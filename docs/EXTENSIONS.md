@@ -97,6 +97,8 @@ python3 tools/extensions/pipeline.py import-legacy \
 
 ## CI 只做增量
 
+项目检查使用 `.github/workflows/project-ci.yml`，只响应分支 push 和 pull request，扩展与索引 Release tag 不启动检查。旧路径 `ci.yml` 已从主分支移除，并在 GitHub 中禁用该工作流；这是为了覆盖仍指向旧固定构建提交的 tag，因为这些提交保留了旧的无筛选 push 配置。不要重新启用旧工作流。新增项目 CI 保持启用，初次本地批量发布无需停掉分支检查。
+
 `.github/workflows/extensions.yml` 每六小时或手动执行，先读私有最新 checkpoint，再跟进上游 main 的固定提交。缺少已完成的本地 baseline 时在 plan 阶段拒绝，不会启动首次全量 matrix。默认每次最多 12 包，手动上限 24，并发最多 2；共享库/host 变化产生的积压按多次运行消化。不自动重试所有未变更的确定失败。
 
 plan/build jobs 只有 contents:read，checkout 不保留 git 凭据；上游 Gradle 子进程移除 GitHub token。三个 job 均用 setup-node 固定 Node 24.15.0，材料 catalog 的读取不需要 npm install；publish 的非递归 checkout 已含桥源码、协议与固定 WASM 元数据。publish job 单独拥有 contents:write，只读取并复核构建资产，既不运行扩展 Gradle，也不执行生成的 JS。整个 workflow 通过同一 concurrency group 串行更新索引，失败包不阻断其他包的记录。
