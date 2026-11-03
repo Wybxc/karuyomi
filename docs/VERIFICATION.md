@@ -47,13 +47,15 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 独立的[共享 Java HTTP 故障门](verification/cache-http-failures.md)已在官方原 JVM 与 Codex 内置 Chromium 156 的实际 TeaVM 各通过四场景、50 项检查：精确读取 8192 B 后截断或取消、Cache 关闭后同目录重开、半成品不可见、旧完整条目保留及网络恢复。另观察到本地 HTTP/1 中继两次真实 RST 和四条原点响应关闭，正式 runner 退出 0；不推广为生产 HTTP/2、HTTP/3 或真实 Access 取消。
 
-已有新 Cache 材料的 Arknights/CuuTruyen 在线图片分项见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)，仍未实测其冷/热 Cache 命中。生产 Access 动态链、正式 Source Cache/取消、Native Java 与 Cache/files 组合压力仍待验收；机制与受控 Java 场景不代替这些门。
+已有新 Cache 材料的 Arknights/CuuTruyen 在线图片分项见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)，仍未实测其冷/热 Cache 命中。固定 `b4f72f7` 的新 AOT 随后通过[原 xkcd 元数据 fresh Cache 复验](verification/source-network-cache.md)：cold HTTP 200 并提交 7187 B，warm 实际 store entry / 正文读取 / EOF / close，零上游请求；两次页列表摘要相同。原图片 cacheless 仍各自请求网络，无 304 结论。生产 Access、更广 Source / 取消与 Native Java 仍待验收；机制与受控 Java 场景不代替这些门。
+
+真实 manager/加载器/产品 Worker 与受控 TS ABI 在内置 Chromium 156 通过[namespace 与组合存储 11 组](verification/runtime-storage-namespace.md)：实际构建替换和 manager 重建后 IDB 数据保留、四维隔离，以及同一真实派生键下 Cache/files 各 128 MiB allocated、完整分块读回与清理。没有修改 usage 伪造边界；不代表 Java/官方 Source、生产 Access、Native 或进程/物理磁盘资源门。
 
 ## 有界普通文件分项
 
 `5148c60` 已将普通文件改为 typed idb inode/chunk、64 KiB 二进制 JSO、稀疏文件、配额与 Web Locks owner。数据、路径、长度及账本同事务，提交后才更新 cursor/ACK；rename/unlink 保留打开 inode，失败关闭可显式重试。真实浏览器机制、原 JVM 和实际 TeaVM 的共享 File/RandomAccessFile/Okio 场景分别通过；首次实际 TeaVM 门发现的 EOF/unsigned 差异由项目自有 JCL 适配修复，没有修改 vendor 或扩展 JAR。
 
-固定预算、原始失败与最终输入身份见[文件证据](verification/file-storage-runtime.md)和[设计](design/runtime-file-storage.md)。普通 files namespace 的逻辑/allocated 预算已经实施；与独立 Cache 的合计限额、正式 Source、Native 和设备资源测量仍未完成，见[存储计划](plan/runtime-storage.md)。
+固定预算、原始失败与最终输入身份见[文件证据](verification/file-storage-runtime.md)和[设计](design/runtime-file-storage.md)。普通 files namespace 的逻辑/allocated 预算已经实施；与独立 Cache 的既定分区及实际组合压力已通过上述受控 ABI 门；正式 Source、Native、产品切换和设备资源测量仍待验，见[存储计划](plan/runtime-storage.md)。
 
 ## 阅读连续性分项
 
@@ -213,7 +215,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
-- 真实 Source 的冷热 Cache、截断网络/取消异常对照、Cache/files 组合压力及版本/身份切换；Cache 跨目录 namespace 39 组预算机制已通过。
+- 更广 Source / Native 的冷热 Cache、真实 Source 截断 / 取消及正式扩展/Flutter 的版本/身份切换；xkcd Web 元数据 fresh Cache 已单独通过，Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换已通过，不能替代产品门。
 - 正式 Native 主入口人工操作、后台恢复与新默认 Cache 的 Native Java 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。

@@ -9,6 +9,8 @@
     "text-layout-browser-suite.ts",
     "bitmap-lifetime-browser-suite.ts",
     "bitmap-lifetime-java-browser-suite.ts",
-    "cache-failure-java-browser-worker.ts"
+    "cache-failure-java-browser-worker.ts",
+    "storage-namespace-browser-suite.ts",
+    "fixtures/storage-namespace-host.ts"
   ]
 }
