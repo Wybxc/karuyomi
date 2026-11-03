@@ -95,11 +95,15 @@ node .local/cache-java/server-policy.ts
 
 改桥或测试后重新运行命令以生成新产物；改 Java 后先重新运行 build。Java runner 使用正式 `prepareSources`、`compileExtension`、`compileBridge`，隔离自身 Maven/workerd state；不要复用正在运行的发布器目录。新 Java 报告为 `.local/cache-java/policy-browser-result.json`，维护文档只保留有用结论。
 
+## Native 引擎分项
+
+固定 `31555e8` 的相同三份编译字节已在 iOS WKWebView 与 Android WebView 133 通过完整 39 组及最终容器销毁，详细输入、正常 TLS 与复验命令见[Native Cache 记录](cache-v3-native.md)。这不包含 Java CacheInterceptor、正式 Source 或 Native 文件通道。
+
 ## 未通过的后续门
 
 - body metadata/pin/usage 记录损坏恢复、清理事务持续失败，以及更广的存储损坏恢复尚未验证；六类 chunk 门不能替代这些情况。
 - 共享 Java 场景尚未覆盖截断网络正文、网络半途取消及更广的异常类型对照；桥上的 reader-close/read abort 不等于完整 Java HTTP 取消门。
-- 新 host 输入的扩展 AOT、正式 Source、扩展版本与 storage namespace 切换、生产 Access、Native 和设备资源测量须另验。
+- 新 host 输入的三源 AOT、Web Source 元数据与首中末图片已通过[分项复验](cache-v3-sources.md)；正式 Source Cache、扩展版本与 storage namespace 切换、生产 Access、Native Java 链和设备资源测量须另验。
 - allocated 是 current/staging/pinned-retired 正文及响应 metadata 的逻辑预算，另有结构 reservation，不是浏览器物理磁盘占用。跨目录 namespace 上限已实现并通过上述门；Cache/files 组合压力、origin 所有 namespace 总占用与设备峰值仍未测量。
 
 实施目标与后续顺序见 [运行时文件与 HTTP Cache 计划](../plan/runtime-storage.md)。

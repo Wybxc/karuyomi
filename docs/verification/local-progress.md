@@ -31,3 +31,5 @@
 同日，固定 `d76e8a4` 的 iOS 模拟器通过原 xkcd 正式 CatalogController/ChapterReaderRoute/ReaderScreen：真实图片 frame 后翻到末页并显式读完，SQLite 保存 current/far/completed；实际 terminate/launch 后，用同一 HTTPS origin 与受信测试 subject 恢复原章末页及完成状态。入口和 Pointer 为测试驱动，Source/JAR、阅读组件和 SQLite 是正式实现；不等同于生产 Access、物理触控、Android Source 或整套日用流程。完整输入与报告见[Native 记录](native-dependencies.md)。
 
 固定 `8eef7b4`（`d76e8a4` 加 Android channel 所有权修复）的 Android API 36 模拟器也通过原 xkcd 正式 ReaderScreen：两页及 Source 文字图、显式读完、route/provider 清理和最终 WebView dispose。两次真实 force-stop/relaunch 均恢复同安装 SQLite 的 current/furthest/completed；最终入口等待正式界面“本地进度已保存”后截图，再验证退出落盘。原 d76 的双 dispose 失败及首次 pre-flush 截图保留，完整身份和隔离 localhost CA 范围见[Native 记录](native-dependencies.md#android-独立-debug-app-的-tlssource-与退出复验)。这仍是受控测试入口，不代表物理设备、正式主入口人工操作、生产 Access 或后续 Cache v3 材料已通过。
+
+固定 `31555e8` 的新 Cache v3 材料在正式 Flutter Web xkcd 两章阅读、显式完成及关标签页后 current/furthest/completed 恢复上通过分项，但首次恢复的文字图为空黑，翻页后才显示。整轮 UI 报告保持失败；这不否定持久状态恢复，也不能被后续翻页成功覆盖。输入、截图及剩余视觉门见[新材料 Source 记录](cache-v3-sources.md#正式-flutter-阅读与恢复中的限制)。

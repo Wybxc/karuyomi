@@ -196,6 +196,12 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 固定 `8eef7b4`（`d76e8a4` 加 `6c2e09c`）的 Android 模拟器进一步通过原 xkcd 正式 ReaderScreen 两页、Source 文字图、显式完成和两次 force-stop 后 SQLite 恢复，最终 route/provider/WebView 退出也通过。修复文件 sink 与 controller 重复销毁 channel 的所有权错误，保留旧失败；最终截图等待正式“本地进度已保存”，与早期 pre-flush 截图分别留证。测试 CA 仅配置在独立 ignored debug App 的 exact localhost，系统 CA 保留，错误 CA/未配置域名均拒绝；不是生产 Access 或真机证据。完整输入、报告与限制见[Native 记录](verification/native-dependencies.md#android-独立-debug-app-的-tlssource-与退出复验)。
 
+## Cache v3 的新材料复验
+
+固定 `31555e8` 的三源新 AOT 已在内置 Chromium 156 通过正式 Source 元数据与图片链：xkcd 两页含原 TextInterceptor 文字图，Arknights 51 页首中末、CuuTruyen 23 页 DRM 引用首中末均解码、释放并关闭会话。输入与完整 EOF 范围见[三源记录](verification/cache-v3-sources.md)；不以此宣称 Cache 命中或取消通过。
+
+同一 Cache 桥及官方 39 组 Worker/suite 字节在 iOS/Android 模拟器均通过 IndexedDB/Web Locks/Worker 机制和最终 dispose，见[移动引擎记录](verification/cache-v3-native.md)。这不替代 Native Java/Source、生产 Access 或真机门。
+
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。

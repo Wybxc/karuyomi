@@ -25,6 +25,8 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 阅读连续性三个实现里程碑已接通：保留 Source 原序/反序与重复章节，用包含漫画/Source 作用域的章节键在同一 route 切章；新叶等旧调度、图片 pin、provider 清理确认后才安装。路由退出时，迟到 pages 与尚未挂载的新 provider 均有明确关闭者。有界下一章在真实末页 frame、窗口与 Source 空闲后自动准备，邻章不取图片；清理失败保留 owner 并阻止继续占用会话。正式目录/详情/Reader 已注入受信身份与 Drift 进度，SQLite 文件关闭重开回归通过；真实 Arknights 连续切章及关标签页重开的章节/页码/顺序恢复已通过，见[Web 产品进度](../verification/reader-progress-web.md)；iOS/Android 模拟器原 xkcd 的正式 ReaderScreen 已分别通过受控入口下真实进程重启恢复章节、末页和完成状态；浏览器进程退出、当前 Cache v3 材料、真机与完整日用流程仍待验收，另见[阅读记录](../verification/reader-continuity.md)与[进度记录](../verification/local-progress.md)。
 
+固定 `31555e8` 的 Cache v3 新材料已通过 Web 三源元数据与首中末图片分项，xkcd 正式 Flutter 两章阅读和显式完成也通过。但关标签页后虽恢复原章末页与完成状态，文字图首次显示为空黑，翻页后才正常；首次恢复视觉门仍失败，见[当前材料记录](../verification/cache-v3-sources.md)。继续修复并以相同输入重验，不能由旧材料通过或状态恢复替代显示验收。
+
 存储细分推进见[运行时文件与 HTTP Cache](runtime-storage.md)，editor 生命周期机制门与原 JVM/正文语义门分别记录。
 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 已通过压缩、重定向、Cookie、HEAD/206、204/205/304、精确 Range、urlencoded/multipart、流式上传、截断上传/响应和三类取消门。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常；这些 Worker 分项不代替正式 Source/cache 或 Java 同版全部语义对照。当前只维护 v2，旧包需要重新构建。

@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。正式 Source、Native Cache 及同一 namespace 的 Cache/files 组合压力尚未完成。
+为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。iOS/Android 模拟器的 Cache 桥 39 组机制及最终容器销毁也已通过；正式 Source Cache、Native Java 链及同一 namespace 的 Cache/files 组合压力尚未完成。
 
 已有浏览器桥机制门覆盖正常持久化、namespace 隔离、Cache editor 竞争/CAS 和文件 rename/unlink；图片 JVM oracle 明确使用 cacheless 链，不是 HTTP Cache 语义验收。证据参见 [Worker 桥](../verification/worker-bridges.md)，P0 总目标参见 [运行时计划](p0-runtime-and-reading.md)。
 
@@ -38,6 +38,8 @@
 - `pnpm teavm:check` 已接入 CacheSink 正式 JVM 边界门：19 项检查覆盖 65536/65536/7 分块、额外未请求字节保留、写入/提交拒绝、存储异常和关闭期间的计数及终态。正式 Cache/Bridge 六源 javac、严格 TS 和 bridge unit 6/6 均通过；这些结果不代替实际 TeaVM JSO、CacheInterceptor 或 Source 验收。
 
 2026-11-04，主代理 Codex 内置浏览器 Chromium 156 使用正式 compileBridge 产物通过 **39 组**：保留原 27 组生命周期、chunk 损坏及真实事务失败门，新增 namespace 预算矩阵。以生产长度 64hex namespace 和真实 8 KiB 块填满 128 MiB/16384 chunks，另以 64 KiB 块验证两 Worker 竞争最后一个正文字节；验证跨目录 LRU/retired pin、全域 reader/editor/owner、metadata/UTF-8、小 chunk 放大、目录 tombstone、pending 清理旁路、死亡 owner 跨目录回收和账本真实 abort。测试没有篡改 usage 假装正文边界。正式入口 `node tools/teavm/check-cache-storage.ts` 提供 loopback 页面并等待内置浏览器，报告编译字节摘要并在通过后退出；不是自动 CI 浏览器门。单次恢复延时不是性能分布。Body metadata/pin/usage 本身损坏、持续清理失败及完整 Java HTTP 取消另验。Java Cache 场景的 no-cache/POST 对照见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)；正式 Source 仍须使用新 AOT 身份验收。
+
+同日，固定 `31555e8` 的 iOS 26.4 Simulator WKWebView 与 Android API 36 / WebView 133 均以完全相同的桥、Worker 与 suite 字节通过 39 组，最终 Headless WebView dispose 成功。正常系统 TLS 验证、平台与 UA 差异、失败保留及复验命令见[Native Cache 机制证据](../verification/cache-v3-native.md)。这是移动引擎的 IndexedDB/Web Locks/Worker 门，不能替代 Native Source 或 Java CacheInterceptor。
 
 ## 阶段三：有界普通文件
 
