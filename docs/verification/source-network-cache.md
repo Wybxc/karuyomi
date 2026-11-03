@@ -1,6 +1,6 @@
 # Source 默认 HTTP Cache 配置
 
-状态：**宿主配置已修复并通过 JVM / TeaVM 配置门；真实 Source 缓存仍待新 AOT 复验**。本项不替代 [Cache 正文与失败语义](http-cache-runtime.md)、[namespace 机制门](cache-v3-native.md) 或 [31555e8 三源在线门](cache-v3-sources.md)。
+状态：**宿主配置已修复；新固定 AOT 的原 xkcd Source 已在 Web 实测 metadata fresh Cache 正文复用**。本轮没有发生 304，图片保持原 cacheless 行为。本项不替代 [Cache 正文与失败语义](http-cache-runtime.md)、[namespace 机制门](cache-v3-native.md) 或 [31555e8 三源在线门](cache-v3-sources.md)。
 
 ## 已复现的缺口
 
@@ -42,6 +42,52 @@ pnpm teavm:check
 
 小门使用同份 `NetworkHelperTest.run()`，通过正式 `compileExtension` 复制当前 owned 源码、物化固定上游补丁、裁剪 seed 并将 mainClass 设为 `prototype.NetworkHelperProbe`。本机编排与原始报告位于 ignored `.local/network-configuration/`：`node .local/network-configuration/build.ts` 构建，`node .local/network-configuration/server.ts` 输出随机 loopback URL，内置浏览器打开后自动运行。它们是本次执行材料，不是自动 CI 浏览器入口；可维护的 Java fixture 与正式 JVM 入口已入源码。
 
-## 下一门
+## 原 Source 新 AOT 在线复验
 
-提交后从新固定提交重新生成完整 input 计划，仅本地重建原 xkcd JAR 的 AOT，保持严格原 JAR 摘要与新材料身份。沿正式链重复 metadata pages cold / warm，并观察 store entry、commit、正文读取及实际 HTTP 200 / 304 流水。fresh reuse、304 重验证、上游不允许缓存和 store 错误必须分别报告，不能为取图命中修改原请求头或启用图片 Cache；观察不到时继续保留 `not_demonstrated`。
+2026-11-04，主代理在 Codex 内置 Chromium 156 执行新固定树的观察夹具，原报告 `finished=true`、`metadataResult=fresh_store_body_reused_without_upstream`。树固定于 `b4f72f70804f12caef21bb51a17cb5adad6982d4`，构建前后跟踪输入干净；完整计划发现 1448 包、发现失败 0，仅本地重建原 xkcd 1.6.1。官方 Gradle 使用相同 debug keystore 重产原 JAR，摘要精确一致，没有改 Source 业务源码或 JAR。
+
+| 固定输入 / 输出             | 身份                                                               |
+| --------------------------- | ------------------------------------------------------------------ |
+| hostFingerprint             | `46e63625a0e1920d284c1077de8aca939f8948d1e50694259834f0846844e0db` |
+| inputFingerprint            | `b33800f6d02ddab83b60b6d7ac85b49db7bd85ba625ee77cead3c22a5ca76de5` |
+| buildId                     | `ext-all.xkcd-b33800f6d02ddab83b60b6d7ac85b49d`                    |
+| 原 JAR，125470 字节         | `4071fdc5b90c473938d33f7e94c71b2a1a79fb33a00a32d0baa035ac4697cc9d` |
+| manifest SHA-256            | `6c5af3b869c190302b58de0845c2611941e7af5fc2f39d012f24016744592c07` |
+| canonical AOT，4038599 字节 | `4d6f571a4d4e806512a9d28fc8a2f93f59a44bbe5c02a6eec809f90f2579ad02` |
+| gzip，852898 字节           | `f70cce3a54c4fa2c5ac30d1668ee4b2898edc45fe787cca40692ccdb51a6657f` |
+| materialVersion             | `63a061a11e24d1bd9a27bbe453960768035229afe3665be96d3302182d887a9d` |
+| 原报告 SHA-256              | `211ab6ed7a3bc3852ed229a8612c82453de7ca04d64b4298ee03b895ebfc4cb4` |
+
+协议身份为 protocol 2 / host ABI v3 / bridge 2。新树正式 runtime-host 重新编译，六个共享材料的摘要、大小和路径与 manifest 逐项一致；没有混用旧 AOT。原 Worker、观察后缀与合并 Worker 的精确 SHA 保存在报告，观察后缀只透传包装 Cache 控制及二进制读写，未改变 Source 请求头、桥材料或返回结果。隔离 D1 仅批准 `xkcd.com`、`imgs.xkcd.com`，Access 使用受控 RS256 测试身份。
+
+| 实际操作                                  | store 观察                                                  | 真实上游网络                              | 结果                                                      |
+| ----------------------------------------- | ----------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
+| 原章节 `/3318/` pages cold                | get 1、miss 1、begin 1、commit 1；2 次写入共 7187 字节      | 1 次 200，正文 7187 字节                  | 原正文完整缓存                                            |
+| 同章节 pages warm                         | get 1、entry 1；3 次读取共 7187 字节、EOF 1、reader-close 1 | 0 次                                      | fresh store 正文复用                                      |
+| 原 direct PNG，同一 Page 会话 cold / warm | 两轮所有 Cache 计数均为 0                                   | 各 1 次 200，正文各 106037 字节且摘要相同 | 保持 cacheless；两轮均解码 607×716，release / revoke 通过 |
+
+metadata 两轮均返回 2 页，PageList 摘要一致，每次 Page 会话关闭均有确认，观察器错误为 0，最后 dispose 完成。真实响应被缓存的 metadata 为 `Cache-Control: max-age=300`，带 ETag；本轮发生的是有效期内复用，没有向上游发起重验证，**不能据此宣称原 Source 的 304 门通过**。这里的 get / commit / read 是 store 事件，不是 Java CacheInterceptor 的精确 request/network/hit 计数，也没有以网络减少或 Source 自有 memo 代替正文复用证据。
+
+可复验目录为 `/Users/wybxc/.codex/worktrees/source-network-cache-validation/karuyomi`，ignored 输入和完整命令保存在 `.local/network-cache-source/README.md`、`build-summary.json` 与 `cache-observation/preparation.json`。使用仓库固定 Node / pnpm，在该固定树执行：
+
+```sh
+node scripts/prepare-runtime.ts --android
+node tools/extensions/pipeline.ts plan \
+  --state .local/network-cache-source/state.json \
+  --output .local/network-cache-source/full-plan.json --limit 10000
+# descriptor 从本次完整计划取准确的 all.xkcd 条目。
+node scripts/build-extension.ts \
+  --descriptor .local/network-cache-source/xkcd/descriptor.json \
+  --output .local/network-cache-source/xkcd
+pnpm --filter @karuyomi/runtime-host build
+node .local/network-cache-source/cache-observation/prepare.ts
+SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
+SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
+SOURCE_PROBE_IMAGES=1 SOURCE_PROBE_PORT=8918 \
+SOURCE_PROBE_EVIDENCE=.local/network-cache-source/cache-observation/result.json \
+node .local/network-cache-source/cache-observation/server.ts \
+  .local/network-cache-source/xkcd/manifest.json \
+  .local/network-cache-source/xkcd/artifacts
+```
+
+观察器从该固定树的正式 `source-metadata-probe.ts` 重生成，client / Worker / server 三份严格 TypeScript 检查通过。内置浏览器在新 loopback origin 单次点击 Run；重跑应另存报告并区分已存在的持久 Cache，不能将热状态伪称冷请求。原报告位于 `.local/network-cache-source/cache-observation/result.json`；旧 `31555e8` 的零 store 报告原样保留。本轮只验 Web 原 Source fresh metadata 复用，不代表生产 Access、Native Source Cache、304 重验证、性能或其它 Source。
