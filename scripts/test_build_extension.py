@@ -27,6 +27,12 @@ builder = module("builder_test", "build-extension.py")
 
 
 class SeedBoundary(unittest.TestCase):
+    def test_checked_in_android_metadata_matches_its_lock(self):
+        for name, entry in prepare.LOCK["android"]["metadata"].items():
+            with self.subTest(metadata=name):
+                content = (ROOT / "runtime/teavm" / entry["path"]).read_bytes()
+                self.assertEqual(hashlib.sha256(content).hexdigest(), entry["sha256"])
+
     def archive(self, directory, names, symlink=False):
         seed = directory / "seed.tar.gz"
         with tarfile.open(seed, "w:gz") as archive:

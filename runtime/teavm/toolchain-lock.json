@@ -109,15 +109,15 @@
     "metadata": {
       "platform": {
         "path": "toolchain/platform.xml",
-        "sha256": "9efedaa8306dc2b690b3ed328b417f19dde7537000701fc761241c6b6ed94c32"
+        "sha256": "bd314eb47f8640c69c2bc095a65de2a141487f2e31e1a8d66874bb98e8bdce87"
       },
       "build-tools": {
         "path": "toolchain/build-tools.xml",
-        "sha256": "4bda9eb99979d0d0af13821b250479a94fa021cf4cfdf284a207068e36dddadc"
+        "sha256": "15389dafe03375e140baebd2251dd40e2f3e220f9a57ca42d414c0dbc03ae399"
       },
       "platform-tools": {
         "path": "toolchain/platform-tools.xml",
-        "sha256": "55d46ccebf3bba4ad4349d3747643bb0ed38aac843ce6c87782b009328f73e1e"
+        "sha256": "0f8f242230304f6190629e032e4988d5f5fd7c6f55e4af5e94f92a46fd3b8404"
       },
       "license": {
         "path": "toolchain/license.txt",
