@@ -1,0 +1,39 @@
+--- a/TRelCompositeGroupQuantifierSet.java
++++ b/PatchedRelCompositeGroupQuantifierSet.java
+@@ -41,9 +41,9 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-class TRelCompositeGroupQuantifierSet extends TCompositeGroupQuantifierSet {
++class PatchedRelCompositeGroupQuantifierSet extends TCompositeGroupQuantifierSet {
+ 
+-    public TRelCompositeGroupQuantifierSet(TQuantifier quant, TAbstractSet innerSet, TAbstractSet next, int type,
++    public PatchedRelCompositeGroupQuantifierSet(TQuantifier quant, TAbstractSet innerSet, TAbstractSet next, int type,
+             int setCounter) {
+         super(quant, innerSet, next, type, setCounter);
+     }
+@@ -51,6 +51,7 @@
+     @Override
+     public int matches(int stringIndex, CharSequence testString, TMatchResultImpl matchResult) {
+         int enterCounter = matchResult.getEnterCounter(setCounter);
++        int previousCounter = enterCounter;
+ 
+         if (!innerSet.hasConsumed(matchResult)) {
+             return next.matches(stringIndex, testString, matchResult);
+@@ -71,13 +72,15 @@
+                 nextIndex = innerSet.matches(stringIndex, testString, matchResult);
+             } else {
+                 matchResult.setEnterCounter(setCounter, 0);
+-                return nextIndex;
++                if(nextIndex < 0)matchResult.setEnterCounter(setCounter, previousCounter);
++        return nextIndex;
+             }
+         } else {
+             matchResult.setEnterCounter(setCounter, ++enterCounter);
+             nextIndex = innerSet.matches(stringIndex, testString, matchResult);
+         }
+ 
++        if(nextIndex < 0)matchResult.setEnterCounter(setCounter, previousCounter);
+         return nextIndex;
+     }
+ }

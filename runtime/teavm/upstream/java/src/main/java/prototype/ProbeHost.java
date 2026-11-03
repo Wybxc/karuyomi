@@ -1,3 +1,0 @@
-package prototype;import org.teavm.jso.JSExport;
-/** Separate entry point: semantic tests do not become reachable in plugin bundles. */
-public final class ProbeHost{public static void main(String[] args){}@JSExport public static void hostInit(String ua){TeaHost.hostInit(ua);}@JSExport public static void probes(){TeaHost.probes();}@JSExport public static void improvementProbes(){new Thread(()->{try{TeaHost.done(ImprovementProbe.run());}catch(Throwable t){TeaHost.fail(TeaHost.describe(t));}}).start();}@JSExport public static void graphicsProbes(){new Thread(()->{try{TeaHost.done(GraphicsProbe.run());}catch(Throwable t){TeaHost.fail(TeaHost.describe(t));}}).start();}}

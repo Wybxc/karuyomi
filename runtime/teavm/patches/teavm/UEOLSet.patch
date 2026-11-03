@@ -1,0 +1,35 @@
+--- a/TUEOLSet.java
++++ b/PatchedUEOLSet.java
+@@ -41,11 +41,11 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-final class TUEOLSet extends TAbstractSet {
++final class PatchedUEOLSet extends TAbstractSet {
+ 
+     private int consCounter;
+ 
+-    public TUEOLSet(int counter) {
++    public PatchedUEOLSet(int counter) {
+         this.consCounter = counter;
+     }
+ 
+@@ -54,14 +54,16 @@
+         int rightBound = matchResult.hasAnchoringBounds() ? matchResult.getRightBound() : testString.length();
+ 
+         if (strIndex >= rightBound) {
++            matchResult.hitEnd = true; matchResult.requireEnd = true;
+             matchResult.setConsumed(consCounter, 0);
+             return next.matches(strIndex, testString, matchResult);
+         }
+         // check final line terminator;
+ 
+         if ((rightBound - strIndex) == 1 && testString.charAt(strIndex) == '\n') {
+-            matchResult.setConsumed(consCounter, 1);
+-            return next.matches(strIndex + 1, testString, matchResult);
++            matchResult.hitEnd = true; matchResult.requireEnd = true;
++            matchResult.setConsumed(consCounter, 0);
++            return next.matches(strIndex, testString, matchResult);
+         }
+ 
+         return -1;

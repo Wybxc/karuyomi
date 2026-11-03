@@ -17,7 +17,6 @@ public class TeaHost {
  @JSExport public static String sourceInfo(){JsonArray a=new JsonArray();for(Source s:sources){JsonObject x=new JsonObject();x.addProperty("id",Long.toString(s.getId()));x.addProperty("name",s.getName());x.addProperty("lang",s.getLang());x.addProperty("supportsLatest",s.getSupportsLatest());if(s instanceof eu.kanade.tachiyomi.source.online.HttpSource)x.addProperty("baseUrl",((eu.kanade.tachiyomi.source.online.HttpSource)s).getBaseUrl());a.add(x);}return a.toString();}
  public static int load(){try{Object entry=new keiyoushi.source.Generated();sources=entry instanceof SourceFactory?((SourceFactory)entry).createSources():List.of((Source)entry);source=sources.get(0); return sources.size();}catch(Throwable t){StringBuilder b=new StringBuilder(t.toString());for(StackTraceElement e:t.getStackTrace())b.append("\n").append(e);fail(b.toString());return -1;}}
  public static String select(String id){source=sources.stream().filter(s->Long.toString(s.getId()).equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("Unknown Source "+id));manga=null;chapters=null;pages=null;return source.getName();}
- public static void probes(){new Thread(()->{try{done(CompatibilityProbe.run());}catch(Throwable t){fail(describe(t));}}).start();}
  /** Product RPC: explicit references and complete DTOs; no hidden selected manga. */
  @JSExport public static void hostInvoke(String sourceId,String operation,String argsJson) {
   new Thread(()->{

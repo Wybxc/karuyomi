@@ -1,0 +1,251 @@
+--- a/TLexer.java
++++ b/PatchedLexer.java
+@@ -43,7 +43,7 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-class TLexer {
++class PatchedLexer {
+ 
+     public static final int CHAR_DOLLAR = 0xe0000000 | '$';
+ 
+@@ -216,12 +216,12 @@
+     // original string representing pattern
+     private String orig;
+ 
+-    public TLexer(String pattern, int flags) {
++    public PatchedLexer(String pattern, int flags) {
+         orig = pattern;
+         if ((flags & TPattern.LITERAL) > 0) {
+             pattern = TPattern.quote(pattern);
+         } else if ((flags & TPattern.CANON_EQ) > 0) {
+-            pattern = TLexer.normalize(pattern);
++            pattern = PatchedLexer.normalize(pattern);
+         }
+ 
+         this.pattern = new char[pattern.length() + 2];
+@@ -258,7 +258,7 @@
+             this.mode = mode;
+         }
+ 
+-        if (mode == TLexer.MODE_PATTERN) {
++        if (mode == PatchedLexer.MODE_PATTERN) {
+             reread();
+         }
+     }
+@@ -365,7 +365,7 @@
+             lookAhead = (index < pattern.length) ? nextCodePoint() : 0;
+             lookAheadST = null;
+ 
+-            if (mode == TLexer.MODE_ESCAPE) {
++            if (mode == PatchedLexer.MODE_ESCAPE) {
+                 if (lookAhead == '\\') {
+ 
+                     // need not care about supplementary codepoints here
+@@ -405,7 +405,10 @@
+                             negative = true;
+                         }
+                         try {
+-                            lookAheadST = TAbstractCharClass.getPredefinedClass(cs, negative);
++                            lookAheadST = (flags & TPattern.CASE_INSENSITIVE) != 0
++                                    && (cs.equals("Lu") || cs.equals("Ll") || cs.equals("Lt"))
++                                    ? new CasedLetterProperty(negative)
++                                    : TAbstractCharClass.getPredefinedClass(cs, negative);
+                         } catch (MissingResourceException mre) {
+                             throw new TPatternSyntaxException("", this.toString(), index);
+                         }
+@@ -424,9 +427,15 @@
+                         break;
+                     }
+ 
++                    case 'R': {
++                        if(mode != MODE_PATTERN)throw new TPatternSyntaxException("Illegal escape sequence",orig,index-1);
++                        lookAhead = 0x80000000 | 'R';
++                        break;
++                    }
++
+                     case 'Q': {
+                         savedMode = mode;
+-                        mode = TLexer.MODE_ESCAPE;
++                        mode = PatchedLexer.MODE_ESCAPE;
+                         reread = true;
+                         break;
+                     }
+@@ -459,7 +468,7 @@
+                     case '7':
+                     case '8':
+                     case '9': {
+-                        if (mode == TLexer.MODE_PATTERN) {
++                        if (mode == PatchedLexer.MODE_PATTERN) {
+                             lookAhead = 0x80000000 | lookAhead;
+                         }
+                         break;
+@@ -469,7 +478,8 @@
+                         lookAhead = readOctals();
+                         break;
+                     case 'x':
+-                        lookAhead = readHex(2);
++                        lookAhead = index < pattern.length - 2 && pattern[index] == '{'
++                                ? readCodePointHex() : readHex(2);
+                         break;
+                     case 'u':
+                         lookAhead = readHex(4);
+@@ -514,7 +524,6 @@
+                     case 'M':
+                     case 'N':
+                     case 'O':
+-                    case 'R':
+                     case 'T':
+                     case 'U':
+                     case 'V':
+@@ -535,7 +544,7 @@
+                     default:
+                         break;
+                 }
+-            } else if (mode == TLexer.MODE_PATTERN) {
++            } else if (mode == PatchedLexer.MODE_PATTERN) {
+                 switch (lookAhead) {
+                     case '+':
+                     case '*':
+@@ -543,17 +552,17 @@
+                         char mod = (index < pattern.length) ? pattern[index] : '*';
+                         switch (mod) {
+                             case '+': {
+-                                lookAhead = lookAhead | TLexer.QMOD_POSSESSIVE;
++                                lookAhead = lookAhead | PatchedLexer.QMOD_POSSESSIVE;
+                                 nextIndex();
+                                 break;
+                             }
+                             case '?': {
+-                                lookAhead = lookAhead | TLexer.QMOD_RELUCTANT;
++                                lookAhead = lookAhead | PatchedLexer.QMOD_RELUCTANT;
+                                 nextIndex();
+                                 break;
+                             }
+                             default: {
+-                                lookAhead = lookAhead | TLexer.QMOD_GREEDY;
++                                lookAhead = lookAhead | PatchedLexer.QMOD_GREEDY;
+                                 break;
+                             }
+                         }
+@@ -676,11 +685,11 @@
+                         break;
+                     case '[': {
+                         lookAhead = CHAR_LEFT_SQUARE_BRACKET;
+-                        setMode(TLexer.MODE_RANGE);
++                        setMode(PatchedLexer.MODE_RANGE);
+                         break;
+                     }
+                     case ']': {
+-                        if (mode == TLexer.MODE_RANGE) {
++                        if (mode == PatchedLexer.MODE_RANGE) {
+                             lookAhead = CHAR_RIGHT_SQUARE_BRACKET;
+                         }
+                         break;
+@@ -697,7 +706,7 @@
+                     default:
+                         break;
+                 }
+-            } else if (mode == TLexer.MODE_RANGE) {
++            } else if (mode == PatchedLexer.MODE_RANGE) {
+                 switch (lookAhead) {
+                     case '[':
+                         lookAhead = CHAR_LEFT_SQUARE_BRACKET;
+@@ -729,7 +738,7 @@
+         if (index < pattern.length - 2) {
+             // one symbol family
+             if (pattern[index] != '{') {
+-                return "Is" + new String(pattern, nextIndex(), 1); //$NON-NLS-1$
++                return propertyName(new String(pattern, nextIndex(), 1));
+             }
+ 
+             nextIndex();
+@@ -751,10 +760,24 @@
+         }
+ 
+         String res = sb.toString();
++        if (res.startsWith("Is") && res.length() == 3) {
++            return propertyName(res.substring(2));
++        }
+         if (res.length() == 1) {
+-            return "Is" + res;
++            return propertyName(res);
+         }
+         return (res.length() > 3 && (res.startsWith("Is") || res.startsWith("In"))) ? res.substring(2) : res;
++    }
++
++    private static String propertyName(String name) {
++        // TeaVM's predefined table spells the Number family without an Is prefix.
++        if (name.equals("N")) {
++            return name;
++        }
++        // This class is transplanted into the JCL by TeaTransformer. Keep the
++        // concatenation explicit: the transplanted invokedynamic concat recipe
++        // loses its constant prefix in TeaVM 0.16.
++        return new StringBuilder("Is").append(name).toString();
+     }
+ 
+     /**
+@@ -803,15 +826,15 @@
+ 
+         switch (mod) {
+             case '+':
+-                lookAhead = TLexer.QUANT_COMP_P;
++                lookAhead = PatchedLexer.QUANT_COMP_P;
+                 nextIndex();
+                 break;
+             case '?':
+-                lookAhead = TLexer.QUANT_COMP_R;
++                lookAhead = PatchedLexer.QUANT_COMP_R;
+                 nextIndex();
+                 break;
+             default:
+-                lookAhead = TLexer.QUANT_COMP;
++                lookAhead = PatchedLexer.QUANT_COMP;
+                 break;
+         }
+         return new TQuantifier(min, max);
+@@ -887,6 +910,27 @@
+         }
+ 
+         throw new TPatternSyntaxException("", this.toString(), index);
++    }
++
++    private int readCodePointHex() {
++        nextIndex(); // opening brace
++        int value = 0;
++        boolean digitSeen = false;
++        while (index < pattern.length - 2) {
++            char c = pattern[nextIndex()];
++            if (c == '}' && digitSeen) {
++                return value;
++            }
++            int digit = c >= '0' && c <= '9' ? c - '0'
++                    : c >= 'a' && c <= 'f' ? c - 'a' + 10
++                    : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
++            if (digit < 0 || value > (Character.MAX_CODE_POINT - digit) / 16) {
++                break;
++            }
++            value = value * 16 + digit;
++            digitSeen = true;
++        }
++        throw new TPatternSyntaxException("Illegal hexadecimal escape sequence", orig, index);
+     }
+ 
+     /**
+@@ -1122,4 +1166,15 @@
+     public int getIndex() {
+         return curToc;
+     }
++
++    boolean hasSupplementaryFrom(int start) {
++        // The JDK selects its code-point lookbehind window when the remaining
++        // pattern contains a literal supplementary character or lone surrogate.
++        for (int i = start; i < orig.length(); i++) {
++            if (Character.isSurrogate(orig.charAt(i))) {
++                return true;
++            }
++        }
++        return false;
++    }
+ }

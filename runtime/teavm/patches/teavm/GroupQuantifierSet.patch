@@ -1,0 +1,43 @@
+--- a/TGroupQuantifierSet.java
++++ b/PatchedGroupQuantifierSet.java
+@@ -42,15 +42,38 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-class TGroupQuantifierSet extends TQuantifierSet {
++public class PatchedGroupQuantifierSet extends TQuantifierSet {
+ 
+-    public TGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
++    public PatchedGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
+         super(innerSet, next, type);
+     }
+ 
+     @Override
+     public int matches(int stringIndex, CharSequence testString, TMatchResultImpl matchResult) {
+ 
++        // Atomic code-point ranges cannot alter capture groups. Preserve TeaVM's own
++        // character semantics while avoiding one JavaScript stack frame per character.
++        if (innerSet instanceof TSupplRangeSet || innerSet instanceof TCompositeRangeSet) {
++            int[] positions = new int[64];
++            int count = 0;
++            positions[0] = stringIndex;
++            TAbstractSet saved = innerSet.getNext();
++            innerSet.setNext(TFSet.posFSet);
++            try {
++                while (stringIndex < matchResult.getRightBound()) {
++                    int end = innerSet.matches(stringIndex, testString, matchResult);
++                    if (end <= stringIndex) break;
++                    if (++count == positions.length) positions = java.util.Arrays.copyOf(positions, count * 2);
++                    positions[count] = end;
++                    stringIndex = end;
++                }
++            } finally { innerSet.setNext(saved); }
++            for (; count >= 0; count--) {
++                int end = next.matches(positions[count], testString, matchResult);
++                if (end >= 0) return end;
++            }
++            return -1;
++        }
+         if (!innerSet.hasConsumed(matchResult)) {
+             return next.matches(stringIndex, testString, matchResult);
+         }

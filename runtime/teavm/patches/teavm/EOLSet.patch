@@ -1,0 +1,44 @@
+--- a/TEOLSet.java
++++ b/PatchedEOLSet.java
+@@ -41,10 +41,10 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-final class TEOLSet extends TAbstractSet {
++final class PatchedEOLSet extends TAbstractSet {
+     private int consCounter;
+ 
+-    public TEOLSet(int counter) {
++    public PatchedEOLSet(int counter) {
+         this.consCounter = counter;
+     }
+ 
+@@ -53,6 +53,7 @@
+         int rightBound = matchResult.hasAnchoringBounds() ? matchResult.getRightBound() : testString.length();
+ 
+         if (strIndex >= rightBound) {
++            matchResult.hitEnd = true; matchResult.requireEnd = true;
+             matchResult.setConsumed(consCounter, 0);
+             return next.matches(strIndex, testString, matchResult);
+         }
+@@ -60,6 +61,7 @@
+         // check final line terminator;
+         if ((rightBound - strIndex) == 2 && testString.charAt(strIndex) == '\r'
+                 && testString.charAt(strIndex + 1) == '\n') {
++            matchResult.hitEnd = true; matchResult.requireEnd = true;
+             matchResult.setConsumed(consCounter, 0);
+             return next.matches(strIndex, testString, matchResult);
+         }
+@@ -67,8 +69,11 @@
+ 
+         if ((rightBound - strIndex) == 1) {
+             ch = testString.charAt(strIndex);
++            int left = matchResult.hasAnchoringBounds() ? matchResult.getLeftBound() : 0;
++            if(ch == '\n' && strIndex > left && testString.charAt(strIndex - 1) == '\r')return -1;
+             if (ch == '\n' || ch == '\r' || ch == '\u0085' || (ch | 1) == '\u2029') {
+-                matchResult.setConsumed(consCounter, 0);
++                matchResult.hitEnd = true; matchResult.requireEnd = true;
++            matchResult.setConsumed(consCounter, 0);
+                 return next.matches(strIndex, testString, matchResult);
+             }
+         }

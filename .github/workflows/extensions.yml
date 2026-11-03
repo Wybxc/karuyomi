@@ -1,0 +1,154 @@
+name: Incremental extension AOT releases
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: Maximum changed packages (1-24); never initial bootstrap
+        type: number
+        default: 12
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-release-index
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+      upstream: ${{ steps.plan.outputs.upstream }}
+      host: ${{ steps.plan.outputs.host }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Read private published baseline
+        run: python3 tools/extensions/pipeline.py pull-state --state .local/extensions/state.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Check planner, immutable publisher and descriptor boundary regressions
+        run: |
+          python3 -m unittest discover -s tools/extensions/tests -v
+          python3 scripts/test_build_extension.py
+      - name: Ensure pinned host upstream submodules are present
+        run: git submodule update --init --recursive vendor/teavm vendor/suwayomi-server
+      - name: Follow upstream main without modifying the tracked gitlink
+        run: |
+          git -C vendor/extensions-source fetch --depth=1 origin main
+          git -C vendor/extensions-source checkout --detach FETCH_HEAD
+      - name: Plan bounded changed inputs; refuse missing initial baseline
+        id: plan
+        env:
+          BATCH_SIZE: ${{ inputs.batch_size || 12 }}
+        run: |
+          python3 tools/extensions/pipeline.py plan --ci --state .local/extensions/state.json --output .local/extensions/plan.json --limit "$BATCH_SIZE"
+          python3 - <<'PY'
+          import json, os
+          p = json.load(open('.local/extensions/plan.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('matrix=' + json.dumps({'include': [{'key': e['inputFingerprint']} for e in p['selected']]}, separators=(',', ':')) + '\n')
+              f.write('count=' + str(len(p['selected'])) + '\n')
+              f.write('upstream=' + p['upstreamCommit'] + '\n')
+              f.write('host=' + p['hostFingerprint'] + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-plan
+          path: .local/extensions/*.json
+          include-hidden-files: true
+          retention-days: 7
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Check out exactly the planned upstream source
+        env:
+          UPSTREAM_COMMIT: ${{ needs.plan.outputs.upstream }}
+        run: |
+          git submodule update --init --recursive vendor/teavm vendor/suwayomi-server
+          git -C vendor/extensions-source fetch --depth=1 origin "$UPSTREAM_COMMIT"
+          git -C vendor/extensions-source checkout --detach FETCH_HEAD
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-plan
+          path: .local/extensions
+      - uses: actions/cache@v4
+        with:
+          path: |
+            runtime/teavm/.local/gradle/caches
+            runtime/teavm/.local/gradle/wrapper
+            runtime/teavm/.local/downloads
+            runtime/teavm/.local/runtime-seed
+            runtime/teavm/.local/build-cache
+            runtime/teavm/.local/jdks
+            runtime/teavm/.local/android-sdk
+          key: extension-toolchain-${{ runner.os }}-${{ hashFiles('runtime/teavm/toolchain-lock.json') }}
+      - name: Prepare checksum-locked runtime seed and Android toolchain
+        run: python3 scripts/prepare-runtime.py --android
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Build and validate one isolated package
+        continue-on-error: true
+        env:
+          INPUT_KEY: ${{ matrix.key }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/extensions/pipeline.py build --plan .local/extensions/plan.json --key "$INPUT_KEY" --output "output/$INPUT_KEY" --repository Wybxc/karuyomi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extension-result-${{ matrix.key }}
+          path: output/${{ matrix.key }}
+          retention-days: 7
+          if-no-files-found: warn
+
+  publish:
+    needs: [plan, build]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-plan
+          path: .local/extensions
+      - uses: actions/download-artifact@v4
+        if: needs.plan.outputs.count != '0'
+        with:
+          pattern: extension-result-*
+          path: output
+      - name: Publish immutable packages, then the index checkpoint
+        run: python3 tools/extensions/pipeline.py publish-plan --plan .local/extensions/plan.json --state .local/extensions/state.json --results output --repository Wybxc/karuyomi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extension-published-checkpoint
+          path: .local/extensions/state.json
+          include-hidden-files: true
+          retention-days: 30

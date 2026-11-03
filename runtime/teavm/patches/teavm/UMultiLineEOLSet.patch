@@ -1,0 +1,31 @@
+--- a/TUMultiLineEOLSet.java
++++ b/PatchedUMultiLineEOLSet.java
+@@ -41,11 +41,11 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-class TUMultiLineEOLSet extends TAbstractSet {
++class PatchedUMultiLineEOLSet extends TAbstractSet {
+ 
+     private int consCounter;
+ 
+-    public TUMultiLineEOLSet(int counter) {
++    public PatchedUMultiLineEOLSet(int counter) {
+         this.consCounter = counter;
+     }
+ 
+@@ -55,11 +55,12 @@
+                 ? matchResult.getRightBound() - strIndex
+                 : testString.length() - strIndex;
+         if (strDif <= 0) {
++            matchResult.hitEnd = true; matchResult.requireEnd = true;
+             matchResult.setConsumed(consCounter, 0);
+             return next.matches(strIndex, testString, matchResult);
+         } else if (testString.charAt(strIndex) == '\n') {
+-            matchResult.setConsumed(consCounter, 1);
+-            return next.matches(strIndex + 1, testString, matchResult);
++            matchResult.setConsumed(consCounter, 0);
++            return next.matches(strIndex, testString, matchResult);
+         }
+         return -1;
+     }

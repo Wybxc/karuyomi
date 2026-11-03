@@ -2,7 +2,7 @@
 
 个人漫画阅读应用。Flutter + TeaVM 浏览器宿主，Cloudflare Workers 后端。
 
-项目正在实施 [P0](docs/PLAN.md)，已部署到 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)。已导入冻结 release9 源码并构建真实 MangaDraft AOT 包，具备私有产物交付、JS / Dart 运行接口、漫画资料浏览界面和独立阅读器。真实浏览器已通过 Source 初始化；产品图片通道与完整在线阅读尚未接通，P0 尚未通过。
+项目正在实施 [P0](docs/PLAN.md)，已部署到 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)。已内化 TeaVM 运行时并构建真实 MangaDraft AOT 包，具备私有产物交付、JS / Dart 运行接口、漫画资料浏览界面和独立阅读器。真实浏览器已通过 Source 初始化；产品图片通道与完整在线阅读尚未接通，P0 尚未通过。
 
 ## 当前能力与边界
 
@@ -25,15 +25,16 @@ packages/reader_core/   独立 Dart 布局、位置、资源窗口与调度
 packages/source_runtime/ Dart SourceRuntime、版本协议与传输验证
 packages/contracts/    Zod 边界校验与协议版本源文件
 packages/runtime-host/ 公开控制页、私有 TeaVM 加载与串行 Worker
-runtime/teavm/          冻结源码、产品覆盖层及验证摘要
+runtime/teavm/          项目运行时、适配层与构建输入
 tools/                 正式回归测试与扩展发布工具
 scripts/               协议生成、构建、私有产物注册与资源组装
 docs/design/           五份设计文档及来源校验记录
+docs/verification/     精简验证结论与正式复验入口
 ```
 
 ## 本地开发
 
-需要 Node 24.15.0（`.node-version`）、pnpm 12.6.0、Flutter 3.47.5（`.fvmrc`）。可用 FVM 安装 Flutter，或将固定版本加入 PATH；也支持 `FLUTTER_ROOT=/path/to/flutter`。原生构建另需 Xcode / Android SDK。TeaVM 当前验证工具链为 JDK 25.0.4、Maven 3.9.11；详细导入与校验见 [运行时说明](runtime/teavm/README.md)。
+需要 Node 24.15.0（`.node-version`）、pnpm 12.6.0、Flutter 3.47.5（`.fvmrc`）。可用 FVM 安装 Flutter，或将固定版本加入 PATH；也支持 `FLUTTER_ROOT=/path/to/flutter`。原生构建另需 Xcode / Android SDK。TeaVM 工具链与依赖材料由锁文件固定；历史验证使用 JDK 25.0.4、Maven 3.9.11；当前构建与校验见 [运行时说明](runtime/teavm/README.md)。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -53,13 +54,14 @@ pnpm dev
 
 ## 本地 TeaVM 构建与回归
 
-冻结 ZIP 和第三方 JAR 不入库。导入只选取经过逐文件摘要校验的最终源码；依赖、原输入 JAR、Maven 缓存和产物均位于被忽略的 `runtime/teavm/.local/`。
+项目维护正式 Java / bridge 源码，第三方源码通过 submodule 固定；TeaVM 派生实现由上游加补丁物化。工具链、runtime seed 和隔离产物位于被忽略的 `runtime/teavm/.local/`，正式构建不依赖研究 ZIP。完整本地批量构建与增量发布见 [扩展发布说明](docs/EXTENSIONS.md)。
 
 ```sh
-pnpm teavm:import /path/to/teavm-compatibility-v2.zip --package mangadraft
+git submodule update --init --recursive
+pnpm teavm:prepare --android
 pnpm teavm:check
-pnpm teavm:build mangadraft
-python3 scripts/register-build.py runtime/teavm/.local/manifests/<buildId>.json --allow-host www.mangadraft.com
+pnpm teavm:build --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
+python3 scripts/register-build.py PATH_TO_OUTPUT/manifest.json --artifacts PATH_TO_OUTPUT/artifacts --allow-host www.mangadraft.com
 ```
 
 注册命令默认仅校验并输出计划；加 `--local` 才写入本地 R2 / D1，加 `--remote` 才写入云端。网络域名需要显式声明，图片 CDN 尚未据此开放。清单、AOT 和必要资源必须经私有 API 获取，不能复制到公开静态目录。正式 API 与 Source 浏览器回归入口见 [验证记录](docs/VERIFICATION.md)。独立字节、Zstd 和 iOS 机制研究保留简洁验证摘要；临时工程已归档到被忽略的本地研究目录，不作为源码提交。

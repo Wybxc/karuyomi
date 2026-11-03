@@ -1,0 +1,37 @@
+--- a/TReluctantGroupQuantifierSet.java
++++ b/PatchedReluctantGroupQuantifierSet.java
+@@ -41,13 +41,32 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-class TReluctantGroupQuantifierSet extends TGroupQuantifierSet {
+-    public TReluctantGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
++public class PatchedReluctantGroupQuantifierSet extends TGroupQuantifierSet {
++    public PatchedReluctantGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
+         super(innerSet, next, type);
+     }
+ 
+     @Override
+     public int matches(int stringIndex, CharSequence testString, TMatchResultImpl matchResult) {
++        // Dot nodes consume exactly one code point and do not change captures.
++        // Keep the native terminator predicate and UTF-16 boundaries, but scan
++        // iteratively so a long reluctant match does not exhaust the JS stack.
++        if (innerSet instanceof TDotSet || innerSet instanceof TDotAllSet) {
++            int right = matchResult.getRightBound();
++            while (true) {
++                int result = next.matches(stringIndex, testString, matchResult);
++                if (result >= 0) return result;
++                if (stringIndex >= right) { matchResult.hitEnd = true; return -1; }
++                char high = testString.charAt(stringIndex);
++                int count = 1, codePoint = high;
++                if (Character.isHighSurrogate(high) && stringIndex + 1 < right) {
++                    char low = testString.charAt(stringIndex + 1);
++                    if (Character.isLowSurrogate(low)) { codePoint = Character.toCodePoint(high, low); count = 2; }
++                }
++                if (innerSet instanceof TDotSet && ((TDotSet) innerSet).lt.isLineTerminator(codePoint)) return -1;
++                stringIndex += count;
++            }
++        }
+         if (!innerSet.hasConsumed(matchResult)) {
+             return next.matches(stringIndex, testString, matchResult);
+         }

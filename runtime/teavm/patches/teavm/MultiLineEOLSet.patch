@@ -1,0 +1,33 @@
+--- a/TMultiLineEOLSet.java
++++ b/PatchedMultiLineEOLSet.java
+@@ -41,11 +41,11 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-class TMultiLineEOLSet extends TAbstractSet {
++class PatchedMultiLineEOLSet extends TAbstractSet {
+ 
+     private int consCounter;
+ 
+-    public TMultiLineEOLSet(int counter) {
++    public PatchedMultiLineEOLSet(int counter) {
+         this.consCounter = counter;
+     }
+ 
+@@ -57,6 +57,7 @@
+         char ch1;
+         char ch2;
+         if (strDif == 0) {
++            matchResult.hitEnd = true; matchResult.requireEnd = true;
+             matchResult.setConsumed(consCounter, 0);
+             return next.matches(strIndex, testString, matchResult);
+         } else if (strDif >= 2) {
+@@ -67,6 +68,8 @@
+             ch2 = 'a';
+         }
+ 
++        int left = matchResult.hasAnchoringBounds() ? matchResult.getLeftBound() : 0;
++        if(ch1 == '\n' && strIndex > left && testString.charAt(strIndex - 1) == '\r')return -1;
+         switch (ch1) {
+             case '\r': {
+                 if (ch2 == '\n') {

@@ -1,0 +1,55 @@
+--- a/TUCISequenceSet.java
++++ b/PatchedUCISequenceSet.java
+@@ -41,33 +41,38 @@
+  *
+  * @author Nikolay A. Kuznetsov
+  */
+-class TUCISequenceSet extends TLeafSet {
++class PatchedUCISequenceSet extends TLeafSet {
+ 
+     private String string;
++    private int[] codePoints;
++    private int count;
+ 
+-    TUCISequenceSet(StringBuffer substring) {
+-        StringBuilder res = new StringBuilder();
+-        for (int i = 0; i < substring.length(); i++) {
+-            res.append(Character.toLowerCase(Character.toUpperCase(substring.charAt(i))));
++    PatchedUCISequenceSet(StringBuffer substring) {
++        string = substring.toString();
++        charCount = string.length();
++        codePoints = new int[charCount];
++        for (int i = 0; i < string.length();) {
++            int codePoint = Character.codePointAt(string, i);
++            codePoints[count++] = Character.toLowerCase(Character.toUpperCase(codePoint));
++            i += Character.charCount(codePoint);
+         }
+-        this.string = res.toString();
+-        this.charCount = res.length();
+     }
+ 
+     @Override
+-    public int accepts(int strIndex, CharSequence testString) {
+-        for (int i = 0; i < string.length(); i++) {
+-            if (string.charAt(i) != Character.toLowerCase(Character.toUpperCase(testString.charAt(strIndex + i)))) {
++    public int accepts(int strIndex, CharSequence text) {
++        int start = strIndex;
++        for (int i = 0; i < count; i++) {
++            int codePoint = Character.codePointAt(text, strIndex);
++            if (codePoints[i] != Character.toLowerCase(Character.toUpperCase(codePoint))) {
+                 return -1;
+             }
++            strIndex += Character.charCount(codePoint);
+         }
+-
+-        return string.length();
+-
++        return strIndex - start;
+     }
+ 
+     @Override
+     public String getName() {
+-        return "UCI sequence: " + string; //$NON-NLS-1$
++        return new StringBuilder("UCI sequence: ").append(string).toString();
+     }
+ }
