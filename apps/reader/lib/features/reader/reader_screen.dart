@@ -224,6 +224,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
       );
     });
+    // A decoder or another post-frame callback may run after the last frame.
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _scheduleDimensions() {
@@ -260,6 +262,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       );
       _scheduleRestore();
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
@@ -379,6 +382,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _syncWindow();
       _scheduleViewport();
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _layout({ReadingMode? mode, bool? doublePage}) {

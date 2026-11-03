@@ -27,6 +27,8 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 固定 `31555e8` 的 Cache v3 新材料已通过 Web 三源元数据与首中末图片分项，xkcd 正式 Flutter 两章阅读和显式完成也通过。但关标签页后虽恢复原章末页与完成状态，文字图首次显示为空黑，翻页后才正常；首次恢复视觉门仍失败，见[当前材料记录](../verification/cache-v3-sources.md)。继续修复并以相同输入重验，不能由旧材料通过或状态恢复替代显示验收。
 
+Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 回调登记后没有请求后续帧。ReaderScreen 的尺寸、恢复与 viewport 调度现使用 Flutter 官方 `ensureVisualUpdate()`；新增解码在帧尾通知的回归，旧码明确没有后续帧，修复后正常观测。阅读相关 43 项及 Dart 分析通过；尚待新固定提交的双端真实 Source 与重启复验，不把诊断补帧结果计为产品通过。Web 首次恢复黑屏是否同因仍未确定。
+
 存储细分推进见[运行时文件与 HTTP Cache](runtime-storage.md)，editor 生命周期机制门与原 JVM/正文语义门分别记录。
 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 已通过压缩、重定向、Cookie、HEAD/206、204/205/304、精确 Range、urlencoded/multipart、流式上传、截断上传/响应和三类取消门。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常；这些 Worker 分项不代替正式 Source/cache 或 Java 同版全部语义对照。当前只维护 v2，旧包需要重新构建。

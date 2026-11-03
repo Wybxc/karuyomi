@@ -73,6 +73,45 @@ Widget screen({
 
 void main() {
   testWidgets(
+    'decoded notification after a frame schedules its viewport observation',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final viewports = <ReaderViewportState>[];
+      BuildContext? imageContext;
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          onViewport: viewports.add,
+          imageBuilder: (context, resource, fit) {
+            if (resource.id == 'runtime-1-page-0') imageContext = context;
+            return fixtureImage(context, resource, fit);
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(imageContext, isNotNull);
+      expect(viewports.last.observed, isNull);
+      expect(tester.binding.hasScheduledFrame, false);
+
+      tester.binding.addPostFrameCallback((_) {
+        ReaderImageDecoded('runtime-1-page-0').dispatch(imageContext!);
+      });
+      tester.binding.ensureVisualUpdate();
+      await tester.pump();
+
+      // pumpAndSettle would force the missing viewport frame and hide the bug.
+      expect(tester.binding.hasScheduledFrame, true);
+      await tester.pump();
+      expect(viewports.last.observed?.pageKey, 'page-0');
+      expect(tester.binding.hasScheduledFrame, false);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'zoom before decoding cannot mark a clipped final spread observed',
     (tester) async {
       final provider = FixturePageProvider();
