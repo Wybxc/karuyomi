@@ -33,6 +33,10 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 同日将正则供体类命名从补丁移入构建生成步骤，使用 `java-parser` token 位置保留原排版与字面量，再应用行为补丁；全部 13 份生成 Java 与拆分前逐字节一致，原输出摘要未改。回归覆盖刻意保留的上游类型转换、Lexer 引用与继承关系、字符串/文本块和注释不误改，以及源码/上下文/结果漂移拒绝。`toolchain/license.txt` 同时改名为 `android-sdk-license`，仅更新锁中的路径，41 字节内容与摘要不变。
 
+## Cache 生命周期分项
+
+2026-11-03，正式 Cache 桥在 Codex 内置浏览器 Chromium 156 通过十组真实 Worker/IndexedDB/Web Locks 门：终止后立即回收 editor、活 owner/Java handle 隔离、并发唯一 editor、版本/clear generation CAS，以及真实事务 abort 后清理与 close/in-flight begin 竞争。事务失败保留旧完整条目，清理不影响替代写入者；类型检查与桥单测通过。具体入口和故障构造见[Worker 桥记录](verification/worker-bridges.md#cache-editor-的-worker-生命周期)。这不是 Java CacheInterceptor、原 Source 或正文预算验收；正文二进制化、普通文件和原 JVM 同版对照按[存储计划](plan/runtime-storage.md)继续推进。
+
 ## 历史部署与匿名边界
 
 2026-11-03 已成功部署 `https://karuyomi.wybxc.cc`，Cloudflare Worker version 为 `0332ef7a-3d49-47c1-ac41-edbed49bd7fe`。云端 D1 的两次迁移均通过，e350 产物已 remote 注册。匿名检查得到 `/` 200、`/runtime/host.js` 200，`/runtime/host.html` 307 规范化到公开 `/runtime/host`；Safari 已实际渲染 Flutter 书架与三个导航页签。

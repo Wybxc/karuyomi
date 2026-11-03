@@ -267,8 +267,8 @@ public final class Cache implements Closeable, Flushable {
   }
 
   public void delete() throws IOException {
-    command("clear", null, null);
     closed = true;
+    command("delete", null, null);
   }
 
   public void flush() throws IOException {

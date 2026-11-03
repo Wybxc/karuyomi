@@ -1,4 +1,8 @@
 {
   "extends": "../../../runtime/teavm/bridge/tsconfig.json",
-  "include": ["bridge-browser-suite.ts"]
+  "include": [
+    "bridge-browser-suite.ts",
+    "cache-lifecycle-worker.ts",
+    "cache-lifecycle-browser-suite.ts"
+  ]
 }
