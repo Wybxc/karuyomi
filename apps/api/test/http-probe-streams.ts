@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { ReadableStream } from 'node:stream/web';
 import {
   HTTP_FRAME_LIMIT,
   HttpFrameReader,
@@ -63,20 +64,6 @@ export function byteStream(source: {
     },
     { highWaterMark: 0 },
   );
-}
-
-export async function* streamChunks(stream: ReadableStream<Uint8Array>) {
-  const reader = stream.getReader();
-  try {
-    for (;;) {
-      const result = await reader.read();
-      if (result.done) return;
-      yield result.value;
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-    reader.releaseLock();
-  }
 }
 
 export function relayFrames(

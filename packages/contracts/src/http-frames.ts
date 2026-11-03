@@ -193,9 +193,16 @@ export function encodeErrorFrame(
   return frame(ERROR, jsonBytes(result.data, HTTP_ERROR_FRAME_LIMIT));
 }
 
+// Framing only requires the default reader. Depending on BYOB or pipeThrough
+// would unnecessarily couple this boundary to browser versus Node stream types.
+type FrameInputReader = Pick<
+  ReadableStreamDefaultReader<Uint8Array>,
+  'read' | 'cancel' | 'releaseLock'
+>;
+
 /** A demand-driven reader with one bounded DATA frame and one input view. */
 export class HttpFrameReader {
-  private readonly source: ReadableStreamDefaultReader<Uint8Array>;
+  private readonly source: FrameInputReader;
   private input: Uint8Array | undefined;
   private inputOffset = 0;
   private sourceDone = false;
@@ -210,7 +217,7 @@ export class HttpFrameReader {
   private delivered = 0;
   private readonly limit: number;
 
-  constructor(stream: ReadableStream<Uint8Array>, limit: number) {
+  constructor(stream: { getReader(): FrameInputReader }, limit: number) {
     if (
       !Number.isSafeInteger(limit) ||
       limit < 0 ||

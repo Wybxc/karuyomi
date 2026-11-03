@@ -2,6 +2,8 @@
 // Loopback-only live-Source probe. Production entry points never import this.
 // Real workerd, policy-only D1, RS256 verification and the product HTTP bridge.
 import assert from 'node:assert/strict';
+import { unstable_readConfig } from 'wrangler';
+import { z } from 'zod';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { createHash } from 'node:crypto';
 import { execa } from 'execa';
@@ -10,7 +12,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { byteStream, relayFrames, streamChunks } from './http-probe-streams.ts';
+import { byteStream, relayFrames } from './http-probe-streams.ts';
 import {
   createStaticSnapshot,
   migrationFiles,
@@ -153,15 +155,22 @@ assert(
   compiled.outputFiles.length === 1,
   'Expected one compiled Worker module',
 );
-const databaseId = /"database_id":\s*"([^"]+)"/.exec(
-  await readFile(path.join(api, 'wrangler.jsonc'), 'utf8'),
-)?.[1];
+const config = unstable_readConfig(
+  { config: path.join(api, 'wrangler.jsonc') },
+  { hideWarnings: true },
+);
+assert(config.compatibility_date, 'Worker compatibility date is required');
+const databaseId = z
+  .array(z.object({ binding: z.string(), database_id: z.string().optional() }))
+  .parse(config.d1_databases)
+  .find((database) => database.binding === 'DB')?.database_id;
 assert(databaseId, 'D1 database identity missing from Wrangler configuration');
 const mf = new Miniflare(
   convertV4MiniflareOptions({
     modules: true,
     script: compiled.outputFiles[0]!.text,
-    compatibilityDate: '2026-11-03',
+    compatibilityDate: config.compatibility_date,
+    compatibilityFlags: config.compatibility_flags,
     resourcePersistencePath: path.join(state, 'v3'),
     d1Databases: { DB: databaseId },
     bindings: {
@@ -488,7 +497,15 @@ const server = createServer(async (request, response) => {
           method: request.method ?? 'GET',
           headers: Object.fromEntries(headers),
           signal: abort.signal,
-          ...(body ? { body: streamChunks(body), duplex: 'half' } : {}),
+          ...(body
+            ? {
+                body: Readable.fromWeb(body, {
+                  highWaterMark: HTTP_FRAME_LIMIT,
+                  signal: abort.signal,
+                }),
+                duplex: 'half',
+              }
+            : {}),
         });
         let outgoing = result.body ? byteStream(result.body) : null;
         if (entry) {
@@ -574,8 +591,7 @@ const server = createServer(async (request, response) => {
         response.writeHead(result.status, Object.fromEntries(outgoingHeaders));
         if (outgoing)
           await pipeline(
-            Readable.from(streamChunks(outgoing), {
-              objectMode: false,
+            Readable.fromWeb(outgoing, {
               highWaterMark: HTTP_FRAME_LIMIT,
             }),
             response,

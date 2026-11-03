@@ -2,6 +2,7 @@
 // Real workerd HTTP-v2 integration against a controlled binary HTTP origin.
 // Production entry points/configuration never import or enable this fixture.
 import assert from 'node:assert/strict';
+import { unstable_readConfig } from 'wrangler';
 import { createHash } from 'node:crypto';
 import { createServer, request as httpRequest } from 'node:http';
 import {
@@ -18,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pipeline } from 'node:stream/promises';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
-import { byteStream, streamChunks } from './http-probe-streams.ts';
+import { byteStream } from './http-probe-streams.ts';
 import {
   HTTP_BRIDGE_MEDIA_TYPE,
   HTTP_FRAME_LIMIT,
@@ -205,23 +206,17 @@ try {
     write: false,
   });
   assert(compiled.outputFiles.length === 1);
-  const wrangler = await readFile(
-    path.join(root, 'apps/api/wrangler.jsonc'),
-    'utf8',
+  const config = unstable_readConfig(
+    { config: path.join(root, 'apps/api/wrangler.jsonc') },
+    { hideWarnings: true },
   );
-  const flags: unknown = JSON.parse(
-    /"compatibility_flags"\s*:\s*(\[[^\]]*\])/.exec(wrangler)?.[1] ?? '[]',
-  );
-  assert(
-    Array.isArray(flags) &&
-      flags.every((value: unknown) => typeof value === 'string'),
-  );
+  assert(config.compatibility_date, 'Worker compatibility date is required');
   mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
       script: compiled.outputFiles[0]!.text,
-      compatibilityDate: '2026-11-03',
-      compatibilityFlags: flags,
+      compatibilityDate: config.compatibility_date,
+      compatibilityFlags: config.compatibility_flags,
       // Only this integration fixture maps declared public target names to a
       // loopback origin. No production target/hostname validation is relaxed.
       outboundService: {
@@ -731,7 +726,8 @@ try {
     controlledOrigin: true,
     sourceOnlineVerified: false,
     productionAccessVerified: false,
-    compatibilityFlags: flags,
+    compatibilityDate: config.compatibility_date,
+    compatibilityFlags: config.compatibility_flags,
     payload: expected,
     encodedSizes: { gzip: compressed.gzip.length, br: compressed.br.length },
     checks,

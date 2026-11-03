@@ -1,6 +1,8 @@
 // Real workerd/D1 + actual Static Assets routing over a controlled local snapshot.
 // Only the separate test entry trusts this run's RSA public key.
 import assert from 'node:assert/strict';
+import { unstable_readConfig } from 'wrangler';
+import { z } from 'zod';
 import isRecord from 'is-plain-obj';
 import { registrationSql } from '../../../tools/extensions/registration.ts';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
@@ -132,9 +134,17 @@ try {
     compiled.outputFiles.length === 1,
     'Expected one compiled Worker module',
   );
-  const databaseId = /"database_id":\s*"([^"]+)"/.exec(
-    await readFile(path.join(api, 'wrangler.jsonc'), 'utf8'),
-  )?.[1];
+  const config = unstable_readConfig(
+    { config: path.join(api, 'wrangler.jsonc') },
+    { hideWarnings: true },
+  );
+  assert(config.compatibility_date, 'Worker compatibility date is required');
+  const databaseId = z
+    .array(
+      z.object({ binding: z.string(), database_id: z.string().optional() }),
+    )
+    .parse(config.d1_databases)
+    .find((database) => database.binding === 'DB')?.database_id;
   assert(
     databaseId,
     'D1 database identity missing from Wrangler configuration',
@@ -143,7 +153,8 @@ try {
     convertV4MiniflareOptions({
       modules: true,
       script: compiled.outputFiles[0]!.text,
-      compatibilityDate: '2026-11-03',
+      compatibilityDate: config.compatibility_date,
+      compatibilityFlags: config.compatibility_flags,
       resourcePersistencePath: path.join(state, 'v3'),
       d1Databases: { DB: databaseId },
       assets: {

@@ -9,7 +9,7 @@ import {
   encodeDataFrame,
   encodeEndFrame,
 } from '@karuyomi/contracts';
-import { byteStream, relayFrames, streamChunks } from './http-probe-streams.ts';
+import { byteStream, relayFrames } from './http-probe-streams.ts';
 
 describe('Source probe streaming adapters', () => {
   function fixture(end = true) {
@@ -152,8 +152,7 @@ describe('Source probe streaming adapters', () => {
       },
     });
     const pumping = pipeline(
-      Readable.from(streamChunks(relay), {
-        objectMode: false,
+      Readable.fromWeb(relay, {
         highWaterMark: HTTP_FRAME_LIMIT,
       }),
       destination,
@@ -167,4 +166,62 @@ describe('Source probe streaming adapters', () => {
     await failed;
     expect(upstream.cancel).toHaveBeenCalledOnce();
   });
+
+  it.each(['response pipeline', 'upload body'])(
+    'cancels a pending upstream read through the %s',
+    async (direction) => {
+      let reading!: () => void;
+      const pendingRead = new Promise<void>((resolve) => {
+        reading = resolve;
+      });
+      const cancel = vi.fn();
+      const source = new ReadableStream<Uint8Array>(
+        {
+          start(controller) {
+            controller.enqueue(encodePreamble());
+            controller.enqueue(encodeMetaFrame({ fixture: 'pending body' }));
+          },
+          pull() {
+            reading();
+          },
+          cancel,
+        },
+        { highWaterMark: 0 },
+      );
+      const input = new HttpFrameReader(source, HTTP_FRAME_LIMIT);
+      const finish = vi.fn(async (_error?: unknown) => {});
+      const relay = relayFrames(input, await input.meta(), () => {}, finish);
+      const abort = new AbortController();
+      const node = Readable.fromWeb(relay, {
+        highWaterMark: HTTP_FRAME_LIMIT,
+        ...(direction === 'upload body' ? { signal: abort.signal } : {}),
+      });
+      const pumping =
+        direction === 'response pipeline'
+          ? pipeline(
+              node,
+              new Writable({
+                write(_chunk, _encoding, callback) {
+                  callback();
+                },
+              }),
+              { signal: abort.signal },
+            )
+          : (async () => {
+              for await (const _chunk of node) {
+                // Miniflare consumes request bodies as a Node async iterable.
+              }
+            })();
+      const failed = expect(pumping).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+      await pendingRead;
+      abort.abort();
+      await failed;
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(source.locked).toBe(false);
+      expect(finish).toHaveBeenCalledOnce();
+      expect(finish.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    },
+  );
 });

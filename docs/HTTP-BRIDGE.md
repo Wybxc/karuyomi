@@ -140,10 +140,27 @@ input uses `protocol_error`, budget violations use `limit_exceeded`, explicit
 cancellation uses `cancelled`, and a valid terminal ERROR exposes its code and
 message with `remote: true`. Other source exception messages are not reflected.
 
+## Runtime and local adapter configuration
+
+The Worker explicitly enables `enable_request_signal` with compatibility date
+`2026-11-03`. Cloudflare only enables client-disconnection events by default at
+[`2026-11-17`](https://developers.cloudflare.com/changelog/post/2026-11-02-request-signal-default/).
+The bridge still passes its abort signal explicitly to upstream fetches. This
+configuration is necessary for cancellation, but is not itself evidence that a
+particular browser or Native request closes its upstream connection.
+
+Local workerd probes read the date, flags and D1 binding from Wrangler's official
+configuration reader. Node adapters use `Readable.fromWeb` with the same abort
+signal as the response pipeline or upload, so cancellation reaches a default
+reader even while its next read is pending. Async-generator cleanup alone cannot
+provide that guarantee. The frame reader only requires the default reader's
+`read`, `cancel` and `releaseLock` methods; it does not require platform-specific
+BYOB or pipe transforms.
+
 ## Regression checks
 
 ```sh
-pnpm exec vitest run packages/contracts/test/http-frames.test.ts
+pnpm exec vitest run packages/contracts/test/http-frames.test.ts apps/api/test/http-probe-streams.test.ts
 pnpm --filter @karuyomi/contracts typecheck
 pnpm test:http-bridge
 ```
