@@ -10,7 +10,7 @@
 - 独立 Dart 阅读核心已有稳定逻辑锚、布局/方向、缩放和有界资源调度；实际图片接入仍属于 [P0](p0-runtime-and-reading.md)。
 - 单 hostname、Access/API、D1 网络策略工程入口已存在；云端书架/进度业务表和客户端同步镜像尚未建立。
 
-Drift/SQLite 本地进度底座与正式路由已接通：受信 bootstrap subject + 部署 origin 隔离，详情继续阅读、当前/最远位置分离、显式完成/重新阅读和保存失败重试已实现。真实 SQLite 文件经产品目录/详情/Reader 关闭重开恢复；真实 Arknights 已通过 Web 连续切章及关标签页恢复，见[Web 产品记录](../verification/reader-progress-web.md)。iOS 原 xkcd 已通过正式 ReaderScreen 与真实进程重启恢复的分项；浏览器进程、Android Source 及完整日用流程仍待验收，见[验证记录](../verification/local-progress.md)。
+Drift/SQLite 本地进度底座与正式路由已接通：受信 bootstrap subject + 部署 origin 隔离，详情继续阅读、当前/最远位置分离、显式完成/重新阅读和保存失败重试已实现。真实 SQLite 文件经产品目录/详情/Reader 关闭重开恢复；真实 Arknights 已通过 Web 连续切章及关标签页恢复，见[Web 产品记录](../verification/reader-progress-web.md)。iOS/Android 模拟器的原 xkcd 已分别通过正式 ReaderScreen 与真实进程重启恢复的分项；浏览器进程、真机、当前 Cache v3 材料及完整日用流程仍待验收，见[验证记录](../verification/local-progress.md)。
 
 ## 待办
 
@@ -18,7 +18,7 @@ Drift/SQLite 本地进度底座与正式路由已接通：受信 bootstrap subje
 2. 完成收藏、分类排序、书架搜索/过滤/批量操作、自定义封面及继续阅读。未读数只使用已主动取得的章节列表，不触发全书架查更新。
 3. 完善详情章节搜索/排序/筛选、重复章节展示、范围已读操作；保留原 Source URL、稳定 ID、空/小数章节编号和来源顺序，不按标题全局去重。
 4. 完善全局与漫画覆盖阅读设置：分页/连续/Webtoon、单双页、方向、适宽/适高、裁白、背景/应用内亮度、点击区与键盘；能力不足时保留正常阅读。
-5. **已实现，实际环境验收进行中：** 使用 Drift/SQLite 将 `chapterKey + pageKey + manifestVersion + pageIndexHint + normalizedOffset` 等逻辑锚持久化；按受信 bootstrap 身份与部署 origin 隔离。分开保存当前回看位置、同 epoch 最远进度与显式完成状态，跨清单不能直接比较旧序号。600 ms trailing debounce、2 秒最长等待，切章/退出/后台切换提交；写入失败保持阅读并保留重试草稿。末页真实显示后，显式“读完本章”或“下一章”才标完成；重新阅读通过事务提升 epoch。产品 SQLite 文件关闭重开已恢复章节/方向/页内偏移，继续验证 Web/Native 应用实际重启，不依赖 unload 成功，不生成时间线事件。D1 云端状态与 P2 同步另行实施。
+5. **已实现，实际环境验收进行中：** 使用 Drift/SQLite 将 `chapterKey + pageKey + manifestVersion + pageIndexHint + normalizedOffset` 等逻辑锚持久化；按受信 bootstrap 身份与部署 origin 隔离。分开保存当前回看位置、同 epoch 最远进度与显式完成状态，跨清单不能直接比较旧序号。600 ms trailing debounce、2 秒最长等待，切章/退出/后台切换提交；写入失败保持阅读并保留重试草稿。末页真实显示后，显式“读完本章”或“下一章”才标完成；重新阅读通过事务提升 epoch。产品 SQLite 文件关闭重开已恢复章节/方向/页内偏移，Web 关标签页及双端模拟器原 xkcd 进程重启分项已通过，继续验证浏览器进程、真机与完整日用流程，不依赖 unload 成功，不生成时间线事件。D1 云端状态与 P2 同步另行实施。
 6. 完成网络错误、验证、Source 登录和 Access 失效的独立状态；有限重试安全读取，取消无用请求，不盲目重发副作用 POST。Web 更新先保存位置，阅读中不强制重载。
 7. 对实际候选 Source 必需的远程脚本提供局部适配、最小回调与超时/存储边界；未实现路径明确受限，不把同源 `eval` 称为受限沙箱。
 

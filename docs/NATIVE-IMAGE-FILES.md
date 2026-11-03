@@ -22,9 +22,9 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 复用锁定插件的 `WebMessageChannel` 与 [`WEB_MESSAGE_ARRAY_BUFFER`](https://developer.android.com/reference/androidx/webkit/WebViewFeature#WEB_MESSAGE_ARRAY_BUFFER) 能力，所有必需 feature 均在启用前检查。缺少能力时明确返回 unsupported，不回退到图片 JSON/Base64。
 
-插件原生 channel registry 只随 WebView 销毁清空，因此文件 sink 使用最多六个常驻 port 槽位，每槽只安装和转移 port 一次，不能将已关闭或已转移的 port 再次转移。每次传输使用该槽单调递增且不回绕的 identity；二进制消息前八字节为 transfer/sequence 两个 u32 BE，余下至多 65,528 字节为图片内容，总消息不超过 64 KiB。每块写入文件后才 ACK；ACK、END、取消终态均绑定 transfer，旧消息不会确认新任务。槽位只在上一任务终态清理后复用，clear 关闭端点，容器销毁释放插件 registry。
+插件原生 channel registry 只随 WebView 销毁清空，因此文件 sink 使用最多六个常驻 port 槽位，每槽只安装和转移 port 一次，不能将已关闭或已转移的 port 再次转移。每次传输使用该槽单调递增且不回绕的 identity；二进制消息前八字节为 transfer/sequence 两个 u32 BE，余下至多 65,528 字节为图片内容，总消息不超过 64 KiB。每块写入文件后才 ACK；ACK、END、取消终态均绑定 transfer，旧消息不会确认新任务。槽位只在上一任务终态清理后复用。文件 sink 的 clear 关闭自己仍持有的端点，由 WebView controller 唯一 dispose channel；不提前 dispose controller registry 中的对象。并发 clear 共享同一个终态 Future，单个端点失败后仍尝试其余端点和目录清理，并保留首个错误，后续调用不能把失败变成成功 ACK。
 
-这段私有平台 sink 使用 ArrayBuffer 正文和小 ACK/终态字符串，不改变公开 ProtoJSON Source 控制合同。取消需等 reader 退出、端点终态与本地写入结束；无法确认时返回 runtime_lost 并销毁容器。文件位于应用私有临时目录，release 删除文件。Android API 36 模拟器的真实 WebView 六槽传输与复用已通过；物理设备与真实 Source 阅读另行验收。
+这段私有平台 sink 使用 ArrayBuffer 正文和小 ACK/终态字符串，不改变公开 ProtoJSON Source 控制合同。取消需等 reader 退出、端点终态与本地写入结束；无法确认时返回 runtime_lost 并销毁容器。文件位于应用私有临时目录，release 删除文件。Android API 36 模拟器的真实 WebView 六槽传输与复用已通过；原版 xkcd 的正式 ReaderScreen 路径见下文，物理设备另行验收。
 
 ## 预算与生命周期
 
@@ -80,7 +80,7 @@ xcodebuild -workspace Runner.xcworkspace -scheme Runner \
 
 固定 `d76e8a48f6898c06dd7413c430747d60e5cba34d`、材料 `80c9e303184623dea1b56acdd1c02cac0db522b83fe01f5f68285d7145f395c7`，iOS 26.4 Simulator 与 Android 16 / API 36 / WebView 133 均通过正式容器握手，两轮各六张并发的多块受控 PNG、实际文件摘要、Flutter 解码、限额、generation、迟到 cancel、幂等释放与清理。Android 第二轮仍是原六个持久插件 slot。两个平台均真正终止、重启进程后恢复正式 Drift / SQLite 的合成章节进度并验证 reset 的 epoch 隔离。
 
-可复验命令、平台摘要及保留的早期失败见[Native 依赖与机制记录](verification/native-dependencies.md#正式-readiness-修复的双端复验)。这组图片是受控同源 Blob，不能代替 Source AOT、实际 ReaderScreen、后台恢复或物理设备验收；与新材料匹配的原版 Source 路径单独验证。
+可复验命令、平台摘要及保留的早期失败见[Native 依赖与机制记录](verification/native-dependencies.md#正式-readiness-修复的双端复验)。这组图片是受控同源 Blob，不能代替 Source AOT、实际 ReaderScreen、后台恢复或物理设备验收。早期机制夹具未将最终 WebView dispose 异常纳入通过条件，因此不能用其通过报告证明完整退出终态；后续原版 Source 门暴露并修复了双重 dispose，见下文。
 
 ## iOS 原版 xkcd 阅读器与进度重启
 
@@ -88,6 +88,16 @@ xcodebuild -workspace Runner.xcworkspace -scheme Runner \
 
 合成 Pointer 事件通过正式“下一页”和“读完本章”按钮；只有末页真实解码并进入视口后才保存完成。实际界面显示 `2 / 2`、本地进度已保存及本章已读完，退出等待 route / provider 清理。真正终止并重启应用进程后，重新验证身份和加载 Source，正式 ReaderScreen 恢复末页 current / furthest 与 completed，退出再次确认清理。
 
-受控入口位于忽略目录，正常受信 localhost HTTPS 连接真实 workerd / 隔离 D1 / RS256 测试身份；不代表生产 Access 或正式主入口人工手势。首次合成 End 键未翻页的失败保留，后续仅调整测试输入。准确 JAR / bundle / 材料身份、命令、报告与截图位置见[分项记录](verification/native-dependencies.md#原版-xkcd正式-readerscreen-与真实进程重启)。Android Source、多个处理源、整章接续、后台恢复、真机和峰值仍需另验。
+受控入口位于忽略目录，正常受信 localhost HTTPS 连接真实 workerd / 隔离 D1 / RS256 测试身份；不代表生产 Access 或正式主入口人工手势。首次合成 End 键未翻页的失败保留，后续仅调整测试输入。准确 JAR / bundle / 材料身份、命令、报告与截图位置见[分项记录](verification/native-dependencies.md#原版-xkcd正式-readerscreen-与真实进程重启)。多个处理源、整章接续、后台恢复、真机和峰值仍需另验。
 
-Android 的相同 Source 测试入口已构建 APK，但 localhost 测试 CA 未获该模拟器信任，真实 TLS 校验拒绝后尚未进入 Source；未修改产品信任或绕过证书错误。此失败不覆盖此前正常生产 HTTPS 上已通过的 Android 六 slot 机制结果。
+Android 首次相同入口因 localhost 测试 CA 未获信任而被真实 TLS 拒绝，该失败保留。后续仅在可丢弃的独立 debug App 中配置 exact localhost 的专用 CA，保留系统 CA、禁止明文并拒绝错误主机和错误 CA；没有修改正式产品信任或安装全局 CA。
+
+## Android 原版 xkcd 阅读器、退出与进度重启
+
+同日的 d76 独立 debug App 已完成真实两页阅读、保存与重启恢复，但最终 `platform.dispose()` 暴露 channel 被文件 sink 和 WebView controller 双重 dispose，整门如实失败。正式修复 `6c2e09c` 将 channel 销毁所有权留给 controller，并增加端点清理失败、并发 clear 和重复失败的生命周期回归。
+
+新固定输入 `8eef7b4e5881b4e83e7259c4e56da4af5c7dee64` 仅在 d76 上 cherry-pick 此 Native 修复，保留同一 `80c9…95c7` 材料和原版 xkcd AOT。在 Android API 36 / WebView 133 的独立 debug 包中，四项真实 TLS 正负例、正式 Catalog / ReaderScreen 两页显示、末页显式完成、route / provider 清理及最终 WebView dispose 均通过。真正 force-stop 后重启同一安装，恢复末页 current / furthest 与 completed，再次显示 Source 文字图并完成退出；两个通过报告都把最终 dispose 错误计入结果。重启首张截图早于本次导航的最终 flush，图上仍是“本地进度待保存”，不能单凭该图宣称本次写入已完成；报告在退出 flush 和最终 dispose 后才记为通过。
+
+随后仅让 ignored 测试入口等待正式 UI 显示“本地进度已保存”再截图；未修改产品状态、触发额外 flush 或隐藏文字。再次 force-stop / relaunch 后，真实恢复、该 UI 状态、截图与最终退出均通过。新图为 `android-reader-force-stop-saved.png`，旧 pre-flush 图及原报告继续保留。
+
+测试 CA 仅作用于该 ignored debug App 的 `localhost`，不扩展到子域或 IP；正常公共 HTTPS 使用系统 CA，`127.0.0.1` 和错误 CA 端点均被拒绝。原始失败、APK manifest / 证书策略核对、命令及新截图位置见[Android 分项记录](verification/native-dependencies.md#android-独立-debug-app-的-tlssource-与退出复验)。这是模拟器中的正式产品 widget / 原 Source / SQLite 路径，输入仍为合成 Flutter Pointer、鉴权为隔离测试身份，不代表生产 Access、物理手势、物理设备或峰值验收。

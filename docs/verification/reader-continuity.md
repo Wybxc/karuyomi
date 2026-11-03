@@ -12,4 +12,4 @@
 
 2026-11-04，第三里程碑已将本地 Drift 进度接入目录/详情/Reader，相关 reader/browse/widget 共 47 项回归通过，包含真实 SQLite 文件关闭重开恢复章节、方向及页内偏移。完成状态仅由实际末页观察后的明确操作推进，邻章准备仍不写进度。该文件恢复分项与上述真实 Source 连续切章/设备门分开，详见[进度记录](local-progress.md)。
 
-2026-11-04，真实 Flutter Web 与原版 Source 已通过连续切章、关标签页重开后的章节/当前页/最远页/顺序恢复，见[Web 产品进度记录](reader-progress-web.md)；浏览器进程退出与 Native 应用重启仍待验收。
+2026-11-04，真实 Flutter Web 与原版 Source 已通过连续切章、关标签页重开后的章节/当前页/最远页/顺序恢复，见[Web 产品进度记录](reader-progress-web.md)；浏览器进程退出仍待验收。固定 `d76e8a4` 的 iOS 和固定 `8eef7b4` 的 Android 模拟器已分别通过原 xkcd 正式 ReaderScreen 两页、显式完成、实际进程重启和末页/完成恢复；Android 同时验证 channel 修复后的最终退出。范围是受控入口与合成 Pointer，详细身份和限制见[Native 记录](native-dependencies.md)，不能替代真机、生产 Access、当前 Cache v3 材料或完整主入口日用流程。

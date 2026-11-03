@@ -194,11 +194,13 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 固定 `d76e8a4` 的新工作树已通过 iOS/Android 正式受管图片机制及真实进程重启的 SQLite 恢复，保留 `5e9e526` 的 iOS interactive 就绪失败及修正依据。iOS 进一步以相同材料的原 xkcd AOT 经正式 CatalogController/ChapterReaderRoute/ReaderScreen 显示两页，实际 frame 后保存末页与完成状态；terminate/launch 后重取原 Source 并恢复。输入是受控 Native 入口与合成 Flutter Pointer，同源受信 localhost HTTPS、隔离 RS256/D1 测试身份。它不证明生产 Access、真机触控、Android Source 或完整主入口日用流程；详细身份与限制见[Native 记录](verification/native-dependencies.md)。
 
+固定 `8eef7b4`（`d76e8a4` 加 `6c2e09c`）的 Android 模拟器进一步通过原 xkcd 正式 ReaderScreen 两页、Source 文字图、显式完成和两次 force-stop 后 SQLite 恢复，最终 route/provider/WebView 退出也通过。修复文件 sink 与 controller 重复销毁 channel 的所有权错误，保留旧失败；最终截图等待正式“本地进度已保存”，与早期 pre-flush 截图分别留证。测试 CA 仅配置在独立 ignored debug App 的 exact localhost，系统 CA 保留，错误 CA/未配置域名均拒绝；不是生产 Access 或真机证据。完整输入、报告与限制见[Native 记录](verification/native-dependencies.md#android-独立-debug-app-的-tlssource-与退出复验)。
+
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
-- 真实 Source 的冷热 Cache、截断网络/取消异常对照、Cache/files 合计 namespace 预算及版本/身份切换。
-- Native ReaderScreen 交互、后台恢复与当前材料的双端 Source 验收；原处理源重复/取消及更多真实解密源覆盖。
+- 真实 Source 的冷热 Cache、截断网络/取消异常对照、Cache/files 组合压力及版本/身份切换；Cache 跨目录 namespace 39 组预算机制已通过。
+- 正式 Native 主入口人工操作、后台恢复与当前材料的双端 Source 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。
 

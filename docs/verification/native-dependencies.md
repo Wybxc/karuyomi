@@ -105,7 +105,7 @@ flutter run --debug --no-resident --no-pub \
 
 随后分别真正执行 iOS `simctl terminate/launch` 和 Android `am force-stop/am start`。同一产品进度 controller / Drift / Native SQLite 恢复当前页、最远页、offset 和反序；不同 subject 隔离，reset 增加 epoch、回首页并清最远，旧 epoch 不能覆盖 reset。四份通过报告保留在该树 `.local/native-data/{ios,android}-{image,progress}-report.json`，构建与运行日志同目录。
 
-这是正式双端 Native 机制与合成章节 SQLite 重启证据；图片输入是同源受控 Blob，未以这组结果宣称 Source、ReaderScreen、生产 Access、物理设备或峰值内存通过。真实 Source / ReaderScreen 使用与当前材料匹配的新 AOT 单独验收。
+这是正式双端 Native 机制与合成章节 SQLite 重启证据；图片输入是同源受控 Blob，未以这组结果宣称 Source、ReaderScreen、生产 Access、物理设备或峰值内存通过。早期机制夹具 finally 未将最终 WebView dispose 异常计入结果，因此这组 passed 报告不能证明完整平台退出终态。后续 Source 测试保留 dispose 失败并在修复后重新验收，见下文。
 
 ## 原版 xkcd、正式 ReaderScreen 与真实进程重启
 
@@ -134,6 +134,51 @@ xcrun simctl launch <SIMULATOR_ID> dev.karuyomi.karuyomi
 
 通过报告及截图在该树 `.local/native-source/ios-native-reader-{first,restart}-report.json`、`ios-native-reader-{first,restarted}.png`；网络记录为 `xkcd-network.json`。首次入口合成 End 键没有改变页码，90 秒后如实失败；该报告另存 `ios-reader-keyboard-attempt.json`。随后只把测试输入改为实际按钮的 Pointer 事件，未修改产品代码或 Source。
 
-这覆盖模拟器中的正式产品 widget 路径、真实 Source 处理、文件解码和 SQLite 真重启；入口及输入事件仍是测试驱动，不等同正式 `lib/main.dart` 的人工手势、Android Source 阅读、后台恢复、真机、生产 Access 或内存峰值验收。
+这覆盖模拟器中的正式产品 widget 路径、真实 Source 处理、文件解码和 SQLite 真重启；入口及输入事件仍是测试驱动，不等同正式 `lib/main.dart` 的人工手势、后台恢复、真机、生产 Access 或内存峰值验收。Android 后续分项结果见下节。
 
 Android 同一受控入口的官方 APK 构建成功，但模拟器未信任该 localhost 测试 CA，WebView 实际报 TLS `net_error=-202`，随后握手超时，尚未进入 Source。失败及系统诊断保留为 `.local/native-source/android-reader-first-report.json`、`android-reader-tls-diagnostic.log`；未忽略证书错误、修改产品信任或回退 HTTP，先前生产 HTTPS 的六 slot 机制通过仍是独立证据。
+
+## Android 独立 debug App 的 TLS、Source 与退出复验
+
+2026-11-04，使用 [Android 官方 Network Security Config](https://developer.android.com/privacy-and-security/security-config) 与 [debug build variant](https://developer.android.com/build/build-variants)，只在 ignored、可丢弃的 App 副本配置测试 CA：base 保留系统 CA 且禁止明文；domain-config 仅 `localhost`、`includeSubdomains=false`、专用 CA `overridePins=false`，不使用覆盖所有域的 debug-overrides。不安装全局 CA，不改正式产品配置，不在 TLS challenge 中放行证书错误。
+
+从 APK 实际解析出的 manifest 确认为独立 debug applicationId、`debuggable=true` 和该 Network Security Config；解包的专用证书与输入逐字节一致。有效期为 2026-11-03 04:17:53 UTC 至 2026-11-04 04:17:53 UTC，执行时仍有效。真实 Android WebView 的四项结果：
+
+| URL                                      | 结果                               |
+| ---------------------------------------- | ---------------------------------- |
+| `https://localhost:9446/runtime/host`    | 专用 CA 正常验证成功               |
+| `https://karuyomi.wybxc.cc/runtime/host` | 系统 CA 正常验证成功，仅公开控制页 |
+| `https://127.0.0.1:9446/runtime/host`    | 未获 domain-config 信任，拒绝      |
+| `https://localhost:9447/runtime/host`    | 错误 CA，拒绝                      |
+
+两个负例均收到 CA 不受信的 challenge 后返回 CANCEL，未使用 PROCEED。公共控制页成功不代表生产 Access 登录。
+
+首个 d76 debug App 的原 xkcd 两页阅读与 SQLite 重启已成功，但最终 `platform.dispose()` 抛出 `AndroidWebMessageChannel was used after being disposed`，首轮与重启整门均为 false。根因是文件 sink 先 dispose 了 WebView controller registry 持有的 channel，controller 销毁时再次 dispose。原报告保留在 `native-ready-validation/karuyomi/.local/android-source-app/android-reader-{first,restart}-d76-dispose-failed.json`，TLS 报告和截图仍保留；不以阅读成功覆盖退出失败。
+
+正式修复 `6c2e09c` 仅修改 `android_image_files.dart` 及其生命周期测试：文件 sink 关闭自身端点，controller 唯一销毁 channel；并发 clear 共享同一终态 Future，关闭一个端点失败后仍尝试其余端点和文件清理，保留原错误，重复 clear 不能伪造成功。回归包含真实临时文件、端点异步 gate、失败后再次调用和 controller 唯一 dispose；完整 Flutter analyze 与 89 项测试通过。
+
+为避免混入 main 后续 Cache 材料，新受管树 `native-owner-validation/karuyomi` 从 d76 cherry-pick 该修复，形成固定提交 `8eef7b4e5881b4e83e7259c4e56da4af5c7dee64`。与 d76 的受跟踪 diff 只有上述两文件；内置材料仍为 `80c9e303184623dea1b56acdd1c02cac0db522b83fe01f5f68285d7145f395c7`，原版 xkcd JAR / AOT 身份与上节一致。独立 ignored debug 包为 `dev.karuyomi.karuyomi.nativeSourceOwnerFixture`，正式 Flutter debug APK SHA-256 为 `2f88ce1de49d220231f1b120d279c2b2fbfd6f5085013fb4a73f2bc49aed1e7f`。
+
+此新包实际通过四项 TLS 检查、原版 xkcd `3319: Elevators` 的热门 / 详情 / 章节 / 页列表、两页正式 ReaderScreen 解码显示、实际 observed 后的末页 current / furthest 保存，以及合成 Pointer 经正式“读完本章”按钮保存 completed。漫画图仍为上节 106,037 B 原响应，末页仍为 Source 原 `TextInterceptor` 生成文字图。退出等待 route / provider ACK，最终 `platform.dispose()` 成功，未吞异常。
+
+随后真正 force-stop PID 7443，再启动同一安装得到 PID 7656；没有重装、清数据或替换 SQLite。重新完成受信 bootstrap 与 Source 初始化，恢复同章末页 current / furthest 和 completed，实际 ReaderScreen 显示 `2 / 2` 和本章已读完，第二次最终退出再次成功。重启首张截图时，本次导航仍显示“本地进度待保存”；截图早于随后 route 退出和最终 flush，不作为本次写入已经完成的视觉证据。首轮与重启报告是在 flush / 清理完成后生成，均 `passed:true`，且把任何 provider / progress / platform 清理错误纳入失败条件。
+
+为补足截图时机，随后只在 ignored 测试入口增加等待正式 UI “本地进度已保存”的条件；未额外调用 flush、修改产品状态文字或产品源码。新 debug APK SHA-256 为 `ecb7c497f0c10983b4a0996a2af1dc63e16ba3b260bc527bf039c592525aa1ad`。同包保留数据安装后通过该条件，再真正 force-stop PID 7840 / relaunch PID 8036，没有再次安装。最终报告同时通过 SQLite 恢复、真实末页、已保存 UI 和最终退出；新截图实际显示 `2 / 2`、本地进度已保存、本章已读完。原 pre-flush 截图及报告单独保留，不被新结果覆盖。
+
+```sh
+# 新固定树 .local/android-source-app/apps/reader；锁定官方 SDK 与依赖
+flutter build apk --debug --no-pub --target lib/fixture/main.dart
+adb -s emulator-5556 install -r build/app/outputs/flutter-apk/app-debug.apk
+adb -s emulator-5556 shell am start -n \
+  dev.karuyomi.karuyomi.nativeSourceOwnerFixture/dev.karuyomi.karuyomi.MainActivity
+adb -s emulator-5556 shell am force-stop \
+  dev.karuyomi.karuyomi.nativeSourceOwnerFixture
+adb -s emulator-5556 shell am start -n \
+  dev.karuyomi.karuyomi.nativeSourceOwnerFixture/dev.karuyomi.karuyomi.MainActivity
+```
+
+新树 `.local/android-source-app/` 保留 `input.json`、`apk-manifest.xml`、`apk-network-security.xml`、`android-tls-report.json`、`android-reader-{first,restart}-report.json`、`android-reader-{first,restarted}.png` 和脱敏 `xkcd-network.json`。Reader 首轮报告 SHA-256 为 `e23fc2a839d76561ec084033d028b7a5a3d8b4f45e9814af47228394f772f946`，重启报告为 `900bace37c808c02c8e11d6f937bd5ee146945fec9ccd226e54317b1576e60cf`。
+
+等待已保存 UI 后再次真实重启的最终记录为同目录 `android-reader-force-stop-saved-report.json`（SHA-256 `fd246b91958a2595933a21789ca2402e380a4ce942ad9e1a9d56ecd5f0b17a69`）及 `android-reader-force-stop-saved.png`；`run-summary.json` 记录各轮 PID 与测试边界。测试 HTTP / TLS 服务均已正常关闭，模拟器和 App 数据保留。
+
+这是 Android 模拟器、隔离 localhost CA / RS256 测试身份中的正式 Catalog / ReaderScreen / 原 Source / Native 文件 / SQLite 路径。入口和输入为受控测试驱动，不代表生产 Access、正式主入口人工手势、物理设备、后台恢复或进程 / GPU 峰值内存通过。

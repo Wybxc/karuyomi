@@ -26,6 +26,8 @@
 
 导航测试直接注入视口回调以隔离进度协调；实际 image frame/缩放/route 覆盖的观察门由已有 ReaderScreen 回归覆盖。此处不是在线 Source 或真实设备测试。Web 官方 WASM/worker 构建见[资源记录](reader-database-assets.md)，Native 打包见[依赖记录](native-dependencies.md)；浏览器关闭重开、Native 应用重启和真实 Source 连续阅读仍须分别验收。
 
-2026-11-04，真实 Flutter Web 与原版 Source 已通过连续切章、关标签页重开后的章节/当前页/最远页/顺序恢复，见[Web 产品进度记录](reader-progress-web.md)；浏览器进程退出与 Native 应用重启仍待验收。
+2026-11-04，真实 Flutter Web 与原版 Source 已通过连续切章、关标签页重开后的章节/当前页/最远页/顺序恢复，见[Web 产品进度记录](reader-progress-web.md)；浏览器进程退出仍待验收；Native 进程重启分项见下文。
 
 同日，固定 `d76e8a4` 的 iOS 模拟器通过原 xkcd 正式 CatalogController/ChapterReaderRoute/ReaderScreen：真实图片 frame 后翻到末页并显式读完，SQLite 保存 current/far/completed；实际 terminate/launch 后，用同一 HTTPS origin 与受信测试 subject 恢复原章末页及完成状态。入口和 Pointer 为测试驱动，Source/JAR、阅读组件和 SQLite 是正式实现；不等同于生产 Access、物理触控、Android Source 或整套日用流程。完整输入与报告见[Native 记录](native-dependencies.md)。
+
+固定 `8eef7b4`（`d76e8a4` 加 Android channel 所有权修复）的 Android API 36 模拟器也通过原 xkcd 正式 ReaderScreen：两页及 Source 文字图、显式读完、route/provider 清理和最终 WebView dispose。两次真实 force-stop/relaunch 均恢复同安装 SQLite 的 current/furthest/completed；最终入口等待正式界面“本地进度已保存”后截图，再验证退出落盘。原 d76 的双 dispose 失败及首次 pre-flush 截图保留，完整身份和隔离 localhost CA 范围见[Native 记录](native-dependencies.md#android-独立-debug-app-的-tlssource-与退出复验)。这仍是受控测试入口，不代表物理设备、正式主入口人工操作、生产 Access 或后续 Cache v3 材料已通过。
