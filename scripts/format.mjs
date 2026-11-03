@@ -243,6 +243,7 @@ const rufoGem = jar(
 const rufoDirectory = path.join(formatterDirectory, 'rufo-0.13.0');
 if (!existsSync(path.join(rufoDirectory, 'exe/rufo'))) {
   run('ruby', [
+    '-rfileutils',
     '-rrubygems/package',
     '-e',
     'Gem::Package.new(ARGV[0]).extract_files(ARGV[1])',

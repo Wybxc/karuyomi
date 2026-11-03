@@ -48,6 +48,8 @@ python3 tools/extensions/pipeline.py bootstrap \
 
 baseline 完成代表首次覆盖已结束，记录 published/failed/discoveryFailed 数量；不代表所有扩展可运行。未尝试、仅本地 built 或尚未上传的包会阻止正常完成标记。`CI=true` 或 `GITHUB_ACTIONS=true` 环境完全禁止首次 bootstrap/finalize。
 
+2026-11-03 已在 ignored `.local/aot-bootstrap/` 的独立完整 clone 中固定 `7f54463`，启动 1,448 包的本地串行全量。主工作区的 `.local/extensions/bootstrap-run.json` 记录 PID、固定 checkout、state/plan/log 路径；`bootstrap.log` 与逐包目录保留进度。该轮仍处于未完成 baseline，结束并核对失败记录后才 finalize；CI 的首次全量保护继续生效。主工作区后续提交不改动正在运行的 clone。
+
 ## 不可变 Release 与索引
 
 每包 tag 为 `ext-<packageSuffix>-v<AndroidVersionCode>-<inputFingerprint前32位>`。新 `source-aot` Release 仅将私有 bundle 用 gzip level 9 压缩，固定 mtime=0、无文件名、平台无关 gzip 头；资产名为 `<canonicalSHA256>.gz`，共享 JS/WASM 不重复上传。另含 `manifest.json`、调度 provenance、原始 build provenance 与 validation。清单始终声明解压后的 canonical SHA256/长度，R2 注册和客户端执行也使用原始字节。

@@ -71,7 +71,7 @@ python3 scripts/register-build.py PATH_TO_OUTPUT/manifest.json --artifacts PATH_
 
 ## 部署与 Access
 
-2026-11-03 已部署 `karuyomi.wybxc.cc`，Worker version 为 `402471fe-f113-4272-89ae-ddbe064289b5`；云端 D1 迁移完成，MangaDraft e350 构建的 7 个产物已注册为 verified。公开 Flutter 页面与运行脚本可访问，Safari 已真实渲染书架和三个主导航页签。Access self-hosted application 与仅允许本人的策略同时覆盖裸 `/api` 和 `/api/*`；匿名 API 请求已确认跳转登录并保持 private/no-store。生产 Access 登录成功后的正向私有交付尚未验收。
+2026-11-03 已部署 `karuyomi.wybxc.cc`，Worker version 为 `0332ef7a-3d49-47c1-ac41-edbed49bd7fe`；云端 D1 迁移完成，MangaDraft e350 构建的 7 个产物已注册为 verified。公开 Flutter 页面与运行脚本可访问，Safari 已真实渲染书架和三个主导航页签。Access self-hosted application 与仅允许本人的策略同时覆盖裸 `/api` 和 `/api/*`；匿名 API 请求已确认跳转登录并保持 private/no-store。生产 Access 登录成功后的正向私有交付尚未验收。
 
 `/api` 和 `/api/*` 始终经过 Worker JWT 校验；未配置或密钥服务不可用返回 503，缺少、无效或过期凭据返回 401，身份或 origin 拒绝返回 403。没有开发鉴权绕过。写请求要求同源 `Origin` 和应用请求头；公开 shell 不读取私有 bindings。可复制 `apps/api/.dev.vars.example` 为忽略提交的 `.dev.vars` 进行 Access 联调。
 
