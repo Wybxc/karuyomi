@@ -48,7 +48,7 @@ export async function verifyInBrowser(
       digest(bytes),
     ]),
   );
-  const manifestPath = `/api/extensions/builds/${encodeURIComponent(manifest.buildId)}/manifest`;
+  const manifestPath = `/extensions/builds/${manifest.buildId}/manifest.json`;
   let networkAttempts = 0;
   let finished = false;
   let origin = '';
@@ -95,7 +95,7 @@ async function indexedDbCheck(){
 }
 try{
   await indexedDbCheck();result.indexedDb=true;
-  const manifestResponse=await fetch(${JSON.stringify(manifestPath)},{credentials:'same-origin',cache:'no-store',redirect:'error'});
+  const manifestResponse=await fetch(${JSON.stringify(manifestPath)},{credentials:'omit',cache:'no-cache',redirect:'error'});
   if(!manifestResponse.ok)throw Error('Manifest unavailable');
   const manifestBytes=await manifestResponse.arrayBuffer();
   result.manifestSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',manifestBytes)),value=>value.toString(16).padStart(2,'0')).join('');
@@ -218,8 +218,8 @@ finally{
       if (artifact) {
         response
           .writeHead(200, {
-            'Content-Type': artifact.contentType ?? 'application/octet-stream',
-            'Content-Length': artifact.size,
+            'Content-Type': artifact.transportContentType,
+            'Content-Length': artifact.transportSize,
           })
           .end(artifact.bytes);
         return;

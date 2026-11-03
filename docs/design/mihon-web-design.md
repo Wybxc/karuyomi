@@ -8,7 +8,7 @@
 
 **访问方式：前端公开，后端由 Cloudflare Access 鉴权。** 页面、共享材料与 Static Assets 扩展产物无需登录；个人数据、Source 网络桥和回调统一走同源 `/api` 和 `/api/*`，只允许本人通过 Access 访问。Access 登录不增加应用内账号系统，也不改变暂缓的“私密使用”范围。
 
-**当前交付决定：** Static Assets 是 Web 与 Native 扩展索引、清单和 AOT 的最终权威来源，每个扩展只发布最新 build。客户端依据 index/catalog 定位当前版本，由客户端或 Service Worker 管理更新与缓存；新分发路径不再要求向 GitHub Release 推送扩展；已有扩展 Release 仅为历史存储，不供客户端定位或下载。通用资源继续走 Web Static Assets / Native 内置。Worker 只负责个人数据与 Source 网络控制，不代理扩展正文、不签发私有下载地址，也不给客户端 GitHub 凭据。该决定覆盖此前的 R2 代理、Release 全客户端直下及 Web 镜像提案。**方案已确定，待实现验收：** 2026-11-03 的 Codex 内置浏览器 Release 直下/Range 实测报 `Failed to fetch`，初始 302 与最终 CDN 缺少 `Access-Control-Allow-Origin`；这是此前方案的失败证据。当前 Static Assets 发布、最新版 index/catalog、跨端下载、更新缓存、有界解压和完整加载链路仍须实测，不能把已选方案写成已通过。
+**当前交付决定：** Static Assets 是 Web 与 Native 扩展索引、清单和 AOT 的最终权威来源，每个扩展只发布最新 build。客户端依据 index/catalog 定位当前版本，由客户端或 Service Worker 管理更新与缓存；新分发路径不再要求向 GitHub Release 推送扩展；已有扩展和索引 Release 已按用户要求删除，不供客户端定位或下载。通用资源继续走 Web Static Assets / Native 内置。Worker 只负责个人数据与 Source 网络控制，不代理扩展正文、不签发私有下载地址，也不给客户端 GitHub 凭据。该决定覆盖此前的 R2 代理、Release 全客户端直下及 Web 镜像提案。**方案已确定，待实现验收：** 2026-11-03 的 Codex 内置浏览器 Release 直下/Range 实测报 `Failed to fetch`，初始 302 与最终 CDN 缺少 `Access-Control-Allow-Origin`；这是此前方案的失败证据。当前 Static Assets 发布、最新版 index/catalog、跨端下载、更新缓存、有界解压和完整加载链路仍须实测，不能把已选方案写成已通过。
 
 ## 1. 已有实现可以复用到什么程度
 
@@ -127,7 +127,7 @@ UI 创建同源通用 Worker 引导；Web 与 Native 均从 Static Assets 的 in
 | 局部脚本适配                          | sandbox WebView、绑定回调与超时                                                   | 向网页脚本提供应用凭证或完整 API                        |
 | D1                                    | 书架、章节元数据、进度、设置、同步增量、已安装构建指针                            | 图片 blob 或扩展运行文件                                |
 | Durable Object                        | 会话代次、必要的跨云端回调关联、WebSocket 通知                                    | 扩展执行、图片正文、永久保存 Promise                    |
-| 已有 GitHub Release                   | 历史存储，不属于新分发路径                                                        | 新扩展发布、客户端定位或下载                            |
+| GitHub Release（构建依赖）            | 仅锁定的 runtime seed，不属于扩展分发路径                                         | 新扩展发布、客户端定位或下载                            |
 | Static Assets / Native 内置材料       | Static Assets 提供全客户端最新扩展与权威 catalog；共享材料 Web 静态 / Native 内置 | 按扩展重复发布共享材料                                  |
 | R2（个人对象）                        | 自定义封面等私有个人数据                                                          | 扩展 AOT/共享材料交付、漫画整章归档                     |
 | IndexedDB / Web Locks                 | 业务镜像、按身份/扩展隔离的普通文件与 HTTP Cache、实例所有权                      | 云同步扩展文件、永久离线保证                            |
@@ -316,7 +316,7 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 | `/assets/*`、`/runtime/*`、`/source-worker.js`、manifest、Service Worker 脚本 | 公开                                | 公开 UI、通用桥与 Worker 引导；不包含扩展 AOT bundle、用户配置或已安装扩展清单   |
 | `/api`、`/api/*`                                                              | Cloudflare Access + Worker JWT 校验 | 私有业务数据/安装状态、Source 网络桥、回调、通知连接、自定义封面；不承载扩展正文 |
 | Static Assets 扩展目录                                                        | 公开、全客户端共用                  | index/catalog、清单与每扩展最新 AOT；客户端下载、更新与缓存须实测                |
-| 已有 GitHub Release（外部 HTTPS）                                             | 公开历史存储                        | 新分发路径不使用，不要求继续推送扩展                                             |
+| GitHub Release（构建依赖）                                                    | 仅锁定的 runtime seed               | 新分发路径不使用，不要求继续推送扩展                                             |
 | `/cdn-cgi/access/*`                                                           | Cloudflare 管理                     | 登录相关平台端点；不由 SPA fallback 接管                                         |
 
 只创建一个 Access **Self-hosted application**，覆盖 `read.example.com/api` 与 `read.example.com/api/*`，共享同一个 AUD；不保护整个 hostname。通配路径不包含裸 `/api`，所以两者都配置。公开前端不创建全站 Bypass，API 子路径也不设置更具体的 Bypass 应用。Access 按路径匹配的行为见[官方文档](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)。
@@ -392,7 +392,7 @@ Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Pat
 
 **源迁移**保留为书架操作：搜索候选作品 → 用户确认 → 预览章节映射 → 创建目标收藏并复制明确匹配的分类/进度/书签。原条目完整保留，由用户另行决定是否移除；不做自动快照、备份文件或恢复向导。模糊章节不自动标为已读，不迁移尚未实现的 tracker 数据。
 
-**部署资源**：一个自定义 hostname、一个入口 Worker（含 Static Assets 及 DO 类）、一个 D1、按个人对象功能需要的私有 R2、一个 SQLite-backed DO namespace、一个仅保护 API 的 Access application。全客户端的最新扩展通过 Static Assets 交付，已有 Release 仅历史存储；扩展交付不依赖 R2 binding。线上不需要 Node/Java 服务器；Java/Maven/TeaVM 和 APK 转换只在开发机/CI 构建时运行。
+**部署资源**：一个自定义 hostname、一个入口 Worker（含 Static Assets 及 DO 类）、一个 D1、按个人对象功能需要的私有 R2、一个 SQLite-backed DO namespace、一个仅保护 API 的 Access application。全客户端的最新扩展通过 Static Assets 交付，已有扩展和索引 Release 已按用户要求删除；扩展交付不依赖 R2 binding。线上不需要 Node/Java 服务器；Java/Maven/TeaVM 和 APK 转换只在开发机/CI 构建时运行。
 
 部署顺序：先配置 Access API 路径、本人 Allow policy、Cookie/会话和 issuer/AUD；绑定 Worker 资源和 hostname，关闭额外入口；发布公共前端与选定产物，分别验证未登录和登录流程。具体部署与实测状态见[验证记录](../VERIFICATION.md)；本节描述资源边界，不把已部署的外壳当作完整产品验收。
 
@@ -400,14 +400,14 @@ Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Pat
 
 1. **输入和编译。** 原版 JAR 直接作为 AOT 输入；仅 APK 时先在本地/CI 转换并记录原 APK/JAR 哈希。使用锁定的工具链、固定 submodule、当前项目宿主/依赖、反射/资源登记与兼容补丁；不要把测试源码、历史修改过的扩展或原型结果 API 纳入产品。
 2. **构建清单。** 每包产出独立 JS 与必要资源，记录 repo/package/version、输入/转换器、TeaVM/backend/JDK、源码/宿主 ABI、bridgeVersion、storageSchema、各文件 hash/字节数/MIME、Source IDs 和已验证能力。buildId 标识这一组不可变输出；编译器/宿主变更使相关构建缓存失效，不只按插件版本复用。保持可重建和业务验证，不宣称 AOT 输出已字节级可复现。
-3. **发布。** 通过构建/完整性检查后，将每扩展最新 build 的索引、清单和 AOT 发布到 Static Assets，index/catalog 作为客户端版本权威；旧 build 不留在在线扩展目录。不再向 GitHub Release 推送扩展，已有 Release 仅历史存储；provenance 记录实际构建身份。首次本地构建和 CI 增量直接更新 Static Assets，checkpoint 与构建缓存用于恢复。初次全量在本地固定 checkout 执行，CI 仅做有界上游增量。编译成功但未实测的包保持 `compiled_unverified`，不宣称可读。扩展与 UI 可独立构建，无对应产物时明确待构建/不支持。
+3. **发布。** 通过构建/完整性检查后，将每扩展最新 build 的索引、清单和 AOT 发布到 Static Assets，index/catalog 作为客户端版本权威；旧 build 不留在在线扩展目录。不再向 GitHub Release 推送扩展，已有扩展和索引 Release 已按用户要求删除；provenance 记录实际构建身份。首次本地构建和 CI 增量直接更新 Static Assets，checkpoint 与构建缓存用于恢复。初次全量在本地固定 checkout 执行，CI 仅做有界上游增量。编译成功但未实测的包保持 `compiled_unverified`，不宣称可读。扩展与 UI 可独立构建，无对应产物时明确待构建/不支持。
 4. **装载。** 公共 Worker 引导在 Web 与 Native 均从 Static Assets 的 index/catalog 获取最新 manifest 和压缩 bundle，有界解压并校验传输字节、原文字节、ABI 与资源集合后再执行；仅在下载/解压边界校验对应字节域，执行复用已验证字节。客户端或 Service Worker 管理更新与本地缓存，不把本地缓存当作旧版本的服务端可下载保证。Source 网络调用仍需 Access；移除原型默认包名命名空间，加载前设置已确认身份/仓库/包/schema。可用显式 fetch 后 Blob import 复用原型形式，但必须验证 CSP、峰值内存、错误页误载和相对资源路径；原型执行后计算哈希的诊断流程不能替代执行前校验。JS、资源和 manifest 均不得用登录 HTML 代替。
 5. **切换与重建。** 固定当前 buildId，校验新构建后排空/终止旧实例并切换指针；通过跨标签页版本锁/通知保持同一可变 namespace 的单一写入版本。原型只维护当前协议，不保留旧桥、旧材料或旧存储 schema 兼容；必要时重建运行缓存，不覆盖书架/Source 稳定身份或别的标签页正在写的数据。
 6. **交付边界。** 研究 ZIP（约 1.15 GB）包含 6019 个源码/证据/历史文件，不整体上传。生产使用显式文件清单，排除 fixtures、响应录制、日志、测试页、结果保存服务和历史候选；保留 NOTICE 与所需许可声明。
 
 **增量发布目标（待迁移）：** 保留现有源码及依赖闭包指纹；构建状态迁移为静态构建清单，记录 upstream commit、input fingerprint、host fingerprint 与构建结果，和只列当前可用版本的客户端 index/catalog 分开。定时 CI 只构建输入变化的包；失败时保留该包上次成功产物，同一失败输入不反复重试。发布最新 Static Assets 快照，不依赖 Release；首全量仍在本地完成，CI 缺少 baseline 时明确停止，不能退化为全量构建。此处是发布器迁移目标，尚非已完成能力。
 
-Static Assets 是所有客户端扩展 AOT 的最终来源，只保留每扩展最新 build；已有 GitHub Release 仅历史存储，不属于新分发路径；首次本地构建和 CI 增量直接更新 Static Assets，依靠 checkpoint 与构建缓存恢复。正文不经过 R2 或 Worker 代理，也不编入 UI 或入口 Worker 脚本。通用 host、桥、WASM 等共享材料使用 Web Static Assets 或 Native 内置资源，不随每个扩展重复发布；Native 材料缺失时明确失败，不从网络回退。构建时生成确定性 gzip 与传输元数据，下载/解压分别验证不同字节域，后续执行复用已验证的字节，不重复 hash 同一份数据。当前发布器迁移尚待实施；最新版发布、index/catalog 更新、客户端或 Service Worker 缓存切换、跨端下载/CSP 与有界解压仍须实测；目前这项交付决策不等于产品链路已通过。AOT JS 仍需解析执行，传输优化不能掩盖实例化内存。
+Static Assets 是所有客户端扩展 AOT 的最终来源，只保留每扩展最新 build；GitHub Release（构建依赖） 仅仅锁定的 runtime seed，不属于扩展分发路径；首次本地构建和 CI 增量直接更新 Static Assets，依靠 checkpoint 与构建缓存恢复。正文不经过 R2 或 Worker 代理，也不编入 UI 或入口 Worker 脚本。通用 host、桥、WASM 等共享材料使用 Web Static Assets 或 Native 内置资源，不随每个扩展重复发布；Native 材料缺失时明确失败，不从网络回退。构建时生成确定性 gzip 与传输元数据，下载/解压分别验证不同字节域，后续执行复用已验证的字节，不重复 hash 同一份数据。当前发布器迁移尚待实施；最新版发布、index/catalog 更新、客户端或 Service Worker 缓存切换、跨端下载/CSP 与有界解压仍须实测；目前这项交付决策不等于产品链路已通过。AOT JS 仍需解析执行，传输优化不能掩盖实例化内存。
 
 R2 如启用只保存自定义封面等私有个人对象，D1 只含保留业务表，DO 只协调会话/通知；不增加漫画归档、备份、任务消费者或 Cron。生产不依赖 CheerpJ 官方 CDN；开发对照仍遵循其许可。断网可展示已有本地镜像和加载页，不承诺新扩展离线启动或完整章节可读。
 

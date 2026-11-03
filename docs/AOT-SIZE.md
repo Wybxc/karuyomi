@@ -1,12 +1,12 @@
 # 扩展 AOT 包体分析
 
-2026-11-03，首次发布采用的方案已确定：共享桥/WASM 在 Web 静态交付、Native 随应用打包，每包 Release 仅发布确定性 gzip 编码的 AOT；保留 TeaVM `ADVANCED` 与现有宿主服务。以下包括现有产物测量和少量真实 A/B 编译，原始中间报告留在 ignored `.local`。
+2026-11-03，当前交付方案已确定：共享桥/WASM 在 Web 静态交付、Native 随应用打包；所有客户端从 Static Assets 获取每包最新可用的 gzip AOT，保留 TeaVM `ADVANCED` 与现有宿主服务。扩展不再使用 GitHub Release 或 R2 分发，具体合同见[扩展静态分发](EXTENSIONS.md)。以下保留交付决策前的产物测量和少量真实 A/B 编译，原始中间报告留在 ignored `.local`。
 
 优先做共享材料单独交付和传输压缩，再测宿主初始化是否引入无用依赖。TeaVM 当前已开启代码裁剪、混淆和均衡优化；把生成文件中的一段直接抽成共享 JavaScript 不能保证正确性。
 
 ## 已测量的体积
 
-以下均为十进制 bytes；压缩是离线结果，生产 HTTP 压缩尚未验收。
+以下均为十进制 bytes，来自历史宿主/桥样本；压缩是离线结果，不代表当前 TS 材料或生产下载大小。
 
 | 样本 / 主 AOT JS       |      原始 |  gzip 9 | Brotli 5 | Brotli 11 |
 | ---------------------- | --------: | ------: | -------: | --------: |
@@ -15,36 +15,36 @@
 
 两包来自 Keiyoushi 提交 `efa93f5a3537856fe830450bbe33f69d21d28167`。原始 JAR SHA-256 分别为 `033c74c396d6b001649911e6e428c88bd3253266732adfd02e47c9b5f6caa011`、`4cc8aed82a0250ee60dddcbe62fccead4090d9ad20a73df72e1c9b9c2d0818ea`，业务 JAR 未改写。对应 AOT 摘要为 `c1502b1cd5407a47b3e43c1501a105b2d4f7105ad496483a4d97f047c574e893`、`992ed3ad5db946bad2ddf03b548f9cf2775bfc33961c124054c0994d1ac9689d`。两包的实际 Chrome 156 Worker / IndexedDB 初始化通过，但未据此判定在线 Source 语义、图片或移动性能通过。
 
-每包另外有完全相同的 6 项共享材料：5 个桥脚本共 45,891 bytes，Zstd WASM 为 251,806 bytes，合计 297,697 bytes（约 291 KiB）。这些文件分别压缩后合计 gzip 94,359 / Brotli 11 72,497 bytes。主 AOT 占当前整包的 92.70% / 85.97%，所以拆共享材料有明确收益，仍需继续分析主程序。
+当时每包另外有完全相同的 6 项共享材料：5 个桥脚本共 45,891 bytes，Zstd WASM 为 251,806 bytes，合计 297,697 bytes（约 291 KiB）。这些文件分别压缩后合计 gzip 94,359 / Brotli 11 72,497 bytes。主 AOT 占该样本整包的 92.70% / 85.97%，所以拆共享材料有明确收益，仍需继续分析主程序。当前 TS 桥的实际体积以构建生成的 `materials.json` 为准。
 
 两个 `ResourceConfig` 均为空，没有内嵌扩展 assets 或 ICU 数据文件；不能把两包体积差异归因于 ICU 数据。依赖 JAR 在构建环境的大小也不等于最终 JS 大小，TeaVM 会做全程序可达性分析与裁剪。
 
 ## 优先采用的交付调整
 
-1. **共享材料只交付一份。** Web 在 `/runtime/materials/` 按摘要发布静态资源；Native 将相同材料随应用打包，由明确的 material 版本与摘要校验命中。每包清单声明所需材料，缺失或版本不匹配时明确失败。扩展 AOT 继续按版本发布到 GitHub Release，个人 API 和扩展私有交付仍经 Access。
+1. **共享材料只交付一份。** Web 在 `/runtime/materials/` 按摘要发布静态资源；Native 将相同材料随应用打包，由明确的 material 版本与摘要校验命中。每包清单声明所需材料，缺失或版本不匹配时明确失败。所有客户端的扩展 AOT 均从公开 Static Assets 下载，Access 只保护动态 API。
 2. **区分构建依赖。** `runtime-materials.tar.gz` 中的 JAR、材料锁等仅供构建，不能作为应用安装依赖；Maven 与 Android SDK 同理。实际客户端只需生成的 AOT、桥脚本和用到的 WASM 等资源。
-3. **启用可验证的传输压缩。** 新 source-aot Release 使用 `<canonicalSHA>.gz` 和 `artifact-encodings.json`，gzip level 9、固定时间戳 0。编码后的长度/摘要与解码后的 canonical 长度/摘要分别记录；恢复时限制解码长度，拒绝截断、尾随内容或多个 gzip stream，最终再次校验原文。旧 raw 资产继续可读且不会覆盖。R2 保存 canonical 原文，Range 仍以原文为准；生产 HTTP 压缩另行验收。
+3. **启用可验证的传输压缩。** 当前唯一 AOT 文件为 `/extensions/artifacts/<canonicalSHA>.gz`，gzip level 9、固定时间戳 0。清单直接记录编码后的长度/摘要与 canonical 长度/摘要；客户端有界解压并分别校验两个字节域。canonical 上限 64 MiB，编码文件上限 25 MiB；HTTP MIME 为 `application/gzip`，不附加 Content-Encoding。当前不保留 raw 交付、编码旁表或旧格式回退。
 
-两份真实 AOT 经正式发布器编码、模拟下载与恢复后，原始 SHA/字节完全一致：MangaDraft 3,777,975 → 791,368 bytes，Arknights Comics 1,824,293 → 583,749 bytes。每包只剩 1 个私有 AOT 和 6 个静态材料引用；这项 roundtrip 是本地输送验证，不是 GitHub 实际发布或运行兼容证据。与原来每包重复携带 297,697 bytes 材料相比，两包资产合计从 6,197,662 降至 1,375,117 bytes（不含小型清单、另行交付的共享材料）。
+历史本地 roundtrip 中，两份真实 AOT 经当时发布器编码、模拟下载与恢复后，原始 SHA/字节完全一致：MangaDraft 3,777,975 → 791,368 bytes，Arknights Comics 1,824,293 → 583,749 bytes。每包只剩 1 个 AOT 和 6 个静态材料引用；这不是当前静态部署或运行兼容证据。与原来每包重复携带 297,697 bytes 材料相比，两包资产合计从 6,197,662 降至 1,375,117 bytes（不含小型清单、另行交付的共享材料）。
 
-正式输入固定到 `8dc22e3` 后，已重新编译并实际发布首两包；从 GitHub 下载并按正式恢复器核验结果如下。每包 7 个 Release 资产，包含一个 gzip AOT 和六个清单/溯源文件；压缩与 canonical 双摘要、长度均通过，`runtimeReady=false` / `compiled_unverified`。
+历史输入固定到 `8dc22e3` 后，曾重新编译并发布首两包；从 GitHub 下载并按当时恢复器核验结果如下。每包当时有 7 个 Release 资产，包含一个 gzip AOT 和六个清单/溯源文件；压缩与 canonical 双摘要、长度均通过，`runtimeReady=false` / `compiled_unverified`。这些 Release 不再是客户端来源，数值只保留作体积基线。
 
-| 正式 Release                                                                                                                             | canonical bytes | gzip bytes |   减少 |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | --------------: | ---------: | -----: |
-| [MangaDraft 1.6.2](https://github.com/Wybxc/karuyomi/releases/tag/ext-all.mangadraft-v106002-364cdedb6cd1e1c7a4aacd99aa2eb05c)           |       3,777,971 |    791,388 | 79.05% |
-| [Arknights Comics 1.6.2](https://github.com/Wybxc/karuyomi/releases/tag/ext-en.arknightscomics-v106002-dd22d6bbf6f048ad02515caa96989397) |       1,824,293 |    583,745 | 68.00% |
+| 历史构建               | canonical bytes | gzip bytes |   减少 |
+| ---------------------- | --------------: | ---------: | -----: |
+| MangaDraft 1.6.2       |       3,777,971 |    791,388 | 79.05% |
+| Arknights Comics 1.6.2 |       1,824,293 |    583,745 | 68.00% |
 
-当前 6 份共享材料合计 297,946 bytes（cache/file 新增 Native 命名空间适配），Web 另保留两份旧桥以支持历史清单；材料实际字节不会进入每个 Release。正式发布保留原业务 JAR；重新编译结果与此前分析样本分别记录，不以分析样本的 SHA 代替正式产物。
+该批 6 份共享材料合计 297,946 bytes，包含 cache/file 的 Native 命名空间适配。当前只维护五个 TS 桥与一份 WASM，不保留旧桥兼容集合；材料字节不进入每包 gzip。构建保留原业务 JAR，重新编译结果与分析样本分别记录，不以分析样本的 SHA 代替正式产物。
 
-当前 R2 已按 SHA 去重，共享交付的主要收益是减少每包发布重复、客户端重复获取，以及清晰的 Web / Native 资源边界。两个样本的 Release 资产合计可从 6,197,662 降为 5,899,965 bytes（减少 4.80%）。现有客户端也可能通过 ETag 得到 304，因此不能把全部原始字节当成每次必然节省的流量。若 1,448 包都包含同一套共享材料，按包重复发布会产生约 431 MB 原始资产；保留一份可避免约 430.8 MB 的重复。该数字是按相同材料的理论累计，不是当前实占或每个用户的下载量。
+仅拆共享材料、不压缩主 AOT 时，两个历史样本的资产合计从 6,197,662 降为 5,899,965 bytes（减少 4.80%）。共享交付减少按包重复和重复获取，并明确 Web / Native 资源边界；客户端缓存命中时不能把全部原始字节当成每次必然节省的流量。若 1,448 包都包含样本中的同一套共享材料，按包重复发布会产生约 431 MB 原始资产；保留一份可避免约 430.8 MB 的重复。该数字是理论累计，不是当前部署实占或每个用户的下载量。
 
-Cloudflare 的实际压缩受 MIME、状态码、浏览器协商、套餐与规则影响；完整响应和 Range 响应需分别验收。不能将上述 Brotli 11 离线值写成生产下载量。依据：[官方压缩说明](https://developers.cloudflare.com/speed/optimization/content/compression/)和[静态资源说明](https://developers.cloudflare.com/workers/static-assets/)。
+当前 gzip 是清单约定的显式文件编码，不依赖 Cloudflare 自动 HTTP 压缩。上述 Brotli 11 仅用于离线比较，不能写成生产下载量；真实静态部署仍需检查 MIME、无 Content-Encoding、摘要和客户端解压。依据：[官方压缩说明](https://developers.cloudflare.com/speed/optimization/content/compression/)和[静态资源说明](https://developers.cloudflare.com/workers/static-assets/)。
 
 ## 主 AOT 还可以从哪里减小
 
 ### 宿主初始化的依赖根
 
-`TeaHost.init` 无条件注册 `ProtoBuf.Default` 和配置过的 kotlinx `Json`，会把对应初始化链变成可达代码。两个原业务 JAR 均没有 protobuf 类引用，实际业务 TypeMap 引用只有 Json；当前生成的 TypeMap 还包含 9 项来自依赖材料的历史宿主类型，其中包括 ProtoBuf。这是值得优先验证的多余可达根。
+分析样本的 `TeaHost.init` 无条件注册 `ProtoBuf.Default` 和配置过的 kotlinx `Json`，会把对应初始化链变成可达代码。两个原业务 JAR 均没有 protobuf 类引用，实际业务 TypeMap 引用只有 Json；样本生成的 TypeMap 还包含 9 项来自依赖材料的历史宿主类型，其中包括 ProtoBuf。这是值得验证的多余可达根。
 
 已做真实 A/B 编译：只保留业务 TypeMap 所需的 Json，并移除无用 ProtoBuf 初始化。MangaDraft gzip / Brotli 仅减少 538 / 753 bytes，Arknights Comics 仅减少 298 / 275 bytes，约为压缩体积的 0.06%–0.12%。收益不足以支持增加逐包服务扫描和兼容分支，因此首批不采用，保留原 JAR 和现有初始化。
 
@@ -83,4 +83,4 @@ Cloudflare 的实际压缩受 MIME、状态码、浏览器协商、套餐与规�
 
 ## 首次全量前的顺序
 
-共享材料与 gzip 契约固定并提交后，先在本地发布两份代表包，核对 GitHub 实际资产与恢复结果；随后启动可断点续传的首次全量，CI 只跟随增量。公共常量字典、二次 minify 和编译档位对比留作后续优化，不阻塞首批。编译成功仅发布为 `compiled_unverified`；真实 Source ID、六项操作、网络/缓存/取消与图片兼容仍按独立证据验收。
+共享材料与静态 gzip 契约固定并提交后，先构建两份代表包，核对静态 index/manifest、实际传输字节、有界解压与真实 Worker 加载；随后在固定本地 clone 启动可恢复的首次全量，CI 只跟随已完成 baseline 做有界增量。部署只保留每包最新可用版本，确认远端快照后才提交 checkpoint。公共常量字典、二次 minify 和编译档位对比留作后续优化，不阻塞首批。编译成功仅交付为 `compiled_unverified`；真实 Source ID、六项操作、网络/缓存/取消与图片兼容仍按独立证据验收。

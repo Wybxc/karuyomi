@@ -1,10 +1,20 @@
 # API 验证
 
-`pnpm exec vitest run apps/api/test` 验证 Access 签名与 claims、完整 API 鉴权、请求 origin/host、登录返回路径、扩展注册读取、私有缓存、条件/Range 请求及 HTTP bridge 边界。
+`pnpm exec vitest run apps/api/test` 验证 Access 签名与 claims、完整 API 鉴权、请求 origin/host、登录返回路径、HTTP bridge 边界，以及旧扩展 API 已删除、公开静态资源不读取私有绑定。
 
-`python3 scripts/test_register_build.py` 验证不可变构建 ID/网络策略/产物元数据冲突、幂等重试、失败回滚、清单边界及上传中断不触发发布。它使用内存 SQLite，不访问 Cloudflare。
+`python3 scripts/test_register_build.py` 验证 gzip 编码/canonical 双 SHA256、有界解压、静态 index/manifest 当前身份、按包替换网络策略、不可变 buildId 冲突及事务回滚。它使用内存 SQLite；材料目录来自当前受信 host 构建元数据，不访问 Cloudflare。
 
-HTTP 网络生产入口只接受 `application/vnd.karuyomi.http.v2`，不提供 JSON/Base64 网络回退。真实 workerd 的受控 HTTP origin 回归独立执行：
+生产扩展唯一来源是 Static Assets：`/extensions/index.json`、`/extensions/builds/<buildId>/manifest.json`、`/extensions/artifacts/<canonicalSHA>.gz`。`.gz` 是 manifest 声明的 payload 编码，HTTP 不使用 `Content-Encoding: gzip`。网络 API 不再提供扩展列表、清单或正文，也没有 R2 绑定。D1 只登记当前 build 的 Source 网络策略；`register-build.py --remote` 在写入前检查部署 origin 的公开 index 和清单，`--local` 必须显式提供 `--static-root` 受控快照，不能用于 remote。
+
+静态更新部署后，可信部署任务运行以下命令，将已批准 package 的域名策略切换到当前 build；它不下载 gzip，不为新 package 批准域名，也不从 Source 请求学习白名单。AOT 构建任务不持有部署凭据：
+
+```sh
+python3 scripts/sync-network-policies.py --remote
+```
+
+同步先校验部署 origin 的完整静态 index 与各清单，再以 Wrangler D1 JSON 接口读取已批准策略并在单个 SQL 文件事务中更新 buildId/bundle SHA、保留原域名、删除退役授权。读写之间的并发禁用或策略修改使事务失败。开发探针只可显式使用 `--local --static-root SNAPSHOT --persist-to STATE`。`python3 scripts/test_sync_network_policies.py` 覆盖跨 build 保留 host、新包不授权、删包、禁用/并发冲突和 metadata-only 校验；正式 workerd 探针同时使用真实本地 D1/Wrangler 验证这条同步链。
+
+HTTP 网络生产入口只接受 `application/vnd.karuyomi.http.v2`，不提供 JSON/Base64 回退。真实 workerd 的受控 HTTP origin 回归独立执行：
 
 ```sh
 node apps/api/test/http-bridge-workerd-probe.ts
@@ -14,7 +24,7 @@ node apps/api/test/http-bridge-workerd-probe.ts
 
 夹具实际发送 gzip/Brotli 压缩字节，验证解码后的正文 SHA256、200/206/403、重复 Set-Cookie、HEAD 的表示头、禁止自动重定向、流式二进制上传、早响应仍要求完整请求 END，以及消费取消、请求 AbortSignal、超时均关闭 origin 连接。它验证真实 workerd 与受控 origin，不验证真实 Source、生产 Access 或 CacheInterceptor。压缩边界依据 [Cloudflare Fetch 文档](https://developers.cloudflare.com/workers/runtime-apis/fetch/)；测试不把附加 gzip 头的普通字节当作压缩证据。
 
-真实 workerd、D1、R2 集成探针单独执行，需要已构建的清单及其所有内容寻址产物：
+真实 D1 策略注册与 Static Assets 路由探针：
 
 ```sh
 node apps/api/test/workerd-probe.ts \
@@ -22,10 +32,10 @@ node apps/api/test/workerd-probe.ts \
   PATH_TO_OUTPUT/artifacts
 ```
 
-默认结果保存到被忽略的 `runtime/teavm/.local/probes/workerd-registered-artifacts.json`；可选第四个参数指定其他输出路径，不会默认改写已提交文档。探针创建独立临时 Wrangler 状态，执行真实迁移和 `register-build.py --local --persist-to`，然后运行 Miniflare/workerd。它会在请求前验证真实 RS256 签名；测试入口只信任该次运行生成的公钥，生产 `src/index.ts` 不导入它，也不提供任何跳过鉴权的开关。
+探针以给定清单与唯一 `artifacts/<canonicalSHA>.gz` 创建临时受控静态快照，执行全部 Drizzle 迁移与正式 `register-build.py --local --static-root ... --persist-to ...`。随后用真实 Miniflare Static Assets 路由公开交付 index、manifest 和 gzip，检查已有静态资源绕过入口 Worker、gzip MIME/无 HTTP Content-Encoding、传输双 hash、未知静态导航 404、已知应用路由 shell 与 host.html 307。独立测试入口添加 marker header 以区别是否经过入口 Worker；生产入口不包含该 header 或测试公钥。
 
-探针检查已注册的真实 TeaVM manifest/list、所有 R2 产物的完整字节和 SHA256、私有缓存、缺失 JWT/错误 audience/错误 host、HEAD、304、Range、416。它还让 Wrangler 执行一个先写入 marker 再触发不可变冲突的文件，并证明 marker 一并回滚。无论成功或失败，临时状态都会清理；不访问远程 D1/R2、不输出 JWT/密钥/Source 正文。
+D1 只含当前网络策略，不含 manifest/artifact 表；探针验证冲突时整个 Wrangler SQL 文件事务回滚。API 仍校验真实 RS256、audience、host；已删除 `/api/extensions/*` 在鉴权后返回 404。默认结果在忽略目录 `.local/probes/workerd-static-extensions.json`，可选第四个参数改输出位置。临时状态始终清理，不访问远程 D1，不输出 JWT、密钥或 Source 正文。此探针可以输入受控构建夹具，因此通过仅证明本地 workerd/D1/Static Assets 集成，不能冒充真实 Source、生产 Access 或在线分发验收。
 
-[历史验证要点](../../../docs/verification/runtime-evidence.md) 保留一次本地真实运行的关键结果；完整请求/来源摘要只存于被忽略的本地研究归档。它证明 API 与本地存储适配工作，不替代生产 Cloudflare Access、线上 Source 网络语义或浏览器元数据闭环验收。HTTP bridge 只允许已验证构建的明确 hostname，禁用自动重定向和上游隐式缓存；不会把应用请求头复制给 Source。生产部署还使用 Cloudflare 的公网 fetch 路由边界，本地 workerd 运行不得绑定私网服务或放宽 host 白名单。
+Wrangler 使用 `not_found_handling: none`，只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker；已有扩展和共享材料直接由 Static Assets 提供。缺失资源保持 404。只有实际应用地址 `/`、`/auth/complete`、`/browse`、`/settings` 显式读取 shell，避免未知扩展路径获得 SPA 200。依据 [官方 Static Assets 配置](https://developers.cloudflare.com/workers/static-assets/binding/) 与 [SPA 路由说明](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/)。
 
-真实 Source 浏览器回归使用 [source-metadata-probe.ts](source-metadata-probe.ts)，复验步骤与边界见 [说明](source-metadata-probe.md)。它加载已校验的产品构建，使用相同测试入口和真实 HTTP bridge，不以夹具替代 Source，也不把编译成功当作在线兼容。
+真实 Source 浏览器回归使用 [source-metadata-probe.ts](source-metadata-probe.ts)，步骤与边界见 [说明](source-metadata-probe.md)。它加载当前静态产品构建并通过正式 HTTP bridge 请求 Source，不以夹具替代 Source，不把编译或初始化当作在线兼容。

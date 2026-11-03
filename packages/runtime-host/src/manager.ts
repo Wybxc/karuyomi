@@ -3,6 +3,7 @@ import {
   runtimeHelloSchema,
   runtimeSessionSchema,
   sourceCallSchema,
+  staticManifestPathSchema,
   workerResponseSchema,
   type RpcEnvelope,
   type RuntimeHello,
@@ -446,7 +447,7 @@ export class SourceRuntimeManager {
     return Promise.resolve();
   }
 
-  /** Business APIs use the same browser/WebView Access cookie context. */
+  /** Private APIs share Access cookies; the public catalog permits only GET. */
   async fetchApi(options: {
     path: string;
     method?: string;
@@ -459,14 +460,24 @@ export class SourceRuntimeManager {
     redirected: boolean;
   }> {
     const url = new URL(options.path, this.workerUrl.origin);
+    const staticJson =
+      options.path === '/extensions/index.json' ||
+      staticManifestPathSchema.safeParse(options.path).success;
+    const privateApi =
+      url.pathname === '/api' || url.pathname.startsWith('/api/');
     if (
       url.origin !== this.workerUrl.origin ||
-      (url.pathname !== '/api' && !url.pathname.startsWith('/api/')) ||
-      url.hash
+      (!privateApi && !staticJson) ||
+      url.hash ||
+      (staticJson &&
+        (url.pathname !== options.path ||
+          url.search ||
+          (options.method !== undefined && options.method !== 'GET') ||
+          options.body !== undefined))
     ) {
       throw new RuntimeFailure(
         'protocol_error',
-        'API requests must use the same-origin private API',
+        'Control requests require the private API or a catalog JSON GET',
       );
     }
     const controller = new AbortController();
@@ -483,11 +494,13 @@ export class SourceRuntimeManager {
       }
       const response = await fetch(url.href, {
         method: options.method ?? 'GET',
-        headers: options.headers ?? {},
+        headers: staticJson
+          ? { Accept: 'application/json' }
+          : (options.headers ?? {}),
         ...(options.body === undefined ? {} : { body: options.body }),
-        credentials: 'same-origin',
+        credentials: staticJson ? 'omit' : 'same-origin',
         redirect: 'manual',
-        cache: 'no-store',
+        cache: staticJson ? 'no-cache' : 'no-store',
         signal: controller.signal,
       });
       if (

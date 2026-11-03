@@ -132,6 +132,31 @@ class DescriptorBoundary(unittest.TestCase):
             self.assertEqual(manifest.read_text(), "original")
 
 
+class EncodedBundleBoundary(unittest.TestCase):
+    def test_builder_writes_only_the_declared_deterministic_gzip(self):
+        import gzip
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "app.js"
+            content = b"console.log('" + "漫画".encode() + b"');"
+            source.write_bytes(content)
+            output = directory / "output"
+            output.mkdir()
+            ref = builder.put(output, source, "text/javascript")
+            artifact = output / "artifacts" / (ref["sha256"] + ".gz")
+            encoded = artifact.read_bytes()
+            self.assertEqual(list((output / "artifacts").iterdir()), [artifact])
+            self.assertEqual(gzip.decompress(encoded), content)
+            self.assertEqual(
+                ref["path"], "/extensions/artifacts/" + ref["sha256"] + ".gz"
+            )
+            self.assertEqual(ref["encoding"], "gzip")
+            self.assertEqual(ref["encodedSha256"], hashlib.sha256(encoded).hexdigest())
+            self.assertEqual(ref["encodedSize"], len(encoded))
+            self.assertEqual(ref["size"], len(content))
+
+
 class SharedMaterialsBoundary(unittest.TestCase):
     def catalog(self):
         protocol = json.loads((ROOT / "packages/contracts/protocol.json").read_text())

@@ -22,6 +22,7 @@ RUNTIME = ROOT / "runtime/teavm"
 LOCAL = RUNTIME / ".local"
 sys.path.insert(0, str(ROOT / "tools/extensions"))
 import catalog
+from assets import encode_bundle
 
 
 def load_module(name, path):
@@ -140,17 +141,11 @@ def validate_descriptor(descriptor, upstream):
 
 
 def put(output, file, content_type):
-    data = file.read_bytes()
-    digest = sha(data)
-    target = output / "artifacts" / digest
+    encoded, reference = encode_bundle(file.read_bytes(), content_type)
+    target = output / "artifacts" / (reference["sha256"] + ".gz")
     target.parent.mkdir(exist_ok=True)
-    target.write_bytes(data)
-    return {
-        "path": "/api/extensions/artifacts/" + digest,
-        "sha256": digest,
-        "size": len(data),
-        "contentType": content_type,
-    }
+    target.write_bytes(encoded)
+    return reference
 
 
 def material_catalog():
@@ -473,7 +468,10 @@ def build(args):
                 {
                     "sha256": item["sha256"],
                     "size": item["size"],
-                    "path": "artifacts/" + item["sha256"],
+                    "path": "artifacts/" + item["sha256"] + ".gz",
+                    "encoding": "gzip",
+                    "encodedSha256": item["encodedSha256"],
+                    "encodedSize": item["encodedSize"],
                 }
                 for item in artifacts
             ],

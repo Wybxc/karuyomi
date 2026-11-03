@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Verify every artifact, then register one immutable build locally or remotely.
+"""Verify a static build and register only its explicit Source network policy.
 
-Without --local/--remote, only prints the reviewed import plan. Network domains
-must be explicitly supplied; they are not learned from extension requests.
+Static Assets is the sole distribution authority. Remote registration checks the
+deployed index; local probes require an explicit controlled static snapshot.
 """
 
 from pathlib import Path
@@ -13,6 +13,9 @@ import os
 import re
 import subprocess
 import tempfile
+import urllib.request
+import urllib.parse
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -37,7 +40,7 @@ def material_catalog():
     )
 
 
-def verify(manifest, folder, *, verify_hashes=True, material_catalog_override=None):
+def verify_metadata(manifest, *, material_catalog_override=None):
     if not isinstance(manifest, dict):
         raise ValueError("Invalid build manifest")
     protocol = json.loads((ROOT / "packages/contracts/protocol.json").read_text())
@@ -94,12 +97,12 @@ def verify(manifest, folder, *, verify_hashes=True, material_catalog_override=No
         ):
             raise ValueError("Invalid artifact")
         digest = artifact["sha256"]
-        private = artifact.get("path") == "/api/extensions/artifacts/" + digest
+        bundle = artifact.get("path") == "/extensions/artifacts/" + digest + ".gz"
         shared = artifact.get("path") == "/runtime/materials/" + digest
         if (
             not re.fullmatch("[a-f0-9]{64}", digest)
-            or not (private or shared)
-            or (index == 0 and not private)
+            or not (bundle or shared)
+            or (index == 0 and not bundle)
         ):
             raise ValueError("Invalid artifact reference")
         if index > 0 and not shared:
@@ -147,107 +150,215 @@ def verify(manifest, folder, *, verify_hashes=True, material_catalog_override=No
                 and artifact["logicalName"] != expected["logicalName"]
             ):
                 raise ValueError("Shared resource logical name mismatch")
-            # Static/app materials are verified against the host catalog, and
-            # never uploaded to private R2 or associated in build_artifacts.
+            if any(
+                key in artifact for key in ("encoding", "encodedSha256", "encodedSize")
+            ):
+                raise ValueError("Shared runtime materials must be unencoded")
+            # Only the bundle is transferred; shared materials belong to the host.
             continue
-        file = folder / digest
-        size = file.stat().st_size
-        if not 0 < size <= 64 * 1024 * 1024 or size != artifact["size"]:
-            raise ValueError("Artifact size mismatch: " + digest)
-        if verify_hashes:
-            with file.open("rb") as stream:
-                actual = hashlib.file_digest(stream, "sha256").hexdigest()
-            if actual != digest:
-                raise ValueError("Artifact integrity mismatch: " + digest)
+        if (
+            artifact.get("contentType")
+            not in ("application/javascript", "text/javascript")
+            or artifact.get("encoding") != "gzip"
+            or not isinstance(artifact.get("encodedSha256"), str)
+            or not re.fullmatch("[a-f0-9]{64}", artifact["encodedSha256"])
+            or type(artifact.get("encodedSize")) is not int
+            or not 0 < artifact["encodedSize"] <= 25 * 1024 * 1024
+        ):
+            raise ValueError("Invalid gzip bundle metadata")
         result[digest] = artifact
     if sum(artifact["size"] for artifact in artifacts) > 96 * 1024 * 1024:
         raise ValueError("Build exceeds runtime budget")
     return result
 
 
-def registration_sql(manifest, artifacts, hosts):
-    manifest_json = json.dumps(
-        manifest, separators=(",", ":"), ensure_ascii=False, sort_keys=True
+def verify(manifest, folder, *, verify_hashes=True, material_catalog_override=None):
+    artifacts = verify_metadata(
+        manifest, material_catalog_override=material_catalog_override
     )
-    build_id = quote(manifest["buildId"])
-    hosts_json = json.dumps(sorted(set(hosts)), separators=(",", ":"))
-    # Wrangler --file submits these statements as a D1 transaction. Avoid SQL
-    # BEGIN/COMMIT, which D1 rejects. A NOT NULL guard aborts the entire batch on
-    # any immutable identity conflict, including existing verified build IDs.
-    same_manifest = " AND ".join(
-        "NOT EXISTS (SELECT fullkey,type,atom FROM json_tree("
-        + first
-        + ") EXCEPT "
-        + "SELECT fullkey,type,atom FROM json_tree("
-        + second
-        + "))"
-        for first, second in [
-            ("extension_builds.manifest_json", "excluded.manifest_json"),
-            ("excluded.manifest_json", "extension_builds.manifest_json"),
-        ]
-    )
-    statements = [
-        "INSERT INTO extension_builds (build_id,package_name,manifest_json,status,created_at,allowed_hosts_json) VALUES ("
-        + ",".join(
-            (
-                build_id,
-                quote(manifest["packageName"]),
-                quote(manifest_json),
-                quote("disabled"),
-                "unixepoch()",
-                quote(hosts_json),
-            )
-        )
-        + ") ON CONFLICT(build_id) DO UPDATE SET manifest_json=CASE WHEN "
-        + "extension_builds.package_name=excluded.package_name AND "
-        + same_manifest
-        + " AND json(extension_builds.allowed_hosts_json)=json(excluded.allowed_hosts_json) THEN extension_builds.manifest_json ELSE NULL END;"
-    ]
     for digest, artifact in artifacts.items():
-        content_type = artifact.get("contentType", "application/octet-stream")
-        if content_type not in (
-            "application/javascript",
-            "text/javascript",
-            "application/wasm",
-            "application/octet-stream",
-            "application/json",
-        ):
-            raise ValueError("Unsupported artifact MIME")
-        statements.append(
-            "INSERT INTO extension_artifacts (sha256,object_key,size,content_type) VALUES ("
-            + ",".join(
-                (
-                    quote(digest),
-                    quote("artifacts/" + digest),
-                    str(artifact["size"]),
-                    quote(content_type),
-                )
-            )
-            + ") ON CONFLICT(sha256) DO UPDATE SET object_key=CASE WHEN "
-            + "extension_artifacts.object_key=excluded.object_key AND extension_artifacts.size=excluded.size "
-            + "AND extension_artifacts.content_type=excluded.content_type THEN extension_artifacts.object_key ELSE NULL END;"
+        file = folder / (digest + ".gz")
+        if file.is_symlink() or not file.is_file():
+            raise ValueError("Bundle must be a regular gzip file")
+        if file.stat().st_size != artifact["encodedSize"]:
+            raise ValueError("Encoded bundle size mismatch")
+        if verify_hashes:
+            verify_gzip(file, artifact)
+    return artifacts
+
+
+def verify_gzip(file, artifact):
+    """One transfer read; at most 64KiB decompressed bytes per iteration."""
+    encoded_hash = hashlib.sha256()
+    raw_hash = hashlib.sha256()
+    decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    encoded_size = raw_size = 0
+    try:
+        with file.open("rb") as stream:
+            while chunk := stream.read(65536):
+                encoded_size += len(chunk)
+                if encoded_size > artifact["encodedSize"]:
+                    raise ValueError("Encoded bundle size mismatch")
+                encoded_hash.update(chunk)
+                if decoder.eof:
+                    raise ValueError("Trailing gzip data")
+                pending = chunk
+                while pending:
+                    raw = decoder.decompress(pending, 65536)
+                    pending = decoder.unconsumed_tail
+                    raw_size += len(raw)
+                    if raw_size > artifact["size"]:
+                        raise ValueError("Bundle exceeds canonical size")
+                    raw_hash.update(raw)
+                    if decoder.unused_data:
+                        raise ValueError("Trailing gzip data")
+        if not decoder.eof:
+            raise ValueError("Truncated gzip bundle")
+    except zlib.error as error:
+        raise ValueError("Invalid gzip bundle") from error
+    if encoded_size != artifact["encodedSize"] or raw_size != artifact["size"]:
+        raise ValueError("Bundle size mismatch")
+    if encoded_hash.hexdigest() != artifact["encodedSha256"]:
+        raise ValueError("Encoded bundle integrity mismatch")
+    if raw_hash.hexdigest() != artifact["sha256"]:
+        raise ValueError("Canonical bundle integrity mismatch")
+
+
+def registration_sql(manifest, artifacts, hosts, *, current_build_ids=None):
+    # No distribution bytes or manifests live in D1. The deployed current index
+    # has already been checked before generating this policy transaction.
+    build_id = quote(manifest["buildId"])
+    package = quote(manifest["packageName"])
+    hosts_json = quote(json.dumps(sorted(set(hosts)), separators=(",", ":")))
+    digest = quote(manifest["bundle"]["sha256"])
+    retire = ""
+    if current_build_ids is not None:
+        retire = (
+            "DELETE FROM extension_builds WHERE build_id NOT IN ("
+            + ",".join(quote(value) for value in sorted(current_build_ids))
+            + ");\n"
         )
-    for digest in artifacts:
-        statements.append(
-            "INSERT OR IGNORE INTO build_artifacts (build_id,sha256) VALUES ("
-            + build_id
-            + ","
-            + quote(digest)
-            + ");"
-        )
-    # Refuse unexpected prior associations instead of silently succeeding with
-    # extra public artifacts (including a previously polluted build).
-    statements.append(
-        "UPDATE extension_builds SET status='verified', manifest_json=CASE WHEN "
-        + "(SELECT count(*) FROM build_artifacts WHERE build_id="
+    return (
+        retire
+        + "DELETE FROM extension_builds WHERE package_name="
+        + package
+        + " AND build_id<>"
         + build_id
-        + ")="
-        + str(len(artifacts))
-        + " THEN manifest_json ELSE NULL END WHERE build_id="
-        + build_id
-        + ";"
+        + ";\n"
+        + "INSERT INTO extension_builds (build_id,package_name,bundle_sha256,status,created_at,allowed_hosts_json) VALUES ("
+        + ",".join((build_id, package, digest, "'verified'", "unixepoch()", hosts_json))
+        + ") ON CONFLICT(build_id) DO UPDATE SET bundle_sha256=CASE WHEN "
+        + "extension_builds.package_name=excluded.package_name AND "
+        + "extension_builds.bundle_sha256=excluded.bundle_sha256 AND "
+        + "json(extension_builds.allowed_hosts_json)=json(excluded.allowed_hosts_json) "
+        + "THEN extension_builds.bundle_sha256 ELSE NULL END,status='verified';\n"
     )
-    return "\n".join(statements) + "\n"
+
+
+def load_static_index(load):
+    index = load("/extensions/index.json", 4 * 1024 * 1024)
+    if (
+        not isinstance(index, dict)
+        or type(index.get("schemaVersion")) is not int
+        or index["schemaVersion"] != 1
+        or index.get("nextCursor") is not None
+        or not isinstance(index.get("builds"), list)
+        or len(index["builds"]) > 5000
+    ):
+        raise ValueError("Invalid static extension index")
+    packages = set()
+    builds = set()
+    for item in index["builds"]:
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("buildId"), str)
+            or not re.fullmatch(r"[a-zA-Z0-9._-]{1,200}", item["buildId"])
+        ):
+            raise ValueError("Invalid static build identity")
+        package = item.get("packageName")
+        if (
+            not isinstance(package, str)
+            or not package
+            or package in packages
+            or item["buildId"] in builds
+        ):
+            raise ValueError(
+                "Static index must contain only one current build per package"
+            )
+        packages.add(package)
+        builds.add(item["buildId"])
+        if (
+            item.get("manifestPath")
+            != "/extensions/builds/" + item["buildId"] + "/manifest.json"
+        ):
+            raise ValueError("Invalid static manifest path")
+    return index
+
+
+def verify_static_authority(manifest, load):
+    index = load_static_index(load)
+    current = next(
+        (
+            item
+            for item in index["builds"]
+            if item["packageName"] == manifest["packageName"]
+        ),
+        None,
+    )
+    if current is None or any(
+        current.get(key) != manifest[key]
+        for key in ("buildId", "packageName", "repoId", "version", "sourceIds")
+    ):
+        raise ValueError("Build is not current in the static index")
+    deployed = load(current["manifestPath"], 1024 * 1024)
+    if deployed != manifest:
+        raise ValueError("Static manifest differs from supplied build")
+    return {item["buildId"] for item in index["builds"]}
+
+
+def snapshot_loader(root):
+    root = root.resolve()
+
+    def load(path, limit):
+        file = root / path.lstrip("/")
+        if file.is_symlink() or not file.resolve().is_relative_to(root):
+            raise ValueError("Invalid static snapshot path")
+        with file.open("rb") as stream:
+            data = stream.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError("Static metadata exceeds limit")
+        return json.loads(data)
+
+    return load
+
+
+def deployed_loader(origin):
+    parsed = urllib.parse.urlsplit(origin)
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+    ):
+        raise ValueError("Static authority requires a configured HTTPS origin")
+
+    def load(path, limit):
+        url = origin + path
+        request = urllib.request.Request(
+            url, headers={"Cache-Control": "no-cache", "Accept": "application/json"}
+        )
+        with urllib.request.urlopen(request, timeout=20) as response:
+            # Static metadata paths must not redirect to a login or other origin.
+            if response.url != url:
+                raise ValueError("Static metadata redirected")
+            data = response.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError("Static metadata exceeds limit")
+        return json.loads(data)
+
+    return load
 
 
 def main():
@@ -265,7 +376,16 @@ def main():
         type=Path,
         help="Dedicated Wrangler state directory (requires --local)",
     )
+    parser.add_argument(
+        "--static-root",
+        type=Path,
+        help="Controlled static snapshot (local probes only)",
+    )
     args = parser.parse_args()
+    if args.static_root and not args.local:
+        parser.error("--static-root requires --local")
+    if args.local and not args.static_root:
+        parser.error("--local requires an explicit --static-root snapshot")
     if args.persist_to and not args.local:
         parser.error("--persist-to requires --local")
     args.artifacts = args.artifacts.resolve()
@@ -282,7 +402,22 @@ def main():
             )
         ):
             parser.error("Network policy requires explicit public hostnames")
-    sql = registration_sql(manifest, artifacts, hosts)
+    current_build_ids = None
+    if args.local:
+        current_build_ids = verify_static_authority(
+            manifest, snapshot_loader(args.static_root)
+        )
+    elif args.remote:
+        configuration = (ROOT / "apps/api/wrangler.jsonc").read_text()
+        origin = re.search(r'"APP_ORIGIN":\s*"([^"\n]+)"', configuration)
+        if not origin:
+            parser.error("APP_ORIGIN is missing")
+        current_build_ids = verify_static_authority(
+            manifest, deployed_loader(origin[1])
+        )
+    sql = registration_sql(
+        manifest, artifacts, hosts, current_build_ids=current_build_ids
+    )
     print(
         json.dumps(
             {
@@ -317,22 +452,6 @@ def main():
             ["pnpm", "exec", "wrangler", *arguments], cwd=cwd, env=env, check=True
         )
 
-    # Objects are immutable, content-addressed and private. Only after every
-    # upload succeeds is the metadata/pointer made visible to authenticated API.
-    for digest, artifact in artifacts.items():
-        run(
-            [
-                "r2",
-                "object",
-                "put",
-                "karuyomi-private/artifacts/" + digest,
-                target,
-                "--file",
-                str(args.artifacts / digest),
-                "--content-type",
-                artifact.get("contentType", "application/octet-stream"),
-            ]
-        )
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".sql", prefix="karuyomi-register-", delete=False
     ) as stream:

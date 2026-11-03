@@ -1,6 +1,6 @@
 # 共享运行时材料
 
-共享桥与 WASM 随客户端版本交付：Web 使用静态资源，Native 将字节打包进应用。扩展 AOT bundle 继续通过受 Access 保护的私有 API 加载。当前处于原型阶段，仅维护当前材料，不保留旧版本兼容集合或私有路径回退。
+共享桥与 WASM 随客户端版本交付：Web 使用静态资源，Native 将字节打包进应用。所有客户端的扩展 AOT bundle 均从 Static Assets 获取，索引每包只保留最新可用构建。当前处于原型阶段，仅维护当前材料，不保留旧版本兼容集合或私有路径回退；完整交付流程见[扩展静态分发](EXTENSIONS.md)。
 
 ## 来源与构建
 
@@ -27,11 +27,11 @@ pnpm --filter @karuyomi/runtime-host build
 
 ## Web 与 Native
 
-扩展清单中的 hostScripts/resources 只能使用 `/runtime/materials/<sha256>` 静态路径。Web loader 使用同源静态请求、`credentials: omit` 和内容寻址缓存，并验证收到的字节。私有 bundle 使用 `/api/extensions/artifacts/<sha256>`，保持同源鉴权。
+扩展清单中的 hostScripts/resources 只能使用 `/runtime/materials/<sha256>` 静态路径。Web loader 使用同源静态请求、`credentials: omit` 和内容寻址缓存，并验证收到的字节。Web 与 Native 的扩展 bundle 都使用 `/extensions/artifacts/<canonicalSHA>.gz`；先验证编码后的长度/摘要，再有界解压并验证 canonical 长度/摘要。索引和清单使用 no-cache，gzip 使用 immutable 缓存及 `application/gzip`，不附加 HTTP Content-Encoding。公开扩展下载不携带 Access cookie。
 
 `scripts/assemble-assets.ts` 合并静态 MIME、nosniff 与一年 immutable 缓存规则；catalog 使用 no-cache。它同时排除 runtime/native 和 Flutter Web 复制出的 assets/assets/runtime，并遍历实际公开文件，防止原生 host/worker/manifest 以其它名字进入公开产物。
 
-Native 的材料解析器只返回应用内字节；缺失时明确失败，不访问网络。Dart 校验运行时 manifest 和 host/worker，再于受控 HTTPS 页面 document-start 注入。控制页采用 `/runtime/host.html` 或 Cloudflare 规范化后的 `/runtime/host`；API 使用该 WebView 的同源 Access cookie。Native host 将当前 origin、plugin 与 fsNamespace 传给 Blob Worker，cache/file 桥据此使用当前构建命名空间。
+Native 的共享材料解析器只返回应用内字节；缺失时明确失败，不访问网络。扩展 bundle 则与 Web 一样从静态索引加载。Dart 校验运行时 manifest 和 host/worker，再于受控 HTTPS 页面 document-start 注入。控制页采用 `/runtime/host.html` 或 Cloudflare 规范化后的 `/runtime/host`；动态 API 使用该 WebView 的同源 Access cookie。Native host 将当前 origin、plugin 与 fsNamespace 传给 Blob Worker，cache/file 桥据此使用当前构建命名空间。
 
 ## 验证范围
 

@@ -10,8 +10,8 @@
   "assets": {
     "directory": "../../dist/public",
     "binding": "ASSETS",
-    "run_worker_first": true,
-    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*", "/runtime/host.html"],
+    "not_found_handling": "none",
   },
   "vars": {
     "ACCESS_TEAM_DOMAIN": "wybxc.cloudflareaccess.com",
@@ -28,7 +28,6 @@
       "migrations_dir": "migrations",
     },
   ],
-  "r2_buckets": [{ "binding": "ARTIFACTS", "bucket_name": "karuyomi-private" }],
   "durable_objects": {
     "bindings": [
       { "name": "RUNTIME_SESSIONS", "class_name": "RuntimeSession" },

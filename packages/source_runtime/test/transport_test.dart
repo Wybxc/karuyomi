@@ -43,7 +43,9 @@ final class FakeTransport implements RuntimeTransport {
 BuildDescriptor build({String identity = 'owner', String? path}) =>
     BuildDescriptor(
       buildId: 'build-1',
-      manifestUri: Uri.parse(path ?? '/api/extensions/builds/build-1/manifest'),
+      manifestUri: Uri.parse(
+        path ?? '/extensions/builds/build-1/manifest.json',
+      ),
       sha256: 'hash',
       identity: identity,
       packageId: 'package-1',
@@ -80,7 +82,7 @@ void main() {
   });
 
   test(
-    'refuses unconfirmed identities and public/cross-origin manifests',
+    'refuses unconfirmed identities and mismatched/cross-origin static manifests',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
@@ -90,7 +92,10 @@ void main() {
       );
       for (final path in [
         '/runtime/build.json',
-        'https://another.example/api/extensions/builds/build-1/manifest',
+        '/api/extensions/builds/build-1/manifest',
+        '/extensions/builds/other/manifest.json',
+        '/extensions/builds/build-1/manifest.json?old=1',
+        'https://another.example/extensions/builds/build-1/manifest.json',
       ]) {
         await expectLater(
           runtime.open(build(path: path)),

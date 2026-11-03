@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Resumable local bootstrap and bounded incremental private-release pipeline."""
+"""Resumable local AOT bootstrap and bounded Static Assets incremental builds."""
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import argparse
-import importlib.util
+import copy
 from functools import lru_cache
+import importlib.util
 import json
 import os
 import re
@@ -16,28 +17,28 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.error
+import uuid
 
 from catalog import (
     ROOT,
     HOST_PATHS,
     canonical,
-    digest,
-    extension_tag,
     git,
     host_fingerprint,
     host_submodules,
     scan,
     tree_hash,
+    digest,
 )
-from releases import (
-    GitHub,
-    download_release,
-    encode_artifact,
-    capture_files,
-    publish_locator,
-    release_pointer,
-    restore_artifacts,
-)
+from assets import decode_bundle, fetch_bytes, fetch_json, MAX_ENCODED
+
+MAX_STATE_BYTES = 16 * 1024 * 1024
+
+DEFAULT_ASSETS = ROOT / ".local/extensions-assets"
+DEFAULT_ORIGIN = "https://karuyomi.wybxc.cc"
+STATE_PATH = "/extensions/build-state.json"
+INDEX_PATH = "/extensions/index.json"
 
 
 class BuildCancelled(KeyboardInterrupt):
@@ -139,22 +140,48 @@ def write_json(path, value):
 def empty_state():
     return {
         "schemaVersion": 1,
+        "kind": "static-extension-build-state",
+        "revision": None,
         "bootstrap": {"complete": False},
         "attempts": {},
         "active": {},
-        "remoteIndexTag": None,
     }
 
 
-def load_state(path):
-    state = read_json(path) if Path(path).exists() else empty_state()
+def validate_state(state):
     if (
-        state.get("schemaVersion") != 1
+        not isinstance(state, dict)
+        or state.get("schemaVersion") != 1
+        or state.get("kind") != "static-extension-build-state"
         or not isinstance(state.get("attempts"), dict)
         or not isinstance(state.get("active"), dict)
+        or not isinstance(state.get("bootstrap"), dict)
     ):
-        raise ValueError("Invalid extension checkpoint")
+        raise ValueError("Invalid static extension build state")
+    revision = state.get("revision")
+    if revision is not None and (
+        not isinstance(revision, str) or not re.fullmatch("[a-f0-9]{32}", revision)
+    ):
+        raise ValueError("Invalid snapshot revision")
+    for key, record in state["attempts"].items():
+        descriptor = record.get("descriptor", {})
+        if key != descriptor.get("inputFingerprint") or record.get("status") not in {
+            "published",
+            "failed",
+        }:
+            raise ValueError("Invalid build result record")
+    for package, key in state["active"].items():
+        record = state["attempts"].get(key, {})
+        if (
+            record.get("status") != "published"
+            or record.get("descriptor", {}).get("packageName") != package
+        ):
+            raise ValueError("Invalid successful build pointer")
     return state
+
+
+def load_state(path):
+    return validate_state(read_json(path)) if Path(path).exists() else empty_state()
 
 
 def ci_environment():
@@ -163,43 +190,94 @@ def ci_environment():
 
 def make_plan(catalog, state, limit=12, ci=False, retry_failed=False):
     if ci and state.get("bootstrap", {}).get("complete") is not True:
-        raise ValueError(
-            "CI bootstrap guard: finish and publish the initial local baseline first"
-        )
+        raise ValueError("CI bootstrap guard: deploy the initial local baseline first")
     if ci and retry_failed:
-        raise ValueError("CI cannot retry an unchanged full failure baseline")
+        raise ValueError("CI cannot retry unchanged failures")
     if not 1 <= limit <= (24 if ci else 10000):
         raise ValueError("Invalid batch limit")
-    repository_commit = git(ROOT, "rev-parse", "HEAD")
-    pinned_submodules = host_submodules()
+    commit = git(ROOT, "rev-parse", "HEAD")
+    pins = host_submodules()
     entries = [
-        {
-            **entry,
-            "hostRepositoryCommit": repository_commit,
-            "hostSubmodules": pinned_submodules,
-        }
+        {**entry, "hostRepositoryCommit": commit, "hostSubmodules": pins}
         for entry in catalog["entries"]
     ]
-    pending = []
-    for entry in entries:
-        previous = state["attempts"].get(entry["inputFingerprint"])
-        if previous is None or (
-            previous["status"] == "failed"
+    pending = [
+        entry
+        for entry in entries
+        if entry["inputFingerprint"] not in state["attempts"]
+        or (
+            state["attempts"][entry["inputFingerprint"]]["status"] == "published"
+            and state["attempts"][entry["inputFingerprint"]].get("available") is False
+            and not state["attempts"][entry["inputFingerprint"]].get("rebuildFailure")
+        )
+        or (
+            retry_failed
             and (
-                retry_failed
-                or previous.get("retryable")
-                and previous.get("attempts", 0) < 3
+                state["attempts"][entry["inputFingerprint"]]["status"] == "failed"
+                or state["attempts"][entry["inputFingerprint"]].get("rebuildFailure")
             )
-        ):
-            pending.append(entry)
+        )
+    ]
     return {
         **catalog,
         "entries": entries,
-        "repositoryCommit": repository_commit,
+        "repositoryCommit": commit,
         "selected": pending[:limit],
         "pendingCount": len(pending),
         "remainingCount": max(0, len(pending) - limit),
         "ci": ci,
+        "baseRevision": state["revision"],
+        "snapshotNeeded": bool(
+            pending[:limit]
+            or state.get("catalogFingerprint") != catalog["catalogFingerprint"]
+        ),
+    }
+
+
+def resume_plan(plan, state, limit=10000, retry_failed=False):
+    if ci_environment():
+        raise ValueError("CI cannot resume an initial frozen baseline")
+    if not 1 <= limit <= 10000:
+        raise ValueError("Invalid batch limit")
+    if not isinstance(plan.get("entries"), list) or not plan["entries"]:
+        raise ValueError("Frozen plan must contain its complete catalog")
+    first = plan["entries"][0]
+    for entry in plan["entries"]:
+        if any(
+            entry.get(key) != first.get(key)
+            for key in [
+                "hostRepositoryCommit",
+                "hostFingerprint",
+                "hostInputs",
+                "hostSubmodules",
+                "upstreamCommit",
+            ]
+        ):
+            raise ValueError("Frozen plan mixes host or source identities")
+    pending = [
+        entry
+        for entry in plan["entries"]
+        if entry["inputFingerprint"] not in state["attempts"]
+        or (
+            state["attempts"][entry["inputFingerprint"]]["status"] == "published"
+            and state["attempts"][entry["inputFingerprint"]].get("available") is False
+            and not state["attempts"][entry["inputFingerprint"]].get("rebuildFailure")
+        )
+        or (
+            retry_failed
+            and (
+                state["attempts"][entry["inputFingerprint"]]["status"] == "failed"
+                or state["attempts"][entry["inputFingerprint"]].get("rebuildFailure")
+            )
+        )
+    ]
+    return {
+        **plan,
+        "selected": pending[:limit],
+        "pendingCount": len(pending),
+        "remainingCount": max(0, len(pending) - limit),
+        "ci": False,
+        "baseRevision": state["revision"],
     }
 
 
@@ -225,54 +303,6 @@ def validate_build_checkout(checkout, descriptor):
     return checkout
 
 
-def resume_plan(plan, state, limit=10000, retry_failed=False):
-    if ci_environment():
-        raise ValueError("CI cannot resume an initial frozen baseline")
-    if not 1 <= limit <= 10000:
-        raise ValueError("Invalid batch limit")
-    if not isinstance(plan.get("entries"), list) or not plan["entries"]:
-        raise ValueError("Frozen plan must contain its complete catalog")
-    entries = plan["entries"]
-    first = entries[0]
-    if any(
-        any(
-            entry.get(key) != first.get(key)
-            for key in [
-                "hostRepositoryCommit",
-                "hostFingerprint",
-                "hostInputs",
-                "hostSubmodules",
-                "upstreamCommit",
-            ]
-        )
-        for entry in entries
-    ):
-        raise ValueError("Frozen plan mixes host or source identities")
-    pending = []
-    for entry in entries:
-        previous = state["attempts"].get(entry["inputFingerprint"])
-        if (
-            previous is None
-            or previous.get("status") == "built"
-            or (
-                previous.get("status") == "failed"
-                and (
-                    retry_failed
-                    or previous.get("retryable")
-                    and previous.get("attempts", 0) < 3
-                )
-            )
-        ):
-            pending.append(entry)
-    return {
-        **plan,
-        "selected": pending[:limit],
-        "pendingCount": len(pending),
-        "remainingCount": max(0, len(pending) - limit),
-        "ci": False,
-    }
-
-
 @lru_cache(maxsize=4)
 def checkout_material_catalog(checkout):
     root = Path(checkout)
@@ -282,39 +312,71 @@ def checkout_material_catalog(checkout):
     )
 
 
-def verify_output(
-    directory, descriptor=None, *, verify_hashes=True, build_checkout=None
-):
+@lru_cache(maxsize=1)
+def verifier():
+    spec = importlib.util.spec_from_file_location(
+        "extension_verifier", ROOT / "scripts/register-build.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class VerifiedBuild(dict):
+    """One process owns these verified transfer bytes; later stages reuse them."""
+
+    def __init__(self, result, manifest, directory, validation):
+        super().__init__(result)
+        self.manifest, self.validation = manifest, validation
+        self.file = (
+            Path(directory) / "artifacts" / (manifest["bundle"]["sha256"] + ".gz")
+        )
+        self.signature = self.identity()
+
+    def identity(self):
+        info = self.file.stat()
+        return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+
+    def payload(self):
+        if self.identity() != self.signature:
+            raise ValueError("Verified output changed before snapshot assembly")
+        return self.file.read_bytes()
+
+
+def verify_output(directory, descriptor=None, *, build_checkout=None):
     directory = Path(directory)
     if directory.is_symlink() or any(
         file.is_symlink() for file in directory.rglob("*")
     ):
         raise ValueError("Build output must not contain symlinks")
     for name in ["manifest.json", "validation.json", "provenance.json"]:
-        if (directory / name).exists() and (
-            directory / name
-        ).stat().st_size > 2 * 1024 * 1024:
+        file = directory / name
+        if file.exists() and file.stat().st_size > 2 * 1024 * 1024:
             raise ValueError("Oversized build metadata")
     manifest = read_json(directory / "manifest.json")
-    spec = importlib.util.spec_from_file_location(
-        "registered_build", ROOT / "scripts/register-build.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    artifacts = module.verify(
+    verifier().verify(
         manifest,
         directory / "artifacts",
-        verify_hashes=verify_hashes,
+        verify_hashes=False,
         material_catalog_override=checkout_material_catalog(str(build_checkout))
         if build_checkout
         else None,
     )
-    if descriptor and (
-        manifest["packageName"] != descriptor["packageName"]
-        or manifest["buildId"] != descriptor["buildId"]
-        or manifest["version"] != descriptor["versionName"]
+    if descriptor and any(
+        manifest[field] != descriptor[name]
+        for field, name in [
+            ("packageName", "packageName"),
+            ("buildId", "buildId"),
+            ("version", "versionName"),
+        ]
     ):
         raise ValueError("Build output differs from its pinned descriptor")
+    reference = manifest["bundle"]
+    file = directory / "artifacts" / (reference["sha256"] + ".gz")
+    if file.stat().st_size != reference["encodedSize"]:
+        raise ValueError("Encoded bundle size mismatch")
+    encoded = file.read_bytes()
+    decode_bundle(encoded, reference)
     validation_path = directory / "validation.json"
     validation = (
         read_json(validation_path)
@@ -322,173 +384,30 @@ def verify_output(
         else {
             "schemaVersion": 1,
             "valid": False,
-            "buildId": manifest["buildId"],
-            "manifestSha256": digest((directory / "manifest.json").read_bytes()),
             "stages": {
                 "artifactIntegrity": "passed",
                 "workerInit": "not_run",
                 "browserLoad": "not_run",
             },
-            "failure": {
-                "code": "browser_not_run",
-                "message": "Compilation is not browser compatibility evidence",
-            },
         }
     )
     stages = validation.get("stages", {})
-    verified = (
+    validation["runtimeReady"] = (
         validation.get("valid") is True
-        and stages.get("artifactIntegrity") == "passed"
-        and stages.get("workerInit") == "passed"
-        and stages.get("browserLoad") == "passed"
+        and all(
+            stages.get(key) == "passed"
+            for key in ["artifactIntegrity", "workerInit", "browserLoad"]
+        )
         and validation.get("buildId") == manifest["buildId"]
         and validation.get("manifestSha256")
         == digest((directory / "manifest.json").read_bytes())
     )
-    validation["runtimeReady"] = verified
-    return manifest, artifacts, validation
+    return manifest, encoded, validation
 
 
-def release_files(directory, descriptor, encoding="gzip", build_checkout=None):
-    directory = Path(directory)
-    manifest, artifacts, validation = verify_output(
-        directory, descriptor, verify_hashes=False, build_checkout=build_checkout
-    )
-    known = {}
-    provenance = {
-        "schemaVersion": 1,
-        "kind": "source-aot",
-        "descriptor": descriptor,
-        "manifestSha256": digest((directory / "manifest.json").read_bytes()),
-        "validationStatus": "browser_verified"
-        if validation["runtimeReady"]
-        else "compiled_unverified",
-    }
-    files = {sha: directory / "artifacts" / sha for sha in artifacts}
-    if encoding != "gzip":
-        raise ValueError("Unknown release artifact encoding")
-    if encoding == "gzip":
-        bundle_sha = manifest["bundle"]["sha256"]
-        transport = directory / "release-transport"
-        if (transport / "artifact-encodings.json").is_file():
-            # Reuse exact transport bytes on an upload retry, even if a different
-            # zlib version would encode the same canonical bundle differently.
-            with tempfile.TemporaryDirectory(
-                prefix="karuyomi-check-encoding-"
-            ) as temporary:
-                restore_artifacts(
-                    transport,
-                    temporary,
-                    {bundle_sha: artifacts[bundle_sha]},
-                    bundle_sha,
-                )
-            encoded = (transport / (bundle_sha + ".gz")).read_bytes()
-            table = (transport / "artifact-encodings.json").read_bytes()
-            entry = json.loads(table)["artifacts"][0]
-        else:
-            encoded, entry = encode_artifact(bundle_sha, files[bundle_sha])
-            table = canonical({"schemaVersion": 1, "artifacts": [entry]}) + b"\n"
-        del files[bundle_sha]
-        files[bundle_sha + ".gz"] = encoded
-        known[bundle_sha + ".gz"] = {
-            "sha256": entry["encodedSha256"],
-            "size": entry["encodedSize"],
-        }
-        files["artifact-encodings.json"] = table
-    files["manifest.json"] = directory / "manifest.json"
-    files["provenance.json"] = canonical(provenance) + b"\n"
-    files["validation.json"] = canonical(validation) + b"\n"
-    if (directory / "provenance.json").exists():
-        files["build-provenance.json"] = directory / "provenance.json"
-    return capture_files(files, known), provenance, validation
-
-
-class DownloadedBuildResult(dict):
-    """A successful download receipt, owned only by this publisher process."""
-
-    def __init__(self, result, reference):
-        super().__init__(result)
-        self.release_reference = reference
-
-
-def restore_build(api, descriptor, output, build_checkout=None):
-    output = Path(output)
-    with tempfile.TemporaryDirectory(prefix="karuyomi-release-") as folder:
-        locator = extension_tag(descriptor["packageName"], descriptor["versionCode"])
-        transfer = download_release(
-            api, locator, folder, generation=descriptor["inputFingerprint"]
-        )
-        if not transfer:
-            return False
-        folder = Path(folder)
-        provenance = read_json(folder / "provenance.json")
-        previous = provenance.get("descriptor", {})
-        if provenance.get("kind") != "source-aot" or any(
-            previous.get(key) != descriptor.get(key)
-            for key in [
-                "packageName",
-                "versionCode",
-                "inputFingerprint",
-                "sourceFingerprint",
-                "hostFingerprint",
-            ]
-        ):
-            raise ValueError("Existing release has different source provenance")
-        staged = folder / "restored"
-        staged.mkdir()
-        manifest = read_json(folder / "manifest.json")
-        references = [
-            manifest["bundle"],
-            *manifest.get("hostScripts", []),
-            *manifest.get("resources", []),
-        ]
-        artifacts = {
-            item["sha256"]: item
-            for item in references
-            if item.get("path")
-            == "/api/extensions/artifacts/" + str(item.get("sha256"))
-        }
-        encoding = restore_artifacts(
-            folder,
-            staged / "artifacts",
-            artifacts,
-            manifest["bundle"]["sha256"],
-            transfer=transfer,
-        )
-        for file in folder.iterdir():
-            if file.name in {"manifest.json", "validation.json"}:
-                shutil.copyfile(file, staged / file.name)
-            elif file.name == "build-provenance.json":
-                shutil.copyfile(file, staged / "provenance.json")
-        _manifest, _artifacts, validation = verify_output(
-            staged, descriptor, verify_hashes=False, build_checkout=build_checkout
-        )
-        if encoding == "gzip":
-            transport = staged / "release-transport"
-            transport.mkdir()
-            for name in [
-                "artifact-encodings.json",
-                manifest["bundle"]["sha256"] + ".gz",
-            ]:
-                shutil.copyfile(folder / name, transport / name)
-        output.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(staged, output, dirs_exist_ok=True)
-        result = DownloadedBuildResult(
-            {
-                "status": "built",
-                "restored": True,
-                "descriptor": descriptor,
-                "releaseDescriptor": previous,
-                "releaseEncoding": encoding,
-                "runtimeReady": validation["runtimeReady"],
-            },
-            transfer.reference,
-        )
-        write_json(output / "pipeline-result.json", result)
-        return result
-
-
-def build_one(descriptor, output, repository=None, build_checkout=None, processes=None):
+def build_one(
+    descriptor, output, build_checkout=None, processes=None, retry_failed=False
+):
     processes = processes or BuilderProcesses()
     processes.check()
     output = Path(output).resolve()
@@ -498,48 +417,42 @@ def build_one(descriptor, output, repository=None, build_checkout=None, processe
         checkout = Path(build_checkout or ROOT).resolve()
         if build_checkout:
             validate_build_checkout(checkout, descriptor)
-        if repository:
-            downloaded = restore_build(
-                GitHub(repository), descriptor, output, build_checkout
-            )
-            if downloaded:
-                return downloaded
         saved = output / "pipeline-result.json"
         if saved.is_file():
             cached = read_json(saved)
-            if (
-                cached.get("descriptor") == descriptor
-                and cached.get("status") == "built"
-            ):
-                verify_output(
-                    output,
-                    descriptor,
-                    verify_hashes=False,
-                    build_checkout=build_checkout,
-                )
-                # A disk checkpoint proves local build reuse, never that the
-                # locator still exposes this generation in the current run.
-                cached.pop("restored", None)
-                cached.pop("releaseReference", None)
-                write_json(saved, cached)
-                return cached
-        current, _inputs = (
-            host_fingerprint()
+            if cached.get("descriptor") == descriptor:
+                if cached.get("status") == "built":
+                    manifest, encoded, validation = verify_output(
+                        output, descriptor, build_checkout=build_checkout
+                    )
+                    cleanup_built_work(output, descriptor, build_checkout)
+                    return VerifiedBuild(cached, manifest, output, validation)
+                if cached.get("status") == "failed" and not retry_failed:
+                    return cached
+        current = (
+            host_fingerprint()[0]
             if not build_checkout
-            else (descriptor["hostFingerprint"], None)
+            else descriptor["hostFingerprint"]
         )
         if current != descriptor["hostFingerprint"]:
             raise ValueError("Host inputs changed since planning")
-        source = checkout / "vendor/extensions-source"
-        if git(source, "rev-parse", "HEAD") != descriptor["upstreamCommit"]:
+        if (
+            git(checkout / "vendor/extensions-source", "rev-parse", "HEAD")
+            != descriptor["upstreamCommit"]
+        ):
             raise ValueError("Source checkout differs from the planned commit")
+        # Explicitly retried failed attempts cannot inherit a partial old output.
+        for name in ["manifest.json", "validation.json", "provenance.json"]:
+            (output / name).unlink(missing_ok=True)
+        if (output / "artifacts").exists():
+            shutil.rmtree(output / "artifacts")
         descriptor_path = output / "descriptor.json"
         write_json(descriptor_path, descriptor)
         with (output / "build.log").open("w") as log:
-            build_environment = {
+            environment = {
                 key: value
                 for key, value in os.environ.items()
-                if key not in {"GH_TOKEN", "GITHUB_TOKEN"}
+                if key not in {"GH_TOKEN", "GITHUB_TOKEN", "CLOUDFLARE_API_TOKEN"}
             }
             processes.run(
                 [
@@ -551,12 +464,12 @@ def build_one(descriptor, output, repository=None, build_checkout=None, processe
                     str(output),
                 ],
                 cwd=checkout,
-                env=build_environment,
+                env=environment,
                 stdout=log,
                 stderr=subprocess.STDOUT,
             )
-        _manifest, _artifacts, validation = verify_output(
-            output, descriptor, verify_hashes=False, build_checkout=build_checkout
+        manifest, encoded, validation = verify_output(
+            output, descriptor, build_checkout=build_checkout
         )
         write_json(output / "validation.json", validation)
         result.update(
@@ -565,8 +478,10 @@ def build_one(descriptor, output, repository=None, build_checkout=None, processe
             if validation["runtimeReady"]
             else "compiled_unverified",
         )
+        write_json(saved, result)
+        cleanup_built_work(output, descriptor, build_checkout)
+        return VerifiedBuild(result, manifest, output, validation)
     except Exception as error:
-        # Do not publish build logs, arbitrary upstream stderr or environment.
         result["failure"] = {
             "stage": "build",
             "code": type(error).__name__,
@@ -579,26 +494,20 @@ def build_one(descriptor, output, repository=None, build_checkout=None, processe
                 result["failure"] = {
                     "stage": failure["stage"],
                     "code": str(failure.get("code", "build_failed"))[:100],
-                    "message": str(failure.get("message", "Build failed"))[:500],
+                    "message": "Official extension build failed; see local build log",
                 }
-        result["retryable"] = isinstance(error, RuntimeError) and str(error).startswith(
-            "GitHub"
-        )
     write_json(output / "pipeline-result.json", result)
     return result
 
 
-def record_result(
-    state, descriptor, result, directory, api=None, target=None, build_checkout=None
-):
+def record_result(state, descriptor, result, directory, build_checkout=None):
     key = descriptor["inputFingerprint"]
-    attempts = state["attempts"].get(key, {}).get("attempts", 0) + 1
     record = {
         "descriptor": descriptor,
         "status": "failed",
-        "attempts": attempts,
-        "retryable": False,
+        "attempts": state["attempts"].get(key, {}).get("attempts", 0) + 1,
     }
+    verified = None
     if result.get("descriptor") != descriptor or result.get("status") != "built":
         record["failure"] = result.get(
             "failure",
@@ -608,100 +517,413 @@ def record_result(
                 "message": "No matching successful build output",
             },
         )
-        record["retryable"] = result.get("retryable") is True
-    elif api is None:
-        record["status"] = "built"
     else:
         try:
-            release_descriptor = result.get("releaseDescriptor", descriptor)
-            if any(
-                release_descriptor.get(key) != descriptor.get(key)
-                for key in [
-                    "packageName",
-                    "versionCode",
-                    "versionName",
-                    "inputFingerprint",
-                    "sourceFingerprint",
-                    "hostFingerprint",
-                    "buildId",
-                ]
-            ):
-                raise ValueError("Restored release does not match planned identity")
-            record["descriptor"] = release_descriptor
-            if isinstance(result, DownloadedBuildResult):
-                reference = result.release_reference
-                if (
-                    reference.get("tag")
-                    != extension_tag(
-                        descriptor["packageName"], descriptor["versionCode"]
-                    )
-                    or reference.get("snapshot", {}).get("generation")
-                    != descriptor["inputFingerprint"]
-                ):
-                    raise ValueError("Restored locator does not match planned identity")
-                _manifest, _artifacts, validation = verify_output(
-                    directory,
-                    release_descriptor,
-                    verify_hashes=False,
-                    build_checkout=build_checkout,
-                )
-                record["release"] = reference
-                validation_status = (
-                    "browser_verified"
-                    if validation["runtimeReady"]
-                    else "compiled_unverified"
-                )
+            if isinstance(result, VerifiedBuild):
+                manifest, validation = result.manifest, result.validation
             else:
-                files, provenance, validation = release_files(
-                    directory,
-                    release_descriptor,
-                    result.get("releaseEncoding", "gzip"),
-                    build_checkout,
+                manifest, encoded, validation = verify_output(
+                    directory, descriptor, build_checkout=build_checkout
                 )
-                record["release"] = publish_locator(
-                    api,
-                    extension_tag(descriptor["packageName"], descriptor["versionCode"]),
-                    descriptor["inputFingerprint"],
-                    files,
-                    target,
-                )
-                validation_status = provenance["validationStatus"]
             record.update(
                 status="published",
-                validationStatus=validation_status,
+                available=True,
+                runtimeIdentity=runtime_identity(manifest),
                 runtimeReady=validation["runtimeReady"],
+                validationStatus="browser_verified"
+                if validation["runtimeReady"]
+                else "compiled_unverified",
+            )
+            verified = (
+                result
+                if isinstance(result, VerifiedBuild)
+                else VerifiedBuild(result, manifest, directory, validation)
             )
             state["active"][descriptor["packageName"]] = key
         except Exception as error:
-            record.update(
-                retryable=isinstance(error, RuntimeError),
-                failure={
-                    "stage": "publish",
-                    "code": type(error).__name__,
-                    "message": str(error)[:500],
-                },
-            )
+            record["status"] = "failed"
+            record["failure"] = {
+                "stage": "integrity",
+                "code": type(error).__name__,
+                "message": str(error)[:500],
+            }
+    if (
+        record["status"] == "failed"
+        and state["active"].get(descriptor["packageName"]) == key
+    ):
+        previous = state["attempts"][key]
+        record = {
+            **previous,
+            "attempts": record["attempts"],
+            "available": False,
+            "rebuildFailure": record["failure"],
+        }
     state["attempts"][key] = record
-    return record
+    return record, verified
 
 
-def cleanup_published_work(state_path, descriptor, record, build_checkout=None):
-    """Remove only local disposable work after its published checkpoint exists."""
-    if ci_environment() or record.get("status") != "published":
-        return []
+def finalize_baseline(state, catalog, local=True):
+    if not local or ci_environment():
+        raise ValueError("CI cannot create or finalize the initial baseline")
+    records = [
+        state["attempts"].get(entry["inputFingerprint"]) for entry in catalog["entries"]
+    ]
+    if any(
+        record is None or record["status"] not in {"published", "failed"}
+        for record in records
+    ):
+        raise ValueError("Initial baseline still has unattempted packages")
+    state["bootstrap"] = {
+        "complete": True,
+        "upstreamCommit": catalog["upstreamCommit"],
+        "catalogFingerprint": catalog["catalogFingerprint"],
+        "published": sum(record["status"] == "published" for record in records),
+        "failed": sum(record["status"] == "failed" for record in records),
+        "discoveryFailed": len(catalog["discoveryFailures"]),
+    }
+
+
+def runtime_identity(manifest):
+    return {
+        key: manifest[key]
+        for key in [
+            "protocolVersion",
+            "hostAbi",
+            "runtimeBaseline",
+            "bridgeVersion",
+            "hostScripts",
+            "resources",
+        ]
+    }
+
+
+def current_runtime(build_checkout=None):
+    catalog = checkout_material_catalog(str(build_checkout or ROOT))
+    return {
+        **{
+            key: catalog[key]
+            for key in [
+                "protocolVersion",
+                "hostAbi",
+                "runtimeBaseline",
+                "hostScripts",
+                "resources",
+            ]
+        },
+        "bridgeVersion": 2,
+    }
+
+
+def static_index(manifests):
+    return {
+        "schemaVersion": 1,
+        "builds": [
+            {
+                **{
+                    key: manifest[key]
+                    for key in [
+                        "buildId",
+                        "packageName",
+                        "repoId",
+                        "version",
+                        "sourceIds",
+                    ]
+                },
+                "manifestPath": "/extensions/builds/"
+                + manifest["buildId"]
+                + "/manifest.json",
+            }
+            for manifest in sorted(manifests, key=lambda item: item["packageName"])
+        ],
+        "nextCursor": None,
+    }
+
+
+def replace_directory(staged, destination):
+    """Keep the previous complete directory if swapping the candidate fails."""
+    destination = Path(destination)
+    backup = destination.with_name(destination.name + ".previous")
+    if backup.exists():
+        raise ValueError("Interrupted snapshot swap: inspect the previous directory")
+    had_previous = destination.exists()
+    if had_previous:
+        os.replace(destination, backup)
+    try:
+        os.replace(staged, destination)
+    except BaseException:
+        if had_previous:
+            os.replace(backup, destination)
+        raise
+    if had_previous:
+        shutil.rmtree(backup)
+
+
+def prepare_snapshot(
+    plan,
+    state,
+    results,
+    assets_dir=DEFAULT_ASSETS,
+    origin=DEFAULT_ORIGIN,
+    finalize=False,
+    build_checkout=None,
+    processes=None,
+    verified_results=None,
+):
+    """Prepare a complete candidate; never mark its state as deployed here."""
+    processes = processes or BuilderProcesses()
+    processes.check()
+    if plan.get("baseRevision") != state["revision"]:
+        raise ValueError("Plan was based on a different deployed snapshot")
+    candidate = copy.deepcopy(state)
+    current = {entry["packageName"]: entry for entry in plan["entries"]}
+    discovery_paths = {failure["sourcePath"] for failure in plan["discoveryFailures"]}
+    retained_discovery = set()
+    for package, key in state["active"].items():
+        descriptor = state["attempts"][key]["descriptor"]
+        if package not in current and descriptor.get("sourcePath") in discovery_paths:
+            current[package] = descriptor
+            retained_discovery.add(package)
+    verified = {}
+    result_paths = list(Path(results).rglob("pipeline-result.json"))
+    result_by_key = {}
+    for file in result_paths:
+        result = read_json(file)
+        descriptor = result.get("descriptor", {})
+        key = descriptor.get("inputFingerprint")
+        if key in result_by_key:
+            raise ValueError("Ambiguous duplicate build results")
+        result_by_key[key] = (file.parent, result)
+    result_by_key.update(verified_results or {})
+    for descriptor in plan["selected"]:
+        processes.check()
+        key = descriptor["inputFingerprint"]
+        if key not in result_by_key:
+            raise ValueError(
+                "Missing matrix result; keep the previous snapshot and retry the interrupted build"
+            )
+        directory, result = result_by_key[key]
+        record, content = record_result(
+            candidate, descriptor, result, directory, build_checkout
+        )
+        if content is not None:
+            verified[descriptor["packageName"]] = content
+    candidate["active"] = {
+        package: key
+        for package, key in candidate["active"].items()
+        if package in current
+    }
+    retained = {entry["inputFingerprint"] for entry in current.values()} | set(
+        candidate["active"].values()
+    )
+    candidate["attempts"] = {
+        key: record for key, record in candidate["attempts"].items() if key in retained
+    }
+    candidate.update(
+        discoveryFailures=plan["discoveryFailures"],
+        upstreamCommit=plan["upstreamCommit"],
+        hostFingerprint=plan["hostFingerprint"],
+        catalogFingerprint=plan["catalogFingerprint"],
+        parentRevision=state["revision"],
+        revision=uuid.uuid4().hex,
+    )
+    if finalize:
+        finalize_baseline(candidate, plan)
+    assets_dir = Path(assets_dir).resolve()
+    assets_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix=assets_dir.name + ".stage-", dir=assets_dir.parent
+    ) as temporary:
+        staged = Path(temporary) / "snapshot"
+        extension = staged / "extensions"
+        (extension / "artifacts").mkdir(parents=True)
+        manifests = []
+        identity = current_runtime(build_checkout)
+        for package, key in sorted(candidate["active"].items()):
+            processes.check()
+            record = candidate["attempts"][key]
+            descriptor = record["descriptor"]
+            record["stale"] = (
+                key != current[package]["inputFingerprint"]
+                or package in retained_discovery
+            )
+            if record.get("runtimeIdentity") != identity:
+                record.update(available=False, availability="stale_host")
+                continue
+            if package not in verified and record.get("available") is False:
+                # A previous snapshot intentionally did not publish this old ABI.
+                # Its state alone is not a recoverable artifact cache.
+                record["availability"] = "rebuild_required"
+                continue
+            record.update(
+                available=True,
+                availability="discovery_failed"
+                if package in retained_discovery
+                else "available",
+            )
+            if package in verified:
+                receipt = verified.pop(package)
+                manifest, encoded = receipt.manifest, receipt.payload()
+            else:
+                manifest_path = (
+                    "/extensions/builds/" + descriptor["buildId"] + "/manifest.json"
+                )
+                manifest = fetch_json(origin, manifest_path)
+                if any(
+                    manifest.get(field) != descriptor[name]
+                    for field, name in [
+                        ("buildId", "buildId"),
+                        ("packageName", "packageName"),
+                        ("version", "versionName"),
+                    ]
+                ):
+                    raise ValueError("Static successful build identity mismatch")
+                encoded = fetch_bytes(origin, manifest["bundle"]["path"], MAX_ENCODED)
+                decode_bundle(encoded, manifest["bundle"])
+            bundle = manifest["bundle"]
+            (extension / "artifacts" / (bundle["sha256"] + ".gz")).write_bytes(encoded)
+            manifest_folder = extension / "builds" / descriptor["buildId"]
+            write_json(manifest_folder / "manifest.json", manifest)
+            # Schema, size, and shared material checks reuse the verified bytes.
+            verifier().verify(
+                manifest,
+                extension / "artifacts",
+                verify_hashes=False,
+                material_catalog_override=checkout_material_catalog(str(build_checkout))
+                if build_checkout
+                else None,
+            )
+            manifests.append(manifest)
+        candidate["summary"] = {
+            "available": len(manifests),
+            "unavailable": sum(
+                not candidate["attempts"][key].get("available", False)
+                for key in candidate["active"].values()
+            ),
+            "failed": sum(
+                record["status"] == "failed"
+                for record in candidate["attempts"].values()
+            ),
+            "pending": sum(
+                entry["inputFingerprint"] not in candidate["attempts"]
+                for entry in current.values()
+            ),
+        }
+        index_bytes = canonical(static_index(manifests)) + b"\n"
+        if len(index_bytes) > 2 * 1024 * 1024:
+            raise ValueError("Static extension index exceeds 2 MiB")
+        (extension / "index.json").write_bytes(index_bytes)
+        candidate["indexSha256"] = digest(index_bytes)
+        state_bytes = canonical(validate_state(candidate)) + b"\n"
+        if len(state_bytes) > MAX_STATE_BYTES:
+            raise ValueError("Static build state exceeds 16 MiB")
+        (extension / "build-state.json").write_bytes(state_bytes)
+        processes.check()
+        replace_directory(staged, assets_dir)
+    return candidate
+
+
+def remote_state(origin, allow_missing=False):
+    try:
+        return validate_state(fetch_json(origin, STATE_PATH))
+    except urllib.error.HTTPError as error:
+        status = error.code
+        error.close()
+        if status == 404 and allow_missing:
+            return empty_state()
+        raise ValueError(
+            "Static build state unavailable; cannot infer a baseline"
+        ) from error
+
+
+def pull_state(origin, path):
+    try:
+        state = remote_state(origin)
+    except json.JSONDecodeError:
+        raise ValueError(
+            "Static baseline is not JSON; CI cannot initialize or infer a missing baseline"
+        ) from None
+    index = fetch_bytes(origin, INDEX_PATH)
+    if digest(index) != state.get("indexSha256"):
+        raise ValueError("Static index and build state are from different snapshots")
+    if state["bootstrap"].get("complete") is not True or state["revision"] is None:
+        raise ValueError("CI bootstrap guard: deploy the initial local baseline first")
+    write_json(path, state)
+    return state
+
+
+def check_base(assets_dir, origin, initialize=False):
+    candidate = validate_state(
+        read_json(Path(assets_dir) / "extensions/build-state.json")
+    )
+    if initialize and (ci_environment() or candidate.get("parentRevision") is not None):
+        raise ValueError(
+            "Explicit initialization is local-only and requires no previous baseline"
+        )
+    try:
+        remote = remote_state(
+            origin, allow_missing=candidate.get("parentRevision") is None
+        )
+    except json.JSONDecodeError:
+        if not initialize:
+            raise ValueError(
+                "Static build state is not JSON; use explicit local initialization only for the known pre-baseline SPA"
+            ) from None
+        body = fetch_bytes(origin, STATE_PATH)
+        if not body.lstrip().lower().startswith((b"<!doctype html", b"<html")):
+            raise ValueError(
+                "Initialization cannot replace an arbitrary invalid response"
+            ) from None
+        remote = empty_state()
+    if remote["revision"] != candidate.get("parentRevision"):
+        raise ValueError(
+            "Remote static snapshot advanced; pull and replan before deploying"
+        )
+
+
+def commit_snapshot(state_path, assets_dir, origin):
+    assets_dir = Path(assets_dir)
+    candidate = validate_state(read_json(assets_dir / "extensions/build-state.json"))
+    index_bytes = (assets_dir / "extensions/index.json").read_bytes()
+    if (
+        digest(index_bytes) != candidate.get("indexSha256")
+        or remote_state(origin) != candidate
+        or fetch_bytes(origin, INDEX_PATH) != index_bytes
+    ):
+        raise ValueError("Static deployment is not confirmed; checkpoint unchanged")
+    persisted = load_state(state_path)
+    if persisted["revision"] not in {
+        candidate.get("parentRevision"),
+        candidate["revision"],
+    }:
+        raise ValueError("Local checkpoint advanced; refusing to overwrite it")
+    write_json(state_path, candidate)
+    return candidate
+
+
+def cleanup_built_work(directory, descriptor, build_checkout=None):
+    """Valid output persisted locally is enough to discard only compiler work."""
+    saved = read_json(Path(directory) / "pipeline-result.json")
+    if saved.get("status") != "built" or saved.get("descriptor") != descriptor:
+        raise ValueError(
+            "Successful build checkpoint must be saved before cache cleanup"
+        )
     build_id = descriptor.get("buildId")
-    key = descriptor.get("inputFingerprint")
     if not isinstance(build_id, str) or not re.fullmatch(
         r"[A-Za-z0-9][A-Za-z0-9._-]{0,199}", build_id
     ):
         raise ValueError("Unsafe build ID for cache cleanup")
-    persisted = load_state(state_path)
-    if (
-        persisted["attempts"].get(key) != record
-        or persisted["active"].get(descriptor.get("packageName")) != key
-        or record.get("descriptor", {}).get("buildId") != build_id
-    ):
-        raise ValueError("Published checkpoint must be saved before cache cleanup")
+    try:
+        return remove_build_work(build_id, build_checkout)
+    except (OSError, RuntimeError) as error:
+        print(
+            "extensions: retained compiler work: " + str(error),
+            file=sys.stderr,
+            flush=True,
+        )
+        return []
+
+
+def remove_build_work(build_id, build_checkout=None):
     local = Path(build_checkout or ROOT) / "runtime/teavm/.local"
     if local.resolve() != local or local.is_symlink():
         raise ValueError("Cache cleanup root must not contain symbolic links")
@@ -739,161 +961,6 @@ def cleanup_published_work(state_path, descriptor, record, build_checkout=None):
     return removed
 
 
-def checkpoint_bootstrap_result(
-    state_path, state, descriptor, record, build_checkout=None
-):
-    write_json(state_path, state)
-    try:
-        cleanup_published_work(state_path, descriptor, record, build_checkout)
-    except (OSError, ValueError, RuntimeError) as error:
-        # Publication and its saved state stay successful. Keep remaining work
-        # for inspection rather than turning a cleanup problem into a republish.
-        print(
-            "extensions: retained build cache for "
-            + descriptor["buildId"]
-            + ": "
-            + str(error),
-            file=sys.stderr,
-            flush=True,
-        )
-
-
-def finalize_baseline(state, catalog, local=True):
-    if not local or ci_environment():
-        raise ValueError("CI cannot create or finalize the initial baseline")
-    records = [
-        state["attempts"].get(entry["inputFingerprint"]) for entry in catalog["entries"]
-    ]
-    if any(
-        record is None or record["status"] not in {"published", "failed"}
-        for record in records
-    ):
-        raise ValueError(
-            "Initial baseline still has unattempted or unpublished packages"
-        )
-    state["bootstrap"] = {
-        "complete": True,
-        "upstreamCommit": catalog["upstreamCommit"],
-        "catalogFingerprint": catalog["catalogFingerprint"],
-        "published": sum(r["status"] == "published" for r in records),
-        "failed": sum(r["status"] == "failed" for r in records),
-        "discoveryFailed": len(catalog["discoveryFailures"]),
-    }
-
-
-def index_payload(state, catalog):
-    current = {entry["packageName"]: entry for entry in catalog["entries"]}
-    packages, failures, pending = [], list(catalog["discoveryFailures"]), 0
-    for package, descriptor in sorted(current.items()):
-        record = state["attempts"].get(descriptor["inputFingerprint"])
-        if record is None or record["status"] == "built":
-            pending += 1
-        elif record["status"] == "failed":
-            failures.append(
-                {
-                    "packageName": package,
-                    "inputFingerprint": descriptor["inputFingerprint"],
-                    "failure": record["failure"],
-                }
-            )
-        active = state["attempts"].get(state["active"].get(package))
-        if (
-            active
-            and active["status"] == "published"
-            and (
-                active["release"].get("tag")
-                == extension_tag(
-                    active["descriptor"]["packageName"],
-                    active["descriptor"]["versionCode"],
-                )
-                and active["release"].get("snapshot", {}).get("generation")
-                == active["descriptor"]["inputFingerprint"]
-            )
-        ):
-            packages.append(
-                {
-                    "packageName": package,
-                    "buildId": active["descriptor"]["buildId"],
-                    "versionName": active["descriptor"]["versionName"],
-                    "release": active["release"],
-                    "runtimeReady": active["runtimeReady"],
-                    "validationStatus": active["validationStatus"],
-                    "inputFingerprint": active["descriptor"]["inputFingerprint"],
-                    "stale": active["descriptor"]["inputFingerprint"]
-                    != descriptor["inputFingerprint"],
-                }
-            )
-    return {
-        "schemaVersion": 1,
-        "upstreamCommit": catalog["upstreamCommit"],
-        "catalogFingerprint": catalog["catalogFingerprint"],
-        "bootstrap": state["bootstrap"],
-        "packages": packages,
-        "failures": failures,
-        "pending": pending,
-    }
-
-
-def publish_index(api, state, catalog, target):
-    latest = api.find_release("extensions-index") or api.find_draft("extensions-index")
-    actual = release_pointer(latest) if latest else None
-    if state.get("remoteIndexSnapshot") != actual:
-        raise ValueError(
-            "Remote index advanced; pull and merge its checkpoint before publishing"
-        )
-    current = {
-        entry["packageName"]: entry["inputFingerprint"] for entry in catalog["entries"]
-    }
-    state["active"] = {
-        package: key for package, key in state["active"].items() if package in current
-    }
-    retained = set(current.values()) | set(state["active"].values())
-    state["attempts"] = {
-        key: value for key, value in state["attempts"].items() if key in retained
-    }
-    index = index_payload(state, catalog)
-    index_bytes = canonical(index) + b"\n"
-    snapshot = {
-        key: value
-        for key, value in state.items()
-        if key not in {"remoteIndexTag", "remoteIndexSnapshot"}
-    }
-    state_bytes = canonical(snapshot) + b"\n"
-    files = capture_files({"index.json": index_bytes, "state.json": state_bytes})
-    generation = digest(canonical(files.metadata))
-    tag = "extensions-index"
-    reference = publish_locator(
-        api,
-        tag,
-        generation,
-        files,
-        target,
-        latest=True,
-        expected=actual,
-    )
-    state["remoteIndexTag"] = tag
-    state["remoteIndexSnapshot"] = reference["snapshot"]
-    return tag
-
-
-def pull_state(api, path):
-    latest = api.find_release("extensions-index") or api.find_draft("extensions-index")
-    if latest and latest.get("draft"):
-        raise RuntimeError("GitHub index replacement is incomplete; retry later")
-    if not latest:
-        write_json(path, empty_state())
-        return
-    with tempfile.TemporaryDirectory(prefix="karuyomi-index-") as folder:
-        transfer = download_release(api, latest["tag_name"], folder)
-        if not transfer:
-            raise ValueError("Index release is not published")
-        state = load_state(Path(folder) / "state.json")
-        state["remoteIndexTag"] = latest["tag_name"]
-        if transfer.reference.get("snapshot"):
-            state["remoteIndexSnapshot"] = transfer.reference["snapshot"]
-        write_json(path, state)
-
-
 def run_pipeline(processes):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -910,76 +977,93 @@ def run_pipeline(processes):
         command.add_argument("--retry-failed", action="store_true")
         command.add_argument("--ci", action="store_true")
         if name == "bootstrap":
-            command.add_argument("--repository", default="Wybxc/karuyomi")
             command.add_argument("--jobs", type=int, default=1)
             command.add_argument("--finalize", action="store_true")
-            command.add_argument(
-                "--plan",
-                type=Path,
-                help="Resume an existing complete frozen plan without replanning",
-            )
-            command.add_argument(
-                "--build-checkout",
-                type=Path,
-                help="Run the builder from this unchanged pinned checkout",
-            )
+            command.add_argument("--plan", type=Path)
+            command.add_argument("--build-checkout", type=Path)
+            command.add_argument("--assets-dir", type=Path, default=DEFAULT_ASSETS)
+            command.add_argument("--origin", default=DEFAULT_ORIGIN)
     command = commands.add_parser("build")
     command.add_argument("--plan", type=Path, required=True)
     command.add_argument("--key", required=True)
     command.add_argument("--output", type=Path, required=True)
-    command.add_argument("--repository")
-    command = commands.add_parser("publish-plan")
+    command = commands.add_parser("prepare-snapshot")
     command.add_argument("--plan", type=Path, required=True)
     command.add_argument("--state", type=Path, required=True)
     command.add_argument("--results", type=Path, required=True)
-    command.add_argument("--repository", default="Wybxc/karuyomi")
-    command = commands.add_parser("pull-state")
-    command.add_argument("--state", type=Path, required=True)
-    command.add_argument("--repository", default="Wybxc/karuyomi")
+    command.add_argument("--assets-dir", type=Path, default=DEFAULT_ASSETS)
+    command.add_argument("--origin", default=DEFAULT_ORIGIN)
+    for name in ["pull-state", "check-base", "commit-snapshot"]:
+        command = commands.add_parser(name)
+        command.add_argument("--origin", default=DEFAULT_ORIGIN)
+        if name == "check-base":
+            command.add_argument("--initialize", action="store_true")
+        if name != "check-base":
+            command.add_argument("--state", type=Path, required=True)
+        if name != "pull-state":
+            command.add_argument("--assets-dir", type=Path, default=DEFAULT_ASSETS)
     args = parser.parse_args()
-    state_lock = None
     if hasattr(args, "state"):
         import fcntl
 
         args.state.parent.mkdir(parents=True, exist_ok=True)
-        state_lock = args.state.with_suffix(".lock").open("a")
-        processes.state_lock = state_lock
+        processes.state_lock = args.state.with_suffix(".lock").open("a")
         try:
-            fcntl.flock(state_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(processes.state_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             parser.error("Another process owns this extension checkpoint")
     if args.command == "pull-state":
-        processes.check()
-        pull_state(GitHub(args.repository), args.state)
-        return
-    if args.command in {"plan", "bootstrap"}:
-        if args.command == "bootstrap" and (args.ci or ci_environment()):
-            parser.error("Initial full bootstrap is local-only")
-        frozen = args.command == "bootstrap" and args.plan is not None
-        if (
-            args.command == "bootstrap"
-            and not frozen
-            and git(ROOT, "status", "--porcelain", "--", *HOST_PATHS)
-        ):
-            parser.error(
-                "Commit the reviewed host/toolchain inputs before publishing the initial source baseline"
+        pull_state(args.origin, args.state)
+    elif args.command == "check-base":
+        check_base(args.assets_dir, args.origin, args.initialize)
+    elif args.command == "commit-snapshot":
+        commit_snapshot(args.state, args.assets_dir, args.origin)
+    elif args.command == "prepare-snapshot":
+        prepare_snapshot(
+            read_json(args.plan),
+            load_state(args.state),
+            args.results,
+            args.assets_dir,
+            args.origin,
+            processes=processes,
+        )
+    elif args.command == "build":
+        plan = read_json(args.plan)
+        descriptor = next(
+            entry for entry in plan["selected"] if entry["inputFingerprint"] == args.key
+        )
+        result = build_one(descriptor, args.output, processes=processes)
+        print(
+            json.dumps(
+                {"packageName": descriptor["packageName"], "status": result["status"]}
             )
+        )
+        if result["status"] != "built":
+            raise SystemExit(1)
+    else:
+        bootstrap = args.command == "bootstrap"
+        if bootstrap and (args.ci or ci_environment()):
+            parser.error("Initial full bootstrap is local-only")
         state = load_state(args.state)
-        if frozen:
+        if bootstrap and args.plan:
             if args.build_checkout is None:
                 parser.error("--plan requires --build-checkout")
-            catalog = read_json(args.plan)
-            plan = resume_plan(catalog, state, args.limit, args.retry_failed)
+            plan = resume_plan(
+                read_json(args.plan), state, args.limit, args.retry_failed
+            )
             args.build_checkout = validate_build_checkout(
                 args.build_checkout, plan["entries"][0]
             )
         else:
-            if args.command == "bootstrap" and args.build_checkout is not None:
+            if bootstrap and args.build_checkout:
                 parser.error("--build-checkout requires --plan")
+            if bootstrap and git(ROOT, "status", "--porcelain", "--", *HOST_PATHS):
+                parser.error(
+                    "Commit the reviewed host inputs before the initial baseline"
+                )
             host, inputs = host_fingerprint()
-            catalog = scan(args.source, host, inputs)
             plan = make_plan(
-                catalog,
+                scan(args.source, host, inputs),
                 state,
                 args.limit,
                 args.ci or ci_environment(),
@@ -989,49 +1073,42 @@ def run_pipeline(processes):
         print(
             json.dumps(
                 {
-                    "discovered": len(catalog["entries"]),
-                    "discoveryFailures": len(catalog["discoveryFailures"]),
+                    "discovered": len(plan["entries"]),
                     "selected": len(plan["selected"]),
                     "remaining": plan["remainingCount"],
                 }
             ),
             flush=True,
         )
-        if args.command == "plan":
+        if not bootstrap:
             return
         if not 1 <= args.jobs <= 4:
             parser.error("--jobs must be between 1 and 4")
-        api = GitHub(args.repository)
         builds = args.output.parent / "builds"
         pool = ThreadPoolExecutor(max_workers=args.jobs)
+        futures = {}
+        completed = {}
         try:
             futures = {
                 pool.submit(
                     build_one,
                     entry,
                     builds / entry["inputFingerprint"],
-                    args.repository,
                     args.build_checkout,
                     processes,
+                    args.retry_failed,
                 ): entry
                 for entry in plan["selected"]
             }
             for future in as_completed(futures):
                 processes.check()
-                descriptor = futures[future]
-                record = record_result(
-                    state,
-                    descriptor,
-                    future.result(),
-                    builds / descriptor["inputFingerprint"],
-                    api,
-                    plan["repositoryCommit"],
-                    args.build_checkout,
+                result = future.result()
+                entry = futures.pop(future)
+                completed[entry["inputFingerprint"]] = (
+                    builds / entry["inputFingerprint"],
+                    result,
                 )
-                checkpoint_bootstrap_result(
-                    args.state, state, descriptor, record, args.build_checkout
-                )
-                print(descriptor["packageName"] + ": " + record["status"], flush=True)
+                print(entry["packageName"] + ": " + result["status"], flush=True)
         finally:
             if processes.cancelled.is_set():
                 for future in futures:
@@ -1039,61 +1116,17 @@ def run_pipeline(processes):
                 processes.stop()
             pool.shutdown(wait=True, cancel_futures=True)
         processes.check()
-        if args.finalize:
-            finalize_baseline(state, catalog)
-        publish_index(api, state, catalog, plan["repositoryCommit"])
-        write_json(args.state, state)
-    elif args.command == "build":
-        plan = read_json(args.plan)
-        descriptor = next(
-            e for e in plan["selected"] if e["inputFingerprint"] == args.key
+        prepare_snapshot(
+            plan,
+            state,
+            builds,
+            args.assets_dir,
+            args.origin,
+            args.finalize,
+            args.build_checkout,
+            processes,
+            completed,
         )
-        result = build_one(
-            descriptor, args.output, args.repository, processes=processes
-        )
-        print(
-            json.dumps(
-                {"packageName": descriptor["packageName"], "status": result["status"]}
-            )
-        )
-        if result["status"] != "built":
-            sys.exit(1)
-    elif args.command == "publish-plan":
-        plan, state, api = (
-            read_json(args.plan),
-            load_state(args.state),
-            GitHub(args.repository),
-        )
-        for descriptor in plan["selected"]:
-            processes.check()
-            matches = list(args.results.rglob("pipeline-result.json"))
-            directory = next(
-                (
-                    p.parent
-                    for p in matches
-                    if read_json(p).get("descriptor") == descriptor
-                ),
-                None,
-            )
-            result = (
-                read_json(directory / "pipeline-result.json")
-                if directory
-                else {
-                    "status": "failed",
-                    "retryable": True,
-                    "failure": {
-                        "stage": "build",
-                        "code": "missing_result",
-                        "message": "No matrix output was produced",
-                    },
-                }
-            )
-            record_result(
-                state, descriptor, result, directory, api, plan["repositoryCommit"]
-            )
-            write_json(args.state, state)
-        publish_index(api, state, plan, plan["repositoryCommit"])
-        write_json(args.state, state)
 
 
 def main():
@@ -1103,15 +1136,12 @@ def main():
             processes.check()
         except BuildCancelled:
             print(
-                "extensions: cancelled; waiting for builder process groups",
+                "extensions: cancelled; prior snapshot and completed build results retained",
                 file=sys.stderr,
+                flush=True,
             )
-            raise SystemExit(128 + (processes.signal_number or signal.SIGINT)) from None
+            raise SystemExit(128 + (processes.signal_number or signal.SIGINT))
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except (ValueError, RuntimeError) as error:
-        print("extensions: " + str(error), file=sys.stderr)
-        sys.exit(2)
+    main()

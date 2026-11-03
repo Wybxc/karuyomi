@@ -1,0 +1,404 @@
+#!/usr/bin/env node
+// Manual, trusted Actions permission check; never imported by product code.
+// API contracts: https://developers.cloudflare.com/api/resources/d1/subresources/database/
+// https://developers.cloudflare.com/api/resources/workers/subresources/routes/
+// Static upload is delegated to the repository's checksum-locked Wrangler.
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import {
+  appendFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { isRecord } from '../tools/extensions/types.ts';
+
+type Check = { status: 'passed' | 'failed'; detail: string };
+class CheckFailure extends Error {}
+const safeError = (error: unknown) =>
+  error instanceof CheckFailure
+    ? error.message
+    : 'Request interrupted or unexpected failure; raw error output withheld';
+const identifier = (
+  value: unknown,
+  pattern = /^[a-f0-9]{32}$/,
+): value is string => typeof value === 'string' && pattern.test(value);
+
+async function main() {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (!token || !identifier(account))
+    throw new CheckFailure(
+      'CLOUDFLARE_API_TOKEN and a valid CLOUDFLARE_ACCOUNT_ID are required',
+    );
+  const abort = new AbortController();
+  const stop = () => abort.abort();
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
+  const temporary = await mkdtemp(
+    path.join(tmpdir(), 'karuyomi-cloudflare-check-'),
+  );
+  const name = `karuyomi-check-${randomUUID().replaceAll('-', '').slice(0, 16)}`;
+  const routePattern = `${name}.wybxc.cc/*`;
+  const accountPath = `/accounts/${account}`;
+  const workerPath = `${accountPath}/workers/scripts/${name}`;
+  const checks: Record<string, Check> = {};
+  const cleanup: Record<string, Check> = {};
+  let workerAttempted = false;
+  let workerUploaded = false;
+  let databaseAttempted = false;
+  let databaseId: string | undefined;
+  let zoneId: string | undefined;
+  let routeAttempted = false;
+  let routeId: string | undefined;
+
+  async function api(
+    endpoint: string,
+    method = 'GET',
+    body?: unknown,
+    cleaning = false,
+    missingOkay = false,
+  ): Promise<unknown> {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4${endpoint}`,
+      {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: cleaning
+          ? AbortSignal.timeout(30_000)
+          : AbortSignal.any([abort.signal, AbortSignal.timeout(45_000)]),
+        redirect: 'error',
+      },
+    );
+    if ((missingOkay && response.status === 404) || response.status === 204)
+      return null;
+    let value: unknown;
+    try {
+      value = await response.json();
+    } catch {
+      throw new CheckFailure(
+        `Cloudflare returned HTTP ${response.status} without valid API JSON`,
+      );
+    }
+    if (!response.ok || !isRecord(value) || value.success !== true) {
+      const codes =
+        isRecord(value) && Array.isArray(value.errors)
+          ? value.errors.flatMap((error: unknown) =>
+              isRecord(error) && typeof error.code === 'number'
+                ? [error.code]
+                : [],
+            )
+          : [];
+      throw new CheckFailure(
+        `Cloudflare HTTP ${response.status}; API codes: ${codes.join(',') || 'unavailable'}`,
+      );
+    }
+    return value.result;
+  }
+  async function check(
+    target: Record<string, Check>,
+    key: string,
+    action: () => Promise<string>,
+  ) {
+    try {
+      target[key] = { status: 'passed', detail: await action() };
+    } catch (error) {
+      target[key] = { status: 'failed', detail: safeError(error) };
+    }
+    console.log(`${key}: ${target[key]?.status} — ${target[key]?.detail}`);
+  }
+  async function deploy() {
+    const require = createRequire(
+      new URL('../apps/api/package.json', import.meta.url),
+    );
+    const cli = require.resolve('wrangler');
+    const locked: unknown = JSON.parse(
+      await readFile(path.join(path.dirname(cli), '../package.json'), 'utf8'),
+    );
+    if (!isRecord(locked) || locked.version !== '4.156.1')
+      throw new CheckFailure('Expected repository-pinned Wrangler 4.156.1');
+    const configuration = path.join(temporary, 'wrangler.json');
+    await mkdir(path.join(temporary, 'public'));
+    await writeFile(
+      path.join(temporary, 'public/check.txt'),
+      `Static upload permission check ${randomUUID()}\n`,
+    );
+    await writeFile(
+      path.join(temporary, 'worker.ts'),
+      "export default { fetch() { return new Response('Temporary permission check'); } };\n",
+    );
+    await writeFile(
+      configuration,
+      JSON.stringify({
+        name,
+        main: './worker.ts',
+        account_id: account,
+        compatibility_date: '2026-11-03',
+        workers_dev: false,
+        preview_urls: false,
+        routes: [],
+        assets: {
+          directory: './public',
+          binding: 'ASSETS',
+          not_found_handling: 'none',
+        },
+        observability: { enabled: false },
+      }),
+    );
+    workerAttempted = true;
+    const output = await new Promise<string>((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        [cli, 'deploy', '--config', configuration],
+        {
+          cwd: temporary,
+          env: {
+            ...process.env,
+            CI: 'true',
+            CLOUDFLARE_SEND_METRICS: 'false',
+            WRANGLER_LOG_PATH: path.join(temporary, 'wrangler.log'),
+            NO_COLOR: '1',
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+          signal: AbortSignal.any([abort.signal, AbortSignal.timeout(180_000)]),
+        },
+      );
+      let output = '';
+      let size = 0;
+      const capture = (bytes: Buffer) => {
+        size += bytes.length;
+        if (size > 512 * 1024) child.kill('SIGTERM');
+        else output += bytes.toString();
+      };
+      child.stdout.on('data', capture);
+      child.stderr.on('data', capture);
+      let commandFailed = false;
+      child.once('error', () => {
+        commandFailed = true;
+      });
+      // Wait for close even after abort/error, so cleanup never races a live
+      // uploader. Only numeric API codes escape the captured CLI output.
+      child.once('close', (code) => {
+        if (code === 0 && !commandFailed && size <= 512 * 1024) resolve(output);
+        else {
+          const codes = [...output.matchAll(/\[code:\s*(\d+)\]/g)].map(
+            (match) => match[1],
+          );
+          reject(
+            new CheckFailure(
+              `Wrangler deployment failed (exit ${code ?? 'signal'}); Cloudflare API codes: ${codes.join(',') || 'unavailable'}. Verify Workers Scripts Write/account scope; raw logs withheld`,
+            ),
+          );
+        }
+      });
+    });
+    workerUploaded = true;
+    // Fixed Wrangler emits this only after the remote asset upload completes.
+    if (!/Success! Uploaded 1 file(?:\s|$)/.test(output))
+      throw new CheckFailure(
+        'Wrangler did not confirm uploading the unique static file',
+      );
+    const subdomain = await api(`${workerPath}/subdomain`);
+    if (
+      !isRecord(subdomain) ||
+      subdomain.enabled !== false ||
+      subdomain.previews_enabled !== false
+    )
+      throw new CheckFailure(
+        'Temporary Worker public workers.dev/preview URLs were not both disabled',
+      );
+  }
+
+  try {
+    await check(checks, 'Worker + Static Assets Write', async () => {
+      await deploy();
+      return 'Wrangler 4.156.1 uploaded one Worker and one unique static file; workers.dev and preview URLs disabled';
+    });
+    await check(checks, 'D1 Write', async () => {
+      databaseAttempted = true;
+      const database = await api(`${accountPath}/d1/database`, 'POST', {
+        name,
+      });
+      if (
+        !isRecord(database) ||
+        !identifier(database.uuid, /^[a-f0-9-]{36}$/) ||
+        database.name !== name
+      )
+        throw new CheckFailure(
+          'D1 create response did not identify the temporary database',
+        );
+      databaseId = database.uuid;
+      const query = await api(
+        `${accountPath}/d1/database/${databaseId}/query`,
+        'POST',
+        {
+          batch: [
+            { sql: 'CREATE TABLE permission_check (value TEXT NOT NULL)' },
+            { sql: 'INSERT INTO permission_check VALUES (?)', params: [name] },
+            { sql: 'SELECT value FROM permission_check' },
+          ],
+        },
+      );
+      if (
+        !Array.isArray(query) ||
+        query.length === 0 ||
+        !query.every(
+          (result: unknown) => isRecord(result) && result.success === true,
+        ) ||
+        !query.some(
+          (result: unknown) =>
+            isRecord(result) &&
+            Array.isArray(result.results) &&
+            result.results.some(
+              (row: unknown) => isRecord(row) && row.value === name,
+            ),
+        )
+      )
+        throw new CheckFailure('Temporary D1 write/read result did not match');
+      return 'Created an isolated database, created a table, wrote and read the unique marker';
+    });
+    await check(checks, 'Workers Routes Edit', async () => {
+      const configured = process.env.CLOUDFLARE_ZONE_ID;
+      if (configured !== undefined) {
+        if (!identifier(configured))
+          throw new CheckFailure('CLOUDFLARE_ZONE_ID is invalid');
+        zoneId = configured;
+      } else {
+        const zones = await api(`/zones?name=wybxc.cc&account.id=${account}`);
+        if (
+          !Array.isArray(zones) ||
+          zones.length !== 1 ||
+          !isRecord(zones[0]) ||
+          zones[0].name !== 'wybxc.cc' ||
+          !identifier(zones[0].id)
+        )
+          throw new CheckFailure(
+            'Zone Read must identify the single wybxc.cc zone for this account',
+          );
+        zoneId = zones[0].id;
+      }
+      routeAttempted = true;
+      const route = await api(`/zones/${zoneId}/workers/routes`, 'POST', {
+        pattern: routePattern,
+        ...(workerUploaded ? { script: name } : {}),
+      });
+      if (
+        !isRecord(route) ||
+        !identifier(route.id) ||
+        route.pattern !== routePattern ||
+        (workerUploaded && route.script !== name)
+      )
+        throw new CheckFailure('Temporary route create response did not match');
+      routeId = route.id;
+      return 'Created one unique random-subdomain route in wybxc.cc; no DNS record changed';
+    });
+  } finally {
+    // Recover IDs by their unique name/pattern if a create response was lost.
+    await check(cleanup, 'Cleanup route', async () => {
+      if (routeAttempted && zoneId) {
+        if (!routeId) {
+          const routes = await api(
+            `/zones/${zoneId}/workers/routes`,
+            'GET',
+            undefined,
+            true,
+          );
+          if (!Array.isArray(routes))
+            throw new CheckFailure('Cannot inspect temporary route cleanup');
+          const route = routes.find(
+            (value: unknown) =>
+              isRecord(value) && value.pattern === routePattern,
+          );
+          if (isRecord(route) && identifier(route.id)) routeId = route.id;
+        }
+        if (routeId)
+          await api(
+            `/zones/${zoneId}/workers/routes/${routeId}`,
+            'DELETE',
+            undefined,
+            true,
+            true,
+          );
+      }
+      return 'Temporary route removed or never created';
+    });
+    await check(cleanup, 'Cleanup Worker', async () => {
+      if (workerAttempted)
+        await api(workerPath, 'DELETE', undefined, true, true);
+      return 'Temporary Worker and its assets removed or never created';
+    });
+    await check(cleanup, 'Cleanup D1', async () => {
+      if (databaseAttempted) {
+        if (!databaseId) {
+          const databases = await api(
+            `${accountPath}/d1/database?name=${name}`,
+            'GET',
+            undefined,
+            true,
+          );
+          if (!Array.isArray(databases))
+            throw new CheckFailure('Cannot inspect temporary D1 cleanup');
+          const database = databases.find(
+            (value: unknown) => isRecord(value) && value.name === name,
+          );
+          if (
+            isRecord(database) &&
+            identifier(database.uuid, /^[a-f0-9-]{36}$/)
+          )
+            databaseId = database.uuid;
+        }
+        if (databaseId)
+          await api(
+            `${accountPath}/d1/database/${databaseId}`,
+            'DELETE',
+            undefined,
+            true,
+            true,
+          );
+      }
+      return 'Temporary database removed or never created';
+    });
+    await rm(temporary, { recursive: true, force: true });
+    process.off('SIGINT', stop);
+    process.off('SIGTERM', stop);
+    const passed =
+      Object.keys(checks).length === 3 &&
+      [...Object.values(checks), ...Object.values(cleanup)].every(
+        (value) => value.status === 'passed',
+      ) &&
+      !abort.signal.aborted;
+    console.log(
+      JSON.stringify(
+        { passed, temporaryResourceLabel: name, checks, cleanup },
+        null,
+        2,
+      ),
+    );
+    if (process.env.GITHUB_STEP_SUMMARY)
+      await appendFile(
+        process.env.GITHUB_STEP_SUMMARY,
+        `Cloudflare permission check: **${passed ? 'PASSED' : 'FAILED'}**\n\nTemporary resource label: \`${name}\`\n\n| Check | Result | Detail |\n| --- | --- | --- |\n${Object.entries(
+          { ...checks, ...cleanup },
+        )
+          .map(
+            ([key, value]) => `| ${key} | ${value.status} | ${value.detail} |`,
+          )
+          .join('\n')}\n`,
+      );
+    if (!passed) process.exitCode = 1;
+  }
+}
+
+await main().catch((error: unknown) => {
+  console.error(`Cloudflare permission check failed: ${safeError(error)}`);
+  process.exitCode = 1;
+});

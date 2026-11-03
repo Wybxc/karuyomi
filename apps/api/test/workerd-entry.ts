@@ -5,7 +5,7 @@ import { createAccessVerifier } from '../src/access.js';
 import { createApp, type Bindings } from '../src/app.js';
 
 export default {
-  fetch(
+  async fetch(
     request: Request,
     env: Bindings & { PROBE_ACCESS_JWKS: string },
     context: ExecutionContext,
@@ -13,6 +13,10 @@ export default {
     const verifier = createAccessVerifier(
       createLocalJWKSet(JSON.parse(env.PROBE_ACCESS_JWKS) as JSONWebKeySet),
     );
-    return createApp(verifier).fetch(request, env, context);
+    const response = await createApp(verifier).fetch(request, env, context);
+    // Formal probes assert that real Static Assets delivery bypasses this entry.
+    const marked = new Response(response.body, response);
+    marked.headers.set('X-Karuyomi-Probe-Worker', '1');
+    return marked;
   },
 };

@@ -11,8 +11,12 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { gzipSync } from 'node:zlib';
 import type { TestContext } from 'node:test';
-import type { Artifact } from '../../packages/contracts/src/index.ts';
+import type {
+  Artifact,
+  BundleArtifact,
+} from '../../packages/contracts/src/index.ts';
 import { isRecord } from './types.ts';
 import type { ValidationFailure } from './types.ts';
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
@@ -21,6 +25,7 @@ import {
   digest,
   repositoryRoot,
   verifyIntegrity,
+  parseExtensionIndex,
 } from './verify-manifest.ts';
 
 const protocolInput: unknown = JSON.parse(
@@ -50,7 +55,10 @@ interface FixtureManifest {
   bridgeVersion: number;
   storageSchema: string;
   sourceIds: string[];
-  bundle: Artifact;
+  bundle: Omit<BundleArtifact, 'contentType' | 'encoding'> & {
+    contentType: string;
+    encoding: string;
+  };
   hostScripts: Artifact[];
   resources: (Artifact & { logicalName: string })[];
 }
@@ -69,6 +77,7 @@ async function fixture(
     'throw new Error("Integrity validation must not execute this bundle");',
   );
   const sha256 = digest(bytes);
+  const encoded = gzipSync(bytes);
   const manifest: FixtureManifest = {
     protocolVersion: protocol.protocolVersion,
     hostAbi: protocol.hostAbi,
@@ -81,10 +90,13 @@ async function fixture(
     storageSchema: 'test-v1',
     sourceIds: ['1234567890123456789'],
     bundle: {
-      path: '/api/extensions/artifacts/' + sha256,
+      path: '/extensions/artifacts/' + sha256 + '.gz',
       sha256,
       size: bytes.length,
       contentType: 'application/javascript',
+      encoding: 'gzip',
+      encodedSha256: digest(encoded),
+      encodedSize: encoded.length,
     },
     hostScripts: [],
     resources: [],
@@ -94,12 +106,13 @@ async function fixture(
     path.join(directory, 'manifest.json'),
     JSON.stringify(manifest),
   );
-  await writeFile(path.join(directory, 'artifacts', sha256), bytes);
+  await writeFile(path.join(directory, 'artifacts', sha256 + '.gz'), encoded);
   return {
     directory,
     manifest,
-    bytes,
-    artifact: path.join(directory, 'artifacts', sha256),
+    bytes: encoded,
+    canonical: bytes,
+    artifact: path.join(directory, 'artifacts', sha256 + '.gz'),
   };
 }
 
@@ -156,6 +169,66 @@ test('same-length artifact corruption fails its SHA-256 gate', async (t) => {
   assert.equal(report.failure?.code, 'hash_mismatch');
 });
 
+test('canonical corruption and malformed gzip fail after the compressed byte gate', async (t) => {
+  for (const mode of ['canonical', 'truncated', 'bomb'] as const) {
+    const value = await fixture(t);
+    let encoded = value.bytes;
+    if (mode === 'canonical')
+      encoded = gzipSync(Buffer.alloc(value.canonical.length, 0));
+    if (mode === 'truncated') encoded = encoded.subarray(0, -1);
+    if (mode === 'bomb') value.manifest.bundle.size = 1;
+    value.manifest.bundle.encodedSha256 = digest(encoded);
+    value.manifest.bundle.encodedSize = encoded.length;
+    await writeFile(value.artifact, encoded);
+    await writeFile(
+      path.join(value.directory, 'manifest.json'),
+      JSON.stringify(value.manifest),
+    );
+    const { report } = await verifyIntegrity(value.directory);
+    assert.equal(report.stages.artifactIntegrity, 'failed');
+    assert.equal(
+      report.failure?.code,
+      mode === 'canonical' ? 'hash_mismatch' : 'invalid_gzip',
+    );
+  }
+});
+
+test('the browser delivery payload retains gzip bytes, transport MIME and size', async (t) => {
+  const value = await fixture(t);
+  const verified = await verifyIntegrity(value.directory);
+  const payload = verified.payloads?.get(value.manifest.bundle.path);
+  assert(payload);
+  assert.deepEqual(payload.bytes, value.bytes);
+  assert.equal(payload.transportContentType, 'application/gzip');
+  assert.equal(payload.transportSize, value.bytes.length);
+  assert.equal(payload.contentType, 'application/javascript');
+  assert.equal(payload.size, value.canonical.length);
+});
+
+test('the shared contract parser enforces the static current-package index', async () => {
+  const descriptor = {
+    buildId: 'test-build',
+    packageName: 'test.package',
+    repoId: 'repo',
+    version: '1',
+    sourceIds: ['123'],
+    manifestPath: '/extensions/builds/test-build/manifest.json',
+  };
+  const index = { schemaVersion: 1, builds: [descriptor], nextCursor: null };
+  assert.deepEqual(
+    await parseExtensionIndex(Buffer.from(JSON.stringify(index))),
+    index,
+  );
+  await assert.rejects(
+    parseExtensionIndex(
+      Buffer.from(
+        JSON.stringify({ ...index, builds: [descriptor, descriptor] }),
+      ),
+    ),
+  );
+  await assert.rejects(parseExtensionIndex(Buffer.alloc(2 * 1024 * 1024 + 1)));
+});
+
 test('shared materials use verified host bytes without per-build copies', async (t) => {
   const { catalog, data } = await collectMaterials();
   const { directory } = await fixture(t, (manifest: FixtureManifest) => {
@@ -164,7 +237,7 @@ test('shared materials use verified host bytes without per-build copies', async 
   });
   const { report, payloads } = await verifyIntegrity(directory);
   assert.equal(report.stages.artifactIntegrity, 'passed');
-  assert.equal(report.privateArtifactCount, 1);
+  assert.equal(report.bundleArtifactCount, 1);
   assert.equal(report.sharedMaterialCount, 6);
   for (const material of [...catalog.hostScripts, ...catalog.resources]) {
     assert.deepEqual(
@@ -259,7 +332,7 @@ test('runtime scripts require an explicit JavaScript MIME type', async (t) => {
   });
   assert.equal(
     (await verifyIntegrity(directory)).report.failure?.code,
-    'invalid_script_mime',
+    'invalid_manifest',
   );
 });
 
@@ -287,7 +360,7 @@ test('symbolic artifact directory is rejected even when every file hashes correc
     path.join(tmpdir(), 'karuyomi-validator-artifacts-'),
   );
   t.after(() => rm(other, { recursive: true, force: true }));
-  await writeFile(path.join(other, manifest.bundle.sha256), bytes);
+  await writeFile(path.join(other, manifest.bundle.sha256 + '.gz'), bytes);
   await rm(path.join(directory, 'artifacts'), { recursive: true });
   await symlink(other, path.join(directory, 'artifacts'));
   assert.equal(

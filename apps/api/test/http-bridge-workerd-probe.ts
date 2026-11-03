@@ -4,7 +4,14 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer, request as httpRequest } from 'node:http';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -192,20 +199,23 @@ try {
     }),
   );
   const db = await mf.getD1Database('DB');
-  for (const statement of (
-    await readFile(
-      path.join(root, 'apps/api/migrations/0001_many_major_mapleleaf.sql'),
-      'utf8',
-    )
-  ).split('--> statement-breakpoint')) {
-    if (statement.trim()) await db.exec(statement.replace(/\n/g, ' '));
+  for (const name of (await readdir(path.join(root, 'apps/api/migrations')))
+    .filter((name) => name.endsWith('.sql'))
+    .sort()) {
+    for (const statement of (
+      await readFile(path.join(root, 'apps/api/migrations', name), 'utf8')
+    ).split('--> statement-breakpoint')) {
+      if (statement.trim()) await db.exec(statement.replace(/\n/g, ' '));
+    }
   }
   await db
-    .prepare('INSERT INTO extension_builds VALUES (?,?,?,?,?,?)')
+    .prepare(
+      'INSERT INTO extension_builds (build_id,package_name,bundle_sha256,status,created_at,allowed_hosts_json) VALUES (?,?,?,?,?,?)',
+    )
     .bind(
       'v2-fixture',
       'fixture',
-      '{}',
+      'a'.repeat(64),
       'verified',
       0,
       '["fixture.example.org"]',

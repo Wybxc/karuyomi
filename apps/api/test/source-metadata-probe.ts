@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Loopback-only live-Source probe. Production entry points never import this.
-// Real workerd, D1/R2, RS256 verification and the product HTTP bridge are used.
+// Real workerd, policy-only D1, RS256 verification and the product HTTP bridge.
 import assert from 'node:assert/strict';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { createHash } from 'node:crypto';
@@ -11,6 +11,11 @@ import type { IncomingMessage } from 'node:http';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { byteStream, relayFrames, streamChunks } from './http-probe-streams.ts';
+import {
+  createStaticSnapshot,
+  migrationFiles,
+  staticProbeFile,
+} from './static-extension-probe.ts';
 import {
   HTTP_BRIDGE_MEDIA_TYPE,
   HTTP_FRAME_LIMIT,
@@ -42,6 +47,12 @@ const artifactFolder = process.argv[3]
   : path.join(path.dirname(manifestPath), 'artifacts');
 const temporary = await mkdtemp(path.join(tmpdir(), 'karuyomi-source-probe-'));
 const state = path.join(temporary, 'state');
+const staticRoot = await createStaticSnapshot(
+  path.join(temporary, 'public'),
+  manifest,
+  artifactFolder,
+  await readFile(manifestPath),
+);
 const evidenceFile = process.env.SOURCE_PROBE_EVIDENCE
   ? path.resolve(process.env.SOURCE_PROBE_EVIDENCE)
   : path.join(root, 'runtime/teavm/.local/probes/source-metadata.json');
@@ -80,20 +91,10 @@ const wrangler = (...args: string[]) =>
   );
 
 console.log(
-  'Registering the verified product build in isolated local D1/R2 state',
+  'Registering current static build network policy in isolated local D1',
 );
-for (const name of [
-  '0000_special_thing.sql',
-  '0001_many_major_mapleleaf.sql',
-]) {
-  wrangler(
-    'd1',
-    'execute',
-    'DB',
-    '--file',
-    path.join(api, 'migrations', name),
-    '--yes',
-  );
+for (const file of await migrationFiles(api)) {
+  wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
 }
 execFileSync(
   'python3',
@@ -105,6 +106,8 @@ execFileSync(
     '--local',
     '--persist-to',
     state,
+    '--static-root',
+    staticRoot,
     ...allowedHosts.flatMap((host) => ['--allow-host', host]),
   ],
   { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] },
@@ -136,7 +139,6 @@ const mf = new Miniflare(
     compatibilityDate: '2026-11-03',
     resourcePersistencePath: path.join(state, 'v3'),
     d1Databases: { DB: databaseId },
-    r2Buckets: { ARTIFACTS: 'karuyomi-private' },
     bindings: {
       ACCESS_TEAM_DOMAIN: 'probe.cloudflareaccess.com',
       ACCESS_AUD: 'probe-app',
@@ -202,7 +204,7 @@ const html = `<!doctype html><html lang="en"><meta charset="utf-8">
 <title>Karuyomi live Source metadata probe</title>
 <style>body{font:14px system-ui;margin:24px;max-width:1000px}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{padding:12px}</style>
 <h1>Live Source metadata probe</h1>
-<p>Loopback only: verified real TeaVM product, local D1/R2, signed test Access identity and real workerd HTTP bridge. No image bytes are requested.</p>
+<p>Loopback only: verified real TeaVM product, direct static gzip assets, policy-only local D1, signed test Access identity and real workerd HTTP bridge. No image bytes are requested.</p>
 <button id="run" disabled>Run real metadata operations</button><pre id="output">Loading...</pre>
 <script type="module">
 import '/runtime/host.js';
@@ -221,7 +223,7 @@ button.onclick = async () => {
   button.disabled = true;
   try {
     const session = await runtime.open({
-      manifestPath:${JSON.stringify(`/api/extensions/builds/${manifest.buildId}/manifest`)},
+      manifestPath:${JSON.stringify(`/extensions/builds/${manifest.buildId}/manifest.json`)},
       identity:'probe-owner', userAgent:navigator.userAgent,
       expectedBuildId:${JSON.stringify(manifest.buildId)}, expectedBundleSha256:${JSON.stringify(manifest.bundle.sha256)}
     });
@@ -279,6 +281,17 @@ const server = createServer(async (request, response) => {
       if (isRecord(browser) && Array.isArray(browser.events))
         console.log(JSON.stringify(browser.events.at(-1)));
       response.writeHead(204).end();
+      return;
+    }
+    const staticFile = await staticProbeFile(staticRoot, pathname, manifest);
+    if (request.method === 'GET' && staticFile) {
+      response
+        .writeHead(200, {
+          'Content-Type': staticFile.contentType,
+          'Content-Length': staticFile.bytes.length,
+          'Cache-Control': 'no-store',
+        })
+        .end(staticFile.bytes);
       return;
     }
     if (pathname.startsWith('/api/')) {

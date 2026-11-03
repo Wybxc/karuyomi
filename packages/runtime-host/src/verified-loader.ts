@@ -1,15 +1,17 @@
 import {
   buildManifestSchema,
+  bundleArtifactSchema,
+  extensionIndexSchema,
+  staticManifestPathSchema,
   type Artifact,
+  type BundleArtifact,
   type BuildManifest,
+  type ExtensionIndex,
 } from '@karuyomi/contracts';
 import { RuntimeFailure } from './errors.js';
 
 export const sha256 = async (bytes: Uint8Array): Promise<string> => {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    bytes as Uint8Array<ArrayBuffer>,
-  );
+  const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
   return Array.from(new Uint8Array(digest), (value) =>
     value.toString(16).padStart(2, '0'),
   ).join('');
@@ -26,46 +28,59 @@ export class VerifiedLoader {
     private readonly materialResolver?: RuntimeMaterialResolver,
   ) {}
 
-  private async response(path: string, signal: AbortSignal): Promise<Response> {
+  private async response(
+    path: string,
+    signal: AbortSignal,
+    immutable = false,
+  ): Promise<Response> {
     const url = new URL(path, this.origin);
     if (
       url.origin !== this.origin ||
-      !url.pathname.startsWith('/api/') ||
+      url.pathname !== path ||
+      !(
+        path === '/extensions/index.json' ||
+        staticManifestPathSchema.safeParse(path).success ||
+        /^\/extensions\/artifacts\/[a-f0-9]{64}\.gz$/.test(path)
+      ) ||
       url.search ||
       url.hash
     ) {
       throw new RuntimeFailure(
         'protocol_error',
-        'Runtime assets must use the authenticated same-origin API',
+        'Extensions must use the same-origin static catalog',
       );
     }
     const response = await this.fetcher(url.href, {
       signal,
-      credentials: 'same-origin',
+      credentials: 'omit',
       redirect: 'manual',
-      cache: 'no-cache',
+      cache: immutable ? 'force-cache' : 'no-cache',
     });
     if (
       response.type === 'opaqueredirect' ||
-      (response.status >= 300 && response.status < 400) ||
-      response.status === 401
+      (response.status >= 300 && response.status < 400)
     ) {
-      throw new RuntimeFailure('access_required', 'Access session is required');
+      void response.body?.cancel().catch(() => {});
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Static extension delivery cannot redirect',
+      );
     }
-    if (response.status === 403)
-      throw new RuntimeFailure('access_denied', 'Access session was denied');
-    if (!response.ok)
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {});
       throw new RuntimeFailure(
         'runtime_lost',
-        `Private runtime asset returned HTTP ${response.status}`,
+        `Static extension asset returned HTTP ${response.status}`,
         response.status >= 500,
       );
+    }
     if (
       response.headers.get('content-type')?.toLowerCase().includes('text/html')
     ) {
+      void response.body?.cancel().catch(() => {});
       throw new RuntimeFailure(
-        'access_required',
-        'Received a login page instead of a private runtime asset',
+        'protocol_error',
+        'Received HTML instead of a static extension asset',
       );
     }
     return response;
@@ -74,27 +89,43 @@ export class VerifiedLoader {
   private async readBounded(
     response: Response,
     limit: number,
+    signal: AbortSignal,
     exact = false,
-  ): Promise<Uint8Array> {
+  ): Promise<Uint8Array<ArrayBuffer>> {
     const declared = response.headers.get('content-length');
     if (
       declared !== null &&
       (!/^\d+$/.test(declared) || Number(declared) > limit)
     ) {
-      await response.body?.cancel();
+      void response.body?.cancel().catch(() => {});
       throw new RuntimeFailure(
         'limit_exceeded',
         'Runtime asset exceeds its declared byte budget',
       );
     }
-    const reader = response.body?.getReader();
-    if (!reader)
+    if (!response.body)
       throw new RuntimeFailure('integrity_error', 'Runtime asset has no body');
+    return this.readStream(response.body, limit, signal, exact);
+  }
+
+  private async readStream(
+    stream: ReadableStream<Uint8Array>,
+    limit: number,
+    signal: AbortSignal,
+    exact: boolean,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    const reader = stream.getReader();
+    const abort = () => {
+      void reader.cancel(signal.reason).catch(() => {});
+    };
+    signal.addEventListener('abort', abort, { once: true });
     const buffer = new Uint8Array(limit);
     let size = 0;
     try {
+      signal.throwIfAborted();
       for (;;) {
         const { value, done } = await reader.read();
+        signal.throwIfAborted();
         if (done) break;
         if (size + value.byteLength > limit) {
           throw new RuntimeFailure(
@@ -110,34 +141,40 @@ export class VerifiedLoader {
           'integrity_error',
           'Runtime asset size does not match the manifest',
         );
-      return exact ? buffer : buffer.subarray(0, size);
+      return exact ? buffer : buffer.slice(0, size);
     } finally {
-      await reader.cancel().catch(() => {});
+      signal.removeEventListener('abort', abort);
+      void reader.cancel().catch(() => {});
       reader.releaseLock();
     }
   }
 
   async manifest(path: string, signal: AbortSignal): Promise<BuildManifest> {
-    if (!/^\/api\/extensions\/builds\/[^/?#]+\/manifest$/.test(path)) {
+    if (!staticManifestPathSchema.safeParse(path).success) {
       throw new RuntimeFailure(
         'protocol_error',
-        'Invalid private build manifest path',
+        'Invalid static build manifest path',
       );
     }
     const response = await this.response(path, signal);
     if (
-      !response.headers
+      response.headers
         .get('content-type')
-        ?.toLowerCase()
-        .includes('application/json')
+        ?.split(';')[0]
+        ?.trim()
+        .toLowerCase() !== 'application/json'
     ) {
+      void response.body?.cancel().catch(() => {});
       throw new RuntimeFailure('protocol_error', 'Build manifest must be JSON');
     }
-    const bytes = await this.readBounded(response, 64 * 1024);
+    const bytes = await this.readBounded(response, 64 * 1024, signal);
     try {
-      return buildManifestSchema.parse(
+      const manifest = buildManifestSchema.parse(
         JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)),
       );
+      if (path !== `/extensions/builds/${manifest.buildId}/manifest.json`)
+        throw Error('Manifest identity mismatch');
+      return manifest;
     } catch {
       throw new RuntimeFailure(
         'protocol_error',
@@ -146,40 +183,113 @@ export class VerifiedLoader {
     }
   }
 
+  async index(signal: AbortSignal): Promise<ExtensionIndex> {
+    const response = await this.response('/extensions/index.json', signal);
+    if (
+      response.headers
+        .get('content-type')
+        ?.split(';')[0]
+        ?.trim()
+        .toLowerCase() !== 'application/json'
+    ) {
+      void response.body?.cancel().catch(() => {});
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Extension index must be JSON',
+      );
+    }
+    const bytes = await this.readBounded(response, 2 * 1024 * 1024, signal);
+    try {
+      return extensionIndexSchema.parse(
+        JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)),
+      );
+    } catch {
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Extension index has an incompatible shape',
+      );
+    }
+  }
+
   async artifact(
-    artifact: Artifact,
+    artifact: BundleArtifact,
     signal: AbortSignal,
     script = false,
-  ): Promise<Uint8Array> {
-    if (artifact.path !== `/api/extensions/artifacts/${artifact.sha256}`) {
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    if (
+      !bundleArtifactSchema.safeParse(artifact).success ||
+      artifact.path !== `/extensions/artifacts/${artifact.sha256}.gz`
+    ) {
       throw new RuntimeFailure(
         'integrity_error',
         'Artifact URL must match its registered digest',
       );
     }
-    const response = await this.response(artifact.path, signal);
+    const response = await this.response(artifact.path, signal, true);
     const mime = response.headers
       .get('content-type')
       ?.split(';')[0]
       ?.trim()
       .toLowerCase();
     if (
-      script &&
-      mime !== 'application/javascript' &&
-      mime !== 'text/javascript'
+      mime !== 'application/gzip' ||
+      response.headers.has('content-encoding') ||
+      (script &&
+        !['application/javascript', 'text/javascript'].includes(
+          artifact.contentType,
+        ))
     ) {
+      void response.body?.cancel().catch(() => {});
       throw new RuntimeFailure(
         'protocol_error',
-        'Runtime script is not JavaScript',
+        'Extension transport must be gzip with a JavaScript canonical type',
       );
     }
-    const bytes = await this.readBounded(response, artifact.size, true);
+    const encoded = await this.readBounded(
+      response,
+      artifact.encodedSize,
+      signal,
+      true,
+    );
+    if ((await sha256(encoded)) !== artifact.encodedSha256)
+      throw new RuntimeFailure(
+        'integrity_error',
+        'Compressed extension hash does not match its manifest',
+      );
+    signal.throwIfAborted();
+    if (typeof DecompressionStream === 'undefined')
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'Gzip extension loading requires DecompressionStream',
+      );
+    let bytes: Uint8Array<ArrayBuffer>;
+    try {
+      const source = new ReadableStream<BufferSource>({
+        start(controller) {
+          controller.enqueue(encoded);
+          controller.close();
+        },
+      });
+      bytes = await this.readStream(
+        source.pipeThrough(new DecompressionStream('gzip')),
+        artifact.size,
+        signal,
+        true,
+      );
+    } catch (error) {
+      if (error instanceof RuntimeFailure || signal.aborted) throw error;
+      throw new RuntimeFailure(
+        'integrity_error',
+        'Extension gzip data is invalid or truncated',
+      );
+    }
     if ((await sha256(bytes)) !== artifact.sha256) {
       throw new RuntimeFailure(
         'integrity_error',
-        'Runtime asset hash does not match the authenticated manifest',
+        'Canonical extension hash does not match the static manifest',
       );
     }
+    signal.throwIfAborted();
     return bytes;
   }
 
@@ -188,7 +298,7 @@ export class VerifiedLoader {
     artifact: Artifact,
     signal: AbortSignal,
     script = false,
-  ): Promise<Uint8Array> {
+  ): Promise<Uint8Array<ArrayBuffer>> {
     signal.throwIfAborted();
     if (artifact.path !== `/runtime/materials/${artifact.sha256}`) {
       throw new RuntimeFailure(
@@ -196,7 +306,7 @@ export class VerifiedLoader {
         'Material URL does not match its digest',
       );
     }
-    let bytes: Uint8Array;
+    let bytes: Uint8Array<ArrayBuffer>;
     let mime: string | null;
     if (this.materialResolver) {
       const material = this.materialResolver(artifact.sha256);
@@ -206,7 +316,7 @@ export class VerifiedLoader {
           'The installed app does not include this runtime material; update the app',
         );
       }
-      bytes = material.bytes.slice();
+      bytes = new Uint8Array(material.bytes);
       mime = material.contentType;
     } else {
       const url = new URL(`/runtime/materials/${artifact.sha256}`, this.origin);
@@ -224,7 +334,7 @@ export class VerifiedLoader {
         );
       }
       mime = response.headers.get('content-type');
-      bytes = await this.readBounded(response, artifact.size, true);
+      bytes = await this.readBounded(response, artifact.size, signal, true);
     }
     mime = mime?.split(';')[0]?.trim().toLowerCase() ?? null;
     const declared = artifact.contentType?.toLowerCase();

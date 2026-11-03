@@ -168,12 +168,12 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
     if (build.manifestUri.hasScheme ||
         build.manifestUri.hasAuthority ||
-        !RegExp(
-          r'^/api/extensions/builds/[^/?#]+/manifest$',
-        ).hasMatch(build.manifestUri.toString())) {
+        !RegExp(r'^[a-zA-Z0-9._-]{1,200}$').hasMatch(build.buildId) ||
+        build.manifestUri.toString() !=
+            '/extensions/builds/${build.buildId}/manifest.json') {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
-        'Runtime manifest must be a relative private API path',
+        'Runtime manifest must match the selected static build',
       );
     }
     final epoch = ++_epoch;

@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { createExtensionRoutes, type ExtensionStore } from './extensions.js';
 import { createHttpBridge } from './http-bridge.js';
 import { protocolVersion, type Bootstrap } from '@karuyomi/contracts';
 import {
@@ -14,7 +13,6 @@ import {
 export type Bindings = AccessConfig & {
   ASSETS: Fetcher;
   DB: D1Database;
-  ARTIFACTS: R2Bucket;
   RUNTIME_SESSIONS: DurableObjectNamespace;
 };
 
@@ -23,10 +21,7 @@ export type AppEnv = {
   Variables: { identity: AccessIdentity };
 };
 
-export function createApp(
-  verifyAccess: VerifyAccess = createAccessVerifier(),
-  extensionStore?: (env: Bindings) => ExtensionStore,
-) {
+export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
   const app = new Hono<AppEnv>();
 
   // Global dispatch prevents encoded API paths or unknown API routes from
@@ -42,6 +37,14 @@ export function createApp(
     const api = path === '/api' || path.startsWith('/api/');
     if (!api) {
       if (path.startsWith('/cdn-cgi/')) return c.notFound();
+      if (
+        ['GET', 'HEAD'].includes(c.req.method) &&
+        ['/', '/auth/complete', '/browse', '/settings'].includes(path)
+      ) {
+        return c.env.ASSETS.fetch(
+          new Request(new URL('/', c.req.url), c.req.raw),
+        );
+      }
       return c.env.ASSETS.fetch(c.req.raw);
     }
     c.header('Cache-Control', 'private, no-store');
@@ -103,7 +106,6 @@ export function createApp(
     };
     return c.json(body);
   });
-  app.route('/api/extensions', createExtensionRoutes(extensionStore));
   app.route('/api/bridge', createHttpBridge());
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((_error, c) => c.json({ error: 'internal_error' }, 500));

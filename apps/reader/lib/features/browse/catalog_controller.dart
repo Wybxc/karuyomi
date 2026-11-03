@@ -27,12 +27,20 @@ final class CatalogBuild {
   final String version;
   final String manifestPath;
 
-  factory CatalogBuild.fromJson(Map<String, Object?> json) => CatalogBuild(
-    id: _string(json, 'buildId'),
-    packageName: _string(json, 'packageName'),
-    version: _string(json, 'version'),
-    manifestPath: _string(json, 'manifestPath'),
-  );
+  factory CatalogBuild.fromJson(Map<String, Object?> json) {
+    final id = _string(json, 'buildId');
+    final path = _string(json, 'manifestPath');
+    if (!RegExp(r'^[a-zA-Z0-9._-]{1,200}$').hasMatch(id) ||
+        path != '/extensions/builds/$id/manifest.json') {
+      throw const FormatException('扩展清单路径与构建不匹配');
+    }
+    return CatalogBuild(
+      id: id,
+      packageName: _string(json, 'packageName'),
+      version: _string(json, 'version'),
+      manifestPath: path,
+    );
+  }
 }
 
 final class MangaEntry {
@@ -107,7 +115,6 @@ final class CatalogController extends ChangeNotifier {
   bool busy = false;
   String? activity;
   List<CatalogBuild> builds = const [];
-  String? nextBuildCursor;
   CatalogBuild? activeBuild;
   RuntimeSession? session;
   SourceInfo? activeSource;
@@ -163,6 +170,15 @@ final class CatalogController extends ChangeNotifier {
 
   Future<Map<String, Object?>> _get(String path) async {
     final reply = await api.fetchApi(path);
+    final isStatic = path.startsWith('/extensions/');
+    if (isStatic &&
+        (reply.redirected ||
+            reply.status != 200 ||
+            !(reply.headers['content-type'] ?? '').contains(
+              'application/json',
+            ))) {
+      throw StateError('扩展目录暂时不可用，请稍后重新连接');
+    }
     if (reply.redirected || reply.status == 401) {
       throw const RuntimeException(RuntimeErrorCode.accessRequired, '请先通过访问验证');
     }
@@ -244,7 +260,6 @@ final class CatalogController extends ChangeNotifier {
       status = ServiceStatus.connecting;
       _dropSession();
       builds = const [];
-      nextBuildCursor = null;
       final bootstrap = await _get('/api/bootstrap');
       if (bootstrap['protocolVersion'] != protocolVersion) {
         throw const FormatException('客户端与服务版本不兼容');
@@ -252,32 +267,23 @@ final class CatalogController extends ChangeNotifier {
       final identity = _object(bootstrap['identity']);
       final confirmedSubject = _string(identity, 'subject');
       final confirmedEmail = _string(identity, 'email');
-      final inventory = await _get('/api/extensions/builds');
+      final inventory = await _get('/extensions/index.json');
+      if (inventory['schemaVersion'] != 1 || inventory['nextCursor'] != null) {
+        throw const FormatException('扩展索引版本不兼容');
+      }
       final available = _list(
         inventory['builds'],
       ).map((v) => CatalogBuild.fromJson(_object(v))).toList();
+      if (available.length > 5000 ||
+          available.map((build) => build.packageName).toSet().length !=
+              available.length) {
+        throw const FormatException('扩展索引必须每包只包含一个当前版本');
+      }
       if (_closed) return;
       subject = confirmedSubject;
       email = confirmedEmail;
       builds = available;
-      nextBuildCursor = inventory['nextCursor'] as String?;
       status = ServiceStatus.ready;
-    });
-  }
-
-  Future<void> moreBuilds() async {
-    final cursor = nextBuildCursor;
-    if (cursor == null) return;
-    await _perform('正在加载漫画源', () async {
-      final inventory = await _get(
-        '/api/extensions/builds?cursor=${Uri.encodeQueryComponent(cursor)}',
-      );
-      final available = _list(
-        inventory['builds'],
-      ).map((v) => CatalogBuild.fromJson(_object(v))).toList();
-      if (_closed) return;
-      builds = [...builds, ...available];
-      nextBuildCursor = inventory['nextCursor'] as String?;
     });
   }
 

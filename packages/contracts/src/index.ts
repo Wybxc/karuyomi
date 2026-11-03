@@ -20,12 +20,7 @@ export const bootstrapSchema = z.object({
   stage: z.enum(['scaffold', 'p0']),
 });
 
-export const artifactSchema = z.object({
-  path: z
-    .string()
-    .regex(
-      /^\/(?:api\/extensions\/artifacts|runtime\/materials)\/[a-f0-9]{64}$/,
-    ),
+const artifactFields = {
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   size: z
     .number()
@@ -33,7 +28,66 @@ export const artifactSchema = z.object({
     .positive()
     .max(64 * 1024 * 1024),
   contentType: z.string().max(128).optional(),
-});
+};
+export const artifactSchema = z
+  .object({
+    ...artifactFields,
+    path: z.string().regex(/^\/runtime\/materials\/[a-f0-9]{64}$/),
+    logicalName: z.string().min(1).max(100).optional(),
+  })
+  .strict();
+export const bundleArtifactSchema = z
+  .object({
+    ...artifactFields,
+    path: z.string().regex(/^\/extensions\/artifacts\/[a-f0-9]{64}\.gz$/),
+    contentType: z.enum(['application/javascript', 'text/javascript']),
+    encoding: z.literal('gzip'),
+    encodedSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    encodedSize: z
+      .number()
+      .int()
+      .positive()
+      .max(25 * 1024 * 1024),
+  })
+  .strict();
+export const buildIdSchema = z.string().regex(/^[a-zA-Z0-9._-]{1,200}$/);
+export const staticManifestPathSchema = z
+  .string()
+  .regex(/^\/extensions\/builds\/[a-zA-Z0-9._-]{1,200}\/manifest\.json$/);
+export const extensionBuildDescriptorSchema = z
+  .object({
+    buildId: buildIdSchema,
+    packageName: z.string().min(1).max(200),
+    repoId: z.string().min(1).max(200),
+    version: z.string().min(1).max(100),
+    sourceIds: z
+      .array(z.string().regex(/^-?\d+$/))
+      .min(1)
+      .max(500),
+    manifestPath: staticManifestPathSchema,
+  })
+  .strict()
+  .refine(
+    (build) =>
+      build.manifestPath ===
+      `/extensions/builds/${build.buildId}/manifest.json`,
+    'Manifest path must match its build',
+  );
+export const extensionIndexSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    builds: z.array(extensionBuildDescriptorSchema).max(5000),
+    nextCursor: z.null(),
+  })
+  .strict()
+  .refine(
+    (index) =>
+      new Set(index.builds.map((build) => build.packageName)).size ===
+        index.builds.length &&
+      new Set(index.builds.map((build) => build.buildId)).size ===
+        index.builds.length,
+    'The static index must contain one current build per package',
+  );
 
 export const buildManifestSchema = z
   .object({
@@ -41,7 +95,7 @@ export const buildManifestSchema = z
     hostAbi: z.literal(hostAbi),
     runtimeBaseline: z.literal(runtimeBaseline),
     bridgeVersion: z.literal(2),
-    buildId: z.string().min(1).max(200),
+    buildId: buildIdSchema,
     packageName: z.string().min(1).max(200),
     repoId: z.string().min(1).max(200),
     version: z.string().min(1).max(100),
@@ -50,7 +104,7 @@ export const buildManifestSchema = z
       .array(z.string().regex(/^-?\d+$/))
       .min(1)
       .max(500),
-    bundle: artifactSchema,
+    bundle: bundleArtifactSchema,
     hostScripts: z.array(artifactSchema).max(16),
     resources: z
       .array(artifactSchema.extend({ logicalName: z.string().min(1).max(100) }))
@@ -72,24 +126,14 @@ export const buildManifestSchema = z
         message: 'Build exceeds the runtime loading budget',
       });
     }
-    for (const artifact of artifacts) {
-      if (
-        artifact.path !== `/api/extensions/artifacts/${artifact.sha256}` &&
-        artifact.path !== `/runtime/materials/${artifact.sha256}`
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Artifact path must match its registered hash',
-        });
-      }
-    }
     if (
       manifest.bundle.path !==
-      `/api/extensions/artifacts/${manifest.bundle.sha256}`
+      `/extensions/artifacts/${manifest.bundle.sha256}.gz`
     ) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Extension programs must use private artifact delivery',
+        message:
+          'Extension programs must use static gzip delivery at their canonical digest',
       });
     }
     for (const artifact of [...manifest.hostScripts, ...manifest.resources]) {
@@ -181,6 +225,11 @@ export const workerResponseSchema = z.object({
   error: runtimeErrorSchema.optional(),
 });
 export type Artifact = z.infer<typeof artifactSchema>;
+export type BundleArtifact = z.infer<typeof bundleArtifactSchema>;
+export type ExtensionBuildDescriptor = z.infer<
+  typeof extensionBuildDescriptorSchema
+>;
+export type ExtensionIndex = z.infer<typeof extensionIndexSchema>;
 export type BuildManifest = z.infer<typeof buildManifestSchema>;
 export type SourceInfo = z.infer<typeof sourceInfoSchema>;
 export type SourceCall = z.infer<typeof sourceCallSchema>;

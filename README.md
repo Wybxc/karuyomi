@@ -2,42 +2,43 @@
 
 个人漫画阅读应用。Flutter + TeaVM 浏览器宿主，Cloudflare Workers 后端。
 
-项目正在实施 [P0](docs/plan/p0-runtime-and-reading.md)，各阶段见[计划目录](docs/plan/README.md)。已部署到 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，已内化 TeaVM 运行时并构建真实 MangaDraft AOT 包，具备私有产物交付、JS / Dart 运行接口、漫画资料浏览界面和独立阅读器。真实浏览器已通过 Source 初始化；产品图片通道与完整在线阅读尚未接通，P0 尚未通过。
+项目正在实施 [P0](docs/plan/p0-runtime-and-reading.md)，各阶段见[计划目录](docs/plan/README.md)。已有真实 AOT 初始化、完整 DTO、资料浏览界面和独立阅读核心；产品图片通道与完整在线阅读尚未接通。已部署域名为 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，当前代码是否完成线上验收以[验证记录](docs/VERIFICATION.md)为准。
 
-最新交付决定：所有客户端从 Static Assets 的权威索引读取每个扩展的最新版，客户端或 Service Worker 管理更新；不再向 GitHub Release 发布扩展，也不经 Worker/R2 转发扩展正文。下文私有交付是现有实现，正按[工程计划](docs/plan/engineering-and-release.md)迁移，不能视为新链路已验收。
+Static Assets 是所有客户端扩展分发的权威来源，每包只部署最新可用构建。客户端刷新静态索引并切换当前版本，不再向 GitHub Release 发布扩展，也不经 Worker/R2 转发扩展正文。共享桥/WASM 在 Web 作为静态资源、Native 随应用打包。动态 Source 网络请求仍经 Access 保护的 HTTP v2 API。
 
 ## 当前能力与边界
 
-| 范围           | 已实现 / 已验证                                                                                                                           | 尚待完成                                                                      |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| TeaVM 公共宿主 | 固定 TeaVM 0.16.0 JS；按包构建、输入及产物 hash；完整 DTO 与显式漫画/章节引用；真实 MangaDraft Web 初始化；热门/最新/搜索列表返回完整 DTO | 3–5 个原版源完整操作与阅读回归、持久层重启/升级验证                           |
-| JS / Dart 接入 | 私有清单及资源执行前校验、串行 Worker、代次隔离、取消/超时回收；Web JS interop 与原生 WebView 控制、可见登录流程                          | 真实域名 Access/cookie 会话、原生容器恢复与真机验收                           |
-| 浏览与阅读器   | 构建/Source 选择、热门/最新/搜索分页、详情与章节；单/双页、RTL、竖向/Webtoon、缩放和有界资源调度                                          | 产品图片获取仍明确不支持；章节暂不可读，ReaderScreen 尚未接入实际 Source 导航 |
-| API 与私有交付 | JWT 再校验、D1 构建注册、私有 R2 流式产物与 Range/HEAD、按构建域名白名单的 v2 分帧网络桥                                                  | 生产 Access 登录与正向私有交付；真实 Source/cache 与二进制链路完整验收        |
-| 独立机制探针   | TeaVM 有界字节复制/fiber 取消/ArrayBuffer 所有权；iOS 模拟器 HTTPS 下 Worker → Blob → WKDownload → 文件                                   | 两者尚未汇合为产品图片通道；真实源、物理设备与合计内存峰值未验收              |
+| 范围           | 已实现 / 已验证                                                                                      | 尚待完成                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| TeaVM 宿主     | 固定 TeaVM 0.16.0 JS、按包构建、完整 DTO、漫画/章节引用；历史真实 MangaDraft 初始化与列表请求        | 当前 gzip 交付的真实 AOT 验收、多源操作与持久层回归 |
+| JS / Dart 接入 | 静态索引/清单、传输校验、有界解压、串行 Worker、代次隔离、取消和超时；Web interop 与 Native 内置宿主 | 生产 Access 会话、Native 恢复和真机验收             |
+| 浏览与阅读器   | 包/Source 选择、热门/最新/搜索分页、详情与章节；单双页、RTL、Webtoon、缩放和有界资源调度             | 产品图片通道与 ReaderScreen 的真实 Source 导航      |
+| API            | JWT 再校验、D1 网络授权元数据、按构建域名白名单的 v2 分帧桥；本地真实 workerd 回归                   | 真实 Source/cache 和生产 Access 正向验收            |
+| 构建分发       | 最新静态快照、输入指纹增量、失败保留可用成功构建、部署后 checkpoint、缺 baseline CI 保护             | 当前宿主首次本地全量与实际增量部署                  |
 
-`ready.sourceReady: false` 只描述控制握手；`open` 必须在真实宿主初始化、Source 列表与清单一致后才返回运行会话。六个 Java 操作边界为 `popular`、`latest`、`search`、`details`、`chapters`、`pages`；边界与 JVM oracle 通过不代表六项在线 Source 语义均已验收。真实网络探针中热门/最新/搜索返回列表，已核对原版 MangaDraft 普通文本搜索未把关键词加入请求，不能将返回列表当作匹配验收；详情/章节遇到 Source 的 Human Verification 挑战，返回 source_error，未伪造页面结果。验证范围见 [记录](docs/VERIFICATION.md)。
+`ready.sourceReady: false` 只描述控制握手；`open` 在真实初始化、Source 列表与清单一致后才返回会话。AOT 编译成功保持 `compiled_unverified` / `runtimeReady=false`，不能当作在线兼容。历史 MangaDraft 普通文本搜索未在原 Source 请求中加入关键词；详情/章节遇到 Human Verification。证据与限制见 [VERIFICATION](docs/VERIFICATION.md)。
 
 ## 工程结构
 
 ```text
-apps/reader/            Flutter Web / iOS / Android 应用
-apps/api/               Hono 入口、Access 校验、D1 / R2 / DO bindings
-packages/reader_core/   独立 Dart 布局、位置、资源窗口与调度
-packages/source_runtime/ Dart SourceRuntime、版本协议与传输验证
-packages/contracts/    Zod 边界校验与协议版本源文件
-packages/runtime-host/ 公开控制页、私有 TeaVM 加载与串行 Worker
-runtime/teavm/          项目运行时、适配层与构建输入
-tools/                 正式回归测试与扩展发布工具
-scripts/               协议生成、构建、私有产物注册与资源组装
-docs/design/           五份设计文档及来源校验记录
-docs/plan/             分阶段实施计划与统一状态索引
-docs/verification/     精简验证结论与正式复验入口
+apps/reader/             Flutter Web / iOS / Android 应用
+apps/api/                Hono、Access 校验、D1 网络政策与 DO
+packages/reader_core/    Dart 布局、位置、资源窗口与调度
+packages/source_runtime/ Dart SourceRuntime 与传输验证
+packages/contracts/     Zod 边界校验与协议版本源文件
+packages/runtime-host/   控制页、TeaVM 加载与串行 Worker
+runtime/teavm/           项目运行时、适配层与构建输入
+vendor/                  固定提交的第三方 submodule
+tools/extensions/        发现、指纹、AOT 与静态快照流水线
+scripts/                 协议生成、构建、网络政策与资源组装
+docs/design/             持续维护的设计与来源记录
+docs/plan/               分阶段计划与统一索引
+docs/verification/       验证结论与复验入口
 ```
 
 ## 本地开发
 
-需要 Node 24.15.0（`.node-version`）、pnpm 12.6.0、Flutter 3.47.5（`.fvmrc`）。可用 FVM 安装 Flutter，或将固定版本加入 PATH；也支持 `FLUTTER_ROOT=/path/to/flutter`。原生构建另需 Xcode / Android SDK。TeaVM 工具链与依赖材料由锁文件固定；历史验证使用 JDK 25.0.4、Maven 3.9.11；当前构建与校验见 [运行时说明](runtime/teavm/README.md)。
+需要 Node 24.15.0（`.node-version`）、pnpm 12.6.0、Flutter 3.47.5（`.fvmrc`）。支持 `FLUTTER_ROOT=/path/to/flutter`；原生构建另需 Xcode / Android SDK。JVM 工具链和依赖由[锁文件与运行时说明](runtime/teavm/README.md)固定。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -50,47 +51,33 @@ pnpm db:migrate:local
 pnpm dev
 ```
 
-打开 Wrangler 输出的本地地址即可访问同源 Flutter Web 和 `/runtime/host.html`。先执行 `pnpm build` 创建静态目录；重新修改 Flutter 或 JS 宿主后再次构建。`pnpm dev:flutter` 提供 Flutter Chrome 热重载，用于独立 UI 开发；Access 联调使用同源 Wrangler / HTTPS 环境。
+打开 Wrangler 输出的同源地址访问 Flutter Web 和 `/runtime/host.html`。修改 Flutter 或宿主后重新构建；独立 UI 热重载使用 `pnpm dev:flutter`，Access 联调使用同源 HTTPS。
 
-`pnpm build` 依次构建公共 JS 宿主、Flutter Web、`dist/public`，然后执行 Wrangler dry-run，仅生成本地部署产物。Web 渲染资源随产物提供。当前不注册 Service Worker，不缓存 API、登录响应或私有扩展。
+`pnpm build` 构建宿主、Flutter Web、静态目录并执行 Wrangler dry-run，不会部署。默认没有本地扩展快照时生成空开发索引；正式部署必须显式设置 `EXTENSION_ASSETS_DIR`，避免遗漏快照。当前没有注册 Service Worker，客户端重新连接时刷新索引。
 
-提交前运行 `pnpm format` 与 `pnpm hooks:check`。prek 0.5.9 由 pnpm 精确锁定，统一检查 Java、Dart、JS/TS、Python、Kotlin、Swift、Objective-C、Ruby、SQL 与 XML；工具版本和源码范围见 [提交要求](AGENTS.md)。完整原生格式检查需要 macOS / Xcode，Ubuntu CI 显式运行 portable 检查。
+提交前先运行 `pnpm format`，再运行 `pnpm format:check` 和适当测试。prek 由 pnpm 精确锁定，完整原生格式检查需要 macOS/Xcode；Ubuntu CI 使用 portable 检查。项目规则见 [AGENTS.md](AGENTS.md)。修改 `packages/contracts/protocol.json` 后运行 `pnpm generate`；跨语言完整 DTO 的单一 schema 方案仍待决定。
 
-修改 `packages/contracts/protocol.json` 后执行 `pnpm generate`，同时更新 TypeScript 和 Dart 常量；CI 的 `generate:check` 防止版本漂移。控制协议、清单与 Source 调用已经接通；完整 DTO 的跨语言代码生成与图片字节协议仍需继续实现。
-
-## 本地 TeaVM 构建与回归
-
-项目维护正式 Java / bridge 源码，第三方源码通过 submodule 固定；TeaVM 派生实现由上游加补丁物化。工具链、runtime seed 和隔离产物位于被忽略的 `runtime/teavm/.local/`，正式构建不依赖研究 ZIP。完整本地批量构建与增量发布见 [扩展发布说明](docs/EXTENSIONS.md)。
+## TeaVM 与静态扩展
 
 ```sh
 git submodule update --init --recursive
 pnpm teavm:prepare --android
 pnpm teavm:check
 pnpm teavm:build --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
-python3 scripts/register-build.py PATH_TO_OUTPUT/manifest.json --artifacts PATH_TO_OUTPUT/artifacts --allow-host www.mangadraft.com
 ```
 
-注册命令默认仅校验并输出计划；加 `--local` 才写入本地 R2 / D1，加 `--remote` 才写入云端。网络域名需要显式声明，图片 CDN 尚未据此开放。清单与 AOT 经私有 API 获取；共享桥/WASM 使用 Web 静态或 Native 内置材料，见 [交付契约](docs/RUNTIME-MATERIALS.md)。正式 API 与 Source 浏览器回归入口见 [验证记录](docs/VERIFICATION.md)。独立字节、Zstd 和 iOS 机制研究保留简洁验证摘要；临时工程已归档到被忽略的本地研究目录，不作为源码提交。
+构建输出 gzip、manifest 和 provenance。运行时材料契约见 [RUNTIME-MATERIALS](docs/RUNTIME-MATERIALS.md)，本地首次全量、增量计划、静态部署及恢复命令见 [EXTENSIONS](docs/EXTENSIONS.md)。首次全量只在本地固定 checkout 中运行；CI 每次最多处理有界变化，缺少完整 baseline 时停止。
+
+D1 注册只保存动态 Source 请求的网络授权，不上传扩展。`scripts/register-build.py` 默认只验证计划；`--local --static-root SNAPSHOT` 写入隔离本地 D1，`--remote` 在验证线上当前索引后写云端 D1。`--allow-host` 必须明确指定源站；部署后 `scripts/sync-network-policies.py --remote` 仅继承已经批准的包级域名，不自动授权新包或学习请求域名。
 
 ## 部署与 Access
 
-2026-11-03 已部署 `karuyomi.wybxc.cc`，Worker version 为 `0332ef7a-3d49-47c1-ac41-edbed49bd7fe`；云端 D1 迁移完成，MangaDraft e350 构建的 7 个产物已注册为 verified。公开 Flutter 页面与运行脚本可访问，Safari 已真实渲染书架和三个主导航页签。Access self-hosted application 与仅允许本人的策略同时覆盖裸 `/api` 和 `/api/*`；匿名 API 请求已确认跳转登录并保持 private/no-store。生产 Access 登录成功后的正向私有交付尚未验收。
+单 Worker 同源部署。Static Assets 中的扩展和材料路径直接命中静态服务；`/api`、`/api/*` 和实际需要规范化的控制页路径经过 Worker。缺失扩展路径保持 404，不能变成 SPA HTML。
 
-`/api` 和 `/api/*` 始终经过 Worker JWT 校验；未配置或密钥服务不可用返回 503，缺少、无效或过期凭据返回 401，身份或 origin 拒绝返回 403。没有开发鉴权绕过。写请求要求同源 `Origin` 和应用请求头；公开 shell 不读取私有 bindings。可复制 `apps/api/.dev.vars.example` 为忽略提交的 `.dev.vars` 进行 Access 联调。
+Access 应用和本人 Allow policy 覆盖 `/api` 与 `/api/*`。Worker 再验证 issuer、AUD、本人邮箱及可选 subject；未配置/密钥服务不可用返回 503，凭据无效返回 401，身份或 origin 拒绝返回 403。可复制 `apps/api/.dev.vars.example` 为忽略的 `.dev.vars` 进行联调。不要把 Cloudflare 凭据、JWT 或 service token 写进静态资源。
 
-部署后继续核验：
+Actions 使用 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，所需权限包括当前账户的 Workers 部署、D1 Edit，以及 `wybxc.cc` 的 Workers Routes Edit。手动凭据检查工作流会创建并清理临时资源；正式增量工作流仅在可信部署阶段接触这些 secrets。`workers.dev` 和预览 URL 均关闭。
 
-1. 保持 `apps/api/wrangler.jsonc` 的 D1 / 私有 R2 bindings、迁移、`APP_ORIGIN` 与已绑定域名一致。
-2. 复核已创建的 Access 应用双路径与本人 Allow policy、HttpOnly Cookie、固定回跳及失效行为。
-3. 设置 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`OWNER_EMAIL`。`ACCESS_SUBJECT` 可进一步固定已验证 JWT 的本人 `sub`；邮箱约束同样只读取已验签的声明，不信任邮箱头。不把 JWT、service token 或 Cloudflare 凭证写入静态资源。
-4. 验证生产 Access 登录成功后的 bootstrap、私有清单/产物与会话失效；继续原生恢复和 Source 完整操作验收。
+扩展和索引旧 Release 已删除，锁定的 TeaVM runtime seed Release 保留为构建依赖。当前原型只维护当前协议、ABI 和材料，不维护旧版兼容层；上线前重建当前宿主代表包并应用 D1 网络政策迁移。
 
-原型代码只接受当前 `bridgeVersion: 2`。部署这轮代码前先注册当前宿主重建的代表包，并将旧注册条目标记为退役；旧 AOT 或共享材料不能当作当前构建继续使用，也不增加兼容分支。
-
-Wrangler 已关闭 `workers.dev` 与预览 URL；R2 不提供公网正文入口。D1 已定义构建、产物、关联和允许网络域名的注册表；书架、进度和同步业务存储尚未实现。SQLite DO 保留运行会话边界，未启动后台任务。
-
-## 后续工作
-
-按[计划目录](docs/plan/README.md)继续 P0-B 分帧二进制 HTTP/Okio 桥、P0-F 原生资源插件与 Access 会话验证，再在 P0-C 汇合真实 Source 图片和完整阅读。P1 的书架/进度持久化、P2 同步、P3 扩展升级/迁移、P4 覆盖与性能工作继续保留，不以独立探针通过替代产品验收。
-
-脚手架实现参考：[Flutter 创建工程](https://docs.flutter.dev/reference/create-new-app)、[Workers 静态资源路由](https://developers.cloudflare.com/workers/static-assets/routing/worker-script/)、[Hono Workers](https://hono.dev/docs/getting-started/cloudflare-workers)。
+后续按[计划目录](docs/plan/README.md)推进 Source/cache、产品图片、生产 Access 和完整阅读，再实施书架/进度、同步、用户扩展与覆盖性能。

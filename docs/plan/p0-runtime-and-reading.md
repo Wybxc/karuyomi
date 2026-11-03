@@ -10,7 +10,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 | 分项           | 已有实现或证据                                                                                                                                      | 尚不能据此认定的能力                                                  |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和私有交付已实现                             | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 交付        |
+| P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和静态交付已实现                             | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 动态请求    |
 | P0-F1 Web      | 串行 Worker、requestId/generation、清单/预算校验、取消/超时、Source ID 一致性和 Dart Web interop 已实现；真实 Chromium 初始化通过                   | 六项操作全部在线成功和图片阅读                                        |
 | P0-F2 Native   | Dart 受管 WebView、可见登录、内置 host/Blob Worker 已实现；iOS 26.4 Simulator 本地受信 HTTPS 下初始化、cookie 携带及容器重建已有证据                | Cloudflare 生产 Access 正向会话、物理 iPhone、Android 真机与后台恢复  |
 | P0-F3 图片机制 | 独立字节/fiber 探针，以及模拟器 Worker → Blob → WKDownload → 文件的字节、取消和释放机制已验证                                                       | Flutter 产品图片插件、任意阶段取消、真实图片链与合计峰值              |
@@ -19,7 +19,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。真实 MangaDraft 网络探针中热门/最新/搜索返回列表；原 Source 的普通文本搜索未把关键词传入 catalog，不能称为搜索匹配通过。详情/章节遇到源站 Human Verification 并明确失败，未伪造 pages 引用。产品 `acquireImage` 仍明确不支持，章节暂不可读。
 
-`karuyomi.wybxc.cc` 已部署并验证公开入口及匿名 Access 拦截；生产登录后的正向 bootstrap/私有交付仍待验收。具体部署版本和历史浏览器环境只在验证记录维护。
+`karuyomi.wybxc.cc` 已部署并验证公开入口及匿名 Access 拦截；生产登录后的正向 bootstrap/Source 请求仍待验收。具体部署版本和历史浏览器环境只在验证记录维护。
 
 ## 下一步
 

@@ -80,7 +80,7 @@ WebKit 支持请求持久存储，但默认 best-effort 数据可能被回收；
 
 ## 6. 决定整条链路性能的共同问题
 
-三条路线当时共享的后端约束是单应用 hostname、公开 Web 外壳、Access 保护 API、Workers/Hono 与 D1/DO；R2 如使用仅承载私有个人对象。当前扩展在所有客户端均以 Static Assets 为最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新缓存，不再要求扩展 Release 发布，已有 Release 仅历史存储；通用资源走 Web Static Assets / Native 内置，不经 Worker/R2 代理扩展正文，不需要客户端 GitHub token。TeaVM 0.16.0 JavaScript backend / release9、原版扩展不改、公共宿主 P0-A 与二进制桥 P0-B 均保持不变。没有服务端 JVM或容器，也不新增持续后台任务。
+三条路线当时共享的后端约束是单应用 hostname、公开 Web 外壳、Access 保护 API、Workers/Hono 与 D1/DO；R2 如使用仅承载私有个人对象。当前扩展在所有客户端均以 Static Assets 为最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新缓存，不再要求扩展 Release 发布，已有扩展和索引 Release 已按用户要求删除；通用资源走 Web Static Assets / Native 内置，不经 Worker/R2 代理扩展正文，不需要客户端 GitHub token。TeaVM 0.16.0 JavaScript backend / release9、原版扩展不改、公共宿主 P0-A 与二进制桥 P0-B 均保持不变。没有服务端 JVM或容器，也不新增持续后台任务。
 
 原生 Flutter/RN 均使用 WebView 内的 TeaVM；iOS 在相同 WebKit 与安全条件下，没有仅由 UI 框架带来的 TeaVM JIT 优势。Dart AOT 只影响 Dart 部分；Hermes 不是这里的 TeaVM 执行引擎。现有桌面 release9 结果与早期 CheerpJ 冷启动都不能直接替代这些组合的手机首图实测。
 

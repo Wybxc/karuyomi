@@ -4,7 +4,7 @@
 
 **当前已确定 Flutter + TeaVM，并采用 Web Worker + 原生 WebView 的浏览器宿主路线；实施接口与工具链以[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)及主设计为准。** 本文的 React/TypeScript 阅读核心、Vite/shadcn、Expo/RN 选型与框架采用门槛属于历史方案，不再要求实现。逻辑位置、图片预算、原版处理链、Access、后端及真实设备验收等通用规范保留，由 Dart/Flutter 与平台 adapter 实现。Flutter UI 使用 Pub；pnpm 管理 TS 后端与 JS 宿主。当前已有分项实现和验证，不能据此宣称完整图片阅读或真机性能通过。
 
-**当前交付边界：** Static Assets 是 Web 与 Native 扩展的最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新与缓存。不再要求扩展 Release 发布，已有 Release 仅历史存储。通用 host/桥/WASM 使用 Web Static Assets 或 Native 内置材料；Worker 只处理个人数据和 Source 网络控制，不经 R2/Worker 交付扩展正文，不向客户端发放 GitHub 凭据。此前 Release Web 直下/Range 因 CORS 失败；当前 Static Assets 方案已确定，发布与完整加载仍待实现验收，具体限制见主设计。
+**当前交付边界：** Static Assets 是 Web 与 Native 扩展的最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新与缓存。不再要求扩展 Release 发布，已有扩展和索引 Release 已按用户要求删除。通用 host/桥/WASM 使用 Web Static Assets 或 Native 内置材料；Worker 只处理个人数据和 Source 网络控制，不经 R2/Worker 交付扩展正文，不向客户端发放 GitHub 凭据。此前 Release Web 直下/Range 因 CORS 失败；当前 Static Assets 方案已确定，发布与完整加载仍待实现验收，具体限制见主设计。
 
 前端的首要工程目标是跨端阅读。本文 Web 方案覆盖桌面 Chrome / Firefox / Safari、Android Chrome / PWA、iPhone Safari / PWA 和 iPad 的触控、横屏及分屏；原生阅读器增加各平台图片、手势、存储、Access 会话与 WebView 生命周期验收。通用的逻辑位置、图片预算和源处理链要求保留，具体语言与组件由已确定的 Dart/Flutter 和平台 adapter 承担。
 
@@ -166,7 +166,7 @@ project/
 
 `pnpm-workspace.yaml` 包含 `apps/*` 和 `packages/*`；内部包使用 `workspace:*`，全仓一份锁文件。根 `packageManager` 固定精确 pnpm 版本，固定受所选 Vite / Wrangler 支持的 Node LTS；CI 使用 `pnpm install --frozen-lockfile`。初次建工程时核对兼容的稳定版本并锁定，计划不凭空填写未经组合验证的包版本。[pnpm workspace](https://pnpm.io/workspaces)。
 
-所有 JS / TS 依赖由 pnpm 管理；Java 依赖仍由 Maven 管理，TeaVM 固定 0.16.0 和 release9 对应宿主/JDK/补丁。Python 转换/构建工具单独固定环境。pnpm scripts 可以统一调用 Maven / Python，但 pnpm 不替代它们的依赖解析。普通 UI 构建不会每次重编全部扩展；AOT 最新 build 发布到 Static Assets，不再要求扩展 Release 发布，已有 Release 仅历史存储；共享材料进入 Web Static Assets 或 Native 打包资源，不随扩展重复上传。
+所有 JS / TS 依赖由 pnpm 管理；Java 依赖仍由 Maven 管理，TeaVM 固定 0.16.0 和 release9 对应宿主/JDK/补丁。Python 转换/构建工具单独固定环境。pnpm scripts 可以统一调用 Maven / Python，但 pnpm 不替代它们的依赖解析。普通 UI 构建不会每次重编全部扩展；AOT 最新 build 发布到 Static Assets，不再要求扩展 Release 发布，已有扩展和索引 Release 已按用户要求删除；共享材料进入 Web Static Assets 或 Native 打包资源，不随扩展重复上传。
 
 | 计划命令                                           | 职责                                                        |
 | -------------------------------------------------- | ----------------------------------------------------------- |

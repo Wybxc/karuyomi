@@ -147,14 +147,6 @@ class _CatalogPageState extends State<CatalogPage> {
                   ],
                 ),
               ],
-              if (controller.nextBuildCursor != null)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: busy ? null : controller.moreBuilds,
-                    child: const Text('更多漫画源'),
-                  ),
-                ),
               if (controller.session != null) ...[
                 const SizedBox(height: 16),
                 Wrap(

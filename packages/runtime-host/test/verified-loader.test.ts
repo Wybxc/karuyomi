@@ -1,26 +1,17 @@
 import { expect, test, vi } from 'vitest';
 import { HTTP_BRIDGE_MEDIA_TYPE } from '@karuyomi/contracts';
-import { manifest } from './fixtures.js';
+import { gzipSync } from 'node:zlib';
+import { manifest, artifact, bytes, encodedBytes } from './fixtures.js';
 import { sha256, VerifiedLoader } from '../src/verified-loader.js';
 import { TeaVMDriver, type TeaVMGlobals } from '../src/teavm-driver.js';
 
 const origin = 'https://read.example.com';
 const signal = () => new AbortController().signal;
-const bytes = new TextEncoder().encode('self.productBuild = true;');
-const artifact = async () => {
-  const hash = await sha256(bytes);
-  return {
-    path: `/api/extensions/artifacts/${hash}`,
-    sha256: hash,
-    size: bytes.byteLength,
-  };
-};
-
-test('private asset fetch preserves origin credentials and disallows redirects', async () => {
+test('static gzip fetch omits credentials and verifies both byte domains', async () => {
   const fetcher = vi.fn(
     async () =>
-      new Response(bytes, {
-        headers: { 'Content-Type': 'application/javascript' },
+      new Response(encodedBytes, {
+        headers: { 'Content-Type': 'application/gzip' },
       }),
   );
   const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
@@ -30,19 +21,200 @@ test('private asset fetch preserves origin credentials and disallows redirects',
   expect(fetcher).toHaveBeenCalledWith(
     `${origin}${(await artifact()).path}`,
     expect.objectContaining({
-      credentials: 'same-origin',
+      credentials: 'omit',
       redirect: 'manual',
-      cache: 'no-cache',
+      cache: 'force-cache',
     }),
   );
 });
 
+test('each gzip byte domain is hashed exactly once at the loading boundary', async () => {
+  const value = await artifact();
+  const digest = vi.spyOn(crypto.subtle, 'digest');
+  try {
+    const loader = new VerifiedLoader(
+      origin,
+      async () =>
+        new Response(encodedBytes, {
+          headers: { 'Content-Type': 'application/gzip' },
+        }),
+    );
+    expect(await loader.artifact(value, signal(), true)).toEqual(bytes);
+    expect(digest).toHaveBeenCalledTimes(2);
+    expect(digest.mock.calls.map((call) => call[1].byteLength)).toEqual([
+      encodedBytes.length,
+      bytes.length,
+    ]);
+  } finally {
+    digest.mockRestore();
+  }
+});
+
+test('gzip validation rejects a valid compressed hash with wrong canonical hash or size', async () => {
+  const value = await artifact();
+  for (const changed of [
+    {
+      ...value,
+      sha256: 'a'.repeat(64),
+      path: '/extensions/artifacts/' + 'a'.repeat(64) + '.gz',
+    },
+    { ...value, size: value.size - 1 },
+    { ...value, size: value.size + 1 },
+  ]) {
+    const loader = new VerifiedLoader(
+      origin,
+      async () =>
+        new Response(encodedBytes, {
+          headers: { 'Content-Type': 'application/gzip' },
+        }),
+    );
+    await expect(
+      loader.artifact(changed, signal(), true),
+    ).rejects.toMatchObject({
+      code: changed.size < value.size ? 'limit_exceeded' : 'integrity_error',
+    });
+  }
+});
+
+test('truncated gzip and a small compressed decompression bomb fail before execution', async () => {
+  const value = await artifact();
+  const bomb = new Uint8Array(gzipSync(new Uint8Array(1024 * 1024)));
+  for (const encoded of [encodedBytes.slice(0, -1), bomb]) {
+    const changed = {
+      ...value,
+      encodedSize: encoded.length,
+      encodedSha256: await sha256(encoded),
+    };
+    const loader = new VerifiedLoader(
+      origin,
+      async () =>
+        new Response(encoded, {
+          headers: { 'Content-Type': 'application/gzip' },
+        }),
+    );
+    await expect(
+      loader.artifact(changed, signal(), true),
+    ).rejects.toMatchObject({
+      code: encoded === bomb ? 'limit_exceeded' : 'integrity_error',
+    });
+  }
+});
+
+test('the gzip file cannot be transparently marked as HTTP content encoding', async () => {
+  const cancelled = vi.fn();
+  const loader = new VerifiedLoader(
+    origin,
+    async () =>
+      new Response(new ReadableStream<Uint8Array>({ cancel: cancelled }), {
+        headers: {
+          'Content-Type': 'application/gzip',
+          'Content-Encoding': 'gzip',
+        },
+      }),
+  );
+  await expect(
+    loader.artifact(await artifact(), signal(), true),
+  ).rejects.toMatchObject({ code: 'protocol_error' });
+  expect(cancelled).toHaveBeenCalledOnce();
+});
+
+test('aborting an encoded download cancels its reader even when a custom fetch ignores the signal', async () => {
+  const cancelled = vi.fn();
+  let reading: (() => void) | undefined;
+  const started = new Promise<void>((resolve) => {
+    reading = resolve;
+  });
+  const loader = new VerifiedLoader(
+    origin,
+    async () =>
+      new Response(
+        new ReadableStream<Uint8Array>(
+          {
+            pull() {
+              reading?.();
+              return new Promise<void>(() => {});
+            },
+            cancel: cancelled,
+          },
+          { highWaterMark: 0 },
+        ),
+        { headers: { 'Content-Type': 'application/gzip' } },
+      ),
+  );
+  const controller = new AbortController();
+  const pending = loader.artifact(await artifact(), controller.signal, true);
+  const failure = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  await started;
+  controller.abort();
+  await failure;
+  expect(cancelled).toHaveBeenCalledOnce();
+});
+
+test('static manifest path must match its returned build and cannot use API fallback', async () => {
+  const build = await manifest();
+  const fetcher = vi.fn(async () => Response.json(build));
+  const loader = new VerifiedLoader(origin, fetcher);
+  expect(
+    await loader.manifest(
+      '/extensions/builds/test-build/manifest.json',
+      signal(),
+    ),
+  ).toEqual(build);
+  expect(fetcher).toHaveBeenCalledWith(
+    origin + '/extensions/builds/test-build/manifest.json',
+    expect.objectContaining({
+      credentials: 'omit',
+      cache: 'no-cache',
+      redirect: 'manual',
+    }),
+  );
+  await expect(
+    loader.manifest('/extensions/builds/other/manifest.json', signal()),
+  ).rejects.toMatchObject({ code: 'protocol_error' });
+});
+
+test('static index accepts more than 64KiB, validates current package uniqueness and bounds JSON', async () => {
+  const builds = Array.from({ length: 1000 }, (_, index) => ({
+    buildId: 'build-' + index,
+    packageName: 'package-' + index,
+    repoId: 'repo',
+    version: '1',
+    sourceIds: [String(index)],
+    manifestPath: '/extensions/builds/build-' + index + '/manifest.json',
+  }));
+  const value = { schemaVersion: 1, builds, nextCursor: null };
+  const fetcher = vi.fn(async () => Response.json(value));
+  expect(
+    (await new VerifiedLoader(origin, fetcher).index(signal())).builds,
+  ).toHaveLength(1000);
+  expect(fetcher).toHaveBeenCalledWith(
+    origin + '/extensions/index.json',
+    expect.objectContaining({ credentials: 'omit', cache: 'no-cache' }),
+  );
+  const duplicate = new VerifiedLoader(origin, async () =>
+    Response.json({ ...value, builds: [builds[0], builds[0]] }),
+  );
+  await expect(duplicate.index(signal())).rejects.toMatchObject({
+    code: 'protocol_error',
+  });
+  const oversized = new VerifiedLoader(
+    origin,
+    async () =>
+      new Response('x'.repeat(2 * 1024 * 1024 + 1), {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+  );
+  await expect(oversized.index(signal())).rejects.toMatchObject({
+    code: 'limit_exceeded',
+  });
+});
+
 test.each([
-  { status: 401, code: 'access_required' },
-  { status: 403, code: 'access_denied' },
-  { status: 302, code: 'access_required' },
+  { status: 401, code: 'runtime_lost' },
+  { status: 403, code: 'runtime_lost' },
+  { status: 302, code: 'protocol_error' },
 ])(
-  'separates Access responses from Source errors: $status',
+  'static delivery failures never fall back to Access APIs: $status',
   async ({ status, code }) => {
     const loader = new VerifiedLoader(
       origin,
@@ -67,18 +239,18 @@ test('login HTML is never executed as a bundle, even with HTTP 200', async () =>
   const driver = new TeaVMDriver(scope, loader, importScript, origin);
   await expect(
     driver.open(await manifest(), 'test', signal()),
-  ).rejects.toMatchObject({ code: 'access_required' });
+  ).rejects.toMatchObject({ code: 'protocol_error' });
   expect(importScript).not.toHaveBeenCalled();
 });
 
 test('hash mismatch never reaches script execution', async () => {
-  const tampered = new Uint8Array(bytes);
+  const tampered = new Uint8Array(encodedBytes);
   tampered[0] = 0;
   const loader = new VerifiedLoader(
     origin,
     (async () =>
       new Response(tampered, {
-        headers: { 'Content-Type': 'application/javascript' },
+        headers: { 'Content-Type': 'application/gzip' },
       })) as typeof fetch,
   );
   const importScript = vi.fn();
@@ -93,8 +265,8 @@ test('streamed over-budget and truncated artifacts fail before execution', async
   const short = new VerifiedLoader(
     origin,
     (async () =>
-      new Response(bytes.subarray(1), {
-        headers: { 'Content-Type': 'application/javascript' },
+      new Response(encodedBytes.subarray(1), {
+        headers: { 'Content-Type': 'application/gzip' },
       })) as typeof fetch,
   );
   await expect(
@@ -103,8 +275,8 @@ test('streamed over-budget and truncated artifacts fail before execution', async
   const long = new VerifiedLoader(
     origin,
     (async () =>
-      new Response(new Uint8Array(bytes.byteLength + 1), {
-        headers: { 'Content-Type': 'application/javascript' },
+      new Response(new Uint8Array(encodedBytes.byteLength + 1), {
+        headers: { 'Content-Type': 'application/gzip' },
       })) as typeof fetch,
   );
   await expect(
@@ -112,17 +284,17 @@ test('streamed over-budget and truncated artifacts fail before execution', async
   ).rejects.toMatchObject({ code: 'limit_exceeded' });
 });
 
-test('cross-origin and public manifest paths cannot be fetched', async () => {
+test('cross-origin and old API manifest paths cannot be fetched', async () => {
   const fetcher = vi.fn();
   const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
   await expect(
     loader.manifest(
-      'https://attacker.example/api/extensions/builds/test/manifest',
+      'https://attacker.example/extensions/builds/test/manifest.json',
       signal(),
     ),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   await expect(
-    loader.manifest('/runtime/build.json', signal()),
+    loader.manifest('/api/extensions/builds/test/manifest', signal()),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   expect(fetcher).not.toHaveBeenCalled();
 });
@@ -150,7 +322,7 @@ test('Web shared materials always use credential-free static digest paths', asyn
   );
   await expect(
     loader.artifact(
-      { ...value, path: `/runtime/materials/${value.sha256}` },
+      { ...(await artifact()), path: `/runtime/materials/${value.sha256}` },
       signal(),
       true,
     ),
@@ -223,7 +395,7 @@ test('incompatible manifest ABI is rejected as protocol error', async () => {
   const loader = new VerifiedLoader(origin, (async () =>
     Response.json(value)) as typeof fetch);
   await expect(
-    loader.manifest('/api/extensions/builds/test/manifest', signal()),
+    loader.manifest('/extensions/builds/test-build/manifest.json', signal()),
   ).rejects.toMatchObject({ code: 'protocol_error' });
 });
 
@@ -232,8 +404,8 @@ test('real TeaVM export handshake validates loaded Source IDs before readiness',
   const loader = new VerifiedLoader(
     origin,
     (async () =>
-      new Response(bytes, {
-        headers: { 'Content-Type': 'application/javascript' },
+      new Response(encodedBytes, {
+        headers: { 'Content-Type': 'application/gzip' },
       })) as typeof fetch,
   );
   const driver = new TeaVMDriver(
@@ -265,8 +437,8 @@ test.each([
     const loader = new VerifiedLoader(
       origin,
       (async () =>
-        new Response(bytes, {
-          headers: { 'Content-Type': 'application/javascript' },
+        new Response(encodedBytes, {
+          headers: { 'Content-Type': 'application/gzip' },
         })) as typeof fetch,
     );
     const fetcher = vi.fn(async () => new Response('', { status }));
@@ -343,8 +515,12 @@ test.each([
 );
 
 async function sharedArtifact() {
-  const value = await artifact();
-  return { ...value, path: `/runtime/materials/${value.sha256}` };
+  const hash = await sha256(bytes);
+  return {
+    path: `/runtime/materials/${hash}`,
+    sha256: hash,
+    size: bytes.length,
+  };
 }
 
 test('the installed v2 finish callback carries a controlled connection flag through TeaVM failure handling', async () => {
@@ -354,8 +530,8 @@ test('the installed v2 finish callback carries a controlled connection flag thro
   const loader = new VerifiedLoader(
     origin,
     async () =>
-      new Response(bytes, {
-        headers: { 'Content-Type': 'application/javascript' },
+      new Response(encodedBytes, {
+        headers: { 'Content-Type': 'application/gzip' },
       }),
   );
   vi.stubGlobal('fetch', async () => {

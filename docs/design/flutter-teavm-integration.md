@@ -47,7 +47,7 @@ Web 适配器用 dart:js_interop / package:web 接现有 JS 管理器，不在 F
 
 原生适配器创建一个受管理的 WebView 控制页，再由控制页创建 TeaVM Worker。插件注入的 window 消息对象通常属于页面，不直接存在于 DedicatedWorker 中，因此小型控制消息要经控制页转发。默认一个执行槽、按包复用；资源验证后最多两个，不为每个源或每章重建 WebView。
 
-控制壳使用当前 hostname 的公开 `/runtime/host`（旧 `.html` 路径规范化跳转），保留真实 HTTPS origin 的 Worker、Cookie 和安全上下文。Web 从 Static Assets 获取通用 host/worker/桥/WASM；Native 使用应用内置的同版材料，校验后注入，材料缺失不回退网络。Web 与 Native 的扩展索引、清单和 AOT 均以 Static Assets 为最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新与缓存。新分发路径不再发布扩展到 GitHub Release，已有 Release 仅历史存储，不参与客户端版本定位；扩展正文不经过 R2 或 Worker 代理，客户端不需要 GitHub 凭据。私有个人数据与 Source 网络桥继续位于 Access 保护的 `/api` 下。此前内置浏览器 Release 直下/Range 因 CORS 失败，用户已将方案改为全客户端 Static Assets；当前最新版发布、跨端下载/CSP、缓存更新、有界解压及完整装载仍待实现验收。
+控制壳使用当前 hostname 的公开 `/runtime/host`（旧 `.html` 路径规范化跳转），保留真实 HTTPS origin 的 Worker、Cookie 和安全上下文。Web 从 Static Assets 获取通用 host/worker/桥/WASM；Native 使用应用内置的同版材料，校验后注入，材料缺失不回退网络。Web 与 Native 的扩展索引、清单和 AOT 均以 Static Assets 为最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新与缓存。新分发路径不再发布扩展到 GitHub Release，已有扩展和索引 Release 已按用户要求删除，不参与客户端版本定位；扩展正文不经过 R2 或 Worker 代理，客户端不需要 GitHub 凭据。私有个人数据与 Source 网络桥继续位于 Access 保护的 `/api` 下。此前内置浏览器 Release 直下/Range 因 CORS 失败，用户已将方案改为全客户端 Static Assets；当前最新版发布、跨端下载/CSP、缓存更新、有界解压及完整装载仍待实现验收。
 
 容器握手检查 protocolVersion、host ABI、buildId/hash、实例 generation 和能力集合；不能仅以 loadStop 表示 Source 已就绪。页面 ready、Worker ready、文件恢复、包加载和 Source 初始化分别记录。进程终止后重建容器与 generation，使旧结果、回调和临时资源失效。
 

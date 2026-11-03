@@ -29,7 +29,7 @@ export interface ValidationReport {
   manifestSha256?: string;
   sourceIds?: string[];
   artifactCount?: number;
-  privateArtifactCount?: number;
+  bundleArtifactCount?: number;
   sharedMaterialCount?: number;
   artifactBytes?: number;
   failure?: ValidationFailure;
@@ -40,8 +40,9 @@ export interface ValidationReport {
 }
 
 export interface VerifiedPayload extends Artifact {
-  logicalName?: string;
   bytes: Buffer;
+  transportContentType: string;
+  transportSize: number;
 }
 
 export interface VerifiedInputs {

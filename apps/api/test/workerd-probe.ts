@@ -1,5 +1,5 @@
-// Manual real-workerd D1/R2 integration. Only the separate test entry trusts
-// this run's RSA public key; production index.ts never imports that entry.
+// Real workerd/D1 + actual Static Assets routing over a controlled local snapshot.
+// Only the separate test entry trusts this run's RSA public key.
 import assert from 'node:assert/strict';
 import { isRecord } from '../../../tools/extensions/types.ts';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
@@ -10,7 +10,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync } from 'node:zlib';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import {
+  createStaticSnapshot,
+  migrationFiles,
+} from './static-extension-probe.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const api = path.join(root, 'apps/api');
@@ -21,10 +26,7 @@ assert(
 );
 const evidencePath = process.argv[4]
   ? path.resolve(process.argv[4])
-  : path.join(
-      root,
-      'runtime/teavm/.local/probes/workerd-registered-artifacts.json',
-    );
+  : path.join(root, '.local/probes/workerd-static-extensions.json');
 const artifactFolder = process.argv[3]
   ? path.resolve(process.argv[3])
   : path.join(path.dirname(manifestPath), 'artifacts');
@@ -61,48 +63,48 @@ const { build }: typeof import('esbuild') = await import(
 const { Miniflare, convertV4MiniflareOptions }: typeof import('miniflare') =
   await import(wranglerRequire.resolve('miniflare'));
 let mf: import('miniflare').Miniflare | undefined;
-
 try {
-  console.log('Registering actual local artifacts into dedicated D1/R2 state');
-  for (const name of [
-    '0000_special_thing.sql',
-    '0001_many_major_mapleleaf.sql',
-  ]) {
-    wrangler(
-      'd1',
-      'execute',
-      'DB',
-      '--file',
-      path.join(api, 'migrations', name),
-      '--yes',
-    );
-  }
+  const staticRoot = await createStaticSnapshot(
+    path.join(temporary, 'public'),
+    manifest,
+    artifactFolder,
+    await readFile(manifestPath),
+  );
+  await writeFile(
+    path.join(staticRoot, 'index.html'),
+    '<html>public probe shell</html>',
+  );
+  await mkdir(path.join(staticRoot, 'runtime'), { recursive: true });
+  await writeFile(
+    path.join(staticRoot, 'runtime/host.html'),
+    '<html>runtime control page</html>',
+  );
+  console.log(
+    'Registering current static build network policy in dedicated local D1',
+  );
+  for (const file of await migrationFiles(api))
+    wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
   python(
     path.join(root, 'scripts/register-build.py'),
     manifestPath,
     '--artifacts',
     artifactFolder,
     '--local',
+    '--static-root',
+    staticRoot,
     '--persist-to',
     state,
   );
-  const conflictPath = path.join(temporary, 'conflict.json');
   const conflictSql = path.join(temporary, 'conflict.sql');
-  await writeFile(
-    conflictPath,
-    JSON.stringify({ ...manifest, version: `${manifest.version}-conflict` }),
-  );
   const sql = python(
     '-c',
     `import importlib.util,json,pathlib,sys
 s=importlib.util.spec_from_file_location('registration','scripts/register-build.py')
 m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
-v=json.loads(pathlib.Path(sys.argv[1]).read_text())
-print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
-    conflictPath,
-    artifactFolder,
+v=json.loads(pathlib.Path(sys.argv[1]).read_text());v['bundle']['sha256']='f'*64
+print(m.registration_sql(v,{},[]))`,
+    manifestPath,
   );
-  // The marker precedes the failing guard: its absence proves batch rollback.
   await writeFile(
     conflictSql,
     "INSERT INTO app_metadata VALUES ('rollback-probe','must-disappear');\n" +
@@ -112,7 +114,6 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
     () => wrangler('d1', 'execute', 'DB', '--file', conflictSql, '--yes'),
     /NOT NULL constraint failed/,
   );
-
   const keys = await generateKeyPair('RS256');
   const jwk = await exportJWK(keys.publicKey);
   jwk.kid = 'isolated-workerd-probe';
@@ -142,7 +143,13 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
       compatibilityDate: '2026-11-03',
       resourcePersistencePath: path.join(state, 'v3'),
       d1Databases: { DB: databaseId },
-      r2Buckets: { ARTIFACTS: 'karuyomi-private' },
+      assets: {
+        directory: staticRoot,
+        binding: 'ASSETS',
+        routerConfig: { has_user_worker: true },
+        run_worker_first: ['/api', '/api/*', '/runtime/host.html'],
+        assetConfig: { not_found_handling: 'none' },
+      },
       bindings: {
         ACCESS_TEAM_DOMAIN: 'probe.cloudflareaccess.com',
         ACCESS_AUD: 'probe-app',
@@ -153,6 +160,7 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
       },
     }),
   );
+  console.log('Static Assets/workerd started; checking policy and routing');
   const db = await mf.getD1Database('DB');
   assert.equal(
     await db
@@ -160,13 +168,31 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
       .first('value'),
     null,
   );
-  const registeredJson = await db
-    .prepare('SELECT manifest_json FROM extension_builds WHERE build_id=?')
-    .bind(manifest.buildId)
-    .first<string>('manifest_json');
-  assert(registeredJson, 'Registered manifest missing');
-  const registered = await parseManifest(Buffer.from(registeredJson));
-  assert.equal(registered.version, manifest.version);
+  assert.equal(
+    await db
+      .prepare('SELECT bundle_sha256 FROM extension_builds WHERE build_id=?')
+      .bind(manifest.buildId)
+      .first('bundle_sha256'),
+    manifest.bundle.sha256,
+  );
+  const tables = await db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+    .all<{ name: string }>();
+  assert(
+    !tables.results.some(
+      (row: unknown) =>
+        isRecord(row) &&
+        ['extension_artifacts', 'build_artifacts'].includes(String(row.name)),
+    ),
+  );
+  const columns = await db
+    .prepare('PRAGMA table_info(extension_builds)')
+    .all<{ name: string }>();
+  assert(
+    !columns.results.some(
+      (row: unknown) => isRecord(row) && row.name === 'manifest_json',
+    ),
+  );
   const token = (audience = 'probe-app') =>
     new SignJWT({ email: 'probe@example.com' })
       .setProtectedHeader({ alg: 'RS256', kid: String(jwk.kid) })
@@ -180,21 +206,21 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
   const worker = mf;
   const request = (
     pathname: string,
+    authenticated = false,
     headers: Record<string, string> = {},
-    method = 'GET',
   ) =>
     worker.dispatchFetch(`https://read.example.com${pathname}`, {
-      method,
-      headers: { 'Cf-Access-Jwt-Assertion': signed, ...headers },
+      headers: {
+        ...(authenticated ? { 'Cf-Access-Jwt-Assertion': signed } : {}),
+        ...headers,
+      },
+      redirect: 'manual',
     });
-  const route = `/api/extensions/builds/${manifest.buildId}/manifest`;
-  assert.equal(
-    (await mf.dispatchFetch(`https://read.example.com${route}`)).status,
-    401,
-  );
+  const unauthenticated = await request('/api/bootstrap');
+  assert.equal(unauthenticated.status, 401, await unauthenticated.text());
   assert.equal(
     (
-      await request(route, {
+      await request('/api/bootstrap', true, {
         'Cf-Access-Jwt-Assertion': await token('wrong-app'),
       })
     ).status,
@@ -202,111 +228,201 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
   );
   assert.equal(
     (
-      await mf.dispatchFetch(`https://alternate.example${route}`, {
+      await worker.dispatchFetch('https://alternate.example/api/bootstrap', {
         headers: { 'Cf-Access-Jwt-Assertion': signed },
       })
     ).status,
     403,
   );
-  const delivered = await request(route);
-  assert.equal(delivered.status, 200);
-  assert.equal(delivered.headers.get('cache-control'), 'private, no-store');
-  const deliveredManifest = await parseManifest(
-    Buffer.from(await delivered.text()),
-  );
-  assert.equal(deliveredManifest.buildId, manifest.buildId);
-  const listing: unknown = await (
-    await request('/api/extensions/builds')
-  ).json();
-  assert(isRecord(listing) && Array.isArray(listing.builds));
-  assert(isRecord(listing.builds[0]));
-  assert.equal(listing.builds[0].buildId, manifest.buildId);
-  let total = 0;
-  const artifacts = [
-    manifest.bundle,
-    ...manifest.hostScripts,
-    ...manifest.resources,
-  ].filter((artifact) => artifact.path.startsWith('/api/'));
-  for (const item of artifacts) {
-    const response = await request(item.path);
+  const bootstrap = await request('/api/bootstrap', true);
+  assert.equal(bootstrap.status, 200);
+  assert.equal(bootstrap.headers.get('x-karuyomi-probe-worker'), '1');
+  for (const route of [
+    '/api/extensions/builds',
+    `/api/extensions/builds/${manifest.buildId}/manifest`,
+    `/api/extensions/artifacts/${manifest.bundle.sha256}`,
+  ])
+    assert.equal((await request(route, true)).status, 404);
+  for (const route of [
+    '/extensions/index.json',
+    `/extensions/builds/${manifest.buildId}/manifest.json`,
+  ]) {
+    const response = await request(route);
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get('cache-control'), 'private, no-cache');
-    assert.equal(response.headers.get('etag'), `"${item.sha256}"`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    assert.equal(bytes.length, item.size);
-    assert.equal(createHash('sha256').update(bytes).digest('hex'), item.sha256);
-    total += bytes.length;
-    const partial = await request(item.path, { Range: 'bytes=0-2' });
-    assert.equal(partial.status, 206);
-    assert.deepEqual(
-      Buffer.from(await partial.arrayBuffer()),
-      bytes.subarray(0, 3),
-    );
-    const head = await request(item.path, {}, 'HEAD');
-    assert.equal(head.status, 200);
-    assert.equal(head.headers.get('content-length'), String(item.size));
-    assert.equal((await head.arrayBuffer()).byteLength, 0);
     assert.equal(
-      (await request(item.path, { 'If-None-Match': `"${item.sha256}"` }))
-        .status,
-      304,
+      response.headers.get('x-karuyomi-probe-worker'),
+      null,
+      'Existing static assets must bypass the entry Worker',
     );
+    const json: unknown = await response.json();
+    if (route.endsWith('manifest.json'))
+      assert.deepEqual(
+        await parseManifest(Buffer.from(JSON.stringify(json))),
+        manifest,
+      );
+  }
+  const bundle = await request(manifest.bundle.path);
+  assert.equal(bundle.status, 200);
+  assert.equal(bundle.headers.get('x-karuyomi-probe-worker'), null);
+  assert.match(bundle.headers.get('content-type') ?? '', /^application\/gzip/);
+  assert.equal(bundle.headers.get('content-encoding'), null);
+  const encoded = Buffer.from(await bundle.arrayBuffer());
+  assert.equal(encoded.length, manifest.bundle.encodedSize);
+  assert.equal(
+    createHash('sha256').update(encoded).digest('hex'),
+    manifest.bundle.encodedSha256,
+  );
+  const raw = gunzipSync(encoded, { maxOutputLength: manifest.bundle.size });
+  assert.equal(raw.length, manifest.bundle.size);
+  assert.equal(
+    createHash('sha256').update(raw).digest('hex'),
+    manifest.bundle.sha256,
+  );
+  for (const route of [
+    '/extensions/missing',
+    '/extensions/builds/missing/manifest.json',
+    `/extensions/artifacts/${'0'.repeat(64)}.gz`,
+    '/runtime/materials/missing',
+  ]) {
+    const response = await request(route, false, {
+      'Sec-Fetch-Mode': 'navigate',
+    });
     assert.equal(
-      (
-        await request(item.path, {
-          'Cf-Access-Jwt-Assertion': '',
-          'If-None-Match': `"${item.sha256}"`,
-        })
-      ).status,
-      401,
-    );
-    assert.equal(
-      (await request(item.path, { Range: `bytes=${item.size}-` })).status,
-      416,
+      response.status,
+      404,
+      'Unknown static assets must not become SPA 200',
     );
   }
-  const sourceSha256: Record<string, string> = {};
+  for (const route of ['/auth/complete', '/browse', '/settings']) {
+    const response = await request(route);
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /public probe shell/);
+  }
+  assert.equal((await request('/%61pi/bootstrap')).status, 400);
+  const redirect = await request('/runtime/host.html');
+  assert.equal(redirect.status, 307);
+  assert.equal(
+    new URL(redirect.headers.get('location')!, 'https://read.example.com')
+      .pathname,
+    '/runtime/host',
+  );
+  // A deploy job synchronizes only policy metadata after the static index moves.
+  // Close this independent workerd instance before the Wrangler D1 subprocesses.
+  await mf.dispose();
+  mf = undefined;
+  wrangler(
+    'd1',
+    'execute',
+    'DB',
+    '--command',
+    `UPDATE extension_builds SET allowed_hosts_json='["example.org"]'; INSERT INTO extension_builds (build_id,package_name,bundle_sha256,status,created_at,allowed_hosts_json) VALUES ('retired-policy','retired.package','${'a'.repeat(64)}','verified',0,'["retired.example.org"]');`,
+    '--yes',
+  );
+  const updated = {
+    ...manifest,
+    buildId: manifest.buildId + '-next',
+    version: manifest.version + '-next',
+  };
+  const unapproved = {
+    ...manifest,
+    buildId: 'unapproved-probe-build',
+    packageName: 'unapproved.probe.package',
+  };
+  for (const value of [updated, unapproved])
+    await createStaticSnapshot(
+      staticRoot,
+      value,
+      artifactFolder,
+      Buffer.from(JSON.stringify(value)),
+    );
+  await writeFile(
+    path.join(staticRoot, 'extensions/index.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      builds: [updated, unapproved].map((value) => ({
+        buildId: value.buildId,
+        packageName: value.packageName,
+        repoId: value.repoId,
+        version: value.version,
+        sourceIds: value.sourceIds,
+        manifestPath: `/extensions/builds/${value.buildId}/manifest.json`,
+      })),
+      nextCursor: null,
+    }),
+  );
+  const synchronization: unknown = JSON.parse(
+    python(
+      path.join(root, 'scripts/sync-network-policies.py'),
+      '--local',
+      '--static-root',
+      staticRoot,
+      '--persist-to',
+      state,
+    ),
+  );
+  assert(isRecord(synchronization));
+  assert.equal(synchronization.inheritedPolicies, 1);
+  assert.equal(synchronization.newPackagesRemainUnapproved, 1);
+  const policyResult: unknown = JSON.parse(
+    wrangler(
+      'd1',
+      'execute',
+      'DB',
+      '--command',
+      'SELECT build_id,package_name,bundle_sha256,allowed_hosts_json FROM extension_builds',
+      '--json',
+    ),
+  );
+  assert(
+    Array.isArray(policyResult) &&
+      isRecord(policyResult[0]) &&
+      Array.isArray(policyResult[0].results),
+  );
+  const policies: unknown[] = policyResult[0].results;
+  assert.equal(
+    policies.length,
+    1,
+    'Retired policy removed and new package stays unapproved',
+  );
+  const inherited = policies[0];
+  assert(isRecord(inherited));
+  assert.equal(inherited.build_id, updated.buildId);
+  assert.equal(inherited.bundle_sha256, updated.bundle.sha256);
+  assert.deepEqual(JSON.parse(String(inherited.allowed_hosts_json)), [
+    'example.org',
+  ]);
   const evidence = {
-    probe: 'local-workerd-registered-artifacts',
+    probe: 'local-workerd-static-extensions-policy',
     passed: true,
     buildId: manifest.buildId,
-    artifacts: artifacts.length,
-    totalBytes: total,
     realRS256Verification: true,
-    immutableConflictRolledBack: true,
-    checks: [
-      'D1 verified manifest',
-      'R2 SHA256',
-      'private cache',
-      'wrong audience/host',
-      'HEAD',
-      '304 after auth',
-      'range',
-      '416',
-    ],
     productionAccessVerified: false,
-    manifestSha256: createHash('sha256')
-      .update(await readFile(manifestPath))
-      .digest('hex'),
-    sourceSha256,
+    sourceOnlineVerified: false,
+    staticSnapshot: true,
+    r2Bindings: false,
+    encodedBytes: encoded.length,
+    canonicalBytes: raw.length,
+    bundleSha256: manifest.bundle.sha256,
+    encodedSha256: manifest.bundle.encodedSha256,
+    checks: [
+      'static index/manifest/gzip bypass entry Worker',
+      'gzip MIME without HTTP Content-Encoding',
+      'encoded/canonical transfer integrity',
+      'missing static navigation remains 404',
+      'known app route shell',
+      'host.html 307 normalization',
+      'policy-only D1',
+      'D1 batch conflict rollback',
+      'RS256/audience/host',
+      'removed API routes 404',
+      'encoded API path rejected',
+      'trusted deployment sync inherits package policy across builds',
+      'retired policy deleted and new package unapproved',
+    ],
   };
-  for (const name of [
-    'apps/api/src/access.ts',
-    'apps/api/src/app.ts',
-    'apps/api/src/extensions.ts',
-    'apps/api/src/http-bridge.ts',
-    'apps/api/test/workerd-entry.ts',
-    'apps/api/test/workerd-probe.ts',
-    'scripts/register-build.py',
-  ]) {
-    evidence.sourceSha256[name] = createHash('sha256')
-      .update(await readFile(path.join(root, name)))
-      .digest('hex');
-  }
-  const json = JSON.stringify(evidence, null, 2) + '\n';
   await mkdir(path.dirname(evidencePath), { recursive: true });
-  await writeFile(evidencePath, json);
-  console.log(json);
+  await writeFile(evidencePath, JSON.stringify(evidence, null, 2) + '\n');
+  console.log(JSON.stringify(evidence, null, 2));
 } finally {
   await mf?.dispose();
   await rm(temporary, { recursive: true, force: true });

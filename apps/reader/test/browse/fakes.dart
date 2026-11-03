@@ -22,12 +22,13 @@ final class TestPlatform extends PlatformRuntime {
   int bootstrapStatus = 200;
   bool loginHtml = false;
   Object? inventory = {
+    'schemaVersion': 1,
     'builds': [
       {
         'buildId': 'build-1',
         'packageName': 'source.test',
         'version': '1.0',
-        'manifestPath': '/api/extensions/builds/build-1/manifest',
+        'manifestPath': '/extensions/builds/build-1/manifest.json',
       },
     ],
     'nextCursor': null,
@@ -49,8 +50,8 @@ final class TestPlatform extends PlatformRuntime {
         'protocolVersion': protocolVersion,
         'identity': {'subject': 'owner-subject', 'email': 'owner@example.com'},
       },
-      '/api/extensions/builds' => inventory,
-      '/api/extensions/builds/build-1/manifest' => {
+      '/extensions/index.json' => inventory,
+      '/extensions/builds/build-1/manifest.json' => {
         'buildId': 'build-1',
         'bundle': {'sha256': 'a' * 64},
       },

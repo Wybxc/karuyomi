@@ -109,10 +109,52 @@ void main() {
   );
 
   test('malformed inventory never becomes ready', () async {
-    platform.inventory = {'builds': 'invalid'};
+    platform.inventory = {'schemaVersion': 1, 'builds': 'invalid'};
     await controller.connect();
     expect(controller.status, ServiceStatus.failed);
     expect(controller.builds, isEmpty);
     expect(controller.error, '服务返回的列表格式无效');
+  });
+
+  test(
+    'reconnect refreshes the current static index and drops old selection',
+    () async {
+      await open();
+      platform.inventory = {
+        'schemaVersion': 1,
+        'builds': [
+          {
+            'buildId': 'build-2',
+            'packageName': 'source.test',
+            'version': '2.0',
+            'manifestPath': '/extensions/builds/build-2/manifest.json',
+          },
+        ],
+        'nextCursor': null,
+      };
+      await controller.connect();
+      expect(controller.status, ServiceStatus.ready);
+      expect(controller.builds.single.id, 'build-2');
+      expect(controller.activeBuild, isNull);
+      expect(controller.session, isNull);
+    },
+  );
+
+  test('static index rejects duplicate package versions', () async {
+    final entry = {
+      'buildId': 'build-1',
+      'packageName': 'source.test',
+      'version': '1.0',
+      'manifestPath': '/extensions/builds/build-1/manifest.json',
+    };
+    platform.inventory = {
+      'schemaVersion': 1,
+      'builds': [entry, entry],
+      'nextCursor': null,
+    };
+    await controller.connect();
+    expect(controller.status, ServiceStatus.failed);
+    expect(controller.builds, isEmpty);
+    expect(controller.error, contains('每包只包含一个当前版本'));
   });
 }

@@ -43,7 +43,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 const options = {
-  manifestPath: '/api/extensions/builds/test/manifest',
+  manifestPath: '/extensions/builds/test-build/manifest.json',
   identity: 'verified-owner',
 };
 const call = (id: string, timeoutMs?: number): SourceCall => ({
@@ -57,6 +57,7 @@ const managers: SourceRuntimeManager[] = [];
 afterEach(async () => {
   for (const manager of managers.splice(0)) await manager.dispose();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 async function setup(
@@ -184,7 +185,6 @@ test('active cancellation recycles the generation and rejects queued work withou
   // A delayed old worker message cannot resolve a new generation's task.
   workers[0]?.emit({
     type: 'response',
-    protocolVersion: 1,
     ...session,
     requestId: 'later',
     result: { leaked: true },
@@ -244,4 +244,55 @@ test('dispose releases file ownership, stops Worker and forbids reuse', async ()
   await expect(manager.open(options)).rejects.toMatchObject({
     code: 'runtime_lost',
   });
+});
+
+test('the JSON control bridge permits only the catalog static GET paths without credentials', async () => {
+  const { manager } = await setup();
+  const fetcher = vi.fn(async () => Response.json({ builds: [] }));
+  vi.stubGlobal('fetch', fetcher);
+  for (const path of [
+    '/extensions/index.json',
+    '/extensions/builds/test-build/manifest.json',
+  ]) {
+    expect((await manager.fetchApi({ path })).status).toBe(200);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      'https://read.example.com' + path,
+      expect.objectContaining({
+        method: 'GET',
+        credentials: 'omit',
+        cache: 'no-cache',
+        headers: { Accept: 'application/json' },
+      }),
+    );
+  }
+  fetcher.mockClear();
+  for (const input of [
+    { path: '/extensions/index.json', method: 'POST' },
+    { path: '/extensions/index.json', body: '' },
+    { path: '/extensions/index.json?cursor=old' },
+    { path: '/extensions/builds/../index.json' },
+    { path: '/extensions/artifacts/' + 'a'.repeat(64) + '.gz' },
+    { path: '/runtime/materials.json' },
+    { path: 'https://other.example/extensions/index.json' },
+  ])
+    await expect(manager.fetchApi(input)).rejects.toMatchObject({
+      code: 'protocol_error',
+    });
+  expect(fetcher).not.toHaveBeenCalled();
+  await manager.fetchApi({
+    path: '/api/settings?scope=reader',
+    method: 'PUT',
+    headers: { 'X-App-Request': '1' },
+    body: '{}',
+  });
+  expect(fetcher).toHaveBeenCalledWith(
+    'https://read.example.com/api/settings?scope=reader',
+    expect.objectContaining({
+      method: 'PUT',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'X-App-Request': '1' },
+      body: '{}',
+    }),
+  );
 });

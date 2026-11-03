@@ -11,6 +11,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MaterialCatalog } from '../packages/runtime-host/materials.ts';
+import { assembleExtensionAssets } from './assemble-extension-assets.ts';
 
 const publicDir = new URL('../dist/public/', import.meta.url);
 const runtime = new URL('../packages/runtime-host/dist/', import.meta.url);
@@ -43,6 +44,10 @@ const catalog: MaterialCatalog = JSON.parse(
   await readFile(new URL('materials.json', runtime), 'utf8'),
 );
 const materials = [...catalog.hostScripts, ...catalog.resources];
+const extensionCount = await assembleExtensionAssets(
+  fileURLToPath(publicDir),
+  catalog,
+);
 const headerFile = new URL('_headers', publicDir);
 let headers = '';
 try {
@@ -61,6 +66,10 @@ const rules = materials.map(
 );
 rules.push(
   '/runtime/materials.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
+  '/extensions/index.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
+  '/extensions/build-state.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
+  '/extensions/builds/*\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
+  '/extensions/artifacts/*\n  Content-Type: application/gzip\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff',
 );
 await writeFile(
   headerFile,
@@ -107,5 +116,5 @@ async function checkTree(directory: string): Promise<void> {
 }
 await checkTree(fileURLToPath(publicDir));
 console.log(
-  `Static assets checked: ${publicFiles} files; native runtime payloads excluded`,
+  `Static assets checked: ${publicFiles} files, ${extensionCount} current extensions; native runtime payloads excluded`,
 );

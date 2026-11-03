@@ -15,6 +15,13 @@
       "when": 1793673604108,
       "tag": "0001_many_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793691421736,
+      "tag": "0002_complete_mister_sinister",
+      "breakpoints": true
     }
   ]
 }

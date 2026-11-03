@@ -2,16 +2,23 @@ import {
   hostAbi,
   protocolVersion,
   runtimeBaseline,
+  type BundleArtifact,
   type BuildManifest,
 } from '@karuyomi/contracts';
+import { gzipSync } from 'node:zlib';
 import { sha256 } from '../src/verified-loader.js';
-const bytes = new TextEncoder().encode('self.productBuild = true;');
-const artifact = async () => {
+export const bytes = new TextEncoder().encode('self.productBuild = true;');
+export const encodedBytes = new Uint8Array(gzipSync(bytes));
+export const artifact = async (): Promise<BundleArtifact> => {
   const hash = await sha256(bytes);
   return {
-    path: `/api/extensions/artifacts/${hash}`,
+    path: `/extensions/artifacts/${hash}.gz`,
     sha256: hash,
     size: bytes.byteLength,
+    contentType: 'application/javascript',
+    encoding: 'gzip',
+    encodedSha256: await sha256(encodedBytes),
+    encodedSize: encodedBytes.byteLength,
   };
 };
 export async function manifest(): Promise<BuildManifest> {
