@@ -77,7 +77,7 @@ async function fixture(
     packageName: 'example.test',
     repoId: 'test',
     version: '1',
-    bridgeVersion: 1,
+    bridgeVersion: 2,
     storageSchema: 'test-v1',
     sourceIds: ['1234567890123456789'],
     bundle: {

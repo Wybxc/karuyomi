@@ -40,7 +40,7 @@ export const buildManifestSchema = z
     protocolVersion: z.literal(protocolVersion),
     hostAbi: z.literal(hostAbi),
     runtimeBaseline: z.literal(runtimeBaseline),
-    bridgeVersion: z.union([z.literal(1), z.literal(2)]),
+    bridgeVersion: z.literal(2),
     buildId: z.string().min(1).max(200),
     packageName: z.string().min(1).max(200),
     repoId: z.string().min(1).max(200),

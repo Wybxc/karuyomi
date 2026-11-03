@@ -112,6 +112,20 @@ async function readAll(reader: HttpFrameReader): Promise<Uint8Array> {
   }
 }
 
+async function readUpload(init: RequestInit): Promise<Uint8Array | undefined> {
+  if (init.body === undefined) return undefined;
+  expect(init.body).toBeInstanceOf(ReadableStream);
+  const reader = (init.body as ReadableStream<Uint8Array>).getReader();
+  const chunks: Uint8Array[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    expect(value.byteLength).toBeLessThanOrEqual(HTTP_FRAME_LIMIT);
+    chunks.push(value);
+  }
+  return concat(chunks);
+}
+
 describe('HTTP bridge v2 request validation', () => {
   it('preserves binary request bytes, an empty body, and an absent body across fragmented transport', async () => {
     const bytes = new Uint8Array([0, 255, 128, 0, 13, 10]);
@@ -119,7 +133,7 @@ describe('HTTP bridge v2 request validation', () => {
     const encoded = concat(frames(meta, [bytes]));
     const wire = Array.from(encoded, (byte) => new Uint8Array([byte]));
     const fetcher = vi.fn(async (_url, init: RequestInit) => {
-      expect(init.body).toEqual(bytes);
+      expect(await readUpload(init)).toEqual(bytes);
       return new Response(null);
     });
     await readAll(
@@ -133,7 +147,9 @@ describe('HTTP bridge v2 request validation', () => {
     );
     for (const hasBody of [true, false]) {
       const fetchEmpty = vi.fn(async (_url, init: RequestInit) => {
-        expect(init.body).toEqual(hasBody ? new Uint8Array() : undefined);
+        expect(await readUpload(init)).toEqual(
+          hasBody ? new Uint8Array() : undefined,
+        );
         return new Response(null);
       });
       await readAll(
@@ -268,7 +284,10 @@ describe('HTTP bridge v2 request validation', () => {
           new Uint8Array([0]),
         ]),
         ['example.org'],
-        vi.fn(),
+        (async (_url, init) => {
+          await readUpload(init!);
+          return new Response(null);
+        }) as typeof fetch,
       );
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({
@@ -285,9 +304,15 @@ describe('HTTP bridge v2 request validation', () => {
     );
     const meta = metadata({ method: 'POST', hasBody: true, bodyLength: null });
     const fetcher = vi.fn(async (_url, init: RequestInit) => {
-      expect((init.body as Uint8Array).byteLength).toBe(
-        HTTP_REQUEST_BODY_LIMIT,
-      );
+      let total = 0;
+      const reader = (init.body as ReadableStream<Uint8Array>).getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        expect(value.byteLength).toBeLessThanOrEqual(HTTP_FRAME_LIMIT);
+        total += value.byteLength;
+      }
+      expect(total).toBe(HTTP_REQUEST_BODY_LIMIT);
       return new Response(null);
     });
     await readAll(
@@ -308,11 +333,126 @@ describe('HTTP bridge v2 request validation', () => {
     expect(over.status).toBe(413);
     expect(await over.json()).toEqual({ error: 'body_limit_exceeded' });
     expect(cancel).toHaveBeenCalledOnce();
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('HTTP bridge v2 response semantics and backpressure', () => {
+  it.each([200, 302, 403])(
+    'an early Source %i cannot turn a truncated or mismatched upload into successful END',
+    async (status) => {
+      for (const malformed of ['missing-end', 'short', 'long', 'trailing']) {
+        const meta = metadata({ method: 'POST', hasBody: true, bodyLength: 2 });
+        const bytes = new Uint8Array(malformed === 'long' ? [1, 2, 3] : [1]);
+        let wire = frames(meta, [bytes]);
+        if (malformed === 'missing-end') wire.pop();
+        if (malformed === 'trailing')
+          wire = [
+            ...frames(meta, [new Uint8Array([1, 2])]),
+            new Uint8Array([0]),
+          ];
+        const fetcher = vi.fn(async () => new Response('early', { status }));
+        const reader = responseReader(
+          await forwardBinary(
+            request(meta, [], { wire }),
+            ['example.org'],
+            fetcher as typeof fetch,
+          ),
+        );
+        expect(
+          httpResponseMetaSchema.parse(await reader.meta()).upstreamStatus,
+        ).toBe(status);
+        await expect(readAll(reader)).rejects.toMatchObject({
+          code: 'invalid_bridge_request',
+          remote: true,
+        });
+        expect(fetcher).toHaveBeenCalledOnce();
+      }
+    },
+  );
+
+  it.each([200, 302, 403])(
+    'validates a valid upload after early Source %i without sending more bytes upstream',
+    async (status) => {
+      const bytes = new Uint8Array(HTTP_FRAME_LIMIT).fill(255);
+      const meta = metadata({
+        method: 'POST',
+        hasBody: true,
+        bodyLength: bytes.byteLength * 2,
+      });
+      let uploadReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+      const fetcher = vi.fn(async (_url, init: RequestInit) => {
+        uploadReader = (init.body as ReadableStream<Uint8Array>).getReader();
+        expect(await uploadReader.read()).toEqual({
+          done: false,
+          value: bytes,
+        });
+        // Some peers cancel their unread upload before returning an early reply.
+        await uploadReader.cancel();
+        return new Response('early', { status });
+      });
+      const reader = responseReader(
+        await forwardBinary(
+          request(meta, [bytes, bytes]),
+          ['example.org'],
+          fetcher as typeof fetch,
+        ),
+      );
+      expect(
+        httpResponseMetaSchema.parse(await reader.meta()).upstreamStatus,
+      ).toBe(status);
+      expect(new TextDecoder().decode(await readAll(reader))).toBe('early');
+      expect(await uploadReader!.read()).toEqual({
+        done: true,
+        value: undefined,
+      });
+    },
+  );
+
+  it('does not consume DATA before the upstream upload asks for it', async () => {
+    let pulls = 0;
+    const meta = metadata({ method: 'POST', hasBody: true, bodyLength: 2 });
+    const wire = frames(meta, [new Uint8Array([1]), new Uint8Array([2])]);
+    const source = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          ++pulls;
+          const chunk = wire.shift();
+          if (chunk) controller.enqueue(chunk);
+          else controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const incoming = new Request('https://read.example.com/api/bridge/http', {
+      method: 'POST',
+      body: source,
+      duplex: 'half',
+    } as RequestInit);
+    const fetcher = vi.fn(async (_url, init: RequestInit) => {
+      expect(pulls).toBe(2); // preamble + META only
+      const reader = (init.body as ReadableStream<Uint8Array>).getReader();
+      expect((await reader.read()).value).toEqual(new Uint8Array([1]));
+      expect(pulls).toBe(3);
+      await Promise.resolve();
+      expect(pulls).toBe(3);
+      return new Response('early');
+    });
+    expect(
+      new TextDecoder().decode(
+        await readAll(
+          responseReader(
+            await forwardBinary(
+              incoming,
+              ['example.org'],
+              fetcher as typeof fetch,
+            ),
+          ),
+        ),
+      ),
+    ).toBe('early');
+  });
+
   it('performs no upstream read for metadata or slow consumers, retaining at most one DATA frame', async () => {
     let pulls = 0;
     const cancel = vi.fn();
@@ -796,7 +936,7 @@ describe('HTTP bridge v2 lifecycle', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('cancels a stalled request body after META without initiating upstream fetch', async () => {
+  it('cancels a stalled upload after META and aborts its in-flight upstream fetch', async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();
     let first = true;
@@ -829,14 +969,17 @@ describe('HTTP bridge v2 lifecycle', () => {
       body,
       duplex: 'half',
     } as RequestInit);
-    const fetcher = vi.fn();
+    const fetcher = vi.fn(async (_url, init: RequestInit) => {
+      await readUpload(init);
+      return new Response(null);
+    });
     const forwarding = forwardBinary(incoming, ['example.org'], fetcher);
     await vi.advanceTimersByTimeAsync(10);
     const response = await forwarding;
     expect(response.status).toBe(504);
     expect(await response.json()).toEqual({ error: 'timeout' });
     expect(cancel).toHaveBeenCalledOnce();
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -928,7 +1071,12 @@ describe('HTTP bridge v2 route negotiation and existing Access boundary', () => 
     {
       contentType: 'application/json',
       accept: HTTP_BRIDGE_MEDIA_TYPE,
-      status: 406,
+      status: 415,
+    },
+    {
+      contentType: 'application/json',
+      accept: 'application/json',
+      status: 415,
     },
     {
       contentType: HTTP_BRIDGE_MEDIA_TYPE + '; charset=utf-8',

@@ -57,7 +57,7 @@ def verify(manifest, folder, *, verify_hashes=True, material_catalog_override=No
         value = manifest.get(name)
         if not isinstance(value, str) or not 1 <= len(value) <= maximum:
             raise ValueError("Invalid " + name)
-    if type(manifest.get("bridgeVersion")) is not int or manifest["bridgeVersion"] != 1:
+    if type(manifest.get("bridgeVersion")) is not int or manifest["bridgeVersion"] != 2:
         raise ValueError("Incompatible bridgeVersion")
     source_ids = manifest.get("sourceIds")
     if (

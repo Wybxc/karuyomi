@@ -24,25 +24,10 @@ public final class Bridge {
   @JSBody(params = "m", script = "self.postMessage({type:'trace',message:m});return '';")
   public static native String trace(String m);
 
-  @Async
-  public static native String http(String request);
-
-  private static void http(String request, AsyncCallback<String> callback) {
-    fetch(request, callback::complete, e -> callback.error(new RuntimeException(e)));
-  }
-
   @JSFunctor
   interface Reply extends JSObject {
     void call(String value);
   }
-
-  @JSBody(
-      params = {"request", "ok", "err"},
-      script = "self.teaHttp(request).then(ok, e=>err(String(e)));")
-  static native void fetch(String request, Reply ok, Reply err);
-
-  @JSBody(script = "return self.teaHttpVersion === 2;")
-  public static native boolean httpVersion2();
 
   public static String httpOpen(String metadata) throws IOException {
     String[] value = new String[1];
@@ -85,15 +70,36 @@ public final class Bridge {
     httpFinish(
         handle,
         callback::complete,
-        (message, name, code) -> callback.error(httpError(message, name, code)));
+        (message, name, code, retryable) -> {
+          IOException error = httpError(message, name, code);
+          callback.error(
+              retryable && !(error instanceof InterruptedIOException)
+                  ? new NetworkFailure(message)
+                  : error);
+        });
   }
 
   @JSBody(
       params = {"handle", "ok", "fail"},
       script =
           "Promise.resolve().then(() => self.teaHttpFinish(handle)).then(ok, failureReason => "
-              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')));")
-  private static native void httpFinish(String handle, Reply ok, HttpFailure fail);
+              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || ''), failureReason.retryable === true));")
+  private static native void httpFinish(String handle, Reply ok, HttpNetworkFailure fail);
+
+  @JSFunctor
+  private interface HttpNetworkFailure extends JSObject {
+    void call(String message, String name, String code, boolean retryable);
+  }
+
+  public static boolean networkFailure(IOException error) {
+    return error instanceof NetworkFailure;
+  }
+
+  private static final class NetworkFailure extends IOException {
+    NetworkFailure(String message) {
+      super(message);
+    }
+  }
 
   public static byte[] httpRead(String handle, int maximum) throws IOException {
     if (maximum < 1 || maximum > HttpBodySource.MAX_CHUNK)

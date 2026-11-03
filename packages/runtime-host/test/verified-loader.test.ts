@@ -1,4 +1,5 @@
 import { expect, test, vi } from 'vitest';
+import { HTTP_BRIDGE_MEDIA_TYPE } from '@karuyomi/contracts';
 import { manifest } from './fixtures.js';
 import { sha256, VerifiedLoader } from '../src/verified-loader.js';
 import { TeaVMDriver, type TeaVMGlobals } from '../src/teavm-driver.js';
@@ -186,8 +187,7 @@ test('shared materials reject changed bytes, MIME and paths before execution', a
     ...(await sharedArtifact()),
     contentType: 'application/javascript',
   };
-  const corrupt = new Uint8Array(bytes);
-  corrupt[0] ^= 1;
+  const corrupt = Uint8Array.from(bytes, (byte) => byte ^ 1);
   for (const material of [
     { bytes: corrupt, contentType: 'application/javascript' },
     { bytes, contentType: 'text/html' },
@@ -254,18 +254,115 @@ test('real TeaVM export handshake validates loaded Source IDs before readiness',
   ).rejects.toMatchObject({ code: 'integrity_error' });
 });
 
-test('Access expiry cannot be swallowed as successful Source data by a Java error handler', async () => {
+test.each([
+  { status: 401, code: 'access_required' },
+  { status: 403, code: 'access_denied' },
+])(
+  'Access $status cannot be swallowed as successful Source data by a Java error handler',
+  async ({ status, code }) => {
+    const scope: TeaVMGlobals = {};
+    const build = await manifest();
+    const loader = new VerifiedLoader(
+      origin,
+      (async () =>
+        new Response(bytes, {
+          headers: { 'Content-Type': 'application/javascript' },
+        })) as typeof fetch,
+    );
+    const fetcher = vi.fn(async () => new Response('', { status }));
+    vi.stubGlobal('fetch', fetcher);
+    const driver = new TeaVMDriver(
+      scope,
+      loader,
+      () => {
+        scope.hostInit = () => scope.teaDone?.('"ready"');
+        scope.hostLoad = () =>
+          scope.teaDone?.(
+            JSON.stringify([
+              { id: build.sourceIds[0], name: 'Test', lang: 'en' },
+            ]),
+          );
+        scope.hostInvoke = () => {
+          const handle = scope.teaHttpOpen!(
+            JSON.stringify({
+              url: 'https://source.example/catalog',
+              method: 'GET',
+              headers: [],
+              hasBody: false,
+              bodyLength: 0,
+              timeoutMs: 30_000,
+            }),
+          );
+          void scope.teaHttpFinish!(handle).catch(() => {
+            // A Source can catch the Java IOException and even make another bad
+            // bridge call; the fatal Access failure must survive both handlers.
+            try {
+              scope.teaHttpOpen!('{}');
+            } catch {}
+            scope.teaDone?.('{"mangas":[],"hasNextPage":false}');
+          });
+        };
+      },
+      origin,
+    );
+    try {
+      expect(
+        Object.keys(scope)
+          .filter((key) => key.startsWith('teaHttp'))
+          .sort(),
+      ).toEqual([
+        'teaHttpCancel',
+        'teaHttpClose',
+        'teaHttpFinish',
+        'teaHttpOpen',
+        'teaHttpRead',
+        'teaHttpWrite',
+      ]);
+      await driver.open(build, 'test', signal());
+      await expect(
+        driver.invoke(build.sourceIds[0]!, 'popular', { page: 1 }),
+      ).rejects.toMatchObject({ code });
+      expect(fetcher).toHaveBeenCalledWith(
+        new URL('/api/bridge/http', origin),
+        expect.objectContaining({
+          credentials: 'same-origin',
+          redirect: 'manual',
+          headers: expect.objectContaining({
+            Accept: HTTP_BRIDGE_MEDIA_TYPE,
+            'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
+            'X-App-Request': '1',
+            'X-Runtime-Build': build.buildId,
+          }),
+        }),
+      );
+    } finally {
+      await driver.close();
+      vi.unstubAllGlobals();
+    }
+  },
+);
+
+async function sharedArtifact() {
+  const value = await artifact();
+  return { ...value, path: `/runtime/materials/${value.sha256}` };
+}
+
+test('the installed v2 finish callback carries a controlled connection flag through TeaVM failure handling', async () => {
   const scope: TeaVMGlobals = {};
   const build = await manifest();
+  const rejected: unknown[] = [];
   const loader = new VerifiedLoader(
     origin,
-    (async () =>
+    async () =>
       new Response(bytes, {
         headers: { 'Content-Type': 'application/javascript' },
-      })) as typeof fetch,
+      }),
   );
-  const fetcher = vi.fn(async () => new Response('', { status: 401 }));
-  vi.stubGlobal('fetch', fetcher);
+  vi.stubGlobal('fetch', async () => {
+    throw new TypeError(
+      'Failed to fetch https://source.invalid/?secret=never-reflect',
+    );
+  });
   const driver = new TeaVMDriver(
     scope,
     loader,
@@ -278,8 +375,19 @@ test('Access expiry cannot be swallowed as successful Source data by a Java erro
           ]),
         );
       scope.hostInvoke = () => {
-        void scope.teaHttp!('{}').catch(() => {
-          scope.teaDone?.('{"mangas":[],"hasNextPage":false}');
+        const handle = scope.teaHttpOpen!(
+          JSON.stringify({
+            url: 'https://source.example/catalog',
+            method: 'GET',
+            headers: [],
+            hasBody: false,
+            bodyLength: 0,
+            timeoutMs: 30_000,
+          }),
+        );
+        void scope.teaHttpFinish!(handle).catch((error: unknown) => {
+          rejected.push(error);
+          scope.teaFail?.('java.io.IOException: Source request failed');
         });
       };
     },
@@ -289,25 +397,18 @@ test('Access expiry cannot be swallowed as successful Source data by a Java erro
     await driver.open(build, 'test', signal());
     await expect(
       driver.invoke(build.sourceIds[0]!, 'popular', { page: 1 }),
-    ).rejects.toMatchObject({ code: 'access_required' });
-    expect(fetcher).toHaveBeenCalledWith(
-      new URL('/api/bridge/http', origin),
-      expect.objectContaining({
-        credentials: 'same-origin',
-        redirect: 'manual',
-        headers: expect.objectContaining({
-          'X-App-Request': '1',
-          'X-Runtime-Build': build.buildId,
-        }),
-      }),
-    );
+    ).rejects.toMatchObject({
+      code: 'source_error',
+      message: 'Source bridge connection failed',
+      retryable: true,
+    });
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]).toMatchObject({
+      retryable: true,
+      message: 'Source bridge connection failed',
+    });
   } finally {
     await driver.close();
     vi.unstubAllGlobals();
   }
 });
-
-async function sharedArtifact() {
-  const value = await artifact();
-  return { ...value, path: `/runtime/materials/${value.sha256}` };
-}

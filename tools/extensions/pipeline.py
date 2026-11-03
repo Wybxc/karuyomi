@@ -277,8 +277,6 @@ def resume_plan(plan, state, limit=10000, retry_failed=False):
 def checkout_material_catalog(checkout):
     root = Path(checkout)
     script = root / "packages/runtime-host/prepare-materials.ts"
-    if not script.is_file():
-        script = script.with_suffix(".mjs")
     return json.loads(
         subprocess.check_output(["node", str(script), "--print"], cwd=root, text=True)
     )

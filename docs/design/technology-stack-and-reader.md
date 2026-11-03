@@ -1,18 +1,20 @@
 # 技术栈与跨端漫画阅读器设计：通用规范及历史方案
 
-日期：2026-11-03。状态：技术选型与实施计划，尚未创建应用工程、安装依赖或部署。本文细化[主设计](./mihon-web-design.md)，功能范围、Access 协议与 TeaVM release9 基线沿用主设计。
+日期：2026-11-03。本文持续维护通用阅读规范与历史技术方案，不再冻结；当前架构以[主设计](./mihon-web-design.md)和[Flutter 接入设计](./flutter-teavm-integration.md)为准，工程与验收状态见[计划目录](../plan/README.md)。下文 React/Vite 目录、命令、依赖及 RN 采用门槛是选型背景，不是当前 Flutter 工程要求。
 
-**当前已确定 Flutter + TeaVM，并采用 Web Worker + 原生 WebView 的浏览器宿主路线；实施接口与工具链以[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)及主设计为准。** 本文的 React/TypeScript 阅读核心、Vite/shadcn、Expo/RN 选型与框架采用门槛属于历史方案，不再要求实现。逻辑位置、图片预算、原版处理链、Access、后端及真实设备验收等通用规范保留，由 Dart/Flutter 与平台 adapter 实现。Flutter UI 使用 Pub；pnpm 管理 TS 后端与 JS 宿主。尚未创建 Flutter 工程或执行原生验证。
+**当前已确定 Flutter + TeaVM，并采用 Web Worker + 原生 WebView 的浏览器宿主路线；实施接口与工具链以[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)及主设计为准。** 本文的 React/TypeScript 阅读核心、Vite/shadcn、Expo/RN 选型与框架采用门槛属于历史方案，不再要求实现。逻辑位置、图片预算、原版处理链、Access、后端及真实设备验收等通用规范保留，由 Dart/Flutter 与平台 adapter 实现。Flutter UI 使用 Pub；pnpm 管理 TS 后端与 JS 宿主。当前已有分项实现和验证，不能据此宣称完整图片阅读或真机性能通过。
 
-前端的首要工程目标是跨端阅读。本文 Web 方案覆盖桌面 Chrome / Firefox / Safari、Android Chrome / PWA、iPhone Safari / PWA 和 iPad 的触控、横屏及分屏；原生阅读器增加各平台图片、手势、存储、Access 会话与 WebView 生命周期验收。通用的逻辑位置、图片预算和源处理链要求保留，具体语言及组件依赖随最终框架确定。
+**当前交付边界：** Static Assets 是 Web 与 Native 扩展的最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新与缓存。不再要求扩展 Release 发布，已有 Release 仅历史存储。通用 host/桥/WASM 使用 Web Static Assets 或 Native 内置材料；Worker 只处理个人数据和 Source 网络控制，不经 R2/Worker 交付扩展正文，不向客户端发放 GitHub 凭据。此前 Release Web 直下/Range 因 CORS 失败；当前 Static Assets 方案已确定，发布与完整加载仍待实现验收，具体限制见主设计。
 
-## 1. UI 选型
+前端的首要工程目标是跨端阅读。本文 Web 方案覆盖桌面 Chrome / Firefox / Safari、Android Chrome / PWA、iPhone Safari / PWA 和 iPad 的触控、横屏及分屏；原生阅读器增加各平台图片、手势、存储、Access 会话与 WebView 生命周期验收。通用的逻辑位置、图片预算和源处理链要求保留，具体语言与组件由已确定的 Dart/Flutter 和平台 adapter 承担。
 
-| 候选 | 对本项目的价值 | 取舍 |
-|---|---|---|
-| MUI | Material 风格完整，导航、表单和设置页能快速统一 | 可实现本应用；阅读器的分页、图片调度、缩放和位置恢复仍需独立开发，现成组件优势主要在外围页面 |
-| Chakra UI | 组合式组件与主题适合构建应用外壳 | 同样可实现；阅读核心仍需自行处理浏览器输入和布局，不因换组件库而减少这部分工作 |
-| **shadcn/ui，采用 Base UI 基础组件版本** | 组件源码进入项目，便于调整工具栏、浮层、焦点恢复及移动端设置面板 | 选用；项目负责维护修改后的组件及可访问性回归，按需引入组件 |
+## 1. 历史 React UI 选型
+
+| 候选                                     | 对本项目的价值                                                   | 取舍                                                                                         |
+| ---------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| MUI                                      | Material 风格完整，导航、表单和设置页能快速统一                  | 可实现本应用；阅读器的分页、图片调度、缩放和位置恢复仍需独立开发，现成组件优势主要在外围页面 |
+| Chakra UI                                | 组合式组件与主题适合构建应用外壳                                 | 同样可实现；阅读核心仍需自行处理浏览器输入和布局，不因换组件库而减少这部分工作               |
+| **shadcn/ui，采用 Base UI 基础组件版本** | 组件源码进入项目，便于调整工具栏、浮层、焦点恢复及移动端设置面板 | 选用；项目负责维护修改后的组件及可访问性回归，按需引入组件                                   |
 
 判断依据是阅读器需要高度定制的布局和交互，而外围 CRUD 页面相对简单。shadcn/ui 的源码分发方式适合这种分工；这不是三者包体积、内存或流畅度的实测排名。[shadcn/ui](https://ui.shadcn.com/docs)、[MUI](https://mui.com/material-ui/getting-started/)、[Chakra UI](https://chakra-ui.com/docs/get-started/installation)。
 
@@ -20,22 +22,22 @@
 
 shadcn/ui 负责按钮、菜单、对话框、设置面板、滑条和表单；样式采用 Tailwind CSS、CSS 自定义属性和 Lucide 图标。阅读画布、图像窗口和输入控制器由项目实现，普通 Carousel 或图片灯箱不作为阅读引擎。移动端面板和桌面弹层共享设置内容，打开后暂停阅读快捷键，关闭后恢复焦点。
 
-## 2. 前端技术栈
+## 2. 历史 React 前端技术栈
 
-| 领域 | 选定技术 | 职责与约束 |
-|---|---|---|
-| 应用框架 | React、TypeScript strict | 应用页面、阅读视图、可访问控件；手势逐帧数据不走整棵 React 渲染树 |
-| 构建 | Vite、`@vitejs/plugin-react`、`@cloudflare/vite-plugin` | 同一工程构建公开 SPA 和入口 Worker；阅读路由、扩展设置等按路由拆包 |
-| UI / 样式 | shadcn/ui（Base UI）、Tailwind CSS / Vite 插件、`lucide-react` | 共用主题和触控尺寸；阅读背景与应用主题可独立设置 |
-| 路由 | React Router，客户端 library 模式 | 书架、详情、阅读、浏览与设置路由；章节/作品深链接和返回位置；首版使用 SPA |
-| 请求状态 | `@tanstack/react-query` | API 请求状态、分页目录和元数据短期缓存；实际 Source 调用经过 SourceRuntime 调度，不放图片正文 |
-| UI 状态 | Zustand | 工具栏、阅读模式、当前逻辑位置及设置面板等会话状态；按 selector 订阅 |
-| 业务本地存储 | Dexie / IndexedDB | 书架镜像、设置、阅读位置、同步 outbox；持久业务状态以 repository 层为入口 |
-| 长列表 | `@tanstack/react-virtual` | 竖向阅读页窗口、长章节列表；动态尺寸、稳定 key、锚点恢复由阅读器适配 |
-| 手势 | Pointer Events、`@use-gesture/react`、`requestAnimationFrame` | 触点识别、缩放和平移；原生滚动与自定义手势按阅读模式明确分工 |
-| 图片显示 | DOM `<img>`、CSS transform、ResizeObserver | 图片呈现、视口测量、适宽/适高、裁切显示；重处理仍走扩展原图片链和独立图像适配 |
-| PWA | `vite-plugin-pwa` 的 `injectManifest`、Workbox | 可审查的自定义 Service Worker；公开应用外壳缓存、版本提示和安装元数据 |
-| 扩展接入 | 自有 `source-runtime` 包、WebWorker、MessageChannel / transferable ArrayBuffer | 版本握手、requestId / generation、有限执行槽、取消；复用 release9 并实现主设计 P0-B 二进制桥 |
+| 领域         | 选定技术                                                                       | 职责与约束                                                                                    |
+| ------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 应用框架     | React、TypeScript strict                                                       | 应用页面、阅读视图、可访问控件；手势逐帧数据不走整棵 React 渲染树                             |
+| 构建         | Vite、`@vitejs/plugin-react`、`@cloudflare/vite-plugin`                        | 同一工程构建公开 SPA 和入口 Worker；阅读路由、扩展设置等按路由拆包                            |
+| UI / 样式    | shadcn/ui（Base UI）、Tailwind CSS / Vite 插件、`lucide-react`                 | 共用主题和触控尺寸；阅读背景与应用主题可独立设置                                              |
+| 路由         | React Router，客户端 library 模式                                              | 书架、详情、阅读、浏览与设置路由；章节/作品深链接和返回位置；首版使用 SPA                     |
+| 请求状态     | `@tanstack/react-query`                                                        | API 请求状态、分页目录和元数据短期缓存；实际 Source 调用经过 SourceRuntime 调度，不放图片正文 |
+| UI 状态      | Zustand                                                                        | 工具栏、阅读模式、当前逻辑位置及设置面板等会话状态；按 selector 订阅                          |
+| 业务本地存储 | Dexie / IndexedDB                                                              | 书架镜像、设置、阅读位置、同步 outbox；持久业务状态以 repository 层为入口                     |
+| 长列表       | `@tanstack/react-virtual`                                                      | 竖向阅读页窗口、长章节列表；动态尺寸、稳定 key、锚点恢复由阅读器适配                          |
+| 手势         | Pointer Events、`@use-gesture/react`、`requestAnimationFrame`                  | 触点识别、缩放和平移；原生滚动与自定义手势按阅读模式明确分工                                  |
+| 图片显示     | DOM `<img>`、CSS transform、ResizeObserver                                     | 图片呈现、视口测量、适宽/适高、裁切显示；重处理仍走扩展原图片链和独立图像适配                 |
+| PWA          | `vite-plugin-pwa` 的 `injectManifest`、Workbox                                 | 可审查的自定义 Service Worker；公开应用外壳缓存、版本提示和安装元数据                         |
+| 扩展接入     | 自有 `source-runtime` 包、WebWorker、MessageChannel / transferable ArrayBuffer | 版本握手、requestId / generation、有限执行槽、取消；复用 release9 并实现主设计 P0-B 二进制桥  |
 
 选择 Vite SPA 是因为书架与阅读器依赖浏览器本地状态及 SourceRuntime，当前产品没有服务端渲染需求。Cloudflare Vite 插件使后端开发运行在本地 workerd，并提供 Workers 集成；仍须在线验证 Access 和真实源站网络。[官方插件说明](https://developers.cloudflare.com/workers/vite-plugin/)。
 
@@ -43,7 +45,7 @@ shadcn/ui 负责按钮、菜单、对话框、设置面板、滑条和表单；�
 
 Source 请求默认关闭自动 retry、refetch-on-focus、自动重挂载重取与自动重连重取；是否重试由 SourceRuntime 的副作用、取消及错误策略决定。API 的安全读取单独设置有限重试；outbox 同步由幂等协议控制。Query 的默认后台刷新和重试不能直接套到 Source，开发环境 React 重挂载也不能重复启动源请求。[Query 选项](https://tanstack.com/query/latest/docs/framework/react/reference/functions/useQuery)。
 
-## 3. 阅读器核心
+## 3. 历史阅读器组织与通用规则
 
 ### 模块边界
 
@@ -65,10 +67,10 @@ flowchart LR
 
 ### 两套显示模式，共用位置与图片调度
 
-| 模式 | 实现 | 必须解决的问题 |
-|---|---|---|
+| 模式                 | 实现                                                                  | 必须解决的问题                                                                                                                     |
+| -------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | LTR / RTL 单页与双页 | 有界页组窗口，CSS 布局与 transform；由 reader-core 控制分页和拖动落点 | 按源页面顺序生成逻辑页组，RTL 只改变展示及前进方向；封面单页、横图独占、奇数页、单双页切换后保留当前页；不镜像图片或把整站设成 RTL |
-| 竖向连续 / Webtoon | 原生 overflow 滚动 + TanStack Virtual；预留图片纵横比，区分页间距 | 图片后到、尺寸修正、横竖屏和前后章接续时保持阅读锚点；不在每次滚动中强制写 scrollTop；Webtoon 关闭页间距 |
+| 竖向连续 / Webtoon   | 原生 overflow 滚动 + TanStack Virtual；预留图片纵横比，区分页间距     | 图片后到、尺寸修正、横竖屏和前后章接续时保持阅读锚点；不在每次滚动中强制写 scrollTop；Webtoon 关闭页间距                           |
 
 横向分页选受控布局，避免滚动吸附与自定义缩放同时争抢横向手势；竖向阅读保留浏览器惯性滚动。两者都使用原生 `<img>` 呈现。虚拟化只管理可见窗口，不自动解决超长图解码内存；动态尺寸测量还需要应用维护稳定页标识和恢复规则。[TanStack Virtual](https://tanstack.com/virtual/latest/docs/introduction)。
 
@@ -104,36 +106,38 @@ Fullscreen、Screen Orientation lock、Screen Wake Lock 均作为能力检测后
 
 ## 4. PWA 和启动
 
-公开应用外壳先显示，IndexedDB 提供现有镜像；Access 确认后按需准备 TeaVM 包。阅读器路由代码可在进入详情或准备继续阅读时预取，扩展产物保持独立分发，书架首屏不加载所有阅读设置和扩展代码。
+公开应用外壳先显示，本地镜像提供已有状态；TeaVM 包在 Web 与 Native 均从 Static Assets 按需获取最新版，Source 网络操作仍需 Access。阅读器路由代码可在进入详情或准备继续阅读时预取，扩展产物保持独立分发，书架首屏不加载所有阅读设置和扩展代码。
 
-Service Worker 使用 `injectManifest` 以明确控制路由和缓存。预缓存清单只包含公开 shell / UI 资源；`/api`、`/api/*`、Access 登录端点和登录回跳走网络，未知后端请求不能落入 SPA navigation fallback。AOT bundle 继续使用主设计的私有 HTTP 缓存和鉴权重验证，不进入 Workbox 预缓存。[自定义 Service Worker](https://vite-pwa-org.netlify.app/guide/inject-manifest)。
+Service Worker 使用 `injectManifest` 以明确控制路由和缓存。预缓存清单只包含公开 shell / UI 资源；`/api`、`/api/*`、Access 登录端点和登录回跳走网络，未知后端请求不能落入 SPA navigation fallback。AOT bundle 从 Static Assets 按需下载最新 build，由客户端或 Service Worker 管理更新缓存，不进入全仓首次预缓存；公开材料缓存和个人业务/Source 状态分开。下述 Workbox 配置是历史 React 实现提案，当前 Flutter 的缓存策略以产品实现为准。[自定义 Service Worker](https://vite-pwa-org.netlify.app/guide/inject-manifest)。
 
 使用提示式更新：正在阅读时不强制 `skipWaiting` / reload，先持久化位置，在安全时机应用新版本。首版不启用 background sync、周期同步或章节离线清单。iOS PWA 的存储、顶层 Access 回跳及从后台恢复独立验证，不能依靠 Service Worker 维持扩展持续运行。
 
 ## 5. 后端技术栈
 
-| 领域 | 选定技术 | 用法 |
-|---|---|---|
-| 运行平台 | Cloudflare Workers ES modules + Workers Static Assets | 一个 hostname、一个入口 Worker；公开 SPA，受保护 `/api` 与 `/api/*` |
-| API 框架 | Hono | 路由、鉴权/Origin 中间件、错误封装；只在确认身份后访问业务 bindings |
-| 合同与校验 | Zod + 共享 TypeScript DTO | 请求、响应、Source DTO / 控制帧的运行时边界校验；外部 Long ID 使用字符串 |
-| 鉴权 | Cloudflare Access + `jose` / Web Crypto | `createRemoteJWKSet` / `jwtVerify` 校验固定 issuer、AUD、签名、期限和本人身份；完整规则见主设计 |
-| 数据库 | D1 + `drizzle-orm/d1` | schema、类型化查询、索引、幂等 mutation 和同步增量；与 SQLite / D1 能力对齐 |
-| 迁移 | Drizzle Kit 生成 SQL + Wrangler D1 migrations 执行 | SQL 入库审核；本地先验证，再对目标环境显式应用；单一迁移历史 |
-| 对象资源 | R2 原生 binding | 私有自定义封面、按哈希 AOT 产物；流式 body、鉴权后 ETag / Range |
-| 会话 / 通知 | SQLite-backed Durable Objects、原生 WebSocket | 必要的运行会话与回调关联、同步通知；D1 保持业务真相，DO 不承载 Source 或图片正文 |
-| 网络桥 | 原生 fetch、ReadableStream / TransformStream、AbortController | 上游域名/重定向检查、Cookie/头映射、二进制转发、背压与取消 |
-| 开发 / 发布 | Cloudflare Vite 插件、Wrangler、`wrangler types` | 由 bindings 生成 Env 类型；固定 compatibility_date，本地和线上分别验证 |
+| 领域        | 选定技术                                                      | 用法                                                                                            |
+| ----------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 运行平台    | Cloudflare Workers ES modules + Workers Static Assets         | 一个 hostname、一个入口 Worker；公开 SPA，受保护 `/api` 与 `/api/*`                             |
+| API 框架    | Hono                                                          | 路由、鉴权/Origin 中间件、错误封装；只在确认身份后访问业务 bindings                             |
+| 合同与校验  | Zod + 共享 TypeScript DTO                                     | 请求、响应、Source DTO / 控制帧的运行时边界校验；外部 Long ID 使用字符串                        |
+| 鉴权        | Cloudflare Access + `jose` / Web Crypto                       | `createRemoteJWKSet` / `jwtVerify` 校验固定 issuer、AUD、签名、期限和本人身份；完整规则见主设计 |
+| 数据库      | D1 + `drizzle-orm/d1`                                         | schema、类型化查询、索引、幂等 mutation 和同步增量；与 SQLite / D1 能力对齐                     |
+| 迁移        | Drizzle Kit 生成 SQL + Wrangler D1 migrations 执行            | SQL 入库审核；本地先验证，再对目标环境显式应用；单一迁移历史                                    |
+| 扩展分发    | Static Assets 最新扩展与权威 index/catalog                    | Web 与 Native 共用，只发布每扩展最新 build；不经 Worker 或 R2 代理正文                          |
+| 共享材料    | Workers Static Assets / Native 内置                           | host、桥、Worker 引导和 WASM；Native 不从网络回退                                               |
+| 个人对象    | 按功能需要的 R2 binding                                       | 仅私有自定义封面等个人数据；鉴权后交付，不保存扩展产物                                          |
+| 会话 / 通知 | SQLite-backed Durable Objects、原生 WebSocket                 | 必要的运行会话与回调关联、同步通知；D1 保持业务真相，DO 不承载 Source 或图片正文                |
+| 网络桥      | 原生 fetch、ReadableStream / TransformStream、AbortController | 上游域名/重定向检查、Cookie/头映射、二进制转发、背压与取消                                      |
+| 开发 / 发布 | Cloudflare Vite 插件、Wrangler、`wrangler types`              | 由 bindings 生成 Env 类型；固定 compatibility_date，本地和线上分别验证                          |
 
 Hono 有 Workers 适配；Drizzle 提供 D1 driver。选用互相兼容的稳定版本，不直接照搬文档中的 `@rc` 安装命令。[Hono](https://hono.dev/docs/getting-started/cloudflare-workers)、[Drizzle D1](https://orm.drizzle.team/docs/sqlite/connect-cloudflare-d1)。
 
-Drizzle 不改变 D1 的事务能力。同步写入使用受支持的 batch / 条件 SQL、唯一约束与幂等键实现原子更新；不可把常驻数据库的交互式事务假设搬进 Worker。元数据和二进制协议分开处理：普通 JSON API 用共享 schema，图片及 AOT 正文始终流式传输，不经 JSON / Base64 或逐字节 Zod 校验。
+Drizzle 不改变 D1 的事务能力。同步写入使用受支持的 batch / 条件 SQL、唯一约束与幂等键实现原子更新；不可把常驻数据库的交互式事务假设搬进 Worker。元数据和二进制协议分开处理：普通 JSON API 用共享 schema；Source 图片等网络正文走有界二进制桥，AOT 由客户端直接下载、有界解压并校验。两者均不经 JSON / Base64 或逐字节 Zod 校验，Worker 不处理 AOT 正文。
 
 前后端通过共享 DTO 和薄 fetch client 保持类型一致；HTTP 错误、Access HTML / redirect 和上游错误分别处理。当前不需要 GraphQL、tRPC 或 Node 常驻 API。Cloudflare 部署凭证只存在于开发/CI；前端通过同源 Access Cookie 访问 API。
 
 ## 6. pnpm 工程与工具链
 
-建议建立一个应用工程；以下是待创建结构，当前未生成这些目录：
+以下是当时 React/Vite 提案的目录，不是当前 Flutter 工程结构；当前目录与实际命令见根 README：
 
 ```text
 project/
@@ -162,34 +166,34 @@ project/
 
 `pnpm-workspace.yaml` 包含 `apps/*` 和 `packages/*`；内部包使用 `workspace:*`，全仓一份锁文件。根 `packageManager` 固定精确 pnpm 版本，固定受所选 Vite / Wrangler 支持的 Node LTS；CI 使用 `pnpm install --frozen-lockfile`。初次建工程时核对兼容的稳定版本并锁定，计划不凭空填写未经组合验证的包版本。[pnpm workspace](https://pnpm.io/workspaces)。
 
-所有 JS / TS 依赖由 pnpm 管理；Java 依赖仍由 Maven 管理，TeaVM 固定 0.16.0 和 release9 对应宿主/JDK/补丁。Python 转换/构建工具单独固定环境。pnpm scripts 可以统一调用 Maven / Python，但 pnpm 不替代它们的依赖解析。普通 UI 构建不会每次重编全部扩展；AOT 输出进入产物目录和私有 R2，不进入公开 `dist`。
+所有 JS / TS 依赖由 pnpm 管理；Java 依赖仍由 Maven 管理，TeaVM 固定 0.16.0 和 release9 对应宿主/JDK/补丁。Python 转换/构建工具单独固定环境。pnpm scripts 可以统一调用 Maven / Python，但 pnpm 不替代它们的依赖解析。普通 UI 构建不会每次重编全部扩展；AOT 最新 build 发布到 Static Assets，不再要求扩展 Release 发布，已有 Release 仅历史存储；共享材料进入 Web Static Assets 或 Native 打包资源，不随扩展重复上传。
 
-| 计划命令 | 职责 |
-|---|---|
-| `pnpm dev` | 启动 Vite + 本地 Workers bindings，按需接入已构建测试扩展 |
-| `pnpm build` | 构建公开 UI、自定义 SW 与入口 Worker，检查产物边界 |
-| `pnpm check` | 分环境 TypeScript、ESLint / React Hooks 规则、Prettier 检查 |
-| `pnpm test` / `pnpm test:worker` / `pnpm test:e2e` | 分别执行纯逻辑/组件、Workers、浏览器验证 |
-| `pnpm db:generate` / `pnpm db:migrate:local` | 生成并验证 SQL；远端迁移使用独立的显式命令 |
-| `pnpm extensions:build -- <package>` | 调用冻结工具链按指定包 AOT，输出清单/哈希及 ABI |
-| `pnpm deploy` | 发布单一应用 Worker；与扩展产物发布、数据库迁移分开执行 |
+| 计划命令                                           | 职责                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------- |
+| `pnpm dev`                                         | 启动 Vite + 本地 Workers bindings，按需接入已构建测试扩展   |
+| `pnpm build`                                       | 构建公开 UI、自定义 SW 与入口 Worker，检查产物边界          |
+| `pnpm check`                                       | 分环境 TypeScript、ESLint / React Hooks 规则、Prettier 检查 |
+| `pnpm test` / `pnpm test:worker` / `pnpm test:e2e` | 分别执行纯逻辑/组件、Workers、浏览器验证                    |
+| `pnpm db:generate` / `pnpm db:migrate:local`       | 生成并验证 SQL；远端迁移使用独立的显式命令                  |
+| `pnpm extensions:build -- <package>`               | 调用锁定工具链按指定包 AOT，输出清单/哈希及 ABI             |
+| `pnpm deploy`                                      | 发布单一应用 Worker；与扩展产物发布、数据库迁移分开执行     |
 
 浏览器 DOM、浏览器 Worker、Service Worker 和 Cloudflare Worker 使用独立 tsconfig / 类型入口；共享包不引入 Node globals。初版 pnpm workspace 足够，不预设额外 monorepo 调度器。shadcn CLI 按需运行并锁版本，不在每次构建时重新生成组件。
 
 ## 7. 验证与实施顺序
 
-单元测试使用 Vitest 验证页组、RTL、位置映射和进度合并；React Testing Library 验证控件、焦点与可访问名称。Workers 集成使用官方 `@cloudflare/vitest-plugin`，覆盖 Access JWT、D1 幂等批次、R2 流与 DO 会话。当前官方该插件要求 Vitest 4.1 或更高；建工程时选择兼容的稳定组合，不套用旧 pool 配置。[Workers 测试文档](https://developers.cloudflare.com/workers/testing/vitest-integration/write-your-first-test/)。
+单元测试使用 Vitest 验证页组、RTL、位置映射和进度合并；React Testing Library 验证控件、焦点与可访问名称。Workers 集成使用官方 `@cloudflare/vitest-plugin`，覆盖 Access JWT、D1 幂等批次、私有个人对象与 DO 会话；Static Assets 最新发布、跨端下载、客户端/SW 缓存更新与压缩/摘要另作客户端集成验证。当前官方该插件要求 Vitest 4.1 或更高；建工程时选择兼容的稳定组合，不套用旧 pool 配置。[Workers 测试文档](https://developers.cloudflare.com/workers/testing/vitest-integration/write-your-first-test/)。
 
 Playwright 在 Chromium / Firefox / WebKit 验证导航、恢复、网络中断和 API 边界；其设备配置模拟视口、UA 和触摸能力，不能替代 iPhone Safari / 已安装 PWA 的触控、内存和 Access 回跳实测。[Playwright 设备模拟](https://playwright.dev/docs/emulation)。
 
-| 验证环境 / 夹具 | 关键验收 |
-|---|---|
-| 桌面 Chrome / Firefox / Safari | LTR / RTL、单双页、键盘、鼠标与触控板、浮层焦点、浏览器返回 |
-| 真机 Android Chrome / PWA | 快速连续翻页、长条惯性、双指缩放、旋转、后台恢复、连续多章内存 |
-| 真机 iPhone Safari / PWA | safe-area / 地址栏、滚动与 pinch 互斥、pointercancel、Access 顶层回跳、存储与后台回收 |
-| iPad Safari / PWA | 双页、分屏动态宽度、横竖屏、触控与外接键盘切换 |
-| 开发图片夹具 | 混合尺寸、超长单图、奇数页、封面/横跨页、延迟解码、损坏图、上方尺寸补全时锚点稳定 |
-| 真实 3–5 个代表 Source | 原版直图/请求头/图片处理完整链；章首中末及下一章；Access 过期保留当前图和待同步位置 |
+| 验证环境 / 夹具                | 关键验收                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| 桌面 Chrome / Firefox / Safari | LTR / RTL、单双页、键盘、鼠标与触控板、浮层焦点、浏览器返回                           |
+| 真机 Android Chrome / PWA      | 快速连续翻页、长条惯性、双指缩放、旋转、后台恢复、连续多章内存                        |
+| 真机 iPhone Safari / PWA       | safe-area / 地址栏、滚动与 pinch 互斥、pointercancel、Access 顶层回跳、存储与后台回收 |
+| iPad Safari / PWA              | 双页、分屏动态宽度、横竖屏、触控与外接键盘切换                                        |
+| 开发图片夹具                   | 混合尺寸、超长单图、奇数页、封面/横跨页、延迟解码、损坏图、上方尺寸补全时锚点稳定     |
+| 真实 3–5 个代表 Source         | 原版直图/请求头/图片处理完整链；章首中末及下一章；Access 过期保留当前图和待同步位置   |
 
 **阅读器与扩展宿主同列 P0。** 新增 P0-R：先用固定开发图片验证两种显示模式、缩放/滚动互斥、位置恢复和手机内存；同时推进主设计 P0-A 公共宿主与 P0-B 二进制桥。P0-C 将两条路径接成真实源 → 原版图片处理 → 可交互阅读器 → 进度落盘的完整链。
 
@@ -203,23 +207,23 @@ P1 再完成书架/分类、完整阅读设置（裁白、页组规则、背景�
 
 **可以采用，并且不要求改变 Cloudflare 后端。** React Native Web（RNW）将 React Native 兼容组件渲染为 React DOM，能用于纯 Web 或多平台应用，也能与现有 React DOM 页面逐步组合。它在浏览器中仍使用浏览器渲染能力，不会把 iOS / Android 原生视图带进网页。[RNW 官方说明](https://necolas.github.io/react-native-web/docs/)。
 
-| 目标 | 可行路径 | 对当前项目的判断 |
-|---|---|---|
-| 桌面 / 手机浏览器和 PWA | React DOM 或 RNW 都可；两者均可部署到 Workers Static Assets | 继续推荐 React DOM；更直接控制长条滚动、CSS、图片生命周期及浏览器宿主，RNW 没有已测性能收益 |
-| 近期同时交付 Web、iOS、Android 原生应用 | Expo + React Native + RNW，按平台实现必要适配 | RNW 的代码复用价值明显增加，值得重新选择前端；须先验证扩展运行时和原生鉴权 |
-| 先做 PWA，未来再加入原生客户端 | 共享 reader-core、DTO、进度/设置逻辑；增设原生视图和平台 provider | 当前建议的演进路径；先固定接口，不预建未使用的原生工程 |
-| 原生外壳快速复用现有 Web 功能 | Expo DOM components / WebView 加载 Web 阅读器或完整应用 | 可验证的过渡方案；阅读部分仍是 WebView，需要另测生命周期、存储、登录和跨桥资源传递 |
+| 目标                                    | 可行路径                                                          | 对当前项目的判断                                                                            |
+| --------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 桌面 / 手机浏览器和 PWA                 | React DOM 或 RNW 都可；两者均可部署到 Workers Static Assets       | 继续推荐 React DOM；更直接控制长条滚动、CSS、图片生命周期及浏览器宿主，RNW 没有已测性能收益 |
+| 近期同时交付 Web、iOS、Android 原生应用 | Expo + React Native + RNW，按平台实现必要适配                     | RNW 的代码复用价值明显增加，值得重新选择前端；须先验证扩展运行时和原生鉴权                  |
+| 先做 PWA，未来再加入原生客户端          | 共享 reader-core、DTO、进度/设置逻辑；增设原生视图和平台 provider | 当前建议的演进路径；先固定接口，不预建未使用的原生工程                                      |
+| 原生外壳快速复用现有 Web 功能           | Expo DOM components / WebView 加载 Web 阅读器或完整应用           | 可验证的过渡方案；阅读部分仍是 WebView，需要另测生命周期、存储、登录和跨桥资源传递          |
 
 ### 哪些代码能共用
 
-| 部分 | 复用程度与平台边界 |
-|---|---|
-| 页序、RTL、双页分组、逻辑位置、设置合并、同步冲突规则 | 纯 TypeScript 核心可共用；输入坐标和持久资源通过接口提供 |
-| React hooks、Zustand 会话状态、DTO / 校验 | 大部分可共用；调用浏览器 API 的代码需分离 |
-| 图像显示、长列表、触控与动画 | 可以共用部分 RN 组件/手势声明，但原生图片、Web DOM、滚动和解码策略仍需平台实现与实测 |
-| shadcn/ui、MUI、Chakra UI | 本次候选都是 Web DOM UI 方案；可用于 Web 外壳，不能直接作为 RN 原生控件。NativeWind 等样式方案也不会自动转换它们的 DOM 组件 |
-| TeaVM 宿主与文件 / 缓存桥 | 当前 release9 产品路线依赖 WebWorker、IndexedDB、浏览器脚本和图像 API；在 RNW 浏览器端可继续用，原生 JS 环境需要新适配或浏览器容器 |
-| Access 和数据存储 | Web 的同源 Cookie / IndexedDB 继续成立；原生登录、Cookie 存储及 HTTP 客户端与 WebView 的会话共享必须重新验证，不能假定外部浏览器登录后原生 fetch 已获授权 |
+| 部分                                                  | 复用程度与平台边界                                                                                                                                        |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 页序、RTL、双页分组、逻辑位置、设置合并、同步冲突规则 | 纯 TypeScript 核心可共用；输入坐标和持久资源通过接口提供                                                                                                  |
+| React hooks、Zustand 会话状态、DTO / 校验             | 大部分可共用；调用浏览器 API 的代码需分离                                                                                                                 |
+| 图像显示、长列表、触控与动画                          | 可以共用部分 RN 组件/手势声明，但原生图片、Web DOM、滚动和解码策略仍需平台实现与实测                                                                      |
+| shadcn/ui、MUI、Chakra UI                             | 本次候选都是 Web DOM UI 方案；可用于 Web 外壳，不能直接作为 RN 原生控件。NativeWind 等样式方案也不会自动转换它们的 DOM 组件                               |
+| TeaVM 宿主与文件 / 缓存桥                             | 当前 release9 产品路线依赖 WebWorker、IndexedDB、浏览器脚本和图像 API；在 RNW 浏览器端可继续用，原生 JS 环境需要新适配或浏览器容器                        |
+| Access 和数据存储                                     | Web 的同源 Cookie / IndexedDB 继续成立；原生登录、Cookie 存储及 HTTP 客户端与 WebView 的会话共享必须重新验证，不能假定外部浏览器登录后原生 fetch 已获授权 |
 
 React Native 通常运行于 Hermes，支持部分 Web API，但不等于完整浏览器环境。因此，TeaVM 生成 JavaScript 只说明存在复用可能，不能据此认定现有浏览器宿主可在原生端原样启动。这是对当前宿主依赖的工程判断，尚无原生实验结果。[RN JavaScript 环境](https://reactnative.dev/docs/javascript-environment)。
 
@@ -241,12 +245,12 @@ Expo DOM components 提供 WebView 中运行现有 DOM 组件的路径；它适�
 
 当前 release9 的 AOT 指 `Java / Kotlin → JVM 字节码 → TeaVM JavaScript`，没有生成 iOS ARM 机器码。生成的 JS 仍由宿主 JavaScript 引擎执行；JSC 对热代码的解释、baseline JIT、DFG / FTL 优化层次仍可能影响它。[TeaVM 编译说明](https://teavm.org/docs/intro/overview.html)、[JavaScriptCore 架构](https://docs.webkit.org/Deep%20Dive/JSC/JavaScriptCore.html)。
 
-| 运行位置 | iOS 常规发行环境中的执行方式 | 对本项目的含义 |
-|---|---|---|
-| Safari / 已安装 PWA 中的 TeaVM WebWorker | WebKit / JavaScriptCore，可在安全策略允许时使用 JIT | 现有浏览器宿主可以延续，热路径计算存在优化机会 |
-| RNW 构建的网页 / PWA | 同样运行在浏览器引擎中 | 选择 RNW 不会使 TeaVM 自动改由 Hermes 执行；WebKit 的条件相同 |
-| RN 原生 Hermes | 常规 release 路线使用预编译字节码和解释执行；不具有 WebKit 内容进程的 JIT 条件 | 字节码可减少加载时解析成本；不能据此预期 Java 风格计算吞吐优于 WebKit |
-| RN 内嵌 WKWebView，TeaVM 放在其中 | WebKit 内容进程通常也可使用 JIT，具体受系统/视图安全策略影响 | 是未来原生壳可评估的运行时；仍需测试启动、生命周期与跨容器传输，不能与原生 Hermes 混为一谈 |
+| 运行位置                                 | iOS 常规发行环境中的执行方式                                                   | 对本项目的含义                                                                             |
+| ---------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Safari / 已安装 PWA 中的 TeaVM WebWorker | WebKit / JavaScriptCore，可在安全策略允许时使用 JIT                            | 现有浏览器宿主可以延续，热路径计算存在优化机会                                             |
+| RNW 构建的网页 / PWA                     | 同样运行在浏览器引擎中                                                         | 选择 RNW 不会使 TeaVM 自动改由 Hermes 执行；WebKit 的条件相同                              |
+| RN 原生 Hermes                           | 常规 release 路线使用预编译字节码和解释执行；不具有 WebKit 内容进程的 JIT 条件 | 字节码可减少加载时解析成本；不能据此预期 Java 风格计算吞吐优于 WebKit                      |
+| RN 内嵌 WKWebView，TeaVM 放在其中        | WebKit 内容进程通常也可使用 JIT，具体受系统/视图安全策略影响                   | 是未来原生壳可评估的运行时；仍需测试启动、生命周期与跨容器传输，不能与原生 Hermes 混为一谈 |
 
 RN 官方说明其嵌入的 JSC 在 iOS 上不使用 JIT；仅将 Hermes 换成 JSC 不等于 Safari 的执行条件。Hermes 官方将常规执行方式描述为 AOT 字节码加运行时解释，RN release 构建可提前生成 `.hbc` 改善启动；这与原生机器码 AOT 不同。此处不将实验性 native AOT 或特殊授权能力当作当前可直接使用的基线。[RN 执行环境](https://reactnative.dev/docs/javascript-environment)、[Hermes 执行方式](https://github.com/meta/hermes/blob/static_h/doc/Features.md)、[RN Hermes 构建](https://reactnative.dev/docs/hermes)。
 
@@ -286,24 +290,24 @@ WebView 内复用按包执行槽和浏览器宿主，保留必要的 DOM / 脚�
 
 目标是 **原生图像组件消费临时文件或受控资源句柄，Hermes 只拿元数据**。适配模块在原生侧管理文件写入、引用、取消和释放，形成一个明确的图像缓存所有者。该资源通道是待实现和测量的原生模块，不将标准 postMessage、WKJSHandle 或任意新 buffer API 等同于已经具备双向零复制传输。跨边界至少一次必要复制可以接受，重点是有界、无整图字符串中转且不重复解码。
 
-| 图片路径 | 可考虑的优化 | 正确性要求 |
-|---|---|---|
-| 正文无需变换的图片 | 在已完成兼容适配的传输层保留最终压缩正文到原生缓存，再给原生图像组件读取 | 仍执行扩展原请求/响应拦截器、Cookie、缓存和错误逻辑；不能只返回图片 URL 后另行下载一遍，或跳过会检查正文的响应拦截器 |
-| 扩展会解密、重排或改变正文 | 处理后字节通过专用有界通道交给原生；输出资源校验后再显示 | 不绕过原处理链；包含 WebKit 端处理副本、跨桥复制、原生解码的峰值；不能只用直图源证明方案性能 |
-| 宿主图像桥执行像素操作 | 后续可探索原生图像桥，用操作/资源句柄替代反复传输 RGBA | 这是独立的宿主兼容改造，须与原版输出对照；不作为现有 TeaVM 直接复用能力或首轮性能结果 |
+| 图片路径                   | 可考虑的优化                                                             | 正确性要求                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| 正文无需变换的图片         | 在已完成兼容适配的传输层保留最终压缩正文到原生缓存，再给原生图像组件读取 | 仍执行扩展原请求/响应拦截器、Cookie、缓存和错误逻辑；不能只返回图片 URL 后另行下载一遍，或跳过会检查正文的响应拦截器 |
+| 扩展会解密、重排或改变正文 | 处理后字节通过专用有界通道交给原生；输出资源校验后再显示                 | 不绕过原处理链；包含 WebKit 端处理副本、跨桥复制、原生解码的峰值；不能只用直图源证明方案性能                         |
+| 宿主图像桥执行像素操作     | 后续可探索原生图像桥，用操作/资源句柄替代反复传输 RGBA                   | 这是独立的宿主兼容改造，须与原版输出对照；不作为现有 TeaVM 直接复用能力或首轮性能结果                                |
 
 原生缓存只保存有界阅读窗口中的临时资源，不建立整章离线清单或下载队列。应用 JS 和 WebKit DOM 不再各保留一份完整章节；浏览器内部必需的扩展 HTTP Cache 语义仍保留，并在总内存/存储核算中计入。
 
 ### 收益与新增成本
 
-| 维度 | 混合方案的预期 |
-|---|---|
-| 热态扩展计算 | 可保留 WebKit JIT；相对同引擎的 PWA，不能预期仅换原生界面就使 TeaVM 更快 |
-| 阅读交互 | 可使用原生滚动、图片解码/显示及 UI 线程手势；是否优于已有 Web 实现须真机比较 |
-| 冷启动 / 首图 | 增加 Hermes/App 与 WebView 的初始化协调、图片资源交接；预热可改善后续调用，不能消除首次成本 |
-| 内存 / 电量 | 同时存在原生视图、Hermes、WebKit 和 TeaVM；更好的原生图片窗口可能抵消部分成本，但总峰值可能高于 PWA |
-| 生命周期 | WebKit 内容进程可独立终止；原生 UI 应保留已落盘位置和当前可用图片，重建 runtime 后递增 generation，废弃旧请求 |
-| 鉴权 | WebView Access 会话与原生网络会话需明确分工；不假设原生 Image / fetch 自动共享 WebView Cookie；不得以公开图片链接绕过 Access |
+| 维度          | 混合方案的预期                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 热态扩展计算  | 可保留 WebKit JIT；相对同引擎的 PWA，不能预期仅换原生界面就使 TeaVM 更快                                                     |
+| 阅读交互      | 可使用原生滚动、图片解码/显示及 UI 线程手势；是否优于已有 Web 实现须真机比较                                                 |
+| 冷启动 / 首图 | 增加 Hermes/App 与 WebView 的初始化协调、图片资源交接；预热可改善后续调用，不能消除首次成本                                  |
+| 内存 / 电量   | 同时存在原生视图、Hermes、WebKit 和 TeaVM；更好的原生图片窗口可能抵消部分成本，但总峰值可能高于 PWA                          |
+| 生命周期      | WebKit 内容进程可独立终止；原生 UI 应保留已落盘位置和当前可用图片，重建 runtime 后递增 generation，废弃旧请求                |
+| 鉴权          | WebView Access 会话与原生网络会话需明确分工；不假设原生 Image / fetch 自动共享 WebView Cookie；不得以公开图片链接绕过 Access |
 
 现有 PWA 已将 TeaVM 放在 WebWorker 中，因此“扩展计算不阻塞 UI JS”并非混合方案独有优势。它额外提供的是原生阅读视图与平台资源管理，同时引入新的跨进程边界。原生壳的内存统计必须合并 App 和 WebKit 内容进程，不能只看 Hermes heap 或 App 单一进程就宣称更省内存。
 
@@ -313,4 +317,4 @@ WebView 必须处理 `onContentProcessDidTerminate`，不能假定前台创建�
 
 现已采用移动原生优先的目标；先比较同一 iPhone 上的 Web 基线与选定混合候选，覆盖直图和正文处理源、冷启动/预热、连续多章、长图缩放、Access 过期和 WebView 重建。记录首图与切章分布、交互帧耗时、跨桥延迟/字节/复制、App + WebKit 总峰值及能耗；原版扩展语义保持一致后再比较性能。
 
-原生图像通道若尚未解决，只能把原型标为功能验证，不能将 JS-only 微基准外推为整章阅读收益。Flutter 已确定，以上边界用于验证 Flutter adapter，不再用于重开 RN/PWA 比选。按移动性能优先、桌面达到日用门槛衡量；当前接入设计优先验证 iOS 图片交接与 Access，尚未新增原生工程、原生桥或性能实验。
+原生图像通道若尚未解决，只能把原型标为功能验证，不能将 JS-only 微基准外推为整章阅读收益。Flutter 已确定，以上边界用于验证 Flutter adapter，不再用于重开 RN/PWA 比选。按移动性能优先、桌面达到日用门槛衡量；当前接入设计继续验证 iOS 产品图片交接与 Access；已完成的局部实现或模拟器机制不得当作真机或完整阅读验收。

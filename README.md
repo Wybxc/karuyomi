@@ -4,6 +4,8 @@
 
 项目正在实施 [P0](docs/plan/p0-runtime-and-reading.md)，各阶段见[计划目录](docs/plan/README.md)。已部署到 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，已内化 TeaVM 运行时并构建真实 MangaDraft AOT 包，具备私有产物交付、JS / Dart 运行接口、漫画资料浏览界面和独立阅读器。真实浏览器已通过 Source 初始化；产品图片通道与完整在线阅读尚未接通，P0 尚未通过。
 
+最新交付决定：所有客户端从 Static Assets 的权威索引读取每个扩展的最新版，客户端或 Service Worker 管理更新；不再向 GitHub Release 发布扩展，也不经 Worker/R2 转发扩展正文。下文私有交付是现有实现，正按[工程计划](docs/plan/engineering-and-release.md)迁移，不能视为新链路已验收。
+
 ## 当前能力与边界
 
 | 范围           | 已实现 / 已验证                                                                                                                           | 尚待完成                                                                      |
@@ -11,7 +13,7 @@
 | TeaVM 公共宿主 | 固定 TeaVM 0.16.0 JS；按包构建、输入及产物 hash；完整 DTO 与显式漫画/章节引用；真实 MangaDraft Web 初始化；热门/最新/搜索列表返回完整 DTO | 3–5 个原版源完整操作与阅读回归、持久层重启/升级验证                           |
 | JS / Dart 接入 | 私有清单及资源执行前校验、串行 Worker、代次隔离、取消/超时回收；Web JS interop 与原生 WebView 控制、可见登录流程                          | 真实域名 Access/cookie 会话、原生容器恢复与真机验收                           |
 | 浏览与阅读器   | 构建/Source 选择、热门/最新/搜索分页、详情与章节；单/双页、RTL、竖向/Webtoon、缩放和有界资源调度                                          | 产品图片获取仍明确不支持；章节暂不可读，ReaderScreen 尚未接入实际 Source 导航 |
-| API 与私有交付 | JWT 再校验、D1 构建注册、私有 R2 流式产物与 Range/HEAD、按构建域名白名单的 P0-A 网络桥                                                    | 生产 Access 登录与正向私有交付；P0-B 替换文本/Base64 网络正文                 |
+| API 与私有交付 | JWT 再校验、D1 构建注册、私有 R2 流式产物与 Range/HEAD、按构建域名白名单的 v2 分帧网络桥                                                  | 生产 Access 登录与正向私有交付；真实 Source/cache 与二进制链路完整验收        |
 | 独立机制探针   | TeaVM 有界字节复制/fiber 取消/ArrayBuffer 所有权；iOS 模拟器 HTTPS 下 Worker → Blob → WKDownload → 文件                                   | 两者尚未汇合为产品图片通道；真实源、物理设备与合计内存峰值未验收              |
 
 `ready.sourceReady: false` 只描述控制握手；`open` 必须在真实宿主初始化、Source 列表与清单一致后才返回运行会话。六个 Java 操作边界为 `popular`、`latest`、`search`、`details`、`chapters`、`pages`；边界与 JVM oracle 通过不代表六项在线 Source 语义均已验收。真实网络探针中热门/最新/搜索返回列表，已核对原版 MangaDraft 普通文本搜索未把关键词加入请求，不能将返回列表当作匹配验收；详情/章节遇到 Source 的 Human Verification 挑战，返回 source_error，未伪造页面结果。验证范围见 [记录](docs/VERIFICATION.md)。
@@ -82,6 +84,8 @@ python3 scripts/register-build.py PATH_TO_OUTPUT/manifest.json --artifacts PATH_
 2. 复核已创建的 Access 应用双路径与本人 Allow policy、HttpOnly Cookie、固定回跳及失效行为。
 3. 设置 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`OWNER_EMAIL`。`ACCESS_SUBJECT` 可进一步固定已验证 JWT 的本人 `sub`；邮箱约束同样只读取已验签的声明，不信任邮箱头。不把 JWT、service token 或 Cloudflare 凭证写入静态资源。
 4. 验证生产 Access 登录成功后的 bootstrap、私有清单/产物与会话失效；继续原生恢复和 Source 完整操作验收。
+
+原型代码只接受当前 `bridgeVersion: 2`。部署这轮代码前先注册当前宿主重建的代表包，并将旧注册条目标记为退役；旧 AOT 或共享材料不能当作当前构建继续使用，也不增加兼容分支。
 
 Wrangler 已关闭 `workers.dev` 与预览 URL；R2 不提供公网正文入口。D1 已定义构建、产物、关联和允许网络域名的注册表；书架、进度和同步业务存储尚未实现。SQLite DO 保留运行会话边界，未启动后台任务。
 

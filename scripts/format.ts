@@ -63,10 +63,7 @@ const files = [
   ),
 ].filter(
   (name) =>
-    name &&
-    !name.startsWith('vendor/') &&
-    !name.startsWith('docs/design/') &&
-    existsSync(path.join(root, name)),
+    name && !name.startsWith('vendor/') && existsSync(path.join(root, name)),
 );
 const matching = (pattern: RegExp) =>
   files.filter((name) => pattern.test(name));

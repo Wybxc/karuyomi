@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { createServer } from 'node:http';
 import {
   HTTP_BRIDGE_MEDIA_TYPE,
   HTTP_FRAME_LIMIT,
@@ -7,6 +8,7 @@ import {
   encodeMetaFrame,
   encodeDataFrame,
   encodeEndFrame,
+  httpRequestMetaSchema,
   type HttpRequestMeta,
 } from '@karuyomi/contracts';
 import { BinaryHttpTransport } from '../src/http-transport.js';
@@ -15,6 +17,7 @@ const transports: BinaryHttpTransport[] = [];
 afterEach(() => {
   for (const transport of transports.splice(0)) transport.dispose();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 function metadata(overrides: Record<string, unknown> = {}) {
@@ -29,7 +32,7 @@ function metadata(overrides: Record<string, unknown> = {}) {
   });
 }
 
-function setup(fetcher: typeof fetch) {
+function setup(fetcher?: typeof fetch) {
   const transport = new BinaryHttpTransport(
     'https://read.example',
     'test-build',
@@ -138,6 +141,176 @@ test('binary upload retains exact bytes, local identities and Source headers', a
   expect(await transport.read(handle, 2)).toBeNull();
 });
 
+test('the production fetch default is called without binding the transport as its receiver', async () => {
+  const fetcher = vi.fn(async function (
+    this: unknown,
+    _url: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ) {
+    expect(this).not.toBeInstanceOf(BinaryHttpTransport);
+    if (!(init?.body instanceof Blob)) throw Error('Expected framed upload');
+    const reader = new HttpFrameReader(init.body.stream(), 8 * 1024 * 1024);
+    return framedResponse(httpRequestMetaSchema.parse(await reader.meta()), []);
+  });
+  vi.stubGlobal('fetch', fetcher);
+  const transport = setup();
+  const handle = transport.open(metadata());
+  await transport.finish(handle);
+  expect(await transport.read(handle, 1)).toBeNull();
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
+test('a real connection drop before response headers carries the controlled retryable flag', async () => {
+  const server = createServer((request) => {
+    request.resume();
+    request.on('end', () => request.socket.destroy());
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string')
+      throw Error('Expected TCP server');
+    const transport = new BinaryHttpTransport(
+      `http://127.0.0.1:${address.port}`,
+      'test-build',
+    );
+    transports.push(transport);
+    transport.begin({
+      requestId: 'connection-drop',
+      generation: 'generation-1',
+    });
+    await expect(
+      transport.finish(transport.open(metadata())),
+    ).rejects.toMatchObject({
+      code: 'source_error',
+      message: 'Source bridge connection failed',
+      retryable: true,
+    });
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
+
+test.each([
+  { error: { error: 'upstream_network_error' }, retryable: true },
+  { error: { error: 'cancelled' }, retryable: false },
+  { error: { error: 'upstream_metadata_error' }, retryable: false },
+  { error: { error: 'upstream_network_error', extra: true }, retryable: false },
+  {
+    error: { error: 'upstream_network_error', padding: 'x'.repeat(4096) },
+    retryable: false,
+  },
+])(
+  'only the bounded API pre-header network error authorizes retry: $error.error/$retryable',
+  async ({ error, retryable }) => {
+    const transport = setup(async () => Response.json(error, { status: 502 }));
+    await expect(
+      transport.finish(transport.open(metadata())),
+    ).rejects.toMatchObject({ code: 'source_error', retryable });
+  },
+);
+
+test('a broken META stream does not turn a received response into a retryable connection failure', async () => {
+  const transport = setup(
+    async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(new TypeError('Network connection lost'));
+          },
+        }),
+        { headers: { 'Content-Type': HTTP_BRIDGE_MEDIA_TYPE } },
+      ),
+  );
+  await expect(
+    transport.finish(transport.open(metadata())),
+  ).rejects.toMatchObject({ retryable: false });
+});
+
+test('error text alone cannot authorize a retry', async () => {
+  const transport = setup(async () => {
+    throw Error('Network connection lost ECONNRESET');
+  });
+  await expect(
+    transport.finish(transport.open(metadata())),
+  ).rejects.toMatchObject({ retryable: false });
+});
+
+test('a stalled API error body remains bounded by the timeout and is never retryable', async () => {
+  vi.useFakeTimers();
+  const cancelled = vi.fn();
+  const transport = setup(
+    async () =>
+      new Response(
+        new ReadableStream<Uint8Array>(
+          {
+            pull: () => new Promise<void>(() => {}),
+            cancel: cancelled,
+          },
+          { highWaterMark: 0 },
+        ),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      ),
+  );
+  const handle = transport.open(metadata({ timeoutMs: 50 }));
+  const pending = expect(transport.finish(handle)).rejects.toMatchObject({
+    code: 'timeout',
+    retryable: false,
+  });
+  await vi.advanceTimersByTimeAsync(51);
+  await pending;
+  expect(cancelled).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test('a network drop after returned metadata and partial DATA is never retryable', async () => {
+  const transport = setup(async (_url, init) => {
+    if (!(init?.body instanceof Blob)) throw Error('Expected framed upload');
+    const requestReader = new HttpFrameReader(
+      init.body.stream(),
+      8 * 1024 * 1024,
+    );
+    const request = httpRequestMetaSchema.parse(await requestReader.meta());
+    const frames = [
+      encodePreamble(),
+      encodeMetaFrame({
+        requestId: request.requestId,
+        runtimeGeneration: request.runtimeGeneration,
+        upstreamStatus: 200,
+        message: 'OK',
+        url: request.url,
+        headers: [],
+        hasBody: true,
+        bodyLength: null,
+        decoded: true,
+      }),
+      encodeDataFrame(new Uint8Array([1])),
+    ];
+    return new Response(
+      new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            const frame = frames.shift();
+            if (frame) controller.enqueue(frame);
+            else controller.error(new TypeError('ECONNRESET'));
+          },
+        },
+        { highWaterMark: 0 },
+      ),
+      { headers: { 'Content-Type': HTTP_BRIDGE_MEDIA_TYPE } },
+    );
+  });
+  const handle = transport.open(metadata());
+  await transport.finish(handle);
+  expect(await transport.read(handle, 1)).toEqual(new Uint8Array([1]));
+  await expect(transport.read(handle, 1)).rejects.toMatchObject({
+    retryable: false,
+  });
+});
+
 test.each([401, 403, 302])(
   'outer status %s is an Access failure',
   async (status) => {
@@ -222,11 +395,146 @@ test('timeout retains its cause and cancels a late response', async () => {
   const failure = expect(pending).rejects.toMatchObject({
     code: 'timeout',
     name: 'TimeoutError',
+    retryable: false,
   });
   await vi.advanceTimersByTimeAsync(51);
   resolve(new Response(new ReadableStream({ cancel: cancelled })));
   await failure;
   expect(cancelled).toHaveBeenCalledOnce();
+});
+
+test('timeout between body reads retains its cause while releasing the stream and timer', async () => {
+  vi.useFakeTimers();
+  const cancelled = vi.fn();
+  let signal: AbortSignal | undefined;
+  const transport = setup(async (_url, init) => {
+    signal = init?.signal ?? undefined;
+    if (!(init?.body instanceof Blob)) throw Error('Expected framed upload');
+    const reader = new HttpFrameReader(init.body.stream(), 8 * 1024 * 1024);
+    return framedResponse(
+      httpRequestMetaSchema.parse(await reader.meta()),
+      [new Uint8Array([1]), new Uint8Array([2])],
+      {},
+      cancelled,
+    );
+  });
+  const handle = transport.open(metadata({ timeoutMs: 50 }));
+  await transport.finish(handle);
+  expect(await transport.read(handle, 1)).toEqual(new Uint8Array([1]));
+  await vi.advanceTimersByTimeAsync(51);
+  expect(signal?.aborted).toBe(true);
+  expect(cancelled).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+  await expect(transport.read(handle, 1)).rejects.toMatchObject({
+    code: 'timeout',
+    name: 'TimeoutError',
+  });
+  // Idempotent Java cleanup cannot replace the terminal cause with cancellation.
+  transport.close(handle);
+  await expect(transport.read(handle, 1)).rejects.toMatchObject({
+    code: 'timeout',
+  });
+  transport.begin({ requestId: 'operation-2', generation: 'generation-2' });
+  await expect(transport.read(handle, 1)).rejects.toMatchObject({
+    code: 'cancelled',
+  });
+});
+
+test('timeout during a pending body read cancels it with timeout rather than reader cancellation', async () => {
+  vi.useFakeTimers();
+  const cancelled = vi.fn();
+  let waiting: (() => void) | undefined;
+  const stalled = new Promise<void>((resolve) => {
+    waiting = resolve;
+  });
+  const transport = setup(async (_url, init) => {
+    if (!(init?.body instanceof Blob)) throw Error('Expected framed upload');
+    const reader = new HttpFrameReader(init.body.stream(), 8 * 1024 * 1024);
+    const request = httpRequestMetaSchema.parse(await reader.meta());
+    const initial = [
+      encodePreamble(),
+      encodeMetaFrame({
+        requestId: request.requestId,
+        runtimeGeneration: request.runtimeGeneration,
+        upstreamStatus: 200,
+        message: 'OK',
+        url: request.url,
+        headers: [],
+        hasBody: true,
+        bodyLength: null,
+        decoded: true,
+      }),
+    ];
+    return new Response(
+      new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            const next = initial.shift();
+            if (next) controller.enqueue(next);
+            else {
+              waiting?.();
+              return new Promise<void>(() => {});
+            }
+          },
+          cancel: cancelled,
+        },
+        { highWaterMark: 0 },
+      ),
+      { headers: { 'Content-Type': HTTP_BRIDGE_MEDIA_TYPE } },
+    );
+  });
+  const handle = transport.open(metadata({ timeoutMs: 50 }));
+  await transport.finish(handle);
+  const pending = transport.read(handle, 1);
+  const failed = expect(pending).rejects.toMatchObject({
+    code: 'timeout',
+    name: 'TimeoutError',
+  });
+  await stalled;
+  await vi.advanceTimersByTimeAsync(51);
+  await failed;
+  expect(cancelled).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test('terminal failure history is bounded, releases handle slots, and ends with its operation', async () => {
+  vi.useFakeTimers();
+  const fetcher = vi.fn();
+  const transport = setup(fetcher);
+  const expired: string[] = [];
+  for (let index = 0; index < 20; index++) {
+    expired.push(
+      transport.open(
+        metadata({
+          timeoutMs: 1,
+          method: 'POST',
+          hasBody: true,
+          bodyLength: 1,
+        }),
+      ),
+    );
+    transport.write(expired[index]!, new Uint8Array([index]));
+    await vi.advanceTimersByTimeAsync(2);
+  }
+  expect(vi.getTimerCount()).toBe(0);
+  await expect(transport.finish(expired[0]!)).rejects.toMatchObject({
+    code: 'cancelled',
+  });
+  await expect(transport.finish(expired[4]!)).rejects.toMatchObject({
+    code: 'timeout',
+  });
+  await expect(transport.finish(expired[19]!)).rejects.toMatchObject({
+    code: 'timeout',
+  });
+  // Released uploads do not consume the four active-body slots or trigger fetch.
+  for (let index = 0; index < 4; index++) transport.open(metadata());
+  expect(() => transport.open(metadata())).toThrow('Too many open HTTP bodies');
+  expect(fetcher).not.toHaveBeenCalled();
+  transport.end();
+  expect(vi.getTimerCount()).toBe(0);
+  await expect(transport.read(expired[19]!, 1)).rejects.toMatchObject({
+    code: 'cancelled',
+  });
 });
 
 test('no DATA is pulled until read, and one pending read excludes another', async () => {

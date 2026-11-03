@@ -1,5 +1,7 @@
 # 扩展 AOT 构建与发布
 
+当前交付决策是 Static Assets 作为所有客户端的扩展权威源，每包只保留最新可用构建，客户端或 Service Worker 管理更新。扩展不再发布到 GitHub Release；共享材料仍由 Web Static Assets / Native 内置提供。下文 Release/R2 流程是待替换的现有实现，静态分发与增量状态迁移按[工程计划](plan/engineering-and-release.md)推进。
+
 上游来源是固定提交的 `vendor/extensions-source`。调度器读取 `src/<lang>/<key>/build.gradle.kts`，按官方 `ExtensionPlugin.kt` 计算 Android versionCode，不使用已退化为提示页的旧 `index.min.json`。无法静态确认的 Kotlin 表达式单独记录为 `discovery_failed`。
 
 `inputFingerprint` 仍是内部增量身份，覆盖包名、版本、源码依赖和 host 输入。共享库、桥、工具链变化即使没有修改扩展版本，也会产生新输入身份；无关上游提交不使全部包重建。它用于 checkpoint、buildId 和 provenance，不进入 Release tag/title。
@@ -33,7 +35,7 @@ Release body 的 `karuyomiRelease` pointer 含 `schemaVersion: 2`、内部 gener
 
 ## 本地首次全量与恢复
 
-先提交稳定 host/工具链，初始化 submodules，执行 `pnpm install --frozen-lockfile` 并准备依赖。REST 凭据使用环境中的 `GH_TOKEN` 或 `GITHUB_TOKEN`，不写入配置；上游 Gradle/AOT 子进程会移除这些发布凭据。
+先提交稳定 host/工具链，初始化 submodules，执行 `pnpm install --frozen-lockfile` 并准备依赖。新的全量宿主统一使用 HTTP v2；先完成代表包验证，再固定全量输入，避免先发布 v1 后立即重建。REST 凭据使用环境中的 `GH_TOKEN` 或 `GITHUB_TOKEN`，不写入配置；上游 Gradle/AOT 子进程会移除这些发布凭据。
 
 ```sh
 python3 scripts/prepare-runtime.py --android
@@ -57,7 +59,7 @@ python3 tools/extensions/pipeline.py bootstrap \
   --repository Wybxc/karuyomi --jobs 1
 ```
 
-runner 检查冻结 checkout 的提交、干净 host 输入、实际指纹、submodule 和上游提交，调用该 checkout 自己的 `scripts/build-extension.py`。材料引用使用该 checkout 的 catalog 检查，便于复验历史结果；该检查本身不证明旧材料仍可被当前产品加载。此前已成功构建但发布中断的本地交付可以复用，避免重新执行 Gradle/AOT。磁盘 `pipeline-result.json` 不作为当前 Release 仍存在的证据；只有本轮真实下载得到的进程内 receipt 可以免发布，普通磁盘复用必须重新走当前定位发布。工作缓存清理指向 `--build-checkout`，交付和日志继续保留在 `--output` 相邻的 `builds/<inputFingerprint>/`。
+runner 检查冻结 checkout 的提交、干净 host 输入、实际指纹、submodule 和上游提交，调用该 checkout 自己的 `scripts/build-extension.py` 与当前 TypeScript 材料入口；不提供旧 MJS 或旧协议回退。此前已成功构建但发布中断的本地交付可以复用，避免重新执行 Gradle/AOT。磁盘 `pipeline-result.json` 不作为当前 Release 仍存在的证据；只有本轮真实下载得到的进程内 receipt 可以免发布，普通磁盘复用必须重新走当前定位发布。工作缓存清理指向 `--build-checkout`，交付和日志继续保留在 `--output` 相邻的 `builds/<inputFingerprint>/`。
 
 切换 publisher 前先正常停止旧调度进程，确认它释放 checkpoint 锁，再启动新命令；不要并发写同一 state。历史 `.local/aot-bootstrap` 固定于 `7f54463`，在 1,448 包中已记录 86 published、9 failed、1,353 pending 后停止，记录已备份至 `.local/extensions/history/pre-typescript-host/`。其五个桥的 hash 不属于当前 Web/Native 六项材料集合，不能接续为当前产品发布；旧 Release/checkpoint 保留为历史，当前队列必须在提交稳定的当前 host 后以新指纹重新计划。冻结 runner 保留用于可复验构建，不为当前产品增加旧材料兼容层。
 

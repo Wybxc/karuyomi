@@ -2,9 +2,9 @@
 
 The v2 transport carries HTTP metadata as bounded JSON and bodies as raw bytes.
 Its media type is `application/vnd.karuyomi.http.v2`. It does not use Base64.
-The frame version is distinct from the extension manifest's `bridgeVersion`;
-the host must select a transport supported by each extension bridge. Existing
-v1 builds retain their transport compatibility path.
+The current extension manifest requires `bridgeVersion: 2`. The prototype
+maintains only this transport; older builds must be rebuilt with the current
+host inputs.
 
 ## Wire format
 
@@ -145,6 +145,7 @@ message with `remote: true`. Other source exception messages are not reflected.
 ```sh
 pnpm exec vitest run packages/contracts/test/http-frames.test.ts
 pnpm --filter @karuyomi/contracts typecheck
+pnpm test:http-bridge
 ```
 
 Tests cover byte-level splitting, an input chunk larger than a frame, no
@@ -152,4 +153,9 @@ background prefetch, partial-buffer transfer, UTF-8 byte budgets, length checks
 before payload reads, both terminal forms, exact u64 counts, trailing data,
 malformed input and pending-read cancellation. Adapter queue limits, actual
 network cancellation and HTTP response semantics require their own integration
-tests.
+tests. `test:http-bridge` runs real workerd against a controlled local HTTP
+origin with actual gzip/Brotli bytes, signed test JWTs and isolated D1 state.
+It checks decoding, repeated cookies, status/body rules, streamed uploads,
+early-response validation and connection cancellation without internet or JVM
+dependencies. This integration is part of `pnpm check`; it is not evidence of
+real Source behavior or a production Access session.

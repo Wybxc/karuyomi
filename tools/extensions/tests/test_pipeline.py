@@ -661,7 +661,7 @@ class OutputTests(unittest.TestCase):
             **json.loads(
                 (catalog.ROOT / "packages/contracts/protocol.json").read_text()
             ),
-            "bridgeVersion": 1,
+            "bridgeVersion": 2,
             "buildId": "fixture-build",
             "packageName": "example.fixture",
             "repoId": "fixture",
@@ -895,7 +895,7 @@ assert pathlib.Path.cwd() == pathlib.Path(__file__).resolve().parents[1]
 o=pathlib.Path(a.output); (o/'artifacts').mkdir(exist_ok=True)
 b=b'const frozen = true;'; h=hashlib.sha256(b).hexdigest()
 (o/'artifacts'/h).write_bytes(b)
-m={**json.loads((pathlib.Path(__file__).resolve().parents[1]/'protocol.json').read_text()),'bridgeVersion':1,'buildId':d['buildId'],'packageName':d['packageName'],'repoId':'fixture','version':d['versionName'],'storageSchema':'1','sourceIds':['1'],'hostScripts':[],'bundle':{'sha256':h,'path':'/api/extensions/artifacts/'+h,'size':len(b)}}
+m={**json.loads((pathlib.Path(__file__).resolve().parents[1]/'protocol.json').read_text()),'bridgeVersion':2,'buildId':d['buildId'],'packageName':d['packageName'],'repoId':'fixture','version':d['versionName'],'storageSchema':'1','sourceIds':['1'],'hostScripts':[],'bundle':{'sha256':h,'path':'/api/extensions/artifacts/'+h,'size':len(b)}}
 (o/'manifest.json').write_text(json.dumps(m))
 (o/'provenance.json').write_text(json.dumps({'descriptor':d}))
 """)

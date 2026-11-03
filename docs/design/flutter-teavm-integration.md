@@ -1,8 +1,8 @@
 # Flutter + TeaVM 跨平台接入设计
 
-日期：2026-11-03。状态：用户已确定 Flutter + TeaVM，并采用浏览器宿主路线：Web Worker + 原生 WebView。本文是该路线的实施设计；未创建应用、安装依赖或完成 Flutter 真机测试。主运行时为 TeaVM 0.16.0 JavaScript backend / release9，原版扩展 JAR 业务代码保持不变。
+日期：2026-11-03。本文是持续维护的接入设计，不再冻结。已采用 Flutter + TeaVM 的浏览器宿主路线：Web Worker + 原生 WebView；工程已有分项实现与机制验证，完整 Source 图片、生产 Access 与真机门仍未完成。实现状态见[计划目录](../plan/README.md)及[验证记录](../VERIFICATION.md)。TeaVM 0.16.0 / release9 是研究起点，当前宿主继续维护，原版扩展 JAR 业务代码保持不变。
 
-**已采用：共用 Dart SourceRuntime 接口与同一套 TeaVM JS 产物，Web 端使用 JS interop + WebWorker，iOS/Android 使用系统 WebView + WebWorker。** 原生容器先验证 flutter_inappwebview 的 HeadlessInAppWebView；具体插件版本与 iOS 图片交付方式通过探针确定，容器实现调整不改变浏览器宿主路线。图片正文使用独立资源通道，不能将现成 JSON 消息 API 当作已完成的二进制桥。
+**已采用：共用 Dart SourceRuntime 接口与同一套 TeaVM JS 产物，Web 端使用 JS interop + WebWorker，iOS/Android 使用系统 WebView + WebWorker。** 原生容器使用 flutter_inappwebview 的受管理 WebView，具体版本以工程锁文件为准；iOS 图片资源通道仍须产品验证，容器实现调整不改变浏览器宿主路线。图片正文使用独立资源通道，不能将现成 JSON 消息 API 当作已完成的二进制桥。
 
 首版决策固定为：Flutter 渲染阅读界面；扩展在浏览器/WebView 的 Worker 中执行；原生控制页通过当前单一 hostname 的 HTTPS origin 加载；控制消息与图片资源分开；默认一个扩展执行槽，按包复用。内嵌 JS 引擎、C/FFI 与 WasmGC 未采用，第 5–7 节仅保留评估记录，不形成实施阶段、自动回退路径或并行研究任务。
 
@@ -14,19 +14,19 @@ Flutter widgets 替代此前 React UI 三选一；Dart 依赖交给 Pub，pnpm �
 
 跨平台统一的是 Source 操作、DTO、异步事件、资源生命周期及错误语义，而非所有平台必须调用同一个插件方法。Dart 的 JS interop 面向 Web，FFI 面向 Dart Native，两者不能互相替代。[JS interop](https://dart.dev/interop/js-interop)、[Dart FFI](https://dart.dev/interop/c-interop)。
 
-| 接入方式 | Flutter Web | iOS / Android | release9 复用程度 | 定位 |
-|---|---|---|---|---|
-| JS interop + 浏览器 Worker | 直接适用 | 原生 Dart 不能直接用它执行 JS | 高 | Web 默认路径 |
-| 系统 WebView + TeaVM Worker | 可用 iframe 模拟容器，但没有必要 | WKWebView / Android WebView | 高，仍需产品与平台回归 | 原生默认路径 |
-| 内嵌 JS 引擎 + FFI | 另走浏览器适配 | QuickJS、JavaScriptCore 等 | 原 JS 产物有复用可能，浏览器宿主需要重做 | 未采用，仅保留评估 |
-| TeaVM C backend + Dart FFI | 另走 JS 或独立 Web 构建 | 生成 C，再编译对应原生库 | 原 JAR 可保留，宿主/编译适配需重新验证 | 未采用，仅保留评估 |
-| TeaVM WasmGC | 浏览器/Worker 中加载 | WebView 中可验证；独立 Wasm 引擎需要另查 GC/宿主支持 | 需要重编译和后端回归 | 未采用，仅保留评估 |
+| 接入方式                    | Flutter Web                      | iOS / Android                                        | release9 复用程度                        | 定位               |
+| --------------------------- | -------------------------------- | ---------------------------------------------------- | ---------------------------------------- | ------------------ |
+| JS interop + 浏览器 Worker  | 直接适用                         | 原生 Dart 不能直接用它执行 JS                        | 高                                       | Web 默认路径       |
+| 系统 WebView + TeaVM Worker | 可用 iframe 模拟容器，但没有必要 | WKWebView / Android WebView                          | 高，仍需产品与平台回归                   | 原生默认路径       |
+| 内嵌 JS 引擎 + FFI          | 另走浏览器适配                   | QuickJS、JavaScriptCore 等                           | 原 JS 产物有复用可能，浏览器宿主需要重做 | 未采用，仅保留评估 |
+| TeaVM C backend + Dart FFI  | 另走 JS 或独立 Web 构建          | 生成 C，再编译对应原生库                             | 原 JAR 可保留，宿主/编译适配需重新验证   | 未采用，仅保留评估 |
+| TeaVM WasmGC                | 浏览器/Worker 中加载             | WebView 中可验证；独立 Wasm 引擎需要另查 GC/宿主支持 | 需要重编译和后端回归                     | 未采用，仅保留评估 |
 
 TeaVM 当前 Maven 文档列出 JAVASCRIPT、WEBASSEMBLY_GC、C 目标；JSO 适用于 JS 和 WasmGC，不适用于 C。不能用一个后端选项变更代替兼容验证。[Maven](https://teavm.org/docs/tooling/maven.html)、[JSO](https://teavm.org/docs/runtime/jso.html)。
 
 ## 2. 已采用架构：两种容器，共用一个运行协议
 
-~~~mermaid
+```mermaid
 flowchart TB
   UI[Flutter 阅读器与业务 UI] --> API[Dart SourceRuntime / ApiClient / PageProvider]
   API --> W[Web adapter · dart:js_interop]
@@ -41,13 +41,13 @@ flowchart TB
   T2 --> NI[原生资源通道 · 有界临时文件或资源]
   WI --> UI
   NI --> UI
-~~~
+```
 
 Web 适配器用 dart:js_interop / package:web 接现有 JS 管理器，不在 Flutter UI 主线程调用重型 TeaVM 方法。Worker 中保留 HTTP、文件/缓存、脚本和图像宿主。Flutter Web 编译成 JS 或 Wasm 都不要求 TeaVM 随之换后端。[Dart JS interop](https://dart.dev/interop/js-interop)、[Flutter Web 条件导入](https://docs.flutter.dev/platform-integration/web/faq)。
 
 原生适配器创建一个受管理的 WebView 控制页，再由控制页创建 TeaVM Worker。插件注入的 window 消息对象通常属于页面，不直接存在于 DedicatedWorker 中，因此小型控制消息要经控制页转发。默认一个执行槽、按包复用；资源验证后最多两个，不为每个源或每章重建 WebView。
 
-首版使用现有 hostname 下的公开 /runtime/host.html 提供无凭证控制壳；私有清单、AOT 产物、个人数据及网络桥继续位于 Access 保护的 /api 下。使用真实 HTTPS origin，避免先引入 file://、自定义 scheme 或 localhost 所带来的 Worker、Cookie、CORS 和安全上下文差异。本地预装/拦截资源作为后续启动优化单独验证。
+控制壳使用当前 hostname 的公开 `/runtime/host`（旧 `.html` 路径规范化跳转），保留真实 HTTPS origin 的 Worker、Cookie 和安全上下文。Web 从 Static Assets 获取通用 host/worker/桥/WASM；Native 使用应用内置的同版材料，校验后注入，材料缺失不回退网络。Web 与 Native 的扩展索引、清单和 AOT 均以 Static Assets 为最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新与缓存。新分发路径不再发布扩展到 GitHub Release，已有 Release 仅历史存储，不参与客户端版本定位；扩展正文不经过 R2 或 Worker 代理，客户端不需要 GitHub 凭据。私有个人数据与 Source 网络桥继续位于 Access 保护的 `/api` 下。此前内置浏览器 Release 直下/Range 因 CORS 失败，用户已将方案改为全客户端 Static Assets；当前最新版发布、跨端下载/CSP、缓存更新、有界解压及完整装载仍待实现验收。
 
 容器握手检查 protocolVersion、host ABI、buildId/hash、实例 generation 和能力集合；不能仅以 loadStop 表示 Source 已就绪。页面 ready、Worker ready、文件恢复、包加载和 Source 初始化分别记录。进程终止后重建容器与 generation，使旧结果、回调和临时资源失效。
 
@@ -55,23 +55,23 @@ Headless 只表示不需要放入可见 widget tree，不承诺应用后台继�
 
 ## 3. Flutter WebView 插件怎么选
 
-| 方案 | 核查到的能力 | 本项目取舍 |
-|---|---|---|
-| webview_flutter | 官方 Flutter 发布；iOS WKWebView、Android WebView；公开平台列表为 Android/iOS/macOS | 适合基础容器与 JS channel；不把未挂载 controller 当作保证可用的 headless 执行宿主，需实际验证 |
-| flutter_inappwebview | 明确的 HeadlessInAppWebView、JS handlers、Web Message Channels；平台还包括 Web/Windows | 优先验证原生宿主；控制和生命周期 API 较丰富，仍需检查稳定版具体能力与原生资源适配 |
-| 自有薄原生插件 | 直接包装 WKWebView / Android WebView，再由 Pigeon/platform channel 暴露接口 | 现成插件无法接入所需原生资源路径时采用；维护量更大，不先重写完整 WebView 插件 |
+| 方案                 | 核查到的能力                                                                           | 本项目取舍                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| webview_flutter      | 官方 Flutter 发布；iOS WKWebView、Android WebView；公开平台列表为 Android/iOS/macOS    | 适合基础容器与 JS channel；不把未挂载 controller 当作保证可用的 headless 执行宿主，需实际验证 |
+| flutter_inappwebview | 明确的 HeadlessInAppWebView、JS handlers、Web Message Channels；平台还包括 Web/Windows | 优先验证原生宿主；控制和生命周期 API 较丰富，仍需检查稳定版具体能力与原生资源适配             |
+| 自有薄原生插件       | 直接包装 WKWebView / Android WebView，再由 Pigeon/platform channel 暴露接口            | 现成插件无法接入所需原生资源路径时采用；维护量更大，不先重写完整 WebView 插件                 |
 
 依据：[webview_flutter](https://pub.dev/packages/webview_flutter)、[HeadlessInAppWebView](https://inappwebview.dev/docs/webview/headless-in-app-webview/)、[InAppWebView 通信](https://inappwebview.dev/docs/webview/javascript/communication/)。
 
 InAppWebView 的 Web 实现是 HTMLIFrameElement；“支持 Web”不等于所有原生通信接口在 Web 都存在。官方通信文档对 JS handlers、Web Message Channels 各列不同平台，部分新选项标注 beta。Web 默认直接连 Worker，避免为表面 API 统一增加 iframe 和 Access 回跳边界。[平台实现](https://inappwebview.dev/docs/intro/)、[通信能力](https://inappwebview.dev/docs/webview/javascript/communication/)。
 
-先以选定稳定插件版本做最小探针，再冻结版本和平台能力；不将最新网站示例中的 beta 参数直接视为稳定版可用。本文未锁定最终插件版本。
+插件版本和平台能力以工程锁文件及实际验证记录为准；不将最新网站示例中的 beta 参数直接视为稳定版可用。版本锁定不代表所有目标设备或图片资源通道均已通过。
 
 ## 4. 控制消息与图片资源分开
 
 统一接口只暴露业务和生命周期。示意 API 非可直接运行的实现：
 
-~~~dart
+```dart
 abstract interface class SourceRuntime {
   Stream<RuntimeEvent> get events;
   Future<RuntimeSession> open(BuildDescriptor build);
@@ -81,17 +81,17 @@ abstract interface class SourceRuntime {
   Future<void> release(ImageResourceId resourceId);
   Future<void> dispose();
 }
-~~~
+```
 
 SourceRequest 携带 requestId、session/generation、package/sourceId、操作与显式漫画/章节引用。小型 DTO 可用 JSON；错误区分取消、超时、Access 失效、源站错误、宿主能力不足和 runtime 丢失。按实例串行前台 Source RPC，回调与底层网络异步运行；不能因为 Dart API 返回 Future 就认为 Java/JS 操作已获得正确取消能力。
 
 ImageResource 是可释放资源，不统一成“每次完整 Uint8List”：
 
-| 平台 | 资源表示与交付 |
-|---|---|
-| Web | Blob/对象 URL 或适合 Flutter Web 的受控图片资源；Worker 内使用 transferable ArrayBuffer 时遵守所有权，Dart/JS 转换是否复制另测 |
-| 原生 | 临时文件或受控资源句柄，附尺寸/MIME/字节数；适配图片 provider 消费，尽量不让 Dart、WebView 与原生各留一份整章正文 |
-| 共用 | 明确 acquire/release、引用与 generation；限制图片窗口、未完成字节、并发和过期资源；取消时停止生产及清理残留 |
+| 平台 | 资源表示与交付                                                                                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Web  | Blob/对象 URL 或适合 Flutter Web 的受控图片资源；Worker 内使用 transferable ArrayBuffer 时遵守所有权，Dart/JS 转换是否复制另测 |
+| 原生 | 临时文件或受控资源句柄，附尺寸/MIME/字节数；适配图片 provider 消费，尽量不让 Dart、WebView 与原生各留一份整章正文              |
+| 共用 | 明确 acquire/release、引用与 generation；限制图片窗口、未完成字节、并发和过期资源；取消时停止生产及清理残留                    |
 
 HTTP/JSO 二进制网络桥 P0-B 与上述 WebView → 原生通道是不同边界，两者都须验证。仅将控制 JSON 传通不算完成图片桥。
 
@@ -104,7 +104,7 @@ iOS 常规 WKScriptMessage 的公开类型列表没有把 ArrayBuffer → Data �
 iOS 数据通道按以下次序做能力探针，尚未确定最终方式：
 
 1. 若目标 SDK/系统提供合适的公开二进制或资源交接能力，验证实际字节类型、分块、复制、取消及内存。
-2. 验证经过处理的 Blob 能否在同一 WebView 上下文中通过 WKDownload 写入受控临时文件；API 支持网页资源下载，但本项目的 Blob/Worker/非交互场景尚未验证。这是内部在线阅读资源交接，不增加下载队列功能。[WKDownload](https://developer.apple.com/documentation/webkit/wkdownload)。
+2. 验证经过处理的 Blob 能否在同一 WebView 上下文中通过 WKDownload 写入受控临时文件；已有 iOS Simulator HTTPS 下 Blob/Worker → WKDownload 临时文件的机制验证；真实 Source 处理后图片、真机和总峰值仍未验收。这是内部在线阅读资源交接，不增加下载队列功能。[WKDownload](https://developer.apple.com/documentation/webkit/wkdownload)。
 3. 仅作为备选探针评估本机二进制 WebSocket/HTTP 通道：需验证 HTTPS 页面到 loopback 的混合内容/权限、origin、随机会话令牌、监听地址和生命周期。不能直接宣称加一个 localhost server 就跨平台可用，也不默认新增该服务。
 
 原版处理后的字节必须经过同一通道；不能把图片 URL 给原生再下载来跳过拦截器或解密。不以整图 Base64/JSON 数组作为最终桥接实现。若 iOS 数据通道未通过，标记接入未完成，不以只测搜索 DTO 的结果宣布可用。
@@ -115,7 +115,8 @@ flutter_js 提供通过 Dart FFI 调用的 JS runtime，包描述为 Android 使
 
 潜在收益是省去完整 WebView/内容进程，原生字节与文件资源更容易在同进程桥接；是否减少峰值或首图需实测。代价是 JS 引擎不是浏览器，fetch/Promise 的部分封装并不提供 WebWorker、IndexedDB、DOM、WebCrypto、Canvas 及现有脚本回调环境。
 
-本轮只读核对 release9 ZIP 中当前源码（排除历史 snapshots）：
+以下是初次评估时核对的 release9 ZIP 宿主依赖（不是当前项目源码清单）：
+
 - public/teavm-worker.js 使用 importScripts、fetch、postMessage。
 - public/file-bridge.js 直接使用 IndexedDB。
 - java/src/main/java/prototype/Bridge.java 使用 @JSBody 调用 self.teaHttp、teaFile、teaCache、teaBrowser、teaCrypto、teaGraphicsAsync 等宿主函数。
@@ -133,7 +134,7 @@ iOS 的独立 JSC 不等同于 WKWebView 内容进程的 JIT 条件；QuickJS �
 1. JSO 不支持 C backend。上述 Bridge 的宿主调用要改成可替换的平台实现；原扩展 JAR 不改，宿主允许适配。
 2. C backend 自带需要平台适配的 runtime，不能把生成 C 等同于 iOS/Android runtime、GC、协程、异常和回调都已验证。
 3. 按稳定 C ABI 提供 init/call/cancel/release，并明确线程、buffer 所有权和回调寿命；TeaVM 原生互操作不是 JNI。[C 互操作](https://teavm.org/docs/c-backend/native.html)。
-4. 平台/CPU 构建与库打包方式不同。若采用随 App 签名/静态打包的方案，扩展包更新会与 App 构建绑定；当前从私有 R2 安装 JS 包的机制不能原样沿用。库体积、多包实例及动态源脚本支持都要重新设计。[Flutter 原生库打包](https://docs.flutter.dev/platform-integration/legacy-ffi-plugin)。
+4. 平台/CPU 构建与库打包方式不同。若采用随 App 签名/静态打包的方案，扩展包更新会与 App 构建绑定；当前从 Static Assets 安装最新 JS 包的机制不能直接用于原生库。库体积、多包实例及动态源脚本支持都要重新设计。[Flutter 原生库打包](https://docs.flutter.dev/platform-integration/legacy-ffi-plugin)。
 
 release9 的 77 包证据来自 JS backend，不能继承为 C backend 兼容率。首版不更换后端，也不在此次探索中承诺完成 C 迁移。
 
@@ -157,10 +158,10 @@ Dart 业务存储与 TeaVM 文件/HTTP Cache 分开所有权。原生业务镜�
 
 - Flutter app 与 Dart packages：reader_core、source_runtime 接口、平台 adapter、业务 repository、图片 provider。
 - JS runtime-host：同一版本的控制页、Worker 引导、公共宿主、脚本/文件/HTTP 桥；pnpm 管理构建和协议生成。
-- Worker API：保留 TypeScript/Hono、Access/jose、D1/R2/DO。
-- Java/Maven：冻结 TeaVM 基线及每包 AOT 编译，宿主变化独立回归。
+- Worker API：TypeScript/Hono、Access/jose、D1/DO，按个人对象需要使用 R2；不承载扩展正文，也不提供私有 GitHub 下载 token 服务。
+- Java/Maven：锁定 TeaVM 工具链与真实上游 submodule，每包 AOT 编译；项目宿主持续维护，变化后更新构建指纹并回归。
 - 原生插件：仅管理必要的 WebView/字节通道/临时资源，平台代码不进入业务 UI。
-- 版本化契约生成 Dart/TS DTO；Dart Native 与 Web 用条件导入选择 adapter，Web 条件使用 dart.library.js_interop，兼容 Flutter Web JS/Wasm 构建。
+- 当前使用版本化控制协议及各端运行时解析；统一 IDL / Protobuf 双端 DTO 生成仍属讨论，未定案或实施。Dart Native 与 Web 用条件导入选择 adapter，Web 条件使用 dart.library.js_interop，支持范围由实际 JS/Wasm 构建验证。
 
 不建立全平台假同步接口，不在 UI 层暴露 Java对象、任意 JS 引擎对象或平台裸指针。
 
@@ -168,15 +169,15 @@ Dart 业务存储与 TeaVM 文件/HTTP Cache 分开所有权。原生业务镜�
 
 P0-F 实施已确定的浏览器宿主路线。F1/F2 验证两端对同版 JS 宿主的接入，F3 优先解决 iOS 图片资源交付，F4 完成真实阅读。插件版本、消息协议细节和资源通道属于实现验证项，不再比选 UI 框架或执行后端。
 
-| 探针 | 最小内容 | 验收 |
-|---|---|---|
-| F1 Web 接入 | Flutter Web → interop → 同版 TeaVM Worker → 搜索/详情/章节 DTO | 请求与输出一致、重入/取消/实例回收正确，UI 主线程不执行扩展 |
-| F2 原生容器 | iOS/Android Headless 或受管理 WebView → 控制页 → Worker | 初始化、文件恢复、包复用、Access 登录/过期、WebView 重建与后台恢复 |
-| F3 图片通道，优先 iOS | 受控字节 → 处理后图片 → 临时资源 → Flutter 图片 | 字节校验、分块背压、取消/释放、无整图字符串中转、合计峰值受控 |
-| F4 完整阅读 | 3–5 个原版源，覆盖直图/请求头/正文处理；长图、双页、缩放和切章 | 首图/切章分布、持续交互、内存/能耗、位置恢复；桌面 Web 达日用门槛 |
+| 探针                  | 最小内容                                                       | 验收                                                               |
+| --------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| F1 Web 接入           | Flutter Web → interop → 同版 TeaVM Worker → 搜索/详情/章节 DTO | 请求与输出一致、重入/取消/实例回收正确，UI 主线程不执行扩展        |
+| F2 原生容器           | iOS/Android Headless 或受管理 WebView → 控制页 → Worker        | 初始化、文件恢复、包复用、Access 登录/过期、WebView 重建与后台恢复 |
+| F3 图片通道，优先 iOS | 受控字节 → 处理后图片 → 临时资源 → Flutter 图片                | 字节校验、分块背压、取消/释放、无整图字符串中转、合计峰值受控      |
+| F4 完整阅读           | 3–5 个原版源，覆盖直图/请求头/正文处理；长图、双页、缩放和切章 | 首图/切章分布、持续交互、内存/能耗、位置恢复；桌面 Web 达日用门槛  |
 
 公共宿主 P0-A 与网络二进制 P0-B 继续推进，Flutter 阅读器 P0-R 共享 Dart 核心，在 P0-C 合成真实在线阅读。若某个平台失败，先修 adapter/资源通道，不自动重开框架选型或启用另一引擎。
 
 测试按固定系统/插件/产物版本、真实 HTTPS、release/profile 构建，分开冷启动、产物缓存后新实例和热实例。记录应用与 WebKit 合计内存；插件有 headless 方法、原型 DTO 成功或某个 hello-world FFI 成功，都不替代完整源与图片链验收。
 
-前轮已完成官方文档核查与 release9 相关源码只读检查；本轮将浏览器宿主路线从推荐改为已采用，并收敛实施范围。尚未运行这些探针。暂缓功能、单 hostname、纯 Workers 后端与前台执行边界保持不变。
+上述顺序是当前产品验收要求，不是全部通过的清单。历史文档核查、已完成机制验证与尚未完成的真实 Source/图片/移动验收在验证记录中分别说明；暂缓功能、单应用 hostname、Workers 后端与前台执行边界保持不变。

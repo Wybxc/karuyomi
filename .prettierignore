@@ -14,10 +14,8 @@ apps/reader/assets/runtime
 dist
 build
 pnpm-lock.yaml
-docs/design
 **/generated.*
 apps/api/worker-configuration.d.ts
-runtime/teavm/bridge/compat
 runtime/teavm/.local
 vendor/
 runtime/teavm/licenses

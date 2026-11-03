@@ -1,57 +1,59 @@
 # 个人漫画阅读 App 设计
 
-设计日期：2026-11-01；最近修订：2026-11-03。状态：可实施设计，尚未实现或部署。本版以 TeaVM 0.16.0 JavaScript backend、冻结候选 release9 为扩展运行基线；参考聊天「继续目标并设为 goal」的完成报告、审计与原 CheerpJ 宿主。研究原型已完成不表示本网页 App 已实现。
+设计日期：2026-11-01；最近修订：2026-11-03。本文是可持续修改的现行设计，不再冻结。当前工程已建立并有分项实现和验证，P0 尚未完整验收；执行状态见[计划目录](../plan/README.md)与[验证记录](../VERIFICATION.md)。TeaVM 0.16.0 JavaScript backend / release9 是项目宿主的研究起点，不是要求产品源码保持原样的快照。
 
-**选型已确定：Flutter + TeaVM，采用浏览器宿主路线。首版功能为浏览漫画源、管理书架、在线阅读。** 移动端原生优先、桌面端浏览器优先，并尽量共享代码；允许以一定桌面性能换取移动性能。Flutter Web 通过 JS interop 连接 TeaVM Worker，iOS/Android 通过系统 WebView 内的 Worker 复用同版 TeaVM JS 宿主；统一 Dart 接口，原生图片通道与鉴权仍待验证。具体方式见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)。RN、SwiftUI 与纯 React PWA 不再是选型候选。后端采用 Cloudflare Workers API + D1 + R2 + Durable Objects，无需常驻 JVM、容器或自有服务器。扩展仅在应用打开时按需执行，关闭后停止；不承诺后台任务续跑。完整 Mihon 功能仅作为长期参考，首版范围以下表为准。
+**选型已确定：Flutter + TeaVM，采用浏览器宿主路线。首版功能为浏览漫画源、管理书架、在线阅读。** 移动端原生优先、桌面端浏览器优先，并尽量共享代码；允许以一定桌面性能换取移动性能。Flutter Web 通过 JS interop 连接 TeaVM Worker，iOS/Android 通过系统 WebView 内的 Worker 复用同版 TeaVM JS 宿主；统一 Dart 接口，原生图片通道与鉴权仍待验证。具体方式见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)。RN、SwiftUI 与纯 React PWA 不再是选型候选。后端采用 Cloudflare Workers API + D1 + Durable Objects，R2 仅用于需要的私有个人对象（如自定义封面），无需常驻 JVM、容器或自有服务器。扩展仅在应用打开时按需执行，关闭后停止；不承诺后台任务续跑。完整 Mihon 功能仅作为长期参考，首版范围以下表为准。
 
 **部署与信任范围：一个 hostname、一个入口 Worker；浏览器按需运行按扩展包 AOT 编译的 TeaVM 模块。** 使用数量受限的 WebWorker 执行槽，复用当前包实例；扩展按应用依赖信任。分包是产物与状态管理需要，不新增跨 origin 沙箱或每包 JVM。源站脚本保留局部执行边界。CheerpJ 保留为开发对照，产品不自动切换引擎。
 
-**访问方式：前端公开，后端由 Cloudflare Access 鉴权。** 页面和通用静态资源无需登录；个人数据、网络桥、扩展产物及回调统一走同源 `/api` 和 `/api/*`，只允许本人通过 Access 访问。Access 登录不增加应用内账号系统，也不改变暂缓的“私密使用”范围。
+**访问方式：前端公开，后端由 Cloudflare Access 鉴权。** 页面、共享材料与 Static Assets 扩展产物无需登录；个人数据、Source 网络桥和回调统一走同源 `/api` 和 `/api/*`，只允许本人通过 Access 访问。Access 登录不增加应用内账号系统，也不改变暂缓的“私密使用”范围。
+
+**当前交付决定：** Static Assets 是 Web 与 Native 扩展索引、清单和 AOT 的最终权威来源，每个扩展只发布最新 build。客户端依据 index/catalog 定位当前版本，由客户端或 Service Worker 管理更新与缓存；新分发路径不再要求向 GitHub Release 推送扩展；已有扩展 Release 仅为历史存储，不供客户端定位或下载。通用资源继续走 Web Static Assets / Native 内置。Worker 只负责个人数据与 Source 网络控制，不代理扩展正文、不签发私有下载地址，也不给客户端 GitHub 凭据。该决定覆盖此前的 R2 代理、Release 全客户端直下及 Web 镜像提案。**方案已确定，待实现验收：** 2026-11-03 的 Codex 内置浏览器 Release 直下/Range 实测报 `Failed to fetch`，初始 302 与最终 CDN 缺少 `Access-Control-Allow-Origin`；这是此前方案的失败证据。当前 Static Assets 发布、最新版 index/catalog、跨端下载、更新缓存、有界解压和完整加载链路仍须实测，不能把已选方案写成已通过。
 
 ## 1. 已有实现可以复用到什么程度
 
-实施参考为冻结的 TeaVM release9：源码指纹 `06b2e8f9b560f41c60ce6779ee320ac50523780bf5dd24c08dc01a65010fe299`，TeaVM 0.16.0 JavaScript backend。交付源在 [实测报告](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/实测报告.md)、[完整 ZIP](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/teavm-compatibility-v2.zip) 和[独立完成审计](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/teavm-compatibility-v2-completion-audit.json)。ZIP 是含历史证据的研究交付，不是部署包；实施时从冻结源码建立工作副本，保留参考交付只读。
+实施来源为 TeaVM release9 研究快照：源码指纹 `06b2e8f9b560f41c60ce6779ee320ac50523780bf5dd24c08dc01a65010fe299`，TeaVM 0.16.0 JavaScript backend。交付源在 [实测报告](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/实测报告.md)、[完整 ZIP](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/teavm-compatibility-v2.zip) 和[独立完成审计](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/teavm-compatibility-v2-completion-audit.json)。ZIP 是含历史证据的研究交付，不是部署包；其初始源码已内化为项目宿主并继续维护，真实第三方上游通过固定提交的 submodule 引入。研究快照的原始指纹只用于溯源，不约束当前设计或项目源码修改。
 
-| 已有证据 | 设计含义 |
-|---|---|
-| release9 的 77 包编译加载、447 Source 身份全部通过，原扩展 JAR 字节未改 | 采用其宿主、依赖 ABI、JDK/IR 补丁和浏览器桥；固定编译工具链，按包 AOT 分发 |
-| 2235 项在线业务：2133 通过、6 空、40 失败、56 跳过；422 读链、418 五项非空 | 是筛选样本中的在线观测，按 Source/版本/操作声明支持；页面列表通过不等于完整阅读器通过 |
-| 各候选失败并集 29 包/125 Source/625 项同输入配对：语义差异和 fixture miss 均为 0 | 已完成原型语义验收；严格请求差异仍保留并有处置证据，不能表述为所有请求完全一致 |
-| 最终包文件重启 40 项、图片 48 项、multipart 18 项、异常路径检查通过 | 复用真实 HTTP Cache、普通文件持久层、图像桥、URL/JSON/协程异常修复；重点验证产品化后的同版回归 |
-| 3600 次固定输入业务性能调用及 18 次连续启动通过输出/请求等价性审计 | 用 release9 最新数据替代早期三插件性能；移动端、Access、公网产物与完整首图仍须产品实测 |
-| 宿主仅输出部分漫画/章节/页面摘要，使用隐式当前对象；Worker 有单一 pending 入口 | 改成完整 DTO 和显式引用；每个实例串行前台 Source 调用，使用 requestId/实例代次防止结果串线 |
-| 浏览器 IndexedDB 文件/HTTP Cache、异步 init/load/select 已实现 | 接入身份与扩展命名空间、版本切换和 Worker 回收，不把实例当无状态；不增加下载或本地漫画模块 |
-| JS/DOM/WebView 有真实执行与回调检查 | 复用能力，但完整 WebView/QuickJS 字节码与任意对象回调不保证支持；产品仍须验证 Access 下无死锁中转 |
-| 本机网络出口、测试保存服务和诊断静态资源 | 生产改用 Workers fetch；移除本机代理、测试端口、结果 API、fixtures 和历史产物，不直接部署原型 public 目录 |
+| 已有证据                                                                         | 设计含义                                                                                                  |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| release9 的 77 包编译加载、447 Source 身份全部通过，原扩展 JAR 字节未改          | 采用其宿主、依赖 ABI、JDK/IR 补丁和浏览器桥；固定编译工具链，按包 AOT 分发                                |
+| 2235 项在线业务：2133 通过、6 空、40 失败、56 跳过；422 读链、418 五项非空       | 是筛选样本中的在线观测，按 Source/版本/操作声明支持；页面列表通过不等于完整阅读器通过                     |
+| 各候选失败并集 29 包/125 Source/625 项同输入配对：语义差异和 fixture miss 均为 0 | 已完成原型语义验收；严格请求差异仍保留并有处置证据，不能表述为所有请求完全一致                            |
+| 最终包文件重启 40 项、图片 48 项、multipart 18 项、异常路径检查通过              | 复用真实 HTTP Cache、普通文件持久层、图像桥、URL/JSON/协程异常修复；重点验证产品化后的同版回归            |
+| 3600 次固定输入业务性能调用及 18 次连续启动通过输出/请求等价性审计               | 用 release9 最新数据替代早期三插件性能；移动端、Access、公网产物与完整首图仍须产品实测                    |
+| 宿主仅输出部分漫画/章节/页面摘要，使用隐式当前对象；Worker 有单一 pending 入口   | 改成完整 DTO 和显式引用；每个实例串行前台 Source 调用，使用 requestId/实例代次防止结果串线                |
+| 浏览器 IndexedDB 文件/HTTP Cache、异步 init/load/select 已实现                   | 接入身份与扩展命名空间、版本切换和 Worker 回收，不把实例当无状态；不增加下载或本地漫画模块                |
+| JS/DOM/WebView 有真实执行与回调检查                                              | 复用能力，但完整 WebView/QuickJS 字节码与任意对象回调不保证支持；产品仍须验证 Access 下无死锁中转         |
+| 本机网络出口、测试保存服务和诊断静态资源                                         | 生产改用 Workers fetch；移除本机代理、测试端口、结果 API、fixtures 和历史产物，不直接部署原型 public 目录 |
 
 遵循原版扩展约束：**扩展业务源码和输入 JAR 保持原样，宿主、依赖和编译器兼容映射可以修复。** AOT 输出是编译产物，不承诺运行时直接执行任意新 JAR；原生官方 JAR 与 APK 转换 JAR 分别验证，77 包证据只覆盖后者。
 
 ## 2. 产品功能与边界
 
-| 模块 | 目标行为 | 实现和限制 |
-|---|---|---|
-| 书架 | 收藏、分类、多分类、排序、过滤、搜索、未读角标、批量操作、自定义封面 | D1 保存，IndexedDB 本地镜像；封面放私有 R2 / 本地缓存；未读数只按最近一次读取到的章节列表计算 |
-| 浏览 | 源列表、语言、收藏源、热门、最新、搜索、分页、源自定义筛选 | 调用原版 Source；源未实现的能力隐藏或明确禁用 |
-| 跨源搜索 | 已启用源并发搜索，结果分源展示、可取消 | 有界并发、逐源返回；一个慢源不阻塞全部结果 |
-| 扩展管理 | 添加仓库、安装、手动升级、固定版本、回滚、卸载 | 原版 JAR 或 APK 转换产物在本地/CI 按包 AOT；安装已验证构建，没有产物时显示待构建/不支持；手动升级/回滚，不做自动调度 |
-| 扩展设置 | 开关、文本、密码、单选、多选、分组、依赖项、修改后刷新 | 新增 typed preferences 协议；自定义 Android Activity 设置页不自动等价支持 |
-| 漫画详情 | 完整元数据、标签、状态、章节列表、搜索/排序/筛选、重复章节处理 | 保存原始 Source URL 与 stable ID；章节编号可空，保留文本和小数 |
-| 阅读器 | 左右翻页、RTL/LTR、竖向连续、Webtoon、双页、缩放、适宽/适高、裁白、背景/亮度、点击区域、键盘、阅读方向 | 按漫画覆盖全局设置；跨页/跨章、书签、恢复位置；浏览器无法接管音量键等系统行为 |
-| 基本阅读进度 | 当前章节/页码、已读标记、书签、继续阅读 | 每部作品的状态；不保存按日浏览历史、阅读时长或统计事件 |
-| 源迁移 | 跨源查找、用户确认对应作品、复制分类/已读/书签、保留旧源 | 章节号 + 标题 + 扫描组辅助匹配；模糊项人工确认；创建目标条目后保留原条目，不依赖备份模块 |
-| 多设备同步 | 书架、分类、阅读进度、书签和非敏感设置 | 同一部署的个人多设备；无任务同步、历史同步或文件同步 |
-| 登录/验证 | 源支持的账号、token、cookie 输入；展示需人工验证状态 | 网页不能读取原站 HttpOnly cookie，也不能保证在 iframe 完成站点挑战 |
+| 模块         | 目标行为                                                                                               | 实现和限制                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 书架         | 收藏、分类、多分类、排序、过滤、搜索、未读角标、批量操作、自定义封面                                   | D1 保存，IndexedDB 本地镜像；封面放私有 R2 / 本地缓存；未读数只按最近一次读取到的章节列表计算                                                                       |
+| 浏览         | 源列表、语言、收藏源、热门、最新、搜索、分页、源自定义筛选                                             | 调用原版 Source；源未实现的能力隐藏或明确禁用                                                                                                                       |
+| 跨源搜索     | 已启用源并发搜索，结果分源展示、可取消                                                                 | 有界并发、逐源返回；一个慢源不阻塞全部结果                                                                                                                          |
+| 扩展管理     | 添加仓库、安装、更新、卸载                                                                             | 原版 JAR 或 APK 转换产物在本地/CI 按包 AOT；安装已验证构建，没有产物时显示待构建/不支持；只发布最新 build；客户端或 Service Worker 管理更新和缓存，不做后台扩展执行 |
+| 扩展设置     | 开关、文本、密码、单选、多选、分组、依赖项、修改后刷新                                                 | 新增 typed preferences 协议；自定义 Android Activity 设置页不自动等价支持                                                                                           |
+| 漫画详情     | 完整元数据、标签、状态、章节列表、搜索/排序/筛选、重复章节处理                                         | 保存原始 Source URL 与 stable ID；章节编号可空，保留文本和小数                                                                                                      |
+| 阅读器       | 左右翻页、RTL/LTR、竖向连续、Webtoon、双页、缩放、适宽/适高、裁白、背景/亮度、点击区域、键盘、阅读方向 | 按漫画覆盖全局设置；跨页/跨章、书签、恢复位置；浏览器无法接管音量键等系统行为                                                                                       |
+| 基本阅读进度 | 当前章节/页码、已读标记、书签、继续阅读                                                                | 每部作品的状态；不保存按日浏览历史、阅读时长或统计事件                                                                                                              |
+| 源迁移       | 跨源查找、用户确认对应作品、复制分类/已读/书签、保留旧源                                               | 章节号 + 标题 + 扫描组辅助匹配；模糊项人工确认；创建目标条目后保留原条目，不依赖备份模块                                                                            |
+| 多设备同步   | 书架、分类、阅读进度、书签和非敏感设置                                                                 | 同一部署的个人多设备；无任务同步、历史同步或文件同步                                                                                                                |
+| 登录/验证    | 源支持的账号、token、cookie 输入；展示需人工验证状态                                                   | 网页不能读取原站 HttpOnly cookie，也不能保证在 iframe 完成站点挑战                                                                                                  |
 
 **暂不实现，也不列入首版实施阶段或验收：**
 
-| 暂缓模块 | 移出范围 |
-|---|---|
-| 更新 | 书架自动/定时/批量查更新、更新页、更新通知、智能更新策略 |
-| 下载 | 章节离线下载、下载队列、断点续传、读后清理、云端漫画归档 |
-| 历史统计 | 历史页、时间线、阅读时长、阅读数量汇总与统计事件 |
-| 追踪 | 所有第三方 tracker 登录、作品关联、评分和进度推送 |
-| 本地漫画 | 图片目录、ZIP/CBZ/RAR/CBR/EPUB 导入、解析与阅读 |
-| 备份恢复 | 手动/自动备份、导入导出、Mihon/Tachiyomi 备份互通、恢复流程 |
+| 暂缓模块 | 移出范围                                                     |
+| -------- | ------------------------------------------------------------ |
+| 更新     | 书架自动/定时/批量查更新、更新页、更新通知、智能更新策略     |
+| 下载     | 章节离线下载、下载队列、断点续传、读后清理、云端漫画归档     |
+| 历史统计 | 历史页、时间线、阅读时长、阅读数量汇总与统计事件             |
+| 追踪     | 所有第三方 tracker 登录、作品关联、评分和进度推送            |
+| 本地漫画 | 图片目录、ZIP/CBZ/RAR/CBR/EPUB 导入、解析与阅读              |
+| 备份恢复 | 手动/自动备份、导入导出、Mihon/Tachiyomi 备份互通、恢复流程  |
 | 私密使用 | 应用内账号/设备会话管理、隐私/无痕模式、应用锁、退出清理流程 |
 
 范围说明：源的“最新”目录、详情页按需读取章节、扩展手动升级仍保留；它们不触发全书架查更新。基本阅读进度用于继续阅读，不建立历史统计。运行时仍保留已有的 Source 登录设置；Cloudflare Access 保护后端，前端公开，不建设应用内账号系统。暂缓模块只记录为范围外需求，不预建空页面、数据表或接口。
@@ -78,7 +80,7 @@
 
 ```mermaid
 flowchart TB
-  Build[开发机或 CI · 原版 JAR / APK 转换 · TeaVM AOT] --> R2
+  Build[开发机或 CI · 原版 JAR / APK 转换 · TeaVM AOT]
   subgraph Browser[用户浏览器]
     UI[Flutter Web 页面与阅读器]
     Local[IndexedDB · 业务镜像 / 扩展文件 / HTTP 缓存]
@@ -98,8 +100,8 @@ flowchart TB
     App[单一入口 Worker · JWT / 业务 API / 网络桥]
     DO[Durable Object · 会话回调与在线通知]
     DB[D1 · 书架 / 进度 / 设置]
-    R2[私有 R2 · 自定义封面 / 编译产物]
-    Assets[公开 Static Assets · Flutter Web / 控制页 / 通用桥]
+    R2[私有个人对象 · 自定义封面]
+    Assets[公开 Static Assets · UI / 通用材料 / 最新扩展与权威 catalog]
     Access --> App
     App <--> DB
     App <--> R2
@@ -107,25 +109,29 @@ flowchart TB
   end
   UI <-->|同源 API · Access Cookie| Access
   UI --> Assets
+  Build -->|每扩展仅最新 build| Assets
+  Runtime -->|同源获取扩展 · 无应用凭证| Assets
   Tea -->|同源 API · Access Cookie| Access
   App --> Sites[漫画站点]
 ```
 
 使用一个 hostname，例如 `read.example.com`，一个入口 Worker 项目提供公开 PWA 静态资源和受保护 API。Access 按路径拦截，入口 Worker 再校验 JWT；公开路径不访问 D1/R2/DO。模块共享应用身份，不把路径或执行槽划分当作扩展权限隔离。关闭 `workers.dev` 和版本预览入口；Access 登录页使用 Cloudflare 团队域名，不增加本项目第二个 hostname。
 
-UI 创建同源通用 Worker 引导，确认 Access 后读取受保护构建清单与 AOT bundle。每个执行槽装载一个扩展包，同包多个语言 Source 复用；槽位回收后可为另一包创建新 Worker。主线程不执行扩展；生产不加载 CheerpJ CDN/JDK，不要求 WasmGC 或 SharedArrayBuffer。DOM sandbox 仅针对源站脚本。
+UI 创建同源通用 Worker 引导；Web 与 Native 均从 Static Assets 的 index/catalog 定位最新清单与 AOT bundle，获取扩展不依赖 Access 登录。客户端或 Service Worker 管理下载、版本切换与缓存，服务端不提供旧 build 的客户端定位。应用个人数据与 Source 网络桥仍要求 Access。每个执行槽装载一个扩展包，同包多个语言 Source 复用；槽位回收后可为另一包创建新 Worker。主线程不执行扩展；生产不加载 CheerpJ CDN/JDK，不要求 WasmGC 或 SharedArrayBuffer。DOM sandbox 仅针对源站脚本。
 
-| 组件 | 职责 | 不应承担 |
-|---|---|---|
-| Flutter Web / JS SourceRuntime 管理器 | UI、状态、实例调度、RPC 与取消 | 同步解析大型扩展或在 UI 主线程运行 Source |
-| TeaVM WebWorker | 编译后的 Source、OkHttp、协作调度、图像/文件适配 | 任意新 JAR 动态类加载、云端常驻任务 |
-| 单一入口 Worker | Access JWT、状态 API、私有产物、HTTP/回调桥 | TeaVM 编译、Java/dex2jar、无限制开放代理 |
-| 局部脚本适配 | sandbox WebView、绑定回调与超时 | 向网页脚本提供应用凭证或完整 API |
-| D1 | 书架、章节元数据、进度、设置、同步增量、已安装构建指针 | 图片 blob 或扩展运行文件 |
-| Durable Object | 会话代次、必要的跨云端回调关联、WebSocket 通知 | 扩展执行、图片正文、永久保存 Promise |
-| R2 | 自定义封面、按哈希存放的 AOT bundle/必要资源 | 漫画整章归档、未验证构建自动发布 |
-| IndexedDB / Web Locks | 业务镜像、按身份/扩展隔离的普通文件与 HTTP Cache、实例所有权 | 云同步扩展文件、永久离线保证 |
-| Service Worker | 公开 app shell 缓存与版本切换，API 走网络 | 保存 Access 登录响应、预缓存全仓 bundle、维持运行时常驻 |
+| 组件                                  | 职责                                                                              | 不应承担                                                |
+| ------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Flutter Web / JS SourceRuntime 管理器 | UI、状态、实例调度、RPC 与取消                                                    | 同步解析大型扩展或在 UI 主线程运行 Source               |
+| TeaVM WebWorker                       | 编译后的 Source、OkHttp、协作调度、图像/文件适配                                  | 任意新 JAR 动态类加载、云端常驻任务                     |
+| 单一入口 Worker                       | Access JWT、个人数据/安装状态 API、Source HTTP/回调桥                             | AOT 正文代理、TeaVM 编译、Java/dex2jar、无限制开放代理  |
+| 局部脚本适配                          | sandbox WebView、绑定回调与超时                                                   | 向网页脚本提供应用凭证或完整 API                        |
+| D1                                    | 书架、章节元数据、进度、设置、同步增量、已安装构建指针                            | 图片 blob 或扩展运行文件                                |
+| Durable Object                        | 会话代次、必要的跨云端回调关联、WebSocket 通知                                    | 扩展执行、图片正文、永久保存 Promise                    |
+| 已有 GitHub Release                   | 历史存储，不属于新分发路径                                                        | 新扩展发布、客户端定位或下载                            |
+| Static Assets / Native 内置材料       | Static Assets 提供全客户端最新扩展与权威 catalog；共享材料 Web 静态 / Native 内置 | 按扩展重复发布共享材料                                  |
+| R2（个人对象）                        | 自定义封面等私有个人数据                                                          | 扩展 AOT/共享材料交付、漫画整章归档                     |
+| IndexedDB / Web Locks                 | 业务镜像、按身份/扩展隔离的普通文件与 HTTP Cache、实例所有权                      | 云同步扩展文件、永久离线保证                            |
+| Service Worker                        | 公开 app shell 缓存与版本切换，API 走网络                                         | 保存 Access 登录响应、预缓存全仓 bundle、维持运行时常驻 |
 
 不引入 KV、Queues、Workflows、Cron 或持久 job 队列。原插件前台会话内的异步网络任务需要追踪和取消；应用关闭后停止，不变成后台更新服务。DO 保留会话协调用途；可在浏览器内完成的回调直接用绑定的消息通道，不强制经过云端。
 
@@ -133,7 +139,7 @@ UI 创建同源通用 Worker 引导，确认 Access 后读取受保护构建清�
 
 客户端确定为 **Flutter / Dart**，共享阅读核心和 UI，平台资源通过适配器实现。移动帧耗时、图片内存、能耗、首图和恢复优先；桌面允许额外渲染/启动成本，但须达到日用与兼容性门槛。Flutter widgets 替代此前 React UI 三选一，Dart 依赖由 Pub 管理；pnpm 保留 TS/JS 依赖与任务编排，这是本次 Flutter 选型带来的工具链调整。先验证 flutter_inappwebview 原生容器与 Web 直接 Worker 适配，不默认将其 iframe Web 实现作为全端入口。
 
-后端继续使用 **pnpm workspace + Hono + Zod + jose + D1 / Drizzle + R2 + Durable Objects**。Flutter Web 产物交给入口 Worker 的 Static Assets；Flutter SDK 构建 UI，Wrangler 构建部署 Worker。Java / Maven / TeaVM 和 Python 构建工具单独固定版本，由 pnpm scripts 编排。当前接入方案见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)；[原技术栈文档](./technology-stack-and-reader.md)保留通用阅读规范、后端方案及历史 React/RN 分析，React 依赖不再是产品前置条件。
+后端继续使用 **pnpm workspace + Hono + Zod + jose + D1 / Drizzle + Durable Objects**；需要私有个人对象时使用 R2，不存放扩展产物。Flutter Web 产物交给入口 Worker 的 Static Assets；Flutter SDK 构建 UI，Wrangler 构建部署 Worker。Java / Maven / TeaVM 和 Python 构建工具单独固定版本，由 pnpm scripts 编排。当前接入方案见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)；[原技术栈文档](./technology-stack-and-reader.md)保留通用阅读规范、后端方案及历史 React/RN 分析，React 依赖不再是产品前置条件。
 
 跨端漫画阅读器仍是首要交付：页序、单双页、RTL、逻辑位置、图片窗口、像素内存、缩放和平移、旋转后的锚点恢复进入 P0。阅读核心使用 Dart，不依赖后端或 TeaVM 实现；PageProvider 返回可释放图片资源，Web 与原生分别实现资源交付，不要求 UI 持有全部正文。
 
@@ -145,18 +151,18 @@ Flutter 原生接入分离控制消息和图像资源，阅读视图消费有界
 
 ### 原型改造
 
-以下文件名均相对于 release9 冻结交付中的 `teavm-compatibility-v2/`；实施目录另行建立。
+以下文件名用于追溯 release9 研究交付中的 `teavm-compatibility-v2/`；现有正式实现位于 `runtime/teavm/` 与 `tools/teavm/`，按当前上游和项目适配持续更新。
 
-| 原型位置 | 产品化改造 |
-|---|---|
-| `public/teavm-worker.js`、`java/src/main/java/prototype/TeaHost.java` | 提取 SourceRuntime 适配器；异步初始化、完整 DTO、版本握手、按实例串行 RPC、取消和安全销毁 |
-| `prototype/BrowserCall.java`、`Bridge.java`、HTTP 客户端 | 复用正确的浏览器传输/缓存/异常语义；P0-B 改为二进制正文与有界读取 |
-| `public/file-bridge.js`、`cache-bridge.js` 及 Java 适配层 | 复用普通文件和 HTTP 缓存；增加身份/包/存储 schema 分区、升级回滚检查、配额和异常终止处理 |
-| `public/browser-bridge.js`、`dom-bridge.js`、图像/加密/Zstd 桥 | 从测试页拆出运行依赖；原版图片/脚本路径保持；局部回调绑定实例与代次 |
-| `scripts/build.py`、`build_matrix.py`、`java/pom.xml`、宿主依赖与 IR 补丁 | 固定 TeaVM 0.16.0 JS backend 与版本；按包独立构建，保留输入/源码/产物哈希；建立可安装清单 |
-| 原 `Host.kt` / `HttpSource` ABI 和 `TeaHost` 输出 | 去除隐式当前漫画与截断输出，支持显式 manga/chapter、分页、latest、typed filters/preferences、图片 |
-| 原 Workers 网络/回调实现 | 单入口 API、Access、DO 会话与流式转发；删除本机诊断服务和 `/api/results` 等入口 |
-| 最终审计/fixtures | 作为开发回归资产；冻结输入只读，产品部署清单不含诊断响应、测试器或历史候选 |
+| 原型位置                                                                  | 产品化改造                                                                                             |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `public/teavm-worker.js`、`java/src/main/java/prototype/TeaHost.java`     | 提取 SourceRuntime 适配器；异步初始化、完整 DTO、版本握手、按实例串行 RPC、取消和安全销毁              |
+| `prototype/BrowserCall.java`、`Bridge.java`、HTTP 客户端                  | 复用正确的浏览器传输/缓存/异常语义；P0-B 改为二进制正文与有界读取                                      |
+| `public/file-bridge.js`、`cache-bridge.js` 及 Java 适配层                 | 复用普通文件和 HTTP 缓存；增加身份/包/存储 schema 分区、版本切换检查、配额和异常终止处理               |
+| `public/browser-bridge.js`、`dom-bridge.js`、图像/加密/Zstd 桥            | 从测试页拆出运行依赖；原版图片/脚本路径保持；局部回调绑定实例与代次                                    |
+| `scripts/build.py`、`build_matrix.py`、`java/pom.xml`、宿主依赖与 IR 补丁 | 固定 TeaVM 0.16.0 JS backend 与版本；按包独立构建，保留输入/源码/产物哈希；建立可安装清单              |
+| 原 `Host.kt` / `HttpSource` ABI 和 `TeaHost` 输出                         | 去除隐式当前漫画与截断输出，支持显式 manga/chapter、分页、latest、typed filters/preferences、图片      |
+| 原 Workers 网络/回调实现                                                  | 单入口 API、Access、DO 会话与流式转发；删除本机诊断服务和 `/api/results` 等入口                        |
+| 最终审计/fixtures                                                         | 作为研究来源；可复用测试内化，临时工程/历史输入留 ignored 目录，产品清单不含诊断响应、测试器或历史候选 |
 
 技术栈采用第 4 节及独立技术栈设计中的分工。Java/Kotlin 保留扩展 ABI 与兼容宿主，通过 TeaVM 编译；不重写网站解析业务。阅读器通过 PageProvider 接收原版扩展处理后的图片，与 TeaVM 的具体实现分离。
 
@@ -166,15 +172,15 @@ Flutter 原生接入分离控制消息和图像资源，阅读视图消费有界
 
 原“公共宿主改进”继续实施，以 release9 的通用浏览器宿主为基线；b-jvm 对照中的浏览器传输经验用于核对语义，CheerpJ 专用预加载清单、ClassLoader 和字节码适配不再是产品交付项。
 
-| 工作项 | 实施约束 | 验收证据 |
-|---|---|---|
-| 固定构建与独立安装 | 按原包 AOT；固定编译器/JDK/依赖/转换与补丁版本、反射和资源登记；校验全部产物哈希与 ABI | 从独立工作目录可重建，原 JAR 不变；按包安装/更新/回滚无需重建前端；可重建不等于字节级输出相同 |
-| 公共 HTTP 宿主 | 沿用应用拦截器、重定向/Cookie、原 CacheInterceptor/CacheStrategy、网络拦截器和 fetch 传输；避免无用 Java SSL 初始化 | 真实 HTTPS 仍由 Workers 校验证书；覆盖命中、Vary、304、Cookie 真实过期、取消、原异常类型与有副作用后台请求 |
-| 持久文件与缓存 | 保留独立 IndexedDB 存储、原子事务/rename、实例所有权、异步 init/load/select；命名空间增加身份/仓库/包/schema | 最终包的文件重启、并发/终止、缓存故障 fixtures 在产品适配后通过；正常关闭不等待 unload 才持久化 |
-| 宿主行为 | 保留 URL 解码与空查询串、JSON null、协程 IOException 传播、SocketException 等 release9 修复 | 原负对照/修复 fixtures 不回退；结构化错误保留 Java 类、消息和 cause，不统一包装为未知错误 |
-| 执行槽与加载 | 一个槽一个包，前台 Source 调用串行；按清单获取/校验后执行，阶段计时包含存储恢复 | 不串 Source/版本/requestId；身份未确认不开源请求；超时能停止 Worker 并释放网络/回调/句柄 |
+| 工作项             | 实施约束                                                                                                            | 验收证据                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 固定构建与独立安装 | 按原包 AOT；固定编译器/JDK/依赖/转换与补丁版本、反射和资源登记；校验全部产物哈希与 ABI                              | 从独立工作目录可重建，原 JAR 不变；按包安装/更新无需重建前端；可重建不等于字节级输出相同                   |
+| 公共 HTTP 宿主     | 沿用应用拦截器、重定向/Cookie、原 CacheInterceptor/CacheStrategy、网络拦截器和 fetch 传输；避免无用 Java SSL 初始化 | 真实 HTTPS 仍由 Workers 校验证书；覆盖命中、Vary、304、Cookie 真实过期、取消、原异常类型与有副作用后台请求 |
+| 持久文件与缓存     | 保留独立 IndexedDB 存储、原子事务/rename、实例所有权、异步 init/load/select；命名空间增加身份/仓库/包/schema        | 最终包的文件重启、并发/终止、缓存故障 fixtures 在产品适配后通过；正常关闭不等待 unload 才持久化            |
+| 宿主行为           | 保留 URL 解码与空查询串、JSON null、协程 IOException 传播、SocketException 等 release9 修复                         | 原负对照/修复 fixtures 不回退；结构化错误保留 Java 类、消息和 cause，不统一包装为未知错误                  |
+| 执行槽与加载       | 一个槽一个包，前台 Source 调用串行；按清单获取/校验后执行，阶段计时包含存储恢复                                     | 不串 Source/版本/requestId；身份未确认不开源请求；超时能停止 Worker 并释放网络/回调/句柄                   |
 
-旧 CheerpJ 宿主遗漏 CacheInterceptor，因此验收以原 OkHttp 策略、JVM oracle 和已解释差异为准，不以旧宿主所有请求次数都相等为目标。公共宿主和二进制桥分别变更并留对照；先在原文本桥下完成 TeaVM 产品宿主基线，再测二进制桥。内部文件/缓存不增加章节下载、后台更新或本地漫画模块。
+旧 CheerpJ 宿主遗漏 CacheInterceptor，因此验收以原 OkHttp 策略、JVM oracle 和已解释差异为准，不以旧宿主所有请求次数都相等为目标。公共宿主和二进制桥分别留可解释的验证结果；原文本桥只作为历史开发对照，当前协议切换直接维护 v2，不保留产品 v1 回退。内部文件/缓存不增加章节下载、后台更新或本地漫画模块。
 
 ### RPC 草案
 
@@ -187,8 +193,12 @@ interface SourceRuntime {
   load(build: CompiledExtension): Promise<SourceInfo[]>;
   popular(source: SourceKey, page: number): Promise<MangaPage>;
   latest(source: SourceKey, page: number): Promise<MangaPage>;
-  search(source: SourceKey, query: string, page: number,
-         filters: FilterState[]): Promise<MangaPage>;
+  search(
+    source: SourceKey,
+    query: string,
+    page: number,
+    filters: FilterState[],
+  ): Promise<MangaPage>;
   details(manga: MangaRef): Promise<MangaSnapshot>;
   chapters(manga: MangaRef): Promise<ChapterSnapshot[]>;
   pages(chapter: ChapterRef): Promise<PageDescriptor[]>;
@@ -209,7 +219,7 @@ interface SourceRuntime {
 
 HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖 Workers↔浏览器与浏览器↔Java 两段，不能只将云端响应改为二进制、随后又在 TeaVM/JS 适配边界编码成整段 Base64。图片不会统一存 D1；不假定 Java 数组与 JavaScript 数组能零拷贝。
 
-当前阅读会话持有 `PageList`：章节标识、扩展哈希、页面顺序及清单版本；图片字节只做有界临时缓存，解码后渲染。切章或内存紧张时释放 Blob URL 与位图。页面列表变化时校验页码/偏移是否仍有效，不建立逐页持久化完成状态、离线章节清单或 R2 漫画归档。普通 HTTP 缓存和少量预取属于在线阅读优化，不提供离线可用性保证。
+当前阅读会话持有 `PageList`：章节标识、扩展构建身份、页面顺序及清单版本；图片字节只做有界临时缓存，解码后渲染。切章或内存紧张时释放 Blob URL 与位图。页面列表变化时校验页码/偏移是否仍有效，不建立逐页持久化完成状态、离线章节清单或 R2 漫画归档。普通 HTTP 缓存和少量预取属于在线阅读优化，不提供离线可用性保证。
 
 ### P0-B：二进制网络桥
 
@@ -220,27 +230,27 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 3. **Worker 流式转发，Java 按需读取。** Worker 读取上游 `ReadableStream` 后逐块输出 DATA，不对大响应调用整段 `text()` / `arrayBuffer()`。浏览器解帧，按 Java 消费速度读取；Java 通过 `open → read(handle, maxBytes) → close/cancel` 的运行时适配获得元信息和字节块，包装为 Okio Source / ResponseBody，再交回原扩展。handle 只存在当前浏览器运行会话，绑定 requestId/generation，不增加公开正文端点。取消、ResponseBody.close、超时、异常和执行槽重启均释放 reader、队列、临时对象并传播上游终止；传播效果需实测。
 4. **限制缓冲和并发。** 初始 DATA 块上限 64 KiB、每响应排队最多 4 块、元信息上限 64 KiB；最终参数按手机与 JSO 字节传递测量调整。请求正文首版允许最多 8 MiB 的有界二进制缓冲，以兼容缺少流式上传支持的浏览器，不依赖浏览器提供全双工上传。响应正文初始总量上限 64 MiB，读取中持续计数，Source 有依据的例外再单独配置；超过限制或不支持的流式/双工请求明确报错。插件主动调用 `bytes()` / `string()` 仍可能分配完整正文，这与桥本身的队列上限分开记录。
 
-| 协议项 | 保留语义 |
-|---|---|
-| 请求 META | requestId、runtimeGeneration、目标 URL、方法、按顺序保存的 header 二元组、正文是否存在/已知长度、调用期限；方法与正文语义不能由桥随意改写 |
-| 响应 META | `upstreamStatus`、状态消息、实际 URL、header 二元组、正文是否存在、已知长度及是否经过传输解压；重复 Set-Cookie 保留在元信息中，交给 Java CookieJar，不作为应用域的响应 Cookie 发给浏览器 |
-| 桥状态与上游状态 | 外层 HTTP 状态表示 Access/桥本身的结果；已取得的上游 401/403/404/500 均在 META 中保留，正文正常可读，不误报应用登录失效。Access 重定向/HTML 在进入解帧前由统一鉴权处理识别 |
-| 重定向与编码 | Worker 对每次目标请求手动处理重定向策略边界，重定向响应交由宿主按 client 设置决定是否跟进；每跳重新校验目标和凭证范围。明确哪一层已解压并修正失效的 Content-Encoding/Content-Length，避免重复解压；上游 HTTP 分块边界不成为应用语义 |
-| 请求 body | 原始二进制保留；文本编码、表单与 multipart 正文由扩展 RequestBody 决定，不经 JSON 字符串转换；没有正文与空正文分别表示 |
-| 错误与重试 | Access 失效、源站状态、网络中断、协议截断、取消和限额错误分开；整段自动重试只限尚未向插件交付响应的安全读取。一旦交付响应/正文，不透明重放；POST 等有副作用请求不自动重试 |
+| 协议项           | 保留语义                                                                                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 请求 META        | requestId、runtimeGeneration、目标 URL、方法、按顺序保存的 header 二元组、正文是否存在/已知长度、调用期限；方法与正文语义不能由桥随意改写                                                                                           |
+| 响应 META        | `upstreamStatus`、状态消息、实际 URL、header 二元组、正文是否存在、已知长度及是否经过传输解压；重复 Set-Cookie 保留在元信息中，交给 Java CookieJar，不作为应用域的响应 Cookie 发给浏览器                                            |
+| 桥状态与上游状态 | 外层 HTTP 状态表示 Access/桥本身的结果；已取得的上游 401/403/404/500 均在 META 中保留，正文正常可读，不误报应用登录失效。Access 重定向/HTML 在进入解帧前由统一鉴权处理识别                                                          |
+| 重定向与编码     | Worker 对每次目标请求手动处理重定向策略边界，重定向响应交由宿主按 client 设置决定是否跟进；每跳重新校验目标和凭证范围。明确哪一层已解压并修正失效的 Content-Encoding/Content-Length，避免重复解压；上游 HTTP 分块边界不成为应用语义 |
+| 请求 body        | 原始二进制保留；文本编码、表单与 multipart 正文由扩展 RequestBody 决定，不经 JSON 字符串转换；没有正文与空正文分别表示                                                                                                              |
+| 错误与重试       | Access 失效、源站状态、网络中断、协议截断、取消和限额错误分开；整段自动重试只限尚未向插件交付响应的安全读取。一旦交付响应/正文，不透明重放；POST 等有副作用请求不自动重试                                                           |
 
 **鉴权与资源边界。** v2 沿用 `/api/*` 的 Access JWT、Origin、自定义请求头、目标域名和逐跳校验；不能因二进制媒体类型跳过中间件。出站只使用扩展构造的凭证，私有响应不进公共缓存；元信息和帧解析都先校验长度再分配。网络 body 不存 DO；DO 继续仅处理回调协调和通知。
 
 **功能与性能验收。** 固定响应覆盖空正文、二进制/UTF-8、重复 Cookie、POST 表单、301/302/303/307/308、HEAD/204/304、206/Range、压缩响应、错误状态、半途取消和截断；逐字节摘要及扩展处理结果一致，慢消费者下桥缓冲保持有界。对 256 KiB、4/16/32 MiB 固定正文，以及 Coomer/Pawchive/JJCOS 的受控真实响应重放，记录 bridge 开销、进入 Java 的字节数、插件解析、内存峰值和取消释放情况。响应重放数据仅进入本地开发证据，移除凭证，不成为公开产品资产。
 
-正式对照分为 release9 冻结宿主+原文本桥、产品宿主+原文本桥、产品宿主+二进制桥；固定运行时、输入、资源缓存条件和业务期限，保留失败样本，不混加分段中位数。完成标准包括：body 不再经 Gson/Base64 往返、桥不为每个大响应额外生成整段字符串、固定输入功能不回退，以及大响应桥处理开销/额外分配的实测改善。收益不足时继续定位，不宣称已消除全部运行时或插件解析成本。最后在线验证完整首图、翻页和切章，正常源无可重复的明显退化；测试中旧协议仅用于开发 A/B，产品发布不以隐式回退掩盖 v2 失败。
+历史对照分为 release9 研究宿主+原文本桥、产品宿主+原文本桥、产品宿主+二进制桥；固定运行时、输入、资源缓存条件和业务期限，保留失败样本，不混加分段中位数。完成标准包括：body 不再经 Gson/Base64 往返、桥不为每个大响应额外生成整段字符串、固定输入功能不回退，以及大响应桥处理开销/额外分配的实测改善。收益不足时继续定位，不宣称已消除全部运行时或插件解析成本。最后在线验证完整首图、翻页和切章，正常源无可重复的明显退化；测试中旧协议仅用于开发 A/B，产品发布不以隐式回退掩盖 v2 失败。
 
 ### 会话与负载
 
 - 默认一个活跃执行槽；跨源搜索可按设备能力启用第二槽，全局同时最多两个。一个槽仅加载一个包，同包多个 Source 复用，前台 RPC 串行；依赖内部异步回调不加入阻塞自身的前台队列。跨包搜索按优先级排队，不能每安装一包就常驻一个 Worker。
 - 公开页面和本地书架首屏不等待扩展。Access 身份确认后，首屏显示完再按最近阅读作品按需准备一个包；预热不调用热门/搜索/章节或全仓扫描。用户请求复用同一初始化 Promise。重包默认只占一个槽，停止额外预热；是否扩容由移动端内存实测决定。
 - 同包页面切换复用实例；跨包调度先使用空闲槽，回收不活跃实例后启动目标包。当前阅读和图片任务优先。原型全局 `pending` 改为按实例/requestId 关联，所有消息检查 buildId、generation 和 Source；64 位 Source ID 不转 JS number。
-- 普通文件和 HTTP 缓存分库存储，按已确认身份/仓库/包/storageSchema 分区；同一包不同版本不并发写同一可变存储。升级先取消并排空旧实例，再切换已验证构建指针；兼容 schema 可复用，需不可逆迁移的更新拒绝直接回滚或使用独立 schema。设置/阅读位置属于应用业务存储，不随实例销毁而消失。
+- 普通文件和 HTTP 缓存分库存储，按已确认身份/仓库/包/storageSchema 分区；同一包不同版本不并发写同一可变存储。升级先取消并排空旧实例，再切换已验证构建指针；只复用当前 schema；原型不实现旧 schema 迁移/兼容，必要时重建运行缓存。设置/阅读位置属于应用业务存储，不随实例销毁而消失。
 - 回收需追踪该实例的 HTTP、`enqueue` 后台请求、回调、图片和文件句柄；正常关闭给予有界清理时间，超时/卡死终止 Worker，撤销代次并 Abort 对应请求。关闭不能撤销上游已接受的 POST；不把整次 Source 调用自动重放到新实例来补偿。
 - 使用 release9 文件层的事务与 Web Locks 所有权恢复；产品验证多标签页、取消和异常终止后的回收。已提交写入直接持久化，不依赖 unload。HTTP Cache 异常终止的写锁租约与普通文件所有权分开验收，避免将等待租约误报为引擎卡死。
 - 当前页图片最高优先，其次手动搜索/详情，再到邻页预取；预取默认 2–3 页，长图限制存活位图。切章/回收释放 Blob URL、ImageBitmap、reader 和无用 bundle 文本；按宽×高×4估算像素内存并实测峰值。
@@ -260,16 +270,16 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 核心表（字段为设计草案，需正式迁移约束）：
 
-| 表 | 关键字段与约束 |
-|---|---|
-| `repositories`, `extensions`, `extension_builds`, `sources` | 仓库/包/版本、原输入哈希、转换版本、TeaVM/宿主/桥 ABI、bundle/资源哈希、storageSchema、能力和允许域名；安装项指向已验证 buildId，历史构建元数据用于手动回滚 |
-| `manga`, `library_entries` | 内部 UUID；唯一 `(source_key, source_url)`；收藏/元数据分离 |
-| `chapters` | UUID、manga_id、source_url、number_text/number_value、source_order、scanlator；唯一 `(manga_id, source_url)` |
-| `categories`, `entry_categories` | 自定义顺序，多对多关系 |
-| `chapter_progress`, `bookmarks`, `reading_positions` | 已读、书签、每部作品当前章节/页码、页面内偏移、清单版本、阅读 epoch、客户端 ID、服务端 revision；不保存时间线事件 |
-| `reader_settings`, `source_preferences` | 全局/漫画覆盖，typed values；敏感项分离 |
-| `sync_mutations`, `change_log` | 客户端 ID、幂等 mutation ID、单调服务端序号、删除墓碑；客户端 ID 只用于同步，不建设设备会话管理模块 |
-| `cover_assets` | 自定义封面对象路径、类型、大小、校验和及所属条目 |
+| 表                                                          | 关键字段与约束                                                                                                                                                                                        |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `repositories`, `extensions`, `extension_builds`, `sources` | 仓库/包/版本、原输入哈希、转换版本、TeaVM/宿主/桥 ABI、bundle/资源哈希、storageSchema、能力和允许域名；安装项指向已验证 buildId，Static Assets index/catalog 用于安装定位，归档及构建来源用于问题追溯 |
+| `manga`, `library_entries`                                  | 内部 UUID；唯一 `(source_key, source_url)`；收藏/元数据分离                                                                                                                                           |
+| `chapters`                                                  | UUID、manga_id、source_url、number_text/number_value、source_order、scanlator；唯一 `(manga_id, source_url)`                                                                                          |
+| `categories`, `entry_categories`                            | 自定义顺序，多对多关系                                                                                                                                                                                |
+| `chapter_progress`, `bookmarks`, `reading_positions`        | 已读、书签、每部作品当前章节/页码、页面内偏移、清单版本、阅读 epoch、客户端 ID、服务端 revision；不保存时间线事件                                                                                     |
+| `reader_settings`, `source_preferences`                     | 全局/漫画覆盖，typed values；敏感项分离                                                                                                                                                               |
+| `sync_mutations`, `change_log`                              | 客户端 ID、幂等 mutation ID、单调服务端序号、删除墓碑；客户端 ID 只用于同步，不建设设备会话管理模块                                                                                                   |
+| `cover_assets`                                              | 自定义封面对象路径、类型、大小、校验和及所属条目                                                                                                                                                      |
 
 不建立历史事件、统计、任务租约、下载页、tracker、文件导入或备份表。`change_log` 仅保存有限期的同步增量，不作为用户历史记录或备份存储。源站敏感凭证暂留当前客户端，不做云端凭证同步。
 
@@ -300,12 +310,14 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 ### 8.1 公开前端与受保护路由
 
-| 路径 | 访问要求 | 内容 |
-|---|---|---|
-| `/`、`/library`、`/browse`、`/reader/*`、`/settings`、`/auth/complete` | 公开 | SPA 页面外壳；个人内容由鉴权 API 或当前设备镜像提供 |
-| `/assets/*`、`/runtime/*`、`/source-worker.js`、manifest、Service Worker 脚本 | 公开 | 公开 UI、通用桥与 Worker 引导；不包含扩展 AOT bundle、用户配置或已安装扩展清单 |
-| `/api`、`/api/*` | Cloudflare Access + Worker JWT 校验 | 全部业务数据、网络桥、回调、通知连接、自定义封面和扩展产物 |
-| `/cdn-cgi/access/*` | Cloudflare 管理 | 登录相关平台端点；不由 SPA fallback 接管 |
+| 路径                                                                          | 访问要求                            | 内容                                                                             |
+| ----------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
+| `/`、`/library`、`/browse`、`/reader/*`、`/settings`、`/auth/complete`        | 公开                                | SPA 页面外壳；个人内容由鉴权 API 或当前设备镜像提供                              |
+| `/assets/*`、`/runtime/*`、`/source-worker.js`、manifest、Service Worker 脚本 | 公开                                | 公开 UI、通用桥与 Worker 引导；不包含扩展 AOT bundle、用户配置或已安装扩展清单   |
+| `/api`、`/api/*`                                                              | Cloudflare Access + Worker JWT 校验 | 私有业务数据/安装状态、Source 网络桥、回调、通知连接、自定义封面；不承载扩展正文 |
+| Static Assets 扩展目录                                                        | 公开、全客户端共用                  | index/catalog、清单与每扩展最新 AOT；客户端下载、更新与缓存须实测                |
+| 已有 GitHub Release（外部 HTTPS）                                             | 公开历史存储                        | 新分发路径不使用，不要求继续推送扩展                                             |
+| `/cdn-cgi/access/*`                                                           | Cloudflare 管理                     | 登录相关平台端点；不由 SPA fallback 接管                                         |
 
 只创建一个 Access **Self-hosted application**，覆盖 `read.example.com/api` 与 `read.example.com/api/*`，共享同一个 AUD；不保护整个 hostname。通配路径不包含裸 `/api`，所以两者都配置。公开前端不创建全站 Bypass，API 子路径也不设置更具体的 Bypass 应用。Access 按路径匹配的行为见[官方文档](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)。
 
@@ -313,20 +325,19 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 ### 8.2 API 与登录流程
 
-| 接口 | 行为 |
-|---|---|
-| `GET /api/auth/login` | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete` |
-| `GET /api/bootstrap` | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT |
-| `POST /api/sync/push` / `GET /api/sync/pull?cursor=` | 幂等变更批次、分页增量 |
-| `GET /api/library` / `GET /api/manga/:id` | 查询服务端状态；Source 实时调用由浏览器执行 |
-| `POST /api/runtime/sessions` | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例 |
-| `GET /api/runtime/events` | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道 |
-| `POST /api/bridge/http`、`/api/bridge/callback/*` | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法 |
-| `GET /api/covers/:id` / `POST /api/covers` | 自定义封面读写，验证类型和大小 |
-| `GET /api/extensions/builds/:buildId/manifest` | 已安装或可安装的验证构建，返回 ABI、哈希、大小、能力和同源产物引用 |
-| `GET /api/extensions/artifacts/:hash` | 私有 AOT JS/资源；仅清单已登记哈希，鉴权后按类型流式返回并支持 ETag；Range 如实现也先鉴权 |
+| 接口                                                 | 行为                                                                                            |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `GET /api/auth/login`                                | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete`             |
+| `GET /api/bootstrap`                                 | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT                       |
+| `POST /api/sync/push` / `GET /api/sync/pull?cursor=` | 幂等变更批次、分页增量                                                                          |
+| `GET /api/library` / `GET /api/manga/:id`            | 查询服务端状态；Source 实时调用由浏览器执行                                                     |
+| `POST /api/runtime/sessions`                         | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例                                    |
+| `GET /api/runtime/events`                            | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                          |
+| `POST /api/bridge/http`、`/api/bridge/callback/*`    | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法        |
+| `GET /api/covers/:id` / `POST /api/covers`           | 自定义封面读写，验证类型和大小                                                                  |
+| `GET /api/extensions/builds`                         | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准 |
 
-旧 `/bridge/*`、`/extensions/*` 后端路径停止服务，不保留公开别名；新的后端功能必须进入 `/api/*`。未知 API 在鉴权后返回 JSON 404，不能返回 `index.html`。通用 JS 桥和 Worker 引导可公开；包含扩展及宿主的 AOT bundle、必要资源和清单由受保护接口提供。
+旧 `/bridge/*`、`/extensions/*` 后端路径停止服务，不保留公开别名；新的后端功能必须进入 `/api/*`。未知 API 在鉴权后返回 JSON 404，不能返回 `index.html`。通用宿主/桥、Worker 引导与 WASM 由 Web Static Assets 或 Native 内置材料提供；构建清单与 AOT 在所有客户端均从 Static Assets 获取，只保留每扩展最新 build。删除 `/api/extensions/artifacts/:hash` 的扩展正文交付，不保留 R2 或 Worker 代理回退，也不新增私有下载地址/token 服务。
 
 1. 前端用 `fetch('/api/bootstrap', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' })` 探测状态。成功且响应结构正确才进入已连接状态；Access 可能先于 Worker 返回登录重定向或拒绝页，不能假定未授权总是 JSON 401。
 2. `opaqueredirect` 或明确的鉴权失败显示“登录后连接”；无法识别的 HTML/403 显示“连接被拒绝，可重新验证”，不能当作业务 JSON。断网、超时、5xx 单独显示连接错误，不触发自动登录循环。
@@ -338,14 +349,14 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 ### 8.3 Worker 校验与静态资源路由
 
-本项目使用 Workers Static Assets / Vite 插件，内部静态资源 router 不传递 `ctx.access`，因此不能依赖 `ctx.access.getIdentity()`。API 中间件显式校验 `Cf-Access-Jwt-Assertion`，不能只检查头存在或信任邮箱头。[Workers Access 限制](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)。
+本项目使用 Workers Static Assets，静态资源 router 不传递 `ctx.access`，因此不能依赖 `ctx.access.getIdentity()`。API 中间件显式校验 `Cf-Access-Jwt-Assertion`，不能只检查头存在或信任邮箱头。[Workers Access 限制](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)。
 
 - 服务端配置：`APP_ORIGIN`、`ACCESS_TEAM_DOMAIN`（完整 HTTPS 团队域名）、`ACCESS_AUD`、`OWNER_EMAIL`；不接受请求传入 issuer 或密钥地址，不将本人邮箱注入公开 bundle。
 - 使用 `jose` 的 `createRemoteJWKSet` / `jwtVerify`，公钥取自固定团队域名的 `/cdn-cgi/access/certs`；复用 JWKS 缓存并支持轮换，限制算法为 RS256，校验签名、issuer、AUD、必需的 exp/sub/email，以及存在时的 nbf。已验证 email 必须匹配本人配置。缺少/无效凭证返回 `401 ACCESS_REQUIRED`，已验证但非本人返回 `403 ACCESS_DENIED`；密钥服务故障拒绝业务访问并返回可重试的 503，不能降级放行。[JWT 校验文档](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)。
 - 只有校验通过才能访问 D1、R2、DO 或发起上游 HTTP。DO 从 Worker binding 接收已验证身份、到期时间和会话上下文，不通过公网自行信任前端身份字段。WebSocket 建连同样鉴权并校验 Origin；连接最晚到 JWT exp 时关闭，重连重新鉴权，不把一次成功 upgrade 视为永久授权。
 - UI、TeaVM Worker 保留版本化消息协议、requestId 与参数校验。写操作和网络桥/回调 POST 必须是预期同源 Origin，要求自定义请求头（如 `X-App-Request: 1`）作为 CSRF 防护的一部分；不开放跨源凭证 CORS，不通过 GET 修改业务状态。不增加逐 Source 权限签发或独立身份域。
 
-Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 Vite 构建确定）：
+Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 Flutter Web 与 runtime-host 构建组装）：
 
 ```jsonc
 {
@@ -354,8 +365,8 @@ Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 V
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api", "/api/*"]
-  }
+    "run_worker_first": ["/api", "/api/*"],
+  },
 }
 ```
 
@@ -371,50 +382,52 @@ Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 V
 
 Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Path/Expires/Secure，避免串账号；这些分组不构成对可信扩展的权限隔离。浏览器到同源网络桥按部署会话鉴权；Worker 到漫画站的出站请求只使用扩展请求描述构建，不复制入站应用 Cookie、Authorization 或 Access 头。敏感 cookie/token 仅保留在当前客户端，不增加云端凭证同步模块。
 
-业务数据、登录返回和错误响应使用 `Cache-Control: private, no-store`；API 不进入 Service Worker Cache Storage 或公共 CDN 缓存。按哈希寻址且不含个人配置的 AOT JS/资源单独使用 `private, no-cache` 与强 ETag：允许浏览器保存字节，但复用前必须向受保护接口重验证，Worker 在返回 200/206/304 前均校验 Access JWT。重验证仍有网络往返，生产不能直接套用本机缓存组耗时；Range/If-Range 和缓存命中须实测。[缓存指令语义](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control)。
+业务数据、登录返回和错误响应使用 `Cache-Control: private, no-store`；API 不进入 Service Worker Cache Storage 或公共 CDN 缓存。公开 AOT 与共享材料不使用 Access 私有缓存重验证：AOT 按 Static Assets index/catalog 定位最新 build 并校验下载字节，由客户端或 Service Worker 管理更新缓存，共享材料使用内容寻址静态缓存。公开缓存与个人运行文件/HTTP Cache 分开所有权；缓存命中、版本变化和解压上限仍须实测。
 
-书架镜像、阅读临时图片由应用在成功鉴权后显式保存到本地，按已验证身份和内容版本分区；身份未确认前不上传 outbox。首版产物走浏览器私有 HTTP 缓存重验证；不额外将受保护 bundle 写入 Service Worker Cache Storage。若以后增加应用级产物缓存，仍须在身份确认后按服务器可用构建清单加载，不能绕过 API 授权。普通文件/HTTP Cache 是原扩展内部运行状态，不能作为 Access 授权凭据。服务端若引入私有对象缓存，必须在 JWT 校验后读取。日志去除 cookie、JWT、token、请求正文与带凭证 URL；DO 回调标识不放长期 URL 日志里。正式版删除 `/api/results` 等原型测试入口。
+书架镜像、阅读临时图片按已验证身份和内容版本分区；身份未确认前不上传 outbox。公开扩展产物缓存可以独立于身份，但安装指针、Source 偏好和运行文件仍按身份隔离。仅加载符合当前协议/材料集合的构建；原型不为旧产物增加兼容分支。普通文件/HTTP Cache 是原扩展内部运行状态，不能作为 Access 授权凭据。服务端若引入私有对象缓存，必须在 JWT 校验后读取。日志去除 cookie、JWT、token、请求正文与带凭证 URL；DO 回调标识不放长期 URL 日志里。正式版删除 `/api/results` 等原型测试入口。
 
-首版按个人应用信任所安装的原版扩展，接受它们共享应用级权限；原版来源与哈希用于追溯和固定版本，不代表代码已通过安全审计。完整扩展隔离不属于首版发布条件。若特定源无法通过正常受限网络请求或手动账号配置访问，保留为受限源，不承诺自动绕过站点挑战。
+首版按个人应用信任所安装的原版扩展，接受它们共享应用级权限；原版来源与哈希用于追溯构建身份，不代表代码已通过安全审计。完整扩展隔离不属于首版发布条件。若特定源无法通过正常受限网络请求或手动账号配置访问，保留为受限源，不承诺自动绕过站点挑战。
 
 ## 9. 源迁移和部署资源
 
 **源迁移**保留为书架操作：搜索候选作品 → 用户确认 → 预览章节映射 → 创建目标收藏并复制明确匹配的分类/进度/书签。原条目完整保留，由用户另行决定是否移除；不做自动快照、备份文件或恢复向导。模糊章节不自动标为已读，不迁移尚未实现的 tracker 数据。
 
-**部署资源**：一个自定义 hostname、一个入口 Worker（含静态资源及 DO 类）、一个 D1、一个私有 R2 bucket、一个 SQLite-backed DO namespace、一个仅保护 API 的 Access application。线上不需要 Node/Java 服务器；Java/Maven/TeaVM 和 APK 转换只在开发机/CI 构建时运行。
+**部署资源**：一个自定义 hostname、一个入口 Worker（含 Static Assets 及 DO 类）、一个 D1、按个人对象功能需要的私有 R2、一个 SQLite-backed DO namespace、一个仅保护 API 的 Access application。全客户端的最新扩展通过 Static Assets 交付，已有 Release 仅历史存储；扩展交付不依赖 R2 binding。线上不需要 Node/Java 服务器；Java/Maven/TeaVM 和 APK 转换只在开发机/CI 构建时运行。
 
-部署顺序：先配置 Access API 路径、本人 Allow policy、Cookie/会话和 issuer/AUD；绑定 Worker 资源和 hostname，关闭额外入口；发布公共前端与选定产物，分别验证未登录和登录流程。具体 hostname、邮箱和 IdP 在部署时填写，本次只改计划，不创建 Cloudflare 资源。
+部署顺序：先配置 Access API 路径、本人 Allow policy、Cookie/会话和 issuer/AUD；绑定 Worker 资源和 hostname，关闭额外入口；发布公共前端与选定产物，分别验证未登录和登录流程。具体部署与实测状态见[验证记录](../VERIFICATION.md)；本节描述资源边界，不把已部署的外壳当作完整产品验收。
 
-### 扩展构建、安装与回滚
+### 扩展构建、安装与切换
 
-1. **输入和编译。** 原版 JAR 直接作为 AOT 输入；仅 APK 时先在本地/CI 转换并记录原 APK/JAR 哈希。使用冻结 release9 的工具链、宿主/依赖、反射/资源登记与兼容补丁；不要把测试源码、历史修改过的扩展或原型结果 API 纳入产品。
+1. **输入和编译。** 原版 JAR 直接作为 AOT 输入；仅 APK 时先在本地/CI 转换并记录原 APK/JAR 哈希。使用锁定的工具链、固定 submodule、当前项目宿主/依赖、反射/资源登记与兼容补丁；不要把测试源码、历史修改过的扩展或原型结果 API 纳入产品。
 2. **构建清单。** 每包产出独立 JS 与必要资源，记录 repo/package/version、输入/转换器、TeaVM/backend/JDK、源码/宿主 ABI、bridgeVersion、storageSchema、各文件 hash/字节数/MIME、Source IDs 和已验证能力。buildId 标识这一组不可变输出；编译器/宿主变更使相关构建缓存失效，不只按插件版本复用。保持可重建和业务验证，不宣称 AOT 输出已字节级可复现。
-3. **发布。** 只上传通过检查的产物到私有 R2，成功后原子发布清单/可安装指针。业务构建包与 UI 独立，更新一个扩展无需重建前端；UI 先做 ABI 握手，旧客户端无法兼容新构建时明确提示。无对应产物的仓库项目标为待构建/不支持，首版不从网页启动远端编译服务。
-4. **装载。** 公共 Worker 引导在 Access 确认后获取 manifest 和 bundle，校验哈希/字节数/ABI/资源白名单后再执行；移除原型默认包名命名空间，加载前设置已确认身份/仓库/包/schema。可用显式 fetch 后 Blob import 复用原型形式，但必须验证 CSP、峰值内存、错误页误载和相对资源路径；原型执行后计算哈希的诊断流程不能替代执行前校验。JS、资源和 manifest 均不得用登录 HTML 代替。
-5. **切换与回滚。** 固定当前 buildId，校验新构建后排空/终止旧实例并切换指针；保留旧产物和兼容 schema。回滚不改变书架/Source 稳定身份；通过跨标签页版本锁/通知排空旧版实例，同一可变 namespace 同时只允许一个构建版本写入；不覆盖别的标签页正在写的数据。不同存储 schema 的兼容性在清单中声明，没有验证迁移就不承诺数据无损回滚。
+3. **发布。** 通过构建/完整性检查后，将每扩展最新 build 的索引、清单和 AOT 发布到 Static Assets，index/catalog 作为客户端版本权威；旧 build 不留在在线扩展目录。不再向 GitHub Release 推送扩展，已有 Release 仅历史存储；provenance 记录实际构建身份。首次本地构建和 CI 增量直接更新 Static Assets，checkpoint 与构建缓存用于恢复。初次全量在本地固定 checkout 执行，CI 仅做有界上游增量。编译成功但未实测的包保持 `compiled_unverified`，不宣称可读。扩展与 UI 可独立构建，无对应产物时明确待构建/不支持。
+4. **装载。** 公共 Worker 引导在 Web 与 Native 均从 Static Assets 的 index/catalog 获取最新 manifest 和压缩 bundle，有界解压并校验传输字节、原文字节、ABI 与资源集合后再执行；仅在下载/解压边界校验对应字节域，执行复用已验证字节。客户端或 Service Worker 管理更新与本地缓存，不把本地缓存当作旧版本的服务端可下载保证。Source 网络调用仍需 Access；移除原型默认包名命名空间，加载前设置已确认身份/仓库/包/schema。可用显式 fetch 后 Blob import 复用原型形式，但必须验证 CSP、峰值内存、错误页误载和相对资源路径；原型执行后计算哈希的诊断流程不能替代执行前校验。JS、资源和 manifest 均不得用登录 HTML 代替。
+5. **切换与重建。** 固定当前 buildId，校验新构建后排空/终止旧实例并切换指针；通过跨标签页版本锁/通知保持同一可变 namespace 的单一写入版本。原型只维护当前协议，不保留旧桥、旧材料或旧存储 schema 兼容；必要时重建运行缓存，不覆盖书架/Source 稳定身份或别的标签页正在写的数据。
 6. **交付边界。** 研究 ZIP（约 1.15 GB）包含 6019 个源码/证据/历史文件，不整体上传。生产使用显式文件清单，排除 fixtures、响应录制、日志、测试页、结果保存服务和历史候选；保留 NOTICE 与所需许可声明。
 
-扩展 JS/大资源统一从私有 R2 经 `/api/extensions/artifacts/:hash` 返回，不直接打入入口 Worker 脚本，也不放公共 Static Assets。ProjectSuki 单包约 42.26 MiB，已超过静态资源单文件 25 MiB 上限；入口 Worker 使用 R2 body 流，必要的预压缩产物在构建期生成，验证 Content-Encoding、Vary、表示对应的 ETag 和解压后哈希，不在线压缩整个包。[Workers 限制](https://developers.cloudflare.com/workers/platform/limits/)。AOT JS 仍在浏览器解析执行；资源交付优化不能掩盖解压、校验和实例化内存。
+**增量发布目标（待迁移）：** 保留现有源码及依赖闭包指纹；构建状态迁移为静态构建清单，记录 upstream commit、input fingerprint、host fingerprint 与构建结果，和只列当前可用版本的客户端 index/catalog 分开。定时 CI 只构建输入变化的包；失败时保留该包上次成功产物，同一失败输入不反复重试。发布最新 Static Assets 快照，不依赖 Release；首全量仍在本地完成，CI 缺少 baseline 时明确停止，不能退化为全量构建。此处是发布器迁移目标，尚非已完成能力。
 
-R2 仅保存自定义封面与扩展产物，D1 只含保留业务表，DO 只协调会话/通知；不增加漫画归档、备份、任务消费者或 Cron。生产不依赖 CheerpJ 官方 CDN；开发对照仍遵循其许可。断网可展示已有本地镜像和加载页，不承诺新扩展离线启动或完整章节可读。
+Static Assets 是所有客户端扩展 AOT 的最终来源，只保留每扩展最新 build；已有 GitHub Release 仅历史存储，不属于新分发路径；首次本地构建和 CI 增量直接更新 Static Assets，依靠 checkpoint 与构建缓存恢复。正文不经过 R2 或 Worker 代理，也不编入 UI 或入口 Worker 脚本。通用 host、桥、WASM 等共享材料使用 Web Static Assets 或 Native 内置资源，不随每个扩展重复发布；Native 材料缺失时明确失败，不从网络回退。构建时生成确定性 gzip 与传输元数据，下载/解压分别验证不同字节域，后续执行复用已验证的字节，不重复 hash 同一份数据。当前发布器迁移尚待实施；最新版发布、index/catalog 更新、客户端或 Service Worker 缓存切换、跨端下载/CSP 与有界解压仍须实测；目前这项交付决策不等于产品链路已通过。AOT JS 仍需解析执行，传输优化不能掩盖实例化内存。
+
+R2 如启用只保存自定义封面等私有个人对象，D1 只含保留业务表，DO 只协调会话/通知；不增加漫画归档、备份、任务消费者或 Cron。生产不依赖 CheerpJ 官方 CDN；开发对照仍遵循其许可。断网可展示已有本地镜像和加载页，不承诺新扩展离线启动或完整章节可读。
 
 ## 10. 运行时决定、证据与性能预算
 
 ### 当前决定：TeaVM release9 为首版默认实现
 
-2026-11-03 核对「继续目标并设为 goal」的冻结报告与独立完成审计：`pass=true`、`goalAchieved=true`，原型任务已完成。此前“等待第六候选/新版性能、暂留 CheerpJ”的条件已过时，本版将 TeaVM 从候选提升为实施默认；这是计划切换，不表示本 App 已编码、部署或完成产品验收。CheerpJ 留作开发对照，b-jvm 不进入首版依赖；不提供自动双引擎重试。
+2026-11-03 核对「继续目标并设为 goal」的冻结报告与独立完成审计：`pass=true`、`goalAchieved=true`，原型任务已完成。此前“等待第六候选/新版性能、暂留 CheerpJ”的条件已过时，本版将 TeaVM 从候选提升为实施默认；这是运行时选择依据，不等于当前产品已完成验收；工程实现与分项验证见现行计划和验证记录。CheerpJ 留作开发对照，b-jvm 不进入首版依赖；不提供自动双引擎重试。
 
-冻结输入为 TeaVM 0.16.0 JavaScript backend、release9，源码指纹 `06b2e8f9b560f41c60ce6779ee320ac50523780bf5dd24c08dc01a65010fe299`；ZIP SHA-256 为 `af26e3c797a72dbd684875d87a62b0006b85f52c97b736d37f67d2d71b619f17`。从该版本建立产品工作副本，后续每项修改生成新指纹并对应回归，冻结交付保持只读。
+初始研究输入为 TeaVM 0.16.0 JavaScript backend、release9，源码指纹 `06b2e8f9b560f41c60ce6779ee320ac50523780bf5dd24c08dc01a65010fe299`；ZIP SHA-256 为 `af26e3c797a72dbd684875d87a62b0006b85f52c97b736d37f67d2d71b619f17`。项目源码由该版本内化后持续维护，后续构建记录当前宿主/上游指纹并对应回归；这里的摘要只标识初始研究输入。
 
 ### 兼容性验收已经完成到哪里
 
-| 范围 | release9 结果 | 产品含义 |
-|---|---|---|
-| 包/身份 | 77/77 包编译加载，447/447 Source 身份 | 证明本批原版 APK 转换 JAR 的可行性，不外推全部仓库/任意官方原生 JAR |
-| 在线五接口 | 2133/2235 业务通过；6 空、40 失败、56 跳过；422 Source 读链、418 五项非空 | 读链止于页面列表；失败为 HTTP/传输症状，不能直接作为引擎缺陷数 |
-| 失败并集固定输入 | 29 包/125 Source/625 项，状态、宿主字段、异常差异 0，fixture miss 0 | 已做同输入语义对照；不是每项业务成功，也不能证明历史未留正文的失败原因 |
-| 请求与头 | 请求序列/次数差异 189 项、头序列差异 205 项，忽略顺序后头内容差异 32 项 | strict pass=false、semantic pass=true；逐项处置证据保留，不宣称严格完全等价 |
-| 最终包定向回归 | 文件重启 40 项、图片 48 项、multipart 18 项及 Webtoons 异常路径通过 | 复用已集成修复；产品 DTO/桥/生命周期修改后复跑相关证据 |
+| 范围             | release9 结果                                                             | 产品含义                                                                    |
+| ---------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 包/身份          | 77/77 包编译加载，447/447 Source 身份                                     | 证明本批原版 APK 转换 JAR 的可行性，不外推全部仓库/任意官方原生 JAR         |
+| 在线五接口       | 2133/2235 业务通过；6 空、40 失败、56 跳过；422 Source 读链、418 五项非空 | 读链止于页面列表；失败为 HTTP/传输症状，不能直接作为引擎缺陷数              |
+| 失败并集固定输入 | 29 包/125 Source/625 项，状态、宿主字段、异常差异 0，fixture miss 0       | 已做同输入语义对照；不是每项业务成功，也不能证明历史未留正文的失败原因      |
+| 请求与头         | 请求序列/次数差异 189 项、头序列差异 205 项，忽略顺序后头内容差异 32 项   | strict pass=false、semantic pass=true；逐项处置证据保留，不宣称严格完全等价 |
+| 最终包定向回归   | 文件重启 40 项、图片 48 项、multipart 18 项及 Webtoons 异常路径通过       | 复用已集成修复；产品 DTO/桥/生命周期修改后复跑相关证据                      |
 
 差异处置按并发顺序、原宿主缓存策略、后台文件状态、请求元数据等价和短期 Cookie 过期分别归因。75 个诊断 Worker/595 项计划包含重复输入，不与 625 项相加为独立覆盖。关键证据包括 Coomer 强制 miss、Grabberzone/MangaDotNet 异步计数 POST 等待收敛、FSIComics 空文件状态观察、Honeytoon Max-Age=1 Cookie 真实等待过期。产品必须追踪后台请求到受控结束，不能通过缩短观测窗口遗漏 POST，也不能排序请求后抹去语义差异。
 
@@ -424,11 +437,11 @@ R2 仅保存自定义封面与扩展产物，D1 只含保留业务表，DO 只�
 
 固定业务响应放在浏览器 Worker 内存中。三插件×两引擎×三个新 Worker；每个预热后 40 轮、每轮五项业务，共 3600 次调用，全部序列化返回字段和请求序列一致。轮次先取每 Worker 中位数再取三个 Worker 中位数，不把 40 轮当作 40 个独立设备样本。
 
-| 原插件 | 五项业务一轮：TeaVM / CheerpJ | 40 轮 renderer CPU：TeaVM / CheerpJ | 连续启动至首次有效业务：TeaVM / CheerpJ |
-|---|---:|---:|---:|
-| MangaDraft | 32.71 / 42.87 ms | 2.12 / 3.28 秒 | 0.174 / 2.348 秒 |
-| Xiutaku | 42.69 / 72.90 ms | 2.21 / 3.41 秒 | 0.193 / 2.387 秒 |
-| ProjectSuki | 2083.73 / 2065.11 ms | 6.93 / 9.59 秒 | 0.549 / 2.445 秒 |
+| 原插件      | 五项业务一轮：TeaVM / CheerpJ | 40 轮 renderer CPU：TeaVM / CheerpJ | 连续启动至首次有效业务：TeaVM / CheerpJ |
+| ----------- | ----------------------------: | ----------------------------------: | --------------------------------------: |
+| MangaDraft  |              32.71 / 42.87 ms |                      2.12 / 3.28 秒 |                        0.174 / 2.348 秒 |
+| Xiutaku     |              42.69 / 72.90 ms |                      2.21 / 3.41 秒 |                        0.193 / 2.387 秒 |
+| ProjectSuki |          2083.73 / 2065.11 ms |                      6.93 / 9.59 秒 |                        0.549 / 2.445 秒 |
 
 连续启动是另一次 18/18 成功的实验，包含创建 Worker、固定响应配置、引擎/宿主/原插件初始化至非空热门列表；输出和请求一致。浏览器保留 HTTP 缓存，TeaVM bundle 位于本地、CheerpJ JDK 位于远端 CDN，构建/APK 转换不计入启动。不能把约 4–14 倍启动差称为编译器速度或手机公网保证；也不是完全清缓存、真实网站请求或首图。CheerpJ 对照是原宿主，不代表此前公共宿主进一步优化后的极限表现。
 
@@ -442,31 +455,31 @@ MangaDraft/Xiutaku 的业务轮耗时改善约 1.31/1.71 倍；ProjectSuki 受�
 - 采用第 5 节有界执行槽；普通文件恢复、HTTP Cache 命中、bundle 校验/解析/实例化均计入测量。按普通包与 ICU 重包分别测新 Worker、同包复用、跨包切换和压力回收。
 - P0 测“打开应用→首张漫画可见”及下一章，单列 Access 探测/交互登录、产物获取、文件恢复、宿主/Source 就绪、页面列表、图片请求/处理/解码；交互登录不混入引擎指标。覆盖桌面、Android Chrome、iOS Safari/PWA 和真实 Workers 出口；IndexedDB/Web Locks/CSP/回调不通过的平台明确限制。
 - 待测 UI 目标维持本地书架热开 <1 秒、缓存页操作 <100 ms；首图、重包和内存不以桌面本地报告直接定数值 SLA。记录成功率、分布、实际传输量和峰值，再确定目标设备预算。
-- runtime 请求/后台 enqueue 超时能终止并释放；检查会话过期、跨标签页写入、升级回滚、HTTP Cache 异常写锁恢复与大文件吞吐。文件层单值存放正文、真实配额耗尽/断电、完整 POSIX 等边界继续保留。
-- 二进制桥仍未实现；在相同 TeaVM/输入/状态下比较原桥与新桥，不将换引擎收益归入桥改造。原版限速、Cookie 时钟和真实缓存保持正确，诊断模式干预只用于解释原因。
+- runtime 请求/后台 enqueue 超时能终止并释放；检查会话过期、跨标签页写入、更新/缓存切换、HTTP Cache 异常写锁恢复与大文件吞吐。文件层单值存放正文、真实配额耗尽/断电、完整 POSIX 等边界继续保留。
+- 二进制桥的实现和验证进度以现行计划为准；在相同 TeaVM/输入/状态下比较原桥与新桥，不将换引擎收益归入桥改造。原版限速、Cookie 时钟和真实缓存保持正确，诊断模式干预只用于解释原因。
 - 发布还须验证完整 DTO/分页/filters/preferences、3–5 个常用与图片处理代表源完整章节、源迁移和同步；研究原型完成不替代这些产品功能。
 
 ### 运行成本
 
-纯 Workers 的云端成本主要来自 API/图片代理请求、CPU、D1/DO 操作及 R2 产物/封面交付；AOT 编译是本地/CI 成本。按需实例化节省浏览器运行开销，不等于云端代理免费。先在免费额度内测量，付费与容量按部署时 [Workers](https://developers.cloudflare.com/workers/platform/pricing/)、[R2](https://developers.cloudflare.com/r2/pricing/)、[D1](https://developers.cloudflare.com/d1/platform/pricing/) 文档核算，域名另计。
+纯 Workers 的云端成本主要来自个人数据与 Source 网络桥请求、CPU、D1/DO 操作及私有封面交付；AOT 编译是本地/CI 成本，全客户端扩展下载与 Web 共享材料流量由 Static Assets 提供，新分发不依赖扩展 Release 发布。按需实例化节省浏览器运行开销，不等于云端代理免费。先在免费额度内测量，付费与容量按部署时 [Workers](https://developers.cloudflare.com/workers/platform/pricing/)、[R2](https://developers.cloudflare.com/r2/pricing/)、[D1](https://developers.cloudflare.com/d1/platform/pricing/) 文档核算，域名另计。
 
-Worker 流式转发正文/产物，避免大 JSON/Base64、在线编译、同步压缩和整包缓冲；网络等待与 CPU 分开计量。当前 Workers 每 isolate 128 MB，不能把 R2 大对象放入内存再响应。[Workers 限制](https://developers.cloudflare.com/workers/platform/limits/)。
+Worker 仅为 Source 网络桥流式转发上游 HTTP 正文，不转发扩展 AOT；避免大 JSON/Base64、在线编译、同步压缩和整包缓冲；网络等待与 CPU 分开计量。当前 Workers 每 isolate 128 MB，不能把 R2 大对象放入内存再响应。[Workers 限制](https://developers.cloudflare.com/workers/platform/limits/)。
 
 早期 CheerpJ 预加载、b-jvm 与 TeaVM 逐候选分析保存在[历史评估](./runtime-evaluation-history-2026-11-02.md)，不作为当前实施依赖。
 
 ## 11. 实施顺序与验收
 
-| 阶段 | 交付内容 | 必须通过 |
-|---|---|---|
-| P0-F：Flutter 接入验证 | 共用 Dart 接口；Web interop/Worker；原生 WebView/Worker；Access 与资源通道；优先 iOS 图片探针 | 协议/DTO/取消/恢复一致；图片字节正确、缓冲有界、无整图字符串中转；移动总峰值/首图可测；不再比选 UI 框架 |
-| P0-R：跨端阅读器基线 | Flutter 工程；独立 Dart 阅读核心；分页与长条视图；局部缩放、逻辑位置、图片窗口；仅开发使用的固定图片夹具 | 声明支持的 Android / iPhone 真机及桌面浏览器验证翻页、惯性滚动与缩放不争抢；旋转、单双页及图片尺寸变化保持锚点；连续阅读内存受控；测试夹具不计入真实源支持 |
-| P0-A：TeaVM 公共宿主与产物运行 | release9 工作副本；按包 AOT 清单与私有交付；有界执行槽；文件/HTTP Cache；单 hostname、公开 UI 和 Access API | 原输入/构建/执行哈希与 ABI 一致；执行前校验；原桥下产品宿主相关语义回归；存储重启/取消/版本切换正确；首屏不等运行时 |
-| P0-B：TeaVM 二进制网络桥 | JSO/byte[]/ArrayBuffer 探针；v2 帧；Worker 流、Okio/fiber 有界读取、取消/限额 | 固定响应语义与字节一致；body 无整段 Gson/Base64；慢消费者缓冲有界；与同版原桥对照；HTTP Cache/图片/异常不回退，Access 通过 |
-| P0-C：真实在线阅读与移动部署 | P0-R 接入 SourceRuntime / PageProvider；完整 DTO/分页、图片拦截器/处理、进度落盘、异步回调、实际 Workers/Access 与客户端 | 3–5 个原版源覆盖直图/请求头/图片处理；原生图片桥及 Access 会话通过；完整章节首中末页及下一章可交互阅读；测手机/重包首图与合计峰值；跨包切换/回收恢复不串状态或重发副作用 |
-| P1：可日用核心 | 书架/分类/详情；完善阅读模式与全部阅读设置；基本进度、书签和继续阅读；PWA 更新恢复；实际所需的局部脚本适配 | 重启保持书架和阅读位置；按需读取当前作品章节；网络错误可重试；移动端手势、键盘、平板分屏可用；已支持的远程脚本路径通过局部接口、存储访问与超时检查 |
-| P2：基本多设备同步 | 书架、分类、进度、书签与非敏感设置的增量同步 | 两设备同时修改/短暂断网后上线不倒退；标未读不被旧进度覆盖；不生成历史统计事件或后台任务；DO 重启不串回调 |
-| P3：源管理与迁移 | 扩展仓库/手动升级/回滚、完整筛选与设置、源迁移 | 每个兼容操作有真实 fixture；扩展失败可回滚；迁移预览准确且保留原条目，不依赖备份或追踪模块 |
-| P4：覆盖与优化 | 扩大候选 Source 集、在线图片格式兼容、性能/可访问性 | 按源、版本、浏览器、Cloudflare 出口记录结果；基准不混入合成输入或前置跳过；不增加暂缓模块 |
+| 阶段                           | 交付内容                                                                                                                  | 必须通过                                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P0-F：Flutter 接入验证         | 共用 Dart 接口；Web interop/Worker；原生 WebView/Worker；Access 与资源通道；优先 iOS 图片探针                             | 协议/DTO/取消/恢复一致；图片字节正确、缓冲有界、无整图字符串中转；移动总峰值/首图可测；不再比选 UI 框架                                                                  |
+| P0-R：跨端阅读器基线           | Flutter 工程；独立 Dart 阅读核心；分页与长条视图；局部缩放、逻辑位置、图片窗口；仅开发使用的固定图片夹具                  | 声明支持的 Android / iPhone 真机及桌面浏览器验证翻页、惯性滚动与缩放不争抢；旋转、单双页及图片尺寸变化保持锚点；连续阅读内存受控；测试夹具不计入真实源支持               |
+| P0-A：TeaVM 公共宿主与产物运行 | 当前项目宿主；按包 AOT 清单与 Static Assets 最新扩展交付；有界执行槽；文件/HTTP Cache；单 hostname、公开 UI 和 Access API | 原输入/构建/执行哈希与 ABI 一致；执行前校验；原桥下产品宿主相关语义回归；存储重启/取消/版本切换正确；首屏不等运行时                                                      |
+| P0-B：TeaVM 二进制网络桥       | JSO/byte[]/ArrayBuffer 探针；v2 帧；Worker 流、Okio/fiber 有界读取、取消/限额                                             | 固定响应语义与字节一致；body 无整段 Gson/Base64；慢消费者缓冲有界；与同版原桥对照；HTTP Cache/图片/异常不回退，Access 通过                                               |
+| P0-C：真实在线阅读与移动部署   | P0-R 接入 SourceRuntime / PageProvider；完整 DTO/分页、图片拦截器/处理、进度落盘、异步回调、实际 Workers/Access 与客户端  | 3–5 个原版源覆盖直图/请求头/图片处理；原生图片桥及 Access 会话通过；完整章节首中末页及下一章可交互阅读；测手机/重包首图与合计峰值；跨包切换/回收恢复不串状态或重发副作用 |
+| P1：可日用核心                 | 书架/分类/详情；完善阅读模式与全部阅读设置；基本进度、书签和继续阅读；PWA 更新恢复；实际所需的局部脚本适配                | 重启保持书架和阅读位置；按需读取当前作品章节；网络错误可重试；移动端手势、键盘、平板分屏可用；已支持的远程脚本路径通过局部接口、存储访问与超时检查                       |
+| P2：基本多设备同步             | 书架、分类、进度、书签与非敏感设置的增量同步                                                                              | 两设备同时修改/短暂断网后上线不倒退；标未读不被旧进度覆盖；不生成历史统计事件或后台任务；DO 重启不串回调                                                                 |
+| P3：源管理与迁移               | 扩展仓库/最新版更新与缓存、完整筛选与设置、源迁移                                                                         | 每个兼容操作有真实 fixture；扩展更新失败可重试且不误用旧协议；迁移预览准确且保留原条目，不依赖备份或追踪模块                                                             |
+| P4：覆盖与优化                 | 扩大候选 Source 集、在线图片格式兼容、性能/可访问性                                                                       | 按源、版本、浏览器、Cloudflare 出口记录结果；基准不混入合成输入或前置跳过；不增加暂缓模块                                                                                |
 
 Access 专项验收：
 
@@ -474,7 +487,7 @@ Access 专项验收：
 - 未登录、过期、伪造 JWT、错 issuer/AUD、非本人身份均不能访问 `/api` 或任一 API 子路由；仅携带邮箱头或回调标识也失败。边缘拒绝与 Worker JWT 校验分别覆盖，密钥轮换后有效会话仍可用。
 - 点击登录、Access 验证、固定回跳、bootstrap 和原路由恢复完整通过；取消或拒绝登录没有循环跳转。会话过期暂停后台请求，重新登录恢复；断网与漫画站 401/403 不误报 Access 失效，未提交进度不丢失。
 - 验证静态文件同名 API、未知 API、裸 `/api`、路径尾斜杠及编码变体，不得绕过中间件、读到私有数据或返回 SPA 成功页；`workers.dev`、版本预览和 R2 公网入口不可作为后端替代入口。
-- API/登录响应不被 Service Worker 或共享缓存保存；凭证不出现在公开 bundle、URL、日志或上游请求中。AOT JS/资源私有 HTTP 缓存重验证及 304/206 也须鉴权，过期会话不能凭 ETag 获得成功响应；产物获取、图片和 WebSocket 建连/到期重连使用正确 Access 会话；登录 HTML 不可作为 JS 执行。
+- API/登录响应不被 Service Worker 或共享缓存保存；凭证不出现在公开 bundle、URL、日志或上游请求中。个人对象的 304/206 也须鉴权，过期会话不能凭 ETag 获得成功响应；图片网络桥和 WebSocket 使用正确 Access 会话。公开扩展下载不依赖应用 Cookie/Authorization/Access 头；真实 Web/Native Static Assets 下载、index/catalog 更新、缓存切换、解压及摘要验证通过后才能执行，登录 HTML 或错误页不可当作 JS。
 - 旧 iframe 同步回调不能靠 Bypass 恢复；声明支持的脚本路径必须通过异步中转、Access 鉴权、实例约束及无主线程死锁验证。iOS PWA 顶层登录回跳和 Cookie 可用性单独实测，不假定与普通浏览器完全一致。
 
 发布门槛：HTTP/回调不得未鉴权访问；失效 Access 会话、过期或错实例回调标识被拒绝；重定向不能逃出允许域；应用登录头不会转发给漫画站；自定义封面等私有对象不公开；基本进度正确持久化；源迁移保留原条目；Chrome/Firefox/Safari 桌面以及声明支持的移动原生、移动 Web/PWA 实际验证，原生侧额外通过 Access 会话、图片资源桥与 WebView 回收恢复。某平台不通过则显示限制，不提前宣称全平台同等能力。暂缓功能不得出现在导航、数据表、API 或发布门槛中。第二 hostname、浏览器 JVM 和完整恶意扩展沙箱不列入首版验收；按包执行槽是 TeaVM 产物管理要求。
@@ -485,14 +498,14 @@ Flutter + TeaVM 已确定。P0-F 验证运行适配与原生图片通道，P0-R 
 
 ## 12. 参考证据
 
-- 当前冻结交付：[继续目标并设为 goal](codex://threads/01a19c7e-1a74-7f82-8942-d6201b0c5d0e)。已读取最终聊天、[实测报告](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/实测报告.md)、[完成审计](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/teavm-compatibility-v2-completion-audit.json) 和交付副本校验；从 ZIP 只读核对 `PERFORMANCE-V2.md`、`STARTUP-V2.md`、对应最终审计、`V2-FREEZE.json`、最终构建矩阵，复算总/中位/最大包体积。
+- 初始研究交付：[继续目标并设为 goal](codex://threads/01a19c7e-1a74-7f82-8942-d6201b0c5d0e)。已读取最终聊天、[实测报告](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/实测报告.md)、[完成审计](/Users/wybxc/Codex/2026-11-02/ji-x/outputs/teavm-compatibility-v2-completion-audit.json) 和交付副本校验；从 ZIP 只读核对 `PERFORMANCE-V2.md`、`STARTUP-V2.md`、对应最终审计、`V2-FREEZE.json`、最终构建矩阵，复算总/中位/最大包体积。
 - 原 TeaVM 开发：[实现 TeaVM 原型并对比性能](codex://threads/01a199be-23ce-7571-bfc5-be9a5b6f14da)，用于追溯原型修复；早期 release3/5/6 等未完成状态已由 release9 取代，不与最终版拼接兼容率。
 - 原 CheerpJ 宿主：[查找浏览器 JVM 运行方案](codex://threads/01a18a59-2c07-7473-8ccd-241f0cb09a36)，目录 `/Users/wybxc/Codex/2026-10-30/you/outputs/mihon-web-prototype`；作为原 ABI、网络桥和语义对照，不直接当作 TeaVM 产品运行时。
 - b-jvm：[实现并对比 b-jvm 原型](codex://threads/01a199bf-5186-77d3-b806-39ad3ee513ad)。公共浏览器宿主经验保留，运行时不进入当前关键路径；历史结论见独立历史评估。
 - TeaVM JSO 只作为字节适配的官方接口依据，具体复制/异步/取消须 P0-B 探针验证：[官方 JSO 文档](https://teavm.org/docs/runtime/jso.html)。不把文档能力当作本项目二进制桥已实现。
-- 本次没有重跑浏览器基准、全量兼容测试或修改冻结交付。本文产品协议/限额/调度是待实现设计；原型测试通过与产品部署通过分开记录。
+- 上述性能与兼容率属于原研究快照，不外推到当前上游全量。本文设计持续更新；实际实现、模拟测试、真实网络和产品验收分开记录。
 
-## 本次交付检查
+## 修订历史（不是当前验收状态）
 
 2026-11-03 确定接入路线：用户采用浏览器宿主，即 Web 直接 WebWorker、原生系统 WebView 内 WebWorker。两端共用 TeaVM JS 产物和运行协议；当前只验证该路线的容器、Access 与图片资源交接。已同步主设计和接入文档，未创建工程或运行新探针。以下“推荐路线”记录反映决策前状态。
 

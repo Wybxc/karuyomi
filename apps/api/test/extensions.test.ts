@@ -13,7 +13,7 @@ const manifest = buildManifestSchema.parse({
   protocolVersion,
   hostAbi,
   runtimeBaseline,
-  bridgeVersion: 1,
+  bridgeVersion: 2,
   buildId: 'verified-build',
   packageName: 'example.source',
   repoId: 'example',

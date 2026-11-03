@@ -19,7 +19,7 @@ export async function manifest(): Promise<BuildManifest> {
     protocolVersion,
     hostAbi,
     runtimeBaseline,
-    bridgeVersion: 1,
+    bridgeVersion: 2,
     buildId: 'test-build',
     repoId: 'test-repo',
     version: '1',

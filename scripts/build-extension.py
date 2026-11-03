@@ -413,7 +413,7 @@ def build(args):
                 key: materials[key]
                 for key in ["protocolVersion", "hostAbi", "runtimeBaseline"]
             },
-            "bridgeVersion": 1,
+            "bridgeVersion": 2,
             "storageSchema": "release9-v1",
             "bundle": bundle,
             "hostScripts": materials["hostScripts"],

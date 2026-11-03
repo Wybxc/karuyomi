@@ -8,6 +8,19 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { byteStream, relayFrames, streamChunks } from './http-probe-streams.ts';
+import {
+  HTTP_BRIDGE_MEDIA_TYPE,
+  HTTP_FRAME_LIMIT,
+  HTTP_REQUEST_BODY_LIMIT,
+  HTTP_RESPONSE_BODY_LIMIT,
+  HttpFrameReader,
+  HttpFrameError,
+  httpRequestMetaSchema,
+  httpResponseMetaSchema,
+} from '../../../packages/contracts/src/http-frames.ts';
 import { collectMaterials } from '../../../packages/runtime-host/materials.ts';
 import { isRecord } from '../../../tools/extensions/types.ts';
 import { createRequire } from 'node:module';
@@ -29,10 +42,16 @@ const artifactFolder = process.argv[3]
   : path.join(path.dirname(manifestPath), 'artifacts');
 const temporary = await mkdtemp(path.join(tmpdir(), 'karuyomi-source-probe-'));
 const state = path.join(temporary, 'state');
-const evidenceFile = path.join(
-  root,
-  'runtime/teavm/.local/probes/source-metadata.json',
-);
+const evidenceFile = process.env.SOURCE_PROBE_EVIDENCE
+  ? path.resolve(process.env.SOURCE_PROBE_EVIDENCE)
+  : path.join(root, 'runtime/teavm/.local/probes/source-metadata.json');
+const allowedHosts = (
+  process.env.SOURCE_PROBE_ALLOWED_HOSTS ?? 'www.mangadraft.com'
+)
+  .split(',')
+  .map((host) => host.trim())
+  .filter(Boolean);
+assert(allowedHosts.length > 0, 'Explicit Source allowed hosts are required');
 const apiOrigin = 'https://read.example.com';
 const environment = {
   ...process.env,
@@ -86,8 +105,7 @@ execFileSync(
     '--local',
     '--persist-to',
     state,
-    '--allow-host',
-    'www.mangadraft.com',
+    ...allowedHosts.flatMap((host) => ['--allow-host', host]),
   ],
   { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] },
 );
@@ -170,7 +188,7 @@ const evidence: LiveEvidence = {
   buildId: manifest.buildId,
   bundleSha256: manifest.bundle.sha256,
   realRS256Verification: true,
-  allowedHosts: ['www.mangadraft.com'],
+  allowedHosts,
   productionAccessVerified: false,
   testOnlyOriginAlias: true,
   network,
@@ -184,7 +202,7 @@ const html = `<!doctype html><html lang="en"><meta charset="utf-8">
 <title>Karuyomi live Source metadata probe</title>
 <style>body{font:14px system-ui;margin:24px;max-width:1000px}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{padding:12px}</style>
 <h1>Live Source metadata probe</h1>
-<p>Loopback only: verified real TeaVM product, local D1/R2, signed test Access identity, real workerd HTTP bridge and live MangaDraft. No image bytes are requested.</p>
+<p>Loopback only: verified real TeaVM product, local D1/R2, signed test Access identity and real workerd HTTP bridge. No image bytes are requested.</p>
 <button id="run" disabled>Run real metadata operations</button><pre id="output">Loading...</pre>
 <script type="module">
 import '/runtime/host.js';
@@ -225,6 +243,7 @@ button.onclick = async () => {
     if(popular?.hasNextPage)await call('popular',{page:2});
     const searched=await call('search',{page:1,query:popular?.mangas?.[0]?.title??'a'});
     if(session.sources[0].supportsLatest!==false)await call('latest',{page:1});
+    else await record('operationSkipped',{operation:'latest',reason:'source_unsupported'});
     const manga=popular?.mangas?.[0]??searched?.mangas?.[0];
     if(manga){
       const details=await call('details',{manga});
@@ -263,86 +282,165 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (pathname.startsWith('/api/')) {
-      const body = await readBody(request);
-      const headers: Record<string, string> = {};
-      for (const [key, value] of Object.entries(request.headers)) {
-        if (value !== undefined)
-          headers[key] = Array.isArray(value) ? value.join(', ') : value;
-      }
-      headers['Cf-Access-Jwt-Assertion'] = token;
-      headers.Origin = apiOrigin;
-      delete headers.host;
-      delete headers['content-length'];
-      const started = performance.now();
-      const result = await mf.dispatchFetch(apiOrigin + request.url, {
-        method: request.method ?? 'GET',
-        headers,
-        ...(body.length ? { body } : {}),
-      });
-      const bytes = Buffer.from(await result.arrayBuffer());
-      if (pathname === '/api/bridge/http') {
-        const descriptor: unknown = JSON.parse(body.toString());
-        const upstream: unknown = JSON.parse(bytes.toString());
-        assert(
-          isRecord(descriptor) &&
-            typeof descriptor.url === 'string' &&
-            typeof descriptor.method === 'string',
-          'Invalid v1 HTTP request metadata',
-        );
-        assert(isRecord(upstream), 'Invalid v1 HTTP response metadata');
-        const entry: NetworkEntry = {
-          method: descriptor.method,
-          target:
-            new URL(descriptor.url).origin + new URL(descriptor.url).pathname,
-          elapsedMs: Math.round(performance.now() - started),
-          bridgeStatus: result.status,
-          ...(typeof upstream.status === 'number'
-            ? { upstreamStatus: upstream.status }
-            : {}),
-          queryKeys: [],
-        };
-        const target = new URL(descriptor.url);
-        entry.queryKeys = [...target.searchParams.keys()];
-        // Only this public catalog request is inspected; never record Source
-        // cookies, authorization or signed image query strings.
-        if (target.pathname === '/api/catalog/projects') {
-          entry.catalogQuery = Object.fromEntries(target.searchParams);
+      const abort = new AbortController();
+      const disconnect = () =>
+        abort.abort(new Error('probe_client_disconnected'));
+      const responseClosed = () => {
+        if (!response.writableFinished) disconnect();
+      };
+      request.once('aborted', disconnect);
+      response.once('close', responseClosed);
+      let requestFrames: HttpFrameReader | undefined;
+      let responseFrames: HttpFrameReader | undefined;
+      try {
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(request.headers)) {
+          if (value !== undefined)
+            for (const item of Array.isArray(value) ? value : [value])
+              headers.append(key, item);
         }
-        if (typeof upstream.error === 'string')
-          entry.bridgeError = upstream.error;
-        if (typeof upstream.body === 'string' && upstream.body) {
-          const data = Buffer.from(upstream.body, 'base64');
-          entry.bodyBytes = data.length;
-          entry.bodySha256 = createHash('sha256').update(data).digest('hex');
-          const contentType = Array.isArray(upstream.headers)
-            ? upstream.headers.find(
-                (value: unknown): value is [string, string] =>
-                  Array.isArray(value) &&
-                  value.length === 2 &&
-                  typeof value[0] === 'string' &&
-                  value[0].toLowerCase() === 'content-type' &&
-                  typeof value[1] === 'string',
-              )?.[1]
-            : undefined;
-          if (contentType !== undefined) entry.contentType = contentType;
-          if (entry.contentType?.includes('text/html')) {
-            const text = data.toString();
-            const title = /<title[^>]*>([^<]*)<\/title>/i
-              .exec(text)?.[1]
-              ?.slice(0, 120);
-            if (title !== undefined) entry.htmlTitle = title;
-            entry.challengeDetected =
-              /cf-chl-|challenge-platform|Just a moment|bot-verification|Human Verification/i.test(
-                text,
-              );
+        headers.set('Cf-Access-Jwt-Assertion', token);
+        headers.set('Origin', apiOrigin);
+        // This controls only the loopback-to-workerd hop. Source headers remain
+        // inside META and are preserved by the product bridge.
+        headers.set('Accept-Encoding', 'identity');
+        for (const name of [
+          'host',
+          'content-length',
+          'connection',
+          'transfer-encoding',
+        ])
+          headers.delete(name);
+        const hasBody = !['GET', 'HEAD'].includes(request.method ?? 'GET');
+        let body = hasBody ? byteStream(Readable.toWeb(request)) : undefined;
+        let entry: NetworkEntry | undefined;
+        const started = performance.now();
+        if (
+          pathname === '/api/bridge/http' &&
+          headers.get('content-type') === HTTP_BRIDGE_MEDIA_TYPE
+        ) {
+          requestFrames = new HttpFrameReader(body!, HTTP_REQUEST_BODY_LIMIT);
+          const descriptor = httpRequestMetaSchema.parse(
+            await requestFrames.meta(),
+          );
+          const target = new URL(descriptor.url);
+          entry = {
+            method: descriptor.method,
+            target: target.origin + target.pathname,
+            elapsedMs: 0,
+            bridgeStatus: 0,
+            queryKeys: [...target.searchParams.keys()],
+          };
+          if (target.pathname === '/api/catalog/projects')
+            entry.catalogQuery = Object.fromEntries(target.searchParams);
+          body = relayFrames(requestFrames, descriptor);
+        }
+        const result = await mf.dispatchFetch(apiOrigin + request.url, {
+          method: request.method ?? 'GET',
+          headers: Object.fromEntries(headers),
+          signal: abort.signal,
+          ...(body ? { body: streamChunks(body), duplex: 'half' } : {}),
+        });
+        let outgoing = result.body ? byteStream(result.body) : null;
+        if (entry) {
+          entry.bridgeStatus = result.status;
+          if (
+            result.headers.get('content-type') === HTTP_BRIDGE_MEDIA_TYPE &&
+            outgoing
+          ) {
+            responseFrames = new HttpFrameReader(
+              outgoing,
+              HTTP_RESPONSE_BODY_LIMIT,
+            );
+            const upstream = httpResponseMetaSchema.parse(
+              await responseFrames.meta(),
+            );
+            entry.upstreamStatus = upstream.upstreamStatus;
+            const contentType = upstream.headers.find(
+              ([name]) => name.toLowerCase() === 'content-type',
+            )?.[1];
+            if (contentType !== undefined) entry.contentType = contentType;
+            const hash = createHash('sha256');
+            let size = 0;
+            // A bounded HTML prefix is sufficient for diagnostic titles and
+            // common challenge markers; no complete Source body is retained.
+            const htmlPrefix = Buffer.alloc(8192);
+            let prefixSize = 0;
+            const current = entry;
+            outgoing = relayFrames(
+              responseFrames,
+              upstream,
+              (data) => {
+                hash.update(data);
+                size += data.byteLength;
+                if (
+                  current.contentType?.includes('text/html') &&
+                  prefixSize < htmlPrefix.length
+                ) {
+                  const part = data.subarray(0, htmlPrefix.length - prefixSize);
+                  htmlPrefix.set(part, prefixSize);
+                  prefixSize += part.byteLength;
+                }
+              },
+              async (error) => {
+                current.elapsedMs = Math.round(performance.now() - started);
+                current.bodyBytes = size;
+                current.bodySha256 = hash.digest('hex');
+                if (error)
+                  current.bridgeError =
+                    error instanceof HttpFrameError
+                      ? error.code
+                      : 'probe_stream_failed';
+                if (prefixSize) {
+                  const text = htmlPrefix.subarray(0, prefixSize).toString();
+                  const title = /<title[^>]*>([^<]*)<\/title>/i
+                    .exec(text)?.[1]
+                    ?.slice(0, 120);
+                  if (title !== undefined) current.htmlTitle = title;
+                  current.challengeDetected =
+                    /cf-chl-|challenge-platform|Just a moment|bot-verification|Human Verification/i.test(
+                      text,
+                    );
+                }
+                network.push(current);
+                await persist();
+                console.log(JSON.stringify(current));
+              },
+            );
+          } else {
+            entry.elapsedMs = Math.round(performance.now() - started);
+            entry.bridgeError = 'bridge_rejected';
+            network.push(entry);
+            await persist();
+            console.log(JSON.stringify(entry));
           }
         }
-        network.push(entry);
-        await persist();
-        console.log(JSON.stringify(entry));
+        const outgoingHeaders = new Headers(Array.from(result.headers));
+        for (const name of [
+          'content-length',
+          'transfer-encoding',
+          'connection',
+        ])
+          outgoingHeaders.delete(name);
+        response.writeHead(result.status, Object.fromEntries(outgoingHeaders));
+        if (outgoing)
+          await pipeline(
+            Readable.from(streamChunks(outgoing), {
+              objectMode: false,
+              highWaterMark: HTTP_FRAME_LIMIT,
+            }),
+            response,
+            { signal: abort.signal },
+          );
+        else response.end();
+      } finally {
+        request.off('aborted', disconnect);
+        response.off('close', responseClosed);
+        await Promise.allSettled([
+          requestFrames?.cancel(),
+          responseFrames?.cancel(),
+        ]);
       }
-      response.writeHead(result.status, Object.fromEntries(result.headers));
-      response.end(bytes);
       return;
     }
     const materialSha256 = /^\/runtime\/materials\/([a-f0-9]{64})$/.exec(
@@ -390,9 +488,10 @@ const server = createServer(async (request, response) => {
     response.writeHead(404).end();
   } catch (error) {
     console.error(error);
-    if (!response.headersSent)
+    if (!response.headersSent) {
       response.writeHead(500, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({ error: 'probe_failed' }));
+      response.end(JSON.stringify({ error: 'probe_failed' }));
+    } else response.destroy();
   }
 });
 await new Promise<void>((resolve) =>

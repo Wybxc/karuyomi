@@ -1,6 +1,6 @@
 # Flutter、RN/RNW 与纯 PWA 历史评估
 
-日期：2026-11-03。**后续决定：用户已选定 Flutter + TeaVM，当前实施方案见[接入设计](./flutter-teavm-integration.md)。** 本文其余内容保留选型前的比较与理由，关于待定、候选、RN/PWA 对照实施或 UI 约束未调整的表述均不再作为当前实施要求。目标继续是移动端原生优先、桌面端浏览器优先，允许用一定桌面性能换取移动性能。尚未建立产品客户端，也没有三条路线的性能实测。
+日期：2026-11-03。**后续决定：用户已选定 Flutter + TeaVM，当前实施方案见[接入设计](./flutter-teavm-integration.md)。** 本文其余内容保留选型前的比较与理由，关于待定、候选、RN/PWA 对照实施或 UI 约束未调整的表述均不再作为当前实施要求。目标继续是移动端原生优先、桌面端浏览器优先，允许用一定桌面性能换取移动性能。本文可正常更新，不再冻结；以下“尚未建立客户端”等状态仅描述当时评估，不代表当前工程状态。当前实现与验收见[计划目录](../plan/README.md)和[验证记录](../VERIFICATION.md)。
 
 **当时建议：以 Flutter 为第一性能验证候选，RN/RNW 为主要备选，纯 PWA 为低成本方案和性能对照。** 原因是移动端阅读性能及定制 UI 复用的权重高于桌面框架开销；这不是 Flutter 已经快于 RN/PWA 的结论。此次确定 Flutter 后，前端改用 Flutter widgets / Pub；pnpm 保留 TS/JS 管理与编排。
 
@@ -8,11 +8,11 @@
 
 PWA 是 Web 应用的交付形态，不是与 Flutter/RN 同层的 UI 框架；Flutter Web 和 RNW 也可配置为 PWA。这里比较三个完整组合：
 
-| 路线 | 移动端 | 桌面端 |
-|---|---|---|
-| Flutter | Flutter 原生 App + 系统 WebView 中的 TeaVM | Flutter Web + 浏览器 TeaVM Worker，可另加 PWA 安装能力 |
-| RN/RNW | RN 原生 App + 系统 WebView 中的 TeaVM | RNW / 必要的 React DOM 视图 + TeaVM Worker，可另加 PWA |
-| 纯 PWA | React DOM + TeaVM Worker，同一 Web 应用安装到主屏幕 | 同一 React DOM 应用 |
+| 路线    | 移动端                                              | 桌面端                                                 |
+| ------- | --------------------------------------------------- | ------------------------------------------------------ |
+| Flutter | Flutter 原生 App + 系统 WebView 中的 TeaVM          | Flutter Web + 浏览器 TeaVM Worker，可另加 PWA 安装能力 |
+| RN/RNW  | RN 原生 App + 系统 WebView 中的 TeaVM               | RNW / 必要的 React DOM 视图 + TeaVM Worker，可另加 PWA |
+| 纯 PWA  | React DOM + TeaVM Worker，同一 Web 应用安装到主屏幕 | 同一 React DOM 应用                                    |
 
 RNW 使用 React DOM，Expo Web 可添加 Service Worker；RNW 的浏览器产物不使用 Hermes。[RNW 文档](https://necolas.github.io/react-native-web/docs/)、[Expo PWA](https://docs.expo.dev/guides/progressive-web-apps/)。Flutter Web 支持独立浏览器构建，但需另配安装和缓存策略。[Flutter Web](https://docs.flutter.dev/platform-integration/web)。
 
@@ -29,18 +29,18 @@ RNW 使用 React DOM，Expo Web 可添加 Service Worker；RNW 的浏览器产�
 
 以下是基于架构的工程判断，均不构成本项目性能实测结果。
 
-| 维度 | Flutter | RN/RNW | 纯 PWA |
-|---|---|---|---|
-| 移动阅读 UI | 一套自绘布局、手势与渲染模型，适合高度定制阅读画布；Dart release AOT | 原生视图/滚动，手势与动画可放 UI 线程；React/JS 状态更新需控制 | 浏览器图片、滚动和合成；精细控制受 Web API 与引擎行为约束 |
-| 原生端与桌面 UI 复用 | 潜力较高，仍需图片/输入/平台适配 | 状态和规则可共享，阅读视图可按平台分支 | 整套 Web UI 共用，但没有原生阅读视图 |
-| 桌面浏览器 | 额外框架渲染与启动成本，在当前权重下可接受一定差距 | DOM 路径，容易结合浏览器输入和专用 Web 视图 | DOM 路径，直接使用浏览器能力 |
-| TeaVM 宿主 | 原生端经 WebView；Web 经 JS interop | 原生端经 WebView；Web 直接接 JS 宿主 | 直接延续已验证的浏览器宿主路径 |
-| 图片数据路径 | 原生端增加 WebView → 资源桥 → Flutter 图片 | 原生端增加 WebView → 资源桥 → 原生图片 | Worker → 浏览器图片资源，无新增原生资源交接 |
-| 移动总内存 | Flutter 引擎、WebKit、TeaVM、解码图片，须合并计量 | Hermes、原生视图、WebKit、TeaVM、解码图片，须合并计量 | 浏览器、TeaVM 和解码图片；结构较少不保证实际峰值一定最低 |
-| Access/恢复 | 新增原生会话与 WebView 生命周期适配 | 同左 | 沿用 Web 路径，仍须真实 Access 与已安装 PWA 验证 |
-| 日常维护 | Dart/Pub + TS/pnpm + 原生桥 | 主要 TS/pnpm + 原生桥及平台视图 | 主要 TS/pnpm，单套前端发布，链路最少 |
-| 原有 UI 约束 | 需要改用 Flutter widgets | Web 可保留 shadcn，原生控件另实现 | 可直接保留 shadcn |
-| 当前定位 | 第一性能验证候选 | 原生主备选、保留 TS 的稳健路线 | 最短可用路径与性能基线；采用为主路线需接受移动 Web |
+| 维度                 | Flutter                                                              | RN/RNW                                                         | 纯 PWA                                                    |
+| -------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------- |
+| 移动阅读 UI          | 一套自绘布局、手势与渲染模型，适合高度定制阅读画布；Dart release AOT | 原生视图/滚动，手势与动画可放 UI 线程；React/JS 状态更新需控制 | 浏览器图片、滚动和合成；精细控制受 Web API 与引擎行为约束 |
+| 原生端与桌面 UI 复用 | 潜力较高，仍需图片/输入/平台适配                                     | 状态和规则可共享，阅读视图可按平台分支                         | 整套 Web UI 共用，但没有原生阅读视图                      |
+| 桌面浏览器           | 额外框架渲染与启动成本，在当前权重下可接受一定差距                   | DOM 路径，容易结合浏览器输入和专用 Web 视图                    | DOM 路径，直接使用浏览器能力                              |
+| TeaVM 宿主           | 原生端经 WebView；Web 经 JS interop                                  | 原生端经 WebView；Web 直接接 JS 宿主                           | 直接延续已验证的浏览器宿主路径                            |
+| 图片数据路径         | 原生端增加 WebView → 资源桥 → Flutter 图片                           | 原生端增加 WebView → 资源桥 → 原生图片                         | Worker → 浏览器图片资源，无新增原生资源交接               |
+| 移动总内存           | Flutter 引擎、WebKit、TeaVM、解码图片，须合并计量                    | Hermes、原生视图、WebKit、TeaVM、解码图片，须合并计量          | 浏览器、TeaVM 和解码图片；结构较少不保证实际峰值一定最低  |
+| Access/恢复          | 新增原生会话与 WebView 生命周期适配                                  | 同左                                                           | 沿用 Web 路径，仍须真实 Access 与已安装 PWA 验证          |
+| 日常维护             | Dart/Pub + TS/pnpm + 原生桥                                          | 主要 TS/pnpm + 原生桥及平台视图                                | 主要 TS/pnpm，单套前端发布，链路最少                      |
+| 原有 UI 约束         | 需要改用 Flutter widgets                                             | Web 可保留 shadcn，原生控件另实现                              | 可直接保留 shadcn                                         |
+| 当前定位             | 第一性能验证候选                                                     | 原生主备选、保留 TS 的稳健路线                                 | 最短可用路径与性能基线；采用为主路线需接受移动 Web        |
 
 已有可复用资产主要是 Java/TeaVM/JS 宿主和测试证据；React 阅读器尚未实现。RN 的优势主要在后续类型、规则和应用代码的统一，不应虚构为已有整套 React 产品可直接迁移。
 
@@ -80,7 +80,7 @@ WebKit 支持请求持久存储，但默认 best-effort 数据可能被回收；
 
 ## 6. 决定整条链路性能的共同问题
 
-三条路线的后端均保留单 hostname、公开 Web 外壳、Access 保护 API、Workers/Hono、D1/R2/DO。TeaVM 0.16.0 JavaScript backend / release9、原版扩展不改、公共宿主 P0-A 与二进制桥 P0-B 均保持不变。没有服务端 JVM或容器，也不新增持续后台任务。
+三条路线当时共享的后端约束是单应用 hostname、公开 Web 外壳、Access 保护 API、Workers/Hono 与 D1/DO；R2 如使用仅承载私有个人对象。当前扩展在所有客户端均以 Static Assets 为最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新缓存，不再要求扩展 Release 发布，已有 Release 仅历史存储；通用资源走 Web Static Assets / Native 内置，不经 Worker/R2 代理扩展正文，不需要客户端 GitHub token。TeaVM 0.16.0 JavaScript backend / release9、原版扩展不改、公共宿主 P0-A 与二进制桥 P0-B 均保持不变。没有服务端 JVM或容器，也不新增持续后台任务。
 
 原生 Flutter/RN 均使用 WebView 内的 TeaVM；iOS 在相同 WebKit 与安全条件下，没有仅由 UI 框架带来的 TeaVM JIT 优势。Dart AOT 只影响 Dart 部分；Hermes 不是这里的 TeaVM 执行引擎。现有桌面 release9 结果与早期 CheerpJ 冷启动都不能直接替代这些组合的手机首图实测。
 
@@ -92,25 +92,25 @@ WebKit 支持请求持久存储，但默认 best-effort 数据可能被回收；
 
 ## 7. 工具链要求与复用目标
 
-| 要求 | Flutter | RN/RNW | 纯 PWA |
-|---|---|---|---|
-| pnpm | 继续管理 TS 后端/JS 宿主和任务编排；Dart 依赖使用 Pub | 管理 JS/TS；原生 SDK/构建仍独立 | 管理前后端 JS/TS |
-| 原 UI 三选一 | 需明确改为 Flutter widgets；Material widgets 不等于 React MUI | Web 保留 shadcn，原生 UI 另实现 | 保留 shadcn |
-| 跨语言契约 | 版本化 schema 生成 Dart/TS 类型，共用测试向量 | 共享纯 TS 类型与规则，隔离浏览器/原生 API | 同一套 TS 实现 |
-| 阅读 UI 复用 | 优先共享布局/交互，平台资源适配 | 优先共享规则和状态，按需要分视图 | 全 Web 复用 |
+| 要求         | Flutter                                                       | RN/RNW                                    | 纯 PWA           |
+| ------------ | ------------------------------------------------------------- | ----------------------------------------- | ---------------- |
+| pnpm         | 继续管理 TS 后端/JS 宿主和任务编排；Dart 依赖使用 Pub         | 管理 JS/TS；原生 SDK/构建仍独立           | 管理前后端 JS/TS |
+| 原 UI 三选一 | 需明确改为 Flutter widgets；Material widgets 不等于 React MUI | Web 保留 shadcn，原生 UI 另实现           | 保留 shadcn      |
+| 跨语言契约   | 版本化 schema 生成 Dart/TS 类型，共用测试向量                 | 共享纯 TS 类型与规则，隔离浏览器/原生 API | 同一套 TS 实现   |
+| 阅读 UI 复用 | 优先共享布局/交互，平台资源适配                               | 优先共享规则和状态，按需要分视图          | 全 Web 复用      |
 
 Flutter 的包管理使用 Pub。[官方文档](https://docs.flutter.dev/packages-and-plugins/using-packages)。当前只评估更改成本，没有把原 UI 要求视为已取消。若三选一仍覆盖整个前端，所有原生路线都需要调整适用范围；若仅约束 Web，RN/React 和纯 PWA 可保留，Flutter Web 仍需改要求。
 
-## 8. P0-F 的验证与采用门槛
+## 8. 历史 P0-F 选型验证与采用门槛
 
-先验证阅读切片和真实图片链，再建设完整外围页面。无需为了选型完成三套产品。
+以下表格记录选型前的比较方案；Flutter 已确定，不再执行三套框架对照或按此重新选择。当前 P0-F 验证接入、Access 和图片资源通道，验收以接入设计与现行计划为准。
 
-| 阶段 | 验证内容 | 用于判断 |
-|---|---|---|
-| Web 对照切片 | React DOM：分页/Webtoon、缩放、RTL/双页、位置恢复；同版 TeaVM 的 3–5 个源 | 建立最短图片路径和手机实际体验基线；可独立于框架候选推进 |
-| Flutter 优先切片 | 同等阅读行为；iPhone/Android 真机与桌面 Web；原生资源桥与 Access | 移动体验是否达目标；桌面增加的成本是否仍可日用；UI 实际能共享到哪里 |
-| RN 对照切片 | 当 Flutter 桥接、移动内存或工具链成本不理想，或 RN 仍可能改善结果时，复用相同样例和原生通道协议验证 | 避免只凭 AOT/生态口号选择；确认原生滚动/手势及平台视图的实际效果 |
-| 决策 | 原版源语义与阅读行为一致后比较实测 | 移动体验优先，桌面过门槛，再比较维护与依赖要求 |
+| 阶段             | 验证内容                                                                                            | 用于判断                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Web 对照切片     | React DOM：分页/Webtoon、缩放、RTL/双页、位置恢复；同版 TeaVM 的 3–5 个源                           | 建立最短图片路径和手机实际体验基线；可独立于框架候选推进            |
+| Flutter 优先切片 | 同等阅读行为；iPhone/Android 真机与桌面 Web；原生资源桥与 Access                                    | 移动体验是否达目标；桌面增加的成本是否仍可日用；UI 实际能共享到哪里 |
+| RN 对照切片      | 当 Flutter 桥接、移动内存或工具链成本不理想，或 RN 仍可能改善结果时，复用相同样例和原生通道协议验证 | 避免只凭 AOT/生态口号选择；确认原生滚动/手势及平台视图的实际效果    |
+| 决策             | 原版源语义与阅读行为一致后比较实测                                                                  | 移动体验优先，桌面过门槛，再比较维护与依赖要求                      |
 
 使用固定版本和 release/profile 配置、同设备、同章节、同网络、相同产物缓存及 Access 状态；不能拿 Flutter debug 与 RN release 或热 PWA 对比。冷启动、缓存后新 runtime、同 runtime 热调用分别记录；交互登录时间独立统计。[Flutter 性能建议](https://docs.flutter.dev/perf/best-practices)、[RN release 测量](https://reactnative.dev/docs/performance)。
 

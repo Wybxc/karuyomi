@@ -35,16 +35,21 @@ interface HttpSession {
   failure?: RuntimeFailure;
 }
 
+const HTTP_HANDLE_LIMIT = 4;
+const HTTP_TERMINAL_LIMIT = 16;
+
 /** One operation owns its handles. No reads run ahead of the Java consumer. */
 export class BinaryHttpTransport {
   private context: HttpCallContext | undefined;
   private readonly sessions = new Map<string, HttpSession>();
+  // Keep only small failure causes until the owning operation ends, never bodies.
+  private readonly terminalFailures = new Map<string, RuntimeFailure>();
   private closed = false;
 
   constructor(
     private readonly origin: string,
     private readonly buildId: string,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (...args) => fetch(...args),
   ) {}
 
   begin(context: HttpCallContext): void {
@@ -56,6 +61,7 @@ export class BinaryHttpTransport {
 
   end(): void {
     for (const handle of this.sessions.keys()) this.close(handle);
+    this.terminalFailures.clear();
     this.context = undefined;
   }
 
@@ -67,7 +73,7 @@ export class BinaryHttpTransport {
   open(json: string): string {
     if (this.closed || !this.context)
       throw new RuntimeFailure('runtime_lost', 'No active Source operation');
-    if (this.sessions.size >= 4)
+    if (this.sessions.size >= HTTP_HANDLE_LIMIT)
       throw new RuntimeFailure('limit_exceeded', 'Too many open HTTP bodies');
     // Reject oversized control input before parsing. Body bytes never enter JSON.
     if (json.length > HTTP_FRAME_LIMIT)
@@ -149,29 +155,52 @@ export class BinaryHttpTransport {
     const body = new Blob(parts, { type: HTTP_BRIDGE_MEDIA_TYPE });
     session.chunks = [];
     try {
-      const response = await this.fetcher(
-        new URL('/api/bridge/http', this.origin),
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
-            Accept: HTTP_BRIDGE_MEDIA_TYPE,
-            'X-App-Request': '1',
-            'X-Runtime-Build': this.buildId,
+      let response: Response;
+      try {
+        response = await this.fetcher(
+          new URL('/api/bridge/http', this.origin),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
+              Accept: HTTP_BRIDGE_MEDIA_TYPE,
+              'X-App-Request': '1',
+              'X-Runtime-Build': this.buildId,
+            },
+            body,
+            credentials: 'same-origin',
+            redirect: 'manual',
+            cache: 'no-store',
+            signal: session.controller.signal,
           },
-          body,
-          credentials: 'same-origin',
-          redirect: 'manual',
-          cache: 'no-store',
-          signal: session.controller.signal,
-        },
-      );
+        );
+      } catch (error) {
+        if (session.failure) throw session.failure;
+        // The endpoint and fetch options are host-controlled. A native TypeError
+        // before Response is a connection failure, never a partial-body retry.
+        if (error instanceof TypeError && !session.controller.signal.aborted)
+          throw new RuntimeFailure(
+            'source_error',
+            'Source bridge connection failed',
+            true,
+          );
+        throw error;
+      }
       if (session.failure) {
         await response.body?.cancel().catch(() => {});
         throw session.failure;
       }
       this.get(handle);
       try {
+        if (
+          response.status === 502 &&
+          (await preResponseNetworkFailure(response, session.controller.signal))
+        )
+          throw new RuntimeFailure(
+            'source_error',
+            'Source bridge connection failed',
+            true,
+          );
         assertBridgeResponse(response);
       } catch (error) {
         await response.body?.cancel().catch(() => {});
@@ -267,6 +296,13 @@ export class BinaryHttpTransport {
     if (!session) return;
     this.sessions.delete(handle);
     session.failure = reason;
+    if (reason.code !== 'cancelled') {
+      this.terminalFailures.set(handle, reason);
+      while (this.terminalFailures.size > HTTP_TERMINAL_LIMIT) {
+        const oldest = this.terminalFailures.keys().next().value;
+        if (oldest !== undefined) this.terminalFailures.delete(oldest);
+      }
+    }
     clearTimeout(session.timer);
     session.chunks = [];
     session.controller.abort(reason);
@@ -274,16 +310,68 @@ export class BinaryHttpTransport {
   }
 
   private get(handle: string): HttpSession {
+    if (this.closed || !this.context) throw cancelledFailure(false);
+    const failure = this.terminalFailures.get(handle);
+    if (failure) throw failure;
     const session = this.sessions.get(handle);
     if (
       !session ||
-      this.closed ||
-      !this.context ||
       session.owner.requestId !== this.context.requestId ||
       session.owner.generation !== this.context.generation
     )
       throw cancelledFailure(false);
     return session;
+  }
+}
+
+/** Only the API's small, fixed pre-header error can authorize a connection retry. */
+async function preResponseNetworkFailure(
+  response: Response,
+  signal: AbortSignal,
+): Promise<boolean> {
+  if (
+    response.headers
+      .get('content-type')
+      ?.split(';')[0]
+      ?.trim()
+      .toLowerCase() !== 'application/json' ||
+    !response.body
+  )
+    return false;
+  const reader = response.body.getReader();
+  const abort = () => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', abort, { once: true });
+  const bytes = new Uint8Array(4096);
+  let size = 0;
+  try {
+    if (signal.aborted) return false;
+    for (;;) {
+      const chunk = await reader.read();
+      if (signal.aborted) return false;
+      if (chunk.done) break;
+      if (size + chunk.value.byteLength > bytes.byteLength) return false;
+      bytes.set(chunk.value, size);
+      size += chunk.value.byteLength;
+    }
+    const error: unknown = JSON.parse(
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, size)),
+    );
+    return (
+      !!error &&
+      typeof error === 'object' &&
+      !Array.isArray(error) &&
+      Object.keys(error).length === 1 &&
+      'error' in error &&
+      error.error === 'upstream_network_error'
+    );
+  } catch {
+    return false;
+  } finally {
+    signal.removeEventListener('abort', abort);
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
 }
 
@@ -299,9 +387,12 @@ function cancelledFailure(timeout: boolean): RuntimeFailure {
 function transportFailure(error: unknown): RuntimeFailure {
   if (error instanceof RuntimeFailure) return error;
   if (error instanceof HttpFrameError) {
-    const code = ['limit_exceeded', 'timeout', 'cancelled'].includes(error.code)
-      ? (error.code as 'limit_exceeded' | 'timeout' | 'cancelled')
-      : 'protocol_error';
+    const code =
+      error.code === 'limit_exceeded' ||
+      error.code === 'timeout' ||
+      error.code === 'cancelled'
+        ? error.code
+        : 'protocol_error';
     return new RuntimeFailure(code, error.message);
   }
   return new RuntimeFailure('source_error', 'Source HTTP transport failed');

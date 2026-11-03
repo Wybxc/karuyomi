@@ -4,6 +4,16 @@
 
 `python3 scripts/test_register_build.py` 验证不可变构建 ID/网络策略/产物元数据冲突、幂等重试、失败回滚、清单边界及上传中断不触发发布。它使用内存 SQLite，不访问 Cloudflare。
 
+HTTP 网络生产入口只接受 `application/vnd.karuyomi.http.v2`，不提供 JSON/Base64 网络回退。真实 workerd 的受控 HTTP origin 回归独立执行：
+
+```sh
+node apps/api/test/http-bridge-workerd-probe.ts
+```
+
+此命令不需要私有凭据、JVM、AOT 或外网。它使用锁定 Wrangler 的 Miniflare/workerd、临时 D1、现场生成并验证的 RS256 JWT，以及临时 loopback HTTP server。只有该探针的 outbound Node HTTP handler 将已声明的 `fixture.example.org` 逐块转发到本地夹具；生产域名、鉴权和网络策略不放宽。成功结果默认写入忽略目录 `.local/probes/http-bridge-v2.json`，可用第一个参数指定输出路径。
+
+夹具实际发送 gzip/Brotli 压缩字节，验证解码后的正文 SHA256、200/206/403、重复 Set-Cookie、HEAD 的表示头、禁止自动重定向、流式二进制上传、早响应仍要求完整请求 END，以及消费取消、请求 AbortSignal、超时均关闭 origin 连接。它验证真实 workerd 与受控 origin，不验证真实 Source、生产 Access 或 CacheInterceptor。压缩边界依据 [Cloudflare Fetch 文档](https://developers.cloudflare.com/workers/runtime-apis/fetch/)；测试不把附加 gzip 头的普通字节当作压缩证据。
+
 真实 workerd、D1、R2 集成探针单独执行，需要已构建的清单及其所有内容寻址产物：
 
 ```sh

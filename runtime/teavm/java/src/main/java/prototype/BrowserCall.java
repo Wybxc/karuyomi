@@ -1,12 +1,10 @@
 package prototype;
 
 import okhttp3.*;
-import okio.Buffer;
 import okio.BufferedSink;
 import okio.Okio;
 import okio.Timeout;
 import com.google.gson.*;
-import java.lang.reflect.*;
 import java.util.*;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -360,7 +358,6 @@ public final class BrowserCall implements Call {
   }
 
   private Response transport(Request r, int readMs) throws IOException {
-    if (!Bridge.httpVersion2()) return transportV1(r);
     try {
       return transportV2(r, readMs);
     } catch (IOException error) {
@@ -368,9 +365,7 @@ public final class BrowserCall implements Call {
           || error instanceof InterruptedIOException
           || !client.retryOnConnectionFailure()
           || !(r.method().equals("GET") || r.method().equals("HEAD"))
-          || !String.valueOf(error.getMessage())
-              .matches("(?is).*?(Network connection lost|ECONNRESET|connection reset).*"))
-        throw error;
+          || !Bridge.networkFailure(error)) throw error;
       Bridge.trace("Retry idempotent request after connection loss: " + r.url());
       return transportV2(r, readMs);
     }
@@ -498,65 +493,5 @@ public final class BrowserCall implements Call {
     } catch (IOException error) {
       Bridge.trace("HTTP cancel failed: " + error.getMessage());
     }
-  }
-
-  private Response transportV1(Request r) throws IOException {
-    Bridge.trace("transport " + r.url());
-    JsonObject j = new JsonObject();
-    j.addProperty("url", r.url().toString());
-    j.addProperty("method", r.method());
-    Headers h = r.headers();
-    JsonArray headers = new JsonArray();
-    for (int i = 0; i < h.size(); i++) {
-      JsonArray a = new JsonArray();
-      a.add(h.name(i));
-      a.add(h.value(i));
-      headers.add(a);
-    }
-    j.add("headers", headers);
-    if (r.body() != null) {
-      Buffer b = new Buffer();
-      r.body().writeTo(b);
-      j.addProperty("body", Base64.getEncoder().encodeToString(b.readByteArray()));
-    }
-    String payload = j.toString();
-    long sentAt = System.currentTimeMillis();
-    JsonObject result = JsonParser.parseString(Bridge.http(payload)).getAsJsonObject();
-    if (cancelled) throw new IOException("Cancelled");
-    if (result.has("error")
-        && client.retryOnConnectionFailure()
-        && (r.method().equals("GET") || r.method().equals("HEAD"))
-        && result
-            .get("error")
-            .getAsString()
-            .matches("(?is).*?(Network connection lost|ECONNRESET|connection reset).*")) {
-      Bridge.trace("Retry idempotent request after connection loss: " + r.url());
-      result = JsonParser.parseString(Bridge.http(payload)).getAsJsonObject();
-    }
-    if (result.has("error")) throw new IOException(result.get("error").getAsString());
-    Headers.Builder received = new Headers.Builder();
-    for (JsonElement e : result.getAsJsonArray("headers")) {
-      JsonArray a = e.getAsJsonArray();
-      received.add(a.get(0).getAsString(), a.get(1).getAsString());
-    }
-    Headers rh = received.build();
-    int code = result.get("status").getAsInt();
-    byte[] body = Base64.getDecoder().decode(result.get("body").getAsString());
-    return new Response.Builder()
-        .request(r)
-        .protocol(Protocol.HTTP_1_1)
-        .code(code)
-        .message(result.get("message").getAsString())
-        .headers(rh)
-        .sentRequestAtMillis(sentAt)
-        .receivedResponseAtMillis(System.currentTimeMillis())
-        .body(
-            ResponseBody.create(
-                body,
-                MediaType.parse(
-                    rh.get("Content-Type") == null
-                        ? "application/octet-stream"
-                        : rh.get("Content-Type"))))
-        .build();
   }
 }

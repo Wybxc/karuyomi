@@ -2,11 +2,7 @@ import type { BuildManifest, SourceInfo } from '@karuyomi/contracts';
 import { sourceInfoSchema } from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
 import { VerifiedLoader } from './verified-loader.js';
-import {
-  BinaryHttpTransport,
-  assertBridgeResponse,
-  type HttpCallContext,
-} from './http-transport.js';
+import { BinaryHttpTransport, type HttpCallContext } from './http-transport.js';
 
 export interface RuntimeDriver {
   open(
@@ -30,8 +26,6 @@ export interface TeaVMGlobals {
   hostInvoke?: (sourceId: string, operation: string, argsJson: string) => void;
   teaDone?: (value: string) => void;
   teaFail?: (error: string) => void;
-  teaHttp?: (request: string) => Promise<string>;
-  teaHttpVersion?: number;
   teaHttpOpen?: (request: string) => string;
   teaHttpWrite?: (handle: string, bytes: Uint8Array) => void;
   teaHttpFinish?: (handle: string) => Promise<string>;
@@ -52,9 +46,7 @@ export class TeaVMDriver implements RuntimeDriver {
     { resolve(value: unknown): void; reject(error: unknown): void } | undefined;
   private bridgeFailure: RuntimeFailure | undefined;
   private readonly objectUrls = new Set<string>();
-  private readonly requests = new Set<AbortController>();
   private closed = false;
-  private buildId = '';
   private binaryTransport: BinaryHttpTransport | undefined;
   private readonly fallbackGeneration = crypto.randomUUID();
 
@@ -98,7 +90,6 @@ export class TeaVMDriver implements RuntimeDriver {
       this.bridgeFailure = undefined;
       waiter?.reject(error);
     };
-    scope.teaHttp = (request) => this.http(request);
     scope.teaHttpOpen = (request) =>
       this.capture(() => this.binary().open(request));
     scope.teaHttpWrite = (handle, bytes) =>
@@ -120,10 +111,10 @@ export class TeaVMDriver implements RuntimeDriver {
   }
 
   private binary(): BinaryHttpTransport {
-    if (!this.binaryTransport || this.scope.teaHttpVersion !== 2)
+    if (!this.binaryTransport)
       throw new RuntimeFailure(
-        'unsupported_capability',
-        'Binary HTTP was not declared by this build',
+        'runtime_lost',
+        'Source HTTP transport is not initialized',
       );
     return this.binaryTransport;
   }
@@ -132,7 +123,7 @@ export class TeaVMDriver implements RuntimeDriver {
     try {
       return operation();
     } catch (error) {
-      this.bridgeFailure = runtimeFailure(error);
+      this.recordBridgeFailure(error);
       throw error;
     }
   }
@@ -141,9 +132,17 @@ export class TeaVMDriver implements RuntimeDriver {
     try {
       return await operation();
     } catch (error) {
-      this.bridgeFailure = runtimeFailure(error);
+      this.recordBridgeFailure(error);
       throw error;
     }
+  }
+
+  private recordBridgeFailure(error: unknown): void {
+    if (
+      this.bridgeFailure?.code !== 'access_required' &&
+      this.bridgeFailure?.code !== 'access_denied'
+    )
+      this.bridgeFailure = runtimeFailure(error);
   }
 
   private call(start: () => void, context?: HttpCallContext): Promise<unknown> {
@@ -182,10 +181,11 @@ export class TeaVMDriver implements RuntimeDriver {
     signal: AbortSignal,
     context?: HttpCallContext,
   ): Promise<SourceInfo[]> {
-    this.buildId = manifest.buildId;
-    this.scope.teaHttpVersion = manifest.bridgeVersion;
-    if (manifest.bridgeVersion === 2)
-      this.binaryTransport = new BinaryHttpTransport(this.origin, this.buildId);
+    this.binaryTransport?.dispose();
+    this.binaryTransport = new BinaryHttpTransport(
+      this.origin,
+      manifest.buildId,
+    );
     this.scope.karuyomiResources = {};
     for (const resource of manifest.resources) {
       const bytes = await this.loader.sharedArtifact(resource, signal);
@@ -256,38 +256,9 @@ export class TeaVMDriver implements RuntimeDriver {
     );
   }
 
-  private async http(request: string): Promise<string> {
-    const controller = new AbortController();
-    this.requests.add(controller);
-    try {
-      const response = await fetch(new URL('/api/bridge/http', this.origin), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Request': '1',
-          'X-Runtime-Build': this.buildId,
-        },
-        body: request,
-        credentials: 'same-origin',
-        redirect: 'manual',
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      assertBridgeResponse(response);
-      return await response.text();
-    } catch (error) {
-      this.bridgeFailure = runtimeFailure(error);
-      throw error;
-    } finally {
-      this.requests.delete(controller);
-    }
-  }
-
   async close(): Promise<void> {
     this.closed = true;
     this.binaryTransport?.dispose();
-    for (const request of this.requests) request.abort();
-    this.requests.clear();
     this.waiter?.reject(
       new RuntimeFailure('runtime_lost', 'TeaVM driver was closed'),
     );

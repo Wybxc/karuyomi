@@ -24,7 +24,7 @@ def fixture(folder, content=b"const source = 1;"):
     (folder / digest).write_bytes(content)
     return {
         **json.loads((ROOT / "packages/contracts/protocol.json").read_text()),
-        "bridgeVersion": 1,
+        "bridgeVersion": 2,
         "buildId": "regression-build",
         "packageName": "example.source",
         "repoId": "example",
@@ -142,6 +142,7 @@ class RegistrationTests(unittest.TestCase):
         for key, value in [
             ("sourceIds", []),
             ("bridgeVersion", True),
+            ("bridgeVersion", 1),
             ("packageName", ""),
             ("hostScripts", [None]),
             ("resources", [{"logicalName": ""}]),
