@@ -1,0 +1,4 @@
+[submodule "vendor/extensions-source"]
+	path = vendor/extensions-source
+	url = https://github.com/keiyoushi/extensions-source.git
+	branch = main

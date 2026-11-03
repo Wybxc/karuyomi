@@ -16,3 +16,4 @@ runtime/teavm/upstream
 runtime/teavm/bridge
 runtime/teavm/.local
 runtime/teavm/upstream-manifest.json
+vendor/
