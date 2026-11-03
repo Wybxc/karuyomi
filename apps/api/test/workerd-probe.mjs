@@ -2,7 +2,7 @@
 // this run's RSA public key; production index.ts never imports that entry.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -17,10 +17,15 @@ assert(
   manifestPath,
   'Usage: node apps/api/test/workerd-probe.mjs MANIFEST [ARTIFACT_FOLDER] [EVIDENCE_JSON]',
 );
-const evidencePath = process.argv[4] && path.resolve(process.argv[4]);
+const evidencePath = process.argv[4]
+  ? path.resolve(process.argv[4])
+  : path.join(
+      root,
+      'runtime/teavm/.local/probes/workerd-registered-artifacts.json',
+    );
 const artifactFolder = process.argv[3]
   ? path.resolve(process.argv[3])
-  : path.join(root, 'runtime/teavm/.local/artifacts');
+  : path.join(path.dirname(manifestPath), 'artifacts');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const temporary = await mkdtemp(path.join(tmpdir(), 'karuyomi-api-probe-'));
 const state = path.join(temporary, 'state');
@@ -277,7 +282,8 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
       .digest('hex');
   }
   const json = JSON.stringify(evidence, null, 2) + '\n';
-  if (evidencePath) await writeFile(evidencePath, json);
+  await mkdir(path.dirname(evidencePath), { recursive: true });
+  await writeFile(evidencePath, json);
   console.log(json);
 } finally {
   await mf?.dispose();

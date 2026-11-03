@@ -16,10 +16,13 @@ const api = path.join(root, 'apps/api');
 const manifestFile = process.argv[2];
 assert(
   manifestFile,
-  'Usage: node apps/api/test/source-metadata-probe.mjs MANIFEST',
+  'Usage: node apps/api/test/source-metadata-probe.mjs MANIFEST [ARTIFACT_FOLDER]',
 );
 const manifestPath = path.resolve(manifestFile);
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+const artifactFolder = process.argv[3]
+  ? path.resolve(process.argv[3])
+  : path.join(path.dirname(manifestPath), 'artifacts');
 const temporary = await mkdtemp(path.join(tmpdir(), 'karuyomi-source-probe-'));
 const state = path.join(temporary, 'state');
 const evidenceFile = path.join(
@@ -75,7 +78,7 @@ execFileSync(
     path.join(root, 'scripts/register-build.py'),
     manifestPath,
     '--artifacts',
-    path.join(root, 'runtime/teavm/.local/artifacts'),
+    artifactFolder,
     '--local',
     '--persist-to',
     state,
