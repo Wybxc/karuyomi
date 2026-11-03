@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
 import { checkFiles } from './check-files.ts';
+import { checkNetwork } from './check-network.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -196,5 +197,6 @@ export async function checkDto(root = ROOT): Promise<void> {
     'prototype.ImageTest',
   ]);
   await checkFiles(root);
+  await checkNetwork(root);
 }
 if (import.meta.main) await checkDto();

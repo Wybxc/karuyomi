@@ -22,6 +22,8 @@ node scripts/build-extension.ts --descriptor PATH_TO_DESCRIPTOR --output PATH_TO
 
 构建器复制正式 Java 到隔离目录，从固定 TeaVM submodule 应用补丁，再生成 TypeMap / ResourceConfig。随后 [正式 AOT 工具](../../tools/teavm/build.ts) 裁剪被兼容层替换的依赖类、运行宿主字节码适配并编译；原扩展 JAR 不修改。生成注册表、裁剪 JAR、Maven 输出和运行日志均留在被忽略的工作目录。
 
+Source 的默认网络配置由 owned `eu/kanade/tachiyomi/network/NetworkHelper.java` 维护，配置来源为固定 Suwayomi-Server submodule 的 `NetworkHelper.kt`，保留 MPL-2.0 来源头。它保留既有 Cookie、UA 与拦截器，在稳定 Context cache 目录下接入 5 MiB Cache；构建时移除 seed 同名类。锁定 seed 原类默认 Cache 为 null 的复现、配置门与真实 Source 待验边界见 [Source 网络缓存配置](../../docs/verification/source-network-cache.md)。图片原有 cacheless 语义不变。
+
 每包输出 `manifest.json`、唯一 `artifacts/<canonicalSHA>.gz`、`provenance.json` 与 `build-result.json`。清单符合共享 `BuildManifest`，包含原包、版本、全部 Source ID 字符串、协议/ABI/bridge/storage 版本，以及 gzip 编码与 canonical 两个字节域的大小和摘要。TeaVM 同输入重建仍可能产生不同 JS 字节；记录的是实际输出，不承诺逐字节确定性。
 
 所有客户端以公开 `/extensions/index.json` 为准，从 Static Assets 加载当前清单和 gzip；共享材料由 Web 静态资源 / Native 内置提供。扩展不再上传 GitHub Release 或 R2，不由 API 转发正文。D1 只登记 Source HTTP 网络策略，动态 `/api` 仍受 Access 保护。编译成功保持 `compiled_unverified`，不能宣称浏览器或在线 Source 兼容。

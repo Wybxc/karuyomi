@@ -52,6 +52,8 @@
 
 2026-11-04，主代理内置 Chromium 156 通过 14 组真实 Worker/IDB/Web Locks 门，包含真实事务 abort、配额、pending、terminate、提交后 ACK 前死亡、system close abort→重试。原 JVM 共享 File/RandomAccessFile/Okio 场景 32 项、Accessor/JCL 窄 fixture 24 项及实际 TeaVM 二进制 JSO 共享场景 32 项分别通过；两端正文摘要一致。分层证据与复验命令见[普通文件运行证据](../verification/file-storage-runtime.md)。仍待正式 Source、Native、真实 namespace 版本/身份切换、Cache/files 组合压力与设备资源测量；取消不承诺撤销已提交写入。
 
+真实 xkcd 冷热观测曾全部为零，已核实锁定 seed 的 `NetworkHelper` 没有配置 Cache。现已内化最小 owned 适配，保留既有 ABI、Cookie、UA 与拦截器，显式启用稳定目录下的 5 MiB Cache；图片原有 cacheless 调用保持有效。原 seed 与 owned JVM 配置门及实际 TeaVM 浏览器 Worker 配置门已通过，详见[Source 网络配置证据](../verification/source-network-cache.md)。正式 Source 命中尚待新 host 指纹、新 AOT 复验，不能把配置通过当作缓存命中。
+
 ## 阶段四：原 JVM 同版对照与产品门
 
 原 JVM 与 TeaVM 共享基线已通过；受控 HTTP 截断与半途取消也已完成独立对照，更广异常、生产网络取消和产品场景仍待实施。seed 中同名 OkHttp JAR 的 `newCall` 已适配为 BrowserCall，不能用作原 JVM oracle；当前从官方 Maven 获取同版未适配的 5.5.0 JAR，验证 SHA-256 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52` 并断言实际 CodeSource。共享 `CacheScenarios.java` 已覆盖 131079 字节冷热、304 合并、no-store、Cookie Vary、evictAll 后继续读已打开 snapshot，并追加 no-cache 强制重验证、POST 上传与同 URL GET 失效/重新缓存；两端本轮均为 18 次请求、13 次网络、7 次命中、8 次成功写入（历史首轮为 11/8/4/5），正文 SHA-256 均为 `1933f7f279fb4232259d5af94a6f792a308a78e4c18b8ed5caafd99e943f9a78`。TeaVM 在 Codex 内置 Chromium 156 的真实 Worker 中运行产品 BrowserCall/Cache、二进制 JSO、typed idb 与 HTTP v2，由 workerd 映射隔离的受控 origin，未放宽生产网络策略。该门不代表正式 Source、生产 Access 或 Native。产物与原始报告留在忽略目录，见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)。
