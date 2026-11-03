@@ -11,19 +11,53 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { collectMaterials } from '../../packages/runtime-host/materials.mjs';
+import type { TestContext } from 'node:test';
+import type { Artifact } from '../../packages/contracts/src/index.ts';
+import { isRecord } from './types.ts';
+import type { ValidationFailure } from './types.ts';
+import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 import {
   completeBrowserValidation,
   digest,
   repositoryRoot,
   verifyIntegrity,
-} from './verify-manifest.mjs';
+} from './verify-manifest.ts';
 
-const protocol = JSON.parse(
-  await readFile(path.join(repositoryRoot, 'packages/contracts/protocol.json')),
+const protocolInput: unknown = JSON.parse(
+  await readFile(
+    path.join(repositoryRoot, 'packages/contracts/protocol.json'),
+    'utf8',
+  ),
 );
 
-async function fixture(t, edit = () => {}) {
+assert(isRecord(protocolInput));
+assert(typeof protocolInput.protocolVersion === 'number');
+assert(typeof protocolInput.hostAbi === 'string');
+assert(typeof protocolInput.runtimeBaseline === 'string');
+const protocol = {
+  protocolVersion: protocolInput.protocolVersion,
+  hostAbi: protocolInput.hostAbi,
+  runtimeBaseline: protocolInput.runtimeBaseline,
+};
+interface FixtureManifest {
+  protocolVersion: number;
+  hostAbi: string;
+  runtimeBaseline: string;
+  buildId: string;
+  packageName: string;
+  repoId: string;
+  version: string;
+  bridgeVersion: number;
+  storageSchema: string;
+  sourceIds: string[];
+  bundle: Artifact;
+  hostScripts: Artifact[];
+  resources: (Artifact & { logicalName: string })[];
+}
+async function fixture(
+  t: TestContext,
+  edit: (manifest: FixtureManifest) => void = () => {},
+) {
   const directory = await mkdtemp(
     path.join(tmpdir(), 'karuyomi-validator-test-'),
   );
@@ -35,8 +69,10 @@ async function fixture(t, edit = () => {}) {
     'throw new Error("Integrity validation must not execute this bundle");',
   );
   const sha256 = digest(bytes);
-  const manifest = {
-    ...protocol,
+  const manifest: FixtureManifest = {
+    protocolVersion: protocol.protocolVersion,
+    hostAbi: protocol.hostAbi,
+    runtimeBaseline: protocol.runtimeBaseline,
     buildId: 'validator-unit-test',
     packageName: 'example.test',
     repoId: 'test',
@@ -67,11 +103,13 @@ async function fixture(t, edit = () => {}) {
   };
 }
 
-async function command(args) {
+async function command(
+  args: string[],
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      [path.join(repositoryRoot, 'tools/extensions/verify-build.mjs'), ...args],
+      [path.join(repositoryRoot, 'tools/extensions/verify-build.ts'), ...args],
       {
         cwd: repositoryRoot,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -106,21 +144,21 @@ test('integrity hashes actual bytes without executing JS or claiming runtime rea
     workerInit: 'not_run',
     browserLoad: 'not_run',
   });
-  assert.equal(report.failure.code, 'browser_not_run');
+  assert.equal(report.failure?.code, 'browser_not_run');
 });
 
 test('same-length artifact corruption fails its SHA-256 gate', async (t) => {
   const { directory, artifact, bytes } = await fixture(t);
-  bytes[0] ^= 1;
+  bytes[0] = bytes[0]! ^ 1;
   await writeFile(artifact, bytes);
   const { report } = await verifyIntegrity(directory);
   assert.equal(report.stages.artifactIntegrity, 'failed');
-  assert.equal(report.failure.code, 'hash_mismatch');
+  assert.equal(report.failure?.code, 'hash_mismatch');
 });
 
 test('shared materials use verified host bytes without per-build copies', async (t) => {
   const { catalog, data } = await collectMaterials();
-  const { directory } = await fixture(t, (manifest) => {
+  const { directory } = await fixture(t, (manifest: FixtureManifest) => {
     manifest.hostScripts = catalog.hostScripts;
     manifest.resources = catalog.resources;
   });
@@ -130,8 +168,8 @@ test('shared materials use verified host bytes without per-build copies', async 
   assert.equal(report.sharedMaterialCount, 6);
   for (const material of [...catalog.hostScripts, ...catalog.resources]) {
     assert.deepEqual(
-      payloads.get(material.path).bytes,
-      data.get(material.sha256).bytes,
+      payloads?.get(material.path)?.bytes,
+      data.get(material.sha256)?.bytes,
     );
   }
 });
@@ -139,24 +177,24 @@ test('shared materials use verified host bytes without per-build copies', async 
 test('shared materials cannot substitute hash, metadata, role or logical name', async (t) => {
   const { catalog } = await collectMaterials();
   for (const edit of [
-    (manifest) => {
-      manifest.hostScripts[0].size += 1;
+    (manifest: FixtureManifest) => {
+      manifest.hostScripts[0]!.size += 1;
     },
-    (manifest) => {
-      manifest.hostScripts[0].contentType = 'text/javascript';
+    (manifest: FixtureManifest) => {
+      manifest.hostScripts[0]!.contentType = 'text/javascript';
     },
-    (manifest) => {
-      manifest.hostScripts[0].sha256 = 'b'.repeat(64);
-      manifest.hostScripts[0].path = '/runtime/materials/' + 'b'.repeat(64);
+    (manifest: FixtureManifest) => {
+      manifest.hostScripts[0]!.sha256 = 'b'.repeat(64);
+      manifest.hostScripts[0]!.path = '/runtime/materials/' + 'b'.repeat(64);
     },
-    (manifest) => {
+    (manifest: FixtureManifest) => {
       manifest.hostScripts = catalog.resources;
     },
-    (manifest) => {
-      manifest.resources[0].logicalName = 'other.wasm';
+    (manifest: FixtureManifest) => {
+      manifest.resources[0]!.logicalName = 'other.wasm';
     },
   ]) {
-    const { directory } = await fixture(t, (manifest) => {
+    const { directory } = await fixture(t, (manifest: FixtureManifest) => {
       manifest.hostScripts = structuredClone(catalog.hostScripts);
       manifest.resources = structuredClone(catalog.resources);
       edit(manifest);
@@ -168,44 +206,59 @@ test('shared materials cannot substitute hash, metadata, role or logical name', 
   }
 });
 
+test('private runtime bridge copies are rejected', async (t) => {
+  const { catalog } = await collectMaterials();
+  const { directory } = await fixture(t, (manifest) => {
+    const material = catalog.hostScripts[0];
+    assert(material);
+    manifest.hostScripts = [
+      { ...material, path: '/api/extensions/artifacts/' + material.sha256 },
+    ];
+  });
+  assert.equal(
+    (await verifyIntegrity(directory)).report.failure?.code,
+    'invalid_manifest',
+  );
+});
+
 test('artifact length must exactly match the bounded manifest', async (t) => {
   const { directory, artifact } = await fixture(t);
   await writeFile(artifact, 'smaller');
   assert.equal(
-    (await verifyIntegrity(directory)).report.failure.code,
+    (await verifyIntegrity(directory)).report.failure?.code,
     'size_mismatch',
   );
 });
 
 test('protocol/ABI drift, private-path mismatch and duplicate Source IDs fail', async (t) => {
   for (const edit of [
-    (manifest) => {
+    (manifest: FixtureManifest) => {
       manifest.protocolVersion += 1;
     },
-    (manifest) => {
+    (manifest: FixtureManifest) => {
       manifest.hostAbi = 'future-host';
     },
-    (manifest) => {
+    (manifest: FixtureManifest) => {
       manifest.bundle.path = 'https://example.com/app.js';
     },
-    (manifest) => {
-      manifest.sourceIds.push(manifest.sourceIds[0]);
+    (manifest: FixtureManifest) => {
+      manifest.sourceIds.push(manifest.sourceIds[0]!);
     },
   ]) {
     const { directory } = await fixture(t, edit);
     assert.equal(
-      (await verifyIntegrity(directory)).report.failure.code,
+      (await verifyIntegrity(directory)).report.failure?.code,
       'invalid_manifest',
     );
   }
 });
 
 test('runtime scripts require an explicit JavaScript MIME type', async (t) => {
-  const { directory } = await fixture(t, (manifest) => {
+  const { directory } = await fixture(t, (manifest: FixtureManifest) => {
     manifest.bundle.contentType = 'text/html';
   });
   assert.equal(
-    (await verifyIntegrity(directory)).report.failure.code,
+    (await verifyIntegrity(directory)).report.failure?.code,
     'invalid_script_mime',
   );
 });
@@ -222,7 +275,7 @@ test('symbolic manifest and artifact files are never followed', async (t) => {
     await rm(file);
     await symlink(other, file);
     assert.equal(
-      (await verifyIntegrity(value.directory)).report.failure.code,
+      (await verifyIntegrity(value.directory)).report.failure?.code,
       'invalid_file',
     );
   }
@@ -238,7 +291,7 @@ test('symbolic artifact directory is rejected even when every file hashes correc
   await rm(path.join(directory, 'artifacts'), { recursive: true });
   await symlink(other, path.join(directory, 'artifacts'));
   assert.equal(
-    (await verifyIntegrity(directory)).report.failure.code,
+    (await verifyIntegrity(directory)).report.failure?.code,
     'invalid_directory',
   );
 });
@@ -253,10 +306,10 @@ test('default CLI writes an atomic unverified report and exits 2', async (t) => 
     reportFile,
   ]);
   assert.equal(result.code, 2, result.stderr);
-  const report = JSON.parse(await readFile(reportFile));
+  const report = JSON.parse(await readFile(reportFile, 'utf8'));
   assert.equal(report.runtimeReady, false);
   assert.equal(report.stages.workerInit, 'not_run');
-  assert.equal(report.failure.code, 'browser_not_run');
+  assert.equal(report.failure?.code, 'browser_not_run');
 });
 
 test('CLI cannot replace manifest/artifact inputs with its report', async (t) => {
@@ -290,39 +343,44 @@ test('browser result reducer rejects missing browser, identity and Source eviden
       buildId: base.buildId,
       generation: 'g',
       workerInstanceId: 'w',
-      sources: base.sourceIds.map((id) => ({ id, name: 'Test', lang: 'en' })),
+      sources: (base.sourceIds ?? []).map((id) => ({
+        id,
+        name: 'Test',
+        lang: 'en',
+      })),
     },
   };
+  type BrowserFixture = typeof value & { failure?: ValidationFailure };
   for (const edit of [
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.indexedDb = false;
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.userAgent = 'Node';
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.buildId = 'different-build';
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.manifestSha256 = '0'.repeat(64);
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.hello.sourceReady = true;
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.hello.hostAbi = 'wrong';
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.session.sources = [];
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.session.generation = '';
     },
-    (copy) => {
+    (copy: BrowserFixture) => {
       copy.failure = { code: 'source_error', message: 'Initialization failed' };
     },
   ]) {
-    const copy = structuredClone(value);
+    const copy: BrowserFixture = structuredClone(value);
     edit(copy);
     const result = completeBrowserValidation(base, copy, 0);
     assert.equal(result.valid, false);
@@ -331,6 +389,6 @@ test('browser result reducer rejects missing browser, identity and Source eviden
   }
   const network = completeBrowserValidation(base, value, 1);
   assert.equal(network.valid, false);
-  assert.equal(network.failure.code, 'network_required');
+  assert.equal(network.failure?.code, 'network_required');
   assert.equal(completeBrowserValidation(base, null, 0).valid, false);
 });

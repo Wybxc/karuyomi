@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true
+  },
+  "include": [
+    "scripts/*.ts",
+    "packages/runtime-host/*.ts",
+    "tools/extensions/*.ts",
+    "apps/api/test/*-probe.ts"
+  ]
+}

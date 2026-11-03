@@ -2,10 +2,19 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { verifyIntegrity, failure } from './verify-manifest.mjs';
+import { verifyIntegrity, failure } from './verify-manifest.ts';
 
-function options(argv) {
-  const values = { serve: false, timeoutMs: 90_000 };
+interface Options {
+  serve: boolean;
+  timeoutMs: number;
+  directory: string;
+  report: string;
+}
+function options(argv: string[]): Options {
+  const values: Partial<Options> & Pick<Options, 'serve' | 'timeoutMs'> = {
+    serve: false,
+    timeoutMs: 90_000,
+  };
   for (let index = 0; index < argv.length; index++) {
     const key = argv[index];
     if (key === '--serve') {
@@ -13,13 +22,16 @@ function options(argv) {
       continue;
     }
     if (
+      !key ||
       !['--directory', '--report', '--timeout-ms'].includes(key) ||
       !argv[index + 1]
     )
       throw Error('arguments');
     const value = argv[++index];
+    if (value === undefined) throw Error('arguments');
     if (key === '--timeout-ms') values.timeoutMs = Number(value);
-    else values[key.slice(2)] = path.resolve(value);
+    else if (key === '--directory') values.directory = path.resolve(value);
+    else values.report = path.resolve(value);
   }
   if (
     !values.directory ||
@@ -38,15 +50,20 @@ function options(argv) {
     (!artifactRelative.startsWith('..') && !path.isAbsolute(artifactRelative))
   )
     throw Error('report_overwrites_input');
-  return values;
+  return {
+    serve: values.serve,
+    timeoutMs: values.timeoutMs,
+    directory: values.directory,
+    report: values.report,
+  };
 }
 
-let args;
+let args: Options;
 try {
   args = options(process.argv.slice(2));
 } catch {
   console.error(
-    'Usage: node tools/extensions/verify-build.mjs --directory DIR --report DIR/validation.json [--serve] [--timeout-ms 90000]',
+    'Usage: node tools/extensions/verify-build.ts --directory DIR --report DIR/validation.json [--serve] [--timeout-ms 90000]',
   );
   process.exit(64);
 }
@@ -54,7 +71,7 @@ const inputs = await verifyIntegrity(args.directory);
 let report = inputs.report;
 if (args.serve && inputs.manifest) {
   try {
-    const { verifyInBrowser } = await import('./verify-browser.mjs');
+    const { verifyInBrowser } = await import('./verify-browser.ts');
     report = await verifyInBrowser(inputs, {
       timeoutMs: args.timeoutMs,
       onListening: (value) => console.error(JSON.stringify(value)),

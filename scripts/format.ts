@@ -1,4 +1,9 @@
-import { spawnSync } from 'node:child_process';
+import {
+  spawnSync,
+  type SpawnSyncOptions,
+  type SpawnSyncOptionsWithStringEncoding,
+  type SpawnSyncReturns,
+} from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -22,9 +27,23 @@ if (
       index > 1 && !['--write', '--check', '--portable'].includes(arg),
   )
 ) {
-  throw Error('Usage: node scripts/format.mjs --write|--check [--portable]');
+  throw Error('Usage: node scripts/format.ts --write|--check [--portable]');
 }
-function run(command, args, options = {}) {
+function run(
+  command: string,
+  args: string[],
+  options: SpawnSyncOptionsWithStringEncoding,
+): SpawnSyncReturns<string>;
+function run(
+  command: string,
+  args: string[],
+  options?: SpawnSyncOptions,
+): SpawnSyncReturns<Buffer>;
+function run(
+  command: string,
+  args: string[],
+  options: SpawnSyncOptions = {},
+): SpawnSyncReturns<string | Buffer> {
   const result = spawnSync(command, args, {
     cwd: root,
     stdio: 'inherit',
@@ -47,15 +66,15 @@ const files = [
     name &&
     !name.startsWith('vendor/') &&
     !name.startsWith('docs/design/') &&
-    !name.startsWith('runtime/teavm/bridge/compat/') &&
     existsSync(path.join(root, name)),
 );
-const matching = (pattern) => files.filter((name) => pattern.test(name));
+const matching = (pattern: RegExp) =>
+  files.filter((name) => pattern.test(name));
 const formatterDirectory = path.join(root, '.local/formatters');
 mkdirSync(formatterDirectory, { recursive: true });
-const hash = (file) =>
+const hash = (file: string) =>
   createHash('sha256').update(readFileSync(file)).digest('hex');
-function jar(name, url, expected) {
+function jar(name: string, url: string, expected: string) {
   const destination = path.join(formatterDirectory, name);
   if (!existsSync(destination) || hash(destination) !== expected) {
     const temporary = destination + '.download';
@@ -88,7 +107,9 @@ const javaCandidates = [
   ),
 ];
 const java =
-  javaCandidates.find((value) => value && existsSync(value)) ?? 'java';
+  javaCandidates.find(
+    (value): value is string => Boolean(value) && existsSync(value!),
+  ) ?? 'java';
 const javaVersion = run(java, ['-version'], {
   encoding: 'utf8',
   stdio: 'pipe',
@@ -269,7 +290,7 @@ if (!portable) {
   for (const [tool, version] of [
     ['swift-format', '6.4.4'],
     ['clang-format', '21.0.0'],
-  ]) {
+  ] as const) {
     const result = run('xcrun', [tool, '--version'], {
       encoding: 'utf8',
       stdio: 'pipe',

@@ -15,7 +15,7 @@ const dart = path.join(
   process.platform === 'win32' ? 'dart.bat' : 'dart',
 );
 
-function run(command, args, cwd = root) {
+function run(command: string, args: string[], cwd = root) {
   const result = spawnSync(command, args, { cwd, stdio: 'inherit' });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);

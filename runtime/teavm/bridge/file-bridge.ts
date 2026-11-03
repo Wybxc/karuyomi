@@ -1,30 +1,175 @@
 /* Durable Java files. Every mutation commits before its Java continuation resumes. */
-(() => {
+import {
+  array,
+  bool,
+  decodeBase64,
+  encodeBase64,
+  idbRequest,
+  integer,
+  number,
+  object,
+  optionalText,
+  storageKey,
+  text,
+  workerScope,
+  type StorageKey,
+} from './bridge-common.js';
+
+interface FileNode {
+  key: StorageKey;
+  id: string;
+  directory: boolean;
+  readOnly: boolean;
+  modified: number;
+  linked: boolean;
+  body: Uint8Array;
+}
+interface PathRow {
+  key: StorageKey;
+  path: string;
+  id: string;
+}
+interface HandleRow {
+  key: [string, string, string];
+  owner: StorageKey;
+  inode: StorageKey;
+}
+interface OpenFile {
+  inode: string;
+  position: number;
+  readable: boolean;
+  writable: boolean;
+  append: boolean;
+}
+interface Stores {
+  paths: IDBObjectStore;
+  nodes: IDBObjectStore;
+  handles: IDBObjectStore;
+  owners: IDBObjectStore;
+}
+const operations = [
+  'initialize',
+  'tell',
+  'seek',
+  'skip',
+  'stat',
+  'list',
+  'create',
+  'mkdir',
+  'delete',
+  'rename',
+  'modified',
+  'readonly',
+  'open',
+  'read',
+  'write',
+  'resize',
+  'size',
+  'flush',
+  'close',
+] as const;
+interface FileRequest {
+  operation: (typeof operations)[number];
+  path: string;
+  handle: string | undefined;
+  source: string;
+  modified: number;
+  readOnly: boolean;
+  writable: boolean;
+  readable: boolean;
+  append: boolean;
+  position: number;
+  count: number;
+  length: number;
+  body: string;
+  size: number;
+}
+export function parseFileRequest(value: unknown): FileRequest {
+  const data = object(value);
+  const operation = operations.find(
+    (operation) => operation === data.operation,
+  );
+  if (!operation) throw Error('Unknown Java filesystem operation');
+  return {
+    operation,
+    path: optionalText(data.path) ?? '/',
+    handle: optionalText(data.handle),
+    source: operation === 'rename' ? text(data.source) : '',
+    modified: operation === 'modified' ? number(data.modified) : 0,
+    readOnly: data.readOnly === undefined ? false : bool(data.readOnly),
+    writable: data.writable === undefined ? false : bool(data.writable),
+    readable: data.readable === undefined ? false : bool(data.readable),
+    append: data.append === undefined ? false : bool(data.append),
+    position: operation === 'seek' ? integer(data.position, 0, 2147483647) : 0,
+    count:
+      operation === 'skip' ? integer(data.count, -2147483647, 2147483647) : 0,
+    length: operation === 'read' ? integer(data.length, 0, 2147483647) : 0,
+    body: operation === 'write' ? text(data.body) : '',
+    size: operation === 'resize' ? integer(data.size, 0, 2147483647) : 0,
+  };
+}
+function nodeValue(value: unknown): FileNode | undefined {
+  if (value === undefined) return undefined;
+  const data = object(value);
+  if (!(data.body instanceof Uint8Array))
+    throw Error('Invalid stored file bytes');
+  return {
+    key: storageKey(data.key),
+    id: text(data.id),
+    directory: bool(data.directory),
+    readOnly: bool(data.readOnly),
+    modified: number(data.modified),
+    linked: bool(data.linked),
+    body: data.body,
+  };
+}
+function pathRow(value: unknown): PathRow {
+  const data = object(value);
+  return {
+    key: storageKey(data.key),
+    path: text(data.path),
+    id: text(data.id),
+  };
+}
+function handleRow(value: unknown): HandleRow {
+  const data = object(value),
+    key = array(data.key);
+  if (key.length !== 3) throw Error('Invalid stored file handle');
+  return {
+    key: [text(key[0]), text(key[1]), text(key[2])],
+    owner: storageKey(data.owner),
+    inode: storageKey(data.inode),
+  };
+}
+declare global {
+  var teaFile: ReturnType<typeof createFileBridge>['teaFile'] | undefined;
+  var teaFileSystemClose:
+    ReturnType<typeof createFileBridge>['teaFileSystemClose'] | undefined;
+}
+
+const scope = workerScope();
+function createFileBridge() {
   const params = new URL(location.href).searchParams;
   const namespace =
-    self.karuyomiWorkerContext?.fsNamespace ||
-    self.karuyomiWorkerContext?.plugin ||
+    scope.karuyomiWorkerContext?.fsNamespace ||
+    scope.karuyomiWorkerContext?.plugin ||
     params.get('fsNamespace') ||
     params.get('plugin');
   if (!namespace) throw new Error('Runtime filesystem namespace is required');
   const owner = crypto.randomUUID(),
-    handles = new Map();
+    handles = new Map<string, OpenFile>();
   const stores = ['paths', 'nodes', 'handles', 'owners'];
-  let opening,
-    starting,
-    tail = Promise.resolve(),
-    releaseOwner,
+  let opening: Promise<IDBDatabase> | undefined,
+    starting: Promise<void> | undefined,
+    tail: Promise<unknown> = Promise.resolve(),
+    releaseOwner: (() => void) | undefined,
     closed = false;
-  const lockName = (id) =>
+  const lockName = (id: string) =>
     'teavm-java-files:' + JSON.stringify([namespace, id]);
-  const key = (path) => [namespace, path];
-  const request = (r) =>
-    new Promise((resolve, reject) => {
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
-    });
-  const parent = (path) => path.slice(0, path.lastIndexOf('/')) || '/';
-  function normalize(path) {
+  const key = (path: string): StorageKey => [namespace, path];
+  const request = idbRequest;
+  const parent = (path: string) => path.slice(0, path.lastIndexOf('/')) || '/';
+  function normalize(path: string) {
     if (typeof path !== 'string' || path.includes('\0'))
       throw Error('Invalid file path');
     const parts = [];
@@ -35,15 +180,10 @@
     }
     return '/' + parts.join('/');
   }
-  function encode(bytes) {
-    let text = '';
-    for (let i = 0; i < bytes.length; i += 16384)
-      text += String.fromCharCode(...bytes.subarray(i, i + 16384));
-    return btoa(text);
-  }
-  const decode = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+  const encode = encodeBase64,
+    decode = decodeBase64;
   function open() {
-    return (opening ||= new Promise((resolve, reject) => {
+    return (opening ||= new Promise<IDBDatabase>((resolve, reject) => {
       const r = indexedDB.open('teavm-java-files-v1', 1);
       r.onupgradeneeded = () => {
         const db = r.result;
@@ -71,17 +211,29 @@
       };
     }));
   }
-  async function transaction(action) {
+  async function transaction<T>(
+    action: (
+      stores: Stores,
+      afterCommit: (action: () => void) => void,
+    ) => T | Promise<T>,
+  ): Promise<T> {
     const db = await open();
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const tx = db.transaction(stores, 'readwrite', { durability: 'strict' });
-      const s = Object.fromEntries(
-        stores.map((name) => [name, tx.objectStore(name)]),
-      );
-      let value, failure, commit;
+      const s: Stores = {
+        paths: tx.objectStore('paths'),
+        nodes: tx.objectStore('nodes'),
+        handles: tx.objectStore('handles'),
+        owners: tx.objectStore('owners'),
+      };
+      let value: { result: T } | undefined,
+        failure: unknown,
+        commit: (() => void) | undefined;
       tx.oncomplete = () => {
         if (commit) commit();
-        resolve(value);
+        if (value) resolve(value.result);
+        else
+          reject(Error('Filesystem transaction completed before its result'));
       };
       tx.onabort = () =>
         reject(
@@ -96,7 +248,7 @@
         )
         .then(
           (result) => {
-            value = result;
+            value = { result };
           },
           (error) => {
             failure = error;
@@ -109,41 +261,55 @@
         );
     });
   }
-  const nodeFor = async (s, path) => {
-    const link = await request(s.paths.get(key(path)));
-    return link ? request(s.nodes.get(key(link.id))) : undefined;
+  const nodeFor = async (
+    s: Stores,
+    path: string,
+  ): Promise<FileNode | undefined> => {
+    const value = await request(s.paths.get(key(path)));
+    if (value === undefined) return undefined;
+    return nodeValue(await request(s.nodes.get(key(pathRow(value).id))));
   };
-  async function children(s, path) {
+  async function children(s: Stores, path: string): Promise<PathRow[]> {
     const prefix = path === '/' ? '/' : path + '/';
-    return (
+    return array(
       await request(
         s.paths.getAll(IDBKeyRange.bound(key(prefix), key(prefix + '\uffff'))),
-      )
-    ).filter((row) => row.path !== path && row.path.startsWith(prefix));
+      ),
+    )
+      .map(pathRow)
+      .filter((row) => row.path !== path && row.path.startsWith(prefix));
   }
-  async function collect(s, node) {
+  async function collect(s: Stores, node: FileNode) {
     if (
       !node.linked &&
-      !(await request(s.handles.index('inode').getAllKeys(node.key))).length
+      !array(await request(s.handles.index('inode').getAllKeys(node.key)))
+        .length
     )
       s.nodes.delete(node.key);
   }
-  async function dropOwner(s, id) {
-    const rows = await request(s.handles.index('owner').getAll(key(id)));
+  async function dropOwner(s: Stores, id: string) {
+    const rows = array(
+      await request(s.handles.index('owner').getAll(key(id))),
+    ).map(handleRow);
     for (const row of rows) s.handles.delete(row.key);
     for (const inode of new Set(rows.map((row) => row.inode[1]))) {
-      const node = await request(s.nodes.get(key(inode)));
+      const node = nodeValue(await request(s.nodes.get(key(inode))));
       if (node) await collect(s, node);
     }
     s.owners.delete(key(id));
   }
-  function touch(s, node) {
+  function touch(s: Stores, node: FileNode) {
     node.modified = Date.now();
     s.nodes.put(node);
   }
-  function create(s, path, directory, parentNode) {
+  function create(
+    s: Stores,
+    path: string,
+    directory: boolean,
+    parentNode?: FileNode,
+  ): FileNode {
     const id = crypto.randomUUID(),
-      node = {
+      node: FileNode = {
         key: key(id),
         id,
         directory,
@@ -164,25 +330,29 @@
         throw Error(
           'Java filesystem requires the Web Locks API for Worker lifetime tracking',
         );
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         navigator.locks
           .request(lockName(owner), () => {
             resolve();
-            return new Promise((done) => {
+            return new Promise<void>((done) => {
               releaseOwner = done;
             });
           })
           .catch(reject);
       });
       const owners = await transaction(async (s) =>
-        request(s.owners.getAll(IDBKeyRange.bound(key(''), key('\uffff')))),
+        array(
+          await request(
+            s.owners.getAll(IDBKeyRange.bound(key(''), key('\uffff'))),
+          ),
+        ).map((value) => storageKey(object(value).key)),
       );
       for (const row of owners)
         await navigator.locks.request(
-          lockName(row.key[1]),
+          lockName(row[1]),
           { ifAvailable: true },
           async (lock) => {
-            if (lock) await transaction((s) => dropOwner(s, row.key[1]));
+            if (lock) await transaction((s) => dropOwner(s, row[1]));
           },
         );
       await transaction(async (s) => {
@@ -192,31 +362,39 @@
       });
     })());
   }
-  function validInteger(value) {
+  function validInteger(value: number) {
     if (!Number.isInteger(value) || value < 0 || value > 2147483647)
       throw Error('File offset exceeds TeaVM filesystem range');
     return value;
   }
-  async function operate(r) {
+  async function operate(r: FileRequest): Promise<Record<string, unknown>> {
     await start();
     const path = normalize(r.path || '/');
     if (r.operation === 'initialize') return { ready: true };
-    const h = r.handle && handles.get(r.handle);
+    const h = r.handle ? handles.get(r.handle) : undefined;
+    const handle = () => {
+      if (!h) throw Error('Stream is closed');
+      return h;
+    };
     if (r.handle && !h) throw Error('Stream is closed');
-    if (r.operation === 'tell') return { position: h.position };
+    if (r.operation === 'tell') return { position: handle().position };
     if (r.operation === 'seek') {
-      h.position = validInteger(r.position);
+      handle().position = validInteger(r.position);
       return {};
     }
     if (r.operation === 'skip') {
-      h.position = validInteger(h.position + r.count);
+      handle().position = validInteger(handle().position + r.count);
       return {};
     }
     return transaction(async (s, afterCommit) => {
       const node = h
-        ? await request(s.nodes.get(key(h.inode)))
+        ? nodeValue(await request(s.nodes.get(key(h.inode))))
         : await nodeFor(s, path);
       if (h && !node) throw Error('Open file inode is missing');
+      const openedNode = () => {
+        if (!node) throw Error('Open file inode is missing');
+        return node;
+      };
       switch (r.operation) {
         case 'stat':
           return node
@@ -305,7 +483,7 @@
             s.paths.put({ key: key(next), path: next, id: row.id });
           }
           touch(s, dir);
-          if (oldDir.id !== dir.id) touch(s, oldDir);
+          if (oldDir && oldDir.id !== dir.id) touch(s, oldDir);
           return { changed: true };
         }
         case 'modified':
@@ -343,24 +521,27 @@
           return { handle };
         }
         case 'read': {
-          if (!h.readable) throw Error('File is not open for reading');
+          const node = openedNode();
+          if (!handle().readable) throw Error('File is not open for reading');
           const end = Math.min(
             node.body.length,
-            h.position + validInteger(r.length),
+            handle().position + validInteger(r.length),
           );
-          const body = node.body.subarray(h.position, end),
-            next = h.position + body.length;
+          const body = node.body.subarray(handle().position, end),
+            next = handle().position + body.length;
           afterCommit(() => {
-            h.position = next;
+            handle().position = next;
           });
           return { body: encode(body), eof: body.length === 0 };
         }
         case 'write':
         case 'resize': {
-          if (!h.writable) throw Error('File is not open for writing');
+          const node = openedNode();
+          if (!handle().writable) throw Error('File is not open for writing');
           const body = r.operation === 'write' ? decode(r.body) : undefined;
           if (body && body.length === 0) return {};
-          const offset = h.append && body ? node.body.length : h.position;
+          const offset =
+            handle().append && body ? node.body.length : handle().position;
           const length = validInteger(
             body ? Math.max(node.body.length, offset + body.length) : r.size,
           );
@@ -371,20 +552,21 @@
           node.modified = Date.now();
           s.nodes.put(node);
           afterCommit(() => {
-            h.position = body
+            handle().position = body
               ? offset + body.length
-              : Math.min(h.position, length);
+              : Math.min(handle().position, length);
           });
           return {};
         }
         case 'size':
-          return { size: node.body.length };
+          return { size: openedNode().body.length };
         case 'flush':
           return {};
         case 'close': {
-          s.handles.delete([namespace, owner, r.handle]);
+          const node = openedNode();
+          s.handles.delete([...key(owner), text(r.handle)]);
           await collect(s, node);
-          afterCommit(() => handles.delete(r.handle));
+          afterCommit(() => handles.delete(text(r.handle)));
           return {};
         }
         default:
@@ -393,12 +575,14 @@
     });
   }
   // Keep each descriptor's cursor updates ordered, including callers from different Java fibers.
-  self.teaFile = (input) => {
-    const job = tail.then(() => operate(JSON.parse(input)));
+  const teaFile = (input: string): Promise<string> => {
+    const job = tail.then(() =>
+      operate(parseFileRequest(JSON.parse(input) as unknown)),
+    );
     tail = job.catch(() => {});
-    return job.then(JSON.stringify);
+    return job.then((result) => JSON.stringify(result));
   };
-  self.teaFileSystemClose = () => {
+  const teaFileSystemClose = (): Promise<void> => {
     const job = tail.then(async () => {
       if (starting) await starting;
       if (releaseOwner) await transaction((s) => dropOwner(s, owner));
@@ -410,4 +594,6 @@
     tail = job.catch(() => {});
     return job;
   };
-})();
+  return { teaFile, teaFileSystemClose };
+}
+Object.assign(scope, createFileBridge());

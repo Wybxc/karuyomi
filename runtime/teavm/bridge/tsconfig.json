@@ -1,0 +1,9 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "ES2025.Float16", "WebWorker", "WebWorker.Iterable"],
+    "types": [],
+    "customConditions": ["browser"]
+  },
+  "include": ["*.ts"]
+}

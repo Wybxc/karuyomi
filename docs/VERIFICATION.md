@@ -7,6 +7,7 @@
 | 范围              | 已有证据                                                                                                                                                               | 复验入口与限制                                                                          |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | 协议 / TypeScript | 生成版本一致性、严格类型检查，JS Worker 与 API 边界分项测试通过                                                                                                        | `pnpm check`；测试覆盖协议/ABI、hash/预算、串行与代次、取消/超时、登录响应及错误分层    |
+| 运行时桥          | Codex 内置浏览器执行真实 Worker、WebCrypto、npm Zstd WASM、Canvas、IndexedDB、隔离与重启持久化均通过                                                                   | [桥验证](verification/worker-bridges.md)；不等同于 Source 在线或图片阅读验收            |
 | Dart / Flutter    | source_runtime、reader_core 与 app 的静态分析、协议/布局/调度/浏览/阅读组件测试分项通过                                                                                | `pnpm flutter:check`；测试 Provider/渲染夹具不等于真实 Source 或真机                    |
 | 构建与静态入口    | 已完成本地 JS 宿主、Flutter Web release、同源资源组装及 Wrangler dry-run；公开 shell 与控制页可加载                                                                    | `pnpm build`、`pnpm dev`；dry-run 不部署，也不证明生产 Access                           |
 | D1 / R2           | 迁移已加入构建/产物/关联/网络域名注册表；真实 MangaDraft 产品包已注册本地 D1/R2                                                                                        | `pnpm db:migrate:local`；`scripts/register-build.py` 默认仅输出计划，`--local` 才写本地 |
@@ -24,7 +25,7 @@ Access 本人策略覆盖 `/api` 和 `/api/*`。匿名 `/api`、`/api/bootstrap`
 
 ## P0-A 真实构建与 Web 初始化
 
-2026-11-03 新共享材料链路已通过实际 workerd 检查：当前 6 份材料与旧 e350 的 2 份兼容桥均返回正确摘要、长度、JavaScript/WASM MIME 和 public immutable 缓存头。逐包 AOT 输出只保留私有 bundle；注册仅关联私有产物，静态材料按受信 host catalog 核对。gzip 恢复回归覆盖编码/原文双摘要、长度上界、截断、尾随/拼接流和旧 raw 兼容；本地真实两包字节 roundtrip 通过。正式契约见[共享材料](RUNTIME-MATERIALS.md)与[发布说明](EXTENSIONS.md)。
+2026-11-03，TypeScript 迁移后的当前 6 份共享材料已通过实际 workerd 检查：摘要、长度、JavaScript/WASM MIME 和 public immutable 缓存头正确。逐包 AOT 输出只保留私有 bundle；注册仅关联私有产物，静态材料按受信 host catalog 核对。原型不保兼容，旧桥副本与旧 raw 恢复路径已移除；旧固定宿主全量队列已停止，需以当前宿主身份重建。gzip 恢复回归覆盖编码/原文双摘要、长度上界、截断、尾随和拼接流。此前两包字节 roundtrip 属于旧发布格式的历史证据，当前固定定位发布与真实下载恢复仍待验证。正式契约见[共享材料](RUNTIME-MATERIALS.md)与[发布说明](EXTENSIONS.md)。
 
 真实 Flutter + flutter_inappwebview 6.1.5 + iOS 26.4 Simulator 已在本地受信 HTTPS 通过内置运行时验证：控制页真实 307 从 `/runtime/host.html` 到 `/runtime/host`；document-start 内置 host 与 Blob Worker 完成 Arknights Comics 的 `hostInit` / `hostLoad`，返回 Source `5973713386239249589`，IndexedDB 可用，API 携带同源 HttpOnly cookie。服务器故意将远端 host.js、worker.js 和材料路径设为 503，这些路径请求数仍为 0。旧 cache/file 构建明确拒绝并提示升级扩展；同长度篡改 AOT 被 `integrity_error` 拦截，重建容器后正常恢复。实测同时修复 WK 返回 HTTP status `200.0` 的有限整数转换边界，并加入负例回归。临时入口、HTTPS 服务、证书与原始记录均留在 ignored `.local`，正式 app 代码、资源校验及 iOS CocoaPods 集成入库。
 
@@ -47,7 +48,7 @@ pnpm teavm:prepare --android
 pnpm teavm:check
 pnpm teavm:build --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
 pnpm --filter @karuyomi/runtime-host build
-node apps/api/test/source-metadata-probe.mjs PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
+node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
 ```
 
 打开脚本输出的 localhost 页面并运行正式 Source 集成回归。它使用真实 IndexedDB、产品 Worker 与 HTTP bridge、隔离 workerd/D1/R2 和 RS256 测试签名；不修改产品鉴权入口。复验步骤见 [集成说明](../apps/api/test/source-metadata-probe.md)，实测状态见 [摘要](verification/runtime-evidence.md)。初始化通过不等于文件/HTTP Cache 重启、升级与取消语义已完成回归。

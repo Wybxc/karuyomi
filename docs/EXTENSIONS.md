@@ -1,112 +1,98 @@
 # 扩展 AOT 构建与发布
 
-当前上游来源是固定提交的 `vendor/extensions-source` submodule。调度器读取源码树的 `src/<lang>/<key>/build.gradle.kts`，不使用已退化成“Outdated App”提示的旧 `index.min.json`，也不把仓库提交时间当成扩展版本。当前 Gradle DSL 的 `pkgName` 覆盖默认 `<lang>.<key>`；主题的 `baseVersionCode` 与扩展 `versionCode` 相加得到有效版本，`versionName=<libVersion>.<有效版本>`，Android/index versionCode 按上游 `ExtensionPlugin.kt` 的 libVersion 编码规则计算。无法静态确认的 Kotlin 表达式单独记为 `discovery_failed`。
+上游来源是固定提交的 `vendor/extensions-source`。调度器读取 `src/<lang>/<key>/build.gradle.kts`，按官方 `ExtensionPlugin.kt` 计算 Android versionCode，不使用已退化为提示页的旧 `index.min.json`。无法静态确认的 Kotlin 表达式单独记录为 `discovery_failed`。
 
-源码指纹覆盖自身目录、主题、递归 `project(":lib:...")` 依赖，以及上游 `common/core/compiler/gradle` 和根构建配置。host 指纹覆盖内化的 Java/bridge、正式构建工具、协议、共享材料生成器、runtime-host 包定义、pnpm 锁、工具链与 seed 锁，以及真正上游 submodules 的 gitlink/checkout 提交。同版本的共享库、host、工具链变化会生成新输入身份；无关上游提交不会使所有包重建。源码必须保持已提交状态，生成的 build/target/cache 不进入身份。
+`inputFingerprint` 仍是内部增量身份，覆盖包名、版本、源码依赖和 host 输入。共享库、桥、工具链变化即使没有修改扩展版本，也会产生新输入身份；无关上游提交不使全部包重建。它用于 checkpoint、buildId 和 provenance，不进入 Release tag/title。
 
-`scripts/build-extension.py --descriptor PATH --output DIR` 是逐包构建接口。它保留业务源码，通过官方 Gradle/KSP 生成 JAR 和 Source 元数据，再执行 AOT。输出包括 `manifest.json`、`artifacts/<sha256>`、`provenance.json` 与 `build-result.json`；失败必须非零退出并记明 upstream/host/aot 阶段。依赖只通过 `scripts/prepare-runtime.py --android` 的固定工具链、公开下载与本项目私有 runtime seed 准备，CI 不依赖研究 ZIP。
+## 固定 Release 定位
 
-这里的 runtime seed 是 JAR 等构建依赖，不是下发给 Web/Native 阅读器的客户端资源。扩展 AOT bundle 通过本仓库私有 Release 分发。每包 `artifacts/` 和 `build-result.json.artifacts` 只包含私有 bundle；5 个通用桥和 zstd WASM 使用 `/runtime/materials/<sha256>` 公共内容寻址引用，由 Web 静态资源或 Native 应用资源交付。构建器调用 `node packages/runtime-host/prepare-materials.mjs --print` 取得 catalog，provenance 记录 `materialVersion`、完整 catalog 字节 SHA256 和协议 ABI。材料的顺序、长度、MIME、哈希仍须核验，不因公共交付而跳过。`--print` 不读取私有 seed 或 npm 安装目录；实际生成客户端资源时才读取并核对固定版本的 npm WASM。
+扩展的 tag 和 title 都为 `ext-<packageSuffix>-v<AndroidVersionCode>`，例如 `ext-all.ahottie-v106005`；索引固定为 `extensions-index`。名称只用于定位当前结果，同版本 host 变化会更新相同定位。tag 不移动，实际构建的上游提交、host 提交和输入身份由 provenance 记录。
 
-## 首次全量只在本地执行
+本项目仍在原型阶段，只支持当前格式，不提供旧 hash-tag、旧传输清单或 raw 资产恢复兼容。历史 Release 保留原样，发布器不查找、改写或迁移它们。旧 checkpoint 中已经发布的历史记录仍会跳过，并从新 `index.json` 的可下载包列表排除；它们不代表已按新格式重新发布。
 
-先提交稳定的 host/工具链变更并准备 seed。Python 之外需要 Node 24.15.0；私有 Release REST 访问使用环境中的 `GH_TOKEN` 或 `GITHUB_TOKEN`，需要本仓库 contents 权限；不要把令牌写入配置或提交记录。
+GitHub 不支持覆盖同名资产。更新流程明确为：
+
+1. 将当前定位设为 draft，暂时隐藏该 Release。
+2. 移除旧 `release-manifest.json`，删除多余或内容不匹配的资产，补齐当前资产。
+3. 最后上传 `release-manifest.json`，核对上传响应的服务端 SHA256/长度。
+4. 最后一次 PATCH 写入当前 pointer 并设为非 draft；索引更新总在本批单包处理之后。
+
+中断留下 draft，重跑会补齐；同内容重跑不替换资产。更新期间定位可能暂时不可用，读者必须重试；拉取处于 draft 的索引会报可重试错误并保留本地 checkpoint。读者若跨越替换窗口取得混合快照，会在下载完整性校验中失败，不能将其视为成功。这里不提供无停机替换或历史 generation 读取。仓库必须允许 mutable releases，发布器遇到 immutable 定位会拒绝修改。
+
+Release body 的 `karuyomiRelease` pointer 含 `schemaVersion: 2`、内部 generation、manifest asset id 和 manifest SHA256。`release-manifest.json` 同为版本 2，记录 tag、generation 和每个上传资产的 SHA256/长度。只有索引设置 GitHub latest，扩展和 runtime seed 均不设置 latest。远端 index pointer 不符合 checkpoint 时拒绝覆盖，先拉取并合并状态。GitHub PATCH 没有事务式 CAS；本地文件锁和 CI concurrency group 必须保证只有一个 publisher，不能同时从独立工作区或 CI 发布。
+
+## 传输与校验
+
+每包只上传一个私有 AOT bundle，使用 gzip level 9、mtime=0、无文件名及平台无关头。资产为 `<canonicalSHA256>.gz`，另有 `artifact-encodings.json`、`manifest.json`、调度及构建 provenance、validation。通用桥与 zstd WASM 由 Web 静态资源或 Native 打包交付，不重复上传到扩展 Release。
+
+编码表记录 canonical SHA256/长度和 encoded SHA256/长度。清单与客户端始终使用解压后的 canonical 身份。下载先校验收到的 manifest 和每个资产；有界解压时再验证不同字节域的 canonical SHA256/长度。截断、拼接 gzip、尾随字节、超长输出、缺失或重复编码项均拒绝。
+
+摘要只在上传/下载边界验证。上传在读取 canonical 字节进行压缩时核对一次，压缩摘要复用于清单和服务端响应比较；下载收到的压缩字节只计算一次摘要，解压后的原始字节也只计算一次。进程内的 owned bytes/metadata receipt 在相邻阶段传递，不从磁盘 JSON 恢复“信任”。阶段间仍检查 schema、身份、大小、MIME、静态材料引用及路径，不反复读取同一大文件计算摘要。注册到 D1/R2 是独立交付边界，其默认完整性校验不关闭。
+
+构建器调用 `node packages/runtime-host/prepare-materials.ts --print` 获取 catalog。该命令需要安装锁定的 npm 依赖，会编译项目 TypeScript 桥并打包锁定的 npm zstd glue；metadata-only 不读 WASM bytes 或私有 JVM seed。实际生成 Web/Native 材料时才读取并核对固定 WASM。runtime seed 是 JAR 等构建依赖，不下发阅读器。
+
+## 本地首次全量与恢复
+
+先提交稳定 host/工具链，初始化 submodules，执行 `pnpm install --frozen-lockfile` 并准备依赖。REST 凭据使用环境中的 `GH_TOKEN` 或 `GITHUB_TOKEN`，不写入配置；上游 Gradle/AOT 子进程会移除这些发布凭据。
 
 ```sh
 python3 scripts/prepare-runtime.py --android
-python3 tools/extensions/pipeline.py plan \
-  --state .local/extensions/state.json --output .local/extensions/plan.json
 python3 tools/extensions/pipeline.py bootstrap \
-  --state .local/extensions/state.json --output .local/extensions/plan.json \
+  --state .local/extensions-current/state.json --output .local/extensions-current/plan.json \
   --repository Wybxc/karuyomi --jobs 1
 ```
 
-`bootstrap` 默认覆盖所有未尝试输入，限并发 1，最高可设 4；可用 `--limit N` 分批。每个包发布或失败后立刻原子保存 checkpoint，重复运行跳过已发布和未变更的确定失败。`--retry-failed` 明确重试原失败；GitHub 传输失败会在后续同身份运行中自动重试，累计最多三次，不会在当前批次立即循环。构建日志留在 plan 所在目录的 `builds/<inputFingerprint>/`，包含 `build.log` 与 `logs/upstream.log`、`logs/aot.log`，索引只保留有用的阶段/错误信息。state 使用文件锁防止两个进程并写。中断后保留 state 和输出，再执行同一命令即可继续；已上传的 matching draft 继续补齐，已发布身份不会覆盖。
+`bootstrap` 默认处理所有未尝试输入，并发默认 1、最高 4，`--limit N` 可分批。每包 published/failed 后原子保存 checkpoint，跳过已发布及未变化的确定失败；`--retry-failed` 明确重试失败。GitHub 传输失败最多自动重试三次，不在同批中无限循环。保存成功后，仅清理精确 buildId 的 `extension-work`、`extension-cache` 和 `gradle-launcher`，不跟随 symlink。交付目录、state、`build.log`、`logs/upstream.log`、`logs/aot.log` 和失败诊断保留，共享 Maven/Gradle 缓存保留。
 
-本地 `bootstrap` 在每包状态确认为 `published` 且 checkpoint 原子保存之后，只清理该包精确 buildId 对应的 `runtime/teavm/.local/extension-work/<buildId>`、`extension-cache/<buildId>` 和 `gradle-launcher/<buildId>`，避免全量构建累积工作副本。交付目录、state、构建日志和失败包诊断保留；共享 `build-cache/m2` 与 Gradle 缓存不清理。清理使用目录文件描述符且不跟随符号链接，包缓存中的 `m2` 链接只被移除，其共享目标保留。保存 checkpoint 失败时不清理；清理遇到异常只发出本地提示，已发布状态不改为失败，也不会因此重新发布。CI 的 build / publish-plan 不执行此清理。
+每个 builder 使用独立进程组。SIGINT/SIGTERM 会停止派发、取消待运行任务，先终止并等待已注册的 builder 进程组，再释放 checkpoint 锁；三秒宽限后仍在运行的组成员会被强制终止。该操作只针对本次创建的构建进程组，不搜索或终止共享 Gradle daemon 和其他任务。
 
-长时间本地运行可在准备好凭据后交给后台，并保留统一日志：
-
-```sh
-mkdir -p .local/extensions
-nohup python3 -u tools/extensions/pipeline.py bootstrap \
-  --state .local/extensions/state.json --output .local/extensions/plan.json \
-  --repository Wybxc/karuyomi --jobs 1 \
-  > .local/extensions/bootstrap.log 2>&1 &
-tail -f .local/extensions/bootstrap.log
-```
-
-长批次也可在独立 clone 中运行：固定已审查提交及对应 submodule，准备好该 clone 的工具链后启动后台任务，避免主工作目录的后续开发改变构建输入。`--state` 和 `--output` 可以使用主工作目录中的绝对路径，以便统一监测和恢复；同一 checkpoint 仍只能由一个进程持有。自动清理只处理执行该 pipeline 的 clone 下的临时工作目录，不触碰绝对路径指定的交付与日志。
-
-全部发现包都有 `published` 或明确 `failed` 终态后，再执行一次带 `--finalize` 的 bootstrap：
+长批次使用固定提交的独立 clone。外层 runner 可以复用该 clone 的完整 plan 和 checkpoint，不修改 clone，也不重算或替换 descriptor/host 身份。下面使用当前 host 的独立构建目录作为示例；冻结材料必须仍属于当前产品 catalog，才能继续当前产品发布：
 
 ```sh
 python3 tools/extensions/pipeline.py bootstrap \
-  --state .local/extensions/state.json --output .local/extensions/plan.json \
-  --repository Wybxc/karuyomi --jobs 1 --finalize
+  --plan .local/extensions-current/plan.json \
+  --build-checkout .local/current-aot \
+  --state .local/extensions-current/state.json \
+  --output .local/extensions-current/resume-plan.json \
+  --repository Wybxc/karuyomi --jobs 1
 ```
 
-baseline 完成代表首次覆盖已结束，记录 published/failed/discoveryFailed 数量；不代表所有扩展可运行。未尝试、仅本地 built 或尚未上传的包会阻止正常完成标记。`CI=true` 或 `GITHUB_ACTIONS=true` 环境完全禁止首次 bootstrap/finalize。
+runner 检查冻结 checkout 的提交、干净 host 输入、实际指纹、submodule 和上游提交，调用该 checkout 自己的 `scripts/build-extension.py`。材料引用使用该 checkout 的 catalog 检查，便于复验历史结果；该检查本身不证明旧材料仍可被当前产品加载。此前已成功构建但发布中断的本地交付可以复用，避免重新执行 Gradle/AOT。磁盘 `pipeline-result.json` 不作为当前 Release 仍存在的证据；只有本轮真实下载得到的进程内 receipt 可以免发布，普通磁盘复用必须重新走当前定位发布。工作缓存清理指向 `--build-checkout`，交付和日志继续保留在 `--output` 相邻的 `builds/<inputFingerprint>/`。
 
-2026-11-03 已在 ignored `.local/aot-bootstrap/` 的独立完整 clone 中固定 `7f54463`，启动 1,448 包的本地串行全量。主工作区的 `.local/extensions/bootstrap-run.json` 记录 PID、固定 checkout、state/plan/log 路径；`bootstrap.log` 与逐包目录保留进度。该轮仍处于未完成 baseline，结束并核对失败记录后才 finalize；CI 的首次全量保护继续生效。主工作区后续提交不改动正在运行的 clone。
+切换 publisher 前先正常停止旧调度进程，确认它释放 checkpoint 锁，再启动新命令；不要并发写同一 state。历史 `.local/aot-bootstrap` 固定于 `7f54463`，在 1,448 包中已记录 86 published、9 failed、1,353 pending 后停止，记录已备份至 `.local/extensions/history/pre-typescript-host/`。其五个桥的 hash 不属于当前 Web/Native 六项材料集合，不能接续为当前产品发布；旧 Release/checkpoint 保留为历史，当前队列必须在提交稳定的当前 host 后以新指纹重新计划。冻结 runner 保留用于可复验构建，不为当前产品增加旧材料兼容层。
 
-## 不可变 Release 与索引
+全部发现包都有 published 或明确 failed 后，再对同一命令增加 `--finalize`。baseline 完成代表覆盖已结束，记录 published/failed/discoveryFailed，不代表全部扩展可运行。未尝试或仅 built 的包阻止 finalize。`CI=true` 或 `GITHUB_ACTIONS=true` 禁止首次全量及冻结计划恢复/finalize。
 
-每包 tag 为 `ext-<packageSuffix>-v<AndroidVersionCode>-<inputFingerprint前32位>`。新 `source-aot` Release 仅将私有 bundle 用 gzip level 9 压缩，固定 mtime=0、无文件名、平台无关 gzip 头；资产名为 `<canonicalSHA256>.gz`，共享 JS/WASM 不重复上传。另含 `manifest.json`、调度 provenance、原始 build provenance 与 validation。清单始终声明解压后的 canonical SHA256/长度，R2 注册和客户端执行也使用原始字节。
-
-`artifact-encodings.json` 的版本为 `schemaVersion: 1`，`artifacts` 中每项包含 `sha256`、`size`（canonical 原始值）、`asset`、`encoding: "gzip"`、`encodedSha256`、`encodedSize`。`release-manifest.json` 则汇总所有实际上传资产的 SHA256/长度，包括压缩字节及编码表，并最后上传。先建 draft，确认资产与服务端 digest 后才发布；同 tag 不同内容、额外资产或缺失资产都会失败，绝不 clobber。失败 draft 可续传。私有 API 下载跨 host 重定向时移除 Authorization/Cookie。
-
-恢复先校验完整 Release 传输清单，再核对编码表中的压缩 SHA256/长度，解压最多允许清单声明的原始长度（单项上限 64 MiB），最后再次核对 canonical SHA256/长度。截断、拼接 gzip、尾随字节、超长输出、重复或未知编码项均失败；存在错误编码表时不回退 raw。旧 Release 没有编码表时继续读取原有 64 位 SHA 命名的 raw 资产；已有 legacy 发布不改写。恢复后重试发布会保留原压缩字节，避免不同 zlib 版本改变不可变资产。
-
-指定计划中的单包构建命令会先尝试恢复相同 Release，成功则不运行 Gradle/AOT；同时重建本地 `artifacts/<canonicalSHA256>` 供注册使用：
+恢复单个当前格式 Release，可使用：
 
 ```sh
-python3 tools/extensions/pipeline.py build --plan .local/extensions/plan.json \
-  --key INPUT_FINGERPRINT --output .local/extensions/builds/INPUT_FINGERPRINT \
+python3 tools/extensions/pipeline.py build --plan .local/extensions-current/plan.json \
+  --key INPUT_FINGERPRINT --output .local/extensions-current/builds/INPUT_FINGERPRINT \
   --repository Wybxc/karuyomi
 ```
 
-两份现有 AOT 字节已在本地完成共享材料引用、gzip、下载校验、canonical 恢复和不可变重试核验。MangaDraft 为 3,777,975 → 791,368 bytes，Arknights 为 1,824,293 → 583,749 bytes。此核验使用内存中的 GitHub API 替身，未新建或发布真实 Release，未重新执行 AOT，也不增加浏览器或在线兼容声明；压缩字节长度可能随 zlib 版本变化，实际发布以编码表哈希为准。
+相同定位的当前 generation 匹配输入身份时，下载恢复代替 Gradle/AOT。同版本但 generation 不同视为缓存未命中，构建新输入后替换该定位。
 
-单包发布之后，才生成含完整 checkpoint 的 `extensions-index-<快照SHA前32位>` Release，内含 `index.json` 和 `state.json`。只有索引设置 GitHub latest；seed/单包都显式 `make_latest=false`。快照身份同时覆盖 index 和 state，重试计数等 checkpoint 变化也不会覆盖旧快照。发布前检查远程 index 未被另一运行推进，否则拒绝覆盖，先拉取并合并 checkpoint。索引保留上一可用版本并将未完成的新身份标为 stale；删除的源不再列入当前索引。
+## 兼容证据与 CI
 
-发布前逐个重新验证清单与所有产物字节。编译和完整性成功的包可以发布为 `compiled_unverified`，其索引 `runtimeReady=false`。只有带匹配 buildId/manifestSHA 的实际 Worker/browser 验证均通过才标为 `browser_verified`。默认无浏览器批量验证不会把编译冒充兼容、真实 Source 网络或图片支持；失败包只进入失败记录。
-
-默认调度器直接执行严格的清单/字节完整性检查，不会因可选验证脚本存在就启动浏览器。人工浏览器验证是显式阶段：
+编译成功可以发布为 `compiled_unverified`，始终 `runtimeReady=false`。只有匹配 buildId/manifestSHA 的真实 Worker/browser gate 均通过才为 `browser_verified`；初始化成功不证明 Source 在线请求、图片或真机支持。人工验证是显式步骤：
 
 ```sh
-node tools/extensions/verify-build.mjs --directory DIR --report DIR/validation.json
-node tools/extensions/verify-build.mjs --directory DIR --report DIR/validation.json \
+node tools/extensions/verify-build.ts --directory DIR --report DIR/validation.json
+node tools/extensions/verify-build.ts --directory DIR --report DIR/validation.json \
   --serve --timeout-ms 120000
-node --test tools/extensions/verify-build.test.mjs
+node --test tools/extensions/verify-build.test.ts
 ```
 
-第一条只检查清单、SHA256、长度与 MIME；完整性通过但未运行浏览器时退出 2，报告 `valid=false`、`runtimeReady=false`、`browser_not_run`。`--serve` 只监听 `127.0.0.1` 临时端口；人或 CUA 打开打印的 URL 后，页面自动用真实产品 Worker 和 IndexedDB 执行初始化。清单/字节或浏览器验证失败退出 1，实际浏览器验证通过才退出 0。报告始终将 `onlineCompatibility` 记为 `not_tested`，初始化成功不代表在线 Source 或图片链路可用。验证器的 Node 回归测试不执行生成的扩展代码。
+默认完整性通过但未运行浏览器时退出 2，报告 `valid=false`、`runtimeReady=false`、`browser_not_run`；失败退出 1，实际浏览器通过才退出 0。`--serve` 只监听 loopback，人或 CUA 打开 URL 后运行真实产品 Worker/IndexedDB。`onlineCompatibility` 始终为 `not_tested`。
 
-已发布资产不会为补充验证而覆盖，后续兼容证据应使用独立不可变 attestation 或新的发布身份。
+`.github/workflows/extensions.yml` 每六小时或手动运行，只做增量。没有已完成本地 baseline 时拒绝生成首次全量 matrix；每次默认 12 包、手动最高 24，并发最多 2。plan/build 仅 contents:read，publish 单独 contents:write；三个 jobs 均安装固定 Node 和锁定 npm 依赖。publish 只编译受信桥 metadata 并处理资产，不运行扩展 Gradle 或生成的 JS。所有发布使用同一 concurrency group。
 
-旧冻结研究输入的已转换构建与当前源码基线严格分开，可用下列命令先查看发布计划，再移除 `--dry-run` 实际发布；它只创建 `legacy-<buildId>`，不会进入当前 source baseline 或 latest 索引：
+项目 CI 使用 `.github/workflows/project-ci.yml`，仅分支 push/PR 触发；Release tag 不启动项目检查。历史 `ci.yml` 在 GitHub 禁用，避免指向旧构建提交的 tag 重新触发旧配置。
 
 ```sh
-python3 tools/extensions/pipeline.py import-legacy \
-  --manifest PATH_TO_MANIFEST --artifacts PATH_TO_ARTIFACT_FOLDER \
-  --provenance PATH_TO_ORIGINAL_PROVENANCE --dry-run
+python3 -m unittest discover -s tools/extensions/tests
+CI=true GITHUB_ACTIONS=true python3 -m unittest discover -s tools/extensions/tests
 ```
 
-已发布的 [legacy MangaDraft e350 构建](https://github.com/Wybxc/karuyomi/releases/tag/legacy-release9-mangadraft-product-e3505206005c25f69b92)来自旧冻结输入，`runtimeReady=false`，未进入当前源码基线。其 release-manifest SHA256 为 `b7f4deda88af0a10c3132b8c0275b0f207c405f280b07f06cc4994ef103eacec`；私有仓库与资产保持私有。
-
-## CI 只做增量
-
-项目检查使用 `.github/workflows/project-ci.yml`，只响应分支 push 和 pull request，扩展与索引 Release tag 不启动检查。旧路径 `ci.yml` 已从主分支移除，并在 GitHub 中禁用该工作流；这是为了覆盖仍指向旧固定构建提交的 tag，因为这些提交保留了旧的无筛选 push 配置。不要重新启用旧工作流。新增项目 CI 保持启用，初次本地批量发布无需停掉分支检查。
-
-`.github/workflows/extensions.yml` 每六小时或手动执行，先读私有最新 checkpoint，再跟进上游 main 的固定提交。缺少已完成的本地 baseline 时在 plan 阶段拒绝，不会启动首次全量 matrix。默认每次最多 12 包，手动上限 24，并发最多 2；共享库/host 变化产生的积压按多次运行消化。不自动重试所有未变更的确定失败。
-
-plan/build jobs 只有 contents:read，checkout 不保留 git 凭据；上游 Gradle 子进程移除 GitHub token。三个 job 均用 setup-node 固定 Node 24.15.0，材料 catalog 的读取不需要 npm install；publish 的非递归 checkout 已含桥源码、协议与固定 WASM 元数据。publish job 单独拥有 contents:write，只读取并复核构建资产，既不运行扩展 Gradle，也不执行生成的 JS。整个 workflow 通过同一 concurrency group 串行更新索引，失败包不阻断其他包的记录。
-
-回归测试不需要网络、GitHub token 或 JVM：
-
-```sh
-python3 -m unittest discover -s tools/extensions/tests -v
-```
-
-实现依据是上游源码中 `ExtensionPlugin.kt`、`generate-build-matrices.py` 和 `publish-repo.py`；GitHub transport 使用[官方 Releases REST API](https://docs.github.com/en/rest/releases/releases)的 draft、make_latest 与资产 digest 契约。
+测试不使用网络、GitHub 凭据、JVM 或真实 Source。冻结 runner 测试只执行自有 Python fixture，验证 checkout 选择、凭据隔离、本地复用，以及 SIGINT/SIGTERM 下 sleeping builder/孙进程停止后才释放锁。发布行为依据 [GitHub Releases API](https://docs.github.com/en/rest/releases/releases) 和 [Release assets API](https://docs.github.com/en/rest/releases/assets)。

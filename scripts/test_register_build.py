@@ -199,17 +199,26 @@ class RegistrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             register.verify(manifest, self.folder)
 
+    def test_private_host_scripts_and_resources_are_rejected(self):
+        for role in ["hostScripts", "resources"]:
+            manifest = copy.deepcopy(self.manifest)
+            manifest[role] = [{**manifest["bundle"], "logicalName": "private.js"}]
+            for verify_hashes in [True, False]:
+                with self.subTest(role=role, verify_hashes=verify_hashes):
+                    with self.assertRaisesRegex(ValueError, "shared runtime materials"):
+                        register.verify(
+                            manifest, self.folder, verify_hashes=verify_hashes
+                        )
+
     def test_failed_upload_never_starts_metadata_publication(self):
         manifest = copy.deepcopy(self.manifest)
-        manifest["hostScripts"] = [fixture(self.folder, b"const helper = 1;")["bundle"]]
         path = self.folder / "manifest.json"
         path.write_text(json.dumps(manifest))
         calls = []
 
-        def fail_second_upload(arguments, **_kwargs):
+        def fail_upload(arguments, **_kwargs):
             calls.append(arguments)
-            if len(calls) == 2:
-                raise subprocess.CalledProcessError(1, arguments)
+            raise subprocess.CalledProcessError(1, arguments)
 
         with (
             patch(
@@ -222,12 +231,12 @@ class RegistrationTests(unittest.TestCase):
                     "--local",
                 ],
             ),
-            patch.object(register.subprocess, "run", side_effect=fail_second_upload),
+            patch.object(register.subprocess, "run", side_effect=fail_upload),
             patch("builtins.print"),
             self.assertRaises(subprocess.CalledProcessError),
         ):
             register.main()
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 1)
         self.assertTrue(all(call[3] == "r2" for call in calls))
 
 

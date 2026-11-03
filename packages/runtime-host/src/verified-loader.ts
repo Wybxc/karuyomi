@@ -190,10 +190,7 @@ export class VerifiedLoader {
     script = false,
   ): Promise<Uint8Array> {
     signal.throwIfAborted();
-    if (
-      artifact.path !== `/runtime/materials/${artifact.sha256}` &&
-      artifact.path !== `/api/extensions/artifacts/${artifact.sha256}`
-    ) {
+    if (artifact.path !== `/runtime/materials/${artifact.sha256}`) {
       throw new RuntimeFailure(
         'integrity_error',
         'Material URL does not match its digest',

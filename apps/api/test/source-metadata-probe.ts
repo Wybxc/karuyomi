@@ -2,10 +2,14 @@
 // Loopback-only live-Source probe. Production entry points never import this.
 // Real workerd, D1/R2, RS256 verification and the product HTTP bridge are used.
 import assert from 'node:assert/strict';
+import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import type { IncomingMessage } from 'node:http';
+import { collectMaterials } from '../../../packages/runtime-host/materials.ts';
+import { isRecord } from '../../../tools/extensions/types.ts';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -16,10 +20,10 @@ const api = path.join(root, 'apps/api');
 const manifestFile = process.argv[2];
 assert(
   manifestFile,
-  'Usage: node apps/api/test/source-metadata-probe.mjs MANIFEST [ARTIFACT_FOLDER]',
+  'Usage: node apps/api/test/source-metadata-probe.ts MANIFEST [ARTIFACT_FOLDER]',
 );
 const manifestPath = path.resolve(manifestFile);
-const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+const manifest = await parseManifest(await readFile(manifestPath));
 const artifactFolder = process.argv[3]
   ? path.resolve(process.argv[3])
   : path.join(path.dirname(manifestPath), 'artifacts');
@@ -37,14 +41,14 @@ const environment = {
 };
 const require = createRequire(path.join(api, 'package.json'));
 const wranglerRequire = createRequire(require.resolve('wrangler'));
-const { build } = await import(wranglerRequire.resolve('esbuild'));
-const { Miniflare, convertV4MiniflareOptions } = await import(
-  wranglerRequire.resolve('miniflare')
+const { build }: typeof import('esbuild') = await import(
+  wranglerRequire.resolve('esbuild')
 );
-const { generateKeyPair, exportJWK, SignJWT } = await import(
-  require.resolve('jose')
-);
-const wrangler = (...args) =>
+const { Miniflare, convertV4MiniflareOptions }: typeof import('miniflare') =
+  await import(wranglerRequire.resolve('miniflare'));
+const { generateKeyPair, exportJWK, SignJWT }: typeof import('jose') =
+  await import(require.resolve('jose'));
+const wrangler = (...args: string[]) =>
   execFileSync(
     'pnpm',
     ['exec', 'wrangler', ...args, '--local', '--persist-to', state],
@@ -99,13 +103,18 @@ const compiled = await build({
   target: 'es2022',
   write: false,
 });
+assert(
+  compiled.outputFiles.length === 1,
+  'Expected one compiled Worker module',
+);
 const databaseId = /"database_id":\s*"([^"]+)"/.exec(
   await readFile(path.join(api, 'wrangler.jsonc'), 'utf8'),
-)[1];
+)?.[1];
+assert(databaseId, 'D1 database identity missing from Wrangler configuration');
 const mf = new Miniflare(
   convertV4MiniflareOptions({
     modules: true,
-    script: compiled.outputFiles[0].text,
+    script: compiled.outputFiles[0]!.text,
     compatibilityDate: '2026-11-03',
     resourcePersistencePath: path.join(state, 'v3'),
     d1Databases: { DB: databaseId },
@@ -121,15 +130,42 @@ const mf = new Miniflare(
   }),
 );
 const token = await new SignJWT({ email: 'probe@example.com' })
-  .setProtectedHeader({ alg: 'RS256', kid: jwk.kid })
+  .setProtectedHeader({ alg: 'RS256', kid: String(jwk.kid) })
   .setSubject('probe-owner')
   .setIssuer('https://probe.cloudflareaccess.com')
   .setAudience('probe-app')
   .setIssuedAt()
   .setExpirationTime('30m')
   .sign(keys.privateKey);
-const network = [];
-const evidence = {
+interface NetworkEntry {
+  method: string;
+  target: string;
+  elapsedMs: number;
+  bridgeStatus: number;
+  upstreamStatus?: number;
+  queryKeys: string[];
+  catalogQuery?: Record<string, string>;
+  bridgeError?: string;
+  bodyBytes?: number;
+  bodySha256?: string;
+  contentType?: string;
+  htmlTitle?: string;
+  challengeDetected?: boolean;
+}
+const { data: materials } = await collectMaterials();
+const network: NetworkEntry[] = [];
+interface LiveEvidence {
+  probe: string;
+  buildId: string;
+  bundleSha256: string;
+  realRS256Verification: boolean;
+  allowedHosts: string[];
+  productionAccessVerified: boolean;
+  testOnlyOriginAlias: boolean;
+  network: NetworkEntry[];
+  browser: unknown;
+}
+const evidence: LiveEvidence = {
   probe: 'live-source-real-workerd',
   buildId: manifest.buildId,
   bundleSha256: manifest.bundle.sha256,
@@ -201,10 +237,11 @@ button.onclick = async () => {
 };
 </script></html>`;
 
-async function readBody(request, limit = 12 * 1024 * 1024) {
-  const chunks = [];
+async function readBody(request: IncomingMessage, limit = 12 * 1024 * 1024) {
+  const chunks: Buffer[] = [];
   let size = 0;
-  for await (const chunk of request) {
+  for await (const value of request) {
+    const chunk = Buffer.isBuffer(value) ? value : Buffer.from(String(value));
     size += chunk.length;
     if (size > limit) throw new Error('probe_request_limit');
     chunks.push(chunk);
@@ -213,40 +250,56 @@ async function readBody(request, limit = 12 * 1024 * 1024) {
 }
 const server = createServer(async (request, response) => {
   try {
-    const pathname = new URL(request.url, 'http://localhost').pathname;
+    const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
     if (request.method === 'POST' && pathname === '/probe-result') {
       evidence.browser = JSON.parse(
         (await readBody(request, 128 * 1024)).toString(),
       );
       await persist();
-      console.log(JSON.stringify(evidence.browser.events.at(-1)));
+      const browser = evidence.browser;
+      if (isRecord(browser) && Array.isArray(browser.events))
+        console.log(JSON.stringify(browser.events.at(-1)));
       response.writeHead(204).end();
       return;
     }
     if (pathname.startsWith('/api/')) {
       const body = await readBody(request);
-      const headers = new Headers(request.headers);
-      headers.set('Cf-Access-Jwt-Assertion', token);
-      headers.set('Origin', apiOrigin);
-      headers.delete('host');
-      headers.delete('content-length');
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(request.headers)) {
+        if (value !== undefined)
+          headers[key] = Array.isArray(value) ? value.join(', ') : value;
+      }
+      headers['Cf-Access-Jwt-Assertion'] = token;
+      headers.Origin = apiOrigin;
+      delete headers.host;
+      delete headers['content-length'];
       const started = performance.now();
       const result = await mf.dispatchFetch(apiOrigin + request.url, {
-        method: request.method,
+        method: request.method ?? 'GET',
         headers,
         ...(body.length ? { body } : {}),
       });
       const bytes = Buffer.from(await result.arrayBuffer());
       if (pathname === '/api/bridge/http') {
-        const descriptor = JSON.parse(body.toString());
-        const upstream = JSON.parse(bytes.toString());
-        const entry = {
+        const descriptor: unknown = JSON.parse(body.toString());
+        const upstream: unknown = JSON.parse(bytes.toString());
+        assert(
+          isRecord(descriptor) &&
+            typeof descriptor.url === 'string' &&
+            typeof descriptor.method === 'string',
+          'Invalid v1 HTTP request metadata',
+        );
+        assert(isRecord(upstream), 'Invalid v1 HTTP response metadata');
+        const entry: NetworkEntry = {
           method: descriptor.method,
           target:
             new URL(descriptor.url).origin + new URL(descriptor.url).pathname,
           elapsedMs: Math.round(performance.now() - started),
           bridgeStatus: result.status,
-          upstreamStatus: upstream.status,
+          ...(typeof upstream.status === 'number'
+            ? { upstreamStatus: upstream.status }
+            : {}),
+          queryKeys: [],
         };
         const target = new URL(descriptor.url);
         entry.queryKeys = [...target.searchParams.keys()];
@@ -255,19 +308,29 @@ const server = createServer(async (request, response) => {
         if (target.pathname === '/api/catalog/projects') {
           entry.catalogQuery = Object.fromEntries(target.searchParams);
         }
-        if (upstream.error) entry.bridgeError = upstream.error;
-        if (upstream.body) {
+        if (typeof upstream.error === 'string')
+          entry.bridgeError = upstream.error;
+        if (typeof upstream.body === 'string' && upstream.body) {
           const data = Buffer.from(upstream.body, 'base64');
           entry.bodyBytes = data.length;
           entry.bodySha256 = createHash('sha256').update(data).digest('hex');
-          entry.contentType = upstream.headers?.find(
-            ([name]) => name.toLowerCase() === 'content-type',
-          )?.[1];
+          const contentType = Array.isArray(upstream.headers)
+            ? upstream.headers.find(
+                (value: unknown): value is [string, string] =>
+                  Array.isArray(value) &&
+                  value.length === 2 &&
+                  typeof value[0] === 'string' &&
+                  value[0].toLowerCase() === 'content-type' &&
+                  typeof value[1] === 'string',
+              )?.[1]
+            : undefined;
+          if (contentType !== undefined) entry.contentType = contentType;
           if (entry.contentType?.includes('text/html')) {
             const text = data.toString();
-            entry.htmlTitle = /<title[^>]*>([^<]*)<\/title>/i
+            const title = /<title[^>]*>([^<]*)<\/title>/i
               .exec(text)?.[1]
               ?.slice(0, 120);
+            if (title !== undefined) entry.htmlTitle = title;
             entry.challengeDetected =
               /cf-chl-|challenge-platform|Just a moment|bot-verification|Human Verification/i.test(
                 text,
@@ -280,6 +343,20 @@ const server = createServer(async (request, response) => {
       }
       response.writeHead(result.status, Object.fromEntries(result.headers));
       response.end(bytes);
+      return;
+    }
+    const materialSha256 = /^\/runtime\/materials\/([a-f0-9]{64})$/.exec(
+      pathname,
+    )?.[1];
+    const material = materialSha256 ? materials.get(materialSha256) : undefined;
+    if (request.method === 'GET' && material) {
+      response
+        .writeHead(200, {
+          'Content-Type': material.contentType,
+          'Cache-Control': 'no-store',
+          'Content-Length': material.bytes.length,
+        })
+        .end(material.bytes);
       return;
     }
     if (request.method === 'GET' && pathname === '/') {
@@ -318,16 +395,16 @@ const server = createServer(async (request, response) => {
     response.end(JSON.stringify({ error: 'probe_failed' }));
   }
 });
-await new Promise((resolve) =>
+await new Promise<void>((resolve) =>
   server.listen(
     Number(process.env.SOURCE_PROBE_PORT ?? 8897),
     '127.0.0.1',
-    resolve,
+    () => resolve(),
   ),
 );
-console.log(
-  `Live Source metadata probe: http://127.0.0.1:${server.address().port}/`,
-);
+const address = server.address();
+assert(address && typeof address !== 'string', 'Missing Source probe address');
+console.log(`Live Source metadata probe: http://127.0.0.1:${address.port}/`);
 console.log(`Evidence: ${evidenceFile}`);
 let closing = false;
 async function close() {

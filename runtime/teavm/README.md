@@ -32,7 +32,7 @@ python3 scripts/build-extension.py --descriptor PATH_TO_DESCRIPTOR --output PATH
 
 ```sh
 pnpm --filter @karuyomi/runtime-host build
-node apps/api/test/source-metadata-probe.mjs PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
+node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
 ```
 
 打开脚本输出的 localhost 页面运行。它核对清单/hash 与实际 `hostInit/hostLoad`，再尝试真实漫画资料操作；范围、上游 Human Verification 阻断和原 Source 搜索行为见 [集成回归说明](../../apps/api/test/source-metadata-probe.md) 与 [实测摘要](../../docs/verification/runtime-evidence.md)。测试签名不替代生产 Access。

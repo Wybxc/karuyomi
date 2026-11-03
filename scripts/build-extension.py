@@ -155,7 +155,7 @@ def put(output, file, content_type):
 
 def material_catalog():
     process = subprocess.run(
-        ["node", str(ROOT / "packages/runtime-host/prepare-materials.mjs"), "--print"],
+        ["node", str(ROOT / "packages/runtime-host/prepare-materials.ts"), "--print"],
         cwd=ROOT,
         capture_output=True,
         check=True,

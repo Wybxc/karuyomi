@@ -135,10 +135,9 @@ test('Web shared materials always use credential-free static digest paths', asyn
   );
   const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
   const value = {
-    ...(await artifact()),
+    ...(await sharedArtifact()),
     contentType: 'application/javascript',
   };
-  // Legacy manifests also resolve to the retained static material.
   expect(await loader.sharedArtifact(value, signal(), true)).toEqual(bytes);
   expect(fetcher).toHaveBeenCalledWith(
     `${origin}/runtime/materials/${value.sha256}`,
@@ -160,7 +159,7 @@ test('Web shared materials always use credential-free static digest paths', asyn
 test('Native shared materials use only bundled bytes and never fall back to network', async () => {
   const fetcher = vi.fn();
   const value = {
-    ...(await artifact()),
+    ...(await sharedArtifact()),
     contentType: 'application/javascript',
   };
   const loader = new VerifiedLoader(origin, fetcher as typeof fetch, (hash) =>
@@ -184,7 +183,7 @@ test('Native shared materials use only bundled bytes and never fall back to netw
 
 test('shared materials reject changed bytes, MIME and paths before execution', async () => {
   const value = {
-    ...(await artifact()),
+    ...(await sharedArtifact()),
     contentType: 'application/javascript',
   };
   const corrupt = new Uint8Array(bytes);
@@ -214,7 +213,7 @@ test('unavailable Web material never falls back to the private artifact endpoint
   const fetcher = vi.fn(async () => new Response('', { status: 404 }));
   const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
   await expect(
-    loader.sharedArtifact(await artifact(), signal(), true),
+    loader.sharedArtifact(await sharedArtifact(), signal(), true),
   ).rejects.toMatchObject({ code: 'unsupported_capability' });
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
@@ -307,3 +306,8 @@ test('Access expiry cannot be swallowed as successful Source data by a Java erro
     vi.unstubAllGlobals();
   }
 });
+
+async function sharedArtifact() {
+  const value = await artifact();
+  return { ...value, path: `/runtime/materials/${value.sha256}` };
+}

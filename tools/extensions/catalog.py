@@ -16,8 +16,8 @@ HOST_PATHS = [
     "scripts/prepare-runtime.py",
     "scripts/build-extension.py",
     "packages/contracts/protocol.json",
-    "packages/runtime-host/materials.mjs",
-    "packages/runtime-host/prepare-materials.mjs",
+    "packages/runtime-host/materials.ts",
+    "packages/runtime-host/prepare-materials.ts",
     "packages/runtime-host/package.json",
     "pnpm-lock.yaml",
     ".gitmodules",
@@ -46,6 +46,17 @@ def canonical(value):
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def extension_tag(package, version):
+    suffix = package.removeprefix("eu.kanade.tachiyomi.extension.")
+    if (
+        not re.fullmatch(r"[a-zA-Z0-9._-]{1,200}", suffix)
+        or type(version) is not int
+        or version <= 0
+    ):
+        raise ValueError("Invalid extension release locator")
+    return "ext-" + suffix + "-v" + str(version)
 
 
 def git(source, *arguments):
@@ -229,12 +240,7 @@ def scan(source, host_hash, host_inputs=None, require_clean=True):
                     "hostInputs": host_inputs or {},
                     "inputFingerprint": fingerprint,
                     "buildId": "ext-" + slug + "-" + fingerprint[:32],
-                    "releaseTag": "ext-"
-                    + slug
-                    + "-v"
-                    + str(version)
-                    + "-"
-                    + fingerprint[:32],
+                    "releaseTag": extension_tag(package, version),
                 }
             )
             packages.add(package)

@@ -92,6 +92,14 @@ export const buildManifestSchema = z
         message: 'Extension programs must use private artifact delivery',
       });
     }
+    for (const artifact of [...manifest.hostScripts, ...manifest.resources]) {
+      if (artifact.path !== `/runtime/materials/${artifact.sha256}`) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Shared runtime materials must use static delivery',
+        });
+      }
+    }
   });
 
 export const sourceInfoSchema = z.object({

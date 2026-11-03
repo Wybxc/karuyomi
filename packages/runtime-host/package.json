@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "build": "node build.mjs"
+    "build": "node build.ts"
   },
   "dependencies": {
     "@karuyomi/contracts": "workspace:*"

@@ -166,6 +166,9 @@ importers:
 
   .:
     devDependencies:
+      '@bokuweb/zstd-wasm':
+        specifier: 0.0.27
+        version: 0.0.27
       '@j178/prek':
         specifier: 0.5.9
         version: 0.5.9
@@ -175,6 +178,15 @@ importers:
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      jose:
+        specifier: 6.2.15
+        version: 6.2.15
+      miniflare:
+        specifier: 5.20261101.0-beta
+        version: 5.20261101.0-beta(@types/node@26.6.6)
       prettier:
         specifier: 3.9.10
         version: 3.9.10

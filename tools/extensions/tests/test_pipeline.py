@@ -5,9 +5,11 @@ import copy
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import urllib.request
 from unittest.mock import patch
@@ -19,9 +21,19 @@ from releases import (
     SafeRedirect,
     download_release,
     encode_artifact,
-    publish_immutable,
+    publish_locator,
+    capture_files,
+    release_pointer,
     restore_artifacts,
 )
+
+
+def publish(api, tag, files, target, generation=None):
+    if generation is None and "provenance.json" in files:
+        value = files["provenance.json"]
+        value = value.read_bytes() if isinstance(value, Path) else value
+        generation = json.loads(value).get("descriptor", {}).get("inputFingerprint")
+    return publish_locator(api, tag, generation or "fixture", files, target)
 
 
 class FakeGitHub:
@@ -29,6 +41,7 @@ class FakeGitHub:
         self.releases, self.content, self.events = {}, {}, []
         self.latest_tag = None
         self.fail_on_upload = None
+        self.next_asset_id = 1
 
     def find_release(self, tag):
         return self.releases.get(tag)
@@ -57,11 +70,12 @@ class FakeGitHub:
             raise RuntimeError("GitHub simulated interruption")
         self.events.append(("upload", release["tag_name"], name))
         asset = {
-            "id": len(self.content) + 1,
+            "id": self.next_asset_id,
             "name": name,
             "size": len(data),
             "digest": "sha256:" + catalog.digest(data),
         }
+        self.next_asset_id += 1
         release["assets"].append(asset)
         self.content[asset["id"]] = data
         return asset
@@ -75,6 +89,28 @@ class FakeGitHub:
             self.latest_tag = release["tag_name"]
         self.events.append(("publish", release["tag_name"], latest))
         return release
+
+    def find_draft(self, tag):
+        release = self.find_release(tag)
+        return release if release and release.get("draft") else None
+
+    def make_draft(self, release):
+        self.events.append(("hide", release["tag_name"]))
+        release["draft"] = True
+        return release
+
+    def delete_asset(self, asset):
+        self.events.append(("delete", asset["name"]))
+        for release in self.releases.values():
+            release["assets"] = [
+                item for item in release["assets"] if item["id"] != asset["id"]
+            ]
+        del self.content[asset["id"]]
+
+    def update_pointer(self, release, body, latest=False):
+        release["body"] = catalog.canonical({"karuyomiRelease": body}).decode()
+        release["name"] = release["tag_name"]
+        return self.publish(release, latest)
 
 
 class CatalogTests(unittest.TestCase):
@@ -206,32 +242,135 @@ class CatalogTests(unittest.TestCase):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_upload_hashes_each_owned_payload_once_and_reuses_its_receipt(self):
+        api = FakeGitHub()
+        data = b"one transfer boundary"
+        with patch("releases.digest", wraps=catalog.digest) as digest:
+            files = capture_files({"bundle.gz": data})
+            publish_locator(api, "ext-one-v1", "input-1", files, "main")
+        self.assertEqual(sum(call.args[0] == data for call in digest.call_args_list), 1)
+
+    def test_different_host_generation_replaces_one_fixed_locator_only(self):
+        api = FakeGitHub()
+        tag = catalog.extension_tag("eu.kanade.tachiyomi.extension.en.fixture", 106001)
+        first = publish(api, tag, {"bundle.gz": b"one"}, "commit-one", "host-one")
+        second = publish(api, tag, {"bundle.gz": b"two"}, "commit-two", "host-two")
+        self.assertEqual(tag, "ext-en.fixture-v106001")
+        self.assertEqual(first["tag"], second["tag"])
+        self.assertNotEqual(first["snapshot"], second["snapshot"])
+        self.assertEqual(list(api.releases), [tag])
+        self.assertEqual(api.releases[tag]["name"], tag)
+        self.assertEqual(
+            {item["name"] for item in api.releases[tag]["assets"]},
+            {"bundle.gz", "release-manifest.json"},
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertFalse(download_release(api, tag, folder, generation="host-one"))
+            self.assertEqual(
+                download_release(api, tag, folder, generation="host-two")["bundle.gz"],
+                b"two",
+            )
+
+    def test_manifest_upload_failure_keeps_new_generation_hidden(self):
+        api = FakeGitHub()
+        first = publish(api, "ext-one-v1", {"bundle.gz": b"one"}, "main", "first")
+        api.fail_on_upload = "release-manifest.json"
+        with self.assertRaises(RuntimeError):
+            publish(api, "ext-one-v1", {"bundle.gz": b"two"}, "main", "second")
+        self.assertEqual(release_pointer(api.releases["ext-one-v1"]), first["snapshot"])
+        self.assertTrue(api.releases["ext-one-v1"]["draft"])
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertFalse(download_release(api, "ext-one-v1", folder))
+
+    def test_stale_writer_and_immutable_locator_fail_without_mutation(self):
+        api = FakeGitHub()
+        publish(api, "ext-one-v1", {"bundle.gz": b"one"}, "main")
+        count = len(api.events)
+        with self.assertRaisesRegex(ValueError, "advanced"):
+            publish_locator(
+                api, "ext-one-v1", "other", {"bundle.gz": b"two"}, "main", expected=None
+            )
+        api.releases["ext-one-v1"]["immutable"] = True
+        with self.assertRaisesRegex(ValueError, "mutable"):
+            publish(api, "ext-one-v1", {"bundle.gz": b"two"}, "main")
+        self.assertEqual(len(api.events), count)
+
+    def test_stale_pointer_does_not_create_a_replacement_for_a_missing_release(self):
+        api = FakeGitHub()
+        with self.assertRaisesRegex(ValueError, "advanced"):
+            publish_locator(
+                api,
+                "extensions-index",
+                "next",
+                {"index.json": b"{}"},
+                "main",
+                expected={"generation": "deleted-remote-generation"},
+            )
+        self.assertEqual(api.events, [])
+
+    def test_old_release_format_is_not_silently_accepted(self):
+        api = FakeGitHub()
+        release = api.create_release("extensions-index", "main")
+        api.upload(release, "release-manifest.json", b'{"schemaVersion":1}')
+        api.publish(release)
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "current-format"):
+                download_release(api, "extensions-index", folder)
+
     def test_interrupted_draft_resumes_and_published_retry_is_identical(self):
         api = FakeGitHub()
         api.fail_on_upload = "manifest.json"
         files = {"a" * 64: b"bytes", "manifest.json": b"{}"}
         with self.assertRaises(RuntimeError):
-            publish_immutable(api, "ext-test", files, "main")
+            publish(api, "ext-test", files, "main")
         self.assertTrue(api.find_release("ext-test")["draft"])
-        publish_immutable(api, "ext-test", files, "main")
+        publish(api, "ext-test", files, "main")
         count = len(api.content)
-        publish_immutable(api, "ext-test", files, "main")
+        publish(api, "ext-test", files, "main")
         self.assertEqual(len(api.content), count)
         self.assertFalse(api.find_release("ext-test")["draft"])
         self.assertEqual(api.events[-2][2], "release-manifest.json")
         self.assertIsNone(api.latest_tag)
 
-    def test_published_content_is_never_clobbered(self):
+    def test_resume_finds_a_draft_hidden_from_the_published_tag_endpoint(self):
+        class DraftGitHub(FakeGitHub):
+            def find_release(self, tag):
+                release = self.releases.get(tag)
+                return release if release and not release["draft"] else None
+
+            def find_draft(self, tag):
+                release = self.releases.get(tag)
+                return release if release and release["draft"] else None
+
+        api = DraftGitHub()
+        api.fail_on_upload = "manifest.json"
+        with self.assertRaises(RuntimeError):
+            publish(api, "ext-test", {"manifest.json": b"{}"}, "main")
+        self.assertIsNone(api.find_release("ext-test"))
+        publish(api, "ext-test", {"manifest.json": b"{}"}, "main")
+        self.assertEqual(len(api.releases), 1)
+        self.assertFalse(api.releases["ext-test"]["draft"])
+
+    def test_replacement_is_hidden_until_all_assets_and_manifest_are_ready(self):
         api = FakeGitHub()
-        publish_immutable(api, "ext-test", {"manifest.json": b"first"}, "main")
-        before = copy.deepcopy(api.content)
-        with self.assertRaisesRegex(ValueError, "conflict"):
-            publish_immutable(api, "ext-test", {"manifest.json": b"other"}, "main")
-        self.assertEqual(api.content, before)
+        publish(api, "ext-test", {"manifest.json": b"first"}, "main")
+        start = len(api.events)
+        api.fail_on_upload = "manifest.json"
+        with self.assertRaises(RuntimeError):
+            publish(api, "ext-test", {"manifest.json": b"other"}, "main", "changed")
+        self.assertEqual(api.events[start], ("hide", "ext-test"))
+        self.assertTrue(api.find_release("ext-test")["draft"])
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertFalse(download_release(api, "ext-test", folder))
+        publish(api, "ext-test", {"manifest.json": b"other"}, "main", "changed")
+        self.assertFalse(api.find_release("ext-test")["draft"])
+        self.assertEqual(
+            release_pointer(api.find_release("ext-test"))["generation"], "changed"
+        )
 
     def test_download_checks_all_bytes_and_rejects_extra_asset(self):
         api = FakeGitHub()
-        publish_immutable(api, "ext-test", {"manifest.json": b"{}"}, "main")
+        publish(api, "ext-test", {"manifest.json": b"{}"}, "main")
         with tempfile.TemporaryDirectory() as folder:
             self.assertTrue(download_release(api, "ext-test", folder))
             api.content[1] = b"broken"
@@ -357,10 +496,10 @@ class EncodingTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.restore()
 
-    def test_original_raw_release_format_remains_supported(self):
+    def test_missing_encoding_table_is_rejected(self):
         (self.folder / self.sha).write_bytes(self.data)
-        self.assertEqual(self.restore(), "identity")
-        self.assertEqual((self.folder / "out" / self.sha).read_bytes(), self.data)
+        with self.assertRaisesRegex(ValueError, "encoding table"):
+            self.restore()
 
 
 class StateTests(unittest.TestCase):
@@ -446,7 +585,7 @@ class StateTests(unittest.TestCase):
                         pipeline.finalize_baseline(state, source, local=True)
                     self.assertEqual(state, before)
 
-    def test_index_is_last_and_state_only_changes_get_new_immutable_snapshots(self):
+    def test_index_is_last_and_state_only_changes_replace_its_fixed_snapshot(self):
         api, state, source = FakeGitHub(), pipeline.empty_state(), self.fixture()
         for entry in source["entries"]:
             state["attempts"][entry["inputFingerprint"]] = {
@@ -457,11 +596,46 @@ class StateTests(unittest.TestCase):
         self.assertEqual(api.events[-1], ("publish", first, True))
         state["attempts"][source["entries"][0]["inputFingerprint"]]["attempts"] = 2
         second = pipeline.publish_index(api, state, source, "main")
-        self.assertNotEqual(first, second)
+        self.assertEqual(first, "extensions-index")
+        self.assertEqual(first, second)
         self.assertEqual(api.latest_tag, second)
         stale = pipeline.empty_state()
         with self.assertRaisesRegex(ValueError, "advanced"):
             pipeline.publish_index(api, stale, source, "main")
+
+    def test_current_index_does_not_advertise_historical_release_formats(self):
+        state, source = pipeline.empty_state(), self.fixture()
+        entry = source["entries"][0]
+        entry["versionCode"] = 106001
+        key, package = entry["inputFingerprint"], entry["packageName"]
+        record = {
+            "status": "published",
+            "descriptor": entry,
+            "runtimeReady": False,
+            "validationStatus": "compiled_unverified",
+            "release": {"tag": "historical-hash-locator"},
+        }
+        state["attempts"][key], state["active"][package] = record, key
+        self.assertEqual(pipeline.index_payload(state, source)["packages"], [])
+        record["release"] = {
+            "tag": catalog.extension_tag(package, entry["versionCode"]),
+            "snapshot": {"generation": key},
+        }
+        self.assertEqual(len(pipeline.index_payload(state, source)["packages"]), 1)
+        self.assertIs(state["attempts"][key], record)
+
+    def test_index_pull_during_replacement_keeps_the_local_checkpoint(self):
+        api = FakeGitHub()
+        api.create_release("extensions-index", "main")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "state.json"
+            state = pipeline.empty_state()
+            state["bootstrap"]["complete"] = True
+            pipeline.write_json(path, state)
+            before = path.read_bytes()
+            with self.assertRaisesRegex(RuntimeError, "retry later"):
+                pipeline.pull_state(api, path)
+            self.assertEqual(path.read_bytes(), before)
 
 
 class OutputTests(unittest.TestCase):
@@ -479,7 +653,7 @@ class OutputTests(unittest.TestCase):
             "hostFingerprint": "h" * 64,
             "inputFingerprint": "i" * 64,
             "upstreamCommit": "old-commit",
-            "releaseTag": "ext-fixture",
+            "releaseTag": "ext-example.fixture-v106001",
         }
         (self.output / "artifacts").mkdir()
         (self.output / "artifacts" / self.sha).write_bytes(self.data)
@@ -529,16 +703,41 @@ class OutputTests(unittest.TestCase):
         self.assertEqual(api.releases, {})
         self.assertEqual(state["active"], {})
 
+    def test_private_non_bundle_material_is_rejected_before_publication(self):
+        for role in ["hostScripts", "resources"]:
+            with self.subTest(role=role):
+                manifest = pipeline.read_json(self.output / "manifest.json")
+                artifact = {**manifest["bundle"], "logicalName": "private.js"}
+                manifest[role] = [artifact]
+                pipeline.write_json(self.output / "manifest.json", manifest)
+                with self.assertRaisesRegex(ValueError, "shared runtime materials"):
+                    pipeline.verify_output(
+                        self.output, self.descriptor, verify_hashes=False
+                    )
+                api, state = FakeGitHub(), pipeline.empty_state()
+                record = pipeline.record_result(
+                    state,
+                    self.descriptor,
+                    {"status": "built", "descriptor": self.descriptor},
+                    self.output,
+                    api,
+                    "main",
+                )
+                self.assertEqual(record["status"], "failed")
+                self.assertEqual(api.releases, {})
+                manifest[role] = []
+                pipeline.write_json(self.output / "manifest.json", manifest)
+
     def test_restore_survives_unrelated_upstream_commit_without_rebuilding(self):
         api = FakeGitHub()
         files, _provenance, _validation = pipeline.release_files(
             self.output, self.descriptor
         )
-        publish_immutable(api, self.descriptor["releaseTag"], files, "main")
+        publish(api, self.descriptor["releaseTag"], files, "main")
         current = {**self.descriptor, "upstreamCommit": "new-unrelated-commit"}
         restored = self.output / "restored"
-        self.assertTrue(pipeline.restore_build(api, current, restored))
-        result = pipeline.read_json(restored / "pipeline-result.json")
+        result = pipeline.restore_build(api, current, restored)
+        self.assertIsInstance(result, pipeline.DownloadedBuildResult)
         state = pipeline.empty_state()
         record = pipeline.record_result(state, current, result, restored, api, "main")
         self.assertEqual(record["status"], "published")
@@ -553,10 +752,10 @@ class OutputTests(unittest.TestCase):
         self.assertIn(self.sha + ".gz", files)
         self.assertIn("artifact-encodings.json", files)
         self.assertEqual(
-            json.loads(files["manifest.json"].read_bytes())["bundle"]["sha256"],
+            json.loads(files["manifest.json"])["bundle"]["sha256"],
             self.sha,
         )
-        publish_immutable(api, self.descriptor["releaseTag"], files, "main")
+        publish(api, self.descriptor["releaseTag"], files, "main")
         restored = self.output / "restored"
         self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
         self.assertEqual((restored / "artifacts" / self.sha).read_bytes(), self.data)
@@ -565,24 +764,23 @@ class OutputTests(unittest.TestCase):
             "gzip",
         )
 
-    def test_already_published_raw_source_release_stays_identical_after_restore(self):
+    def test_download_hashes_encoded_and_canonical_bytes_once_each(self):
         api = FakeGitHub()
         files, _provenance, _validation = pipeline.release_files(
-            self.output, self.descriptor, "identity"
+            self.output, self.descriptor
         )
-        publish_immutable(api, self.descriptor["releaseTag"], files, "main")
-        before = copy.deepcopy(api.content)
-        restored = self.output / "restored"
-        self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
-        result = pipeline.read_json(restored / "pipeline-result.json")
-        self.assertEqual(result["releaseEncoding"], "identity")
-        record = pipeline.record_result(
-            pipeline.empty_state(), self.descriptor, result, restored, api, "main"
-        )
-        self.assertEqual(record["status"], "published")
-        self.assertEqual(api.content, before)
+        encoded = files[self.sha + ".gz"]
+        publish(api, self.descriptor["releaseTag"], files, "main")
+        with patch("releases.digest", wraps=catalog.digest) as digest:
+            self.assertTrue(
+                pipeline.restore_build(api, self.descriptor, self.output / "received")
+            )
+        for data in [encoded, self.data]:
+            self.assertEqual(
+                sum(call.args[0] == data for call in digest.call_args_list), 1
+            )
 
-    def test_restore_preserves_original_compressed_bytes_for_immutable_retry(self):
+    def test_live_download_receipt_adopts_original_compressed_bytes(self):
         api = FakeGitHub()
         files, _provenance, _validation = pipeline.release_files(
             self.output, self.descriptor
@@ -595,22 +793,394 @@ class OutputTests(unittest.TestCase):
         table = json.loads(files["artifact-encodings.json"])
         table["artifacts"][0]["encodedSha256"] = catalog.digest(encoded)
         files["artifact-encodings.json"] = catalog.canonical(table) + b"\n"
-        publish_immutable(api, self.descriptor["releaseTag"], files, "main")
+        files = capture_files(dict(files))
+        publish(api, self.descriptor["releaseTag"], files, "main")
         before = copy.deepcopy(api.content)
         restored = self.output / "restored"
-        self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
-        result = pipeline.read_json(restored / "pipeline-result.json")
+        result = pipeline.restore_build(api, self.descriptor, restored)
+        self.assertIsInstance(result, pipeline.DownloadedBuildResult)
         record = pipeline.record_result(
             pipeline.empty_state(), self.descriptor, result, restored, api, "main"
         )
         self.assertEqual(record["status"], "published")
         self.assertEqual(api.content, before)
 
+    def test_cached_download_after_remote_miss_must_publish_again(self):
+        for remote_state in ["deleted", "different_generation"]:
+            with self.subTest(remote_state=remote_state):
+                api = FakeGitHub()
+                files, _provenance, _validation = pipeline.release_files(
+                    self.output, self.descriptor
+                )
+                tag = self.descriptor["releaseTag"]
+                old_reference = publish(api, tag, files, "main")
+                restored = self.output / remote_state
+                self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
+                saved = restored / "pipeline-result.json"
+                cached = pipeline.read_json(saved)
+                # Reproduce a stale checkpoint written before the receipt fix.
+                cached["releaseReference"] = old_reference
+                pipeline.write_json(saved, cached)
+                if remote_state == "deleted":
+                    del api.releases[tag]
+                else:
+                    publish(api, tag, files, "main", "another-input-generation")
+                before = len(api.events)
+                with patch.object(pipeline, "GitHub", return_value=api):
+                    result = pipeline.build_one(
+                        self.descriptor, restored, repository="fixture/repo"
+                    )
+                self.assertEqual(result["status"], "built", result)
+                self.assertNotIsInstance(result, pipeline.DownloadedBuildResult)
+                for value in [result, pipeline.read_json(saved)]:
+                    self.assertNotIn("restored", value)
+                    self.assertNotIn("releaseReference", value)
+                record = pipeline.record_result(
+                    pipeline.empty_state(),
+                    self.descriptor,
+                    result,
+                    restored,
+                    api,
+                    "main",
+                )
+                self.assertEqual(record["status"], "published", record)
+                self.assertEqual(
+                    release_pointer(api.releases[tag])["generation"],
+                    self.descriptor["inputFingerprint"],
+                )
+                self.assertTrue(
+                    any(event[0] == "publish" for event in api.events[before:])
+                )
+
+    def test_serialized_restore_flags_cannot_skip_publication(self):
+        api = FakeGitHub()
+        files, _provenance, _validation = pipeline.release_files(
+            self.output, self.descriptor
+        )
+        reference = publish(api, self.descriptor["releaseTag"], files, "main")
+        restored = self.output / "restored"
+        self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
+        result = pipeline.read_json(restored / "pipeline-result.json")
+        result["releaseReference"] = reference
+        del api.releases[self.descriptor["releaseTag"]]
+        record = pipeline.record_result(
+            pipeline.empty_state(), self.descriptor, result, restored, api, "main"
+        )
+        self.assertEqual(record["status"], "published", record)
+        self.assertIn(self.descriptor["releaseTag"], api.releases)
+
     def test_symlink_in_untrusted_build_output_is_rejected(self):
         (self.output / "provenance.json").unlink()
         (self.output / "provenance.json").symlink_to("/etc/hosts")
         with self.assertRaisesRegex(ValueError, "symlink"):
             pipeline.verify_output(self.output, self.descriptor)
+
+
+class FrozenRunnerTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.folder = Path(self.temporary.name).resolve()
+        self.checkout = self.folder / "builder"
+        self.checkout.mkdir()
+        self.git(self.checkout, "init", "-q")
+        (self.checkout / "host.txt").write_text("frozen host")
+        script = self.checkout / "scripts/build-extension.py"
+        script.parent.mkdir()
+        script.write_text("""import argparse, hashlib, json, os, pathlib
+p=argparse.ArgumentParser()
+p.add_argument('--descriptor'); p.add_argument('--output')
+a=p.parse_args(); d=json.loads(pathlib.Path(a.descriptor).read_text())
+assert 'GH_TOKEN' not in os.environ and 'GITHUB_TOKEN' not in os.environ
+assert pathlib.Path.cwd() == pathlib.Path(__file__).resolve().parents[1]
+o=pathlib.Path(a.output); (o/'artifacts').mkdir(exist_ok=True)
+b=b'const frozen = true;'; h=hashlib.sha256(b).hexdigest()
+(o/'artifacts'/h).write_bytes(b)
+m={**json.loads((pathlib.Path(__file__).resolve().parents[1]/'protocol.json').read_text()),'bridgeVersion':1,'buildId':d['buildId'],'packageName':d['packageName'],'repoId':'fixture','version':d['versionName'],'storageSchema':'1','sourceIds':['1'],'hostScripts':[],'bundle':{'sha256':h,'path':'/api/extensions/artifacts/'+h,'size':len(b)}}
+(o/'manifest.json').write_text(json.dumps(m))
+(o/'provenance.json').write_text(json.dumps({'descriptor':d}))
+""")
+        protocol = (catalog.ROOT / "packages/contracts/protocol.json").read_bytes()
+        (self.checkout / "protocol.json").write_bytes(protocol)
+        self.git(
+            self.checkout,
+            "add",
+            "host.txt",
+            "scripts/build-extension.py",
+            "protocol.json",
+        )
+        self.git(
+            self.checkout,
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "frozen builder",
+        )
+        upstream = self.checkout / "vendor/extensions-source"
+        upstream.mkdir(parents=True)
+        self.git(upstream, "init", "-q")
+        (upstream / "source.txt").write_text("frozen source")
+        self.git(upstream, "add", "source.txt")
+        self.git(
+            upstream,
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "source",
+        )
+        inputs = {
+            name: catalog.tree_hash(self.checkout, name)
+            for name in ["host.txt", "scripts/build-extension.py", "protocol.json"]
+        }
+        self.descriptor = {
+            "schemaVersion": 1,
+            "packageName": "example.frozen",
+            "buildId": "frozen-build",
+            "versionCode": 106001,
+            "versionName": "1.6.1",
+            "hostRepositoryCommit": self.git(self.checkout, "rev-parse", "HEAD"),
+            "hostSubmodules": [],
+            "hostInputs": inputs,
+            "hostFingerprint": catalog.digest(
+                catalog.canonical(
+                    {"schemaVersion": 1, "inputs": inputs, "pinnedSubmodules": []}
+                )
+            ),
+            "sourceFingerprint": "s" * 64,
+            "inputFingerprint": "f" * 64,
+            "upstreamCommit": self.git(upstream, "rev-parse", "HEAD"),
+            "releaseTag": "old-internal-plan-field",
+        }
+
+    def git(self, root, *args):
+        return subprocess.check_output(
+            ["git", "-C", str(root), *args], text=True
+        ).strip()
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def test_runner_uses_frozen_child_and_strips_publish_credentials(self):
+        output = self.folder / "delivery"
+        with (
+            patch.object(
+                pipeline,
+                "checkout_material_catalog",
+                return_value={"hostScripts": [], "resources": []},
+            ),
+            patch.dict(
+                os.environ,
+                {"GH_TOKEN": "must-not-reach-builder", "GITHUB_TOKEN": "also-private"},
+            ),
+        ):
+            result = pipeline.build_one(
+                self.descriptor, output, build_checkout=self.checkout
+            )
+            self.assertEqual(result["status"], "built", result)
+            with patch.object(
+                pipeline.subprocess,
+                "run",
+                wraps=subprocess.run,
+            ) as calls:
+                self.assertEqual(
+                    pipeline.build_one(
+                        self.descriptor, output, build_checkout=self.checkout
+                    ),
+                    result,
+                )
+                self.assertFalse(
+                    any(
+                        len(call.args[0]) > 1
+                        and call.args[0][1]
+                        == str(self.checkout / "scripts/build-extension.py")
+                        for call in calls.call_args_list
+                    )
+                )
+        self.assertEqual(
+            self.git(
+                self.checkout,
+                "status",
+                "--porcelain",
+                "--",
+                *self.descriptor["hostInputs"],
+            ),
+            "",
+        )
+
+    def test_frozen_checkout_rejects_dirty_input_and_wrong_commit(self):
+        wrong = {**self.descriptor, "hostRepositoryCommit": "0" * 40}
+        with self.assertRaisesRegex(ValueError, "commit"):
+            pipeline.validate_build_checkout(self.checkout, wrong)
+        (self.checkout / "host.txt").write_text("changed")
+        with self.assertRaisesRegex(ValueError, "clean"):
+            pipeline.validate_build_checkout(self.checkout, self.descriptor)
+
+    def test_resume_preserves_every_frozen_descriptor_and_rejects_ci(self):
+        plan = {
+            "entries": [self.descriptor],
+            "repositoryCommit": self.descriptor["hostRepositoryCommit"],
+        }
+        with patch.object(pipeline, "ci_environment", return_value=False):
+            resumed = pipeline.resume_plan(plan, pipeline.empty_state())
+        self.assertEqual(resumed["selected"], [self.descriptor])
+        self.assertEqual(
+            resumed["selected"][0]["releaseTag"], "old-internal-plan-field"
+        )
+        with patch.object(pipeline, "ci_environment", return_value=True):
+            with self.assertRaisesRegex(ValueError, "CI"):
+                pipeline.resume_plan(plan, pipeline.empty_state())
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups required")
+    def test_signal_stops_sleeping_builder_tree_before_releasing_checkpoint_lock(self):
+        import fcntl
+
+        script = self.checkout / "scripts/build-extension.py"
+        script.write_text("""import argparse, json, os, pathlib, signal, subprocess, sys, time
+p=argparse.ArgumentParser(); p.add_argument('--descriptor'); p.add_argument('--output')
+a=p.parse_args(); output=pathlib.Path(a.output)
+child=subprocess.Popen([sys.executable, '-c', '''import pathlib, signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+signal.signal(signal.SIGINT, signal.SIG_IGN)
+heartbeat=pathlib.Path(sys.argv[1])
+while True:
+    heartbeat.write_text(str(time.monotonic()))
+    time.sleep(0.03)
+''', str(output/'heartbeat')])
+(output/'pids.json').write_text(json.dumps([os.getpid(), child.pid]))
+while True: time.sleep(1)
+""")
+        self.git(self.checkout, "add", "scripts/build-extension.py")
+        self.git(
+            self.checkout,
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "sleeping process-tree fixture",
+        )
+        self.descriptor["hostRepositoryCommit"] = self.git(
+            self.checkout, "rev-parse", "HEAD"
+        )
+        inputs = {
+            name: catalog.tree_hash(self.checkout, name)
+            for name in self.descriptor["hostInputs"]
+        }
+        self.descriptor["hostInputs"] = inputs
+        self.descriptor["hostFingerprint"] = catalog.digest(
+            catalog.canonical(
+                {"schemaVersion": 1, "inputs": inputs, "pinnedSubmodules": []}
+            )
+        )
+        pending = {
+            **self.descriptor,
+            "packageName": "example.pending",
+            "inputFingerprint": "e" * 64,
+            "buildId": "pending-build",
+        }
+        plan = {
+            "entries": [self.descriptor, pending],
+            "repositoryCommit": self.descriptor["hostRepositoryCommit"],
+            "discoveryFailures": [],
+        }
+        plan_path = self.folder / "plan.json"
+        pipeline.write_json(plan_path, plan)
+        runner = self.folder / "runner.py"
+        runner.write_text(
+            "import sys\n"
+            + "sys.path.insert(0, "
+            + repr(str(catalog.ROOT / "tools/extensions"))
+            + ")\n"
+            + "import pipeline\n"
+            + "class OfflineGitHub:\n"
+            + "    def find_release(self, tag): return None\n"
+            + "    def find_draft(self, tag): return None\n"
+            + "pipeline.GitHub=lambda repository: OfflineGitHub()\n"
+            + "pipeline.main()\n"
+        )
+        for number in [signal.SIGINT, signal.SIGTERM]:
+            with self.subTest(signal=number):
+                run_root = self.folder / str(number)
+                state = run_root / "state.json"
+                output = run_root / "resume-plan.json"
+                delivery = run_root / "builds" / self.descriptor["inputFingerprint"]
+                with (self.folder / (str(number) + ".log")).open("w") as log:
+                    process = subprocess.Popen(
+                        [
+                            sys.executable,
+                            str(runner),
+                            "bootstrap",
+                            "--plan",
+                            str(plan_path),
+                            "--build-checkout",
+                            str(self.checkout),
+                            "--state",
+                            str(state),
+                            "--output",
+                            str(output),
+                            "--jobs",
+                            "1",
+                        ],
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        env={**os.environ, "CI": "false", "GITHUB_ACTIONS": "false"},
+                    )
+                    pids = []
+                    try:
+                        deadline = time.monotonic() + 10
+                        while not (delivery / "heartbeat").exists():
+                            self.assertIsNone(
+                                process.poll(),
+                                (self.folder / (str(number) + ".log")).read_text(),
+                            )
+                            self.assertLess(time.monotonic(), deadline)
+                            time.sleep(0.02)
+                        pids = pipeline.read_json(delivery / "pids.json")
+                        with state.with_suffix(".lock").open("a") as lock:
+                            with self.assertRaises(BlockingIOError):
+                                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            process.send_signal(number)
+                            self.assertEqual(process.wait(timeout=10), 128 + number)
+                            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            fcntl.flock(lock, fcntl.LOCK_UN)
+                        heartbeat = (delivery / "heartbeat").read_bytes()
+                        time.sleep(0.1)
+                        self.assertEqual(
+                            (delivery / "heartbeat").read_bytes(), heartbeat
+                        )
+                        for pid in pids:
+                            status = subprocess.run(
+                                ["ps", "-p", str(pid), "-o", "stat="],
+                                capture_output=True,
+                                text=True,
+                            ).stdout.strip()
+                            self.assertTrue(
+                                not status or status.startswith("Z"), (pid, status)
+                            )
+                        self.assertFalse(
+                            (
+                                run_root
+                                / "builds"
+                                / pending["inputFingerprint"]
+                                / "build.log"
+                            ).exists()
+                        )
+                        self.assertFalse(state.exists())
+                    finally:
+                        if process.poll() is None:
+                            process.kill()
+                            process.wait()
+                        for pid in pids:
+                            try:
+                                os.kill(pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
 
 
 class WorkCleanupTests(unittest.TestCase):

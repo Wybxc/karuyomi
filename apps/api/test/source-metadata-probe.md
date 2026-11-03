@@ -6,7 +6,7 @@ After building a product package and installing workspace dependencies:
 
 ```sh
 pnpm --filter @karuyomi/runtime-host build
-node apps/api/test/source-metadata-probe.mjs PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
+node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
 ```
 
 Open the reported `http://127.0.0.1:8897/` URL and click **Run real metadata operations**. `SOURCE_PROBE_PORT` can select a different port. Artifact files default to the `artifacts` directory beside the manifest; pass the optional second argument for historical build layouts. The probe opens the real Source, calls popular pages 1 and 2, search with the first real popular title, latest, details, chapters, and pages only when a real chapter reference is available. It never substitutes fixtures, changes extension bytes, or requests image bytes directly.

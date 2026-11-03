@@ -1,6 +1,8 @@
 // Manual real-workerd D1/R2 integration. Only the separate test entry trusts
 // this run's RSA public key; production index.ts never imports that entry.
 import assert from 'node:assert/strict';
+import { isRecord } from '../../../tools/extensions/types.ts';
+import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -15,7 +17,7 @@ const api = path.join(root, 'apps/api');
 const manifestPath = process.argv[2] && path.resolve(process.argv[2]);
 assert(
   manifestPath,
-  'Usage: node apps/api/test/workerd-probe.mjs MANIFEST [ARTIFACT_FOLDER] [EVIDENCE_JSON]',
+  'Usage: node apps/api/test/workerd-probe.ts MANIFEST [ARTIFACT_FOLDER] [EVIDENCE_JSON]',
 );
 const evidencePath = process.argv[4]
   ? path.resolve(process.argv[4])
@@ -26,7 +28,7 @@ const evidencePath = process.argv[4]
 const artifactFolder = process.argv[3]
   ? path.resolve(process.argv[3])
   : path.join(path.dirname(manifestPath), 'artifacts');
-const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+const manifest = await parseManifest(await readFile(manifestPath));
 const temporary = await mkdtemp(path.join(tmpdir(), 'karuyomi-api-probe-'));
 const state = path.join(temporary, 'state');
 const environment = {
@@ -34,7 +36,7 @@ const environment = {
   CLOUDFLARE_SEND_METRICS: 'false',
   WRANGLER_LOG_PATH: path.join(temporary, 'wrangler.log'),
 };
-const wrangler = (...args) =>
+const wrangler = (...args: string[]) =>
   execFileSync(
     'pnpm',
     ['exec', 'wrangler', ...args, '--local', '--persist-to', state],
@@ -45,7 +47,7 @@ const wrangler = (...args) =>
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
-const python = (...args) =>
+const python = (...args: string[]) =>
   execFileSync('python3', args, {
     cwd: root,
     env: environment,
@@ -53,11 +55,12 @@ const python = (...args) =>
   });
 const require = createRequire(new URL('../package.json', import.meta.url));
 const wranglerRequire = createRequire(require.resolve('wrangler'));
-const { build } = await import(wranglerRequire.resolve('esbuild'));
-const { Miniflare, convertV4MiniflareOptions } = await import(
-  wranglerRequire.resolve('miniflare')
+const { build }: typeof import('esbuild') = await import(
+  wranglerRequire.resolve('esbuild')
 );
-let mf;
+const { Miniflare, convertV4MiniflareOptions }: typeof import('miniflare') =
+  await import(wranglerRequire.resolve('miniflare'));
+let mf: import('miniflare').Miniflare | undefined;
 
 try {
   console.log('Registering actual local artifacts into dedicated D1/R2 state');
@@ -121,13 +124,21 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
     target: 'es2022',
     write: false,
   });
+  assert(
+    compiled.outputFiles.length === 1,
+    'Expected one compiled Worker module',
+  );
   const databaseId = /"database_id":\s*"([^"]+)"/.exec(
     await readFile(path.join(api, 'wrangler.jsonc'), 'utf8'),
-  )[1];
+  )?.[1];
+  assert(
+    databaseId,
+    'D1 database identity missing from Wrangler configuration',
+  );
   mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
-      script: compiled.outputFiles[0].text,
+      script: compiled.outputFiles[0]!.text,
       compatibilityDate: '2026-11-03',
       resourcePersistencePath: path.join(state, 'v3'),
       d1Databases: { DB: databaseId },
@@ -149,16 +160,16 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
       .first('value'),
     null,
   );
-  const registered = JSON.parse(
-    await db
-      .prepare('SELECT manifest_json FROM extension_builds WHERE build_id=?')
-      .bind(manifest.buildId)
-      .first('manifest_json'),
-  );
+  const registeredJson = await db
+    .prepare('SELECT manifest_json FROM extension_builds WHERE build_id=?')
+    .bind(manifest.buildId)
+    .first<string>('manifest_json');
+  assert(registeredJson, 'Registered manifest missing');
+  const registered = await parseManifest(Buffer.from(registeredJson));
   assert.equal(registered.version, manifest.version);
   const token = (audience = 'probe-app') =>
     new SignJWT({ email: 'probe@example.com' })
-      .setProtectedHeader({ alg: 'RS256', kid: jwk.kid })
+      .setProtectedHeader({ alg: 'RS256', kid: String(jwk.kid) })
       .setSubject('probe-owner')
       .setIssuer('https://probe.cloudflareaccess.com')
       .setAudience(audience)
@@ -166,8 +177,13 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
       .setExpirationTime('5m')
       .sign(keys.privateKey);
   const signed = await token();
-  const request = (pathname, headers = {}, method = 'GET') =>
-    mf.dispatchFetch(`https://read.example.com${pathname}`, {
+  const worker = mf;
+  const request = (
+    pathname: string,
+    headers: Record<string, string> = {},
+    method = 'GET',
+  ) =>
+    worker.dispatchFetch(`https://read.example.com${pathname}`, {
       method,
       headers: { 'Cf-Access-Jwt-Assertion': signed, ...headers },
     });
@@ -195,17 +211,22 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
   const delivered = await request(route);
   assert.equal(delivered.status, 200);
   assert.equal(delivered.headers.get('cache-control'), 'private, no-store');
-  assert.equal((await delivered.json()).buildId, manifest.buildId);
-  assert.equal(
-    (await (await request('/api/extensions/builds')).json()).builds[0].buildId,
-    manifest.buildId,
+  const deliveredManifest = await parseManifest(
+    Buffer.from(await delivered.text()),
   );
+  assert.equal(deliveredManifest.buildId, manifest.buildId);
+  const listing: unknown = await (
+    await request('/api/extensions/builds')
+  ).json();
+  assert(isRecord(listing) && Array.isArray(listing.builds));
+  assert(isRecord(listing.builds[0]));
+  assert.equal(listing.builds[0].buildId, manifest.buildId);
   let total = 0;
   const artifacts = [
     manifest.bundle,
     ...manifest.hostScripts,
-    ...(manifest.resources ?? []),
-  ];
+    ...manifest.resources,
+  ].filter((artifact) => artifact.path.startsWith('/api/'));
   for (const item of artifacts) {
     const response = await request(item.path);
     assert.equal(response.status, 200);
@@ -244,6 +265,7 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
       416,
     );
   }
+  const sourceSha256: Record<string, string> = {};
   const evidence = {
     probe: 'local-workerd-registered-artifacts',
     passed: true,
@@ -266,7 +288,7 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
     manifestSha256: createHash('sha256')
       .update(await readFile(manifestPath))
       .digest('hex'),
-    sourceSha256: {},
+    sourceSha256,
   };
   for (const name of [
     'apps/api/src/access.ts',
@@ -274,7 +296,7 @@ print(m.registration_sql(v,m.verify(v,pathlib.Path(sys.argv[2])),[]))`,
     'apps/api/src/extensions.ts',
     'apps/api/src/http-bridge.ts',
     'apps/api/test/workerd-entry.ts',
-    'apps/api/test/workerd-probe.mjs',
+    'apps/api/test/workerd-probe.ts',
     'scripts/register-build.py',
   ]) {
     evidence.sourceSha256[name] = createHash('sha256')

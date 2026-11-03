@@ -1,4 +1,4 @@
-"""GitHub private-release transport and immutable, resumable publication."""
+"""GitHub private-release transport and resumable fixed-locator publication."""
 
 from pathlib import Path
 import gzip
@@ -40,15 +40,15 @@ def encode_artifact(sha256, data):
     return encoded, entry
 
 
-def restore_artifacts(directory, output, artifacts, bundle_sha):
-    """Restore a source release, checking transport and canonical identities.
-
-    A missing encoding table is the original raw-asset format. A present table
-    is authoritative: invalid gzip never falls back to an unencoded asset.
-    """
+def restore_artifacts(directory, output, artifacts, bundle_sha, transfer=None):
+    """Restore gzip bundle bytes with transport and canonical integrity checks."""
     directory, output = Path(directory), Path(output)
+    if set(artifacts) != {bundle_sha}:
+        raise ValueError("A release must contain exactly one private bundle")
     table_path = directory / "artifact-encodings.json"
     entries = {}
+    if not table_path.is_file():
+        raise ValueError("Release lacks its gzip encoding table")
     if table_path.exists():
         if table_path.stat().st_size > 64 * 1024:
             raise ValueError("Oversized artifact encoding table")
@@ -101,28 +101,30 @@ def restore_artifacts(directory, output, artifacts, bundle_sha):
             or not 0 < size <= MAX_ARTIFACT_BYTES
         ):
             raise ValueError("Invalid canonical artifact reference")
-        entry = entries.get(sha256)
-        file = directory / (entry["asset"] if entry else sha256)
-        expected_size = entry["encodedSize"] if entry else size
-        if file.is_symlink() or file.stat().st_size != expected_size:
+        entry = entries[sha256]
+        file = directory / entry["asset"]
+        if file.is_symlink() or file.stat().st_size != entry["encodedSize"]:
             raise ValueError("Downloaded artifact size mismatch")
-        data = file.read_bytes()
-        if entry:
-            if digest(data) != entry["encodedSha256"]:
-                raise ValueError("Encoded artifact integrity mismatch")
-            decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
-            try:
-                data = decoder.decompress(data, size + 1)
-            except zlib.error:
-                raise ValueError("Invalid gzip artifact") from None
-            if len(data) > size or decoder.unconsumed_tail:
-                raise ValueError("Decoded artifact exceeds canonical size")
-            if not decoder.eof or decoder.unused_data:
-                raise ValueError("Truncated or trailing gzip artifact")
+        name = file.name
+        data = transfer[name] if transfer is not None else file.read_bytes()
+        actual = (
+            transfer.metadata[name]["sha256"] if transfer is not None else digest(data)
+        )
+        if actual != entry["encodedSha256"]:
+            raise ValueError("Encoded artifact integrity mismatch")
+        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        try:
+            data = decoder.decompress(data, size + 1)
+        except zlib.error:
+            raise ValueError("Invalid gzip artifact") from None
+        if len(data) > size or decoder.unconsumed_tail:
+            raise ValueError("Decoded artifact exceeds canonical size")
+        if not decoder.eof or decoder.unused_data:
+            raise ValueError("Truncated or trailing gzip artifact")
         if len(data) != size or digest(data) != sha256:
             raise ValueError("Canonical artifact integrity mismatch")
         (output / sha256).write_bytes(data)
-    return "gzip" if entries else "identity"
+    return "gzip"
 
 
 class SafeRedirect(urllib.request.HTTPRedirectHandler):
@@ -153,6 +155,7 @@ class GitHub:
         if not self.token:
             raise ValueError("GH_TOKEN is required for private release access")
         self.opener = urllib.request.build_opener(SafeRedirect())
+        self._drafts = None
 
     def request(
         self,
@@ -219,6 +222,22 @@ class GitHub:
             "GET", f"/repos/{self.repository}/releases/latest", missing=True
         )
 
+    def find_draft(self, tag):
+        if self._drafts is None:
+            self._drafts = {}
+            page = 1
+            while True:
+                items = self.request(
+                    "GET", f"/repos/{self.repository}/releases?per_page=100&page={page}"
+                )
+                self._drafts.update(
+                    {item["tag_name"]: item for item in items if item.get("draft")}
+                )
+                if len(items) < 100:
+                    break
+                page += 1
+        return self._drafts.get(tag)
+
     def create_release(self, tag, target):
         return self.request(
             "POST",
@@ -272,80 +291,215 @@ class GitHub:
             },
         )
 
+    def update_pointer(self, release, body, latest=False):
+        return self.request(
+            "PATCH",
+            f"/repos/{self.repository}/releases/{release['id']}",
+            {
+                "name": release["tag_name"],
+                "body": canonical({"karuyomiRelease": body}).decode(),
+                "draft": False,
+                "make_latest": "true" if latest else "false",
+            },
+        )
+
+    def make_draft(self, release):
+        return self.request(
+            "PATCH",
+            f"/repos/{self.repository}/releases/{release['id']}",
+            {"draft": True},
+        )
+
+    def delete_asset(self, asset):
+        self.request(
+            "DELETE", f"/repos/{self.repository}/releases/assets/{asset['id']}"
+        )
+
 
 def bytes_of(value):
     return value.read_bytes() if isinstance(value, Path) else value
 
 
-def publish_immutable(api, tag, files, target, latest=False):
-    """Finish a matching draft, or verify an identical published release.
+class TransferFiles(dict):
+    """Owned transfer bytes and their once-computed integrity metadata.
 
-    Never clobber an asset. The final manifest is uploaded last; a draft is made
-    visible only after every asset's size and server digest has been checked.
+    This receipt is process-local, never deserialized from build output JSON.
     """
-    metadata = {
-        name: {"sha256": digest(bytes_of(value)), "size": len(bytes_of(value))}
-        for name, value in files.items()
-    }
+
+    def __init__(self, files, known=None):
+        super().__init__()
+        self.metadata = {}
+        self.reference = None
+        for name, value in files.items():
+            data = bytes_of(value)
+            self[name] = data
+            previous = (known or {}).get(name)
+            if previous is not None and not isinstance(value, bytes):
+                raise ValueError("Precomputed digests require owned bytes")
+            self.metadata[name] = previous or {
+                "sha256": digest(data),
+                "size": len(data),
+            }
+            if self.metadata[name]["size"] != len(data):
+                raise ValueError("Transfer receipt size mismatch")
+
+
+def capture_files(files, known=None):
+    return files if isinstance(files, TransferFiles) else TransferFiles(files, known)
+
+
+def release_pointer(release):
+    try:
+        body = json.loads(release.get("body") or "null")
+    except (TypeError, ValueError):
+        return None
+    pointer = body.get("karuyomiRelease") if isinstance(body, dict) else None
+    if pointer is None:
+        return None
+    if (
+        not isinstance(pointer, dict)
+        or pointer.get("schemaVersion") != 2
+        or not isinstance(pointer.get("generation"), str)
+        or not re.fullmatch(r"[a-zA-Z0-9._-]{1,200}", pointer["generation"])
+        or type(pointer.get("manifestAssetId")) is not int
+        or pointer["manifestAssetId"] <= 0
+        or not re.fullmatch(r"[a-f0-9]{64}", str(pointer.get("manifestSha256")))
+    ):
+        raise ValueError("Invalid release generation pointer")
+    return pointer
+
+
+def _check_asset(api, asset, expected, name):
+    if asset["size"] != expected["size"]:
+        raise ValueError("Release asset size conflict: " + name)
+    actual = asset.get("digest")
+    if actual is None:
+        actual = "sha256:" + digest(api.download(asset))
+    if actual != "sha256:" + expected["sha256"]:
+        raise ValueError("Release asset hash conflict: " + name)
+
+
+_UNSET = object()
+
+
+def publish_locator(api, tag, generation, files, target, latest=False, expected=_UNSET):
+    """Hide the locator as a draft, replace assets, then publish it last.
+
+    Readers may temporarily find the locator unavailable during replacement.
+    A single publisher is required: GitHub release updates have no CAS API.
+    """
+    if not re.fullmatch(r"[a-zA-Z0-9._-]{1,200}", generation):
+        raise ValueError("Invalid release generation")
+    files = capture_files(files)
     if "release-manifest.json" in files or any(
-        "/" in name or "\\" in name for name in files
+        not re.fullmatch(r"[a-zA-Z0-9._-]+", name) or name in {".", ".."}
+        for name in files
     ):
         raise ValueError("Invalid release asset name")
-    release_manifest = (
-        canonical({"schemaVersion": 1, "tag": tag, "files": metadata}) + b"\n"
+    release = api.find_release(tag) or api.find_draft(tag)
+    previous = release_pointer(release) if release else None
+    if expected is not _UNSET and previous != expected:
+        raise ValueError("Remote release advanced; pull its checkpoint first")
+    if release and release.get("immutable"):
+        raise ValueError("Fixed release locator requires a mutable release")
+    if release is None:
+        release = api.create_release(tag, target)
+    manifest = (
+        canonical(
+            {
+                "schemaVersion": 2,
+                "tag": tag,
+                "generation": generation,
+                "files": files.metadata,
+            }
+        )
+        + b"\n"
     )
-    upload_files = {**files, "release-manifest.json": release_manifest}
-    release = api.find_release(tag) or api.create_release(tag, target)
-    remote = {asset["name"]: asset for asset in api.assets(release)}
-    if set(remote) - set(upload_files):
-        raise ValueError("Immutable release has unexpected assets: " + tag)
-    for name, value in upload_files.items():
-        data = bytes_of(value)
-        expected = digest(data)
-        asset = remote.get(name)
-        if asset is None:
-            if not release.get("draft"):
-                raise ValueError("Published release is incomplete: " + tag)
-            asset = api.upload(release, name, data)
-        if asset["size"] != len(data):
-            raise ValueError("Immutable release asset size conflict: " + name)
-        actual = asset.get("digest")
-        if actual is None:
-            actual = "sha256:" + digest(api.download(asset))
-        if actual != "sha256:" + expected:
-            raise ValueError("Immutable release asset hash conflict: " + name)
-    if release.get("draft") or latest:
-        release = api.publish(release, latest=latest)
+    metadata = {"size": len(manifest), "sha256": digest(manifest)}
+    wanted = {**files, "release-manifest.json": manifest}
+    checks = {**files.metadata, "release-manifest.json": metadata}
+    assets = {asset["name"]: asset for asset in api.assets(release)}
+    same = set(assets) == set(wanted) and all(
+        assets[name]["size"] == checks[name]["size"]
+        and assets[name].get("digest") == "sha256:" + checks[name]["sha256"]
+        for name in wanted
+    )
+    if not same:
+        if not release.get("draft"):
+            release = api.make_draft(release)
+        # Remove the old commit marker before changing any of its data assets.
+        if "release-manifest.json" in assets:
+            api.delete_asset(assets.pop("release-manifest.json"))
+        for name, asset in list(assets.items()):
+            if (
+                name not in wanted
+                or asset["size"] != checks[name]["size"]
+                or asset.get("digest") != "sha256:" + checks[name]["sha256"]
+            ):
+                api.delete_asset(asset)
+                del assets[name]
+        for name, data in wanted.items():
+            asset = assets.get(name) or api.upload(release, name, data)
+            _check_asset(api, asset, checks[name], name)
+            assets[name] = asset
+    pointer = {
+        "schemaVersion": 2,
+        "generation": generation,
+        "manifestAssetId": assets["release-manifest.json"]["id"],
+        "manifestSha256": metadata["sha256"],
+    }
+    if previous != pointer or release.get("draft") or latest:
+        release = api.update_pointer(release, pointer, latest=latest)
     return {
         "tag": tag,
         "url": release.get("html_url"),
-        "releaseManifestSha256": digest(release_manifest),
+        "releaseManifestSha256": metadata["sha256"],
+        "snapshot": pointer,
     }
 
 
-def download_release(api, tag, directory):
+def download_release(api, tag, directory, generation=None):
     release = api.find_release(tag)
     if not release or release.get("draft"):
         return False
+    pointer = release_pointer(release)
+    if pointer is None:
+        raise ValueError("Release lacks current-format pointer: " + tag)
+    if generation is not None and pointer["generation"] != generation:
+        return False
     assets = {asset["name"]: asset for asset in api.assets(release)}
-    if "release-manifest.json" not in assets:
-        raise ValueError("Release lacks immutable manifest: " + tag)
-    manifest_bytes = api.download(assets["release-manifest.json"])
+    asset = assets.get("release-manifest.json")
+    if asset is None or asset["id"] != pointer["manifestAssetId"]:
+        raise ValueError("Release generation manifest is missing")
+    manifest_bytes = api.download(asset)
+    if digest(manifest_bytes) != pointer["manifestSha256"]:
+        raise ValueError("Downloaded release manifest integrity mismatch")
     manifest = json.loads(manifest_bytes)
     if (
-        manifest.get("schemaVersion") != 1
+        manifest.get("schemaVersion") != 2
         or manifest.get("tag") != tag
+        or manifest.get("generation") != pointer["generation"]
+        or not isinstance(manifest.get("files"), dict)
         or set(assets) != set(manifest["files"]) | {"release-manifest.json"}
     ):
         raise ValueError("Release manifest mismatch: " + tag)
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    for name, expected in manifest["files"].items():
-        if "/" in name or "\\" in name or name in {".", ".."}:
+    received, metadata = {}, {}
+    for name, item in manifest["files"].items():
+        if not re.fullmatch(r"[a-zA-Z0-9._-]+", name) or name in {".", ".."}:
             raise ValueError("Unsafe asset name")
         data = api.download(assets[name])
-        if len(data) != expected["size"] or digest(data) != expected["sha256"]:
+        if len(data) != item["size"] or digest(data) != item["sha256"]:
             raise ValueError("Downloaded asset integrity mismatch: " + name)
         (directory / name).write_bytes(data)
+        received[name], metadata[name] = data, item
     (directory / "release-manifest.json").write_bytes(manifest_bytes)
-    return True
+    result = TransferFiles(received, metadata)
+    result.reference = {
+        "tag": tag,
+        "url": release.get("html_url"),
+        "releaseManifestSha256": pointer["manifestSha256"],
+        "snapshot": pointer,
+    }
+    return result

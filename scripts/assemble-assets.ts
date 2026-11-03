@@ -10,12 +10,13 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { MaterialCatalog } from '../packages/runtime-host/materials.ts';
 
 const publicDir = new URL('../dist/public/', import.meta.url);
 const runtime = new URL('../packages/runtime-host/dist/', import.meta.url);
 const flutterWeb = new URL('../apps/reader/build/web/', import.meta.url);
 const nativeFlutterPath = path.join('assets', 'assets', 'runtime');
-const inside = (relative, directory) =>
+const inside = (relative: string, directory: string) =>
   relative === directory || relative.startsWith(directory + path.sep);
 await rm(publicDir, { recursive: true, force: true });
 await mkdir(publicDir, { recursive: true });
@@ -37,24 +38,25 @@ await cp(runtime, new URL('runtime/', publicDir), {
 });
 
 // Hash-only names need explicit MIME declarations. Keep Flutter's existing
-// rules, and retain immutable shared assets for previously published builds.
-const catalog = JSON.parse(
+// rules and publish the current immutable shared materials.
+const catalog: MaterialCatalog = JSON.parse(
   await readFile(new URL('materials.json', runtime), 'utf8'),
 );
-const materials = [
-  ...catalog.hostScripts,
-  ...catalog.resources,
-  ...(catalog.compatibility ?? []),
-];
+const materials = [...catalog.hostScripts, ...catalog.resources];
 const headerFile = new URL('_headers', publicDir);
 let headers = '';
 try {
   headers = await readFile(headerFile, 'utf8');
 } catch (error) {
-  if (error.code !== 'ENOENT') throw error;
+  if (
+    !(error instanceof Error) ||
+    !('code' in error) ||
+    error.code !== 'ENOENT'
+  )
+    throw error;
 }
 const rules = materials.map(
-  (artifact) =>
+  (artifact: { path: string; contentType: string }) =>
     `${artifact.path}\n  Content-Type: ${artifact.contentType}\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff`,
 );
 rules.push(
@@ -73,10 +75,11 @@ const nativePayloads = await Promise.all(
   ),
 );
 const nativeSizes = new Set(nativePayloads.map((bytes) => bytes.length));
-const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const digest = (bytes: Uint8Array) =>
+  createHash('sha256').update(bytes).digest('hex');
 const nativeHashes = new Set(nativePayloads.map(digest));
 let publicFiles = 0;
-async function checkTree(directory) {
+async function checkTree(directory: string): Promise<void> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const file = path.join(directory, entry.name);
     const relative = path.relative(fileURLToPath(publicDir), file);

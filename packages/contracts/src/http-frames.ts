@@ -99,12 +99,12 @@ const errorSchema = z
 export type HttpErrorPayload = z.infer<typeof errorSchema>;
 
 export class HttpFrameError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly remote = false,
-  ) {
+  readonly code: string;
+  readonly remote: boolean;
+  constructor(code: string, message: string, remote = false) {
     super(message);
+    this.code = code;
+    this.remote = remote;
     this.name = 'HttpFrameError';
   }
 }
@@ -208,11 +208,9 @@ export class HttpFrameReader {
   private reading = false;
   private dataTotal = 0;
   private delivered = 0;
+  private readonly limit: number;
 
-  constructor(
-    stream: ReadableStream<Uint8Array>,
-    private readonly limit: number,
-  ) {
+  constructor(stream: ReadableStream<Uint8Array>, limit: number) {
     if (
       !Number.isSafeInteger(limit) ||
       limit < 0 ||
@@ -223,6 +221,7 @@ export class HttpFrameReader {
         'Invalid HTTP body byte limit',
       );
     this.source = stream.getReader();
+    this.limit = limit;
   }
 
   /** DATA bytes already returned to the consumer, excluding all framing. */

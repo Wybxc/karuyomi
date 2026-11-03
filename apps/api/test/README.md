@@ -7,7 +7,7 @@
 真实 workerd、D1、R2 集成探针单独执行，需要已构建的清单及其所有内容寻址产物：
 
 ```sh
-node apps/api/test/workerd-probe.mjs \
+node apps/api/test/workerd-probe.ts \
   PATH_TO_OUTPUT/manifest.json \
   PATH_TO_OUTPUT/artifacts
 ```
@@ -18,4 +18,4 @@ node apps/api/test/workerd-probe.mjs \
 
 [历史验证要点](../../../docs/verification/runtime-evidence.md) 保留一次本地真实运行的关键结果；完整请求/来源摘要只存于被忽略的本地研究归档。它证明 API 与本地存储适配工作，不替代生产 Cloudflare Access、线上 Source 网络语义或浏览器元数据闭环验收。HTTP bridge 只允许已验证构建的明确 hostname，禁用自动重定向和上游隐式缓存；不会把应用请求头复制给 Source。生产部署还使用 Cloudflare 的公网 fetch 路由边界，本地 workerd 运行不得绑定私网服务或放宽 host 白名单。
 
-真实 Source 浏览器回归使用 [source-metadata-probe.mjs](source-metadata-probe.mjs)，复验步骤与边界见 [说明](source-metadata-probe.md)。它加载已校验的产品构建，使用相同测试入口和真实 HTTP bridge，不以夹具替代 Source，也不把编译成功当作在线兼容。
+真实 Source 浏览器回归使用 [source-metadata-probe.ts](source-metadata-probe.ts)，复验步骤与边界见 [说明](source-metadata-probe.md)。它加载已校验的产品构建，使用相同测试入口和真实 HTTP bridge，不以夹具替代 Source，也不把编译成功当作在线兼容。

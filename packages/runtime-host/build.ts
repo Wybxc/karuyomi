@@ -1,8 +1,8 @@
-import { build } from 'esbuild';
+import { build, type BuildOptions } from 'esbuild';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { digest, prepareMaterials } from './materials.mjs';
+import { digest, prepareMaterials } from './materials.ts';
 
 const directory = fileURLToPath(new URL('./', import.meta.url));
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -17,13 +17,16 @@ const common = {
   target: 'es2022',
   minify: true,
   write: false,
-};
+} satisfies BuildOptions;
 const web = await Promise.all([
   build({ ...common, entryPoints: ['src/host.ts'], format: 'esm' }),
   build({ ...common, entryPoints: ['src/worker.ts'], format: 'iife' }),
 ]);
-await writeFile(path.join(output, 'host.js'), web[0].outputFiles[0].contents);
-await writeFile(path.join(output, 'worker.js'), web[1].outputFiles[0].contents);
+await writeFile(path.join(output, 'host.js'), web[0]!.outputFiles[0]!.contents);
+await writeFile(
+  path.join(output, 'worker.js'),
+  web[1]!.outputFiles[0]!.contents,
+);
 await cp(
   path.join(directory, 'public/host.html'),
   path.join(output, 'host.html'),
@@ -31,24 +34,18 @@ await cp(
 
 // Each embedded value is decoded into fresh bytes. VerifiedLoader independently
 // checks MIME, size and SHA on every use, and never falls back to a network read.
-const legacyHashes = catalog.compatibility
-  .filter((artifact) => !artifact.nativeSupported)
-  .map((artifact) => artifact.sha256);
-const legacy = new Set(legacyHashes);
 const embedded = Object.fromEntries(
-  [...data]
-    .filter(([sha256]) => !legacy.has(sha256))
-    .map(([sha256, value]) => [
-      sha256,
-      {
-        base64: value.bytes.toString('base64'),
-        contentType: value.contentType,
-      },
-    ]),
+  [...data].map(([sha256, value]) => [
+    sha256,
+    {
+      base64: value.bytes.toString('base64'),
+      contentType: value.contentType,
+    },
+  ]),
 );
 const nativeMaterialModule = `import {createNativeMaterialResolver} from ${JSON.stringify(path.join(directory, 'src/native-materials.ts'))};
 const values=${JSON.stringify(embedded)};
-export const nativeMaterials=createNativeMaterialResolver(values,${JSON.stringify(legacyHashes)});`;
+export const nativeMaterials=createNativeMaterialResolver(values);`;
 const nativeWorker = await build({
   ...common,
   entryPoints: ['src/worker.ts'],
@@ -81,10 +78,11 @@ const nativeHost = await build({
 const nativeOutput = path.join(output, 'native');
 await mkdir(nativeOutput, { recursive: true });
 const nativeFiles = {
-  host: { name: 'host.js', bytes: nativeHost.outputFiles[0].contents },
-  worker: { name: 'worker.js', bytes: nativeWorker.outputFiles[0].contents },
+  host: { name: 'host.js', bytes: nativeHost.outputFiles[0]!.contents },
+  worker: { name: 'worker.js', bytes: nativeWorker.outputFiles[0]!.contents },
 };
-const files = {};
+const files: Record<string, { path: string; sha256: string; size: number }> =
+  {};
 for (const [key, { name, bytes }] of Object.entries(nativeFiles)) {
   await writeFile(path.join(nativeOutput, name), bytes);
   files[key] = { path: name, sha256: digest(bytes), size: bytes.length };
@@ -96,12 +94,7 @@ const nativeManifest = {
   runtimeBaseline: catalog.runtimeBaseline,
   materialVersion: catalog.materialVersion,
   files,
-  materials: [
-    ...catalog.hostScripts,
-    ...catalog.resources,
-    ...catalog.compatibility.filter((artifact) => artifact.nativeSupported),
-  ],
-  unsupportedMaterialHashes: legacyHashes,
+  materials: [...catalog.hostScripts, ...catalog.resources],
 };
 await writeFile(
   path.join(nativeOutput, 'manifest.json'),

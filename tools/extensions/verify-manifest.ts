@@ -4,19 +4,32 @@ import { constants } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectMaterials } from '../../packages/runtime-host/materials.mjs';
+import type {
+  Artifact,
+  BuildManifest,
+} from '../../packages/contracts/src/index.ts';
+import { isRecord, isSourceInfo } from './types.ts';
+import type {
+  IntegrityResult,
+  ValidationReport,
+  VerifiedPayload,
+} from './types.ts';
+import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
 const runtimeRequire = createRequire(
   path.join(repositoryRoot, 'packages/runtime-host/package.json'),
 );
-let schemaPromise;
+type ManifestSchema =
+  typeof import('../../packages/contracts/src/index.ts').buildManifestSchema;
+let schemaPromise: Promise<ManifestSchema> | undefined;
 
-export const digest = (bytes) =>
+export const digest = (bytes: Uint8Array) =>
   createHash('sha256').update(bytes).digest('hex');
 
 export class VerificationFailure extends Error {
-  constructor(code, message) {
+  readonly code: string;
+  constructor(code: string, message: string) {
     super(message);
     this.code = code;
   }
@@ -26,7 +39,9 @@ async function schema() {
   // Bundle the actual shared Zod contract: the release tool must not maintain a
   // second, drifting implementation of the runtime manifest/ABI contract.
   schemaPromise ??= (async () => {
-    const { build } = await import(runtimeRequire.resolve('esbuild'));
+    const { build }: typeof import('esbuild') = await import(
+      runtimeRequire.resolve('esbuild')
+    );
     const compiled = await build({
       entryPoints: [
         path.join(repositoryRoot, 'packages/contracts/src/index.ts'),
@@ -37,16 +52,26 @@ async function schema() {
       format: 'esm',
       target: 'node24',
     });
-    const contracts = await import(
-      'data:text/javascript;base64,' +
-        Buffer.from(compiled.outputFiles[0].text).toString('base64')
-    );
+    const output = compiled.outputFiles[0];
+    if (!output) throw new Error('Missing compiled contract');
+    const contracts: typeof import('../../packages/contracts/src/index.ts') =
+      await import(
+        'data:text/javascript;base64,' +
+          Buffer.from(output.text).toString('base64')
+      );
     return contracts.buildManifestSchema;
   })();
   return schemaPromise;
 }
 
-async function regularDirectory(directory) {
+export async function parseManifest(bytes: Uint8Array): Promise<BuildManifest> {
+  const parsed: unknown = JSON.parse(
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+  );
+  return (await schema()).parse(parsed);
+}
+
+async function regularDirectory(directory: string) {
   const info = await lstat(directory);
   if (!info.isDirectory() || info.isSymbolicLink()) {
     throw new VerificationFailure(
@@ -56,7 +81,7 @@ async function regularDirectory(directory) {
   }
 }
 
-async function regularFile(file, limit, expectedSize) {
+async function regularFile(file: string, limit: number, expectedSize?: number) {
   const before = await lstat(file);
   if (!before.isFile() || before.isSymbolicLink()) {
     throw new VerificationFailure(
@@ -103,7 +128,7 @@ async function regularFile(file, limit, expectedSize) {
   }
 }
 
-export function failure(error) {
+export function failure(error: unknown) {
   return {
     code:
       error instanceof VerificationFailure ? error.code : 'validation_failed',
@@ -114,8 +139,10 @@ export function failure(error) {
   };
 }
 
-export async function verifyIntegrity(directory) {
-  const report = {
+export async function verifyIntegrity(
+  directory: string,
+): Promise<IntegrityResult> {
+  const report: ValidationReport = {
     schemaVersion: 1,
     kind: 'karuyomi-extension-build-validation',
     valid: false,
@@ -135,7 +162,7 @@ export async function verifyIntegrity(directory) {
       path.join(directory, 'manifest.json'),
       64 * 1024,
     );
-    let parsed;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(
         new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes),
@@ -173,12 +200,25 @@ export async function verifyIntegrity(directory) {
       manifestSha256: digest(manifestBytes),
       sourceIds: manifest.sourceIds,
     });
+    if (
+      [...manifest.hostScripts, ...manifest.resources].some(
+        (artifact) => !artifact.path.startsWith('/runtime/materials/'),
+      )
+    ) {
+      throw new VerificationFailure(
+        'unknown_material',
+        'Runtime bridges and resources must use the current shared material catalog',
+      );
+    }
     const scripts = [manifest.bundle, ...manifest.hostScripts];
-    const artifacts = [...scripts, ...manifest.resources];
+    const artifacts: (Artifact & { logicalName?: string })[] = [
+      ...scripts,
+      ...manifest.resources,
+    ];
     for (const script of scripts) {
       if (
         !['application/javascript', 'text/javascript'].includes(
-          script.contentType,
+          script.contentType ?? '',
         )
       ) {
         throw new VerificationFailure(
@@ -187,25 +227,22 @@ export async function verifyIntegrity(directory) {
         );
       }
     }
-    const payloads = new Map();
-    let materials;
+    const payloads = new Map<string, VerifiedPayload>();
+    let materials: Awaited<ReturnType<typeof collectMaterials>> | undefined;
     for (const artifact of artifacts) {
       let bytes;
       if (artifact.path.startsWith('/runtime/materials/')) {
         materials ??= await collectMaterials();
         const isScript = manifest.hostScripts.includes(artifact);
         const candidates = isScript
-          ? [
-              ...materials.catalog.hostScripts,
-              ...materials.catalog.compatibility,
-            ]
+          ? materials.catalog.hostScripts
           : materials.catalog.resources;
         const expected = candidates.find(
           (value) => value.sha256 === artifact.sha256,
         );
         if (
           !expected ||
-          ['path', 'sha256', 'size', 'contentType'].some(
+          (['path', 'sha256', 'size', 'contentType'] as const).some(
             (key) => artifact[key] !== expected[key],
           ) ||
           (!isScript && artifact.logicalName !== expected.logicalName)
@@ -281,8 +318,12 @@ export async function verifyIntegrity(directory) {
   }
 }
 
-export function completeBrowserValidation(base, value, networkAttempts) {
-  value = value && typeof value === 'object' ? value : {};
+export function completeBrowserValidation(
+  base: ValidationReport,
+  input: unknown,
+  networkAttempts: number,
+): ValidationReport {
+  const value = isRecord(input) ? input : {};
   const report = structuredClone(base);
   report.browser = {
     userAgent: typeof value.userAgent === 'string' ? value.userAgent : '',
@@ -311,37 +352,42 @@ export function completeBrowserValidation(base, value, networkAttempts) {
     return report;
   }
   report.stages.browserLoad = 'passed';
-  const session = value.session;
-  const ids = Array.isArray(session?.sources)
-    ? session.sources.map((source) => source.id)
-    : [];
+  const session = isRecord(value.session) ? value.session : {};
+  const hello = isRecord(value.hello) ? value.hello : {};
+  const browserFailure = isRecord(value.failure) ? value.failure : {};
+  const sources =
+    Array.isArray(session.sources) && session.sources.every(isSourceInfo)
+      ? session.sources
+      : undefined;
+  const ids = sources?.map((source) => source.id) ?? [];
   if (
+    !sources ||
     value.failure ||
     value.buildId !== base.buildId ||
     value.manifestSha256 !== base.manifestSha256 ||
-    value.hello?.protocolVersion !== base.protocolVersion ||
-    value.hello?.hostAbi !== base.hostAbi ||
-    value.hello?.runtimeBaseline !== base.runtimeBaseline ||
-    value.hello?.sourceReady !== false ||
-    session?.protocolVersion !== base.protocolVersion ||
-    session?.buildId !== base.buildId ||
-    typeof session?.generation !== 'string' ||
+    hello.protocolVersion !== base.protocolVersion ||
+    hello.hostAbi !== base.hostAbi ||
+    hello.runtimeBaseline !== base.runtimeBaseline ||
+    hello.sourceReady !== false ||
+    session.protocolVersion !== base.protocolVersion ||
+    session.buildId !== base.buildId ||
+    typeof session.generation !== 'string' ||
     !session.generation ||
-    typeof session?.workerInstanceId !== 'string' ||
+    typeof session.workerInstanceId !== 'string' ||
     !session.workerInstanceId ||
     new Set(ids).size !== ids.length ||
     JSON.stringify([...ids].sort()) !==
-      JSON.stringify([...base.sourceIds].sort())
+      JSON.stringify([...(base.sourceIds ?? [])].sort())
   ) {
     report.stages.workerInit = 'failed';
     report.failure = {
       code:
-        typeof value.failure?.code === 'string'
-          ? value.failure.code
+        typeof browserFailure.code === 'string'
+          ? browserFailure.code
           : 'worker_init_failed',
       message:
-        typeof value.failure?.message === 'string'
-          ? value.failure.message.slice(0, 2000)
+        typeof browserFailure.message === 'string'
+          ? browserFailure.message.slice(0, 2000)
           : 'Real Worker initialization or Source identity validation failed',
     };
     return report;
@@ -354,7 +400,7 @@ export function completeBrowserValidation(base, value, networkAttempts) {
     'indexeddb-available',
     'manifest-source-identities',
   );
-  report.sources = session.sources;
+  report.sources = sources;
   delete report.failure;
   report.scope =
     'Real Chromium Worker hostInit/hostLoad with IndexedDB and verified local artifacts. No live Source operations, private network or production Access validation; online compatibility remains untested.';

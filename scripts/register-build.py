@@ -22,13 +22,13 @@ def quote(value):
 
 
 def material_catalog():
-    # Metadata comes from the pinned host sources, never from the build being
-    # registered. --print does not require npm packages or the private JVM seed.
+    # Metadata comes from the pinned host sources and locked npm packages, never
+    # from the build being registered. --print does not read WASM or private seed.
     return json.loads(
         subprocess.check_output(
             [
                 "node",
-                str(ROOT / "packages/runtime-host/prepare-materials.mjs"),
+                str(ROOT / "packages/runtime-host/prepare-materials.ts"),
                 "--print",
             ],
             cwd=ROOT,
@@ -37,7 +37,7 @@ def material_catalog():
     )
 
 
-def verify(manifest, folder):
+def verify(manifest, folder, *, verify_hashes=True, material_catalog_override=None):
     if not isinstance(manifest, dict):
         raise ValueError("Invalid build manifest")
     protocol = json.loads((ROOT / "packages/contracts/protocol.json").read_text())
@@ -102,6 +102,10 @@ def verify(manifest, folder):
             or (index == 0 and not private)
         ):
             raise ValueError("Invalid artifact reference")
+        if index > 0 and not shared:
+            raise ValueError(
+                "Host scripts and resources must use shared runtime materials"
+            )
         if (
             type(artifact.get("size")) is not int
             or not 0 < artifact["size"] <= 64 * 1024 * 1024
@@ -121,13 +125,15 @@ def verify(manifest, folder):
         seen[digest] = content_type
         if shared:
             if catalog is None:
-                catalog = material_catalog()
+                catalog = (
+                    material_catalog_override
+                    if material_catalog_override is not None
+                    else material_catalog()
+                )
             role = (
                 "hostScripts" if index <= len(manifest["hostScripts"]) else "resources"
             )
             candidates = catalog[role]
-            if role == "hostScripts":
-                candidates = [*candidates, *catalog.get("compatibility", [])]
             expected = next(
                 (value for value in candidates if value["sha256"] == digest), None
             )
@@ -148,10 +154,11 @@ def verify(manifest, folder):
         size = file.stat().st_size
         if not 0 < size <= 64 * 1024 * 1024 or size != artifact["size"]:
             raise ValueError("Artifact size mismatch: " + digest)
-        with file.open("rb") as stream:
-            actual = hashlib.file_digest(stream, "sha256").hexdigest()
-        if actual != digest:
-            raise ValueError("Artifact integrity mismatch: " + digest)
+        if verify_hashes:
+            with file.open("rb") as stream:
+                actual = hashlib.file_digest(stream, "sha256").hexdigest()
+            if actual != digest:
+                raise ValueError("Artifact integrity mismatch: " + digest)
         result[digest] = artifact
     if sum(artifact["size"] for artifact in artifacts) > 96 * 1024 * 1024:
         raise ValueError("Build exceeds runtime budget")

@@ -1,26 +1,38 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { isRecord } from './types.ts';
+import type { VerifiedInputs, ValidationReport } from './types.ts';
 import path from 'node:path';
-import { collectMaterials } from '../../packages/runtime-host/materials.mjs';
+import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 import {
   completeBrowserValidation,
   digest,
   repositoryRoot,
-} from './verify-manifest.mjs';
+} from './verify-manifest.ts';
 
 /** Long-lived release validator, without a browser automation dependency.
  * The human/CI opens the URL. Agents controlling a local browser must use CUA.
  * Direct Source networking is blocked by CSP and a rejecting bridge endpoint.
  */
 export async function verifyInBrowser(
-  inputs,
-  { timeoutMs = 90_000, onListening = console.error } = {},
-) {
+  inputs: VerifiedInputs,
+  {
+    timeoutMs = 90_000,
+    onListening = console.error,
+  }: {
+    timeoutMs?: number;
+    onListening?: (value: {
+      browserValidationUrl: string;
+      buildId: string;
+      timeoutMs: number;
+    }) => void;
+  } = {},
+): Promise<ValidationReport> {
   const { manifest, manifestBytes, payloads } = inputs;
   const { data: staticMaterials } = await collectMaterials();
   const nonce = randomUUID();
-  const runtimeFiles = new Map();
+  const runtimeFiles = new Map<string, Buffer>();
   for (const name of ['host.js', 'worker.js']) {
     runtimeFiles.set(
       '/runtime/' + name,
@@ -39,11 +51,15 @@ export async function verifyInBrowser(
   const manifestPath = `/api/extensions/builds/${encodeURIComponent(manifest.buildId)}/manifest`;
   let networkAttempts = 0;
   let finished = false;
-  let origin;
-  let timer;
-  let resolveResult;
-  const result = new Promise((resolve) => (resolveResult = resolve));
-  const complete = (report) => {
+  let origin = '';
+  let timer: NodeJS.Timeout | undefined;
+  let resolveResult: (report: ValidationReport) => void = () => {
+    throw new Error('Validator promise is not initialized');
+  };
+  const result = new Promise<ValidationReport>(
+    (resolve) => (resolveResult = resolve),
+  );
+  const complete = (report: ValidationReport) => {
     if (finished) return;
     finished = true;
     clearTimeout(timer);
@@ -105,7 +121,7 @@ finally{
         'Content-Security-Policy',
         "default-src 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'",
       );
-      const url = new URL(request.url, origin);
+      const url = new URL(request.url ?? '/', origin);
       const pathname = url.pathname;
       const workerQuery =
         pathname === '/runtime/worker.js' &&
@@ -121,15 +137,20 @@ finally{
           response.writeHead(403).end();
           return;
         }
-        const chunks = [];
+        const chunks: Buffer[] = [];
         let size = 0;
-        for await (const chunk of request) {
+        for await (const value of request) {
+          const chunk = Buffer.isBuffer(value)
+            ? value
+            : Buffer.from(String(value));
           size += chunk.length;
           if (size > 64 * 1024) throw Error('report_limit');
           chunks.push(chunk);
         }
-        const value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-        if (value.nonce !== nonce) {
+        const value: unknown = JSON.parse(
+          Buffer.concat(chunks).toString('utf8'),
+        );
+        if (!isRecord(value) || value.nonce !== nonce) {
           response.writeHead(403).end();
           return;
         }
@@ -181,7 +202,9 @@ finally{
       const sharedDigest = /^\/runtime\/materials\/([a-f0-9]{64})$/.exec(
         pathname,
       )?.[1];
-      const shared = staticMaterials.get(sharedDigest);
+      const shared = sharedDigest
+        ? staticMaterials.get(sharedDigest)
+        : undefined;
       if (shared) {
         response
           .writeHead(200, {
@@ -191,8 +214,8 @@ finally{
           .end(shared.bytes);
         return;
       }
-      if (payloads.has(pathname)) {
-        const artifact = payloads.get(pathname);
+      const artifact = payloads.get(pathname);
+      if (artifact) {
         response
           .writeHead(200, {
             'Content-Type': artifact.contentType ?? 'application/octet-stream',
@@ -209,11 +232,14 @@ finally{
       response.end('{"error":"validation_request_failed"}');
     }
   });
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  origin = `http://127.0.0.1:${server.address().port}`;
+  const address = server.address();
+  if (!address || typeof address === 'string')
+    throw new Error('Missing validator address');
+  origin = `http://127.0.0.1:${address.port}`;
   onListening({
     browserValidationUrl: origin + '/',
     buildId: manifest.buildId,
