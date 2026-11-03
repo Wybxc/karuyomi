@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，两包代表快照已部署验证，本地 baseline 未完成**。旧 `7f54463` 全量队列已停止，当前固定 `022d828` 队列的状态见下文。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，两包代表快照已部署验证，本地 baseline 未完成**。旧 `7f54463` 全量队列已停止，当前 v3 的固定 `b4f72f7` 独立队列已启动；旧 `022d828` 的 v1 队列保持原状，二者不可混用。
 
 操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
@@ -28,6 +28,10 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。固定提交 `022d828` 的两包真实 AOT / 内置浏览器初始化、线上匿名 gzip 下载和旧版本远端清理均通过，D1 仅继承已有域名授权。固定该提交的本地单并发全量已经启动，队列包含剩余 1,446 包，尚未完成 baseline。首次全量最终部署、有界 CI 部署及客户端真实更新/旧缓存清理仍需收齐证据；CI 在完整 baseline 部署前继续停用。Actions secrets、全 TS 自动化、依赖规则与固定 Node 24 检查已验证，详细证据见 [VERIFICATION](../VERIFICATION.md)。
 
 当前 Protobuf 控制合同使用 host ABI `karuyomi-source-host-v3`、protocolVersion 2，HTTP bridgeVersion 保持 2；原型不兼容旧控制协议或 Page DTO。正在运行的 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用当前客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v3 包须按新指纹重新构建和验收。完整 baseline 尚未部署、ABI 更新尚未验证前，不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
+
+2026-11-04，当前 hostFingerprint `46e63625a0e1920d284c1077de8aca939f8948d1e50694259834f0846844e0db` 的三包候选已通过正式交付校验、完整客户端组装和 API dry-run，尚未部署；三包及客户端实际分项分别见 [Source Cache](../verification/source-network-cache.md)、[Native Cache](../verification/source-cache-native.md)与[完整章阅读](../verification/full-chapter-web.md)。后续 Dart 重连/布局修复不改变该 AOT host 指纹，但最终客户端仍须按固定提交重新构建。
+
+当前 v3 首次全量在 main ignored `.local/aot-static-abi3-b4/` 独立 clone 固定 `b4f72f7`，三 submodule 与工具链均锁定、跟踪输入干净；独立 state 来自最后已部署 revision，不复制在途 v1 checkpoint。完整冻结计划覆盖 1448 包，并发 1，已通过正式校验导入三个真实交付供恢复复用。官方 `bootstrap --jobs 1 --limit 10000 --finalize` 已启动，仅构建和准备本地快照，不自动部署或提交已部署 state。完整 baseline 尚未完成，CI 继续停用；准确进程与本地恢复说明保留在 ignored `.local/v3-baseline-plan/` 和独立队列目录。中断后使用同一输入、同一 builds/state 恢复；不要启动第二个 supervisor 写同一 state。若期间部署 parent 前进，等待 builder 完全退出后按新确认 checkpoint 重新计划，复用匹配结果，不修改 parent 绕过前置检查。
 
 该冻结批次目前已定位的宿主缺口可供后续正式回归使用，不从失败包自动重试，也不修改原扩展：bookorbit/lanraragi/mango 缺 `OkHttpClient.Builder.dns`，komga 缺 `Builder.authenticator`，dragonballmultiverse/manhuarm 缺 `StaticLayout.Builder` 等文本绘图 ABI（后者还用到字体度量与旋转），mangafire 缺 `Class.getResource` 与协程 cancel ABI。DNS 和认证须实现真实请求语义，不能以 no-op 仅换取编译成功。lunaranime 当前只有 TeaVM `2/2` 无栈错误，尚不能确定首因，需要后续独立诊断。原始逐包日志留在冻结 checkout 的 ignored 构建目录。
 

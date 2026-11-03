@@ -1,6 +1,6 @@
 # Source 默认 HTTP Cache 配置
 
-状态：**宿主配置已修复；新固定 AOT 的原 xkcd Source 已在 Web 实测 metadata fresh Cache 正文复用及实际 manager/Worker 销毁重建后的复用**。本轮没有发生 304，图片保持原 cacheless 行为。本项不替代 [Cache 正文与失败语义](http-cache-runtime.md)、[namespace 机制门](cache-v3-native.md) 或 [31555e8 三源在线门](cache-v3-sources.md)。
+状态：**宿主配置已修复；新固定 AOT 的原 xkcd Source 已在 Web 实测 metadata fresh Cache 正文复用及实际 manager/Worker 销毁重建后的复用；同一 AOT 的 iOS / Android 模拟器正式 Native runtime 亦已通过冷热与容器重建复用**。双端分层证据见[原 Source Native Cache](source-cache-native.md)。本轮没有发生 304，图片保持原 cacheless 行为。本项不替代 [Cache 正文与失败语义](http-cache-runtime.md)、[namespace 机制门](cache-v3-native.md) 或 [31555e8 三源在线门](cache-v3-sources.md)。
 
 ## 已复现的缺口
 

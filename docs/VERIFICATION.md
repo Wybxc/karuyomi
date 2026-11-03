@@ -47,7 +47,7 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 独立的[共享 Java HTTP 故障门](verification/cache-http-failures.md)已在官方原 JVM 与 Codex 内置 Chromium 156 的实际 TeaVM 各通过四场景、50 项检查：精确读取 8192 B 后截断或取消、Cache 关闭后同目录重开、半成品不可见、旧完整条目保留及网络恢复。另观察到本地 HTTP/1 中继两次真实 RST 和四条原点响应关闭，正式 runner 退出 0；不推广为生产 HTTP/2、HTTP/3 或真实 Access 取消。
 
-已有新 Cache 材料的 Arknights/CuuTruyen 在线图片分项见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)，仍未实测其冷/热 Cache 命中。固定 `b4f72f7` 的新 AOT 随后通过[原 xkcd 元数据 fresh Cache 复验](verification/source-network-cache.md)：cold HTTP 200 并提交 7187 B，warm 实际 store entry / 正文读取 / EOF / close，零上游请求；两次页列表摘要相同。原图片 cacheless 仍各自请求网络，无 304 结论。独立 origin 的原 Source 又通过 12 项实际 manager/Worker 重建门：dispose 终止旧 Worker，新 manager/Worker 在同四维 namespace 命中并读完 7187 B、EOF / reader-close，零网络、同 PageList 摘要，最终两 Worker 终止。这只验同一浏览器文档内的重建；浏览器进程、正式版本/身份切换、生产 Access、更广 Source / 取消与 Native Java 仍待验收。
+已有新 Cache 材料的 Arknights/CuuTruyen 在线图片分项见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)，仍未实测其冷/热 Cache 命中。固定 `b4f72f7` 的新 AOT 随后通过[原 xkcd 元数据 fresh Cache 复验](verification/source-network-cache.md)：cold HTTP 200 并提交 7187 B，warm 实际 store entry / 正文读取 / EOF / close，零上游请求；两次页列表摘要相同。原图片 cacheless 仍各自请求网络，无 304 结论。独立 origin 的原 Source 又通过 12 项实际 manager/Worker 重建门：dispose 终止旧 Worker，新 manager/Worker 在同四维 namespace 命中并读完 7187 B、EOF / reader-close，零网络、同 PageList 摘要，最终两 Worker 终止。这只验同一浏览器文档内的重建；浏览器进程、正式版本/身份切换、生产 Access、更广 Source / 取消仍待验收。随后双端模拟器也通过[原 xkcd Native Cache](verification/source-cache-native.md)：cold 完整提交 7187 B，warm 与正式 Native 容器重建后读取相同正文至 EOF、零网络，逐会话与最终 dispose 确认；不是 App 进程重启或其它 Source 结论。
 
 真实 manager/加载器/产品 Worker 与受控 TS ABI 在内置 Chromium 156 通过[namespace 与组合存储 11 组](verification/runtime-storage-namespace.md)：实际构建替换和 manager 重建后 IDB 数据保留、四维隔离，以及同一真实派生键下 Cache/files 各 128 MiB allocated、完整分块读回与清理。没有修改 usage 伪造边界；不代表 Java/官方 Source、生产 Access、Native 或进程/物理磁盘资源门。
 
@@ -62,6 +62,8 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 2026-11-03，阅读路由已接 Source 原序/反序、漫画作用域章节键与上一章/下一章控制；不按编号排序或丢弃重复 URL。每次切章等旧 Reader 的 scheduler、图片 pin 与 provider 清理 ACK 后才挂载新叶；下一章 pages 迟到和新 provider 在下一帧挂载前退出均被关闭。`chapter_sequence_test.dart` 与 `chapter_reader_route_test.dart` 覆盖空/零/小数编号、重复章的快照键、跨漫画/Source 隔离及延迟清理/退出竞争；相关 26 项组件回归和 Flutter analyze 通过。完整 `pnpm flutter:check` 通过三个包的静态分析及 15/23/50 项测试，完整格式检查通过。此时尚无背景下一章准备、Drift 落盘、真实 Source 章节连续阅读或真机证据，不据此标记 P0/P1 通过。
 
 2026-11-04，正式 Drift 产品接线与数据库静态资源已完成，完整格式检查、通用检查、TeaVM 回归及最终格式化后的三个 Flutter 包分析/测试通过。Codex 内置浏览器实际阅读原版 Arknights，完成连续切章、回看不降低最远进度、关标签页重开后恢复章节/当前页/最远页/章节顺序，以及重新阅读回首页。固定输入、命令和边界见[Web 产品进度记录](verification/reader-progress-web.md)；此处不是浏览器进程重启、Native 应用或生产 Access 动态请求门。
+
+2026-11-04，固定新 host 的 Arknights DREAM 51 页、CuuTruyen Chương 142 的 23 页已在正式 Flutter Web 逐页显示并保存，末页显式完成，同路由下一章开头也通过，见[完整章记录](verification/full-chapter-web.md)。手动单双页被控件高度变化覆盖的缺口已先以正式 Widget 复现再修复；重连旧身份与迟到 API/图片清理污染新会话也已通过正式回归修复，见[重连记录](verification/runtime-reconnect.md)。该轮完整格式化、`pnpm flutter:check`（Reader 102 项）及 `pnpm check` 通过；实际身份/版本切换及修复后浏览器复验继续验收。
 
 ## 新图形宿主与生产 Access 分项
 
@@ -215,8 +217,8 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
-- 更广 Source / Native 的冷热 Cache、真实 Source 截断 / 取消及正式扩展/Flutter 的版本/身份切换；xkcd Web 元数据 fresh Cache 及实际 manager/Worker 重建后的复用已单独通过，但浏览器进程重启未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换已通过，不能替代正式版本/身份切换等产品门。
-- 正式 Native 主入口人工操作、后台恢复与新默认 Cache 的 Native Java 验收；原处理源重复/取消及更多真实解密源覆盖。
+- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消及正式扩展/Flutter 的版本/身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但浏览器/App 进程重启未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换已通过，不能替代正式版本/身份切换等产品门。
+- 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。
 
