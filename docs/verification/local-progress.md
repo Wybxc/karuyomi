@@ -27,3 +27,5 @@
 导航测试直接注入视口回调以隔离进度协调；实际 image frame/缩放/route 覆盖的观察门由已有 ReaderScreen 回归覆盖。此处不是在线 Source 或真实设备测试。Web 官方 WASM/worker 构建见[资源记录](reader-database-assets.md)，Native 打包见[依赖记录](native-dependencies.md)；浏览器关闭重开、Native 应用重启和真实 Source 连续阅读仍须分别验收。
 
 2026-11-04，真实 Flutter Web 与原版 Source 已通过连续切章、关标签页重开后的章节/当前页/最远页/顺序恢复，见[Web 产品进度记录](reader-progress-web.md)；浏览器进程退出与 Native 应用重启仍待验收。
+
+同日，固定 `d76e8a4` 的 iOS 模拟器通过原 xkcd 正式 CatalogController/ChapterReaderRoute/ReaderScreen：真实图片 frame 后翻到末页并显式读完，SQLite 保存 current/far/completed；实际 terminate/launch 后，用同一 HTTPS origin 与受信测试 subject 恢复原章末页及完成状态。入口和 Pointer 为测试驱动，Source/JAR、阅读组件和 SQLite 是正式实现；不等同于生产 Access、物理触控、Android Source 或整套日用流程。完整输入与报告见[Native 记录](native-dependencies.md)。

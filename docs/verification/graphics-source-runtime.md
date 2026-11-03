@@ -82,3 +82,23 @@ node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
 原始 descriptor、provenance、构建日志和报告保留在该树忽略的 `.local/text-source/`，严格原 JAR 构建使用 `xkcd-original/`。先前 fresh debug keystore 的试构建仅签名 `META-INF/CERT.RSA` 不同，未作为严格对照使用。
 
 该 `926b93d` 身份的内部图形生命周期仍有确定缺口：官方 TextInterceptor 没有 recycle 它创建的 Bitmap；owned Bitmap 无自动回收注册，bridge `teaGraphicsEnd` 只清 byte handles/scratch，surface Map 仍持有画布。因此上述 release/revoke 不能冒称内部 ledger 归零，重复文字页处理、取消和存活 Worker 的内存/64-surface 预算仍待验收。独立 Java/Canvas 场景显式 recycle 后归零的结果见[文字布局记录](text-layout-runtime.md)，不能替代这项实际 Source 门。后续 typed lease 的活 owner、编码pin及真实Java自然回收已通过[独立验证](bitmap-lifetime-runtime.md)，须再固定新材料重建原 Source 复验。
+
+## 新生命周期材料的原 xkcd Source
+
+2026-11-04，固定主仓库 `5148c60185b71624664c45c20162e9322c9ef904`，在独立 `bitmap-source-validation` checkout 按 frozen lockfile 安装依赖并重新构建 xkcd。该身份包含Bitmap回收及二进制文件桥，早于后续 `3a06d5f` Cache reader关闭修复，不能作为该修复的Source复验。三个上游 pin 与前两轮相同，Source 闭包仍为 `aa3fa0e42967ce18a35fb3c21b811c3218a35a4a8607cb12bc82f27a54da7f89`。沿用旧官方构建的 debug keystore，让官方 Gradle 重产原 JAR；SHA-256 严格保持 `4071fdc5b90c473938d33f7e94c71b2a1a79fb33a00a32d0baa035ac4697cc9d`（125470 字节），未修改业务源码或 JAR。
+
+- host 输入指纹：`9e76bfb067f192f4b2c13dac68f81f1844530c2b4ce78746b8db8219c6943562`。
+- buildId：`ext-all.xkcd-b96033033497e10d554cf94850e5793f`；bundle SHA-256 `a7efb40c8231bcde976321e91b44f88a51e2d6fe0aaba65bc6c6bd0cc10ad800`，4035205 字节，gzip 852513 字节。
+- 材料版本：`80c9e303184623dea1b56acdd1c02cac0db522b83fe01f5f68285d7145f395c7`；graphics SHA-256 `230ec744421cc1651194900af006eba06b1659aa9d61de559a54150556e8af75`。没有复用 `926b93d` 的 bundle 或材料。
+
+Codex 内置浏览器 Chrome156 先用未经扩展的正式 `source-metadata-probe.ts`，经过产品 host/Worker、真实 workerd、隔离 D1 与 RS256 测试身份复验。原英文 Source 返回 `3319: Elevators`、3318 章和两页；直图仍为 PNG106037 字节/607×716，原 TextInterceptor 第二页仍为 PNG49246 字节/1000×286。释放、Blob URL 撤销和 Page session 关闭通过；搜索按原 Source 返回0，latest 不支持。网络仍仅允许 `xkcd.com,imgs.xkcd.com`。
+
+另外在 ignored harness 中对同一正式 host/Worker 附加内部账本读取与诊断计数，不改原 Source、JAR、bundle 或已校验共享材料。通过真实 pages 返回的第2页 pageKey 重复 `acquireImage`、解码并 `releaseImage` 共80次，实际新增80个 Java Bitmap lease，没有注入 `recycle`。两次运行均成功跨过64次处理，surface 数处理中多次自然下降，观测峰值均为18。
+
+空闲回收结果如实保留：首轮处理完成后仍有17个 surface/19448000字节 raster reservation；单纯读取账本15010ms没有观测到最终GC，因此该轮“空闲15秒归零”观察失败。第二轮完成后仍有16个 surface/18304000字节，空闲1532ms也未归零。随后仅测试Worker执行每批32768个普通JS对象的有界分配/丢弃，5批后观察到所有图形账本归零，单次413ms；没有调用显式GC API，但这是测试分配压力下的观察，不能称为无压力空闲保证或实际 Source 负载保证。
+
+取消门使用原 TextInterceptor 的实际 `OffscreenCanvas.convertToBlob`，只在测试harness暂缓其真实结果交付。编码等待时账本保留1个 surface/1144000字节 raster，总 reservation68383936字节；发出产品 `cancelImage` 后，在结果放行前继续保留计费。放行后原请求返回 `cancelled`，没有图片发布，graphics handles 为0，总计费降至该未回收 surface 的1144000字节。同一generation随后重新获取文字页成功，Worker没有因本次取消而重建。取消及恢复留下的两个未显式回收 Bitmap 在空闲1532ms仍未回收，后经22批相同有界对象分配观察归零，单次2155ms。
+
+上述字节为bridge内部reservation，并非进程或GPU实测峰值；所有GC延时仅为单次机制观察。取消覆盖受控的真实PNG编码等待阶段，不推广为所有HTTP/解码阶段、所有Source或任意引擎环境。生产Access、长期连续阅读、Native生命周期与真机性能仍须另验。
+
+正式两页复验命令沿用上一节。此次descriptor、provenance、构建日志及原始报告保留在固定树 `.local/bitmap-source/`：`xkcd-online.json`、`xkcd-lifecycle-idle.json`、`xkcd-lifecycle-pressure.json`，诊断服务源为 `lifecycle-probe.ts`。该ignored入口基于同树正式Source服务；观测代码和原生PNG结果gate不进入产品分发。

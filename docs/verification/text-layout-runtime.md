@@ -40,7 +40,7 @@ Codex 内置浏览器 Chrome 156 实际通过最新 Canvas 5 组及 TeaVM 同场
 
 随后使用同一 `926b93d` xkcd AOT、材料和原 JAR，配合固定 `80841b` 的真实 Flutter Web 构建，在 Codex 内置浏览器的正式产品界面选择英文 Source、xkcd 与 3319 章。直图正常显示，切换到 2/2 后可见原 TextInterceptor 绘制的标题和完整 alt 文字，本地阅读进度保存；继续下一章进入 3318 正常。截图保留于本地 `/tmp/karuyomi-xkcd-text-page.jpg`。这是实际 Flutter 显示与单次跨章检查，不是生产 Access、Native 或连续负载验收。
 
-独立 Canvas/Java 场景显式 recycle 后的图形账本归零，不能推广为实际 Source 的内部账本归零：原 TextInterceptor 创建 Bitmap 后没有 recycle，该 `926b93d` bridge End 仅关闭 byte handles 和 scratch，surface Map 仍需显式回收或 Worker 销毁。Source probe 只验证产品图片资源释放/撤销，没有采集内部 graphics ledger；长时间重复文字页可能耗尽 surface/内存预算，后续 typed lease 已通过独立 [Bitmap 所有权门](bitmap-lifetime-runtime.md)，仍需固定新材料重建原 Source 重复处理验证。生产 Access 和长章节负载须另外验收。
+独立 Canvas/Java 场景显式 recycle 后的图形账本归零，不能推广为实际 Source 的内部账本归零：原 TextInterceptor 创建 Bitmap 后没有 recycle，该 `926b93d` bridge End 仅关闭 byte handles 和 scratch，surface Map 仍需显式回收或 Worker 销毁。Source probe 只验证产品图片资源释放/撤销，没有采集内部 graphics ledger；长时间重复文字页可能耗尽 surface/内存预算，后续 typed lease 已通过独立 [Bitmap 所有权门](bitmap-lifetime-runtime.md)，之后已固定 `5148c60` 新材料重建同SHA原JAR，正式两页、原TextInterceptor80次处理和受控PNG编码取消分项通过，内部账本的空闲未回收与有界测试分配后回收见[新Source记录](graphics-source-runtime.md#新生命周期材料的原-xkcd-source)。这不改变926b93d的历史局限；生产Access和长期负载须另外验收。
 
 styled spans、Builder/ellipsize、复杂富文本/制表位、所有 HTML 容错分支、Native 应用与真机字体/性能尚未验收。库规则版本与系统字体差异会影响输出；受控场景不能替代生产 Access、实际阅读、取消和长章节负载门。
 

@@ -1,10 +1,10 @@
 # Native 受管图片文件
 
-本文记录 P0-F3 的 Native 产品实现与已执行的机制验收。公开图片合同仍由 [IMAGE-RESOURCES](IMAGE-RESOURCES.md) 和 Protobuf 定义；本文不新增 Source 控制方法。原 Source 完整阅读、Android 设备、物理 iPhone、后台恢复和进程/GPU 合计峰值仍需分别验收。
+本文记录 P0-F3 的 Native 产品实现与已执行的机制验收。公开图片合同仍由 [IMAGE-RESOURCES](IMAGE-RESOURCES.md) 和 Protobuf 定义；本文不新增 Source 控制方法。多个原 Source 的整章/切章阅读、物理 Android / iPhone、后台恢复和进程/GPU 合计峰值仍需分别验收。
 
 ## 产品路径
 
-`NativePlatformRuntime` 在部署 HTTPS 控制页的 document-start 注入已校验的内置 host/Worker，以及该容器独有的随机图片绑定 token。仅通过平台能力检查并成功绑定文件存储后，Dart 才能获取图片；TS Native 入口仅在 `imageFiles === true` 时启用图片 manager。`/runtime/host.html` 和 Static Assets 规范化后的 `/runtime/host` 均受支持，其他 origin、路径、frame 不安装该能力。
+`NativePlatformRuntime` 直接加载部署 HTTPS 规范控制页 `/runtime/host`，在 document-start 注入已校验的内置 host/Worker，以及该容器独有的随机图片绑定 token。握手前通过官方同步 API 确认文档处于 `interactive` 或 `complete`、插件桥存在且内置 runtime 身份一致；未就绪不占握手，异步检查后重验 generation。避免 `.html` 的 307 触发 Android 中间加载回调，也不错误要求 iOS 单次回调时已经 complete。仅通过平台能力检查并成功绑定文件存储后，Dart 才能获取图片；TS Native 入口仅在 `imageFiles === true` 时启用图片 manager。其他 origin、路径、frame 不安装该能力。
 
 Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK 通道生成 manager 持有的 Blob。Dart 的 `NativeImageControl` 接收生成模型中的小描述，将同上下文 Blob 交给平台文件 sink，完成后仅将 `ImageResource.url` 换成受管 `file:` URI。图片字节不放进 ProtoJSON、MethodChannel JSON 或 Base64，也不重新请求原图 URL。
 
@@ -12,7 +12,7 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 ## iOS
 
-锁定的 `flutter_inappwebview 6.1.5`（iOS 子包 1.1.2）没有暴露现有 Headless WebView 的公开原生 registry 或 `startDownload` 方法。Runner 内的薄插件使用公开 UIWindowScene/UIView 树发现 WKWebView，再同时核对 HTTPS 控制页和 document-start token，且必须恰有一个匹配。它不使用 KVC、私有 registry 或私有 WebKit API，也不接管插件的 navigation delegate。找不到或多重匹配会明确失败；此发现方式依赖锁定插件确实将 Headless view 挂入公开视图树，不是上游提供的稳定 accessor。
+当前精确锁定 `flutter_inappwebview 6.2.0-beta.3`，升级原因与官方 AGP 9 修复见[依赖记录](verification/native-dependencies.md)。插件没有暴露现有 Headless WebView 的公开原生 registry 或 `startDownload` 方法。Runner 内的薄插件使用公开 UIWindowScene/UIView 树发现 WKWebView，再同时核对 HTTPS 控制页和 document-start token，且必须恰有一个匹配。它不使用 KVC、私有 registry 或私有 WebKit API，也不接管插件的 navigation delegate。找不到或多重匹配会明确失败；此发现方式依赖锁定插件确实将 Headless view 挂入公开视图树，不是上游提供的稳定 accessor。
 
 绑定后，插件在同一个 WKWebView 上调用公开的 [`startDownload(using:completionHandler:)`](<https://developer.apple.com/documentation/webkit/wkwebview/startdownload(using:completionhandler:)>)，由 [`WKDownloadDelegate`](https://developer.apple.com/documentation/webkit/wkdownloaddelegate) 决定随机私有文件目标。只接受同 origin Blob，校验下载 MIME、声明长度、实际文件长度及普通文件类型，拒绝下载重定向与认证挑战。目录权限为 `0700`，文件为 `0600`；每次进程首次建立存储时移除自身目录中的崩溃残留。
 
@@ -24,7 +24,7 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 插件原生 channel registry 只随 WebView 销毁清空，因此文件 sink 使用最多六个常驻 port 槽位，每槽只安装和转移 port 一次，不能将已关闭或已转移的 port 再次转移。每次传输使用该槽单调递增且不回绕的 identity；二进制消息前八字节为 transfer/sequence 两个 u32 BE，余下至多 65,528 字节为图片内容，总消息不超过 64 KiB。每块写入文件后才 ACK；ACK、END、取消终态均绑定 transfer，旧消息不会确认新任务。槽位只在上一任务终态清理后复用，clear 关闭端点，容器销毁释放插件 registry。
 
-这段私有平台 sink 使用 ArrayBuffer 正文和小 ACK/终态字符串，不改变公开 ProtoJSON Source 控制合同。取消需等 reader 退出、端点终态与本地写入结束；无法确认时返回 runtime_lost 并销毁容器。文件位于应用私有临时目录，release 删除文件。Android 路径已实现与静态检查，但尚未在 Android WebView/设备运行验收。
+这段私有平台 sink 使用 ArrayBuffer 正文和小 ACK/终态字符串，不改变公开 ProtoJSON Source 控制合同。取消需等 reader 退出、端点终态与本地写入结束；无法确认时返回 runtime_lost 并销毁容器。文件位于应用私有临时目录，release 删除文件。Android API 36 模拟器的真实 WebView 六槽传输与复用已通过；物理设备与真实 Source 阅读另行验收。
 
 ## 预算与生命周期
 
@@ -74,4 +74,20 @@ xcodebuild -workspace Runner.xcworkspace -scheme Runner \
 
 三份文件的 SHA-256 均机器核对为对应 workerd 上游流的摘要。`ChapterPageProvider.close()` 在获取中取消并关闭原 Page 会话；保留一张未释放图片后调用真实 `NativePlatformRuntime.rebuild()`，文件和 binding 目录消失、旧所有权失效，新 Source 在不同 generation 下重开。原始小报告留在冻结工作树忽略的 `.local/native-source/`；测试服务、隔离 D1、静态快照和 App 已清理。仅合法的空 process 根目录残留，不将其误报为未清理 binding。
 
-这是实际 Dart 产品控制器与 Source/文件通道的分项证据，尚非 Native ReaderScreen 的完整交互、3–5 个处理源、整章/下一章、后台恢复、物理设备、生产 Access 或峰值验收。公开 API 没有直接暴露原 Blob URL 或 Swift reservation 计数，文件消失不能单独证明内存或全部账本归零。后续保留这些门；Android 还需真实 ArrayBuffer 插件链与端点复用验证。
+这是实际 Dart 产品控制器与 Source/文件通道的分项证据，尚非 Native ReaderScreen 的完整交互、3–5 个处理源、整章/下一章、后台恢复、物理设备、生产 Access 或峰值验收。公开 API 没有直接暴露原 Blob URL 或 Swift reservation 计数，文件消失不能单独证明内存或全部账本归零。
+
+## 当前官方 beta 双端机制复验
+
+固定 `d76e8a48f6898c06dd7413c430747d60e5cba34d`、材料 `80c9e303184623dea1b56acdd1c02cac0db522b83fe01f5f68285d7145f395c7`，iOS 26.4 Simulator 与 Android 16 / API 36 / WebView 133 均通过正式容器握手，两轮各六张并发的多块受控 PNG、实际文件摘要、Flutter 解码、限额、generation、迟到 cancel、幂等释放与清理。Android 第二轮仍是原六个持久插件 slot。两个平台均真正终止、重启进程后恢复正式 Drift / SQLite 的合成章节进度并验证 reset 的 epoch 隔离。
+
+可复验命令、平台摘要及保留的早期失败见[Native 依赖与机制记录](verification/native-dependencies.md#正式-readiness-修复的双端复验)。这组图片是受控同源 Blob，不能代替 Source AOT、实际 ReaderScreen、后台恢复或物理设备验收；与新材料匹配的原版 Source 路径单独验证。
+
+## iOS 原版 xkcd 阅读器与进度重启
+
+2026-11-04，同一 `d76e8a48` / `80c9…95c7` 固定输入，在 iOS 26.4 模拟器通过真实 `CatalogController → ChapterReaderRoute → ReaderScreen`。使用材料完全匹配的原版 xkcd AOT `ext-all.xkcd-b96033033497e10d554cf94850e5793f`，英语 Source 取得 `3319: Elevators` 的两页；漫画 PNG 经正式受管文件供 Flutter 解码，第二页为 Source 原 `TextInterceptor` 生成的文字图，没有以原图 URL 绕过处理。
+
+合成 Pointer 事件通过正式“下一页”和“读完本章”按钮；只有末页真实解码并进入视口后才保存完成。实际界面显示 `2 / 2`、本地进度已保存及本章已读完，退出等待 route / provider 清理。真正终止并重启应用进程后，重新验证身份和加载 Source，正式 ReaderScreen 恢复末页 current / furthest 与 completed，退出再次确认清理。
+
+受控入口位于忽略目录，正常受信 localhost HTTPS 连接真实 workerd / 隔离 D1 / RS256 测试身份；不代表生产 Access 或正式主入口人工手势。首次合成 End 键未翻页的失败保留，后续仅调整测试输入。准确 JAR / bundle / 材料身份、命令、报告与截图位置见[分项记录](verification/native-dependencies.md#原版-xkcd正式-readerscreen-与真实进程重启)。Android Source、多个处理源、整章接续、后台恢复、真机和峰值仍需另验。
+
+Android 的相同 Source 测试入口已构建 APK，但 localhost 测试 CA 未获该模拟器信任，真实 TLS 校验拒绝后尚未进入 Source；未修改产品信任或绕过证书错误。此失败不覆盖此前正常生产 HTTPS 上已通过的 Android 六 slot 机制结果。

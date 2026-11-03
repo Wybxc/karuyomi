@@ -192,6 +192,8 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 固定 `a15c030` 的独立工作树进一步完成 iOS 原 Source 文件门：真实 CatalogController/ChapterPageProvider 从 17 项目录进入 3 章/51 页，首、中、末页经原 Source、HTTP v2、WKDownload 和 Flutter 文件解码均为 1200×1691，字节与上游流摘要逐项一致。release 删除文件并撤销所有权；获取中章节关闭、持图容器重建、binding 目录删除和新 generation 重开通过。身份核对与范围见 [原版 Source 分项证据](NATIVE-IMAGE-FILES.md#原版-source-到-native-文件的分项验收)。它仍使用测试身份与模拟器，未证明 Native ReaderScreen 完整交互、生产 Access、真机或峰值。
 
+固定 `d76e8a4` 的新工作树已通过 iOS/Android 正式受管图片机制及真实进程重启的 SQLite 恢复，保留 `5e9e526` 的 iOS interactive 就绪失败及修正依据。iOS 进一步以相同材料的原 xkcd AOT 经正式 CatalogController/ChapterReaderRoute/ReaderScreen 显示两页，实际 frame 后保存末页与完成状态；terminate/launch 后重取原 Source 并恢复。输入是受控 Native 入口与合成 Flutter Pointer，同源受信 localhost HTTPS、隔离 RS256/D1 测试身份。它不证明生产 Access、真机触控、Android Source 或完整主入口日用流程；详细身份与限制见[Native 记录](verification/native-dependencies.md)。
+
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。

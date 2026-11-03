@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，v3 Web 初始化与真实 Source/图片分项通过，Native 与剩余运行门待验收。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
+消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，v3 Web、双端 Native 机制与 iOS 原 Source Reader 分项通过，生产部署及剩余运行门待验收。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
 
 正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v3，原型不兼容旧材料。
 
@@ -17,7 +17,7 @@
 ## 待验收
 
 1. 固定 `6e08ec9` 的新指纹代表包已通过真实 Web Source 控制、首中末图片、重复释放与会话关闭，见 [v3 运行证据](../verification/protocol-v3-runtime.md)。继续验证实际取消和后续材料变更；不能复用旧 v2 或不同材料的证据。
-2. iOS 模拟器正式 NativePlatformRuntime 已通过真实 Headless 握手和受控 Blob 文件交接，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。固定 `a15c030` 的真实 Source 首中末文件、取消与容器重建也已分项通过；Native ReaderScreen 交互、Android WebView 与物理设备继续验收；编译、mock 和 Dart golden 不能替代这些门。
+2. iOS 模拟器正式 NativePlatformRuntime 已通过真实 Headless 握手和受控 Blob 文件交接，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。固定 `a15c030` 的真实 Source 首中末文件、取消与容器重建也已分项通过；固定 `d76e8a4` 的双端 Native 图片机制、SQLite 真重启及 iOS 原 xkcd 正式 ReaderScreen/进度恢复也已通过分项，输入与测试驱动范围见[Native 记录](../verification/native-dependencies.md)；Android 原 Source、物理设备和生产 Access 继续验收。编译、mock 和 Dart golden 不能替代这些门。
 3. 新材料与静态快照、生产 Access 分项验收后再更新部署记录。固定 `022d828` v1 队列保持独立，尚不能部署为当前协议成果。
 
 ## 验收

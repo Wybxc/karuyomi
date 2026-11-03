@@ -39,8 +39,16 @@ Codex 内置浏览器 Chrome 156 实跑最新真实 Canvas 五组全部通过：
 
 Canvas 和 Java 门的单次观测分别约 16.4 ms、24.7/88.8 ms，只记录机制事实，不是时延分布或承诺。严格 bridge/tools 类型检查通过；机器报告、官方 oracle 日志及截图留在 ignored 验证目录。
 
+## 原 Source 新材料复验
+
+固定 `5148c60`，使用与旧门严格相同SHA的官方 xkcd JAR 重新AOT；新的host、bundle和材料完整身份见[Source记录](graphics-source-runtime.md#新生命周期材料的原-xkcd-source)。Codex内置Chrome156的正式两页门再次通过，第二页由未经修改的原TextInterceptor实际生成。其后同一真实pageKey连续获取、解码和释放80次，诊断记录恰好新增80个Java Bitmap lease；未注入recycle，处理中多次自然回收，观测峰值18 surfaces，成功跨过64次处理。
+
+空闲最终回收没有固定时限：第一轮完成留17 surfaces/19448000字节，空闲15010ms没有再回收，原始失败报告已保留。第二轮留16 surfaces，空闲1532ms仍未归零；仅测试Worker每批分配/丢弃32768个普通JS对象后，5批观察到账本全零。没有显式GC API，但有测试分配压力，不能把forced=false写成无压力空闲保证。
+
+原Source实际PNG编码的取消门另外通过：测试harness暂缓真实convertToBlob结果，取消时pending reservation仍保留；放行后返回cancelled、没有发布迟到图片、handles为0，并能在同一generation重新获取文字页。取消及恢复后的两个Bitmap在空闲1532ms未回收，22批同样的有界分配后观察到所有账本归零。详细计费、单次时间及诊断接线见Source记录；它们不是进程/GPU峰值或延时分布。
+
 ## 未完成门
 
-新生命周期材料尚未在固定新commit重新AOT并重复运行原xkcd TextInterceptor；926b93d的两页及Flutter可见文字只证明该旧身份下图片/显示通过，没有内部graphics ledger证据。生产Access、Native应用、运行中取消原Source、长期负载、进程/GPU实际峰值均未因此通过。自然GC机制的单次观测不是回收延时分布或内存峰值保证。
+生产Access、Native应用的Bitmap生命周期、所有HTTP/解码阶段的取消、长期负载、进程/GPU实际峰值仍须另验。本次取消覆盖受控的真实PNG编码等待阶段；普通对象分配压力下的最终回收与原Source80次处理事实分开记录，不保证所有引擎总会及时回收外部画布内存。旧926b93d的Source/UI证据继续保留，不能混用材料身份。
 
 依据：[TeaVM JSO](https://teavm.org/docs/runtime/jso.html)、[固定上游 JSWeakRef](https://github.com/konsoletyper/teavm/blob/e87d452e4bd70c77b9e19314a46c3d6971c148b6/jso/apis/src/main/java/org/teavm/jso/core/JSWeakRef.java)、[固定上游 Cleaner](https://github.com/konsoletyper/teavm/blob/e87d452e4bd70c77b9e19314a46c3d6971c148b6/classlib/src/main/java/org/teavm/classlib/java/lang/ref/TCleaner.java)、[TC39 WeakRef处理模型](https://tc39.es/ecma262/multipage/executable-code-and-execution-contexts.html#sec-processing-model-of-weakref-and-finalizationregistry-targets)、[Android15 Bitmap](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/graphics/java/android/graphics/Bitmap.java)。
