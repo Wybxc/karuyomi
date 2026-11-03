@@ -1,16 +1,7 @@
---- a/TGroupQuantifierSet.java
+===================================================================
+--- a/PatchedGroupQuantifierSet.java
 +++ b/PatchedGroupQuantifierSet.java
-@@ -42,15 +42,38 @@
-  *
-  * @author Nikolay A. Kuznetsov
-  */
--class TGroupQuantifierSet extends TQuantifierSet {
-+public class PatchedGroupQuantifierSet extends TQuantifierSet {
- 
--    public TGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
-+    public PatchedGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
-         super(innerSet, next, type);
-     }
+@@ -50,8 +50,31 @@
  
      @Override
      public int matches(int stringIndex, CharSequence testString, TMatchResultImpl matchResult) {
@@ -41,3 +32,4 @@
          if (!innerSet.hasConsumed(matchResult)) {
              return next.matches(stringIndex, testString, matchResult);
          }
+ 

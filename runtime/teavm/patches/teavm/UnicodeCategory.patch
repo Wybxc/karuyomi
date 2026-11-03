@@ -1,17 +1,7 @@
---- a/TUnicodeCategory.java
+===================================================================
+--- a/PatchedUnicodeCategory.java
 +++ b/PatchedUnicodeCategory.java
-@@ -41,16 +41,16 @@
-  *
-  * @author Nikolay A. Kuznetsov
-  */
--class TUnicodeCategory extends TAbstractCharClass {
-+class PatchedUnicodeCategory extends TAbstractCharClass {
- 
-     protected int category;
- 
--    public TUnicodeCategory(int category) {
-+    public PatchedUnicodeCategory(int category) {
-         this.category = category;
+@@ -50,7 +50,7 @@
      }
  
      @Override

@@ -1,15 +1,12 @@
---- a/TUnicodeCategoryScope.java
+===================================================================
+--- a/PatchedUnicodeCategoryScope.java
 +++ b/PatchedUnicodeCategoryScope.java
-@@ -40,14 +40,15 @@
-  * Unicode category scope (i.e IsL, IsM, ...)
-  * @author Nikolay A. Kuznetsov
+@@ -42,12 +42,13 @@
   */
--class TUnicodeCategoryScope extends TUnicodeCategory {
-+class PatchedUnicodeCategoryScope extends TUnicodeCategory {
+ class PatchedUnicodeCategoryScope extends TUnicodeCategory {
  
--    public TUnicodeCategoryScope(int category) {
+     public PatchedUnicodeCategoryScope(int category) {
 -        super(category);
-+    public PatchedUnicodeCategoryScope(int category) {
 +        // General category C includes unassigned and control characters.
 +        super(category == 0xF0000 ? 0xD8001 : category);
      }

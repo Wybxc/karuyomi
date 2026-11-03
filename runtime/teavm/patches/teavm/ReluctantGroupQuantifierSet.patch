@@ -1,14 +1,7 @@
---- a/TReluctantGroupQuantifierSet.java
+===================================================================
+--- a/PatchedReluctantGroupQuantifierSet.java
 +++ b/PatchedReluctantGroupQuantifierSet.java
-@@ -41,13 +41,32 @@
-  *
-  * @author Nikolay A. Kuznetsov
-  */
--class TReluctantGroupQuantifierSet extends TGroupQuantifierSet {
--    public TReluctantGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
-+public class PatchedReluctantGroupQuantifierSet extends TGroupQuantifierSet {
-+    public PatchedReluctantGroupQuantifierSet(TAbstractSet innerSet, TAbstractSet next, int type) {
-         super(innerSet, next, type);
+@@ -47,8 +47,27 @@
      }
  
      @Override
@@ -35,3 +28,4 @@
          if (!innerSet.hasConsumed(matchResult)) {
              return next.matches(stringIndex, testString, matchResult);
          }
+ 

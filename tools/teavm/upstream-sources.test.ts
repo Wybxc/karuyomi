@@ -11,7 +11,12 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE, PATCHES, prepareSources } from './upstream-sources.ts';
+import {
+  PACKAGE,
+  PATCHES,
+  generateDonorSource,
+  prepareSources,
+} from './upstream-sources.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -48,7 +53,10 @@ test(
       writeFileSync(path.join(root, relative), original);
       writeFileSync(
         path.join(root, patchPath),
-        patch.replace('-final class TEOLSet', '-final class DifferentSet'),
+        patch.replace(
+          'int rightBound = matchResult.hasAnchoringBounds()',
+          'int wrongBound = matchResult.hasAnchoringBounds()',
+        ),
       );
       assert.throws(
         () => prepareSources(path.join(root, 'out'), root),
@@ -57,8 +65,8 @@ test(
       writeFileSync(
         path.join(root, patchPath),
         patch.replace(
-          '+final class PatchedEOLSet',
-          '+final class ChangedEOLSet',
+          '+            matchResult.hitEnd = true; matchResult.requireEnd = true;',
+          '+            matchResult.hitEnd = false; matchResult.requireEnd = true;',
         ),
       );
       assert.throws(
@@ -75,7 +83,7 @@ test(
   },
 );
 test(
-  'all pinned sources materialize',
+  'all pinned donor bytes remain unchanged, including intentional upstream references',
   { skip: !existsSync(path.join(ROOT, 'vendor/teavm/classlib')) },
   () => {
     const folder = mkdtempSync(path.join(os.tmpdir(), 'karuyomi-upstream-'));
@@ -85,11 +93,66 @@ test(
       assert.ok(
         outputs.every((file) => !path.relative(folder, file).startsWith('..')),
       );
+      const generated = (name: string): string =>
+        readFileSync(path.join(folder, PACKAGE, `Patched${name}.java`), 'utf8');
+      assert.ok(generated('Pattern').includes('(TPattern)(Object)this'));
+      assert.ok(generated('Lexer').includes('TPattern.quote(pattern)'));
+      assert.ok(
+        generated('ReluctantGroupQuantifierSet').includes(
+          'extends TGroupQuantifierSet',
+        ),
+      );
+      assert.ok(
+        generated('UnicodeCategoryScope').includes('extends TUnicodeCategory'),
+      );
     } finally {
       rmSync(folder, { recursive: true, force: true });
     }
   },
 );
+
+test('donor generation renames Java identifiers without changing literals or unrelated trivia', () => {
+  const source = `/** @see TPattern#compile(java.lang.String, int)
+ * TPattern and TLexer are names in documentation.
+ */
+class TPattern {
+  // TPattern TLexer
+  String literal = "TPattern TLexer @see TPattern#compile(java.lang.String, int)";
+  String block = """
+    TPattern TLexer @see TPattern#compile(java.lang.String, int)
+    """;
+  TPatternSuffix unrelated;
+  TLexer lexer;
+  TPattern self;
+  private TPattern() {}
+}
+`;
+  const generated = generateDonorSource('Pattern', source);
+  assert.ok(generated.includes('class PatchedPattern {'));
+  assert.ok(generated.includes('private PatchedPattern() {}'));
+  assert.ok(generated.includes('PatchedPattern self;'));
+  assert.ok(generated.includes('PatchedLexer lexer;'));
+  assert.ok(generated.includes('TPatternSuffix unrelated;'));
+  assert.ok(
+    generated.includes(' * TPattern and TLexer are names in documentation.'),
+  );
+  assert.ok(generated.includes('// TPattern TLexer'));
+  assert.ok(
+    generated.includes(
+      '/** @see PatchedPattern#compile(java.lang.String, int)',
+    ),
+  );
+  assert.ok(
+    generated.includes(
+      'String literal = "TPattern TLexer @see TPattern#compile(java.lang.String, int)";',
+    ),
+  );
+  assert.ok(
+    generated.includes(
+      'String block = """\n    TPattern TLexer @see TPattern#compile(java.lang.String, int)\n    """;',
+    ),
+  );
+});
 test('missing submodule gives an actionable bootstrap instruction', () => {
   const folder = mkdtempSync(path.join(os.tmpdir(), 'karuyomi-no-upstream-'));
   try {

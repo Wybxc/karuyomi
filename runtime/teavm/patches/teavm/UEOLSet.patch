@@ -1,20 +1,8 @@
---- a/TUEOLSet.java
+===================================================================
+--- a/PatchedUEOLSet.java
 +++ b/PatchedUEOLSet.java
-@@ -41,11 +41,11 @@
-  *
-  * @author Nikolay A. Kuznetsov
-  */
--final class TUEOLSet extends TAbstractSet {
-+final class PatchedUEOLSet extends TAbstractSet {
- 
-     private int consCounter;
- 
--    public TUEOLSet(int counter) {
-+    public PatchedUEOLSet(int counter) {
-         this.consCounter = counter;
-     }
- 
-@@ -54,14 +54,16 @@
+@@ -53,16 +53,18 @@
+     public int matches(int strIndex, CharSequence testString, TMatchResultImpl matchResult) {
          int rightBound = matchResult.hasAnchoringBounds() ? matchResult.getRightBound() : testString.length();
  
          if (strIndex >= rightBound) {
@@ -33,3 +21,4 @@
          }
  
          return -1;
+     }

@@ -1,15 +1,8 @@
---- a/TSOLSet.java
+===================================================================
+--- a/PatchedSOLSet.java
 +++ b/PatchedSOLSet.java
-@@ -41,7 +41,7 @@
-  *
-  * @author Nikolay A. Kuznetsov
-  */
--final class TSOLSet extends TAbstractSet {
-+final class PatchedSOLSet extends TAbstractSet {
- 
-     @Override
-     public int matches(int strIndex, CharSequence testString,
-@@ -54,6 +54,9 @@
+@@ -53,8 +53,11 @@
+         return -1;
      }
  
      @Override
@@ -19,3 +12,4 @@
      public boolean hasConsumed(TMatchResultImpl matchResult) {
          return false;
      }
+ 

@@ -1,21 +1,18 @@
---- a/TUCISequenceSet.java
+===================================================================
+--- a/PatchedUCISequenceSet.java
 +++ b/PatchedUCISequenceSet.java
-@@ -41,33 +41,38 @@
-  *
-  * @author Nikolay A. Kuznetsov
+@@ -43,31 +43,36 @@
   */
--class TUCISequenceSet extends TLeafSet {
-+class PatchedUCISequenceSet extends TLeafSet {
+ class PatchedUCISequenceSet extends TLeafSet {
  
      private String string;
 +    private int[] codePoints;
 +    private int count;
  
--    TUCISequenceSet(StringBuffer substring) {
+     PatchedUCISequenceSet(StringBuffer substring) {
 -        StringBuilder res = new StringBuilder();
 -        for (int i = 0; i < substring.length(); i++) {
 -            res.append(Character.toLowerCase(Character.toUpperCase(substring.charAt(i))));
-+    PatchedUCISequenceSet(StringBuffer substring) {
 +        string = substring.toString();
 +        charCount = string.length();
 +        codePoints = new int[charCount];

@@ -120,7 +120,7 @@
         "sha256": "0f8f242230304f6190629e032e4988d5f5fd7c6f55e4af5e94f92a46fd3b8404"
       },
       "license": {
-        "path": "toolchain/license.txt",
+        "path": "toolchain/android-sdk-license",
         "sha256": "c43fa37686457c3f18caa3607945f4ec52a9d1beaaad8117e50dc4e863270c85"
       }
     }

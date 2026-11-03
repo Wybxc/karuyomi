@@ -1,20 +1,8 @@
---- a/TMultiLineEOLSet.java
+===================================================================
+--- a/PatchedMultiLineEOLSet.java
 +++ b/PatchedMultiLineEOLSet.java
-@@ -41,11 +41,11 @@
-  *
-  * @author Nikolay A. Kuznetsov
-  */
--class TMultiLineEOLSet extends TAbstractSet {
-+class PatchedMultiLineEOLSet extends TAbstractSet {
- 
-     private int consCounter;
- 
--    public TMultiLineEOLSet(int counter) {
-+    public PatchedMultiLineEOLSet(int counter) {
-         this.consCounter = counter;
-     }
- 
-@@ -57,6 +57,7 @@
+@@ -56,8 +56,9 @@
+                 : testString.length() - strIndex;
          char ch1;
          char ch2;
          if (strDif == 0) {
@@ -22,7 +10,9 @@
              matchResult.setConsumed(consCounter, 0);
              return next.matches(strIndex, testString, matchResult);
          } else if (strDif >= 2) {
-@@ -67,6 +68,8 @@
+             ch1 = testString.charAt(strIndex);
+@@ -66,8 +67,10 @@
+             ch1 = testString.charAt(strIndex);
              ch2 = 'a';
          }
  
@@ -31,3 +21,4 @@
          switch (ch1) {
              case '\r': {
                  if (ch2 == '\n') {
+                     matchResult.setConsumed(consCounter, 0);

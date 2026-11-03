@@ -1,19 +1,8 @@
---- a/TEOLSet.java
+===================================================================
+--- a/PatchedEOLSet.java
 +++ b/PatchedEOLSet.java
-@@ -41,10 +41,10 @@
-  *
-  * @author Nikolay A. Kuznetsov
-  */
--final class TEOLSet extends TAbstractSet {
-+final class PatchedEOLSet extends TAbstractSet {
-     private int consCounter;
- 
--    public TEOLSet(int counter) {
-+    public PatchedEOLSet(int counter) {
-         this.consCounter = counter;
-     }
- 
-@@ -53,6 +53,7 @@
+@@ -52,24 +52,29 @@
+     public int matches(int strIndex, CharSequence testString, TMatchResultImpl matchResult) {
          int rightBound = matchResult.hasAnchoringBounds() ? matchResult.getRightBound() : testString.length();
  
          if (strIndex >= rightBound) {
@@ -21,7 +10,7 @@
              matchResult.setConsumed(consCounter, 0);
              return next.matches(strIndex, testString, matchResult);
          }
-@@ -60,6 +61,7 @@
+ 
          // check final line terminator;
          if ((rightBound - strIndex) == 2 && testString.charAt(strIndex) == '\r'
                  && testString.charAt(strIndex + 1) == '\n') {
@@ -29,7 +18,7 @@
              matchResult.setConsumed(consCounter, 0);
              return next.matches(strIndex, testString, matchResult);
          }
-@@ -67,8 +69,11 @@
+         char ch;
  
          if ((rightBound - strIndex) == 1) {
              ch = testString.charAt(strIndex);
@@ -42,3 +31,4 @@
                  return next.matches(strIndex, testString, matchResult);
              }
          }
+ 

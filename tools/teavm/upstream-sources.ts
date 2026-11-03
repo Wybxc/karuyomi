@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { applyPatch } from 'diff';
+import { lexAndParse } from 'java-parser';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -75,6 +76,47 @@ export const PATCHES = [
   ],
 ] as const;
 
+/** Give the transformer an independent donor without changing Java trivia or
+ * literals. Run before behavior patches, which may deliberately refer to T*. */
+export function generateDonorSource(name: string, source: string): string {
+  const originalName = `T${name}`;
+  const identifiers = new Map([[originalName, `Patched${name}`]]);
+  if (name === 'Pattern') identifiers.set('TLexer', 'PatchedLexer');
+  const { tokens } = lexAndParse(source);
+  const parts: string[] = [];
+  let offset = 0;
+  for (const [index, token] of tokens.entries()) {
+    // Tokens exclude comments. Update this upstream Javadoc link only in the
+    // trivia between tokens, never inside a string or text-block literal.
+    const trivia = source.slice(offset, token.startOffset);
+    parts.push(
+      name === 'Pattern'
+        ? trivia.replaceAll(
+            '@see TPattern#compile(java.lang.String, int)',
+            '@see PatchedPattern#compile(java.lang.String, int)',
+          )
+        : trivia,
+    );
+    // Preserve these donors' established public visibility as a generation
+    // detail, rather than including it in regex behavior patches.
+    if (
+      (name === 'GroupQuantifierSet' ||
+        name === 'ReluctantGroupQuantifierSet') &&
+      token.image === 'class' &&
+      tokens[index + 1]?.image === originalName
+    )
+      parts.push('public ');
+    parts.push(
+      token.tokenType.name === 'Identifier'
+        ? (identifiers.get(token.image) ?? token.image)
+        : token.image,
+    );
+    offset = token.endOffset + 1;
+  }
+  parts.push(source.slice(offset));
+  return parts.join('');
+}
+
 export function prepareSources(destination: string, root = ROOT): string[] {
   const upstream = path.join(
       root,
@@ -94,7 +136,7 @@ export function prepareSources(destination: string, root = ROOT): string[] {
     if (createHash('sha256').update(data).digest('hex') !== sourceHash)
       throw new Error(`Pinned TeaVM source differs: ${file}`);
     const text = applyPatch(
-      data.toString(),
+      generateDonorSource(name, data.toString()),
       readFileSync(path.join(patches, `${name}.patch`), 'utf8'),
       { fuzzFactor: 0, autoConvertLineEndings: false },
     );
