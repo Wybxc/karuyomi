@@ -112,6 +112,7 @@ final class CatalogController extends ChangeNotifier {
   CatalogController({
     required this.api,
     required this.runtime,
+    required this.rebuildRuntime,
     this.progressDatabase,
     this.deploymentOrigin,
   }) {
@@ -120,6 +121,7 @@ final class CatalogController extends ChangeNotifier {
 
   final ApiFetch api;
   final SourceRuntime runtime;
+  final Future<void> Function() rebuildRuntime;
   final ReaderDatabase? progressDatabase;
   final Uri? deploymentOrigin;
   final _readingClients = <ReadingProgressController, int>{};
@@ -262,6 +264,8 @@ final class CatalogController extends ChangeNotifier {
   int _requestSequence = 0;
   int _epoch = 0;
   bool _closed = false;
+  bool _runtimeNeedsRebuild = false;
+  bool _rebuildingRuntime = false;
 
   void _notify() {
     if (!_closed) notifyListeners();
@@ -269,6 +273,11 @@ final class CatalogController extends ChangeNotifier {
 
   void _onRuntimeEvent(RuntimeEvent event) {
     if (_closed) return;
+    // A reconnect intentionally invalidates the old container before bootstrap.
+    // Platform rebuild still owns Worker, WebView and native file cleanup.
+    if (_rebuildingRuntime && event.code == RuntimeErrorCode.runtimeLost) {
+      return;
+    }
     if ({
       RuntimeErrorCode.runtimeLost,
       RuntimeErrorCode.accessRequired,
@@ -390,14 +399,34 @@ final class CatalogController extends ChangeNotifier {
   }
 
   Future<void> connect() async {
+    if (busy || _closed) return;
+    ++_epoch;
     await _perform('正在连接服务', () async {
+      final epoch = _epoch;
       status = ServiceStatus.connecting;
       _dropSession();
+      subject = null;
+      email = null;
       builds = const [];
+      // Writers retain their original verified identity. Failed drafts remain
+      // retryable; closing the Catalog's progress service would prevent reuse.
+      await flushReadingProgress();
+      if (_closed || epoch != _epoch) return;
+      if (_runtimeNeedsRebuild) {
+        _rebuildingRuntime = true;
+        try {
+          await rebuildRuntime();
+        } finally {
+          _rebuildingRuntime = false;
+        }
+        if (_closed || epoch != _epoch) return;
+        _runtimeNeedsRebuild = false;
+      }
       final bootstrap = wire.decodeProtoJson(
         wire.Bootstrap(),
         await _get('/api/bootstrap'),
       );
+      if (_closed || epoch != _epoch) return;
       if (bootstrap.protocolVersion != protocolVersion) {
         throw const FormatException('客户端与服务版本不兼容');
       }
@@ -410,6 +439,7 @@ final class CatalogController extends ChangeNotifier {
         wire.ExtensionIndex(),
         await _get('/extensions/index.json'),
       );
+      if (_closed || epoch != _epoch) return;
       if (inventory.schemaVersion != 1) {
         throw const FormatException('扩展索引版本不兼容');
       }
@@ -419,7 +449,7 @@ final class CatalogController extends ChangeNotifier {
               available.length) {
         throw const FormatException('扩展索引必须每包只包含一个当前版本');
       }
-      if (_closed) return;
+      if (_closed || epoch != _epoch) return;
       subject = confirmedSubject;
       email = confirmedEmail;
       builds = available;
@@ -432,6 +462,7 @@ final class CatalogController extends ChangeNotifier {
     lastBuildId = build.id;
     lastSourceId = null;
     await _perform('正在加载漫画源', () async {
+      final epoch = _epoch;
       _dropSession();
       final identity = subject;
       if (identity == null) {
@@ -441,11 +472,13 @@ final class CatalogController extends ChangeNotifier {
         wire.BuildManifest(),
         await _get(build.manifestPath),
       );
+      if (_closed || epoch != _epoch) return;
       if (manifest.buildId != build.id ||
           !manifest.hasBundle() ||
           manifest.bundle.sha256.isEmpty) {
         throw const FormatException('构建标识不匹配');
       }
+      _runtimeNeedsRebuild = true;
       final loaded = await runtime.open(
         BuildDescriptor(
           buildId: build.id,
@@ -455,7 +488,7 @@ final class CatalogController extends ChangeNotifier {
           packageId: build.packageName,
         ),
       );
-      if (_closed) return;
+      if (_closed || epoch != _epoch) return;
       activeBuild = build;
       session = loaded;
       activeSource = null;

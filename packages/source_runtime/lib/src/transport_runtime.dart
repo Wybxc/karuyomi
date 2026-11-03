@@ -93,6 +93,26 @@ final class TransportSourceRuntime implements SourceRuntime {
     wire.ControlResponse_Result expected,
   ) async {
     final command = request.whichCommand();
+    final epoch = _epoch;
+    final requestGeneration = switch (command) {
+      wire.ControlRequest_Command.invoke => request.invoke.generation,
+      wire.ControlRequest_Command.cancel => request.cancel.generation,
+      wire.ControlRequest_Command.acquireImage =>
+        request.acquireImage.generation,
+      wire.ControlRequest_Command.cancelImage => request.cancelImage.generation,
+      wire.ControlRequest_Command.releaseImage =>
+        request.releaseImage.generation,
+      wire.ControlRequest_Command.closePageSession =>
+        request.closePageSession.generation,
+      _ => null,
+    };
+    bool current() =>
+        epoch == _epoch &&
+        (!_disposed || command == wire.ControlRequest_Command.dispose);
+    const expired = RuntimeException(
+      RuntimeErrorCode.runtimeLost,
+      'Control response belongs to an expired runtime',
+    );
     if (_disposed && command != wire.ControlRequest_Command.dispose) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
@@ -111,6 +131,12 @@ final class TransportSourceRuntime implements SourceRuntime {
           'Control response identity mismatch',
         );
       }
+      // A late image must reach acquireImage's ownership cleanup below. Other
+      // stale replies cannot publish API/Source/session data into a new epoch.
+      final ownsImageResult =
+          command == wire.ControlRequest_Command.acquireImage &&
+          response.whichResult() == wire.ControlResponse_Result.image;
+      if (!current() && !ownsImageResult) throw expired;
       if (response.whichResult() == wire.ControlResponse_Result.error) {
         throw RuntimeException.fromProto(response.error);
       }
@@ -122,6 +148,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       }
       return response;
     } catch (error) {
+      if (!current()) throw expired;
       final failure = error is RuntimeException
           ? error
           : error is FormatException
@@ -133,6 +160,12 @@ final class TransportSourceRuntime implements SourceRuntime {
               RuntimeErrorCode.runtimeLost,
               'Runtime control transport failed',
             );
+      // Cleanup may still address the previous generation after a new open.
+      // Its failure belongs to that owner and cannot invalidate the new slot.
+      if (requestGeneration != null &&
+          requestGeneration != _session?.generation) {
+        throw failure;
+      }
       final localImageTimeout =
           failure.code == RuntimeErrorCode.timeout &&
           {

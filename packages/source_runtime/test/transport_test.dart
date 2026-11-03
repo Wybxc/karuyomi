@@ -511,4 +511,149 @@ void main() {
       throwsA(failure(RuntimeErrorCode.runtimeLost)),
     );
   });
+  for (final lateError in [false, true]) {
+    test(
+      'late API completion cannot affect a reopened runtime (error=$lateError)',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        final events = <RuntimeEvent>[];
+        final subscription = runtime.events.listen(events.add);
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        transport.handler = (call) async {
+          if (!call.hasFetchApi()) return transport.respond(call);
+          entered.complete();
+          await release.future;
+          return wire.ControlResponse(
+            requestId: call.requestId,
+            error: lateError
+                ? wire.RuntimeError(
+                    code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+                    message: 'Old API failed',
+                  )
+                : null,
+            api: lateError
+                ? null
+                : wire.ApiFetchResponse(status: 200, body: 'old identity'),
+          );
+        };
+        final old = expectLater(
+          runtime.fetchApi(wire.ApiFetchRequest(path: '/api/bootstrap')),
+          throwsA(failure(RuntimeErrorCode.runtimeLost)),
+        );
+        await entered.future;
+        runtime.containerLost('Old API container ended');
+        await runtime.open(build());
+        events.clear();
+        release.complete();
+        await old;
+        expect((await runtime.invoke(request())).generation, 'generation-1');
+        await Future<void>.delayed(Duration.zero);
+        expect(events, isEmpty);
+        await subscription.cancel();
+        await runtime.dispose();
+      },
+    );
+  }
+
+  for (final cleanupFails in [false, true]) {
+    test(
+      'late image cleanup keeps original owner and reopened session (failure=$cleanupFails)',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        final events = <RuntimeEvent>[];
+        final subscription = runtime.events.listen(events.add);
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        var generation = 'generation-1';
+        transport.handler = (call) async {
+          final response = transport.respond(call);
+          if (call.hasAcquireImage()) {
+            entered.complete();
+            await release.future;
+            return response;
+          }
+          if (call.hasOpen()) {
+            response.session.generation = generation;
+            response.session.workerInstanceId = 'worker-$generation';
+          }
+          if (call.hasInvoke()) response.source.generation = generation;
+          if (call.hasReleaseImage() && cleanupFails) {
+            return wire.ControlResponse(
+              requestId: call.requestId,
+              error: wire.RuntimeError(
+                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+                message: 'Old image cleanup failed',
+              ),
+            );
+          }
+          return response;
+        };
+        await runtime.open(build());
+        final old = expectLater(
+          runtime.acquireImage(imageRequest()),
+          throwsA(failure(RuntimeErrorCode.runtimeLost)),
+        );
+        await entered.future;
+        runtime.containerLost('Old image container ended');
+        generation = 'generation-2';
+        await runtime.open(build());
+        events.clear();
+        release.complete();
+        await old;
+        final cleanup = transport.calls.singleWhere(
+          (call) => call.hasReleaseImage(),
+        );
+        expect(cleanup.releaseImage.resourceId, 'resource-1');
+        expect(cleanup.releaseImage.generation, 'generation-1');
+        expect(
+          (await runtime.invoke(request(generation: generation))).generation,
+          generation,
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(events, isEmpty);
+        await subscription.cancel();
+        await runtime.dispose();
+      },
+    );
+  }
+  for (final lateError in [false, true]) {
+    test(
+      'late control handshake cannot invalidate a newer open (error=$lateError)',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        final events = <RuntimeEvent>[];
+        final subscription = runtime.events.listen(events.add);
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        var readyCalls = 0;
+        transport.handler = (call) async {
+          if (call.hasReady() && ++readyCalls == 1) {
+            entered.complete();
+            await release.future;
+            if (lateError) throw StateError('Old handshake transport failed');
+          }
+          return transport.respond(call);
+        };
+        final old = expectLater(
+          runtime.open(build()),
+          throwsA(failure(RuntimeErrorCode.runtimeLost)),
+        );
+        await entered.future;
+        runtime.containerLost('Previous startup ended');
+        await runtime.open(build());
+        events.clear();
+        release.complete();
+        await old;
+        expect((await runtime.invoke(request())).generation, 'generation-1');
+        await Future<void>.delayed(Duration.zero);
+        expect(events, isEmpty);
+        await subscription.cancel();
+        await runtime.dispose();
+      },
+    );
+  }
 }

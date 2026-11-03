@@ -118,6 +118,7 @@ class _AppShellState extends State<AppShell> {
       _catalog = CatalogController(
         api: _platform!,
         runtime: _platform!.runtime,
+        rebuildRuntime: _platform!.rebuild,
         progressDatabase: _database ??=
             widget.database ?? ReaderDatabase.open(),
         deploymentOrigin: _platform!.origin,

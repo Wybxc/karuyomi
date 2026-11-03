@@ -19,8 +19,12 @@ final class TestPlatform extends PlatformRuntime {
   TestPlatform({Uri? origin, this.bootstrapSubject = 'owner-subject'})
     : _origin = origin ?? Uri.parse('https://reader.example.com');
   final Uri _origin;
-  final String bootstrapSubject;
+  String bootstrapSubject;
   int disposalCount = 0;
+  int rebuildCount = 0;
+  Future<void> Function(String path)? beforeApiFetch;
+  Future<void> Function()? beforeRebuild;
+  final openedIdentities = <String>[];
   @override
   Uri get origin => _origin;
 
@@ -86,6 +90,7 @@ final class TestPlatform extends PlatformRuntime {
     final response = wire.ControlResponse(requestId: request.requestId);
     switch (request.whichCommand()) {
       case wire.ControlRequest_Command.fetchApi:
+        await beforeApiFetch?.call(request.fetchApi.path);
         response.api = _fetch(request.fetchApi.path);
       case wire.ControlRequest_Command.ready:
         response.hello = wire.RuntimeHello(
@@ -94,6 +99,7 @@ final class TestPlatform extends PlatformRuntime {
           runtimeBaseline: runtimeBaseline,
         );
       case wire.ControlRequest_Command.open:
+        openedIdentities.add(request.open.identity);
         response.session = wire.RuntimeSession(
           protocolVersion: protocolVersion,
           workerInstanceId: 'worker-1',
@@ -209,8 +215,12 @@ final class TestPlatform extends PlatformRuntime {
   }
 
   @override
-  Future<void> rebuild() async =>
-      runtime.containerLost('Rebuilt test container');
+  Future<void> rebuild() async {
+    rebuildCount++;
+    runtime.containerLost('Rebuilt test container');
+    await beforeRebuild?.call();
+  }
+
   @override
   Future<void> dispose() {
     disposalCount++;

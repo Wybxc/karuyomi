@@ -22,7 +22,11 @@ void main() {
     liveSessions.clear();
     pagesGate = null;
     platform = TestPlatform();
-    catalog = CatalogController(api: platform, runtime: platform.runtime);
+    catalog = CatalogController(
+      api: platform,
+      runtime: platform.runtime,
+      rebuildRuntime: platform.rebuild,
+    );
     await catalog.connect();
     await catalog.openBuild(catalog.builds.single);
     await catalog.selectSource(catalog.session!.sources.single);

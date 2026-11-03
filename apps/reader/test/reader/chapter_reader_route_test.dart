@@ -23,6 +23,7 @@ void main() {
       final catalog = CatalogController(
         api: platform,
         runtime: platform.runtime,
+        rebuildRuntime: platform.rebuild,
         progressDatabase: database,
         deploymentOrigin: platform.origin,
       );
@@ -85,6 +86,7 @@ void main() {
         final catalog = CatalogController(
           api: platform,
           runtime: platform.runtime,
+          rebuildRuntime: platform.rebuild,
         );
         await catalog.connect();
         await catalog.openBuild(catalog.builds.single);
@@ -225,6 +227,7 @@ void main() {
       final catalog = CatalogController(
         api: platform,
         runtime: platform.runtime,
+        rebuildRuntime: platform.rebuild,
       );
       await catalog.connect();
       await catalog.openBuild(catalog.builds.single);

@@ -250,6 +250,7 @@ void main() {
       final catalog = CatalogController(
         api: platform,
         runtime: platform.runtime,
+        rebuildRuntime: platform.rebuild,
         progressDatabase: database,
         deploymentOrigin: platform.origin,
       );
@@ -295,6 +296,7 @@ void main() {
       final first = CatalogController(
         api: firstPlatform,
         runtime: firstPlatform.runtime,
+        rebuildRuntime: firstPlatform.rebuild,
         progressDatabase: database,
         deploymentOrigin: firstPlatform.origin,
       );
@@ -315,6 +317,7 @@ void main() {
       final wrong = CatalogController(
         api: wrongPlatform,
         runtime: wrongPlatform.runtime,
+        rebuildRuntime: wrongPlatform.rebuild,
         progressDatabase: database,
         deploymentOrigin: wrongPlatform.origin,
       );
@@ -327,6 +330,7 @@ void main() {
       final next = CatalogController(
         api: nextPlatform,
         runtime: nextPlatform.runtime,
+        rebuildRuntime: nextPlatform.rebuild,
         progressDatabase: database,
         deploymentOrigin: nextPlatform.origin,
       );
@@ -348,4 +352,81 @@ void main() {
       );
     },
   );
+  for (final failSave in [false, true]) {
+    test(
+      'same Catalog subject change retains original progress ownership (save failure=$failSave)',
+      () async {
+        final platform = TestPlatform();
+        final catalog = CatalogController(
+          api: platform,
+          runtime: platform.runtime,
+          rebuildRuntime: platform.rebuild,
+          progressDatabase: database,
+          deploymentOrigin: platform.origin,
+        );
+        addTearDown(() async {
+          catalog.dispose();
+          await catalog.closeReadingProgress();
+          await platform.dispose();
+        });
+        await catalog.connect();
+        await catalog.openBuild(catalog.builds.single);
+        final oldRepository = catalog.readingProgress!;
+        final oldWriter = catalog.createReadingProgress('manga')!;
+        await oldWriter.restore(_manifest);
+        oldWriter.observe(
+          manifest: _manifest,
+          current: _manifest.positionAt(1),
+          reversedOrder: true,
+        );
+        if (failSave) {
+          await database.customStatement(
+            "CREATE TRIGGER reject_switch_progress BEFORE INSERT ON manga_resume_rows BEGIN SELECT RAISE(ABORT, 'controlled switch write failure'); END",
+          );
+        }
+        platform.bootstrapSubject = 'other-subject';
+        await catalog.connect();
+        expect(catalog.status, ServiceStatus.ready);
+        expect(catalog.readingProgress!.identity.subject, 'other-subject');
+        expect(oldWriter.repository.identity.subject, 'owner-subject');
+        expect(oldWriter.unsaved, failSave);
+        expect(catalog.hasUnsavedReadingProgress, failSave);
+        final nextWriter = catalog.createReadingProgress('manga')!;
+        expect(nextWriter, isNot(same(oldWriter)));
+        expect(await nextWriter.restore(_manifest), isNull);
+        expect(await catalog.readingProgress!.loadResume('manga'), isNull);
+        expect(catalog.adoptReadingProgress(oldWriter), false);
+        if (failSave) {
+          await database.customStatement('DROP TRIGGER reject_switch_progress');
+          expect(await catalog.flushReadingProgress(), true);
+        }
+        final oldSaved = (await oldRepository.loadChapter(
+          mangaKey: 'manga',
+          chapterKey: 'chapter',
+        ))!;
+        expect(oldSaved.current.pageKey, 'two');
+        nextWriter.observe(
+          manifest: _manifest,
+          current: _manifest.positionAt(2),
+          reversedOrder: false,
+        );
+        await catalog.releaseReadingProgress(nextWriter);
+        await catalog.releaseReadingProgress(oldWriter);
+        expect(
+          (await oldRepository.loadChapter(
+            mangaKey: 'manga',
+            chapterKey: 'chapter',
+          ))!.current.pageKey,
+          'two',
+        );
+        expect(
+          (await catalog.readingProgress!.loadChapter(
+            mangaKey: 'manga',
+            chapterKey: 'chapter',
+          ))!.current.pageKey,
+          'three',
+        );
+      },
+    );
+  }
 }

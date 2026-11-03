@@ -13,7 +13,11 @@ void main() {
   late CatalogController controller;
   setUp(() {
     platform = TestPlatform();
-    controller = CatalogController(api: platform, runtime: platform.runtime);
+    controller = CatalogController(
+      api: platform,
+      runtime: platform.runtime,
+      rebuildRuntime: platform.rebuild,
+    );
   });
   tearDown(() async {
     controller.dispose();
@@ -144,6 +148,138 @@ void main() {
       expect(controller.session, isNull);
     },
   );
+
+  for (final path in ['/api/bootstrap', '/extensions/index.json']) {
+    test('container loss rejects late reconnect response at $path', () async {
+      await controller.connect();
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      platform.beforeApiFetch = (requested) async {
+        if (requested != path) return;
+        entered.complete();
+        await release.future;
+      };
+      final reconnecting = controller.connect();
+      await entered.future;
+      platform.runtime.containerLost('Container lost during catalog refresh');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.status, ServiceStatus.failed);
+      release.complete();
+      await reconnecting;
+      expect(controller.status, ServiceStatus.failed);
+      expect(controller.subject, isNull);
+      expect(controller.email, isNull);
+      expect(controller.builds, isEmpty);
+      expect(controller.session, isNull);
+      expect(controller.busy, false);
+    });
+  }
+
+  test(
+    'loaded runtime is rebuilt before reconnect verifies another subject',
+    () async {
+      await open();
+      platform.bootstrapSubject = 'other-subject';
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      platform.beforeApiFetch = (path) async {
+        if (path != '/api/bootstrap') return;
+        entered.complete();
+        await release.future;
+      };
+      final reconnecting = controller.connect();
+      await entered.future;
+      expect(platform.rebuildCount, 1);
+      expect(controller.subject, isNull);
+      expect(controller.email, isNull);
+      expect(controller.session, isNull);
+      expect(controller.busy, true);
+      expect(controller.status, ServiceStatus.connecting);
+      final invokes = platform.invocations.length;
+      await expectLater(
+        platform.runtime.invoke(
+          SourceRequest(
+            packageId: 'source.test',
+            call: wire.SourceCall(
+              requestId: 'old-after-reconnect',
+              generation: 'generation-1',
+              sourceId: sourceId,
+              popular: wire.PageRequest(page: 1),
+            ),
+          ),
+        ),
+        throwsA(
+          isA<RuntimeException>().having(
+            (error) => error.code,
+            'code',
+            RuntimeErrorCode.runtimeLost,
+          ),
+        ),
+      );
+      expect(platform.invocations.length, invokes);
+      release.complete();
+      await reconnecting;
+      expect(controller.status, ServiceStatus.ready);
+      expect(controller.subject, 'other-subject');
+      expect(controller.busy, false);
+      await controller.openBuild(controller.builds.single);
+      expect(platform.openedIdentities, ['owner-subject', 'other-subject']);
+      expect(controller.session, isNotNull);
+    },
+  );
+
+  test(
+    'failed reconnect rebuild retains no verified subject and can retry cleanup',
+    () async {
+      await open();
+      final before = platform.controlCommands.length;
+      platform.beforeRebuild = () async =>
+          throw StateError('Controlled rebuild cleanup failure');
+      await controller.connect();
+      expect(platform.rebuildCount, 1);
+      expect(platform.controlCommands.length, before);
+      expect(controller.subject, isNull);
+      expect(controller.email, isNull);
+      expect(controller.session, isNull);
+      expect(controller.builds, isEmpty);
+      expect(controller.status, ServiceStatus.failed);
+      expect(controller.busy, false);
+      expect(controller.error, isNotNull);
+      platform.beforeRebuild = null;
+      await controller.connect();
+      expect(platform.rebuildCount, 2);
+      expect(controller.status, ServiceStatus.ready);
+      expect(controller.subject, 'owner-subject');
+    },
+  );
+
+  test('catalog-only refresh does not rebuild an unopened runtime', () async {
+    await controller.connect();
+    await controller.connect();
+    expect(platform.rebuildCount, 0);
+    expect(controller.status, ServiceStatus.ready);
+  });
+
+  test('late manifest cannot open a Source after container loss', () async {
+    await controller.connect();
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    platform.beforeApiFetch = (path) async {
+      if (!path.endsWith('/manifest.json')) return;
+      entered.complete();
+      await release.future;
+    };
+    final opening = controller.openBuild(controller.builds.single);
+    await entered.future;
+    platform.runtime.containerLost('Lost while manifest was pending');
+    await Future<void>.delayed(Duration.zero);
+    release.complete();
+    await opening;
+    expect(platform.openedIdentities, isEmpty);
+    expect(controller.session, isNull);
+    expect(controller.activeBuild, isNull);
+    expect(controller.status, ServiceStatus.failed);
+  });
 
   test(
     'empty page URLs use content version so same-length reorders cannot claim a stable page',
