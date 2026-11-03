@@ -12,7 +12,82 @@ import path from 'node:path';
 import test from 'node:test';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { build, parseOfficialMetadata, put } from './builder.ts';
+import { execa } from 'execa';
+import {
+  build,
+  buildEnvironment,
+  parseOfficialMetadata,
+  put,
+} from './builder.ts';
+
+test('direct builder subprocesses omit credentials without changing the parent environment', async () => {
+  const originalEnvironment = { ...process.env };
+  const parentEnvironment: Readonly<NodeJS.ProcessEnv> = Object.freeze({
+    ...process.env,
+    GH_TOKEN: 'synthetic-github-cli-token',
+    GITHUB_TOKEN: 'synthetic-actions-token',
+    CLOUDFLARE_API_TOKEN: 'synthetic-deploy-token',
+    BUILDER_FIXTURE: 'preserved',
+  });
+  const runtime = {
+    javaHome: path.resolve('fixture-java'),
+    androidSdk: path.resolve('fixture-android'),
+  };
+  for (const androidSdk of [undefined, 'custom-android']) {
+    const environment = buildEnvironment(
+      runtime,
+      androidSdk === undefined ? {} : { androidSdk },
+      parentEnvironment,
+    );
+    const child = await execa(
+      process.execPath,
+      [
+        '-e',
+        `const assert = require('node:assert/strict');
+for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'CLOUDFLARE_API_TOKEN'])
+  assert.equal(Object.hasOwn(process.env, key), false, key);
+assert.equal(process.env.BUILDER_FIXTURE, 'preserved');
+process.stdout.write(JSON.stringify({
+  javaHome: process.env.JAVA_HOME,
+  path: process.env.PATH,
+  androidHome: process.env.ANDROID_HOME,
+  androidRoot: process.env.ANDROID_SDK_ROOT,
+  gradleHome: process.env.GRADLE_USER_HOME,
+  androidUserHome: process.env.ANDROID_USER_HOME,
+}));`,
+      ],
+      {
+        env: environment,
+        extendEnv: false,
+        shell: false,
+        stdin: 'ignore',
+        preferLocal: false,
+        verbose: 'none',
+      },
+    );
+    const androidHome = androidSdk
+      ? path.resolve(androidSdk)
+      : runtime.androidSdk;
+    assert.deepEqual(JSON.parse(child.stdout), {
+      javaHome: runtime.javaHome,
+      path:
+        path.join(runtime.javaHome, 'bin') +
+        path.delimiter +
+        (parentEnvironment['PATH'] ?? ''),
+      androidHome,
+      androidRoot: androidHome,
+      gradleHome: environment['GRADLE_USER_HOME'],
+      androidUserHome: environment['ANDROID_USER_HOME'],
+    });
+  }
+  assert.equal(parentEnvironment['GH_TOKEN'], 'synthetic-github-cli-token');
+  assert.equal(parentEnvironment['GITHUB_TOKEN'], 'synthetic-actions-token');
+  assert.equal(
+    parentEnvironment['CLOUDFLARE_API_TOKEN'],
+    'synthetic-deploy-token',
+  );
+  assert.deepEqual({ ...process.env }, originalEnvironment);
+});
 
 test('invalid descriptor records failure without an executable manifest', async () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'karuyomi-builder-'));

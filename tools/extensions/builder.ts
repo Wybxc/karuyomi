@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { buildManifestSchema } from '../../packages/contracts/src/index.ts';
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 import { prepareRuntime, LOCK } from '../teavm/runtime.ts';
+import type { PreparedRuntime } from '../teavm/runtime.ts';
 import { prepareSources } from '../teavm/upstream-sources.ts';
 import {
   dependencies,
@@ -171,6 +172,34 @@ export interface BuildOptions {
   androidSdk?: string;
   workers?: number;
 }
+
+/** Upstream Gradle and AOT execute without deployment or release credentials. */
+export function buildEnvironment(
+  runtime: Pick<PreparedRuntime, 'javaHome' | 'androidSdk'>,
+  options: Pick<BuildOptions, 'androidSdk'>,
+  parentEnvironment: Readonly<NodeJS.ProcessEnv> = process.env,
+): NodeJS.ProcessEnv {
+  const local = path.join(ROOT, 'runtime/teavm/.local');
+  const androidHome = options.androidSdk
+    ? path.resolve(options.androidSdk)
+    : runtime.androidSdk;
+  return {
+    ...parentEnvironment,
+    JAVA_HOME: runtime.javaHome,
+    PATH:
+      path.join(runtime.javaHome, 'bin') +
+      path.delimiter +
+      (parentEnvironment['PATH'] ?? ''),
+    GRADLE_USER_HOME: path.join(local, 'gradle'),
+    ANDROID_HOME: androidHome,
+    ANDROID_SDK_ROOT: androidHome,
+    ANDROID_USER_HOME: path.join(local, 'android-home'),
+    GH_TOKEN: undefined,
+    GITHUB_TOKEN: undefined,
+    CLOUDFLARE_API_TOKEN: undefined,
+  };
+}
+
 export interface BuildResult {
   schemaVersion: 1;
   status: 'built' | 'failed';
@@ -251,20 +280,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     );
     if (!javaVersion.stderr.match(/version "25(?:\.|\")/))
       throw new Error('JDK 25 required');
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      JAVA_HOME: runtime.javaHome,
-      PATH:
-        path.join(runtime.javaHome, 'bin') +
-        path.delimiter +
-        (process.env['PATH'] ?? ''),
-      GRADLE_USER_HOME: path.join(local, 'gradle'),
-      ANDROID_HOME: options.androidSdk
-        ? path.resolve(options.androidSdk)
-        : runtime.androidSdk,
-      ANDROID_USER_HOME: path.join(local, 'android-home'),
-    };
-    env['ANDROID_SDK_ROOT'] = env['ANDROID_HOME'];
+    const env = buildEnvironment(runtime, options);
     const module = ':' + descriptor.sourcePath.replaceAll('/', ':');
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
