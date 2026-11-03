@@ -2,17 +2,17 @@
 
 `pnpm exec vitest run apps/api/test` 验证 Access 签名与 claims、完整 API 鉴权、请求 origin/host、登录返回路径、HTTP bridge 边界，以及旧扩展 API 已删除、公开静态资源不读取私有绑定。
 
-`python3 scripts/test_register_build.py` 验证 gzip 编码/canonical 双 SHA256、有界解压、静态 index/manifest 当前身份、按包替换网络策略、不可变 buildId 冲突及事务回滚。它使用内存 SQLite；材料目录来自当前受信 host 构建元数据，不访问 Cloudflare。
+`node --test tools/extensions/registration.test.ts` 验证 gzip 编码/canonical 双 SHA256、有界解压、静态 index/manifest 当前身份、按包替换网络策略、不可变 buildId 冲突及事务回滚。它使用内存 SQLite；材料目录来自当前受信 host 构建元数据，不访问 Cloudflare。
 
-生产扩展唯一来源是 Static Assets：`/extensions/index.json`、`/extensions/builds/<buildId>/manifest.json`、`/extensions/artifacts/<canonicalSHA>.gz`。`.gz` 是 manifest 声明的 payload 编码，HTTP 不使用 `Content-Encoding: gzip`。网络 API 不再提供扩展列表、清单或正文，也没有 R2 绑定。D1 只登记当前 build 的 Source 网络策略；`register-build.py --remote` 在写入前检查部署 origin 的公开 index 和清单，`--local` 必须显式提供 `--static-root` 受控快照，不能用于 remote。
+生产扩展唯一来源是 Static Assets：`/extensions/index.json`、`/extensions/builds/<buildId>/manifest.json`、`/extensions/artifacts/<canonicalSHA>.gz`。`.gz` 是 manifest 声明的 payload 编码，HTTP 不使用 `Content-Encoding: gzip`。网络 API 不再提供扩展列表、清单或正文，也没有 R2 绑定。D1 只登记当前 build 的 Source 网络策略；`registration.ts --remote` 在写入前检查部署 origin 的公开 index 和清单，`--local` 必须显式提供 `--static-root` 受控快照，不能用于 remote。
 
 静态更新部署后，可信部署任务运行以下命令，将已批准 package 的域名策略切换到当前 build；它不下载 gzip，不为新 package 批准域名，也不从 Source 请求学习白名单。AOT 构建任务不持有部署凭据：
 
 ```sh
-python3 scripts/sync-network-policies.py --remote
+node tools/extensions/network-policies.ts --remote
 ```
 
-同步先校验部署 origin 的完整静态 index 与各清单，再以 Wrangler D1 JSON 接口读取已批准策略并在单个 SQL 文件事务中更新 buildId/bundle SHA、保留原域名、删除退役授权。读写之间的并发禁用或策略修改使事务失败。开发探针只可显式使用 `--local --static-root SNAPSHOT --persist-to STATE`。`python3 scripts/test_sync_network_policies.py` 覆盖跨 build 保留 host、新包不授权、删包、禁用/并发冲突和 metadata-only 校验；正式 workerd 探针同时使用真实本地 D1/Wrangler 验证这条同步链。
+同步先校验部署 origin 的完整静态 index 与各清单，再以 Wrangler D1 JSON 接口读取已批准策略并在单个 SQL 文件事务中更新 buildId/bundle SHA、保留原域名、删除退役授权。读写之间的并发禁用或策略修改使事务失败。开发探针只可显式使用 `--local --static-root SNAPSHOT --persist-to STATE`。`node --test tools/extensions/network-policies.test.ts` 覆盖跨 build 保留 host、新包不授权、删包、禁用/并发冲突和 metadata-only 校验；正式 workerd 探针同时使用真实本地 D1/Wrangler 验证这条同步链。
 
 HTTP 网络生产入口只接受 `application/vnd.karuyomi.http.v2`，不提供 JSON/Base64 回退。真实 workerd 的受控 HTTP origin 回归独立执行：
 
@@ -32,7 +32,7 @@ node apps/api/test/workerd-probe.ts \
   PATH_TO_OUTPUT/artifacts
 ```
 
-探针以给定清单与唯一 `artifacts/<canonicalSHA>.gz` 创建临时受控静态快照，执行全部 Drizzle 迁移与正式 `register-build.py --local --static-root ... --persist-to ...`。随后用真实 Miniflare Static Assets 路由公开交付 index、manifest 和 gzip，检查已有静态资源绕过入口 Worker、gzip MIME/无 HTTP Content-Encoding、传输双 hash、未知静态导航 404、已知应用路由 shell 与 host.html 307。独立测试入口添加 marker header 以区别是否经过入口 Worker；生产入口不包含该 header 或测试公钥。
+探针以给定清单与唯一 `artifacts/<canonicalSHA>.gz` 创建临时受控静态快照，执行全部 Drizzle 迁移与正式 `registration.ts --local --static-root ... --persist-to ...`。随后用真实 Miniflare Static Assets 路由公开交付 index、manifest 和 gzip，检查已有静态资源绕过入口 Worker、gzip MIME/无 HTTP Content-Encoding、传输双 hash、未知静态导航 404、已知应用路由 shell 与 host.html 307。独立测试入口添加 marker header 以区别是否经过入口 Worker；生产入口不包含该 header 或测试公钥。
 
 D1 只含当前网络策略，不含 manifest/artifact 表；探针验证冲突时整个 Wrangler SQL 文件事务回滚。API 仍校验真实 RS256、audience、host；已删除 `/api/extensions/*` 在鉴权后返回 404。默认结果在忽略目录 `.local/probes/workerd-static-extensions.json`，可选第四个参数改输出位置。临时状态始终清理，不访问远程 D1，不输出 JWT、密钥或 Source 正文。此探针可以输入受控构建夹具，因此通过仅证明本地 workerd/D1/Static Assets 集成，不能冒充真实 Source、生产 Access 或在线分发验收。
 

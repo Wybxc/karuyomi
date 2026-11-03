@@ -2,7 +2,8 @@ import { beforeAll, expect, test } from 'vitest';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { bootstrapSchema } from '@karuyomi/contracts';
 import { createAccessVerifier } from '../src/access.js';
-import { createApp, type Bindings } from '../src/app.js';
+import { createApp } from '../src/app.js';
+import type { Bindings } from '../src/env.js';
 
 const config = {
   ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',

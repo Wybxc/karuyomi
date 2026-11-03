@@ -68,7 +68,7 @@ pnpm teavm:build --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
 
 构建输出 gzip、manifest 和 provenance。运行时材料契约见 [RUNTIME-MATERIALS](docs/RUNTIME-MATERIALS.md)，本地首次全量、增量计划、静态部署及恢复命令见 [EXTENSIONS](docs/EXTENSIONS.md)。首次全量只在本地固定 checkout 中运行；CI 每次最多处理有界变化，缺少完整 baseline 时停止。
 
-D1 注册只保存动态 Source 请求的网络授权，不上传扩展。`scripts/register-build.py` 默认只验证计划；`--local --static-root SNAPSHOT` 写入隔离本地 D1，`--remote` 在验证线上当前索引后写云端 D1。`--allow-host` 必须明确指定源站；部署后 `scripts/sync-network-policies.py --remote` 仅继承已经批准的包级域名，不自动授权新包或学习请求域名。
+D1 注册只保存动态 Source 请求的网络授权，不上传扩展。`tools/extensions/registration.ts` 默认只验证计划；`--local --static-root SNAPSHOT` 写入隔离本地 D1，`--remote` 在验证线上当前索引后写云端 D1。`--allow-host` 必须明确指定源站；部署后 `tools/extensions/network-policies.ts --remote` 仅继承已经批准的包级域名，不自动授权新包或学习请求域名。
 
 ## 部署与 Access
 
@@ -76,7 +76,7 @@ D1 注册只保存动态 Source 请求的网络授权，不上传扩展。`scrip
 
 Access 应用和本人 Allow policy 覆盖 `/api` 与 `/api/*`。Worker 再验证 issuer、AUD、本人邮箱及可选 subject；未配置/密钥服务不可用返回 503，凭据无效返回 401，身份或 origin 拒绝返回 403。可复制 `apps/api/.dev.vars.example` 为忽略的 `.dev.vars` 进行联调。不要把 Cloudflare 凭据、JWT 或 service token 写进静态资源。
 
-Actions 使用 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，所需权限包括当前账户的 Workers 部署、D1 Edit，以及 `wybxc.cc` 的 Workers Routes Edit。手动凭据检查工作流会创建并清理临时资源；正式增量工作流仅在可信部署阶段接触这些 secrets。`workers.dev` 和预览 URL 均关闭。
+Actions 使用 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，所需权限包括当前账户的 Workers 部署、D1 Edit，以及 `wybxc.cc` 的 Workers Routes Edit。手动凭据检查工作流会更新预先建立的隔离 Worker，并创建/清理临时 D1 与路由；Workers Editor 足够用于部署现有应用，不要求创建/删除 Worker 的 Admin。正式增量工作流仅在可信部署阶段接触这些 secrets。`workers.dev` 和预览 URL 均关闭。
 
 扩展和索引旧 Release 已删除，锁定的 TeaVM runtime seed Release 保留为构建依赖。当前原型只维护当前协议、ABI 和材料，不维护旧版兼容层；上线前重建当前宿主代表包并应用 D1 网络政策迁移。
 

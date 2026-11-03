@@ -1,11 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { MaterialCatalog } from '../packages/runtime-host/materials.ts';
-import {
-  parseExtensionIndex,
-  parseManifest,
-} from '../tools/extensions/verify-manifest.ts';
+import type { MaterialCatalog } from '../../packages/runtime-host/materials.ts';
+import { parseExtensionIndex, parseManifest } from './verify-manifest.ts';
 
 /** Publish only the current index's reachable files, never a historical tree. */
 export async function assembleExtensionAssets(

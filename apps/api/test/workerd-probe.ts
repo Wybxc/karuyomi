@@ -2,6 +2,7 @@
 // Only the separate test entry trusts this run's RSA public key.
 import assert from 'node:assert/strict';
 import { isRecord } from '../../../tools/extensions/types.ts';
+import { registrationSql } from '../../../tools/extensions/registration.ts';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -49,8 +50,8 @@ const wrangler = (...args: string[]) =>
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
-const python = (...args: string[]) =>
-  execFileSync('python3', args, {
+const runTool = (...args: string[]) =>
+  execFileSync(process.execPath, args, {
     cwd: root,
     env: environment,
     encoding: 'utf8',
@@ -84,8 +85,8 @@ try {
   );
   for (const file of await migrationFiles(api))
     wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
-  python(
-    path.join(root, 'scripts/register-build.py'),
+  runTool(
+    path.join(root, 'tools/extensions/registration.ts'),
     manifestPath,
     '--artifacts',
     artifactFolder,
@@ -96,14 +97,9 @@ try {
     state,
   );
   const conflictSql = path.join(temporary, 'conflict.sql');
-  const sql = python(
-    '-c',
-    `import importlib.util,json,pathlib,sys
-s=importlib.util.spec_from_file_location('registration','scripts/register-build.py')
-m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
-v=json.loads(pathlib.Path(sys.argv[1]).read_text());v['bundle']['sha256']='f'*64
-print(m.registration_sql(v,{},[]))`,
-    manifestPath,
+  const sql = registrationSql(
+    { ...manifest, bundle: { ...manifest.bundle, sha256: 'f'.repeat(64) } },
+    [],
   );
   await writeFile(
     conflictSql,
@@ -351,8 +347,8 @@ print(m.registration_sql(v,{},[]))`,
     }),
   );
   const synchronization: unknown = JSON.parse(
-    python(
-      path.join(root, 'scripts/sync-network-policies.py'),
+    runTool(
+      path.join(root, 'tools/extensions/network-policies.ts'),
       '--local',
       '--static-root',
       staticRoot,

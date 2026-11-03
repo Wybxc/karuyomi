@@ -1,0 +1,118 @@
+{
+  "$schema": "https://unpkg.com/dependency-cruiser@18.7.1/schema/dependency-cruiser.schema.json",
+  "forbidden": [
+    {
+      "name": "no-circular-dependencies",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "circular": true
+      }
+    },
+    {
+      "name": "tools-do-not-import-cli-entrypoints",
+      "severity": "error",
+      "from": {
+        "path": "^tools/"
+      },
+      "to": {
+        "path": "^scripts/"
+      }
+    },
+    {
+      "name": "common-tools-have-no-domain-dependencies",
+      "severity": "error",
+      "from": {
+        "path": "^tools/lib/"
+      },
+      "to": {
+        "path": "^(?:scripts|apps|packages|runtime)/|^tools/(?!lib/)"
+      }
+    },
+    {
+      "name": "teavm-does-not-depend-on-extension-orchestration",
+      "severity": "error",
+      "from": {
+        "path": "^tools/teavm/"
+      },
+      "to": {
+        "path": "^(?:scripts|apps)/|^tools/(?!lib/|teavm/)"
+      }
+    },
+    {
+      "name": "product-code-does-not-import-tooling",
+      "severity": "error",
+      "from": {
+        "path": "^(?:packages/[^/]+/src/|apps/api/src/|runtime/teavm/bridge/)"
+      },
+      "to": {
+        "path": "^(?:scripts|tools)/|/test/|\\.test\\.ts$"
+      }
+    },
+    {
+      "name": "contracts-are-independent",
+      "severity": "error",
+      "from": {
+        "path": "^packages/contracts/src/"
+      },
+      "to": {
+        "path": "^(?:scripts|tools|apps|runtime)/|^packages/(?!contracts/)"
+      }
+    },
+    {
+      "name": "extension-model-has-no-orchestration-dependencies",
+      "severity": "error",
+      "from": {
+        "path": "^tools/extensions/(?:model|types)\\.ts$"
+      },
+      "to": {
+        "path": "^tools/extensions/(?!model\\.ts$|types\\.ts$)"
+      }
+    },
+    {
+      "name": "catalog-does-not-depend-on-build-or-release",
+      "severity": "error",
+      "from": {
+        "path": "^tools/extensions/catalog\\.ts$"
+      },
+      "to": {
+        "path": "^tools/extensions/(?!model\\.ts$|types\\.ts$)"
+      }
+    },
+    {
+      "name": "transport-and-verification-do-not-depend-on-orchestration",
+      "severity": "error",
+      "from": {
+        "path": "^tools/extensions/(?:assets|verify-manifest)\\.ts$"
+      },
+      "to": {
+        "path": "^tools/extensions/(?:pipeline|builder|registration|network-policies|verify-browser|verify-build)\\.ts$"
+      }
+    },
+    {
+      "name": "no-unresolved-imports",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "couldNotResolve": true,
+        "pathNot": "^cloudflare:workers$"
+      }
+    }
+  ],
+  "options": {
+    "doNotFollow": {
+      "path": "node_modules"
+    },
+    "exclude": {
+      "path": "(?:^|/)(?:dist|build|\\.local|node_modules|vendor)/|worker-configuration\\.d\\.ts$"
+    },
+    "tsPreCompilationDeps": true,
+    "tsConfig": {
+      "fileName": "tsconfig.tools.json"
+    },
+    "enhancedResolveOptions": {
+      "exportsFields": ["exports"],
+      "conditionNames": ["import", "node", "default"]
+    }
+  }
+}

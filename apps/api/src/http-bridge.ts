@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { AppEnv } from './app.js';
+import type { AppEnv } from './env.js';
 import {
   HTTP_BRIDGE_MEDIA_TYPE,
   HTTP_FRAME_LIMIT,

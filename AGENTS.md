@@ -21,10 +21,11 @@
 ## 代码与格式
 
 - 如果某个功能有成熟的第三方库可用，就直接引入，不要自行实现。固定依赖版本并使用现有包管理方式；自行编写的代码集中在项目特有的业务逻辑和集成上。
-- 所有项目自有代码提交前必须先运行 `pnpm format`，再运行 `pnpm format:check`。范围包括 Java、Dart、TypeScript、JavaScript、Python、Kotlin/Gradle Kotlin DSL、Swift、Objective-C、Ruby、SQL 和结构化配置；现有代码同样适用。
+- 所有项目自有代码提交前必须先运行 `pnpm format`，再运行 `pnpm format:check`。范围包括 Java、Dart、TypeScript、JavaScript、Kotlin/Gradle Kotlin DSL、Swift、Objective-C、Ruby、SQL 和结构化配置；现有代码同样适用。
 - 使用 pnpm 精确锁定的 prek 管理标准 pre-commit hook，不维护手写 Git hook。检查不自动暂存，部分暂存的工作区处理交给 prek。
 - 当前格式工具要求完整 JDK 21+、Flutter 3.47.5 / Dart 3.13.4、Xcode 27.2 的 swift-format 6.4.4 与 clang-format 21.0.0；其余 formatter 的版本和校验固定在 `scripts/format.ts`。首次下载公开 formatter 不需要私有 JVM seed。
 - `pnpm check` 在跨平台 CI 使用显式 portable 格式检查；提交前仍须在 macOS 通过完整检查。不要以跳过 hook 或缩小格式范围解决失败。
+- 项目自有自动化脚本统一使用 TypeScript；Java 编译器适配/JVM oracle 和平台要求的构建文件保留各自语言。`scripts/` 是调用入口，依赖 `tools/` 领域模块与公共层，工具不得反向导入入口；通用层不得依赖领域，TeaVM 工具不得依赖扩展发布编排。依赖层级和验证入口见 `docs/TOOLING.md`，提交必须通过 `pnpm check:dependencies`。
 - 自有、可维护的 JS/Node 脚本和运行时桥使用 TypeScript，并纳入严格类型检查。不能只改后缀，也不能用 `any`、`@ts-nocheck` 或宽泛断言掩盖迁移问题；产品桥和宿主实际执行的 JS 由构建生成。测试工具内嵌的浏览器脚本模板必须保持合法 JavaScript，不能直接加入 TS 语法。
 - 上游 submodule、生成产物、锁文件和精确上游上下文补丁不作为普通源码重新排版。更新它们时使用对应生成器、包管理器或上游补丁流程。设计文档参与普通 Markdown 格式检查。
 

@@ -4,10 +4,12 @@
     "lib": ["ES2022", "DOM"],
     "types": ["node"],
     "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "resolveJsonModule": true
   },
   "include": [
     "scripts/*.ts",
+    "tools/**/*.ts",
     "packages/runtime-host/*.ts",
     "tools/extensions/*.ts",
     "apps/api/test/*-probe.ts"

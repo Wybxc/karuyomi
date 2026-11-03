@@ -38,8 +38,8 @@ Bundle 清单记录 canonical `sha256/size/contentType`，以及 `encoding: gzip
 ```sh
 git submodule update --init --recursive
 pnpm install --frozen-lockfile
-python3 scripts/prepare-runtime.py --android
-python3 tools/extensions/pipeline.py bootstrap \
+node scripts/prepare-runtime.ts --android
+node tools/extensions/pipeline.ts bootstrap \
   --state .local/extensions-current/state.json \
   --output .local/extensions-current/plan.json \
   --assets-dir .local/extensions-assets \
@@ -51,7 +51,7 @@ python3 tools/extensions/pipeline.py bootstrap \
 需要显式恢复完整冻结计划时，在同一固定 clone 执行：
 
 ```sh
-python3 tools/extensions/pipeline.py bootstrap \
+node tools/extensions/pipeline.ts bootstrap \
   --plan .local/extensions-current/plan.json \
   --build-checkout "$PWD" \
   --state .local/extensions-current/state.json \
@@ -71,18 +71,18 @@ runner 检查冻结 checkout 的提交、干净 host 输入、指纹、submodule
 `prepare-snapshot` 将成功结果和已部署的上次成功版本合成完整候选，先在临时目录完成，再替换本地快照。缺少 matrix 结果、下载/完整性错误或取消均不会替换已有快照。它不提交部署状态。
 
 ```sh
-python3 tools/extensions/pipeline.py prepare-snapshot \
+node tools/extensions/pipeline.ts prepare-snapshot \
   --plan .local/extensions-current/plan.json \
   --state .local/extensions-current/state.json \
   --results .local/extensions-current/builds \
   --assets-dir .local/extensions-assets
 EXTENSION_ASSETS_DIR="$PWD/.local/extensions-assets" pnpm build
 pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
-python3 tools/extensions/pipeline.py check-base \
+node tools/extensions/pipeline.ts check-base \
   --assets-dir .local/extensions-assets
 pnpm --filter @karuyomi/api exec wrangler deploy
-python3 scripts/sync-network-policies.py --remote
-python3 tools/extensions/pipeline.py commit-snapshot \
+node tools/extensions/network-policies.ts --remote
+node tools/extensions/pipeline.ts commit-snapshot \
   --state .local/extensions-current/state.json \
   --assets-dir .local/extensions-assets
 ```
@@ -97,10 +97,10 @@ python3 tools/extensions/pipeline.py commit-snapshot \
 
 静态分发无需 Access。D1 仅保存当前 build 的 Source 网络策略，不保存扩展清单或正文；`/api` 继续校验 Access、Origin 和显式域名白名单。
 
-部署后的 `sync-network-policies.py --remote` 将已批准 package 的域名策略切换到当前 build，退役已不在索引中的策略；它不自动批准新包、不从请求学习白名单，也不下载 gzip。首次批准一个当前包时，明确指定允许的 hostname：
+部署后的 `network-policies.ts --remote` 将已批准 package 的域名策略切换到当前 build，退役已不在索引中的策略；它不自动批准新包、不从请求学习白名单，也不下载 gzip。首次批准一个当前包时，明确指定允许的 hostname：
 
 ```sh
-python3 scripts/register-build.py PATH_TO_OUTPUT/manifest.json \
+node tools/extensions/registration.ts PATH_TO_OUTPUT/manifest.json \
   --artifacts PATH_TO_OUTPUT/artifacts \
   --allow-host www.mangadraft.com --remote
 ```
@@ -116,10 +116,10 @@ plan/build/deploy 三个 jobs 只需 GitHub `contents: read`，均安装固定 N
 增量调度使用以下命令，再以本批结果执行上面的 `prepare-snapshot` 和部署流程；`INPUT_FINGERPRINT` 来自 plan 的 selected 条目：
 
 ```sh
-python3 tools/extensions/pipeline.py pull-state --state .local/extensions/state.json
-python3 tools/extensions/pipeline.py plan --ci \
+node tools/extensions/pipeline.ts pull-state --state .local/extensions/state.json
+node tools/extensions/pipeline.ts plan --ci \
   --state .local/extensions/state.json --output .local/extensions/plan.json --limit 12
-python3 tools/extensions/pipeline.py build \
+node tools/extensions/pipeline.ts build \
   --plan .local/extensions/plan.json --key INPUT_FINGERPRINT \
   --output output/INPUT_FINGERPRINT
 ```
@@ -139,3 +139,9 @@ pnpm test:extension-assets
 默认完整性通过但未运行浏览器时退出 2，报告 `valid=false`、`runtimeReady=false`、`browser_not_run`；失败退出 1，实际浏览器通过才退出 0。`--serve` 只监听 loopback，由人或 Codex 内置浏览器运行真实产品 Worker/IndexedDB；`onlineCompatibility` 仍为 `not_tested`。单元测试不使用真实 Source、生产 Access 或远程部署凭据。
 
 项目 CI 使用 `.github/workflows/project-ci.yml`，仅分支 push/PR 触发。历史 Release 传输、旧宿主 bulk 与旧 R2 探针只保留测量背景，不是当前恢复入口；有用体积数据见 [AOT 包体分析](AOT-SIZE.md)，实际门槛见 [VERIFICATION](VERIFICATION.md)。
+
+## CI 凭据检查
+
+仓库 Actions secrets 使用 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。Workers Editor 用于更新现有 Worker，D1 Edit 用于迁移和网络策略，`wybxc.cc` 的 Workers Routes Edit 用于域名连接。正常部署不要求创建/删除 Worker 的 Admin 权限。
+
+手动工作流 `cloudflare-permissions.yml` 在预先建立、无 `workers.dev`/preview URL 的 `karuyomi-ci-permission-check` 上实际上传 Worker 和静态文件，再恢复空白配置；另创建并删除独立 D1 和唯一测试路由。该 Worker 缺失时应由本地管理员预先创建，检查不会自行申请扩权或新建 Worker。它不修改生产 Worker 或 D1。实际结果见 [验证记录](VERIFICATION.md#ci-凭据权限)。

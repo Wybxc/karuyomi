@@ -1,16 +1,17 @@
-import { createHash } from 'node:crypto';
 import { lstat, open } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gunzipSync } from 'node:zlib';
+import * as contracts from '../../packages/contracts/src/index.ts';
 import type {
   Artifact,
+  BundleArtifact,
   BuildManifest,
   ExtensionIndex,
 } from '../../packages/contracts/src/index.ts';
-import { isRecord, isSourceInfo } from './types.ts';
+import { isRecord, digest } from '../lib/json.ts';
+import { isSourceInfo } from './types.ts';
+export { digest } from '../lib/json.ts';
 import type {
   IntegrityResult,
   ValidationReport,
@@ -19,14 +20,6 @@ import type {
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
-const runtimeRequire = createRequire(
-  path.join(repositoryRoot, 'packages/runtime-host/package.json'),
-);
-type Contracts = typeof import('../../packages/contracts/src/index.ts');
-let schemaPromise: Promise<Contracts> | undefined;
-
-export const digest = (bytes: Uint8Array) =>
-  createHash('sha256').update(bytes).digest('hex');
 
 export class VerificationFailure extends Error {
   readonly code: string;
@@ -36,40 +29,178 @@ export class VerificationFailure extends Error {
   }
 }
 
-async function schema() {
-  // Bundle the actual shared Zod contract: the release tool must not maintain a
-  // second, drifting implementation of the runtime manifest/ABI contract.
-  schemaPromise ??= (async () => {
-    const { build }: typeof import('esbuild') = await import(
-      runtimeRequire.resolve('esbuild')
+export async function loadContracts() {
+  return contracts;
+}
+
+export async function parseManifestValue(
+  input: unknown,
+): Promise<BuildManifest> {
+  const result = (await loadContracts()).buildManifestSchema.safeParse(input);
+  if (!result.success)
+    throw new VerificationFailure(
+      'invalid_manifest',
+      'Manifest shape, ABI, protocol or artifact budget is incompatible',
     );
-    const compiled = await build({
-      entryPoints: [
-        path.join(repositoryRoot, 'packages/contracts/src/index.ts'),
-      ],
-      bundle: true,
-      write: false,
-      platform: 'node',
-      format: 'esm',
-      target: 'node24',
-    });
-    const output = compiled.outputFiles[0];
-    if (!output) throw new Error('Missing compiled contract');
-    const contracts: typeof import('../../packages/contracts/src/index.ts') =
-      await import(
-        'data:text/javascript;base64,' +
-          Buffer.from(output.text).toString('base64')
+  const manifest = result.data;
+  if (
+    new Set(manifest.sourceIds).size !== manifest.sourceIds.length ||
+    new Set(manifest.resources.map((value) => value.logicalName)).size !==
+      manifest.resources.length
+  )
+    throw new VerificationFailure(
+      'invalid_manifest',
+      'Source IDs and resource logical names must be unique',
+    );
+  for (const script of [manifest.bundle, ...manifest.hostScripts]) {
+    if (
+      !['application/javascript', 'text/javascript'].includes(
+        script.contentType ?? '',
+      )
+    )
+      throw new VerificationFailure(
+        'invalid_script_mime',
+        'Published scripts must declare a JavaScript content type',
       );
-    return contracts;
-  })();
-  return schemaPromise;
+  }
+  return manifest;
 }
 
 export async function parseManifest(bytes: Uint8Array): Promise<BuildManifest> {
-  const parsed: unknown = JSON.parse(
-    new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+  let input: unknown;
+  try {
+    input = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } catch {
+    throw new VerificationFailure(
+      'invalid_manifest',
+      'Manifest is not valid UTF-8 JSON',
+    );
+  }
+  return parseManifestValue(input);
+}
+
+export interface MaterialCatalogRefs {
+  hostScripts: readonly Artifact[];
+  resources: readonly (Artifact & { logicalName: string })[];
+}
+
+export function verifyMaterialReferences(
+  manifest: BuildManifest,
+  catalog: MaterialCatalogRefs,
+) {
+  for (const [artifacts, candidates, resource] of [
+    [manifest.hostScripts, catalog.hostScripts, false],
+    [manifest.resources, catalog.resources, true],
+  ] as const) {
+    for (const artifact of artifacts) {
+      const expected = candidates.find(
+        (value) => value.sha256 === artifact.sha256,
+      );
+      if (
+        !expected ||
+        (['path', 'sha256', 'size', 'contentType'] as const).some(
+          (key) => artifact[key] !== expected[key],
+        ) ||
+        (resource && artifact.logicalName !== expected.logicalName)
+      )
+        throw new VerificationFailure(
+          'unknown_material',
+          'Shared runtime material does not match the pinned host catalog',
+        );
+    }
+  }
+}
+
+/** One transfer boundary: hash the encoded and canonical byte domains once. */
+export async function decodeBundleBytes(
+  bundle: BundleArtifact,
+  encoded: Uint8Array,
+): Promise<Buffer> {
+  if (encoded.byteLength !== bundle.encodedSize)
+    throw new VerificationFailure(
+      'size_mismatch',
+      'Encoded artifact size does not match its manifest',
+    );
+  if (digest(encoded) !== bundle.encodedSha256)
+    throw new VerificationFailure(
+      'hash_mismatch',
+      'Compressed artifact SHA-256 does not match its manifest',
+    );
+  // WHATWG gzip decompression rejects concatenated members/trailing bytes. The
+  // maintained platform decoder owns gzip framing; no project gzip parser.
+  const source =
+    encoded.buffer instanceof ArrayBuffer
+      ? new Uint8Array(encoded.buffer, encoded.byteOffset, encoded.byteLength)
+      : Uint8Array.from(encoded);
+  const input = new ReadableStream<BufferSource>({
+    start(controller) {
+      controller.enqueue(source);
+      controller.close();
+    },
+  });
+  const reader = input.pipeThrough(new DecompressionStream('gzip')).getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      size += next.value.byteLength;
+      if (size > bundle.size) throw new Error('canonical_size_exceeded');
+      chunks.push(next.value);
+    }
+  } catch {
+    await reader.cancel().catch(() => {});
+    throw new VerificationFailure(
+      'invalid_gzip',
+      'Artifact gzip is invalid, truncated or exceeds its canonical budget',
+    );
+  } finally {
+    reader.releaseLock();
+  }
+  if (size !== bundle.size)
+    throw new VerificationFailure(
+      'size_mismatch',
+      'Canonical artifact size does not match its manifest',
+    );
+  const canonical = Buffer.concat(chunks, size);
+  if (digest(canonical) !== bundle.sha256)
+    throw new VerificationFailure(
+      'hash_mismatch',
+      'Canonical artifact SHA-256 does not match its manifest',
+    );
+  return canonical;
+}
+
+/** False is for already verified in-process bytes, never a disk-resume receipt. */
+export async function verifyBundleFile(
+  bundle: BundleArtifact,
+  artifactDirectory: string,
+  { verifyHashes = true }: { verifyHashes?: boolean } = {},
+): Promise<Buffer | undefined> {
+  await regularDirectory(artifactDirectory);
+  const file = path.join(artifactDirectory, bundle.sha256 + '.gz');
+  if (!verifyHashes) {
+    const info = await lstat(file);
+    if (!info.isFile() || info.isSymbolicLink())
+      throw new VerificationFailure(
+        'invalid_file',
+        'Bundle must be a regular gzip file',
+      );
+    if (info.size !== bundle.encodedSize)
+      throw new VerificationFailure(
+        'size_mismatch',
+        'Encoded artifact size does not match its manifest',
+      );
+    return;
+  }
+  const encoded = await readRegularFile(
+    file,
+    25 * 1024 * 1024,
+    bundle.encodedSize,
   );
-  return (await schema()).buildManifestSchema.parse(parsed);
+  await decodeBundleBytes(bundle, encoded);
+  return encoded;
 }
 
 export async function parseExtensionIndex(
@@ -83,7 +214,7 @@ export async function parseExtensionIndex(
   const parsed: unknown = JSON.parse(
     new TextDecoder('utf-8', { fatal: true }).decode(bytes),
   );
-  return (await schema()).extensionIndexSchema.parse(parsed);
+  return (await loadContracts()).extensionIndexSchema.parse(parsed);
 }
 
 async function regularDirectory(directory: string) {
@@ -96,7 +227,11 @@ async function regularDirectory(directory: string) {
   }
 }
 
-async function regularFile(file: string, limit: number, expectedSize?: number) {
+export async function readRegularFile(
+  file: string,
+  limit: number,
+  expectedSize?: number,
+) {
   const before = await lstat(file);
   if (!before.isFile() || before.isSymbolicLink()) {
     throw new VerificationFailure(
@@ -173,38 +308,11 @@ export async function verifyIntegrity(
   try {
     await regularDirectory(directory);
     await regularDirectory(path.join(directory, 'artifacts'));
-    const manifestBytes = await regularFile(
+    const manifestBytes = await readRegularFile(
       path.join(directory, 'manifest.json'),
       64 * 1024,
     );
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(
-        new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes),
-      );
-    } catch {
-      throw new VerificationFailure(
-        'invalid_manifest',
-        'Manifest is not valid bounded UTF-8 JSON',
-      );
-    }
-    const result = (await schema()).buildManifestSchema.safeParse(parsed);
-    if (!result.success)
-      throw new VerificationFailure(
-        'invalid_manifest',
-        'Manifest shape, ABI, protocol or artifact budget is incompatible',
-      );
-    const manifest = result.data;
-    if (
-      new Set(manifest.sourceIds).size !== manifest.sourceIds.length ||
-      new Set(manifest.resources.map((value) => value.logicalName)).size !==
-        manifest.resources.length
-    ) {
-      throw new VerificationFailure(
-        'invalid_manifest',
-        'Source IDs and resource logical names must be unique',
-      );
-    }
+    const manifest = await parseManifest(manifestBytes);
     Object.assign(report, {
       buildId: manifest.buildId,
       packageName: manifest.packageName,
@@ -215,107 +323,34 @@ export async function verifyIntegrity(
       manifestSha256: digest(manifestBytes),
       sourceIds: manifest.sourceIds,
     });
-    if (
-      [...manifest.hostScripts, ...manifest.resources].some(
-        (artifact) => !artifact.path.startsWith('/runtime/materials/'),
-      )
-    ) {
-      throw new VerificationFailure(
-        'unknown_material',
-        'Runtime bridges and resources must use the current shared material catalog',
-      );
-    }
-    const scripts = [manifest.bundle, ...manifest.hostScripts];
-    const artifacts: Artifact[] = [...scripts, ...manifest.resources];
-    for (const script of scripts) {
-      if (
-        !['application/javascript', 'text/javascript'].includes(
-          script.contentType ?? '',
-        )
-      ) {
-        throw new VerificationFailure(
-          'invalid_script_mime',
-          'Published scripts must declare a JavaScript content type',
-        );
-      }
-    }
+    const artifacts: Artifact[] = [
+      manifest.bundle,
+      ...manifest.hostScripts,
+      ...manifest.resources,
+    ];
     const payloads = new Map<string, VerifiedPayload>();
     const bundle = manifest.bundle;
-    const encoded = await regularFile(
-      path.join(directory, 'artifacts', bundle.sha256 + '.gz'),
-      64 * 1024 * 1024,
-      bundle.encodedSize,
+    const encoded = await verifyBundleFile(
+      bundle,
+      path.join(directory, 'artifacts'),
     );
-    if (digest(encoded) !== bundle.encodedSha256)
-      throw new VerificationFailure(
-        'hash_mismatch',
-        'Compressed artifact SHA-256 does not match its manifest',
-      );
-    let canonical: Buffer;
-    try {
-      canonical = gunzipSync(encoded, { maxOutputLength: bundle.size });
-    } catch {
-      throw new VerificationFailure(
-        'invalid_gzip',
-        'Artifact gzip is invalid, truncated or exceeds its canonical budget',
-      );
-    }
-    if (canonical.byteLength !== bundle.size)
-      throw new VerificationFailure(
-        'size_mismatch',
-        'Canonical artifact size does not match its manifest',
-      );
-    if (digest(canonical) !== bundle.sha256)
-      throw new VerificationFailure(
-        'hash_mismatch',
-        'Canonical artifact SHA-256 does not match its manifest',
-      );
+    if (!encoded) throw new Error('Missing verified bundle');
     payloads.set(bundle.path, {
       ...bundle,
       bytes: encoded,
       transportContentType: 'application/gzip',
       transportSize: bundle.encodedSize,
     });
-    let materials: Awaited<ReturnType<typeof collectMaterials>> | undefined;
+    const hasMaterials =
+      manifest.hostScripts.length + manifest.resources.length > 0;
+    const materials = hasMaterials ? await collectMaterials() : undefined;
+    if (materials) verifyMaterialReferences(manifest, materials.catalog);
     for (const artifact of [...manifest.hostScripts, ...manifest.resources]) {
-      let bytes;
-      if (artifact.path.startsWith('/runtime/materials/')) {
-        materials ??= await collectMaterials();
-        const isScript = manifest.hostScripts.includes(artifact);
-        const candidates = isScript
-          ? materials.catalog.hostScripts
-          : materials.catalog.resources;
-        const expected = candidates.find(
-          (value) => value.sha256 === artifact.sha256,
-        );
-        if (
-          !expected ||
-          (['path', 'sha256', 'size', 'contentType'] as const).some(
-            (key) => artifact[key] !== expected[key],
-          ) ||
-          (!isScript && artifact.logicalName !== expected.logicalName)
-        ) {
-          throw new VerificationFailure(
-            'unknown_material',
-            'Shared runtime material does not match the pinned host catalog',
-          );
-        }
-        bytes = materials.data.get(artifact.sha256)?.bytes;
-        if (!bytes || bytes.length !== artifact.size) {
-          throw new VerificationFailure(
-            'size_mismatch',
-            'Shared runtime material size mismatch',
-          );
-        }
-      } else
+      const bytes = materials?.data.get(artifact.sha256)?.bytes;
+      if (!bytes || bytes.length !== artifact.size)
         throw new VerificationFailure(
-          'unknown_material',
-          'Shared materials must use static delivery',
-        );
-      if (digest(bytes) !== artifact.sha256)
-        throw new VerificationFailure(
-          'hash_mismatch',
-          'Artifact SHA-256 does not match its manifest',
+          'size_mismatch',
+          'Shared runtime material size mismatch',
         );
       const existing = payloads.get(artifact.path);
       if (existing && existing.contentType !== artifact.contentType) {

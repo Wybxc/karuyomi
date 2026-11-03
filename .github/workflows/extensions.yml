@@ -38,11 +38,11 @@ jobs:
           version: 12.6.0
       - run: pnpm install --frozen-lockfile
       - name: Read the deployed static baseline; refuse missing or partial bootstrap
-        run: python3 tools/extensions/pipeline.py pull-state --state .local/extensions/state.json
+        run: node tools/extensions/pipeline.ts pull-state --state .local/extensions/state.json
       - name: Check planner, static snapshots and descriptor boundaries
         run: |
-          python3 -m unittest discover -s tools/extensions/tests -v
-          python3 scripts/test_build_extension.py
+          pnpm test:extensions
+          pnpm test:extension-build
       - name: Follow upstream main without modifying its tracked gitlink
         run: |
           git -C vendor/extensions-source fetch --depth=1 origin main
@@ -52,16 +52,7 @@ jobs:
         env:
           BATCH_SIZE: ${{ inputs.batch_size || 12 }}
         run: |
-          python3 tools/extensions/pipeline.py plan --ci --state .local/extensions/state.json --output .local/extensions/plan.json --limit "$BATCH_SIZE"
-          python3 - <<'PY'
-          import json, os
-          p = json.load(open('.local/extensions/plan.json'))
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write('matrix=' + json.dumps({'include': [{'key': e['inputFingerprint']} for e in p['selected']]}, separators=(',', ':')) + '\n')
-              f.write('count=' + str(len(p['selected'])) + '\n')
-              f.write('upstream=' + p['upstreamCommit'] + '\n')
-              f.write('snapshot_needed=' + str(p['snapshotNeeded']).lower() + '\n')
-          PY
+          node tools/extensions/pipeline.ts plan --ci --state .local/extensions/state.json --output .local/extensions/plan.json --limit "$BATCH_SIZE" --github-output "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: extension-plan
@@ -112,14 +103,14 @@ jobs:
             runtime/teavm/.local/android-sdk
           key: extension-toolchain-${{ runner.os }}-${{ hashFiles('runtime/teavm/toolchain-lock.json') }}
       - name: Prepare checksum-locked runtime seed and Android toolchain
-        run: python3 scripts/prepare-runtime.py --android
+        run: node scripts/prepare-runtime.ts --android
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Build and validate one isolated package
         continue-on-error: true
         env:
           INPUT_KEY: ${{ matrix.key }}
-        run: python3 tools/extensions/pipeline.py build --plan .local/extensions/plan.json --key "$INPUT_KEY" --output "output/$INPUT_KEY"
+        run: node tools/extensions/pipeline.ts build --plan .local/extensions/plan.json --key "$INPUT_KEY" --output "output/$INPUT_KEY"
       - uses: actions/upload-artifact@v4
         if: always() && !cancelled()
         with:
@@ -153,7 +144,7 @@ jobs:
           pattern: extension-result-*
           path: output
       - name: Assemble a complete latest-only candidate from results and deployed bytes
-        run: python3 tools/extensions/pipeline.py prepare-snapshot --plan .local/extensions/plan.json --state .local/extensions/state.json --results output --assets-dir .local/extensions-assets
+        run: node tools/extensions/pipeline.ts prepare-snapshot --plan .local/extensions/plan.json --state .local/extensions/state.json --results output --assets-dir .local/extensions-assets
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.5
@@ -163,17 +154,17 @@ jobs:
       - name: Build the client and explicitly include the extension snapshot
         run: EXTENSION_ASSETS_DIR="$PWD/.local/extensions-assets" pnpm build
       - name: Refuse a stale publisher before deploying
-        run: python3 tools/extensions/pipeline.py check-base --assets-dir .local/extensions-assets
+        run: node tools/extensions/pipeline.ts check-base --assets-dir .local/extensions-assets
       - name: Apply database migrations and deploy Static Assets with the app
         run: |
           pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
           pnpm --filter @karuyomi/api exec wrangler deploy
-          python3 scripts/sync-network-policies.py --remote
+          node tools/extensions/network-policies.ts --remote
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Confirm the deployed snapshot before committing its checkpoint
-        run: python3 tools/extensions/pipeline.py commit-snapshot --state .local/extensions/state.json --assets-dir .local/extensions-assets
+        run: node tools/extensions/pipeline.ts commit-snapshot --state .local/extensions/state.json --assets-dir .local/extensions-assets
       - uses: actions/upload-artifact@v4
         if: always()
         with:

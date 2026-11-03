@@ -5,21 +5,10 @@ import {
   accessIssuer,
   AccessError,
   createAccessVerifier,
-  type AccessConfig,
-  type AccessIdentity,
   type VerifyAccess,
 } from './access.js';
 
-export type Bindings = AccessConfig & {
-  ASSETS: Fetcher;
-  DB: D1Database;
-  RUNTIME_SESSIONS: DurableObjectNamespace;
-};
-
-export type AppEnv = {
-  Bindings: Bindings;
-  Variables: { identity: AccessIdentity };
-};
+import type { AppEnv } from './env.js';
 
 export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
   const app = new Hono<AppEnv>();

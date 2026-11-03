@@ -35,7 +35,7 @@
 
 - [API 验证](../../apps/api/test/README.md)：真实签名、workerd、D1/R2、注册与 HTTP 桥回归。
 - [Source 浏览器集成](../../apps/api/test/source-metadata-probe.md)：真实 bundle / Worker / Source 网络，默认输出 ignored `.local/probes`。
-- `python3 tools/teavm/check-dto.py`：完整 DTO、显式引用、分页和长列表的 JVM 边界回归。
+- `node tools/teavm/check-dto.ts`：完整 DTO、显式引用、分页和长列表的 JVM 边界回归。
 - `pnpm check`、`pnpm flutter:check`：协议、类型、界面与资源调度回归；夹具通过不替代在线或真机验收。
 
 构建协议、工具链锁、依赖/资源清单属于构建输入，继续随代码维护；按构建生成的 manifest、validation 和 provenance 属于发布产物，不把历史验证流水当作构建源。

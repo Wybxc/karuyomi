@@ -11,7 +11,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 - Keiyoushi、TeaVM、Suwayomi 通过固定提交的 submodule 引入；研究交付中的项目代码已内化，真正上游用正式补丁追踪。依赖/JAR/seed/大产物留在忽略目录。
 - generalized builder 能发现扩展、准备固定工具链、构建原版 JAR 并按包 AOT；源码依赖闭包与 host 输入参与内部指纹，失败按包隔离。
 - 包体方案已有真实 A/B：保留 `ADVANCED` 和服务，桥/WASM 共享交付，每包确定性 gzip。额外字典与低收益裁剪不阻塞发布。
-- 自有代码统一格式化并由 prek 检查；自有 Node 工具和运行时桥已严格迁移 TypeScript。通用 CI 仅响应分支 push/PR，tag 不触发。
+- 自有代码统一格式化并由 prek 检查；项目自有自动化与运行时桥统一使用严格 TypeScript；依赖分层由 dependency-cruiser 纳入 CI，细节见 [TOOLING](../TOOLING.md)。通用 CI 仅响应分支 push/PR，tag 不触发。
 - HTTP 生产链、构建和注册清单只维护 v2；受控 workerd 与真实 TeaVM 编译的模拟 supplier 回归通过，真实 Source/cache 和产品图片仍待验收。
 - GitHub 已确认公开，但 IAB 实测 Release/CDN 正文不能跨域读取。用户据此选定最终 Static Assets 方案；不建设私有下载凭据服务。
 
@@ -25,7 +25,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 6. **移除旧分发。** 删除扩展 R2 正文路由、上传和关联表，D1 仅保留动态 Source 所需网络授权元数据。已停用旧工作流并删除 90 个扩展 AOT/索引 Release 及其 tag；运行时 seed 是独立锁定构建依赖，保留。清理旧发布器与 Release 专属 CI，源码不保留无用兼容分支。
 7. **实际验收后全量。** 用当前代表包验证静态发布、客户端下载、更新替换、旧包清理、失败保留和断点恢复，再建立新完整 plan 与首次本地 baseline。旧 `7f54463` 队列和材料不能继续作为当前产品结果。
 
-当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。纯测试与本地 workerd 分项已通过；实际 AOT 浏览器执行、新静态部署、首次本地 baseline 和有界 CI 部署仍需收齐证据。Actions secrets 已添加，权限检查单独运行，不启动全量 AOT。
+当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。纯测试与本地 workerd 分项已通过；实际 AOT 浏览器执行、新静态部署、首次本地 baseline 和有界 CI 部署仍需收齐证据。Actions secrets 已通过独立真实权限检查；TS 自动化迁移、依赖规则和固定 Node 24 全库检查均通过，尚未启动新宿主初次全量 AOT。
 
 ## 验收
 

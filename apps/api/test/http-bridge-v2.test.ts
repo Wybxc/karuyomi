@@ -13,7 +13,8 @@ import {
   type HttpRequestMeta,
 } from '@karuyomi/contracts';
 import { createHttpBridge, forwardBinary } from '../src/http-bridge.js';
-import { createApp, type Bindings } from '../src/app.js';
+import { createApp } from '../src/app.js';
+import type { Bindings } from '../src/env.js';
 
 afterEach(() => {
   vi.useRealTimers();

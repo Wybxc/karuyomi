@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { hostAbi, protocolVersion, runtimeBaseline } from './generated.js';
+import { hostAbi, protocolVersion, runtimeBaseline } from './generated.ts';
 
 export { hostAbi, protocolVersion, runtimeBaseline };
-export * from './http-frames.js';
+export * from './http-frames.ts';
 
 export const runtimeHelloSchema = z.object({
   protocolVersion: z.literal(protocolVersion),

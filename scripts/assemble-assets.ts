@@ -11,7 +11,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MaterialCatalog } from '../packages/runtime-host/materials.ts';
-import { assembleExtensionAssets } from './assemble-extension-assets.ts';
+import { assembleExtensionAssets } from '../tools/extensions/assemble-assets.ts';
 
 const publicDir = new URL('../dist/public/', import.meta.url);
 const runtime = new URL('../packages/runtime-host/dist/', import.meta.url);

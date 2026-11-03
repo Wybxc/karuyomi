@@ -12,8 +12,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { gzipSync } from 'node:zlib';
-import { collectMaterials } from '../packages/runtime-host/materials.ts';
-import { assembleExtensionAssets } from './assemble-extension-assets.ts';
+import { collectMaterials } from '../../packages/runtime-host/materials.ts';
+import { assembleExtensionAssets } from './assemble-assets.ts';
 
 const digest = (bytes: Uint8Array) =>
   createHash('sha256').update(bytes).digest('hex');

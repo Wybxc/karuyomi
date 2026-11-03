@@ -3,7 +3,7 @@
 本目录维护项目的 Java 兼容层、Source RPC 和浏览器桥。研究交付 release9 是历史起点；项目源码在这里继续开发，不受旧逐文件冻结清单约束。真正第三方源码通过根目录 `vendor/` submodules 固定，上游改动通过明确补丁物化。
 
 - `java/`：正式 Java 源码、JCL/Android/库 ABI 适配、Maven 配置与服务注册。`hostInvoke(sourceId, operation, argsJson)` 使用完整 DTO、分页与显式漫画/章节引用。
-- `patches/teavm/`：针对固定 TeaVM 上游的兼容补丁；[物化工具](../../tools/teavm/upstream_sources.py) 校验原始和输出摘要，只写隔离构建目录。
+- `patches/teavm/`：针对固定 TeaVM 上游的兼容补丁；[物化工具](../../tools/teavm/upstream-sources.ts) 校验原始和输出摘要，只写隔离构建目录。
 - `bridge/`：严格 TypeScript 产品浏览器桥。Zstd 只读取已校验的共享材料映射，Web 使用静态字节，Native 使用应用内字节。
 - `toolchain-lock.json`、`toolchain/`：工具版本、下载摘要、runtime seed 材料与 Android SDK 元数据。
 - [来源与许可](NOTICE.md)、`licenses/`：ABI 适配、上游来源与必须保留的许可说明。
@@ -13,14 +13,14 @@
 
 ```sh
 git submodule update --init --recursive
-python3 scripts/prepare-runtime.py --android
-python3 tools/teavm/check-dto.py
-python3 scripts/build-extension.py --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
+node scripts/prepare-runtime.ts --android
+node tools/teavm/check-dto.ts
+node scripts/build-extension.ts --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
 ```
 
 完整发现、增量身份、首次本地批量构建与 latest-only 快照部署流程见 [扩展静态分发](../../docs/EXTENSIONS.md)。依赖材料通过固定摘要的 runtime seed 获取，公开工具链按锁定 URL 和摘要下载；不依赖本机研究 ZIP。seed 是独立构建依赖，不下发客户端，也不受扩展停止 Release 发布的决定影响。
 
-构建器复制正式 Java 到隔离目录，从固定 TeaVM submodule 应用补丁，再生成 TypeMap / ResourceConfig。随后 [正式 AOT 工具](../../tools/teavm/build.py) 裁剪被兼容层替换的依赖类、运行宿主字节码适配并编译；原扩展 JAR 不修改。生成注册表、裁剪 JAR、Maven 输出和运行日志均留在被忽略的工作目录。
+构建器复制正式 Java 到隔离目录，从固定 TeaVM submodule 应用补丁，再生成 TypeMap / ResourceConfig。随后 [正式 AOT 工具](../../tools/teavm/build.ts) 裁剪被兼容层替换的依赖类、运行宿主字节码适配并编译；原扩展 JAR 不修改。生成注册表、裁剪 JAR、Maven 输出和运行日志均留在被忽略的工作目录。
 
 每包输出 `manifest.json`、唯一 `artifacts/<canonicalSHA>.gz`、`provenance.json` 与 `build-result.json`。清单符合共享 `BuildManifest`，包含原包、版本、全部 Source ID 字符串、协议/ABI/bridge/storage 版本，以及 gzip 编码与 canonical 两个字节域的大小和摘要。TeaVM 同输入重建仍可能产生不同 JS 字节；记录的是实际输出，不承诺逐字节确定性。
 

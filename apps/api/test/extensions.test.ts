@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
-import { createApp, type Bindings } from '../src/app.js';
+import { createApp } from '../src/app.js';
+import type { Bindings } from '../src/env.js';
 
 function fixture() {
   const assets = vi.fn(async () => new Response('static asset'));

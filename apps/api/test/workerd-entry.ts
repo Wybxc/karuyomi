@@ -2,7 +2,8 @@
 // Every probe request still verifies a real RS256 JWT against a test public key.
 import { createLocalJWKSet, type JSONWebKeySet } from 'jose';
 import { createAccessVerifier } from '../src/access.js';
-import { createApp, type Bindings } from '../src/app.js';
+import { createApp } from '../src/app.js';
+import type { Bindings } from '../src/env.js';
 
 export default {
   async fetch(

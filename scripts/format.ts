@@ -158,45 +158,6 @@ run(java, [
   ...matching(/\.kts?$/),
 ]);
 
-console.log('[format] Python');
-const uv = spawnSync('uv', ['--version'], { stdio: 'ignore' }).status === 0;
-if (uv) {
-  run(
-    'uvx',
-    [
-      '--default-index',
-      'https://pypi.org/simple',
-      '--no-python-downloads',
-      'ruff@0.17.3',
-      'format',
-      ...(write ? [] : ['--check']),
-      'scripts',
-      'tools',
-    ],
-    {
-      env: {
-        ...process.env,
-        UV_CACHE_DIR: path.join(root, '.tools/uv-cache'),
-        UV_TOOL_DIR: path.join(root, '.tools/uv-tools'),
-      },
-    },
-  );
-} else {
-  const environment = path.join(root, '.tools/format-python');
-  const ruff = path.join(environment, 'bin/ruff');
-  if (!existsSync(ruff)) {
-    run('python3', ['-m', 'venv', environment]);
-    run(path.join(environment, 'bin/python'), [
-      '-m',
-      'pip',
-      'install',
-      '--disable-pip-version-check',
-      'ruff==0.17.3',
-    ]);
-  }
-  run(ruff, ['format', ...(write ? [] : ['--check']), 'scripts', 'tools']);
-}
-
 console.log('[format] Dart');
 const dart = process.env.FLUTTER_ROOT
   ? path.join(process.env.FLUTTER_ROOT, 'bin/dart')

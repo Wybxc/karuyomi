@@ -97,9 +97,9 @@ for (const file of await migrationFiles(api)) {
   wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
 }
 execFileSync(
-  'python3',
+  process.execPath,
   [
-    path.join(root, 'scripts/register-build.py'),
+    path.join(root, 'tools/extensions/registration.ts'),
     manifestPath,
     '--artifacts',
     artifactFolder,

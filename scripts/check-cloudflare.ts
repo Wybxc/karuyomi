@@ -16,7 +16,7 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { isRecord } from '../tools/extensions/types.ts';
+import { isRecord } from '../tools/lib/json.ts';
 
 type Check = { status: 'passed' | 'failed'; detail: string };
 class CheckFailure extends Error {}

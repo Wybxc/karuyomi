@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { digest, prepareMaterials } from './materials.ts';
 
 const directory = fileURLToPath(new URL('./', import.meta.url));
-const root = fileURLToPath(new URL('../../', import.meta.url));
 const output = path.join(directory, 'dist');
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
@@ -101,13 +100,6 @@ await writeFile(
   JSON.stringify(nativeManifest, null, 2) + '\n',
 );
 
-// Flutter consumes only these three generated files. Material bytes occur once,
-// inside worker.js; the web static copies and audit files do not enter the app.
-const flutterAssets = path.join(root, 'apps/reader/assets/runtime');
-await mkdir(flutterAssets, { recursive: true });
-for (const name of ['host.js', 'worker.js', 'manifest.json']) {
-  await cp(path.join(nativeOutput, name), path.join(flutterAssets, name));
-}
 console.log(
   JSON.stringify({
     materialVersion: catalog.materialVersion,
