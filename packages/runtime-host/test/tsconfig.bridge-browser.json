@@ -3,6 +3,7 @@
   "include": [
     "bridge-browser-suite.ts",
     "cache-lifecycle-worker.ts",
-    "cache-lifecycle-browser-suite.ts"
+    "cache-lifecycle-browser-suite.ts",
+    "text-layout-browser-suite.ts"
   ]
 }

@@ -33,6 +33,12 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 同日将正则供体类命名从补丁移入构建生成步骤，使用 `java-parser` token 位置保留原排版与字面量，再应用行为补丁；全部 13 份生成 Java 与拆分前逐字节一致，原输出摘要未改。回归覆盖刻意保留的上游类型转换、Lexer 引用与继承关系、字符串/文本块和注释不误改，以及源码/上下文/结果漂移拒绝。`toolchain/license.txt` 同时改名为 `android-sdk-license`，仅更新锁中的路径，41 字节内容与摘要不变。
 
+## Android 普通文本布局分项
+
+2026-11-04，项目 owned `TextPaint`/`Layout`/旧构造器 `StaticLayout`、真实 Canvas 字体指标与有界布局已接入，并补齐 TextInterceptor 使用的 HTML 字符串投影。Codex 内置浏览器 Chrome 156 通过 Canvas 五组机制门及同份 Java 101 项检查；独立固定 API 35/Robolectric 4.17 的 Android NATIVE oracle 同样通过 101 项，并断言真实 native shadows 和固定 instrumented SDK 身份。两端默认字体输出分别为 1000×140 与 1000×190，不声称高度或 PNG 像素等价。新增 CRLF 场景曾在 TeaVM 失败，修复后完整重跑通过；浏览器资源账本均归零。
+
+这些证据覆盖 HTML plain-string、UTF-16 range、padding/spacing/行宽、普通文本绘字与预算机制，不能替代新 host 下原 xkcd TextInterceptor 第二页、生产 Access 或 Native 应用验收。旧 host 的 Android Stub 失败证据保留。正式入口、原 Android plain 状态反向断言及未验范围见[文字布局记录](verification/text-layout-runtime.md)与[计划](plan/text-layout.md)。
+
 ## Cache 生命周期与有界正文分项
 
 2026-11-03 至 04，正式 Cache 桥使用 `idb@8.0.4` 将正文拆成最多 64 KiB 的二进制块，metadata 与正文分开，snapshot pin 保留被替换/清空后仍在读取的完整 body；可见预算和计入 staging/retired 的 allocated 预算分别限制。Codex 内置浏览器 Chromium 156 通过十七组真实 Worker/IndexedDB/Web Locks 门，覆盖 editor 死亡 owner 回收、handle/CAS/generation 隔离、put abort、close/delete 与在途 begin、分块 snapshot/EOF、metadata 不读 chunks、块与目录预算、预算不足时原子回滚，以及 close/delete 原事务失败后按 owner/handle 清理。机制与故障门不代表完整 Source 或峰值验收。

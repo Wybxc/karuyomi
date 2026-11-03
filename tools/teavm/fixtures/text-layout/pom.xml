@@ -1,0 +1,63 @@
+<project
+  xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd"
+>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>cc.wybxc.karuyomi</groupId>
+  <artifactId>text-layout-android-oracle</artifactId>
+  <version>1</version>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>17</maven.compiler.release>
+  </properties>
+  <repositories>
+    <repository><id>central</id><url
+      >https://repo.maven.apache.org/maven2</url></repository>
+    <repository><id>google</id><url
+      >https://dl.google.com/dl/android/maven2</url></repository>
+  </repositories>
+  <dependencies>
+    <dependency><groupId>com.google.code.gson</groupId><artifactId
+      >gson</artifactId><version>2.13.2</version><scope
+      >test</scope></dependency>
+    <dependency><groupId>junit</groupId><artifactId>junit</artifactId><version
+      >4.13.2</version><scope>test</scope></dependency>
+    <dependency><groupId>org.robolectric</groupId><artifactId
+      >robolectric</artifactId><version>4.17</version><scope
+      >test</scope></dependency>
+    <dependency><groupId>org.robolectric</groupId><artifactId
+      >android-all</artifactId><version>15-robolectric-13954326</version><scope
+      >test</scope></dependency>
+    <dependency><groupId>org.robolectric</groupId><artifactId
+      >android-all-instrumented</artifactId><version
+      >15-robolectric-13954326-i7</version><scope>test</scope></dependency>
+    <dependency><groupId>org.robolectric</groupId><artifactId
+      >nativeruntime-dist-compat</artifactId><version>1.0.19</version><scope
+      >test</scope></dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId
+        >maven-resources-plugin</artifactId><version>3.3.1</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId
+        >maven-compiler-plugin</artifactId><version>3.14.1</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId
+        >maven-surefire-plugin</artifactId><version>3.5.3</version>
+      <configuration>
+        <argLine
+          >--enable-native-access=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.security=ALL-UNNAMED --add-opens=java.base/java.text=ALL-UNNAMED --add-opens=java.base/jdk.internal.access=ALL-UNNAMED --add-opens=java.desktop/java.awt.font=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</argLine>
+        <systemPropertyVariables>
+          <robolectric.offline>true</robolectric.offline>
+          <robolectric.dependency.dir
+            >${android.sdk.jar.directory}</robolectric.dependency.dir>
+        </systemPropertyVariables>
+        <additionalClasspathElements>
+          <additionalClasspathElement
+            >${project.build.directory}/aar/monitor-1.8.0/classes.jar</additionalClasspathElement>
+          <additionalClasspathElement
+            >${project.build.directory}/aar/espresso-idling-resource-3.7.0/classes.jar</additionalClasspathElement>
+        </additionalClasspathElements>
+      </configuration>
+    </plugin>
+  </plugins></build>
+</project>

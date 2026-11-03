@@ -9,6 +9,13 @@ import {
   workerScope,
 } from './bridge-common.js';
 import { imageDimensionsFromData } from 'image-dimensions';
+import {
+  layoutText,
+  textDirection,
+  TEXT_UNITS,
+  TEXT_WORK_BYTES,
+  type TextAlignment,
+} from './text-layout.js';
 type Rect = [number, number, number, number];
 type Matrix = [number, number, number, number, number, number];
 interface Paint {
@@ -23,12 +30,14 @@ interface Paint {
   family: string;
   scaleX: number;
   style: 'FILL' | 'STROKE' | 'FILL_AND_STROKE';
+  direction: 'ltr' | 'rtl' | 'auto';
 }
 const operations = [
   'create',
   'closeDecoder',
   'recycle',
   'measure',
+  'layout',
   'pixels',
   'raw',
   'putPixels',
@@ -68,6 +77,10 @@ interface GraphicsRequest {
   bounds: boolean;
   sample: number;
   densityScale: number;
+  alignment: TextAlignment;
+  spacingMult: number;
+  spacingAdd: number;
+  includePad: boolean;
 }
 function rect(value: unknown): Rect {
   if (!Array.isArray(value) || value.length !== 4)
@@ -105,7 +118,11 @@ function paintValue(value: unknown): Paint {
   const style = optionalText(data.style) ?? 'FILL';
   if (style !== 'FILL' && style !== 'STROKE' && style !== 'FILL_AND_STROKE')
     throw Error('Unknown paint style');
+  const direction = optionalText(data.direction) ?? 'auto';
+  if (direction !== 'ltr' && direction !== 'rtl' && direction !== 'auto')
+    throw Error('Unknown text direction');
   return {
+    direction,
     color: data.color === undefined ? -16777216 : number(data.color),
     strokeWidth: data.strokeWidth === undefined ? 1 : number(data.strokeWidth),
     join: { MITER: 'miter', ROUND: 'round', BEVEL: 'bevel' }[
@@ -129,6 +146,13 @@ export function parseGraphicsRequest(value: unknown): GraphicsRequest {
   const data = object(value),
     op = operations.find((operation) => operation === data.op);
   if (!op) throw Error('Unknown raster operation');
+  const alignment = optionalText(data.alignment) ?? 'ALIGN_NORMAL';
+  if (
+    alignment !== 'ALIGN_NORMAL' &&
+    alignment !== 'ALIGN_OPPOSITE' &&
+    alignment !== 'ALIGN_CENTER'
+  )
+    throw Error('Unknown layout alignment');
   const numeric = (key: string, fallback = 0) =>
     data[key] === undefined ? fallback : number(data[key]);
   return {
@@ -155,6 +179,10 @@ export function parseGraphicsRequest(value: unknown): GraphicsRequest {
     bounds: data.bounds === undefined ? false : bool(data.bounds),
     sample: numeric('sample', 1),
     densityScale: numeric('densityScale', 1),
+    alignment,
+    spacingMult: numeric('spacingMult', 1),
+    spacingAdd: numeric('spacingAdd'),
+    includePad: data.includePad === undefined ? true : bool(data.includePad),
   };
 }
 interface Surface {
@@ -601,6 +629,17 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
   }
   const teaGraphicsSync = (input: unknown): Record<string, unknown> => {
     const a = parseGraphicsRequest(input);
+    if (a.op === 'measure' || a.op === 'layout' || a.op === 'text') {
+      if (a.text.length > TEXT_UNITS)
+        throw limit('Text exceeds 8192 UTF-16 units');
+      if (
+        a.paint.size < 0 ||
+        a.paint.size > 4096 ||
+        a.paint.scaleX < 0 ||
+        a.paint.scaleX > 64
+      )
+        throw limit('Text paint exceeds dimensions budget');
+    }
     if (a.op === 'closeDecoder') {
       closeDecoder(a.id);
       return {};
@@ -611,8 +650,11 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     }
     context();
     if (a.op === 'create') return create(a.width, a.height, a.f16);
-    if (a.op === 'measure') {
-      const release = reserve(4, 4);
+    if (a.op === 'measure' || a.op === 'layout') {
+      const release = reserve(
+        4 + (a.op === 'layout' ? TEXT_WORK_BYTES : 4096 + a.text.length * 8),
+        4,
+      );
       let canvas: OffscreenCanvas | undefined;
       try {
         if (typeof OffscreenCanvas === 'undefined')
@@ -621,12 +663,63 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
         const c = canvas.getContext('2d');
         if (!c) throw Error('Canvas 2D unavailable');
         paint(c, a.paint);
-        return {
-          width:
-            a.paint.size === 0
-              ? 0
-              : c.measureText(a.text).width * (a.paint.scaleX ?? 1),
+        const measure = (value: string) => {
+          if (a.paint.size === 0)
+            return {
+              width: 0,
+              top: 0,
+              ascent: 0,
+              descent: 0,
+              bottom: 0,
+              leading: 0,
+            };
+          c.direction =
+            a.paint.direction === 'auto'
+              ? textDirection(value) === -1
+                ? 'rtl'
+                : 'ltr'
+              : a.paint.direction;
+          const metrics = c.measureText(value || 'Hg');
+          const ascent = Number.isFinite(metrics.emHeightAscent)
+            ? metrics.emHeightAscent
+            : metrics.fontBoundingBoxAscent;
+          const descent = Number.isFinite(metrics.emHeightDescent)
+            ? metrics.emHeightDescent
+            : metrics.fontBoundingBoxDescent;
+          const result = {
+            width: value ? metrics.width * a.paint.scaleX : 0,
+            top: -Math.max(
+              ascent,
+              metrics.fontBoundingBoxAscent,
+              metrics.actualBoundingBoxAscent,
+            ),
+            ascent: -ascent,
+            descent,
+            bottom: Math.max(
+              descent,
+              metrics.fontBoundingBoxDescent,
+              metrics.actualBoundingBoxDescent,
+            ),
+            leading: 0,
+          };
+          if (Object.values(result).some((value) => !Number.isFinite(value)))
+            throw unsupported('Canvas font metrics unavailable');
+          return result;
         };
+        if (a.op === 'measure') return measure(a.text);
+        const result = layoutText(
+          {
+            text: a.text,
+            width: a.width,
+            alignment: a.alignment,
+            spacingMult: a.spacingMult,
+            spacingAdd: a.spacingAdd,
+            includePad: a.includePad,
+          },
+          measure,
+        );
+        dimensions(Math.max(1, a.width), Math.max(1, result.height));
+        return { ...result };
       } finally {
         if (canvas) canvas.width = canvas.height = 0;
         release();
@@ -736,14 +829,25 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
           () => c.stroke(),
         );
       } else if (a.op === 'text') {
-        if (a.paint.size === 0) return {};
-        c.translate(a.x, a.y);
-        c.scale(a.paint.scaleX ?? 1, 1);
-        shape(
-          a.paint,
-          () => c.fillText(a.text, 0, 0),
-          () => c.strokeText(a.text, 0, 0),
-        );
+        const releaseText = reserve(4096 + a.text.length * 8);
+        try {
+          c.direction =
+            a.paint.direction === 'auto'
+              ? textDirection(a.text) === -1
+                ? 'rtl'
+                : 'ltr'
+              : a.paint.direction;
+          if (a.paint.size === 0) return {};
+          c.translate(a.x, a.y);
+          c.scale(a.paint.scaleX ?? 1, 1);
+          shape(
+            a.paint,
+            () => c.fillText(a.text, 0, 0),
+            () => c.strokeText(a.text, 0, 0),
+          );
+        } finally {
+          releaseText();
+        }
       } else throw Error('Unknown raster operation ' + a.op);
     } finally {
       c.restore();
