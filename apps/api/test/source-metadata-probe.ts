@@ -101,8 +101,6 @@ execFileSync(
   [
     path.join(root, 'tools/extensions/registration.ts'),
     manifestPath,
-    '--artifacts',
-    artifactFolder,
     '--local',
     '--persist-to',
     state,

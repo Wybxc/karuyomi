@@ -88,8 +88,6 @@ try {
   runTool(
     path.join(root, 'tools/extensions/registration.ts'),
     manifestPath,
-    '--artifacts',
-    artifactFolder,
     '--local',
     '--static-root',
     staticRoot,

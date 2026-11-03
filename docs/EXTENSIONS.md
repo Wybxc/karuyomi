@@ -101,11 +101,10 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 ```sh
 node tools/extensions/registration.ts PATH_TO_OUTPUT/manifest.json \
-  --artifacts PATH_TO_OUTPUT/artifacts \
   --allow-host www.mangadraft.com --remote
 ```
 
-远程注册先核对部署 origin 的当前 index/manifest；本地测试必须使用 `--local --static-root SNAPSHOT`。注册不上传扩展正文。构建任务不持有 Cloudflare 部署凭据；上游 Gradle/AOT 子进程移除 GitHub 和 Cloudflare 凭据。runtime seed 是独立构建依赖，不属于扩展发布。
+远程注册先核对部署 origin 的当前 index/manifest；本地测试必须使用 `--local --static-root SNAPSHOT`。注册只解析元数据，不读取本地 gzip、不下载正文，也不重复计算扩展摘要；上传/下载边界负责完整性校验。构建任务不持有 Cloudflare 部署凭据；上游 Gradle/AOT 子进程移除 GitHub 和 Cloudflare 凭据。runtime seed 是独立构建依赖，不属于扩展发布。
 
 ## 增量 CI 与验证层级
 

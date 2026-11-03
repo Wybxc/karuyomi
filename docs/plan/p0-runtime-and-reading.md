@@ -17,7 +17,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 | P0-R 阅读核心  | Dart 逻辑锚、单双页/LTR/RTL、封面/横图独占、竖向/Webtoon、缩放、旋转恢复及有界 PageProvider 已实现                                                  | ReaderScreen 尚未接真实 Source 导航；无产品首图、超长图或真机性能结论 |
 | P0-B v2        | 帧协议、按需 Worker 流、operation/generation handle、Java Okio Source/有界上传 Sink 已实现；当前生产代码与构建清单统一为 v2，模拟 supplier 回归通过 | 真实 HTTP 压缩、Source/cache、Access、浏览器与移动内存门仍需分别验收  |
 
-Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。真实 MangaDraft 网络探针中热门/最新/搜索返回列表；原 Source 的普通文本搜索未把关键词传入 catalog，不能称为搜索匹配通过。详情/章节遇到源站 Human Verification 并明确失败，未伪造 pages 引用。产品 `acquireImage` 仍明确不支持，章节暂不可读。
+Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。当前 `1bfc97f` 的 Arknights Comics 在内置浏览器经真实 workerd/HTTP v2 通过热门、标题搜索、详情、章节和 51 页列表；latest 按源声明跳过，尚未请求图片。历史 MangaDraft 网络探针中热门/最新/搜索返回列表；原 Source 的普通文本搜索未把关键词传入 catalog，不能称为搜索匹配通过。详情/章节遇到源站 Human Verification 并明确失败，未伪造 pages 引用。产品 `acquireImage` 仍明确不支持，章节暂不可读。
 
 `karuyomi.wybxc.cc` 已部署并验证公开入口及匿名 Access 拦截；生产登录后的正向 bootstrap/Source 请求仍待验收。具体部署版本和历史浏览器环境只在验证记录维护。
 
@@ -25,7 +25,7 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 的压缩、重定向、Cookie、HEAD/206、流式上传、截断上传和三类取消门已通过。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常，补实际 Source/cache、204/304、Range、表单/multipart 及半途失败回归。当前只维护 v2，旧包需要重新构建。
 2. **验证缓冲与取消。** META/DATA 最多 64 KiB，正文请求最多 8 MiB、响应最多 64 MiB，适配队列最多四块。检查慢消费者、背压、迟到响应和 generation 销毁能终止上游并释放 handle；整体请求预算和两次读取之间的 idle timeout 分别验证。协议细节见 [HTTP bridge](../HTTP-BRIDGE.md)。
-3. **接通产品图片。** 实现 Java 图片入口及可取消/释放的 JS 资源 handle；保持原 Source 请求头、拦截器、解密/重排语义。连接 Dart PageProvider、Web 显示资源和原生受管临时文件；在现有 WebView 插件补 iOS 所需薄扩展，不绕过插件直接读取原图 URL，不用整图 JSON/Base64。
+3. **接通产品图片。** 先完成 Web 单页闭环，再接原生受管文件。Java 保留有界、绑定 build/Source/generation 的原始 Page 引用；图片经原 Source 的 `getImageUrl/getImage` 与拦截器处理后，以最多 64 KiB 的分块写入独立图片 sink，等待 ACK 并限制总字节和在途块。HTTP 正文 handle 在 Source 调用结束时会清理，不能代替可显示资源；ACK、取消和释放必须在 Source 忙碌时仍可处理。Web 将处理后字节交给 Blob URL 和 Dart PageProvider，成功结束才标为可显示。Android 优先复用已锁定插件的 ArrayBuffer WebMessage 通道；iOS 需要补正式受管 WKDownload 薄扩展，`onDownloadStartRequest` 本身不能完成文件交接。现有 Bitmap/ImageDecoder 仍有整图 Base64/JSON、`readAllBytes()` 和仅单 surface 限额，需改为二进制资源与总预算后，才能验收解密/重排链的峰值。不绕过插件直接读取原图 URL。
 4. **汇合 P0-R / F4 / P0-C。** 从真实章节导航进入 ReaderScreen，补下一章、有界邻章准备和进度落盘。完成超长图降采样/分片验证、触控与缩放冲突、位置恢复、内存和首图测量。
 5. **完成实际部署与恢复。** 在真实 Access、Web 和移动容器验证登录/过期/回跳、Cookie 恢复、执行槽/文件恢复、跨包切换和后台重建；不自动重发无幂等保证的副作用请求。
 

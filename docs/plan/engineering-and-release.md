@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待验收，当前静态交付与本地 baseline 待部署验证**。当前 host 首次 baseline 尚未完成，旧全量队列已经停止。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，两包代表快照已部署验证，本地 baseline 未完成**。旧全量队列已经停止。
 
 操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
@@ -25,7 +25,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 6. **移除旧分发。** 删除扩展 R2 正文路由、上传和关联表，D1 仅保留动态 Source 所需网络授权元数据。已停用旧工作流并删除 90 个扩展 AOT/索引 Release 及其 tag；运行时 seed 是独立锁定构建依赖，保留。清理旧发布器与 Release 专属 CI，源码不保留无用兼容分支。
 7. **实际验收后全量。** 用当前代表包验证静态发布、客户端下载、更新替换、旧包清理、失败保留和断点恢复，再建立新完整 plan 与首次本地 baseline。旧 `7f54463` 队列和材料不能继续作为当前产品结果。
 
-当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。纯测试与本地 workerd 分项已通过；实际 AOT 浏览器执行、新静态部署、首次本地 baseline 和有界 CI 部署仍需收齐证据。Actions secrets 已通过独立真实权限检查；TS 自动化迁移、依赖规则和固定 Node 24 全库检查均通过，尚未启动新宿主初次全量 AOT。
+当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。纯测试、本地 workerd 分项、固定提交 `1bfc97f` 的两包真实 AOT / 内置浏览器初始化，以及两包快照线上匿名下载、gzip 双字节域完整性和六份共享材料均通过。首次本地 baseline、有界 CI 部署及客户端真实更新/旧缓存清理仍需收齐证据。Actions secrets 已通过独立真实权限检查；TS 自动化迁移、依赖规则和固定 Node 24 全库检查均通过，尚未启动新宿主初次全量 AOT。
 
 ## 验收
 

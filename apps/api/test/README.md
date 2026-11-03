@@ -2,7 +2,7 @@
 
 `pnpm exec vitest run apps/api/test` 验证 Access 签名与 claims、完整 API 鉴权、请求 origin/host、登录返回路径、HTTP bridge 边界，以及旧扩展 API 已删除、公开静态资源不读取私有绑定。
 
-`node --test tools/extensions/registration.test.ts` 验证 gzip 编码/canonical 双 SHA256、有界解压、静态 index/manifest 当前身份、按包替换网络策略、不可变 buildId 冲突及事务回滚。它使用内存 SQLite；材料目录来自当前受信 host 构建元数据，不访问 Cloudflare。
+`node --test tools/extensions/registration.test.ts` 分别验证传输完整性工具的 gzip 编码/canonical 双 SHA256、有界解压，以及纯元数据注册的静态 index/manifest 当前身份、按包替换网络策略、不可变 buildId 冲突与事务回滚。注册 CLI 不读取本地 bundle，不下载正文或重复计算摘要。测试使用内存 SQLite；材料目录来自当前受信 host 构建元数据，不访问 Cloudflare。
 
 生产扩展唯一来源是 Static Assets：`/extensions/index.json`、`/extensions/builds/<buildId>/manifest.json`、`/extensions/artifacts/<canonicalSHA>.gz`。`.gz` 是 manifest 声明的 payload 编码，HTTP 不使用 `Content-Encoding: gzip`。网络 API 不再提供扩展列表、清单或正文，也没有 R2 绑定。D1 只登记当前 build 的 Source 网络策略；`registration.ts --remote` 在写入前检查部署 origin 的公开 index 和清单，`--local` 必须显式提供 `--static-root` 受控快照，不能用于 remote。
 

@@ -1,0 +1,17 @@
+diff --git a/wrangler-dist/cli.js b/wrangler-dist/cli.js
+index 7e2238d140c4a8151dbdb9d23a2493eaee24d4e3..5e7b32a385b26bc1eebfcf352a38385fea1b2dec 100644
+--- a/wrangler-dist/cli.js
++++ b/wrangler-dist/cli.js
+@@ -239709,7 +239709,11 @@ var init_execute = __esm({
+             }
+           } else {
+             logger2.loggerLevel = existingLogLevel;
+-            logger2.log(JSON.stringify(response, null, 2));
++            if (json2) {
++              logger2.json(response);
++            } else {
++              logger2.log(JSON.stringify(response, null, 2));
++            }
+           }
+         } catch (error64) {
+           if (json2 && error64 instanceof Error) {

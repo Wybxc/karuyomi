@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Verify transferred static artifacts, then register explicit Source policy only.
+// Validate authoritative static metadata, then register explicit Source policy only.
 import { execFile } from 'node:child_process';
 import { isDeepStrictEqual, parseArgs, promisify } from 'node:util';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
@@ -278,6 +278,9 @@ export const executeD1: D1Executor = async (arguments_, destination) => {
       env: {
         ...process.env,
         CLOUDFLARE_SEND_METRICS: 'false',
+        // --json suppresses D1 logs but not its separate upload spinner logger.
+        // Set both loggers before Wrangler's command middleware initializes.
+        WRANGLER_LOG: 'error',
         WRANGLER_LOG_PATH:
           process.env.WRANGLER_LOG_PATH ??
           path.join(repositoryRoot, '.local/extensions/network-policy.log'),
@@ -317,14 +320,13 @@ export async function registrationMain(
     allowPositionals: true,
     options: {
       ...destinationOptions,
-      artifacts: { type: 'string' },
       'allow-host': { type: 'string', multiple: true },
       help: { type: 'boolean' },
     },
   });
   if (values.help) {
     console.log(
-      'node tools/extensions/registration.ts MANIFEST [--artifacts DIR] [--allow-host HOST] [--remote | --local --static-root SNAPSHOT] [--persist-to STATE]',
+      'node tools/extensions/registration.ts MANIFEST [--allow-host HOST] [--remote | --local --static-root SNAPSHOT] [--persist-to STATE]',
     );
     return;
   }
@@ -332,9 +334,8 @@ export async function registrationMain(
     throw new Error('Expected one build manifest path');
   const destination = policyDestination(values);
   const file = path.resolve(positionals[0]);
-  const manifest = await verifyBuild(
+  const manifest = await verifyMetadata(
     await parseManifest(await readRegularFile(file, MANIFEST_METADATA_LIMIT)),
-    values.artifacts ?? path.join(path.dirname(file), 'artifacts'),
   );
   const hosts = networkHosts(values['allow-host'] ?? []);
   const current = destination

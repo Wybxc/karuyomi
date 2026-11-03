@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, rename, symlink, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
@@ -13,6 +13,7 @@ import {
   transaction,
 } from './registration-fixtures.ts';
 import {
+  executeD1,
   registrationMain,
   registrationSql,
   snapshotLoader,
@@ -322,17 +323,16 @@ test('duplicate static packages and missing current builds are rejected', async 
     );
   }
 });
-test('local CLI submits only policy SQL after checking its explicit snapshot', async (t) => {
+test('local CLI registers authoritative metadata without local bundle files', async (t) => {
   const f = await fixture(t);
   await snapshot(f.directory, f.manifest);
+  await rm(f.artifacts, { recursive: true });
   const db = await database(t);
   let calls = 0;
   t.mock.method(console, 'log', () => {});
   await registrationMain(
     [
       f.manifestFile,
-      '--artifacts',
-      f.artifacts,
       '--local',
       '--static-root',
       f.directory,
@@ -373,18 +373,16 @@ test('registration retires policies removed from the current static index', asyn
 });
 test('plan-only never writes D1 or contacts deployed authority', async (t) => {
   const f = await fixture(t);
+  await rm(f.artifacts, { recursive: true });
   t.mock.method(console, 'log', () => {});
   const fetch = t.mock.method(globalThis, 'fetch', () => {
     throw new Error('network');
   });
   let calls = 0;
-  await registrationMain(
-    [f.manifestFile, '--artifacts', f.artifacts],
-    async () => {
-      calls++;
-      throw new Error('D1');
-    },
-  );
+  await registrationMain([f.manifestFile], async () => {
+    calls++;
+    throw new Error('D1');
+  });
   assert.equal(calls, 0);
   assert.equal(fetch.mock.callCount(), 0);
 });
@@ -417,14 +415,117 @@ test('remote CLI rejects snapshots and refuses stale deployed current identity',
   );
   let calls = 0;
   await assert.rejects(
-    registrationMain(
-      [f.manifestFile, '--artifacts', f.artifacts, '--remote'],
-      async () => {
-        calls++;
-        return [];
-      },
-    ),
+    registrationMain([f.manifestFile, '--remote'], async () => {
+      calls++;
+      return [];
+    }),
     /not current/,
   );
   assert.equal(calls, 0);
+});
+
+test('remote CLI only reads index and manifest metadata despite a corrupt local bundle', async (t) => {
+  const f = await fixture(t);
+  const s = await snapshot(f.directory, f.manifest);
+  await writeFile(f.file, Buffer.alloc(f.encoded.length));
+  t.mock.method(console, 'log', () => {});
+  const paths: string[] = [];
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (input: Parameters<typeof fetch>[0]) => {
+      const pathname = new URL(
+        input instanceof Request ? input.url : String(input),
+      ).pathname;
+      paths.push(pathname);
+      if (pathname === '/extensions/index.json') return Response.json(s.index);
+      assert.equal(pathname, s.index.builds[0]?.manifestPath);
+      return Response.json(f.manifest);
+    },
+  );
+  const db = await database(t);
+  let calls = 0;
+  await registrationMain(
+    [f.manifestFile, '--remote'],
+    async (args, destination) => {
+      calls++;
+      assert.equal(destination.mode, 'remote');
+      const file = args[args.indexOf('--file') + 1];
+      assert(file);
+      transaction(db, await readFile(file, 'utf8'));
+      return [{ success: true }];
+    },
+  );
+  assert.deepEqual(paths, [
+    '/extensions/index.json',
+    s.index.builds[0]?.manifestPath,
+  ]);
+  assert.equal(calls, 1);
+  assert.equal(db.prepare('SELECT * FROM extension_builds').all().length, 1);
+});
+
+test('CLI rejects the removed artifact transfer option before any registration', async (t) => {
+  const f = await fixture(t);
+  let calls = 0;
+  await assert.rejects(
+    registrationMain([f.manifestFile, '--artifacts', f.artifacts], async () => {
+      calls++;
+      return [];
+    }),
+    /Unknown option '--artifacts'/,
+  );
+  assert.equal(calls, 0);
+});
+
+test('real local Wrangler file execution returns strict JSON and rejects SQL failure', async (t) => {
+  const f = await fixture(t);
+  for (const [key, value] of Object.entries({
+    WRANGLER_LOG: 'debug',
+    WRANGLER_LOG_PATH: path.join(f.directory, 'wrangler.log'),
+  })) {
+    const previous = process.env[key];
+    process.env[key] = value;
+    t.after(() => {
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    });
+  }
+  const destination = {
+    mode: 'local',
+    staticRoot: f.directory,
+    persistTo: path.join(f.directory, 'd1'),
+  } as const;
+  const sql = path.join(f.directory, 'policy.sql');
+  await writeFile(
+    sql,
+    "CREATE TABLE policy_probe (value TEXT NOT NULL); INSERT INTO policy_probe VALUES ('local-only');",
+  );
+  const written = await executeD1(['--file', sql, '--yes'], destination);
+  assert(Array.isArray(written));
+  assert(
+    written.every(
+      (item: unknown) =>
+        !!item &&
+        typeof item === 'object' &&
+        'success' in item &&
+        item.success === true,
+    ),
+  );
+  const queried = await executeD1(
+    ['--command', 'SELECT value FROM policy_probe'],
+    destination,
+  );
+  assert(Array.isArray(queried));
+  const first: unknown = queried[0];
+  assert(first && typeof first === 'object' && 'results' in first);
+  assert.deepEqual(first.results, [{ value: 'local-only' }]);
+  await writeFile(sql, 'INSERT INTO missing_policy_probe VALUES (1);');
+  await assert.rejects(
+    executeD1(['--file', sql, '--yes'], destination),
+    (error: unknown) => {
+      assert(error instanceof Error && 'code' in error);
+      assert.equal(error.code, 1);
+      return true;
+    },
+  );
 });
