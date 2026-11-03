@@ -56,6 +56,9 @@ class ReaderScreen extends StatefulWidget {
   final String title;
   final ReadingPosition? initialPosition;
   final ReadingMode initialMode;
+
+  /// Defaults to automatic width-based layout. An in-reader selection lasts for
+  /// this chapter unless this input changes; changing to null resumes automatic.
   final bool? doublePage;
   final ValueChanged<ReadingPosition>? onPositionChanged;
   final ResourceImageBuilder imageBuilder;
@@ -98,6 +101,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _zoomed = false;
   bool _dimensionsScheduled = false;
   bool _viewportScheduled = false;
+  bool? _doublePageOverride;
   final _decodedResources = <String>{};
 
   @override
@@ -285,6 +289,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _reader.updateManifest(widget.manifest);
       _scheduleRestore();
     }
+    if (oldWidget.doublePage != widget.doublePage ||
+        oldWidget.manifest.chapterKey != widget.manifest.chapterKey) {
+      _doublePageOverride = null;
+      _applyDoublePagePreference();
+    }
     if (oldWidget.generation != widget.generation) _syncWindow();
   }
 
@@ -386,8 +395,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _layout({ReadingMode? mode, bool? doublePage}) {
+    if (doublePage != null) _doublePageOverride = doublePage;
     _transform.value = Matrix4.identity();
     _reader.setLayout(mode: mode, doublePage: doublePage);
+    _scheduleRestore();
+  }
+
+  void _applyDoublePagePreference() {
+    final doublePage =
+        _doublePageOverride ?? widget.doublePage ?? _viewportWidth >= 900;
+    if (_reader.doublePage == doublePage) return;
+    _reader.setLayout(doublePage: doublePage);
     _scheduleRestore();
   }
 
@@ -618,13 +636,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         _viewportWidth = constraints.maxWidth;
                         _viewportHeight = constraints.maxHeight;
                         _scheduleRestore();
-                        final doublePage =
-                            widget.doublePage ?? constraints.maxWidth >= 900;
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!mounted) return;
-                          if (_reader.doublePage != doublePage) {
-                            _reader.setLayout(doublePage: doublePage);
-                          }
+                          // A user or parent can change the preference before
+                          // this layout callback runs.
+                          _applyDoublePagePreference();
                           _scheduleRestore();
                         });
                       }

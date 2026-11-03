@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/reader/resource_image.dart';
@@ -56,6 +57,7 @@ Widget screen({
   ValueChanged<ReaderViewportState>? onViewport,
   ResourceImageBuilder imageBuilder = fixtureImage,
   bool? doublePage,
+  Widget? chapterControls,
 }) => MaterialApp(
   home: ReaderScreen(
     manifest: manifest,
@@ -64,6 +66,7 @@ Widget screen({
     initialPosition: position,
     initialMode: mode,
     doublePage: doublePage,
+    chapterControls: chapterControls,
     onPositionChanged: onPosition,
     onViewportChanged: onViewport,
     imageBuilder: imageBuilder,
@@ -72,6 +75,219 @@ Widget screen({
 );
 
 void main() {
+  testWidgets(
+    'manual single-page preference survives progress panel and viewport changes',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: List.generate(
+          51,
+          (index) => ReaderPage(key: 'page-$index', width: 600, height: 900),
+        ),
+      );
+      final panelHeight = ValueNotifier(0.0);
+      addTearDown(panelHeight.dispose);
+      await tester.pumpWidget(
+        ValueListenableBuilder<double>(
+          valueListenable: panelHeight,
+          builder: (context, height, child) => screen(
+            provider: provider,
+            manifest: manifest,
+            position: manifest.positionAt(50),
+            chapterControls: SizedBox(height: height),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+      await tester.tap(find.byType(FilterChip));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+      expect(find.text('51 / 51'), findsOneWidget);
+      expect(find.byKey(const ValueKey('runtime-1-page-49')), findsNothing);
+
+      // Completion/save controls may gain a row without changing page width.
+      panelHeight.value = 72;
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+      expect(find.byKey(const ValueKey('runtime-1-page-49')), findsNothing);
+
+      await tester.tapAt(tester.getCenter(find.byType(InteractiveViewer)));
+      await tester.pump(kDoubleTapTimeout);
+      await tester.pumpAndSettle();
+      expect(find.byType(FilterChip), findsNothing);
+      await tester.tapAt(tester.getCenter(find.byType(InteractiveViewer)));
+      await tester.pump(kDoubleTapTimeout);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+
+      tester.view.physicalSize = const Size(800, 760);
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(1200, 760);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+      expect(find.text('51 / 51'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('automatic double-page follows width until the user selects it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final provider = FixturePageProvider();
+    await tester.pumpWidget(
+      screen(provider: provider, manifest: fixtureChapter()),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
+    tester.view.physicalSize = const Size(1200, 900);
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+    tester.view.physicalSize = const Size(800, 900);
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
+    await tester.tap(find.byType(FilterChip));
+    await tester.pumpAndSettle();
+    tester.view.physicalSize = const Size(800, 760);
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'changed doublePage input resets manual choice and null resumes automatic',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      await tester.pumpWidget(
+        screen(provider: provider, manifest: manifest, doublePage: true),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+      await tester.tap(find.byType(FilterChip));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+      // Rebuilding an unchanged parent input must preserve the local choice.
+      await tester.pumpWidget(
+        screen(provider: provider, manifest: manifest, doublePage: true),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+      await tester.pumpWidget(
+        screen(provider: provider, manifest: manifest, doublePage: false),
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        screen(provider: provider, manifest: manifest, doublePage: true),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+      await tester.tap(find.byType(FilterChip));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(screen(provider: provider, manifest: manifest));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+      tester.view.physicalSize = const Size(1200, 900);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+      await tester.pumpWidget(
+        screen(provider: provider, manifest: manifest, doublePage: false),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
+        false,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('manual layout persists for a chapter and resets for the next', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final provider = FixturePageProvider();
+    final manifest = fixtureChapter();
+    await tester.pumpWidget(screen(provider: provider, manifest: manifest));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(FilterChip));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
+    await tester.pumpWidget(
+      screen(
+        provider: provider,
+        manifest: ChapterManifest(
+          chapterKey: manifest.chapterKey,
+          version: '2',
+          pages: manifest.pages,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
+    await tester.pumpWidget(
+      screen(
+        provider: provider,
+        manifest: ChapterManifest(
+          chapterKey: 'next-chapter',
+          version: '1',
+          pages: List.generate(
+            20,
+            (index) =>
+                ReaderPage(key: 'next-page-$index', width: 600, height: 900),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     'decoded notification after a frame schedules its viewport observation',
     (tester) async {
