@@ -15,4 +15,4 @@
 
 `teaHttp` 仍使用 P0-A v1 文本/Base64 基线，POST `/api/bridge/http` 并携带同源 cookie、`X-App-Request: 1` 与 `X-Runtime-Build`。远程脚本能力未开放。此基线不表示 P0-B 二进制桥或 P0-F3 图片门已完成。
 
-运行 `pnpm --filter @karuyomi/runtime-host typecheck`、`pnpm exec vitest run packages/runtime-host/test`、`pnpm --filter @karuyomi/runtime-host build`。真实浏览器初始化探针由 `tools/teavm/browser-probe.mjs` 提供；本地探针不能替代生产 Access 或原生真机验证。
+运行 `pnpm --filter @karuyomi/runtime-host typecheck`、`pnpm exec vitest run packages/runtime-host/test`、`pnpm --filter @karuyomi/runtime-host build`。真实浏览器与 Source 网络集成回归见 [API 集成说明](../../apps/api/test/source-metadata-probe.md)；本地测试不能替代生产 Access 或原生真机验证。

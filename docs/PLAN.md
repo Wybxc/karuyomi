@@ -16,13 +16,13 @@
 2026-11-03：工程已从脚手架进入 P0 实现。下列能力有源码、分项测试或机制探针；仍未汇合成可完整阅读的产品链路，P0 尚未通过。
 
 - **P0-A 公共宿主。** 已从 release9 导入经过逐文件 SHA-256 校验的最终源码、许可证和构建工具。原扩展 JAR 不修改；依赖、ZIP、构建副本与产物留在忽略的本地目录。固定 TeaVM 0.16.0 JS backend，按包输出带 hash/ABI/版本的私有清单。MangaDraft 冻结基线与产品覆盖层都已真实编译。
-- **Java Source 边界。** `hostInvoke(sourceId, operation, argsJson)` 支持热门、最新、搜索、详情、章节、页面六项操作，返回完整列表与 DTO，显式传入漫画/章节引用；Source ID 和章节 Long 日期以字符串跨语言保存。JVM oracle 已覆盖长列表、元数据、顺序与引用校验；六项边界可用不代表全部在线语义已实测。非默认 filters/preferences 和远程脚本能力尚未开放。
+- **Java Source 边界。** `hostInvoke(sourceId, operation, argsJson)` 支持热门、最新、搜索、详情、章节、页面六项操作，返回完整列表与 DTO，显式传入漫画/章节引用；Source ID 和章节 Long 日期以字符串跨语言保存。JVM oracle 已覆盖长列表、元数据、顺序与引用校验；六项边界可用不代表全部在线语义已实测。原 JAR 字节码已确认 MangaDraft 普通文本搜索未把关键词加入 catalog 请求，这是原版行为，不是宿主漏参。非默认 filters/preferences 和远程脚本能力尚未开放。
 - **Web / Dart 控制链。** JS 验证私有清单、脚本与资源后加载真实 TeaVM，管理串行调用、generation/build 隔离、取消/超时和销毁。真实 Chromium 已初始化 MangaDraft 并验证显式引用错误；经真实 workerd 桥和测试 JWT，热门/最新/搜索各返回完整列表，详情/章节遇到源站 Human Verification 挑战并明确失败，pages 未伪造。`ready.sourceReady: false` 只表示控制握手；成功 `open` 以真实 Source ID 与清单一致为条件。Dart 协议层、Web JS interop、原生受管 WebView 控制与可见登录代码已接入，原生真机与 Access 会话恢复仍待验收。
 - **资料浏览与阅读核心。** Flutter 已接构建/Source 选择、热门/最新/搜索分页、详情与章节。独立 Dart 阅读核心及 `ReaderScreen` 已实现单/双页、RTL、竖向/Webtoon、缩放、稳定逻辑锚与有界资源窗口。产品 `acquireImage` 仍明确不支持，章节暂不可读，ReaderScreen 尚未接入实际 Source 导航；书架和进度持久化仍未实现。
 - **API 与部署准备。** Worker 已实现 Access JWT 再校验、固定 origin/写请求边界、D1 构建注册、私有 R2 流式产物、Range/HEAD 与按构建网络白名单的临时 v1 桥。本地与云端均已注册真实 MangaDraft e350 产品构建。2026-11-03 已部署 `karuyomi.wybxc.cc`（Worker version `60bac3c2-96df-4763-8c92-2cf8fd1e2a86`），云端 D1 迁移通过。Access 应用及本人策略覆盖 `/api`、`/api/*`；公开页面已渲染，匿名 API 已确认跳转 Access 登录。生产登录成功后的私有交付与 cookie 恢复仍待验收。
 - **独立 P0-B / F3 探针。** TeaVM JSO 的有界双向字节复制、fiber 等待/取消和 Worker 所有权转移已在 Chromium 实测。iOS 模拟器已在本地受信 HTTPS 下验证 Worker → ArrayBuffer → Blob → WKDownload → 文件及取消/释放。两者都是独立机制证据，尚未接通产品 HTTP/Okio/图片通道；物理 iPhone、生产 HTTPS/Access 与进程/GPU 合计峰值未验证。
 
-当前证据与复验入口见 [VERIFICATION.md](VERIFICATION.md)、[TeaVM 说明](../runtime/teavm/README.md) 和 [iOS 机制探针](../tools/ios-resource-probe/README.md)。`docs/design/` 的冻结设计副本继续保留，不随工程进展改写。
+当前证据与正式回归入口见 [VERIFICATION.md](VERIFICATION.md) 和 [TeaVM 说明](../runtime/teavm/README.md)。独立机制研究只保留验证摘要，临时工程存于被忽略的本地归档，不作为产品源码或发布工具提交。`docs/design/` 的冻结设计副本继续保留，不随工程进展改写。
 
 ## 后续顺序与验收
 

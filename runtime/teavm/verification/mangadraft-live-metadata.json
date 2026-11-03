@@ -1,0 +1,251 @@
+{
+  "probe": "live-source-real-browser-workerd",
+  "observedAtUTC": "2026-11-03T03:17:43.879721+00:00",
+  "buildId": "release9-mangadraft-product-e3505206005c25f69b92",
+  "bundleSha256": "209ad02ba02eae99147502799c08e1aac0c1c7bc29906aa3d60e99174b1b9f22",
+  "sourceJarSha256": "81d456c80449fc205e50332ff281c0b8ee20e584f7e5670ccd3f79abb71dfa86",
+  "protocolVersion": 1,
+  "hostAbi": "karuyomi-source-host-v1",
+  "runtimeBaseline": "teavm-0.16.0-js-release9",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "privateDelivery": {
+    "realWorkerd": true,
+    "realD1": true,
+    "realR2": true,
+    "realRS256TestJWTVerification": true,
+    "verifiedArtifacts": 7,
+    "artifactBytes": 3957861,
+    "testOnlyOriginAlias": true,
+    "productionAccessVerified": false
+  },
+  "source": {
+    "id": "6866320578550428692",
+    "name": "MangaDraft",
+    "lang": "all",
+    "supportsLatest": true,
+    "baseUrl": "https://www.mangadraft.com"
+  },
+  "operations": [
+    {
+      "operation": "popular",
+      "ok": true,
+      "elapsedMs": 755,
+      "keys": ["mangas", "hasNextPage"],
+      "page": 1,
+      "count": 20,
+      "hasNextPage": true,
+      "firstTitle": "Dragon Ball Kakumei"
+    },
+    {
+      "operation": "popular",
+      "ok": true,
+      "elapsedMs": 394,
+      "keys": ["mangas", "hasNextPage"],
+      "page": 2,
+      "count": 20,
+      "hasNextPage": true,
+      "firstTitle": "A Place Like Home"
+    },
+    {
+      "operation": "search",
+      "ok": true,
+      "elapsedMs": 351,
+      "keys": ["mangas", "hasNextPage"],
+      "page": 1,
+      "query": "Dragon Ball Kakumei",
+      "count": 20,
+      "hasNextPage": true,
+      "firstTitle": "Le Fléau du Capillophagocyte"
+    },
+    {
+      "operation": "latest",
+      "ok": true,
+      "elapsedMs": 350,
+      "keys": ["mangas", "hasNextPage"],
+      "page": 1,
+      "count": 20,
+      "hasNextPage": true,
+      "firstTitle": "SHINKA HIJUTSU"
+    },
+    {
+      "operation": "details",
+      "ok": false,
+      "elapsedMs": 565,
+      "error": {
+        "code": "source_error",
+        "name": "RuntimeFailure",
+        "message": "java.lang.Exception: Unable to find project script",
+        "javaClass": "java.lang.Exception"
+      }
+    },
+    {
+      "operation": "chapters",
+      "ok": false,
+      "elapsedMs": 510,
+      "error": {
+        "code": "source_error",
+        "name": "RuntimeFailure",
+        "message": "java.lang.Exception: Unable to find project script",
+        "javaClass": "java.lang.Exception"
+      }
+    }
+  ],
+  "network": [
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/api/catalog/projects",
+      "elapsedMs": 706,
+      "bridgeStatus": 200,
+      "upstreamStatus": 200,
+      "queryKeys": ["order", "type", "page", "number"],
+      "catalogQuery": {
+        "order": "popular",
+        "type": "all",
+        "page": "1",
+        "number": "20"
+      },
+      "bodyBytes": 28139,
+      "bodySha256": "7e5427a460ec80ab124a136320e8c729dd195a37ddf1599f564718eeded3c18d",
+      "contentType": "application/json"
+    },
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/api/catalog/projects",
+      "elapsedMs": 384,
+      "bridgeStatus": 200,
+      "upstreamStatus": 200,
+      "queryKeys": ["order", "type", "page", "number"],
+      "catalogQuery": {
+        "order": "popular",
+        "type": "all",
+        "page": "2",
+        "number": "20"
+      },
+      "bodyBytes": 28627,
+      "bodySha256": "0738a6d56323dc1ec3c053c12f7e6c98320159bebb8009e44e7a82eb02a16ed7",
+      "contentType": "application/json"
+    },
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/api/catalog/projects",
+      "elapsedMs": 341,
+      "bridgeStatus": 200,
+      "upstreamStatus": 200,
+      "queryKeys": [
+        "type",
+        "order",
+        "section",
+        "genre",
+        "format",
+        "language",
+        "status",
+        "order_all",
+        "page",
+        "number"
+      ],
+      "catalogQuery": {
+        "type": "all",
+        "order": "all",
+        "section": "",
+        "genre": "",
+        "format": "",
+        "language": "",
+        "status": "",
+        "order_all": "likes",
+        "page": "1",
+        "number": "20"
+      },
+      "bodyBytes": 27546,
+      "bodySha256": "10f4607d1b7d2885bf64b62fb24b7798fc2313aca6251bb9cfd17ec2a2d284b9",
+      "contentType": "application/json"
+    },
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/api/catalog/projects",
+      "elapsedMs": 341,
+      "bridgeStatus": 200,
+      "upstreamStatus": 200,
+      "queryKeys": ["order", "type", "page", "number"],
+      "catalogQuery": {
+        "order": "news",
+        "type": "all",
+        "page": "1",
+        "number": "20"
+      },
+      "bodyBytes": 28227,
+      "bodySha256": "454aff719e65ae17a4cacf56700602aa7d84a9f9e08d3c35bfe9fa7df46f725b",
+      "contentType": "application/json"
+    },
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/manga/dragon-ball-kakumei",
+      "elapsedMs": 285,
+      "bridgeStatus": 200,
+      "upstreamStatus": 302,
+      "queryKeys": [],
+      "bodyBytes": 418,
+      "bodySha256": "6458e3b5e1cdeff6d3d5d6d314f0bdcc571ffd5797f558b2012cc57fc54e04f8",
+      "contentType": "text/html; charset=utf-8",
+      "htmlTitle": "Redirecting to https://www.mangadraft.com/bot-verification",
+      "challengeDetected": true
+    },
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/bot-verification",
+      "elapsedMs": 252,
+      "bridgeStatus": 200,
+      "upstreamStatus": 200,
+      "queryKeys": [],
+      "bodyBytes": 2440,
+      "bodySha256": "b4e50f7437bb7a8ae5c45b8191ca9c80748c5f5a0b2db2d1b1ddbcdf17d64840",
+      "contentType": "text/html; charset=UTF-8",
+      "htmlTitle": "Human Verification",
+      "challengeDetected": true
+    },
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/manga/dragon-ball-kakumei",
+      "elapsedMs": 263,
+      "bridgeStatus": 200,
+      "upstreamStatus": 302,
+      "queryKeys": [],
+      "bodyBytes": 418,
+      "bodySha256": "6458e3b5e1cdeff6d3d5d6d314f0bdcc571ffd5797f558b2012cc57fc54e04f8",
+      "contentType": "text/html; charset=utf-8",
+      "htmlTitle": "Redirecting to https://www.mangadraft.com/bot-verification",
+      "challengeDetected": true
+    },
+    {
+      "method": "GET",
+      "target": "https://www.mangadraft.com/bot-verification",
+      "elapsedMs": 237,
+      "bridgeStatus": 200,
+      "upstreamStatus": 200,
+      "queryKeys": [],
+      "bodyBytes": 2440,
+      "bodySha256": "b4e50f7437bb7a8ae5c45b8191ca9c80748c5f5a0b2db2d1b1ddbcdf17d64840",
+      "contentType": "text/html; charset=UTF-8",
+      "htmlTitle": "Human Verification",
+      "challengeDetected": true
+    }
+  ],
+  "searchSemanticAudit": {
+    "input": "Dragon Ball Kakumei",
+    "ordinaryTextQueryTransmitted": false,
+    "upstreamJarBehavior": true,
+    "sourceUnmodified": true,
+    "bytecodeEvidence": "Original j.getSearchManga passes the text query to r.i. r.i builds ten catalog parameters (type/order/section/genre/format/language/status/order_all/page/number) without adding the text query. Full-URL query takes a separate j.b path. Verified against the frozen original JAR; not a host argument loss."
+  },
+  "metadataClosedLoopPassed": false,
+  "blockers": [
+    "Details and chapters follow a real HTTP 302 to /bot-verification, whose 200 HTML title is Human Verification. The Source reports java.lang.Exception: Unable to find project script.",
+    "No real chapter reference was returned, so pages was not called with fabricated references.",
+    "The frozen Source ignores ordinary text search queries; an RPC result alone does not prove text search semantics."
+  ],
+  "notVerified": [
+    "production Cloudflare Access session",
+    "native app on device",
+    "pages with a real chapter reference",
+    "processed image acquisition"
+  ]
+}

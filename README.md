@@ -14,7 +14,7 @@
 | API 与私有交付 | JWT 再校验、D1 构建注册、私有 R2 流式产物与 Range/HEAD、按构建域名白名单的 P0-A 网络桥                                                    | 生产 Access 登录与正向私有交付；P0-B 替换文本/Base64 网络正文                 |
 | 独立机制探针   | TeaVM 有界字节复制/fiber 取消/ArrayBuffer 所有权；iOS 模拟器 HTTPS 下 Worker → Blob → WKDownload → 文件                                   | 两者尚未汇合为产品图片通道；真实源、物理设备与合计内存峰值未验收              |
 
-`ready.sourceReady: false` 只描述控制握手；`open` 必须在真实宿主初始化、Source 列表与清单一致后才返回运行会话。六个 Java 操作边界为 `popular`、`latest`、`search`、`details`、`chapters`、`pages`；边界与 JVM oracle 通过不代表六项在线 Source 语义均已验收。真实网络探针中热门/最新/搜索返回列表，搜索筛选语义仍需核对；详情/章节遇到 Source 的 Human Verification 挑战，返回 source_error，未伪造页面结果。验证范围见 [记录](docs/VERIFICATION.md)。
+`ready.sourceReady: false` 只描述控制握手；`open` 必须在真实宿主初始化、Source 列表与清单一致后才返回运行会话。六个 Java 操作边界为 `popular`、`latest`、`search`、`details`、`chapters`、`pages`；边界与 JVM oracle 通过不代表六项在线 Source 语义均已验收。真实网络探针中热门/最新/搜索返回列表，已核对原版 MangaDraft 普通文本搜索未把关键词加入请求，不能将返回列表当作匹配验收；详情/章节遇到 Source 的 Human Verification 挑战，返回 source_error，未伪造页面结果。验证范围见 [记录](docs/VERIFICATION.md)。
 
 ## 工程结构
 
@@ -25,8 +25,8 @@ packages/reader_core/   独立 Dart 布局、位置、资源窗口与调度
 packages/source_runtime/ Dart SourceRuntime、版本协议与传输验证
 packages/contracts/    Zod 边界校验与协议版本源文件
 packages/runtime-host/ 公开控制页、私有 TeaVM 加载与串行 Worker
-runtime/teavm/          冻结源码、产品覆盖层、独立探针及验证摘要
-tools/                 TeaVM / iOS 资源机制探针
+runtime/teavm/          冻结源码、产品覆盖层及验证摘要
+tools/                 正式回归测试与扩展发布工具
 scripts/               协议生成、构建、私有产物注册与资源组装
 docs/design/           五份设计文档及来源校验记录
 ```
@@ -51,7 +51,7 @@ pnpm dev
 
 修改 `packages/contracts/protocol.json` 后执行 `pnpm generate`，同时更新 TypeScript 和 Dart 常量；CI 的 `generate:check` 防止版本漂移。控制协议、清单与 Source 调用已经接通；完整 DTO 的跨语言代码生成与图片字节协议仍需继续实现。
 
-## 本地 TeaVM 构建与探针
+## 本地 TeaVM 构建与回归
 
 冻结 ZIP 和第三方 JAR 不入库。导入只选取经过逐文件摘要校验的最终源码；依赖、原输入 JAR、Maven 缓存和产物均位于被忽略的 `runtime/teavm/.local/`。
 
@@ -62,7 +62,7 @@ pnpm teavm:build mangadraft
 python3 scripts/register-build.py runtime/teavm/.local/manifests/<buildId>.json --allow-host www.mangadraft.com
 ```
 
-注册命令默认仅校验并输出计划；加 `--local` 才写入本地 R2 / D1，加 `--remote` 才写入云端。网络域名需要显式声明，图片 CDN 尚未据此开放。清单、AOT 和必要资源必须经私有 API 获取，不能复制到公开静态目录。浏览器初始化、JSO 字节、Zstd 错误和 iOS HTTPS 机制探针的复验命令见 [验证记录](docs/VERIFICATION.md)。
+注册命令默认仅校验并输出计划；加 `--local` 才写入本地 R2 / D1，加 `--remote` 才写入云端。网络域名需要显式声明，图片 CDN 尚未据此开放。清单、AOT 和必要资源必须经私有 API 获取，不能复制到公开静态目录。正式 API 与 Source 浏览器回归入口见 [验证记录](docs/VERIFICATION.md)。独立字节、Zstd 和 iOS 机制研究保留简洁验证摘要；临时工程已归档到被忽略的本地研究目录，不作为源码提交。
 
 ## 部署与 Access
 
