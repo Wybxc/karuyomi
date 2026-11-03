@@ -132,6 +132,31 @@ export function prepareLibraries(workRoot: string, source: string): void {
   }
 }
 
+/** Compile bridge classes needed before the java.base compatibility patch. */
+export async function compileBridgeBootstrap(
+  workRoot: string,
+  classpath: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  const source = path.join(workRoot, 'java/src/main/java/prototype'),
+    classes = path.join(workRoot, 'java/target/classes');
+  mkdirSync(classes, { recursive: true });
+  await run(
+    'javac',
+    [
+      '-cp',
+      classpath,
+      '-d',
+      classes,
+      ...['Bridge', 'Callbacks', 'JsonValues', 'HttpBodySource'].map((name) =>
+        path.join(source, name + '.java'),
+      ),
+    ],
+    { cwd: workRoot, env },
+  );
+  return classes;
+}
+
 export async function compileExtension(
   options: AotOptions,
 ): Promise<AotResult> {
@@ -186,21 +211,7 @@ export async function compileExtension(
     ],
     { cwd: workRoot, env },
   );
-  const classes = path.join(workRoot, 'java/target/classes');
-  mkdirSync(classes, { recursive: true });
-  await run(
-    'javac',
-    [
-      '-cp',
-      cp,
-      '-d',
-      classes,
-      ...['Bridge', 'Callbacks', 'JsonValues'].map((name) =>
-        path.join(source, 'prototype', name + '.java'),
-      ),
-    ],
-    { cwd: workRoot, env },
-  );
+  const classes = await compileBridgeBootstrap(workRoot, cp, env);
   cp = classes + path.delimiter + cp;
   await run(
     'javac',

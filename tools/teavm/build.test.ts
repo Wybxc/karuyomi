@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -11,7 +12,41 @@ import path from 'node:path';
 import test from 'node:test';
 import { readZip, writeZip } from '../lib/archive.ts';
 import { digest } from '../lib/json.ts';
-import { generateRegistries, prepareLibraries } from './build.ts';
+import {
+  compileBridgeBootstrap,
+  generateRegistries,
+  prepareLibraries,
+} from './build.ts';
+
+test('bridge bootstrap javac resolves its binary HTTP source before compatibility compilation', async () => {
+  const work = mkdtempSync(
+    path.join(os.tmpdir(), 'karuyomi-bridge-bootstrap-'),
+  );
+  try {
+    const source = path.join(work, 'java/src/main/java/prototype'),
+      dependencies = path.join(work, 'dependencies');
+    mkdirSync(source, { recursive: true });
+    mkdirSync(dependencies);
+    // This explicit dependency reproduces the source-list failure without the
+    // runtime seed, third-party libraries or the full TeaVM compilation.
+    for (const [name, declaration] of Object.entries({
+      Bridge: 'static int maximum() { return HttpBodySource.MAX_CHUNK; }',
+      Callbacks: 'static int maximum() { return Bridge.maximum(); }',
+      JsonValues: '',
+      HttpBodySource: 'static final int MAX_CHUNK = 64 * 1024;',
+    })) {
+      writeFileSync(
+        path.join(source, name + '.java'),
+        `package prototype; public final class ${name} { ${declaration} }`,
+      );
+    }
+    const classes = await compileBridgeBootstrap(work, dependencies);
+    for (const name of ['Bridge', 'Callbacks', 'JsonValues', 'HttpBodySource'])
+      assert.ok(existsSync(path.join(classes, 'prototype', name + '.class')));
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
 
 test('registries bind exact injection references and conditional extension resources', () => {
   const work = mkdtempSync(path.join(os.tmpdir(), 'karuyomi-aot-'));
