@@ -32,6 +32,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import sirv from 'sirv';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const api = path.join(root, 'apps/api');
@@ -63,6 +64,16 @@ const allowedHosts = (
   .map((host) => host.trim())
   .filter(Boolean);
 assert(allowedHosts.length > 0, 'Explicit Source allowed hosts are required');
+const verifyImages = process.env.SOURCE_PROBE_IMAGES === '1';
+const readerDirectory = process.env.SOURCE_PROBE_READER_DIR
+  ? path.resolve(process.env.SOURCE_PROBE_READER_DIR)
+  : undefined;
+// Use the normal built Flutter app, while retaining this probe's controlled
+// static catalog and authenticated HTTP hop. No test UI enters the product.
+if (readerDirectory) await readFile(path.join(readerDirectory, 'index.html'));
+const readerAssets = readerDirectory
+  ? sirv(readerDirectory, { dev: true })
+  : undefined;
 const apiOrigin = 'https://read.example.com';
 const environment = {
   ...process.env,
@@ -199,21 +210,62 @@ const persist = async () => {
   await writeFile(evidenceFile, JSON.stringify(evidence, null, 2) + '\n');
 };
 const html = `<!doctype html><html lang="en"><meta charset="utf-8">
-<title>Karuyomi live Source metadata probe</title>
-<style>body{font:14px system-ui;margin:24px;max-width:1000px}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{padding:12px}</style>
+<title>Karuyomi live Source probe</title>
+<style>body{font:14px system-ui;margin:24px;max-width:1000px}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{padding:12px}#images{display:flex;gap:12px;align-items:start}#images img{width:30%;max-height:480px;object-fit:contain;object-position:top}</style>
 <h1>Live Source metadata probe</h1>
-<p>Loopback only: verified real TeaVM product, direct static gzip assets, policy-only local D1, signed test Access identity and real workerd HTTP bridge. No image bytes are requested.</p>
-<button id="run" disabled>Run real metadata operations</button><pre id="output">Loading...</pre>
+<p>Loopback only: verified real TeaVM product, direct static gzip assets, policy-only local D1, signed test Access identity and real workerd HTTP bridge. ${verifyImages ? 'First, middle and last page images are acquired through the original Source and the product binary image channel.' : 'No image bytes are requested.'}</p>
+<button id="run" disabled>Run real metadata operations</button><div id="images"></div><pre id="output">Loading...</pre>
 <script type="module">
 import '/runtime/host.js';
 const runtime = window.karuyomiRuntime;
 const output = document.querySelector('#output');
-const report = {userAgent:navigator.userAgent, events:[], operations:[], finished:false};
+const report = {userAgent:navigator.userAgent, events:[], operations:[], images:[], requiredImages:0, imageGate:${JSON.stringify(verifyImages ? 'pending' : 'not_requested')}, finished:false};
 const record = async (event, value) => {
   report.events.push({event,value}); output.textContent = JSON.stringify(report,null,2);
   await fetch('/probe-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(report)});
 };
 const failure = error => ({code:error.code ?? 'unknown',name:error.name,message:String(error.message ?? error).slice(0,1400),javaClass:error.javaClass});
+const checkImages = async (session, sourceId, pages) => {
+  const pageSessionId=pages.pageSessionId;
+  if(typeof pageSessionId!=='string'||!pages.pages?.length)throw new Error('Missing original Page session');
+  const indices=[...new Set([0,Math.floor(pages.pages.length/2),pages.pages.length-1])];
+  report.requiredImages=indices.length;
+  try {
+    for(const index of indices){
+      const started=performance.now();
+      let resource;
+      let image;
+      try {
+        resource=await runtime.acquireImage({requestId:crypto.randomUUID(),sourceId,pageSessionId,pageKey:pages.pages[index].pageKey,generation:session.generation,timeoutMs:60000});
+        if(resource.generation!==session.generation||!resource.url?.startsWith('blob:'))throw new Error('Invalid resource ownership');
+        image=new Image(); image.src=resource.url; image.alt='Processed page '+(index+1);
+        await image.decode();document.querySelector('#images').append(image);
+        if(image.naturalWidth!==resource.width||image.naturalHeight!==resource.height)throw new Error('Image dimension descriptor mismatch');
+        const summary={index,ok:true,byteLength:resource.byteLength,mimeType:resource.mimeType,width:resource.width,height:resource.height,elapsedMs:Math.round(performance.now()-started)};
+        report.images.push(summary);await record('imageDecoded',summary);
+      }catch(error){
+        const summary={index,ok:false,error:failure(error)};report.images.push(summary);await record('imageFailed',summary);
+      }finally{
+        if(image){image.remove();image.removeAttribute('src');}
+        if(resource){
+          const release={resourceId:resource.resourceId,generation:resource.generation};
+          if((await runtime.releaseImage(release)).released!==true)throw new Error('Missing image release acknowledgement');
+          if((await runtime.releaseImage(release)).released!==true)throw new Error('Missing repeated release acknowledgement');
+          let revoked=false;
+          try{const response=await fetch(resource.url);revoked=!response.ok;}catch{revoked=true;}
+          if(!revoked)throw new Error('Released Blob URL remains readable');
+          await record('imageReleased',{index,revoked});
+        }
+      }
+    }
+  }finally{
+    if((await runtime.closePageSession({pageSessionId,generation:session.generation})).closed!==true)throw new Error('Missing page session close acknowledgement');
+    await record('pageSessionClosed',true);
+  }
+  if(report.images.length!==report.requiredImages||report.images.some(image=>!image.ok))throw new Error('One or more required page images failed');
+  report.imageGate='passed';
+  await record('imageGatePassed',true);
+};
 window.addEventListener('unhandledrejection',event=>record('unhandledRejection',failure(event.reason)));
 await record('hello', await runtime.ready);
 const button = document.querySelector('#run');button.disabled = false;
@@ -248,11 +300,14 @@ button.onclick = async () => {
     if(manga){
       const details=await call('details',{manga});
       const chapters=await call('chapters',{manga:details??manga});
-      if(chapters?.chapters?.[0])await call('pages',{chapter:chapters.chapters[0]});
+      if(chapters?.chapters?.[0]){
+        const pages=await call('pages',{chapter:chapters.chapters[0]});
+        if(${verifyImages}&&pages)await checkImages(session,sourceId,pages);
+      }
       else await record('pagesBlocked','No real chapter reference was returned');
     }else await record('referenceOperationsBlocked','No real manga reference was returned; details/chapters/pages were not fabricated');
   }catch(error){await record('openError',failure(error));}
-  finally{report.finished=true;await runtime.dispose();await record('finished',true);}
+  finally{if(report.imageGate==='pending')report.imageGate='failed';report.finished=true;await runtime.dispose();await record('finished',true);}
 };
 </script></html>`;
 
@@ -468,13 +523,27 @@ const server = createServer(async (request, response) => {
         .end(material.bytes);
       return;
     }
-    if (request.method === 'GET' && pathname === '/') {
+    if (
+      request.method === 'GET' &&
+      pathname === (readerAssets ? '/probe' : '/')
+    ) {
       response
         .writeHead(200, {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store',
         })
         .end(html);
+      return;
+    }
+    // Never let a missing runtime/extension/API asset fall through to Flutter.
+    if (
+      readerAssets &&
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !/^\/(?:runtime|extensions|api)(?:\/|$)/.test(pathname)
+    ) {
+      readerAssets(request, response, () => {
+        response.writeHead(404).end();
+      });
       return;
     }
     if (
@@ -515,6 +584,10 @@ await new Promise<void>((resolve) =>
 const address = server.address();
 assert(address && typeof address !== 'string', 'Missing Source probe address');
 console.log(`Live Source metadata probe: http://127.0.0.1:${address.port}/`);
+if (readerAssets) {
+  console.log(`Flutter reader: http://127.0.0.1:${address.port}/`);
+  console.log(`Metadata/image gate: http://127.0.0.1:${address.port}/probe`);
+}
 console.log(`Evidence: ${evidenceFile}`);
 let closing = false;
 async function close() {

@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
+import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'browse/fakes.dart';
 
 void main() {
@@ -29,7 +33,7 @@ void main() {
   }
 
   testWidgets(
-    'real DTO flow shows metadata and keeps chapters unreadable until images are supported',
+    'chapter navigation preserves Source reference and Native reports its image gate',
     (tester) async {
       final platform = TestPlatform();
       await tester.pumpWidget(KaruyomiApp(platform: platform));
@@ -44,7 +48,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('漫画源返回的完整简介'), findsOneWidget);
       expect(find.text('第 1 章'), findsOneWidget);
-      expect(find.text('暂不可读'), findsOneWidget);
       expect(find.byType(Image), findsNothing);
       expect(
         tester
@@ -55,8 +58,79 @@ void main() {
               ),
             )
             .enabled,
-        false,
+        true,
       );
+      await tester.tap(find.text('第 1 章'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderScreen), findsOneWidget);
+      expect(platform.invocations.last['operation'], 'pages');
+      expect(platform.invocations.last['args'], {
+        'chapter': {'url': '/chapter/opaque-ref', 'name': '第 1 章'},
+      });
+      expect(find.text('当前平台尚未支持图片阅读'), findsOneWidget);
+      expect(platform.imageControls.single.$1, 'acquireImage');
+      expect(platform.imageControls.single.$2['pageKey'], 'p-0');
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(platform.imageControls.last.$1, 'closePageSession');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'chapter completion during details exit closes its session without opening Reader',
+    (tester) async {
+      final platform = TestPlatform();
+      await tester.pumpWidget(KaruyomiApp(platform: platform));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('去浏览'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('source.test · 1.0'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('测试漫画源 · zh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('真实源 DTO 测试'));
+      await tester.pumpAndSettle();
+
+      final pages = Completer<Object?>();
+      platform.invokeHandler = (payload) {
+        expect(payload['operation'], 'pages');
+        return pages.future;
+      };
+      final detailsContext = tester.element(find.byType(MangaDetailsPage));
+      final detailsRoute = ModalRoute.of(detailsContext)!;
+      await tester.tap(find.text('第 1 章'));
+      await tester.pump();
+      await tester.tap(find.byType(BackButton));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(detailsContext.mounted, true);
+      expect(detailsRoute.isCurrent, false);
+      expect(detailsRoute.isActive, false);
+
+      pages.complete({
+        'pageSessionId': 'departed-details-session',
+        'pages': [
+          {
+            'pageKey': 'p-0',
+            'index': 0,
+            'sourceIndex': 0,
+            'url': '/page/stable-1',
+            'imageUrl': 'https://source.invalid/raw-1.png',
+          },
+        ],
+      });
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderScreen), findsNothing);
+      expect(find.byType(MangaDetailsPage), findsNothing);
+      expect(find.text('真实源 DTO 测试'), findsOneWidget);
+      expect(platform.imageControls, hasLength(1));
+      expect(platform.imageControls.single.$1, 'closePageSession');
+      expect(platform.imageControls.single.$2, {
+        'pageSessionId': 'departed-details-session',
+        'generation': 'generation-1',
+      });
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();

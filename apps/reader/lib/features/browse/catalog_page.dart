@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'catalog_controller.dart';
+import '../reader/reader_screen.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -32,6 +33,7 @@ class _CatalogPageState extends State<CatalogPage> {
           controller: controller,
           manga: details.manga,
           chapters: details.chapters,
+          source: details.source,
         ),
       ),
     );
@@ -254,21 +256,55 @@ class MangaDetailsPage extends StatelessWidget {
     required this.controller,
     required this.manga,
     required this.chapters,
+    required this.source,
   });
   final CatalogController controller;
   final MangaEntry manga;
   final List<ChapterEntry> chapters;
+  final CatalogSourceRef source;
+
+  Future<void> _openChapter(BuildContext context, ChapterEntry chapter) async {
+    final route = ModalRoute.of(context);
+    final opened = await controller.openChapter(
+      manga,
+      chapter,
+      reference: source,
+    );
+    if (opened == null) return;
+    if (!context.mounted ||
+        route?.isCurrent != true ||
+        route?.isActive != true) {
+      await controller.closeChapter(opened);
+      return;
+    }
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => ReaderScreen(
+            manifest: opened.manifest,
+            provider: opened.provider,
+            generation: opened.generation,
+            title: opened.title,
+            onClosed: () => controller.closeChapter(opened),
+          ),
+        ),
+      );
+    } catch (_) {
+      await controller.closeChapter(opened);
+      rethrow;
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(manga.title)),
     body: AnimatedBuilder(
       animation: controller,
-      builder: (context, _) => controller.session == null
+      builder: (context, _) => !controller.isCurrentSource(source)
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(controller.error ?? '漫画源已断开，请返回浏览重新连接。'),
+                child: Text(controller.error ?? '漫画源会话已变化，请返回浏览重新打开详情。'),
               ),
             )
           : Center(
@@ -307,10 +343,12 @@ class MangaDetailsPage extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 12),
-                    const _Notice(
-                      text: '图片处理功能尚未就绪，章节暂不可读。',
-                      icon: Icons.image_not_supported_outlined,
-                    ),
+                    if (controller.busy) const LinearProgressIndicator(),
+                    if (controller.error != null)
+                      _Notice(
+                        text: controller.error!,
+                        icon: Icons.error_outline,
+                      ),
                     if (chapters.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(24),
@@ -318,10 +356,10 @@ class MangaDetailsPage extends StatelessWidget {
                       ),
                     for (final chapter in chapters)
                       ListTile(
-                        enabled: false,
+                        enabled: !controller.busy,
                         leading: const Icon(Icons.article_outlined),
                         title: Text(chapter.name),
-                        subtitle: const Text('暂不可读'),
+                        onTap: () => _openChapter(context, chapter),
                       ),
                   ],
                 ),

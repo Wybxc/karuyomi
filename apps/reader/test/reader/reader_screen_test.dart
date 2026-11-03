@@ -7,6 +7,8 @@ final class FixturePageProvider implements PageProvider {
   final acquired = <PageRef>[];
   final released = <String>[];
   final cancelled = <String>[];
+  int width = 600;
+  int height = 900;
 
   @override
   Future<ImageResource> acquire(PageRef ref) async {
@@ -17,6 +19,8 @@ final class FixturePageProvider implements PageProvider {
       location: Uri.parse('https://processed-fixture.invalid/${ref.pageKey}'),
       mimeType: 'image/png',
       byteLength: 100,
+      width: width,
+      height: height,
     );
   }
 
@@ -57,6 +61,7 @@ Widget screen({
     initialMode: mode,
     onPositionChanged: onPosition,
     imageBuilder: fixtureImage,
+    imageEvictor: (_) async {},
   ),
 );
 
@@ -179,4 +184,44 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+    'learned image dimensions preserve page, offset and content version',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider()
+        ..width = 1200
+        ..height = 600;
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: 'content-v1',
+        pages: List.generate(12, (index) => ReaderPage(key: 'page-$index')),
+      );
+      final positions = <ReadingPosition>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          position: manifest.positionAt(4, offset: 0.3),
+          mode: ReadingMode.continuous,
+          onPosition: positions.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(positions.last.pageKey, 'page-4');
+      expect(positions.last.manifestVersion, 'content-v1');
+      expect(positions.last.normalizedOffset, closeTo(0.3, 0.01));
+      // Learned 2:1 images have a much smaller logical height than the 2:3 fallback.
+      expect(
+        tester.getSize(find.byKey(const ValueKey('runtime-1-page-4'))).height,
+        closeTo(360 / 2, 1),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

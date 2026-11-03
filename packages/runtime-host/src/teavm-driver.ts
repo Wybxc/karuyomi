@@ -3,6 +3,7 @@ import { sourceInfoSchema } from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
 import { VerifiedLoader } from './verified-loader.js';
 import { BinaryHttpTransport, type HttpCallContext } from './http-transport.js';
+import { ImageSink } from './image-channel.js';
 
 export interface RuntimeDriver {
   open(
@@ -18,12 +19,30 @@ export interface RuntimeDriver {
     context?: HttpCallContext,
   ): Promise<unknown>;
   close(): Promise<void>;
+  acquireImage?(
+    sourceId: string,
+    pageSessionId: string,
+    pageKey: string,
+    port: MessagePort,
+    resourceId: string,
+    context: HttpCallContext,
+  ): Promise<unknown>;
+  closePageSession?(
+    pageSessionId: string,
+    context: HttpCallContext,
+  ): Promise<unknown>;
 }
 
 export interface TeaVMGlobals {
   hostInit?: (userAgent: string) => void;
   hostLoad?: () => void;
   hostInvoke?: (sourceId: string, operation: string, argsJson: string) => void;
+  hostAcquireImage?: (
+    sourceId: string,
+    pageSessionId: string,
+    pageKey: string,
+  ) => void;
+  hostClosePageSession?: (pageSessionId: string) => void;
   teaDone?: (value: string) => void;
   teaFail?: (error: string) => void;
   teaHttpOpen?: (request: string) => string;
@@ -35,6 +54,10 @@ export interface TeaVMGlobals {
   ) => Promise<Uint8Array | null>;
   teaHttpClose?: (handle: string) => void;
   teaHttpCancel?: (handle: string) => void;
+  teaImageOpen?: (mimeType: string) => string;
+  teaImageWrite?: (handle: string, bytes: Uint8Array) => Promise<void>;
+  teaImageClose?: (handle: string) => Promise<string>;
+  teaImageCancel?: (handle: string) => void;
   teaBrowser?: () => never;
   teaFileSystemClose?: () => Promise<void>;
   karuyomiResources?: Record<string, string>;
@@ -48,6 +71,8 @@ export class TeaVMDriver implements RuntimeDriver {
   private readonly objectUrls = new Set<string>();
   private closed = false;
   private binaryTransport: BinaryHttpTransport | undefined;
+  private imageSink: ImageSink | undefined;
+  private imageFailure: RuntimeFailure | undefined;
   private readonly fallbackGeneration = crypto.randomUUID();
 
   constructor(
@@ -68,6 +93,10 @@ export class TeaVMDriver implements RuntimeDriver {
         waiter?.reject(failure);
         return;
       }
+      if (this.imageFailure) {
+        waiter?.reject(this.imageFailure);
+        return;
+      }
       try {
         waiter?.resolve(JSON.parse(json));
       } catch {
@@ -80,7 +109,10 @@ export class TeaVMDriver implements RuntimeDriver {
       const waiter = this.waiter;
       this.waiter = undefined;
       const error =
-        this.bridgeFailure ??
+        (this.bridgeFailure?.code === 'access_required' ||
+        this.bridgeFailure?.code === 'access_denied'
+          ? this.bridgeFailure
+          : (this.imageFailure ?? this.bridgeFailure)) ??
         new RuntimeFailure(
           'source_error',
           message,
@@ -100,6 +132,13 @@ export class TeaVMDriver implements RuntimeDriver {
       this.captureAsync(() => this.binary().read(handle, maxBytes));
     scope.teaHttpClose = (handle) => this.binaryTransport?.close(handle);
     scope.teaHttpCancel = scope.teaHttpClose;
+    scope.teaImageOpen = (mimeType) =>
+      this.capture(() => this.images().open(mimeType));
+    scope.teaImageWrite = (handle, bytes) =>
+      this.captureAsync(() => this.images().write(handle, bytes));
+    scope.teaImageClose = (handle) =>
+      this.captureAsync(() => this.images().close(handle));
+    scope.teaImageCancel = (handle) => this.imageSink?.cancel(handle);
     // The prototype callback relay/eval Worker is deliberately not installed.
     // Sources requiring remote scripts get an explicit capability error.
     scope.teaBrowser = () => {
@@ -108,6 +147,15 @@ export class TeaVMDriver implements RuntimeDriver {
         'Remote script execution is not available in this host',
       );
     };
+  }
+
+  private images(): ImageSink {
+    if (!this.imageSink)
+      throw new RuntimeFailure(
+        'protocol_error',
+        'No image operation is active',
+      );
+    return this.imageSink;
   }
 
   private binary(): BinaryHttpTransport {
@@ -215,11 +263,13 @@ export class TeaVMDriver implements RuntimeDriver {
     if (
       !this.scope.hostInit ||
       !this.scope.hostLoad ||
-      !this.scope.hostInvoke
+      !this.scope.hostInvoke ||
+      !this.scope.hostAcquireImage ||
+      !this.scope.hostClosePageSession
     ) {
       throw new RuntimeFailure(
         'unsupported_capability',
-        'This build does not export the product hostInit/hostLoad/hostInvoke ABI',
+        'This build does not export the complete Source and image host ABI',
       );
     }
     await this.call(() => this.scope.hostInit!(userAgent), context);
@@ -256,9 +306,54 @@ export class TeaVMDriver implements RuntimeDriver {
     );
   }
 
+  async acquireImage(
+    sourceId: string,
+    pageSessionId: string,
+    pageKey: string,
+    port: MessagePort,
+    resourceId: string,
+    context: HttpCallContext,
+  ): Promise<unknown> {
+    if (this.waiter)
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Concurrent TeaVM entry is not allowed',
+      );
+    const sink = new ImageSink(port, resourceId, (error) => {
+      this.imageFailure ??= error;
+      this.binaryTransport?.end();
+    });
+    this.imageSink = sink;
+    this.imageFailure = undefined;
+    try {
+      return await this.call(
+        () => this.scope.hostAcquireImage!(sourceId, pageSessionId, pageKey),
+        context,
+      );
+    } finally {
+      sink.dispose();
+      this.imageSink = undefined;
+      this.imageFailure = undefined;
+    }
+  }
+
+  closePageSession(
+    pageSessionId: string,
+    context: HttpCallContext,
+  ): Promise<unknown> {
+    return this.call(
+      () => this.scope.hostClosePageSession!(pageSessionId),
+      context,
+    );
+  }
+
   async close(): Promise<void> {
     this.closed = true;
     this.binaryTransport?.dispose();
+    this.imageSink?.abort(
+      new RuntimeFailure('runtime_lost', 'Image runtime was closed'),
+    );
+    this.imageSink?.dispose();
     this.waiter?.reject(
       new RuntimeFailure('runtime_lost', 'TeaVM driver was closed'),
     );

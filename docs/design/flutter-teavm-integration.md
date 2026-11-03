@@ -76,9 +76,11 @@ abstract interface class SourceRuntime {
   Stream<RuntimeEvent> get events;
   Future<RuntimeSession> open(BuildDescriptor build);
   Future<SourceResult> invoke(SourceRequest request);
-  Future<ImageResource> acquireImage(PageRef page);
+  Future<ImageResource> acquireImage(ImageAcquireRequest request);
+  Future<void> cancelImage(ImageCancelRequest request);
+  Future<void> releaseImage(ImageReleaseRequest request);
+  Future<void> closePageSession(PageSessionCloseRequest request);
   Future<void> cancel(RequestId requestId);
-  Future<void> release(ImageResourceId resourceId);
   Future<void> dispose();
 }
 ```
@@ -94,6 +96,8 @@ ImageResource 是可释放资源，不统一成“每次完整 Uint8List”：
 | 共用 | 明确 acquire/release、引用与 generation；限制图片窗口、未完成字节、并发和过期资源；取消时停止生产及清理残留                    |
 
 HTTP/JSO 二进制网络桥 P0-B 与上述 WebView → 原生通道是不同边界，两者都须验证。仅将控制 JSON 传通不算完成图片桥。
+
+产品 Web 图片通道采用每次获取一个 MessageChannel、至多一块未确认 DATA、主线程管理 Blob 资源的方式。Java 保留原始 Page 会话，经原 Source 图片链输出处理后正文；Dart 通过绑定章节的 PageProvider 将逻辑页键映射到会话页键。HTTP handle 不跨 Source 调用存活，不能充当图片资源。合同、取消时等待 Java 退出的原因及验收边界见[图片资源通道](../IMAGE-RESOURCES.md)。Native 受管文件未接通前明确返回能力不足，不把 Web Blob URL 当作原生文件。
 
 ### 原生二进制通道的核查结果
 
@@ -161,7 +165,7 @@ Dart 业务存储与 TeaVM 文件/HTTP Cache 分开所有权。原生业务镜�
 - Worker API：TypeScript/Hono、Access/jose、D1/DO，按个人对象需要使用 R2；不承载扩展正文，也不提供私有 GitHub 下载 token 服务。
 - Java/Maven：锁定 TeaVM 工具链与真实上游 submodule，每包 AOT 编译；项目宿主持续维护，变化后更新构建指纹并回归。
 - 原生插件：仅管理必要的 WebView/字节通道/临时资源，平台代码不进入业务 UI。
-- 当前使用版本化控制协议及各端运行时解析；统一 IDL / Protobuf 双端 DTO 生成仍属讨论，未定案或实施。Dart Native 与 Web 用条件导入选择 adapter，Web 条件使用 dart.library.js_interop，支持范围由实际 JS/Wasm 构建验证。
+- 当前使用版本化控制协议及各端运行时解析；统一 IDL 已选定 Protobuf + Buf、双端生成与 ProtoJSON 小控制消息，尚未实施，比较与边界见[协议决策](cross-language-protocol.md)。Dart Native 与 Web 用条件导入选择 adapter，Web 条件使用 dart.library.js_interop，支持范围由实际 JS/Wasm 构建验证。
 
 不建立全平台假同步接口，不在 UI 层暴露 Java对象、任意 JS 引擎对象或平台裸指针。
 

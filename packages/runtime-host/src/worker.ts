@@ -26,7 +26,7 @@ const runtime = new WorkerRuntime(driver, (message) =>
 );
 globalThis.postMessage(createHello(runtime.workerInstanceId));
 globalThis.onmessage = (event: MessageEvent<unknown>) => {
-  void runtime.receive(event.data);
+  void runtime.receive(event.data, event.ports);
 };
 globalThis.addEventListener('unhandledrejection', () => {
   // Fatal unbound async work invalidates the generation; it is never replayed.

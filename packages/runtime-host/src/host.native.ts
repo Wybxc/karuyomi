@@ -83,7 +83,8 @@ if (!window.karuyomiRuntime) {
       set onerror(value) {
         worker.onerror = value;
       },
-      postMessage: (message) => worker.postMessage(message),
+      postMessage: (message, transfer = []) =>
+        worker.postMessage(message, transfer),
       terminate: () => {
         worker.terminate();
         revoke();
@@ -95,6 +96,8 @@ if (!window.karuyomiRuntime) {
       workerUrl,
       createWorker,
       new VerifiedLoader(origin, undefined, () => undefined),
+      60_000,
+      { enabled: false },
     ),
   );
 }

@@ -1,12 +1,12 @@
 package prototype;
 
-import org.teavm.jso.*;
-import org.teavm.interop.Async;
-import org.teavm.interop.AsyncCallback;
-import org.teavm.jso.typedarrays.Uint8Array;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
+import org.teavm.interop.Async;
+import org.teavm.interop.AsyncCallback;
+import org.teavm.jso.*;
+import org.teavm.jso.typedarrays.Uint8Array;
 
 public final class Bridge {
   @Async
@@ -41,8 +41,9 @@ public final class Bridge {
   @JSBody(
       params = {"metadata", "ok", "fail"},
       script =
-          "try { ok(self.teaHttpOpen(metadata)); } catch (failureReason) {"
-              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')); }")
+          "try { ok(self.teaHttpOpen(metadata)); } catch (failureReason)"
+              + " {fail(String(failureReason.message || failureReason), String(failureReason.name"
+              + " || 'Error'), String(failureReason.code || '')); }")
   private static native void httpOpen(String metadata, Reply ok, HttpFailure fail);
 
   public static void httpWrite(String handle, byte[] bytes) throws IOException {
@@ -59,8 +60,9 @@ public final class Bridge {
   @JSBody(
       params = {"handle", "bytes", "fail"},
       script =
-          "try { self.teaHttpWrite(handle, bytes); } catch (failureReason) {"
-              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')); }")
+          "try { self.teaHttpWrite(handle, bytes); } catch (failureReason)"
+              + " {fail(String(failureReason.message || failureReason), String(failureReason.name"
+              + " || 'Error'), String(failureReason.code || '')); }")
   private static native void httpWrite(String handle, Uint8Array bytes, HttpFailure fail);
 
   @Async
@@ -82,8 +84,9 @@ public final class Bridge {
   @JSBody(
       params = {"handle", "ok", "fail"},
       script =
-          "Promise.resolve().then(() => self.teaHttpFinish(handle)).then(ok, failureReason => "
-              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || ''), failureReason.retryable === true));")
+          "Promise.resolve().then(() => self.teaHttpFinish(handle)).then(ok, failureReason =>"
+              + " fail(String(failureReason.message || failureReason), String(failureReason.name ||"
+              + " 'Error'), String(failureReason.code || ''), failureReason.retryable === true));")
   private static native void httpFinish(String handle, Reply ok, HttpNetworkFailure fail);
 
   @JSFunctor
@@ -140,8 +143,9 @@ public final class Bridge {
   @JSBody(
       params = {"handle", "maximum", "ok", "fail"},
       script =
-          "Promise.resolve().then(() => self.teaHttpRead(handle, maximum)).then(ok, failureReason => "
-              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')));")
+          "Promise.resolve().then(() => self.teaHttpRead(handle, maximum)).then(ok, failureReason"
+              + " => fail(String(failureReason.message || failureReason), String(failureReason.name"
+              + " || 'Error'), String(failureReason.code || '')));")
   private static native void httpReadChunk(
       String handle, int maximum, HttpChunk ok, HttpFailure fail);
 
@@ -153,6 +157,75 @@ public final class Bridge {
     httpControl("teaHttpCancel", handle);
   }
 
+  public static String imageOpen(String mimeType) throws IOException {
+    String[] value = new String[1];
+    HttpError error = new HttpError();
+    imageOpen(mimeType, result -> value[0] = result, error::accept);
+    error.check();
+    if (value[0] == null || value[0].isEmpty()) throw new IOException("Missing image sink handle");
+    return value[0];
+  }
+
+  @JSBody(
+      params = {"mimeType", "ok", "fail"},
+      script =
+          "try { ok(self.teaImageOpen(mimeType)); } catch (failureReason)"
+              + " {fail(String(failureReason.message || failureReason), String(failureReason.name"
+              + " || 'Error'), String(failureReason.code || '')); }")
+  private static native void imageOpen(String mimeType, Reply ok, HttpFailure fail);
+
+  public static void imageWrite(String handle, byte[] bytes) throws IOException {
+    if (bytes.length < 1 || bytes.length > HttpBodySource.MAX_CHUNK)
+      throw new IOException("Invalid processed image chunk size");
+    Uint8Array copy = new Uint8Array(bytes.length);
+    for (int index = 0; index < bytes.length; index++)
+      copy.set(index, (short) (bytes[index] & 255));
+    imageWriteChunk(handle, copy);
+  }
+
+  @Async
+  private static native String imageWriteChunk(String handle, Uint8Array bytes) throws IOException;
+
+  private static void imageWriteChunk(
+      String handle, Uint8Array bytes, AsyncCallback<String> callback) {
+    imageWriteChunk(
+        handle,
+        bytes,
+        callback::complete,
+        (message, name, code) -> callback.error(httpError(message, name, code)));
+  }
+
+  @JSBody(
+      params = {"handle", "bytes", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaImageWrite(handle, bytes)).then(() => ok(''),"
+              + " failureReason => fail(String(failureReason.message || failureReason),"
+              + " String(failureReason.name || 'Error'), String(failureReason.code || '')));")
+  private static native void imageWriteChunk(
+      String handle, Uint8Array bytes, Reply ok, HttpFailure fail);
+
+  @Async
+  public static native String imageClose(String handle) throws IOException;
+
+  private static void imageClose(String handle, AsyncCallback<String> callback) {
+    imageClose(
+        handle,
+        callback::complete,
+        (message, name, code) -> callback.error(httpError(message, name, code)));
+  }
+
+  @JSBody(
+      params = {"handle", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaImageClose(handle)).then(ok, failureReason =>"
+              + " fail(String(failureReason.message || failureReason), String(failureReason.name ||"
+              + " 'Error'), String(failureReason.code || '')));")
+  private static native void imageClose(String handle, Reply ok, HttpFailure fail);
+
+  public static void imageCancel(String handle) throws IOException {
+    httpControl("teaImageCancel", handle);
+  }
+
   private static void httpControl(String operation, String handle) throws IOException {
     HttpError error = new HttpError();
     httpControl(operation, handle, error::accept);
@@ -162,8 +235,9 @@ public final class Bridge {
   @JSBody(
       params = {"operation", "handle", "fail"},
       script =
-          "try { self[operation](handle); } catch (failureReason) {"
-              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')); }")
+          "try { self[operation](handle); } catch (failureReason)"
+              + " {fail(String(failureReason.message || failureReason), String(failureReason.name"
+              + " || 'Error'), String(failureReason.code || '')); }")
   private static native void httpControl(String operation, String handle, HttpFailure fail);
 
   private static IOException httpError(String message, String name, String code) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:reader_core/reader_core.dart';
 
 import 'fakes.dart';
 
@@ -140,6 +141,47 @@ void main() {
     },
   );
 
+  test(
+    'empty page URLs use content version so same-length reorders cannot claim a stable page',
+    () async {
+      await open();
+      final manga = controller.mangas.single;
+      final chapter = ChapterEntry({'url': '/chapter/ref', 'name': 'chapter'});
+      var images = ['first', 'second'];
+      platform.invokeHandler = (payload) async => {
+        'pageSessionId': 'pages-empty',
+        'pages': [
+          for (var i = 0; i < images.length; i++)
+            {
+              'pageKey': 'p-$i',
+              'index': i,
+              'sourceIndex': i,
+              'url': '',
+              'imageUrl': 'https://source.invalid/${images[i]}.png',
+            },
+        ],
+      };
+      final first = await controller.openChapter(
+        manga,
+        chapter,
+        reference: controller.sourceReference,
+      );
+      final position = first!.manifest.positionAt(0, offset: 0.3);
+      await controller.closeChapter(first);
+      images = images.reversed.toList();
+      final second = await controller.openChapter(
+        manga,
+        chapter,
+        reference: controller.sourceReference,
+      );
+      expect(second!.manifest.version, isNot(first.manifest.version));
+      final resolved = resolvePosition(second.manifest, position);
+      expect(resolved.kind, PositionResolutionKind.missingPage);
+      expect(resolved.position!.pageIndexHint, 0);
+      await controller.closeChapter(second);
+    },
+  );
+
   test('static index rejects duplicate package versions', () async {
     final entry = {
       'buildId': 'build-1',
@@ -157,4 +199,114 @@ void main() {
     expect(controller.builds, isEmpty);
     expect(controller.error, contains('每包只包含一个当前版本'));
   });
+
+  test(
+    'chapter manifests separate stable reading keys from opaque Page handles',
+    () async {
+      await open();
+      final manga = controller.mangas.single;
+      final details = await controller.details(manga);
+      final first = await controller.openChapter(
+        manga,
+        details!.chapters.single,
+        reference: details.source,
+      );
+      expect(first!.provider.pageSessionId, 'pages-1');
+      expect(first.provider.pageKeys.values, ['p-0']);
+      expect(first.manifest.pages.single.width, isNull);
+      expect(first.manifest.pages.single.key, isNot('p-0'));
+      await controller.closeChapter(first);
+      platform.invokeHandler = (payload) async => {
+        'pageSessionId': 'replacement-session',
+        'pages': [
+          {
+            'pageKey': 'new-opaque-key',
+            'index': 0,
+            'sourceIndex': 7,
+            'url': '/page/stable-1',
+            'imageUrl': 'https://source.invalid/rotated-token.png',
+          },
+        ],
+      };
+      final second = await controller.openChapter(
+        manga,
+        details.chapters.single,
+        reference: details.source,
+      );
+      expect(second!.manifest.chapterKey, first.manifest.chapterKey);
+      expect(second.manifest.pages.single.key, first.manifest.pages.single.key);
+      expect(second.provider.pageKeys.values, ['new-opaque-key']);
+      expect(second.manifest.version, isNot(first.manifest.version));
+      await controller.closeChapter(second);
+    },
+  );
+
+  test(
+    'malformed page references close their original Java page session',
+    () async {
+      await open();
+      platform.invokeHandler = (payload) async => {
+        'pageSessionId': 'malformed-session',
+        'pages': [
+          {
+            'pageKey': 'p-0',
+            'index': 1,
+            'sourceIndex': 0,
+            'url': '',
+            'imageUrl': null,
+          },
+        ],
+      };
+      final chapter = ChapterEntry({'url': '/chapter/ref', 'name': 'chapter'});
+      expect(
+        await controller.openChapter(
+          controller.mangas.single,
+          chapter,
+          reference: controller.sourceReference,
+        ),
+        isNull,
+      );
+      expect(controller.error, '漫画源页面引用无效');
+      expect(platform.imageControls.last.$1, 'closePageSession');
+      expect(platform.imageControls.last.$2, {
+        'pageSessionId': 'malformed-session',
+        'generation': 'generation-1',
+      });
+    },
+  );
+
+  test(
+    'old details never submit their chapter to another Source slot',
+    () async {
+      await open();
+      final manga = controller.mangas.single;
+      final chapter = ChapterEntry({'url': '/chapter/ref', 'name': 'chapter'});
+      final before = platform.invocations.length;
+      for (final reference in [
+        CatalogSourceRef(
+          buildId: 'different-build',
+          sourceId: sourceId,
+          generation: 'generation-1',
+        ),
+        CatalogSourceRef(
+          buildId: 'build-1',
+          sourceId: 'different-source',
+          generation: 'generation-1',
+        ),
+        CatalogSourceRef(
+          buildId: 'build-1',
+          sourceId: sourceId,
+          generation: 'old-generation',
+        ),
+      ]) {
+        expect(
+          await controller.openChapter(manga, chapter, reference: reference),
+          isNull,
+        );
+        expect(controller.error, contains('会话已过期'));
+      }
+      expect(platform.invocations.length, before);
+      expect(controller.session, isNotNull);
+    },
+  );
 }

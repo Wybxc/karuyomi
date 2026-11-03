@@ -41,6 +41,7 @@ final class _Acquisition {
 /// Decoded costs are estimates; providers must additionally bound processing
 /// buffers, and platform adapters must enforce actual decode/resource budgets.
 final class ImageScheduler {
+  static int _instanceSequence = 0;
   ImageScheduler({
     required this.provider,
     this.maxConcurrent = 2,
@@ -75,6 +76,7 @@ final class ImageScheduler {
   final _active = <String, _Acquisition>{};
   final _wanted = <String, ReaderPage>{};
   final _pendingCleanup = <Future<void>>{};
+  final int _instanceId = ++_instanceSequence;
   String _chapterKey = '';
   String _generation = '';
   int _epoch = 0;
@@ -91,9 +93,9 @@ final class ImageScheduler {
         .where((job) => !job.cancelled && job.epoch == _epoch)
         .map((job) => job.ref.pageKey),
     residentBytes: _resources.values.fold(0, (sum, r) => sum + r.byteLength),
-    estimatedDecodedBytes: _resources.keys.fold(
+    estimatedDecodedBytes: _resources.values.fold(
       0,
-      (sum, key) => sum + _estimatedCost(_wanted[key]),
+      (sum, image) => sum + image.width * image.height * 4,
     ),
     cleanupError: _cleanupError,
   );
@@ -103,8 +105,12 @@ final class ImageScheduler {
     return (_idle ??= Completer<void>()).future;
   }
 
-  int _estimatedCost(ReaderPage? page) =>
-      page?.estimatedDecodedBytes ?? unknownPageDecodedEstimate;
+  int _estimatedCost(ReaderPage? page) {
+    final image = _resources[page?.key];
+    return image == null
+        ? page?.estimatedDecodedBytes ?? unknownPageDecodedEstimate
+        : image.width * image.height * 4;
+  }
 
   /// [pages] is in priority order: visible, forward prefetch, backward reserve.
   /// A generation/chapter switch invalidates all results and prior ownership.
@@ -194,7 +200,7 @@ final class ImageScheduler {
       }
       final job = _Acquisition(
         PageRef(
-          requestId: 'reader-$_epoch-${++_requestCounter}',
+          requestId: 'reader-$_instanceId-$_epoch-${++_requestCounter}',
           chapterKey: _chapterKey,
           pageKey: page.key,
           generation: _generation,
@@ -251,17 +257,24 @@ final class ImageScheduler {
       final ranks = _wanted.keys.toList();
       final incomingRank = ranks.indexOf(job.ref.pageKey);
       var residentBytes = snapshot.residentBytes;
+      var decodedBytes = snapshot.estimatedDecodedBytes;
+      final incomingDecodedBytes = resource.width * resource.height * 4;
       for (final key in ranks.reversed) {
-        if (residentBytes + resource.byteLength <= maxResidentBytes) break;
+        if (residentBytes + resource.byteLength <= maxResidentBytes &&
+            decodedBytes + incomingDecodedBytes <= maxEstimatedDecodedBytes) {
+          break;
+        }
         if (ranks.indexOf(key) <= incomingRank) continue;
         final evicted = _resources.remove(key);
         if (evicted != null) {
           residentBytes -= evicted.byteLength;
+          decodedBytes -= evicted.width * evicted.height * 4;
           _errors[key] = const ImageBudgetExceeded('预取窗口已缩小以保留当前图片。');
           _cleanup(() => provider.release(evicted.id));
         }
       }
-      if (residentBytes + resource.byteLength > maxResidentBytes) {
+      if (residentBytes + resource.byteLength > maxResidentBytes ||
+          decodedBytes + incomingDecodedBytes > maxEstimatedDecodedBytes) {
         _cleanup(() => provider.release(resource.id));
         throw const ImageBudgetExceeded('图片资源超过当前内存预算。');
       }

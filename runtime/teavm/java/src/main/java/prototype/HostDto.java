@@ -119,12 +119,14 @@ public final class HostDto {
     return dto;
   }
 
-  public static JsonObject pages(List<Page> pages) {
+  public static JsonObject pages(String pageSessionId, List<Page> pages) {
     JsonObject dto = new JsonObject();
+    dto.addProperty("pageSessionId", pageSessionId);
     JsonArray items = new JsonArray();
     for (int index = 0; index < pages.size(); index++) {
       Page page = pages.get(index);
       JsonObject item = new JsonObject();
+      item.addProperty("pageKey", "p-" + index);
       item.addProperty("index", index);
       item.addProperty("sourceIndex", page.getIndex());
       item.addProperty("url", page.getUrl());

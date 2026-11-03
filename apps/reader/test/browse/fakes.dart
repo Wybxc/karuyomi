@@ -35,6 +35,7 @@ final class TestPlatform extends PlatformRuntime {
   };
   int authCalls = 0;
   final invocations = <Map<String, Object?>>[];
+  final imageControls = <(String, Map<String, Object?>)>[];
   Map<String, Object?>? continuation;
   Future<Object?> Function(Map<String, Object?> payload)? invokeHandler;
 
@@ -110,6 +111,18 @@ final class TestPlatform extends PlatformRuntime {
                 {'url': '/chapter/opaque-ref', 'name': '第 1 章'},
               ],
             },
+            'pages' => {
+              'pageSessionId': 'pages-1',
+              'pages': [
+                {
+                  'pageKey': 'p-0',
+                  'index': 0,
+                  'sourceIndex': 7,
+                  'url': '/page/stable-1',
+                  'imageUrl': 'https://source.invalid/raw-1.png',
+                },
+              ],
+            },
             _ => {
               'mangas': [testManga],
               'hasNextPage': false,
@@ -122,6 +135,19 @@ final class TestPlatform extends PlatformRuntime {
           'buildId': 'build-1',
           'data': data,
         };
+      case 'acquireImage':
+        imageControls.add((method, payload));
+        throw const RuntimeException(
+          RuntimeErrorCode.unsupportedCapability,
+          'Test platform has no native image file channel',
+        );
+      case 'cancelImage':
+      case 'releaseImage':
+        imageControls.add((method, payload));
+        return {'released': true};
+      case 'closePageSession':
+        imageControls.add((method, payload));
+        return {'closed': true};
       default:
         return null;
     }

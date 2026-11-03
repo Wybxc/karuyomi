@@ -1,11 +1,11 @@
 package prototype;
 
+import com.google.gson.*;
 import eu.kanade.tachiyomi.source.*;
 import eu.kanade.tachiyomi.source.model.*;
-import org.teavm.jso.*;
 import java.util.*;
 import kotlin.coroutines.*;
-import com.google.gson.*;
+import org.teavm.jso.*;
 
 public class TeaHost {
   public static eu.kanade.tachiyomi.network.NetworkHelper network;
@@ -14,6 +14,7 @@ public class TeaHost {
   static SManga manga;
   static List<SChapter> chapters;
   static List<Page> pages;
+  static final PageSessions pageSessions = new PageSessions();
 
   public static void main(String[] args) {}
 
@@ -63,6 +64,7 @@ public class TeaHost {
   }
 
   public static String init(String userAgent) {
+    pageSessions.clear();
     PersistentFileSystem.install();
     System.setProperty("http.agent", userAgent);
     android.app.Application app = new android.app.Application();
@@ -138,6 +140,7 @@ public class TeaHost {
   public static void hostInvoke(String sourceId, String operation, String argsJson) {
     new Thread(
             () -> {
+              String createdPageSession = null;
               try {
                 Source selected =
                     sources.stream()
@@ -193,12 +196,81 @@ public class TeaHost {
                     mergeManga(stored, update.getManga());
                     dto = HostDto.manga(stored);
                   }
-                } else if (operation.equals("pages") && result instanceof List)
-                  dto = HostDto.pages((List<Page>) result);
-                else throw new IllegalStateException("Unexpected result for " + operation);
-                done(HostJson.write(dto));
+                } else if (operation.equals("pages") && result instanceof List) {
+                  PageSessions.Session session = pageSessions.open(selected, (List<Page>) result);
+                  createdPageSession = session.id;
+                  dto = HostDto.pages(session.id, session.pages);
+                } else throw new IllegalStateException("Unexpected result for " + operation);
+                String json = HostJson.write(dto);
+                if (createdPageSession != null
+                    && json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+                        > PageSessions.MAX_DTO_BYTES)
+                  throw new IllegalArgumentException("Page metadata exceeds 2 MiB");
+                done(json);
               } catch (Throwable t) {
+                if (createdPageSession != null) pageSessions.close(createdPageSession);
                 fail(describe(t));
+              }
+            })
+        .start();
+  }
+
+  @JSExport
+  public static void hostAcquireImage(String sourceId, String pageSessionId, String pageKey) {
+    new Thread(
+            () -> {
+              try {
+                Source selected =
+                    sources.stream()
+                        .filter(s -> Long.toString(s.getId()).equals(sourceId))
+                        .findFirst()
+                        .orElseThrow(
+                            () -> new IllegalArgumentException("Unknown Source " + sourceId));
+                if (!(selected instanceof eu.kanade.tachiyomi.source.online.HttpSource))
+                  throw new UnsupportedOperationException(
+                      "Image acquisition requires an HttpSource");
+                try (PageSessions.Lease lease =
+                    pageSessions.acquire(selected, sourceId, pageSessionId, pageKey)) {
+                  String resource =
+                      SourceImages.acquire(
+                          (eu.kanade.tachiyomi.source.online.HttpSource) selected,
+                          lease.page(),
+                          new SourceImages.Sink() {
+                            public String open(String mimeType) throws java.io.IOException {
+                              return Bridge.imageOpen(mimeType);
+                            }
+
+                            public void write(String handle, byte[] bytes)
+                                throws java.io.IOException {
+                              Bridge.imageWrite(handle, bytes);
+                            }
+
+                            public String close(String handle) throws java.io.IOException {
+                              return Bridge.imageClose(handle);
+                            }
+
+                            public void cancel(String handle) throws java.io.IOException {
+                              Bridge.imageCancel(handle);
+                            }
+                          });
+                  done(resource);
+                }
+              } catch (Throwable error) {
+                fail(describe(error));
+              }
+            })
+        .start();
+  }
+
+  @JSExport
+  public static void hostClosePageSession(String pageSessionId) {
+    new Thread(
+            () -> {
+              try {
+                pageSessions.close(pageSessionId);
+                done("{\"closed\":true}");
+              } catch (Throwable error) {
+                fail(describe(error));
               }
             })
         .start();

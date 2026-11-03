@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
+import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 
 import '../../runtime/runtime_platform_types.dart';
@@ -77,6 +79,33 @@ final class ChapterEntry {
   final String name;
   final String url;
 }
+
+final class CatalogSourceRef {
+  const CatalogSourceRef({
+    required this.buildId,
+    required this.sourceId,
+    required this.generation,
+  });
+  final String buildId;
+  final String sourceId;
+  final String generation;
+}
+
+final class OpenedChapter {
+  const OpenedChapter({
+    required this.manifest,
+    required this.provider,
+    required this.generation,
+    required this.title,
+  });
+  final ChapterManifest manifest;
+  final ChapterPageProvider provider;
+  final String generation;
+  final String title;
+}
+
+String _readingKey(Object value) =>
+    sha256.convert(utf8.encode(jsonEncode(value))).toString();
 
 String _string(Map<String, Object?> value, String key) {
   final field = value[key];
@@ -396,9 +425,30 @@ final class CatalogController extends ChangeNotifier {
     });
   }
 
-  Future<({MangaEntry manga, List<ChapterEntry> chapters})?> details(
-    MangaEntry manga,
-  ) => _perform('正在加载详情和章节', () async {
+  bool isCurrentSource(CatalogSourceRef reference) =>
+      session?.generation == reference.generation &&
+      activeBuild?.id == reference.buildId &&
+      activeSource?.id == reference.sourceId;
+
+  CatalogSourceRef get sourceReference {
+    final current = session;
+    final source = activeSource;
+    final build = activeBuild;
+    if (current == null || source == null || build == null) {
+      throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源未就绪');
+    }
+    return CatalogSourceRef(
+      buildId: build.id,
+      sourceId: source.id,
+      generation: current.generation,
+    );
+  }
+
+  Future<
+    ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})?
+  >
+  details(MangaEntry manga) => _perform('正在加载详情和章节', () async {
+    final source = sourceReference;
     final detail = MangaEntry(
       await _invoke('details', {'manga': manga.snapshot}),
     );
@@ -406,8 +456,117 @@ final class CatalogController extends ChangeNotifier {
     final chapters = _list(
       result['chapters'],
     ).map((value) => ChapterEntry(_object(value))).toList();
-    return (manga: detail, chapters: chapters);
+    return (manga: detail, chapters: chapters, source: source);
   });
+
+  Future<OpenedChapter?> openChapter(
+    MangaEntry manga,
+    ChapterEntry chapter, {
+    required CatalogSourceRef reference,
+  }) => _perform('正在加载章节页面', () async {
+    if (!isCurrentSource(reference)) {
+      throw const FormatException('章节所属漫画源会话已过期，请返回重新打开详情');
+    }
+    final current = session;
+    final source = activeSource;
+    final build = activeBuild;
+    if (current == null || source == null || build == null) {
+      throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源未就绪');
+    }
+    final result = await _invoke('pages', {'chapter': chapter.snapshot});
+    final pageSessionId = _string(result, 'pageSessionId');
+    try {
+      final values = _list(result['pages']);
+      if (values.length > 10000) throw const FormatException('章节页面数量超过限制');
+      final pages = <Map<String, Object?>>[];
+      final opaqueKeys = <String>{};
+      for (var i = 0; i < values.length; i++) {
+        final item = _object(values[i]);
+        final opaque = _string(item, 'pageKey');
+        final index = item['index'];
+        final sourceIndex = item['sourceIndex'];
+        if (opaque.length > 1000 ||
+            !opaqueKeys.add(opaque) ||
+            index != i ||
+            sourceIndex is! num ||
+            !sourceIndex.isFinite ||
+            sourceIndex != sourceIndex.truncateToDouble() ||
+            item['url'] is! String ||
+            (item['imageUrl'] != null && item['imageUrl'] is! String)) {
+          throw const FormatException('漫画源页面引用无效');
+        }
+        pages.add(item);
+      }
+      final chapterKey = _readingKey([
+        build.packageName,
+        source.id,
+        chapter.url,
+      ]);
+      // Handles and learned dimensions do not change content identity.
+      final version = _readingKey(
+        pages
+            .map((page) => [page['sourceIndex'], page['url'], page['imageUrl']])
+            .toList(),
+      );
+      final urlCounts = <String, int>{};
+      for (final page in pages) {
+        final url = page['url'] as String;
+        if (url.isNotEmpty) {
+          urlCounts.update(url, (count) => count + 1, ifAbsent: () => 1);
+        }
+      }
+      final bindings = <String, String>{};
+      final manifestPages = <ReaderPage>[];
+      for (var i = 0; i < pages.length; i++) {
+        final page = pages[i];
+        final url = page['url'] as String;
+        // Without a stable source reference, a changed list must report a
+        // missing page and use the index hint rather than claim an exact match.
+        final logicalKey = url.isNotEmpty && urlCounts[url] == 1
+            ? 'url-${_readingKey(url)}'
+            : '$version:$i';
+        bindings[logicalKey] = page['pageKey'] as String;
+        manifestPages.add(ReaderPage(key: logicalKey));
+      }
+      final provider = ChapterPageProvider(
+        runtime: runtime,
+        sourceId: source.id,
+        pageSessionId: pageSessionId,
+        generation: current.generation,
+        chapterKey: chapterKey,
+        pageKeys: bindings,
+      );
+      return OpenedChapter(
+        manifest: ChapterManifest(
+          chapterKey: chapterKey,
+          version: version,
+          pages: manifestPages,
+        ),
+        provider: provider,
+        generation: current.generation,
+        title: '${manga.title} · ${chapter.name}',
+      );
+    } catch (_) {
+      await runtime.closePageSession(
+        PageSessionRef(
+          pageSessionId: pageSessionId,
+          generation: current.generation,
+        ),
+      );
+      rethrow;
+    }
+  });
+
+  Future<void> closeChapter(OpenedChapter chapter) async {
+    try {
+      await chapter.provider.close();
+    } catch (_) {
+      if (!_closed) {
+        error = '章节资源清理失败，请重新连接漫画源';
+        _notify();
+      }
+    }
+  }
 
   @override
   void dispose() {

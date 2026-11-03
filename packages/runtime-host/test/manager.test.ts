@@ -230,7 +230,15 @@ test('duplicate request ID and image channel are explicit failures', async () =>
   await expect(manager.invoke(call('same'))).rejects.toMatchObject({
     code: 'protocol_error',
   });
-  await expect(manager.acquireImage()).rejects.toMatchObject({
+  await expect(
+    manager.acquireImage({
+      requestId: 'image',
+      generation: (await manager.open(options)).generation,
+      sourceId: '9223372036854775806',
+      pageSessionId: 'session',
+      pageKey: 'p-0',
+    }),
+  ).rejects.toMatchObject({
     code: 'unsupported_capability',
   });
 });

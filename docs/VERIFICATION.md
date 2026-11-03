@@ -108,6 +108,24 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 `pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 15 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。该门已纳入 `pnpm check`，完整输出留在忽略目录 `.local/probes/http-bridge-v2.json`。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
 
+## Web 产品图片通道
+
+2026-11-03，当前 host ABI `karuyomi-source-host-v2` 的原版 Arknights Comics 1.6.2 已完成实际 AOT，并在 Codex 内置浏览器 Chromium 156 通过正式 Worker 初始化门：IndexedDB 可用、清单 Source ID 一致。build 为 `ext-en.arknightscomics-4d57964aa8f40e8728f0fb701b2fa3de`，bundle SHA-256 为 `7f47a06dfb8002b9f0b70713d39588091ba909f4477eadb6288fb7382c9ee93f`。这不是已部署的 ABI v1 两包快照，也不能与仍运行的固定 v1 首次全量混装。
+
+本地隔离 D1、签名测试 JWT 和真实 workerd 的 Source 门完成热门 17 项、标题搜索同名 1 项、详情、3 个章节及 DREAM 的 51 页列表；latest 依源声明跳过。网络政策显式限定 `arknights.global` 与元数据确认的 `webusstatic.yo-star.com`，未扩展生产政策。原 Page 对象由 Java 会话保存，图片经原 Source 的 `getImageUrl/getImage` 与 HTTP v2 进入产品图片 sink，没有读取原图 URL 绕过 Source。
+
+| 实际章节页 | 已处理编码字节 | 浏览器解码尺寸 | 显示与释放                                     |
+| ---------- | -------------- | -------------- | ---------------------------------------------- |
+| 第 1 页    | 39,602 B，JPEG | 1200 × 1691    | decode、尺寸一致、重复释放及 Blob URL 撤销通过 |
+| 第 26 页   | 719,916 B，PNG | 1200 × 1691    | 同上                                           |
+| 第 51 页   | 718,931 B，PNG | 1200 × 1691    | 同上                                           |
+
+实际 Flutter Web release 构建在同一边界经“浏览→扩展→Source→漫画详情→DREAM”进入 ReaderScreen，真实首图、单双页翻页、缩放/重置、连续阅读模式切换与放大层打开/关闭通过交互检查；模式切换保留逻辑页，连续下一页可前进至第 3 页。它是本地产品链路，不是 Cloudflare Access 正向会话、完整章逐页验收、下一章/进度持久化或手机性能。
+
+正式回归还覆盖：保留原始/子类 Page、cacheless/progress 与本地 XOR 拦截器的 JVM 对照；双完成后才公开资源；单块 ACK；取消与迟到发布、解码预算 tombstone、Java 退出后解锁；资源公开后迟到 cancel/close 不撤销已返回 Blob；详情退出动画期间迟到 pages 不重开 Reader。真实 Flutter 退出还暴露了两端 mock 掩盖的应答漂移，现关闭会话统一为 `{closed:true}`，取消/释放为 `{released:true}`，公开 API→Worker 延迟确认与浏览器 Source 门均明确检查相应 ACK。原始日志与截图留在 ignored `.local/image-session-review/`，复验入口见 [Source 门](../apps/api/test/source-metadata-probe.md)。
+
+`pnpm check`、`pnpm flutter:check` 与产品 Web/API dry-run 构建通过；Java 图片 oracle 对 seed 和正式 HttpSource 两套签名均通过。Web 终端有 encoded/pixel/resource 总预算、头部预检与实际 decode，但内部 Bitmap/ImageDecoder 仍有整图 Base64/readAllBytes 和未协调的总 raster 预算。不能据此声称图片解密/重排、动画/超长图、进程/GPU 合计峰值、Native 受管文件或 P0 已通过。
+
 ## F3 iOS 模拟器 HTTPS 机制
 
 [实测摘要](verification/runtime-evidence.md) 记录 iOS 26.4 Simulator / Xcode SDK 27.2 在本地受信 HTTPS 下的机制验证：256 KiB、4 MiB、16 MiB 二进制，Worker 处理生成的 PNG，以及 16 MiB 下载启动后立即取消。正文走 `Worker → transferable ArrayBuffer → Blob URL → WKWebView.startDownload → WKDownloadDelegate → 受管临时文件`，只用小型控制消息；独立原生摘要、PNG 尺寸、发送方脱离、文件/Blob 释放与最终空资源目录检查通过。
@@ -118,7 +136,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
 - v2 二进制网络/Okio 流控、真实上游取消、文件与 HTTP Cache 同版回归。
-- Java 图片处理到 Dart Provider / Web 资源 / 原生文件的产品通道，以及真实图片进入 ReaderScreen。
+- Native 图片受管文件产品通道；内部 Bitmap/ImageDecoder 二进制化及总 raster 预算；更多真实处理/解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 书架/进度等持久化、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化。
 

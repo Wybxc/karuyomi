@@ -69,7 +69,14 @@ public final class HostDtoTest {
     check(
         chapterDtos.get(42).getAsJsonObject().get("sourceOrder").getAsInt() == 42,
         "Source ordering lost");
-    JsonArray pageDtos = HostDto.pages(pages).getAsJsonArray("pages");
+    JsonObject pageResult = HostDto.pages("fixture-session", pages);
+    check(
+        pageResult.get("pageSessionId").getAsString().equals("fixture-session"),
+        "Page session lost");
+    JsonArray pageDtos = pageResult.getAsJsonArray("pages");
+    check(
+        pageDtos.get(42).getAsJsonObject().get("pageKey").getAsString().equals("p-42"),
+        "Opaque page key lost");
     check(pageDtos.size() == 43, "Pages were truncated");
     check(
         pageDtos.get(42).getAsJsonObject().get("index").getAsInt() == 42,
@@ -102,6 +109,7 @@ public final class HostDtoTest {
     }
     check(rejected, "Implicit manga reference accepted");
     System.out.println(
-        "Host DTO JVM oracle passed: complete lists, metadata, explicit refs, ordering and page validation");
+        "Host DTO JVM oracle passed: complete lists, metadata, explicit refs, ordering and page"
+            + " validation");
   }
 }

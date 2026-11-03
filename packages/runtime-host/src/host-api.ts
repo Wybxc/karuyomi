@@ -22,7 +22,18 @@ function createRuntimeApi(manager: SourceRuntimeManager) {
     open: (options: OpenOptions) => manager.open(options),
     invoke: (call: SourceCall) => manager.invoke(call),
     cancel: (requestId: string) => manager.cancel(requestId),
-    acquireImage: () => manager.acquireImage(),
+    acquireImage: (
+      options: Parameters<SourceRuntimeManager['acquireImage']>[0],
+    ) => manager.acquireImage(options),
+    cancelImage: (
+      options: Parameters<SourceRuntimeManager['cancelImage']>[0],
+    ) => manager.cancelImage(options),
+    releaseImage: (
+      options: Parameters<SourceRuntimeManager['releaseImage']>[0],
+    ) => manager.releaseImage(options),
+    closePageSession: (
+      options: Parameters<SourceRuntimeManager['closePageSession']>[0],
+    ) => manager.closePageSession(options),
     rebuild: () => manager.rebuild(),
     fetchApi: (options: Parameters<SourceRuntimeManager['fetchApi']>[0]) =>
       manager.fetchApi(options),

@@ -54,17 +54,31 @@ final class PageRef {
 /// Web adapters return a revocable object URL; native adapters a managed file.
 /// Resource ownership remains with the provider until [PageProvider.release].
 final class ImageResource {
-  const ImageResource({
+  ImageResource({
     required this.id,
     required this.generation,
     required this.location,
     required this.mimeType,
     required this.byteLength,
-  });
+    required this.width,
+    required this.height,
+  }) {
+    if (id.isEmpty ||
+        generation.isEmpty ||
+        byteLength <= 0 ||
+        width <= 0 ||
+        height <= 0) {
+      throw ArgumentError(
+        'Image resources require valid identity, bytes and dimensions',
+      );
+    }
+  }
 
   final String id;
   final String generation;
   final Uri location;
   final String mimeType;
   final int byteLength;
+  final int width;
+  final int height;
 }

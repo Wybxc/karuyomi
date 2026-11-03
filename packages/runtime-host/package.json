@@ -8,7 +8,8 @@
     "build": "node build.ts"
   },
   "dependencies": {
-    "@karuyomi/contracts": "workspace:*"
+    "@karuyomi/contracts": "workspace:*",
+    "image-dimensions": "2.6.0"
   },
   "devDependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",

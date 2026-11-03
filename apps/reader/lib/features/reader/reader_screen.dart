@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:reader_core/reader_core.dart';
+import 'package:source_runtime/source_runtime.dart';
 import 'resource_image.dart';
+import 'resource_pool.dart';
 
 typedef ResourceImageBuilder =
     Widget Function(BuildContext context, ImageResource resource, BoxFit fit);
@@ -23,6 +25,8 @@ class ReaderScreen extends StatefulWidget {
     this.doublePage,
     this.onPositionChanged,
     this.imageBuilder = buildResourceImage,
+    this.imageEvictor,
+    this.onClosed,
   });
 
   final ChapterManifest manifest;
@@ -34,6 +38,10 @@ class ReaderScreen extends StatefulWidget {
   final bool? doublePage;
   final ValueChanged<ReadingPosition>? onPositionChanged;
   final ResourceImageBuilder imageBuilder;
+  final Future<void> Function(ImageResource)? imageEvictor;
+
+  /// Runs after scheduler cancellation, widget pins and cache eviction finish.
+  final Future<void> Function()? onClosed;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -42,6 +50,7 @@ class ReaderScreen extends StatefulWidget {
 class _ReaderScreenState extends State<ReaderScreen> {
   late final ReaderController _reader;
   late ImageScheduler _scheduler;
+  late ReaderResourcePool _resourcePool;
   StreamSubscription<void>? _readerSubscription;
   StreamSubscription<ImageSchedulerSnapshot>? _imagesSubscription;
   final _scroll = ScrollController();
@@ -56,6 +65,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   ReadingPosition? _pendingRestorePosition;
   String _windowSignature = '';
   bool _zoomed = false;
+  bool _dimensionsScheduled = false;
 
   @override
   void initState() {
@@ -79,11 +89,52 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _attachScheduler() {
     _windowSignature = '';
-    _scheduler = ImageScheduler(provider: widget.provider);
+    _resourcePool = ReaderResourcePool(
+      widget.provider,
+      evict: widget.imageEvictor,
+    );
+    _scheduler = ImageScheduler(provider: _resourcePool);
     _imagesSubscription = _scheduler.changes.listen((_) {
+      _scheduleDimensions();
       if (mounted) setState(() {});
     });
     _syncWindow();
+  }
+
+  void _scheduleDimensions() {
+    if (_dimensionsScheduled) return;
+    _dimensionsScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _dimensionsScheduled = false;
+      if (!mounted) return;
+      final resources = _scheduler.snapshot.resources;
+      var changed = false;
+      final pages = _reader.manifest.pages.map((page) {
+        final image = resources[page.key];
+        if (image == null ||
+            (page.width == image.width && page.height == image.height)) {
+          return page;
+        }
+        changed = true;
+        return ReaderPage(
+          key: page.key,
+          width: image.width.toDouble(),
+          height: image.height.toDouble(),
+        );
+      }).toList();
+      if (!changed) return;
+      // Dimensions are learned layout data, not a change to page identity.
+      _restoring = true;
+      _pendingRestorePosition = _reader.position;
+      _reader.updateManifest(
+        ChapterManifest(
+          chapterKey: _reader.manifest.chapterKey,
+          version: _reader.manifest.version,
+          pages: pages,
+        ),
+      );
+      _scheduleRestore();
+    });
   }
 
   @override
@@ -91,7 +142,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.provider != widget.provider) {
       unawaited(_imagesSubscription?.cancel());
-      unawaited(_scheduler.dispose());
+      final oldScheduler = _scheduler;
+      unawaited(() async {
+        await oldScheduler.dispose();
+        await oldWidget.onClosed?.call();
+      }());
       _attachScheduler();
     }
     if (oldWidget.manifest != widget.manifest) {
@@ -115,7 +170,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
     var pages = _reader.imageWindow();
     if (_reader.isContinuous && _viewportWidth > 0 && _viewportHeight > 0) {
       final offsets = _offsets;
-      final top = _scroll.hasClients ? _scroll.offset : 0.0;
+      final anchor = _pendingRestorePosition ?? _reader.position;
+      final top = _restoring && anchor != null
+          ? offsets[anchor.pageIndexHint] +
+                _pageHeight(_reader.manifest.pages[anchor.pageIndexHint]) *
+                    anchor.normalizedOffset
+          : _scroll.hasClients
+          ? _scroll.offset
+          : 0.0;
       final visible = <ReaderPage>[];
       final forward = <ReaderPage>[];
       final backward = <ReaderPage>[];
@@ -233,7 +295,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
       return Semantics(
         label: '第 ${_reader.manifest.pages.indexOf(page) + 1} 页',
         image: true,
-        child: widget.imageBuilder(context, resource, fit),
+        child: PinnedReaderImage(
+          key: ValueKey('display-${resource.id}'),
+          pool: _resourcePool,
+          image: resource,
+          builder: (context) => widget.imageBuilder(context, resource, fit),
+        ),
       );
     }
     if (snapshot.cleanupError != null) {
@@ -244,7 +311,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('图片未能加载'),
+            Text(switch (snapshot.errors[page.key]) {
+              RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
+                '当前平台尚未支持图片阅读',
+              RuntimeException(code: RuntimeErrorCode.accessRequired) =>
+                '访问验证已失效，请返回重新登录',
+              RuntimeException(code: RuntimeErrorCode.runtimeLost) =>
+                '漫画源已中断，请返回重新连接',
+              ImageBudgetExceeded(:final message) => message,
+              _ => '图片未能加载',
+            }),
             const SizedBox(height: 8),
             FilledButton.tonal(
               onPressed: () => _scheduler.retry(page.key),
@@ -254,21 +330,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
       );
     }
-    return const Center(child: CircularProgressIndicator());
+    return snapshot.loading.contains(page.key)
+        ? const Center(child: CircularProgressIndicator())
+        : const SizedBox.shrink();
   }
 
   void _openZoom(ReaderPage page) {
     final resource = _scheduler.snapshot.resources[page.key];
     if (resource == null) return;
+    final pool = _resourcePool;
+    final pin = pool.pin(resource.id);
     unawaited(
       showDialog<void>(
         context: context,
         useSafeArea: true,
         builder: (context) => _ZoomImageDialog(
           resource: resource,
+          pool: pool,
           imageBuilder: widget.imageBuilder,
         ),
-      ),
+      ).whenComplete(pin.close),
     );
   }
 
@@ -374,45 +455,48 @@ class _ReaderScreenState extends State<ReaderScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: _toolbar ? AppBar(title: Text(widget.title)) : null,
-        body: SafeArea(
-          child: Column(
-            children: [
-              if (_reader.requiresPositionNotice)
-                const MaterialBanner(
-                  content: Text('页面清单发生变化，已定位到最接近的页码。'),
-                  actions: [SizedBox.shrink()],
-                ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (_viewportWidth != constraints.maxWidth ||
-                        _viewportHeight != constraints.maxHeight) {
-                      _viewportWidth = constraints.maxWidth;
-                      _viewportHeight = constraints.maxHeight;
-                      _scheduleRestore();
-                      final doublePage =
-                          widget.doublePage ?? constraints.maxWidth >= 900;
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!mounted) return;
-                        if (_reader.doublePage != doublePage) {
-                          _reader.setLayout(doublePage: doublePage);
-                        }
+        body: DefaultTextStyle.merge(
+          style: const TextStyle(color: Colors.white),
+          child: SafeArea(
+            child: Column(
+              children: [
+                if (_reader.requiresPositionNotice)
+                  const MaterialBanner(
+                    content: Text('页面清单发生变化，已定位到最接近的页码。'),
+                    actions: [SizedBox.shrink()],
+                  ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (_viewportWidth != constraints.maxWidth ||
+                          _viewportHeight != constraints.maxHeight) {
+                        _viewportWidth = constraints.maxWidth;
+                        _viewportHeight = constraints.maxHeight;
                         _scheduleRestore();
-                      });
-                    }
-                    if (_reader.manifest.pages.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          '这一章没有页面',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }
-                    return _reader.isContinuous ? _continuous() : _paged();
-                  },
+                        final doublePage =
+                            widget.doublePage ?? constraints.maxWidth >= 900;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          if (_reader.doublePage != doublePage) {
+                            _reader.setLayout(doublePage: doublePage);
+                          }
+                          _scheduleRestore();
+                        });
+                      }
+                      if (_reader.manifest.pages.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            '这一章没有页面',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        );
+                      }
+                      return _reader.isContinuous ? _continuous() : _paged();
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         bottomNavigationBar: _toolbar ? _controls() : null,
@@ -527,7 +611,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (position != null) widget.onPositionChanged?.call(position);
     unawaited(_readerSubscription?.cancel());
     unawaited(_imagesSubscription?.cancel());
-    unawaited(_scheduler.dispose());
+    final scheduler = _scheduler;
+    final onClosed = widget.onClosed;
+    unawaited(() async {
+      await scheduler.dispose();
+      await onClosed?.call();
+    }());
     unawaited(_reader.dispose());
     _scroll.dispose();
     _transform.dispose();
@@ -536,8 +625,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
 }
 
 class _ZoomImageDialog extends StatefulWidget {
-  const _ZoomImageDialog({required this.resource, required this.imageBuilder});
+  const _ZoomImageDialog({
+    required this.resource,
+    required this.pool,
+    required this.imageBuilder,
+  });
   final ImageResource resource;
+  final ReaderResourcePool pool;
   final ResourceImageBuilder imageBuilder;
 
   @override
@@ -583,7 +677,12 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
         minScale: 1,
         maxScale: 5,
         child: Center(
-          child: widget.imageBuilder(context, widget.resource, BoxFit.contain),
+          child: PinnedReaderImage(
+            pool: widget.pool,
+            image: widget.resource,
+            builder: (context) =>
+                widget.imageBuilder(context, widget.resource, BoxFit.contain),
+          ),
         ),
       ),
     ),

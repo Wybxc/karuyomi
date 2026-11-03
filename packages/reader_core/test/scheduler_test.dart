@@ -21,7 +21,13 @@ final class ControlledProvider implements PageProvider {
     return future.future.whenComplete(() => concurrent--);
   }
 
-  void complete(PageRef ref, {int bytes = 10, String? generation}) {
+  void complete(
+    PageRef ref, {
+    int bytes = 10,
+    String? generation,
+    int width = 10,
+    int height = 20,
+  }) {
     pending[ref.requestId]!.complete(
       ImageResource(
         id: ref.requestId,
@@ -29,6 +35,8 @@ final class ControlledProvider implements PageProvider {
         location: Uri.parse('https://processed.invalid/${ref.pageKey}'),
         mimeType: 'image/png',
         byteLength: bytes,
+        width: width,
+        height: height,
       ),
     );
   }
@@ -222,6 +230,49 @@ void main() {
       provider.complete(provider.requests.last);
       await scheduler.settled;
       await scheduler.dispose();
+    },
+  );
+
+  test(
+    'newly learned giant dimensions are rejected before presentation',
+    () async {
+      final provider = ControlledProvider();
+      final scheduler = ImageScheduler(
+        provider: provider,
+        maxEstimatedDecodedBytes: 1000,
+        unknownPageDecodedEstimate: 100,
+      );
+      scheduler.setWindow(
+        chapterKey: 'chapter',
+        generation: 'g',
+        pages: [ReaderPage(key: 'unknown')],
+      );
+      provider.complete(provider.requests.single, width: 100, height: 100);
+      await scheduler.settled;
+      expect(scheduler.snapshot.resources, isEmpty);
+      expect(scheduler.snapshot.errors['unknown'], isA<ImageBudgetExceeded>());
+      expect(provider.released, [provider.requests.single.requestId]);
+      await scheduler.dispose();
+    },
+  );
+
+  test(
+    'new reader schedulers do not reuse image request IDs in one runtime generation',
+    () async {
+      final provider = ControlledProvider();
+      final first = ImageScheduler(provider: provider);
+      first.setWindow(chapterKey: 'chapter', generation: 'g', pages: pages(1));
+      final a = provider.requests.single;
+      provider.complete(a);
+      await first.settled;
+      await first.dispose();
+      final second = ImageScheduler(provider: provider);
+      second.setWindow(chapterKey: 'chapter', generation: 'g', pages: pages(1));
+      final b = provider.requests.last;
+      expect(b.requestId, isNot(a.requestId));
+      provider.complete(b);
+      await second.settled;
+      await second.dispose();
     },
   );
 }

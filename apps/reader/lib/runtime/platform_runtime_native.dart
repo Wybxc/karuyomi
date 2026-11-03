@@ -217,6 +217,19 @@ final class NativePlatformRuntime extends PlatformRuntime {
     String method, [
     Map<String, Object?> payload = const {},
   ]) async {
+    if (method == 'acquireImage') {
+      throw const RuntimeException(
+        RuntimeErrorCode.unsupportedCapability,
+        'Native processed-image files are not implemented on this platform',
+      );
+    }
+    if (_view == null &&
+        {'cancelImage', 'releaseImage', 'closePageSession'}.contains(method)) {
+      // Cleanup of an expired handle must not create a replacement WebView.
+      return method == 'closePageSession'
+          ? {'closed': true}
+          : {'released': true};
+    }
     if (method == 'dispose' && _view == null) return null;
     await _ensureHost();
     final generation = _generation;
@@ -228,8 +241,8 @@ final class NativePlatformRuntime extends PlatformRuntime {
           let value;
           if (method === 'ready') value = await host.ready;
           else if (method === 'cancel') value = await host.cancel(payload.requestId);
-          else if (method === 'dispose' || method === 'acquireImage') value = await host[method]();
-          else if (['open', 'invoke', 'fetchApi'].includes(method)) value = await host[method](payload);
+          else if (method === 'dispose') value = await host[method]();
+          else if (['open', 'invoke', 'fetchApi', 'cancelImage', 'releaseImage', 'closePageSession'].includes(method)) value = await host[method](payload);
           else throw {code:'protocol_error', message:'Unknown runtime control method'};
           return {ok:true, value:value ?? null};
         } catch (error) {

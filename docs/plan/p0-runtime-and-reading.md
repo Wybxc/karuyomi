@@ -8,16 +8,16 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 ## 已完成与边界
 
-| 分项           | 已有实现或证据                                                                                                                                      | 尚不能据此认定的能力                                                  |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和静态交付已实现                             | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 动态请求    |
-| P0-F1 Web      | 串行 Worker、requestId/generation、清单/预算校验、取消/超时、Source ID 一致性和 Dart Web interop 已实现；真实 Chromium 初始化通过                   | 六项操作全部在线成功和图片阅读                                        |
-| P0-F2 Native   | Dart 受管 WebView、可见登录、内置 host/Blob Worker 已实现；iOS 26.4 Simulator 本地受信 HTTPS 下初始化、cookie 携带及容器重建已有证据                | Cloudflare 生产 Access 正向会话、物理 iPhone、Android 真机与后台恢复  |
-| P0-F3 图片机制 | 独立字节/fiber 探针，以及模拟器 Worker → Blob → WKDownload → 文件的字节、取消和释放机制已验证                                                       | Flutter 产品图片插件、任意阶段取消、真实图片链与合计峰值              |
-| P0-R 阅读核心  | Dart 逻辑锚、单双页/LTR/RTL、封面/横图独占、竖向/Webtoon、缩放、旋转恢复及有界 PageProvider 已实现                                                  | ReaderScreen 尚未接真实 Source 导航；无产品首图、超长图或真机性能结论 |
-| P0-B v2        | 帧协议、按需 Worker 流、operation/generation handle、Java Okio Source/有界上传 Sink 已实现；当前生产代码与构建清单统一为 v2，模拟 supplier 回归通过 | 真实 HTTP 压缩、Source/cache、Access、浏览器与移动内存门仍需分别验收  |
+| 分项           | 已有实现或证据                                                                                                                                      | 尚不能据此认定的能力                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和静态交付已实现                             | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 动态请求   |
+| P0-F1 Web      | 串行 Worker、requestId/generation、清单/预算校验、取消/超时、Source ID 一致性和 Dart Web interop 已实现；真实 Chromium 初始化通过                   | 六项操作全部在线成功和图片阅读                                       |
+| P0-F2 Native   | Dart 受管 WebView、可见登录、内置 host/Blob Worker 已实现；iOS 26.4 Simulator 本地受信 HTTPS 下初始化、cookie 携带及容器重建已有证据                | Cloudflare 生产 Access 正向会话、物理 iPhone、Android 真机与后台恢复 |
+| P0-F3 图片机制 | Web 产品已接原始 Page 会话、Source 图片链、64 KiB/ACK、Blob 资源及释放；真实章节首中末页解码通过；iOS 受管文件独立机制已验证                        | Native 产品图片文件通道、处理/解密源覆盖、任意阶段取消与合计峰值     |
+| P0-R 阅读核心  | 逻辑锚、单双页/LTR/RTL、竖向/Webtoon、缩放和有界 Provider 已实现；本地 Flutter 实测真实目录→详情→章节→图片阅读、翻页及模式切换                      | 下一章、进度落盘、超长图、物理设备与性能分布                         |
+| P0-B v2        | 帧协议、按需 Worker 流、operation/generation handle、Java Okio Source/有界上传 Sink 已实现；当前生产代码与构建清单统一为 v2，模拟 supplier 回归通过 | 真实 HTTP 压缩、Source/cache、Access、浏览器与移动内存门仍需分别验收 |
 
-Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。当前 `1bfc97f` 的 Arknights Comics 在内置浏览器经真实 workerd/HTTP v2 通过热门、标题搜索、详情、章节和 51 页列表；latest 按源声明跳过，尚未请求图片。历史 MangaDraft 网络探针中热门/最新/搜索返回列表；原 Source 的普通文本搜索未把关键词传入 catalog，不能称为搜索匹配通过。详情/章节遇到源站 Human Verification 并明确失败，未伪造 pages 引用。产品 `acquireImage` 仍明确不支持，章节暂不可读。
+Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。当前 host ABI v2 的 Arknights Comics 在内置浏览器经真实 workerd/HTTP v2 通过热门、标题搜索、详情、章节与 51 页列表；首、中、末页经原 Source 解码和释放通过，实际 Flutter 已能打开章节阅读。latest 按源声明跳过。该证据使用显式本地政策与测试 JWT，不是生产 Access；详情见 [VERIFICATION](../VERIFICATION.md#web-产品图片通道)。历史 MangaDraft 的文本搜索与挑战失败不因另一源的成功而变为通过。
 
 `karuyomi.wybxc.cc` 已部署并验证公开入口及匿名 Access 拦截；生产登录后的正向 bootstrap/Source 请求仍待验收。具体部署版本和历史浏览器环境只在验证记录维护。
 
@@ -25,7 +25,7 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 的压缩、重定向、Cookie、HEAD/206、流式上传、截断上传和三类取消门已通过。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常，补实际 Source/cache、204/304、Range、表单/multipart 及半途失败回归。当前只维护 v2，旧包需要重新构建。
 2. **验证缓冲与取消。** META/DATA 最多 64 KiB，正文请求最多 8 MiB、响应最多 64 MiB，适配队列最多四块。检查慢消费者、背压、迟到响应和 generation 销毁能终止上游并释放 handle；整体请求预算和两次读取之间的 idle timeout 分别验证。协议细节见 [HTTP bridge](../HTTP-BRIDGE.md)。
-3. **接通产品图片。** 先完成 Web 单页闭环，再接原生受管文件。Java 保留有界、绑定 build/Source/generation 的原始 Page 引用；图片经原 Source 的 `getImageUrl/getImage` 与拦截器处理后，以最多 64 KiB 的分块写入独立图片 sink，等待 ACK 并限制总字节和在途块。HTTP 正文 handle 在 Source 调用结束时会清理，不能代替可显示资源；ACK、取消和释放必须在 Source 忙碌时仍可处理。Web 将处理后字节交给 Blob URL 和 Dart PageProvider，成功结束才标为可显示。Android 优先复用已锁定插件的 ArrayBuffer WebMessage 通道；iOS 需要补正式受管 WKDownload 薄扩展，`onDownloadStartRequest` 本身不能完成文件交接。现有 Bitmap/ImageDecoder 仍有整图 Base64/JSON、`readAllBytes()` 和仅单 surface 限额，需改为二进制资源与总预算后，才能验收解密/重排链的峰值。不绕过插件直接读取原图 URL。
+3. **完成图片剩余门槛。** Web 单页及真实 Flutter 阅读闭环已通过分项门，合同见[图片资源通道](../IMAGE-RESOURCES.md)。继续接原生受管文件：Android 优先复用已锁定插件的 ArrayBuffer WebMessage 通道；iOS 补正式受管 WKDownload 薄扩展，`onDownloadStartRequest` 本身不能完成文件交接。现有 Bitmap/ImageDecoder 仍有整图 Base64/JSON、`readAllBytes()` 和仅单 surface 限额，下一步改为内部二进制 handle、≤64 KiB 像素/字节块、解码前头部校验与 surface/decoder/font 合计预算；只查 bounds 不应先完整解码。取消不能提前解锁 Java，也不能一律删除 Source 仍持有的 Bitmap。终端 Blob 的预算不覆盖插件内部解码内存；修正并协调两侧预算后，才验收解密/重排链峰值。不绕过插件直接读取原图 URL。
 4. **汇合 P0-R / F4 / P0-C。** 从真实章节导航进入 ReaderScreen，补下一章、有界邻章准备和进度落盘。完成超长图降采样/分片验证、触控与缩放冲突、位置恢复、内存和首图测量。
 5. **完成实际部署与恢复。** 在真实 Access、Web 和移动容器验证登录/过期/回跳、Cookie 恢复、执行槽/文件恢复、跨包切换和后台重建；不自动重发无幂等保证的副作用请求。
 

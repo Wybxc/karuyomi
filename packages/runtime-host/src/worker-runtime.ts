@@ -25,18 +25,30 @@ export class WorkerRuntime {
     this.workerInstanceId = id;
   }
 
-  async receive(input: unknown): Promise<void> {
+  async receive(
+    input: unknown,
+    ports: readonly MessagePort[] = [],
+  ): Promise<void> {
     const parsed = workerCommandSchema.safeParse(input);
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      for (const port of ports) port.close();
+      return;
+    }
     const command = parsed.data;
-    if (command.workerInstanceId !== this.workerInstanceId) return;
+    if (command.workerInstanceId !== this.workerInstanceId) {
+      for (const port of ports) port.close();
+      return;
+    }
     if (
       this.generation !== undefined &&
       (command.generation !== this.generation ||
         command.buildId !== this.manifest?.buildId)
-    )
+    ) {
+      for (const port of ports) port.close();
       return;
+    }
     if (this.busy) {
+      for (const port of ports) port.close();
       this.reply(
         command,
         undefined,
@@ -79,6 +91,9 @@ export class WorkerRuntime {
             'explicit-references',
             'complete-dto',
             'cancel-by-worker-recycle',
+            ...(this.driver.acquireImage && this.driver.closePageSession
+              ? ['processed-image-resources']
+              : []),
           ],
           hostAbi,
           runtimeBaseline,
@@ -111,6 +126,42 @@ export class WorkerRuntime {
           buildId: command.buildId,
           data,
         });
+      } else if (command.type === 'acquire-image') {
+        if (
+          !this.manifest ||
+          !this.manifest.sourceIds.includes(command.sourceId)
+        )
+          throw new RuntimeFailure(
+            'runtime_lost',
+            'Image Source does not belong to this runtime',
+          );
+        if (!this.driver.acquireImage || ports.length !== 1 || !ports[0])
+          throw new RuntimeFailure(
+            'unsupported_capability',
+            'Image channel is not available',
+          );
+        const result = await this.driver.acquireImage(
+          command.sourceId,
+          command.pageSessionId,
+          command.pageKey,
+          ports[0],
+          command.resourceId,
+          { requestId: command.requestId, generation: command.generation },
+        );
+        this.reply(command, result);
+      } else if (command.type === 'close-page-session') {
+        if (!this.manifest || !this.driver.closePageSession)
+          throw new RuntimeFailure(
+            'unsupported_capability',
+            'Page session control is not available',
+          );
+        this.reply(
+          command,
+          await this.driver.closePageSession(command.pageSessionId, {
+            requestId: command.requestId,
+            generation: command.generation,
+          }),
+        );
       } else {
         this.controller.abort();
         await this.driver.close();
@@ -119,6 +170,7 @@ export class WorkerRuntime {
     } catch (error) {
       this.reply(command, undefined, runtimeFailure(error));
     } finally {
+      for (const port of ports) port.close();
       this.busy = false;
     }
   }

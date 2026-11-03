@@ -3,6 +3,16 @@ import {
   runtimeHelloSchema,
   runtimeSessionSchema,
   sourceCallSchema,
+  acquireImageSchema,
+  cancelImageSchema,
+  releaseImageSchema,
+  closePageSessionSchema,
+  imageResourceSchema,
+  type AcquireImage,
+  type CancelImage,
+  type ReleaseImage,
+  type ClosePageSession,
+  type ImageResource,
   staticManifestPathSchema,
   workerResponseSchema,
   type RpcEnvelope,
@@ -14,11 +24,12 @@ import {
 import { createHello } from './hello.js';
 import { RuntimeFailure } from './errors.js';
 import { sha256, VerifiedLoader } from './verified-loader.js';
+import { ImageResourceStore, type ImageCollector } from './image-resources.js';
 
 export interface WorkerEndpoint {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
   onerror: ((event: ErrorEvent) => unknown) | null;
-  postMessage(command: WorkerCommand): void;
+  postMessage(command: WorkerCommand, transfer?: Transferable[]): void;
   terminate(): void;
 }
 export interface OpenOptions {
@@ -28,12 +39,31 @@ export interface OpenOptions {
   expectedBuildId?: string;
   expectedBundleSha256?: string;
 }
-interface Task {
-  call: SourceCall;
+interface TaskBase {
+  requestId: string;
   resolve(value: unknown): void;
   reject(error: unknown): void;
   timer: ReturnType<typeof setTimeout>;
 }
+interface SourceTask extends TaskBase {
+  kind: 'source';
+  call: SourceCall;
+}
+interface ImageTask extends TaskBase {
+  kind: 'image';
+  input: AcquireImage;
+  collector: ImageCollector;
+  port: MessagePort;
+  settled: Promise<void>;
+  settle(): void;
+  failure?: RuntimeFailure;
+  cancelTimer?: ReturnType<typeof setTimeout>;
+}
+interface PageSessionTask extends TaskBase {
+  kind: 'page-session';
+  pageSessionId: string;
+}
+type Task = SourceTask | ImageTask | PageSessionTask;
 interface Pending {
   resolve(value: unknown): void;
   reject(error: unknown): void;
@@ -55,13 +85,26 @@ export class SourceRuntimeManager {
   private active: Task | undefined;
   private pending = new Map<string, Pending>();
   private requestIds = new Set<string>();
+  private readonly images: ImageResourceStore;
+  private readonly imageTasks = new Map<string, ImageTask>();
+  private readonly closedPageSessions = new Map<
+    string,
+    Promise<{ closed: true }>
+  >();
 
   constructor(
     private readonly workerUrl: URL,
     private readonly createWorker: (url: URL) => WorkerEndpoint,
     private readonly loader: VerifiedLoader,
     private readonly startupTimeoutMs = 60_000,
-  ) {}
+    private readonly imageOptions: {
+      enabled?: boolean;
+      store?: ImageResourceStore;
+      cancelGraceMs?: number;
+    } = {},
+  ) {
+    this.images = imageOptions.store ?? new ImageResourceStore();
+  }
 
   open(options: OpenOptions): Promise<RuntimeSession> {
     if (this.disposed)
@@ -257,15 +300,26 @@ export class SourceRuntimeManager {
         'Runtime session does not match its Worker envelope',
       );
     }
-    this.session = result;
-    return result;
+    this.session =
+      this.imageOptions.enabled === false
+        ? {
+            ...result,
+            capabilities: result.capabilities.filter(
+              (capability) => capability !== 'processed-image-resources',
+            ),
+          }
+        : result;
+    return this.session;
   }
 
-  private send(command: WorkerCommand): Promise<unknown> {
+  private send(
+    command: WorkerCommand,
+    transfer: Transferable[] = [],
+  ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       this.pending.set(command.requestId, { resolve, reject });
       try {
-        this.worker!.postMessage(command);
+        this.worker!.postMessage(command, transfer);
       } catch {
         this.pending.delete(command.requestId);
         reject(
@@ -313,6 +367,8 @@ export class SourceRuntimeManager {
     this.requestIds.add(call.requestId);
     return new Promise((resolve, reject) => {
       const task: Task = {
+        kind: 'source',
+        requestId: call.requestId,
         call,
         resolve,
         reject,
@@ -330,23 +386,63 @@ export class SourceRuntimeManager {
     this.active = task;
     const { protocolVersion, workerInstanceId, generation, buildId } =
       this.session;
-    void this.send({
+    const envelope = {
       protocolVersion,
       workerInstanceId,
       generation,
       buildId,
-      requestId: task.call.requestId,
-      type: 'invoke',
-      sourceId: task.call.sourceId,
-      operation: task.call.operation,
-      args: task.call.args,
-    })
-      .then(
-        (result) => task.resolve(result),
-        (error: unknown) => task.reject(error),
+      requestId: task.requestId,
+    };
+    const command: WorkerCommand =
+      task.kind === 'source'
+        ? {
+            ...envelope,
+            type: 'invoke',
+            sourceId: task.call.sourceId,
+            operation: task.call.operation,
+            args: task.call.args,
+          }
+        : task.kind === 'image'
+          ? {
+              ...envelope,
+              type: 'acquire-image',
+              sourceId: task.input.sourceId,
+              pageSessionId: task.input.pageSessionId,
+              pageKey: task.input.pageKey,
+              resourceId: task.collector.resourceId,
+            }
+          : {
+              ...envelope,
+              type: 'close-page-session',
+              pageSessionId: task.pageSessionId,
+            };
+    let published = false;
+    void this.send(command, task.kind === 'image' ? [task.port] : [])
+      .then(async (result) => {
+        if (task.kind === 'image') {
+          if (task.failure) throw task.failure;
+          const resource = await task.collector.publish(result);
+          if (task.failure) throw task.failure;
+          this.assertGeneration(task.input.generation);
+          published = true;
+          // Commit ownership before resolving: caller continuations can run
+          // before finally, and cancellation only applies to pending production.
+          this.imageTasks.delete(task.requestId);
+          clearTimeout(task.timer);
+          task.resolve(resource);
+        } else task.resolve(result);
+      })
+      .catch((error: unknown) =>
+        task.reject(task.kind === 'image' ? (task.failure ?? error) : error),
       )
       .finally(() => {
         clearTimeout(task.timer);
+        if (task.kind === 'image') {
+          clearTimeout(task.cancelTimer);
+          if (!published) task.collector.release(task.failure);
+          this.imageTasks.delete(task.requestId);
+          task.settle();
+        }
         if (this.active === task) {
           this.active = undefined;
           this.pump();
@@ -355,6 +451,13 @@ export class SourceRuntimeManager {
   }
 
   private expire(task: Task): void {
+    if (task.kind === 'image') {
+      void this.stopImage(
+        task,
+        new RuntimeFailure('timeout', 'Image acquisition timed out'),
+      );
+      return;
+    }
     if (this.active === task) {
       task.reject(
         new RuntimeFailure(
@@ -380,7 +483,12 @@ export class SourceRuntimeManager {
   }
 
   cancel(requestId: string): Promise<void> {
-    if (this.active?.call.requestId === requestId) {
+    if (this.active?.requestId === requestId) {
+      if (this.active.kind === 'image')
+        return this.cancelImage({
+          requestId,
+          generation: this.active.input.generation,
+        }).then(() => {});
       this.active.reject(
         new RuntimeFailure(
           'cancelled',
@@ -394,10 +502,13 @@ export class SourceRuntimeManager {
         ),
       );
     } else {
-      const task = this.queue.find(
-        (queued) => queued.call.requestId === requestId,
-      );
+      const task = this.queue.find((queued) => queued.requestId === requestId);
       if (task) {
+        if (task.kind === 'image')
+          return this.cancelImage({
+            requestId,
+            generation: task.input.generation,
+          }).then(() => {});
         clearTimeout(task.timer);
         this.queue = this.queue.filter((queued) => queued !== task);
         task.reject(
@@ -420,24 +531,199 @@ export class SourceRuntimeManager {
     this.controller = undefined;
     this.worker?.terminate();
     this.worker = undefined;
+    this.images.clear(error);
+    for (const task of this.imageTasks.values()) {
+      clearTimeout(task.cancelTimer);
+      task.collector.release(error);
+      task.settle();
+    }
+    this.imageTasks.clear();
+    this.closedPageSessions.clear();
     for (const pending of this.pending.values()) pending.reject(error);
     this.pending.clear();
     for (const task of [...this.queue, ...(this.active ? [this.active] : [])]) {
       clearTimeout(task.timer);
-      task.reject(error);
+      task.reject(task.kind === 'image' ? (task.failure ?? error) : error);
     }
     this.queue = [];
     this.active = undefined;
     this.requestIds.clear();
   }
 
-  acquireImage(): Promise<never> {
-    return Promise.reject(
-      new RuntimeFailure(
+  async acquireImage(input: AcquireImage): Promise<ImageResource> {
+    const parsed = acquireImageSchema.safeParse(input);
+    if (!parsed.success)
+      throw new RuntimeFailure('protocol_error', 'Invalid image request');
+    const request = parsed.data;
+    if (this.imageOptions.enabled === false)
+      throw new RuntimeFailure(
         'unsupported_capability',
-        'This host has not passed the processed-image resource channel gate',
-      ),
-    );
+        'Native processed-image delivery is not implemented',
+      );
+    const session = this.session;
+    if (
+      !session ||
+      session.generation !== request.generation ||
+      !session.sources.some((source) => source.id === request.sourceId)
+    )
+      throw new RuntimeFailure(
+        'runtime_lost',
+        'Image request belongs to an expired Source runtime',
+      );
+    if (!session.capabilities.includes('processed-image-resources'))
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'The loaded build does not provide image resources',
+      );
+    if (this.closedPageSessions.has(request.pageSessionId))
+      throw new RuntimeFailure('runtime_lost', 'Page session was closed');
+    this.reserveRequest(request.requestId);
+    const collector = this.images.create(request.generation);
+    const channel = new MessageChannel();
+    collector.attach(channel.port1);
+    let settle!: () => void;
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    return new Promise<ImageResource>((resolve, reject) => {
+      const task: ImageTask = {
+        kind: 'image',
+        requestId: request.requestId,
+        input: request,
+        collector,
+        port: channel.port2,
+        settled,
+        settle,
+        resolve: (value) => {
+          // The publication path above is the only producer for this promise.
+          const resource = imageResourceSchema.parse(value);
+          resolve(resource);
+        },
+        reject,
+        timer: setTimeout(() => {
+          void this.stopImage(
+            task,
+            new RuntimeFailure('timeout', 'Image acquisition timed out'),
+          );
+        }, request.timeoutMs ?? 30_000),
+      };
+      this.imageTasks.set(request.requestId, task);
+      this.queue.push(task);
+      this.pump();
+    });
+  }
+
+  async cancelImage(input: CancelImage): Promise<{ released: true }> {
+    const parsed = cancelImageSchema.safeParse(input);
+    if (!parsed.success)
+      throw new RuntimeFailure('protocol_error', 'Invalid image cancellation');
+    if (parsed.data.generation === this.generation) {
+      const task = this.imageTasks.get(parsed.data.requestId);
+      if (task)
+        await this.stopImage(
+          task,
+          new RuntimeFailure('cancelled', 'Image acquisition was cancelled'),
+        );
+    }
+    return { released: true };
+  }
+
+  private async stopImage(
+    task: ImageTask,
+    error: RuntimeFailure,
+  ): Promise<void> {
+    if (task.failure) return task.settled;
+    task.failure = error;
+    clearTimeout(task.timer);
+    if (this.active !== task) {
+      this.queue = this.queue.filter((candidate) => candidate !== task);
+      task.collector.release(error);
+      task.port.close();
+      this.imageTasks.delete(task.requestId);
+      task.reject(error);
+      task.settle();
+    } else {
+      task.collector.abort(error);
+      task.cancelTimer = setTimeout(() => {
+        if (this.active === task) {
+          const lost = new RuntimeFailure(
+            'runtime_lost',
+            'Image cancellation did not stop Java; the Worker was recycled',
+          );
+          task.failure = lost;
+          this.invalidate(lost);
+        }
+      }, this.imageOptions.cancelGraceMs ?? 1000);
+    }
+    await task.settled;
+  }
+
+  releaseImage(input: ReleaseImage): Promise<{ released: true }> {
+    const parsed = releaseImageSchema.safeParse(input);
+    if (!parsed.success)
+      return Promise.reject(
+        new RuntimeFailure('protocol_error', 'Invalid image release'),
+      );
+    this.images.release(parsed.data.resourceId, parsed.data.generation);
+    return Promise.resolve({ released: true });
+  }
+
+  closePageSession(input: ClosePageSession): Promise<{ closed: true }> {
+    const parsed = closePageSessionSchema.safeParse(input);
+    if (!parsed.success)
+      return Promise.reject(
+        new RuntimeFailure('protocol_error', 'Invalid page session close'),
+      );
+    if (parsed.data.generation !== this.generation || !this.session)
+      return Promise.resolve({ closed: true });
+    const existing = this.closedPageSessions.get(parsed.data.pageSessionId);
+    if (existing) return existing;
+    const closing = (async (): Promise<{ closed: true }> => {
+      await Promise.all(
+        [...this.imageTasks.values()]
+          .filter(
+            (task) => task.input.pageSessionId === parsed.data.pageSessionId,
+          )
+          .map((task) =>
+            this.stopImage(
+              task,
+              new RuntimeFailure('cancelled', 'Page session was closed'),
+            ),
+          ),
+      );
+      if (parsed.data.generation !== this.generation) return { closed: true };
+      const requestId = crypto.randomUUID();
+      this.reserveRequest(requestId);
+      await new Promise((resolve, reject) => {
+        const task: PageSessionTask = {
+          kind: 'page-session',
+          requestId,
+          pageSessionId: parsed.data.pageSessionId,
+          resolve,
+          reject,
+          timer: setTimeout(() => this.expire(task), 30_000),
+        };
+        this.queue.push(task);
+        this.pump();
+      });
+      return { closed: true };
+    })();
+    this.closedPageSessions.set(parsed.data.pageSessionId, closing);
+    return closing;
+  }
+
+  private reserveRequest(requestId: string): void {
+    if (this.queue.length >= 128 || this.requestIds.size >= 10_000)
+      throw new RuntimeFailure(
+        'limit_exceeded',
+        'Runtime request budget is exhausted',
+      );
+    if (this.requestIds.has(requestId))
+      throw new RuntimeFailure(
+        'protocol_error',
+        'requestId must be unique within a runtime generation',
+      );
+    this.requestIds.add(requestId);
   }
 
   rebuild(): Promise<void> {

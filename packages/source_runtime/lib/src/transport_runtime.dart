@@ -107,7 +107,17 @@ final class TransportSourceRuntime implements SourceRuntime {
       return await transport.call(method, payload);
     } catch (error) {
       final failure = RuntimeException.fromWire(error);
-      if (!_events.isClosed) {
+      final localImageTimeout =
+          failure.code == RuntimeErrorCode.timeout &&
+          {
+            'acquireImage',
+            'cancelImage',
+            'releaseImage',
+            'closePageSession',
+          }.contains(method);
+      // A successfully unwound image timeout does not recycle the Source slot.
+      // The host must report runtime_lost if cancellation needed a generation reset.
+      if (!_events.isClosed && !localImageTimeout) {
         _events.add(
           RuntimeEvent(
             generation: _session?.generation ?? '',
@@ -308,16 +318,163 @@ final class TransportSourceRuntime implements SourceRuntime {
   }
 
   @override
-  Future<ImageResource> acquire(PageRef page) => Future.error(
-    const RuntimeException(
-      RuntimeErrorCode.unsupportedCapability,
-      'The processed-image resource channel has not passed its platform gate',
-    ),
-  );
+  Future<ImageResource> acquireImage(ImageAcquireRequest request) async {
+    final session = _session;
+    if (session == null ||
+        request.generation != session.generation ||
+        !session.sources.any((source) => source.id == request.sourceId)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Image request belongs to an expired Source',
+      );
+    }
+    if ([
+          request.requestId,
+          request.pageSessionId,
+          request.pageKey,
+        ].any((value) => value.isEmpty || value.length > 1000) ||
+        request.timeout <= Duration.zero ||
+        request.timeout > const Duration(minutes: 5)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Invalid image control request',
+      );
+    }
+    final epoch = _epoch;
+    final response = _object(
+      await _call('acquireImage', {
+        'requestId': request.requestId,
+        'sourceId': request.sourceId,
+        'pageSessionId': request.pageSessionId,
+        'pageKey': request.pageKey,
+        'generation': request.generation,
+        'timeoutMs': request.timeout.inMilliseconds,
+      }),
+    );
+    final id = response['resourceId'];
+    try {
+      if (id is! String ||
+          id.isEmpty ||
+          id.length > 1000 ||
+          response['generation'] != session.generation) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Invalid image resource identity',
+        );
+      }
+      if (_disposed ||
+          epoch != _epoch ||
+          _session?.generation != session.generation) {
+        throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Discarded a stale image resource',
+        );
+      }
+      final url = response['url'];
+      final mime = response['mimeType'];
+      final location = url is String && url.length <= 4096
+          ? Uri.tryParse(url)
+          : null;
+      if (location == null ||
+          location.scheme != 'blob' ||
+          mime is! String ||
+          !RegExp(r'^image/[a-zA-Z0-9.+-]{1,80}$').hasMatch(mime)) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Images must use a managed Web blob resource',
+        );
+      }
+      int positiveInteger(Object? value) {
+        if (value is! num ||
+            !value.isFinite ||
+            value <= 0 ||
+            value != value.truncateToDouble() ||
+            value > 64 * 1024 * 1024) {
+          throw const RuntimeException(
+            RuntimeErrorCode.protocolError,
+            'Invalid image dimensions or byte length',
+          );
+        }
+        return value.toInt();
+      }
+
+      final width = positiveInteger(response['width']);
+      final height = positiveInteger(response['height']);
+      final bytes = positiveInteger(response['byteLength']);
+      if (width * height > 64 * 1024 * 1024) {
+        throw const RuntimeException(
+          RuntimeErrorCode.limitExceeded,
+          'Image exceeds the raster budget',
+        );
+      }
+      return ImageResource(
+        id: id,
+        generation: session.generation,
+        location: location,
+        mimeType: mime,
+        byteLength: bytes,
+        width: width,
+        height: height,
+      );
+    } catch (_) {
+      if (id is String && id.isNotEmpty) {
+        await releaseImage(
+          ImageReleaseRequest(resourceId: id, generation: request.generation),
+        );
+      }
+      rethrow;
+    }
+  }
 
   @override
-  Future<void> release(String resourceId) async {
-    // This adapter never acquires an image until that resource channel exists.
+  Future<void> cancelImage(ImageCancelRequest request) async {
+    if (_disposed) return;
+    final response = _object(
+      await _call('cancelImage', {
+        'requestId': request.requestId,
+        'generation': request.generation,
+      }),
+    );
+    if (response['released'] != true) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image cancellation was not acknowledged',
+      );
+    }
+  }
+
+  @override
+  Future<void> releaseImage(ImageReleaseRequest request) async {
+    if (_disposed) return;
+    final response = _object(
+      await _call('releaseImage', {
+        'resourceId': request.resourceId,
+        'generation': request.generation,
+      }),
+    );
+    if (response['released'] != true) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image release was not acknowledged',
+      );
+    }
+  }
+
+  @override
+  Future<void> closePageSession(PageSessionRef session) async {
+    if (_disposed) return;
+    final response = _object(
+      await _call('closePageSession', {
+        'pageSessionId': session.pageSessionId,
+        'generation': session.generation,
+      }),
+    );
+    if (response['closed'] != true) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Page session cleanup was not acknowledged',
+      );
+    }
   }
 
   @override

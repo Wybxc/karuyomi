@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import { hostAbi, protocolVersion, runtimeBaseline } from './generated.ts';
+import { acquireImageSchema, closePageSessionSchema } from './image-control.ts';
 
 export { hostAbi, protocolVersion, runtimeBaseline };
 export * from './http-frames.ts';
+export * from './image-control.ts';
+export * from './image-frames.ts';
 
 export const runtimeHelloSchema = z.object({
   protocolVersion: z.literal(protocolVersion),
@@ -217,6 +220,17 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
     args: z.record(z.string(), z.unknown()),
   }),
   z.object({ ...rpcFields, type: z.literal('shutdown') }),
+  z.object({
+    ...rpcFields,
+    ...acquireImageSchema.omit({ requestId: true, generation: true }).shape,
+    type: z.literal('acquire-image'),
+    resourceId: z.string().uuid(),
+  }),
+  z.object({
+    ...rpcFields,
+    pageSessionId: closePageSessionSchema.shape.pageSessionId,
+    type: z.literal('close-page-session'),
+  }),
 ]);
 export const workerResponseSchema = z.object({
   ...rpcFields,

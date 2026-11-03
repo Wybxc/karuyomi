@@ -418,6 +418,8 @@ test('real TeaVM export handshake validates loaded Source IDs before readiness',
           JSON.stringify([{ id: '1', name: 'Wrong Source', lang: 'en' }]),
         );
       scope.hostInvoke = () => {};
+      scope.hostAcquireImage = () => {};
+      scope.hostClosePageSession = () => {};
     },
     origin,
   );
@@ -448,6 +450,8 @@ test.each([
       loader,
       () => {
         scope.hostInit = () => scope.teaDone?.('"ready"');
+        scope.hostAcquireImage = () => {};
+        scope.hostClosePageSession = () => {};
         scope.hostLoad = () =>
           scope.teaDone?.(
             JSON.stringify([
@@ -544,6 +548,8 @@ test('the installed v2 finish callback carries a controlled connection flag thro
     loader,
     () => {
       scope.hostInit = () => scope.teaDone?.('"ready"');
+      scope.hostAcquireImage = () => {};
+      scope.hostClosePageSession = () => {};
       scope.hostLoad = () =>
         scope.teaDone?.(
           JSON.stringify([

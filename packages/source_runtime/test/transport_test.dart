@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:source_runtime/source_runtime.dart';
-import 'package:reader_core/reader_core.dart';
 import 'package:test/test.dart';
 
 final class FakeTransport implements RuntimeTransport {
@@ -63,6 +62,24 @@ SourceRequest request({
 );
 TypeMatcher<RuntimeException> failure(RuntimeErrorCode code) =>
     isA<RuntimeException>().having((error) => error.code, 'code', code);
+
+ImageAcquireRequest imageRequest({String generation = 'generation-1'}) =>
+    ImageAcquireRequest(
+      requestId: 'image-1',
+      sourceId: '9223372036854775806',
+      pageSessionId: 'pages-1',
+      pageKey: 'p-0',
+      generation: generation,
+    );
+Map<String, Object?> imageReply() => {
+  'resourceId': 'resource-1',
+  'generation': 'generation-1',
+  'mimeType': 'image/png',
+  'byteLength': 1234,
+  'width': 600,
+  'height': 900,
+  'url': 'blob:https://reader.example/image-1',
+};
 
 void main() {
   test('shares concurrent open and keeps Long identities as strings', () async {
@@ -231,22 +248,113 @@ void main() {
   );
 
   test(
-    'images remain an explicit unsupported resource gate without a string body fallback',
+    'image controls pass explicit handles and require release/cancel acknowledgements',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
+      await runtime.open(build());
+      transport.handler = (method, payload) async => switch (method) {
+        'acquireImage' => imageReply(),
+        'cancelImage' || 'releaseImage' => {'released': true},
+        'closePageSession' => {'closed': true},
+        _ => null,
+      };
+      final image = await runtime.acquireImage(imageRequest());
+      expect(image.width, 600);
+      expect(image.location.scheme, 'blob');
+      expect(transport.calls.last.$2, {
+        'requestId': 'image-1',
+        'sourceId': '9223372036854775806',
+        'pageSessionId': 'pages-1',
+        'pageKey': 'p-0',
+        'generation': 'generation-1',
+        'timeoutMs': 30000,
+      });
+      await runtime.cancelImage(
+        const ImageCancelRequest(
+          requestId: 'image-1',
+          generation: 'generation-1',
+        ),
+      );
+      await runtime.releaseImage(
+        const ImageReleaseRequest(
+          resourceId: 'resource-1',
+          generation: 'generation-1',
+        ),
+      );
+      await runtime.closePageSession(
+        const PageSessionRef(
+          pageSessionId: 'pages-1',
+          generation: 'generation-1',
+        ),
+      );
+      expect(transport.calls.where((call) => call.$1 == 'cancel'), isEmpty);
+      await runtime.dispose();
+    },
+  );
+
+  test(
+    'rejects Source URLs and invalid dimensions and releases rejected resources',
+    () async {
+      final transport = FakeTransport();
+      final runtime = TransportSourceRuntime(transport);
+      await runtime.open(build());
+      for (final invalid in [
+        {'url': 'https://source.example/raw.png'},
+        {'url': 'data:image/png;base64,AAAA'},
+        {'width': 1.5},
+        {'height': 0},
+        {'byteLength': 64 * 1024 * 1024 + 1},
+      ]) {
+        transport.handler = (method, payload) async => method == 'acquireImage'
+            ? {...imageReply(), ...invalid}
+            : {'released': true};
+        await expectLater(
+          runtime.acquireImage(imageRequest()),
+          throwsA(failure(RuntimeErrorCode.protocolError)),
+        );
+        expect(transport.calls.last.$1, 'releaseImage');
+      }
       await expectLater(
-        runtime.acquire(
-          const PageRef(
-            requestId: 'image',
-            chapterKey: 'chapter',
-            pageKey: 'page',
-            generation: 'generation',
+        runtime.acquireImage(imageRequest(generation: 'old')),
+        throwsA(failure(RuntimeErrorCode.runtimeLost)),
+      );
+      transport.handler = (_, payload) async => {'released': false};
+      await expectLater(
+        runtime.releaseImage(
+          const ImageReleaseRequest(
+            resourceId: 'resource-1',
+            generation: 'generation-1',
           ),
         ),
-        throwsA(failure(RuntimeErrorCode.unsupportedCapability)),
+        throwsA(failure(RuntimeErrorCode.protocolError)),
       );
-      expect(transport.calls, isEmpty);
+      await runtime.dispose();
+    },
+  );
+
+  test(
+    'late image after container replacement is released under its original generation',
+    () async {
+      final transport = FakeTransport();
+      final runtime = TransportSourceRuntime(transport);
+      await runtime.open(build());
+      final result = Completer<Object?>();
+      transport.handler = (method, payload) async =>
+          method == 'acquireImage' ? result.future : {'released': true};
+      final acquiring = runtime.acquireImage(imageRequest());
+      final assertion = expectLater(
+        acquiring,
+        throwsA(failure(RuntimeErrorCode.runtimeLost)),
+      );
+      runtime.containerLost('replaced');
+      result.complete(imageReply());
+      await assertion;
+      expect(transport.calls.last.$1, 'releaseImage');
+      expect(transport.calls.last.$2, {
+        'resourceId': 'resource-1',
+        'generation': 'generation-1',
+      });
       await runtime.dispose();
     },
   );
@@ -263,4 +371,36 @@ void main() {
       throwsA(failure(RuntimeErrorCode.runtimeLost)),
     );
   });
+
+  test(
+    'an image timeout stays local while a real container loss is broadcast',
+    () async {
+      final transport = FakeTransport();
+      final runtime = TransportSourceRuntime(transport);
+      await runtime.open(build());
+      final events = <RuntimeEvent>[];
+      final subscription = runtime.events.listen(events.add);
+      transport.handler = (_, payload) async =>
+          throw {'code': 'timeout', 'message': 'Image cancelled and unwound'};
+      await expectLater(
+        runtime.acquireImage(imageRequest()),
+        throwsA(failure(RuntimeErrorCode.timeout)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(events, isEmpty);
+      transport.handler = (_, payload) async => throw {
+        'code': 'runtime_lost',
+        'message': 'Cancellation needed Worker recycle',
+      };
+      await expectLater(
+        runtime.acquireImage(imageRequest()),
+        throwsA(failure(RuntimeErrorCode.runtimeLost)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(events.single.code, RuntimeErrorCode.runtimeLost);
+      await subscription.cancel();
+      transport.handler = null;
+      await runtime.dispose();
+    },
+  );
 }

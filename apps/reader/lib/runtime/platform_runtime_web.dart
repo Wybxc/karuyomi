@@ -88,9 +88,7 @@ final class WebPlatformRuntime extends PlatformRuntime {
           method.toJS,
           (payload['requestId'] as String).toJS,
         );
-      } else if (method == 'dispose' ||
-          method == 'acquireImage' ||
-          method == 'rebuild') {
+      } else if (method == 'dispose' || method == 'rebuild') {
         result = host.callMethod<JSPromise<JSAny?>>(method.toJS);
       } else {
         result = host.callMethod<JSPromise<JSAny?>>(
