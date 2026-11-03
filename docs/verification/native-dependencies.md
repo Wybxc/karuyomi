@@ -42,4 +42,42 @@ flutter analyze --fatal-infos lib/runtime test/runtime
 flutter test test/runtime
 ```
 
-分析无问题，23 项测试通过，包括 Android 二进制 block / transfer 标识、匹配 ACK、持久 port、旧 transfer 消息与取消，以及 Native 文件预算、迟到结果和释放失败。这里的 port 场景运行在 Node，不代替 Android WebView。升级后的完整 iOS / Android 打包、Android 六 slot 实际传输与 iOS 薄 WKDownload 接线，仍须在新固定提交上分别验收；旧 `7edf123` 的打包结果不能自动转移到新依赖身份。
+分析无问题，23 项测试通过，包括 Android 二进制 block / transfer 标识、匹配 ACK、持久 port、旧 transfer 消息与取消，以及 Native 文件预算、迟到结果和释放失败。这里的 port 场景运行在 Node，不代替 Android WebView。旧 `7edf123` 的打包结果不能自动转移到新依赖身份；升级后的固定输入验证如下。
+
+## 官方 beta 的双端实际打包
+
+独立工作树 `native-progress-validation/karuyomi` 固定 `926b93d78a7360d849813b2d03dd650cd5c34172`，使用锁定的官方 beta 及 Flutter 3.47.5 / Dart 3.13.4。全部命令移除 `GH_TOKEN`、`GITHUB_TOKEN`、`CLOUDFLARE_API_TOKEN`，未修改插件缓存或跳过官方构建步骤。
+
+- iOS：同上 `flutter build ios --simulator --debug --no-codesign --no-pub` 成功。实际 SQLite framework 包含 arm64 / x86_64 及 `sqlite3_open_v2`、`sqlite3_prepare_v2`、`sqlite3_close_v2` 符号。
+- Android：JDK 25.0.5+8、项目既定 AGP 9.1.0 / Gradle 9.3.1，`flutter build apk --debug --no-pub` 成功。APK 实际包含三种 Android ABI 的 `libsqlite3.so` 及 `NativeAssetsManifest.json`，SHA-256 为 `b42e7d19a43ec76bee3fa5cb1679850d5dcb8e15014ec2602ffa302e80b05010`。官方 beta 解决了此前 AGP 9 构建阻断。
+- 依赖准备仅复用已按 sqlite3 3.5.2 包内固定 SHA-256 验证的官方 native-assets 下载文件；仍由未修改的 hook 验收，没有复制编译 hook 或手改 pub-cache。
+- Flutter 官方流程将本次 iOS 插件切换到 Swift Package Manager。`Podfile.lock` 仅剩 Flutter；`project.pbxproj` 移除无用的 Pods framework 嵌入阶段，保留 `NativeImageFiles.swift` 正式编译引用。两份 workspace `Package.resolved` 固定官方 `swift-collections` 1.7.5 / `f96b909e1a9e469620bc5037c1e24e00153f376f`。只回收这些构建输入，SPM checkout 与生成缓存不入库。
+
+正式主入口包备份与完整日志保留在该树 `.local/native-data/official-ios/Runner.app`、`official-android-app-debug.apk`、`ios-simulator-build.log`、`android-debug-build.log`。下述运行使用忽略目录内的机制夹具，不能把其结果当成正式 ReaderScreen 或 Source 阅读验收。
+
+## iOS 实际受管文件与 SQLite 进程重启
+
+同一固定树的 `.local/native-image-validation/main.dart` 调用正式 `NativePlatformRuntime`、`IosImageFileStore`、`NativeImageControl`，在 iPhone 17 Pro / iOS 26.4 模拟器运行。内置材料为 `6ce41048c205ea29dc6ba076faa2eb63398bd745f9ad864787c21391e9acee37`，正常 HTTPS 控制页为 `https://karuyomi.wybxc.cc/runtime/host`。
+
+```sh
+cd apps/reader
+flutter run --debug --no-resident --no-pub \
+  -d 516C79A4-FE42-46C2-8500-BDE77CBBA069 \
+  --target .local/native-image-validation/main.dart
+```
+
+实际通过：正式容器握手；两轮各六张并发、每张 233,144 B 的同源受控 PNG Blob 经 WKDownload 到受管文件；文件摘要一致、Flutter 实际解码、六资源配额、generation 绑定、发布后迟到取消、幂等释放、文件删除与 owner clear。PNG 摘要为 `b5b30238a6a750d723ee80d3af098b20d562bda00d2972d6d53717dc9afdb896`。另验证已取消的 acquisition 不发布资源；这不是 WKDownload 正文中段取消的证明。
+
+夹具随后通过正式 `ReadingProgressController` / `ProgressRepository` / `ReaderDatabase.open()` 保存合成章节，确认真实 persistent 模式并关闭数据库。使用 `xcrun simctl terminate` 后 `launch` 真正重启进程，成功恢复当前页及 `.25` offset、最远页及 `.75` offset、反序；不同 subject 无该进度，reset 原子增加 epoch 并回首页、清最远，旧 epoch 写入不能覆盖 reset。
+
+报告为该树 `.local/native-data/ios-image-report.json`、`ios-progress-report.json`；原报告也保留在应用 Application Support。此结果仅覆盖正式 Native 文件/SQLite 机制，输入是受控 Blob 与合成章节，未调用 Source AOT、正式 ReaderScreen 或真机；不宣称 Source 图片处理、真机峰值内存或 Native 阅读全链已通过。
+
+## Android 实际桥就绪阻断与修正
+
+官方 Android Emulator 37.2.13 / Google APIs ARM64 API 36 r7、Android WebView `133.0.6943.137` 上，926 固定树的正式 `NativePlatformRuntime.ready` 超时，尚未进入六 slot 图片验证。
+
+真实对照区分出原因：直达 `/runtime/host` 时，`onLoadStop` 中立即 `callAsyncJavaScript` 成功；经 `.html` 的 307 时，会先得到一次 URL 已显示 `/runtime/host` 的回调，立即调用却报 `callHandler is not a function` 且不返回，随后第二次加载完成回调桥才就绪。有无内置脚本、显式 bridge origin 设置均相同。原宿主在第一次回调设置 `handshaking`，导致后续就绪回调被忽略。
+
+当前修正直接加载规范路径，先用官方同步 `evaluateJavascript` 的 boolean 返回检查文档、插件桥与内置材料身份；未就绪不占握手，异步检查后重验 generation，仍受原整体超时预算。不增加固定 sleep 或修改插件。四项正式平台接口回归覆盖未就绪后再就绪、并发回调、重建后的迟到 readiness、拒绝非 boolean 返回。此修正的真实 Android 六 slot 与双端重新打包仍待新固定提交验证。
+
+失败及对照报告保留为该固定树 `.local/native-data/android-image-report.json`、`android-plugin-diagnostic-v2.json`；不能用后来的对照成功覆盖首次生产路径失败。

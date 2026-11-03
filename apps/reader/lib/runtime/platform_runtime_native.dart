@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -144,7 +145,9 @@ final class NativePlatformRuntime extends PlatformRuntime
         ),
       ]),
       initialUrlRequest: URLRequest(
-        url: WebUri(origin.resolve('/runtime/host.html').toString()),
+        // Avoid the static host.html -> host redirect: Android can report an
+        // intermediate onLoadStop before the new document's plugin bridge exists.
+        url: WebUri(origin.resolve('/runtime/host').toString()),
       ),
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,
@@ -177,7 +180,6 @@ final class NativePlatformRuntime extends PlatformRuntime
         if (generation != _generation || loaded.isCompleted || handshaking) {
           return;
         }
-        handshaking = true;
         if (url == null || Uri.parse(url.toString()).origin != origin.origin) {
           loaded.completeError(
             const RuntimeException(
@@ -188,6 +190,34 @@ final class NativePlatformRuntime extends PlatformRuntime
           return;
         }
         try {
+          final bridgeReady = await controller.evaluateJavascript(
+            source:
+                '''
+              (() => {
+                const installed = window.__karuyomiNativeRuntimeInstalled;
+                return document.readyState === 'complete' &&
+                  location.origin === ${jsonEncode(origin.origin)} &&
+                  location.pathname === '/runtime/host' &&
+                  !location.search && !location.hash &&
+                  typeof window.flutter_inappwebview?.callHandler === 'function' &&
+                  !!installed && installed.materialVersion === ${jsonEncode(assets.materialVersion)} &&
+                  installed.runtime === window.karuyomiRuntime;
+              })();
+            ''',
+          );
+          if (generation != _generation || loaded.isCompleted || handshaking) {
+            return;
+          }
+          if (bridgeReady is! bool) {
+            throw const RuntimeException(
+              RuntimeErrorCode.protocolError,
+              'Native bridge readiness did not return a boolean',
+            );
+          }
+          // An intermediate load event must not claim the handshake. A later
+          // completed document can retry within the existing overall timeout.
+          if (!bridgeReady) return;
+          handshaking = true;
           final result = await controller.callAsyncJavaScript(
             functionBody: '''
               const installed = window.__karuyomiNativeRuntimeInstalled;
