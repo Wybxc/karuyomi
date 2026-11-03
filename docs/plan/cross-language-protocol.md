@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，待新 ABI 的实际浏览器与原生运行验收。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
+消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，v3 Web 初始化与真实 Source/图片分项通过，Native 与剩余运行门待验收。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
 
 正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v3，原型不兼容旧材料。
 
@@ -16,7 +16,7 @@
 
 ## 待验收
 
-1. 用新 host 指纹重新 AOT 代表包，验证真实 Web Source 控制、图片、取消和关闭；旧 v2 图片证据不能改称 v3 证据。
+1. 固定 `6e08ec9` 的新指纹代表包已通过真实 Web Source 控制、首中末图片、重复释放与会话关闭，见 [v3 运行证据](../verification/protocol-v3-runtime.md)。继续验证实际取消和后续材料变更；不能复用旧 v2 或不同材料的证据。
 2. 实测 Native WebView 控制链和实际设备；编译、mock 和 Dart golden 不能替代该项。
 3. 新材料与静态快照、生产 Access 分项验收后再更新部署记录。固定 `022d828` v1 队列保持独立，尚不能部署为当前协议成果。
 
