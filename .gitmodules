@@ -2,3 +2,9 @@
 	path = vendor/extensions-source
 	url = https://github.com/keiyoushi/extensions-source.git
 	branch = main
+[submodule "vendor/suwayomi-server"]
+	path = vendor/suwayomi-server
+	url = https://github.com/Suwayomi/Suwayomi-Server.git
+[submodule "vendor/teavm"]
+	path = vendor/teavm
+	url = https://github.com/konsoletyper/teavm.git
