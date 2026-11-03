@@ -79,6 +79,252 @@ const edit = (
   metadata,
 });
 
+async function expectFailure(action: Promise<unknown>, message: string) {
+  let failure: unknown;
+  try {
+    await action;
+  } catch (error) {
+    failure = error;
+  }
+  assert(failure instanceof Error, message);
+  return failure;
+}
+
+async function readExact(
+  client: CacheWorker,
+  reader: unknown,
+  expected: Uint8Array,
+  handle = 'one',
+) {
+  let offset = 0;
+  for (let step = 0; step < 16; step++) {
+    const bytes = (
+      await client.control('read', { reader, handle, maximum: 65536 })
+    ).bytes;
+    if (bytes === null) {
+      assert(offset === expected.length, 'Snapshot reaches exact complete EOF');
+      return;
+    }
+    assert(
+      bytes instanceof Uint8Array && bytes.length > 0 && bytes.length <= 65536,
+      'Snapshot uses bounded binary chunks',
+    );
+    assert(
+      offset + bytes.length <= expected.length &&
+        bytes.every((value, index) => value === expected[offset + index]),
+      'Snapshot retains exact bytes',
+    );
+    offset += bytes.length;
+  }
+  throw Error('Snapshot did not reach EOF in its bounded fixture');
+}
+
+async function readerFailureGates(
+  url: URL,
+  b: CacheWorker,
+  c: CacheWorker,
+  large: Uint8Array,
+  encodedLarge: string,
+  checks: string[],
+) {
+  const seed = async () => {
+    await c.call('clear');
+    const editor = await c.call('begin');
+    assert(
+      (await c.call('put', { ...edit(editor), body: encodedLarge }))
+        .committed === true,
+      'Seed complete reader-lifecycle fixture',
+    );
+  };
+  await seed();
+  const dying = new CacheWorker(url);
+  try {
+    const dead = object((await dying.call('get', { raw: true })).entry),
+      live = object((await b.call('get', { raw: true })).entry);
+    assert(
+      (await dying.control('read', { reader: dead.reader, maximum: 3 }))
+        .bytes instanceof Uint8Array,
+      'Reader Worker consumed a prefix before dying',
+    );
+    await c.call('clear');
+    assert(
+      (await c.call('size')).allocatedBytes === large.length,
+      'Both live pins retain one retired body',
+    );
+    dying.terminate();
+    await c.call('size');
+    await readExact(b, live.reader, large);
+    assert(
+      (await c.call('size')).allocatedBytes === 0,
+      'Dead reader reclaimed without deleting the live sibling pin',
+    );
+    checks.push('reader-worker-death-reclaims-retired-body-with-live-sibling');
+  } finally {
+    dying.terminate();
+  }
+
+  const cases: { name: string; index: number; bytes: Uint8Array | null }[] = [
+    { name: 'missing', index: 1, bytes: null },
+    { name: 'empty', index: 1, bytes: new Uint8Array(0) },
+    { name: 'oversized', index: 1, bytes: new Uint8Array(65537) },
+    { name: 'truncated-first', index: 0, bytes: large.slice(0, 65535) },
+    { name: 'truncated-last', index: 2, bytes: large.slice(131072, -1) },
+    { name: 'overlong-last', index: 2, bytes: new Uint8Array(8) },
+  ];
+  for (const fixture of cases) {
+    await seed();
+    const doomed = object((await b.call('get', { raw: true })).entry),
+      sibling = object((await c.call('get', { raw: true })).entry);
+    await b.control('read', { reader: doomed.reader, maximum: 3 });
+    await c.call('clear');
+    await b.control('mutate-chunk', {
+      reader: doomed.reader,
+      index: fixture.index,
+      bytes: fixture.bytes,
+    });
+    let ended = false;
+    const failure = await expectFailure(
+      (async () => {
+        for (let step = 0; step < 16; step++) {
+          const bytes = (
+            await b.control('read', { reader: doomed.reader, maximum: 65536 })
+          ).bytes;
+          if (bytes === null) {
+            ended = true;
+            return;
+          }
+          assert(
+            bytes instanceof Uint8Array,
+            'Corrupt snapshot still uses binary until rejection',
+          );
+        }
+      })(),
+      'Corrupt chunk must fail: ' + fixture.name,
+    );
+    assert(
+      !ended && /cache (body|reader)/i.test(failure.message),
+      'Corruption produces a storage error rather than successful EOF: ' +
+        fixture.name,
+    );
+    assert(
+      (await c.call('size')).allocatedBytes === large.length,
+      'Error cleanup retains the live sibling pin: ' + fixture.name,
+    );
+    await c.control('mutate-chunk', {
+      reader: sibling.reader,
+      index: fixture.index,
+      bytes: large.slice(
+        fixture.index * 65536,
+        Math.min(large.length, (fixture.index + 1) * 65536),
+      ),
+    });
+    await readExact(c, sibling.reader, large);
+    assert(
+      (await c.call('size')).allocatedBytes === 0,
+      'Error cleanup releases only the bad reader and final sibling EOF frees retired bytes',
+    );
+    checks.push(
+      'corrupt-chunk-' + fixture.name + '-fails-without-eof-or-pin-leak',
+    );
+  }
+
+  for (const operation of ['reader-close', 'read-abort']) {
+    await seed();
+    const doomed = object((await b.call('get', { raw: true })).entry),
+      sibling = object((await c.call('get', { raw: true })).entry);
+    await b.control('read', { reader: doomed.reader, maximum: 65536 });
+    await c.call('clear');
+    if (operation === 'reader-close') {
+      await b.call('reader-close', { reader: doomed.reader });
+      await expectFailure(
+        b.control('read', { reader: doomed.reader, maximum: 1 }),
+        'Read after explicit reader close must fail rather than return EOF',
+      );
+    } else {
+      await b.control('fail-next-read');
+      const failure = await expectFailure(
+        b.control('read', { reader: doomed.reader, maximum: 1024 }),
+        'Real IDB failure during a later read must be reported',
+      );
+      assert(
+        failure.message.includes('ConstraintError'),
+        'Read preserves original IDB abort error',
+      );
+    }
+    assert(
+      (await c.call('size')).allocatedBytes === large.length,
+      'Early reader cleanup retains live sibling bytes',
+    );
+    await readExact(c, sibling.reader, large);
+    assert(
+      (await c.call('size')).allocatedBytes === 0,
+      'Last reader releases retired body after ' + operation,
+    );
+    checks.push('partial-read-' + operation + '-releases-only-its-pin');
+  }
+
+  await seed();
+  const doomed = object((await b.call('get', { raw: true }, 'closing')).entry),
+    sibling = object((await b.call('get', { raw: true }, 'sibling')).entry),
+    foreign = object((await c.call('get', { raw: true }, 'foreign')).entry);
+  await b.control('read', {
+    reader: doomed.reader,
+    handle: 'closing',
+    maximum: 3,
+  });
+  await c.call('clear');
+  for (const request of [
+    { reader: doomed.reader, handle: 'wrong' },
+    { reader: foreign.reader, handle: 'foreign' },
+  ]) {
+    await b.control('fail-next-close');
+    const failure = await expectFailure(
+      b.call('reader-close', { reader: request.reader }, request.handle),
+      'Controlled reader-close failure must be preserved',
+    );
+    assert(
+      failure.message.includes('ConstraintError'),
+      'Wrong-owner failure keeps original IDB error',
+    );
+  }
+  assert(
+    (
+      await b.control('read', {
+        reader: doomed.reader,
+        handle: 'closing',
+        maximum: 1,
+      })
+    ).bytes instanceof Uint8Array,
+    'Failed wrong-handle cleanup never invalidates the owned reader',
+  );
+  await b.control('fail-next-close');
+  const failure = await expectFailure(
+    b.call('reader-close', { reader: doomed.reader }, 'closing'),
+    'Failed owned reader close still reports storage failure',
+  );
+  assert(
+    failure.message.includes('ConstraintError'),
+    'Independent close cleanup preserves original IDB error',
+  );
+  await expectFailure(
+    b.control('read', { reader: doomed.reader, handle: 'closing', maximum: 1 }),
+    'Failed owned reader close has nevertheless released its snapshot',
+  );
+  await readExact(b, sibling.reader, large, 'sibling');
+  assert(
+    (await c.call('size')).allocatedBytes === large.length,
+    'Sibling close preserves the live foreign reader pin',
+  );
+  await readExact(c, foreign.reader, large, 'foreign');
+  assert(
+    (await c.call('size')).allocatedBytes === 0,
+    'Independent failed-close cleanup frees only owned pin and leaves no retired bytes',
+  );
+  checks.push(
+    'reader-close-idb-abort-cas-preserves-sibling-handle-and-foreign-owner',
+  );
+}
+
 export async function runCacheLifecycleSuite(workerUrl: string) {
   const url = new URL(workerUrl, location.href);
   url.searchParams.set('plugin', 'cache-lifecycle-' + crypto.randomUUID());
@@ -687,6 +933,7 @@ export async function runCacheLifecycleSuite(workerUrl: string) {
       );
       checks.push('failed-' + operation + '-releases-only-closed-handle');
     }
+    await readerFailureGates(url, b, c, large, encodedLarge, checks);
     return {
       passed: true,
       checks,

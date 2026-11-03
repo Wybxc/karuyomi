@@ -103,7 +103,7 @@ interface Reader {
   offset: number;
   received: number;
 }
-interface CacheSchema extends DBSchema {
+export interface CacheSchema extends DBSchema {
   directories: { key: StorageKey; value: Directory };
   entries: {
     key: EntryKey;
@@ -461,6 +461,27 @@ async function releaseClosedHandle(
     await tx.objectStore('directories').put(state);
   });
 }
+/** Java releases a snapshot once; a failed close must not strand its body pin. */
+async function releaseFailedReader(
+  database: Database,
+  owner: StorageKey,
+  id: string,
+  handle: string,
+) {
+  await transaction(database, async (tx) => {
+    const reader = await tx.objectStore('readers').get(id);
+    if (
+      reader?.worker === workerId &&
+      reader.handle === handle &&
+      sameDirectory(reader.directory, owner)
+    ) {
+      invalidate(pendingReads, reader.id);
+      const state = await stateFor(tx, owner);
+      await closeReader(tx, state, reader);
+      await tx.objectStore('directories').put(state);
+    }
+  });
+}
 async function control(
   request: CacheRequest,
   attempt: Attempt | undefined,
@@ -780,6 +801,21 @@ const cacheBridge = async (input: string): Promise<string> => {
           throw new AggregateError(
             [error, cleanup],
             'Cache close and handle cleanup failed',
+          );
+        }
+      }
+      if (request.operation === 'reader-close' && request.reader) {
+        try {
+          await releaseFailedReader(
+            database,
+            owner,
+            request.reader,
+            request.handle,
+          );
+        } catch (cleanup) {
+          throw new AggregateError(
+            [error, cleanup],
+            'Cache snapshot close and cleanup failed',
           );
         }
       }

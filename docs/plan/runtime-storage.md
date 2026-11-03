@@ -30,12 +30,13 @@
 - 小 JSON 控制不超过 64 KiB，metadata 不超过 48 KiB。`get` 仅返回 metadata/version/generation/reader/length，`begin` 接收 metadata，`commit` 原子发布完整 body 指针。
 - `teaCacheRead(reader, javaHandle, maximum)` 和 `teaCacheWrite(editor, javaHandle, sequence, bytes)` 传递不超过 64 KiB 的二进制块；Java 同样逐块复制，写 ACK 在实际事务提交之后。editor 与 reader 均校验 Worker/Java handle 所有权。
 - IDB 拆分 entries、bodies、chunks、editors、readers、directories；size、URLs、304 update 和 LRU 只读 metadata。读者 pin 不可变 body，replace/remove/clear/delete 仅移除当前引用，旧 snapshot 在最后 reader EOF/close 或死亡 owner 回收后释放。
-- Cache 可见大小上限为 `min(maxSize, 64 MiB)`，逻辑 allocated 同时计入 current、staging、retired-but-pinned 正文和 metadata，上限为可见预算两倍。每目录最多 64 个 editor 和 64 个 reader，每 body 最多 8192 块；事务 5 秒超时后 abort 并等到终态，再独立 CAS 清理。allocated 是应用逻辑字节预算，不是浏览器实际磁盘占用测量；普通文件与跨目录 namespace 总预算仍属后续阶段。
+- Cache 可见大小上限为 `min(maxSize, 64 MiB)`，逻辑 allocated 同时计入 current、staging、retired-but-pinned 正文和 metadata，上限为可见预算两倍。每目录最多 64 个 editor 和 64 个 reader，每 body 最多 8192 块；事务 5 秒超时后 abort 并等到终态，再独立 CAS 清理。allocated 是应用逻辑字节预算，不是浏览器实际磁盘占用测量；跨 Cache/files 与跨目录 namespace 总预算仍属后续阶段。
 - commit 与 metadata update 若无法在保留活 editor 的前提下达到可见预算，会原子回滚并拒绝发布；commit 再独立清理原 editor。close/delete 的原事务失败后，独立事务仅清对应 Worker/Java handle 的 staging editor，保留旧 current、打开 reader、sibling 和其他 owner；原始失败仍报告，清理失败聚合两个错误。
+- reader-close 的原事务失败后，以 readerId/Worker/Java handle/directory 验证独立清理；不因 Java 已标记释放且不会重试而遗留 retired pin。原错误保留，清理再失败则聚合错误；错 handle、兄弟和外来 owner 不被误清理。
 - Java `CacheSink` 将存储 IOException 或容量拒绝转为一次缓存 abort，精确消费本次 write 的剩余 count，后续仅丢弃缓存副本，网络正文继续；程序参数错误不宽泛吞掉。原网络读取异常仍传播，已发布 cache-hit 的读取故障不擅自重新请求网络。
 - `pnpm teavm:check` 已接入 CacheSink 正式 JVM 边界门：19 项检查覆盖 65536/65536/7 分块、额外未请求字节保留、写入/提交拒绝、存储异常和关闭期间的计数及终态。正式 Cache/Bridge 六源 javac、严格 TS 和 bridge unit 6/6 均通过；这些结果不代替实际 TeaVM JSO、CacheInterceptor 或 Source 验收。
 
-2026-11-04，Codex 内置浏览器 Chromium 156 使用正式 compileBridge 产物通过十七组：保留阶段一十组，追加多块 snapshot 替换/clear/EOF 与 allocated 释放、metadata 操作不读 chunks、块/目录预算、Java handle 隔离、可见预算 commit/update 原子拒绝，以及 close/delete 真实 IDB 失败后的同 handle 清理。原始报告在忽略目录；单次恢复延时不构成性能分布。待验收：reader 死亡回收、正文损坏和取消中途故障门。同一 Java Cache 场景的 TeaVM/原 JVM 对照已通过，证据与复验入口见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)；仍须以新 AOT 身份验收正式 Source。取消只允许完整旧或完整新条目，不允许半条正文；已完成提交不承诺因后续取消而回滚。
+2026-11-04，Codex 内置浏览器 Chromium 156 使用正式 compileBridge 产物通过 27 组：保留原十七组，新增 reader 死亡回收、六类实际 chunk 损坏、半途显式 reader-close、读事务真实 abort 与 reader-close 失败 CAS 清理。损坏最终报错而非成功 EOF，retired 计费仅在最后 pin 释放后回收；活兄弟 reader 保留。正式入口 `node tools/teavm/check-cache-storage.ts` 从干净检出编译桥与测试，提供 loopback 页面并等待内置浏览器，报告通过后退出；没有冒称自动 CI 浏览器门。原始报告在忽略目录，单次恢复延时不构成性能分布。Body metadata/pin 记录损坏、清理持续失败与完整 Java HTTP 取消仍待专门验收。Java Cache 场景的 TeaVM/原 JVM 对照已追加 no-cache/POST invalidation 并通过，证据见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)；仍须以新 AOT 身份验收正式 Source。取消不承诺回滚已提交写入。
 
 ## 阶段三：有界普通文件
 
@@ -50,9 +51,9 @@
 
 ## 阶段四：原 JVM 同版对照与产品门
 
-原 JVM 与 TeaVM 共享场景已通过；更广的异常、取消和产品场景仍待实施。seed 中同名 OkHttp JAR 的 `newCall` 已适配为 BrowserCall，不能用作原 JVM oracle；当前从官方 Maven 获取同版未适配的 5.5.0 JAR，验证 SHA-256 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52` 并断言实际 CodeSource。共享 `CacheScenarios.java` 已在原 JVM 通过 131079 字节冷热、304 合并、no-store、Cookie Vary、evictAll 后继续读已打开 snapshot；两端结果均为 11 次请求、8 次网络、4 次命中、5 次成功写入，正文 SHA-256 均为 `1933f7f279fb4232259d5af94a6f792a308a78e4c18b8ed5caafd99e943f9a78`。TeaVM 在 Codex 内置 Chromium 156 的真实 Worker 中运行产品 BrowserCall/Cache、二进制 JSO、typed idb 与 HTTP v2，由 workerd 映射隔离的受控 origin，未放宽生产网络策略。该门不代表正式 Source、生产 Access 或 Native。产物与原始报告留在忽略目录，见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)。
+原 JVM 与 TeaVM 共享场景已通过；更广的异常、取消和产品场景仍待实施。seed 中同名 OkHttp JAR 的 `newCall` 已适配为 BrowserCall，不能用作原 JVM oracle；当前从官方 Maven 获取同版未适配的 5.5.0 JAR，验证 SHA-256 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52` 并断言实际 CodeSource。共享 `CacheScenarios.java` 已覆盖 131079 字节冷热、304 合并、no-store、Cookie Vary、evictAll 后继续读已打开 snapshot，并追加 no-cache 强制重验证、POST 上传与同 URL GET 失效/重新缓存；两端本轮均为 18 次请求、13 次网络、7 次命中、8 次成功写入（历史首轮为 11/8/4/5），正文 SHA-256 均为 `1933f7f279fb4232259d5af94a6f792a308a78e4c18b8ed5caafd99e943f9a78`。TeaVM 在 Codex 内置 Chromium 156 的真实 Worker 中运行产品 BrowserCall/Cache、二进制 JSO、typed idb 与 HTTP v2，由 workerd 映射隔离的受控 origin，未放宽生产网络策略。该门不代表正式 Source、生产 Access 或 Native。产物与原始报告留在忽略目录，见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)。
 
-1. 比较冷/热命中、Vary/Cookie、ETag 304 合并、no-cache/no-store、POST invalidation、截断正文、半途取消和重启。
+1. 补充截断网络正文、半途取消与重启，并保留已覆盖的冷热、Vary/Cookie、304、no-cache/no-store 和 POST invalidation 对照。
 2. 对照正文摘要、状态及关键响应头、网络请求次数、cache/network 标记和异常类型；不能只比较测试数量或编译结果。
 3. 验证正式 namespace 派生：identity、repo、package、storageSchema 相同的版本保留数据；新 schema、其他身份或包隔离。buildId 不参与当前存储 namespace。
 4. 原版 Source、HTTPS handshake 适配、生产 Access 和 Web/Native 实际环境分别验收。受控 HTTP 或存储机制门不能替代这些结果。

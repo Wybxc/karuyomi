@@ -63,6 +63,53 @@ public final class CacheScenarios {
           noStore.body().bytes();
         }
       }
+      try (Response first = get(client, origin + "/no-cache", null)) {
+        check(first.networkResponse() != null, "no-cache seed network");
+        check(digest(first.body().bytes()).equals(expected), "no-cache seed bytes");
+      }
+      try (Response validated = get(client, origin + "/no-cache", null)) {
+        check(
+            validated.code() == 200
+                && validated.networkResponse() != null
+                && validated.networkResponse().code() == 304,
+            "no-cache always revalidates");
+        check(validated.cacheResponse() != null, "no-cache keeps stored response");
+        check("yes".equals(validated.header("X-Revalidated")), "no-cache merged header");
+        check(digest(validated.body().bytes()).equals(expected), "no-cache keeps body");
+      }
+      try (Response seed = get(client, origin + "/invalidate", null)) {
+        check(seed.networkResponse() != null, "invalidation seed network");
+        check(digest(seed.body().bytes()).equals(expected), "invalidation seed bytes");
+      }
+      try (Response warm = get(client, origin + "/invalidate", null)) {
+        check(
+            warm.networkResponse() == null && warm.cacheResponse() != null,
+            "invalidation seed is warm");
+        check(digest(warm.body().bytes()).equals(expected), "invalidation warm bytes");
+      }
+      Request mutation =
+          new Request.Builder()
+              .url(origin + "/invalidate")
+              .post(RequestBody.create("mutation", MediaType.parse("text/plain")))
+              .build();
+      try (Response changed = client.newCall(mutation).execute()) {
+        check(
+            changed.networkResponse() != null && changed.cacheResponse() == null,
+            "POST uses network");
+        check(changed.body().string().equals("mutation"), "POST request bytes reach origin");
+      }
+      try (Response invalidated = get(client, origin + "/invalidate", null)) {
+        check(
+            invalidated.networkResponse() != null && invalidated.cacheResponse() == null,
+            "POST invalidates cached GET");
+        check(digest(invalidated.body().bytes()).equals(expected), "invalidated network bytes");
+      }
+      try (Response warm = get(client, origin + "/invalidate", null)) {
+        check(
+            warm.networkResponse() == null && warm.cacheResponse() != null,
+            "GET after invalidation is cached again");
+        check(digest(warm.body().bytes()).equals(expected), "replacement warm bytes");
+      }
       try (Response varied = get(client, origin + "/vary", "mode=a")) {
         check(varied.body().string().equals("mode=a"), "vary seed");
       }

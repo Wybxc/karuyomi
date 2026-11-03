@@ -22,8 +22,10 @@ public final class CacheTest {
           String path = exchange.getRequestURI().getPath();
           byte[] body = CacheScenarios.body();
           exchange.getResponseHeaders().set("Cache-Control", "max-age=600");
-          if (path.equals("/etag")) {
-            exchange.getResponseHeaders().set("Cache-Control", "max-age=0");
+          if (path.equals("/etag") || path.equals("/no-cache")) {
+            exchange
+                .getResponseHeaders()
+                .set("Cache-Control", path.equals("/no-cache") ? "no-cache" : "max-age=0");
             exchange.getResponseHeaders().set("ETag", "\"cache-fixture\"");
             if ("\"cache-fixture\""
                 .equals(exchange.getRequestHeaders().getFirst("If-None-Match"))) {
@@ -38,6 +40,8 @@ public final class CacheTest {
             exchange.getResponseHeaders().set("Vary", "Cookie");
             body = exchange.getRequestHeaders().getFirst("Cookie").getBytes(StandardCharsets.UTF_8);
           }
+          if (path.equals("/invalidate") && exchange.getRequestMethod().equals("POST"))
+            body = exchange.getRequestBody().readAllBytes();
           exchange.sendResponseHeaders(200, body.length);
           exchange.getResponseBody().write(body);
           exchange.close();

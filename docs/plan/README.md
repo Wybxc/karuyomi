@@ -15,7 +15,7 @@
 | 基础运行与书架具备后 | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                                                                     |
 | 持续推进             | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                                                                    |
 | 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 与正式双端控制已接入；新 ABI 的真实 Web Source/图片分项通过，Native 与剩余运行门待验收                                                                                    |
-| P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | Cache editor/正文十七组真实浏览器回归与原 JVM/TeaVM 共享场景通过；实际 Source、取消、Native Cache 与完整存储预算门仍未齐                                                                 |
+| P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | Cache 27 组浏览器机制与 JVM/TeaVM no-cache/POST 对照、普通文件 14 组及 Java 共享场景通过；实际 Source、完整 HTTP 取消、Native Cache 与合计存储预算门仍未齐                               |
 | P0 文字布局子计划    | [普通文本与 TextInterceptor](text-layout.md)                  | 有界布局/HTML 与 xkcd 两页/Flutter 可见文字通过；共享 Bitmap13/文本101与真实Java自然GC分项通过，新材料原 Source 重复处理/取消仍待验收                                                    |
 | 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                                                                       |
 

@@ -37,15 +37,21 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 2026-11-04，项目 owned `TextPaint`/`Layout`/旧构造器 `StaticLayout`、真实 Canvas 字体指标与有界布局已接入，并补齐 TextInterceptor 使用的 HTML 字符串投影。Codex 内置浏览器 Chrome 156 通过 Canvas 五组机制门及同份 Java 101 项检查；独立固定 API 35/Robolectric 4.17 的 Android NATIVE oracle 同样通过 101 项，并断言真实 native shadows 和固定 instrumented SDK 身份。两端默认字体输出分别为 1000×140 与 1000×190，不声称高度或 PNG 像素等价。新增 CRLF 场景曾在 TeaVM 失败，修复后完整重跑通过；浏览器资源账本均归零。
 
-这些证据覆盖 HTML plain-string、UTF-16 range、padding/spacing/行宽、普通文本绘字与预算机制，不能替代新 host 下原 xkcd TextInterceptor 第二页、生产 Access 或 Native 应用验收。旧 host 的 Android Stub 失败证据保留。正式入口、原 Android plain 状态反向断言及未验范围见[文字布局记录](verification/text-layout-runtime.md)与[计划](plan/text-layout.md)。
+这些机制证据覆盖 HTML plain-string、UTF-16 range、padding/spacing/行宽、普通文本绘字与预算。固定 `926b93d` 后原 xkcd 两页及 Flutter 可见文字已通过；固定 `5148c60` 的新文件/Bitmap 生命周期宿主重 AOT 后，两页也已通过。原 JAR 摘要保持一致；重复处理与内部自然回收、生产 Access 和 Native 应用分别验收。旧 host 的 Android Stub 失败证据保留。正式入口、原 Android plain 状态反向断言及未验范围见[文字布局记录](verification/text-layout-runtime.md)与[计划](plan/text-layout.md)。
 
 ## Cache 生命周期与有界正文分项
 
-2026-11-03 至 04，正式 Cache 桥使用 `idb@8.0.4` 将正文拆成最多 64 KiB 的二进制块，metadata 与正文分开，snapshot pin 保留被替换/清空后仍在读取的完整 body；可见预算和计入 staging/retired 的 allocated 预算分别限制。Codex 内置浏览器 Chromium 156 通过十七组真实 Worker/IndexedDB/Web Locks 门，覆盖 editor 死亡 owner 回收、handle/CAS/generation 隔离、put abort、close/delete 与在途 begin、分块 snapshot/EOF、metadata 不读 chunks、块与目录预算、预算不足时原子回滚，以及 close/delete 原事务失败后按 owner/handle 清理。机制与故障门不代表完整 Source 或峰值验收。
+正式 Cache 桥直接使用 `idb@8.0.4`，正文为最多 64 KiB 的二进制块，metadata 与正文分开；snapshot pin 保留被替换/清空后仍在读取的完整 body，visible 与 staging/retired allocated 分别计费。Codex 内置浏览器通过真实 Worker/IndexedDB/Web Locks 门，覆盖死亡 owner、CAS/generation、事务 abort、读者 snapshot、六类 chunk 损坏与中途关闭。reader-close 原事务失败后独立按 owner/handle/directory/reader 清理，保留原错误，避免 Java 已释放的 reader 永久 pin 正文。具体矩阵与正式复验入口见[Cache 记录](verification/http-cache-runtime.md)。
 
-共享 `CacheScenarios.java` 分别在官方 Maven 未适配 OkHttp 5.5.0 与真实 TeaVM 0.16 产品 Cache/BrowserCall/二进制 JSO 中执行。131079 字节冷/热命中、304 合并、no-store、Cookie Vary 和打开 snapshot 跨 evictAll 的正文摘要一致，均为 `1933f7f279fb4232259d5af94a6f792a308a78e4c18b8ed5caafd99e943f9a78`；计数均为 11 次请求、8 次网络、4 次命中、5 次成功写入。原 JVM 断言 Cache/OkHttpClient CodeSource，避免 seed 同名适配 JAR 将请求送入 BrowserCall。Java CacheSink 的 19 项 JVM 边界检查同时通过，存储写失败仅丢弃缓存副本，不吞网络读取异常。
+共享 `CacheScenarios.java` 分别在官方 Maven 未适配 OkHttp 5.5.0 与真实 TeaVM 0.16 产品 Cache/BrowserCall/二进制 JSO 中执行，经受控 workerd origin 对照冷/热命中、304、no-cache/no-store、POST invalidation、Cookie Vary 和 evictAll 后打开 snapshot。请求/网络/命中/成功写入及正文摘要一致；原 JVM 断言实际 CodeSource，避免误用 seed 同名适配 JAR。CacheSink 的存储写失败只丢弃缓存副本，不吞网络读取异常。
 
-上述 TeaVM 网络使用受控 workerd origin，新 Cache 材料下 Arknights/CuuTruyen 两包已重新 AOT 并通过在线首中末图片，见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)；未测这两源的冷/热 Cache 命中，生产 Access 动态链、reader 死亡/损坏正文/中途取消或 Native 仍未验收；普通文件与跨目录 namespace 总预算仍待实施。复验与边界见[Cache 记录](verification/http-cache-runtime.md)和[存储计划](plan/runtime-storage.md)。原 JVM oracle JAR SHA-256 为 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52`。
+已有新 Cache 材料的 Arknights/CuuTruyen 在线图片分项见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)，仍未实测其冷/热 Cache 命中。生产 Access 动态链、截断网络正文的共享 Java 异常对照、Native 与跨目录 namespace 总预算未验收；机制与受控 Java 场景不代替这些门。
+
+## 有界普通文件分项
+
+`5148c60` 已将普通文件改为 typed idb inode/chunk、64 KiB 二进制 JSO、稀疏文件、配额与 Web Locks owner。数据、路径、长度及账本同事务，提交后才更新 cursor/ACK；rename/unlink 保留打开 inode，失败关闭可显式重试。真实浏览器机制、原 JVM 和实际 TeaVM 的共享 File/RandomAccessFile/Okio 场景分别通过；首次实际 TeaVM 门发现的 EOF/unsigned 差异由项目自有 JCL 适配修复，没有修改 vendor 或扩展 JAR。
+
+固定预算、原始失败与最终输入身份见[文件证据](verification/file-storage-runtime.md)和[设计](design/runtime-file-storage.md)。普通 files namespace 的逻辑/allocated 预算已经实施；与独立 Cache 的合计限额、正式 Source、Native 和设备资源测量仍未完成，见[存储计划](plan/runtime-storage.md)。
 
 ## 阅读连续性分项
 
@@ -162,7 +168,7 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 正式回归还覆盖：保留原始/子类 Page、cacheless/progress 与本地 XOR 拦截器的 JVM 对照；双完成后才公开资源；单块 ACK；取消与迟到发布、解码预算 tombstone、Java 退出后解锁；资源公开后迟到 cancel/close 不撤销已返回 Blob；详情退出动画期间迟到 pages 不重开 Reader。真实 Flutter 退出还暴露了两端 mock 掩盖的应答漂移，现关闭会话统一为 `{closed:true}`，取消/释放为 `{released:true}`，公开 API→Worker 延迟确认与浏览器 Source 门均明确检查相应 ACK。原始日志与截图留在 ignored `.local/image-session-review/`，复验入口见 [Source 门](../apps/api/test/source-metadata-probe.md)。
 
-`pnpm check`、`pnpm flutter:check` 与产品 Web/API dry-run 构建通过；Java 图片 oracle 对 seed 和正式 HttpSource 两套签名均通过。Web 终端有 encoded/pixel/resource 总预算、头部预检与实际 decode，但内部 Bitmap/ImageDecoder 仍有整图 Base64/readAllBytes 和未协调的总 raster 预算。不能据此声称图片解密/重排、动画/超长图、进程/GPU 合计峰值、Native 受管文件或 P0 已通过。
+`pnpm check`、`pnpm flutter:check` 与产品 Web/API dry-run 构建通过；Java 图片 oracle 对 seed 和正式 HttpSource 两套签名均通过。该历史输入的 Web 终端有 encoded/pixel/resource 总预算、头部预检与实际 decode；随后内部 Bitmap/ImageDecoder 的二进制与合计账本进展见下节。不能据此声称图片解密/重排、动画/超长图、进程/GPU 合计峰值、Native 受管文件或 P0 已通过。
 
 ## 内部 graphics 二进制与预算
 
@@ -170,7 +176,7 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 新增流式 Java oracle 与原 DTO/HTTP/两套图片 oracle、16 个正式图形 Java 类 javac、113 项 runtime-host 测试及严格类型检查通过。Codex 内置浏览器 Chromium 156 的真实 Canvas 门通过；TeaVM 0.16.0 实际 Java→JSO→Canvas oracle 通过 131,079 字节分块往返、同步/异步 Java 异常、fiber bounds、Bitmap pixels/raw/PNG、region sample 别名与 Java Frame lease，显式释放后图形账本归零。独立 harness 初次遗漏正式构建器的 Android 重复类裁剪曾报 Stub，修正 harness 后复跑通过，未改扩展业务代码或原始 JAR。
 
-预算合同、范围和复验入口见 [图片资源内部图形桥](IMAGE-RESOURCES.md#source-内部图形桥)。这是图形桥和受控 codec 的分项证据，尚需新 host 输入的真实 AOT、处理/解密源、移动环境及实际进程/GPU 峰值。Cache/File 的 Base64、整条目复制和存储预算仍属于独立未完成阶段；图形账本不代表整个 Worker 的硬上限。
+预算合同、范围和复验入口见 [图片资源内部图形桥](IMAGE-RESOURCES.md#source-内部图形桥)。这是图形桥和受控 codec 的分项证据，尚需新 host 输入的真实 AOT、处理/解密源、移动环境及实际进程/GPU 峰值。Cache 与普通 File 的二进制正文、事务和各自预算已分阶段通过机制门，合计 namespace 预算及产品环境仍待汇合；图形账本不代表整个 Worker 的硬上限。Bitmap 自然回收和活 owner 的独立证据见[生命周期记录](verification/bitmap-lifetime-runtime.md)。
 
 ## F3 iOS 模拟器 HTTPS 机制
 
@@ -180,7 +186,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 ## Native 受管文件产品机制
 
-2026-11-03 已接入正式 NativePlatformRuntime、资源所有权表、iOS WKDownload 文件桥与 Android 固定六槽 ArrayBuffer sink。iOS 26.4 Simulator / Xcode SDK 27.2 在正常受信 localhost HTTPS 下，实际 Flutter Headless 握手、唯一 token 绑定、307 控制页规范化、受控 Blob 下载、1,175 字节摘要、Flutter 256×128 解码及取消/释放/目录清理通过。Swift XCTest 11 项、Flutter 45 项、SourceRuntime 23 项和 Native opt-in/图片 manager 的 TypeScript 15 项通过；analyze 无问题，正式产品 iOS 模拟器构建成功。Android 嵌入脚本的真实 Node MessagePort 背压/复用/迟到 ACK 回归通过，尚未在 Android WebView 运行。
+2026-11-03 已接入正式 NativePlatformRuntime、资源所有权表、iOS WKDownload 文件桥与 Android 固定六槽 ArrayBuffer sink。iOS 26.4 Simulator / Xcode SDK 27.2 在正常受信 localhost HTTPS 下，实际 Flutter Headless 握手、唯一 token 绑定、307 控制页规范化、受控 Blob 下载、1,175 字节摘要、Flutter 256×128 解码及取消/释放/目录清理通过。Swift XCTest 11 项、Flutter 45 项、SourceRuntime 23 项和 Native opt-in/图片 manager 的 TypeScript 15 项通过；analyze 无问题，正式产品 iOS 模拟器构建成功。Android 嵌入脚本在该历史阶段仅通过 Node MessagePort 回归；后续实际 WebView 六槽、SQLite 进程重启及双端 readiness 差异见[Native 依赖与运行记录](verification/native-dependencies.md)。
 
 完整合同、工具来源、期限/tombstone/配额和复验入口见 [Native 图片文件](NATIVE-IMAGE-FILES.md)。这证明产品容器与文件交接机制，尚非原版 Source→Native Reader、物理 iPhone、生产 Access、后台恢复或合计峰值验收。绑定与下载回调未确认停止时不会声称成功清理或归还预算。
 
@@ -189,9 +195,9 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
-- v2 二进制网络/Okio 流控、真实上游取消、文件与 HTTP Cache 同版回归。
-- Native ReaderScreen 交互、Android 实际 WebView 和后台恢复；新 graphics 材料的实际 AOT/处理源及更多真实解密源覆盖。
+- 真实 Source 的冷热 Cache、截断网络/取消异常对照、Cache/files 合计 namespace 预算及版本/身份切换。
+- Native ReaderScreen 交互、后台恢复与当前材料的双端 Source 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
-- P1 书架/进度等持久化、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化。
+- P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。
 
 CI 已配置统一检查，远端运行结果需由对应提交确认。以上工程与探针证据不表示 P0 或后续阶段通过。

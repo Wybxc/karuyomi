@@ -1,14 +1,16 @@
 /** Test-only Worker driver; all cache operations use the product bridge. */
+import { openDB } from 'idb';
 import {
   array,
   decodeBase64,
   encodeBase64,
+  integer,
   object,
   optionalText,
   text,
   workerScope,
 } from '../../../runtime/teavm/bridge/bridge-common.js';
-import type {} from '../../../runtime/teavm/bridge/cache-bridge.js';
+import type { CacheSchema } from '../../../runtime/teavm/bridge/cache-bridge.js';
 
 let chunkReads = 0;
 const originalGet = IDBObjectStore.prototype.get;
@@ -141,6 +143,52 @@ function failNextClose() {
   };
 }
 
+function failNextRead() {
+  const originalPut = IDBObjectStore.prototype.put,
+    originalAdd = IDBObjectStore.prototype.add;
+  IDBObjectStore.prototype.put = function (value: unknown, key?: IDBValidKey) {
+    if (this.name !== 'readers') return originalPut.call(this, value, key);
+    IDBObjectStore.prototype.put = originalPut;
+    // A reader already exists. Abort the actual read/cursor transaction.
+    return originalAdd.call(this, value, key);
+  };
+}
+
+async function mutateChunk(message: Record<string, unknown>) {
+  const database = await openDB<CacheSchema>('teavm-http-cache-v2'),
+    tx = database.transaction(['readers', 'chunks'], 'readwrite'),
+    done = tx.done;
+  try {
+    const reader = await tx.objectStore('readers').get(text(message.reader));
+    if (!reader) throw Error('Missing reader for controlled chunk corruption');
+    const key: [string, string, string, number] = [
+      ...reader.directory,
+      reader.body,
+      integer(message.index, 0, 8191),
+    ];
+    if (message.bytes === null) await tx.objectStore('chunks').delete(key);
+    else {
+      if (
+        !(message.bytes instanceof Uint8Array) ||
+        message.bytes.length > 65537
+      )
+        throw Error('Invalid controlled corrupt chunk');
+      await tx.objectStore('chunks').put(message.bytes, key);
+    }
+    await done;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* Already terminal. */
+    }
+    await done.catch(() => {});
+    throw error;
+  } finally {
+    database.close();
+  }
+}
+
 self.onmessage = async (event: MessageEvent<unknown>) => {
   const message = object(event.data),
     id = text(message.id);
@@ -165,6 +213,10 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         reclaimPause = undefined;
       } else if (control === 'fail-next-close') {
         failNextClose();
+      } else if (control === 'fail-next-read') {
+        failNextRead();
+      } else if (control === 'mutate-chunk') {
+        await mutateChunk(message);
       } else if (control === 'fail-next-put') {
         failNextPut(text(message.replacement));
       } else if (control === 'read') {
