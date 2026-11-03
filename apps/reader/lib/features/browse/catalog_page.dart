@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'catalog_controller.dart';
-import '../reader/reader_screen.dart';
+import '../reader/chapter_reader_route.dart';
+import '../reader/chapter_sequence.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -265,12 +266,22 @@ class MangaDetailsPage extends StatelessWidget {
   final List<ChapterEntry> chapters;
   final CatalogSourceRef source;
 
-  Future<void> _openChapter(BuildContext context, ChapterEntry chapter) async {
+  Future<void> _openChapter(BuildContext context, int index) async {
     final route = ModalRoute.of(context);
+    final build = controller.activeBuild;
+    if (build == null) return;
+    final sequence = ChapterSequence(
+      packageName: build.packageName,
+      sourceId: source.sourceId,
+      mangaUrl: manga.url,
+      chapters: chapters.map((chapter) => chapter.snapshot),
+    );
+    final selected = sequence.entries[index];
     final opened = await controller.openChapter(
       manga,
-      chapter,
+      ChapterEntry(selected.snapshot),
       reference: source,
+      logicalChapterKey: selected.key,
     );
     if (opened == null) return;
     if (!context.mounted ||
@@ -282,12 +293,13 @@ class MangaDetailsPage extends StatelessWidget {
     try {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => ReaderScreen(
-            manifest: opened.manifest,
-            provider: opened.provider,
-            generation: opened.generation,
-            title: opened.title,
-            onClosed: () => controller.closeChapter(opened),
+          builder: (_) => ChapterReaderRoute(
+            catalog: controller,
+            manga: manga,
+            source: source,
+            sequence: sequence,
+            initialChapter: selected,
+            initialOpened: opened,
           ),
         ),
       );
@@ -356,12 +368,12 @@ class MangaDetailsPage extends StatelessWidget {
                         padding: EdgeInsets.all(24),
                         child: Text('这个漫画源没有返回章节'),
                       ),
-                    for (final chapter in chapters)
+                    for (var index = 0; index < chapters.length; index++)
                       ListTile(
                         enabled: !controller.busy,
                         leading: const Icon(Icons.article_outlined),
-                        title: Text(chapter.name),
-                        onTap: () => _openChapter(context, chapter),
+                        title: Text(chapters[index].name),
+                        onTap: () => _openChapter(context, index),
                       ),
                   ],
                 ),

@@ -39,6 +39,7 @@ final class TestPlatform extends PlatformRuntime {
   final imageControls = <(String, Map<String, Object?>)>[];
   Map<String, Object?>? continuation;
   Future<wire.SourceResult> Function(wire.SourceCall call)? invokeHandler;
+  Future<void> Function(String pageSessionId)? closePageSessionHandler;
 
   wire.ApiFetchResponse _fetch(String path) {
     final response = switch (path) {
@@ -166,6 +167,9 @@ final class TestPlatform extends PlatformRuntime {
         ));
         response.released = wire.Released(released: true);
       case wire.ControlRequest_Command.closePageSession:
+        await closePageSessionHandler?.call(
+          request.closePageSession.pageSessionId,
+        );
         imageControls.add((
           'closePageSession',
           wire.encodeProtoJson(request.closePageSession),

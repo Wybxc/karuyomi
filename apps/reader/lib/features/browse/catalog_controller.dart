@@ -449,6 +449,7 @@ final class CatalogController extends ChangeNotifier {
     MangaEntry manga,
     ChapterEntry chapter, {
     required CatalogSourceRef reference,
+    String? logicalChapterKey,
   }) => _perform('正在加载章节页面', () async {
     if (!isCurrentSource(reference)) {
       throw const FormatException('章节所属漫画源会话已过期，请返回重新打开详情');
@@ -479,11 +480,9 @@ final class CatalogController extends ChangeNotifier {
           throw const FormatException('漫画源页面引用无效');
         }
       }
-      final chapterKey = _readingKey([
-        build.packageName,
-        source.id,
-        chapter.url,
-      ]);
+      final chapterKey =
+          logicalChapterKey ??
+          _readingKey([build.packageName, source.id, manga.url, chapter.url]);
       // Handles and learned dimensions do not change content identity.
       final version = _readingKey(
         pages

@@ -27,6 +27,9 @@ class ReaderScreen extends StatefulWidget {
     this.imageBuilder = buildResourceImage,
     this.imageEvictor,
     this.onClosed,
+    this.onClosing,
+    this.chapterControls,
+    this.onAttached,
   });
 
   final ChapterManifest manifest;
@@ -42,6 +45,11 @@ class ReaderScreen extends StatefulWidget {
 
   /// Runs after scheduler cancellation, widget pins and cache eviction finish.
   final Future<void> Function()? onClosed;
+
+  /// Publishes the complete cleanup future as soon as this leaf unmounts.
+  final ValueChanged<Future<void>>? onClosing;
+  final Widget? chapterControls;
+  final VoidCallback? onAttached;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -70,6 +78,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void initState() {
     super.initState();
+    widget.onAttached?.call();
     _reader = ReaderController(
       manifest: widget.manifest,
       initialPosition: widget.initialPosition,
@@ -599,6 +608,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
               ],
             ),
+            if (widget.chapterControls case final Widget controls) controls,
           ],
         ),
       ),
@@ -613,10 +623,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     unawaited(_imagesSubscription?.cancel());
     final scheduler = _scheduler;
     final onClosed = widget.onClosed;
-    unawaited(() async {
+    final cleanup = () async {
       await scheduler.dispose();
       await onClosed?.call();
-    }());
+    }();
+    widget.onClosing?.call(cleanup);
+    unawaited(cleanup);
     unawaited(_reader.dispose());
     _scroll.dispose();
     _transform.dispose();

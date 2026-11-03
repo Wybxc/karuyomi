@@ -37,6 +37,10 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 2026-11-03，正式 Cache 桥在 Codex 内置浏览器 Chromium 156 通过十组真实 Worker/IndexedDB/Web Locks 门：终止后立即回收 editor、活 owner/Java handle 隔离、并发唯一 editor、版本/clear generation CAS，以及真实事务 abort 后清理与 close/in-flight begin 竞争。事务失败保留旧完整条目，清理不影响替代写入者；类型检查与桥单测通过。具体入口和故障构造见[Worker 桥记录](verification/worker-bridges.md#cache-editor-的-worker-生命周期)。这不是 Java CacheInterceptor、原 Source 或正文预算验收；正文二进制化、普通文件和原 JVM 同版对照按[存储计划](plan/runtime-storage.md)继续推进。
 
+## 阅读连续性分项
+
+2026-11-03，阅读路由已接 Source 原序/反序、漫画作用域章节键与上一章/下一章控制；不按编号排序或丢弃重复 URL。每次切章等旧 Reader 的 scheduler、图片 pin 与 provider 清理 ACK 后才挂载新叶；下一章 pages 迟到和新 provider 在下一帧挂载前退出均被关闭。`chapter_sequence_test.dart` 与 `chapter_reader_route_test.dart` 覆盖空/零/小数编号、重复章的快照键、跨漫画/Source 隔离及延迟清理/退出竞争；相关 26 项组件回归和 Flutter analyze 通过。完整 `pnpm flutter:check` 通过三个包的静态分析及 15/23/50 项测试，完整格式检查通过。此时尚无背景下一章准备、Drift 落盘、真实 Source 章节连续阅读或真机证据，不据此标记 P0/P1 通过。
+
 ## 历史部署与匿名边界
 
 2026-11-03 已成功部署 `https://karuyomi.wybxc.cc`，Cloudflare Worker version 为 `0332ef7a-3d49-47c1-ac41-edbed49bd7fe`。云端 D1 的两次迁移均通过，e350 产物已 remote 注册。匿名检查得到 `/` 200、`/runtime/host.js` 200，`/runtime/host.html` 307 规范化到公开 `/runtime/host`；Safari 已实际渲染 Flutter 书架与三个导航页签。
