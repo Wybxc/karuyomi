@@ -45,9 +45,10 @@ async function main() {
     path.join(tmpdir(), 'karuyomi-cloudflare-check-'),
   );
   const name = `karuyomi-check-${randomUUID().replaceAll('-', '').slice(0, 16)}`;
+  const workerName = 'karuyomi-ci-permission-check';
   const routePattern = `${name}.wybxc.cc/*`;
   const accountPath = `/accounts/${account}`;
-  const workerPath = `${accountPath}/workers/scripts/${name}`;
+  const workerPath = `${accountPath}/workers/scripts/${workerName}`;
   const checks: Record<string, Check> = {};
   const cleanup: Record<string, Check> = {};
   let workerAttempted = false;
@@ -127,7 +128,34 @@ async function main() {
     }
     console.log(`${key}: ${target[key]?.status} — ${target[key]?.detail}`);
   }
-  async function deploy() {
+  async function existingWorker(
+    cleaning = false,
+  ): Promise<Record<string, unknown>> {
+    let metadata: unknown;
+    try {
+      metadata = await api(
+        `${workerPath}/settings`,
+        'GET',
+        undefined,
+        cleaning,
+        true,
+      );
+    } catch (error) {
+      if (!(error instanceof CheckFailure) || !/\b10007\b/.test(error.message))
+        throw error;
+    }
+    if (metadata === undefined || metadata === null)
+      throw new CheckFailure(
+        `Isolated Worker ${workerName} is missing; bootstrap it manually with workers.dev and previews disabled and no routes, then rerun. This check never creates a Worker`,
+      );
+    if (!isRecord(metadata))
+      throw new CheckFailure('Existing isolated Worker metadata was invalid');
+    return metadata;
+  }
+  async function deploy(cleaning = false) {
+    // The token only needs to edit an existing isolated Worker. Never turn a
+    // missing pre-created Worker into an implicit create attempt.
+    await existingWorker(cleaning);
     const require = createRequire(
       new URL('../apps/api/package.json', import.meta.url),
     );
@@ -141,35 +169,47 @@ async function main() {
     );
     if (!isRecord(locked) || locked.version !== '4.156.1')
       throw new CheckFailure('Expected repository-pinned Wrangler 4.156.1');
-    const configuration = path.join(temporary, 'wrangler.json');
-    await mkdir(path.join(temporary, 'public'));
-    await writeFile(
-      path.join(temporary, 'public/check.txt'),
-      `Static upload permission check ${randomUUID()}\n`,
+    const configuration = path.join(
+      temporary,
+      cleaning ? 'baseline.wrangler.json' : 'check.wrangler.json',
     );
+    if (!cleaning) {
+      await mkdir(path.join(temporary, 'public'), { recursive: true });
+      await writeFile(
+        path.join(temporary, 'public/check.txt'),
+        `Static upload permission check ${randomUUID()}\n`,
+      );
+    }
+    const entry = cleaning ? 'baseline.ts' : 'worker.ts';
     await writeFile(
-      path.join(temporary, 'worker.ts'),
-      "export default { fetch() { return new Response('Temporary permission check'); } };\n",
+      path.join(temporary, entry),
+      cleaning
+        ? 'export default { fetch() { return new Response(null, { status: 404 }); } };\n'
+        : "export default { fetch() { return new Response('Temporary permission check'); } };\n",
     );
     await writeFile(
       configuration,
       JSON.stringify({
-        name,
-        main: './worker.ts',
+        name: workerName,
+        main: './' + entry,
         account_id: account,
         compatibility_date: '2026-11-03',
         workers_dev: false,
         preview_urls: false,
         routes: [],
-        assets: {
-          directory: './public',
-          binding: 'ASSETS',
-          not_found_handling: 'none',
-        },
+        ...(cleaning
+          ? {}
+          : {
+              assets: {
+                directory: './public',
+                binding: 'ASSETS',
+                not_found_handling: 'none',
+              },
+            }),
         observability: { enabled: false },
       }),
     );
-    workerAttempted = true;
+    if (!cleaning) workerAttempted = true;
     const output = await new Promise<string>((resolve, reject) => {
       const child = spawn(
         process.execPath,
@@ -184,7 +224,9 @@ async function main() {
             NO_COLOR: '1',
           },
           stdio: ['ignore', 'pipe', 'pipe'],
-          signal: AbortSignal.any([abort.signal, AbortSignal.timeout(180_000)]),
+          signal: cleaning
+            ? AbortSignal.timeout(180_000)
+            : AbortSignal.any([abort.signal, AbortSignal.timeout(180_000)]),
         },
       );
       let output = '';
@@ -216,27 +258,46 @@ async function main() {
         }
       });
     });
-    workerUploaded = true;
+    if (!cleaning) workerUploaded = true;
     // Fixed Wrangler emits this only after the remote asset upload completes.
-    if (!/Success! Uploaded 1 file(?:\s|$)/.test(output))
+    if (!cleaning && !/Success! Uploaded 1 file(?:\s|$)/.test(output))
       throw new CheckFailure(
         'Wrangler did not confirm uploading the unique static file',
       );
-    const subdomain = await api(`${workerPath}/subdomain`);
+    const subdomain = await api(
+      `${workerPath}/subdomain`,
+      'GET',
+      undefined,
+      cleaning,
+    );
     if (
       !isRecord(subdomain) ||
       subdomain.enabled !== false ||
       subdomain.previews_enabled !== false
     )
       throw new CheckFailure(
-        'Temporary Worker public workers.dev/preview URLs were not both disabled',
+        'Isolated Worker public workers.dev/preview URLs were not both disabled',
       );
+    if (cleaning) {
+      const metadata = await existingWorker(true);
+      if (
+        metadata.assets != null ||
+        (Array.isArray(metadata.bindings) &&
+          metadata.bindings.some(
+            (binding: unknown) =>
+              isRecord(binding) && binding.type === 'assets',
+          ))
+      )
+        throw new CheckFailure(
+          'Isolated Worker baseline still has Static Assets',
+        );
+    }
   }
 
   try {
     await check(checks, 'Worker + Static Assets Write', async () => {
       await deploy();
-      return 'Wrangler 4.156.1 uploaded one Worker and one unique static file; workers.dev and preview URLs disabled';
+      return `Wrangler 4.156.1 updated existing ${workerName} and uploaded one unique static file; workers.dev and preview URLs disabled`;
     });
     await check(checks, 'D1 Write', async () => {
       databaseAttempted = true;
@@ -304,13 +365,13 @@ async function main() {
       routeAttempted = true;
       const route = await api(`/zones/${zoneId}/workers/routes`, 'POST', {
         pattern: routePattern,
-        ...(workerUploaded ? { script: name } : {}),
+        ...(workerUploaded ? { script: workerName } : {}),
       });
       if (
         !isRecord(route) ||
         !identifier(route.id) ||
         route.pattern !== routePattern ||
-        (workerUploaded && route.script !== name)
+        (workerUploaded && route.script !== workerName)
       )
         throw new CheckFailure('Temporary route create response did not match');
       routeId = route.id;
@@ -347,9 +408,11 @@ async function main() {
       return 'Temporary route removed or never created';
     });
     await check(cleanup, 'Cleanup Worker', async () => {
-      if (workerAttempted)
-        await api(workerPath, 'DELETE', undefined, true, true);
-      return 'Temporary Worker and its assets removed or never created';
+      if (workerAttempted) {
+        await deploy(true);
+        return `Restored ${workerName} to the empty baseline without assets, routes or public URLs; Worker retained`;
+      }
+      return 'Isolated Worker was not modified; no create or delete attempted';
     });
     await check(cleanup, 'Cleanup D1', async () => {
       if (databaseAttempted) {
@@ -393,7 +456,13 @@ async function main() {
       !abort.signal.aborted;
     console.log(
       JSON.stringify(
-        { passed, temporaryResourceLabel: name, checks, cleanup },
+        {
+          passed,
+          isolatedWorker: workerName,
+          temporaryResourceLabel: name,
+          checks,
+          cleanup,
+        },
         null,
         2,
       ),
