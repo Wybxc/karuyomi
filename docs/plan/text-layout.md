@@ -14,10 +14,13 @@
 
 - 固定 `926b93d` 新 host 后，官方 Gradle 重建得到与旧门 SHA 完全一致的原 JAR；正式 Source probe 已通过 3319 章两页，包括原 TextInterceptor 生成的 1000×286 PNG，Blob 释放/撤销与 Page session 关闭通过。旧 `15a3900` 的 stub 失败证据仍保留，身份与结果见[Source 记录](../verification/graphics-source-runtime.md#新文字材料与-xkcd)。
 
+- 配合同一原包/AOT 与固定 `80841b` Flutter Web 构建，已在正式产品界面看到 3319 章直图和 2/2 标题/完整 alt 文字，保存进度并正常进入下一章3318。截图与限制见验证记录。
+- 已实现 Bitmap typed JSO lease 与标准 WeakRef/FinalizationRegistry 回收；Canvas 保留真实 Java 强引用，活 owner 不因 End 或预算压力被逐出。原 Android/TeaVM 共享 Bitmap13 与 Text101、真实 Canvas 五组及真实 Java 未显式 recycle 的自然 GC 分项通过，见 [所有权证据](../verification/bitmap-lifetime-runtime.md)。这还不是原 Source 新材料的重复负载验收。
+
 ## 后续阶段与验收
 
-1. 经真实 Flutter 产品界面查看文字第二页并保留可见文字截图；独立 probe 的 PNG 解码成功不代替产品显示验收。
-2. 为不显式 recycle 的官方 Bitmap 使用建立完整回收生命周期，并在重复处理、取消和 Worker 终态中验收预算。原 TextInterceptor 没有调用 `bitmap.recycle()`；当前 Source probe 仅证明图片资源释放/撤销，不能证明内部 surfaces 账本归零。
+1. 固定本次生命周期实现的新 commit/材料，重建相同未改 xkcd 原 JAR，再经原 TextInterceptor 重复请求文字页并观测内部 graphics ledger。保留926b93d的旧身份与局限，不能把旧 Source 的 Blob release/revoke当作新材料的内部账本证据。
+2. 验收原 Source 运行中取消、存活 Worker 重复处理及 Worker 终态的资源预算。标准 GC 没有固定触发时机，不能承诺外部画布内存总会及时回收或永不触及64-surface上限；不能扫描删除仍由 Source 持有的对象。
 3. 推进生产 Access 和实际连续阅读；Android oracle 不等于 Native 应用或真机通过。
 
 当前支持普通文本及 HTML 字符串投影。styled spans、StaticLayout.Builder、ellipsize、复杂制表位/富文本、所有 HTML 容错情形和各平台字体一致性未验收。系统默认字体可改变断行、尺寸和 PNG 字节；不能把不同字体的图片声称为像素等价，也不能用这一点掩盖接口契约错误。

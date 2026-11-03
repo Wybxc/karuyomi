@@ -21,6 +21,14 @@ import org.robolectric.shadow.api.Shadow;
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public final class AndroidTextTest {
   @Test
+  public void nativeAndroidBitmapCopyContracts() {
+    JsonObject result = BitmapLifetimeScenarios.run();
+    assertTrue(result.get("passed").getAsBoolean());
+    assertEquals(13, result.get("checks").getAsInt());
+    System.out.println("Android NATIVE Bitmap copy: " + result);
+  }
+
+  @Test
   public void nativeAndroidSharedScenarios() throws Exception {
     assertEquals(35, Build.VERSION.SDK_INT);
     Paint paint = new Paint();

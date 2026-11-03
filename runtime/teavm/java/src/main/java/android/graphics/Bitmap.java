@@ -24,14 +24,14 @@ public final class Bitmap {
     WEBP_LOSSLESS
   }
 
-  private int id;
+  private Graphics.BitmapLease lease;
   private final int width, height;
   private final Config config;
-  private final boolean mutable;
+  private boolean mutable;
   private int density = 160;
 
   private Bitmap(int id, int w, int h, Config c, boolean mutable) {
-    this.id = id;
+    lease = Graphics.claimBitmap(id);
     width = w;
     height = h;
     config = c;
@@ -74,7 +74,7 @@ public final class Bitmap {
 
   public static Bitmap createScaledBitmap(Bitmap b, int w, int h, boolean filter) {
     b.check();
-    if (w == b.width && h == b.height) return b;
+    if (w == b.width && h == b.height && !b.mutable) return b;
     Bitmap n = createBitmap(w, h, b.config);
     try {
       n.density = b.density;
@@ -95,7 +95,8 @@ public final class Bitmap {
       new Canvas(b)
           .drawBitmap(this, new Rect(0, 0, width, height), new Rect(0, 0, width, height), null);
       b.density = density;
-      return mutable ? b : new Bitmap(b.id, b.width, b.height, c, false);
+      b.mutable = mutable;
+      return b;
     } catch (RuntimeException | Error error) {
       b.recycle();
       throw error;
@@ -103,12 +104,12 @@ public final class Bitmap {
   }
 
   void check() {
-    if (id == 0) throw new IllegalStateException("Bitmap has been recycled");
+    if (lease == null) throw new IllegalStateException("Bitmap has been recycled");
   }
 
   public int id() {
     check();
-    return id;
+    return Graphics.bitmapId(lease);
   }
 
   public int getWidth() {
@@ -128,7 +129,7 @@ public final class Bitmap {
   }
 
   public boolean isRecycled() {
-    return id == 0;
+    return lease == null;
   }
 
   public int getDensity() {
@@ -156,11 +157,9 @@ public final class Bitmap {
   }
 
   public void recycle() {
-    if (id != 0) {
-      JsonObject a = Graphics.args();
-      a.addProperty("id", id);
-      Graphics.call("recycle", a);
-      id = 0;
+    if (lease != null) {
+      Graphics.recycleBitmap(lease);
+      lease = null;
     }
   }
 
@@ -226,7 +225,7 @@ public final class Bitmap {
 
   private JsonObject tile(int x, int y, int width, boolean f16) {
     JsonObject a = Graphics.args();
-    a.addProperty("id", id);
+    a.addProperty("id", id());
     a.addProperty("f16", f16);
     a.add("rect", Graphics.numbers(x, y, width, 1));
     return a;
@@ -308,7 +307,7 @@ public final class Bitmap {
     Objects.requireNonNull(stream);
     if (quality < 0 || quality > 100) throw new IllegalArgumentException("quality must be 0..100");
     JsonObject a = Graphics.args();
-    a.addProperty("id", id);
+    a.addProperty("id", id());
     a.addProperty("format", format.name());
     a.addProperty("quality", quality);
     JsonObject r = Graphics.async("encode", a);

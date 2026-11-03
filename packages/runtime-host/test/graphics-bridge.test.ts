@@ -101,12 +101,18 @@ test('bounds parses dimensions with no decode or Canvas allocation', async () =>
   expect(b.teaGraphicsSnapshot().totalBytes).toBe(0);
 });
 test('aggregate raster budget preserves Source bitmaps across operations and rejects allocation before Canvas', () => {
+  const allocation = vi.spyOn(Canvas.prototype, 'getContext');
   const b = opened({ rasterBytes: 32 }),
-    first = b.teaGraphicsSync({ op: 'create', width: 2, height: 2 });
-  b.teaGraphicsSync({ op: 'create', width: 2, height: 2 });
+    first = b.teaGraphicsSync({ op: 'create', width: 2, height: 2 }),
+    second = b.teaGraphicsSync({ op: 'create', width: 2, height: 2 });
+  if (typeof first.id !== 'number' || typeof second.id !== 'number')
+    throw Error('Missing surface ID');
+  const firstOwner = b.teaGraphicsBitmapClaim(first.id),
+    secondOwner = b.teaGraphicsBitmapClaim(second.id);
   expect(() =>
     b.teaGraphicsSync({ op: 'create', width: 1, height: 1 }),
   ).toThrow('budget');
+  expect(allocation).toHaveBeenCalledTimes(2);
   b.teaGraphicsEnd(identity.requestId, identity.generation);
   expect(b.teaGraphicsSnapshot()).toMatchObject({
     surfaces: 2,
@@ -114,10 +120,23 @@ test('aggregate raster budget preserves Source bitmaps across operations and rej
     totalBytes: 32,
   });
   b.teaGraphicsBegin({ requestId: 'next', generation: 'generation' });
-  b.teaGraphicsSync({ op: 'recycle', id: first.id });
+  expect(b.teaGraphicsBitmapId(firstOwner)).toBe(first.id);
+  expect(b.teaGraphicsBitmapId(secondOwner)).toBe(second.id);
+  b.teaGraphicsBitmapRecycle(firstOwner);
   expect(
     b.teaGraphicsSync({ op: 'create', width: 2, height: 2 }),
   ).toMatchObject({ width: 2 });
+  expect(allocation).toHaveBeenCalledTimes(3);
+  b.teaGraphicsEnd('next', 'generation');
+  // The replacement was never adopted; the still-held second owner survives.
+  expect(b.teaGraphicsSnapshot()).toMatchObject({
+    surfaces: 1,
+    rasterBytes: 16,
+    totalBytes: 16,
+  });
+  expect(b.teaGraphicsBitmapId(secondOwner)).toBe(second.id);
+  b.teaGraphicsBitmapRecycle(secondOwner);
+  expect(b.teaGraphicsSnapshot().totalBytes).toBe(0);
 });
 test('cancelled decode retains input and working reservations until non-interruptible codec settles', async () => {
   const gate = deferred<{ width: number; height: number; close(): void }>(),

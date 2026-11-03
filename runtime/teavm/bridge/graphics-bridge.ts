@@ -185,7 +185,12 @@ export function parseGraphicsRequest(value: unknown): GraphicsRequest {
     includePad: data.includePad === undefined ? true : bool(data.includePad),
   };
 }
+interface BitmapLease {
+  readonly id: number;
+}
 interface Surface {
+  creator: GraphicsContext;
+  owner?: WeakRef<BitmapLease>;
   canvas: OffscreenCanvas;
   ctx: OffscreenCanvasRenderingContext2D;
   f16: boolean;
@@ -274,6 +279,14 @@ declare global {
   var teaGraphicsBytesDetach:
     | ReturnType<typeof createGraphicsBridge>['teaGraphicsBytesDetach']
     | undefined;
+  var teaGraphicsBitmapClaim:
+    | ReturnType<typeof createGraphicsBridge>['teaGraphicsBitmapClaim']
+    | undefined;
+  var teaGraphicsBitmapId:
+    ReturnType<typeof createGraphicsBridge>['teaGraphicsBitmapId'] | undefined;
+  var teaGraphicsBitmapRecycle:
+    | ReturnType<typeof createGraphicsBridge>['teaGraphicsBitmapRecycle']
+    | undefined;
   var teaGraphicsSnapshot:
     ReturnType<typeof createGraphicsBridge>['teaGraphicsSnapshot'] | undefined;
 }
@@ -284,6 +297,12 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     decoders = new Map<number, Decoder>(),
     handles = new Map<string, ByteHandle>(),
     fonts = new Map<string, { face: FontFace; release: () => void }>();
+  // The bridge must never strongly retain an adopted Java Bitmap owner.
+  const leases = new WeakMap<object, number>();
+  const finalization =
+    typeof WeakRef === 'function' && typeof FinalizationRegistry === 'function'
+      ? new FinalizationRegistry<number>((id) => retire(id))
+      : undefined;
   const limits = {
     totalBytes: 256 * 1024 * 1024,
     rasterBytes: 192 * 1024 * 1024,
@@ -312,6 +331,11 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
   function reserve(bytes: number, raster = 0): () => void {
     integer(bytes);
     integer(raster);
+    if (
+      totalBytes + bytes > limits.totalBytes ||
+      rasterBytes + raster > limits.rasterBytes
+    )
+      reapSurfaces();
     if (
       totalBytes + bytes > limits.totalBytes ||
       rasterBytes + raster > limits.rasterBytes
@@ -359,6 +383,7 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
       throw Error('Graphics operation overlap');
     const requestId = text(identity.requestId),
       generation = text(identity.generation);
+    reapSurfaces();
     // One JSO block and its Java byte[] copy can coexist during a transfer.
     scratchRelease = reserve(2 * CHUNK);
     current = {
@@ -379,6 +404,10 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
   const teaGraphicsEnd = (requestId: string, generation: string) => {
     if (!sameContext(requestId, generation) || !current) return;
     current.ended = true;
+    // Unadopted results were never returned as Java Bitmap objects. Live
+    // adopted Bitmaps may outlive this operation and must remain usable.
+    for (const [id, entry] of surfaces)
+      if (entry.creator === current && !entry.owner) retire(id);
     for (const [id, entry] of handles)
       if (entry.context === current && (!entry.persistent || !entry.detached))
         closeBytes(id);
@@ -548,6 +577,7 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
   }
   function create(width: number, height: number, f16 = false) {
     dimensions(width, height);
+    if (surfaces.size >= 64) reapSurfaces();
     if (surfaces.size >= 64)
       throw limit('Bitmap count exceeds graphics budget');
     const size = width * height * (f16 ? 8 : 4),
@@ -569,7 +599,15 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
       )
         throw unsupported('Float16 canvas unavailable');
       const id = next++;
-      surfaces.set(id, { canvas, ctx, f16, release, pins: 0, retired: false });
+      surfaces.set(id, {
+        creator: context(),
+        canvas,
+        ctx,
+        f16,
+        release,
+        pins: 0,
+        retired: false,
+      });
       return { id, width, height };
     } catch (error) {
       if (canvas) canvas.width = canvas.height = 0;
@@ -577,8 +615,50 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
       throw error;
     }
   }
+  function reapSurfaces() {
+    for (const [id, entry] of surfaces)
+      if (entry.owner && entry.owner.deref() === undefined) retire(id);
+  }
+  const teaGraphicsBitmapClaim = (id: number): BitmapLease => {
+    const owner = context(),
+      entry = surface(integer(id, 1, 2147483647));
+    if (!finalization)
+      throw unsupported(
+        'Bitmap lifetime requires WeakRef and FinalizationRegistry',
+      );
+    if (entry.creator !== owner || entry.owner)
+      throw Error('Bitmap ownership already claimed or stale');
+    const lease = Object.freeze({ id });
+    leases.set(lease, id);
+    entry.owner = new WeakRef(lease);
+    finalization.register(lease, id, lease);
+    return lease;
+  };
+  const teaGraphicsBitmapId = (lease: unknown): number => {
+    const token: object = object(lease);
+    const id = leases.get(token);
+    if (id === undefined || surfaces.get(id)?.owner?.deref() !== token)
+      throw Error('Unknown or recycled bitmap owner');
+    // deref keeps the actual owner alive through this JS job. An asynchronous
+    // encode additionally pins its surface before yielding to browser work.
+    return id;
+  };
+  const teaGraphicsBitmapRecycle = (lease: unknown): void => {
+    const token: object = object(lease);
+    const id = leases.get(token);
+    if (id === undefined) return;
+    leases.delete(token);
+    finalization?.unregister(token);
+    retire(id);
+  };
   function retire(id: number) {
-    const s = surface(id);
+    const s = surfaces.get(id);
+    if (!s) return;
+    const owner = s.owner?.deref();
+    if (owner) {
+      leases.delete(owner);
+      finalization?.unregister(owner);
+    }
     surfaces.delete(id);
     s.retired = true;
     releaseSurface(s);
@@ -1173,6 +1253,9 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     teaGraphicsBytesRead,
     teaGraphicsBytesClose,
     teaGraphicsBytesDetach,
+    teaGraphicsBitmapClaim,
+    teaGraphicsBitmapId,
+    teaGraphicsBitmapRecycle,
     teaGraphicsSnapshot,
   };
 }

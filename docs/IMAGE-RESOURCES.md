@@ -89,7 +89,7 @@ Bitmap / ImageDecoder 的图像正文改用 Worker 内部 byte handle，`teaGrap
 | Java Frame                                             | 传输期间同时计 JS 像素与 Java ByteBuffer；Detach 后保留 Java lease，Frame.close 后释放           |
 | 临时字节                                               | 合并上传、尺寸解析副本、Blob、编码副本、ImageData 和临时 canvas 均先预留；转换时允许两份同时计费 |
 
-预算属于每个 Source Worker，与外层 manager 的图片窗口预算分别计量。Bitmap、decoder、成功加载的字体和已交付的 Java Frame 属于 Source 持有对象；普通调用结束或取消不得扫描删除它们。Bitmap.recycle、decoder.close 和 Frame.close 才解除相应所有权；Android Typeface 没有 close，已加载字体保留到 Worker 回收，受数量和字节预算约束。
+预算属于每个 Source Worker，与外层 manager 的图片窗口预算分别计量。Bitmap、decoder、成功加载的字体和已交付的 Java Frame 属于 Source 持有对象；普通调用结束或取消不得扫描删除它们。Bitmap 通过真实持有的 typed JSO lease 与 surface 关联；bridge 仅弱持 owner，显式 recycle 或 owner 真正被 GC 后同步 retire。普通 End 仅清尚未交付给 Java 的 surface，不删活 owner；预算前仅回收 WeakRef 已清空的对象，编码 pin 在工作终态前继续计费。标准 GC 无固定触发时间，延迟回收仍可能触及预算；独立机制与 Java 证据见 [Bitmap 所有权](verification/bitmap-lifetime-runtime.md)，原 Source 需新材料另验。decoder.close 和 Frame.close 解除各自所有权；Android Typeface 没有 close，已加载字体保留到 Worker 回收，受数量和字节预算约束。
 
 取消只标记当前 requestId/generation。不可中断的浏览器 decode、encode 或 font.load 结束后才释放其预留、输入 pin 和临时对象，迟到结果不发布；编码期间显式 recycle 的 surface 延迟到工作完成后销毁。driver 仍等待 Java 回调退出再结束图形上下文和释放串行锁。Java 同步 JSO 和异步 fiber 错误均回传为 Java 异常，确保 finally 路径执行；预算、能力与取消错误在 driver 保留对应错误类别。
 

@@ -4,6 +4,8 @@
     "bridge-browser-suite.ts",
     "cache-lifecycle-worker.ts",
     "cache-lifecycle-browser-suite.ts",
-    "text-layout-browser-suite.ts"
+    "text-layout-browser-suite.ts",
+    "bitmap-lifetime-browser-suite.ts",
+    "bitmap-lifetime-java-browser-suite.ts"
   ]
 }

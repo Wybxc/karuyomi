@@ -119,6 +119,59 @@ public final class Graphics {
     }
   }
 
+  /** Opaque JS object strongly held by its Java Bitmap and weakly held by the bridge. */
+  public interface BitmapLease extends JSObject {}
+
+  @JSFunctor
+  interface BitmapReply extends JSObject {
+    void call(BitmapLease value);
+  }
+
+  @JSFunctor
+  interface IntReply extends JSObject {
+    void call(int value);
+  }
+
+  public static BitmapLease claimBitmap(int id) {
+    BitmapLease[] result = new BitmapLease[1];
+    ErrorResult error = new ErrorResult();
+    claimBitmap(id, value -> result[0] = value, error::accept);
+    error.check();
+    return java.util.Objects.requireNonNull(result[0]);
+  }
+
+  @JSBody(
+      params = {"id", "ok", "fail"},
+      script =
+          "try {ok(self.teaGraphicsBitmapClaim(id));} catch(e) {fail(String(e.message || e),String(e.code || ''));}")
+  private static native void claimBitmap(int id, BitmapReply ok, Failure fail);
+
+  public static int bitmapId(BitmapLease lease) {
+    int[] result = new int[1];
+    ErrorResult error = new ErrorResult();
+    bitmapId(lease, value -> result[0] = value, error::accept);
+    error.check();
+    return result[0];
+  }
+
+  @JSBody(
+      params = {"lease", "ok", "fail"},
+      script =
+          "try {ok(self.teaGraphicsBitmapId(lease));} catch(e) {fail(String(e.message || e),String(e.code || ''));}")
+  private static native void bitmapId(BitmapLease lease, IntReply ok, Failure fail);
+
+  public static void recycleBitmap(BitmapLease lease) {
+    ErrorResult error = new ErrorResult();
+    recycleBitmap(lease, error::accept);
+    error.check();
+  }
+
+  @JSBody(
+      params = {"lease", "fail"},
+      script =
+          "try {self.teaGraphicsBitmapRecycle(lease);} catch(e) {fail(String(e.message || e),String(e.code || ''));}")
+  private static native void recycleBitmap(BitmapLease lease, Failure fail);
+
   @JSFunctor
   interface StringReply extends JSObject {
     void call(String value);

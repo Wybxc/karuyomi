@@ -65,7 +65,9 @@ Codex 内置浏览器 Chromium 156 使用该固定 checkout 的正式 `source-me
 
 Codex 内置浏览器 Chrome 156 经正式 `source-metadata-probe.ts`、产品 host/Worker、隔离 D1、真实 workerd、RS256 测试身份和显式 `xkcd.com,imgs.xkcd.com` 政策执行。明确选中英文 Source `1538249443376436084`；原返回的首章仍为 `3319: Elevators`，没有伪造或替换章节引用。热门/详情、3318 章及两页列表成功，搜索按原实现返回空，latest 不支持。
 
-原 Source 两页均通过：直图 106037 字节 PNG、607×716；第二页经原 TextInterceptor 实际生成 49246 字节 PNG、1000×286。`tachiyomi-lib-textinterceptor` 仅在原拦截器内处理，没有加入网络白名单或发生该主机的外部请求。两次释放均撤销 Blob URL，Page session 关闭且 image gate passed。该证据是 Source 图片解码/资源边界，实际 Flutter 文字显示须另行检查，不是生产 Access 或 Native 验收。
+原 Source 两页均通过：直图 106037 字节 PNG、607×716；第二页经原 TextInterceptor 实际生成 49246 字节 PNG、1000×286。`tachiyomi-lib-textinterceptor` 仅在原拦截器内处理，没有加入网络白名单或发生该主机的外部请求。两次释放均撤销 Blob URL，Page session 关闭且 image gate passed。该证据是 Source 图片解码/资源边界，不是生产 Access 或 Native 验收。
+
+随后以相同 AOT/材料配合固定 `80841b` 的真实 Flutter Web 构建，在正式产品界面选择英文 Source → xkcd → 3319。直图正常显示；切换到 2/2 可清楚看到原 TextInterceptor 生成的标题和完整 alt 文字，阅读进度已保存；下一章进入 3318 正常。本地可见文字截图为 `/tmp/karuyomi-xkcd-text-page.jpg`。此 UI 检查补齐该章实际显示证据，不把 Blob 撤销等同于内部 graphics ledger 归零，也不代表生产 Access 或长期连续阅读已通过。
 
 复验在同一固定树构建 runtime-host 后执行：
 
@@ -79,4 +81,4 @@ node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
 
 原始 descriptor、provenance、构建日志和报告保留在该树忽略的 `.local/text-source/`，严格原 JAR 构建使用 `xkcd-original/`。先前 fresh debug keystore 的试构建仅签名 `META-INF/CERT.RSA` 不同，未作为严格对照使用。
 
-内部图形生命周期仍有确定缺口：官方 TextInterceptor 没有 recycle 它创建的 Bitmap；owned Bitmap 无自动回收注册，bridge `teaGraphicsEnd` 只清 byte handles/scratch，surface Map 仍持有画布。因此上述 release/revoke 不能冒称内部 ledger 归零，重复文字页处理、取消和存活 Worker 的内存/64-surface 预算仍待验收。独立 Java/Canvas 场景显式 recycle 后归零的结果见[文字布局记录](text-layout-runtime.md)，不能替代这项实际 Source 门。
+该 `926b93d` 身份的内部图形生命周期仍有确定缺口：官方 TextInterceptor 没有 recycle 它创建的 Bitmap；owned Bitmap 无自动回收注册，bridge `teaGraphicsEnd` 只清 byte handles/scratch，surface Map 仍持有画布。因此上述 release/revoke 不能冒称内部 ledger 归零，重复文字页处理、取消和存活 Worker 的内存/64-surface 预算仍待验收。独立 Java/Canvas 场景显式 recycle 后归零的结果见[文字布局记录](text-layout-runtime.md)，不能替代这项实际 Source 门。后续 typed lease 的活 owner、编码pin及真实Java自然回收已通过[独立验证](bitmap-lifetime-runtime.md)，须再固定新材料重建原 Source 复验。

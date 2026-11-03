@@ -92,10 +92,11 @@ export async function checkTextLayout(
     path.join(root, 'tools/teavm/fixtures/text-layout/AndroidTextTest.java'),
     path.join(source, 'AndroidTextTest.java'),
   );
-  copyFileSync(
-    path.join(root, 'tools/teavm/TextLayoutScenarios.java'),
-    path.join(source, 'TextLayoutScenarios.java'),
-  );
+  for (const name of [
+    'TextLayoutScenarios.java',
+    'BitmapLifetimeScenarios.java',
+  ])
+    copyFileSync(path.join(root, 'tools/teavm', name), path.join(source, name));
   const execute = execa({
     shell: false,
     cwd: output,
