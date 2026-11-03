@@ -63,7 +63,7 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 2026-11-04，正式 Drift 产品接线与数据库静态资源已完成，完整格式检查、通用检查、TeaVM 回归及最终格式化后的三个 Flutter 包分析/测试通过。Codex 内置浏览器实际阅读原版 Arknights，完成连续切章、回看不降低最远进度、关标签页重开后恢复章节/当前页/最远页/章节顺序，以及重新阅读回首页。固定输入、命令和边界见[Web 产品进度记录](verification/reader-progress-web.md)；此处不是浏览器进程重启、Native 应用或生产 Access 动态请求门。
 
-2026-11-04，固定新 host 的 Arknights DREAM 51 页、CuuTruyen Chương 142 的 23 页已在正式 Flutter Web 逐页显示并保存，末页显式完成，同路由下一章开头也通过，见[完整章记录](verification/full-chapter-web.md)。手动单双页被控件高度变化覆盖的缺口已先以正式 Widget 复现再修复；重连旧身份与迟到 API/图片清理污染新会话也已通过正式回归修复，见[重连记录](verification/runtime-reconnect.md)。该轮完整格式化、`pnpm flutter:check`（Reader 102 项）及 `pnpm check` 通过；固定 `be5c3ed` 的正式 Flutter Web release 已通过修复后末页实际复验：手动单页保持、51/51 保存及显式完成、返回详情继续阅读，详见同一完整章记录；没有重新逐页阅读 51 页。真实身份/版本切换继续验收。
+2026-11-04，固定新 host 的 Arknights DREAM 51 页、CuuTruyen Chương 142 的 23 页已在正式 Flutter Web 逐页显示并保存，末页显式完成，同路由下一章开头也通过，见[完整章记录](verification/full-chapter-web.md)。手动单双页被控件高度变化覆盖的缺口已先以正式 Widget 复现再修复；重连旧身份与迟到 API/图片清理污染新会话也已通过正式回归修复，见[重连记录](verification/runtime-reconnect.md)。该轮完整格式化、`pnpm flutter:check`（Reader 102 项）及 `pnpm check` 通过；固定 `be5c3ed` 的正式 Flutter Web release 已通过修复后末页实际复验：手动单页保持、51/51 保存及显式完成、返回详情继续阅读，详见同一完整章记录；没有重新逐页阅读 51 页。随后同一正式客户端以原 xkcd 通过 Web A→B→A：B 无 A 的继续阅读、返回 A 首次恢复第 2 页文字图，三个 Worker 的 namespace 依次 A/B/A，真实 304 后从原 Cache 读取 7187 B 至 EOF 并关闭。首轮记录器失败和新 origin 完整复验分别保留，详情见重连记录；版本更新、Native 身份与生产 Access 仍待验收。
 
 ## 新图形宿主与生产 Access 分项
 
@@ -217,7 +217,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
-- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消及正式扩展/Flutter 的版本/身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但浏览器/App 进程重启未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换已通过，不能替代正式版本/身份切换等产品门。
+- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、正式扩展版本更新及 Native 身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但浏览器/App 进程重启未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换已通过，不能替代版本更新等剩余产品门。Web 正式原 Source 的 A→B→A 及 304 后正文复用已按重连记录独立通过。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。

@@ -13,4 +13,32 @@
 
 旧码 Catalog 4 项、Transport 3 项回归明确失败。修后 source_runtime 完整 29 项及 Dart 分析通过；Reader 六个受影响测试文件 46 项与 Flutter 分析通过，包含身份更换前的旧进度保存、保存失败草稿、迟到 manifest、无已加载 runtime 时不重建、重建失败恢复及迟到图片所有权。正式入口为 `packages/source_runtime/test/transport_test.dart`、`apps/reader/test/browse/catalog_controller_test.dart` 与 `apps/reader/test/reader/reading_progress_controller_test.dart`。
 
-该结果是正式组件/传输与本地 SQLite 回归；真实浏览器/Native 主入口的身份切换、版本更新和生产 Access 过期恢复仍须另验，不能用模拟 transport 替代。分项产品验收继续按[P0](../plan/p0-runtime-and-reading.md)推进。
+上述结果是正式组件/传输与本地 SQLite 回归。随后正式 Web 主入口的 A→B→A 身份切换通过下述独立产品门；Native 身份切换、版本更新和生产 Access 过期恢复仍须另验，不能用模拟 transport 替代。分项产品验收继续按[P0](../plan/p0-runtime-and-reading.md)推进。
+
+## 正式 Web 主入口的 A→B→A
+
+2026-11-04，Codex 内置 Chromium 156 使用正式 Flutter `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 完成身份切换；`main.dart.js` SHA-256 为 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`。原 xkcd AOT 仍为 `b4f72f7` 的 `ext-all.xkcd-b33800f6d02ddab83b60b6d7ac85b49d`，JAR、清单、材料均未改，完整输入身份见[Source 网络 Cache](source-network-cache.md)。
+
+全新同源 `http://127.0.0.1:8928` 提供正式产品与独立 A/B 控制页。两个隔离 workerd 各自固定匹配的 `ACCESS_SUBJECT`，通过真实产品 `jwtVerify` 校验局部 RS256 身份；启动实测匹配 A/A、B/B 为 200，交叉 A/B、B/A 为 403。操作者在正式 Catalog、Source、章节和重新连接 UI 完成操作，观察器不直接创建 manager 或调用 Source。
+
+- A 读取原 `3318: Earth Sized Planets` 的首图和 TextInterceptor 文字第 2 页，保存第 2 页并退出。
+- B 重连后没有 A 的继续阅读；正常读取同章第 1 页原图，退出后详情出现自己的继续阅读。
+- 返回 A 后继续阅读首次恢复第 2 页，原文字图片真实可见；恢复过渡和随后稳定保存的截图分别保留。
+
+独立报告确认三个不同 Worker、generation、workerInstanceId，真实 namespace 为 A/B/A。原 `/3318/` 按 requestId 关联的三轮均为 2 页，PageList SHA-256 同为 `cf4df2da1b455de6533e8a3563e764ef414857c49b3f574f27b702bed0665bd4`；额外打开的 3317 分开计数。A/B 各自 miss 1、commit 1，写入 7187 B；返回 A 实际 entry 1、miss 0、4 次读取共 7187 B、EOF 1、reader-close 1、正文写入 0。此时原请求带 If-None-Match，上游为 **304 / 0 B**：证明条件再验证后复用旧正文，**不证明零网络**，未调整原 freshness 或请求头。
+
+正常退出和最终返回浏览后重连，三 Worker 均 terminate，实际章节会话关闭数为 2/1/2；第四次 bootstrap 仅用于清理，未创建第四个 Source Worker。最终检查点 `sequence=acknowledgedSequence=113`，事件连续，队列字节/条目均为 0，持久化失败为空；console、夹具及 Cache 观察错误均为 0。主代理随后关闭两临时标签，本地所属 server 已 Ctrl-C 停止且端口无监听；不据此声称图形账本或浏览器内存归零。
+
+首轮 8924 的 UI 成功但 keepalive 遥测触及 [Fetch 64 KiB 合计限额](https://fetch.spec.whatwg.org/#http-network-or-cache-fetch)，返 A 观察不完整；原报告、console、截图均保留在固定 b4 树 `.local/network-cache-source/product-identity/first-round/`，不将该轮记为完整 Cache 门。新 8928 仅修 ignored 观测器：普通 fetch、消费响应正文、单请求有界队列，切换前确认快照与队列排空。
+
+第二轮完整输入、启动命令与证据保留在该树 `.local/network-cache-source/product-identity-8928/`，归档位于 `evidence/`：
+
+| 文件                                                    | SHA-256                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `report-product-identity-observed.json`                 | `69f8bc8f7ee0170c776cf97c5b2498012cbad21dda4bff184ad8687a7c1a1973` |
+| `evidence-sha256.json`（UI、console、六张截图逐项摘要） | `33990b94975ec5d1d0aa756afbb35988645c6ba4ca7454fbf2f0e82be74e0055` |
+| `acceptance-human-and-observation.json`                 | `5c1d5965aa2f6ea029d2385fc2d1ad7dcf455bcde40d7c79b04b56ed1a787a86` |
+
+原报告的 `passed=false` 保持不变；人工 UI 与独立数据核对另存 acceptance summary，不冒充自动 UI 测试。复验先对夹具三份 `tsconfig.{server,client,worker}.json` 运行 `pnpm exec tsc -p`，再按 `start-command.txt` 使用 Node 24、冻结 Flutter 目录及新 loopback origin 启动。临时 runner、D1、JSON 和截图不入源码库。
+
+本门证明正式 Web 主入口的身份/进度隔离与恢复、同一原 Java Source 的条件 Cache 正文复用；不证明生产 Access 登录/过期/登出、Native 身份切换、浏览器或 App 进程重启、真实版本更新、其它 Source 兼容性或设备内存峰值。Cache 桥观察也不是精确 Java Cache counter。
