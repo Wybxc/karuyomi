@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
+  type BuildManifest,
   type SourceCall,
   type WorkerCommand,
   type WorkerResponse,
@@ -125,8 +126,10 @@ test('the public generated control entry correlates typed Source success and str
 
 async function setup(
   invoke: RuntimeDriver['invoke'] = async () => mangaPage(),
+  initialBuild?: BuildManifest,
 ) {
   const workers: FakeWorker[] = [];
+  const workerUrls: URL[] = [];
   const driver = {
     open: vi.fn(async () => [
       { id: '9223372036854775806', name: 'Test', lang: 'en' },
@@ -134,7 +137,7 @@ async function setup(
     invoke: vi.fn(invoke),
     close: vi.fn(async () => {}),
   };
-  const build = await manifest();
+  const build = initialBuild ?? (await manifest());
   const loader = new VerifiedLoader('https://read.example.com', (async () =>
     Response.json(build)) as typeof fetch);
   const manager = new SourceRuntimeManager(
@@ -145,6 +148,7 @@ async function setup(
         url.searchParams.get('fsNamespace'),
       );
       expect(url.href).not.toContain(options.identity);
+      workerUrls.push(new URL(url));
       const worker = new FakeWorker(driver);
       workers.push(worker);
       return worker;
@@ -152,7 +156,7 @@ async function setup(
     loader,
   );
   managers.push(manager);
-  return { manager, workers, driver };
+  return { manager, workers, workerUrls, driver };
 }
 
 test('same build open is shared; only actual initialized Sources produce a session', async () => {
@@ -166,6 +170,63 @@ test('same build open is shared; only actual initialized Sources produce a sessi
   expect(workers).toHaveLength(1);
   expect(driver.open).toHaveBeenCalledTimes(1);
 });
+
+test('extension updates and Worker replacement retain the same storage namespace', async () => {
+  const build = await manifest();
+  const { manager, workers, workerUrls } = await setup(undefined, build);
+  const first = await manager.open(options);
+  build.buildId = 'updated-build';
+  build.version = '2';
+  const updatedOptions = {
+    ...options,
+    manifestPath: '/extensions/builds/updated-build/manifest.json',
+    expectedBuildId: 'updated-build',
+    userAgent: 'Updated client',
+  };
+  const updated = await manager.open(updatedOptions);
+  expect(updated.buildId).toBe('updated-build');
+  expect(updated.generation).not.toBe(first.generation);
+  expect(workers[0]?.terminated).toBe(true);
+  expect(workerUrls).toHaveLength(2);
+  expect(workerUrls[1]?.searchParams.get('fsNamespace')).toBe(
+    workerUrls[0]?.searchParams.get('fsNamespace'),
+  );
+
+  const recreated = await setup(undefined, build);
+  await recreated.manager.open(updatedOptions);
+  expect(recreated.workerUrls[0]?.searchParams.get('plugin')).toBe(
+    workerUrls[0]?.searchParams.get('plugin'),
+  );
+});
+
+test.each([
+  { boundary: 'identity', changes: {}, identity: 'another-owner' },
+  { boundary: 'repository', changes: { repoId: 'another-repo' } },
+  { boundary: 'package', changes: { packageName: 'another.extension' } },
+  { boundary: 'storage schema', changes: { storageSchema: '2' } },
+])(
+  'changing $boundary isolates both Cache and ordinary files',
+  async ({ changes, identity }) => {
+    const baseline = await setup();
+    await baseline.manager.open(options);
+    const isolated = await setup(undefined, {
+      ...(await manifest()),
+      ...changes,
+    });
+    await isolated.manager.open({
+      ...options,
+      identity: identity ?? options.identity,
+    });
+    const baselineNamespace =
+      baseline.workerUrls[0]?.searchParams.get('plugin');
+    const isolatedNamespace =
+      isolated.workerUrls[0]?.searchParams.get('plugin');
+    expect(isolatedNamespace).not.toBe(baselineNamespace);
+    expect(isolated.workerUrls[0]?.searchParams.get('fsNamespace')).toBe(
+      isolatedNamespace,
+    );
+  },
+);
 
 test('selected build identity and digest are checked before creating a Worker, including reused manifests', async () => {
   const { manager, workers } = await setup();
