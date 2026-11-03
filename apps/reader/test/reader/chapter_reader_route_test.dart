@@ -11,9 +11,13 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import '../browse/fakes.dart';
 
 void main() {
-  for (final exitBeforeMount in [false, true]) {
+  for (final (exitBeforeMount, usePreparation) in [
+    (false, false),
+    (true, false),
+    (false, true),
+  ]) {
     testWidgets(
-      'chapter hop awaits cleanup; exit before next mount: $exitBeforeMount',
+      'chapter hop awaits cleanup; exit before mount: $exitBeforeMount, prepared: $usePreparation',
       (tester) async {
         final platform = TestPlatform();
         final catalog = CatalogController(
@@ -64,6 +68,28 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        if (usePreparation) {
+          final leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+          leaf.onViewportChanged!(
+            ReaderViewportState(
+              current: opened.manifest.positionAt(0),
+              observed: opened.manifest.positionAt(0, offset: 1),
+              atEnd: true,
+              windowReady: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            platform.invocations.where(
+              (call) => call.whichRequest() == wire.SourceCall_Request.pages,
+            ),
+            hasLength(2),
+          );
+          expect(
+            platform.imageControls.where((entry) => entry.$1 == 'acquireImage'),
+            hasLength(1),
+          );
+        }
         final closeGate = Completer<void>();
         platform.closePageSessionHandler = (_) => closeGate.future;
         await tester.tap(find.text('下一章'));
@@ -104,6 +130,12 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(ReaderScreen), findsOneWidget);
         expect(find.text('${manga.title} · 二'), findsOneWidget);
+        expect(
+          platform.invocations.where(
+            (call) => call.whichRequest() == wire.SourceCall_Request.pages,
+          ),
+          hasLength(2),
+        );
         expect(
           platform.imageControls.where((entry) => entry.$1 == 'acquireImage'),
           hasLength(2),

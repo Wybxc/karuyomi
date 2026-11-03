@@ -37,9 +37,11 @@ final class TestPlatform extends PlatformRuntime {
   int authCalls = 0;
   final invocations = <wire.SourceCall>[];
   final imageControls = <(String, Map<String, Object?>)>[];
+  final controlCommands = <wire.ControlRequest_Command>[];
   Map<String, Object?>? continuation;
   Future<wire.SourceResult> Function(wire.SourceCall call)? invokeHandler;
   Future<void> Function(String pageSessionId)? closePageSessionHandler;
+  bool closeAcknowledged = true;
 
   wire.ApiFetchResponse _fetch(String path) {
     final response = switch (path) {
@@ -75,6 +77,7 @@ final class TestPlatform extends PlatformRuntime {
   @override
   Future<Object?> control(Map<String, Object?> json) async {
     final request = wire.decodeProtoJson(wire.ControlRequest(), json);
+    controlCommands.add(request.whichCommand());
     final response = wire.ControlResponse(requestId: request.requestId);
     switch (request.whichCommand()) {
       case wire.ControlRequest_Command.fetchApi:
@@ -174,7 +177,7 @@ final class TestPlatform extends PlatformRuntime {
           'closePageSession',
           wire.encodeProtoJson(request.closePageSession),
         ));
-        response.closed = wire.Closed(closed: true);
+        response.closed = wire.Closed(closed: closeAcknowledged);
       default:
         response.completed = wire.Completed(completed: true);
     }

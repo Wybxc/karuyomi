@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../browse/catalog_controller.dart';
 import 'chapter_sequence.dart';
+import 'chapter_preparation.dart';
 import 'reader_screen.dart';
 
 /// One navigation route owns the whole reading session, not one route per page
@@ -41,6 +42,96 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
   bool _viewAttached = false;
   String? _error;
   Future<void>? _moving;
+  late final _preparation = ChapterPreparation(_openChapter);
+  ReaderViewportState? _viewport;
+  bool _preparationScheduled = false;
+  String? _preparationAttempt;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.catalog.addListener(_schedulePreparation);
+  }
+
+  void _schedulePreparation() {
+    if (_preparationScheduled || _closing) return;
+    _preparationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preparationScheduled = false;
+      if (!mounted ||
+          _closing ||
+          _busy ||
+          _preparation.busy ||
+          _preparation.ready ||
+          _preparation.blocked ||
+          widget.catalog.busy ||
+          !widget.catalog.isCurrentSource(widget.source) ||
+          _viewport?.atEnd != true ||
+          _viewport?.windowReady != true) {
+        return;
+      }
+      final next = widget.sequence.adjacent(_chapter.sourceIndex, _order, 1);
+      if (next == null) return;
+      final attempt = '${_chapter.key}:${next.key}';
+      if (_preparationAttempt == attempt) return;
+      _preparationAttempt = attempt;
+      unawaited(_prepareNext(next));
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Future<OpenedChapter?> _openChapter(SequenceChapter chapter) =>
+      widget.catalog.openChapter(
+        widget.manga,
+        ChapterEntry(chapter.snapshot),
+        reference: widget.source,
+        logicalChapterKey: chapter.key,
+      );
+
+  Future<void> _prepareNext(SequenceChapter target) async {
+    if (_busy ||
+        _closing ||
+        _preparation.busy ||
+        _preparation.ready ||
+        _preparation.blocked) {
+      return;
+    }
+    final pending = _preparation.prepare(target);
+    setState(() => _error = null);
+    try {
+      await pending;
+      if (!_closing && mounted) {
+        setState(() {
+          if (!_preparation.ready && widget.catalog.error != null) {
+            _error = widget.catalog.error;
+          }
+        });
+      }
+    } catch (_) {
+      if (!_closing && mounted) {
+        setState(() => _error = '下一章准备未完成，可进入时重试');
+      }
+    }
+  }
+
+  void _changeOrder(ChapterOrder order) {
+    final pending = _preparation.discard();
+    setState(() {
+      _order = order;
+      _preparationAttempt = null;
+    });
+    unawaited(() async {
+      try {
+        await pending;
+      } catch (_) {
+        if (!_closing && mounted) {
+          setState(() => _error = '章节资源清理失败，请返回重新连接漫画源');
+        }
+      }
+      if (!_closing && mounted) setState(() {});
+      _schedulePreparation();
+    }());
+  }
 
   Future<void> _move(SequenceChapter target) {
     if (_busy || _closing || target.key == _chapter.key) return Future.value();
@@ -56,12 +147,9 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
   Future<void> _changeChapter(SequenceChapter target) async {
     OpenedChapter? next;
     try {
-      next = await widget.catalog.openChapter(
-        widget.manga,
-        ChapterEntry(target.snapshot),
-        reference: widget.source,
-        logicalChapterKey: target.key,
-      );
+      next = await _preparation.take(target);
+      if (_closing || !mounted) return;
+      next ??= await _openChapter(target);
       if (next == null) {
         if (!_closing && mounted) {
           setState(() => _error = widget.catalog.error ?? '章节未能打开，请重试');
@@ -80,6 +168,8 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
         _chapter = target;
         _viewClosed = Completer<void>();
         _viewAttached = false;
+        _viewport = null;
+        _preparationAttempt = null;
         _visible = true;
       });
       next = null; // The route owns it until onAttached mounts the new leaf.
@@ -108,6 +198,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_busy) const LinearProgressIndicator(),
+        if (_preparation.busy && !_busy) const LinearProgressIndicator(),
         if (_error != null)
           Padding(padding: const EdgeInsets.all(8), child: Text(_error!)),
         Row(
@@ -136,7 +227,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
                 onChanged: _busy
                     ? null
                     : (order) {
-                        if (order != null) setState(() => _order = order);
+                        if (order != null) _changeOrder(order);
                       },
               ),
             ),
@@ -174,6 +265,14 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
       generation: opened.generation,
       title: opened.title,
       chapterControls: _chapterControls(),
+      onViewportChanged: (viewport) {
+        final changed =
+            _viewport?.atEnd != viewport.atEnd ||
+            _viewport?.windowReady != viewport.windowReady;
+        _viewport = viewport;
+        if (changed && !_closing && mounted) setState(() {});
+        _schedulePreparation();
+      },
       onAttached: () {
         if (identical(completion, _viewClosed)) _viewAttached = true;
       },
@@ -188,6 +287,8 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
   @override
   void dispose() {
     _closing = true;
+    widget.catalog.removeListener(_schedulePreparation);
+    final preparationClosed = _preparation.close();
     if (!_viewAttached && !_viewClosed.isCompleted) {
       // setState may install a provider just before a pop removes this route,
       // before the next frame ever mounts its Reader leaf. The route retains
@@ -198,8 +299,11 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute> {
     // late pages() result as well. Never recycle the runtime to cancel a hop.
     unawaited(() async {
       try {
-        await _viewClosed.future;
-        await _moving;
+        await Future.wait<void>([
+          _viewClosed.future,
+          ?_moving,
+          preparationClosed,
+        ]);
       } catch (_) {
         // The route has gone; Catalog/runtime errors remain available on return.
       }

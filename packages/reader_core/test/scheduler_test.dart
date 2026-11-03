@@ -59,6 +59,31 @@ Future<void> tick() => Future<void>.delayed(Duration.zero);
 
 void main() {
   test(
+    'idle includes pending release ACKs, not only visible loading',
+    () async {
+      final provider = ControlledProvider();
+      final scheduler = ImageScheduler(provider: provider);
+      scheduler.setWindow(
+        chapterKey: 'chapter',
+        generation: '1',
+        pages: pages(1),
+      );
+      expect(scheduler.isIdle, false);
+      provider.complete(provider.requests.single);
+      await scheduler.settled;
+      expect(scheduler.isIdle, true);
+      provider.releaseGate = Completer<void>();
+      scheduler.setWindow(chapterKey: 'chapter', generation: '1', pages: []);
+      expect(scheduler.snapshot.loading, isEmpty);
+      expect(scheduler.isIdle, false);
+      provider.releaseGate!.complete();
+      await scheduler.settled;
+      expect(scheduler.isIdle, true);
+      await scheduler.dispose();
+    },
+  );
+
+  test(
     'priority, concurrent and resident-page limits hold across a long chapter',
     () async {
       final provider = ControlledProvider();

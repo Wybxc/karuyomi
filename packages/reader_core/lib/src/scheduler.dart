@@ -86,6 +86,7 @@ final class ImageScheduler {
   Completer<void>? _idle;
 
   Stream<ImageSchedulerSnapshot> get changes => _changes.stream;
+  bool get isIdle => _active.isEmpty && _pendingCleanup.isEmpty;
   ImageSchedulerSnapshot get snapshot => ImageSchedulerSnapshot(
     resources: _resources,
     errors: _errors,
@@ -101,7 +102,7 @@ final class ImageScheduler {
   );
 
   Future<void> get settled {
-    if (_active.isEmpty && _pendingCleanup.isEmpty) return Future.value();
+    if (isIdle) return Future.value();
     return (_idle ??= Completer<void>()).future;
   }
 

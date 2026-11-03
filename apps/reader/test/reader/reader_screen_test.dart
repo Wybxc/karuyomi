@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/features/reader/resource_image.dart';
 import 'package:reader_core/reader_core.dart';
 
 final class FixturePageProvider implements PageProvider {
@@ -52,6 +53,9 @@ Widget screen({
   ReadingPosition? position,
   ReadingMode mode = ReadingMode.leftToRight,
   ValueChanged<ReadingPosition>? onPosition,
+  ValueChanged<ReaderViewportState>? onViewport,
+  ResourceImageBuilder imageBuilder = fixtureImage,
+  bool? doublePage,
 }) => MaterialApp(
   home: ReaderScreen(
     manifest: manifest,
@@ -59,13 +63,106 @@ Widget screen({
     generation: 'runtime-1',
     initialPosition: position,
     initialMode: mode,
+    doublePage: doublePage,
     onPositionChanged: onPosition,
-    imageBuilder: fixtureImage,
+    onViewportChanged: onViewport,
+    imageBuilder: imageBuilder,
     imageEvictor: (_) async {},
   ),
 );
 
 void main() {
+  testWidgets(
+    'zoom before decoding cannot mark a clipped final spread observed',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: 'v1',
+        pages: List.generate(
+          21,
+          (index) => ReaderPage(key: 'page-$index', width: 600, height: 900),
+        ),
+      );
+      final viewports = <ReaderViewportState>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          doublePage: true,
+          position: manifest.positionAt(19),
+          onViewport: viewports.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('放大'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          doublePage: true,
+          position: manifest.positionAt(19),
+          onViewport: viewports.add,
+          imageBuilder: (context, resource, fit) {
+            ReaderImageDecoded(resource.id).dispatch(context);
+            return fixtureImage(context, resource, fit);
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.atEnd, false);
+      expect(viewports.last.windowReady, false);
+      await tester.tap(find.byTooltip('重置缩放'));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed!.pageKey, 'page-20');
+      expect(viewports.last.atEnd, true);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('resident images do not report reading before a Flutter frame', (
+    tester,
+  ) async {
+    final provider = FixturePageProvider();
+    final manifest = fixtureChapter();
+    final viewports = <ReaderViewportState>[];
+    await tester.pumpWidget(
+      screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(19),
+        onViewport: viewports.add,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(provider.acquired, isNotEmpty);
+    expect(viewports.last.observed, isNull);
+    expect(viewports.last.atEnd, false);
+    expect(viewports.last.windowReady, false);
+    await tester.pumpWidget(
+      screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(19),
+        onViewport: viewports.add,
+        imageBuilder: (context, resource, fit) {
+          ReaderImageDecoded(resource.id).dispatch(context);
+          return fixtureImage(context, resource, fit);
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(viewports.last.observed!.pageKey, 'page-19');
+    expect(viewports.last.observed!.normalizedOffset, 1);
+    expect(viewports.last.atEnd, true);
+    expect(viewports.last.windowReady, true);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('paged controls, zoom and pan do not race page turning', (
     tester,
   ) async {

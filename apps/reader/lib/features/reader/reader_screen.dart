@@ -11,6 +11,21 @@ import 'resource_pool.dart';
 typedef ResourceImageBuilder =
     Widget Function(BuildContext context, ImageResource resource, BoxFit fit);
 
+/// Logical viewport state. An observed anchor requires an actually decoded,
+/// visible Flutter image; scheduler residency alone never advances reading.
+final class ReaderViewportState {
+  const ReaderViewportState({
+    required this.current,
+    required this.observed,
+    required this.atEnd,
+    required this.windowReady,
+  });
+  final ReadingPosition current;
+  final ReadingPosition? observed;
+  final bool atEnd;
+  final bool windowReady;
+}
+
 /// An online chapter view. Images are exclusively acquired through the Source's
 /// PageProvider; this screen never downloads raw Source image URLs itself.
 class ReaderScreen extends StatefulWidget {
@@ -30,6 +45,7 @@ class ReaderScreen extends StatefulWidget {
     this.onClosing,
     this.chapterControls,
     this.onAttached,
+    this.onViewportChanged,
   });
 
   final ChapterManifest manifest;
@@ -50,6 +66,7 @@ class ReaderScreen extends StatefulWidget {
   final ValueChanged<Future<void>>? onClosing;
   final Widget? chapterControls;
   final VoidCallback? onAttached;
+  final ValueChanged<ReaderViewportState>? onViewportChanged;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -74,6 +91,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   String _windowSignature = '';
   bool _zoomed = false;
   bool _dimensionsScheduled = false;
+  bool _viewportScheduled = false;
+  final _decodedResources = <String>{};
 
   @override
   void initState() {
@@ -90,6 +109,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (mounted) setState(() {});
       final position = _reader.position;
       if (position != null) widget.onPositionChanged?.call(position);
+      _scheduleViewport();
     });
     _attachScheduler();
     _scroll.addListener(_onScroll);
@@ -105,9 +125,86 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _scheduler = ImageScheduler(provider: _resourcePool);
     _imagesSubscription = _scheduler.changes.listen((_) {
       _scheduleDimensions();
+      _scheduleViewport();
       if (mounted) setState(() {});
     });
     _syncWindow();
+  }
+
+  void _scheduleViewport() {
+    if (_viewportScheduled || widget.onViewportChanged == null) return;
+    _viewportScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _viewportScheduled = false;
+      if (!mounted || _restoring || _reader.position == null) return;
+      final snapshot = _scheduler.snapshot;
+      final manifest = _reader.manifest;
+      if ((!_reader.isContinuous && !_transform.value.isIdentity()) ||
+          ModalRoute.of(context)?.isCurrent == false) {
+        widget.onViewportChanged?.call(
+          ReaderViewportState(
+            current: _reader.position!,
+            observed: null,
+            atEnd: false,
+            windowReady: false,
+          ),
+        );
+        return;
+      }
+      final visible = <int>[];
+      var bottomOffset = 1.0;
+      var atEnd = false;
+      if (_reader.isContinuous) {
+        if (!_scroll.hasClients || _viewportHeight <= 0) return;
+        final top = _scroll.offset;
+        final bottom = top + _viewportHeight;
+        final offsets = _offsets;
+        for (var index = 0; index < manifest.pages.length; index++) {
+          if (offsets[index + 1] > top && offsets[index] < bottom) {
+            visible.add(index);
+          }
+        }
+        if (visible.isNotEmpty) {
+          final last = visible.last;
+          bottomOffset =
+              ((bottom - offsets[last]) / _pageHeight(manifest.pages[last]))
+                  .clamp(0.0, 1.0);
+        }
+        atEnd = _scroll.position.extentAfter <= 1;
+      } else {
+        visible.addAll(
+          _reader.spreads[_reader.spreadIndex].pages.map(
+            (page) => manifest.pages.indexWhere((item) => item.key == page.key),
+          ),
+        );
+        atEnd = !_reader.canAdvance;
+      }
+      bool decoded(int index) {
+        final image = snapshot.resources[manifest.pages[index].key];
+        return image != null && _decodedResources.contains(image.id);
+      }
+
+      final shown = visible.where(decoded).toList();
+      final allVisible = visible.isNotEmpty && visible.every(decoded);
+      final observed = shown.isEmpty
+          ? null
+          : manifest.positionAt(
+              shown.last,
+              offset: shown.last == visible.last ? bottomOffset : 1,
+            );
+      widget.onViewportChanged?.call(
+        ReaderViewportState(
+          current: _reader.position!,
+          observed: observed,
+          atEnd: atEnd && allVisible,
+          windowReady:
+              allVisible &&
+              _scheduler.isIdle &&
+              snapshot.errors.isEmpty &&
+              snapshot.cleanupError == null,
+        ),
+      );
+    });
   }
 
   void _scheduleDimensions() {
@@ -233,6 +330,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _syncWindow();
     final position = _reader.position;
     if (position != null) widget.onPositionChanged?.call(position);
+    _scheduleViewport();
   }
 
   void _scheduleRestore() {
@@ -256,6 +354,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       }
       _restoring = false;
       _syncWindow();
+      _scheduleViewport();
     });
   }
 
@@ -289,6 +388,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _onTransform() {
     final zoomed = _transform.value.getMaxScaleOnAxis() > 1.01;
     if (_zoomed != zoomed && mounted) setState(() => _zoomed = zoomed);
+    _scheduleViewport();
   }
 
   void _zoom(double factor) {
@@ -304,11 +404,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
       return Semantics(
         label: '第 ${_reader.manifest.pages.indexOf(page) + 1} 页',
         image: true,
-        child: PinnedReaderImage(
-          key: ValueKey('display-${resource.id}'),
-          pool: _resourcePool,
-          image: resource,
-          builder: (context) => widget.imageBuilder(context, resource, fit),
+        child: NotificationListener<ReaderImageDecoded>(
+          onNotification: (notification) {
+            if (notification.resourceId == resource.id &&
+                _decodedResources.add(resource.id)) {
+              _scheduleViewport();
+            }
+            return true;
+          },
+          child: PinnedReaderImage(
+            key: ValueKey('display-${resource.id}'),
+            pool: _resourcePool,
+            image: resource,
+            builder: (context) => widget.imageBuilder(context, resource, fit),
+          ),
         ),
       );
     }

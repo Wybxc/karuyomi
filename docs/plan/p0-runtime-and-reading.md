@@ -23,14 +23,14 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 ## 下一步
 
-阅读连续性第一里程碑已实现：保留 Source 原序/反序与重复章节，用包含漫画/Source 作用域的章节键在同一 route 切章；新叶等旧调度、图片 pin、provider 清理确认后才安装。路由退出时，迟到 pages 与尚未挂载的新 provider 均有明确关闭者。组件与静态分析分项通过，真实 Source 切章、有界下一章准备及 Drift 进度恢复继续验收，见 [阅读记录](../VERIFICATION.md#阅读连续性分项)。
+阅读连续性前两里程碑已实现：保留 Source 原序/反序与重复章节，用包含漫画/Source 作用域的章节键在同一 route 切章；新叶等旧调度、图片 pin、provider 清理确认后才安装。路由退出时，迟到 pages 与尚未挂载的新 provider 均有明确关闭者。有界下一章在真实末页 frame、窗口与 Source 空闲后自动准备，邻章不取图片；清理失败保留 owner 并阻止继续占用会话。组件与静态分析分项通过，真实 Source 连续阅读及 Drift 产品进度恢复继续验收，见[阅读记录](../verification/reader-continuity.md)。
 
 存储细分推进见[运行时文件与 HTTP Cache](runtime-storage.md)，editor 生命周期机制门与原 JVM/正文语义门分别记录。
 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 的压缩、重定向、Cookie、HEAD/206、流式上传、截断上传和三类取消门已通过。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常，补实际 Source/cache、204/304、Range、表单/multipart 及半途失败回归。当前只维护 v2，旧包需要重新构建。
 2. **验证缓冲与取消。** META/DATA 最多 64 KiB，正文请求最多 8 MiB、响应最多 64 MiB，适配队列最多四块。检查慢消费者、背压、迟到响应和 generation 销毁能终止上游并释放 handle；整体请求预算和两次读取之间的 idle timeout 分别验证。协议细节见 [HTTP bridge](../HTTP-BRIDGE.md)。
 3. **完成图片剩余门槛。** Web 单页及真实 Flutter 阅读闭环已通过分项门，合同见[图片资源通道](../IMAGE-RESOURCES.md)。正式 Native 文件通道已实现：Android 采用锁定插件的六个常驻 ArrayBuffer 槽位，iOS 使用受管 WKDownload 薄扩展；iOS 模拟器实际 Flutter Headless/受信 HTTPS、文件解码与清理通过，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。继续用一致材料验收原 Source→Native Reader、Android WebView 与真机；机制分项不能代替这些门。内部 Bitmap/ImageDecoder 已改为二进制 handle、≤64 KiB 像素/字节块、解码前头部校验和 surface/decoder/font 合计账本；只查 bounds 不完整解码。JVM、受控时序、实际 TeaVM→Canvas 分项通过；取消仍等待 Java 退出，不扫描删除 Source 持有对象。详见 [graphics 合同](../IMAGE-RESOURCES.md#source-内部图形桥)。继续固定新 host 重新 AOT 并验收实际处理源；Cache/File 大正文、存储总额及原 JVM 同版语义仍待后续存储阶段，终端与图形账本均不代表进程/GPU 实际峰值。不绕过插件直接读取原图 URL。
-4. **汇合 P0-R / F4 / P0-C（阅读连续性正在实施）。** 按三个可独立验收的里程碑推进：保留 Source 原序/反序与重复章节，在同一阅读路由完成确定性切章；当前章加至多一个下一章页面会话，邻章不取图片，普通活动 Source 调用不冒充可抢占取消；使用 Drift/SQLite 保存当前位置、最远位置和阅读 epoch，并验证关闭重开恢复。Web 数据库 WASM/worker 随静态资源交付，Native 使用正式 SQLite；命中内存模式时明确提示不能持久保存。随后完成超长图降采样/分片验证、触控与缩放冲突、位置恢复、内存和首图测量。
+4. **汇合 P0-R / F4 / P0-C（章序/切章与有界准备已实现，本地进度正在接入）。** 保留 Source 原序/反序与重复章节，在同一阅读路由等待旧资源 ACK 后切章。末页由 Flutter 实际解码显示、图片窗口含清理均空闲且 Source 元数据槽空闲时，自动准备至多一个下一章页面会话；邻章不取图片，不推进进度。普通活动 Source 调用不冒充可抢占取消，过期准备结果等待返回后关闭。继续使用 Drift/SQLite 保存当前位置、最远位置和阅读 epoch，并验证关闭重开恢复。Web 数据库 WASM/worker 随静态资源交付，Native 使用正式 SQLite；命中内存模式时明确提示不能持久保存。随后完成超长图降采样/分片验证、触控与缩放冲突、位置恢复、内存和首图测量。
 5. **完成实际部署与恢复。** 在真实 Access、Web 和移动容器验证登录/过期/回跳、Cookie 恢复、执行槽/文件恢复、跨包切换和后台重建；不自动重发无幂等保证的副作用请求。
 
 ## 验收
