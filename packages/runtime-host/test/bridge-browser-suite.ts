@@ -28,6 +28,8 @@ function installedBridges() {
     teaGraphicsBytesClose,
     teaGraphicsSnapshot,
     teaCache,
+    teaCacheRead,
+    teaCacheWrite,
     teaFile,
     teaFileSystemClose,
   } = workerScope();
@@ -52,7 +54,10 @@ function installedBridges() {
       teaGraphicsSnapshot,
     'Binary graphics lifecycle installed',
   );
-  assert(typeof teaCache === 'function', 'Cache bridge installed');
+  assert(
+    typeof teaCache === 'function' && teaCacheRead && teaCacheWrite,
+    'Binary cache bridge installed',
+  );
   assert(typeof teaFile === 'function', 'File bridge installed');
   assert(
     typeof teaFileSystemClose === 'function',
@@ -72,6 +77,8 @@ function installedBridges() {
     teaGraphicsBytesClose,
     teaGraphicsSnapshot,
     teaCache,
+    teaCacheRead,
+    teaCacheWrite,
     teaFile,
     teaFileSystemClose,
   };
@@ -260,26 +267,54 @@ async function graphics(checks: string[]) {
   checks.push('offscreen-canvas-binary-rgba-png-bounds-cancel-recycle');
 }
 
+async function cacheBody(entry: Record<string, unknown>): Promise<string> {
+  const parts: Uint8Array[] = [];
+  let length = 0,
+    part;
+  while (
+    (part = await scope.teaCacheRead(text(entry.reader), 'probe', 65536)) !==
+    null
+  ) {
+    parts.push(part);
+    length += part.length;
+  }
+  const bytes = new Uint8Array(length);
+  let at = 0;
+  for (const part of parts) {
+    bytes.set(part, at);
+    at += part.length;
+  }
+  return encodeBase64(bytes);
+}
+
 async function cacheWrite(checks: string[]) {
   await cache('clear');
   const begins = await Promise.all([
-    cache('begin', { url: 'source-entry' }),
-    cache('begin', { url: 'source-entry' }),
+    cache('begin', {
+      url: 'source-entry',
+      metadata: { status: 200, headers: [['x-test', 'binary']] },
+    }),
+    cache('begin', {
+      url: 'source-entry',
+      metadata: { status: 200, headers: [['x-test', 'binary']] },
+    }),
   ]);
   const winners = begins.filter((value) => value.accepted === true);
   assert(winners.length === 1, 'Only one concurrent cache editor');
   const editor = winners[0]!;
-  const committed = await cache('put', {
+  assert(
+    await scope.teaCacheWrite(text(editor.editor), 'probe', 0, binary),
+    'Binary cache body ACK',
+  );
+  const committed = await cache('commit', {
     url: 'source-entry',
     editor: editor.editor,
     expected: null,
     generation: editor.generation,
-    metadata: { status: 200, headers: [['x-test', 'binary']] },
-    body: encoded,
   });
   assert(committed.committed === true, 'Cache commit');
   const entry = object((await cache('get', { url: 'source-entry' })).entry);
-  assert(entry.body === encoded, 'Cache binary bytes');
+  assert((await cacheBody(entry)) === encoded, 'Cache binary bytes');
   const stale = await cache('update', {
     url: 'source-entry',
     expected: 'stale-version',
@@ -295,8 +330,9 @@ async function cacheWrite(checks: string[]) {
   });
   assert(updated.committed === true, 'Cache conditional metadata update');
   assert(
-    object((await cache('get', { url: 'source-entry' })).entry).body ===
-      encoded,
+    (await cacheBody(
+      object((await cache('get', { url: 'source-entry' })).entry),
+    )) === encoded,
     'Cache update preserves body',
   );
   assert(
@@ -404,7 +440,8 @@ globalThis.onmessage = (event: MessageEvent<unknown>) => {
           (await cache('get', { url: 'source-entry' })).entry,
         );
         assert(
-          entry.body === encoded && object(entry.metadata).status === 304,
+          (await cacheBody(entry)) === encoded &&
+            object(entry.metadata).status === 304,
           'Cache persisted across Worker restart',
         );
         const opened = await file({

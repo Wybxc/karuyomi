@@ -307,6 +307,75 @@ public final class Bridge {
       script = "self.teaCallbackResult(id,result);")
   static native void callbackReply(String id, String result);
 
+  public static byte[] cacheRead(String reader, String handle, int maximum) throws IOException {
+    if (maximum < 1 || maximum > HttpBodySource.MAX_CHUNK)
+      throw new IllegalArgumentException("Invalid cache read size");
+    Uint8Array input = cacheReadChunk(reader, handle, maximum);
+    if (input == null) return null;
+    int length = input.getByteLength();
+    if (length < 1 || length > maximum) throw new IOException("Invalid cache response chunk size");
+    byte[] copy = new byte[length];
+    for (int index = 0; index < length; index++) copy[index] = (byte) input.get(index);
+    return copy;
+  }
+
+  @Async
+  private static native Uint8Array cacheReadChunk(String reader, String handle, int maximum)
+      throws IOException;
+
+  private static void cacheReadChunk(
+      String reader, String handle, int maximum, AsyncCallback<Uint8Array> callback) {
+    cacheReadChunk(
+        reader,
+        handle,
+        maximum,
+        callback::complete,
+        error -> callback.error(new IOException(error)));
+  }
+
+  @JSBody(
+      params = {"reader", "handle", "maximum", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaCacheRead(reader, handle, maximum)).then(ok, error => fail(String(error)));")
+  private static native void cacheReadChunk(
+      String reader, String handle, int maximum, HttpChunk ok, Reply fail);
+
+  public static boolean cacheWrite(String editor, String handle, int sequence, byte[] bytes)
+      throws IOException {
+    if (bytes.length < 1 || bytes.length > HttpBodySource.MAX_CHUNK)
+      throw new IllegalArgumentException("Invalid cache write size");
+    Uint8Array copy = new Uint8Array(bytes.length);
+    for (int index = 0; index < bytes.length; index++)
+      copy.set(index, (short) (bytes[index] & 255));
+    return "1".equals(cacheWriteChunk(editor, handle, sequence, copy));
+  }
+
+  @Async
+  private static native String cacheWriteChunk(
+      String editor, String handle, int sequence, Uint8Array bytes) throws IOException;
+
+  private static void cacheWriteChunk(
+      String editor,
+      String handle,
+      int sequence,
+      Uint8Array bytes,
+      AsyncCallback<String> callback) {
+    cacheWriteChunk(
+        editor,
+        handle,
+        sequence,
+        bytes,
+        callback::complete,
+        error -> callback.error(new IOException(error)));
+  }
+
+  @JSBody(
+      params = {"editor", "handle", "sequence", "bytes", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaCacheWrite(editor, handle, sequence, bytes)).then(accepted => ok(accepted === true ? '1' : '0'), error => fail(String(error)));")
+  private static native void cacheWriteChunk(
+      String editor, String handle, int sequence, Uint8Array bytes, Reply ok, Reply fail);
+
   @Async
   public static native String cache(String request);
 

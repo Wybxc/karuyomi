@@ -6,6 +6,8 @@ import java.util.*;
 import okio.*;
 import okhttp3.internal.cache.*;
 import prototype.Bridge;
+import prototype.CacheSink;
+import prototype.HttpBodySource;
 
 /** Persistent browser cache backend. OkHttp's original interceptor and strategy remain in use. */
 public final class Cache implements Closeable, Flushable {
@@ -126,39 +128,84 @@ public final class Cache implements Closeable, Flushable {
 
   public Response get$okhttp(Request request) {
     checkOpen();
+    String reader = null;
     try {
       JsonObject stored = command("get", request.url().toString(), null);
       if (!stored.has("entry")) return null;
       JsonObject value = stored.getAsJsonObject("entry"), meta = value.getAsJsonObject("metadata");
+      reader = value.get("reader").getAsString();
       if (!request.url().toString().equals(meta.get("url").getAsString())
           || !request.method().equals(meta.get("method").getAsString())) return null;
       Headers responseHeaders = headers(meta.getAsJsonArray("headers")),
           varied = headers(meta.getAsJsonArray("vary"));
       for (String name : varyFields(responseHeaders))
         if (!request.headers(name).equals(varied.values(name))) return null;
-      byte[] bytes = Base64.getDecoder().decode(value.get("body").getAsString());
+      String snapshot = reader;
+      BufferedSource source =
+          Okio.buffer(
+              new HttpBodySource(
+                  new HttpBodySource.Reader() {
+                    public byte[] read(int maximum) throws IOException {
+                      return Bridge.cacheRead(snapshot, handle, maximum);
+                    }
+
+                    public void close() throws IOException {
+                      closeReader(snapshot);
+                    }
+                  },
+                  value.get("length").getAsLong()));
+      ResponseBody body =
+          new ResponseBody() {
+            public MediaType contentType() {
+              return MediaType.parse(
+                  responseHeaders.get("Content-Type") == null
+                      ? "application/octet-stream"
+                      : responseHeaders.get("Content-Type"));
+            }
+
+            public long contentLength() {
+              String length = responseHeaders.get("Content-Length");
+              try {
+                return length == null ? -1 : Long.parseLong(length);
+              } catch (NumberFormatException ignored) {
+                return -1;
+              }
+            }
+
+            public BufferedSource source() {
+              return source;
+            }
+          };
       BrowserEntry entry =
           new BrowserEntry(value.get("version").getAsString(), value.get("generation").getAsLong());
-      Request storedRequest = request.newBuilder().tag(BrowserEntry.class, entry).build();
-      return new Response.Builder()
-          .request(storedRequest)
-          .protocol(Protocol.get(meta.get("protocol").getAsString()))
-          .code(meta.get("code").getAsInt())
-          .message(meta.get("message").getAsString())
-          .headers(responseHeaders)
-          .sentRequestAtMillis(meta.get("sent").getAsLong())
-          .receivedResponseAtMillis(meta.get("received").getAsLong())
-          .body(
-              ResponseBody.create(
-                  bytes,
-                  MediaType.parse(
-                      responseHeaders.get("Content-Type") == null
-                          ? "application/octet-stream"
-                          : responseHeaders.get("Content-Type"))))
-          .build();
+      Response response =
+          new Response.Builder()
+              .request(request.newBuilder().tag(BrowserEntry.class, entry).build())
+              .protocol(Protocol.get(meta.get("protocol").getAsString()))
+              .code(meta.get("code").getAsInt())
+              .message(meta.get("message").getAsString())
+              .headers(responseHeaders)
+              .sentRequestAtMillis(meta.get("sent").getAsLong())
+              .receivedResponseAtMillis(meta.get("received").getAsLong())
+              .body(body)
+              .build();
+      reader = null;
+      return response;
     } catch (IOException | IllegalArgumentException error) {
       return null;
+    } finally {
+      if (reader != null)
+        try {
+          closeReader(reader);
+        } catch (IOException ignored) {
+        }
     }
+  }
+
+  private void closeReader(String reader) throws IOException {
+    JsonObject close = new JsonObject();
+    close.addProperty("reader", reader);
+    command("reader-close", null, close);
   }
 
   public CacheRequest put$okhttp(Response response) {
@@ -173,63 +220,43 @@ public final class Cache implements Closeable, Flushable {
     }
     if (!method.equals("GET") || varyFields(response.headers()).contains("*")) return null;
     try {
-      JsonObject begin = command("begin", url, null);
+      JsonObject start = new JsonObject();
+      start.add("metadata", metadata(response));
+      start.addProperty("length", response.body() == null ? 0 : response.body().contentLength());
+      JsonObject begin = command("begin", url, start);
       if (!begin.get("accepted").getAsBoolean()) return null;
-      JsonObject meta = metadata(response);
+      String editor = begin.get("editor").getAsString();
+      CacheSink sink =
+          new CacheSink(
+              new CacheSink.Store() {
+                public boolean write(int sequence, byte[] bytes) throws IOException {
+                  return Bridge.cacheWrite(editor, handle, sequence, bytes);
+                }
+
+                public boolean commit() throws IOException {
+                  JsonObject finish = new JsonObject();
+                  finish.add("expected", begin.get("version"));
+                  finish.add("generation", begin.get("generation"));
+                  finish.addProperty("editor", editor);
+                  return command("commit", url, finish).get("committed").getAsBoolean();
+                }
+
+                public void abort() throws IOException {
+                  JsonObject abort = new JsonObject();
+                  abort.addProperty("editor", editor);
+                  command("abort", url, abort);
+                }
+              },
+              () -> closed,
+              () -> writes++,
+              () -> aborts++);
       return new CacheRequest() {
-        private boolean done;
-        private final Buffer bytes = new Buffer();
-        private final Sink sink =
-            new Sink() {
-              public void write(Buffer source, long count) throws IOException {
-                if (done) throw new IllegalStateException("closed cache writer");
-                bytes.write(source, count);
-              }
-
-              public void flush() {}
-
-              public Timeout timeout() {
-                return Timeout.NONE;
-              }
-
-              public void close() {
-                if (done) return;
-                done = true;
-                if (closed) {
-                  bytes.clear();
-                  aborts++;
-                  return;
-                }
-                JsonObject put = new JsonObject();
-                put.add("expected", begin.get("version"));
-                put.add("generation", begin.get("generation"));
-                put.add("editor", begin.get("editor"));
-                put.add("metadata", meta);
-                put.addProperty("body", Base64.getEncoder().encodeToString(bytes.readByteArray()));
-                try {
-                  if (command("put", url, put).get("committed").getAsBoolean()) writes++;
-                  else aborts++;
-                } catch (IOException error) {
-                  aborts++;
-                }
-              }
-            };
-
         public Sink body() {
           return sink;
         }
 
         public void abort() {
-          if (done) return;
-          done = true;
-          bytes.clear();
-          aborts++;
-          JsonObject abort = new JsonObject();
-          abort.add("editor", begin.get("editor"));
-          try {
-            command("abort", url, abort);
-          } catch (IOException ignored) {
-          }
+          sink.abort();
         }
       };
     } catch (IOException error) {

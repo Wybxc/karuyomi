@@ -33,11 +33,13 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 同日将正则供体类命名从补丁移入构建生成步骤，使用 `java-parser` token 位置保留原排版与字面量，再应用行为补丁；全部 13 份生成 Java 与拆分前逐字节一致，原输出摘要未改。回归覆盖刻意保留的上游类型转换、Lexer 引用与继承关系、字符串/文本块和注释不误改，以及源码/上下文/结果漂移拒绝。`toolchain/license.txt` 同时改名为 `android-sdk-license`，仅更新锁中的路径，41 字节内容与摘要不变。
 
-## Cache 生命周期分项
+## Cache 生命周期与有界正文分项
 
-2026-11-03，正式 Cache 桥在 Codex 内置浏览器 Chromium 156 通过十组真实 Worker/IndexedDB/Web Locks 门：终止后立即回收 editor、活 owner/Java handle 隔离、并发唯一 editor、版本/clear generation CAS，以及真实事务 abort 后清理与 close/in-flight begin 竞争。事务失败保留旧完整条目，清理不影响替代写入者；类型检查与桥单测通过。具体入口和故障构造见[Worker 桥记录](verification/worker-bridges.md#cache-editor-的-worker-生命周期)。这不是 Java CacheInterceptor、原 Source 或正文预算验收；正文二进制化、普通文件和原 JVM 同版对照按[存储计划](plan/runtime-storage.md)继续推进。
+2026-11-03 至 04，正式 Cache 桥使用 `idb@8.0.4` 将正文拆成最多 64 KiB 的二进制块，metadata 与正文分开，snapshot pin 保留被替换/清空后仍在读取的完整 body；可见预算和计入 staging/retired 的 allocated 预算分别限制。Codex 内置浏览器 Chromium 156 通过十七组真实 Worker/IndexedDB/Web Locks 门，覆盖 editor 死亡 owner 回收、handle/CAS/generation 隔离、put abort、close/delete 与在途 begin、分块 snapshot/EOF、metadata 不读 chunks、块与目录预算、预算不足时原子回滚，以及 close/delete 原事务失败后按 owner/handle 清理。机制与故障门不代表完整 Source 或峰值验收。
 
-原 JVM Cache 对照基线已独立建立：`pnpm teavm:check` 使用官方 Maven 的未适配 OkHttp 5.5.0（SHA-256 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52`），断言 Cache/OkHttpClient 的 CodeSource，避免 seed 同名适配 JAR 将请求送入 BrowserCall。131079 字节冷热命中、304 合并、no-store、Cookie Vary 和打开 snapshot 跨 evictAll 场景在原 JVM 通过；TeaVM 同场景对照仍待实施，详见[存储计划](plan/runtime-storage.md#阶段四原-jvm-同版对照与产品门)。
+共享 `CacheScenarios.java` 分别在官方 Maven 未适配 OkHttp 5.5.0 与真实 TeaVM 0.16 产品 Cache/BrowserCall/二进制 JSO 中执行。131079 字节冷/热命中、304 合并、no-store、Cookie Vary 和打开 snapshot 跨 evictAll 的正文摘要一致，均为 `1933f7f279fb4232259d5af94a6f792a308a78e4c18b8ed5caafd99e943f9a78`；计数均为 11 次请求、8 次网络、4 次命中、5 次成功写入。原 JVM 断言 Cache/OkHttpClient CodeSource，避免 seed 同名适配 JAR 将请求送入 BrowserCall。Java CacheSink 的 19 项 JVM 边界检查同时通过，存储写失败仅丢弃缓存副本，不吞网络读取异常。
+
+上述 TeaVM 网络使用受控 workerd origin，尚未验收新 Cache 下的真实 Source、生产 Access、reader 死亡/损坏正文/中途取消或 Native；普通文件与跨目录 namespace 总预算仍待实施。复验与边界见[Cache 记录](verification/http-cache-runtime.md)和[存储计划](plan/runtime-storage.md)。原 JVM oracle JAR SHA-256 为 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52`。
 
 ## 阅读连续性分项
 

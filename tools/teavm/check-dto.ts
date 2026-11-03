@@ -125,6 +125,24 @@ export async function checkDto(root = ROOT): Promise<void> {
     cacheOutput + path.delimiter + originalCacheClasspath,
     'prototype.CacheTest',
   ]);
+  await oracle('javac', [
+    '--release',
+    '17',
+    '-cp',
+    cacheOutput + path.delimiter + classpath,
+    '-d',
+    cacheOutput,
+    ...[
+      'runtime/teavm/java/src/main/java/prototype/HttpBodySource.java',
+      'runtime/teavm/java/src/main/java/prototype/CacheSink.java',
+      'tools/teavm/CacheSinkTest.java',
+    ].map((file) => path.join(root, file)),
+  ]);
+  await oracle('java', [
+    '-cp',
+    cacheOutput + path.delimiter + classpath,
+    'prototype.CacheSinkTest',
+  ]);
   const imageOutput = path.join(output, 'image');
   mkdirSync(imageOutput, { recursive: true });
   await oracle('javac', [

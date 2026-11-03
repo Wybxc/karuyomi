@@ -47,6 +47,7 @@ class CacheWorker {
         maxSize: 1048576,
         handle,
         url: 'https://fixture.example.org/cache',
+        metadata: { status: 200 },
         ...extra,
       },
     });
@@ -115,7 +116,7 @@ export async function runCacheLifecycleSuite(workerUrl: string) {
 
     a.terminate();
     const restartStart = performance.now();
-    const recovered = await b.call('begin');
+    const recovered = await b.call('begin', { metadata: { status: 201 } });
     const recoveryMs = performance.now() - restartStart;
     assert(
       recovered.accepted === true,
@@ -351,6 +352,341 @@ export async function runCacheLifecycleSuite(workerUrl: string) {
       'EvictAll leaves its Java handle available for future begin',
     );
     checks.push('delete-fences-inflight-begin-without-closing-evictall');
+    await c.call('clear');
+    const large = new Uint8Array(131079);
+    for (let i = 0; i < large.length; i++) large[i] = i & 255;
+    // Build the fixture encoding in bounded pieces; no spread of the complete body.
+    let fixture = '';
+    for (let offset = 0; offset < large.length; offset += 16384)
+      fixture += String.fromCharCode(...large.subarray(offset, offset + 16384));
+    const encodedLarge = btoa(fixture);
+    const largeEditor = await c.call('begin');
+    assert(
+      (await c.call('put', { ...edit(largeEditor), body: encodedLarge }))
+        .committed === true,
+      'Multi-chunk body commits',
+    );
+    const snapshot = object((await b.call('get', { raw: true })).entry);
+    await b.control('reset-metrics');
+    await b.call('size');
+    await b.call('urls');
+    await b.call('flush');
+    assert(
+      (
+        await b.call('update', {
+          expected: snapshot.version,
+          generation: snapshot.generation,
+          metadata: { status: 304 },
+        })
+      ).committed === true,
+      'Metadata update on immutable snapshot body',
+    );
+    assert(
+      (await b.control('metrics')).chunkReads === 0,
+      'Size, URLs, LRU and 304 update never read chunks',
+    );
+    const prefix = (
+      await b.control('read', { reader: snapshot.reader, maximum: 3 })
+    ).bytes;
+    assert(
+      prefix instanceof Uint8Array && prefix.length === 3,
+      'Snapshot read obeys demand',
+    );
+    const replacementEditor = await c.call('begin', {
+      metadata: { status: 204 },
+    });
+    assert(
+      (await c.call('put', edit(replacementEditor))).committed === true,
+      'Replace entry without changing existing snapshot',
+    );
+    assert(
+      object((await c.call('get')).entry).body === body,
+      'New get sees complete replacement body',
+    );
+    await c.call('clear');
+    const retained = await c.call('size');
+    assert(
+      retained.size === 0 && retained.allocatedBytes === large.length,
+      'Clear retains pinned body in allocated budget',
+    );
+    const parts: Uint8Array[] = [prefix];
+    let total = prefix.length;
+    for (;;) {
+      const part = (
+        await b.control('read', { reader: snapshot.reader, maximum: 65536 })
+      ).bytes;
+      if (part === null) break;
+      assert(
+        part instanceof Uint8Array && part.length <= 65536,
+        'Bounded binary snapshot chunk',
+      );
+      parts.push(part);
+      total += part.length;
+    }
+    const restored = new Uint8Array(total);
+    let at = 0;
+    for (const part of parts) {
+      restored.set(part, at);
+      at += part.length;
+    }
+    assert(
+      total === large.length &&
+        restored.every((value, index) => value === large[index]),
+      'Pinned old body survives clear exactly',
+    );
+    assert(
+      (await c.call('size')).allocatedBytes === 0,
+      'EOF releases retired body and allocated budget',
+    );
+    checks.push('binary-chunks-snapshot-replace-clear-and-eof-budget');
+    checks.push('metadata-only-size-urls-lru-and-304');
+
+    const limited = await b.call('begin', { maxSize: 100, url: 'budget' });
+    assert(limited.accepted === true, 'Small metadata fits budget');
+    assert(
+      (
+        await b.control('write', {
+          editor: limited.editor,
+          sequence: 0,
+          bytes: new Uint8Array(101),
+        })
+      ).accepted === false,
+      'Over-budget chunk aborts staging',
+    );
+    assert(
+      (await b.call('begin', { maxSize: 100, url: 'budget' })).accepted ===
+        true,
+      'Budget failure releases live editor',
+    );
+    let invalidChunk: unknown;
+    try {
+      await b.control('write', {
+        editor: limited.editor,
+        sequence: 0,
+        bytes: new Uint8Array(65537),
+      });
+    } catch (error) {
+      invalidChunk = error;
+    }
+    assert(invalidChunk instanceof Error, 'Oversized binary chunk rejects');
+    checks.push('binary-chunk-and-staging-budget-boundaries');
+    await c.call('clear');
+    const ownedEditor = await c.call('begin');
+    assert(
+      (
+        await c.control('write', {
+          editor: ownedEditor.editor,
+          handle: 'foreign',
+          sequence: 0,
+          bytes: new Uint8Array([9]),
+        })
+      ).accepted === false,
+      'Sibling Java handle cannot write owner editor',
+    );
+    assert(
+      (await c.call('put', edit(ownedEditor))).committed === true,
+      'Foreign binary write preserves rightful editor',
+    );
+    const ownedReader = object((await c.call('get', { raw: true })).entry);
+    let foreignRead: unknown;
+    try {
+      await c.control('read', {
+        reader: ownedReader.reader,
+        handle: 'foreign',
+        maximum: 1,
+      });
+    } catch (error) {
+      foreignRead = error;
+    }
+    assert(
+      foreignRead instanceof Error,
+      'Sibling Java handle cannot read owner snapshot',
+    );
+    const rightful = (
+      await c.control('read', { reader: ownedReader.reader, maximum: 65536 })
+    ).bytes;
+    assert(
+      rightful instanceof Uint8Array && rightful[0] === 0,
+      'Foreign read does not close or advance rightful snapshot',
+    );
+    await c.call('reader-close', { reader: ownedReader.reader });
+    checks.push('binary-reader-writer-java-handle-isolation');
+    await c.call('clear');
+    const seal = (editor: Record<string, unknown>, url: string) => ({
+      url,
+      maxSize: 100,
+      editor: editor.editor,
+      expected: editor.version,
+      generation: editor.generation,
+    });
+    const visibleA = await b.call('begin', { url: 'visible-a', maxSize: 100 });
+    assert(
+      (
+        await b.control('write', {
+          editor: visibleA.editor,
+          sequence: 0,
+          bytes: new Uint8Array(70),
+        })
+      ).accepted === true,
+      'Seed A fits visible budget',
+    );
+    assert(
+      (await b.call('commit', seal(visibleA, 'visible-a'))).committed === true,
+      'Seed A commits 84 logical bytes',
+    );
+    const busyA = await b.call('begin', { url: 'visible-a', maxSize: 100 });
+    const visibleB = await c.call('begin', { url: 'visible-b', maxSize: 100 });
+    assert(
+      (
+        await c.control('write', {
+          editor: visibleB.editor,
+          sequence: 0,
+          bytes: new Uint8Array(10),
+        })
+      ).accepted === true,
+      'B fits allocated staging budget',
+    );
+    assert(
+      (await c.call('commit', seal(visibleB, 'visible-b'))).committed === false,
+      'Commit rejects when active A prevents visible trim',
+    );
+    assert(
+      (await c.call('size', { maxSize: 100 })).size === 84,
+      'Rejected commit leaves visible budget intact',
+    );
+    assert(
+      (await c.call('get', { url: 'visible-b', maxSize: 100 })).entry ===
+        undefined,
+      'Rejected commit publishes no entry',
+    );
+    assert(
+      (await c.call('begin', { url: 'visible-a', maxSize: 100 })).accepted ===
+        false,
+      'Budget rejection preserves another active editor',
+    );
+    const retryB = await c.call('begin', { url: 'visible-b', maxSize: 100 });
+    assert(
+      retryB.accepted === true,
+      'Rejected commit releases its own staging editor',
+    );
+    await c.call('abort', { ...seal(retryB, 'visible-b') });
+    await b.call('abort', { ...seal(busyA, 'visible-a') });
+    const smallB = await c.call('begin', {
+      url: 'visible-b',
+      maxSize: 100,
+      metadata: {},
+    });
+    assert(
+      (
+        await c.control('write', {
+          editor: smallB.editor,
+          sequence: 0,
+          bytes: new Uint8Array(10),
+        })
+      ).accepted === true,
+      'Smaller metadata B fits',
+    );
+    assert(
+      (await c.call('commit', seal(smallB, 'visible-b'))).committed === true,
+      'A plus smaller B fits 96 bytes',
+    );
+    const beforeUpdate = object(
+      (await c.call('get', { url: 'visible-b', maxSize: 100 })).entry,
+    );
+    const busyAgain = await b.call('begin', { url: 'visible-a', maxSize: 100 });
+    assert(
+      (
+        await c.call('update', {
+          url: 'visible-b',
+          maxSize: 100,
+          expected: beforeUpdate.version,
+          generation: beforeUpdate.generation,
+          metadata: { status: 304 },
+        })
+      ).committed === false,
+      'Metadata update rejects when visible trim cannot finish',
+    );
+    const afterUpdate = object(
+      (await c.call('get', { url: 'visible-b', maxSize: 100 })).entry,
+    );
+    assert(
+      afterUpdate.version === beforeUpdate.version &&
+        Object.keys(object(afterUpdate.metadata)).length === 0,
+      'Rejected metadata update rolls back version and metadata',
+    );
+    assert(
+      (await c.call('size', { maxSize: 100 })).size === 96,
+      'Update rollback preserves visible budget',
+    );
+    await b.call('abort', seal(busyAgain, 'visible-a'));
+    checks.push('visible-budget-commit-and-update-atomic-rejection');
+    for (const operation of ['close', 'delete']) {
+      await c.call('clear');
+      const seed = await b.call('begin');
+      assert(
+        (await b.call('put', edit(seed))).committed === true,
+        'Seed old complete entry before failed ' + operation,
+      );
+      const beforeClose = object((await c.call('get')).entry);
+      const snapshotBeforeClose = object(
+        (await b.call('get', { raw: true }, 'doomed')).entry,
+      );
+      const doomed = await b.call('begin', {}, 'doomed');
+      const sibling = await b.call('begin', { url: 'sibling' }, 'sibling');
+      const foreign = await c.call('begin', { url: 'foreign' });
+      assert(
+        doomed.accepted === true &&
+          sibling.accepted === true &&
+          foreign.accepted === true,
+        'Own, sibling and foreign editors active before failed ' + operation,
+      );
+      await b.control('fail-next-close');
+      let closeFailure: unknown;
+      try {
+        await b.call(operation, {}, 'doomed');
+      } catch (error) {
+        closeFailure = error;
+      }
+      assert(
+        closeFailure instanceof Error &&
+          closeFailure.message.includes('ConstraintError'),
+        'Failed ' + operation + ' still reports original real IDB error',
+      );
+      const afterClose = object((await c.call('get')).entry);
+      assert(
+        afterClose.body === beforeClose.body &&
+          afterClose.version === beforeClose.version &&
+          afterClose.generation === beforeClose.generation,
+        'Failed ' + operation + ' rolls back old entry and generation',
+      );
+      assert(
+        (await c.call('begin')).accepted === true,
+        'Failed ' + operation + ' releases closed live handle editor',
+      );
+      assert(
+        (await c.call('begin', { url: 'sibling' })).accepted === false &&
+          (await b.call('begin', { url: 'foreign' })).accepted === false,
+        'Failed ' + operation + ' preserves sibling and foreign editors',
+      );
+      const retainedSnapshot = (
+        await b.control('read', {
+          reader: snapshotBeforeClose.reader,
+          handle: 'doomed',
+          maximum: 65536,
+        })
+      ).bytes;
+      assert(
+        retainedSnapshot instanceof Uint8Array &&
+          btoa(String.fromCharCode(...retainedSnapshot)) === body,
+        'Failed ' + operation + ' preserves already opened reader snapshot',
+      );
+      await b.call(
+        'reader-close',
+        { reader: snapshotBeforeClose.reader },
+        'doomed',
+      );
+      checks.push('failed-' + operation + '-releases-only-closed-handle');
+    }
     return {
       passed: true,
       checks,
