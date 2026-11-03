@@ -40,6 +40,9 @@ execa 可将输出直接交给终端、文件或流；实现应选对应输出�
 | `pipeline.ts`                     | 用 execa 管理 builder 与材料采集        | 有界增量、checkpoint、锁、原子候选和进程树终止顺序             |
 | `tools/protocol/`                 | 官方生成器与 golden runner 直接用 execa | protoc 二进制透传、NDJSON 隔离、正常 ESM 编译                  |
 | 工具测试启动器                    | 普通命令迁移 execa                      | 真实 OS 后代/信号测试可保留必要的原生探针，并说明用途          |
+| API/Source loopback 验证入口      | 直接使用异步 execa                      | D1 迁移顺序、受限输出、JSON/换行和异步失败断言                 |
+
+正式 `workerd-probe.ts` 与 `source-metadata-probe.ts` 的普通子进程同样采用 execa。workerd 的真实 Static Assets/D1 注册、冲突回滚和策略同步回归，以及 Source 入口的隔离 D1 注册、protocol 2 测试 bootstrap 和静态快照启动均已通过；这轮执行器验证使用显式测试 bundle，不作为原 Source 在线或生产 Access 证据。原始报告留在忽略的 `.local/execa-probes/`。
 
 ## AOT 取消与状态锁
 

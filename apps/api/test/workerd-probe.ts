@@ -9,7 +9,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execa } from 'execa';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
@@ -39,23 +39,32 @@ const environment = {
   CLOUDFLARE_SEND_METRICS: 'false',
   WRANGLER_LOG_PATH: path.join(temporary, 'wrangler.log'),
 };
-const wrangler = (...args: string[]) =>
-  execFileSync(
-    'pnpm',
-    ['exec', 'wrangler', ...args, '--local', '--persist-to', state],
-    {
-      cwd: api,
+const wrangler = async (...args: string[]) =>
+  (
+    await execa(
+      'pnpm',
+      ['exec', 'wrangler', ...args, '--local', '--persist-to', state],
+      {
+        cwd: api,
+        env: environment,
+        extendEnv: false,
+        stdin: 'ignore',
+        maxBuffer: 1024 * 1024,
+        stripFinalNewline: false,
+      },
+    )
+  ).stdout;
+const runTool = async (...args: string[]) =>
+  (
+    await execa(process.execPath, args, {
+      cwd: root,
       env: environment,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
-const runTool = (...args: string[]) =>
-  execFileSync(process.execPath, args, {
-    cwd: root,
-    env: environment,
-    encoding: 'utf8',
-  });
+      extendEnv: false,
+      stdin: 'ignore',
+      maxBuffer: 1024 * 1024,
+      stripFinalNewline: false,
+    })
+  ).stdout;
 const require = createRequire(new URL('../package.json', import.meta.url));
 const wranglerRequire = createRequire(require.resolve('wrangler'));
 const { build }: typeof import('esbuild') = await import(
@@ -84,8 +93,8 @@ try {
     'Registering current static build network policy in dedicated local D1',
   );
   for (const file of await migrationFiles(api))
-    wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
-  runTool(
+    await wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
+  await runTool(
     path.join(root, 'tools/extensions/registration.ts'),
     manifestPath,
     '--local',
@@ -104,7 +113,7 @@ try {
     "INSERT INTO app_metadata VALUES ('rollback-probe','must-disappear');\n" +
       sql,
   );
-  assert.throws(
+  await assert.rejects(
     () => wrangler('d1', 'execute', 'DB', '--file', conflictSql, '--yes'),
     /NOT NULL constraint failed/,
   );
@@ -304,7 +313,7 @@ try {
   // Close this independent workerd instance before the Wrangler D1 subprocesses.
   await mf.dispose();
   mf = undefined;
-  wrangler(
+  await wrangler(
     'd1',
     'execute',
     'DB',
@@ -344,7 +353,7 @@ try {
     }),
   );
   const synchronization: unknown = JSON.parse(
-    runTool(
+    await runTool(
       path.join(root, 'tools/extensions/network-policies.ts'),
       '--local',
       '--static-root',
@@ -357,7 +366,7 @@ try {
   assert.equal(synchronization.inheritedPolicies, 1);
   assert.equal(synchronization.newPackagesRemainUnapproved, 1);
   const policyResult: unknown = JSON.parse(
-    wrangler(
+    await wrangler(
       'd1',
       'execute',
       'DB',

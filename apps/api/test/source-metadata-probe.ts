@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execa } from 'execa';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
@@ -96,14 +96,16 @@ const { Miniflare, convertV4MiniflareOptions }: typeof import('miniflare') =
 const { generateKeyPair, exportJWK, SignJWT }: typeof import('jose') =
   await import(require.resolve('jose'));
 const wrangler = (...args: string[]) =>
-  execFileSync(
+  execa(
     'pnpm',
     ['exec', 'wrangler', ...args, '--local', '--persist-to', state],
     {
       cwd: api,
       env: environment,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      extendEnv: false,
+      stdin: 'ignore',
+      maxBuffer: 1024 * 1024,
+      stripFinalNewline: false,
     },
   );
 
@@ -111,9 +113,9 @@ console.log(
   'Registering current static build network policy in isolated local D1',
 );
 for (const file of await migrationFiles(api)) {
-  wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
+  await wrangler('d1', 'execute', 'DB', '--file', file, '--yes');
 }
-execFileSync(
+await execa(
   process.execPath,
   [
     path.join(root, 'tools/extensions/registration.ts'),
@@ -125,7 +127,15 @@ execFileSync(
     staticRoot,
     ...allowedHosts.flatMap((host) => ['--allow-host', host]),
   ],
-  { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] },
+  {
+    cwd: root,
+    env: environment,
+    extendEnv: false,
+    stdin: 'ignore',
+    stdout: 'inherit',
+    stderr: 'inherit',
+    buffer: false,
+  },
 );
 
 const keys = await generateKeyPair('RS256');
