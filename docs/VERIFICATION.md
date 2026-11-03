@@ -138,6 +138,14 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 `pnpm check`、`pnpm flutter:check` 与产品 Web/API dry-run 构建通过；Java 图片 oracle 对 seed 和正式 HttpSource 两套签名均通过。Web 终端有 encoded/pixel/resource 总预算、头部预检与实际 decode，但内部 Bitmap/ImageDecoder 仍有整图 Base64/readAllBytes 和未协调的总 raster 预算。不能据此声称图片解密/重排、动画/超长图、进程/GPU 合计峰值、Native 受管文件或 P0 已通过。
 
+## 内部 graphics 二进制与预算
+
+2026-11-03，Bitmap、两套 ImageDecoder 和字体输入已将整图正文改为不超过 64 KiB 的 JSO 字节块，小 JSON 只传控制与 handle。尺寸查询先用锁定的 image-dimensions 解析至多 1 MiB 头部，不为 bounds 完整解码。账本分别覆盖可见 payload、surface、decoder/Frame、字体、临时副本和不可中断任务的工作预留；Source 持有的 Bitmap/decoder/Frame 不因普通调用结束被扫描删除，取消与迟到结果保留相应所有权直到任务真正退出。
+
+新增流式 Java oracle 与原 DTO/HTTP/两套图片 oracle、16 个正式图形 Java 类 javac、113 项 runtime-host 测试及严格类型检查通过。Codex 内置浏览器 Chromium 156 的真实 Canvas 门通过；TeaVM 0.16.0 实际 Java→JSO→Canvas oracle 通过 131,079 字节分块往返、同步/异步 Java 异常、fiber bounds、Bitmap pixels/raw/PNG、region sample 别名与 Java Frame lease，显式释放后图形账本归零。独立 harness 初次遗漏正式构建器的 Android 重复类裁剪曾报 Stub，修正 harness 后复跑通过，未改扩展业务代码或原始 JAR。
+
+预算合同、范围和复验入口见 [图片资源内部图形桥](IMAGE-RESOURCES.md#source-内部图形桥)。这是图形桥和受控 codec 的分项证据，尚需新 host 输入的真实 AOT、处理/解密源、移动环境及实际进程/GPU 峰值。Cache/File 的 Base64、整条目复制和存储预算仍属于独立未完成阶段；图形账本不代表整个 Worker 的硬上限。
+
 ## F3 iOS 模拟器 HTTPS 机制
 
 [实测摘要](verification/runtime-evidence.md) 记录 iOS 26.4 Simulator / Xcode SDK 27.2 在本地受信 HTTPS 下的机制验证：256 KiB、4 MiB、16 MiB 二进制，Worker 处理生成的 PNG，以及 16 MiB 下载启动后立即取消。正文走 `Worker → transferable ArrayBuffer → Blob URL → WKWebView.startDownload → WKDownloadDelegate → 受管临时文件`，只用小型控制消息；独立原生摘要、PNG 尺寸、发送方脱离、文件/Blob 释放与最终空资源目录检查通过。
@@ -150,11 +158,13 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 完整合同、工具来源、期限/tombstone/配额和复验入口见 [Native 图片文件](NATIVE-IMAGE-FILES.md)。这证明产品容器与文件交接机制，尚非原版 Source→Native Reader、物理 iPhone、生产 Access、后台恢复或合计峰值验收。绑定与下载回调未确认停止时不会声称成功清理或归还预算。
 
+固定 `a15c030` 的独立工作树进一步完成 iOS 原 Source 文件门：真实 CatalogController/ChapterPageProvider 从 17 项目录进入 3 章/51 页，首、中、末页经原 Source、HTTP v2、WKDownload 和 Flutter 文件解码均为 1200×1691，字节与上游流摘要逐项一致。release 删除文件并撤销所有权；获取中章节关闭、持图容器重建、binding 目录删除和新 generation 重开通过。身份核对与范围见 [原版 Source 分项证据](NATIVE-IMAGE-FILES.md#原版-source-到-native-文件的分项验收)。它仍使用测试身份与模拟器，未证明 Native ReaderScreen 完整交互、生产 Access、真机或峰值。
+
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
 - v2 二进制网络/Okio 流控、真实上游取消、文件与 HTTP Cache 同版回归。
-- 原 Source→Native Reader、Android 实际 WebView 和后台恢复；内部 Bitmap/ImageDecoder 二进制化及总 raster 预算；更多真实处理/解密源覆盖。
+- Native ReaderScreen 交互、Android 实际 WebView 和后台恢复；新 graphics 材料的实际 AOT/处理源及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 书架/进度等持久化、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化。
 

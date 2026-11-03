@@ -62,29 +62,44 @@ public final class Bitmap {
   public static Bitmap createBitmap(Bitmap b, int x, int y, int w, int h) {
     b.region(x, y, w, h);
     Bitmap n = createBitmap(w, h, b.config);
-    n.density = b.density;
-    new Canvas(n).drawBitmap(b, new Rect(x, y, x + w, y + h), new Rect(0, 0, w, h), null);
-    return n;
+    try {
+      n.density = b.density;
+      new Canvas(n).drawBitmap(b, new Rect(x, y, x + w, y + h), new Rect(0, 0, w, h), null);
+      return n;
+    } catch (RuntimeException | Error error) {
+      n.recycle();
+      throw error;
+    }
   }
 
   public static Bitmap createScaledBitmap(Bitmap b, int w, int h, boolean filter) {
     b.check();
     if (w == b.width && h == b.height) return b;
     Bitmap n = createBitmap(w, h, b.config);
-    n.density = b.density;
-    Paint p = new Paint();
-    p.setFilterBitmap(filter);
-    new Canvas(n).drawBitmap(b, null, new Rect(0, 0, w, h), p);
-    return n;
+    try {
+      n.density = b.density;
+      Paint p = new Paint();
+      p.setFilterBitmap(filter);
+      new Canvas(n).drawBitmap(b, null, new Rect(0, 0, w, h), p);
+      return n;
+    } catch (RuntimeException | Error error) {
+      n.recycle();
+      throw error;
+    }
   }
 
   public Bitmap copy(Config c, boolean mutable) {
     check();
     Bitmap b = createBitmap(width, height, c);
-    new Canvas(b)
-        .drawBitmap(this, new Rect(0, 0, width, height), new Rect(0, 0, width, height), null);
-    b.density = density;
-    return mutable ? b : new Bitmap(b.id, b.width, b.height, c, false);
+    try {
+      new Canvas(b)
+          .drawBitmap(this, new Rect(0, 0, width, height), new Rect(0, 0, width, height), null);
+      b.density = density;
+      return mutable ? b : new Bitmap(b.id, b.width, b.height, c, false);
+    } catch (RuntimeException | Error error) {
+      b.recycle();
+      throw error;
+    }
   }
 
   void check() {
@@ -165,15 +180,23 @@ public final class Bitmap {
     region(x, y, w, h);
     checkArray(out.length, offset, stride, w, h);
     if (w == 0 || h == 0) return;
-    JsonObject a = Graphics.args();
-    a.addProperty("id", id);
-    a.add("rect", Graphics.numbers(x, y, w, h));
-    byte[] data = Base64.getDecoder().decode(Graphics.call("pixels", a).get("body").getAsString());
     for (int row = 0; row < h; row++)
-      for (int col = 0; col < w; col++) {
-        int p = (row * w + col) * 4;
-        out[offset + row * stride + col] =
-            Color.argb(data[p + 3] & 255, data[p] & 255, data[p + 1] & 255, data[p + 2] & 255);
+      for (int col = 0; col < w; col += Graphics.CHUNK / 4) {
+        int count = Math.min(Graphics.CHUNK / 4, w - col);
+        JsonObject result = Graphics.call("pixels", tile(x + col, y + row, count, false));
+        String handle = result.get("bytes").getAsString();
+        try {
+          byte[] data = Graphics.readBytes(handle);
+          if (data == null || data.length != count * 4)
+            throw new IllegalStateException("Invalid pixel block");
+          for (int pixel = 0; pixel < count; pixel++) {
+            int p = pixel * 4;
+            out[offset + row * stride + col + pixel] =
+                Color.argb(data[p + 3] & 255, data[p] & 255, data[p + 1] & 255, data[p + 2] & 255);
+          }
+        } finally {
+          Graphics.closeBytes(handle);
+        }
       }
   }
 
@@ -186,20 +209,37 @@ public final class Bitmap {
     if (!mutable) throw new IllegalStateException("Immutable bitmap");
     checkArray(data.length, offset, stride, w, h);
     if (w == 0 || h == 0) return;
-    byte[] bytes = new byte[w * h * 4];
     for (int row = 0; row < h; row++)
-      for (int col = 0; col < w; col++) {
-        int c = data[offset + row * stride + col], p = (row * w + col) * 4;
-        bytes[p] = (byte) Color.red(c);
-        bytes[p + 1] = (byte) Color.green(c);
-        bytes[p + 2] = (byte) Color.blue(c);
-        bytes[p + 3] = (byte) Color.alpha(c);
+      for (int col = 0; col < w; col += Graphics.CHUNK / 4) {
+        int count = Math.min(Graphics.CHUNK / 4, w - col);
+        byte[] bytes = new byte[count * 4];
+        for (int pixel = 0; pixel < count; pixel++) {
+          int c = data[offset + row * stride + col + pixel], p = pixel * 4;
+          bytes[p] = (byte) Color.red(c);
+          bytes[p + 1] = (byte) Color.green(c);
+          bytes[p + 2] = (byte) Color.blue(c);
+          bytes[p + 3] = (byte) Color.alpha(c);
+        }
+        putTile("putPixels", tile(x + col, y + row, count, false), bytes);
       }
+  }
+
+  private JsonObject tile(int x, int y, int width, boolean f16) {
     JsonObject a = Graphics.args();
     a.addProperty("id", id);
-    a.add("rect", Graphics.numbers(x, y, w, h));
-    a.addProperty("body", Base64.getEncoder().encodeToString(bytes));
-    Graphics.call("putPixels", a);
+    a.addProperty("f16", f16);
+    a.add("rect", Graphics.numbers(x, y, width, 1));
+    return a;
+  }
+
+  private void putTile(String operation, JsonObject args, byte[] bytes) {
+    String handle = Graphics.upload(bytes, 0, bytes.length, Graphics.CHUNK);
+    try {
+      args.addProperty("bytes", handle);
+      Graphics.call(operation, args);
+    } finally {
+      Graphics.closeBytes(handle);
+    }
   }
 
   private static void checkArray(int len, int offset, int stride, int w, int h) {
@@ -226,13 +266,15 @@ public final class Bitmap {
     ByteBuffer b = (ByteBuffer) buffer;
     if (b.remaining() < getByteCount())
       throw new RuntimeException("Buffer not large enough for pixels");
-    byte[] bytes = new byte[getByteCount()];
-    b.get(bytes);
-    JsonObject a = Graphics.args();
-    a.addProperty("id", id);
-    a.addProperty("f16", config == Config.RGBA_F16);
-    a.addProperty("body", Base64.getEncoder().encodeToString(bytes));
-    Graphics.call("putRaw", a);
+    boolean f16 = config == Config.RGBA_F16;
+    int pixelBytes = f16 ? 8 : 4, blockPixels = Graphics.CHUNK / pixelBytes;
+    for (int row = 0; row < height; row++)
+      for (int col = 0; col < width; col += blockPixels) {
+        int count = Math.min(blockPixels, width - col);
+        byte[] bytes = new byte[count * pixelBytes];
+        b.get(bytes);
+        putTile("putRaw", tile(col, row, count, f16), bytes);
+      }
   }
 
   public void copyPixelsToBuffer(Buffer buffer) {
@@ -242,10 +284,22 @@ public final class Bitmap {
     ByteBuffer b = (ByteBuffer) buffer;
     if (b.remaining() < getByteCount())
       throw new RuntimeException("Buffer not large enough for pixels");
-    JsonObject a = Graphics.args();
-    a.addProperty("id", id);
-    a.addProperty("f16", config == Config.RGBA_F16);
-    b.put(Base64.getDecoder().decode(Graphics.call("raw", a).get("body").getAsString()));
+    boolean f16 = config == Config.RGBA_F16;
+    int pixelBytes = f16 ? 8 : 4, blockPixels = Graphics.CHUNK / pixelBytes;
+    for (int row = 0; row < height; row++)
+      for (int col = 0; col < width; col += blockPixels) {
+        int count = Math.min(blockPixels, width - col);
+        JsonObject result = Graphics.call("raw", tile(col, row, count, f16));
+        String handle = result.get("bytes").getAsString();
+        try {
+          byte[] bytes = Graphics.readBytes(handle);
+          if (bytes == null || bytes.length != count * pixelBytes)
+            throw new IllegalStateException("Invalid raw block");
+          b.put(bytes);
+        } finally {
+          Graphics.closeBytes(handle);
+        }
+      }
   }
 
   public boolean compress(CompressFormat format, int quality, OutputStream stream) {
@@ -260,7 +314,7 @@ public final class Bitmap {
     JsonObject r = Graphics.async("encode", a);
     if (!r.get("ok").getAsBoolean()) return false;
     try {
-      stream.write(Base64.getDecoder().decode(r.get("body").getAsString()));
+      Graphics.copyOutput(r, stream);
       return true;
     } catch (IOException e) {
       return false;

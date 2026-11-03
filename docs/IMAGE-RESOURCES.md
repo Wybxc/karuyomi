@@ -72,4 +72,27 @@ Reader 在 widget、缩放 overlay 与解码缓存解除引用后释放资源。
 - 实际 Web：未修改 Source 的真实章首中末页，经产品通道解码、阅读器导航、尺寸更新及释放。
 - 后续设备门：原 Source→Native Reader、Android ArrayBuffer 实际插件链、物理 iPhone、后台恢复及合计进程/GPU 峰值。iOS 真实 Flutter Headless→受控 Blob→WKDownload 文件机制已单独通过，不代替这些门。
 
-现有 Bitmap / ImageDecoder 内部的整图 Base64、`readAllBytes()` 与合计 graphics 预算仍需独立改造。外层图片通道通过不能代替图片解密/重排 Source、超长图或移动端完整阅读验收。
+## Source 内部图形桥
+
+Bitmap / ImageDecoder 的图像正文改用 Worker 内部 byte handle，`teaGraphicsBytesOpen/Write/Read/Close/Detach` 仅接受每块最多 64 KiB 的 `Uint8Array`；Java 逐字节复制。绘图参数、handle 和长度仍走小 JSON，Java 控制请求限制 64 KiB UTF-8。解码、字体上传从 InputStream 有界读取，编码结果按块写入调用方 OutputStream，像素数组和 ByteBuffer 按行及 64 KiB 子块读写；这条图形链不再把整图塞入 Base64/Gson，也不再使用 `readAllBytes()`。
+
+`inJustDecodeBounds` 只读取最多前 1 MiB，使用固定 `image-dimensions` 解析头部，不调用 `createImageBitmap` 或创建 canvas。头部不足或格式不支持时，BitmapFactory 返回解码失败；完整解码先检查尺寸，再核对浏览器实际尺寸。现代 ImageDecoder、Float16 和字体 API 缺失须明确报能力不足，不能伪造 HDR、帧或字体成功。旧 region-decoder 仍以完整有界 Bitmap 为 backing，并非真正的分片解码。
+
+| 内部图形账本                                           | 当前上限 / 计量                                                                                  |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| 桥持有 payload 账本 / raster 预留                      | 256 MiB / 192 MiB                                                                                |
+| 单 surface / 单输入或编码输出                          | 16 Mi 像素 / 64 MiB                                                                              |
+| surface / decoder / font / byte handle / pending codec | 64 / 8 / 32 / 64 / 4                                                                             |
+| 字体输入 / 尺寸头 / JSO 暂存预留                       | 8 MiB / 1 MiB / 每操作 2 × 64 KiB                                                                |
+| surface                                                | 宽 × 高 × 4，Float16 为 × 8                                                                      |
+| decoder                                                | 保留输入及浏览器编码副本，并按宽 × 高 × 8 保留工作 raster；每次 decode 另预留一帧                |
+| Java Frame                                             | 传输期间同时计 JS 像素与 Java ByteBuffer；Detach 后保留 Java lease，Frame.close 后释放           |
+| 临时字节                                               | 合并上传、尺寸解析副本、Blob、编码副本、ImageData 和临时 canvas 均先预留；转换时允许两份同时计费 |
+
+预算属于每个 Source Worker，与外层 manager 的图片窗口预算分别计量。Bitmap、decoder、成功加载的字体和已交付的 Java Frame 属于 Source 持有对象；普通调用结束或取消不得扫描删除它们。Bitmap.recycle、decoder.close 和 Frame.close 才解除相应所有权；Android Typeface 没有 close，已加载字体保留到 Worker 回收，受数量和字节预算约束。
+
+取消只标记当前 requestId/generation。不可中断的浏览器 decode、encode 或 font.load 结束后才释放其预留、输入 pin 和临时对象，迟到结果不发布；编码期间显式 recycle 的 surface 延迟到工作完成后销毁。driver 仍等待 Java 回调退出再结束图形上下文和释放串行锁。Java 同步 JSO 和异步 fiber 错误均回传为 Java 异常，确保 finally 路径执行；预算、能力与取消错误在 driver 保留对应错误类别。
+
+此账本约束可见对象和明确工作预留，不等于浏览器进程、GPU、codec 内部或字体 glyph cache 的实际峰值硬上限，也无法限制 Source 自行持有的任意数组或调用方缓存。已有 JVM 流式检查、受控 codec 生命周期测试，以及 Codex 内置浏览器 Chromium 156 的真实 Canvas 二进制 RGBA/PNG、头部 bounds、取消与显式回收检查。同环境的 TeaVM 0.16.0 独立 Java→JSO→Canvas oracle 也通过 131,079 字节分块往返、同步/异步 Java 异常、fiber bounds、Bitmap pixels/raw/PNG、1px region sample 别名和 Java Frame lease 检查，显式释放后账本归零；这不代表真实进程峰值为零。harness 初次遗漏正式构建器的 Android 重复类裁剪，曾触发上游 Stub，校正独立 harness 后复跑通过，未修改 Source 或原始 JAR。新 host 的真实图片解密、重排 Source、超长图和移动设备合计峰值仍须分别验收。Cache/File 等其它内部桥的大正文问题属于后续阶段，不能据此宣称整个 runtime 已无 Base64/JSON 大正文。
+
+相关正式回归入口：`pnpm teavm:check`、`pnpm exec vitest run packages/runtime-host/test/graphics-bridge.test.ts packages/runtime-host/test/image-driver.test.ts`、`pnpm typecheck:bridges`；真实 Worker 测试入口为 `packages/runtime-host/test/bridge-browser-suite.ts` 的 graphics phase。独立 TeaVM harness 与详细日志留在忽略的 `.local/graphics-review/`，不作为构建或 CI 依赖。

@@ -347,13 +347,23 @@ public final class Bridge {
   @Async
   public static native String graphics(String request);
 
+  static RuntimeException graphicsFailure(String message, String code) {
+    if ("cancelled".equals(code)) return new java.util.concurrent.CancellationException(message);
+    if ("unsupported_capability".equals(code)) return new UnsupportedOperationException(message);
+    if ("limit_exceeded".equals(code)) return new IllegalStateException(message);
+    return new RuntimeException(message);
+  }
+
   private static void graphics(String request, AsyncCallback<String> callback) {
-    graphicsFetch(request, callback::complete, e -> callback.error(new RuntimeException(e)));
+    graphicsFetch(
+        request,
+        callback::complete,
+        (message, name, code) -> callback.error(graphicsFailure(message, code)));
   }
 
   @JSBody(
       params = {"request", "ok", "err"},
       script =
-          "self.teaGraphicsAsync(JSON.parse(request)).then(v=>ok(JSON.stringify(v)),e=>err(String(e)));")
-  static native void graphicsFetch(String request, Reply ok, Reply err);
+          "Promise.resolve().then(()=>self.teaGraphicsAsync(JSON.parse(request))).then(v=>ok(JSON.stringify(v)),e=>err(String(e.message || e),String(e.name || 'Error'),String(e.code || '')));")
+  static native void graphicsFetch(String request, Reply ok, HttpFailure err);
 }

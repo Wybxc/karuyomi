@@ -220,6 +220,9 @@ importers:
       get-stream:
         specifier: 9.0.1
         version: 9.0.1
+      image-dimensions:
+        specifier: 2.6.0
+        version: 2.6.0
       is-plain-obj:
         specifier: 4.1.0
         version: 4.1.0

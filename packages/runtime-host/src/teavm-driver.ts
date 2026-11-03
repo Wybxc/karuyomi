@@ -66,6 +66,15 @@ export interface TeaVMGlobals {
   teaImageWrite?: (handle: string, bytes: Uint8Array) => Promise<void>;
   teaImageClose?: (handle: string) => Promise<string>;
   teaImageCancel?: (handle: string) => void;
+  teaGraphicsBegin?: (context: HttpCallContext) => void;
+  teaGraphicsCancel?: (requestId: string, generation: string) => void;
+  teaGraphicsEnd?: (requestId: string, generation: string) => void;
+  teaGraphicsSync?: (request: unknown) => Record<string, unknown>;
+  teaGraphicsAsync?: (request: unknown) => Promise<Record<string, unknown>>;
+  teaGraphicsBytesOpen?: (maximum: number) => string;
+  teaGraphicsBytesWrite?: (handle: string, bytes: Uint8Array) => void;
+  teaGraphicsBytesRead?: (handle: string, maximum: number) => Uint8Array | null;
+  teaGraphicsBytesDetach?: (handle: string) => void;
   teaBrowser?: () => never;
   teaFileSystemClose?: () => Promise<void>;
   karuyomiResources?: Record<string, string>;
@@ -81,6 +90,7 @@ export class TeaVMDriver implements RuntimeDriver {
   private binaryTransport: BinaryHttpTransport | undefined;
   private imageSink: ImageSink | undefined;
   private imageFailure: RuntimeFailure | undefined;
+  private graphicsContext: HttpCallContext | undefined;
   private readonly fallbackGeneration = crypto.randomUUID();
 
   constructor(
@@ -213,12 +223,20 @@ export class TeaVMDriver implements RuntimeDriver {
           'Concurrent TeaVM entry is not allowed',
         ),
       );
-    this.binaryTransport?.begin(
-      context ?? {
-        requestId: crypto.randomUUID(),
-        generation: this.fallbackGeneration,
-      },
-    );
+    const owner = context ?? {
+      requestId: crypto.randomUUID(),
+      generation: this.fallbackGeneration,
+    };
+    this.binaryTransport?.begin(owner);
+    try {
+      this.scope.teaGraphicsBegin?.(owner);
+    } catch (error) {
+      this.binaryTransport?.end();
+      return Promise.reject(
+        this.graphicsFailure(error) ?? runtimeFailure(error),
+      );
+    }
+    this.graphicsContext = owner;
     return new Promise((resolve, reject) => {
       this.bridgeFailure = undefined;
       this.waiter = { resolve, reject };
@@ -228,7 +246,11 @@ export class TeaVMDriver implements RuntimeDriver {
         this.waiter = undefined;
         reject(runtimeFailure(error));
       }
-    }).finally(() => this.binaryTransport?.end());
+    }).finally(() => {
+      this.binaryTransport?.end();
+      this.scope.teaGraphicsEnd?.(owner.requestId, owner.generation);
+      this.graphicsContext = undefined;
+    });
   }
 
   async open(
@@ -268,6 +290,7 @@ export class TeaVMDriver implements RuntimeDriver {
     for (const artifact of manifest.hostScripts)
       execute(await this.loader.sharedArtifact(artifact, signal, true));
     execute(await this.loader.artifact(manifest.bundle, signal, true));
+    this.installGraphicsFailures();
     if (
       !this.scope.hostInit ||
       !this.scope.hostLoad ||
@@ -335,6 +358,7 @@ export class TeaVMDriver implements RuntimeDriver {
     const sink = new ImageSink(port, resourceId, (error) => {
       this.imageFailure ??= error;
       this.binaryTransport?.end();
+      this.cancelGraphics();
     });
     this.imageSink = sink;
     this.imageFailure = undefined;
@@ -365,6 +389,7 @@ export class TeaVMDriver implements RuntimeDriver {
   async close(): Promise<void> {
     this.closed = true;
     this.binaryTransport?.dispose();
+    this.cancelGraphics();
     this.imageSink?.abort(
       new RuntimeFailure('runtime_lost', 'Image runtime was closed'),
     );
@@ -379,5 +404,76 @@ export class TeaVMDriver implements RuntimeDriver {
       for (const url of this.objectUrls) URL.revokeObjectURL(url);
       this.objectUrls.clear();
     }
+  }
+
+  private cancelGraphics(): void {
+    const owner = this.graphicsContext;
+    if (owner)
+      this.scope.teaGraphicsCancel?.(owner.requestId, owner.generation);
+  }
+
+  private installGraphicsFailures(): void {
+    const record = (error: unknown) => {
+      const failure = this.graphicsFailure(error);
+      if (failure) this.recordBridgeFailure(failure);
+    };
+    const capture =
+      <Args extends unknown[], Result>(operation: (...args: Args) => Result) =>
+      (...args: Args): Result => {
+        try {
+          return operation(...args);
+        } catch (error) {
+          record(error);
+          throw error;
+        }
+      };
+    if (this.scope.teaGraphicsBytesOpen)
+      this.scope.teaGraphicsBytesOpen = capture(
+        this.scope.teaGraphicsBytesOpen,
+      );
+    if (this.scope.teaGraphicsBytesWrite)
+      this.scope.teaGraphicsBytesWrite = capture(
+        this.scope.teaGraphicsBytesWrite,
+      );
+    if (this.scope.teaGraphicsBytesRead)
+      this.scope.teaGraphicsBytesRead = capture(
+        this.scope.teaGraphicsBytesRead,
+      );
+    if (this.scope.teaGraphicsBytesDetach)
+      this.scope.teaGraphicsBytesDetach = capture(
+        this.scope.teaGraphicsBytesDetach,
+      );
+    const sync = this.scope.teaGraphicsSync,
+      async = this.scope.teaGraphicsAsync;
+    if (sync)
+      this.scope.teaGraphicsSync = (request) => {
+        try {
+          return sync(request);
+        } catch (error) {
+          record(error);
+          throw error;
+        }
+      };
+    if (async)
+      this.scope.teaGraphicsAsync = async (request) => {
+        try {
+          return await async(request);
+        } catch (error) {
+          record(error);
+          throw error;
+        }
+      };
+  }
+
+  private graphicsFailure(error: unknown): RuntimeFailure | undefined {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'limit_exceeded' ||
+        error.code === 'cancelled' ||
+        error.code === 'unsupported_capability')
+    )
+      return new RuntimeFailure(error.code, error.message);
+    return undefined;
   }
 }

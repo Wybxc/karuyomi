@@ -32,14 +32,19 @@ public final class ImageDecoder {
     Bitmap cropped =
         Bitmap.createBitmap(bitmap, region.left, region.top, region.width(), region.height());
     if (sample == 1) return cropped;
-    Bitmap scaled =
-        Bitmap.createScaledBitmap(
-            cropped,
-            Math.max(1, cropped.getWidth() / sample),
-            Math.max(1, cropped.getHeight() / sample),
-            true);
-    cropped.recycle();
-    return scaled;
+    try {
+      Bitmap scaled =
+          Bitmap.createScaledBitmap(
+              cropped,
+              Math.max(1, cropped.getWidth() / sample),
+              Math.max(1, cropped.getHeight() / sample),
+              true);
+      if (scaled != cropped) cropped.recycle();
+      return scaled;
+    } catch (RuntimeException | Error error) {
+      cropped.recycle();
+      throw error;
+    }
   }
 
   public static Bitmap decode$default(

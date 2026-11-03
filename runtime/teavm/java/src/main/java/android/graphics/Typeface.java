@@ -1,7 +1,6 @@
 package android.graphics;
 
 import java.io.*;
-import java.util.Base64;
 import prototype.Graphics;
 
 public class Typeface {
@@ -50,8 +49,13 @@ public class Typeface {
   public static Typeface createFromFile(File file) {
     try (InputStream in = new FileInputStream(file)) {
       var a = Graphics.args();
-      a.addProperty("body", Base64.getEncoder().encodeToString(in.readAllBytes()));
-      return new Typeface(Graphics.async("font", a).get("family").getAsString(), 0);
+      String handle = Graphics.upload(in, Graphics.FONT_LIMIT, false);
+      try {
+        a.addProperty("bytes", handle);
+        return new Typeface(Graphics.async("font", a).get("family").getAsString(), 0);
+      } finally {
+        Graphics.closeBytes(handle);
+      }
     } catch (IOException e) {
       throw new RuntimeException("Font asset not found: " + file, e);
     }

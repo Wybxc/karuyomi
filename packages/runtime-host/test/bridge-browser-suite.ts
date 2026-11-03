@@ -19,6 +19,14 @@ function installedBridges() {
     teaZstd,
     teaGraphicsSync,
     teaGraphicsAsync,
+    teaGraphicsBegin,
+    teaGraphicsCancel,
+    teaGraphicsEnd,
+    teaGraphicsBytesOpen,
+    teaGraphicsBytesWrite,
+    teaGraphicsBytesRead,
+    teaGraphicsBytesClose,
+    teaGraphicsSnapshot,
     teaCache,
     teaFile,
     teaFileSystemClose,
@@ -33,6 +41,17 @@ function installedBridges() {
     typeof teaGraphicsAsync === 'function',
     'Async graphics bridge installed',
   );
+  assert(
+    teaGraphicsBegin &&
+      teaGraphicsCancel &&
+      teaGraphicsEnd &&
+      teaGraphicsBytesOpen &&
+      teaGraphicsBytesWrite &&
+      teaGraphicsBytesRead &&
+      teaGraphicsBytesClose &&
+      teaGraphicsSnapshot,
+    'Binary graphics lifecycle installed',
+  );
   assert(typeof teaCache === 'function', 'Cache bridge installed');
   assert(typeof teaFile === 'function', 'File bridge installed');
   assert(
@@ -44,6 +63,14 @@ function installedBridges() {
     teaZstd,
     teaGraphicsSync,
     teaGraphicsAsync,
+    teaGraphicsBegin,
+    teaGraphicsCancel,
+    teaGraphicsEnd,
+    teaGraphicsBytesOpen,
+    teaGraphicsBytesWrite,
+    teaGraphicsBytesRead,
+    teaGraphicsBytesClose,
+    teaGraphicsSnapshot,
     teaCache,
     teaFile,
     teaFileSystemClose,
@@ -109,37 +136,120 @@ async function cryptoAndZstd(checks: string[]) {
 }
 
 async function graphics(checks: string[]) {
+  const identity = {
+    requestId: 'browser-graphics',
+    generation: 'browser-generation',
+  };
+  scope.teaGraphicsBegin(identity);
   const pixels = new Uint8Array([
     0, 255, 128, 255, 255, 0, 0, 255, 1, 2, 3, 255, 128, 128, 128, 255,
   ]);
+  const upload = (bytes: Uint8Array) => {
+    const handle = scope.teaGraphicsBytesOpen(Math.max(1, bytes.length));
+    for (let offset = 0; offset < bytes.length; offset += 65536)
+      scope.teaGraphicsBytesWrite(
+        handle,
+        bytes.subarray(offset, offset + 65536),
+      );
+    return handle;
+  };
+  const read = (handle: string) => {
+    const chunks: Uint8Array[] = [];
+    let length = 0,
+      chunk;
+    while ((chunk = scope.teaGraphicsBytesRead(handle, 65536)) !== null) {
+      chunks.push(chunk);
+      length += chunk.length;
+    }
+    const result = new Uint8Array(length);
+    let offset = 0;
+    for (const part of chunks) {
+      result.set(part, offset);
+      offset += part.length;
+    }
+    return result;
+  };
   const created = scope.teaGraphicsSync({ op: 'create', width: 2, height: 2 });
-  scope.teaGraphicsSync({
-    op: 'putPixels',
-    id: created.id,
-    body: encodeBase64(pixels),
-  });
+  const input = upload(pixels);
+  scope.teaGraphicsSync({ op: 'putPixels', id: created.id, bytes: input });
+  scope.teaGraphicsBytesClose(input);
+  const raw = scope.teaGraphicsSync({ op: 'pixels', id: created.id });
   assert(
-    scope.teaGraphicsSync({ op: 'pixels', id: created.id }).body ===
-      encodeBase64(pixels),
-    'Canvas RGBA bytes',
+    encodeBase64(read(text(raw.bytes))) === encodeBase64(pixels),
+    'Canvas binary RGBA bytes',
   );
+  scope.teaGraphicsBytesClose(text(raw.bytes));
   const png = await scope.teaGraphicsAsync({
     op: 'encode',
     id: created.id,
     format: 'PNG',
     quality: 100,
   });
-  assert(png.ok === true && png.mime === 'image/png', 'Canvas PNG encoding');
-  const decoded = await scope.teaGraphicsAsync({
+  assert(
+    png.ok === true && png.mime === 'image/png',
+    'Canvas binary PNG encoding',
+  );
+  const bounds = await scope.teaGraphicsAsync({
     op: 'decode',
-    body: png.body,
+    bytes: png.bytes,
+    bounds: true,
   });
   assert(
+    bounds.ok === true &&
+      bounds.originalWidth === 2 &&
+      bounds.originalHeight === 2,
+    'Header-only PNG bounds',
+  );
+  const decoded = await scope.teaGraphicsAsync({
+    op: 'decode',
+    bytes: png.bytes,
+  });
+  scope.teaGraphicsBytesClose(text(png.bytes));
+  assert(
     decoded.ok === true && decoded.width === 2 && decoded.height === 2,
-    'Canvas PNG decoding',
+    'Canvas binary PNG decoding',
+  );
+  const decodedPixels = scope.teaGraphicsSync({ op: 'pixels', id: decoded.id });
+  assert(
+    encodeBase64(read(text(decodedPixels.bytes))) === encodeBase64(pixels),
+    'PNG RGBA roundtrip',
+  );
+  scope.teaGraphicsBytesClose(text(decodedPixels.bytes));
+  scope.teaGraphicsEnd(identity.requestId, identity.generation);
+  assert(
+    scope.teaGraphicsSnapshot().surfaces === 2,
+    'Operation end preserves source-owned bitmaps',
+  );
+  const next = {
+    requestId: 'browser-graphics-next',
+    generation: identity.generation,
+  };
+  scope.teaGraphicsBegin(next);
+  const cancelled = scope.teaGraphicsAsync({
+    op: 'encode',
+    id: created.id,
+    format: 'PNG',
+    quality: 100,
+  });
+  scope.teaGraphicsCancel(next.requestId, next.generation);
+  let failed = false;
+  try {
+    await cancelled;
+  } catch {
+    failed = true;
+  }
+  assert(failed, 'Cancelled encoder discards late bytes');
+  scope.teaGraphicsEnd(next.requestId, next.generation);
+  assert(
+    scope.teaGraphicsSnapshot().surfaces === 2,
+    'Cancel preserves source-owned bitmaps',
   );
   scope.teaGraphicsSync({ op: 'recycle', id: created.id });
   scope.teaGraphicsSync({ op: 'recycle', id: decoded.id });
+  assert(
+    scope.teaGraphicsSnapshot().totalBytes === 0,
+    'Binary graphics budget returns to zero after explicit recycle',
+  );
   let recycled = false;
   try {
     scope.teaGraphicsSync({ op: 'pixels', id: created.id });
@@ -147,7 +257,7 @@ async function graphics(checks: string[]) {
     recycled = true;
   }
   assert(recycled, 'Recycled Canvas handle must fail');
-  checks.push('offscreen-canvas-rgba-png-recycle');
+  checks.push('offscreen-canvas-binary-rgba-png-bounds-cancel-recycle');
 }
 
 async function cacheWrite(checks: string[]) {
@@ -271,7 +381,9 @@ globalThis.onmessage = (event: MessageEvent<unknown>) => {
     const phase = text(object(event.data).phase),
       checks: string[] = [];
     try {
-      if (phase === 'write') {
+      if (phase === 'graphics') {
+        await graphics(checks);
+      } else if (phase === 'write') {
         await cryptoAndZstd(checks);
         await graphics(checks);
         await cacheWrite(checks);

@@ -49,9 +49,15 @@ export async function checkDto(root = ROOT): Promise<void> {
       'runtime/teavm/java/src/main/java/prototype/HttpBodySource.java',
       'runtime/teavm/java/src/main/java/prototype/HttpRequestSink.java',
       'tools/teavm/HttpBodyTest.java',
+      'runtime/teavm/java/src/main/java/prototype/GraphicsStreams.java',
+      'tools/teavm/GraphicsTest.java',
     ].map((file) => path.join(root, file)),
   ]);
-  for (const oracleClass of ['prototype.HostDtoTest', 'prototype.HttpBodyTest'])
+  for (const oracleClass of [
+    'prototype.HostDtoTest',
+    'prototype.HttpBodyTest',
+    'prototype.GraphicsTest',
+  ])
     await oracle('java', [
       '-cp',
       output + path.delimiter + classpath,

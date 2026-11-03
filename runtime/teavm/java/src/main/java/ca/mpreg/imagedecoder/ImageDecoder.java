@@ -4,7 +4,6 @@ import prototype.Graphics;
 import com.google.gson.*;
 import java.io.*;
 import java.nio.*;
-import java.util.Base64;
 
 public final class ImageDecoder implements Closeable {
   public static final Companion Companion = new Companion();
@@ -44,14 +43,14 @@ public final class ImageDecoder implements Closeable {
 
   public static final class Frame implements Closeable {
     private ByteBuffer image;
+    private String bytes;
     private final int width, height;
 
     Frame(JsonObject result) {
       width = result.get("width").getAsInt();
       height = result.get("height").getAsInt();
-      image =
-          ByteBuffer.wrap(Base64.getDecoder().decode(result.get("body").getAsString()))
-              .order(ByteOrder.LITTLE_ENDIAN);
+      bytes = result.get("bytes").getAsString();
+      image = Graphics.readFrame(result).order(ByteOrder.LITTLE_ENDIAN);
     }
 
     public int getWidth() {
@@ -68,6 +67,8 @@ public final class ImageDecoder implements Closeable {
     }
 
     public void close() {
+      if (bytes != null) Graphics.closeBytes(bytes);
+      bytes = null;
       image = null;
     }
   }
@@ -76,8 +77,13 @@ public final class ImageDecoder implements Closeable {
     public ImageDecoder open(InputStream in, boolean cropBorders) throws IOException {
       if (cropBorders) throw new UnsupportedOperationException("Automatic border detection");
       JsonObject a = Graphics.args();
-      a.addProperty("body", Base64.getEncoder().encodeToString(in.readAllBytes()));
-      return new ImageDecoder(Graphics.async("openDecoder", a));
+      String handle = Graphics.upload(in, Graphics.IMAGE_LIMIT, false);
+      try {
+        a.addProperty("bytes", handle);
+        return new ImageDecoder(Graphics.async("openDecoder", a));
+      } finally {
+        Graphics.closeBytes(handle);
+      }
     }
 
     public static ImageDecoder open$default(

@@ -30,6 +30,21 @@ public class BitmapFactory {
 
   public static Bitmap decodeByteArray(byte[] bytes, int offset, int length, Options opts) {
     Objects.checkFromIndexSize(offset, length, bytes.length);
+    boolean bounds = opts != null && opts.inJustDecodeBounds;
+    int maximum = bounds ? Graphics.HEADER_LIMIT : Graphics.IMAGE_LIMIT;
+    return decodeUploaded(
+        Graphics.upload(bytes, offset, bounds ? Math.min(length, maximum) : length, maximum), opts);
+  }
+
+  private static Bitmap decodeUploaded(String handle, Options opts) {
+    try {
+      return decodeHandle(handle, opts);
+    } finally {
+      Graphics.closeBytes(handle);
+    }
+  }
+
+  private static Bitmap decodeHandle(String handle, Options opts) {
     if (opts != null) {
       opts.outWidth = -1;
       opts.outHeight = -1;
@@ -46,9 +61,7 @@ public class BitmapFactory {
         throw new UnsupportedOperationException("Unpremultiplied bitmap storage");
     }
     JsonObject a = Graphics.args();
-    a.addProperty(
-        "body",
-        Base64.getEncoder().encodeToString(Arrays.copyOfRange(bytes, offset, offset + length)));
+    a.addProperty("bytes", handle);
     a.addProperty(
         "sample",
         opts == null ? 1 : Math.max(1, Integer.highestOneBit(Math.max(1, opts.inSampleSize))));
@@ -85,8 +98,9 @@ public class BitmapFactory {
   public static Bitmap decodeStream(InputStream in, Rect padding, Options opts) {
     if (in == null) return null;
     try {
-      byte[] data = in.readAllBytes();
-      return decodeByteArray(data, 0, data.length, opts);
+      boolean bounds = opts != null && opts.inJustDecodeBounds;
+      return decodeUploaded(
+          Graphics.upload(in, bounds ? Graphics.HEADER_LIMIT : Graphics.IMAGE_LIMIT, bounds), opts);
     } catch (IOException e) {
       return null;
     }

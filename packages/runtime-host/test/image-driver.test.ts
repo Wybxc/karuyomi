@@ -255,3 +255,61 @@ test.each([401, 403])(
     image.release();
   },
 );
+
+test('graphics cancellation marks the owner but keeps the Java entry locked until its callback', async () => {
+  const unwind = deferred<void>(),
+    cancelled = deferred<void>(),
+    events: string[] = [];
+  const { driver, build } = await setup((scope) => {
+    scope.teaGraphicsBegin = (owner) => events.push('begin:' + owner.requestId);
+    scope.teaGraphicsCancel = (request) => {
+      events.push('cancel:' + request);
+      cancelled.resolve();
+    };
+    scope.teaGraphicsEnd = (request) => events.push('end:' + request);
+    scope.hostAcquireImage = () => {
+      void unwind.promise.then(() => scope.teaFail!('cancelled graphics'));
+    };
+  });
+  await driver.open(build, 'test', new AbortController().signal);
+  const { image, channel } = collector();
+  const result = driver.acquireImage(
+    build.sourceIds[0]!,
+    'session',
+    'p-0',
+    channel.port2,
+    image.resourceId,
+    { requestId: 'image', generation: 'generation' },
+  );
+  const rejected = expect(result).rejects.toMatchObject({ code: 'cancelled' });
+  image.abort(new RuntimeFailure('cancelled', 'cancelled'));
+  await cancelled.promise;
+  expect(events).toContain('cancel:image');
+  expect(events).not.toContain('end:image');
+  await expect(
+    driver.invoke(metadata(build.sourceIds[0]!)),
+  ).rejects.toMatchObject({ code: 'protocol_error' });
+  unwind.resolve();
+  await rejected;
+  expect(events.at(-1)).toBe('end:image');
+  image.release();
+});
+
+test('graphics aggregate limit survives the Java string error callback', async () => {
+  const { driver, scope, build } = await setup((globals) => {
+    globals.teaGraphicsAsync = () =>
+      Promise.reject(
+        Object.assign(Error('raster budget'), { code: 'limit_exceeded' }),
+      );
+    globals.hostAcquireImage = () => {};
+  });
+  await driver.open(build, 'test', new AbortController().signal);
+  scope.hostInvoke = () => {
+    void scope.teaGraphicsAsync!({ op: 'decode' }).catch(() =>
+      scope.teaFail!('java.lang.RuntimeException: raster budget'),
+    );
+  };
+  await expect(
+    driver.invoke(metadata(build.sourceIds[0]!)),
+  ).rejects.toMatchObject({ code: 'limit_exceeded', message: 'raster budget' });
+});

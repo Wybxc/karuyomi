@@ -59,6 +59,7 @@
     "execa": "10.2.1",
     "fflate": "0.8.3",
     "get-stream": "9.0.1",
+    "image-dimensions": "2.6.0",
     "is-plain-obj": "4.1.0",
     "java-parser": "3.0.1",
     "jose": "6.2.15",
