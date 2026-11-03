@@ -182,3 +182,5 @@ adb -s emulator-5556 shell am start -n \
 等待已保存 UI 后再次真实重启的最终记录为同目录 `android-reader-force-stop-saved-report.json`（SHA-256 `fd246b91958a2595933a21789ca2402e380a4ce942ad9e1a9d56ecd5f0b17a69`）及 `android-reader-force-stop-saved.png`；`run-summary.json` 记录各轮 PID 与测试边界。测试 HTTP / TLS 服务均已正常关闭，模拟器和 App 数据保留。
 
 这是 Android 模拟器、隔离 localhost CA / RS256 测试身份中的正式 Catalog / ReaderScreen / 原 Source / Native 文件 / SQLite 路径。入口和输入为受控测试驱动，不代表生产 Access、正式主入口人工手势、物理设备、后台恢复或进程 / GPU 峰值内存通过。
+
+更新至 Cache v3 材料 `63a061…` 后的双端 Source / 真重启复验，以及实际发现的 Reader 帧调度缺陷、早期 iOS 黑截图与最终系统 / Flutter 并列核验，见 [Reader 帧调度与 Native 复验](reader-frame-native.md)。该记录使用独立固定输入和 App，不覆盖本页的旧材料、TLS 或 dispose 失败证据。
