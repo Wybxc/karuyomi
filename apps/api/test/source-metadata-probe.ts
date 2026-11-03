@@ -43,6 +43,12 @@ assert(
 );
 const manifestPath = path.resolve(manifestFile);
 const manifest = await parseManifest(await readFile(manifestPath));
+const selectedSourceId = process.env.SOURCE_PROBE_SOURCE_ID;
+assert(
+  selectedSourceId === undefined ||
+    manifest.sourceIds.includes(selectedSourceId),
+  'SOURCE_PROBE_SOURCE_ID must identify a Source in the manifest',
+);
 const artifactFolder = process.argv[3]
   ? path.resolve(process.argv[3])
   : path.join(path.dirname(manifestPath), 'artifacts');
@@ -173,6 +179,8 @@ interface NetworkEntry {
   bridgeStatus: number;
   upstreamStatus?: number;
   queryKeys: string[];
+  sourceHeaderNames?: string[];
+  cookieNames?: string[];
   catalogQuery?: Record<string, string>;
   bridgeError?: string;
   bodyBytes?: number;
@@ -290,7 +298,11 @@ button.onclick = async () => {
       expectedBuildId:${JSON.stringify(manifest.buildId)}, expectedBundleSha256:${JSON.stringify(manifest.bundle.sha256)}
     }},'session');
     await record('session',runtimeSessionSchema.parse(messageJson(pb.RuntimeSessionSchema,session)));
-    const sourceId=session.sources[0].id;
+    const selectedSourceId=${JSON.stringify(selectedSourceId ?? null)};
+    const selectedSource=selectedSourceId===null?session.sources[0]:session.sources.find(source=>source.id===selectedSourceId);
+    if(!selectedSource)throw Error('Selected Source is not present in the runtime session');
+    const sourceId=selectedSource.id;
+    await record('selectedSource',{sourceId,name:selectedSource.name,lang:selectedSource.lang});
     const call=async(operation,args)=>{
       const started=performance.now();
       try {
@@ -302,7 +314,11 @@ button.onclick = async () => {
         const summary={operation,ok:true,elapsedMs:Math.round(performance.now()-started),keys:Object.keys(plain(data)),...(args.page?{page:args.page}:{}),...(operation==='search'?{query:args.query}:{})};
         if(Array.isArray(data.mangas)){summary.count=data.mangas.length;summary.hasNextPage=data.hasNextPage;summary.firstTitle=data.mangas[0]?.title;}
         if(Array.isArray(data.chapters)){summary.count=data.chapters.length;summary.firstName=data.chapters[0]?.name;}
-        if(Array.isArray(data.pages)){summary.count=data.pages.length;summary.firstKeys=data.pages[0]?Object.keys(plain(data.pages[0])):[];}
+        if(Array.isArray(data.pages)){
+          summary.count=data.pages.length;summary.firstKeys=data.pages[0]?Object.keys(plain(data.pages[0])):[];
+          const urls=data.pages.map(page=>page.imageUrl).filter(value=>typeof value==='string'&&URL.canParse(value)).map(value=>new URL(value));
+          summary.processingReferences={drmPages:urls.filter(url=>url.hash.startsWith('#drm_data=')).length,tokenPages:urls.filter(url=>url.hash.includes('token')).length,scrambledReferences:urls.filter(url=>url.hash.startsWith('#1;')).length,imageHosts:[...new Set(urls.map(url=>url.hostname))]};
+        }
         if(operation==='details'){summary.title=data.title;summary.descriptionLength=data.description?.length??0;summary.genreCount=data.genres.length;}
         report.operations.push(summary);await record('operation',summary);return data;
       }catch(error){const summary={operation,ok:false,elapsedMs:Math.round(performance.now()-started),error:failure(error)};report.operations.push(summary);await record('operation',summary);return null;}
@@ -310,7 +326,7 @@ button.onclick = async () => {
     const popular=await call('popular',{page:1});
     if(popular?.hasNextPage)await call('popular',{page:2});
     const searched=await call('search',{page:1,query:popular?.mangas?.[0]?.title??'a'});
-    if(session.sources[0].supportsLatest!==false)await call('latest',{page:1});
+    if(selectedSource.supportsLatest!==false)await call('latest',{page:1});
     else await record('operationSkipped',{operation:'latest',reason:'source_unsupported'});
     const manga=popular?.mangas?.[0]??searched?.mangas?.[0];
     if(manga){
@@ -443,6 +459,16 @@ const server = createServer(async (request, response) => {
             elapsedMs: 0,
             bridgeStatus: 0,
             queryKeys: [...target.searchParams.keys()],
+            sourceHeaderNames: descriptor.headers.map(([name]) =>
+              name.toLowerCase(),
+            ),
+            cookieNames: descriptor.headers
+              .filter(([name]) => name.toLowerCase() === 'cookie')
+              .flatMap(([, value]) =>
+                value
+                  .split(';')
+                  .map((cookie) => cookie.trim().split('=')[0] ?? ''),
+              ),
           };
           if (target.pathname === '/api/catalog/projects')
             entry.catalogQuery = Object.fromEntries(target.searchParams);
