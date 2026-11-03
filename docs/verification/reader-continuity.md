@@ -9,3 +9,7 @@
 关闭失败不是已释放：保留失败 provider 所有权并阻止继续 prepare/take；未确认清理前不再占新会话。分页缩放/平移时保守地不宣称完整 observed/atEnd，避免把被裁剪的末页当成已显示；重置后重新报告视口。
 
 相关 34 项 Flutter 回归与 10 项核心调度回归通过，覆盖迟到 pages、挂载前退出、实际 frame 与驻留资源的区别、双页缩放裁剪、拒绝关闭 ACK 后不再新开会话，以及取消/释放未完成时 scheduler 不报告 idle。它们使用产品组件与受控 Provider，尚不代表实际 Source 连续切章、进度落盘、生产 Access 或真机验收。P0/P1 状态见[计划目录](../plan/README.md)。
+
+2026-11-04，第三里程碑已将本地 Drift 进度接入目录/详情/Reader，相关 reader/browse/widget 共 47 项回归通过，包含真实 SQLite 文件关闭重开恢复章节、方向及页内偏移。完成状态仅由实际末页观察后的明确操作推进，邻章准备仍不写进度。该文件恢复分项与上述真实 Source 连续切章/设备门分开，详见[进度记录](local-progress.md)。
+
+2026-11-04，真实 Flutter Web 与原版 Source 已通过连续切章、关标签页重开后的章节/当前页/最远页/顺序恢复，见[Web 产品进度记录](reader-progress-web.md)；浏览器进程退出与 Native 应用重启仍待验收。

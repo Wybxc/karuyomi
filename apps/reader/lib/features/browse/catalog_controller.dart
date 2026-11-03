@@ -8,6 +8,10 @@ import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../runtime/runtime_platform_types.dart';
+import '../../data/reader_database.dart';
+import '../../data/progress_repository.dart';
+import '../../data/reading_progress.dart';
+import '../reader/reading_progress_controller.dart';
 
 enum ServiceStatus {
   disconnected,
@@ -105,12 +109,138 @@ String _readingKey(Object value) =>
 /// The UI keeps original Source snapshots for explicit manga/chapter references.
 /// It never derives a source URL from an application route or a display label.
 final class CatalogController extends ChangeNotifier {
-  CatalogController({required this.api, required this.runtime}) {
+  CatalogController({
+    required this.api,
+    required this.runtime,
+    this.progressDatabase,
+    this.deploymentOrigin,
+  }) {
     _subscription = runtime.events.listen(_onRuntimeEvent);
   }
 
   final ApiFetch api;
   final SourceRuntime runtime;
+  final ReaderDatabase? progressDatabase;
+  final Uri? deploymentOrigin;
+  final _readingClients = <ReadingProgressController, int>{};
+  Future<bool>? _progressClosing;
+
+  ProgressRepository? get readingProgress {
+    final database = progressDatabase;
+    final origin = deploymentOrigin;
+    final verifiedSubject = subject;
+    if (database == null || origin == null || verifiedSubject == null) {
+      return null;
+    }
+    return ProgressRepository(
+      database,
+      ProgressIdentity(origin: origin, subject: verifiedSubject),
+    );
+  }
+
+  ReadingProgressController? createReadingProgress(String mangaKey) {
+    final repository = readingProgress;
+    if (repository == null || _progressClosing != null) return null;
+    for (final existing in _readingClients.keys) {
+      if (existing.mangaKey == mangaKey &&
+          existing.repository.identity.key == repository.identity.key) {
+        _readingClients[existing] = _readingClients[existing]! + 1;
+        return existing;
+      }
+    }
+    final client = ReadingProgressController(
+      repository: repository,
+      mangaKey: mangaKey,
+    );
+    _readingClients[client] = 1;
+    client.addListener(_notify);
+    return client;
+  }
+
+  Future<void> releaseReadingProgress(ReadingProgressController client) async {
+    final owners = _readingClients[client];
+    if (owners == null || owners == 0) return;
+    _readingClients[client] = owners - 1;
+    await client.flush();
+    _retireSavedProgress();
+    _notify();
+  }
+
+  MangaResume? readingDraftResume(String mangaKey) {
+    final identity = readingProgress?.identity.key;
+    for (final client in _readingClients.keys) {
+      if (client.unsaved &&
+          client.mangaKey == mangaKey &&
+          client.repository.identity.key == identity) {
+        return client.draftResume;
+      }
+    }
+    return null;
+  }
+
+  bool get hasUnsavedReadingProgress =>
+      _readingClients.keys.any((client) => client.unsaved);
+
+  /// Transfer only local database writers when a service container is replaced.
+  /// These retain their verified identity, not this Catalog or its runtime.
+  List<ReadingProgressController> takeUnsavedReadingProgress() {
+    final clients = _readingClients.keys
+        .where((client) => client.unsaved)
+        .toList();
+    for (final client in clients) {
+      _readingClients.remove(client);
+      client.removeListener(_notify);
+    }
+    return clients;
+  }
+
+  bool adoptReadingProgress(ReadingProgressController client) {
+    final sameIdentity =
+        client.repository.identity.key == readingProgress?.identity.key;
+    if (_progressClosing != null || !sameIdentity) return false;
+    if (!_readingClients.containsKey(client)) {
+      _readingClients[client] = 0;
+      client.addListener(_notify);
+    }
+    return true;
+  }
+
+  Future<bool> flushReadingProgress() async {
+    final results = await Future.wait(
+      _readingClients.keys.toList().map((client) => client.flush()),
+    );
+    _retireSavedProgress();
+    _notify();
+    return results.every((saved) => saved);
+  }
+
+  void _retireSavedProgress() {
+    if (_progressClosing != null) return;
+    for (final entry in _readingClients.entries.toList()) {
+      if (entry.value == 0 && !entry.key.unsaved) {
+        _readingClients.remove(entry.key);
+        entry.key.removeListener(_notify);
+        entry.key.dispose();
+      }
+    }
+  }
+
+  /// Shutdown is best effort. Normal route exits retain dirty controllers for
+  /// explicit retry, and cannot dispose their unsaved drafts as if persisted.
+  Future<bool> closeReadingProgress() =>
+      _progressClosing ??= _closeReadingProgress();
+
+  Future<bool> _closeReadingProgress() async {
+    final clients = _readingClients.keys.toList();
+    final results = await Future.wait(clients.map((client) => client.flush()));
+    for (final client in clients) {
+      client.removeListener(_notify);
+      client.dispose();
+    }
+    _readingClients.clear();
+    return results.every((saved) => saved);
+  }
+
   late final StreamSubscription<RuntimeEvent> _subscription;
   ServiceStatus status = ServiceStatus.disconnected;
   String? email;

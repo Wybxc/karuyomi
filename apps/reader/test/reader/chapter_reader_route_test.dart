@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show LazyDatabase, QueryExecutor;
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
@@ -11,6 +14,65 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import '../browse/fakes.dart';
 
 void main() {
+  testWidgets(
+    'exit during delayed progress restore closes unmounted provider and ignores late result',
+    (tester) async {
+      final executor = Completer<QueryExecutor>();
+      final database = ReaderDatabase(LazyDatabase(() => executor.future));
+      final platform = TestPlatform();
+      final catalog = CatalogController(
+        api: platform,
+        runtime: platform.runtime,
+        progressDatabase: database,
+        deploymentOrigin: platform.origin,
+      );
+      await catalog.connect();
+      await catalog.openBuild(catalog.builds.single);
+      await catalog.selectSource(catalog.session!.sources.single);
+      final manga = catalog.mangas.single;
+      final sequence = ChapterSequence(
+        packageName: 'source.test',
+        sourceId: sourceId,
+        mangaUrl: manga.url,
+        chapters: [wire.Chapter(url: '/one', name: '一')],
+      );
+      final opened = (await catalog.openChapter(
+        manga,
+        ChapterEntry(sequence.entries.first.snapshot),
+        reference: catalog.sourceReference,
+        logicalChapterKey: sequence.entries.first.key,
+      ))!;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChapterReaderRoute(
+            catalog: catalog,
+            manga: manga,
+            source: catalog.sourceReference,
+            sequence: sequence,
+            initialChapter: sequence.entries.first,
+            initialOpened: opened,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(ReaderScreen), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(platform.imageControls.map((entry) => entry.$1), [
+        'closePageSession',
+      ]);
+      executor.complete(NativeDatabase.memory());
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderScreen), findsNothing);
+      expect(catalog.hasUnsavedReadingProgress, false);
+      expect(tester.takeException(), isNull);
+      await catalog.closeReadingProgress();
+      catalog.dispose();
+      await platform.dispose();
+      await database.close();
+    },
+  );
+
   for (final (exitBeforeMount, usePreparation) in [
     (false, false),
     (true, false),

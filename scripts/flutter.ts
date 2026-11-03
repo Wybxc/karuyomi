@@ -2,6 +2,7 @@ import { execa, ExecaError } from 'execa';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { prepareDatabaseAssets } from '../tools/reader/database-assets.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const bin = process.platform === 'win32' ? 'flutter.bat' : 'flutter';
@@ -96,6 +97,7 @@ async function main(): Promise<void> {
       break;
     }
     case 'build':
+      await prepareDatabaseAssets();
       await run(
         flutter,
         ['build', 'web', '--release', '--no-web-resources-cdn'],
@@ -103,6 +105,7 @@ async function main(): Promise<void> {
       );
       break;
     case 'run':
+      await prepareDatabaseAssets();
       await run(flutter, ['run', '-d', 'chrome', ...process.argv.slice(3)], {
         cwd: path.join(root, 'apps/reader'),
         stdin: 'inherit',

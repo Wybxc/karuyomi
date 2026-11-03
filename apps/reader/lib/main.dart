@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'data/reader_database.dart';
+import 'features/reader/reading_progress_controller.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
 import 'runtime/platform_runtime.dart';
@@ -9,8 +11,15 @@ import 'runtime/platform_runtime.dart';
 void main() => runApp(const KaruyomiApp());
 
 class KaruyomiApp extends StatefulWidget {
-  const KaruyomiApp({super.key, this.platform});
+  const KaruyomiApp({
+    super.key,
+    this.platform,
+    this.database,
+    this.platformFactory,
+  });
   final PlatformRuntime? platform;
+  final ReaderDatabase? database;
+  final PlatformRuntime Function(Uri? origin)? platformFactory;
 
   @override
   State<KaruyomiApp> createState() => _KaruyomiAppState();
@@ -42,6 +51,8 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
       themeMode: _themeMode,
       onThemeChanged: (value) => setState(() => _themeMode = value),
       platform: widget.platform,
+      database: widget.database,
+      platformFactory: widget.platformFactory,
     ),
   );
 }
@@ -52,11 +63,15 @@ class AppShell extends StatefulWidget {
     required this.themeMode,
     required this.onThemeChanged,
     this.platform,
+    this.database,
+    this.platformFactory,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeChanged;
   final PlatformRuntime? platform;
+  final ReaderDatabase? database;
+  final PlatformRuntime Function(Uri? origin)? platformFactory;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -68,6 +83,10 @@ class _AppShellState extends State<AppShell> {
   CatalogController? _catalog;
   String? _configurationError;
   Map<String, Object?>? _pendingContinuation;
+  ReaderDatabase? _database;
+  final _retiredProgress = <ReadingProgressController>{};
+  bool _retryingProgress = false;
+  bool _changingService = false;
   final _originField = TextEditingController(
     text: const String.fromEnvironment('APP_ORIGIN'),
   );
@@ -91,13 +110,17 @@ class _AppShellState extends State<AppShell> {
       final configured = _originField.text.trim();
       _platform =
           injected ??
-          createPlatformRuntime(
-            origin: configured.isEmpty ? null : Uri.parse(configured),
+          (widget.platformFactory ??
+              ((origin) => createPlatformRuntime(origin: origin)))(
+            configured.isEmpty ? null : Uri.parse(configured),
           );
       _originField.text = _platform!.origin.toString();
       _catalog = CatalogController(
         api: _platform!,
         runtime: _platform!.runtime,
+        progressDatabase: _database ??=
+            widget.database ?? ReaderDatabase.open(),
+        deploymentOrigin: _platform!.origin,
       );
       _configurationError = null;
       final continuation = _platform!.takePendingAuthentication();
@@ -124,6 +147,15 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     await controller.connect();
+    if (mounted &&
+        identical(controller, _catalog) &&
+        controller.status == ServiceStatus.ready) {
+      for (final client in _retiredProgress.toList()) {
+        if (!controller.adoptReadingProgress(client)) continue;
+        _retiredProgress.remove(client);
+      }
+      setState(() {});
+    }
     if (!mounted ||
         !identical(controller, _catalog) ||
         controller.status != ServiceStatus.ready ||
@@ -182,18 +214,41 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _changeService() async {
-    if (kIsWeb && _platform != null) {
-      await _platform!.rebuild();
-      if (mounted) await _connect();
-      return;
+    if (_changingService) return;
+    setState(() => _changingService = true);
+    try {
+      if (kIsWeb && _platform != null) {
+        await _platform!.rebuild();
+        if (mounted) await _connect();
+        return;
+      }
+      final old = _platform;
+      final oldCatalog = _catalog;
+      if (oldCatalog != null) {
+        await oldCatalog.flushReadingProgress();
+        _retiredProgress.addAll(oldCatalog.takeUnsavedReadingProgress());
+        oldCatalog.dispose();
+        await oldCatalog.closeReadingProgress();
+      }
+      _catalog = null;
+      _platform = null;
+      if (old != null) await old.dispose();
+      if (!mounted) return;
+      setState(_configure);
+    } finally {
+      if (mounted) setState(() => _changingService = false);
     }
-    final old = _platform;
-    _catalog?.dispose();
-    _catalog = null;
-    _platform = null;
-    if (old != null) await old.dispose();
-    if (!mounted) return;
-    setState(_configure);
+  }
+
+  Future<void> _retryProgress() async {
+    if (_retryingProgress) return;
+    setState(() => _retryingProgress = true);
+    await _catalog?.flushReadingProgress();
+    for (final client in _retiredProgress.toList()) {
+      if (!await client.flush()) continue;
+      if (_retiredProgress.remove(client)) client.dispose();
+    }
+    if (mounted) setState(() => _retryingProgress = false);
   }
 
   Widget _page() => switch (_index) {
@@ -272,13 +327,24 @@ class _AppShellState extends State<AppShell> {
         if (_configurationError != null) Text(_configurationError!),
         if (controller?.email != null) Text('账号：${controller!.email}'),
         if (controller?.error != null) Text(controller!.error!),
+        if (_retiredProgress.isNotEmpty ||
+            controller?.hasUnsavedReadingProgress == true) ...[
+          const SizedBox(height: 12),
+          const Text('部分阅读进度尚未保存；原服务和身份的记录仍保留，可继续连接服务。'),
+          TextButton(
+            onPressed: _retryingProgress ? null : _retryProgress,
+            child: const Text('重试保存所有进度'),
+          ),
+        ],
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
           runSpacing: 8,
           children: [
             OutlinedButton.icon(
-              onPressed: controller?.busy == true ? null : _changeService,
+              onPressed: controller?.busy == true || _changingService
+                  ? null
+                  : _changeService,
               icon: const Icon(Icons.link),
               label: const Text('连接服务'),
             ),
@@ -348,8 +414,21 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
-    _catalog?.dispose();
-    unawaited(_platform?.dispose());
+    final catalog = _catalog;
+    final platform = _platform;
+    final database = _database;
+    final ownsDatabase = widget.database == null;
+    final retired = _retiredProgress.toList();
+    catalog?.dispose();
+    unawaited(() async {
+      await catalog?.closeReadingProgress();
+      for (final client in retired) {
+        await client.flush();
+        client.dispose();
+      }
+      await platform?.dispose();
+      if (ownsDatabase) await database?.close();
+    }());
     _originField.dispose();
     super.dispose();
   }

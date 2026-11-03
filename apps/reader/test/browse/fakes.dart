@@ -16,8 +16,13 @@ wire.Manga get testManga => wire.Manga(
 );
 
 final class TestPlatform extends PlatformRuntime {
+  TestPlatform({Uri? origin, this.bootstrapSubject = 'owner-subject'})
+    : _origin = origin ?? Uri.parse('https://reader.example.com');
+  final Uri _origin;
+  final String bootstrapSubject;
+  int disposalCount = 0;
   @override
-  Uri get origin => Uri.parse('https://reader.example.com');
+  Uri get origin => _origin;
 
   int bootstrapStatus = 200;
   bool loginHtml = false;
@@ -49,7 +54,7 @@ final class TestPlatform extends PlatformRuntime {
         wire.Bootstrap(
           protocolVersion: protocolVersion,
           identity: wire.Identity(
-            subject: 'owner-subject',
+            subject: bootstrapSubject,
             email: 'owner@example.com',
           ),
           expiresAt: 2000000000,
@@ -207,5 +212,8 @@ final class TestPlatform extends PlatformRuntime {
   Future<void> rebuild() async =>
       runtime.containerLost('Rebuilt test container');
   @override
-  Future<void> dispose() => runtime.dispose();
+  Future<void> dispose() {
+    disposalCount++;
+    return runtime.dispose();
+  }
 }

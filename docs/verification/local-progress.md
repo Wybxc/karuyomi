@@ -14,4 +14,16 @@
 
 `cd apps/reader && flutter test test/data` 的 12 项回归通过；相关静态分析通过。实际 SQLite 文件经关闭重开仍保持当前页、最远页、offset、epoch 与漫画 resume，文件头确认为 SQLite format 3。另覆盖 origin/subject/漫画/重复章隔离、并发观察合并、reset 后旧写拒绝，以及真实 SQL trigger 失败时进度和 resume 整体回滚。
 
-生成与完整检查入口见 [TOOLING](../TOOLING.md#drift-生成模型)。此时底座尚未接入产品路由，Web 静态数据库资源与真实浏览器持久化、Native 应用重启恢复仍待验收；文件数据库单测不能替代这些门。P1 全部范围见[计划](../plan/p1-library-and-progress.md)。
+生成与完整检查入口见 [TOOLING](../TOOLING.md#drift-生成模型)。上述为底座阶段，后续产品接线证据如下；文件数据库测试不能替代浏览器或原生应用重启门。P1 全部范围见[计划](../plan/p1-library-and-progress.md)。
+
+## 产品接线与文件重启
+
+2026-11-04，正式 `KaruyomiApp` 从平台 origin 与成功 bootstrap 的 subject 构造 repository，未确认身份时不创建进度会话。目录→详情→章节使用同一个生产路由；详情提供继续阅读，Reader 保存当前导航锚与实际观察锚，末页显示后通过明确的完成或下一章操作标记读完。重新阅读在 SQL 事务提升 epoch，并通过位置命令回首页，不关闭后复用旧图片 provider。
+
+600 ms debounce 与 2 秒最长等待控制写入；切章、返回与进入后台触发提交。普通数据库读写异常不会移除阅读器：失败的精确草稿仍有 Catalog owner，可重试或在同一身份重新进入时继续使用。切换服务不因存储失败被阻止；应用只接管旧身份的数据库 writer，释放旧运行容器，设置提供全局重试。回到同一受信身份会接管原 writer，避免两个写者迟到覆盖。只有 Drift 报告 persistent 且写入完成时显示本地已保存；memoryOnly 明示关闭后不保留，unsafePersistence 明示不安全多窗口，均不冒称持久保存。
+
+执行 `cd apps/reader && flutter test test/reader test/browse test/widget_test.dart`，47 项通过；`dart analyze lib test` 无问题。其中新增产品回归通过正常目录/详情/Reader，使用受控 ProtoJSON Source DTO 与真实 SQLite 文件：显式下一章完成前章，在次章记录 pageKey/normalizedOffset/方向，移除产品组件、关闭数据库，再打开同一文件并经详情继续阅读，恢复原章与锚。另覆盖首个 current 即使无图片也可保存、观察最远位置不因回看退后、SQL trigger 真实回滚后重试、旧 epoch 拒绝、数据库延迟打开时退出、reset 不重开页面会话，以及存储持续失败时切换服务成功、旧运行时释放、旧身份独立重试与同身份 writer 接管。
+
+导航测试直接注入视口回调以隔离进度协调；实际 image frame/缩放/route 覆盖的观察门由已有 ReaderScreen 回归覆盖。此处不是在线 Source 或真实设备测试。Web 官方 WASM/worker 构建见[资源记录](reader-database-assets.md)，Native 打包见[依赖记录](native-dependencies.md)；浏览器关闭重开、Native 应用重启和真实 Source 连续阅读仍须分别验收。
+
+2026-11-04，真实 Flutter Web 与原版 Source 已通过连续切章、关标签页重开后的章节/当前页/最远页/顺序恢复，见[Web 产品进度记录](reader-progress-web.md)；浏览器进程退出与 Native 应用重启仍待验收。

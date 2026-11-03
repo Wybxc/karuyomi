@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
@@ -46,6 +47,7 @@ class ReaderScreen extends StatefulWidget {
     this.chapterControls,
     this.onAttached,
     this.onViewportChanged,
+    this.positionRequest,
   });
 
   final ChapterManifest manifest;
@@ -67,6 +69,10 @@ class ReaderScreen extends StatefulWidget {
   final Widget? chapterControls;
   final VoidCallback? onAttached;
   final ValueChanged<ReaderViewportState>? onViewportChanged;
+
+  /// Explicit navigation such as a persisted reading-epoch reset. It changes
+  /// the logical viewport without replacing or reusing a closed provider.
+  final ValueListenable<ReadingPosition?>? positionRequest;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -114,6 +120,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _attachScheduler();
     _scroll.addListener(_onScroll);
     _transform.addListener(_onTransform);
+    widget.positionRequest?.addListener(_applyPositionRequest);
+  }
+
+  void _applyPositionRequest() {
+    final requested = widget.positionRequest?.value;
+    if (requested == null) return;
+    if (requested.chapterKey != _reader.manifest.chapterKey) return;
+    final resolved = resolvePosition(_reader.manifest, requested).position;
+    if (resolved == null) return;
+    _restoring = true;
+    _transform.value = Matrix4.identity();
+    _reader.goToPage(resolved.pageIndexHint, offset: resolved.normalizedOffset);
+    _scheduleRestore();
   }
 
   void _attachScheduler() {
@@ -246,6 +265,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.positionRequest != widget.positionRequest) {
+      oldWidget.positionRequest?.removeListener(_applyPositionRequest);
+      widget.positionRequest?.addListener(_applyPositionRequest);
+    }
     if (oldWidget.provider != widget.provider) {
       unawaited(_imagesSubscription?.cancel());
       final oldScheduler = _scheduler;
@@ -726,6 +749,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   void dispose() {
+    widget.positionRequest?.removeListener(_applyPositionRequest);
     final position = _reader.position;
     if (position != null) widget.onPositionChanged?.call(position);
     unawaited(_readerSubscription?.cancel());

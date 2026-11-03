@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../data/reading_progress.dart';
 import 'catalog_controller.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
@@ -127,6 +130,16 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                 ],
               ),
+              if (controller.hasUnsavedReadingProgress) ...[
+                const _Notice(
+                  text: '部分阅读进度尚未保存，当前会话仍保留记录。',
+                  icon: Icons.warning_amber,
+                ),
+                TextButton(
+                  onPressed: () => unawaited(controller.flushReadingProgress()),
+                  child: const Text('重试保存进度'),
+                ),
+              ],
               if (controller.builds.isEmpty)
                 const _Notice(
                   text: '尚未安装漫画源。安装后重新连接即可浏览。',
@@ -253,7 +266,7 @@ class _CatalogPageState extends State<CatalogPage> {
   }
 }
 
-class MangaDetailsPage extends StatelessWidget {
+class MangaDetailsPage extends StatefulWidget {
   const MangaDetailsPage({
     super.key,
     required this.controller,
@@ -266,16 +279,71 @@ class MangaDetailsPage extends StatelessWidget {
   final List<ChapterEntry> chapters;
   final CatalogSourceRef source;
 
-  Future<void> _openChapter(BuildContext context, int index) async {
-    final route = ModalRoute.of(context);
+  @override
+  State<MangaDetailsPage> createState() => _MangaDetailsPageState();
+}
+
+class _MangaDetailsPageState extends State<MangaDetailsPage> {
+  CatalogController get controller => widget.controller;
+  MangaEntry get manga => widget.manga;
+  List<ChapterEntry> get chapters => widget.chapters;
+  CatalogSourceRef get source => widget.source;
+  ChapterSequence? _sequence;
+  MangaResume? _resume;
+  String? _resumeError;
+  bool _opening = false;
+
+  @override
+  void initState() {
+    super.initState();
     final build = controller.activeBuild;
-    if (build == null) return;
-    final sequence = ChapterSequence(
-      packageName: build.packageName,
-      sourceId: source.sourceId,
-      mangaUrl: manga.url,
-      chapters: chapters.map((chapter) => chapter.snapshot),
-    );
+    if (build != null) {
+      _sequence = ChapterSequence(
+        packageName: build.packageName,
+        sourceId: source.sourceId,
+        mangaUrl: manga.url,
+        chapters: chapters.map((chapter) => chapter.snapshot),
+      );
+      unawaited(_refreshResume());
+    }
+  }
+
+  Future<void> _refreshResume() async {
+    final sequence = _sequence;
+    final repository = controller.readingProgress;
+    if (sequence == null || repository == null) return;
+    MangaResume? resume;
+    String? error;
+    try {
+      resume =
+          controller.readingDraftResume(sequence.mangaKey) ??
+          await repository.loadResume(sequence.mangaKey);
+      if (resume != null &&
+          !sequence.entries.any((entry) => entry.key == resume!.chapterKey)) {
+        error = '章节清单已变化，无法确定上次章节；请从列表选择。';
+        resume = null;
+      }
+    } catch (_) {
+      error = '未能读取本地阅读位置，仍可从章节列表打开。';
+    }
+    if (!mounted) return;
+    setState(() {
+      _resume = resume;
+      _resumeError = error;
+    });
+  }
+
+  Future<void> _retryProgress() async {
+    await controller.flushReadingProgress();
+    await _refreshResume();
+  }
+
+  Future<void> _openChapter(BuildContext context, int index) async {
+    if (_opening) return;
+    final route = ModalRoute.of(context);
+    final sequence = _sequence;
+    if (sequence == null) return;
+    setState(() => _opening = true);
     final selected = sequence.entries[index];
     final opened = await controller.openChapter(
       manga,
@@ -283,29 +351,38 @@ class MangaDetailsPage extends StatelessWidget {
       reference: source,
       logicalChapterKey: selected.key,
     );
-    if (opened == null) return;
+    if (opened == null) {
+      if (mounted) setState(() => _opening = false);
+      return;
+    }
     if (!context.mounted ||
         route?.isCurrent != true ||
         route?.isActive != true) {
       await controller.closeChapter(opened);
+      if (mounted) setState(() => _opening = false);
       return;
     }
     try {
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => ChapterReaderRoute(
-            catalog: controller,
-            manga: manga,
-            source: source,
-            sequence: sequence,
-            initialChapter: selected,
-            initialOpened: opened,
-          ),
+      final readerRoute = MaterialPageRoute<void>(
+        builder: (_) => ChapterReaderRoute(
+          catalog: controller,
+          manga: manga,
+          source: source,
+          sequence: sequence,
+          initialChapter: selected,
+          initialOpened: opened,
         ),
       );
-    } catch (_) {
+      await Navigator.of(context).push<void>(readerRoute);
+      await readerRoute.completed;
+      await controller.flushReadingProgress();
+    } finally {
+      // Also covers a route popped before its first Reader leaf mounted.
       await controller.closeChapter(opened);
-      rethrow;
+      if (mounted) {
+        setState(() => _opening = false);
+        await _refreshResume();
+      }
     }
   }
 
@@ -352,6 +429,34 @@ class MangaDetailsPage extends StatelessWidget {
                       SelectableText(manga.description!),
                     ],
                     const SizedBox(height: 32),
+                    if (_resume case final resume?)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('继续阅读'),
+                          onPressed: _opening || controller.busy
+                              ? null
+                              : () => _openChapter(
+                                  context,
+                                  _sequence!.entries.indexWhere(
+                                    (entry) => entry.key == resume.chapterKey,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    if (_resumeError != null)
+                      _Notice(text: _resumeError!, icon: Icons.info_outline),
+                    if (controller.hasUnsavedReadingProgress) ...[
+                      const _Notice(
+                        text: '部分阅读进度尚未保存，当前会话仍保留记录。',
+                        icon: Icons.warning_amber,
+                      ),
+                      TextButton(
+                        onPressed: () => unawaited(_retryProgress()),
+                        child: const Text('重试保存进度'),
+                      ),
+                    ],
                     Text(
                       '章节（${chapters.length}）',
                       style: Theme.of(context).textTheme.titleLarge,
@@ -370,7 +475,7 @@ class MangaDetailsPage extends StatelessWidget {
                       ),
                     for (var index = 0; index < chapters.length; index++)
                       ListTile(
-                        enabled: !controller.busy,
+                        enabled: !controller.busy && !_opening,
                         leading: const Icon(Icons.article_outlined),
                         title: Text(chapters[index].name),
                         onTap: () => _openChapter(context, index),
