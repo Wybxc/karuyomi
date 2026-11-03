@@ -1,1 +1,3 @@
-package java.security.spec;public interface KeySpec{}
+package java.security.spec;
+
+public interface KeySpec {}

@@ -1,1 +1,19 @@
-package java.util;public class StringJoiner{private final String d;private String s="";public StringJoiner(CharSequence d){this.d=d.toString();}public StringJoiner add(CharSequence v){s+=(s.isEmpty()?"":d)+v;return this;}public String toString(){return s;}}
+package java.util;
+
+public class StringJoiner {
+  private final String d;
+  private String s = "";
+
+  public StringJoiner(CharSequence d) {
+    this.d = d.toString();
+  }
+
+  public StringJoiner add(CharSequence v) {
+    s += (s.isEmpty() ? "" : d) + v;
+    return this;
+  }
+
+  public String toString() {
+    return s;
+  }
+}

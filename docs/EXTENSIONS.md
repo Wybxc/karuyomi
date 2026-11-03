@@ -23,6 +23,8 @@ python3 tools/extensions/pipeline.py bootstrap \
 
 `bootstrap` 默认覆盖所有未尝试输入，限并发 1，最高可设 4；可用 `--limit N` 分批。每个包发布或失败后立刻原子保存 checkpoint，重复运行跳过已发布和未变更的确定失败。`--retry-failed` 明确重试原失败；GitHub 传输失败会在后续同身份运行中自动重试，累计最多三次，不会在当前批次立即循环。构建日志留在 plan 所在目录的 `builds/<inputFingerprint>/`，包含 `build.log` 与 `logs/upstream.log`、`logs/aot.log`，索引只保留有用的阶段/错误信息。state 使用文件锁防止两个进程并写。中断后保留 state 和输出，再执行同一命令即可继续；已上传的 matching draft 继续补齐，已发布身份不会覆盖。
 
+本地 `bootstrap` 在每包状态确认为 `published` 且 checkpoint 原子保存之后，只清理该包精确 buildId 对应的 `runtime/teavm/.local/extension-work/<buildId>`、`extension-cache/<buildId>` 和 `gradle-launcher/<buildId>`，避免全量构建累积工作副本。交付目录、state、构建日志和失败包诊断保留；共享 `build-cache/m2` 与 Gradle 缓存不清理。清理使用目录文件描述符且不跟随符号链接，包缓存中的 `m2` 链接只被移除，其共享目标保留。保存 checkpoint 失败时不清理；清理遇到异常只发出本地提示，已发布状态不改为失败，也不会因此重新发布。CI 的 build / publish-plan 不执行此清理。
+
 长时间本地运行可在准备好凭据后交给后台，并保留统一日志：
 
 ```sh
@@ -33,6 +35,8 @@ nohup python3 -u tools/extensions/pipeline.py bootstrap \
   > .local/extensions/bootstrap.log 2>&1 &
 tail -f .local/extensions/bootstrap.log
 ```
+
+长批次也可在独立 clone 中运行：固定已审查提交及对应 submodule，准备好该 clone 的工具链后启动后台任务，避免主工作目录的后续开发改变构建输入。`--state` 和 `--output` 可以使用主工作目录中的绝对路径，以便统一监测和恢复；同一 checkpoint 仍只能由一个进程持有。自动清理只处理执行该 pipeline 的 clone 下的临时工作目录，不触碰绝对路径指定的交付与日志。
 
 全部发现包都有 `published` 或明确 `failed` 终态后，再执行一次带 `--finalize` 的 bootstrap：
 

@@ -98,7 +98,8 @@
       <artifactId>lib7</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/libs/injekt-core-4135455a2a.jar</systemPath>
+      <systemPath
+      >${project.basedir}/libs/injekt-core-4135455a2a.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>local</groupId>
@@ -119,35 +120,40 @@
       <artifactId>lib10</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/libs/kotlinx-coroutines-core-jvm-1.11.0.jar</systemPath>
+      <systemPath
+      >${project.basedir}/libs/kotlinx-coroutines-core-jvm-1.11.0.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>local</groupId>
       <artifactId>lib11</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/libs/kotlinx-serialization-core-jvm-1.11.0.jar</systemPath>
+      <systemPath
+      >${project.basedir}/libs/kotlinx-serialization-core-jvm-1.11.0.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>local</groupId>
       <artifactId>lib12</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/libs/kotlinx-serialization-json-jvm-1.11.0.jar</systemPath>
+      <systemPath
+      >${project.basedir}/libs/kotlinx-serialization-json-jvm-1.11.0.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>local</groupId>
       <artifactId>lib13</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/libs/kotlinx-serialization-json-okio-jvm-1.11.0.jar</systemPath>
+      <systemPath
+      >${project.basedir}/libs/kotlinx-serialization-json-okio-jvm-1.11.0.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>local</groupId>
       <artifactId>lib14</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/libs/kotlinx-serialization-protobuf-jvm-1.11.0.jar</systemPath>
+      <systemPath
+      >${project.basedir}/libs/kotlinx-serialization-protobuf-jvm-1.11.0.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>local</groupId>
@@ -196,14 +202,16 @@
       <artifactId>lib21</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/libs/zstd-kmp-okio-jvm-0.4.0.jar</systemPath>
+      <systemPath
+      >${project.basedir}/libs/zstd-kmp-okio-jvm-0.4.0.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>local</groupId>
       <artifactId>extension</artifactId>
       <version>1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/../public/extensions/${extension}</systemPath>
+      <systemPath
+      >${project.basedir}/../public/extensions/${extension}</systemPath>
     </dependency>
   </dependencies>
   <build>
@@ -228,7 +236,8 @@
                 <param>prototype.TeaTransformer</param>
               </transformers>
               <mainClass>${mainClass}</mainClass>
-              <targetDirectory>${project.basedir}/../public/teavm/${plugin}</targetDirectory>
+              <targetDirectory
+              >${project.basedir}/../public/teavm/${plugin}</targetDirectory>
               <targetFileName>app.js</targetFileName>
               <optimizationLevel>ADVANCED</optimizationLevel>
               <minifying>${minify}</minifying>

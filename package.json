@@ -11,11 +11,11 @@
     "dev:flutter": "node scripts/flutter.mjs run",
     "generate": "node scripts/generate-protocol.mjs",
     "generate:check": "node scripts/generate-protocol.mjs --check",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "node scripts/format.mjs --write",
+    "format:check": "node scripts/format.mjs --check",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "check": "pnpm generate:check && pnpm format:check && pnpm typecheck && pnpm test && pnpm test:registration && pnpm test:extensions && pnpm test:extension-build && pnpm test:extension-integrity && pnpm test:teavm-patches",
+    "check": "pnpm generate:check && pnpm format:check:portable && pnpm typecheck && pnpm test && pnpm test:registration && pnpm test:extensions && pnpm test:extension-build && pnpm test:extension-integrity && pnpm test:teavm-patches",
     "test:registration": "python3 -m unittest discover -s scripts -p test_register_build.py",
     "test:extensions": "python3 -m unittest discover -s tools/extensions/tests",
     "test:extension-build": "python3 scripts/test_build_extension.py",
@@ -28,11 +28,17 @@
     "db:migrate:local": "pnpm --filter @karuyomi/api db:migrate:local",
     "teavm:build": "python3 scripts/build-extension.py",
     "teavm:check": "python3 tools/teavm/check-dto.py",
-    "teavm:prepare": "python3 scripts/prepare-runtime.py"
+    "teavm:prepare": "python3 scripts/prepare-runtime.py",
+    "hooks:install": "prek install",
+    "format:check:portable": "node scripts/format.mjs --check --portable",
+    "hooks:check": "prek run --all-files --show-diff-on-failure"
   },
   "devDependencies": {
+    "@j178/prek": "0.5.9",
+    "@prettier/plugin-xml": "3.4.2",
     "@types/node": "26.6.6",
     "prettier": "3.9.10",
+    "sql-formatter": "15.9.0",
     "typescript": "6.0.3",
     "vitest": "4.1.12"
   }

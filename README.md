@@ -39,6 +39,7 @@ docs/verification/     精简验证结论与正式复验入口
 ```sh
 pnpm install --frozen-lockfile
 pnpm flutter:setup
+pnpm hooks:install
 pnpm check
 pnpm flutter:check
 pnpm build
@@ -49,6 +50,8 @@ pnpm dev
 打开 Wrangler 输出的本地地址即可访问同源 Flutter Web 和 `/runtime/host.html`。先执行 `pnpm build` 创建静态目录；重新修改 Flutter 或 JS 宿主后再次构建。`pnpm dev:flutter` 提供 Flutter Chrome 热重载，用于独立 UI 开发；Access 联调使用同源 Wrangler / HTTPS 环境。
 
 `pnpm build` 依次构建公共 JS 宿主、Flutter Web、`dist/public`，然后执行 Wrangler dry-run，仅生成本地部署产物。Web 渲染资源随产物提供。当前不注册 Service Worker，不缓存 API、登录响应或私有扩展。
+
+提交前运行 `pnpm format` 与 `pnpm hooks:check`。prek 0.5.9 由 pnpm 精确锁定，统一检查 Java、Dart、JS/TS、Python、Kotlin、Swift、Objective-C、Ruby、SQL 与 XML；工具版本和源码范围见 [提交要求](AGENTS.md)。完整原生格式检查需要 macOS / Xcode，Ubuntu CI 显式运行 portable 检查。
 
 修改 `packages/contracts/protocol.json` 后执行 `pnpm generate`，同时更新 TypeScript 和 Dart 常量；CI 的 `generate:check` 防止版本漂移。控制协议、清单与 Source 调用已经接通；完整 DTO 的跨语言代码生成与图片字节协议仍需继续实现。
 
@@ -64,11 +67,11 @@ pnpm teavm:build --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
 python3 scripts/register-build.py PATH_TO_OUTPUT/manifest.json --artifacts PATH_TO_OUTPUT/artifacts --allow-host www.mangadraft.com
 ```
 
-注册命令默认仅校验并输出计划；加 `--local` 才写入本地 R2 / D1，加 `--remote` 才写入云端。网络域名需要显式声明，图片 CDN 尚未据此开放。清单、AOT 和必要资源必须经私有 API 获取，不能复制到公开静态目录。正式 API 与 Source 浏览器回归入口见 [验证记录](docs/VERIFICATION.md)。独立字节、Zstd 和 iOS 机制研究保留简洁验证摘要；临时工程已归档到被忽略的本地研究目录，不作为源码提交。
+注册命令默认仅校验并输出计划；加 `--local` 才写入本地 R2 / D1，加 `--remote` 才写入云端。网络域名需要显式声明，图片 CDN 尚未据此开放。清单与 AOT 经私有 API 获取；共享桥/WASM 使用 Web 静态或 Native 内置材料，见 [交付契约](docs/RUNTIME-MATERIALS.md)。正式 API 与 Source 浏览器回归入口见 [验证记录](docs/VERIFICATION.md)。独立字节、Zstd 和 iOS 机制研究保留简洁验证摘要；临时工程已归档到被忽略的本地研究目录，不作为源码提交。
 
 ## 部署与 Access
 
-2026-11-03 已部署 `karuyomi.wybxc.cc`，Worker version 为 `60bac3c2-96df-4763-8c92-2cf8fd1e2a86`；云端 D1 迁移完成，MangaDraft e350 构建的 7 个产物已注册为 verified。公开 Flutter 页面与运行脚本可访问，Safari 已真实渲染书架和三个主导航页签。Access self-hosted application 与仅允许本人的策略同时覆盖裸 `/api` 和 `/api/*`；匿名 API 请求已确认跳转登录并保持 private/no-store。生产 Access 登录成功后的正向私有交付尚未验收。
+2026-11-03 已部署 `karuyomi.wybxc.cc`，Worker version 为 `402471fe-f113-4272-89ae-ddbe064289b5`；云端 D1 迁移完成，MangaDraft e350 构建的 7 个产物已注册为 verified。公开 Flutter 页面与运行脚本可访问，Safari 已真实渲染书架和三个主导航页签。Access self-hosted application 与仅允许本人的策略同时覆盖裸 `/api` 和 `/api/*`；匿名 API 请求已确认跳转登录并保持 private/no-store。生产 Access 登录成功后的正向私有交付尚未验收。
 
 `/api` 和 `/api/*` 始终经过 Worker JWT 校验；未配置或密钥服务不可用返回 503，缺少、无效或过期凭据返回 401，身份或 origin 拒绝返回 403。没有开发鉴权绕过。写请求要求同源 `Origin` 和应用请求头；公开 shell 不读取私有 bindings。可复制 `apps/api/.dev.vars.example` 为忽略提交的 `.dev.vars` 进行 Access 联调。
 

@@ -31,7 +31,9 @@ await cp(
 
 // Each embedded value is decoded into fresh bytes. VerifiedLoader independently
 // checks MIME, size and SHA on every use, and never falls back to a network read.
-const legacyHashes = catalog.compatibility.map((artifact) => artifact.sha256);
+const legacyHashes = catalog.compatibility
+  .filter((artifact) => !artifact.nativeSupported)
+  .map((artifact) => artifact.sha256);
 const legacy = new Set(legacyHashes);
 const embedded = Object.fromEntries(
   [...data]
@@ -94,7 +96,11 @@ const nativeManifest = {
   runtimeBaseline: catalog.runtimeBaseline,
   materialVersion: catalog.materialVersion,
   files,
-  materials: [...catalog.hostScripts, ...catalog.resources],
+  materials: [
+    ...catalog.hostScripts,
+    ...catalog.resources,
+    ...catalog.compatibility.filter((artifact) => artifact.nativeSupported),
+  ],
   unsupportedMaterialHashes: legacyHashes,
 };
 await writeFile(

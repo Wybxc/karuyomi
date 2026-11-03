@@ -1,25 +1,191 @@
-import java.nio.file.*;import java.util.*;import java.util.zip.*;import java.io.*;import org.objectweb.asm.*;
+import java.nio.file.*;
+import java.util.*;
+import java.util.zip.*;
+import java.io.*;
+import org.objectweb.asm.*;
+
 /** Adapt only host/dependency libraries. Extension input JAR is never rewritten. */
-public class PatchLibraries{
- public static void main(String[] args)throws Exception{for(String arg:args){Path f=Path.of(arg);ByteArrayOutputStream out=new ByteArrayOutputStream();try(ZipInputStream in=new ZipInputStream(Files.newInputStream(f));ZipOutputStream z=new ZipOutputStream(out)){ZipEntry e;while((e=in.getNextEntry())!=null){byte[] b=in.readAllBytes();if(e.getName().endsWith(".class")){ClassReader r=new ClassReader(b);ClassWriter w=new ClassWriter(ClassWriter.COMPUTE_MAXS);r.accept(new ClassVisitor(Opcodes.ASM9,w){public MethodVisitor visitMethod(int a,String n,String d,String s,String[] ex){
- if(r.getClassName().equals("android/view/ViewGroup$LayoutParams")&&n.equals("<init>")&&d.equals("(II)V")){
-  MethodVisitor method=super.visitMethod(a,n,d,s,ex);method.visitCode();method.visitVarInsn(Opcodes.ALOAD,0);method.visitMethodInsn(Opcodes.INVOKESPECIAL,"java/lang/Object","<init>","()V",false);method.visitVarInsn(Opcodes.ALOAD,0);method.visitVarInsn(Opcodes.ILOAD,1);method.visitFieldInsn(Opcodes.PUTFIELD,r.getClassName(),"width","I");method.visitVarInsn(Opcodes.ALOAD,0);method.visitVarInsn(Opcodes.ILOAD,2);method.visitFieldInsn(Opcodes.PUTFIELD,r.getClassName(),"height","I");method.visitInsn(Opcodes.RETURN);method.visitMaxs(2,3);method.visitEnd();return null;
- }
- if(r.getClassName().equals("com/ibm/icu/impl/ICUBinary")&&n.equals("mapFile")&&d.equals("(Ljava/io/File;)Ljava/nio/ByteBuffer;")){
-  MethodVisitor method=super.visitMethod(a,n,d,s,ex);method.visitCode();method.visitVarInsn(Opcodes.ALOAD,0);method.visitMethodInsn(Opcodes.INVOKESTATIC,"prototype/PlatformSupport","mapIcuFile",d,false);method.visitInsn(Opcodes.ARETURN);method.visitMaxs(1,1);method.visitEnd();return null;
- }
- return new MethodVisitor(Opcodes.ASM9,super.visitMethod(a,n,d,s,ex)){public void visitCode(){super.visitCode();if(Boolean.getBoolean("trace") && r.getClassName().startsWith("kotlinx/coroutines/") && (n.equals("<init>")&&r.getClassName().endsWith("AbstractCoroutine")||n.equals("coroutineScope")||n.equals("async")||n.equals("newCoroutineContext")||n.equals("initParentJob")||n.equals("attachChild")||n.equals("start")||n.equals("startCoroutineCancellable")||n.equals("resumeCancellableWith")||n.equals("dispatchUnconfined")||n.equals("processUnconfinedEvent"))){super.visitLdcInsn(r.getClassName()+"."+n);super.visitMethodInsn(Opcodes.INVOKESTATIC,"prototype/Bridge","trace","(Ljava/lang/String;)Ljava/lang/String;",false);super.visitInsn(Opcodes.POP);}}public void visitMethodInsn(int op,String owner,String name,String desc,boolean itf){
- if(owner.equals("java/nio/charset/Charset")&&name.equals("isSupported")){super.visitMethodInsn(Opcodes.INVOKESTATIC,"prototype/PlatformSupport","charsetSupported",desc,false);return;}
- // TLS belongs to the verified fetch transport. Only responses restored by our
- // browser cache may omit Java's unavailable Handshake/certificate serialization.
- if(r.getClassName().equals("okhttp3/internal/cache/CacheStrategy$Factory")&&n.equals("computeCandidate")&&owner.equals("okhttp3/Request")&&name.equals("isHttps")){
-  super.visitVarInsn(Opcodes.ALOAD,0);super.visitFieldInsn(Opcodes.GETFIELD,r.getClassName(),"cacheResponse","Lokhttp3/Response;");super.visitMethodInsn(Opcodes.INVOKESTATIC,"okhttp3/Cache","requiresJavaHandshake","(Lokhttp3/Request;Lokhttp3/Response;)Z",false);return;
- }
- if(owner.equals("java/lang/Class")&&name.equals("newInstance")&&desc.equals("()Ljava/lang/Object;")&&n.equals("getShim")&&(r.getClassName().equals("com/ibm/icu/text/Collator")||r.getClassName().equals("com/ibm/icu/text/BreakIterator"))){super.visitMethodInsn(Opcodes.INVOKESTATIC,"com/ibm/icu/text/AotServiceFactory","newInstance","(Ljava/lang/Class;)Ljava/lang/Object;",false);return;}
- if(owner.equals("java/lang/Thread")&&name.equals("setContextClassLoader")){super.visitMethodInsn(Opcodes.INVOKESTATIC,"prototype/PlatformSupport","contextLoader","(Ljava/lang/Thread;Ljava/lang/ClassLoader;)V",false);return;}
- if(owner.equals("java/lang/ClassLoader")&&name.equals("getResources")){super.visitMethodInsn(Opcodes.INVOKESTATIC,"prototype/PlatformSupport","resources","(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/util/Enumeration;",false);return;}
- if(owner.equals("java/lang/ClassLoader")&&name.equals("loadClass")&&desc.equals("(Ljava/lang/String;)Ljava/lang/Class;")){super.visitMethodInsn(Opcodes.INVOKESTATIC,"prototype/PlatformSupport","loadClass","(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/Class;",false);return;}
- if(owner.equals("java/lang/Thread")&&name.equals("dumpStack")){super.visitMethodInsn(Opcodes.INVOKESTATIC,"prototype/PlatformSupport","dumpStack",desc,false);return;}
- super.visitMethodInsn(op,owner,name,desc,itf);
- }};}},0);b=w.toByteArray();}z.putNextEntry(new ZipEntry(e.getName()));z.write(b);z.closeEntry();}}Files.write(f,out.toByteArray());}}
+public class PatchLibraries {
+  public static void main(String[] args) throws Exception {
+    for (String arg : args) {
+      Path f = Path.of(arg);
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      try (ZipInputStream in = new ZipInputStream(Files.newInputStream(f));
+          ZipOutputStream z = new ZipOutputStream(out)) {
+        ZipEntry e;
+        while ((e = in.getNextEntry()) != null) {
+          byte[] b = in.readAllBytes();
+          if (e.getName().endsWith(".class")) {
+            ClassReader r = new ClassReader(b);
+            ClassWriter w = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            r.accept(
+                new ClassVisitor(Opcodes.ASM9, w) {
+                  public MethodVisitor visitMethod(
+                      int a, String n, String d, String s, String[] ex) {
+                    if (r.getClassName().equals("android/view/ViewGroup$LayoutParams")
+                        && n.equals("<init>")
+                        && d.equals("(II)V")) {
+                      MethodVisitor method = super.visitMethod(a, n, d, s, ex);
+                      method.visitCode();
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitVarInsn(Opcodes.ILOAD, 1);
+                      method.visitFieldInsn(Opcodes.PUTFIELD, r.getClassName(), "width", "I");
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitVarInsn(Opcodes.ILOAD, 2);
+                      method.visitFieldInsn(Opcodes.PUTFIELD, r.getClassName(), "height", "I");
+                      method.visitInsn(Opcodes.RETURN);
+                      method.visitMaxs(2, 3);
+                      method.visitEnd();
+                      return null;
+                    }
+                    if (r.getClassName().equals("com/ibm/icu/impl/ICUBinary")
+                        && n.equals("mapFile")
+                        && d.equals("(Ljava/io/File;)Ljava/nio/ByteBuffer;")) {
+                      MethodVisitor method = super.visitMethod(a, n, d, s, ex);
+                      method.visitCode();
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKESTATIC,
+                          "prototype/PlatformSupport",
+                          "mapIcuFile",
+                          d,
+                          false);
+                      method.visitInsn(Opcodes.ARETURN);
+                      method.visitMaxs(1, 1);
+                      method.visitEnd();
+                      return null;
+                    }
+                    return new MethodVisitor(Opcodes.ASM9, super.visitMethod(a, n, d, s, ex)) {
+                      public void visitCode() {
+                        super.visitCode();
+                        if (Boolean.getBoolean("trace")
+                            && r.getClassName().startsWith("kotlinx/coroutines/")
+                            && (n.equals("<init>") && r.getClassName().endsWith("AbstractCoroutine")
+                                || n.equals("coroutineScope")
+                                || n.equals("async")
+                                || n.equals("newCoroutineContext")
+                                || n.equals("initParentJob")
+                                || n.equals("attachChild")
+                                || n.equals("start")
+                                || n.equals("startCoroutineCancellable")
+                                || n.equals("resumeCancellableWith")
+                                || n.equals("dispatchUnconfined")
+                                || n.equals("processUnconfinedEvent"))) {
+                          super.visitLdcInsn(r.getClassName() + "." + n);
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/Bridge",
+                              "trace",
+                              "(Ljava/lang/String;)Ljava/lang/String;",
+                              false);
+                          super.visitInsn(Opcodes.POP);
+                        }
+                      }
+
+                      public void visitMethodInsn(
+                          int op, String owner, String name, String desc, boolean itf) {
+                        if (owner.equals("java/nio/charset/Charset")
+                            && name.equals("isSupported")) {
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/PlatformSupport",
+                              "charsetSupported",
+                              desc,
+                              false);
+                          return;
+                        }
+                        // TLS belongs to the verified fetch transport. Only responses restored by
+                        // our
+                        // browser cache may omit Java's unavailable Handshake/certificate
+                        // serialization.
+                        if (r.getClassName().equals("okhttp3/internal/cache/CacheStrategy$Factory")
+                            && n.equals("computeCandidate")
+                            && owner.equals("okhttp3/Request")
+                            && name.equals("isHttps")) {
+                          super.visitVarInsn(Opcodes.ALOAD, 0);
+                          super.visitFieldInsn(
+                              Opcodes.GETFIELD,
+                              r.getClassName(),
+                              "cacheResponse",
+                              "Lokhttp3/Response;");
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "okhttp3/Cache",
+                              "requiresJavaHandshake",
+                              "(Lokhttp3/Request;Lokhttp3/Response;)Z",
+                              false);
+                          return;
+                        }
+                        if (owner.equals("java/lang/Class")
+                            && name.equals("newInstance")
+                            && desc.equals("()Ljava/lang/Object;")
+                            && n.equals("getShim")
+                            && (r.getClassName().equals("com/ibm/icu/text/Collator")
+                                || r.getClassName().equals("com/ibm/icu/text/BreakIterator"))) {
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "com/ibm/icu/text/AotServiceFactory",
+                              "newInstance",
+                              "(Ljava/lang/Class;)Ljava/lang/Object;",
+                              false);
+                          return;
+                        }
+                        if (owner.equals("java/lang/Thread")
+                            && name.equals("setContextClassLoader")) {
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/PlatformSupport",
+                              "contextLoader",
+                              "(Ljava/lang/Thread;Ljava/lang/ClassLoader;)V",
+                              false);
+                          return;
+                        }
+                        if (owner.equals("java/lang/ClassLoader") && name.equals("getResources")) {
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/PlatformSupport",
+                              "resources",
+                              "(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/util/Enumeration;",
+                              false);
+                          return;
+                        }
+                        if (owner.equals("java/lang/ClassLoader")
+                            && name.equals("loadClass")
+                            && desc.equals("(Ljava/lang/String;)Ljava/lang/Class;")) {
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/PlatformSupport",
+                              "loadClass",
+                              "(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/Class;",
+                              false);
+                          return;
+                        }
+                        if (owner.equals("java/lang/Thread") && name.equals("dumpStack")) {
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/PlatformSupport",
+                              "dumpStack",
+                              desc,
+                              false);
+                          return;
+                        }
+                        super.visitMethodInsn(op, owner, name, desc, itf);
+                      }
+                    };
+                  }
+                },
+                0);
+            b = w.toByteArray();
+          }
+          z.putNextEntry(new ZipEntry(e.getName()));
+          z.write(b);
+          z.closeEntry();
+        }
+      }
+      Files.write(f, out.toByteArray());
+    }
+  }
 }

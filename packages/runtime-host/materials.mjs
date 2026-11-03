@@ -76,17 +76,23 @@ export async function collectMaterials({ includeWasmBytes = true } = {}) {
   }
   const resources = [resource];
   const compatibility = [];
-  for (const name of ['cache', 'file']) {
-    const logicalName = 'release9-v1/' + name + '-bridge.js';
-    compatibility.push(
-      artifact(
-        logicalName,
-        await readFile(
-          path.join(root, 'runtime/teavm/bridge/compat', logicalName),
+  for (const [version, names, nativeSupported] of [
+    ['release9-v1', ['cache', 'file'], false],
+    ['source-aot-v1', scriptNames, true],
+  ]) {
+    for (const name of names) {
+      const logicalName = version + '/' + name + '-bridge.js';
+      compatibility.push({
+        ...artifact(
+          logicalName,
+          await readFile(
+            path.join(root, 'runtime/teavm/bridge/compat', logicalName),
+          ),
+          'application/javascript',
         ),
-        'application/javascript',
-      ),
-    );
+        nativeSupported,
+      });
+    }
   }
   const identity = { ...protocol, hostScripts, resources, compatibility };
   const catalog = {

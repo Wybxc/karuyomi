@@ -27,6 +27,15 @@
 
 两份真实 AOT 经正式发布器编码、模拟下载与恢复后，原始 SHA/字节完全一致：MangaDraft 3,777,975 → 791,368 bytes，Arknights Comics 1,824,293 → 583,749 bytes。每包只剩 1 个私有 AOT 和 6 个静态材料引用；这项 roundtrip 是本地输送验证，不是 GitHub 实际发布或运行兼容证据。与原来每包重复携带 297,697 bytes 材料相比，两包资产合计从 6,197,662 降至 1,375,117 bytes（不含小型清单、另行交付的共享材料）。
 
+正式输入固定到 `8dc22e3` 后，已重新编译并实际发布首两包；从 GitHub 下载并按正式恢复器核验结果如下。每包 7 个 Release 资产，包含一个 gzip AOT 和六个清单/溯源文件；压缩与 canonical 双摘要、长度均通过，`runtimeReady=false` / `compiled_unverified`。
+
+| 正式 Release                                                                                                                             | canonical bytes | gzip bytes |   减少 |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | --------------: | ---------: | -----: |
+| [MangaDraft 1.6.2](https://github.com/Wybxc/karuyomi/releases/tag/ext-all.mangadraft-v106002-364cdedb6cd1e1c7a4aacd99aa2eb05c)           |       3,777,971 |    791,388 | 79.05% |
+| [Arknights Comics 1.6.2](https://github.com/Wybxc/karuyomi/releases/tag/ext-en.arknightscomics-v106002-dd22d6bbf6f048ad02515caa96989397) |       1,824,293 |    583,745 | 68.00% |
+
+当前 6 份共享材料合计 297,946 bytes（cache/file 新增 Native 命名空间适配），Web 另保留两份旧桥以支持历史清单；材料实际字节不会进入每个 Release。正式发布保留原业务 JAR；重新编译结果与此前分析样本分别记录，不以分析样本的 SHA 代替正式产物。
+
 当前 R2 已按 SHA 去重，共享交付的主要收益是减少每包发布重复、客户端重复获取，以及清晰的 Web / Native 资源边界。两个样本的 Release 资产合计可从 6,197,662 降为 5,899,965 bytes（减少 4.80%）。现有客户端也可能通过 ETag 得到 304，因此不能把全部原始字节当成每次必然节省的流量。若 1,448 包都包含同一套共享材料，按包重复发布会产生约 431 MB 原始资产；保留一份可避免约 430.8 MB 的重复。该数字是按相同材料的理论累计，不是当前实占或每个用户的下载量。
 
 Cloudflare 的实际压缩受 MIME、状态码、浏览器协商、套餐与规则影响；完整响应和 Range 响应需分别验收。不能将上述 Brotli 11 离线值写成生产下载量。依据：[官方压缩说明](https://developers.cloudflare.com/speed/optimization/content/compression/)和[静态资源说明](https://developers.cloudflare.com/workers/static-assets/)。

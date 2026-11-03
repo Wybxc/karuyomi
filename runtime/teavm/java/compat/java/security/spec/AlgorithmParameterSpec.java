@@ -1,1 +1,3 @@
-package java.security.spec;public interface AlgorithmParameterSpec{}
+package java.security.spec;
+
+public interface AlgorithmParameterSpec {}

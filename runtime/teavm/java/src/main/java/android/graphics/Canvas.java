@@ -1,16 +1,137 @@
 package android.graphics;
-import prototype.Graphics;import com.google.gson.*;import java.util.*;
+
+import prototype.Graphics;
+import com.google.gson.*;
+import java.util.*;
+
 public class Canvas {
- private Bitmap bitmap;private float[] matrix={1,0,0,1,0,0};private final List<float[]> stack=new ArrayList<>();
- public Canvas(){}public Canvas(Bitmap b){setBitmap(b);}public void setBitmap(Bitmap b){if(b!=null){b.check();if(!b.isMutable())throw new IllegalStateException("Immutable bitmap");}bitmap=b;matrix=new float[]{1,0,0,1,0,0};stack.clear();}
- public int getWidth(){return bitmap==null?0:bitmap.getWidth();}public int getHeight(){return bitmap==null?0:bitmap.getHeight();}
- private JsonObject args(Paint p){if(bitmap==null)throw new IllegalStateException("No bitmap");bitmap.check();JsonObject a=Graphics.args();a.addProperty("id",bitmap.id());a.add("matrix",Graphics.numbers(matrix));a.add("paint",(p==null?new Paint():p).json());return a;}
- public int save(){int n=getSaveCount();stack.add(matrix.clone());return n;}public int getSaveCount(){return stack.size()+1;}public void restore(){if(stack.isEmpty())throw new IllegalStateException("Underflow in restore");matrix=stack.remove(stack.size()-1);}public void restoreToCount(int n){if(n<1)throw new IllegalArgumentException();while(getSaveCount()>n)restore();}
- public void translate(float x,float y){matrix[4]+=matrix[0]*x+matrix[2]*y;matrix[5]+=matrix[1]*x+matrix[3]*y;}public void scale(float x,float y){matrix[0]*=x;matrix[1]*=x;matrix[2]*=y;matrix[3]*=y;}
- public void drawColor(int color){JsonObject a=args(null);a.addProperty("color",color);Graphics.call("color",a);}
- public void drawBitmap(Bitmap s,float x,float y,Paint p){s.check();JsonObject a=args(p);a.addProperty("source",s.id());a.add("src",Graphics.numbers(0,0,s.getWidth(),s.getHeight()));float ratio=bitmap.getDensity()==0||s.getDensity()==0?1:(float)bitmap.getDensity()/s.getDensity();a.add("dst",Graphics.numbers(x,y,x+s.getWidth()*ratio,y+s.getHeight()*ratio));Graphics.call("drawBitmap",a);}
- public void drawBitmap(Bitmap s,Rect src,Rect dst,Paint p){drawBitmap(s,src,new RectF(dst),p);}public void drawBitmap(Bitmap s,Rect src,RectF dst,Paint p){s.check();JsonObject a=args(p);a.addProperty("source",s.id());a.add("src",src==null?Graphics.numbers(0,0,s.getWidth(),s.getHeight()):Graphics.numbers(src.left,src.top,src.right,src.bottom));a.add("dst",Graphics.numbers(dst.left,dst.top,dst.right,dst.bottom));Graphics.call("drawBitmap",a);}
- public void drawRoundRect(RectF r,float rx,float ry,Paint p){JsonObject a=args(p);a.add("rect",Graphics.numbers(r.left,r.top,r.right,r.bottom));a.addProperty("rx",rx);a.addProperty("ry",ry);Graphics.call("roundRect",a);}
- public void drawRect(float l,float t,float r,float b,Paint p){drawRoundRect(new RectF(l,t,r,b),0,0,p);}public void drawRect(Rect r,Paint p){drawRect(r.left,r.top,r.right,r.bottom,p);}
- public void drawText(String s,float x,float y,Paint p){JsonObject a=args(p);a.addProperty("text",s);a.addProperty("x",x);a.addProperty("y",y);Graphics.call("text",a);}
+  private Bitmap bitmap;
+  private float[] matrix = {1, 0, 0, 1, 0, 0};
+  private final List<float[]> stack = new ArrayList<>();
+
+  public Canvas() {}
+
+  public Canvas(Bitmap b) {
+    setBitmap(b);
+  }
+
+  public void setBitmap(Bitmap b) {
+    if (b != null) {
+      b.check();
+      if (!b.isMutable()) throw new IllegalStateException("Immutable bitmap");
+    }
+    bitmap = b;
+    matrix = new float[] {1, 0, 0, 1, 0, 0};
+    stack.clear();
+  }
+
+  public int getWidth() {
+    return bitmap == null ? 0 : bitmap.getWidth();
+  }
+
+  public int getHeight() {
+    return bitmap == null ? 0 : bitmap.getHeight();
+  }
+
+  private JsonObject args(Paint p) {
+    if (bitmap == null) throw new IllegalStateException("No bitmap");
+    bitmap.check();
+    JsonObject a = Graphics.args();
+    a.addProperty("id", bitmap.id());
+    a.add("matrix", Graphics.numbers(matrix));
+    a.add("paint", (p == null ? new Paint() : p).json());
+    return a;
+  }
+
+  public int save() {
+    int n = getSaveCount();
+    stack.add(matrix.clone());
+    return n;
+  }
+
+  public int getSaveCount() {
+    return stack.size() + 1;
+  }
+
+  public void restore() {
+    if (stack.isEmpty()) throw new IllegalStateException("Underflow in restore");
+    matrix = stack.remove(stack.size() - 1);
+  }
+
+  public void restoreToCount(int n) {
+    if (n < 1) throw new IllegalArgumentException();
+    while (getSaveCount() > n) restore();
+  }
+
+  public void translate(float x, float y) {
+    matrix[4] += matrix[0] * x + matrix[2] * y;
+    matrix[5] += matrix[1] * x + matrix[3] * y;
+  }
+
+  public void scale(float x, float y) {
+    matrix[0] *= x;
+    matrix[1] *= x;
+    matrix[2] *= y;
+    matrix[3] *= y;
+  }
+
+  public void drawColor(int color) {
+    JsonObject a = args(null);
+    a.addProperty("color", color);
+    Graphics.call("color", a);
+  }
+
+  public void drawBitmap(Bitmap s, float x, float y, Paint p) {
+    s.check();
+    JsonObject a = args(p);
+    a.addProperty("source", s.id());
+    a.add("src", Graphics.numbers(0, 0, s.getWidth(), s.getHeight()));
+    float ratio =
+        bitmap.getDensity() == 0 || s.getDensity() == 0
+            ? 1
+            : (float) bitmap.getDensity() / s.getDensity();
+    a.add("dst", Graphics.numbers(x, y, x + s.getWidth() * ratio, y + s.getHeight() * ratio));
+    Graphics.call("drawBitmap", a);
+  }
+
+  public void drawBitmap(Bitmap s, Rect src, Rect dst, Paint p) {
+    drawBitmap(s, src, new RectF(dst), p);
+  }
+
+  public void drawBitmap(Bitmap s, Rect src, RectF dst, Paint p) {
+    s.check();
+    JsonObject a = args(p);
+    a.addProperty("source", s.id());
+    a.add(
+        "src",
+        src == null
+            ? Graphics.numbers(0, 0, s.getWidth(), s.getHeight())
+            : Graphics.numbers(src.left, src.top, src.right, src.bottom));
+    a.add("dst", Graphics.numbers(dst.left, dst.top, dst.right, dst.bottom));
+    Graphics.call("drawBitmap", a);
+  }
+
+  public void drawRoundRect(RectF r, float rx, float ry, Paint p) {
+    JsonObject a = args(p);
+    a.add("rect", Graphics.numbers(r.left, r.top, r.right, r.bottom));
+    a.addProperty("rx", rx);
+    a.addProperty("ry", ry);
+    Graphics.call("roundRect", a);
+  }
+
+  public void drawRect(float l, float t, float r, float b, Paint p) {
+    drawRoundRect(new RectF(l, t, r, b), 0, 0, p);
+  }
+
+  public void drawRect(Rect r, Paint p) {
+    drawRect(r.left, r.top, r.right, r.bottom, p);
+  }
+
+  public void drawText(String s, float x, float y, Paint p) {
+    JsonObject a = args(p);
+    a.addProperty("text", s);
+    a.addProperty("x", x);
+    a.addProperty("y", y);
+    Graphics.call("text", a);
+  }
 }

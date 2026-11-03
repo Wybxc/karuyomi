@@ -1,1 +1,9 @@
-package javax.crypto;public class BadPaddingException extends java.security.GeneralSecurityException{public BadPaddingException(){}public BadPaddingException(String s){super(s);}}
+package javax.crypto;
+
+public class BadPaddingException extends java.security.GeneralSecurityException {
+  public BadPaddingException() {}
+
+  public BadPaddingException(String s) {
+    super(s);
+  }
+}

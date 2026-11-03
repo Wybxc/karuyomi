@@ -1,1 +1,9 @@
-package java.util.concurrent;public class TimeoutException extends Exception{public TimeoutException(){}public TimeoutException(String s){super(s);}}
+package java.util.concurrent;
+
+public class TimeoutException extends Exception {
+  public TimeoutException() {}
+
+  public TimeoutException(String s) {
+    super(s);
+  }
+}

@@ -1,1 +1,43 @@
-package java.util.concurrent.atomic; public class AtomicIntegerArray{private final int[] a;public AtomicIntegerArray(int n){a=new int[n];}public int length(){return a.length;}public int get(int i){return a[i];}public void set(int i,int v){a[i]=v;}public void lazySet(int i,int v){set(i,v);}public boolean compareAndSet(int i,int old,int v){if(a[i]!=old)return false;a[i]=v;return true;}public int getAndSet(int i,int v){int old=a[i];a[i]=v;return old;}public int getAndAdd(int i,int v){int old=a[i];a[i]+=v;return old;}}
+package java.util.concurrent.atomic;
+
+public class AtomicIntegerArray {
+  private final int[] a;
+
+  public AtomicIntegerArray(int n) {
+    a = new int[n];
+  }
+
+  public int length() {
+    return a.length;
+  }
+
+  public int get(int i) {
+    return a[i];
+  }
+
+  public void set(int i, int v) {
+    a[i] = v;
+  }
+
+  public void lazySet(int i, int v) {
+    set(i, v);
+  }
+
+  public boolean compareAndSet(int i, int old, int v) {
+    if (a[i] != old) return false;
+    a[i] = v;
+    return true;
+  }
+
+  public int getAndSet(int i, int v) {
+    int old = a[i];
+    a[i] = v;
+    return old;
+  }
+
+  public int getAndAdd(int i, int v) {
+    int old = a[i];
+    a[i] += v;
+    return old;
+  }
+}

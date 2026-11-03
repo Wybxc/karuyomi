@@ -1,4 +1,12 @@
 node_modules
+.local
+.dart_tool
+.flutter-plugins*
+ios/Pods
+**/Pods/
+**/ephemeral/
+**/.symlinks/
+apps/reader/assets/runtime
 .pub-cache
 .fvm
 .tools
@@ -7,12 +15,9 @@ dist
 build
 pnpm-lock.yaml
 docs/design
-apps/reader
-packages/reader_core
-packages/source_runtime
 **/generated.*
 apps/api/worker-configuration.d.ts
-runtime/teavm/bridge
+runtime/teavm/bridge/compat
 runtime/teavm/.local
 vendor/
 runtime/teavm/licenses

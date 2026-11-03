@@ -1,1 +1,13 @@
-package java.util.concurrent;public class RejectedExecutionException extends RuntimeException{public RejectedExecutionException(){}public RejectedExecutionException(String s){super(s);}public RejectedExecutionException(String s,Throwable t){super(s,t);}}
+package java.util.concurrent;
+
+public class RejectedExecutionException extends RuntimeException {
+  public RejectedExecutionException() {}
+
+  public RejectedExecutionException(String s) {
+    super(s);
+  }
+
+  public RejectedExecutionException(String s, Throwable t) {
+    super(s, t);
+  }
+}

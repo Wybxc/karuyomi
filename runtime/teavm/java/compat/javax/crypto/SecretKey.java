@@ -1,1 +1,3 @@
-package javax.crypto;public interface SecretKey extends java.security.Key{}
+package javax.crypto;
+
+public interface SecretKey extends java.security.Key {}
