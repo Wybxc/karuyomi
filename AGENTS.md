@@ -45,7 +45,7 @@
 - Static Assets 是所有客户端扩展分发的最终权威来源。每个扩展只部署最新可用构建，由客户端或 Service Worker 检查索引、更新及清理旧缓存；不经 R2 或入口 Worker 转发正文，不在入口 Worker 脚本中内嵌。公开扩展下载不携带 GitHub 凭据或应用 Access 凭据。
 - 共享桥、WASM 等构建资源属于 Web Static Assets；Native 按已确定的方案内置。Source 原有请求头、Cookie、拦截器和图片处理语义必须通过正式运行时链路，不能用原图 URL 绕过插件处理。
 - Worker TypeScript 与 Dart 的静态类型不能保证跨语言消息安全。交换边界需要统一协议、运行时解析、版本和大小校验，以及 requestId/generation 约束。
-- 跨语言单一 schema/IDL 与 Protobuf + Protobuf-ES / protoc-gen-dart 双端生成仍属讨论方向，尚未定案或实施，不能声称已有单一协议源。实施此类改造时使用成熟方案。Pigeon 适用于 Dart 与原生平台，不代替 TS Worker 协议。
+- 跨语言协议已选定 Protobuf `.proto` + Buf，使用 Protobuf-ES / Google Dart 插件生成模型和 codec，小控制消息先采用标准 ProtoJSON；具体比较见 `docs/design/cross-language-protocol.md`，实施状态见 `docs/plan/cross-language-protocol.md`。当前尚未实施，不能声称已有单一协议源。业务预算、generation 与资源生命周期仍须校验；图片/HTTP 大正文保持独立二进制通道。Pigeon 适用于 Dart 与原生平台，不代替 TS Worker 协议。
 - 大正文与图片使用有界二进制通道，控制消息保持小；落实背压、限额、超时、取消、迟到结果丢弃和资源释放。
 
 ## AOT、静态分发与 CI
