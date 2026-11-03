@@ -104,5 +104,36 @@ class DescriptorBoundary(unittest.TestCase):
             self.assertEqual(manifest.read_text(), 'original')
 
 
+class SharedMaterialsBoundary(unittest.TestCase):
+    def catalog(self):
+        protocol = json.loads((ROOT / 'packages/contracts/protocol.json').read_text())
+        def item(name, content_type):
+            return {'logicalName': name, 'sha256': 'a' * 64, 'path': '/runtime/materials/' + 'a' * 64,
+                    'size': 100, 'contentType': content_type}
+        return {'schemaVersion': 1, **protocol, 'materialVersion': 'b' * 64,
+                'hostScripts': [item('file-bridge.js', 'application/javascript')],
+                'resources': [item('zstd.wasm', 'application/wasm')]}
+
+    def read(self, value):
+        encoded = (json.dumps(value) + '\n').encode()
+        with patch.object(builder.subprocess, 'run', return_value=SimpleNamespace(stdout=encoded)):
+            return builder.material_catalog(), encoded
+
+    def test_provenance_hash_binds_exact_catalog_bytes(self):
+        (catalog, digest), encoded = self.read(self.catalog())
+        self.assertEqual(digest, hashlib.sha256(encoded).hexdigest())
+        self.assertTrue(catalog['hostScripts'][0]['path'].startswith('/runtime/materials/'))
+
+    def test_shared_materials_cannot_become_private_or_change_protocol(self):
+        value = self.catalog()
+        value['hostScripts'][0]['path'] = '/api/extensions/artifacts/' + 'a' * 64
+        with self.assertRaisesRegex(ValueError, 'material reference'):
+            self.read(value)
+        value = self.catalog()
+        value['hostAbi'] = 'different-host'
+        with self.assertRaisesRegex(ValueError, 'ABI mismatch'):
+            self.read(value)
+
+
 if __name__ == '__main__':
     unittest.main()

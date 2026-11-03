@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
+import { collectMaterials } from '../../packages/runtime-host/materials.mjs';
 import {
   completeBrowserValidation,
   digest,
@@ -17,6 +18,7 @@ export async function verifyInBrowser(
   { timeoutMs = 90_000, onListening = console.error } = {},
 ) {
   const { manifest, manifestBytes, payloads } = inputs;
+  const { data: staticMaterials } = await collectMaterials();
   const nonce = randomUUID();
   const runtimeFiles = new Map();
   for (const name of ['host.js', 'worker.js']) {
@@ -174,6 +176,19 @@ finally{
         response
           .writeHead(200, { 'Content-Type': 'application/json' })
           .end(manifestBytes);
+        return;
+      }
+      const sharedDigest = /^\/runtime\/materials\/([a-f0-9]{64})$/.exec(
+        pathname,
+      )?.[1];
+      const shared = staticMaterials.get(sharedDigest);
+      if (shared) {
+        response
+          .writeHead(200, {
+            'Content-Type': shared.contentType,
+            'Content-Length': shared.bytes.length,
+          })
+          .end(shared.bytes);
         return;
       }
       if (payloads.has(pathname)) {

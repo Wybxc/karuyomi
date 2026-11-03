@@ -4,6 +4,7 @@ import { constants } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectMaterials } from '../../packages/runtime-host/materials.mjs';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
 const runtimeRequire = createRequire(
@@ -187,12 +188,47 @@ export async function verifyIntegrity(directory) {
       }
     }
     const payloads = new Map();
+    let materials;
     for (const artifact of artifacts) {
-      const bytes = await regularFile(
-        path.join(directory, 'artifacts', artifact.sha256),
-        64 * 1024 * 1024,
-        artifact.size,
-      );
+      let bytes;
+      if (artifact.path.startsWith('/runtime/materials/')) {
+        materials ??= await collectMaterials();
+        const isScript = manifest.hostScripts.includes(artifact);
+        const candidates = isScript
+          ? [
+              ...materials.catalog.hostScripts,
+              ...materials.catalog.compatibility,
+            ]
+          : materials.catalog.resources;
+        const expected = candidates.find(
+          (value) => value.sha256 === artifact.sha256,
+        );
+        if (
+          !expected ||
+          ['path', 'sha256', 'size', 'contentType'].some(
+            (key) => artifact[key] !== expected[key],
+          ) ||
+          (!isScript && artifact.logicalName !== expected.logicalName)
+        ) {
+          throw new VerificationFailure(
+            'unknown_material',
+            'Shared runtime material does not match the pinned host catalog',
+          );
+        }
+        bytes = materials.data.get(artifact.sha256)?.bytes;
+        if (!bytes || bytes.length !== artifact.size) {
+          throw new VerificationFailure(
+            'size_mismatch',
+            'Shared runtime material size mismatch',
+          );
+        }
+      } else {
+        bytes = await regularFile(
+          path.join(directory, 'artifacts', artifact.sha256),
+          64 * 1024 * 1024,
+          artifact.size,
+        );
+      }
       if (digest(bytes) !== artifact.sha256)
         throw new VerificationFailure(
           'hash_mismatch',
@@ -217,6 +253,12 @@ export async function verifyIntegrity(directory) {
       manifestSha256: digest(manifestBytes),
       sourceIds: manifest.sourceIds,
       artifactCount: payloads.size,
+      privateArtifactCount: artifacts.filter((value) =>
+        value.path.startsWith('/api/'),
+      ).length,
+      sharedMaterialCount: artifacts.filter((value) =>
+        value.path.startsWith('/runtime/'),
+      ).length,
       artifactBytes: [...payloads.values()].reduce(
         (sum, value) => sum + value.size,
         0,

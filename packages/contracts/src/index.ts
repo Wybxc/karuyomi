@@ -20,7 +20,11 @@ export const bootstrapSchema = z.object({
 });
 
 export const artifactSchema = z.object({
-  path: z.string().regex(/^\/api\/extensions\/artifacts\/[a-f0-9]{64}$/),
+  path: z
+    .string()
+    .regex(
+      /^\/(?:api\/extensions\/artifacts|runtime\/materials)\/[a-f0-9]{64}$/,
+    ),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   size: z
     .number()
@@ -68,12 +72,24 @@ export const buildManifestSchema = z
       });
     }
     for (const artifact of artifacts) {
-      if (artifact.path !== `/api/extensions/artifacts/${artifact.sha256}`) {
+      if (
+        artifact.path !== `/api/extensions/artifacts/${artifact.sha256}` &&
+        artifact.path !== `/runtime/materials/${artifact.sha256}`
+      ) {
         ctx.addIssue({
           code: 'custom',
           message: 'Artifact path must match its registered hash',
         });
       }
+    }
+    if (
+      manifest.bundle.path !==
+      `/api/extensions/artifacts/${manifest.bundle.sha256}`
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Extension programs must use private artifact delivery',
+      });
     }
   });
 

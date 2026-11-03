@@ -20,6 +20,15 @@ def quote(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
+def material_catalog():
+    # Metadata comes from the pinned host sources, never from the build being
+    # registered. --print does not require npm packages or the private JVM seed.
+    return json.loads(subprocess.check_output(
+        ['node', str(ROOT / 'packages/runtime-host/prepare-materials.mjs'), '--print'],
+        cwd=ROOT, text=True,
+    ))
+
+
 def verify(manifest, folder):
     if not isinstance(manifest, dict):
         raise ValueError('Invalid build manifest')
@@ -49,19 +58,39 @@ def verify(manifest, folder):
             raise ValueError('Invalid resource logical name')
     artifacts = [manifest.get('bundle'), *manifest['hostScripts'], *manifest.get('resources', [])]
     result = {}
-    for artifact in artifacts:
+    seen = {}
+    catalog = None
+    for index, artifact in enumerate(artifacts):
         if not isinstance(artifact, dict) or not isinstance(artifact.get('sha256'), str):
             raise ValueError('Invalid artifact')
         digest = artifact['sha256']
-        if not re.fullmatch('[a-f0-9]{64}', digest) or artifact.get('path') != '/api/extensions/artifacts/' + digest:
+        private = artifact.get('path') == '/api/extensions/artifacts/' + digest
+        shared = artifact.get('path') == '/runtime/materials/' + digest
+        if not re.fullmatch('[a-f0-9]{64}', digest) or not (private or shared) or (index == 0 and not private):
             raise ValueError('Invalid artifact reference')
         if type(artifact.get('size')) is not int or not 0 < artifact['size'] <= 64 * 1024 * 1024:
             raise ValueError('Invalid artifact size')
         content_type = artifact.get('contentType', 'application/octet-stream')
         if content_type not in ('application/javascript', 'text/javascript', 'application/wasm', 'application/octet-stream', 'application/json'):
             raise ValueError('Unsupported artifact MIME')
-        if digest in result and content_type != result[digest].get('contentType', 'application/octet-stream'):
+        if digest in seen and content_type != seen[digest]:
             raise ValueError('Conflicting MIME for the same artifact')
+        seen[digest] = content_type
+        if shared:
+            if catalog is None:
+                catalog = material_catalog()
+            role = 'hostScripts' if index <= len(manifest['hostScripts']) else 'resources'
+            candidates = catalog[role]
+            if role == 'hostScripts':
+                candidates = [*candidates, *catalog.get('compatibility', [])]
+            expected = next((value for value in candidates if value['sha256'] == digest), None)
+            if expected is None or any(artifact.get(key) != expected[key] for key in ['path', 'sha256', 'size', 'contentType']):
+                raise ValueError('Unknown or incompatible shared runtime material')
+            if role == 'resources' and artifact['logicalName'] != expected['logicalName']:
+                raise ValueError('Shared resource logical name mismatch')
+            # Static/app materials are verified against the host catalog, and
+            # never uploaded to private R2 or associated in build_artifacts.
+            continue
         file = folder / digest
         size = file.stat().st_size
         if not 0 < size <= 64 * 1024 * 1024 or size != artifact['size']:

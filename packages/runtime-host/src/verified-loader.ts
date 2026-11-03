@@ -15,10 +15,15 @@ export const sha256 = async (bytes: Uint8Array): Promise<string> => {
   ).join('');
 };
 
+export type RuntimeMaterialResolver = (
+  sha256: string,
+) => { bytes: Uint8Array; contentType: string } | undefined;
+
 export class VerifiedLoader {
   constructor(
     private readonly origin: string,
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
+    private readonly materialResolver?: RuntimeMaterialResolver,
   ) {}
 
   private async response(path: string, signal: AbortSignal): Promise<Response> {
@@ -175,6 +180,84 @@ export class VerifiedLoader {
         'Runtime asset hash does not match the authenticated manifest',
       );
     }
+    return bytes;
+  }
+
+  /** Shared host code/data comes from static Web assets or the installed app. */
+  async sharedArtifact(
+    artifact: Artifact,
+    signal: AbortSignal,
+    script = false,
+  ): Promise<Uint8Array> {
+    signal.throwIfAborted();
+    if (
+      artifact.path !== `/runtime/materials/${artifact.sha256}` &&
+      artifact.path !== `/api/extensions/artifacts/${artifact.sha256}`
+    ) {
+      throw new RuntimeFailure(
+        'integrity_error',
+        'Material URL does not match its digest',
+      );
+    }
+    let bytes: Uint8Array;
+    let mime: string | null;
+    if (this.materialResolver) {
+      const material = this.materialResolver(artifact.sha256);
+      if (!material) {
+        throw new RuntimeFailure(
+          'unsupported_capability',
+          'The installed app does not include this runtime material; update the app',
+        );
+      }
+      bytes = material.bytes.slice();
+      mime = material.contentType;
+    } else {
+      const url = new URL(`/runtime/materials/${artifact.sha256}`, this.origin);
+      const response = await this.fetcher(url.href, {
+        signal,
+        credentials: 'omit',
+        redirect: 'manual',
+        cache: 'force-cache',
+      });
+      if (!response.ok || response.type === 'opaqueredirect') {
+        await response.body?.cancel();
+        throw new RuntimeFailure(
+          'unsupported_capability',
+          'This Web deployment does not include the required runtime material',
+        );
+      }
+      mime = response.headers.get('content-type');
+      bytes = await this.readBounded(response, artifact.size, true);
+    }
+    mime = mime?.split(';')[0]?.trim().toLowerCase() ?? null;
+    const declared = artifact.contentType?.toLowerCase();
+    if (
+      !mime ||
+      (script &&
+        !['application/javascript', 'text/javascript'].includes(mime)) ||
+      (declared &&
+        mime !== declared &&
+        !(
+          script &&
+          ['application/javascript', 'text/javascript'].includes(declared) &&
+          ['application/javascript', 'text/javascript'].includes(mime)
+        ))
+    ) {
+      throw new RuntimeFailure(
+        'integrity_error',
+        'Runtime material MIME does not match the manifest',
+      );
+    }
+    if (
+      bytes.byteLength !== artifact.size ||
+      (await sha256(bytes)) !== artifact.sha256
+    ) {
+      throw new RuntimeFailure(
+        'integrity_error',
+        'Runtime material size or hash does not match the manifest',
+      );
+    }
+    signal.throwIfAborted();
     return bytes;
   }
 }

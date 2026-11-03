@@ -122,6 +122,41 @@ class RegistrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             register.verify(manifest, self.folder)
 
+    def test_shared_materials_are_catalog_checked_without_private_uploads(self):
+        catalog = register.material_catalog()
+        self.manifest['hostScripts'] = catalog['hostScripts']
+        self.manifest['resources'] = catalog['resources']
+        artifacts = register.verify(self.manifest, self.folder)
+        self.assertEqual(list(artifacts), [self.manifest['bundle']['sha256']])
+        self.execute(self.sql())
+        self.assertEqual(len(self.rows('extension_artifacts')), 1)
+        self.assertEqual(len(self.rows('build_artifacts')), 1)
+
+    def test_shared_material_hash_size_mime_role_and_name_are_bound(self):
+        catalog = register.material_catalog()
+        for key, value in [('sha256', 'b' * 64), ('size', 1),
+                           ('contentType', 'application/wasm')]:
+            manifest = copy.deepcopy(self.manifest)
+            manifest['hostScripts'] = [dict(catalog['hostScripts'][0], **{key: value})]
+            if key == 'sha256':
+                manifest['hostScripts'][0]['path'] = '/runtime/materials/' + value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                register.verify(manifest, self.folder)
+        manifest = copy.deepcopy(self.manifest)
+        manifest['hostScripts'] = catalog['resources']
+        with self.assertRaises(ValueError):
+            register.verify(manifest, self.folder)
+        manifest['hostScripts'] = []
+        manifest['resources'] = [dict(catalog['resources'][0], logicalName='different.wasm')]
+        with self.assertRaises(ValueError):
+            register.verify(manifest, self.folder)
+
+    def test_public_bundle_is_rejected_even_if_it_matches_a_material(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest['bundle'] = register.material_catalog()['hostScripts'][0]
+        with self.assertRaises(ValueError):
+            register.verify(manifest, self.folder)
+
     def test_failed_upload_never_starts_metadata_publication(self):
         manifest = copy.deepcopy(self.manifest)
         manifest['hostScripts'] = [fixture(self.folder, b'const helper = 1;')['bundle']]

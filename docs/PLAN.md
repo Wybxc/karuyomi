@@ -25,7 +25,7 @@
 
 当前证据与正式回归入口见 [VERIFICATION.md](VERIFICATION.md) 和 [TeaVM 说明](../runtime/teavm/README.md)。独立机制研究只保留验证摘要，临时工程存于被忽略的本地归档，不作为产品源码或发布工具提交。`docs/design/` 的冻结设计副本继续保留，不随工程进展改写。
 
-首次全量扩展 AOT 尚未启动。官方源码发现 1,448 包；MangaDraft 与 Arknights Comics 两个当前版本已完成隔离 AOT 和真实浏览器初始化，在线兼容性未据此通过。按最新要求，先完成[包体分析](AOT-SIZE.md)，再调整共享材料的 Web 静态 / Native 内置交付与压缩，并以少量样本验证优化；之后才从本地启动首次全量。增量 CI 已有缺失初始基线的保护。
+官方源码发现 1,448 包；[包体分析](AOT-SIZE.md)已确定首次方案：共享材料在 Web 静态 / Native 内置交付，每包 Release 使用确定性 gzip，保留 TeaVM `ADVANCED` 与现有服务。逐包输出只含私有 AOT，材料与压缩恢复契约已通过回归；发布输入固定后，从本地发布两份代表包，再继续可恢复的全量队列。MangaDraft 与 Arknights Comics 的此前构建通过真实浏览器初始化，在线兼容性未据此通过；新发布默认仍为 `compiled_unverified`。增量 CI 保留缺失初始基线的保护，首次全量不占用 CI。
 
 ## 后续顺序与验收
 

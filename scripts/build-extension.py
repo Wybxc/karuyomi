@@ -95,6 +95,35 @@ def put(output, file, content_type):
             'size': len(data), 'contentType': content_type}
 
 
+def material_catalog():
+    process = subprocess.run(['node', str(ROOT / 'packages/runtime-host/prepare-materials.mjs'), '--print'],
+                             cwd=ROOT, capture_output=True, check=True)
+    if len(process.stdout) > 1024 * 1024:
+        raise ValueError('Oversized shared material catalog')
+    materials = json.loads(process.stdout)
+    protocol = json.loads((ROOT / 'packages/contracts/protocol.json').read_text())
+    if not isinstance(materials, dict) or type(materials.get('schemaVersion')) is not int or materials['schemaVersion'] != 1 or any(
+            type(materials.get(key)) is not type(value) or materials.get(key) != value for key, value in protocol.items()):
+        raise ValueError('Shared material protocol ABI mismatch')
+    if not isinstance(materials.get('materialVersion'), str) or not re.fullmatch('[a-f0-9]{64}', materials['materialVersion']):
+        raise ValueError('Invalid shared material version')
+    for group in ['hostScripts', 'resources']:
+        values = materials.get(group)
+        if not isinstance(values, list) or not 1 <= len(values) <= 16:
+            raise ValueError('Invalid shared material list: ' + group)
+        for item in values:
+            if not isinstance(item, dict) or not isinstance(item.get('sha256'), str) or not re.fullmatch('[a-f0-9]{64}', item['sha256']):
+                raise ValueError('Invalid shared material hash')
+            if item.get('path') != '/runtime/materials/' + item['sha256'] or type(item.get('size')) is not int or not 0 < item['size'] <= 64 * 1024 * 1024:
+                raise ValueError('Invalid shared material reference')
+            if not isinstance(item.get('logicalName'), str) or not 1 <= len(item['logicalName']) <= 100:
+                raise ValueError('Invalid shared material logical name')
+            expected_type = 'application/javascript' if group == 'hostScripts' else 'application/wasm'
+            if item.get('contentType') != expected_type:
+                raise ValueError('Invalid shared material MIME')
+    return materials, sha(process.stdout)
+
+
 def build(args):
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -115,6 +144,7 @@ def build(args):
         result.update(packageName=descriptor.get('packageName'), buildId=descriptor.get('buildId'))
         upstream = args.upstream.resolve()
         validate_descriptor(descriptor, upstream)
+        materials, materials_hash = material_catalog()
         runtime = load_module('prepare_runtime', ROOT / 'scripts/prepare-runtime.py').prepare(args.seed, args.android)
         java_home = Path(runtime['javaHome'])
         java_version = subprocess.run([str(java_home / 'bin/java'), '-version'], text=True, capture_output=True, check=True).stderr.strip()
@@ -200,23 +230,21 @@ def build(args):
         bundle = put(output, work / 'public/teavm' / key / 'app.js', 'text/javascript')
         manifest = {'buildId': descriptor['buildId'], 'repoId': 'keiyoushi', 'packageName': descriptor['packageName'],
                     'version': metadata['versionName'], 'sourceIds': sorted(str(item['id']) for item in metadata['sources']),
-                    'protocolVersion': 1, 'hostAbi': 'karuyomi-source-host-v1', 'runtimeBaseline': 'teavm-0.16.0-js-release9',
-                    'bridgeVersion': 1, 'storageSchema': 'release9-v1', 'bundle': bundle, 'hostScripts': [], 'resources': []}
-        for name in ['crypto-bridge.js', 'zstd-bridge.js', 'graphics-bridge.js', 'cache-bridge.js', 'file-bridge.js']:
-            manifest['hostScripts'].append(put(output, RUNTIME / 'bridge' / name, 'text/javascript'))
-        resource = put(output, Path(runtime['materials']) / 'public/assets/zstd-CV7N7xSg.wasm', 'application/wasm')
-        resource['logicalName'] = 'zstd.wasm'
-        manifest['resources'].append(resource)
+                    **{key: materials[key] for key in ['protocolVersion', 'hostAbi', 'runtimeBaseline']},
+                    'bridgeVersion': 1, 'storageSchema': 'release9-v1', 'bundle': bundle,
+                    'hostScripts': materials['hostScripts'], 'resources': materials['resources']}
         record = json.loads((work / 'results' / ('build-' + key + '.json')).read_text())
         provenance = {'schemaVersion': 1, 'descriptor': descriptor, 'upstream': {'commit': descriptor['upstreamCommit'],
                       'metadata': metadata, 'jar': original.name, 'jarSha256': original_hash},
                       'toolchain': {'androidHome': env['ANDROID_HOME'], 'java': java_version, 'maven': '3.9.11', 'teavm': '0.16.0', 'runtime': runtime},
+                      'sharedMaterials': {'materialVersion': materials['materialVersion'], 'catalogSha256': materials_hash,
+                                          'protocolABI': {key: materials[key] for key in ['protocolVersion', 'hostAbi', 'runtimeBaseline']}},
                       'aot': record, 'generatedUpstreamAdapters': [{'path': path.relative_to(work).as_posix(), 'sha256': sha(path.read_bytes())} for path in generated_adapters], 'manifestSha256': sha((json.dumps(manifest, indent=2, ensure_ascii=False) + '\n').encode()),
                       'compatibility': {'browserInitialized': False, 'onlineMetadata': False, 'productImages': False},
                       'boundary': 'Compilation and immutable input/hash provenance only. Verify actual Worker initialization separately.'}
         save(output / 'provenance.json', provenance)
         save(output / 'manifest.json', manifest)
-        artifacts = [manifest['bundle'], *manifest['hostScripts'], *manifest['resources']]
+        artifacts = [manifest['bundle']]
         result.update(status='built', stage='complete', manifestPath='manifest.json',
                       artifacts=[{'sha256': item['sha256'], 'size': item['size'], 'path': 'artifacts/' + item['sha256']} for item in artifacts],
                       seconds=round(time.monotonic() - started, 3), provenancePath='provenance.json')

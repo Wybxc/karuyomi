@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 from catalog import ROOT, HOST_PATHS, canonical, digest, git, host_fingerprint, host_submodules, scan
-from releases import GitHub, download_release, publish_immutable
+from releases import GitHub, download_release, encode_artifact, publish_immutable, restore_artifacts
 
 
 def read_json(path):
@@ -95,13 +95,31 @@ def verify_output(directory, descriptor=None):
     return manifest, artifacts, validation
 
 
-def release_files(directory, descriptor):
+def release_files(directory, descriptor, encoding='gzip'):
     directory = Path(directory)
     manifest, artifacts, validation = verify_output(directory, descriptor)
     provenance = {'schemaVersion': 1, 'kind': 'source-aot', 'descriptor': descriptor,
                   'manifestSha256': digest((directory / 'manifest.json').read_bytes()),
                   'validationStatus': 'browser_verified' if validation['runtimeReady'] else 'compiled_unverified'}
     files = {sha: directory / 'artifacts' / sha for sha in artifacts}
+    if encoding not in {'gzip', 'identity'}:
+        raise ValueError('Unknown release artifact encoding')
+    if encoding == 'gzip':
+        bundle_sha = manifest['bundle']['sha256']
+        transport = directory / 'release-transport'
+        if (transport / 'artifact-encodings.json').is_file():
+            # Preserve exact verified transport bytes when retrying an immutable
+            # release, even if a different zlib version would encode differently.
+            with tempfile.TemporaryDirectory(prefix='karuyomi-check-encoding-') as temporary:
+                restore_artifacts(transport, temporary, {bundle_sha: artifacts[bundle_sha]}, bundle_sha)
+            encoded = (transport / (bundle_sha + '.gz')).read_bytes()
+            table = (transport / 'artifact-encodings.json').read_bytes()
+        else:
+            encoded, entry = encode_artifact(bundle_sha, files[bundle_sha])
+            table = canonical({'schemaVersion': 1, 'artifacts': [entry]}) + b'\n'
+        del files[bundle_sha]
+        files[bundle_sha + '.gz'] = encoded
+        files['artifact-encodings.json'] = table
     files['manifest.json'] = directory / 'manifest.json'
     files['provenance.json'] = canonical(provenance) + b'\n'
     files['validation.json'] = canonical(validation) + b'\n'
@@ -111,6 +129,7 @@ def release_files(directory, descriptor):
 
 
 def restore_build(api, descriptor, output):
+    output = Path(output)
     with tempfile.TemporaryDirectory(prefix='karuyomi-release-') as folder:
         if not download_release(api, descriptor['releaseTag'], folder):
             return False
@@ -120,18 +139,28 @@ def restore_build(api, descriptor, output):
         if provenance.get('kind') != 'source-aot' or any(previous.get(key) != descriptor.get(key) for key in
                 ['packageName', 'versionCode', 'inputFingerprint', 'sourceFingerprint', 'hostFingerprint']):
             raise ValueError('Existing release has different source provenance')
-        output.mkdir(parents=True, exist_ok=True)
-        (output / 'artifacts').mkdir(exist_ok=True)
+        staged = folder / 'restored'
+        staged.mkdir()
+        manifest = read_json(folder / 'manifest.json')
+        references = [manifest['bundle'], *manifest.get('hostScripts', []), *manifest.get('resources', [])]
+        artifacts = {item['sha256']: item for item in references
+                     if item.get('path') == '/api/extensions/artifacts/' + str(item.get('sha256'))}
+        encoding = restore_artifacts(folder, staged / 'artifacts', artifacts, manifest['bundle']['sha256'])
         for file in folder.iterdir():
-            if len(file.name) == 64 and all(c in '0123456789abcdef' for c in file.name):
-                shutil.copyfile(file, output / 'artifacts' / file.name)
-            elif file.name in {'manifest.json', 'validation.json'}:
-                shutil.copyfile(file, output / file.name)
+            if file.name in {'manifest.json', 'validation.json'}:
+                shutil.copyfile(file, staged / file.name)
             elif file.name == 'build-provenance.json':
-                shutil.copyfile(file, output / 'provenance.json')
-        verify_output(output, descriptor)
+                shutil.copyfile(file, staged / 'provenance.json')
+        verify_output(staged, descriptor)
+        if encoding == 'gzip':
+            transport = staged / 'release-transport'
+            transport.mkdir()
+            for name in ['artifact-encodings.json', manifest['bundle']['sha256'] + '.gz']:
+                shutil.copyfile(folder / name, transport / name)
+        output.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(staged, output, dirs_exist_ok=True)
         write_json(output / 'pipeline-result.json', {'status': 'built', 'restored': True,
-                   'descriptor': descriptor, 'releaseDescriptor': previous})
+                   'descriptor': descriptor, 'releaseDescriptor': previous, 'releaseEncoding': encoding})
         return True
 
 
@@ -188,7 +217,7 @@ def record_result(state, descriptor, result, directory, api=None, target=None):
             if any(release_descriptor.get(key) != descriptor.get(key) for key in
                    ['packageName', 'versionCode', 'versionName', 'inputFingerprint', 'sourceFingerprint', 'hostFingerprint', 'buildId']):
                 raise ValueError('Restored release does not match planned identity')
-            files, provenance, validation = release_files(directory, release_descriptor)
+            files, provenance, validation = release_files(directory, release_descriptor, result.get('releaseEncoding', 'gzip'))
             record['descriptor'] = release_descriptor
             record['release'] = publish_immutable(api, descriptor['releaseTag'], files, target)
             record.update(status='published', validationStatus=provenance['validationStatus'], runtimeReady=validation['runtimeReady'])

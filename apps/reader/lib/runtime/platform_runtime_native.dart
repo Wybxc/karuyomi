@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:collection';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'runtime_platform_types.dart';
+import 'native_runtime_assets.dart';
 
 PlatformRuntime createPlatformRuntime({Uri? origin}) {
   if (origin == null) {
@@ -84,8 +87,34 @@ final class NativePlatformRuntime extends PlatformRuntime {
 
   Future<void> _startHost() async {
     final generation = ++_generation;
+    final assets = await NativeRuntimeAssets.load();
+    if (Platform.isAndroid &&
+        !await WebViewFeature.isFeatureSupported(
+          WebViewFeature.DOCUMENT_START_SCRIPT,
+        )) {
+      throw const RuntimeException(
+        RuntimeErrorCode.unsupportedCapability,
+        'This Android WebView cannot install the bundled runtime before page scripts',
+      );
+    }
+    if (_disposed || generation != _generation) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Native runtime container was replaced while loading app assets',
+      );
+    }
     final loaded = Completer<void>();
     _view = HeadlessInAppWebView(
+      initialUserScripts: UnmodifiableListView([
+        UserScript(
+          groupName: 'karuyomi-native-runtime',
+          source: assets.documentStartScript(origin),
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+          contentWorld: ContentWorld.PAGE,
+          forMainFrameOnly: true,
+          allowedOriginRules: {origin.origin},
+        ),
+      ]),
       initialUrlRequest: URLRequest(
         url: WebUri(origin.resolve('/runtime/host.html').toString()),
       ),
@@ -96,7 +125,7 @@ final class NativePlatformRuntime extends PlatformRuntime {
         useOnRenderProcessGone: true,
       ),
       onWebViewCreated: (controller) {
-        _controller = controller;
+        if (generation == _generation) _controller = controller;
       },
       shouldOverrideUrlLoading: (controller, action) async {
         final target = action.request.url;
@@ -104,6 +133,14 @@ final class NativePlatformRuntime extends PlatformRuntime {
         // runtime never silently follows a cross-origin login document.
         if (target != null &&
             Uri.parse(target.toString()).origin != origin.origin) {
+          if (generation == _generation && !loaded.isCompleted) {
+            loaded.completeError(
+              const RuntimeException(
+                RuntimeErrorCode.accessRequired,
+                'Access login requires a visible authentication flow',
+              ),
+            );
+          }
           return NavigationActionPolicy.CANCEL;
         }
         return NavigationActionPolicy.ALLOW;
@@ -121,8 +158,15 @@ final class NativePlatformRuntime extends PlatformRuntime {
         }
         try {
           final result = await controller.callAsyncJavaScript(
-            functionBody:
-                "if (!window.karuyomiRuntime) throw new Error('Runtime module is missing'); return await window.karuyomiRuntime.ready;",
+            functionBody: '''
+              const installed = window.__karuyomiNativeRuntimeInstalled;
+              if (!installed || installed.materialVersion !== materialVersion ||
+                  installed.runtime !== window.karuyomiRuntime) {
+                throw new Error('Bundled Native runtime is missing or was replaced');
+              }
+              return await window.karuyomiRuntime.ready;
+            ''',
+            arguments: {'materialVersion': assets.materialVersion},
           );
           if (result?.error != null || result?.value is! Map) {
             throw const RuntimeException(
@@ -136,7 +180,9 @@ final class NativePlatformRuntime extends PlatformRuntime {
         }
       },
       onReceivedError: (controller, request, error) {
-        if (request.isForMainFrame == true && !loaded.isCompleted) {
+        if (generation == _generation &&
+            request.isForMainFrame == true &&
+            !loaded.isCompleted) {
           loaded.completeError(
             RuntimeException(RuntimeErrorCode.runtimeLost, error.description),
           );

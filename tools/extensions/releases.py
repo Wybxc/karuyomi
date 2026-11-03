@@ -1,13 +1,95 @@
 """GitHub private-release transport and immutable, resumable publication."""
 from pathlib import Path
+import gzip
 import hashlib
+import io
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 
 from catalog import canonical, digest
+
+MAX_ARTIFACT_BYTES = 64 * 1024 * 1024
+MAX_ENCODED_BYTES = 65 * 1024 * 1024
+
+
+def encode_artifact(sha256, data):
+    """Encode canonical bytes without a timestamp, filename, or host OS header."""
+    data = bytes_of(data)
+    if not 0 < len(data) <= MAX_ARTIFACT_BYTES or digest(data) != sha256:
+        raise ValueError('Invalid canonical artifact')
+    stream = io.BytesIO()
+    with gzip.GzipFile(filename='', mode='wb', fileobj=stream, compresslevel=9, mtime=0) as archive:
+        archive.write(data)
+    encoded = stream.getvalue()
+    entry = {'sha256': sha256, 'size': len(data), 'asset': sha256 + '.gz', 'encoding': 'gzip',
+             'encodedSha256': digest(encoded), 'encodedSize': len(encoded)}
+    return encoded, entry
+
+
+def restore_artifacts(directory, output, artifacts, bundle_sha):
+    """Restore a source release, checking transport and canonical identities.
+
+    A missing encoding table is the original raw-asset format. A present table
+    is authoritative: invalid gzip never falls back to an unencoded asset.
+    """
+    directory, output = Path(directory), Path(output)
+    table_path = directory / 'artifact-encodings.json'
+    entries = {}
+    if table_path.exists():
+        if table_path.stat().st_size > 64 * 1024:
+            raise ValueError('Oversized artifact encoding table')
+        table = json.loads(table_path.read_bytes())
+        if not isinstance(table, dict) or type(table.get('schemaVersion')) is not int or table['schemaVersion'] != 1 or not isinstance(table.get('artifacts'), list):
+            raise ValueError('Invalid artifact encoding table')
+        for entry in table['artifacts']:
+            if not isinstance(entry, dict) or set(entry) != {'sha256', 'size', 'asset', 'encoding', 'encodedSha256', 'encodedSize'}:
+                raise ValueError('Invalid artifact encoding entry')
+            sha256 = entry['sha256']
+            if sha256 != bundle_sha or sha256 not in artifacts or sha256 in entries:
+                raise ValueError('Encoding must identify exactly the private bundle')
+            if entry['asset'] != sha256 + '.gz' or entry['encoding'] != 'gzip':
+                raise ValueError('Invalid encoded asset reference')
+            if not isinstance(entry['encodedSha256'], str) or not re.fullmatch('[a-f0-9]{64}', entry['encodedSha256']):
+                raise ValueError('Invalid encoded artifact hash')
+            if type(entry['size']) is not int or entry['size'] != artifacts[sha256]['size']:
+                raise ValueError('Canonical artifact size mismatch')
+            if type(entry['encodedSize']) is not int or not 0 < entry['encodedSize'] <= MAX_ENCODED_BYTES:
+                raise ValueError('Invalid encoded artifact size')
+            entries[sha256] = entry
+        if set(entries) != {bundle_sha}:
+            raise ValueError('Encoding table lacks the private bundle')
+    output.mkdir(parents=True, exist_ok=True)
+    for sha256, artifact in artifacts.items():
+        size = artifact.get('size')
+        if not re.fullmatch('[a-f0-9]{64}', sha256) or type(size) is not int or not 0 < size <= MAX_ARTIFACT_BYTES:
+            raise ValueError('Invalid canonical artifact reference')
+        entry = entries.get(sha256)
+        file = directory / (entry['asset'] if entry else sha256)
+        expected_size = entry['encodedSize'] if entry else size
+        if file.is_symlink() or file.stat().st_size != expected_size:
+            raise ValueError('Downloaded artifact size mismatch')
+        data = file.read_bytes()
+        if entry:
+            if digest(data) != entry['encodedSha256']:
+                raise ValueError('Encoded artifact integrity mismatch')
+            decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+            try:
+                data = decoder.decompress(data, size + 1)
+            except zlib.error:
+                raise ValueError('Invalid gzip artifact') from None
+            if len(data) > size or decoder.unconsumed_tail:
+                raise ValueError('Decoded artifact exceeds canonical size')
+            if not decoder.eof or decoder.unused_data:
+                raise ValueError('Truncated or trailing gzip artifact')
+        if len(data) != size or digest(data) != sha256:
+            raise ValueError('Canonical artifact integrity mismatch')
+        (output / sha256).write_bytes(data)
+    return 'gzip' if entries else 'identity'
 
 
 class SafeRedirect(urllib.request.HTTPRedirectHandler):

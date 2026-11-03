@@ -126,6 +126,99 @@ test('cross-origin and public manifest paths cannot be fetched', async () => {
   expect(fetcher).not.toHaveBeenCalled();
 });
 
+test('Web shared materials always use credential-free static digest paths', async () => {
+  const fetcher = vi.fn(
+    async () =>
+      new Response(bytes, {
+        headers: { 'Content-Type': 'application/javascript; charset=utf-8' },
+      }),
+  );
+  const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
+  const value = {
+    ...(await artifact()),
+    contentType: 'application/javascript',
+  };
+  // Legacy manifests also resolve to the retained static material.
+  expect(await loader.sharedArtifact(value, signal(), true)).toEqual(bytes);
+  expect(fetcher).toHaveBeenCalledWith(
+    `${origin}/runtime/materials/${value.sha256}`,
+    expect.objectContaining({
+      credentials: 'omit',
+      redirect: 'manual',
+      cache: 'force-cache',
+    }),
+  );
+  await expect(
+    loader.artifact(
+      { ...value, path: `/runtime/materials/${value.sha256}` },
+      signal(),
+      true,
+    ),
+  ).rejects.toMatchObject({ code: 'integrity_error' });
+});
+
+test('Native shared materials use only bundled bytes and never fall back to network', async () => {
+  const fetcher = vi.fn();
+  const value = {
+    ...(await artifact()),
+    contentType: 'application/javascript',
+  };
+  const loader = new VerifiedLoader(origin, fetcher as typeof fetch, (hash) =>
+    hash === value.sha256
+      ? { bytes, contentType: 'application/javascript' }
+      : undefined,
+  );
+  const loaded = await loader.sharedArtifact(value, signal(), true);
+  expect(loaded).toEqual(bytes);
+  expect(loaded).not.toBe(bytes);
+  const missing = new VerifiedLoader(
+    origin,
+    fetcher as typeof fetch,
+    () => undefined,
+  );
+  await expect(
+    missing.sharedArtifact(value, signal(), true),
+  ).rejects.toMatchObject({ code: 'unsupported_capability' });
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+test('shared materials reject changed bytes, MIME and paths before execution', async () => {
+  const value = {
+    ...(await artifact()),
+    contentType: 'application/javascript',
+  };
+  const corrupt = new Uint8Array(bytes);
+  corrupt[0] ^= 1;
+  for (const material of [
+    { bytes: corrupt, contentType: 'application/javascript' },
+    { bytes, contentType: 'text/html' },
+    { bytes: bytes.subarray(1), contentType: 'application/javascript' },
+  ]) {
+    const loader = new VerifiedLoader(origin, vi.fn(), () => material);
+    await expect(
+      loader.sharedArtifact(value, signal(), true),
+    ).rejects.toMatchObject({ code: 'integrity_error' });
+  }
+  const fetcher = vi.fn();
+  await expect(
+    new VerifiedLoader(origin, fetcher).sharedArtifact(
+      { ...value, path: 'https://attacker.example/' + value.sha256 },
+      signal(),
+      true,
+    ),
+  ).rejects.toMatchObject({ code: 'integrity_error' });
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+test('unavailable Web material never falls back to the private artifact endpoint', async () => {
+  const fetcher = vi.fn(async () => new Response('', { status: 404 }));
+  const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
+  await expect(
+    loader.sharedArtifact(await artifact(), signal(), true),
+  ).rejects.toMatchObject({ code: 'unsupported_capability' });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
 test('incompatible manifest ABI is rejected as protocol error', async () => {
   const value = { ...(await manifest()), hostAbi: 'wrong-abi' };
   const loader = new VerifiedLoader(origin, (async () =>

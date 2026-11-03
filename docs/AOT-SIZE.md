@@ -1,6 +1,6 @@
 # 扩展 AOT 包体分析
 
-2026-11-03，首次全量尚未启动。本次使用此前已完成的两个当前源码构建，只测现有字节的压缩和后处理，没有启动新的 AOT。原始中间报告留在 ignored `.local`，本页保留后续决策需要的数据。
+2026-11-03，首次发布采用的方案已确定：共享桥/WASM 在 Web 静态交付、Native 随应用打包，每包 Release 仅发布确定性 gzip 编码的 AOT；保留 TeaVM `ADVANCED` 与现有宿主服务。以下包括现有产物测量和少量真实 A/B 编译，原始中间报告留在 ignored `.local`。
 
 优先做共享材料单独交付和传输压缩，再测宿主初始化是否引入无用依赖。TeaVM 当前已开启代码裁剪、混淆和均衡优化；把生成文件中的一段直接抽成共享 JavaScript 不能保证正确性。
 
@@ -23,7 +23,9 @@
 
 1. **共享材料只交付一份。** Web 在 `/runtime/materials/` 按摘要发布静态资源；Native 将相同材料随应用打包，由明确的 material 版本与摘要校验命中。每包清单声明所需材料，缺失或版本不匹配时明确失败。扩展 AOT 继续按版本发布到 GitHub Release，个人 API 和扩展私有交付仍经 Access。
 2. **区分构建依赖。** `runtime-materials.tar.gz` 中的 JAR、材料锁等仅供构建，不能作为应用安装依赖；Maven 与 Android SDK 同理。实际客户端只需生成的 AOT、桥脚本和用到的 WASM 等资源。
-3. **启用可验证的传输压缩。** Web 的 JS / WASM 可使用 HTTP gzip / Brotli；GitHub Release 的原始二进制资产不能假定会自动获得相同压缩，需设计带编码说明的压缩分发格式。编码后的长度/摘要与解码后的 canonical 长度/摘要分别记录；解码限额、最终校验、缓存与 Range 语义保持明确。R2 可继续保存 canonical 原文，通过 HTTP 层压缩完整响应。
+3. **启用可验证的传输压缩。** 新 source-aot Release 使用 `<canonicalSHA>.gz` 和 `artifact-encodings.json`，gzip level 9、固定时间戳 0。编码后的长度/摘要与解码后的 canonical 长度/摘要分别记录；恢复时限制解码长度，拒绝截断、尾随内容或多个 gzip stream，最终再次校验原文。旧 raw 资产继续可读且不会覆盖。R2 保存 canonical 原文，Range 仍以原文为准；生产 HTTP 压缩另行验收。
+
+两份真实 AOT 经正式发布器编码、模拟下载与恢复后，原始 SHA/字节完全一致：MangaDraft 3,777,975 → 791,368 bytes，Arknights Comics 1,824,293 → 583,749 bytes。每包只剩 1 个私有 AOT 和 6 个静态材料引用；这项 roundtrip 是本地输送验证，不是 GitHub 实际发布或运行兼容证据。与原来每包重复携带 297,697 bytes 材料相比，两包资产合计从 6,197,662 降至 1,375,117 bytes（不含小型清单、另行交付的共享材料）。
 
 当前 R2 已按 SHA 去重，共享交付的主要收益是减少每包发布重复、客户端重复获取，以及清晰的 Web / Native 资源边界。两个样本的 Release 资产合计可从 6,197,662 降为 5,899,965 bytes（减少 4.80%）。现有客户端也可能通过 ETag 得到 304，因此不能把全部原始字节当成每次必然节省的流量。若 1,448 包都包含同一套共享材料，按包重复发布会产生约 431 MB 原始资产；保留一份可避免约 430.8 MB 的重复。该数字是按相同材料的理论累计，不是当前实占或每个用户的下载量。
 
@@ -35,7 +37,7 @@ Cloudflare 的实际压缩受 MIME、状态码、浏览器协商、套餐与规�
 
 `TeaHost.init` 无条件注册 `ProtoBuf.Default` 和配置过的 kotlinx `Json`，会把对应初始化链变成可达代码。两个原业务 JAR 均没有 protobuf 类引用，实际业务 TypeMap 引用只有 Json；当前生成的 TypeMap 还包含 9 项来自依赖材料的历史宿主类型，其中包括 ProtoBuf。这是值得优先验证的多余可达根。
 
-可研究根据每包实际字节码与生成的 TypeMap 安装需要的服务，并收窄类型注册，让 TeaVM 裁剪不用的 codec。收益尚未测量；需要包含 JSON、ProtoBuf 和多 Source Factory 的样本验证，不能只凭文本搜索删掉依赖或影响原 Source 行为。
+已做真实 A/B 编译：只保留业务 TypeMap 所需的 Json，并移除无用 ProtoBuf 初始化。MangaDraft gzip / Brotli 仅减少 538 / 753 bytes，Arknights Comics 仅减少 298 / 275 bytes，约为压缩体积的 0.06%–0.12%。收益不足以支持增加逐包服务扫描和兼容分支，因此首批不采用，保留原 JAR 和现有初始化。
 
 反射策略已经限定到明确字段、构造器和 `JavascriptInterface` 方法，宿主 JSON DTO 使用显式读写；当前没有开启全库反射保留。后续应核对统计中的异常、线程、正则、集合、codec 和元数据占比，按实际依赖链处理。
 
@@ -43,7 +45,7 @@ Cloudflare 的实际压缩受 MIME、状态码、浏览器协商、套餐与规�
 
 `java/pom.xml` 当前为 `ADVANCED`、`minifying=true`、生产 source maps 关闭。固定 TeaVM 0.16.0 源码中的映射是 `NONE → SIMPLE`、`BALANCED → ADVANCED`、`AGGRESSIVE → FULL`，因此当前已处于官方 JS 默认的均衡档。不能把当前误判为尚未开优化，或把 `ADVANCED` 误解为激进档。
 
-`SIMPLE` 跳过内联，可作为后续少量样本的体积/启动/运行性能对照，收益与兼容性均待测。`FULL` 允许更大内联预算，不能预设它会缩小包体。下一次样本 AOT 应通过 `MAVEN_OPTS` 启用 JVM 属性 `-Dteavm.js.stats=true`；`JavaScriptTarget.printStats` 原生输出总量、元数据、字符串池和各 Java 包的代码大小，无需修改编译器。这些统计实际按 UTF-16 源码偏移计数，用于归因与相对比较；交付大小继续以 UTF-8 文件字节及压缩结果为准。依据：[官方 Gradle 选项](https://teavm.org/docs/tooling/gradle.html)、[Maven 选项](https://teavm.org/docs/tooling/maven.html)，以及固定子模块的 `TeaVMTask.java`、`TeaVM.java`、`JavaScriptTarget.java`。
+`SIMPLE` 跳过内联；`FULL` 允许更大内联预算，两者都不能预设更小。首批固定现有 `ADVANCED`，不为可选实验延迟发布。A/B 已通过 `MAVEN_OPTS=-Dteavm.js.stats=true` 获取 TeaVM 原生包级统计：主要体积来自 Jsoup parser、regex/re2j、Unicode 与 time formatting，收窄 ProtoBuf 服务未改变这些依赖链。统计实际按 UTF-16 源码偏移计数，只用于归因与相对比较；交付大小继续以 UTF-8 文件字节及压缩结果为准。依据：[官方 Gradle 选项](https://teavm.org/docs/tooling/gradle.html)、[Maven 选项](https://teavm.org/docs/tooling/maven.html)，以及固定子模块的 `TeaVMTask.java`、`TeaVM.java`、`JavaScriptTarget.java`。
 
 ### 提取公共常量数据
 
@@ -72,4 +74,4 @@ Cloudflare 的实际压缩受 MIME、状态码、浏览器协商、套餐与规�
 
 ## 首次全量前的顺序
 
-先调整共享材料交付和压缩契约；随后只用少量代表包开启包级体积统计，比较服务安装裁剪、当前 `ADVANCED` 与 `SIMPLE`，必要时再评估后处理。保留原业务 JAR，验证实际 Source ID、六项操作边界、网络/缓存/取消及压缩后完整性。选定策略后固定新的 host 输入身份，再从本地启动可断点续传的首次全量，CI 继续只跟随增量。
+共享材料与 gzip 契约固定并提交后，先在本地发布两份代表包，核对 GitHub 实际资产与恢复结果；随后启动可断点续传的首次全量，CI 只跟随增量。公共常量字典、二次 minify 和编译档位对比留作后续优化，不阻塞首批。编译成功仅发布为 `compiled_unverified`；真实 Source ID、六项操作、网络/缓存/取消与图片兼容仍按独立证据验收。

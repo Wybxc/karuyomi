@@ -56,8 +56,20 @@ abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
         'API transport did not return a response',
       );
     }
+    // WKWebView maps JavaScript Numbers to doubles, including HTTP status codes.
+    final status = value['status'];
+    if (status is! num ||
+        !status.isFinite ||
+        status != status.truncateToDouble() ||
+        (status != 0 && (status < 100 || status > 599)) ||
+        (status == 0 && value['redirected'] != true)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'API transport returned an invalid HTTP status',
+      );
+    }
     return ApiReply(
-      status: value['status'] as int,
+      status: status.toInt(),
       headers: Map<String, String>.from(value['headers'] as Map),
       body: value['body'] as String,
       redirected: value['redirected'] == true,

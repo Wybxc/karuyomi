@@ -1,7 +1,8 @@
 /* Durable Java files. Every mutation commits before its Java continuation resumes. */
 (() => {
   const params = new URL(location.href).searchParams;
-  const namespace = params.get('fsNamespace') || params.get('plugin') || 'webtoons';
+  const namespace = self.karuyomiWorkerContext?.fsNamespace || self.karuyomiWorkerContext?.plugin || params.get('fsNamespace') || params.get('plugin');
+  if (!namespace) throw new Error('Runtime filesystem namespace is required');
   const owner = crypto.randomUUID(), handles = new Map();
   const stores = ['paths', 'nodes', 'handles', 'owners'];
   let opening, starting, tail = Promise.resolve(), releaseOwner, closed = false;

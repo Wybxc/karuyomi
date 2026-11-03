@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { collectMaterials } from '../../packages/runtime-host/materials.mjs';
 import {
   completeBrowserValidation,
   digest,
@@ -115,6 +116,56 @@ test('same-length artifact corruption fails its SHA-256 gate', async (t) => {
   const { report } = await verifyIntegrity(directory);
   assert.equal(report.stages.artifactIntegrity, 'failed');
   assert.equal(report.failure.code, 'hash_mismatch');
+});
+
+test('shared materials use verified host bytes without per-build copies', async (t) => {
+  const { catalog, data } = await collectMaterials();
+  const { directory } = await fixture(t, (manifest) => {
+    manifest.hostScripts = catalog.hostScripts;
+    manifest.resources = catalog.resources;
+  });
+  const { report, payloads } = await verifyIntegrity(directory);
+  assert.equal(report.stages.artifactIntegrity, 'passed');
+  assert.equal(report.privateArtifactCount, 1);
+  assert.equal(report.sharedMaterialCount, 6);
+  for (const material of [...catalog.hostScripts, ...catalog.resources]) {
+    assert.deepEqual(
+      payloads.get(material.path).bytes,
+      data.get(material.sha256).bytes,
+    );
+  }
+});
+
+test('shared materials cannot substitute hash, metadata, role or logical name', async (t) => {
+  const { catalog } = await collectMaterials();
+  for (const edit of [
+    (manifest) => {
+      manifest.hostScripts[0].size += 1;
+    },
+    (manifest) => {
+      manifest.hostScripts[0].contentType = 'text/javascript';
+    },
+    (manifest) => {
+      manifest.hostScripts[0].sha256 = 'b'.repeat(64);
+      manifest.hostScripts[0].path = '/runtime/materials/' + 'b'.repeat(64);
+    },
+    (manifest) => {
+      manifest.hostScripts = catalog.resources;
+    },
+    (manifest) => {
+      manifest.resources[0].logicalName = 'other.wasm';
+    },
+  ]) {
+    const { directory } = await fixture(t, (manifest) => {
+      manifest.hostScripts = structuredClone(catalog.hostScripts);
+      manifest.resources = structuredClone(catalog.resources);
+      edit(manifest);
+    });
+    assert.equal(
+      (await verifyIntegrity(directory)).report.stages.artifactIntegrity,
+      'failed',
+    );
+  }
 });
 
 test('artifact length must exactly match the bounded manifest', async (t) => {

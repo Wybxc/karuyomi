@@ -13,7 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import catalog
 import pipeline
-from releases import SafeRedirect, download_release, publish_immutable
+from releases import SafeRedirect, download_release, encode_artifact, publish_immutable, restore_artifacts
 
 
 class FakeGitHub:
@@ -187,6 +187,83 @@ class ReleaseTests(unittest.TestCase):
             SafeRedirect().redirect_request(request, None, 302, 'Found', {}, 'http://example.invalid/file')
 
 
+class EncodingTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.folder = Path(self.temporary.name)
+        self.data = b'\x00\xff' + '中文ページ'.encode() + bytes(range(256)) * 64
+        self.sha = catalog.digest(self.data)
+        self.artifacts = {self.sha: {'sha256': self.sha, 'size': len(self.data)}}
+        self.encoded, self.entry = encode_artifact(self.sha, self.data)
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def write(self, encoded=None, entry=None):
+        encoded = self.encoded if encoded is None else encoded
+        entry = self.entry if entry is None else entry
+        (self.folder / (self.sha + '.gz')).write_bytes(encoded)
+        pipeline.write_json(self.folder / 'artifact-encodings.json', {'schemaVersion': 1, 'artifacts': [entry]})
+
+    def restore(self):
+        return restore_artifacts(self.folder, self.folder / 'out', self.artifacts, self.sha)
+
+    def test_deterministic_gzip_roundtrip_preserves_binary_and_unicode(self):
+        self.assertEqual(encode_artifact(self.sha, self.data), (self.encoded, self.entry))
+        self.assertEqual(self.encoded[4:8], b'\x00' * 4)  # mtime
+        self.assertEqual(self.encoded[9], 255)  # OS independent header
+        self.write()
+        self.assertEqual(self.restore(), 'gzip')
+        self.assertEqual((self.folder / 'out' / self.sha).read_bytes(), self.data)
+
+    def test_transport_corruption_fails_before_decoding(self):
+        data = bytearray(self.encoded)
+        data[-1] ^= 1
+        self.write(bytes(data))
+        with self.assertRaisesRegex(ValueError, 'Encoded artifact integrity'):
+            self.restore()
+
+    def test_valid_transport_cannot_substitute_different_canonical_bytes(self):
+        other = b'x' * len(self.data)
+        encoded, entry = encode_artifact(catalog.digest(other), other)
+        entry.update(sha256=self.sha, asset=self.sha + '.gz')
+        self.write(encoded, entry)
+        with self.assertRaisesRegex(ValueError, 'Canonical artifact integrity'):
+            self.restore()
+
+    def test_decompression_stops_at_declared_size(self):
+        self.write()
+        self.artifacts[self.sha]['size'] = 10
+        entry = {**self.entry, 'size': 10}
+        self.write(entry=entry)
+        with self.assertRaisesRegex(ValueError, 'exceeds canonical size'):
+            self.restore()
+        self.assertFalse((self.folder / 'out' / self.sha).exists())
+
+    def test_truncated_concatenated_and_trailing_streams_fail_even_with_valid_transport_hash(self):
+        for encoded in [self.encoded[:-2], self.encoded + self.encoded, self.encoded + b'trailing']:
+            with self.subTest(size=len(encoded)):
+                self.write(encoded, {**self.entry, 'encodedSha256': catalog.digest(encoded), 'encodedSize': len(encoded)})
+                with self.assertRaisesRegex(ValueError, 'Truncated or trailing'):
+                    self.restore()
+
+    def test_unsafe_asset_and_missing_or_duplicate_bundle_do_not_fall_back_to_raw(self):
+        (self.folder / self.sha).write_bytes(self.data)
+        self.write(entry={**self.entry, 'asset': '../escape'})
+        with self.assertRaisesRegex(ValueError, 'asset reference'):
+            self.restore()
+        for entries in [[], [self.entry, self.entry], [{**self.entry, 'sha256': '0' * 64}]]:
+            with self.subTest(entries=len(entries)):
+                pipeline.write_json(self.folder / 'artifact-encodings.json', {'schemaVersion': 1, 'artifacts': entries})
+                with self.assertRaises(ValueError):
+                    self.restore()
+
+    def test_original_raw_release_format_remains_supported(self):
+        (self.folder / self.sha).write_bytes(self.data)
+        self.assertEqual(self.restore(), 'identity')
+        self.assertEqual((self.folder / 'out' / self.sha).read_bytes(), self.data)
+
+
 class StateTests(unittest.TestCase):
     def fixture(self):
         entries = [{'packageName': 'fixture.' + str(i), 'inputFingerprint': str(i) * 64,
@@ -309,6 +386,52 @@ class OutputTests(unittest.TestCase):
         record = pipeline.record_result(state, current, result, restored, api, 'main')
         self.assertEqual(record['status'], 'published')
         self.assertEqual(record['descriptor']['upstreamCommit'], 'old-commit')
+
+    def test_source_release_uses_encoded_bundle_and_canonical_manifest(self):
+        api = FakeGitHub()
+        files, _provenance, _validation = pipeline.release_files(self.output, self.descriptor)
+        self.assertNotIn(self.sha, files)
+        self.assertIn(self.sha + '.gz', files)
+        self.assertIn('artifact-encodings.json', files)
+        self.assertEqual(json.loads(files['manifest.json'].read_bytes())['bundle']['sha256'], self.sha)
+        publish_immutable(api, self.descriptor['releaseTag'], files, 'main')
+        restored = self.output / 'restored'
+        self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
+        self.assertEqual((restored / 'artifacts' / self.sha).read_bytes(), self.data)
+        self.assertEqual(pipeline.read_json(restored / 'pipeline-result.json')['releaseEncoding'], 'gzip')
+
+    def test_already_published_raw_source_release_stays_identical_after_restore(self):
+        api = FakeGitHub()
+        files, _provenance, _validation = pipeline.release_files(self.output, self.descriptor, 'identity')
+        publish_immutable(api, self.descriptor['releaseTag'], files, 'main')
+        before = copy.deepcopy(api.content)
+        restored = self.output / 'restored'
+        self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
+        result = pipeline.read_json(restored / 'pipeline-result.json')
+        self.assertEqual(result['releaseEncoding'], 'identity')
+        record = pipeline.record_result(pipeline.empty_state(), self.descriptor, result, restored, api, 'main')
+        self.assertEqual(record['status'], 'published')
+        self.assertEqual(api.content, before)
+
+    def test_restore_preserves_original_compressed_bytes_for_immutable_retry(self):
+        api = FakeGitHub()
+        files, _provenance, _validation = pipeline.release_files(self.output, self.descriptor)
+        # Another encoder may use a different valid gzip header or deflate
+        # representation; restore must never rewrite a published transport.
+        encoded = bytearray(files[self.sha + '.gz'])
+        encoded[4] = 1
+        files[self.sha + '.gz'] = bytes(encoded)
+        table = json.loads(files['artifact-encodings.json'])
+        table['artifacts'][0]['encodedSha256'] = catalog.digest(encoded)
+        files['artifact-encodings.json'] = catalog.canonical(table) + b'\n'
+        publish_immutable(api, self.descriptor['releaseTag'], files, 'main')
+        before = copy.deepcopy(api.content)
+        restored = self.output / 'restored'
+        self.assertTrue(pipeline.restore_build(api, self.descriptor, restored))
+        result = pipeline.read_json(restored / 'pipeline-result.json')
+        record = pipeline.record_result(pipeline.empty_state(), self.descriptor, result, restored, api, 'main')
+        self.assertEqual(record['status'], 'published')
+        self.assertEqual(api.content, before)
 
     def test_symlink_in_untrusted_build_output_is_rejected(self):
         (self.output / 'provenance.json').unlink()

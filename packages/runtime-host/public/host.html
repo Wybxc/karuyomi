@@ -7,6 +7,8 @@
   </head>
   <body>
     <p>Karuyomi 运行容器 · 尚未加载扩展</p>
-    <script type="module" src="./host.js"></script>
+    <script type="module">
+      if (!window.karuyomiRuntime) await import('./host.js');
+    </script>
   </body>
 </html>

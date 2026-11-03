@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 HOST_PATHS = [
     'runtime/teavm/java', 'runtime/teavm/bridge', 'runtime/teavm/patches/teavm', 'runtime/teavm/toolchain', 'runtime/teavm/toolchain-lock.json',
     'scripts/prepare-runtime.py', 'scripts/build-extension.py', 'packages/contracts/protocol.json',
+    'packages/runtime-host/materials.mjs', 'packages/runtime-host/prepare-materials.mjs',
+    'packages/runtime-host/package.json', 'pnpm-lock.yaml',
     '.gitmodules', 'tools/teavm/build.py', 'tools/teavm/PatchLibraries.java', 'tools/teavm/upstream_sources.py',
 ]
 SHARED_PATHS = ['common', 'core', 'compiler', 'gradle', 'build.gradle.kts',

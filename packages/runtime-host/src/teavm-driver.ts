@@ -122,7 +122,7 @@ export class TeaVMDriver implements RuntimeDriver {
     this.buildId = manifest.buildId;
     this.scope.karuyomiResources = {};
     for (const resource of manifest.resources) {
-      const bytes = await this.loader.artifact(resource, signal);
+      const bytes = await this.loader.sharedArtifact(resource, signal);
       const url = URL.createObjectURL(
         new Blob([bytes as Uint8Array<ArrayBuffer>], {
           type: resource.contentType ?? 'application/octet-stream',
@@ -132,7 +132,9 @@ export class TeaVMDriver implements RuntimeDriver {
       this.scope.karuyomiResources[resource.logicalName] = url;
     }
     for (const artifact of [...manifest.hostScripts, manifest.bundle]) {
-      const bytes = await this.loader.artifact(artifact, signal, true);
+      const bytes = manifest.hostScripts.includes(artifact)
+        ? await this.loader.sharedArtifact(artifact, signal, true)
+        : await this.loader.artifact(artifact, signal, true);
       const url = URL.createObjectURL(
         new Blob([bytes as Uint8Array<ArrayBuffer>], {
           type: 'application/javascript',

@@ -1,6 +1,8 @@
 /* Atomic IndexedDB storage; HTTP policy stays in the unchanged OkHttp interceptor/strategy. */
 (() => {
- const namespace=new URL(location.href).searchParams.get('plugin')||'webtoons',workerId=crypto.randomUUID();
+ const namespace=self.karuyomiWorkerContext?.plugin||new URL(location.href).searchParams.get('plugin');
+ if(!namespace)throw new Error('Runtime cache namespace is required');
+ const workerId=crypto.randomUUID();
  let opening;
  const open=()=>opening||=(new Promise((resolve,reject)=>{
   const request=indexedDB.open('teavm-http-cache-v1',1);
