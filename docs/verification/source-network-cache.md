@@ -1,6 +1,6 @@
 # Source 默认 HTTP Cache 配置
 
-状态：**宿主配置已修复；新固定 AOT 的原 xkcd Source 已在 Web 实测 metadata fresh Cache 正文复用**。本轮没有发生 304，图片保持原 cacheless 行为。本项不替代 [Cache 正文与失败语义](http-cache-runtime.md)、[namespace 机制门](cache-v3-native.md) 或 [31555e8 三源在线门](cache-v3-sources.md)。
+状态：**宿主配置已修复；新固定 AOT 的原 xkcd Source 已在 Web 实测 metadata fresh Cache 正文复用及实际 manager/Worker 销毁重建后的复用**。本轮没有发生 304，图片保持原 cacheless 行为。本项不替代 [Cache 正文与失败语义](http-cache-runtime.md)、[namespace 机制门](cache-v3-native.md) 或 [31555e8 三源在线门](cache-v3-sources.md)。
 
 ## 已复现的缺口
 
@@ -91,3 +91,40 @@ node .local/network-cache-source/cache-observation/server.ts \
 ```
 
 观察器从该固定树的正式 `source-metadata-probe.ts` 重生成，client / Worker / server 三份严格 TypeScript 检查通过。内置浏览器在新 loopback origin 单次点击 Run；重跑应另存报告并区分已存在的持久 Cache，不能将热状态伪称冷请求。原报告位于 `.local/network-cache-source/cache-observation/result.json`；旧 `31555e8` 的零 store 报告原样保留。本轮只验 Web 原 Source fresh metadata 复用，不代表生产 Access、Native Source Cache、304 重验证、性能或其它 Source。
+
+## 同新 host 的其它 Source 回归
+
+同一 `b4f72f7` 固定树、hostFingerprint 和 `63a061a…7a9d` 六材料另行重建两包，原 JAR 分别严格匹配既定 `e1a706cc…7cf3` / `5bdd45cd…63ce` 基线。主代理在 Codex 内置 Chromium 156 通过正式 Source probe（8919 / 8920）实际运行，两份最终报告均 `finished=true`、`imageGate=passed`；每张图均解码、release 后 Blob 撤销，Page 会话关闭确认完成。
+
+| Source / 新 buildId                                                         | 元数据与原 Source 首 / 中 / 末图片                                                                                                                                                |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arknights Comics；`ext-en.arknightscomics-ef114e43af44b3bda11182fc16202bb5` | 5 项元数据操作通过，latest 明确不支持；`DREAM` 51 页，0 / 25 / 50 页：39602 / 719916 / 718931 字节，均 1200×1691；首图 JPEG，其余 PNG。                                           |
+| CuuTruyen；`ext-vi.cuutruyen-94c37a892ae82a87c4600d5ee1704eeb`              | 含 latest 的 7 项元数据操作通过；`Chương 142` 23 页均含 DRM 引用，0 / 11 / 22 页经原 Source 解密重排输出 JPEG：746910 / 493881 / 563725 字节，2048×1152 / 1024×1606 / 2048×1223。 |
+
+报告保存在同树 `.local/network-cache-source/online/{arknights,cuutruyen}.json`，SHA-256 分别为 `964d9b75fbd4c379973fc28820d796d9fa17d761ee621d69a0ef0e90fe16de13`、`73d2f5a38bbcf2cba6f4c46219d158770ef4896f2c87ee4bcf6c703855a90dd2`；精确清单、AOT 与原 JAR 身份见 `additional-build-summary.json`。本分项未包装 Cache 统计，不能据网络流水声称 Cache 命中，也不是完整章阅读、生产 Access 或 Native 验收。交付状态继续保留 `compiled_unverified` / `runtimeReady=false`，实际在线分项证据单独记录。
+
+## 原 Source Cache 跨 manager/Worker 重建复用
+
+2026-11-04，主代理在 Codex 内置 Chromium 156 的独立 origin `8921` 单次运行追加门，**12/12 通过**，`passed`、`finished`、`cleanupConfirmed` 均为 true。输入仍为上述固定 `b4f72f7`、原 xkcd JAR、新 AOT 与 `63a061a…7a9d` 材料；原8918 cold/warm报告未覆盖或重跑。
+
+夹具直接导入固定树正式 `SourceRuntimeManager` 与 `VerifiedLoader`：第一个manager正常加载原Source，从其真实章节列表选`/3318/`，调用pages并关闭Page会话；`dispose()`实际调用旧Worker的`terminate()`后，再构造第二个manager和Worker，以相同identity/repo/package/storageSchema正常open、调用原3318 pages并close。未改Source/JAR、Source请求头、AOT或桥材料，Worker仍只附加与8918字节相同的透传计数观察后缀，没有以TS受控ABI代替Java Source。
+
+| 阶段                      | 原3318 store事件                                                             | 实际上游与结果                                            |
+| ------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 新origin seed             | get1/miss1/begin1/commit1，3次写共7187B                                      | 一次HTTP200/7187B；原2页Page会话关闭                      |
+| dispose后新manager/Worker | get1/entry1，4次读取共7187B、EOF1/reader-close1；begin/commit/write/error均0 | 上游请求0；原2页Page会话关闭，与seed的PageListSHA完全相同 |
+
+两个实际manager与Worker对象不同，generation和workerInstanceId均改变。产品创建的两Worker URL使用同一个plugin/fsNamespace，均与四维元组`["probe-owner","keiyoushi","eu.kanade.tachiyomi.extension.all.xkcd","release9-v1"]`的SHA-256 `5f117e9a3d1cef49d0ab9f0b2a5a0c297bcdee36d91c0a66a0639ffd511d6d9a`相同；第二Worker起始观察计数全0。两次PageListSHA为`cf4df2da1b455de6533e8a3563e764ef414857c49b3f574f27b702bed0665bd4`，观察器错误0，最终两个Worker均确认终止。读取块数取决于实际流分块，正文长度与EOF/close是本项语义依据。
+
+独立报告位于同固定树`.local/network-cache-source/cache-recreation/result-manager-recreated-passed.json`，SHA-256 `1ee68b895fe01489cfce57b925272a641cee0ee44d160b9026b3fe2d2d134684`；原Worker、观察后缀、合并Worker和manager/client源码摘要亦保存在报告。三份client/Worker/server严格TypeScript检查通过；本机复验步骤和边界见该目录`README.md`。在该固定树使用锁定Node24并去掉GitHub/Cloudflare私有凭据，运行三份tsconfig检查后启动独立服务：
+
+```sh
+SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
+SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com SOURCE_PROBE_PORT=8921 \
+SOURCE_PROBE_EVIDENCE=.local/network-cache-source/cache-recreation/result.json \
+node .local/network-cache-source/cache-recreation/server.ts \
+  .local/network-cache-source/xkcd/manifest.json \
+  .local/network-cache-source/xkcd/artifacts
+```
+
+应使用新的origin并另存报告，不能把已有Cache当作新的seed miss。本项证明同一浏览器文档内实际manager/Worker销毁重建后，原Java Source能复用持久Cache正文；没有关闭或重启浏览器进程，不是Native或生产Access门，没有发生304，store事件仍不等于Java精确计数。版本/identity切换的受控机制门保持独立证据，不能由本项推广到所有Source或Flutter产品切换。

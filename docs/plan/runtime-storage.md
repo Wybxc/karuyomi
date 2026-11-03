@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。iOS/Android 模拟器的 Cache 桥 39 组机制及最终容器销毁也已通过；真实 manager 的 namespace 切换与同键 Cache/files 256 MiB allocated 组合门已通过受控 ABI 分项；原 xkcd 的 Web 元数据 fresh Cache 已通过新 AOT 分项；更广 Source、Native Java 链与产品切换仍待验收。
+为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。iOS/Android 模拟器的 Cache 桥 39 组机制及最终容器销毁也已通过；真实 manager 的 namespace 切换与同键 Cache/files 256 MiB allocated 组合门已通过受控 ABI 分项；原 xkcd 的 Web 元数据 fresh Cache 及实际 manager/Worker 重建后复用已通过新 AOT 分项；浏览器进程重启、更广 Source、Native Java 链与产品切换仍待验收。
 
 已有浏览器桥机制门覆盖正常持久化、namespace 隔离、Cache editor 竞争/CAS 和文件 rename/unlink；图片 JVM oracle 明确使用 cacheless 链，不是 HTTP Cache 语义验收。证据参见 [Worker 桥](../verification/worker-bridges.md)，P0 总目标参见 [运行时计划](p0-runtime-and-reading.md)。
 
@@ -52,7 +52,7 @@
 
 2026-11-04，主代理内置 Chromium 156 通过 14 组真实 Worker/IDB/Web Locks 门，包含真实事务 abort、配额、pending、terminate、提交后 ACK 前死亡、system close abort→重试。原 JVM 共享 File/RandomAccessFile/Okio 场景 32 项、Accessor/JCL 窄 fixture 24 项及实际 TeaVM 二进制 JSO 共享场景 32 项分别通过；两端正文摘要一致。分层证据与复验命令见[普通文件运行证据](../verification/file-storage-runtime.md)。仍待正式 Source、Native、正式扩展/Flutter 的版本与身份切换和设备资源测量；真实 manager + IDB 切换及组合分区已另验，取消不承诺撤销已提交写入。
 
-真实 xkcd 冷热观测曾全部为零，已核实锁定 seed 的 `NetworkHelper` 没有配置 Cache。现已内化最小 owned 适配，保留既有 ABI、Cookie、UA 与拦截器，显式启用稳定目录下的 5 MiB Cache；图片原有 cacheless 调用保持有效。原 seed 与 owned JVM 配置门及实际 TeaVM 浏览器 Worker 配置门已通过，详见[Source 网络配置证据](../verification/source-network-cache.md)。随后固定 `b4f72f7` 的新指纹 / 原 JAR AOT 已实际证明 xkcd 3318 元数据 cold commit 7187 B、warm 从 store 读完 7187 B 且上游零请求；Page 会话关闭及页列表摘要一致。图片保持原 cacheless，两轮各走真实网络。此分项未发生 304，Native、跨进程及其他 Source 仍须另验。
+真实 xkcd 冷热观测曾全部为零，已核实锁定 seed 的 `NetworkHelper` 没有配置 Cache。现已内化最小 owned 适配，保留既有 ABI、Cookie、UA 与拦截器，显式启用稳定目录下的 5 MiB Cache；图片原有 cacheless 调用保持有效。原 seed 与 owned JVM 配置门及实际 TeaVM 浏览器 Worker 配置门已通过，详见[Source 网络配置证据](../verification/source-network-cache.md)。随后固定 `b4f72f7` 的新指纹 / 原 JAR AOT 已实际证明 xkcd 3318 元数据 cold commit 7187 B、warm 从 store 读完 7187 B 且上游零请求；Page 会话关闭及页列表摘要一致。图片保持原 cacheless，两轮各走真实网络。随后独立新 origin 的原 Source 通过 12 项 manager/Worker 重建门：旧 manager dispose 实际终止 Worker，新 manager/Worker 以相同四维 namespace 读完持久 store 的 7187 B、EOF 与 reader-close，上游零请求、PageList 摘要一致，最终两 Worker 均终止。这是同一浏览器文档内重建，未发生 304；Native、浏览器进程重启、正式产品切换及其他 Source 仍须另验。
 
 ## 阶段四：原 JVM 同版对照与产品门
 
@@ -60,7 +60,7 @@
 
 1. 已补充 `CacheFailureScenarios.java`：两端四场景、50 项检查通过，精确读 8192 B 后截断/取消，Cache.close 后同目录重开验证半成品不可见、旧条目保留及恢复；不是进程重启。真实本地 HTTP/1 中继 RST 与原点关闭单独确认，生产 HTTP/2、HTTP/3、Access/Native 仍待验，见[独立故障记录](../verification/cache-http-failures.md)。历史冷热、Vary/Cookie、304、no-cache/no-store 和 POST invalidation 对照保留。
 2. 对照正文摘要、状态及关键响应头、网络请求次数、cache/network 标记和异常类型；不能只比较测试数量或编译结果。
-3. 正式 manager namespace 的版本/重建保留和 identity、repo、package、storageSchema 四维隔离单元门已通过；buildId 不参与派生。新增[真实 manager/存储门](../verification/runtime-storage-namespace.md)通过 11 组：由产品加载器和 Worker/driver 驱动受控 TS ABI，实际 IDB 数据跨构建/manager 保留、四维隔离，以及同键两分区合计 256 MiB allocated 和不借贷。它不运行 Java/官方 Source，正式扩展/Flutter 的切换、生产 Access 和 Native 仍须验收。
+3. 正式 manager namespace 的版本/重建保留和 identity、repo、package、storageSchema 四维隔离单元门已通过；buildId 不参与派生。新增[真实 manager/存储门](../verification/runtime-storage-namespace.md)通过 11 组：由产品加载器和 Worker/driver 驱动受控 TS ABI，实际 IDB 数据跨构建/manager 保留、四维隔离，以及同键两分区合计 256 MiB allocated 和不借贷。该组合门不运行 Java/官方 Source。另有原 xkcd 的实际 manager/Worker 重建后复用已通过上述独立门；正式扩展/Flutter 的版本/身份切换、浏览器进程重启、生产 Access 和 Native 仍须验收。
 4. 原版 Source、HTTPS handshake 适配、生产 Access 和 Web/Native 实际环境分别验收。受控 HTTP 或存储机制门不能替代这些结果。
 
 完成以上阶段也不等于已控制整个 Worker 或进程/GPU 峰值；存储、网络、图形和终端图片预算的组合与实际测量仍需 P0 汇合验收。

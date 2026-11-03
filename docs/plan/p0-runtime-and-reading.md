@@ -8,14 +8,14 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 ## 已完成与边界
 
-| 分项           | 已有实现或证据                                                                                                                                                                     | 尚不能据此认定的能力                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和静态交付已实现                                                            | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 动态请求                       |
-| P0-F1 Web      | 串行 Worker、requestId/generation、清单/预算校验、取消/超时、Source ID 一致性和 Dart Web interop 已实现；真实 Chromium 初始化通过                                                  | 六项操作全部在线成功和图片阅读                                                           |
-| P0-F2 Native   | Dart 受管 WebView、可见登录、内置 host/Blob Worker 已实现；iOS 26.4 Simulator 本地受信 HTTPS 下初始化、cookie 携带及容器重建已有证据                                               | Cloudflare 生产 Access 正向会话、物理 iPhone、Android 真机与后台恢复                     |
-| P0-F3 图片机制 | Web 产品已接原始 Page 会话、Source 图片链、64 KiB/ACK、Blob 资源及释放；真实章节首中末页解码通过；双端正式受管文件机制及进程重启、双端模拟器原 xkcd ReaderScreen 与进度恢复已验证  | 新默认 Cache 的 Native Java 链、处理/解密源覆盖、任意阶段取消与合计峰值                  |
-| P0-R 阅读核心  | 逻辑锚、单双页/LTR/RTL、竖向/Webtoon、缩放和有界 Provider 已实现；同路由切章、自动有界邻章准备、Drift 产品进度与 SQLite 文件/Web 关标签页及 双端模拟器原 xkcd 进程重启恢复分项通过 | 多源连续切章、浏览器进程恢复、超长图、物理设备与性能分布                                 |
-| P0-B v2        | 帧协议、按需 Worker 流、operation/generation handle、Java Okio Source/有界上传 Sink 已实现；当前生产代码与构建清单统一为 v2，模拟 supplier 回归通过                                | 受控 HTTP、文件/Cache 同版分项已通过；真实 Source 缓存、Access、移动与合计资源门仍需验收 |
+| 分项           | 已有实现或证据                                                                                                                                                                     | 尚不能据此认定的能力                                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和静态交付已实现                                                            | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 动态请求                                                   |
+| P0-F1 Web      | 串行 Worker、requestId/generation、清单/预算校验、取消/超时、Source ID 一致性和 Dart Web interop 已实现；真实 Chromium 初始化通过                                                  | 六项操作全部在线成功和图片阅读                                                                                       |
+| P0-F2 Native   | Dart 受管 WebView、可见登录、内置 host/Blob Worker 已实现；iOS 26.4 Simulator 本地受信 HTTPS 下初始化、cookie 携带及容器重建已有证据                                               | Cloudflare 生产 Access 正向会话、物理 iPhone、Android 真机与后台恢复                                                 |
+| P0-F3 图片机制 | Web 产品已接原始 Page 会话、Source 图片链、64 KiB/ACK、Blob 资源及释放；真实章节首中末页解码通过；双端正式受管文件机制及进程重启、双端模拟器原 xkcd ReaderScreen 与进度恢复已验证  | 新默认 Cache 的 Native Java 链、处理/解密源覆盖、任意阶段取消与合计峰值                                              |
+| P0-R 阅读核心  | 逻辑锚、单双页/LTR/RTL、竖向/Webtoon、缩放和有界 Provider 已实现；同路由切章、自动有界邻章准备、Drift 产品进度与 SQLite 文件/Web 关标签页及 双端模拟器原 xkcd 进程重启恢复分项通过 | 多源连续切章、浏览器进程恢复、超长图、物理设备与性能分布                                                             |
+| P0-B v2        | 帧协议、按需 Worker 流、operation/generation handle、Java Okio Source/有界上传 Sink 已实现；当前生产代码与构建清单统一为 v2，模拟 supplier 回归通过                                | 受控 HTTP/文件/Cache 同版及 Web xkcd fresh Cache/Worker 重建已通过；更广 Source、Access、Native 与合计资源门仍待验收 |
 
 Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。当时 host ABI v2 的 Arknights Comics 在内置浏览器经真实 workerd/HTTP v2 通过热门、标题搜索、详情、章节与 51 页列表；首、中、末页经原 Source 解码和释放通过，实际 Flutter 已能打开章节阅读。latest 按源声明跳过。该证据使用显式本地政策与测试 JWT，不是生产 Access；详情见 [VERIFICATION](../VERIFICATION.md#web-产品图片通道)。当前 Protobuf 控制已升为 host ABI v3 / protocolVersion 2；固定 `6e08ec9` 后已重新构建并通过内置浏览器的同类 Source/图片分项，见 [v3 运行证据](../verification/protocol-v3-runtime.md)，Native 与剩余运行门继续验收。历史 MangaDraft 的文本搜索与挑战失败不因另一源的成功而变为通过。
 
@@ -29,7 +29,7 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 回调登记后没有请求后续帧。ReaderScreen 的尺寸、恢复与 viewport 调度现使用 Flutter 官方 `ensureVisualUpdate()`；新增解码在帧尾通知的回归，旧码明确没有后续帧，修复后正常观测。阅读相关 43 项及 Dart 分析通过；修复后 Web 首次恢复与双端模拟器的真实 Source / 进程重启均已按固定 `19b65f5` 通过，详见[Native 修复后记录](../verification/reader-frame-native.md)；不把诊断补帧结果计为产品通过。Web 旧黑屏与该问题是否完全同因仍未确定。
 
-存储细分推进见[运行时文件与 HTTP Cache](runtime-storage.md)，editor 生命周期机制门与原 JVM/正文语义门分别记录。
+存储细分推进见[运行时文件与 HTTP Cache](runtime-storage.md)，editor 生命周期机制门与原 JVM/正文语义门分别记录。固定 `b4f72f7` 的新 AOT 原 xkcd 已通过 Web fresh metadata Cache，以及实际 manager dispose/Worker 终止后新 manager/Worker 的同 namespace 正文复用，7187 B 读至 EOF、零网络、原 PageList 摘要一致；详见[原 Source Cache 证据](../verification/source-network-cache.md#原-source-cache-跨-managerworker-重建复用)。这是同一浏览器文档内重建，浏览器进程、Native Cache、生产 Access 和正式版本/身份切换仍待验收。
 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 已通过压缩、重定向、Cookie、HEAD/206、204/205/304、精确 Range、urlencoded/multipart、流式上传、截断上传/响应和三类取消门。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常；这些 Worker 分项不代替正式 Source/cache 或 Java 同版全部语义对照。当前只维护 v2，旧包需要重新构建。
 2. **验证缓冲与取消。** META/DATA 最多 64 KiB，正文请求最多 8 MiB、响应最多 64 MiB，适配队列最多四块。检查慢消费者、背压、迟到响应和 generation 销毁能终止上游并释放 handle；整体请求预算和两次读取之间的 idle timeout 分别验证。协议细节见 [HTTP bridge](../HTTP-BRIDGE.md)。
