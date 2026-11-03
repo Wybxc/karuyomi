@@ -214,17 +214,34 @@ class StateTests(unittest.TestCase):
 
     def test_baseline_cannot_hide_unattempted_packages_or_claim_all_ready(self):
         state, source = pipeline.empty_state(), self.fixture()
-        with self.assertRaisesRegex(ValueError, 'unattempted'):
-            pipeline.finalize_baseline(state, source)
-        for entry in source['entries']:
-            state['attempts'][entry['inputFingerprint']] = {'status': 'failed'}
-        with patch.dict(os.environ, {'CI': 'false', 'GITHUB_ACTIONS': 'false'}):
+        with patch.object(pipeline, 'ci_environment', return_value=False):
+            with self.assertRaisesRegex(ValueError, 'unattempted'):
+                pipeline.finalize_baseline(state, source)
+            for entry in source['entries']:
+                state['attempts'][entry['inputFingerprint']] = {'status': 'failed'}
             pipeline.finalize_baseline(state, source)
         self.assertTrue(state['bootstrap']['complete'])
         self.assertEqual(state['bootstrap']['published'], 0)
         self.assertEqual(state['bootstrap']['failed'], 4)
-        with patch.dict(os.environ, {'CI': 'true'}), self.assertRaises(ValueError):
-            pipeline.finalize_baseline(state, source)
+
+    def test_ci_environment_cannot_finalize_or_overwrite_baseline(self):
+        environments = [
+            {'CI': 'true', 'GITHUB_ACTIONS': 'false'},
+            {'CI': 'false', 'GITHUB_ACTIONS': 'true'},
+            {'CI': 'true', 'GITHUB_ACTIONS': 'true'},
+        ]
+        for environment in environments:
+            for complete in (False, True):
+                with self.subTest(environment=environment, complete=complete), patch.dict(os.environ, environment):
+                    state, source = pipeline.empty_state(), self.fixture()
+                    for entry in source['entries']:
+                        state['attempts'][entry['inputFingerprint']] = {'status': 'failed'}
+                    state['bootstrap'] = {'complete': complete, 'catalogFingerprint': 'preserved-baseline'}
+                    before = copy.deepcopy(state)
+                    self.assertTrue(pipeline.ci_environment())
+                    with self.assertRaisesRegex(ValueError, 'CI cannot create or finalize'):
+                        pipeline.finalize_baseline(state, source, local=True)
+                    self.assertEqual(state, before)
 
     def test_index_is_last_and_state_only_changes_get_new_immutable_snapshots(self):
         api, state, source = FakeGitHub(), pipeline.empty_state(), self.fixture()

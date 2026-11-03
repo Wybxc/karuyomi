@@ -12,7 +12,7 @@
 | D1 / R2           | 迁移已加入构建/产物/关联/网络域名注册表；真实 MangaDraft 产品包已注册本地 D1/R2                                                                                        | `pnpm db:migrate:local`；`scripts/register-build.py` 默认仅输出计划，`--local` 才写本地 |
 | JWT / API         | 本地 RSA 密钥真实签名测试覆盖 issuer、AUD、本人邮箱/可选 subject、过期/伪造凭据、固定回跳、路径规范化与 API 不落入 SPA；私有交付校验已注册关联、MIME/长度和 Range/HEAD | `pnpm exec vitest run apps/api/test`；测试签名不是 Cloudflare 签发的生产会话            |
 | 阅读核心          | 单/双页、LTR/RTL、封面/横图独占、竖向/Webtoon、缩放/翻页、逻辑锚与布局恢复、取消/释放确认和迟到资源清理                                                                | `pnpm flutter:check`；窗口预算为实现约束，估算解码像素不等于实测进程/GPU 峰值           |
-| 冻结设计溯源      | 五份设计副本保留，摘要记录在 `design/provenance.json`                                                                                                                  | `docs/design/` 未随工程状态改写                                                         |
+| 冻结设计溯源      | 五份设计副本保留，摘要记录在[设计文档来源](verification/design-provenance.md)                                                                                          | `docs/design/` 未随工程状态改写                                                         |
 
 本地与云端已注册构建 `release9-mangadraft-product-e3505206005c25f69b92`：7 个私有产物，共 3,957,861 字节，云端查询状态为 verified。登记前逐文件校验长度/hash，构建与产物关联只在完整写入后可见。本地真实 workerd/D1/R2 加 RS256 测试签名探针已检查 manifest/list、全部 R2 SHA-256、HEAD/304/Range/416、缺 JWT/错误 AUD/错误 host 及整批冲突回滚，见 [API 探针](../apps/api/test/README.md) 与 [证据](verification/runtime-evidence.md#通过的分项与限制)。测试入口仅信任本次生成的公钥，产品没有鉴权绕过。
 

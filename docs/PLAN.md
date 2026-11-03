@@ -8,6 +8,7 @@
 - TeaVM 0.16.0 JavaScript backend / release9 是冻结基线。Web 通过 JS interop 直连 Web Worker；原生通过系统 WebView 控制页连接同版 Worker。
 - Dart `SourceRuntime`、版本化协议和公共 JS 宿主共享；图片使用可获取、取消、释放的独立资源通道。先验证 iOS，不以整图 Base64 或 JSON 代替图片桥。
 - 单 hostname、单 Cloudflare Worker。公开 Flutter shell 与 `/runtime/`；全部后端、私有产物和个人数据位于 Access 保护的 `/api`、`/api/*`，Worker 再校验 JWT。
+- 客户端共享运行时材料在 Web 作为静态资源交付，在 Native 随应用打包；每包 AOT 与共享材料分别管理。JAR、Maven、Android SDK 属于构建依赖，不下发客户端。
 - 后端沿用 pnpm、TypeScript、Hono、Zod、jose、D1/Drizzle、私有 R2、SQLite Durable Objects。Pub 管 Dart 依赖；Java/Maven 工具链与依赖材料由正式锁文件校验。
 - 首版只保留书架、浏览、在线阅读、基本进度、同步和源管理。更新、离线下载、历史统计、追踪、本地漫画、备份、应用内账号与隐私模块不预建。
 
@@ -23,6 +24,8 @@
 - **独立 P0-B / F3 探针。** TeaVM JSO 的有界双向字节复制、fiber 等待/取消和 Worker 所有权转移已在 Chromium 实测。iOS 模拟器已在本地受信 HTTPS 下验证 Worker → ArrayBuffer → Blob → WKDownload → 文件及取消/释放。两者都是独立机制证据，尚未接通产品 HTTP/Okio/图片通道；物理 iPhone、生产 HTTPS/Access 与进程/GPU 合计峰值未验证。
 
 当前证据与正式回归入口见 [VERIFICATION.md](VERIFICATION.md) 和 [TeaVM 说明](../runtime/teavm/README.md)。独立机制研究只保留验证摘要，临时工程存于被忽略的本地归档，不作为产品源码或发布工具提交。`docs/design/` 的冻结设计副本继续保留，不随工程进展改写。
+
+首次全量扩展 AOT 尚未启动。官方源码发现 1,448 包；MangaDraft 与 Arknights Comics 两个当前版本已完成隔离 AOT 和真实浏览器初始化，在线兼容性未据此通过。按最新要求，先完成[包体分析](AOT-SIZE.md)，再调整共享材料的 Web 静态 / Native 内置交付与压缩，并以少量样本验证优化；之后才从本地启动首次全量。增量 CI 已有缺失初始基线的保护。
 
 ## 后续顺序与验收
 
@@ -57,4 +60,4 @@ P0-F / P0-R / P0-A 可以独立推进，在 P0-C 合流；不重新比选 UI 框
 4. [跨端框架评估](design/cross-platform-framework-evaluation.md)：历史决策记录。
 5. [运行时历史评估](design/runtime-evaluation-history-2026-11-02.md)：历史研究证据。
 
-副本仅将五份文档之间的绝对链接改为仓库内相对链接；研究材料的本机路径和历史状态原样保留。原文与副本 SHA-256 记录在 [provenance.json](design/provenance.json)。当前工程状态以本页和仓库 README 为准；历史“未创建工程”描述对应原聊天当时状态。
+副本仅将五份文档之间的绝对链接改为仓库内相对链接；研究材料的本机路径和历史状态原样保留。原文与副本 SHA-256 记录在[设计文档来源](verification/design-provenance.md)。当前工程状态以本页和仓库 README 为准；历史“未创建工程”描述对应原聊天当时状态。

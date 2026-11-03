@@ -41,7 +41,18 @@ baseline 完成代表首次覆盖已结束，记录 published/failed/discoveryFa
 
 发布前逐个重新验证清单与所有产物字节。编译和完整性成功的包可以发布为 `compiled_unverified`，其索引 `runtimeReady=false`。只有带匹配 buildId/manifestSHA 的实际 Worker/browser 验证均通过才标为 `browser_verified`。默认无浏览器批量验证不会把编译冒充兼容、真实 Source 网络或图片支持；失败包只进入失败记录。
 
-默认调度器直接执行严格的清单/字节完整性检查，不会因可选验证脚本存在就启动浏览器或运行尚未完成的验证工具。人工浏览器验证是显式阶段；已发布资产不会为补充验证而覆盖，后续兼容证据应使用独立不可变 attestation 或新的发布身份。
+默认调度器直接执行严格的清单/字节完整性检查，不会因可选验证脚本存在就启动浏览器。人工浏览器验证是显式阶段：
+
+```sh
+node tools/extensions/verify-build.mjs --directory DIR --report DIR/validation.json
+node tools/extensions/verify-build.mjs --directory DIR --report DIR/validation.json \
+  --serve --timeout-ms 120000
+node --test tools/extensions/verify-build.test.mjs
+```
+
+第一条只检查清单、SHA256、长度与 MIME；完整性通过但未运行浏览器时退出 2，报告 `valid=false`、`runtimeReady=false`、`browser_not_run`。`--serve` 只监听 `127.0.0.1` 临时端口；人或 CUA 打开打印的 URL 后，页面自动用真实产品 Worker 和 IndexedDB 执行初始化。清单/字节或浏览器验证失败退出 1，实际浏览器验证通过才退出 0。报告始终将 `onlineCompatibility` 记为 `not_tested`，初始化成功不代表在线 Source 或图片链路可用。验证器的 10 项 Node 回归测试不执行生成的扩展代码。
+
+已发布资产不会为补充验证而覆盖，后续兼容证据应使用独立不可变 attestation 或新的发布身份。
 
 旧冻结研究输入的已转换构建与当前源码基线严格分开，可用下列命令先查看发布计划，再移除 `--dry-run` 实际发布；它只创建 `legacy-<buildId>`，不会进入当前 source baseline 或 latest 索引：
 
