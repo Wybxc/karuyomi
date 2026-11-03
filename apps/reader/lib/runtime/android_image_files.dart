@@ -42,6 +42,7 @@ final class AndroidImageFileStore implements NativeImageFileStore {
   final _files = <String, File>{};
   final _slots = <_AndroidImageSlot>[];
   bool _closed = false;
+  Future<void>? _clearing;
   int _sequence = 0;
 
   static Future<bool> supported() async {
@@ -147,18 +148,40 @@ final class AndroidImageFileStore implements NativeImageFileStore {
   }
 
   @override
-  Future<void> clear() async {
+  Future<void> clear() => _clearing ??= _clear();
+
+  Future<void> _clear() async {
     _closed = true;
+    (Object, StackTrace)? failure;
     try {
       await Future.wait(_pending.values.toList().map((task) => task.cancel()));
-    } finally {
-      for (final slot in _slots) {
+    } catch (error, stack) {
+      failure = (error, stack);
+    }
+    for (final slot in _slots) {
+      try {
         await slot.channel?.port1.close();
-        if (!slot.transferred) await slot.channel?.port2.close();
-        slot.channel?.dispose();
+      } catch (error, stack) {
+        failure ??= (error, stack);
       }
+      if (!slot.transferred) {
+        try {
+          await slot.channel?.port2.close();
+        } catch (error, stack) {
+          failure ??= (error, stack);
+        }
+      }
+      // The plugin controller retains this channel in its registry and owns
+      // dispose(). Destroying it here would make WebView teardown dispose twice.
+    }
+    try {
       if (await directory.exists()) await directory.delete(recursive: true);
       _files.clear();
+    } catch (error, stack) {
+      failure ??= (error, stack);
+    }
+    if (failure case (final error, final stack)) {
+      Error.throwWithStackTrace(error, stack);
     }
   }
 }
