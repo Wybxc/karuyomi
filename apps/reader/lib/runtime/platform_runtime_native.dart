@@ -195,7 +195,8 @@ final class NativePlatformRuntime extends PlatformRuntime
                 '''
               (() => {
                 const installed = window.__karuyomiNativeRuntimeInstalled;
-                return document.readyState === 'complete' &&
+                return (document.readyState === 'interactive' ||
+                    document.readyState === 'complete') &&
                   location.origin === ${jsonEncode(origin.origin)} &&
                   location.pathname === '/runtime/host' &&
                   !location.search && !location.hash &&
@@ -215,7 +216,7 @@ final class NativePlatformRuntime extends PlatformRuntime
             );
           }
           // An intermediate load event must not claim the handshake. A later
-          // completed document can retry within the existing overall timeout.
+          // initialized document can retry within the existing overall timeout.
           if (!bridgeReady) return;
           handshaking = true;
           final result = await controller.callAsyncJavaScript(

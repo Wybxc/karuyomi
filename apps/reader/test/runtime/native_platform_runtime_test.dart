@@ -186,7 +186,10 @@ void main() {
       expect(view.controller.handshakes, 1);
       expect(
         view.controller.probeSources.first,
-        contains("document.readyState === 'complete'"),
+        allOf(
+          contains("document.readyState === 'interactive'"),
+          contains("document.readyState === 'complete'"),
+        ),
       );
       expect(
         view.controller.probeSources.first,

@@ -81,3 +81,11 @@ flutter run --debug --no-resident --no-pub \
 当前修正直接加载规范路径，先用官方同步 `evaluateJavascript` 的 boolean 返回检查文档、插件桥与内置材料身份；未就绪不占握手，异步检查后重验 generation，仍受原整体超时预算。不增加固定 sleep 或修改插件。四项正式平台接口回归覆盖未就绪后再就绪、并发回调、重建后的迟到 readiness、拒绝非 boolean 返回。此修正的真实 Android 六 slot 与双端重新打包仍待新固定提交验证。
 
 失败及对照报告保留为该固定树 `.local/native-data/android-image-report.json`、`android-plugin-diagnostic-v2.json`；不能用后来的对照成功覆盖首次生产路径失败。
+
+## iOS 单次加载回调与文档状态
+
+固定 `5e9e526` 的独立 `native-canonical-validation` 工作树已通过 Android 正式握手、两轮各六张并发受管图片、解码/取消/释放及真实 force-stop/relaunch 的 SQLite 恢复。Flutter CLI 末端 DDS 连接被拒绝并退出 2；应用实际已生成完整 passed 报告，分别记录这两个结果，不把 CLI 退出码改称成功。
+
+同提交在 iOS 却真实触发 20 秒 readiness 超时：唯一 `onLoadStop` 的同步检查中，文档状态为 `interactive`，来源、规范路径、插件 `callHandler`、内置材料及 runtime 引用全部正确；紧接官方 native `callAsyncJavaScript` 返回 42，随后文档才进入 `complete`，没有第二次 `onLoadStop`。因此不能要求该回调时文档已经 complete。
+
+当前条件显式接受 `interactive` 或 `complete`，继续检查插件、来源/路径、材料身份及 generation；不以定时等待或固定 sleep 代替真实就绪。忽略目录中的单条件诊断复制已通过完整 iOS 受管图片机制，说明该条件可以修复超时；它是草稿诊断，正式提交仍须在新固定工作树复验双端。失败、分条件诊断和草稿报告分别保留在 `.local/native-data/`，不会覆盖首次失败。
