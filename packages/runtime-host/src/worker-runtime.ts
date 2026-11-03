@@ -66,6 +66,7 @@ export class WorkerRuntime {
           command.manifest,
           command.userAgent,
           this.controller.signal,
+          { requestId: command.requestId, generation: command.generation },
         );
         this.reply(command, {
           protocolVersion,
@@ -102,6 +103,7 @@ export class WorkerRuntime {
           command.sourceId,
           command.operation,
           command.args,
+          { requestId: command.requestId, generation: command.generation },
         );
         this.reply(command, {
           requestId: command.requestId,

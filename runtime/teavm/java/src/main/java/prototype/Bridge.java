@@ -3,6 +3,10 @@ package prototype;
 import org.teavm.jso.*;
 import org.teavm.interop.Async;
 import org.teavm.interop.AsyncCallback;
+import org.teavm.jso.typedarrays.Uint8Array;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.SocketTimeoutException;
 
 public final class Bridge {
   @Async
@@ -36,6 +40,145 @@ public final class Bridge {
       params = {"request", "ok", "err"},
       script = "self.teaHttp(request).then(ok, e=>err(String(e)));")
   static native void fetch(String request, Reply ok, Reply err);
+
+  @JSBody(script = "return self.teaHttpVersion === 2;")
+  public static native boolean httpVersion2();
+
+  public static String httpOpen(String metadata) throws IOException {
+    String[] value = new String[1];
+    HttpError error = new HttpError();
+    httpOpen(metadata, result -> value[0] = result, error::accept);
+    error.check();
+    if (value[0] == null || value[0].isEmpty()) throw new IOException("Missing HTTP handle");
+    return value[0];
+  }
+
+  @JSBody(
+      params = {"metadata", "ok", "fail"},
+      script =
+          "try { ok(self.teaHttpOpen(metadata)); } catch (failureReason) {"
+              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')); }")
+  private static native void httpOpen(String metadata, Reply ok, HttpFailure fail);
+
+  public static void httpWrite(String handle, byte[] bytes) throws IOException {
+    if (bytes.length < 1 || bytes.length > HttpBodySource.MAX_CHUNK)
+      throw new IOException("Invalid HTTP upload chunk size");
+    Uint8Array copy = new Uint8Array(bytes.length);
+    for (int index = 0; index < bytes.length; index++)
+      copy.set(index, (short) (bytes[index] & 255));
+    HttpError error = new HttpError();
+    httpWrite(handle, copy, error::accept);
+    error.check();
+  }
+
+  @JSBody(
+      params = {"handle", "bytes", "fail"},
+      script =
+          "try { self.teaHttpWrite(handle, bytes); } catch (failureReason) {"
+              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')); }")
+  private static native void httpWrite(String handle, Uint8Array bytes, HttpFailure fail);
+
+  @Async
+  public static native String httpFinish(String handle) throws IOException;
+
+  private static void httpFinish(String handle, AsyncCallback<String> callback) {
+    httpFinish(
+        handle,
+        callback::complete,
+        (message, name, code) -> callback.error(httpError(message, name, code)));
+  }
+
+  @JSBody(
+      params = {"handle", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaHttpFinish(handle)).then(ok, failureReason => "
+              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')));")
+  private static native void httpFinish(String handle, Reply ok, HttpFailure fail);
+
+  public static byte[] httpRead(String handle, int maximum) throws IOException {
+    if (maximum < 1 || maximum > HttpBodySource.MAX_CHUNK)
+      throw new IOException("Invalid HTTP read size");
+    Uint8Array input = httpReadChunk(handle, maximum);
+    if (input == null) return null;
+    int length = input.getByteLength();
+    if (length < 1 || length > maximum)
+      throw new IOException(
+          "HTTP supplier exceeded requested chunk size or returned an empty chunk");
+    byte[] copy = new byte[length];
+    for (int index = 0; index < length; index++) copy[index] = (byte) input.get(index);
+    return copy;
+  }
+
+  @Async
+  private static native Uint8Array httpReadChunk(String handle, int maximum) throws IOException;
+
+  private static void httpReadChunk(
+      String handle, int maximum, AsyncCallback<Uint8Array> callback) {
+    httpReadChunk(
+        handle,
+        maximum,
+        callback::complete,
+        (message, name, code) -> callback.error(httpError(message, name, code)));
+  }
+
+  @JSFunctor
+  private interface HttpChunk extends JSObject {
+    void call(Uint8Array bytes);
+  }
+
+  @JSFunctor
+  private interface HttpFailure extends JSObject {
+    void call(String message, String name, String code);
+  }
+
+  @JSBody(
+      params = {"handle", "maximum", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaHttpRead(handle, maximum)).then(ok, failureReason => "
+              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')));")
+  private static native void httpReadChunk(
+      String handle, int maximum, HttpChunk ok, HttpFailure fail);
+
+  public static void httpClose(String handle) throws IOException {
+    httpControl("teaHttpClose", handle);
+  }
+
+  public static void httpCancel(String handle) throws IOException {
+    httpControl("teaHttpCancel", handle);
+  }
+
+  private static void httpControl(String operation, String handle) throws IOException {
+    HttpError error = new HttpError();
+    httpControl(operation, handle, error::accept);
+    error.check();
+  }
+
+  @JSBody(
+      params = {"operation", "handle", "fail"},
+      script =
+          "try { self[operation](handle); } catch (failureReason) {"
+              + "fail(String(failureReason.message || failureReason), String(failureReason.name || 'Error'), String(failureReason.code || '')); }")
+  private static native void httpControl(String operation, String handle, HttpFailure fail);
+
+  private static IOException httpError(String message, String name, String code) {
+    if ("TimeoutError".equals(name) || "timeout".equals(code))
+      return new SocketTimeoutException(message);
+    if ("AbortError".equals(name) || "cancelled".equals(code))
+      return new InterruptedIOException(message);
+    return new IOException(message);
+  }
+
+  private static final class HttpError {
+    IOException error;
+
+    void accept(String message, String name, String code) {
+      error = httpError(message, name, code);
+    }
+
+    void check() throws IOException {
+      if (error != null) throw error;
+    }
+  }
 
   public static String js(String id, String operation, String payload) {
     checkReentry(operation);

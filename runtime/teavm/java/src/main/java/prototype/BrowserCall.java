@@ -2,17 +2,22 @@ package prototype;
 
 import okhttp3.*;
 import okio.Buffer;
+import okio.BufferedSink;
+import okio.Okio;
 import okio.Timeout;
 import com.google.gson.*;
 import java.lang.reflect.*;
 import java.util.*;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 
 /** Replaces only OkHttpClient.newCall; plugin interceptors still execute as JVM bytecode. */
 public final class BrowserCall implements Call {
   private final OkHttpClient client;
   private final Request request;
-  private boolean executed, cancelled;
+  private boolean executed;
+  private volatile boolean cancelled;
+  private final Set<String> httpHandles = new HashSet<>();
   private Call proxy;
 
   private BrowserCall(OkHttpClient c, Request r) {
@@ -43,7 +48,13 @@ public final class BrowserCall implements Call {
   }
 
   public void cancel() {
-    cancelled = true;
+    List<String> handles;
+    synchronized (this) {
+      cancelled = true;
+      handles = new ArrayList<>(httpHandles);
+      httpHandles.clear();
+    }
+    for (String handle : handles) cancelHandle(handle);
   }
 
   public boolean isExecuted() {
@@ -115,7 +126,7 @@ public final class BrowserCall implements Call {
       Cache cache)
       throws IOException {
     if (cancelled) throw new IOException("Cancelled");
-    if (index == list.size()) return transport(r);
+    if (index == list.size()) return transport(r, readMs);
     return list.get(index).intercept(chain(list, index, r, connectMs, readMs, writeMs, cache));
   }
 
@@ -348,7 +359,148 @@ public final class BrowserCall implements Call {
     return response.newBuilder().request(user).build();
   }
 
-  private Response transport(Request r) throws IOException {
+  private Response transport(Request r, int readMs) throws IOException {
+    if (!Bridge.httpVersion2()) return transportV1(r);
+    try {
+      return transportV2(r, readMs);
+    } catch (IOException error) {
+      if (cancelled
+          || error instanceof InterruptedIOException
+          || !client.retryOnConnectionFailure()
+          || !(r.method().equals("GET") || r.method().equals("HEAD"))
+          || !String.valueOf(error.getMessage())
+              .matches("(?is).*?(Network connection lost|ECONNRESET|connection reset).*"))
+        throw error;
+      Bridge.trace("Retry idempotent request after connection loss: " + r.url());
+      return transportV2(r, readMs);
+    }
+  }
+
+  private Response transportV2(Request request, int readMs) throws IOException {
+    if (cancelled) throw new InterruptedIOException("Cancelled");
+    RequestBody body = request.body();
+    if (body != null && body.isDuplex()) throw new IOException("Duplex HTTP upload is unsupported");
+    long bodyLength = body == null ? 0 : body.contentLength();
+    if (bodyLength < -1 || bodyLength > HttpRequestSink.MAX_REQUEST)
+      throw new IOException("HTTP request body exceeds 8 MiB or has an invalid length");
+    JsonObject metadata = new JsonObject();
+    metadata.addProperty("url", request.url().toString());
+    metadata.addProperty("method", request.method());
+    JsonArray headers = new JsonArray();
+    for (int index = 0; index < request.headers().size(); index++) {
+      JsonArray pair = new JsonArray();
+      pair.add(request.headers().name(index));
+      pair.add(request.headers().value(index));
+      headers.add(pair);
+    }
+    metadata.add("headers", headers);
+    metadata.addProperty("hasBody", body != null);
+    if (bodyLength < 0) metadata.add("bodyLength", JsonNull.INSTANCE);
+    else metadata.addProperty("bodyLength", bodyLength);
+    // The v2 host currently enforces one overall budget, not three separate
+    // connect/read/write idle timers. A zero OkHttp timeout uses its 5-minute cap.
+    metadata.addProperty("timeoutMs", readMs <= 0 ? 300000 : Math.min(readMs, 300000));
+    String json = metadata.toString();
+    if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > HttpBodySource.MAX_CHUNK)
+      throw new IOException("HTTP request metadata exceeds 64 KiB");
+    long sentAt = System.currentTimeMillis();
+    String handle = Bridge.httpOpen(json);
+    synchronized (this) {
+      if (!cancelled) httpHandles.add(handle);
+    }
+    try {
+      if (cancelled) throw new InterruptedIOException("Cancelled");
+      if (body != null) {
+        HttpRequestSink upload =
+            new HttpRequestSink(bytes -> {
+              if (cancelled) throw new InterruptedIOException("Cancelled");
+              Bridge.httpWrite(handle, bytes);
+            });
+        BufferedSink sink = Okio.buffer(upload);
+        body.writeTo(sink);
+        sink.flush();
+        upload.finish(bodyLength);
+        sink.close();
+      }
+      String responseJson = Bridge.httpFinish(handle);
+      if (cancelled) throw new InterruptedIOException("Cancelled");
+      // The host adds one opaque handle to the already bounded wire META.
+      if (responseJson == null
+          || responseJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+              > HttpBodySource.MAX_CHUNK + 256)
+        throw new IOException("Invalid HTTP response metadata size");
+      JsonObject result = JsonParser.parseString(responseJson).getAsJsonObject();
+      if (result.has("body") || !handle.equals(result.get("handle").getAsString()))
+        throw new IOException("Invalid HTTP response handle or inline body");
+      int status = result.get("upstreamStatus").getAsInt();
+      if (status < 100 || status > 599) throw new IOException("Invalid upstream status");
+      long responseLength =
+          result.get("bodyLength").isJsonNull() ? -1 : result.get("bodyLength").getAsLong();
+      if (!result.get("hasBody").getAsBoolean() && responseLength != 0)
+        throw new IOException("An absent response body must have zero length");
+      Headers.Builder received = new Headers.Builder();
+      for (JsonElement element : result.getAsJsonArray("headers")) {
+        JsonArray pair = element.getAsJsonArray();
+        if (pair.size() != 2) throw new IOException("Invalid HTTP response header");
+        received.add(pair.get(0).getAsString(), pair.get(1).getAsString());
+      }
+      Headers responseHeaders = received.build();
+      HttpBodySource source =
+          new HttpBodySource(
+              new HttpBodySource.Reader() {
+                public byte[] read(int maximum) throws IOException {
+                  if (cancelled) throw new InterruptedIOException("Cancelled");
+                  byte[] bytes = Bridge.httpRead(handle, maximum);
+                  if (cancelled) throw new InterruptedIOException("Cancelled");
+                  return bytes;
+                }
+
+                public void close() throws IOException {
+                  try {
+                    Bridge.httpClose(handle);
+                  } finally {
+                    forgetHandle(handle);
+                  }
+                }
+              },
+              responseLength);
+      return new Response.Builder()
+          .request(request)
+          .protocol(Protocol.HTTP_1_1)
+          .code(status)
+          .message(result.get("message").getAsString())
+          .headers(responseHeaders)
+          .sentRequestAtMillis(sentAt)
+          .receivedResponseAtMillis(System.currentTimeMillis())
+          .body(
+              ResponseBody.create(
+                  MediaType.parse(
+                      responseHeaders.get("Content-Type") == null
+                          ? "application/octet-stream"
+                          : responseHeaders.get("Content-Type")),
+                  responseLength,
+                  Okio.buffer(source)))
+          .build();
+    } catch (IOException | RuntimeException error) {
+      cancelHandle(handle);
+      forgetHandle(handle);
+      throw error;
+    }
+  }
+
+  private synchronized void forgetHandle(String handle) {
+    httpHandles.remove(handle);
+  }
+
+  private static void cancelHandle(String handle) {
+    try {
+      Bridge.httpCancel(handle);
+    } catch (IOException error) {
+      Bridge.trace("HTTP cancel failed: " + error.getMessage());
+    }
+  }
+
+  private Response transportV1(Request r) throws IOException {
     Bridge.trace("transport " + r.url());
     JsonObject j = new JsonObject();
     j.addProperty("url", r.url().toString());

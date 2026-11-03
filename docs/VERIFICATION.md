@@ -60,7 +60,9 @@ node apps/api/test/source-metadata-probe.mjs PATH_TO_OUTPUT/manifest.json PATH_T
 
 临时独立研究工程和脚本已移入本机被忽略的 `runtime/teavm/.local/research/`，保留原始本地资料，不进入源码仓库。上面的精简文档记录历史机制证据；正式产品与发布回归需要独立测试，不能依赖临时工程存在。
 
-这些探针尚未接入 HTTP v2 分帧、真实网络 reader、Okio ResponseBody 或图片通道。当前 P0-A `/api/bridge/http` 仍为有界文本/Base64 基线；不作为 P0-B 完成标准。下一步实现落点见 [计划](PLAN.md#p0-b-下一步落点)。
+产品代码现已加入 [HTTP v2](HTTP-BRIDGE.md)：严格帧、Worker 按需响应、JS operation/generation handle、Java Okio Source 与有界上传 Sink。新增协议 38 项及 JS transport 9 项测试；完整 TypeScript 套件 192 项通过。Java 完整 javac 与 `tools/teavm/HttpBodyTest.java` 的 1,051 项断言通过，包括 64 MiB 分块读取与 8 MiB 上传上限（`pnpm teavm:check` 同时运行 DTO 与 body oracle）。真实 TeaVM 0.16 编译 JS 在 Node 的模拟六函数 supplier 下，验证 131,079 字节 GET/POST（00/ff、64 KiB 分块）、空 POST、pending-read 取消、超时、超请求块与 EOF 长度错共七例，handle 最终归零；这仍不是实际 HTTP、浏览器或 Access 验收。
+
+服务端与客户端流测试覆盖无预读、取消/超时、迟到响应释放、帧截断、身份错配及 HTTP metadata。HTTP v2 仅由 `bridgeVersion: 2` 显式选择；当前 AOT 发布及生产仍使用 v1，不会隐式回退。真实 workerd 压缩响应、原 Source/cache 同版对照和图片/移动内存链路仍待完成，P0-B 尚未通过。
 
 ## F3 iOS 模拟器 HTTPS 机制
 

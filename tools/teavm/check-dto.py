@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the DTO boundary against original ABI JARs, then run its JVM oracle."""
+"""Run DTO and bounded HTTP body JVM oracles against original ABI JARs."""
 
 from pathlib import Path
 import os
@@ -25,10 +25,17 @@ subprocess.run(
         str(OUT),
         str(ROOT / "runtime/teavm/java/src/main/java/prototype/HostDto.java"),
         str(ROOT / "tools/teavm/HostDtoTest.java"),
+        str(ROOT / "runtime/teavm/java/src/main/java/prototype/HttpBodySource.java"),
+        str(ROOT / "runtime/teavm/java/src/main/java/prototype/HttpRequestSink.java"),
+        str(ROOT / "tools/teavm/HttpBodyTest.java"),
     ],
     check=True,
 )
 subprocess.run(
     ["java", "-cp", str(OUT) + os.pathsep + CLASSPATH, "prototype.HostDtoTest"],
+    check=True,
+)
+subprocess.run(
+    ["java", "-cp", str(OUT) + os.pathsep + CLASSPATH, "prototype.HttpBodyTest"],
     check=True,
 )

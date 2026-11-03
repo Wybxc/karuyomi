@@ -22,6 +22,7 @@
 - **资料浏览与阅读核心。** Flutter 已接构建/Source 选择、热门/最新/搜索分页、详情与章节。独立 Dart 阅读核心及 `ReaderScreen` 已实现单/双页、RTL、竖向/Webtoon、缩放、稳定逻辑锚与有界资源窗口。产品 `acquireImage` 仍明确不支持，章节暂不可读，ReaderScreen 尚未接入实际 Source 导航；书架和进度持久化仍未实现。
 - **API 与部署准备。** Worker 已实现 Access JWT 再校验、固定 origin/写请求边界、D1 构建注册、私有 R2 流式产物、Range/HEAD 与按构建网络白名单的临时 v1 桥。本地与云端均已注册真实 MangaDraft e350 产品构建。2026-11-03 已部署 `karuyomi.wybxc.cc`（Worker version `0332ef7a-3d49-47c1-ac41-edbed49bd7fe`），云端 D1 迁移通过。Access 应用及本人策略覆盖 `/api`、`/api/*`；公开页面已渲染，匿名 API 已确认跳转 Access 登录。生产登录成功后的私有交付与 cookie 恢复仍待验收。
 - **独立 P0-B / F3 探针。** TeaVM JSO 的有界双向字节复制、fiber 等待/取消和 Worker 所有权转移已在 Chromium 实测。iOS 模拟器已在本地受信 HTTPS 下验证 Worker → ArrayBuffer → Blob → WKDownload → 文件及取消/释放。两者都是独立机制证据，尚未接通产品 HTTP/Okio/图片通道；物理 iPhone、生产 HTTPS/Access 与进程/GPU 合计峰值未验证。
+- **P0-B v2 实现里程碑。** 已加入严格二进制帧、按需服务端响应、按 operation/generation 绑定的 JS handle，以及 Java Okio Source / 有界 RequestBody Sink；v1 保留为显式清单选择的基线，现有发布批次仍为 v1。协议、API、JS 回归及真实 TeaVM 编译后接模拟 supplier 的 Java 字节/fiber/取消检查通过；真实 workerd 压缩语义、原 Source 同版网络/cache 对照、浏览器和移动内存仍待验收，尚未切换发布默认值或接通图片。
 
 当前证据与正式回归入口见 [VERIFICATION.md](VERIFICATION.md) 和 [TeaVM 说明](../runtime/teavm/README.md)。独立机制研究只保留验证摘要，临时工程存于被忽略的本地归档，不作为产品源码或发布工具提交。`docs/design/` 的冻结设计副本继续保留，不随工程进展改写。
 
