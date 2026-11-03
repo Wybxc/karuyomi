@@ -60,4 +60,18 @@ xcodebuild -workspace Runner.xcworkspace -scheme Runner \
   FLUTTER_TARGET=lib/main.dart -only-testing:RunnerTests/NativeImageFilesTests test
 ```
 
-后续原 Source Native 验收必须同步构建 AOT、内置材料与当前协议身份，验证真实章节首中末页、特殊图片处理、导航退出、后台/容器重建和文件/Blob 表归零；Android 还需真实 ArrayBuffer 插件链与端点复用验证。
+## 原版 Source 到 Native 文件的分项验收
+
+同日固定 `a15c030` 的独立工作树，在上述 iOS 26.4 模拟器用实际 `CatalogController → ChapterPageProvider → NativePlatformRuntime` 完成原版 Arknights Comics 1.6.2 的目录、详情、章节、页会话和图片交接。正常受信 HTTPS 前端流式转发到真实 workerd、隔离 D1 与 RS256 测试身份；没有放宽产品 TLS 或生产鉴权。热门 17 项、所选漫画 3 章、DREAM 51 页，latest 依源声明不支持。
+
+复用了 [v3 构建](verification/protocol-v3-runtime.md) 的 `ext-en.arknightscomics-23489f22c8a1d874d1a62ca1ecd743a3`：新树 host 指纹仍为 `2229bb210e74c8def41cda1fcbc7bbce6937dd8ad92a8aa01fdb765430ea1508`，materials 仍为 `fba63bcd9b2a194131eb76a500c2e8f046d987b4650d510d6b6f5205bf32a9e8`，清单 SHA-256 `f3373696187454a2465a022bca977ce700bc0f94a59bdec5c19b96ba05af42be`。Native host/Worker 与本次内置索引逐字节匹配，未放宽材料身份检查；后续 graphics/Cache 输入变化必须重新 AOT 验证。
+
+| 实际章节页 |       文件字节 | Flutter 文件解码 | 释放                                    |
+| ---------- | -------------: | ---------------- | --------------------------------------- |
+| 第 1 页    | 39,602 B，JPEG | 1200 × 1691      | 文件删除、所有权撤销、重复 release 通过 |
+| 第 26 页   | 719,916 B，PNG | 1200 × 1691      | 同上                                    |
+| 第 51 页   | 718,931 B，PNG | 1200 × 1691      | 同上                                    |
+
+三份文件的 SHA-256 均机器核对为对应 workerd 上游流的摘要。`ChapterPageProvider.close()` 在获取中取消并关闭原 Page 会话；保留一张未释放图片后调用真实 `NativePlatformRuntime.rebuild()`，文件和 binding 目录消失、旧所有权失效，新 Source 在不同 generation 下重开。原始小报告留在冻结工作树忽略的 `.local/native-source/`；测试服务、隔离 D1、静态快照和 App 已清理。仅合法的空 process 根目录残留，不将其误报为未清理 binding。
+
+这是实际 Dart 产品控制器与 Source/文件通道的分项证据，尚非 Native ReaderScreen 的完整交互、3–5 个处理源、整章/下一章、后台恢复、物理设备、生产 Access 或峰值验收。公开 API 没有直接暴露原 Blob URL 或 Swift reservation 计数，文件消失不能单独证明内存或全部账本归零。后续保留这些门；Android 还需真实 ArrayBuffer 插件链与端点复用验证。
