@@ -2,7 +2,7 @@
 
 个人漫画阅读应用。Flutter + TeaVM 浏览器宿主，Cloudflare Workers 后端。
 
-项目正在实施 [P0](docs/PLAN.md)，已部署到 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)。已内化 TeaVM 运行时并构建真实 MangaDraft AOT 包，具备私有产物交付、JS / Dart 运行接口、漫画资料浏览界面和独立阅读器。真实浏览器已通过 Source 初始化；产品图片通道与完整在线阅读尚未接通，P0 尚未通过。
+项目正在实施 [P0](docs/plan/p0-runtime-and-reading.md)，各阶段见[计划目录](docs/plan/README.md)。已部署到 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，已内化 TeaVM 运行时并构建真实 MangaDraft AOT 包，具备私有产物交付、JS / Dart 运行接口、漫画资料浏览界面和独立阅读器。真实浏览器已通过 Source 初始化；产品图片通道与完整在线阅读尚未接通，P0 尚未通过。
 
 ## 当前能力与边界
 
@@ -29,6 +29,7 @@ runtime/teavm/          项目运行时、适配层与构建输入
 tools/                 正式回归测试与扩展发布工具
 scripts/               协议生成、构建、私有产物注册与资源组装
 docs/design/           五份设计文档及来源校验记录
+docs/plan/             分阶段实施计划与统一状态索引
 docs/verification/     精简验证结论与正式复验入口
 ```
 
@@ -86,6 +87,6 @@ Wrangler 已关闭 `workers.dev` 与预览 URL；R2 不提供公网正文入口�
 
 ## 后续工作
 
-按 [完整计划](docs/PLAN.md) 继续 P0-B 分帧二进制 HTTP/Okio 桥、P0-F 原生资源插件与 Access 会话验证，再在 P0-C 汇合真实 Source 图片和完整阅读。P1 的书架/进度持久化、P2 同步、P3 扩展升级/迁移、P4 覆盖与性能工作继续保留，不以独立探针通过替代产品验收。
+按[计划目录](docs/plan/README.md)继续 P0-B 分帧二进制 HTTP/Okio 桥、P0-F 原生资源插件与 Access 会话验证，再在 P0-C 汇合真实 Source 图片和完整阅读。P1 的书架/进度持久化、P2 同步、P3 扩展升级/迁移、P4 覆盖与性能工作继续保留，不以独立探针通过替代产品验收。
 
 脚手架实现参考：[Flutter 创建工程](https://docs.flutter.dev/reference/create-new-app)、[Workers 静态资源路由](https://developers.cloudflare.com/workers/static-assets/routing/worker-script/)、[Hono Workers](https://hono.dev/docs/getting-started/cloudflare-workers)。
