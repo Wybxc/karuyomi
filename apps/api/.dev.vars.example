@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local Access integration. Never commit JWTs or tokens.
+# Missing configuration fails closed; there is no local authentication bypass.
+ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
+ACCESS_AUD=your-access-application-audience
+ACCESS_SUBJECT=your-own-access-jwt-subject

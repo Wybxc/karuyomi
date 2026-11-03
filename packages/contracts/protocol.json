@@ -1,0 +1,5 @@
+{
+  "protocolVersion": 1,
+  "hostAbi": "karuyomi-source-host-v1",
+  "runtimeBaseline": "teavm-0.16.0-js-release9"
+}

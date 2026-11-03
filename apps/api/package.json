@@ -1,0 +1,24 @@
+{
+  "name": "@karuyomi/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "typecheck": "tsc -p tsconfig.json",
+    "types": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local"
+  },
+  "dependencies": {
+    "@karuyomi/contracts": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.16",
+    "jose": "6.2.15"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.11",
+    "wrangler": "4.156.1"
+  }
+}

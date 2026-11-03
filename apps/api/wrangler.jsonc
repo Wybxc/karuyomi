@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "karuyomi",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-03",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "../../dist/public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "single-page-application",
+  },
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "ACCESS_SUBJECT": "",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "karuyomi",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [{ "binding": "ARTIFACTS", "bucket_name": "karuyomi-private" }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "RUNTIME_SESSIONS", "class_name": "RuntimeSession" },
+    ],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RuntimeSession"] }],
+}

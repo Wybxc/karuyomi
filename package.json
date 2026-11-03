@@ -1,0 +1,31 @@
+{
+  "name": "karuyomi",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @karuyomi/api dev",
+    "dev:flutter": "node scripts/flutter.mjs run",
+    "generate": "node scripts/generate-protocol.mjs",
+    "generate:check": "node scripts/generate-protocol.mjs --check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "check": "pnpm generate:check && pnpm format:check && pnpm typecheck && pnpm test",
+    "flutter:setup": "node scripts/flutter.mjs setup",
+    "flutter:check": "node scripts/flutter.mjs check",
+    "build": "pnpm --filter @karuyomi/runtime-host build && node scripts/flutter.mjs build && node scripts/assemble-assets.mjs && pnpm --filter @karuyomi/api build",
+    "db:generate": "pnpm --filter @karuyomi/api db:generate",
+    "db:migrate:local": "pnpm --filter @karuyomi/api db:migrate:local"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}

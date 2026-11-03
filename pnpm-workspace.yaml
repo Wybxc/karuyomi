@@ -1,0 +1,9 @@
+packages:
+  - apps/api
+  - packages/contracts
+  - packages/runtime-host
+
+allowBuilds:
+  esbuild: true
+  workerd: true
+  sharp: true

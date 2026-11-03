@@ -1,0 +1,14 @@
+node_modules
+.pub-cache
+.fvm
+.tools
+.wrangler
+dist
+build
+pnpm-lock.yaml
+docs/design
+apps/reader
+packages/reader_core
+packages/source_runtime
+**/generated.*
+apps/api/worker-configuration.d.ts
