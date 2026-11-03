@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pipeline } from 'node:stream/promises';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { byteStream, streamChunks } from './http-probe-streams.ts';
 import {
@@ -54,6 +55,7 @@ const sha256 = (bytes: Uint8Array) =>
 const calls: string[] = [];
 let slowOpened = 0;
 let slowClosed = 0;
+let truncateBody: (() => void) | undefined;
 const origin = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', 'http://fixture.example.org');
   calls.push(url.pathname);
@@ -71,6 +73,78 @@ const origin = createServer(async (request, response) => {
     }
     response.setHeader('Content-Type', 'application/json');
     response.end(JSON.stringify({ size, sha256: hash.digest('hex') }));
+    return;
+  }
+  if (url.pathname === '/empty') {
+    const status = Number(url.searchParams.get('status'));
+    assert([204, 205, 304].includes(status));
+    response.writeHead(status, {
+      ETag: '"fixture-representation"',
+      'Cache-Control': 'max-age=60',
+      ...(status === 304
+        ? {
+            'Content-Encoding': 'gzip',
+            'Content-Length': compressed.gzip.length,
+          }
+        : {}),
+    });
+    response.end();
+    return;
+  }
+  if (url.pathname === '/range') {
+    assert.equal(request.headers.range, 'bytes=65533-65551');
+    response.writeHead(206, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Range': `bytes 65533-65551/${payload.length}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': 19,
+    });
+    response.end(payload.subarray(65533, 65552));
+    return;
+  }
+  if (url.pathname === '/inspect-form') {
+    // The standard parser consumes only this small controlled form fixture.
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for await (const value of request) {
+      assert(value instanceof Uint8Array);
+      size += value.byteLength;
+      assert(size <= HTTP_FRAME_LIMIT * 2);
+      chunks.push(value);
+    }
+    const contentType = request.headers['content-type'];
+    assert(typeof contentType === 'string');
+    const form = await new Request('http://fixture.example.org/inspect-form', {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body: new Uint8Array(Buffer.concat(chunks)),
+    }).formData();
+    const file = form.get('image');
+    assert(file === null || file instanceof File);
+    response.setHeader('Content-Type', 'application/json');
+    response.end(
+      JSON.stringify({
+        notes: form.getAll('note'),
+        file:
+          file === null
+            ? null
+            : {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                sha256: sha256(new Uint8Array(await file.arrayBuffer())),
+              },
+      }),
+    );
+    return;
+  }
+  if (url.pathname === '/truncate') {
+    response.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': payload.length,
+    });
+    response.write(payload.subarray(0, HTTP_FRAME_LIMIT + 7));
+    truncateBody = () => response.destroy();
     return;
   }
   if (url.pathname === '/slow') {
@@ -170,7 +244,12 @@ try {
                   upstream.statusCode ?? 502,
                   upstream.headers,
                 );
-                upstream.pipe(response);
+                // Propagate a genuinely truncated origin stream to workerd.
+                void pipeline(upstream, response).catch(() => {
+                  response.destroy();
+                  outbound.destroy();
+                  resolve();
+                });
                 response.once('close', () => {
                   upstream.destroy();
                   outbound.destroy();
@@ -348,6 +427,139 @@ try {
     );
     assert.equal(await reader.read(1), null);
     checks.push(`${encoding}_HEAD_representation_headers`);
+  }
+  for (const status of [204, 205, 304]) {
+    const { reader, meta } = await framed(
+      await dispatch(requestMeta(`/empty?status=${status}`)),
+    );
+    assert.equal(meta.upstreamStatus, status);
+    assert.equal(meta.hasBody, false);
+    assert.equal(meta.bodyLength, 0);
+    assert.equal(meta.decoded, false);
+    assert(
+      meta.headers.some(
+        ([name, value]) =>
+          name === 'etag' && value === '"fixture-representation"',
+      ),
+    );
+    if (status === 304) {
+      assert(
+        meta.headers.some(
+          ([name, value]) => name === 'content-encoding' && value === 'gzip',
+        ),
+      );
+      assert(
+        meta.headers.some(
+          ([name, value]) =>
+            name === 'content-length' &&
+            Number(value) === compressed.gzip.length,
+        ),
+      );
+    }
+    assert.equal(await reader.read(1), null);
+    checks.push(`status_${status}_empty_body_and_representation_headers`);
+  }
+  {
+    const { reader, meta } = await framed(
+      await dispatch(
+        requestMeta('/range', {
+          headers: [['Range', 'bytes=65533-65551']],
+        }),
+      ),
+    );
+    assert.equal(meta.upstreamStatus, 206);
+    assert.equal(meta.bodyLength, 19);
+    assert(
+      meta.headers.some(
+        ([name, value]) =>
+          name === 'content-range' &&
+          value === `bytes 65533-65551/${payload.length}`,
+      ),
+    );
+    assert.deepEqual(await consume(reader), {
+      size: 19,
+      sha256: sha256(payload.subarray(65533, 65552)),
+    });
+    checks.push('range_request_and_exact_partial_response');
+  }
+  for (const multipart of [false, true]) {
+    const notes = ['空格 + & emoji 🦀', 'second=value'];
+    const form = multipart ? new FormData() : new URLSearchParams();
+    for (const note of notes) form.append('note', note);
+    const fileBytes = new Uint8Array(payload.subarray(0, HTTP_FRAME_LIMIT + 7));
+    if (form instanceof FormData)
+      form.append(
+        'image',
+        new File([fileBytes], 'fixture.bin', {
+          type: 'application/octet-stream',
+        }),
+      );
+    const encoded = new Request('http://fixture.example.org/inspect-form', {
+      method: 'POST',
+      body: form,
+    });
+    const contentType = encoded.headers.get('content-type');
+    assert(contentType);
+    const bytes = new Uint8Array(await encoded.arrayBuffer());
+    const { reader, meta } = await framed(
+      await dispatch(
+        requestMeta('/inspect-form', {
+          method: 'POST',
+          hasBody: true,
+          bodyLength: bytes.length,
+          headers: [['Content-Type', contentType]],
+        }),
+        bytes,
+      ),
+    );
+    assert.equal(meta.upstreamStatus, 200);
+    const result: Uint8Array[] = [];
+    for (;;) {
+      const chunk = await reader.read(HTTP_FRAME_LIMIT);
+      if (chunk === null) break;
+      assert(chunk.byteLength < 1024);
+      result.push(chunk);
+    }
+    assert.deepEqual(JSON.parse(Buffer.concat(result).toString()), {
+      notes,
+      file: multipart
+        ? {
+            name: 'fixture.bin',
+            type: 'application/octet-stream',
+            size: fileBytes.byteLength,
+            sha256: sha256(fileBytes),
+          }
+        : null,
+    });
+    checks.push(
+      multipart
+        ? 'multipart_fields_and_binary_file_preserved'
+        : 'urlencoded_fields_and_duplicates_preserved',
+    );
+  }
+  {
+    const { reader, meta } = await framed(
+      await dispatch(requestMeta('/truncate')),
+    );
+    assert.equal(meta.upstreamStatus, 200);
+    assert.equal(meta.bodyLength, payload.length);
+    const prefix = await reader.read(HTTP_FRAME_LIMIT);
+    assert(prefix && prefix.byteLength > 0);
+    assert.deepEqual(
+      prefix,
+      new Uint8Array(payload.subarray(0, prefix.byteLength)),
+    );
+    assert(truncateBody);
+    truncateBody();
+    truncateBody = undefined;
+    await assert.rejects(
+      consume(reader),
+      (error: unknown) =>
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'upstream_body_error',
+    );
+    checks.push('truncated_origin_body_fails_without_success_END');
   }
   {
     const before = calls.length;

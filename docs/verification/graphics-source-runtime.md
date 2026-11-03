@@ -24,7 +24,7 @@ Codex 内置浏览器 Chromium 156，正式 host、产品 Worker、隔离 D1、�
 
 - MangaDex：原包 61 个 Source 初始化并与清单匹配，明确选英文 `2499283573021220255`；热门、搜索、latest 均在约 10 秒后返回结构化 HTTP timeout，没有取得上游 HTTP 状态。未获得真实漫画/章节，后续详情、pages 与动态 MD@Home 图片未测；没有伪造引用、扩张域名政策或把超时写成 403。
 
-- xkcd：原包五语言 Source 初始化成功，英文 `1538249443376436084` 的热门、详情、3318 章及两页列表成功；搜索按原实现返回空列表，latest 明确不支持。第 3319 章直图经原 Source 返回 106037 字节 PNG（607×716），释放和撤销通过；第二页由原 TextInterceptor 生成文字图片时遇到 `java.lang.RuntimeException: Stub!`。图片 gate 因此失败，不能把第一张成功视作完整章节通过；正在定位宿主缺失的 Android 适配，不修改 Source 或绕过文字页。
+- xkcd：原包五语言 Source 初始化成功，英文 `1538249443376436084` 的热门、详情、3318 章及两页列表成功；搜索按原实现返回空列表，latest 明确不支持。第 3319 章直图经原 Source 返回 106037 字节 PNG（607×716），释放和撤销通过；第二页由原 TextInterceptor 生成文字图片时遇到 `java.lang.RuntimeException: Stub!`。该固定身份的图片 gate 因此失败，不能把第一张成功视作完整章节通过；下文另记新文字材料的复验，不修改这份历史身份或 Source。
 
 这只证明上述浏览器元数据、Source 图片分项和失败边界；尚无三至五源全部在线、完整连续阅读、Native、运行中取消、实际进程/GPU 峰值或新 Cache 正文的证据。编译检查报告继续保留 `compiled_unverified`，正式发布验证不会因本文自动提升。
 
@@ -54,3 +54,29 @@ node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
 Codex 内置浏览器 Chromium 156 使用该固定 checkout 的正式 `source-metadata-probe.ts`，产品 Cache/Worker/HTTP v2、隔离 D1 与测试签名；两个 Source 均重新通过原元数据链和首中末图片。Arknights 仍为 17 项/3 章/51 页，三图字节与尺寸同上；CuuTruyen 仍从真实 Spy x Family 第 142 章取得 23 个 DRM 页，三图处理后的字节/尺寸同上，Blob 释放与撤销通过。正式 probe 的 header/Cookie 名称和 fragment 计数已接入，未保存凭据值。
 
 这证明新 Cache 材料下的两源在线图片链。没有测量这些 Source 的冷/热 Cache 命中计数，不能代替共享 Java 的同版语义对照，也没有新增生产 Access、Native、连续阅读或峰值证据。独立产物/报告位于该 checkout 的忽略目录 `.local/p0c/`；发布状态不自动提升。
+
+## 新文字材料与 xkcd
+
+2026-11-04，固定主仓库 `926b93d78a7360d849813b2d03dd650cd5c34172`，三个上游 pin 与首轮相同。在独立 `text-source-validation` checkout 使用 Node 24.15.0、固定 JDK/Maven、精确锁定的新 npm 依赖重新扫描并仅构建 xkcd。源码闭包仍为 `aa3fa0e42967ce18a35fb3c21b811c3218a35a4a8607cb12bc82f27a54da7f89`。复用旧官方构建的 debug keystore 后，官方 Gradle 重产原 JAR 的 SHA-256 严格保持 `4071fdc5b90c473938d33f7e94c71b2a1a79fb33a00a32d0baa035ac4697cc9d`（125470 字节），没有编辑 JAR 或业务源码。
+
+- host 输入指纹：`272b2f84259d7f7e629385394d6bc1671ceb099e2f26ae420b6a4728e62128b7`。
+- buildId：`ext-all.xkcd-e2b8a80d2c3d3a9de6cb78b76505c27e`；bundle SHA-256 `75f4356b5ef81156454e106975666d25a132870f9af52de56d4234977040ee6f`，4032407 字节，gzip 851982 字节。
+- 材料版本：`6ce41048c205ea29dc6ba076faa2eb63398bd745f9ad864787c21391e9acee37`；graphics SHA-256 `6e7bcba18059cfd8fd85943ad08af6038433f99497931af29e14b92461af598d`。不复用旧文字 stub 材料的 AOT。
+
+Codex 内置浏览器 Chrome 156 经正式 `source-metadata-probe.ts`、产品 host/Worker、隔离 D1、真实 workerd、RS256 测试身份和显式 `xkcd.com,imgs.xkcd.com` 政策执行。明确选中英文 Source `1538249443376436084`；原返回的首章仍为 `3319: Elevators`，没有伪造或替换章节引用。热门/详情、3318 章及两页列表成功，搜索按原实现返回空，latest 不支持。
+
+原 Source 两页均通过：直图 106037 字节 PNG、607×716；第二页经原 TextInterceptor 实际生成 49246 字节 PNG、1000×286。`tachiyomi-lib-textinterceptor` 仅在原拦截器内处理，没有加入网络白名单或发生该主机的外部请求。两次释放均撤销 Blob URL，Page session 关闭且 image gate passed。该证据是 Source 图片解码/资源边界，实际 Flutter 文字显示须另行检查，不是生产 Access 或 Native 验收。
+
+复验在同一固定树构建 runtime-host 后执行：
+
+```sh
+SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
+SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
+SOURCE_PROBE_IMAGES=1 \
+SOURCE_PROBE_EVIDENCE=.local/xkcd-online.json \
+node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
+```
+
+原始 descriptor、provenance、构建日志和报告保留在该树忽略的 `.local/text-source/`，严格原 JAR 构建使用 `xkcd-original/`。先前 fresh debug keystore 的试构建仅签名 `META-INF/CERT.RSA` 不同，未作为严格对照使用。
+
+内部图形生命周期仍有确定缺口：官方 TextInterceptor 没有 recycle 它创建的 Bitmap；owned Bitmap 无自动回收注册，bridge `teaGraphicsEnd` 只清 byte handles/scratch，surface Map 仍持有画布。因此上述 release/revoke 不能冒称内部 ledger 归零，重复文字页处理、取消和存活 Worker 的内存/64-surface 预算仍待验收。独立 Java/Canvas 场景显式 recycle 后归零的结果见[文字布局记录](text-layout-runtime.md)，不能替代这项实际 Source 门。

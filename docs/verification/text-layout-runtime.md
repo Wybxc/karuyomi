@@ -36,7 +36,9 @@ Codex 内置浏览器 Chrome 156 实际通过最新 Canvas 5 组及 TeaVM 同场
 
 ## 限制与 Source 门
 
-独立 oracle/Canvas/TeaVM 共同场景通过，不等于 xkcd Source 第二页已恢复。旧 host `15a3900` 仍保留原包第二页 `java.lang.RuntimeException: Stub!` 记录；后续必须以新 host 重建同一未修改原 JAR，经原 TextInterceptor 请求复验两页。
+固定 `926b93d` 后，已通过正式 Source/Worker/HTTP v2 和原 TextInterceptor 复验 xkcd 3319 章两页：直图 106037 字节/607×716，文字 PNG 49246 字节/1000×286；两次 Blob 释放/撤销及 Page session 关闭均通过。原 JAR SHA 与旧门完全一致，未修改 Source/JAR；实际使用的材料、构建身份和复验命令见[Source 记录](graphics-source-runtime.md#新文字材料与-xkcd)。旧 host `15a3900` 的第二页 stub 失败仍保留，不能混用两个 host 的证据。
+
+独立 Canvas/Java 场景显式 recycle 后的图形账本归零，不能推广为实际 Source 的内部账本归零：原 TextInterceptor 创建 Bitmap 后没有 recycle，当前 bridge End 仅关闭 byte handles 和 scratch，surface Map 仍需显式回收或 Worker 销毁。Source probe 只验证产品图片资源释放/撤销，没有采集内部 graphics ledger；长时间重复文字页可能耗尽 surface/内存预算，这项生命周期门仍待修复。实际 Flutter 第二页的可见文字、生产 Access 和长章节负载须另外验收。
 
 styled spans、Builder/ellipsize、复杂富文本/制表位、所有 HTML 容错分支、Native 应用与真机字体/性能尚未验收。库规则版本与系统字体差异会影响输出；受控场景不能替代生产 Access、实际阅读、取消和长章节负载门。
 
