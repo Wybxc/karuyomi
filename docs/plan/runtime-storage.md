@@ -40,7 +40,7 @@
 
 ## 阶段四：原 JVM 同版对照与产品门
 
-待实施。使用工具链锁定的原始 OkHttp JAR，与 TeaVM 的产品 BrowserCall/Cache 运行同一 Java 场景和受控 origin；测试入口沿用既有 workerd 受控 origin 映射，不能放宽生产网络政策。
+原 JVM 基线已建立，TeaVM 同场景对照仍待实施。seed 中同名 OkHttp JAR 的 `newCall` 已适配为 BrowserCall，不能用作原 JVM oracle；当前从官方 Maven 获取同版未适配的 5.5.0 JAR，验证 SHA-256 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52` 并断言实际 CodeSource。共享 `CacheScenarios.java` 已在原 JVM 通过 131079 字节冷热、304 合并、no-store、Cookie Vary、evictAll 后继续读已打开 snapshot；结果为 11 次请求、8 次网络、4 次命中、5 次成功写入，尚不是 TeaVM Cache 通过。产物留在忽略目录。继续使用工具链锁定的原始 OkHttp JAR，与 TeaVM 的产品 BrowserCall/Cache 运行同一 Java 场景和受控 origin；测试入口沿用既有 workerd 受控 origin 映射，不能放宽生产网络政策。
 
 1. 比较冷/热命中、Vary/Cookie、ETag 304 合并、no-cache/no-store、POST invalidation、截断正文、半途取消和重启。
 2. 对照正文摘要、状态及关键响应头、网络请求次数、cache/network 标记和异常类型；不能只比较测试数量或编译结果。

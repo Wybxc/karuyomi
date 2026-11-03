@@ -1,4 +1,11 @@
-import { mkdirSync, readdirSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
@@ -63,6 +70,61 @@ export async function checkDto(root = ROOT): Promise<void> {
       output + path.delimiter + classpath,
       oracleClass,
     ]);
+  // The seed OkHttp JAR has its newCall bytecode adapted for BrowserCall.
+  // Oracle execution must use the untouched same-version upstream artifact.
+  const originalDependencies = path.join(output, 'cache-original-dependencies');
+  mkdirSync(originalDependencies, { recursive: true });
+  const originalOkHttp = path.join(
+    originalDependencies,
+    'okhttp-jvm-5.5.0.jar',
+  );
+  if (!existsSync(originalOkHttp)) {
+    const response = await fetch(
+      'https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-jvm/5.5.0/okhttp-jvm-5.5.0.jar',
+    );
+    if (!response.ok)
+      throw new Error(
+        'Original OkHttp oracle dependency: HTTP ' + response.status,
+      );
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (
+      createHash('sha256').update(bytes).digest('hex') !==
+      '234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52'
+    )
+      throw new Error('Original OkHttp oracle dependency checksum mismatch');
+    writeFileSync(originalOkHttp, bytes);
+  }
+  if (
+    createHash('sha256').update(readFileSync(originalOkHttp)).digest('hex') !==
+    '234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52'
+  )
+    throw new Error('Original OkHttp oracle cache checksum mismatch');
+  const originalCacheClasspath = [
+    originalOkHttp,
+    ...jars.filter(
+      (file) =>
+        !path.basename(file).startsWith('host-') &&
+        path.basename(file) !== 'okhttp-jvm-5.5.0.jar',
+    ),
+  ].join(path.delimiter);
+  const cacheOutput = path.join(output, 'cache-original');
+  mkdirSync(cacheOutput, { recursive: true });
+  await oracle('javac', [
+    '--release',
+    '17',
+    '-cp',
+    originalCacheClasspath,
+    '-d',
+    cacheOutput,
+    ...['CacheScenarios.java', 'CacheTest.java'].map((file) =>
+      path.join(root, 'tools/teavm', file),
+    ),
+  ]);
+  await oracle('java', [
+    '-cp',
+    cacheOutput + path.delimiter + originalCacheClasspath,
+    'prototype.CacheTest',
+  ]);
   const imageOutput = path.join(output, 'image');
   mkdirSync(imageOutput, { recursive: true });
   await oracle('javac', [
