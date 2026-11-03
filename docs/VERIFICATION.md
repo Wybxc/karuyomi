@@ -29,7 +29,7 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 同期接入唯一 `.proto` 与 Buf，Protobuf-ES/Dart 官方生成模型用于正式 API、Source/Worker 与 Web/Native 控制边界；`pnpm generate:check` 检查生成文件全集和字节，9 项实际 TS↔Dart golden 覆盖 ProtoJSON/二进制、oneof、可选字段、精确 memo 数字文本及业务预算。`pnpm flutter:check` 的静态分析及 71 项测试通过；`pnpm build` 完成宿主、Native 材料、Flutter Web release、空扩展索引组装及 API Wrangler dry-run。Java DTO、HTTP body、图片和 Locale oracle 也通过。复验范围和命令见[协议计划](plan/cross-language-protocol.md)与[工具计划](plan/tooling-processes.md)。
 
-当前控制身份为 host ABI `karuyomi-source-host-v3` / protocolVersion 2，HTTP bridgeVersion 仍为 2。浏览器探针入口已迁至单一 control 和正式生成 codec。固定 `6e08ec9` 后，原版 Arknights Comics 已重新 AOT，并在 Codex 内置浏览器通过初始化、真实 Source 元数据和首中末图片门，见 [v3 运行证据](verification/protocol-v3-runtime.md)。Native 正式控制链、取消和生产 Access 仍须分项验收。下文 v2 图片和 v1 部署证据仍保持原身份；冻结 `022d828` 全量未改动，不能把其产物装配进当前客户端。
+当前控制身份为 host ABI `karuyomi-source-host-v3` / protocolVersion 2，HTTP bridgeVersion 仍为 2。浏览器探针入口已迁至单一 control 和正式生成 codec。固定 `6e08ec9` 后，原版 Arknights Comics 已重新 AOT，并在 Codex 内置浏览器通过初始化、真实 Source 元数据和首中末图片门，见 [v3 运行证据](verification/protocol-v3-runtime.md)。Native 实际 Source、运行中取消和生产 Access 仍须分项验收。下文 v2 图片和 v1 部署证据仍保持原身份；冻结 `022d828` 全量未改动，不能把其产物装配进当前客户端。
 
 同日将正则供体类命名从补丁移入构建生成步骤，使用 `java-parser` token 位置保留原排版与字面量，再应用行为补丁；全部 13 份生成 Java 与拆分前逐字节一致，原输出摘要未改。回归覆盖刻意保留的上游类型转换、Lexer 引用与继承关系、字符串/文本块和注释不误改，以及源码/上下文/结果漂移拒绝。`toolchain/license.txt` 同时改名为 `android-sdk-license`，仅更新锁中的路径，41 字节内容与摘要不变。
 
@@ -142,13 +142,19 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 [实测摘要](verification/runtime-evidence.md) 记录 iOS 26.4 Simulator / Xcode SDK 27.2 在本地受信 HTTPS 下的机制验证：256 KiB、4 MiB、16 MiB 二进制，Worker 处理生成的 PNG，以及 16 MiB 下载启动后立即取消。正文走 `Worker → transferable ArrayBuffer → Blob URL → WKWebView.startDownload → WKDownloadDelegate → 受管临时文件`，只用小型控制消息；独立原生摘要、PNG 尺寸、发送方脱离、文件/Blob 释放与最终空资源目录检查通过。
 
-iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录，仓库只保留摘要。该次实测使用专用模拟器及临时受信 localhost 证书，没有跳过系统 TLS 校验。当前 `flutter_inappwebview` 未直接暴露所需 `startDownload` 受管文件链路，产品薄插件扩展尚未实现；这份机制证据不是 Flutter 产品图片桥，也不是物理 iPhone、生产 HTTPS/Access、任意阶段取消、首图性能或进程/GPU 峰值验收。
+iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录，仓库只保留摘要。该次实测使用专用模拟器及临时受信 localhost 证书，没有跳过系统 TLS 校验。当时 `flutter_inappwebview` 未直接暴露所需 `startDownload` 受管文件链路，尚无产品薄扩展；这份历史机制证据不是 Flutter 产品图片桥，也不是物理 iPhone、生产 HTTPS/Access、任意阶段取消、首图性能或进程/GPU 峰值验收。
+
+## Native 受管文件产品机制
+
+2026-11-03 已接入正式 NativePlatformRuntime、资源所有权表、iOS WKDownload 文件桥与 Android 固定六槽 ArrayBuffer sink。iOS 26.4 Simulator / Xcode SDK 27.2 在正常受信 localhost HTTPS 下，实际 Flutter Headless 握手、唯一 token 绑定、307 控制页规范化、受控 Blob 下载、1,175 字节摘要、Flutter 256×128 解码及取消/释放/目录清理通过。Swift XCTest 11 项、Flutter 45 项、SourceRuntime 23 项和 Native opt-in/图片 manager 的 TypeScript 15 项通过；analyze 无问题，正式产品 iOS 模拟器构建成功。Android 嵌入脚本的真实 Node MessagePort 背压/复用/迟到 ACK 回归通过，尚未在 Android WebView 运行。
+
+完整合同、工具来源、期限/tombstone/配额和复验入口见 [Native 图片文件](NATIVE-IMAGE-FILES.md)。这证明产品容器与文件交接机制，尚非原版 Source→Native Reader、物理 iPhone、生产 Access、后台恢复或合计峰值验收。绑定与下载回调未确认停止时不会声称成功清理或归还预算。
 
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
 - v2 二进制网络/Okio 流控、真实上游取消、文件与 HTTP Cache 同版回归。
-- Native 图片受管文件产品通道；内部 Bitmap/ImageDecoder 二进制化及总 raster 预算；更多真实处理/解密源覆盖。
+- 原 Source→Native Reader、Android 实际 WebView 和后台恢复；内部 Bitmap/ImageDecoder 二进制化及总 raster 预算；更多真实处理/解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 书架/进度等持久化、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化。
 

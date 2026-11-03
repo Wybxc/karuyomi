@@ -5,6 +5,12 @@ abstract interface class RuntimeTransport {
   Future<Object?> control(Map<String, Object?> request);
 }
 
+/// Only a platform-owned resource table may authorize a local image file.
+/// A file URI received from a WebView is not itself evidence of ownership.
+abstract interface class ManagedImageTransport {
+  bool ownsImageLocation(String resourceId, String generation, Uri location);
+}
+
 final class RuntimeException implements Exception {
   const RuntimeException(
     this.code,
@@ -422,8 +428,17 @@ final class TransportSourceRuntime implements SourceRuntime {
       final location = response.url.length <= 4096
           ? Uri.tryParse(response.url)
           : null;
+      final managedFile =
+          location != null &&
+          location.scheme == 'file' &&
+          transport is ManagedImageTransport &&
+          (transport as ManagedImageTransport).ownsImageLocation(
+            response.resourceId,
+            response.generation,
+            location,
+          );
       if (location == null ||
-          location.scheme != 'blob' ||
+          (location.scheme != 'blob' && !managedFile) ||
           !RegExp(
             r'^image/[a-zA-Z0-9.+-]{1,80}$',
           ).hasMatch(response.mimeType) ||

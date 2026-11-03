@@ -10,6 +10,7 @@ declare global {
     __karuyomiNativeRuntime?: {
       workerSource: string;
       materialVersion: string;
+      imageFiles?: boolean;
     };
   }
 }
@@ -97,7 +98,7 @@ if (!window.karuyomiRuntime) {
       createWorker,
       new VerifiedLoader(origin, undefined, () => undefined),
       60_000,
-      { enabled: false },
+      { enabled: configuration.imageFiles === true },
     ),
   );
 }

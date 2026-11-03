@@ -178,4 +178,27 @@ void main() {
       }
     },
   );
+
+  test(
+    'managed file capability and binding token are explicitly opted in together',
+    () async {
+      final assets = await load();
+      final ordinary = assets.documentStartScript(
+        Uri.parse('https://reader.example'),
+      );
+      expect(ordinary, contains('imageFiles: false'));
+      expect(ordinary, isNot(contains('__karuyomiNativeImageToken')));
+      final managed = assets.documentStartScript(
+        Uri.parse('https://reader.example'),
+        imageFileToken: 'native-token',
+      );
+      expect(managed, contains('imageFiles: true'));
+      expect(
+        managed,
+        contains("Object.defineProperty(window, '__karuyomiNativeImageToken'"),
+      );
+      expect(managed, contains('location.origin !== "https://reader.example"'));
+      expect(managed, contains("['/runtime/host.html', '/runtime/host']"));
+    },
+  );
 }

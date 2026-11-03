@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'runtime_platform_types.dart';
 import 'native_runtime_assets.dart';
+import 'native_image_files.dart';
+import 'android_image_files.dart';
 
 PlatformRuntime createPlatformRuntime({Uri? origin}) {
   if (origin == null) {
@@ -15,7 +19,8 @@ PlatformRuntime createPlatformRuntime({Uri? origin}) {
   return NativePlatformRuntime(origin);
 }
 
-final class NativePlatformRuntime extends PlatformRuntime {
+final class NativePlatformRuntime extends PlatformRuntime
+    implements ManagedImageTransport {
   NativePlatformRuntime(this.origin) {
     if (origin.scheme != 'https' ||
         origin.host.isEmpty ||
@@ -36,6 +41,14 @@ final class NativePlatformRuntime extends PlatformRuntime {
   Future<void>? _opening;
   int _generation = 0;
   bool _disposed = false;
+  NativeImageControl? _images;
+  Completer<void>? _containerEnded;
+  Future<void>? _resetting;
+  Future<void>? _disposing;
+
+  @override
+  bool ownsImageLocation(String resourceId, String generation, Uri location) =>
+      _images?.owns(resourceId, generation, location) ?? false;
   Map<String, Object?>? _authenticationContinuation;
 
   @override
@@ -71,6 +84,8 @@ final class NativePlatformRuntime extends PlatformRuntime {
         ),
       );
     }
+    final resetting = _resetting;
+    if (resetting != null) return resetting.then((_) => _ensureHost());
     final current = _opening;
     if (current != null) return current;
     final opening = _startHost();
@@ -88,7 +103,15 @@ final class NativePlatformRuntime extends PlatformRuntime {
 
   Future<void> _startHost() async {
     final generation = ++_generation;
+    _containerEnded = Completer<void>();
     final assets = await NativeRuntimeAssets.load();
+    final imageFiles =
+        Platform.isIOS ||
+        (Platform.isAndroid && await AndroidImageFileStore.supported());
+    final random = Random.secure();
+    final imageToken = imageFiles
+        ? 'native-$generation-${List.generate(24, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}'
+        : null;
     if (Platform.isAndroid &&
         !await WebViewFeature.isFeatureSupported(
           WebViewFeature.DOCUMENT_START_SCRIPT,
@@ -105,11 +128,15 @@ final class NativePlatformRuntime extends PlatformRuntime {
       );
     }
     final loaded = Completer<void>();
+    var handshaking = false;
     _view = HeadlessInAppWebView(
       initialUserScripts: UnmodifiableListView([
         UserScript(
           groupName: 'karuyomi-native-runtime',
-          source: assets.documentStartScript(origin),
+          source: assets.documentStartScript(
+            origin,
+            imageFileToken: imageToken,
+          ),
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
           contentWorld: ContentWorld.PAGE,
           forMainFrameOnly: true,
@@ -147,7 +174,10 @@ final class NativePlatformRuntime extends PlatformRuntime {
         return NavigationActionPolicy.ALLOW;
       },
       onLoadStop: (controller, url) async {
-        if (generation != _generation || loaded.isCompleted) return;
+        if (generation != _generation || loaded.isCompleted || handshaking) {
+          return;
+        }
+        handshaking = true;
         if (url == null || Uri.parse(url.toString()).origin != origin.origin) {
           loaded.completeError(
             const RuntimeException(
@@ -199,6 +229,32 @@ final class NativePlatformRuntime extends PlatformRuntime {
               'Incompatible bundled Native runtime',
             );
           }
+          if (imageToken != null) {
+            final NativeImageFileStore files = Platform.isIOS
+                ? await IosImageFileStore.bind(
+                    token: imageToken,
+                    origin: origin,
+                  )
+                : await AndroidImageFileStore.bind(controller, origin);
+            if (generation != _generation) {
+              await files.clear();
+              throw const RuntimeException(
+                RuntimeErrorCode.runtimeLost,
+                'Native image container was replaced during binding',
+              );
+            }
+            _images = NativeImageControl(
+              store: files,
+              origin: origin,
+              call: (request) async => wire.decodeProtoJson(
+                wire.ControlResponse(),
+                await _callExistingHost(
+                  wire.encodeProtoJson(request),
+                  generation,
+                ),
+              ),
+            );
+          }
           if (!loaded.isCompleted) loaded.complete();
         } catch (error) {
           if (!loaded.isCompleted) loaded.completeError(error);
@@ -222,11 +278,20 @@ final class NativePlatformRuntime extends PlatformRuntime {
       await loaded.future.timeout(const Duration(seconds: 20));
     } catch (_) {
       if (generation == _generation) {
+        if (!_containerEnded!.isCompleted) _containerEnded!.complete();
         ++_generation;
         _view = null;
         _controller = null;
+        final images = _images;
+        _images = null;
+        try {
+          await images?.close();
+        } finally {
+          await view.dispose();
+        }
+      } else {
+        await view.dispose();
       }
-      await view.dispose();
       rethrow;
     }
     if (generation != _generation) {
@@ -245,7 +310,9 @@ final class NativePlatformRuntime extends PlatformRuntime {
       maxBytes: wire.controlRequestLimit,
     );
     final command = message.whichCommand();
-    if (command == wire.ControlRequest_Command.acquireImage) {
+    if (command == wire.ControlRequest_Command.acquireImage &&
+        !Platform.isIOS &&
+        !Platform.isAndroid) {
       throw const RuntimeException(
         RuntimeErrorCode.unsupportedCapability,
         'Native processed-image files are not implemented on this platform',
@@ -258,6 +325,7 @@ final class NativePlatformRuntime extends PlatformRuntime {
           wire.ControlRequest_Command.closePageSession,
         }.contains(command)) {
       // Cleanup of an expired handle must not create a replacement WebView.
+      await _resetting;
       return wire.encodeProtoJson(
         wire.ControlResponse(
           requestId: message.requestId,
@@ -279,15 +347,88 @@ final class NativePlatformRuntime extends PlatformRuntime {
       );
     }
     await _ensureHost();
+    try {
+      final images = _images;
+      if (command == wire.ControlRequest_Command.acquireImage) {
+        if (images == null) {
+          throw const RuntimeException(
+            RuntimeErrorCode.unsupportedCapability,
+            'This WebView does not support managed image files',
+          );
+        }
+        return wire.encodeProtoJson(
+          await images.acquire(message),
+          maxBytes: wire.controlJsonLimit,
+        );
+      }
+      if (command == wire.ControlRequest_Command.cancelImage &&
+          images != null) {
+        return wire.encodeProtoJson(
+          await images.cancel(message),
+          maxBytes: wire.controlJsonLimit,
+        );
+      }
+      if (command == wire.ControlRequest_Command.releaseImage &&
+          images != null) {
+        return wire.encodeProtoJson(
+          await images.release(message),
+          maxBytes: wire.controlJsonLimit,
+        );
+      }
+      if (command == wire.ControlRequest_Command.dispose) await images?.close();
+      return await _callExistingHost(request, _generation);
+    } catch (error, stack) {
+      final failure = error is PlatformException
+          ? RuntimeException(switch (error.code) {
+              'cancelled' => RuntimeErrorCode.cancelled,
+              'timeout' => RuntimeErrorCode.timeout,
+              'unsupported_capability' =>
+                RuntimeErrorCode.unsupportedCapability,
+              'limit_exceeded' => RuntimeErrorCode.limitExceeded,
+              'integrity_error' => RuntimeErrorCode.integrityError,
+              'protocol_error' => RuntimeErrorCode.protocolError,
+              _ => RuntimeErrorCode.runtimeLost,
+            }, error.message ?? 'Native image file operation failed')
+          : error is RuntimeException
+          ? error
+          : const RuntimeException(
+              RuntimeErrorCode.runtimeLost,
+              'Native runtime operation failed',
+            );
+      if (failure.code == RuntimeErrorCode.runtimeLost) {
+        unawaited(rebuild().catchError((Object _) {}));
+      }
+      Error.throwWithStackTrace(failure, stack);
+    }
+  }
+
+  Future<Object?> _callExistingHost(
+    Map<String, Object?> request,
+    int expectedGeneration,
+  ) async {
+    if (expectedGeneration != _generation || _controller == null) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Native runtime container was replaced',
+      );
+    }
     final generation = _generation;
-    final result = await _controller!.callAsyncJavaScript(
-      functionBody: '''
+    final result = await Future.any([
+      _controller!.callAsyncJavaScript(
+        functionBody: '''
         const host = window.karuyomiRuntime;
         if (!host) throw new Error('Runtime control module was lost');
         return JSON.stringify(await host.control(request));
       ''',
-      arguments: {'request': request},
-    );
+        arguments: {'request': request},
+      ),
+      _containerEnded!.future.then<CallAsyncJavaScriptResult?>(
+        (_) => throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Native runtime container was replaced',
+        ),
+      ),
+    ]);
     if (generation != _generation ||
         result?.error != null ||
         result?.value is! String) {
@@ -300,27 +441,55 @@ final class NativePlatformRuntime extends PlatformRuntime {
   }
 
   @override
-  Future<void> rebuild() async {
+  Future<void> rebuild() =>
+      _resetting ??= Future<void>.microtask(_reset).whenComplete(() {
+        _resetting = null;
+      });
+
+  Future<void> _reset() async {
     runtime.containerLost('Native runtime container was rebuilt');
+    if (_containerEnded != null && !_containerEnded!.isCompleted) {
+      _containerEnded!.complete();
+    }
     ++_generation;
-    await _view?.dispose();
+    final images = _images;
+    final view = _view;
+    _images = null;
     _view = null;
     _controller = null;
     _opening = null;
+    try {
+      await images?.close();
+    } finally {
+      await view?.dispose();
+    }
   }
 
   @override
-  Future<void> dispose() async {
+  Future<void> dispose() => _disposing ??= _dispose();
+
+  Future<void> _dispose() async {
     if (_disposed) return;
     try {
+      await _resetting;
       await runtime.dispose();
     } finally {
       _disposed = true;
+      if (_containerEnded != null && !_containerEnded!.isCompleted) {
+        _containerEnded!.complete();
+      }
       ++_generation;
-      await _view?.dispose();
+      final images = _images;
+      final view = _view;
+      _images = null;
       _view = null;
       _controller = null;
       _opening = null;
+      try {
+        await images?.close();
+      } finally {
+        await view?.dispose();
+      }
     }
   }
 }

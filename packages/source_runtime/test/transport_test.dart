@@ -71,6 +71,21 @@ final class FakeTransport implements RuntimeTransport {
   }
 }
 
+final class ManagedTransport
+    implements RuntimeTransport, ManagedImageTransport {
+  ManagedTransport(this.delegate);
+  final FakeTransport delegate;
+  Uri? owned;
+  @override
+  Future<Object?> control(Map<String, Object?> request) =>
+      delegate.control(request);
+  @override
+  bool ownsImageLocation(String resourceId, String generation, Uri location) =>
+      resourceId == 'resource-1' &&
+      generation == 'generation-1' &&
+      location == owned;
+}
+
 BuildDescriptor build({String identity = 'owner', String? path}) =>
     BuildDescriptor(
       buildId: 'build-1',
@@ -317,6 +332,35 @@ void main() {
     );
     await runtime.dispose();
   });
+
+  test(
+    'file images require the Native transport ownership table, including identity and generation',
+    () async {
+      final delegate = FakeTransport();
+      final managed = ManagedTransport(delegate);
+      final location = Uri.parse('file:///private/tmp/managed/image');
+      delegate.handler = (request) async {
+        final response = delegate.respond(request);
+        if (request.hasAcquireImage()) response.image.url = location.toString();
+        return response;
+      };
+      final runtime = TransportSourceRuntime(managed);
+      await runtime.open(build());
+      await expectLater(
+        runtime.acquireImage(imageRequest()),
+        throwsA(failure(RuntimeErrorCode.protocolError)),
+      );
+      managed.owned = location;
+      final resource = await runtime.acquireImage(imageRequest());
+      expect(resource.location, location);
+      managed.owned = Uri.parse('file:///private/tmp/managed/other');
+      await expectLater(
+        runtime.acquireImage(imageRequest()),
+        throwsA(failure(RuntimeErrorCode.protocolError)),
+      );
+      await runtime.dispose();
+    },
+  );
 
   test(
     'invalid managed locations and dimensions release rejected resource',

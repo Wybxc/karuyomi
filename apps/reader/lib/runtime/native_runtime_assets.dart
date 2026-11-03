@@ -92,7 +92,7 @@ final class NativeRuntimeAssets {
 
   /// iOS 6.1.5 does not enforce allowedOriginRules for WKUserScript. Keep the
   /// origin/frame/path checks in the script as well as the native navigation gate.
-  String documentStartScript(Uri origin) {
+  String documentStartScript(Uri origin, {String? imageFileToken}) {
     if (origin.scheme != 'https' ||
         origin.host.isEmpty ||
         origin.userInfo.isNotEmpty ||
@@ -108,8 +108,9 @@ final class NativeRuntimeAssets {
   if (window !== window.top || location.origin !== ${jsonEncode(origin.origin)} ||
       !['/runtime/host.html', '/runtime/host'].includes(location.pathname) || location.search || location.hash) return;
   if (window.karuyomiRuntime || window.__karuyomiNativeRuntime) return;
+  ${imageFileToken == null ? '' : "Object.defineProperty(window, '__karuyomiNativeImageToken', {value: ${jsonEncode(imageFileToken)}});"}
   Object.defineProperty(window, '__karuyomiNativeRuntime', {configurable: true, value: Object.freeze({
-    workerSource: ${jsonEncode(workerSource)}, materialVersion: ${jsonEncode(materialVersion)}
+    workerSource: ${jsonEncode(workerSource)}, materialVersion: ${jsonEncode(materialVersion)}, imageFiles: ${imageFileToken != null}
   })});
 $hostSource
   if (!window.karuyomiRuntime) throw new Error('Bundled Native runtime did not install');

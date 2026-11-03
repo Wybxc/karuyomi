@@ -42,7 +42,7 @@ Java 仅在 Page 的 imageUrl 尚未解析时调用原 Source 的 `getImageUrl`�
 
 Java 图片出口为 `teaImageOpen/Write/Close/Cancel`，同步控制信息保持小；Write 每次至多 64 KiB，等待 ACK 后才生产下一块。每次获取使用独立 MessageChannel，DATA buffer 转移所有权。END 时暂存已校验 Blob 并返回内部元数据 ACK，Java Close 完成后才返回 Source 调用成功。主线程必须同时收到有效流终态和一致的 Java 成功结果，才能创建 Blob URL 并向 Dart 发布资源；单独 END 或 RPC 成功均不足以显示图片。暂存后 Java 失败也须解除字节所有权。
 
-HTTP handle 只属于当前 Source 调用，调用结束清理。图片资源归主线程 manager 所有，独立存活至 release；不能返回 HTTP handle 充当图片资源。资源描述为 `resourceId/generation/mimeType/byteLength/width/height/url`。Web 仅接受 manager 创建的 Blob URL；Native 需受管文件，尚未实现时返回能力不足。
+HTTP handle 只属于当前 Source 调用，调用结束清理。图片资源归主线程 manager 所有，独立存活至 release；不能返回 HTTP handle 充当图片资源。资源描述为 `resourceId/generation/mimeType/byteLength/width/height/url`。Web 仅接受 manager 创建的 Blob URL；Native 经平台所有权表确认后只交付受管文件，不支持的平台返回能力不足。iOS 产品文件桥与 Android 平台 sink 的实现、模拟器机制证据和未验门见 [Native 图片文件](NATIVE-IMAGE-FILES.md)。
 
 编码字节、驻留资源与尺寸均受预算约束。尺寸头解析复用固定版本的 [image-dimensions](https://github.com/sindresorhus/image-dimensions)，先检查像素预算，再用浏览器 `createImageBitmap` 获取实际显示尺寸并立即 close，处理 EXIF 等浏览器方向语义。这会增加一次临时解码，不构成零复制或移动端峰值通过的证据。尺寸学习只更新 Reader 布局，保留 manifest.version 与逻辑锚。
 
@@ -70,6 +70,6 @@ Reader 在 widget、缩放 overlay 与解码缓存解除引用后释放资源。
 - 通道：慢消费者背压、序号与字节预算、END/RPC 竞争、取消后退出、旧 generation、重复 release、空资源表。
 - Java：原 Page 身份、Source 绑定、原图片方法与处理后正文、有界读取、关闭和失败路径。
 - 实际 Web：未修改 Source 的真实章首中末页，经产品通道解码、阅读器导航、尺寸更新及释放。
-- 后续设备门：Android ArrayBuffer / iOS 受管 WKDownload 文件交接、后台恢复及合计进程/GPU 峰值。
+- 后续设备门：原 Source→Native Reader、Android ArrayBuffer 实际插件链、物理 iPhone、后台恢复及合计进程/GPU 峰值。iOS 真实 Flutter Headless→受控 Blob→WKDownload 文件机制已单独通过，不代替这些门。
 
 现有 Bitmap / ImageDecoder 内部的整图 Base64、`readAllBytes()` 与合计 graphics 预算仍需独立改造。外层图片通道通过不能代替图片解密/重排 Source、超长图或移动端完整阅读验收。
