@@ -102,7 +102,7 @@ node .local/cache-java/server-policy.ts
 ## 未通过的后续门
 
 - body metadata/pin/usage 记录损坏恢复、清理事务持续失败，以及更广的存储损坏恢复尚未验证；六类 chunk 门不能替代这些情况。
-- 共享 Java 场景尚未覆盖截断网络正文、网络半途取消及更广的异常类型对照；桥上的 reader-close/read abort 不等于完整 Java HTTP 取消门。
+- 共享 Java 的截断网络正文、半途取消及 Cache.close 后同目录重开已通过[独立受控 HTTP 故障门](cache-http-failures.md)；生产 HTTP/2、HTTP/3、正式 Source/Access、Native 与更广异常仍待验收。桥上的 reader-close/read abort 不代替这些产品门。
 - 新 host 输入的三源 AOT、Web Source 元数据与首中末图片已通过[分项复验](cache-v3-sources.md)；正式 Source Cache、扩展版本与 storage namespace 切换、生产 Access、Native Java 链和设备资源测量须另验。
 - allocated 是 current/staging/pinned-retired 正文及响应 metadata 的逻辑预算，另有结构 reservation，不是浏览器物理磁盘占用。跨目录 namespace 上限已实现并通过上述门；Cache/files 组合压力、origin 所有 namespace 总占用与设备峰值仍未测量。
 

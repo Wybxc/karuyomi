@@ -176,3 +176,10 @@ It checks decoding, repeated cookies, status/body rules, streamed uploads,
 early-response validation and connection cancellation without internet or JVM
 dependencies. This integration is part of `pnpm check`; it is not evidence of
 real Source behavior or a production Access session.
+
+The independent [shared Java Cache failure gate](verification/cache-http-failures.md)
+passes 50 checks on both the untouched original JVM and actual TeaVM in Chromium
+156, including truncated bodies and cancellation after an exact 8192-byte prefix.
+It separately observes two real relay TCP resets and all four origin response
+closures. This is a manual loopback HTTP/1 gate with a signed test identity; it
+does not establish production HTTP/2, HTTP/3, Access, Source or Native cancellation.

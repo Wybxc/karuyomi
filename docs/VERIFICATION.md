@@ -45,7 +45,9 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 共享 `CacheScenarios.java` 分别在官方 Maven 未适配 OkHttp 5.5.0 与真实 TeaVM 0.16 产品 Cache/BrowserCall/二进制 JSO 中执行，经受控 workerd origin 对照冷/热命中、304、no-cache/no-store、POST invalidation、Cookie Vary 和 evictAll 后打开 snapshot。请求/网络/命中/成功写入及正文摘要一致；原 JVM 断言实际 CodeSource，避免误用 seed 同名适配 JAR。CacheSink 的存储写失败只丢弃缓存副本，不吞网络读取异常。
 
-已有新 Cache 材料的 Arknights/CuuTruyen 在线图片分项见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)，仍未实测其冷/热 Cache 命中。生产 Access 动态链、截断网络正文的共享 Java 异常对照、Native 与跨目录 namespace 总预算未验收；机制与受控 Java 场景不代替这些门。
+独立的[共享 Java HTTP 故障门](verification/cache-http-failures.md)已在官方原 JVM 与 Codex 内置 Chromium 156 的实际 TeaVM 各通过四场景、50 项检查：精确读取 8192 B 后截断或取消、Cache 关闭后同目录重开、半成品不可见、旧完整条目保留及网络恢复。另观察到本地 HTTP/1 中继两次真实 RST 和四条原点响应关闭，正式 runner 退出 0；不推广为生产 HTTP/2、HTTP/3 或真实 Access 取消。
+
+已有新 Cache 材料的 Arknights/CuuTruyen 在线图片分项见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)，仍未实测其冷/热 Cache 命中。生产 Access 动态链、正式 Source Cache/取消、Native Java 与 Cache/files 组合压力仍待验收；机制与受控 Java 场景不代替这些门。
 
 ## 有界普通文件分项
 
@@ -151,6 +153,8 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 当前构建、注册清单、Java、Worker 和 API 只维护 HTTP v2，旧 v1 传输分支已删除。Java 重新经过真实 TeaVM 编译后的 18 例模拟 supplier 回归，覆盖 GET/POST、空正文、取消/超时、受控重试及错误分类；这些仍是模拟环境证据。
 
 `pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 22 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。新增分项实际验证 204/205/304 无正文与 304 表示元数据、显式 Range 的精确 19 字节返回、Unicode/重复 urlencoded 字段及跨 64 KiB 的 multipart 文件。表单由标准 Request/FormData codec 生成和解析；origin 在消费者已读到正确前缀后真实截断，bridge 返回 `upstream_body_error` 而非成功 END。测试 adapter 使用标准 Node pipeline 传递该错误，没有修改生产入口。该门已纳入 `pnpm check`，完整输出留在忽略目录 `.local/probes/http-bridge-v2.json`。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
+
+共享 CacheInterceptor 的截断/半途取消另有[实际 TeaVM 与原 JVM 对照](verification/cache-http-failures.md)，与上述模拟 supplier、独立 HTTP bridge 门分别计证据；生产网络取消仍未通过。
 
 ## Web 产品图片通道
 

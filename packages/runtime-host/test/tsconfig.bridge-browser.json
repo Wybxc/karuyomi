@@ -8,6 +8,7 @@
     "file-lifecycle-browser-suite.ts",
     "text-layout-browser-suite.ts",
     "bitmap-lifetime-browser-suite.ts",
-    "bitmap-lifetime-java-browser-suite.ts"
+    "bitmap-lifetime-java-browser-suite.ts",
+    "cache-failure-java-browser-worker.ts"
   ]
 }
