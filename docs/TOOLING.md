@@ -35,3 +35,7 @@ Wrangler 4.156.1 的 D1 `--file --json` 会由另一套 logger 输出上传进�
 迁移保留有意义的行为门：无变化跳过、失败保留兼容的成功、同失败不重试、删除退役、传输损坏、有界 gzip、D1 事务与明确域名、真实进程组取消、checkpoint 锁、候选原子替换与部署确认后落状态。单元测试、真实 workerd、真实 AOT 初始化和线上部署分别记录在 [VERIFICATION](VERIFICATION.md)。
 
 命令见 [EXTENSIONS](EXTENSIONS.md) 和 [TeaVM README](../runtime/teavm/README.md)。提交前仍须先 `pnpm format`，再 `pnpm format:check`，并通过真实 prek hook。
+
+## Drift 生成模型
+
+阅读进度数据库使用 `apps/reader/pubspec.yaml` 精确锁定的 Drift/Drift Dev 与官方 build_runner。修改表后在 `apps/reader/` 运行 `dart run build_runner build`，将自有表定义和官方 `reader_database.g.dart` 一起审阅提交。`pnpm flutter:check` 用官方生成器重建该目标并逐字节检查，发现差异时要求审阅生成结果；随后继续静态分析与测试。`.g.dart` 与现有 Protobuf 生成模型一样不参与普通源码再排版，类型分析与真实数据库测试仍包含它们。

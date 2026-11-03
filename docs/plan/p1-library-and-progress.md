@@ -10,6 +10,8 @@
 - 独立 Dart 阅读核心已有稳定逻辑锚、布局/方向、缩放和有界资源调度；实际图片接入仍属于 [P0](p0-runtime-and-reading.md)。
 - 单 hostname、Access/API、D1/R2 工程入口已存在；书架/进度业务表、客户端镜像和 repository 尚未建立。
 
+Drift/SQLite 本地进度底座已实现，12 项数据回归包括真实文件关闭重开、事务回滚和 epoch/身份隔离；当前仅基础分项通过，产品接线与 Web/Native 实际恢复仍在推进，见[验证记录](../verification/local-progress.md)。
+
 ## 待办
 
 1. 设计并迁移漫画、收藏、章节、分类、多分类关联、进度/书签/阅读位置和阅读设置；D1 保存云端业务状态，客户端维护当前身份镜像与待提交变更。Flutter 平台的具体存储适配需落实，不能照搬历史 React/Dexie 代码结构。

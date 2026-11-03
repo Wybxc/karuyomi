@@ -1,5 +1,5 @@
 import { execa, ExecaError } from 'execa';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -39,7 +39,25 @@ async function main(): Promise<void> {
         });
       }
       break;
-    case 'check':
+    case 'check': {
+      const app = path.join(root, 'apps/reader');
+      const generated = path.join(app, 'lib/data/reader_database.g.dart');
+      const expected = readFileSync(generated);
+      await run(
+        dart,
+        [
+          'run',
+          'build_runner',
+          'build',
+          '--build-filter=lib/data/reader_database.g.dart',
+        ],
+        { cwd: app },
+      );
+      if (!expected.equals(readFileSync(generated))) {
+        throw new Error(
+          'Drift generated code changed; review the generator output and rerun checks',
+        );
+      }
       for (const project of projects) {
         const cwd = path.join(root, project);
         if (project === 'apps/reader') {
@@ -66,7 +84,9 @@ async function main(): Promise<void> {
                   .map((entry) => path.join(entry.parentPath, entry.name))
                   .filter(
                     (file) =>
-                      !file.includes(`${path.sep}src${path.sep}pb${path.sep}`),
+                      !file.includes(
+                        `${path.sep}src${path.sep}pb${path.sep}`,
+                      ) && !file.endsWith('.g.dart'),
                   )
                   .sort()
               : [];
@@ -74,6 +94,7 @@ async function main(): Promise<void> {
         ),
       ]);
       break;
+    }
     case 'build':
       await run(
         flutter,

@@ -59,6 +59,7 @@ const files = [
     !name.startsWith('vendor/') &&
     !name.startsWith('packages/protocol/src/') &&
     !name.startsWith('packages/source_runtime/lib/src/pb/') &&
+    !name.endsWith('.g.dart') &&
     existsSync(path.join(root, name)),
 );
 const matching = (pattern: RegExp) =>
