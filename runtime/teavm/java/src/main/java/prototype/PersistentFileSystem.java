@@ -202,6 +202,7 @@ public final class PersistentFileSystem implements VirtualFileSystem {
   }
 
   private static final class Accessor implements VirtualFileAccessor {
+    private static final int MAX_CHUNK = 65536;
     private final String handle;
     private boolean closed;
 
@@ -218,23 +219,25 @@ public final class PersistentFileSystem implements VirtualFileSystem {
 
     public int read(byte[] bytes, int offset, int length) throws IOException {
       Objects.checkFromIndexSize(offset, length, bytes.length);
-      JsonObject r = command("read");
+      if (closed) throw new IOException("Stream is closed");
       if (length == 0) return 0;
-      r.addProperty("length", length);
-      JsonObject out = call(r);
-      if (flag(out, "eof")) return -1;
-      byte[] data = Base64.getDecoder().decode(out.get("body").getAsString());
+      byte[] data = Bridge.fileRead(handle, Math.min(length, MAX_CHUNK));
+      // TeaVM's VirtualFileAccessor uses zero, rather than InputStream's -1, at EOF.
+      if (data == null) return 0;
+      if (data.length == 0 || data.length > Math.min(length, MAX_CHUNK))
+        throw new IOException("Invalid file response chunk size");
       System.arraycopy(data, 0, bytes, offset, data.length);
       return data.length;
     }
 
     public void write(byte[] bytes, int offset, int length) throws IOException {
       Objects.checkFromIndexSize(offset, length, bytes.length);
-      JsonObject r = command("write");
-      r.addProperty(
-          "body",
-          Base64.getEncoder().encodeToString(Arrays.copyOfRange(bytes, offset, offset + length)));
-      call(r);
+      if (closed) throw new IOException("Stream is closed");
+      for (int written = 0; written < length; ) {
+        int count = Math.min(length - written, MAX_CHUNK);
+        Bridge.fileWrite(handle, bytes, offset + written, count);
+        written += count;
+      }
     }
 
     public int tell() throws IOException {

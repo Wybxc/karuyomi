@@ -31,6 +31,8 @@ function installedBridges() {
     teaCacheRead,
     teaCacheWrite,
     teaFile,
+    teaFileRead,
+    teaFileWrite,
     teaFileSystemClose,
   } = workerScope();
   assert(typeof teaCrypto === 'function', 'Crypto bridge installed');
@@ -58,7 +60,10 @@ function installedBridges() {
     typeof teaCache === 'function' && teaCacheRead && teaCacheWrite,
     'Binary cache bridge installed',
   );
-  assert(typeof teaFile === 'function', 'File bridge installed');
+  assert(
+    teaFile && teaFileRead && teaFileWrite,
+    'Binary file bridge installed',
+  );
   assert(
     typeof teaFileSystemClose === 'function',
     'File close bridge installed',
@@ -80,6 +85,8 @@ function installedBridges() {
     teaCacheRead,
     teaCacheWrite,
     teaFile,
+    teaFileRead,
+    teaFileWrite,
     teaFileSystemClose,
   };
 }
@@ -356,21 +363,16 @@ async function filesystemWrite(checks: string[]) {
     writable: true,
   });
   const second = await file({ operation: 'open', path, readable: true });
-  await file({ operation: 'write', handle: opened.handle, body: encoded });
+  await scope.teaFileWrite(text(opened.handle), binary);
   await file({ operation: 'seek', handle: opened.handle, position: 0 });
   assert(
-    (
-      await file({
-        operation: 'read',
-        handle: opened.handle,
-        length: binary.length,
-      })
-    ).body === encoded,
+    encodeBase64(
+      (await scope.teaFileRead(text(opened.handle), binary.length))!,
+    ) === encoded,
     'Filesystem binary bytes',
   );
   assert(
-    (await file({ operation: 'read', handle: second.handle, length: 1 }))
-      .body === 'AA==',
+    (await scope.teaFileRead(text(second.handle), 1))?.[0] === 0,
     'Independent file cursors',
   );
   assert(
@@ -384,13 +386,9 @@ async function filesystemWrite(checks: string[]) {
   );
   await file({ operation: 'seek', handle: opened.handle, position: 0 });
   assert(
-    (
-      await file({
-        operation: 'read',
-        handle: opened.handle,
-        length: binary.length,
-      })
-    ).body === encoded,
+    encodeBase64(
+      (await scope.teaFileRead(text(opened.handle), binary.length))!,
+    ) === encoded,
     'Open inode survives unlink',
   );
   await file({ operation: 'close', handle: opened.handle });
@@ -407,7 +405,7 @@ async function filesystemWrite(checks: string[]) {
     readable: true,
     writable: true,
   });
-  await file({ operation: 'write', handle: persistent.handle, body: encoded });
+  await scope.teaFileWrite(text(persistent.handle), binary);
   await file({ operation: 'close', handle: persistent.handle });
   checks.push('indexeddb-files-cursors-rename-unlink');
 }
@@ -454,13 +452,9 @@ globalThis.onmessage = (event: MessageEvent<unknown>) => {
           'File persisted across Worker restart',
         );
         assert(
-          (
-            await file({
-              operation: 'read',
-              handle: opened.handle,
-              length: binary.length,
-            })
-          ).body === encoded,
+          encodeBase64(
+            (await scope.teaFileRead(text(opened.handle), binary.length))!,
+          ) === encoded,
           'Persistent file bytes',
         );
         await file({ operation: 'close', handle: opened.handle });

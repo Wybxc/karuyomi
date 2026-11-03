@@ -1,20 +1,34 @@
-/* Durable Java files. Every mutation commits before its Java continuation resumes. */
+/* TeaVM file semantics; IndexedDB transactions and typed requests come from idb. */
 import {
-  array,
+  openDB,
+  type DBSchema,
+  type IDBPDatabase,
+  type IDBPTransaction,
+} from 'idb';
+import {
   bool,
-  decodeBase64,
-  encodeBase64,
-  idbRequest,
   integer,
   number,
   object,
   optionalText,
-  storageKey,
   text,
   workerScope,
   type StorageKey,
 } from './bridge-common.js';
 
+const CHUNK = 65536,
+  CONTROL = 65536,
+  FILE_LIMIT = 64 * 1024 * 1024,
+  NAMESPACE_LIMIT = 128 * 1024 * 1024,
+  METADATA_LIMIT = 2 * 1024 * 1024,
+  NODE_LIMIT = 4096,
+  HANDLE_LIMIT = 64,
+  OWNER_LIMIT = 32,
+  PENDING_LIMIT = 4,
+  PATH_LIMIT = 4096,
+  TIMEOUT = 5000;
+type HandleKey = [string, string, string];
+type ChunkKey = [string, string, number];
 interface FileNode {
   key: StorageKey;
   id: string;
@@ -22,17 +36,61 @@ interface FileNode {
   readOnly: boolean;
   modified: number;
   linked: boolean;
-  body: Uint8Array;
+  length: number;
 }
 interface PathRow {
   key: StorageKey;
   path: string;
+  parent: StorageKey;
   id: string;
 }
 interface HandleRow {
-  key: [string, string, string];
+  key: HandleKey;
   owner: StorageKey;
   inode: StorageKey;
+}
+interface OwnerRow {
+  key: StorageKey;
+  token: string;
+}
+interface Usage {
+  namespace: string;
+  logicalBytes: number;
+  allocatedBytes: number;
+  metadataBytes: number;
+  nodes: number;
+  handles: number;
+  owners: number;
+}
+export interface FileSchema extends DBSchema {
+  paths: {
+    key: StorageKey;
+    value: PathRow;
+    indexes: { byParent: StorageKey };
+  };
+  inodes: { key: StorageKey; value: FileNode };
+  chunks: { key: ChunkKey; value: Uint8Array };
+  handles: {
+    key: HandleKey;
+    value: HandleRow;
+    indexes: { byInode: StorageKey; byOwner: StorageKey };
+  };
+  owners: { key: StorageKey; value: OwnerRow };
+  usage: { key: string; value: Usage };
+}
+type Stores = ['paths', 'inodes', 'chunks', 'handles', 'owners', 'usage'];
+const stores: Stores = [
+  'paths',
+  'inodes',
+  'chunks',
+  'handles',
+  'owners',
+  'usage',
+];
+type FileTx = IDBPTransaction<FileSchema, Stores, 'readwrite'>;
+interface FileTransaction {
+  tx: FileTx;
+  usage: Usage;
 }
 interface OpenFile {
   inode: string;
@@ -40,12 +98,6 @@ interface OpenFile {
   readable: boolean;
   writable: boolean;
   append: boolean;
-}
-interface Stores {
-  paths: IDBObjectStore;
-  nodes: IDBObjectStore;
-  handles: IDBObjectStore;
-  owners: IDBObjectStore;
 }
 const operations = [
   'initialize',
@@ -61,8 +113,6 @@ const operations = [
   'modified',
   'readonly',
   'open',
-  'read',
-  'write',
   'resize',
   'size',
   'flush',
@@ -80,15 +130,11 @@ interface FileRequest {
   append: boolean;
   position: number;
   count: number;
-  length: number;
-  body: string;
   size: number;
 }
 export function parseFileRequest(value: unknown): FileRequest {
-  const data = object(value);
-  const operation = operations.find(
-    (operation) => operation === data.operation,
-  );
+  const data = object(value),
+    operation = operations.find((item) => item === data.operation);
   if (!operation) throw Error('Unknown Java filesystem operation');
   return {
     operation,
@@ -100,214 +146,292 @@ export function parseFileRequest(value: unknown): FileRequest {
     writable: data.writable === undefined ? false : bool(data.writable),
     readable: data.readable === undefined ? false : bool(data.readable),
     append: data.append === undefined ? false : bool(data.append),
-    position: operation === 'seek' ? integer(data.position, 0, 2147483647) : 0,
+    position: operation === 'seek' ? integer(data.position, 0, FILE_LIMIT) : 0,
     count:
-      operation === 'skip' ? integer(data.count, -2147483647, 2147483647) : 0,
-    length: operation === 'read' ? integer(data.length, 0, 2147483647) : 0,
-    body: operation === 'write' ? text(data.body) : '',
-    size: operation === 'resize' ? integer(data.size, 0, 2147483647) : 0,
+      operation === 'skip' ? integer(data.count, -FILE_LIMIT, FILE_LIMIT) : 0,
+    size: operation === 'resize' ? integer(data.size, 0, FILE_LIMIT) : 0,
   };
 }
-function nodeValue(value: unknown): FileNode | undefined {
-  if (value === undefined) return undefined;
-  const data = object(value);
-  if (!(data.body instanceof Uint8Array))
-    throw Error('Invalid stored file bytes');
-  return {
-    key: storageKey(data.key),
-    id: text(data.id),
-    directory: bool(data.directory),
-    readOnly: bool(data.readOnly),
-    modified: number(data.modified),
-    linked: bool(data.linked),
-    body: data.body,
-  };
+const encoder = new TextEncoder();
+function jsonSize(value: unknown): number {
+  return value === undefined ? 0 : encoder.encode(JSON.stringify(value)).length;
 }
-function pathRow(value: unknown): PathRow {
-  const data = object(value);
-  return {
-    key: storageKey(data.key),
-    path: text(data.path),
-    id: text(data.id),
-  };
+function assertUsage(usage: Usage) {
+  for (const value of Object.values(usage)) {
+    if (
+      typeof value === 'number' &&
+      (!Number.isSafeInteger(value) || value < 0)
+    )
+      throw Error('Invalid Java filesystem usage accounting');
+  }
+  if (
+    usage.logicalBytes > NAMESPACE_LIMIT ||
+    usage.allocatedBytes > NAMESPACE_LIMIT ||
+    usage.metadataBytes > METADATA_LIMIT ||
+    usage.nodes > NODE_LIMIT ||
+    usage.handles > HANDLE_LIMIT ||
+    usage.owners > OWNER_LIMIT
+  )
+    throw Error('Java filesystem namespace capacity exceeded');
 }
-function handleRow(value: unknown): HandleRow {
-  const data = object(value),
-    key = array(data.key);
-  if (key.length !== 3) throw Error('Invalid stored file handle');
-  return {
-    key: [text(key[0]), text(key[1]), text(key[2])],
-    owner: storageKey(data.owner),
-    inode: storageKey(data.inode),
-  };
+function checkedChunk(value: Uint8Array | undefined): Uint8Array | undefined {
+  if (
+    value !== undefined &&
+    (!(value instanceof Uint8Array) || value.byteLength !== CHUNK)
+  )
+    throw Error('Invalid stored Java file chunk');
+  return value;
 }
 declare global {
   var teaFile: ReturnType<typeof createFileBridge>['teaFile'] | undefined;
+  var teaFileRead:
+    ReturnType<typeof createFileBridge>['teaFileRead'] | undefined;
+  var teaFileWrite:
+    ReturnType<typeof createFileBridge>['teaFileWrite'] | undefined;
   var teaFileSystemClose:
     ReturnType<typeof createFileBridge>['teaFileSystemClose'] | undefined;
 }
-
 const scope = workerScope();
 function createFileBridge() {
-  const params = new URL(location.href).searchParams;
-  const namespace =
-    scope.karuyomiWorkerContext?.fsNamespace ||
-    scope.karuyomiWorkerContext?.plugin ||
-    params.get('fsNamespace') ||
-    params.get('plugin');
-  if (!namespace) throw new Error('Runtime filesystem namespace is required');
+  const params = new URL(location.href).searchParams,
+    requestedNamespace =
+      scope.karuyomiWorkerContext?.fsNamespace ||
+      scope.karuyomiWorkerContext?.plugin ||
+      params.get('fsNamespace') ||
+      params.get('plugin');
+  if (!requestedNamespace)
+    throw Error('Runtime filesystem namespace is required');
+  const namespace: string = requestedNamespace;
+  if (encoder.encode(namespace).length > PATH_LIMIT)
+    throw Error('Runtime filesystem namespace is too long');
   const owner = crypto.randomUUID(),
-    handles = new Map<string, OpenFile>();
-  const stores = ['paths', 'nodes', 'handles', 'owners'];
-  let opening: Promise<IDBDatabase> | undefined,
+    ownerToken = crypto.randomUUID(),
+    handles = new Map<string, OpenFile>(),
+    key = (value: string): StorageKey => [namespace, value],
+    ownerKey = key(owner),
+    namespaceRange = () => IDBKeyRange.bound([namespace], [namespace, []]),
+    lockName = (id: string) =>
+      'teavm-java-files:' + JSON.stringify([namespace, id]);
+  let opening: Promise<IDBPDatabase<FileSchema>> | undefined,
     starting: Promise<void> | undefined,
     tail: Promise<unknown> = Promise.resolve(),
     releaseOwner: (() => void) | undefined,
+    closePromise: Promise<void> | undefined,
+    pending = 0,
+    closing = false,
     closed = false;
-  const lockName = (id: string) =>
-    'teavm-java-files:' + JSON.stringify([namespace, id]);
-  const key = (path: string): StorageKey => [namespace, path];
-  const request = idbRequest;
   const parent = (path: string) => path.slice(0, path.lastIndexOf('/')) || '/';
-  function normalize(path: string) {
-    if (typeof path !== 'string' || path.includes('\0'))
-      throw Error('Invalid file path');
-    const parts = [];
+  function normalize(path: string): string {
+    if (path.includes('\0') || encoder.encode(path).length > PATH_LIMIT)
+      throw Error('Invalid or overlong Java file path');
+    const parts: string[] = [];
     for (const part of path.split('/')) {
       if (!part || part === '.') continue;
       if (part === '..') parts.pop();
       else parts.push(part);
     }
-    return '/' + parts.join('/');
+    const result = '/' + parts.join('/');
+    if (encoder.encode(result).length > PATH_LIMIT)
+      throw Error('Invalid or overlong Java file path');
+    return result;
   }
-  const encode = encodeBase64,
-    decode = decodeBase64;
   function open() {
-    return (opening ||= new Promise<IDBDatabase>((resolve, reject) => {
-      const r = indexedDB.open('teavm-java-files-v1', 1);
-      r.onupgradeneeded = () => {
-        const db = r.result;
-        db.createObjectStore('paths', { keyPath: 'key' });
-        db.createObjectStore('nodes', { keyPath: 'key' });
+    return (opening ??= openDB<FileSchema>('teavm-java-files-v2', 1, {
+      upgrade(db) {
+        db.createObjectStore('paths', { keyPath: 'key' }).createIndex(
+          'byParent',
+          'parent',
+        );
+        db.createObjectStore('inodes', { keyPath: 'key' });
+        db.createObjectStore('chunks');
         const h = db.createObjectStore('handles', { keyPath: 'key' });
-        h.createIndex('inode', 'inode');
-        h.createIndex('owner', 'owner');
+        h.createIndex('byInode', 'inode');
+        h.createIndex('byOwner', 'owner');
         db.createObjectStore('owners', { keyPath: 'key' });
-      };
-      r.onsuccess = () => {
-        r.result.onversionchange = () => {
-          r.result.close();
-          opening = undefined;
-        };
-        resolve(r.result);
-      };
-      r.onerror = () => {
+        db.createObjectStore('usage', { keyPath: 'namespace' });
+      },
+      blocking() {
+        void opening?.then((db) => db.close());
         opening = undefined;
-        reject(r.error);
-      };
-      r.onblocked = () => {
+      },
+      terminated() {
         opening = undefined;
-        reject(Error('Java filesystem database upgrade blocked'));
-      };
+      },
+    }).catch((error: unknown) => {
+      opening = undefined;
+      throw error;
     }));
   }
+  // Only IDB requests are awaited inside this callback. ACK/cursors follow tx.done.
   async function transaction<T>(
     action: (
-      stores: Stores,
-      afterCommit: (action: () => void) => void,
-    ) => T | Promise<T>,
+      state: FileTransaction,
+      afterCommit: (fn: () => void) => void,
+    ) => Promise<T>,
   ): Promise<T> {
-    const db = await open();
-    return new Promise<T>((resolve, reject) => {
-      const tx = db.transaction(stores, 'readwrite', { durability: 'strict' });
-      const s: Stores = {
-        paths: tx.objectStore('paths'),
-        nodes: tx.objectStore('nodes'),
-        handles: tx.objectStore('handles'),
-        owners: tx.objectStore('owners'),
-      };
-      let value: { result: T } | undefined,
-        failure: unknown,
-        commit: (() => void) | undefined;
-      tx.oncomplete = () => {
-        if (commit) commit();
-        if (value) resolve(value.result);
-        else
-          reject(Error('Filesystem transaction completed before its result'));
-      };
-      tx.onabort = () =>
-        reject(
-          failure || tx.error || Error('Java filesystem transaction aborted'),
-        );
-      tx.onerror = () => {};
-      Promise.resolve()
-        .then(() =>
-          action(s, (fn) => {
-            commit = fn;
-          }),
-        )
-        .then(
-          (result) => {
-            value = { result };
-          },
-          (error) => {
-            failure = error;
-            try {
-              tx.abort();
-            } catch {
-              reject(error);
-            }
-          },
-        );
-    });
-  }
-  const nodeFor = async (
-    s: Stores,
-    path: string,
-  ): Promise<FileNode | undefined> => {
-    const value = await request(s.paths.get(key(path)));
-    if (value === undefined) return undefined;
-    return nodeValue(await request(s.nodes.get(key(pathRow(value).id))));
-  };
-  async function children(s: Stores, path: string): Promise<PathRow[]> {
-    const prefix = path === '/' ? '/' : path + '/';
-    return array(
-      await request(
-        s.paths.getAll(IDBKeyRange.bound(key(prefix), key(prefix + '\uffff'))),
+    const db = await open(),
+      tx = db.transaction(stores, 'readwrite', { durability: 'strict' }),
+      settled = tx.done.then(
+        () => ({ passed: true as const }),
+        (error: unknown) => ({ passed: false as const, error }),
       ),
-    )
-      .map(pathRow)
-      .filter((row) => row.path !== path && row.path.startsWith(prefix));
-  }
-  async function collect(s: Stores, node: FileNode) {
-    if (
-      !node.linked &&
-      !array(await request(s.handles.index('inode').getAllKeys(node.key)))
-        .length
-    )
-      s.nodes.delete(node.key);
-  }
-  async function dropOwner(s: Stores, id: string) {
-    const rows = array(
-      await request(s.handles.index('owner').getAll(key(id))),
-    ).map(handleRow);
-    for (const row of rows) s.handles.delete(row.key);
-    for (const inode of new Set(rows.map((row) => row.inode[1]))) {
-      const node = nodeValue(await request(s.nodes.get(key(inode))));
-      if (node) await collect(s, node);
+      commits: (() => void)[] = [];
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        tx.abort();
+      } catch {
+        /* Already terminal. */
+      }
+    }, TIMEOUT);
+    try {
+      const usage = (await tx.objectStore('usage').get(namespace)) ?? {
+        namespace,
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        metadataBytes: 256 + encoder.encode(namespace).length,
+        nodes: 0,
+        handles: 0,
+        owners: 0,
+      };
+      assertUsage(usage);
+      const result = await action({ tx, usage }, (fn) => commits.push(fn));
+      assertUsage(usage);
+      await tx.objectStore('usage').put(usage);
+      const outcome = await settled;
+      if (!outcome.passed) throw outcome.error;
+      // A completed transaction remains committed even if a later timer runs.
+      for (const commit of commits) commit();
+      return result;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* Already terminal. */
+      }
+      await settled;
+      if (timedOut) throw Error('Java filesystem transaction timed out');
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    s.owners.delete(key(id));
   }
-  function touch(s: Stores, node: FileNode) {
-    node.modified = Date.now();
-    s.nodes.put(node);
+  async function putNode(s: FileTransaction, node: FileNode) {
+    integer(node.length, 0, FILE_LIMIT);
+    const store = s.tx.objectStore('inodes'),
+      previous = await store.get(node.key);
+    s.usage.nodes += previous ? 0 : 1;
+    s.usage.logicalBytes += node.length - (previous?.length ?? 0);
+    s.usage.metadataBytes += jsonSize(node) - jsonSize(previous);
+    assertUsage(s.usage);
+    await store.put(node);
   }
-  function create(
-    s: Stores,
+  async function putPath(s: FileTransaction, path: string, id: string) {
+    const store = s.tx.objectStore('paths'),
+      row: PathRow = {
+        key: key(path),
+        path,
+        parent: key(path === '/' ? '' : parent(path)),
+        id,
+      },
+      previous = await store.get(row.key);
+    s.usage.metadataBytes += jsonSize(row) - jsonSize(previous);
+    assertUsage(s.usage);
+    await store.put(row);
+  }
+  async function deletePath(s: FileTransaction, row: PathRow) {
+    s.usage.metadataBytes -= jsonSize(row);
+    await s.tx.objectStore('paths').delete(row.key);
+  }
+  const chunkRange = (id: string, minimum = 0) =>
+    IDBKeyRange.bound(
+      [namespace, id, minimum],
+      [namespace, id, Number.MAX_SAFE_INTEGER],
+    );
+  const chunkMetadata = (chunkKey: ChunkKey) => jsonSize(chunkKey) + 32;
+  async function putChunk(
+    s: FileTransaction,
+    chunkKey: ChunkKey,
+    bytes: Uint8Array,
+  ) {
+    const store = s.tx.objectStore('chunks'),
+      previous = checkedChunk(await store.get(chunkKey));
+    if (!previous) {
+      s.usage.allocatedBytes += CHUNK;
+      s.usage.metadataBytes += chunkMetadata(chunkKey);
+      assertUsage(s.usage);
+    }
+    await store.put(bytes, chunkKey);
+  }
+  async function removeChunks(s: FileTransaction, id: string, minimum = 0) {
+    let cursor = await s.tx
+      .objectStore('chunks')
+      .openCursor(chunkRange(id, minimum));
+    while (cursor) {
+      checkedChunk(cursor.value);
+      s.usage.allocatedBytes -= CHUNK;
+      s.usage.metadataBytes -= chunkMetadata(cursor.key);
+      await cursor.delete();
+      cursor = await cursor.continue();
+    }
+  }
+  async function collect(s: FileTransaction, node: FileNode) {
+    if (
+      node.linked ||
+      (await s.tx.objectStore('handles').index('byInode').count(node.key))
+    )
+      return;
+    await removeChunks(s, node.id);
+    s.usage.nodes--;
+    s.usage.logicalBytes -= node.length;
+    s.usage.metadataBytes -= jsonSize(node);
+    await s.tx.objectStore('inodes').delete(node.key);
+  }
+  async function dropHandle(s: FileTransaction, row: HandleRow) {
+    await s.tx.objectStore('handles').delete(row.key);
+    s.usage.handles--;
+    s.usage.metadataBytes -= jsonSize(row);
+    const node = await s.tx.objectStore('inodes').get(row.inode);
+    if (node) await collect(s, node);
+  }
+  async function dropOwner(s: FileTransaction, row: OwnerRow) {
+    const existing = await s.tx.objectStore('owners').get(row.key);
+    if (existing?.token !== row.token) return;
+    for (const handle of await s.tx
+      .objectStore('handles')
+      .index('byOwner')
+      .getAll(row.key))
+      await dropHandle(s, handle);
+    await s.tx.objectStore('owners').delete(row.key);
+    s.usage.owners--;
+    s.usage.metadataBytes -= jsonSize(existing);
+  }
+  async function reclaimOwners() {
+    const owners = await transaction(async ({ tx }) =>
+      tx.objectStore('owners').getAll(namespaceRange()),
+    );
+    for (const row of owners) {
+      if (row.key[1] === owner) continue;
+      await navigator.locks.request(
+        lockName(row.key[1]),
+        { ifAvailable: true },
+        async (lock) => {
+          if (lock) await transaction((s) => dropOwner(s, row));
+        },
+      );
+    }
+  }
+  async function nodeFor(s: FileTransaction, path: string) {
+    const row = await s.tx.objectStore('paths').get(key(path));
+    return row ? s.tx.objectStore('inodes').get(key(row.id)) : undefined;
+  }
+  async function create(
+    s: FileTransaction,
     path: string,
     directory: boolean,
     parentNode?: FileNode,
-  ): FileNode {
+  ) {
     const id = crypto.randomUUID(),
       node: FileNode = {
         key: key(id),
@@ -316,19 +440,23 @@ function createFileBridge() {
         readOnly: false,
         modified: Date.now(),
         linked: true,
-        body: new Uint8Array(),
+        length: 0,
       };
-    s.nodes.add(node);
-    s.paths.add({ key: key(path), path, id });
-    if (parentNode) touch(s, parentNode);
+    await putNode(s, node);
+    await putPath(s, path, id);
+    if (parentNode) await touch(s, parentNode);
     return node;
+  }
+  async function touch(s: FileTransaction, node: FileNode) {
+    node.modified = Date.now();
+    await putNode(s, node);
   }
   async function start() {
     if (closed) throw Error('Java filesystem is closed');
-    return (starting ||= (async () => {
+    return (starting ??= (async () => {
       if (!navigator.locks)
         throw Error(
-          'Java filesystem requires the Web Locks API for Worker lifetime tracking',
+          'Java filesystem requires Web Locks for Worker lifetime tracking',
         );
       await new Promise<void>((resolve, reject) => {
         navigator.locks
@@ -340,61 +468,73 @@ function createFileBridge() {
           })
           .catch(reject);
       });
-      const owners = await transaction(async (s) =>
-        array(
-          await request(
-            s.owners.getAll(IDBKeyRange.bound(key(''), key('\uffff'))),
-          ),
-        ).map((value) => storageKey(object(value).key)),
-      );
-      for (const row of owners)
-        await navigator.locks.request(
-          lockName(row[1]),
-          { ifAvailable: true },
-          async (lock) => {
-            if (lock) await transaction((s) => dropOwner(s, row[1]));
-          },
-        );
+      await reclaimOwners();
       await transaction(async (s) => {
         for (const path of ['/', '/tmp'])
-          if (!(await nodeFor(s, path))) create(s, path, true);
-        s.owners.put({ key: key(owner) });
+          if (!(await nodeFor(s, path))) await create(s, path, true);
+        const row: OwnerRow = { key: ownerKey, token: ownerToken };
+        s.usage.owners++;
+        s.usage.metadataBytes += jsonSize(row);
+        assertUsage(s.usage);
+        await s.tx.objectStore('owners').add(row);
       });
-    })());
+    })().catch((error: unknown) => {
+      releaseOwner?.();
+      releaseOwner = undefined;
+      starting = undefined;
+      throw error;
+    }));
   }
-  function validInteger(value: number) {
-    if (!Number.isInteger(value) || value < 0 || value > 2147483647)
-      throw Error('File offset exceeds TeaVM filesystem range');
-    return value;
+  function handle(id: string): OpenFile {
+    const result = handles.get(id);
+    if (!result) throw Error('File stream is closed');
+    return result;
+  }
+  async function opened(s: FileTransaction, id: string) {
+    const h = handle(id),
+      row = await s.tx.objectStore('handles').get([namespace, owner, id]);
+    if (!row || row.inode[1] !== h.inode)
+      throw Error('File stream owner is no longer active');
+    const node = await s.tx.objectStore('inodes').get(row.inode);
+    if (!node || node.directory) throw Error('Open file inode is missing');
+    return { h, row, node };
+  }
+  async function resize(s: FileTransaction, node: FileNode, length: number) {
+    integer(length, 0, FILE_LIMIT);
+    if (length < node.length) {
+      await removeChunks(s, node.id, Math.ceil(length / CHUNK));
+      if (length % CHUNK) {
+        const index = Math.floor(length / CHUNK),
+          chunkKey: ChunkKey = [namespace, node.id, index],
+          bytes = checkedChunk(await s.tx.objectStore('chunks').get(chunkKey));
+        if (bytes) {
+          bytes.fill(0, length % CHUNK);
+          await putChunk(s, chunkKey, bytes);
+        }
+      }
+    }
+    node.length = length;
+    await touch(s, node);
   }
   async function operate(r: FileRequest): Promise<Record<string, unknown>> {
     await start();
-    const path = normalize(r.path || '/');
+    const path = normalize(r.path);
     if (r.operation === 'initialize') return { ready: true };
-    const h = r.handle ? handles.get(r.handle) : undefined;
-    const handle = () => {
-      if (!h) throw Error('Stream is closed');
-      return h;
-    };
-    if (r.handle && !h) throw Error('Stream is closed');
-    if (r.operation === 'tell') return { position: handle().position };
-    if (r.operation === 'seek') {
-      handle().position = validInteger(r.position);
-      return {};
-    }
-    if (r.operation === 'skip') {
-      handle().position = validInteger(handle().position + r.count);
+    if (r.operation === 'open') await reclaimOwners();
+    if (r.operation === 'tell')
+      return { position: handle(text(r.handle)).position };
+    if (r.operation === 'seek' || r.operation === 'skip') {
+      const h = handle(text(r.handle));
+      h.position = integer(
+        r.operation === 'seek' ? r.position : h.position + r.count,
+        0,
+        FILE_LIMIT,
+      );
       return {};
     }
     return transaction(async (s, afterCommit) => {
-      const node = h
-        ? nodeValue(await request(s.nodes.get(key(h.inode))))
-        : await nodeFor(s, path);
-      if (h && !node) throw Error('Open file inode is missing');
-      const openedNode = () => {
-        if (!node) throw Error('Open file inode is missing');
-        return node;
-      };
+      const state = r.handle ? await opened(s, r.handle) : undefined,
+        node = state?.node ?? (await nodeFor(s, path));
       switch (r.operation) {
         case 'stat':
           return node
@@ -405,14 +545,18 @@ function createFileBridge() {
                 readable: true,
                 writable: !node.readOnly,
                 modified: node.modified,
-                size: node.directory ? 0 : node.body.length,
+                size: node.length,
               }
             : { exists: false };
         case 'list':
           return node?.directory
             ? {
-                names: (await children(s, path))
-                  .filter((row) => parent(row.path) === path)
+                names: (
+                  await s.tx
+                    .objectStore('paths')
+                    .index('byParent')
+                    .getAll(key(path))
+                )
                   .map((row) => row.path.slice(row.path.lastIndexOf('/') + 1))
                   .sort(),
               }
@@ -426,7 +570,7 @@ function createFileBridge() {
               throw Error('Parent directory does not exist or is not writable');
             return { changed: false };
           }
-          create(s, path, r.operation === 'mkdir', dir);
+          await create(s, path, r.operation === 'mkdir', dir);
           return { changed: true };
         }
         case 'delete': {
@@ -435,28 +579,35 @@ function createFileBridge() {
           if (
             !dir ||
             dir.readOnly ||
-            (node.directory && (await children(s, path)).length)
+            (node.directory &&
+              (await s.tx
+                .objectStore('paths')
+                .index('byParent')
+                .count(key(path))))
           )
             return { changed: false };
-          s.paths.delete(key(path));
+          const row = await s.tx.objectStore('paths').get(key(path));
+          if (!row) throw Error('File path disappeared');
+          await deletePath(s, row);
           node.linked = false;
-          s.nodes.put(node);
+          await putNode(s, node);
           await collect(s, node);
-          touch(s, dir);
+          await touch(s, dir);
           return { changed: true };
         }
         case 'rename': {
           const source = normalize(r.source),
             from = await nodeFor(s, source),
-            dir = await nodeFor(s, parent(path));
-          const oldDir = await nodeFor(s, parent(source));
+            dir = await nodeFor(s, parent(path)),
+            oldDir = await nodeFor(s, parent(source));
           if (
             !from ||
             source === '/' ||
             path === '/' ||
             !dir?.directory ||
             dir.readOnly ||
-            oldDir?.readOnly
+            !oldDir ||
+            oldDir.readOnly
           )
             return { changed: false };
           if (source === path) return { changed: true };
@@ -465,135 +616,228 @@ function createFileBridge() {
           if (
             node &&
             (node.directory !== from.directory ||
-              (node.directory && (await children(s, path)).length))
+              (node.directory &&
+                (await s.tx
+                  .objectStore('paths')
+                  .index('byParent')
+                  .count(key(path)))))
           )
             return { changed: false };
-          const moving = [
-            { key: key(source), path: source, id: from.id },
-            ...(from.directory ? await children(s, source) : []),
-          ];
+          const sourceRow = await s.tx.objectStore('paths').get(key(source));
+          if (!sourceRow) throw Error('File path disappeared');
+          const moving = [sourceRow];
+          if (from.directory)
+            moving.push(
+              ...(await s.tx
+                .objectStore('paths')
+                .getAll(
+                  IDBKeyRange.bound(
+                    key(source + '/'),
+                    key(source + '0'),
+                    false,
+                    true,
+                  ),
+                )),
+            );
           if (node) {
+            const target = await s.tx.objectStore('paths').get(key(path));
+            if (!target) throw Error('File path disappeared');
+            await deletePath(s, target);
             node.linked = false;
-            s.nodes.put(node);
+            await putNode(s, node);
             await collect(s, node);
           }
-          for (const row of moving) s.paths.delete(row.key);
+          for (const row of moving) await deletePath(s, row);
           for (const row of moving) {
-            const next = path + row.path.slice(source.length);
-            s.paths.put({ key: key(next), path: next, id: row.id });
+            const next = normalize(path + row.path.slice(source.length));
+            await putPath(s, next, row.id);
           }
-          touch(s, dir);
-          if (oldDir && oldDir.id !== dir.id) touch(s, oldDir);
+          await touch(s, dir);
+          if (oldDir.id !== dir.id) await touch(s, oldDir);
           return { changed: true };
         }
         case 'modified':
         case 'readonly': {
           if (!node) return { changed: false };
           if (r.operation === 'modified') node.modified = r.modified;
-          else node.readOnly = !!r.readOnly;
-          s.nodes.put(node);
+          else node.readOnly = r.readOnly;
+          await putNode(s, node);
           return { changed: true };
         }
         case 'open': {
           if (!node || node.directory || (r.writable && node.readOnly))
             return {};
-          // RandomAccessFile opens readable+writable and must preserve existing bytes.
-          if (r.writable && !r.readable && !r.append) {
-            node.body = new Uint8Array();
-            node.modified = Date.now();
-            s.nodes.put(node);
-          }
-          const handle = crypto.randomUUID();
-          s.handles.add({
-            key: [namespace, owner, handle],
-            owner: key(owner),
-            inode: node.key,
-          });
+          if (r.writable && !r.readable && !r.append) await resize(s, node, 0);
+          const id = crypto.randomUUID(),
+            row: HandleRow = {
+              key: [namespace, owner, id],
+              owner: ownerKey,
+              inode: node.key,
+            };
+          s.usage.handles++;
+          s.usage.metadataBytes += jsonSize(row);
+          assertUsage(s.usage);
+          await s.tx.objectStore('handles').add(row);
           afterCommit(() =>
-            handles.set(handle, {
+            handles.set(id, {
               inode: node.id,
-              position: r.append ? node.body.length : 0,
-              readable: !!r.readable,
-              writable: !!r.writable,
-              append: !!r.append,
+              position: r.append ? node.length : 0,
+              readable: r.readable,
+              writable: r.writable,
+              append: r.append,
             }),
           );
-          return { handle };
+          return { handle: id };
         }
-        case 'read': {
-          const node = openedNode();
-          if (!handle().readable) throw Error('File is not open for reading');
-          const end = Math.min(
-            node.body.length,
-            handle().position + validInteger(r.length),
-          );
-          const body = node.body.subarray(handle().position, end),
-            next = handle().position + body.length;
-          afterCommit(() => {
-            handle().position = next;
-          });
-          return { body: encode(body), eof: body.length === 0 };
-        }
-        case 'write':
         case 'resize': {
-          const node = openedNode();
-          if (!handle().writable) throw Error('File is not open for writing');
-          const body = r.operation === 'write' ? decode(r.body) : undefined;
-          if (body && body.length === 0) return {};
-          const offset =
-            handle().append && body ? node.body.length : handle().position;
-          const length = validInteger(
-            body ? Math.max(node.body.length, offset + body.length) : r.size,
-          );
-          const next = new Uint8Array(length);
-          next.set(node.body.subarray(0, length));
-          if (body) next.set(body, offset);
-          node.body = next;
-          node.modified = Date.now();
-          s.nodes.put(node);
+          if (!state || !state.h.writable)
+            throw Error('File is not open for writing');
+          await resize(s, state.node, r.size);
           afterCommit(() => {
-            handle().position = body
-              ? offset + body.length
-              : Math.min(handle().position, length);
+            state.h.position = Math.min(state.h.position, r.size);
           });
           return {};
         }
         case 'size':
-          return { size: openedNode().body.length };
+          if (!state) throw Error('File stream is closed');
+          return { size: state.node.length };
         case 'flush':
+          if (!state) throw Error('File stream is closed');
           return {};
-        case 'close': {
-          const node = openedNode();
-          s.handles.delete([...key(owner), text(r.handle)]);
-          await collect(s, node);
+        case 'close':
+          if (!state) throw Error('File stream is closed');
+          await dropHandle(s, state.row);
           afterCommit(() => handles.delete(text(r.handle)));
           return {};
-        }
         default:
-          throw Error('Unknown Java filesystem operation ' + r.operation);
+          throw Error('Unknown Java filesystem operation');
       }
     });
   }
-  // Keep each descriptor's cursor updates ordered, including callers from different Java fibers.
-  const teaFile = (input: string): Promise<string> => {
-    const job = tail.then(() =>
-      operate(parseFileRequest(JSON.parse(input) as unknown)),
-    );
-    tail = job.catch(() => {});
-    return job.then((result) => JSON.stringify(result));
-  };
-  const teaFileSystemClose = (): Promise<void> => {
-    const job = tail.then(async () => {
-      if (starting) await starting;
-      if (releaseOwner) await transaction((s) => dropOwner(s, owner));
-      handles.clear();
-      closed = true;
-      releaseOwner?.();
-      if (opening) (await opening).close();
+  // Bound queued buffers as well as each operation. No detached background IO.
+  function enqueue<T>(action: () => Promise<T>): Promise<T> {
+    if (closing || closed)
+      return Promise.reject(Error('Java filesystem is closed'));
+    if (pending >= PENDING_LIMIT)
+      return Promise.reject(Error('Java filesystem operation queue is full'));
+    pending++;
+    const job = tail.then(action).finally(() => {
+      pending--;
     });
     tail = job.catch(() => {});
     return job;
+  }
+  const teaFile = async (input: string): Promise<string> => {
+    if (
+      typeof input !== 'string' ||
+      input.length > CONTROL ||
+      encoder.encode(input).length > CONTROL
+    )
+      throw Error('Java filesystem control limit exceeded');
+    const request = parseFileRequest(JSON.parse(input) as unknown);
+    return enqueue(async () => {
+      const result = await operate(request),
+        encoded = JSON.stringify(result);
+      if (encoder.encode(encoded).length > CONTROL)
+        throw Error('Java filesystem response limit exceeded');
+      return encoded;
+    });
   };
-  return { teaFile, teaFileSystemClose };
+  const teaFileRead = async (
+    id: string,
+    maximum: number,
+  ): Promise<Uint8Array | null> => {
+    text(id);
+    integer(maximum, 1, CHUNK);
+    return enqueue(async () => {
+      await start();
+      return transaction(async (s, afterCommit) => {
+        const { h, node } = await opened(s, id);
+        if (!h.readable) throw Error('File is not open for reading');
+        const count = Math.min(maximum, Math.max(0, node.length - h.position));
+        if (!count) return null;
+        const bytes = new Uint8Array(count);
+        for (let copied = 0; copied < count;) {
+          const position = h.position + copied,
+            index = Math.floor(position / CHUNK),
+            start = position % CHUNK,
+            size = Math.min(count - copied, CHUNK - start),
+            chunk = checkedChunk(
+              await s.tx.objectStore('chunks').get([namespace, node.id, index]),
+            );
+          if (chunk) bytes.set(chunk.subarray(start, start + size), copied);
+          copied += size;
+        }
+        afterCommit(() => {
+          h.position += count;
+        });
+        return bytes;
+      });
+    });
+  };
+  const teaFileWrite = async (id: string, input: Uint8Array): Promise<true> => {
+    text(id);
+    if (
+      !(input instanceof Uint8Array) ||
+      input.byteLength < 1 ||
+      input.byteLength > CHUNK
+    )
+      throw Error('Java filesystem binary chunk limit exceeded');
+    // Copy only after the pending bound is checked; callers may reuse their JSO buffer.
+    if (closing || closed) throw Error('Java filesystem is closed');
+    if (pending >= PENDING_LIMIT)
+      throw Error('Java filesystem operation queue is full');
+    const bytes = input.slice();
+    return enqueue(async () => {
+      await start();
+      return transaction(async (s, afterCommit) => {
+        const { h, node } = await opened(s, id);
+        if (!h.writable) throw Error('File is not open for writing');
+        const offset = h.append ? node.length : h.position,
+          end = integer(offset + bytes.length, 0, FILE_LIMIT);
+        for (let copied = 0; copied < bytes.length;) {
+          const position = offset + copied,
+            index = Math.floor(position / CHUNK),
+            start = position % CHUNK,
+            count = Math.min(bytes.length - copied, CHUNK - start),
+            chunkKey: ChunkKey = [namespace, node.id, index],
+            chunk =
+              checkedChunk(await s.tx.objectStore('chunks').get(chunkKey)) ??
+              new Uint8Array(CHUNK);
+          chunk.set(bytes.subarray(copied, copied + count), start);
+          await putChunk(s, chunkKey, chunk);
+          copied += count;
+        }
+        node.length = Math.max(node.length, end);
+        await touch(s, node);
+        afterCommit(() => {
+          h.position = end;
+        });
+        return true as const;
+      });
+    });
+  };
+  const teaFileSystemClose = (): Promise<void> => {
+    closing = true;
+    return (closePromise ??= tail
+      .then(async () => {
+        if (starting) await starting;
+        if (releaseOwner)
+          await transaction((s) =>
+            dropOwner(s, { key: ownerKey, token: ownerToken }),
+          );
+        handles.clear();
+        closed = true;
+        releaseOwner?.();
+        releaseOwner = undefined;
+        if (opening) (await opening).close();
+      })
+      .catch((error: unknown) => {
+        // Failed cleanup retains ownership and may be explicitly retried.
+        closePromise = undefined;
+        throw error;
+      }));
+  };
+  return { teaFile, teaFileRead, teaFileWrite, teaFileSystemClose };
 }
 Object.assign(scope, createFileBridge());

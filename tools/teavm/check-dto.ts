@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
+import { checkFiles } from './check-files.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -194,5 +195,6 @@ export async function checkDto(root = ROOT): Promise<void> {
     [ownedOutput, imageOutput, classpath].join(path.delimiter),
     'prototype.ImageTest',
   ]);
+  await checkFiles(root);
 }
 if (import.meta.main) await checkDto();

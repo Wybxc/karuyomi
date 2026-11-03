@@ -21,6 +21,59 @@ public final class Bridge {
       script = "self.teaFile(request).then(ok,e=>err(String(e)));")
   static native void fileFetch(String request, Reply ok, Reply err);
 
+  public static byte[] fileRead(String handle, int maximum) throws IOException {
+    if (maximum < 1 || maximum > 65536)
+      throw new IllegalArgumentException("Invalid file read size");
+    Uint8Array bytes = fileReadChunk(handle, maximum);
+    if (bytes == null) return null;
+    int length = bytes.getByteLength();
+    if (length < 1 || length > maximum) throw new IOException("Invalid file response chunk size");
+    byte[] result = new byte[length];
+    for (int index = 0; index < length; index++) result[index] = (byte) bytes.get(index);
+    return result;
+  }
+
+  @Async
+  private static native Uint8Array fileReadChunk(String handle, int maximum) throws IOException;
+
+  private static void fileReadChunk(
+      String handle, int maximum, AsyncCallback<Uint8Array> callback) {
+    fileReadChunk(
+        handle, maximum, callback::complete, error -> callback.error(new IOException(error)));
+  }
+
+  @JSBody(
+      params = {"handle", "maximum", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaFileRead(handle, maximum)).then(ok, error => fail(String(error)));")
+  private static native void fileReadChunk(String handle, int maximum, HttpChunk ok, Reply fail);
+
+  public static void fileWrite(String handle, byte[] bytes, int offset, int length)
+      throws IOException {
+    java.util.Objects.checkFromIndexSize(offset, length, bytes.length);
+    if (length < 1 || length > 65536) throw new IllegalArgumentException("Invalid file write size");
+    Uint8Array copy = new Uint8Array(length);
+    for (int index = 0; index < length; index++)
+      copy.set(index, (short) (bytes[offset + index] & 255));
+    if (!"1".equals(fileWriteChunk(handle, copy)))
+      throw new IOException("File write was not committed");
+  }
+
+  @Async
+  private static native String fileWriteChunk(String handle, Uint8Array bytes) throws IOException;
+
+  private static void fileWriteChunk(
+      String handle, Uint8Array bytes, AsyncCallback<String> callback) {
+    fileWriteChunk(
+        handle, bytes, callback::complete, error -> callback.error(new IOException(error)));
+  }
+
+  @JSBody(
+      params = {"handle", "bytes", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaFileWrite(handle, bytes)).then(value => ok(value === true ? '1' : '0'), error => fail(String(error)));")
+  private static native void fileWriteChunk(String handle, Uint8Array bytes, Reply ok, Reply fail);
+
   @JSBody(params = "m", script = "self.postMessage({type:'trace',message:m});return '';")
   public static native String trace(String m);
 

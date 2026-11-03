@@ -20,6 +20,22 @@ public class TeaTransformer implements ClassHolderTransformer {
           .setProgram(
               org.teavm.model.util.ModelUtils.copyMethod(copy.getMethod(descriptor)).getProgram());
     }
+    if (cls.getName().equals("java.io.FileInputStream")) {
+      String sourceName = "prototype.jcl.FileInputStreamMethods";
+      ClassHolder copy =
+          org.teavm.model.util.ModelUtils.copyClass(
+              context.getHierarchy().getClassSource().get(sourceName));
+      copy =
+          new org.teavm.parsing.ClassRefsRenamer(
+                  new ReferenceCache(), n -> n.equals(sourceName) ? cls.getName() : n)
+              .rename(copy);
+      MethodDescriptor descriptor = new MethodDescriptor("read", ValueType.INTEGER);
+      MethodHolder target = cls.getMethod(descriptor);
+      if (target == null)
+        throw new IllegalStateException("Unexpected TeaVM FileInputStream.read ABI");
+      target.setProgram(
+          org.teavm.model.util.ModelUtils.copyMethod(copy.getMethod(descriptor)).getProgram());
+    }
     if (cls.getName().equals("java.io.RandomAccessFile")) {
       String sourceName = "prototype.jcl.RandomAccessFileMethods";
       ClassHolder copy =
@@ -29,12 +45,22 @@ public class TeaTransformer implements ClassHolderTransformer {
           new org.teavm.parsing.ClassRefsRenamer(
                   new ReferenceCache(), n -> n.equals(sourceName) ? cls.getName() : n)
               .rename(copy);
-      MethodDescriptor descriptor = new MethodDescriptor("close", ValueType.VOID);
-      MethodHolder target = cls.getMethod(descriptor);
-      if (target == null)
-        throw new IllegalStateException("Unexpected TeaVM RandomAccessFile.close ABI");
-      target.setProgram(
-          org.teavm.model.util.ModelUtils.copyMethod(copy.getMethod(descriptor)).getProgram());
+      for (MethodDescriptor descriptor :
+          new MethodDescriptor[] {
+            new MethodDescriptor("close", ValueType.VOID),
+            new MethodDescriptor(
+                "read",
+                ValueType.arrayOf(ValueType.BYTE),
+                ValueType.INTEGER,
+                ValueType.INTEGER,
+                ValueType.INTEGER)
+          }) {
+        MethodHolder target = cls.getMethod(descriptor);
+        if (target == null)
+          throw new IllegalStateException("Unexpected TeaVM RandomAccessFile ABI: " + descriptor);
+        target.setProgram(
+            org.teavm.model.util.ModelUtils.copyMethod(copy.getMethod(descriptor)).getProgram());
+      }
       for (MethodHolder method : cls.getMethods())
         if (method.getName().equals("<init>")
             && method.parameterCount() == 2

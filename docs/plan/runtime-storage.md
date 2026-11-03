@@ -39,11 +39,14 @@
 
 ## 阶段三：有界普通文件
 
-待实施。当前文件 accessor 的 Base64 块长随调用方决定；IDB node 保存整文件，每次 write/resize 复制完整数组，允许近 2 GiB 的逻辑长度，没有正式单文件/namespace 总预算。
+**核心实现与分层机制门已通过，产品验收仍进行中**。官方候选源码核对后，直接使用现有 `idb@8.0.4` 提供 typed schema 与事务；项目保留 Java FS 语义、inode、owner 与配额适配。新 DB `teavm-java-files-v2` 不迁移原型旧格式。选型、接口与固定预算见[普通文件存储设计](../design/runtime-file-storage.md)。
 
-- Java accessor 与 JS 使用有界二进制块，随机访问按 inode/chunk 读写；resize 和稀疏区间不通过分配整段数组实现。
-- 先确定单文件、namespace、未链接但被打开文件和待提交操作的配额，保留打开时 rename/unlink 与独立 cursor 语义。
-- 真实 terminate/reopen 检查 Web Locks owner 清理、孤立 inode 回收和最后完整事务边界。取消不承诺撤销已持久化写入。
+- 正文移除整文件记录与 Base64；Java/JS 每块最多 64 KiB，按 inode/chunk 随机 IO。稀疏扩容只更新逻辑长度，缺块读零；truncate 清尾块，重扩不泄露旧内容。
+- 单文件 64 MiB；普通 files namespace 逻辑长度/allocated chunks 各 128 MiB，metadata 2 MiB、4096 inode、64 handle、32 live owner；每 Worker pending 4，事务期限 5 秒。未链接 open inode 仍计费。普通文件与独立 Cache 的合计预算尚待汇合。
+- data/路径/inode/usage 同事务，提交后才更新 cursor 与 ACK；rename/unlink 保留打开 inode，append 使用事务内最新 EOF。Web Locks 死亡 owner 以快照、事务外探测和 token CAS 清理；system close 失败保留 owner/句柄，可显式重试。
+- 修正 TeaVM 内部 accessor EOF0、FIS unsigned/EOF、RAF 零长度/range 和 close ACK 语义；仅项目自有 JCL IR 适配，不改 vendor 或扩展 JAR。
+
+2026-11-04，主代理内置 Chromium 156 通过 14 组真实 Worker/IDB/Web Locks 门，包含真实事务 abort、配额、pending、terminate、提交后 ACK 前死亡、system close abort→重试。原 JVM 共享 File/RandomAccessFile/Okio 场景 32 项、Accessor/JCL 窄 fixture 24 项及实际 TeaVM 二进制 JSO 共享场景 32 项分别通过；两端正文摘要一致。分层证据与复验命令见[普通文件运行证据](../verification/file-storage-runtime.md)。仍待正式 Source、Native、namespace 版本/身份切换、跨 Cache/files 总预算与设备资源测量；取消不承诺撤销已提交写入。
 
 ## 阶段四：原 JVM 同版对照与产品门
 
