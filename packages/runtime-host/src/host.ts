@@ -1,39 +1,36 @@
-import { runtimeHelloSchema, type RuntimeHello } from '@karuyomi/contracts';
+import { SourceRuntimeManager, type OpenOptions } from './manager.js';
+import { VerifiedLoader } from './verified-loader.js';
+import type { SourceCall } from '@karuyomi/contracts';
 
 declare global {
   interface Window {
-    karuyomiRuntime?: {
-      ready: Promise<RuntimeHello>;
-      dispose(): void;
-    };
+    karuyomiRuntime?: ReturnType<typeof exposeRuntime>;
   }
 }
 
-const worker = new Worker(new URL('./worker.js', import.meta.url), {
-  type: 'module',
-});
-const ready = new Promise<RuntimeHello>((resolve, reject) => {
-  const timeout = setTimeout(() => {
-    worker.terminate();
-    reject(new Error('Runtime handshake timed out'));
-  }, 10_000);
-  worker.onmessage = (event: MessageEvent<unknown>) => {
-    clearTimeout(timeout);
-    const hello = runtimeHelloSchema.safeParse(event.data);
-    if (hello.success) resolve(hello.data);
-    else {
-      worker.terminate();
-      reject(new Error('Incompatible runtime handshake'));
-    }
-  };
-  worker.onerror = () => {
-    clearTimeout(timeout);
-    worker.terminate();
-    reject(new Error('Runtime worker failed'));
-  };
-});
-
-window.karuyomiRuntime = { ready, dispose: () => worker.terminate() };
-// Avoid unhandled rejection when this control shell is opened without an adapter.
-void ready.catch(() => {});
-window.addEventListener('pagehide', () => worker.terminate(), { once: true });
+const manager = new SourceRuntimeManager(
+  new URL('./worker.js', import.meta.url),
+  (url) => new Worker(url),
+  new VerifiedLoader(location.origin),
+);
+function exposeRuntime() {
+  return Object.freeze({
+    ready: manager.ready,
+    open: (options: OpenOptions) => manager.open(options),
+    invoke: (call: SourceCall) => manager.invoke(call),
+    cancel: (requestId: string) => manager.cancel(requestId),
+    acquireImage: () => manager.acquireImage(),
+    rebuild: () => manager.rebuild(),
+    fetchApi: (options: Parameters<SourceRuntimeManager['fetchApi']>[0]) =>
+      manager.fetchApi(options),
+    dispose: () => manager.dispose(),
+  });
+}
+window.karuyomiRuntime = exposeRuntime();
+window.addEventListener(
+  'pagehide',
+  () => {
+    void manager.dispose();
+  },
+  { once: true },
+);

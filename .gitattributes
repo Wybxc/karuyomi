@@ -1,0 +1,2 @@
+# Preserve the exact bytes of the frozen upstream snapshot, including whitespace.
+runtime/teavm/upstream/** -whitespace

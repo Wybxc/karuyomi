@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "build": {
+    "teavm": "0.16.0",
+    "backend": "JAVASCRIPT",
+    "maven": "3.9.11",
+    "seconds": 2.679424708010629,
+    "bytes": 26214,
+    "bundleSha256": "2162129ab73c98b39403478a86042974ea7f4006f0038efe771d10fab09277c4",
+    "sourceFiles": {
+      "pom.xml": "80578bfb1c4231905eb831ab7d1f28448625c19e909020e39067555779b12a2b",
+      "src/main/java/probe/ByteProbe.java": "22bbd8ea549ef90014fe1bfc0d607faa5a0a735083d838008bfb805e58bbd106"
+    }
+  },
+  "inputDetached": true,
+  "result": {
+    "passed": true,
+    "cases": [
+      {
+        "name": "empty",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "passed": true
+      },
+      {
+        "name": "zero-and-ff",
+        "bytes": 4,
+        "sha256": "7a7bf454c5f3cb1b9d9a20f81417f98d976fe3b3dd52c1b9968f02e89e7e8a2f",
+        "passed": true
+      },
+      {
+        "name": "all-byte-values",
+        "bytes": 256,
+        "sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+        "passed": true
+      },
+      {
+        "name": "unicode-utf8",
+        "bytes": 42,
+        "sha256": "cc2e225ebd9b775d0cb3777d002f575fa3b2e8e4dcce7e37d920934985d5b714",
+        "passed": true
+      },
+      {
+        "name": "offset-view",
+        "bytes": 4,
+        "sha256": "6509423fd9da5c225d2f8619ffae394b40f9f7686fee55a38c54b1424ac65f46",
+        "passed": true
+      },
+      {
+        "name": "random-64KiB",
+        "bytes": 65536,
+        "sha256": "e416e94828203d0cc381b39f339e3dc7bd626bdecdfe22340afead6918c90617",
+        "passed": true
+      }
+    ],
+    "timings": [
+      {
+        "bytes": 0,
+        "iterationsPerSample": 512,
+        "samples": 7,
+        "medianRoundTripMs": 0.00019531254656612873,
+        "minRoundTripMs": 0
+      },
+      {
+        "bytes": 256,
+        "iterationsPerSample": 512,
+        "samples": 7,
+        "medianRoundTripMs": 0.0005859374068677425,
+        "minRoundTripMs": 0.00039062497671693563
+      },
+      {
+        "bytes": 4096,
+        "iterationsPerSample": 512,
+        "samples": 7,
+        "medianRoundTripMs": 0.00390625,
+        "minRoundTripMs": 0.0033203124767169356
+      },
+      {
+        "bytes": 16384,
+        "iterationsPerSample": 128,
+        "samples": 7,
+        "medianRoundTripMs": 0.014062500093132257,
+        "minRoundTripMs": 0.012499999720603228
+      },
+      {
+        "bytes": 65536,
+        "iterationsPerSample": 128,
+        "samples": 7,
+        "medianRoundTripMs": 0.0546875,
+        "minRoundTripMs": 0.05078125
+      }
+    ],
+    "asynchronous": [
+      {
+        "name": "empty",
+        "bytes": 0,
+        "roundTripMs": 0.6000000238418579
+      },
+      {
+        "name": "zero-and-ff",
+        "bytes": 4,
+        "roundTripMs": 0.09999996423721313
+      },
+      {
+        "name": "all-byte-values",
+        "bytes": 256,
+        "roundTripMs": 0
+      },
+      {
+        "name": "unicode-utf8",
+        "bytes": 42,
+        "roundTripMs": 10.199999988079071
+      },
+      {
+        "name": "offset-view",
+        "bytes": 4,
+        "roundTripMs": 9.700000047683716
+      },
+      {
+        "name": "random-64KiB",
+        "bytes": 65536,
+        "roundTripMs": 10.599999964237213
+      }
+    ],
+    "bounds": {
+      "maxChunkBytes": 65536,
+      "oversizedRejected": true,
+      "oversizedRead": "java.io.IOException: Supplier exceeded requested chunk limit"
+    },
+    "copyIsolation": true,
+    "retainedReleased": true,
+    "readFailure": "java.io.IOException: Simulated read failure",
+    "cancellation": {
+      "javaError": "java.io.InterruptedIOException: Probe read cancelled",
+      "elapsedMs": 5.300000011920929,
+      "cancelledDeliveries": 0,
+      "pendingReads": 0,
+      "pendingCallbacks": 0
+    },
+    "ownership": {
+      "outputDetachedAfterTransfer": true
+    },
+    "allocationModel": "Explicit loops copy one bounded Uint8Array into Java byte[] and one Java byte[] into a new Uint8Array. No zero-copy or total-heap claim."
+  },
+  "outputTransfer": {
+    "correct": true,
+    "bytes": 65536,
+    "sha256": "e416e94828203d0cc381b39f339e3dc7bd626bdecdfe22340afead6918c90617"
+  },
+  "passed": true,
+  "scope": "Independent TeaVM JSO explicit bounded copy/fiber/cancel oracle. Supplier is simulated; not the v2 HTTP/Okio/image bridge, not mobile or total-heap evidence.",
+  "harnessFiles": {
+    "tools/teavm/bridge-probe-worker.js": "e48535f979b4d526322967b409946b1bb813468be827dcf406d34babdfcab935",
+    "tools/teavm/byte-probe-worker.js": "e20282cd356be85bb2e08a413f53ef2e898f0980708567fd47dcebaef370d948"
+  }
+}

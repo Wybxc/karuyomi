@@ -11,7 +11,7 @@ export function createHello(generation: string): RuntimeHello {
     hostAbi,
     runtimeBaseline,
     generation,
-    capabilities: ['control-handshake'],
+    capabilities: ['control-handshake', 'verified-build-loading'],
     sourceReady: false,
   };
 }

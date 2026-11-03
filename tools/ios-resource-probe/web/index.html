@@ -1,0 +1,64 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Karuyomi iOS resource probe</title>
+<p>Development fixture · Worker → transferable → Blob → WKDownload</p>
+<pre id="status">Starting</pre>
+<script type="module">
+  const worker = new Worker('./worker.js', { type: 'module' });
+  const pending = new Map();
+  const status = document.querySelector('#status');
+  function send(value) {
+    status.textContent = JSON.stringify(value);
+    window.webkit.messageHandlers.resourceProbe.postMessage(value);
+  }
+  function ready(id) {
+    const item = pending.get(id);
+    if (!item?.url || !item.detached) return;
+    send({
+      type: 'resource',
+      id,
+      url: item.url,
+      byteLength: item.byteLength,
+      sha256: item.sha256,
+      mimeType: item.mimeType,
+      workerBufferDetached: true,
+      origin: location.origin,
+      secureContext: isSecureContext,
+    });
+  }
+  worker.onmessage = ({ data }) => {
+    if (data.type === 'error') {
+      send(data);
+      return;
+    }
+    const item = pending.get(data.id) ?? {};
+    if (data.type === 'bytes') {
+      const blob = new Blob([data.buffer], { type: data.mimeType });
+      Object.assign(item, {
+        url: URL.createObjectURL(blob),
+        byteLength: blob.size,
+        sha256: data.sha256,
+        mimeType: data.mimeType,
+      });
+    } else if (data.type === 'detached') item.detached = data.detached;
+    pending.set(data.id, item);
+    ready(data.id);
+  };
+  worker.onerror = () => send({ type: 'error', message: 'Worker failed' });
+  window.resourceProbe = {
+    run(request) {
+      worker.postMessage(request);
+    },
+    release(id) {
+      const item = pending.get(id);
+      if (item?.url) URL.revokeObjectURL(item.url);
+      pending.delete(id);
+      return pending.size;
+    },
+  };
+  send({
+    type: 'ready',
+    origin: location.origin,
+    secureContext: isSecureContext,
+  });
+</script>

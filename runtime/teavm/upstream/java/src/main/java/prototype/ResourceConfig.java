@@ -1,0 +1,1 @@
+package prototype;public class ResourceConfig implements org.teavm.extension.spi.resources.ResourcesPolicy{public String[] supplyResources(java.util.Collection<? extends String> names){return new String[]{"assets/i18n/messages_en.properties","assets/i18n/messages_es.properties","assets/i18n/messages_pt_br.properties","assets/i18n/messages_uk.properties"};}}

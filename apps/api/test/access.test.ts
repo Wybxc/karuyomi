@@ -8,6 +8,8 @@ const config = {
   ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
   ACCESS_AUD: 'test-audience',
   ACCESS_SUBJECT: 'owner-subject',
+  OWNER_EMAIL: 'owner@example.com',
+  APP_ORIGIN: 'https://read.example.com',
 };
 const env = {
   ...config,
@@ -32,9 +34,10 @@ async function token(
     audience?: string;
     issuer?: string;
     expired?: boolean;
+    email?: string;
   } = {},
 ) {
-  return new SignJWT({})
+  return new SignJWT({ email: options.email ?? config.OWNER_EMAIL })
     .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
     .setSubject(options.subject ?? config.ACCESS_SUBJECT)
     .setIssuer(options.issuer ?? `https://${config.ACCESS_TEAM_DOMAIN}`)
@@ -66,7 +69,7 @@ test.each(['/api', '/api/', '/api/bootstrap', '/api/unknown'])(
       env,
     );
     expect(response.status).toBe(401);
-    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(await response.json()).toEqual({ error: 'access_required' });
   },
 );
@@ -97,6 +100,7 @@ test('unconfigured Access is unavailable, with no development bypass', async () 
 
 test.each([
   { subject: 'another-person' },
+  { email: 'other@example.com' },
   { audience: 'wrong-audience' },
   { issuer: 'https://wrong.cloudflareaccess.com' },
   { expired: true },
@@ -108,7 +112,7 @@ test.each([
     },
     env,
   );
-  expect(response.status).toBe(403);
+  expect(response.status).toBe(options.subject || options.email ? 403 : 401);
 });
 
 test('rejects forged tokens and identity headers', async () => {
@@ -122,7 +126,7 @@ test('rejects forged tokens and identity headers', async () => {
     },
     env,
   );
-  expect(response.status).toBe(403);
+  expect(response.status).toBe(401);
 });
 
 test('verified owner gets typed bootstrap without a token in the body', async () => {
@@ -136,7 +140,7 @@ test('verified owner gets typed bootstrap without a token in the body', async ()
   expect(response.status).toBe(200);
   const body = bootstrapSchema.parse(await response.json());
   expect(body.identity.subject).toBe(config.ACCESS_SUBJECT);
-  expect(body.stage).toBe('scaffold');
+  expect(body.stage).toBe('p0');
 });
 
 test('unknown authenticated API returns JSON 404', async () => {
@@ -151,14 +155,78 @@ test('unknown authenticated API returns JSON 404', async () => {
   expect(await response.json()).toEqual({ error: 'not_found' });
 });
 
-test('login returns only to the fixed public completion path', async () => {
+test.each([
+  '/',
+  '/auth/complete',
+  '/browse',
+  '/settings',
+  '/runtime/host.html',
+])(
+  'login permits only a public application continuation: %s',
+  async (returnTo) => {
+    const response = await app.request(
+      `https://read.example.com/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+      { headers: { 'Cf-Access-Jwt-Assertion': await token() } },
+      env,
+    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(returnTo);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+  },
+);
+
+test.each([
+  'https://attacker.example',
+  '//attacker.example',
+  '/api/bootstrap',
+  '/cdn-cgi/access/login',
+  '/browse?redirect=https://attacker.example',
+])('login rejects arbitrary continuations: %s', async (returnTo) => {
   const response = await app.request(
-    'https://read.example.com/api/auth/login?returnTo=https://attacker.example',
+    `https://read.example.com/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
     {
       headers: { 'Cf-Access-Jwt-Assertion': await token() },
     },
     env,
   );
-  expect(response.status).toBe(303);
-  expect(response.headers.get('location')).toBe('/auth/complete');
+  expect(response.status).toBe(400);
+  expect(response.headers.get('location')).toBeNull();
 });
+
+test.each([
+  'https://alternate.example',
+  'http://read.example.com',
+  'https://read.example.com:8443',
+])(
+  'API rejects an unexpected request origin before checking identity: %s',
+  async (origin) => {
+    const response = await app.request(
+      `${origin}/api/bootstrap`,
+      { headers: { 'Cf-Access-Jwt-Assertion': await token() } },
+      env,
+    );
+    expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(await response.json()).toEqual({ error: 'invalid_host' });
+  },
+);
+
+test.each([
+  {},
+  { Origin: 'https://other.example', 'X-App-Request': '1' },
+  { Origin: config.APP_ORIGIN },
+])(
+  'mutating APIs require the exact application Origin and request marker: %j',
+  async (headers) => {
+    const response = await app.request(
+      'https://read.example.com/api/bridge/http',
+      {
+        method: 'POST',
+        headers: { 'Cf-Access-Jwt-Assertion': await token(), ...headers },
+      },
+      env,
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'invalid_origin' });
+  },
+);

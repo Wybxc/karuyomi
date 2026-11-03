@@ -3,8 +3,10 @@
   "name": "karuyomi",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-03",
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "workers_dev": false,
   "preview_urls": false,
+  "routes": [{ "pattern": "karuyomi.wybxc.cc", "custom_domain": true }],
   "assets": {
     "directory": "../../dist/public",
     "binding": "ASSETS",
@@ -12,15 +14,17 @@
     "not_found_handling": "single-page-application",
   },
   "vars": {
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
+    "ACCESS_TEAM_DOMAIN": "wybxc.cloudflareaccess.com",
+    "ACCESS_AUD": "715cfedd3bdf82be23fb21b58c6d3b6d533a1e123f901c17b5697da842d7ce4c",
     "ACCESS_SUBJECT": "",
+    "OWNER_EMAIL": "wybxc@qq.com",
+    "APP_ORIGIN": "https://karuyomi.wybxc.cc",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "karuyomi",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "b6960ee4-98ad-47e4-ac12-4e9ca22ebfba",
       "migrations_dir": "migrations",
     },
   ],

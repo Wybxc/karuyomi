@@ -1,0 +1,91 @@
+{
+  "complete": true,
+  "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+  "environment": "simulator",
+  "independentBinaryDigestVerified": true,
+  "localHTTPSVerified": true,
+  "memoryPeakMeasured": false,
+  "origin": "https://127.0.0.1:62107",
+  "pageURL": "https://127.0.0.1:62107/index.html",
+  "passed": true,
+  "physicalDeviceVerified": false,
+  "platform": "iOS",
+  "probe": "ios-wkdownload-blob-v1",
+  "productionHTTPSVerified": false,
+  "remainingFiles": [],
+  "results": [
+    {
+      "blobReleased": true,
+      "byteLength": 262144,
+      "durationMs": 44.11005973815918,
+      "fileReleased": true,
+      "id": "binary-256k",
+      "passed": true,
+      "sha256": "582ea324ac01ab8d2ed4a83bf252199a874e9b45c7034859c7428b3c6935796b",
+      "status": "downloaded",
+      "workerBufferDetached": true,
+      "workerSha256": "582ea324ac01ab8d2ed4a83bf252199a874e9b45c7034859c7428b3c6935796b"
+    },
+    {
+      "blobReleased": true,
+      "byteLength": 4194304,
+      "durationMs": 26.324987411499023,
+      "fileReleased": true,
+      "id": "binary-4m",
+      "passed": true,
+      "sha256": "2fbca684e0459c746e5cdc438c03ff1015528500cc7a3478a936d6bb427aaa20",
+      "status": "downloaded",
+      "workerBufferDetached": true,
+      "workerSha256": "2fbca684e0459c746e5cdc438c03ff1015528500cc7a3478a936d6bb427aaa20"
+    },
+    {
+      "blobReleased": true,
+      "byteLength": 16777216,
+      "durationMs": 47.79708385467529,
+      "fileReleased": true,
+      "id": "binary-16m",
+      "passed": true,
+      "sha256": "42d0f11043681c9109fdf8c8880470bbb7fdc00f450184b6f3161cb82c466c06",
+      "status": "downloaded",
+      "workerBufferDetached": true,
+      "workerSha256": "42d0f11043681c9109fdf8c8880470bbb7fdc00f450184b6f3161cb82c466c06"
+    },
+    {
+      "blobReleased": true,
+      "byteLength": 1203,
+      "durationMs": 218.52898597717285,
+      "fileReleased": true,
+      "id": "processed-png",
+      "imageHeight": 256,
+      "imageWidth": 128,
+      "passed": true,
+      "sha256": "6eb9211f34d1f2379f325acf86bea120c2b702c88ffaaf8a8e4511dd7039504a",
+      "status": "downloaded",
+      "workerBufferDetached": true,
+      "workerSha256": "6eb9211f34d1f2379f325acf86bea120c2b702c88ffaaf8a8e4511dd7039504a"
+    },
+    {
+      "blobReleased": true,
+      "fileReleased": true,
+      "id": "cancel-16m",
+      "passed": true,
+      "status": "cancelled"
+    }
+  ],
+  "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-26-4",
+  "sdkVersion": "27.2",
+  "secureContext": true,
+  "sourceSha256": {
+    "Info.plist": "26db4d8bb41fa2b073f98148a483fbea8473c5c56d6e3276d80eb50bdf1af5d3",
+    "Sources/AppDelegate.swift": "58b08efbd810de98bab20ee2fcc49684f616e2b587a34339756c33b94de91e39",
+    "Sources/ProbeController.swift": "e9ae22f213cb2f33d1ef491fd87d7598ee9f855fee5b5f589b5e53395f297d38",
+    "project.yml": "d61490994974107c1ae5c465e97728b183d0c5308518464544c7b61e14135c23",
+    "run-simulator.py": "83550c4980bf2be8038d934d1f03c82a07e8dfeab83328d3d468bc13683c857a",
+    "web/index.html": "ca314a2366ca808aaa2e21ef64c64cdc6426417b20244ffa6157cba52f46cad2",
+    "web/worker.js": "cc9a7bfd588c2929b2cf58b95b994d3a4910018973f4a83c01788c92383c7b31"
+  },
+  "systemVersion": "26.4",
+  "transport": "WKWebView.startDownload(blob)",
+  "transportSecurity": "local-trusted-certificate",
+  "xcodeVersion": "Xcode 27.2\nBuild version 27B52"
+}

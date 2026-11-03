@@ -1,0 +1,19 @@
+name: ResourceBridgeProbe
+options:
+  deploymentTarget:
+    iOS: '15.0'
+targets:
+  ResourceBridgeProbe:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.karuyomi.resourceprobe
+        SWIFT_VERSION: '5.0'
+        CODE_SIGNING_ALLOWED: NO
+        TARGETED_DEVICE_FAMILY: '1,2'
+        INFOPLIST_FILE: $(SRCROOT)/../Info.plist
+        ENABLE_DEBUG_DYLIB: NO
+    scheme:
+      gatherCoverageData: false

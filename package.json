@@ -15,12 +15,16 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "check": "pnpm generate:check && pnpm format:check && pnpm typecheck && pnpm test",
+    "check": "pnpm generate:check && pnpm format:check && pnpm typecheck && pnpm test && pnpm test:registration",
+    "test:registration": "python3 -m unittest discover -s scripts -p test_register_build.py",
     "flutter:setup": "node scripts/flutter.mjs setup",
     "flutter:check": "node scripts/flutter.mjs check",
     "build": "pnpm --filter @karuyomi/runtime-host build && node scripts/flutter.mjs build && node scripts/assemble-assets.mjs && pnpm --filter @karuyomi/api build",
     "db:generate": "pnpm --filter @karuyomi/api db:generate",
-    "db:migrate:local": "pnpm --filter @karuyomi/api db:migrate:local"
+    "db:migrate:local": "pnpm --filter @karuyomi/api db:migrate:local",
+    "teavm:import": "python3 scripts/import-teavm.py",
+    "teavm:build": "python3 scripts/build-teavm.py",
+    "teavm:check": "python3 tools/teavm/check-dto.py"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

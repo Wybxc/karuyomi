@@ -1,7 +1,10 @@
 import { Hono } from 'hono';
+import { createExtensionRoutes, type ExtensionStore } from './extensions.js';
+import { createHttpBridge } from './http-bridge.js';
 import { protocolVersion, type Bootstrap } from '@karuyomi/contracts';
 import {
   accessIssuer,
+  AccessError,
   createAccessVerifier,
   type AccessConfig,
   type AccessIdentity,
@@ -15,12 +18,15 @@ export type Bindings = AccessConfig & {
   RUNTIME_SESSIONS: DurableObjectNamespace;
 };
 
-type AppEnv = {
+export type AppEnv = {
   Bindings: Bindings;
   Variables: { identity: AccessIdentity };
 };
 
-export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
+export function createApp(
+  verifyAccess: VerifyAccess = createAccessVerifier(),
+  extensionStore?: (env: Bindings) => ExtensionStore,
+) {
   const app = new Hono<AppEnv>();
 
   // Global dispatch prevents encoded API paths or unknown API routes from
@@ -38,7 +44,7 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
       if (path.startsWith('/cdn-cgi/')) return c.notFound();
       return c.env.ASSETS.fetch(c.req.raw);
     }
-    c.header('Cache-Control', 'no-store');
+    c.header('Cache-Control', 'private, no-store');
     if (path !== rawPath)
       return c.json({ error: 'noncanonical_api_path' }, 400);
     try {
@@ -46,27 +52,59 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
     } catch {
       return c.json({ error: 'access_not_configured' }, 503);
     }
+    if (new URL(c.req.url).origin !== c.env.APP_ORIGIN) {
+      return c.json({ error: 'invalid_host' }, 403);
+    }
     const token = c.req.header('Cf-Access-Jwt-Assertion');
     if (!token) return c.json({ error: 'access_required' }, 401);
     try {
       c.set('identity', await verifyAccess(token, c.env));
-    } catch {
-      return c.json({ error: 'access_denied' }, 403);
+    } catch (error) {
+      if (error instanceof AccessError) {
+        if (error.status === 503) c.header('Retry-After', '5');
+        return c.json({ error: error.code }, error.status);
+      }
+      return c.json({ error: 'access_unavailable' }, 503);
+    }
+    if (
+      !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) &&
+      (c.req.header('Origin') !== c.env.APP_ORIGIN ||
+        c.req.header('X-App-Request') !== '1')
+    ) {
+      return c.json({ error: 'invalid_origin' }, 403);
     }
     await next();
   });
 
-  app.get('/api/auth/login', (c) => c.redirect('/auth/complete', 303));
+  app.get('/api/auth/login', (c) => {
+    const returnTo = c.req.query('returnTo') ?? '/auth/complete';
+    // Keep the login continuation on one of the public application routes.
+    // In particular, never redirect back into Access or an arbitrary origin.
+    if (
+      ![
+        '/',
+        '/auth/complete',
+        '/browse',
+        '/settings',
+        '/runtime/host.html',
+      ].includes(returnTo)
+    ) {
+      return c.json({ error: 'invalid_return_to' }, 400);
+    }
+    return c.redirect(returnTo, 303);
+  });
   app.get('/api/bootstrap', (c) => {
     const identity = c.get('identity');
     const body: Bootstrap = {
       protocolVersion,
-      identity: { subject: identity.subject },
+      identity: { subject: identity.subject, email: identity.email },
       expiresAt: identity.expiresAt,
-      stage: 'scaffold',
+      stage: 'p0',
     };
     return c.json(body);
   });
+  app.route('/api/extensions', createExtensionRoutes(extensionStore));
+  app.route('/api/bridge', createHttpBridge());
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((_error, c) => c.json({ error: 'internal_error' }, 500));
   return app;

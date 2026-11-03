@@ -1,18 +1,84 @@
-# 脚手架验证
+# 实施验证记录
 
-2026-11-03，在 macOS 上使用 Flutter 3.47.5 / Dart 3.13.4、Node 26.5.0、pnpm 12.6.0 验证。
+2026-11-03，本地 macOS。Flutter 3.47.5 / Dart 3.13.4、pnpm 12.6.0；仓库固定 Node 24.15.0，本轮也使用 Node 26.5.0 执行检查。TeaVM 固定 0.16.0 JS backend，验证 JDK 为 Oracle GraalVM 25.0.4、Maven 3.9.11。下表区分代码/分项测试、独立机制探针与尚未完成的产品验收，不以测试总数作为能力证明。
 
-| 检查                             | 结果                                                                                                                             |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install --frozen-lockfile` | 通过；依赖构建仅允许声明的 esbuild / workerd / sharp                                                                             |
-| `pnpm check`                     | 协议生成一致、格式、严格 TS 类型检查通过；20 项测试通过                                                                          |
-| `pnpm flutter:check`             | 两个 Dart 包和 Flutter app 静态分析通过；3 项核心测试与 2 项响应式界面测试通过；Dart 格式通过                                    |
-| `pnpm build`                     | JS 宿主、Flutter Web release、同源静态产物与 Wrangler dry-run 全部通过                                                           |
-| `pnpm db:migrate:local`          | 本地 D1 初始迁移成功                                                                                                             |
-| 本地 workerd HTTP 检查           | `/`、`/library`、运行控制页与 Worker 脚本 200；未配置的裸 `/api`、bootstrap 与未知 API 为 JSON 503 / no-store；编码 API 别名 400 |
-| 浏览器检查                       | IAB 加载本地完整产物，桌面书架空态和中文文字正常渲染                                                                             |
-| 设计副本溯源                     | 五份副本 SHA-256 与 `design/provenance.json` 一致                                                                                |
+## 工程与代码验证
 
-JWT 测试使用本地生成的 RSA 密钥与真实签名，覆盖错 issuer、AUD、subject、到期、伪造 token / 邮箱头、缺 token、固定登录回跳、鉴权后的 JSON 404；没有修改或绕过线上 Access 配置。
+| 范围              | 已有证据                                                                                                                                                               | 复验入口与限制                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 协议 / TypeScript | 生成版本一致性、严格类型检查，JS Worker 与 API 边界分项测试通过                                                                                                        | `pnpm check`；测试覆盖协议/ABI、hash/预算、串行与代次、取消/超时、登录响应及错误分层    |
+| Dart / Flutter    | source_runtime、reader_core 与 app 的静态分析、协议/布局/调度/浏览/阅读组件测试分项通过                                                                                | `pnpm flutter:check`；测试 Provider/渲染夹具不等于真实 Source 或真机                    |
+| 构建与静态入口    | 已完成本地 JS 宿主、Flutter Web release、同源资源组装及 Wrangler dry-run；公开 shell 与控制页可加载                                                                    | `pnpm build`、`pnpm dev`；dry-run 不部署，也不证明生产 Access                           |
+| D1 / R2           | 迁移已加入构建/产物/关联/网络域名注册表；真实 MangaDraft 产品包已注册本地 D1/R2                                                                                        | `pnpm db:migrate:local`；`scripts/register-build.py` 默认仅输出计划，`--local` 才写本地 |
+| JWT / API         | 本地 RSA 密钥真实签名测试覆盖 issuer、AUD、本人邮箱/可选 subject、过期/伪造凭据、固定回跳、路径规范化与 API 不落入 SPA；私有交付校验已注册关联、MIME/长度和 Range/HEAD | `pnpm exec vitest run apps/api/test`；测试签名不是 Cloudflare 签发的生产会话            |
+| 阅读核心          | 单/双页、LTR/RTL、封面/横图独占、竖向/Webtoon、缩放/翻页、逻辑锚与布局恢复、取消/释放确认和迟到资源清理                                                                | `pnpm flutter:check`；窗口预算为实现约束，估算解码像素不等于实测进程/GPU 峰值           |
+| 冻结设计溯源      | 五份设计副本保留，摘要记录在 `design/provenance.json`                                                                                                                  | `docs/design/` 未随工程状态改写                                                         |
 
-尚未执行 Android/iOS 原生编译或真机验收、线上部署与 Access 联调、TeaVM release9 导入、真实源和图片桥。Worker 握手仍声明 `sourceReady: false`；本记录验证工程起点，不代表 P0 完成。CI 已配置同类检查，尚未在远端执行。
+本地与云端已注册构建 `release9-mangadraft-product-e3505206005c25f69b92`：7 个私有产物，共 3,957,861 字节，云端查询状态为 verified。登记前逐文件校验长度/hash，构建与产物关联只在完整写入后可见。本地真实 workerd/D1/R2 加 RS256 测试签名探针已检查 manifest/list、全部 R2 SHA-256、HEAD/304/Range/416、缺 JWT/错误 AUD/错误 host 及整批冲突回滚，见 [API 探针](../apps/api/test/README.md) 与 [证据](../apps/api/test/evidence/workerd-registered-artifacts.json)。测试入口仅信任本次生成的公钥，产品没有鉴权绕过。
+
+## 正式部署与匿名边界
+
+2026-11-03 已成功部署 `https://karuyomi.wybxc.cc`，Cloudflare Worker version 为 `60bac3c2-96df-4763-8c92-2cf8fd1e2a86`。云端 D1 的两次迁移均通过，e350 产物已 remote 注册。匿名检查得到 `/` 200、`/runtime/host.js` 200，`/runtime/host.html` 307 规范化到公开 `/runtime/host`；Safari 已实际渲染 Flutter 书架与三个导航页签。
+
+Access 本人策略覆盖 `/api` 和 `/api/*`。匿名 `/api`、`/api/bootstrap` 与私有 `/api/extensions/artifacts/<hash>` 均返回 302 到 `wybxc.cloudflareaccess.com` 登录，保持 private/no-store。这里验证的是公开入口与匿名拦截；尚未取得生产 Access 登录成功后的正向 bootstrap/私有产物交付，也未完成登录/cookie 失效与恢复验收。
+
+## P0-A 真实构建与 Web 初始化
+
+冻结导入选取 221 份最终源码/构建资源/许可证，逐文件摘要与 release9 源指纹固定；依赖、原 JAR、ZIP 和大产物不入库。原 MangaDraft JAR SHA-256 为 `81d456c80449fc205e50332ff281c0b8ee20e584f7e5670ccd3f79abb71dfa86`，基线和产品构建前后保持一致。
+
+| 项目                | 证据                                                                               | 能证明的范围                                                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 冻结宿主基线        | [mangadraft-baseline.json](../runtime/teavm/verification/mangadraft-baseline.json) | 未修改 release9 宿主真实编译；没有生成可安装产品清单                                                                                 |
+| 产品宿主            | [mangadraft-p0a.json](../runtime/teavm/verification/mangadraft-p0a.json)           | 新 `hostInvoke` ABI、完整 DTO、显式引用覆盖层真实编译；bundle SHA `209ad02ba02eae99147502799c08e1aac0c1c7bc29906aa3d60e99174b1b9f22` |
+| Chromium 156 初始化 | 同上报告中的 `browser`                                                             | 清单/hash 检查后实际执行 `hostInit` / `hostLoad`，返回 MangaDraft ID `6866320578550428692`；缺章节引用经 Java 失败回调返回结构化错误 |
+| DTO JVM oracle      | `tools/teavm/HostDtoTest.java`                                                     | 六项操作使用的完整漫画/章节/页面字段、长列表不截断、分页参数、顺序、memo、Long 精度及显式引用验证                                    |
+
+`popular/latest/search/details/chapters/pages` 已实现 Java 调用边界。新增 Chromium 156 + 产品 JS + 真实 workerd/D1/R2/v1 HTTP bridge + RS256 测试签名的在线探针中，热门/最新/搜索请求均为 HTTP 200 并返回 20 项完整 DTO；搜索筛选语义仍在核对，不能仅凭返回列表判定结果匹配。详情/章节访问真实 `/manga/dragon-ball-kakumei` 后被源站 302 到 `/bot-verification`，最终返回 Human Verification；Java 明确返回 `source_error: Unable to find project script`，这是源站挑战而非 ABI 加载错误。探针没有伪造章节或 pages 引用，pages 尚未实测。当前仍未判定六项在线 Source 等价。控制 `ready` 始终为 `sourceReady: false`；真实初始化成功的 `open` 才返回 session。Source ID 与清单不符、hash/MIME/预算错误或登录 HTML 不得进入可用会话。远程脚本、非默认 filters/preferences 和产品图片调用仍明确不支持。
+
+```sh
+pnpm teavm:import /path/to/teavm-compatibility-v2.zip --package mangadraft
+pnpm teavm:check
+pnpm teavm:build mangadraft
+pnpm --filter @karuyomi/runtime-host build
+node tools/teavm/browser-probe.mjs runtime/teavm/.local/manifests/<buildId>.json
+```
+
+打开 `http://127.0.0.1:8898/`，依次运行初始化与显式引用检查。它是隔离的本地产物服务器，不提供 Access 绕过或上游 HTTP 代理；真实 IndexedDB 初始化通过不等于文件/HTTP Cache 的重启、升级与取消语义已完成回归。
+
+## P0-B 独立字节与错误探针
+
+[byte-boundary.json](../runtime/teavm/verification/byte-boundary.json) 记录 Chromium 156 上实际编译的 TeaVM JSO 探针：空字节、`00/ff`、全部 256 值、含 NUL/emoji 的 UTF-8、带偏移视图和 64 KiB 随机字节经 `Uint8Array → byte[] → Uint8Array` 显式复制后逐字节一致。它同时验证 64 KiB 限额、复制不别名、retained Java 引用清除、fiber 等待/IOException 恢复、模拟 supplier 取消后无遗留/迟到回调，以及主线程/Worker 双向转移后的发送方 ArrayBuffer 脱离。报告保留每块耗时；桌面数字不外推为手机性能、零拷贝或总堆上限。
+
+[zstd-callback.json](../runtime/teavm/verification/zstd-callback.json) 对照实际编译的原版和产品 `Bridge.zstd`。两者对真实 WASM 无效压缩流都返回 `Truncated Zstd frame`；显式注入 rejected host Promise 时，原版生成代码因局部变量名碰撞抛出 `TypeError` 并等待超时，产品覆盖层改用 `failureReason` 后恢复 Java RuntimeException。冻结源码未改。
+
+```sh
+python3 tools/teavm/build-byte-probe.py
+node tools/teavm/byte-probe.mjs
+python3 tools/teavm/build-bridge-probe.py
+node tools/teavm/bridge-probe.mjs
+```
+
+分别打开 `http://127.0.0.1:8899/`、`http://127.0.0.1:8900/` 并运行。TeaVM 包构建与 Bridge 对照探针共享构建缓存，应顺序执行。通过后可用 `python3 tools/teavm/record-verification.py <产品清单>` 记录小型摘要。
+
+这些探针尚未接入 HTTP v2 分帧、真实网络 reader、Okio ResponseBody 或图片通道。当前 P0-A `/api/bridge/http` 仍为有界文本/Base64 基线；不作为 P0-B 完成标准。下一步实现落点见 [计划](PLAN.md#p0-b-下一步落点)。
+
+## F3 iOS 模拟器 HTTPS 机制
+
+[独立探针说明](../tools/ios-resource-probe/README.md) 和 [实测报告](../tools/ios-resource-probe/evidence/simulator-ios26.4-https.json) 记录 iOS 26.4 Simulator / Xcode SDK 27.2 在本地受信 HTTPS 下的机制验证：256 KiB、4 MiB、16 MiB 二进制，Worker 处理生成的 PNG，以及 16 MiB 下载启动后立即取消。正文走 `Worker → transferable ArrayBuffer → Blob URL → WKWebView.startDownload → WKDownloadDelegate → 受管临时文件`，只用小型控制消息；独立原生摘要、PNG 尺寸、发送方脱离、文件/Blob 释放与最终空资源目录检查通过。
+
+```sh
+cd tools/ios-resource-probe
+python3 run-simulator.py --https
+```
+
+该命令需要 Xcode、iOS Simulator runtime、XcodeGen、Python 与 OpenSSL，默认创建并清理专用模拟器。受信临时证书只装到测试模拟器，不跳过系统 TLS 校验。当前 `flutter_inappwebview` 未直接暴露所需 `startDownload` 受管文件链路，产品薄插件扩展尚未实现；这个原生探针不是 Flutter 产品图片桥，也不是物理 iPhone、生产 HTTPS/Access、任意阶段取消、首图性能或进程/GPU 峰值验收。
+
+## 尚未通过的门槛
+
+- Cloudflare 签发的真实 Access JWT 正向私有交付、登录回跳/cookie 失效与原生恢复。
+- v2 二进制网络/Okio 流控、真实上游取消、文件与 HTTP Cache 同版回归。
+- Java 图片处理到 Dart Provider / Web 资源 / 原生文件的产品通道，以及真实图片进入 ReaderScreen。
+- 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
+- P1 书架/进度等持久化、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化。
+
+CI 已配置统一检查，远端运行结果需由对应提交确认。以上工程与探针证据不表示 P0 或后续阶段通过。

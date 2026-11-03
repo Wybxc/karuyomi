@@ -1,0 +1,413 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:source_runtime/source_runtime.dart';
+
+import '../../runtime/runtime_platform_types.dart';
+
+enum ServiceStatus {
+  disconnected,
+  connecting,
+  ready,
+  loginRequired,
+  denied,
+  failed,
+}
+
+final class CatalogBuild {
+  const CatalogBuild({
+    required this.id,
+    required this.packageName,
+    required this.version,
+    required this.manifestPath,
+  });
+  final String id;
+  final String packageName;
+  final String version;
+  final String manifestPath;
+
+  factory CatalogBuild.fromJson(Map<String, Object?> json) => CatalogBuild(
+    id: _string(json, 'buildId'),
+    packageName: _string(json, 'packageName'),
+    version: _string(json, 'version'),
+    manifestPath: _string(json, 'manifestPath'),
+  );
+}
+
+final class MangaEntry {
+  MangaEntry(Map<String, Object?> snapshot)
+    : snapshot = Map.unmodifiable(snapshot),
+      title = _string(snapshot, 'title'),
+      url = _string(snapshot, 'url') {
+    for (final key in ['description', 'author', 'artist']) {
+      if (snapshot[key] != null && snapshot[key] is! String) {
+        throw const FormatException('漫画资料格式无效');
+      }
+    }
+    if (snapshot['genres'] != null &&
+        (snapshot['genres'] is! List ||
+            !(snapshot['genres'] as List).every((value) => value is String))) {
+      throw const FormatException('漫画分类格式无效');
+    }
+  }
+  final Map<String, Object?> snapshot;
+  final String title;
+  final String url;
+  String? get description => snapshot['description'] as String?;
+  String? get author => snapshot['author'] as String?;
+  String? get artist => snapshot['artist'] as String?;
+  List<String> get genres => (snapshot['genres'] as List? ?? []).cast<String>();
+}
+
+final class ChapterEntry {
+  ChapterEntry(Map<String, Object?> snapshot)
+    : snapshot = Map.unmodifiable(snapshot),
+      name = _string(snapshot, 'name'),
+      url = _string(snapshot, 'url');
+  final Map<String, Object?> snapshot;
+  final String name;
+  final String url;
+}
+
+String _string(Map<String, Object?> value, String key) {
+  final field = value[key];
+  if (field is! String || field.isEmpty) {
+    throw const FormatException('服务返回的数据不完整');
+  }
+  return field;
+}
+
+Map<String, Object?> _object(Object? value) {
+  if (value is! Map || !value.keys.every((key) => key is String)) {
+    throw const FormatException('服务返回了无效数据');
+  }
+  return Map<String, Object?>.from(value);
+}
+
+List<Object?> _list(Object? value) {
+  if (value is! List) throw const FormatException('服务返回的列表格式无效');
+  return value;
+}
+
+/// The UI keeps original Source snapshots for explicit manga/chapter references.
+/// It never derives a source URL from an application route or a display label.
+final class CatalogController extends ChangeNotifier {
+  CatalogController({required this.api, required this.runtime}) {
+    _subscription = runtime.events.listen(_onRuntimeEvent);
+  }
+
+  final ApiFetch api;
+  final SourceRuntime runtime;
+  late final StreamSubscription<RuntimeEvent> _subscription;
+  ServiceStatus status = ServiceStatus.disconnected;
+  String? email;
+  String? subject;
+  String? error;
+  bool busy = false;
+  String? activity;
+  List<CatalogBuild> builds = const [];
+  String? nextBuildCursor;
+  CatalogBuild? activeBuild;
+  RuntimeSession? session;
+  SourceInfo? activeSource;
+  List<MangaEntry> mangas = const [];
+  bool hasNextPage = false;
+  int page = 0;
+  String query = '';
+  String listing = 'popular';
+  String? lastBuildId;
+  String? lastSourceId;
+  int _requestSequence = 0;
+  int _epoch = 0;
+  bool _closed = false;
+
+  void _notify() {
+    if (!_closed) notifyListeners();
+  }
+
+  void _onRuntimeEvent(RuntimeEvent event) {
+    if (_closed) return;
+    if ({
+      RuntimeErrorCode.runtimeLost,
+      RuntimeErrorCode.accessRequired,
+      RuntimeErrorCode.accessDenied,
+      RuntimeErrorCode.timeout,
+    }.contains(event.code)) {
+      ++_epoch;
+      busy = false;
+      activity = null;
+      _dropSession();
+      error = event.code == RuntimeErrorCode.accessRequired
+          ? '访问验证已失效，请重新登录'
+          : event.code == RuntimeErrorCode.accessDenied
+          ? '当前身份没有访问权限'
+          : '运行容器已中断，请重新连接';
+      status = event.code == RuntimeErrorCode.accessRequired
+          ? ServiceStatus.loginRequired
+          : event.code == RuntimeErrorCode.accessDenied
+          ? ServiceStatus.denied
+          : ServiceStatus.failed;
+    }
+    _notify();
+  }
+
+  void _dropSession() {
+    session = null;
+    activeSource = null;
+    activeBuild = null;
+    mangas = const [];
+    page = 0;
+    hasNextPage = false;
+  }
+
+  Future<Map<String, Object?>> _get(String path) async {
+    final reply = await api.fetchApi(path);
+    if (reply.redirected || reply.status == 401) {
+      throw const RuntimeException(RuntimeErrorCode.accessRequired, '请先通过访问验证');
+    }
+    if (reply.status == 403) {
+      throw const RuntimeException(RuntimeErrorCode.accessDenied, '当前身份没有访问权限');
+    }
+    if (reply.status != 200) {
+      throw StateError(
+        reply.status == 503 ? '服务尚未配置完成，请稍后重试' : '服务请求失败（${reply.status}）',
+      );
+    }
+    if (!(reply.headers['content-type'] ?? '').contains('application/json')) {
+      throw const RuntimeException(
+        RuntimeErrorCode.accessRequired,
+        '访问验证已失效，请重新登录',
+      );
+    }
+    return _object(jsonDecode(reply.body));
+  }
+
+  Future<T?> _perform<T>(String label, Future<T> Function() action) async {
+    if (busy || _closed) return null;
+    final epoch = _epoch;
+    busy = true;
+    activity = label;
+    error = null;
+    _notify();
+    try {
+      return await action();
+    } on RuntimeException catch (failure) {
+      if (epoch == _epoch && !_closed) {
+        error = switch (failure.code) {
+          RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录',
+          RuntimeErrorCode.accessDenied => '当前身份没有访问权限',
+          RuntimeErrorCode.timeout => '漫画源响应超时，请重新连接后重试',
+          RuntimeErrorCode.runtimeLost => '运行容器已中断，请重新连接',
+          RuntimeErrorCode.unsupportedCapability => '这个漫画源功能暂未支持',
+          RuntimeErrorCode.integrityError => '构建校验失败，请重新加载',
+          RuntimeErrorCode.sourceError => '漫画源请求失败，请重试',
+          RuntimeErrorCode.protocolError => '漫画源返回的数据与当前版本不兼容',
+          _ => '漫画源请求失败，请稍后重试',
+        };
+        if (failure.code == RuntimeErrorCode.accessRequired) {
+          status = ServiceStatus.loginRequired;
+          _dropSession();
+        } else if (failure.code == RuntimeErrorCode.accessDenied) {
+          status = ServiceStatus.denied;
+          _dropSession();
+        } else if ({
+          RuntimeErrorCode.runtimeLost,
+          RuntimeErrorCode.timeout,
+        }.contains(failure.code)) {
+          _dropSession();
+          status = ServiceStatus.failed;
+        } else if (session == null) {
+          status = ServiceStatus.failed;
+        }
+      }
+      return null;
+    } catch (failure) {
+      if (epoch == _epoch && !_closed) {
+        error = failure is FormatException
+            ? failure.message
+            : '连接未完成，请检查服务配置后重试';
+        if (status == ServiceStatus.connecting) status = ServiceStatus.failed;
+      }
+      return null;
+    } finally {
+      if (epoch == _epoch && !_closed) {
+        busy = false;
+        activity = null;
+        _notify();
+      }
+    }
+  }
+
+  Future<void> connect() async {
+    await _perform('正在连接服务', () async {
+      status = ServiceStatus.connecting;
+      _dropSession();
+      builds = const [];
+      nextBuildCursor = null;
+      final bootstrap = await _get('/api/bootstrap');
+      if (bootstrap['protocolVersion'] != protocolVersion) {
+        throw const FormatException('客户端与服务版本不兼容');
+      }
+      final identity = _object(bootstrap['identity']);
+      final confirmedSubject = _string(identity, 'subject');
+      final confirmedEmail = _string(identity, 'email');
+      final inventory = await _get('/api/extensions/builds');
+      final available = _list(
+        inventory['builds'],
+      ).map((v) => CatalogBuild.fromJson(_object(v))).toList();
+      if (_closed) return;
+      subject = confirmedSubject;
+      email = confirmedEmail;
+      builds = available;
+      nextBuildCursor = inventory['nextCursor'] as String?;
+      status = ServiceStatus.ready;
+    });
+  }
+
+  Future<void> moreBuilds() async {
+    final cursor = nextBuildCursor;
+    if (cursor == null) return;
+    await _perform('正在加载漫画源', () async {
+      final inventory = await _get(
+        '/api/extensions/builds?cursor=${Uri.encodeQueryComponent(cursor)}',
+      );
+      final available = _list(
+        inventory['builds'],
+      ).map((v) => CatalogBuild.fromJson(_object(v))).toList();
+      if (_closed) return;
+      builds = [...builds, ...available];
+      nextBuildCursor = inventory['nextCursor'] as String?;
+    });
+  }
+
+  Future<void> openBuild(CatalogBuild build) async {
+    if (busy) return;
+    lastBuildId = build.id;
+    lastSourceId = null;
+    await _perform('正在加载漫画源', () async {
+      _dropSession();
+      final identity = subject;
+      if (identity == null) {
+        throw const RuntimeException(RuntimeErrorCode.accessRequired, '身份未确认');
+      }
+      final manifest = await _get(build.manifestPath);
+      if (manifest['buildId'] != build.id) {
+        throw const FormatException('构建标识不匹配');
+      }
+      final loaded = await runtime.open(
+        BuildDescriptor(
+          buildId: build.id,
+          manifestUri: Uri.parse(build.manifestPath),
+          sha256: _string(_object(manifest['bundle']), 'sha256'),
+          identity: identity,
+          packageId: build.packageName,
+        ),
+      );
+      if (_closed) return;
+      activeBuild = build;
+      session = loaded;
+      activeSource = null;
+      mangas = const [];
+      page = 0;
+      hasNextPage = false;
+    });
+  }
+
+  Future<Map<String, Object?>> _invoke(
+    String operation,
+    Map<String, Object?> args,
+  ) async {
+    final epoch = _epoch;
+    final current = session;
+    final build = activeBuild;
+    final source = activeSource;
+    if (current == null || build == null || source == null) {
+      throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源未就绪');
+    }
+    final result = await runtime.invoke(
+      SourceRequest(
+        requestId: 'ui-${++_requestSequence}',
+        generation: current.generation,
+        packageId: build.packageName,
+        sourceId: source.id,
+        operation: operation,
+        arguments: args,
+      ),
+    );
+    if (_closed ||
+        epoch != _epoch ||
+        session?.generation != current.generation) {
+      throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源会话已失效');
+    }
+    return result.data;
+  }
+
+  Future<void> selectSource(SourceInfo source) async {
+    if (busy) return;
+    if (!(session?.sources.any((value) => value.id == source.id) ?? false)) {
+      return;
+    }
+    activeSource = source;
+    lastSourceId = source.id;
+    mangas = const [];
+    page = 0;
+    hasNextPage = false;
+    query = '';
+    listing = 'popular';
+    await loadMangas();
+  }
+
+  Future<void> loadMangas({
+    String? search,
+    String? operation,
+    bool more = false,
+  }) async {
+    await _perform('正在加载漫画', () async {
+      final selectedQuery = search ?? query;
+      final selectedListing =
+          operation ??
+          (search != null
+              ? (search.trim().isEmpty ? 'popular' : 'search')
+              : listing);
+      final selectedPage = more ? page + 1 : 1;
+      final result = await _invoke(selectedListing, {
+        'page': selectedPage,
+        if (selectedListing == 'search') 'query': selectedQuery,
+      });
+      final entries = _list(
+        result['mangas'],
+      ).map((value) => MangaEntry(_object(value))).toList();
+      if (result['hasNextPage'] is! bool) {
+        throw const FormatException('漫画分页数据格式无效');
+      }
+      if (_closed) return;
+      mangas = more ? [...mangas, ...entries] : entries;
+      page = selectedPage;
+      query = selectedQuery;
+      listing = selectedListing;
+      hasNextPage = result['hasNextPage'] == true;
+    });
+  }
+
+  Future<({MangaEntry manga, List<ChapterEntry> chapters})?> details(
+    MangaEntry manga,
+  ) => _perform('正在加载详情和章节', () async {
+    final detail = MangaEntry(
+      await _invoke('details', {'manga': manga.snapshot}),
+    );
+    final result = await _invoke('chapters', {'manga': detail.snapshot});
+    final chapters = _list(
+      result['chapters'],
+    ).map((value) => ChapterEntry(_object(value))).toList();
+    return (manga: detail, chapters: chapters);
+  });
+
+  @override
+  void dispose() {
+    _closed = true;
+    ++_epoch;
+    unawaited(_subscription.cancel());
+    super.dispose();
+  }
+}

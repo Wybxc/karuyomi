@@ -1,10 +1,16 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'features/browse/catalog_controller.dart';
+import 'features/browse/catalog_page.dart';
+import 'runtime/platform_runtime.dart';
 
 void main() => runApp(const KaruyomiApp());
 
 class KaruyomiApp extends StatefulWidget {
-  const KaruyomiApp({super.key});
+  const KaruyomiApp({super.key, this.platform});
+  final PlatformRuntime? platform;
 
   @override
   State<KaruyomiApp> createState() => _KaruyomiAppState();
@@ -35,6 +41,7 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
     home: AppShell(
       themeMode: _themeMode,
       onThemeChanged: (value) => setState(() => _themeMode = value),
+      platform: widget.platform,
     ),
   );
 }
@@ -44,10 +51,12 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.themeMode,
     required this.onThemeChanged,
+    this.platform,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeChanged;
+  final PlatformRuntime? platform;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -55,6 +64,13 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  PlatformRuntime? _platform;
+  CatalogController? _catalog;
+  String? _configurationError;
+  Map<String, Object?>? _pendingContinuation;
+  final _originField = TextEditingController(
+    text: const String.fromEnvironment('APP_ORIGIN'),
+  );
   static const _labels = ['书架', '浏览', '设置'];
   static const _icons = [
     Icons.collections_bookmark_outlined,
@@ -63,6 +79,122 @@ class _AppShellState extends State<AppShell> {
   ];
 
   void _select(int index) => setState(() => _index = index);
+
+  @override
+  void initState() {
+    super.initState();
+    _configure(widget.platform);
+  }
+
+  void _configure([PlatformRuntime? injected]) {
+    try {
+      final configured = _originField.text.trim();
+      _platform =
+          injected ??
+          createPlatformRuntime(
+            origin: configured.isEmpty ? null : Uri.parse(configured),
+          );
+      _originField.text = _platform!.origin.toString();
+      _catalog = CatalogController(
+        api: _platform!,
+        runtime: _platform!.runtime,
+      );
+      _configurationError = null;
+      final continuation = _platform!.takePendingAuthentication();
+      if (continuation?['pending'] case final Map pending) {
+        _pendingContinuation = Map<String, Object?>.from(pending);
+        final tab = pending['tab'];
+        if (tab is int && tab >= 0 && tab < 3) _index = tab;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(_connect(_pendingContinuation));
+      });
+    } on ArgumentError {
+      _configurationError = '请先在设置中填写服务的 HTTPS 地址。';
+    } catch (_) {
+      _configurationError = '服务初始化未完成，请在设置中重新连接。';
+    }
+  }
+
+  Future<void> _connect([Map<String, Object?>? continuation]) async {
+    final controller = _catalog;
+    if (controller == null) {
+      _select(2);
+      return;
+    }
+    await controller.connect();
+    if (!mounted ||
+        !identical(controller, _catalog) ||
+        controller.status != ServiceStatus.ready ||
+        continuation == null) {
+      return;
+    }
+    _pendingContinuation = null;
+    final buildId = continuation['buildId'];
+    final builds = controller.builds.where((build) => build.id == buildId);
+    if (builds.isEmpty) return;
+    await controller.openBuild(builds.first);
+    if (!mounted || !identical(controller, _catalog)) return;
+    final sourceId = continuation['sourceId'];
+    final sources = controller.session?.sources.where(
+      (source) => source.id == sourceId,
+    );
+    if (sources == null || sources.isEmpty) return;
+    await controller.selectSource(sources.first);
+    final query = continuation['query'];
+    if (query is String && query.isNotEmpty && controller.session != null) {
+      await controller.loadMangas(search: query);
+    }
+  }
+
+  Future<void> _authenticate() async {
+    final platform = _platform;
+    if (platform == null) {
+      _select(2);
+      return;
+    }
+    try {
+      final authenticated = await platform.authenticate(
+        context,
+        pending: {
+          ...?_pendingContinuation,
+          'tab': _index,
+          if (_catalog?.lastBuildId != null) 'buildId': _catalog!.lastBuildId,
+          if (_catalog?.lastSourceId != null)
+            'sourceId': _catalog!.lastSourceId,
+          if (_catalog?.query.isNotEmpty == true) 'query': _catalog!.query,
+        },
+      );
+      if (mounted && authenticated) {
+        final pending = platform.takePendingAuthentication()?['pending'];
+        await _connect(
+          pending is Map ? Map<String, Object?>.from(pending) : null,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('登录未完成，请重试。')));
+      }
+    }
+  }
+
+  Future<void> _changeService() async {
+    if (kIsWeb && _platform != null) {
+      await _platform!.rebuild();
+      if (mounted) await _connect();
+      return;
+    }
+    final old = _platform;
+    _catalog?.dispose();
+    _catalog = null;
+    _platform = null;
+    if (old != null) await old.dispose();
+    if (!mounted) return;
+    setState(_configure);
+  }
 
   Widget _page() => switch (_index) {
     0 => _EmptyState(
@@ -75,10 +207,11 @@ class _AppShellState extends State<AppShell> {
         label: const Text('去浏览'),
       ),
     ),
-    1 => const _EmptyState(
-      icon: Icons.travel_explore_outlined,
-      title: '尚未安装漫画源',
-      description: '接入漫画源后，可以在这里搜索和浏览。',
+    1 => CatalogPage(
+      controller: _catalog,
+      onConnect: () => unawaited(_connect()),
+      onAuthenticate: () => unawaited(_authenticate()),
+      configurationError: _configurationError,
     ),
     _ => Align(
       alignment: Alignment.topCenter,
@@ -87,6 +220,8 @@ class _AppShellState extends State<AppShell> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            _connectionSettings(),
+            const SizedBox(height: 24),
             DropdownButtonFormField<ThemeMode>(
               initialValue: widget.themeMode,
               decoration: const InputDecoration(
@@ -114,6 +249,57 @@ class _AppShellState extends State<AppShell> {
       ),
     ),
   };
+
+  Widget _connectionSettings() {
+    final controller = _catalog;
+    Widget content() => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('服务连接', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _originField,
+          readOnly: kIsWeb,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            labelText: '服务地址',
+            hintText: 'https://你的服务域名',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_configurationError != null) Text(_configurationError!),
+        if (controller?.email != null) Text('账号：${controller!.email}'),
+        if (controller?.error != null) Text(controller!.error!),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: controller?.busy == true ? null : _changeService,
+              icon: const Icon(Icons.link),
+              label: const Text('连接服务'),
+            ),
+            FilledButton.icon(
+              onPressed: _platform == null || controller?.busy == true
+                  ? null
+                  : _authenticate,
+              icon: const Icon(Icons.login),
+              label: const Text('登录'),
+            ),
+          ],
+        ),
+      ],
+    );
+    return controller == null
+        ? content()
+        : AnimatedBuilder(
+            animation: controller,
+            builder: (context, _) => content(),
+          );
+  }
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -159,6 +345,14 @@ class _AppShellState extends State<AppShell> {
       );
     },
   );
+
+  @override
+  void dispose() {
+    _catalog?.dispose();
+    unawaited(_platform?.dispose());
+    _originField.dispose();
+    super.dispose();
+  }
 }
 
 class _EmptyState extends StatelessWidget {

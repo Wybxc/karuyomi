@@ -12,3 +12,7 @@ packages/reader_core
 packages/source_runtime
 **/generated.*
 apps/api/worker-configuration.d.ts
+runtime/teavm/upstream
+runtime/teavm/bridge
+runtime/teavm/.local
+runtime/teavm/upstream-manifest.json
