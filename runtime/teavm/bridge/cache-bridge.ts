@@ -21,6 +21,22 @@ const MAX_CACHE = 64 * 1024 * 1024,
   MAX_HANDLES = 64,
   MAX_CHUNKS = 8192,
   TIMEOUT = 5000;
+const limits = {
+  allocatedBytes: 128 * 1024 * 1024,
+  metadataBytes: 4 * 1024 * 1024,
+  directories: 32,
+  entries: 4096,
+  bodies: 4224,
+  chunks: 16384,
+  readers: 64,
+  editors: 64,
+  owners: 32,
+} as const;
+type Reservation = { -readonly [K in keyof typeof limits]: number };
+interface Usage extends Reservation {
+  namespace: string;
+  sequence: number;
+}
 const operations = [
   'get',
   'begin',
@@ -63,6 +79,7 @@ type EntryKey = [string, string, string];
 type ChunkKey = [string, string, string, number];
 interface Entry {
   key: EntryKey;
+  namespace: string;
   directory: StorageKey;
   url: string;
   metadata: unknown;
@@ -76,6 +93,7 @@ interface Body {
   key: EntryKey;
   bytes: number;
   chunks: number;
+  chunkMetadataBytes: number;
   current: boolean;
   staging: boolean;
   pins: number;
@@ -85,6 +103,7 @@ interface Editor {
   directory: StorageKey;
   url: string;
   worker: string;
+  namespace: string;
   handle: string;
   expected: string | null;
   generation: number;
@@ -97,6 +116,7 @@ interface Reader {
   id: string;
   directory: StorageKey;
   worker: string;
+  namespace: string;
   handle: string;
   body: string;
   index: number;
@@ -104,11 +124,20 @@ interface Reader {
   received: number;
 }
 export interface CacheSchema extends DBSchema {
+  usage: { key: string; value: Usage };
+  owners: {
+    key: StorageKey;
+    value: { key: StorageKey; namespace: string };
+    indexes: { byNamespace: string };
+  };
   directories: { key: StorageKey; value: Directory };
   entries: {
     key: EntryKey;
     value: Entry;
-    indexes: { byAccess: [StorageKey, number] };
+    indexes: {
+      byAccess: [StorageKey, number];
+      byNamespaceAccess: [string, number];
+    };
   };
   bodies: { key: EntryKey; value: Body };
   chunks: { key: ChunkKey; value: Uint8Array };
@@ -119,15 +148,22 @@ export interface CacheSchema extends DBSchema {
       byEntry: [StorageKey, string];
       byDirectory: StorageKey;
       byWorker: [StorageKey, string];
+      byNamespaceWorker: [string, string];
     };
   };
   readers: {
     key: string;
     value: Reader;
-    indexes: { byDirectory: StorageKey; byWorker: [StorageKey, string] };
+    indexes: {
+      byDirectory: StorageKey;
+      byWorker: [StorageKey, string];
+      byNamespaceWorker: [string, string];
+    };
   };
 }
 type Stores = [
+  'usage',
+  'owners',
   'directories',
   'entries',
   'bodies',
@@ -136,6 +172,8 @@ type Stores = [
   'readers',
 ];
 const stores: Stores = [
+  'usage',
+  'owners',
   'directories',
   'entries',
   'bodies',
@@ -146,12 +184,26 @@ const stores: Stores = [
 type CacheTx = IDBPTransaction<CacheSchema, Stores, 'readwrite'>;
 type Database = IDBPDatabase<CacheSchema>;
 class CacheCapacityError extends Error {}
+interface Context {
+  tx: CacheTx;
+  usage: Usage;
+  states: Map<string, Directory>;
+  persisted: Set<string>;
+}
 
 interface Attempt {
   valid: boolean;
 }
 const pendingBegins = new Map<string, Set<Attempt>>(),
   pendingReads = new Map<string, Set<Attempt>>();
+// Only ordinary data/ref creation is admitted here. Terminal cleanup bypasses
+// this window: Java closes once, so refusing its ACK could strand a live pin.
+let ordinaryPending = 0;
+function admit() {
+  if (ordinaryPending >= 4) return false;
+  ordinaryPending++;
+  return true;
+}
 function register(map: Map<string, Set<Attempt>>, key: string): Attempt {
   const attempt = { valid: true },
     attempts = map.get(key) ?? new Set<Attempt>();
@@ -176,19 +228,33 @@ const sameDirectory = (a: StorageKey, b: StorageKey) =>
 function jsonSize(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value)).length;
 }
+function boundedText(value: string, maximum: number) {
+  if (new TextEncoder().encode(value).length > maximum)
+    throw Error('Cache identifier exceeds its UTF-8 budget');
+  return value;
+}
 export function parseCacheRequest(value: unknown): CacheRequest {
   const data = object(value),
     operation = operations.find((item) => item === data.operation);
   if (!operation) throw Error('Unknown browser cache operation');
   return {
     operation,
-    directory: text(data.directory),
+    directory: boundedText(text(data.directory), 4096),
     maxSize: integer(data.maxSize, 1),
-    url: optionalText(data.url) ?? '',
-    handle: optionalText(data.handle) ?? '',
-    editor: optionalText(data.editor),
-    reader: optionalText(data.reader),
-    expected: optionalText(data.expected) ?? null,
+    url: boundedText(optionalText(data.url) ?? '', 16384),
+    handle: boundedText(optionalText(data.handle) ?? '', 256),
+    editor:
+      data.editor === undefined
+        ? undefined
+        : boundedText(text(data.editor), 256),
+    reader:
+      data.reader === undefined
+        ? undefined
+        : boundedText(text(data.reader), 256),
+    expected:
+      data.expected === undefined || data.expected === null
+        ? null
+        : boundedText(text(data.expected), 256),
     generation: data.generation === undefined ? 0 : integer(data.generation),
     metadata:
       operation === 'begin' || operation === 'update'
@@ -198,10 +264,11 @@ export function parseCacheRequest(value: unknown): CacheRequest {
   };
 }
 const scope = workerScope();
-const namespace =
+const requestedNamespace =
   scope.karuyomiWorkerContext?.plugin ||
   new URL(location.href).searchParams.get('plugin');
-if (!namespace) throw Error('Runtime cache namespace is required');
+if (!requestedNamespace) throw Error('Runtime cache namespace is required');
+const namespace = boundedText(requestedNamespace, 256);
 const workerId = crypto.randomUUID();
 const lifetimeName = (worker: string) =>
   'teavm-http-cache:' + JSON.stringify([namespace, worker]);
@@ -224,21 +291,27 @@ function holdLifetime(): Promise<void> {
 }
 let opening: Promise<Database> | undefined;
 const open = () =>
-  (opening ??= openDB<CacheSchema>('teavm-http-cache-v2', 1, {
+  (opening ??= openDB<CacheSchema>('teavm-http-cache-v3', 1, {
     upgrade(database) {
-      database.createObjectStore('directories', { keyPath: 'key' });
+      database.createObjectStore('usage', { keyPath: 'namespace' });
       database
-        .createObjectStore('entries', { keyPath: 'key' })
-        .createIndex('byAccess', ['directory', 'access']);
+        .createObjectStore('owners', { keyPath: 'key' })
+        .createIndex('byNamespace', 'namespace');
+      database.createObjectStore('directories', { keyPath: 'key' });
+      const entries = database.createObjectStore('entries', { keyPath: 'key' });
+      entries.createIndex('byAccess', ['directory', 'access']);
+      entries.createIndex('byNamespaceAccess', ['namespace', 'access']);
       database.createObjectStore('bodies', { keyPath: 'key' });
       database.createObjectStore('chunks');
       const editors = database.createObjectStore('editors', { keyPath: 'id' });
       editors.createIndex('byEntry', ['directory', 'url'], { unique: true });
       editors.createIndex('byDirectory', 'directory');
       editors.createIndex('byWorker', ['directory', 'worker']);
+      editors.createIndex('byNamespaceWorker', ['namespace', 'worker']);
       const readers = database.createObjectStore('readers', { keyPath: 'id' });
       readers.createIndex('byDirectory', 'directory');
       readers.createIndex('byWorker', ['directory', 'worker']);
+      readers.createIndex('byNamespaceWorker', ['namespace', 'worker']);
     },
     blocking() {
       void opening?.then((database) => database.close());
@@ -252,10 +325,111 @@ const open = () =>
     throw error;
   }));
 
-/** Short atomic storage operations; the callback awaits only IDB requests. */
+/** Conservative logical structure reservation, including primary/index keys.
+ * Numbers/booleans have a fixed allowance: advancing a reader cannot allocate
+ * metadata merely because a cursor acquired another decimal digit. Payload
+ * metadata and binary values are accounted separately in allocatedBytes. */
+function structure(...values: unknown[]) {
+  return 192 + values.reduce<number>((sum, value) => sum + jsonSize(value), 0);
+}
+const directoryCharge = (row: Directory) => structure(row.key, row.key);
+const entryCharge = (row: Entry) =>
+  structure(
+    {
+      key: row.key,
+      namespace: row.namespace,
+      directory: row.directory,
+      url: row.url,
+      body: row.body,
+      version: row.version,
+    },
+    row.key,
+    [row.directory, 0],
+    [row.namespace, 0],
+  );
+const bodyCharge = (row: Body) => structure(row.key, row.key);
+const editorCharge = (row: Editor) =>
+  structure(
+    {
+      id: row.id,
+      namespace: row.namespace,
+      directory: row.directory,
+      url: row.url,
+      worker: row.worker,
+      handle: row.handle,
+      expected: row.expected,
+      body: row.body,
+    },
+    row.id,
+    [row.directory, row.url],
+    row.directory,
+    [row.directory, row.worker],
+    [row.namespace, row.worker],
+  );
+const readerCharge = (row: Reader) =>
+  structure(
+    {
+      id: row.id,
+      namespace: row.namespace,
+      directory: row.directory,
+      worker: row.worker,
+      handle: row.handle,
+      body: row.body,
+    },
+    row.id,
+    row.directory,
+    [row.directory, row.worker],
+    [row.namespace, row.worker],
+  );
+const ownerCharge = (key: StorageKey) => structure(key, key, key[0]);
+// Chunks have a binary value and one out-of-line primary key, no value-side key
+// or secondary index. This also permits 128 MiB in ordinary 8 KiB writes within
+// the independent 4 MiB structure reservation for typical short directories.
+const chunkCharge = (key: ChunkKey) => 64 + jsonSize(key);
+function emptyUsage(): Usage {
+  return {
+    namespace,
+    sequence: 0,
+    allocatedBytes: 0,
+    metadataBytes: structure(namespace, namespace),
+    directories: 0,
+    entries: 0,
+    bodies: 0,
+    chunks: 0,
+    readers: 0,
+    editors: 0,
+    owners: 0,
+  };
+}
+function fits(usage: Usage, extra: Partial<Reservation> = {}) {
+  return (Object.keys(limits) as (keyof Reservation)[]).every(
+    (key) => usage[key] + (extra[key] ?? 0) <= limits[key],
+  );
+}
+function assertUsage(usage: Usage) {
+  for (const key of Object.keys(limits) as (keyof Reservation)[]) {
+    if (!Number.isSafeInteger(usage[key]) || usage[key] < 0)
+      throw Error('Invalid cache namespace ledger: ' + key);
+  }
+  if (!Number.isSafeInteger(usage.sequence) || usage.sequence < 0)
+    throw Error('Invalid cache LRU sequence');
+  if (!fits(usage))
+    throw new CacheCapacityError('Cache namespace reservation exhausted');
+}
+function allocated(context: Context, state: Directory, delta: number) {
+  state.allocatedBytes += delta;
+  context.usage.allocatedBytes += delta;
+}
+function sequence(context: Context) {
+  if (context.usage.sequence === Number.MAX_SAFE_INTEGER)
+    throw new CacheCapacityError('Cache LRU sequence exhausted');
+  return ++context.usage.sequence;
+}
+/** Short atomic storage operations; the callback awaits only IDB requests.
+ * The ledger and all affected directories commit before the caller receives ACK. */
 async function transaction<T>(
   database: Database,
-  action: (tx: CacheTx) => Promise<T>,
+  action: (context: Context) => Promise<T>,
 ): Promise<T> {
   const tx = database.transaction(stores, 'readwrite');
   const settled = tx.done.then(
@@ -272,8 +446,31 @@ async function transaction<T>(
     }
   }, TIMEOUT);
   try {
-    const value = await action(tx),
-      outcome = await settled;
+    const usage =
+      (await tx.objectStore('usage').get(namespace)) ?? emptyUsage();
+    assertUsage(usage);
+    const context: Context = {
+      tx,
+      usage,
+      states: new Map(),
+      persisted: new Set(),
+    };
+    const value = await action(context);
+    assertUsage(usage);
+    for (const [directory, state] of context.states) {
+      if (!context.persisted.has(directory)) continue;
+      if (
+        !Number.isSafeInteger(state.allocatedBytes) ||
+        state.allocatedBytes < 0 ||
+        !Number.isSafeInteger(state.visibleBytes) ||
+        state.visibleBytes < 0 ||
+        state.visibleBytes > state.allocatedBytes
+      )
+        throw Error('Invalid cache directory ledger');
+      await tx.objectStore('directories').put(state);
+    }
+    await tx.objectStore('usage').put(usage);
+    const outcome = await settled;
     if (timedOut) throw Error('Cache storage transaction timed out');
     if (!outcome.passed) throw outcome.error;
     return value;
@@ -290,20 +487,33 @@ async function transaction<T>(
   }
 }
 async function stateFor(
-  tx: CacheTx,
+  context: Context,
   owner: StorageKey,
   maxSize?: number,
 ): Promise<Directory> {
-  const state = (await tx.objectStore('directories').get(owner)) ?? {
-    key: owner,
-    sequence: 0,
-    generation: 0,
-    visibleBytes: 0,
-    allocatedBytes: 0,
-    limit: Math.min(maxSize ?? MAX_CACHE, MAX_CACHE),
-  };
+  let state = context.states.get(owner[1]);
+  if (!state) {
+    state = await context.tx.objectStore('directories').get(owner);
+    if (state) context.persisted.add(owner[1]);
+    else
+      state = {
+        key: owner,
+        sequence: 0,
+        generation: 0,
+        visibleBytes: 0,
+        allocatedBytes: 0,
+        limit: Math.min(maxSize ?? MAX_CACHE, MAX_CACHE),
+      };
+    context.states.set(owner[1], state);
+  }
   if (maxSize !== undefined) state.limit = Math.min(maxSize, MAX_CACHE);
   return state;
+}
+function ensureDirectory(context: Context, state: Directory) {
+  if (context.persisted.has(state.key[1])) return;
+  context.persisted.add(state.key[1]);
+  context.usage.directories++;
+  context.usage.metadataBytes += directoryCharge(state);
 }
 const bodyKey = (owner: StorageKey, body: string): EntryKey => [...owner, body];
 const entryKey = (owner: StorageKey, url: string): EntryKey => [...owner, url];
@@ -312,56 +522,116 @@ const chunkRange = (owner: StorageKey, body: string) =>
     [...owner, body, 0],
     [...owner, body, Number.MAX_SAFE_INTEGER],
   );
-async function collectBody(tx: CacheTx, state: Directory, body: Body) {
+async function addOwner(context: Context, worker: string) {
+  const key: StorageKey = [namespace, worker],
+    owners = context.tx.objectStore('owners');
+  if (await owners.get(key)) return;
+  await owners.add({ key, namespace });
+  context.usage.owners++;
+  context.usage.metadataBytes += ownerCharge(key);
+}
+async function releaseOwner(context: Context, worker: string) {
+  const { tx, usage } = context,
+    key: StorageKey = [namespace, worker];
+  if (
+    (await tx.objectStore('editors').index('byNamespaceWorker').count(key)) ||
+    (await tx.objectStore('readers').index('byNamespaceWorker').count(key))
+  )
+    return;
+  if (!(await tx.objectStore('owners').get(key))) return;
+  await tx.objectStore('owners').delete(key);
+  usage.owners--;
+  usage.metadataBytes -= ownerCharge(key);
+}
+async function removeEditor(context: Context, editor: Editor) {
+  await context.tx.objectStore('editors').delete(editor.id);
+  context.usage.editors--;
+  context.usage.metadataBytes -= editorCharge(editor);
+  await releaseOwner(context, editor.worker);
+}
+async function collectBody(context: Context, state: Directory, body: Body) {
+  const { tx, usage } = context;
   if (body.current || body.staging || body.pins) {
     await tx.objectStore('bodies').put(body);
     return;
   }
   await tx.objectStore('chunks').delete(chunkRange(state.key, body.key[2]));
   await tx.objectStore('bodies').delete(body.key);
-  state.allocatedBytes -= body.bytes;
+  allocated(context, state, -body.bytes);
+  usage.bodies--;
+  usage.chunks -= body.chunks;
+  // The reservation belongs to the committed body, not possibly corrupt values.
+  usage.metadataBytes -= bodyCharge(body) + body.chunkMetadataBytes;
 }
-async function detachEntry(tx: CacheTx, state: Directory, row: Entry) {
+async function detachEntry(context: Context, state: Directory, row: Entry) {
+  const { tx, usage } = context;
   await tx.objectStore('entries').delete(row.key);
+  usage.entries--;
+  usage.metadataBytes -= entryCharge(row);
   state.visibleBytes -= row.metadataBytes + row.bytes;
-  state.allocatedBytes -= row.metadataBytes;
+  allocated(context, state, -row.metadataBytes);
   const body = await tx.objectStore('bodies').get(bodyKey(state.key, row.body));
   if (!body) throw Error('Missing cache entry body');
   body.current = false;
-  await collectBody(tx, state, body);
+  await collectBody(context, state, body);
 }
-async function abortEditor(tx: CacheTx, state: Directory, editor: Editor) {
-  await tx.objectStore('editors').delete(editor.id);
-  state.allocatedBytes -= editor.metadataBytes;
-  const body = await tx
+async function abortEditor(context: Context, state: Directory, editor: Editor) {
+  await removeEditor(context, editor);
+  allocated(context, state, -editor.metadataBytes);
+  const body = await context.tx
     .objectStore('bodies')
     .get(bodyKey(state.key, editor.body));
   if (!body) throw Error('Missing cache staging body');
   body.staging = false;
-  await collectBody(tx, state, body);
+  await collectBody(context, state, body);
 }
-async function closeReader(tx: CacheTx, state: Directory, reader: Reader) {
+async function closeReader(context: Context, state: Directory, reader: Reader) {
+  const { tx, usage } = context;
   await tx.objectStore('readers').delete(reader.id);
+  usage.readers--;
+  usage.metadataBytes -= readerCharge(reader);
+  await releaseOwner(context, reader.worker);
   const body = await tx
     .objectStore('bodies')
     .get(bodyKey(state.key, reader.body));
   if (!body || body.pins < 1) throw Error('Missing cache reader snapshot');
   body.pins--;
-  await collectBody(tx, state, body);
+  await collectBody(context, state, body);
 }
 const accessRange = (owner: StorageKey) =>
   IDBKeyRange.bound([owner, 0], [owner, Number.MAX_SAFE_INTEGER]);
+async function evictable(
+  context: Context,
+  row: Entry,
+  owner: StorageKey,
+  protectedUrl: string,
+) {
+  return (
+    !(sameDirectory(row.directory, owner) && row.url === protectedUrl) &&
+    !(await context.tx
+      .objectStore('editors')
+      .index('byEntry')
+      .get([row.directory, row.url]))
+  );
+}
 async function makeSpace(
-  tx: CacheTx,
+  context: Context,
   state: Directory,
   bytes: number,
   protectedUrl: string,
   trimVisible = false,
+  extra: Partial<Reservation> = {},
 ): Promise<boolean> {
-  let cursor = await tx
-    .objectStore('entries')
-    .index('byAccess')
-    .openCursor(accessRange(state.key));
+  const { tx, usage } = context;
+  const localPressure = trimVisible
+    ? state.visibleBytes > state.limit
+    : state.allocatedBytes + bytes > state.limit * 2;
+  let cursor = localPressure
+    ? await tx
+        .objectStore('entries')
+        .index('byAccess')
+        .openCursor(accessRange(state.key))
+    : null;
   while (
     cursor &&
     (trimVisible
@@ -369,58 +639,76 @@ async function makeSpace(
       : state.allocatedBytes + bytes > state.limit * 2)
   ) {
     const row = cursor.value;
-    if (
-      row.url !== protectedUrl &&
-      !(await tx
-        .objectStore('editors')
-        .index('byEntry')
-        .get([state.key, row.url]))
-    )
-      await detachEntry(tx, state, row);
+    if (await evictable(context, row, state.key, protectedUrl))
+      await detachEntry(context, state, row);
     cursor = await cursor.continue();
   }
-  return trimVisible
-    ? state.visibleBytes <= state.limit
-    : state.allocatedBytes + bytes <= state.limit * 2;
+  if (trimVisible) return state.visibleBytes <= state.limit;
+  const reservation = { ...extra, allocatedBytes: bytes };
+  if (fits(usage, reservation))
+    return state.allocatedBytes + bytes <= state.limit * 2;
+  // Namespace LRU: a cold directory must not permanently consume another one's
+  // budget. Pinned snapshots remain charged after detaching their current entry.
+  let global = await tx
+    .objectStore('entries')
+    .index('byNamespaceAccess')
+    .openCursor(
+      IDBKeyRange.bound([namespace, 0], [namespace, Number.MAX_SAFE_INTEGER]),
+    );
+  while (global && !fits(usage, reservation)) {
+    const row = global.value;
+    if (await evictable(context, row, state.key, protectedUrl))
+      await detachEntry(context, await stateFor(context, row.directory), row);
+    global = await global.continue();
+  }
+  return (
+    fits(usage, reservation) && state.allocatedBytes + bytes <= state.limit * 2
+  );
 }
-/** Web Lock probes never keep an IDB transaction alive. */
-async function reclaimEditors(database: Database, owner: StorageKey) {
-  const lookup = database.transaction(['editors', 'readers'], 'readonly');
-  const [editors, readers] = await Promise.all([
-    lookup.objectStore('editors').index('byDirectory').getAll(owner),
-    lookup.objectStore('readers').index('byDirectory').getAll(owner),
-  ]);
-  await lookup.done;
-  const workers = new Set(
-    [...editors, ...readers]
-      .map((item) => item.worker)
-      .filter((worker) => worker !== workerId),
+/** Namespace-wide Web Lock probes never keep an IDB transaction alive.
+ * Ordinary binary read/write uses direct lookups, not this bounded owner scan. */
+async function reclaimEditors(database: Database) {
+  const workers = await database.getAllFromIndex(
+    'owners',
+    'byNamespace',
+    namespace,
   );
   await Promise.all(
-    [...workers].map((worker) =>
-      navigator.locks.request(
-        lifetimeName(worker),
-        { ifAvailable: true },
-        async (lock) => {
-          if (!lock) return;
-          await transaction(database, async (tx) => {
-            const state = await stateFor(tx, owner),
-              key: [StorageKey, string] = [owner, worker];
-            for (const editor of await tx
-              .objectStore('editors')
-              .index('byWorker')
-              .getAll(key))
-              await abortEditor(tx, state, editor);
-            for (const reader of await tx
-              .objectStore('readers')
-              .index('byWorker')
-              .getAll(key))
-              await closeReader(tx, state, reader);
-            await tx.objectStore('directories').put(state);
-          });
-        },
+    workers
+      .filter((row) => row.key[1] !== workerId)
+      .map((row) =>
+        navigator.locks.request(
+          lifetimeName(row.key[1]),
+          { ifAvailable: true },
+          async (lock) => {
+            if (!lock) return;
+            await transaction(database, async (context) => {
+              const { tx } = context,
+                worker = row.key[1],
+                key: StorageKey = [namespace, worker];
+              for (const editor of await tx
+                .objectStore('editors')
+                .index('byNamespaceWorker')
+                .getAll(key))
+                await abortEditor(
+                  context,
+                  await stateFor(context, editor.directory),
+                  editor,
+                );
+              for (const reader of await tx
+                .objectStore('readers')
+                .index('byNamespaceWorker')
+                .getAll(key))
+                await closeReader(
+                  context,
+                  await stateFor(context, reader.directory),
+                  reader,
+                );
+              await releaseOwner(context, worker);
+            });
+          },
+        ),
       ),
-    ),
   );
 }
 async function releaseFailedEditor(
@@ -430,19 +718,17 @@ async function releaseFailedEditor(
   handle: string,
   generation: number,
 ) {
-  await transaction(database, async (tx) => {
-    const state = await stateFor(tx, owner),
-      editor = await tx.objectStore('editors').get(id);
+  await transaction(database, async (context) => {
+    const state = await stateFor(context, owner),
+      editor = await context.tx.objectStore('editors').get(id);
     if (
       state.generation === generation &&
       editor?.worker === workerId &&
       editor.handle === handle &&
       editor.generation === generation &&
       sameDirectory(editor.directory, owner)
-    ) {
-      await abortEditor(tx, state, editor);
-      await tx.objectStore('directories').put(state);
-    }
+    )
+      await abortEditor(context, state, editor);
   });
 }
 /** Java closes its handle before awaiting storage, so failure must release it too. */
@@ -451,14 +737,13 @@ async function releaseClosedHandle(
   owner: StorageKey,
   handle: string,
 ) {
-  await transaction(database, async (tx) => {
-    const state = await stateFor(tx, owner);
-    for (const editor of await tx
+  await transaction(database, async (context) => {
+    const state = await stateFor(context, owner);
+    for (const editor of await context.tx
       .objectStore('editors')
       .index('byWorker')
       .getAll([owner, workerId]))
-      if (editor.handle === handle) await abortEditor(tx, state, editor);
-    await tx.objectStore('directories').put(state);
+      if (editor.handle === handle) await abortEditor(context, state, editor);
   });
 }
 /** Java releases a snapshot once; a failed close must not strand its body pin. */
@@ -468,17 +753,15 @@ async function releaseFailedReader(
   id: string,
   handle: string,
 ) {
-  await transaction(database, async (tx) => {
-    const reader = await tx.objectStore('readers').get(id);
+  await transaction(database, async (context) => {
+    const reader = await context.tx.objectStore('readers').get(id);
     if (
       reader?.worker === workerId &&
       reader.handle === handle &&
       sameDirectory(reader.directory, owner)
     ) {
       invalidate(pendingReads, reader.id);
-      const state = await stateFor(tx, owner);
-      await closeReader(tx, state, reader);
-      await tx.objectStore('directories').put(state);
+      await closeReader(context, await stateFor(context, owner), reader);
     }
   });
 }
@@ -488,8 +771,9 @@ async function control(
   database: Database,
   owner: StorageKey,
 ): Promise<Record<string, unknown>> {
-  return transaction(database, async (tx) => {
-    const state = await stateFor(tx, owner, request.maxSize),
+  return transaction(database, async (context) => {
+    const { tx, usage } = context;
+    const state = await stateFor(context, owner, request.maxSize),
       entries = tx.objectStore('entries'),
       editors = tx.objectStore('editors'),
       readers = tx.objectStore('readers');
@@ -499,8 +783,7 @@ async function control(
     switch (request.operation) {
       case 'get':
         if (row) {
-          if ((await readers.index('byDirectory').count(owner)) >= MAX_HANDLES)
-            break;
+          if (usage.readers >= MAX_HANDLES) break;
           const body = await tx
             .objectStore('bodies')
             .get(bodyKey(owner, row.body));
@@ -512,12 +795,9 @@ async function control(
           )
             throw Error('Invalid cache snapshot body');
           const reader = crypto.randomUUID();
-          body.pins++;
-          row.access = ++state.sequence;
-          await tx.objectStore('bodies').put(body);
-          await entries.put(row);
-          await readers.add({
+          const record: Reader = {
             id: reader,
+            namespace,
             directory: owner,
             worker: workerId,
             handle: request.handle,
@@ -525,7 +805,16 @@ async function control(
             index: 0,
             offset: 0,
             received: 0,
-          });
+          };
+          await addOwner(context, workerId);
+          usage.readers++;
+          usage.metadataBytes += readerCharge(record);
+          assertUsage(usage);
+          body.pins++;
+          row.access = sequence(context);
+          await tx.objectStore('bodies').put(body);
+          await entries.put(row);
+          await readers.add(record);
           result = {
             entry: {
               metadata: row.metadata,
@@ -546,30 +835,25 @@ async function control(
             metadataBytes > state.limit ||
             request.length > state.limit - metadataBytes ||
             (await editors.index('byEntry').get([owner, request.url])) ||
-            (await editors.index('byDirectory').count(owner)) >= MAX_HANDLES
-          ) {
-            result = { accepted: false };
-            break;
-          }
-          if (
-            !(await makeSpace(tx, state, metadataBytes, request.url)) ||
-            !attempt.valid
+            usage.editors >= MAX_HANDLES
           ) {
             result = { accepted: false };
             break;
           }
           const id = crypto.randomUUID(),
             body = crypto.randomUUID();
-          await tx.objectStore('bodies').add({
+          const bodyRecord: Body = {
             key: bodyKey(owner, body),
             bytes: 0,
             chunks: 0,
+            chunkMetadataBytes: 0,
             current: false,
             staging: true,
             pins: 0,
-          });
-          await editors.add({
+          };
+          const editor: Editor = {
             id,
+            namespace,
             directory: owner,
             url: request.url,
             worker: workerId,
@@ -580,8 +864,31 @@ async function control(
             metadataBytes,
             body,
             length: request.length,
-          });
-          state.allocatedBytes += metadataBytes;
+          };
+          ensureDirectory(context, state);
+          await addOwner(context, workerId);
+          if (
+            !(await makeSpace(
+              context,
+              state,
+              metadataBytes,
+              request.url,
+              false,
+              {
+                bodies: 1,
+                editors: 1,
+                metadataBytes: bodyCharge(bodyRecord) + editorCharge(editor),
+              },
+            )) ||
+            !attempt.valid
+          )
+            throw new CacheCapacityError('Cache cannot reserve an editor');
+          await tx.objectStore('bodies').add(bodyRecord);
+          await editors.add(editor);
+          usage.bodies++;
+          usage.editors++;
+          usage.metadataBytes += bodyCharge(bodyRecord) + editorCharge(editor);
+          allocated(context, state, metadataBytes);
           result = {
             accepted: true,
             editor: id,
@@ -617,16 +924,17 @@ async function control(
             body.bytes + editor.metadataBytes > state.limit ||
             (editor.length >= 0 && editor.length !== body.bytes)
           ) {
-            await abortEditor(tx, state, editor);
+            await abortEditor(context, state, editor);
             result = { committed: false };
             break;
           }
-          if (row) await detachEntry(tx, state, row);
+          if (row) await detachEntry(context, state, row);
           body.staging = false;
           body.current = true;
           await tx.objectStore('bodies').put(body);
           const entry: Entry = {
             key,
+            namespace,
             directory: owner,
             url: request.url,
             metadata: editor.metadata,
@@ -634,12 +942,21 @@ async function control(
             body: editor.body,
             bytes: body.bytes,
             version: crypto.randomUUID(),
-            access: ++state.sequence,
+            access: sequence(context),
           };
+          await removeEditor(context, editor);
+          if (
+            !(await makeSpace(context, state, 0, request.url, false, {
+              entries: 1,
+              metadataBytes: entryCharge(entry),
+            }))
+          )
+            throw new CacheCapacityError('Cache cannot reserve an entry');
           await entries.put(entry);
-          await editors.delete(editor.id);
+          usage.entries++;
+          usage.metadataBytes += entryCharge(entry);
           state.visibleBytes += body.bytes + editor.metadataBytes;
-          if (!(await makeSpace(tx, state, 0, request.url, true)))
+          if (!(await makeSpace(context, state, 0, request.url, true)))
             throw new CacheCapacityError(
               'Cache visible budget is pinned by active editors',
             );
@@ -657,7 +974,7 @@ async function control(
             state.generation !== request.generation ||
             row.bytes + metadataBytes > state.limit ||
             !(await makeSpace(
-              tx,
+              context,
               state,
               Math.max(0, metadataBytes - row.metadataBytes),
               request.url,
@@ -667,13 +984,13 @@ async function control(
             break;
           }
           state.visibleBytes += metadataBytes - row.metadataBytes;
-          state.allocatedBytes += metadataBytes - row.metadataBytes;
+          allocated(context, state, metadataBytes - row.metadataBytes);
           row.metadata = request.metadata;
           row.metadataBytes = metadataBytes;
           row.version = crypto.randomUUID();
-          row.access = ++state.sequence;
+          row.access = sequence(context);
           await entries.put(row);
-          if (!(await makeSpace(tx, state, 0, request.url, true)))
+          if (!(await makeSpace(context, state, 0, request.url, true)))
             throw new CacheCapacityError(
               'Cache visible budget is pinned by active editors',
             );
@@ -685,8 +1002,8 @@ async function control(
           const editor = await editors
             .index('byEntry')
             .get([owner, request.url]);
-          if (editor) await abortEditor(tx, state, editor);
-          if (row) await detachEntry(tx, state, row);
+          if (editor) await abortEditor(context, state, editor);
+          if (row) await detachEntry(context, state, row);
         }
         break;
       case 'abort':
@@ -700,7 +1017,7 @@ async function control(
             editor.url === request.url &&
             sameDirectory(editor.directory, owner)
           )
-            await abortEditor(tx, state, editor);
+            await abortEditor(context, state, editor);
         }
         break;
       case 'reader-close':
@@ -714,7 +1031,7 @@ async function control(
             sameDirectory(reader.directory, owner)
           ) {
             invalidate(pendingReads, reader.id);
-            await closeReader(tx, state, reader);
+            await closeReader(context, state, reader);
           }
         }
         break;
@@ -723,28 +1040,37 @@ async function control(
           .index('byWorker')
           .getAll([owner, workerId]))
           if (editor.handle === request.handle)
-            await abortEditor(tx, state, editor);
+            await abortEditor(context, state, editor);
         break;
       case 'clear':
       case 'delete':
         for (const editor of await editors.index('byDirectory').getAll(owner))
-          await abortEditor(tx, state, editor);
+          await abortEditor(context, state, editor);
         for (const entry of await entries
           .index('byAccess')
           .getAll(accessRange(owner)))
-          await detachEntry(tx, state, entry);
+          await detachEntry(context, state, entry);
         state.generation++;
         break;
-      case 'urls':
-        result = {
-          urls: (
-            await entries.index('byAccess').getAll(accessRange(owner))
-          ).map((entry) => entry.url),
-        };
+      case 'urls': {
+        const urls: string[] = [];
+        let length = 16;
+        for await (const cursor of entries
+          .index('byAccess')
+          .iterate(accessRange(owner))) {
+          length += jsonSize(cursor.value.url) + 1;
+          if (length > CONTROL) throw Error('Cache URL list exceeds 64 KiB');
+          urls.push(cursor.value.url);
+        }
+        result = { urls };
         break;
+      }
       case 'initialize':
+        ensureDirectory(context, state);
+        await makeSpace(context, state, 0, '', true);
+        break;
       case 'flush':
-        await makeSpace(tx, state, 0, '', true);
+        await makeSpace(context, state, 0, '', true);
         break;
       case 'size':
         result = {
@@ -753,7 +1079,6 @@ async function control(
         };
         break;
     }
-    await tx.objectStore('directories').put(state);
     return result;
   });
 }
@@ -765,6 +1090,11 @@ const cacheBridge = async (input: string): Promise<string> => {
     throw Error('Cache control exceeds 64 KiB');
   const request = parseCacheRequest(JSON.parse(input) as unknown),
     handle = JSON.stringify([request.directory, request.handle]);
+  const ordinary = request.operation === 'get' || request.operation === 'begin';
+  if (ordinary && !admit())
+    return JSON.stringify(
+      request.operation === 'get' ? {} : { accepted: false },
+    );
   const attempt =
     request.operation === 'begin' ? register(pendingBegins, handle) : undefined;
   if (request.operation === 'close' || request.operation === 'delete')
@@ -775,7 +1105,12 @@ const cacheBridge = async (input: string): Promise<string> => {
       owner: StorageKey = [namespace, request.directory];
     let result: Record<string, unknown>;
     try {
-      await reclaimEditors(database, owner);
+      if (
+        request.operation !== 'close' &&
+        request.operation !== 'reader-close' &&
+        request.operation !== 'abort'
+      )
+        await reclaimEditors(database);
       result = await control(request, attempt, database, owner);
     } catch (error) {
       if (request.operation === 'commit' && request.editor) {
@@ -819,7 +1154,18 @@ const cacheBridge = async (input: string): Promise<string> => {
           );
         }
       }
-      if (error instanceof CacheCapacityError) result = { committed: false };
+      if (error instanceof CacheCapacityError && request.operation === 'get')
+        result = {};
+      else if (
+        error instanceof CacheCapacityError &&
+        request.operation === 'begin'
+      )
+        result = { accepted: false };
+      else if (
+        error instanceof CacheCapacityError &&
+        (request.operation === 'commit' || request.operation === 'update')
+      )
+        result = { committed: false };
       else throw error;
     }
     const response = JSON.stringify(result);
@@ -828,6 +1174,7 @@ const cacheBridge = async (input: string): Promise<string> => {
     return response;
   } finally {
     if (attempt) unregister(pendingBegins, handle, attempt);
+    if (ordinary) ordinaryPending--;
   }
 };
 const cacheWrite = async (
@@ -836,8 +1183,8 @@ const cacheWrite = async (
   sequence: number,
   bytes: Uint8Array,
 ): Promise<boolean> => {
-  text(id);
-  text(handle);
+  boundedText(text(id), 256);
+  boundedText(text(handle), 256);
   integer(sequence);
   if (
     !(bytes instanceof Uint8Array) ||
@@ -845,16 +1192,31 @@ const cacheWrite = async (
     bytes.length > CHUNK
   )
     throw Error('Invalid binary cache chunk size');
-  await holdLifetime();
-  const database = await open();
+  const admitted = admit();
+  let database: Database | undefined;
   let acquired: Editor | undefined;
   try {
-    return await transaction(database, async (tx) => {
+    await holdLifetime();
+    database = await open();
+    if (!admitted) {
+      const editor = await database.get('editors', id);
+      if (editor?.worker === workerId && editor.handle === handle)
+        await releaseFailedEditor(
+          database,
+          editor.directory,
+          id,
+          handle,
+          editor.generation,
+        );
+      return false;
+    }
+    return await transaction(database, async (context) => {
+      const { tx, usage } = context;
       const editor = await tx.objectStore('editors').get(id);
       if (!editor || editor.worker !== workerId || editor.handle !== handle)
         return false;
       acquired = editor;
-      const state = await stateFor(tx, editor.directory),
+      const state = await stateFor(context, editor.directory),
         body = await tx
           .objectStore('bodies')
           .get(bodyKey(editor.directory, editor.body));
@@ -865,24 +1227,37 @@ const cacheWrite = async (
         body.chunks >= MAX_CHUNKS ||
         body.bytes + bytes.length + editor.metadataBytes > state.limit ||
         (editor.length >= 0 && body.bytes + bytes.length > editor.length) ||
-        !(await makeSpace(tx, state, bytes.length, editor.url))
+        !(await makeSpace(context, state, bytes.length, editor.url, false, {
+          chunks: 1,
+          metadataBytes: chunkCharge([
+            ...editor.directory,
+            editor.body,
+            sequence,
+          ]),
+        }))
       ) {
-        await abortEditor(tx, state, editor);
-        await tx.objectStore('directories').put(state);
+        await abortEditor(context, state, editor);
         return false;
       }
       await tx
         .objectStore('chunks')
         .add(bytes, [...editor.directory, editor.body, sequence]);
       body.chunks++;
+      const metadataBytes = chunkCharge([
+        ...editor.directory,
+        editor.body,
+        sequence,
+      ]);
+      body.chunkMetadataBytes += metadataBytes;
       body.bytes += bytes.length;
-      state.allocatedBytes += bytes.length;
+      allocated(context, state, bytes.length);
+      usage.chunks++;
+      usage.metadataBytes += metadataBytes;
       await tx.objectStore('bodies').put(body);
-      await tx.objectStore('directories').put(state);
       return true;
     });
   } catch (error) {
-    if (acquired) {
+    if (acquired && database) {
       try {
         await releaseFailedEditor(
           database,
@@ -898,7 +1273,10 @@ const cacheWrite = async (
         );
       }
     }
+    if (error instanceof CacheCapacityError) return false;
     throw error;
+  } finally {
+    if (admitted) ordinaryPending--;
   }
 };
 const cacheRead = async (
@@ -906,14 +1284,17 @@ const cacheRead = async (
   handle: string,
   maximum: number,
 ): Promise<Uint8Array | null> => {
-  text(id);
-  text(handle);
+  boundedText(text(id), 256);
+  boundedText(text(handle), 256);
   integer(maximum, 1, CHUNK);
   const attempt = register(pendingReads, id);
+  const admitted = admit();
   try {
+    if (!admitted) throw Error('Cache ordinary operation window is full');
     await holdLifetime();
     const database = await open();
-    const result = await transaction(database, async (tx) => {
+    const result = await transaction(database, async (context) => {
+      const { tx } = context;
       const reader = await tx.objectStore('readers').get(id);
       if (
         !attempt.valid ||
@@ -922,7 +1303,7 @@ const cacheRead = async (
         reader.handle !== handle
       )
         throw Error('Cache reader is closed');
-      const state = await stateFor(tx, reader.directory),
+      const state = await stateFor(context, reader.directory),
         body = await tx
           .objectStore('bodies')
           .get(bodyKey(reader.directory, reader.body));
@@ -931,8 +1312,7 @@ const cacheRead = async (
       if (reader.received === body.bytes) {
         if (reader.index !== body.chunks || reader.offset !== 0)
           throw Error('Cache body length mismatch');
-        await closeReader(tx, state, reader);
-        await tx.objectStore('directories').put(state);
+        await closeReader(context, state, reader);
         return null;
       }
       const chunk = await tx
@@ -964,12 +1344,12 @@ const cacheRead = async (
   } catch (error) {
     try {
       const database = await open();
-      await transaction(database, async (tx) => {
+      await transaction(database, async (context) => {
+        const { tx } = context;
         const reader = await tx.objectStore('readers').get(id);
         if (reader?.worker === workerId && reader.handle === handle) {
-          const state = await stateFor(tx, reader.directory);
-          await closeReader(tx, state, reader);
-          await tx.objectStore('directories').put(state);
+          const state = await stateFor(context, reader.directory);
+          await closeReader(context, state, reader);
         }
       });
     } catch (cleanup) {
@@ -981,6 +1361,7 @@ const cacheRead = async (
     throw error;
   } finally {
     unregister(pendingReads, id, attempt);
+    if (admitted) ordinaryPending--;
   }
 };
 declare global {

@@ -12,11 +12,26 @@ import {
 } from '../../../runtime/teavm/bridge/bridge-common.js';
 import type { CacheSchema } from '../../../runtime/teavm/bridge/cache-bridge.js';
 
-let chunkReads = 0;
+let chunkReads = 0,
+  recordScans = 0;
 const originalGet = IDBObjectStore.prototype.get;
 IDBObjectStore.prototype.get = function (query: IDBValidKey | IDBKeyRange) {
   if (this.name === 'chunks') chunkReads++;
   return originalGet.call(this, query);
+};
+const originalGetAll = IDBObjectStore.prototype.getAll;
+IDBObjectStore.prototype.getAll = function (
+  ...args: Parameters<IDBObjectStore['getAll']>
+) {
+  recordScans++;
+  return originalGetAll.apply(this, args);
+};
+const originalCursor = IDBObjectStore.prototype.openCursor;
+IDBObjectStore.prototype.openCursor = function (
+  ...args: Parameters<IDBObjectStore['openCursor']>
+) {
+  recordScans++;
+  return originalCursor.apply(this, args);
 };
 const originalLockRequest = navigator.locks.request.bind(navigator.locks);
 interface ReclaimPause {
@@ -24,9 +39,10 @@ interface ReclaimPause {
   signalReached(): void;
   released: Promise<void>;
   release(): void;
+  all: boolean;
 }
 let reclaimPause: ReclaimPause | undefined;
-function pauseReclaim() {
+function pauseReclaim(all = false) {
   if (reclaimPause) throw Error('Reclaim pause is already armed');
   let signalReached = () => {},
     release = () => {};
@@ -36,7 +52,7 @@ function pauseReclaim() {
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
-  reclaimPause = { reached, signalReached, released, release };
+  reclaimPause = { reached, signalReached, released, release, all };
 }
 function delayedLockRequest<T>(
   name: string,
@@ -56,7 +72,7 @@ function delayedLockRequest<T>(
   if (!callback) throw Error('Missing Web Lock callback');
   const pause = reclaimPause;
   if (options.ifAvailable && pause) {
-    navigator.locks.request = originalLockRequest;
+    if (!pause.all) navigator.locks.request = originalLockRequest;
     pause.signalReached();
     return pause.released.then(() =>
       originalLockRequest(name, options, callback),
@@ -155,7 +171,7 @@ function failNextRead() {
 }
 
 async function mutateChunk(message: Record<string, unknown>) {
-  const database = await openDB<CacheSchema>('teavm-http-cache-v2'),
+  const database = await openDB<CacheSchema>('teavm-http-cache-v3'),
     tx = database.transaction(['readers', 'chunks'], 'readwrite'),
     done = tx.done;
   try {
@@ -189,6 +205,71 @@ async function mutateChunk(message: Record<string, unknown>) {
   }
 }
 
+async function inspectNamespace(reset = false) {
+  const namespace = new URL(location.href).searchParams.get('plugin');
+  if (!namespace) throw Error('Missing test namespace');
+  const database = await openDB<CacheSchema>('teavm-http-cache-v3');
+  try {
+    const usage = await database.get('usage', namespace);
+    const stores = [
+      'usage',
+      'owners',
+      'directories',
+      'entries',
+      'bodies',
+      'chunks',
+      'editors',
+      'readers',
+    ] as const;
+    const tx = database.transaction(stores, reset ? 'readwrite' : 'readonly');
+    const rows: Record<string, number> = {};
+    let allocatedBytes = 0;
+    for (const name of stores) {
+      rows[name] = 0;
+      if (name === 'chunks') {
+        let cursor = await tx.objectStore('chunks').openKeyCursor();
+        while (cursor) {
+          if (cursor.primaryKey[0] === namespace) {
+            rows[name]++;
+            const chunks = tx.objectStore('chunks');
+            if (reset && chunks.delete) await chunks.delete(cursor.primaryKey);
+          }
+          cursor = await cursor.continue();
+        }
+      } else if (name === 'editors' || name === 'readers') {
+        for await (const cursor of tx.objectStore(name).iterate()) {
+          if (cursor.value.namespace !== namespace) continue;
+          rows[name]++;
+          if (name === 'editors')
+            allocatedBytes += integer(object(cursor.value).metadataBytes);
+          if (reset && cursor.delete) await cursor.delete();
+        }
+      } else {
+        const store = tx.objectStore(name);
+        for await (const cursor of store.iterate()) {
+          const key = cursor.primaryKey;
+          if (
+            name === 'usage'
+              ? key !== namespace
+              : !Array.isArray(key) || key[0] !== namespace
+          )
+            continue;
+          rows[name]++;
+          if (name === 'entries')
+            allocatedBytes += integer(object(cursor.value).metadataBytes);
+          if (name === 'bodies')
+            allocatedBytes += integer(object(cursor.value).bytes);
+          if (reset && cursor.delete) await cursor.delete();
+        }
+      }
+    }
+    await tx.done;
+    return { usage, rows, allocatedBytes };
+  } finally {
+    database.close();
+  }
+}
+
 self.onmessage = async (event: MessageEvent<unknown>) => {
   const message = object(event.data),
     id = text(message.id);
@@ -197,11 +278,21 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
     if (control) {
       if (control === 'reset-metrics') {
         chunkReads = 0;
+        recordScans = 0;
       } else if (control === 'metrics') {
-        self.postMessage({ id, result: { chunkReads } });
+        self.postMessage({ id, result: { chunkReads, recordScans } });
+        return;
+      } else if (
+        control === 'namespace-usage' ||
+        control === 'reset-namespace'
+      ) {
+        self.postMessage({
+          id,
+          result: await inspectNamespace(control === 'reset-namespace'),
+        });
         return;
       } else if (control === 'pause-reclaim') {
-        pauseReclaim();
+        pauseReclaim(message.all === true);
         navigator.locks.request = delayedLockRequest;
       } else if (control === 'wait-reclaim') {
         if (!reclaimPause) throw Error('Reclaim pause is not armed');
@@ -240,6 +331,33 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
           message.bytes,
         );
         self.postMessage({ id, result: { accepted } });
+        return;
+      } else if (control === 'fill-editor') {
+        const write = workerScope().teaCacheWrite;
+        if (!write) throw Error('Binary cache write bridge missing');
+        const length = integer(message.length, 0, 64 * 1024 * 1024),
+          chunkSize = integer(message.chunkSize, 1, 65536),
+          block = new Uint8Array(chunkSize).fill(143);
+        let written = 0,
+          sequence = 0;
+        while (written < length) {
+          const bytes = block.subarray(
+            0,
+            Math.min(chunkSize, length - written),
+          );
+          if (
+            !(await write(
+              text(message.editor),
+              optionalText(message.handle) ?? 'one',
+              sequence,
+              bytes,
+            ))
+          )
+            break;
+          written += bytes.length;
+          sequence++;
+        }
+        self.postMessage({ id, result: { written, chunks: sequence } });
         return;
       } else throw Error('Unknown cache lifecycle control');
       self.postMessage({ id, result: {} });

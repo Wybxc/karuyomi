@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache editor 的 Worker lifetime 已通过机制门；正文已接入 typed idb 分块与二进制 JSO，已通过真实浏览器机制门和原 JVM/TeaVM 的共享 CacheInterceptor 场景；正式 Source、普通文件及 namespace 总预算尚未完成。
+为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。正式 Source、Native Cache 及同一 namespace 的 Cache/files 组合压力尚未完成。
 
 已有浏览器桥机制门覆盖正常持久化、namespace 隔离、Cache editor 竞争/CAS 和文件 rename/unlink；图片 JVM oracle 明确使用 cacheless 链，不是 HTTP Cache 语义验收。证据参见 [Worker 桥](../verification/worker-bridges.md)，P0 总目标参见 [运行时计划](p0-runtime-and-reading.md)。
 
@@ -13,7 +13,7 @@
 已完成：
 
 - 每个 Cache Worker 持有一个 Web Lock；终止 Worker 自动释放，不再使用五分钟时钟判断 owner 是否失效。
-- Cache 操作先取得目录 owner 快照，在 IDB 事务外用 Web Locks 探测死亡 owner，再以独立原子事务清理其 editor。不会等待锁时持有 IDB 事务。
+- Cache 操作先取得 namespace owner 快照，在 IDB 事务外用 Web Locks 探测死亡 owner，再以独立原子事务清理其跨目录 editor/reader。不会等待锁时持有 IDB 事务；显式终态清理不先等待这项探测。
 - editor token、Java handle、entry version 和 clear generation 继续约束提交；外来 Worker 不能提交或 abort 活 owner 的 editor。Java `Cache.close()` 只清理对应 handle，不影响同 Worker 的其他 Cache 实例。
 - `put` 的真实 IDB request failure 等到事务 abort/回滚结束后，再以独立小事务按 editor、Worker/Java handle 和 generation 清理；原始失败仍向调用方报告。清理不会删除期间替换的 editor、owner 或 generation。
 - begin 在第一个异步等待前登记 pending attempt，close/delete 同步失效同 handle 的在途 attempt；主事务复查，避免关闭后迟到 begin 重建锁。Java delete 先标记 closed，再发送明确的 delete 操作；evictAll 仍为 clear，不关闭 handle。完成后即删除跟踪记录，不保留无限增长的 closed handle 历史表。
@@ -23,31 +23,32 @@
 
 ## 阶段二：有界 Cache 正文
 
-**核心正文通道与受控 Java 场景已通过，产品验收仍进行中**。移除产品 Cache 的正文 Base64 与整段 Java Buffer；使用精确依赖 `idb@8.0.4` 的 typed schema 与 `tx.done`，不另建通用存储包装。新数据库为 `teavm-http-cache-v2`，原型不维护旧格式迁移。
+**核心正文通道、namespace 预算与受控 Java 场景已通过，产品验收仍进行中**。移除产品 Cache 的正文 Base64 与整段 Java Buffer；使用精确依赖 `idb@8.0.4` 的 typed schema 与 `tx.done`，不另建通用存储包装。当前数据库为 `teavm-http-cache-v3`，原型不维护旧格式迁移；固定分区与结构计费见[Cache 存储设计](../design/runtime-cache-storage.md)。
 
 已接线：
 
 - 小 JSON 控制不超过 64 KiB，metadata 不超过 48 KiB。`get` 仅返回 metadata/version/generation/reader/length，`begin` 接收 metadata，`commit` 原子发布完整 body 指针。
 - `teaCacheRead(reader, javaHandle, maximum)` 和 `teaCacheWrite(editor, javaHandle, sequence, bytes)` 传递不超过 64 KiB 的二进制块；Java 同样逐块复制，写 ACK 在实际事务提交之后。editor 与 reader 均校验 Worker/Java handle 所有权。
 - IDB 拆分 entries、bodies、chunks、editors、readers、directories；size、URLs、304 update 和 LRU 只读 metadata。读者 pin 不可变 body，replace/remove/clear/delete 仅移除当前引用，旧 snapshot 在最后 reader EOF/close 或死亡 owner 回收后释放。
-- Cache 可见大小上限为 `min(maxSize, 64 MiB)`，逻辑 allocated 同时计入 current、staging、retired-but-pinned 正文和 metadata，上限为可见预算两倍。每目录最多 64 个 editor 和 64 个 reader，每 body 最多 8192 块；事务 5 秒超时后 abort 并等到终态，再独立 CAS 清理。allocated 是应用逻辑字节预算，不是浏览器实际磁盘占用测量；跨 Cache/files 与跨目录 namespace 总预算仍属后续阶段。
+- 每目录可见上限为 `min(maxSize, 64 MiB)`，逻辑 allocated 计入 current、staging、retired-but-pinned 正文和响应 metadata，上限为该目录可见预算两倍。全 namespace 全部 Cache 目录合计 allocated 128 MiB、结构 metadata 4 MiB；32 个目录 tombstone、4096 current entries、4224 bodies、64 editor、64 reader、32 有引用 owner、16384 chunks，单 body 最多 8192 块。所有动态主键/索引键计费；未知 size/get/clear 不造目录。usage 与记录增删同事务，跨目录 LRU 和死亡 owner 回收释放可回收的副本，活 pin 不提前退款。
+- 普通 get/begin/read/write 每 Worker pending 4；close/reader-close/abort 走清理旁路，不因普通窗口已满遗留 pin，不宣称终态 Promise 或进程内存总上界。事务 5 秒超时后 abort 并等到终态，再独立 CAS 清理；每块 read 使用直接 lookup，不全表扫描。allocated/结构 reservation 是应用逻辑政策，不是浏览器实际磁盘占用。
 - commit 与 metadata update 若无法在保留活 editor 的前提下达到可见预算，会原子回滚并拒绝发布；commit 再独立清理原 editor。close/delete 的原事务失败后，独立事务仅清对应 Worker/Java handle 的 staging editor，保留旧 current、打开 reader、sibling 和其他 owner；原始失败仍报告，清理失败聚合两个错误。
 - reader-close 的原事务失败后，以 readerId/Worker/Java handle/directory 验证独立清理；不因 Java 已标记释放且不会重试而遗留 retired pin。原错误保留，清理再失败则聚合错误；错 handle、兄弟和外来 owner 不被误清理。
 - Java `CacheSink` 将存储 IOException 或容量拒绝转为一次缓存 abort，精确消费本次 write 的剩余 count，后续仅丢弃缓存副本，网络正文继续；程序参数错误不宽泛吞掉。原网络读取异常仍传播，已发布 cache-hit 的读取故障不擅自重新请求网络。
 - `pnpm teavm:check` 已接入 CacheSink 正式 JVM 边界门：19 项检查覆盖 65536/65536/7 分块、额外未请求字节保留、写入/提交拒绝、存储异常和关闭期间的计数及终态。正式 Cache/Bridge 六源 javac、严格 TS 和 bridge unit 6/6 均通过；这些结果不代替实际 TeaVM JSO、CacheInterceptor 或 Source 验收。
 
-2026-11-04，Codex 内置浏览器 Chromium 156 使用正式 compileBridge 产物通过 27 组：保留原十七组，新增 reader 死亡回收、六类实际 chunk 损坏、半途显式 reader-close、读事务真实 abort 与 reader-close 失败 CAS 清理。损坏最终报错而非成功 EOF，retired 计费仅在最后 pin 释放后回收；活兄弟 reader 保留。正式入口 `node tools/teavm/check-cache-storage.ts` 从干净检出编译桥与测试，提供 loopback 页面并等待内置浏览器，报告通过后退出；没有冒称自动 CI 浏览器门。原始报告在忽略目录，单次恢复延时不构成性能分布。Body metadata/pin 记录损坏、清理持续失败与完整 Java HTTP 取消仍待专门验收。Java Cache 场景的 TeaVM/原 JVM 对照已追加 no-cache/POST invalidation 并通过，证据见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)；仍须以新 AOT 身份验收正式 Source。取消不承诺回滚已提交写入。
+2026-11-04，主代理 Codex 内置浏览器 Chromium 156 使用正式 compileBridge 产物通过 **39 组**：保留原 27 组生命周期、chunk 损坏及真实事务失败门，新增 namespace 预算矩阵。以生产长度 64hex namespace 和真实 8 KiB 块填满 128 MiB/16384 chunks，另以 64 KiB 块验证两 Worker 竞争最后一个正文字节；验证跨目录 LRU/retired pin、全域 reader/editor/owner、metadata/UTF-8、小 chunk 放大、目录 tombstone、pending 清理旁路、死亡 owner 跨目录回收和账本真实 abort。测试没有篡改 usage 假装正文边界。正式入口 `node tools/teavm/check-cache-storage.ts` 提供 loopback 页面并等待内置浏览器，报告编译字节摘要并在通过后退出；不是自动 CI 浏览器门。单次恢复延时不是性能分布。Body metadata/pin/usage 本身损坏、持续清理失败及完整 Java HTTP 取消另验。Java Cache 场景的 no-cache/POST 对照见 [HTTP Cache 运行证据](../verification/http-cache-runtime.md)；正式 Source 仍须使用新 AOT 身份验收。
 
 ## 阶段三：有界普通文件
 
 **核心实现与分层机制门已通过，产品验收仍进行中**。官方候选源码核对后，直接使用现有 `idb@8.0.4` 提供 typed schema 与事务；项目保留 Java FS 语义、inode、owner 与配额适配。新 DB `teavm-java-files-v2` 不迁移原型旧格式。选型、接口与固定预算见[普通文件存储设计](../design/runtime-file-storage.md)。
 
 - 正文移除整文件记录与 Base64；Java/JS 每块最多 64 KiB，按 inode/chunk 随机 IO。稀疏扩容只更新逻辑长度，缺块读零；truncate 清尾块，重扩不泄露旧内容。
-- 单文件 64 MiB；普通 files namespace 逻辑长度/allocated chunks 各 128 MiB，metadata 2 MiB、4096 inode、64 handle、32 live owner；每 Worker pending 4，事务期限 5 秒。未链接 open inode 仍计费。普通文件与独立 Cache 的合计预算尚待汇合。
+- 单文件 64 MiB；普通 files namespace 逻辑长度/allocated chunks 各 128 MiB，metadata 2 MiB、4096 inode、64 handle、32 live owner；每 Worker pending 4，事务期限 5 秒。未链接 open inode 仍计费。与 Cache 独立静态分区合计最多 262 MiB 逻辑 reservation，不跨两个 DB 借贷；同一 namespace 的组合压力尚未实测。
 - data/路径/inode/usage 同事务，提交后才更新 cursor 与 ACK；rename/unlink 保留打开 inode，append 使用事务内最新 EOF。Web Locks 死亡 owner 以快照、事务外探测和 token CAS 清理；system close 失败保留 owner/句柄，可显式重试。
 - 修正 TeaVM 内部 accessor EOF0、FIS unsigned/EOF、RAF 零长度/range 和 close ACK 语义；仅项目自有 JCL IR 适配，不改 vendor 或扩展 JAR。
 
-2026-11-04，主代理内置 Chromium 156 通过 14 组真实 Worker/IDB/Web Locks 门，包含真实事务 abort、配额、pending、terminate、提交后 ACK 前死亡、system close abort→重试。原 JVM 共享 File/RandomAccessFile/Okio 场景 32 项、Accessor/JCL 窄 fixture 24 项及实际 TeaVM 二进制 JSO 共享场景 32 项分别通过；两端正文摘要一致。分层证据与复验命令见[普通文件运行证据](../verification/file-storage-runtime.md)。仍待正式 Source、Native、namespace 版本/身份切换、跨 Cache/files 总预算与设备资源测量；取消不承诺撤销已提交写入。
+2026-11-04，主代理内置 Chromium 156 通过 14 组真实 Worker/IDB/Web Locks 门，包含真实事务 abort、配额、pending、terminate、提交后 ACK 前死亡、system close abort→重试。原 JVM 共享 File/RandomAccessFile/Okio 场景 32 项、Accessor/JCL 窄 fixture 24 项及实际 TeaVM 二进制 JSO 共享场景 32 项分别通过；两端正文摘要一致。分层证据与复验命令见[普通文件运行证据](../verification/file-storage-runtime.md)。仍待正式 Source、Native、真实 namespace 版本/身份切换、Cache/files 组合压力与设备资源测量；取消不承诺撤销已提交写入。
 
 ## 阶段四：原 JVM 同版对照与产品门
 
@@ -55,7 +56,7 @@
 
 1. 补充截断网络正文、半途取消与重启，并保留已覆盖的冷热、Vary/Cookie、304、no-cache/no-store 和 POST invalidation 对照。
 2. 对照正文摘要、状态及关键响应头、网络请求次数、cache/network 标记和异常类型；不能只比较测试数量或编译结果。
-3. 验证正式 namespace 派生：identity、repo、package、storageSchema 相同的版本保留数据；新 schema、其他身份或包隔离。buildId 不参与当前存储 namespace。
+3. 正式 manager namespace 的版本/重建保留和 identity、repo、package、storageSchema 四维隔离单元门已通过；buildId 不参与派生。实际 IDB 数据跨扩展版本/身份切换仍待验收，不能用单元门代替。
 4. 原版 Source、HTTPS handshake 适配、生产 Access 和 Web/Native 实际环境分别验收。受控 HTTP 或存储机制门不能替代这些结果。
 
 完成以上阶段也不等于已控制整个 Worker 或进程/GPU 峰值；存储、网络、图形和终端图片预算的组合与实际测量仍需 P0 汇合验收。

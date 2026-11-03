@@ -6,18 +6,18 @@
 
 ## 优先级与状态
 
-| 优先级               | 计划                                                          | 当前状态与依赖                                                                                                                                             |
-| -------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 当前主线             | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | Web 原 Source 图片与阅读、iOS 原 Source ReaderScreen/进程重启分项通过；Android Source、生产 Access、合计存储预算及真机门仍未齐                             |
-| 并行工程             | [工程、AOT 与发布](engineering-and-release.md)                | 全 TS 自动化、依赖分层和两包静态交付已验证；首次本地全量进行中，完整 baseline/有界 CI 待验收                                                               |
-| P0 后                | [P1 书架与进度](p1-library-and-progress.md)                   | 章序/切章、有界下一章准备与本地进度已接产品，Web 关标签页及 iOS 原 Source 进程重启分项通过；浏览器进程/Android Source、收藏及完整日用流程待验收            |
-| P1 状态模型确定后    | [P2 多设备同步](p2-sync.md)                                   | 语义已规划；业务表、outbox、push/pull 与冲突恢复待实现                                                                                                     |
-| 基础运行与书架具备后 | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                                       |
-| 持续推进             | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                                      |
-| 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；Web、Native 机制和 iOS Source 分项通过，生产部署及剩余运行门待验收                                                      |
-| P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | Cache 27 组浏览器机制与 JVM/TeaVM no-cache/POST 对照、普通文件 14 组及 Java 共享场景通过；实际 Source、完整 HTTP 取消、Native Cache 与合计存储预算门仍未齐 |
-| P0 文字布局子计划    | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收                                 |
-| 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                                         |
+| 优先级               | 计划                                                          | 当前状态与依赖                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 当前主线             | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | Web 原 Source 图片与阅读、iOS 原 Source ReaderScreen/进程重启分项通过；Android Source、生产 Access、合计存储预算及真机门仍未齐                                    |
+| 并行工程             | [工程、AOT 与发布](engineering-and-release.md)                | 全 TS 自动化、依赖分层和两包静态交付已验证；首次本地全量进行中，完整 baseline/有界 CI 待验收                                                                      |
+| P0 后                | [P1 书架与进度](p1-library-and-progress.md)                   | 章序/切章、有界下一章准备与本地进度已接产品，Web 关标签页及 iOS 原 Source 进程重启分项通过；浏览器进程/Android Source、收藏及完整日用流程待验收                   |
+| P1 状态模型确定后    | [P2 多设备同步](p2-sync.md)                                   | 语义已规划；业务表、outbox、push/pull 与冲突恢复待实现                                                                                                            |
+| 基础运行与书架具备后 | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                                              |
+| 持续推进             | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                                             |
+| 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；Web、Native 机制和 iOS Source 分项通过，生产部署及剩余运行门待验收                                                             |
+| P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | Cache namespace 39 组机制及 JVM/TeaVM no-cache/POST 对照、普通文件独立门通过；静态分区合计 262 MiB；组合压力、实际 Source、完整 HTTP 取消与 Native Cache 仍待验收 |
+| P0 文字布局子计划    | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收                                        |
+| 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                                                |
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
 

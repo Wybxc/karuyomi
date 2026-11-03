@@ -31,10 +31,17 @@ class CacheWorker {
   private send(label: string, message: Record<string, unknown>) {
     const id = String(++this.sequence);
     return new Promise<Record<string, unknown>>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(Error('Cache Worker command timed out: ' + label));
-      }, 10000);
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id);
+          reject(Error('Cache Worker command timed out: ' + label));
+        },
+        ['fill-editor', 'namespace-usage', 'reset-namespace'].includes(
+          String(message.control),
+        )
+          ? 120000
+          : 10000,
+      );
       this.pending.set(id, { resolve, reject, timer });
       this.worker.postMessage({ id, ...message });
     });
@@ -323,6 +330,601 @@ async function readerFailureGates(
   checks.push(
     'reader-close-idb-abort-cas-preserves-sibling-handle-and-foreign-owner',
   );
+}
+
+const CACHE_BYTES = 64 * 1024 * 1024,
+  NAMESPACE_BYTES = 2 * CACHE_BYTES;
+const requestFor = (directory: string, url = directory) => ({
+  directory,
+  url,
+  maxSize: CACHE_BYTES,
+});
+async function beginAt(
+  client: CacheWorker,
+  directory: string,
+  url = directory,
+) {
+  const editor = await client.call('begin', requestFor(directory, url));
+  assert(editor.accepted === true, 'Fixture editor is accepted: ' + directory);
+  return editor;
+}
+async function commitAt(
+  client: CacheWorker,
+  editor: Record<string, unknown>,
+  directory: string,
+  url = directory,
+) {
+  assert(
+    (
+      await client.call('commit', {
+        ...requestFor(directory, url),
+        editor: editor.editor,
+        expected: editor.version,
+        generation: editor.generation,
+      })
+    ).committed === true,
+    'Fixture commits exact body: ' + directory,
+  );
+}
+async function seedAt(client: CacheWorker, directory: string, url = directory) {
+  await commitAt(client, await beginAt(client, directory, url), directory, url);
+}
+async function ledger(client: CacheWorker) {
+  const result = await client.control('namespace-usage'),
+    usage = object(result.usage),
+    rows = object(result.rows);
+  assert(
+    usage.allocatedBytes === result.allocatedBytes,
+    'Ledger equals actual body and payload metadata reservations',
+  );
+  const caps = {
+    directories: 32,
+    entries: 4096,
+    bodies: 4224,
+    chunks: 16384,
+    readers: 64,
+    editors: 64,
+    owners: 32,
+  };
+  for (const [name, cap] of Object.entries(caps)) {
+    const count = usage[name];
+    assert(
+      typeof count === 'number' &&
+        count >= 0 &&
+        count <= cap &&
+        count === rows[name],
+      'Namespace record count agrees with actual rows: ' + name,
+    );
+  }
+  assert(
+    typeof usage.allocatedBytes === 'number' &&
+      usage.allocatedBytes <= NAMESPACE_BYTES,
+    'Namespace payload fits 128 MiB',
+  );
+  assert(
+    typeof usage.metadataBytes === 'number' &&
+      usage.metadataBytes > 0 &&
+      usage.metadataBytes <= 4 * 1024 * 1024,
+    'Structure reservation fits 4 MiB',
+  );
+  return usage;
+}
+async function withNamespace(
+  workerUrl: string,
+  count: number,
+  run: (clients: CacheWorker[], url: URL) => Promise<void>,
+) {
+  const url = new URL(workerUrl, location.href);
+  // Match the exact 64-hex production namespace length in charged primary keys.
+  url.searchParams.set(
+    'plugin',
+    (crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''),
+  );
+  const clients = Array.from({ length: count }, () => new CacheWorker(url));
+  let failed = false,
+    failure: unknown;
+  try {
+    await run(clients, url);
+  } catch (error) {
+    failed = true;
+    failure = error;
+  } finally {
+    try {
+      await clients.at(-1)?.control('reset-namespace');
+    } catch (cleanup) {
+      if (failed)
+        throw new AggregateError(
+          [failure, cleanup],
+          'Namespace fixture and cleanup failed',
+        );
+      throw cleanup;
+    } finally {
+      for (const client of clients) client.terminate();
+    }
+  }
+  if (failed) throw failure;
+}
+async function namespaceGates(workerUrl: string, checks: string[]) {
+  await withNamespace(workerUrl, 2, async (clients) => {
+    const a = clients[0]!,
+      b = clients[1]!;
+    for (let index = 0; index < 40; index++) {
+      await a.call('size', requestFor('/miss-' + index));
+      assert(
+        !(await a.call('get', requestFor('/miss-' + index))).entry,
+        'Unknown directory is a miss',
+      );
+      await a.call('clear', requestFor('/miss-' + index));
+    }
+    assert(
+      (await ledger(a)).directories === 0,
+      'Unknown size/get/clear creates no directory',
+    );
+    for (let index = 0; index < 32; index++)
+      await a.call('initialize', requestFor('/tombstone-' + index));
+    await expectFailure(
+      a.call('initialize', requestFor('/overflow')),
+      'Strong initialize reports directory quota',
+    );
+    assert(
+      (await a.call('begin', requestFor('/overflow'))).accepted === false,
+      'New editor cannot exceed directory cap',
+    );
+    for (let index = 0; index < 32; index++)
+      await b.call('clear', requestFor('/tombstone-' + index));
+    assert(
+      (await ledger(a)).directories === 32,
+      'Generation tombstones remain bounded after clear',
+    );
+    checks.push('namespace-directory-cap-and-miss-without-record-allocation');
+
+    await a.control('reset-namespace');
+    await seedAt(a, '/refs-a');
+    await seedAt(a, '/refs-b');
+    const readers: { reader: unknown; directory: string }[] = [];
+    for (let index = 0; index < 64; index++) {
+      const directory = index % 2 ? '/refs-a' : '/refs-b';
+      const entry = object(
+        (await b.call('get', { ...requestFor(directory), raw: true })).entry,
+      );
+      readers.push({ reader: entry.reader, directory });
+    }
+    assert(
+      !(await a.call('get', { ...requestFor('/refs-a'), raw: true })).entry,
+      'Reader 65 across directories is a miss',
+    );
+    const first = readers.shift()!;
+    await b.call('reader-close', {
+      ...requestFor(first.directory),
+      reader: first.reader,
+    });
+    const replacement = object(
+      (await a.call('get', { ...requestFor('/refs-a'), raw: true })).entry,
+    );
+    await a.call('reader-close', {
+      ...requestFor('/refs-a'),
+      reader: replacement.reader,
+    });
+    for (const reader of readers)
+      await b.call('reader-close', {
+        ...requestFor(reader.directory),
+        reader: reader.reader,
+      });
+    for (let index = 0; index < 64; index++)
+      await beginAt(a, index % 2 ? '/refs-a' : '/refs-b', 'editor-' + index);
+    assert(
+      (await b.call('begin', requestFor('/refs-b', 'editor-overflow')))
+        .accepted === false,
+      'Editor 65 across directories is refused',
+    );
+    assert(
+      (await ledger(b)).editors === 64,
+      'Exactly 64 namespace editors are reserved',
+    );
+    await a.call('close', requestFor('/refs-a'));
+    await a.call('close', requestFor('/refs-b'));
+    assert(
+      (await ledger(b)).editors === 0,
+      'Terminal close refunds all owned editors',
+    );
+    checks.push('namespace-reader-and-editor-caps-span-directories');
+  });
+  await withNamespace(workerUrl, 33, async (clients) => {
+    for (let index = 0; index < 32; index++)
+      await beginAt(clients[index]!, '/dead-a', 'owner-' + index);
+    const firstEditor = (
+      await clients[0]!.call('begin', requestFor('/dead-a', 'extra'))
+    ).editor;
+    assert(typeof firstEditor === 'string', 'First owner has a staged body');
+    assert(
+      (
+        await clients[0]!.control('write', {
+          editor: firstEditor,
+          sequence: 0,
+          bytes: new Uint8Array([7]),
+        })
+      ).accepted === true,
+      'Dead owner really reserves binary bytes',
+    );
+    const observer = clients[32]!;
+    assert(
+      (await observer.call('begin', requestFor('/live-b'))).accepted === false,
+      'Owner 33 is refused across directories',
+    );
+    const before = await ledger(observer);
+    clients[0]!.terminate();
+    await observer.call('size', requestFor('/live-b'));
+    const after = await ledger(observer);
+    const metadataBytes = new TextEncoder().encode(
+      JSON.stringify({ status: 200 }),
+    ).length;
+    assert(
+      before.allocatedBytes ===
+        Number(after.allocatedBytes) + 2 * metadataBytes + 1 &&
+        after.owners === 31,
+      'Access to B reclaims dead owner staging in A, including two payload metadata rows',
+    );
+    await beginAt(observer, '/live-b');
+    assert(
+      (await ledger(observer)).owners === 32,
+      'Reclaimed owner slot is reusable by another Worker',
+    );
+    checks.push('namespace-owner-cap-and-death-reclaim-across-directories');
+  });
+  await withNamespace(workerUrl, 2, async (clients) => {
+    const a = clients[0]!,
+      b = clients[1]!,
+      metadataBytes = new TextEncoder().encode(
+        JSON.stringify({ status: 200 }),
+      ).length;
+    const spare = await beginAt(a, '/payload-spare');
+    const first = await beginAt(a, '/payload-a');
+    const second = await beginAt(b, '/payload-b');
+    for (const [client, editor, length] of [
+      [a, first, CACHE_BYTES - metadataBytes],
+      [b, second, CACHE_BYTES - 2 * metadataBytes],
+    ] as const) {
+      const filled = await client.control('fill-editor', {
+        editor: editor.editor,
+        length,
+        chunkSize: 8192,
+      });
+      assert(
+        filled.written === length && filled.chunks === 8192,
+        'Actual 8 KiB binary writes fill each bounded body',
+      );
+    }
+    const full = await ledger(a);
+    assert(
+      full.allocatedBytes === NAMESPACE_BYTES && full.chunks === 16384,
+      'Actual rows reach exactly 128 MiB and 16384 chunks',
+    );
+    assert(
+      (
+        await a.control('write', {
+          editor: spare.editor,
+          sequence: 0,
+          bytes: new Uint8Array([1]),
+        })
+      ).accepted === false,
+      'Live staging editors cannot be evicted to create excess space',
+    );
+    await commitAt(a, first, '/payload-a');
+    await commitAt(b, second, '/payload-b');
+    const pinA = object(
+      (await a.call('get', { ...requestFor('/payload-a'), raw: true })).entry,
+    );
+    const pinB = object(
+      (await b.call('get', { ...requestFor('/payload-b'), raw: true })).entry,
+    );
+    const refused = await beginAt(a, '/payload-spare');
+    assert(
+      (
+        await a.control('write', {
+          editor: refused.editor,
+          sequence: 0,
+          bytes: new Uint8Array(65536),
+        })
+      ).accepted === false,
+      'Detached but pinned bodies cannot fund a new write',
+    );
+    const retained = await ledger(b);
+    assert(
+      retained.entries === 0 &&
+        retained.readers === 2 &&
+        retained.allocatedBytes === NAMESPACE_BYTES - 3 * metadataBytes,
+      'Both retired snapshots stay fully charged after global eviction',
+    );
+    const prefix = (
+      await b.control('read', { reader: pinB.reader, maximum: 65536 })
+    ).bytes;
+    assert(
+      prefix instanceof Uint8Array &&
+        prefix.length === 8192 &&
+        prefix.every((value) => value === 143),
+      'Pinned sibling still delivers exact binary data',
+    );
+    await a.call('reader-close', {
+      ...requestFor('/payload-a'),
+      reader: pinA.reader,
+    });
+    assert(
+      (await ledger(a)).allocatedBytes === CACHE_BYTES - 2 * metadataBytes,
+      'Final pin ACK refunds only its own body',
+    );
+    const lru = await beginAt(a, '/lru-c');
+    assert(
+      (
+        await a.control('fill-editor', {
+          editor: lru.editor,
+          length: CACHE_BYTES - metadataBytes,
+          chunkSize: 65536,
+        })
+      ).written ===
+        CACHE_BYTES - metadataBytes,
+      'Freed capacity is reusable',
+    );
+    await commitAt(a, lru, '/lru-c');
+    const next = await beginAt(a, '/lru-d');
+    assert(
+      (
+        await a.control('write', {
+          editor: next.editor,
+          sequence: 0,
+          bytes: new Uint8Array(65536),
+        })
+      ).accepted === true,
+      'Namespace LRU evicts an unpinned entry from another directory',
+    );
+    await commitAt(a, next, '/lru-d');
+    assert(
+      !(await a.call('get', requestFor('/lru-c'))).entry,
+      'Old other-directory current entry was evicted',
+    );
+    await b.call('reader-close', {
+      ...requestFor('/payload-b'),
+      reader: pinB.reader,
+    });
+    await a.control('reset-metrics');
+    const live = object(
+      (await a.call('get', { ...requestFor('/lru-d'), raw: true })).entry,
+    );
+    await a.control('reset-metrics');
+    await a.control('read', { reader: live.reader, maximum: 65536 });
+    const metrics = await a.control('metrics');
+    assert(
+      metrics.chunkReads === 1 && metrics.recordScans === 0,
+      'Binary read performs one direct chunk lookup and no record scan',
+    );
+    await a.call('reader-close', {
+      ...requestFor('/lru-d'),
+      reader: live.reader,
+    });
+    await ledger(a);
+    checks.push('namespace-actual-128mib-and-16384-8k-chunks');
+    checks.push(
+      'namespace-retired-pin-no-premature-refund-and-cross-directory-lru',
+    );
+    checks.push('namespace-binary-read-does-not-scan-metadata-or-bodies');
+  });
+  await withNamespace(workerUrl, 2, async (clients) => {
+    const a = clients[0]!,
+      b = clients[1]!;
+    const metadataBytes = new TextEncoder().encode(
+      JSON.stringify({ status: 200 }),
+    ).length;
+    const spareA = await beginAt(a, '/race-spare-a'),
+      spareB = await beginAt(b, '/race-spare-b');
+    const fillA = await beginAt(a, '/race-fill-a'),
+      fillB = await beginAt(b, '/race-fill-b');
+    for (const [client, editor, length] of [
+      [a, fillA, CACHE_BYTES - metadataBytes],
+      [b, fillB, CACHE_BYTES - 3 * metadataBytes - 1],
+    ] as const) {
+      assert(
+        (
+          await client.control('fill-editor', {
+            editor: editor.editor,
+            length,
+            chunkSize: 65536,
+          })
+        ).written === length,
+        'Real 64 KiB writes reserve all but the last namespace payload byte',
+      );
+    }
+    const before = await ledger(a);
+    assert(
+      before.allocatedBytes === NAMESPACE_BYTES - 1 && before.chunks === 2048,
+      'Only payload capacity is exhausted, chunk records remain available',
+    );
+    const results = await Promise.all([
+      a.control('write', {
+        editor: spareA.editor,
+        sequence: 0,
+        bytes: new Uint8Array([91]),
+      }),
+      b.control('write', {
+        editor: spareB.editor,
+        sequence: 0,
+        bytes: new Uint8Array([91]),
+      }),
+    ]);
+    assert(
+      results.filter((result) => result.accepted === true).length === 1,
+      'Two Workers cannot both acquire the last namespace byte',
+    );
+    assert(
+      (await ledger(a)).allocatedBytes === NAMESPACE_BYTES - metadataBytes,
+      'Losing writer abort refunds only its own metadata',
+    );
+    const winner = results[0]!.accepted === true ? a : b;
+    const editor = results[0]!.accepted === true ? spareA : spareB;
+    const directory =
+      results[0]!.accepted === true ? '/race-spare-a' : '/race-spare-b';
+    await commitAt(winner, editor, directory);
+    const snapshot = object(
+      (await winner.call('get', { ...requestFor(directory), raw: true })).entry,
+    );
+    await readExact(winner, snapshot.reader, new Uint8Array([91]));
+    checks.push('namespace-concurrent-workers-compete-for-last-payload-byte');
+  });
+  await withNamespace(workerUrl, 1, async (clients) => {
+    const a = clients[0]!;
+    const first = await beginAt(a, '/tiny-a'),
+      second = await beginAt(a, '/tiny-b'),
+      third = await beginAt(a, '/tiny-c');
+    for (const editor of [first, second])
+      assert(
+        (
+          await a.control('fill-editor', {
+            editor: editor.editor,
+            length: 8192,
+            chunkSize: 1,
+          })
+        ).written === 8192,
+        'Small writes allocate real separate records',
+      );
+    assert(
+      (
+        await a.control('write', {
+          editor: third.editor,
+          sequence: 0,
+          bytes: new Uint8Array([1]),
+        })
+      ).accepted === false,
+      'Tiny chunks hit namespace record cap despite little payload',
+    );
+    const usage = await ledger(a);
+    assert(
+      usage.chunks === 16384 && Number(usage.allocatedBytes) < 20000,
+      'Record cap independently bounds tiny chunk amplification',
+    );
+    checks.push('namespace-tiny-chunk-record-cap-independent-of-payload');
+  });
+  await withNamespace(workerUrl, 1, async (clients) => {
+    const a = clients[0]!,
+      directory = '/' + 'd'.repeat(4095),
+      suffix = 'u'.repeat(16000);
+    for (let index = 0; index < 64; index++) {
+      const url = index + suffix;
+      await seedAt(a, directory, url);
+      assert(
+        (await a.call('get', { ...requestFor(directory, url), raw: true }))
+          .entry,
+        'Long-key reader gets reserved',
+      );
+      await a.call('clear', requestFor(directory));
+    }
+    let accepted = 0;
+    for (let index = 0; index < 64; index++) {
+      const result = await a.call(
+        'begin',
+        requestFor(directory, 'pending-' + index + suffix),
+      );
+      if (result.accepted !== true) break;
+      accepted++;
+    }
+    const usage = await ledger(a);
+    assert(
+      accepted > 0 &&
+        accepted < 64 &&
+        Number(usage.metadataBytes) > 3 * 1024 * 1024 &&
+        Number(usage.allocatedBytes) < 4096,
+      'Dynamic primary/index keys exhaust structure budget before body or reference caps',
+    );
+    await expectFailure(
+      a.call('begin', requestFor('/' + '界'.repeat(1366))),
+      'Directory UTF-8 budget is enforced',
+    );
+    await expectFailure(
+      a.call('begin', requestFor('/valid', 'u'.repeat(16385))),
+      'URL UTF-8 budget is enforced',
+    );
+    checks.push('namespace-structure-metadata-and-utf8-key-budgets');
+  });
+  await withNamespace(workerUrl, 2, async (clients) => {
+    const a = clients[0]!,
+      b = clients[1]!;
+    await seedAt(a, '/pending');
+    const reader = object(
+      (await a.call('get', { ...requestFor('/pending'), raw: true })).entry,
+    );
+    await a.call('clear', requestFor('/pending'));
+    await beginAt(b, '/foreign-live');
+    await a.control('pause-reclaim', { all: true });
+    const pending = Array.from({ length: 4 }, (_, index) =>
+      a.call('begin', requestFor('/window', 'pending-' + index)),
+    );
+    await a.control('wait-reclaim');
+    assert(
+      (await a.call('begin', requestFor('/window', 'overflow'))).accepted ===
+        false,
+      'Ordinary data window is bounded at four',
+    );
+    await a.call('reader-close', {
+      ...requestFor('/pending'),
+      reader: reader.reader,
+    });
+    await a.control('resume-reclaim');
+    for (const result of await Promise.all(pending))
+      assert(result.accepted === true, 'Admitted begin resumes after cleanup');
+    assert(
+      (await ledger(a)).readers === 0,
+      'Terminal cleanup succeeded while ordinary window was full',
+    );
+    checks.push('namespace-pending-four-preserves-terminal-cleanup-channel');
+
+    const editor = await beginAt(a, '/rollback');
+    assert(
+      (
+        await a.control('write', {
+          editor: editor.editor,
+          sequence: 0,
+          bytes: new Uint8Array([1, 2, 3]),
+        })
+      ).accepted === true,
+      'Rollback fixture stores real binary bytes',
+    );
+    await a.control('fail-next-put', { replacement: 'none' });
+    await expectFailure(
+      a.call('commit', {
+        ...requestFor('/rollback'),
+        editor: editor.editor,
+        expected: editor.version,
+        generation: editor.generation,
+      }),
+      'Actual IDB commit abort remains observable',
+    );
+    const after = await ledger(a);
+    assert(
+      after.allocatedBytes ===
+        5 * new TextEncoder().encode(JSON.stringify({ status: 200 })).length,
+      'Failed commit rollback plus CAS cleanup refunds only its own body and payload metadata',
+    );
+    checks.push('namespace-ledger-and-records-share-real-idb-abort');
+  });
+  await withNamespace(workerUrl, 1, async (clients) => {
+    const a = clients[0]!;
+    await seedAt(a, '/same');
+    await withNamespace(workerUrl, 1, async (others) => {
+      const b = others[0]!;
+      assert(
+        !(await b.call('get', requestFor('/same'))).entry,
+        'Other namespace does not see entries',
+      );
+      assert(
+        (await ledger(b)).directories === 0,
+        'Other namespace has independent capacity',
+      );
+      await seedAt(b, '/same');
+      await b.call('clear', requestFor('/same'));
+      assert(
+        (await a.call('get', requestFor('/same'))).entry,
+        'Other namespace clear cannot remove this current entry',
+      );
+    });
+    checks.push('namespace-capacity-and-current-entries-remain-isolated');
+  });
 }
 
 export async function runCacheLifecycleSuite(workerUrl: string) {
@@ -934,6 +1536,7 @@ export async function runCacheLifecycleSuite(workerUrl: string) {
       checks.push('failed-' + operation + '-releases-only-closed-handle');
     }
     await readerFailureGates(url, b, c, large, encodedLarge, checks);
+    await namespaceGates(workerUrl, checks);
     return {
       passed: true,
       checks,

@@ -1,5 +1,6 @@
 /** Manual real-browser gate for the product Cache bridge; no JVM or Source network. */
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,6 +51,11 @@ export async function checkCacheStorage({
   if (!driverBytes || !suiteBytes)
     throw Error('Missing Cache browser test output');
   const worker = Buffer.concat([cache, Buffer.from('\n'), driverBytes]);
+  const artifactIdentity = {
+    cacheBridgeSha256: createHash('sha256').update(cache).digest('hex'),
+    workerSha256: createHash('sha256').update(worker).digest('hex'),
+    suiteSha256: createHash('sha256').update(suiteBytes).digest('hex'),
+  };
   let resolveReport: (value: Record<string, unknown>) => void = () => {},
     rejectReport: (error: Error) => void = () => {},
     received = false;
@@ -137,11 +143,9 @@ export async function checkCacheStorage({
       timeoutMs,
     );
     const completed = await result;
-    await writeFileAtomic(
-      reportPath,
-      JSON.stringify(completed, null, 2) + '\n',
-    );
-    console.log(JSON.stringify(completed, null, 2));
+    const evidence = { ...completed, ...artifactIdentity };
+    await writeFileAtomic(reportPath, JSON.stringify(evidence, null, 2) + '\n');
+    console.log(JSON.stringify(evidence, null, 2));
     console.log('Report: ' + reportPath);
     if (!completed.passed)
       throw Error('Real-browser Cache storage gate failed');
@@ -152,6 +156,7 @@ export async function checkCacheStorage({
         JSON.stringify(
           {
             passed: false,
+            ...artifactIdentity,
             error:
               error instanceof Error
                 ? error.message
