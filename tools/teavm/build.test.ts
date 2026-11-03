@@ -10,8 +10,8 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { readZip, writeZip } from '../lib/archive.ts';
-import { digest } from '../lib/json.ts';
+import { createHash } from 'node:crypto';
+import { unzipSync, zipSync } from 'fflate';
 import {
   compileBridgeBootstrap,
   generateRegistries,
@@ -55,21 +55,32 @@ test('registries bind exact injection references and conditional extension resou
       source = path.join(work, 'java/src/main/java');
     mkdirSync(runtime, { recursive: true });
     mkdirSync(path.join(source, 'prototype'), { recursive: true });
-    writeZip(path.join(runtime, 'host.jar'), {
-      'prototype/Reference.class': Buffer.from(
-        'Luy/kohesive/injekt/api/FullTypeReference<Lhost/Service$Nested;>;',
-      ),
-    });
-    writeZip(path.join(runtime, 'icu4j-79.1.jar'), {
-      'com/ibm/icu/data/example.res': Buffer.from('resource'),
-      'com/ibm/icu/Excluded.class': Buffer.from('class'),
-    });
+    writeFileSync(
+      path.join(runtime, 'host.jar'),
+      zipSync({
+        'prototype/Reference.class': Buffer.from(
+          'Luy/kohesive/injekt/api/FullTypeReference<Lhost/Service$Nested;>;',
+        ),
+      }),
+    );
+    writeFileSync(
+      path.join(runtime, 'icu4j-79.1.jar'),
+      zipSync({
+        'com/ibm/icu/data/example.res': Buffer.from('resource'),
+        'com/ibm/icu/Excluded.class': Buffer.from('class'),
+      }),
+    );
     const original = path.join(work, 'extension.jar');
-    writeZip(original, {
-      'assets/data.json': Buffer.from('{}'),
-      'example/Source.class': Buffer.from('no ICU here'),
-    });
-    const originalHash = digest(readFileSync(original));
+    writeFileSync(
+      original,
+      zipSync({
+        'assets/data.json': Buffer.from('{}'),
+        'example/Source.class': Buffer.from('no ICU here'),
+      }),
+    );
+    const originalHash = createHash('sha256')
+      .update(readFileSync(original))
+      .digest('hex');
     generateRegistries(work, source, original);
     assert.match(
       readFileSync(path.join(source, 'prototype/TypeMap.java'), 'utf8'),
@@ -81,10 +92,16 @@ test('registries bind exact injection references and conditional extension resou
     );
     assert.match(resources, /assets\/data.json/);
     assert.doesNotMatch(resources, /example\.res/);
-    assert.equal(digest(readFileSync(original)), originalHash);
-    writeZip(original, {
-      'example/Source.class': Buffer.from('android/icu/text/Collator'),
-    });
+    assert.equal(
+      createHash('sha256').update(readFileSync(original)).digest('hex'),
+      originalHash,
+    );
+    writeFileSync(
+      original,
+      zipSync({
+        'example/Source.class': Buffer.from('android/icu/text/Collator'),
+      }),
+    );
     generateRegistries(work, source, original);
     resources = readFileSync(
       path.join(source, 'prototype/ResourceConfig.java'),
@@ -109,19 +126,29 @@ test('dependency adaptation removes owned classes and inners without changing or
       'package example; class Owned {}',
     );
     const dependency = path.join(runtime, 'host.jar');
-    writeZip(dependency, {
-      'example/Owned.class': Buffer.from('owned'),
-      'example/Owned$Inner.class': Buffer.from('inner'),
-      'example/OwnedOther.class': Buffer.from('retain'),
-      'resource.bin': Buffer.from([0, 255]),
-    });
-    const originalHash = digest(readFileSync(dependency));
+    writeFileSync(
+      dependency,
+      zipSync({
+        'example/Owned.class': Buffer.from('owned'),
+        'example/Owned$Inner.class': Buffer.from('inner'),
+        'example/OwnedOther.class': Buffer.from('retain'),
+        'resource.bin': Buffer.from([0, 255]),
+      }),
+    );
+    const originalHash = createHash('sha256')
+      .update(readFileSync(dependency))
+      .digest('hex');
     prepareLibraries(work, source);
     assert.deepEqual(
-      Object.keys(readZip(path.join(work, 'java/libs/host.jar'))).sort(),
+      Object.keys(
+        unzipSync(readFileSync(path.join(work, 'java/libs/host.jar'))),
+      ).sort(),
       ['example/OwnedOther.class', 'resource.bin'],
     );
-    assert.equal(digest(readFileSync(dependency)), originalHash);
+    assert.equal(
+      createHash('sha256').update(readFileSync(dependency)).digest('hex'),
+      originalHash,
+    );
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

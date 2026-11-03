@@ -1,13 +1,13 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { isRecord } from './types.ts';
+import { build } from 'esbuild';
+import isRecord from 'is-plain-obj';
 import type { VerifiedInputs, ValidationReport } from './types.ts';
 import path from 'node:path';
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 import {
   completeBrowserValidation,
-  digest,
   repositoryRoot,
 } from './verify-manifest.ts';
 
@@ -45,7 +45,7 @@ export async function verifyInBrowser(
   base.runtimeHostSha256 = Object.fromEntries(
     [...runtimeFiles].map(([name, bytes]) => [
       path.basename(name),
-      digest(bytes),
+      createHash('sha256').update(bytes).digest('hex'),
     ]),
   );
   const manifestPath = `/extensions/builds/${manifest.buildId}/manifest.json`;
@@ -67,7 +67,23 @@ export async function verifyInBrowser(
     server.closeAllConnections();
     resolveResult(report);
   };
-  const runner = `import '/runtime/host.js';
+  const runnerSource = `import '/runtime/host.js';
+import {create} from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
+import {encodeControlRequest,parseControlResponse,runtimeErrorData,messageJson,runtimeHelloSchema,runtimeSessionSchema} from './packages/contracts/src/index.ts';
+const runtime=window.karuyomiRuntime;
+async function control(command,expected){
+  const requestId=crypto.randomUUID();
+  const request=create(pb.ControlRequestSchema,{requestId,command});
+  const response=parseControlResponse(await runtime.control(encodeControlRequest(request)));
+  if(response.requestId!==requestId)throw Error('Control response identity mismatch');
+  if(response.result.case==='error'){
+    const failure=runtimeErrorData(response.result.value);
+    throw Object.assign(Error(failure.message),failure);
+  }
+  if(response.result.case!==expected)throw Error('Unexpected control result');
+  return response.result.value;
+}
 const output=document.querySelector('pre');
 const result={nonce:${JSON.stringify(nonce)},userAgent:navigator.userAgent,indexedDb:false};
 async function indexedDbCheck(){
@@ -101,18 +117,31 @@ try{
   result.manifestSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',manifestBytes)),value=>value.toString(16).padStart(2,'0')).join('');
   result.buildId=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(manifestBytes)).buildId;
   if(result.manifestSha256!==${JSON.stringify(base.manifestSha256)}||result.buildId!==${JSON.stringify(manifest.buildId)})throw Error('Browser manifest identity mismatch');
-  result.hello=await window.karuyomiRuntime.ready;
-  result.session=await window.karuyomiRuntime.open({
+  result.hello=runtimeHelloSchema.parse(messageJson(pb.RuntimeHelloSchema,await control({case:'ready',value:{}},'hello')));
+  const session=await control({case:'open',value:{
     manifestPath:${JSON.stringify(manifestPath)},identity:${JSON.stringify('release-validator:' + nonce)},
     expectedBuildId:${JSON.stringify(manifest.buildId)},expectedBundleSha256:${JSON.stringify(manifest.bundle.sha256)},userAgent:navigator.userAgent
-  });
+  }},'session');
+  result.session=runtimeSessionSchema.parse(messageJson(pb.RuntimeSessionSchema,session));
 }catch(error){result.failure={code:error.code??'browser_init_failed',message:String(error.message??error).slice(0,2000)};}
 finally{
-  try{await window.karuyomiRuntime?.dispose();}catch(error){result.failure??={code:'dispose_failed',message:String(error.message??error).slice(0,2000)};}
+  try{if(runtime)await control({case:'dispose',value:{}},'completed');}catch(error){result.failure??={code:'dispose_failed',message:String(error.message??error).slice(0,2000)};}
   output.textContent=JSON.stringify(result,null,2);
   const response=await fetch('/validation-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result)});
   document.title=response.ok?'Extension validation complete':'Extension validation report rejected';
 }`;
+  // Bundle the real generated codec into the page; the template stays legal JS.
+  const compiledRunner = await build({
+    stdin: { contents: runnerSource, resolveDir: repositoryRoot, loader: 'js' },
+    external: ['/runtime/host.js'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    target: 'es2022',
+    write: false,
+  });
+  const runner = compiledRunner.outputFiles[0]?.text;
+  if (!runner) throw new Error('Browser validator compilation failed');
   const server = createServer(async (request, response) => {
     try {
       response.setHeader('Cache-Control', 'no-store');

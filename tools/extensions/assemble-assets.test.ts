@@ -47,7 +47,6 @@ async function fixture(t: TestContext) {
         manifestPath,
       },
     ],
-    nextCursor: null,
   };
   async function put(relative: string, bytes: string | Uint8Array) {
     const file = path.join(source, relative);

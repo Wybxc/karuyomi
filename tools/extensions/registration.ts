@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Validate authoritative static metadata, then register explicit Source policy only.
-import { execFile } from 'node:child_process';
-import { isDeepStrictEqual, parseArgs, promisify } from 'node:util';
+import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -11,7 +10,8 @@ import type {
   BuildManifest,
   ExtensionIndex,
 } from '../../packages/contracts/src/index.ts';
-import { isRecord } from '../lib/json.ts';
+import isRecord from 'is-plain-obj';
+import { execa } from 'execa';
 import {
   parseManifest,
   parseManifestValue,
@@ -37,7 +37,6 @@ export type D1Executor = (
 ) => Promise<unknown>;
 export const INDEX_METADATA_LIMIT = 2 * 1024 * 1024;
 export const MANIFEST_METADATA_LIMIT = 64 * 1024;
-const exec = promisify(execFile);
 
 /** Catalog-only validation does not read any extension or WASM bytes. */
 export async function verifyMetadata(
@@ -261,7 +260,7 @@ export const executeD1: D1Executor = async (arguments_, destination) => {
             ? ['--persist-to', destination.persistTo]
             : []),
         ];
-  const { stdout } = await exec(
+  const { stdout } = await execa(
     process.execPath,
     [
       require.resolve('wrangler'),
@@ -273,8 +272,14 @@ export const executeD1: D1Executor = async (arguments_, destination) => {
       '--json',
     ],
     {
+      shell: false,
+      stdin: 'ignore',
+      preferLocal: false,
+      stripFinalNewline: false,
+      verbose: 'none',
       cwd: path.join(repositoryRoot, 'apps/api'),
       maxBuffer: 8 * 1024 * 1024,
+      extendEnv: false,
       env: {
         ...process.env,
         CLOUDFLARE_SEND_METRICS: 'false',

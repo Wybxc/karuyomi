@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawn, execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -15,22 +14,23 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { test, type TestContext } from 'node:test';
 import lockfile from 'proper-lockfile';
-import {
-  canonical,
-  digest,
-  isRecord,
-  readJson,
-  writeJson,
-} from '../lib/json.ts';
+import { execa, execaSync } from 'execa';
+import { createHash } from 'node:crypto';
+import isRecord from 'is-plain-obj';
+import stableStringify from 'json-stable-stringify';
+import writeFileAtomic from 'write-file-atomic';
 import { ROOT, git, treeHash } from './catalog.ts';
 import {
   ExtensionPipeline,
+  BuilderProcesses,
   emptyState,
   resultOf,
   resumePlan,
   validateBuildCheckout,
   writeGithubOutput,
+  withStateLock,
 } from './pipeline.ts';
+
 import {
   runtimeIdentitySchema,
   type Catalog,
@@ -137,13 +137,15 @@ function fixture(t: TestContext) {
         'package.json',
       ].map((name) => [name, treeHash(checkout, name)]),
     );
-    descriptor.hostFingerprint = digest(
-      canonical({
-        schemaVersion: 1,
-        inputs: descriptor.hostInputs,
-        pinnedSubmodules: [],
-      }),
-    );
+    descriptor.hostFingerprint = createHash('sha256')
+      .update(
+        stableStringify({
+          schemaVersion: 1,
+          inputs: descriptor.hostInputs,
+          pinnedSubmodules: [],
+        }) ?? assert.fail('Fixture must be valid JSON'),
+      )
+      .digest('hex');
   };
   refresh();
   const plan = (entries = [descriptor]): ExtensionPlan => {
@@ -217,6 +219,58 @@ test('runner executes frozen same-layer builder, strips credentials and reuses v
     ),
     '',
   );
+});
+test('builder preserves Unicode and shell metacharacter arguments and streams large logs without inheriting credentials', async (t) => {
+  const f = fixture(t);
+  const processes = new BuilderProcesses();
+  const argsFile = path.join(f.root, 'arguments.json');
+  const log = path.join(f.root, 'large-builder.log');
+  const sentinel = path.join(f.root, 'must-not-be-created');
+  const arguments_ = [
+    '漫画 🍵 with spaces',
+    `$(touch ${sentinel})`,
+    '`echo shell-expansion`',
+    'quote" and apostrophe\' and ; * ? $HOME',
+  ];
+  const previous = process.env.KARUYOMI_TEST_CREDENTIAL;
+  process.env.KARUYOMI_TEST_CREDENTIAL = 'must-not-be-inherited';
+  try {
+    await processes.run(
+      process.execPath,
+      [
+        '-e',
+        `const fs=require('node:fs');
+if(process.env.KARUYOMI_TEST_CREDENTIAL)throw Error('Environment was merged');
+if(process.env.BUILDER_FIXTURE!=='allowed')throw Error('Explicit environment missing');
+fs.writeFileSync(process.argv[1],JSON.stringify(process.argv.slice(2)));
+process.stdout.write(Buffer.alloc(5*1024*1024,97),()=>process.stderr.write(Buffer.alloc(5*1024*1024,98)));`,
+        argsFile,
+        ...arguments_,
+      ],
+      {
+        cwd: f.root,
+        env: { BUILDER_FIXTURE: 'allowed' },
+        stdout: { file: log, append: true },
+        stderr: { file: log, append: true },
+      },
+    );
+    assert.deepEqual(JSON.parse(readFileSync(argsFile, 'utf8')), arguments_);
+    assert.equal(existsSync(sentinel), false);
+    const bytes = readFileSync(log);
+    assert.equal(bytes.length, 10 * 1024 * 1024);
+    assert.equal(
+      bytes.subarray(0, 5 * 1024 * 1024).every((byte) => byte === 97),
+      true,
+    );
+    assert.equal(
+      bytes.subarray(5 * 1024 * 1024).every((byte) => byte === 98),
+      true,
+    );
+  } finally {
+    await processes.close();
+    if (previous === undefined) delete process.env.KARUYOMI_TEST_CREDENTIAL;
+    else process.env.KARUYOMI_TEST_CREDENTIAL = previous;
+  }
 });
 test('frozen checkout rejects wrong commits and dirty host input', (t) => {
   const f = fixture(t);
@@ -300,7 +354,10 @@ fs.writeFileSync(path.join(output,'pids.json'),JSON.stringify([process.pid,child
         buildId: 'pending-build',
       },
       planFile = path.join(f.root, 'plan.json');
-    writeJson(planFile, f.plan([f.descriptor, pending]));
+    writeFileAtomic.sync(
+      planFile,
+      JSON.stringify(f.plan([f.descriptor, pending])) + '\n',
+    );
     for (const [signal, number] of [
       ['SIGINT', 2],
       ['SIGTERM', 15],
@@ -309,7 +366,7 @@ fs.writeFileSync(path.join(output,'pids.json'),JSON.stringify([process.pid,child
         state = path.join(runRoot, 'state.json'),
         output = path.join(runRoot, 'resume-plan.json'),
         delivery = path.join(runRoot, 'builds', f.descriptor.inputFingerprint);
-      const runner = spawn(
+      const runner = execa(
         process.execPath,
         [
           fileURLToPath(new URL('./pipeline.ts', import.meta.url)),
@@ -326,8 +383,13 @@ fs.writeFileSync(path.join(output,'pids.json'),JSON.stringify([process.pid,child
           '1',
         ],
         {
+          stdin: 'ignore',
           env: { ...process.env, CI: 'false', GITHUB_ACTIONS: 'false' },
-          stdio: ['ignore', 'pipe', 'pipe'],
+          extendEnv: false,
+          stdout: 'pipe',
+          stderr: 'pipe',
+          buffer: false,
+          reject: false,
         },
       );
       let log = '',
@@ -338,12 +400,9 @@ fs.writeFileSync(path.join(output,'pids.json'),JSON.stringify([process.pid,child
       runner.stderr.on('data', (data: Buffer) => {
         log += data.toString();
       });
-      const exited = new Promise<void>((resolve) =>
-        runner.on('exit', (code) => {
-          exitCode = code;
-          resolve();
-        }),
-      );
+      const exited = runner.then((result) => {
+        exitCode = result.exitCode ?? null;
+      });
       let pids: number[] = [];
       try {
         await until(
@@ -354,7 +413,9 @@ fs.writeFileSync(path.join(output,'pids.json'),JSON.stringify([process.pid,child
           },
           () => log,
         );
-        const input = readJson(path.join(delivery, 'pids.json'));
+        const input = JSON.parse(
+          readFileSync(path.join(delivery, 'pids.json'), 'utf8'),
+        );
         assert.ok(
           Array.isArray(input) &&
             input.every((pid): pid is number => typeof pid === 'number'),
@@ -391,14 +452,13 @@ fs.writeFileSync(path.join(output,'pids.json'),JSON.stringify([process.pid,child
           heartbeat,
         );
         for (const pid of pids) {
-          let status = '';
-          try {
-            status = execFileSync('ps', ['-p', String(pid), '-o', 'stat='], {
-              encoding: 'utf8',
-            }).trim();
-          } catch (error) {
-            if (!isRecord(error) || error.status !== 1) throw error;
-          }
+          const result = execaSync('ps', ['-p', String(pid), '-o', 'stat='], {
+            stdin: 'ignore',
+            encoding: 'utf8',
+            reject: false,
+          });
+          if (result.failed && result.exitCode !== 1) throw result;
+          const status = result.stdout.trim();
           assert.ok(
             !status || status.startsWith('Z'),
             'live child ' + pid + ': ' + status,
@@ -420,9 +480,137 @@ fs.writeFileSync(path.join(output,'pids.json'),JSON.stringify([process.pid,child
           try {
             process.kill(pid, 'SIGKILL');
           } catch (error) {
-            if (!isRecord(error) || error.code !== 'ESRCH') throw error;
+            if (
+              !(error instanceof Error) ||
+              !('code' in error) ||
+              error.code !== 'ESRCH'
+            )
+              throw error;
           }
       }
+    }
+  },
+);
+
+for (const stdio of ['ignore', 'inherit'] as const)
+  test(
+    `successful builder exit stops descendants with ${stdio} stdio before releasing the checkpoint lock`,
+    { skip: process.platform === 'win32', timeout: 15000 },
+    async (t) => {
+      const f = fixture(t);
+      const heartbeat = path.join(f.root, 'orphan-heartbeat');
+      const pidFile = path.join(f.root, 'orphan-pid');
+      const logFile = path.join(f.root, 'orphan-build.log');
+      const processes = new BuilderProcesses();
+      const state = path.join(f.root, 'orphan-state.json');
+      const childScript =
+        "const fs=require('node:fs');process.on('SIGTERM',()=>{});" +
+        "setInterval(()=>{fs.writeFileSync(process.argv[1],String(Date.now()));process.stdout.write('still running\\n')},10);";
+      const builderScript =
+        "const fs=require('node:fs');const {spawn}=require('node:child_process');" +
+        `const child=spawn(process.execPath,['-e',${JSON.stringify(childScript)},${JSON.stringify(heartbeat)}],{stdio:${JSON.stringify(stdio)}});` +
+        `fs.writeFileSync(${JSON.stringify(pidFile)},String(child.pid));` +
+        `setInterval(()=>{if(fs.existsSync(${JSON.stringify(heartbeat)}))process.exit(0)},10);`;
+      let pid: number | undefined;
+      try {
+        await withStateLock(state, processes, async () => {
+          await processes.run(process.execPath, ['-e', builderScript], {
+            stdout: { file: logFile, append: true },
+            stderr: { file: logFile, append: true },
+          });
+        });
+        pid = Number(readFileSync(pidFile, 'utf8'));
+        assert.ok(Number.isSafeInteger(pid) && pid > 0);
+        const release = await lockfile.lock(state, {
+          realpath: false,
+          lockfilePath: path.join(f.root, 'orphan-state.lock'),
+          retries: 0,
+        });
+        try {
+          const stopped = readFileSync(heartbeat, 'utf8');
+          const log = readFileSync(logFile, 'utf8');
+          if (stdio === 'inherit') assert.ok(log.includes('still running\n'));
+          await delay(100);
+          assert.equal(readFileSync(heartbeat, 'utf8'), stopped);
+          assert.equal(readFileSync(logFile, 'utf8'), log);
+          const result = execaSync('ps', ['-p', String(pid), '-o', 'stat='], {
+            stdin: 'ignore',
+            reject: false,
+          });
+          assert.ok(
+            result.exitCode === 1 || result.stdout.trim().startsWith('Z'),
+          );
+        } finally {
+          await release();
+        }
+      } finally {
+        await processes.close();
+        if (pid !== undefined)
+          try {
+            process.kill(pid, 'SIGKILL');
+          } catch (error) {
+            if (
+              !(error instanceof Error) ||
+              !('code' in error) ||
+              error.code !== 'ESRCH'
+            )
+              throw error;
+          }
+      }
+    },
+  );
+
+test(
+  'a compromised real checkpoint lock stops the builder before any later state write',
+  { timeout: 20_000 },
+  async (t) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'karuyomi-lock-loss-'));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const state = path.join(directory, 'state.json');
+    const heartbeat = path.join(directory, 'heartbeat');
+    writeFileSync(state, 'previous checkpoint\n');
+    const processes = new BuilderProcesses();
+    try {
+      const running = withStateLock(state, processes, async () => {
+        await processes.run(
+          process.execPath,
+          [
+            '-e',
+            "const fs=require('node:fs');fs.writeFileSync(process.argv[1],'ready');setInterval(()=>fs.appendFileSync(process.argv[1],'.'),20);",
+            heartbeat,
+          ],
+          { stdout: 'ignore', stderr: 'ignore' },
+        );
+        writeFileSync(state, 'must never be committed\n');
+      });
+      const failed = assert.rejects(
+        running,
+        (error: unknown) =>
+          error instanceof Error &&
+          'code' in error &&
+          error.code === 'ECOMPROMISED',
+      );
+      const started = performance.now();
+      while (!existsSync(heartbeat)) {
+        if (performance.now() - started > 3000)
+          assert.fail('Builder did not start');
+        await delay(10);
+      }
+      rmSync(path.join(directory, 'state.lock'), { recursive: true });
+      await failed;
+      const stopped = readFileSync(heartbeat, 'utf8');
+      await delay(100);
+      assert.equal(readFileSync(heartbeat, 'utf8'), stopped);
+      assert.equal(readFileSync(state, 'utf8'), 'previous checkpoint\n');
+      await assert.rejects(
+        processes.run(process.execPath, [
+          '-e',
+          "throw new Error('must not run')",
+        ]),
+        /ENOENT|compromised|lock/i,
+      );
+    } finally {
+      await processes.close();
     }
   },
 );

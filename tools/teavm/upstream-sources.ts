@@ -1,7 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { ROOT } from '../lib/io.ts';
-import { digest } from '../lib/json.ts';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { applyPatch } from 'diff';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export const PACKAGE = 'org/teavm/classlib/java/util/regex';
 export const PATCHES = [
@@ -72,67 +75,6 @@ export const PATCHES = [
   ],
 ] as const;
 
-function lines(text: string): string[] {
-  return text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
-}
-
-export function applyPatch(original: string, patch: string): string {
-  const source = lines(original),
-    changes = lines(patch),
-    result: string[] = [];
-  if (
-    !changes[0]?.startsWith('--- ') ||
-    !changes[1]?.startsWith('+++ ') ||
-    changes.length < 3
-  )
-    throw new Error('Expected a single-file unified diff');
-  let cursor = 0,
-    index = 2;
-  while (index < changes.length) {
-    const header = changes[index];
-    const match = header?.match(
-      /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@[^\n]*\n$/,
-    );
-    if (!match) throw new Error('Invalid patch hunk');
-    const oldStart = Number(match[1]),
-      oldCount = Number(match[2] ?? 1),
-      newStart = Number(match[3]),
-      newCount = Number(match[4] ?? 1);
-    const start = oldCount ? oldStart - 1 : oldStart;
-    if (start < cursor || start > source.length)
-      throw new Error('Overlapping or invalid patch range');
-    result.push(...source.slice(cursor, start));
-    cursor = start;
-    if (result.length !== (newCount ? newStart - 1 : newStart))
-      throw new Error('Invalid patch output position');
-    let consumed = 0,
-      produced = 0;
-    index++;
-    while (index < changes.length && !changes[index]?.startsWith('@@ ')) {
-      const line = changes[index];
-      if (!line || !' +-'.includes(line[0] ?? ''))
-        throw new Error('Unsupported patch line');
-      const operation = line[0],
-        value = line.slice(1);
-      if (operation === ' ' || operation === '-') {
-        if (source[cursor] !== value)
-          throw new Error('Patch context differs from pinned upstream');
-        cursor++;
-        consumed++;
-      }
-      if (operation === ' ' || operation === '+') {
-        result.push(value);
-        produced++;
-      }
-      index++;
-    }
-    if (consumed !== oldCount || produced !== newCount)
-      throw new Error('Patch hunk length differs from header');
-  }
-  result.push(...source.slice(cursor));
-  return result.join('');
-}
-
 export function prepareSources(destination: string, root = ROOT): string[] {
   const upstream = path.join(
       root,
@@ -149,15 +91,17 @@ export function prepareSources(destination: string, root = ROOT): string[] {
         'TeaVM sources missing; run git submodule update --init vendor/teavm',
       );
     const data = readFileSync(file);
-    if (digest(data) !== sourceHash)
+    if (createHash('sha256').update(data).digest('hex') !== sourceHash)
       throw new Error(`Pinned TeaVM source differs: ${file}`);
-    const patched = Buffer.from(
-      applyPatch(
-        data.toString(),
-        readFileSync(path.join(patches, `${name}.patch`), 'utf8'),
-      ),
+    const text = applyPatch(
+      data.toString(),
+      readFileSync(path.join(patches, `${name}.patch`), 'utf8'),
+      { fuzzFactor: 0, autoConvertLineEndings: false },
     );
-    if (digest(patched) !== outputHash)
+    if (text === false)
+      throw new Error(`Patch context differs from pinned TeaVM: ${name}`);
+    const patched = Buffer.from(text);
+    if (createHash('sha256').update(patched).digest('hex') !== outputHash)
       throw new Error(`Patched TeaVM source differs: ${name}`);
     mkdirSync(folder, { recursive: true });
     const output = path.join(folder, `Patched${name}.java`);

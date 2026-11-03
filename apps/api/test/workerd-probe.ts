@@ -1,7 +1,7 @@
 // Real workerd/D1 + actual Static Assets routing over a controlled local snapshot.
 // Only the separate test entry trusts this run's RSA public key.
 import assert from 'node:assert/strict';
-import { isRecord } from '../../../tools/extensions/types.ts';
+import isRecord from 'is-plain-obj';
 import { registrationSql } from '../../../tools/extensions/registration.ts';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { createHash } from 'node:crypto';
@@ -341,7 +341,6 @@ try {
         sourceIds: value.sourceIds,
         manifestPath: `/extensions/builds/${value.buildId}/manifest.json`,
       })),
-      nextCursor: null,
     }),
   );
   const synchronization: unknown = JSON.parse(

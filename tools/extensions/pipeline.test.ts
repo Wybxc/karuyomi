@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -9,12 +10,15 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { canonical, digest, readJson, writeJson } from '../lib/json.ts';
+import { createHash } from 'node:crypto';
+import stableStringify from 'json-stable-stringify';
+import writeFileAtomic from 'write-file-atomic';
 import { ROOT, git } from './catalog.ts';
 import { encodeBundle, StaticHttpError } from './assets.ts';
 import {
@@ -26,7 +30,9 @@ import {
   emptyState,
   finalizeBaseline,
   loadState,
+  MAX_STATE_BYTES,
   makePlan,
+  persistStateCheckpoint,
   removeBuildWork,
   runtimeIdentity,
   validateState,
@@ -123,9 +129,12 @@ class Fixture {
       entries,
       upstreamCommit: 'a'.repeat(40),
       hostFingerprint: 'd'.repeat(64),
-      catalogFingerprint: digest(
-        canonical(entries.map((entry) => entry.inputFingerprint)),
-      ),
+      catalogFingerprint: createHash('sha256')
+        .update(
+          stableStringify(entries.map((entry) => entry.inputFingerprint)) ??
+            assert.fail('Fixture must be valid JSON'),
+        )
+        .digest('hex'),
       discoveryFailures: [],
     };
   }
@@ -173,18 +182,24 @@ class Fixture {
         path.join(directory, 'artifacts', reference.sha256 + '.gz'),
         encoded,
       );
-      writeJson(path.join(directory, 'manifest.json'), {
-        ...materialIdentity,
-        buildId: descriptor.buildId,
-        repoId: 'keiyoushi',
-        packageName: descriptor.packageName,
-        version: descriptor.versionName,
-        sourceIds: ['1'],
-        storageSchema: '1',
-        bundle: reference,
-      });
+      writeFileAtomic.sync(
+        path.join(directory, 'manifest.json'),
+        JSON.stringify({
+          ...materialIdentity,
+          buildId: descriptor.buildId,
+          repoId: 'keiyoushi',
+          packageName: descriptor.packageName,
+          version: descriptor.versionName,
+          sourceIds: ['1'],
+          storageSchema: '1',
+          bundle: reference,
+        }) + '\n',
+      );
     }
-    writeJson(path.join(directory, 'pipeline-result.json'), result);
+    writeFileAtomic.sync(
+      path.join(directory, 'pipeline-result.json'),
+      JSON.stringify(result) + '\n',
+    );
     return { directory, result };
   }
   prepare(
@@ -206,6 +221,43 @@ class Fixture {
     );
   }
 }
+test('checkpoint persistence validates before replacement, bounds metadata and preserves private file permissions', (t) => {
+  const f = new Fixture(t);
+  const directory = path.join(f.root, 'checkpoints');
+  const file = path.join(directory, 'state.json');
+  const state = emptyState();
+  persistStateCheckpoint(file, state);
+  if (process.platform !== 'win32') chmodSync(file, 0o600);
+  state.revision = 'a'.repeat(32);
+  persistStateCheckpoint(file, state);
+  const before = readFileSync(file);
+  assert.equal(before.toString(), stableStringify(state) + '\n');
+  assert.deepEqual(loadState(file), state);
+  if (process.platform !== 'win32')
+    assert.equal(statSync(file).mode & 0o777, 0o600);
+  const invalid = { ...state, active: { 'unknown.package': 'a'.repeat(64) } };
+  assert.throws(() => persistStateCheckpoint(file, invalid), /pointer/);
+  assert.deepEqual(readFileSync(file), before);
+  const descriptor = f.descriptor();
+  const oversized: ExtensionState = {
+    ...state,
+    attempts: {
+      [descriptor.inputFingerprint]: {
+        descriptor,
+        status: 'failed',
+        attempts: 1,
+        failure: {
+          stage: 'upstream',
+          code: 'fixture',
+          message: 'x'.repeat(MAX_STATE_BYTES),
+        },
+      },
+    },
+  };
+  assert.throws(() => persistStateCheckpoint(file, oversized), /Oversized/);
+  assert.deepEqual(readFileSync(file), before);
+  assert.deepEqual(readdirSync(directory), ['state.json']);
+});
 test('complete gzip-only snapshot commits checkpoint only after remote confirmation', async (t) => {
   const f = new Fixture(t),
     descriptor = f.descriptor();
@@ -216,7 +268,9 @@ test('complete gzip-only snapshot commits checkpoint only after remote confirmat
   assert.equal(existsSync(f.stateFile), false);
   assert.equal(
     candidate.indexSha256,
-    digest(readFileSync(path.join(f.snapshot, 'extensions/index.json'))),
+    createHash('sha256')
+      .update(readFileSync(path.join(f.snapshot, 'extensions/index.json')))
+      .digest('hex'),
   );
   assert.equal(candidate.bootstrap.complete, true);
   assert.equal(
@@ -448,13 +502,19 @@ test('stale revision and unconfirmed deployment cannot commit checkpoint', async
     descriptor = f.descriptor();
   f.output(descriptor);
   const candidate = await f.prepare(f.plan([descriptor]));
-  writeJson(path.join(f.snapshot, 'extensions/build-state.json'), {
-    ...candidate,
-    revision: 'b'.repeat(32),
-  });
+  writeFileAtomic.sync(
+    path.join(f.snapshot, 'extensions/build-state.json'),
+    JSON.stringify({
+      ...candidate,
+      revision: 'b'.repeat(32),
+    }) + '\n',
+  );
   const offline = path.join(f.root, 'offline');
   cpSync(f.snapshot, offline, { recursive: true });
-  writeJson(path.join(offline, 'extensions/build-state.json'), candidate);
+  writeFileAtomic.sync(
+    path.join(offline, 'extensions/build-state.json'),
+    JSON.stringify(candidate) + '\n',
+  );
   await assert.rejects(
     f.pipeline.checkBase(offline, 'https://example.invalid'),
     /advanced/,
@@ -467,10 +527,13 @@ test('stale revision and unconfirmed deployment cannot commit checkpoint', async
 });
 test('CI pull rejects missing baseline and mixed state/index without overwriting checkpoint', async (t) => {
   const f = new Fixture(t);
-  writeJson(f.stateFile, emptyState());
+  writeFileAtomic.sync(f.stateFile, JSON.stringify(emptyState()) + '\n');
   const before = readFileSync(f.stateFile);
   mkdirSync(path.join(f.snapshot, 'extensions'), { recursive: true });
-  writeJson(path.join(f.snapshot, 'extensions/build-state.json'), emptyState());
+  writeFileAtomic.sync(
+    path.join(f.snapshot, 'extensions/build-state.json'),
+    JSON.stringify(emptyState()) + '\n',
+  );
   writeFileSync(path.join(f.snapshot, 'extensions/index.json'), '{}');
   await assert.rejects(
     f.pipeline.pullState('https://example.invalid', f.stateFile),
@@ -480,9 +543,12 @@ test('CI pull rejects missing baseline and mixed state/index without overwriting
   const nullRevision = {
     ...emptyState(),
     bootstrap: { complete: true },
-    indexSha256: digest(Buffer.from('{}')),
+    indexSha256: createHash('sha256').update(Buffer.from('{}')).digest('hex'),
   };
-  writeJson(path.join(f.snapshot, 'extensions/build-state.json'), nullRevision);
+  writeFileAtomic.sync(
+    path.join(f.snapshot, 'extensions/build-state.json'),
+    JSON.stringify(nullRevision) + '\n',
+  );
   await assert.rejects(
     f.pipeline.pullState('https://example.invalid', f.stateFile),
     /bootstrap/,
@@ -610,15 +676,21 @@ test('cleanup needs persisted success and preserves outputs, other work and shar
     path.join(local, 'extension-cache', descriptor.buildId, 'm2'),
     'dir',
   );
-  writeJson(path.join(output.directory, 'pipeline-result.json'), {
-    ...output.result,
-    status: 'failed',
-  });
+  writeFileAtomic.sync(
+    path.join(output.directory, 'pipeline-result.json'),
+    JSON.stringify({
+      ...output.result,
+      status: 'failed',
+    }) + '\n',
+  );
   assert.throws(
     () => cleanupBuiltWork(output.directory, descriptor, f.root),
     /checkpoint/,
   );
-  writeJson(path.join(output.directory, 'pipeline-result.json'), output.result);
+  writeFileAtomic.sync(
+    path.join(output.directory, 'pipeline-result.json'),
+    JSON.stringify(output.result) + '\n',
+  );
   assert.equal(
     cleanupBuiltWork(output.directory, descriptor, f.root).length,
     3,

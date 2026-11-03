@@ -23,7 +23,7 @@ pnpm --filter @karuyomi/runtime-host build
 | `packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}` | Native 运行时，材料只内嵌于 worker 一次 |
 | `apps/reader/assets/runtime/{host.js,worker.js,manifest.json}`        | 自动复制的 Flutter 应用资源，不入库     |
 
-`materialVersion` 覆盖协议、ABI、材料顺序、路径、摘要、长度和 MIME。同一提交、锁定工具链和依赖必须生成一致的 catalog。扩展 AOT 另有自己的输入指纹与 bundle 摘要。
+`materialVersion` 覆盖协议、ABI、材料顺序、路径、摘要、长度和 MIME。同一提交、锁定工具链和依赖必须生成一致的 catalog。当前 host ABI 为 `karuyomi-source-host-v3`、protocolVersion 为 2；Web/Native 材料与扩展须按同一身份重建。扩展 AOT 另有自己的输入指纹与 bundle 摘要。
 
 ## Web 与 Native
 

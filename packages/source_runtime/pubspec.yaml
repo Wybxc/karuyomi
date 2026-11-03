@@ -5,6 +5,8 @@ publish_to: none
 environment:
   sdk: ^3.12.0
 dependencies:
+  fixnum: 1.1.1
+  protobuf: 6.1.0
   reader_core:
     path: ../reader_core
 dev_dependencies:

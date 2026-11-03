@@ -3,8 +3,6 @@ import type {
   BuildManifest,
   SourceInfo,
 } from '../../packages/contracts/src/index.ts';
-import { isRecord } from '../lib/json.ts';
-export { isRecord } from '../lib/json.ts';
 
 export interface ValidationFailure {
   code: string;
@@ -62,16 +60,3 @@ export type IntegrityResult =
       manifestBytes?: undefined;
       payloads?: undefined;
     };
-
-export function isSourceInfo(value: unknown): value is SourceInfo {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    /^-?\d+$/.test(value.id) &&
-    typeof value.name === 'string' &&
-    typeof value.lang === 'string' &&
-    (value.supportsLatest === undefined ||
-      typeof value.supportsLatest === 'boolean') &&
-    (value.baseUrl === undefined || typeof value.baseUrl === 'string')
-  );
-}

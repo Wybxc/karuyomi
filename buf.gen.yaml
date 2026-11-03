@@ -1,0 +1,13 @@
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-es
+    out: packages/protocol/src
+    opt:
+      - target=ts
+      - import_extension=js
+      - json_types=true
+  - local: [node, scripts/protoc-gen-dart.ts]
+    out: packages/source_runtime/lib/src/pb
+inputs:
+  - directory: protocol

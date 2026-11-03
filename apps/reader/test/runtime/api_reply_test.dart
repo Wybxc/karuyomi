@@ -2,22 +2,27 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
 final class ApiRuntime extends PlatformRuntime {
-  Object? status = 200.0;
+  Object? status = 200;
   bool redirected = false;
   @override
   Uri get origin => Uri.parse('https://reader.example.com');
   @override
-  Future<Object?> call(
-    String method, [
-    Map<String, Object?> payload = const {},
-  ]) async => {
-    'status': status,
-    'headers': {'content-type': 'application/json'},
-    'body': '{}',
-    'redirected': redirected,
-  };
+  Future<Object?> control(Map<String, Object?> json) async {
+    final request = wire.decodeProtoJson(wire.ControlRequest(), json);
+    return {
+      'requestId': request.requestId,
+      'api': {
+        'status': status,
+        'headers': {'content-type': 'application/json'},
+        'body': '{}',
+        'redirected': redirected,
+      },
+    };
+  }
+
   @override
   Future<bool> authenticate(
     BuildContext context, {
@@ -33,20 +38,17 @@ final class ApiRuntime extends PlatformRuntime {
 }
 
 void main() {
-  test(
-    'integral WKWebView Number statuses retain their HTTP meaning',
-    () async {
-      final runtime = ApiRuntime();
-      for (final status in [200, 200.0, 401.0, 503.0]) {
-        runtime.status = status;
-        final reply = await runtime.fetchApi('/api/bootstrap');
-        expect(reply.status, status.toInt());
-        expect(reply.headers['content-type'], 'application/json');
-        expect(reply.body, '{}');
-        expect(reply.redirected, isFalse);
-      }
-    },
-  );
+  test('generated API reply retains HTTP status and headers', () async {
+    final runtime = ApiRuntime();
+    for (final status in [200, 401, 503]) {
+      runtime.status = status;
+      final reply = await runtime.fetchApi('/api/bootstrap');
+      expect(reply.status, status.toInt());
+      expect(reply.headers['content-type'], 'application/json');
+      expect(reply.body, '{}');
+      expect(reply.redirected, isFalse);
+    }
+  });
 
   test(
     'malformed statuses fail instead of rounding into a successful response',
@@ -59,7 +61,7 @@ void main() {
         -1,
         99,
         600,
-        '200',
+        'not-a-status',
         null,
         0,
       ]) {
@@ -82,11 +84,27 @@ void main() {
     'opaque manual redirects preserve status zero and require authentication',
     () async {
       final runtime = ApiRuntime()
-        ..status = 0.0
+        ..status = 0
         ..redirected = true;
       final reply = await runtime.fetchApi('/api/bootstrap');
       expect(reply.status, 0);
       expect(reply.redirected, isTrue);
     },
   );
+
+  test('Native JSON text preserves integer tokens and rejects Number maps', () {
+    final decoded = decodeNativeControlResult(
+      '{"requestId":"c","api":{"status":200,"body":"{}"}}',
+    );
+    expect(
+      wire.decodeProtoJson(wire.ControlResponse(), decoded).api.status,
+      200,
+    );
+    expect(
+      () => decodeNativeControlResult({
+        'api': {'status': 200.0},
+      }),
+      throwsA(isA<RuntimeException>()),
+    );
+  });
 }

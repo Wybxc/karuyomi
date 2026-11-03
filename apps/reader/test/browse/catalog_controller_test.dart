@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:reader_core/reader_core.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
 import 'fakes.dart';
 
@@ -32,17 +33,19 @@ void main() {
       expect(controller.email, 'owner@example.com');
       expect(controller.activeSource!.id, sourceId);
       await controller.loadMangas(search: '原始 搜索');
-      expect(platform.invocations.last['operation'], 'search');
-      expect(platform.invocations.last['args'], {'page': 1, 'query': '原始 搜索'});
+      expect(
+        platform.invocations.last.whichRequest(),
+        wire.SourceCall_Request.search,
+      );
+      expect(platform.invocations.last.search.page, 1);
+      expect(platform.invocations.last.search.query, '原始 搜索');
       final entry = controller.mangas.single;
       final result = await controller.details(entry);
       expect(result!.chapters.single.url, '/chapter/opaque-ref');
       final detailCall = platform.invocations[platform.invocations.length - 2];
-      expect(detailCall['sourceId'], sourceId);
-      expect(detailCall['args'], {'manga': testManga});
-      expect(platform.invocations.last['args'], {
-        'manga': result.manga.snapshot,
-      });
+      expect(detailCall.sourceId, sourceId);
+      expect(detailCall.details.manga, testManga);
+      expect(platform.invocations.last.chapters.manga, result.manga.snapshot);
       expect(result.manga.description, '漫画源返回的完整简介');
     },
   );
@@ -75,13 +78,14 @@ void main() {
     () async {
       await open();
       final prior = controller.mangas.single;
-      platform.invokeHandler = (_) async => {
-        'mangas': 'not a list',
-        'hasNextPage': false,
-      };
+      platform.invokeHandler = (_) async => wire.SourceResult(
+        mangaPage: wire.MangaPage(
+          mangas: [wire.Manga(title: 'missing original Source reference')],
+        ),
+      );
       await controller.loadMangas(more: true);
       expect(controller.mangas.single, same(prior));
-      expect(controller.error, '服务返回的列表格式无效');
+      expect(controller.error, '服务返回的数据不完整');
       expect(controller.busy, false);
       expect(controller.page, 1);
     },
@@ -91,16 +95,17 @@ void main() {
     'container loss prevents late Source data from repopulating the catalog',
     () async {
       await open();
-      final delayed = Completer<Object?>();
+      final delayed = Completer<wire.SourceResult>();
       platform.invokeHandler = (_) => delayed.future;
       final loading = controller.loadMangas(more: true);
       await Future<void>.delayed(Duration.zero);
       platform.runtime.containerLost('Process terminated');
       await Future<void>.delayed(Duration.zero);
-      delayed.complete({
-        'mangas': [testManga],
-        'hasNextPage': true,
-      });
+      delayed.complete(
+        wire.SourceResult(
+          mangaPage: wire.MangaPage(mangas: [testManga], hasNextPage: true),
+        ),
+      );
       await loading;
       expect(controller.session, isNull);
       expect(controller.mangas, isEmpty);
@@ -114,7 +119,7 @@ void main() {
     await controller.connect();
     expect(controller.status, ServiceStatus.failed);
     expect(controller.builds, isEmpty);
-    expect(controller.error, '服务返回的列表格式无效');
+    expect(controller.error, isNotNull);
   });
 
   test(
@@ -131,7 +136,6 @@ void main() {
             'manifestPath': '/extensions/builds/build-2/manifest.json',
           },
         ],
-        'nextCursor': null,
       };
       await controller.connect();
       expect(controller.status, ServiceStatus.ready);
@@ -146,21 +150,25 @@ void main() {
     () async {
       await open();
       final manga = controller.mangas.single;
-      final chapter = ChapterEntry({'url': '/chapter/ref', 'name': 'chapter'});
+      final chapter = ChapterEntry(
+        wire.Chapter(url: '/chapter/ref', name: 'chapter'),
+      );
       var images = ['first', 'second'];
-      platform.invokeHandler = (payload) async => {
-        'pageSessionId': 'pages-empty',
-        'pages': [
-          for (var i = 0; i < images.length; i++)
-            {
-              'pageKey': 'p-$i',
-              'index': i,
-              'sourceIndex': i,
-              'url': '',
-              'imageUrl': 'https://source.invalid/${images[i]}.png',
-            },
-        ],
-      };
+      platform.invokeHandler = (payload) async => wire.SourceResult(
+        pageList: wire.PageList(
+          pageSessionId: 'pages-empty',
+          pages: [
+            for (var i = 0; i < images.length; i++)
+              wire.Page(
+                pageKey: 'p-$i',
+                index: i,
+                sourceIndex: i,
+                url: '',
+                imageUrl: 'https://source.invalid/${images[i]}.png',
+              ),
+          ],
+        ),
+      );
       final first = await controller.openChapter(
         manga,
         chapter,
@@ -192,7 +200,6 @@ void main() {
     platform.inventory = {
       'schemaVersion': 1,
       'builds': [entry, entry],
-      'nextCursor': null,
     };
     await controller.connect();
     expect(controller.status, ServiceStatus.failed);
@@ -216,18 +223,20 @@ void main() {
       expect(first.manifest.pages.single.width, isNull);
       expect(first.manifest.pages.single.key, isNot('p-0'));
       await controller.closeChapter(first);
-      platform.invokeHandler = (payload) async => {
-        'pageSessionId': 'replacement-session',
-        'pages': [
-          {
-            'pageKey': 'new-opaque-key',
-            'index': 0,
-            'sourceIndex': 7,
-            'url': '/page/stable-1',
-            'imageUrl': 'https://source.invalid/rotated-token.png',
-          },
-        ],
-      };
+      platform.invokeHandler = (payload) async => wire.SourceResult(
+        pageList: wire.PageList(
+          pageSessionId: 'replacement-session',
+          pages: [
+            wire.Page(
+              pageKey: 'new-opaque-key',
+              index: 0,
+              sourceIndex: 7,
+              url: '/page/stable-1',
+              imageUrl: 'https://source.invalid/rotated-token.png',
+            ),
+          ],
+        ),
+      );
       final second = await controller.openChapter(
         manga,
         details.chapters.single,
@@ -245,19 +254,15 @@ void main() {
     'malformed page references close their original Java page session',
     () async {
       await open();
-      platform.invokeHandler = (payload) async => {
-        'pageSessionId': 'malformed-session',
-        'pages': [
-          {
-            'pageKey': 'p-0',
-            'index': 1,
-            'sourceIndex': 0,
-            'url': '',
-            'imageUrl': null,
-          },
-        ],
-      };
-      final chapter = ChapterEntry({'url': '/chapter/ref', 'name': 'chapter'});
+      platform.invokeHandler = (payload) async => wire.SourceResult(
+        pageList: wire.PageList(
+          pageSessionId: 'malformed-session',
+          pages: [wire.Page(pageKey: 'p-0', index: 1, sourceIndex: 0, url: '')],
+        ),
+      );
+      final chapter = ChapterEntry(
+        wire.Chapter(url: '/chapter/ref', name: 'chapter'),
+      );
       expect(
         await controller.openChapter(
           controller.mangas.single,
@@ -280,7 +285,9 @@ void main() {
     () async {
       await open();
       final manga = controller.mangas.single;
-      final chapter = ChapterEntry({'url': '/chapter/ref', 'name': 'chapter'});
+      final chapter = ChapterEntry(
+        wire.Chapter(url: '/chapter/ref', name: 'chapter'),
+      );
       final before = platform.invocations.length;
       for (final reference in [
         CatalogSourceRef(

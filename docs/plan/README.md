@@ -14,7 +14,8 @@
 | P1 状态模型确定后    | [P2 多设备同步](p2-sync.md)                                   | 语义已规划；业务表、outbox、push/pull 与冲突恢复待实现                                                        |
 | 基础运行与书架具备后 | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                          |
 | 持续推进             | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                         |
-| 已选定，待实施       | [跨语言协议方案](cross-language-protocol.md)                  | 采用 Protobuf + Buf 双端生成，控制消息使用 ProtoJSON；当前仍为手写解析，尚未实施                              |
+| 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 与正式双端控制已接入；golden/严格检查通过，新 ABI 的实际浏览器/原生运行待验收                  |
+| 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                            |
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
 

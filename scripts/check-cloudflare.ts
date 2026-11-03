@@ -3,7 +3,10 @@
 // API contracts: https://developers.cloudflare.com/api/resources/d1/subresources/database/
 // https://developers.cloudflare.com/api/resources/workers/subresources/routes/
 // Static upload is delegated to the repository's checksum-locked Wrangler.
-import { spawn } from 'node:child_process';
+import {
+  deployPermissionProbe,
+  PermissionDeploymentFailure,
+} from '../tools/cloudflare/deploy-permission-probe.ts';
 import { randomUUID } from 'node:crypto';
 import {
   appendFile,
@@ -16,12 +19,12 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { isRecord } from '../tools/lib/json.ts';
+import isRecord from 'is-plain-obj';
 
 type Check = { status: 'passed' | 'failed'; detail: string };
 class CheckFailure extends Error {}
 const safeError = (error: unknown) =>
-  error instanceof CheckFailure
+  error instanceof CheckFailure || error instanceof PermissionDeploymentFailure
     ? error.message
     : 'Request interrupted or unexpected failure; raw error output withheld';
 const identifier = (
@@ -36,6 +39,7 @@ async function main() {
     throw new CheckFailure(
       'CLOUDFLARE_API_TOKEN and a valid CLOUDFLARE_ACCOUNT_ID are required',
     );
+  const deploymentToken = token;
   const redact = (value: string) => value.replaceAll(token, '[redacted]');
   const abort = new AbortController();
   const stop = () => abort.abort();
@@ -210,60 +214,15 @@ async function main() {
       }),
     );
     if (!cleaning) workerAttempted = true;
-    const output = await new Promise<string>((resolve, reject) => {
-      const child = spawn(
-        process.execPath,
-        [cli, 'deploy', '--config', configuration],
-        {
-          cwd: temporary,
-          env: {
-            ...process.env,
-            CI: 'true',
-            CLOUDFLARE_SEND_METRICS: 'false',
-            WRANGLER_LOG_PATH: path.join(temporary, 'wrangler.log'),
-            NO_COLOR: '1',
-          },
-          stdio: ['ignore', 'pipe', 'pipe'],
-          signal: cleaning
-            ? AbortSignal.timeout(180_000)
-            : AbortSignal.any([abort.signal, AbortSignal.timeout(180_000)]),
-        },
-      );
-      let output = '';
-      let size = 0;
-      const capture = (bytes: Buffer) => {
-        size += bytes.length;
-        if (size > 512 * 1024) child.kill('SIGTERM');
-        else output += bytes.toString();
-      };
-      child.stdout.on('data', capture);
-      child.stderr.on('data', capture);
-      let commandFailed = false;
-      child.once('error', () => {
-        commandFailed = true;
-      });
-      // Wait for close even after abort/error, so cleanup never races a live
-      // uploader. Only numeric API codes escape the captured CLI output.
-      child.once('close', (code) => {
-        if (code === 0 && !commandFailed && size <= 512 * 1024) resolve(output);
-        else {
-          const codes = [...output.matchAll(/\[code:\s*(\d+)\]/g)].map(
-            (match) => match[1],
-          );
-          reject(
-            new CheckFailure(
-              `Wrangler deployment failed (exit ${code ?? 'signal'}); Cloudflare API codes: ${codes.join(',') || 'unavailable'}. ${redact(output).slice(-5000)}`,
-            ),
-          );
-        }
-      });
+    await deployPermissionProbe({
+      wranglerCli: cli,
+      configuration,
+      temporaryDirectory: temporary,
+      token: deploymentToken,
+      restoringBaseline: cleaning,
+      signal: abort.signal,
     });
     if (!cleaning) workerUploaded = true;
-    // Fixed Wrangler emits this only after the remote asset upload completes.
-    if (!cleaning && !/Success! Uploaded 1 file(?:\s|$)/.test(output))
-      throw new CheckFailure(
-        'Wrangler did not confirm uploading the unique static file',
-      );
     const subdomain = await api(
       `${workerPath}/subdomain`,
       'GET',

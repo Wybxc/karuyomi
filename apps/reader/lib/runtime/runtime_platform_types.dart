@@ -1,5 +1,19 @@
+import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
+
+/// Native returns JSON.stringify output so JS integer tokens survive the
+/// WebView's otherwise all-double JavaScript Number conversion.
+Object? decodeNativeControlResult(Object? value) {
+  if (value is! String) {
+    throw const RuntimeException(
+      RuntimeErrorCode.protocolError,
+      'Native control did not return ProtoJSON text',
+    );
+  }
+  return jsonDecode(value);
+}
 
 final class ApiReply {
   const ApiReply({
@@ -44,35 +58,19 @@ abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
     Map<String, String> headers = const {},
     String? body,
   }) async {
-    final value = await call('fetchApi', {
-      'path': path,
-      'method': method,
-      'headers': headers,
-      'body': ?body,
-    });
-    if (value is! Map) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'API transport did not return a response',
-      );
-    }
-    // WKWebView maps JavaScript Numbers to doubles, including HTTP status codes.
-    final status = value['status'];
-    if (status is! num ||
-        !status.isFinite ||
-        status != status.truncateToDouble() ||
-        (status != 0 && (status < 100 || status > 599)) ||
-        (status == 0 && value['redirected'] != true)) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'API transport returned an invalid HTTP status',
-      );
-    }
+    final value = await runtime.fetchApi(
+      wire.ApiFetchRequest(
+        path: path,
+        method: method,
+        headers: headers.entries,
+        body: body,
+      ),
+    );
     return ApiReply(
-      status: status.toInt(),
-      headers: Map<String, String>.from(value['headers'] as Map),
-      body: value['body'] as String,
-      redirected: value['redirected'] == true,
+      status: value.status,
+      headers: Map.unmodifiable(value.headers),
+      body: value.body,
+      redirected: value.redirected,
     );
   }
 

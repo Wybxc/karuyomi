@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { gunzipSync } from 'node:zlib';
-import { digest, readJson } from '../lib/json.ts';
+import { createHash } from 'node:crypto';
 import { build, parseOfficialMetadata, put } from './builder.ts';
 
 test('invalid descriptor records failure without an executable manifest', async () => {
@@ -28,7 +28,10 @@ test('invalid descriptor records failure without an executable manifest', async 
     assert.deepEqual(result.artifacts, []);
     assert.equal(result.stage, 'upstream');
     assert.throws(() => readFileSync(path.join(output, 'manifest.json')));
-    assert.deepEqual(readJson(path.join(output, 'build-result.json')), result);
+    assert.deepEqual(
+      JSON.parse(readFileSync(path.join(output, 'build-result.json'), 'utf8')),
+      result,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -64,10 +67,13 @@ test('builder writes exactly the declared deterministic gzip artifact', () => {
     assert.deepEqual(gunzipSync(encoded), raw);
     assert.equal(ref.path, '/extensions/artifacts/' + name);
     assert.equal(ref.encoding, 'gzip');
-    assert.equal(ref.encodedSha256, digest(encoded));
+    assert.equal(
+      ref.encodedSha256,
+      createHash('sha256').update(encoded).digest('hex'),
+    );
     assert.equal(ref.encodedSize, encoded.length);
     assert.equal(ref.size, raw.length);
-    assert.equal(ref.sha256, digest(raw));
+    assert.equal(ref.sha256, createHash('sha256').update(raw).digest('hex'));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

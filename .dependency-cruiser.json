@@ -20,13 +20,11 @@
       }
     },
     {
-      "name": "common-tools-have-no-domain-dependencies",
+      "name": "no-tools-lib-wrapper-layer",
       "severity": "error",
-      "from": {
-        "path": "^tools/lib/"
-      },
+      "from": {},
       "to": {
-        "path": "^(?:scripts|apps|packages|runtime)/|^tools/(?!lib/)"
+        "path": "^tools/lib/"
       }
     },
     {
@@ -36,7 +34,7 @@
         "path": "^tools/teavm/"
       },
       "to": {
-        "path": "^(?:scripts|apps)/|^tools/(?!lib/|teavm/)"
+        "path": "^(?:scripts|apps)/|^tools/(?!teavm/)"
       }
     },
     {
@@ -56,7 +54,17 @@
         "path": "^packages/contracts/src/"
       },
       "to": {
-        "path": "^(?:scripts|tools|apps|runtime)/|^packages/(?!contracts/)"
+        "path": "^(?:scripts|tools|apps|runtime)/|^packages/(?!contracts/|protocol/)"
+      }
+    },
+    {
+      "name": "generated-protocol-is-independent",
+      "severity": "error",
+      "from": {
+        "path": "^packages/protocol/src/"
+      },
+      "to": {
+        "path": "^(?:scripts|tools|apps|runtime)/|^packages/(?!protocol/)"
       }
     },
     {

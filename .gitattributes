@@ -1,2 +1,4 @@
 # Unified diffs preserve the original upstream context, including whitespace.
 runtime/teavm/patches/teavm/*.patch -whitespace
+# Preserve official Protobuf-ES output, including its final blank line.
+packages/protocol/src/** whitespace=-blank-at-eof

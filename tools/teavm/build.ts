@@ -3,14 +3,19 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { ROOT, files, run } from '../lib/io.ts';
-import { digest, writeJson } from '../lib/json.ts';
-import { readZip, writeZip } from '../lib/archive.ts';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { execa } from 'execa';
+import { unzipSync, zipSync } from 'fflate';
+import { sync as writeFileAtomicSync } from 'write-file-atomic';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export interface AotInput {
   key: string;
@@ -45,9 +50,17 @@ export function generateRegistries(
   jar: string,
 ): void {
   const types = new Map<string, string>();
-  const dependencies = files(path.join(workRoot, 'public/runtime'), '.jar');
+  const dependencies = readdirSync(path.join(workRoot, 'public/runtime'), {
+    recursive: true,
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.jar'))
+    .map((entry) => path.join(entry.parentPath, entry.name))
+    .sort();
   for (const dependency of [...dependencies, jar]) {
-    for (const [name, bytes] of Object.entries(readZip(dependency))) {
+    for (const [name, bytes] of Object.entries(
+      unzipSync(readFileSync(dependency)),
+    )) {
       if (!name.endsWith('.class')) continue;
       const signature = Buffer.from(bytes)
         .toString('latin1')
@@ -76,7 +89,7 @@ export function generateRegistries(
       cases +
       'default:throw new IllegalArgumentException("Unregistered AOT type "+n);}}}',
   );
-  const entries = readZip(jar),
+  const entries = unzipSync(readFileSync(jar)),
     resources = Object.keys(entries).filter(
       (name) => name.startsWith('assets/') && !name.endsWith('/'),
     );
@@ -89,7 +102,9 @@ export function generateRegistries(
   if (usesIcu)
     resources.push(
       ...Object.keys(
-        readZip(path.join(workRoot, 'public/runtime/icu4j-79.1.jar')),
+        unzipSync(
+          readFileSync(path.join(workRoot, 'public/runtime/icu4j-79.1.jar')),
+        ),
       ).filter(
         (name) =>
           name.startsWith('com/ibm/icu/') &&
@@ -109,16 +124,26 @@ export function generateRegistries(
 }
 
 export function prepareLibraries(workRoot: string, source: string): void {
-  const classes = files(source, '.java').map((file) =>
-    path.relative(source, file).split(path.sep).join('/').slice(0, -5),
-  );
+  const classes = readdirSync(source, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.java'))
+    .map((entry) =>
+      path
+        .relative(source, path.join(entry.parentPath, entry.name))
+        .split(path.sep)
+        .join('/')
+        .slice(0, -5),
+    );
   const libs = path.join(workRoot, 'java/libs');
   mkdirSync(libs, { recursive: true });
-  for (const dependency of files(
-    path.join(workRoot, 'public/runtime'),
-    '.jar',
-  )) {
-    const entries = readZip(dependency),
+  const dependencies = readdirSync(path.join(workRoot, 'public/runtime'), {
+    recursive: true,
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.jar'))
+    .map((entry) => path.join(entry.parentPath, entry.name))
+    .sort();
+  for (const dependency of dependencies) {
+    const entries = unzipSync(readFileSync(dependency)),
       retained: Record<string, Uint8Array> = {};
     for (const [name, bytes] of Object.entries(entries))
       if (
@@ -128,7 +153,10 @@ export function prepareLibraries(workRoot: string, source: string): void {
         )
       )
         retained[name] = bytes;
-    writeZip(path.join(libs, path.basename(dependency)), retained);
+    writeFileSync(
+      path.join(libs, path.basename(dependency)),
+      zipSync(retained, { level: 6, mtime: new Date(1980, 0, 1) }),
+    );
   }
 }
 
@@ -141,7 +169,7 @@ export async function compileBridgeBootstrap(
   const source = path.join(workRoot, 'java/src/main/java/prototype'),
     classes = path.join(workRoot, 'java/target/classes');
   mkdirSync(classes, { recursive: true });
-  await run(
+  await execa(
     'javac',
     [
       '-cp',
@@ -152,7 +180,18 @@ export async function compileBridgeBootstrap(
         path.join(source, name + '.java'),
       ),
     ],
-    { cwd: workRoot, env },
+    {
+      cwd: workRoot,
+      env,
+      extendEnv: false,
+      shell: false,
+      stdin: 'ignore',
+      stdout: 'inherit',
+      stderr: 'inherit',
+      buffer: false,
+      preferLocal: false,
+      verbose: 'none',
+    },
   );
   return classes;
 }
@@ -165,71 +204,87 @@ export async function compileExtension(
     started = performance.now();
   const jar = path.join(workRoot, 'public/extensions', entry.jar),
     source = path.join(workRoot, 'java/src/main/java');
-  if (digest(readFileSync(jar)) !== entry.convertedSha256)
+  if (
+    createHash('sha256').update(readFileSync(jar)).digest('hex') !==
+    entry.convertedSha256
+  )
     throw new Error(`Extension input checksum mismatch: ${entry.key}`);
   mkdirSync(cache, { recursive: true });
   generateRegistries(workRoot, source, jar);
   prepareLibraries(workRoot, source);
   const properties = [`-Dextension=${entry.jar}`, `-Dplugin=${entry.key}`];
   if (env['TEAVM_DEBUG']) properties.push('-Dminify=false', '-Ddebug=true');
-  const mvn = async (...args: string[]) =>
-    await run(
-      options.maven,
-      [
-        '-q',
-        '-f',
-        'java/pom.xml',
-        `-Dmaven.repo.local=${path.join(cache, 'm2')}`,
-        ...properties,
-        ...args,
-      ],
-      { cwd: workRoot, env },
-    );
+  const compiler = execa({
+    cwd: workRoot,
+    env,
+    extendEnv: false,
+    shell: false,
+    stdin: 'ignore',
+    stdout: 'inherit',
+    stderr: 'inherit',
+    buffer: false,
+    preferLocal: false,
+    verbose: 'none',
+  });
+  const mavenArguments = [
+    '-q',
+    '-f',
+    'java/pom.xml',
+    `-Dmaven.repo.local=${path.join(cache, 'm2')}`,
+    ...properties,
+  ];
   const cpfile = path.join(cache, 'classpath.txt');
-  await mvn('dependency:build-classpath', `-Dmdep.outputFile=${cpfile}`);
+  await compiler(options.maven, [
+    ...mavenArguments,
+    'dependency:build-classpath',
+    `-Dmdep.outputFile=${cpfile}`,
+  ]);
   let cp = readFileSync(cpfile, 'utf8').trim();
   const tools = path.join(cache, 'tools');
   mkdirSync(tools, { recursive: true });
-  await run(
-    'javac',
-    [
-      '-cp',
-      cp,
-      '-d',
-      tools,
-      path.join(sourceRoot, 'tools/teavm/PatchLibraries.java'),
-    ],
-    { cwd: workRoot, env },
-  );
-  await run(
-    'java',
-    [
-      '-cp',
-      tools + path.delimiter + cp,
-      'PatchLibraries',
-      ...files(path.join(workRoot, 'java/libs'), '.jar'),
-    ],
-    { cwd: workRoot, env },
-  );
+  await compiler('javac', [
+    '-cp',
+    cp,
+    '-d',
+    tools,
+    path.join(sourceRoot, 'tools/teavm/PatchLibraries.java'),
+  ]);
+  await compiler('java', [
+    '-cp',
+    tools + path.delimiter + cp,
+    'PatchLibraries',
+    ...readdirSync(path.join(workRoot, 'java/libs'), {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.jar'))
+      .map((entry) => path.join(entry.parentPath, entry.name))
+      .sort(),
+  ]);
   const classes = await compileBridgeBootstrap(workRoot, cp, env);
   cp = classes + path.delimiter + cp;
-  await run(
-    'javac',
-    [
-      '--patch-module',
-      `java.base=${path.join(workRoot, 'java/compat')}`,
-      '--add-reads',
-      'java.base=ALL-UNNAMED',
-      '-cp',
-      cp,
-      '-d',
-      classes,
-      ...files(path.join(workRoot, 'java/compat'), '.java'),
-    ],
-    { cwd: workRoot, env },
-  );
-  await mvn('package');
-  if (digest(readFileSync(jar)) !== entry.convertedSha256)
+  await compiler('javac', [
+    '--patch-module',
+    `java.base=${path.join(workRoot, 'java/compat')}`,
+    '--add-reads',
+    'java.base=ALL-UNNAMED',
+    '-cp',
+    cp,
+    '-d',
+    classes,
+    ...readdirSync(path.join(workRoot, 'java/compat'), {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.java'))
+      .map((entry) => path.join(entry.parentPath, entry.name))
+      .sort(),
+  ]);
+  await compiler(options.maven, [...mavenArguments, 'package']);
+  if (
+    createHash('sha256').update(readFileSync(jar)).digest('hex') !==
+    entry.convertedSha256
+  )
     throw new Error(`Build changed extension input: ${entry.key}`);
   const output = path.join(workRoot, 'public/teavm', entry.key, 'app.js');
   if (!existsSync(output))
@@ -245,14 +300,17 @@ export async function compileExtension(
     bytes: statSync(output).size,
     teavm: '0.16.0',
   };
-  writeJson(path.join(workRoot, 'results', `build-${entry.key}.json`), result);
+  mkdirSync(path.join(workRoot, 'results'), { recursive: true });
+  writeFileAtomicSync(
+    path.join(workRoot, 'results', `build-${entry.key}.json`),
+    JSON.stringify(result, null, 2) + '\n',
+  );
   return result;
 }
 
 export async function main(args = process.argv.slice(2)): Promise<void> {
   const { parseArgs } = await import('node:util');
   const { z } = await import('zod');
-  const { readJson } = await import('../lib/json.ts');
   const { values } = parseArgs({
     args,
     options: {
@@ -278,7 +336,11 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     }),
   );
   const entries = schema
-    .parse(readJson(path.join(values['work-root'], 'inputs.json')))
+    .parse(
+      JSON.parse(
+        readFileSync(path.join(values['work-root'], 'inputs.json'), 'utf8'),
+      ),
+    )
     .filter((entry) => entry.key === values.key);
   const entry = entries[0];
   if (entries.length !== 1 || !entry)

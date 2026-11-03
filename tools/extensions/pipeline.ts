@@ -1,19 +1,12 @@
 /** Resumable local AOT bootstrap and bounded latest-only static snapshots. */
-import {
-  spawn,
-  execFileSync,
-  type ChildProcess,
-  type SpawnOptions,
-} from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { once } from 'node:events';
 import {
   appendFileSync,
-  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
-  openSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -23,22 +16,19 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { parseArgs } from 'node:util';
+import { parseArgs, isDeepStrictEqual } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import lockfile from 'proper-lockfile';
 import pLimit from 'p-limit';
+import { execa, execaSync } from 'execa';
+import stableStringify from 'json-stable-stringify';
+import writeFileAtomic from 'write-file-atomic';
+import isRecord from 'is-plain-obj';
 import type {
   BuildManifest,
   ExtensionIndex,
 } from '../../packages/contracts/src/index.ts';
-import {
-  canonical,
-  digest,
-  isRecord,
-  readJson,
-  writeJson,
-} from '../lib/json.ts';
 import {
   ROOT,
   HOST_PATHS,
@@ -70,14 +60,12 @@ import {
   type RuntimeIdentity,
 } from './model.ts';
 
-export { readJson, writeJson } from '../lib/json.ts';
 export const MAX_STATE_BYTES = 16 * 1024 * 1024;
 export const DEFAULT_ASSETS = path.join(ROOT, '.local/extensions-assets');
 export const DEFAULT_ORIGIN = 'https://karuyomi.wybxc.cc';
 export const STATE_PATH = '/extensions/build-state.json';
 export const INDEX_PATH = '/extensions/index.json';
-const equal = (a: unknown, b: unknown): boolean =>
-  canonical(a).equals(canonical(b));
+const equal = isDeepStrictEqual;
 export const ciEnvironment = (): boolean =>
   process.env.GITHUB_ACTIONS === 'true' || process.env.CI === 'true';
 export function emptyState(): ExtensionState {
@@ -92,10 +80,47 @@ export function emptyState(): ExtensionState {
 }
 export const validateState = (value: unknown): ExtensionState =>
   extensionStateSchema.parse(value);
-export const loadState = (file: string): ExtensionState =>
-  existsSync(file)
-    ? validateState(readJson(file, MAX_STATE_BYTES))
-    : emptyState();
+export function loadState(file: string): ExtensionState {
+  if (!existsSync(file)) return emptyState();
+  if (statSync(file).size > MAX_STATE_BYTES)
+    throw new Error('Oversized state metadata');
+  const bytes = readFileSync(file);
+  if (bytes.length > MAX_STATE_BYTES)
+    throw new Error('Oversized state metadata');
+  return validateState(JSON.parse(bytes.toString('utf8')));
+}
+export function loadPlan(file: string): ExtensionPlan {
+  if (statSync(file).size > MAX_STATE_BYTES)
+    throw new Error('Oversized plan metadata');
+  const bytes = readFileSync(file);
+  if (bytes.length > MAX_STATE_BYTES)
+    throw new Error('Oversized plan metadata');
+  return extensionPlanSchema.parse(JSON.parse(bytes.toString('utf8')));
+}
+export function loadPipelineResult(file: string): PipelineResult {
+  if (statSync(file).size > 2 * 1024 * 1024)
+    throw new Error('Oversized pipeline result');
+  const bytes = readFileSync(file);
+  if (bytes.length > 2 * 1024 * 1024)
+    throw new Error('Oversized pipeline result');
+  return pipelineResultSchema.parse(JSON.parse(bytes.toString('utf8')));
+}
+function persistPipelineResult(file: string, result: PipelineResult): void {
+  const serialized = stableStringify(pipelineResultSchema.parse(result));
+  if (serialized === undefined) throw new Error('Pipeline result is not JSON');
+  writeFileAtomic.sync(file, serialized + '\n');
+}
+export function persistStateCheckpoint(
+  file: string,
+  state: ExtensionState,
+): void {
+  const serialized = stableStringify(validateState(state));
+  if (serialized === undefined) throw new Error('State checkpoint is not JSON');
+  if (Buffer.byteLength(serialized + '\n') > MAX_STATE_BYTES)
+    throw new Error('Oversized state checkpoint');
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileAtomic.sync(file, serialized + '\n');
+}
 
 export class BuildCancelled extends Error {
   constructor() {
@@ -109,12 +134,22 @@ class ChildFailure extends Error {
     this.code = code;
   }
 }
+interface BuilderChild {
+  kill(signal: NodeJS.Signals): boolean;
+}
+type BuilderOutput = 'ignore' | 'inherit' | { file: string; append: boolean };
+interface BuilderProcessOptions {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  stdout?: BuilderOutput;
+  stderr?: BuilderOutput;
+}
 /** Own process groups until all writers stop, then allow the state lock to release. */
 export class BuilderProcesses {
   readonly controller = new AbortController();
   signalNumber: number | undefined;
   private compromised: Error | undefined;
-  private readonly active = new Map<ChildProcess, Promise<void>>();
+  private readonly active = new Set<() => Promise<void>>();
   private handlers: { signal: NodeJS.Signals; handler: () => void }[] = [];
   get cancelled(): boolean {
     return this.controller.signal.aborted;
@@ -141,22 +176,11 @@ export class BuilderProcesses {
     this.compromised = error;
     this.cancel();
   }
-  private signalGroup(child: ChildProcess, signal: NodeJS.Signals): boolean {
-    if (!child.pid) return false;
-    try {
-      if (process.platform === 'win32') child.kill(signal);
-      else process.kill(-child.pid, signal);
-      return true;
-    } catch (error) {
-      if (isRecord(error) && error.code === 'ESRCH') return false;
-      throw error;
-    }
-  }
   private async terminate(
-    child: ChildProcess,
+    child: BuilderChild,
     exited: Promise<void>,
   ): Promise<void> {
-    if (this.signalGroup(child, 'SIGTERM')) {
+    if (child.kill('SIGTERM')) {
       const timeout = new AbortController();
       try {
         await Promise.race([
@@ -165,7 +189,9 @@ export class BuilderProcesses {
         ]);
       } finally {
         timeout.abort();
-        this.signalGroup(child, 'SIGKILL');
+        // The direct builder may already have exited while descendants still
+        // own files. Execa's killDescendants also targets that remaining group.
+        child.kill('SIGKILL');
       }
     }
     await exited.catch(() => {});
@@ -173,22 +199,44 @@ export class BuilderProcesses {
   async run(
     command: string,
     args: string[],
-    options: SpawnOptions = {},
+    options: BuilderProcessOptions = {},
   ): Promise<void> {
     this.check();
-    const child = spawn(command, args, {
+    const child = execa(command, args, {
+      shell: false,
+      stdin: 'ignore',
+      preferLocal: false,
+      stripFinalNewline: false,
+      verbose: 'none',
       ...options,
-      detached: process.platform !== 'win32',
+      extendEnv: false,
+      killDescendants: true,
+      forceKillAfterDelay: false,
+      buffer: false,
+      reject: false,
     });
     let code: number | null = null;
-    const exited = new Promise<void>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('exit', (status) => {
-        code = status;
-        resolve();
-      });
+    const exited = child.then((result) => {
+      code = result.exitCode ?? null;
+      if (result.failed && result.exitCode === undefined && !result.signal)
+        throw result;
     });
-    this.active.set(child, exited);
+    let stopping: Promise<void> | undefined;
+    const stop = (): Promise<void> =>
+      (stopping ??= this.terminate(child, exited));
+    this.active.add(stop);
+    // Execa settles after its redirected stdio has closed. A descendant can
+    // retain those pipes after the builder exits, so use the native exit event
+    // to start tree cleanup before awaiting the final logs/result.
+    const nativeProcess = child.nodeChildProcess;
+    const nativeExit =
+      nativeProcess.exitCode !== null || nativeProcess.signalCode !== null
+        ? Promise.resolve()
+        : once(nativeProcess, 'exit').then(
+            () => {},
+            () => {},
+          );
+    const completed = nativeExit.then(stop).then(() => exited);
     const aborted = new Promise<never>((_resolve, reject) => {
       const cancel = (): void => reject(new BuildCancelled());
       this.controller.signal.addEventListener('abort', cancel, { once: true });
@@ -199,19 +247,17 @@ export class BuilderProcesses {
         .catch(() => {});
     });
     try {
-      await Promise.race([exited, aborted]);
+      await Promise.race([completed, aborted]);
       this.check();
       if (code !== 0) throw new ChildFailure(code);
     } finally {
-      await this.terminate(child, exited);
-      this.active.delete(child);
+      await stop();
+      this.active.delete(stop);
     }
   }
   async stop(): Promise<void> {
     this.cancel();
-    await Promise.all(
-      [...this.active].map(([child, exited]) => this.terminate(child, exited)),
-    );
+    await Promise.all([...this.active].map((stop) => stop()));
   }
   async close(): Promise<void> {
     await this.stop();
@@ -226,19 +272,27 @@ export async function withStateLock<T>(
   action: () => Promise<T>,
 ): Promise<T> {
   mkdirSync(path.dirname(state), { recursive: true });
+  let compromised: Error | undefined;
   const release = await lockfile.lock(state, {
     realpath: false,
     lockfilePath: state.replace(/\.[^/.]+$/, '') + '.lock',
     retries: 0,
     stale: 60_000,
     update: 10_000,
-    onCompromised: (error) => processes.loseLock(error),
+    onCompromised: (error) => {
+      compromised = error;
+      processes.loseLock(error);
+    },
   });
   try {
-    return await action();
+    const result = await action();
+    processes.check();
+    return result;
+  } catch (error) {
+    throw compromised ?? error;
   } finally {
     await processes.stop();
-    await release();
+    if (!compromised) await release();
   }
 }
 function pendingEntries(
@@ -350,9 +404,16 @@ export function validateBuildCheckout(
   const inputs = Object.fromEntries(
     Object.keys(names).map((name) => [name, treeHash(checkout, name)]),
   );
+  const encoded = stableStringify({
+    schemaVersion: 1,
+    inputs,
+    pinnedSubmodules: pins,
+  });
+  if (encoded === undefined)
+    throw new Error('Frozen host fingerprint is not JSON');
   if (
     !equal(inputs, names) ||
-    digest(canonical({ schemaVersion: 1, inputs, pinnedSubmodules: pins })) !==
+    createHash('sha256').update(encoded).digest('hex') !==
       descriptor.hostFingerprint
   )
     throw new Error('Frozen host fingerprint mismatch');
@@ -459,7 +520,7 @@ export class ExtensionPipeline {
         ? this.materialProvider(checkout)
         : Promise.resolve().then(() => {
             const catalog: unknown = JSON.parse(
-              execFileSync(
+              execaSync(
                 process.execPath,
                 [
                   path.join(
@@ -468,8 +529,17 @@ export class ExtensionPipeline {
                   ),
                   '--print',
                 ],
-                { cwd: checkout, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 },
-              ),
+                {
+                  shell: false,
+                  stdin: 'ignore',
+                  preferLocal: false,
+                  stripFinalNewline: false,
+                  verbose: 'none',
+                  cwd: checkout,
+                  encoding: 'utf8',
+                  maxBuffer: 2 * 1024 * 1024,
+                },
+              ).stdout,
             );
             if (!isRecord(catalog))
               throw new Error('Invalid runtime material catalog');
@@ -494,8 +564,14 @@ export class ExtensionPipeline {
     if (lstatSync(directory).isSymbolicLink())
       throw new Error('Build output must not contain symlinks');
     filesIn(directory);
+    const manifestFile = path.join(directory, 'manifest.json');
+    if (statSync(manifestFile).size > 64 * 1024)
+      throw new Error('Oversized build manifest');
+    const manifestBytes = readFileSync(manifestFile);
+    if (manifestBytes.length > 64 * 1024)
+      throw new Error('Oversized build manifest');
     const manifest = await verifyBuild(
-      readJson(path.join(directory, 'manifest.json')),
+      JSON.parse(manifestBytes.toString('utf8')),
       path.join(directory, 'artifacts'),
       {
         verifyHashes: false,
@@ -514,8 +590,13 @@ export class ExtensionPipeline {
     );
     await decodeBundle(manifest.bundle, encoded);
     const validationFile = path.join(directory, 'validation.json');
+    if (
+      existsSync(validationFile) &&
+      statSync(validationFile).size > 2 * 1024 * 1024
+    )
+      throw new Error('Oversized validation report');
     const input = existsSync(validationFile)
-      ? readJson(validationFile)
+      ? JSON.parse(readFileSync(validationFile, 'utf8'))
       : {
           schemaVersion: 1,
           valid: false,
@@ -534,7 +615,7 @@ export class ExtensionPipeline {
       ) &&
       input.buildId === manifest.buildId &&
       input.manifestSha256 ===
-        digest(readFileSync(path.join(directory, 'manifest.json')));
+        createHash('sha256').update(manifestBytes).digest('hex');
     return { manifest, encoded, validation: { ...input, runtimeReady } };
   }
   async buildOne(
@@ -560,7 +641,7 @@ export class ExtensionPipeline {
     try {
       if (options.checkout) validateBuildCheckout(checkout, descriptor);
       if (existsSync(saved)) {
-        const cached = pipelineResultSchema.parse(readJson(saved));
+        const cached = loadPipelineResult(saved);
         if (equal(cached.descriptor, descriptor)) {
           if (cached.status === 'built') {
             const verified = await this.verifyOutput(
@@ -600,31 +681,42 @@ export class ExtensionPipeline {
         rmSync(path.join(output, name), { force: true });
       rmSync(path.join(output, 'artifacts'), { recursive: true, force: true });
       const descriptorFile = path.join(output, 'descriptor.json');
-      writeJson(descriptorFile, descriptor);
+      const serializedDescriptor = stableStringify(descriptor);
+      if (serializedDescriptor === undefined)
+        throw new Error('Build descriptor is not JSON');
+      writeFileAtomic.sync(descriptorFile, serializedDescriptor + '\n');
       const environment = Object.fromEntries(
         Object.entries(process.env).filter(
           ([key]) =>
             !['GH_TOKEN', 'GITHUB_TOKEN', 'CLOUDFLARE_API_TOKEN'].includes(key),
         ),
       );
-      const log = openSync(path.join(output, 'build.log'), 'w');
-      try {
-        await processes.run(
-          process.execPath,
-          [
-            path.join(checkout, 'tools/extensions/builder.ts'),
-            '--descriptor',
-            descriptorFile,
-            '--output',
-            output,
-          ],
-          { cwd: checkout, env: environment, stdio: ['ignore', log, log] },
-        );
-      } finally {
-        closeSync(log);
-      }
+      const log = path.join(output, 'build.log');
+      writeFileSync(log, '');
+      await processes.run(
+        process.execPath,
+        [
+          path.join(checkout, 'tools/extensions/builder.ts'),
+          '--descriptor',
+          descriptorFile,
+          '--output',
+          output,
+        ],
+        {
+          cwd: checkout,
+          env: environment,
+          stdout: { file: log, append: true },
+          stderr: { file: log, append: true },
+        },
+      );
       const verified = await this.verifyOutput(output, descriptor, checkout);
-      writeJson(path.join(output, 'validation.json'), verified.validation);
+      const serializedValidation = stableStringify(verified.validation);
+      if (serializedValidation === undefined)
+        throw new Error('Validation report is not JSON');
+      writeFileAtomic.sync(
+        path.join(output, 'validation.json'),
+        serializedValidation + '\n',
+      );
       result = {
         schemaVersion: 1,
         descriptor,
@@ -633,7 +725,7 @@ export class ExtensionPipeline {
           ? 'browser_verified'
           : 'compiled_unverified',
       };
-      writeJson(saved, result);
+      persistPipelineResult(saved, result);
       cleanupBuiltWork(output, descriptor, checkout);
       return new VerifiedBuild(
         result,
@@ -646,7 +738,9 @@ export class ExtensionPipeline {
       result.failure = failure(error, 'build');
       const failureFile = path.join(output, 'build-result.json');
       if (error instanceof ChildFailure && existsSync(failureFile)) {
-        const input = readJson(failureFile);
+        if (statSync(failureFile).size > 2 * 1024 * 1024)
+          throw new Error('Oversized build failure report');
+        const input: unknown = JSON.parse(readFileSync(failureFile, 'utf8'));
         if (
           isRecord(input) &&
           isRecord(input.failure) &&
@@ -660,7 +754,7 @@ export class ExtensionPipeline {
           };
       }
     }
-    writeJson(saved, result);
+    persistPipelineResult(saved, result);
     return result;
   }
   async recordResult(
@@ -776,7 +870,7 @@ export class ExtensionPipeline {
     for (const file of filesIn(results).filter(
       (file) => path.basename(file) === 'pipeline-result.json',
     )) {
-      const result = pipelineResultSchema.parse(readJson(file)),
+      const result = loadPipelineResult(file),
         key = result.descriptor.inputFingerprint;
       if (resultByKey.has(key))
         throw new Error('Ambiguous duplicate build results');
@@ -895,10 +989,17 @@ export class ExtensionPipeline {
           path.join(artifacts, manifest.bundle.sha256 + '.gz'),
           encoded,
         );
-        writeJson(
-          path.join(extension, 'builds', descriptor.buildId, 'manifest.json'),
-          manifest,
+        const serializedManifest = stableStringify(manifest);
+        if (serializedManifest === undefined)
+          throw new Error('Manifest is not JSON');
+        const manifestFile = path.join(
+          extension,
+          'builds',
+          descriptor.buildId,
+          'manifest.json',
         );
+        mkdirSync(path.dirname(manifestFile), { recursive: true });
+        writeFileAtomic.sync(manifestFile, serializedManifest + '\n');
         await verifyBuild(manifest, artifacts, {
           verifyHashes: false,
           materialCatalog: identity,
@@ -917,18 +1018,20 @@ export class ExtensionPipeline {
           (entry) => !candidate.attempts[entry.inputFingerprint],
         ).length,
       };
-      const indexBytes = Buffer.concat([
-        canonical(staticIndex(manifests)),
-        Buffer.from('\n'),
-      ]);
+      const serializedIndex = stableStringify(staticIndex(manifests));
+      if (serializedIndex === undefined)
+        throw new Error('Static index is not JSON');
+      const indexBytes = Buffer.from(serializedIndex + '\n');
       if (indexBytes.length > 2 * 1024 * 1024)
         throw new Error('Static extension index exceeds 2 MiB');
       writeFileSync(path.join(extension, 'index.json'), indexBytes);
-      candidate.indexSha256 = digest(indexBytes);
-      const stateBytes = Buffer.concat([
-        canonical(validateState(candidate)),
-        Buffer.from('\n'),
-      ]);
+      candidate.indexSha256 = createHash('sha256')
+        .update(indexBytes)
+        .digest('hex');
+      const serializedState = stableStringify(validateState(candidate));
+      if (serializedState === undefined)
+        throw new Error('Static state is not JSON');
+      const stateBytes = Buffer.from(serializedState + '\n');
       if (stateBytes.length > MAX_STATE_BYTES)
         throw new Error('Static build state exceeds 16 MiB');
       writeFileSync(path.join(extension, 'build-state.json'), stateBytes);
@@ -964,7 +1067,7 @@ export class ExtensionPipeline {
   async pullState(origin: string, file: string): Promise<ExtensionState> {
     const state = await this.remoteState(origin),
       index = await this.download(origin, INDEX_PATH, 2 * 1024 * 1024);
-    if (digest(index) !== state.indexSha256)
+    if (createHash('sha256').update(index).digest('hex') !== state.indexSha256)
       throw new Error(
         'Static index and build state are from different snapshots',
       );
@@ -972,7 +1075,7 @@ export class ExtensionPipeline {
       throw new Error(
         'CI bootstrap guard: deploy initial local baseline first',
       );
-    writeJson(file, state);
+    persistStateCheckpoint(file, state);
     return state;
   }
   async checkBase(
@@ -980,12 +1083,11 @@ export class ExtensionPipeline {
     origin: string,
     initialize = false,
   ): Promise<void> {
-    const candidate = validateState(
-      readJson(
-        path.join(assetsDirectory, 'extensions/build-state.json'),
-        MAX_STATE_BYTES,
-      ),
+    const candidate = loadState(
+      path.join(assetsDirectory, 'extensions/build-state.json'),
     );
+    if (candidate.revision === null)
+      throw new Error('Candidate snapshot is missing');
     if (initialize && (ciEnvironment() || candidate.parentRevision !== null))
       throw new Error(
         'Explicit initialization is local-only and requires no previous baseline',
@@ -1019,15 +1121,15 @@ export class ExtensionPipeline {
     assetsDirectory: string,
     origin: string,
   ): Promise<ExtensionState> {
-    const candidate = validateState(
-        readJson(
-          path.join(assetsDirectory, 'extensions/build-state.json'),
-          MAX_STATE_BYTES,
-        ),
+    const candidate = loadState(
+        path.join(assetsDirectory, 'extensions/build-state.json'),
       ),
       index = readFileSync(path.join(assetsDirectory, 'extensions/index.json'));
+    if (candidate.revision === null)
+      throw new Error('Candidate snapshot is missing');
     if (
-      digest(index) !== candidate.indexSha256 ||
+      createHash('sha256').update(index).digest('hex') !==
+        candidate.indexSha256 ||
       !equal(await this.remoteState(origin), candidate) ||
       !(await this.download(origin, INDEX_PATH, 2 * 1024 * 1024)).equals(index)
     )
@@ -1040,7 +1142,7 @@ export class ExtensionPipeline {
       persisted.revision !== candidate.revision
     )
       throw new Error('Local checkpoint advanced; refusing to overwrite it');
-    writeJson(stateFile, candidate);
+    persistStateCheckpoint(stateFile, candidate);
     return candidate;
   }
 }
@@ -1084,7 +1186,6 @@ export function staticIndex(manifests: BuildManifest[]): ExtensionIndex {
         sourceIds,
         manifestPath: '/extensions/builds/' + buildId + '/manifest.json',
       })),
-    nextCursor: null,
   };
 }
 export function replaceDirectory(staged: string, destination: string): void {
@@ -1119,7 +1220,8 @@ export function removeBuildWork(buildId: string, checkout = ROOT): string[] {
     try {
       info = lstatSync(target);
     } catch (error) {
-      if (isRecord(error) && error.code === 'ENOENT') continue;
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+        continue;
       throw error;
     }
     if (!info.isSymbolicLink() && !info.isDirectory())
@@ -1134,8 +1236,8 @@ export function cleanupBuiltWork(
   descriptor: ExtensionDescriptor,
   checkout = ROOT,
 ): string[] {
-  const saved = pipelineResultSchema.parse(
-    readJson(path.join(directory, 'pipeline-result.json')),
+  const saved = loadPipelineResult(
+    path.join(directory, 'pipeline-result.json'),
   );
   if (saved.status !== 'built' || !equal(saved.descriptor, descriptor))
     throw new Error(
@@ -1224,16 +1326,14 @@ async function runPipeline(
       await pipeline.commitSnapshot(required('state'), assetsDirectory, origin);
     else if (command === 'prepare-snapshot')
       await pipeline.prepareSnapshot(
-        extensionPlanSchema.parse(readJson(required('plan'), MAX_STATE_BYTES)),
+        loadPlan(required('plan')),
         loadState(required('state')),
         required('results'),
         assetsDirectory,
         { origin, processes },
       );
     else if (command === 'build') {
-      const plan = extensionPlanSchema.parse(
-          readJson(required('plan'), MAX_STATE_BYTES),
-        ),
+      const plan = loadPlan(required('plan')),
         key = required('key');
       const descriptor = plan.selected.find(
         (entry) => entry.inputFingerprint === key,
@@ -1261,7 +1361,7 @@ async function runPipeline(
         if (!values['build-checkout'])
           throw new Error('--plan requires --build-checkout');
         plan = resumePlan(
-          extensionPlanSchema.parse(readJson(values.plan, MAX_STATE_BYTES)),
+          loadPlan(values.plan),
           state,
           limit,
           values['retry-failed'],
@@ -1295,7 +1395,11 @@ async function runPipeline(
         );
       }
       const output = path.resolve(required('output'));
-      writeJson(output, plan);
+      const serializedPlan = stableStringify(plan);
+      if (serializedPlan === undefined)
+        throw new Error('Build plan is not JSON');
+      mkdirSync(path.dirname(output), { recursive: true });
+      writeFileAtomic.sync(output, serializedPlan + '\n');
       if (values['github-output'])
         writeGithubOutput(values['github-output'], plan);
       console.log(

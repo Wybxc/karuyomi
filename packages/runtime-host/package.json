@@ -8,6 +8,8 @@
     "build": "node build.ts"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
+    "@karuyomi/protocol": "workspace:*",
     "@karuyomi/contracts": "workspace:*",
     "image-dimensions": "2.6.0"
   },

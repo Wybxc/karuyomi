@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../runtime/runtime_platform_types.dart';
 
@@ -29,55 +30,49 @@ final class CatalogBuild {
   final String version;
   final String manifestPath;
 
-  factory CatalogBuild.fromJson(Map<String, Object?> json) {
-    final id = _string(json, 'buildId');
-    final path = _string(json, 'manifestPath');
+  factory CatalogBuild.fromProto(wire.ExtensionBuildDescriptor value) {
+    final id = value.buildId;
+    final path = value.manifestPath;
     if (!RegExp(r'^[a-zA-Z0-9._-]{1,200}$').hasMatch(id) ||
-        path != '/extensions/builds/$id/manifest.json') {
+        path != '/extensions/builds/$id/manifest.json' ||
+        value.packageName.isEmpty ||
+        value.version.isEmpty) {
       throw const FormatException('扩展清单路径与构建不匹配');
     }
     return CatalogBuild(
       id: id,
-      packageName: _string(json, 'packageName'),
-      version: _string(json, 'version'),
+      packageName: value.packageName,
+      version: value.version,
       manifestPath: path,
     );
   }
 }
 
 final class MangaEntry {
-  MangaEntry(Map<String, Object?> snapshot)
-    : snapshot = Map.unmodifiable(snapshot),
-      title = _string(snapshot, 'title'),
-      url = _string(snapshot, 'url') {
-    for (final key in ['description', 'author', 'artist']) {
-      if (snapshot[key] != null && snapshot[key] is! String) {
-        throw const FormatException('漫画资料格式无效');
-      }
-    }
-    if (snapshot['genres'] != null &&
-        (snapshot['genres'] is! List ||
-            !(snapshot['genres'] as List).every((value) => value is String))) {
-      throw const FormatException('漫画分类格式无效');
+  MangaEntry(wire.Manga value) : snapshot = value.deepCopy()..freeze() {
+    if (value.title.isEmpty || value.url.isEmpty) {
+      throw const FormatException('服务返回的数据不完整');
     }
   }
-  final Map<String, Object?> snapshot;
-  final String title;
-  final String url;
-  String? get description => snapshot['description'] as String?;
-  String? get author => snapshot['author'] as String?;
-  String? get artist => snapshot['artist'] as String?;
-  List<String> get genres => (snapshot['genres'] as List? ?? []).cast<String>();
+  final wire.Manga snapshot;
+  String get title => snapshot.title;
+  String get url => snapshot.url;
+  String? get description =>
+      snapshot.hasDescription() ? snapshot.description : null;
+  String? get author => snapshot.hasAuthor() ? snapshot.author : null;
+  String? get artist => snapshot.hasArtist() ? snapshot.artist : null;
+  List<String> get genres => snapshot.genres;
 }
 
 final class ChapterEntry {
-  ChapterEntry(Map<String, Object?> snapshot)
-    : snapshot = Map.unmodifiable(snapshot),
-      name = _string(snapshot, 'name'),
-      url = _string(snapshot, 'url');
-  final Map<String, Object?> snapshot;
-  final String name;
-  final String url;
+  ChapterEntry(wire.Chapter value) : snapshot = value.deepCopy()..freeze() {
+    if (value.name.isEmpty || value.url.isEmpty) {
+      throw const FormatException('服务返回的数据不完整');
+    }
+  }
+  final wire.Chapter snapshot;
+  String get name => snapshot.name;
+  String get url => snapshot.url;
 }
 
 final class CatalogSourceRef {
@@ -106,26 +101,6 @@ final class OpenedChapter {
 
 String _readingKey(Object value) =>
     sha256.convert(utf8.encode(jsonEncode(value))).toString();
-
-String _string(Map<String, Object?> value, String key) {
-  final field = value[key];
-  if (field is! String || field.isEmpty) {
-    throw const FormatException('服务返回的数据不完整');
-  }
-  return field;
-}
-
-Map<String, Object?> _object(Object? value) {
-  if (value is! Map || !value.keys.every((key) => key is String)) {
-    throw const FormatException('服务返回了无效数据');
-  }
-  return Map<String, Object?>.from(value);
-}
-
-List<Object?> _list(Object? value) {
-  if (value is! List) throw const FormatException('服务返回的列表格式无效');
-  return value;
-}
 
 /// The UI keeps original Source snapshots for explicit manga/chapter references.
 /// It never derives a source URL from an application route or a display label.
@@ -197,7 +172,7 @@ final class CatalogController extends ChangeNotifier {
     hasNextPage = false;
   }
 
-  Future<Map<String, Object?>> _get(String path) async {
+  Future<Object?> _get(String path) async {
     final reply = await api.fetchApi(path);
     final isStatic = path.startsWith('/extensions/');
     if (isStatic &&
@@ -225,7 +200,7 @@ final class CatalogController extends ChangeNotifier {
         '访问验证已失效，请重新登录',
       );
     }
-    return _object(jsonDecode(reply.body));
+    return jsonDecode(reply.body);
   }
 
   Future<T?> _perform<T>(String label, Future<T> Function() action) async {
@@ -289,20 +264,26 @@ final class CatalogController extends ChangeNotifier {
       status = ServiceStatus.connecting;
       _dropSession();
       builds = const [];
-      final bootstrap = await _get('/api/bootstrap');
-      if (bootstrap['protocolVersion'] != protocolVersion) {
+      final bootstrap = wire.decodeProtoJson(
+        wire.Bootstrap(),
+        await _get('/api/bootstrap'),
+      );
+      if (bootstrap.protocolVersion != protocolVersion) {
         throw const FormatException('客户端与服务版本不兼容');
       }
-      final identity = _object(bootstrap['identity']);
-      final confirmedSubject = _string(identity, 'subject');
-      final confirmedEmail = _string(identity, 'email');
-      final inventory = await _get('/extensions/index.json');
-      if (inventory['schemaVersion'] != 1 || inventory['nextCursor'] != null) {
+      final confirmedSubject = bootstrap.identity.subject;
+      final confirmedEmail = bootstrap.identity.email;
+      if (confirmedSubject.isEmpty || confirmedEmail.isEmpty) {
+        throw const FormatException('服务返回的数据不完整');
+      }
+      final inventory = wire.decodeProtoJson(
+        wire.ExtensionIndex(),
+        await _get('/extensions/index.json'),
+      );
+      if (inventory.schemaVersion != 1) {
         throw const FormatException('扩展索引版本不兼容');
       }
-      final available = _list(
-        inventory['builds'],
-      ).map((v) => CatalogBuild.fromJson(_object(v))).toList();
+      final available = inventory.builds.map(CatalogBuild.fromProto).toList();
       if (available.length > 5000 ||
           available.map((build) => build.packageName).toSet().length !=
               available.length) {
@@ -326,15 +307,20 @@ final class CatalogController extends ChangeNotifier {
       if (identity == null) {
         throw const RuntimeException(RuntimeErrorCode.accessRequired, '身份未确认');
       }
-      final manifest = await _get(build.manifestPath);
-      if (manifest['buildId'] != build.id) {
+      final manifest = wire.decodeProtoJson(
+        wire.BuildManifest(),
+        await _get(build.manifestPath),
+      );
+      if (manifest.buildId != build.id ||
+          !manifest.hasBundle() ||
+          manifest.bundle.sha256.isEmpty) {
         throw const FormatException('构建标识不匹配');
       }
       final loaded = await runtime.open(
         BuildDescriptor(
           buildId: build.id,
           manifestUri: Uri.parse(build.manifestPath),
-          sha256: _string(_object(manifest['bundle']), 'sha256'),
+          sha256: manifest.bundle.sha256,
           identity: identity,
           packageId: build.packageName,
         ),
@@ -349,10 +335,7 @@ final class CatalogController extends ChangeNotifier {
     });
   }
 
-  Future<Map<String, Object?>> _invoke(
-    String operation,
-    Map<String, Object?> args,
-  ) async {
+  Future<SourceResult> _invoke(wire.SourceCall call) async {
     final epoch = _epoch;
     final current = session;
     final build = activeBuild;
@@ -360,22 +343,19 @@ final class CatalogController extends ChangeNotifier {
     if (current == null || build == null || source == null) {
       throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源未就绪');
     }
+    call.requestId = 'ui-${++_requestSequence}';
+    call.generation = current.generation;
+    call.sourceId = source.id;
+    call.timeoutMs = 30000;
     final result = await runtime.invoke(
-      SourceRequest(
-        requestId: 'ui-${++_requestSequence}',
-        generation: current.generation,
-        packageId: build.packageName,
-        sourceId: source.id,
-        operation: operation,
-        arguments: args,
-      ),
+      SourceRequest(packageId: build.packageName, call: call),
     );
     if (_closed ||
         epoch != _epoch ||
         session?.generation != current.generation) {
       throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源会话已失效');
     }
-    return result.data;
+    return result;
   }
 
   Future<void> selectSource(SourceInfo source) async {
@@ -406,22 +386,26 @@ final class CatalogController extends ChangeNotifier {
               ? (search.trim().isEmpty ? 'popular' : 'search')
               : listing);
       final selectedPage = more ? page + 1 : 1;
-      final result = await _invoke(selectedListing, {
-        'page': selectedPage,
-        if (selectedListing == 'search') 'query': selectedQuery,
-      });
-      final entries = _list(
-        result['mangas'],
-      ).map((value) => MangaEntry(_object(value))).toList();
-      if (result['hasNextPage'] is! bool) {
-        throw const FormatException('漫画分页数据格式无效');
-      }
+      final call = switch (selectedListing) {
+        'popular' => wire.SourceCall(
+          popular: wire.PageRequest(page: selectedPage),
+        ),
+        'latest' => wire.SourceCall(
+          latest: wire.PageRequest(page: selectedPage),
+        ),
+        'search' => wire.SourceCall(
+          search: wire.SearchRequest(page: selectedPage, query: selectedQuery),
+        ),
+        _ => throw const FormatException('未知漫画列表操作'),
+      };
+      final result = (await _invoke(call)).mangaPage;
+      final entries = result.mangas.map(MangaEntry.new).toList();
       if (_closed) return;
       mangas = more ? [...mangas, ...entries] : entries;
       page = selectedPage;
       query = selectedQuery;
       listing = selectedListing;
-      hasNextPage = result['hasNextPage'] == true;
+      hasNextPage = result.hasNextPage;
     });
   }
 
@@ -450,12 +434,14 @@ final class CatalogController extends ChangeNotifier {
   details(MangaEntry manga) => _perform('正在加载详情和章节', () async {
     final source = sourceReference;
     final detail = MangaEntry(
-      await _invoke('details', {'manga': manga.snapshot}),
+      (await _invoke(
+        wire.SourceCall(details: wire.MangaRequest(manga: manga.snapshot)),
+      )).manga,
     );
-    final result = await _invoke('chapters', {'manga': detail.snapshot});
-    final chapters = _list(
-      result['chapters'],
-    ).map((value) => ChapterEntry(_object(value))).toList();
+    final result = await _invoke(
+      wire.SourceCall(chapters: wire.MangaRequest(manga: detail.snapshot)),
+    );
+    final chapters = result.chapters.chapters.map(ChapterEntry.new).toList();
     return (manga: detail, chapters: chapters, source: source);
   });
 
@@ -473,29 +459,25 @@ final class CatalogController extends ChangeNotifier {
     if (current == null || source == null || build == null) {
       throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源未就绪');
     }
-    final result = await _invoke('pages', {'chapter': chapter.snapshot});
-    final pageSessionId = _string(result, 'pageSessionId');
+    final result = (await _invoke(
+      wire.SourceCall(pages: wire.ChapterRequest(chapter: chapter.snapshot)),
+    )).pageList;
+    final pageSessionId = result.pageSessionId;
     try {
-      final values = _list(result['pages']);
-      if (values.length > 10000) throw const FormatException('章节页面数量超过限制');
-      final pages = <Map<String, Object?>>[];
+      final pages = result.pages;
+      if (pages.length > 2048 || pageSessionId.isEmpty) {
+        throw const FormatException('章节页面数量或会话无效');
+      }
       final opaqueKeys = <String>{};
-      for (var i = 0; i < values.length; i++) {
-        final item = _object(values[i]);
-        final opaque = _string(item, 'pageKey');
-        final index = item['index'];
-        final sourceIndex = item['sourceIndex'];
-        if (opaque.length > 1000 ||
+      for (var i = 0; i < pages.length; i++) {
+        final item = pages[i];
+        final opaque = item.pageKey;
+        if (opaque.isEmpty ||
+            opaque.length > 200 ||
             !opaqueKeys.add(opaque) ||
-            index != i ||
-            sourceIndex is! num ||
-            !sourceIndex.isFinite ||
-            sourceIndex != sourceIndex.truncateToDouble() ||
-            item['url'] is! String ||
-            (item['imageUrl'] != null && item['imageUrl'] is! String)) {
+            item.index != i) {
           throw const FormatException('漫画源页面引用无效');
         }
-        pages.add(item);
       }
       final chapterKey = _readingKey([
         build.packageName,
@@ -505,12 +487,18 @@ final class CatalogController extends ChangeNotifier {
       // Handles and learned dimensions do not change content identity.
       final version = _readingKey(
         pages
-            .map((page) => [page['sourceIndex'], page['url'], page['imageUrl']])
+            .map(
+              (page) => [
+                page.sourceIndex,
+                page.url,
+                page.hasImageUrl() ? page.imageUrl : null,
+              ],
+            )
             .toList(),
       );
       final urlCounts = <String, int>{};
       for (final page in pages) {
-        final url = page['url'] as String;
+        final url = page.url;
         if (url.isNotEmpty) {
           urlCounts.update(url, (count) => count + 1, ifAbsent: () => 1);
         }
@@ -519,13 +507,13 @@ final class CatalogController extends ChangeNotifier {
       final manifestPages = <ReaderPage>[];
       for (var i = 0; i < pages.length; i++) {
         final page = pages[i];
-        final url = page['url'] as String;
+        final url = page.url;
         // Without a stable source reference, a changed list must report a
         // missing page and use the index hint rather than claim an exact match.
         final logicalKey = url.isNotEmpty && urlCounts[url] == 1
             ? 'url-${_readingKey(url)}'
             : '$version:$i';
-        bindings[logicalKey] = page['pageKey'] as String;
+        bindings[logicalKey] = page.pageKey;
         manifestPages.add(ReaderPage(key: logicalKey));
       }
       final provider = ChapterPageProvider(

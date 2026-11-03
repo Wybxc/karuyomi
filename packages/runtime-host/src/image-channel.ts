@@ -1,22 +1,20 @@
 import {
   IMAGE_CHUNK_LIMIT,
   imageFrameSchema,
-  runtimeErrorSchema,
+  encodeImageFrame,
+  type RuntimeErrorData,
   type ImageFrame,
   type ProcessedImage,
 } from '@karuyomi/contracts';
 import { RuntimeFailure } from './errors.js';
 
-export function imageFailure(input: unknown): RuntimeFailure {
-  const result = runtimeErrorSchema.safeParse(input);
-  return result.success
-    ? new RuntimeFailure(
-        result.data.code,
-        result.data.message,
-        result.data.retryable,
-        result.data.javaClass,
-      )
-    : new RuntimeFailure('protocol_error', 'Invalid image channel failure');
+export function imageFailure(input: RuntimeErrorData): RuntimeFailure {
+  return new RuntimeFailure(
+    input.code,
+    input.message,
+    input.retryable,
+    input.javaClass,
+  );
 }
 
 /** Worker producer: one transferred chunk and one ACK outstanding at most. */
@@ -156,7 +154,10 @@ export class ImageSink {
     this.failure = error;
     this.pending?.reject(error);
     this.pending = undefined;
-    if (notify) this.port.postMessage({ type: 'abort', error: error.toJSON() });
+    if (notify)
+      this.port.postMessage(
+        encodeImageFrame({ type: 'abort', error: error.toJSON() }),
+      );
     void this.writer.abort(error).catch(() => {});
   }
 
@@ -196,7 +197,7 @@ export class ImageSink {
         reject,
       };
       try {
-        this.port.postMessage(frame, transfer);
+        this.port.postMessage(encodeImageFrame(frame), transfer);
       } catch {
         this.abort(
           new RuntimeFailure('runtime_lost', 'Image channel delivery failed'),

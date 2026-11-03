@@ -6,12 +6,12 @@ Static Assets 是 Web 与 Native 的扩展权威来源。每个包只部署最�
 
 快照根目录默认为 `.local/extensions-assets`，公开目录结构如下：
 
-| 路径                                         | 内容与缓存                                                      |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| `/extensions/index.json`                     | `schemaVersion: 1`、当前 `builds`、`nextCursor: null`；no-cache |
-| `/extensions/builds/<buildId>/manifest.json` | 与索引身份严格一致的 `BuildManifest`；no-cache                  |
-| `/extensions/artifacts/<canonicalSHA>.gz`    | 唯一 AOT 交付文件；`application/gzip`、一年 immutable           |
-| `/extensions/build-state.json`               | 增量调度状态与已完成 baseline 标记；no-cache，不作为客户端目录  |
+| 路径                                         | 内容与缓存                                                     |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| `/extensions/index.json`                     | `schemaVersion: 1`、当前 `builds`；no-cache                    |
+| `/extensions/builds/<buildId>/manifest.json` | 与索引身份严格一致的 `BuildManifest`；no-cache                 |
+| `/extensions/artifacts/<canonicalSHA>.gz`    | 唯一 AOT 交付文件；`application/gzip`、一年 immutable          |
+| `/extensions/build-state.json`               | 增量调度状态与已完成 baseline 标记；no-cache，不作为客户端目录 |
 
 索引每个包只含一个 build，字段为 `buildId/packageName/repoId/version/sourceIds/manifestPath`。`manifestPath` 必须绑定该 buildId；索引上限 2 MiB、5,000 包。build-state 与客户端索引分开维护，以 `indexSha256` 绑定索引的精确字节，状态上限 16 MiB。
 

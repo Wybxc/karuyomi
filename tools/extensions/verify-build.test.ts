@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execa } from 'execa';
+import { createHash } from 'node:crypto';
 import {
   mkdtemp,
   mkdir,
@@ -17,12 +18,11 @@ import type {
   Artifact,
   BundleArtifact,
 } from '../../packages/contracts/src/index.ts';
-import { isRecord } from './types.ts';
+import isRecord from 'is-plain-obj';
 import type { ValidationFailure } from './types.ts';
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 import {
   completeBrowserValidation,
-  digest,
   repositoryRoot,
   verifyIntegrity,
   parseExtensionIndex,
@@ -76,7 +76,7 @@ async function fixture(
   const bytes = Buffer.from(
     'throw new Error("Integrity validation must not execute this bundle");',
   );
-  const sha256 = digest(bytes);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
   const encoded = gzipSync(bytes);
   const manifest: FixtureManifest = {
     protocolVersion: protocol.protocolVersion,
@@ -95,7 +95,7 @@ async function fixture(
       size: bytes.length,
       contentType: 'application/javascript',
       encoding: 'gzip',
-      encodedSha256: digest(encoded),
+      encodedSha256: createHash('sha256').update(encoded).digest('hex'),
       encodedSize: encoded.length,
     },
     hostScripts: [],
@@ -119,26 +119,21 @@ async function fixture(
 async function command(
   args: string[],
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      process.execPath,
-      [path.join(repositoryRoot, 'tools/extensions/verify-build.ts'), ...args],
-      {
-        cwd: repositoryRoot,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    );
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (value) => {
-      stdout += value;
-    });
-    child.stderr.on('data', (value) => {
-      stderr += value;
-    });
-    child.on('error', reject);
-    child.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
+  const result = await execa(
+    process.execPath,
+    [path.join(repositoryRoot, 'tools/extensions/verify-build.ts'), ...args],
+    {
+      cwd: repositoryRoot,
+      stdin: 'ignore',
+      maxBuffer: 2 * 1024 * 1024,
+      reject: false,
+    },
+  );
+  return {
+    code: result.exitCode ?? null,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 test('integrity hashes actual bytes without executing JS or claiming runtime readiness', async (t) => {
@@ -147,7 +142,9 @@ test('integrity hashes actual bytes without executing JS or claiming runtime rea
   assert.equal(report.buildId, manifest.buildId);
   assert.equal(
     report.manifestSha256,
-    digest(await readFile(path.join(directory, 'manifest.json'))),
+    createHash('sha256')
+      .update(await readFile(path.join(directory, 'manifest.json')))
+      .digest('hex'),
   );
   assert.equal(report.valid, false);
   assert.equal(report.runtimeReady, false);
@@ -177,7 +174,9 @@ test('canonical corruption and malformed gzip fail after the compressed byte gat
       encoded = gzipSync(Buffer.alloc(value.canonical.length, 0));
     if (mode === 'truncated') encoded = encoded.subarray(0, -1);
     if (mode === 'bomb') value.manifest.bundle.size = 1;
-    value.manifest.bundle.encodedSha256 = digest(encoded);
+    value.manifest.bundle.encodedSha256 = createHash('sha256')
+      .update(encoded)
+      .digest('hex');
     value.manifest.bundle.encodedSize = encoded.length;
     await writeFile(value.artifact, encoded);
     await writeFile(
@@ -214,7 +213,7 @@ test('the shared contract parser enforces the static current-package index', asy
     sourceIds: ['123'],
     manifestPath: '/extensions/builds/test-build/manifest.json',
   };
-  const index = { schemaVersion: 1, builds: [descriptor], nextCursor: null };
+  const index = { schemaVersion: 1, builds: [descriptor] };
   assert.deepEqual(
     await parseExtensionIndex(Buffer.from(JSON.stringify(index))),
     index,
@@ -410,7 +409,12 @@ test('browser result reducer rejects missing browser, identity and Source eviden
     indexedDb: true,
     buildId: base.buildId,
     manifestSha256: base.manifestSha256,
-    hello: { ...protocol, sourceReady: false },
+    hello: {
+      ...protocol,
+      generation: 'w',
+      capabilities: [],
+      sourceReady: false,
+    },
     session: {
       protocolVersion: base.protocolVersion,
       buildId: base.buildId,

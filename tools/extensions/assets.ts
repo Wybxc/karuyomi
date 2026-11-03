@@ -1,7 +1,7 @@
 /** Deterministic application-level gzip, distinct from HTTP Content-Encoding. */
 import { gzipSync } from 'node:zlib';
 import type { BundleArtifact } from '../../packages/contracts/src/index.ts';
-import { digest } from '../lib/json.ts';
+import { createHash } from 'node:crypto';
 export { decodeBundleBytes as decodeBundle } from './verify-manifest.ts';
 export const MAX_RAW = 64 * 1024 * 1024;
 export const MAX_ENCODED = 25 * 1024 * 1024;
@@ -18,7 +18,7 @@ export function encodeBundle(
   encoded[9] = 255;
   if (encoded.length > maximum)
     throw new Error('Encoded bundle exceeds Static Assets 25 MiB limit');
-  const sha256 = digest(data);
+  const sha256 = createHash('sha256').update(data).digest('hex');
   return {
     encoded,
     reference: {
@@ -27,7 +27,7 @@ export function encodeBundle(
       size: data.length,
       contentType,
       encoding: 'gzip',
-      encodedSha256: digest(encoded),
+      encodedSha256: createHash('sha256').update(encoded).digest('hex'),
       encodedSize: encoded.length,
     },
   };

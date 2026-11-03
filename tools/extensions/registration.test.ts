@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
-import { digest, repositoryRoot } from './verify-manifest.ts';
+import { repositoryRoot } from './verify-manifest.ts';
 import {
   database,
   fixture,
@@ -161,7 +162,7 @@ test('gzip truncation, trailing junk, extra members and bombs are rejected', asy
           bundle: {
             ...f.manifest.bundle,
             encodedSize: encoded.length,
-            encodedSha256: digest(encoded),
+            encodedSha256: createHash('sha256').update(encoded).digest('hex'),
           },
         },
         f.artifacts,
@@ -411,7 +412,7 @@ test('remote CLI rejects snapshots and refuses stale deployed current identity',
     /require --local/,
   );
   t.mock.method(globalThis, 'fetch', async () =>
-    Response.json({ schemaVersion: 1, builds: [], nextCursor: null }),
+    Response.json({ schemaVersion: 1, builds: [] }),
   );
   let calls = 0;
   await assert.rejects(
@@ -523,9 +524,10 @@ test('real local Wrangler file execution returns strict JSON and rejects SQL fai
   await assert.rejects(
     executeD1(['--file', sql, '--yes'], destination),
     (error: unknown) => {
-      assert(error instanceof Error && 'code' in error);
-      assert.equal(error.code, 1);
+      assert(error instanceof ExecaError);
+      assert.equal(error.exitCode, 1);
       return true;
     },
   );
 });
+import { ExecaError } from 'execa';

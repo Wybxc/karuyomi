@@ -1,5 +1,13 @@
-import type { SourceCall } from '@karuyomi/contracts';
-import type { OpenOptions, SourceRuntimeManager } from './manager.js';
+import {
+  parseControlRequest,
+  encodeControlResponse,
+  runtimeErrorMessage,
+  plain,
+} from '@karuyomi/contracts';
+import { create } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
+import { RuntimeFailure, runtimeFailure } from './errors.js';
+import type { SourceRuntimeManager } from './manager.js';
 
 export function installRuntime(manager: SourceRuntimeManager): RuntimeHostApi {
   if (window.karuyomiRuntime) return window.karuyomiRuntime;
@@ -18,26 +26,137 @@ export function installRuntime(manager: SourceRuntimeManager): RuntimeHostApi {
 export type RuntimeHostApi = ReturnType<typeof createRuntimeApi>;
 function createRuntimeApi(manager: SourceRuntimeManager) {
   return {
-    ready: manager.ready,
-    open: (options: OpenOptions) => manager.open(options),
-    invoke: (call: SourceCall) => manager.invoke(call),
-    cancel: (requestId: string) => manager.cancel(requestId),
-    acquireImage: (
-      options: Parameters<SourceRuntimeManager['acquireImage']>[0],
-    ) => manager.acquireImage(options),
-    cancelImage: (
-      options: Parameters<SourceRuntimeManager['cancelImage']>[0],
-    ) => manager.cancelImage(options),
-    releaseImage: (
-      options: Parameters<SourceRuntimeManager['releaseImage']>[0],
-    ) => manager.releaseImage(options),
-    closePageSession: (
-      options: Parameters<SourceRuntimeManager['closePageSession']>[0],
-    ) => manager.closePageSession(options),
-    rebuild: () => manager.rebuild(),
-    fetchApi: (options: Parameters<SourceRuntimeManager['fetchApi']>[0]) =>
-      manager.fetchApi(options),
-    dispose: () => manager.dispose(),
+    async control(input: unknown): Promise<pb.ControlResponseJson> {
+      let requestId = 'invalid-control';
+      // Correlate malformed requests when their transport identity is readable;
+      // all command structure is still owned by the generated parser below.
+      if (
+        input !== null &&
+        typeof input === 'object' &&
+        'requestId' in input &&
+        typeof input.requestId === 'string' &&
+        input.requestId.length > 0 &&
+        input.requestId.length <= 200
+      )
+        requestId = input.requestId;
+      let result: pb.ControlResponse['result'];
+      try {
+        const request = parseControlRequest(input);
+        requestId = request.requestId;
+        switch (request.command.case) {
+          case 'ready':
+            result = {
+              case: 'hello',
+              value: create(pb.RuntimeHelloSchema, await manager.ready),
+            };
+            break;
+          case 'open':
+            result = {
+              case: 'session',
+              value: create(
+                pb.RuntimeSessionSchema,
+                await manager.open(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'invoke':
+            result = {
+              case: 'source',
+              value: await manager.invoke(request.command.value),
+            };
+            break;
+          case 'cancel':
+            await manager.cancel(
+              request.command.value.requestId,
+              request.command.value.generation,
+            );
+            result = {
+              case: 'completed',
+              value: create(pb.CompletedSchema, { completed: true }),
+            };
+            break;
+          case 'acquireImage':
+            result = {
+              case: 'image',
+              value: create(
+                pb.ImageResourceSchema,
+                await manager.acquireImage(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'cancelImage':
+            result = {
+              case: 'released',
+              value: create(
+                pb.ReleasedSchema,
+                await manager.cancelImage(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'releaseImage':
+            result = {
+              case: 'released',
+              value: create(
+                pb.ReleasedSchema,
+                await manager.releaseImage(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'closePageSession':
+            result = {
+              case: 'closed',
+              value: create(
+                pb.ClosedSchema,
+                await manager.closePageSession(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'rebuild':
+            await manager.rebuild();
+            result = {
+              case: 'completed',
+              value: create(pb.CompletedSchema, { completed: true }),
+            };
+            break;
+          case 'fetchApi':
+            result = {
+              case: 'api',
+              value: create(
+                pb.ApiFetchResponseSchema,
+                await manager.fetchApi(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'dispose':
+            await manager.dispose();
+            result = {
+              case: 'completed',
+              value: create(pb.CompletedSchema, { completed: true }),
+            };
+            break;
+          default:
+            throw new RuntimeFailure(
+              'protocol_error',
+              'A control command must be selected',
+            );
+        }
+      } catch (error) {
+        const failure =
+          error instanceof RuntimeFailure
+            ? error
+            : new RuntimeFailure(
+                'protocol_error',
+                'Invalid runtime control request',
+              );
+        result = {
+          case: 'error',
+          value: runtimeErrorMessage(runtimeFailure(failure).toJSON()),
+        };
+      }
+      return encodeControlResponse(
+        create(pb.ControlResponseSchema, { requestId, result }),
+      );
+    },
   };
 }
 

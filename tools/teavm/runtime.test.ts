@@ -14,11 +14,12 @@ import test from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { Header } from 'tar';
 import { zipSync } from 'fflate';
-import { ROOT } from '../lib/io.ts';
-import { digest } from '../lib/json.ts';
-import { extractZip } from '../lib/archive.ts';
-import { LOCK, prepareRuntime } from './runtime.ts';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { LOCK, prepareRuntime, installAndroidSdkArchive } from './runtime.ts';
 import type { RuntimeLock } from './runtime.ts';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 function archive(
   root: string,
@@ -49,9 +50,12 @@ function archive(
   lock.seed = {
     ...lock.seed,
     size: encoded.length,
-    sha256: digest(encoded),
+    sha256: createHash('sha256').update(encoded).digest('hex'),
     members: Object.fromEntries(
-      names.map((name) => [name, digest(Buffer.from('data'))]),
+      names.map((name) => [
+        name,
+        createHash('sha256').update('data').digest('hex'),
+      ]),
     ),
   };
   return { seed, lock };
@@ -63,7 +67,9 @@ function temporary() {
 test('Android metadata is bound to locked hashes', () => {
   for (const entry of Object.values(LOCK.android.metadata))
     assert.equal(
-      digest(readFileSync(path.join(ROOT, 'runtime/teavm', entry.path))),
+      createHash('sha256')
+        .update(readFileSync(path.join(ROOT, 'runtime/teavm', entry.path)))
+        .digest('hex'),
       entry.sha256,
     );
 });
@@ -124,7 +130,7 @@ test('SDK ZIP extraction preserves upstream executable modes', async () => {
         ],
       }),
     );
-    await extractZip(file, path.join(root, 'sdk'), true);
+    await installAndroidSdkArchive(file, path.join(root, 'sdk'));
     assert.equal(statSync(path.join(root, 'sdk/tool')).mode & 0o777, 0o755);
     assert.equal(
       statSync(path.join(root, 'sdk/config.xml')).mode & 0o777,

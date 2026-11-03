@@ -1,12 +1,12 @@
 /** Pinned Keiyoushi discovery. Never executes upstream Gradle. */
-import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { ROOT } from '../lib/io.ts';
-import { canonical, digest } from '../lib/json.ts';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import stableStringify from 'json-stable-stringify';
+import { execaSync } from 'execa';
 import type { Catalog, ExtensionDescriptor, SubmodulePin } from './model.ts';
-export { canonical, digest } from '../lib/json.ts';
-export { ROOT } from '../lib/io.ts';
+export const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const HOST_PATHS = [
   'runtime/teavm/java',
   'runtime/teavm/bridge',
@@ -21,7 +21,19 @@ export const HOST_PATHS = [
   'tools/teavm/build.ts',
   'tools/teavm/upstream-sources.ts',
   'tools/teavm/PatchLibraries.java',
-  'tools/lib',
+  'protocol',
+  'buf.yaml',
+  'buf.gen.yaml',
+  'packages/protocol/package.json',
+  'packages/protocol/tsconfig.json',
+  'packages/protocol/src',
+  'packages/contracts/src',
+  'scripts/generate-protocol.ts',
+  'scripts/protoc-gen-dart.ts',
+  'tools/protocol/generate.ts',
+  'tools/protocol/dart-plugin.ts',
+  'tools/protocol/generator/pubspec.yaml',
+  'tools/protocol/generator/pubspec.lock',
   'packages/contracts/protocol.json',
   'packages/runtime-host/materials.ts',
   'packages/runtime-host/prepare-materials.ts',
@@ -42,10 +54,15 @@ export const SHARED_PATHS = [
   'gradlew.bat',
 ];
 export function git(root: string, ...args: string[]): string {
-  return execFileSync('git', ['-C', root, ...args], {
+  return execaSync('git', ['-C', root, ...args], {
+    shell: false,
+    stdin: 'ignore',
+    preferLocal: false,
+    stripFinalNewline: false,
+    verbose: 'none',
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
-  }).trim();
+  }).stdout.trim();
 }
 export function treeHash(
   root: string,
@@ -84,12 +101,15 @@ export function treeHash(
         visit(path.join(file, child));
     else if (info.isFile() && (tracked === undefined || tracked.has(name)))
       records[name] = {
-        sha256: digest(readFileSync(file)),
+        sha256: createHash('sha256').update(readFileSync(file)).digest('hex'),
         executable: (info.mode & 0o111) !== 0,
       };
   }
   visit(target);
-  return digest(canonical(records));
+  const encoded = stableStringify(records);
+  if (encoded === undefined)
+    throw new Error('Fingerprint records are not JSON');
+  return createHash('sha256').update(encoded).digest('hex');
 }
 export function hostSubmodules(root = ROOT): SubmodulePin[] {
   return git(root, 'ls-files', '--stage')
@@ -117,14 +137,14 @@ export function hostFingerprint(root = ROOT): {
   const inputs = Object.fromEntries(
     HOST_PATHS.map((name) => [name, treeHash(root, name)]),
   );
+  const encoded = stableStringify({
+    schemaVersion: 1,
+    inputs,
+    pinnedSubmodules: hostSubmodules(root),
+  });
+  if (encoded === undefined) throw new Error('Host fingerprint is not JSON');
   return {
-    fingerprint: digest(
-      canonical({
-        schemaVersion: 1,
-        inputs,
-        pinnedSubmodules: hostSubmodules(root),
-      }),
-    ),
+    fingerprint: createHash('sha256').update(encoded).digest('hex'),
     inputs,
   };
 }
@@ -268,13 +288,21 @@ export function scan(
       const inputs = Object.fromEntries(
         dependencies(source, relative).map((item) => [item, hashed(item)]),
       );
+      const sourceIdentity = stableStringify({ modules: inputs, shared });
+      if (sourceIdentity === undefined)
+        throw new Error('Source fingerprint is not JSON');
       const identity = {
         packageName,
         versionCode: version,
-        sourceFingerprint: digest(canonical({ modules: inputs, shared })),
+        sourceFingerprint: createHash('sha256')
+          .update(sourceIdentity)
+          .digest('hex'),
         hostFingerprint: hostHash,
       };
-      const fingerprint = digest(canonical(identity));
+      const encoded = stableStringify(identity);
+      if (encoded === undefined)
+        throw new Error('Input fingerprint is not JSON');
+      const fingerprint = createHash('sha256').update(encoded).digest('hex');
       entries.push({
         schemaVersion: 1,
         ...identity,
@@ -305,16 +333,19 @@ export function scan(
   }
   if (!entries.length && !failures.length)
     throw new Error('No extension modules found in the pinned source tree');
+  const catalogIdentity = stableStringify({
+    entries: entries.map((entry) => entry.inputFingerprint),
+    failures,
+  });
+  if (catalogIdentity === undefined)
+    throw new Error('Catalog fingerprint is not JSON');
   return {
     schemaVersion: 1,
     upstreamCommit: commit,
     hostFingerprint: hostHash,
-    catalogFingerprint: digest(
-      canonical({
-        entries: entries.map((entry) => entry.inputFingerprint),
-        failures,
-      }),
-    ),
+    catalogFingerprint: createHash('sha256')
+      .update(catalogIdentity)
+      .digest('hex'),
     entries,
     discoveryFailures: failures,
   };

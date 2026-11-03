@@ -34,7 +34,6 @@ export async function createStaticSnapshot(
           manifestPath,
         },
       ],
-      nextCursor: null,
     }),
   );
   await copyFile(

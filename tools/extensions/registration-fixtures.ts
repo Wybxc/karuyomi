@@ -16,8 +16,9 @@ import type {
   BuildManifest,
   ExtensionIndex,
 } from '../../packages/contracts/src/index.ts';
-import { isRecord } from '../lib/json.ts';
-import { digest, parseManifest, repositoryRoot } from './verify-manifest.ts';
+import isRecord from 'is-plain-obj';
+import { createHash } from 'node:crypto';
+import { parseManifest, repositoryRoot } from './verify-manifest.ts';
 
 export async function fixture(
   t: TestContext,
@@ -37,7 +38,7 @@ export async function fixture(
   );
   assert(isRecord(protocol));
   const encoded = gzipSync(content);
-  const sha256 = digest(content);
+  const sha256 = createHash('sha256').update(content).digest('hex');
   const manifest = await parseManifest(
     Buffer.from(
       JSON.stringify({
@@ -55,7 +56,7 @@ export async function fixture(
           size: content.length,
           contentType: 'application/javascript',
           encoding: 'gzip',
-          encodedSha256: digest(encoded),
+          encodedSha256: createHash('sha256').update(encoded).digest('hex'),
           encodedSize: encoded.length,
         },
         hostScripts: [],
@@ -83,7 +84,6 @@ export async function snapshot(directory: string, manifest: BuildManifest) {
         manifestPath,
       },
     ],
-    nextCursor: null,
   };
   const indexFile = path.join(directory, 'extensions/index.json');
   const manifestFile = path.join(directory, manifestPath);

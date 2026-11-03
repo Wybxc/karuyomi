@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstat, open } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
@@ -9,9 +10,7 @@ import type {
   BuildManifest,
   ExtensionIndex,
 } from '../../packages/contracts/src/index.ts';
-import { isRecord, digest } from '../lib/json.ts';
-import { isSourceInfo } from './types.ts';
-export { digest } from '../lib/json.ts';
+import isRecord from 'is-plain-obj';
 import type {
   IntegrityResult,
   ValidationReport,
@@ -121,7 +120,9 @@ export async function decodeBundleBytes(
       'size_mismatch',
       'Encoded artifact size does not match its manifest',
     );
-  if (digest(encoded) !== bundle.encodedSha256)
+  if (
+    createHash('sha256').update(encoded).digest('hex') !== bundle.encodedSha256
+  )
     throw new VerificationFailure(
       'hash_mismatch',
       'Compressed artifact SHA-256 does not match its manifest',
@@ -164,7 +165,7 @@ export async function decodeBundleBytes(
       'Canonical artifact size does not match its manifest',
     );
   const canonical = Buffer.concat(chunks, size);
-  if (digest(canonical) !== bundle.sha256)
+  if (createHash('sha256').update(canonical).digest('hex') !== bundle.sha256)
     throw new VerificationFailure(
       'hash_mismatch',
       'Canonical artifact SHA-256 does not match its manifest',
@@ -320,7 +321,7 @@ export async function verifyIntegrity(
       hostAbi: manifest.hostAbi,
       runtimeBaseline: manifest.runtimeBaseline,
       bundleSha256: manifest.bundle.sha256,
-      manifestSha256: digest(manifestBytes),
+      manifestSha256: createHash('sha256').update(manifestBytes).digest('hex'),
       sourceIds: manifest.sourceIds,
     });
     const artifacts: Artifact[] = [
@@ -374,7 +375,7 @@ export async function verifyIntegrity(
       hostAbi: manifest.hostAbi,
       runtimeBaseline: manifest.runtimeBaseline,
       bundleSha256: manifest.bundle.sha256,
-      manifestSha256: digest(manifestBytes),
+      manifestSha256: createHash('sha256').update(manifestBytes).digest('hex'),
       sourceIds: manifest.sourceIds,
       artifactCount: payloads.size,
       bundleArtifactCount: 1,
@@ -437,29 +438,24 @@ export function completeBrowserValidation(
     return report;
   }
   report.stages.browserLoad = 'passed';
-  const session = isRecord(value.session) ? value.session : {};
-  const hello = isRecord(value.hello) ? value.hello : {};
+  const session = contracts.runtimeSessionSchema.safeParse(value.session);
+  const hello = contracts.runtimeHelloSchema.safeParse(value.hello);
   const browserFailure = isRecord(value.failure) ? value.failure : {};
-  const sources =
-    Array.isArray(session.sources) && session.sources.every(isSourceInfo)
-      ? session.sources
-      : undefined;
+  const sources = session.success ? session.data.sources : undefined;
   const ids = sources?.map((source) => source.id) ?? [];
   if (
     !sources ||
+    !hello.success ||
+    !session.success ||
     value.failure ||
     value.buildId !== base.buildId ||
     value.manifestSha256 !== base.manifestSha256 ||
-    hello.protocolVersion !== base.protocolVersion ||
-    hello.hostAbi !== base.hostAbi ||
-    hello.runtimeBaseline !== base.runtimeBaseline ||
-    hello.sourceReady !== false ||
-    session.protocolVersion !== base.protocolVersion ||
-    session.buildId !== base.buildId ||
-    typeof session.generation !== 'string' ||
-    !session.generation ||
-    typeof session.workerInstanceId !== 'string' ||
-    !session.workerInstanceId ||
+    hello.data.protocolVersion !== base.protocolVersion ||
+    hello.data.hostAbi !== base.hostAbi ||
+    hello.data.runtimeBaseline !== base.runtimeBaseline ||
+    hello.data.sourceReady !== false ||
+    session.data.protocolVersion !== base.protocolVersion ||
+    session.data.buildId !== base.buildId ||
     new Set(ids).size !== ids.length ||
     JSON.stringify([...ids].sort()) !==
       JSON.stringify([...(base.sourceIds ?? [])].sort())

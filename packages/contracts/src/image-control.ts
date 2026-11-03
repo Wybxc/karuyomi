@@ -1,4 +1,15 @@
+import * as pb from '@karuyomi/protocol';
 import { z } from 'zod';
+import {
+  codec,
+  plainMessage,
+  plain,
+  parseMessage,
+  requireCondition,
+  type PlainMessage,
+} from './codec.ts';
+import { validId, validSourceId } from './static-control.ts';
+import { validatePageList } from './runtime-control.ts';
 
 export const IMAGE_CHUNK_LIMIT = 64 * 1024;
 export const IMAGE_BODY_LIMIT = 64 * 1024 * 1024;
@@ -6,74 +17,107 @@ export const IMAGE_PIXEL_LIMIT = 16 * 1024 * 1024;
 export const IMAGE_RESIDENT_PIXEL_LIMIT = 32 * 1024 * 1024;
 export const IMAGE_RESOURCE_LIMIT = 6;
 export const IMAGE_HEADER_LIMIT = 1024 * 1024;
-const id = z.string().min(1).max(200);
-export const acquireImageSchema = z
-  .object({
-    requestId: id,
-    sourceId: z.string().regex(/^-?\d+$/),
-    pageSessionId: id,
-    pageKey: id,
-    generation: id,
-    timeoutMs: z.number().int().positive().max(300_000).optional(),
-  })
-  .strict();
-export const cancelImageSchema = z
-  .object({ requestId: id, generation: id })
-  .strict();
-export const releaseImageSchema = z
-  .object({ resourceId: id, generation: id })
-  .strict();
-export const closePageSessionSchema = z
-  .object({ pageSessionId: id, generation: id })
-  .strict();
-export const processedImageSchema = z
-  .object({
-    resourceId: id,
-    generation: id,
-    mimeType: z.enum([
-      'image/png',
-      'image/jpeg',
-      'image/webp',
-      'image/gif',
-      'image/avif',
-      'image/heic',
-    ]),
-    byteLength: z.number().int().positive().max(IMAGE_BODY_LIMIT),
-    // Dimensions after browser decoding, including its image orientation handling.
-    width: z.number().int().positive().max(1_000_000),
-    height: z.number().int().positive().max(1_000_000),
-  })
-  .strict();
-export const imageResourceSchema = processedImageSchema.extend({
-  url: z.string().startsWith('blob:'),
+
+// MIME support is a business capability, not a duplicate message structure.
+export const imageMimeTypeSchema = z.enum([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+  'image/heic',
+]);
+export type ImageMimeType = z.infer<typeof imageMimeTypeSchema>;
+export type AcquireImage = PlainMessage<pb.AcquireImage>;
+export type CancelImage = PlainMessage<pb.CancelImage>;
+export type ReleaseImage = PlainMessage<pb.ReleaseImage>;
+export type ClosePageSession = PlainMessage<pb.ClosePageSession>;
+export type ProcessedImage = Omit<
+  PlainMessage<pb.ProcessedImage>,
+  'mimeType'
+> & { mimeType: ImageMimeType };
+export type ImageResource = Omit<PlainMessage<pb.ImageResource>, 'mimeType'> & {
+  mimeType: ImageMimeType;
+};
+export type PageList = Omit<PlainMessage<pb.PageList>, 'pages'> & {
+  pages: PlainMessage<pb.Page>[];
+};
+export type Released = PlainMessage<pb.Released>;
+export type Closed = PlainMessage<pb.Closed>;
+export type Completed = PlainMessage<pb.Completed>;
+
+export const acquireImageSchema = codec<AcquireImage>((input) => {
+  const value = plainMessage(pb.AcquireImageSchema, input);
+  [
+    value.requestId,
+    value.pageSessionId,
+    value.pageKey,
+    value.generation,
+  ].forEach(validId);
+  validSourceId(value.sourceId);
+  if (value.timeoutMs !== undefined)
+    requireCondition(
+      value.timeoutMs > 0 && value.timeoutMs <= 300_000,
+      'Invalid image deadline',
+    );
+  return value;
 });
-export const pageListSchema = z
-  .object({
-    pageSessionId: id,
-    pages: z
-      .array(
-        z
-          .object({
-            pageKey: id,
-            index: z.number().int().nonnegative(),
-            sourceIndex: z.number().int(),
-            url: z.string(),
-            imageUrl: z.string().nullable(),
-          })
-          .strict(),
-      )
-      .max(2048),
-  })
-  .strict()
-  .refine(
-    (value) =>
-      new Set(value.pages.map((page) => page.pageKey)).size ===
-      value.pages.length,
-    'Duplicate page key',
+export const cancelImageSchema = codec<CancelImage>((input) => {
+  const value = plainMessage(pb.CancelImageSchema, input);
+  [value.requestId, value.generation].forEach(validId);
+  return value;
+});
+export const releaseImageSchema = codec<ReleaseImage>((input) => {
+  const value = plainMessage(pb.ReleaseImageSchema, input);
+  [value.resourceId, value.generation].forEach(validId);
+  return value;
+});
+export const closePageSessionSchema = codec<ClosePageSession>((input) => {
+  const value = plainMessage(pb.ClosePageSessionSchema, input);
+  [value.pageSessionId, value.generation].forEach(validId);
+  return value;
+});
+export const processedImageSchema = codec<ProcessedImage>((input) => {
+  const value = plainMessage(pb.ProcessedImageSchema, input);
+  [value.resourceId, value.generation].forEach(validId);
+  const mimeType = imageMimeTypeSchema.parse(value.mimeType);
+  requireCondition(
+    value.byteLength > 0 &&
+      value.byteLength <= IMAGE_BODY_LIMIT &&
+      value.width > 0 &&
+      value.height > 0 &&
+      value.width * value.height <= IMAGE_PIXEL_LIMIT,
+    'Invalid processed image budget',
   );
-export type AcquireImage = z.infer<typeof acquireImageSchema>;
-export type CancelImage = z.infer<typeof cancelImageSchema>;
-export type ReleaseImage = z.infer<typeof releaseImageSchema>;
-export type ClosePageSession = z.infer<typeof closePageSessionSchema>;
-export type ProcessedImage = z.infer<typeof processedImageSchema>;
-export type ImageResource = z.infer<typeof imageResourceSchema>;
+  return { ...value, mimeType };
+});
+export const imageResourceSchema = codec<ImageResource>((input) => {
+  const value = plainMessage(pb.ImageResourceSchema, input);
+  const { url, ...processed } = value;
+  const descriptor = processedImageSchema.parse(processed);
+  requireCondition(
+    url.startsWith('blob:'),
+    'Images require a managed Blob resource',
+  );
+  return { ...descriptor, url };
+});
+export const pageListSchema = codec<PageList>((input) => {
+  const value = parseMessage(pb.PageListSchema, input);
+  validatePageList(value);
+  return { ...plain(value), pages: value.pages.map(plain) };
+});
+export const releasedSchema = codec<Released>((input) => {
+  const value = plainMessage(pb.ReleasedSchema, input);
+  requireCondition(value.released, 'Image release was not acknowledged');
+  return value;
+});
+export const closedSchema = codec<Closed>((input) => {
+  const value = plainMessage(pb.ClosedSchema, input);
+  requireCondition(value.closed, 'Page session close was not acknowledged');
+  return value;
+});
+export const completedSchema = codec<Completed>((input) => {
+  const value = plainMessage(pb.CompletedSchema, input);
+  requireCondition(value.completed, 'Control operation was not acknowledged');
+  return value;
+});

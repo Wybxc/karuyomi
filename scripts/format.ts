@@ -1,9 +1,4 @@
-import {
-  spawnSync,
-  type SpawnSyncOptions,
-  type SpawnSyncOptionsWithStringEncoding,
-  type SpawnSyncReturns,
-} from 'node:child_process';
+import { execaSync } from 'execa';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -29,41 +24,42 @@ if (
 ) {
   throw Error('Usage: node scripts/format.ts --write|--check [--portable]');
 }
-function run(
-  command: string,
-  args: string[],
-  options: SpawnSyncOptionsWithStringEncoding,
-): SpawnSyncReturns<string>;
-function run(
-  command: string,
-  args: string[],
-  options?: SpawnSyncOptions,
-): SpawnSyncReturns<Buffer>;
-function run(
-  command: string,
-  args: string[],
-  options: SpawnSyncOptions = {},
-): SpawnSyncReturns<string | Buffer> {
-  const result = spawnSync(command, args, {
-    cwd: root,
-    stdio: 'inherit',
-    ...options,
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw Error(`${command} failed (${result.status})`);
-  return result;
-}
+const run = execaSync({
+  cwd: root,
+  stdin: 'ignore',
+  stdout: 'inherit',
+  stderr: 'inherit',
+  buffer: false,
+  shell: false,
+  preferLocal: false,
+  verbose: 'none',
+});
+const capture = execaSync({
+  cwd: root,
+  stdin: 'ignore',
+  maxBuffer: 8 * 1024 * 1024,
+  shell: false,
+  preferLocal: false,
+  stripFinalNewline: false,
+  verbose: 'none',
+});
 const files = [
   ...new Set(
-    run(
-      'git',
-      ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
-      { encoding: 'utf8', stdio: 'pipe' },
-    ).stdout.split('\0'),
+    capture('git', [
+      'ls-files',
+      '-z',
+      '--cached',
+      '--others',
+      '--exclude-standard',
+    ]).stdout.split('\0'),
   ),
 ].filter(
   (name) =>
-    name && !name.startsWith('vendor/') && existsSync(path.join(root, name)),
+    name &&
+    !name.startsWith('vendor/') &&
+    !name.startsWith('packages/protocol/src/') &&
+    !name.startsWith('packages/source_runtime/lib/src/pb/') &&
+    existsSync(path.join(root, name)),
 );
 const matching = (pattern: RegExp) =>
   files.filter((name) => pattern.test(name));
@@ -107,10 +103,7 @@ const java =
   javaCandidates.find(
     (value): value is string => Boolean(value) && existsSync(value!),
   ) ?? 'java';
-const javaVersion = run(java, ['-version'], {
-  encoding: 'utf8',
-  stdio: 'pipe',
-});
+const javaVersion = capture(java, ['-version']);
 const major = Number(
   /version "(\d+)/.exec(javaVersion.stderr + javaVersion.stdout)?.[1],
 );
@@ -158,16 +151,21 @@ run(java, [
   ...matching(/\.kts?$/),
 ]);
 
+console.log('[format] Protobuf');
+run('pnpm', [
+  'exec',
+  'buf',
+  'format',
+  ...(write ? ['-w'] : ['--diff', '--exit-code']),
+]);
+
 console.log('[format] Dart');
 const dart = process.env.FLUTTER_ROOT
   ? path.join(process.env.FLUTTER_ROOT, 'bin/dart')
   : existsSync(path.join(root, '.fvm/flutter_sdk/bin/dart'))
     ? path.join(root, '.fvm/flutter_sdk/bin/dart')
     : 'dart';
-const dartVersion = run(dart, ['--version'], {
-  encoding: 'utf8',
-  stdio: 'pipe',
-});
+const dartVersion = capture(dart, ['--version']);
 if (!(dartVersion.stdout + dartVersion.stderr).includes('3.13.4'))
   throw Error('Use Dart 3.13.4 from Flutter 3.47.5 for stable formatting');
 run(dart, [
@@ -249,10 +247,7 @@ if (!portable) {
     ['swift-format', '6.4.4'],
     ['clang-format', '21.0.0'],
   ] as const) {
-    const result = run('xcrun', [tool, '--version'], {
-      encoding: 'utf8',
-      stdio: 'pipe',
-    });
+    const result = capture('xcrun', [tool, '--version']);
     if (!(result.stdout + result.stderr).includes(version))
       throw Error(`Use the Xcode formatter ${tool} ${version}`);
   }

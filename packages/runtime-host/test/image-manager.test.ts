@@ -1,5 +1,14 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import type { AcquireImage, WorkerCommand } from '@karuyomi/contracts';
+import {
+  type AcquireImage,
+  type SourceCall,
+  type SourcePayload,
+  processedImageSchema,
+  encodeControlRequest,
+  parseControlResponse,
+} from '@karuyomi/contracts';
+import { create } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
 import { SourceRuntimeManager, type WorkerEndpoint } from '../src/manager.js';
 import { ImageResourceStore } from '../src/image-resources.js';
 import { ImageSink } from '../src/image-channel.js';
@@ -28,7 +37,7 @@ class WorkerHarness implements WorkerEndpoint {
       ),
     );
   }
-  postMessage(command: WorkerCommand, transfer: Transferable[] = []) {
+  postMessage(command: unknown, transfer: Transferable[] = []) {
     void this.runtime.receive(
       command,
       transfer.filter(
@@ -56,7 +65,10 @@ async function setup(
   const store = new ImageResourceStore({
     decode: async () => ({ width: 2, height: 3, close() {} }),
   });
-  const invoke = vi.fn(async () => ({ mangas: [], hasNextPage: false }));
+  const invoke = vi.fn(async (): Promise<SourcePayload> => ({
+    case: 'mangaPage',
+    value: create(pb.MangaPageSchema),
+  }));
   const closePageSession = vi.fn(async () => ({ closed: true as const }));
   const driver: RuntimeDriver = {
     open: async () => [
@@ -108,8 +120,15 @@ async function prepare(port: MessagePort, id: string) {
   sinks.push(sink);
   const handle = sink.open('image/png');
   await sink.write(handle, pngHeader());
-  const result: unknown = JSON.parse(await sink.close(handle));
-  return result;
+  return processedImageSchema.parse(JSON.parse(await sink.close(handle)));
+}
+function metadata(request: AcquireImage, requestId: string): SourceCall {
+  return create(pb.SourceCallSchema, {
+    requestId,
+    sourceId: request.sourceId,
+    generation: request.generation,
+    request: { case: 'popular', value: { page: 1 } },
+  });
 }
 
 test('image and metadata share the Source lock, while END alone cannot publish', async () => {
@@ -125,18 +144,13 @@ test('image and metadata share the Source lock, while END alone cannot publish',
     },
   );
   const acquiring = manager.acquireImage(request);
-  const metadata = manager.invoke({
-    requestId: 'metadata',
-    sourceId: request.sourceId,
-    operation: 'popular',
-    args: {},
-  });
+  const queued = manager.invoke(metadata(request, 'metadata'));
   await prepared.promise;
   expect(create).not.toHaveBeenCalled();
   expect(invoke).not.toHaveBeenCalled();
   java.resolve();
   const image = await acquiring;
-  await metadata;
+  await queued;
   expect(create).toHaveBeenCalledOnce();
   expect(store.snapshot.resources).toBe(1);
   await manager.releaseImage({
@@ -164,12 +178,7 @@ test('cancel control reaches a busy Worker and waits for Java unwind before unlo
     code: 'cancelled',
   });
   await entered.promise;
-  const metadata = manager.invoke({
-    requestId: 'queued',
-    sourceId: request.sourceId,
-    operation: 'popular',
-    args: {},
-  });
+  const queued = manager.invoke(metadata(request, 'queued'));
   let acknowledged = false;
   const stopping = manager
     .cancelImage({
@@ -185,7 +194,7 @@ test('cancel control reaches a busy Worker and waits for Java unwind before unlo
   unwind.resolve();
   await stopping;
   await result;
-  await metadata;
+  await queued;
   expect(workers[0]?.terminated).toBe(false);
   expect(store.snapshot.resources).toBe(0);
 });
@@ -233,12 +242,7 @@ test('a cooperative image timeout preserves the generation for later metadata', 
   ).rejects.toMatchObject({ code: 'timeout' });
   expect(workers[0]?.terminated).toBe(false);
   await expect(
-    manager.invoke({
-      requestId: 'after-timeout',
-      sourceId: request.sourceId,
-      operation: 'popular',
-      args: {},
-    }),
+    manager.invoke(metadata(request, 'after-timeout')),
   ).resolves.toMatchObject({ generation: request.generation });
 });
 
@@ -368,22 +372,48 @@ test('public page-session close waits for the Worker acknowledgement and returns
     generation: request.generation,
   };
   let acknowledged = false;
-  const closing = api.closePageSession(input).then((result) => {
+  const close = async () =>
+    parseControlResponse(
+      await api.control(
+        encodeControlRequest(
+          create(pb.ControlRequestSchema, {
+            requestId: 'control-close',
+            command: { case: 'closePageSession', value: input },
+          }),
+        ),
+      ),
+    );
+  const closing = close().then((result) => {
     acknowledged = true;
     return result;
   });
   await vi.waitFor(() => expect(closePageSession).toHaveBeenCalledOnce());
   expect(acknowledged).toBe(false);
   acknowledgement.resolve({ closed: true });
-  await expect(closing).resolves.toEqual({ closed: true });
-  await expect(api.closePageSession(input)).resolves.toEqual({ closed: true });
+  await expect(closing).resolves.toMatchObject({
+    result: { case: 'closed', value: { closed: true } },
+  });
+  await expect(close()).resolves.toMatchObject({
+    result: { case: 'closed', value: { closed: true } },
+  });
   expect(closePageSession).toHaveBeenCalledOnce();
   await manager.rebuild();
-  await expect(api.closePageSession(input)).resolves.toEqual({ closed: true });
+  await expect(close()).resolves.toMatchObject({
+    result: { case: 'closed', value: { closed: true } },
+  });
 });
 
 test('Native does not advertise or acquire Web Blob resources', async () => {
-  const acquire = vi.fn(async () => ({}));
+  const acquire = vi.fn(async () =>
+    processedImageSchema.parse({
+      resourceId: 'unreachable',
+      generation: 'unreachable',
+      mimeType: 'image/png',
+      byteLength: 1,
+      width: 1,
+      height: 1,
+    }),
+  );
   const { manager, request, session } = await setup(acquire, false);
   expect(session.capabilities).not.toContain('processed-image-resources');
   await expect(manager.acquireImage(request)).rejects.toMatchObject({

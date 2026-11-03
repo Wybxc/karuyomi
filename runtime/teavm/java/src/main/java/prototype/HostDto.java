@@ -1,12 +1,42 @@
 package prototype;
 
 import com.google.gson.*;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import eu.kanade.tachiyomi.source.model.*;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /** Boundary DTOs retain all list items and source metadata. No URL rewriting. */
 public final class HostDto {
+  private static final int MAX_MEMO_BYTES = 64 * 1024;
+
   private HostDto() {}
+
+  private static String memoJson(String json) {
+    if (json.getBytes(StandardCharsets.UTF_8).length > MAX_MEMO_BYTES)
+      throw new IllegalArgumentException("memoJson exceeds 64 KiB UTF-8");
+    JsonReader reader = new JsonReader(new StringReader(json));
+    reader.setStrictness(Strictness.STRICT);
+    try {
+      JsonElement memo = JsonParser.parseReader(reader);
+      if (!memo.isJsonObject() || reader.peek() != JsonToken.END_DOCUMENT)
+        throw new IllegalArgumentException("memoJson must contain one JSON object");
+      return memo.toString();
+    } catch (JsonParseException | IOException error) {
+      throw new IllegalArgumentException("memoJson must contain one JSON object", error);
+    }
+  }
+
+  private static kotlinx.serialization.json.JsonObject memo(JsonObject value) {
+    JsonElement field = value.get("memoJson");
+    if (!field.isJsonPrimitive() || !field.getAsJsonPrimitive().isString())
+      throw new IllegalArgumentException("memoJson must be a JSON string");
+    return (kotlinx.serialization.json.JsonObject)
+        kotlinx.serialization.json.Json.Default.parseToJsonElement(memoJson(field.getAsString()));
+  }
 
   public static int page(JsonObject args) {
     if (!args.has("page")) return 1;
@@ -42,12 +72,7 @@ public final class HostDto {
     if (value.has("initialized")) manga.setInitialized(value.get("initialized").getAsBoolean());
     if (value.has("updateStrategy"))
       manga.setUpdate_strategy(UpdateStrategy.valueOf(value.get("updateStrategy").getAsString()));
-    if (value.has("memo") && !value.get("memo").isJsonNull()) {
-      manga.setMemo(
-          (kotlinx.serialization.json.JsonObject)
-              kotlinx.serialization.json.Json.Default.parseToJsonElement(
-                  value.get("memo").toString()));
-    }
+    if (value.has("memoJson")) manga.setMemo(memo(value));
     return manga;
   }
 
@@ -60,12 +85,7 @@ public final class HostDto {
       chapter.setDate_upload(Long.parseLong(value.get("dateUpload").getAsString()));
     if (value.has("chapterNumber") && !value.get("chapterNumber").isJsonNull())
       chapter.setChapter_number(value.get("chapterNumber").getAsFloat());
-    if (value.has("memo") && !value.get("memo").isJsonNull()) {
-      chapter.setMemo(
-          (kotlinx.serialization.json.JsonObject)
-              kotlinx.serialization.json.Json.Default.parseToJsonElement(
-                  value.get("memo").toString()));
-    }
+    if (value.has("memoJson")) chapter.setMemo(memo(value));
     return chapter;
   }
 
@@ -84,7 +104,7 @@ public final class HostDto {
     dto.addProperty("thumbnailUrl", manga.getThumbnail_url());
     dto.addProperty("initialized", manga.getInitialized());
     dto.addProperty("updateStrategy", manga.getUpdate_strategy().toString());
-    dto.add("memo", JsonParser.parseString(manga.getMemo().toString()));
+    dto.addProperty("memoJson", memoJson(manga.getMemo().toString()));
     return dto;
   }
 
@@ -112,7 +132,7 @@ public final class HostDto {
       item.addProperty("scanlator", chapter.getScanlator());
       item.addProperty("dateUpload", Long.toString(chapter.getDate_upload()));
       item.addProperty("sourceOrder", index);
-      item.add("memo", JsonParser.parseString(chapter.getMemo().toString()));
+      item.addProperty("memoJson", memoJson(chapter.getMemo().toString()));
       items.add(item);
     }
     dto.add("chapters", items);

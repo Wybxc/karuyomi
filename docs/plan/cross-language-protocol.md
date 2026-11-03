@@ -2,17 +2,23 @@
 
 ## 目标与状态
 
-消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**方案已确定，实施未开始。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
+消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，待新 ABI 的实际浏览器与原生运行验收。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
 
-当前 Zod + 手写 Dart 仍是实际实现，图片 ABI v2 仅是图片功能合同，不能作为本计划完成的证据。Java protobuf/TeaVM 适配不是第一批前置要求。
+正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v3，原型不兼容旧材料。
 
-## 待办
+## 已完成
 
-1. 固定标准生成器与 runtime；接入 Buf format/lint/build/generate 和项目 TS 编排，明确生成 TS 的正规 ESM 编译步骤，禁止 ts-nocheck 或实验语法捷径。
-2. 定义 envelope、session/error、Source 请求/结果 oneof、Page/image 控制与实际跨端 API/静态目录 DTO；opaque ID 使用 string，明确 presence、默认值、未知字段及 enum 行为。
-3. 先用双端真实 codec 运行 golden 与非法输入测试，包括超过 JS 安全范围的 ID、缺失 oneof、错误类型、null/default、非整数、未知字段/枚举；随后替换产品调用边界，不长期维护两套 wire schema。
-4. 保留并测试 generation、预算、路径绑定、取消与资源释放等业务规则；保持 MessagePort 和大正文传输独立，不能以 Struct/Any 或 Base64 逃避类型与流控要求。
-5. 严格检查、生成无漂移、实际 Web interop 与 Native 小控制消息通过后更新验证记录，按当前原型协议同步更新 ABI 并及时提交推送。不加旧版兼容门禁。
+- `.proto` 定义、Buf format/lint/build、精确锁定的 ES/Dart 生成器，生成 TS 经 `@karuyomi/protocol` 正常编译为 ESM。
+- `pnpm protocol:setup` 准备独立锁定的 Dart generator；`pnpm generate:check` 在临时目录生成并比较完整文件集与字节，CI 同步检查。
+- TS/Dart 正反 golden、标准二进制与 ProtoJSON 对照、oneof/presence/非法字段、业务预算、签名 ID 和 generation/build 绑定回归。
+- 正式 Worker、Web 与 Native 小控制消息接入；Native 使用 JSON.stringify 文本再交官方 Dart codec，避免 WK NSNumber 的 double 表示改变整数输入。
+- index 删除分页字段；Source 输出使用具体四类 payload；图片/HTTP 大正文继续独立有界二进制传输。Java memo 对象与 64 KiB UTF-8 限额通过 JVM oracle。
+
+## 待验收
+
+1. 用新 host 指纹重新 AOT 代表包，验证真实 Web Source 控制、图片、取消和关闭；旧 v2 图片证据不能改称 v3 证据。
+2. 实测 Native WebView 控制链和实际设备；编译、mock 和 Dart golden 不能替代该项。
+3. 新材料与静态快照、生产 Access 分项验收后再更新部署记录。固定 `022d828` v1 队列保持独立，尚不能部署为当前协议成果。
 
 ## 验收
 

@@ -1,33 +1,79 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { ROOT } from '../lib/io.ts';
-import { applyPatch, PATCHES, prepareSources } from './upstream-sources.ts';
+import { fileURLToPath } from 'node:url';
+import { PACKAGE, PATCHES, prepareSources } from './upstream-sources.ts';
 
-test('exact replacement, insertion and deletion', () => {
-  const patch =
-    '--- a/file\n+++ b/file\n@@ -1,3 +1,3 @@\n first\n-old\n+new\n last\n';
-  assert.equal(applyPatch('first\nold\nlast\n', patch), 'first\nnew\nlast\n');
-  assert.equal(
-    applyPatch('', '--- a/file\n+++ b/file\n@@ -0,0 +1 @@\n+new\n'),
-    'new\n',
-  );
-  assert.equal(
-    applyPatch('old\n', '--- a/file\n+++ b/file\n@@ -1 +0,0 @@\n-old\n'),
-    '',
-  );
-});
-test('context drift and malformed ranges fail', () => {
-  const patch = '--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+new\n';
-  assert.throws(() => applyPatch('changed\n', patch), /context/);
-  assert.throws(
-    () => applyPatch('old\n', patch.replace('@@ -1 +1 @@', '@@ -1,2 +1 @@')),
-    /length/,
-  );
-  assert.throws(() => applyPatch('old\n', patch + patch));
-});
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+test(
+  'source drift, patch context drift and changed patch output fail the pinned TeaVM gates',
+  {
+    skip: !existsSync(path.join(ROOT, 'vendor/teavm/classlib')),
+  },
+  () => {
+    const root = mkdtempSync(
+      path.join(os.tmpdir(), 'karuyomi-upstream-drift-'),
+    );
+    try {
+      const name = PATCHES[0][0];
+      const relative = path.join(
+        'vendor/teavm/classlib/src/main/java',
+        PACKAGE,
+        `T${name}.java`,
+      );
+      const original = readFileSync(path.join(ROOT, relative), 'utf8');
+      const patchPath = path.join(
+        'runtime/teavm/patches/teavm',
+        `${name}.patch`,
+      );
+      const patch = readFileSync(path.join(ROOT, patchPath), 'utf8');
+      mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
+      mkdirSync(path.dirname(path.join(root, patchPath)), { recursive: true });
+      writeFileSync(path.join(root, relative), original + '\n// drift\n');
+      writeFileSync(path.join(root, patchPath), patch);
+      assert.throws(
+        () => prepareSources(path.join(root, 'out'), root),
+        /Pinned TeaVM source differs/,
+      );
+      writeFileSync(path.join(root, relative), original);
+      writeFileSync(
+        path.join(root, patchPath),
+        patch.replace('-final class TEOLSet', '-final class DifferentSet'),
+      );
+      assert.throws(
+        () => prepareSources(path.join(root, 'out'), root),
+        /Patch context differs/,
+      );
+      writeFileSync(
+        path.join(root, patchPath),
+        patch.replace(
+          '+final class PatchedEOLSet',
+          '+final class ChangedEOLSet',
+        ),
+      );
+      assert.throws(
+        () => prepareSources(path.join(root, 'out'), root),
+        /Patched TeaVM source differs/,
+      );
+      assert.equal(
+        existsSync(path.join(root, 'out', PACKAGE, `Patched${name}.java`)),
+        false,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
 test(
   'all pinned sources materialize',
   { skip: !existsSync(path.join(ROOT, 'vendor/teavm/classlib')) },

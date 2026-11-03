@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'browse/fakes.dart';
 
 void main() {
@@ -63,10 +64,15 @@ void main() {
       await tester.tap(find.text('第 1 章'));
       await tester.pumpAndSettle();
       expect(find.byType(ReaderScreen), findsOneWidget);
-      expect(platform.invocations.last['operation'], 'pages');
-      expect(platform.invocations.last['args'], {
-        'chapter': {'url': '/chapter/opaque-ref', 'name': '第 1 章'},
-      });
+      expect(
+        platform.invocations.last.whichRequest(),
+        wire.SourceCall_Request.pages,
+      );
+      expect(
+        platform.invocations.last.pages.chapter.url,
+        '/chapter/opaque-ref',
+      );
+      expect(platform.invocations.last.pages.chapter.name, '第 1 章');
       expect(find.text('当前平台尚未支持图片阅读'), findsOneWidget);
       expect(platform.imageControls.single.$1, 'acquireImage');
       expect(platform.imageControls.single.$2['pageKey'], 'p-0');
@@ -94,9 +100,9 @@ void main() {
       await tester.tap(find.text('真实源 DTO 测试'));
       await tester.pumpAndSettle();
 
-      final pages = Completer<Object?>();
+      final pages = Completer<wire.SourceResult>();
       platform.invokeHandler = (payload) {
-        expect(payload['operation'], 'pages');
+        expect(payload.whichRequest(), wire.SourceCall_Request.pages);
         return pages.future;
       };
       final detailsContext = tester.element(find.byType(MangaDetailsPage));
@@ -109,18 +115,22 @@ void main() {
       expect(detailsRoute.isCurrent, false);
       expect(detailsRoute.isActive, false);
 
-      pages.complete({
-        'pageSessionId': 'departed-details-session',
-        'pages': [
-          {
-            'pageKey': 'p-0',
-            'index': 0,
-            'sourceIndex': 0,
-            'url': '/page/stable-1',
-            'imageUrl': 'https://source.invalid/raw-1.png',
-          },
-        ],
-      });
+      pages.complete(
+        wire.SourceResult(
+          pageList: wire.PageList(
+            pageSessionId: 'departed-details-session',
+            pages: [
+              wire.Page(
+                pageKey: 'p-0',
+                index: 0,
+                sourceIndex: 0,
+                url: '/page/stable-1',
+                imageUrl: 'https://source.invalid/raw-1.png',
+              ),
+            ],
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.byType(ReaderScreen), findsNothing);
       expect(find.byType(MangaDetailsPage), findsNothing);

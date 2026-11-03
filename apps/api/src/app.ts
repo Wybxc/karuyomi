@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { createHttpBridge } from './http-bridge.js';
-import { protocolVersion, type Bootstrap } from '@karuyomi/contracts';
+import {
+  protocolVersion,
+  BootstrapStage,
+  encodeBootstrap,
+  type Bootstrap,
+} from '@karuyomi/contracts';
 import {
   accessIssuer,
   AccessError,
@@ -91,9 +96,9 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
       protocolVersion,
       identity: { subject: identity.subject, email: identity.email },
       expiresAt: identity.expiresAt,
-      stage: 'p0',
+      stage: BootstrapStage.P0,
     };
-    return c.json(body);
+    return c.json(encodeBootstrap(body));
   });
   app.route('/api/bridge', createHttpBridge());
   app.notFound((c) => c.json({ error: 'not_found' }, 404));

@@ -1,12 +1,17 @@
 import {
-  hostAbi,
   protocolVersion,
-  runtimeBaseline,
   workerCommandSchema,
+  buildManifestSchema,
+  messageJson,
+  encodeWorkerResponse,
+  runtimeErrorMessage,
+  sourceResultFor,
+  requireCondition,
   type BuildManifest,
   type WorkerCommand,
-  type WorkerResponse,
 } from '@karuyomi/contracts';
+import { create } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
 import type { RuntimeDriver } from './teavm-driver.js';
 
@@ -19,7 +24,7 @@ export class WorkerRuntime {
 
   constructor(
     private readonly driver: RuntimeDriver,
-    private readonly send: (message: WorkerResponse) => void,
+    private readonly send: (message: pb.WorkerResponseJson) => void,
     id = crypto.randomUUID(),
   ) {
     this.workerInstanceId = id;
@@ -35,140 +40,166 @@ export class WorkerRuntime {
       return;
     }
     const command = parsed.data;
-    if (command.workerInstanceId !== this.workerInstanceId) {
-      for (const port of ports) port.close();
-      return;
-    }
+    const envelope = command.envelope;
     if (
-      this.generation !== undefined &&
-      (command.generation !== this.generation ||
-        command.buildId !== this.manifest?.buildId)
+      envelope.workerInstanceId !== this.workerInstanceId ||
+      (this.generation !== undefined &&
+        (envelope.generation !== this.generation ||
+          envelope.buildId !== this.manifest?.buildId))
     ) {
       for (const port of ports) port.close();
       return;
     }
     if (this.busy) {
       for (const port of ports) port.close();
-      this.reply(
-        command,
-        undefined,
-        new RuntimeFailure(
-          'protocol_error',
-          'A Source operation is already active',
+      this.reply(command, {
+        case: 'error',
+        value: runtimeErrorMessage(
+          new RuntimeFailure(
+            'protocol_error',
+            'A Source operation is already active',
+          ).toJSON(),
         ),
-      );
+      });
       return;
     }
     this.busy = true;
     try {
-      if (command.type === 'open') {
-        if (this.manifest)
+      switch (command.command.case) {
+        case 'open': {
+          if (this.manifest)
+            throw new RuntimeFailure(
+              'protocol_error',
+              'A Worker can only load one extension build',
+            );
+          const opening = command.command.value;
+          requireCondition(
+            opening.manifest !== undefined,
+            'Worker manifest is required',
+          );
+          const manifest = buildManifestSchema.parse(
+            messageJson(pb.BuildManifestSchema, opening.manifest),
+          );
+          this.generation = envelope.generation;
+          this.manifest = manifest;
+          const sources = await this.driver.open(
+            manifest,
+            opening.userAgent,
+            this.controller.signal,
+            { requestId: envelope.requestId, generation: envelope.generation },
+          );
+          this.reply(command, {
+            case: 'session',
+            value: create(pb.RuntimeSessionSchema, {
+              protocolVersion,
+              workerInstanceId: this.workerInstanceId,
+              generation: envelope.generation,
+              buildId: envelope.buildId,
+              sources,
+              capabilities: [
+                'source-rpc',
+                'explicit-references',
+                'complete-dto',
+                'cancel-by-worker-recycle',
+                ...(this.driver.acquireImage && this.driver.closePageSession
+                  ? ['processed-image-resources']
+                  : []),
+              ],
+            }),
+          });
+          break;
+        }
+        case 'invoke': {
+          const call = command.command.value;
+          if (!this.manifest)
+            throw new RuntimeFailure(
+              'runtime_lost',
+              'Source runtime is not open',
+            );
+          if (!this.manifest.sourceIds.includes(call.sourceId))
+            throw new RuntimeFailure(
+              'protocol_error',
+              'Source does not belong to the loaded build',
+            );
+          const payload = await this.driver.invoke(call, {
+            requestId: envelope.requestId,
+            generation: envelope.generation,
+          });
+          this.reply(command, {
+            case: 'source',
+            value: sourceResultFor(call, envelope.buildId, payload),
+          });
+          break;
+        }
+        case 'acquireImage': {
+          const acquiring = command.command.value;
+          requireCondition(
+            acquiring.request !== undefined,
+            'Image request is required',
+          );
+          const request = acquiring.request;
+          if (
+            !this.manifest ||
+            !this.manifest.sourceIds.includes(request.sourceId)
+          )
+            throw new RuntimeFailure(
+              'runtime_lost',
+              'Image Source does not belong to this runtime',
+            );
+          if (!this.driver.acquireImage || ports.length !== 1 || !ports[0])
+            throw new RuntimeFailure(
+              'unsupported_capability',
+              'Image channel is not available',
+            );
+          const result = await this.driver.acquireImage(
+            request.sourceId,
+            request.pageSessionId,
+            request.pageKey,
+            ports[0],
+            acquiring.resourceId,
+            { requestId: envelope.requestId, generation: envelope.generation },
+          );
+          this.reply(command, {
+            case: 'image',
+            value: create(pb.ProcessedImageSchema, result),
+          });
+          break;
+        }
+        case 'closePageSession': {
+          if (!this.manifest || !this.driver.closePageSession)
+            throw new RuntimeFailure(
+              'unsupported_capability',
+              'Page session control is not available',
+            );
+          const result = await this.driver.closePageSession(
+            command.command.value.pageSessionId,
+            { requestId: envelope.requestId, generation: envelope.generation },
+          );
+          this.reply(command, {
+            case: 'closed',
+            value: create(pb.ClosedSchema, result),
+          });
+          break;
+        }
+        case 'shutdown':
+          this.controller.abort();
+          await this.driver.close();
+          this.reply(command, {
+            case: 'closed',
+            value: create(pb.ClosedSchema, { closed: true }),
+          });
+          break;
+        default:
           throw new RuntimeFailure(
             'protocol_error',
-            'A Worker can only load one extension build',
+            'A Worker command must be selected',
           );
-        if (command.buildId !== command.manifest.buildId)
-          throw new RuntimeFailure(
-            'integrity_error',
-            'Envelope build does not match the manifest',
-          );
-        this.generation = command.generation;
-        this.manifest = command.manifest;
-        const sources = await this.driver.open(
-          command.manifest,
-          command.userAgent,
-          this.controller.signal,
-          { requestId: command.requestId, generation: command.generation },
-        );
-        this.reply(command, {
-          protocolVersion,
-          workerInstanceId: this.workerInstanceId,
-          generation: command.generation,
-          buildId: command.buildId,
-          sources,
-          capabilities: [
-            'source-rpc',
-            'explicit-references',
-            'complete-dto',
-            'cancel-by-worker-recycle',
-            ...(this.driver.acquireImage && this.driver.closePageSession
-              ? ['processed-image-resources']
-              : []),
-          ],
-          hostAbi,
-          runtimeBaseline,
-        });
-      } else if (command.type === 'invoke') {
-        if (!this.manifest)
-          throw new RuntimeFailure(
-            'runtime_lost',
-            'Source runtime is not open',
-          );
-        if (!this.manifest.sourceIds.includes(command.sourceId))
-          throw new RuntimeFailure(
-            'protocol_error',
-            'Source does not belong to the loaded build',
-          );
-        if (JSON.stringify(command.args).length > 128 * 1024)
-          throw new RuntimeFailure(
-            'limit_exceeded',
-            'Source control arguments are too large',
-          );
-        const data = await this.driver.invoke(
-          command.sourceId,
-          command.operation,
-          command.args,
-          { requestId: command.requestId, generation: command.generation },
-        );
-        this.reply(command, {
-          requestId: command.requestId,
-          generation: command.generation,
-          buildId: command.buildId,
-          data,
-        });
-      } else if (command.type === 'acquire-image') {
-        if (
-          !this.manifest ||
-          !this.manifest.sourceIds.includes(command.sourceId)
-        )
-          throw new RuntimeFailure(
-            'runtime_lost',
-            'Image Source does not belong to this runtime',
-          );
-        if (!this.driver.acquireImage || ports.length !== 1 || !ports[0])
-          throw new RuntimeFailure(
-            'unsupported_capability',
-            'Image channel is not available',
-          );
-        const result = await this.driver.acquireImage(
-          command.sourceId,
-          command.pageSessionId,
-          command.pageKey,
-          ports[0],
-          command.resourceId,
-          { requestId: command.requestId, generation: command.generation },
-        );
-        this.reply(command, result);
-      } else if (command.type === 'close-page-session') {
-        if (!this.manifest || !this.driver.closePageSession)
-          throw new RuntimeFailure(
-            'unsupported_capability',
-            'Page session control is not available',
-          );
-        this.reply(
-          command,
-          await this.driver.closePageSession(command.pageSessionId, {
-            requestId: command.requestId,
-            generation: command.generation,
-          }),
-        );
-      } else {
-        this.controller.abort();
-        await this.driver.close();
-        this.reply(command, { closed: true });
       }
     } catch (error) {
-      this.reply(command, undefined, runtimeFailure(error));
+      this.reply(command, {
+        case: 'error',
+        value: runtimeErrorMessage(runtimeFailure(error).toJSON()),
+      });
     } finally {
       for (const port of ports) port.close();
       this.busy = false;
@@ -177,17 +208,12 @@ export class WorkerRuntime {
 
   private reply(
     command: WorkerCommand,
-    result?: unknown,
-    error?: RuntimeFailure,
+    result: pb.WorkerResponse['result'],
   ): void {
-    this.send({
-      type: 'response',
-      protocolVersion,
-      workerInstanceId: this.workerInstanceId,
-      generation: command.generation,
-      buildId: command.buildId,
-      requestId: command.requestId,
-      ...(error ? { error: error.toJSON() } : { result }),
-    });
+    this.send(
+      encodeWorkerResponse(
+        create(pb.WorkerResponseSchema, { envelope: command.envelope, result }),
+      ),
+    );
   }
 }

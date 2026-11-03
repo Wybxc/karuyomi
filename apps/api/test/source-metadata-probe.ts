@@ -27,7 +27,7 @@ import {
   httpResponseMetaSchema,
 } from '../../../packages/contracts/src/http-frames.ts';
 import { collectMaterials } from '../../../packages/runtime-host/materials.ts';
-import { isRecord } from '../../../tools/extensions/types.ts';
+import isRecord from 'is-plain-obj';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -209,15 +209,23 @@ const persist = async () => {
   await mkdir(path.dirname(evidenceFile), { recursive: true });
   await writeFile(evidenceFile, JSON.stringify(evidence, null, 2) + '\n');
 };
-const html = `<!doctype html><html lang="en"><meta charset="utf-8">
-<title>Karuyomi live Source probe</title>
-<style>body{font:14px system-ui;margin:24px;max-width:1000px}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{padding:12px}#images{display:flex;gap:12px;align-items:start}#images img{width:30%;max-height:480px;object-fit:contain;object-position:top}</style>
-<h1>Live Source metadata probe</h1>
-<p>Loopback only: verified real TeaVM product, direct static gzip assets, policy-only local D1, signed test Access identity and real workerd HTTP bridge. ${verifyImages ? 'First, middle and last page images are acquired through the original Source and the product binary image channel.' : 'No image bytes are requested.'}</p>
-<button id="run" disabled>Run real metadata operations</button><div id="images"></div><pre id="output">Loading...</pre>
-<script type="module">
-import '/runtime/host.js';
+const runnerSource = `import '/runtime/host.js';
+import {create} from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
+import {encodeControlRequest,parseControlResponse,runtimeErrorData,messageJson,runtimeHelloSchema,runtimeSessionSchema,plain} from './packages/contracts/src/index.ts';
 const runtime = window.karuyomiRuntime;
+async function control(command,expected){
+  const requestId=crypto.randomUUID();
+  const request=create(pb.ControlRequestSchema,{requestId,command});
+  const response=parseControlResponse(await runtime.control(encodeControlRequest(request)));
+  if(response.requestId!==requestId)throw Error('Control response identity mismatch');
+  if(response.result.case==='error'){
+    const failure=runtimeErrorData(response.result.value);
+    throw Object.assign(Error(failure.message),failure);
+  }
+  if(response.result.case!==expected)throw Error('Unexpected control result');
+  return response.result.value;
+}
 const output = document.querySelector('#output');
 const report = {userAgent:navigator.userAgent, events:[], operations:[], images:[], requiredImages:0, imageGate:${JSON.stringify(verifyImages ? 'pending' : 'not_requested')}, finished:false};
 const record = async (event, value) => {
@@ -227,20 +235,20 @@ const record = async (event, value) => {
 const failure = error => ({code:error.code ?? 'unknown',name:error.name,message:String(error.message ?? error).slice(0,1400),javaClass:error.javaClass});
 const checkImages = async (session, sourceId, pages) => {
   const pageSessionId=pages.pageSessionId;
-  if(typeof pageSessionId!=='string'||!pages.pages?.length)throw new Error('Missing original Page session');
   const indices=[...new Set([0,Math.floor(pages.pages.length/2),pages.pages.length-1])];
   report.requiredImages=indices.length;
   try {
+    if(!pages.pages.length)throw Error('Original Page session is empty');
     for(const index of indices){
       const started=performance.now();
       let resource;
       let image;
       try {
-        resource=await runtime.acquireImage({requestId:crypto.randomUUID(),sourceId,pageSessionId,pageKey:pages.pages[index].pageKey,generation:session.generation,timeoutMs:60000});
-        if(resource.generation!==session.generation||!resource.url?.startsWith('blob:'))throw new Error('Invalid resource ownership');
+        resource=await control({case:'acquireImage',value:{requestId:crypto.randomUUID(),sourceId,pageSessionId,pageKey:pages.pages[index].pageKey,generation:session.generation,timeoutMs:60000}},'image');
+        if(resource.generation!==session.generation||!resource.url.startsWith('blob:'))throw Error('Invalid resource ownership');
         image=new Image(); image.src=resource.url; image.alt='Processed page '+(index+1);
         await image.decode();document.querySelector('#images').append(image);
-        if(image.naturalWidth!==resource.width||image.naturalHeight!==resource.height)throw new Error('Image dimension descriptor mismatch');
+        if(image.naturalWidth!==resource.width||image.naturalHeight!==resource.height)throw Error('Image dimension descriptor mismatch');
         const summary={index,ok:true,byteLength:resource.byteLength,mimeType:resource.mimeType,width:resource.width,height:resource.height,elapsedMs:Math.round(performance.now()-started)};
         report.images.push(summary);await record('imageDecoded',summary);
       }catch(error){
@@ -249,45 +257,53 @@ const checkImages = async (session, sourceId, pages) => {
         if(image){image.remove();image.removeAttribute('src');}
         if(resource){
           const release={resourceId:resource.resourceId,generation:resource.generation};
-          if((await runtime.releaseImage(release)).released!==true)throw new Error('Missing image release acknowledgement');
-          if((await runtime.releaseImage(release)).released!==true)throw new Error('Missing repeated release acknowledgement');
+          await control({case:'releaseImage',value:release},'released');
+          await control({case:'releaseImage',value:release},'released');
           let revoked=false;
           try{const response=await fetch(resource.url);revoked=!response.ok;}catch{revoked=true;}
-          if(!revoked)throw new Error('Released Blob URL remains readable');
+          if(!revoked)throw Error('Released Blob URL remains readable');
           await record('imageReleased',{index,revoked});
         }
       }
     }
   }finally{
-    if((await runtime.closePageSession({pageSessionId,generation:session.generation})).closed!==true)throw new Error('Missing page session close acknowledgement');
+    await control({case:'closePageSession',value:{pageSessionId,generation:session.generation}},'closed');
     await record('pageSessionClosed',true);
   }
-  if(report.images.length!==report.requiredImages||report.images.some(image=>!image.ok))throw new Error('One or more required page images failed');
+  if(report.images.length!==report.requiredImages||report.images.some(image=>!image.ok))throw Error('One or more required page images failed');
   report.imageGate='passed';
   await record('imageGatePassed',true);
 };
 window.addEventListener('unhandledrejection',event=>record('unhandledRejection',failure(event.reason)));
-await record('hello', await runtime.ready);
-const button = document.querySelector('#run');button.disabled = false;
+const button = document.querySelector('#run');
+try{
+  const hello=await control({case:'ready',value:{}},'hello');
+  await record('hello',runtimeHelloSchema.parse(messageJson(pb.RuntimeHelloSchema,hello)));
+  button.disabled=false;
+}catch(error){await record('readyError',failure(error));}
 button.onclick = async () => {
   button.disabled = true;
   try {
-    const session = await runtime.open({
+    const session = await control({case:'open',value:{
       manifestPath:${JSON.stringify(`/extensions/builds/${manifest.buildId}/manifest.json`)},
       identity:'probe-owner', userAgent:navigator.userAgent,
       expectedBuildId:${JSON.stringify(manifest.buildId)}, expectedBundleSha256:${JSON.stringify(manifest.bundle.sha256)}
-    });
-    await record('session',session);
+    }},'session');
+    await record('session',runtimeSessionSchema.parse(messageJson(pb.RuntimeSessionSchema,session)));
     const sourceId=session.sources[0].id;
     const call=async(operation,args)=>{
       const started=performance.now();
       try {
-        const {data}=await runtime.invoke({requestId:crypto.randomUUID(),sourceId,operation,args,timeoutMs:60000});
-        const summary={operation,ok:true,elapsedMs:Math.round(performance.now()-started),keys:Object.keys(data),...(args.page?{page:args.page}:{}),...(operation==='search'?{query:args.query}:{})};
+        const requestId=crypto.randomUUID();
+        const source=await control({case:'invoke',value:{requestId,sourceId,generation:session.generation,request:{case:operation,value:args},timeoutMs:60000}},'source');
+        const expected=operation==='pages'?'pageList':operation==='details'?'manga':operation==='chapters'?'chapters':'mangaPage';
+        if(source.requestId!==requestId||source.generation!==session.generation||source.buildId!==session.buildId||source.payload.case!==expected)throw Error('Source result identity or payload mismatch');
+        const data=source.payload.value;
+        const summary={operation,ok:true,elapsedMs:Math.round(performance.now()-started),keys:Object.keys(plain(data)),...(args.page?{page:args.page}:{}),...(operation==='search'?{query:args.query}:{})};
         if(Array.isArray(data.mangas)){summary.count=data.mangas.length;summary.hasNextPage=data.hasNextPage;summary.firstTitle=data.mangas[0]?.title;}
         if(Array.isArray(data.chapters)){summary.count=data.chapters.length;summary.firstName=data.chapters[0]?.name;}
-        if(Array.isArray(data.pages)){summary.count=data.pages.length;summary.firstKeys=data.pages[0]?Object.keys(data.pages[0]):[];}
-        if(operation==='details'){summary.title=data.title;summary.descriptionLength=data.description?.length??0;summary.genreCount=data.genres?.length??0;}
+        if(Array.isArray(data.pages)){summary.count=data.pages.length;summary.firstKeys=data.pages[0]?Object.keys(plain(data.pages[0])):[];}
+        if(operation==='details'){summary.title=data.title;summary.descriptionLength=data.description?.length??0;summary.genreCount=data.genres.length;}
         report.operations.push(summary);await record('operation',summary);return data;
       }catch(error){const summary={operation,ok:false,elapsedMs:Math.round(performance.now()-started),error:failure(error)};report.operations.push(summary);await record('operation',summary);return null;}
     };
@@ -307,9 +323,31 @@ button.onclick = async () => {
       else await record('pagesBlocked','No real chapter reference was returned');
     }else await record('referenceOperationsBlocked','No real manga reference was returned; details/chapters/pages were not fabricated');
   }catch(error){await record('openError',failure(error));}
-  finally{if(report.imageGate==='pending')report.imageGate='failed';report.finished=true;await runtime.dispose();await record('finished',true);}
-};
-</script></html>`;
+  finally{
+    if(report.imageGate==='pending')report.imageGate='failed';
+    try{await control({case:'dispose',value:{}},'completed');}
+    catch(error){await record('disposeError',failure(error));}
+    report.finished=true;await record('finished',true);
+  }
+};`;
+const compiledRunner = await build({
+  stdin: { contents: runnerSource, resolveDir: root, loader: 'js' },
+  external: ['/runtime/host.js'],
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target: 'es2022',
+  write: false,
+});
+const runner = compiledRunner.outputFiles[0]?.text;
+assert(runner, 'Expected one compiled browser probe module');
+const html = `<!doctype html><html lang="en"><meta charset="utf-8">
+<title>Karuyomi live Source probe</title>
+<style>body{font:14px system-ui;margin:24px;max-width:1000px}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{padding:12px}#images{display:flex;gap:12px;align-items:start}#images img{width:30%;max-height:480px;object-fit:contain;object-position:top}</style>
+<h1>Live Source metadata probe</h1>
+<p>Loopback only: verified real TeaVM product, direct static gzip assets, policy-only local D1, signed test Access identity and real workerd HTTP bridge. ${verifyImages ? 'First, middle and last page images are acquired through the original Source and the product binary image channel.' : 'No image bytes are requested.'}</p>
+<button id="run" disabled>Run real metadata operations</button><div id="images"></div><pre id="output">Loading...</pre>
+<script type="module" src="/probe-runner.js"></script></html>`;
 
 async function readBody(request: IncomingMessage, limit = 12 * 1024 * 1024) {
   const chunks: Buffer[] = [];
@@ -334,6 +372,15 @@ const server = createServer(async (request, response) => {
       if (isRecord(browser) && Array.isArray(browser.events))
         console.log(JSON.stringify(browser.events.at(-1)));
       response.writeHead(204).end();
+      return;
+    }
+    if (request.method === 'GET' && pathname === '/probe-runner.js') {
+      response
+        .writeHead(200, {
+          'Content-Type': 'application/javascript',
+          'Cache-Control': 'no-store',
+        })
+        .end(runner);
       return;
     }
     const staticFile = await staticProbeFile(staticRoot, pathname, manifest);

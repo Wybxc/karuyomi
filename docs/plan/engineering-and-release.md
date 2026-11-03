@@ -27,7 +27,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。固定提交 `022d828` 的两包真实 AOT / 内置浏览器初始化、线上匿名 gzip 下载和旧版本远端清理均通过，D1 仅继承已有域名授权。固定该提交的本地单并发全量已经启动，队列包含剩余 1,446 包，尚未完成 baseline。首次全量最终部署、有界 CI 部署及客户端真实更新/旧缓存清理仍需收齐证据；CI 在完整 baseline 部署前继续停用。Actions secrets、全 TS 自动化、依赖规则与固定 Node 24 检查已验证，详细证据见 [VERIFICATION](../VERIFICATION.md)。
 
-产品图片合同将 host ABI 提升为 `karuyomi-source-host-v2`，原型不兼容旧 Page DTO。正在运行的 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用 v2 客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v2 包须按新指纹重新构建和验收。完整 baseline 尚未部署、ABI 更新尚未验证前，不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
+当前 Protobuf 控制合同使用 host ABI `karuyomi-source-host-v3`、protocolVersion 2，HTTP bridgeVersion 保持 2；原型不兼容旧控制协议或 Page DTO。正在运行的 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用当前客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v3 包须按新指纹重新构建和验收。完整 baseline 尚未部署、ABI 更新尚未验证前，不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
 
 该冻结批次目前已定位的宿主缺口可供后续正式回归使用，不从失败包自动重试，也不修改原扩展：bookorbit/lanraragi/mango 缺 `OkHttpClient.Builder.dns`，komga 缺 `Builder.authenticator`，dragonballmultiverse/manhuarm 缺 `StaticLayout.Builder` 等文本绘图 ABI（后者还用到字体度量与旋转），mangafire 缺 `Class.getResource` 与协程 cancel ABI。DNS 和认证须实现真实请求语义，不能以 no-op 仅换取编译成功。lunaranime 当前只有 TeaVM `2/2` 无栈错误，尚不能确定首因，需要后续独立诊断。原始逐包日志留在冻结 checkout 的 ignored 构建目录。
 

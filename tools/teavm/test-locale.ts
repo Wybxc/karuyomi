@@ -1,7 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ROOT, run } from '../lib/io.ts';
+import { fileURLToPath } from 'node:url';
+import { execa } from 'execa';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export async function testLocale(root = ROOT): Promise<void> {
   const javaHome =
@@ -10,18 +13,30 @@ export async function testLocale(root = ROOT): Promise<void> {
   const java = path.join(javaHome, 'bin/java'),
     javac = path.join(javaHome, 'bin/javac');
   const work = mkdtempSync(path.join(os.tmpdir(), 'karuyomi-locale-'));
+  const jdk = execa({
+    shell: false,
+    stdin: 'ignore',
+    preferLocal: false,
+    stripFinalNewline: false,
+    verbose: 'none',
+    maxBuffer: 2 * 1024 * 1024,
+  });
   try {
     const patch = path.join(work, 'patch'),
       compat = path.join(root, 'runtime/teavm/java/compat');
     mkdirSync(patch);
-    await run(javac, [
-      '--patch-module',
-      `java.base=${compat}`,
-      '-d',
-      patch,
-      path.join(compat, 'java/util/Locale$Builder.java'),
-      path.join(compat, 'java/util/IllformedLocaleException.java'),
-    ]);
+    await jdk(
+      javac,
+      [
+        '--patch-module',
+        `java.base=${compat}`,
+        '-d',
+        patch,
+        path.join(compat, 'java/util/Locale$Builder.java'),
+        path.join(compat, 'java/util/IllformedLocaleException.java'),
+      ],
+      { stdout: 'inherit', stderr: 'inherit', buffer: false },
+    );
     const test = path.join(work, 'LocaleContract.java');
     writeFileSync(
       test,
@@ -40,14 +55,18 @@ public class LocaleContract {
  }
 }`,
     );
-    await run(javac, ['-d', work, test]);
+    await jdk(javac, ['-d', work, test], {
+      stdout: 'inherit',
+      stderr: 'inherit',
+      buffer: false,
+    });
     const args = ['-cp', work, 'LocaleContract'];
-    const stock = await run(java, args, { capture: true }),
-      adapted = await run(
-        java,
-        ['--patch-module', `java.base=${patch}`, ...args],
-        { capture: true },
-      );
+    const stock = await jdk(java, args),
+      adapted = await jdk(java, [
+        '--patch-module',
+        `java.base=${patch}`,
+        ...args,
+      ]);
     if (stock.stdout !== adapted.stdout)
       throw new Error('Locale.Builder differs from the stock JDK');
     console.log('Locale.Builder: 15 JDK comparison cases passed');

@@ -4,23 +4,22 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
+  statSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { createHash } from 'node:crypto';
+import { execa } from 'execa';
+import stableStringify from 'json-stable-stringify';
+import writeFileAtomic from 'write-file-atomic';
+import isRecord from 'is-plain-obj';
 import { z } from 'zod';
 import { buildManifestSchema } from '../../packages/contracts/src/index.ts';
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
-import { ROOT, files, run } from '../lib/io.ts';
-import {
-  canonical,
-  digest,
-  readJson,
-  writeJson,
-  isRecord,
-} from '../lib/json.ts';
 import { prepareRuntime, LOCK } from '../teavm/runtime.ts';
 import { prepareSources } from '../teavm/upstream-sources.ts';
 import {
@@ -29,6 +28,7 @@ import {
   hostFingerprint,
   treeHash,
   SHARED_PATHS,
+  ROOT,
 } from './catalog.ts';
 import { extensionDescriptorSchema } from './model.ts';
 import type { ExtensionDescriptor } from './model.ts';
@@ -102,13 +102,15 @@ export function validateDescriptor(
     !equalNames(Object.keys(descriptor.sharedInputs), [...SHARED_PATHS])
   )
     throw new Error('Incomplete descriptor fingerprint input set');
+  const sourceIdentity = stableStringify({
+    modules: descriptor.sourceInputs,
+    shared: descriptor.sharedInputs,
+  });
+  if (sourceIdentity === undefined)
+    throw new Error('Source identity is not JSON');
   if (
-    digest(
-      canonical({
-        modules: descriptor.sourceInputs,
-        shared: descriptor.sharedInputs,
-      }),
-    ) !== descriptor.sourceFingerprint
+    createHash('sha256').update(sourceIdentity).digest('hex') !==
+    descriptor.sourceFingerprint
   )
     throw new Error('Descriptor source fingerprint mismatch');
   const identity = {
@@ -117,7 +119,13 @@ export function validateDescriptor(
     sourceFingerprint: descriptor.sourceFingerprint,
     hostFingerprint: descriptor.hostFingerprint,
   };
-  if (digest(canonical(identity)) !== descriptor.inputFingerprint)
+  const encodedIdentity = stableStringify(identity);
+  if (encodedIdentity === undefined)
+    throw new Error('Input identity is not JSON');
+  if (
+    createHash('sha256').update(encodedIdentity).digest('hex') !==
+    descriptor.inputFingerprint
+  )
     throw new Error('Descriptor input fingerprint mismatch');
   const slug = descriptor.packageName
     .replace(/^eu\.kanade\.tachiyomi\.extension\./, '')
@@ -148,7 +156,10 @@ export function put(
 export async function materialCatalog() {
   const { catalog } = await collectMaterials({ includeWasmBytes: false });
   const bytes = Buffer.from(JSON.stringify(catalog, null, 2) + '\n');
-  return { catalog, catalogSha256: digest(bytes) };
+  return {
+    catalog,
+    catalogSha256: createHash('sha256').update(bytes).digest('hex'),
+  };
 }
 
 export interface BuildOptions {
@@ -205,8 +216,13 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
   let stage = 'upstream',
     activeLog: string | undefined;
   try {
+    if (statSync(options.descriptor).size > 2 * 1024 * 1024)
+      throw new Error('Oversized build descriptor');
+    const descriptorBytes = readFileSync(options.descriptor);
+    if (descriptorBytes.length > 2 * 1024 * 1024)
+      throw new Error('Oversized build descriptor');
     const descriptor = validateDescriptor(
-      readJson(options.descriptor),
+      JSON.parse(descriptorBytes.toString('utf8')),
       path.resolve(
         options.upstream ?? path.join(ROOT, 'vendor/extensions-source'),
       ),
@@ -221,10 +237,17 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       ...(options.seed ? { seed: options.seed } : {}),
       android: options.android ?? false,
     });
-    const javaVersion = await run(
+    const javaVersion = await execa(
       path.join(runtime.javaHome, 'bin/java'),
       ['-version'],
-      { capture: true },
+      {
+        shell: false,
+        stdin: 'ignore',
+        preferLocal: false,
+        stripFinalNewline: false,
+        verbose: 'none',
+        maxBuffer: 2 * 1024 * 1024,
+      },
     );
     if (!javaVersion.stderr.match(/version "25(?:\.|\")/))
       throw new Error('JDK 25 required');
@@ -263,7 +286,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     );
     activeLog = path.join(logs, 'upstream.log');
     console.log(JSON.stringify({ stage, module, logPath: activeLog }));
-    await run(
+    await execa(
       'java',
       [
         '-classpath',
@@ -278,7 +301,19 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         '-Dorg.gradle.daemon=false',
         '-Dorg.gradle.parallel=false',
       ],
-      { cwd: upstream, env, log: activeLog },
+      {
+        shell: false,
+        stdin: 'ignore',
+        preferLocal: false,
+        stripFinalNewline: false,
+        verbose: 'none',
+        cwd: upstream,
+        env,
+        extendEnv: false,
+        stdout: { file: activeLog },
+        stderr: { file: activeLog },
+        buffer: false,
+      },
     );
     if (git(upstream, 'status', '--porcelain', '--untracked-files=no'))
       throw new Error(
@@ -301,15 +336,25 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     ])
       if (expected !== actual)
         throw new Error('Official metadata disagrees with descriptor');
-    const jars = files(
-      path.join(upstream, descriptor.sourcePath, 'build/outputs/jar/release'),
-      '.jar',
+    const jarDirectory = path.join(
+      upstream,
+      descriptor.sourcePath,
+      'build/outputs/jar/release',
     );
+    const jars = readdirSync(jarDirectory, {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((file) => file.isFile() && file.name.endsWith('.jar'))
+      .map((file) => path.join(file.parentPath, file.name))
+      .sort();
     if (jars.length !== 1)
       throw new Error('Expected exactly one official release JVM JAR');
     const original = jars[0];
     if (!original) throw new Error('Missing original JVM JAR');
-    const originalHash = digest(readFileSync(original));
+    const originalHash = createHash('sha256')
+      .update(readFileSync(original))
+      .digest('hex');
     stage = 'host';
     if (hostFingerprint().fingerprint !== descriptor.hostFingerprint)
       throw new Error(
@@ -341,7 +386,13 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       convertedSha256: originalHash,
       expectedSources: metadata.sources,
     };
-    writeJson(path.join(work, 'inputs.json'), [entry]);
+    const serializedInputs = stableStringify([entry]);
+    if (serializedInputs === undefined)
+      throw new Error('Build inputs are not JSON');
+    writeFileAtomic.sync(
+      path.join(work, 'inputs.json'),
+      serializedInputs + '\n',
+    );
     const cache = path.join(local, 'extension-cache', descriptor.buildId),
       sharedM2 = path.join(local, 'build-cache/m2');
     mkdirSync(cache, { recursive: true });
@@ -357,7 +408,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     );
     // This is the stable checkout implementation; work only holds sources/data.
     // runAot in a child retains process-group cancellation and a bounded log file.
-    await run(
+    await execa(
       process.execPath,
       [
         path.join(ROOT, 'tools/teavm/build.ts'),
@@ -370,15 +421,30 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         '--maven',
         runtime.maven,
       ],
-      { cwd: ROOT, env, log: activeLog },
+      {
+        shell: false,
+        stdin: 'ignore',
+        preferLocal: false,
+        stripFinalNewline: false,
+        verbose: 'none',
+        cwd: ROOT,
+        env,
+        extendEnv: false,
+        stdout: { file: activeLog },
+        stderr: { file: activeLog },
+        buffer: false,
+      },
     );
     if (
-      digest(readFileSync(original)) !== originalHash ||
-      digest(
-        readFileSync(
-          path.join(work, 'public/extensions', path.basename(original)),
-        ),
-      ) !== originalHash
+      createHash('sha256').update(readFileSync(original)).digest('hex') !==
+        originalHash ||
+      createHash('sha256')
+        .update(
+          readFileSync(
+            path.join(work, 'public/extensions', path.basename(original)),
+          ),
+        )
+        .digest('hex') !== originalHash
     )
       throw new Error('Build changed the official extension input JAR');
     if (hostFingerprint().fingerprint !== descriptor.hostFingerprint)
@@ -405,10 +471,20 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       hostScripts: materials.hostScripts,
       resources: materials.resources,
     });
-    const summary = readJson(path.join(work, 'results', `build-${key}.json`));
+    const summaryFile = path.join(work, 'results', `build-${key}.json`);
+    if (statSync(summaryFile).size > 2 * 1024 * 1024)
+      throw new Error('Oversized AOT summary');
+    const summary: unknown = JSON.parse(readFileSync(summaryFile, 'utf8'));
     if (!isRecord(summary)) throw new Error('Invalid AOT build summary');
     const record = { ...summary, outputSha256: bundle.sha256 };
-    writeJson(path.join(work, 'results', `build-${key}.json`), record);
+    const serializedSummary = stableStringify(record);
+    if (serializedSummary === undefined)
+      throw new Error('AOT summary is not JSON');
+    writeFileAtomic.sync(summaryFile, serializedSummary + '\n');
+    const serializedManifest = stableStringify(manifest);
+    if (serializedManifest === undefined)
+      throw new Error('Build manifest is not JSON');
+    const manifestBytes = Buffer.from(serializedManifest + '\n');
     const provenance = {
       schemaVersion: 1,
       descriptor,
@@ -437,11 +513,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       aot: record,
       generatedUpstreamAdapters: generated.map((file) => ({
         path: path.relative(work, file),
-        sha256: digest(readFileSync(file)),
+        sha256: createHash('sha256').update(readFileSync(file)).digest('hex'),
       })),
-      manifestSha256: digest(
-        Buffer.concat([canonical(manifest), Buffer.from('\n')]),
-      ),
+      manifestSha256: createHash('sha256').update(manifestBytes).digest('hex'),
       compatibility: {
         browserInitialized: false,
         onlineMetadata: false,
@@ -450,8 +524,14 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       boundary:
         'Compilation and immutable input/hash provenance only. Verify actual Worker initialization separately.',
     };
-    writeJson(path.join(output, 'manifest.json'), manifest);
-    writeJson(path.join(output, 'provenance.json'), provenance);
+    const serializedProvenance = stableStringify(provenance);
+    if (serializedProvenance === undefined)
+      throw new Error('Build provenance is not JSON');
+    writeFileAtomic.sync(path.join(output, 'manifest.json'), manifestBytes);
+    writeFileAtomic.sync(
+      path.join(output, 'provenance.json'),
+      serializedProvenance + '\n',
+    );
     result.status = 'built';
     result.stage = 'complete';
     result.manifestPath = 'manifest.json';
@@ -477,7 +557,13 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     };
   }
   result.seconds = Math.round((performance.now() - started) / 10) / 100;
-  writeJson(path.join(output, 'build-result.json'), result);
+  const serializedResult = stableStringify(result);
+  if (serializedResult === undefined)
+    throw new Error('Build result is not JSON');
+  writeFileAtomic.sync(
+    path.join(output, 'build-result.json'),
+    serializedResult + '\n',
+  );
   return result;
 }
 

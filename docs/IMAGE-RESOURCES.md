@@ -2,7 +2,7 @@
 
 本文记录 P0 的产品图片合同。实现和分层验收见 [P0 计划](plan/p0-runtime-and-reading.md)及[验证记录](VERIFICATION.md)；协议设计本身不表示真实 Source 或移动设备已经通过。
 
-该合同使用 `karuyomi-source-host-v2`：Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI。控制信封 protocolVersion 仍为 1，HTTP bridgeVersion 仍为 2；三者含义不同。v1 AOT 与旧 Page DTO 不作兼容，必须重新构建，不能与 v2 客户端/材料混合部署。
+当前合同使用 `karuyomi-source-host-v3`：Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI，控制边界采用 Protobuf 生成模型和标准 ProtoJSON。控制信封 protocolVersion 为 2，HTTP bridgeVersion 为 2；三者含义不同。旧 ABI 的 AOT、客户端和材料必须同步重建，不混合部署。历史 v2 图片实测结果保留其原始身份，不能作为 v3 运行验收。
 
 ## 原始 Page 与逻辑页
 

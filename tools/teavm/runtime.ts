@@ -1,5 +1,7 @@
 import {
   existsSync,
+  chmodSync,
+  createWriteStream,
   mkdirSync,
   readFileSync,
   renameSync,
@@ -8,10 +10,15 @@ import {
 } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { pipeline } from 'node:stream/promises';
+import { execa } from 'execa';
+import { x as extractTar } from 'tar';
+import { openPromise, validateFileName } from 'yauzl';
+import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import locked from '../../runtime/teavm/toolchain-lock.json' with { type: 'json' };
-import { ROOT, run, safeName } from '../lib/io.ts';
-import { digest, writeJson } from '../lib/json.ts';
-import { extractTar, extractZip } from '../lib/archive.ts';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 interface JavaArchive {
   url: string;
@@ -61,28 +68,53 @@ export interface RuntimeOptions {
   lock?: RuntimeLock;
 }
 
-function hash(data: Uint8Array, algorithm: 'sha1' | 'sha512'): string {
-  return createHash(algorithm).update(data).digest('hex');
-}
 function requireEntry<T>(entry: T | undefined, name: string): T {
   if (entry === undefined) throw new Error(`Missing locked archive: ${name}`);
   return entry;
-}
-async function download(url: string): Promise<Buffer> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(180000) });
-  if (!response.ok)
-    throw new Error(`Download failed (${response.status}): ${url}`);
-  return Buffer.from(await response.arrayBuffer());
 }
 export function verifyMaterials(
   destination: string,
   lock: RuntimeLock = LOCK,
 ): void {
   for (const [name, expected] of Object.entries(lock.seed.members)) {
-    safeName(name);
+    if (validateFileName(name)) throw new Error(`Unsafe archive path: ${name}`);
     const file = path.join(destination, name);
-    if (!existsSync(file) || digest(readFileSync(file)) !== expected)
+    if (
+      !existsSync(file) ||
+      createHash('sha256').update(readFileSync(file)).digest('hex') !== expected
+    )
       throw new Error(`Runtime material missing or altered: ${name}`);
+  }
+}
+
+/** Install a locked Android SDK archive, removing its single upstream root. */
+export async function installAndroidSdkArchive(
+  archiveFile: string,
+  destination: string,
+): Promise<void> {
+  const archive = await openPromise(archiveFile, {
+    autoClose: false,
+    strictFileNames: true,
+  });
+  let prefix: string | undefined;
+  try {
+    for await (const entry of archive.eachEntry()) {
+      prefix ??= (entry.fileName.split('/')[0] ?? '') + '/';
+      if (!entry.fileName.startsWith(prefix))
+        throw new Error('Android SDK archive must contain one root directory');
+      const relative = entry.fileName.slice(prefix.length);
+      if (!relative || entry.fileName.endsWith('/')) continue;
+      const output = path.join(destination, relative);
+      mkdirSync(path.dirname(output), { recursive: true });
+      await pipeline(
+        await archive.openReadStreamPromise(entry),
+        createWriteStream(output),
+      );
+      const mode = entry.externalFileAttributes >>> 16;
+      if (mode) chmodSync(output, mode & 0o777);
+    }
+  } finally {
+    archive.close();
   }
 }
 
@@ -107,26 +139,68 @@ export async function prepareRuntime(
       : path.join(local, 'downloads', lock.seed.asset);
     if (!existsSync(asset)) {
       mkdirSync(path.dirname(asset), { recursive: true });
-      await run('gh', [
-        'release',
-        'download',
-        lock.seed.tag,
-        '--repo',
-        lock.seed.repo,
-        '--pattern',
-        lock.seed.asset,
-        '--dir',
-        path.dirname(asset),
-        '--clobber',
-      ]);
+      await execa(
+        'gh',
+        [
+          'release',
+          'download',
+          lock.seed.tag,
+          '--repo',
+          lock.seed.repo,
+          '--pattern',
+          lock.seed.asset,
+          '--dir',
+          path.dirname(asset),
+          '--clobber',
+        ],
+        {
+          shell: false,
+          stdin: 'ignore',
+          stdout: 'inherit',
+          stderr: 'inherit',
+          buffer: false,
+          preferLocal: false,
+          verbose: 'none',
+        },
+      );
     }
     const data = readFileSync(asset);
-    if (data.length !== lock.seed.size || digest(data) !== lock.seed.sha256)
+    if (
+      data.length !== lock.seed.size ||
+      createHash('sha256').update(data).digest('hex') !== lock.seed.sha256
+    )
       throw new Error('Runtime seed archive checksum/size mismatch');
     const staging = path.join(local, 'runtime-seed.extracting');
     rmSync(staging, { recursive: true, force: true });
     try {
-      await extractTar(asset, staging, new Set(Object.keys(lock.seed.members)));
+      mkdirSync(staging, { recursive: true });
+      const expectedNames = new Set(Object.keys(lock.seed.members)),
+        seen = new Set<string>();
+      let validationError: Error | undefined;
+      await extractTar({
+        file: asset,
+        cwd: staging,
+        strict: true,
+        preserveOwner: false,
+        filter(name, entry) {
+          if (validationError) return false;
+          if (validateFileName(name))
+            validationError = new Error(`Unsafe archive path: ${name}`);
+          else if (
+            !('type' in entry) ||
+            entry.type !== 'File' ||
+            !expectedNames.has(name) ||
+            seen.has(name)
+          )
+            validationError = new Error(`Unexpected seed member: ${name}`);
+          if (validationError) return false;
+          seen.add(name);
+          return true;
+        },
+      });
+      if (validationError) throw validationError;
+      if (seen.size !== expectedNames.size)
+        throw new Error('Seed member set is incomplete');
       verifyMaterials(staging, lock);
       rmSync(materials, { recursive: true, force: true });
       renameSync(staging, materials);
@@ -137,13 +211,23 @@ export async function prepareRuntime(
   const cache = path.join(local, 'build-cache'),
     maven = path.join(cache, `apache-maven-${lock.maven.version}/bin/mvn`);
   if (!existsSync(maven)) {
-    const data = await download(lock.maven.url);
-    if (hash(data, 'sha512') !== lock.maven.sha512)
+    const response = await fetch(lock.maven.url, {
+      signal: AbortSignal.timeout(180000),
+    });
+    if (!response.ok)
+      throw new Error(`Maven download failed (${response.status})`);
+    const data = Buffer.from(await response.arrayBuffer());
+    if (createHash('sha512').update(data).digest('hex') !== lock.maven.sha512)
       throw new Error('Maven checksum mismatch');
     mkdirSync(cache, { recursive: true });
     const archive = path.join(cache, 'maven.tar.gz');
     writeFileSync(archive, data);
-    await extractTar(archive, cache);
+    await extractTar({
+      file: archive,
+      cwd: cache,
+      strict: true,
+      preserveOwner: false,
+    });
     rmSync(archive);
   }
   const system =
@@ -165,8 +249,13 @@ export async function prepareRuntime(
       let obtained = false;
       for (const url of [...(jdk.mirrors ?? []), jdk.url]) {
         try {
-          const data = await download(url);
-          if (digest(data) !== jdk.sha256)
+          const response = await fetch(url, {
+            signal: AbortSignal.timeout(180000),
+          });
+          if (!response.ok)
+            throw new Error(`JDK download failed (${response.status})`);
+          const data = Buffer.from(await response.arrayBuffer());
+          if (createHash('sha256').update(data).digest('hex') !== jdk.sha256)
             throw new Error('JDK download checksum mismatch');
           writeFileSync(archive, data);
           obtained = true;
@@ -179,9 +268,18 @@ export async function prepareRuntime(
       }
       if (!obtained) throw new Error('JDK download failed');
     }
-    if (digest(readFileSync(archive)) !== jdk.sha256)
+    if (
+      createHash('sha256').update(readFileSync(archive)).digest('hex') !==
+      jdk.sha256
+    )
       throw new Error('JDK checksum mismatch');
-    await extractTar(archive, path.join(local, 'jdks'));
+    mkdirSync(path.join(local, 'jdks'), { recursive: true });
+    await extractTar({
+      file: archive,
+      cwd: path.join(local, 'jdks'),
+      strict: true,
+      preserveOwner: false,
+    });
   }
   const sdk = path.join(local, 'android-sdk');
   if (options.android) {
@@ -191,13 +289,18 @@ export async function prepareRuntime(
         marker = path.join(target, '.karuyomi-archive-sha1');
       if (existsSync(marker) && readFileSync(marker, 'utf8') === entry.sha1)
         continue;
-      const data = await download(entry.url);
-      if (hash(data, 'sha1') !== entry.sha1)
+      const response = await fetch(entry.url, {
+        signal: AbortSignal.timeout(180000),
+      });
+      if (!response.ok)
+        throw new Error(`Android SDK download failed (${response.status})`);
+      const data = Buffer.from(await response.arrayBuffer());
+      if (createHash('sha1').update(data).digest('hex') !== entry.sha1)
         throw new Error('Android archive checksum mismatch');
       const archive = path.join(local, 'downloads', `android-${key}.zip`);
       mkdirSync(path.dirname(archive), { recursive: true });
       writeFileSync(archive, data);
-      await extractZip(archive, target, true);
+      await installAndroidSdkArchive(archive, target);
       rmSync(archive);
       mkdirSync(target, { recursive: true });
       writeFileSync(marker, entry.sha1);
@@ -220,7 +323,7 @@ export async function prepareRuntime(
       const payload = readFileSync(
         path.join(root, 'runtime/teavm', entry.path),
       );
-      if (digest(payload) !== entry.sha256)
+      if (createHash('sha256').update(payload).digest('hex') !== entry.sha256)
         throw new Error(`Android metadata checksum mismatch: ${name}`);
       const target = requireEntry(destinations[name], name);
       mkdirSync(path.dirname(target), { recursive: true });
@@ -233,12 +336,17 @@ export async function prepareRuntime(
     maven,
     androidSdk: sdk,
     javaHome,
-    lockSha256: digest(
-      readFileSync(path.join(root, 'runtime/teavm/toolchain-lock.json')),
-    ),
+    lockSha256: createHash('sha256')
+      .update(
+        readFileSync(path.join(root, 'runtime/teavm/toolchain-lock.json')),
+      )
+      .digest('hex'),
     seedSha256: lock.seed.sha256,
   };
-  writeJson(path.join(local, 'prepared-runtime.json'), result);
+  writeFileAtomicSync(
+    path.join(local, 'prepared-runtime.json'),
+    JSON.stringify(result, null, 2) + '\n',
+  );
   return result;
 }
 

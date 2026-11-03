@@ -5,7 +5,10 @@ import {
   encodeMetaFrame,
   encodePreamble,
   httpRequestMetaSchema,
+  type SourceCall,
 } from '@karuyomi/contracts';
+import { create } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
 import { TeaVMDriver, type TeaVMGlobals } from '../src/teavm-driver.js';
 import { ImageResourceStore } from '../src/image-resources.js';
 import { RuntimeFailure } from '../src/errors.js';
@@ -43,7 +46,8 @@ async function setup(install: (scope: TeaVMGlobals) => void) {
             { id: build.sourceIds[0], name: 'Test', lang: 'en' },
           ]),
         );
-      scope.hostInvoke = () => scope.teaDone?.('{}');
+      scope.hostInvoke = () =>
+        scope.teaDone?.('{"mangas":[],"hasNextPage":false}');
       scope.hostClosePageSession = () => scope.teaDone?.('{"closed":true}');
       install(scope);
     },
@@ -52,6 +56,13 @@ async function setup(install: (scope: TeaVMGlobals) => void) {
   drivers.push(driver);
   return { driver, scope, build };
 }
+const metadata = (sourceId: string): SourceCall =>
+  create(pb.SourceCallSchema, {
+    requestId: 'metadata',
+    sourceId,
+    generation: 'generation',
+    request: { case: 'popular', value: { page: 1 } },
+  });
 function collector() {
   const store = new ImageResourceStore({
     decode: async () => ({ width: 2, height: 3, close() {} }),
@@ -96,12 +107,10 @@ test('the installed image ABI sends typed bytes and survives HTTP operation clea
   );
   const resource = await image.publish(result);
   expect(refs).toEqual([[build.sourceIds[0], 'page-session', 'p-0']]);
-  await driver.invoke(
-    build.sourceIds[0]!,
-    'popular',
-    {},
-    { requestId: 'metadata', generation: 'generation' },
-  );
+  await driver.invoke(metadata(build.sourceIds[0]!), {
+    requestId: 'metadata',
+    generation: 'generation',
+  });
   await expect(
     driver.closePageSession('page-session', {
       requestId: 'close-pages',
@@ -197,13 +206,16 @@ test('image cancellation closes a pending HTTP body but waits for swallowed Java
   expect(fetchSignal?.aborted).toBe(true);
   expect(cancelledBody).toHaveBeenCalledOnce();
   await expect(
-    driver.invoke(build.sourceIds[0]!, 'popular', {}),
+    driver.invoke(metadata(build.sourceIds[0]!)),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   unwind.resolve();
   await rejected;
   await expect(
-    driver.invoke(build.sourceIds[0]!, 'popular', {}),
-  ).resolves.toEqual({});
+    driver.invoke(metadata(build.sourceIds[0]!)),
+  ).resolves.toMatchObject({
+    case: 'mangaPage',
+    value: { mangas: [], hasNextPage: false },
+  });
   image.release();
 });
 

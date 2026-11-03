@@ -29,9 +29,7 @@ globalThis.onmessage = (event: MessageEvent<unknown>) => {
   void runtime.receive(event.data, event.ports);
 };
 globalThis.addEventListener('unhandledrejection', () => {
-  // Fatal unbound async work invalidates the generation; it is never replayed.
-  globalThis.postMessage({
-    type: 'fatal',
-    workerInstanceId: runtime.workerInstanceId,
-  });
+  // Use the Worker's native error event for an unbound transport failure.
+  // RPC responses always use the generated envelope and remain correlated.
+  throw new Error('Runtime Worker has an unhandled async failure');
 });

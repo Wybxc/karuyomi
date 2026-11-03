@@ -1,6 +1,9 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { ROOT, files, run } from '../lib/io.ts';
+import { fileURLToPath } from 'node:url';
+import { execa } from 'execa';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export async function checkDto(root = ROOT): Promise<void> {
   const materials = path.join(
@@ -10,7 +13,10 @@ export async function checkDto(root = ROOT): Promise<void> {
     output = path.join(root, 'runtime/teavm/.local/dto-test');
   let jars: string[] = [];
   try {
-    jars = files(materials, '.jar');
+    jars = readdirSync(materials, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.jar'))
+      .map((entry) => path.join(entry.parentPath, entry.name))
+      .sort();
   } catch {
     /* Report the missing bootstrap below. */
   }
@@ -20,7 +26,16 @@ export async function checkDto(root = ROOT): Promise<void> {
     );
   mkdirSync(output, { recursive: true });
   const classpath = jars.join(path.delimiter);
-  await run('javac', [
+  const oracle = execa({
+    shell: false,
+    stdin: 'ignore',
+    stdout: 'inherit',
+    stderr: 'inherit',
+    buffer: false,
+    preferLocal: false,
+    verbose: 'none',
+  });
+  await oracle('javac', [
     '--release',
     '17',
     '-cp',
@@ -29,17 +44,22 @@ export async function checkDto(root = ROOT): Promise<void> {
     output,
     ...[
       'runtime/teavm/java/src/main/java/prototype/HostDto.java',
+      'runtime/teavm/java/src/main/java/prototype/HostJson.java',
       'tools/teavm/HostDtoTest.java',
       'runtime/teavm/java/src/main/java/prototype/HttpBodySource.java',
       'runtime/teavm/java/src/main/java/prototype/HttpRequestSink.java',
       'tools/teavm/HttpBodyTest.java',
     ].map((file) => path.join(root, file)),
   ]);
-  for (const oracle of ['prototype.HostDtoTest', 'prototype.HttpBodyTest'])
-    await run('java', ['-cp', output + path.delimiter + classpath, oracle]);
+  for (const oracleClass of ['prototype.HostDtoTest', 'prototype.HttpBodyTest'])
+    await oracle('java', [
+      '-cp',
+      output + path.delimiter + classpath,
+      oracleClass,
+    ]);
   const imageOutput = path.join(output, 'image');
   mkdirSync(imageOutput, { recursive: true });
-  await run('javac', [
+  await oracle('javac', [
     '--release',
     '17',
     '-cp',
@@ -58,7 +78,7 @@ export async function checkDto(root = ROOT): Promise<void> {
       'tools/teavm/ImageTest.java',
     ].map((file) => path.join(root, file)),
   ]);
-  await run('java', [
+  await oracle('java', [
     '-cp',
     imageOutput + path.delimiter + classpath,
     'prototype.ImageTest',
@@ -67,7 +87,7 @@ export async function checkDto(root = ROOT): Promise<void> {
   // checked throws signature is absent from the original Kotlin bytecode.
   const ownedOutput = path.join(output, 'owned-http-source');
   mkdirSync(ownedOutput, { recursive: true });
-  await run('javac', [
+  await oracle('javac', [
     '--release',
     '17',
     '-cp',
@@ -83,7 +103,7 @@ export async function checkDto(root = ROOT): Promise<void> {
   console.log(
     'Running image oracle against the current owned HttpSource adapter',
   );
-  await run('java', [
+  await oracle('java', [
     '-cp',
     [ownedOutput, imageOutput, classpath].join(path.delimiter),
     'prototype.ImageTest',

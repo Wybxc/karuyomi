@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'runtime_platform_types.dart';
 import 'native_runtime_assets.dart';
 
@@ -164,14 +165,38 @@ final class NativePlatformRuntime extends PlatformRuntime {
                   installed.runtime !== window.karuyomiRuntime) {
                 throw new Error('Bundled Native runtime is missing or was replaced');
               }
-              return await window.karuyomiRuntime.ready;
+              return JSON.stringify(await window.karuyomiRuntime.control(request));
             ''',
-            arguments: {'materialVersion': assets.materialVersion},
+            arguments: {
+              'materialVersion': assets.materialVersion,
+              'request': wire.encodeProtoJson(
+                wire.ControlRequest(
+                  requestId: 'native-handshake-$generation',
+                  ready: wire.Empty(),
+                ),
+              ),
+            },
           );
-          if (result?.error != null || result?.value is! Map) {
+          if (result?.error != null || result?.value is! String) {
             throw const RuntimeException(
               RuntimeErrorCode.runtimeLost,
               'Native runtime control handshake failed',
+            );
+          }
+          final response = wire.decodeProtoJson(
+            wire.ControlResponse(),
+            decodeNativeControlResult(result!.value),
+          );
+          if (response.whichResult() == wire.ControlResponse_Result.error) {
+            throw RuntimeException.fromProto(response.error);
+          }
+          if (response.requestId != 'native-handshake-$generation' ||
+              response.whichResult() != wire.ControlResponse_Result.hello ||
+              !isCompatibleHost(response.hello) ||
+              response.hello.runtimeBaseline != runtimeBaseline) {
+            throw const RuntimeException(
+              RuntimeErrorCode.protocolError,
+              'Incompatible bundled Native runtime',
             );
           }
           if (!loaded.isCompleted) loaded.complete();
@@ -213,57 +238,65 @@ final class NativePlatformRuntime extends PlatformRuntime {
   }
 
   @override
-  Future<Object?> call(
-    String method, [
-    Map<String, Object?> payload = const {},
-  ]) async {
-    if (method == 'acquireImage') {
+  Future<Object?> control(Map<String, Object?> request) async {
+    final message = wire.decodeProtoJson(
+      wire.ControlRequest(),
+      request,
+      maxBytes: wire.controlRequestLimit,
+    );
+    final command = message.whichCommand();
+    if (command == wire.ControlRequest_Command.acquireImage) {
       throw const RuntimeException(
         RuntimeErrorCode.unsupportedCapability,
         'Native processed-image files are not implemented on this platform',
       );
     }
     if (_view == null &&
-        {'cancelImage', 'releaseImage', 'closePageSession'}.contains(method)) {
+        {
+          wire.ControlRequest_Command.cancelImage,
+          wire.ControlRequest_Command.releaseImage,
+          wire.ControlRequest_Command.closePageSession,
+        }.contains(command)) {
       // Cleanup of an expired handle must not create a replacement WebView.
-      return method == 'closePageSession'
-          ? {'closed': true}
-          : {'released': true};
+      return wire.encodeProtoJson(
+        wire.ControlResponse(
+          requestId: message.requestId,
+          closed: command == wire.ControlRequest_Command.closePageSession
+              ? wire.Closed(closed: true)
+              : null,
+          released: command == wire.ControlRequest_Command.closePageSession
+              ? null
+              : wire.Released(released: true),
+        ),
+      );
     }
-    if (method == 'dispose' && _view == null) return null;
+    if (command == wire.ControlRequest_Command.dispose && _view == null) {
+      return wire.encodeProtoJson(
+        wire.ControlResponse(
+          requestId: message.requestId,
+          completed: wire.Completed(completed: true),
+        ),
+      );
+    }
     await _ensureHost();
     final generation = _generation;
     final result = await _controller!.callAsyncJavaScript(
       functionBody: '''
-        try {
-          const host = window.karuyomiRuntime;
-          if (!host) throw {code:'runtime_lost', message:'Runtime control module was lost'};
-          let value;
-          if (method === 'ready') value = await host.ready;
-          else if (method === 'cancel') value = await host.cancel(payload.requestId);
-          else if (method === 'dispose') value = await host[method]();
-          else if (['open', 'invoke', 'fetchApi', 'cancelImage', 'releaseImage', 'closePageSession'].includes(method)) value = await host[method](payload);
-          else throw {code:'protocol_error', message:'Unknown runtime control method'};
-          return {ok:true, value:value ?? null};
-        } catch (error) {
-          return {ok:false, error:{code:error.code ?? 'runtime_lost', message:String(error.message ?? error), retryable:error.retryable === true, javaClass:error.javaClass ?? null}};
-        }
+        const host = window.karuyomiRuntime;
+        if (!host) throw new Error('Runtime control module was lost');
+        return JSON.stringify(await host.control(request));
       ''',
-      arguments: {'method': method, 'payload': payload},
+      arguments: {'request': request},
     );
     if (generation != _generation ||
         result?.error != null ||
-        result?.value is! Map) {
+        result?.value is! String) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Native runtime call belongs to an expired or failed container',
       );
     }
-    final envelope = Map<String, Object?>.from(result!.value as Map);
-    if (envelope['ok'] != true) {
-      throw RuntimeException.fromWire(envelope['error']);
-    }
-    return envelope['value'];
+    return decodeNativeControlResult(result!.value);
   }
 
   @override

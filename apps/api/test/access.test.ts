@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from 'vitest';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { bootstrapSchema } from '@karuyomi/contracts';
+import { bootstrapSchema, BootstrapStage } from '@karuyomi/contracts';
 import { createAccessVerifier } from '../src/access.js';
 import { createApp } from '../src/app.js';
 import type { Bindings } from '../src/env.js';
@@ -141,7 +141,7 @@ test('verified owner gets typed bootstrap without a token in the body', async ()
   expect(response.status).toBe(200);
   const body = bootstrapSchema.parse(await response.json());
   expect(body.identity.subject).toBe(config.ACCESS_SUBJECT);
-  expect(body.stage).toBe('p0');
+  expect(body.stage).toBe(BootstrapStage.P0);
 });
 
 test('unknown authenticated API returns JSON 404', async () => {

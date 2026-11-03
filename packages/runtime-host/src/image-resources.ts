@@ -6,6 +6,8 @@ import {
   IMAGE_RESIDENT_PIXEL_LIMIT,
   IMAGE_RESOURCE_LIMIT,
   imageFrameSchema,
+  encodeImageFrame,
+  imageMimeTypeSchema,
   processedImageSchema,
   type ImageResource,
   type ProcessedImage,
@@ -214,11 +216,13 @@ export class ImageCollector {
         throw new RuntimeFailure('protocol_error', 'Unexpected image frame');
       if (this.released) return;
       this.next++;
-      this.port?.postMessage({
-        type: 'ack',
-        seq: frame.seq,
-        ...(resource ? { resource } : {}),
-      });
+      this.port?.postMessage(
+        encodeImageFrame({
+          type: 'ack',
+          seq: frame.seq,
+          ...(resource ? { resource } : {}),
+        }),
+      );
       if (resource) {
         this.resolve(resource);
       }
@@ -256,7 +260,7 @@ export class ImageCollector {
     this.store.reserve(0, pixels);
     this.pixelCount = pixels;
     const mimeType = `image/${raw.type}`;
-    const parsedMime = processedImageSchema.shape.mimeType.safeParse(mimeType);
+    const parsedMime = imageMimeTypeSchema.safeParse(mimeType);
     if (!parsedMime.success)
       throw new RuntimeFailure(
         'unsupported_capability',
@@ -340,7 +344,9 @@ export class ImageCollector {
   abort(error: RuntimeFailure, notify = true): void {
     if (this.released) return;
     if (notify)
-      this.port?.postMessage({ type: 'abort', error: error.toJSON() });
+      this.port?.postMessage(
+        encodeImageFrame({ type: 'abort', error: error.toJSON() }),
+      );
     this.drop(error);
     // Keep the port until Java unwinds so the cancellation can reach its sink.
   }
@@ -349,7 +355,9 @@ export class ImageCollector {
     error = new RuntimeFailure('cancelled', 'Image resource was released'),
   ): void {
     if (!this.released) {
-      this.port?.postMessage({ type: 'abort', error: error.toJSON() });
+      this.port?.postMessage(
+        encodeImageFrame({ type: 'abort', error: error.toJSON() }),
+      );
       this.drop(error);
     }
     this.port?.close();

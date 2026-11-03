@@ -1,9 +1,11 @@
 packages:
   - apps/api
   - packages/contracts
+  - packages/protocol
   - packages/runtime-host
 
 allowBuilds:
+  '@bufbuild/buf': true
   esbuild: true
   workerd: true
   sharp: true

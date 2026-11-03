@@ -20,12 +20,12 @@
 
 ## 代码与格式
 
-- 如果某个功能有成熟的第三方库可用，就直接引入，不要自行实现。固定依赖版本并使用现有包管理方式；自行编写的代码集中在项目特有的业务逻辑和集成上。
+- 如果某个功能有成熟的第三方库可用，就直接引入，不要自行实现。固定依赖版本并使用现有包管理方式；直接在调用点导入库，不另建只转发同一功能的通用包装层；`tools/lib/` 已移除，不以换目录的方式恢复。自行编写的代码集中在项目特有的业务逻辑和集成上。
 - 所有项目自有代码提交前必须先运行 `pnpm format`，再运行 `pnpm format:check`。范围包括 Java、Dart、TypeScript、JavaScript、Kotlin/Gradle Kotlin DSL、Swift、Objective-C、Ruby、SQL 和结构化配置；现有代码同样适用。
 - 使用 pnpm 精确锁定的 prek 管理标准 pre-commit hook，不维护手写 Git hook。检查不自动暂存，部分暂存的工作区处理交给 prek。
 - 当前格式工具要求完整 JDK 21+、Flutter 3.47.5 / Dart 3.13.4、Xcode 27.2 的 swift-format 6.4.4 与 clang-format 21.0.0；其余 formatter 的版本和校验固定在 `scripts/format.ts`。首次下载公开 formatter 不需要私有 JVM seed。
 - `pnpm check` 在跨平台 CI 使用显式 portable 格式检查；提交前仍须在 macOS 通过完整检查。不要以跳过 hook 或缩小格式范围解决失败。
-- 项目自有自动化脚本统一使用 TypeScript；Java 编译器适配/JVM oracle 和平台要求的构建文件保留各自语言。`scripts/` 是调用入口，依赖 `tools/` 领域模块与公共层，工具不得反向导入入口；通用层不得依赖领域，TeaVM 工具不得依赖扩展发布编排。依赖层级和验证入口见 `docs/TOOLING.md`，提交必须通过 `pnpm check:dependencies`。
+- 项目自有自动化脚本统一使用 TypeScript；Java 编译器适配/JVM oracle 和平台要求的构建文件保留各自语言。`scripts/` 是调用入口，依赖 `tools/` 领域模块及第三方库，工具不得反向导入入口；TeaVM 工具不得依赖扩展发布编排。依赖层级和验证入口见 `docs/TOOLING.md`，提交必须通过 `pnpm check:dependencies`。
 - 自有、可维护的 JS/Node 脚本和运行时桥使用 TypeScript，并纳入严格类型检查。不能只改后缀，也不能用 `any`、`@ts-nocheck` 或宽泛断言掩盖迁移问题；产品桥和宿主实际执行的 JS 由构建生成。测试工具内嵌的浏览器脚本模板必须保持合法 JavaScript，不能直接加入 TS 语法。
 - 上游 submodule、生成产物、锁文件和精确上游上下文补丁不作为普通源码重新排版。更新它们时使用对应生成器、包管理器或上游补丁流程。设计文档参与普通 Markdown 格式检查。
 
@@ -45,7 +45,7 @@
 - Static Assets 是所有客户端扩展分发的最终权威来源。每个扩展只部署最新可用构建，由客户端或 Service Worker 检查索引、更新及清理旧缓存；不经 R2 或入口 Worker 转发正文，不在入口 Worker 脚本中内嵌。公开扩展下载不携带 GitHub 凭据或应用 Access 凭据。
 - 共享桥、WASM 等构建资源属于 Web Static Assets；Native 按已确定的方案内置。Source 原有请求头、Cookie、拦截器和图片处理语义必须通过正式运行时链路，不能用原图 URL 绕过插件处理。
 - Worker TypeScript 与 Dart 的静态类型不能保证跨语言消息安全。交换边界需要统一协议、运行时解析、版本和大小校验，以及 requestId/generation 约束。
-- 跨语言协议已选定 Protobuf `.proto` + Buf，使用 Protobuf-ES / Google Dart 插件生成模型和 codec，小控制消息先采用标准 ProtoJSON；具体比较见 `docs/design/cross-language-protocol.md`，实施状态见 `docs/plan/cross-language-protocol.md`。当前尚未实施，不能声称已有单一协议源。业务预算、generation 与资源生命周期仍须校验；图片/HTTP 大正文保持独立二进制通道。Pigeon 适用于 Dart 与原生平台，不代替 TS Worker 协议。
+- 跨语言协议已选定 Protobuf `.proto` + Buf，使用 Protobuf-ES / Google Dart 插件生成模型和 codec，小控制消息先采用标准 ProtoJSON；具体比较见 `docs/design/cross-language-protocol.md`，实施状态见 `docs/plan/cross-language-protocol.md`。IDL 位于 `protocol/`，双端生成并接入正式控制边界；生成一致性用 `pnpm generate:check` 检查。实际浏览器/原生运行证据须另外验收。业务预算、generation 与资源生命周期仍须校验；图片/HTTP 大正文保持独立二进制通道。Pigeon 适用于 Dart 与原生平台，不代替 TS Worker 协议。
 - 大正文与图片使用有界二进制通道，控制消息保持小；落实背压、限额、超时、取消、迟到结果丢弃和资源释放。
 
 ## AOT、静态分发与 CI

@@ -88,7 +88,7 @@ test('the static index binds manifest paths to one current build per package', (
     sourceIds: build.sourceIds,
     manifestPath: '/extensions/builds/test-build/manifest.json',
   };
-  const index = { schemaVersion: 1, builds: [descriptor], nextCursor: null };
+  const index = { schemaVersion: 1, builds: [descriptor] };
   expect(extensionIndexSchema.parse(index)).toEqual(index);
   for (const value of [
     { ...index, nextCursor: 'next' },

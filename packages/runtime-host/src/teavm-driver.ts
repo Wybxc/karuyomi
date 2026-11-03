@@ -1,5 +1,18 @@
-import type { BuildManifest, SourceInfo } from '@karuyomi/contracts';
-import { sourceInfoSchema } from '@karuyomi/contracts';
+import type {
+  BuildManifest,
+  SourceInfo,
+  SourceCall,
+  SourcePayload,
+  ProcessedImage,
+  Closed,
+} from '@karuyomi/contracts';
+import {
+  sourceInfoSchema,
+  javaSourceInvocation,
+  parseJavaSourcePayload,
+  processedImageSchema,
+  closedSchema,
+} from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
 import { VerifiedLoader } from './verified-loader.js';
 import { BinaryHttpTransport, type HttpCallContext } from './http-transport.js';
@@ -12,12 +25,7 @@ export interface RuntimeDriver {
     signal: AbortSignal,
     context?: HttpCallContext,
   ): Promise<SourceInfo[]>;
-  invoke(
-    sourceId: string,
-    operation: string,
-    args: Record<string, unknown>,
-    context?: HttpCallContext,
-  ): Promise<unknown>;
+  invoke(call: SourceCall, context?: HttpCallContext): Promise<SourcePayload>;
   close(): Promise<void>;
   acquireImage?(
     sourceId: string,
@@ -26,11 +34,11 @@ export interface RuntimeDriver {
     port: MessagePort,
     resourceId: string,
     context: HttpCallContext,
-  ): Promise<unknown>;
+  ): Promise<ProcessedImage>;
   closePageSession?(
     pageSessionId: string,
     context: HttpCallContext,
-  ): Promise<unknown>;
+  ): Promise<Closed>;
 }
 
 export interface TeaVMGlobals {
@@ -294,16 +302,21 @@ export class TeaVMDriver implements RuntimeDriver {
     return sources;
   }
 
-  invoke(
-    sourceId: string,
-    operation: string,
-    args: Record<string, unknown>,
+  async invoke(
+    call: SourceCall,
     context?: HttpCallContext,
-  ): Promise<unknown> {
-    return this.call(
-      () => this.scope.hostInvoke!(sourceId, operation, JSON.stringify(args)),
+  ): Promise<SourcePayload> {
+    const invocation = javaSourceInvocation(call);
+    const raw = await this.call(
+      () =>
+        this.scope.hostInvoke!(
+          call.sourceId,
+          invocation.operation,
+          invocation.argsJson,
+        ),
       context,
     );
+    return parseJavaSourcePayload(call, raw);
   }
 
   async acquireImage(
@@ -313,7 +326,7 @@ export class TeaVMDriver implements RuntimeDriver {
     port: MessagePort,
     resourceId: string,
     context: HttpCallContext,
-  ): Promise<unknown> {
+  ): Promise<ProcessedImage> {
     if (this.waiter)
       throw new RuntimeFailure(
         'protocol_error',
@@ -326,10 +339,11 @@ export class TeaVMDriver implements RuntimeDriver {
     this.imageSink = sink;
     this.imageFailure = undefined;
     try {
-      return await this.call(
+      const raw = await this.call(
         () => this.scope.hostAcquireImage!(sourceId, pageSessionId, pageKey),
         context,
       );
+      return processedImageSchema.parse(raw);
     } finally {
       sink.dispose();
       this.imageSink = undefined;
@@ -337,14 +351,15 @@ export class TeaVMDriver implements RuntimeDriver {
     }
   }
 
-  closePageSession(
+  async closePageSession(
     pageSessionId: string,
     context: HttpCallContext,
-  ): Promise<unknown> {
-    return this.call(
+  ): Promise<Closed> {
+    const raw = await this.call(
       () => this.scope.hostClosePageSession!(pageSessionId),
       context,
     );
+    return closedSchema.parse(raw);
   }
 
   async close(): Promise<void> {

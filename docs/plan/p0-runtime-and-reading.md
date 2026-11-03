@@ -17,7 +17,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 | P0-R 阅读核心  | 逻辑锚、单双页/LTR/RTL、竖向/Webtoon、缩放和有界 Provider 已实现；本地 Flutter 实测真实目录→详情→章节→图片阅读、翻页及模式切换                      | 下一章、进度落盘、超长图、物理设备与性能分布                         |
 | P0-B v2        | 帧协议、按需 Worker 流、operation/generation handle、Java Okio Source/有界上传 Sink 已实现；当前生产代码与构建清单统一为 v2，模拟 supplier 回归通过 | 真实 HTTP 压缩、Source/cache、Access、浏览器与移动内存门仍需分别验收 |
 
-Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。当前 host ABI v2 的 Arknights Comics 在内置浏览器经真实 workerd/HTTP v2 通过热门、标题搜索、详情、章节与 51 页列表；首、中、末页经原 Source 解码和释放通过，实际 Flutter 已能打开章节阅读。latest 按源声明跳过。该证据使用显式本地政策与测试 JWT，不是生产 Access；详情见 [VERIFICATION](../VERIFICATION.md#web-产品图片通道)。历史 MangaDraft 的文本搜索与挑战失败不因另一源的成功而变为通过。
+Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。当时 host ABI v2 的 Arknights Comics 在内置浏览器经真实 workerd/HTTP v2 通过热门、标题搜索、详情、章节与 51 页列表；首、中、末页经原 Source 解码和释放通过，实际 Flutter 已能打开章节阅读。latest 按源声明跳过。该证据使用显式本地政策与测试 JWT，不是生产 Access；详情见 [VERIFICATION](../VERIFICATION.md#web-产品图片通道)。当前 Protobuf 控制已升为 host ABI v3 / protocolVersion 2，尚需重新构建并完成实际浏览器/Native 运行验收。历史 MangaDraft 的文本搜索与挑战失败不因另一源的成功而变为通过。
 
 `karuyomi.wybxc.cc` 已部署并验证公开入口及匿名 Access 拦截；生产登录后的正向 bootstrap/Source 请求仍待验收。具体部署版本和历史浏览器环境只在验证记录维护。
 

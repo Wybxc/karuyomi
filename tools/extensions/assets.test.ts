@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canonical, digest } from '../lib/json.ts';
+import { createHash } from 'node:crypto';
+import stableStringify from 'json-stable-stringify';
 import { decodeBundle, encodeBundle, originUrl } from './assets.ts';
 import { decodeBundleBytes } from './verify-manifest.ts';
 test('deterministic binary and Unicode gzip roundtrip', async () => {
@@ -29,8 +30,14 @@ test('decode reuses the shared single-pass dual-domain verifier', async () => {
   const raw = Buffer.from('data'.repeat(100)),
     { encoded, reference } = encodeBundle(raw);
   assert.deepEqual(await decodeBundle(reference, encoded), raw);
-  assert.equal(reference.sha256, digest(raw));
-  assert.equal(reference.encodedSha256, digest(encoded));
+  assert.equal(
+    reference.sha256,
+    createHash('sha256').update(raw).digest('hex'),
+  );
+  assert.equal(
+    reference.encodedSha256,
+    createHash('sha256').update(encoded).digest('hex'),
+  );
 });
 test('encoded corruption and canonical substitution are rejected', async () => {
   const { encoded, reference } = encodeBundle(Buffer.from('original'));
@@ -58,7 +65,7 @@ test('bounded decode rejects bombs, truncated, concatenated and trailing streams
         {
           ...reference,
           encodedSize: bytes.length,
-          encodedSha256: digest(bytes),
+          encodedSha256: createHash('sha256').update(bytes).digest('hex'),
         },
         bytes,
       ),
@@ -83,5 +90,8 @@ test('static origin contract rejects credentials, traversal and non-HTTPS origin
     '/extensions/index.json?q=1',
   ])
     assert.throws(() => originUrl('https://example.com', relative));
-  assert.ok(canonical({ a: 1 }).length > 0);
+  assert.ok(
+    (stableStringify({ a: 1 }) ?? assert.fail('Fixture must be valid JSON'))
+      .length > 0,
+  );
 });

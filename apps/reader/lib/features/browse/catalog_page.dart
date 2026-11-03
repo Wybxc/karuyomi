@@ -191,6 +191,8 @@ class _CatalogPageState extends State<CatalogPage> {
                   children: [
                     for (final item in [('popular', '热门'), ('latest', '最新')])
                       if (item.$1 != 'latest' ||
+                          controller.activeSource?.hasSupportsLatest() !=
+                              true ||
                           controller.activeSource?.supportsLatest != false)
                         ChoiceChip(
                           label: Text(item.$2),

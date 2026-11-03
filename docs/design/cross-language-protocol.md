@@ -1,6 +1,6 @@
 # 跨语言 IDL 与序列化决策
 
-日期：2026-11-03。**方案已选定，尚未实施。** 当前产品仍使用 TS Zod 与手写 Dart 解析；图片接口和 host ABI v2 不代表统一 IDL 已落地。实施进度见[协议计划](../plan/cross-language-protocol.md)。
+日期：2026-11-03。**双端生成与产品控制边界已实现，实际新 ABI 浏览器/原生运行验收待完成。** 当前采用 protocolVersion 2 / host ABI v3；历史图片 v2 证据不能替代新协议验收。实施进度见[协议计划](../plan/cross-language-protocol.md)。
 
 选择 **Protobuf `.proto` 作为唯一消息定义，Buf 管理生成与格式，Protobuf-ES 和 Google Dart 插件生成双端模型及 codec；小型控制消息先使用标准 ProtoJSON**。这个选择针对当前 Flutter、Worker、WebView 和 Node 工具边界，不以未经测量的序列化性能作为依据。
 

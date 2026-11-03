@@ -2,7 +2,12 @@ import {
   protocolVersion,
   runtimeHelloSchema,
   runtimeSessionSchema,
-  sourceCallSchema,
+  validateSourceCall,
+  sourceResultFor,
+  runtimeErrorData,
+  encodeWorkerCommand,
+  messageJson,
+  closedSchema,
   acquireImageSchema,
   cancelImageSchema,
   releaseImageSchema,
@@ -19,8 +24,14 @@ import {
   type RuntimeHello,
   type RuntimeSession,
   type SourceCall,
+  type SourceResult,
+  type Closed,
+  type WorkerResponse,
+  type PlainMessage,
   type WorkerCommand,
 } from '@karuyomi/contracts';
+import { create } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
 import { createHello } from './hello.js';
 import { RuntimeFailure } from './errors.js';
 import { sha256, VerifiedLoader } from './verified-loader.js';
@@ -29,25 +40,19 @@ import { ImageResourceStore, type ImageCollector } from './image-resources.js';
 export interface WorkerEndpoint {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
   onerror: ((event: ErrorEvent) => unknown) | null;
-  postMessage(command: WorkerCommand, transfer?: Transferable[]): void;
+  postMessage(command: unknown, transfer?: Transferable[]): void;
   terminate(): void;
 }
-export interface OpenOptions {
-  manifestPath: string;
-  identity: string;
-  userAgent?: string;
-  expectedBuildId?: string;
-  expectedBundleSha256?: string;
-}
+export type OpenOptions = PlainMessage<pb.OpenRequest>;
 interface TaskBase {
   requestId: string;
-  resolve(value: unknown): void;
   reject(error: unknown): void;
   timer: ReturnType<typeof setTimeout>;
 }
 interface SourceTask extends TaskBase {
   kind: 'source';
   call: SourceCall;
+  resolve(value: SourceResult): void;
 }
 interface ImageTask extends TaskBase {
   kind: 'image';
@@ -58,14 +63,16 @@ interface ImageTask extends TaskBase {
   settle(): void;
   failure?: RuntimeFailure;
   cancelTimer?: ReturnType<typeof setTimeout>;
+  resolve(value: ImageResource): void;
 }
 interface PageSessionTask extends TaskBase {
   kind: 'page-session';
   pageSessionId: string;
+  resolve(value: Closed): void;
 }
 type Task = SourceTask | ImageTask | PageSessionTask;
 interface Pending {
-  resolve(value: unknown): void;
+  resolve(value: WorkerResponse): void;
   reject(error: unknown): void;
 }
 
@@ -236,43 +243,31 @@ export class SourceRuntimeManager {
     };
     worker.onmessage = ({ data }) => {
       if (this.generation !== generation) return;
-      if (
-        typeof data === 'object' &&
-        data !== null &&
-        'type' in data &&
-        data.type === 'fatal'
-      ) {
-        this.invalidate(
-          new RuntimeFailure(
-            'runtime_lost',
-            'Runtime Worker reported an unhandled async failure',
-          ),
-        );
-        return;
-      }
       const parsed = workerResponseSchema.safeParse(data);
       if (!parsed.success) return;
       const response = parsed.data;
+      const responseEnvelope = response.envelope;
       if (
-        response.generation !== generation ||
-        response.workerInstanceId !== envelope.workerInstanceId ||
-        response.buildId !== envelope.buildId
+        responseEnvelope.generation !== generation ||
+        responseEnvelope.workerInstanceId !== envelope.workerInstanceId ||
+        responseEnvelope.buildId !== envelope.buildId
       )
         return;
-      const waiter = this.pending.get(response.requestId);
+      const waiter = this.pending.get(responseEnvelope.requestId);
       if (!waiter) return;
-      this.pending.delete(response.requestId);
-      if (response.error) {
+      this.pending.delete(responseEnvelope.requestId);
+      if (response.result.case === 'error') {
+        const failure = runtimeErrorData(response.result.value);
         const error = new RuntimeFailure(
-          response.error.code,
-          response.error.message,
-          response.error.retryable,
-          response.error.javaClass,
+          failure.code,
+          failure.message,
+          failure.retryable,
+          failure.javaClass,
         );
         waiter.reject(error);
         if (error.code === 'access_required' || error.code === 'access_denied')
           this.invalidate(error);
-      } else waiter.resolve(response.result);
+      } else waiter.resolve(response);
     };
     worker.onerror = () => {
       if (this.generation === generation)
@@ -280,14 +275,22 @@ export class SourceRuntimeManager {
           new RuntimeFailure('runtime_lost', 'Runtime Worker failed'),
         );
     };
-    const result = runtimeSessionSchema.parse(
-      await this.send({
-        ...envelope,
-        requestId: crypto.randomUUID(),
-        type: 'open',
-        manifest,
-        userAgent: options.userAgent ?? 'Karuyomi/0.1',
+    const response = await this.send(
+      create(pb.WorkerCommandSchema, {
+        envelope: { ...envelope, requestId: crypto.randomUUID() },
+        command: {
+          case: 'open',
+          value: { manifest, userAgent: options.userAgent ?? 'Karuyomi/0.1' },
+        },
       }),
+    );
+    if (response.result.case !== 'session')
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Worker did not return a session',
+      );
+    const result = runtimeSessionSchema.parse(
+      messageJson(pb.RuntimeSessionSchema, response.result.value),
     );
     this.assertGeneration(generation);
     if (
@@ -313,15 +316,22 @@ export class SourceRuntimeManager {
   }
 
   private send(
-    command: WorkerCommand,
+    command: pb.WorkerCommand,
     transfer: Transferable[] = [],
-  ): Promise<unknown> {
+  ): Promise<WorkerResponse> {
     return new Promise((resolve, reject) => {
-      this.pending.set(command.requestId, { resolve, reject });
+      const requestId = command.envelope?.requestId;
+      if (!requestId) {
+        reject(
+          new RuntimeFailure('protocol_error', 'Worker envelope is required'),
+        );
+        return;
+      }
+      this.pending.set(requestId, { resolve, reject });
       try {
-        this.worker!.postMessage(command, transfer);
+        this.worker!.postMessage(encodeWorkerCommand(command), transfer);
       } catch {
-        this.pending.delete(command.requestId);
+        this.pending.delete(requestId);
         reject(
           new RuntimeFailure('runtime_lost', 'Runtime message delivery failed'),
         );
@@ -329,18 +339,27 @@ export class SourceRuntimeManager {
     });
   }
 
-  invoke(input: SourceCall): Promise<unknown> {
-    const parsed = sourceCallSchema.safeParse(input);
-    if (!parsed.success)
+  invoke(input: SourceCall): Promise<SourceResult> {
+    let call: SourceCall;
+    try {
+      call = validateSourceCall(input);
+    } catch {
       return Promise.reject(
         new RuntimeFailure('protocol_error', 'Invalid Source request'),
       );
-    const call = parsed.data;
-    if (!this.session)
+    }
+    if (!this.session || call.generation !== this.session.generation)
       return Promise.reject(
         new RuntimeFailure(
           'runtime_lost',
           'Open a verified extension build before invoking a Source',
+        ),
+      );
+    if (!this.session.sources.some((source) => source.id === call.sourceId))
+      return Promise.reject(
+        new RuntimeFailure(
+          'protocol_error',
+          'Source does not belong to this runtime',
         ),
       );
     if (this.queue.length >= 128 || this.requestIds.size >= 10_000)
@@ -355,13 +374,6 @@ export class SourceRuntimeManager {
         new RuntimeFailure(
           'protocol_error',
           'requestId must be unique within a runtime generation',
-        ),
-      );
-    if (JSON.stringify(call.args).length > 128 * 1024)
-      return Promise.reject(
-        new RuntimeFailure(
-          'limit_exceeded',
-          'Source control arguments are too large',
         ),
       );
     this.requestIds.add(call.requestId);
@@ -393,35 +405,40 @@ export class SourceRuntimeManager {
       buildId,
       requestId: task.requestId,
     };
-    const command: WorkerCommand =
-      task.kind === 'source'
-        ? {
-            ...envelope,
-            type: 'invoke',
-            sourceId: task.call.sourceId,
-            operation: task.call.operation,
-            args: task.call.args,
-          }
-        : task.kind === 'image'
+    const command = create(pb.WorkerCommandSchema, {
+      envelope,
+      command:
+        task.kind === 'source'
           ? {
-              ...envelope,
-              type: 'acquire-image',
-              sourceId: task.input.sourceId,
-              pageSessionId: task.input.pageSessionId,
-              pageKey: task.input.pageKey,
-              resourceId: task.collector.resourceId,
+              case: 'invoke',
+              value: task.call,
             }
-          : {
-              ...envelope,
-              type: 'close-page-session',
-              pageSessionId: task.pageSessionId,
-            };
+          : task.kind === 'image'
+            ? {
+                case: 'acquireImage',
+                value: {
+                  request: task.input,
+                  resourceId: task.collector.resourceId,
+                },
+              }
+            : {
+                case: 'closePageSession',
+                value: { pageSessionId: task.pageSessionId, generation },
+              },
+    });
     let published = false;
     void this.send(command, task.kind === 'image' ? [task.port] : [])
-      .then(async (result) => {
+      .then(async (response) => {
         if (task.kind === 'image') {
+          if (response.result.case !== 'image')
+            throw new RuntimeFailure(
+              'protocol_error',
+              'Worker did not return an image',
+            );
           if (task.failure) throw task.failure;
-          const resource = await task.collector.publish(result);
+          const resource = await task.collector.publish(
+            messageJson(pb.ProcessedImageSchema, response.result.value),
+          );
           if (task.failure) throw task.failure;
           this.assertGeneration(task.input.generation);
           published = true;
@@ -430,7 +447,27 @@ export class SourceRuntimeManager {
           this.imageTasks.delete(task.requestId);
           clearTimeout(task.timer);
           task.resolve(resource);
-        } else task.resolve(result);
+        } else if (task.kind === 'source') {
+          if (response.result.case !== 'source')
+            throw new RuntimeFailure(
+              'protocol_error',
+              'Worker did not return a Source result',
+            );
+          task.resolve(
+            sourceResultFor(task.call, buildId, response.result.value.payload),
+          );
+        } else {
+          if (response.result.case !== 'closed')
+            throw new RuntimeFailure(
+              'protocol_error',
+              'Worker did not acknowledge page-session close',
+            );
+          task.resolve(
+            closedSchema.parse(
+              messageJson(pb.ClosedSchema, response.result.value),
+            ),
+          );
+        }
       })
       .catch((error: unknown) =>
         task.reject(task.kind === 'image' ? (task.failure ?? error) : error),
@@ -482,7 +519,9 @@ export class SourceRuntimeManager {
     }
   }
 
-  cancel(requestId: string): Promise<void> {
+  cancel(requestId: string, generation?: string): Promise<void> {
+    if (generation !== undefined && generation !== this.generation)
+      return Promise.resolve();
     if (this.active?.requestId === requestId) {
       if (this.active.kind === 'image')
         return this.cancelImage({
@@ -734,17 +773,10 @@ export class SourceRuntimeManager {
   }
 
   /** Private APIs share Access cookies; the public catalog permits only GET. */
-  async fetchApi(options: {
-    path: string;
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-  }): Promise<{
-    status: number;
-    headers: Record<string, string>;
-    body: string;
-    redirected: boolean;
-  }> {
+  async fetchApi(
+    options: Omit<PlainMessage<pb.ApiFetchRequest>, 'headers'> &
+      Partial<Pick<PlainMessage<pb.ApiFetchRequest>, 'headers'>>,
+  ): Promise<PlainMessage<pb.ApiFetchResponse>> {
     const url = new URL(options.path, this.workerUrl.origin);
     const staticJson =
       options.path === '/extensions/index.json' ||
@@ -846,7 +878,12 @@ export class SourceRuntimeManager {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         await Promise.race([
-          this.send({ ...envelope, type: 'shutdown' }),
+          this.send(
+            create(pb.WorkerCommandSchema, {
+              envelope,
+              command: { case: 'shutdown', value: {} },
+            }),
+          ),
           new Promise((resolve) => {
             timer = setTimeout(resolve, 1000);
           }),

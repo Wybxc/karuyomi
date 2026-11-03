@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { canonical, git, scan, SHARED_PATHS, treeHash } from './catalog.ts';
+import { git, scan, SHARED_PATHS, treeHash } from './catalog.ts';
+import stableStringify from 'json-stable-stringify';
 function fixture(t: TestContext) {
   const root = mkdtempSync(path.join(tmpdir(), 'karuyomi-catalog-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -127,18 +128,18 @@ test('dirty trees fail and unsupported Kotlin is isolated per package', (t) => {
     /Unsupported expression/,
   );
 });
-test('generated host outputs do not change fingerprints; stable JSON matches Python ordering', (t) => {
+test('generated host outputs do not change fingerprints; stable JSON uses lexical UTF-16 keys', (t) => {
   const f = fixture(t),
     before = treeHash(f.root, 'lib');
   f.put('lib/target/classes/Generated.class', 'generated');
   f.put('lib/__pycache__/module.pyc', 'generated');
   assert.equal(treeHash(f.root, 'lib'), before);
   assert.equal(
-    canonical({ '2': 2, '10': 10, '\ue000': 3, '😀': 4 }).toString(),
-    '{"10":10,"2":2,"\ue000":3,"😀":4}',
+    stableStringify({ '2': 2, '10': 10, '\ue000': 3, '😀': 4 }),
+    '{"10":10,"2":2,"😀":4,"\ue000":3}',
   );
   assert.equal(
-    canonical({ z: 1, A: 2, _: 3, a: { b: '漫画', a: 1 } }).toString(),
+    stableStringify({ z: 1, A: 2, _: 3, a: { b: '漫画', a: 1 } }),
     '{"A":2,"_":3,"a":{"a":1,"b":"漫画"},"z":1}',
   );
 });

@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { buildManifestSchema } from '../../packages/contracts/src/index.ts';
+import {
+  hostScriptListSchema,
+  resourceListSchema,
+} from '../../packages/contracts/src/index.ts';
 
 export const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const commitSchema = z.string().regex(/^[a-f0-9]{40,64}$/);
@@ -66,8 +69,10 @@ export const runtimeIdentitySchema = z.object({
   hostAbi: z.string().min(1),
   runtimeBaseline: z.string().min(1),
   bridgeVersion: z.number().int().positive(),
-  hostScripts: buildManifestSchema.shape.hostScripts,
-  resources: buildManifestSchema.shape.resources,
+  hostScripts: z
+    .unknown()
+    .transform((value) => hostScriptListSchema.parse(value)),
+  resources: z.unknown().transform((value) => resourceListSchema.parse(value)),
 });
 export type RuntimeIdentity = z.infer<typeof runtimeIdentitySchema>;
 export const pipelineResultSchema = z.object({

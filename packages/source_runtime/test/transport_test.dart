@@ -1,41 +1,73 @@
 import 'dart:async';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:test/test.dart';
 
+const sourceId = '9223372036854775806';
+
 final class FakeTransport implements RuntimeTransport {
-  final calls = <(String, Map<String, Object?>)>[];
-  Future<Object?> Function(String, Map<String, Object?>)? handler;
+  final calls = <wire.ControlRequest>[];
+  Future<wire.ControlResponse> Function(wire.ControlRequest)? handler;
+  Object? Function(wire.ControlRequest, Map<String, Object?>)? corrupt;
+
+  wire.ControlResponse respond(wire.ControlRequest request) {
+    final response = wire.ControlResponse(requestId: request.requestId);
+    switch (request.whichCommand()) {
+      case wire.ControlRequest_Command.ready:
+        response.hello = wire.RuntimeHello(
+          protocolVersion: protocolVersion,
+          hostAbi: hostAbi,
+          runtimeBaseline: runtimeBaseline,
+        );
+      case wire.ControlRequest_Command.open:
+        response.session = wire.RuntimeSession(
+          protocolVersion: protocolVersion,
+          buildId: 'build-1',
+          workerInstanceId: 'worker-1',
+          generation: 'generation-1',
+          sources: [wire.SourceInfo(id: sourceId, name: 'Source', lang: 'en')],
+          capabilities: ['source-rpc'],
+        );
+      case wire.ControlRequest_Command.invoke:
+        response.source = wire.SourceResult(
+          requestId: request.invoke.requestId,
+          generation: 'generation-1',
+          buildId: 'build-1',
+          mangaPage: wire.MangaPage(hasNextPage: false),
+        );
+      case wire.ControlRequest_Command.acquireImage:
+        response.image = wire.ImageResource(
+          resourceId: 'resource-1',
+          generation: 'generation-1',
+          mimeType: 'image/png',
+          byteLength: 1234,
+          width: 600,
+          height: 900,
+          url: 'blob:https://reader.example/image-1',
+        );
+      case wire.ControlRequest_Command.cancelImage ||
+          wire.ControlRequest_Command.releaseImage:
+        response.released = wire.Released(released: true);
+      case wire.ControlRequest_Command.closePageSession:
+        response.closed = wire.Closed(closed: true);
+      default:
+        response.completed = wire.Completed(completed: true);
+    }
+    return response;
+  }
+
   @override
-  Future<Object?> call(
-    String method, [
-    Map<String, Object?> payload = const {},
-  ]) async {
-    calls.add((method, payload));
-    if (handler != null) return handler!(method, payload);
-    return switch (method) {
-      'ready' => {
-        'protocolVersion': protocolVersion,
-        'hostAbi': hostAbi,
-        'runtimeBaseline': runtimeBaseline,
-      },
-      'open' => {
-        'protocolVersion': protocolVersion,
-        'buildId': 'build-1',
-        'workerInstanceId': 'worker-1',
-        'generation': 'generation-1',
-        'sources': [
-          {'id': '9223372036854775806', 'name': 'Source', 'lang': 'en'},
-        ],
-        'capabilities': ['source-rpc'],
-      },
-      'invoke' => {
-        'requestId': payload['requestId'],
-        'generation': 'generation-1',
-        'buildId': 'build-1',
-        'data': {'mangas': <Object?>[], 'hasNextPage': false},
-      },
-      _ => null,
-    };
+  Future<Object?> control(Map<String, Object?> json) async {
+    final request = wire.decodeProtoJson(wire.ControlRequest(), json);
+    calls.add(request.deepCopy()..freeze());
+    final response = handler == null
+        ? respond(request)
+        : await handler!(request);
+    final encoded = wire.encodeProtoJson(
+      response,
+      maxBytes: wire.controlJsonLimit,
+    );
+    return corrupt?.call(request, encoded) ?? encoded;
   }
 }
 
@@ -45,61 +77,68 @@ BuildDescriptor build({String identity = 'owner', String? path}) =>
       manifestUri: Uri.parse(
         path ?? '/extensions/builds/build-1/manifest.json',
       ),
-      sha256: 'hash',
+      sha256: 'a' * 64,
       identity: identity,
       packageId: 'package-1',
     );
 SourceRequest request({
   String generation = 'generation-1',
-  String sourceId = '9223372036854775806',
+  String id = sourceId,
 }) => SourceRequest(
-  requestId: 'request-1',
-  generation: generation,
   packageId: 'package-1',
-  sourceId: sourceId,
-  operation: 'popular',
-  arguments: {'page': 2},
+  call: wire.SourceCall(
+    requestId: 'request-1',
+    generation: generation,
+    sourceId: id,
+    popular: wire.PageRequest(page: 2),
+    timeoutMs: 30000,
+  ),
 );
 TypeMatcher<RuntimeException> failure(RuntimeErrorCode code) =>
     isA<RuntimeException>().having((error) => error.code, 'code', code);
-
 ImageAcquireRequest imageRequest({String generation = 'generation-1'}) =>
     ImageAcquireRequest(
       requestId: 'image-1',
-      sourceId: '9223372036854775806',
+      sourceId: sourceId,
       pageSessionId: 'pages-1',
       pageKey: 'p-0',
       generation: generation,
     );
-Map<String, Object?> imageReply() => {
-  'resourceId': 'resource-1',
-  'generation': 'generation-1',
-  'mimeType': 'image/png',
-  'byteLength': 1234,
-  'width': 600,
-  'height': 900,
-  'url': 'blob:https://reader.example/image-1',
-};
 
 void main() {
-  test('shares concurrent open and keeps Long identities as strings', () async {
-    final transport = FakeTransport();
-    final runtime = TransportSourceRuntime(transport);
-    final a = runtime.open(build());
-    final b = runtime.open(build());
-    final session = await a;
-    expect((await b).generation, session.generation);
-    expect(session.sources.single.id, '9223372036854775806');
-    expect(transport.calls.where((call) => call.$1 == 'open'), hasLength(1));
-    final payload = transport.calls.firstWhere((call) => call.$1 == 'open').$2;
-    expect(payload['expectedBuildId'], 'build-1');
-    expect(payload['expectedBundleSha256'], 'hash');
-    expect((await runtime.invoke(request())).data['hasNextPage'], false);
-    await runtime.dispose();
-  });
+  test(
+    'concurrent open shares generated session and decimal Source identity',
+    () async {
+      final transport = FakeTransport();
+      final runtime = TransportSourceRuntime(transport);
+      final first = runtime.open(build());
+      final second = runtime.open(build());
+      final session = await first;
+      expect((await second).generation, session.generation);
+      expect(session.sources.single.id, sourceId);
+      expect(session.sources.single.hasSupportsLatest(), false);
+      expect(transport.calls.where((call) => call.hasOpen()), hasLength(1));
+      expect(
+        transport.calls
+            .singleWhere((call) => call.hasOpen())
+            .open
+            .expectedBundleSha256,
+        'a' * 64,
+      );
+      final result = await runtime.invoke(request());
+      expect(result.whichPayload(), wire.SourceResult_Payload.mangaPage);
+      expect(result.mangaPage.hasNextPage, false);
+      expect(transport.calls.last.invoke.popular.page, 2);
+      expect(
+        transport.calls.map((call) => call.requestId).toSet().length,
+        transport.calls.length,
+      );
+      await runtime.dispose();
+    },
+  );
 
   test(
-    'refuses unconfirmed identities and mismatched/cross-origin static manifests',
+    'unconfirmed identity and noncanonical static paths never reach transport',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
@@ -109,7 +148,6 @@ void main() {
       );
       for (final path in [
         '/runtime/build.json',
-        '/api/extensions/builds/build-1/manifest',
         '/extensions/builds/other/manifest.json',
         '/extensions/builds/build-1/manifest.json?old=1',
         'https://another.example/extensions/builds/build-1/manifest.json',
@@ -124,7 +162,7 @@ void main() {
     },
   );
 
-  test('stale or foreign Source requests never enter the transport', () async {
+  test('foreign generation and Source cannot invoke transport', () async {
     final transport = FakeTransport();
     final runtime = TransportSourceRuntime(transport);
     await runtime.open(build());
@@ -133,274 +171,300 @@ void main() {
       throwsA(failure(RuntimeErrorCode.runtimeLost)),
     );
     await expectLater(
-      runtime.invoke(request(sourceId: 'other')),
+      runtime.invoke(request(id: 'other')),
       throwsA(failure(RuntimeErrorCode.runtimeLost)),
     );
-    expect(transport.calls.where((call) => call.$1 == 'invoke'), isEmpty);
+    expect(transport.calls.where((call) => call.hasInvoke()), isEmpty);
     await runtime.dispose();
   });
 
-  test('native process replacement discards late control results', () async {
+  test('container replacement discards late generated Source result', () async {
     final transport = FakeTransport();
     final runtime = TransportSourceRuntime(transport);
     await runtime.open(build());
-    final response = Completer<Object?>();
-    transport.handler = (method, payload) async =>
-        method == 'invoke' ? response.future : null;
-    final invocation = runtime.invoke(request());
+    final ready = Completer<void>();
+    transport.handler = (call) async {
+      if (call.hasInvoke()) await ready.future;
+      return transport.respond(call);
+    };
     final assertion = expectLater(
-      invocation,
+      runtime.invoke(request()),
       throwsA(failure(RuntimeErrorCode.runtimeLost)),
     );
     runtime.containerLost('process recycled');
-    response.complete({
-      'requestId': 'request-1',
-      'generation': 'generation-1',
-      'buildId': 'build-1',
-      'data': {'stale': true},
-    });
+    ready.complete();
     await assertion;
     await runtime.dispose();
   });
 
   test(
-    'expired handshake never starts a Source in a replacement container',
+    'expired hello cannot start a Source in replacement container',
     () async {
       final transport = FakeTransport();
-      final ready = Completer<Object?>();
-      transport.handler = (method, payload) async =>
-          method == 'ready' ? ready.future : null;
-      final runtime = TransportSourceRuntime(transport);
-      final opening = runtime.open(build());
-      final assertion = expectLater(
-        opening,
-        throwsA(failure(RuntimeErrorCode.runtimeLost)),
-      );
-      runtime.containerLost('replaced during ready');
-      ready.complete({
-        'protocolVersion': protocolVersion,
-        'hostAbi': hostAbi,
-        'runtimeBaseline': runtimeBaseline,
-      });
-      await assertion;
-      expect(transport.calls.where((call) => call.$1 == 'open'), isEmpty);
-      await runtime.dispose();
-    },
-  );
-
-  test(
-    'malformed session capabilities are a structured protocol error',
-    () async {
-      final transport = FakeTransport();
-      transport.handler = (method, payload) async => switch (method) {
-        'ready' => {
-          'protocolVersion': protocolVersion,
-          'hostAbi': hostAbi,
-          'runtimeBaseline': runtimeBaseline,
-        },
-        'open' => {
-          'protocolVersion': protocolVersion,
-          'buildId': 'build-1',
-          'workerInstanceId': 'worker-1',
-          'generation': 'generation-1',
-          'sources': <Object?>[],
-          'capabilities': <Object?>[42],
-        },
-        _ => null,
+      final ready = Completer<void>();
+      transport.handler = (call) async {
+        if (call.hasReady()) await ready.future;
+        return transport.respond(call);
       };
       final runtime = TransportSourceRuntime(transport);
-      await expectLater(
+      final assertion = expectLater(
         runtime.open(build()),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
+        throwsA(failure(RuntimeErrorCode.runtimeLost)),
       );
+      runtime.containerLost('replaced during hello');
+      ready.complete();
+      await assertion;
+      expect(transport.calls.where((call) => call.hasOpen()), isEmpty);
       await runtime.dispose();
     },
   );
 
+  test('invalid generated session shape is a protocol error', () async {
+    final transport = FakeTransport();
+    transport.corrupt = (call, json) => call.hasOpen()
+        ? {
+            ...json,
+            'session': {
+              ...json['session'] as Map,
+              'capabilities': [42],
+            },
+          }
+        : json;
+    final runtime = TransportSourceRuntime(transport);
+    await expectLater(
+      runtime.open(build()),
+      throwsA(failure(RuntimeErrorCode.protocolError)),
+    );
+    await runtime.dispose();
+  });
+
   test(
-    'Java errors retain category, class and message across native JSON RPC',
+    'generated error preserves category, Java class, message and retryability',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
       await runtime.open(build());
-      transport.handler = (method, payload) async {
-        if (method == 'invoke') {
-          throw {
-            'code': 'source_error',
-            'message': 'Explicit reference is required',
-            'javaClass': 'java.lang.IllegalArgumentException',
-          };
-        }
-        return null;
-      };
+      transport.handler = (call) async => call.hasInvoke()
+          ? wire.ControlResponse(
+              requestId: call.requestId,
+              error: wire.RuntimeError(
+                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_SOURCE_ERROR,
+                message: 'Explicit reference is required',
+                javaClass: 'java.lang.IllegalArgumentException',
+                retryable: true,
+              ),
+            )
+          : transport.respond(call);
       await expectLater(
         runtime.invoke(request()),
         throwsA(
-          failure(RuntimeErrorCode.sourceError).having(
-            (error) => error.javaClass,
-            'javaClass',
-            'java.lang.IllegalArgumentException',
-          ),
+          failure(RuntimeErrorCode.sourceError)
+              .having(
+                (error) => error.javaClass,
+                'javaClass',
+                'java.lang.IllegalArgumentException',
+              )
+              .having((error) => error.retryable, 'retryable', true),
         ),
       );
       await runtime.dispose();
     },
   );
 
-  test(
-    'image controls pass explicit handles and require release/cancel acknowledgements',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      transport.handler = (method, payload) async => switch (method) {
-        'acquireImage' => imageReply(),
-        'cancelImage' || 'releaseImage' => {'released': true},
-        'closePageSession' => {'closed': true},
-        _ => null,
-      };
-      final image = await runtime.acquireImage(imageRequest());
-      expect(image.width, 600);
-      expect(image.location.scheme, 'blob');
-      expect(transport.calls.last.$2, {
-        'requestId': 'image-1',
-        'sourceId': '9223372036854775806',
-        'pageSessionId': 'pages-1',
-        'pageKey': 'p-0',
-        'generation': 'generation-1',
-        'timeoutMs': 30000,
-      });
-      await runtime.cancelImage(
-        const ImageCancelRequest(
-          requestId: 'image-1',
-          generation: 'generation-1',
-        ),
-      );
-      await runtime.releaseImage(
+  test('image control uses opaque handles and matching cleanup ACKs', () async {
+    final transport = FakeTransport();
+    final runtime = TransportSourceRuntime(transport);
+    await runtime.open(build());
+    final image = await runtime.acquireImage(imageRequest());
+    expect(image.width, 600);
+    expect(image.location.scheme, 'blob');
+    expect(transport.calls.last.acquireImage.pageSessionId, 'pages-1');
+    expect(transport.calls.last.acquireImage.pageKey, 'p-0');
+    expect(transport.calls.last.acquireImage.timeoutMs, 30000);
+    await runtime.cancelImage(
+      const ImageCancelRequest(
+        requestId: 'image-1',
+        generation: 'generation-1',
+      ),
+    );
+    await runtime.releaseImage(
+      const ImageReleaseRequest(
+        resourceId: 'resource-1',
+        generation: 'generation-1',
+      ),
+    );
+    await runtime.closePageSession(
+      const PageSessionRef(
+        pageSessionId: 'pages-1',
+        generation: 'generation-1',
+      ),
+    );
+    expect(transport.calls.where((call) => call.hasCancel()), isEmpty);
+    transport.handler = (call) async => call.hasReleaseImage()
+        ? wire.ControlResponse(
+            requestId: call.requestId,
+            released: wire.Released(),
+          )
+        : transport.respond(call);
+    await expectLater(
+      runtime.releaseImage(
         const ImageReleaseRequest(
           resourceId: 'resource-1',
           generation: 'generation-1',
         ),
-      );
-      await runtime.closePageSession(
-        const PageSessionRef(
-          pageSessionId: 'pages-1',
-          generation: 'generation-1',
-        ),
-      );
-      expect(transport.calls.where((call) => call.$1 == 'cancel'), isEmpty);
-      await runtime.dispose();
-    },
-  );
+      ),
+      throwsA(failure(RuntimeErrorCode.protocolError)),
+    );
+    await runtime.dispose();
+  });
 
   test(
-    'rejects Source URLs and invalid dimensions and releases rejected resources',
+    'invalid managed locations and dimensions release rejected resource',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
       await runtime.open(build());
-      for (final invalid in [
-        {'url': 'https://source.example/raw.png'},
-        {'url': 'data:image/png;base64,AAAA'},
-        {'width': 1.5},
-        {'height': 0},
-        {'byteLength': 64 * 1024 * 1024 + 1},
+      for (final change in <void Function(wire.ImageResource)>[
+        (image) => image.url = 'https://source.example/raw.png',
+        (image) => image.url = 'data:image/png;base64,AAAA',
+        (image) => image.height = 0,
+        (image) => image.byteLength = 64 * 1024 * 1024 + 1,
       ]) {
-        transport.handler = (method, payload) async => method == 'acquireImage'
-            ? {...imageReply(), ...invalid}
-            : {'released': true};
+        transport.handler = (call) async {
+          final response = transport.respond(call);
+          if (call.hasAcquireImage()) change(response.image);
+          return response;
+        };
         await expectLater(
           runtime.acquireImage(imageRequest()),
           throwsA(failure(RuntimeErrorCode.protocolError)),
         );
-        expect(transport.calls.last.$1, 'releaseImage');
+        expect(transport.calls.last.hasReleaseImage(), true);
       }
-      await expectLater(
-        runtime.acquireImage(imageRequest(generation: 'old')),
-        throwsA(failure(RuntimeErrorCode.runtimeLost)),
-      );
-      transport.handler = (_, payload) async => {'released': false};
-      await expectLater(
-        runtime.releaseImage(
-          const ImageReleaseRequest(
-            resourceId: 'resource-1',
-            generation: 'generation-1',
-          ),
-        ),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
-      );
       await runtime.dispose();
     },
   );
 
   test(
-    'late image after container replacement is released under its original generation',
+    'late image after replacement is released under original generation',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
       await runtime.open(build());
-      final result = Completer<Object?>();
-      transport.handler = (method, payload) async =>
-          method == 'acquireImage' ? result.future : {'released': true};
-      final acquiring = runtime.acquireImage(imageRequest());
+      final ready = Completer<void>();
+      transport.handler = (call) async {
+        if (call.hasAcquireImage()) await ready.future;
+        return transport.respond(call);
+      };
       final assertion = expectLater(
-        acquiring,
+        runtime.acquireImage(imageRequest()),
         throwsA(failure(RuntimeErrorCode.runtimeLost)),
       );
       runtime.containerLost('replaced');
-      result.complete(imageReply());
+      ready.complete();
       await assertion;
-      expect(transport.calls.last.$1, 'releaseImage');
-      expect(transport.calls.last.$2, {
-        'resourceId': 'resource-1',
-        'generation': 'generation-1',
-      });
+      expect(transport.calls.last.releaseImage.generation, 'generation-1');
       await runtime.dispose();
     },
   );
 
-  test('dispose is idempotent and prevents future runtime work', () async {
+  test(
+    'response control ID, result case and Source payload must match request',
+    () async {
+      for (final change in <void Function(wire.ControlResponse)>[
+        (response) => response.requestId = 'foreign',
+        (response) => response.completed = wire.Completed(completed: true),
+        (response) => response.source.chapters = wire.ChapterList(),
+      ]) {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        await runtime.open(build());
+        transport.handler = (call) async {
+          final response = transport.respond(call);
+          if (call.hasInvoke()) change(response);
+          return response;
+        };
+        await expectLater(
+          runtime.invoke(request()),
+          throwsA(failure(RuntimeErrorCode.protocolError)),
+        );
+        await runtime.dispose();
+      }
+    },
+  );
+
+  test(
+    'opaque memo numeric lexemes and false optional presence survive response',
+    () async {
+      const memo = '{"id":9223372036854775806,"nested":{"huge":1e1000}}';
+      final transport = FakeTransport();
+      transport.handler = (call) async {
+        final response = transport.respond(call);
+        if (call.hasOpen()) {
+          response.session.sources.single.supportsLatest = false;
+        }
+        if (call.hasInvoke()) {
+          response.source.mangaPage.mangas.add(
+            wire.Manga(url: '/m', title: 'm', memoJson: memo),
+          );
+        }
+        return response;
+      };
+      final runtime = TransportSourceRuntime(transport);
+      final session = await runtime.open(build());
+      expect(session.sources.single.hasSupportsLatest(), true);
+      expect(session.sources.single.supportsLatest, false);
+      expect(
+        (await runtime.invoke(request())).mangaPage.mangas.single.memoJson,
+        memo,
+      );
+      await runtime.dispose();
+    },
+  );
+
+  test('image timeout is local; lost generation remains broadcast', () async {
+    final transport = FakeTransport();
+    final runtime = TransportSourceRuntime(transport);
+    await runtime.open(build());
+    final events = <RuntimeEvent>[];
+    final subscription = runtime.events.listen(events.add);
+    var code = wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT;
+    transport.handler = (call) async => call.hasAcquireImage()
+        ? wire.ControlResponse(
+            requestId: call.requestId,
+            error: wire.RuntimeError(
+              code: code,
+              message: 'Image unwind outcome',
+            ),
+          )
+        : transport.respond(call);
+    await expectLater(
+      runtime.acquireImage(imageRequest()),
+      throwsA(failure(RuntimeErrorCode.timeout)),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(events, isEmpty);
+    code = wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST;
+    await expectLater(
+      runtime.acquireImage(imageRequest()),
+      throwsA(failure(RuntimeErrorCode.runtimeLost)),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(events.single.code, RuntimeErrorCode.runtimeLost);
+    await subscription.cancel();
+    await runtime.dispose();
+  });
+
+  test('dispose is acknowledged once and rejects later work', () async {
     final transport = FakeTransport();
     final runtime = TransportSourceRuntime(transport);
     await runtime.open(build());
     await runtime.dispose();
     await runtime.dispose();
-    expect(transport.calls.where((call) => call.$1 == 'dispose'), hasLength(1));
+    expect(transport.calls.where((call) => call.hasDispose()), hasLength(1));
     await expectLater(
       runtime.invoke(request()),
       throwsA(failure(RuntimeErrorCode.runtimeLost)),
     );
   });
-
-  test(
-    'an image timeout stays local while a real container loss is broadcast',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      final events = <RuntimeEvent>[];
-      final subscription = runtime.events.listen(events.add);
-      transport.handler = (_, payload) async =>
-          throw {'code': 'timeout', 'message': 'Image cancelled and unwound'};
-      await expectLater(
-        runtime.acquireImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.timeout)),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(events, isEmpty);
-      transport.handler = (_, payload) async => throw {
-        'code': 'runtime_lost',
-        'message': 'Cancellation needed Worker recycle',
-      };
-      await expectLater(
-        runtime.acquireImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.runtimeLost)),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(events.single.code, RuntimeErrorCode.runtimeLost);
-      await subscription.cancel();
-      transport.handler = null;
-      await runtime.dispose();
-    },
-  );
 }

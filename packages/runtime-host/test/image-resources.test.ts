@@ -1,5 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { IMAGE_CHUNK_LIMIT, processedImageSchema } from '@karuyomi/contracts';
+import {
+  IMAGE_CHUNK_LIMIT,
+  processedImageSchema,
+  encodeImageFrame,
+  imageFrameSchema,
+} from '@karuyomi/contracts';
 import { ImageSink } from '../src/image-channel.js';
 import { ImageResourceStore } from '../src/image-resources.js';
 import { RuntimeFailure } from '../src/errors.js';
@@ -76,22 +81,10 @@ test('only one data frame can wait for an ACK and source buffers retain ownershi
     received = resolve;
   });
   channel.port1.onmessage = (event) => {
-    const value: unknown = event.data;
-    if (
-      value &&
-      typeof value === 'object' &&
-      'type' in value &&
-      value.type === 'meta'
-    )
-      channel.port1.postMessage({ type: 'ack', seq: 0 });
-    else if (
-      value &&
-      typeof value === 'object' &&
-      'seq' in value &&
-      typeof value.seq === 'number' &&
-      'buffer' in value &&
-      value.buffer instanceof ArrayBuffer
-    )
+    const value = imageFrameSchema.parse(event.data);
+    if (value.type === 'meta')
+      channel.port1.postMessage(encodeImageFrame({ type: 'ack', seq: 0 }));
+    else if (value.type === 'data')
       received({ seq: value.seq, buffer: value.buffer });
   };
   const sink = new ImageSink(channel.port2, crypto.randomUUID(), () => {});
@@ -105,7 +98,7 @@ test('only one data frame can wait for an ACK and source buffers retain ownershi
   });
   expect(bytes.byteLength).toBe(33);
   expect(new Uint8Array(frame.buffer)).toEqual(bytes);
-  channel.port1.postMessage({ type: 'ack', seq: frame.seq });
+  channel.port1.postMessage(encodeImageFrame({ type: 'ack', seq: frame.seq }));
   await write;
   sink.dispose();
   channel.port1.close();
@@ -213,10 +206,10 @@ test('decode failure, metadata disagreement and Java mismatch cannot publish a U
 
 test('wrong sequence and END truncation abort the receiver', async () => {
   for (const frames of [
-    [{ type: 'data', seq: 1, buffer: pngHeader().buffer }],
+    [encodeImageFrame({ type: 'data', seq: 1, buffer: pngHeader().buffer })],
     [
-      { type: 'meta', seq: 0, mimeType: 'image/png' },
-      { type: 'end', seq: 1, totalBytes: 10 },
+      encodeImageFrame({ type: 'meta', seq: 0, mimeType: 'image/png' }),
+      encodeImageFrame({ type: 'end', seq: 1, totalBytes: 10 }),
     ],
   ]) {
     const store = new ImageResourceStore();

@@ -2,6 +2,7 @@ library;
 
 import 'dart:async';
 import 'package:reader_core/reader_core.dart';
+import 'control_protocol.dart' as wire;
 import 'src/generated.dart';
 
 export 'src/generated.dart';
@@ -78,66 +79,15 @@ final class BuildDescriptor {
   final String? packageId;
 }
 
-final class RuntimeSession {
-  const RuntimeSession({
-    required this.generation,
-    required this.buildId,
-    this.workerInstanceId = '',
-    this.sources = const [],
-    this.capabilities = const [],
-  });
-  final String generation;
-  final String buildId;
-  final String workerInstanceId;
-  final List<SourceInfo> sources;
-  final List<String> capabilities;
-}
-
-final class SourceInfo {
-  const SourceInfo({
-    required this.id,
-    required this.name,
-    required this.lang,
-    this.supportsLatest,
-    this.baseUrl,
-  });
-  final String id;
-  final String name;
-  final String lang;
-  final bool? supportsLatest;
-  final String? baseUrl;
-}
+typedef RuntimeSession = wire.RuntimeSession;
+typedef SourceInfo = wire.SourceInfo;
+typedef SourceResult = wire.SourceResult;
 
 final class SourceRequest {
-  const SourceRequest({
-    required this.requestId,
-    required this.generation,
-    required this.packageId,
-    required this.sourceId,
-    required this.operation,
-    required this.arguments,
-    this.timeout = const Duration(seconds: 30),
-  });
+  const SourceRequest({required this.packageId, required this.call});
 
-  final String requestId;
-  final String generation;
   final String packageId;
-  // External 64 bit identifiers stay strings across Dart/JS.
-  final String sourceId;
-  final String operation;
-  final Map<String, Object?> arguments;
-  final Duration timeout;
-}
-
-final class SourceResult {
-  const SourceResult({
-    required this.requestId,
-    required this.generation,
-    required this.data,
-  });
-  final String requestId;
-  final String generation;
-  final Map<String, Object?> data;
+  final wire.SourceCall call;
 }
 
 enum RuntimeErrorCode {
@@ -165,5 +115,5 @@ final class RuntimeEvent {
 }
 
 /// Shared version check; readiness also requires package, files and Source init.
-bool isCompatibleHost(Map<String, Object?> hello) =>
-    hello['protocolVersion'] == protocolVersion && hello['hostAbi'] == hostAbi;
+bool isCompatibleHost(wire.RuntimeHello hello) =>
+    hello.protocolVersion == protocolVersion && hello.hostAbi == hostAbi;

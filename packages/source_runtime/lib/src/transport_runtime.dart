@@ -1,11 +1,8 @@
 part of '../source_runtime.dart';
 
-/// A platform bridge for small control DTOs. Image bytes have a separate gate.
+/// A platform bridge for standard ProtoJSON control envelopes, never body bytes.
 abstract interface class RuntimeTransport {
-  Future<Object?> call(
-    String method, [
-    Map<String, Object?> payload = const {},
-  ]);
+  Future<Object?> control(Map<String, Object?> request);
 }
 
 final class RuntimeException implements Exception {
@@ -20,41 +17,44 @@ final class RuntimeException implements Exception {
   final bool retryable;
   final String? javaClass;
 
-  factory RuntimeException.fromWire(Object? value) {
-    if (value is RuntimeException) return value;
-    final data = value is Map && value.keys.every((key) => key is String)
-        ? Map<String, Object?>.from(value)
-        : const <String, Object?>{};
-    final code = switch (data['code']) {
-      'cancelled' => RuntimeErrorCode.cancelled,
-      'timeout' => RuntimeErrorCode.timeout,
-      'access_required' => RuntimeErrorCode.accessRequired,
-      'access_denied' => RuntimeErrorCode.accessDenied,
-      'unsupported_capability' => RuntimeErrorCode.unsupportedCapability,
-      'protocol_error' => RuntimeErrorCode.protocolError,
-      'integrity_error' => RuntimeErrorCode.integrityError,
-      'limit_exceeded' => RuntimeErrorCode.limitExceeded,
-      'source_error' => RuntimeErrorCode.sourceError,
-      _ => RuntimeErrorCode.runtimeLost,
-    };
-    return RuntimeException(
-      code,
-      data['message']?.toString() ?? value.toString(),
-      retryable: data['retryable'] == true,
-      javaClass: data['javaClass'] is String
-          ? data['javaClass'] as String
-          : null,
-    );
-  }
+  factory RuntimeException.fromProto(wire.RuntimeError error) =>
+      RuntimeException(
+        switch (error.code) {
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED =>
+            RuntimeErrorCode.cancelled,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT =>
+            RuntimeErrorCode.timeout,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED =>
+            RuntimeErrorCode.accessRequired,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED =>
+            RuntimeErrorCode.accessDenied,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_SOURCE_ERROR =>
+            RuntimeErrorCode.sourceError,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY =>
+            RuntimeErrorCode.unsupportedCapability,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_PROTOCOL_ERROR =>
+            RuntimeErrorCode.protocolError,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_INTEGRITY_ERROR =>
+            RuntimeErrorCode.integrityError,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_LIMIT_EXCEEDED =>
+            RuntimeErrorCode.limitExceeded,
+          _ => RuntimeErrorCode.runtimeLost,
+        },
+        error.message,
+        retryable: error.retryable,
+        javaClass: error.hasJavaClass() ? error.javaClass : null,
+      );
 
   @override
   String toString() => '$code: $message';
 }
 
-/// Validates the same protocol/generation across JS interop and WebView RPC.
 final class TransportSourceRuntime implements SourceRuntime {
   TransportSourceRuntime(this.transport);
+  static int _instanceSequence = 0;
   final RuntimeTransport transport;
+  final int _instanceId = ++_instanceSequence;
+  int _controlSequence = 0;
   final _events = StreamController<RuntimeEvent>.broadcast();
   RuntimeSession? _session;
   String? _packageId;
@@ -66,7 +66,6 @@ final class TransportSourceRuntime implements SourceRuntime {
   @override
   Stream<RuntimeEvent> get events => _events.stream;
 
-  /// Called by native content-process lifecycle notifications.
   void containerLost(String message) {
     ++_epoch;
     _session = null;
@@ -83,40 +82,59 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
   }
 
-  Map<String, Object?> _object(Object? value) {
-    if (value is! Map || !value.keys.every((key) => key is String)) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'Runtime did not return an object',
-      );
-    }
-    return Map<String, Object?>.from(value);
-  }
-
-  Future<Object?> _call(
-    String method, [
-    Map<String, Object?> payload = const {},
-  ]) async {
-    if (_disposed && method != 'dispose') {
+  Future<wire.ControlResponse> _exchange(
+    wire.ControlRequest request,
+    wire.ControlResponse_Result expected,
+  ) async {
+    final command = request.whichCommand();
+    if (_disposed && command != wire.ControlRequest_Command.dispose) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Runtime was disposed',
       );
     }
+    request.requestId = 'control-$_instanceId-${++_controlSequence}';
     try {
-      return await transport.call(method, payload);
+      final response = wire.decodeProtoJson(
+        wire.ControlResponse(),
+        await transport.control(wire.encodeProtoJson(request)),
+      );
+      if (response.requestId != request.requestId) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Control response identity mismatch',
+        );
+      }
+      if (response.whichResult() == wire.ControlResponse_Result.error) {
+        throw RuntimeException.fromProto(response.error);
+      }
+      if (response.whichResult() != expected) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Control response has the wrong result',
+        );
+      }
+      return response;
     } catch (error) {
-      final failure = RuntimeException.fromWire(error);
+      final failure = error is RuntimeException
+          ? error
+          : error is FormatException
+          ? const RuntimeException(
+              RuntimeErrorCode.protocolError,
+              'Invalid runtime ProtoJSON',
+            )
+          : const RuntimeException(
+              RuntimeErrorCode.runtimeLost,
+              'Runtime control transport failed',
+            );
       final localImageTimeout =
           failure.code == RuntimeErrorCode.timeout &&
           {
-            'acquireImage',
-            'cancelImage',
-            'releaseImage',
-            'closePageSession',
-          }.contains(method);
-      // A successfully unwound image timeout does not recycle the Source slot.
-      // The host must report runtime_lost if cancellation needed a generation reset.
+            wire.ControlRequest_Command.acquireImage,
+            wire.ControlRequest_Command.cancelImage,
+            wire.ControlRequest_Command.releaseImage,
+            wire.ControlRequest_Command.closePageSession,
+          }.contains(command);
       if (!_events.isClosed && !localImageTimeout) {
         _events.add(
           RuntimeEvent(
@@ -188,9 +206,11 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
     final epoch = ++_epoch;
     _session = null;
-    final hello = _object(await _call('ready'));
-    if (!isCompatibleHost(hello) ||
-        hello['runtimeBaseline'] != runtimeBaseline) {
+    final hello = (await _exchange(
+      wire.ControlRequest(ready: wire.Empty()),
+      wire.ControlResponse_Result.hello,
+    )).hello;
+    if (!isCompatibleHost(hello) || hello.runtimeBaseline != runtimeBaseline) {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
         'Incompatible runtime host',
@@ -202,119 +222,147 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Runtime handshake belongs to an expired container',
       );
     }
-    final response = _object(
-      await _call('open', {
-        'manifestPath': build.manifestUri.toString(),
-        'identity': build.identity,
-        'expectedBuildId': build.buildId,
-        'expectedBundleSha256': build.sha256,
-      }),
-    );
+    final response = (await _exchange(
+      wire.ControlRequest(
+        open: wire.OpenRequest(
+          manifestPath: build.manifestUri.toString(),
+          identity: build.identity,
+          expectedBuildId: build.buildId,
+          expectedBundleSha256: build.sha256,
+        ),
+      ),
+      wire.ControlResponse_Result.session,
+    )).session;
     if (_disposed || epoch != _epoch) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Runtime open result belongs to an expired container',
       );
     }
-    if (response['protocolVersion'] != protocolVersion ||
-        response['buildId'] != build.buildId ||
-        response['generation'] is! String ||
-        (response['generation'] as String).isEmpty ||
-        response['workerInstanceId'] is! String ||
-        (response['workerInstanceId'] as String).isEmpty ||
-        response['sources'] is! List ||
-        response['capabilities'] is! List ||
-        !(response['capabilities'] as List).every((value) => value is String)) {
+    if (response.protocolVersion != protocolVersion ||
+        response.buildId != build.buildId ||
+        response.generation.isEmpty ||
+        response.workerInstanceId.isEmpty ||
+        response.sources.isEmpty ||
+        response.sources.any(
+          (source) => !RegExp(r'^-?\d+$').hasMatch(source.id),
+        ) ||
+        response.sources.map((source) => source.id).toSet().length !=
+            response.sources.length) {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
         'Runtime session does not match the requested build',
       );
     }
-    final sources = (response['sources'] as List)
-        .map((value) {
-          final item = _object(value);
-          if (item['id'] is! String ||
-              !RegExp(r'^-?\d+$').hasMatch(item['id'] as String) ||
-              item['name'] is! String ||
-              item['lang'] is! String ||
-              (item['supportsLatest'] != null &&
-                  item['supportsLatest'] is! bool) ||
-              (item['baseUrl'] != null && item['baseUrl'] is! String)) {
-            throw const RuntimeException(
-              RuntimeErrorCode.protocolError,
-              'Invalid Source identity',
-            );
-          }
-          return SourceInfo(
-            id: item['id'] as String,
-            name: item['name'] as String,
-            lang: item['lang'] as String,
-            supportsLatest: item['supportsLatest'] as bool?,
-            baseUrl: item['baseUrl'] as String?,
-          );
-        })
-        .toList(growable: false);
-    if (sources.isEmpty ||
-        sources.map((source) => source.id).toSet().length != sources.length) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'Runtime Sources must be nonempty and unique',
-      );
-    }
     _packageId = build.packageId;
-    return _session = RuntimeSession(
-      generation: response['generation'] as String,
-      buildId: build.buildId,
-      workerInstanceId: response['workerInstanceId'] as String,
-      sources: sources,
-      capabilities: List<String>.from(
-        response['capabilities'] as List? ?? const [],
-      ),
-    );
+    response.freeze();
+    return _session = response;
   }
 
   @override
   Future<SourceResult> invoke(SourceRequest request) async {
     final session = _session;
+    final call = request.call.deepCopy();
     if (session == null ||
-        request.generation != session.generation ||
+        call.generation != session.generation ||
         (_packageId != null && request.packageId != _packageId) ||
-        !session.sources.any((source) => source.id == request.sourceId)) {
+        !session.sources.any((source) => source.id == call.sourceId)) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Source request belongs to an expired or different runtime',
       );
     }
+    final expected = switch (call.whichRequest()) {
+      wire.SourceCall_Request.popular ||
+      wire.SourceCall_Request.latest ||
+      wire.SourceCall_Request.search => wire.SourceResult_Payload.mangaPage,
+      wire.SourceCall_Request.details => wire.SourceResult_Payload.manga,
+      wire.SourceCall_Request.chapters => wire.SourceResult_Payload.chapters,
+      wire.SourceCall_Request.pages => wire.SourceResult_Payload.pageList,
+      _ => throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Source request requires an operation',
+      ),
+    };
     final epoch = _epoch;
-    final response = _object(
-      await _call('invoke', {
-        'requestId': request.requestId,
-        'sourceId': request.sourceId,
-        'operation': request.operation,
-        'args': request.arguments,
-        'timeoutMs': request.timeout.inMilliseconds,
-      }),
-    );
+    final response = (await _exchange(
+      wire.ControlRequest(invoke: call),
+      wire.ControlResponse_Result.source,
+    )).source;
     if (_disposed ||
         epoch != _epoch ||
-        response['generation'] != session.generation ||
-        response['requestId'] != request.requestId ||
-        response['buildId'] != session.buildId) {
+        response.generation != session.generation ||
+        response.requestId != call.requestId ||
+        response.buildId != session.buildId) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Discarded a stale Source result',
       );
     }
-    return SourceResult(
-      requestId: request.requestId,
-      generation: session.generation,
-      data: _object(response['data']),
-    );
+    if (response.whichPayload() != expected) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Source result does not match its operation',
+      );
+    }
+    try {
+      void manga(wire.Manga value) {
+        if (value.hasMemoJson()) wire.checkSourceMemo(value.memoJson);
+      }
+
+      switch (response.whichPayload()) {
+        case wire.SourceResult_Payload.mangaPage:
+          response.mangaPage.mangas.forEach(manga);
+        case wire.SourceResult_Payload.manga:
+          manga(response.manga);
+        case wire.SourceResult_Payload.chapters:
+          for (final chapter in response.chapters.chapters) {
+            if (chapter.hasMemoJson()) wire.checkSourceMemo(chapter.memoJson);
+            if (chapter.hasChapterNumber() && !chapter.chapterNumber.isFinite) {
+              throw const FormatException('Chapter number must be finite');
+            }
+          }
+        case wire.SourceResult_Payload.pageList:
+          wire.checkJsonBudget(
+            wire.encodeProtoJson(response.pageList, maxBytes: 2 * 1024 * 1024),
+            maxBytes: 2 * 1024 * 1024,
+          );
+        case wire.SourceResult_Payload.notSet:
+          throw const FormatException('Source result requires a payload');
+      }
+    } on FormatException {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Invalid Source metadata',
+      );
+    }
+    response.freeze();
+    return response;
   }
 
   @override
   Future<void> cancel(String requestId) async {
-    await _call('cancel', {'requestId': requestId});
+    final session = _session;
+    if (session == null) return;
+    final result = (await _exchange(
+      wire.ControlRequest(
+        cancel: wire.CancelSourceRequest(
+          requestId: requestId,
+          generation: session.generation,
+        ),
+      ),
+      wire.ControlResponse_Result.completed,
+    )).completed;
+    _requireAck(result.completed);
+  }
+
+  void _requireAck(bool acknowledged) {
+    if (!acknowledged) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Runtime cleanup was not acknowledged',
+      );
+    }
   }
 
   @override
@@ -332,7 +380,7 @@ final class TransportSourceRuntime implements SourceRuntime {
           request.requestId,
           request.pageSessionId,
           request.pageKey,
-        ].any((value) => value.isEmpty || value.length > 1000) ||
+        ].any((value) => value.isEmpty || value.length > 200) ||
         request.timeout <= Duration.zero ||
         request.timeout > const Duration(minutes: 5)) {
       throw const RuntimeException(
@@ -341,22 +389,23 @@ final class TransportSourceRuntime implements SourceRuntime {
       );
     }
     final epoch = _epoch;
-    final response = _object(
-      await _call('acquireImage', {
-        'requestId': request.requestId,
-        'sourceId': request.sourceId,
-        'pageSessionId': request.pageSessionId,
-        'pageKey': request.pageKey,
-        'generation': request.generation,
-        'timeoutMs': request.timeout.inMilliseconds,
-      }),
-    );
-    final id = response['resourceId'];
+    final response = (await _exchange(
+      wire.ControlRequest(
+        acquireImage: wire.AcquireImage(
+          requestId: request.requestId,
+          sourceId: request.sourceId,
+          pageSessionId: request.pageSessionId,
+          pageKey: request.pageKey,
+          generation: request.generation,
+          timeoutMs: request.timeout.inMilliseconds,
+        ),
+      ),
+      wire.ControlResponse_Result.image,
+    )).image;
     try {
-      if (id is! String ||
-          id.isEmpty ||
-          id.length > 1000 ||
-          response['generation'] != session.generation) {
+      if (response.resourceId.isEmpty ||
+          response.resourceId.length > 200 ||
+          response.generation != session.generation) {
         throw const RuntimeException(
           RuntimeErrorCode.protocolError,
           'Invalid image resource identity',
@@ -370,56 +419,47 @@ final class TransportSourceRuntime implements SourceRuntime {
           'Discarded a stale image resource',
         );
       }
-      final url = response['url'];
-      final mime = response['mimeType'];
-      final location = url is String && url.length <= 4096
-          ? Uri.tryParse(url)
+      final location = response.url.length <= 4096
+          ? Uri.tryParse(response.url)
           : null;
       if (location == null ||
           location.scheme != 'blob' ||
-          mime is! String ||
-          !RegExp(r'^image/[a-zA-Z0-9.+-]{1,80}$').hasMatch(mime)) {
+          !RegExp(
+            r'^image/[a-zA-Z0-9.+-]{1,80}$',
+          ).hasMatch(response.mimeType) ||
+          response.byteLength <= 0 ||
+          response.byteLength > 64 * 1024 * 1024 ||
+          response.width <= 0 ||
+          response.height <= 0 ||
+          response.width > 1000000 ||
+          response.height > 1000000) {
         throw const RuntimeException(
           RuntimeErrorCode.protocolError,
-          'Images must use a managed Web blob resource',
+          'Invalid managed image resource',
         );
       }
-      int positiveInteger(Object? value) {
-        if (value is! num ||
-            !value.isFinite ||
-            value <= 0 ||
-            value != value.truncateToDouble() ||
-            value > 64 * 1024 * 1024) {
-          throw const RuntimeException(
-            RuntimeErrorCode.protocolError,
-            'Invalid image dimensions or byte length',
-          );
-        }
-        return value.toInt();
-      }
-
-      final width = positiveInteger(response['width']);
-      final height = positiveInteger(response['height']);
-      final bytes = positiveInteger(response['byteLength']);
-      if (width * height > 64 * 1024 * 1024) {
+      if (response.width * response.height > 16 * 1024 * 1024) {
         throw const RuntimeException(
           RuntimeErrorCode.limitExceeded,
           'Image exceeds the raster budget',
         );
       }
       return ImageResource(
-        id: id,
+        id: response.resourceId,
         generation: session.generation,
         location: location,
-        mimeType: mime,
-        byteLength: bytes,
-        width: width,
-        height: height,
+        mimeType: response.mimeType,
+        byteLength: response.byteLength,
+        width: response.width,
+        height: response.height,
       );
     } catch (_) {
-      if (id is String && id.isNotEmpty) {
+      if (response.resourceId.isNotEmpty) {
         await releaseImage(
-          ImageReleaseRequest(resourceId: id, generation: request.generation),
+          ImageReleaseRequest(
+            resourceId: response.resourceId,
+            generation: request.generation,
+          ),
         );
       }
       rethrow;
@@ -429,52 +469,74 @@ final class TransportSourceRuntime implements SourceRuntime {
   @override
   Future<void> cancelImage(ImageCancelRequest request) async {
     if (_disposed) return;
-    final response = _object(
-      await _call('cancelImage', {
-        'requestId': request.requestId,
-        'generation': request.generation,
-      }),
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(
+          cancelImage: wire.CancelImage(
+            requestId: request.requestId,
+            generation: request.generation,
+          ),
+        ),
+        wire.ControlResponse_Result.released,
+      )).released.released,
     );
-    if (response['released'] != true) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'Image cancellation was not acknowledged',
-      );
-    }
   }
 
   @override
   Future<void> releaseImage(ImageReleaseRequest request) async {
     if (_disposed) return;
-    final response = _object(
-      await _call('releaseImage', {
-        'resourceId': request.resourceId,
-        'generation': request.generation,
-      }),
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(
+          releaseImage: wire.ReleaseImage(
+            resourceId: request.resourceId,
+            generation: request.generation,
+          ),
+        ),
+        wire.ControlResponse_Result.released,
+      )).released.released,
     );
-    if (response['released'] != true) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'Image release was not acknowledged',
-      );
-    }
   }
 
   @override
   Future<void> closePageSession(PageSessionRef session) async {
     if (_disposed) return;
-    final response = _object(
-      await _call('closePageSession', {
-        'pageSessionId': session.pageSessionId,
-        'generation': session.generation,
-      }),
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(
+          closePageSession: wire.ClosePageSession(
+            pageSessionId: session.pageSessionId,
+            generation: session.generation,
+          ),
+        ),
+        wire.ControlResponse_Result.closed,
+      )).closed.closed,
     );
-    if (response['closed'] != true) {
+  }
+
+  Future<wire.ApiFetchResponse> fetchApi(wire.ApiFetchRequest request) async {
+    final response = (await _exchange(
+      wire.ControlRequest(fetchApi: request),
+      wire.ControlResponse_Result.api,
+    )).api;
+    if ((response.status == 0 && !response.redirected) ||
+        (response.status != 0 &&
+            (response.status < 100 || response.status > 599))) {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
-        'Page session cleanup was not acknowledged',
+        'Invalid API HTTP status',
       );
     }
+    return response;
+  }
+
+  Future<void> rebuildHost() async {
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(rebuild: wire.Empty()),
+        wire.ControlResponse_Result.completed,
+      )).completed.completed,
+    );
   }
 
   @override
@@ -484,7 +546,12 @@ final class TransportSourceRuntime implements SourceRuntime {
     ++_epoch;
     _session = null;
     try {
-      await _call('dispose');
+      _requireAck(
+        (await _exchange(
+          wire.ControlRequest(dispose: wire.Empty()),
+          wire.ControlResponse_Result.completed,
+        )).completed.completed,
+      );
     } finally {
       await _events.close();
     }

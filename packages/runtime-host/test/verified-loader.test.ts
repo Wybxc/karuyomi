@@ -1,5 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { HTTP_BRIDGE_MEDIA_TYPE } from '@karuyomi/contracts';
+import { create } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
 import { gzipSync } from 'node:zlib';
 import { manifest, artifact, bytes, encodedBytes } from './fixtures.js';
 import { sha256, VerifiedLoader } from '../src/verified-loader.js';
@@ -7,6 +9,13 @@ import { TeaVMDriver, type TeaVMGlobals } from '../src/teavm-driver.js';
 
 const origin = 'https://read.example.com';
 const signal = () => new AbortController().signal;
+const sourceCall = (sourceId: string) =>
+  create(pb.SourceCallSchema, {
+    requestId: 'metadata',
+    generation: 'generation',
+    sourceId,
+    request: { case: 'popular', value: { page: 1 } },
+  });
 test('static gzip fetch omits credentials and verifies both byte domains', async () => {
   const fetcher = vi.fn(
     async () =>
@@ -182,7 +191,7 @@ test('static index accepts more than 64KiB, validates current package uniqueness
     sourceIds: [String(index)],
     manifestPath: '/extensions/builds/build-' + index + '/manifest.json',
   }));
-  const value = { schemaVersion: 1, builds, nextCursor: null };
+  const value = { schemaVersion: 1, builds };
   const fetcher = vi.fn(async () => Response.json(value));
   expect(
     (await new VerifiedLoader(origin, fetcher).index(signal())).builds,
@@ -496,7 +505,7 @@ test.each([
       ]);
       await driver.open(build, 'test', signal());
       await expect(
-        driver.invoke(build.sourceIds[0]!, 'popular', { page: 1 }),
+        driver.invoke(sourceCall(build.sourceIds[0]!)),
       ).rejects.toMatchObject({ code });
       expect(fetcher).toHaveBeenCalledWith(
         new URL('/api/bridge/http', origin),
@@ -578,7 +587,7 @@ test('the installed v2 finish callback carries a controlled connection flag thro
   try {
     await driver.open(build, 'test', signal());
     await expect(
-      driver.invoke(build.sourceIds[0]!, 'popular', { page: 1 }),
+      driver.invoke(sourceCall(build.sourceIds[0]!)),
     ).rejects.toMatchObject({
       code: 'source_error',
       message: 'Source bridge connection failed',

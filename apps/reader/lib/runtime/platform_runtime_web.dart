@@ -74,50 +74,27 @@ final class WebPlatformRuntime extends PlatformRuntime {
   }
 
   @override
-  Future<Object?> call(
-    String method, [
-    Map<String, Object?> payload = const {},
-  ]) async {
+  Future<Object?> control(Map<String, Object?> request) async {
     try {
       final host = await _host();
-      final JSPromise<JSAny?> result;
-      if (method == 'ready') {
-        result = host.getProperty<JSPromise<JSAny?>>('ready'.toJS);
-      } else if (method == 'cancel') {
-        result = host.callMethod<JSPromise<JSAny?>>(
-          method.toJS,
-          (payload['requestId'] as String).toJS,
-        );
-      } else if (method == 'dispose' || method == 'rebuild') {
-        result = host.callMethod<JSPromise<JSAny?>>(method.toJS);
-      } else {
-        result = host.callMethod<JSPromise<JSAny?>>(
-          method.toJS,
-          payload.jsify(),
-        );
-      }
+      final result = host.callMethod<JSPromise<JSAny?>>(
+        'control'.toJS,
+        request.jsify(),
+      );
       return (await result.toDart)?.dartify();
     } catch (error) {
       if (error is RuntimeException) rethrow;
-      if (error.isA<JSObject>()) {
-        final jsError = error as JSObject;
-        Object? field(String name) =>
-            jsError.getProperty<JSAny?>(name.toJS)?.dartify();
-        throw RuntimeException.fromWire({
-          'code': field('code'),
-          'message': field('message'),
-          'retryable': field('retryable'),
-          'javaClass': field('javaClass'),
-        });
-      }
-      throw RuntimeException.fromWire(error);
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Web runtime control transport failed',
+      );
     }
   }
 
   @override
   Future<void> rebuild() async {
     runtime.containerLost('Web runtime slot must be opened again');
-    await call('rebuild');
+    await runtime.rebuildHost();
   }
 
   @override

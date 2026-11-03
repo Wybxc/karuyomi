@@ -21,6 +21,16 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 历史私有交付实现曾在本地与云端注册构建 `release9-mangadraft-product-e3505206005c25f69b92`：7 个私有产物，共 3,957,861 字节，云端查询状态为 verified。登记前逐文件校验长度/hash，构建与产物关联只在完整写入后可见。本地真实 workerd/D1/R2 加 RS256 测试签名探针已检查 manifest/list、全部 R2 SHA-256、HEAD/304/Range/416、缺 JWT/错误 AUD/错误 host 及整批冲突回滚，见 [API 探针](../apps/api/test/README.md) 与 [证据](verification/runtime-evidence.md#通过的分项与限制)。测试入口仅信任本次生成的公钥，产品没有鉴权绕过。
 
+## 执行器与第三方库直接接入
+
+2026-11-03，固定 Node 24.15.0 下完成 execa 迁移与 `tools/lib/` 删除。调用点直接使用 execa、json-stable-stringify、write-file-atomic、is-plain-obj、fflate/tar/yauzl、diff 和 get-stream；没有将通用包装换目录恢复。dependency-cruiser 检查 134 个模块、485 条依赖通过，禁止重新导入 `tools/lib/`。全库 `pnpm format`、`pnpm format:check` 与 `pnpm check` 通过，包含 256 项 TypeScript 测试、真实本地 D1 CLI、归档/补丁/静态分发及受控 origin 的 workerd HTTP v2 回归。
+
+执行器回归真实运行 Unicode/元字符 argv、10 MiB 双流日志和过滤后的环境；checkpoint 校验失败保留旧内容，原子替换保留 0600 权限、末尾换行且无临时残留。41 项扩展发现/流水线/runner 回归包含 SIGINT/SIGTERM、正常退出仍有继承或独立 stdio 的后代，以及真实锁被删除后的失锁检测；后代停止后才允许锁释放和后续状态操作。Cloudflare 部署领域函数的 9 项无网络 CLI 回归覆盖合并输出正好 512 KiB UTF-8、两路总字节溢出、凭据脱敏、取消后独立恢复，以及正常退出和取消时 TERM-resistant 后代在函数返回前停止。这些测试没有重新执行线上权限探测或部署。
+
+同期接入唯一 `.proto` 与 Buf，Protobuf-ES/Dart 官方生成模型用于正式 API、Source/Worker 与 Web/Native 控制边界；`pnpm generate:check` 检查生成文件全集和字节，9 项实际 TS↔Dart golden 覆盖 ProtoJSON/二进制、oneof、可选字段、精确 memo 数字文本及业务预算。`pnpm flutter:check` 的静态分析及 71 项测试通过；`pnpm build` 完成宿主、Native 材料、Flutter Web release、空扩展索引组装及 API Wrangler dry-run。Java DTO、HTTP body、图片和 Locale oracle 也通过。复验范围和命令见[协议计划](plan/cross-language-protocol.md)与[工具计划](plan/tooling-processes.md)。
+
+当前控制身份为 host ABI `karuyomi-source-host-v3` / protocolVersion 2，HTTP bridgeVersion 仍为 2。浏览器探针入口已迁至单一 control 和正式生成 codec，受控 Node host 执行页面模块通过；尚未用新身份重建 AOT 并完成实际内置浏览器 Source 或 Native 运行验收。下文 v2 图片和 v1 部署证据仍保持原身份；冻结 `022d828` 全量未改动，不能把其产物装配进当前客户端。
+
 ## 历史部署与匿名边界
 
 2026-11-03 已成功部署 `https://karuyomi.wybxc.cc`，Cloudflare Worker version 为 `0332ef7a-3d49-47c1-ac41-edbed49bd7fe`。云端 D1 的两次迁移均通过，e350 产物已 remote 注册。匿名检查得到 `/` 200、`/runtime/host.js` 200，`/runtime/host.html` 307 规范化到公开 `/runtime/host`；Safari 已实际渲染 Flutter 书架与三个导航页签。
@@ -110,7 +120,7 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 ## Web 产品图片通道
 
-2026-11-03，当前 host ABI `karuyomi-source-host-v2` 的原版 Arknights Comics 1.6.2 已完成实际 AOT，并在 Codex 内置浏览器 Chromium 156 通过正式 Worker 初始化门：IndexedDB 可用、清单 Source ID 一致。build 为 `ext-en.arknightscomics-4d57964aa8f40e8728f0fb701b2fa3de`，bundle SHA-256 为 `7f47a06dfb8002b9f0b70713d39588091ba909f4477eadb6288fb7382c9ee93f`。这不是已部署的 ABI v1 两包快照，也不能与仍运行的固定 v1 首次全量混装。
+2026-11-03，当时 host ABI `karuyomi-source-host-v2` 的原版 Arknights Comics 1.6.2 已完成实际 AOT，并在 Codex 内置浏览器 Chromium 156 通过正式 Worker 初始化门：IndexedDB 可用、清单 Source ID 一致。build 为 `ext-en.arknightscomics-4d57964aa8f40e8728f0fb701b2fa3de`，bundle SHA-256 为 `7f47a06dfb8002b9f0b70713d39588091ba909f4477eadb6288fb7382c9ee93f`。这不是已部署的 ABI v1 两包快照，也不能与仍运行的固定 v1 首次全量混装；它不代表后续 v3 控制协议已通过实际运行验收。
 
 本地隔离 D1、签名测试 JWT 和真实 workerd 的 Source 门完成热门 17 项、标题搜索同名 1 项、详情、3 个章节及 DREAM 的 51 页列表；latest 依源声明跳过。网络政策显式限定 `arknights.global` 与元数据确认的 `webusstatic.yo-star.com`，未扩展生产政策。原 Page 对象由 Java 会话保存，图片经原 Source 的 `getImageUrl/getImage` 与 HTTP v2 进入产品图片 sink，没有读取原图 URL 绕过 Source。
 
