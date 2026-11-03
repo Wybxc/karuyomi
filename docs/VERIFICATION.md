@@ -63,7 +63,7 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 2026-11-04，正式 Drift 产品接线与数据库静态资源已完成，完整格式检查、通用检查、TeaVM 回归及最终格式化后的三个 Flutter 包分析/测试通过。Codex 内置浏览器实际阅读原版 Arknights，完成连续切章、回看不降低最远进度、关标签页重开后恢复章节/当前页/最远页/章节顺序，以及重新阅读回首页。固定输入、命令和边界见[Web 产品进度记录](verification/reader-progress-web.md)；此处不是浏览器进程重启、Native 应用或生产 Access 动态请求门。
 
-2026-11-04，固定新 host 的 Arknights DREAM 51 页、CuuTruyen Chương 142 的 23 页已在正式 Flutter Web 逐页显示并保存，末页显式完成，同路由下一章开头也通过，见[完整章记录](verification/full-chapter-web.md)。手动单双页被控件高度变化覆盖的缺口已先以正式 Widget 复现再修复；重连旧身份与迟到 API/图片清理污染新会话也已通过正式回归修复，见[重连记录](verification/runtime-reconnect.md)。该轮完整格式化、`pnpm flutter:check`（Reader 102 项）及 `pnpm check` 通过；实际身份/版本切换及修复后浏览器复验继续验收。
+2026-11-04，固定新 host 的 Arknights DREAM 51 页、CuuTruyen Chương 142 的 23 页已在正式 Flutter Web 逐页显示并保存，末页显式完成，同路由下一章开头也通过，见[完整章记录](verification/full-chapter-web.md)。手动单双页被控件高度变化覆盖的缺口已先以正式 Widget 复现再修复；重连旧身份与迟到 API/图片清理污染新会话也已通过正式回归修复，见[重连记录](verification/runtime-reconnect.md)。该轮完整格式化、`pnpm flutter:check`（Reader 102 项）及 `pnpm check` 通过；固定 `be5c3ed` 的正式 Flutter Web release 已通过修复后末页实际复验：手动单页保持、51/51 保存及显式完成、返回详情继续阅读，详见同一完整章记录；没有重新逐页阅读 51 页。真实身份/版本切换继续验收。
 
 ## 新图形宿主与生产 Access 分项
 

@@ -31,7 +31,7 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 
 存储细分推进见[运行时文件与 HTTP Cache](runtime-storage.md)，editor 生命周期机制门与原 JVM/正文语义门分别记录。固定 `b4f72f7` 的新 AOT 原 xkcd 已通过 Web fresh metadata Cache，以及实际 manager dispose/Worker 终止后新 manager/Worker 的同 namespace 正文复用，7187 B 读至 EOF、零网络、原 PageList 摘要一致；详见[原 Source Cache 证据](../verification/source-network-cache.md#原-source-cache-跨-managerworker-重建复用)。这是同一浏览器文档内重建。随后原 xkcd 也通过双端模拟器的正式 Native Java Source 冷/热 Cache 与容器重建复用，见[Native Source Cache](../verification/source-cache-native.md)；浏览器/App 进程、更多 Source、生产 Access 和正式版本/身份切换仍待验收。
 
-同一新 host 的 Arknights DREAM 51 页与 CuuTruyen Chương 142 的 23 页，已在正式 Flutter Web 主入口逐页显示、保存并显式完成，随后正常阅读下一章开头，见[完整章记录](../verification/full-chapter-web.md)。本轮发现的手动双页选择被末页控件覆盖已补正式回归并修复，实际浏览器复验继续进行。重连身份空窗与迟到控制结果污染新会话也已通过正式 Dart/SQLite 回归修复，见[重连记录](../verification/runtime-reconnect.md)；不据此认定真实身份/版本切换或生产恢复已经通过。
+同一新 host 的 Arknights DREAM 51 页与 CuuTruyen Chương 142 的 23 页，已在正式 Flutter Web 主入口逐页显示、保存并显式完成，随后正常阅读下一章开头，见[完整章记录](../verification/full-chapter-web.md)。本轮发现的手动双页选择被末页控件覆盖已补正式回归并修复；固定 `be5c3ed` 的正式 Flutter Web release 已通过修复后末页单页保持、保存/显式完成及返回详情分项，原 b4 完整章与布局失败记录保留。重连身份空窗与迟到控制结果污染新会话也已通过正式 Dart/SQLite 回归修复，见[重连记录](../verification/runtime-reconnect.md)；不据此认定真实身份/版本切换或生产恢复已经通过。
 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 已通过压缩、重定向、Cookie、HEAD/206、204/205/304、精确 Range、urlencoded/multipart、流式上传、截断上传/响应和三类取消门。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常；这些 Worker 分项不代替正式 Source/cache 或 Java 同版全部语义对照。当前只维护 v2，旧包需要重新构建。
 2. **验证缓冲与取消。** META/DATA 最多 64 KiB，正文请求最多 8 MiB、响应最多 64 MiB，适配队列最多四块。检查慢消费者、背压、迟到响应和 generation 销毁能终止上游并释放 handle；整体请求预算和两次读取之间的 idle timeout 分别验证。协议细节见 [HTTP bridge](../HTTP-BRIDGE.md)。

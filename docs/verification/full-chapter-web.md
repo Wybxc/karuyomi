@@ -23,6 +23,22 @@
 
 自动化曾因 Flutter tooltip 使“下一页”的可访问名称重复而匹配失败，改为匹配名称前缀；第 28 页一次等待超时后，新的 AX 已确认该页可见且保存，再继续。两项保留在 UI 报告，不通过重读或补帧伪造第一次显示。双页与宽图的最远页预期也按实际可见布局核对。
 
+## 修复后末页布局复验
+
+2026-11-04，主代理在同一 Codex 内置 Chromium 156，以固定 `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 的正式 Flutter Web release，于新 origin `8926` 重验上述布局缺口。客户端 `main.dart.js` 为 3605960 B，SHA-256 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`；Source 使用原 Arknights AOT `ext-en.arknightscomics-ef114e43af44b3bda11182fc16202bb5`，canonical SHA-256 `8969cab4db08462d60284f193a3680e0704b41303eb81c9deb7dea761fdfc98c`，未修改 Source/JAR 或替换图片链。
+
+从正式入口进入漫画详情和第 1 章 `DREAM`，手动关闭双页，再以 End 到 `51 / 51`，等待“本地进度已保存”并显式读完本章。主代理读取的新 AX 确认双页值仍为 0，当前 `51 / 51`、已保存及“本章已读完”；截图也实际显示末页。正常返回后详情显示“继续阅读”。本项确认末页进度与邻章面板出现时仍保留手动单页选择，**没有重新逐页阅读 51 页**；上文旧 b4 完整章报告及当时布局失败保留，不以本项替代完整章、其它布局或 Native 验收。
+
+材料已从 `/tmp` 复制到固定树 `/Users/wybxc/.codex/worktrees/reconnect-reader-validation/karuyomi` 的 ignored `.local/reader-layout-browser/`，客户端摘要与报告一致，跟踪输入未改。`ui.json` 保存主代理本轮观察及末次 AX 摘录；截图是实际末页可见证据，网络记录不作为 Cache 命中或资源峰值证据。
+
+| 材料          | SHA-256                                                            |
+| ------------- | ------------------------------------------------------------------ |
+| ui.json       | `585c6e203f8ebcf44254ff151f61c04ff9275d856e344abf411612ede89c1588` |
+| last-page.png | `5b909e4feff847a526d1f2958f5da6b3de4c0cba166f64561233429395ffe3ce` |
+| network.json  | `9a4c1279514b2b516094af05963776d308a1a1986a687a38e1f95855236f77e5` |
+
+复验沿用下一节正式产品入口与受控 RS256/workerd/D1 方式，`SOURCE_PROBE_READER_DIR` 指向该 be5 固定树的 `apps/reader/build/web`，端口为 `8926`、Source ID 和域名仍使用 Arknights 的显式配置。这里只验证修复后的末页分项，不是生产 Access、浏览器进程重启或性能门。
+
 ## 复验与材料
 
 固定树为 `/Users/wybxc/.codex/worktrees/source-network-cache-validation/karuyomi`。先以三包候选运行正式 `pnpm build`，再使用该树未修改的 `apps/api/test/source-metadata-probe.ts`，设置 `SOURCE_PROBE_READER_DIR=apps/reader/build/web`。Arknights Source ID 为 `5973713386239249589`，显式域名为 `arknights.global,webusstatic.yo-star.com`，origin 8922；CuuTruyen ID 为 `8222087175453285202`，显式域名为 `cuutruyen.net,hetcuutruyen.net,storage-bravo.cuutruyen.net,storage-charlie.cuutruyen.net`，origin 8923。按照[正式 probe 说明](../../apps/api/test/source-metadata-probe.md)从产品入口复验，不运行 `/probe` 代替产品阅读。
