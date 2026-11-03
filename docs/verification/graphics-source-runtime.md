@@ -41,3 +41,16 @@ node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
 ```
 
 多 Source 包通过 `SOURCE_PROBE_SOURCE_ID` 指定清单内的准确 ID；本次 MangaDex 使用英文 ID。用内置浏览器点击 `Run real metadata operations`。探针只记录 header/Cookie 名称、图片 host 和处理 fragment 的计数，不保存 token、Cookie 值或 DRM key。原始报告、构建日志与本次扩展观测入口留在冻结工作树 ignored `.local/p0c/`，文档只保留可复验身份、必要结果与未通过门。
+
+## 新 Cache 材料复验
+
+2026-11-04，另固定主仓库 `b6b5f478f568708273ba7d384e587164309ff999` 与相同三个上游 pin，重新准备工具链、扫描完整计划并仅在本地构建以下两包。host 输入指纹 `e7b0c766c6f50761835c80a4b17bf8820dccaf9697dacd19b12e865e70eb899a`，材料版本 `9eb2f18fff6e404078a3b8ef9f83aac882ba8dad5066bc971d556d9c88115706`；不复用上文旧 Cache 材料的 AOT。
+
+| 包        | buildId                                                   | JavaScript 字节 | gzip 字节 |
+| --------- | --------------------------------------------------------- | --------------: | --------: |
+| arknights | `ext-en.arknightscomics-f84adfbf3b83d33ef45bdc0284c76718` |       1,899,694 |   607,120 |
+| cuutruyen | `ext-vi.cuutruyen-abe419ec0673cb4314f582d92f7e3585`       |       2,100,468 |   656,844 |
+
+Codex 内置浏览器 Chromium 156 使用该固定 checkout 的正式 `source-metadata-probe.ts`，产品 Cache/Worker/HTTP v2、隔离 D1 与测试签名；两个 Source 均重新通过原元数据链和首中末图片。Arknights 仍为 17 项/3 章/51 页，三图字节与尺寸同上；CuuTruyen 仍从真实 Spy x Family 第 142 章取得 23 个 DRM 页，三图处理后的字节/尺寸同上，Blob 释放与撤销通过。正式 probe 的 header/Cookie 名称和 fragment 计数已接入，未保存凭据值。
+
+这证明新 Cache 材料下的两源在线图片链。没有测量这些 Source 的冷/热 Cache 命中计数，不能代替共享 Java 的同版语义对照，也没有新增生产 Access、Native、连续阅读或峰值证据。独立产物/报告位于该 checkout 的忽略目录 `.local/p0c/`；发布状态不自动提升。

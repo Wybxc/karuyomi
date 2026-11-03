@@ -45,11 +45,13 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 共享 `CacheScenarios.java` 分别在官方 Maven 未适配 OkHttp 5.5.0 与真实 TeaVM 0.16 产品 Cache/BrowserCall/二进制 JSO 中执行。131079 字节冷/热命中、304 合并、no-store、Cookie Vary 和打开 snapshot 跨 evictAll 的正文摘要一致，均为 `1933f7f279fb4232259d5af94a6f792a308a78e4c18b8ed5caafd99e943f9a78`；计数均为 11 次请求、8 次网络、4 次命中、5 次成功写入。原 JVM 断言 Cache/OkHttpClient CodeSource，避免 seed 同名适配 JAR 将请求送入 BrowserCall。Java CacheSink 的 19 项 JVM 边界检查同时通过，存储写失败仅丢弃缓存副本，不吞网络读取异常。
 
-上述 TeaVM 网络使用受控 workerd origin，尚未验收新 Cache 下的真实 Source、生产 Access、reader 死亡/损坏正文/中途取消或 Native；普通文件与跨目录 namespace 总预算仍待实施。复验与边界见[Cache 记录](verification/http-cache-runtime.md)和[存储计划](plan/runtime-storage.md)。原 JVM oracle JAR SHA-256 为 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52`。
+上述 TeaVM 网络使用受控 workerd origin，新 Cache 材料下 Arknights/CuuTruyen 两包已重新 AOT 并通过在线首中末图片，见[Source 复验](verification/graphics-source-runtime.md#新-cache-材料复验)；未测这两源的冷/热 Cache 命中，生产 Access 动态链、reader 死亡/损坏正文/中途取消或 Native 仍未验收；普通文件与跨目录 namespace 总预算仍待实施。复验与边界见[Cache 记录](verification/http-cache-runtime.md)和[存储计划](plan/runtime-storage.md)。原 JVM oracle JAR SHA-256 为 `234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52`。
 
 ## 阅读连续性分项
 
 2026-11-03，阅读路由已接 Source 原序/反序、漫画作用域章节键与上一章/下一章控制；不按编号排序或丢弃重复 URL。每次切章等旧 Reader 的 scheduler、图片 pin 与 provider 清理 ACK 后才挂载新叶；下一章 pages 迟到和新 provider 在下一帧挂载前退出均被关闭。`chapter_sequence_test.dart` 与 `chapter_reader_route_test.dart` 覆盖空/零/小数编号、重复章的快照键、跨漫画/Source 隔离及延迟清理/退出竞争；相关 26 项组件回归和 Flutter analyze 通过。完整 `pnpm flutter:check` 通过三个包的静态分析及 15/23/50 项测试，完整格式检查通过。此时尚无背景下一章准备、Drift 落盘、真实 Source 章节连续阅读或真机证据，不据此标记 P0/P1 通过。
+
+2026-11-04，正式 Drift 产品接线与数据库静态资源已完成，完整格式检查、通用检查、TeaVM 回归及最终格式化后的三个 Flutter 包分析/测试通过。Codex 内置浏览器实际阅读原版 Arknights，完成连续切章、回看不降低最远进度、关标签页重开后恢复章节/当前页/最远页/章节顺序，以及重新阅读回首页。固定输入、命令和边界见[Web 产品进度记录](verification/reader-progress-web.md)；此处不是浏览器进程重启、Native 应用或生产 Access 动态请求门。
 
 ## 新图形宿主与生产 Access 分项
 

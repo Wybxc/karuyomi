@@ -10,7 +10,7 @@
 - 独立 Dart 阅读核心已有稳定逻辑锚、布局/方向、缩放和有界资源调度；实际图片接入仍属于 [P0](p0-runtime-and-reading.md)。
 - 单 hostname、Access/API、D1 网络策略工程入口已存在；云端书架/进度业务表和客户端同步镜像尚未建立。
 
-Drift/SQLite 本地进度底座与正式路由已接通：受信 bootstrap subject + 部署 origin 隔离，详情继续阅读、当前/最远位置分离、显式完成/重新阅读和保存失败重试已实现。真实 SQLite 文件经产品目录/详情/Reader 关闭重开恢复，Web/Native 应用实际重启仍待验收，见[验证记录](../verification/local-progress.md)。
+Drift/SQLite 本地进度底座与正式路由已接通：受信 bootstrap subject + 部署 origin 隔离，详情继续阅读、当前/最远位置分离、显式完成/重新阅读和保存失败重试已实现。真实 SQLite 文件经产品目录/详情/Reader 关闭重开恢复；真实 Arknights 已通过 Web 连续切章及关标签页恢复，见[Web 产品记录](../verification/reader-progress-web.md)。浏览器进程/Native 应用重启仍待验收，见[验证记录](../verification/local-progress.md)。
 
 ## 待办
 
