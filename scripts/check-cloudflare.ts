@@ -36,6 +36,7 @@ async function main() {
     throw new CheckFailure(
       'CLOUDFLARE_API_TOKEN and a valid CLOUDFLARE_ACCOUNT_ID are required',
     );
+  const redact = (value: string) => value.replaceAll(token, '[redacted]');
   const abort = new AbortController();
   const stop = () => abort.abort();
   process.once('SIGINT', stop);
@@ -98,8 +99,18 @@ async function main() {
                 : [],
             )
           : [];
+      const messages =
+        isRecord(value) && Array.isArray(value.errors)
+          ? value.errors.flatMap((error: unknown) =>
+              typeof error === 'string'
+                ? [error]
+                : isRecord(error) && typeof error.message === 'string'
+                  ? [error.message]
+                  : [],
+            )
+          : [];
       throw new CheckFailure(
-        `Cloudflare HTTP ${response.status}; API codes: ${codes.join(',') || 'unavailable'}`,
+        `Cloudflare HTTP ${response.status}; API codes: ${codes.join(',') || 'unavailable'}; ${redact(messages.join('; ')).slice(0, 1500)}`,
       );
     }
     return value.result;
@@ -120,9 +131,13 @@ async function main() {
     const require = createRequire(
       new URL('../apps/api/package.json', import.meta.url),
     );
-    const cli = require.resolve('wrangler');
+    const resolved = require.resolve('wrangler');
+    const cli = path.join(path.dirname(resolved), '../bin/wrangler.js');
     const locked: unknown = JSON.parse(
-      await readFile(path.join(path.dirname(cli), '../package.json'), 'utf8'),
+      await readFile(
+        path.join(path.dirname(resolved), '../package.json'),
+        'utf8',
+      ),
     );
     if (!isRecord(locked) || locked.version !== '4.156.1')
       throw new CheckFailure('Expected repository-pinned Wrangler 4.156.1');
@@ -195,7 +210,7 @@ async function main() {
           );
           reject(
             new CheckFailure(
-              `Wrangler deployment failed (exit ${code ?? 'signal'}); Cloudflare API codes: ${codes.join(',') || 'unavailable'}. Verify Workers Scripts Write/account scope; raw logs withheld`,
+              `Wrangler deployment failed (exit ${code ?? 'signal'}); Cloudflare API codes: ${codes.join(',') || 'unavailable'}. ${redact(output).slice(-5000)}`,
             ),
           );
         }
