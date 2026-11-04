@@ -124,9 +124,6 @@ void main() {
     generation: 'generation',
     url: 'blob:https://reader.example/image',
     byteLength: 4,
-    mimeType: 'image/png',
-    width: 1,
-    height: 1,
   );
 
   test(

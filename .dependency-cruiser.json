@@ -115,6 +115,26 @@
       "to": {
         "path": "^tools/(?!images/)"
       }
+    },
+    {
+      "name": "source-host-has-no-client-image-processing",
+      "severity": "error",
+      "from": {
+        "path": "^packages/runtime-host/src/"
+      },
+      "to": {
+        "path": "^runtime/image-codec/"
+      }
+    },
+    {
+      "name": "client-image-codec-does-not-depend-on-source-host",
+      "severity": "error",
+      "from": {
+        "path": "^runtime/image-codec/(?!test/|.*\\.test\\.ts$)"
+      },
+      "to": {
+        "path": "^packages/runtime-host/"
+      }
     }
   ],
   "options": {

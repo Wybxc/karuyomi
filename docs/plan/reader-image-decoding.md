@@ -1,40 +1,47 @@
-# 阅读器长图与终端解码
+# 阅读器图片解码与长图评估
 
 ## 目标与状态
 
-使真实长图经原 Source 图片链进入 Web 与 Native 阅读器，在条漫、旋转、缩放与位置恢复时保留原图坐标，并记录解码尺寸、资源释放和进程/GPU 峰值。状态：**进行中，codec Worker、共享材料、Source编码页、正式tile控制、Web URL与Dart/Native有界片文件已实现；Reader窗口/LOD/EXIF坐标接线尚未完成，真实长图产品未验收**。既有Node24项和独立Worker内置浏览器11项保留原证据范围；本轮编码页工程检查及TS↔Dart协议交叉验证已通过，见[编码页记录](../verification/encoded-image-ownership.md)；合成正文的真实Web owner机制已通过，范围见同一记录。正式控制与Native adapter的工程范围见[分片控制记录](../verification/image-page-controls.md)，与上述合成正文浏览器owner机制分开验收。这是 [P0 阅读计划](p0-runtime-and-reading.md)的图片子计划，不以现有单图像素拒绝门替代长图支持。
+保持 Source 原有图片获取和处理语义，使 Web 与 Native 阅读器在真实客户端中完成解码、布局、显示及资源释放。先测量 Flutter 直接解码的正式 UI 基线，再依据首图、交互和内存数据决定是否采用分片、降采样或成熟区域解码器。
 
-## 当前证据与缺口
+状态：**进行中，Source 图片交付已收敛为不透明编码资源，客户端实际帧尺寸与预算接线已实现；当前路径的真实 UI 性能基线、长图、EXIF/LOD 与真机验收仍待完成。** 本计划是 [P0 阅读计划](p0-runtime-and-reading.md)的图片子计划，不能以编译、逻辑预算或独立 codec 机制关闭产品门。
 
-- 固定 libspng/WASM 的两张大尺寸合成 RGBA PNG、ACK 背压、首块取消与缺 IEND 尾部已通过 Node 与内置浏览器 Web Worker 机制分项；实际 heap 为 16 MiB，Web 不依赖 SAB / COOP/COEP，首/中/末区域已可见。范围、工具链偏差与剩余输入见[codec 证据](../verification/long-image-codec.md)，不将其视为真实 Source 或终端产品验收。
-- 固定 libjpeg-turbo 3.2.1 已用官方 macOS SDK 在 Node 通过两张 baseline 长图的完整尺寸、1/2 与 1/4 原生 IDCT 输出，完整流及首/中/末像素分别匹配 Sharp JPEG 解码或独立原生 djpeg 缩放 oracle；另通过首 ACK 取消、缺 EOI 失败与 progressive 接纳拒绝，共九项。JPEG 又通过内置浏览器完整尺寸、背压、取消、截断、progressive 拒绝与强制 terminate 观察窗六项，首/中/末区域可见并匹配 SHA，无 SAB；Web 完整流 SHA、缩放和强制终止后的 heap 释放未测。不能把 progressive 拒绝算作其解码支持。
-- SDK 准备器与工具链检查作为本轮独立工程门完成，入口为 `pnpm image-codecs:prepare` / `pnpm test:image-codecs`，后者纳入 `pnpm check`。来源和使用见[codec 工具链说明](../../runtime/image-codec/README.md)。正式 PNG/JPEG 源码构建另见下一项；Linux SDK 执行与跨主机字节一致性仍未验；材料构建已使用固定 portable 产物归档，不要求 CI 隐式编译或准备 Linux SDK。
-- 已内化共同 C ABI、严格 TypeScript 顺序 session、双上游 submodule、构建指纹与自生成长图回归；此前正式源码通过两次同主机独立缓存构建和 Node 19 项真实 WASM 验收，范围按[正式证据](../verification/long-image-codec.md#正式源码构建与-node-验收)保留。本轮增加固定 libspng PNG encoder，正式 CLI 的 24 项全部通过，包括真实 WASM 编码后由 Sharp 解码对照的最大高熵条带、错误后恢复与直接 ABI 释放；见[编码器 Node 证据](../verification/long-image-codec.md#有界-png-编码器的-node-验收)。这不是新 Worker 的跨线程或浏览器证据，不能沿用历史探针 Web 结果。
-- 独立 codec Worker/client 已实现：读取前限制 8 MiB 受管 Blob，PNG/JPEG 顺序解码并编码至多 256 行的 PNG tile，单片 RGBA 4 MiB / PNG 8 MiB，64 KiB DATA 逐块 ACK，下一次 pull 才推进下一片。tile 带原图 sourceRect 且保持 provisional，尾部失败或取消使已交付片整体失效；取消等待清理，超出 grace 只终止专用 codec Worker。源码、能力范围与命令见 [codec README](../../runtime/image-codec/README.md)。fake Worker / 生命周期回归及真实 Codex 内置浏览器 11 项均通过；590 个基础 tile 的 PNG 字节/几何、ACK/pull、三种取消边界、截尾和恢复范围见[正式 Worker 证据](../verification/long-image-codec.md)。这不是 Source / Reader 或 Native 执行证据。
-- `MaterialCatalog.imageCodecs`、Static Assets MIME 与 Native host 内置 resolver 已接线，材料和构建来源参与 `materialVersion`。Web 使用共享静态材料；Native host 内置实际所需 Worker、模块、WASM 和许可证，不重复内置已 bundle 的 Web client.js，也不向 Source Worker 预载 codec。`artifacts-lock.json` 与 portable 归档准备/打包入口已实现，核对来源及成员后原子安装，不让 CI 临时构建 SDK。构建/装配通过不代表 Native WebView 内置执行通过，公开构建依赖已发布，并通过新空缓存匿名下载及完整导入校验；Linux 项目 CI 的通用检查、Flutter、完整构建及 D1 迁移也已通过，见[工程证据](../verification/long-image-codec.md#固定构建依赖的公开下载)。
-- `EncodedImage`、`acquireEncodedImage` 与END编码页ACK已接Proto/Buf、TS运行时解析和Dart接收；Source collector限制8 MiB编码正文，raw宽≤4096、PNG高≤100000/JPEG高≤65500，保存EXIF1..8方向而不作整页raster解码。固定exifr读取完整有界metadata输入副本，END ACK不代表decode成功；Java成功描述一致后才publish/borrow。owner release禁止新borrow，既有lease继续占正文预算。本轮Source链、Dart与TS↔Dart协议交叉验证属于工程回归；合成正文的真实Web owner机制已通过；原Source与EXIF方向显示另验。
-- 独立 `ImageTileStore` 已有单活动会话、有界顺序扫尾、窗口缓存、缺片重扫和失效lease确认；PNG缓存16 MiB、显示lease≤64且合计≤32 Mi像素。已由 `ImagePageControl` 接到编码页borrow、正式窗口控制和Web稳定URL，Dart与Native有界小片文件也已接线。打开页后调用方显式 `releaseImage` 原编码owner，页关闭等codec终态才归还borrow；已交付片保留至显示ACK。Reader/实际provider cache eviction尚未接入，不能将工程回归写成产品显示通过。
-- 现有完整图 `ProcessedImage/ImageResource` 语义及宿主、Dart/Native文件的16 Mi像素门保留；新增编码页边界不按整页像素否决。Reader尚未消费新合同，不能据此称1080×20000等长图已进入正式阅读器。协议version2/hostAbi v3保持，变化仍进入hostFingerprint/materialVersion，不建设旧版兼容层。
-- 宿主完整解码验证处理后的图片，Flutter 再用完整 `NetworkImage` / `FileImage` 显示；布局缩放不等于请求较小 raster。调度器在 acquire 返回后接纳资源，现有账本不能证明在途解码峰值。
-- 连续阅读已经按原尺寸计算页高，并保存页内归一化偏移；应扩展现有逻辑锚，不用分片序号替代逻辑页和进度。
-- Flutter 目标尺寸 API 可改善部分平台/格式的最终 raster，但不能保证 Web 和所有原生格式都避免原尺寸临时解码。默认 wasm-vips 的共享内存与初始堆也不符合当前约束，不能直接引入后宣布完成。
+## 当前架构与实现边界
 
-固定源码、候选库与限制统一见[解码设计依据](../design/reader-image-decoding.md)，避免在计划中复制库实现细节。
+- `PageProvider.acquire` 仍返回 `ImageResource`，仅含 `id`、`generation`、`location` 和 `byteLength`。Source/host 交付边界只收集、传输、持有及释放编码正文，不检测 MIME、宽高或 EXIF，不为阅读器预解码，也不提供编码页、分片或窗口控制协议。保持原插件处理后的正文，不通过原图 URL 绕过插件。
+- Web 使用受管 Blob URL，Native 使用受管文件；Flutter 的实际 `ImageProvider` 负责解码。`ResourceImage` 与显示用 `Image` 复用相同 provider/cache key/completer，额外 listener 只提取并释放其拥有的 `ImageInfo`，不再创建 codec 或重复解码。只有真实 frame 与尺寸均已就绪时才发出 decoded 通知；错误单独通知。
+- `ImageDimensions` 是客户端布局模型，不进入 Source 描述。Reader 根据实际解码宽高学习页比例，保持逻辑页键、内容版本和页内归一化锚。预取成功不代表已读；解码失败或超预算资源不得推进 observed。
+- `ImageScheduler` 未获得客户端尺寸时沿用既有未知页估算，获得实际帧后按 `width × height × 4` 更新解码估算。编码正文和已知 decoded 成本在资源退休后继续保留到释放 ACK；widget pin、帧尾和实际 provider cache eviction 仍决定何时可归还文件/Blob。当前预算没有提高。
+- 这套后验账本限制接纳和后续生产，**不能证明平台整图 decoder 的初次临时分配或 GPU 峰值有界**。当前产品仍使用 Flutter 整图显示路径，尚未完成终端长图方案选型和性能验收。
+- 候选 codec 源码集中在 `runtime/image-codec/`，保留独立构建和测试入口，退出默认构建、Web 静态资源和 Native 打包。尚无真实 UI 性能对照支持把它选为默认；候选 Worker、tile store 或 WASM 算法均未接入当前 Reader。
 
-## 实施顺序
+当前源码和候选库约束见[解码设计依据](../design/reader-image-decoding.md)，Source 交付与所有权见[图片资源通道](../IMAGE-RESOURCES.md)。
 
-1. **验收已实现的独立 Worker 与材料链。** C 适配、严格 TypeScript session/client/Worker、submodule、可复验 builder、Blob 输入、PNG 条带编码及 Web / Native 材料接线已实现。`pnpm image-codecs:check-worker` 已在 Codex 内置浏览器运行正式 catalog/client/VerifiedLoader/Worker，11 项覆盖逐片 PNG 字节与几何、ACK/pull、取消、截尾和错误后恢复。Node 24 项只提供独立 decoder/encoder 证据，旧探针 Web 机制继续保留原来源。portable 归档新空缓存公开下载已通过；Linux 工程 CI 已通过；Native 内置执行和冷启动另验。临时工程、下载与日志继续留在忽略目录，不以机制或构建成功关闭产品门。
-2. **验收已实现的编码页描述与所有权。** Proto/TS/Dart模型、Source编码页collector、Java成功一致性与borrow生命周期已实现；新增crosswire和合成正文的真实Web owner机制已通过；tile控制现已接入，下一步接Reader，再进入真实Source长图门。编码页接纳、实际codec decode与显示frame保持不同状态；EXIF元数据1..8被保留不等于八种方向显示正确，源插件内部surface预算仍独立限制。
-3. **验收已实现的borrow/store与正式控制接线。** manager已将已发布的Source处理后Blob借给store，接入open/window/wait/release/close控制、Dart小描述、Web稳定URL与Native有界小片文件。工程检查及模拟边界按[控制记录](../verification/image-page-controls.md)维护，不充作正式浏览器/Native执行证据。调用方打开页后显式释放原编码owner，关闭页等待codec和borrow终态，已交付片继续等待显示ACK；下一门是复用Static Assets/Native内置材料的实际执行及Reader消费。
-4. **接入Reader窗口、预算与取消。** 将逻辑页header与tile资源分开，页内滚动更新source窗口/LOD，不将tile序号写成持久页键。解码/pull前预留工作与输出，旧片在帧/pin、实际provider cache eviction及Native ACK完成前继续计费。消费store的有界扫尾、非可见丢弃/缓存和缺片本地重扫，不积存整页raster或全部PNG。尾部失败撤下同会话全部provisional片；observed来自可见tile的实际Flutter frame，章节完成等待真实页terminal。覆盖取消、迟到、格式失败、缩放替换与完整cache key清理，合计预算和真实峰值另验。
-5. **完成正式产品验收。** 原图首/中/末位置可辨；条漫、DPR、旋转、模式切换和缩放后恢复相同原图坐标。检查缓存变体全部释放、坏图后恢复与取消时所有权。Web 内置浏览器、iOS/Android 真机分别记录首图时间与进程/GPU 峰值；模拟器与替身 Widget 只算对应分层证据。
+## 工程验证与历史证据
+
+本轮领域与 widget 回归覆盖不透明资源引用、实际 provider 只 load/decode 一次、真实帧尺寸、缓存同步帧、错误/卸载后迟到结果、暂停时 observer 生命周期、布局锚保持，以及释放 ACK 前的编码/解码成本。它们是工程回归，不能代替正式 Web/Native 主入口和原 Source 的运行复验。
+
+以下历史材料保留原输入、环境、失败和证据范围，**其架构已被本轮客户端解码决策替代**：
+
+- [长图 codec 记录](../verification/long-image-codec.md)：固定 libspng/libjpeg-turbo、PNG 条带编码器、Node 和独立 Codex 内置浏览器 Worker 分项，及材料准备/打包的历史工程证据。独立解码、取消、背压、截尾和像素对照不代表 Reader 已接入，也不证明实际 UI 速度或进程/GPU 峰值。
+- [编码页所有权记录](../verification/encoded-image-ownership.md)：历史 `EncodedImage/acquireEncodedImage`、Java 一致性/borrow 及合成正文 Web owner 机制。当前 Source 合同已删除这套图片信息与编码页分支，不保留兼容层。
+- [分片控制记录](../verification/image-page-controls.md)：历史 host `open/window/wait/release/close`、Dart/Native 小片文件和模拟边界。该合同已退出正式 Source 路径，不能继续列为产品能力或当前验收。
+- 此前普通图片、文字图恢复和模拟器 Source 阅读记录仍只证明各自固定版本。原 Web 黑屏、Android observed 调度、截断/progressive 不支持等失败与限制保持在原验证记录，不因架构调整改写为通过。
+
+## 实施顺序与待办
+
+1. **收敛并验证客户端直接解码路径。** 不透明资源合同与实际 `ImageInfo` 接线已经实现。继续核对双端传输、取消、迟到结果、文件/Blob 释放、真实 provider cache key 与帧尾 pin；重新运行正式主入口的原 Source 阅读和恢复，明确与旧证据的材料版本差异。
+2. **建立真实 UI 直接解码 baseline。** 固定同一原 Source、编码正文、构建版本和设备，覆盖普通图、长 JPEG/PNG、冷/热缓存、首图、中末页跳转、连续滚动、缩放与退出取消。Web 使用 Codex 内置浏览器；iOS/Android 区分模拟器和真机。记录首图可见时间及分布、跳转延迟、滚动卡顿/掉帧、CPU、RSS 和 GPU 峰值；明确运行次数、测量方法和无法取得的指标。
+3. **依据瓶颈比较成熟方案。** 先查正式 Flutter/平台成熟 decoder 与区域解码库；在同一编码输入和实际 UI 上比较直接解码、目标 raster/降采样、成熟区域 decoder，以及有证据支持时的候选 `runtime/image-codec`。包含解码、重编码、跨线程传输、Flutter 再解码、缓存和显存成本，不只比较 WASM 或单个函数耗时。默认方案由性能、格式覆盖、维护和可用性共同决定，不能先接线后补理由。
+4. **必要时实施客户端长图方案。** 选型后才设计逻辑页、EXIF 八方向、LOD/可见覆盖、跨页单 codec、合计工作预算和帧尾释放。分片序号不得成为持久页键；缩放 dialog 与主阅读视图协调所有权，错误/取消/迟到结果不得污染当前 generation。全部图片知识保留在客户端，不重新扩展 Source/host 图片协议。
+5. **完成产品验收。** 在声明支持的 Web、iOS/Android 真机和格式上，验证真实长图首/中/末可辨、连续阅读、模式切换、旋转与缩放后的相同逻辑锚。对照 baseline 报告首图、滚动、CPU/RSS/GPU 和释放结果；缺少实测的格式、EXIF/LOD、Source 和设备继续列为待验。
 
 ## 验收条件
 
-- 不修改官方 Source/JAR，不绕过插件访问原图，不用宽泛断言绕过协议类型检查。
-- 真实超过当前上限的长图通过明确支持的解码路径显示，并能定位首、中、末区域；不能只调高常量或以小图替身通过。
-- 所有新增 raster/分片及工作预留有拥有者，清理确认前持续计费，取消/错误后能继续阅读。
-- 已显示页和进度仍由真实 Flutter frame 推进；分片预取不冒充已读。
-- 固定输入的 Web 与 Native 实测证据说明所覆盖格式和资源边界；未测的格式、Source 和设备继续明确待验。
+- 不修改官方 Source/JAR，不绕过插件，不以图片协议字段或类型断言掩盖边界错误。
+- 客户端尺寸来自实际解码显示链，预取和 Source acquire 成功均不推进已读；错误、超预算与迟到结果不会推进 observed。
+- 全部已拥有资源在释放 ACK 前持续计费；退出、错误与取消后能释放并恢复阅读。逻辑账本与进程/GPU 实测分别报告。
+- 先取得可复验的正式 UI baseline 和候选对照，才确定长图默认方案；不通过调高整图预算或小图替身宣布长图支持。
+- 真实长图与方向/缩放/恢复通过所声明的设备和格式范围，未测部分明确保留。
 
-实施变化同步本计划和 [P0](p0-runtime-and-reading.md)，实际证据归入 [VERIFICATION](../VERIFICATION.md)。
+实施变化同步本计划和 [P0](p0-runtime-and-reading.md)，实际运行证据归入 [VERIFICATION](../VERIFICATION.md)。

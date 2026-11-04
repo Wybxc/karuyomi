@@ -13,20 +13,11 @@ import {
   releaseImageSchema,
   closePageSessionSchema,
   imageResourceSchema,
-  encodedImageSchema,
   type AcquireImage,
   type CancelImage,
   type ReleaseImage,
   type ClosePageSession,
   type ImageResource,
-  type OpenImagePage,
-  type ImagePage,
-  type WaitImageWindow,
-  type ReleaseImageTile,
-  type CloseImagePage,
-  type ImageWindowSnapshot,
-  requestImageWindowSchema,
-  type EncodedImage,
   staticManifestPathSchema,
   workerResponseSchema,
   type RpcEnvelope,
@@ -42,18 +33,9 @@ import {
 import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
 import { createHello } from './hello.js';
-import { ImagePageControl } from './image-page-control.js';
-import {
-  ImageTileStore,
-  type ImageTileStoreDependencies,
-} from './image-tile-store.js';
 import { RuntimeFailure } from './errors.js';
 import { sha256, VerifiedLoader } from './verified-loader.js';
-import {
-  ImageResourceStore,
-  type ImageCollector,
-  type EncodedImageLease,
-} from './image-resources.js';
+import { ImageResourceStore, type ImageCollector } from './image-resources.js';
 
 export interface WorkerEndpoint {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -72,8 +54,9 @@ interface SourceTask extends TaskBase {
   call: SourceCall;
   resolve(value: SourceResult): void;
 }
-interface ImageTaskBase extends TaskBase {
+interface ImageTask extends TaskBase {
   kind: 'image';
+  resolve(value: ImageResource): void;
   input: AcquireImage;
   collector: ImageCollector;
   port: MessagePort;
@@ -82,11 +65,6 @@ interface ImageTaskBase extends TaskBase {
   failure?: RuntimeFailure;
   cancelTimer?: ReturnType<typeof setTimeout>;
 }
-type ImageTask = ImageTaskBase &
-  (
-    | { encodedOnly: false; resolve(value: ImageResource): void }
-    | { encodedOnly: true; resolve(value: EncodedImage): void }
-  );
 interface PageSessionTask extends TaskBase {
   kind: 'page-session';
   pageSessionId: string;
@@ -116,8 +94,6 @@ export class SourceRuntimeManager {
   private pending = new Map<string, Pending>();
   private requestIds = new Set<string>();
   private readonly images: ImageResourceStore;
-  private readonly imagePages: ImagePageControl | undefined;
-  private imagePageCleanup: Promise<void> = Promise.resolve();
   private readonly imageTasks = new Map<string, ImageTask>();
   private readonly closedPageSessions = new Map<
     string,
@@ -133,15 +109,9 @@ export class SourceRuntimeManager {
       enabled?: boolean;
       store?: ImageResourceStore;
       cancelGraceMs?: number;
-      tiles?: ImageTileStoreDependencies;
     } = {},
   ) {
     this.images = imageOptions.store ?? new ImageResourceStore();
-    if (imageOptions.tiles)
-      this.imagePages = new ImagePageControl(
-        new ImageTileStore(imageOptions.tiles),
-        (input) => this.borrowEncodedImage(input),
-      );
   }
 
   open(options: OpenOptions): Promise<RuntimeSession> {
@@ -339,9 +309,7 @@ export class SourceRuntimeManager {
         ? {
             ...result,
             capabilities: result.capabilities.filter(
-              (capability) =>
-                capability !== 'processed-image-resources' &&
-                capability !== 'encoded-image-resources',
+              (capability) => capability !== 'processed-image-resources',
             ),
           }
         : result;
@@ -452,7 +420,6 @@ export class SourceRuntimeManager {
                 value: {
                   request: task.input,
                   resourceId: task.collector.resourceId,
-                  encodedOnly: task.encodedOnly,
                 },
               }
             : {
@@ -465,39 +432,22 @@ export class SourceRuntimeManager {
       .then(async (response) => {
         if (task.kind === 'image') {
           if (task.failure) throw task.failure;
-          if (task.encodedOnly) {
-            if (response.result.case !== 'encodedImage')
-              throw new RuntimeFailure(
-                'protocol_error',
-                'Worker did not return an encoded page',
-              );
-            const resource = await task.collector.publishEncoded(
-              messageJson(pb.EncodedImageSchema, response.result.value),
+          if (response.result.case !== 'image')
+            throw new RuntimeFailure(
+              'protocol_error',
+              'Worker did not return an image',
             );
-            if (task.failure) throw task.failure;
-            this.assertGeneration(task.input.generation);
-            published = true;
-            this.imageTasks.delete(task.requestId);
-            clearTimeout(task.timer);
-            task.resolve(resource);
-          } else {
-            if (response.result.case !== 'image')
-              throw new RuntimeFailure(
-                'protocol_error',
-                'Worker did not return an image',
-              );
-            const resource = await task.collector.publish(
-              messageJson(pb.ProcessedImageSchema, response.result.value),
-            );
-            if (task.failure) throw task.failure;
-            this.assertGeneration(task.input.generation);
-            published = true;
-            // Commit ownership before resolving: caller continuations can run
-            // before finally, and cancellation only applies to pending production.
-            this.imageTasks.delete(task.requestId);
-            clearTimeout(task.timer);
-            task.resolve(resource);
-          }
+          const resource = await task.collector.publish(
+            messageJson(pb.ProcessedImageSchema, response.result.value),
+          );
+          if (task.failure) throw task.failure;
+          this.assertGeneration(task.input.generation);
+          published = true;
+          // Commit ownership before resolving: caller continuations can run
+          // before finally, and cancellation only applies to pending production.
+          this.imageTasks.delete(task.requestId);
+          clearTimeout(task.timer);
+          task.resolve(resource);
         } else if (task.kind === 'source') {
           if (response.result.case !== 'source')
             throw new RuntimeFailure(
@@ -621,16 +571,6 @@ export class SourceRuntimeManager {
     this.controller = undefined;
     this.worker?.terminate();
     this.worker = undefined;
-    const closingPages = this.imagePages?.invalidate();
-    if (closingPages) {
-      this.imagePageCleanup = Promise.all([
-        this.imagePageCleanup,
-        closingPages,
-      ]).then(() => {});
-      // Public rebuild/dispose await this cleanup; open can begin a new Source
-      // generation while the single shared codec store finishes old work.
-      void this.imagePageCleanup.catch(() => {});
-    }
     this.images.clear(error);
     for (const task of this.imageTasks.values()) {
       clearTimeout(task.cancelTimer);
@@ -650,70 +590,7 @@ export class SourceRuntimeManager {
     this.requestIds.clear();
   }
 
-  acquireImage(input: AcquireImage): Promise<ImageResource> {
-    return this.acquireImageResource(input, false);
-  }
-
-  acquireEncodedImage(input: AcquireImage): Promise<EncodedImage> {
-    return this.acquireImageResource(input, true);
-  }
-
-  borrowEncodedImage(input: ReleaseImage): EncodedImageLease {
-    const parsed = releaseImageSchema.parse(input);
-    this.assertGeneration(parsed.generation);
-    return this.images.borrowEncoded(parsed.resourceId, parsed.generation);
-  }
-
-  get imagePageUsage() {
-    return this.imagePages?.usage;
-  }
-
-  private tileControl(): ImagePageControl {
-    if (!this.imagePages)
-      throw new RuntimeFailure(
-        'unsupported_capability',
-        'Image codec materials are unavailable',
-      );
-    return this.imagePages;
-  }
-
-  openImagePage(input: OpenImagePage): ImagePage {
-    this.assertGeneration(input.generation);
-    return this.tileControl().open(input);
-  }
-
-  requestImageWindow(
-    input: PlainMessage<pb.RequestImageWindow>,
-  ): ImageWindowSnapshot {
-    this.assertGeneration(input.generation);
-    return this.tileControl().request(requestImageWindowSchema.parse(input));
-  }
-
-  waitImageWindow(input: WaitImageWindow): Promise<ImageWindowSnapshot> {
-    this.assertGeneration(input.generation);
-    return this.tileControl().wait(input);
-  }
-
-  releaseImageTile(input: ReleaseImageTile): { released: true } {
-    return this.tileControl().release(input);
-  }
-
-  closeImagePage(input: CloseImagePage): Promise<{ closed: true }> {
-    return this.tileControl().close(input);
-  }
-
-  private acquireImageResource(
-    input: AcquireImage,
-    encodedOnly: false,
-  ): Promise<ImageResource>;
-  private acquireImageResource(
-    input: AcquireImage,
-    encodedOnly: true,
-  ): Promise<EncodedImage>;
-  private async acquireImageResource(
-    input: AcquireImage,
-    encodedOnly: boolean,
-  ): Promise<ImageResource | EncodedImage> {
+  async acquireImage(input: AcquireImage): Promise<ImageResource> {
     const parsed = acquireImageSchema.safeParse(input);
     if (!parsed.success)
       throw new RuntimeFailure('protocol_error', 'Invalid image request');
@@ -733,11 +610,7 @@ export class SourceRuntimeManager {
         'runtime_lost',
         'Image request belongs to an expired Source runtime',
       );
-    if (
-      !session.capabilities.includes(
-        encodedOnly ? 'encoded-image-resources' : 'processed-image-resources',
-      )
-    )
+    if (!session.capabilities.includes('processed-image-resources'))
       throw new RuntimeFailure(
         'unsupported_capability',
         'The loaded build does not provide image resources',
@@ -745,16 +618,17 @@ export class SourceRuntimeManager {
     if (this.closedPageSessions.has(request.pageSessionId))
       throw new RuntimeFailure('runtime_lost', 'Page session was closed');
     this.reserveRequest(request.requestId);
-    const collector = this.images.create(request.generation, { encodedOnly });
+    const collector = this.images.create(request.generation);
     const channel = new MessageChannel();
     collector.attach(channel.port1);
     let settle!: () => void;
     const settled = new Promise<void>((resolve) => {
       settle = resolve;
     });
-    return new Promise<ImageResource | EncodedImage>((resolve, reject) => {
-      const common: ImageTaskBase = {
+    return new Promise<ImageResource>((resolve, reject) => {
+      const task: ImageTask = {
         kind: 'image',
+        resolve: (value) => resolve(imageResourceSchema.parse(value)),
         requestId: request.requestId,
         input: request,
         collector,
@@ -769,17 +643,6 @@ export class SourceRuntimeManager {
           );
         }, request.timeoutMs ?? 30_000),
       };
-      const task: ImageTask = encodedOnly
-        ? {
-            ...common,
-            encodedOnly: true,
-            resolve: (value) => resolve(encodedImageSchema.parse(value)),
-          }
-        : {
-            ...common,
-            encodedOnly: false,
-            resolve: (value) => resolve(imageResourceSchema.parse(value)),
-          };
       this.imageTasks.set(request.requestId, task);
       this.queue.push(task);
       this.pump();
@@ -903,7 +766,7 @@ export class SourceRuntimeManager {
     this.invalidate(
       new RuntimeFailure('runtime_lost', 'Runtime container was rebuilt'),
     );
-    return this.imagePageCleanup;
+    return Promise.resolve();
   }
 
   /** Private APIs share Access cookies; the public catalog permits only GET. */
@@ -1034,7 +897,5 @@ export class SourceRuntimeManager {
     this.invalidate(
       new RuntimeFailure('runtime_lost', 'Runtime container was disposed'),
     );
-    await this.imagePageCleanup;
-    await this.imagePages?.dispose();
   }
 }

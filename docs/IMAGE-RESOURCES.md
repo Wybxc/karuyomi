@@ -1,121 +1,91 @@
 # Source 图片资源通道
 
-本文记录 P0 的产品图片合同。实现和分层验收见 [P0 计划](plan/p0-runtime-and-reading.md)及[验证记录](VERIFICATION.md)；协议设计本身不表示真实 Source 或移动设备已经通过。
+本文记录当前 Source → UI 的编码正文合同。协议定义在 `protocol/karuyomi/v1/control.proto`，TS 校验与资源所有权分别在 `packages/contracts/src/image-control.ts`、`packages/runtime-host/src/image-resources.ts`；Dart 接收在 `packages/source_runtime/lib/src/transport_runtime.dart`。实施状态见 [P0 计划](plan/p0-runtime-and-reading.md)，实际环境与范围见[验证记录](VERIFICATION.md)。传输成功不表示图片能解码、已显示或峰值受控。
 
-当前合同使用 `karuyomi-source-host-v3`：Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI，控制边界采用 Protobuf 生成模型和标准 ProtoJSON。控制信封 protocolVersion 为 2，HTTP bridgeVersion 为 2；三者含义不同。旧 ABI 的 AOT、客户端和材料必须同步重建，不混合部署。历史 v2 图片实测结果保留其原始身份，不能作为 v3 运行验收。
+当前使用 `karuyomi-source-host-v3`，Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI；小控制消息采用 Protobuf 生成模型和标准 ProtoJSON，正文通过独立二进制通道。控制 protocolVersion 为 2，HTTP bridgeVersion 为 2，三者含义不同。项目原型直接更新当前合同和产物，不增加旧协议兼容层；代码、协议与依赖变化按实际输入重新构建。
 
-本轮新增 `EncodedImage/acquireEncodedImage`，将编码页接纳与完整图显示分开。Java桥仍原样传递小描述，protocolVersion=2、hostAbi v3不变；代码、协议与固定依赖变化仍进入 `hostFingerprint/materialVersion`。编码页、tile store、正式窗口控制、Web受管URL、Dart与Native有界小片文件已接线；Reader尚未消费新窗口合同。不新增旧版本兼容层，也不把元数据接纳或控制工程回归当作长图阅读通过。
+## 职责边界
+
+Source 与宿主只向 UI 交付插件处理后的不透明编码字节。宿主不检查图片 MIME、尺寸、EXIF 方向或格式，不作预解码，也不决定完整图、分片或 LOD。图片识别、实际解码、尺寸学习、像素与解码工作预算、缓存和分片全部属于 UI 客户端。宿主仍必须执行传输字节/资源限额、身份与 generation 校验、背压、取消和资源回收。
+
+这一边界不改变插件本身的业务：原请求头、Cookie、拦截器、解密、重排或其它图片处理仍通过原 Source 执行，不修改官方扩展或原始 JAR，不以原图 URL 绕过处理。
 
 ## 原始 Page 与逻辑页
 
-`pages` 返回 `pageSessionId` 及 `pages`，每项包含 `pageKey/index/sourceIndex/url/imageUrl`。Java 在有界会话表中保留原 Source 返回的 Page 实例，包括其可变字段和子类；图片阶段不能用 DTO 重新构造 Page。会话绑定创建它的 Source 实例，Worker generation 或 build 改变时全部失效。
+`pages` 返回 `pageSessionId` 及 `pages`，每项包含 `pageKey/index/sourceIndex/url/imageUrl`。Java 在有界会话表中保留原 Source 返回的 Page 实例，包括可变字段和子类；图片阶段不能用 DTO 重新构造 Page。会话绑定创建它的 Source 实例，Worker generation 或 build 改变时全部失效。
 
-`ChapterPageProvider` 绑定 Source、会话、generation 和稳定章节引用，内部将阅读核心的逻辑页键映射到会话内 opaque pageKey。阅读位置不保存临时会话 ID 或有签名的 imageUrl。`reader_core.PageRef` 仅含 requestId、chapterKey、pageKey 和 generation，不依赖 TeaVM 或 Source URL。
+`ChapterPageProvider` 绑定 Source、会话、generation 和稳定章节引用，将阅读核心的逻辑页键映射到会话内 opaque pageKey。阅读位置不保存临时会话 ID 或有签名的 imageUrl；`reader_core.PageRef` 不依赖 TeaVM 或 Source URL。
 
-章节导航负责关闭 Page 会话。释放显示资源与关闭 Page 会话是不同操作：前者撤销已交付的 Blob，后者解除 Java 原始 Page 引用。两者都必须在取消、路由离开及容器失效时清理。
+章节导航负责关闭 Page 会话。`releaseImage` 结束已交付正文的所有权，`closePageSession` 解除 Java 原始 Page 引用；二者分别清理，不互相代替。
 
-## 完整图处理与所有权
+## 编码正文与所有权
 
 ```mermaid
 sequenceDiagram
-  participant D as Dart PageProvider
-  participant M as 主线程 manager
+  participant U as UI PageProvider
+  participant M as Source host manager
   participant W as Worker / TeaVM
   participant S as 原版 HttpSource
-  D->>M: acquireImage(requestId, Source, 会话, 页, generation)
-  M->>W: acquire-image + 独立 MessagePort
+  U->>M: acquireImage(requestId, Source, 会话, 页, generation)
+  M->>W: 请求 + 独立 MessagePort
   W->>S: 原 Page 的 getImageUrl / getImage
-  S-->>W: 经原拦截器处理后的 ResponseBody.source()
+  S-->>W: 插件处理后的 ResponseBody.source()
+  W->>M: META 空描述
+  M-->>W: ACK
   loop 每块最多 64 KiB，等待确认
     W->>M: DATA(seq, transferable ArrayBuffer)
     M-->>W: ACK(seq)
   end
   W->>M: END(totalBytes)
-  M->>M: 校验尺寸、预算，暂存未发布资源
-  M-->>W: ACK(资源描述)
+  M->>M: 检查字节长度，暂存不透明 Blob
+  M-->>W: ACK(ProcessedImage)
   W->>M: Java 成功结果
-  M->>M: 确认结果一致，发布 Blob URL
-  M-->>D: ImageResource 小描述
-  D->>M: releaseImage(resourceId, generation)
-  M->>M: 撤销 URL 并解除字节所有权
+  M->>M: 核对描述一致，创建一次 Blob URL
+  M-->>U: ImageResource
+  U->>U: 识别、解码、显示与缓存
+  U->>M: releaseImage(resourceId, generation)
+  M->>M: 撤销 URL，归还字节与资源额度
 ```
 
-Java 仅在 Page 的 imageUrl 尚未解析时调用原 Source 的 `getImageUrl`，随后调用原 `getImage`。原请求头、Cookie、拦截器及图片处理保留在同一网络链中；不能直接读取原图 URL。cacheless/progress helper 也须保持上游语义。
+Java 只在 Page 的 imageUrl 尚未解析时调用原 `getImageUrl`，随后调用原 `getImage`。图片出口仍是 `teaImageOpen/Write/Close/Cancel`；`open()` 无参，交付适配不读取响应的图片 Content-Type，也不解释或转发图片 metadata。`ImageMeta` 为空消息，DATA 从序号 1 开始；每块转移 ArrayBuffer 所有权，生产者等待 ACK 后才读取下一块。
 
-Java 图片出口为 `teaImageOpen/Write/Close/Cancel`，同步控制信息保持小；Write 每次至多 64 KiB，等待 ACK 后才生产下一块。每次获取使用独立 MessageChannel，DATA buffer 转移所有权。END 时暂存已校验 Blob 并返回内部元数据 ACK，Java Close 完成后才返回 Source 调用成功。主线程必须同时收到有效流终态和一致的 Java 成功结果，才能创建 Blob URL 并向 Dart 发布资源；单独 END 或 RPC 成功均不足以显示图片。暂存后 Java 失败也须解除字节所有权。
+END 确认非空正文与总长度一致，暂存无 MIME type 的 Blob。内部 ACK 的 `ProcessedImage` 仅有 `resourceId/generation/byteLength`；普通 DATA ACK 不带资源。Java 成功结果必须与这一描述逐字段一致，manager 才创建受管 URL；重复发布复用同一 URL。仅收到 END、RPC 成功或完整编码正文都不等于完成像素解码。Java 失败、描述不一致或取消不得发布，暂存字节必须回收。
 
-HTTP handle 只属于当前 Source 调用，调用结束清理。图片资源归主线程 manager 所有，独立存活至 release；不能返回 HTTP handle 充当图片资源。资源描述为 `resourceId/generation/mimeType/byteLength/width/height/url`。Web 仅接受 manager 创建的 Blob URL；Native 经平台所有权表确认后只交付受管文件，不支持的平台返回能力不足。iOS 产品文件桥与 Android 平台 sink 的实现、模拟器机制证据和未验门见 [Native 图片文件](NATIVE-IMAGE-FILES.md)。
+对外 `ImageResource` 仅有 `resourceId/generation/byteLength/url`。Web 使用 manager 创建的 Blob URL；Native 在平台所有权表确认后复制为受管文件，客户端消费该文件。文件移交仍只检查身份、位置与字节长度，不判断图片内容。具体平台实现和未验门见 [Native 图片文件](NATIVE-IMAGE-FILES.md)。HTTP handle 只属于当前 Source 调用，不能充当独立存活的图片资源。
 
-编码字节、驻留资源与尺寸均受预算约束。尺寸头解析复用固定版本的 [image-dimensions](https://github.com/sindresorhus/image-dimensions)，先检查像素预算，再用浏览器 `createImageBitmap` 获取实际显示尺寸并立即 close，处理 EXIF 等浏览器方向语义。这会增加一次临时解码，不构成零复制或移动端峰值通过的证据。尺寸学习只更新 Reader 布局，保留 manifest.version 与逻辑锚。
+| 传输或所有权范围            | 当前上限                    |
+| --------------------------- | --------------------------- |
+| DATA / 未确认块             | 64 KiB / 1 块               |
+| 单份正文 / 全部在途驻留字节 | 64 MiB / 64 MiB             |
+| 在途与驻留正文资源数        | 6                           |
+| Java 原始 Page 会话         | 2 个会话，每个至多 2,048 页 |
+| 取消退出宽限                | 1 秒，超过则失效 generation |
 
-| 范围                          | 当前上限                    |
-| ----------------------------- | --------------------------- |
-| DATA / 未确认块               | 64 KiB / 1 块               |
-| 单图 / 在途与驻留编码字节合计 | 64 MiB / 64 MiB             |
-| 单图 / 在途与驻留像素合计     | 16 Mi / 32 Mi 像素          |
-| 在途与驻留资源数 / 尺寸头检查 | 6 / 前 1 MiB                |
-| Java 原始 Page 会话           | 2 个会话，每个至多 2,048 页 |
-| 取消退出宽限                  | 1 秒，超过则失效 generation |
-
-像素预算只估算图片 surface（按 RGBA 为 64 / 128 MiB），不能代表浏览器进程合计峰值。浏览器解码无法中断时，取消也须等其完成并 close 后才能归还计数，不能用提前删除资源表来绕过总预算。
-
-现有Reader完整图路径仍会按16 Mi像素拒绝1080×20000等长图，窗口账本也不包含所有codec临时对象。独立codec/tile基础和下述编码页合同已经实现，但尚未接入正式阅读器；不能仅接纳编码页、调高限额或加入Flutter缩放便认定产品显示与峰值受控。范围及后续步骤见[解码设计](design/reader-image-decoding.md)和[长图计划](plan/reader-image-decoding.md)。
-
-## 编码页描述与tile所有权
-
-`acquireEncodedImage()` 仍调用原Page、`getImageUrl/getImage`及Source处理后的正文，不另请求原图。Protobuf的 `EncodedImage` 只含 `resourceId/generation/mimeType/byteLength/rawWidth/rawHeight/orientation`，由Buf生成双端模型并在TS/Dart运行时校验；不含URL，也不向Dart交付整页文件或PNG。
-
-| 编码页范围              | 当前上限          |
-| ----------------------- | ----------------- |
-| 正文格式 / 单页编码字节 | PNG或JPEG / 8 MiB |
-| 原始宽 / PNG原始高      | 4096 / 100000     |
-| JPEG原始高 / EXIF方向   | 65500 / 1..8      |
-| 流DATA / 未确认块       | 64 KiB / 1块      |
-
-原始尺寸不按完整 `width*height` 申请raster预算。collector以固定 `image-dimensions` 检查头部，以固定 `exifr 7.1.3` 读取完整有界 `Uint8Array` 的方向元数据；PNG eXIf可能位于IDAT之后，因此不能只读取前缀作为方向依据。metadata输入副本最多8 MiB，是额外JS内存，不是零复制或已解码surface；方向值已保留不等于八种EXIF方向显示已验证。
-
-END只在编码正文收齐、字节/头部/元数据校验后返回ACK；END ACK恰含完整图 `resource` 或编码页 `encoded` 之一，普通DATA ACK不带描述。编码页ACK不表示decode成功。manager等Java成功结果与暂存描述一致后，才允许 `publishEncoded()` 和 `borrowEncoded()`；坏尾、具体codec不支持与真实像素解码仍由后续decoder判定，Java失败或结果不一致不得借出Blob。
-
-编码Blob留在host，borrow得到单独lease。owner release后禁止新borrow；已有borrow继续保留正文和预算，最后一个lease释放才归还。编码页仍占共享Source资源表的资源数/字节预算，但不虚构完整原图像素分配。Dart的 `SourceRuntime.acquireEncodedImage()` 只接收冻结描述，校验预算、方向、requestId和generation；无效或替换后迟到描述按原generation通过 `releaseImage` 清理。Native通用control直接传描述，不进入原完整图文件copy路径。
-
-`ImageTileStore` 已实现单活动codec、有界扫尾、窗口PNG缓存和缺片本地重扫。PNG缓存≤16 MiB，显示lease≤64份且合计≤32 Mi像素；失效片在显示owner确认释放前继续计费。`ImagePageControl` 将编码页borrow与store串接，同一lease复用一个Web Blob URL；Native适配只把有界PNG片交给现有文件sink。store本身不创建URL或文件，也不积存完整raster或全部页PNG。Reader还需消费 `invalidatedLeaseIds`，等待widget/overlay pin、实际provider cache eviction及文件/URL释放，再确认 `releaseImageTile()`；现有控制接线不构成Flutter显示或设备峰值验收。
-
-本轮Source链、Dart与严格TS检查通过，TS↔Dart新增协议也已通过真实双端codec交叉验证；命令和范围见[编码页证据](verification/encoded-image-ownership.md)。合成正文的真实Web owner机制已通过，范围见同一记录。既有独立codec浏览器11项不自动成为本轮Source编码页或store的真实浏览器证据；真实Source长图、Reader、Native内置执行与EXIF方向显示仍未验收。
-
-## 正式分片控制
-
-以下消息由同一 `.proto` 经Buf生成双端模型，Dart `SourceRuntime` 与TS控制dispatcher均已接入。控制只包含小描述，编码页正文留在host。
-
-| 操作                 | 输入与结果                                                                                                           |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `openImagePage`      | `resourceId/generation` → `ImagePage(pageId,generation,encoded)`，借用已发布的Source编码Blob                         |
-| `requestImageWindow` | `pageId/generation/windowId/sourceY/sourceEndY/denominator` → 窗口快照；raw Y为半开区间，缩放分母为1/2/4，PNG当前仅1 |
-| `waitImageWindow`    | 同页/窗口身份与`afterRevision/timeoutMs?` → 变化或期限时的当前快照；最长25秒，观察超时不取消codec                    |
-| `releaseImageTile`   | `leaseId/generation` → 幂等显示释放ACK                                                                               |
-| `closeImagePage`     | `pageId/generation` → 页关闭ACK，等待活动codec真实终态及编码borrow释放                                               |
-
-调用方在 `openImagePage` 成功后，必须显式 `releaseImage` 原编码资源owner；页borrow独立保留正文预算。打开失败时也须结束不再使用的原owner。`closeImagePage` 归还的是borrow，不代替原owner的release，也不代替已交付tile的显示ACK；调用方继续逐片释放已交付租约。
-
-窗口快照带 `windowId/revision/state`、实际header、tile列表及 `invalidatedLeaseIds`。每片含codec session、index、raw `sourceRect`、缩放分母、provisional状态与PNG `ImageResource`，`resourceId` 等于leaseId。双端校验身份、generation、几何、格式和合计预算；同一windowId不能更换几何，已替换的ID不能重用。pending可以尚无header；完整扫尾和清理后才能将片转为committed，坏尾则通过failed/error和失效租约通知显示方。真实codec终态与可见Flutter frame仍是不同门。
-
-页关闭或generation失效会取消codec、等待真实终止、清理未交付pin并归还borrow；已交付URL/文件与预算保留到显示ACK。Native同一lease复用受管文件，并发快照共用复制工作；文件删除与host释放均确认后才归还额度。工程回归、模拟边界及仍未执行的正式浏览器/Native长图门见[分片控制证据](verification/image-page-controls.md)。先前[编码页Web owner证据](verification/encoded-image-ownership.md)保留原合成正文环境，不能转作新控制或Reader验收。
+这些是 Source 传输与所有权限额，不是图片格式、像素准入或进程/GPU 峰值上限。字节副本、UI 解码工作及显示资源必须由各自所有者计量。
 
 ## 控制与清理
 
-获取接口为 `acquireImage({requestId,sourceId,pageSessionId,pageKey,generation,timeoutMs?})` 与同字段的 `acquireEncodedImage()`；清理共用 `cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})` 和 `closePageSession({pageSessionId,generation})`。release幂等，重复释放不能复活资源，旧generation结果不能落入当前会话。编码页没有对外URL可撤销，release结束owner接纳权并按borrow存续保留计费。
+当前图片控制只有 `acquireImage({requestId,sourceId,pageSessionId,pageKey,generation,timeoutMs?})`、`cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})` 和 `closePageSession({pageSessionId,generation})`。release 幂等，旧 generation 的结果不得进入当前会话。
 
-ACK 和图片取消不能排在 Source 串行锁后等待。取消先终止图片 sink 与相应 HTTP 句柄，再等待当前 Java 调用退出；`teaDone/teaFail` 没有调用身份，提前解锁会使迟到回调污染下一次操作。超过取消宽限只能回收整个 Worker、失效 generation，并由客户端重新打开章节，不能静默复用旧 Page 会话。
+Source 调用共享串行槽，ACK 和取消通过独立图片通道到达生产者。取消先终止 sink 与当前 HTTP 句柄，再等待 Java 真正退出；`teaDone/teaFail` 没有调用身份，提前解锁会污染下一次操作。超过宽限则回收 Worker、失效 generation，由客户端重新打开章节，不重放 Source 图片操作。
 
-Reader 在 widget、缩放 overlay 与解码缓存解除引用后释放资源。manager 在 invalidate 中清理在途Source工作并关闭编码页；已交付tile的URL/pin保留至显示ACK，整个host dispose/pagehide再结束剩余所有权。失败、超限、解码错误及迟到结果也必须清理。图片窗口限制同时持有的页，不整章获取。
+已交付正文不再属于待取消的获取任务；迟到 cancel 或关闭 Page 会话不应误删它。Reader 等 widget、缩放 overlay 和实际 provider cache 解除引用后调用 release；容器 invalidate/dispose 清理本代正文和在途工作。失败、超限和迟到结果同样需要结束对应所有权。
 
-## 分层验收
+## UI 解码与客户端 codec
 
-- 通道：慢消费者背压、序号与字节预算、END/RPC 竞争、取消后退出、旧 generation、重复 release、空资源表。
-- Java：原 Page 身份、Source 绑定、原图片方法与处理后正文、有界读取、关闭和失败路径。
-- 实际 Web：未修改 Source 的真实章首中末页，经产品通道解码、阅读器导航、尺寸更新及释放。
-- 后续设备门：原 Source→Native Reader、Android ArrayBuffer 实际插件链、物理 iPhone、后台恢复及合计进程/GPU 峰值。iOS 真实 Flutter Headless→受控 Blob→WKDownload 文件机制已单独通过，不代替这些门。
+普通图由 Flutter `Image` 消费同一受管 Blob/文件，`ResourceImage` 从该 provider 的实际 `ImageInfo` 获取尺寸，并在 `frameBuilder` 确认显示帧后通知 Reader。正文到达、预取或缓存命中本身不能推进阅读进度。客户端学习尺寸后更新布局与解码估算，保留逻辑页、manifest 版本和归一化锚点；当前 scheduler 估算不限制平台完整图 decoder 的瞬时峰值。
+
+`runtime/image-codec/` 保留独立 Worker、`assets.ts` 材料准备与 `tile-store.ts` 窗口/lease 管理，作为显式验证的分片候选；它与 Source host 相互独立，没有宿主页控制 API。当前默认产品只使用 UI 直接解码，不构建或打包候选 codec 到 Web Static Assets、Native 应用资源或 Source `host.js`。尚无同条件真机对照支持把候选设为默认；先测 UI 基线与候选的首屏、跳转、滚动、CPU、RSS/GPU，再决定是否接入。Reader 长图分片、LOD、方向坐标和设备峰值仍待决策与验证，见[解码设计](design/reader-image-decoding.md)。
+
+## 已替代合同与分层验收
+
+先前的 `EncodedImage/acquireEncodedImage`、`openImagePage/requestImageWindow/waitImageWindow/releaseImageTile/closeImagePage`、host 编码 borrow 和宿主图片 metadata/预解码已从正式协议与实现删除。[编码页所有权记录](verification/encoded-image-ownership.md)及[宿主页控制记录](verification/image-page-controls.md)保留原提交、素材和环境，属于历史证据，不能据此认定当前纯正文边界或 Reader 长图已验收。独立 codec 的[构建与 Worker 证据](verification/long-image-codec.md)也只适用于记录中的产物与执行范围。
+
+验收分别覆盖：通道背压、序号、预算和取消；Java 原 Page、Source 绑定与处理后正文；UI 实际解码、显示、导航、尺寸与释放；真实 Web/Native Source 链以及设备进程/GPU 峰值。工程类型检查、模拟 supplier、独立 codec 与真实阅读结果不可互相替代。
 
 ## Source 内部图形桥
+
+以下桥实现插件原业务主动调用的 Android 图形 API，不属于向 Reader 交付图片时的识别或预解码。插件现有图片处理语义继续保留；不能把这些内部能力作为宿主额外解析所有阅读图片的理由。
 
 Bitmap / ImageDecoder 的图像正文改用 Worker 内部 byte handle，`teaGraphicsBytesOpen/Write/Read/Close/Detach` 仅接受每块最多 64 KiB 的 `Uint8Array`；Java 逐字节复制。绘图参数、handle 和长度仍走小 JSON，Java 控制请求限制 64 KiB UTF-8。解码、字体上传从 InputStream 有界读取，编码结果按块写入调用方 OutputStream，像素数组和 ByteBuffer 按行及 64 KiB 子块读写；这条图形链不再把整图塞入 Base64/Gson，也不再使用 `readAllBytes()`。
 

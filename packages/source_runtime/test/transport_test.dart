@@ -171,221 +171,12 @@ void main() {
     },
   );
 
-  test(
-    'encoded pages preserve opaque ownership without a whole-page raster gate',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      for (final (mimeType, height, orientation) in [
-        ('image/png', wire.encodedPngRawHeightLimit, 1),
-        ('image/jpeg', wire.encodedJpegRawHeightLimit, 8),
-      ]) {
-        transport.handler = (call) async {
-          final response = transport.respond(call);
-          if (call.hasAcquireEncodedImage()) {
-            response.encodedImage
-              ..mimeType = mimeType
-              ..byteLength = wire.encodedImageByteLimit
-              ..rawWidth = wire.encodedImageRawWidthLimit
-              ..rawHeight = height
-              ..orientation = orientation;
-          }
-          return response;
-        };
-        final image = await runtime.acquireEncodedImage(imageRequest());
-        expect(image.rawWidth * image.rawHeight, greaterThan(16 * 1024 * 1024));
-        expect(image.mimeType, mimeType);
-        expect(image.orientation, orientation);
-        expect(image.isFrozen, true);
-        expect(wire.encodeProtoJson(image).containsKey('url'), false);
-        final call = transport.calls.last.acquireEncodedImage;
-        expect(call.requestId, 'image-1');
-        expect(call.sourceId, sourceId);
-        expect(call.pageSessionId, 'pages-1');
-        expect(call.pageKey, 'p-0');
-        expect(call.generation, 'generation-1');
-        expect(call.timeoutMs, 30000);
-      }
-      expect(transport.calls.where((call) => call.hasAcquireImage()), isEmpty);
-      await runtime.dispose();
-    },
-  );
-
-  test(
-    'invalid encoded budgets, dimensions, orientation and generation release the resource',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      final changes = <void Function(wire.EncodedImage)>[
-        (image) => image.byteLength = 0,
-        (image) => image.byteLength = wire.encodedImageByteLimit + 1,
-        (image) => image.rawWidth = 0,
-        (image) => image.rawWidth = wire.encodedImageRawWidthLimit + 1,
-        (image) => image.rawHeight = 0,
-        (image) => image.rawHeight = wire.encodedPngRawHeightLimit + 1,
-        (image) {
-          image.mimeType = 'image/jpeg';
-          image.rawHeight = wire.encodedJpegRawHeightLimit + 1;
-        },
-        (image) => image.mimeType = 'image/webp',
-        (image) => image.orientation = 0,
-        (image) => image.orientation = 9,
-        (image) => image.generation = 'foreign',
-      ];
-      for (final change in changes) {
-        transport.handler = (call) async {
-          final response = transport.respond(call);
-          if (call.hasAcquireEncodedImage()) change(response.encodedImage);
-          return response;
-        };
-        await expectLater(
-          runtime.acquireEncodedImage(imageRequest()),
-          throwsA(failure(RuntimeErrorCode.protocolError)),
-        );
-        expect(transport.calls.last.hasReleaseImage(), true);
-        expect(transport.calls.last.releaseImage.resourceId, 'encoded-1');
-        expect(transport.calls.last.releaseImage.generation, 'generation-1');
-      }
-      expect(
-        transport.calls.where((call) => call.hasReleaseImage()),
-        hasLength(changes.length),
-      );
-      await runtime.dispose();
-    },
-  );
-
-  test(
-    'encoded request validation happens before calling the transport',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      final before = transport.calls.length;
-      for (final request in [
-        imageRequest(id: ''),
-        imageRequest(id: 'x' * 201),
-        imageRequest(session: ''),
-        imageRequest(page: ''),
-        imageRequest(timeout: Duration.zero),
-        imageRequest(timeout: const Duration(minutes: 5, milliseconds: 1)),
-      ]) {
-        await expectLater(
-          runtime.acquireEncodedImage(request),
-          throwsA(failure(RuntimeErrorCode.protocolError)),
-        );
-      }
-      for (final request in [
-        imageRequest(generation: 'foreign'),
-        imageRequest(source: '42'),
-      ]) {
-        await expectLater(
-          runtime.acquireEncodedImage(request),
-          throwsA(failure(RuntimeErrorCode.runtimeLost)),
-        );
-      }
-      expect(transport.calls, hasLength(before));
-      await runtime.dispose();
-    },
-  );
-
-  test(
-    'a rejected encoded response envelope releases its typed resource',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      transport.handler = (call) async {
-        final response = transport.respond(call);
-        if (call.hasAcquireEncodedImage()) {
-          response.requestId = 'foreign-control';
-        }
-        return response;
-      };
-      await expectLater(
-        runtime.acquireEncodedImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
-      );
-      expect(transport.calls.last.releaseImage.resourceId, 'encoded-1');
-      expect(transport.calls.last.releaseImage.generation, 'generation-1');
-      await runtime.dispose();
-    },
-  );
-
-  test(
-    'late encoded pages release under their original generation after replacement',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      final started = Completer<void>();
-      final ready = Completer<void>();
-      transport.handler = (call) async {
-        final response = transport.respond(call);
-        if (call.hasAcquireEncodedImage()) {
-          started.complete();
-          await ready.future;
-        }
-        if (call.hasOpen()) response.session.generation = 'generation-2';
-        return response;
-      };
-      final assertion = expectLater(
-        runtime.acquireEncodedImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.runtimeLost)),
-      );
-      await started.future;
-      runtime.containerLost('replaced');
-      expect((await runtime.open(build())).generation, 'generation-2');
-      ready.complete();
-      await assertion;
-      expect(transport.calls.last.releaseImage.resourceId, 'encoded-1');
-      expect(transport.calls.last.releaseImage.generation, 'generation-1');
-      await runtime.cancel('source-next');
-      expect(transport.calls.last.cancel.generation, 'generation-2');
-      await runtime.dispose();
-    },
-  );
-
-  test(
-    'encoded timeout stays local while later acquisitions keep the Source session',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      final events = <RuntimeEvent>[];
-      final subscription = runtime.events.listen(events.add);
-      transport.handler = (call) async => call.hasAcquireEncodedImage()
-          ? wire.ControlResponse(
-              requestId: call.requestId,
-              error: wire.RuntimeError(
-                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT,
-                message: 'encoded timeout',
-              ),
-            )
-          : transport.respond(call);
-      await expectLater(
-        runtime.acquireEncodedImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.timeout)),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(events, isEmpty);
-      transport.handler = null;
-      expect(
-        (await runtime.acquireEncodedImage(imageRequest())).resourceId,
-        'encoded-1',
-      );
-      await subscription.cancel();
-      await runtime.dispose();
-    },
-  );
-
   test('image control uses opaque handles and matching cleanup ACKs', () async {
     final transport = FakeTransport();
     final runtime = TransportSourceRuntime(transport);
     await runtime.open(build());
     final image = await runtime.acquireImage(imageRequest());
-    expect(image.width, 600);
+    expect(image.byteLength, 1234);
     expect(image.location.scheme, 'blob');
     expect(transport.calls.last.acquireImage.pageSessionId, 'pages-1');
     expect(transport.calls.last.acquireImage.pageKey, 'p-0');
@@ -447,6 +238,12 @@ void main() {
       managed.owned = location;
       final resource = await runtime.acquireImage(imageRequest());
       expect(resource.location, location);
+      await runtime.releaseImage(
+        const ImageReleaseRequest(
+          resourceId: 'resource-1',
+          generation: 'generation-1',
+        ),
+      );
       managed.owned = Uri.parse('file:///private/tmp/managed/other');
       await expectLater(
         runtime.acquireImage(imageRequest()),
@@ -457,7 +254,7 @@ void main() {
   );
 
   test(
-    'invalid managed locations and dimensions release rejected resource',
+    'invalid managed locations and byte counts release rejected resource',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
@@ -465,7 +262,7 @@ void main() {
       for (final change in <void Function(wire.ImageResource)>[
         (image) => image.url = 'https://source.example/raw.png',
         (image) => image.url = 'data:image/png;base64,AAAA',
-        (image) => image.height = 0,
+        (image) => image.byteLength = 0,
         (image) => image.byteLength = 64 * 1024 * 1024 + 1,
       ]) {
         transport.handler = (call) async {

@@ -43,7 +43,7 @@
     "test:reader-assets": "node --test tools/reader/database-assets.test.ts",
     "image-codecs:prepare": "node scripts/prepare-image-codecs.ts",
     "test:image-codecs": "node --test tools/images/*.test.ts runtime/image-codec/*.test.ts",
-    "typecheck:image-codecs": "tsc -p runtime/image-codec/tsconfig.json && tsc -p runtime/image-codec/tsconfig.worker.json",
+    "typecheck:image-codecs": "tsc -p runtime/image-codec/tsconfig.json && tsc -p runtime/image-codec/tsconfig.worker.json && tsc -p runtime/image-codec/tsconfig.test.json",
     "image-codecs:build": "node scripts/build-image-codecs.ts",
     "image-codecs:check": "node scripts/check-image-codecs.ts",
     "image-codecs:prepare-artifacts": "node scripts/prepare-image-codec-artifacts.ts",

@@ -104,10 +104,6 @@ export class WorkerRuntime {
                 ...(this.driver.acquireImage && this.driver.closePageSession
                   ? ['processed-image-resources']
                   : []),
-                ...(this.driver.acquireEncodedImage &&
-                this.driver.closePageSession
-                  ? ['encoded-image-resources']
-                  : []),
               ],
             }),
           });
@@ -159,43 +155,23 @@ export class WorkerRuntime {
             requestId: envelope.requestId,
             generation: envelope.generation,
           };
-          if (acquiring.encodedOnly) {
-            if (!this.driver.acquireEncodedImage)
-              throw new RuntimeFailure(
-                'unsupported_capability',
-                'Encoded image channel is not available',
-              );
-            const result = await this.driver.acquireEncodedImage(
-              request.sourceId,
-              request.pageSessionId,
-              request.pageKey,
-              ports[0],
-              acquiring.resourceId,
-              context,
+          if (!this.driver.acquireImage)
+            throw new RuntimeFailure(
+              'unsupported_capability',
+              'Image channel is not available',
             );
-            this.reply(command, {
-              case: 'encodedImage',
-              value: create(pb.EncodedImageSchema, result),
-            });
-          } else {
-            if (!this.driver.acquireImage)
-              throw new RuntimeFailure(
-                'unsupported_capability',
-                'Image channel is not available',
-              );
-            const result = await this.driver.acquireImage(
-              request.sourceId,
-              request.pageSessionId,
-              request.pageKey,
-              ports[0],
-              acquiring.resourceId,
-              context,
-            );
-            this.reply(command, {
-              case: 'image',
-              value: create(pb.ProcessedImageSchema, result),
-            });
-          }
+          const result = await this.driver.acquireImage(
+            request.sourceId,
+            request.pageSessionId,
+            request.pageKey,
+            ports[0],
+            acquiring.resourceId,
+            context,
+          );
+          this.reply(command, {
+            case: 'image',
+            value: create(pb.ProcessedImageSchema, result),
+          });
           break;
         }
         case 'closePageSession': {

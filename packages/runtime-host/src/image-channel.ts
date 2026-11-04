@@ -5,7 +5,6 @@ import {
   type RuntimeErrorData,
   type ImageFrame,
   type ProcessedImage,
-  type EncodedImage,
 } from '@karuyomi/contracts';
 import { RuntimeFailure } from './errors.js';
 
@@ -28,12 +27,11 @@ export class ImageSink {
     | {
         seq: number;
         final: boolean;
-        resolve(value: ProcessedImage | EncodedImage | undefined): void;
+        resolve(value: ProcessedImage | undefined): void;
         reject(error: unknown): void;
       }
     | undefined;
-  private opened:
-    Promise<ProcessedImage | EncodedImage | undefined> | undefined;
+  private opened: Promise<ProcessedImage | undefined> | undefined;
   private writing = false;
   private finished = false;
   private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
@@ -42,7 +40,6 @@ export class ImageSink {
     private readonly port: MessagePort,
     private readonly resourceId: string,
     private readonly cancelled: (error: RuntimeFailure) => void,
-    private readonly encodedOnly = false,
   ) {
     port.onmessage = (event) => {
       const parsed = imageFrameSchema.safeParse(event.data);
@@ -58,21 +55,16 @@ export class ImageSink {
       } else if (message.type === 'ack' && this.pending?.seq === message.seq) {
         const pending = this.pending;
         this.pending = undefined;
-        if (message.resource || message.encoded) {
-          if (
-            !pending.final ||
-            (this.encodedOnly ? !message.encoded : !message.resource)
-          ) {
-            const error = new RuntimeFailure(
-              'protocol_error',
-              'Image acknowledgement mode mismatch',
-            );
-            pending.reject(error);
-            this.abort(error);
-            return;
-          }
+        if (message.resource && !pending.final) {
+          const error = new RuntimeFailure(
+            'protocol_error',
+            'Image descriptor is only valid on END ACK',
+          );
+          pending.reject(error);
+          this.abort(error);
+          return;
         }
-        pending.resolve(this.encodedOnly ? message.encoded : message.resource);
+        pending.resolve(message.resource);
       } else
         this.abort(
           new RuntimeFailure(
@@ -103,16 +95,14 @@ export class ImageSink {
     ).getWriter();
   }
 
-  open(mimeType: string): string {
+  open(): string {
     if (this.handle || this.finished || this.failure)
       throw (
         this.failure ??
         new RuntimeFailure('protocol_error', 'Image sink was already opened')
       );
-    if (typeof mimeType !== 'string' || mimeType.length > 128)
-      throw new RuntimeFailure('protocol_error', 'Invalid image MIME metadata');
     this.handle = this.resourceId;
-    this.opened = this.exchange({ type: 'meta', seq: 0, mimeType });
+    this.opened = this.exchange({ type: 'meta', seq: 0 });
     void this.opened.catch(() => {});
     return this.handle;
   }
@@ -202,7 +192,7 @@ export class ImageSink {
   private exchange(
     frame: ImageFrame,
     transfer: Transferable[] = [],
-  ): Promise<ProcessedImage | EncodedImage | undefined> {
+  ): Promise<ProcessedImage | undefined> {
     if (this.failure) return Promise.reject(this.failure);
     if (this.pending)
       return Promise.reject(

@@ -58,18 +58,11 @@ final class ImageResource {
     required this.id,
     required this.generation,
     required this.location,
-    required this.mimeType,
     required this.byteLength,
-    required this.width,
-    required this.height,
   }) {
-    if (id.isEmpty ||
-        generation.isEmpty ||
-        byteLength <= 0 ||
-        width <= 0 ||
-        height <= 0) {
+    if (id.isEmpty || generation.isEmpty || byteLength <= 0) {
       throw ArgumentError(
-        'Image resources require valid identity, bytes and dimensions',
+        'Image resources require valid identity and encoded bytes',
       );
     }
   }
@@ -77,8 +70,18 @@ final class ImageResource {
   final String id;
   final String generation;
   final Uri location;
-  final String mimeType;
   final int byteLength;
+}
+
+/// Dimensions learned from the client's actual decoded frame, never the Source.
+final class ImageDimensions {
+  ImageDimensions({required this.width, required this.height}) {
+    if (width <= 0 || height <= 0) {
+      throw ArgumentError('Decoded image dimensions must be positive');
+    }
+  }
+
   final int width;
   final int height;
+  int get decodedBytes => width * height * 4;
 }

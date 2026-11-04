@@ -1,6 +1,6 @@
 # Native 受管图片文件
 
-本文记录 P0-F3 的 Native 产品实现与已执行的机制验收。公开图片合同仍由 [IMAGE-RESOURCES](IMAGE-RESOURCES.md) 和 Protobuf 定义；原 Source 的图片业务方法不变，分片窗口是新增的host控制。多个原 Source 的整章/切章阅读、物理 Android / iPhone、后台恢复和进程/GPU 合计峰值仍需分别验收。
+本文记录 P0-F3 的 Native 产品实现与已执行的机制验收。公开图片合同仍由 [IMAGE-RESOURCES](IMAGE-RESOURCES.md) 和 Protobuf 定义；原 Source 的图片业务方法不变，交付边界只识别资源身份与编码字节。多个原 Source 的整章/切章阅读、物理 Android / iPhone、后台恢复和进程/GPU 合计峰值仍需分别验收。
 
 ## 产品路径
 
@@ -10,19 +10,17 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 `TransportSourceRuntime` 只允许实现 `ManagedImageTransport` 的平台表确认过的 `resourceId/generation/file URI` 三元组。Web 继续只接受 manager 的 Blob URL。Reader 的 widget、overlay 和图片缓存解除引用后，release 同时删除本地文件并释放 manager 的 Blob；任一 owner 未确认清理均不返回成功 ACK。取消只作用于在途获取，迟到 cancel 不删除已交付文件。
 
-## 编码页与有界小片
+## 图片职责边界
 
-新增正式 `openImagePage/requestImageWindow/waitImageWindow/releaseImageTile/closeImagePage` 控制已接入Native适配。`EncodedImage` 仍只传raw尺寸、方向及身份，整页Blob留在host；打开页成功后，调用方须显式 `releaseImage` 原编码资源owner，由页borrow继续保留正文。后续窗口返回至多256行的PNG小片，按上述文件通道复制，不生成或交付整页PNG文件。
+`ImageResource` 只包含 `resourceId/generation/byteLength/url`。Source 宿主、Dart 文件桥与 Swift 下载器不检查 MIME、宽高或 EXIF，也不完整解码。Flutter 使用实际 `ImageProvider` 的同一条 `ImageStream` 学习尺寸，参与布局和解码预算；原 Source 业务主动执行的图片处理保留。
 
-`NativeImageFileStore.copy` 使用明确的传输requestId、generation和已校验的 `ImageResource`，不伪造Source acquire。Native控制表按lease复用文件，并发快照共用复制Future；窗口替换、无效/迟到结果与复制失败清理未交付文件及host租约。已交付片即使被尾部错误标为失效，也先保留文件和预算，等待显示方撤下引用后显式释放；页关闭只取消未交付复制并等待其真实终态，不替显示方删除仍持有的文件。代次改变后的清理仍使用原generation。
-
-这些是正式控制及文件adapter的实现与工程回归，范围见[分片控制记录](verification/image-page-controls.md)。当前Reader仍使用完整图provider；尚未将窗口/LOD、EXIF坐标变换和逐片显示cache接入Reader，也未据此完成新codec在Native WebView的内置执行或真实Source长图验收。下文既有模拟器文件和xkcd阅读证据保持当次输入与材料身份，不能迁作本轮tile显示证据。
+此前的 `EncodedImage`、页/窗口/小片控制已从 Source 协议和 Native adapter 删除。历史[控制记录](verification/image-page-controls.md)保留原输入与范围，不能作为当前能力。独立分片库仅是客户端候选；没有与 UI 直接解码的同条件真机性能对照，已退出默认构建及 Web/Native 打包。下一步和门槛见[图片计划](plan/reader-image-decoding.md)。
 
 ## iOS
 
 当前精确锁定 `flutter_inappwebview 6.2.0-beta.3`，升级原因与官方 AGP 9 修复见[依赖记录](verification/native-dependencies.md)。插件没有暴露现有 Headless WebView 的公开原生 registry 或 `startDownload` 方法。Runner 内的薄插件使用公开 UIWindowScene/UIView 树发现 WKWebView，再同时核对 HTTPS 控制页和 document-start token，且必须恰有一个匹配。它不使用 KVC、私有 registry 或私有 WebKit API，也不接管插件的 navigation delegate。找不到或多重匹配会明确失败；此发现方式依赖锁定插件确实将 Headless view 挂入公开视图树，不是上游提供的稳定 accessor。
 
-绑定后，插件在同一个 WKWebView 上调用公开的 [`startDownload(using:completionHandler:)`](<https://developer.apple.com/documentation/webkit/wkwebview/startdownload(using:completionhandler:)>)，由 [`WKDownloadDelegate`](https://developer.apple.com/documentation/webkit/wkdownloaddelegate) 决定随机私有文件目标。只接受同 origin Blob，校验下载 MIME、声明长度、实际文件长度及普通文件类型，拒绝下载重定向与认证挑战。目录权限为 `0700`，文件为 `0600`；每次进程首次建立存储时移除自身目录中的崩溃残留。
+绑定后，插件在同一个 WKWebView 上调用公开的 [`startDownload(using:completionHandler:)`](<https://developer.apple.com/documentation/webkit/wkwebview/startdownload(using:completionhandler:)>)，由 [`WKDownloadDelegate`](https://developer.apple.com/documentation/webkit/wkdownloaddelegate) 决定随机私有文件目标。只接受同 origin Blob，校验绑定的 Blob URL、声明长度、实际文件长度及普通文件类型，拒绝下载重定向与认证挑战。目录权限为 `0700`，文件为 `0600`；每次进程首次建立存储时移除自身目录中的崩溃残留。
 
 绑定有自身期限与一次完成 fence；迟到 JavaScript 探测不得再创建目录或 binding。下载任务在尚无 WKDownload handle 时强持 originating WKWebView。取消/clear 等待真实取消回调和文件删除，正常完成才归还预算。超过 1 秒宽限只返回 `runtime_lost` 并失效容器，不能伪造取消成功；无公开 handle 或回调永久不返回时保留有界 tombstone、容器和 reservation。晚到 handle 只取消，不重新登记为活动下载；真实停止后再删除文件、归还预算，并在 closed binding 排空后自动删除目录和表项。
 
@@ -36,9 +34,9 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 ## 预算与生命周期
 
-在途和驻留的完整图文件共同计入六资源、单图16 Mi像素预算。分片另限64份、单片8 MiB/4096×256、分片编码文件合计16 MiB；完整图与片文件共享64 MiB编码字节和32 Mi像素额度，复制在途、失效但未释放及旧窗口pin均持续计费。iOS原生reservation也执行这些分类和共享预算；Android复用既有至多六个二进制port槽，tile复制队列不为每片创建新channel。manager 的 Blob 仍占其原有预算，直到本地文件 release 后对应的 JS release 完成。文件是额外磁盘副本；浏览器临时解码、Flutter 图片缓存、graphics surface、GPU 和进程总内存不由文件预算代表，不能声称零复制或峰值已通过。
+在途与驻留编码文件共同计入六资源、64 MiB 字节预算；没有图片像素或完整图/分片分类。复制在途和未确认清理的资源持续计费，manager 的 Blob 保留到对应 JS release 完成。iOS reservation 与 Android 文件表执行相同字节/资源边界，Android 使用固定六个二进制 port 槽。文件是额外磁盘副本；Flutter 解码缓存、Source 原业务的 graphics surface、GPU 和进程内存分别计量，文件预算不能代表它们或证明峰值通过。
 
-总 acquire 期限包含 Source 获取和文件交接。本地 timeout 优先于其取消导致的 Source cancelled 错误。失败清理未确认时保留资源 reservation，并报告 runtime_lost；不因删除任务表就归还额度。重建先失效代次、阻断旧控制调用、关闭文件存储，再 dispose WebView；并发重建共享同一清理。迟到绑定若属于旧代次立即 clear，不进入当前图片表。
+总 acquire 期限包含 Source 获取和文件交接。取消 ACK 不代替原获取结果终态；同代次的迟到资源必须清理，错误 requestId/generation 和清理失败使控制失败。关闭等待文件存储明确 clear，打断挂起控制；并发 release 共享同一任务。本地 timeout 优先于其取消导致的 Source cancelled 错误。失败清理未确认时保留资源 reservation，并报告 runtime_lost；不因删除任务表就归还额度。重建先失效代次、阻断旧控制调用、关闭文件存储，再 dispose WebView；并发重建共享同一清理。迟到绑定若属于旧代次立即 clear，不进入当前图片表。
 
 ## 验证与复验
 

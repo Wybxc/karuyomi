@@ -338,12 +338,6 @@ importers:
       '@karuyomi/protocol':
         specifier: workspace:*
         version: link:../protocol
-      exifr:
-        specifier: 7.1.3
-        version: 7.1.3
-      image-dimensions:
-        specifier: 2.6.0
-        version: 2.6.0
     devDependencies:
       '@bokuweb/zstd-wasm':
         specifier: 0.0.27
@@ -1652,9 +1646,6 @@ packages:
   execa@10.2.1:
     resolution: {integrity: sha512-/Bofl3ZBh2Q4/PG0W63qFzP5vDAypi8Zc90UWTBzaDNIYiX7apPOd0N6L8hG8CojUdq4V51adu8BObP+iVsSTw==}
     engines: {node: '>=22'}
-
-  exifr@7.1.3:
-    resolution: {integrity: sha512-g/aje2noHivrRSLbAUtBPWFbxKdKhgj/xr1vATDdUXPOFYJlQ62Ft0oy+72V6XLIpDJfHs6gXLbBLAolqOXYRw==}
 
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
@@ -3264,8 +3255,6 @@ snapshots:
       strip-final-newline: 4.0.0
       which-command: 0.1.0
       yoctocolors: 2.2.0
-
-  exifr@7.1.3: {}
 
   expect-type@1.4.0: {}
 

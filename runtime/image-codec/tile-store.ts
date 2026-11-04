@@ -1,24 +1,26 @@
-import {
-  ENCODED_IMAGE_BODY_LIMIT,
-  ENCODED_IMAGE_WIDTH_LIMIT,
-  ENCODED_IMAGE_HEIGHT_LIMIT,
-  ENCODED_JPEG_HEIGHT_LIMIT,
-} from '@karuyomi/contracts';
+const ENCODED_IMAGE_BODY_LIMIT = 8 * 1024 * 1024;
+const ENCODED_IMAGE_WIDTH_LIMIT = 4096;
+const ENCODED_IMAGE_HEIGHT_LIMIT = 100000;
+const ENCODED_JPEG_HEIGHT_LIMIT = 65500;
+
 import {
   decodeImageTiles,
   type ImageTileOptions,
   type ImageTileEvent,
-} from '../../../runtime/image-codec/client.ts';
-import type { ImageHeader } from '../../../runtime/image-codec/decoder.ts';
+} from './client.ts';
+import type { ImageHeader } from './decoder.ts';
 import {
   imageHeaderSchema,
   tileMetadataSchema,
   tileTerminalSchema,
   type ImageTileMetadata,
   type ImageTileTerminal,
-} from '../../../runtime/image-codec/worker-protocol.ts';
-import type { PreparedImageCodecAssets } from './image-codec-assets.js';
-import { RuntimeFailure, runtimeFailure } from './errors.js';
+} from './worker-protocol.ts';
+import type { PreparedImageCodecAssets } from './assets.ts';
+import {
+  ImageCodecFailure as RuntimeFailure,
+  imageCodecFailure as runtimeFailure,
+} from './errors.ts';
 
 export const IMAGE_TILE_STORE_LIMITS = Object.freeze({
   inputBytes: ENCODED_IMAGE_BODY_LIMIT,
@@ -128,7 +130,10 @@ export class ImageTileStore {
   private clock = 0;
   private closing: Promise<void> | undefined;
 
-  constructor(private readonly dependencies: ImageTileStoreDependencies) {}
+  private readonly dependencies: ImageTileStoreDependencies;
+  constructor(dependencies: ImageTileStoreDependencies) {
+    this.dependencies = dependencies;
+  }
 
   get usage() {
     return Object.freeze({

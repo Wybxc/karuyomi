@@ -90,53 +90,9 @@ void main() {
       throwsFormatException,
     );
     expect(
-      () => wire.decodeProtoJson(wire.ImageResource(), {'width': 1.5}),
+      () => wire.decodeProtoJson(wire.ImageResource(), {'byteLength': 1.5}),
       throwsFormatException,
     );
-  });
-
-  test(
-    'encoded descriptor ProtoJSON retains raw dimensions and all EXIF orientations',
-    () {
-      for (var orientation = 1; orientation <= 8; orientation++) {
-        final image = wire.EncodedImage(
-          resourceId: 'encoded-page',
-          generation: 'g',
-          mimeType: 'image/png',
-          byteLength: wire.encodedImageByteLimit,
-          rawWidth: wire.encodedImageRawWidthLimit,
-          rawHeight: wire.encodedPngRawHeightLimit,
-          orientation: orientation,
-        );
-        final json = wire.encodeProtoJson(image);
-        expect(json.containsKey('url'), false);
-        final decoded = wire.decodeProtoJson(wire.EncodedImage(), json);
-        expect(() => wire.checkEncodedImage(decoded), returnsNormally);
-        expect(decoded.rawWidth, 4096);
-        expect(decoded.rawHeight, 100000);
-        expect(decoded.orientation, orientation);
-      }
-    },
-  );
-
-  test('encoded descriptors need bounded nonempty ownership identities', () {
-    for (final (id, generation) in [
-      ('', 'g'),
-      ('x' * 201, 'g'),
-      ('id', ''),
-      ('id', 'x' * 201),
-    ]) {
-      final image = wire.EncodedImage(
-        resourceId: id,
-        generation: generation,
-        mimeType: 'image/png',
-        byteLength: 1,
-        rawWidth: 1,
-        rawHeight: 1,
-        orientation: 1,
-      );
-      expect(() => wire.checkEncodedImage(image), throwsFormatException);
-    }
   });
 
   test(

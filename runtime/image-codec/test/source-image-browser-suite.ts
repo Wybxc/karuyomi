@@ -1,28 +1,29 @@
 /// <reference lib="dom" />
 /** Synthetic Source-output ownership, real channel and codec Worker; no Source/Reader claim. */
 import { z } from 'zod';
-import { encodedImageSchema, IMAGE_CHUNK_LIMIT } from '@karuyomi/contracts';
-import { ImageSink } from '../src/image-channel.js';
+import { imageDimensionsFromData } from 'image-dimensions';
 import {
-  ImageResourceStore,
-  type EncodedImageLease,
-} from '../src/image-resources.js';
+  processedImageSchema,
+  IMAGE_CHUNK_LIMIT,
+} from '../../../packages/contracts/src/index.ts';
+import { ImageSink } from '../../../packages/runtime-host/src/image-channel.ts';
+import { ImageResourceStore } from '../../../packages/runtime-host/src/image-resources.ts';
 import {
   ImageTileStore,
   IMAGE_TILE_STORE_LIMITS,
   type ImageTileWindowSnapshot,
-} from '../src/image-tile-store.js';
-import { createImageCodecAssetProvider } from '../src/image-codec-assets.js';
-import { VerifiedLoader, sha256 } from '../src/verified-loader.js';
-import { RuntimeFailure } from '../src/errors.js';
+} from '../tile-store.ts';
+import { createImageCodecAssetProvider } from '../assets.ts';
 import {
-  decodeImageTiles,
-  type ImageTileSession,
-} from '../../../runtime/image-codec/client.ts';
+  VerifiedLoader,
+  sha256,
+} from '../../../packages/runtime-host/src/verified-loader.ts';
+import { RuntimeFailure } from '../../../packages/runtime-host/src/errors.ts';
+import { decodeImageTiles, type ImageTileSession } from '../client.ts';
 import {
   imageHeaderSchema,
   type ImageTileTerminal,
-} from '../../../runtime/image-codec/worker-protocol.ts';
+} from '../worker-protocol.ts';
 
 const tileReferenceSchema = z.object({
   index: z.int().nonnegative(),
@@ -87,7 +88,6 @@ const log = (message: string) => {
 };
 const config = configSchema.parse(await (await fetch('/config.json')).json());
 const provider = createImageCodecAssetProvider(
-  location.origin,
   config.imageCodecs,
   new VerifiedLoader(location.origin),
 );
@@ -120,7 +120,6 @@ function createOwners(signal: AbortSignal) {
     trace.push({ sequence: trace.length + 1, event, detail });
   const counters = {
     sourceReceipts: 0,
-    bitmapCalls: 0,
     createdWorkers: 0,
     terminatedWorkers: 0,
     activeWorkers: 0,
@@ -132,14 +131,7 @@ function createOwners(signal: AbortSignal) {
   };
   const terminals: ImageTileTerminal[] = [];
   const sessions = new Set<ImageTileSession>();
-  const source = new ImageResourceStore({
-    decode: async () => {
-      counters.bitmapCalls++;
-      throw new Error(
-        'Encoded Source receipt must never decode the full image',
-      );
-    },
-  });
+  const source = new ImageResourceStore();
   const tiles = new ImageTileStore({
     prepare: async (format, abort) => {
       const assets = await provider.prepare(format, abort);
@@ -196,10 +188,11 @@ function createOwners(signal: AbortSignal) {
   const pageId = crypto.randomUUID();
   const leases = new Set<string>();
   const visible: { image: HTMLImageElement; url: string }[] = [];
-  let input: EncodedImageLease | undefined;
+  let input: Blob | undefined;
   let removed = false;
   let cleanupCompletion: Promise<void> | undefined;
   let sourceBytes = 0;
+  const sourceIds = new Set<string>();
   function observe(snapshot: ImageTileWindowSnapshot) {
     for (const tile of snapshot.tiles) leases.add(tile.leaseId);
     for (const id of snapshot.invalidatedLeaseIds) leases.add(id);
@@ -255,20 +248,16 @@ function createOwners(signal: AbortSignal) {
     signal.throwIfAborted();
     counters.sourceReceipts++;
     sourceBytes = bytes.length;
-    const collector = source.create(generation, { encodedOnly: true });
+    const collector = source.create(generation);
+    sourceIds.add(collector.resourceId);
     const channel = new MessageChannel();
     collector.attach(channel.port1);
     let cancelled: RuntimeFailure | undefined;
-    const sink = new ImageSink(
-      channel.port2,
-      collector.resourceId,
-      (error) => {
-        cancelled = error;
-      },
-      true,
-    );
+    const sink = new ImageSink(channel.port2, collector.resourceId, (error) => {
+      cancelled = error;
+    });
     try {
-      const handle = sink.open('image/' + fixture.format);
+      const handle = sink.open();
       for (let offset = 0; offset < bytes.length; offset += IMAGE_CHUNK_LIMIT) {
         signal.throwIfAborted();
         await sink.write(
@@ -276,7 +265,7 @@ function createOwners(signal: AbortSignal) {
           bytes.subarray(offset, offset + IMAGE_CHUNK_LIMIT),
         );
       }
-      const descriptor = encodedImageSchema.parse(
+      const descriptor = processedImageSchema.parse(
         JSON.parse(await sink.close(handle)),
       );
       check(
@@ -284,51 +273,43 @@ function createOwners(signal: AbortSignal) {
         'Real image channel must acknowledge the complete body',
       );
       check(
-        descriptor.rawWidth === fixture.header.sourceWidth &&
-          descriptor.rawHeight === fixture.header.sourceHeight,
-        'END metadata matches fixture',
+        descriptor.byteLength === bytes.length,
+        'Source byte receipt length',
       );
       check(
-        descriptor.byteLength === bytes.length && descriptor.orientation === 1,
-        'END metadata byte count and orientation',
+        Object.keys(descriptor).sort().join(',') ===
+          'byteLength,generation,resourceId',
+        'Source receipt is opaque',
       );
-      let rejected = false;
-      try {
-        source.borrowEncoded(descriptor.resourceId, generation);
-      } catch {
-        rejected = true;
-      }
-      check(rejected, 'Borrow forbidden until Java result publication');
-      record('end-descriptor', descriptor);
-      // This is the Java-return oracle only: no real Source or Java invocation occurs here.
-      await collector.publishEncoded(descriptor);
-      record('simulated-java-result-published', descriptor);
-      input = source.borrowEncoded(descriptor.resourceId, generation);
+      // No real Java/Source invocation: only its opaque successful return is simulated.
+      const resource = await collector.publish(descriptor);
+      record('simulated-java-result-published', resource);
+      input = await (await fetch(resource.url, { signal })).blob();
+      const header = imageDimensionsFromData(
+        new Uint8Array(await input.slice(0, 128 * 1024).arrayBuffer()),
+      );
+      check(
+        header && header.type === fixture.format,
+        'Client identifies the format',
+      );
+      check(
+        header.width === fixture.header.sourceWidth &&
+          header.height === fixture.header.sourceHeight,
+        'Client identifies raw geometry',
+      );
       tiles.addPage({
         pageId,
         generation,
         format: fixture.format,
-        blob: input.blob,
-        expectedSize: {
-          width: descriptor.rawWidth,
-          height: descriptor.rawHeight,
-        },
+        blob: input,
+        expectedSize: { width: header.width, height: header.height },
       });
-      source.release(descriptor.resourceId, generation);
       check(
         source.snapshot.bytes === bytes.length &&
-          source.snapshot.resources === 1 &&
-          source.snapshot.pixels === 0,
-        'Early Source owner release retains borrowed encoded charge only',
+          source.snapshot.resources === 1,
+        'Source encoded owner remains charged until client closes',
       );
-      let expired = false;
-      try {
-        source.borrowEncoded(descriptor.resourceId, generation);
-      } catch {
-        expired = true;
-      }
-      check(expired, 'Released Source owner rejects any new borrow');
-      record('source-owner-released-with-live-borrow', source.snapshot);
+      record('client-page-opened', source.snapshot);
     } finally {
       channel.port2.close();
     }
@@ -354,7 +335,7 @@ function createOwners(signal: AbortSignal) {
     if (input)
       check(
         source.snapshot.bytes === sourceBytes,
-        'Borrow stays charged while removePage waits for real terminal',
+        'Source owner stays charged while removePage waits for real terminal',
       );
     await pending;
     removed = true;
@@ -378,19 +359,17 @@ function createOwners(signal: AbortSignal) {
       await Promise.all([...sessions].map((session) => session.cancel()));
       await tiles.clear();
       releaseTiles();
-      input?.release();
-      input?.release();
-      record('borrow-released', source.snapshot);
+      source.release([...sourceIds][0] ?? '', generation);
+      input = undefined;
+      record('source-owner-released', source.snapshot);
       source.clear(
         new RuntimeFailure('cancelled', 'Browser ownership scenario ended'),
       );
       cleanupTasks.delete(cleanup);
     }
     check(
-      source.snapshot.resources === 0 &&
-        source.snapshot.bytes === 0 &&
-        source.snapshot.pixels === 0,
-      'Every Source owner and borrow released',
+      source.snapshot.resources === 0 && source.snapshot.bytes === 0,
+      'Every opaque Source resource released',
     );
     check(
       Object.values(tiles.usage).every((value) => value === 0),
@@ -406,10 +385,6 @@ function createOwners(signal: AbortSignal) {
       counters.createdWorkers === counters.terminatedWorkers &&
         counters.preparedModules === counters.releasedModules,
       'Every logical Worker/module owner has a matching close',
-    );
-    check(
-      counters.bitmapCalls === 0,
-      'Encoded receipt never invokes full-image bitmap decoder',
     );
   }
   cleanupTasks.add(cleanup);
@@ -670,7 +645,7 @@ async function cancelDuringDecode(fixture: Fixture, signal: AbortSignal) {
     );
     check(
       owners.source.snapshot.bytes === fixture.encodedBytes,
-      'Encoded borrow stays charged after codec terminal until its owner releases it',
+      'Encoded Source owner stays charged after codec terminal until its owner releases it',
     );
     await owners.cleanup();
     const terminalIndex = owners.trace.findIndex(
@@ -680,13 +655,13 @@ async function cancelDuringDecode(fixture: Fixture, signal: AbortSignal) {
       (event) => event.event === 'remove-page-settled',
     );
     const borrowIndex = owners.trace.findIndex(
-      (event) => event.event === 'borrow-released',
+      (event) => event.event === 'source-owner-released',
     );
     check(
       terminalIndex >= 0 &&
         terminalIndex < removedIndex &&
         removedIndex < borrowIndex,
-      'Real terminal precedes removePage resolution, then encoded borrow release',
+      'Real terminal precedes removePage resolution, then opaque Source resource release',
     );
     return {
       name: fixture.name + '-remove-page-terminal-order',

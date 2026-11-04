@@ -1,6 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
+  IMAGE_BODY_LIMIT,
   IMAGE_CHUNK_LIMIT,
+  IMAGE_RESOURCE_LIMIT,
   processedImageSchema,
   encodeImageFrame,
   imageFrameSchema,
@@ -8,26 +10,20 @@ import {
 import { ImageSink } from '../src/image-channel.js';
 import { ImageResourceStore } from '../src/image-resources.js';
 import { RuntimeFailure } from '../src/errors.js';
-import { pngHeader } from './image-fixtures.js';
 
-// Header fixtures exercise the channel. The injected decoder is deliberately
-// separate from the real browser decode gate, which must reject corrupt images.
 const stores: ImageResourceStore[] = [];
 const sinks: ImageSink[] = [];
 afterEach(() => {
   for (const store of stores.splice(0))
     store.clear(new RuntimeFailure('runtime_lost', 'test teardown'));
   for (const sink of sinks.splice(0)) sink.dispose();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 function setup(
   options: ConstructorParameters<typeof ImageResourceStore>[0] = {},
 ) {
-  const close = vi.fn();
-  const store = new ImageResourceStore({
-    decode: async () => ({ width: 2, height: 3, close }),
-    ...options,
-  });
+  const store = new ImageResourceStore(options);
   stores.push(store);
   const image = store.create('generation');
   const channel = new MessageChannel();
@@ -35,43 +31,57 @@ function setup(
   const cancelled = vi.fn();
   const sink = new ImageSink(channel.port2, image.resourceId, cancelled);
   sinks.push(sink);
-  const handle = sink.open('image/png');
-  return { store, image, sink, handle, close, cancelled };
+  const handle = sink.open();
+  return { store, image, sink, handle, cancelled };
+}
+async function prepare(
+  value: ReturnType<typeof setup>,
+  bytes = new Uint8Array([0, 255, 7]),
+) {
+  await value.sink.write(value.handle, bytes);
+  return processedImageSchema.parse(
+    JSON.parse(await value.sink.close(value.handle)),
+  );
 }
 
-test('prepared binary image is published only after matching Java completion and is revocable', async () => {
+test('opaque bytes publish only after matching Java completion and reuse one revocable URL', async () => {
   const create = vi.spyOn(URL, 'createObjectURL');
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
-  const { store, image, sink, handle, close } = setup();
-  const data = pngHeader(2, 3, 200_000);
+  const decode = vi.fn(() => {
+    throw new Error('host must not decode');
+  });
+  vi.stubGlobal('createImageBitmap', decode);
+  const value = setup();
+  const data = new Uint8Array(200_000).fill(173);
   for (let offset = 0; offset < data.length; offset += IMAGE_CHUNK_LIMIT)
-    await sink.write(handle, data.subarray(offset, offset + IMAGE_CHUNK_LIMIT));
+    await value.sink.write(
+      value.handle,
+      data.subarray(offset, offset + IMAGE_CHUNK_LIMIT),
+    );
   const prepared = processedImageSchema.parse(
-    JSON.parse(await sink.close(handle)),
+    JSON.parse(await value.sink.close(value.handle)),
   );
-  expect(close).toHaveBeenCalledOnce();
+  expect(prepared).toEqual({
+    resourceId: value.image.resourceId,
+    generation: 'generation',
+    byteLength: data.length,
+  });
   expect(create).not.toHaveBeenCalled();
-  expect(store.snapshot).toEqual({
-    resources: 1,
-    bytes: data.length,
-    pixels: 6,
-  });
-  const resource = await image.publish(prepared);
-  expect(resource).toMatchObject({
-    ...prepared,
-    url: expect.stringMatching(/^blob:/),
-  });
-  const received = new Uint8Array(
-    await (await fetch(resource.url)).arrayBuffer(),
-  );
-  expect(received).toEqual(data);
+  expect(value.store.snapshot).toEqual({ resources: 1, bytes: data.length });
+  const resource = await value.image.publish(prepared);
+  expect(await value.image.publish(prepared)).toEqual(resource);
+  expect(create).toHaveBeenCalledOnce();
+  const response = await fetch(resource.url);
+  expect(response.headers.get('content-type')).toBe('');
+  expect(new Uint8Array(await response.arrayBuffer())).toEqual(data);
   expect(data.buffer.byteLength).toBe(data.length);
-  store.release(resource.resourceId, 'other-generation');
+  expect(decode).not.toHaveBeenCalled();
+  value.store.release(resource.resourceId, 'other-generation');
   expect(revoke).not.toHaveBeenCalled();
-  store.release(resource.resourceId, 'generation');
-  store.release(resource.resourceId, 'generation');
+  value.store.release(resource.resourceId, 'generation');
+  value.store.release(resource.resourceId, 'generation');
   expect(revoke).toHaveBeenCalledOnce();
-  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
+  expect(value.store.snapshot).toEqual({ resources: 0, bytes: 0 });
 });
 
 test('only one data frame can wait for an ACK and source buffers retain ownership', async () => {
@@ -89,126 +99,128 @@ test('only one data frame can wait for an ACK and source buffers retain ownershi
   };
   const sink = new ImageSink(channel.port2, crypto.randomUUID(), () => {});
   sinks.push(sink);
-  const handle = sink.open('image/png');
-  const bytes = pngHeader();
+  const handle = sink.open();
+  const bytes = new Uint8Array([1, 2, 3]);
   const write = sink.write(handle, bytes);
   const frame = await next;
   await expect(sink.write(handle, bytes)).rejects.toMatchObject({
     code: 'protocol_error',
   });
-  expect(bytes.byteLength).toBe(33);
+  expect(bytes.byteLength).toBe(3);
   expect(new Uint8Array(frame.buffer)).toEqual(bytes);
   channel.port1.postMessage(encodeImageFrame({ type: 'ack', seq: frame.seq }));
   await write;
-  sink.dispose();
   channel.port1.close();
 });
 
-test('encoded and pixel budgets reject without publishing or leaking ownership', async () => {
-  const create = vi.spyOn(URL, 'createObjectURL');
-  const small = setup({ maxImageBytes: 32 });
+test('default byte, resource and chunk budgets apply without image metadata', async () => {
+  const store = new ImageResourceStore();
+  stores.push(store);
+  expect(store.limits).toEqual({
+    maxBytes: IMAGE_BODY_LIMIT,
+    maxImageBytes: IMAGE_BODY_LIMIT,
+    maxResources: IMAGE_RESOURCE_LIMIT,
+  });
+  for (let index = 0; index < IMAGE_RESOURCE_LIMIT; index++)
+    store.create('generation');
+  expect(() => store.create('generation')).toThrow('window is full');
+  const value = setup({ maxImageBytes: 2 });
   await expect(
-    small.sink.write(small.handle, pngHeader()),
+    value.sink.write(value.handle, new Uint8Array(3)),
   ).rejects.toMatchObject({ code: 'limit_exceeded' });
-  expect(small.store.snapshot.resources).toBe(0);
-  const pixels = setup({ maxPixels: 5 });
-  await pixels.sink.write(pixels.handle, pngHeader());
-  await expect(pixels.sink.close(pixels.handle)).rejects.toMatchObject({
-    code: 'limit_exceeded',
-  });
-  expect(pixels.close).not.toHaveBeenCalled();
-  expect(pixels.store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
-  expect(create).not.toHaveBeenCalled();
+  expect(value.store.snapshot).toEqual({ resources: 0, bytes: 0 });
+  const chunk = setup();
+  await expect(
+    chunk.sink.write(chunk.handle, new Uint8Array(IMAGE_CHUNK_LIMIT + 1)),
+  ).rejects.toMatchObject({ code: 'protocol_error' });
 });
 
-test('cancelled in-progress decode remains charged until its bitmap is closed', async () => {
-  let finish!: (value: {
-    width: number;
-    height: number;
-    close(): void;
-  }) => void;
-  const pending = new Promise<{ width: number; height: number; close(): void }>(
-    (resolve) => {
-      finish = resolve;
-    },
-  );
-  const decode = vi.fn(() => pending);
-  const { store, image, sink, handle } = setup({
-    maxResources: 1,
-    maxResidentPixels: 6,
-    decode,
-  });
-  await sink.write(handle, pngHeader());
-  const closing = expect(sink.close(handle)).rejects.toMatchObject({
-    code: 'cancelled',
-  });
-  await vi.waitFor(() => expect(decode).toHaveBeenCalledOnce());
-  image.abort(new RuntimeFailure('cancelled', 'cancel'));
-  await closing;
-  expect(store.snapshot).toEqual({ resources: 1, bytes: 33, pixels: 6 });
-  expect(() => store.create('next')).toThrow('window is full');
-  const close = vi.fn();
-  finish({ width: 2, height: 3, close });
-  await vi.waitFor(() => expect(store.snapshot.resources).toBe(0));
-  expect(close).toHaveBeenCalledOnce();
-  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
-  image.release();
-});
-
-test('aggregate encoded bytes include resident images and are returned on release', async () => {
-  const { store, image, sink, handle } = setup({ maxBytes: 65 });
-  await sink.write(handle, pngHeader());
-  const prepared = processedImageSchema.parse(
-    JSON.parse(await sink.close(handle)),
-  );
-  await image.publish(prepared);
-  const second = store.create('generation');
+test('aggregate encoded bytes include resident resources and return on release', async () => {
+  const value = setup({ maxBytes: 5 });
+  await value.image.publish(await prepare(value));
+  const second = value.store.create('generation');
   const channel = new MessageChannel();
   second.attach(channel.port1);
   const other = new ImageSink(channel.port2, second.resourceId, () => {});
   sinks.push(other);
-  const otherHandle = other.open('image/png');
-  await expect(other.write(otherHandle, pngHeader())).rejects.toMatchObject({
+  const handle = other.open();
+  await expect(other.write(handle, new Uint8Array(3))).rejects.toMatchObject({
     code: 'limit_exceeded',
   });
-  expect(store.snapshot).toEqual({ resources: 1, bytes: 33, pixels: 6 });
-  store.release(image.resourceId, 'generation');
-  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
+  expect(value.store.snapshot).toEqual({ resources: 1, bytes: 3 });
+  value.image.release();
+  expect(value.store.snapshot).toEqual({ resources: 0, bytes: 0 });
 });
 
-test('decode failure, metadata disagreement and Java mismatch cannot publish a URL', async () => {
+test.each(['resourceId', 'generation', 'byteLength'] as const)(
+  'Java %s mismatch cannot publish a URL',
+  async (field) => {
+    const create = vi.spyOn(URL, 'createObjectURL');
+    const value = setup();
+    const prepared = await prepare(value);
+    await expect(
+      value.image.publish({
+        ...prepared,
+        [field]: field === 'byteLength' ? 4 : 'foreign',
+      }),
+    ).rejects.toMatchObject({ code: 'protocol_error' });
+    expect(create).not.toHaveBeenCalled();
+    value.image.release();
+    expect(value.store.snapshot).toEqual({ resources: 0, bytes: 0 });
+  },
+);
+
+test('cancellation before and after END returns bytes and prevents late publication', async () => {
   const create = vi.spyOn(URL, 'createObjectURL');
-  const failed = setup({
-    decode: async () => {
-      throw new Error('invalid image');
-    },
+  const pending = setup();
+  await pending.sink.write(pending.handle, new Uint8Array(3));
+  pending.image.abort(new RuntimeFailure('cancelled', 'cancel'));
+  await expect(pending.sink.close(pending.handle)).rejects.toMatchObject({
+    code: 'cancelled',
   });
-  await failed.sink.write(failed.handle, pngHeader());
-  await expect(failed.sink.close(failed.handle)).rejects.toMatchObject({
-    code: 'source_error',
+  expect(pending.store.snapshot).toEqual({ resources: 0, bytes: 0 });
+  const ended = setup();
+  const descriptor = await prepare(ended);
+  ended.image.release();
+  await expect(ended.image.publish(descriptor)).rejects.toMatchObject({
+    code: 'cancelled',
   });
-  expect(failed.store.snapshot.resources).toBe(0);
-  const rotated = setup({
-    decode: async () => ({ width: 3, height: 2, close() {} }),
-  });
-  await rotated.sink.write(rotated.handle, pngHeader());
-  const prepared = processedImageSchema.parse(
-    JSON.parse(await rotated.sink.close(rotated.handle)),
-  );
-  expect(prepared).toMatchObject({ width: 3, height: 2 });
-  await expect(
-    rotated.image.publish({ ...prepared, byteLength: 34 }),
-  ).rejects.toMatchObject({ code: 'protocol_error' });
-  rotated.image.release();
-  expect(rotated.store.snapshot.resources).toBe(0);
+  expect(ended.store.snapshot).toEqual({ resources: 0, bytes: 0 });
   expect(create).not.toHaveBeenCalled();
+});
+
+test('URL creation failure is recoverable and cancellation during publication revokes the new URL', async () => {
+  const value = setup();
+  const descriptor = await prepare(value);
+  const original = URL.createObjectURL;
+  const create = vi.spyOn(URL, 'createObjectURL').mockImplementationOnce(() => {
+    throw new Error('URL unavailable');
+  });
+  await expect(value.image.publish(descriptor)).rejects.toThrow(
+    'URL unavailable',
+  );
+  await expect(value.image.publish(descriptor)).resolves.toHaveProperty('url');
+  expect(create).toHaveBeenCalledTimes(2);
+  const second = setup();
+  const other = await prepare(second);
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  create.mockImplementationOnce((blob) => {
+    const url = original(blob);
+    second.image.release();
+    return url;
+  });
+  await expect(second.image.publish(other)).rejects.toMatchObject({
+    code: 'cancelled',
+  });
+  expect(revoke).toHaveBeenCalledOnce();
+  expect(second.store.snapshot).toEqual({ resources: 0, bytes: 0 });
 });
 
 test('wrong sequence and END truncation abort the receiver', async () => {
   for (const frames of [
-    [encodeImageFrame({ type: 'data', seq: 1, buffer: pngHeader().buffer })],
+    [encodeImageFrame({ type: 'data', seq: 1, buffer: new ArrayBuffer(1) })],
     [
-      encodeImageFrame({ type: 'meta', seq: 0, mimeType: 'image/png' }),
+      encodeImageFrame({ type: 'meta', seq: 0 }),
       encodeImageFrame({ type: 'end', seq: 1, totalBytes: 10 }),
     ],
   ]) {
@@ -223,7 +235,7 @@ test('wrong sequence and END truncation abort the receiver', async () => {
     });
     for (const frame of frames) channel.port2.postMessage(frame);
     await failure;
-    expect(store.snapshot.resources).toBe(0);
+    expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
     image.release();
     channel.port2.close();
   }

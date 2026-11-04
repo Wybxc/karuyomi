@@ -34,7 +34,11 @@ export interface MaterialCatalog {
   imageCodecs: MaterialArtifact[];
   sources: {
     zstd: typeof zstdSource;
-    imageCodecs: { buildIdentity: string; abi: string; encoderAbi: string };
+    imageCodecs: {
+      buildIdentity: string;
+      abi: string;
+      encoderAbi: string;
+    } | null;
   };
 }
 export interface RuntimeMaterials {
@@ -42,13 +46,10 @@ export interface RuntimeMaterials {
   data: Map<string, { bytes: Buffer; contentType: string }>;
 }
 
-/** Native bundles the client in host.js, and embeds codec bytes only in that host. */
+/** Native Source workers embed only their own bridges and shared runtime bytes. */
 export function nativeMaterialGroups(catalog: MaterialCatalog) {
   return {
     sourceWorker: [...catalog.hostScripts, ...catalog.resources],
-    imageCodecs: catalog.imageCodecs.filter(
-      (artifact) => artifact.logicalName !== 'client.js',
-    ),
   };
 }
 
@@ -86,6 +87,8 @@ export interface ImageCodecMaterialInput {
 }
 export interface CollectMaterialsOptions {
   includeWasmBytes?: boolean;
+  /** Candidate decoder assets are prepared only by dedicated evaluation tools. */
+  includeImageCodecs?: boolean;
   imageCodecArtifacts?: ImageCodecMaterialInput;
   signal?: AbortSignal;
 }
@@ -99,7 +102,7 @@ async function compileImageCodecEntry(
       ? { entryPoints: ['runtime/image-codec/worker.ts'] }
       : {
           stdin: {
-            contents: `export * from './runtime/image-codec/client.ts';\nexport * from './packages/runtime-host/src/image-codec-assets.ts';`,
+            contents: `export * from './runtime/image-codec/client.ts';\nexport * from './runtime/image-codec/assets.ts';`,
             resolveDir: root,
             sourcefile: 'image-codec-client.ts',
             loader: 'ts',
@@ -121,9 +124,10 @@ async function compileImageCodecEntry(
   return Buffer.from(output.contents);
 }
 
-/** Public materials only. Uses verified locked codec artifacts, never an SDK or JVM seed. */
+/** Product materials exclude candidate image codecs unless explicitly requested. */
 export async function collectMaterials({
   includeWasmBytes = true,
+  includeImageCodecs = false,
   imageCodecArtifacts,
   signal,
 }: CollectMaterialsOptions = {}): Promise<RuntimeMaterials> {
@@ -188,71 +192,78 @@ export async function collectMaterials({
     });
   }
   const resources = [resource];
-  const codecBuild =
-    imageCodecArtifacts ??
-    (await prepareImageCodecArtifacts(signal ? { signal } : {}));
   const imageCodecs: MaterialArtifact[] = [];
-  for (const name of ['client', 'worker'] as const)
-    imageCodecs.push(
-      artifact(
-        name + '.js',
-        await compileImageCodecEntry(name),
-        'application/javascript',
-      ),
-    );
-  const codecNames = [
-    'png.mjs',
-    'png.wasm',
-    'jpeg.mjs',
-    'jpeg.wasm',
-    'encoder.mjs',
-    'encoder.wasm',
-  ];
-  const noticeNames = [
-    'licenses/libspng-LICENSE.txt',
-    'licenses/libjpeg-turbo-LICENSE.md',
-    'licenses/libjpeg-turbo-README.ijg',
-    'licenses/zlib-README',
-  ];
-  if (
-    Object.keys(codecBuild.manifest.artifacts).sort().join('\n') !==
-    [...codecNames, ...noticeNames].sort().join('\n')
-  )
-    throw new Error(
-      'Image codec material artifacts do not match the current three codecs and notices',
-    );
-  for (const logicalName of [...codecNames, ...noticeNames]) {
-    const pinned = codecBuild.manifest.artifacts[logicalName];
-    if (!pinned)
-      throw new Error('Missing pinned image codec material: ' + logicalName);
-    const contentType = logicalName.endsWith('.mjs')
-      ? 'application/javascript'
-      : logicalName.endsWith('.wasm')
-        ? 'application/wasm'
-        : 'text/plain';
-    imageCodecs.push({
-      logicalName,
-      path: '/runtime/materials/' + pinned.sha256,
-      ...pinned,
-      contentType,
-    });
-    if (includeWasmBytes || !logicalName.endsWith('.wasm')) {
-      const bytes = await readFile(
-        path.join(codecBuild.directory, logicalName),
+  let codecSource: MaterialCatalog['sources']['imageCodecs'] = null;
+  if (includeImageCodecs) {
+    const codecBuild =
+      imageCodecArtifacts ??
+      (await prepareImageCodecArtifacts(signal ? { signal } : {}));
+    for (const name of ['client', 'worker'] as const)
+      imageCodecs.push(
+        artifact(
+          name + '.js',
+          await compileImageCodecEntry(name),
+          'application/javascript',
+        ),
       );
-      if (bytes.length !== pinned.size)
-        throw new Error(
-          'Prepared image codec material changed length: ' + logicalName,
+    const codecNames = [
+      'png.mjs',
+      'png.wasm',
+      'jpeg.mjs',
+      'jpeg.wasm',
+      'encoder.mjs',
+      'encoder.wasm',
+    ];
+    const noticeNames = [
+      'licenses/libspng-LICENSE.txt',
+      'licenses/libjpeg-turbo-LICENSE.md',
+      'licenses/libjpeg-turbo-README.ijg',
+      'licenses/zlib-README',
+    ];
+    if (
+      Object.keys(codecBuild.manifest.artifacts).sort().join('\n') !==
+      [...codecNames, ...noticeNames].sort().join('\n')
+    )
+      throw new Error(
+        'Image codec material artifacts do not match the current three codecs and notices',
+      );
+    for (const logicalName of [...codecNames, ...noticeNames]) {
+      const pinned = codecBuild.manifest.artifacts[logicalName];
+      if (!pinned)
+        throw new Error('Missing pinned image codec material: ' + logicalName);
+      const contentType = logicalName.endsWith('.mjs')
+        ? 'application/javascript'
+        : logicalName.endsWith('.wasm')
+          ? 'application/wasm'
+          : 'text/plain';
+      imageCodecs.push({
+        logicalName,
+        path: '/runtime/materials/' + pinned.sha256,
+        ...pinned,
+        contentType,
+      });
+      if (includeWasmBytes || !logicalName.endsWith('.wasm')) {
+        const bytes = await readFile(
+          path.join(codecBuild.directory, logicalName),
         );
-      // Preparation already verified this artifact at its archive import boundary.
-      data.set(pinned.sha256, { bytes, contentType });
+        if (bytes.length !== pinned.size)
+          throw new Error(
+            'Prepared image codec material changed length: ' + logicalName,
+          );
+        // Preparation already verified this artifact at its archive import boundary.
+        data.set(pinned.sha256, { bytes, contentType });
+      }
     }
+    codecSource = {
+      buildIdentity: codecBuild.manifest.identity,
+      abi: codecBuild.manifest.abi,
+      encoderAbi: codecBuild.manifest.encoderAbi,
+    };
+  } else if (imageCodecArtifacts) {
+    throw new Error(
+      'Candidate codec artifacts require includeImageCodecs: true',
+    );
   }
-  const codecSource = {
-    buildIdentity: codecBuild.manifest.identity,
-    abi: codecBuild.manifest.abi,
-    encoderAbi: codecBuild.manifest.encoderAbi,
-  };
   const identity = {
     ...protocol,
     hostScripts,

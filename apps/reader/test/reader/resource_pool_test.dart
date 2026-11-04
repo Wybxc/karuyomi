@@ -10,10 +10,7 @@ final class PoolFixture implements PageProvider {
     id: 'image',
     generation: 'g',
     location: Uri.parse('blob:https://reader.example/id'),
-    mimeType: 'image/png',
     byteLength: 20,
-    width: 10,
-    height: 20,
   );
   @override
   Future<void> cancel(String requestId) async {}

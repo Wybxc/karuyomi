@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { digest } from '../materials.ts';
+import { digest } from '../../../packages/runtime-host/materials.ts';
 import {
   createImageCodecAssetProvider,
   prepareImageCodecAssets,
   type ImageCodecMaterial,
   type ImageCodecObjectUrls,
-} from '../src/image-codec-assets.js';
-import { createNativeMaterialResolver } from '../src/native-materials.js';
-import { VerifiedLoader } from '../src/verified-loader.js';
+} from '../assets.ts';
+import { createNativeMaterialResolver } from '../../../packages/runtime-host/src/native-materials.ts';
+import { VerifiedLoader } from '../../../packages/runtime-host/src/verified-loader.ts';
 
 function fixture() {
   const values = new Map<string, { bytes: Uint8Array; contentType: string }>();
@@ -121,11 +121,7 @@ describe('image codec material leases', () => {
       },
       resolver,
     );
-    const provider = createImageCodecAssetProvider(
-      'https://reader.example',
-      f.materials,
-      loader,
-    );
+    const provider = createImageCodecAssetProvider(f.materials, loader);
     const lease = await provider.prepare('png', new AbortController().signal);
     expect(lease.workerUrl.protocol).toBe('blob:');
     expect(new TextDecoder().decode(lease.decoder.wasmBinary)).toBe(
@@ -154,7 +150,10 @@ describe('image codec material leases', () => {
           new URL(String(input)).pathname.split('/').pop()!,
         )!;
         const bytes = new Uint8Array(value.bytes);
-        bytes[0] ^= 1;
+        const first = bytes[0];
+        if (first === undefined)
+          throw new Error('Expected nonempty material fixture');
+        bytes[0] = first ^ 1;
         return new Response(bytes, {
           headers: { 'content-type': value.contentType },
         });

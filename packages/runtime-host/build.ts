@@ -17,9 +17,6 @@ const common = {
   target: 'es2022',
   minify: true,
   write: false,
-  define: {
-    __KARUYOMI_IMAGE_CODEC_MATERIALS__: JSON.stringify(catalog.imageCodecs),
-  },
 } satisfies BuildOptions;
 const web = await Promise.all([
   build({ ...common, entryPoints: ['src/host.ts'], format: 'esm' }),
@@ -74,60 +71,14 @@ const nativeWorker = await build({
     },
   ],
 });
-// Codec bytes belong to the terminal host only, never every Source Worker.
-const codecEmbedded = Object.fromEntries(
-  nativeGroups.imageCodecs.map(({ sha256 }) => {
-    const value = data.get(sha256);
-    if (!value)
-      throw new Error('Missing Native image codec material: ' + sha256);
-    return [
-      sha256,
-      {
-        base64: value.bytes.toString('base64'),
-        contentType: value.contentType,
-      },
-    ];
-  }),
-);
+// Source host contains no client image decoders or image metadata policy.
 const nativeHost = await build({
   ...common,
-  stdin: {
-    contents: `import './src/host.native.ts';
-import {createImageCodecAssetProvider} from './src/image-codec-assets.ts';
-import {decodeImageTiles} from '../../runtime/image-codec/client.ts';
-const provider=createImageCodecAssetProvider(location.origin,${JSON.stringify(nativeGroups.imageCodecs)});
-Object.defineProperty(window,'karuyomiImageCodecs',{value:Object.freeze({...provider,decodeImageTiles})});`,
-    resolveDir: directory,
-    sourcefile: 'native-image-codec-host.ts',
-    loader: 'ts',
-  },
+  entryPoints: ['src/host.native.ts'],
   format: 'iife',
   define: {
     __KARUYOMI_MATERIAL_VERSION__: JSON.stringify(catalog.materialVersion),
-    __KARUYOMI_IMAGE_CODEC_MATERIALS__: JSON.stringify(
-      nativeGroups.imageCodecs,
-    ),
   },
-  plugins: [
-    {
-      name: 'embedded-native-image-codecs',
-      setup(builder) {
-        builder.onResolve({ filter: /^\.\/materials\.js$/ }, () => ({
-          path: 'image-codecs',
-          namespace: 'native-image-codecs',
-        }));
-        builder.onLoad(
-          { filter: /.*/, namespace: 'native-image-codecs' },
-          () => ({
-            contents: `import {createNativeMaterialResolver} from ${JSON.stringify(path.join(directory, 'src/native-materials.ts'))};
-export const nativeMaterials=createNativeMaterialResolver(${JSON.stringify(codecEmbedded)});`,
-            loader: 'js',
-            resolveDir: directory,
-          }),
-        );
-      },
-    },
-  ],
 });
 const nativeOutput = path.join(output, 'native');
 await mkdir(nativeOutput, { recursive: true });
@@ -149,7 +100,6 @@ const nativeManifest = {
   materialVersion: catalog.materialVersion,
   files,
   materials: nativeGroups.sourceWorker,
-  imageCodecs: nativeGroups.imageCodecs,
   sources: catalog.sources,
 };
 await writeFile(

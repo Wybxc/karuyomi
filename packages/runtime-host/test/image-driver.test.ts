@@ -64,9 +64,7 @@ const metadata = (sourceId: string): SourceCall =>
     request: { case: 'popular', value: { page: 1 } },
   });
 function collector() {
-  const store = new ImageResourceStore({
-    decode: async () => ({ width: 2, height: 3, close() {} }),
-  });
+  const store = new ImageResourceStore();
   stores.push(store);
   const image = store.create('generation');
   const channel = new MessageChannel();
@@ -89,7 +87,7 @@ test('the installed image ABI sends typed bytes and survives HTTP operation clea
     scope.hostAcquireImage = (...args) => {
       refs.push(args);
       void (async () => {
-        const handle = scope.teaImageOpen!('image/png');
+        const handle = scope.teaImageOpen!();
         await scope.teaImageWrite!(handle, pngHeader());
         scope.teaDone!(await scope.teaImageClose!(handle));
       })().catch((error) => scope.teaFail!(String(error)));
@@ -312,52 +310,4 @@ test('graphics aggregate limit survives the Java string error callback', async (
   await expect(
     driver.invoke(metadata(build.sourceIds[0]!)),
   ).rejects.toMatchObject({ code: 'limit_exceeded', message: 'raster budget' });
-});
-
-test('the Java completion ABI round-trips encoded receipts without raster decoding', async () => {
-  const { driver, build } = await setup((scope) => {
-    scope.hostAcquireImage = () => {
-      void (async () => {
-        const handle = scope.teaImageOpen!('image/png');
-        await scope.teaImageWrite!(handle, pngHeader(1080, 18000));
-        scope.teaDone!(await scope.teaImageClose!(handle));
-      })().catch((error) => scope.teaFail!(String(error)));
-    };
-  });
-  await driver.open(build, 'test', new AbortController().signal);
-  const decode = vi.fn(async () => {
-    throw new Error('must not decode');
-  });
-  const store = new ImageResourceStore({ decode });
-  stores.push(store);
-  const image = store.create('generation', { encodedOnly: true });
-  const channel = new MessageChannel();
-  image.attach(channel.port1);
-  const result = await driver.acquireEncodedImage(
-    build.sourceIds[0]!,
-    'pages',
-    'p-0',
-    channel.port2,
-    image.resourceId,
-    { requestId: 'encoded', generation: 'generation' },
-  );
-  expect(result).toMatchObject({
-    rawWidth: 1080,
-    rawHeight: 18000,
-    orientation: 1,
-  });
-  await image.publishEncoded(result);
-  const lease = store.borrowEncoded(result.resourceId, result.generation);
-  try {
-    expect(new Uint8Array(await lease.blob.arrayBuffer())).toEqual(
-      pngHeader(1080, 18000),
-    );
-  } finally {
-    lease.release();
-  }
-  expect(decode).not.toHaveBeenCalled();
-  await driver.invoke(metadata(build.sourceIds[0]!), {
-    requestId: 'next',
-    generation: 'generation',
-  });
 });

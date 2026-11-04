@@ -108,9 +108,10 @@ export async function prepareImageOwnersBrowser(
     recursive: true,
   });
   options.signal?.throwIfAborted();
-  const materials = await collectMaterials(
-    options.signal ? { signal: options.signal } : {},
-  );
+  const materials = await collectMaterials({
+    includeImageCodecs: true,
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
   assert.deepEqual(
     materials.catalog.sources.imageCodecs,
     reference.codecSource,
@@ -157,9 +158,9 @@ export async function prepareImageOwnersBrowser(
     cases,
     scope: {
       input:
-        'Synthetic Source-processed output bytes through the real ImageSink/collector channel, END metadata and simulated Java-result publication; no real Source execution',
+        'Opaque Source-processed encoded bytes through real ImageSink/collector ACK and simulated Java publication; all image format/geometry inspection and codec work happen in the client; no real Source execution',
       owners:
-        'Published encoded Blob borrow, early Source-owner release accounting, bounded tile display leases, invalidation, removePage and real codec Worker termination order',
+        'Opaque Source Blob URL retained until client page cleanup; client-side format/geometry parsing, bounded tile display leases, invalidation and real codec Worker termination order',
       oracle:
         'Existing independent Node WASM tile PNG hashes and geometry from the identical fixed C codec build; current maintained host and Worker JS are freshly bundled',
       excluded:
@@ -176,7 +177,7 @@ export async function prepareImageOwnersBrowser(
   );
   await build({
     absWorkingDir: ROOT,
-    entryPoints: ['packages/runtime-host/test/image-owner-browser-suite.ts'],
+    entryPoints: ['runtime/image-codec/test/source-image-browser-suite.ts'],
     outfile: path.join(publicDirectory, 'runner.js'),
     bundle: true,
     platform: 'browser',
@@ -379,4 +380,4 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   }
 }
 
-const HTML = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Karuyomi 图片所有权验收</title><style>body{font:16px system-ui;max-width:1100px;margin:24px auto;padding:0 16px;background:#f4f7fb;color:#182537}button{font:inherit;padding:10px;margin:4px}pre{white-space:pre-wrap;background:white;padding:16px;max-height:45vh;overflow:auto}#preview img{display:block;max-width:100%;max-height:260px;margin:8px 0}#status{font-weight:600}</style><h1>编码正文 → 有界 PNG tiles 所有权验收</h1><p>合成 Source 处理后正文通过真实 ImageSink/collector/END，模拟 Java 返回并 publish，再借用 Blob 给真实 codec Worker。覆盖首末中窗口、反向重扫、尾部坏流、取消和借用释放顺序。</p><p>此页不证明真实扩展 Source、Reader、Native、真机性能或物理内存回收。</p><button id="run">运行验收</button><button id="close">关闭服务</button><span id="status">准备就绪</span><div id="preview"></div><pre id="log"></pre><script type="module" src="/runner.js"></script></html>`;
+const HTML = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Karuyomi 图片所有权验收</title><style>body{font:16px system-ui;max-width:1100px;margin:24px auto;padding:0 16px;background:#f4f7fb;color:#182537}button{font:inherit;padding:10px;margin:4px}pre{white-space:pre-wrap;background:white;padding:16px;max-height:45vh;overflow:auto}#preview img{display:block;max-width:100%;max-height:260px;margin:8px 0}#status{font-weight:600}</style><h1>编码正文 → 有界 PNG tiles 所有权验收</h1><p>合成 Source 处理后正文通过不透明字节 ImageSink/collector，模拟 Java 返回并 publish；客户端接收 Blob 后自行识别图片并调用 codec Worker。覆盖首末中窗口、反向重扫、尾部坏流、取消和借用释放顺序。</p><p>此页不证明真实扩展 Source、Reader、Native、真机性能或物理内存回收。</p><button id="run">运行验收</button><button id="close">关闭服务</button><span id="status">准备就绪</span><div id="preview"></div><pre id="log"></pre><script type="module" src="/runner.js"></script></html>`;

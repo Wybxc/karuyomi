@@ -4,7 +4,6 @@ import {
   type SourceCall,
   type SourcePayload,
   processedImageSchema,
-  encodedImageSchema,
   encodeControlRequest,
   parseControlResponse,
 } from '@karuyomi/contracts';
@@ -61,11 +60,9 @@ afterEach(async () => {
 async function setup(
   acquire: NonNullable<RuntimeDriver['acquireImage']>,
   enabled = true,
-  acquireEncoded?: NonNullable<RuntimeDriver['acquireEncodedImage']>,
 ) {
   const build = await manifest();
-  const decode = vi.fn(async () => ({ width: 2, height: 3, close() {} }));
-  const store = new ImageResourceStore({ decode });
+  const store = new ImageResourceStore();
   const invoke = vi.fn(async (): Promise<SourcePayload> => ({
     case: 'mangaPage',
     value: create(pb.MangaPageSchema),
@@ -77,7 +74,6 @@ async function setup(
     ],
     invoke,
     acquireImage: acquire,
-    ...(acquireEncoded ? { acquireEncodedImage: acquireEncoded } : {}),
     closePageSession,
     close: async () => {},
   };
@@ -115,13 +111,12 @@ async function setup(
     workers,
     invoke,
     closePageSession,
-    decode,
   };
 }
 async function prepare(port: MessagePort, id: string) {
   const sink = new ImageSink(port, id, () => {});
   sinks.push(sink);
-  const handle = sink.open('image/png');
+  const handle = sink.open();
   await sink.write(handle, pngHeader());
   return processedImageSchema.parse(JSON.parse(await sink.close(handle)));
 }
@@ -171,7 +166,7 @@ test('cancel control reaches a busy Worker and waits for Java unwind before unlo
     async (_source, _session, _page, port, id) => {
       const sink = new ImageSink(port, id, () => cancelled.resolve());
       sinks.push(sink);
-      sink.open('image/png');
+      sink.open();
       entered.resolve();
       await unwind.promise;
       throw new Error('Java unwound after cancellation');
@@ -208,7 +203,7 @@ test('a noncooperative image producer is recycled after bounded cancel grace', a
     async (_source, _session, _page, port, id) => {
       const sink = new ImageSink(port, id, () => {});
       sinks.push(sink);
-      sink.open('image/png');
+      sink.open();
       entered.resolve();
       return new Promise(() => {});
     },
@@ -235,7 +230,7 @@ test('a cooperative image timeout preserves the generation for later metadata', 
       const stopped = deferred<void>();
       const sink = new ImageSink(port, id, () => stopped.resolve());
       sinks.push(sink);
-      sink.open('image/png');
+      sink.open();
       await stopped.promise;
       throw new Error('Java unwound');
     },
@@ -261,7 +256,7 @@ test('Java failure after END drops the prepared image without creating a URL', a
     code: 'source_error',
   });
   expect(create).not.toHaveBeenCalled();
-  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
 });
 
 test('cancellation during publication never returns an already revoked URL', async () => {
@@ -411,10 +406,7 @@ test('Native does not advertise or acquire Web Blob resources', async () => {
     processedImageSchema.parse({
       resourceId: 'unreachable',
       generation: 'unreachable',
-      mimeType: 'image/png',
       byteLength: 1,
-      width: 1,
-      height: 1,
     }),
   );
   const { manager, request, session } = await setup(acquire, false);
@@ -425,144 +417,86 @@ test('Native does not advertise or acquire Web Blob resources', async () => {
   expect(acquire).not.toHaveBeenCalled();
 });
 
-async function prepareEncoded(port: MessagePort, id: string) {
-  const sink = new ImageSink(port, id, () => {}, true);
-  sinks.push(sink);
-  const handle = sink.open('image/png');
-  await sink.write(handle, pngHeader(1080, 18000));
-  return encodedImageSchema.parse(JSON.parse(await sink.close(handle)));
-}
-const unusedSmallImage = async (): Promise<never> => {
-  throw new Error('encoded operation must not call the small-image driver');
-};
-
-test('encoded reception waits for Java completion, then frees the Source slot without a raster decode', async () => {
-  const prepared = deferred<void>();
-  const java = deferred<void>();
-  const { manager, request, invoke, store, decode } = await setup(
-    unusedSmallImage,
-    true,
-    async (_source, _session, _page, port, id) => {
-      const result = await prepareEncoded(port, id);
-      prepared.resolve();
-      await java.promise;
-      return result;
-    },
-  );
-  const acquiring = manager.acquireEncodedImage(request);
-  const queued = manager.invoke(metadata(request, 'after-encoded'));
-  await prepared.promise;
-  expect(() =>
-    manager.borrowEncodedImage({
-      resourceId: 'unknown',
-      generation: request.generation,
-    }),
-  ).toThrow();
-  expect(invoke).not.toHaveBeenCalled();
-  expect(decode).not.toHaveBeenCalled();
-  java.resolve();
-  const descriptor = await acquiring;
-  await queued;
-  expect(invoke).toHaveBeenCalledOnce();
-  expect(descriptor).toMatchObject({
-    rawWidth: 1080,
-    rawHeight: 18000,
-    orientation: 1,
+test('formal host control delivers opaque Source bytes once with only ownership metadata', async () => {
+  const decode = vi.fn(() => {
+    throw new Error('UI owns decoding');
   });
-  const reference = {
-    resourceId: descriptor.resourceId,
-    generation: descriptor.generation,
-  };
-  const lease = manager.borrowEncodedImage(reference);
-  try {
-    expect(new Uint8Array(await lease.blob.arrayBuffer())).toEqual(
-      pngHeader(1080, 18000),
-    );
-    await manager.releaseImage(reference);
-    expect(store.snapshot).toEqual({ resources: 1, bytes: 33, pixels: 0 });
-    expect(() => manager.borrowEncodedImage(reference)).toThrow();
-    // A codec can still own this encoded page while later Source calls run.
-    await manager.invoke(metadata(request, 'while-codec-borrows'));
-    expect(invoke).toHaveBeenCalledTimes(2);
-  } finally {
-    lease.release();
-  }
-  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
-});
-
-test('encoded cancellation waits for Source unwind and prevents a late successful descriptor from publishing', async () => {
-  const prepared = deferred<void>();
-  const java = deferred<void>();
-  const { manager, request, invoke, store } = await setup(
-    unusedSmallImage,
-    true,
+  vi.stubGlobal('createImageBitmap', decode);
+  const bytes = new Uint8Array([255, 0, 173, 3]);
+  const acquire = vi.fn<NonNullable<RuntimeDriver['acquireImage']>>(
     async (_source, _session, _page, port, id) => {
-      const result = await prepareEncoded(port, id);
-      prepared.resolve();
-      await java.promise;
-      return result;
+      const sink = new ImageSink(port, id, () => {});
+      sinks.push(sink);
+      const handle = sink.open();
+      await sink.write(handle, bytes);
+      return processedImageSchema.parse(JSON.parse(await sink.close(handle)));
     },
   );
-  const acquiring = expect(
-    manager.acquireEncodedImage(request),
-  ).rejects.toMatchObject({ code: 'cancelled' });
-  await prepared.promise;
-  const queued = manager.invoke(metadata(request, 'after-encoded-cancel'));
-  let cancelled = false;
-  const stopping = manager
-    .cancelImage({
-      requestId: request.requestId,
-      generation: request.generation,
-    })
-    .then(() => {
-      cancelled = true;
-    });
-  await Promise.resolve();
-  expect(cancelled).toBe(false);
-  expect(invoke).not.toHaveBeenCalled();
-  java.resolve();
-  await stopping;
-  await acquiring;
-  await queued;
-  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
-});
-
-test('forged encoded Java metadata is rejected and host control returns the generated encoded descriptor', async () => {
-  const forged = await setup(
-    unusedSmallImage,
-    true,
-    async (_source, _session, _page, port, id) => ({
-      ...(await prepareEncoded(port, id)),
-      orientation: 8,
-    }),
-  );
-  await expect(
-    forged.manager.acquireEncodedImage(forged.request),
-  ).rejects.toMatchObject({ code: 'protocol_error' });
-  expect(forged.store.snapshot.resources).toBe(0);
-  const current = await setup(
-    unusedSmallImage,
-    true,
-    async (_source, _session, _page, port, id) => prepareEncoded(port, id),
-  );
+  const { manager, request, store } = await setup(acquire);
   vi.stubGlobal('window', { addEventListener: vi.fn() });
-  const api = installRuntime(current.manager);
+  const api = installRuntime(manager);
   const response = parseControlResponse(
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
-          requestId: 'encoded-control',
-          command: { case: 'acquireEncodedImage', value: current.request },
+          requestId: 'opaque-control',
+          command: { case: 'acquireImage', value: request },
         }),
       ),
     ),
   );
-  expect(response.result.case).toBe('encodedImage');
-  if (response.result.case !== 'encodedImage')
-    throw new Error('encoded response missing');
-  expect(response.result.value.rawHeight).toBe(18000);
-  await current.manager.releaseImage({
-    resourceId: response.result.value.resourceId,
-    generation: response.result.value.generation,
+  expect(response.result.case).toBe('image');
+  if (response.result.case !== 'image')
+    throw new Error('Image response missing');
+  const value = response.result.value;
+  expect(Object.keys(value).sort()).toEqual([
+    '$typeName',
+    'byteLength',
+    'generation',
+    'resourceId',
+    'url',
+  ]);
+  expect(value.byteLength).toBe(bytes.length);
+  expect(new Uint8Array(await (await fetch(value.url)).arrayBuffer())).toEqual(
+    bytes,
+  );
+  expect(acquire).toHaveBeenCalledOnce();
+  expect(decode).not.toHaveBeenCalled();
+  const released = parseControlResponse(
+    await api.control(
+      encodeControlRequest(
+        create(pb.ControlRequestSchema, {
+          requestId: 'opaque-release',
+          command: {
+            case: 'releaseImage',
+            value: {
+              resourceId: value.resourceId,
+              generation: value.generation,
+            },
+          },
+        }),
+      ),
+    ),
+  );
+  expect(released.result.case).toBe('released');
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
+});
+
+test('URL publication failure frees the Source slot and resource budget without retrying Source', async () => {
+  const acquire = vi.fn<NonNullable<RuntimeDriver['acquireImage']>>(
+    async (_source, _session, _page, port, id) => prepare(port, id),
+  );
+  const { manager, request, store, invoke } = await setup(acquire);
+  vi.spyOn(URL, 'createObjectURL').mockImplementationOnce(() => {
+    throw new Error('URL unavailable');
   });
+  const acquiring = expect(manager.acquireImage(request)).rejects.toThrow(
+    'URL unavailable',
+  );
+  const queued = manager.invoke(metadata(request, 'after-url-failure'));
+  await acquiring;
+  await queued;
+  expect(invoke).toHaveBeenCalledOnce();
+  expect(acquire).toHaveBeenCalledOnce();
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
 });

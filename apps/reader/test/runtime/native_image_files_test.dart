@@ -13,6 +13,11 @@ final class Files implements NativeImageFileStore {
   final copied = Completer<void>();
   Completer<void>? permitCopy;
   Completer<void>? permitCancel;
+  Completer<void>? permitRelease;
+  Completer<void>? permitClear;
+  final releaseStarted = Completer<void>();
+  final clearStarted = Completer<void>();
+  int releases = 0;
   int cancelled = 0;
   bool rejectCancel = false;
   bool rejectRelease = false;
@@ -21,7 +26,6 @@ final class Files implements NativeImageFileStore {
     required String requestId,
     required String generation,
     required wire.ImageResource resource,
-    bool tile = false,
   }) async {
     if (!copied.isCompleted) copied.complete();
     await permitCopy?.future;
@@ -41,13 +45,18 @@ final class Files implements NativeImageFileStore {
 
   @override
   Future<void> release(String resourceId, String generation) async {
+    releases++;
+    if (!releaseStarted.isCompleted) releaseStarted.complete();
     if (rejectRelease) throw StateError('release failed');
+    await permitRelease?.future;
     final file = files.remove(resourceId);
     if (file != null && await file.exists()) await file.delete();
   }
 
   @override
   Future<void> clear() async {
+    if (!clearStarted.isCompleted) clearStarted.complete();
+    await permitClear?.future;
     if (permitCopy != null && !permitCopy!.isCompleted) permitCopy!.complete();
     if (await root.exists()) await root.delete(recursive: true);
     files.clear();
@@ -84,13 +93,13 @@ void main() {
   late Files files;
   late NativeImageControl images;
   late List<wire.ControlRequest> calls;
-  var pixels = 100;
+  var byteLength = 1234;
   late Future<wire.ControlResponse> Function(wire.ControlRequest) handler;
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('native-image-test-');
     files = Files(directory);
     calls = [];
-    pixels = 100;
+    byteLength = 1234;
     handler = (request) async => request.hasAcquireImage()
         ? wire.ControlResponse(
             requestId: request.requestId,
@@ -98,10 +107,7 @@ void main() {
               resourceId: 'r-${request.acquireImage.requestId}',
               generation: 'g',
               url: 'blob:https://reader.example/image',
-              mimeType: 'image/png',
-              byteLength: 1234,
-              width: pixels,
-              height: pixels,
+              byteLength: byteLength,
             ),
           )
         : wire.ControlResponse(
@@ -198,7 +204,7 @@ void main() {
   );
 
   test(
-    'retained files count against resource and raster budgets until release',
+    'retained encoded files count against resource and byte budgets until release',
     () async {
       final retained = <wire.ImageResource>[];
       for (var index = 0; index < 6; index++) {
@@ -213,7 +219,7 @@ void main() {
       for (final image in retained) {
         await images.release(release(image.resourceId));
       }
-      pixels = 4096;
+      byteLength = 32 * 1024 * 1024;
       final one = (await images.acquire(acquire(8))).image;
       final two = (await images.acquire(acquire(9))).image;
       await expectLater(
@@ -273,6 +279,312 @@ void main() {
       await images.close();
       await rejected;
       expect(await directory.exists(), false);
+    },
+  );
+
+  for (final identity in ['matching', 'requestId', 'generation']) {
+    for (final failure in ['none', 'host', 'file']) {
+      test(
+        'cancel waits for late Source identity and cleanup ($identity, $failure)',
+        () async {
+          final entered = Completer<void>();
+          final source = Completer<wire.ControlResponse>();
+          files.rejectRelease = failure == 'file';
+          handler = (request) async {
+            if (request.hasAcquireImage()) {
+              entered.complete();
+              return source.future;
+            }
+            if (request.hasReleaseImage() && failure == 'host') {
+              return wire.ControlResponse(
+                requestId: request.requestId,
+                error: wire.RuntimeError(
+                  code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+                  message: 'release rejected',
+                ),
+              );
+            }
+            return wire.ControlResponse(
+              requestId: request.requestId,
+              released: wire.Released(released: true),
+            );
+          };
+          final confirmed = identity == 'matching' && failure == 'none';
+          final acquisition = expectLater(
+            images.acquire(acquire(1)),
+            throwsA(
+              code(
+                confirmed
+                    ? RuntimeErrorCode.cancelled
+                    : RuntimeErrorCode.runtimeLost,
+              ),
+            ),
+          );
+          await entered.future;
+          var ended = false;
+          final cancelled = images
+              .cancel(cancel(1))
+              .whenComplete(() => ended = true);
+          final cancellation = confirmed
+              ? expectLater(
+                  cancelled,
+                  completion(
+                    isA<wire.ControlResponse>().having(
+                      (value) => value.released.released,
+                      'released',
+                      true,
+                    ),
+                  ),
+                )
+              : expectLater(
+                  cancelled,
+                  throwsA(code(RuntimeErrorCode.runtimeLost)),
+                );
+          await Future<void>.delayed(Duration.zero);
+          expect(files.cancelled, 1);
+          expect(ended, false);
+          source.complete(
+            wire.ControlResponse(
+              requestId: identity == 'requestId'
+                  ? 'foreign-control'
+                  : 'control-1',
+              image: wire.ImageResource(
+                resourceId: 'late-resource',
+                generation: identity == 'generation'
+                    ? 'foreign-generation'
+                    : 'g',
+                byteLength: 1234,
+                url: 'blob:https://reader.example/late-image',
+              ),
+            ),
+          );
+          await Future.wait([
+            acquisition,
+            cancellation,
+          ]).timeout(const Duration(seconds: 2));
+          final releases = calls
+              .where((request) => request.hasReleaseImage())
+              .toList();
+          if (identity == 'generation') {
+            expect(releases, isEmpty);
+            expect(files.releases, 0);
+          } else {
+            expect(releases, hasLength(1));
+            expect(files.releases, 1);
+            expect(releases.single.releaseImage.resourceId, 'late-resource');
+            expect(releases.single.releaseImage.generation, 'g');
+          }
+          expect(files.files, isEmpty);
+        },
+      );
+    }
+  }
+
+  test(
+    'close ends cancellation waiting for the original Source response',
+    () async {
+      final source = Completer<wire.ControlResponse>();
+      final cancelled = Completer<void>();
+      handler = (request) async {
+        if (request.hasAcquireImage()) return source.future;
+        if (request.hasCancelImage()) cancelled.complete();
+        return wire.ControlResponse(
+          requestId: request.requestId,
+          released: wire.Released(released: true),
+        );
+      };
+      final acquisition = expectLater(
+        images.acquire(acquire(1)),
+        throwsA(code(RuntimeErrorCode.cancelled)),
+      );
+      final cancellation = expectLater(
+        images.cancel(cancel(1)),
+        throwsA(code(RuntimeErrorCode.runtimeLost)),
+      );
+      await cancelled.future;
+      await Future<void>.delayed(Duration.zero);
+      await images.close().timeout(const Duration(seconds: 2));
+      await Future.wait([
+        acquisition,
+        cancellation,
+      ]).timeout(const Duration(seconds: 2));
+      expect(await directory.exists(), false);
+      expect(source.isCompleted, false);
+    },
+  );
+
+  test(
+    'close interrupts hanging Source cancel only after local clear ACK',
+    () async {
+      final source = Completer<wire.ControlResponse>();
+      final entered = Completer<void>();
+      final reply = Completer<wire.ControlResponse>();
+      files.permitClear = Completer<void>();
+      handler = (request) async {
+        if (request.hasAcquireImage()) return source.future;
+        if (request.hasCancelImage()) {
+          entered.complete();
+          return reply.future;
+        }
+        return wire.ControlResponse(
+          requestId: request.requestId,
+          released: wire.Released(released: true),
+        );
+      };
+      final acquisition = expectLater(
+        images.acquire(acquire(1)),
+        throwsA(code(RuntimeErrorCode.runtimeLost)),
+      );
+      var ended = false;
+      final cancellation = expectLater(
+        images.cancel(cancel(1)).whenComplete(() => ended = true),
+        throwsA(code(RuntimeErrorCode.runtimeLost)),
+      );
+      await entered.future;
+      var closed = false;
+      final closing = images.close().then((_) => closed = true);
+      await files.clearStarted.future;
+      await Future<void>.delayed(Duration.zero);
+      expect(closed, false);
+      expect(ended, false);
+      expect(await directory.exists(), true);
+      files.permitClear!.complete();
+      await Future.wait([
+        closing,
+        acquisition,
+        cancellation,
+      ]).timeout(const Duration(seconds: 2));
+      expect(reply.isCompleted, false);
+      expect(await directory.exists(), false);
+    },
+  );
+
+  test(
+    'close interrupts hanging Blob release after local files clear',
+    () async {
+      final resource = (await images.acquire(acquire(1))).image;
+      final location = Uri.parse(resource.url);
+      final entered = Completer<void>();
+      final reply = Completer<wire.ControlResponse>();
+      files.permitRelease = Completer<void>();
+      files.permitClear = Completer<void>();
+      handler = (request) async {
+        if (request.hasReleaseImage()) {
+          entered.complete();
+          return reply.future;
+        }
+        return wire.ControlResponse(
+          requestId: request.requestId,
+          released: wire.Released(released: true),
+        );
+      };
+      var ended = false;
+      final releasing = expectLater(
+        images
+            .release(release(resource.resourceId))
+            .whenComplete(() => ended = true),
+        throwsA(code(RuntimeErrorCode.runtimeLost)),
+      );
+      await entered.future;
+      var closed = false;
+      final closing = images.close().then((_) => closed = true);
+      await files.clearStarted.future;
+      await Future<void>.delayed(Duration.zero);
+      expect(closed, false);
+      expect(ended, false);
+      expect(await File.fromUri(location).exists(), true);
+      files.permitClear!.complete();
+      await Future.wait([
+        closing,
+        releasing,
+      ]).timeout(const Duration(seconds: 2));
+      expect(await File.fromUri(location).exists(), false);
+      expect(reply.isCompleted, false);
+      files.permitRelease!.complete();
+    },
+  );
+
+  for (final cancelling in [false, true]) {
+    test(
+      'close interrupts unowned cleanup control (cancel=$cancelling)',
+      () async {
+        final entered = Completer<void>();
+        final reply = Completer<wire.ControlResponse>();
+        files.permitClear = Completer<void>();
+        handler = (request) {
+          entered.complete();
+          return reply.future;
+        };
+        var ended = false;
+        final cleanup = cancelling
+            ? images.cancel(cancel(99))
+            : images.release(release('missing'));
+        final rejected = expectLater(
+          cleanup.whenComplete(() => ended = true),
+          throwsA(code(RuntimeErrorCode.runtimeLost)),
+        );
+        await entered.future;
+        final closing = images.close();
+        await files.clearStarted.future;
+        await Future<void>.delayed(Duration.zero);
+        expect(ended, false);
+        files.permitClear!.complete();
+        await Future.wait([
+          closing,
+          rejected,
+        ]).timeout(const Duration(seconds: 2));
+        expect(reply.isCompleted, false);
+      },
+    );
+  }
+
+  test('concurrent release shares one local deletion and host ACK', () async {
+    final resource = (await images.acquire(acquire(1))).image;
+    files.permitRelease = Completer<void>();
+    final first = images.release(release(resource.resourceId));
+    final second = images.release(release(resource.resourceId));
+    await files.releaseStarted.future;
+    expect(files.releases, 1);
+    expect(calls.where((request) => request.hasReleaseImage()), hasLength(1));
+    expect(await File.fromUri(Uri.parse(resource.url)).exists(), true);
+    files.permitRelease!.complete();
+    final responses = await Future.wait([first, second]);
+    expect(responses.every((response) => response.released.released), true);
+    expect(files.files, isEmpty);
+  });
+
+  test('closed image control never restarts JS cleanup', () async {
+    await images.close();
+    final before = calls.length;
+    await expectLater(
+      images.cancel(cancel(99)),
+      throwsA(code(RuntimeErrorCode.runtimeLost)),
+    );
+    await expectLater(
+      images.release(release('missing')),
+      throwsA(code(RuntimeErrorCode.runtimeLost)),
+    );
+    expect(calls.length, before);
+  });
+
+  test(
+    'duplicate image identity preserves the displayed managed file',
+    () async {
+      final resource = (await images.acquire(acquire(1))).image;
+      handler = (request) async => wire.ControlResponse(
+        requestId: request.requestId,
+        image: resource.deepCopy()
+          ..url = 'blob:https://reader.example/duplicate',
+      );
+      await expectLater(
+        images.acquire(acquire(2)),
+        throwsA(code(RuntimeErrorCode.protocolError)),
+      );
+      final location = Uri.parse(resource.url);
+      expect(images.owns(resource.resourceId, 'g', location), true);
+      expect(await File.fromUri(location).exists(), true);
+      expect(files.releases, 0);
+      expect(calls.where((request) => request.hasReleaseImage()), isEmpty);
     },
   );
 

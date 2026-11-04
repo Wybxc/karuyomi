@@ -236,8 +236,8 @@ public class TeaHost {
                           (eu.kanade.tachiyomi.source.online.HttpSource) selected,
                           lease.page(),
                           new SourceImages.Sink() {
-                            public String open(String mimeType) throws java.io.IOException {
-                              return Bridge.imageOpen(mimeType);
+                            public String open() throws java.io.IOException {
+                              return Bridge.imageOpen();
                             }
 
                             public void write(String handle, byte[] bytes)

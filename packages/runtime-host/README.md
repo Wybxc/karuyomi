@@ -1,18 +1,20 @@
 # 公共运行宿主
 
-`host.html` 是 Web 与原生 WebView 共用的同源控制页，`host.js` 也可直接加载到 Flutter Web 页面。`window.karuyomiRuntime.ready` 只表示控制协议可用，始终保持 `sourceReady: false`；只有真实 TeaVM `hostInit`、`hostLoad` 成功且 Source IDs 与已验证清单一致时，`open()` 才返回 session。
+Web 页面加载 `host.js`，Native 在受控 WebView 中加载内置 host/Worker。唯一公开入口是 `window.karuyomiRuntime.control()`：输入与结果使用 `.proto` 生成的标准 ProtoJSON，每次带 `requestId` 并选择一个 command/result。`ready` 只表示控制协议可用，保持 `sourceReady: false`；真实 TeaVM 初始化和 Source ID 核对成功后，`open` 才返回 session。
 
-控制接口只传小型 DTO：
+当前命令包括：
 
-- `open({manifestPath, identity, expectedBuildId?, expectedBundleSha256?, userAgent?})` 返回 `{protocolVersion, workerInstanceId, generation, buildId, sources, capabilities}`。
-- `invoke({requestId, sourceId, operation, args, timeoutMs?})` 返回 `{requestId, generation, buildId, data}`。Source 操作只允许 `popular/latest/search/details/chapters/pages`，顺序进入 Java。
-- `cancel(requestId)` 取消排队任务；取消正在执行的任务会回收整代 Worker，不重放 Source 操作。
-- `fetchApi({path, method?, headers?, body?})` 使用相同 cookie 上下文访问同源 `/api`，返回 `{status, headers, body, redirected}`；控制请求/响应分别限制为 128 KiB / 2 MiB。
-- `rebuild()` 回收当前 Worker 并允许重新打开。`dispose()` 结束宿主；静默 Worker 最多有 1 秒提交文件系统状态，随后必定终止。
-- `acquireImage()` 明确返回 `unsupported_capability`，等待真实二进制与处理后图片资源通道通过验证。
+- `open` 返回绑定 Worker、generation、build 和 Source IDs 的 session；`invoke` 只允许 `popular/latest/search/details/chapters/pages`，Source 调用串行进入 Java。
+- `cancel` 取消排队 Source 请求；正在执行的普通 Source 调用通过回收 Worker 取消，不自动重放。
+- `acquireImage` 经原 Page、Source 请求与处理链收齐不透明编码字节，仅返回 `resourceId/generation/byteLength/url`。宿主不读取图片 MIME、尺寸、方向，不预解码，也不选择分片。Web 使用受管 Blob URL，Native 平台适配复制为受管文件；不具备交付能力的平台明确拒绝。
+- `cancelImage` 经独立通道停止生产，并等待 Java 退出；超过宽限回收 Worker。`releaseImage` 幂等释放正文；`closePageSession` 解除 Java 原始 Page 引用，不代替正文释放。图片合同见 [IMAGE-RESOURCES](../../docs/IMAGE-RESOURCES.md)。
+- `fetchApi` 访问同源私有 `/api` 时携带同源 cookie；公开索引/清单仅允许无凭据的静态 GET。控制正文请求/响应分别限制为 128 KiB / 2 MiB。
+- `rebuild` 回收当前 Worker 并允许重新打开；`dispose` 结束宿主，静默 Worker 最多有 1 秒提交文件系统状态，随后终止。
 
-清单、脚本和资源只能通过 Access 保护的 `/api/extensions` 获取。加载器拒绝跳转、登录 HTML、协议/ABI 不匹配、超预算与 SHA-256 不符的产物；执行前检查完整字节。构建清单不属于公共静态目录。缓存与文件系统以已确认身份、仓库、包、storage schema 的摘要隔离。Worker 回收后，旧 generation 或 workerInstanceId 的响应不进入当前会话。
+扩展索引、清单和 gzip 产物来自同源 `/extensions/` Static Assets，不经私有 API 或 Worker 转发正文，也不携带 Access/GitHub 凭据。加载器拒绝跳转、HTML、协议/ABI 不匹配、超预算与传输摘要错误。缓存与文件系统按已确认身份、仓库、包和 storage schema 隔离；旧 generation 或 workerInstanceId 的结果不得进入当前会话。
 
-`teaHttp` 仍使用 P0-A v1 文本/Base64 基线，POST `/api/bridge/http` 并携带同源 cookie、`X-App-Request: 1` 与 `X-Runtime-Build`。远程脚本能力未开放。此基线不表示 P0-B 二进制桥或 P0-F3 图片门已完成。
+Source HTTP 使用 v2 有界二进制协议，向 `/api/bridge/http` 发送小 metadata 与分帧正文，携带同源 cookie、`X-App-Request: 1` 与 `X-Runtime-Build`；图片/HTTP 大正文不进入控制 ProtoJSON。远程脚本能力仍未开放。
 
-运行 `pnpm --filter @karuyomi/runtime-host typecheck`、`pnpm exec vitest run packages/runtime-host/test`、`pnpm --filter @karuyomi/runtime-host build`。真实浏览器与 Source 网络集成回归见 [API 集成说明](../../apps/api/test/source-metadata-probe.md)；本地测试不能替代生产 Access 或原生真机验证。
+图片内容解释、解码与缓存属于 UI。当前默认使用 Flutter/平台直接解码；`runtime/image-codec` 仅作为独立候选维护，不进入默认构建与 Web/Native 打包，尚无同条件真机性能证据支持默认采用。
+
+工程检查入口：`pnpm --filter @karuyomi/runtime-host typecheck`、`pnpm exec vitest run packages/runtime-host/test`、`pnpm --filter @karuyomi/runtime-host build`。真实 Source、Access、图片阅读与设备峰值分别验收，范围见 [VERIFICATION](../../docs/VERIFICATION.md)；本地工程测试不能代替产品运行结果。

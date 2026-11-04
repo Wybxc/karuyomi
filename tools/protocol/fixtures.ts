@@ -83,21 +83,8 @@ export const pageList: JsonObject = {
 export const imageResource: JsonObject = {
   resourceId: 'resource-golden',
   generation,
-  mimeType: 'image/png',
   byteLength: 65536,
-  width: 1024,
-  height: 2048,
   url: 'blob:https://reader.invalid/golden',
-};
-
-export const encodedImage: JsonObject = {
-  resourceId: 'encoded-golden',
-  generation,
-  mimeType: 'image/png',
-  byteLength: 8 * 1024 * 1024,
-  rawWidth: 1080,
-  rawHeight: 40000,
-  orientation: 8,
 };
 
 const descriptor: JsonObject = {
@@ -200,53 +187,6 @@ const envelope: JsonObject = {
 };
 
 export const goldenFixtures: GoldenFixture[] = [
-  {
-    name: 'image-window-pending',
-    type: 'ControlResponse',
-    value: {
-      requestId,
-      imageWindow: {
-        pageId: 'image-page',
-        generation,
-        windowId: 'window-golden',
-        revision: 0,
-        state: 'IMAGE_WINDOW_STATE_PENDING',
-      },
-    },
-  },
-  {
-    name: 'image-window-failed',
-    type: 'ControlResponse',
-    value: {
-      requestId,
-      imageWindow: {
-        pageId: 'image-page',
-        generation,
-        windowId: 'window-golden',
-        revision: 13,
-        state: 'IMAGE_WINDOW_STATE_FAILED',
-        invalidatedLeaseIds: ['tile-golden'],
-        error,
-      },
-    },
-  },
-  {
-    name: 'image-frame-encoded-ack',
-    type: 'ImageFrameControl',
-    value: { ack: { seq: 3, encoded: encodedImage } },
-  },
-  {
-    name: 'worker-command-encoded-image',
-    type: 'WorkerCommand',
-    value: {
-      envelope,
-      acquireImage: {
-        request: imageRequest,
-        resourceId: 'encoded-golden',
-        encodedOnly: true,
-      },
-    },
-  },
   { name: 'manga-full-opaque-memo', type: 'Manga', value: manga },
   {
     name: 'manga-absent-optionals',
@@ -348,31 +288,6 @@ export const goldenFixtures: GoldenFixture[] = [
       ],
       ['cancel', { requestId, generation }],
       ['acquireImage', imageRequest],
-      ['acquireEncodedImage', imageRequest],
-      ['openImagePage', { resourceId: 'encoded-golden', generation }],
-      [
-        'requestImageWindow',
-        {
-          pageId: 'image-page',
-          generation,
-          windowId: 'window-golden',
-          sourceY: 39936,
-          sourceEndY: 40001,
-          denominator: 2,
-        },
-      ],
-      [
-        'waitImageWindow',
-        {
-          pageId: 'image-page',
-          generation,
-          windowId: 'window-golden',
-          afterRevision: 12,
-          timeoutMs: 25000,
-        },
-      ],
-      ['releaseImageTile', { leaseId: 'tile-golden', generation }],
-      ['closeImagePage', { pageId: 'image-page', generation }],
       ['cancelImage', { requestId, generation }],
       ['releaseImage', { resourceId: 'resource-golden', generation }],
       ['closePageSession', { pageSessionId: 'session-golden', generation }],
@@ -406,48 +321,6 @@ export const goldenFixtures: GoldenFixture[] = [
       ],
       ['session', session],
       ['image', imageResource],
-      ['encodedImage', encodedImage],
-      [
-        'imagePage',
-        { pageId: 'image-page', generation, encoded: encodedImage },
-      ],
-      [
-        'imageWindow',
-        {
-          pageId: 'image-page',
-          generation,
-          windowId: 'window-golden',
-          revision: 12,
-          state: 'IMAGE_WINDOW_STATE_COMPLETE',
-          header: {
-            width: 541,
-            height: 20001,
-            sourceWidth: 1081,
-            sourceHeight: 40001,
-            denominator: 2,
-          },
-          tiles: [
-            {
-              leaseId: 'tile-golden',
-              sessionId: 'codec-golden',
-              index: 78,
-              sourceRect: { x: 0, y: 39936, width: 1081, height: 65 },
-              denominator: 2,
-              provisional: false,
-              resource: {
-                resourceId: 'tile-golden',
-                generation,
-                mimeType: 'image/png',
-                byteLength: 65536,
-                width: 541,
-                height: 33,
-                url: 'blob:https://reader.invalid/tile-golden',
-              },
-            },
-          ],
-          invalidatedLeaseIds: ['tile-old-golden'],
-        },
-      ],
       ['released', { released: true }],
       ['closed', { closed: true }],
       ['completed', { completed: true }],
@@ -469,7 +342,7 @@ export const goldenFixtures: GoldenFixture[] = [
   })),
   ...(
     [
-      ['meta', { seq: 0, mimeType: 'image/png' }],
+      ['meta', {}],
       ['data', { seq: 1, byteLength: 65536 }],
       ['end', { seq: 2, totalBytes: 65536 }],
       [
@@ -479,10 +352,7 @@ export const goldenFixtures: GoldenFixture[] = [
           resource: {
             resourceId: 'resource-golden',
             generation,
-            mimeType: 'image/png',
             byteLength: 65536,
-            width: 1024,
-            height: 2048,
           },
         },
       ],
@@ -516,13 +386,9 @@ export const goldenFixtures: GoldenFixture[] = [
         {
           resourceId: 'resource-golden',
           generation,
-          mimeType: 'image/png',
           byteLength: 65536,
-          width: 1024,
-          height: 2048,
         },
       ],
-      ['encodedImage', encodedImage],
       ['closed', { closed: true }],
       ['error', error],
     ] satisfies Array<[string, JsonObject]>

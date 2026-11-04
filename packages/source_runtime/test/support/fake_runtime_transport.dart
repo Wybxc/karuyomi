@@ -38,21 +38,8 @@ final class FakeTransport implements RuntimeTransport {
         response.image = wire.ImageResource(
           resourceId: 'resource-1',
           generation: 'generation-1',
-          mimeType: 'image/png',
           byteLength: 1234,
-          width: 600,
-          height: 900,
           url: 'blob:https://reader.example/image-1',
-        );
-      case wire.ControlRequest_Command.acquireEncodedImage:
-        response.encodedImage = wire.EncodedImage(
-          resourceId: 'encoded-1',
-          generation: 'generation-1',
-          mimeType: 'image/png',
-          byteLength: 1234,
-          rawWidth: 1080,
-          rawHeight: 20000,
-          orientation: 1,
         );
       case wire.ControlRequest_Command.cancelImage ||
           wire.ControlRequest_Command.releaseImage:

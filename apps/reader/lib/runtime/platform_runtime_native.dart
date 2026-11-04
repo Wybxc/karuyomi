@@ -341,11 +341,7 @@ final class NativePlatformRuntime extends PlatformRuntime
       maxBytes: wire.controlRequestLimit,
     );
     final command = message.whichCommand();
-    if ({
-          wire.ControlRequest_Command.acquireImage,
-          wire.ControlRequest_Command.requestImageWindow,
-          wire.ControlRequest_Command.waitImageWindow,
-        }.contains(command) &&
+    if ({wire.ControlRequest_Command.acquireImage}.contains(command) &&
         !Platform.isIOS &&
         !Platform.isAndroid) {
       throw const RuntimeException(
@@ -358,8 +354,6 @@ final class NativePlatformRuntime extends PlatformRuntime
           wire.ControlRequest_Command.cancelImage,
           wire.ControlRequest_Command.releaseImage,
           wire.ControlRequest_Command.closePageSession,
-          wire.ControlRequest_Command.releaseImageTile,
-          wire.ControlRequest_Command.closeImagePage,
         }.contains(command)) {
       // Cleanup of an expired handle must not create a replacement WebView.
       await _resetting;
@@ -367,17 +361,11 @@ final class NativePlatformRuntime extends PlatformRuntime
         wire.ControlResponse(
           requestId: message.requestId,
           closed:
-              {
-                wire.ControlRequest_Command.closePageSession,
-                wire.ControlRequest_Command.closeImagePage,
-              }.contains(command)
+              {wire.ControlRequest_Command.closePageSession}.contains(command)
               ? wire.Closed(closed: true)
               : null,
           released:
-              {
-                wire.ControlRequest_Command.closePageSession,
-                wire.ControlRequest_Command.closeImagePage,
-              }.contains(command)
+              {wire.ControlRequest_Command.closePageSession}.contains(command)
               ? null
               : wire.Released(released: true),
         ),
@@ -417,35 +405,6 @@ final class NativePlatformRuntime extends PlatformRuntime
           images != null) {
         return wire.encodeProtoJson(
           await images.release(message),
-          maxBytes: wire.controlJsonLimit,
-        );
-      }
-      if ({
-        wire.ControlRequest_Command.requestImageWindow,
-        wire.ControlRequest_Command.waitImageWindow,
-      }.contains(command)) {
-        if (images == null) {
-          throw const RuntimeException(
-            RuntimeErrorCode.unsupportedCapability,
-            'This WebView does not support managed tile files',
-          );
-        }
-        return wire.encodeProtoJson(
-          await images.window(message),
-          maxBytes: wire.controlJsonLimit,
-        );
-      }
-      if (command == wire.ControlRequest_Command.releaseImageTile &&
-          images != null) {
-        return wire.encodeProtoJson(
-          await images.releaseTile(message),
-          maxBytes: wire.controlJsonLimit,
-        );
-      }
-      if (command == wire.ControlRequest_Command.closeImagePage &&
-          images != null) {
-        return wire.encodeProtoJson(
-          await images.closeImagePage(message),
           maxBytes: wire.controlJsonLimit,
         );
       }

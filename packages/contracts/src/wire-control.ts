@@ -24,14 +24,6 @@ import {
   cancelImageSchema,
   closePageSessionSchema,
   imageResourceSchema,
-  encodedImageSchema,
-  openImagePageSchema,
-  requestImageWindowSchema,
-  waitImageWindowSchema,
-  releaseImageTileSchema,
-  closeImagePageSchema,
-  imagePageSchema,
-  imageWindowSnapshotSchema,
   processedImageSchema,
   releaseImageSchema,
   closedSchema,
@@ -137,15 +129,6 @@ export function validateWorkerResponse(
         'Image result does not match its envelope',
       );
       break;
-    case 'encodedImage':
-      encodedImageSchema.parse(
-        messageJson(pb.EncodedImageSchema, value.result.value),
-      );
-      requireCondition(
-        value.result.value.generation === rpc.generation,
-        'Encoded image result does not match its envelope',
-      );
-      break;
     case 'closed':
       closedSchema.parse(messageJson(pb.ClosedSchema, value.result.value));
       break;
@@ -191,34 +174,8 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
       validId(value.command.value.generation);
       break;
     case 'acquireImage':
-    case 'acquireEncodedImage':
       acquireImageSchema.parse(
         messageJson(pb.AcquireImageSchema, value.command.value),
-      );
-      break;
-    case 'openImagePage':
-      openImagePageSchema.parse(
-        messageJson(pb.OpenImagePageSchema, value.command.value),
-      );
-      break;
-    case 'requestImageWindow':
-      requestImageWindowSchema.parse(
-        messageJson(pb.RequestImageWindowSchema, value.command.value),
-      );
-      break;
-    case 'waitImageWindow':
-      waitImageWindowSchema.parse(
-        messageJson(pb.WaitImageWindowSchema, value.command.value),
-      );
-      break;
-    case 'releaseImageTile':
-      releaseImageTileSchema.parse(
-        messageJson(pb.ReleaseImageTileSchema, value.command.value),
-      );
-      break;
-    case 'closeImagePage':
-      closeImagePageSchema.parse(
-        messageJson(pb.CloseImagePageSchema, value.command.value),
       );
       break;
     case 'cancelImage':
@@ -268,21 +225,6 @@ export function validateControlResponse(
     case 'image':
       imageResourceSchema.parse(
         messageJson(pb.ImageResourceSchema, value.result.value),
-      );
-      break;
-    case 'encodedImage':
-      encodedImageSchema.parse(
-        messageJson(pb.EncodedImageSchema, value.result.value),
-      );
-      break;
-    case 'imagePage':
-      imagePageSchema.parse(
-        messageJson(pb.ImagePageSchema, value.result.value),
-      );
-      break;
-    case 'imageWindow':
-      imageWindowSnapshotSchema.parse(
-        messageJson(pb.ImageWindowSnapshotSchema, value.result.value),
       );
       break;
     case 'released':

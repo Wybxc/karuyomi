@@ -151,7 +151,7 @@ test('generated host outputs do not change fingerprints; stable JSON uses lexica
   );
 });
 
-test('codec sources and the pinned material lock change the host identity while codec caches do not', (t) => {
+test('candidate codec sources, artifact locks and caches stay outside the Source host identity', (t) => {
   const f = fixture(t);
   for (const name of HOST_PATHS) {
     f.put(
@@ -159,20 +159,30 @@ test('codec sources and the pinned material lock change the host identity while 
       'fixed host input\n',
     );
   }
-  f.put('runtime/image-codec/worker.ts', 'export const version = 1;\n');
-  f.put('runtime/image-codec/artifacts-lock.json', '{}\n');
+  const candidateInputs = [
+    'runtime/image-codec/png.c',
+    'runtime/image-codec/worker.ts',
+    'runtime/image-codec/assets.ts',
+    'runtime/image-codec/tile-store.ts',
+    'runtime/image-codec/artifacts-lock.json',
+    'tools/images/build.ts',
+    'tools/images/artifacts.ts',
+  ];
+  for (const name of candidateInputs) f.put(name, 'candidate input v1\n');
   const before = hostFingerprint(f.root).fingerprint;
+  for (const name of candidateInputs) {
+    f.put(name, 'candidate input v2\n');
+    assert.equal(hostFingerprint(f.root).fingerprint, before, name);
+  }
   f.put(
     'runtime/image-codec/.local/build/generated.wasm',
     'ignored cached build',
   );
   assert.equal(hostFingerprint(f.root).fingerprint, before);
-  f.put('runtime/image-codec/worker.ts', 'export const version = 2;\n');
-  const codeChanged = hostFingerprint(f.root).fingerprint;
-  assert.notEqual(codeChanged, before);
-  f.put(
-    'runtime/image-codec/artifacts-lock.json',
-    '{"buildIdentity":"next"}\n',
-  );
-  assert.notEqual(hostFingerprint(f.root).fingerprint, codeChanged);
+
+  f.put('runtime/teavm/bridge/graphics-bridge.ts', 'changed Source bridge\n');
+  const bridgeChanged = hostFingerprint(f.root).fingerprint;
+  assert.notEqual(bridgeChanged, before);
+  f.put('packages/runtime-host/materials.ts', 'changed Source materials\n');
+  assert.notEqual(hostFingerprint(f.root).fingerprint, bridgeChanged);
 });

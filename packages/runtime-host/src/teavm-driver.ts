@@ -4,7 +4,6 @@ import type {
   SourceCall,
   SourcePayload,
   ProcessedImage,
-  EncodedImage,
   Closed,
 } from '@karuyomi/contracts';
 import {
@@ -12,7 +11,6 @@ import {
   javaSourceInvocation,
   parseJavaSourcePayload,
   processedImageSchema,
-  encodedImageSchema,
   closedSchema,
 } from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
@@ -37,14 +35,6 @@ export interface RuntimeDriver {
     resourceId: string,
     context: HttpCallContext,
   ): Promise<ProcessedImage>;
-  acquireEncodedImage?(
-    sourceId: string,
-    pageSessionId: string,
-    pageKey: string,
-    port: MessagePort,
-    resourceId: string,
-    context: HttpCallContext,
-  ): Promise<EncodedImage>;
   closePageSession?(
     pageSessionId: string,
     context: HttpCallContext,
@@ -72,7 +62,7 @@ export interface TeaVMGlobals {
   ) => Promise<Uint8Array | null>;
   teaHttpClose?: (handle: string) => void;
   teaHttpCancel?: (handle: string) => void;
-  teaImageOpen?: (mimeType: string) => string;
+  teaImageOpen?: () => string;
   teaImageWrite?: (handle: string, bytes: Uint8Array) => Promise<void>;
   teaImageClose?: (handle: string) => Promise<string>;
   teaImageCancel?: (handle: string) => void;
@@ -160,8 +150,7 @@ export class TeaVMDriver implements RuntimeDriver {
       this.captureAsync(() => this.binary().read(handle, maxBytes));
     scope.teaHttpClose = (handle) => this.binaryTransport?.close(handle);
     scope.teaHttpCancel = scope.teaHttpClose;
-    scope.teaImageOpen = (mimeType) =>
-      this.capture(() => this.images().open(mimeType));
+    scope.teaImageOpen = () => this.capture(() => this.images().open());
     scope.teaImageWrite = (handle, bytes) =>
       this.captureAsync(() => this.images().write(handle, bytes));
     scope.teaImageClose = (handle) =>
@@ -368,28 +357,6 @@ export class TeaVMDriver implements RuntimeDriver {
         port,
         resourceId,
         context,
-        false,
-      ),
-    );
-  }
-
-  async acquireEncodedImage(
-    sourceId: string,
-    pageSessionId: string,
-    pageKey: string,
-    port: MessagePort,
-    resourceId: string,
-    context: HttpCallContext,
-  ): Promise<EncodedImage> {
-    return encodedImageSchema.parse(
-      await this.acquireImageResult(
-        sourceId,
-        pageSessionId,
-        pageKey,
-        port,
-        resourceId,
-        context,
-        true,
       ),
     );
   }
@@ -401,23 +368,17 @@ export class TeaVMDriver implements RuntimeDriver {
     port: MessagePort,
     resourceId: string,
     context: HttpCallContext,
-    encodedOnly: boolean,
   ): Promise<unknown> {
     if (this.waiter)
       throw new RuntimeFailure(
         'protocol_error',
         'Concurrent TeaVM entry is not allowed',
       );
-    const sink = new ImageSink(
-      port,
-      resourceId,
-      (error) => {
-        this.imageFailure ??= error;
-        this.binaryTransport?.end();
-        this.cancelGraphics();
-      },
-      encodedOnly,
-    );
+    const sink = new ImageSink(port, resourceId, (error) => {
+      this.imageFailure ??= error;
+      this.binaryTransport?.end();
+      this.cancelGraphics();
+    });
     this.imageSink = sink;
     this.imageFailure = undefined;
     try {

@@ -1,17 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import type {
-  ImageTileOptions,
-  ImageTileEvent,
-} from '../../../runtime/image-codec/client.ts';
-import type { ImageHeader } from '../../../runtime/image-codec/decoder.ts';
-import type { ImageTileTerminal } from '../../../runtime/image-codec/worker-protocol.ts';
-import type { PreparedImageCodecAssets } from '../src/image-codec-assets.js';
+import type { ImageTileOptions, ImageTileEvent } from '../client.ts';
+import type { ImageHeader } from '../decoder.ts';
+import type { ImageTileTerminal } from '../worker-protocol.ts';
+import type { PreparedImageCodecAssets } from '../assets.ts';
 import {
   IMAGE_TILE_STORE_LIMITS,
   ImageTileStore,
   type ImageTileDecodeSession,
   type ImageTileWindowSnapshot,
-} from '../src/image-tile-store.js';
+} from '../tile-store.ts';
 
 function gate() {
   let release = () => {};

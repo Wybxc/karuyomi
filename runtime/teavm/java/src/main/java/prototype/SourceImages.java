@@ -8,7 +8,6 @@ import kotlin.ResultKt;
 import kotlin.coroutines.Continuation;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 import kotlinx.coroutines.Dispatchers;
-import okhttp3.MediaType;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okio.Buffer;
@@ -17,7 +16,7 @@ import okio.BufferedSource;
 /** Calls the original Source image API and exports only its processed response body. */
 public final class SourceImages {
   public interface Sink {
-    String open(String mimeType) throws IOException;
+    String open() throws IOException;
 
     void write(String handle, byte[] bytes) throws IOException;
 
@@ -55,12 +54,7 @@ public final class SourceImages {
         long length = body.contentLength();
         if (length < -1 || length > HttpBodySource.MAX_RESPONSE)
           throw new IOException("Processed image exceeds 64 MiB or has an invalid length");
-        MediaType contentType = body.contentType();
-        String mimeType =
-            contentType == null
-                ? "application/octet-stream"
-                : contentType.type() + "/" + contentType.subtype();
-        handle = sink.open(mimeType);
+        handle = sink.open();
         if (handle == null || handle.isEmpty()) throw new IOException("Missing image sink handle");
         pump(body.source(), length, sink, handle);
       }

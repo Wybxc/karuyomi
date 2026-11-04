@@ -234,6 +234,10 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 同期正式 Native main 成品、62 份 Dart 和内置材料核对一致，正常 TLS、Secure/HttpOnly Cookie 与真实 RS256 Worker 的九项预验通过；当前 CUA 无法连接 Simulator，App 未安装/启动，UI 保持 `not_run` / `passed=false`。测试服务、模拟器和工具启动的 Xcode 已清理，见[Native 主入口记录](verification/native-main-entry.md)。
 
+## UI 图片职责与分片选型
+
+2026-11-04 当前原型已将 Source 图片交付统一为不透明编码资源；MIME、尺寸、EXIF、完整解码与分片决策移至 UI，Flutter 从实际显示所用 ImageStream 学习尺寸。旧 host 编码页/分片控制已移除，历史证据保持原输入；独立分片库仅候选，退出默认构建与 Web/Native 打包。工程检查、所有权边界与限制见[本轮记录](verification/ui-image-boundary.md)。候选算法尚无相对 Flutter 直接解码或平台区域解码的同条件真机性能依据，下一步先建立 UI 直接解码基线；不能用有界缓冲、WASM heap 或正确性证明性能优越。
+
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。

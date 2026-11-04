@@ -210,22 +210,22 @@ public final class Bridge {
     httpControl("teaHttpCancel", handle);
   }
 
-  public static String imageOpen(String mimeType) throws IOException {
+  public static String imageOpen() throws IOException {
     String[] value = new String[1];
     HttpError error = new HttpError();
-    imageOpen(mimeType, result -> value[0] = result, error::accept);
+    imageOpen(result -> value[0] = result, error::accept);
     error.check();
     if (value[0] == null || value[0].isEmpty()) throw new IOException("Missing image sink handle");
     return value[0];
   }
 
   @JSBody(
-      params = {"mimeType", "ok", "fail"},
+      params = {"ok", "fail"},
       script =
-          "try { ok(self.teaImageOpen(mimeType)); } catch (failureReason)"
+          "try { ok(self.teaImageOpen()); } catch (failureReason)"
               + " {fail(String(failureReason.message || failureReason), String(failureReason.name"
               + " || 'Error'), String(failureReason.code || '')); }")
-  private static native void imageOpen(String mimeType, Reply ok, HttpFailure fail);
+  private static native void imageOpen(Reply ok, HttpFailure fail);
 
   public static void imageWrite(String handle, byte[] bytes) throws IOException {
     if (bytes.length < 1 || bytes.length > HttpBodySource.MAX_CHUNK)

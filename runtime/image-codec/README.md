@@ -1,6 +1,12 @@
-# 图片 codec 构建依赖
+# 图片 codec 候选库
 
-当前已内化 PNG/JPEG 解码与 PNG 编码的 C 适配、严格 TypeScript 顺序接口、独立 codec Worker，以及官方 SDK 准备器与构建器。Worker 消费有界 Blob 并输出 PNG 条带；材料加入 Web Static Assets / Native 内置目录。正式 Source 所有权、Protobuf、缓存和 Flutter 阅读器接入仍按[长图计划](../../docs/plan/reader-image-decoding.md)推进。历史 Node/Web 机制与正式源码验收分别见[长图 codec 验证](../../docs/verification/long-image-codec.md)。
+这里保留 PNG/JPEG 解码、PNG 编码的 C 适配、严格 TypeScript 顺序接口、独立 Worker 和可复现工具链，**仅作为显式验证的分片候选，不进入默认构建或 Web/Native 产品打包**。当前 Reader 直接使用 Flutter/平台解码，图片识别、尺寸、方向、预算与缓存属于 UI；Source host 只交付处理后的编码字节，不调用本库或选择分片。
+
+现有证据证明部分格式可顺序生成 PNG 条带并执行局部限额，没有同条件真机性能依据支持将其设为默认。先建立直接解码基线，再比较首个可见 frame、跳转、滚动、CPU、峰值 RSS/GPU；采用门槛见[解码设计](../../docs/design/reader-image-decoding.md)。Reader 分片、LOD、方向映射和 Native 消费均未接入。
+
+`client.ts/worker.ts` 提供独立 codec 会话；`assets.ts`、`tile-store.ts`、`errors.ts` 从原宿主内化到客户端库，分别负责材料准备、窗口与租约、局部错误。它们不依赖 Source host，原宿主页控制协议已删除。材料准备由调用方显式提供目录和 loader；默认应用不下载、内嵌或发布这些候选资源。
+
+历史构建、Node 像素与独立浏览器 Worker 的原始身份、素材及限制保留于[codec 验证](../../docs/verification/long-image-codec.md)，不作为当前 Reader 或 Native 验收。下列命令专供维护与复验候选，不是正常产品构建的前置步骤。
 
 ## 准备工具链
 
@@ -30,11 +36,9 @@ pnpm test:image-codecs
 
 准备器通过不表示已经生成产品 WASM，也不表示 Source、Flutter、Native、真机或进程/GPU 峰值验收完成。
 
-## 本轮验证
+## 工具链历史证据
 
-2026-11-04，在 macOS arm64 上用已保存的 282,468,276 B 官方归档执行正式 CLI 离线安装，exit=0，耗时 19.51 s；随后不传 `--archive` 复用同一安装，exit=0，耗时 0.339 s，没有下载。实际版本为 Node 24.15.0、Python 3.15.2、Emscripten 5.0.7-git、Clang 23.0.0git、Binaryen 129，与锁一致。摘要保存在忽略的 `.local/image-codec-toolchain-acceptance/`。
-
-19 项回归覆盖离线复用、归档大小与摘要错误、完成记录/身份/可执行文件不一致、HTTP 限额与取消、父进程退出后持有 stdio 的后代清理和主动取消。后两项实际完成清理，不只核对配置；结束后没有本轮准备器、夹具、临时安装或锁残留。Linux 官方归档仍待验收；正式 codec 构建与运行证据按下文独立记录。
+macOS arm64 官方归档已按锁文件完成真实离线安装与复用；归档验证、HTTP 限额、取消、进程组与锁清理均有独立回归。原始输入身份和限制见[codec 验证](../../docs/verification/long-image-codec.md)，详细临时摘要留在忽略目录。Linux 官方 SDK 仍待实际执行验收；不能用历史 Linux 材料装配结果代替它。
 
 ## 固定上游与正式构建
 
@@ -59,7 +63,7 @@ pnpm image-codecs:build --zlib-archive /absolute/path/zlib.tar.gz
 
 `decoder.ts` 的 `decodeImage({bytes,codecUrl,format,denominator?,signal?})` 返回单消费者 session。异步事件依次为 header、连续字节 chunk 和 terminal；每个 chunk 至多 64 KiB，消费者下一次拉取才推进，没有在运行时积存完整 raster。chunk 可以跨行，不能直接用作 Flutter tile。`completion` 在真正 close 后提供结果、错误阶段与计量；显式取消、signal abort 和消费者退出都驱动清理。加载等待可以立即取消，迟到实例不再接纳、迟到拒绝会被消费；底层动态导入/WASM 初始化本身仍不可中断，尚未取得实例时计量为 null、close 不冒充成功。取消只能发生在同步 C 调用之间；原始 WASM 实例同一时刻只有一个 lease，清理失败的实例不再复用。
 
-首批能力明确为非隔行 RGBA8 PNG，以及 8-bit 单 scan 顺序 Huffman 灰度/RGB/YCbCr JPEG；PNG 仅分母1，JPEG 支持1/2/4。编码输入不超过8 MiB、C 请求 payload不超过16 MiB、条带不超过256行；宽不超过4096，PNG高不超过100000，JPEG高不超过65500。不支持的颜色、隔行或多 scan 输入明确拒绝，不沿用原型产品整图解码路径的更广范围。
+首批能力明确为非隔行 RGBA8 PNG，以及 8-bit 单 scan 顺序 Huffman 灰度/RGB/YCbCr JPEG；PNG 仅分母1，JPEG 支持1/2/4。编码输入不超过8 MiB、C 请求 payload不超过16 MiB、条带不超过256行；宽不超过4096，PNG高不超过100000，JPEG高不超过65500。不支持的颜色、隔行或多 scan 输入明确拒绝，这些限制仅属于候选，不筛选 Source 正文或改变普通图直接解码能力。
 
 普通工程回归使用小夹具，不下载或编译 SDK；真实验收另行运行，避免在 CI 隐式触发全工具链构建：
 
@@ -70,19 +74,19 @@ pnpm image-codecs:check --build runtime/image-codec/.local/build/<identity>
 
 真实命令使用锁定的 Sharp 重新生成超16 Mi像素合成长图，PNG完整像素对照原始RGBA，JPEG对照Sharp重新解码结果；消费者增量校验完整流和首/中/末区域。另测同线程 pull 暂停窗口、取消、消费者退出、截尾、首版不支持格式、ABI长度与释放/peak重置。四幅长图分别记录 heap/payload；同线程背压不等同跨 Worker ACK。JPEG新一轮缩放只核尺寸及字节数，历史独立原生djpeg像素对照单独保留。参考图生成和Sharp完整解码内存不属于被测WASM计量；这里不报告进程/GPU峰值。报告只写忽略的 `.local`，不依赖临时探针目录。
 
-2026-11-04，正式源码的两次同主机独立缓存构建及 19 项真实 WASM 回归已通过；四幅图的完整输出及首/中/末摘要一致，heap 均为 16 MiB。第二次构建使用无效 ambient flags，四份生成资产仍逐字节相同；输入身份与详细范围见[正式证据](../../docs/verification/long-image-codec.md#正式源码构建与-node-验收)。无 SDK 下载的工程回归共 53 项，覆盖工具链、builder 与运行库生命周期，已通过 `pnpm check`。
-
-正式源码的 Node 回归不能代替新产物的浏览器、Native 内置执行、原 Source 图片链、Flutter、LOD/位置恢复或真实设备验收；材料和协议接线后仍需逐项完成这些门。
+同主机独立缓存构建、真实 WASM 回归及不依赖 SDK 下载的工程回归保留于[正式源码证据](../../docs/verification/long-image-codec.md#正式源码构建与-node-验收)。它们不能代替新产物的浏览器、Native 执行、原 Source 图片链、Flutter 或设备性能对照。
 
 ## 独立 Worker 与 PNG 条带
 
 `client.ts` 的 `decodeImageTiles()` 消费插件处理后的受管 `Blob`；单个专用 module Worker 与 Source Worker 分开。输入在读取前限制为 8 MiB，PNG/JPEG decoder 顺序输出，独立 libspng encoder 将至多 256 行 RGBA 编为 PNG。每块传输至多 64 KiB，等待 ACK 后再发；下一条带由消费者下一次 pull 驱动。最大宽 4096、RGBA 条带 4 MiB、编码 PNG 8 MiB。两个 WASM 各自最多 32 MiB heap / 16 MiB C payload；合计上界不代表实际同时峰值或进程 RSS。
 
-事件为 header、tile 与 terminal；tile 的 `sourceRect` 保留原图坐标，所有 tile 在真实 IEND/EOI 完成前都是 provisional。终态失败或取消必须作废该页已交付 tiles。消费者退出、AbortSignal、超时均取消；协作清理读真实 C 账本，超出 grace 则 terminate，强制终止的未取得计量为 null，不能当作已测 heap 归零。宿主将已验证模块 URL 的 `release()` 作为 `releaseModules` 传入，客户端在 Worker 终止后调用。
+事件为 header、tile 与 terminal；tile 的 `sourceRect` 保留原图坐标，所有 tile 在真实 IEND/EOI 完成前都是 provisional。终态失败或取消必须作废该页已交付 tiles。消费者退出、AbortSignal、超时均取消；协作清理读真实 C 账本，超出 grace 则 terminate，强制终止的未取得计量为 null，不能当作已测 heap 归零。调用方将已验证模块 URL 的 `release()` 作为 `releaseModules` 传入，在 Worker 终止后释放。
 
-`prepareImageCodecAssets()` 通过正式 VerifiedLoader 验证 Worker、decoder/encoder 模块与两份 WASM 后才创建 Blob URL。已有 WASM 字节传入 Emscripten，不从相对 URL 回退下载。`MaterialCatalog.imageCodecs` 独立于 Source hostScripts/resources：Web 只交付一份共享 Static Assets；Native 由 `host.js` 内置所需字节和 resolver，公开 `window.karuyomiImageCodecs`，Source Worker 不预载 codec，Native 不请求远端材料。Native client 已 bundle，避免重复嵌入 Web client.js。当前只是运行库和材料接线，未改变产品 16 Mi 像素门。
+`assets.ts` 的 `prepareImageCodecAssets()` 使用调用方提供的结构化 loader，验证 Worker、decoder/encoder 模块与两份 WASM 后才创建 Blob URL。已有 WASM 字节传入 Emscripten，不从相对 URL 回退下载。`tile-store.ts` 管理单活动会话、有界扫尾、窗口 PNG 缓存与显示 lease，调用方负责 UI 图片识别、显示 URL/文件和 cache 引用。它不是 Source host 的页控制服务。
 
-真实浏览器验收工具使用正式 catalog、client、VerifiedLoader 和独立 Worker：
+此前 Web catalog、Native host 内嵌以及独立 `assets/image-codec/` 目录的装配均为已撤回的中间接线。候选退出默认材料与应用打包；若后续性能证据支持采用，再明确接入共享 Web Static Assets 或 Native 随应用资源，不能通过 Source host 隐式消费。
+
+独立浏览器验收工具显式装配候选 catalog、client、loader 与 Worker：
 
 ```sh
 pnpm image-codecs:check-worker --output .local/image-codec-worker/acceptance
@@ -90,9 +94,9 @@ pnpm image-codecs:check-worker --output .local/image-codec-worker/acceptance
 
 CLI 准备夹具和增量逐 tile Node 基准后提供 localhost URL；使用 Codex 内置浏览器点击运行，报告保存在同一忽略目录。工具检查四幅长图与高熵最大条带的全部 PNG SHA/几何、pull/ACK、取消、截尾和恢复，只保留首/中/末三幅预览；不会积存整图 raster。独立 Sharp 像素正确性由另行执行的 24 项 Node 门提供。通过页面关闭服务或 SIGINT 退出，服务还有有界存活期限。`--prepare-only` 只准备；可选 `--build <directory>` 校验并使用本地 builder 目录。
 
-## 供工程构建使用的固定产物
+## 供显式候选验证使用的固定产物
 
-`artifacts-lock.json` 固定三组模块、许可证、构建清单及来源身份。它是构建输入，归档属于独立运行时构建依赖；客户端扩展仍只从 Static Assets 下载。CI 不隐式编译 SDK，也不下载未验收的 Linux 工具链：
+`artifacts-lock.json` 固定三组模块、许可证、构建清单及来源身份。它是候选的固定构建输入，默认产品构建不消费归档。显式验证时也不隐式编译 SDK 或下载未验收的 Linux 工具链；扩展 Static Assets 分发规则不变：
 
 ```sh
 pnpm image-codecs:prepare-artifacts
@@ -110,6 +114,6 @@ pnpm image-codecs:package --build runtime/image-codec/.local/build/<identity> \
   --url https://github.com/Wybxc/karuyomi/releases/download/<dependency-tag>/image-codecs.tar.gz
 ```
 
-发布构建依赖时，tag 必须指向包含实际构建源码的提交；核实公开下载与锁一致后才让分支 CI 使用。扩展 AOT 与该归档分开，不能复用旧冻结 checkpoint 作为当前 host 身份。
+发布候选构建依赖时，tag 必须指向包含实际构建源码的提交，核实公开下载与锁一致；这不使默认分支构建自动消费候选。扩展 AOT 与该归档分开，不能复用旧冻结 checkpoint 作为当前 host 身份。
 
-2026-11-04，正式 catalog/client/VerifiedLoader/Worker 在 Codex 内置 Chromium 156 通过 11 项验收；四幅长图与高熵条带共 590 个基础 tile 的 PNG 字节和几何匹配 Node 同产物基准，另测 ACK/pull、取消、截尾及恢复。所有会话记录 terminal → terminate → release，最终活动 Worker 为零；25 ms 无迟到消息观察不等于物理 heap 已回收。服务已正常关闭、端口释放。完整身份与范围见[正式 Worker 证据](../../docs/verification/long-image-codec.md)；Source/Reader/Native 产品接线和峰值仍按计划待验。
+既有独立浏览器验收使用当时固定的 catalog/client/loader/Worker，在 Codex 内置 Chromium 156 对照 Node 同产物基准检查 PNG 字节、几何、背压、取消、截尾及恢复。完整身份与范围见[正式 Worker 历史证据](../../docs/verification/long-image-codec.md)；Worker 终止观察不等于物理 heap 归零，更不提供直接解码对照或真实设备峰值。候选目录迁移后的工程测试不自动继承旧浏览器环境的结论。

@@ -209,6 +209,27 @@ test('opaque memo numeric lexemes and optional scalar presence are exact', () =>
 
 const invalidFixtures: GoldenFixture[] = [
   {
+    name: 'source-resource-has-no-image-metadata',
+    type: 'ImageResource',
+    value: {
+      resourceId: 'opaque',
+      generation,
+      byteLength: 1,
+      url: 'blob:opaque',
+      mimeType: 'image/png',
+    },
+  },
+  {
+    name: 'image-meta-is-empty',
+    type: 'ImageFrameControl',
+    value: { meta: { seq: 0 } },
+  },
+  {
+    name: 'worker-has-no-encoded-selection',
+    type: 'WorkerCommand',
+    value: { acquireImage: { encodedOnly: true } },
+  },
+  {
     name: 'unknown-field',
     type: 'Manga',
     value: { url: '/a', unexpected: true },
@@ -485,10 +506,7 @@ test('UTF-8 request/memo, page-window and image transfer budgets are bounded', (
   const resource = {
     resourceId: 'resource',
     generation,
-    mimeType: 'image/png',
     byteLength: contract.IMAGE_BODY_LIMIT,
-    width: 4096,
-    height: 4096,
   };
   assert.doesNotThrow(() => contract.processedImageSchema.parse(resource));
   assert.throws(() =>
@@ -498,7 +516,7 @@ test('UTF-8 request/memo, page-window and image transfer budgets are bounded', (
     }),
   );
   assert.throws(() =>
-    contract.processedImageSchema.parse({ ...resource, height: 4097 }),
+    contract.processedImageSchema.parse({ ...resource, byteLength: 0 }),
   );
   assert.throws(() =>
     contract.processedImageSchema.parse({ ...resource, mimeType: 'text/html' }),
@@ -566,10 +584,7 @@ test('Worker envelopes bind Source and image request/generation/build identities
   const image = {
     resourceId: 'resource',
     generation: 'other',
-    mimeType: 'image/png',
     byteLength: 1,
-    width: 1,
-    height: 1,
   };
   assert.throws(() => contract.workerResponseSchema.parse({ envelope, image }));
   assert.throws(() =>

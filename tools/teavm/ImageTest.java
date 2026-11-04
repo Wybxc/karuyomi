@@ -59,6 +59,7 @@ public final class ImageTest {
     final BufferedSource source;
     final long length;
     boolean closed;
+    int contentTypeReads;
 
     TrackedBody(byte[] bytes, long length, boolean failRead) {
       this.length = length;
@@ -83,7 +84,8 @@ public final class ImageTest {
 
     @Override
     public MediaType contentType() {
-      return MediaType.get("image/png");
+      contentTypeReads++;
+      return MediaType.get("application/octet-stream");
     }
 
     @Override
@@ -199,8 +201,7 @@ public final class ImageTest {
       this.source = source;
     }
 
-    public String open(String mime) {
-      check(mime.equals("image/png"));
+    public String open() {
       opens++;
       return "fixture-handle";
     }
@@ -285,7 +286,7 @@ public final class ImageTest {
   static void bodyLimits() throws Exception {
     SourceImages.Sink discard =
         new SourceImages.Sink() {
-          public String open(String mime) {
+          public String open() {
             return "unused";
           }
 
@@ -386,6 +387,7 @@ public final class ImageTest {
       check(first.opens == 1 && first.closes == 1 && first.cancels == 0 && first.maximum <= 65536);
       check(source.resolutions == 1 && source.imageRequests == 1 && source.processed.closed);
       check(page.updates > 0 && page.completed);
+      check(source.processed.contentTypeReads == 0);
       Sink second = new Sink(source);
       SourceImages.acquire(source, page, second);
       check(source.resolutions == 1 && source.imageRequests == 2);

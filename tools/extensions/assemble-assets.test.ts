@@ -23,6 +23,7 @@ async function fixture(t: TestContext) {
   const root = await mkdtemp(path.join(tmpdir(), 'karuyomi-static-assemble-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const { catalog } = await collectMaterials({
+    includeImageCodecs: true,
     includeWasmBytes: false,
     imageCodecArtifacts: await imageCodecMaterialFixture(
       path.join(root, 'codecs'),

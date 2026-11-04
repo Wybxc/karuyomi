@@ -44,23 +44,6 @@ final $typed_data.Uint8List runtimeErrorCodeDescriptor = $convert.base64Decode(
     'Uk9SX0NPREVfUFJPVE9DT0xfRVJST1IQCBImCiJSVU5USU1FX0VSUk9SX0NPREVfSU5URUdSSV'
     'RZX0VSUk9SEAkSJQohUlVOVElNRV9FUlJPUl9DT0RFX0xJTUlUX0VYQ0VFREVEEAo=');
 
-@$core.Deprecated('Use imageWindowStateDescriptor instead')
-const ImageWindowState$json = {
-  '1': 'ImageWindowState',
-  '2': [
-    {'1': 'IMAGE_WINDOW_STATE_UNSPECIFIED', '2': 0},
-    {'1': 'IMAGE_WINDOW_STATE_PENDING', '2': 1},
-    {'1': 'IMAGE_WINDOW_STATE_COMPLETE', '2': 2},
-    {'1': 'IMAGE_WINDOW_STATE_FAILED', '2': 3},
-  ],
-};
-
-/// Descriptor for `ImageWindowState`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List imageWindowStateDescriptor = $convert.base64Decode(
-    'ChBJbWFnZVdpbmRvd1N0YXRlEiIKHklNQUdFX1dJTkRPV19TVEFURV9VTlNQRUNJRklFRBAAEh'
-    '4KGklNQUdFX1dJTkRPV19TVEFURV9QRU5ESU5HEAESHwobSU1BR0VfV0lORE9XX1NUQVRFX0NP'
-    'TVBMRVRFEAISHQoZSU1BR0VfV0lORE9XX1NUQVRFX0ZBSUxFRBAD');
-
 @$core.Deprecated('Use bootstrapStageDescriptor instead')
 const BootstrapStage$json = {
   '1': 'BootstrapStage',
@@ -838,41 +821,15 @@ const ProcessedImage$json = {
   '2': [
     {'1': 'resource_id', '3': 1, '4': 1, '5': 9, '10': 'resourceId'},
     {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-    {'1': 'mime_type', '3': 3, '4': 1, '5': 9, '10': 'mimeType'},
-    {'1': 'byte_length', '3': 4, '4': 1, '5': 13, '10': 'byteLength'},
-    {'1': 'width', '3': 5, '4': 1, '5': 13, '10': 'width'},
-    {'1': 'height', '3': 6, '4': 1, '5': 13, '10': 'height'},
+    {'1': 'byte_length', '3': 3, '4': 1, '5': 13, '10': 'byteLength'},
   ],
 };
 
 /// Descriptor for `ProcessedImage`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List processedImageDescriptor = $convert.base64Decode(
     'Cg5Qcm9jZXNzZWRJbWFnZRIfCgtyZXNvdXJjZV9pZBgBIAEoCVIKcmVzb3VyY2VJZBIeCgpnZW'
-    '5lcmF0aW9uGAIgASgJUgpnZW5lcmF0aW9uEhsKCW1pbWVfdHlwZRgDIAEoCVIIbWltZVR5cGUS'
-    'HwoLYnl0ZV9sZW5ndGgYBCABKA1SCmJ5dGVMZW5ndGgSFAoFd2lkdGgYBSABKA1SBXdpZHRoEh'
-    'YKBmhlaWdodBgGIAEoDVIGaGVpZ2h0');
-
-@$core.Deprecated('Use encodedImageDescriptor instead')
-const EncodedImage$json = {
-  '1': 'EncodedImage',
-  '2': [
-    {'1': 'resource_id', '3': 1, '4': 1, '5': 9, '10': 'resourceId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-    {'1': 'mime_type', '3': 3, '4': 1, '5': 9, '10': 'mimeType'},
-    {'1': 'byte_length', '3': 4, '4': 1, '5': 13, '10': 'byteLength'},
-    {'1': 'raw_width', '3': 5, '4': 1, '5': 13, '10': 'rawWidth'},
-    {'1': 'raw_height', '3': 6, '4': 1, '5': 13, '10': 'rawHeight'},
-    {'1': 'orientation', '3': 7, '4': 1, '5': 13, '10': 'orientation'},
-  ],
-};
-
-/// Descriptor for `EncodedImage`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List encodedImageDescriptor = $convert.base64Decode(
-    'CgxFbmNvZGVkSW1hZ2USHwoLcmVzb3VyY2VfaWQYASABKAlSCnJlc291cmNlSWQSHgoKZ2VuZX'
-    'JhdGlvbhgCIAEoCVIKZ2VuZXJhdGlvbhIbCgltaW1lX3R5cGUYAyABKAlSCG1pbWVUeXBlEh8K'
-    'C2J5dGVfbGVuZ3RoGAQgASgNUgpieXRlTGVuZ3RoEhsKCXJhd193aWR0aBgFIAEoDVIIcmF3V2'
-    'lkdGgSHQoKcmF3X2hlaWdodBgGIAEoDVIJcmF3SGVpZ2h0EiAKC29yaWVudGF0aW9uGAcgASgN'
-    'UgtvcmllbnRhdGlvbg==');
+    '5lcmF0aW9uGAIgASgJUgpnZW5lcmF0aW9uEh8KC2J5dGVfbGVuZ3RoGAMgASgNUgpieXRlTGVu'
+    'Z3Ro');
 
 @$core.Deprecated('Use imageResourceDescriptor instead')
 const ImageResource$json = {
@@ -880,290 +837,25 @@ const ImageResource$json = {
   '2': [
     {'1': 'resource_id', '3': 1, '4': 1, '5': 9, '10': 'resourceId'},
     {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-    {'1': 'mime_type', '3': 3, '4': 1, '5': 9, '10': 'mimeType'},
-    {'1': 'byte_length', '3': 4, '4': 1, '5': 13, '10': 'byteLength'},
-    {'1': 'width', '3': 5, '4': 1, '5': 13, '10': 'width'},
-    {'1': 'height', '3': 6, '4': 1, '5': 13, '10': 'height'},
-    {'1': 'url', '3': 7, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'byte_length', '3': 3, '4': 1, '5': 13, '10': 'byteLength'},
+    {'1': 'url', '3': 4, '4': 1, '5': 9, '10': 'url'},
   ],
 };
 
 /// Descriptor for `ImageResource`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List imageResourceDescriptor = $convert.base64Decode(
     'Cg1JbWFnZVJlc291cmNlEh8KC3Jlc291cmNlX2lkGAEgASgJUgpyZXNvdXJjZUlkEh4KCmdlbm'
-    'VyYXRpb24YAiABKAlSCmdlbmVyYXRpb24SGwoJbWltZV90eXBlGAMgASgJUghtaW1lVHlwZRIf'
-    'CgtieXRlX2xlbmd0aBgEIAEoDVIKYnl0ZUxlbmd0aBIUCgV3aWR0aBgFIAEoDVIFd2lkdGgSFg'
-    'oGaGVpZ2h0GAYgASgNUgZoZWlnaHQSEAoDdXJsGAcgASgJUgN1cmw=');
-
-@$core.Deprecated('Use openImagePageDescriptor instead')
-const OpenImagePage$json = {
-  '1': 'OpenImagePage',
-  '2': [
-    {'1': 'resource_id', '3': 1, '4': 1, '5': 9, '10': 'resourceId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-  ],
-};
-
-/// Descriptor for `OpenImagePage`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List openImagePageDescriptor = $convert.base64Decode(
-    'Cg1PcGVuSW1hZ2VQYWdlEh8KC3Jlc291cmNlX2lkGAEgASgJUgpyZXNvdXJjZUlkEh4KCmdlbm'
-    'VyYXRpb24YAiABKAlSCmdlbmVyYXRpb24=');
-
-@$core.Deprecated('Use imagePageDescriptor instead')
-const ImagePage$json = {
-  '1': 'ImagePage',
-  '2': [
-    {'1': 'page_id', '3': 1, '4': 1, '5': 9, '10': 'pageId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-    {
-      '1': 'encoded',
-      '3': 3,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.EncodedImage',
-      '10': 'encoded'
-    },
-  ],
-};
-
-/// Descriptor for `ImagePage`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List imagePageDescriptor = $convert.base64Decode(
-    'CglJbWFnZVBhZ2USFwoHcGFnZV9pZBgBIAEoCVIGcGFnZUlkEh4KCmdlbmVyYXRpb24YAiABKA'
-    'lSCmdlbmVyYXRpb24SMwoHZW5jb2RlZBgDIAEoCzIZLmthcnV5b21pLnYxLkVuY29kZWRJbWFn'
-    'ZVIHZW5jb2RlZA==');
-
-@$core.Deprecated('Use requestImageWindowDescriptor instead')
-const RequestImageWindow$json = {
-  '1': 'RequestImageWindow',
-  '2': [
-    {'1': 'page_id', '3': 1, '4': 1, '5': 9, '10': 'pageId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-    {'1': 'window_id', '3': 3, '4': 1, '5': 9, '10': 'windowId'},
-    {'1': 'source_y', '3': 4, '4': 1, '5': 13, '10': 'sourceY'},
-    {'1': 'source_end_y', '3': 5, '4': 1, '5': 13, '10': 'sourceEndY'},
-    {'1': 'denominator', '3': 6, '4': 1, '5': 13, '10': 'denominator'},
-  ],
-};
-
-/// Descriptor for `RequestImageWindow`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List requestImageWindowDescriptor = $convert.base64Decode(
-    'ChJSZXF1ZXN0SW1hZ2VXaW5kb3cSFwoHcGFnZV9pZBgBIAEoCVIGcGFnZUlkEh4KCmdlbmVyYX'
-    'Rpb24YAiABKAlSCmdlbmVyYXRpb24SGwoJd2luZG93X2lkGAMgASgJUgh3aW5kb3dJZBIZCghz'
-    'b3VyY2VfeRgEIAEoDVIHc291cmNlWRIgCgxzb3VyY2VfZW5kX3kYBSABKA1SCnNvdXJjZUVuZF'
-    'kSIAoLZGVub21pbmF0b3IYBiABKA1SC2Rlbm9taW5hdG9y');
-
-@$core.Deprecated('Use waitImageWindowDescriptor instead')
-const WaitImageWindow$json = {
-  '1': 'WaitImageWindow',
-  '2': [
-    {'1': 'page_id', '3': 1, '4': 1, '5': 9, '10': 'pageId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-    {'1': 'window_id', '3': 3, '4': 1, '5': 9, '10': 'windowId'},
-    {'1': 'after_revision', '3': 4, '4': 1, '5': 13, '10': 'afterRevision'},
-    {
-      '1': 'timeout_ms',
-      '3': 5,
-      '4': 1,
-      '5': 13,
-      '9': 0,
-      '10': 'timeoutMs',
-      '17': true
-    },
-  ],
-  '8': [
-    {'1': '_timeout_ms'},
-  ],
-};
-
-/// Descriptor for `WaitImageWindow`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List waitImageWindowDescriptor = $convert.base64Decode(
-    'Cg9XYWl0SW1hZ2VXaW5kb3cSFwoHcGFnZV9pZBgBIAEoCVIGcGFnZUlkEh4KCmdlbmVyYXRpb2'
-    '4YAiABKAlSCmdlbmVyYXRpb24SGwoJd2luZG93X2lkGAMgASgJUgh3aW5kb3dJZBIlCg5hZnRl'
-    'cl9yZXZpc2lvbhgEIAEoDVINYWZ0ZXJSZXZpc2lvbhIiCgp0aW1lb3V0X21zGAUgASgNSABSCX'
-    'RpbWVvdXRNc4gBAUINCgtfdGltZW91dF9tcw==');
-
-@$core.Deprecated('Use releaseImageTileDescriptor instead')
-const ReleaseImageTile$json = {
-  '1': 'ReleaseImageTile',
-  '2': [
-    {'1': 'lease_id', '3': 1, '4': 1, '5': 9, '10': 'leaseId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-  ],
-};
-
-/// Descriptor for `ReleaseImageTile`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List releaseImageTileDescriptor = $convert.base64Decode(
-    'ChBSZWxlYXNlSW1hZ2VUaWxlEhkKCGxlYXNlX2lkGAEgASgJUgdsZWFzZUlkEh4KCmdlbmVyYX'
-    'Rpb24YAiABKAlSCmdlbmVyYXRpb24=');
-
-@$core.Deprecated('Use closeImagePageDescriptor instead')
-const CloseImagePage$json = {
-  '1': 'CloseImagePage',
-  '2': [
-    {'1': 'page_id', '3': 1, '4': 1, '5': 9, '10': 'pageId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-  ],
-};
-
-/// Descriptor for `CloseImagePage`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List closeImagePageDescriptor = $convert.base64Decode(
-    'Cg5DbG9zZUltYWdlUGFnZRIXCgdwYWdlX2lkGAEgASgJUgZwYWdlSWQSHgoKZ2VuZXJhdGlvbh'
-    'gCIAEoCVIKZ2VuZXJhdGlvbg==');
-
-@$core.Deprecated('Use imageSourceRectDescriptor instead')
-const ImageSourceRect$json = {
-  '1': 'ImageSourceRect',
-  '2': [
-    {'1': 'x', '3': 1, '4': 1, '5': 13, '10': 'x'},
-    {'1': 'y', '3': 2, '4': 1, '5': 13, '10': 'y'},
-    {'1': 'width', '3': 3, '4': 1, '5': 13, '10': 'width'},
-    {'1': 'height', '3': 4, '4': 1, '5': 13, '10': 'height'},
-  ],
-};
-
-/// Descriptor for `ImageSourceRect`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List imageSourceRectDescriptor = $convert.base64Decode(
-    'Cg9JbWFnZVNvdXJjZVJlY3QSDAoBeBgBIAEoDVIBeBIMCgF5GAIgASgNUgF5EhQKBXdpZHRoGA'
-    'MgASgNUgV3aWR0aBIWCgZoZWlnaHQYBCABKA1SBmhlaWdodA==');
-
-@$core.Deprecated('Use imageTileHeaderDescriptor instead')
-const ImageTileHeader$json = {
-  '1': 'ImageTileHeader',
-  '2': [
-    {'1': 'width', '3': 1, '4': 1, '5': 13, '10': 'width'},
-    {'1': 'height', '3': 2, '4': 1, '5': 13, '10': 'height'},
-    {'1': 'source_width', '3': 3, '4': 1, '5': 13, '10': 'sourceWidth'},
-    {'1': 'source_height', '3': 4, '4': 1, '5': 13, '10': 'sourceHeight'},
-    {'1': 'denominator', '3': 5, '4': 1, '5': 13, '10': 'denominator'},
-  ],
-};
-
-/// Descriptor for `ImageTileHeader`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List imageTileHeaderDescriptor = $convert.base64Decode(
-    'Cg9JbWFnZVRpbGVIZWFkZXISFAoFd2lkdGgYASABKA1SBXdpZHRoEhYKBmhlaWdodBgCIAEoDV'
-    'IGaGVpZ2h0EiEKDHNvdXJjZV93aWR0aBgDIAEoDVILc291cmNlV2lkdGgSIwoNc291cmNlX2hl'
-    'aWdodBgEIAEoDVIMc291cmNlSGVpZ2h0EiAKC2Rlbm9taW5hdG9yGAUgASgNUgtkZW5vbWluYX'
-    'Rvcg==');
-
-@$core.Deprecated('Use imageTileDescriptor instead')
-const ImageTile$json = {
-  '1': 'ImageTile',
-  '2': [
-    {'1': 'lease_id', '3': 1, '4': 1, '5': 9, '10': 'leaseId'},
-    {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
-    {'1': 'index', '3': 3, '4': 1, '5': 13, '10': 'index'},
-    {
-      '1': 'source_rect',
-      '3': 4,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.ImageSourceRect',
-      '10': 'sourceRect'
-    },
-    {'1': 'denominator', '3': 5, '4': 1, '5': 13, '10': 'denominator'},
-    {'1': 'provisional', '3': 6, '4': 1, '5': 8, '10': 'provisional'},
-    {
-      '1': 'resource',
-      '3': 7,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.ImageResource',
-      '10': 'resource'
-    },
-  ],
-};
-
-/// Descriptor for `ImageTile`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List imageTileDescriptor = $convert.base64Decode(
-    'CglJbWFnZVRpbGUSGQoIbGVhc2VfaWQYASABKAlSB2xlYXNlSWQSHQoKc2Vzc2lvbl9pZBgCIA'
-    'EoCVIJc2Vzc2lvbklkEhQKBWluZGV4GAMgASgNUgVpbmRleBI9Cgtzb3VyY2VfcmVjdBgEIAEo'
-    'CzIcLmthcnV5b21pLnYxLkltYWdlU291cmNlUmVjdFIKc291cmNlUmVjdBIgCgtkZW5vbWluYX'
-    'RvchgFIAEoDVILZGVub21pbmF0b3ISIAoLcHJvdmlzaW9uYWwYBiABKAhSC3Byb3Zpc2lvbmFs'
-    'EjYKCHJlc291cmNlGAcgASgLMhoua2FydXlvbWkudjEuSW1hZ2VSZXNvdXJjZVIIcmVzb3VyY2'
-    'U=');
-
-@$core.Deprecated('Use imageWindowSnapshotDescriptor instead')
-const ImageWindowSnapshot$json = {
-  '1': 'ImageWindowSnapshot',
-  '2': [
-    {'1': 'page_id', '3': 1, '4': 1, '5': 9, '10': 'pageId'},
-    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
-    {'1': 'window_id', '3': 3, '4': 1, '5': 9, '10': 'windowId'},
-    {'1': 'revision', '3': 4, '4': 1, '5': 13, '10': 'revision'},
-    {
-      '1': 'state',
-      '3': 5,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.ImageWindowState',
-      '10': 'state'
-    },
-    {
-      '1': 'header',
-      '3': 6,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.ImageTileHeader',
-      '9': 0,
-      '10': 'header',
-      '17': true
-    },
-    {
-      '1': 'tiles',
-      '3': 7,
-      '4': 3,
-      '5': 11,
-      '6': '.karuyomi.v1.ImageTile',
-      '10': 'tiles'
-    },
-    {
-      '1': 'invalidated_lease_ids',
-      '3': 8,
-      '4': 3,
-      '5': 9,
-      '10': 'invalidatedLeaseIds'
-    },
-    {
-      '1': 'error',
-      '3': 9,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.RuntimeError',
-      '9': 1,
-      '10': 'error',
-      '17': true
-    },
-  ],
-  '8': [
-    {'1': '_header'},
-    {'1': '_error'},
-  ],
-};
-
-/// Descriptor for `ImageWindowSnapshot`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List imageWindowSnapshotDescriptor = $convert.base64Decode(
-    'ChNJbWFnZVdpbmRvd1NuYXBzaG90EhcKB3BhZ2VfaWQYASABKAlSBnBhZ2VJZBIeCgpnZW5lcm'
-    'F0aW9uGAIgASgJUgpnZW5lcmF0aW9uEhsKCXdpbmRvd19pZBgDIAEoCVIId2luZG93SWQSGgoI'
-    'cmV2aXNpb24YBCABKA1SCHJldmlzaW9uEjMKBXN0YXRlGAUgASgOMh0ua2FydXlvbWkudjEuSW'
-    '1hZ2VXaW5kb3dTdGF0ZVIFc3RhdGUSOQoGaGVhZGVyGAYgASgLMhwua2FydXlvbWkudjEuSW1h'
-    'Z2VUaWxlSGVhZGVySABSBmhlYWRlcogBARIsCgV0aWxlcxgHIAMoCzIWLmthcnV5b21pLnYxLk'
-    'ltYWdlVGlsZVIFdGlsZXMSMgoVaW52YWxpZGF0ZWRfbGVhc2VfaWRzGAggAygJUhNpbnZhbGlk'
-    'YXRlZExlYXNlSWRzEjQKBWVycm9yGAkgASgLMhkua2FydXlvbWkudjEuUnVudGltZUVycm9ySA'
-    'FSBWVycm9yiAEBQgkKB19oZWFkZXJCCAoGX2Vycm9y');
+    'VyYXRpb24YAiABKAlSCmdlbmVyYXRpb24SHwoLYnl0ZV9sZW5ndGgYAyABKA1SCmJ5dGVMZW5n'
+    'dGgSEAoDdXJsGAQgASgJUgN1cmw=');
 
 @$core.Deprecated('Use imageMetaDescriptor instead')
 const ImageMeta$json = {
   '1': 'ImageMeta',
-  '2': [
-    {'1': 'seq', '3': 1, '4': 1, '5': 13, '10': 'seq'},
-    {'1': 'mime_type', '3': 2, '4': 1, '5': 9, '10': 'mimeType'},
-  ],
 };
 
 /// Descriptor for `ImageMeta`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List imageMetaDescriptor = $convert.base64Decode(
-    'CglJbWFnZU1ldGESEAoDc2VxGAEgASgNUgNzZXESGwoJbWltZV90eXBlGAIgASgJUghtaW1lVH'
-    'lwZQ==');
+final $typed_data.Uint8List imageMetaDescriptor =
+    $convert.base64Decode('CglJbWFnZU1ldGE=');
 
 @$core.Deprecated('Use imageDataDescriptor instead')
 const ImageData$json = {
@@ -1208,29 +900,16 @@ const ImageAck$json = {
       '10': 'resource',
       '17': true
     },
-    {
-      '1': 'encoded',
-      '3': 3,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.EncodedImage',
-      '9': 1,
-      '10': 'encoded',
-      '17': true
-    },
   ],
   '8': [
     {'1': '_resource'},
-    {'1': '_encoded'},
   ],
 };
 
 /// Descriptor for `ImageAck`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List imageAckDescriptor = $convert.base64Decode(
     'CghJbWFnZUFjaxIQCgNzZXEYASABKA1SA3NlcRI8CghyZXNvdXJjZRgCIAEoCzIbLmthcnV5b2'
-    '1pLnYxLlByb2Nlc3NlZEltYWdlSABSCHJlc291cmNliAEBEjgKB2VuY29kZWQYAyABKAsyGS5r'
-    'YXJ1eW9taS52MS5FbmNvZGVkSW1hZ2VIAVIHZW5jb2RlZIgBAUILCglfcmVzb3VyY2VCCgoIX2'
-    'VuY29kZWQ=');
+    '1pLnYxLlByb2Nlc3NlZEltYWdlSABSCHJlc291cmNliAEBQgsKCV9yZXNvdXJjZQ==');
 
 @$core.Deprecated('Use imageFrameControlDescriptor instead')
 const ImageFrameControl$json = {
@@ -1679,60 +1358,6 @@ const ControlRequest$json = {
       '9': 0,
       '10': 'dispose'
     },
-    {
-      '1': 'acquire_encoded_image',
-      '3': 21,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.AcquireImage',
-      '9': 0,
-      '10': 'acquireEncodedImage'
-    },
-    {
-      '1': 'open_image_page',
-      '3': 22,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.OpenImagePage',
-      '9': 0,
-      '10': 'openImagePage'
-    },
-    {
-      '1': 'request_image_window',
-      '3': 23,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.RequestImageWindow',
-      '9': 0,
-      '10': 'requestImageWindow'
-    },
-    {
-      '1': 'wait_image_window',
-      '3': 24,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.WaitImageWindow',
-      '9': 0,
-      '10': 'waitImageWindow'
-    },
-    {
-      '1': 'release_image_tile',
-      '3': 25,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.ReleaseImageTile',
-      '9': 0,
-      '10': 'releaseImageTile'
-    },
-    {
-      '1': 'close_image_page',
-      '3': 26,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.CloseImagePage',
-      '9': 0,
-      '10': 'closeImagePage'
-    },
   ],
   '8': [
     {'1': 'command'},
@@ -1753,15 +1378,7 @@ final $typed_data.Uint8List controlRequestDescriptor = $convert.base64Decode(
     'NzaW9uSABSEGNsb3NlUGFnZVNlc3Npb24SLgoHcmVidWlsZBgSIAEoCzISLmthcnV5b21pLnYx'
     'LkVtcHR5SABSB3JlYnVpbGQSOwoJZmV0Y2hfYXBpGBMgASgLMhwua2FydXlvbWkudjEuQXBpRm'
     'V0Y2hSZXF1ZXN0SABSCGZldGNoQXBpEi4KB2Rpc3Bvc2UYFCABKAsyEi5rYXJ1eW9taS52MS5F'
-    'bXB0eUgAUgdkaXNwb3NlEk8KFWFjcXVpcmVfZW5jb2RlZF9pbWFnZRgVIAEoCzIZLmthcnV5b2'
-    '1pLnYxLkFjcXVpcmVJbWFnZUgAUhNhY3F1aXJlRW5jb2RlZEltYWdlEkQKD29wZW5faW1hZ2Vf'
-    'cGFnZRgWIAEoCzIaLmthcnV5b21pLnYxLk9wZW5JbWFnZVBhZ2VIAFINb3BlbkltYWdlUGFnZR'
-    'JTChRyZXF1ZXN0X2ltYWdlX3dpbmRvdxgXIAEoCzIfLmthcnV5b21pLnYxLlJlcXVlc3RJbWFn'
-    'ZVdpbmRvd0gAUhJyZXF1ZXN0SW1hZ2VXaW5kb3cSSgoRd2FpdF9pbWFnZV93aW5kb3cYGCABKA'
-    'syHC5rYXJ1eW9taS52MS5XYWl0SW1hZ2VXaW5kb3dIAFIPd2FpdEltYWdlV2luZG93Ek0KEnJl'
-    'bGVhc2VfaW1hZ2VfdGlsZRgZIAEoCzIdLmthcnV5b21pLnYxLlJlbGVhc2VJbWFnZVRpbGVIAF'
-    'IQcmVsZWFzZUltYWdlVGlsZRJHChBjbG9zZV9pbWFnZV9wYWdlGBogASgLMhsua2FydXlvbWku'
-    'djEuQ2xvc2VJbWFnZVBhZ2VIAFIOY2xvc2VJbWFnZVBhZ2VCCQoHY29tbWFuZA==');
+    'bXB0eUgAUgdkaXNwb3NlQgkKB2NvbW1hbmQ=');
 
 @$core.Deprecated('Use controlResponseDescriptor instead')
 const ControlResponse$json = {
@@ -1849,33 +1466,6 @@ const ControlResponse$json = {
       '9': 0,
       '10': 'error'
     },
-    {
-      '1': 'encoded_image',
-      '3': 19,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.EncodedImage',
-      '9': 0,
-      '10': 'encodedImage'
-    },
-    {
-      '1': 'image_page',
-      '3': 20,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.ImagePage',
-      '9': 0,
-      '10': 'imagePage'
-    },
-    {
-      '1': 'image_window',
-      '3': 21,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.ImageWindowSnapshot',
-      '9': 0,
-      '10': 'imageWindow'
-    },
   ],
   '8': [
     {'1': 'result'},
@@ -1893,11 +1483,7 @@ final $typed_data.Uint8List controlResponseDescriptor = $convert.base64Decode(
     'a2FydXlvbWkudjEuQ2xvc2VkSABSBmNsb3NlZBI2Cgljb21wbGV0ZWQYECABKAsyFi5rYXJ1eW'
     '9taS52MS5Db21wbGV0ZWRIAFIJY29tcGxldGVkEjEKA2FwaRgRIAEoCzIdLmthcnV5b21pLnYx'
     'LkFwaUZldGNoUmVzcG9uc2VIAFIDYXBpEjEKBWVycm9yGBIgASgLMhkua2FydXlvbWkudjEuUn'
-    'VudGltZUVycm9ySABSBWVycm9yEkAKDWVuY29kZWRfaW1hZ2UYEyABKAsyGS5rYXJ1eW9taS52'
-    'MS5FbmNvZGVkSW1hZ2VIAFIMZW5jb2RlZEltYWdlEjcKCmltYWdlX3BhZ2UYFCABKAsyFi5rYX'
-    'J1eW9taS52MS5JbWFnZVBhZ2VIAFIJaW1hZ2VQYWdlEkUKDGltYWdlX3dpbmRvdxgVIAEoCzIg'
-    'LmthcnV5b21pLnYxLkltYWdlV2luZG93U25hcHNob3RIAFILaW1hZ2VXaW5kb3dCCAoGcmVzdW'
-    'x0');
+    'VudGltZUVycm9ySABSBWVycm9yQggKBnJlc3VsdA==');
 
 @$core.Deprecated('Use openWorkerDescriptor instead')
 const OpenWorker$json = {
@@ -1933,15 +1519,13 @@ const AcquireImageWorker$json = {
       '10': 'request'
     },
     {'1': 'resource_id', '3': 2, '4': 1, '5': 9, '10': 'resourceId'},
-    {'1': 'encoded_only', '3': 3, '4': 1, '5': 8, '10': 'encodedOnly'},
   ],
 };
 
 /// Descriptor for `AcquireImageWorker`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List acquireImageWorkerDescriptor = $convert.base64Decode(
     'ChJBY3F1aXJlSW1hZ2VXb3JrZXISMwoHcmVxdWVzdBgBIAEoCzIZLmthcnV5b21pLnYxLkFjcX'
-    'VpcmVJbWFnZVIHcmVxdWVzdBIfCgtyZXNvdXJjZV9pZBgCIAEoCVIKcmVzb3VyY2VJZBIhCgxl'
-    'bmNvZGVkX29ubHkYAyABKAhSC2VuY29kZWRPbmx5');
+    'VpcmVJbWFnZVIHcmVxdWVzdBIfCgtyZXNvdXJjZV9pZBgCIAEoCVIKcmVzb3VyY2VJZA==');
 
 @$core.Deprecated('Use workerCommandDescriptor instead')
 const WorkerCommand$json = {
@@ -2073,15 +1657,6 @@ const WorkerResponse$json = {
       '9': 0,
       '10': 'error'
     },
-    {
-      '1': 'encoded_image',
-      '3': 15,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.EncodedImage',
-      '9': 0,
-      '10': 'encodedImage'
-    },
   ],
   '8': [
     {'1': 'result'},
@@ -2095,6 +1670,5 @@ final $typed_data.Uint8List workerResponseDescriptor = $convert.base64Decode(
     'c3Npb25IAFIHc2Vzc2lvbhIzCgZzb3VyY2UYCyABKAsyGS5rYXJ1eW9taS52MS5Tb3VyY2VSZX'
     'N1bHRIAFIGc291cmNlEjMKBWltYWdlGAwgASgLMhsua2FydXlvbWkudjEuUHJvY2Vzc2VkSW1h'
     'Z2VIAFIFaW1hZ2USLQoGY2xvc2VkGA0gASgLMhMua2FydXlvbWkudjEuQ2xvc2VkSABSBmNsb3'
-    'NlZBIxCgVlcnJvchgOIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAUgVlcnJvchJA'
-    'Cg1lbmNvZGVkX2ltYWdlGA8gASgLMhkua2FydXlvbWkudjEuRW5jb2RlZEltYWdlSABSDGVuY2'
-    '9kZWRJbWFnZUIICgZyZXN1bHQ=');
+    'NlZBIxCgVlcnJvchgOIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAUgVlcnJvckII'
+    'CgZyZXN1bHQ=');

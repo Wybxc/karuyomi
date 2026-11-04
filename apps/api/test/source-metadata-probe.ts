@@ -284,8 +284,8 @@ const checkImages = async (session, sourceId, pages) => {
         if(resource.generation!==session.generation||!resource.url.startsWith('blob:'))throw Error('Invalid resource ownership');
         image=new Image(); image.src=resource.url; image.alt='Processed page '+(index+1);
         await image.decode();document.querySelector('#images').append(image);
-        if(image.naturalWidth!==resource.width||image.naturalHeight!==resource.height)throw Error('Image dimension descriptor mismatch');
-        const summary={index,ok:true,byteLength:resource.byteLength,mimeType:resource.mimeType,width:resource.width,height:resource.height,elapsedMs:Math.round(performance.now()-started)};
+        if(!image.naturalWidth||!image.naturalHeight)throw Error('Client decoded no image dimensions');
+        const summary={index,ok:true,byteLength:resource.byteLength,width:image.naturalWidth,height:image.naturalHeight,elapsedMs:Math.round(performance.now()-started)};
         report.images.push(summary);await record('imageDecoded',summary);
       }catch(error){
         const summary={index,ok:false,error:failure(error)};report.images.push(summary);await record('imageFailed',summary);

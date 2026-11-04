@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { transform } from 'esbuild';
+import { build, transform } from 'esbuild';
 import sharp from 'sharp';
 import sirv from 'sirv';
 import writeFileAtomic from 'write-file-atomic';
@@ -216,6 +216,7 @@ export async function prepareImageCodecWorkerBrowser(
     ? await verifiedBuild(path.resolve(options.buildDirectory))
     : undefined;
   const materials = await collectMaterials({
+    includeImageCodecs: true,
     ...(imageCodecArtifacts ? { imageCodecArtifacts } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
   });
@@ -314,6 +315,17 @@ export async function prepareImageCodecWorkerBrowser(
     path.join(publicDirectory, 'materials.json'),
     JSON.stringify(materials.catalog),
   );
+  // Evaluation tooling supplies its transport verifier; the candidate client has no Source dependency.
+  await build({
+    absWorkingDir: ROOT,
+    entryPoints: ['packages/runtime-host/src/verified-loader.ts'],
+    outfile: path.join(publicDirectory, 'verified-loader.js'),
+    bundle: true,
+    platform: 'browser',
+    format: 'esm',
+    target: 'es2022',
+    legalComments: 'none',
+  });
   // The inline browser program is intentionally JavaScript. esbuild checks its syntax.
   const script = await transform(BROWSER_SCRIPT, {
     loader: 'js',
@@ -517,6 +529,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
 const HTML = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Karuyomi codec Worker 验收</title><style>body{font:16px system-ui;margin:24px;color:#182537;background:#f4f7fb}button,select{font:inherit;padding:10px;margin:4px}pre{white-space:pre-wrap;max-height:38vh;overflow:auto;background:white;padding:16px}.previews{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}figure{margin:0;background:white;padding:10px}img{width:100%;image-rendering:auto}figcaption{overflow-wrap:anywhere}#status{font-weight:600}</style><h1>独立 codec Worker / PNG 条带验收</h1><p>合成长图与真实 WASM、材料完整性校验、逐片 PNG 摘要、pull/ACK 与取消；不代表 Source、Reader 或真机验收。</p><button id="run">运行验收</button><button id="close">关闭服务</button><span id="status">准备就绪</span><p><label>查看首/中/末条带 <select id="fixture"></select></label></p><div id="previews" class="previews"></div><pre id="log"></pre><script type="module" src="/runner.js"></script></html>`;
 
 const BROWSER_SCRIPT = String.raw`
+import { VerifiedLoader } from './verified-loader.js';
 const $ = id => document.getElementById(id);
 const check = (value, message) => { if (!value) throw new Error(message); };
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -574,7 +587,7 @@ async function initialize() {
   clientUrl = URL.createObjectURL(new Blob([bytes], { type: material.contentType }));
   imported = await import(clientUrl);
   check(typeof imported.decodeImageTiles === 'function' && typeof imported.createImageCodecAssetProvider === 'function', 'Catalog client exports');
-  provider = imported.createImageCodecAssetProvider(location.origin, config.imageCodecs);
+  provider = imported.createImageCodecAssetProvider(config.imageCodecs, new VerifiedLoader(location.origin));
 }
 async function inputBlob(fixture, truncate = 0) {
   const response = await fetch(fixture.path, { credentials: 'omit' });

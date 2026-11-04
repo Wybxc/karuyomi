@@ -21,22 +21,13 @@ final class ControlledProvider implements PageProvider {
     return future.future.whenComplete(() => concurrent--);
   }
 
-  void complete(
-    PageRef ref, {
-    int bytes = 10,
-    String? generation,
-    int width = 10,
-    int height = 20,
-  }) {
+  void complete(PageRef ref, {int bytes = 10, String? generation}) {
     pending[ref.requestId]!.complete(
       ImageResource(
         id: ref.requestId,
         generation: generation ?? ref.generation,
         location: Uri.parse('https://processed.invalid/${ref.pageKey}'),
-        mimeType: 'image/png',
         byteLength: bytes,
-        width: width,
-        height: height,
       ),
     );
   }
@@ -272,12 +263,154 @@ void main() {
         generation: 'g',
         pages: [ReaderPage(key: 'unknown')],
       );
-      provider.complete(provider.requests.single, width: 100, height: 100);
+      provider.complete(provider.requests.single);
+      await scheduler.settled;
+      expect(
+        scheduler.recordDecoded(provider.requests.single.requestId, 100, 100),
+        false,
+      );
       await scheduler.settled;
       expect(scheduler.snapshot.resources, isEmpty);
       expect(scheduler.snapshot.errors['unknown'], isA<ImageBudgetExceeded>());
       expect(provider.released, [provider.requests.single.requestId]);
       await scheduler.dispose();
+    },
+  );
+
+  test(
+    'client dimensions replace unknown estimates and survive release until ACK',
+    () async {
+      final provider = ControlledProvider();
+      final scheduler = ImageScheduler(
+        provider: provider,
+        unknownPageDecodedEstimate: 100,
+      );
+      scheduler.setWindow(
+        chapterKey: 'chapter',
+        generation: 'g',
+        pages: [ReaderPage(key: 'p')],
+      );
+      provider.complete(provider.requests.single, bytes: 12);
+      await scheduler.settled;
+      final id = provider.requests.single.requestId;
+      expect(scheduler.snapshot.estimatedDecodedBytes, 100);
+      expect(scheduler.snapshot.dimensions, isEmpty);
+      expect(scheduler.recordDecoded(id, 4, 5), true);
+      expect(scheduler.snapshot.estimatedDecodedBytes, 80);
+      expect(scheduler.snapshot.dimensions[id]?.width, 4);
+      expect(
+        () => scheduler.snapshot.dimensions.clear(),
+        throwsUnsupportedError,
+      );
+      provider.releaseGate = Completer<void>();
+      scheduler.setWindow(chapterKey: 'chapter', generation: 'g', pages: []);
+      expect(scheduler.snapshot.resources, isEmpty);
+      expect(scheduler.snapshot.residentBytes, 12);
+      expect(scheduler.snapshot.estimatedDecodedBytes, 80);
+      expect(scheduler.snapshot.dimensions[id]?.height, 5);
+      expect(scheduler.recordDecoded(id, 1, 1), false);
+      provider.releaseGate!.complete();
+      await scheduler.settled;
+      expect(scheduler.snapshot.residentBytes, 0);
+      expect(scheduler.snapshot.estimatedDecodedBytes, 0);
+      expect(scheduler.snapshot.dimensions, isEmpty);
+      await scheduler.dispose();
+    },
+  );
+
+  test(
+    'client decode failures invalidate display and retain costs through release ACK',
+    () async {
+      final provider = ControlledProvider();
+      final scheduler = ImageScheduler(
+        provider: provider,
+        unknownPageDecodedEstimate: 100,
+      );
+      scheduler.setWindow(
+        chapterKey: 'chapter',
+        generation: 'g',
+        pages: [ReaderPage(key: 'p')],
+      );
+      provider.complete(provider.requests.single);
+      await scheduler.settled;
+      final id = provider.requests.single.requestId;
+      expect(scheduler.recordDecoded(id, 10, 20), true);
+      provider.releaseGate = Completer<void>();
+      final error = StateError('bad client frame');
+      scheduler.recordDecodeError(id, error);
+      expect(scheduler.snapshot.resources, isEmpty);
+      expect(scheduler.snapshot.errors['p'], same(error));
+      expect(scheduler.snapshot.estimatedDecodedBytes, 800);
+      expect(scheduler.recordDecoded(id, 1, 1), false);
+      scheduler.recordDecodeError('foreign', StateError('unrelated'));
+      expect(provider.released, [id]);
+      provider.releaseGate!.complete();
+      await scheduler.settled;
+      expect(scheduler.snapshot.estimatedDecodedBytes, 0);
+      await scheduler.dispose();
+    },
+  );
+
+  test(
+    'over-budget actual frame is rejected and its full cost stays until release ACK',
+    () async {
+      final provider = ControlledProvider();
+      final scheduler = ImageScheduler(
+        provider: provider,
+        unknownPageDecodedEstimate: 100,
+        maxEstimatedDecodedBytes: 1000,
+      );
+      scheduler.setWindow(
+        chapterKey: 'chapter',
+        generation: 'g',
+        pages: [ReaderPage(key: 'p')],
+      );
+      provider.complete(provider.requests.single);
+      await scheduler.settled;
+      provider.releaseGate = Completer<void>();
+      final id = provider.requests.single.requestId;
+      expect(scheduler.recordDecoded(id, 100, 100), false);
+      expect(scheduler.snapshot.resources, isEmpty);
+      expect(scheduler.snapshot.errors['p'], isA<ImageBudgetExceeded>());
+      expect(scheduler.snapshot.estimatedDecodedBytes, 40000);
+      expect(scheduler.snapshot.residentBytes, 10);
+      provider.releaseGate!.complete();
+      await scheduler.settled;
+      expect(scheduler.snapshot.estimatedDecodedBytes, 0);
+      await scheduler.dispose();
+    },
+  );
+
+  test(
+    'dispose releases an acquired image waiting for a prefetch eviction ACK exactly once',
+    () async {
+      final provider = ControlledProvider();
+      final scheduler = ImageScheduler(
+        provider: provider,
+        maxResidentBytes: 100,
+      );
+      scheduler.setWindow(
+        chapterKey: 'chapter',
+        generation: 'g',
+        pages: pages(2),
+      );
+      provider.complete(provider.requests[1], bytes: 80);
+      await tick();
+      provider.releaseGate = Completer<void>();
+      provider.complete(provider.requests[0], bytes: 80);
+      await tick();
+      expect(provider.released, [provider.requests[1].requestId]);
+      expect(scheduler.snapshot.residentBytes, 160);
+      final disposal = scheduler.dispose();
+      expect(
+        provider.released,
+        containsAll(provider.requests.map((request) => request.requestId)),
+      );
+      provider.releaseGate!.complete();
+      await disposal;
+      await tick();
+      expect(provider.released, hasLength(2));
+      expect(scheduler.snapshot.residentBytes, 0);
     },
   );
 

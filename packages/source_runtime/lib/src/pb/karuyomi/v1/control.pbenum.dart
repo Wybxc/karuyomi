@@ -70,33 +70,6 @@ class RuntimeErrorCode extends $pb.ProtobufEnum {
   const RuntimeErrorCode._(super.value, super.name);
 }
 
-class ImageWindowState extends $pb.ProtobufEnum {
-  static const ImageWindowState IMAGE_WINDOW_STATE_UNSPECIFIED =
-      ImageWindowState._(
-          0, _omitEnumNames ? '' : 'IMAGE_WINDOW_STATE_UNSPECIFIED');
-  static const ImageWindowState IMAGE_WINDOW_STATE_PENDING =
-      ImageWindowState._(1, _omitEnumNames ? '' : 'IMAGE_WINDOW_STATE_PENDING');
-  static const ImageWindowState IMAGE_WINDOW_STATE_COMPLETE =
-      ImageWindowState._(
-          2, _omitEnumNames ? '' : 'IMAGE_WINDOW_STATE_COMPLETE');
-  static const ImageWindowState IMAGE_WINDOW_STATE_FAILED =
-      ImageWindowState._(3, _omitEnumNames ? '' : 'IMAGE_WINDOW_STATE_FAILED');
-
-  static const $core.List<ImageWindowState> values = <ImageWindowState>[
-    IMAGE_WINDOW_STATE_UNSPECIFIED,
-    IMAGE_WINDOW_STATE_PENDING,
-    IMAGE_WINDOW_STATE_COMPLETE,
-    IMAGE_WINDOW_STATE_FAILED,
-  ];
-
-  static final $core.List<ImageWindowState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static ImageWindowState? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const ImageWindowState._(super.value, super.name);
-}
-
 class BootstrapStage extends $pb.ProtobufEnum {
   static const BootstrapStage BOOTSTRAP_STAGE_UNSPECIFIED =
       BootstrapStage._(0, _omitEnumNames ? '' : 'BOOTSTRAP_STAGE_UNSPECIFIED');

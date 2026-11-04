@@ -9,8 +9,6 @@ final class FixturePageProvider implements PageProvider {
   final acquired = <PageRef>[];
   final released = <String>[];
   final cancelled = <String>[];
-  int width = 600;
-  int height = 900;
 
   @override
   Future<ImageResource> acquire(PageRef ref) async {
@@ -19,10 +17,7 @@ final class FixturePageProvider implements PageProvider {
       id: '${ref.generation}-${ref.pageKey}',
       generation: ref.generation,
       location: Uri.parse('https://processed-fixture.invalid/${ref.pageKey}'),
-      mimeType: 'image/png',
       byteLength: 100,
-      width: width,
-      height: height,
     );
   }
 
@@ -312,7 +307,11 @@ void main() {
       expect(tester.binding.hasScheduledFrame, false);
 
       tester.binding.addPostFrameCallback((_) {
-        ReaderImageDecoded('runtime-1-page-0').dispatch(imageContext!);
+        ReaderImageDecoded(
+          'runtime-1-page-0',
+          width: 600,
+          height: 900,
+        ).dispatch(imageContext!);
       });
       tester.binding.ensureVisualUpdate();
       await tester.pump();
@@ -324,6 +323,53 @@ void main() {
       expect(tester.binding.hasScheduledFrame, false);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'decoder error clears observed progress and rejects a queued late frame',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final viewports = <ReaderViewportState>[];
+      BuildContext? imageContext;
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: fixtureChapter(),
+          onViewport: viewports.add,
+          imageBuilder: (context, resource, fit) {
+            if (resource.id == 'runtime-1-page-0') imageContext = context;
+            return fixtureImage(context, resource, fit);
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      ReaderImageDecoded(
+        'runtime-1-page-0',
+        width: 600,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'page-0');
+      ReaderImageFailed(
+        'runtime-1-page-0',
+        StateError('failed frame'),
+      ).dispatch(imageContext!);
+      ReaderImageDecoded(
+        'runtime-1-page-0',
+        width: 600,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.windowReady, false);
+      expect(viewports.last.atEnd, false);
+      expect(find.text('图片未能加载'), findsOneWidget);
+      expect(provider.released, contains('runtime-1-page-0'));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -360,7 +406,11 @@ void main() {
           position: manifest.positionAt(19),
           onViewport: viewports.add,
           imageBuilder: (context, resource, fit) {
-            ReaderImageDecoded(resource.id).dispatch(context);
+            ReaderImageDecoded(
+              resource.id,
+              width: 600,
+              height: 900,
+            ).dispatch(context);
             return fixtureImage(context, resource, fit);
           },
         ),
@@ -404,7 +454,11 @@ void main() {
         position: manifest.positionAt(19),
         onViewport: viewports.add,
         imageBuilder: (context, resource, fit) {
-          ReaderImageDecoded(resource.id).dispatch(context);
+          ReaderImageDecoded(
+            resource.id,
+            width: 600,
+            height: 900,
+          ).dispatch(context);
           return fixtureImage(context, resource, fit);
         },
       ),
@@ -544,9 +598,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final provider = FixturePageProvider()
-        ..width = 1200
-        ..height = 600;
+      final provider = FixturePageProvider();
       final manifest = ChapterManifest(
         chapterKey: 'chapter',
         version: 'content-v1',
@@ -560,6 +612,14 @@ void main() {
           position: manifest.positionAt(4, offset: 0.3),
           mode: ReadingMode.continuous,
           onPosition: positions.add,
+          imageBuilder: (context, resource, fit) {
+            ReaderImageDecoded(
+              resource.id,
+              width: 1200,
+              height: 600,
+            ).dispatch(context);
+            return fixtureImage(context, resource, fit);
+          },
         ),
       );
       await tester.pumpAndSettle();

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'resource_image.dart';
@@ -103,6 +104,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _viewportScheduled = false;
   bool? _doublePageOverride;
   final _decodedResources = <String>{};
+  final _learnedDimensions = <String, ImageDimensions>{};
 
   @override
   void initState() {
@@ -141,12 +143,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _attachScheduler() {
     _windowSignature = '';
+    _decodedResources.clear();
+    _learnedDimensions.clear();
     _resourcePool = ReaderResourcePool(
       widget.provider,
       evict: widget.imageEvictor,
     );
     _scheduler = ImageScheduler(provider: _resourcePool);
-    _imagesSubscription = _scheduler.changes.listen((_) {
+    _imagesSubscription = _scheduler.changes.listen((snapshot) {
+      final residentIds = snapshot.resources.values
+          .map((image) => image.id)
+          .toSet();
+      _decodedResources.removeWhere((id) => !residentIds.contains(id));
       _scheduleDimensions();
       _scheduleViewport();
       if (mounted) setState(() {});
@@ -238,19 +246,24 @@ class _ReaderScreenState extends State<ReaderScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _dimensionsScheduled = false;
       if (!mounted) return;
-      final resources = _scheduler.snapshot.resources;
+      final snapshot = _scheduler.snapshot;
+      final resources = snapshot.resources;
       var changed = false;
       final pages = _reader.manifest.pages.map((page) {
         final image = resources[page.key];
-        if (image == null ||
-            (page.width == image.width && page.height == image.height)) {
+        final dimensions =
+            _learnedDimensions[page.key] ??
+            (image == null ? null : snapshot.dimensions[image.id]);
+        if (dimensions == null ||
+            (page.width == dimensions.width &&
+                page.height == dimensions.height)) {
           return page;
         }
         changed = true;
         return ReaderPage(
           key: page.key,
-          width: image.width.toDouble(),
-          height: image.height.toDouble(),
+          width: dimensions.width.toDouble(),
+          height: dimensions.height.toDouble(),
         );
       }).toList();
       if (!changed) return;
@@ -286,6 +299,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _attachScheduler();
     }
     if (oldWidget.manifest != widget.manifest) {
+      if (oldWidget.manifest.chapterKey != widget.manifest.chapterKey ||
+          oldWidget.manifest.version != widget.manifest.version) {
+        _learnedDimensions.clear();
+      }
       _reader.updateManifest(widget.manifest);
       _scheduleRestore();
     }
@@ -294,7 +311,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _doublePageOverride = null;
       _applyDoublePagePreference();
     }
-    if (oldWidget.generation != widget.generation) _syncWindow();
+    if (oldWidget.generation != widget.generation) {
+      _learnedDimensions.clear();
+      _syncWindow();
+    }
   }
 
   double get _gap => _reader.mode == ReadingMode.webtoon ? 0 : 12;
@@ -442,6 +462,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _transform.value = Matrix4.diagonal3Values(next, next, 1);
   }
 
+  void _afterImageNotification(VoidCallback action) {
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.postFrameCallbacks) {
+      action();
+      return;
+    }
+    final scheduler = _scheduler;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && identical(scheduler, _scheduler)) action();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   Widget _image(ReaderPage page, {BoxFit fit = BoxFit.contain}) {
     final snapshot = _scheduler.snapshot;
     final resource = snapshot.resources[page.key];
@@ -451,17 +484,47 @@ class _ReaderScreenState extends State<ReaderScreen> {
         image: true,
         child: NotificationListener<ReaderImageDecoded>(
           onNotification: (notification) {
-            if (notification.resourceId == resource.id &&
-                _decodedResources.add(resource.id)) {
-              _scheduleViewport();
+            if (notification.resourceId == resource.id) {
+              _afterImageNotification(() {
+                if (_scheduler.snapshot.resources[page.key]?.id !=
+                    resource.id) {
+                  return;
+                }
+                _learnedDimensions[page.key] = ImageDimensions(
+                  width: notification.width,
+                  height: notification.height,
+                );
+                if (_scheduler.recordDecoded(
+                  resource.id,
+                  notification.width,
+                  notification.height,
+                )) {
+                  _decodedResources.add(resource.id);
+                } else {
+                  _decodedResources.remove(resource.id);
+                }
+                _scheduleViewport();
+              });
             }
             return true;
           },
-          child: PinnedReaderImage(
-            key: ValueKey('display-${resource.id}'),
-            pool: _resourcePool,
-            image: resource,
-            builder: (context) => widget.imageBuilder(context, resource, fit),
+          child: NotificationListener<ReaderImageFailed>(
+            onNotification: (notification) {
+              if (notification.resourceId == resource.id) {
+                _afterImageNotification(() {
+                  _decodedResources.remove(resource.id);
+                  _scheduler.recordDecodeError(resource.id, notification.error);
+                  _scheduleViewport();
+                });
+              }
+              return true;
+            },
+            child: PinnedReaderImage(
+              key: ValueKey('display-${resource.id}'),
+              pool: _resourcePool,
+              image: resource,
+              builder: (context) => widget.imageBuilder(context, resource, fit),
+            ),
           ),
         ),
       );
@@ -502,15 +565,47 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final resource = _scheduler.snapshot.resources[page.key];
     if (resource == null) return;
     final pool = _resourcePool;
+    final scheduler = _scheduler;
     final pin = pool.pin(resource.id);
     unawaited(
       showDialog<void>(
         context: context,
         useSafeArea: true,
-        builder: (context) => _ZoomImageDialog(
-          resource: resource,
-          pool: pool,
-          imageBuilder: widget.imageBuilder,
+        builder: (dialogContext) => NotificationListener<ReaderImageDecoded>(
+          onNotification: (notification) {
+            if (notification.resourceId == resource.id) {
+              _afterImageNotification(() {
+                if (!identical(scheduler, _scheduler)) return;
+                final accepted = scheduler.recordDecoded(
+                  resource.id,
+                  notification.width,
+                  notification.height,
+                );
+                if (!accepted && dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+              });
+            }
+            return true;
+          },
+          child: NotificationListener<ReaderImageFailed>(
+            onNotification: (notification) {
+              if (notification.resourceId == resource.id) {
+                _afterImageNotification(() {
+                  if (!identical(scheduler, _scheduler)) return;
+                  _decodedResources.remove(resource.id);
+                  scheduler.recordDecodeError(resource.id, notification.error);
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                });
+              }
+              return true;
+            },
+            child: _ZoomImageDialog(
+              resource: resource,
+              pool: pool,
+              imageBuilder: widget.imageBuilder,
+            ),
+          ),
         ),
       ).whenComplete(pin.close),
     );

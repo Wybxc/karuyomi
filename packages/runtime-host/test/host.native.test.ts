@@ -33,14 +33,12 @@ test.each([
   vi.stubGlobal('window', runtimeWindow);
   vi.stubGlobal('location', new URL('https://read.example/runtime/host'));
   vi.stubGlobal('__KARUYOMI_MATERIAL_VERSION__', 'test-materials');
-  vi.stubGlobal('__KARUYOMI_IMAGE_CODEC_MATERIALS__', []);
 
   await import('../src/host.native.js');
 
   expect(SourceRuntimeManager).toHaveBeenCalledOnce();
   expect(vi.mocked(SourceRuntimeManager).mock.calls[0]?.[4]).toEqual({
     enabled,
-    tiles: { prepare: expect.any(Function) },
   });
   expect(installRuntime).toHaveBeenCalledOnce();
   expect(runtimeWindow).not.toHaveProperty('__karuyomiNativeRuntime');

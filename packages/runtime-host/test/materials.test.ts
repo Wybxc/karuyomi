@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -9,6 +9,14 @@ import {
   nativeMaterialGroups,
   prepareMaterials,
 } from '../materials.ts';
+import { prepareImageCodecArtifacts } from '../../../tools/images/artifacts.ts';
+
+vi.mock('../../../tools/images/artifacts.ts', () => ({
+  prepareImageCodecArtifacts: vi.fn(() => {
+    throw new Error('Default builds must not prepare candidate codecs');
+  }),
+}));
+
 import { imageCodecMaterialFixture } from './image-codec-material-fixture.ts';
 import { createNativeMaterialResolver } from '../src/native-materials.js';
 import { VerifiedLoader } from '../src/verified-loader.js';
@@ -34,11 +42,23 @@ async function codecFixture() {
 async function currentMaterials(includeWasmBytes = true) {
   return collectMaterials({
     includeWasmBytes,
+    includeImageCodecs: true,
     imageCodecArtifacts: await codecFixture(),
   });
 }
 
 describe('current runtime materials', () => {
+  it('default product materials exclude candidate codecs without preparing them', async () => {
+    const metadata = await collectMaterials({ includeWasmBytes: false });
+    const full = await collectMaterials();
+    expect(full.catalog).toEqual(metadata.catalog);
+    expect(full.catalog.imageCodecs).toEqual([]);
+    expect(full.catalog.sources.imageCodecs).toBeNull();
+    expect(full.data.size).toBe(6);
+    expect(metadata.data.size).toBe(5);
+    expect(prepareImageCodecArtifacts).not.toHaveBeenCalled();
+  });
+
   it('compiles deterministic classic JS from TS with the exact npm WASM identity', async () => {
     const metadata = await currentMaterials(false);
     const full = await currentMaterials();
@@ -96,8 +116,12 @@ describe('current runtime materials', () => {
 
   it('codec build provenance and artifact changes participate in materialVersion without entering Source preload groups', async () => {
     const imageCodecArtifacts = await codecFixture();
-    const first = await collectMaterials({ imageCodecArtifacts });
+    const first = await collectMaterials({
+      includeImageCodecs: true,
+      imageCodecArtifacts,
+    });
     const second = await collectMaterials({
+      includeImageCodecs: true,
       imageCodecArtifacts: {
         ...imageCodecArtifacts,
         manifest: { ...imageCodecArtifacts.manifest, identity: '2'.repeat(64) },
@@ -112,6 +136,7 @@ describe('current runtime materials', () => {
       changed,
     );
     const third = await collectMaterials({
+      includeImageCodecs: true,
       imageCodecArtifacts: {
         ...imageCodecArtifacts,
         manifest: {
@@ -138,32 +163,18 @@ describe('current runtime materials', () => {
     ).toBe(false);
   });
 
-  it('Native omits the Web client entry, retains codec notices and never embeds codec bytes in a Source Worker', async () => {
+  it('Native Source groups contain no client codec assets', async () => {
     const { catalog } = await currentMaterials();
-    const before = structuredClone(catalog);
     const native = nativeMaterialGroups(catalog);
-    expect(native.imageCodecs.map((item) => item.logicalName)).toEqual([
-      'worker.js',
-      'png.mjs',
-      'png.wasm',
-      'jpeg.mjs',
-      'jpeg.wasm',
-      'encoder.mjs',
-      'encoder.wasm',
-      'licenses/libspng-LICENSE.txt',
-      'licenses/libjpeg-turbo-LICENSE.md',
-      'licenses/libjpeg-turbo-README.ijg',
-      'licenses/zlib-README',
-    ]);
-    expect(native.sourceWorker).toEqual([
-      ...catalog.hostScripts,
-      ...catalog.resources,
-    ]);
-    const codecHashes = new Set(catalog.imageCodecs.map((item) => item.sha256));
+    expect(native).toEqual({
+      sourceWorker: [...catalog.hostScripts, ...catalog.resources],
+    });
+    const clientHashes = new Set(
+      catalog.imageCodecs.map((item) => item.sha256),
+    );
     expect(
-      native.sourceWorker.some((item) => codecHashes.has(item.sha256)),
+      native.sourceWorker.some((item) => clientHashes.has(item.sha256)),
     ).toBe(false);
-    expect(catalog).toEqual(before);
     expect(
       catalog.imageCodecs.some((item) => item.logicalName === 'client.js'),
     ).toBe(true);
@@ -239,6 +250,7 @@ describe('current runtime materials', () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'karuyomi-materials-'));
     temporary.push(directory);
     const { catalog, data } = await prepareMaterials(directory, {
+      includeImageCodecs: true,
       imageCodecArtifacts: await codecFixture(),
     });
     expect((await readdir(directory)).sort()).toEqual([

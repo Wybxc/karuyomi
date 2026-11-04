@@ -44,6 +44,7 @@
 - 共享 runtime materials 作为 Web 静态资源交付，或打包进 Native 应用；不要把共享材料按扩展重复发布，也不要让 Native 通过网络回退读取这些内置资源。
 - Static Assets 是所有客户端扩展分发的最终权威来源。每个扩展只部署最新可用构建，由客户端或 Service Worker 检查索引、更新及清理旧缓存；不经 R2 或入口 Worker 转发正文，不在入口 Worker 脚本中内嵌。公开扩展下载不携带 GitHub 凭据或应用 Access 凭据。
 - 共享桥、WASM 等构建资源属于 Web Static Assets；Native 按已确定的方案内置。Source 原有请求头、Cookie、拦截器和图片处理语义必须通过正式运行时链路，不能用原图 URL 绕过插件处理。
+- 阅读图片交付边界只传插件处理后的不透明编码字节与资源身份（`resourceId/generation/byteLength/url`）。Source 宿主不检查图片 MIME、尺寸或方向，不预解码，也不决定完整图、分片或 LOD；图片识别、解码、尺寸学习、解码预算、缓存与分片由 UI 客户端负责。宿主仍校验传输字节/资源限额、generation 和生命周期；插件原业务主动执行的图片处理继续保留。客户端 codec 与 Source host 独立。当前默认使用 UI 直接解码，分片 codec 仅为候选，不进入默认构建或 Web/Native 打包；先取得同条件目标设备的首屏、跳转、滚动、CPU、RSS/GPU 对照证据，再决定是否采用，不能以机制可行性代替性能结论。
 - Worker TypeScript 与 Dart 的静态类型不能保证跨语言消息安全。交换边界需要统一协议、运行时解析、版本和大小校验，以及 requestId/generation 约束。
 - 跨语言协议已选定 Protobuf `.proto` + Buf，使用 Protobuf-ES / Google Dart 插件生成模型和 codec，小控制消息先采用标准 ProtoJSON；具体比较见 `docs/design/cross-language-protocol.md`，实施状态见 `docs/plan/cross-language-protocol.md`。IDL 位于 `protocol/`，双端生成并接入正式控制边界；生成一致性用 `pnpm generate:check` 检查。实际浏览器/原生运行证据须另外验收。业务预算、generation 与资源生命周期仍须校验；图片/HTTP 大正文保持独立二进制通道。Pigeon 适用于 Dart 与原生平台，不代替 TS Worker 协议。
 - 大正文与图片使用有界二进制通道，控制消息保持小；落实背压、限额、超时、取消、迟到结果丢弃和资源释放。

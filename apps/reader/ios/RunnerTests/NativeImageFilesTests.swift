@@ -8,12 +8,11 @@ import XCTest
 final class NativeImageFilesTests: XCTestCase {
   private let origin = "https://reader.example"
 
-  private func input(bytes: Int = 100, width: Int = 10, height: Int = 10) -> [String: Any] {
+  private func input(bytes: Int = 100) -> [String: Any] {
     [
       "requestId": "request", "resourceId": "resource", "generation": "generation",
       "url": "blob:https://reader.example/00000000-0000-0000-0000-000000000001",
-      "byteLength": bytes, "mimeType": "image/png", "width": width, "height": height,
-      "tile": false,
+      "byteLength": bytes,
     ]
   }
 
@@ -49,7 +48,7 @@ final class NativeImageFilesTests: XCTestCase {
       metadata["url"] = value
       XCTAssertThrowsError(try NativeImageDescriptor(metadata, origin: origin), value)
     }
-    for field in ["byteLength", "width", "height"] {
+    for field in ["byteLength"] {
       for scalar: Any in [true, 1.5, 0, -1, "100"] {
         var metadata = input()
         metadata[field] = scalar
@@ -66,9 +65,8 @@ final class NativeImageFilesTests: XCTestCase {
         XCTAssertThrowsError(try NativeImageDescriptor(metadata, origin: origin), field)
       }
     }
-    metadata = input()
-    metadata["mimeType"] = "text/html"
-    XCTAssertThrowsError(try NativeImageDescriptor(metadata, origin: origin))
+    XCTAssertThrowsError(
+      try NativeImageDescriptor(input(bytes: 64 * 1024 * 1024 + 1), origin: origin))
   }
 
   func testByteAndResourceReservationsAreSharedAndSurviveFailedReservations() throws {
@@ -86,50 +84,16 @@ final class NativeImageFilesTests: XCTestCase {
     for _ in 0..<6 { budget.release(small) }
     XCTAssertEqual(budget.resources, 0)
     XCTAssertEqual(budget.bytes, 0)
-    XCTAssertEqual(budget.pixels, 0)
   }
 
-  func testSingleAndTotalPixelBudgetsApplyBeforeDownload() throws {
-    XCTAssertThrowsError(
-      try NativeImageDescriptor(input(width: 4097, height: 4096), origin: origin))
-    let image = try NativeImageDescriptor(input(width: 4096, height: 4096), origin: origin)
+  func testEncodedTransferNeedsNoImageMetadata() throws {
+    let image = try NativeImageDescriptor(input(), origin: origin)
+    XCTAssertEqual(image.byteLength, 100)
     let budget = NativeImageBudget()
     try budget.reserve(image)
-    try budget.reserve(image)
-    XCTAssertThrowsError(try budget.reserve(image))
-    XCTAssertEqual(budget.pixels, 32 * 1024 * 1024)
+    XCTAssertEqual(budget.bytes, 100)
     budget.release(image)
-    budget.release(image)
-    XCTAssertEqual(budget.pixels, 0)
-  }
-
-  func testTileLimitsAreSeparateAndAllSurfacesSharePixelBudget() throws {
-    var metadata = input(width: 100, height: 256)
-    metadata["tile"] = true
-    let tile = try NativeImageDescriptor(metadata, origin: origin)
-    let budget = NativeImageBudget()
-    for _ in 0..<64 { try budget.reserve(tile) }
-    XCTAssertThrowsError(try budget.reserve(tile))
-    XCTAssertEqual(budget.tileResources, 64)
-    for _ in 0..<64 { budget.release(tile) }
-    metadata["height"] = 257
-    XCTAssertThrowsError(try NativeImageDescriptor(metadata, origin: origin))
-    metadata = input(bytes: 8 * 1024 * 1024)
-    metadata["tile"] = true
-    let large = try NativeImageDescriptor(metadata, origin: origin)
-    try budget.reserve(large)
-    try budget.reserve(large)
-    XCTAssertThrowsError(try budget.reserve(large))
-    budget.release(large)
-    budget.release(large)
-    let full = try NativeImageDescriptor(input(width: 4096, height: 4096), origin: origin)
-    try budget.reserve(full)
-    try budget.reserve(full)
-    XCTAssertThrowsError(try budget.reserve(tile))
-    budget.release(full)
-    budget.release(full)
-    XCTAssertEqual(budget.tileResources, 0)
-    XCTAssertEqual(budget.tileBytes, 0)
+    XCTAssertEqual(budget.bytes, 0)
   }
 
   func testManagedDirectoryMustBeARealDirectory() throws {

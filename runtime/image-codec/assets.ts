@@ -1,11 +1,18 @@
-import type { Artifact } from '@karuyomi/contracts';
-import { RuntimeFailure } from './errors.js';
-import { nativeMaterials } from './materials.js';
-import { VerifiedLoader } from './verified-loader.js';
+import { ImageCodecFailure as RuntimeFailure } from './errors.ts';
 
-export interface ImageCodecMaterial extends Artifact {
+export interface ImageCodecMaterial {
+  path: string;
+  sha256: string;
+  size: number;
   logicalName: string;
   contentType: string;
+}
+export interface ImageCodecLoader {
+  sharedArtifact(
+    artifact: ImageCodecMaterial,
+    signal: AbortSignal,
+    script: boolean,
+  ): Promise<Uint8Array<ArrayBuffer>>;
 }
 export interface ImageCodecModuleBytes {
   moduleUrl: string;
@@ -27,7 +34,7 @@ export interface ImageCodecObjectUrls {
 export async function prepareImageCodecAssets(
   materials: readonly ImageCodecMaterial[],
   format: 'png' | 'jpeg',
-  loader: VerifiedLoader,
+  loader: ImageCodecLoader,
   signal: AbortSignal,
   objectUrls: ImageCodecObjectUrls = URL,
 ): Promise<PreparedImageCodecAssets> {
@@ -87,11 +94,10 @@ export async function prepareImageCodecAssets(
   }
 }
 
-/** Native builds replace nativeMaterials with the bundled codec-only resolver. */
+/** The UI client supplies verified static assets or bundled Native bytes. */
 export function createImageCodecAssetProvider(
-  origin: string,
   materials: readonly ImageCodecMaterial[],
-  loader = new VerifiedLoader(origin, undefined, nativeMaterials),
+  loader: ImageCodecLoader,
 ) {
   return Object.freeze({
     prepare: (format: 'png' | 'jpeg', signal: AbortSignal) =>

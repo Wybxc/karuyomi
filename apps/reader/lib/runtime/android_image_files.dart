@@ -75,7 +75,6 @@ final class AndroidImageFileStore implements NativeImageFileStore {
     required String requestId,
     required String generation,
     required wire.ImageResource resource,
-    bool tile = false,
   }) async {
     if (_closed) {
       throw const RuntimeException(

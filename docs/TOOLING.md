@@ -21,12 +21,12 @@ flowchart TD
 
 - `scripts/` 是仓库操作入口，不被工具模块或产品代码导入。CLI 参数解析与领域实现分开，领域函数可以直接测试。
 - `tools/extensions/` 负责扩展描述、输入指纹、隔离 AOT、静态当前快照、传输校验和网络授权元数据。注册、同步和流水线共享同一份清单与 gzip 校验，不再动态导入 CLI 文件。
-- `tools/images/` 负责图片 codec 的官方 SDK、portable 产物校验、原子安装与隔离缓存，不依赖扩展发布编排。`pnpm image-codecs:prepare` 准备锁定工具链，`pnpm image-codecs:build` 构建共同 ABI 的 PNG/JPEG decoder 与 PNG encoder WASM，`pnpm image-codecs:check --build <directory>` 另行执行真实长图回归。`pnpm image-codecs:prepare-artifacts` 准备 CI 和材料构建所用锁定 portable 归档；`pnpm image-codecs:package` 由已验证的本地构建生成归档与锁。`pnpm image-codecs:check-worker` 提供 Codex 内置浏览器的真实 Worker/tile 验收入口。`pnpm test:image-codecs` 运行不下载 SDK 的归档、构建器和消费生命周期回归，已纳入 `pnpm check`。支持平台和当前集成范围见 [image-codec README](../runtime/image-codec/README.md)。
+- `tools/images/` 负责图片 codec 的官方 SDK、portable 产物校验、原子安装与隔离缓存，不依赖扩展发布编排。`pnpm image-codecs:prepare` 准备锁定工具链，`pnpm image-codecs:build` 构建共同 ABI 的 PNG/JPEG decoder 与 PNG encoder WASM，`pnpm image-codecs:check --build <directory>` 另行执行真实长图回归。`pnpm image-codecs:prepare-artifacts` 为候选专项验收准备锁定 portable 归档；`pnpm image-codecs:package` 由已验证的本地构建生成归档与锁。`pnpm image-codecs:check-worker` 提供 Codex 内置浏览器的真实 Worker/tile 验收入口。`pnpm test:image-codecs` 运行不下载 SDK 的归档、构建器和消费生命周期回归，已纳入 `pnpm check`。支持平台和当前集成范围见 [image-codec README](../runtime/image-codec/README.md)。
 - `tools/teavm/` 负责锁定工具链、seed、归档、上游补丁和 JVM 构建。工作目录由参数明确传入，不复制脚本后改变源码定位，不依赖扩展发布编排。
 - 通用进程、序列化、原子写入、归档、文件锁和并发直接使用成熟库。seed 成员、构建身份、checkpoint 与资源预算等项目规则留在所属领域，不重新搬出一套通用 helper。
-- `runtime/image-codec/` 的 C 与严格 TypeScript 是正式运行库；它不导入自动化或测试代码。`tools/images/` 只依赖该领域与第三方库，不依赖扩展发布编排。
+- `runtime/image-codec/` 的 C 与严格 TypeScript 是独立客户端候选库；它不导入自动化、测试或 Source host；Source host 同样不得导入该候选库。`tools/images/` 只依赖该领域与第三方库，不依赖扩展发布编排。
 - 产品 `src/` 不依赖工具或测试代码。contracts 只依赖底层生成协议包及库，独立于应用、运行时和自动化。
-- `packages/runtime-host/build.ts` 仅生成包自身 `dist/`；仓库入口 `scripts/assemble-native-assets.ts` 将 Native 产物装入 Flutter 应用。Web 与扩展快照由仓库资源组装入口组合。
+- `packages/runtime-host/build.ts` 仅生成包自身 `dist/`；仓库入口 `scripts/assemble-native-assets.ts` 将 Native 产物装入 Flutter 应用。Web 与扩展快照由仓库资源组装入口组合。默认 `collectMaterials()` 不准备、下载或编译候选图片 codec，默认 Web/Native 成品也不携带它；只有 `tools/images/` 的专项验收显式传入 `includeImageCodecs: true`。候选源码不进入扩展 AOT 的直接输入集合。
 
 `pnpm check:dependencies` 使用固定版本 dependency-cruiser 检查循环、工具反向引用 CLI、重新引入 tools/lib 包装层、TeaVM 依赖扩展编排，以及产品导入工具/测试。类型依赖同样参与；`cloudflare:workers` 是平台提供的模块，其他无法解析的导入会报错。检查纳入 `pnpm check`。边界变化应调整模块归属，不能靠忽略规则掩盖循环。
 

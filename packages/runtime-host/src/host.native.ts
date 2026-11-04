@@ -3,8 +3,6 @@ import { installRuntime } from './host-api.js';
 import { RuntimeFailure } from './errors.js';
 import { VerifiedLoader } from './verified-loader.js';
 import { isNativeControlPage } from './native-location.js';
-import { createImageCodecAssetProvider } from './image-codec-assets.js';
-import { imageCodecMaterials } from './image-codec-materials.js';
 
 declare const __KARUYOMI_MATERIAL_VERSION__: string;
 declare global {
@@ -102,7 +100,6 @@ if (!window.karuyomiRuntime) {
       60_000,
       {
         enabled: configuration.imageFiles === true,
-        tiles: createImageCodecAssetProvider(origin, imageCodecMaterials),
       },
     ),
   );

@@ -11,6 +11,9 @@
     "encoder.ts",
     "worker-protocol.ts",
     "worker.ts",
-    "client.ts"
+    "client.ts",
+    "assets.ts",
+    "tile-store.ts",
+    "errors.ts"
   ]
 }
