@@ -55,6 +55,28 @@ final class RuntimeException implements Exception {
   String toString() => '$code: $message';
 }
 
+final class _ImageWindowDemand {
+  _ImageWindowDemand(this.request);
+  final wire.RequestImageWindow request;
+  int revision = 0;
+  wire.ImageWindowSnapshot? snapshot;
+}
+
+final class _ImageTileOwner {
+  _ImageTileOwner(this.pageId, this.epoch, this.tile);
+  final String pageId;
+  final int epoch;
+  final wire.ImageTile tile;
+  bool invalidated = false;
+  bool retiring = false;
+}
+
+final class _ImageWindowObservation {
+  _ImageWindowObservation(Iterable<(String, String)> released)
+    : excluded = released.toSet();
+  final Set<(String, String)> excluded;
+}
+
 final class TransportSourceRuntime implements SourceRuntime {
   TransportSourceRuntime(this.transport);
   static int _instanceSequence = 0;
@@ -68,6 +90,13 @@ final class TransportSourceRuntime implements SourceRuntime {
   bool _disposed = false;
   Future<RuntimeSession>? _opening;
   String? _openKey;
+  final _imagePages = <(String, String), wire.ImagePage>{};
+  final _imageWindows = <(String, String), _ImageWindowDemand>{};
+  final _imageWindowIds = <(String, String), Set<String>>{};
+  final _imageTileLeases = <(String, String), _ImageTileOwner>{};
+  final _closingImagePages = <(String, String)>{};
+  final _imageWindowObservations = <_ImageWindowObservation>{};
+  final _imageTileReleases = <(String, String), int>{};
 
   @override
   Stream<RuntimeEvent> get events => _events.stream;
@@ -77,6 +106,10 @@ final class TransportSourceRuntime implements SourceRuntime {
     _session = null;
     _opening = null;
     _openKey = null;
+    _imagePages.clear();
+    _imageWindows.clear();
+    _imageWindowIds.clear();
+    _closingImagePages.clear();
     if (!_events.isClosed) {
       _events.add(
         RuntimeEvent(
@@ -106,6 +139,16 @@ final class TransportSourceRuntime implements SourceRuntime {
         request.releaseImage.generation,
       wire.ControlRequest_Command.closePageSession =>
         request.closePageSession.generation,
+      wire.ControlRequest_Command.openImagePage =>
+        request.openImagePage.generation,
+      wire.ControlRequest_Command.requestImageWindow =>
+        request.requestImageWindow.generation,
+      wire.ControlRequest_Command.waitImageWindow =>
+        request.waitImageWindow.generation,
+      wire.ControlRequest_Command.releaseImageTile =>
+        request.releaseImageTile.generation,
+      wire.ControlRequest_Command.closeImagePage =>
+        request.closeImagePage.generation,
       _ => null,
     };
     bool current() =>
@@ -141,6 +184,7 @@ final class TransportSourceRuntime implements SourceRuntime {
             ),
           );
         }
+        await _cleanupRejectedTileControl(request, response);
         throw const RuntimeException(
           RuntimeErrorCode.protocolError,
           'Control response identity mismatch',
@@ -151,7 +195,16 @@ final class TransportSourceRuntime implements SourceRuntime {
       final ownsImageResult =
           (command == wire.ControlRequest_Command.acquireImage &&
               response.whichResult() == wire.ControlResponse_Result.image) ||
-          ownsEncodedResult;
+          ownsEncodedResult ||
+          (command == wire.ControlRequest_Command.openImagePage &&
+              response.whichResult() ==
+                  wire.ControlResponse_Result.imagePage) ||
+          ({
+                wire.ControlRequest_Command.requestImageWindow,
+                wire.ControlRequest_Command.waitImageWindow,
+              }.contains(command) &&
+              response.whichResult() ==
+                  wire.ControlResponse_Result.imageWindow);
       if (!current() && !ownsImageResult) throw expired;
       if (response.whichResult() == wire.ControlResponse_Result.error) {
         throw RuntimeException.fromProto(response.error);
@@ -190,6 +243,11 @@ final class TransportSourceRuntime implements SourceRuntime {
             wire.ControlRequest_Command.cancelImage,
             wire.ControlRequest_Command.releaseImage,
             wire.ControlRequest_Command.closePageSession,
+            wire.ControlRequest_Command.openImagePage,
+            wire.ControlRequest_Command.requestImageWindow,
+            wire.ControlRequest_Command.waitImageWindow,
+            wire.ControlRequest_Command.releaseImageTile,
+            wire.ControlRequest_Command.closeImagePage,
           }.contains(command);
       if (!_events.isClosed && !localImageTimeout) {
         _events.add(
@@ -503,6 +561,496 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
   }
 
+  bool _imageId(String value) => value.isNotEmpty && value.length <= 200;
+
+  void _imageControlIdentity(String id, String generation) {
+    if (!_imageId(id) || !_imageId(generation)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Invalid image control identity',
+      );
+    }
+  }
+
+  void _requireImageGeneration(String generation) {
+    if (_disposed || _session == null || _session?.generation != generation) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Image page belongs to an expired runtime',
+      );
+    }
+  }
+
+  wire.ImagePage _imagePage(String pageId, String generation) {
+    _imageControlIdentity(pageId, generation);
+    _requireImageGeneration(generation);
+    final page = _imagePages[(generation, pageId)];
+    if (page == null || _closingImagePages.contains((generation, pageId))) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Image page has closed',
+      );
+    }
+    return page;
+  }
+
+  Future<void> _discardImagePage(wire.ImagePage page, String generation) async {
+    if (!_imageId(page.pageId) ||
+        _imagePages.containsKey((generation, page.pageId))) {
+      return;
+    }
+    try {
+      await closeImagePage(
+        wire.CloseImagePage(pageId: page.pageId, generation: generation),
+      );
+    } on Object {
+      // Preserve the rejected response error; cleanup never invalidates a newer generation.
+    }
+  }
+
+  Future<void> _discardImageWindow(
+    wire.ImageWindowSnapshot snapshot,
+    String pageId,
+    String generation,
+  ) async {
+    // A foreign page is not evidence that its leases belong to this request.
+    if (snapshot.pageId != pageId) return;
+    for (final id in snapshot.tiles.map((tile) => tile.leaseId).toSet()) {
+      // Accepted leases may still be displayed, including those in a newer window.
+      if (!_imageId(id) || _imageTileLeases.containsKey((generation, id))) {
+        continue;
+      }
+      try {
+        await releaseImageTile(
+          wire.ReleaseImageTile(leaseId: id, generation: generation),
+        );
+      } on Object {
+        // The original protocol/stale response error remains the failure to report.
+      }
+    }
+  }
+
+  Future<void> _cleanupRejectedTileControl(
+    wire.ControlRequest request,
+    wire.ControlResponse response,
+  ) async {
+    if (request.hasOpenImagePage() && response.hasImagePage()) {
+      await _discardImagePage(
+        response.imagePage,
+        request.openImagePage.generation,
+      );
+    } else if (request.hasRequestImageWindow() && response.hasImageWindow()) {
+      await _discardImageWindow(
+        response.imageWindow,
+        request.requestImageWindow.pageId,
+        request.requestImageWindow.generation,
+      );
+    } else if (request.hasWaitImageWindow() && response.hasImageWindow()) {
+      await _discardImageWindow(
+        response.imageWindow,
+        request.waitImageWindow.pageId,
+        request.waitImageWindow.generation,
+      );
+    }
+  }
+
+  @override
+  Future<wire.ImagePage> openImagePage(wire.OpenImagePage request) async {
+    final input = request.deepCopy()..freeze();
+    _imageControlIdentity(input.resourceId, input.generation);
+    _requireImageGeneration(input.generation);
+    final epoch = _epoch;
+    final page = (await _exchange(
+      wire.ControlRequest(openImagePage: input),
+      wire.ControlResponse_Result.imagePage,
+    )).imagePage;
+    try {
+      try {
+        wire.checkImagePage(page);
+      } on FormatException {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Invalid image page descriptor',
+        );
+      }
+      if (page.generation != input.generation ||
+          page.encoded.resourceId != input.resourceId) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Image page ownership mismatch',
+        );
+      }
+      if (_disposed ||
+          epoch != _epoch ||
+          _session?.generation != input.generation) {
+        throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Discarded a stale image page',
+        );
+      }
+      final key = (input.generation, page.pageId);
+      final existing = _imagePages[key];
+      if (existing != null) {
+        if (existing != page || _closingImagePages.contains(key)) {
+          throw const RuntimeException(
+            RuntimeErrorCode.protocolError,
+            'Image page changed an existing owner',
+          );
+        }
+        return existing;
+      }
+      page.freeze();
+      _imagePages[key] = page;
+      return page;
+    } catch (_) {
+      await _discardImagePage(page, input.generation);
+      rethrow;
+    }
+  }
+
+  wire.ImageWindowSnapshot _acceptImageWindow(
+    wire.ImageWindowSnapshot snapshot,
+    wire.ImagePage page,
+    _ImageWindowDemand window,
+    int epoch,
+    _ImageWindowObservation observation, {
+    int afterRevision = 0,
+  }) {
+    final request = window.request;
+    try {
+      wire.checkImageWindow(
+        snapshot,
+        isManagedFile: (resource) {
+          final location = Uri.tryParse(resource.url);
+          return location != null &&
+              transport is ManagedImageTransport &&
+              (transport as ManagedImageTransport).ownsImageLocation(
+                resource.resourceId,
+                resource.generation,
+                location,
+              );
+        },
+      );
+    } on FormatException {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Invalid image window descriptor',
+      );
+    }
+    if (snapshot.pageId != request.pageId ||
+        snapshot.generation != request.generation ||
+        snapshot.windowId != request.windowId ||
+        snapshot.revision < afterRevision ||
+        snapshot.revision < window.revision) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image window identity or revision mismatch',
+      );
+    }
+    if (window.snapshot != null &&
+        snapshot.revision == window.revision &&
+        snapshot != window.snapshot) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image window changed without a revision',
+      );
+    }
+    if (_disposed ||
+        epoch != _epoch ||
+        _session?.generation != request.generation) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Discarded a stale image window',
+      );
+    }
+    if (!identical(_imagePages[(request.generation, request.pageId)], page) ||
+        !identical(
+          _imageWindows[(request.generation, request.pageId)],
+          window,
+        ) ||
+        _closingImagePages.contains((request.generation, request.pageId))) {
+      throw const RuntimeException(
+        RuntimeErrorCode.cancelled,
+        'Image window was replaced or closed',
+      );
+    }
+    if (snapshot.hasHeader() &&
+        (snapshot.header.sourceWidth != page.encoded.rawWidth ||
+            snapshot.header.sourceHeight != page.encoded.rawHeight ||
+            snapshot.header.denominator != request.denominator)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image window changed its encoded page geometry',
+      );
+    }
+    final additions = <wire.ImageTile>[];
+    for (final tile in snapshot.tiles) {
+      if (observation.excluded.contains((request.generation, tile.leaseId))) {
+        throw const RuntimeException(
+          RuntimeErrorCode.cancelled,
+          'Image tile was released during this window observation',
+        );
+      }
+      final rect = tile.sourceRect;
+      if (rect.y >= request.sourceEndY ||
+          rect.y + rect.height <= request.sourceY) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Image tile lies outside its requested window',
+        );
+      }
+      final prior = _imageTileLeases[(request.generation, tile.leaseId)];
+      if (prior == null) {
+        additions.add(tile);
+      } else if (prior.retiring ||
+          prior.invalidated ||
+          prior.pageId != request.pageId ||
+          prior.epoch != epoch ||
+          prior.tile.sessionId != tile.sessionId ||
+          prior.tile.index != tile.index ||
+          prior.tile.sourceRect != tile.sourceRect ||
+          prior.tile.denominator != tile.denominator ||
+          prior.tile.resource != tile.resource ||
+          (!prior.tile.provisional && tile.provisional)) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Image tile lease changed its resource',
+        );
+      }
+    }
+    for (final id in snapshot.invalidatedLeaseIds) {
+      final prior = _imageTileLeases[(request.generation, id)];
+      if (prior != null &&
+          (prior.pageId != request.pageId || prior.epoch != epoch)) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Image window invalidated a foreign tile',
+        );
+      }
+    }
+    final retained = _imageTileLeases.values.map((owner) => owner.tile);
+    if (retained.length + additions.length > wire.imageTileCountLimit ||
+        [...retained, ...additions].fold<int>(
+              0,
+              (sum, tile) => sum + tile.resource.width * tile.resource.height,
+            ) >
+            wire.imageTilePixelLimit ||
+        [
+              ...retained,
+              ...additions,
+            ].fold<int>(0, (sum, tile) => sum + tile.resource.byteLength) >
+            wire.imageTileCacheByteLimit) {
+      throw const RuntimeException(
+        RuntimeErrorCode.limitExceeded,
+        'Image display leases exceed their retained budget',
+      );
+    }
+    snapshot.freeze();
+    for (final tile in snapshot.tiles) {
+      _imageTileLeases[(request.generation, tile.leaseId)] = _ImageTileOwner(
+        request.pageId,
+        epoch,
+        tile,
+      );
+    }
+    for (final id in snapshot.invalidatedLeaseIds) {
+      _imageTileLeases[(request.generation, id)]?.invalidated = true;
+    }
+    window.revision = snapshot.revision;
+    window.snapshot = snapshot;
+    return snapshot;
+  }
+
+  _ImageWindowObservation _observeImageWindow() {
+    final observation = _ImageWindowObservation(_imageTileReleases.keys);
+    _imageWindowObservations.add(observation);
+    return observation;
+  }
+
+  @override
+  Future<wire.ImageWindowSnapshot> requestImageWindow(
+    wire.RequestImageWindow request,
+  ) async {
+    final input = request.deepCopy()..freeze();
+    final page = _imagePage(input.pageId, input.generation);
+    if (!_imageId(input.windowId) ||
+        input.sourceY < 0 ||
+        input.sourceY >= input.sourceEndY ||
+        input.sourceEndY > page.encoded.rawHeight ||
+        !const [1, 2, 4].contains(input.denominator)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Invalid raw image window',
+      );
+    }
+    if (page.encoded.mimeType == 'image/png' && input.denominator != 1) {
+      throw const RuntimeException(
+        RuntimeErrorCode.unsupportedCapability,
+        'PNG requires scale 1',
+      );
+    }
+    final key = (input.generation, input.pageId);
+    final previous = _imageWindows[key];
+    final usedIds = _imageWindowIds.putIfAbsent(key, () => <String>{});
+    if (previous?.request.windowId != input.windowId &&
+        usedIds.contains(input.windowId)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'A replaced image window identity cannot be reused',
+      );
+    }
+    if (previous?.request.windowId == input.windowId &&
+        previous!.request != input) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image window identity was reused for different geometry',
+      );
+    }
+    final window = previous?.request.windowId == input.windowId
+        ? previous!
+        : _ImageWindowDemand(input);
+    _imageWindows[key] = window;
+    usedIds.add(input.windowId);
+    final epoch = _epoch;
+    final observation = _observeImageWindow();
+    wire.ImageWindowSnapshot? response;
+    try {
+      response = (await _exchange(
+        wire.ControlRequest(requestImageWindow: input),
+        wire.ControlResponse_Result.imageWindow,
+      )).imageWindow;
+      return _acceptImageWindow(response, page, window, epoch, observation);
+    } catch (_) {
+      if (response == null && identical(_imageWindows[key], window)) {
+        // A rejected new demand did not replace the host's accepted window.
+        // Do not roll back a newer concurrent request or an accepted response.
+        if (previous == null) {
+          _imageWindows.remove(key);
+        } else {
+          _imageWindows[key] = previous;
+        }
+        if (previous?.request.windowId != input.windowId) {
+          usedIds.remove(input.windowId);
+        }
+      }
+      if (response != null) {
+        await _discardImageWindow(response, input.pageId, input.generation);
+      }
+      rethrow;
+    } finally {
+      _imageWindowObservations.remove(observation);
+    }
+  }
+
+  @override
+  Future<wire.ImageWindowSnapshot> waitImageWindow(
+    wire.WaitImageWindow request,
+  ) async {
+    final input = request.deepCopy()..freeze();
+    final page = _imagePage(input.pageId, input.generation);
+    final window = _imageWindows[(input.generation, input.pageId)];
+    if (window?.request.windowId != input.windowId &&
+        (_imageWindowIds[(input.generation, input.pageId)]?.contains(
+              input.windowId,
+            ) ??
+            false)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.cancelled,
+        'Image window was replaced',
+      );
+    }
+    if (!_imageId(input.windowId) ||
+        window == null ||
+        window.request.windowId != input.windowId ||
+        input.afterRevision < 0 ||
+        input.afterRevision > window.revision ||
+        (input.hasTimeoutMs() &&
+            (input.timeoutMs <= 0 ||
+                input.timeoutMs > wire.imageWindowWaitLimitMs))) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Invalid image window wait',
+      );
+    }
+    final epoch = _epoch;
+    final observation = _observeImageWindow();
+    wire.ImageWindowSnapshot? response;
+    try {
+      response = (await _exchange(
+        wire.ControlRequest(waitImageWindow: input),
+        wire.ControlResponse_Result.imageWindow,
+      )).imageWindow;
+      return _acceptImageWindow(
+        response,
+        page,
+        window,
+        epoch,
+        observation,
+        afterRevision: input.afterRevision,
+      );
+    } catch (_) {
+      if (response != null) {
+        await _discardImageWindow(response, input.pageId, input.generation);
+      }
+      rethrow;
+    } finally {
+      _imageWindowObservations.remove(observation);
+    }
+  }
+
+  @override
+  Future<void> releaseImageTile(wire.ReleaseImageTile request) async {
+    if (_disposed) return;
+    final input = request.deepCopy()..freeze();
+    _imageControlIdentity(input.leaseId, input.generation);
+    final key = (input.generation, input.leaseId);
+    final owner = _imageTileLeases[key];
+    owner?.retiring = true;
+    _imageTileReleases.update(key, (count) => count + 1, ifAbsent: () => 1);
+    for (final observation in _imageWindowObservations) {
+      observation.excluded.add(key);
+    }
+    try {
+      _requireAck(
+        (await _exchange(
+          wire.ControlRequest(releaseImageTile: input),
+          wire.ControlResponse_Result.released,
+        )).released.released,
+      );
+      if (identical(_imageTileLeases[key], owner)) _imageTileLeases.remove(key);
+    } finally {
+      final count = _imageTileReleases[key] ?? 0;
+      if (count <= 1) {
+        _imageTileReleases.remove(key);
+      } else {
+        _imageTileReleases[key] = count - 1;
+      }
+    }
+  }
+
+  @override
+  Future<void> closeImagePage(wire.CloseImagePage request) async {
+    if (_disposed) return;
+    final input = request.deepCopy()..freeze();
+    _imageControlIdentity(input.pageId, input.generation);
+    final key = (input.generation, input.pageId);
+    final page = _imagePages[key];
+    _closingImagePages.add(key);
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(closeImagePage: input),
+        wire.ControlResponse_Result.closed,
+      )).closed.closed,
+    );
+    if (identical(_imagePages[key], page)) {
+      _imagePages.remove(key);
+      _imageWindows.remove(key);
+      _imageWindowIds.remove(key);
+      _closingImagePages.remove(key);
+    }
+    // Display leases stay charged until releaseImageTile receives its own ACK.
+  }
+
   @override
   Future<ImageResource> acquireImage(ImageAcquireRequest request) async {
     final session = _imageRequestSession(request);
@@ -680,6 +1228,13 @@ final class TransportSourceRuntime implements SourceRuntime {
         )).completed.completed,
       );
     } finally {
+      _imagePages.clear();
+      _imageWindows.clear();
+      _imageWindowIds.clear();
+      _imageTileLeases.clear();
+      _closingImagePages.clear();
+      _imageWindowObservations.clear();
+      _imageTileReleases.clear();
       await _events.close();
     }
   }

@@ -6,7 +6,12 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 /// File handoff for a single, already authenticated runtime container.
 abstract interface class NativeImageFileStore {
-  Future<Uri> copy(wire.AcquireImage request, wire.ImageResource resource);
+  Future<Uri> copy({
+    required String requestId,
+    required String generation,
+    required wire.ImageResource resource,
+    bool tile = false,
+  });
   Future<void> cancel(String requestId, String generation);
   Future<void> release(String resourceId, String generation);
   Future<void> clear();
@@ -48,15 +53,18 @@ final class IosImageFileStore implements NativeImageFileStore {
       !uri.hasFragment;
 
   @override
-  Future<Uri> copy(
-    wire.AcquireImage request,
-    wire.ImageResource resource,
-  ) async {
+  Future<Uri> copy({
+    required String requestId,
+    required String generation,
+    required wire.ImageResource resource,
+    bool tile = false,
+  }) async {
     final value = await _channel.invokeMapMethod<String, Object?>('acquire', {
       'bindingId': _bindingId,
-      'requestId': request.requestId,
+      'requestId': requestId,
       'resourceId': resource.resourceId,
-      'generation': resource.generation,
+      'generation': generation,
+      'tile': tile,
       'url': resource.url,
       'byteLength': resource.byteLength,
       'mimeType': resource.mimeType,
@@ -130,12 +138,19 @@ final class NativeImageControl {
   int _pixels = 0;
   int _sequence = 0;
   Future<void>? _closing;
+  final _tileTasks = <String, _TileTask>{};
+  final _tilePages = <String, _TilePage>{};
+  final _tileObservations = <Set<String>>{};
+  Future<void> _tileCopyQueue = Future<void>.value();
+  int _tileBytes = 0;
 
   String _key(String id, String generation) => '$generation\u0000$id';
   bool owns(String id, String generation, Uri location) =>
       !_closed &&
-      _resources[_key(id, generation)]?.published == true &&
-      _resources[_key(id, generation)]?.location == location;
+      ((_resources[_key(id, generation)]?.published == true &&
+              _resources[_key(id, generation)]?.location == location) ||
+          (_tileTasks[_key(id, generation)]?.published == true &&
+              _tileTasks[_key(id, generation)]?.location == location));
 
   Future<wire.ControlResponse> acquire(wire.ControlRequest control) async {
     final request = control.acquireImage;
@@ -234,7 +249,11 @@ final class NativeImageControl {
       _bytes += image.byteLength;
       _pixels += image.width * image.height;
       _check(task);
-      final location = await store.copy(request, image);
+      final location = await store.copy(
+        requestId: request.requestId,
+        generation: request.generation,
+        resource: image,
+      );
       task.location = location;
       _check(task);
       if (location.scheme != 'file' ||
@@ -282,6 +301,395 @@ final class NativeImageControl {
         _tasks.remove(key);
         task.done.complete();
       }
+    }
+  }
+
+  /// Convert only bounded display tiles; the Source encoded page stays in JS.
+  Future<wire.ControlResponse> window(wire.ControlRequest control) async {
+    if (_tileObservations.length >= 32) {
+      throw const RuntimeException(
+        RuntimeErrorCode.limitExceeded,
+        'Too many Native image window observations',
+      );
+    }
+    final retired = _tileTasks.entries
+        .where((entry) => entry.value.retiring)
+        .map((entry) => entry.key)
+        .toSet();
+    _tileObservations.add(retired);
+    try {
+      return await _window(control, retired);
+    } finally {
+      _tileObservations.remove(retired);
+    }
+  }
+
+  Future<wire.ControlResponse> _window(
+    wire.ControlRequest control,
+    Set<String> retired,
+  ) async {
+    final requesting = control.hasRequestImageWindow();
+    final pageId = requesting
+        ? control.requestImageWindow.pageId
+        : control.waitImageWindow.pageId;
+    final generation = requesting
+        ? control.requestImageWindow.generation
+        : control.waitImageWindow.generation;
+    final windowId = requesting
+        ? control.requestImageWindow.windowId
+        : control.waitImageWindow.windowId;
+    final pageKey = _key(pageId, generation);
+    final page = _tilePages.putIfAbsent(pageKey, _TilePage.new);
+    if (requesting && !page.closed) {
+      page.windowId = windowId;
+    } else if (page.windowId == null && !page.closed) {
+      page.windowId = windowId;
+    }
+    final attempt = requesting ? ++page.attempt : page.attempt;
+    void restoreRejectedWindow() {
+      if (requesting && page.attempt == attempt && page.windowId == windowId) {
+        page.windowId = page.acceptedWindowId;
+      }
+    }
+
+    _checkTileWindow(page, windowId);
+    final response = await call(control).catchError((Object error) {
+      restoreRejectedWindow();
+      throw error;
+    });
+    if (response.hasError()) {
+      restoreRejectedWindow();
+      if (response.requestId != control.requestId) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Tile control response identity mismatch',
+        );
+      }
+      return response;
+    }
+    if (!response.hasImageWindow()) {
+      restoreRejectedWindow();
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Tile window response is missing',
+      );
+    }
+    final snapshot = response.imageWindow;
+    if (snapshot.pageId != pageId || snapshot.generation != generation) {
+      restoreRejectedWindow();
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Tile response belongs to another page',
+      );
+    }
+    final used = <_TileTask>[];
+    var published = false;
+    var accepted = false;
+    try {
+      if (response.requestId != control.requestId) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Tile control response identity mismatch',
+        );
+      }
+      wire.checkImageWindow(snapshot);
+      if (snapshot.windowId != windowId ||
+          (!requesting &&
+              snapshot.revision < control.waitImageWindow.afterRevision)) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Tile response window or revision mismatch',
+        );
+      }
+      _checkTileWindow(page, windowId);
+      if (snapshot.revision < page.revision) {
+        throw const RuntimeException(
+          RuntimeErrorCode.cancelled,
+          'A newer tile window response has already arrived',
+        );
+      }
+      page.revision = snapshot.revision;
+      page.acceptedWindowId = windowId;
+      accepted = true;
+      for (final tile in snapshot.tiles) {
+        final image = tile.resource;
+        final uri = Uri.tryParse(image.url.substring(5));
+        if (uri?.scheme != 'https' || uri?.origin != origin.origin) {
+          throw const RuntimeException(
+            RuntimeErrorCode.protocolError,
+            'Tile Blob is outside the managed origin',
+          );
+        }
+        final key = _key(tile.leaseId, generation);
+        if (retired.contains(key)) {
+          throw const RuntimeException(
+            RuntimeErrorCode.cancelled,
+            'Tile was released while this observation was in flight',
+          );
+        }
+        var task = _tileTasks[key];
+        if (task != null) {
+          if (task.pageId != pageId || !_sameTile(task.tile, tile)) {
+            throw const RuntimeException(
+              RuntimeErrorCode.protocolError,
+              'Tile lease metadata changed',
+            );
+          }
+        } else {
+          if (_tileTasks.length >= 64 ||
+              _tileBytes + image.byteLength > 16 * 1024 * 1024 ||
+              _bytes + image.byteLength > 64 * 1024 * 1024 ||
+              _pixels + image.width * image.height > 32 * 1024 * 1024) {
+            throw const RuntimeException(
+              RuntimeErrorCode.limitExceeded,
+              'Native tile display budget exceeded',
+            );
+          }
+          task = _TileTask(
+            pageId: pageId,
+            requestId: 'native-tile-${++_sequence}',
+            tile: tile.deepCopy()..freeze(),
+          );
+          _tileTasks[key] = task;
+          _tileBytes += image.byteLength;
+          _bytes += image.byteLength;
+          _pixels += image.width * image.height;
+          final pending = task;
+          task.copy = _tileCopyQueue.then((_) => _copyTile(pending));
+          _tileCopyQueue = task.copy.then<void>((_) {}, onError: (Object _) {});
+          task.timer = Timer(const Duration(seconds: 60), () {
+            pending.failure ??= const RuntimeException(
+              RuntimeErrorCode.timeout,
+              'Native tile copy timed out',
+            );
+            unawaited(_stopTile(pending).catchError((Object _) {}));
+          });
+        }
+        task.users++;
+        used.add(task);
+      }
+      final result = response.deepCopy();
+      for (var index = 0; index < used.length; index++) {
+        final location = await used[index].copy;
+        _checkTileWindow(page, windowId);
+        if (page.revision != snapshot.revision) {
+          throw const RuntimeException(
+            RuntimeErrorCode.cancelled,
+            'A newer tile snapshot superseded this file copy',
+          );
+        }
+        result.imageWindow.tiles[index].resource.url = location.toString();
+      }
+      for (final task in used) {
+        _checkTile(task);
+      }
+      for (final task in used) {
+        task.published = true;
+      }
+      published = true;
+      return result;
+    } finally {
+      if (!accepted) restoreRejectedWindow();
+      for (final task in used) {
+        task.users--;
+      }
+      if (!published) {
+        // A refused snapshot can own new host leases even before file copying
+        // starts. Existing published leases still belong to the display owner.
+        final newIds = snapshot.tiles
+            .where((tile) => tile.leaseId.isNotEmpty)
+            .map((tile) => tile.leaseId)
+            .toSet();
+        for (final id in newIds) {
+          final task = _tileTasks[_key(id, generation)];
+          if (task != null) {
+            if (task.pageId == pageId && !task.published && task.users == 0) {
+              await _releaseTileTask(task);
+            }
+          } else if (!_closed) {
+            await _cleanup(
+              wire.ControlRequest(
+                requestId: 'native-tile-discard-${++_sequence}',
+                releaseImageTile: wire.ReleaseImageTile(
+                  leaseId: id,
+                  generation: generation,
+                ),
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  bool _sameTile(wire.ImageTile a, wire.ImageTile b) =>
+      a.sessionId == b.sessionId &&
+      a.index == b.index &&
+      a.denominator == b.denominator &&
+      a.sourceRect == b.sourceRect &&
+      _sameTileResource(a.resource, b.resource);
+
+  bool _sameTileResource(wire.ImageResource a, wire.ImageResource b) =>
+      a.resourceId == b.resourceId &&
+      a.generation == b.generation &&
+      a.url == b.url &&
+      a.mimeType == b.mimeType &&
+      a.byteLength == b.byteLength &&
+      a.width == b.width &&
+      a.height == b.height;
+
+  void _checkTileWindow(_TilePage page, String windowId) {
+    if (_closed || page.closed || page.windowId != windowId) {
+      throw const RuntimeException(
+        RuntimeErrorCode.cancelled,
+        'Tile window was replaced or closed',
+      );
+    }
+  }
+
+  void _checkTile(_TileTask task) {
+    if (_closed) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Native image container was replaced',
+      );
+    }
+    if (task.retiring) {
+      throw const RuntimeException(
+        RuntimeErrorCode.cancelled,
+        'Native tile display lease is being released',
+      );
+    }
+    final failure = task.failure;
+    if (failure != null) throw failure;
+  }
+
+  Future<Uri> _copyTile(_TileTask task) async {
+    try {
+      _checkTile(task);
+      final location = await store.copy(
+        requestId: task.requestId,
+        generation: task.resource.generation,
+        resource: task.resource,
+        tile: true,
+      );
+      task.location = location;
+      _checkTile(task);
+      if (location.scheme != 'file' ||
+          location.host.isNotEmpty ||
+          location.hasQuery ||
+          location.hasFragment) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Native tile handoff requires a managed file',
+        );
+      }
+      return location;
+    } catch (_) {
+      _checkTile(task);
+      rethrow;
+    } finally {
+      task.timer?.cancel();
+    }
+  }
+
+  Future<void> _stopTile(_TileTask task) async {
+    task.failure ??= const RuntimeException(
+      RuntimeErrorCode.cancelled,
+      'Native tile copy was cancelled',
+    );
+    await store.cancel(task.requestId, task.resource.generation);
+    try {
+      await task.copy;
+    } catch (_) {
+      // The actual copy future must reach terminal before its file is released.
+    }
+  }
+
+  Future<void> _releaseTileTask(_TileTask task) => task.releasing ??= () async {
+    try {
+      task.retiring = true;
+      final retiringKey = _key(
+        task.resource.resourceId,
+        task.resource.generation,
+      );
+      for (final observation in _tileObservations) {
+        observation.add(retiringKey);
+      }
+      if (!task.published) await _stopTile(task);
+      await store.release(task.resource.resourceId, task.resource.generation);
+      if (!_closed) {
+        await _cleanup(
+          wire.ControlRequest(
+            requestId: 'native-tile-release-${++_sequence}',
+            releaseImageTile: wire.ReleaseImageTile(
+              leaseId: task.resource.resourceId,
+              generation: task.resource.generation,
+            ),
+          ),
+        );
+      }
+      _tileTasks.remove(
+        _key(task.resource.resourceId, task.resource.generation),
+      );
+      _pruneTilePage(task.pageId, task.resource.generation);
+      _tileBytes -= task.resource.byteLength;
+      _bytes -= task.resource.byteLength;
+      _pixels -= task.resource.width * task.resource.height;
+    } catch (_) {
+      task.releasing = null;
+      rethrow;
+    }
+  }();
+
+  Future<wire.ControlResponse> releaseTile(wire.ControlRequest control) async {
+    final request = control.releaseImageTile;
+    final task = _tileTasks[_key(request.leaseId, request.generation)];
+    if (task == null) return call(control);
+    await _releaseTileTask(task);
+    return wire.ControlResponse(
+      requestId: control.requestId,
+      released: wire.Released(released: true),
+    );
+  }
+
+  Future<wire.ControlResponse> closeImagePage(
+    wire.ControlRequest control,
+  ) async {
+    final request = control.closeImagePage;
+    final page = _tilePages.putIfAbsent(
+      _key(request.pageId, request.generation),
+      _TilePage.new,
+    );
+    page.closed = true;
+    final response = await call(control);
+    if (response.requestId != control.requestId ||
+        (!response.hasError() &&
+            (!response.hasClosed() || !response.closed.closed))) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image page close was not acknowledged',
+      );
+    }
+    for (final task in _tileTasks.values.toList()) {
+      if (task.pageId == request.pageId &&
+          task.resource.generation == request.generation &&
+          !task.published) {
+        await _releaseTileTask(task);
+      }
+    }
+    _pruneTilePage(request.pageId, request.generation);
+    return response;
+  }
+
+  void _pruneTilePage(String pageId, String generation) {
+    final key = _key(pageId, generation);
+    if (_tilePages[key]?.closed == true &&
+        !_tileTasks.values.any(
+          (task) =>
+              task.pageId == pageId && task.resource.generation == generation,
+        )) {
+      _tilePages.remove(key);
     }
   }
 
@@ -399,8 +807,23 @@ final class NativeImageControl {
       );
       if (!task.interrupted.isCompleted) task.interrupted.complete();
     }
+    for (final page in _tilePages.values) {
+      page.closed = true;
+    }
+    for (final task in _tileTasks.values) {
+      task.failure = const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Native image container was replaced',
+      );
+    }
     await store.clear();
+    await _tileCopyQueue;
     await Future.wait(_tasks.values.toList().map((task) => task.done.future));
+    for (final task in _tileTasks.values) {
+      task.timer?.cancel();
+    }
+    _tileTasks.clear();
+    _tilePages.clear();
     _resources.clear();
   }
 }
@@ -416,4 +839,32 @@ final class _ImageTask {
   Future<void>? aborting;
   bool reserved = false;
   bool published = false;
+}
+
+final class _TilePage {
+  String? windowId;
+  String? acceptedWindowId;
+  int attempt = 0;
+  int revision = 0;
+  bool closed = false;
+}
+
+final class _TileTask {
+  _TileTask({
+    required this.pageId,
+    required this.requestId,
+    required this.tile,
+  });
+  final String pageId;
+  final String requestId;
+  final wire.ImageTile tile;
+  wire.ImageResource get resource => tile.resource;
+  late final Future<Uri> copy;
+  Uri? location;
+  RuntimeException? failure;
+  Timer? timer;
+  Future<void>? releasing;
+  int users = 0;
+  bool published = false;
+  bool retiring = false;
 }

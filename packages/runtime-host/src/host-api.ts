@@ -93,6 +93,51 @@ function createRuntimeApi(manager: SourceRuntimeManager) {
               ),
             };
             break;
+          case 'openImagePage':
+            result = {
+              case: 'imagePage',
+              value: create(
+                pb.ImagePageSchema,
+                manager.openImagePage(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'requestImageWindow':
+            result = {
+              case: 'imageWindow',
+              value: create(
+                pb.ImageWindowSnapshotSchema,
+                manager.requestImageWindow(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'waitImageWindow':
+            result = {
+              case: 'imageWindow',
+              value: create(
+                pb.ImageWindowSnapshotSchema,
+                await manager.waitImageWindow(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'releaseImageTile':
+            result = {
+              case: 'released',
+              value: create(
+                pb.ReleasedSchema,
+                manager.releaseImageTile(plain(request.command.value)),
+              ),
+            };
+            break;
+          case 'closeImagePage':
+            result = {
+              case: 'closed',
+              value: create(
+                pb.ClosedSchema,
+                await manager.closeImagePage(plain(request.command.value)),
+              ),
+            };
+            break;
           case 'cancelImage':
             result = {
               case: 'released',

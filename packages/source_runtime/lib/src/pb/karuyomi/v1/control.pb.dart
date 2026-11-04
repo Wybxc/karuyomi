@@ -2844,6 +2844,1011 @@ class ImageResource extends $pb.GeneratedMessage {
   void clearUrl() => $_clearField(7);
 }
 
+/// Encoded page ownership stays in the host; only small display tiles cross
+/// the control boundary. A closed page does not acknowledge outstanding tiles.
+class OpenImagePage extends $pb.GeneratedMessage {
+  factory OpenImagePage({
+    $core.String? resourceId,
+    $core.String? generation,
+  }) {
+    final result = OpenImagePage._();
+    if (resourceId != null) result.resourceId = resourceId;
+    if (generation != null) result.generation = generation;
+    return result;
+  }
+
+  OpenImagePage._();
+
+  factory OpenImagePage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      OpenImagePage()..mergeFromBuffer(data, registry);
+  factory OpenImagePage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      OpenImagePage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'OpenImagePage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: OpenImagePage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'resourceId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OpenImagePage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OpenImagePage copyWith(void Function(OpenImagePage) updates) =>
+      super.copyWith((message) => updates(message as OpenImagePage))
+          as OpenImagePage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use OpenImagePage() / OpenImagePage.new instead')
+  static OpenImagePage create() => OpenImagePage._();
+  static $pb.GeneratedMessage $_createMessage() => OpenImagePage._();
+  @$core.override
+  OpenImagePage createEmptyInstance() => OpenImagePage._();
+  @$core.pragma('dart2js:noInline')
+  static OpenImagePage getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<OpenImagePage>(
+          OpenImagePage.$_createMessage);
+  static OpenImagePage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get resourceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set resourceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasResourceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearResourceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+}
+
+class ImagePage extends $pb.GeneratedMessage {
+  factory ImagePage({
+    $core.String? pageId,
+    $core.String? generation,
+    EncodedImage? encoded,
+  }) {
+    final result = ImagePage._();
+    if (pageId != null) result.pageId = pageId;
+    if (generation != null) result.generation = generation;
+    if (encoded != null) result.encoded = encoded;
+    return result;
+  }
+
+  ImagePage._();
+
+  factory ImagePage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImagePage()..mergeFromBuffer(data, registry);
+  factory ImagePage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImagePage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ImagePage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ImagePage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'pageId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..aOM<EncodedImage>(3, _omitFieldNames ? '' : 'encoded',
+        subBuilder: EncodedImage.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImagePage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImagePage copyWith(void Function(ImagePage) updates) =>
+      super.copyWith((message) => updates(message as ImagePage)) as ImagePage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ImagePage() / ImagePage.new instead')
+  static ImagePage create() => ImagePage._();
+  static $pb.GeneratedMessage $_createMessage() => ImagePage._();
+  @$core.override
+  ImagePage createEmptyInstance() => ImagePage._();
+  @$core.pragma('dart2js:noInline')
+  static ImagePage getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ImagePage>(ImagePage.$_createMessage);
+  static ImagePage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get pageId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set pageId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  EncodedImage get encoded => $_getN(2);
+  @$pb.TagNumber(3)
+  set encoded(EncodedImage value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEncoded() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEncoded() => $_clearField(3);
+  @$pb.TagNumber(3)
+  EncodedImage ensureEncoded() => $_ensure(2);
+}
+
+class RequestImageWindow extends $pb.GeneratedMessage {
+  factory RequestImageWindow({
+    $core.String? pageId,
+    $core.String? generation,
+    $core.String? windowId,
+    $core.int? sourceY,
+    $core.int? sourceEndY,
+    $core.int? denominator,
+  }) {
+    final result = RequestImageWindow._();
+    if (pageId != null) result.pageId = pageId;
+    if (generation != null) result.generation = generation;
+    if (windowId != null) result.windowId = windowId;
+    if (sourceY != null) result.sourceY = sourceY;
+    if (sourceEndY != null) result.sourceEndY = sourceEndY;
+    if (denominator != null) result.denominator = denominator;
+    return result;
+  }
+
+  RequestImageWindow._();
+
+  factory RequestImageWindow.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RequestImageWindow()..mergeFromBuffer(data, registry);
+  factory RequestImageWindow.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RequestImageWindow()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RequestImageWindow',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: RequestImageWindow.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'pageId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..aOS(3, _omitFieldNames ? '' : 'windowId')
+    ..aI(4, _omitFieldNames ? '' : 'sourceY', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'sourceEndY', fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'denominator',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RequestImageWindow clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RequestImageWindow copyWith(void Function(RequestImageWindow) updates) =>
+      super.copyWith((message) => updates(message as RequestImageWindow))
+          as RequestImageWindow;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use RequestImageWindow() / RequestImageWindow.new instead')
+  static RequestImageWindow create() => RequestImageWindow._();
+  static $pb.GeneratedMessage $_createMessage() => RequestImageWindow._();
+  @$core.override
+  RequestImageWindow createEmptyInstance() => RequestImageWindow._();
+  @$core.pragma('dart2js:noInline')
+  static RequestImageWindow getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RequestImageWindow>(
+          RequestImageWindow.$_createMessage);
+  static RequestImageWindow? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get pageId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set pageId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get windowId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set windowId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWindowId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWindowId() => $_clearField(3);
+
+  /// Half-open raw image coordinates before orientation or downsampling.
+  @$pb.TagNumber(4)
+  $core.int get sourceY => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set sourceY($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSourceY() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSourceY() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get sourceEndY => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set sourceEndY($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSourceEndY() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSourceEndY() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get denominator => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set denominator($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasDenominator() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearDenominator() => $_clearField(6);
+}
+
+class WaitImageWindow extends $pb.GeneratedMessage {
+  factory WaitImageWindow({
+    $core.String? pageId,
+    $core.String? generation,
+    $core.String? windowId,
+    $core.int? afterRevision,
+    $core.int? timeoutMs,
+  }) {
+    final result = WaitImageWindow._();
+    if (pageId != null) result.pageId = pageId;
+    if (generation != null) result.generation = generation;
+    if (windowId != null) result.windowId = windowId;
+    if (afterRevision != null) result.afterRevision = afterRevision;
+    if (timeoutMs != null) result.timeoutMs = timeoutMs;
+    return result;
+  }
+
+  WaitImageWindow._();
+
+  factory WaitImageWindow.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WaitImageWindow()..mergeFromBuffer(data, registry);
+  factory WaitImageWindow.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WaitImageWindow()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WaitImageWindow',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: WaitImageWindow.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'pageId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..aOS(3, _omitFieldNames ? '' : 'windowId')
+    ..aI(4, _omitFieldNames ? '' : 'afterRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'timeoutMs', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WaitImageWindow clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WaitImageWindow copyWith(void Function(WaitImageWindow) updates) =>
+      super.copyWith((message) => updates(message as WaitImageWindow))
+          as WaitImageWindow;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WaitImageWindow() / WaitImageWindow.new instead')
+  static WaitImageWindow create() => WaitImageWindow._();
+  static $pb.GeneratedMessage $_createMessage() => WaitImageWindow._();
+  @$core.override
+  WaitImageWindow createEmptyInstance() => WaitImageWindow._();
+  @$core.pragma('dart2js:noInline')
+  static WaitImageWindow getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<WaitImageWindow>(
+          WaitImageWindow.$_createMessage);
+  static WaitImageWindow? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get pageId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set pageId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get windowId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set windowId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWindowId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWindowId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get afterRevision => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set afterRevision($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAfterRevision() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAfterRevision() => $_clearField(4);
+
+  /// A bounded long poll returns the current snapshot when this deadline expires.
+  @$pb.TagNumber(5)
+  $core.int get timeoutMs => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set timeoutMs($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTimeoutMs() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTimeoutMs() => $_clearField(5);
+}
+
+class ReleaseImageTile extends $pb.GeneratedMessage {
+  factory ReleaseImageTile({
+    $core.String? leaseId,
+    $core.String? generation,
+  }) {
+    final result = ReleaseImageTile._();
+    if (leaseId != null) result.leaseId = leaseId;
+    if (generation != null) result.generation = generation;
+    return result;
+  }
+
+  ReleaseImageTile._();
+
+  factory ReleaseImageTile.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReleaseImageTile()..mergeFromBuffer(data, registry);
+  factory ReleaseImageTile.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReleaseImageTile()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReleaseImageTile',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ReleaseImageTile.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'leaseId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReleaseImageTile clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReleaseImageTile copyWith(void Function(ReleaseImageTile) updates) =>
+      super.copyWith((message) => updates(message as ReleaseImageTile))
+          as ReleaseImageTile;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ReleaseImageTile() / ReleaseImageTile.new instead')
+  static ReleaseImageTile create() => ReleaseImageTile._();
+  static $pb.GeneratedMessage $_createMessage() => ReleaseImageTile._();
+  @$core.override
+  ReleaseImageTile createEmptyInstance() => ReleaseImageTile._();
+  @$core.pragma('dart2js:noInline')
+  static ReleaseImageTile getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ReleaseImageTile>(
+          ReleaseImageTile.$_createMessage);
+  static ReleaseImageTile? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get leaseId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set leaseId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLeaseId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLeaseId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+}
+
+class CloseImagePage extends $pb.GeneratedMessage {
+  factory CloseImagePage({
+    $core.String? pageId,
+    $core.String? generation,
+  }) {
+    final result = CloseImagePage._();
+    if (pageId != null) result.pageId = pageId;
+    if (generation != null) result.generation = generation;
+    return result;
+  }
+
+  CloseImagePage._();
+
+  factory CloseImagePage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CloseImagePage()..mergeFromBuffer(data, registry);
+  factory CloseImagePage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CloseImagePage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CloseImagePage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CloseImagePage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'pageId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CloseImagePage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CloseImagePage copyWith(void Function(CloseImagePage) updates) =>
+      super.copyWith((message) => updates(message as CloseImagePage))
+          as CloseImagePage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CloseImagePage() / CloseImagePage.new instead')
+  static CloseImagePage create() => CloseImagePage._();
+  static $pb.GeneratedMessage $_createMessage() => CloseImagePage._();
+  @$core.override
+  CloseImagePage createEmptyInstance() => CloseImagePage._();
+  @$core.pragma('dart2js:noInline')
+  static CloseImagePage getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CloseImagePage>(
+          CloseImagePage.$_createMessage);
+  static CloseImagePage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get pageId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set pageId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+}
+
+class ImageSourceRect extends $pb.GeneratedMessage {
+  factory ImageSourceRect({
+    $core.int? x,
+    $core.int? y,
+    $core.int? width,
+    $core.int? height,
+  }) {
+    final result = ImageSourceRect._();
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    return result;
+  }
+
+  ImageSourceRect._();
+
+  factory ImageSourceRect.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageSourceRect()..mergeFromBuffer(data, registry);
+  factory ImageSourceRect.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageSourceRect()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ImageSourceRect',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ImageSourceRect.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageSourceRect clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageSourceRect copyWith(void Function(ImageSourceRect) updates) =>
+      super.copyWith((message) => updates(message as ImageSourceRect))
+          as ImageSourceRect;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ImageSourceRect() / ImageSourceRect.new instead')
+  static ImageSourceRect create() => ImageSourceRect._();
+  static $pb.GeneratedMessage $_createMessage() => ImageSourceRect._();
+  @$core.override
+  ImageSourceRect createEmptyInstance() => ImageSourceRect._();
+  @$core.pragma('dart2js:noInline')
+  static ImageSourceRect getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ImageSourceRect>(
+          ImageSourceRect.$_createMessage);
+  static ImageSourceRect? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get x => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set x($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasX() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearX() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get y => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set y($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasY() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearY() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get width => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set width($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWidth() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWidth() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get height => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set height($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasHeight() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearHeight() => $_clearField(4);
+}
+
+class ImageTileHeader extends $pb.GeneratedMessage {
+  factory ImageTileHeader({
+    $core.int? width,
+    $core.int? height,
+    $core.int? sourceWidth,
+    $core.int? sourceHeight,
+    $core.int? denominator,
+  }) {
+    final result = ImageTileHeader._();
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    if (sourceWidth != null) result.sourceWidth = sourceWidth;
+    if (sourceHeight != null) result.sourceHeight = sourceHeight;
+    if (denominator != null) result.denominator = denominator;
+    return result;
+  }
+
+  ImageTileHeader._();
+
+  factory ImageTileHeader.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageTileHeader()..mergeFromBuffer(data, registry);
+  factory ImageTileHeader.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageTileHeader()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ImageTileHeader',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ImageTileHeader.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'sourceWidth',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'sourceHeight',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'denominator',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageTileHeader clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageTileHeader copyWith(void Function(ImageTileHeader) updates) =>
+      super.copyWith((message) => updates(message as ImageTileHeader))
+          as ImageTileHeader;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ImageTileHeader() / ImageTileHeader.new instead')
+  static ImageTileHeader create() => ImageTileHeader._();
+  static $pb.GeneratedMessage $_createMessage() => ImageTileHeader._();
+  @$core.override
+  ImageTileHeader createEmptyInstance() => ImageTileHeader._();
+  @$core.pragma('dart2js:noInline')
+  static ImageTileHeader getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ImageTileHeader>(
+          ImageTileHeader.$_createMessage);
+  static ImageTileHeader? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get width => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set width($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasWidth() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearWidth() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get height => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set height($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasHeight() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearHeight() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get sourceWidth => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set sourceWidth($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSourceWidth() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSourceWidth() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get sourceHeight => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set sourceHeight($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSourceHeight() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSourceHeight() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get denominator => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set denominator($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDenominator() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDenominator() => $_clearField(5);
+}
+
+class ImageTile extends $pb.GeneratedMessage {
+  factory ImageTile({
+    $core.String? leaseId,
+    $core.String? sessionId,
+    $core.int? index,
+    ImageSourceRect? sourceRect,
+    $core.int? denominator,
+    $core.bool? provisional,
+    ImageResource? resource,
+  }) {
+    final result = ImageTile._();
+    if (leaseId != null) result.leaseId = leaseId;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (index != null) result.index = index;
+    if (sourceRect != null) result.sourceRect = sourceRect;
+    if (denominator != null) result.denominator = denominator;
+    if (provisional != null) result.provisional = provisional;
+    if (resource != null) result.resource = resource;
+    return result;
+  }
+
+  ImageTile._();
+
+  factory ImageTile.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageTile()..mergeFromBuffer(data, registry);
+  factory ImageTile.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageTile()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ImageTile',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ImageTile.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'leaseId')
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..aI(3, _omitFieldNames ? '' : 'index', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<ImageSourceRect>(4, _omitFieldNames ? '' : 'sourceRect',
+        subBuilder: ImageSourceRect.$_createMessage)
+    ..aI(5, _omitFieldNames ? '' : 'denominator',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(6, _omitFieldNames ? '' : 'provisional')
+    ..aOM<ImageResource>(7, _omitFieldNames ? '' : 'resource',
+        subBuilder: ImageResource.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageTile clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageTile copyWith(void Function(ImageTile) updates) =>
+      super.copyWith((message) => updates(message as ImageTile)) as ImageTile;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ImageTile() / ImageTile.new instead')
+  static ImageTile create() => ImageTile._();
+  static $pb.GeneratedMessage $_createMessage() => ImageTile._();
+  @$core.override
+  ImageTile createEmptyInstance() => ImageTile._();
+  @$core.pragma('dart2js:noInline')
+  static ImageTile getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ImageTile>(ImageTile.$_createMessage);
+  static ImageTile? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get leaseId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set leaseId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLeaseId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLeaseId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get index => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set index($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasIndex() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearIndex() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  ImageSourceRect get sourceRect => $_getN(3);
+  @$pb.TagNumber(4)
+  set sourceRect(ImageSourceRect value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSourceRect() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSourceRect() => $_clearField(4);
+  @$pb.TagNumber(4)
+  ImageSourceRect ensureSourceRect() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  $core.int get denominator => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set denominator($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDenominator() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDenominator() => $_clearField(5);
+
+  /// The session has not reached a successful real codec terminal yet.
+  @$pb.TagNumber(6)
+  $core.bool get provisional => $_getBF(5);
+  @$pb.TagNumber(6)
+  set provisional($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasProvisional() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearProvisional() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  ImageResource get resource => $_getN(6);
+  @$pb.TagNumber(7)
+  set resource(ImageResource value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasResource() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearResource() => $_clearField(7);
+  @$pb.TagNumber(7)
+  ImageResource ensureResource() => $_ensure(6);
+}
+
+class ImageWindowSnapshot extends $pb.GeneratedMessage {
+  factory ImageWindowSnapshot({
+    $core.String? pageId,
+    $core.String? generation,
+    $core.String? windowId,
+    $core.int? revision,
+    ImageWindowState? state,
+    ImageTileHeader? header,
+    $core.Iterable<ImageTile>? tiles,
+    $core.Iterable<$core.String>? invalidatedLeaseIds,
+    RuntimeError? error,
+  }) {
+    final result = ImageWindowSnapshot._();
+    if (pageId != null) result.pageId = pageId;
+    if (generation != null) result.generation = generation;
+    if (windowId != null) result.windowId = windowId;
+    if (revision != null) result.revision = revision;
+    if (state != null) result.state = state;
+    if (header != null) result.header = header;
+    if (tiles != null) result.tiles.addAll(tiles);
+    if (invalidatedLeaseIds != null)
+      result.invalidatedLeaseIds.addAll(invalidatedLeaseIds);
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  ImageWindowSnapshot._();
+
+  factory ImageWindowSnapshot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageWindowSnapshot()..mergeFromBuffer(data, registry);
+  factory ImageWindowSnapshot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ImageWindowSnapshot()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ImageWindowSnapshot',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ImageWindowSnapshot.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'pageId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..aOS(3, _omitFieldNames ? '' : 'windowId')
+    ..aI(4, _omitFieldNames ? '' : 'revision', fieldType: $pb.PbFieldType.OU3)
+    ..aE<ImageWindowState>(5, _omitFieldNames ? '' : 'state',
+        enumValues: ImageWindowState.values)
+    ..aOM<ImageTileHeader>(6, _omitFieldNames ? '' : 'header',
+        subBuilder: ImageTileHeader.$_createMessage)
+    ..pPM<ImageTile>(7, _omitFieldNames ? '' : 'tiles',
+        subBuilder: ImageTile.$_createMessage)
+    ..pPS(8, _omitFieldNames ? '' : 'invalidatedLeaseIds')
+    ..aOM<RuntimeError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: RuntimeError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageWindowSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ImageWindowSnapshot copyWith(void Function(ImageWindowSnapshot) updates) =>
+      super.copyWith((message) => updates(message as ImageWindowSnapshot))
+          as ImageWindowSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use ImageWindowSnapshot() / ImageWindowSnapshot.new instead')
+  static ImageWindowSnapshot create() => ImageWindowSnapshot._();
+  static $pb.GeneratedMessage $_createMessage() => ImageWindowSnapshot._();
+  @$core.override
+  ImageWindowSnapshot createEmptyInstance() => ImageWindowSnapshot._();
+  @$core.pragma('dart2js:noInline')
+  static ImageWindowSnapshot getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ImageWindowSnapshot>(
+          ImageWindowSnapshot.$_createMessage);
+  static ImageWindowSnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get pageId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set pageId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get windowId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set windowId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWindowId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWindowId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get revision => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set revision($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRevision() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRevision() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  ImageWindowState get state => $_getN(4);
+  @$pb.TagNumber(5)
+  set state(ImageWindowState value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasState() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearState() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  ImageTileHeader get header => $_getN(5);
+  @$pb.TagNumber(6)
+  set header(ImageTileHeader value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasHeader() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearHeader() => $_clearField(6);
+  @$pb.TagNumber(6)
+  ImageTileHeader ensureHeader() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<ImageTile> get tiles => $_getList(6);
+
+  /// These leases remain charged until the display adapter acknowledges release.
+  @$pb.TagNumber(8)
+  $pb.PbList<$core.String> get invalidatedLeaseIds => $_getList(7);
+
+  @$pb.TagNumber(9)
+  RuntimeError get error => $_getN(8);
+  @$pb.TagNumber(9)
+  set error(RuntimeError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  RuntimeError ensureError() => $_ensure(8);
+}
+
 class ImageMeta extends $pb.GeneratedMessage {
   factory ImageMeta({
     $core.int? seq,
@@ -4239,6 +5244,11 @@ enum ControlRequest_Command {
   fetchApi,
   dispose,
   acquireEncodedImage,
+  openImagePage,
+  requestImageWindow,
+  waitImageWindow,
+  releaseImageTile,
+  closeImagePage,
   notSet
 }
 
@@ -4257,6 +5267,11 @@ class ControlRequest extends $pb.GeneratedMessage {
     ApiFetchRequest? fetchApi,
     Empty? dispose,
     AcquireImage? acquireEncodedImage,
+    OpenImagePage? openImagePage,
+    RequestImageWindow? requestImageWindow,
+    WaitImageWindow? waitImageWindow,
+    ReleaseImageTile? releaseImageTile,
+    CloseImagePage? closeImagePage,
   }) {
     final result = ControlRequest._();
     if (requestId != null) result.requestId = requestId;
@@ -4273,6 +5288,12 @@ class ControlRequest extends $pb.GeneratedMessage {
     if (dispose != null) result.dispose = dispose;
     if (acquireEncodedImage != null)
       result.acquireEncodedImage = acquireEncodedImage;
+    if (openImagePage != null) result.openImagePage = openImagePage;
+    if (requestImageWindow != null)
+      result.requestImageWindow = requestImageWindow;
+    if (waitImageWindow != null) result.waitImageWindow = waitImageWindow;
+    if (releaseImageTile != null) result.releaseImageTile = releaseImageTile;
+    if (closeImagePage != null) result.closeImagePage = closeImagePage;
     return result;
   }
 
@@ -4299,13 +5320,19 @@ class ControlRequest extends $pb.GeneratedMessage {
     19: ControlRequest_Command.fetchApi,
     20: ControlRequest_Command.dispose,
     21: ControlRequest_Command.acquireEncodedImage,
+    22: ControlRequest_Command.openImagePage,
+    23: ControlRequest_Command.requestImageWindow,
+    24: ControlRequest_Command.waitImageWindow,
+    25: ControlRequest_Command.releaseImageTile,
+    26: ControlRequest_Command.closeImagePage,
     0: ControlRequest_Command.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlRequest.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    ..oo(
+        0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOM<Empty>(10, _omitFieldNames ? '' : 'ready',
         subBuilder: Empty.$_createMessage)
@@ -4331,6 +5358,16 @@ class ControlRequest extends $pb.GeneratedMessage {
         subBuilder: Empty.$_createMessage)
     ..aOM<AcquireImage>(21, _omitFieldNames ? '' : 'acquireEncodedImage',
         subBuilder: AcquireImage.$_createMessage)
+    ..aOM<OpenImagePage>(22, _omitFieldNames ? '' : 'openImagePage',
+        subBuilder: OpenImagePage.$_createMessage)
+    ..aOM<RequestImageWindow>(23, _omitFieldNames ? '' : 'requestImageWindow',
+        subBuilder: RequestImageWindow.$_createMessage)
+    ..aOM<WaitImageWindow>(24, _omitFieldNames ? '' : 'waitImageWindow',
+        subBuilder: WaitImageWindow.$_createMessage)
+    ..aOM<ReleaseImageTile>(25, _omitFieldNames ? '' : 'releaseImageTile',
+        subBuilder: ReleaseImageTile.$_createMessage)
+    ..aOM<CloseImagePage>(26, _omitFieldNames ? '' : 'closeImagePage',
+        subBuilder: CloseImagePage.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4367,6 +5404,11 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
   @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
   ControlRequest_Command whichCommand() =>
       _ControlRequest_CommandByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -4381,6 +5423,11 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
   @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
   void clearCommand() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -4523,6 +5570,61 @@ class ControlRequest extends $pb.GeneratedMessage {
   void clearAcquireEncodedImage() => $_clearField(21);
   @$pb.TagNumber(21)
   AcquireImage ensureAcquireEncodedImage() => $_ensure(12);
+
+  @$pb.TagNumber(22)
+  OpenImagePage get openImagePage => $_getN(13);
+  @$pb.TagNumber(22)
+  set openImagePage(OpenImagePage value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasOpenImagePage() => $_has(13);
+  @$pb.TagNumber(22)
+  void clearOpenImagePage() => $_clearField(22);
+  @$pb.TagNumber(22)
+  OpenImagePage ensureOpenImagePage() => $_ensure(13);
+
+  @$pb.TagNumber(23)
+  RequestImageWindow get requestImageWindow => $_getN(14);
+  @$pb.TagNumber(23)
+  set requestImageWindow(RequestImageWindow value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasRequestImageWindow() => $_has(14);
+  @$pb.TagNumber(23)
+  void clearRequestImageWindow() => $_clearField(23);
+  @$pb.TagNumber(23)
+  RequestImageWindow ensureRequestImageWindow() => $_ensure(14);
+
+  @$pb.TagNumber(24)
+  WaitImageWindow get waitImageWindow => $_getN(15);
+  @$pb.TagNumber(24)
+  set waitImageWindow(WaitImageWindow value) => $_setField(24, value);
+  @$pb.TagNumber(24)
+  $core.bool hasWaitImageWindow() => $_has(15);
+  @$pb.TagNumber(24)
+  void clearWaitImageWindow() => $_clearField(24);
+  @$pb.TagNumber(24)
+  WaitImageWindow ensureWaitImageWindow() => $_ensure(15);
+
+  @$pb.TagNumber(25)
+  ReleaseImageTile get releaseImageTile => $_getN(16);
+  @$pb.TagNumber(25)
+  set releaseImageTile(ReleaseImageTile value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasReleaseImageTile() => $_has(16);
+  @$pb.TagNumber(25)
+  void clearReleaseImageTile() => $_clearField(25);
+  @$pb.TagNumber(25)
+  ReleaseImageTile ensureReleaseImageTile() => $_ensure(16);
+
+  @$pb.TagNumber(26)
+  CloseImagePage get closeImagePage => $_getN(17);
+  @$pb.TagNumber(26)
+  set closeImagePage(CloseImagePage value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasCloseImagePage() => $_has(17);
+  @$pb.TagNumber(26)
+  void clearCloseImagePage() => $_clearField(26);
+  @$pb.TagNumber(26)
+  CloseImagePage ensureCloseImagePage() => $_ensure(17);
 }
 
 enum ControlResponse_Result {
@@ -4536,6 +5638,8 @@ enum ControlResponse_Result {
   api,
   error,
   encodedImage,
+  imagePage,
+  imageWindow,
   notSet
 }
 
@@ -4552,6 +5656,8 @@ class ControlResponse extends $pb.GeneratedMessage {
     ApiFetchResponse? api,
     RuntimeError? error,
     EncodedImage? encodedImage,
+    ImagePage? imagePage,
+    ImageWindowSnapshot? imageWindow,
   }) {
     final result = ControlResponse._();
     if (requestId != null) result.requestId = requestId;
@@ -4565,6 +5671,8 @@ class ControlResponse extends $pb.GeneratedMessage {
     if (api != null) result.api = api;
     if (error != null) result.error = error;
     if (encodedImage != null) result.encodedImage = encodedImage;
+    if (imagePage != null) result.imagePage = imagePage;
+    if (imageWindow != null) result.imageWindow = imageWindow;
     return result;
   }
 
@@ -4589,13 +5697,15 @@ class ControlResponse extends $pb.GeneratedMessage {
     17: ControlResponse_Result.api,
     18: ControlResponse_Result.error,
     19: ControlResponse_Result.encodedImage,
+    20: ControlResponse_Result.imagePage,
+    21: ControlResponse_Result.imageWindow,
     0: ControlResponse_Result.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlResponse.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOM<RuntimeHello>(10, _omitFieldNames ? '' : 'hello',
         subBuilder: RuntimeHello.$_createMessage)
@@ -4617,6 +5727,10 @@ class ControlResponse extends $pb.GeneratedMessage {
         subBuilder: RuntimeError.$_createMessage)
     ..aOM<EncodedImage>(19, _omitFieldNames ? '' : 'encodedImage',
         subBuilder: EncodedImage.$_createMessage)
+    ..aOM<ImagePage>(20, _omitFieldNames ? '' : 'imagePage',
+        subBuilder: ImagePage.$_createMessage)
+    ..aOM<ImageWindowSnapshot>(21, _omitFieldNames ? '' : 'imageWindow',
+        subBuilder: ImageWindowSnapshot.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4651,6 +5765,8 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   ControlResponse_Result whichResult() =>
       _ControlResponse_ResultByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -4663,6 +5779,8 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   void clearResult() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -4783,6 +5901,28 @@ class ControlResponse extends $pb.GeneratedMessage {
   void clearEncodedImage() => $_clearField(19);
   @$pb.TagNumber(19)
   EncodedImage ensureEncodedImage() => $_ensure(10);
+
+  @$pb.TagNumber(20)
+  ImagePage get imagePage => $_getN(11);
+  @$pb.TagNumber(20)
+  set imagePage(ImagePage value) => $_setField(20, value);
+  @$pb.TagNumber(20)
+  $core.bool hasImagePage() => $_has(11);
+  @$pb.TagNumber(20)
+  void clearImagePage() => $_clearField(20);
+  @$pb.TagNumber(20)
+  ImagePage ensureImagePage() => $_ensure(11);
+
+  @$pb.TagNumber(21)
+  ImageWindowSnapshot get imageWindow => $_getN(12);
+  @$pb.TagNumber(21)
+  set imageWindow(ImageWindowSnapshot value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasImageWindow() => $_has(12);
+  @$pb.TagNumber(21)
+  void clearImageWindow() => $_clearField(21);
+  @$pb.TagNumber(21)
+  ImageWindowSnapshot ensureImageWindow() => $_ensure(12);
 }
 
 class OpenWorker extends $pb.GeneratedMessage {

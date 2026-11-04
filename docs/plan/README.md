@@ -6,19 +6,19 @@
 
 ## 优先级与状态
 
-| 优先级               | 计划                                                          | 当前状态与依赖                                                                                                                               |
-| -------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 当前主线             | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | Web 两源完整章、xkcd Web/Native Cache 与 Web 身份/版本切换分项通过；生产动态 Access、Native 主入口与真机待验收                               |
-| 并行工程             | [工程、AOT 与发布](engineering-and-release.md)                | 两包静态部署已验证；当前 ABI v3 的首次本地全量中断且未完成，冻结输入/产物保留；完整 baseline/有界 CI 待验收                                  |
-| P0 后                | [P1 书架与进度](p1-library-and-progress.md)                   | 章序/切章、有界下一章准备与本地进度已接产品，Web 关标签页及双端模拟器原 xkcd 进程重启分项通过；浏览器进程/真机、收藏及完整日用流程待验收     |
-| P1 状态模型确定后    | [P2 多设备同步](p2-sync.md)                                   | 语义已规划；业务表、outbox、push/pull 与冲突恢复待实现                                                                                       |
-| 基础运行与书架具备后 | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                         |
-| 持续推进             | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                        |
-| 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；Web、Native 机制和双端模拟器原 xkcd 分项通过，生产部署及剩余运行门待验收                                  |
-| P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | 有界组合存储、xkcd Web/Native Cache 与 Web A→B→A 后 304 正文复用通过；版本更新、更多 Source 与生产取消待验收                                 |
-| P0 文字布局子计划    | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收                   |
-| P0 图片解码子计划    | [阅读器长图与终端解码](reader-image-decoding.md)              | codec Worker、Source编码页/双端描述与独立tile store已实现；tile控制与Reader接线待做，真实Source长图/Native执行、方向显示、缓存/LOD及峰值待验 |
-| 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                           |
+| 优先级               | 计划                                                          | 当前状态与依赖                                                                                                                           |
+| -------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 当前主线             | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | Web 两源完整章、xkcd Web/Native Cache 与 Web 身份/版本切换分项通过；生产动态 Access、Native 主入口与真机待验收                           |
+| 并行工程             | [工程、AOT 与发布](engineering-and-release.md)                | 两包静态部署已验证；当前 ABI v3 的首次本地全量中断且未完成，冻结输入/产物保留；完整 baseline/有界 CI 待验收                              |
+| P0 后                | [P1 书架与进度](p1-library-and-progress.md)                   | 章序/切章、有界下一章准备与本地进度已接产品，Web 关标签页及双端模拟器原 xkcd 进程重启分项通过；浏览器进程/真机、收藏及完整日用流程待验收 |
+| P1 状态模型确定后    | [P2 多设备同步](p2-sync.md)                                   | 语义已规划；业务表、outbox、push/pull 与冲突恢复待实现                                                                                   |
+| 基础运行与书架具备后 | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                     |
+| 持续推进             | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                    |
+| 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；Web、Native 机制和双端模拟器原 xkcd 分项通过，生产部署及剩余运行门待验收                              |
+| P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | 有界组合存储、xkcd Web/Native Cache 与 Web A→B→A 后 304 正文复用通过；版本更新、更多 Source 与生产取消待验收                             |
+| P0 文字布局子计划    | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收               |
+| P0 图片解码子计划    | [阅读器长图与终端解码](reader-image-decoding.md)              | codec/编码页、正式tile控制、Web URL与Dart/Native片文件已接线；Reader窗口/LOD/EXIF待接，真实Source长图/Native执行及峰值待验               |
+| 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                       |
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
 

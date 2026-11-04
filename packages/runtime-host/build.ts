@@ -17,6 +17,9 @@ const common = {
   target: 'es2022',
   minify: true,
   write: false,
+  define: {
+    __KARUYOMI_IMAGE_CODEC_MATERIALS__: JSON.stringify(catalog.imageCodecs),
+  },
 } satisfies BuildOptions;
 const web = await Promise.all([
   build({ ...common, entryPoints: ['src/host.ts'], format: 'esm' }),
@@ -101,6 +104,9 @@ Object.defineProperty(window,'karuyomiImageCodecs',{value:Object.freeze({...prov
   format: 'iife',
   define: {
     __KARUYOMI_MATERIAL_VERSION__: JSON.stringify(catalog.materialVersion),
+    __KARUYOMI_IMAGE_CODEC_MATERIALS__: JSON.stringify(
+      nativeGroups.imageCodecs,
+    ),
   },
   plugins: [
     {

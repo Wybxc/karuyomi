@@ -16,6 +16,23 @@ final class ImageRuntime implements SourceRuntime {
   Future<wire.EncodedImage> acquireEncodedImage(ImageAcquireRequest request) =>
       throw UnimplementedError();
   @override
+  Future<wire.ImagePage> openImagePage(wire.OpenImagePage request) =>
+      throw UnimplementedError();
+  @override
+  Future<wire.ImageWindowSnapshot> requestImageWindow(
+    wire.RequestImageWindow request,
+  ) => throw UnimplementedError();
+  @override
+  Future<wire.ImageWindowSnapshot> waitImageWindow(
+    wire.WaitImageWindow request,
+  ) => throw UnimplementedError();
+  @override
+  Future<void> releaseImageTile(wire.ReleaseImageTile request) =>
+      throw UnimplementedError();
+  @override
+  Future<void> closeImagePage(wire.CloseImagePage request) =>
+      throw UnimplementedError();
+  @override
   Future<ImageResource> acquireImage(ImageAcquireRequest request) {
     acquisitions.add(request);
     return result.future;

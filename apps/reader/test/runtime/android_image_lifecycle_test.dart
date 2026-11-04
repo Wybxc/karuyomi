@@ -137,7 +137,11 @@ void main() {
         InAppWebViewController.fromPlatform(platform: controller),
         Uri.parse('https://reader.example'),
       );
-      final location = await store.copy(request, resource);
+      final location = await store.copy(
+        requestId: request.requestId,
+        generation: request.generation,
+        resource: resource,
+      );
       expect(await File.fromUri(location).readAsBytes(), [0, 255, 12, 34]);
       await store.clear();
       expect(controller.imageChannel.remote.closes, 0);
@@ -148,7 +152,11 @@ void main() {
       await store.clear();
       expect(controller.imageChannel.local.closes, 1);
       await expectLater(
-        store.copy(request, resource),
+        store.copy(
+          requestId: request.requestId,
+          generation: request.generation,
+          resource: resource,
+        ),
         throwsA(isA<RuntimeException>()),
       );
     },
@@ -160,7 +168,11 @@ void main() {
       InAppWebViewController.fromPlatform(platform: controller),
       Uri.parse('https://reader.example'),
     );
-    await store.copy(request, resource);
+    await store.copy(
+      requestId: request.requestId,
+      generation: request.generation,
+      resource: resource,
+    );
     final gate = Completer<void>();
     controller.imageChannel.local.closeGate = gate;
     final first = store.clear();
@@ -187,7 +199,14 @@ void main() {
         InAppWebViewController.fromPlatform(platform: controller),
         Uri.parse('https://reader.example'),
       );
-      await expectLater(store.copy(request, resource), throwsStateError);
+      await expectLater(
+        store.copy(
+          requestId: request.requestId,
+          generation: request.generation,
+          resource: resource,
+        ),
+        throwsStateError,
+      );
       await File('${store.directory.path}/leftover.image').writeAsBytes([1]);
       final failure = StateError('local port close rejected');
       controller.imageChannel.local.closeFailure = failure;

@@ -71,17 +71,19 @@ final class AndroidImageFileStore implements NativeImageFileStore {
   String _key(String id, String generation) => '$generation\u0000$id';
 
   @override
-  Future<Uri> copy(
-    wire.AcquireImage request,
-    wire.ImageResource resource,
-  ) async {
+  Future<Uri> copy({
+    required String requestId,
+    required String generation,
+    required wire.ImageResource resource,
+    bool tile = false,
+  }) async {
     if (_closed) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Native image store was closed',
       );
     }
-    final key = _key(request.requestId, request.generation);
+    final key = _key(requestId, generation);
     if (_pending.containsKey(key)) {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,

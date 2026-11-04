@@ -17,10 +17,12 @@ final class Files implements NativeImageFileStore {
   bool rejectCancel = false;
   bool rejectRelease = false;
   @override
-  Future<Uri> copy(
-    wire.AcquireImage request,
-    wire.ImageResource resource,
-  ) async {
+  Future<Uri> copy({
+    required String requestId,
+    required String generation,
+    required wire.ImageResource resource,
+    bool tile = false,
+  }) async {
     if (!copied.isCompleted) copied.complete();
     await permitCopy?.future;
     final file = File('${root.path}/${resource.resourceId}.image');
@@ -307,8 +309,9 @@ void main() {
       );
       await expectLater(
         store.copy(
-          acquire(1).acquireImage,
-          wire.ImageResource(resourceId: 'r', generation: 'g'),
+          requestId: 'request-1',
+          generation: 'g',
+          resource: wire.ImageResource(resourceId: 'r', generation: 'g'),
         ),
         throwsA(code(RuntimeErrorCode.protocolError)),
       );

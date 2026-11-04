@@ -1,6 +1,6 @@
 # Native 受管图片文件
 
-本文记录 P0-F3 的 Native 产品实现与已执行的机制验收。公开图片合同仍由 [IMAGE-RESOURCES](IMAGE-RESOURCES.md) 和 Protobuf 定义；本文不新增 Source 控制方法。多个原 Source 的整章/切章阅读、物理 Android / iPhone、后台恢复和进程/GPU 合计峰值仍需分别验收。
+本文记录 P0-F3 的 Native 产品实现与已执行的机制验收。公开图片合同仍由 [IMAGE-RESOURCES](IMAGE-RESOURCES.md) 和 Protobuf 定义；原 Source 的图片业务方法不变，分片窗口是新增的host控制。多个原 Source 的整章/切章阅读、物理 Android / iPhone、后台恢复和进程/GPU 合计峰值仍需分别验收。
 
 ## 产品路径
 
@@ -9,6 +9,14 @@
 Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK 通道生成 manager 持有的 Blob。Dart 的 `NativeImageControl` 接收生成模型中的小描述，将同上下文 Blob 交给平台文件 sink，完成后仅将 `ImageResource.url` 换成受管 `file:` URI。图片字节不放进 ProtoJSON、MethodChannel JSON 或 Base64，也不重新请求原图 URL。
 
 `TransportSourceRuntime` 只允许实现 `ManagedImageTransport` 的平台表确认过的 `resourceId/generation/file URI` 三元组。Web 继续只接受 manager 的 Blob URL。Reader 的 widget、overlay 和图片缓存解除引用后，release 同时删除本地文件并释放 manager 的 Blob；任一 owner 未确认清理均不返回成功 ACK。取消只作用于在途获取，迟到 cancel 不删除已交付文件。
+
+## 编码页与有界小片
+
+新增正式 `openImagePage/requestImageWindow/waitImageWindow/releaseImageTile/closeImagePage` 控制已接入Native适配。`EncodedImage` 仍只传raw尺寸、方向及身份，整页Blob留在host；打开页成功后，调用方须显式 `releaseImage` 原编码资源owner，由页borrow继续保留正文。后续窗口返回至多256行的PNG小片，按上述文件通道复制，不生成或交付整页PNG文件。
+
+`NativeImageFileStore.copy` 使用明确的传输requestId、generation和已校验的 `ImageResource`，不伪造Source acquire。Native控制表按lease复用文件，并发快照共用复制Future；窗口替换、无效/迟到结果与复制失败清理未交付文件及host租约。已交付片即使被尾部错误标为失效，也先保留文件和预算，等待显示方撤下引用后显式释放；页关闭只取消未交付复制并等待其真实终态，不替显示方删除仍持有的文件。代次改变后的清理仍使用原generation。
+
+这些是正式控制及文件adapter的实现与工程回归，范围见[分片控制记录](verification/image-page-controls.md)。当前Reader仍使用完整图provider；尚未将窗口/LOD、EXIF坐标变换和逐片显示cache接入Reader，也未据此完成新codec在Native WebView的内置执行或真实Source长图验收。下文既有模拟器文件和xkcd阅读证据保持当次输入与材料身份，不能迁作本轮tile显示证据。
 
 ## iOS
 
@@ -28,7 +36,7 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 ## 预算与生命周期
 
-在途和驻留文件共同计入六资源、64 MiB 编码字节、单图 16 Mi 像素、合计 32 Mi 像素预算。manager 的 Blob 仍占其原有预算，直到本地文件 release 后对应的 JS release 完成。文件是额外磁盘副本；浏览器临时解码、Flutter 图片缓存、graphics surface、GPU 和进程总内存不由文件预算代表，不能声称零复制或峰值已通过。
+在途和驻留的完整图文件共同计入六资源、单图16 Mi像素预算。分片另限64份、单片8 MiB/4096×256、分片编码文件合计16 MiB；完整图与片文件共享64 MiB编码字节和32 Mi像素额度，复制在途、失效但未释放及旧窗口pin均持续计费。iOS原生reservation也执行这些分类和共享预算；Android复用既有至多六个二进制port槽，tile复制队列不为每片创建新channel。manager 的 Blob 仍占其原有预算，直到本地文件 release 后对应的 JS release 完成。文件是额外磁盘副本；浏览器临时解码、Flutter 图片缓存、graphics surface、GPU 和进程总内存不由文件预算代表，不能声称零复制或峰值已通过。
 
 总 acquire 期限包含 Source 获取和文件交接。本地 timeout 优先于其取消导致的 Source cancelled 错误。失败清理未确认时保留资源 reservation，并报告 runtime_lost；不因删除任务表就归还额度。重建先失效代次、阻断旧控制调用、关闭文件存储，再 dispose WebView；并发重建共享同一清理。迟到绑定若属于旧代次立即 clear，不进入当前图片表。
 

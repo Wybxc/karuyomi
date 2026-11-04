@@ -25,6 +25,13 @@ import {
   closePageSessionSchema,
   imageResourceSchema,
   encodedImageSchema,
+  openImagePageSchema,
+  requestImageWindowSchema,
+  waitImageWindowSchema,
+  releaseImageTileSchema,
+  closeImagePageSchema,
+  imagePageSchema,
+  imageWindowSnapshotSchema,
   processedImageSchema,
   releaseImageSchema,
   closedSchema,
@@ -189,6 +196,31 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
         messageJson(pb.AcquireImageSchema, value.command.value),
       );
       break;
+    case 'openImagePage':
+      openImagePageSchema.parse(
+        messageJson(pb.OpenImagePageSchema, value.command.value),
+      );
+      break;
+    case 'requestImageWindow':
+      requestImageWindowSchema.parse(
+        messageJson(pb.RequestImageWindowSchema, value.command.value),
+      );
+      break;
+    case 'waitImageWindow':
+      waitImageWindowSchema.parse(
+        messageJson(pb.WaitImageWindowSchema, value.command.value),
+      );
+      break;
+    case 'releaseImageTile':
+      releaseImageTileSchema.parse(
+        messageJson(pb.ReleaseImageTileSchema, value.command.value),
+      );
+      break;
+    case 'closeImagePage':
+      closeImagePageSchema.parse(
+        messageJson(pb.CloseImagePageSchema, value.command.value),
+      );
+      break;
     case 'cancelImage':
       cancelImageSchema.parse(
         messageJson(pb.CancelImageSchema, value.command.value),
@@ -241,6 +273,16 @@ export function validateControlResponse(
     case 'encodedImage':
       encodedImageSchema.parse(
         messageJson(pb.EncodedImageSchema, value.result.value),
+      );
+      break;
+    case 'imagePage':
+      imagePageSchema.parse(
+        messageJson(pb.ImagePageSchema, value.result.value),
+      );
+      break;
+    case 'imageWindow':
+      imageWindowSnapshotSchema.parse(
+        messageJson(pb.ImageWindowSnapshotSchema, value.result.value),
       );
       break;
     case 'released':

@@ -260,6 +260,15 @@ export class ImageTileStore {
     });
   }
 
+  /** Includes pins outside the current window and pins awaiting invalidation ACK. */
+  leaseIds(pageId: string, generation: string): readonly string[] {
+    return [...this.leases].flatMap(([id, entry]) =>
+      entry.page.pageId === pageId && entry.page.generation === generation
+        ? [id]
+        : [],
+    );
+  }
+
   /** Call only after the matching Blob URL/file and decoded display cache stop using it. */
   releaseTile(leaseId: string, generation: string): void {
     const entry = this.leases.get(leaseId);
@@ -271,7 +280,14 @@ export class ImageTileStore {
     entry.leaseId = undefined;
     if (entry.invalidated) this.bytes -= entry.png.size;
     for (const page of this.pages.values()) {
-      if (!page.window || page.error || page.closed) continue;
+      if (page.closed) continue;
+      if (page === entry.page && page.error) {
+        // Failed pages remain observable until close. Removing an invalidated
+        // display pin changes their snapshot just as a new tile would.
+        this.notify(page);
+        continue;
+      }
+      if (!page.window || page.error) continue;
       this.refresh(page);
       page.workRequested = this.needsDecode(page);
       this.notify(page);

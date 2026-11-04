@@ -19,6 +19,13 @@ import {
   type ReleaseImage,
   type ClosePageSession,
   type ImageResource,
+  type OpenImagePage,
+  type ImagePage,
+  type WaitImageWindow,
+  type ReleaseImageTile,
+  type CloseImagePage,
+  type ImageWindowSnapshot,
+  requestImageWindowSchema,
   type EncodedImage,
   staticManifestPathSchema,
   workerResponseSchema,
@@ -35,6 +42,11 @@ import {
 import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
 import { createHello } from './hello.js';
+import { ImagePageControl } from './image-page-control.js';
+import {
+  ImageTileStore,
+  type ImageTileStoreDependencies,
+} from './image-tile-store.js';
 import { RuntimeFailure } from './errors.js';
 import { sha256, VerifiedLoader } from './verified-loader.js';
 import {
@@ -98,11 +110,14 @@ export class SourceRuntimeManager {
   private generation: string | undefined;
   private controller: AbortController | undefined;
   private disposed = false;
+  private disposing: Promise<void> | undefined;
   private queue: Task[] = [];
   private active: Task | undefined;
   private pending = new Map<string, Pending>();
   private requestIds = new Set<string>();
   private readonly images: ImageResourceStore;
+  private readonly imagePages: ImagePageControl | undefined;
+  private imagePageCleanup: Promise<void> = Promise.resolve();
   private readonly imageTasks = new Map<string, ImageTask>();
   private readonly closedPageSessions = new Map<
     string,
@@ -118,9 +133,15 @@ export class SourceRuntimeManager {
       enabled?: boolean;
       store?: ImageResourceStore;
       cancelGraceMs?: number;
+      tiles?: ImageTileStoreDependencies;
     } = {},
   ) {
     this.images = imageOptions.store ?? new ImageResourceStore();
+    if (imageOptions.tiles)
+      this.imagePages = new ImagePageControl(
+        new ImageTileStore(imageOptions.tiles),
+        (input) => this.borrowEncodedImage(input),
+      );
   }
 
   open(options: OpenOptions): Promise<RuntimeSession> {
@@ -600,6 +621,16 @@ export class SourceRuntimeManager {
     this.controller = undefined;
     this.worker?.terminate();
     this.worker = undefined;
+    const closingPages = this.imagePages?.invalidate();
+    if (closingPages) {
+      this.imagePageCleanup = Promise.all([
+        this.imagePageCleanup,
+        closingPages,
+      ]).then(() => {});
+      // Public rebuild/dispose await this cleanup; open can begin a new Source
+      // generation while the single shared codec store finishes old work.
+      void this.imagePageCleanup.catch(() => {});
+    }
     this.images.clear(error);
     for (const task of this.imageTasks.values()) {
       clearTimeout(task.cancelTimer);
@@ -631,6 +662,44 @@ export class SourceRuntimeManager {
     const parsed = releaseImageSchema.parse(input);
     this.assertGeneration(parsed.generation);
     return this.images.borrowEncoded(parsed.resourceId, parsed.generation);
+  }
+
+  get imagePageUsage() {
+    return this.imagePages?.usage;
+  }
+
+  private tileControl(): ImagePageControl {
+    if (!this.imagePages)
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'Image codec materials are unavailable',
+      );
+    return this.imagePages;
+  }
+
+  openImagePage(input: OpenImagePage): ImagePage {
+    this.assertGeneration(input.generation);
+    return this.tileControl().open(input);
+  }
+
+  requestImageWindow(
+    input: PlainMessage<pb.RequestImageWindow>,
+  ): ImageWindowSnapshot {
+    this.assertGeneration(input.generation);
+    return this.tileControl().request(requestImageWindowSchema.parse(input));
+  }
+
+  waitImageWindow(input: WaitImageWindow): Promise<ImageWindowSnapshot> {
+    this.assertGeneration(input.generation);
+    return this.tileControl().wait(input);
+  }
+
+  releaseImageTile(input: ReleaseImageTile): { released: true } {
+    return this.tileControl().release(input);
+  }
+
+  closeImagePage(input: CloseImagePage): Promise<{ closed: true }> {
+    return this.tileControl().close(input);
   }
 
   private acquireImageResource(
@@ -834,7 +903,7 @@ export class SourceRuntimeManager {
     this.invalidate(
       new RuntimeFailure('runtime_lost', 'Runtime container was rebuilt'),
     );
-    return Promise.resolve();
+    return this.imagePageCleanup;
   }
 
   /** Private APIs share Access cookies; the public catalog permits only GET. */
@@ -931,8 +1000,11 @@ export class SourceRuntimeManager {
     }
   }
 
-  async dispose(): Promise<void> {
-    if (this.disposed) return;
+  dispose(): Promise<void> {
+    return (this.disposing ??= this.disposeRuntime());
+  }
+
+  private async disposeRuntime(): Promise<void> {
     this.disposed = true;
     // A quiet Worker can commit/release filesystem ownership before termination.
     if (this.session && !this.active) {
@@ -962,5 +1034,7 @@ export class SourceRuntimeManager {
     this.invalidate(
       new RuntimeFailure('runtime_lost', 'Runtime container was disposed'),
     );
+    await this.imagePageCleanup;
+    await this.imagePages?.dispose();
   }
 }

@@ -13,6 +13,7 @@ final class NativeImageFilesTests: XCTestCase {
       "requestId": "request", "resourceId": "resource", "generation": "generation",
       "url": "blob:https://reader.example/00000000-0000-0000-0000-000000000001",
       "byteLength": bytes, "mimeType": "image/png", "width": width, "height": height,
+      "tile": false,
     ]
   }
 
@@ -100,6 +101,35 @@ final class NativeImageFilesTests: XCTestCase {
     budget.release(image)
     budget.release(image)
     XCTAssertEqual(budget.pixels, 0)
+  }
+
+  func testTileLimitsAreSeparateAndAllSurfacesSharePixelBudget() throws {
+    var metadata = input(width: 100, height: 256)
+    metadata["tile"] = true
+    let tile = try NativeImageDescriptor(metadata, origin: origin)
+    let budget = NativeImageBudget()
+    for _ in 0..<64 { try budget.reserve(tile) }
+    XCTAssertThrowsError(try budget.reserve(tile))
+    XCTAssertEqual(budget.tileResources, 64)
+    for _ in 0..<64 { budget.release(tile) }
+    metadata["height"] = 257
+    XCTAssertThrowsError(try NativeImageDescriptor(metadata, origin: origin))
+    metadata = input(bytes: 8 * 1024 * 1024)
+    metadata["tile"] = true
+    let large = try NativeImageDescriptor(metadata, origin: origin)
+    try budget.reserve(large)
+    try budget.reserve(large)
+    XCTAssertThrowsError(try budget.reserve(large))
+    budget.release(large)
+    budget.release(large)
+    let full = try NativeImageDescriptor(input(width: 4096, height: 4096), origin: origin)
+    try budget.reserve(full)
+    try budget.reserve(full)
+    XCTAssertThrowsError(try budget.reserve(tile))
+    budget.release(full)
+    budget.release(full)
+    XCTAssertEqual(budget.tileResources, 0)
+    XCTAssertEqual(budget.tileBytes, 0)
   }
 
   func testManagedDirectoryMustBeARealDirectory() throws {

@@ -4,7 +4,7 @@
 
 当前合同使用 `karuyomi-source-host-v3`：Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI，控制边界采用 Protobuf 生成模型和标准 ProtoJSON。控制信封 protocolVersion 为 2，HTTP bridgeVersion 为 2；三者含义不同。旧 ABI 的 AOT、客户端和材料必须同步重建，不混合部署。历史 v2 图片实测结果保留其原始身份，不能作为 v3 运行验收。
 
-本轮新增 `EncodedImage/acquireEncodedImage`，将编码页接纳与完整图显示分开。Java桥仍原样传递小描述，protocolVersion=2、hostAbi v3不变；代码、协议与固定依赖变化仍进入 `hostFingerprint/materialVersion`。编码页与独立tile store已实现，尚未串接正式tile控制和Reader；不新增旧版本兼容层，也不把元数据接纳当作长图阅读通过。
+本轮新增 `EncodedImage/acquireEncodedImage`，将编码页接纳与完整图显示分开。Java桥仍原样传递小描述，protocolVersion=2、hostAbi v3不变；代码、协议与固定依赖变化仍进入 `hostFingerprint/materialVersion`。编码页、tile store、正式窗口控制、Web受管URL、Dart与Native有界小片文件已接线；Reader尚未消费新窗口合同。不新增旧版本兼容层，也不把元数据接纳或控制工程回归当作长图阅读通过。
 
 ## 原始 Page 与逻辑页
 
@@ -61,7 +61,7 @@ HTTP handle 只属于当前 Source 调用，调用结束清理。图片资源归
 
 现有Reader完整图路径仍会按16 Mi像素拒绝1080×20000等长图，窗口账本也不包含所有codec临时对象。独立codec/tile基础和下述编码页合同已经实现，但尚未接入正式阅读器；不能仅接纳编码页、调高限额或加入Flutter缩放便认定产品显示与峰值受控。范围及后续步骤见[解码设计](design/reader-image-decoding.md)和[长图计划](plan/reader-image-decoding.md)。
 
-## 编码页描述与独立tile所有权
+## 编码页描述与tile所有权
 
 `acquireEncodedImage()` 仍调用原Page、`getImageUrl/getImage`及Source处理后的正文，不另请求原图。Protobuf的 `EncodedImage` 只含 `resourceId/generation/mimeType/byteLength/rawWidth/rawHeight/orientation`，由Buf生成双端模型并在TS/Dart运行时校验；不含URL，也不向Dart交付整页文件或PNG。
 
@@ -78,9 +78,27 @@ END只在编码正文收齐、字节/头部/元数据校验后返回ACK；END AC
 
 编码Blob留在host，borrow得到单独lease。owner release后禁止新borrow；已有borrow继续保留正文和预算，最后一个lease释放才归还。编码页仍占共享Source资源表的资源数/字节预算，但不虚构完整原图像素分配。Dart的 `SourceRuntime.acquireEncodedImage()` 只接收冻结描述，校验预算、方向、requestId和generation；无效或替换后迟到描述按原generation通过 `releaseImage` 清理。Native通用control直接传描述，不进入原完整图文件copy路径。
 
-独立 `ImageTileStore` 已实现单活动codec、有界扫尾、窗口PNG缓存和缺片本地重扫。PNG缓存≤16 MiB，显示lease≤64份且合计≤32 Mi像素；失效片在显示owner确认释放前继续计费。store不创建Blob URL或Native文件，尚未接到编码页borrow、正式tile控制与Reader。后续adapter须消费 `invalidatedLeaseIds`，等待widget/overlay pin、实际provider cache eviction及文件/URL释放，再确认 `releaseTile()`；上层在 `removePage()` 等到codec终态后才归还编码页borrow。它不积存完整raster或全部页PNG，也不构成真实缓存/设备峰值验收。
+`ImageTileStore` 已实现单活动codec、有界扫尾、窗口PNG缓存和缺片本地重扫。PNG缓存≤16 MiB，显示lease≤64份且合计≤32 Mi像素；失效片在显示owner确认释放前继续计费。`ImagePageControl` 将编码页borrow与store串接，同一lease复用一个Web Blob URL；Native适配只把有界PNG片交给现有文件sink。store本身不创建URL或文件，也不积存完整raster或全部页PNG。Reader还需消费 `invalidatedLeaseIds`，等待widget/overlay pin、实际provider cache eviction及文件/URL释放，再确认 `releaseImageTile()`；现有控制接线不构成Flutter显示或设备峰值验收。
 
 本轮Source链、Dart与严格TS检查通过，TS↔Dart新增协议也已通过真实双端codec交叉验证；命令和范围见[编码页证据](verification/encoded-image-ownership.md)。合成正文的真实Web owner机制已通过，范围见同一记录。既有独立codec浏览器11项不自动成为本轮Source编码页或store的真实浏览器证据；真实Source长图、Reader、Native内置执行与EXIF方向显示仍未验收。
+
+## 正式分片控制
+
+以下消息由同一 `.proto` 经Buf生成双端模型，Dart `SourceRuntime` 与TS控制dispatcher均已接入。控制只包含小描述，编码页正文留在host。
+
+| 操作                 | 输入与结果                                                                                                           |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `openImagePage`      | `resourceId/generation` → `ImagePage(pageId,generation,encoded)`，借用已发布的Source编码Blob                         |
+| `requestImageWindow` | `pageId/generation/windowId/sourceY/sourceEndY/denominator` → 窗口快照；raw Y为半开区间，缩放分母为1/2/4，PNG当前仅1 |
+| `waitImageWindow`    | 同页/窗口身份与`afterRevision/timeoutMs?` → 变化或期限时的当前快照；最长25秒，观察超时不取消codec                    |
+| `releaseImageTile`   | `leaseId/generation` → 幂等显示释放ACK                                                                               |
+| `closeImagePage`     | `pageId/generation` → 页关闭ACK，等待活动codec真实终态及编码borrow释放                                               |
+
+调用方在 `openImagePage` 成功后，必须显式 `releaseImage` 原编码资源owner；页borrow独立保留正文预算。打开失败时也须结束不再使用的原owner。`closeImagePage` 归还的是borrow，不代替原owner的release，也不代替已交付tile的显示ACK；调用方继续逐片释放已交付租约。
+
+窗口快照带 `windowId/revision/state`、实际header、tile列表及 `invalidatedLeaseIds`。每片含codec session、index、raw `sourceRect`、缩放分母、provisional状态与PNG `ImageResource`，`resourceId` 等于leaseId。双端校验身份、generation、几何、格式和合计预算；同一windowId不能更换几何，已替换的ID不能重用。pending可以尚无header；完整扫尾和清理后才能将片转为committed，坏尾则通过failed/error和失效租约通知显示方。真实codec终态与可见Flutter frame仍是不同门。
+
+页关闭或generation失效会取消codec、等待真实终止、清理未交付pin并归还borrow；已交付URL/文件与预算保留到显示ACK。Native同一lease复用受管文件，并发快照共用复制工作；文件删除与host释放均确认后才归还额度。工程回归、模拟边界及仍未执行的正式浏览器/Native长图门见[分片控制证据](verification/image-page-controls.md)。先前[编码页Web owner证据](verification/encoded-image-ownership.md)保留原合成正文环境，不能转作新控制或Reader验收。
 
 ## 控制与清理
 
@@ -88,7 +106,7 @@ END只在编码正文收齐、字节/头部/元数据校验后返回ACK；END AC
 
 ACK 和图片取消不能排在 Source 串行锁后等待。取消先终止图片 sink 与相应 HTTP 句柄，再等待当前 Java 调用退出；`teaDone/teaFail` 没有调用身份，提前解锁会使迟到回调污染下一次操作。超过取消宽限只能回收整个 Worker、失效 generation，并由客户端重新打开章节，不能静默复用旧 Page 会话。
 
-Reader 在 widget、缩放 overlay 与解码缓存解除引用后释放资源。manager 在 invalidate、dispose 和 pagehide 中清理在途块、Blob URL 和资源表；失败、超限、解码错误及迟到结果也必须清理。图片窗口限制同时持有的页，不整章获取。
+Reader 在 widget、缩放 overlay 与解码缓存解除引用后释放资源。manager 在 invalidate 中清理在途Source工作并关闭编码页；已交付tile的URL/pin保留至显示ACK，整个host dispose/pagehide再结束剩余所有权。失败、超限、解码错误及迟到结果也必须清理。图片窗口限制同时持有的页，不整章获取。
 
 ## 分层验收
 

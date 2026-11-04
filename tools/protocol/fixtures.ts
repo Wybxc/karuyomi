@@ -201,6 +201,36 @@ const envelope: JsonObject = {
 
 export const goldenFixtures: GoldenFixture[] = [
   {
+    name: 'image-window-pending',
+    type: 'ControlResponse',
+    value: {
+      requestId,
+      imageWindow: {
+        pageId: 'image-page',
+        generation,
+        windowId: 'window-golden',
+        revision: 0,
+        state: 'IMAGE_WINDOW_STATE_PENDING',
+      },
+    },
+  },
+  {
+    name: 'image-window-failed',
+    type: 'ControlResponse',
+    value: {
+      requestId,
+      imageWindow: {
+        pageId: 'image-page',
+        generation,
+        windowId: 'window-golden',
+        revision: 13,
+        state: 'IMAGE_WINDOW_STATE_FAILED',
+        invalidatedLeaseIds: ['tile-golden'],
+        error,
+      },
+    },
+  },
+  {
     name: 'image-frame-encoded-ack',
     type: 'ImageFrameControl',
     value: { ack: { seq: 3, encoded: encodedImage } },
@@ -319,6 +349,30 @@ export const goldenFixtures: GoldenFixture[] = [
       ['cancel', { requestId, generation }],
       ['acquireImage', imageRequest],
       ['acquireEncodedImage', imageRequest],
+      ['openImagePage', { resourceId: 'encoded-golden', generation }],
+      [
+        'requestImageWindow',
+        {
+          pageId: 'image-page',
+          generation,
+          windowId: 'window-golden',
+          sourceY: 39936,
+          sourceEndY: 40001,
+          denominator: 2,
+        },
+      ],
+      [
+        'waitImageWindow',
+        {
+          pageId: 'image-page',
+          generation,
+          windowId: 'window-golden',
+          afterRevision: 12,
+          timeoutMs: 25000,
+        },
+      ],
+      ['releaseImageTile', { leaseId: 'tile-golden', generation }],
+      ['closeImagePage', { pageId: 'image-page', generation }],
       ['cancelImage', { requestId, generation }],
       ['releaseImage', { resourceId: 'resource-golden', generation }],
       ['closePageSession', { pageSessionId: 'session-golden', generation }],
@@ -353,6 +407,47 @@ export const goldenFixtures: GoldenFixture[] = [
       ['session', session],
       ['image', imageResource],
       ['encodedImage', encodedImage],
+      [
+        'imagePage',
+        { pageId: 'image-page', generation, encoded: encodedImage },
+      ],
+      [
+        'imageWindow',
+        {
+          pageId: 'image-page',
+          generation,
+          windowId: 'window-golden',
+          revision: 12,
+          state: 'IMAGE_WINDOW_STATE_COMPLETE',
+          header: {
+            width: 541,
+            height: 20001,
+            sourceWidth: 1081,
+            sourceHeight: 40001,
+            denominator: 2,
+          },
+          tiles: [
+            {
+              leaseId: 'tile-golden',
+              sessionId: 'codec-golden',
+              index: 78,
+              sourceRect: { x: 0, y: 39936, width: 1081, height: 65 },
+              denominator: 2,
+              provisional: false,
+              resource: {
+                resourceId: 'tile-golden',
+                generation,
+                mimeType: 'image/png',
+                byteLength: 65536,
+                width: 541,
+                height: 33,
+                url: 'blob:https://reader.invalid/tile-golden',
+              },
+            },
+          ],
+          invalidatedLeaseIds: ['tile-old-golden'],
+        },
+      ],
       ['released', { released: true }],
       ['closed', { closed: true }],
       ['completed', { completed: true }],

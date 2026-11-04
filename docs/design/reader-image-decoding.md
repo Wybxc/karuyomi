@@ -2,7 +2,7 @@
 
 ## 状态与范围
 
-状态：**独立 codec Worker、PNG 条带 tile、共享材料、Source 编码页描述与独立 ImageTileStore 已实现；Reader 与 tile 控制接线未完成，P0 超长图门未通过**。既有 Node 24 项和独立 Worker 内置浏览器11项保留其原产物与范围。本轮编码页链及新增协议的真实 TS↔Dart crosswire 已通过工程检查，范围见[编码页证据](../verification/encoded-image-ownership.md)；合成正文的真实 Web owner机制已通过，范围见同一记录。Native 内置执行、Reader缓存/LOD、EXIF方向显示及真实进程/GPU峰值仍待验。完整图显示路径的16 Mi像素准入仍保留，新的编码页描述不使用整图 raster 准入。
+状态：**codec Worker、PNG条带、共享材料、Source编码页、正式tile控制、Web URL与Dart/Native小片文件已接线；Reader窗口与LOD接线未完成，P0超长图门未通过**。既有 Node 24 项和独立 Worker 内置浏览器11项保留其原产物与范围。本轮编码页链及新增协议的真实 TS↔Dart crosswire 已通过工程检查，范围见[编码页证据](../verification/encoded-image-ownership.md)；合成正文的真实 Web owner机制已通过，范围见同一记录。正式分片控制的工程证据另见[控制记录](../verification/image-page-controls.md)，不沿用独立owner机制的浏览器结论。Native内置执行、Reader缓存/LOD、EXIF方向显示及真实进程/GPU峰值仍待验。完整图显示路径的16 Mi像素准入仍保留，新的编码页描述不使用整图 raster 准入。
 
 最初设计以主仓库 `4645ade` 和仓库固定 Flutter `3.47.5` 做源码审查；2026-11-04 的历史机制另实际执行固定 libspng 的超 16 Mi 像素合成 PNG，以及 libjpeg-turbo 的 baseline 长图、背压、取消与错误场景，见[codec 证据](../verification/long-image-codec.md)。历史 Web 仅核首/中/末区域，不沿用 Node 的完整流 SHA 或缩放证明，也不转作新 Worker / 新产物的浏览器证据。实验未改变产品准入，没有测量进程/GPU 峰值；独立机制与正式 Source/Flutter/Native 验收分别维护。
 
@@ -124,7 +124,7 @@ JPEG 先缩放再输出可以减小条带和终端 raster，但不使 progressiv
 
 ## 正式源码基础与产品接线
 
-`runtime/image-codec/` 已内化 PNG/JPEG decoder、PNG encoder 的 C ABI、严格 TypeScript 顺序接口，以及 `client.ts` / `worker.ts` 的独立 module Worker；真实上游通过 submodule 固定。`tools/images/` 提供锁定 SDK 构建、自生成长图回归和 portable 产物准备器。操作与首批能力见 [codec README](../../runtime/image-codec/README.md)。本节区分已经实现的运行库与尚未接通的正式产品合同。
+`runtime/image-codec/` 已内化 PNG/JPEG decoder、PNG encoder 的 C ABI、严格 TypeScript 顺序接口，以及 `client.ts` / `worker.ts` 的独立 module Worker；真实上游通过 submodule 固定。`tools/images/` 提供锁定 SDK 构建、自生成长图回归和 portable 产物准备器。操作与首批能力见 [codec README](../../runtime/image-codec/README.md)。本节区分已实现的运行库/控制合同与尚未接通的Reader消费。
 
 ### 已实现的独立 Worker 与显示片基础
 
@@ -136,7 +136,7 @@ header、tile 与 terminal 是分开的事件。tile 保留原图 `sourceRect`�
 
 正式 C 产物已经通过 [24 项 Node 解码器/编码器验收](../verification/long-image-codec.md#有界-png-编码器的-node-验收)，包括独立 Sharp 像素对照与高熵最大条带；该证据没有运行新 Worker 的真实浏览器 ACK、重组、跨线程取消或显示。新管线另在 Codex 内置浏览器通过 11 项，590 个基础 tile 的 PNG 字节/几何与 Node 同产物基准一致，真实 ACK/pull、三种取消边界、截尾失效及恢复也通过；详见[正式 Worker 证据](../verification/long-image-codec.md)。两份 WASM 各自 32 MiB 最大 heap / 16 MiB C payload 是配置上界，不是两者同时运行的实际峰值；高熵 encoder 已观察到 heap 增长，不能将所有场景写为 16 MiB。
 
-本轮已建立 Source处理后编码页、Protobuf双端描述和独立tile store；尚未将编码页borrow、tile store与正式tile控制/Dart Reader串接。`ProcessedImage/ImageResource` 的完整图语义和像素门保留，不承担编码页的描述职责。以下区分已实现基础与剩余产品接线。
+编码页borrow、tile store、manager控制dispatcher、双端窗口模型和Native有界小片文件已串接；Reader尚未消费新合同。`ProcessedImage/ImageResource` 的完整图语义和像素门保留，不承担编码页的描述职责。以下区分已实现基础与剩余产品接线。
 
 ### 1. 保留原 Source 已处理正文，分开编码页与显示片
 
@@ -144,7 +144,7 @@ header、tile 与 terminal 是分开的事件。tile 保留原图 `sourceRect`�
 
 `EncodedImage` 已由 `.proto` + Buf生成双端模型，并接入TS运行时解析和 Dart `SourceRuntime.acquireEncodedImage()`。PNG/JPEG编码正文≤8 MiB，rawWidth≤4096，PNG rawHeight≤100000、JPEG≤65500，orientation为1..8；不按 `rawWidth*rawHeight` 应用16 Mi raster门。描述表示 Source正文传输完成并与Java成功结果一致，不能叫作像素解码成功。显示tile仍须经过实际codec decode，并记录原图矩形、输出尺寸和独立资源身份。
 
-方向元数据由固定 `exifr 7.1.3` 读取完整、有界 `Uint8Array`，避免PNG eXIf位于IDAT之后时被头部截断；这份临时metadata输入副本也≤8 MiB，是额外JS内存，不是零复制或raster。已发布编码页由host持有，Dart不接收编码页URL或整图文件。`borrowEncoded()` 返回单独lease；owner release后禁止新borrow，既有borrow的正文预算保留至lease释放。Native通用control可传此描述，后续小tile文件合同另接。
+方向元数据由固定 `exifr 7.1.3` 读取完整、有界 `Uint8Array`，避免PNG eXIf位于IDAT之后时被头部截断；这份临时metadata输入副本也≤8 MiB，是额外JS内存，不是零复制或raster。已发布编码页由host持有，Dart不接收编码页URL或整图文件。`borrowEncoded()` 返回单独lease；owner release后禁止新borrow，既有borrow的正文预算保留至lease释放。Native通用control传递此描述，后续窗口仅复制小PNG片到受管文件。调用方在 `openImagePage` 成功后显式 `releaseImage` 原编码owner；页关闭仅归还borrow，不能替原owner结束所有权。
 
 本轮Java桥原样传递描述，控制 protocolVersion=2、`karuyomi-source-host-v3`保持不变；这不新增旧版兼容层。协议、自有host代码和依赖变化仍进入 `hostFingerprint/materialVersion`，不能混入冻结AOT checkpoint。双端协议交叉验证、Source链和Dart工程检查已通过，实际范围见[编码页记录](../verification/encoded-image-ownership.md)；真实Web Source链和八种EXIF方向显示未据此通过。
 
@@ -162,9 +162,9 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 对真正支持顺序读取的格式，可以评估按源 scanline 从上到下生成有限条带或 tiles，再将片输出交给有界缓存。反向滚动和任意位置恢复不能倒读同一个 sequential 管线；需要命中已生成的有界 tile 存储，或明确重新打开编码页、从可支持的起点重新扫描。重复解码的耗时也属于首图和恢复门。
 
-`packages/runtime-host/src/image-tile-store.ts` 的独立 `ImageTileStore` 已实现单活动codec会话、`requestWindow()`、revision快照/等待、顺序扫尾和缺片时从已持有编码页重新扫描。它只缓存所需窗口的PNG，缓存字节上限16 MiB；显示lease至多64份、合计32 Mi像素，已失效但尚未确认释放的lease继续计费。store本身不创建Blob URL或Native文件，也尚未接正式control、Reader调度或Flutter cache。
+`packages/runtime-host/src/image-tile-store.ts` 的独立 `ImageTileStore` 已实现单活动codec会话、`requestWindow()`、revision快照/等待、顺序扫尾和缺片时从已持有编码页重新扫描。它只缓存所需窗口的PNG，缓存字节上限16 MiB；显示lease至多64份、合计32 Mi像素，已失效但尚未确认释放的lease继续计费。store本身不创建Blob URL或Native文件；正式 `ImagePageControl` 负责借用编码正文、映射小描述并按lease复用Web Blob URL，Dart与Native适配负责严格接收和有界片文件。`openImagePage` 返回独立pageId与原编码描述，窗口控制以 `windowId/revision` 绑定半开raw Y区间和分母；观察最长25秒，超时返回当前状态，不取消工作。Reader调度和Flutter逐片cache仍待接入。
 
-当前 client 的期限覆盖整个会话，且最后一片后还要继续pull才有真实terminal。store持续有界扫尾并丢弃非所需PNG，不能让Reader只拉可见片后无限暂停，也不积存全部页PNG/raster。真实尾部失败使本次会话的provisional片失效；将来的显示adapter须按 `invalidatedLeaseIds` 撤下引用、驱逐实际cache key并释放Blob/文件，再确认 `releaseTile()`。`removePage()` 等活动codec终态后才允许上层归还编码页borrow。不能把最后tile、可见frame或独立store实现当作整页产品验收。
+当前 client 的期限覆盖整个会话，且最后一片后还要继续pull才有真实terminal。store持续有界扫尾并丢弃非所需PNG，不能让Reader只拉可见片后无限暂停，也不积存全部页PNG/raster。真实尾部失败使本次会话的provisional片失效；Reader显示adapter仍须按 `invalidatedLeaseIds` 撤下引用、驱逐实际cache key并通过正式 `releaseImageTile()` 确认释放；Native adapter在此ACK中等待文件删除与host释放，Web撤销对应Blob URL。`closeImagePage()` 经 `removePage()` 等活动codec真实终态、清理未交付pin后才归还编码页borrow。已交付片继续计费至独立显示ACK，页关闭不承诺显示引用已消失；generation切换仍接受原代次租约清理。窗口pending/complete/failed及provisional描述表达codec状态，不代表Flutter显示frame。不能把最后tile、可见frame或独立store实现当作整页产品验收。
 
 若后续重新评估 libvips，`SourceCustom.onRead/onSeek` 可作为有界输入候选，但其回调是同步接口，不是可 await 的流。`writeToBuffer` 也会物化该次输出；只允许用于已限制尺寸的小片，不得对整张长图调用 `writeToMemory/copyMemory`。使用异步 ACK 或文件 sink 时，应先验证同步 codec 如何暂停并处理取消，不能在回调外无限排队。
 
@@ -193,7 +193,7 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 1. **验收已内化的新 Worker 管线。** C/TypeScript 适配、双上游 submodule、builder、独立 Worker、Blob 输入、256 行 PNG tile、共享材料与 portable 归档均已实现；[正式 Node 解码器/编码器证据](../verification/long-image-codec.md#有界-png-编码器的-node-验收)已具备。正式材料与新产物已在 Codex 内置浏览器通过 11 项：590 个基础 tile 的 PNG 字节/几何、ACK/pull、取消、截尾及恢复。证据来自当前 catalog/client/VerifiedLoader/Worker，独立 Sharp 像素正确性仍引用另行执行的 24 项 Node 门；[正式 Worker 证据](../verification/long-image-codec.md)不沿用历史探针的 Web 成功。冷启动、Native 内置执行和实际进程/heap 释放仍须另验。
 2. **验证大于 16 Mi 的真实输入。** 至少包含 1080 × 20000 及更长的 baseline JPEG、非 interlaced PNG，用首/中/末可辨内容验证实际小片像素。增加 progressive JPEG、interlaced PNG、透明图、16-bit、EXIF 和截断文件，区分支持、预算拒绝与真实解码失败。头部尺寸和构造空白 widget 不算通过。
 3. **验证有界生成和任意位置读取。** 记录输入副本、codec 高水位、条带/片数、缓存字节和存储配额；测试慢消费者、跳到末尾、连续反向滚动、LOD 替换与 zoom。不得由完整 raster、无界内存文件或全部 tile 同时驻留来实现“分片”。
-4. **接通正式产品合同与锚点。** 编码页双端模型、Source collector和独立store已实现；接下来把borrow/store接入tile控制、Native小片文件与Reader，覆盖同一长图内滚动、旋转、DPR、模式切换、缩放、关章及恢复。显示与 observed 必须来自实际已解码且可见的tiles，章节完成须等待真实页terminal。
+4. **接通Reader窗口与锚点。** 编码页、borrow/store、正式双端tile控制与Native小片文件已实现，工程范围见[控制记录](../verification/image-page-controls.md)；接下来消费窗口/LOD并处理EXIF raw↔逻辑坐标，覆盖同一长图内滚动、旋转、DPR、模式切换、缩放、关章及恢复。显示与 observed 必须来自实际已解码且可见的tiles，章节完成须等待真实页terminal。
 5. **验证失败与退出。** 在获取、解析、解码、编码、传输、显示和 cache eviction 阶段取消/切 generation；证明迟到片不发布，相关所有者在终态后归零。单测账本归零不代表进程/GPU 峰值已通过。
 6. **完成真实 Source 与环境门。** 使用未修改 Source 的处理后正文，在 Codex 内置浏览器和 iOS/Android 设备读取完整长图，验证首/中/末、锚点恢复与释放。分别记录冷/热首图、跳转分布及进程/GPU 峰值；模拟器、独立 codec 机制和真实 Source 证据分开保存。
 

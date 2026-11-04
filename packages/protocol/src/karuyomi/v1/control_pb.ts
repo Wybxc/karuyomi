@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file karuyomi/v1/control.proto.
  */
 export const file_karuyomi_v1_control: GenFile = /*@__PURE__*/
-  fileDesc("ChlrYXJ1eW9taS92MS9jb250cm9sLnByb3RvEgtrYXJ1eW9taS52MSIHCgVFbXB0eSKHAQoMUnVudGltZUVycm9yEisKBGNvZGUYASABKA4yHS5rYXJ1eW9taS52MS5SdW50aW1lRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIEhcKCmphdmFfY2xhc3MYBCABKAlIAIgBAUINCgtfamF2YV9jbGFzcyKUAQoMUnVudGltZUhlbGxvEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SEAoIaG9zdF9hYmkYAiABKAkSGAoQcnVudGltZV9iYXNlbGluZRgDIAEoCRISCgpnZW5lcmF0aW9uGAQgASgJEhQKDGNhcGFiaWxpdGllcxgFIAMoCRIUCgxzb3VyY2VfcmVhZHkYBiABKAgiigEKClNvdXJjZUluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRsYW5nGAMgASgJEhwKD3N1cHBvcnRzX2xhdGVzdBgEIAEoCEgAiAEBEhUKCGJhc2VfdXJsGAUgASgJSAGIAQFCEgoQX3N1cHBvcnRzX2xhdGVzdEILCglfYmFzZV91cmwirAEKDlJ1bnRpbWVTZXNzaW9uEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSKAoHc291cmNlcxgFIAMoCzIXLmthcnV5b21pLnYxLlNvdXJjZUluZm8SFAoMY2FwYWJpbGl0aWVzGAYgAygJIn0KC1JwY0VudmVsb3BlEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSEgoKcmVxdWVzdF9pZBgFIAEoCSLUAQoLT3BlblJlcXVlc3QSFQoNbWFuaWZlc3RfcGF0aBgBIAEoCRIQCghpZGVudGl0eRgCIAEoCRIXCgp1c2VyX2FnZW50GAMgASgJSACIAQESHgoRZXhwZWN0ZWRfYnVpbGRfaWQYBCABKAlIAYgBARIjChZleHBlY3RlZF9idW5kbGVfc2hhMjU2GAUgASgJSAKIAQFCDQoLX3VzZXJfYWdlbnRCFAoSX2V4cGVjdGVkX2J1aWxkX2lkQhkKF19leHBlY3RlZF9idW5kbGVfc2hhMjU2Is0CCgVNYW5nYRILCgN1cmwYASABKAkSDQoFdGl0bGUYAiABKAkSEwoGYXV0aG9yGAMgASgJSACIAQESEwoGYXJ0aXN0GAQgASgJSAGIAQESGAoLZGVzY3JpcHRpb24YBSABKAlIAogBARISCgVnZW5yZRgGIAEoCUgDiAEBEg4KBmdlbnJlcxgHIAMoCRIOCgZzdGF0dXMYCCABKAUSGgoNdGh1bWJuYWlsX3VybBgJIAEoCUgEiAEBEhMKC2luaXRpYWxpemVkGAogASgIEhcKD3VwZGF0ZV9zdHJhdGVneRgLIAEoCRIWCgltZW1vX2pzb24YDCABKAlIBYgBAUIJCgdfYXV0aG9yQgkKB19hcnRpc3RCDgoMX2Rlc2NyaXB0aW9uQggKBl9nZW5yZUIQCg5fdGh1bWJuYWlsX3VybEIMCgpfbWVtb19qc29uIssBCgdDaGFwdGVyEgsKA3VybBgBIAEoCRIMCgRuYW1lGAIgASgJEhsKDmNoYXB0ZXJfbnVtYmVyGAMgASgCSACIAQESFgoJc2NhbmxhdG9yGAQgASgJSAGIAQESEwoLZGF0ZV91cGxvYWQYBSABKAkSFAoMc291cmNlX29yZGVyGAYgASgNEhYKCW1lbW9fanNvbhgHIAEoCUgCiAEBQhEKD19jaGFwdGVyX251bWJlckIMCgpfc2NhbmxhdG9yQgwKCl9tZW1vX2pzb24icAoEUGFnZRIQCghwYWdlX2tleRgBIAEoCRINCgVpbmRleBgCIAEoDRIUCgxzb3VyY2VfaW5kZXgYAyABKAUSCwoDdXJsGAQgASgJEhYKCWltYWdlX3VybBgFIAEoCUgAiAEBQgwKCl9pbWFnZV91cmwiGwoLUGFnZVJlcXVlc3QSDAoEcGFnZRgBIAEoDSIsCg1TZWFyY2hSZXF1ZXN0EgwKBHBhZ2UYASABKA0SDQoFcXVlcnkYAiABKAkiMQoMTWFuZ2FSZXF1ZXN0EiEKBW1hbmdhGAEgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiNwoOQ2hhcHRlclJlcXVlc3QSJQoHY2hhcHRlchgBIAEoCzIULmthcnV5b21pLnYxLkNoYXB0ZXIijAMKClNvdXJjZUNhbGwSEgoKcmVxdWVzdF9pZBgBIAEoCRIRCglzb3VyY2VfaWQYAiABKAkSFwoKdGltZW91dF9tcxgDIAEoDUgBiAEBEhIKCmdlbmVyYXRpb24YBCABKAkSKwoHcG9wdWxhchgKIAEoCzIYLmthcnV5b21pLnYxLlBhZ2VSZXF1ZXN0SAASKgoGbGF0ZXN0GAsgASgLMhgua2FydXlvbWkudjEuUGFnZVJlcXVlc3RIABIsCgZzZWFyY2gYDCABKAsyGi5rYXJ1eW9taS52MS5TZWFyY2hSZXF1ZXN0SAASLAoHZGV0YWlscxgNIAEoCzIZLmthcnV5b21pLnYxLk1hbmdhUmVxdWVzdEgAEi0KCGNoYXB0ZXJzGA4gASgLMhkua2FydXlvbWkudjEuTWFuZ2FSZXF1ZXN0SAASLAoFcGFnZXMYDyABKAsyGy5rYXJ1eW9taS52MS5DaGFwdGVyUmVxdWVzdEgAQgkKB3JlcXVlc3RCDQoLX3RpbWVvdXRfbXMiRgoJTWFuZ2FQYWdlEiIKBm1hbmdhcxgBIAMoCzISLmthcnV5b21pLnYxLk1hbmdhEhUKDWhhc19uZXh0X3BhZ2UYAiABKAgiNQoLQ2hhcHRlckxpc3QSJgoIY2hhcHRlcnMYASADKAsyFC5rYXJ1eW9taS52MS5DaGFwdGVyIkUKCFBhZ2VMaXN0EhcKD3BhZ2Vfc2Vzc2lvbl9pZBgBIAEoCRIgCgVwYWdlcxgCIAMoCzIRLmthcnV5b21pLnYxLlBhZ2UigAIKDFNvdXJjZVJlc3VsdBISCgpyZXF1ZXN0X2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkSEAoIYnVpbGRfaWQYAyABKAkSLAoKbWFuZ2FfcGFnZRgKIAEoCzIWLmthcnV5b21pLnYxLk1hbmdhUGFnZUgAEiMKBW1hbmdhGAsgASgLMhIua2FydXlvbWkudjEuTWFuZ2FIABIsCghjaGFwdGVycxgMIAEoCzIYLmthcnV5b21pLnYxLkNoYXB0ZXJMaXN0SAASKgoJcGFnZV9saXN0GA0gASgLMhUua2FydXlvbWkudjEuUGFnZUxpc3RIAEIJCgdwYXlsb2FkIj0KE0NhbmNlbFNvdXJjZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIpwBCgxBY3F1aXJlSW1hZ2USEgoKcmVxdWVzdF9pZBgBIAEoCRIRCglzb3VyY2VfaWQYAiABKAkSFwoPcGFnZV9zZXNzaW9uX2lkGAMgASgJEhAKCHBhZ2Vfa2V5GAQgASgJEhIKCmdlbmVyYXRpb24YBSABKAkSFwoKdGltZW91dF9tcxgGIAEoDUgAiAEBQg0KC190aW1lb3V0X21zIjUKC0NhbmNlbEltYWdlEhIKCnJlcXVlc3RfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCSI3CgxSZWxlYXNlSW1hZ2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCSI/ChBDbG9zZVBhZ2VTZXNzaW9uEhcKD3BhZ2Vfc2Vzc2lvbl9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIhwKCFJlbGVhc2VkEhAKCHJlbGVhc2VkGAEgASgIIhgKBkNsb3NlZBIOCgZjbG9zZWQYASABKAgiHgoJQ29tcGxldGVkEhEKCWNvbXBsZXRlZBgBIAEoCCKAAQoOUHJvY2Vzc2VkSW1hZ2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkSEwoLYnl0ZV9sZW5ndGgYBCABKA0SDQoFd2lkdGgYBSABKA0SDgoGaGVpZ2h0GAYgASgNIpsBCgxFbmNvZGVkSW1hZ2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkSEwoLYnl0ZV9sZW5ndGgYBCABKA0SEQoJcmF3X3dpZHRoGAUgASgNEhIKCnJhd19oZWlnaHQYBiABKA0SEwoLb3JpZW50YXRpb24YByABKA0ijAEKDUltYWdlUmVzb3VyY2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkSEwoLYnl0ZV9sZW5ndGgYBCABKA0SDQoFd2lkdGgYBSABKA0SDgoGaGVpZ2h0GAYgASgNEgsKA3VybBgHIAEoCSIrCglJbWFnZU1ldGESCwoDc2VxGAEgASgNEhEKCW1pbWVfdHlwZRgCIAEoCSItCglJbWFnZURhdGESCwoDc2VxGAEgASgNEhMKC2J5dGVfbGVuZ3RoGAIgASgNIiwKCEltYWdlRW5kEgsKA3NlcRgBIAEoDRITCgt0b3RhbF9ieXRlcxgCIAEoDSKVAQoISW1hZ2VBY2sSCwoDc2VxGAEgASgNEjIKCHJlc291cmNlGAIgASgLMhsua2FydXlvbWkudjEuUHJvY2Vzc2VkSW1hZ2VIAIgBARIvCgdlbmNvZGVkGAMgASgLMhkua2FydXlvbWkudjEuRW5jb2RlZEltYWdlSAGIAQFCCwoJX3Jlc291cmNlQgoKCF9lbmNvZGVkIuQBChFJbWFnZUZyYW1lQ29udHJvbBImCgRtZXRhGAEgASgLMhYua2FydXlvbWkudjEuSW1hZ2VNZXRhSAASJgoEZGF0YRgCIAEoCzIWLmthcnV5b21pLnYxLkltYWdlRGF0YUgAEiQKA2VuZBgDIAEoCzIVLmthcnV5b21pLnYxLkltYWdlRW5kSAASJAoDYWNrGAQgASgLMhUua2FydXlvbWkudjEuSW1hZ2VBY2tIABIqCgVhYm9ydBgFIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAQgcKBWZyYW1lIo4BCghBcnRpZmFjdBIMCgRwYXRoGAEgASgJEg4KBnNoYTI1NhgCIAEoCRIMCgRzaXplGAMgASgNEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUgAiAEBEhkKDGxvZ2ljYWxfbmFtZRgFIAEoCUgBiAEBQg8KDV9jb250ZW50X3R5cGVCDwoNX2xvZ2ljYWxfbmFtZSKSAQoOQnVuZGxlQXJ0aWZhY3QSDAoEcGF0aBgBIAEoCRIOCgZzaGEyNTYYAiABKAkSDAoEc2l6ZRgDIAEoDRIUCgxjb250ZW50X3R5cGUYBCABKAkSEAoIZW5jb2RpbmcYBSABKAkSFgoOZW5jb2RlZF9zaGEyNTYYBiABKAkSFAoMZW5jb2RlZF9zaXplGAcgASgNIucCCg1CdWlsZE1hbmlmZXN0EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SEAoIaG9zdF9hYmkYAiABKAkSGAoQcnVudGltZV9iYXNlbGluZRgDIAEoCRIWCg5icmlkZ2VfdmVyc2lvbhgEIAEoDRIQCghidWlsZF9pZBgFIAEoCRIUCgxwYWNrYWdlX25hbWUYBiABKAkSDwoHcmVwb19pZBgHIAEoCRIPCgd2ZXJzaW9uGAggASgJEhYKDnN0b3JhZ2Vfc2NoZW1hGAkgASgJEhIKCnNvdXJjZV9pZHMYCiADKAkSKwoGYnVuZGxlGAsgASgLMhsua2FydXlvbWkudjEuQnVuZGxlQXJ0aWZhY3QSKwoMaG9zdF9zY3JpcHRzGAwgAygLMhUua2FydXlvbWkudjEuQXJ0aWZhY3QSKAoJcmVzb3VyY2VzGA0gAygLMhUua2FydXlvbWkudjEuQXJ0aWZhY3QijwEKGEV4dGVuc2lvbkJ1aWxkRGVzY3JpcHRvchIQCghidWlsZF9pZBgBIAEoCRIUCgxwYWNrYWdlX25hbWUYAiABKAkSDwoHcmVwb19pZBgDIAEoCRIPCgd2ZXJzaW9uGAQgASgJEhIKCnNvdXJjZV9pZHMYBSADKAkSFQoNbWFuaWZlc3RfcGF0aBgGIAEoCSJfCg5FeHRlbnNpb25JbmRleBIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRI1CgZidWlsZHMYAiADKAsyJS5rYXJ1eW9taS52MS5FeHRlbnNpb25CdWlsZERlc2NyaXB0b3IiKgoISWRlbnRpdHkSDwoHc3ViamVjdBgBIAEoCRINCgVlbWFpbBgCIAEoCSKOAQoJQm9vdHN0cmFwEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SJwoIaWRlbnRpdHkYAiABKAsyFS5rYXJ1eW9taS52MS5JZGVudGl0eRISCgpleHBpcmVzX2F0GAMgASgBEioKBXN0YWdlGAQgASgOMhsua2FydXlvbWkudjEuQm9vdHN0cmFwU3RhZ2UixwEKD0FwaUZldGNoUmVxdWVzdBIMCgRwYXRoGAEgASgJEhMKBm1ldGhvZBgCIAEoCUgAiAEBEjoKB2hlYWRlcnMYAyADKAsyKS5rYXJ1eW9taS52MS5BcGlGZXRjaFJlcXVlc3QuSGVhZGVyc0VudHJ5EhEKBGJvZHkYBCABKAlIAYgBARouCgxIZWFkZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIJCgdfbWV0aG9kQgcKBV9ib2R5IrEBChBBcGlGZXRjaFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoDRI7CgdoZWFkZXJzGAIgAygLMioua2FydXlvbWkudjEuQXBpRmV0Y2hSZXNwb25zZS5IZWFkZXJzRW50cnkSDAoEYm9keRgDIAEoCRISCgpyZWRpcmVjdGVkGAQgASgIGi4KDEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIvEECg5Db250cm9sUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEiMKBXJlYWR5GAogASgLMhIua2FydXlvbWkudjEuRW1wdHlIABIoCgRvcGVuGAsgASgLMhgua2FydXlvbWkudjEuT3BlblJlcXVlc3RIABIpCgZpbnZva2UYDCABKAsyFy5rYXJ1eW9taS52MS5Tb3VyY2VDYWxsSAASMgoGY2FuY2VsGA0gASgLMiAua2FydXlvbWkudjEuQ2FuY2VsU291cmNlUmVxdWVzdEgAEjIKDWFjcXVpcmVfaW1hZ2UYDiABKAsyGS5rYXJ1eW9taS52MS5BY3F1aXJlSW1hZ2VIABIwCgxjYW5jZWxfaW1hZ2UYDyABKAsyGC5rYXJ1eW9taS52MS5DYW5jZWxJbWFnZUgAEjIKDXJlbGVhc2VfaW1hZ2UYECABKAsyGS5rYXJ1eW9taS52MS5SZWxlYXNlSW1hZ2VIABI7ChJjbG9zZV9wYWdlX3Nlc3Npb24YESABKAsyHS5rYXJ1eW9taS52MS5DbG9zZVBhZ2VTZXNzaW9uSAASJQoHcmVidWlsZBgSIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SAASMQoJZmV0Y2hfYXBpGBMgASgLMhwua2FydXlvbWkudjEuQXBpRmV0Y2hSZXF1ZXN0SAASJQoHZGlzcG9zZRgUIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SAASOgoVYWNxdWlyZV9lbmNvZGVkX2ltYWdlGBUgASgLMhkua2FydXlvbWkudjEuQWNxdWlyZUltYWdlSABCCQoHY29tbWFuZCLyAwoPQ29udHJvbFJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKAkSKgoFaGVsbG8YCiABKAsyGS5rYXJ1eW9taS52MS5SdW50aW1lSGVsbG9IABIuCgdzZXNzaW9uGAsgASgLMhsua2FydXlvbWkudjEuUnVudGltZVNlc3Npb25IABIrCgZzb3VyY2UYDCABKAsyGS5rYXJ1eW9taS52MS5Tb3VyY2VSZXN1bHRIABIrCgVpbWFnZRgNIAEoCzIaLmthcnV5b21pLnYxLkltYWdlUmVzb3VyY2VIABIpCghyZWxlYXNlZBgOIAEoCzIVLmthcnV5b21pLnYxLlJlbGVhc2VkSAASJQoGY2xvc2VkGA8gASgLMhMua2FydXlvbWkudjEuQ2xvc2VkSAASKwoJY29tcGxldGVkGBAgASgLMhYua2FydXlvbWkudjEuQ29tcGxldGVkSAASLAoDYXBpGBEgASgLMh0ua2FydXlvbWkudjEuQXBpRmV0Y2hSZXNwb25zZUgAEioKBWVycm9yGBIgASgLMhkua2FydXlvbWkudjEuUnVudGltZUVycm9ySAASMgoNZW5jb2RlZF9pbWFnZRgTIAEoCzIZLmthcnV5b21pLnYxLkVuY29kZWRJbWFnZUgAQggKBnJlc3VsdCJOCgpPcGVuV29ya2VyEiwKCG1hbmlmZXN0GAEgASgLMhoua2FydXlvbWkudjEuQnVpbGRNYW5pZmVzdBISCgp1c2VyX2FnZW50GAIgASgJImsKEkFjcXVpcmVJbWFnZVdvcmtlchIqCgdyZXF1ZXN0GAEgASgLMhkua2FydXlvbWkudjEuQWNxdWlyZUltYWdlEhMKC3Jlc291cmNlX2lkGAIgASgJEhQKDGVuY29kZWRfb25seRgDIAEoCCK5AgoNV29ya2VyQ29tbWFuZBIqCghlbnZlbG9wZRgBIAEoCzIYLmthcnV5b21pLnYxLlJwY0VudmVsb3BlEicKBG9wZW4YCiABKAsyFy5rYXJ1eW9taS52MS5PcGVuV29ya2VySAASKQoGaW52b2tlGAsgASgLMhcua2FydXlvbWkudjEuU291cmNlQ2FsbEgAEjgKDWFjcXVpcmVfaW1hZ2UYDCABKAsyHy5rYXJ1eW9taS52MS5BY3F1aXJlSW1hZ2VXb3JrZXJIABI7ChJjbG9zZV9wYWdlX3Nlc3Npb24YDSABKAsyHS5rYXJ1eW9taS52MS5DbG9zZVBhZ2VTZXNzaW9uSAASJgoIc2h1dGRvd24YDiABKAsyEi5rYXJ1eW9taS52MS5FbXB0eUgAQgkKB2NvbW1hbmQi2AIKDldvcmtlclJlc3BvbnNlEioKCGVudmVsb3BlGAEgASgLMhgua2FydXlvbWkudjEuUnBjRW52ZWxvcGUSLgoHc2Vzc2lvbhgKIAEoCzIbLmthcnV5b21pLnYxLlJ1bnRpbWVTZXNzaW9uSAASKwoGc291cmNlGAsgASgLMhkua2FydXlvbWkudjEuU291cmNlUmVzdWx0SAASLAoFaW1hZ2UYDCABKAsyGy5rYXJ1eW9taS52MS5Qcm9jZXNzZWRJbWFnZUgAEiUKBmNsb3NlZBgNIAEoCzITLmthcnV5b21pLnYxLkNsb3NlZEgAEioKBWVycm9yGA4gASgLMhkua2FydXlvbWkudjEuUnVudGltZUVycm9ySAASMgoNZW5jb2RlZF9pbWFnZRgPIAEoCzIZLmthcnV5b21pLnYxLkVuY29kZWRJbWFnZUgAQggKBnJlc3VsdCq1AwoQUnVudGltZUVycm9yQ29kZRIiCh5SVU5USU1FX0VSUk9SX0NPREVfVU5TUEVDSUZJRUQQABIgChxSVU5USU1FX0VSUk9SX0NPREVfQ0FOQ0VMTEVEEAESHgoaUlVOVElNRV9FUlJPUl9DT0RFX1RJTUVPVVQQAhImCiJSVU5USU1FX0VSUk9SX0NPREVfQUNDRVNTX1JFUVVJUkVEEAMSJAogUlVOVElNRV9FUlJPUl9DT0RFX0FDQ0VTU19ERU5JRUQQBBIjCh9SVU5USU1FX0VSUk9SX0NPREVfU09VUkNFX0VSUk9SEAUSLQopUlVOVElNRV9FUlJPUl9DT0RFX1VOU1VQUE9SVEVEX0NBUEFCSUxJVFkQBhIjCh9SVU5USU1FX0VSUk9SX0NPREVfUlVOVElNRV9MT1NUEAcSJQohUlVOVElNRV9FUlJPUl9DT0RFX1BST1RPQ09MX0VSUk9SEAgSJgoiUlVOVElNRV9FUlJPUl9DT0RFX0lOVEVHUklUWV9FUlJPUhAJEiUKIVJVTlRJTUVfRVJST1JfQ09ERV9MSU1JVF9FWENFRURFRBAKKmcKDkJvb3RzdHJhcFN0YWdlEh8KG0JPT1RTVFJBUF9TVEFHRV9VTlNQRUNJRklFRBAAEhwKGEJPT1RTVFJBUF9TVEFHRV9TQ0FGRk9MRBABEhYKEkJPT1RTVFJBUF9TVEFHRV9QMBACYgZwcm90bzM");
+  fileDesc("ChlrYXJ1eW9taS92MS9jb250cm9sLnByb3RvEgtrYXJ1eW9taS52MSIHCgVFbXB0eSKHAQoMUnVudGltZUVycm9yEisKBGNvZGUYASABKA4yHS5rYXJ1eW9taS52MS5SdW50aW1lRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIEhcKCmphdmFfY2xhc3MYBCABKAlIAIgBAUINCgtfamF2YV9jbGFzcyKUAQoMUnVudGltZUhlbGxvEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SEAoIaG9zdF9hYmkYAiABKAkSGAoQcnVudGltZV9iYXNlbGluZRgDIAEoCRISCgpnZW5lcmF0aW9uGAQgASgJEhQKDGNhcGFiaWxpdGllcxgFIAMoCRIUCgxzb3VyY2VfcmVhZHkYBiABKAgiigEKClNvdXJjZUluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRsYW5nGAMgASgJEhwKD3N1cHBvcnRzX2xhdGVzdBgEIAEoCEgAiAEBEhUKCGJhc2VfdXJsGAUgASgJSAGIAQFCEgoQX3N1cHBvcnRzX2xhdGVzdEILCglfYmFzZV91cmwirAEKDlJ1bnRpbWVTZXNzaW9uEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSKAoHc291cmNlcxgFIAMoCzIXLmthcnV5b21pLnYxLlNvdXJjZUluZm8SFAoMY2FwYWJpbGl0aWVzGAYgAygJIn0KC1JwY0VudmVsb3BlEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSEgoKcmVxdWVzdF9pZBgFIAEoCSLUAQoLT3BlblJlcXVlc3QSFQoNbWFuaWZlc3RfcGF0aBgBIAEoCRIQCghpZGVudGl0eRgCIAEoCRIXCgp1c2VyX2FnZW50GAMgASgJSACIAQESHgoRZXhwZWN0ZWRfYnVpbGRfaWQYBCABKAlIAYgBARIjChZleHBlY3RlZF9idW5kbGVfc2hhMjU2GAUgASgJSAKIAQFCDQoLX3VzZXJfYWdlbnRCFAoSX2V4cGVjdGVkX2J1aWxkX2lkQhkKF19leHBlY3RlZF9idW5kbGVfc2hhMjU2Is0CCgVNYW5nYRILCgN1cmwYASABKAkSDQoFdGl0bGUYAiABKAkSEwoGYXV0aG9yGAMgASgJSACIAQESEwoGYXJ0aXN0GAQgASgJSAGIAQESGAoLZGVzY3JpcHRpb24YBSABKAlIAogBARISCgVnZW5yZRgGIAEoCUgDiAEBEg4KBmdlbnJlcxgHIAMoCRIOCgZzdGF0dXMYCCABKAUSGgoNdGh1bWJuYWlsX3VybBgJIAEoCUgEiAEBEhMKC2luaXRpYWxpemVkGAogASgIEhcKD3VwZGF0ZV9zdHJhdGVneRgLIAEoCRIWCgltZW1vX2pzb24YDCABKAlIBYgBAUIJCgdfYXV0aG9yQgkKB19hcnRpc3RCDgoMX2Rlc2NyaXB0aW9uQggKBl9nZW5yZUIQCg5fdGh1bWJuYWlsX3VybEIMCgpfbWVtb19qc29uIssBCgdDaGFwdGVyEgsKA3VybBgBIAEoCRIMCgRuYW1lGAIgASgJEhsKDmNoYXB0ZXJfbnVtYmVyGAMgASgCSACIAQESFgoJc2NhbmxhdG9yGAQgASgJSAGIAQESEwoLZGF0ZV91cGxvYWQYBSABKAkSFAoMc291cmNlX29yZGVyGAYgASgNEhYKCW1lbW9fanNvbhgHIAEoCUgCiAEBQhEKD19jaGFwdGVyX251bWJlckIMCgpfc2NhbmxhdG9yQgwKCl9tZW1vX2pzb24icAoEUGFnZRIQCghwYWdlX2tleRgBIAEoCRINCgVpbmRleBgCIAEoDRIUCgxzb3VyY2VfaW5kZXgYAyABKAUSCwoDdXJsGAQgASgJEhYKCWltYWdlX3VybBgFIAEoCUgAiAEBQgwKCl9pbWFnZV91cmwiGwoLUGFnZVJlcXVlc3QSDAoEcGFnZRgBIAEoDSIsCg1TZWFyY2hSZXF1ZXN0EgwKBHBhZ2UYASABKA0SDQoFcXVlcnkYAiABKAkiMQoMTWFuZ2FSZXF1ZXN0EiEKBW1hbmdhGAEgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiNwoOQ2hhcHRlclJlcXVlc3QSJQoHY2hhcHRlchgBIAEoCzIULmthcnV5b21pLnYxLkNoYXB0ZXIijAMKClNvdXJjZUNhbGwSEgoKcmVxdWVzdF9pZBgBIAEoCRIRCglzb3VyY2VfaWQYAiABKAkSFwoKdGltZW91dF9tcxgDIAEoDUgBiAEBEhIKCmdlbmVyYXRpb24YBCABKAkSKwoHcG9wdWxhchgKIAEoCzIYLmthcnV5b21pLnYxLlBhZ2VSZXF1ZXN0SAASKgoGbGF0ZXN0GAsgASgLMhgua2FydXlvbWkudjEuUGFnZVJlcXVlc3RIABIsCgZzZWFyY2gYDCABKAsyGi5rYXJ1eW9taS52MS5TZWFyY2hSZXF1ZXN0SAASLAoHZGV0YWlscxgNIAEoCzIZLmthcnV5b21pLnYxLk1hbmdhUmVxdWVzdEgAEi0KCGNoYXB0ZXJzGA4gASgLMhkua2FydXlvbWkudjEuTWFuZ2FSZXF1ZXN0SAASLAoFcGFnZXMYDyABKAsyGy5rYXJ1eW9taS52MS5DaGFwdGVyUmVxdWVzdEgAQgkKB3JlcXVlc3RCDQoLX3RpbWVvdXRfbXMiRgoJTWFuZ2FQYWdlEiIKBm1hbmdhcxgBIAMoCzISLmthcnV5b21pLnYxLk1hbmdhEhUKDWhhc19uZXh0X3BhZ2UYAiABKAgiNQoLQ2hhcHRlckxpc3QSJgoIY2hhcHRlcnMYASADKAsyFC5rYXJ1eW9taS52MS5DaGFwdGVyIkUKCFBhZ2VMaXN0EhcKD3BhZ2Vfc2Vzc2lvbl9pZBgBIAEoCRIgCgVwYWdlcxgCIAMoCzIRLmthcnV5b21pLnYxLlBhZ2UigAIKDFNvdXJjZVJlc3VsdBISCgpyZXF1ZXN0X2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkSEAoIYnVpbGRfaWQYAyABKAkSLAoKbWFuZ2FfcGFnZRgKIAEoCzIWLmthcnV5b21pLnYxLk1hbmdhUGFnZUgAEiMKBW1hbmdhGAsgASgLMhIua2FydXlvbWkudjEuTWFuZ2FIABIsCghjaGFwdGVycxgMIAEoCzIYLmthcnV5b21pLnYxLkNoYXB0ZXJMaXN0SAASKgoJcGFnZV9saXN0GA0gASgLMhUua2FydXlvbWkudjEuUGFnZUxpc3RIAEIJCgdwYXlsb2FkIj0KE0NhbmNlbFNvdXJjZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIpwBCgxBY3F1aXJlSW1hZ2USEgoKcmVxdWVzdF9pZBgBIAEoCRIRCglzb3VyY2VfaWQYAiABKAkSFwoPcGFnZV9zZXNzaW9uX2lkGAMgASgJEhAKCHBhZ2Vfa2V5GAQgASgJEhIKCmdlbmVyYXRpb24YBSABKAkSFwoKdGltZW91dF9tcxgGIAEoDUgAiAEBQg0KC190aW1lb3V0X21zIjUKC0NhbmNlbEltYWdlEhIKCnJlcXVlc3RfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCSI3CgxSZWxlYXNlSW1hZ2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCSI/ChBDbG9zZVBhZ2VTZXNzaW9uEhcKD3BhZ2Vfc2Vzc2lvbl9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIhwKCFJlbGVhc2VkEhAKCHJlbGVhc2VkGAEgASgIIhgKBkNsb3NlZBIOCgZjbG9zZWQYASABKAgiHgoJQ29tcGxldGVkEhEKCWNvbXBsZXRlZBgBIAEoCCKAAQoOUHJvY2Vzc2VkSW1hZ2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkSEwoLYnl0ZV9sZW5ndGgYBCABKA0SDQoFd2lkdGgYBSABKA0SDgoGaGVpZ2h0GAYgASgNIpsBCgxFbmNvZGVkSW1hZ2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkSEwoLYnl0ZV9sZW5ndGgYBCABKA0SEQoJcmF3X3dpZHRoGAUgASgNEhIKCnJhd19oZWlnaHQYBiABKA0SEwoLb3JpZW50YXRpb24YByABKA0ijAEKDUltYWdlUmVzb3VyY2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkSEwoLYnl0ZV9sZW5ndGgYBCABKA0SDQoFd2lkdGgYBSABKA0SDgoGaGVpZ2h0GAYgASgNEgsKA3VybBgHIAEoCSI4Cg1PcGVuSW1hZ2VQYWdlEhMKC3Jlc291cmNlX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkiXAoJSW1hZ2VQYWdlEg8KB3BhZ2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIqCgdlbmNvZGVkGAMgASgLMhkua2FydXlvbWkudjEuRW5jb2RlZEltYWdlIokBChJSZXF1ZXN0SW1hZ2VXaW5kb3cSDwoHcGFnZV9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJEhEKCXdpbmRvd19pZBgDIAEoCRIQCghzb3VyY2VfeRgEIAEoDRIUCgxzb3VyY2VfZW5kX3kYBSABKA0SEwoLZGVub21pbmF0b3IYBiABKA0iiQEKD1dhaXRJbWFnZVdpbmRvdxIPCgdwYWdlX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkSEQoJd2luZG93X2lkGAMgASgJEhYKDmFmdGVyX3JldmlzaW9uGAQgASgNEhcKCnRpbWVvdXRfbXMYBSABKA1IAIgBAUINCgtfdGltZW91dF9tcyI4ChBSZWxlYXNlSW1hZ2VUaWxlEhAKCGxlYXNlX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkiNQoOQ2xvc2VJbWFnZVBhZ2USDwoHcGFnZV9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIkYKD0ltYWdlU291cmNlUmVjdBIJCgF4GAEgASgNEgkKAXkYAiABKA0SDQoFd2lkdGgYAyABKA0SDgoGaGVpZ2h0GAQgASgNInIKD0ltYWdlVGlsZUhlYWRlchINCgV3aWR0aBgBIAEoDRIOCgZoZWlnaHQYAiABKA0SFAoMc291cmNlX3dpZHRoGAMgASgNEhUKDXNvdXJjZV9oZWlnaHQYBCABKA0SEwoLZGVub21pbmF0b3IYBSABKA0iywEKCUltYWdlVGlsZRIQCghsZWFzZV9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJEg0KBWluZGV4GAMgASgNEjEKC3NvdXJjZV9yZWN0GAQgASgLMhwua2FydXlvbWkudjEuSW1hZ2VTb3VyY2VSZWN0EhMKC2Rlbm9taW5hdG9yGAUgASgNEhMKC3Byb3Zpc2lvbmFsGAYgASgIEiwKCHJlc291cmNlGAcgASgLMhoua2FydXlvbWkudjEuSW1hZ2VSZXNvdXJjZSLKAgoTSW1hZ2VXaW5kb3dTbmFwc2hvdBIPCgdwYWdlX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkSEQoJd2luZG93X2lkGAMgASgJEhAKCHJldmlzaW9uGAQgASgNEiwKBXN0YXRlGAUgASgOMh0ua2FydXlvbWkudjEuSW1hZ2VXaW5kb3dTdGF0ZRIxCgZoZWFkZXIYBiABKAsyHC5rYXJ1eW9taS52MS5JbWFnZVRpbGVIZWFkZXJIAIgBARIlCgV0aWxlcxgHIAMoCzIWLmthcnV5b21pLnYxLkltYWdlVGlsZRIdChVpbnZhbGlkYXRlZF9sZWFzZV9pZHMYCCADKAkSLQoFZXJyb3IYCSABKAsyGS5rYXJ1eW9taS52MS5SdW50aW1lRXJyb3JIAYgBAUIJCgdfaGVhZGVyQggKBl9lcnJvciIrCglJbWFnZU1ldGESCwoDc2VxGAEgASgNEhEKCW1pbWVfdHlwZRgCIAEoCSItCglJbWFnZURhdGESCwoDc2VxGAEgASgNEhMKC2J5dGVfbGVuZ3RoGAIgASgNIiwKCEltYWdlRW5kEgsKA3NlcRgBIAEoDRITCgt0b3RhbF9ieXRlcxgCIAEoDSKVAQoISW1hZ2VBY2sSCwoDc2VxGAEgASgNEjIKCHJlc291cmNlGAIgASgLMhsua2FydXlvbWkudjEuUHJvY2Vzc2VkSW1hZ2VIAIgBARIvCgdlbmNvZGVkGAMgASgLMhkua2FydXlvbWkudjEuRW5jb2RlZEltYWdlSAGIAQFCCwoJX3Jlc291cmNlQgoKCF9lbmNvZGVkIuQBChFJbWFnZUZyYW1lQ29udHJvbBImCgRtZXRhGAEgASgLMhYua2FydXlvbWkudjEuSW1hZ2VNZXRhSAASJgoEZGF0YRgCIAEoCzIWLmthcnV5b21pLnYxLkltYWdlRGF0YUgAEiQKA2VuZBgDIAEoCzIVLmthcnV5b21pLnYxLkltYWdlRW5kSAASJAoDYWNrGAQgASgLMhUua2FydXlvbWkudjEuSW1hZ2VBY2tIABIqCgVhYm9ydBgFIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAQgcKBWZyYW1lIo4BCghBcnRpZmFjdBIMCgRwYXRoGAEgASgJEg4KBnNoYTI1NhgCIAEoCRIMCgRzaXplGAMgASgNEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUgAiAEBEhkKDGxvZ2ljYWxfbmFtZRgFIAEoCUgBiAEBQg8KDV9jb250ZW50X3R5cGVCDwoNX2xvZ2ljYWxfbmFtZSKSAQoOQnVuZGxlQXJ0aWZhY3QSDAoEcGF0aBgBIAEoCRIOCgZzaGEyNTYYAiABKAkSDAoEc2l6ZRgDIAEoDRIUCgxjb250ZW50X3R5cGUYBCABKAkSEAoIZW5jb2RpbmcYBSABKAkSFgoOZW5jb2RlZF9zaGEyNTYYBiABKAkSFAoMZW5jb2RlZF9zaXplGAcgASgNIucCCg1CdWlsZE1hbmlmZXN0EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SEAoIaG9zdF9hYmkYAiABKAkSGAoQcnVudGltZV9iYXNlbGluZRgDIAEoCRIWCg5icmlkZ2VfdmVyc2lvbhgEIAEoDRIQCghidWlsZF9pZBgFIAEoCRIUCgxwYWNrYWdlX25hbWUYBiABKAkSDwoHcmVwb19pZBgHIAEoCRIPCgd2ZXJzaW9uGAggASgJEhYKDnN0b3JhZ2Vfc2NoZW1hGAkgASgJEhIKCnNvdXJjZV9pZHMYCiADKAkSKwoGYnVuZGxlGAsgASgLMhsua2FydXlvbWkudjEuQnVuZGxlQXJ0aWZhY3QSKwoMaG9zdF9zY3JpcHRzGAwgAygLMhUua2FydXlvbWkudjEuQXJ0aWZhY3QSKAoJcmVzb3VyY2VzGA0gAygLMhUua2FydXlvbWkudjEuQXJ0aWZhY3QijwEKGEV4dGVuc2lvbkJ1aWxkRGVzY3JpcHRvchIQCghidWlsZF9pZBgBIAEoCRIUCgxwYWNrYWdlX25hbWUYAiABKAkSDwoHcmVwb19pZBgDIAEoCRIPCgd2ZXJzaW9uGAQgASgJEhIKCnNvdXJjZV9pZHMYBSADKAkSFQoNbWFuaWZlc3RfcGF0aBgGIAEoCSJfCg5FeHRlbnNpb25JbmRleBIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRI1CgZidWlsZHMYAiADKAsyJS5rYXJ1eW9taS52MS5FeHRlbnNpb25CdWlsZERlc2NyaXB0b3IiKgoISWRlbnRpdHkSDwoHc3ViamVjdBgBIAEoCRINCgVlbWFpbBgCIAEoCSKOAQoJQm9vdHN0cmFwEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SJwoIaWRlbnRpdHkYAiABKAsyFS5rYXJ1eW9taS52MS5JZGVudGl0eRISCgpleHBpcmVzX2F0GAMgASgBEioKBXN0YWdlGAQgASgOMhsua2FydXlvbWkudjEuQm9vdHN0cmFwU3RhZ2UixwEKD0FwaUZldGNoUmVxdWVzdBIMCgRwYXRoGAEgASgJEhMKBm1ldGhvZBgCIAEoCUgAiAEBEjoKB2hlYWRlcnMYAyADKAsyKS5rYXJ1eW9taS52MS5BcGlGZXRjaFJlcXVlc3QuSGVhZGVyc0VudHJ5EhEKBGJvZHkYBCABKAlIAYgBARouCgxIZWFkZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIJCgdfbWV0aG9kQgcKBV9ib2R5IrEBChBBcGlGZXRjaFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoDRI7CgdoZWFkZXJzGAIgAygLMioua2FydXlvbWkudjEuQXBpRmV0Y2hSZXNwb25zZS5IZWFkZXJzRW50cnkSDAoEYm9keRgDIAEoCRISCgpyZWRpcmVjdGVkGAQgASgIGi4KDEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpoHCg5Db250cm9sUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEiMKBXJlYWR5GAogASgLMhIua2FydXlvbWkudjEuRW1wdHlIABIoCgRvcGVuGAsgASgLMhgua2FydXlvbWkudjEuT3BlblJlcXVlc3RIABIpCgZpbnZva2UYDCABKAsyFy5rYXJ1eW9taS52MS5Tb3VyY2VDYWxsSAASMgoGY2FuY2VsGA0gASgLMiAua2FydXlvbWkudjEuQ2FuY2VsU291cmNlUmVxdWVzdEgAEjIKDWFjcXVpcmVfaW1hZ2UYDiABKAsyGS5rYXJ1eW9taS52MS5BY3F1aXJlSW1hZ2VIABIwCgxjYW5jZWxfaW1hZ2UYDyABKAsyGC5rYXJ1eW9taS52MS5DYW5jZWxJbWFnZUgAEjIKDXJlbGVhc2VfaW1hZ2UYECABKAsyGS5rYXJ1eW9taS52MS5SZWxlYXNlSW1hZ2VIABI7ChJjbG9zZV9wYWdlX3Nlc3Npb24YESABKAsyHS5rYXJ1eW9taS52MS5DbG9zZVBhZ2VTZXNzaW9uSAASJQoHcmVidWlsZBgSIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SAASMQoJZmV0Y2hfYXBpGBMgASgLMhwua2FydXlvbWkudjEuQXBpRmV0Y2hSZXF1ZXN0SAASJQoHZGlzcG9zZRgUIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SAASOgoVYWNxdWlyZV9lbmNvZGVkX2ltYWdlGBUgASgLMhkua2FydXlvbWkudjEuQWNxdWlyZUltYWdlSAASNQoPb3Blbl9pbWFnZV9wYWdlGBYgASgLMhoua2FydXlvbWkudjEuT3BlbkltYWdlUGFnZUgAEj8KFHJlcXVlc3RfaW1hZ2Vfd2luZG93GBcgASgLMh8ua2FydXlvbWkudjEuUmVxdWVzdEltYWdlV2luZG93SAASOQoRd2FpdF9pbWFnZV93aW5kb3cYGCABKAsyHC5rYXJ1eW9taS52MS5XYWl0SW1hZ2VXaW5kb3dIABI7ChJyZWxlYXNlX2ltYWdlX3RpbGUYGSABKAsyHS5rYXJ1eW9taS52MS5SZWxlYXNlSW1hZ2VUaWxlSAASNwoQY2xvc2VfaW1hZ2VfcGFnZRgaIAEoCzIbLmthcnV5b21pLnYxLkNsb3NlSW1hZ2VQYWdlSABCCQoHY29tbWFuZCLaBAoPQ29udHJvbFJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKAkSKgoFaGVsbG8YCiABKAsyGS5rYXJ1eW9taS52MS5SdW50aW1lSGVsbG9IABIuCgdzZXNzaW9uGAsgASgLMhsua2FydXlvbWkudjEuUnVudGltZVNlc3Npb25IABIrCgZzb3VyY2UYDCABKAsyGS5rYXJ1eW9taS52MS5Tb3VyY2VSZXN1bHRIABIrCgVpbWFnZRgNIAEoCzIaLmthcnV5b21pLnYxLkltYWdlUmVzb3VyY2VIABIpCghyZWxlYXNlZBgOIAEoCzIVLmthcnV5b21pLnYxLlJlbGVhc2VkSAASJQoGY2xvc2VkGA8gASgLMhMua2FydXlvbWkudjEuQ2xvc2VkSAASKwoJY29tcGxldGVkGBAgASgLMhYua2FydXlvbWkudjEuQ29tcGxldGVkSAASLAoDYXBpGBEgASgLMh0ua2FydXlvbWkudjEuQXBpRmV0Y2hSZXNwb25zZUgAEioKBWVycm9yGBIgASgLMhkua2FydXlvbWkudjEuUnVudGltZUVycm9ySAASMgoNZW5jb2RlZF9pbWFnZRgTIAEoCzIZLmthcnV5b21pLnYxLkVuY29kZWRJbWFnZUgAEiwKCmltYWdlX3BhZ2UYFCABKAsyFi5rYXJ1eW9taS52MS5JbWFnZVBhZ2VIABI4CgxpbWFnZV93aW5kb3cYFSABKAsyIC5rYXJ1eW9taS52MS5JbWFnZVdpbmRvd1NuYXBzaG90SABCCAoGcmVzdWx0Ik4KCk9wZW5Xb3JrZXISLAoIbWFuaWZlc3QYASABKAsyGi5rYXJ1eW9taS52MS5CdWlsZE1hbmlmZXN0EhIKCnVzZXJfYWdlbnQYAiABKAkiawoSQWNxdWlyZUltYWdlV29ya2VyEioKB3JlcXVlc3QYASABKAsyGS5rYXJ1eW9taS52MS5BY3F1aXJlSW1hZ2USEwoLcmVzb3VyY2VfaWQYAiABKAkSFAoMZW5jb2RlZF9vbmx5GAMgASgIIrkCCg1Xb3JrZXJDb21tYW5kEioKCGVudmVsb3BlGAEgASgLMhgua2FydXlvbWkudjEuUnBjRW52ZWxvcGUSJwoEb3BlbhgKIAEoCzIXLmthcnV5b21pLnYxLk9wZW5Xb3JrZXJIABIpCgZpbnZva2UYCyABKAsyFy5rYXJ1eW9taS52MS5Tb3VyY2VDYWxsSAASOAoNYWNxdWlyZV9pbWFnZRgMIAEoCzIfLmthcnV5b21pLnYxLkFjcXVpcmVJbWFnZVdvcmtlckgAEjsKEmNsb3NlX3BhZ2Vfc2Vzc2lvbhgNIAEoCzIdLmthcnV5b21pLnYxLkNsb3NlUGFnZVNlc3Npb25IABImCghzaHV0ZG93bhgOIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SABCCQoHY29tbWFuZCLYAgoOV29ya2VyUmVzcG9uc2USKgoIZW52ZWxvcGUYASABKAsyGC5rYXJ1eW9taS52MS5ScGNFbnZlbG9wZRIuCgdzZXNzaW9uGAogASgLMhsua2FydXlvbWkudjEuUnVudGltZVNlc3Npb25IABIrCgZzb3VyY2UYCyABKAsyGS5rYXJ1eW9taS52MS5Tb3VyY2VSZXN1bHRIABIsCgVpbWFnZRgMIAEoCzIbLmthcnV5b21pLnYxLlByb2Nlc3NlZEltYWdlSAASJQoGY2xvc2VkGA0gASgLMhMua2FydXlvbWkudjEuQ2xvc2VkSAASKgoFZXJyb3IYDiABKAsyGS5rYXJ1eW9taS52MS5SdW50aW1lRXJyb3JIABIyCg1lbmNvZGVkX2ltYWdlGA8gASgLMhkua2FydXlvbWkudjEuRW5jb2RlZEltYWdlSABCCAoGcmVzdWx0KrUDChBSdW50aW1lRXJyb3JDb2RlEiIKHlJVTlRJTUVfRVJST1JfQ09ERV9VTlNQRUNJRklFRBAAEiAKHFJVTlRJTUVfRVJST1JfQ09ERV9DQU5DRUxMRUQQARIeChpSVU5USU1FX0VSUk9SX0NPREVfVElNRU9VVBACEiYKIlJVTlRJTUVfRVJST1JfQ09ERV9BQ0NFU1NfUkVRVUlSRUQQAxIkCiBSVU5USU1FX0VSUk9SX0NPREVfQUNDRVNTX0RFTklFRBAEEiMKH1JVTlRJTUVfRVJST1JfQ09ERV9TT1VSQ0VfRVJST1IQBRItCilSVU5USU1FX0VSUk9SX0NPREVfVU5TVVBQT1JURURfQ0FQQUJJTElUWRAGEiMKH1JVTlRJTUVfRVJST1JfQ09ERV9SVU5USU1FX0xPU1QQBxIlCiFSVU5USU1FX0VSUk9SX0NPREVfUFJPVE9DT0xfRVJST1IQCBImCiJSVU5USU1FX0VSUk9SX0NPREVfSU5URUdSSVRZX0VSUk9SEAkSJQohUlVOVElNRV9FUlJPUl9DT0RFX0xJTUlUX0VYQ0VFREVEEAoqlgEKEEltYWdlV2luZG93U3RhdGUSIgoeSU1BR0VfV0lORE9XX1NUQVRFX1VOU1BFQ0lGSUVEEAASHgoaSU1BR0VfV0lORE9XX1NUQVRFX1BFTkRJTkcQARIfChtJTUFHRV9XSU5ET1dfU1RBVEVfQ09NUExFVEUQAhIdChlJTUFHRV9XSU5ET1dfU1RBVEVfRkFJTEVEEAMqZwoOQm9vdHN0cmFwU3RhZ2USHwobQk9PVFNUUkFQX1NUQUdFX1VOU1BFQ0lGSUVEEAASHAoYQk9PVFNUUkFQX1NUQUdFX1NDQUZGT0xEEAESFgoSQk9PVFNUUkFQX1NUQUdFX1AwEAJiBnByb3RvMw");
 
 /**
  * @generated from message karuyomi.v1.Empty
@@ -1757,6 +1757,648 @@ export const ImageResourceSchema: GenMessage<ImageResource, {jsonType: ImageReso
   messageDesc(file_karuyomi_v1_control, 29);
 
 /**
+ * Encoded page ownership stays in the host; only small display tiles cross
+ * the control boundary. A closed page does not acknowledge outstanding tiles.
+ *
+ * @generated from message karuyomi.v1.OpenImagePage
+ */
+export type OpenImagePage = Message<"karuyomi.v1.OpenImagePage"> & {
+  /**
+   * @generated from field: string resource_id = 1;
+   */
+  resourceId: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation: string;
+};
+
+/**
+ * Encoded page ownership stays in the host; only small display tiles cross
+ * the control boundary. A closed page does not acknowledge outstanding tiles.
+ *
+ * @generated from message karuyomi.v1.OpenImagePage
+ */
+export type OpenImagePageJson = {
+  /**
+   * @generated from field: string resource_id = 1;
+   */
+  resourceId?: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.OpenImagePage.
+ * Use `create(OpenImagePageSchema)` to create a new message.
+ */
+export const OpenImagePageSchema: GenMessage<OpenImagePage, {jsonType: OpenImagePageJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 30);
+
+/**
+ * @generated from message karuyomi.v1.ImagePage
+ */
+export type ImagePage = Message<"karuyomi.v1.ImagePage"> & {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation: string;
+
+  /**
+   * @generated from field: karuyomi.v1.EncodedImage encoded = 3;
+   */
+  encoded?: EncodedImage | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.ImagePage
+ */
+export type ImagePageJson = {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId?: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation?: string;
+
+  /**
+   * @generated from field: karuyomi.v1.EncodedImage encoded = 3;
+   */
+  encoded?: EncodedImageJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.ImagePage.
+ * Use `create(ImagePageSchema)` to create a new message.
+ */
+export const ImagePageSchema: GenMessage<ImagePage, {jsonType: ImagePageJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 31);
+
+/**
+ * @generated from message karuyomi.v1.RequestImageWindow
+ */
+export type RequestImageWindow = Message<"karuyomi.v1.RequestImageWindow"> & {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation: string;
+
+  /**
+   * @generated from field: string window_id = 3;
+   */
+  windowId: string;
+
+  /**
+   * Half-open raw image coordinates before orientation or downsampling.
+   *
+   * @generated from field: uint32 source_y = 4;
+   */
+  sourceY: number;
+
+  /**
+   * @generated from field: uint32 source_end_y = 5;
+   */
+  sourceEndY: number;
+
+  /**
+   * @generated from field: uint32 denominator = 6;
+   */
+  denominator: number;
+};
+
+/**
+ * @generated from message karuyomi.v1.RequestImageWindow
+ */
+export type RequestImageWindowJson = {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId?: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation?: string;
+
+  /**
+   * @generated from field: string window_id = 3;
+   */
+  windowId?: string;
+
+  /**
+   * Half-open raw image coordinates before orientation or downsampling.
+   *
+   * @generated from field: uint32 source_y = 4;
+   */
+  sourceY?: number;
+
+  /**
+   * @generated from field: uint32 source_end_y = 5;
+   */
+  sourceEndY?: number;
+
+  /**
+   * @generated from field: uint32 denominator = 6;
+   */
+  denominator?: number;
+};
+
+/**
+ * Describes the message karuyomi.v1.RequestImageWindow.
+ * Use `create(RequestImageWindowSchema)` to create a new message.
+ */
+export const RequestImageWindowSchema: GenMessage<RequestImageWindow, {jsonType: RequestImageWindowJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 32);
+
+/**
+ * @generated from message karuyomi.v1.WaitImageWindow
+ */
+export type WaitImageWindow = Message<"karuyomi.v1.WaitImageWindow"> & {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation: string;
+
+  /**
+   * @generated from field: string window_id = 3;
+   */
+  windowId: string;
+
+  /**
+   * @generated from field: uint32 after_revision = 4;
+   */
+  afterRevision: number;
+
+  /**
+   * A bounded long poll returns the current snapshot when this deadline expires.
+   *
+   * @generated from field: optional uint32 timeout_ms = 5;
+   */
+  timeoutMs?: number | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.WaitImageWindow
+ */
+export type WaitImageWindowJson = {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId?: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation?: string;
+
+  /**
+   * @generated from field: string window_id = 3;
+   */
+  windowId?: string;
+
+  /**
+   * @generated from field: uint32 after_revision = 4;
+   */
+  afterRevision?: number;
+
+  /**
+   * A bounded long poll returns the current snapshot when this deadline expires.
+   *
+   * @generated from field: optional uint32 timeout_ms = 5;
+   */
+  timeoutMs?: number;
+};
+
+/**
+ * Describes the message karuyomi.v1.WaitImageWindow.
+ * Use `create(WaitImageWindowSchema)` to create a new message.
+ */
+export const WaitImageWindowSchema: GenMessage<WaitImageWindow, {jsonType: WaitImageWindowJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 33);
+
+/**
+ * @generated from message karuyomi.v1.ReleaseImageTile
+ */
+export type ReleaseImageTile = Message<"karuyomi.v1.ReleaseImageTile"> & {
+  /**
+   * @generated from field: string lease_id = 1;
+   */
+  leaseId: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation: string;
+};
+
+/**
+ * @generated from message karuyomi.v1.ReleaseImageTile
+ */
+export type ReleaseImageTileJson = {
+  /**
+   * @generated from field: string lease_id = 1;
+   */
+  leaseId?: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.ReleaseImageTile.
+ * Use `create(ReleaseImageTileSchema)` to create a new message.
+ */
+export const ReleaseImageTileSchema: GenMessage<ReleaseImageTile, {jsonType: ReleaseImageTileJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 34);
+
+/**
+ * @generated from message karuyomi.v1.CloseImagePage
+ */
+export type CloseImagePage = Message<"karuyomi.v1.CloseImagePage"> & {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation: string;
+};
+
+/**
+ * @generated from message karuyomi.v1.CloseImagePage
+ */
+export type CloseImagePageJson = {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId?: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.CloseImagePage.
+ * Use `create(CloseImagePageSchema)` to create a new message.
+ */
+export const CloseImagePageSchema: GenMessage<CloseImagePage, {jsonType: CloseImagePageJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 35);
+
+/**
+ * @generated from message karuyomi.v1.ImageSourceRect
+ */
+export type ImageSourceRect = Message<"karuyomi.v1.ImageSourceRect"> & {
+  /**
+   * @generated from field: uint32 x = 1;
+   */
+  x: number;
+
+  /**
+   * @generated from field: uint32 y = 2;
+   */
+  y: number;
+
+  /**
+   * @generated from field: uint32 width = 3;
+   */
+  width: number;
+
+  /**
+   * @generated from field: uint32 height = 4;
+   */
+  height: number;
+};
+
+/**
+ * @generated from message karuyomi.v1.ImageSourceRect
+ */
+export type ImageSourceRectJson = {
+  /**
+   * @generated from field: uint32 x = 1;
+   */
+  x?: number;
+
+  /**
+   * @generated from field: uint32 y = 2;
+   */
+  y?: number;
+
+  /**
+   * @generated from field: uint32 width = 3;
+   */
+  width?: number;
+
+  /**
+   * @generated from field: uint32 height = 4;
+   */
+  height?: number;
+};
+
+/**
+ * Describes the message karuyomi.v1.ImageSourceRect.
+ * Use `create(ImageSourceRectSchema)` to create a new message.
+ */
+export const ImageSourceRectSchema: GenMessage<ImageSourceRect, {jsonType: ImageSourceRectJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 36);
+
+/**
+ * @generated from message karuyomi.v1.ImageTileHeader
+ */
+export type ImageTileHeader = Message<"karuyomi.v1.ImageTileHeader"> & {
+  /**
+   * @generated from field: uint32 width = 1;
+   */
+  width: number;
+
+  /**
+   * @generated from field: uint32 height = 2;
+   */
+  height: number;
+
+  /**
+   * @generated from field: uint32 source_width = 3;
+   */
+  sourceWidth: number;
+
+  /**
+   * @generated from field: uint32 source_height = 4;
+   */
+  sourceHeight: number;
+
+  /**
+   * @generated from field: uint32 denominator = 5;
+   */
+  denominator: number;
+};
+
+/**
+ * @generated from message karuyomi.v1.ImageTileHeader
+ */
+export type ImageTileHeaderJson = {
+  /**
+   * @generated from field: uint32 width = 1;
+   */
+  width?: number;
+
+  /**
+   * @generated from field: uint32 height = 2;
+   */
+  height?: number;
+
+  /**
+   * @generated from field: uint32 source_width = 3;
+   */
+  sourceWidth?: number;
+
+  /**
+   * @generated from field: uint32 source_height = 4;
+   */
+  sourceHeight?: number;
+
+  /**
+   * @generated from field: uint32 denominator = 5;
+   */
+  denominator?: number;
+};
+
+/**
+ * Describes the message karuyomi.v1.ImageTileHeader.
+ * Use `create(ImageTileHeaderSchema)` to create a new message.
+ */
+export const ImageTileHeaderSchema: GenMessage<ImageTileHeader, {jsonType: ImageTileHeaderJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 37);
+
+/**
+ * @generated from message karuyomi.v1.ImageTile
+ */
+export type ImageTile = Message<"karuyomi.v1.ImageTile"> & {
+  /**
+   * @generated from field: string lease_id = 1;
+   */
+  leaseId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: uint32 index = 3;
+   */
+  index: number;
+
+  /**
+   * @generated from field: karuyomi.v1.ImageSourceRect source_rect = 4;
+   */
+  sourceRect?: ImageSourceRect | undefined;
+
+  /**
+   * @generated from field: uint32 denominator = 5;
+   */
+  denominator: number;
+
+  /**
+   * The session has not reached a successful real codec terminal yet.
+   *
+   * @generated from field: bool provisional = 6;
+   */
+  provisional: boolean;
+
+  /**
+   * @generated from field: karuyomi.v1.ImageResource resource = 7;
+   */
+  resource?: ImageResource | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.ImageTile
+ */
+export type ImageTileJson = {
+  /**
+   * @generated from field: string lease_id = 1;
+   */
+  leaseId?: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId?: string;
+
+  /**
+   * @generated from field: uint32 index = 3;
+   */
+  index?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.ImageSourceRect source_rect = 4;
+   */
+  sourceRect?: ImageSourceRectJson;
+
+  /**
+   * @generated from field: uint32 denominator = 5;
+   */
+  denominator?: number;
+
+  /**
+   * The session has not reached a successful real codec terminal yet.
+   *
+   * @generated from field: bool provisional = 6;
+   */
+  provisional?: boolean;
+
+  /**
+   * @generated from field: karuyomi.v1.ImageResource resource = 7;
+   */
+  resource?: ImageResourceJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.ImageTile.
+ * Use `create(ImageTileSchema)` to create a new message.
+ */
+export const ImageTileSchema: GenMessage<ImageTile, {jsonType: ImageTileJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 38);
+
+/**
+ * @generated from message karuyomi.v1.ImageWindowSnapshot
+ */
+export type ImageWindowSnapshot = Message<"karuyomi.v1.ImageWindowSnapshot"> & {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation: string;
+
+  /**
+   * @generated from field: string window_id = 3;
+   */
+  windowId: string;
+
+  /**
+   * @generated from field: uint32 revision = 4;
+   */
+  revision: number;
+
+  /**
+   * @generated from field: karuyomi.v1.ImageWindowState state = 5;
+   */
+  state: ImageWindowState;
+
+  /**
+   * @generated from field: optional karuyomi.v1.ImageTileHeader header = 6;
+   */
+  header?: ImageTileHeader | undefined;
+
+  /**
+   * @generated from field: repeated karuyomi.v1.ImageTile tiles = 7;
+   */
+  tiles: ImageTile[];
+
+  /**
+   * These leases remain charged until the display adapter acknowledges release.
+   *
+   * @generated from field: repeated string invalidated_lease_ids = 8;
+   */
+  invalidatedLeaseIds: string[];
+
+  /**
+   * @generated from field: optional karuyomi.v1.RuntimeError error = 9;
+   */
+  error?: RuntimeError | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.ImageWindowSnapshot
+ */
+export type ImageWindowSnapshotJson = {
+  /**
+   * @generated from field: string page_id = 1;
+   */
+  pageId?: string;
+
+  /**
+   * @generated from field: string generation = 2;
+   */
+  generation?: string;
+
+  /**
+   * @generated from field: string window_id = 3;
+   */
+  windowId?: string;
+
+  /**
+   * @generated from field: uint32 revision = 4;
+   */
+  revision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.ImageWindowState state = 5;
+   */
+  state?: ImageWindowStateJson;
+
+  /**
+   * @generated from field: optional karuyomi.v1.ImageTileHeader header = 6;
+   */
+  header?: ImageTileHeaderJson;
+
+  /**
+   * @generated from field: repeated karuyomi.v1.ImageTile tiles = 7;
+   */
+  tiles?: ImageTileJson[];
+
+  /**
+   * These leases remain charged until the display adapter acknowledges release.
+   *
+   * @generated from field: repeated string invalidated_lease_ids = 8;
+   */
+  invalidatedLeaseIds?: string[];
+
+  /**
+   * @generated from field: optional karuyomi.v1.RuntimeError error = 9;
+   */
+  error?: RuntimeErrorJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.ImageWindowSnapshot.
+ * Use `create(ImageWindowSnapshotSchema)` to create a new message.
+ */
+export const ImageWindowSnapshotSchema: GenMessage<ImageWindowSnapshot, {jsonType: ImageWindowSnapshotJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 39);
+
+/**
  * @generated from message karuyomi.v1.ImageMeta
  */
 export type ImageMeta = Message<"karuyomi.v1.ImageMeta"> & {
@@ -1791,7 +2433,7 @@ export type ImageMetaJson = {
  * Use `create(ImageMetaSchema)` to create a new message.
  */
 export const ImageMetaSchema: GenMessage<ImageMeta, {jsonType: ImageMetaJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 30);
+  messageDesc(file_karuyomi_v1_control, 40);
 
 /**
  * @generated from message karuyomi.v1.ImageData
@@ -1828,7 +2470,7 @@ export type ImageDataJson = {
  * Use `create(ImageDataSchema)` to create a new message.
  */
 export const ImageDataSchema: GenMessage<ImageData, {jsonType: ImageDataJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 31);
+  messageDesc(file_karuyomi_v1_control, 41);
 
 /**
  * @generated from message karuyomi.v1.ImageEnd
@@ -1865,7 +2507,7 @@ export type ImageEndJson = {
  * Use `create(ImageEndSchema)` to create a new message.
  */
 export const ImageEndSchema: GenMessage<ImageEnd, {jsonType: ImageEndJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 32);
+  messageDesc(file_karuyomi_v1_control, 42);
 
 /**
  * @generated from message karuyomi.v1.ImageAck
@@ -1916,7 +2558,7 @@ export type ImageAckJson = {
  * Use `create(ImageAckSchema)` to create a new message.
  */
 export const ImageAckSchema: GenMessage<ImageAck, {jsonType: ImageAckJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 33);
+  messageDesc(file_karuyomi_v1_control, 43);
 
 /**
  * @generated from message karuyomi.v1.ImageFrameControl
@@ -1993,7 +2635,7 @@ export type ImageFrameControlJson = {
  * Use `create(ImageFrameControlSchema)` to create a new message.
  */
 export const ImageFrameControlSchema: GenMessage<ImageFrameControl, {jsonType: ImageFrameControlJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 34);
+  messageDesc(file_karuyomi_v1_control, 44);
 
 /**
  * @generated from message karuyomi.v1.Artifact
@@ -2060,7 +2702,7 @@ export type ArtifactJson = {
  * Use `create(ArtifactSchema)` to create a new message.
  */
 export const ArtifactSchema: GenMessage<Artifact, {jsonType: ArtifactJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 35);
+  messageDesc(file_karuyomi_v1_control, 45);
 
 /**
  * @generated from message karuyomi.v1.BundleArtifact
@@ -2147,7 +2789,7 @@ export type BundleArtifactJson = {
  * Use `create(BundleArtifactSchema)` to create a new message.
  */
 export const BundleArtifactSchema: GenMessage<BundleArtifact, {jsonType: BundleArtifactJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 36);
+  messageDesc(file_karuyomi_v1_control, 46);
 
 /**
  * @generated from message karuyomi.v1.BuildManifest
@@ -2294,7 +2936,7 @@ export type BuildManifestJson = {
  * Use `create(BuildManifestSchema)` to create a new message.
  */
 export const BuildManifestSchema: GenMessage<BuildManifest, {jsonType: BuildManifestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 37);
+  messageDesc(file_karuyomi_v1_control, 47);
 
 /**
  * @generated from message karuyomi.v1.ExtensionBuildDescriptor
@@ -2371,7 +3013,7 @@ export type ExtensionBuildDescriptorJson = {
  * Use `create(ExtensionBuildDescriptorSchema)` to create a new message.
  */
 export const ExtensionBuildDescriptorSchema: GenMessage<ExtensionBuildDescriptor, {jsonType: ExtensionBuildDescriptorJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 38);
+  messageDesc(file_karuyomi_v1_control, 48);
 
 /**
  * @generated from message karuyomi.v1.ExtensionIndex
@@ -2412,7 +3054,7 @@ export type ExtensionIndexJson = {
  * Use `create(ExtensionIndexSchema)` to create a new message.
  */
 export const ExtensionIndexSchema: GenMessage<ExtensionIndex, {jsonType: ExtensionIndexJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 39);
+  messageDesc(file_karuyomi_v1_control, 49);
 
 /**
  * @generated from message karuyomi.v1.Identity
@@ -2449,7 +3091,7 @@ export type IdentityJson = {
  * Use `create(IdentitySchema)` to create a new message.
  */
 export const IdentitySchema: GenMessage<Identity, {jsonType: IdentityJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 40);
+  messageDesc(file_karuyomi_v1_control, 50);
 
 /**
  * @generated from message karuyomi.v1.Bootstrap
@@ -2512,7 +3154,7 @@ export type BootstrapJson = {
  * Use `create(BootstrapSchema)` to create a new message.
  */
 export const BootstrapSchema: GenMessage<Bootstrap, {jsonType: BootstrapJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 41);
+  messageDesc(file_karuyomi_v1_control, 51);
 
 /**
  * @generated from message karuyomi.v1.ApiFetchRequest
@@ -2569,7 +3211,7 @@ export type ApiFetchRequestJson = {
  * Use `create(ApiFetchRequestSchema)` to create a new message.
  */
 export const ApiFetchRequestSchema: GenMessage<ApiFetchRequest, {jsonType: ApiFetchRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 42);
+  messageDesc(file_karuyomi_v1_control, 52);
 
 /**
  * @generated from message karuyomi.v1.ApiFetchResponse
@@ -2626,7 +3268,7 @@ export type ApiFetchResponseJson = {
  * Use `create(ApiFetchResponseSchema)` to create a new message.
  */
 export const ApiFetchResponseSchema: GenMessage<ApiFetchResponse, {jsonType: ApiFetchResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 43);
+  messageDesc(file_karuyomi_v1_control, 53);
 
 /**
  * @generated from message karuyomi.v1.ControlRequest
@@ -2712,6 +3354,36 @@ export type ControlRequest = Message<"karuyomi.v1.ControlRequest"> & {
      */
     value: AcquireImage;
     case: "acquireEncodedImage";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.OpenImagePage open_image_page = 22;
+     */
+    value: OpenImagePage;
+    case: "openImagePage";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.RequestImageWindow request_image_window = 23;
+     */
+    value: RequestImageWindow;
+    case: "requestImageWindow";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.WaitImageWindow wait_image_window = 24;
+     */
+    value: WaitImageWindow;
+    case: "waitImageWindow";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.ReleaseImageTile release_image_tile = 25;
+     */
+    value: ReleaseImageTile;
+    case: "releaseImageTile";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.CloseImagePage close_image_page = 26;
+     */
+    value: CloseImagePage;
+    case: "closeImagePage";
   } | { case: undefined; value?: undefined };
 };
 
@@ -2783,6 +3455,31 @@ export type ControlRequestJson = {
    * @generated from field: karuyomi.v1.AcquireImage acquire_encoded_image = 21;
    */
   acquireEncodedImage?: AcquireImageJson;
+
+  /**
+   * @generated from field: karuyomi.v1.OpenImagePage open_image_page = 22;
+   */
+  openImagePage?: OpenImagePageJson;
+
+  /**
+   * @generated from field: karuyomi.v1.RequestImageWindow request_image_window = 23;
+   */
+  requestImageWindow?: RequestImageWindowJson;
+
+  /**
+   * @generated from field: karuyomi.v1.WaitImageWindow wait_image_window = 24;
+   */
+  waitImageWindow?: WaitImageWindowJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ReleaseImageTile release_image_tile = 25;
+   */
+  releaseImageTile?: ReleaseImageTileJson;
+
+  /**
+   * @generated from field: karuyomi.v1.CloseImagePage close_image_page = 26;
+   */
+  closeImagePage?: CloseImagePageJson;
 };
 
 /**
@@ -2790,7 +3487,7 @@ export type ControlRequestJson = {
  * Use `create(ControlRequestSchema)` to create a new message.
  */
 export const ControlRequestSchema: GenMessage<ControlRequest, {jsonType: ControlRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 44);
+  messageDesc(file_karuyomi_v1_control, 54);
 
 /**
  * @generated from message karuyomi.v1.ControlResponse
@@ -2864,6 +3561,18 @@ export type ControlResponse = Message<"karuyomi.v1.ControlResponse"> & {
      */
     value: EncodedImage;
     case: "encodedImage";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.ImagePage image_page = 20;
+     */
+    value: ImagePage;
+    case: "imagePage";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.ImageWindowSnapshot image_window = 21;
+     */
+    value: ImageWindowSnapshot;
+    case: "imageWindow";
   } | { case: undefined; value?: undefined };
 };
 
@@ -2925,6 +3634,16 @@ export type ControlResponseJson = {
    * @generated from field: karuyomi.v1.EncodedImage encoded_image = 19;
    */
   encodedImage?: EncodedImageJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ImagePage image_page = 20;
+   */
+  imagePage?: ImagePageJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ImageWindowSnapshot image_window = 21;
+   */
+  imageWindow?: ImageWindowSnapshotJson;
 };
 
 /**
@@ -2932,7 +3651,7 @@ export type ControlResponseJson = {
  * Use `create(ControlResponseSchema)` to create a new message.
  */
 export const ControlResponseSchema: GenMessage<ControlResponse, {jsonType: ControlResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 45);
+  messageDesc(file_karuyomi_v1_control, 55);
 
 /**
  * @generated from message karuyomi.v1.OpenWorker
@@ -2969,7 +3688,7 @@ export type OpenWorkerJson = {
  * Use `create(OpenWorkerSchema)` to create a new message.
  */
 export const OpenWorkerSchema: GenMessage<OpenWorker, {jsonType: OpenWorkerJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 46);
+  messageDesc(file_karuyomi_v1_control, 56);
 
 /**
  * @generated from message karuyomi.v1.AcquireImageWorker
@@ -3016,7 +3735,7 @@ export type AcquireImageWorkerJson = {
  * Use `create(AcquireImageWorkerSchema)` to create a new message.
  */
 export const AcquireImageWorkerSchema: GenMessage<AcquireImageWorker, {jsonType: AcquireImageWorkerJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 47);
+  messageDesc(file_karuyomi_v1_control, 57);
 
 /**
  * @generated from message karuyomi.v1.WorkerCommand
@@ -3103,7 +3822,7 @@ export type WorkerCommandJson = {
  * Use `create(WorkerCommandSchema)` to create a new message.
  */
 export const WorkerCommandSchema: GenMessage<WorkerCommand, {jsonType: WorkerCommandJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 48);
+  messageDesc(file_karuyomi_v1_control, 58);
 
 /**
  * @generated from message karuyomi.v1.WorkerResponse
@@ -3201,7 +3920,7 @@ export type WorkerResponseJson = {
  * Use `create(WorkerResponseSchema)` to create a new message.
  */
 export const WorkerResponseSchema: GenMessage<WorkerResponse, {jsonType: WorkerResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 49);
+  messageDesc(file_karuyomi_v1_control, 59);
 
 /**
  * @generated from enum karuyomi.v1.RuntimeErrorCode
@@ -3275,6 +3994,42 @@ export const RuntimeErrorCodeSchema: GenEnum<RuntimeErrorCode, RuntimeErrorCodeJ
   enumDesc(file_karuyomi_v1_control, 0);
 
 /**
+ * @generated from enum karuyomi.v1.ImageWindowState
+ */
+export enum ImageWindowState {
+  /**
+   * @generated from enum value: IMAGE_WINDOW_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: IMAGE_WINDOW_STATE_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: IMAGE_WINDOW_STATE_COMPLETE = 2;
+   */
+  COMPLETE = 2,
+
+  /**
+   * @generated from enum value: IMAGE_WINDOW_STATE_FAILED = 3;
+   */
+  FAILED = 3,
+}
+
+/**
+ * @generated from enum karuyomi.v1.ImageWindowState
+ */
+export type ImageWindowStateJson = "IMAGE_WINDOW_STATE_UNSPECIFIED" | "IMAGE_WINDOW_STATE_PENDING" | "IMAGE_WINDOW_STATE_COMPLETE" | "IMAGE_WINDOW_STATE_FAILED";
+
+/**
+ * Describes the enum karuyomi.v1.ImageWindowState.
+ */
+export const ImageWindowStateSchema: GenEnum<ImageWindowState, ImageWindowStateJson> = /*@__PURE__*/
+  enumDesc(file_karuyomi_v1_control, 1);
+
+/**
  * @generated from enum karuyomi.v1.BootstrapStage
  */
 export enum BootstrapStage {
@@ -3303,5 +4058,5 @@ export type BootstrapStageJson = "BOOTSTRAP_STAGE_UNSPECIFIED" | "BOOTSTRAP_STAG
  * Describes the enum karuyomi.v1.BootstrapStage.
  */
 export const BootstrapStageSchema: GenEnum<BootstrapStage, BootstrapStageJson> = /*@__PURE__*/
-  enumDesc(file_karuyomi_v1_control, 1);
+  enumDesc(file_karuyomi_v1_control, 2);
 

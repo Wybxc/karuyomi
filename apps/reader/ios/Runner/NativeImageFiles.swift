@@ -24,6 +24,7 @@ struct NativeImageDescriptor {
   let mimeType: String
   let width: Int
   let height: Int
+  let isTile: Bool
 
   var key: String { generation + "\0" + resourceId }
   var pixels: Int { width * height }
@@ -65,11 +66,24 @@ struct NativeImageDescriptor {
       throw NativeImageFailure(
         code: "protocol_error", message: "Only owned same-origin image Blobs can be transferred")
     }
+    guard let tile = input["tile"] as? NSNumber,
+      CFGetTypeID(tile) == CFBooleanGetTypeID()
+    else {
+      throw NativeImageFailure(code: "protocol_error", message: "Image transfer kind is missing")
+    }
+    isTile = tile.boolValue
     url = candidate
     mimeType = mime
     byteLength = try Self.positiveInteger(input["byteLength"], maximum: 64 * 1024 * 1024)
     width = try Self.positiveInteger(input["width"], maximum: 1_000_000)
     height = try Self.positiveInteger(input["height"], maximum: 1_000_000)
+    guard
+      !isTile
+        || (mimeType == "image/png" && byteLength <= 8 * 1024 * 1024
+          && width <= 4096 && height <= 256)
+    else {
+      throw NativeImageFailure(code: "limit_exceeded", message: "Tile exceeds its bounded surface")
+    }
     guard pixels <= 16 * 1024 * 1024 else {
       throw NativeImageFailure(code: "limit_exceeded", message: "Image exceeds the pixel budget")
     }
@@ -81,21 +95,35 @@ final class NativeImageBudget {
   private(set) var resources = 0
   private(set) var bytes = 0
   private(set) var pixels = 0
+  private(set) var tileResources = 0
+  private(set) var tileBytes = 0
 
   func reserve(_ descriptor: NativeImageDescriptor) throws {
-    guard resources < 6, bytes + descriptor.byteLength <= 64 * 1024 * 1024,
+    let countAllowed =
+      descriptor.isTile
+      ? tileResources < 64 && tileBytes + descriptor.byteLength <= 16 * 1024 * 1024
+      : resources - tileResources < 6
+    guard countAllowed, bytes + descriptor.byteLength <= 64 * 1024 * 1024,
       pixels + descriptor.pixels <= 32 * 1024 * 1024
     else {
       throw NativeImageFailure(
         code: "limit_exceeded", message: "Native image resources exceed their shared budget")
     }
     resources += 1
+    if descriptor.isTile {
+      tileResources += 1
+      tileBytes += descriptor.byteLength
+    }
     bytes += descriptor.byteLength
     pixels += descriptor.pixels
   }
 
   func release(_ descriptor: NativeImageDescriptor) {
     resources -= 1
+    if descriptor.isTile {
+      tileResources -= 1
+      tileBytes -= descriptor.byteLength
+    }
     bytes -= descriptor.byteLength
     pixels -= descriptor.pixels
   }

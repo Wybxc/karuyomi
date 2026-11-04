@@ -223,6 +223,84 @@ message ImageResource {
   string url = 7;
 }
 
+// Encoded page ownership stays in the host; only small display tiles cross
+// the control boundary. A closed page does not acknowledge outstanding tiles.
+message OpenImagePage {
+  string resource_id = 1;
+  string generation = 2;
+}
+message ImagePage {
+  string page_id = 1;
+  string generation = 2;
+  EncodedImage encoded = 3;
+}
+message RequestImageWindow {
+  string page_id = 1;
+  string generation = 2;
+  string window_id = 3;
+  // Half-open raw image coordinates before orientation or downsampling.
+  uint32 source_y = 4;
+  uint32 source_end_y = 5;
+  uint32 denominator = 6;
+}
+message WaitImageWindow {
+  string page_id = 1;
+  string generation = 2;
+  string window_id = 3;
+  uint32 after_revision = 4;
+  // A bounded long poll returns the current snapshot when this deadline expires.
+  optional uint32 timeout_ms = 5;
+}
+message ReleaseImageTile {
+  string lease_id = 1;
+  string generation = 2;
+}
+message CloseImagePage {
+  string page_id = 1;
+  string generation = 2;
+}
+enum ImageWindowState {
+  IMAGE_WINDOW_STATE_UNSPECIFIED = 0;
+  IMAGE_WINDOW_STATE_PENDING = 1;
+  IMAGE_WINDOW_STATE_COMPLETE = 2;
+  IMAGE_WINDOW_STATE_FAILED = 3;
+}
+message ImageSourceRect {
+  uint32 x = 1;
+  uint32 y = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+}
+message ImageTileHeader {
+  uint32 width = 1;
+  uint32 height = 2;
+  uint32 source_width = 3;
+  uint32 source_height = 4;
+  uint32 denominator = 5;
+}
+message ImageTile {
+  string lease_id = 1;
+  string session_id = 2;
+  uint32 index = 3;
+  ImageSourceRect source_rect = 4;
+  uint32 denominator = 5;
+  // The session has not reached a successful real codec terminal yet.
+  bool provisional = 6;
+  ImageResource resource = 7;
+}
+message ImageWindowSnapshot {
+  string page_id = 1;
+  string generation = 2;
+  string window_id = 3;
+  uint32 revision = 4;
+  ImageWindowState state = 5;
+  optional ImageTileHeader header = 6;
+  repeated ImageTile tiles = 7;
+  // These leases remain charged until the display adapter acknowledges release.
+  repeated string invalidated_lease_ids = 8;
+  optional RuntimeError error = 9;
+}
+
 message ImageMeta {
   uint32 seq = 1;
   string mime_type = 2;
@@ -340,6 +418,11 @@ message ControlRequest {
     ApiFetchRequest fetch_api = 19;
     Empty dispose = 20;
     AcquireImage acquire_encoded_image = 21;
+    OpenImagePage open_image_page = 22;
+    RequestImageWindow request_image_window = 23;
+    WaitImageWindow wait_image_window = 24;
+    ReleaseImageTile release_image_tile = 25;
+    CloseImagePage close_image_page = 26;
   }
 }
 message ControlResponse {
@@ -355,6 +438,8 @@ message ControlResponse {
     ApiFetchResponse api = 17;
     RuntimeError error = 18;
     EncodedImage encoded_image = 19;
+    ImagePage image_page = 20;
+    ImageWindowSnapshot image_window = 21;
   }
 }
 
