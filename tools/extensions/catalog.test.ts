@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
@@ -10,10 +16,15 @@ import {
   treeHash,
   HOST_PATHS,
   hostFingerprint,
+  hostSubmodules,
+  HOST_SUBMODULE_PATHS,
 } from './catalog.ts';
 import stableStringify from 'json-stable-stringify';
+import { addHostTestSubmodules, addTestSubmodule } from './test-submodules.ts';
 function fixture(t: TestContext) {
-  const root = mkdtempSync(path.join(tmpdir(), 'karuyomi-catalog-'));
+  const root = realpathSync(
+    mkdtempSync(path.join(tmpdir(), 'karuyomi-catalog-')),
+  );
   t.after(() => rmSync(root, { recursive: true, force: true }));
   git(root, 'init', '-q');
   const put = (file: string, text: string) => {
@@ -159,6 +170,7 @@ test('candidate codec sources, artifact locks and caches stay outside the Source
       'fixed host input\n',
     );
   }
+  addHostTestSubmodules(f.root);
   const candidateInputs = [
     'runtime/image-codec/png.c',
     'runtime/image-codec/worker.ts',
@@ -185,4 +197,84 @@ test('candidate codec sources, artifact locks and caches stay outside the Source
   assert.notEqual(bridgeChanged, before);
   f.put('packages/runtime-host/materials.ts', 'changed Source materials\n');
   assert.notEqual(hostFingerprint(f.root).fingerprint, bridgeChanged);
+});
+
+test('candidate gitlinks, checkout state and configuration do not change the Source host identity', (t) => {
+  const f = fixture(t);
+  for (const name of HOST_PATHS)
+    f.put(
+      path.basename(name).includes('.') ? name : name + '/fixture.txt',
+      'fixed host input\n',
+    );
+  addHostTestSubmodules(f.root);
+  const before = hostFingerprint(f.root).fingerprint;
+  assert.deepEqual(
+    hostSubmodules(f.root).map((pin) => pin.path),
+    [...HOST_SUBMODULE_PATHS],
+  );
+  for (const name of [
+    'vendor/libspng',
+    'vendor/libjpeg-turbo',
+    'vendor/extensions-source',
+  ]) {
+    addTestSubmodule(f.root, name);
+    assert.equal(hostFingerprint(f.root).fingerprint, before);
+    const directory = path.join(f.root, name);
+    f.put(name + '/candidate.txt', 'candidate change\n');
+    git(directory, 'add', 'candidate.txt');
+    git(
+      directory,
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-qm',
+      'candidate',
+    );
+    git(f.root, 'add', name);
+    assert.equal(hostFingerprint(f.root).fingerprint, before);
+    git(f.root, 'submodule', 'deinit', '-f', '--', name);
+    assert.equal(git(directory, 'rev-parse', '--show-toplevel'), f.root);
+    assert.equal(hostFingerprint(f.root).fingerprint, before);
+  }
+  f.put('.gitmodules', 'unrelated candidate configuration\n');
+  assert.equal(hostFingerprint(f.root).fingerprint, before);
+});
+
+test('required Source dependencies reject missing pins, parent repository fallback, wrong HEAD and tracked dirt', (t) => {
+  const f = fixture(t);
+  assert.throws(() => hostSubmodules(f.root), /Missing required.*gitlink/);
+  addHostTestSubmodules(f.root);
+  const name = HOST_SUBMODULE_PATHS[0];
+  const directory = path.join(f.root, name);
+  const expected = hostSubmodules(f.root)[0];
+  assert.ok(expected);
+  f.put(name + '/new-local-only.txt', 'ignored untracked file\n');
+  assert.deepEqual(hostSubmodules(f.root)[0], expected);
+  f.put(name + '/build.gradle.kts', 'tracked dependency changed\n');
+  assert.throws(() => hostSubmodules(f.root), /dirty tracked/);
+  git(directory, 'checkout', '--', 'build.gradle.kts');
+  git(directory, 'add', 'new-local-only.txt');
+  git(
+    directory,
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.invalid',
+    'commit',
+    '-qm',
+    'wrong dependency HEAD',
+  );
+  assert.throws(
+    () => hostSubmodules(f.root),
+    /HEAD differs from pinned gitlink/,
+  );
+  git(f.root, 'add', name);
+  assert.throws(() => hostSubmodules(f.root), /gitlinks have staged changes/);
+  git(f.root, 'reset', '--', name);
+  git(directory, 'checkout', '--detach', expected.gitlink);
+  git(f.root, 'submodule', 'deinit', '-f', '--', name);
+  assert.equal(git(directory, 'rev-parse', '--show-toplevel'), f.root);
+  assert.throws(() => hostSubmodules(f.root), /not initialized/);
 });

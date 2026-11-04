@@ -123,7 +123,7 @@ Reader 尚未消费此库。只有对照证据支持采用后，客户端接入�
 
 `artifacts-lock.json` 固定候选 decoder、encoder、许可证与构建清单的归档，显式准备器在下载/导入边界验证并原子安装。默认产品构建与打包不消费该归档；历史公开下载、Linux 材料装配与 SDK 执行证据分别见[codec 验证](../verification/long-image-codec.md)。若后续通过采用门槛，再接入 Web 共享 Static Assets 或 Native 随应用资源，Native 不作网络回退。扩展分发规则不因候选 codec 改变。
 
-客户端 codec 不再直接列入 `tools/extensions/catalog.ts` 的 Source `HOST_PATHS`，也不能由 runtime-host 正式执行路径导入。协议、contracts、材料构建定义和仓库锁文件仍按当前源码参与身份；具体输入变化以实际指纹为准。默认 `materialVersion` 不因未消费的候选 codec 变化而包含其材料；独立候选验收记录自己的产物身份。不得将新协议或材料混入历史冻结 AOT checkpoint；发布按当前输入和已完成的 baseline 推进。
+客户端 codec 的源码、gitlink 与初始化状态不进入 `tools/extensions/catalog.ts` 的默认 Source 身份；必需子模块只包含固定的 TeaVM/Suwayomi。客户端 codec 也不能由 runtime-host 正式执行路径导入。协议、contracts、材料构建定义和仓库锁文件仍按当前源码参与身份；具体输入变化以实际指纹为准。默认 `materialVersion` 不因未消费的候选 codec 变化而包含其材料；独立候选验收记录自己的产物身份。不得将新协议或材料混入历史冻结 AOT checkpoint；发布按当前输入和已完成的 baseline 推进。
 
 ## 性能决策与剩余验收
 

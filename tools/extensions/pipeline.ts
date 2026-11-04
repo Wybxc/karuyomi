@@ -640,6 +640,19 @@ export class ExtensionPipeline {
     const saved = path.join(output, 'pipeline-result.json');
     try {
       if (options.checkout) validateBuildCheckout(checkout, descriptor);
+      const current = options.checkout
+        ? descriptor.hostFingerprint
+        : hostFingerprint(this.root).fingerprint;
+      if (current !== descriptor.hostFingerprint)
+        throw new Error('Host inputs changed since planning');
+      if (
+        git(
+          path.join(checkout, 'vendor/extensions-source'),
+          'rev-parse',
+          'HEAD',
+        ) !== descriptor.upstreamCommit
+      )
+        throw new Error('Source checkout differs from planned commit');
       if (existsSync(saved)) {
         const cached = loadPipelineResult(saved);
         if (equal(cached.descriptor, descriptor)) {
@@ -660,19 +673,6 @@ export class ExtensionPipeline {
           if (!options.retryFailed) return cached;
         }
       }
-      const current = options.checkout
-        ? descriptor.hostFingerprint
-        : hostFingerprint(this.root).fingerprint;
-      if (current !== descriptor.hostFingerprint)
-        throw new Error('Host inputs changed since planning');
-      if (
-        git(
-          path.join(checkout, 'vendor/extensions-source'),
-          'rev-parse',
-          'HEAD',
-        ) !== descriptor.upstreamCommit
-      )
-        throw new Error('Source checkout differs from planned commit');
       for (const name of [
         'manifest.json',
         'validation.json',

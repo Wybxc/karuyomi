@@ -19,7 +19,15 @@ import { createHash } from 'node:crypto';
 import isRecord from 'is-plain-obj';
 import stableStringify from 'json-stable-stringify';
 import writeFileAtomic from 'write-file-atomic';
-import { ROOT, git, treeHash } from './catalog.ts';
+import {
+  ROOT,
+  git,
+  treeHash,
+  hostSubmodules,
+  hostFingerprint,
+  HOST_PATHS,
+} from './catalog.ts';
+import { addHostTestSubmodules } from './test-submodules.ts';
 import {
   ExtensionPipeline,
   BuilderProcesses,
@@ -93,6 +101,7 @@ function fixture(t: TestContext) {
   put('protocol.json', JSON.stringify(protocol));
   put('package.json', '{"type":"module"}');
   commit();
+  addHostTestSubmodules(checkout);
   const upstream = path.join(checkout, 'vendor/extensions-source');
   mkdirSync(upstream, { recursive: true });
   git(upstream, 'init', '-q');
@@ -118,7 +127,7 @@ function fixture(t: TestContext) {
     effectiveVersionCode: 1,
     versionName: '1.6.1',
     hostRepositoryCommit: git(checkout, 'rev-parse', 'HEAD'),
-    hostSubmodules: [],
+    hostSubmodules: hostSubmodules(checkout),
     hostInputs: {},
     hostFingerprint: '',
     sourceFingerprint: 'a'.repeat(64),
@@ -142,7 +151,7 @@ function fixture(t: TestContext) {
         stableStringify({
           schemaVersion: 1,
           inputs: descriptor.hostInputs,
-          pinnedSubmodules: [],
+          pinnedSubmodules: descriptor.hostSubmodules,
         }) ?? assert.fail('Fixture must be valid JSON'),
       )
       .digest('hex');
@@ -614,3 +623,78 @@ test(
     }
   },
 );
+
+test('cached builds validate required repositories and Source HEAD before reuse in default and frozen modes', async (t) => {
+  for (const frozen of [false, true]) {
+    for (const change of [
+      'uninitialized host dependency',
+      'changed Source HEAD',
+    ]) {
+      await t.test(`${frozen ? 'frozen' : 'default'}: ${change}`, async (t) => {
+        const f = fixture(t);
+        for (const name of HOST_PATHS) {
+          if (!existsSync(path.join(f.checkout, name)))
+            f.put(
+              path.basename(name).includes('.') ? name : name + '/fixture.txt',
+              'fixed host input\n',
+            );
+        }
+        git(f.checkout, 'add', '--', ...HOST_PATHS);
+        f.commit();
+        const identity = hostFingerprint(f.checkout);
+        f.descriptor.hostRepositoryCommit = git(
+          f.checkout,
+          'rev-parse',
+          'HEAD',
+        );
+        f.descriptor.hostFingerprint = identity.fingerprint;
+        f.descriptor.hostInputs = identity.inputs;
+        const pipeline = new ExtensionPipeline({
+          root: f.checkout,
+          materials: async () => materials,
+        });
+        const output = path.join(f.root, 'cached-delivery');
+        const options = frozen ? { checkout: f.checkout } : {};
+        assert.equal(
+          resultOf(await pipeline.buildOne(f.descriptor, output, options))
+            .status,
+          'built',
+        );
+        assert.equal(
+          resultOf(await pipeline.buildOne(f.descriptor, output, options))
+            .status,
+          'built',
+        );
+        const log = readFileSync(path.join(output, 'build.log'));
+        if (change === 'uninitialized host dependency') {
+          git(f.checkout, 'submodule', 'deinit', '-f', '--', 'vendor/teavm');
+        } else {
+          const upstream = path.join(f.checkout, 'vendor/extensions-source');
+          writeFileSync(path.join(upstream, 'source.txt'), 'changed Source');
+          git(upstream, 'add', 'source.txt');
+          git(
+            upstream,
+            '-c',
+            'user.name=Fixture',
+            '-c',
+            'user.email=fixture@example.invalid',
+            'commit',
+            '-qm',
+            'changed Source',
+          );
+        }
+        const result = resultOf(
+          await pipeline.buildOne(f.descriptor, output, options),
+        );
+        assert.equal(result.status, 'failed');
+        assert.match(
+          result.failure?.message ?? '',
+          change === 'uninitialized host dependency'
+            ? /not initialized/
+            : /[Ss]ource checkout/,
+        );
+        assert.deepEqual(readFileSync(path.join(output, 'build.log')), log);
+      });
+    }
+  }
+});

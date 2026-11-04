@@ -1,5 +1,11 @@
 /** Pinned Keiyoushi discovery. Never executes upstream Gradle. */
-import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -40,7 +46,6 @@ export const HOST_PATHS = [
   'packages/runtime-host/package.json',
   'pnpm-lock.yaml',
   '.node-version',
-  '.gitmodules',
 ];
 export const SHARED_PATHS = [
   'common',
@@ -111,24 +116,56 @@ export function treeHash(
     throw new Error('Fingerprint records are not JSON');
   return createHash('sha256').update(encoded).digest('hex');
 }
+// Candidate image codecs have their own build identity and are not Source inputs.
+export const HOST_SUBMODULE_PATHS = [
+  'vendor/suwayomi-server',
+  'vendor/teavm',
+] as const;
 export function hostSubmodules(root = ROOT): SubmodulePin[] {
-  return git(root, 'ls-files', '--stage')
-    .split('\n')
-    .filter((line) => line.startsWith('160000 '))
-    .map((line) => {
-      const [metadata, name] = line.split('\t');
-      const commit = metadata?.split(' ')[1];
-      if (!name || !commit) throw new Error('Invalid submodule gitlink');
-      return {
-        path: name,
-        gitlink: commit,
-        checkout:
-          name === 'vendor/extensions-source'
-            ? commit
-            : git(path.join(root, name), 'rev-parse', 'HEAD'),
-      };
-    })
-    .filter((pin) => pin.path !== 'vendor/extensions-source');
+  const gitlinks = new Map(
+    git(root, 'ls-files', '--stage', '--', ...HOST_SUBMODULE_PATHS)
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [metadata, name] = line.split('\t');
+        const [mode, commit, stage] = metadata?.split(' ') ?? [];
+        if (mode !== '160000' || !name || !commit || stage !== '0')
+          throw new Error('Invalid Source host submodule gitlink');
+        return [name, commit] as const;
+      }),
+  );
+  const pins = HOST_SUBMODULE_PATHS.map((name) => {
+    const commit = gitlinks.get(name);
+    if (!commit)
+      throw new Error(
+        'Missing required Source host submodule gitlink: ' + name,
+      );
+    const directory = path.join(root, name);
+    if (!existsSync(path.join(directory, '.git')))
+      throw new Error(
+        'Required Source host submodule is not initialized: ' + name,
+      );
+    if (
+      realpathSync(git(directory, 'rev-parse', '--show-toplevel')) !==
+      realpathSync(directory)
+    )
+      throw new Error(
+        'Source host submodule must be its own repository: ' + name,
+      );
+    const checkout = git(directory, 'rev-parse', 'HEAD');
+    if (checkout !== commit)
+      throw new Error(
+        'Source host submodule HEAD differs from pinned gitlink: ' + name,
+      );
+    if (git(directory, 'status', '--porcelain', '--untracked-files=no'))
+      throw new Error('Source host submodule has dirty tracked files: ' + name);
+    return { path: name, gitlink: commit, checkout };
+  });
+  if (
+    git(root, 'diff', '--cached', '--name-only', '--', ...HOST_SUBMODULE_PATHS)
+  )
+    throw new Error('Source host submodule gitlinks have staged changes');
+  return pins;
 }
 export function hostFingerprint(root = ROOT): {
   fingerprint: string;

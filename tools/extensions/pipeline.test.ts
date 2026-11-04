@@ -20,6 +20,7 @@ import { createHash } from 'node:crypto';
 import stableStringify from 'json-stable-stringify';
 import writeFileAtomic from 'write-file-atomic';
 import { ROOT, git } from './catalog.ts';
+import { addHostTestSubmodules } from './test-submodules.ts';
 import { encodeBundle, StaticHttpError } from './assets.ts';
 import {
   BuilderProcesses,
@@ -94,6 +95,7 @@ class Fixture {
       '-qm',
       'fixture',
     );
+    addHostTestSubmodules(this.root);
     this.pipeline = new ExtensionPipeline({
       root: this.root,
       materials: async () => materialIdentity,
