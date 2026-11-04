@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，两包代表快照已部署验证，本地 baseline 未完成**。旧 `7f54463` 全量队列已停止，当前 v3 的固定 `b4f72f7` 独立队列已启动；旧 `022d828` 的 v1 队列保持原状，二者不可混用。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，两包代表快照已部署验证，本地 baseline 未完成**。旧 `7f54463` 全量队列已停止。v3 的固定 `b4f72f7` 独立队列与旧 `022d828` v1 队列均曾启动，但 2026-11-04 复核时已无活动进程，首次 baseline 未完成；两套冻结输入与本地产物保留，二者不可混用。
 
 操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
@@ -27,7 +27,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。固定提交 `022d828` 的两包真实 AOT / 内置浏览器初始化、线上匿名 gzip 下载和旧版本远端清理均通过，D1 仅继承已有域名授权。固定该提交的本地单并发全量已经启动，队列包含剩余 1,446 包，尚未完成 baseline。首次全量最终部署、有界 CI 部署及客户端真实更新/旧缓存清理仍需收齐证据；CI 在完整 baseline 部署前继续停用。Actions secrets、全 TS 自动化、依赖规则与固定 Node 24 检查已验证，详细证据见 [VERIFICATION](../VERIFICATION.md)。
 
-当前 Protobuf 控制合同使用 host ABI `karuyomi-source-host-v3`、protocolVersion 2，HTTP bridgeVersion 保持 2；原型不兼容旧控制协议或 Page DTO。正在运行的 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用当前客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v3 包须按新指纹重新构建和验收。完整 baseline 尚未部署、ABI 更新尚未验证前，不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
+当前 Protobuf 控制合同使用 host ABI `karuyomi-source-host-v3`、protocolVersion 2，HTTP bridgeVersion 保持 2；原型不兼容旧控制协议或 Page DTO。历史 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用当前客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v3 包须按新指纹重新构建和验收。完整 baseline 尚未部署、ABI 更新尚未验证前，不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
 
 2026-11-04，当前 hostFingerprint `46e63625a0e1920d284c1077de8aca939f8948d1e50694259834f0846844e0db` 的三包候选已通过正式交付校验。重连 / 布局修复后的客户端现已从固定 `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 成功完成正式 build、API Worker dry-run 与静态组装一致性检查；`main.dart.js` SHA-256 为 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`。host 输入、三包 AOT、共享材料 `63a061a…7a9d` 和 Native 内置 runtime 字节与原 b4 候选一致，静态索引 / 清单精确匹配，仅包含索引引用产物，MIME 规则正确。固定树跟踪输入干净，未改 checkpoint。
 
@@ -35,13 +35,21 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 当前 v3 首次全量在 main ignored `.local/aot-static-abi3-b4/` 独立 clone 固定 `b4f72f7`，三 submodule 与工具链均锁定、跟踪输入干净；独立 state 来自最后已部署 revision，不复制在途 v1 checkpoint。完整冻结计划覆盖 1448 包，并发 1，已通过正式校验导入三个真实交付供恢复复用。官方 `bootstrap --jobs 1 --limit 10000 --finalize` 已启动，仅构建和准备本地快照，不自动部署或提交已部署 state。完整 baseline 尚未完成，CI 继续停用；准确进程与本地恢复说明保留在 ignored `.local/v3-baseline-plan/` 和独立队列目录。中断后使用同一输入、同一 builds/state 恢复；不要启动第二个 supervisor 写同一 state。若期间部署 parent 前进，等待 builder 完全退出后按新确认 checkpoint 重新计划，复用匹配结果，不修改 parent 绕过前置检查。
 
-已亲读新 v3 队列的首个实际新构建样本 `all.ahottie`：buildId `ext-all.ahottie-b92d36ca170dd2e6ef9dccdeb92c82d0`，正式 builder 204.91 秒完成，canonical 3791303 B、gzip 793431 B；pipeline 结果为 `built` / `compiled_unverified`，不代表 Source 已可运行。记录位于该独立队列 `builds/b92d36ca170dd2e6ef9dccdeb92c82d0673b49a9d7ae71baa45241bfc1518600/` 的 `build-result.json` 与 `pipeline-result.json`。这是固定样本证据，不维护变化中的完成计数；既有单一 supervisor 继续执行，旧 v1 冻结队列未改。另已核对 `bookorbit` 的正式 AOT 日志：缺少 `OkHttpClient.Builder.dns(Dns)`，属于按包隔离的宿主 ABI 失败，不是环境下载或工具链失败，不将其标为可运行。
+已亲读新 v3 队列的首个实际新构建样本 `all.ahottie`：buildId `ext-all.ahottie-b92d36ca170dd2e6ef9dccdeb92c82d0`，正式 builder 204.91 秒完成，canonical 3791303 B、gzip 793431 B；pipeline 结果为 `built` / `compiled_unverified`，不代表 Source 已可运行。记录位于该独立队列 `builds/b92d36ca170dd2e6ef9dccdeb92c82d0673b49a9d7ae71baa45241bfc1518600/` 的 `build-result.json` 与 `pipeline-result.json`。这是固定样本证据，不维护变化中的完成计数；该记录仅证明当时执行的固定样本，当前队列是否活动以本节末尾复核为准；旧 v1 冻结输入未改。另已核对 `bookorbit` 的正式 AOT 日志：缺少 `OkHttpClient.Builder.dns(Dns)`，属于按包隔离的宿主 ABI 失败，不是环境下载或工具链失败，不将其标为可运行。
 
 历史冻结批次暴露的宿主缺口可供后续正式回归使用，不从失败包自动重试，也不修改原扩展：bookorbit/lanraragi/mango 缺 `OkHttpClient.Builder.dns`，旧 v1 的 komga 缺 `Builder.authenticator`，dragonballmultiverse/manhuarm 缺 `StaticLayout.Builder` 等文本绘图 ABI（后者还用到字体度量与旋转），mangafire 缺 `Class.getResource` 与协程 cancel ABI。DNS 和认证须实现真实请求语义，不能以 no-op 仅换取编译成功。lunaranime 当前只有 TeaVM `2/2` 无栈错误，尚不能确定首因，需要后续独立诊断。原始逐包日志留在各自冻结 checkout 的 ignored 构建目录，不把旧批次的诊断直接归于新输入。
 
-2026-11-04 重新核对当前 v3 的实际 checkpoint 和日志：komga 的本轮失败处于 `upstream` 阶段，是从 `dl.google.com` 下载 `commons-text:1.11.0` 时 DNS 解析失败，尚未进入 AOT，不能称为本轮认证 ABI 失败。后续包持续成功，未见持续的全局下载故障；先让现有 supervisor 完成本批次，再按正式恢复入口单独重试该失败输入，不修改在途 state 或启动第二个发布器。两条队列的 baseline 均未完成，继续保持定时扩展 CI 停用。
+2026-11-04 重新核对当前 v3 的实际 checkpoint 和日志：komga 的本轮失败处于 `upstream` 阶段，是从 `dl.google.com` 下载 `commons-text:1.11.0` 时 DNS 解析失败，尚未进入 AOT，不能称为本轮认证 ABI 失败。后续包持续成功，未见持续的全局下载故障；该轮尚未完成，后续如恢复须使用正式入口；相同失败输入仅在明确重试时再尝试，不修改 checkpoint 或启动第二个发布器。两条队列的 baseline 均未完成，继续保持定时扩展 CI 停用。
 
 正式 Web 客户端的真实扩展更新已有独立分项：官方 Arknights 1.6.1 → 1.6.2 经当前静态索引、不同 AOT/Worker 重新加载后，首次续读恢复 DREAM 第 3 页并显示原图；旧远端清单/产物 404、两会话与 Worker 最终清理均确认，见[版本更新证据](../verification/extension-version-web.md)。该门使用本地隔离快照，不代表生产 baseline 部署、Native 更新或旧本地 bundle 缓存清理，后几项仍待验收。
+
+## 中断复核与恢复边界
+
+2026-11-04 清理测试进程时，以当前进程列表与工作目录复核，两条历史 AOT 主进程及项目 builder 子进程均不存在。两树跟踪输入仍干净，已部署 state 都保持 revision `22378bbcb89d40f5a0397c5098310072`、`bootstrap.complete=false`；v3 尚无完整候选快照，扩展增量工作流仍为 `disabled_manually`。日志没有全量完成汇总，因此应记为未完成中断，不能沿用“正在运行”或当作首次 baseline 已完成。
+
+最近的 v3 正式包终态为 `en.aethonwebcomics`（02:45:22 UTC）；其后 `en.akazascans` 仅有部分交付文件，缺少 validation 与 pipeline 终态，不能凭 manifest 或构建输出计为完成。已有正式终态由 runner 在恢复时复验复用，部分输出由正式入口重新构建，不手造成功记录。
+
+本次没有重启队列、删除过期锁或改动 state。后续恢复优先当前 v3 冻结输入，按 [EXTENSIONS 的恢复命令](../EXTENSIONS.md#首次本地全量与恢复)沿用同一 full-plan、state 和 builds，先确认无发布者并重新核对远端 parent；过期锁交给 `proper-lockfile` 处理。旧 v1 不作为当前协议发布候选，也不因恢复自动重试相同失败输入。若长图协议或材料形成新 host 身份，应另建固定输入和计划，不把新合同混入这两套 checkpoint。
 
 ## 验收
 

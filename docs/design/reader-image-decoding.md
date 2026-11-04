@@ -24,13 +24,14 @@ Reader 的 `apps/reader/lib/features/reader/resource_image.dart` 再创建 Flutt
 
 以下正式边界均使用原图 `width × height`：
 
-| 边界             | 当前行为                                               | 源码                                              |
-| ---------------- | ------------------------------------------------------ | ------------------------------------------------- |
-| host 单图        | 超过 16 Mi 像素时，真实 bitmap decode 前拒绝           | `packages/runtime-host/src/image-resources.ts`    |
-| 控制描述         | `processedImageSchema` 拒绝超过 16 Mi 像素             | `packages/contracts/src/image-control.ts`         |
-| Native Dart      | 拒绝超过 16 Mi 像素，驻留合计 32 Mi 像素               | `apps/reader/lib/runtime/native_image_files.dart` |
-| iOS 文件桥       | 单图 16 Mi、共享合计 32 Mi 像素                        | `apps/reader/ios/Runner/NativeImageFiles.swift`   |
-| Reader scheduler | 用完整 `width × height × 4` 估算，默认驻留上限 128 MiB | `packages/reader_core/lib/src/scheduler.dart`     |
+| 边界             | 当前行为                                               | 源码                                                     |
+| ---------------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| host 单图        | 超过 16 Mi 像素时，真实 bitmap decode 前拒绝           | `packages/runtime-host/src/image-resources.ts`           |
+| 控制描述         | `processedImageSchema` 拒绝超过 16 Mi 像素             | `packages/contracts/src/image-control.ts`                |
+| Dart 传输        | `acquireImage()` 在建立资源前再次限制 16 Mi 像素       | `packages/source_runtime/lib/src/transport_runtime.dart` |
+| Native Dart      | 拒绝超过 16 Mi 像素，驻留合计 32 Mi 像素               | `apps/reader/lib/runtime/native_image_files.dart`        |
+| iOS 文件桥       | 单图 16 Mi、共享合计 32 Mi 像素                        | `apps/reader/ios/Runner/NativeImageFiles.swift`          |
+| Reader scheduler | 用完整 `width × height × 4` 估算，默认驻留上限 128 MiB | `packages/reader_core/lib/src/scheduler.dart`            |
 
 例如 1080 × 20000 为 2160 万像素，已超过 16 Mi 限额。只给 Flutter 增加 `ResizeImage`，无法使这张图通过前面的合同。
 
@@ -145,7 +146,7 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 `packages/runtime-host/materials.ts` 的 `materialVersion` 又包含当前协议、hostScripts 和 resources；共享 WASM/脚本纳入该目录后会形成新材料身份，扩展 manifest/装配需要一致。本轮不修改指纹计算范围，也不将“终端 codec 未改 Java”解释为无需重新计划 AOT。
 
-正式实施应在独立固定输入中锁定依赖和构建配方，再产生新的 catalog/材料/AOT 计划。不得改变正在运行的两个 AOT 队列输入，也不得把新协议材料混入旧 checkpoint。完成后按实际输入生成新 host 身份并重新验收。
+正式实施应在独立固定输入中锁定依赖和构建配方，再产生新的 catalog/材料/AOT 计划。不得改变两套历史冻结 AOT 输入，也不得把新协议材料混入旧 checkpoint；队列中断与恢复边界见[工程计划](../plan/engineering-and-release.md#中断复核与恢复边界)。完成后按实际输入生成新 host 身份并重新验收。
 
 无论采用 WASM 或 Native 库，Web 所需材料只发布一份 Static Assets；Native 所需材料/库随应用内置，不通过网络回退读取。产品 JS/桥接逻辑仍维护为严格 TypeScript，第三方构建产物按锁定包或校验后的构建器获取，不复制依赖缓存为维护源码。
 
