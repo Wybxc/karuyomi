@@ -322,3 +322,19 @@ pnpm image-codecs:check-worker \
 在 Codex 内置浏览器打开输出地址，点击“运行验收”，完成后点击“关闭服务”并核对进程和端口；仅准备素材、Node基准与页面时追加 `--prepare-only`。`--build` 可指定含 `build-manifest.json` 的本地正式构建。
 
 本轮覆盖合成输入、静态材料风格装配、真实独立 Worker 与有界顺序 PNG tiles；没有经过 Source 请求头、Cookie、拦截器或图片处理链，也未进入 Flutter Reader、视口调度、随机区域、LOD、位置恢复或 Native内置执行。没有测量 JS GC、GPU、RSS、物理heap释放或真机性能；25 ms无迟到不保证任意时间范围无迟到，协作取消不代替强杀超时路径的真实浏览器验收。旧证据保留各自时间点和产物身份，本节不宣布长图产品门通过。
+
+## 固定构建依赖的公开下载
+
+2026-11-04，`image-codecs-v1` tag 实际指向包含 decoder/encoder/Worker 源码的 `3d2c628f4436f8c6576fb20afcb73d36fd062801`。[固定构建依赖 Release](https://github.com/Wybxc/karuyomi/releases/tag/image-codecs-v1) 已发布，唯一资产 `image-codecs.tar.gz` 为 198,511 B，GitHub 返回的 SHA-256 为 `362ea417572014def148038492262345f6a40b47da71b643726a0e911de6331a`，与 `artifacts-lock.json` 一致。它只用于工程构建；客户端仍消费 Static Assets / Native 内置字节，扩展不恢复 Release 分发。
+
+随后不传本地 `--archive`，以新空缓存执行：
+
+```sh
+pnpm image-codecs:prepare-artifacts --cache-root .local/image-codec-public-download
+```
+
+正式 CLI 从锁定公开 URL 匿名下载，exit=0、`reused=false`；归档传输校验、11个成员及构建身份校验全部通过，返回身份为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。原始摘要保存在忽略的 `.local/image-codec-artifacts-public-prepare.json`，SHA-256 为 `968a4e2719ca0ded31a282fdf144238215913f59411d5607551e7ac46e3b032d`。这不同于之前的离线归档导入或默认缓存复用。
+
+推送该 tag 后、main push 前，按源码提交查询 Actions 为零条；main push 才触发正常 CI。未启用或重启旧扩展全量发布器，也未改两套冻结 AOT checkpoint。
+
+源码提交 `3d2c628` 的 [Linux 项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/41817032533) 随后全部通过，包括 `pnpm check`、`pnpm flutter:check`、`pnpm build` 和本地 D1 迁移。该 checkout 没有预装本地 codec 缓存，正式 build 从公开锁定归档准备静态/Native 材料，未在 Linux 编译 SDK。它验证工程获取与装配，不增加 Linux SDK、Native WebView、Source 或 Reader 的运行结论。

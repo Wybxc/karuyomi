@@ -158,6 +158,8 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 对真正支持顺序读取的格式，可以评估按源 scanline 从上到下生成有限条带或 tiles，再将片输出交给有界缓存。反向滚动和任意位置恢复不能倒读同一个 sequential 管线；需要命中已生成的有界 tile 存储，或明确重新打开编码页、从可支持的起点重新扫描。重复解码的耗时也属于首图和恢复门。
 
+当前 client 的期限覆盖整个会话，且最后一个 tile 后还要继续 pull 才能取得真实 terminal；Reader 不得只拉可见片后无限暂停。产品 owner 应驱动有界顺序扫尾，按配额缓存或丢弃非可见 PNG，保留编码页供缺片时本地重新解码。真实尾部失败使该会话所有 provisional tiles 失效，必须同步撤下显示引用、驱逐全部实际 cache key 并释放 Blob/文件；不能把最后 tile 或可见 frame 当作整页成功。
+
 若后续重新评估 libvips，`SourceCustom.onRead/onSeek` 可作为有界输入候选，但其回调是同步接口，不是可 await 的流。`writeToBuffer` 也会物化该次输出；只允许用于已限制尺寸的小片，不得对整张长图调用 `writeToMemory/copyMemory`。使用异步 ACK 或文件 sink 时，应先验证同步 codec 如何暂停并处理取消，不能在回调外无限排队。
 
 编码输入、WASM/native heap、codec 工作空间、临时条带、编码 tile 存储、传输块、Flutter decoded tile 和 GPU 资源分别计量。operation cache 上限不是 codec 内存上限，WASM 最大 heap 也不是进程总上限。临时文件必须是有配额的真实持久层；WASM 内存文件系统不能被描述成磁盘卸载。
@@ -172,7 +174,7 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 ## 依赖、静态材料与 AOT 输入身份
 
-`runtime/image-codec/artifacts-lock.json` 已固定 PNG/JPEG decoder、PNG encoder、许可证和构建清单的 portable 归档。`tools/images/artifacts.ts` 校验归档 size/SHA、精确成员、逐成员大小/SHA、manifest 输入身份、自有构建源码与 index gitlink，原子安装到忽略缓存；同步只读核对成员后使用可取消的系统 tar，等实际提取器及后代退出才清理 stage/lock。材料构建消费这一已验证结果，CI 无需隐式构建 SDK，也不依赖尚未验收的 Linux SDK。归档是独立运行时构建依赖，不能把其准备或发布写成客户端扩展重新使用 GitHub Release 分发；公开依赖下载与 CI 运行状态按工程证据另验。
+`runtime/image-codec/artifacts-lock.json` 已固定 PNG/JPEG decoder、PNG encoder、许可证和构建清单的 portable 归档。`tools/images/artifacts.ts` 校验归档 size/SHA、精确成员、逐成员大小/SHA、manifest 输入身份、自有构建源码与 index gitlink，原子安装到忽略缓存；同步只读核对成员后使用可取消的系统 tar，等实际提取器及后代退出才清理 stage/lock。材料构建消费这一已验证结果，CI 无需隐式构建 SDK，也不依赖尚未验收的 Linux SDK。归档是独立运行时构建依赖，不能把其准备或发布写成客户端扩展重新使用 GitHub Release 分发；公开依赖已通过新空缓存匿名下载和完整导入校验，见[公开下载证据](../verification/long-image-codec.md#固定构建依赖的公开下载)；Linux 项目 CI 也已通过获取和材料装配，不作为 Native 或 SDK 执行证明。
 
 当前 `tools/extensions/catalog.ts` 的 `HOST_PATHS` 已包含 `runtime/image-codec`、相应 image 构建/准备工具与材料 helper，并保留整个 `protocol`、`packages/contracts/src`、runtime-host 材料定义及全仓锁文件；真实上游 gitlink 也参与身份。因此终端 codec 输入或共享材料变化会改变 `hostFingerprint`，不能因未修改 Java 就复用旧 AOT 身份。
 

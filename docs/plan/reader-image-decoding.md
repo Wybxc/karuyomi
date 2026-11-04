@@ -11,7 +11,7 @@
 - SDK 准备器与工具链检查作为本轮独立工程门完成，入口为 `pnpm image-codecs:prepare` / `pnpm test:image-codecs`，后者纳入 `pnpm check`。来源和使用见[codec 工具链说明](../../runtime/image-codec/README.md)。正式 PNG/JPEG 源码构建另见下一项；Linux SDK 执行与跨主机字节一致性仍未验；材料构建已使用固定 portable 产物归档，不要求 CI 隐式编译或准备 Linux SDK。
 - 已内化共同 C ABI、严格 TypeScript 顺序 session、双上游 submodule、构建指纹与自生成长图回归；此前正式源码通过两次同主机独立缓存构建和 Node 19 项真实 WASM 验收，范围按[正式证据](../verification/long-image-codec.md#正式源码构建与-node-验收)保留。本轮增加固定 libspng PNG encoder，正式 CLI 的 24 项全部通过，包括真实 WASM 编码后由 Sharp 解码对照的最大高熵条带、错误后恢复与直接 ABI 释放；见[编码器 Node 证据](../verification/long-image-codec.md#有界-png-编码器的-node-验收)。这不是新 Worker 的跨线程或浏览器证据，不能沿用历史探针 Web 结果。
 - 独立 codec Worker/client 已实现：读取前限制 8 MiB 受管 Blob，PNG/JPEG 顺序解码并编码至多 256 行的 PNG tile，单片 RGBA 4 MiB / PNG 8 MiB，64 KiB DATA 逐块 ACK，下一次 pull 才推进下一片。tile 带原图 sourceRect 且保持 provisional，尾部失败或取消使已交付片整体失效；取消等待清理，超出 grace 只终止专用 codec Worker。源码、能力范围与命令见 [codec README](../../runtime/image-codec/README.md)。fake Worker / 生命周期回归及真实 Codex 内置浏览器 11 项均通过；590 个基础 tile 的 PNG 字节/几何、ACK/pull、三种取消边界、截尾和恢复范围见[正式 Worker 证据](../verification/long-image-codec.md)。这不是 Source / Reader 或 Native 执行证据。
-- `MaterialCatalog.imageCodecs`、Static Assets MIME 与 Native host 内置 resolver 已接线，材料和构建来源参与 `materialVersion`。Web 使用共享静态材料；Native host 内置实际所需 Worker、模块、WASM 和许可证，不重复内置已 bundle 的 Web client.js，也不向 Source Worker 预载 codec。`artifacts-lock.json` 与 portable 归档准备/打包入口已实现，核对来源及成员后原子安装，不让 CI 临时构建 SDK。构建/装配通过不代表 Native WebView 内置执行通过，也不代表公开归档下载或 CI 运行门通过。
+- `MaterialCatalog.imageCodecs`、Static Assets MIME 与 Native host 内置 resolver 已接线，材料和构建来源参与 `materialVersion`。Web 使用共享静态材料；Native host 内置实际所需 Worker、模块、WASM 和许可证，不重复内置已 bundle 的 Web client.js，也不向 Source Worker 预载 codec。`artifacts-lock.json` 与 portable 归档准备/打包入口已实现，核对来源及成员后原子安装，不让 CI 临时构建 SDK。构建/装配通过不代表 Native WebView 内置执行通过，公开构建依赖已发布，并通过新空缓存匿名下载及完整导入校验；Linux 项目 CI 的通用检查、Flutter、完整构建及 D1 迁移也已通过，见[工程证据](../verification/long-image-codec.md#固定构建依赖的公开下载)。
 - 原 Source 处理后正文所有权、Protobuf 图片描述、Flutter Reader、tile 缓存与 LOD 仍未接入新运行库。现有 ProcessedImage/ImageResource 语义与 16 Mi 像素准入不变；Native 执行、缓存释放、锚点/LOD 以及真实合计峰值继续待验。
 - 当前宿主、控制描述符、Dart 传输和 Native 文件接收边界限制每图 16 Mi 像素，1080×20000 等长图在到达 Flutter 前即被拒绝。
 - 宿主完整解码验证处理后的图片，Flutter 再用完整 `NetworkImage` / `FileImage` 显示；布局缩放不等于请求较小 raster。调度器在 acquire 返回后接纳资源，现有账本不能证明在途解码峰值。
@@ -22,10 +22,10 @@
 
 ## 实施顺序
 
-1. **验收已实现的独立 Worker 与材料链。** C 适配、严格 TypeScript session/client/Worker、submodule、可复验 builder、Blob 输入、PNG 条带编码及 Web / Native 材料接线已实现。`pnpm image-codecs:check-worker` 已在 Codex 内置浏览器运行正式 catalog/client/VerifiedLoader/Worker，11 项覆盖逐片 PNG 字节与几何、ACK/pull、取消、截尾和错误后恢复。Node 24 项只提供独立 decoder/encoder 证据，旧探针 Web 机制继续保留原来源。portable 归档公开下载与 CI 门、Native 内置执行和冷启动另验。临时工程、下载与日志继续留在忽略目录，不以机制或构建成功关闭产品门。
-2. **建立统一的图片描述与所有权。** 分开表示插件处理后图片的逻辑尺寸、方向与实际 raster/分片尺寸，保持原图坐标与已有逻辑页键。通过 Protobuf 同步 Web/Native 描述和限额；源插件内部图形预算、传输字节、解码工作区、驻留 raster 分别计费。只有管线实测成立后才调整当前像素准入条件。
+1. **验收已实现的独立 Worker 与材料链。** C 适配、严格 TypeScript session/client/Worker、submodule、可复验 builder、Blob 输入、PNG 条带编码及 Web / Native 材料接线已实现。`pnpm image-codecs:check-worker` 已在 Codex 内置浏览器运行正式 catalog/client/VerifiedLoader/Worker，11 项覆盖逐片 PNG 字节与几何、ACK/pull、取消、截尾和错误后恢复。Node 24 项只提供独立 decoder/encoder 证据，旧探针 Web 机制继续保留原来源。portable 归档新空缓存公开下载已通过；Linux 工程 CI 已通过；Native 内置执行和冷启动另验。临时工程、下载与日志继续留在忽略目录，不以机制或构建成功关闭产品门。
+2. **建立统一的图片描述与所有权。** 分开表示插件处理后图片的逻辑尺寸、方向与实际 raster/分片尺寸，保持原图坐标与已有逻辑页键。通过 Protobuf 同步 Web/Native 描述和限额；源插件内部图形预算、传输字节、解码工作区、驻留 raster 分别计费。先将正文 END ACK 定义为编码页已收齐，再等 Java 成功结果与描述一致后打开 codec；codec 不占 Source 串行执行槽。只有管线实测成立后才调整当前像素准入条件。
 3. **接入宿主与终端。** 保留原 Source 的请求、Cookie、拦截器及处理结果；把解码后的可见窗口交给 Flutter，按实际物理视口请求足够清晰的 raster，禁止无意义放大。消费已接线的 Web Static Assets / Native 内置材料，并实测各端解析与执行，不回退读取远端 Native 材料。所有实际使用的 provider/cache key 都由资源池跟踪，替换、缩放和释放等待真实终态，不只淘汰原 provider。
-4. **完成预算与取消。** 解码启动前预留工作空间及输出，旧 raster 尚未释放时仍计费；在途取消、迟到解码、格式错误及预算拒绝均回收至明确终态。分片窗口、单边纹理限制、并发和预取纳入合计预算。
+4. **完成预算与取消。** 解码启动前预留工作空间及输出，旧 raster 尚未释放时仍计费；在途取消、迟到解码、格式错误及预算拒绝均回收至明确终态。顺序会话须继续 pull 至真实 terminal；不可把最后一片或可见片交付视为整页成功。通过有界顺序扫尾、非可见 PNG 丢弃/有界缓存，以及保留编码页供本地重新解码，支持任意滚动位置；不积存整页 raster 或全部 PNG。尾部失败须撤下同会话全部 provisional tiles 并释放其 Blob/文件与缓存。分片窗口、单边纹理限制、并发和预取纳入合计预算。
 5. **完成正式产品验收。** 原图首/中/末位置可辨；条漫、DPR、旋转、模式切换和缩放后恢复相同原图坐标。检查缓存变体全部释放、坏图后恢复与取消时所有权。Web 内置浏览器、iOS/Android 真机分别记录首图时间与进程/GPU 峰值；模拟器与替身 Widget 只算对应分层证据。
 
 ## 验收条件
