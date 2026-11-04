@@ -20,6 +20,19 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 当前精确锁定 `flutter_inappwebview 6.2.0-beta.3`，升级原因与官方 AGP 9 修复见[依赖记录](verification/native-dependencies.md)。插件没有暴露现有 Headless WebView 的公开原生 registry 或 `startDownload` 方法。Runner 内的薄插件使用公开 UIWindowScene/UIView 树发现 WKWebView，再同时核对 HTTPS 控制页和 document-start token，且必须恰有一个匹配。它不使用 KVC、私有 registry 或私有 WebKit API，也不接管插件的 navigation delegate。找不到或多重匹配会明确失败；此发现方式依赖锁定插件确实将 Headless view 挂入公开视图树，不是上游提供的稳定 accessor。
 
+文件交接是针对当前锁定插件的实现选择：让同一 WKWebView 内已经过 Source 处理的 Blob 落入受管文件，再由 Flutter 的文件图片路径解码，避免图片正文经过该插件的 JS/Dart 消息转换。它不是 iOS 必须先写文件的限制，也不代表文件方案已经比自建二进制桥或其它公开 WebKit 交接方式更快；磁盘副本、首屏延迟、CPU 与进程峰值仍需同条件测量。
+
+锁定的 iOS 联邦包为 `flutter_inappwebview_ios 1.2.0-beta.3`，见 [pub 锁文件](../apps/reader/pubspec.lock)。其公开 `WebMessage` 虽可标记 `ArrayBuffer`，但 JS → Dart 的 `WebMessagePort` 路径并非端到端原始二进制：
+
+1. [`Types/WebMessagePort.swift`](https://github.com/pichillilorenzo/flutter_inappwebview/blob/v6.2.0-beta.3/flutter_inappwebview_ios/ios/flutter_inappwebview_ios/Sources/flutter_inappwebview_ios/Types/WebMessagePort.swift) 注入的 `onmessage` 将 `event.data` 的 ArrayBuffer 用 `Array.from(new Uint8Array(event.data))` 转成 JS 数字数组，再调用 `onWebMessagePortMessageReceived` handler。
+2. [`PluginScriptsJS/JavaScriptBridgeJS.swift`](https://github.com/pichillilorenzo/flutter_inappwebview/blob/v6.2.0-beta.3/flutter_inappwebview_ios/ios/flutter_inappwebview_ios/Sources/flutter_inappwebview_ios/PluginScriptsJS/JavaScriptBridgeJS.swift) 的 `callHandler` 对参数数组执行 `JSON.stringify`，将得到的字符串放进 `args`，经 `window.webkit.messageHandlers.callHandler.postMessage` 发送。
+3. [`InAppWebView/InAppWebView.swift`](https://github.com/pichillilorenzo/flutter_inappwebview/blob/v6.2.0-beta.3/flutter_inappwebview_ios/ios/flutter_inappwebview_ios/Sources/flutter_inappwebview_ios/InAppWebView/InAppWebView.swift) 的同名 handler 将 `args` 字符串转成 UTF-8 Data，再由 `JSONSerialization.jsonObject` 解析，重建 `WebMessage` 并分发到对应 channel。
+4. [`Types/WebMessage.swift`](https://github.com/pichillilorenzo/flutter_inappwebview/blob/v6.2.0-beta.3/flutter_inappwebview_ios/ios/flutter_inappwebview_ios/Sources/flutter_inappwebview_ios/Types/WebMessage.swift) 在 `toMap()` 中处理 ArrayBuffer 数据；随后锁定包相对路径 `ios/flutter_inappwebview_ios/Sources/flutter_inappwebview_ios/InAppWebView/WebMessage/WebMessageChannelChannelDelegate.swift` 通过 Flutter method channel 的 `onMessage` 回调，Dart 的 `lib/src/web_message/web_message_channel.dart` 再调用 `WebMessage.fromMap`。后半段的 Flutter channel 不是 JSON 协议，但正文此前已经经历数字数组和 JSON 字符串转换。
+
+以上是锁定版本的源码事实，不是对所有 iOS/WebKit 二进制能力的概括。升级插件时应重新核对这些入口。当前文件桥绕开的是这条正文转换路径；同上下文 Blob 的归属、复制完成、实际取消与文件删除仍由本项目的生命周期控制负责，不能从 `ArrayBuffer` 类型名或下载成功推导出零拷贝和完整清理。
+
+后续可使用 [Pigeon](https://pub.dev/packages/pigeon) 替换本项目 Dart ↔ Swift 的 `bind/acquire/cancel/release/clear` 小控制及其描述符、确认和错误类型，不替换 Source ↔ TS 的 Protobuf 控制协议，也不把图片正文塞入生成控制消息。Pigeon 使用 `StandardMessageCodec`，本身支持平台通道的二进制类型；本项目限定其只传小控制，是为了保留独立的正文与所有权路径。仅更换 Dart ↔ Swift 的消息生成方式，不会改变上述 JS ↔ WebKit 的插件实现，也不能自动取得二进制交接或性能收益。
+
 绑定后，插件在同一个 WKWebView 上调用公开的 [`startDownload(using:completionHandler:)`](<https://developer.apple.com/documentation/webkit/wkwebview/startdownload(using:completionhandler:)>)，由 [`WKDownloadDelegate`](https://developer.apple.com/documentation/webkit/wkdownloaddelegate) 决定随机私有文件目标。只接受同 origin Blob，校验绑定的 Blob URL、声明长度、实际文件长度及普通文件类型，拒绝下载重定向与认证挑战。目录权限为 `0700`，文件为 `0600`；每次进程首次建立存储时移除自身目录中的崩溃残留。
 
 绑定有自身期限与一次完成 fence；迟到 JavaScript 探测不得再创建目录或 binding。下载任务在尚无 WKDownload handle 时强持 originating WKWebView。取消/clear 等待真实取消回调和文件删除，正常完成才归还预算。超过 1 秒宽限只返回 `runtime_lost` 并失效容器，不能伪造取消成功；无公开 handle 或回调永久不返回时保留有界 tombstone、容器和 reservation。晚到 handle 只取消，不重新登记为活动下载；真实停止后再删除文件、归还预算，并在 closed binding 排空后自动删除目录和表项。
