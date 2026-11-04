@@ -3,6 +3,7 @@ library;
 
 import 'dart:convert';
 import 'package:protobuf/protobuf.dart';
+import 'src/pb/karuyomi/v1/control.pb.dart' show EncodedImage;
 
 export 'src/pb/karuyomi/v1/control.pb.dart';
 
@@ -10,6 +11,33 @@ const controlJsonLimit = 8 * 1024 * 1024;
 const controlRequestLimit = 128 * 1024;
 const sourceMemoLimit = 64 * 1024;
 const controlJsonDepthLimit = 64;
+const encodedImageByteLimit = 8 * 1024 * 1024;
+const encodedImageRawWidthLimit = 4096;
+const encodedPngRawHeightLimit = 100000;
+const encodedJpegRawHeightLimit = 65500;
+
+/// An encoded page is not a decoded surface; raw pixels do not spend a raster budget.
+void checkEncodedImage(EncodedImage image) {
+  final maxHeight = switch (image.mimeType) {
+    'image/png' => encodedPngRawHeightLimit,
+    'image/jpeg' => encodedJpegRawHeightLimit,
+    _ => 0,
+  };
+  if (image.resourceId.isEmpty ||
+      image.resourceId.length > 200 ||
+      image.generation.isEmpty ||
+      image.generation.length > 200 ||
+      image.byteLength <= 0 ||
+      image.byteLength > encodedImageByteLimit ||
+      image.rawWidth <= 0 ||
+      image.rawWidth > encodedImageRawWidthLimit ||
+      image.rawHeight <= 0 ||
+      image.rawHeight > maxHeight ||
+      image.orientation < 1 ||
+      image.orientation > 8) {
+    throw const FormatException('Invalid encoded image descriptor');
+  }
+}
 
 /// Checks transport budgets, without duplicating the generated field schema.
 void _checkJsonNesting(Object? value) {

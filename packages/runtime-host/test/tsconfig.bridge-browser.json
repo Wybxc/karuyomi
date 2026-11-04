@@ -11,6 +11,7 @@
     "bitmap-lifetime-java-browser-suite.ts",
     "cache-failure-java-browser-worker.ts",
     "storage-namespace-browser-suite.ts",
-    "fixtures/storage-namespace-host.ts"
+    "fixtures/storage-namespace-host.ts",
+    "image-owner-browser-suite.ts"
   ]
 }

@@ -11,6 +11,8 @@ import {
 import {
   IMAGE_CHUNK_LIMIT,
   processedImageSchema,
+  encodedImageSchema,
+  type EncodedImage,
   type ProcessedImage,
 } from './image-control.ts';
 import {
@@ -28,7 +30,7 @@ export type ImageFrame =
       'seq'
     >)
   | ({ type: 'end' } & PlainMessage<pb.ImageEnd>)
-  | ({ type: 'ack'; resource?: ProcessedImage } & Pick<
+  | ({ type: 'ack'; resource?: ProcessedImage; encoded?: EncodedImage } & Pick<
       PlainMessage<pb.ImageAck>,
       'seq'
     >)
@@ -69,12 +71,19 @@ export function encodeImageFrame(frame: ImageFrame): ImageFrameWire {
       });
       break;
     case 'ack':
+      requireCondition(
+        !(frame.resource && frame.encoded),
+        'Ambiguous image ACK descriptor',
+      );
+      if (frame.resource) processedImageSchema.parse(frame.resource);
+      if (frame.encoded) encodedImageSchema.parse(frame.encoded);
       control = create(pb.ImageFrameControlSchema, {
         frame: {
           case: 'ack',
           value: {
             seq: frame.seq,
             ...(frame.resource ? { resource: frame.resource } : {}),
+            ...(frame.encoded ? { encoded: frame.encoded } : {}),
           },
         },
       });
@@ -126,6 +135,10 @@ export const imageFrameSchema = codec<ImageFrame>((input) => {
       return { type: 'end', ...plain(control.frame.value) };
     case 'ack': {
       const value = control.frame.value;
+      requireCondition(
+        !(value.resource && value.encoded),
+        'Ambiguous image ACK descriptor',
+      );
       return {
         type: 'ack',
         seq: value.seq,
@@ -133,6 +146,13 @@ export const imageFrameSchema = codec<ImageFrame>((input) => {
           ? {
               resource: processedImageSchema.parse(
                 messageJson(pb.ProcessedImageSchema, value.resource),
+              ),
+            }
+          : {}),
+        ...(value.encoded
+          ? {
+              encoded: encodedImageSchema.parse(
+                messageJson(pb.EncodedImageSchema, value.encoded),
               ),
             }
           : {}),

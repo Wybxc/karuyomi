@@ -2584,6 +2584,137 @@ class ProcessedImage extends $pb.GeneratedMessage {
   void clearHeight() => $_clearField(6);
 }
 
+/// A bounded Source-processed body with header metadata, not a decoded surface.
+class EncodedImage extends $pb.GeneratedMessage {
+  factory EncodedImage({
+    $core.String? resourceId,
+    $core.String? generation,
+    $core.String? mimeType,
+    $core.int? byteLength,
+    $core.int? rawWidth,
+    $core.int? rawHeight,
+    $core.int? orientation,
+  }) {
+    final result = EncodedImage._();
+    if (resourceId != null) result.resourceId = resourceId;
+    if (generation != null) result.generation = generation;
+    if (mimeType != null) result.mimeType = mimeType;
+    if (byteLength != null) result.byteLength = byteLength;
+    if (rawWidth != null) result.rawWidth = rawWidth;
+    if (rawHeight != null) result.rawHeight = rawHeight;
+    if (orientation != null) result.orientation = orientation;
+    return result;
+  }
+
+  EncodedImage._();
+
+  factory EncodedImage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      EncodedImage()..mergeFromBuffer(data, registry);
+  factory EncodedImage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      EncodedImage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EncodedImage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: EncodedImage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'resourceId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..aOS(3, _omitFieldNames ? '' : 'mimeType')
+    ..aI(4, _omitFieldNames ? '' : 'byteLength', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'rawWidth', fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'rawHeight', fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'orientation',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EncodedImage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EncodedImage copyWith(void Function(EncodedImage) updates) =>
+      super.copyWith((message) => updates(message as EncodedImage))
+          as EncodedImage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use EncodedImage() / EncodedImage.new instead')
+  static EncodedImage create() => EncodedImage._();
+  static $pb.GeneratedMessage $_createMessage() => EncodedImage._();
+  @$core.override
+  EncodedImage createEmptyInstance() => EncodedImage._();
+  @$core.pragma('dart2js:noInline')
+  static EncodedImage getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<EncodedImage>(
+          EncodedImage.$_createMessage);
+  static EncodedImage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get resourceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set resourceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasResourceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearResourceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get mimeType => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set mimeType($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMimeType() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMimeType() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get byteLength => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set byteLength($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasByteLength() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearByteLength() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get rawWidth => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set rawWidth($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRawWidth() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRawWidth() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get rawHeight => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set rawHeight($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRawHeight() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRawHeight() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get orientation => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set orientation($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasOrientation() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearOrientation() => $_clearField(7);
+}
+
 class ImageResource extends $pb.GeneratedMessage {
   factory ImageResource({
     $core.String? resourceId,
@@ -2918,10 +3049,12 @@ class ImageAck extends $pb.GeneratedMessage {
   factory ImageAck({
     $core.int? seq,
     ProcessedImage? resource,
+    EncodedImage? encoded,
   }) {
     final result = ImageAck._();
     if (seq != null) result.seq = seq;
     if (resource != null) result.resource = resource;
+    if (encoded != null) result.encoded = encoded;
     return result;
   }
 
@@ -2941,6 +3074,8 @@ class ImageAck extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'seq', fieldType: $pb.PbFieldType.OU3)
     ..aOM<ProcessedImage>(2, _omitFieldNames ? '' : 'resource',
         subBuilder: ProcessedImage.$_createMessage)
+    ..aOM<EncodedImage>(3, _omitFieldNames ? '' : 'encoded',
+        subBuilder: EncodedImage.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2982,6 +3117,18 @@ class ImageAck extends $pb.GeneratedMessage {
   void clearResource() => $_clearField(2);
   @$pb.TagNumber(2)
   ProcessedImage ensureResource() => $_ensure(1);
+
+  /// Exactly one descriptor is permitted on END ACK; neither on chunk ACKs.
+  @$pb.TagNumber(3)
+  EncodedImage get encoded => $_getN(2);
+  @$pb.TagNumber(3)
+  set encoded(EncodedImage value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEncoded() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEncoded() => $_clearField(3);
+  @$pb.TagNumber(3)
+  EncodedImage ensureEncoded() => $_ensure(2);
 }
 
 enum ImageFrameControl_Frame { meta, data, end, ack, abort, notSet }
@@ -4091,6 +4238,7 @@ enum ControlRequest_Command {
   rebuild,
   fetchApi,
   dispose,
+  acquireEncodedImage,
   notSet
 }
 
@@ -4108,6 +4256,7 @@ class ControlRequest extends $pb.GeneratedMessage {
     Empty? rebuild,
     ApiFetchRequest? fetchApi,
     Empty? dispose,
+    AcquireImage? acquireEncodedImage,
   }) {
     final result = ControlRequest._();
     if (requestId != null) result.requestId = requestId;
@@ -4122,6 +4271,8 @@ class ControlRequest extends $pb.GeneratedMessage {
     if (rebuild != null) result.rebuild = rebuild;
     if (fetchApi != null) result.fetchApi = fetchApi;
     if (dispose != null) result.dispose = dispose;
+    if (acquireEncodedImage != null)
+      result.acquireEncodedImage = acquireEncodedImage;
     return result;
   }
 
@@ -4147,13 +4298,14 @@ class ControlRequest extends $pb.GeneratedMessage {
     18: ControlRequest_Command.rebuild,
     19: ControlRequest_Command.fetchApi,
     20: ControlRequest_Command.dispose,
+    21: ControlRequest_Command.acquireEncodedImage,
     0: ControlRequest_Command.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlRequest.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOM<Empty>(10, _omitFieldNames ? '' : 'ready',
         subBuilder: Empty.$_createMessage)
@@ -4177,6 +4329,8 @@ class ControlRequest extends $pb.GeneratedMessage {
         subBuilder: ApiFetchRequest.$_createMessage)
     ..aOM<Empty>(20, _omitFieldNames ? '' : 'dispose',
         subBuilder: Empty.$_createMessage)
+    ..aOM<AcquireImage>(21, _omitFieldNames ? '' : 'acquireEncodedImage',
+        subBuilder: AcquireImage.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4212,6 +4366,7 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   ControlRequest_Command whichCommand() =>
       _ControlRequest_CommandByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -4225,6 +4380,7 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   void clearCommand() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -4356,6 +4512,17 @@ class ControlRequest extends $pb.GeneratedMessage {
   void clearDispose() => $_clearField(20);
   @$pb.TagNumber(20)
   Empty ensureDispose() => $_ensure(11);
+
+  @$pb.TagNumber(21)
+  AcquireImage get acquireEncodedImage => $_getN(12);
+  @$pb.TagNumber(21)
+  set acquireEncodedImage(AcquireImage value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasAcquireEncodedImage() => $_has(12);
+  @$pb.TagNumber(21)
+  void clearAcquireEncodedImage() => $_clearField(21);
+  @$pb.TagNumber(21)
+  AcquireImage ensureAcquireEncodedImage() => $_ensure(12);
 }
 
 enum ControlResponse_Result {
@@ -4368,6 +4535,7 @@ enum ControlResponse_Result {
   completed,
   api,
   error,
+  encodedImage,
   notSet
 }
 
@@ -4383,6 +4551,7 @@ class ControlResponse extends $pb.GeneratedMessage {
     Completed? completed,
     ApiFetchResponse? api,
     RuntimeError? error,
+    EncodedImage? encodedImage,
   }) {
     final result = ControlResponse._();
     if (requestId != null) result.requestId = requestId;
@@ -4395,6 +4564,7 @@ class ControlResponse extends $pb.GeneratedMessage {
     if (completed != null) result.completed = completed;
     if (api != null) result.api = api;
     if (error != null) result.error = error;
+    if (encodedImage != null) result.encodedImage = encodedImage;
     return result;
   }
 
@@ -4418,13 +4588,14 @@ class ControlResponse extends $pb.GeneratedMessage {
     16: ControlResponse_Result.completed,
     17: ControlResponse_Result.api,
     18: ControlResponse_Result.error,
+    19: ControlResponse_Result.encodedImage,
     0: ControlResponse_Result.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlResponse.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOM<RuntimeHello>(10, _omitFieldNames ? '' : 'hello',
         subBuilder: RuntimeHello.$_createMessage)
@@ -4444,6 +4615,8 @@ class ControlResponse extends $pb.GeneratedMessage {
         subBuilder: ApiFetchResponse.$_createMessage)
     ..aOM<RuntimeError>(18, _omitFieldNames ? '' : 'error',
         subBuilder: RuntimeError.$_createMessage)
+    ..aOM<EncodedImage>(19, _omitFieldNames ? '' : 'encodedImage',
+        subBuilder: EncodedImage.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4477,6 +4650,7 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(19)
   ControlResponse_Result whichResult() =>
       _ControlResponse_ResultByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -4488,6 +4662,7 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(19)
   void clearResult() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -4597,6 +4772,17 @@ class ControlResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(18);
   @$pb.TagNumber(18)
   RuntimeError ensureError() => $_ensure(9);
+
+  @$pb.TagNumber(19)
+  EncodedImage get encodedImage => $_getN(10);
+  @$pb.TagNumber(19)
+  set encodedImage(EncodedImage value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasEncodedImage() => $_has(10);
+  @$pb.TagNumber(19)
+  void clearEncodedImage() => $_clearField(19);
+  @$pb.TagNumber(19)
+  EncodedImage ensureEncodedImage() => $_ensure(10);
 }
 
 class OpenWorker extends $pb.GeneratedMessage {
@@ -4673,10 +4859,12 @@ class AcquireImageWorker extends $pb.GeneratedMessage {
   factory AcquireImageWorker({
     AcquireImage? request,
     $core.String? resourceId,
+    $core.bool? encodedOnly,
   }) {
     final result = AcquireImageWorker._();
     if (request != null) result.request = request;
     if (resourceId != null) result.resourceId = resourceId;
+    if (encodedOnly != null) result.encodedOnly = encodedOnly;
     return result;
   }
 
@@ -4696,6 +4884,7 @@ class AcquireImageWorker extends $pb.GeneratedMessage {
     ..aOM<AcquireImage>(1, _omitFieldNames ? '' : 'request',
         subBuilder: AcquireImage.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'resourceId')
+    ..aOB(3, _omitFieldNames ? '' : 'encodedOnly')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4739,6 +4928,15 @@ class AcquireImageWorker extends $pb.GeneratedMessage {
   $core.bool hasResourceId() => $_has(1);
   @$pb.TagNumber(2)
   void clearResourceId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get encodedOnly => $_getBF(2);
+  @$pb.TagNumber(3)
+  set encodedOnly($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEncodedOnly() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEncodedOnly() => $_clearField(3);
 }
 
 enum WorkerCommand_Command {
@@ -4909,7 +5107,15 @@ class WorkerCommand extends $pb.GeneratedMessage {
   Empty ensureShutdown() => $_ensure(5);
 }
 
-enum WorkerResponse_Result { session, source, image, closed, error, notSet }
+enum WorkerResponse_Result {
+  session,
+  source,
+  image,
+  closed,
+  error,
+  encodedImage,
+  notSet
+}
 
 class WorkerResponse extends $pb.GeneratedMessage {
   factory WorkerResponse({
@@ -4919,6 +5125,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
     ProcessedImage? image,
     Closed? closed,
     RuntimeError? error,
+    EncodedImage? encodedImage,
   }) {
     final result = WorkerResponse._();
     if (envelope != null) result.envelope = envelope;
@@ -4927,6 +5134,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
     if (image != null) result.image = image;
     if (closed != null) result.closed = closed;
     if (error != null) result.error = error;
+    if (encodedImage != null) result.encodedImage = encodedImage;
     return result;
   }
 
@@ -4946,13 +5154,14 @@ class WorkerResponse extends $pb.GeneratedMessage {
     12: WorkerResponse_Result.image,
     13: WorkerResponse_Result.closed,
     14: WorkerResponse_Result.error,
+    15: WorkerResponse_Result.encodedImage,
     0: WorkerResponse_Result.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'WorkerResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: WorkerResponse.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14])
+    ..oo(0, [10, 11, 12, 13, 14, 15])
     ..aOM<RpcEnvelope>(1, _omitFieldNames ? '' : 'envelope',
         subBuilder: RpcEnvelope.$_createMessage)
     ..aOM<RuntimeSession>(10, _omitFieldNames ? '' : 'session',
@@ -4965,6 +5174,8 @@ class WorkerResponse extends $pb.GeneratedMessage {
         subBuilder: Closed.$_createMessage)
     ..aOM<RuntimeError>(14, _omitFieldNames ? '' : 'error',
         subBuilder: RuntimeError.$_createMessage)
+    ..aOM<EncodedImage>(15, _omitFieldNames ? '' : 'encodedImage',
+        subBuilder: EncodedImage.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4994,6 +5205,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   WorkerResponse_Result whichResult() =>
       _WorkerResponse_ResultByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -5001,6 +5213,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   void clearResult() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -5068,6 +5281,17 @@ class WorkerResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(14);
   @$pb.TagNumber(14)
   RuntimeError ensureError() => $_ensure(5);
+
+  @$pb.TagNumber(15)
+  EncodedImage get encodedImage => $_getN(6);
+  @$pb.TagNumber(15)
+  set encodedImage(EncodedImage value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasEncodedImage() => $_has(6);
+  @$pb.TagNumber(15)
+  void clearEncodedImage() => $_clearField(15);
+  @$pb.TagNumber(15)
+  EncodedImage ensureEncodedImage() => $_ensure(6);
 }
 
 const $core.bool _omitFieldNames =

@@ -4,6 +4,7 @@ import {
   type SourceCall,
   type SourcePayload,
   processedImageSchema,
+  encodedImageSchema,
   encodeControlRequest,
   parseControlResponse,
 } from '@karuyomi/contracts';
@@ -60,11 +61,11 @@ afterEach(async () => {
 async function setup(
   acquire: NonNullable<RuntimeDriver['acquireImage']>,
   enabled = true,
+  acquireEncoded?: NonNullable<RuntimeDriver['acquireEncodedImage']>,
 ) {
   const build = await manifest();
-  const store = new ImageResourceStore({
-    decode: async () => ({ width: 2, height: 3, close() {} }),
-  });
+  const decode = vi.fn(async () => ({ width: 2, height: 3, close() {} }));
+  const store = new ImageResourceStore({ decode });
   const invoke = vi.fn(async (): Promise<SourcePayload> => ({
     case: 'mangaPage',
     value: create(pb.MangaPageSchema),
@@ -76,6 +77,7 @@ async function setup(
     ],
     invoke,
     acquireImage: acquire,
+    ...(acquireEncoded ? { acquireEncodedImage: acquireEncoded } : {}),
     closePageSession,
     close: async () => {},
   };
@@ -113,6 +115,7 @@ async function setup(
     workers,
     invoke,
     closePageSession,
+    decode,
   };
 }
 async function prepare(port: MessagePort, id: string) {
@@ -420,4 +423,146 @@ test('Native does not advertise or acquire Web Blob resources', async () => {
     code: 'unsupported_capability',
   });
   expect(acquire).not.toHaveBeenCalled();
+});
+
+async function prepareEncoded(port: MessagePort, id: string) {
+  const sink = new ImageSink(port, id, () => {}, true);
+  sinks.push(sink);
+  const handle = sink.open('image/png');
+  await sink.write(handle, pngHeader(1080, 18000));
+  return encodedImageSchema.parse(JSON.parse(await sink.close(handle)));
+}
+const unusedSmallImage = async (): Promise<never> => {
+  throw new Error('encoded operation must not call the small-image driver');
+};
+
+test('encoded reception waits for Java completion, then frees the Source slot without a raster decode', async () => {
+  const prepared = deferred<void>();
+  const java = deferred<void>();
+  const { manager, request, invoke, store, decode } = await setup(
+    unusedSmallImage,
+    true,
+    async (_source, _session, _page, port, id) => {
+      const result = await prepareEncoded(port, id);
+      prepared.resolve();
+      await java.promise;
+      return result;
+    },
+  );
+  const acquiring = manager.acquireEncodedImage(request);
+  const queued = manager.invoke(metadata(request, 'after-encoded'));
+  await prepared.promise;
+  expect(() =>
+    manager.borrowEncodedImage({
+      resourceId: 'unknown',
+      generation: request.generation,
+    }),
+  ).toThrow();
+  expect(invoke).not.toHaveBeenCalled();
+  expect(decode).not.toHaveBeenCalled();
+  java.resolve();
+  const descriptor = await acquiring;
+  await queued;
+  expect(invoke).toHaveBeenCalledOnce();
+  expect(descriptor).toMatchObject({
+    rawWidth: 1080,
+    rawHeight: 18000,
+    orientation: 1,
+  });
+  const reference = {
+    resourceId: descriptor.resourceId,
+    generation: descriptor.generation,
+  };
+  const lease = manager.borrowEncodedImage(reference);
+  try {
+    expect(new Uint8Array(await lease.blob.arrayBuffer())).toEqual(
+      pngHeader(1080, 18000),
+    );
+    await manager.releaseImage(reference);
+    expect(store.snapshot).toEqual({ resources: 1, bytes: 33, pixels: 0 });
+    expect(() => manager.borrowEncodedImage(reference)).toThrow();
+    // A codec can still own this encoded page while later Source calls run.
+    await manager.invoke(metadata(request, 'while-codec-borrows'));
+    expect(invoke).toHaveBeenCalledTimes(2);
+  } finally {
+    lease.release();
+  }
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
+});
+
+test('encoded cancellation waits for Source unwind and prevents a late successful descriptor from publishing', async () => {
+  const prepared = deferred<void>();
+  const java = deferred<void>();
+  const { manager, request, invoke, store } = await setup(
+    unusedSmallImage,
+    true,
+    async (_source, _session, _page, port, id) => {
+      const result = await prepareEncoded(port, id);
+      prepared.resolve();
+      await java.promise;
+      return result;
+    },
+  );
+  const acquiring = expect(
+    manager.acquireEncodedImage(request),
+  ).rejects.toMatchObject({ code: 'cancelled' });
+  await prepared.promise;
+  const queued = manager.invoke(metadata(request, 'after-encoded-cancel'));
+  let cancelled = false;
+  const stopping = manager
+    .cancelImage({
+      requestId: request.requestId,
+      generation: request.generation,
+    })
+    .then(() => {
+      cancelled = true;
+    });
+  await Promise.resolve();
+  expect(cancelled).toBe(false);
+  expect(invoke).not.toHaveBeenCalled();
+  java.resolve();
+  await stopping;
+  await acquiring;
+  await queued;
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0, pixels: 0 });
+});
+
+test('forged encoded Java metadata is rejected and host control returns the generated encoded descriptor', async () => {
+  const forged = await setup(
+    unusedSmallImage,
+    true,
+    async (_source, _session, _page, port, id) => ({
+      ...(await prepareEncoded(port, id)),
+      orientation: 8,
+    }),
+  );
+  await expect(
+    forged.manager.acquireEncodedImage(forged.request),
+  ).rejects.toMatchObject({ code: 'protocol_error' });
+  expect(forged.store.snapshot.resources).toBe(0);
+  const current = await setup(
+    unusedSmallImage,
+    true,
+    async (_source, _session, _page, port, id) => prepareEncoded(port, id),
+  );
+  vi.stubGlobal('window', { addEventListener: vi.fn() });
+  const api = installRuntime(current.manager);
+  const response = parseControlResponse(
+    await api.control(
+      encodeControlRequest(
+        create(pb.ControlRequestSchema, {
+          requestId: 'encoded-control',
+          command: { case: 'acquireEncodedImage', value: current.request },
+        }),
+      ),
+    ),
+  );
+  expect(response.result.case).toBe('encodedImage');
+  if (response.result.case !== 'encodedImage')
+    throw new Error('encoded response missing');
+  expect(response.result.value.rawHeight).toBe(18000);
+  await current.manager.releaseImage({
+    resourceId: response.result.value.resourceId,
+    generation: response.result.value.generation,
+  });
 });

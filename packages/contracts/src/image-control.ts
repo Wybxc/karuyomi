@@ -17,6 +17,10 @@ export const IMAGE_PIXEL_LIMIT = 16 * 1024 * 1024;
 export const IMAGE_RESIDENT_PIXEL_LIMIT = 32 * 1024 * 1024;
 export const IMAGE_RESOURCE_LIMIT = 6;
 export const IMAGE_HEADER_LIMIT = 1024 * 1024;
+export const ENCODED_IMAGE_BODY_LIMIT = 8 * 1024 * 1024;
+export const ENCODED_IMAGE_WIDTH_LIMIT = 4096;
+export const ENCODED_IMAGE_HEIGHT_LIMIT = 100000;
+export const ENCODED_JPEG_HEIGHT_LIMIT = 65500;
 
 // MIME support is a business capability, not a duplicate message structure.
 export const imageMimeTypeSchema = z.enum([
@@ -36,6 +40,9 @@ export type ProcessedImage = Omit<
   PlainMessage<pb.ProcessedImage>,
   'mimeType'
 > & { mimeType: ImageMimeType };
+export type EncodedImage = Omit<PlainMessage<pb.EncodedImage>, 'mimeType'> & {
+  mimeType: 'image/png' | 'image/jpeg';
+};
 export type ImageResource = Omit<PlainMessage<pb.ImageResource>, 'mimeType'> & {
   mimeType: ImageMimeType;
 };
@@ -90,6 +97,30 @@ export const processedImageSchema = codec<ProcessedImage>((input) => {
     'Invalid processed image budget',
   );
   return { ...value, mimeType };
+});
+export const encodedImageSchema = codec<EncodedImage>((input) => {
+  const value = plainMessage(pb.EncodedImageSchema, input);
+  [value.resourceId, value.generation].forEach(validId);
+  requireCondition(
+    value.mimeType === 'image/png' || value.mimeType === 'image/jpeg',
+    'Unsupported encoded image format',
+  );
+  const heightLimit =
+    value.mimeType === 'image/jpeg'
+      ? ENCODED_JPEG_HEIGHT_LIMIT
+      : ENCODED_IMAGE_HEIGHT_LIMIT;
+  requireCondition(
+    value.byteLength > 0 &&
+      value.byteLength <= ENCODED_IMAGE_BODY_LIMIT &&
+      value.rawWidth > 0 &&
+      value.rawWidth <= ENCODED_IMAGE_WIDTH_LIMIT &&
+      value.rawHeight > 0 &&
+      value.rawHeight <= heightLimit &&
+      value.orientation >= 1 &&
+      value.orientation <= 8,
+    'Invalid encoded image budget or orientation',
+  );
+  return { ...value, mimeType: value.mimeType };
 });
 export const imageResourceSchema = codec<ImageResource>((input) => {
   const value = plainMessage(pb.ImageResourceSchema, input);

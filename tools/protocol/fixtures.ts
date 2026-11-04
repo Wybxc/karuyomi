@@ -90,6 +90,16 @@ export const imageResource: JsonObject = {
   url: 'blob:https://reader.invalid/golden',
 };
 
+export const encodedImage: JsonObject = {
+  resourceId: 'encoded-golden',
+  generation,
+  mimeType: 'image/png',
+  byteLength: 8 * 1024 * 1024,
+  rawWidth: 1080,
+  rawHeight: 40000,
+  orientation: 8,
+};
+
 const descriptor: JsonObject = {
   buildId,
   packageName,
@@ -190,6 +200,23 @@ const envelope: JsonObject = {
 };
 
 export const goldenFixtures: GoldenFixture[] = [
+  {
+    name: 'image-frame-encoded-ack',
+    type: 'ImageFrameControl',
+    value: { ack: { seq: 3, encoded: encodedImage } },
+  },
+  {
+    name: 'worker-command-encoded-image',
+    type: 'WorkerCommand',
+    value: {
+      envelope,
+      acquireImage: {
+        request: imageRequest,
+        resourceId: 'encoded-golden',
+        encodedOnly: true,
+      },
+    },
+  },
   { name: 'manga-full-opaque-memo', type: 'Manga', value: manga },
   {
     name: 'manga-absent-optionals',
@@ -291,6 +318,7 @@ export const goldenFixtures: GoldenFixture[] = [
       ],
       ['cancel', { requestId, generation }],
       ['acquireImage', imageRequest],
+      ['acquireEncodedImage', imageRequest],
       ['cancelImage', { requestId, generation }],
       ['releaseImage', { resourceId: 'resource-golden', generation }],
       ['closePageSession', { pageSessionId: 'session-golden', generation }],
@@ -324,6 +352,7 @@ export const goldenFixtures: GoldenFixture[] = [
       ],
       ['session', session],
       ['image', imageResource],
+      ['encodedImage', encodedImage],
       ['released', { released: true }],
       ['closed', { closed: true }],
       ['completed', { completed: true }],
@@ -398,6 +427,7 @@ export const goldenFixtures: GoldenFixture[] = [
           height: 2048,
         },
       ],
+      ['encodedImage', encodedImage],
       ['closed', { closed: true }],
       ['error', error],
     ] satisfies Array<[string, JsonObject]>

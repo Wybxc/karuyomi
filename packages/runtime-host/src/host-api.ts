@@ -84,6 +84,15 @@ function createRuntimeApi(manager: SourceRuntimeManager) {
               ),
             };
             break;
+          case 'acquireEncodedImage':
+            result = {
+              case: 'encodedImage',
+              value: create(
+                pb.EncodedImageSchema,
+                await manager.acquireEncodedImage(plain(request.command.value)),
+              ),
+            };
+            break;
           case 'cancelImage':
             result = {
               case: 'released',

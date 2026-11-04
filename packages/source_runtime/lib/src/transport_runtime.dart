@@ -99,6 +99,8 @@ final class TransportSourceRuntime implements SourceRuntime {
       wire.ControlRequest_Command.cancel => request.cancel.generation,
       wire.ControlRequest_Command.acquireImage =>
         request.acquireImage.generation,
+      wire.ControlRequest_Command.acquireEncodedImage =>
+        request.acquireEncodedImage.generation,
       wire.ControlRequest_Command.cancelImage => request.cancelImage.generation,
       wire.ControlRequest_Command.releaseImage =>
         request.releaseImage.generation,
@@ -125,17 +127,31 @@ final class TransportSourceRuntime implements SourceRuntime {
         wire.ControlResponse(),
         await transport.control(wire.encodeProtoJson(request)),
       );
+      final ownsEncodedResult =
+          command == wire.ControlRequest_Command.acquireEncodedImage &&
+          response.whichResult() == wire.ControlResponse_Result.encodedImage;
       if (response.requestId != request.requestId) {
+        // A typed resource returned to this acquisition still needs cleanup
+        // when its envelope is rejected. Never address a foreign generation.
+        if (ownsEncodedResult && response.encodedImage.resourceId.isNotEmpty) {
+          await releaseImage(
+            ImageReleaseRequest(
+              resourceId: response.encodedImage.resourceId,
+              generation: request.acquireEncodedImage.generation,
+            ),
+          );
+        }
         throw const RuntimeException(
           RuntimeErrorCode.protocolError,
           'Control response identity mismatch',
         );
       }
-      // A late image must reach acquireImage's ownership cleanup below. Other
+      // A late image must reach its acquisition ownership cleanup below. Other
       // stale replies cannot publish API/Source/session data into a new epoch.
       final ownsImageResult =
-          command == wire.ControlRequest_Command.acquireImage &&
-          response.whichResult() == wire.ControlResponse_Result.image;
+          (command == wire.ControlRequest_Command.acquireImage &&
+              response.whichResult() == wire.ControlResponse_Result.image) ||
+          ownsEncodedResult;
       if (!current() && !ownsImageResult) throw expired;
       if (response.whichResult() == wire.ControlResponse_Result.error) {
         throw RuntimeException.fromProto(response.error);
@@ -170,6 +186,7 @@ final class TransportSourceRuntime implements SourceRuntime {
           failure.code == RuntimeErrorCode.timeout &&
           {
             wire.ControlRequest_Command.acquireImage,
+            wire.ControlRequest_Command.acquireEncodedImage,
             wire.ControlRequest_Command.cancelImage,
             wire.ControlRequest_Command.releaseImage,
             wire.ControlRequest_Command.closePageSession,
@@ -404,8 +421,7 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
   }
 
-  @override
-  Future<ImageResource> acquireImage(ImageAcquireRequest request) async {
+  RuntimeSession _imageRequestSession(ImageAcquireRequest request) {
     final session = _session;
     if (session == null ||
         request.generation != session.generation ||
@@ -427,6 +443,69 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Invalid image control request',
       );
     }
+    return session;
+  }
+
+  @override
+  Future<wire.EncodedImage> acquireEncodedImage(
+    ImageAcquireRequest request,
+  ) async {
+    final session = _imageRequestSession(request);
+    final epoch = _epoch;
+    final response = (await _exchange(
+      wire.ControlRequest(
+        acquireEncodedImage: wire.AcquireImage(
+          requestId: request.requestId,
+          sourceId: request.sourceId,
+          pageSessionId: request.pageSessionId,
+          pageKey: request.pageKey,
+          generation: request.generation,
+          timeoutMs: request.timeout.inMilliseconds,
+        ),
+      ),
+      wire.ControlResponse_Result.encodedImage,
+    )).encodedImage;
+    try {
+      try {
+        wire.checkEncodedImage(response);
+      } on FormatException {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Invalid encoded image descriptor',
+        );
+      }
+      if (response.generation != session.generation) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Encoded image generation mismatch',
+        );
+      }
+      if (_disposed ||
+          epoch != _epoch ||
+          _session?.generation != session.generation) {
+        throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Discarded a stale encoded image',
+        );
+      }
+      response.freeze();
+      return response;
+    } catch (_) {
+      if (response.resourceId.isNotEmpty) {
+        await releaseImage(
+          ImageReleaseRequest(
+            resourceId: response.resourceId,
+            generation: request.generation,
+          ),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<ImageResource> acquireImage(ImageAcquireRequest request) async {
+    final session = _imageRequestSession(request);
     final epoch = _epoch;
     final response = (await _exchange(
       wire.ControlRequest(

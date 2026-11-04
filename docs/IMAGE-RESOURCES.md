@@ -4,6 +4,8 @@
 
 当前合同使用 `karuyomi-source-host-v3`：Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI，控制边界采用 Protobuf 生成模型和标准 ProtoJSON。控制信封 protocolVersion 为 2，HTTP bridgeVersion 为 2；三者含义不同。旧 ABI 的 AOT、客户端和材料必须同步重建，不混合部署。历史 v2 图片实测结果保留其原始身份，不能作为 v3 运行验收。
 
+本轮新增 `EncodedImage/acquireEncodedImage`，将编码页接纳与完整图显示分开。Java桥仍原样传递小描述，protocolVersion=2、hostAbi v3不变；代码、协议与固定依赖变化仍进入 `hostFingerprint/materialVersion`。编码页与独立tile store已实现，尚未串接正式tile控制和Reader；不新增旧版本兼容层，也不把元数据接纳当作长图阅读通过。
+
 ## 原始 Page 与逻辑页
 
 `pages` 返回 `pageSessionId` 及 `pages`，每项包含 `pageKey/index/sourceIndex/url/imageUrl`。Java 在有界会话表中保留原 Source 返回的 Page 实例，包括其可变字段和子类；图片阶段不能用 DTO 重新构造 Page。会话绑定创建它的 Source 实例，Worker generation 或 build 改变时全部失效。
@@ -12,7 +14,7 @@
 
 章节导航负责关闭 Page 会话。释放显示资源与关闭 Page 会话是不同操作：前者撤销已交付的 Blob，后者解除 Java 原始 Page 引用。两者都必须在取消、路由离开及容器失效时清理。
 
-## 处理与所有权
+## 完整图处理与所有权
 
 ```mermaid
 sequenceDiagram
@@ -57,11 +59,32 @@ HTTP handle 只属于当前 Source 调用，调用结束清理。图片资源归
 
 像素预算只估算图片 surface（按 RGBA 为 64 / 128 MiB），不能代表浏览器进程合计峰值。浏览器解码无法中断时，取消也须等其完成并 close 后才能归还计数，不能用提前删除资源表来绕过总预算。
 
-当前 16 Mi 像素准入会拒绝 1080×20000 等长图；终端仍显示完整原图，现有窗口账本不包含所有 codec 临时对象。真正的长图降采样/分片尚未实现，不能仅调高限额或加入 Flutter 缩放便认定峰值受控。候选库、平台限制与后续步骤见[解码设计](design/reader-image-decoding.md)和[长图计划](plan/reader-image-decoding.md)。
+现有Reader完整图路径仍会按16 Mi像素拒绝1080×20000等长图，窗口账本也不包含所有codec临时对象。独立codec/tile基础和下述编码页合同已经实现，但尚未接入正式阅读器；不能仅接纳编码页、调高限额或加入Flutter缩放便认定产品显示与峰值受控。范围及后续步骤见[解码设计](design/reader-image-decoding.md)和[长图计划](plan/reader-image-decoding.md)。
+
+## 编码页描述与独立tile所有权
+
+`acquireEncodedImage()` 仍调用原Page、`getImageUrl/getImage`及Source处理后的正文，不另请求原图。Protobuf的 `EncodedImage` 只含 `resourceId/generation/mimeType/byteLength/rawWidth/rawHeight/orientation`，由Buf生成双端模型并在TS/Dart运行时校验；不含URL，也不向Dart交付整页文件或PNG。
+
+| 编码页范围              | 当前上限          |
+| ----------------------- | ----------------- |
+| 正文格式 / 单页编码字节 | PNG或JPEG / 8 MiB |
+| 原始宽 / PNG原始高      | 4096 / 100000     |
+| JPEG原始高 / EXIF方向   | 65500 / 1..8      |
+| 流DATA / 未确认块       | 64 KiB / 1块      |
+
+原始尺寸不按完整 `width*height` 申请raster预算。collector以固定 `image-dimensions` 检查头部，以固定 `exifr 7.1.3` 读取完整有界 `Uint8Array` 的方向元数据；PNG eXIf可能位于IDAT之后，因此不能只读取前缀作为方向依据。metadata输入副本最多8 MiB，是额外JS内存，不是零复制或已解码surface；方向值已保留不等于八种EXIF方向显示已验证。
+
+END只在编码正文收齐、字节/头部/元数据校验后返回ACK；END ACK恰含完整图 `resource` 或编码页 `encoded` 之一，普通DATA ACK不带描述。编码页ACK不表示decode成功。manager等Java成功结果与暂存描述一致后，才允许 `publishEncoded()` 和 `borrowEncoded()`；坏尾、具体codec不支持与真实像素解码仍由后续decoder判定，Java失败或结果不一致不得借出Blob。
+
+编码Blob留在host，borrow得到单独lease。owner release后禁止新borrow；已有borrow继续保留正文和预算，最后一个lease释放才归还。编码页仍占共享Source资源表的资源数/字节预算，但不虚构完整原图像素分配。Dart的 `SourceRuntime.acquireEncodedImage()` 只接收冻结描述，校验预算、方向、requestId和generation；无效或替换后迟到描述按原generation通过 `releaseImage` 清理。Native通用control直接传描述，不进入原完整图文件copy路径。
+
+独立 `ImageTileStore` 已实现单活动codec、有界扫尾、窗口PNG缓存和缺片本地重扫。PNG缓存≤16 MiB，显示lease≤64份且合计≤32 Mi像素；失效片在显示owner确认释放前继续计费。store不创建Blob URL或Native文件，尚未接到编码页borrow、正式tile控制与Reader。后续adapter须消费 `invalidatedLeaseIds`，等待widget/overlay pin、实际provider cache eviction及文件/URL释放，再确认 `releaseTile()`；上层在 `removePage()` 等到codec终态后才归还编码页borrow。它不积存完整raster或全部页PNG，也不构成真实缓存/设备峰值验收。
+
+本轮Source链、Dart与严格TS检查通过，TS↔Dart新增协议也已通过真实双端codec交叉验证；命令和范围见[编码页证据](verification/encoded-image-ownership.md)。合成正文的真实Web owner机制已通过，范围见同一记录。既有独立codec浏览器11项不自动成为本轮Source编码页或store的真实浏览器证据；真实Source长图、Reader、Native内置执行与EXIF方向显示仍未验收。
 
 ## 控制与清理
 
-接口为 `acquireImage({requestId,sourceId,pageSessionId,pageKey,generation,timeoutMs?})`、`cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})` 和 `closePageSession({pageSessionId,generation})`。release 幂等，重复释放不能复活资源。旧 generation 的结果不能落入当前会话。
+获取接口为 `acquireImage({requestId,sourceId,pageSessionId,pageKey,generation,timeoutMs?})` 与同字段的 `acquireEncodedImage()`；清理共用 `cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})` 和 `closePageSession({pageSessionId,generation})`。release幂等，重复释放不能复活资源，旧generation结果不能落入当前会话。编码页没有对外URL可撤销，release结束owner接纳权并按borrow存续保留计费。
 
 ACK 和图片取消不能排在 Source 串行锁后等待。取消先终止图片 sink 与相应 HTTP 句柄，再等待当前 Java 调用退出；`teaDone/teaFail` 没有调用身份，提前解锁会使迟到回调污染下一次操作。超过取消宽限只能回收整个 Worker、失效 generation，并由客户端重新打开章节，不能静默复用旧 Page 会话。
 

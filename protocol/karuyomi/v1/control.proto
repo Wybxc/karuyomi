@@ -203,6 +203,16 @@ message ProcessedImage {
   uint32 width = 5;
   uint32 height = 6;
 }
+// A bounded Source-processed body with header metadata, not a decoded surface.
+message EncodedImage {
+  string resource_id = 1;
+  string generation = 2;
+  string mime_type = 3;
+  uint32 byte_length = 4;
+  uint32 raw_width = 5;
+  uint32 raw_height = 6;
+  uint32 orientation = 7;
+}
 message ImageResource {
   string resource_id = 1;
   string generation = 2;
@@ -228,6 +238,8 @@ message ImageEnd {
 message ImageAck {
   uint32 seq = 1;
   optional ProcessedImage resource = 2;
+  // Exactly one descriptor is permitted on END ACK; neither on chunk ACKs.
+  optional EncodedImage encoded = 3;
 }
 message ImageFrameControl {
   oneof frame {
@@ -327,6 +339,7 @@ message ControlRequest {
     Empty rebuild = 18;
     ApiFetchRequest fetch_api = 19;
     Empty dispose = 20;
+    AcquireImage acquire_encoded_image = 21;
   }
 }
 message ControlResponse {
@@ -341,6 +354,7 @@ message ControlResponse {
     Completed completed = 16;
     ApiFetchResponse api = 17;
     RuntimeError error = 18;
+    EncodedImage encoded_image = 19;
   }
 }
 
@@ -351,6 +365,7 @@ message OpenWorker {
 message AcquireImageWorker {
   AcquireImage request = 1;
   string resource_id = 2;
+  bool encoded_only = 3;
 }
 message WorkerCommand {
   RpcEnvelope envelope = 1;
@@ -370,5 +385,6 @@ message WorkerResponse {
     ProcessedImage image = 12;
     Closed closed = 13;
     RuntimeError error = 14;
+    EncodedImage encoded_image = 15;
   }
 }

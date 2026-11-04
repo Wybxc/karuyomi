@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:test/test.dart';
 
 final class ImageRuntime implements SourceRuntime {
@@ -11,6 +12,9 @@ final class ImageRuntime implements SourceRuntime {
   final result = Completer<ImageResource>();
   final cancelAck = Completer<void>();
   final releaseAck = Completer<void>();
+  @override
+  Future<wire.EncodedImage> acquireEncodedImage(ImageAcquireRequest request) =>
+      throw UnimplementedError();
   @override
   Future<ImageResource> acquireImage(ImageAcquireRequest request) {
     acquisitions.add(request);

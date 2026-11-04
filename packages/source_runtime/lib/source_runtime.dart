@@ -16,6 +16,9 @@ abstract interface class SourceRuntime {
   Future<SourceResult> invoke(SourceRequest request);
   Future<void> cancel(String requestId);
   Future<ImageResource> acquireImage(ImageAcquireRequest request);
+
+  /// A processed encoded page remains host-owned; no raster or URL crosses here.
+  Future<wire.EncodedImage> acquireEncodedImage(ImageAcquireRequest request);
   Future<void> cancelImage(ImageCancelRequest request);
   Future<void> releaseImage(ImageReleaseRequest request);
   Future<void> closePageSession(PageSessionRef session);

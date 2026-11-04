@@ -48,7 +48,8 @@
     "image-codecs:check": "node scripts/check-image-codecs.ts",
     "image-codecs:prepare-artifacts": "node scripts/prepare-image-codec-artifacts.ts",
     "image-codecs:package": "node scripts/package-image-codec-artifacts.ts",
-    "image-codecs:check-worker": "node scripts/check-image-codec-worker.ts"
+    "image-codecs:check-worker": "node scripts/check-image-codec-worker.ts",
+    "image-codecs:check-owners": "node scripts/check-image-owners.ts"
   },
   "devDependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",

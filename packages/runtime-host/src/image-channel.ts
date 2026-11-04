@@ -5,6 +5,7 @@ import {
   type RuntimeErrorData,
   type ImageFrame,
   type ProcessedImage,
+  type EncodedImage,
 } from '@karuyomi/contracts';
 import { RuntimeFailure } from './errors.js';
 
@@ -26,11 +27,13 @@ export class ImageSink {
   private pending:
     | {
         seq: number;
-        resolve(value: ProcessedImage | undefined): void;
+        final: boolean;
+        resolve(value: ProcessedImage | EncodedImage | undefined): void;
         reject(error: unknown): void;
       }
     | undefined;
-  private opened: Promise<ProcessedImage | undefined> | undefined;
+  private opened:
+    Promise<ProcessedImage | EncodedImage | undefined> | undefined;
   private writing = false;
   private finished = false;
   private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
@@ -39,6 +42,7 @@ export class ImageSink {
     private readonly port: MessagePort,
     private readonly resourceId: string,
     private readonly cancelled: (error: RuntimeFailure) => void,
+    private readonly encodedOnly = false,
   ) {
     port.onmessage = (event) => {
       const parsed = imageFrameSchema.safeParse(event.data);
@@ -54,7 +58,21 @@ export class ImageSink {
       } else if (message.type === 'ack' && this.pending?.seq === message.seq) {
         const pending = this.pending;
         this.pending = undefined;
-        pending.resolve(message.resource);
+        if (message.resource || message.encoded) {
+          if (
+            !pending.final ||
+            (this.encodedOnly ? !message.encoded : !message.resource)
+          ) {
+            const error = new RuntimeFailure(
+              'protocol_error',
+              'Image acknowledgement mode mismatch',
+            );
+            pending.reject(error);
+            this.abort(error);
+            return;
+          }
+        }
+        pending.resolve(this.encodedOnly ? message.encoded : message.resource);
       } else
         this.abort(
           new RuntimeFailure(
@@ -184,7 +202,7 @@ export class ImageSink {
   private exchange(
     frame: ImageFrame,
     transfer: Transferable[] = [],
-  ): Promise<ProcessedImage | undefined> {
+  ): Promise<ProcessedImage | EncodedImage | undefined> {
     if (this.failure) return Promise.reject(this.failure);
     if (this.pending)
       return Promise.reject(
@@ -193,6 +211,7 @@ export class ImageSink {
     return new Promise((resolve, reject) => {
       this.pending = {
         seq: frame.type === 'abort' ? -1 : frame.seq,
+        final: frame.type === 'end',
         resolve,
         reject,
       };
