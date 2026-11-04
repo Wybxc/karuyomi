@@ -4,6 +4,8 @@
 
 选择 **Protobuf `.proto` 作为唯一消息定义，Buf 管理生成与格式，Protobuf-ES 和 Google Dart 插件生成双端模型及 codec；小型控制消息先使用标准 ProtoJSON**。这个选择针对当前 Flutter、Worker、WebView 和 Node 工具边界，不以未经测量的序列化性能作为依据。
 
+当前各实际边界、quicktype/OpenAPI/FlatBuffers/GraphQL 与平台通道的适用范围见[数据交换评估](data-exchange-boundaries.md)。Protobuf 主控不意味着所有文件、原生平台通道和二进制 ABI 都必须套用同一种方案。
+
 ## 比较
 
 IDL 定义消息结构，encoding 定义字节表示，transport 管理投递和生命周期，三者分别选择。Protobuf 可以用 binary 或 ProtoJSON；换编码不会自动解决重复手写 DTO。Protobuf-ES 用同一份生成 schema 支持这两种编码。[官方序列化说明](https://protobufes.com/guides/serialization/)

@@ -20,6 +20,16 @@
 2. iOS 模拟器正式 NativePlatformRuntime 已通过真实 Headless 握手和受控 Blob 文件交接，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。固定 `a15c030` 的真实 Source 首中末文件、取消与容器重建也已分项通过；固定 `d76e8a4` 的双端 Native 图片机制、SQLite 真重启及 iOS 原 xkcd 正式 ReaderScreen/进度恢复也已通过分项，输入与测试驱动范围见[Native 记录](../verification/native-dependencies.md)；固定 `8eef7b4` 的 Android 原 xkcd Reader/force-stop 恢复及退出也已通过分项，仍须验收当前 Cache v3 材料、物理设备和生产 Access。编译、mock 和 Dart golden 不能替代这些门。
 3. 新材料与静态快照、生产 Access 分项验收后再更新部署记录。固定 `022d828` v1 队列保持独立，尚不能部署为当前协议成果。
 
+## 后续边界评估
+
+当前主控合同继续沿用 Protobuf；本节是新增评估和待办，不将选型建议写成已实施能力。完整范围与官方依据见[数据交换边界评估](../design/data-exchange-boundaries.md)。
+
+- 自有 iOS 文件 MethodChannel 优先使用 Pigeon 生成 Dart/Swift API；保持正文走 WKDownload 文件、原绑定与清理 ACK。不重写第三方 Android WebMessagePort 插件。
+- Native runtime manifest 与注入配置仍有手写 shape：对比 JSON Schema + quicktype 和加入现有 .proto 的维护成本，只保留一个权威结构来源。已在 .proto 的扩展索引/BuildManifest 不另建 schema 副本。
+- Java HostDto/Gson 尚未生成：以真实 DTO 做 TeaVM/AOT 小范围对照，核对 protobuf/javalite 与 quicktype 的编译、正确性、包大小和启动/解析成本。quicktype 默认 Java 使用 Jackson，只有 POJO 不等于 Gson/TeaVM codec 已可用。
+- HTTP 接口增长时以 OpenAPI 描述端点、鉴权、状态码和 SDK，复用既有 DTO；当前不为少量 bootstrap 请求重写运行时主控。
+- 现无证明需要 FlatBuffers 的大型结构化随机访问数据，也无 GraphQL 查询图服务；保持二进制正文与 C/WASM ABI，按真实需求再评估。
+
 ## 验收
 
 - 改一份 `.proto` 能稳定重建两端模型和 codec，CI 能发现未提交的生成变化；生成物无手改。
