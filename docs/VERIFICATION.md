@@ -180,6 +180,10 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 `pnpm check`、`pnpm flutter:check` 与产品 Web/API dry-run 构建通过；Java 图片 oracle 对 seed 和正式 HttpSource 两套签名均通过。该历史输入的 Web 终端有 encoded/pixel/resource 总预算、头部预检与实际 decode；随后内部 Bitmap/ImageDecoder 的二进制与合计账本进展见下节。不能据此声称图片解密/重排、动画/超长图、进程/GPU 合计峰值、Native 受管文件或 P0 已通过。
 
+## 长图 codec 机制
+
+2026-11-04，固定 libspng v0.7.3 / WASM 在 Node Worker 对 1080×20000 和 1080×40000 合成 RGBA8 非交错 PNG 完成顺序行解码，完整流 SHA 匹配编码前原始 RGBA 生成基准、首/中/末区域 SHA 匹配独立 libpng oracle，实际非共享 heap 为 16 MiB。64 KiB 单块 ACK 背压、首块后协作取消与缺失 IEND 的尾部拒绝分别通过，C 请求 payload 账本归零、Worker 自然退出。同一 WASM 在内置 Chromium 156 无 SAB / 跨源隔离的真实 Web Worker 五项分测通过，首/中/末区域实际可见且 SHA 匹配；额外首块 terminate 只证明观察窗无后续消息，不声称测得 heap 回收。服务已正常 exit=0、端口释放。输入、构建工具偏差及限制见[长图机制证据](verification/long-image-codec.md)。它不是原 Source 内容、随机区域/LOD、Flutter/Native 集成或进程/GPU 峰值验收，正式 16 Mi 像素准入尚未调整。
+
 ## 内部 graphics 二进制与预算
 
 2026-11-03，Bitmap、两套 ImageDecoder 和字体输入已将整图正文改为不超过 64 KiB 的 JSO 字节块，小 JSON 只传控制与 handle。尺寸查询先用锁定的 image-dimensions 解析至多 1 MiB 头部，不为 bounds 完整解码。账本分别覆盖可见 payload、surface、decoder/Frame、字体、临时副本和不可中断任务的工作预留；Source 持有的 Bitmap/decoder/Frame 不因普通调用结束被扫描删除，取消与迟到结果保留相应所有权直到任务真正退出。

@@ -2,7 +2,7 @@
 
 ## 状态与范围
 
-状态：**设计审查完成，正式长图解码路径尚未实现，P0 超长图门未通过**。本轮以主仓库 `4645ade` 和仓库固定 Flutter `3.47.5` 做源码审查，并读取固定版本上游实现；没有引入依赖、执行候选 codec、测量进程内存或改动产品路径。本文的方案和候选库能力不能作为运行证据。
+状态：**libspng/WASM 已通过 Node 与 Web 顺序解码机制，正式长图路径尚未实现，P0 超长图门未通过**。最初设计以主仓库 `4645ade` 和仓库固定 Flutter `3.47.5` 做源码审查；2026-11-04 进一步在 Node 与 Codex 内置浏览器实际执行固定 libspng 的两张超 16 Mi 像素合成 PNG、背压、取消与尾部错误，见[codec 证据](../verification/long-image-codec.md)。该实验未改变产品准入，没有测量进程/GPU 峰值；独立机制与正式 Source/Flutter/Native 验收分别维护。
 
 目标是在既定 Flutter + TeaVM 架构中，经未修改 Source 的正式图片链，显示超过当前 16 Mi 像素限制的长图。需要同时解决真实解码、按需显示、缩放、原图坐标恢复和资源峰值；保留 16 Mi 拒绝只能说明现有限额生效。
 
@@ -101,6 +101,12 @@ wrapper 的 MIT 标识不覆盖全部底层库。该 npm 包的 `THIRD-PARTY-NOT
 - iOS/Android 可以评估相同 WASM 在现有受管 WebView 中运行，但实际 SAB、worker、内置材料解析和 heap 成本均未验。本轮没有得到可以声明三端共享默认 wasm-vips 成功的证据。
 - Native 也可以通过平台绑定调用同版本 libvips C API，读取现有受管文件并输出小 tile；需要 iOS/Android 的可复现交叉构建、GLib 及所需 codec 依赖，维护成本高于一个 Dart package。libvips 的[上游构建说明](https://github.com/libvips/libvips/tree/v8.18.7) 可作为依赖依据，不能用桌面编译成功代替移动端构建和真机峰值。
 - Android `BitmapRegionDecoder` 是另一条成熟的原生候选，可避免在 Android 再装完整 libvips；如果采用，需要与 Web/iOS 分别验证格式、采样、EXIF 和色彩输出，三端仍共享业务协议而非实现假设。
+
+## libspng 顺序 PNG 机制与采用边界
+
+固定 `libspng v0.7.3` 的 progressive row API 已在独立 Node Worker 与 Codex 内置浏览器的 Web Worker 中实际运行：1080×20000 / 1080×40000 的合成 RGBA8 非交错 PNG，在实际 16 MiB 非共享 WASM heap 中顺序输出全部像素。Node 完整流 SHA 匹配编码前原始 RGBA 生成基准；Node 和 Web 的首/中/末区域 SHA 分别匹配独立 libpng oracle，Web 未计算完整流 SHA。单个 256 行条带加 64 KiB ACK 通道没有建立完整 raster；首块取消会关闭 C 上下文。仅删除 IEND 的文件在全部行输出后仍失败，说明正式片资源必须能因后部错误整体作废。具体输入、构建器偏差、计量范围和剩余格式见[实验记录](../verification/long-image-codec.md)。
+
+这使 libspng 成为顺序 PNG 路径的实际候选，尚不能宣布整套终端 codec 已选定。正式接入前应固定可复现工具链、上游 submodule、颜色/透明与方向合同，完成 Native 内置资源及正式终端集成验证。RGB/灰度/调色板 tRNS、Adam7、16-bit、JPEG/WebP 等不套用这两张 RGBA 素材的结果；JPEG 仍需另验成熟的扫描行/缩放库。随机区域、反向读取、tile 编码和实际 Flutter 显示仍是后续实现门。
 
 ## 下一轮正式实现的结构
 

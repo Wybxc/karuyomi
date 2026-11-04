@@ -17,7 +17,7 @@
 | 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；Web、Native 机制和双端模拟器原 xkcd 分项通过，生产部署及剩余运行门待验收                              |
 | P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | 有界组合存储、xkcd Web/Native Cache 与 Web A→B→A 后 304 正文复用通过；版本更新、更多 Source 与生产取消待验收                             |
 | P0 文字布局子计划    | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收               |
-| P0 图片解码子计划    | [阅读器长图与终端解码](reader-image-decoding.md)              | 当前 16 Mi 像素准入和完整解码尚不能支持更长图片；成熟解码管线、分片所有权及真实设备峰值待实施与验收                                      |
+| P0 图片解码子计划    | [阅读器长图与终端解码](reader-image-decoding.md)              | libspng/WASM 的 Node / Web 顺序 PNG 机制分项通过；当前产品仍受 16 Mi 准入限制，正式分片所有权及真实设备峰值待实施与验收                  |
 | 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                       |
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
