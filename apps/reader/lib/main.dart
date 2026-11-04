@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'data/reader_database.dart';
+import 'diagnostics/reader_baseline.dart';
+import 'diagnostics/reader_baseline_host.dart';
 import 'features/reader/reading_progress_controller.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
@@ -31,6 +33,9 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Karuyomi',
+    builder: readerBaselineEnabled
+        ? (context, child) => ReaderBaselineHost(child: child!)
+        : null,
     debugShowCheckedModeBanner: false,
     locale: const Locale('zh'),
     supportedLocales: const [Locale('zh'), Locale('en')],

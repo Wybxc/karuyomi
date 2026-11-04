@@ -18,7 +18,7 @@
 
 默认材料、候选 assets/tile store 的三文件 35 项 Vitest 通过；默认 catalog 的 imageCodecs 为空且准备器未调用。候选正式模块、Worker 与迁移后的测试分别经严格 TypeScript 检查通过；测试的 browser bundle 使用 esbuild 支持的 TypeScript 语法，运行库本身继续要求 erasableSyntaxOnly。
 
-完整 `pnpm flutter:check` 已通过：Reader core 20 项、SourceRuntime 37 项、Flutter 应用 124 项；所有分析和官方 Drift 生成一致性检查通过。实际 PNG provider 回归确认观察者与 Image 共用一次 load/decode，覆盖同步缓存、坏编码、卸载后迟到和暂停。它们是工程测试，未启动本轮真实 Source 产品阅读。
+完整 `pnpm flutter:check` 已通过：Reader core 20 项、SourceRuntime 37 项、Flutter 应用 124 项；所有分析和官方 Drift 生成一致性检查通过。实际 PNG provider 回归确认观察者与 Image 共用一次 load/decode，覆盖同步缓存、坏编码、卸载后迟到和暂停。它们是工程测试；后续诊断性真实 Source 产品阅读分项单列如下。
 
 Native Dart 定向 30 项通过，覆盖迟到原响应的正常/错 requestId/错 generation 与 host/本地释放失败组合、挂起控制随 close 结束、clear ACK 前保留文件及并发 release。Xcode 27.2（27B52）/ iOS 26.4（23E244）Simulator 的正式 `NativeImageFilesTests` 11/11 通过，xcodebuild exit=0；测试新启动的 iPhone 17 Pro 已关闭，Booted devices 为空。日志与 xcresult 位于忽略目录 `.local/ui-image-boundary/native-image-files-20261104.*`。这不等于真实 Source/Native Reader 或物理设备验收。
 
@@ -39,11 +39,31 @@ contracts、runtime-host 与工具严格类型检查通过，依赖检查未发�
 
 TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSON/二进制往返及语义校验，覆盖空 ImageMeta、三字段内部 ACK、四字段对外资源，以及拒绝旧 MIME、非空 meta 和 encodedOnly 字段。该跨语言验证不执行浏览器或 Native 容器。
 
-默认材料测试确认 imageCodecs 为空、来源为 null 且候选准备器未调用。源码审查确认 Source host 无客户端 codec 导入，默认 build 与 Native 装配无 codec 输出路径；正常重建后的成品已按上述文件集核对，没有沿用旧 dist 目录证明新默认打包行为。以上均为工程/协议证据，未执行本轮真实 Source 阅读、浏览器交互或性能测试。
+默认材料测试确认 imageCodecs 为空、来源为 null 且候选准备器未调用。源码审查确认 Source host 无客户端 codec 导入，默认 build 与 Native 装配无 codec 输出路径；正常重建后的成品已按上述文件集核对，没有沿用旧 dist 目录证明新默认打包行为。以上均为工程/协议证据，不包含后续单列的真实 Source 浏览器分项或性能测试。
 
 ### Java 交付适配
 
 `pnpm teavm:check` 已通过：原 seed 和正式自有 HttpSource 两套 `ImageTest` 各 8,355 断言，包括响应 `contentType()` 会抛错的输入仍可原样交付。原请求头、Cookie、getImageUrl/getImage、子类 Page、cacheless/progress 与原 Source 图片处理语义不变。本项为 JVM oracle，不等于新 AOT 的真实 Source 运行验收。
+
+## 新合同的诊断性 Web 分项
+
+固定 `c294c71a95382834df82ba6871e1c87ad54da560` 的独立 `ui-image-baseline-validation/karuyomi` 工作树，在 Codex 内置浏览器、正式 `lib/main.dart` Web release、隔离 workerd/D1 与 RS256 测试身份下，通过原版 xkcd `3319: Elevators` 的漫画页和原 `TextInterceptor` 文字页。手动改为单页后，第 2/2 页文字实际可见；显式完成显示“本地进度已保存／本章已读完”，退出返回详情后“继续阅读”首次恢复末页文字与完成状态。此项是同一标签页中的路由重开，不是浏览器进程重启、生产 Access、Native 或性能门。
+
+原 JAR SHA-256 为 `4071fdc5b90c473938d33f7e94c71b2a1a79fb33a00a32d0baa035ac4697cc9d`，本轮 AOT canonical JS 为 `b04dacb990df567cdb08c2155845d2936bf4c93be948fbd42dce8836a5b38e34`，材料仍为上述 `0b2ce107…f6ff`。构建和正式运行没有改动原 Source/JAR，也没有用原图 URL 替代文字处理。
+
+准备过程中发现旧 `hostSubmodules()` 会从未初始化的候选 codec 目录向上找到父仓库，导致本树 host 指纹错误包含父提交。诊断 buildId `ext-all.xkcd-ce8b19debe9b65d53c82fa75c08fdf40` 的指纹为 `832ae9f93415090979c2c2aa6a7adc39311f36f0f898a4bfebfda5a2237411bd`，只保留其固定输入下的功能观察，不作为修复后的发布身份或性能基线。当前构建器的 Source 必需依赖收敛为 TeaVM/Suwayomi，后续须重新计划和构建。
+
+原始构建与网络报告保存在该树 ignored `.local/ui-image-baseline/`。页面已关闭，服务会话退出 130 后另行确认端口 8930、Node 与 workerd 子进程均消失，并仅删除匹配本 buildId 的临时静态快照和 D1；退出码本身不作为清理证明。UI 成功不等于内部 Blob/缓存账本或进程/GPU 峰值归零。
+
+## 默认关闭的采集入口工程验收
+
+正式 app 已接入默认关闭的 `READER_BASELINE` 采集入口，使用方法与数据含义见[采集说明](../READER-BASELINE.md)。它复用实际 provider/ImageStream、布局后 viewport 与官方 FrameTiming，不更换图片实现；默认 release 不挂载记录器或性能面板。
+
+完整 `pnpm check`、`pnpm flutter:check`、默认 `pnpm build` 与提交前完整格式检查通过。Flutter 三包分别为 20、37、130 项测试；新增回归覆盖真实 provider 仍只 decode 一次、离屏图片不冒充当前可见页、raw 帧号关联、限额/收尾、迟到 acquire/release 跨采集隔离，以及默认/显式启用的 app shell。
+
+完整套件首轮暴露 raw timing 测试依赖尚未初始化的 engine frameNumber；该失败日志保留。锁定 SDK 没有对应 testValue setter，测试现通过明确标记的实例级测试 reader 固定帧号，生产默认仍读真实 PlatformDispatcher，未知帧号仍拒绝，未放宽匹配。之后完整 Flutter 检查 130 项通过。详细日志在 main ignored `.local/ui-image-boundary/baseline-*.log`，不作为性能数据。
+
+截至本项工程验收，尚未在新采集入口执行真实运行采样，不能报告首图/跳转分布或帧性能通过；CPU、RSS、GPU 与物理呈现均未采集。P0 保持先用最简单直接的实现完成真实流程，再按实测瓶颈优化。
 
 ## 性能依据与下一门
 
@@ -51,4 +71,4 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 顺序扫尾、反向跳转时重扫、PNG 再编码和跨端复制的成本须实测。下一步先记录 UI 直接解码的冷热首帧、首/中/末跳转、往返滚动与缩放，再在相同输入上比较候选方案的 CPU、帧耗时、RSS/GPU 和总峰值。标准见[设计](../design/reader-image-decoding.md)，实施顺序见[计划](../plan/reader-image-decoding.md)。
 
-本轮未执行新合同的真实 Source 阅读或 Native/浏览器产品交互，未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。
+当前仅新增上述诊断性 Web 路由阅读分项，未重新完成 Native 产品交互，也未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。

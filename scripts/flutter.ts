@@ -100,7 +100,13 @@ async function main(): Promise<void> {
       await prepareDatabaseAssets();
       await run(
         flutter,
-        ['build', 'web', '--release', '--no-web-resources-cdn'],
+        [
+          'build',
+          'web',
+          '--release',
+          '--no-web-resources-cdn',
+          ...process.argv.slice(3),
+        ],
         { cwd: path.join(root, 'apps/reader') },
       );
       break;

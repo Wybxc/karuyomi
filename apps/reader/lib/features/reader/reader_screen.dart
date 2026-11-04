@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
+import '../../diagnostics/reader_baseline.dart';
 import 'resource_image.dart';
 import 'resource_pool.dart';
 
@@ -83,6 +85,8 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen> {
+  ReaderBaselineRecorder? _baseline;
+  int _navigationEpoch = 0;
   late final ReaderController _reader;
   late ImageScheduler _scheduler;
   late ReaderResourcePool _resourcePool;
@@ -109,6 +113,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void initState() {
     super.initState();
+    _baseline = ReaderBaselineScope.read(context);
+    _baseline?.event('reader_attached', {
+      'chapterKey': widget.manifest.chapterKey,
+      'generation': widget.generation,
+    });
     widget.onAttached?.call();
     _reader = ReaderController(
       manifest: widget.manifest,
@@ -135,6 +144,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (requested.chapterKey != _reader.manifest.chapterKey) return;
     final resolved = resolvePosition(_reader.manifest, requested).position;
     if (resolved == null) return;
+    _navigation('position_request', {
+      'targetPageKey': resolved.pageKey,
+      'targetIndex': resolved.pageIndexHint,
+    });
     _restoring = true;
     _transform.value = Matrix4.identity();
     _reader.goToPage(resolved.pageIndexHint, offset: resolved.normalizedOffset);
@@ -148,6 +161,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _resourcePool = ReaderResourcePool(
       widget.provider,
       evict: widget.imageEvictor,
+      baseline: _baseline,
     );
     _scheduler = ImageScheduler(provider: _resourcePool);
     _imagesSubscription = _scheduler.changes.listen((snapshot) {
@@ -163,7 +177,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _scheduleViewport() {
-    if (_viewportScheduled || widget.onViewportChanged == null) return;
+    if (_viewportScheduled ||
+        (widget.onViewportChanged == null && _baseline?.recording != true)) {
+      return;
+    }
     _viewportScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _viewportScheduled = false;
@@ -172,6 +189,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       final manifest = _reader.manifest;
       if ((!_reader.isContinuous && !_transform.value.isIdentity()) ||
           ModalRoute.of(context)?.isCurrent == false) {
+        _recordViewport(const [], snapshot, blocked: true);
         widget.onViewportChanged?.call(
           ReaderViewportState(
             current: _reader.position!,
@@ -223,6 +241,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
               shown.last,
               offset: shown.last == visible.last ? bottomOffset : 1,
             );
+      if (_baseline?.recording == true) {
+        final offsets = _reader.isContinuous ? _offsets : null;
+        final contentVisible = offsets == null
+            ? visible
+            : visible
+                  .where(
+                    (index) =>
+                        offsets[index] + _pageHeight(manifest.pages[index]) >
+                        _scroll.offset,
+                  )
+                  .toList();
+        _recordViewport(contentVisible, snapshot);
+      }
       widget.onViewportChanged?.call(
         ReaderViewportState(
           current: _reader.position!,
@@ -238,6 +269,62 @@ class _ReaderScreenState extends State<ReaderScreen> {
     });
     // A decoder or another post-frame callback may run after the last frame.
     WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _recordViewport(
+    List<int> visible,
+    ImageSchedulerSnapshot snapshot, {
+    bool blocked = false,
+  }) {
+    final baseline = _baseline;
+    if (baseline?.recording != true) return;
+    final position = _reader.position;
+    baseline!.event('viewport', {
+      'chapterKey': _reader.manifest.chapterKey,
+      'generation': widget.generation,
+      'frameNumber': ui.PlatformDispatcher.instance.frameData.frameNumber,
+      'viewportWidth': _viewportWidth,
+      'viewportHeight': _viewportHeight,
+      'scrollOffset': _scroll.hasClients ? _scroll.offset : null,
+      'mode': _reader.mode.name,
+      'blockedByRouteOrTransform': blocked,
+      'navigationEpoch': _navigationEpoch,
+      'manifestVersion': _reader.manifest.version,
+      'currentPageKey': position?.pageKey,
+      'currentIndex': position?.pageIndexHint,
+      'normalizedOffset': position?.normalizedOffset,
+      'visible': [
+        for (final index in visible)
+          {
+            'pageKey': _reader.manifest.pages[index].key,
+            'index': index,
+            'resourceId':
+                snapshot.resources[_reader.manifest.pages[index].key]?.id,
+            'resourceGeneration': snapshot
+                .resources[_reader.manifest.pages[index].key]
+                ?.generation,
+            'decoded': _decodedResources.contains(
+              snapshot.resources[_reader.manifest.pages[index].key]?.id,
+            ),
+          },
+      ],
+    });
+  }
+
+  void _navigation(String action, [Map<String, Object?> data = const {}]) {
+    if (_baseline?.recording != true) return;
+    final index = data['targetIndex'];
+    _baseline!.event('navigation', {
+      'action': action,
+      'chapterKey': _reader.manifest.chapterKey,
+      'generation': widget.generation,
+      'fromPageKey': _reader.position?.pageKey,
+      'manifestVersion': _reader.manifest.version,
+      'navigationEpoch': ++_navigationEpoch,
+      if (index is int && index >= 0 && index < _reader.manifest.pages.length)
+        'targetPageKey': _reader.manifest.pages[index].key,
+      ...data,
+    });
   }
 
   void _scheduleDimensions() {
@@ -381,6 +468,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (_reader.manifest.pages.isEmpty) return;
     final height = _pageHeight(_reader.manifest.pages[index]);
     final offset = ((top - offsets[index]) / height).clamp(0.0, 1.0);
+    _navigation('scroll', {
+      'targetIndex': index,
+      'offset': offset,
+      'scrollOffset': top,
+    });
     _reader.updateViewportAnchor(index, offset: offset);
     _syncWindow();
     final position = _reader.position;
@@ -415,6 +507,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _layout({ReadingMode? mode, bool? doublePage}) {
+    _navigation('layout', {'mode': mode?.name, 'doublePage': doublePage});
     if (doublePage != null) _doublePageOverride = doublePage;
     _transform.value = Matrix4.identity();
     _reader.setLayout(mode: mode, doublePage: doublePage);
@@ -432,12 +525,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _goTo(int index) {
     if (_reader.manifest.pages.isEmpty) return;
     _transform.value = Matrix4.identity();
+    _navigation('jump', {'targetIndex': index});
     _reader.goToPage(index);
     _scheduleRestore();
   }
 
   void _advance() {
     if (!_reader.canAdvance) return;
+    _navigation('advance', {
+      'targetPageKey': _reader.spreads[_reader.spreadIndex + 1].pages.first.key,
+    });
     _reader.advance();
     _transform.value = Matrix4.identity();
     _scheduleRestore();
@@ -445,6 +542,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _back() {
     if (!_reader.canGoBack) return;
+    _navigation('back', {
+      'targetPageKey': _reader.spreads[_reader.spreadIndex - 1].pages.first.key,
+    });
     _reader.back();
     _transform.value = Matrix4.identity();
     _scheduleRestore();
@@ -564,6 +664,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _openZoom(ReaderPage page) {
     final resource = _scheduler.snapshot.resources[page.key];
     if (resource == null) return;
+    _navigation('open_zoom', {'targetPageKey': page.key});
     final pool = _resourcePool;
     final scheduler = _scheduler;
     final pin = pool.pin(resource.id);
@@ -871,9 +972,30 @@ class _ReaderScreenState extends State<ReaderScreen> {
     unawaited(_imagesSubscription?.cancel());
     final scheduler = _scheduler;
     final onClosed = widget.onClosed;
+    final baseline = _baseline;
+    final exitCapture = baseline?.recording == true ? baseline!.session : null;
+    final exitIdentity = {
+      'chapterKey': _reader.manifest.chapterKey,
+      'generation': widget.generation,
+      'manifestVersion': _reader.manifest.version,
+    };
+    baseline?.event('reader_exit_requested', exitIdentity);
     final cleanup = () async {
-      await scheduler.dispose();
-      await onClosed?.call();
+      try {
+        await scheduler.dispose();
+        await onClosed?.call();
+        if (exitCapture != null && exitCapture == baseline?.session) {
+          baseline?.event('reader_exit_ack', exitIdentity);
+        }
+      } catch (error) {
+        if (exitCapture != null && exitCapture == baseline?.session) {
+          baseline?.event('reader_exit_error', {
+            ...exitIdentity,
+            'errorType': error.runtimeType.toString(),
+          });
+        }
+        rethrow;
+      }
     }();
     widget.onClosing?.call(cleanup);
     unawaited(cleanup);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:reader_core/reader_core.dart';
 
 import '../../data/reading_progress.dart';
+import '../../diagnostics/reader_baseline.dart';
 import '../browse/catalog_controller.dart';
 import 'chapter_sequence.dart';
 import 'chapter_preparation.dart';
@@ -218,6 +219,11 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
 
   Future<void> _move(SequenceChapter target) {
     if (_busy || _closing || target.key == _chapter.key) return Future.value();
+    ReaderBaselineScope.read(context)?.event('navigation', {
+      'action': 'change_chapter',
+      'fromChapterKey': _chapter.key,
+      'targetChapterKey': target.key,
+    });
     setState(() {
       _busy = true;
       _error = null;

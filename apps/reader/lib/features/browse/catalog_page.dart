@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/reading_progress.dart';
+import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
@@ -345,6 +346,10 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
     if (sequence == null) return;
     setState(() => _opening = true);
     final selected = sequence.entries[index];
+    ReaderBaselineScope.read(context)?.event('navigation', {
+      'action': 'open_chapter',
+      'targetChapterKey': selected.key,
+    });
     final opened = await controller.openChapter(
       manga,
       ChapterEntry(selected.snapshot),

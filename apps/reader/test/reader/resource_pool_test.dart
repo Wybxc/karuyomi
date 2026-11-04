@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/reader/resource_pool.dart';
+import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:reader_core/reader_core.dart';
 
 final class PoolFixture implements PageProvider {
   final releases = <String>[];
+  Completer<void>? releaseGate;
   @override
   Future<ImageResource> acquire(PageRef page) async => ImageResource(
     id: 'image',
@@ -17,18 +19,63 @@ final class PoolFixture implements PageProvider {
   @override
   Future<void> release(String resourceId) async {
     releases.add(resourceId);
+    await releaseGate?.future;
   }
 }
 
 void main() {
   testWidgets(
+    'release ACK remains owned but does not leak into a new capture',
+    (tester) async {
+      final baseline = ReaderBaselineRecorder(
+        flushDuration: const Duration(milliseconds: 10),
+      )..start();
+      addTearDown(baseline.dispose);
+      final fixture = PoolFixture()..releaseGate = Completer<void>();
+      final pool = ReaderResourcePool(fixture, baseline: baseline);
+      await pool.acquire(
+        const PageRef(
+          requestId: 'r',
+          chapterKey: 'c',
+          pageKey: 'p',
+          generation: 'g',
+        ),
+      );
+      final release = pool.release('image');
+      final stopped = baseline.stop();
+      await tester.pump(const Duration(milliseconds: 10));
+      await stopped;
+      expect(
+        (baseline.export()['events'] as List).map((e) => e['type']),
+        contains('release_sent'),
+      );
+      baseline.start();
+      fixture.releaseGate!.complete();
+      await release;
+      final next = baseline.stop();
+      await tester.pump(const Duration(milliseconds: 10));
+      await next;
+      expect(
+        (baseline.export()['events'] as List).map((e) => e['type']),
+        isNot(contains('release_ack')),
+      );
+      expect(fixture.releases, ['image']);
+    },
+  );
+
+  testWidgets(
     'scheduler release waits for widget and overlay pins, then cache eviction',
     (tester) async {
+      final baseline = ReaderBaselineRecorder(
+        flushDuration: const Duration(milliseconds: 10),
+      )..start();
+      addTearDown(baseline.dispose);
       final fixture = PoolFixture();
       final events = <String>[];
       final eviction = Completer<void>();
       final pool = ReaderResourcePool(
         fixture,
+        baseline: baseline,
         evict: (image) async {
           events.add('evict');
           await eviction.future;
@@ -60,6 +107,17 @@ void main() {
       expect(fixture.releases, ['image']);
       await pool.release('image');
       expect(fixture.releases, hasLength(1));
+      final stopped = baseline.stop();
+      await tester.pump(const Duration(milliseconds: 10));
+      await stopped;
+      final captured = (baseline.export()['events'] as List)
+          .cast<Map<String, Object?>>();
+      expect(
+        captured
+            .map((e) => e['type'])
+            .where((name) => (name as String).startsWith('release_')),
+        ['release_requested', 'release_sent', 'release_ack'],
+      );
     },
   );
 }

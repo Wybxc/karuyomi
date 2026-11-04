@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/features/reader/resource_image.dart';
 import 'package:reader_core/reader_core.dart';
 
@@ -70,6 +72,90 @@ Widget screen({
 );
 
 void main() {
+  testWidgets(
+    'baseline keeps visible pages distinct from prefetch and fences late reader exit',
+    (tester) async {
+      final baseline = ReaderBaselineRecorder(
+        flushDuration: const Duration(milliseconds: 10),
+      )..start();
+      addTearDown(baseline.dispose);
+      final provider = FixturePageProvider();
+      final closeGate = Completer<void>();
+      Future<void>? closing;
+      await tester.pumpWidget(
+        ReaderBaselineScope(
+          recorder: baseline,
+          child: MaterialApp(
+            home: ReaderScreen(
+              manifest: fixtureChapter(),
+              provider: provider,
+              generation: 'runtime-1',
+              doublePage: false,
+              imageBuilder: fixtureImage,
+              imageEvictor: (_) async {},
+              onClosed: () => closeGate.future,
+              onClosing: (value) => closing = value,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        provider.acquired.map((e) => e.pageKey),
+        containsAll(['page-0', 'page-1']),
+      );
+      await tester.tap(find.byTooltip('下一页'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      final stopped = baseline.stop();
+      await tester.pump(const Duration(milliseconds: 10));
+      await stopped;
+      final captured = (baseline.export()['events'] as List)
+          .cast<Map<String, Object?>>();
+      final viewports = captured
+          .where((e) => e['type'] == 'viewport')
+          .map((e) => e['data'] as Map<String, Object?>)
+          .toList();
+      expect(viewports, isNotEmpty);
+      final first = viewports.first;
+      expect((first['visible'] as List).map((e) => e['pageKey']), ['page-0']);
+      expect(
+        (first['visible'] as List).every((e) => e['decoded'] == false),
+        true,
+      );
+      final afterAdvance = viewports.last;
+      expect(afterAdvance['currentPageKey'], 'page-1');
+      expect(afterAdvance['navigationEpoch'], 1);
+      expect(afterAdvance['manifestVersion'], '1');
+      expect(
+        (afterAdvance['visible'] as List).single['resourceId'],
+        'runtime-1-page-1',
+      );
+      final navigation =
+          captured.singleWhere((e) => e['type'] == 'navigation')['data']
+              as Map<String, Object?>;
+      expect(navigation['targetPageKey'], 'page-1');
+      expect(captured.map((e) => e['type']), contains('reader_exit_requested'));
+      expect(
+        captured.map((e) => e['type']),
+        isNot(contains('reader_exit_ack')),
+      );
+      baseline.start();
+      closeGate.complete();
+      expect(closing, isNotNull);
+      await closing!;
+      final next = baseline.stop();
+      await tester.pump(const Duration(milliseconds: 10));
+      await next;
+      expect(
+        (baseline.export()['events'] as List).map((e) => e['type']),
+        isNot(contains('reader_exit_ack')),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'manual single-page preference survives progress panel and viewport changes',
     (tester) async {

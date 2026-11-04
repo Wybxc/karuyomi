@@ -1,4 +1,6 @@
+import 'dart:ui' as ui;
 import 'package:flutter/widgets.dart';
+import '../../diagnostics/reader_baseline.dart';
 import 'package:reader_core/reader_core.dart';
 import 'resource_image_web.dart'
     if (dart.library.io) 'resource_image_native.dart'
@@ -64,6 +66,9 @@ class _ResourceImageState extends State<ResourceImage> {
   bool _scheduled = false;
   bool _errorNotified = false;
   int _epoch = 0;
+  ReaderBaselineRecorder? _baseline;
+  ({int session, int epoch, int frame})? _lastBaselineFrame;
+  ({int session, int epoch})? _baselineErrorIdentity;
 
   @override
   void initState() {
@@ -75,6 +80,7 @@ class _ResourceImageState extends State<ResourceImage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _baseline = ReaderBaselineScope.read(context);
     _paused =
         !TickerMode.valuesOf(context).enabled ||
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
@@ -138,6 +144,13 @@ class _ResourceImageState extends State<ResourceImage> {
 
   void _onImage(ImageInfo info, bool synchronousCall) {
     try {
+      _baseline?.event('image_info', {
+        'resourceId': widget.resource.id,
+        'generation': widget.resource.generation,
+        'width': info.image.width,
+        'height': info.image.height,
+        'synchronousCall': synchronousCall,
+      });
       _dimensions = ImageDimensions(
         width: info.image.width,
         height: info.image.height,
@@ -151,6 +164,17 @@ class _ResourceImageState extends State<ResourceImage> {
   }
 
   void _onError(Object error, StackTrace? stack) {
+    final baseline = _baseline;
+    if (baseline != null &&
+        baseline.recording &&
+        _baselineErrorIdentity != (session: baseline.session, epoch: _epoch)) {
+      _baselineErrorIdentity = (session: baseline.session, epoch: _epoch);
+      baseline.event('image_error', {
+        'resourceId': widget.resource.id,
+        'generation': widget.resource.generation,
+        'errorType': error.runtimeType.toString(),
+      });
+    }
     _error = error;
     _dimensions = null;
     _hasFrame = false;
@@ -184,6 +208,13 @@ class _ResourceImageState extends State<ResourceImage> {
         return;
       }
       _notifiedDimensions = dimensions;
+      _baseline?.event('image_post_frame', {
+        'resourceId': widget.resource.id,
+        'generation': widget.resource.generation,
+        'width': dimensions.width,
+        'height': dimensions.height,
+        'frameNumber': ui.PlatformDispatcher.instance.frameData.frameNumber,
+      });
       if (_paused) _stopListening(keepAlive: true);
       ReaderImageDecoded(
         widget.resource.id,
@@ -202,6 +233,25 @@ class _ResourceImageState extends State<ResourceImage> {
     excludeFromSemantics: true,
     frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
       if (frame != null && _error == null) {
+        final baseline = _baseline;
+        if (baseline != null && baseline.recording) {
+          final identity = (
+            session: baseline.session,
+            epoch: _epoch,
+            frame: frame,
+          );
+          if (_lastBaselineFrame != identity) {
+            _lastBaselineFrame = identity;
+            baseline.event('image_frame', {
+              'resourceId': widget.resource.id,
+              'generation': widget.resource.generation,
+              'imageFrame': frame,
+              'synchronouslyLoaded': wasSynchronouslyLoaded,
+              'frameNumber':
+                  ui.PlatformDispatcher.instance.frameData.frameNumber,
+            });
+          }
+        }
         _hasFrame = true;
         _scheduleNotification();
       }

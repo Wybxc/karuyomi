@@ -4,6 +4,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
+import 'package:karuyomi/diagnostics/reader_baseline.dart';
+import 'package:karuyomi/diagnostics/reader_baseline_host.dart';
 import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
@@ -24,6 +26,10 @@ void main() {
       await tester.pumpWidget(const KaruyomiApp());
       await tester.pumpAndSettle();
       expect(find.text('书架还是空的'), findsOneWidget);
+      expect(
+        find.byType(ReaderBaselineHost),
+        readerBaselineEnabled ? findsOneWidget : findsNothing,
+      );
       expect(
         find.byType(size.width >= 840 ? NavigationRail : NavigationBar),
         findsOneWidget,

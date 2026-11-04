@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/reader/resource_image.dart';
+import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:reader_core/reader_core.dart';
 
 final class CountingImageProvider extends ImageProvider<CountingImageProvider> {
@@ -47,6 +48,29 @@ ImageResource resource(String id) => ImageResource(
 );
 
 Widget image({
+  required ImageResource resource,
+  required ImageProvider<Object> provider,
+  required List<ReaderImageDecoded> decoded,
+  required List<ReaderImageFailed> failures,
+  ReaderBaselineRecorder? baseline,
+}) => baseline == null
+    ? imageContent(
+        resource: resource,
+        provider: provider,
+        decoded: decoded,
+        failures: failures,
+      )
+    : ReaderBaselineScope(
+        recorder: baseline,
+        child: imageContent(
+          resource: resource,
+          provider: provider,
+          decoded: decoded,
+          failures: failures,
+        ),
+      );
+
+Widget imageContent({
   required ImageResource resource,
   required ImageProvider<Object> provider,
   required List<ReaderImageDecoded> decoded,
@@ -122,12 +146,17 @@ void main() {
   testWidgets(
     'metadata observer and displayed Image share one actual decode and report after a frame',
     (tester) async {
+      final baseline = ReaderBaselineRecorder(
+        flushDuration: const Duration(milliseconds: 10),
+      )..start();
+      addTearDown(baseline.dispose);
       final provider = CountingImageProvider(png);
       final decoded = <ReaderImageDecoded>[];
       final failures = <ReaderImageFailed>[];
       await tester.pumpWidget(
         image(
           resource: resource('a'),
+          baseline: baseline,
           provider: provider,
           decoded: decoded,
           failures: failures,
@@ -152,6 +181,7 @@ void main() {
       await tester.pumpWidget(
         image(
           resource: resource('b'),
+          baseline: baseline,
           provider: provider,
           decoded: decoded,
           failures: failures,
@@ -161,6 +191,31 @@ void main() {
       expect(provider.loads, 1);
       expect(provider.decodes, 1);
       expect(decoded.map((event) => event.resourceId), ['a', 'b']);
+      final stopped = baseline.stop();
+      await tester.pump(const Duration(milliseconds: 10));
+      await stopped;
+      final captured = (jsonDecode(baseline.exportJson())['events'] as List)
+          .cast<Map<String, dynamic>>();
+      final infos = captured.where((e) => e['type'] == 'image_info').toList();
+      expect(infos, hasLength(2));
+      expect(infos.first['data'], containsPair('synchronousCall', false));
+      expect(infos.last['data'], containsPair('synchronousCall', true));
+      expect(infos.last['data'], containsPair('width', 3));
+      expect(infos.last['data'], containsPair('height', 2));
+      final frames = captured.where((e) => e['type'] == 'image_frame').toList();
+      expect(frames.map((e) => e['data']['resourceId']), ['a', 'b']);
+      expect(
+        frames.every(
+          (e) =>
+              e['data']['imageFrame'] == 0 && e['data']['frameNumber'] is int,
+        ),
+        true,
+      );
+      expect(
+        captured.where((e) => e['type'] == 'image_post_frame'),
+        hasLength(2),
+      );
+
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await provider.evict();
@@ -171,12 +226,17 @@ void main() {
   testWidgets(
     'actual provider decode error emits failure and never a decoded frame',
     (tester) async {
+      final baseline = ReaderBaselineRecorder(
+        flushDuration: const Duration(milliseconds: 10),
+      )..start();
+      addTearDown(baseline.dispose);
       final provider = CountingImageProvider(Uint8List.fromList([1, 2, 3]));
       final decoded = <ReaderImageDecoded>[];
       final failures = <ReaderImageFailed>[];
       await tester.pumpWidget(
         image(
           resource: resource('bad'),
+          baseline: baseline,
           provider: provider,
           decoded: decoded,
           failures: failures,
@@ -188,6 +248,22 @@ void main() {
       expect(decoded, isEmpty);
       expect(failures, hasLength(1));
       expect(failures.single.resourceId, 'bad');
+      final stopped = baseline.stop();
+      await tester.pump(const Duration(milliseconds: 10));
+      await stopped;
+      final captured = (jsonDecode(baseline.exportJson())['events'] as List)
+          .cast<Map<String, dynamic>>();
+      expect(captured.where((e) => e['type'] == 'image_error'), hasLength(1));
+      expect(
+        captured.where(
+          (e) =>
+              e['type'] == 'image_info' ||
+              e['type'] == 'image_frame' ||
+              e['type'] == 'image_post_frame',
+        ),
+        isEmpty,
+      );
+
       expect(find.text('无法显示这张图片'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
