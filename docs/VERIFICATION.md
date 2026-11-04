@@ -156,9 +156,11 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 当前构建、注册清单、Java、Worker 和 API 只维护 HTTP v2，旧 v1 传输分支已删除。Java 重新经过真实 TeaVM 编译后的 18 例模拟 supplier 回归，覆盖 GET/POST、空正文、取消/超时、受控重试及错误分类；这些仍是模拟环境证据。
 
-`pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 22 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。新增分项实际验证 204/205/304 无正文与 304 表示元数据、显式 Range 的精确 19 字节返回、Unicode/重复 urlencoded 字段及跨 64 KiB 的 multipart 文件。表单由标准 Request/FormData codec 生成和解析；origin 在消费者已读到正确前缀后真实截断，bridge 返回 `upstream_body_error` 而非成功 END。测试 adapter 使用标准 Node pipeline 传递该错误，没有修改生产入口。该门已纳入 `pnpm check`，完整输出留在忽略目录 `.local/probes/http-bridge-v2.json`。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
+`pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 24 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。分项实际验证 204/205/304 无正文与 304 表示元数据、显式 Range 的精确 19 字节返回、Unicode/重复 urlencoded 字段及跨 64 KiB 的 multipart 文件。表单由标准 Request/FormData codec 生成和解析；origin 在消费者已读到正确前缀后真实截断，bridge 返回 `upstream_body_error` 而非成功 END。入口通过固定 Undici 直连用户 Worker socket，origin 经明确启用 signal flag 的辅助 Worker 和原生 external HTTP proxy；没有修改生产入口。四个主动取消场景均使用 30 秒请求期限、1 秒取消窗口，本次本地取消及 origin 关闭用时约 12–22 毫秒；持续发送时使用普通 body cancel / AbortSignal，首块后 idle 的场景明确使用 TCP reset，不能把本地 destroy 当成远端已取消。该门已纳入 `pnpm check`，完整输出留在忽略目录 `.local/probes/http-bridge-v2.json`，合同见 [HTTP bridge](HTTP-BRIDGE.md)。提交 `7e57a74` 的[项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/41760712045) 已全部通过，包括通用检查、Flutter、构建与本地 D1。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
 
 共享 CacheInterceptor 的截断/半途取消另有[实际 TeaVM 与原 JVM 对照](verification/cache-http-failures.md)，与上述模拟 supplier、独立 HTTP bridge 门分别计证据；生产网络取消仍未通过。
+
+正式 `be5c3ed` Flutter Web 主入口已完成原版 Arknights 1.6.2 图片获取中退出与恢复的限定分项：真实未完成 HTTPS 响应转发 8192 B 后暂停，正式 Reader 返回触发取消，约 12 毫秒后上游 aborted/close，早于 Source 原 10 秒期限；Java 取消、章节关闭、首图及原取消页恢复可见与保存均确认。最终 Worker 终止、308/308 遥测检查点与正常服务关闭分别取得；旧轮的超时、400 和缺失检查点均保留，见[Source 图片取消证据](verification/source-cancellation-web.md)。这一门使用隔离 RS256、loopback HTTP/1 与真实 Source HTTPS，不是生产 Access、HTTP/2/3、Native、全部图片阶段或进程/GPU 峰值验收。
 
 ## Web 产品图片通道
 
