@@ -19,6 +19,8 @@ dependencies:
     path: ../../packages/reader_core
   source_runtime:
     path: ../../packages/source_runtime
+  cross_file: 0.3.5+2
+  web: 1.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

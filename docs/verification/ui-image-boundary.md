@@ -63,7 +63,17 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 完整套件首轮暴露 raw timing 测试依赖尚未初始化的 engine frameNumber；该失败日志保留。锁定 SDK 没有对应 testValue setter，测试现通过明确标记的实例级测试 reader 固定帧号，生产默认仍读真实 PlatformDispatcher，未知帧号仍拒绝，未放宽匹配。之后完整 Flutter 检查 130 项通过。详细日志在 main ignored `.local/ui-image-boundary/baseline-*.log`，不作为性能数据。
 
-截至本项工程验收，尚未在新采集入口执行真实运行采样，不能报告首图/跳转分布或帧性能通过；CPU、RSS、GPU 与物理呈现均未采集。P0 保持先用最简单直接的实现完成真实流程，再按实测瓶颈优化。
+本项工程验收之后执行了下述真实采集，但首次报告导出失败；不能报告首图/跳转分布或帧性能通过。CPU、RSS、GPU 与物理呈现均未采集。P0 保持先用最简单直接的实现完成真实流程，再按实测瓶颈优化。
+
+## 修复 AOT 身份后的 Web 采集尝试
+
+固定 `8494757c00e0337e4d3d5b34885bb8ef484e56c0`，在独立验证树重新计划并顺序构建原版 xkcd 与 Arknights。必需 submodule 已初始化且匹配已提交 gitlink；候选 codec 未参与默认 Source 输入。新 host 指纹为 `964de7e6d37bfd1f63cf15597adda6af36bb6bc929e7f4fe9658f65c6393b435`，xkcd buildId 为 `ext-all.xkcd-6624520c0b18799a9a0f87c34a4aed72`；canonical 字节与上述原 xkcd 相同，材料版本不变。正式 gzip/canonical 交付验证通过，尚未发布，兼容标记仍为 `compiled_unverified`。
+
+以正式 `lib/main.dart` release 显式开启 `READER_BASELINE`，在新的本地 origin、Codex 内置浏览器默认 1280×720 视口、已启用 Flutter 无障碍树、隔离 workerd/D1 和 RS256 测试身份下，从详情开始采集并进入原 xkcd `3319: Elevators`。漫画及原 TextInterceptor 文字页实际可见，显式完成后显示本地进度已保存并返回详情。这不是生产 Access、Native、真机或性能验收。
+
+60 秒自动停止后，面板显示 30 个事件和 406 个帧样本；这些只是 UI 显示计数，没有可用的原始报告。点击“查看 JSON”产生真实 Web `Bad state: RenderBox was not laid out`，复制后读取剪贴板为空，空 JSON 文件无法解析。因此本次采集完整性门失败，不能根据这些计数计算或声称首图、帧分布通过。修复方向为有界摘要与成熟库的文件下载，随后必须复验实际下载正文。
+
+截图、网络记录、空导出和 `capture-1-failed.json` 保存在验证树 ignored `.local/ui-image-baseline/confirmed/`；失败记录保留。测试标签页已关闭，服务退出后确认端口 50188 无监听，且无本次 Node/workerd/Java/Gradle 子进程；仅删除匹配本 buildId 的临时快照/D1。
 
 ## 性能依据与下一门
 

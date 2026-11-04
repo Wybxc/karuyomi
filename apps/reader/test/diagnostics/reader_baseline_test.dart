@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -194,9 +195,90 @@ void main() {
   );
 
   testWidgets(
-    'panel exports accessible JSON only after the bounded flush and copies the same result',
+    'large reports never enter paragraph layout and download complete UTF8 bytes once per report',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      late ReaderBaselineRecorder recorder;
+      final files = <XFile>[];
+      final downloads = <List<int>>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => ReaderBaselineHost(
+            saveReportForTesting: (file) async {
+              files.add(file);
+              downloads.add(await file.readAsBytes());
+            },
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                recorder = ReaderBaselineScope.read(context)!;
+                return const Text('正式 UI');
+              },
+            ),
+          ),
+        ),
+      );
+      var currentFrame = 42;
+      recorder.setFrameNumberReaderForTesting(() => currentFrame);
+      await tester.tap(find.text('性能采集'));
+      await tester.pump();
+      await tester.tap(find.text('开始采集'));
+      await tester.pump();
+      // Raw fixture samples stress export integrity and layout only, not speed.
+      recorder.recordFrameTimings(List.generate(4096, (i) => timing(42 + i)));
+      recorder.event('export_fixture', {'label': '中文导出完整性'});
+      currentFrame = 42 + 4095;
+      await tester.tap(find.text('停止采集'));
+      await tester.pump(const Duration(milliseconds: 1500));
+      final complete = recorder.exportJson();
+      expect(complete.length, greaterThan(1000000));
+      await tester.tap(find.text('查看摘要'));
+      await tester.pumpAndSettle();
+      final preview = tester
+          .widget<SelectableText>(
+            find.byKey(const ValueKey('reader-baseline-preview')),
+          )
+          .data!;
+      expect(preview.length, lessThanOrEqualTo(1024));
+      expect(complete, startsWith(preview));
+      final paragraphs = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .map((text) => text.data ?? '');
+      expect(paragraphs.every((text) => text.length <= 1024), true);
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('下载 JSON'));
+      await tester.tap(find.text('下载 JSON'));
+      await tester.pumpAndSettle();
+      expect(downloads, hasLength(1));
+      expect(downloads.single, orderedEquals(utf8.encode(complete)));
+      expect(
+        jsonDecode(utf8.decode(downloads.single))['frames'],
+        hasLength(4096),
+      );
+      expect(files.single.mimeType, 'application/json');
+      expect(files.single.name, 'karuyomi-reader-baseline-1.json');
+      expect(find.text('已请求下载 JSON'), findsOneWidget);
+      await tester.tap(find.text('下载 JSON'));
+      await tester.pumpAndSettle();
+      expect(files, hasLength(2));
+      expect(identical(files.first, files.last), true);
+      expect(downloads.last, orderedEquals(downloads.first));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'panel displays only bounded summary and preview then copies the complete report',
     (tester) async {
       String? clipboard;
+      late ReaderBaselineRecorder recorder;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
         (call) async {
@@ -215,7 +297,14 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           builder: (context, child) => ReaderBaselineHost(child: child!),
-          home: const Scaffold(body: Text('正式 UI')),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                recorder = ReaderBaselineScope.read(context)!;
+                return const Text('正式 UI');
+              },
+            ),
+          ),
         ),
       );
       await tester.tap(find.text('性能采集'));
@@ -231,13 +320,16 @@ void main() {
       await tester.pump();
       expect(find.textContaining('停止中'), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 1500));
-      await tester.tap(find.text('查看 JSON'));
+      await tester.tap(find.text('查看摘要'));
       await tester.pump();
-      final text = tester
+      final preview = tester
           .widget<SelectableText>(
-            find.byKey(const ValueKey('reader-baseline-json')),
+            find.byKey(const ValueKey('reader-baseline-preview')),
           )
           .data!;
+      final text = recorder.exportJson();
+      expect(preview.length, lessThanOrEqualTo(1024));
+      expect(text, startsWith(preview));
       expect(jsonDecode(text)['schema'], 'karuyomi.reader-baseline.v1');
       expect(
         jsonDecode(text)['environment']['devicePixelRatio'],
@@ -253,7 +345,10 @@ void main() {
       expect(clipboard, text);
       await tester.tap(find.text('开始采集'));
       await tester.pump();
-      expect(find.byKey(const ValueKey('reader-baseline-json')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('reader-baseline-preview')),
+        findsNothing,
+      );
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 2));
       expect(tester.takeException(), isNull);
