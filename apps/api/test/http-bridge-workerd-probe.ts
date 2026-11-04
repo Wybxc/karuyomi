@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { unstable_readConfig } from 'wrangler';
 import { createHash } from 'node:crypto';
-import { createServer, request as httpRequest } from 'node:http';
+import { createServer, type RequestListener } from 'node:http';
 import {
   mkdir,
   mkdtemp,
@@ -17,7 +17,14 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
+import type { Socket } from 'node:net';
+import {
+  buildConnector,
+  Client,
+  request as socketRequest,
+  Response,
+} from 'undici';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { byteStream } from './http-probe-streams.ts';
 import {
@@ -39,8 +46,13 @@ const wranglerRequire = createRequire(require.resolve('wrangler'));
 const { build }: typeof import('esbuild') = await import(
   wranglerRequire.resolve('esbuild')
 );
-const { Miniflare, convertV4MiniflareOptions }: typeof import('miniflare') =
-  await import(wranglerRequire.resolve('miniflare'));
+const {
+  Miniflare,
+  convertV4MiniflareOptions,
+  HttpOptions_Style,
+}: typeof import('miniflare') = await import(
+  wranglerRequire.resolve('miniflare')
+);
 const { generateKeyPair, exportJWK, SignJWT }: typeof import('jose') =
   await import(require.resolve('jose'));
 const temporary = await mkdtemp(path.join(tmpdir(), 'karuyomi-http-v2-'));
@@ -54,10 +66,11 @@ const compressed = { gzip: gzipSync(payload), br: brotliCompressSync(payload) };
 const sha256 = (bytes: Uint8Array) =>
   createHash('sha256').update(bytes).digest('hex');
 const calls: string[] = [];
+const appOrigin = 'http://127.0.0.1';
 let slowOpened = 0;
 let slowClosed = 0;
 let truncateBody: (() => void) | undefined;
-const origin = createServer(async (request, response) => {
+const originHandler: RequestListener = async (request, response) => {
   const url = new URL(request.url ?? '/', 'http://fixture.example.org');
   calls.push(url.pathname);
   if (url.pathname === '/echo') {
@@ -152,9 +165,11 @@ const origin = createServer(async (request, response) => {
     ++slowOpened;
     response.writeHead(200, { 'Content-Type': 'application/octet-stream' });
     response.write(payload.subarray(0, 1024));
-    const interval = setInterval(() => {
-      response.write(payload.subarray(0, 1024));
-    }, 20);
+    const interval = url.searchParams.has('paused')
+      ? undefined
+      : setInterval(() => {
+          response.write(payload.subarray(0, 1024));
+        }, 20);
     response.on('close', () => {
       clearInterval(interval);
       ++slowClosed;
@@ -187,12 +202,68 @@ const origin = createServer(async (request, response) => {
     ],
   });
   response.end(bytes);
-});
+};
+// workerd's PROXY request line carries the complete URL and may omit Host.
+const origin = createServer({ requireHostHeader: false }, originHandler);
 await new Promise<void>((resolve) => origin.listen(0, '127.0.0.1', resolve));
 const address = origin.address();
 assert(address && typeof address !== 'string');
 let mf: import('miniflare').Miniflare | undefined;
+let client: Client | undefined;
 const checks: string[] = [];
+const cancellationTimings: {
+  check: string;
+  requestTimeoutMs: number;
+  cancellationBudgetMs: number;
+  elapsedMs: number;
+  tcpReset: boolean;
+}[] = [];
+const cancellationBudgetMs = 1000;
+const cancellationRequestTimeoutMs = 30_000;
+async function assertPromptCancellation(
+  check: string,
+  cancel: () => Promise<void>,
+  tcpReset = false,
+) {
+  const opened = slowOpened;
+  assert.equal(slowClosed, opened - 1, `${check}: origin must still be active`);
+  const started = performance.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let observing = true;
+  try {
+    await Promise.race([
+      Promise.all([
+        cancel(),
+        (async () => {
+          while (observing && slowClosed < opened)
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        })(),
+      ]),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${check}: origin did not close promptly`)),
+          cancellationBudgetMs,
+        );
+      }),
+    ]);
+    const elapsedMs = performance.now() - started;
+    assert(
+      elapsedMs <= cancellationBudgetMs,
+      `${check}: cancellation was late`,
+    );
+    cancellationTimings.push({
+      check,
+      requestTimeoutMs: cancellationRequestTimeoutMs,
+      cancellationBudgetMs,
+      elapsedMs,
+      tcpReset,
+    });
+    checks.push(check);
+  } finally {
+    observing = false;
+    clearTimeout(timer);
+  }
+}
 try {
   const keys = await generateKeyPair('RS256');
   const jwk = await exportJWK(keys.publicKey);
@@ -213,66 +284,54 @@ try {
   assert(config.compatibility_date, 'Worker compatibility date is required');
   mf = new Miniflare(
     convertV4MiniflareOptions({
-      modules: true,
-      script: compiled.outputFiles[0]!.text,
-      compatibilityDate: config.compatibility_date,
-      compatibilityFlags: config.compatibility_flags,
-      // Only this integration fixture maps declared public target names to a
-      // loopback origin. No production target/hostname validation is relaxed.
-      outboundService: {
-        node: (request, response) =>
-          new Promise<void>((resolve) => {
-            const target = new URL(
-              request.url ?? '/',
-              'http://fixture.example.org',
-            );
-            const outbound = httpRequest(
-              {
-                hostname: '127.0.0.1',
-                port: address.port,
-                path: target.pathname + target.search,
-                method: request.method,
-                headers: request.headers,
-              },
-              (upstream) => {
-                response.writeHead(
-                  upstream.statusCode ?? 502,
-                  upstream.headers,
-                );
-                // Propagate a genuinely truncated origin stream to workerd.
-                void pipeline(upstream, response).catch(() => {
-                  response.destroy();
-                  outbound.destroy();
-                  resolve();
-                });
-                response.once('close', () => {
-                  upstream.destroy();
-                  outbound.destroy();
-                  resolve();
-                });
-              },
-            );
-            outbound.on('error', () => {
-              response.destroy();
-              resolve();
-            });
-            request.once('aborted', () => outbound.destroy());
-            request.pipe(outbound);
-          }),
-      },
       resourcePersistencePath: path.join(temporary, 'state'),
-      d1Databases: { DB: 'http-v2-fixture' },
-      bindings: {
-        ACCESS_TEAM_DOMAIN: 'probe.cloudflareaccess.com',
-        ACCESS_AUD: 'http-v2',
-        ACCESS_SUBJECT: 'probe-owner',
-        OWNER_EMAIL: 'probe@example.com',
-        APP_ORIGIN: 'https://read.example.com',
-        PROBE_ACCESS_JWKS: JSON.stringify({ keys: [jwk] }),
-      },
+      workers: [
+        {
+          name: 'http-v2-api',
+          modules: true,
+          script: compiled.outputFiles[0]!.text,
+          compatibilityDate: config.compatibility_date,
+          compatibilityFlags: config.compatibility_flags,
+          // Use the user Worker socket, with the product's request-signal flags.
+          unsafeDirectSockets: [
+            { host: '127.0.0.1', port: 0, entrypoint: 'default', proxy: false },
+          ],
+          outboundService: 'http-v2-origin',
+          d1Databases: { DB: 'http-v2-fixture' },
+          bindings: {
+            ACCESS_TEAM_DOMAIN: 'probe.cloudflareaccess.com',
+            ACCESS_AUD: 'http-v2',
+            ACCESS_SUBJECT: 'probe-owner',
+            OWNER_EMAIL: 'probe@example.com',
+            APP_ORIGIN: appOrigin,
+            PROBE_ACCESS_JWKS: JSON.stringify({ keys: [jwk] }),
+          },
+        },
+        {
+          name: 'http-v2-origin',
+          modules: true,
+          script: `export default { fetch(request, env) { return env.ORIGIN.fetch(request); } };`,
+          compatibilityDate: config.compatibility_date,
+          compatibilityFlags: [
+            'enable_request_signal',
+            'request_signal_passthrough',
+          ],
+          // A node-handler inserts an old-compat Worker that loses cancellation
+          // while the origin is idle. This native service keeps the signal and
+          // maps only the test target to the controlled HTTP origin.
+          serviceBindings: {
+            ORIGIN: {
+              external: {
+                address: `127.0.0.1:${address.port}`,
+                http: { style: HttpOptions_Style.PROXY },
+              },
+            },
+          },
+        },
+      ],
     }),
   );
-  const db = await mf.getD1Database('DB');
+  const db = await mf.getD1Database('DB', 'http-v2-api');
   for (const name of (await readdir(path.join(root, 'apps/api/migrations')))
     .filter((name) => name.endsWith('.sql'))
     .sort()) {
@@ -303,7 +362,29 @@ try {
     .setIssuedAt()
     .setExpirationTime('10m')
     .sign(keys.privateKey);
-  const worker = mf;
+  const direct = await mf.unsafeGetDirectURL('http-v2-api');
+  let clientSocket: Socket | undefined;
+  const connect = buildConnector({});
+  client = new Client(direct.origin, {
+    pipelining: 0,
+    connect(options, callback) {
+      connect(options, (...connected) => {
+        const [, socket] = connected;
+        if (socket) clientSocket = socket;
+        callback(...connected);
+      });
+    },
+  });
+  const dispatcher = client;
+  const resetConnection = () => {
+    assert(
+      clientSocket && !clientSocket.destroyed,
+      'Expected an active client socket',
+    );
+    // A stalled HTTP/1 response cannot reliably detect ordinary local destroy.
+    // Reset the actual TCP connection before releasing the local body reader.
+    clientSocket.resetAndDestroy();
+  };
   let serial = 0;
   const requestMeta = (
     pathname: string,
@@ -336,20 +417,34 @@ try {
     headers: Record<string, string> = {},
     signal?: AbortSignal,
   ) =>
-    worker.dispatchFetch('https://read.example.com/api/bridge/http', {
+    socketRequest(new URL('/api/bridge/http', direct), {
+      dispatcher,
       method: 'POST',
       headers: {
+        Host: new URL(appOrigin).host,
         'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
         Accept: HTTP_BRIDGE_MEDIA_TYPE,
         'X-Runtime-Build': 'v2-fixture',
         'X-App-Request': '1',
-        Origin: 'https://read.example.com',
+        Origin: appOrigin,
         'Cf-Access-Jwt-Assertion': signed,
         ...headers,
       },
-      body: wire(meta, bytes, end),
-      duplex: 'half',
+      body: Readable.from(wire(meta, bytes, end), {
+        objectMode: false,
+        highWaterMark: HTTP_FRAME_LIMIT,
+      }),
       ...(signal ? { signal } : {}),
+    }).then((result) => {
+      const responseHeaders = new Headers();
+      for (const [name, values] of Object.entries(result.headers))
+        if (values !== undefined)
+          for (const value of Array.isArray(values) ? values : [values])
+            responseHeaders.append(name, value);
+      return new Response(result.body, {
+        status: result.statusCode,
+        headers: Array.from(responseHeaders),
+      });
     });
   const framed = async (response: Awaited<ReturnType<typeof dispatch>>) => {
     assert.equal(response.status, 200);
@@ -636,31 +731,49 @@ try {
     }
   }
   checks.push('early_200_302_403_require_upload_END');
-  {
-    const { reader } = await framed(await dispatch(requestMeta('/slow')));
+  for (const paused of [false, true]) {
+    const { reader } = await framed(
+      await dispatch(
+        requestMeta(paused ? '/slow?paused' : '/slow', {
+          timeoutMs: cancellationRequestTimeoutMs,
+        }),
+      ),
+    );
     assert((await reader.read(1))?.byteLength);
-    await reader.cancel();
-    const deadline = Date.now() + 5000;
-    while (slowClosed < slowOpened && Date.now() < deadline)
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    assert.equal(slowClosed, slowOpened);
-    checks.push('consumer_cancel_closes_origin');
+    await assertPromptCancellation(
+      `consumer_cancel_closes_origin${paused ? '_after_tcp_reset_while_paused' : ''}`,
+      async () => {
+        if (paused) resetConnection();
+        await reader.cancel();
+      },
+      paused,
+    );
   }
-  {
+  for (const paused of [false, true]) {
     const abort = new AbortController();
     const { reader } = await framed(
-      await dispatch(requestMeta('/slow'), undefined, true, {}, abort.signal),
+      await dispatch(
+        requestMeta(paused ? '/slow?paused' : '/slow', {
+          timeoutMs: cancellationRequestTimeoutMs,
+        }),
+        undefined,
+        true,
+        {},
+        abort.signal,
+      ),
     );
     assert((await reader.read(1))?.byteLength);
     const reading = consume(reader);
     const rejection = assert.rejects(reading);
-    abort.abort();
-    await rejection;
-    const deadline = Date.now() + 5000;
-    while (slowClosed < slowOpened && Date.now() < deadline)
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    assert.equal(slowClosed, slowOpened);
-    checks.push('incoming_abort_closes_origin');
+    await assertPromptCancellation(
+      `incoming_abort_closes_origin${paused ? '_after_tcp_reset_while_paused' : ''}`,
+      async () => {
+        if (paused) resetConnection();
+        abort.abort();
+        await rejection;
+      },
+      paused,
+    );
   }
   {
     const { reader } = await framed(
@@ -724,6 +837,7 @@ try {
     realRS256Verification: true,
     realD1Policy: true,
     controlledOrigin: true,
+    transport: 'direct-user-worker-http-socket',
     sourceOnlineVerified: false,
     productionAccessVerified: false,
     compatibilityDate: config.compatibility_date,
@@ -731,6 +845,7 @@ try {
     payload: expected,
     encodedSizes: { gzip: compressed.gzip.length, br: compressed.br.length },
     checks,
+    cancellationTimings,
     sourceSha256: Object.fromEntries(
       await Promise.all(
         [
@@ -748,6 +863,7 @@ try {
   await writeFile(evidencePath, JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify(report, null, 2));
 } finally {
+  await client?.destroy();
   await mf?.dispose();
   origin.closeAllConnections();
   await new Promise<void>((resolve) => origin.close(() => resolve()));

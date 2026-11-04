@@ -268,6 +268,9 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      undici:
+        specifier: 7.30.1
+        version: 7.30.1
       vitest:
         specifier: 4.1.12
         version: 4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))

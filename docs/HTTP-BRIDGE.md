@@ -177,6 +177,25 @@ early-response validation and connection cancellation without internet or JVM
 dependencies. This integration is part of `pnpm check`; it is not evidence of
 real Source behavior or a production Access session.
 
+The client connects to the user Worker socket with pinned Undici. The controlled
+origin uses a separate Worker with `enable_request_signal` and
+`request_signal_passthrough`, then a native external HTTP proxy binding. This
+avoids Miniflare's generated Node-handler Worker, whose independent compatibility
+settings can hide an idle origin's cancellation. Product authentication and
+target checks still run unchanged. Cloudflare documents the incoming-signal and
+[subrequest passthrough flags](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#passthrough-abortsignal-of-incoming-request-to-subrequests)
+separately.
+
+Cancellation cases use a 30-second request deadline and require an active origin
+to close within one second, measured from the cancellation action through both
+local completion and origin closure. They cover ordinary body cancellation and
+AbortSignal while the origin is sending data, plus explicit TCP reset while the
+origin is paused after its first block. The idle cases identify that reset in
+their names and report. Ordinary local `destroy()` alone did not promptly notify
+the idle peer in a separate controlled comparison; it is not evidence of a TCP
+reset or remote cancellation. These are loopback HTTP/1 gates, not production
+HTTP/2, HTTP/3 or browser-to-origin evidence.
+
 The independent [shared Java Cache failure gate](verification/cache-http-failures.md)
 passes 50 checks on both the untouched original JVM and actual TeaVM in Chromium
 156, including truncated bodies and cancellation after an exact 8192-byte prefix.

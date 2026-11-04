@@ -10,8 +10,10 @@ import { execa } from 'execa';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
+import type { Socket } from 'node:net';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { buildConnector, Client, request as socketRequest } from 'undici';
 import { byteStream, relayFrames } from './http-probe-streams.ts';
 import {
   createStaticSnapshot,
@@ -82,7 +84,7 @@ if (readerDirectory) await readFile(path.join(readerDirectory, 'index.html'));
 const readerAssets = readerDirectory
   ? sirv(readerDirectory, { dev: true })
   : undefined;
-const apiOrigin = 'https://read.example.com';
+const apiOrigin = 'http://127.0.0.1';
 const environment = {
   ...process.env,
   CLOUDFLARE_SEND_METRICS: 'false',
@@ -171,6 +173,9 @@ const mf = new Miniflare(
     script: compiled.outputFiles[0]!.text,
     compatibilityDate: config.compatibility_date,
     compatibilityFlags: config.compatibility_flags,
+    unsafeDirectSockets: [
+      { host: '127.0.0.1', port: 0, entrypoint: 'default', proxy: false },
+    ],
     resourcePersistencePath: path.join(state, 'v3'),
     d1Databases: { DB: databaseId },
     bindings: {
@@ -183,6 +188,8 @@ const mf = new Miniflare(
     },
   }),
 );
+const direct = await mf.unsafeGetDirectURL();
+const connect = buildConnector({});
 const token = await new SignJWT({ email: 'probe@example.com' })
   .setProtectedHeader({ alg: 'RS256', kid: String(jwk.kid) })
   .setSubject('probe-owner')
@@ -433,8 +440,24 @@ const server = createServer(async (request, response) => {
     }
     if (pathname.startsWith('/api/')) {
       const abort = new AbortController();
-      const disconnect = () =>
+      let workerSocket: Socket | undefined;
+      const workerClient = new Client(direct.origin, {
+        pipelining: 0,
+        connect(options, callback) {
+          connect(options, (...connected) => {
+            const [, socket] = connected;
+            if (socket) workerSocket = socket;
+            callback(...connected);
+          });
+        },
+      });
+      const disconnect = () => {
+        // An idle HTTP/1 peer may not observe ordinary local stream destroy.
+        // Forward the browser disconnect as a reset of this request's socket.
+        if (workerSocket && !workerSocket.destroyed)
+          workerSocket.resetAndDestroy();
         abort.abort(new Error('probe_client_disconnected'));
+      };
       const responseClosed = () => {
         if (!response.writableFinished) disconnect();
       };
@@ -442,6 +465,7 @@ const server = createServer(async (request, response) => {
       response.once('close', responseClosed);
       let requestFrames: HttpFrameReader | undefined;
       let responseFrames: HttpFrameReader | undefined;
+      let workerBody: Readable | undefined;
       try {
         const headers = new Headers();
         for (const [key, value] of Object.entries(request.headers)) {
@@ -497,21 +521,37 @@ const server = createServer(async (request, response) => {
             entry.catalogQuery = Object.fromEntries(target.searchParams);
           body = relayFrames(requestFrames, descriptor);
         }
-        const result = await mf.dispatchFetch(apiOrigin + request.url, {
-          method: request.method ?? 'GET',
-          headers: Object.fromEntries(headers),
-          signal: abort.signal,
-          ...(body
-            ? {
-                body: Readable.fromWeb(body, {
-                  highWaterMark: HTTP_FRAME_LIMIT,
-                  signal: abort.signal,
-                }),
-                duplex: 'half',
-              }
-            : {}),
-        });
-        let outgoing = result.body ? byteStream(result.body) : null;
+        // Connect to the user Worker socket so its request-signal flags apply
+        // to actual client disconnects. Host/Origin still pass product checks.
+        headers.set('Host', new URL(apiOrigin).host);
+        const incoming = await socketRequest(
+          new URL(request.url ?? '/', direct),
+          {
+            dispatcher: workerClient,
+            method: request.method ?? 'GET',
+            headers: Object.fromEntries(headers),
+            signal: abort.signal,
+            ...(body
+              ? {
+                  body: Readable.fromWeb(body, {
+                    highWaterMark: HTTP_FRAME_LIMIT,
+                    signal: abort.signal,
+                  }),
+                }
+              : {}),
+          },
+        );
+        workerBody = incoming.body;
+        const resultHeaders = new Headers();
+        for (const [name, values] of Object.entries(incoming.headers))
+          if (values !== undefined)
+            for (const value of Array.isArray(values) ? values : [values])
+              resultHeaders.append(name, value);
+        const result = {
+          status: incoming.statusCode,
+          headers: resultHeaders,
+        };
+        let outgoing = byteStream(Readable.toWeb(incoming.body));
         if (entry) {
           entry.bridgeStatus = result.status;
           if (
@@ -605,11 +645,13 @@ const server = createServer(async (request, response) => {
           );
         else response.end();
       } finally {
+        workerBody?.destroy();
         request.off('aborted', disconnect);
         response.off('close', responseClosed);
         await Promise.allSettled([
           requestFrames?.cancel(),
           responseFrames?.cancel(),
+          workerClient.destroy(),
         ]);
       }
       return;
