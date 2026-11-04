@@ -188,3 +188,60 @@ JPEG 当前尚未覆盖 Web 缩放、Native、真实 Source、EXIF 方向、ICC/
 - Native 的内置 WASM / Worker、平台文件、Flutter 与真机内存仍须单独验证。当前机制不构成调整正式协议和限额后即可发布的依据。
 
 原始 JSON、源码冻结记录、工具日志与素材保留于 ignored 实验目录；本页只保留后续实现需要的输入、结果和边界。
+
+## 正式源码构建与 Node 验收
+
+2026-11-04，macOS arm64。上述忽略目录内的历史机制随后内化为 `runtime/image-codec/{codec.h,png.c,jpeg.c}`、严格 TypeScript session 和 `tools/images` 构建/验收工具；真正上游由固定提交的 `vendor/libspng`、`vendor/libjpeg-turbo` submodule 提供。本节记录正式入口生成的新产物，不将前述旧 WASM 的浏览器或原生 oracle 结果移作新产物验收。构建和操作说明见 [image-codec README](../../runtime/image-codec/README.md)。
+
+实际工具为 Node 24.15.0、Python 3.15.2、CMake 4.4.5、官方 Emscripten 5.0.7-git / `263db4cffa6f9fc2ec514a70abac81362ea41849`、Clang 23.0.0git / `7b58716d96c3ae4c0c4e6f72e29b16137bb6224b`、Binaryen 129 / `version_125-430-gc6a5e65b7`。SDK 归档仍为本页已记录的官方 Darwin arm64 SHA-256 `37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c`；上游提交分别为 libspng `bab9f94a1186f8fda234b4e1cb65e1b9a77049cc`、libjpeg-turbo `7b4993786d856cbccabfc0ed2f923ba000e326cc`，zlib 1.3.1 来自固定官方 SDK port。参考图工具为锁定的 Sharp 0.35.5 / libvips 8.18.7 / mozjpeg `0826579`。
+
+最终构建身份为 `0c00a221dbc8df36bddb2baf4393fb2cc492a8f288a0a0daf088dfe900dc4a8d`。正式 CLI 先验证 manifest 身份与输入自洽，再核对真实四份 JS/WASM 的大小和 SHA。最终19项全部通过、进程 exit=0；报告保存在忽略的 `runtime/image-codec/.local/verification/formal-final/result.json`，SHA-256 为 `c516f2982013c0e163279d039c845a924d5bfef75ddfb2700f017309de26eab5`。
+
+### 四幅合成长图与资源终态
+
+素材由正式 CLI 每次重新生成，不依赖旧研究目录。PNG 为非交错 RGBA8，完整流 expected SHA 取编码前原始 RGBA；JPEG 为 baseline、4:4:4，expected SHA 取 Sharp 重新解码同一 JPEG 的 RGBA，不能使用有损编码前像素。消费者只增量计算完整流及首/中/末256行区域的摘要，不积存完整输出 RGBA；四图的完整与区域摘要均精确匹配参考。
+
+| 格式与尺寸     | 编码输入 B | 完整 RGBA 输出 B | C 请求 payload 高水位 B | 实际 WASM heap B |
+| -------------- | ---------: | ---------------: | ----------------------: | ---------------: |
+| PNG 1080×20000 |  1,243,254 |       86,400,000 |               2,401,864 |       16,777,216 |
+| PNG 1080×40000 |  2,487,252 |      172,800,000 |               3,645,862 |       16,777,216 |
+| JPEG 720×30000 |    904,939 |       86,400,000 |               1,679,009 |       16,777,216 |
+| JPEG 720×60000 |  1,809,921 |      172,800,000 |               2,583,991 |       16,777,216 |
+
+四个完整终态均为 `complete`、C error=0、phase=3；`closeSucceeded=true`，close 后 live bytes 和 allocations 均为0。输入上限8 MiB、计量 payload 上限16 MiB、最大 WASM heap 32 MiB、条带最多256行；实际观察到的16 MiB heap是容量，不是进程峰值。payload包含编码输入、条带及库分配请求，排除 allocation header、底层分配器元数据/碎片、realloc 短暂双占用、栈、静态数据、JS副本和图形资源。夹具生成与 Sharp 参考解码确实分配完整图像，其内存不属于被测 WASM 计量；本轮没有测量进程 RSS 或 GPU 峰值。
+
+### 19项真实覆盖与边界
+
+首轮正式源码15项已通过；最终轮保留其范围，增加两幅更高图的完整像素检查和两种 codec 各一个真实 pull 暂停检查，共19项：4项完整图、2项暂停、2项首块 signal 取消、2项消费者 break、2项截尾、3项不支持格式拒绝、2项直接 ABI 生命周期、2项 JPEG 缩放尺寸/字节。新增高图只增加完整流验证，不能写成四幅图均运行了全部取消、截尾或缩放场景。
+
+- PNG/JPEG 暂停检查分别使用1080×20000和720×30000输入，在公开 lease 上只计数并转调真实 `image_next()`：header 后调用数为0，首 chunk 后为1；请求80 ms暂停，实际约82.73 / 81.42 ms，调用数仍为1。恢复拉取同一 strip 的下一 chunk 后仍为1，再取消，终态交付131,072 B、已解256行、live/allocations=0。这证明同线程 pull 背压，不等于跨 Worker 的 ACK 协议验收。
+- 两种 codec 首 chunk 后 signal 取消，以及消费者直接 break，均只交付65,536 B、已解256行；终态为 `cancelled`、close成功、live/allocations=0。这是同步 C 调用之间的协作取消，不证明 C 内抢占。
+- PNG 仅删除末尾12 B的 IEND：已经交付全部20,000行 / 86,400,000 B，随后在 phase=3、code=-1失败，确实经过尾部操作。JPEG仅删除末尾2 B的EOI：在 phase=2、code=120失败，交付29,952行 / 86,261,760 B；不能写成所有行完成后才在 finish 失败。两者 close 后账本均为0。
+- 小型非RGBA PNG、Adam7 PNG和progressive JPEG均在 phase=1拒绝，没有 raster交付；这是拒绝范围的验证，不是这些格式解码通过。
+- 两库直接 ABI 均拒绝输入分配长度与 open 长度不一致、拒绝超过8 MiB的输入；多次close后live/allocations为0。1 MiB输入的peak在close后保持可读，下次32 B输入的peak为32 B，不继承上次高水位。
+- JPEG 720×30000的1/2、1/4输出分别为360×15000 / 21,600,000 B和180×7500 / 5,400,000 B，尺寸、字节数、真实收尾及释放通过。新一轮没有对这些缩放输出运行像素oracle；前述独立原生djpeg结果保留为历史证据，不把Sharp resize或本轮记录的未对照SHA当作缩放像素证明。
+
+### 产物身份与独立缓存重建
+
+| 正式产物    |  大小 B | SHA-256                                                            |
+| ----------- | ------: | ------------------------------------------------------------------ |
+| `png.mjs`   |  31,143 | `e169f3f750965775be6522bb0578f7f2f2919fb41e912e688e2f2397c7a1e3e2` |
+| `png.wasm`  |  67,753 | `dcacd157f1a0712a81560b0b0abcdf0dd737e1509f3e468bfe3f68d06a5b2840` |
+| `jpeg.mjs`  |  37,316 | `48acf0712120301e105513078dd477f4fb557dae6e8ef282c83502ef54ac35ad` |
+| `jpeg.wasm` | 250,162 | `b5f81ab31746b0cc11970885b94fa5f213b1b2f8be7650593994e2affb092b63` |
+
+同一主机、同一固定SDK下，另设独立构建缓存和输出目录，并在外部注入无效 `CFLAGS`、`LDFLAGS`、`EMCC_CFLAGS`、`CMAKE_TOOLCHAIN_FILE` 后重新构建，exit=0；构建身份及上表四份资产字节均一致，四份JS/WASM中未发现本机绝对路径字符串。摘要保存在忽略的 `.local/image-codec-repro-result.json`。这证明本轮同机、独立缓存与环境过滤下的重建一致性；没有验证Linux构建或跨主机字节一致性。
+
+使用仓库固定Node/pnpm版本，在根目录通过正式入口复验；新报告写入另一个忽略目录，保留原报告：
+
+```sh
+git submodule update --init --depth 1 vendor/libspng vendor/libjpeg-turbo
+pnpm image-codecs:build
+pnpm image-codecs:check \
+  --build runtime/image-codec/.local/build/0c00a221dbc8df36bddb2baf4393fb2cc492a8f288a0a0daf088dfe900dc4a8d \
+  --report runtime/image-codec/.local/verification/formal-rerun/result.json
+```
+
+输入或工具链变化时，使用构建命令返回的新身份目录；已有SDK/zlib归档可按 [README](../../runtime/image-codec/README.md) 的正式选项传入。普通 `pnpm test:image-codecs` 是不编译SDK的小夹具工程回归，不能替代这里的真实WASM命令。
+
+本节只证明正式源码在Node中的顺序解码与生命周期，以及上述同机重建。新产物尚未据此取得浏览器、Source图片链、Flutter、Native内置执行、tile/LOD/位置恢复或真实设备性能验收；也不代表全项目检查、P0或长图产品门通过。历史浏览器的Worker/ACK与原生缩放结果仍按各自输入和旧产物身份单独解释，正式16 Mi像素准入不因这份报告自动改变。

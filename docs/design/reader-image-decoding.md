@@ -118,9 +118,9 @@ JPEG 先缩放再输出可以减小条带和终端 raster，但不使 progressiv
 
 首块 ACK 点取消后 C 账本归零；缺失 EOI 的文件在最后条带的扫描行阶段因 corrupt-data warning 失败，已输出片必须能整体作废。每个进入库的导出调用都有活跃错误恢复帧；完整输入最终仍经过 `finish_decompress()`。Codex 内置 Chromium 156 又实际通过两张完整尺寸的六个区域 SHA/Canvas、背压、取消、截断、progressive 拒绝及首块后强制 terminate 观察窗，无 SAB，五个协作终态 C 账本归零。Web 未计算完整流 SHA、未测缩放或强制终止后的 heap 释放；Native、EXIF/ICC/其它色彩、随机区域及正式 Source/Flutter 链仍待验，不关闭产品门。
 
-## 下一轮正式实现的结构
+## 正式源码基础与产品接线
 
-以下是应落到产品中的边界和先后顺序；codec 具体构建仍由下一节的实验选择，不引入未验证的替代框架。
+`runtime/image-codec/` 已内化共同 C ABI 与严格 TypeScript 顺序消费接口，真实上游通过 submodule 固定；`tools/images/` 提供锁定 SDK 构建与自生成长图回归。操作与首批能力见 [codec README](../../runtime/image-codec/README.md)。该基础不等于独立 codec Worker、可显示 tile 或正式产品路径，以下边界仍需逐步接入。
 
 ### 1. 保留原 Source 已处理正文，分开编码页与显示片
 
@@ -168,7 +168,7 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 ## 下一轮实现与实测门
 
-1. **内化已验证的 codec 管线。** PNG/JPEG 的现有 Node/Web 顺序机制及 JPEG Node 原生缩放证据足以进入正式集成。将自有 C/TypeScript 适配内化，以 submodule 固定两库和已验 SDK 准备器建立可复验 builder，不让可选格式研究继续推迟交付。正式构建仍须锁定参数、产物哈希并测量冷启动、工作堆和显式退出；不能用未实际运行的裁剪版或默认 wasm-vips 的 256 MiB/SAB 假设替代当前证据。
+1. **内化已验证的 codec 管线。** PNG/JPEG 的现有 Node/Web 顺序机制及 JPEG Node 原生缩放证据足以进入正式集成。自有 C/TypeScript 适配、两库 submodule、锁定 SDK 准备器与 builder 已内化，正式 Node 长图与同主机独立缓存构建证据见[正式验收](../verification/long-image-codec.md#正式源码构建与-node-验收)。接下来建立独立 Worker、Blob 输入与有界小片编码/缓存，接入共享材料和产品协议；冷启动与实际工作进程退出仍须验证。不能用未实际运行的裁剪版或默认 wasm-vips 的 256 MiB/SAB 假设替代当前证据。
 2. **验证大于 16 Mi 的真实输入。** 至少包含 1080 × 20000 及更长的 baseline JPEG、非 interlaced PNG，用首/中/末可辨内容验证实际小片像素。增加 progressive JPEG、interlaced PNG、透明图、16-bit、EXIF 和截断文件，区分支持、预算拒绝与真实解码失败。头部尺寸和构造空白 widget 不算通过。
 3. **验证有界生成和任意位置读取。** 记录输入副本、codec 高水位、条带/片数、缓存字节和存储配额；测试慢消费者、跳到末尾、连续反向滚动、LOD 替换与 zoom。不得由完整 raster、无界内存文件或全部 tile 同时驻留来实现“分片”。
 4. **接通正式产品合同与锚点。** 生成双端模型，接入 host、Native 文件与 Reader，覆盖同一长图内滚动、旋转、DPR、模式切换、缩放、关章及恢复。显示与 observed 必须来自实际已解码且可见的 tiles。

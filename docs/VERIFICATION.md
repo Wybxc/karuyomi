@@ -186,6 +186,8 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 64 KiB 单块 ACK 背压、首块后协作取消与截尾拒绝分测通过，JPEG progressive 在解码前拒绝；协作终态 C 账本归零。观察到非共享 WASM heap 为 16 MiB，JPEG 最大计量 payload 为 1,959,276 B，不等同 RSS/GPU；强制 terminate 只证明 100 ms 窗无后续消息，没有测得 heap 回收。服务均已 exit=0、端口释放。官方 SDK 准备器及无大型下载的归档/HTTP/进程清理回归已接工程检查。详情、历史工具链偏差和复验命令见[长图 codec 证据](verification/long-image-codec.md)及 [SDK 操作](../runtime/image-codec/README.md)。这些是独立机制，Source、随机区域/LOD、Flutter/Native 与真实设备峰值待验，正式 16 Mi 像素准入尚未调整。
 
+正式源码也已在同一 macOS arm64 官方 SDK 下完成独立构建与 Node 19 项回归：四幅合成 PNG/JPEG 长图的完整流及首/中/末摘要一致，heap 均为 16 MiB，最大计量 payload 为 3,645,862 B，close 后分配数与 payload 均归零。两次使用独立构建缓存，第二次注入无效 CFLAGS/LDFLAGS/EMCC_CFLAGS/CMAKE_TOOLCHAIN_FILE，生成的四个 JS/WASM 文件字节相同；仅证明同主机/同 SDK 重建。新轮 80 ms 暂停只测同线程 pull，JPEG 缩放只核尺寸和字节数；新产物的独立 Worker、浏览器、共享材料、Source 与终端均待接入。正式命令、输入身份及覆盖范围见[正式 codec 验收](verification/long-image-codec.md#正式源码构建与-node-验收)。无大型 SDK 下载的 53 项运行库/构建器/工具链回归、完整 macOS 格式与通用 `pnpm check` 已通过。
+
 ## 内部 graphics 二进制与预算
 
 2026-11-03，Bitmap、两套 ImageDecoder 和字体输入已将整图正文改为不超过 64 KiB 的 JSO 字节块，小 JSON 只传控制与 handle。尺寸查询先用锁定的 image-dimensions 解析至多 1 MiB 头部，不为 bounds 完整解码。账本分别覆盖可见 payload、surface、decoder/Frame、字体、临时副本和不可中断任务的工作预留；Source 持有的 Bitmap/decoder/Frame 不因普通调用结束被扫描删除，取消与迟到结果保留相应所有权直到任务真正退出。

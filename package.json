@@ -15,7 +15,7 @@
     "test:protocol": "node --test tools/protocol/golden.test.ts",
     "format": "node scripts/format.ts --write",
     "format:check": "node scripts/format.ts --check",
-    "typecheck": "pnpm -r typecheck && pnpm typecheck:tools && pnpm typecheck:bridges",
+    "typecheck": "pnpm -r typecheck && pnpm typecheck:tools && pnpm typecheck:bridges && pnpm typecheck:image-codecs",
     "typecheck:tools": "tsc -p tsconfig.tools.json",
     "typecheck:bridges": "tsc -p runtime/teavm/bridge/tsconfig.json && tsc -p packages/runtime-host/test/tsconfig.bridge-browser.json",
     "test": "vitest run",
@@ -38,11 +38,14 @@
     "hooks:install": "prek install",
     "format:check:portable": "node scripts/format.ts --check --portable",
     "hooks:check": "prek run --all-files --show-diff-on-failure",
-    "check:dependencies": "depcruise --config .dependency-cruiser.json scripts tools packages apps/api/src apps/api/test runtime/teavm/bridge",
+    "check:dependencies": "depcruise --config .dependency-cruiser.json scripts tools packages apps/api/src apps/api/test runtime/teavm/bridge runtime/image-codec",
     "test:cloudflare-probe": "node --test tools/cloudflare/*.test.ts",
     "test:reader-assets": "node --test tools/reader/database-assets.test.ts",
     "image-codecs:prepare": "node scripts/prepare-image-codecs.ts",
-    "test:image-codecs": "node --test tools/images/*.test.ts"
+    "test:image-codecs": "node --test tools/images/*.test.ts runtime/image-codec/*.test.ts",
+    "typecheck:image-codecs": "tsc -p runtime/image-codec/tsconfig.json",
+    "image-codecs:build": "node scripts/build-image-codecs.ts",
+    "image-codecs:check": "node scripts/check-image-codecs.ts"
   },
   "devDependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",
@@ -74,6 +77,7 @@
     "p-limit": "7.3.3",
     "prettier": "3.9.10",
     "proper-lockfile": "4.1.2",
+    "sharp": "0.35.5",
     "sirv": "3.0.2",
     "sql-formatter": "15.9.0",
     "tar": "7.5.22",

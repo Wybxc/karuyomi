@@ -1,6 +1,6 @@
 # 图片 codec 构建依赖
 
-当前提供官方 Emscripten SDK 准备器。PNG / JPEG 的 Node 与 Web 机制证据见[长图 codec 验证](../../docs/verification/long-image-codec.md)；正式 codec 源码、共享产物和阅读器接入仍按[长图计划](../../docs/plan/reader-image-decoding.md)推进。
+当前已内化 PNG/JPEG 的 C 适配、严格 TypeScript 顺序消费接口、官方 SDK 准备器与构建器。它们提供有界 scanline/chunk 基础；独立 Worker、可显示 tile、共享静态材料和阅读器接入仍按[长图计划](../../docs/plan/reader-image-decoding.md)推进。历史 Node/Web 机制与正式源码验收分别见[长图 codec 验证](../../docs/verification/long-image-codec.md)。
 
 ## 准备工具链
 
@@ -20,7 +20,7 @@ pnpm image-codecs:prepare --archive /absolute/path/wasm-binaries-arm64.tar.xz
 
 SDK 安装在忽略的 `runtime/image-codec/.local/toolchains/<host>-<archive-sha256>/`。同一安装由 `proper-lockfile` 互斥，下载或导入时验证归档大小与 SHA-256；解包、真实版本检查和完成记录写入成功后才原子替换目标目录。复用读取完成记录并检查 Emscripten / Clang / Binaryen 版本，不重复遍历并计算整个 SDK 的文件哈希。修改或损坏的安装应删除相应缓存目录后重新准备，不增加旧安装兼容层。
 
-`.emscripten` 明确指向该安装的 LLVM、Binaryen、项目 Node 和独立 `EM_CACHE`；准备器保留官方版本检查，不使用本机 Homebrew 编译器或执行 `emsdk.py`。可用 `--cache-root` 指定缓存根、`--python` 指定 Python。SDK 属于校验下载的构建依赖，不作为源码或未使用的 submodule 提交。后续 builder 所需 npm/声明生成依赖另由锁定流程准备，不在这里重写官方依赖。
+`.emscripten` 明确指向该安装的 LLVM、Binaryen、项目 Node 和独立 `EM_CACHE`；准备器保留官方版本检查，不使用本机 Homebrew 编译器或执行 `emsdk.py`。可用 `--cache-root` 指定缓存根、`--python` 指定 Python。SDK 属于校验下载的构建依赖，不作为源码或未使用的 submodule 提交。构建器不在 SDK 内执行 npm 安装；项目工具依赖由 pnpm 精确锁定，产物 ABI 在加载边界做运行时校验。
 
 中断准备会关闭 HTTP 流、终止所属子进程组并等待退出，删除临时安装并释放锁。回归使用临时小归档和本机 HTTP 服务，不下载大型 SDK：
 
@@ -34,4 +34,42 @@ pnpm test:image-codecs
 
 2026-11-04，在 macOS arm64 上用已保存的 282,468,276 B 官方归档执行正式 CLI 离线安装，exit=0，耗时 19.51 s；随后不传 `--archive` 复用同一安装，exit=0，耗时 0.339 s，没有下载。实际版本为 Node 24.15.0、Python 3.15.2、Emscripten 5.0.7-git、Clang 23.0.0git、Binaryen 129，与锁一致。摘要保存在忽略的 `.local/image-codec-toolchain-acceptance/`。
 
-19 项回归覆盖离线复用、归档大小与摘要错误、完成记录/身份/可执行文件不一致、HTTP 限额与取消、父进程退出后持有 stdio 的后代清理和主动取消。后两项实际完成清理，不只核对配置；结束后没有本轮准备器、夹具、临时安装或锁残留。Linux 官方归档和产品 codec 构建仍须分别验收。
+19 项回归覆盖离线复用、归档大小与摘要错误、完成记录/身份/可执行文件不一致、HTTP 限额与取消、父进程退出后持有 stdio 的后代清理和主动取消。后两项实际完成清理，不只核对配置；结束后没有本轮准备器、夹具、临时安装或锁残留。Linux 官方归档仍待验收；正式 codec 构建与运行证据按下文独立记录。
+
+## 固定上游与正式构建
+
+真正上游通过 `vendor/libspng`（v0.7.3 / `bab9f94a1186f8fda234b4e1cb65e1b9a77049cc`）和 `vendor/libjpeg-turbo`（3.2.1 / `7b4993786d856cbccabfc0ed2f923ba000e326cc`）submodule 引入；自有薄适配是这里的 `png.c`、`jpeg.c` 和共同 `codec.h`，不复制依赖缓存为源码。
+
+```sh
+git submodule update --init --depth 1 vendor/libspng vendor/libjpeg-turbo
+pnpm image-codecs:build
+```
+
+构建器读取父仓库 index 的 gitlink，检查上游 HEAD 和工作区干净；身份包含 SDK、实际 Node/Python 与 CMake 版本、上游 pin、自有 C/header 与构建源码、zlib port 和规范参数。编译前清理 ambient 编译器、链接器、Make 与 CMake 初始化参数，显式固定 flags；保留正常 PATH 与代理环境。只在输入保持一致且四份 JS/WASM 完整生成后原子发布。每个身份拥有独立 `EM_CACHE`、CMake 缓存与进程生命周期，取消或编译失败不发布部分结果。
+
+输出为忽略的 `runtime/image-codec/.local/build/<identity>/`，包含 `png.mjs/png.wasm`、`jpeg.mjs/jpeg.wasm`、上游许可及 `build-manifest.json`。清单记录输入身份、真实工具版本、产物大小及 SHA。SDK 官方 port 固定 zlib 1.3.1 及 SHA-512；已有归档可在导入边界验证后离线使用：
+
+```sh
+pnpm image-codecs:build --zlib-archive /absolute/path/zlib.tar.gz
+```
+
+`--archive` 转交 SDK 准备器，`--output` 和 `--cache-root` 分别指定输出根与构建缓存根。构建参数使用无 pthread/SAB、无内存文件系统、初始 16 MiB / 最大 32 MiB 的 WASM；这不是进程 RSS 上限。生成 JS 不提交，运行时从 `unknown` 校验真实具名 ABI，不生成未消费的声明文件或屏蔽类型检查。
+
+## 顺序消费与真实回归
+
+`decoder.ts` 的 `decodeImage({bytes,codecUrl,format,denominator?,signal?})` 返回单消费者 session。异步事件依次为 header、连续字节 chunk 和 terminal；每个 chunk 至多 64 KiB，消费者下一次拉取才推进，没有在运行时积存完整 raster。chunk 可以跨行，不能直接用作 Flutter tile。`completion` 在真正 close 后提供结果、错误阶段与计量；显式取消、signal abort 和消费者退出都驱动清理。加载等待可以立即取消，迟到实例不再接纳、迟到拒绝会被消费；底层动态导入/WASM 初始化本身仍不可中断，尚未取得实例时计量为 null、close 不冒充成功。取消只能发生在同步 C 调用之间；原始 WASM 实例同一时刻只有一个 lease，清理失败的实例不再复用。
+
+首批能力明确为非隔行 RGBA8 PNG，以及 8-bit 单 scan 顺序 Huffman 灰度/RGB/YCbCr JPEG；PNG 仅分母1，JPEG 支持1/2/4。编码输入不超过8 MiB、C 请求 payload不超过16 MiB、条带不超过256行；宽不超过4096，PNG高不超过100000，JPEG高不超过65500。不支持的颜色、隔行或多 scan 输入明确拒绝，不沿用原型产品整图解码路径的更广范围。
+
+普通工程回归使用小夹具，不下载或编译 SDK；真实验收另行运行，避免在 CI 隐式触发全工具链构建：
+
+```sh
+pnpm test:image-codecs
+pnpm image-codecs:check --build runtime/image-codec/.local/build/<identity>
+```
+
+真实命令使用锁定的 Sharp 重新生成超16 Mi像素合成长图，PNG完整像素对照原始RGBA，JPEG对照Sharp重新解码结果；消费者增量校验完整流和首/中/末区域。另测同线程 pull 暂停窗口、取消、消费者退出、截尾、首版不支持格式、ABI长度与释放/peak重置。四幅长图分别记录 heap/payload；同线程背压不等同跨 Worker ACK。JPEG新一轮缩放只核尺寸及字节数，历史独立原生djpeg像素对照单独保留。参考图生成和Sharp完整解码内存不属于被测WASM计量；这里不报告进程/GPU峰值。报告只写忽略的 `.local`，不依赖临时探针目录。
+
+2026-11-04，正式源码的两次同主机独立缓存构建及 19 项真实 WASM 回归已通过；四幅图的完整输出及首/中/末摘要一致，heap 均为 16 MiB。第二次构建使用无效 ambient flags，四份生成资产仍逐字节相同；输入身份与详细范围见[正式证据](../../docs/verification/long-image-codec.md#正式源码构建与-node-验收)。无 SDK 下载的工程回归共 53 项，覆盖工具链、builder 与运行库生命周期，已通过 `pnpm check`。
+
+正式源码的 Node 回归不能代替新产物的浏览器、Native 内置执行、原 Source 图片链、Flutter、LOD/位置恢复或真实设备验收；材料和协议接线后仍需逐项完成这些门。

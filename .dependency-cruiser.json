@@ -41,7 +41,7 @@
       "name": "product-code-does-not-import-tooling",
       "severity": "error",
       "from": {
-        "path": "^(?:packages/[^/]+/src/|apps/api/src/|runtime/teavm/bridge/)"
+        "path": "^(?:packages/[^/]+/src/|apps/api/src/|runtime/teavm/bridge/|runtime/image-codec/(?!.*\\.test\\.ts$))"
       },
       "to": {
         "path": "^(?:scripts|tools)/|/test/|\\.test\\.ts$"
@@ -104,6 +104,16 @@
       "to": {
         "couldNotResolve": true,
         "pathNot": "^cloudflare:workers$"
+      }
+    },
+    {
+      "name": "image-codec-tools-do-not-depend-on-extension-orchestration",
+      "severity": "error",
+      "from": {
+        "path": "^tools/images/"
+      },
+      "to": {
+        "path": "^tools/(?!images/)"
       }
     }
   ],

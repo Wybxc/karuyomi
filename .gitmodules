@@ -8,3 +8,9 @@
 [submodule "vendor/teavm"]
 	path = vendor/teavm
 	url = https://github.com/konsoletyper/teavm.git
+[submodule "vendor/libspng"]
+	path = vendor/libspng
+	url = https://github.com/randy408/libspng.git
+[submodule "vendor/libjpeg-turbo"]
+	path = vendor/libjpeg-turbo
+	url = https://github.com/libjpeg-turbo/libjpeg-turbo.git
