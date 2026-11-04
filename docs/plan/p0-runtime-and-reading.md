@@ -41,6 +41,8 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 
 正式 `be5c3ed` Web 主入口现已通过官方 Arknights 1.6.1 → 1.6.2 的静态快照更新、重新连接与 DREAM 第 3 页首次续读；两版章节会话均关闭、两 Worker 最终终止，见[版本更新证据](../verification/extension-version-web.md)。新版仍走真实上游 200 并重新写入正文，不推广为 Cache 正文复用或零网络；Native 版本切换继续待验。同期正式 Native `lib/main.dart` 成品与正常 TLS/签名会话预验通过，但当前工具无法连接 Simulator 操作 UI，App 未安装/启动，见[主入口准备与阻断](../verification/native-main-entry.md)。生产 Access、Native 主入口和真机等完整 P0 门槛不变。
 
+长图工作按[独立子计划](reader-image-decoding.md)推进：当前宿主与 Native 准入会拒绝超过 16 Mi 像素的原处理结果，Flutter 仍请求完整图片。先实证成熟解码管线、原图坐标与合计工作预留，再修改协议和准入；已有普通图、布局替身或逻辑预算不能替代长图与实际峰值门。
+
 ## 验收
 
 - P0-A：原输入/工具链/ABI/实际执行身份一致；Source IDs 与清单吻合；文件与 HTTP Cache 在重启、取消和版本切换后语义正确。

@@ -57,6 +57,8 @@ HTTP handle 只属于当前 Source 调用，调用结束清理。图片资源归
 
 像素预算只估算图片 surface（按 RGBA 为 64 / 128 MiB），不能代表浏览器进程合计峰值。浏览器解码无法中断时，取消也须等其完成并 close 后才能归还计数，不能用提前删除资源表来绕过总预算。
 
+当前 16 Mi 像素准入会拒绝 1080×20000 等长图；终端仍显示完整原图，现有窗口账本不包含所有 codec 临时对象。真正的长图降采样/分片尚未实现，不能仅调高限额或加入 Flutter 缩放便认定峰值受控。候选库、平台限制与后续步骤见[解码设计](design/reader-image-decoding.md)和[长图计划](plan/reader-image-decoding.md)。
+
 ## 控制与清理
 
 接口为 `acquireImage({requestId,sourceId,pageSessionId,pageKey,generation,timeoutMs?})`、`cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})` 和 `closePageSession({pageSessionId,generation})`。release 幂等，重复释放不能复活资源。旧 generation 的结果不能落入当前会话。

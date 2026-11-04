@@ -192,6 +192,8 @@ const token = await new SignJWT({ email: 'probe@example.com' })
   .setExpirationTime('30m')
   .sign(keys.privateKey);
 interface NetworkEntry {
+  requestId: string;
+  runtimeGeneration: string;
   method: string;
   target: string;
   elapsedMs: number;
@@ -473,6 +475,8 @@ const server = createServer(async (request, response) => {
           );
           const target = new URL(descriptor.url);
           entry = {
+            requestId: descriptor.requestId,
+            runtimeGeneration: descriptor.runtimeGeneration,
             method: descriptor.method,
             target: target.origin + target.pathname,
             elapsedMs: 0,
@@ -521,6 +525,8 @@ const server = createServer(async (request, response) => {
             const upstream = httpResponseMetaSchema.parse(
               await responseFrames.meta(),
             );
+            assert.equal(upstream.requestId, entry.requestId);
+            assert.equal(upstream.runtimeGeneration, entry.runtimeGeneration);
             entry.upstreamStatus = upstream.upstreamStatus;
             const contentType = upstream.headers.find(
               ([name]) => name.toLowerCase() === 'content-type',
