@@ -214,10 +214,16 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 固定 `19b65f5`（`31555e8` 加 `5267181`）的正式 Flutter Web release 已在 Codex 内置 Chromium 156 经主入口完成原 xkcd 两章、显式读完与关标签页重开；首次恢复 3318 末页即显示原文字图，未翻页或诊断补帧。原黑屏失败不覆盖，详见[Web 修复后证据](verification/reader-frame-web.md)。同输入 Android / iOS 模拟器也通过正式 Reader 及真实进程重启，原文字图、已保存 / 已读完与最终清理均已核对，见[Native 修复后证据](verification/reader-frame-native.md)。iOS 早期黑截图仍作为视觉失败保留；终态截图等待实际路由过渡完成，并以 OS / Flutter 两种原图核对。以上不声明生产 Access、Source Cache、真机或浏览器进程恢复。
 
+## 正式扩展版本更新与 Native 主入口准备
+
+2026-11-04，固定 `be5c3ed` 的正式 Flutter Web 通过官方 Arknights 1.6.1 → 1.6.2 更新：旧版保存 DREAM 第 3 页，新版重新连接后首次继续阅读即显示同一原图和已保存页位；两版 PageList 均为 51 页且摘要一致，同 principal/namespace、不同 Worker/generation，章节会话与最终 Worker 清理确认。当前静态快照旧清单/正文返回 404；独立审查和完整 90/90 检查点见[版本记录](verification/extension-version-web.md)。新版四次 Cache entry 后仍以真实 200 重新写入正文，不能认定正文复用、304、零网络或本地旧 bundle 缓存清理。
+
+同期正式 Native main 成品、62 份 Dart 和内置材料核对一致，正常 TLS、Secure/HttpOnly Cookie 与真实 RS256 Worker 的九项预验通过；当前 CUA 无法连接 Simulator，App 未安装/启动，UI 保持 `not_run` / `passed=false`。测试服务、模拟器和工具启动的 Xcode 已清理，见[Native 主入口记录](verification/native-main-entry.md)。
+
 ## 尚未通过的门槛
 
 - Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
-- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、正式扩展版本更新及 Native 身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但浏览器/App 进程重启未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换已通过，不能替代版本更新等剩余产品门。Web 正式原 Source 的 A→B→A 及 304 后正文复用已按重连记录独立通过。
+- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 Cache 正文复用与普通文件、Native 版本/身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但浏览器/App 进程重启未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述版本更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。

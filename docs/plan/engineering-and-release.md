@@ -37,7 +37,11 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 已亲读新 v3 队列的首个实际新构建样本 `all.ahottie`：buildId `ext-all.ahottie-b92d36ca170dd2e6ef9dccdeb92c82d0`，正式 builder 204.91 秒完成，canonical 3791303 B、gzip 793431 B；pipeline 结果为 `built` / `compiled_unverified`，不代表 Source 已可运行。记录位于该独立队列 `builds/b92d36ca170dd2e6ef9dccdeb92c82d0673b49a9d7ae71baa45241bfc1518600/` 的 `build-result.json` 与 `pipeline-result.json`。这是固定样本证据，不维护变化中的完成计数；既有单一 supervisor 继续执行，旧 v1 冻结队列未改。另已核对 `bookorbit` 的正式 AOT 日志：缺少 `OkHttpClient.Builder.dns(Dns)`，属于按包隔离的宿主 ABI 失败，不是环境下载或工具链失败，不将其标为可运行。
 
-该冻结批次目前已定位的宿主缺口可供后续正式回归使用，不从失败包自动重试，也不修改原扩展：bookorbit/lanraragi/mango 缺 `OkHttpClient.Builder.dns`，komga 缺 `Builder.authenticator`，dragonballmultiverse/manhuarm 缺 `StaticLayout.Builder` 等文本绘图 ABI（后者还用到字体度量与旋转），mangafire 缺 `Class.getResource` 与协程 cancel ABI。DNS 和认证须实现真实请求语义，不能以 no-op 仅换取编译成功。lunaranime 当前只有 TeaVM `2/2` 无栈错误，尚不能确定首因，需要后续独立诊断。原始逐包日志留在冻结 checkout 的 ignored 构建目录。
+历史冻结批次暴露的宿主缺口可供后续正式回归使用，不从失败包自动重试，也不修改原扩展：bookorbit/lanraragi/mango 缺 `OkHttpClient.Builder.dns`，旧 v1 的 komga 缺 `Builder.authenticator`，dragonballmultiverse/manhuarm 缺 `StaticLayout.Builder` 等文本绘图 ABI（后者还用到字体度量与旋转），mangafire 缺 `Class.getResource` 与协程 cancel ABI。DNS 和认证须实现真实请求语义，不能以 no-op 仅换取编译成功。lunaranime 当前只有 TeaVM `2/2` 无栈错误，尚不能确定首因，需要后续独立诊断。原始逐包日志留在各自冻结 checkout 的 ignored 构建目录，不把旧批次的诊断直接归于新输入。
+
+2026-11-04 重新核对当前 v3 的实际 checkpoint 和日志：komga 的本轮失败处于 `upstream` 阶段，是从 `dl.google.com` 下载 `commons-text:1.11.0` 时 DNS 解析失败，尚未进入 AOT，不能称为本轮认证 ABI 失败。后续包持续成功，未见持续的全局下载故障；先让现有 supervisor 完成本批次，再按正式恢复入口单独重试该失败输入，不修改在途 state 或启动第二个发布器。两条队列的 baseline 均未完成，继续保持定时扩展 CI 停用。
+
+正式 Web 客户端的真实扩展更新已有独立分项：官方 Arknights 1.6.1 → 1.6.2 经当前静态索引、不同 AOT/Worker 重新加载后，首次续读恢复 DREAM 第 3 页并显示原图；旧远端清单/产物 404、两会话与 Worker 最终清理均确认，见[版本更新证据](../verification/extension-version-web.md)。该门使用本地隔离快照，不代表生产 baseline 部署、Native 更新或旧本地 bundle 缓存清理，后几项仍待验收。
 
 ## 验收
 
