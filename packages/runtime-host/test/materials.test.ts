@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildManifestSchema } from '@karuyomi/contracts';
-import { collectMaterials, digest, prepareMaterials } from '../materials.ts';
+import {
+  collectMaterials,
+  digest,
+  nativeMaterialGroups,
+  prepareMaterials,
+} from '../materials.ts';
+import { imageCodecMaterialFixture } from './image-codec-material-fixture.ts';
 import { createNativeMaterialResolver } from '../src/native-materials.js';
 import { VerifiedLoader } from '../src/verified-loader.js';
 import { isNativeControlPage } from '../src/native-location.js';
@@ -18,13 +24,52 @@ afterEach(async () => {
   );
 });
 
+async function codecFixture() {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), 'karuyomi-codec-materials-'),
+  );
+  temporary.push(directory);
+  return imageCodecMaterialFixture(directory);
+}
+async function currentMaterials(includeWasmBytes = true) {
+  return collectMaterials({
+    includeWasmBytes,
+    imageCodecArtifacts: await codecFixture(),
+  });
+}
+
 describe('current runtime materials', () => {
   it('compiles deterministic classic JS from TS with the exact npm WASM identity', async () => {
-    const metadata = await collectMaterials({ includeWasmBytes: false });
-    const full = await collectMaterials();
+    const metadata = await currentMaterials(false);
+    const full = await currentMaterials();
     expect(full.catalog).toEqual(metadata.catalog);
-    expect(full.data.size).toBe(6);
-    expect(metadata.data.size).toBe(5);
+    expect(full.data.size).toBe(18);
+    expect(metadata.data.size).toBe(14);
+    expect(full.catalog.imageCodecs.map((item) => item.logicalName)).toEqual([
+      'client.js',
+      'worker.js',
+      'png.mjs',
+      'png.wasm',
+      'jpeg.mjs',
+      'jpeg.wasm',
+      'encoder.mjs',
+      'encoder.wasm',
+      'licenses/libspng-LICENSE.txt',
+      'licenses/libjpeg-turbo-LICENSE.md',
+      'licenses/libjpeg-turbo-README.ijg',
+      'licenses/zlib-README',
+    ]);
+    expect(full.catalog.sources.imageCodecs).toEqual({
+      buildIdentity: '1'.repeat(64),
+      abi: 'karuyomi-image-strips-v1',
+      encoderAbi: 'karuyomi-png-tiles-v1',
+    });
+    const worker = full.catalog.imageCodecs.find(
+      (item) => item.logicalName === 'worker.js',
+    )!;
+    expect(full.data.get(worker.sha256)!.bytes.toString('utf8')).not.toMatch(
+      /(?:^|;)\s*import(?:\s|\{)/m,
+    );
     expect(full.catalog.hostScripts.map((item) => item.logicalName)).toEqual([
       'crypto-bridge.js',
       'zstd-bridge.js',
@@ -49,8 +94,83 @@ describe('current runtime materials', () => {
     }
   });
 
+  it('codec build provenance and artifact changes participate in materialVersion without entering Source preload groups', async () => {
+    const imageCodecArtifacts = await codecFixture();
+    const first = await collectMaterials({ imageCodecArtifacts });
+    const second = await collectMaterials({
+      imageCodecArtifacts: {
+        ...imageCodecArtifacts,
+        manifest: { ...imageCodecArtifacts.manifest, identity: '2'.repeat(64) },
+      },
+    });
+    expect(second.catalog.materialVersion).not.toBe(
+      first.catalog.materialVersion,
+    );
+    const changed = Buffer.from('Changed packaging fixture: png.mjs');
+    await writeFile(
+      path.join(imageCodecArtifacts.directory, 'png.mjs'),
+      changed,
+    );
+    const third = await collectMaterials({
+      imageCodecArtifacts: {
+        ...imageCodecArtifacts,
+        manifest: {
+          ...imageCodecArtifacts.manifest,
+          artifacts: {
+            ...imageCodecArtifacts.manifest.artifacts,
+            'png.mjs': { size: changed.length, sha256: digest(changed) },
+          },
+        },
+      },
+    });
+    expect(third.catalog.materialVersion).not.toBe(
+      first.catalog.materialVersion,
+    );
+    expect(second.catalog.hostScripts).toEqual(first.catalog.hostScripts);
+    expect(second.catalog.resources).toEqual(first.catalog.resources);
+    const codecHashes = new Set(
+      first.catalog.imageCodecs.map((item) => item.sha256),
+    );
+    expect(
+      [...first.catalog.hostScripts, ...first.catalog.resources].some((item) =>
+        codecHashes.has(item.sha256),
+      ),
+    ).toBe(false);
+  });
+
+  it('Native omits the Web client entry, retains codec notices and never embeds codec bytes in a Source Worker', async () => {
+    const { catalog } = await currentMaterials();
+    const before = structuredClone(catalog);
+    const native = nativeMaterialGroups(catalog);
+    expect(native.imageCodecs.map((item) => item.logicalName)).toEqual([
+      'worker.js',
+      'png.mjs',
+      'png.wasm',
+      'jpeg.mjs',
+      'jpeg.wasm',
+      'encoder.mjs',
+      'encoder.wasm',
+      'licenses/libspng-LICENSE.txt',
+      'licenses/libjpeg-turbo-LICENSE.md',
+      'licenses/libjpeg-turbo-README.ijg',
+      'licenses/zlib-README',
+    ]);
+    expect(native.sourceWorker).toEqual([
+      ...catalog.hostScripts,
+      ...catalog.resources,
+    ]);
+    const codecHashes = new Set(catalog.imageCodecs.map((item) => item.sha256));
+    expect(
+      native.sourceWorker.some((item) => codecHashes.has(item.sha256)),
+    ).toBe(false);
+    expect(catalog).toEqual(before);
+    expect(
+      catalog.imageCodecs.some((item) => item.logicalName === 'client.js'),
+    ).toBe(true);
+  });
+
   it('fetches current shared materials only through static Web paths', async () => {
-    const { catalog, data } = await collectMaterials();
+    const { catalog, data } = await currentMaterials();
     const build = {
       ...(await manifest()),
       hostScripts: catalog.hostScripts,
@@ -88,7 +208,11 @@ describe('current runtime materials', () => {
         });
       },
     );
-    for (const artifact of [...catalog.hostScripts, ...catalog.resources]) {
+    for (const artifact of [
+      ...catalog.hostScripts,
+      ...catalog.resources,
+      ...catalog.imageCodecs,
+    ]) {
       const bytes = await loader.sharedArtifact(
         artifact,
         new AbortController().signal,
@@ -96,7 +220,7 @@ describe('current runtime materials', () => {
       );
       expect(digest(bytes)).toBe(artifact.sha256);
     }
-    expect(requests).toHaveLength(6);
+    expect(requests).toHaveLength(18);
     expect(requests.every((url) => url.startsWith('/runtime/materials/'))).toBe(
       true,
     );
@@ -108,13 +232,15 @@ describe('current runtime materials', () => {
         true,
       ),
     ).rejects.toMatchObject({ code: 'integrity_error' });
-    expect(requests).toHaveLength(6);
+    expect(requests).toHaveLength(18);
   });
 
   it('writes only current hash-addressed public bytes and a matching catalog', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'karuyomi-materials-'));
     temporary.push(directory);
-    const { catalog, data } = await prepareMaterials(directory);
+    const { catalog, data } = await prepareMaterials(directory, {
+      imageCodecArtifacts: await codecFixture(),
+    });
     expect((await readdir(directory)).sort()).toEqual([
       'materials',
       'materials.json',
@@ -127,7 +253,11 @@ describe('current runtime materials', () => {
     expect((await readdir(path.join(directory, 'materials'))).sort()).toEqual(
       [...data.keys()].sort(),
     );
-    for (const artifact of [...catalog.hostScripts, ...catalog.resources]) {
+    for (const artifact of [
+      ...catalog.hostScripts,
+      ...catalog.resources,
+      ...catalog.imageCodecs,
+    ]) {
       const bytes = await readFile(
         path.join(directory, 'materials', artifact.sha256),
       );
@@ -140,8 +270,12 @@ describe('current runtime materials', () => {
 
 describe('native material resolver', () => {
   it('returns owned current bytes and never falls back to HTTP for missing materials', async () => {
-    const { catalog, data } = await collectMaterials();
-    const supported = [...catalog.hostScripts, ...catalog.resources];
+    const { catalog, data } = await currentMaterials();
+    const supported = [
+      ...catalog.hostScripts,
+      ...catalog.resources,
+      ...catalog.imageCodecs,
+    ];
     const encoded = Object.fromEntries(
       [...data].map(([sha256, value]) => [
         sha256,

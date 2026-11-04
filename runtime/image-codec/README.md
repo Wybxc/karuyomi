@@ -1,6 +1,6 @@
 # 图片 codec 构建依赖
 
-当前已内化 PNG/JPEG 的 C 适配、严格 TypeScript 顺序消费接口、官方 SDK 准备器与构建器。它们提供有界 scanline/chunk 基础；独立 Worker、可显示 tile、共享静态材料和阅读器接入仍按[长图计划](../../docs/plan/reader-image-decoding.md)推进。历史 Node/Web 机制与正式源码验收分别见[长图 codec 验证](../../docs/verification/long-image-codec.md)。
+当前已内化 PNG/JPEG 解码与 PNG 编码的 C 适配、严格 TypeScript 顺序接口、独立 codec Worker，以及官方 SDK 准备器与构建器。Worker 消费有界 Blob 并输出 PNG 条带；材料加入 Web Static Assets / Native 内置目录。正式 Source 所有权、Protobuf、缓存和 Flutter 阅读器接入仍按[长图计划](../../docs/plan/reader-image-decoding.md)推进。历史 Node/Web 机制与正式源码验收分别见[长图 codec 验证](../../docs/verification/long-image-codec.md)。
 
 ## 准备工具链
 
@@ -38,16 +38,16 @@ pnpm test:image-codecs
 
 ## 固定上游与正式构建
 
-真正上游通过 `vendor/libspng`（v0.7.3 / `bab9f94a1186f8fda234b4e1cb65e1b9a77049cc`）和 `vendor/libjpeg-turbo`（3.2.1 / `7b4993786d856cbccabfc0ed2f923ba000e326cc`）submodule 引入；自有薄适配是这里的 `png.c`、`jpeg.c` 和共同 `codec.h`，不复制依赖缓存为源码。
+真正上游通过 `vendor/libspng`（v0.7.3 / `bab9f94a1186f8fda234b4e1cb65e1b9a77049cc`）和 `vendor/libjpeg-turbo`（3.2.1 / `7b4993786d856cbccabfc0ed2f923ba000e326cc`）submodule 引入；自有薄适配是这里的 `png.c`、`jpeg.c`、`encoder.c` 与共同 ABI header，不复制依赖缓存为源码。
 
 ```sh
 git submodule update --init --depth 1 vendor/libspng vendor/libjpeg-turbo
 pnpm image-codecs:build
 ```
 
-构建器读取父仓库 index 的 gitlink，检查上游 HEAD 和工作区干净；身份包含 SDK、实际 Node/Python 与 CMake 版本、上游 pin、自有 C/header 与构建源码、zlib port 和规范参数。编译前清理 ambient 编译器、链接器、Make 与 CMake 初始化参数，显式固定 flags；保留正常 PATH 与代理环境。只在输入保持一致且四份 JS/WASM 完整生成后原子发布。每个身份拥有独立 `EM_CACHE`、CMake 缓存与进程生命周期，取消或编译失败不发布部分结果。
+构建器读取父仓库 index 的 gitlink，检查上游 HEAD 和工作区干净；身份包含 SDK、实际 Node/Python 与 CMake 版本、上游 pin、自有 C/header 与构建源码、zlib port 和规范参数。编译前清理 ambient 编译器、链接器、Make 与 CMake 初始化参数，显式固定 flags；保留正常 PATH 与代理环境。只在输入保持一致且三组 JS/WASM 完整生成后原子发布。每个身份拥有独立 `EM_CACHE`、CMake 缓存与进程生命周期，取消或编译失败不发布部分结果。
 
-输出为忽略的 `runtime/image-codec/.local/build/<identity>/`，包含 `png.mjs/png.wasm`、`jpeg.mjs/jpeg.wasm`、上游许可及 `build-manifest.json`。清单记录输入身份、真实工具版本、产物大小及 SHA。SDK 官方 port 固定 zlib 1.3.1 及 SHA-512；已有归档可在导入边界验证后离线使用：
+输出为忽略的 `runtime/image-codec/.local/build/<identity>/`，包含 `png.mjs/png.wasm`、`jpeg.mjs/jpeg.wasm`、`encoder.mjs/encoder.wasm`、上游许可及构建清单。清单记录输入身份、真实工具版本、产物大小及 SHA。SDK 官方 port 固定 zlib 1.3.1 及 SHA-512；已有归档可在导入边界验证后离线使用：
 
 ```sh
 pnpm image-codecs:build --zlib-archive /absolute/path/zlib.tar.gz
@@ -73,3 +73,43 @@ pnpm image-codecs:check --build runtime/image-codec/.local/build/<identity>
 2026-11-04，正式源码的两次同主机独立缓存构建及 19 项真实 WASM 回归已通过；四幅图的完整输出及首/中/末摘要一致，heap 均为 16 MiB。第二次构建使用无效 ambient flags，四份生成资产仍逐字节相同；输入身份与详细范围见[正式证据](../../docs/verification/long-image-codec.md#正式源码构建与-node-验收)。无 SDK 下载的工程回归共 53 项，覆盖工具链、builder 与运行库生命周期，已通过 `pnpm check`。
 
 正式源码的 Node 回归不能代替新产物的浏览器、Native 内置执行、原 Source 图片链、Flutter、LOD/位置恢复或真实设备验收；材料和协议接线后仍需逐项完成这些门。
+
+## 独立 Worker 与 PNG 条带
+
+`client.ts` 的 `decodeImageTiles()` 消费插件处理后的受管 `Blob`；单个专用 module Worker 与 Source Worker 分开。输入在读取前限制为 8 MiB，PNG/JPEG decoder 顺序输出，独立 libspng encoder 将至多 256 行 RGBA 编为 PNG。每块传输至多 64 KiB，等待 ACK 后再发；下一条带由消费者下一次 pull 驱动。最大宽 4096、RGBA 条带 4 MiB、编码 PNG 8 MiB。两个 WASM 各自最多 32 MiB heap / 16 MiB C payload；合计上界不代表实际同时峰值或进程 RSS。
+
+事件为 header、tile 与 terminal；tile 的 `sourceRect` 保留原图坐标，所有 tile 在真实 IEND/EOI 完成前都是 provisional。终态失败或取消必须作废该页已交付 tiles。消费者退出、AbortSignal、超时均取消；协作清理读真实 C 账本，超出 grace 则 terminate，强制终止的未取得计量为 null，不能当作已测 heap 归零。宿主将已验证模块 URL 的 `release()` 作为 `releaseModules` 传入，客户端在 Worker 终止后调用。
+
+`prepareImageCodecAssets()` 通过正式 VerifiedLoader 验证 Worker、decoder/encoder 模块与两份 WASM 后才创建 Blob URL。已有 WASM 字节传入 Emscripten，不从相对 URL 回退下载。`MaterialCatalog.imageCodecs` 独立于 Source hostScripts/resources：Web 只交付一份共享 Static Assets；Native 由 `host.js` 内置所需字节和 resolver，公开 `window.karuyomiImageCodecs`，Source Worker 不预载 codec，Native 不请求远端材料。Native client 已 bundle，避免重复嵌入 Web client.js。当前只是运行库和材料接线，未改变产品 16 Mi 像素门。
+
+真实浏览器验收工具使用正式 catalog、client、VerifiedLoader 和独立 Worker：
+
+```sh
+pnpm image-codecs:check-worker --output .local/image-codec-worker/acceptance
+```
+
+CLI 准备夹具和增量逐 tile Node 基准后提供 localhost URL；使用 Codex 内置浏览器点击运行，报告保存在同一忽略目录。工具检查四幅长图与高熵最大条带的全部 PNG SHA/几何、pull/ACK、取消、截尾和恢复，只保留首/中/末三幅预览；不会积存整图 raster。独立 Sharp 像素正确性由另行执行的 24 项 Node 门提供。通过页面关闭服务或 SIGINT 退出，服务还有有界存活期限。`--prepare-only` 只准备；可选 `--build <directory>` 校验并使用本地 builder 目录。
+
+## 供工程构建使用的固定产物
+
+`artifacts-lock.json` 固定三组模块、许可证、构建清单及来源身份。它是构建输入，归档属于独立运行时构建依赖；客户端扩展仍只从 Static Assets 下载。CI 不隐式编译 SDK，也不下载未验收的 Linux 工具链：
+
+```sh
+pnpm image-codecs:prepare-artifacts
+# 离线导入同一归档
+pnpm image-codecs:prepare-artifacts --archive /absolute/path/image-codecs.tar.gz
+```
+
+准备器校验有界归档 size/SHA、精确成员集合、逐成员 SHA、manifest 身份、自有构建输入和 Git index 的上游 pin，再原子安装到忽略缓存。复用也检查锁定成员；材料收集复用该次已验证结果。归档检查和 extractor 清理在真实进程终态后才释放 stage/lock，回归覆盖失败、取消及提前退出父进程的后代。
+
+维护 C/builder/toolchain 输入或上游 pin 后必须重新构建、运行真实 Node 门，再生成新归档和锁：
+
+```sh
+pnpm image-codecs:package --build runtime/image-codec/.local/build/<identity> \
+  --archive .local/image-codecs.tar.gz \
+  --url https://github.com/Wybxc/karuyomi/releases/download/<dependency-tag>/image-codecs.tar.gz
+```
+
+发布构建依赖时，tag 必须指向包含实际构建源码的提交；核实公开下载与锁一致后才让分支 CI 使用。扩展 AOT 与该归档分开，不能复用旧冻结 checkpoint 作为当前 host 身份。
+
+2026-11-04，正式 catalog/client/VerifiedLoader/Worker 在 Codex 内置 Chromium 156 通过 11 项验收；四幅长图与高熵条带共 590 个基础 tile 的 PNG 字节和几何匹配 Node 同产物基准，另测 ACK/pull、取消、截尾及恢复。所有会话记录 terminal → terminate → release，最终活动 Worker 为零；25 ms 无迟到消息观察不等于物理 heap 已回收。服务已正常关闭、端口释放。完整身份与范围见[正式 Worker 证据](../../docs/verification/long-image-codec.md)；Source/Reader/Native 产品接线和峰值仍按计划待验。

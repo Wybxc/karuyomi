@@ -56,7 +56,7 @@ async function fixture(context: TestContext) {
     ]);
   }
   await mkdir(path.join(root, 'runtime/image-codec'), { recursive: true });
-  for (const file of ['codec.h', 'png.c', 'jpeg.c'])
+  for (const file of ['codec.h', 'png.c', 'jpeg.c', 'encoder.c', 'encoder.h'])
     await writeFile(
       path.join(root, 'runtime/image-codec', file),
       `fixture ${file}\n`,
@@ -94,6 +94,7 @@ if(process.env.CODEC_FIXTURE_MODE==='cancel') {
  await new Promise(resolve=>setTimeout(resolve,120000));
 }
 if(output.endsWith('jpeg.mjs') && process.env.CODEC_FIXTURE_MODE==='failure') process.exit(7);
+if(output.endsWith('encoder.mjs') && process.env.CODEC_FIXTURE_MODE==='encoder-failure') process.exit(7);
 if(output.endsWith('jpeg.mjs') && process.env.CODEC_FIXTURE_MODE==='changed') fs.appendFileSync(path.join(path.dirname(args[0]),'png.c'),'changed');
 const ports=path.join(process.env.EM_CACHE,'ports/zlib/zlib-1.3.1');
 fs.mkdirSync(ports,{recursive:true});
@@ -198,8 +199,14 @@ test('a complete build records pinned sources, bounded parameters and notices, t
       /pthread|SHARED_MEMORY|emit-tsd/.test(value),
     ),
   );
-  assert.equal(Object.keys(result.manifest.artifacts).length, 8);
+  assert.equal(Object.keys(result.manifest.artifacts).length, 10);
   assert.ok(result.manifest.artifacts['licenses/zlib-README']);
+  assert.equal(result.manifest.encoderAbi, 'karuyomi-png-tiles-v1');
+  assert.ok(result.manifest.artifacts['encoder.mjs']);
+  assert.ok(result.manifest.artifacts['encoder.wasm']);
+  assert.ok(result.manifest.inputs.recipe.encoder.includes('-sUSE_ZLIB=1'));
+  assert.ok(result.manifest.inputs.files['runtime/image-codec/encoder.c']);
+  assert.ok(result.manifest.inputs.files['runtime/image-codec/encoder.h']);
   f.setMode('failure');
   const second = await buildImageCodecs(f.options);
   assert.equal(second.reused, true);
@@ -219,13 +226,31 @@ test('source edits, SDK lock changes and staged upstream pins select new build i
   const sourceChanged = await buildImageCodecs(f.options);
   assert.notEqual(sourceChanged.manifest.identity, first.manifest.identity);
   await writeFile(
+    path.join(f.root, 'runtime/image-codec/encoder.c'),
+    'changed PNG encoder adapter\n',
+  );
+  const encoderChanged = await buildImageCodecs(f.options);
+  assert.notEqual(
+    encoderChanged.manifest.identity,
+    sourceChanged.manifest.identity,
+  );
+  await writeFile(
+    path.join(f.root, 'runtime/image-codec/encoder.h'),
+    'changed PNG encoder ABI\n',
+  );
+  const encoderHeaderChanged = await buildImageCodecs(f.options);
+  assert.notEqual(
+    encoderHeaderChanged.manifest.identity,
+    encoderChanged.manifest.identity,
+  );
+  await writeFile(
     path.join(f.root, 'runtime/image-codec/toolchain-lock.json'),
     '{"fixture":2}\n',
   );
   const sdkChanged = await buildImageCodecs(f.options);
   assert.notEqual(
     sdkChanged.manifest.identity,
-    sourceChanged.manifest.identity,
+    encoderHeaderChanged.manifest.identity,
   );
   await execa('git', [
     '-C',
@@ -262,23 +287,24 @@ test('a dirty upstream is rejected before publishing or compiling', async (conte
   await assert.rejects(readdir(f.outputRoot), { code: 'ENOENT' });
 });
 
-test('a same-size modified cached output fails integrity verification instead of being silently reused', async (context) => {
-  const f = await fixture(context);
-  const first = await buildImageCodecs(f.options);
-  const file = path.join(first.directory, 'png.mjs');
-  const bytes = await readFile(file);
-  bytes[0] = (bytes[0] ?? 0) ^ 1;
-  await writeFile(file, bytes);
-  await assert.rejects(
-    buildImageCodecs(f.options),
-    /artifact differs from its manifest/,
-  );
-  assert.deepEqual(await readdir(f.outputRoot), [
-    path.basename(first.directory),
-  ]);
-});
+for (const artifact of ['png.mjs', 'encoder.wasm'])
+  test(`a same-size modified ${artifact} fails integrity verification instead of being silently reused`, async (context) => {
+    const f = await fixture(context);
+    const first = await buildImageCodecs(f.options);
+    const file = path.join(first.directory, artifact);
+    const bytes = await readFile(file);
+    bytes[0] = (bytes[0] ?? 0) ^ 1;
+    await writeFile(file, bytes);
+    await assert.rejects(
+      buildImageCodecs(f.options),
+      /artifact differs from its manifest/,
+    );
+    assert.deepEqual(await readdir(f.outputRoot), [
+      path.basename(first.directory),
+    ]);
+  });
 
-for (const mode of ['failure', 'changed'] as const) {
+for (const mode of ['failure', 'encoder-failure', 'changed'] as const) {
   test(`${mode} during compilation cannot publish partial outputs or replace another build`, async (context) => {
     const f = await fixture(context);
     await mkdir(path.join(f.outputRoot, 'previous'), { recursive: true });

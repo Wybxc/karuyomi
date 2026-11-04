@@ -5,5 +5,12 @@
     "types": [],
     "erasableSyntaxOnly": true
   },
-  "include": ["codec-api.ts", "decoder.ts"]
+  "include": [
+    "codec-api.ts",
+    "decoder.ts",
+    "encoder.ts",
+    "worker-protocol.ts",
+    "worker.ts",
+    "client.ts"
+  ]
 }

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import type { Artifact } from '@karuyomi/contracts';
+import { prepareImageCodecArtifacts } from '../../tools/images/artifacts.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const require = createRequire(import.meta.url);
@@ -30,11 +31,25 @@ export interface MaterialCatalog {
   materialVersion: string;
   hostScripts: MaterialArtifact[];
   resources: MaterialArtifact[];
-  sources: { zstd: typeof zstdSource };
+  imageCodecs: MaterialArtifact[];
+  sources: {
+    zstd: typeof zstdSource;
+    imageCodecs: { buildIdentity: string; abi: string; encoderAbi: string };
+  };
 }
 export interface RuntimeMaterials {
   catalog: MaterialCatalog;
   data: Map<string, { bytes: Buffer; contentType: string }>;
+}
+
+/** Native bundles the client in host.js, and embeds codec bytes only in that host. */
+export function nativeMaterialGroups(catalog: MaterialCatalog) {
+  return {
+    sourceWorker: [...catalog.hostScripts, ...catalog.resources],
+    imageCodecs: catalog.imageCodecs.filter(
+      (artifact) => artifact.logicalName !== 'client.js',
+    ),
+  };
 }
 
 /** Compile the maintained TS bridges into the current material catalog. */
@@ -60,10 +75,58 @@ export async function compileBridge(name: string): Promise<Buffer> {
   return Buffer.from(output.contents);
 }
 
-/** Public materials only. Requires locked npm build dependencies, never JVM seed. */
+export interface ImageCodecMaterialInput {
+  directory: string;
+  manifest: {
+    identity: string;
+    abi: string;
+    encoderAbi: string;
+    artifacts: Record<string, { size: number; sha256: string }>;
+  };
+}
+export interface CollectMaterialsOptions {
+  includeWasmBytes?: boolean;
+  imageCodecArtifacts?: ImageCodecMaterialInput;
+  signal?: AbortSignal;
+}
+
+async function compileImageCodecEntry(
+  name: 'client' | 'worker',
+): Promise<Buffer> {
+  const result = await build({
+    absWorkingDir: root,
+    ...(name === 'worker'
+      ? { entryPoints: ['runtime/image-codec/worker.ts'] }
+      : {
+          stdin: {
+            contents: `export * from './runtime/image-codec/client.ts';\nexport * from './packages/runtime-host/src/image-codec-assets.ts';`,
+            resolveDir: root,
+            sourcefile: 'image-codec-client.ts',
+            loader: 'ts',
+          },
+        }),
+    bundle: true,
+    platform: 'browser',
+    format: 'esm',
+    target: 'es2022',
+    minify: true,
+    sourcemap: false,
+    write: false,
+    charset: 'utf8',
+    legalComments: 'none',
+  });
+  const output = result.outputFiles[0];
+  if (!output || result.outputFiles.length !== 1)
+    throw new Error('Invalid image codec entry output');
+  return Buffer.from(output.contents);
+}
+
+/** Public materials only. Uses verified locked codec artifacts, never an SDK or JVM seed. */
 export async function collectMaterials({
   includeWasmBytes = true,
-} = {}): Promise<RuntimeMaterials> {
+  imageCodecArtifacts,
+  signal,
+}: CollectMaterialsOptions = {}): Promise<RuntimeMaterials> {
   const protocol: {
     protocolVersion: number;
     hostAbi: string;
@@ -125,22 +188,95 @@ export async function collectMaterials({
     });
   }
   const resources = [resource];
-  const identity = { ...protocol, hostScripts, resources };
+  const codecBuild =
+    imageCodecArtifacts ??
+    (await prepareImageCodecArtifacts(signal ? { signal } : {}));
+  const imageCodecs: MaterialArtifact[] = [];
+  for (const name of ['client', 'worker'] as const)
+    imageCodecs.push(
+      artifact(
+        name + '.js',
+        await compileImageCodecEntry(name),
+        'application/javascript',
+      ),
+    );
+  const codecNames = [
+    'png.mjs',
+    'png.wasm',
+    'jpeg.mjs',
+    'jpeg.wasm',
+    'encoder.mjs',
+    'encoder.wasm',
+  ];
+  const noticeNames = [
+    'licenses/libspng-LICENSE.txt',
+    'licenses/libjpeg-turbo-LICENSE.md',
+    'licenses/libjpeg-turbo-README.ijg',
+    'licenses/zlib-README',
+  ];
+  if (
+    Object.keys(codecBuild.manifest.artifacts).sort().join('\n') !==
+    [...codecNames, ...noticeNames].sort().join('\n')
+  )
+    throw new Error(
+      'Image codec material artifacts do not match the current three codecs and notices',
+    );
+  for (const logicalName of [...codecNames, ...noticeNames]) {
+    const pinned = codecBuild.manifest.artifacts[logicalName];
+    if (!pinned)
+      throw new Error('Missing pinned image codec material: ' + logicalName);
+    const contentType = logicalName.endsWith('.mjs')
+      ? 'application/javascript'
+      : logicalName.endsWith('.wasm')
+        ? 'application/wasm'
+        : 'text/plain';
+    imageCodecs.push({
+      logicalName,
+      path: '/runtime/materials/' + pinned.sha256,
+      ...pinned,
+      contentType,
+    });
+    if (includeWasmBytes || !logicalName.endsWith('.wasm')) {
+      const bytes = await readFile(
+        path.join(codecBuild.directory, logicalName),
+      );
+      if (bytes.length !== pinned.size)
+        throw new Error(
+          'Prepared image codec material changed length: ' + logicalName,
+        );
+      // Preparation already verified this artifact at its archive import boundary.
+      data.set(pinned.sha256, { bytes, contentType });
+    }
+  }
+  const codecSource = {
+    buildIdentity: codecBuild.manifest.identity,
+    abi: codecBuild.manifest.abi,
+    encoderAbi: codecBuild.manifest.encoderAbi,
+  };
+  const identity = {
+    ...protocol,
+    hostScripts,
+    resources,
+    imageCodecs,
+    codecSource,
+  };
   const catalog: MaterialCatalog = {
     schemaVersion: 1,
     ...protocol,
     materialVersion: digest(Buffer.from(JSON.stringify(identity))),
     hostScripts,
     resources,
-    sources: { zstd: zstdSource },
+    imageCodecs,
+    sources: { zstd: zstdSource, imageCodecs: codecSource },
   };
   return { catalog, data };
 }
 
 export async function prepareMaterials(
   outputDirectory: string,
+  options: CollectMaterialsOptions = {},
 ): Promise<RuntimeMaterials> {
-  const materials = await collectMaterials();
+  const materials = await collectMaterials(options);
   await mkdir(path.join(outputDirectory, 'materials'), { recursive: true });
   for (const [sha256, { bytes }] of materials.data)
     await writeFile(path.join(outputDirectory, 'materials', sha256), bytes);

@@ -2,13 +2,14 @@ import { build, type BuildOptions } from 'esbuild';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { digest, prepareMaterials } from './materials.ts';
+import { digest, nativeMaterialGroups, prepareMaterials } from './materials.ts';
 
 const directory = fileURLToPath(new URL('./', import.meta.url));
 const output = path.join(directory, 'dist');
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 const { catalog, data } = await prepareMaterials(output);
+const nativeGroups = nativeMaterialGroups(catalog);
 const common = {
   absWorkingDir: directory,
   bundle: true,
@@ -34,13 +35,17 @@ await cp(
 // Each embedded value is decoded into fresh bytes. VerifiedLoader independently
 // checks MIME, size and SHA on every use, and never falls back to a network read.
 const embedded = Object.fromEntries(
-  [...data].map(([sha256, value]) => [
-    sha256,
-    {
-      base64: value.bytes.toString('base64'),
-      contentType: value.contentType,
-    },
-  ]),
+  nativeGroups.sourceWorker.map(({ sha256 }) => {
+    const value = data.get(sha256);
+    if (!value) throw new Error('Missing Native Source material: ' + sha256);
+    return [
+      sha256,
+      {
+        base64: value.bytes.toString('base64'),
+        contentType: value.contentType,
+      },
+    ];
+  }),
 );
 const nativeMaterialModule = `import {createNativeMaterialResolver} from ${JSON.stringify(path.join(directory, 'src/native-materials.ts'))};
 const values=${JSON.stringify(embedded)};
@@ -66,13 +71,57 @@ const nativeWorker = await build({
     },
   ],
 });
+// Codec bytes belong to the terminal host only, never every Source Worker.
+const codecEmbedded = Object.fromEntries(
+  nativeGroups.imageCodecs.map(({ sha256 }) => {
+    const value = data.get(sha256);
+    if (!value)
+      throw new Error('Missing Native image codec material: ' + sha256);
+    return [
+      sha256,
+      {
+        base64: value.bytes.toString('base64'),
+        contentType: value.contentType,
+      },
+    ];
+  }),
+);
 const nativeHost = await build({
   ...common,
-  entryPoints: ['src/host.native.ts'],
+  stdin: {
+    contents: `import './src/host.native.ts';
+import {createImageCodecAssetProvider} from './src/image-codec-assets.ts';
+import {decodeImageTiles} from '../../runtime/image-codec/client.ts';
+const provider=createImageCodecAssetProvider(location.origin,${JSON.stringify(nativeGroups.imageCodecs)});
+Object.defineProperty(window,'karuyomiImageCodecs',{value:Object.freeze({...provider,decodeImageTiles})});`,
+    resolveDir: directory,
+    sourcefile: 'native-image-codec-host.ts',
+    loader: 'ts',
+  },
   format: 'iife',
   define: {
     __KARUYOMI_MATERIAL_VERSION__: JSON.stringify(catalog.materialVersion),
   },
+  plugins: [
+    {
+      name: 'embedded-native-image-codecs',
+      setup(builder) {
+        builder.onResolve({ filter: /^\.\/materials\.js$/ }, () => ({
+          path: 'image-codecs',
+          namespace: 'native-image-codecs',
+        }));
+        builder.onLoad(
+          { filter: /.*/, namespace: 'native-image-codecs' },
+          () => ({
+            contents: `import {createNativeMaterialResolver} from ${JSON.stringify(path.join(directory, 'src/native-materials.ts'))};
+export const nativeMaterials=createNativeMaterialResolver(${JSON.stringify(codecEmbedded)});`,
+            loader: 'js',
+            resolveDir: directory,
+          }),
+        );
+      },
+    },
+  ],
 });
 const nativeOutput = path.join(output, 'native');
 await mkdir(nativeOutput, { recursive: true });
@@ -93,7 +142,9 @@ const nativeManifest = {
   runtimeBaseline: catalog.runtimeBaseline,
   materialVersion: catalog.materialVersion,
   files,
-  materials: [...catalog.hostScripts, ...catalog.resources],
+  materials: nativeGroups.sourceWorker,
+  imageCodecs: nativeGroups.imageCodecs,
+  sources: catalog.sources,
 };
 await writeFile(
   path.join(nativeOutput, 'manifest.json'),

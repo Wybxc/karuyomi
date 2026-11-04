@@ -13,15 +13,21 @@ import path from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { collectMaterials } from '../../packages/runtime-host/materials.ts';
+import { imageCodecMaterialFixture } from '../../packages/runtime-host/test/image-codec-material-fixture.ts';
 import { assembleExtensionAssets } from './assemble-assets.ts';
 
 const digest = (bytes: Uint8Array) =>
   createHash('sha256').update(bytes).digest('hex');
-const { catalog } = await collectMaterials({ includeWasmBytes: false });
 
 async function fixture(t: TestContext) {
   const root = await mkdtemp(path.join(tmpdir(), 'karuyomi-static-assemble-'));
   t.after(() => rm(root, { recursive: true, force: true }));
+  const { catalog } = await collectMaterials({
+    includeWasmBytes: false,
+    imageCodecArtifacts: await imageCodecMaterialFixture(
+      path.join(root, 'codecs'),
+    ),
+  });
   const source = path.join(root, 'input');
   const target = path.join(root, 'public');
   const previous = process.env.EXTENSION_ASSETS_DIR;
@@ -89,14 +95,14 @@ async function fixture(t: TestContext) {
     }),
   );
   await put(bundlePath.slice(1), encoded);
-  return { source, target, bundlePath, manifestPath, encoded, put };
+  return { source, target, bundlePath, manifestPath, encoded, put, catalog };
 }
 
 test('assembly publishes only the current index reachable snapshot', async (t) => {
   const f = await fixture(t);
   await f.put('extensions/builds/old-build/manifest.json', '{}');
   await f.put('extensions/artifacts/orphan.gz', 'obsolete');
-  assert.equal(await assembleExtensionAssets(f.target, catalog), 1);
+  assert.equal(await assembleExtensionAssets(f.target, f.catalog), 1);
   assert.deepEqual(
     await readFile(path.join(f.target, f.bundlePath.slice(1))),
     f.encoded,
@@ -119,7 +125,7 @@ test('assembly refuses an index/state mixture from different deployments', async
     JSON.stringify({ indexSha256: '0'.repeat(64) }),
   );
   await assert.rejects(
-    assembleExtensionAssets(f.target, catalog),
+    assembleExtensionAssets(f.target, f.catalog),
     /does not bind/,
   );
 });
@@ -129,13 +135,30 @@ test('assembly checks gzip bytes at the upload boundary', async (t) => {
   const corrupted = Buffer.from(f.encoded);
   corrupted[corrupted.length - 1] = (corrupted[corrupted.length - 1] ?? 0) ^ 1;
   await f.put(f.bundlePath.slice(1), corrupted);
-  await assert.rejects(assembleExtensionAssets(f.target, catalog), /integrity/);
+  await assert.rejects(
+    assembleExtensionAssets(f.target, f.catalog),
+    /integrity/,
+  );
 });
 
 test('an explicit missing snapshot never silently deploys an empty catalog', async (t) => {
   const f = await fixture(t);
   process.env.EXTENSION_ASSETS_DIR = path.join(f.source, 'missing');
-  await assert.rejects(assembleExtensionAssets(f.target, catalog), {
+  await assert.rejects(assembleExtensionAssets(f.target, f.catalog), {
     code: 'ENOENT',
   });
+});
+
+test('codec materials cannot become extension host scripts or Source Worker preload resources', async (t) => {
+  const f = await fixture(t);
+  const file = path.join(f.source, f.manifestPath.slice(1));
+  const manifest = JSON.parse(await readFile(file, 'utf8'));
+  manifest.resources = [
+    f.catalog.imageCodecs.find((item) => item.logicalName === 'png.wasm'),
+  ];
+  await f.put(f.manifestPath.slice(1), JSON.stringify(manifest));
+  await assert.rejects(
+    assembleExtensionAssets(f.target, f.catalog),
+    /unavailable runtime materials/,
+  );
 });

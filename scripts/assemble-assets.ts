@@ -47,7 +47,11 @@ await cp(runtime, new URL('runtime/', publicDir), {
 const catalog: MaterialCatalog = JSON.parse(
   await readFile(new URL('materials.json', runtime), 'utf8'),
 );
-const materials = [...catalog.hostScripts, ...catalog.resources];
+const materials = [
+  ...catalog.hostScripts,
+  ...catalog.resources,
+  ...catalog.imageCodecs,
+];
 const extensionCount = await assembleExtensionAssets(
   fileURLToPath(publicDir),
   catalog,

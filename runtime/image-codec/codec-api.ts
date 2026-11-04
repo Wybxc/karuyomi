@@ -52,9 +52,25 @@ const apiSchema = z
     image_close: raw._image_close,
   }));
 const heapSchema = z.object({ HEAPU8: z.instanceof(Uint8Array) });
-const factorySchema = z.object({
-  default: z.function({ input: [], output: z.promise(z.unknown()) }),
+const loadOptionsSchema = z
+  .object({
+    wasmBinary: z.instanceof(Uint8Array).optional(),
+  })
+  .strict();
+const factoryOptionsSchema = loadOptionsSchema.extend({
+  locateFile: z
+    .function({ input: [z.string(), z.string()], output: z.string() })
+    .optional(),
 });
+const factorySchema = z.object({
+  default: z.function({
+    input: [factoryOptionsSchema],
+    output: z.promise(z.unknown()),
+  }),
+});
+export interface ImageCodecLoadOptions {
+  wasmBinary?: Uint8Array;
+}
 
 export type ImageCodecApi = z.infer<typeof apiSchema>;
 export interface ImageCodecMetrics {
@@ -227,8 +243,37 @@ export class ImageCodec {
   }
 }
 
-export async function loadImageCodec(codecUrl: URL): Promise<ImageCodec> {
+/** Explicit bytes let verified Blob modules load without a relative/network WASM fallback. */
+export async function instantiateCodecModule(
+  codecUrl: URL,
+  options: ImageCodecLoadOptions = {},
+): Promise<unknown> {
+  const parsed = loadOptionsSchema.parse(options);
+  if (
+    parsed.wasmBinary &&
+    (!(parsed.wasmBinary.buffer instanceof ArrayBuffer) ||
+      !parsed.wasmBinary.byteLength ||
+      parsed.wasmBinary.byteLength > 8 * 1024 * 1024)
+  )
+    throw new Error('Invalid verified codec WASM bytes');
   const imported: unknown = await import(codecUrl.href);
-  const raw = await factorySchema.parse(imported).default();
-  return new ImageCodec(raw);
+  // Emscripten resolves its WASM filename even when bytes are supplied. A Blob
+  // module cannot be a relative URL base; this inert data URL also prevents a
+  // network fallback if generated initialization ever asks for a location.
+  return factorySchema.parse(imported).default({
+    ...parsed,
+    ...(parsed.wasmBinary
+      ? {
+          locateFile: (_name: string, _directory: string) =>
+            'data:application/wasm;base64,',
+        }
+      : {}),
+  });
+}
+
+export async function loadImageCodec(
+  codecUrl: URL,
+  options: ImageCodecLoadOptions = {},
+): Promise<ImageCodec> {
+  return new ImageCodec(await instantiateCodecModule(codecUrl, options));
 }

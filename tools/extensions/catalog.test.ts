@@ -3,7 +3,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { git, scan, SHARED_PATHS, treeHash } from './catalog.ts';
+import {
+  git,
+  scan,
+  SHARED_PATHS,
+  treeHash,
+  HOST_PATHS,
+  hostFingerprint,
+} from './catalog.ts';
 import stableStringify from 'json-stable-stringify';
 function fixture(t: TestContext) {
   const root = mkdtempSync(path.join(tmpdir(), 'karuyomi-catalog-'));
@@ -142,4 +149,30 @@ test('generated host outputs do not change fingerprints; stable JSON uses lexica
     stableStringify({ z: 1, A: 2, _: 3, a: { b: '漫画', a: 1 } }),
     '{"A":2,"_":3,"a":{"a":1,"b":"漫画"},"z":1}',
   );
+});
+
+test('codec sources and the pinned material lock change the host identity while codec caches do not', (t) => {
+  const f = fixture(t);
+  for (const name of HOST_PATHS) {
+    f.put(
+      path.basename(name).includes('.') ? name : name + '/fixture.txt',
+      'fixed host input\n',
+    );
+  }
+  f.put('runtime/image-codec/worker.ts', 'export const version = 1;\n');
+  f.put('runtime/image-codec/artifacts-lock.json', '{}\n');
+  const before = hostFingerprint(f.root).fingerprint;
+  f.put(
+    'runtime/image-codec/.local/build/generated.wasm',
+    'ignored cached build',
+  );
+  assert.equal(hostFingerprint(f.root).fingerprint, before);
+  f.put('runtime/image-codec/worker.ts', 'export const version = 2;\n');
+  const codeChanged = hostFingerprint(f.root).fingerprint;
+  assert.notEqual(codeChanged, before);
+  f.put(
+    'runtime/image-codec/artifacts-lock.json',
+    '{"buildIdentity":"next"}\n',
+  );
+  assert.notEqual(hostFingerprint(f.root).fingerprint, codeChanged);
 });

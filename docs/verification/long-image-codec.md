@@ -245,3 +245,80 @@ pnpm image-codecs:check \
 输入或工具链变化时，使用构建命令返回的新身份目录；已有SDK/zlib归档可按 [README](../../runtime/image-codec/README.md) 的正式选项传入。普通 `pnpm test:image-codecs` 是不编译SDK的小夹具工程回归，不能替代这里的真实WASM命令。
 
 本节只证明正式源码在Node中的顺序解码与生命周期，以及上述同机重建。新产物尚未据此取得浏览器、Source图片链、Flutter、Native内置执行、tile/LOD/位置恢复或真实设备性能验收；也不代表全项目检查、P0或长图产品门通过。历史浏览器的Worker/ACK与原生缩放结果仍按各自输入和旧产物身份单独解释，正式16 Mi像素准入不因这份报告自动改变。
+
+## 有界 PNG 编码器的 Node 验收
+
+2026-11-04，同一 macOS arm64 与上一节固定官方 SDK、Node 24.15.0、Sharp 0.35.5 环境，正式源码增加 `runtime/image-codec/encoder.{c,h}`，使用固定 libspng 编码 straight RGBA8 条带，ABI 为 `karuyomi-png-tiles-v1`。宽度1至4096、高度1至256，输入必须精确等于 `width * height * 4` 且不超过4 MiB，编码输出上限8 MiB；C 请求 payload 上限16 MiB，WASM heap 初始16 MiB、最大32 MiB。接口和构建说明见 [image-codec README](../../runtime/image-codec/README.md)。
+
+新构建身份为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。正式 CLI 在原19项之外增加5项编码器检查，本轮24项全部通过、进程 exit=0；原19项范围保留，PNG/JPEG 四份 JS/WASM 的大小和 SHA 与上一节完全相同。报告为忽略的 `runtime/image-codec/.local/verification/encoder-final/result.json`，SHA-256 `99a8f995914be55a59d266ba23ba90de2f9b26f332c8a0498a8bca14bb17d0d3`。
+
+三项像素检查使用真实 encoder WASM，将返回的 PNG 复制出 WASM，在 C close 后由 Sharp 完整解码；解码后 RGBA 的 SHA 均与编码输入精确匹配。高熵素材由固定 AES-CTR 测试字节流确定性生成，用于触及最大输入和低压缩率路径。
+
+| RGBA8 输入    |    输入 B | PNG 输出 B | C 请求 payload 高水位 B | 实际 WASM heap B |
+| ------------- | --------: | ---------: | ----------------------: | ---------------: |
+| 1080×256 图案 | 1,105,920 |      1,889 |               1,407,431 |       16,777,216 |
+| 4096×256 高熵 | 4,194,304 |  4,202,052 |              12,904,231 |       21,364,736 |
+| 1×1           |         4 |         70 |                 288,567 |       16,777,216 |
+
+三项 close 均成功，`liveBytes=0`、`allocations=0`，peak 保持真实可读。高熵输入触发实际 heap 增长，不能将所有编码器案例写成16 MiB heap。
+
+另外两项直接检查真实 ABI 与生命周期：
+
+- 尺寸0、宽4097、高257、RGBA长度不符和输入超过4 MiB均被拒绝；encode 尺寸/长度错误返回 `-103`、raw code `-3`，失败后的输出指针/长度及 live/allocations 均为0。随后同一实例成功编码1×1，Sharp 完整像素仍一致，证明错误后可复用。
+- 仅分配1 MiB输入、尚未 encode 时 close，live/allocations 清零，peak 仍为1,048,576 B；下次32 B输入将 peak 重置为32 B，close 后仍可读。这只证明 encode 前调用者放弃输入的释放边界，不是 Worker 取消或同步 C 内抢占。
+
+| 新增正式产物   | 大小 B | SHA-256                                                            |
+| -------------- | -----: | ------------------------------------------------------------------ |
+| `encoder.mjs`  | 29,659 | `0fef62f2e378400634c5a3b118bab6549822a4900a60f604b5d10dea57496cbf` |
+| `encoder.wasm` | 86,421 | `8d835c0aafc2ef49a7e0bea05e257f480b1d8ac22408ace19623f704a6f79a92` |
+
+在仓库根目录按 README 准备固定工具链后构建，并使用构建命令返回的身份目录复验；以下已有身份的报告写到新目录以保留本轮证据：
+
+```sh
+pnpm image-codecs:build
+pnpm image-codecs:check \
+  --build runtime/image-codec/.local/build/8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854 \
+  --report runtime/image-codec/.local/verification/encoder-rerun/result.json
+```
+
+本轮是 Node 中独立解码器/编码器的真实 WASM 验收，没有执行新管线的真实 Worker、ACK、重组、浏览器显示或跨线程取消；上一节同线程 pull 也不能代替 Worker ACK。JPEG 新轮缩放仍只验证尺寸和字节。夹具生成及 Sharp 完整参考解码的内存不计入 WASM payload/heap，表中数值不是 RSS、图形内存或解码器与编码器同时运行的总峰值。本轮不证明真实 Source、Flutter、Native 或新产物浏览器行为，不更新全项目、P0或长图产品完成状态。
+
+## 正式独立 Worker 与 PNG tiles 浏览器验收
+
+2026-11-04，主代理在 Codex 内置 Chromium 156 实际点击正式工具页面的“运行验收”，11项全部通过；`crossOriginIsolated=false`，未使用 SharedArrayBuffer。入口为 `scripts/check-image-codec-worker.ts` / `tools/images/verify-worker-browser.ts`。浏览器执行 catalog 的 `client.js`，经 `createImageCodecAssetProvider().prepare()` 校验静态材料传输，再以已验证 JS Blob URL、WASM bytes 和真实独立 module Worker 完成解码、条带重组与 PNG 编码；消息观察器转调真实 Worker，不模拟 codec 结果。
+
+构建身份沿用上一节的 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`，材料版本为 `c1745a37a9f2affd364544829d608d25772b29082f24db12600aa736cad22f8c`。报告位于忽略的 `.local/image-codec-worker/acceptance/result.json`，SHA-256 为 `75db7461445289a3b49e9664a3bb1f31008d2734e5c512e8593b6c0d33b364b4`，runId 为 `e48a9445-0429-4a8e-ac85-93fa61840574`；对应输入与逐片 expected 摘要在 `public/config.json`。
+
+五项完整案例共590片，全部 denominator=1、每片最多256行。四幅长图均超过16 Mi像素，PNG 为非交错 RGBA8，JPEG 为顺序 baseline、4:4:4。每片索引、尺寸、源坐标、PNG长度和 SHA 均匹配，完整消费继续至真实 IEND/EOI 验证后的 `complete`。
+
+| 输入                  | 编码输入 B | 基础完整 tile 数 |
+| --------------------- | ---------: | ---------------: |
+| PNG 1080×20000        |  1,243,254 |               79 |
+| PNG 1080×40000        |  2,487,252 |              157 |
+| JPEG 720×30000        |    904,939 |              118 |
+| JPEG 720×60000        |  1,809,921 |              235 |
+| PNG 4096×256 固定高熵 |  4,202,073 |                1 |
+
+Node 基准使用同一最终材料的正式 `decodeImage()` 按 chunk 全流 offset 重组单个有界 RGBA strip，再经 `loadPngEncoder()` 编码、逐片计算摘要并关闭 lease，不积存完整 decoded raster。Web 对实际 Worker 交付的 PNG Blob 计算摘要。这证明同一固定 codec 的跨环境分片与传输一致性；独立 Sharp 完整像素正确性仍归上一节24项 Node 门。页面仅保留首/中/末三个 HTML 图片预览并等待 `decode()` 成功，不以 Canvas alpha 往返作为精确 RGBA oracle。
+
+另外6项为3项取消、2项截尾和1项错误后恢复；暂停检查合并在首幅 PNG 完整案例中：
+
+- 首片交付后暂停250 ms，不再 pull；前后 `pull`、`tile-start`、DATA、`tile-end` 计数均为1。高熵片实际 PNG 为4,202,052 B，经过65条 DATA，最大块65,536 B、实际在途最多1块、ACK序号连续；补足低熵片只有单块时未覆盖的多块路径。
+- 首片后取消只交付1片；真实 ACK 等待取消则扣住首条 DATA 的 ACK，终态保留待确认 seq=1，没有完整 tile 交付。两者 decoder 均已处理256行 / 1,105,920 B，终态 `cancelled`、`invalidatesTiles=true`，已取得 decoder/encoder 的 close 成功、live/allocations=0；只证明同步 C 调用之间的协作取消。
+- start 实际发送后立即取消，没有 DATA 或 tile；终态 `cancelled`，decoder/encoder 均为 `null`。没有观察到已取得的 C 实例，也不证明当时具体 import、fetch 或 WASM 初始化指令已中断。
+- PNG 仅删末尾12 B IEND，先交付79片和全部20,000行，再于 phase=3 / raw code=-1失败。JPEG 仅删末尾2 B EOI，先交付117片，再于 phase=2 / raw code=120、29,952行失败。两者均 `failed`、`invalidatesTiles=true`，明确作废同 generation 的 provisional tiles，已取得实例 close 后账本为0。
+- 取消与截尾后新建 Worker，再次完整处理高熵片，摘要、65块 ACK 和 `complete` 均通过。它证明新会话恢复，不证明复用已终止 Worker 或失败实例；该恢复片及取消/截尾输出不计入上述590个基础完整片。
+
+每项真实 trace 都记录一次 `terminal → terminate → release`，Worker创建、`terminate()`、模块release回调各一次，`forced=false`。已取得 C 实例的关闭账本均为0，start取消保留空账本；每项终态后25 ms观察窗迟到消息为0。报告最终 `activeWorkers=0`、最大活动 Worker 数为1。这是协作终态、调用次序和短时消息观察，不是物理 WASM heap、浏览器线程或 RSS 回收的测量，也没有把一次release回调写成逐个 Blob URL 撤销计数。
+
+主代理随后点击“关闭服务”，服务 exec session 47165 exit=0，8953无 LISTEN。使用固定 Node/pnpm 和正式材料缓存，写入新忽略目录复验并保留原报告：
+
+```sh
+pnpm image-codecs:check-worker \
+  --output .local/image-codec-worker/rerun \
+  --port 8953
+```
+
+在 Codex 内置浏览器打开输出地址，点击“运行验收”，完成后点击“关闭服务”并核对进程和端口；仅准备素材、Node基准与页面时追加 `--prepare-only`。`--build` 可指定含 `build-manifest.json` 的本地正式构建。
+
+本轮覆盖合成输入、静态材料风格装配、真实独立 Worker 与有界顺序 PNG tiles；没有经过 Source 请求头、Cookie、拦截器或图片处理链，也未进入 Flutter Reader、视口调度、随机区域、LOD、位置恢复或 Native内置执行。没有测量 JS GC、GPU、RSS、物理heap释放或真机性能；25 ms无迟到不保证任意时间范围无迟到，协作取消不代替强杀超时路径的真实浏览器验收。旧证据保留各自时间点和产物身份，本节不宣布长图产品门通过。

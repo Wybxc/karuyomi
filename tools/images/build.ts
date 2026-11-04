@@ -60,6 +60,7 @@ export const imageCodecBuildInputsSchema = z
         common: z.array(z.string()),
         png: z.array(z.string()),
         jpeg: z.array(z.string()),
+        encoder: z.array(z.string()),
         configure: z.array(z.string()),
       })
       .strict(),
@@ -72,6 +73,7 @@ export const imageCodecBuildManifestSchema = z
     identity: hashSchema,
     inputs: imageCodecBuildInputsSchema,
     abi: z.literal('karuyomi-image-strips-v1'),
+    encoderAbi: z.literal('karuyomi-png-tiles-v1'),
     artifacts: z.record(z.string(), fileSchema),
     toolchainVersions: z.record(z.string(), z.string()),
   })
@@ -113,6 +115,7 @@ const COMMON = [
 ];
 const PNG = ['-DSPNG_STATIC', '-sUSE_ZLIB=1'];
 const JPEG = ['-sSUPPORT_LONGJMP=emscripten'];
+const ENCODER = ['-DSPNG_STATIC', '-sUSE_ZLIB=1'];
 const CONFIGURE = [
   '-G',
   'Unix Makefiles',
@@ -146,6 +149,8 @@ const OWN_SOURCES = [
   'runtime/image-codec/codec.h',
   'runtime/image-codec/png.c',
   'runtime/image-codec/jpeg.c',
+  'runtime/image-codec/encoder.c',
+  'runtime/image-codec/encoder.h',
 ];
 
 function serialized(value: unknown): string {
@@ -317,7 +322,13 @@ async function collectInputs(
       sha512,
       portSha256: createHash('sha256').update(port).digest('hex'),
     },
-    recipe: { common: COMMON, png: PNG, jpeg: JPEG, configure: CONFIGURE },
+    recipe: {
+      common: COMMON,
+      png: PNG,
+      jpeg: JPEG,
+      encoder: ENCODER,
+      configure: CONFIGURE,
+    },
   };
 }
 
@@ -382,6 +393,8 @@ async function cachedBuild(
     'png.wasm',
     'jpeg.mjs',
     'jpeg.wasm',
+    'encoder.mjs',
+    'encoder.wasm',
     ...Object.keys(NOTICE_SOURCES).map((name) => `licenses/${name}`),
     'licenses/zlib-README',
   ]) {
@@ -498,6 +511,20 @@ export async function buildImageCodecs(
         ],
       },
       {
+        name: 'encoder',
+        executable: toolchain.python,
+        args: [
+          toolchain.emcc,
+          path.join(root, 'runtime/image-codec/encoder.c'),
+          path.join(pngSource, 'spng/spng.c'),
+          '-I' + path.join(pngSource, 'spng'),
+          ...ENCODER,
+          ...COMMON,
+          '-o',
+          path.join(temporary, 'encoder.mjs'),
+        ],
+      },
+      {
         name: 'jpeg-configure',
         executable: toolchain.python,
         args: [
@@ -581,6 +608,8 @@ export async function buildImageCodecs(
       'png.wasm',
       'jpeg.mjs',
       'jpeg.wasm',
+      'encoder.mjs',
+      'encoder.wasm',
       ...Object.keys(NOTICE_SOURCES).map((name) => `licenses/${name}`),
       'licenses/zlib-README',
     ]) {
@@ -597,6 +626,7 @@ export async function buildImageCodecs(
       identity,
       inputs,
       abi: 'karuyomi-image-strips-v1',
+      encoderAbi: 'karuyomi-png-tiles-v1',
       artifacts,
       toolchainVersions: toolchain.versions,
     };

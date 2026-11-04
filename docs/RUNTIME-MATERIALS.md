@@ -14,14 +14,16 @@ pnpm typecheck
 pnpm --filter @karuyomi/runtime-host build
 ```
 
-普通客户端构建不需要私有 JVM seed。元数据入口 `node packages/runtime-host/prepare-materials.ts --print` 也会编译 TS 桥及其 npm 依赖，但只读取固定的 WASM 元数据；`--output DIR` 另外读取和验证 WASM 字节。
+普通客户端构建不需要私有 JVM seed 或 SDK 编译。PNG/JPEG decoder 与 PNG encoder 来自 `runtime/image-codec/artifacts-lock.json` 锁定的 portable 构建依赖；准备器在归档导入边界验证成员、来源和当前构建输入。独立 codec Worker/client 由严格 TypeScript 编译，`imageCodecs` 组包含二者、三组模块/WASM 和四份上游许可证，不加入 Source 的 hostScripts/resources。来源和维护命令见 [codec README](../runtime/image-codec/README.md)。
 
-| 生成输出                                                              | 用途                                    |
-| --------------------------------------------------------------------- | --------------------------------------- |
-| `packages/runtime-host/dist/materials.json`                           | 当前六份材料、来源及 materialVersion    |
-| `packages/runtime-host/dist/materials/<sha256>`                       | 五份 JS 与一份 WASM 的 Web 静态字节     |
-| `packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}` | Native 运行时，材料只内嵌于 worker 一次 |
-| `apps/reader/assets/runtime/{host.js,worker.js,manifest.json}`        | 自动复制的 Flutter 应用资源，不入库     |
+元数据入口 `node packages/runtime-host/prepare-materials.ts --print` 也会编译 TS 桥及其 npm 依赖，使用已验证的固定 codec 归档；`--output DIR` 另外输出完整材料字节。
+
+| 生成输出                                                              | 用途                                               |
+| --------------------------------------------------------------------- | -------------------------------------------------- |
+| `packages/runtime-host/dist/materials.json`                           | 当前分组材料、来源及 materialVersion               |
+| `packages/runtime-host/dist/materials/<sha256>`                       | 共享桥、codec、WASM 及许可证的 Web 静态字节        |
+| `packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}` | Native 运行时；Source 材料在 worker，codec 在 host |
+| `apps/reader/assets/runtime/{host.js,worker.js,manifest.json}`        | 自动复制的 Flutter 应用资源，不入库                |
 
 `materialVersion` 覆盖协议、ABI、材料顺序、路径、摘要、长度和 MIME。同一提交、锁定工具链和依赖必须生成一致的 catalog。当前 host ABI 为 `karuyomi-source-host-v3`、protocolVersion 为 2；Web/Native 材料与扩展须按同一身份重建。扩展 AOT 另有自己的输入指纹与 bundle 摘要。
 
@@ -31,7 +33,7 @@ pnpm --filter @karuyomi/runtime-host build
 
 `scripts/assemble-assets.ts` 合并静态 MIME、nosniff 与一年 immutable 缓存规则；catalog 使用 no-cache。它同时排除 runtime/native 和 Flutter Web 复制出的 assets/assets/runtime，并遍历实际公开文件，防止原生 host/worker/manifest 以其它名字进入公开产物。
 
-Native 的共享材料解析器只返回应用内字节；缺失时明确失败，不访问网络。扩展 bundle 则与 Web 一样从静态索引加载。Dart 校验运行时 manifest 和 host/worker，再于受控 HTTPS 页面 document-start 注入。控制页采用 `/runtime/host.html` 或 Cloudflare 规范化后的 `/runtime/host`；动态 API 使用该 WebView 的同源 Access cookie。Native host 将当前 origin、plugin 与 fsNamespace 传给 Blob Worker，cache/file 桥据此使用当前构建命名空间。
+独立 codec 的 Web provider 通过 VerifiedLoader 校验 Worker、模块和 WASM 后创建 Blob URL，每次 decode 终止 Worker 后释放模块 lease。Native 的 Source 材料只在 Source Worker 内置，codec 只在 host 内置，Web client 已 bundle 进 host 因而不重复嵌入；`window.karuyomiImageCodecs` 提供 provider 和 decode 入口。Native 的共享材料解析器只返回应用内字节；缺失时明确失败，不访问网络。扩展 bundle 则与 Web 一样从静态索引加载。Dart 校验运行时 manifest 和 host/worker，再于受控 HTTPS 页面 document-start 注入。控制页采用 `/runtime/host.html` 或 Cloudflare 规范化后的 `/runtime/host`；动态 API 使用该 WebView 的同源 Access cookie。Native host 将当前 origin、plugin 与 fsNamespace 传给 Blob Worker，cache/file 桥据此使用当前构建命名空间。
 
 ## 验证范围
 
@@ -40,4 +42,4 @@ pnpm exec vitest run packages/runtime-host/test/materials.test.ts
 pnpm test:extension-integrity
 ```
 
-材料测试覆盖 TS 编译确定性、固定 WASM、六份输出的真实字节摘要、MIME、Native 独立字节所有权、缺失材料无网络回退和私有旧路径拒绝。桥单独进行 crypto/WASM/IndexedDB/graphics 回归；类型检查覆盖维护源码。材料检查不代表 Source 在线语义、图片通道、真实 Access 登录或完整阅读通过；对应证据见 [VERIFICATION](VERIFICATION.md)。
+材料测试覆盖 TS 编译确定性、固定 WASM、分组输出的真实字节摘要、MIME、Native 独立字节所有权、Source/codec 分组与 client 去重、缺失材料无网络回退和私有旧路径拒绝。桥单独进行 crypto/WASM/IndexedDB/graphics 回归；类型检查覆盖维护源码。材料检查不代表 Source 在线语义、图片通道、真实 Access 登录或完整阅读通过；对应证据见 [VERIFICATION](VERIFICATION.md)。

@@ -2,7 +2,9 @@
 
 ## 状态与范围
 
-状态：**PNG / JPEG 已通过 Node / Web 顺序机制，JPEG 原生缩放另通过 Node 像素对照；正式长图路径尚未实现，P0 超长图门未通过**。最初设计以主仓库 `4645ade` 和仓库固定 Flutter `3.47.5` 做源码审查；2026-11-04 进一步实际执行固定 libspng 的超 16 Mi 像素合成 PNG，以及 libjpeg-turbo 的 baseline 长图、背压、取消与错误场景，见[codec 证据](../verification/long-image-codec.md)。Web 仅核首/中/末区域，不沿用 Node 的完整流 SHA 或缩放证明。实验未改变产品准入，没有测量进程/GPU 峰值；独立机制与正式 Source/Flutter/Native 验收分别维护。
+状态：**独立 codec Worker、Blob 输入、PNG 条带 tile 与 Web / Native 材料接线已实现；正式解码器和编码器的 Node 24 项通过，Source / Protobuf / Reader 尚未接入，P0 超长图门未通过**。本轮新 Worker 管线已通过 Codex 内置浏览器 11 项验收；Native 内置执行、缓存、LOD 与真实进程/GPU 峰值仍待验。现有 16 Mi 像素准入没有调整。
+
+最初设计以主仓库 `4645ade` 和仓库固定 Flutter `3.47.5` 做源码审查；2026-11-04 的历史机制另实际执行固定 libspng 的超 16 Mi 像素合成 PNG，以及 libjpeg-turbo 的 baseline 长图、背压、取消与错误场景，见[codec 证据](../verification/long-image-codec.md)。历史 Web 仅核首/中/末区域，不沿用 Node 的完整流 SHA 或缩放证明，也不转作新 Worker / 新产物的浏览器证据。实验未改变产品准入，没有测量进程/GPU 峰值；独立机制与正式 Source/Flutter/Native 验收分别维护。
 
 目标是在既定 Flutter + TeaVM 架构中，经未修改 Source 的正式图片链，显示超过当前 16 Mi 像素限制的长图。需要同时解决真实解码、按需显示、缩放、原图坐标恢复和资源峰值；保留 16 Mi 拒绝只能说明现有限额生效。
 
@@ -16,7 +18,7 @@
 
 `packages/runtime-host/src/image-resources.ts` 的 `ImageCollector.seal()` 先用 `image-dimensions` 解析头部、检查原始像素限额，再调用无 resize 参数的 `createImageBitmap(blob, { imageOrientation: 'from-image' })`，核对实际尺寸并 close。Java 成功结果一致后才发布 Blob URL。
 
-Reader 的 `apps/reader/lib/features/reader/resource_image.dart` 再创建 Flutter `Image`；Web 的 provider 为受管 Blob 上的 `NetworkImage`，Native 的 provider 为受管文件上的 `FileImage`。两端均未传目标尺寸，也没有终端 tile decoder。当前源码未发现名为 `FlutterImageDecoder` 的项目类。`BoxFit` 和 `InteractiveViewer` 没有给上述 provider 增加目标解码尺寸。
+Reader 的 `apps/reader/lib/features/reader/resource_image.dart` 再创建 Flutter `Image`；Web 的 provider 为受管 Blob 上的 `NetworkImage`，Native 的 provider 为受管文件上的 `FileImage`。两端均未传目标尺寸，也尚未调用新增的独立 codec Worker / tile 运行库。当前源码未发现名为 `FlutterImageDecoder` 的项目类。`BoxFit` 和 `InteractiveViewer` 没有给上述 provider 增加目标解码尺寸。
 
 因此当前链路包含 host 的临时完整 bitmap 校验，以及 Flutter 的正式显示解码。两次通常先后发生，但没有统一计量它们与其它页、插件图形对象、编码副本和 GPU 资源的合计峰值。
 
@@ -106,7 +108,7 @@ wrapper 的 MIT 标识不覆盖全部底层库。该 npm 包的 `THIRD-PARTY-NOT
 
 固定 `libspng v0.7.3` 的 progressive row API 已在独立 Node Worker 与 Codex 内置浏览器的 Web Worker 中实际运行：1080×20000 / 1080×40000 的合成 RGBA8 非交错 PNG，在实际 16 MiB 非共享 WASM heap 中顺序输出全部像素。Node 完整流 SHA 匹配编码前原始 RGBA 生成基准；Node 和 Web 的首/中/末区域 SHA 分别匹配独立 libpng oracle，Web 未计算完整流 SHA。单个 256 行条带加 64 KiB ACK 通道没有建立完整 raster；首块取消会关闭 C 上下文。仅删除 IEND 的文件在全部行输出后仍失败，说明正式片资源必须能因后部错误整体作废。具体输入、构建器偏差、计量范围和剩余格式见[实验记录](../verification/long-image-codec.md)。
 
-这使 libspng 成为顺序 PNG 路径的实际候选，尚不能宣布整套终端 codec 已选定。固定官方 macOS SDK 已重新构建并通过同样的 Node / Web 分项，独立新 WASM 身份与首轮分别保存；Linux 及跨主机一致性未验。正式接入前还需维护构建入口、上游 submodule、颜色/透明与方向合同，完成 Native 内置资源及正式终端集成验证。RGB/灰度/调色板 tRNS、Adam7、16-bit、JPEG/WebP 等不套用这两张 RGBA 素材的结果。随机区域、反向读取、tile 编码和实际 Flutter 显示仍是后续实现门。
+这份历史机制证据使 libspng 成为当时顺序 PNG 路径的实际候选，本身未完成整套终端 codec 选型和产品验收。固定官方 macOS SDK 已重新构建并通过同样的 Node / Web 分项，独立新 WASM 身份与首轮分别保存；Linux 及跨主机一致性未验。当轮尚未维护正式构建入口、上游 submodule 或 Native 内置材料；当前工程化实现见后文，颜色/透明与方向合同、Native 内置执行及正式终端集成仍待验。RGB/灰度/调色板 tRNS、Adam7、16-bit、JPEG/WebP 等不套用这两张 RGBA 素材的结果。随机区域、反向读取和实际 Flutter 显示仍是后续实现门；新增 PNG tile 编码的 Node 验收另有独立产物与证据，不能沿用本段历史 Web 结果。
 
 ## libjpeg-turbo 顺序 JPEG 机制与采用边界
 
@@ -120,7 +122,19 @@ JPEG 先缩放再输出可以减小条带和终端 raster，但不使 progressiv
 
 ## 正式源码基础与产品接线
 
-`runtime/image-codec/` 已内化共同 C ABI 与严格 TypeScript 顺序消费接口，真实上游通过 submodule 固定；`tools/images/` 提供锁定 SDK 构建与自生成长图回归。操作与首批能力见 [codec README](../../runtime/image-codec/README.md)。该基础不等于独立 codec Worker、可显示 tile 或正式产品路径，以下边界仍需逐步接入。
+`runtime/image-codec/` 已内化 PNG/JPEG decoder、PNG encoder 的 C ABI、严格 TypeScript 顺序接口，以及 `client.ts` / `worker.ts` 的独立 module Worker；真实上游通过 submodule 固定。`tools/images/` 提供锁定 SDK 构建、自生成长图回归和 portable 产物准备器。操作与首批能力见 [codec README](../../runtime/image-codec/README.md)。本节区分已经实现的运行库与尚未接通的正式产品合同。
+
+### 已实现的独立 Worker 与显示片基础
+
+`decodeImageTiles()` 接受受管 `Blob`，在读取前限制编码输入为 8 MiB。独立 Worker 顺序解码 PNG/JPEG，将解码输出宽度、至多 256 行的 RGBA 条带交给固定 libspng encoder，返回可独立解码的 PNG tile。RGBA 条带上限 4 MiB、单片 PNG 上限 8 MiB；传输块至多 64 KiB，每块等待 ACK，下一片由消费者的下一次 pull 驱动。它没有建立完整页 raster，也不是随机 region decoder。首批 PNG 仍限非隔行 RGBA8、分母1；JPEG 仍限 8-bit 单 scan 顺序 Huffman 灰度/RGB/YCbCr，支持 1/2/4 缩放；方向、颜色与拒绝范围继续按当前 codec 合同解释。
+
+header、tile 与 terminal 是分开的事件。tile 保留原图 `sourceRect`，在完整 IEND/EOI 和清理成功前均为 provisional；尾部失败、取消或清理失败使此前全部 tile 失效。requestId/generation、几何、序号、大小与真实 WASM ABI 在边界检查。消费者退出、AbortSignal 与超时触发协作取消；超过 grace 时终止专用 codec Worker，不终止 Source Worker。已验证模块的 Blob URL 在 Worker 终止后释放；未取得的强制终止计量保持 null，不能记为 heap 已归零。
+
+`MaterialCatalog.imageCodecs` 是独立于 `hostScripts` / `resources` 的共享组，包含 client、Worker、三组模块/WASM 和许可证，进入 `materialVersion` 并记录构建身份与 ABI。Web 使用 Static Assets；`prepareImageCodecAssets()` 经 VerifiedLoader 验证后提供 Worker / 模块 Blob URL 与完整拥有的 WASM 字节，不依赖相对 URL 再下载 WASM。Native 构建将所需 codec 字节及本地 resolver 只内置到 `host.js`，通过 `window.karuyomiImageCodecs` 提供相同准备入口；已 bundle 的 Native client 不重复嵌入 Web `client.js`。Source Worker 不预载或重复携带这一组，Native 缺材料时不回退网络。Native 构建接线不等于已经在 WKWebView / Android WebView 执行成功。
+
+正式 C 产物已经通过 [24 项 Node 解码器/编码器验收](../verification/long-image-codec.md#有界-png-编码器的-node-验收)，包括独立 Sharp 像素对照与高熵最大条带；该证据没有运行新 Worker 的真实浏览器 ACK、重组、跨线程取消或显示。新管线另在 Codex 内置浏览器通过 11 项，590 个基础 tile 的 PNG 字节/几何与 Node 同产物基准一致，真实 ACK/pull、三种取消边界、截尾失效及恢复也通过；详见[正式 Worker 证据](../verification/long-image-codec.md)。两份 WASM 各自 32 MiB 最大 heap / 16 MiB C payload 是配置上界，不是两者同时运行的实际峰值；高熵 encoder 已观察到 heap 增长，不能将所有场景写为 16 MiB。
+
+目前尚未把该运行库接到原 Source 的处理后正文、Protobuf 图片描述、Flutter Reader、tile 缓存或 LOD 调度；现有 ProcessedImage/ImageResource、host 完整 bitmap 校验和全部 16 Mi 像素门保持原状。以下是仍需完成的产品接线。
 
 ### 1. 保留原 Source 已处理正文，分开编码页与显示片
 
@@ -134,7 +148,7 @@ JPEG 先缩放再输出可以减小条带和终端 raster，但不使 progressiv
 
 ### 2. 用有限像素窗口显示同一逻辑长图
 
-Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变成持久进度 pageKey。布局依据方向处理后的原图坐标，视口、缩放和 DPR 决定所需 tile/LOD。初次实验可用 1024 × 1024 输出 tile、单活动 decoder 和现有邻近视口窗口，随后以实测调整尺寸。
+Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变成持久进度 pageKey。布局依据方向处理后的原图坐标，视口、缩放和 DPR 决定所需 tile/LOD。当前运行库输出解码宽度、至多 256 行的 PNG 条带；Reader 应先接入这一明确布局与单活动 decoder，再以真实视口和峰值证据调整片尺寸及 LOD，不能把待实现的任意矩形切片视为既有能力。
 
 同一 Source 页内滚动会改变 tile 需求，因此调度签名必须加入原图 viewport/LOD，不能继续只比较 pageKey/width/height。可见 tile 优先，其次前向和后向准备；每份 raster、替换中的旧 LOD 和 zoom overlay 均单独计费。
 
@@ -144,7 +158,7 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 对真正支持顺序读取的格式，可以评估按源 scanline 从上到下生成有限条带或 tiles，再将片输出交给有界缓存。反向滚动和任意位置恢复不能倒读同一个 sequential 管线；需要命中已生成的有界 tile 存储，或明确重新打开编码页、从可支持的起点重新扫描。重复解码的耗时也属于首图和恢复门。
 
-`SourceCustom.onRead/onSeek` 可作为有界输入候选，但其回调是同步接口，不是可 await 的流。`writeToBuffer` 也会物化该次输出；只允许用于已限制尺寸的小片，不得对整张长图调用 `writeToMemory/copyMemory`。使用异步 ACK 或文件 sink 时，应先验证同步 codec 如何暂停并处理取消，不能在回调外无限排队。
+若后续重新评估 libvips，`SourceCustom.onRead/onSeek` 可作为有界输入候选，但其回调是同步接口，不是可 await 的流。`writeToBuffer` 也会物化该次输出；只允许用于已限制尺寸的小片，不得对整张长图调用 `writeToMemory/copyMemory`。使用异步 ACK 或文件 sink 时，应先验证同步 codec 如何暂停并处理取消，不能在回调外无限排队。
 
 编码输入、WASM/native heap、codec 工作空间、临时条带、编码 tile 存储、传输块、Flutter decoded tile 和 GPU 资源分别计量。operation cache 上限不是 codec 内存上限，WASM 最大 heap 也不是进程总上限。临时文件必须是有配额的真实持久层；WASM 内存文件系统不能被描述成磁盘卸载。
 
@@ -158,17 +172,17 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 ## 依赖、静态材料与 AOT 输入身份
 
-当前 `tools/extensions/catalog.ts` 的 `HOST_PATHS` 包含整个 `protocol`、`packages/contracts/src`、`packages/runtime-host/package.json`、`packages/runtime-host/materials.ts` 与全仓 `pnpm-lock.yaml`。因此即使新增 codec 只用于终端显示，引入 npm 依赖、改图片协议或共享材料定义，按当前规则也会改变 `hostFingerprint`。
+`runtime/image-codec/artifacts-lock.json` 已固定 PNG/JPEG decoder、PNG encoder、许可证和构建清单的 portable 归档。`tools/images/artifacts.ts` 校验归档 size/SHA、精确成员、逐成员大小/SHA、manifest 输入身份、自有构建源码与 index gitlink，原子安装到忽略缓存；同步只读核对成员后使用可取消的系统 tar，等实际提取器及后代退出才清理 stage/lock。材料构建消费这一已验证结果，CI 无需隐式构建 SDK，也不依赖尚未验收的 Linux SDK。归档是独立运行时构建依赖，不能把其准备或发布写成客户端扩展重新使用 GitHub Release 分发；公开依赖下载与 CI 运行状态按工程证据另验。
 
-`packages/runtime-host/materials.ts` 的 `materialVersion` 又包含当前协议、hostScripts 和 resources；共享 WASM/脚本纳入该目录后会形成新材料身份，扩展 manifest/装配需要一致。本轮不修改指纹计算范围，也不将“终端 codec 未改 Java”解释为无需重新计划 AOT。
+当前 `tools/extensions/catalog.ts` 的 `HOST_PATHS` 已包含 `runtime/image-codec`、相应 image 构建/准备工具与材料 helper，并保留整个 `protocol`、`packages/contracts/src`、runtime-host 材料定义及全仓锁文件；真实上游 gitlink 也参与身份。因此终端 codec 输入或共享材料变化会改变 `hostFingerprint`，不能因未修改 Java 就复用旧 AOT 身份。
 
-正式实施应在独立固定输入中锁定依赖和构建配方，再产生新的 catalog/材料/AOT 计划。不得改变两套历史冻结 AOT 输入，也不得把新协议材料混入旧 checkpoint；队列中断与恢复边界见[工程计划](../plan/engineering-and-release.md#中断复核与恢复边界)。完成后按实际输入生成新 host 身份并重新验收。
+`packages/runtime-host/materials.ts` 的 `materialVersion` 已包含协议、hostScripts、resources、imageCodecs 与 codec 构建来源。Native 省略 Web-only client 字节仍保留同一完整 catalog 的材料版本；扩展 manifest 的 Source 预载组不加入终端 codec。不得改变两套历史冻结 AOT 输入，也不得把新材料或协议混入旧 checkpoint；队列中断与恢复边界见[工程计划](../plan/engineering-and-release.md#中断复核与恢复边界)。后续发布按当前实际输入生成新 host 身份并重新验收。
 
 无论采用 WASM 或 Native 库，Web 所需材料只发布一份 Static Assets；Native 所需材料/库随应用内置，不通过网络回退读取。产品 JS/桥接逻辑仍维护为严格 TypeScript，第三方构建产物按锁定包或校验后的构建器获取，不复制依赖缓存为维护源码。
 
 ## 下一轮实现与实测门
 
-1. **内化已验证的 codec 管线。** PNG/JPEG 的现有 Node/Web 顺序机制及 JPEG Node 原生缩放证据足以进入正式集成。自有 C/TypeScript 适配、两库 submodule、锁定 SDK 准备器与 builder 已内化，正式 Node 长图与同主机独立缓存构建证据见[正式验收](../verification/long-image-codec.md#正式源码构建与-node-验收)。接下来建立独立 Worker、Blob 输入与有界小片编码/缓存，接入共享材料和产品协议；冷启动与实际工作进程退出仍须验证。不能用未实际运行的裁剪版或默认 wasm-vips 的 256 MiB/SAB 假设替代当前证据。
+1. **验收已内化的新 Worker 管线。** C/TypeScript 适配、双上游 submodule、builder、独立 Worker、Blob 输入、256 行 PNG tile、共享材料与 portable 归档均已实现；[正式 Node 解码器/编码器证据](../verification/long-image-codec.md#有界-png-编码器的-node-验收)已具备。正式材料与新产物已在 Codex 内置浏览器通过 11 项：590 个基础 tile 的 PNG 字节/几何、ACK/pull、取消、截尾及恢复。证据来自当前 catalog/client/VerifiedLoader/Worker，独立 Sharp 像素正确性仍引用另行执行的 24 项 Node 门；[正式 Worker 证据](../verification/long-image-codec.md)不沿用历史探针的 Web 成功。冷启动、Native 内置执行和实际进程/heap 释放仍须另验。
 2. **验证大于 16 Mi 的真实输入。** 至少包含 1080 × 20000 及更长的 baseline JPEG、非 interlaced PNG，用首/中/末可辨内容验证实际小片像素。增加 progressive JPEG、interlaced PNG、透明图、16-bit、EXIF 和截断文件，区分支持、预算拒绝与真实解码失败。头部尺寸和构造空白 widget 不算通过。
 3. **验证有界生成和任意位置读取。** 记录输入副本、codec 高水位、条带/片数、缓存字节和存储配额；测试慢消费者、跳到末尾、连续反向滚动、LOD 替换与 zoom。不得由完整 raster、无界内存文件或全部 tile 同时驻留来实现“分片”。
 4. **接通正式产品合同与锚点。** 生成双端模型，接入 host、Native 文件与 Reader，覆盖同一长图内滚动、旋转、DPR、模式切换、缩放、关章及恢复。显示与 observed 必须来自实际已解码且可见的 tiles。

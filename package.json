@@ -43,9 +43,12 @@
     "test:reader-assets": "node --test tools/reader/database-assets.test.ts",
     "image-codecs:prepare": "node scripts/prepare-image-codecs.ts",
     "test:image-codecs": "node --test tools/images/*.test.ts runtime/image-codec/*.test.ts",
-    "typecheck:image-codecs": "tsc -p runtime/image-codec/tsconfig.json",
+    "typecheck:image-codecs": "tsc -p runtime/image-codec/tsconfig.json && tsc -p runtime/image-codec/tsconfig.worker.json",
     "image-codecs:build": "node scripts/build-image-codecs.ts",
-    "image-codecs:check": "node scripts/check-image-codecs.ts"
+    "image-codecs:check": "node scripts/check-image-codecs.ts",
+    "image-codecs:prepare-artifacts": "node scripts/prepare-image-codec-artifacts.ts",
+    "image-codecs:package": "node scripts/package-image-codec-artifacts.ts",
+    "image-codecs:check-worker": "node scripts/check-image-codec-worker.ts"
   },
   "devDependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",

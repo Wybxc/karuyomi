@@ -1,6 +1,6 @@
 /** Real-WASM acceptance checks. Reference generation is outside codec memory accounting. */
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createCipheriv, createHash } from 'node:crypto';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -8,7 +8,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import sharp from 'sharp';
 import writeFileAtomic from 'write-file-atomic';
-import { loadImageCodec } from '../../runtime/image-codec/codec-api.ts';
+import {
+  loadImageCodec,
+  type ImageCodecCleanup,
+} from '../../runtime/image-codec/codec-api.ts';
+import {
+  loadPngEncoder,
+  PNG_ENCODER_LIMITS,
+} from '../../runtime/image-codec/encoder.ts';
 import { decodeImage } from '../../runtime/image-codec/decoder.ts';
 import {
   imageCodecBuildIdentity,
@@ -159,7 +166,7 @@ async function jpegFixture(
   };
 }
 
-async function fixtures(signal?: AbortSignal): Promise<Fixtures> {
+export async function fixtures(signal?: AbortSignal): Promise<Fixtures> {
   // Keep generation sequential: these full reference allocations are neither
   // the decoder's metered payload nor measurements of its WASM/JS/process peak.
   const png = await pngFixture(20000, signal);
@@ -523,6 +530,173 @@ async function abi(codecUrl: URL) {
   }
 }
 
+function assertEncoderCleanup(cleanup: ImageCodecCleanup): void {
+  assert.equal(
+    cleanup.succeeded,
+    true,
+    cleanup.error ?? 'PNG encoder close must succeed',
+  );
+  assert.equal(cleanup.liveBytes, 0);
+  assert.equal(cleanup.allocations, 0);
+  assert(
+    cleanup.peakBytes !== null &&
+      cleanup.peakBytes >= 0 &&
+      cleanup.peakBytes <= MAX_PAYLOAD_BYTES,
+  );
+  assert(cleanup.heapBytes !== null && cleanup.heapBytes <= MAX_HEAP_BYTES);
+}
+
+function encoderReference(
+  width: number,
+  height: number,
+  entropy: boolean,
+): Buffer {
+  if (!entropy) return pattern(width, height, true);
+  // A fixed AES-CTR stream gives repeatable incompressible RGBA test bytes.
+  // This uses Node crypto only as a fixture generator, not as a project cipher.
+  const key = createHash('sha256')
+    .update('karuyomi-png-tile-reference-v1')
+    .digest();
+  const generator = createCipheriv('aes-256-ctr', key, Buffer.alloc(16));
+  const result = generator.update(Buffer.alloc(width * height * 4));
+  assert.equal(generator.final().length, 0);
+  return result;
+}
+
+async function encodeRoundtrip(
+  codecUrl: URL,
+  width: number,
+  height: number,
+  entropy: boolean,
+) {
+  const rgba = encoderReference(width, height, entropy);
+  const encoder = await loadPngEncoder(codecUrl);
+  const lease = encoder.acquire();
+  try {
+    const png = lease.encode(rgba, width, height);
+    const during = lease.metrics();
+    const cleanup = lease.close();
+    assertEncoderCleanup(cleanup);
+    assert(
+      during.peakBytes >= rgba.length && during.peakBytes <= MAX_PAYLOAD_BYTES,
+    );
+    assert(png.length > 0 && png.length <= PNG_ENCODER_LIMITS.pngBytes);
+    // Decode the copied PNG after close, proving its bytes do not alias WASM.
+    const decoded = await sharp(png)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    assert.equal(decoded.info.width, width);
+    assert.equal(decoded.info.height, height);
+    assert.equal(decoded.info.channels, 4);
+    assert.equal(decoded.data.length, rgba.length);
+    const expectedSha256 = sha256(rgba);
+    const decodedSha256 = sha256(decoded.data);
+    assert.equal(decodedSha256, expectedSha256);
+    return {
+      width,
+      height,
+      rgbaBytes: rgba.length,
+      entropy,
+      pngBytes: png.length,
+      pngSha256: sha256(png),
+      expectedSha256,
+      decodedSha256,
+      during,
+      cleanup,
+      validation:
+        'Real libspng WASM encoding; complete Sharp-decoded RGBA matches the source after C close.',
+    };
+  } finally {
+    assertEncoderCleanup(lease.close());
+  }
+}
+
+async function encoderRejectedDimensions(codecUrl: URL) {
+  const encoder = await loadPngEncoder(codecUrl);
+  const lease = encoder.acquire();
+  const api = lease.api;
+  try {
+    const failures = [];
+    for (const [width, height, length] of [
+      [0, 1, 4],
+      [4097, 1, 4],
+      [1, 0, 4],
+      [1, 257, 4],
+      [2, 2, 4],
+      [1, 1, 5],
+    ] as const) {
+      assert(api.encoder_input(length) > 0);
+      const result = api.encoder_encode(width, height);
+      const code = api.encoder_error_code();
+      assert(result < 0);
+      assert.notEqual(code, 0);
+      assert.equal(api.encoder_output(), 0);
+      assert.equal(api.encoder_length(), 0);
+      assert.equal(
+        api.encoder_live_bytes(),
+        0,
+        'encode failure itself must release input and context',
+      );
+      assert.equal(api.encoder_allocations(), 0);
+      failures.push({ width, height, length, result, code });
+    }
+    assert.equal(api.encoder_input(PNG_ENCODER_LIMITS.rgbaBytes + 1), 0);
+    assert.equal(api.encoder_live_bytes(), 0);
+    assert.equal(api.encoder_allocations(), 0);
+    // A clean input can reuse this same real instance after all failures.
+    const rgba = encoderReference(1, 1, false);
+    const png = lease.encode(rgba, 1, 1);
+    const cleanup = lease.close();
+    assertEncoderCleanup(cleanup);
+    const decoded = await sharp(png).ensureAlpha().raw().toBuffer();
+    assert.equal(sha256(decoded), sha256(rgba));
+    return {
+      failures,
+      oversizedInputRejected: true,
+      reusedAfterFailure: true,
+      cleanup,
+    };
+  } finally {
+    assertEncoderCleanup(lease.close());
+  }
+}
+
+async function encoderInputBoundaryClose(codecUrl: URL) {
+  const encoder = await loadPngEncoder(codecUrl);
+  const lease = encoder.acquire();
+  const api = lease.api;
+  try {
+    assert(api.encoder_input(1024 * 1024) > 0);
+    const peakBeforeClose = api.encoder_peak_bytes();
+    assert.equal(peakBeforeClose, 1024 * 1024);
+    // The caller may abandon staged input before invoking synchronous encode.
+    // This is a close/cancel boundary, not a claim of C or Worker preemption.
+    api.encoder_close();
+    assert.equal(api.encoder_live_bytes(), 0);
+    assert.equal(api.encoder_allocations(), 0);
+    assert.equal(api.encoder_peak_bytes(), peakBeforeClose);
+    assert(api.encoder_input(32) > 0);
+    const nextPeak = api.encoder_peak_bytes();
+    assert.equal(nextPeak, 32);
+    api.encoder_close();
+    assert.equal(api.encoder_live_bytes(), 0);
+    assert.equal(api.encoder_allocations(), 0);
+    const cleanup = lease.close();
+    assertEncoderCleanup(cleanup);
+    assert.equal(cleanup.peakBytes, 32);
+    return {
+      validation:
+        'Caller close after allocating input and before encode; no asynchronous Worker cancel or C preemption is exercised.',
+      peakBeforeClose,
+      nextPeak,
+      cleanup,
+    };
+  } finally {
+    assertEncoderCleanup(lease.close());
+  }
+}
+
 export async function verifyImageCodecs(
   options: ImageCodecVerificationOptions,
 ) {
@@ -551,7 +725,14 @@ export async function verifyImageCodecs(
       'Verification reports must be written inside an ignored .local directory',
     );
   const artifacts: Record<string, { size: number; sha256: string }> = {};
-  for (const name of ['png.mjs', 'png.wasm', 'jpeg.mjs', 'jpeg.wasm']) {
+  for (const name of [
+    'png.mjs',
+    'png.wasm',
+    'jpeg.mjs',
+    'jpeg.wasm',
+    'encoder.mjs',
+    'encoder.wasm',
+  ]) {
     const bytes = await readFile(path.join(directory, name));
     const actual = { size: bytes.length, sha256: sha256(bytes) };
     assert.deepEqual(
@@ -563,6 +744,7 @@ export async function verifyImageCodecs(
   }
   const pngUrl = pathToFileURL(path.join(directory, 'png.mjs'));
   const jpegUrl = pathToFileURL(path.join(directory, 'jpeg.mjs'));
+  const encoderUrl = pathToFileURL(path.join(directory, 'encoder.mjs'));
   const input = await fixtures(options.signal);
   const cases: CaseResult[] = [];
   const completeImages: {
@@ -674,6 +856,21 @@ export async function verifyImageCodecs(
       };
     });
   }
+  await run('encoder:strip-rgba-pixels', () =>
+    encodeRoundtrip(encoderUrl, 1080, 256, false),
+  );
+  await run('encoder:maximum-entropy-rgba-pixels', () =>
+    encodeRoundtrip(encoderUrl, 4096, 256, true),
+  );
+  await run('encoder:single-pixel-rgba', () =>
+    encodeRoundtrip(encoderUrl, 1, 1, false),
+  );
+  await run('encoder:invalid-dimensions-and-recovery', () =>
+    encoderRejectedDimensions(encoderUrl),
+  );
+  await run('encoder:input-boundary-close-and-peak-reset', () =>
+    encoderInputBoundaryClose(encoderUrl),
+  );
   const passed = cases.every((result) => result.status === 'passed');
   const report = {
     schemaVersion: 1,
@@ -685,6 +882,8 @@ export async function verifyImageCodecs(
     scope: {
       environment:
         'Node real WASM; no browser, Flutter, Source or Native product claim',
+      encoding:
+        'Synchronous libspng RGBA8 strips to PNG, including maximum 4096x256 high-entropy input. Sharp validates complete output pixels after close. Input-boundary close is not Worker cancellation or C preemption.',
       fixtures:
         'Four synthetic images above 16 Mi pixels: RGBA8 noninterlaced PNG 1080x20000 and 1080x40000; single-scan baseline JPEG 720x30000 and 720x60000',
       memory:

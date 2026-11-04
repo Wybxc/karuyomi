@@ -188,6 +188,8 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 正式源码也已在同一 macOS arm64 官方 SDK 下完成独立构建与 Node 19 项回归：四幅合成 PNG/JPEG 长图的完整流及首/中/末摘要一致，heap 均为 16 MiB，最大计量 payload 为 3,645,862 B，close 后分配数与 payload 均归零。两次使用独立构建缓存，第二次注入无效 CFLAGS/LDFLAGS/EMCC_CFLAGS/CMAKE_TOOLCHAIN_FILE，生成的四个 JS/WASM 文件字节相同；仅证明同主机/同 SDK 重建。新轮 80 ms 暂停只测同线程 pull，JPEG 缩放只核尺寸和字节数；新产物的独立 Worker、浏览器、共享材料、Source 与终端均待接入。正式命令、输入身份及覆盖范围见[正式 codec 验收](verification/long-image-codec.md#正式源码构建与-node-验收)。无大型 SDK 下载的 53 项运行库/构建器/工具链回归、完整 macOS 格式与通用 `pnpm check` 已通过。
 
+随后当前源码增加有界 PNG encoder 和独立 codec Worker：真实 Node 门扩为 24 项，新增条带编码由 Sharp 全像素对照。正式 catalog/client/VerifiedLoader/Blob 模块与 WASM 已在 Codex 内置 Chromium 156 通过 11 项：四幅长图加最大高熵条带共 590 个基础 tile 的 PNG 字节/几何匹配独立 Node 实例，同一 Worker 内两个独立 WASM 实例；250 ms pull 暂停、逐块 ACK、首片/扣住首 ACK/start post 后取消、PNG/JPEG 截尾失效及错误后恢复通过。最大 DATA 为 64 KiB，观测最大活动 Worker 为 1，全部终态之后 terminate 再释放模块，最终为零；25 ms 无迟到消息只证明该观察窗，不证明物理 heap 或进程/GPU 归零。详细身份、C 计量、原始报告 SHA 和复验命令见[正式 Worker 证据](verification/long-image-codec.md)。Web Static Assets / Native host 内置材料接线及去重已有构建回归，Native 执行、Source/Protobuf/Reader、tile 缓存/LOD 与真机峰值仍未验，产品 16 Mi 像素门保持原状态。
+
 ## 内部 graphics 二进制与预算
 
 2026-11-03，Bitmap、两套 ImageDecoder 和字体输入已将整图正文改为不超过 64 KiB 的 JSO 字节块，小 JSON 只传控制与 handle。尺寸查询先用锁定的 image-dimensions 解析至多 1 MiB 头部，不为 bounds 完整解码。账本分别覆盖可见 payload、surface、decoder/Frame、字体、临时副本和不可中断任务的工作预留；Source 持有的 Bitmap/decoder/Frame 不因普通调用结束被扫描删除，取消与迟到结果保留相应所有权直到任务真正退出。

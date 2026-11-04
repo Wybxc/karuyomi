@@ -21,7 +21,7 @@ flowchart TD
 
 - `scripts/` 是仓库操作入口，不被工具模块或产品代码导入。CLI 参数解析与领域实现分开，领域函数可以直接测试。
 - `tools/extensions/` 负责扩展描述、输入指纹、隔离 AOT、静态当前快照、传输校验和网络授权元数据。注册、同步和流水线共享同一份清单与 gzip 校验，不再动态导入 CLI 文件。
-- `tools/images/` 负责图片 codec 的官方 SDK 校验、原子安装与隔离缓存，不依赖扩展发布编排。`pnpm image-codecs:prepare` 准备锁定工具链，`pnpm image-codecs:build` 构建共同 ABI 的 PNG/JPEG WASM，`pnpm image-codecs:check --build <directory>` 另行执行真实长图回归。`pnpm test:image-codecs` 运行不下载 SDK 的归档、构建器和消费生命周期回归，已纳入 `pnpm check`。支持平台和当前集成范围见 [image-codec README](../runtime/image-codec/README.md)。
+- `tools/images/` 负责图片 codec 的官方 SDK、portable 产物校验、原子安装与隔离缓存，不依赖扩展发布编排。`pnpm image-codecs:prepare` 准备锁定工具链，`pnpm image-codecs:build` 构建共同 ABI 的 PNG/JPEG decoder 与 PNG encoder WASM，`pnpm image-codecs:check --build <directory>` 另行执行真实长图回归。`pnpm image-codecs:prepare-artifacts` 准备 CI 和材料构建所用锁定 portable 归档；`pnpm image-codecs:package` 由已验证的本地构建生成归档与锁。`pnpm image-codecs:check-worker` 提供 Codex 内置浏览器的真实 Worker/tile 验收入口。`pnpm test:image-codecs` 运行不下载 SDK 的归档、构建器和消费生命周期回归，已纳入 `pnpm check`。支持平台和当前集成范围见 [image-codec README](../runtime/image-codec/README.md)。
 - `tools/teavm/` 负责锁定工具链、seed、归档、上游补丁和 JVM 构建。工作目录由参数明确传入，不复制脚本后改变源码定位，不依赖扩展发布编排。
 - 通用进程、序列化、原子写入、归档、文件锁和并发直接使用成熟库。seed 成员、构建身份、checkpoint 与资源预算等项目规则留在所属领域，不重新搬出一套通用 helper。
 - `runtime/image-codec/` 的 C 与严格 TypeScript 是正式运行库；它不导入自动化或测试代码。`tools/images/` 只依赖该领域与第三方库，不依赖扩展发布编排。
