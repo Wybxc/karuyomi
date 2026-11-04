@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "emsdk": {
+    "repository": "https://github.com/emscripten-core/emsdk",
+    "commit": "41190c21c662e9cc1962aea94e71cbae9fd2fc87",
+    "version": "5.0.7",
+    "releaseTag": "6cd98e86d7749ff98b82b7f2ae78eb4f01942788"
+  },
+  "emscriptenCommit": "263db4cffa6f9fc2ec514a70abac81362ea41849",
+  "archives": {
+    "darwin-arm64": {
+      "verification": "verified",
+      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/mac/6cd98e86d7749ff98b82b7f2ae78eb4f01942788/wasm-binaries-arm64.tar.xz?generation=1777481187423024",
+      "generation": "1777481187423024",
+      "size": 282468276,
+      "sha256": "37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c",
+      "versions": {
+        "clang": "23.0.0git",
+        "clangCommit": "7b58716d96c3ae4c0c4e6f72e29b16137bb6224b",
+        "binaryen": "129",
+        "binaryenRevision": "version_125-430-gc6a5e65b7"
+      }
+    },
+    "linux-x64": {
+      "verification": "pending_sha256",
+      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/linux/6cd98e86d7749ff98b82b7f2ae78eb4f01942788/wasm-binaries.tar.xz?generation=1777479298652562",
+      "generation": "1777479298652562",
+      "size": 337510296,
+      "reason": "Official GCS metadata supplies MD5/CRC32C only. The archive and bundled executable versions have not been independently verified; preparation is disabled until SHA-256 and actual versions are locked."
+    }
+  }
+}

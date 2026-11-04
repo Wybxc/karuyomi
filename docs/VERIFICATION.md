@@ -182,7 +182,9 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 ## 长图 codec 机制
 
-2026-11-04，固定 libspng v0.7.3 / WASM 在 Node Worker 对 1080×20000 和 1080×40000 合成 RGBA8 非交错 PNG 完成顺序行解码，完整流 SHA 匹配编码前原始 RGBA 生成基准、首/中/末区域 SHA 匹配独立 libpng oracle，实际非共享 heap 为 16 MiB。64 KiB 单块 ACK 背压、首块后协作取消与缺失 IEND 的尾部拒绝分别通过，C 请求 payload 账本归零、Worker 自然退出。同一 WASM 在内置 Chromium 156 无 SAB / 跨源隔离的真实 Web Worker 五项分测通过，首/中/末区域实际可见且 SHA 匹配；额外首块 terminate 只证明观察窗无后续消息，不声称测得 heap 回收。服务已正常 exit=0、端口释放。输入、构建工具偏差及限制见[长图机制证据](verification/long-image-codec.md)。它不是原 Source 内容、随机区域/LOD、Flutter/Native 集成或进程/GPU 峰值验收，正式 16 Mi 像素准入尚未调整。
+2026-11-04，官方 Emscripten 5.0.7 macOS arm64 SDK 的 libspng 0.7.3 对 1080×20000 / 1080×40000 合成 RGBA8 非交错 PNG，Node 四项与内置 Chromium 五项通过；libjpeg-turbo 3.2.1 对 720×30000 / 720×60000 合成 baseline JPEG，Node 九项和浏览器六项通过。Node PNG 完整流对照原始 RGBA，JPEG 原尺寸与 1/2、1/4 完整流对照独立解码基准；Web 只核首/中/末区域且实际可见，不声称全流或缩放验收。
+
+64 KiB 单块 ACK 背压、首块后协作取消与截尾拒绝分测通过，JPEG progressive 在解码前拒绝；协作终态 C 账本归零。观察到非共享 WASM heap 为 16 MiB，JPEG 最大计量 payload 为 1,959,276 B，不等同 RSS/GPU；强制 terminate 只证明 100 ms 窗无后续消息，没有测得 heap 回收。服务均已 exit=0、端口释放。官方 SDK 准备器及无大型下载的归档/HTTP/进程清理回归已接工程检查。详情、历史工具链偏差和复验命令见[长图 codec 证据](verification/long-image-codec.md)及 [SDK 操作](../runtime/image-codec/README.md)。这些是独立机制，Source、随机区域/LOD、Flutter/Native 与真实设备峰值待验，正式 16 Mi 像素准入尚未调整。
 
 ## 内部 graphics 二进制与预算
 

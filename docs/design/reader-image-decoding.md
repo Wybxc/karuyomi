@@ -2,7 +2,7 @@
 
 ## 状态与范围
 
-状态：**libspng/WASM 已通过 Node 与 Web 顺序解码机制，正式长图路径尚未实现，P0 超长图门未通过**。最初设计以主仓库 `4645ade` 和仓库固定 Flutter `3.47.5` 做源码审查；2026-11-04 进一步在 Node 与 Codex 内置浏览器实际执行固定 libspng 的两张超 16 Mi 像素合成 PNG、背压、取消与尾部错误，见[codec 证据](../verification/long-image-codec.md)。该实验未改变产品准入，没有测量进程/GPU 峰值；独立机制与正式 Source/Flutter/Native 验收分别维护。
+状态：**PNG / JPEG 已通过 Node / Web 顺序机制，JPEG 原生缩放另通过 Node 像素对照；正式长图路径尚未实现，P0 超长图门未通过**。最初设计以主仓库 `4645ade` 和仓库固定 Flutter `3.47.5` 做源码审查；2026-11-04 进一步实际执行固定 libspng 的超 16 Mi 像素合成 PNG，以及 libjpeg-turbo 的 baseline 长图、背压、取消与错误场景，见[codec 证据](../verification/long-image-codec.md)。Web 仅核首/中/末区域，不沿用 Node 的完整流 SHA 或缩放证明。实验未改变产品准入，没有测量进程/GPU 峰值；独立机制与正式 Source/Flutter/Native 验收分别维护。
 
 目标是在既定 Flutter + TeaVM 架构中，经未修改 Source 的正式图片链，显示超过当前 16 Mi 像素限制的长图。需要同时解决真实解码、按需显示、缩放、原图坐标恢复和资源峰值；保留 16 Mi 拒绝只能说明现有限额生效。
 
@@ -106,7 +106,17 @@ wrapper 的 MIT 标识不覆盖全部底层库。该 npm 包的 `THIRD-PARTY-NOT
 
 固定 `libspng v0.7.3` 的 progressive row API 已在独立 Node Worker 与 Codex 内置浏览器的 Web Worker 中实际运行：1080×20000 / 1080×40000 的合成 RGBA8 非交错 PNG，在实际 16 MiB 非共享 WASM heap 中顺序输出全部像素。Node 完整流 SHA 匹配编码前原始 RGBA 生成基准；Node 和 Web 的首/中/末区域 SHA 分别匹配独立 libpng oracle，Web 未计算完整流 SHA。单个 256 行条带加 64 KiB ACK 通道没有建立完整 raster；首块取消会关闭 C 上下文。仅删除 IEND 的文件在全部行输出后仍失败，说明正式片资源必须能因后部错误整体作废。具体输入、构建器偏差、计量范围和剩余格式见[实验记录](../verification/long-image-codec.md)。
 
-这使 libspng 成为顺序 PNG 路径的实际候选，尚不能宣布整套终端 codec 已选定。正式接入前应固定可复现工具链、上游 submodule、颜色/透明与方向合同，完成 Native 内置资源及正式终端集成验证。RGB/灰度/调色板 tRNS、Adam7、16-bit、JPEG/WebP 等不套用这两张 RGBA 素材的结果；JPEG 仍需另验成熟的扫描行/缩放库。随机区域、反向读取、tile 编码和实际 Flutter 显示仍是后续实现门。
+这使 libspng 成为顺序 PNG 路径的实际候选，尚不能宣布整套终端 codec 已选定。固定官方 macOS SDK 已重新构建并通过同样的 Node / Web 分项，独立新 WASM 身份与首轮分别保存；Linux 及跨主机一致性未验。正式接入前还需维护构建入口、上游 submodule、颜色/透明与方向合同，完成 Native 内置资源及正式终端集成验证。RGB/灰度/调色板 tRNS、Adam7、16-bit、JPEG/WebP 等不套用这两张 RGBA 素材的结果。随机区域、反向读取、tile 编码和实际 Flutter 显示仍是后续实现门。
+
+## libjpeg-turbo 顺序 JPEG 机制与采用边界
+
+固定 libjpeg-turbo 3.2.1 / `7b4993786d856cbccabfc0ed2f923ba000e326cc` 已用同一官方 macOS SDK、独立缓存编译为无 pthread 的 250,040 B WASM。Node Worker 中，720×30000 / 720×60000 合成 baseline JPEG 的完整尺寸、1/2 和 1/4 IDCT 缩放均通过完整流与首/中/末像素 SHA。完整尺寸参考取自 Sharp 重新解码有损 JPEG；缩放参考是本机独立原生 `djpeg` 3.2.1 的整数 IDCT 输出，经无损 PNG 和 Sharp 解析，未用任意 resize kernel 代替原生缩放。输入、哈希与复验命令见[实验记录](../verification/long-image-codec.md#libjpeg-turbo-顺序-jpeg-机制)。
+
+适配先读取头部，以 `jpeg_has_multiple_scans()` 拒绝多 scan，并限定 8-bit、Huffman、灰度/RGB/YCbCr 与顺序 DCT 的 SOS 参数。实际验证 SOF0 baseline；不依赖固定库未赋值的 `is_baseline` ABI 字段。条带至多 256 行、通道至多一个 64 KiB ACK 块，WASM 实际非共享 heap 为 16 MiB，最大图 C 计量峰值约 1.96 MB，包含约 1.18 MB 编码输入。请求账本和 heap 均不代表进程/GPU 峰值。
+
+JPEG 先缩放再输出可以减小条带和终端 raster，但不使 progressive / multi-scan 的整图系数消失。当前机制在 `start_decompress()` 前拒绝这些输入，不用缩小目标图掩盖工作区需求；仅有一个小 progressive 拒绝素材，尚未另验 multi-scan sequential。输入高上限为 65500，不能把 PNG 的高度范围照搬到 JPEG。
+
+首块 ACK 点取消后 C 账本归零；缺失 EOI 的文件在最后条带的扫描行阶段因 corrupt-data warning 失败，已输出片必须能整体作废。每个进入库的导出调用都有活跃错误恢复帧；完整输入最终仍经过 `finish_decompress()`。Codex 内置 Chromium 156 又实际通过两张完整尺寸的六个区域 SHA/Canvas、背压、取消、截断、progressive 拒绝及首块后强制 terminate 观察窗，无 SAB，五个协作终态 C 账本归零。Web 未计算完整流 SHA、未测缩放或强制终止后的 heap 释放；Native、EXIF/ICC/其它色彩、随机区域及正式 Source/Flutter 链仍待验，不关闭产品门。
 
 ## 下一轮正式实现的结构
 
@@ -158,7 +168,7 @@ Reader 继续保留一个 Source 逻辑页；tile 不进入章节页序、不变
 
 ## 下一轮实现与实测门
 
-1. **先确定 codec 可交付性。** 固定候选版本、构建参数和哈希，得到能执行真实大图 decode 的产物。测量冷启动下载、heap 初始/峰值、线程数与显式退出；若评估裁剪版，先证明它能运行，再决定采用。默认 wasm-vips 的 256 MiB/SAB 成本不能直接跳过。
+1. **内化已验证的 codec 管线。** PNG/JPEG 的现有 Node/Web 顺序机制及 JPEG Node 原生缩放证据足以进入正式集成。将自有 C/TypeScript 适配内化，以 submodule 固定两库和已验 SDK 准备器建立可复验 builder，不让可选格式研究继续推迟交付。正式构建仍须锁定参数、产物哈希并测量冷启动、工作堆和显式退出；不能用未实际运行的裁剪版或默认 wasm-vips 的 256 MiB/SAB 假设替代当前证据。
 2. **验证大于 16 Mi 的真实输入。** 至少包含 1080 × 20000 及更长的 baseline JPEG、非 interlaced PNG，用首/中/末可辨内容验证实际小片像素。增加 progressive JPEG、interlaced PNG、透明图、16-bit、EXIF 和截断文件，区分支持、预算拒绝与真实解码失败。头部尺寸和构造空白 widget 不算通过。
 3. **验证有界生成和任意位置读取。** 记录输入副本、codec 高水位、条带/片数、缓存字节和存储配额；测试慢消费者、跳到末尾、连续反向滚动、LOD 替换与 zoom。不得由完整 raster、无界内存文件或全部 tile 同时驻留来实现“分片”。
 4. **接通正式产品合同与锚点。** 生成双端模型，接入 host、Native 文件与 Reader，覆盖同一长图内滚动、旋转、DPR、模式切换、缩放、关章及恢复。显示与 observed 必须来自实际已解码且可见的 tiles。

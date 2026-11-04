@@ -9,6 +9,8 @@
 ```mermaid
 flowchart TD
   CLI["scripts / CI：调用与产品组装"] --> EXT["tools/extensions：发现、构建、验证、快照、网络政策"]
+  CLI --> IMG["tools/images：图像 codec 工具链与构建"]
+  IMG --> BASE
   CLI --> JVM["tools/teavm：工具链、上游补丁、Java 编译"]
   EXT --> JVM
   EXT --> BASE["第三方库 / Node 标准库"]
@@ -19,6 +21,7 @@ flowchart TD
 
 - `scripts/` 是仓库操作入口，不被工具模块或产品代码导入。CLI 参数解析与领域实现分开，领域函数可以直接测试。
 - `tools/extensions/` 负责扩展描述、输入指纹、隔离 AOT、静态当前快照、传输校验和网络授权元数据。注册、同步和流水线共享同一份清单与 gzip 校验，不再动态导入 CLI 文件。
+- `tools/images/` 负责图片 codec 的官方 SDK 校验、原子安装与隔离缓存，不依赖扩展发布编排。`pnpm image-codecs:prepare` 准备锁定的工具链，`pnpm test:image-codecs` 运行不下载 SDK 的归档、HTTP、取消与子进程清理回归；后者已纳入 `pnpm check`。支持平台和当前集成范围见 [image-codec README](../runtime/image-codec/README.md)。
 - `tools/teavm/` 负责锁定工具链、seed、归档、上游补丁和 JVM 构建。工作目录由参数明确传入，不复制脚本后改变源码定位，不依赖扩展发布编排。
 - 通用进程、序列化、原子写入、归档、文件锁和并发直接使用成熟库。seed 成员、构建身份、checkpoint 与资源预算等项目规则留在所属领域，不重新搬出一套通用 helper。
 - 产品 `src/` 不依赖工具或测试代码。contracts 只依赖底层生成协议包及库，独立于应用、运行时和自动化。

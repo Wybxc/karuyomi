@@ -1,10 +1,12 @@
-# 长图 libspng / WASM 机制验证
+# 长图 codec / WASM 机制验证
 
 ## 结论与边界
 
-2026-11-04，固定 libspng 的顺序行解码已通过 Node Worker 的两张大尺寸合成 PNG、ACK 边界取消及缺失 IEND 尾部四项机制测试。完整 RGBA 输出分别为 86,400,000 B 与 172,800,000 B，实际 WASM 线性 heap 均为 16 MiB；没有在 WASM 中建立完整 raster。该证据推进[长图计划](../plan/reader-image-decoding.md)的 codec 可交付性门，尚未接入 Source、Flutter 或 Native 产品，也不证明进程/GPU 峰值。
+2026-11-04，固定 libspng 的顺序行解码已通过 Node Worker 的两张大尺寸合成 PNG、ACK 边界取消及缺失 IEND 尾部四项机制测试。完整 RGBA 输出分别为 86,400,000 B 与 172,800,000 B，实际 WASM 线性 heap 均为 16 MiB；没有在 WASM 中建立完整 raster。该证据推进[长图计划](../plan/reader-image-decoding.md)的 codec 可交付性门，尚未接入 Source、Flutter 或 Native 产品，也不证明进程/GPU 峰值。随后同一素材又通过官方 macOS SDK 的独立重建和 Node / Web 复验，见下方第二轮；首轮组合工具链证据保留原样。
 
 同一 WASM 与素材已在 Codex 内置 Chromium 156 的真实 Web Worker 通过五项测试，并亲眼核对首/中/末区域。正式长图合同、任意区域读取、缩放/LOD、PNG tile 编码、资源池和真实设备仍未完成，不改变现有 16 Mi 像素准入。
+
+同日，固定 libjpeg-turbo 3.2.1 又通过官方 macOS SDK 的 Node 顺序 JPEG 机制：两张 baseline 长图的完整尺寸、1/2 与 1/4 原生 IDCT 缩放，连同 ACK 取消、缺失 EOI 和 progressive 拒绝，共九项通过。随后 JPEG 又在 Codex 内置浏览器通过完整尺寸及生命周期六项；Web 只核对首/中/末区域，未计算完整流 SHA，1/2、1/4 像素对照仍只有 Node 证据。
 
 ## 固定输入与构建
 
@@ -70,12 +72,118 @@ env PATH="$PWD/.local/node24/bin:$PATH" PORT=8951 node .local/long-image-codec/s
 
 浏览器访问 `http://127.0.0.1:8951`，点击“运行全部五项”，报告自动保存为新的 `web-result-N.json`；完成后点击“关闭服务”，再核对 shell exit 与端口释放。重跑前保留冻结原报告，不把重复结果覆盖成旧轮证据。
 
+## 官方 macOS SDK 的第二轮
+
+为消除首轮本机组合工具链偏差，另建 `.local/long-image-official-sdk/`，仅下载 emsdk 5.0.7 的官方 Darwin arm64 归档。SDK 来源由 emsdk 固定提交 `41190c21c662e9cc1962aea94e71cbae9fd2fc87` 映射到 release `6cd98e86d7749ff98b82b7f2ae78eb4f01942788`；GCS 对象 generation 为 `1777481187423024`，大小 282,468,276 B。下载第一段触发 600 秒上限，确认退出后对同一 generation 断点续传；完整文件的官方 MD5、CRC32C 均匹配，SHA-256 为 `37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c`。
+
+实际工具是 emcc 5.0.7 / `263db4c…`、LLVM 23.0.0git / `7b58716d96c3ae4c0c4e6f72e29b16137bb6224b`、Binaryen 129 / `version_125-430-gc6a5e65b7`。Emscripten 的版本检查接受 128 或 129；本轮保留 `-Werror=version-check`，没有把“源码预期 128”误称归档实际版本，也没有复用 Homebrew 二进制或第一轮编译缓存。
+
+官方 `--emit-tsd` 使用 `--outFile`，与项目 TS 6.0.3 的弃用错误冲突；声明生成改用该官方 package-lock 固定的 TypeScript 5.9.3 独立工具依赖。自有脚本和三套 harness 继续由项目 TS 6.0.3 严格检查，不增加 `ignoreDeprecations`、宽泛断言或上游源码补丁。首次缺少 tsc 和随后 TS5101 的失败日志均保留。
+
+同一冻结 C / libspng 得到新 WASM 67,341 B，SHA-256 `a90a18bce4ea17b9de95cff97acae2d560025030e12fb085eb583d6167bc7190`。Node 四项全部重跑通过，完整流匹配原始 RGBA 基准、三个区域匹配独立 libpng oracle，16 MiB 非共享 heap、条带和 allocator 计数与首轮对应场景一致，四个 Worker 均清理至 0 并自然 exit=0。
+
+08:02:22.635–08:02:23.643 UTC，主代理在 Codex 内置 Chromium 156 点击官方新页面的全部五项；首/中/末六区可见且摘要匹配，两个完整输出、首块取消、IEND 尾部拒绝及额外强制 terminate 观察窗均通过。`crossOriginIsolated=false`、无 SAB，四个协作终态的实际 heap 16 MiB、C 请求账本为 0。强制 terminate 仍未声称观测到 heap 释放。页面关闭服务后 session 99171 输出 `server closed`、exit=0，8952 无监听。
+
+第二轮冻结在 `.local/long-image-official-sdk/runs/2026-11-04-official-darwin-arm64-rgba8/`，与首轮分别保存；`official-lock.json` 的 Web 待验状态反映其生成时点，后补的浏览器报告记录上述实际完成结果，不改写旧清单或日志。
+
+| 第二轮证据               | SHA-256                                                            |
+| ------------------------ | ------------------------------------------------------------------ |
+| Node `result.json`       | `1dc04e63ff7fbcf731441a260f718decbac0f8e36cd1c744e123cc160f0c8059` |
+| Web `web-result-1.json`  | `617eab2d9a164fdb3c9f7db898debd0c72534b3a432b77c5b58fb85575fd1465` |
+| 首中末截图 `regions.jpg` | `0d25dfe682937876b05dbd03c235e2f6e7dfd1905d8b5453ec9d350f01efd25f` |
+
+该轮证明固定官方 macOS 工具链能重建并执行此 PNG 机制；尚未验证 Linux SDK、跨主机字节一致性或 Native 内置执行，不能据此宣称完整跨平台可复现构建已通过。正式接入还需上游 submodule、维护构建入口和后文各项产品门。
+
+## libjpeg-turbo 顺序 JPEG 机制
+
+### 固定输入与适配
+
+实验位于忽略的 `.local/long-image-jpeg/`。官方 [libjpeg-turbo 3.2.1](https://github.com/libjpeg-turbo/libjpeg-turbo/releases/tag/3.2.1) 独立 checkout 固定为 `7b4993786d856cbccabfc0ed2f923ba000e326cc`，上游工作区保持干净。使用上一节同一官方 Emscripten 5.0.7 SDK、Node 24.15.0 与项目 TS 6.0.3，但使用 JPEG 自己的 `EM_CONFIG` 和缓存，保留 `-Werror=version-check`。CMake 构建无 SIMD 的 `jpeg-static`，关闭 shared、TurboJPEG API、tools 和 tests，再链接项目自有最薄 C 适配；未使用实际指向 IJG jpeg 9f 的 Emscripten 内置 `USE_LIBJPEG` port。
+
+适配按官方 [libjpeg API](https://github.com/libjpeg-turbo/libjpeg-turbo/blob/7b4993786d856cbccabfc0ed2f923ba000e326cc/doc/libjpeg.txt) 执行 `read_header → start_decompress → read_scanlines → finish_decompress → destroy`。头部后先以 `jpeg_has_multiple_scans()` 拒绝多 scan，另限定 8-bit、Huffman、灰度/RGB/YCbCr 和顺序 DCT 的 SOS 参数；实际素材是 SOF0 baseline。`JCS_EXT_RGBA` 保证 opaque alpha，缩放设置为 1/1、1/2 或 1/4，再从库计算的输出尺寸分配至多 256 行条带；每次累积 `read_scanlines()` 实际返回的行数。
+
+单 scan 顺序 DCT 的系数控制器只需局部 MCU 缓冲；progressive 及 multi-scan sequential 会使用整图系数，普通 `start_decompress()` 还会预读所有 scan，不能靠缩小输出 raster 消除这些内存。依据为固定 [系数控制器](https://github.com/libjpeg-turbo/libjpeg-turbo/blob/7b4993786d856cbccabfc0ed2f923ba000e326cc/src/jdcoefct.c)和[解压启动逻辑](https://github.com/libjpeg-turbo/libjpeg-turbo/blob/7b4993786d856cbccabfc0ed2f923ba000e326cc/src/jdapistd.c)。当前适配上限为宽 4096、高 65500、编码输入 8 MiB；JPEG 本身的每轴尺寸字段及该库上限不能沿用 PNG 的 100000 高范围。
+
+通过官方 `jmemsys` 后端接口计量库的池分配，加上自有编码输入和条带，请求 payload 总上限 16 MiB；不修改上游。WASM 初始 16 MiB、最大 32 MiB，关闭 pthread 和内存文件系统。通道每次只转移至多 64 KiB，收到 ACK 才继续，首 ACK 人为延迟 80 ms。消费者增量计算 SHA，不保存完整 raster。
+
+默认内存 source 在数据耗尽时会警告并合成 EOI，故自有 `emit_message` 将 corrupt-data warning 转为失败；完整行读取后仍调用 `finish_decompress()` 消费尾部。每个可能进入 libjpeg 的导出调用都有活跃 `setjmp`，失败后统一 destroy，避免跳向已经返回的栈帧。首次额外使用的 `is_baseline` ABI 字段虽在头文件中存在，固定库实际上未赋值，曾错拒有效 baseline；已删除此门和不必要的 JPEG8 ABI 设置，保留错拒摘要，没有修改上游。此路径可以接纳符合条件的 SOF0/SOF1 单 scan 顺序 DCT，但未据此声称全部模式已实测。
+
+WASM 模块以 `unknown` 导入，再由 Zod 的具名函数 schema 校验导出函数的参数/返回值；每次读取 heap 时重新解析 `HEAPU8`，避免增长后的旧 view。未消费的 `--emit-tsd` 在遭遇前述 SDK/TS6 弃用冲突后删除，失败日志保留；没有使用 `any`、宽泛断言或关闭类型检查。
+
+### 九项实际结果与像素基准
+
+两张 JPEG 由 Sharp 0.35.5 编码，输入为可辨的合成图案，不是 Source 内容。完整尺寸的 expected SHA 与首/中/末各 32 行均取自 Sharp / libvips 8.18.7 / mozjpeg `0826579` **重新解码 JPEG** 的 RGBA，不能以编码前原始 RGBA 的无损 SHA 作为有损结果基准。
+
+缩放参考来自 Homebrew 安装的本机原生 `djpeg` 3.2.1：`-strict -scale 1/2` 或 `1/4 -dct int -rgb -png -noicc`。其输出 PNG 由 Sharp 无损解析为 RGBA，未调用 Sharp resize。被测 WASM 的六个完整流 SHA 和各自三个区域 SHA 均精确匹配；这证明与独立原生编译结果一致，仍是同一 libjpeg-turbo 算法，不能称为另一种独立 JPEG 算法实现。
+
+| 输入与比例     | 输出 raster / 完整流字节  | C 请求 payload 高水位 |
+| -------------- | ------------------------- | --------------------- |
+| 720×30000，1/1 | 720×30000 / 86,400,000 B  | 1,370,703 B           |
+| 同图，1/2      | 360×15000 / 21,600,000 B  | 986,217 B             |
+| 同图，1/4      | 180×7500 / 5,400,000 B    | 795,369 B             |
+| 720×60000，1/1 | 720×60000 / 172,800,000 B | 1,959,276 B           |
+| 同图，1/2      | 360×30000 / 43,200,000 B  | 1,574,790 B           |
+| 同图，1/4      | 180×15000 / 10,800,000 B  | 1,383,942 B           |
+
+两张 JPEG 分别为 589,235 / 1,177,808 B；全尺寸峰值包含这份编码输入及 737,280 B 条带，扣除输入后的计量值同为 781,468 B。六项实际 heap 均为 16,777,216 B、非共享 buffer，关闭后 live/allocations 均为 0、Worker 自然 exit=0。两次全尺寸耗时约 268 / 427 ms，含 80 ms ACK 人为等待，只是本机机制记录，不能作为产品或真机性能结论。
+
+其余三项使用 60000 高素材或独立小 progressive 素材：
+
+- 首块 ACK 点协作取消：已经同步解码 256 行，只交付 65,536 B；终态 `cancelled`，live/allocations=0，exit=0。没有证明同步 C 内抢占。
+- 仅删除最后 EOI 的 2 B：在 scanline phase=2 触发 `JWRN_JPEG_EOF=120`，只交付 59,904 行 / 172,523,520 B 后失败；live/allocations=0，exit=0。该警告可在库的预读阶段发生，不能写成全部行交付后才在 finish 阶段失败。
+- 320×480 progressive JPEG（2,841 B）：在 `start_decompress()` 之前以自有拒绝码 `-4`、phase=1 返回，无 raster 交付；live/allocations=0，exit=0。这是 progressive 的接纳拒绝证据，不是 progressive 解码通过，也未另行实测 multi-scan sequential 素材。
+
+最终 Node exec session 80502 exit=0；两套 strict TS、Prettier 和 Xcode clang-format 21.0.0 检查通过。所有测试、素材生成、原生 oracle 和编译命令已退出；临时 raw/参考 PNG 已删除，进程复核无 JPEG 相关遗留。
+
+### JPEG 内置浏览器实际结果
+
+主代理在 Codex 内置 Chromium 156 亲自点击“运行全部六项”。保存的报告为 `passed=true/error=null`，`crossOriginIsolated=false`、`SharedArrayBuffer` 未暴露，五个协作终态均报告实际非共享 heap；活动 Worker 与迟到消息计数均为 0。
+
+- 两张完整图输出 86,400,000 / 172,800,000 B，seq/offset 连续，首 ACK 延迟门通过；每图只保留首/中/末三个 32 行区域共 276,480 B，六个区域与 Sharp 解码 JPEG oracle 的 SHA 精确匹配，六条 Canvas 可见并截图。Web 没有完整流 SHA，也没有执行 1/2、1/4 缩放；这两项范围不能沿用 Node 的像素证明。
+- 两次完整图 Worker 耗时约 233 / 354 ms，含人为 80 ms 首 ACK 等待；实际 heap 16 MiB，C 请求高水位分别为 1,370,703 / 1,959,276 B，与 Node 一致。这不是产品或真机性能结论。
+- 首 ACK 协作取消只交付 65,536 B，已解码 256 行；缺失 EOI 在 phase=2 / code=120、59,904 行处失败；小 progressive 在 phase=1 / code=-4、`start_decompress()` 前拒绝。五个协作终态在 C close 后均为 live/allocations=0。
+- 额外强制 terminate 在首块后直接调用 `Worker.terminate()`，不发送 ACK/cancel；100 ms 内无后续消息，未伪造协作 close。报告保留 `allocatorCleanupObserved=false`、`wasmHeapReleaseMeasured=false`，没有测量浏览器线程退出或 heap 清理。
+
+主代理点击“关闭服务”后，server exec session 58504 输出关闭终态并 exit=0；`lsof` 再次核对 8952 无监听。浏览器报告、截图、AX 与关闭证据后补到同一冻结目录；最初 `checks.json` / `toolchain.json` 的 Web 待验字段仅反映生成时点，不改写为后续状态。
+
+### JPEG 保存身份与复验
+
+最终源码、素材与 oracle 清单、工具链、构建参数、运行日志和校验已冻结在 `.local/long-image-jpeg/runs/2026-11-04-libjpeg-turbo-3.2.1-official-sdk/`，详细临时输出不入库。后补 Web 证据的 SHA 另存于 `web-evidence-sha256.json`。
+
+| JPEG 证据                   | 身份                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| WASM                        | 250,040 B；SHA-256 `369247f9e75917b33dc0f17decc508ee6eac01c2e20a4bf3ddeab57c591c91da` |
+| Node `result.json`          | SHA-256 `39ac3576abdaedf9d34b0255eb41d93c42bb832913a712ce0e4f9a6b380e4c5c`            |
+| `fixtures.json`             | SHA-256 `357639e092add3684f3a47d8867b6cf5d53542a3b8e1b6c753fcf011b50315a6`            |
+| Web `web-result-1.json`     | SHA-256 `857150ddfe03c145813cc5e51e737661e631ed91ddb6968ed11134c1d002400a`            |
+| Web 截图 `jpeg-regions.png` | SHA-256 `c702cb691aa960f9629e915404296cd130df4f65a92b27e3778922a57c1200cf`            |
+| Web AX `jpeg-ax.txt`        | SHA-256 `759516393053f7ea6f2d0be38b63115dfd617e31bcff50043e1bbe02a589d496`            |
+
+已保存输入及官方 SDK 的这台机器可在主仓库复验；以下不是干净 checkout 的正式产品构建入口。先保留冻结报告，再在工作实验目录重跑，不覆盖旧轮证据。
+
+```sh
+env PATH="$PWD/.local/node24/bin:$PWD/node_modules/.bin:$PATH" \
+  EM_CONFIG="$PWD/.local/long-image-jpeg/.emscripten" \
+  JPEG_EMCC="$PWD/.local/long-image-official-sdk/sdk/emscripten/emcc" \
+  JPEG_EMCMAKE="$PWD/.local/long-image-official-sdk/sdk/emscripten/emcmake" \
+  JPEG_TOOLCHAIN_ID=emscripten-5.0.7-official-37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c \
+  node .local/long-image-jpeg/build.ts
+env PATH="$PWD/.local/node24/bin:$PATH" node .local/long-image-jpeg/native-oracles.ts
+env PATH="$PWD/.local/node24/bin:$PATH" node .local/long-image-jpeg/run.ts
+pnpm exec tsc --project .local/long-image-jpeg/tsconfig.json
+pnpm exec tsc --project .local/long-image-jpeg/tsconfig.web.json
+```
+
+Web 复验另运行 `node .local/long-image-jpeg/build-web.ts`，再以 `PORT=8952 node .local/long-image-jpeg/server.ts` 启动本地页；在 Codex 内置浏览器点击“运行全部六项”，完成后点击“关闭服务”，核对 shell exit 与端口释放。重跑会在工作实验目录写报告，须先保留冻结原报告。
+
+JPEG 当前尚未覆盖 Web 缩放、Native、真实 Source、EXIF 方向、ICC/色彩管理、CMYK/YCCK、高位深、随机区域或 tile 编码。严格 warning 与 finish 证明本轮缺 EOI 被拒绝，不证明校验真实 EOI 之后的额外字节。计量不含 allocation header、libc 元数据/碎片、栈、静态数据、JS 副本或 RSS；WASM 最大 heap 也不是浏览器/进程总内存上限。前述离线 Sharp/native oracle 生成中的完整图像分配不计入被测解码器证据。
+
 ## 限制与后续
 
-- allocator 高水位只统计 libspng、zlib、编码输入和条带的请求 payload；不含 allocation header、分配器元数据/碎片、栈、静态区或 realloc 短暂新旧并存。heap 上限与该计数均不等于进程物理内存峰值。
+- PNG allocator 高水位只统计 libspng、zlib、编码输入和条带的请求 payload；JPEG 另按上述 libjpeg 池请求、编码输入和条带计量。均不含自有 allocation header、底层分配器元数据/碎片、栈或静态区，PNG 还未计入 realloc 短暂新旧并存。heap 上限与该计数均不等于进程物理内存峰值。
 - 64 KiB 单块背压不证明已消费的 JS ArrayBuffer 立即 GC。消费者保存的三个 oracle 区域也须在后续产品预算中单独计费。
 - 取消只证明 ACK 等待点协作取消，首个 256 行同步 C 调用已经结束；不证明同步 C 内抢占，也没有用自然 exit 冒充强制 Worker 终止。
-- 本轮仅覆盖 RGBA8 非交错素材；RGB/灰度/调色板 tRNS、ICC/gamma、16-bit、Adam7、JPEG、WebP、动画与 EXIF 方向尚未验收。不能泛称支持全部非交错 8-bit PNG。
+- PNG 分项仅覆盖 RGBA8 非交错素材；RGB/灰度/调色板 tRNS、ICC/gamma、16-bit、Adam7、WebP、动画与 EXIF 方向尚未验收。JPEG 只在上述 Node baseline / 原生缩放及 Web 完整尺寸机制范围通过，不能泛称所有 PNG/JPEG 或终端阅读均支持。
 - 顺序输出不等于随机区域访问或按视口生成。末尾跳转、反向滚动、重新扫描、LOD 交替、实际 tile 编码和最终 Flutter cache / GPU 释放都仍待正式实现。
 - Native 的内置 WASM / Worker、平台文件、Flutter 与真机内存仍须单独验证。当前机制不构成调整正式协议和限额后即可发布的依据。
 

@@ -2,11 +2,13 @@
 
 ## 目标与状态
 
-使真实长图经原 Source 图片链进入 Web 与 Native 阅读器，在条漫、旋转、缩放与位置恢复时保留原图坐标，并记录解码尺寸、资源释放和进程/GPU 峰值。状态：**进行中，Node / Web 顺序 PNG 解码机制分项通过，正式产品尚未验收**。这是 [P0 阅读计划](p0-runtime-and-reading.md)的图片子计划，不以现有单图像素拒绝门替代长图支持。
+使真实长图经原 Source 图片链进入 Web 与 Native 阅读器，在条漫、旋转、缩放与位置恢复时保留原图坐标，并记录解码尺寸、资源释放和进程/GPU 峰值。状态：**进行中，PNG / JPEG Node / Web 顺序机制及 JPEG Node 原生缩放机制分项通过，正式产品尚未验收**。这是 [P0 阅读计划](p0-runtime-and-reading.md)的图片子计划，不以现有单图像素拒绝门替代长图支持。
 
 ## 当前证据与缺口
 
 - 固定 libspng/WASM 的两张大尺寸合成 RGBA PNG、ACK 背压、首块取消与缺 IEND 尾部已通过 Node 与内置浏览器 Web Worker 机制分项；实际 heap 为 16 MiB，Web 不依赖 SAB / COOP/COEP，首/中/末区域已可见。范围、工具链偏差与剩余输入见[codec 证据](../verification/long-image-codec.md)，不将其视为真实 Source 或终端产品验收。
+- 固定 libjpeg-turbo 3.2.1 已用官方 macOS SDK 在 Node 通过两张 baseline 长图的完整尺寸、1/2 与 1/4 原生 IDCT 输出，完整流及首/中/末像素分别匹配 Sharp JPEG 解码或独立原生 djpeg 缩放 oracle；另通过首 ACK 取消、缺 EOI 失败与 progressive 接纳拒绝，共九项。JPEG 又通过内置浏览器完整尺寸、背压、取消、截断、progressive 拒绝与强制 terminate 观察窗六项，首/中/末区域可见并匹配 SHA，无 SAB；Web 完整流 SHA、缩放和强制终止后的 heap 释放未测。不能把 progressive 拒绝算作其解码支持。
+- SDK 准备器与工具链检查作为本轮独立工程门完成，入口为 `pnpm image-codecs:prepare` / `pnpm test:image-codecs`，后者纳入 `pnpm check`。来源和使用见[codec 工具链说明](../../runtime/image-codec/README.md)。这不代表正式 PNG/JPEG 产品构建、Linux 执行或跨主机字节一致性已经验收。
 - 当前宿主、控制描述符、Dart 传输和 Native 文件接收边界限制每图 16 Mi 像素，1080×20000 等长图在到达 Flutter 前即被拒绝。
 - 宿主完整解码验证处理后的图片，Flutter 再用完整 `NetworkImage` / `FileImage` 显示；布局缩放不等于请求较小 raster。调度器在 acquire 返回后接纳资源，现有账本不能证明在途解码峰值。
 - 连续阅读已经按原尺寸计算页高，并保存页内归一化偏移；应扩展现有逻辑锚，不用分片序号替代逻辑页和进度。
@@ -16,7 +18,7 @@
 
 ## 实施顺序
 
-1. **选定可实际运行的有界解码管线。** 使用成熟库或平台 API，先以真实 PNG/JPEG/WebP、方向信息及超过现有 16 Mi 像素的长图测量。记录输入/输出、工作堆、首个可显示区域与最终资源释放；明确哪些格式支持顺序/区域解码、哪些需额外工作预留。不能将裁剪完整 bitmap 或先完整解码再缩放称作解码前分片。尚未证明的裁剪构建不能作为已可用依赖。
+1. **正式内化已验证的 PNG/JPEG 管线。** 现有 Node/Web 顺序与 JPEG Node 缩放证据足以推进集成，不再等待可选格式研究。将项目自有 C 适配、严格 TypeScript Worker/harness 内化为维护源码；libspng、libjpeg-turbo 通过 submodule 固定上游提交，使用已验 SDK 准备器建立锁定输入、参数和产物身份的正式可复验 builder。临时工程、下载与冻结日志继续留在忽略目录。先明确首批格式、方向和尺寸能力合同及拒绝范围，再接入正式 Source 链；真实输入、Web 缩放、Native 内置执行与峰值在后续验收中收齐。不能将裁剪完整 bitmap 或先完整解码再缩放称作解码前分片，也不将未证明可运行的裁剪构建作为依赖。
 2. **建立统一的图片描述与所有权。** 分开表示插件处理后图片的逻辑尺寸、方向与实际 raster/分片尺寸，保持原图坐标与已有逻辑页键。通过 Protobuf 同步 Web/Native 描述和限额；源插件内部图形预算、传输字节、解码工作区、驻留 raster 分别计费。只有管线实测成立后才调整当前像素准入条件。
 3. **接入宿主与终端。** 保留原 Source 的请求、Cookie、拦截器及处理结果；把解码后的可见窗口交给 Flutter，按实际物理视口请求足够清晰的 raster，禁止无意义放大。共享库作为 Web Static Assets 或 Native 内置材料交付。所有实际使用的 provider/cache key 都由资源池跟踪，替换、缩放和释放等待真实终态，不只淘汰原 provider。
 4. **完成预算与取消。** 解码启动前预留工作空间及输出，旧 raster 尚未释放时仍计费；在途取消、迟到解码、格式错误及预算拒绝均回收至明确终态。分片窗口、单边纹理限制、并发和预取纳入合计预算。
