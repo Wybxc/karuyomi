@@ -4,7 +4,7 @@
 
 **首要设计目标是多端同步。** [P2](p2-sync.md) 提升为当前主线，与 [P1](p1-library-and-progress.md) 的数据模型、API 和客户端读写一起推进；阶段编号保留，不代表同步必须等完整本地书架之后才开始。Worker API + D1 为唯一业务权威，先打通同身份跨 Web/iOS/Android 的在线保存与恢复，再扩展外围功能。
 
-2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。固定 `13494a0` 的 v4 三包已部署，匿名 26 路径及三包网络政策核对通过，见[生产部署记录](../verification/v4-production.md)；Access 会话已失效，用户稍后登录，生产正向与 Native 主入口仍待验收，完整 P0 未通过。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；工程检查与真实 Web 独立会话闭环已通过，Native 配对与生产正向仍待验收，见[P1](p1-library-and-progress.md)和[P2](p2-sync.md)。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
+2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当前客户端/API `466acdd` 已部署，扩展快照不变，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)；Access 会话已失效，用户稍后登录，生产正向与 Native 主入口仍待验收，完整 P0 未通过。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；工程检查与真实 Web 独立会话闭环已通过，Native 配对与生产正向仍待验收，见[P1](p1-library-and-progress.md)和[P2](p2-sync.md)。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
 
 ## 优先级与状态
 

@@ -84,7 +84,7 @@ EXTENSION_ASSETS_DIR="$PWD/.local/v4-production/snapshot" pnpm build
 - 旧幂等成功只证明过去提交发生。重试或已知落后响应会读回当前权威作品，再决定确认还是 revision/epoch 冲突；另一端取消收藏/reset 后不会重现旧收藏或假报旧进度已保存。
 - 进度冲突按原操作归属保留。收藏、resume 与整库刷新不能解除旧阅读草稿的 CAS/epoch 冲突；重新打开相应章节后才恢复写入。
 - 正式 Catalog 在 bootstrap 确认当前身份前不提交草稿，随后仅提交同身份 writer。真实 `TransportSourceRuntime` 的 AccessDenied 事件回归覆盖身份切换、原身份恢复后重绑与原请求正文重试；确认身份期间立即清除旧书架视图。
-- 正式 Flutter Web release、已有 v4 三包快照的 Static Assets 组装与 Worker dry-run 构建通过；默认空索引构建也通过，不能将它代替含三包的组装检查。共享 materialVersion 仍为 `629d6e30fe3a1ac956e39630354cfd5ce390923c4b07af2a0603a181d348d11b`，未启动新的全量 AOT；新 API/D1 及客户端尚未部署生产，也未构建/安装本轮 Native App。
+- 正式 Flutter Web release、已有 v4 三包快照的 Static Assets 组装与 Worker dry-run 构建通过；默认空索引构建也通过，不能将它代替含三包的组装检查。共享 materialVersion 仍为 `629d6e30fe3a1ac956e39630354cfd5ce390923c4b07af2a0603a181d348d11b`，未启动新的全量 AOT；本节执行时新 API/D1 及客户端尚未部署生产，也未构建/安装本轮 Native App。后续正式部署见[生产记录](server-state-production.md)。
 - 本地业务数据库、Drift/build_runner 依赖、生成模型和数据库 Web 资产已移除；Source 文件/HTTP Cache、扩展缓存与图片资源的原存储未改变。
 
 ## 阅读中前台重取与登录恢复
