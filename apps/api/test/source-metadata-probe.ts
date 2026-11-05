@@ -234,14 +234,6 @@ const mf = new Miniflare(
 );
 const direct = await mf.unsafeGetDirectURL();
 const connect = buildConnector({});
-const token = await new SignJWT({ email: 'probe@example.com' })
-  .setProtectedHeader({ alg: 'RS256', kid: String(jwk.kid) })
-  .setSubject('probe-owner')
-  .setIssuer('https://probe.cloudflareaccess.com')
-  .setAudience('probe-app')
-  .setIssuedAt()
-  .setExpirationTime('30m')
-  .sign(keys.privateKey);
 interface NetworkEntry {
   requestId: string;
   runtimeGeneration: string;
@@ -532,7 +524,17 @@ const handleRequest: RequestListener = async (request, response) => {
             for (const item of Array.isArray(value) ? value : [value])
               headers.append(key, item);
         }
-        headers.set('Cf-Access-Jwt-Assertion', token);
+        headers.set(
+          'Cf-Access-Jwt-Assertion',
+          await new SignJWT({ email: 'probe@example.com' })
+            .setProtectedHeader({ alg: 'RS256', kid: String(jwk.kid) })
+            .setSubject('probe-owner')
+            .setIssuer('https://probe.cloudflareaccess.com')
+            .setAudience('probe-app')
+            .setIssuedAt()
+            .setExpirationTime('30m')
+            .sign(keys.privateKey),
+        );
         headers.set('Origin', apiOrigin);
         // This controls only the loopback-to-workerd hop. Source headers remain
         // inside META and are preserved by the product bridge.

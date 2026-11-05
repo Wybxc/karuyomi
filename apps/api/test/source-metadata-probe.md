@@ -2,6 +2,10 @@
 
 This loopback harness loads the actual product TeaVM build through its public static manifest and explicit gzip artifact loader. It runs the product `/api/bridge/http` route in real workerd with isolated policy-only D1 state and an explicit `www.mangadraft.com` network policy. Its separate test entry verifies a real RS256 test JWT; the localhost proxy supplies that test assertion and maps its origin to the test API origin. It does not change or bypass authentication in the production entry point.
 
+For each forwarded `/api/*` request, the proxy signs a new assertion with the same test subject, issuer, audience and key ID, a current `iat`, and a 30-minute `exp`. It does not cache an assertion from startup or extend an existing credential. This keeps a long-running local test service usable while the real verifier continues checking every request. It does not exercise production Access credentials, login cookies or expiration recovery; those require separate dedicated tests.
+
+The first Android server-sync attempt on 2026-11-05 used the former startup-scoped assertion after its 30-minute lifetime had elapsed: bootstrap/state requests returned 401 and the official integration test failed in the Access-paused state. That attempt is a failure, not a sync or production Access pass. Its raw report remains in the ignored `.local/android-server-sync/android-from-web.log`; subsequent runs must record their own inputs and results.
+
 The API hop uses pinned Undici directly against `unsafeGetDirectURL()` for the user Worker, with a loopback HTTP Host/Origin and the normal product checks. It does not use Miniflare's front `dispatchFetch` Worker, which has independent request-signal settings. Each API request owns one client/socket; a browser disconnect resets that socket before aborting its upload/response. This makes an idle HTTP/1 cancellation visible to workerd; ordinary local stream destruction alone did not do so in a controlled comparison. It does not establish production HTTP/2 or HTTP/3 behavior.
 
 After building a product package and installing workspace dependencies:
