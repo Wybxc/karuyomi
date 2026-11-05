@@ -117,9 +117,21 @@ Future<CatalogController> _details(
   await tester.pumpWidget(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
   await _tap(tester, find.text('去浏览'));
-  await _tap(tester, find.text('source.test · 1.0'));
-  await _tap(tester, find.text('测试漫画源 · zh'));
-  await _tap(tester, find.text('真实源 DTO 测试'));
+  final catalog = find.byType(CatalogPage);
+  final scrollable = find
+      .descendant(of: catalog, matching: find.byType(Scrollable))
+      .first;
+  for (final label in ['source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+    final target = find.descendant(of: catalog, matching: find.text(label));
+    await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(target);
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+  }
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
       .controller;

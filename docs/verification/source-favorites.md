@@ -42,6 +42,8 @@ flutter test test/browse/source_favorites_controller_test.dart test/sources/
 
 `pnpm check` 完整通过，包含协议生成一致性、portable 格式、严格类型、依赖方向、392 项 Vitest 与全部协议/扩展/工具回归。`pnpm build` 完整通过，包含 Web/Native runtime 材料、Flutter Web release 和 Worker/Static Assets。提交使用全库 `pnpm format`、完整 `pnpm format:check` 和正常 prek；没有修改原生插件或构建设置，也未重新构建或运行 Native App。
 
+提交 `77a1c07` 已推送 main，对应 [GitHub Actions](https://github.com/Wybxc/karuyomi/actions/runs/42125427487) 完整成功，包含 `pnpm check`、`pnpm flutter:check`、`pnpm build` 和本地 D1 migration；CI 成功不代表远端部署或独立客户端验收。
+
 控制器、容量、完整检查与构建临时日志位于 `/private/tmp/karuyomi-source-favorites-*.log`，原始输出不入库。
 
 ## 独立运行门

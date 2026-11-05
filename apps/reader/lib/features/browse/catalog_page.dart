@@ -43,6 +43,8 @@ class CatalogPage extends StatefulWidget {
 
 class _CatalogPageState extends State<CatalogPage> {
   final _search = TextEditingController();
+  String? _sourceLanguage;
+  Object? _sourceLanguageSession;
 
   Future<void> _details(MangaEntry entry) async {
     final controller = widget.controller!;
@@ -74,6 +76,21 @@ class _CatalogPageState extends State<CatalogPage> {
   Widget _content(BuildContext context, CatalogController? controller) {
     final status = controller?.status ?? ServiceStatus.disconnected;
     final busy = controller?.busy ?? false;
+    final session = controller?.session;
+    final languageSession = session == null
+        ? null
+        : (
+            controller,
+            controller?.subject,
+            controller?.activeBuild?.packageName,
+            controller?.activeBuild?.id,
+            session.workerInstanceId,
+            session.generation,
+          );
+    if (_sourceLanguageSession != languageSession) {
+      _sourceLanguageSession = languageSession;
+      _sourceLanguage = null;
+    }
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
@@ -187,20 +204,7 @@ class _CatalogPageState extends State<CatalogPage> {
               ],
               if (controller.session != null) ...[
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final source in controller.session!.sources)
-                      FilterChip(
-                        label: Text('${source.name} · ${source.lang}'),
-                        selected: controller.activeSource?.id == source.id,
-                        onSelected: busy
-                            ? null
-                            : (_) => controller.selectSource(source),
-                      ),
-                  ],
-                ),
+                _sourceChoices(controller),
               ],
               if (controller.activeSource != null) ...[
                 const SizedBox(height: 24),
@@ -278,6 +282,99 @@ class _CatalogPageState extends State<CatalogPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _sourceChoices(CatalogController controller) {
+    final sources = controller.session!.sources;
+    final languages = sources.map((source) => source.lang).toSet().toList()
+      ..sort();
+    final visible = sources
+        .where(
+          (source) => _sourceLanguage == null || source.lang == _sourceLanguage,
+        )
+        .toList();
+    final active = controller.activeSource;
+    final activeHidden =
+        active != null && !visible.any((source) => source.id == active.id);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('当前扩展的漫画源', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: '漫画源语言',
+                  border: OutlineInputBorder(),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    key: const ValueKey('source-language-filter'),
+                    value: _sourceLanguage,
+                    isExpanded: true,
+                    isDense: true,
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('全部语言'),
+                      ),
+                      for (final language in languages)
+                        DropdownMenuItem<String>(
+                          value: language,
+                          child: Text(language.isEmpty ? '未标注语言' : language),
+                        ),
+                    ],
+                    onChanged: controller.busy
+                        ? null
+                        : (language) =>
+                              setState(() => _sourceLanguage = language),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              key: const ValueKey('source-language-clear'),
+              onPressed: controller.busy || _sourceLanguage == null
+                  ? null
+                  : () => setState(() => _sourceLanguage = null),
+              child: const Text('清除筛选'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '匹配 ${visible.length} / ${sources.length} 个漫画源',
+          key: const ValueKey('source-language-count'),
+        ),
+        if (activeHidden)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('当前使用：${active.name} · ${active.lang}（不在当前筛选中）'),
+          ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final source in visible)
+              FilterChip(
+                key: ValueKey(('catalog-source', source.id)),
+                label: Text(
+                  '${source.name} · ${source.lang}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+                selected: active?.id == source.id,
+                onSelected: controller.busy
+                    ? null
+                    : (_) => controller.selectSource(source),
+              ),
+          ],
+        ),
+      ],
     );
   }
 

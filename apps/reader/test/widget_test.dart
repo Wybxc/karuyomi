@@ -10,6 +10,22 @@ import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'browse/fakes.dart';
 
+Future<void> _browseDetails(WidgetTester tester) async {
+  await tester.tap(find.text('去浏览'));
+  await tester.pumpAndSettle();
+  final catalog = find.byType(CatalogPage);
+  final scrollable = find
+      .descendant(of: catalog, matching: find.byType(Scrollable))
+      .first;
+  for (final label in ['source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+    final target = find.descendant(of: catalog, matching: find.text(label));
+    await tester.scrollUntilVisible(target, 180, scrollable: scrollable);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+}
+
 void main() {
   for (final size in [const Size(360, 800), const Size(1280, 900)]) {
     testWidgets('empty shell navigation at ${size.width}px', (tester) async {
@@ -46,25 +62,7 @@ void main() {
       final platform = TestPlatform();
       await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('去浏览'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('source.test · 1.0'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('测试漫画源 · zh'));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('真实源 DTO 测试'),
-        180,
-        scrollable: find
-            .descendant(
-              of: find.byType(CatalogPage),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('真实源 DTO 测试'));
-      await tester.pumpAndSettle();
+      await _browseDetails(tester);
       expect(find.text('漫画源返回的完整简介'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('第 1 章'),
@@ -122,25 +120,7 @@ void main() {
       final platform = TestPlatform();
       await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('去浏览'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('source.test · 1.0'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('测试漫画源 · zh'));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('真实源 DTO 测试'),
-        180,
-        scrollable: find
-            .descendant(
-              of: find.byType(CatalogPage),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('真实源 DTO 测试'));
-      await tester.pumpAndSettle();
+      await _browseDetails(tester);
       await tester.scrollUntilVisible(
         find.text('第 1 章'),
         160,
@@ -218,6 +198,17 @@ void main() {
       expect(platform.authCalls, 1);
       expect(find.text('source.test · 1.0'), findsOneWidget);
       expect(find.text('owner@example.com'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('真实源 DTO 测试'),
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byType(CatalogPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('真实源 DTO 测试'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
