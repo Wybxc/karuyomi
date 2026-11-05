@@ -6,7 +6,7 @@
 
 D1 的 `cover_assets` 保存每个 `subject + mangaKey` 的当前封面描述和私有 R2 object key，查询漫画及书架时投影为 `MangaState.customCover`。漫画 JSON 不再保存第二份封面关系。R2 保存编码图片正文，不作为业务当前版本的判据；客户端只显示 D1 已确认的引用，不维护本地权威封面或持久待提交队列。
 
-`CustomCover` 包含独立 UUIDv4 `assetId`、`contentType`、`byteLength` 和 SHA-256。客户端在新操作开始时生成 assetId，独立于 mutation UUID；描述不含任意 URL 或 R2 key。支持 JPEG/PNG，正文为 1 字节至 1 MiB，服务端按真实文件识别格式、检查两轴均不超过 4096，并验证长度与 SHA-256。自定义封面与 Source 的原始 Manga 快照及 thumbnailUrl 分开；刷新源元数据、取消收藏、修改分类或阅读进度不清除封面。
+`CustomCover` 包含独立小写 UUIDv4 `assetId`、`contentType`、`byteLength` 和 SHA-256。客户端在新操作开始时生成 assetId，独立于 mutation UUID；描述不含任意 URL 或 R2 key。支持 JPEG/PNG，正文为 1 字节至 1 MiB，服务端按真实文件识别格式、检查两轴均不超过 4096，并验证长度与 SHA-256。自定义封面与 Source 的原始 Manga 快照及 thumbnailUrl 分开；刷新源元数据、取消收藏、修改分类或阅读进度不清除封面。
 
 API 复用已验证的 Access subject，额外核对 `X-App-Subject` 与该身份一致。`GET /api/covers/:assetId` 只查询该 subject 的当前 D1 引用，再读取私有 R2；替换或清除后旧 asset 不再通过此入口读取。正文响应为 `private, no-store`，不进入公共 Static Assets、扩展分发或 Source 图片通道。
 

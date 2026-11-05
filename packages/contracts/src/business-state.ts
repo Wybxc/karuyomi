@@ -26,14 +26,14 @@ export const COVER_DIMENSION_LIMIT = 4096;
 
 const mutationId = z.uuid();
 const mangaKey = z.string().regex(/^[a-f0-9]{64}$/);
-const categoryId = z.uuidv4();
+const canonicalUuidV4 = z.uuidv4().lowercase();
 
 function categoryIds(values: string[]): void {
   requireCondition(
     values.length <= CATEGORY_LIMIT && new Set(values).size === values.length,
     'Category identities must be unique and within budget',
   );
-  values.forEach((id) => categoryId.parse(id));
+  values.forEach((id) => canonicalUuidV4.parse(id));
 }
 
 function categoryName(value: string): void {
@@ -84,18 +84,18 @@ export const categoryMutationSchema = codec<pb.CategoryMutation>((input) => {
   switch (value.operation.case) {
     case 'createCategory':
       requireFields(value.operation.value, ['category']);
-      categoryId.parse(value.operation.value.category.id);
+      canonicalUuidV4.parse(value.operation.value.category.id);
       categoryName(value.operation.value.category.name);
       break;
     case 'renameCategory':
-      categoryId.parse(value.operation.value.categoryId);
+      canonicalUuidV4.parse(value.operation.value.categoryId);
       categoryName(value.operation.value.name);
       break;
     case 'reorderCategories':
       categoryIds(value.operation.value.categoryIds);
       break;
     case 'deleteCategory':
-      categoryId.parse(value.operation.value.categoryId);
+      canonicalUuidV4.parse(value.operation.value.categoryId);
       break;
     default:
       throw new Error('A category mutation operation is required');
@@ -209,7 +209,7 @@ export function validateChapterSnapshot(value: pb.ChapterSnapshot): void {
 }
 
 export function validateCustomCover(value: pb.CustomCover): void {
-  z.uuidv4().parse(value.assetId);
+  canonicalUuidV4.parse(value.assetId);
   z.enum(['image/jpeg', 'image/png']).parse(value.contentType);
   z.int().min(1).max(COVER_BYTE_LIMIT).parse(value.byteLength);
   z.string()

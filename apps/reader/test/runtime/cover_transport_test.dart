@@ -229,6 +229,15 @@ void main() {
       throwsArgumentError,
     );
     await expectLater(
+      transport.readCover(
+        assetId: asset.toUpperCase(),
+        subject: subject,
+        sha256: digest,
+        byteLength: payload.length,
+      ),
+      throwsArgumentError,
+    );
+    await expectLater(
       transport.uploadCover(
         mangaKey: manga,
         mutation: '{}',

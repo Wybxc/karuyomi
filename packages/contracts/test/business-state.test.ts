@@ -43,9 +43,11 @@ test('category names count Unicode scalars and UTF-8 bytes, require trimmed vali
   ]) {
     expect(() => categoryMutationSchema.parse(create(name))).toThrow();
   }
-  expect(() =>
-    categoryMutationSchema.parse(create('ok', id.replace('-4d7c-', '-1d7c-'))),
-  ).toThrow();
+  for (const invalidId of [id.replace('-4d7c-', '-1d7c-'), id.toUpperCase()]) {
+    expect(() =>
+      categoryMutationSchema.parse(create('ok', invalidId)),
+    ).toThrow();
+  }
 });
 
 test('category operations reject duplicates, over-budget lists, missing operations and multiple oneof values', () => {
@@ -580,6 +582,7 @@ test('custom covers preserve set/clear presence and validate descriptor identiti
   ).toMatchObject(cover);
   for (const invalid of [
     { ...cover, assetId: 'invalid' },
+    { ...cover, assetId: id.toUpperCase() },
     { ...cover, contentType: 'image/gif' },
     { ...cover, byteLength: 0 },
     { ...cover, byteLength: 1048577 },

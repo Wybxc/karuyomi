@@ -321,6 +321,7 @@ void main() {
       validateBusinessCustomCover(valid);
       for (final invalid in [
         valid.deepCopy()..assetId = 'https://example.com/cover',
+        valid.deepCopy()..assetId = valid.assetId.toUpperCase(),
         valid.deepCopy()..contentType = 'image/svg+xml',
         valid.deepCopy()..byteLength = 1024 * 1024 + 1,
         valid.deepCopy()..sha256 = 'bad',

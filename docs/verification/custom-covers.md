@@ -25,7 +25,7 @@ flutter test test/data/ --reporter expanded
 - 官方 Vite 构建与 Wrangler harness 2 项通过，实际核对 `COVERS` 的 put/get/delete 和 `cover_assets` migration。正式本地 `db:migrate:local` 应用 0007 后，真实 `pnpm covers:cleanup` exit 0，输出 local/scanned=0/deleted=0/truncated=false；即使空桶，helper 也先查询当前表，缺 migration 会失败。
 - 封面 UI 4 项通过：规范化的方向、像素头预算与缩小；480×800 正式详情选择/替换/清除并更新书架；丢 ACK 的原 UUID/正文/字节重试、重开时 GET 503 后仍可重试原操作、CAS 冲突后只读刷新；身份变化后拒绝迟到 picker。相关 browse/library/covers 组合 80 项通过。文件选择由官方平台接口 supplier 驱动，不作为真实系统选择器操作证据。
 - 独立 HTTP 传输 7 项通过：实际 `http` multipart 封装的字节与同源身份、下载完整性和不可变结果、错误格式/长度/digest/redirect、声明和流式限额、等待 Cookie 时关闭、超时迟到结果，以及非法输入不发请求。使用成熟库的受控 HTTP supplier，不代表 Native Cookie 或浏览器网络验收。
-- `pnpm format`、完整 `pnpm format:check`、`pnpm check` 全通过，覆盖所有自有语言、生成一致性、依赖层级、严格类型、389 项 Vitest、10 项正式 TS/Dart 双向 ProtoJSON golden 和全部工具回归。golden 包含封面描述、设置及清除的 message presence。
+- `pnpm format`、完整 `pnpm format:check`、`pnpm check` 全通过，覆盖所有自有语言、生成一致性、依赖层级、严格类型、389 项 Vitest、10 项正式 TS/Dart 双向 ProtoJSON golden 和全部工具回归。golden 包含封面描述、设置及清除的 message presence。最终合同复核统一共享 UUIDv4 校验为小写；TS、Dart 数据和 HTTP 边界均拒绝大写，避免服务端接受客户端无法读回的身份。
 - `pnpm flutter:check` 全通过：reader_core 22、source_runtime 42、客户端 375 项，三个项目静态分析无问题。`pnpm build` 完成 Web/Native runtime 资源、Flutter Web 与 Worker/Static Assets 正式构建。
 
 ```sh
