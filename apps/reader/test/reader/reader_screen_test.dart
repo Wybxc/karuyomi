@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/features/reader/resource_image.dart';
 import 'package:reader_core/reader_core.dart';
@@ -58,6 +60,10 @@ Widget screen({
   bool? doublePage,
   Widget? chapterControls,
   bool layoutSettingsEnabled = true,
+  ReaderBackground background = ReaderBackground.black,
+  int dimPercent = 0,
+  ReaderInputPreset tapZones = ReaderInputPreset.standard,
+  ReaderInputPreset keyboard = ReaderInputPreset.standard,
 }) => MaterialApp(
   home: ReaderScreen(
     manifest: manifest,
@@ -68,6 +74,10 @@ Widget screen({
     doublePage: doublePage,
     chapterControls: chapterControls,
     layoutSettingsEnabled: layoutSettingsEnabled,
+    background: background,
+    dimPercent: dimPercent,
+    tapZones: tapZones,
+    keyboard: keyboard,
     onPositionChanged: onPosition,
     onViewportChanged: onViewport,
     onModeChanged: onMode,
@@ -85,6 +95,307 @@ bool? pageLayoutPreference(WidgetTester tester) => tester
     .single;
 
 void main() {
+  testWidgets(
+    'tap presets respect reading direction while disabled keeps toolbar and swipes usable',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      Widget configured(ReadingMode mode, ReaderInputPreset tapZones) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(5),
+        mode: mode,
+        doublePage: false,
+        tapZones: tapZones,
+        dimPercent: 80,
+      );
+      Future<void> tapFraction(double fraction) async {
+        final rect = tester.getRect(find.byType(InteractiveViewer));
+        await tester.tapAt(
+          Offset(rect.left + rect.width * fraction, rect.center.dy),
+        );
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.pumpWidget(
+        configured(ReadingMode.leftToRight, ReaderInputPreset.standard),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('6 / 20'), findsOneWidget);
+      await tapFraction(.9);
+      expect(find.text('7 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        configured(ReadingMode.leftToRight, ReaderInputPreset.reversed),
+      );
+      await tester.pumpAndSettle();
+      await tapFraction(.9);
+      expect(find.text('6 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        configured(ReadingMode.rightToLeft, ReaderInputPreset.standard),
+      );
+      await tester.pumpAndSettle();
+      await tapFraction(.1);
+      expect(find.text('7 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        configured(ReadingMode.rightToLeft, ReaderInputPreset.reversed),
+      );
+      await tester.pumpAndSettle();
+      await tapFraction(.1);
+      expect(find.text('6 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        configured(ReadingMode.rightToLeft, ReaderInputPreset.disabled),
+      );
+      await tester.pumpAndSettle();
+      await tapFraction(.1);
+      await tapFraction(.9);
+      expect(find.text('6 / 20'), findsOneWidget);
+      await tapFraction(.5);
+      expect(find.byType(AppBar), findsNothing);
+      await tapFraction(.5);
+      expect(find.byType(AppBar), findsOneWidget);
+      await tester.drag(find.byType(InteractiveViewer), const Offset(120, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('7 / 20'), findsOneWidget);
+      await tester.tap(find.byTooltip('上一页'));
+      await tester.pumpAndSettle();
+      expect(find.text('6 / 20'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'keyboard presets reverse relative keys, retain absolute keys and consume disabled navigation',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      Widget configured(ReadingMode mode, ReaderInputPreset keyboard) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(5),
+        mode: mode,
+        doublePage: false,
+        keyboard: keyboard,
+      );
+      Future<void> press(LogicalKeyboardKey key) async {
+        await tester.sendKeyEvent(key);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.pumpWidget(
+        configured(ReadingMode.leftToRight, ReaderInputPreset.standard),
+      );
+      await tester.pumpAndSettle();
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(find.text('7 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        configured(ReadingMode.leftToRight, ReaderInputPreset.reversed),
+      );
+      await tester.pumpAndSettle();
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(find.text('6 / 20'), findsOneWidget);
+      await press(LogicalKeyboardKey.pageDown);
+      expect(find.text('5 / 20'), findsOneWidget);
+      await press(LogicalKeyboardKey.pageUp);
+      expect(find.text('6 / 20'), findsOneWidget);
+      await press(LogicalKeyboardKey.space);
+      expect(find.text('5 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        configured(ReadingMode.rightToLeft, ReaderInputPreset.reversed),
+      );
+      await tester.pumpAndSettle();
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(find.text('6 / 20'), findsOneWidget);
+      await press(LogicalKeyboardKey.arrowLeft);
+      expect(find.text('5 / 20'), findsOneWidget);
+      await press(LogicalKeyboardKey.home);
+      expect(find.text('1 / 20'), findsOneWidget);
+      await press(LogicalKeyboardKey.end);
+      expect(find.text('20 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        configured(ReadingMode.rightToLeft, ReaderInputPreset.disabled),
+      );
+      await tester.pumpAndSettle();
+      for (final key in [
+        LogicalKeyboardKey.arrowLeft,
+        LogicalKeyboardKey.arrowRight,
+        LogicalKeyboardKey.pageUp,
+        LogicalKeyboardKey.pageDown,
+        LogicalKeyboardKey.space,
+        LogicalKeyboardKey.home,
+        LogicalKeyboardKey.end,
+      ]) {
+        await press(key);
+      }
+      expect(find.text('20 / 20'), findsOneWidget);
+      await tester.tap(find.byTooltip('上一页'));
+      await tester.pumpAndSettle();
+      expect(find.text('19 / 20'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'content appearance updates preserve anchor and resource residency without fabricating observation',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final viewports = <ReaderViewportState>[];
+      Color? textColor;
+      Widget configured(ReaderBackground background, int dimPercent) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(5, offset: .35),
+        doublePage: false,
+        background: background,
+        dimPercent: dimPercent,
+        onViewport: viewports.add,
+        imageBuilder: (context, resource, fit) {
+          textColor = DefaultTextStyle.of(context).style.color;
+          return fixtureImage(context, resource, fit);
+        },
+      );
+      await tester.pumpWidget(configured(ReaderBackground.black, 0));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        Colors.black,
+      );
+      expect(textColor, Colors.white);
+      final acquired = provider.acquired.map((page) => page.pageKey).toList();
+      final released = provider.released.toList();
+      final anchor = viewports.last.current;
+      expect(viewports.last.observed, isNull);
+      await tester.pumpWidget(configured(ReaderBackground.white, 80));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        Colors.white,
+      );
+      expect(textColor, Colors.black);
+      final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
+      expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
+      expect(
+        tester.getRect(dimmer),
+        tester.getRect(find.byType(InteractiveViewer)),
+      );
+      expect(
+        tester.getRect(dimmer).overlaps(tester.getRect(find.byTooltip('下一页'))),
+        false,
+      );
+      expect(viewports.last.current.pageKey, anchor.pageKey);
+      expect(
+        viewports.last.current.normalizedOffset,
+        closeTo(anchor.normalizedOffset, .001),
+      );
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.atEnd, false);
+      expect(provider.acquired.map((page) => page.pageKey), acquired);
+      expect(provider.released, released);
+      await tester.pumpWidget(configured(ReaderBackground.theme, 0));
+      await tester.pumpAndSettle();
+      final readerContext = tester.element(find.byType(ReaderScreen));
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        Theme.of(readerContext).scaffoldBackgroundColor,
+      );
+      expect(textColor, Theme.of(readerContext).colorScheme.onSurface);
+      expect(dimmer, findsNothing);
+      expect(provider.acquired.map((page) => page.pageKey), acquired);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'continuous zoom follows live content appearance while controls and scrolling remain usable',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final positions = <ReadingPosition>[];
+      Widget configured(ReaderBackground background, int dimPercent) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(4, offset: .3),
+        mode: ReadingMode.continuous,
+        background: background,
+        dimPercent: dimPercent,
+        keyboard: ReaderInputPreset.disabled,
+        onPosition: positions.add,
+      );
+      await tester.pumpWidget(configured(ReaderBackground.black, 20));
+      await tester.pumpAndSettle();
+      final list = find.byKey(const ValueKey('continuous-reader'));
+      await tester.drag(list, const Offset(0, -150));
+      await tester.pumpAndSettle();
+      final anchor = positions.last;
+      final scrollable = tester.state<ScrollableState>(
+        find.descendant(of: list, matching: find.byType(Scrollable)),
+      );
+      final scrollOffset = scrollable.position.pixels;
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.home);
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, scrollOffset);
+      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.pumpAndSettle();
+      expect(find.text('查看图片'), findsOneWidget);
+      final acquired = provider.acquired.map((page) => page.pageKey).toList();
+      final released = provider.released.toList();
+      await tester.pumpWidget(configured(ReaderBackground.white, 80));
+      await tester.pumpAndSettle();
+      final dialog = find.byType(Dialog);
+      expect(
+        tester
+            .widget<Scaffold>(
+              find.descendant(of: dialog, matching: find.byType(Scaffold)),
+            )
+            .backgroundColor,
+        Colors.white,
+      );
+      final dimmer = find.descendant(
+        of: dialog,
+        matching: find.byKey(const ValueKey('reader-content-dimming')),
+      );
+      expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
+      expect(
+        tester.getRect(dimmer).overlaps(tester.getRect(find.byTooltip('放大'))),
+        false,
+      );
+      await tester.tap(find.byTooltip('放大'));
+      await tester.pumpAndSettle();
+      final zoom = tester.widget<InteractiveViewer>(
+        find.descendant(of: dialog, matching: find.byType(InteractiveViewer)),
+      );
+      expect(zoom.transformationController!.value.getMaxScaleOnAxis(), 2);
+      expect(provider.acquired.map((page) => page.pageKey), acquired);
+      expect(provider.released, released);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(positions.last.pageKey, anchor.pageKey);
+      expect(
+        positions.last.normalizedOffset,
+        closeTo(anchor.normalizedOffset, .001),
+      );
+      await tester.drag(list, const Offset(0, -150));
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, greaterThan(scrollOffset));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(provider.released.length, provider.released.toSet().length);
+      expect(
+        provider.released.toSet(),
+        provider.acquired.map((page) => 'runtime-1-${page.pageKey}').toSet(),
+      );
+    },
+  );
+
   testWidgets(
     'baseline keeps visible pages distinct from prefetch and fences late reader exit',
     (tester) async {

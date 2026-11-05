@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
+import '../reader/reader_preferences.dart';
 import 'settings_controller.dart';
 
 ReadingMode readerMode(wire.ReaderMode mode) => switch (mode) {
@@ -30,6 +31,23 @@ wire.ReaderPageLayout wirePageLayout(bool? value) => value == null
     : value
     ? wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE
     : wire.ReaderPageLayout.READER_PAGE_LAYOUT_SINGLE;
+ReaderBackground readerBackground(wire.ReaderBackground value) =>
+    switch (value) {
+      wire.ReaderBackground.READER_BACKGROUND_BLACK => ReaderBackground.black,
+      wire.ReaderBackground.READER_BACKGROUND_WHITE => ReaderBackground.white,
+      wire.ReaderBackground.READER_BACKGROUND_THEME => ReaderBackground.theme,
+      _ => throw const FormatException('Unsupported reader background'),
+    };
+ReaderInputPreset readerInputPreset(wire.ReaderInputPreset value) =>
+    switch (value) {
+      wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD =>
+        ReaderInputPreset.standard,
+      wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED =>
+        ReaderInputPreset.reversed,
+      wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED =>
+        ReaderInputPreset.disabled,
+      _ => throw const FormatException('Unsupported reader input preset'),
+    };
 ThemeMode appTheme(wire.AppTheme theme) => switch (theme) {
   wire.AppTheme.APP_THEME_SYSTEM => ThemeMode.system,
   wire.AppTheme.APP_THEME_LIGHT => ThemeMode.light,
@@ -48,6 +66,138 @@ const _layouts = <wire.ReaderPageLayout, String>{
   wire.ReaderPageLayout.READER_PAGE_LAYOUT_SINGLE: '单页',
   wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE: '双页',
 };
+
+const _backgrounds = <wire.ReaderBackground, String>{
+  wire.ReaderBackground.READER_BACKGROUND_BLACK: '黑色',
+  wire.ReaderBackground.READER_BACKGROUND_WHITE: '白色',
+  wire.ReaderBackground.READER_BACKGROUND_THEME: '跟随应用主题',
+};
+const _inputPresets = <wire.ReaderInputPreset, String>{
+  wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD: '标准',
+  wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED: '反向',
+  wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED: '关闭',
+};
+
+/// The same four preferences are edited globally and per manga. Null values
+/// mean inheritance only in the manga editor; zero dimming remains explicit.
+class _ReaderAppearanceFields extends StatelessWidget {
+  const _ReaderAppearanceFields({
+    required this.scope,
+    required this.enabled,
+    required this.background,
+    required this.dimPercent,
+    required this.tapZones,
+    required this.keyboard,
+    required this.onBackground,
+    required this.onDimPercent,
+    required this.onTapZones,
+    required this.onKeyboard,
+    this.allowInheritance = false,
+    this.inheritedDimPercent = 0,
+  });
+  final String scope;
+  final bool enabled;
+  final bool allowInheritance;
+  final wire.ReaderBackground? background;
+  final int? dimPercent;
+  final wire.ReaderInputPreset? tapZones;
+  final wire.ReaderInputPreset? keyboard;
+  final int inheritedDimPercent;
+  final ValueChanged<wire.ReaderBackground?> onBackground;
+  final ValueChanged<int?> onDimPercent;
+  final ValueChanged<wire.ReaderInputPreset?> onTapZones;
+  final ValueChanged<wire.ReaderInputPreset?> onKeyboard;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const SizedBox(height: 16),
+      DropdownButtonFormField<wire.ReaderBackground>(
+        key: ValueKey(('$scope-background', background)),
+        initialValue: background,
+        hint: const Text('跟随全局'),
+        decoration: const InputDecoration(
+          labelText: '阅读背景',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          if (allowInheritance)
+            const DropdownMenuItem(value: null, child: Text('跟随全局')),
+          for (final item in _backgrounds.entries)
+            DropdownMenuItem(value: item.key, child: Text(item.value)),
+        ],
+        onChanged: enabled ? onBackground : null,
+      ),
+      const SizedBox(height: 16),
+      if (allowInheritance)
+        SwitchListTile(
+          key: ValueKey('$scope-dim-inherit'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('调暗跟随全局'),
+          value: dimPercent == null,
+          onChanged: enabled
+              ? (inherit) => onDimPercent(inherit ? null : inheritedDimPercent)
+              : null,
+        ),
+      Text(
+        dimPercent == null
+            ? '应用内调暗：跟随全局（$inheritedDimPercent%）'
+            : '应用内调暗：$dimPercent%',
+      ),
+      Slider(
+        key: ValueKey('$scope-dim'),
+        value: (dimPercent ?? inheritedDimPercent).toDouble(),
+        min: 0,
+        max: 80,
+        divisions: 80,
+        label: '${dimPercent ?? inheritedDimPercent}%',
+        onChanged: enabled && dimPercent != null
+            ? (value) => onDimPercent(value.round())
+            : null,
+      ),
+      const Text('仅调暗阅读内容，不改变系统亮度。'),
+      const SizedBox(height: 16),
+      DropdownButtonFormField<wire.ReaderInputPreset>(
+        key: ValueKey(('$scope-tap-zones', tapZones)),
+        initialValue: tapZones,
+        hint: const Text('跟随全局'),
+        decoration: const InputDecoration(
+          labelText: '分页点击区',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          if (allowInheritance)
+            const DropdownMenuItem(value: null, child: Text('跟随全局')),
+          for (final item in _inputPresets.entries)
+            DropdownMenuItem(value: item.key, child: Text(item.value)),
+        ],
+        onChanged: enabled ? onTapZones : null,
+      ),
+      const SizedBox(height: 8),
+      const Text('反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
+      const SizedBox(height: 16),
+      DropdownButtonFormField<wire.ReaderInputPreset>(
+        key: ValueKey(('$scope-keyboard', keyboard)),
+        initialValue: keyboard,
+        hint: const Text('跟随全局'),
+        decoration: const InputDecoration(
+          labelText: '阅读快捷键',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          if (allowInheritance)
+            const DropdownMenuItem(value: null, child: Text('跟随全局')),
+          for (final item in _inputPresets.entries)
+            DropdownMenuItem(value: item.key, child: Text(item.value)),
+        ],
+        onChanged: enabled ? onKeyboard : null,
+      ),
+      const SizedBox(height: 8),
+      const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
+    ],
+  );
+}
 
 class SettingsStatus extends StatelessWidget {
   const SettingsStatus({super.key, required this.controller, this.onReloaded});
@@ -122,7 +272,7 @@ class _GlobalSettingsPanelState extends State<GlobalSettingsPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('全局设置', style: Theme.of(context).textTheme.titleLarge),
-          const Text('漫画可以单独覆盖阅读模式和页组；服务端确认后才保存。'),
+          const Text('漫画可以单独覆盖各项阅读偏好；服务端确认后才保存。'),
           const SizedBox(height: 16),
           if (draft != null) ...[
             DropdownButtonFormField<wire.AppTheme>(
@@ -202,6 +352,46 @@ class _GlobalSettingsPanelState extends State<GlobalSettingsPanel> {
                       }
                     }
                   : null,
+            ),
+            _ReaderAppearanceFields(
+              scope: 'global',
+              enabled: controller.canEdit,
+              background: draft.reader.background,
+              dimPercent: draft.reader.dimPercent,
+              tapZones: draft.reader.tapZones,
+              keyboard: draft.reader.keyboard,
+              onBackground: (value) {
+                if (value != null) {
+                  setState(() {
+                    _dirty = true;
+                    draft.reader.background = value;
+                  });
+                }
+              },
+              onDimPercent: (value) {
+                if (value != null) {
+                  setState(() {
+                    _dirty = true;
+                    draft.reader.dimPercent = value;
+                  });
+                }
+              },
+              onTapZones: (value) {
+                if (value != null) {
+                  setState(() {
+                    _dirty = true;
+                    draft.reader.tapZones = value;
+                  });
+                }
+              },
+              onKeyboard: (value) {
+                if (value != null) {
+                  setState(() {
+                    _dirty = true;
+                    draft.reader.keyboard = value;
+                  });
+                }
+              },
             ),
             const SizedBox(height: 12),
             FilledButton(
@@ -332,6 +522,49 @@ class _MangaSettingsEditorState extends State<MangaSettingsEditor> {
                           }
                         })
                       : null,
+                ),
+                _ReaderAppearanceFields(
+                  scope: 'manga',
+                  enabled: controller.canEdit,
+                  allowInheritance: true,
+                  background: draft.hasBackground() ? draft.background : null,
+                  dimPercent: draft.hasDimPercent() ? draft.dimPercent : null,
+                  tapZones: draft.hasTapZones() ? draft.tapZones : null,
+                  keyboard: draft.hasKeyboard() ? draft.keyboard : null,
+                  inheritedDimPercent:
+                      controller.snapshot?.global.reader.dimPercent ?? 0,
+                  onBackground: (value) => setState(() {
+                    _dirty = true;
+                    if (value == null) {
+                      draft.clearBackground();
+                    } else {
+                      draft.background = value;
+                    }
+                  }),
+                  onDimPercent: (value) => setState(() {
+                    _dirty = true;
+                    if (value == null) {
+                      draft.clearDimPercent();
+                    } else {
+                      draft.dimPercent = value;
+                    }
+                  }),
+                  onTapZones: (value) => setState(() {
+                    _dirty = true;
+                    if (value == null) {
+                      draft.clearTapZones();
+                    } else {
+                      draft.tapZones = value;
+                    }
+                  }),
+                  onKeyboard: (value) => setState(() {
+                    _dirty = true;
+                    if (value == null) {
+                      draft.clearKeyboard();
+                    } else {
+                      draft.keyboard = value;
+                    }
+                  }),
                 ),
                 const SizedBox(height: 12),
                 FilledButton(

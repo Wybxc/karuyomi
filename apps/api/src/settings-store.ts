@@ -3,6 +3,8 @@ import {
   AppTheme,
   BusinessStateErrorCode as ErrorCode,
   GlobalSettingsValuesSchema,
+  ReaderBackground,
+  ReaderInputPreset,
   ReaderMode,
   ReaderPageLayout,
   ReaderSettingsOverrideSchema,
@@ -24,6 +26,10 @@ const defaultValues = toJsonString(
     reader: {
       mode: ReaderMode.LEFT_TO_RIGHT,
       pageLayout: ReaderPageLayout.AUTO,
+      background: ReaderBackground.BLACK,
+      dimPercent: 0,
+      tapZones: ReaderInputPreset.STANDARD,
+      keyboard: ReaderInputPreset.STANDARD,
     },
   }),
 );
@@ -41,7 +47,11 @@ function snapshotFieldsSql(mangaKeySql?: string): string {
       'values', json(${globalValuesSql})),
     'effectiveReader', json_object(
       'mode', COALESCE(json_extract(${overrides}, '$.mode'), json_extract(${globalValuesSql}, '$.reader.mode')),
-      'pageLayout', COALESCE(json_extract(${overrides}, '$.pageLayout'), json_extract(${globalValuesSql}, '$.reader.pageLayout')))
+      'pageLayout', COALESCE(json_extract(${overrides}, '$.pageLayout'), json_extract(${globalValuesSql}, '$.reader.pageLayout')),
+      'background', COALESCE(json_extract(${overrides}, '$.background'), json_extract(${globalValuesSql}, '$.reader.background')),
+      'dimPercent', COALESCE(json_extract(${overrides}, '$.dimPercent'), json_extract(${globalValuesSql}, '$.reader.dimPercent'), 0),
+      'tapZones', COALESCE(json_extract(${overrides}, '$.tapZones'), json_extract(${globalValuesSql}, '$.reader.tapZones')),
+      'keyboard', COALESCE(json_extract(${overrides}, '$.keyboard'), json_extract(${globalValuesSql}, '$.reader.keyboard')))
     ${
       mangaKeySql
         ? `, 'manga', json_object('mangaKey', ${mangaKeySql},

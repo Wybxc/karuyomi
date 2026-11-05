@@ -1,20 +1,32 @@
 # 非敏感阅读设置
 
-本轮同步现有阅读能力的三项偏好：应用主题、阅读模式和页组选择。Worker API + D1 是唯一业务权威，Web/iOS/Android 共用 `business.proto` 生成模型与标准 ProtoJSON。本轮不表示完整 P1 阅读设置已经完成；适宽/适高、裁白、阅读背景/应用内亮度和可配置输入继续保留在 [P1](../plan/p1-library-and-progress.md)。
+同步设置覆盖应用主题、阅读模式、页组、阅读背景、应用内调暗、点击区与键盘预设。Worker API + D1 是唯一业务权威，Web/iOS/Android 共用 `business.proto` 生成模型与标准 ProtoJSON。完整 P1 的适宽/适高与裁白仍按 [P1](../plan/p1-library-and-progress.md) 推进；实现与验收状态分别维护。
 
 ## 全局默认与漫画覆盖
 
-| 偏好     | 有类型的取值                                         | 作用域                              |
-| -------- | ---------------------------------------------------- | ----------------------------------- |
-| 应用主题 | SYSTEM / LIGHT / DARK                                | 全局；SYSTEM 由各端跟随本机系统外观 |
-| 阅读模式 | LEFT_TO_RIGHT / RIGHT_TO_LEFT / CONTINUOUS / WEBTOON | 全局默认，可逐漫画覆盖              |
-| 页组     | AUTO / SINGLE / DOUBLE                               | 全局默认，可逐漫画覆盖              |
+| 偏好       | 有类型的取值                                         | 作用域                              |
+| ---------- | ---------------------------------------------------- | ----------------------------------- |
+| 应用主题   | SYSTEM / LIGHT / DARK                                | 全局；SYSTEM 由各端跟随本机系统外观 |
+| 阅读模式   | LEFT_TO_RIGHT / RIGHT_TO_LEFT / CONTINUOUS / WEBTOON | 全局默认，可逐漫画覆盖              |
+| 页组       | AUTO / SINGLE / DOUBLE                               | 全局默认，可逐漫画覆盖              |
+| 阅读背景   | BLACK / WHITE / THEME                                | 全局默认，可逐漫画覆盖              |
+| 应用内调暗 | 0–80 的整数百分比                                    | 全局默认，可逐漫画覆盖              |
+| 点击区     | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖              |
+| 键盘       | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖              |
 
-全局默认是 SYSTEM、LEFT_TO_RIGHT、AUTO。AUTO 由客户端按实际可用宽度决定单双页，不同步设备宽度或当前计算结果；连续/Webtoon 不显示双页，但仍保留偏好，以便恢复分页模式。
+全局默认是 SYSTEM、LEFT_TO_RIGHT、AUTO、BLACK、调暗 0%、STANDARD 点击区与 STANDARD 键盘。AUTO 由客户端按实际可用宽度决定单双页，不同步设备宽度或当前计算结果；连续/Webtoon 不显示双页，但仍保留偏好，以便恢复分页模式。
 
-漫画覆盖使用 `ReaderSettingsOverride` 的 optional 字段。字段缺省表示继承全局；显式 AUTO 表示覆盖为自动布局，不能当成继承。提交完整覆盖文档，未包含的字段恢复继承；空 `overrides` 清空全部覆盖。应用主题没有漫画覆盖。全局变化会改变未覆盖字段的有效值，但不会修改漫画覆盖的 revision。
+漫画覆盖使用 `ReaderSettingsOverride` 的 optional 字段。字段缺省表示继承全局；显式 AUTO 表示覆盖为自动布局，不能当成继承。提交完整覆盖文档，未包含的字段恢复继承；空 `overrides` 清空全部覆盖。应用主题没有漫画覆盖。调暗覆盖的显式 0 表示不调暗，与缺省继承不同；D1 计算有效值时以字段 presence 合并，不能按数值真假选择默认值。全局变化会改变未覆盖字段的有效值，但不会修改漫画覆盖的 revision。
 
 章节来源顺序已经随 `MangaResume.reversedOrder` 由进度链路保存，不再建立第二份设置权威。当前缩放/平移矩阵、视口尺寸、工具栏显隐、服务连接地址和平台资源状态不进入同步设置；Source 密码、token、Cookie 也不混入本协议。
+
+## 阅读内容与输入
+
+背景使用黑色、白色或当前应用主题的背景色，相应状态文字保持可读。应用内调暗只给阅读内容叠加 0–80% 黑色遮罩；分页、连续/Webtoon 与独立图片放大窗口使用同一确认偏好，打开的放大窗口也跟随设置更新。工具栏、设置与显式导航仍保持可操作，不申请系统亮度权限。偏好变化不重新获取图片、替换章节或伪造观察位置。
+
+点击预设用于分页模式的左右区域：STANDARD 沿阅读方向翻页，REVERSED 反转左右区域，DISABLED 关闭区域翻页；中央工具栏切换始终保留。滑动翻页与连续滚动维持各模式原有语义。
+
+键盘预设覆盖方向键、PageUp/PageDown、空格、Home/End。STANDARD 保留现有方向语义；REVERSED 反转相对翻页，Home/End 仍定位绝对首末；DISABLED 消费这些阅读导航键而不导航。设置表单和其它路由的键盘交互不受影响。显式导航按钮始终保留，偏好变化保持当前图像逻辑锚与真实末页观察规则。
 
 ## API 与原子状态
 
@@ -36,4 +48,4 @@
 
 连接确认、进入设置页、恢复前台和同身份重连时只读刷新。全局确认变化触发当前漫画重新读取有效设置，保留显式覆盖；来源顺序继续由阅读进度管理。父级应用设置、窗口变宽及切章不产生保存回调，迟到 viewport 数据不能覆盖父级偏好。成功确认的设置从服务端恢复，不在客户端另建权威偏好文件。
 
-实施状态见 [P2](../plan/p2-sync.md)，证据与实际平台限制见[设置记录](../verification/reader-settings.md)。
+实施状态见 [P2](../plan/p2-sync.md)，原有三项设置证据见[记录](../verification/reader-settings.md)，阅读外观与输入的工程范围及实际平台限制见[后续记录](../verification/reader-appearance.md)。

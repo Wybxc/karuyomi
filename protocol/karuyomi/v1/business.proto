@@ -253,9 +253,28 @@ enum ReaderPageLayout {
   READER_PAGE_LAYOUT_DOUBLE = 3;
 }
 
+enum ReaderBackground {
+  READER_BACKGROUND_UNSPECIFIED = 0;
+  READER_BACKGROUND_BLACK = 1;
+  READER_BACKGROUND_WHITE = 2;
+  READER_BACKGROUND_THEME = 3;
+}
+
+enum ReaderInputPreset {
+  READER_INPUT_PRESET_UNSPECIFIED = 0;
+  READER_INPUT_PRESET_STANDARD = 1;
+  READER_INPUT_PRESET_REVERSED = 2;
+  READER_INPUT_PRESET_DISABLED = 3;
+}
+
 message ReaderSettings {
   ReaderMode mode = 1;
   ReaderPageLayout page_layout = 2;
+  ReaderBackground background = 3;
+  // Reading-content dimming only; never changes platform display brightness.
+  uint32 dim_percent = 4;
+  ReaderInputPreset tap_zones = 5;
+  ReaderInputPreset keyboard = 6;
 }
 
 // Missing fields inherit the global reader preference. AUTO is an explicit
@@ -263,6 +282,10 @@ message ReaderSettings {
 message ReaderSettingsOverride {
   optional ReaderMode mode = 1;
   optional ReaderPageLayout page_layout = 2;
+  optional ReaderBackground background = 3;
+  optional uint32 dim_percent = 4;
+  optional ReaderInputPreset tap_zones = 5;
+  optional ReaderInputPreset keyboard = 6;
 }
 
 message GlobalSettingsValues {

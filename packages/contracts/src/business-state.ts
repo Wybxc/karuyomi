@@ -554,6 +554,25 @@ export function validateReaderSettings(value: pb.ReaderSettings): void {
       value.pageLayout <= pb.ReaderPageLayout.DOUBLE,
     'Unknown reader page layout',
   );
+  requireCondition(
+    Number.isInteger(value.background) &&
+      value.background >= pb.ReaderBackground.BLACK &&
+      value.background <= pb.ReaderBackground.THEME,
+    'Unknown reader background',
+  );
+  requireCondition(
+    Number.isInteger(value.dimPercent) &&
+      value.dimPercent >= 0 &&
+      value.dimPercent <= 80,
+    'Reader dimming exceeds its range',
+  );
+  for (const preset of [value.tapZones, value.keyboard])
+    requireCondition(
+      Number.isInteger(preset) &&
+        preset >= pb.ReaderInputPreset.STANDARD &&
+        preset <= pb.ReaderInputPreset.DISABLED,
+      'Unknown reader input preset',
+    );
 }
 
 export function validateReaderSettingsOverride(
@@ -573,6 +592,28 @@ export function validateReaderSettingsOverride(
         value.pageLayout <= pb.ReaderPageLayout.DOUBLE,
       'Unknown reader page layout override',
     );
+  if (value.background !== undefined)
+    requireCondition(
+      Number.isInteger(value.background) &&
+        value.background >= pb.ReaderBackground.BLACK &&
+        value.background <= pb.ReaderBackground.THEME,
+      'Unknown reader background override',
+    );
+  if (value.dimPercent !== undefined)
+    requireCondition(
+      Number.isInteger(value.dimPercent) &&
+        value.dimPercent >= 0 &&
+        value.dimPercent <= 80,
+      'Reader dimming override exceeds its range',
+    );
+  for (const preset of [value.tapZones, value.keyboard])
+    if (preset !== undefined)
+      requireCondition(
+        Number.isInteger(preset) &&
+          preset >= pb.ReaderInputPreset.STANDARD &&
+          preset <= pb.ReaderInputPreset.DISABLED,
+        'Unknown reader input preset override',
+      );
 }
 
 export function validateGlobalSettingsValues(
@@ -657,7 +698,15 @@ function validateSettingsResponse(value: {
       value.effectiveReader.mode ===
         (value.manga?.overrides?.mode ?? defaults?.mode) &&
         value.effectiveReader.pageLayout ===
-          (value.manga?.overrides?.pageLayout ?? defaults?.pageLayout),
+          (value.manga?.overrides?.pageLayout ?? defaults?.pageLayout) &&
+        value.effectiveReader.background ===
+          (value.manga?.overrides?.background ?? defaults?.background) &&
+        value.effectiveReader.dimPercent ===
+          (value.manga?.overrides?.dimPercent ?? defaults?.dimPercent) &&
+        value.effectiveReader.tapZones ===
+          (value.manga?.overrides?.tapZones ?? defaults?.tapZones) &&
+        value.effectiveReader.keyboard ===
+          (value.manga?.overrides?.keyboard ?? defaults?.keyboard),
       'Effective reader settings do not match their defaults and overrides',
     );
   }

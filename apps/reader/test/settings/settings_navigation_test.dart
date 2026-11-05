@@ -4,8 +4,10 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/main.dart';
+import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -38,7 +40,19 @@ TestPlatform _platform() =>
       };
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
+    final page = find.byType(MangaDetailsPage).evaluate().isNotEmpty
+        ? find.byType(MangaDetailsPage)
+        : find.byType(CatalogPage);
+    final scrollable = find
+        .descendant(of: page, matching: find.byType(Scrollable))
+        .first;
+    await tester.drag(scrollable, const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
+  }
   await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
   await tester.runAsync(() async {
     await tester.tap(finder);
     await Future<void>.delayed(Duration.zero);
@@ -51,8 +65,48 @@ Future<void> _choose<T>(WidgetTester tester, String label) async {
   await _tap(tester, find.text(label).last);
 }
 
-Future<void> _start(WidgetTester tester, TestPlatform platform) async {
-  tester.view.physicalSize = const Size(1100, 1800);
+Finder _field<T>(String label) => find.byWidgetPredicate(
+  (widget) =>
+      widget is DropdownButtonFormField<T> &&
+      widget.decoration.labelText == label,
+);
+Future<void> _chooseField<T>(
+  WidgetTester tester,
+  String field,
+  String value,
+) async {
+  await _tap(tester, _field<T>(field));
+  await _tap(tester, find.text(value).last);
+}
+
+Finder _navigation(String label) => find.descendant(
+  of: find.byWidgetPredicate(
+    (widget) => widget is NavigationRail || widget is NavigationBar,
+  ),
+  matching: find.text(label),
+);
+Future<void> _dim(
+  WidgetTester tester,
+  String scope, {
+  required bool zero,
+}) async {
+  final slider = find.byKey(ValueKey('$scope-dim'));
+  await tester.ensureVisible(slider);
+  await tester.pumpAndSettle();
+  if (zero) {
+    await tester.drag(slider, const Offset(-500, 0));
+  } else {
+    await tester.tap(slider);
+  }
+  await tester.pumpAndSettle();
+}
+
+Future<void> _start(
+  WidgetTester tester,
+  TestPlatform platform, {
+  Size size = const Size(1100, 1800),
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -61,20 +115,18 @@ Future<void> _start(WidgetTester tester, TestPlatform platform) async {
 }
 
 Future<void> _globalDefaults(WidgetTester tester, {bool dark = false}) async {
-  await _tap(
-    tester,
-    find.descendant(of: find.byType(NavigationRail), matching: find.text('设置')),
-  );
+  await _tap(tester, _navigation('设置'));
   if (dark) await _choose<wire.AppTheme>(tester, '深色');
   await _choose<wire.ReaderMode>(tester, '从右到左');
   await _choose<wire.ReaderPageLayout>(tester, '双页');
+  await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '白色');
+  await _dim(tester, 'global', zero: false);
+  await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '反向');
+  await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '关闭');
 }
 
 Future<CatalogController> _details(WidgetTester tester) async {
-  await _tap(
-    tester,
-    find.descendant(of: find.byType(NavigationRail), matching: find.text('浏览')),
-  );
+  await _tap(tester, _navigation('浏览'));
   await _tap(tester, find.text('source.test · 1.0'));
   await _tap(tester, find.text('测试漫画源 · zh'));
   await _tap(tester, find.text('真实源 DTO 测试'));
@@ -153,6 +205,23 @@ void main() {
       expect(inherited!.global.theme, wire.AppTheme.APP_THEME_DARK);
       expect(inherited.overrides!.hasMode(), false);
       expect(inherited.overrides!.hasPageLayout(), false);
+      expect(inherited.overrides!.hasBackground(), false);
+      expect(inherited.overrides!.hasDimPercent(), false);
+      expect(inherited.overrides!.hasTapZones(), false);
+      expect(inherited.overrides!.hasKeyboard(), false);
+      expect(
+        inherited.effectiveReader.background,
+        wire.ReaderBackground.READER_BACKGROUND_WHITE,
+      );
+      expect(inherited.effectiveReader.dimPercent, 40);
+      expect(
+        inherited.effectiveReader.tapZones,
+        wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
+      );
+      expect(
+        inherited.effectiveReader.keyboard,
+        wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
+      );
       expect(
         inherited.effectiveReader.mode,
         wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
@@ -164,6 +233,10 @@ void main() {
       await _tap(tester, find.text('第一章'));
       expect(_reader(tester).initialMode, ReadingMode.rightToLeft);
       expect(_reader(tester).doublePage, true);
+      expect(_reader(tester).background, ReaderBackground.white);
+      expect(_reader(tester).dimPercent, 40);
+      expect(_reader(tester).tapZones, ReaderInputPreset.reversed);
+      expect(_reader(tester).keyboard, ReaderInputPreset.disabled);
       expect(
         tester
             .widget<DropdownButton<ReadingMode>>(
@@ -222,6 +295,23 @@ void main() {
       );
       await _tap(tester, find.text('阅读设置'));
       expect(find.byType(MangaSettingsEditor), findsOneWidget);
+      final leafBeforeAppearance = _reader(tester).key;
+      await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '黑色');
+      await _tap(tester, find.byKey(const ValueKey('manga-dim-inherit')));
+      await _dim(tester, 'manga', zero: true);
+      await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '标准');
+      await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '反向');
+      await _tap(tester, find.text('保存本漫画设置'));
+      expect(_reader(tester).key, leafBeforeAppearance);
+      expect(_reader(tester).background, ReaderBackground.black);
+      expect(_reader(tester).dimPercent, 0);
+      expect(_reader(tester).tapZones, ReaderInputPreset.standard);
+      expect(_reader(tester).keyboard, ReaderInputPreset.reversed);
+      snapshot = await tester.runAsync(
+        () => catalog.settings!.loadManga(_mangaKey),
+      );
+      expect(snapshot!.overrides!.hasDimPercent(), true);
+      expect(snapshot.overrides!.dimPercent, 0);
       await _choose<wire.ReaderMode>(tester, '跟随全局');
       await _tap(tester, find.text('保存本漫画设置'));
       snapshot = await tester.runAsync(
@@ -256,6 +346,20 @@ void main() {
         () => catalog.settings!.loadManga(_mangaKey),
       );
       expect(snapshot!.overrides!.hasPageLayout(), true);
+      expect(snapshot.overrides!.hasDimPercent(), true);
+      expect(snapshot.overrides!.dimPercent, 0);
+      expect(
+        snapshot.overrides!.background,
+        wire.ReaderBackground.READER_BACKGROUND_BLACK,
+      );
+      expect(
+        snapshot.overrides!.tapZones,
+        wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+      );
+      expect(
+        snapshot.overrides!.keyboard,
+        wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
+      );
       expect(
         snapshot.overrides!.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
@@ -282,6 +386,10 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
       await tester.pumpAndSettle();
       expect(_reader(tester).key, isNot(firstLeaf));
+      expect(_reader(tester).background, ReaderBackground.black);
+      expect(_reader(tester).dimPercent, 0);
+      expect(_reader(tester).tapZones, ReaderInputPreset.standard);
+      expect(_reader(tester).keyboard, ReaderInputPreset.reversed);
       expect(_reader(tester).initialMode, ReadingMode.rightToLeft);
       expect(_reader(tester).doublePage, isNull);
       expect(
@@ -305,6 +413,116 @@ void main() {
         ),
         hasLength(writes),
       );
+      await _tap(tester, find.text('阅读设置'));
+      await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '跟随全局');
+      await _tap(tester, find.byKey(const ValueKey('manga-dim-inherit')));
+      await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '跟随全局');
+      await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '跟随全局');
+      final leafBeforeInheritance = _reader(tester).key;
+      await _tap(tester, find.text('保存本漫画设置'));
+      snapshot = await tester.runAsync(
+        () => catalog.settings!.loadManga(_mangaKey),
+      );
+      expect(snapshot!.overrides!.hasBackground(), false);
+      expect(snapshot.overrides!.hasDimPercent(), false);
+      expect(snapshot.overrides!.hasTapZones(), false);
+      expect(snapshot.overrides!.hasKeyboard(), false);
+      await _closeModal(tester);
+      expect(_reader(tester).key, leafBeforeInheritance);
+      expect(_reader(tester).background, ReaderBackground.white);
+      expect(_reader(tester).dimPercent, 40);
+      expect(_reader(tester).tapZones, ReaderInputPreset.reversed);
+      expect(_reader(tester).keyboard, ReaderInputPreset.disabled);
+      await _leaveReader(tester, catalog);
+      await _finish(tester, catalog);
+    },
+  );
+
+  testWidgets(
+    'narrow settings retain all submitted preferences across lost ACK and exact retry',
+    (tester) async {
+      final platform = _platform();
+      await _start(tester, platform, size: const Size(480, 800));
+      await _globalDefaults(tester);
+      var truncateNextAck = true;
+      platform.afterBusinessReply = (request, reply) {
+        if (truncateNextAck &&
+            request.method == 'POST' &&
+            request.uri.path == '/api/settings/mutations') {
+          truncateNextAck = false;
+          return ApiReply(
+            status: reply.status,
+            headers: reply.headers,
+            redirected: reply.redirected,
+            body: '{',
+          );
+        }
+        return reply;
+      };
+      await _tap(tester, find.text('保存全局设置'));
+      final writes = platform.businessServer.requests
+          .where((request) => request.uri.path == '/api/settings/mutations')
+          .toList();
+      expect(writes, hasLength(1));
+      final original = writes.single.body;
+      expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
+      await _tap(tester, _navigation('浏览'));
+      await _tap(tester, _navigation('设置'));
+      expect(
+        tester
+            .widget<DropdownButtonFormField<wire.ReaderBackground>>(
+              _field<wire.ReaderBackground>('阅读背景'),
+            )
+            .initialValue,
+        wire.ReaderBackground.READER_BACKGROUND_WHITE,
+      );
+      expect(
+        tester.widget<Slider>(find.byKey(const ValueKey('global-dim'))).value,
+        40,
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<wire.ReaderInputPreset>>(
+              _field<wire.ReaderInputPreset>('分页点击区'),
+            )
+            .initialValue,
+        wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<wire.ReaderInputPreset>>(
+              _field<wire.ReaderInputPreset>('阅读快捷键'),
+            )
+            .initialValue,
+        wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
+      );
+      expect(
+        tester
+            .widget<Slider>(find.byKey(const ValueKey('global-dim')))
+            .onChanged,
+        isNull,
+      );
+      await _tap(tester, find.text('重新读取设置'));
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.uri.path == '/api/settings/mutations',
+        ),
+        hasLength(1),
+      );
+      await _tap(tester, find.text('重试原设置操作'));
+      expect(
+        platform.businessServer.requests
+            .where((request) => request.uri.path == '/api/settings/mutations')
+            .map((request) => request.body),
+        [original, original],
+      );
+      expect(platform.businessServer.appliedMutations, 1);
+      final catalog = await _details(tester);
+      await _tap(tester, find.text('第一章'));
+      expect(_reader(tester).background, ReaderBackground.white);
+      expect(_reader(tester).dimPercent, 40);
+      expect(_reader(tester).tapZones, ReaderInputPreset.reversed);
+      expect(_reader(tester).keyboard, ReaderInputPreset.disabled);
       await _leaveReader(tester, catalog);
       await _finish(tester, catalog);
     },

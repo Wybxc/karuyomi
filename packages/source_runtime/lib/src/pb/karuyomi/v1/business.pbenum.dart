@@ -138,5 +138,60 @@ class ReaderPageLayout extends $pb.ProtobufEnum {
   const ReaderPageLayout._(super.value, super.name);
 }
 
+class ReaderBackground extends $pb.ProtobufEnum {
+  static const ReaderBackground READER_BACKGROUND_UNSPECIFIED =
+      ReaderBackground._(
+          0, _omitEnumNames ? '' : 'READER_BACKGROUND_UNSPECIFIED');
+  static const ReaderBackground READER_BACKGROUND_BLACK =
+      ReaderBackground._(1, _omitEnumNames ? '' : 'READER_BACKGROUND_BLACK');
+  static const ReaderBackground READER_BACKGROUND_WHITE =
+      ReaderBackground._(2, _omitEnumNames ? '' : 'READER_BACKGROUND_WHITE');
+  static const ReaderBackground READER_BACKGROUND_THEME =
+      ReaderBackground._(3, _omitEnumNames ? '' : 'READER_BACKGROUND_THEME');
+
+  static const $core.List<ReaderBackground> values = <ReaderBackground>[
+    READER_BACKGROUND_UNSPECIFIED,
+    READER_BACKGROUND_BLACK,
+    READER_BACKGROUND_WHITE,
+    READER_BACKGROUND_THEME,
+  ];
+
+  static final $core.List<ReaderBackground?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ReaderBackground? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReaderBackground._(super.value, super.name);
+}
+
+class ReaderInputPreset extends $pb.ProtobufEnum {
+  static const ReaderInputPreset READER_INPUT_PRESET_UNSPECIFIED =
+      ReaderInputPreset._(
+          0, _omitEnumNames ? '' : 'READER_INPUT_PRESET_UNSPECIFIED');
+  static const ReaderInputPreset READER_INPUT_PRESET_STANDARD =
+      ReaderInputPreset._(
+          1, _omitEnumNames ? '' : 'READER_INPUT_PRESET_STANDARD');
+  static const ReaderInputPreset READER_INPUT_PRESET_REVERSED =
+      ReaderInputPreset._(
+          2, _omitEnumNames ? '' : 'READER_INPUT_PRESET_REVERSED');
+  static const ReaderInputPreset READER_INPUT_PRESET_DISABLED =
+      ReaderInputPreset._(
+          3, _omitEnumNames ? '' : 'READER_INPUT_PRESET_DISABLED');
+
+  static const $core.List<ReaderInputPreset> values = <ReaderInputPreset>[
+    READER_INPUT_PRESET_UNSPECIFIED,
+    READER_INPUT_PRESET_STANDARD,
+    READER_INPUT_PRESET_REVERSED,
+    READER_INPUT_PRESET_DISABLED,
+  ];
+
+  static final $core.List<ReaderInputPreset?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ReaderInputPreset? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReaderInputPreset._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

@@ -38,6 +38,6 @@ pnpm exec vitest run --project workers apps/api/test/state-workerd.test.ts
 
 - 两个独立客户端的 A→B / B→A 设置读回、继承/覆盖/清空、并发与丢响应恢复，以及新进程从 D1 恢复。
 - Web/iOS/Android 实际组合、前台恢复、生产 Access、Native 触控与真机。
-- 完整 P1 阅读设置仍包含适宽/适高、裁白、阅读背景/应用内亮度和可配置点击区/键盘；本轮三项同步不替代这些尚未实现的功能。
+- 该轮三项设置之后，阅读背景、应用内调暗与点击区/键盘预设已继续接入，结果分别见[后续记录](reader-appearance.md)；适宽/适高与裁白仍待实现。
 
 当前交付顺序见 [P1](../plan/p1-library-and-progress.md) 与 [P2](../plan/p2-sync.md)。生产、跨端和真机门未因上述工程与组件测试通过。

@@ -221,6 +221,10 @@ const globalSettingsValues = {
   reader: {
     mode: 'READER_MODE_LEFT_TO_RIGHT',
     pageLayout: 'READER_PAGE_LAYOUT_AUTO',
+    background: 'READER_BACKGROUND_BLACK',
+    dimPercent: 0,
+    tapZones: 'READER_INPUT_PRESET_STANDARD',
+    keyboard: 'READER_INPUT_PRESET_STANDARD',
   },
 };
 
@@ -236,13 +240,18 @@ test('settings mutations require typed complete defaults and preserve per-field 
     ...manga,
     setManga: {
       ...manga.setManga,
-      overrides: { pageLayout: 'READER_PAGE_LAYOUT_AUTO' },
+      overrides: { pageLayout: 'READER_PAGE_LAYOUT_AUTO', dimPercent: 0 },
     },
   });
   if (explicit.operation.case !== 'setManga')
     throw new Error('Missing manga settings');
   expect(explicit.operation.value.overrides?.mode).toBeUndefined();
   expect(explicit.operation.value.overrides?.pageLayout).toBe(1);
+  expect(explicit.operation.value.overrides?.dimPercent).toBe(0);
+  const inherited = settingsMutationSchema.parse(manga);
+  if (inherited.operation.case !== 'setManga')
+    throw new Error('Missing manga settings');
+  expect(inherited.operation.value.overrides?.dimPercent).toBeUndefined();
   for (const value of [
     base,
     { ...global, setManga: manga.setManga },
@@ -260,6 +269,24 @@ test('settings mutations require typed complete defaults and preserve per-field 
     { ...manga, setManga: { mangaKey: 'a'.repeat(64) } },
     { ...manga, setManga: { ...manga.setManga, overrides: { mode: 0 } } },
     { ...manga, setManga: { ...manga.setManga, overrides: { pageLayout: 4 } } },
+    ...[
+      { background: 0 },
+      { background: 4 },
+      { tapZones: 0 },
+      { keyboard: 4 },
+      { dimPercent: -1 },
+      { dimPercent: 81 },
+      { dimPercent: 0.5 },
+    ].flatMap((fields) => [
+      { ...manga, setManga: { ...manga.setManga, overrides: fields } },
+      {
+        ...global,
+        setGlobal: {
+          ...globalSettingsValues,
+          reader: { ...globalSettingsValues.reader, ...fields },
+        },
+      },
+    ]),
     { ...global, expectedRevision: 4294967296 },
   ])
     expect(() => settingsMutationSchema.parse(value)).toThrow();
@@ -299,6 +326,15 @@ test('settings replies verify the complete snapshot and effective defaults/overr
     { ...manga, manga: { ...manga.manga, revision: 4 } },
     { ...manga, manga: { ...manga.manga, overrides: undefined } },
     { ...manga, effectiveReader: globalSettingsValues.reader },
+    ...[
+      { background: 'READER_BACKGROUND_WHITE' },
+      { dimPercent: 1 },
+      { tapZones: 'READER_INPUT_PRESET_DISABLED' },
+      { keyboard: 'READER_INPUT_PRESET_REVERSED' },
+    ].map((fields) => ({
+      ...manga,
+      effectiveReader: { ...manga.effectiveReader, ...fields },
+    })),
     {
       ...manga,
       effectiveReader: {

@@ -9,6 +9,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 import '../../diagnostics/reader_baseline.dart';
+import 'reader_preferences.dart';
 import 'resource_image.dart';
 import 'resource_pool.dart';
 
@@ -46,6 +47,10 @@ class ReaderScreen extends StatefulWidget {
     this.initialPosition,
     this.initialMode = ReadingMode.leftToRight,
     this.doublePage,
+    this.background = ReaderBackground.black,
+    this.dimPercent = 0,
+    this.tapZones = ReaderInputPreset.standard,
+    this.keyboard = ReaderInputPreset.standard,
     this.onModeChanged,
     this.onDoublePageChanged,
     this.layoutSettingsEnabled = true,
@@ -59,7 +64,7 @@ class ReaderScreen extends StatefulWidget {
     this.onViewportChanged,
     this.positionRequest,
     this.paused = false,
-  });
+  }) : assert(dimPercent >= 0 && dimPercent <= 80);
 
   final ChapterManifest manifest;
   final PageProvider provider;
@@ -71,6 +76,13 @@ class ReaderScreen extends StatefulWidget {
   /// Defaults to automatic width-based layout. An in-reader selection lasts for
   /// this chapter unless this input changes; changing to null resumes automatic.
   final bool? doublePage;
+
+  final ReaderBackground background;
+
+  /// Application content dimming only; never changes system screen brightness.
+  final int dimPercent;
+  final ReaderInputPreset tapZones;
+  final ReaderInputPreset keyboard;
 
   /// User selections only; applying parent settings and resizing do not save.
   final ValueChanged<ReadingMode>? onModeChanged;
@@ -102,7 +114,10 @@ class ReaderScreen extends StatefulWidget {
   State<ReaderScreen> createState() => _ReaderScreenState();
 }
 
+typedef _ReaderAppearance = ({ReaderBackground background, int dimPercent});
+
 class _ReaderScreenState extends State<ReaderScreen> {
+  late final ValueNotifier<_ReaderAppearance> _appearance;
   ReaderBaselineRecorder? _baseline;
   int _navigationEpoch = 0;
   late final ReaderController _reader;
@@ -131,6 +146,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void initState() {
     super.initState();
+    _appearance = ValueNotifier((
+      background: widget.background,
+      dimPercent: widget.dimPercent,
+    ));
     _baseline = ReaderBaselineScope.read(context);
     _baseline?.event('reader_attached', {
       'chapterKey': widget.manifest.chapterKey,
@@ -396,6 +415,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.background != widget.background ||
+        oldWidget.dimPercent != widget.dimPercent) {
+      // The zoom route is a sibling of the rebuilding Reader route. Publish
+      // after this frame rather than dirtying that sibling during its build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _appearance.value = (
+          background: widget.background,
+          dimPercent: widget.dimPercent,
+        );
+      });
+    }
     _scheduler.setPaused(widget.paused);
     if (oldWidget.positionRequest != widget.positionRequest) {
       oldWidget.positionRequest?.removeListener(_applyPositionRequest);
@@ -753,6 +784,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               resource: resource,
               pool: pool,
               imageBuilder: widget.imageBuilder,
+              appearance: _appearance,
             ),
           ),
         ),
@@ -818,11 +850,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
           final fraction = details.localPosition.dx / _viewportWidth;
           if (fraction > 1 / 3 && fraction < 2 / 3) {
             setState(() => _toolbar = !_toolbar);
-          } else {
+          } else if (widget.tapZones != ReaderInputPreset.disabled) {
             final forward = _reader.mode == ReadingMode.rightToLeft
                 ? fraction < 1 / 3
                 : fraction > 2 / 3;
-            forward ? _advance() : _back();
+            final advance = widget.tapZones == ReaderInputPreset.reversed
+                ? !forward
+                : forward;
+            advance ? _advance() : _back();
           }
         },
         child: InteractiveViewer(
@@ -843,27 +878,44 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  void _keyboardTurn(bool forward) {
+    if (widget.keyboard == ReaderInputPreset.disabled) return;
+    final advance = widget.keyboard == ReaderInputPreset.reversed
+        ? !forward
+        : forward;
+    advance ? _advance() : _back();
+  }
+
+  void _keyboardGoTo(int index) {
+    if (widget.keyboard != ReaderInputPreset.disabled) _goTo(index);
+  }
+
   @override
   Widget build(BuildContext context) => CallbackShortcuts(
     bindings: {
       const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-          _reader.mode == ReadingMode.rightToLeft ? _back() : _advance(),
+          _keyboardTurn(_reader.mode != ReadingMode.rightToLeft),
       const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-          _reader.mode == ReadingMode.rightToLeft ? _advance() : _back(),
-      const SingleActivator(LogicalKeyboardKey.pageDown): _advance,
-      const SingleActivator(LogicalKeyboardKey.space): _advance,
-      const SingleActivator(LogicalKeyboardKey.pageUp): _back,
-      const SingleActivator(LogicalKeyboardKey.home): () => _goTo(0),
+          _keyboardTurn(_reader.mode == ReadingMode.rightToLeft),
+      const SingleActivator(LogicalKeyboardKey.pageDown): () =>
+          _keyboardTurn(true),
+      const SingleActivator(LogicalKeyboardKey.space): () =>
+          _keyboardTurn(true),
+      const SingleActivator(LogicalKeyboardKey.pageUp): () =>
+          _keyboardTurn(false),
+      const SingleActivator(LogicalKeyboardKey.home): () => _keyboardGoTo(0),
       const SingleActivator(LogicalKeyboardKey.end): () =>
-          _goTo(_reader.manifest.pages.length - 1),
+          _keyboardGoTo(_reader.manifest.pages.length - 1),
     },
     child: Focus(
       autofocus: true,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: _readerBackgroundColor(context, widget.background),
         appBar: _toolbar ? AppBar(title: Text(widget.title)) : null,
         body: DefaultTextStyle.merge(
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: _readerForegroundColor(context, widget.background),
+          ),
           child: SafeArea(
             child: Column(
               children: [
@@ -889,14 +941,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         });
                       }
                       if (_reader.manifest.pages.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            '这一章没有页面',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        );
+                        return const Center(child: Text('这一章没有页面'));
                       }
-                      return _reader.isContinuous ? _continuous() : _paged();
+                      return _ReaderContent(
+                        background: widget.background,
+                        dimPercent: widget.dimPercent,
+                        child: _reader.isContinuous ? _continuous() : _paged(),
+                      );
                     },
                   ),
                 ),
@@ -1060,8 +1111,60 @@ class _ReaderScreenState extends State<ReaderScreen> {
     unawaited(_reader.dispose());
     _scroll.dispose();
     _transform.dispose();
+    _appearance.dispose();
     super.dispose();
   }
+}
+
+Color _readerBackgroundColor(
+  BuildContext context,
+  ReaderBackground background,
+) => switch (background) {
+  ReaderBackground.black => Colors.black,
+  ReaderBackground.white => Colors.white,
+  ReaderBackground.theme => Theme.of(context).scaffoldBackgroundColor,
+};
+
+Color _readerForegroundColor(
+  BuildContext context,
+  ReaderBackground background,
+) => switch (background) {
+  ReaderBackground.black => Colors.white,
+  ReaderBackground.white => Colors.black,
+  ReaderBackground.theme => Theme.of(context).colorScheme.onSurface,
+};
+
+/// Applies appearance only to reading content, preserving input and controls.
+class _ReaderContent extends StatelessWidget {
+  const _ReaderContent({
+    required this.background,
+    required this.dimPercent,
+    required this.child,
+  });
+  final ReaderBackground background;
+  final int dimPercent;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: _readerBackgroundColor(context, background),
+    child: DefaultTextStyle.merge(
+      style: TextStyle(color: _readerForegroundColor(context, background)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          if (dimPercent > 0)
+            IgnorePointer(
+              child: ColoredBox(
+                key: const ValueKey('reader-content-dimming'),
+                color: Colors.black.withValues(alpha: dimPercent / 100),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ZoomImageDialog extends StatefulWidget {
@@ -1069,7 +1172,9 @@ class _ZoomImageDialog extends StatefulWidget {
     required this.resource,
     required this.pool,
     required this.imageBuilder,
+    required this.appearance,
   });
+  final ValueListenable<_ReaderAppearance> appearance;
   final ImageResource resource;
   final ReaderResourcePool pool;
   final ResourceImageBuilder imageBuilder;
@@ -1090,43 +1195,58 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => Dialog.fullscreen(
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('查看图片'),
-        actions: [
-          IconButton(
-            tooltip: '缩小',
-            onPressed: () => _zoom(0.5),
-            icon: const Icon(Icons.zoom_out),
-          ),
-          IconButton(
-            tooltip: '放大',
-            onPressed: () => _zoom(2),
-            icon: const Icon(Icons.zoom_in),
-          ),
-          IconButton(
-            tooltip: '重置缩放',
-            onPressed: () => _transform.value = Matrix4.identity(),
-            icon: const Icon(Icons.fit_screen),
-          ),
-        ],
-      ),
-      body: InteractiveViewer(
-        transformationController: _transform,
-        minScale: 1,
-        maxScale: 5,
-        child: Center(
-          child: PinnedReaderImage(
-            pool: widget.pool,
-            image: widget.resource,
-            builder: (context) =>
-                widget.imageBuilder(context, widget.resource, BoxFit.contain),
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<_ReaderAppearance>(
+        valueListenable: widget.appearance,
+        builder: (context, appearance, _) => Dialog.fullscreen(
+          child: Scaffold(
+            backgroundColor: _readerBackgroundColor(
+              context,
+              appearance.background,
+            ),
+            appBar: AppBar(
+              title: const Text('查看图片'),
+              actions: [
+                IconButton(
+                  tooltip: '缩小',
+                  onPressed: () => _zoom(0.5),
+                  icon: const Icon(Icons.zoom_out),
+                ),
+                IconButton(
+                  tooltip: '放大',
+                  onPressed: () => _zoom(2),
+                  icon: const Icon(Icons.zoom_in),
+                ),
+                IconButton(
+                  tooltip: '重置缩放',
+                  onPressed: () => _transform.value = Matrix4.identity(),
+                  icon: const Icon(Icons.fit_screen),
+                ),
+              ],
+            ),
+            body: _ReaderContent(
+              background: appearance.background,
+              dimPercent: appearance.dimPercent,
+              child: InteractiveViewer(
+                transformationController: _transform,
+                minScale: 1,
+                maxScale: 5,
+                child: Center(
+                  child: PinnedReaderImage(
+                    pool: widget.pool,
+                    image: widget.resource,
+                    builder: (context) => widget.imageBuilder(
+                      context,
+                      widget.resource,
+                      BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
-    ),
-  );
+      );
 
   @override
   void dispose() {

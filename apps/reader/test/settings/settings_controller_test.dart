@@ -17,7 +17,13 @@ wire.GlobalSettingsValues _global({
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
 }) => wire.GlobalSettingsValues(
   theme: theme,
-  reader: wire.ReaderSettings(mode: mode, pageLayout: layout),
+  reader: wire.ReaderSettings(
+    mode: mode,
+    pageLayout: layout,
+    background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
+    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+  ),
 );
 
 final class _ResponseGate implements ApiFetch {

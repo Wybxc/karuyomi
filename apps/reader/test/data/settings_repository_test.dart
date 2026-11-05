@@ -30,7 +30,13 @@ wire.GlobalSettingsValues _global({
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
 }) => wire.GlobalSettingsValues(
   theme: theme,
-  reader: wire.ReaderSettings(mode: mode, pageLayout: layout),
+  reader: wire.ReaderSettings(
+    mode: mode,
+    pageLayout: layout,
+    background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
+    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+  ),
 );
 
 ApiReply _reply(GeneratedMessage value) => ApiReply(
@@ -52,6 +58,9 @@ wire.SettingsResponse _snapshot() => wire.SettingsResponse(
   effectiveReader: wire.ReaderSettings(
     mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
     pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
+    background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
+    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
   ),
 );
 
@@ -194,6 +203,36 @@ void main() {
   );
 
   test(
+    'appearance overrides distinguish explicit zero from inheritance and preserve unrelated defaults',
+    () async {
+      final global = _global();
+      global.reader
+        ..background = wire.ReaderBackground.READER_BACKGROUND_THEME
+        ..dimPercent = 80
+        ..tapZones = wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED
+        ..keyboard = wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED;
+      await repository.setGlobal(values: global, basedOnRevision: 0);
+      final explicit = await repository.setManga(
+        mangaKey: _key,
+        basedOnRevision: 0,
+        overrides: wire.ReaderSettingsOverride(dimPercent: 0),
+      );
+      expect(explicit.overrides!.hasDimPercent(), true);
+      expect(explicit.effectiveReader.dimPercent, 0);
+      expect(explicit.effectiveReader.background, global.reader.background);
+      expect(explicit.effectiveReader.tapZones, global.reader.tapZones);
+      expect(explicit.effectiveReader.keyboard, global.reader.keyboard);
+      final cleared = await repository.setManga(
+        mangaKey: _key,
+        basedOnRevision: 1,
+        overrides: wire.ReaderSettingsOverride(),
+      );
+      expect(cleared.overrides!.hasDimPercent(), false);
+      expect(cleared.effectiveReader, global.reader);
+    },
+  );
+
+  test(
     'different settings scopes never implicitly resend each other',
     () async {
       server.failNextRequest = true;
@@ -257,6 +296,10 @@ void main() {
                 mangaKey: _key,
                 overrides: wire.ReaderSettingsOverride(
                   pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
+                  background: wire.ReaderBackground.READER_BACKGROUND_WHITE,
+                  dimPercent: 0,
+                  tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
+                  keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
                 ),
                 basedOnRevision: 0,
               )
@@ -287,6 +330,22 @@ void main() {
         );
         expect(sent.mutationId, isNotEmpty);
         expect(sent.expectedRevision, 0);
+        if (mangaScope) {
+          expect(sent.setManga.overrides.hasDimPercent(), true);
+          expect(
+            result.effectiveReader.background,
+            wire.ReaderBackground.READER_BACKGROUND_WHITE,
+          );
+          expect(result.effectiveReader.dimPercent, 0);
+          expect(
+            result.effectiveReader.tapZones,
+            wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
+          );
+          expect(
+            result.effectiveReader.keyboard,
+            wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
+          );
+        }
         expect(server.appliedMutations, 1);
         expect(mangaScope ? result.mangaRevision : result.globalRevision, 1);
         expect(
@@ -395,6 +454,29 @@ void main() {
         _snapshot()
           ..effectiveReader.mode = wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
         _snapshot()..manga.clearOverrides(),
+        _snapshot()
+          ..global.values.reader.background =
+              wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
+        _snapshot()
+          ..manga.overrides.background =
+              wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
+        _snapshot()..manga.overrides.dimPercent = 81,
+        _snapshot()
+          ..manga.overrides.tapZones =
+              wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
+        _snapshot()
+          ..manga.overrides.keyboard =
+              wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
+        _snapshot()
+          ..effectiveReader.background =
+              wire.ReaderBackground.READER_BACKGROUND_THEME,
+        _snapshot()..effectiveReader.dimPercent = 1,
+        _snapshot()
+          ..effectiveReader.tapZones =
+              wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
+        _snapshot()
+          ..effectiveReader.keyboard =
+              wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
       ];
       for (final value in invalid) {
         server.beforeRequest = (_) => _reply(value);

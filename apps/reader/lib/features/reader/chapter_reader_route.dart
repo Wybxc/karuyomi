@@ -14,6 +14,7 @@ import '../settings/settings_widgets.dart' as settings_ui;
 import 'chapter_sequence.dart';
 import 'chapter_preparation.dart';
 import 'reader_screen.dart';
+import 'reader_preferences.dart';
 import 'reading_progress_controller.dart';
 import 'reader_recovery.dart';
 
@@ -64,6 +65,10 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   ChapterOrder _order = ChapterOrder.source;
   late ReadingMode _mode = widget.initialMode;
   late bool? _doublePage = widget.initialDoublePage;
+  ReaderBackground _background = ReaderBackground.black;
+  int _dimPercent = 0;
+  ReaderInputPreset _tapZones = ReaderInputPreset.standard;
+  ReaderInputPreset _keyboard = ReaderInputPreset.standard;
   Completer<void> _viewClosed = Completer<void>();
   bool _visible = true;
   bool _busy = false;
@@ -164,6 +169,12 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       _appliedSettings = value;
       _mode = settings_ui.readerMode(value.effectiveReader.mode);
       _doublePage = settings_ui.doublePage(value.effectiveReader.pageLayout);
+      _background = settings_ui.readerBackground(
+        value.effectiveReader.background,
+      );
+      _dimPercent = value.effectiveReader.dimPercent;
+      _tapZones = settings_ui.readerInputPreset(value.effectiveReader.tapZones);
+      _keyboard = settings_ui.readerInputPreset(value.effectiveReader.keyboard);
     }
     setState(() {});
   }
@@ -878,6 +889,10 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       initialPosition: _initialPosition,
       initialMode: _mode,
       doublePage: _doublePage,
+      background: _background,
+      dimPercent: _dimPercent,
+      tapZones: _tapZones,
+      keyboard: _keyboard,
       onModeChanged: _changeMode,
       onDoublePageChanged: _changePageLayout,
       layoutSettingsEnabled: _canEditSettings,

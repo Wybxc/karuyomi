@@ -2,6 +2,8 @@ import { create, toJson, type MessageInitShape } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
   AppTheme,
+  ReaderBackground,
+  ReaderInputPreset,
   ReaderMode,
   ReaderPageLayout,
   SettingsMutationSchema,
@@ -1043,14 +1045,31 @@ function globalSettings(
     expectedRevision,
     operation: {
       case: 'setGlobal',
-      value: { theme, reader: { mode, pageLayout } },
+      value: {
+        theme,
+        reader: {
+          mode,
+          pageLayout,
+          background: ReaderBackground.BLACK,
+          dimPercent: 0,
+          tapZones: ReaderInputPreset.STANDARD,
+          keyboard: ReaderInputPreset.STANDARD,
+        },
+      },
     },
   });
 }
 function mangaSettings(
   mangaKey: string,
   expectedRevision = 0,
-  overrides: { mode?: ReaderMode; pageLayout?: ReaderPageLayout } = {},
+  overrides: {
+    mode?: ReaderMode;
+    pageLayout?: ReaderPageLayout;
+    background?: ReaderBackground;
+    dimPercent?: number;
+    tapZones?: ReaderInputPreset;
+    keyboard?: ReaderInputPreset;
+  } = {},
 ) {
   return create(SettingsMutationSchema, {
     schemaVersion: businessSchemaVersion,
@@ -1147,6 +1166,84 @@ test('settings reads do not write, defaults inherit per field, and clearing over
       .bind(first.subject, key)
       .first('revision'),
   ).toBe(3);
+});
+
+test('appearance preferences preserve explicit zero, inherit all fields and reject invalid writes without touching reading state', async () => {
+  const reader = await client();
+  const command = favorite();
+  const key = command.mangaKey;
+  await reader.mutate(command);
+  await reader.mutate(save(key, 1));
+  const before = await reader.state(key, 'chapter-1');
+  const defaults = await reader.settings(key);
+  expect(defaults.effectiveReader).toMatchObject({
+    background: ReaderBackground.BLACK,
+    dimPercent: 0,
+    tapZones: ReaderInputPreset.STANDARD,
+    keyboard: ReaderInputPreset.STANDARD,
+  });
+  const global = globalSettings();
+  if (global.operation.case !== 'setGlobal' || !global.operation.value.reader)
+    throw new Error('Missing reader defaults');
+  Object.assign(global.operation.value.reader, {
+    background: ReaderBackground.THEME,
+    dimPercent: 80,
+    tapZones: ReaderInputPreset.REVERSED,
+    keyboard: ReaderInputPreset.DISABLED,
+  });
+  expect((await reader.mutateSettings(global)).status).toBe(200);
+  const overrides = mangaSettings(key, 0, {
+    background: ReaderBackground.WHITE,
+    dimPercent: 0,
+    tapZones: ReaderInputPreset.DISABLED,
+    keyboard: ReaderInputPreset.REVERSED,
+  });
+  const saved = await reader.mutateSettings(overrides);
+  expect(saved.status).toBe(200);
+  expect(saved.body.effectiveReader).toMatchObject({
+    background: ReaderBackground.WHITE,
+    dimPercent: 0,
+    tapZones: ReaderInputPreset.DISABLED,
+    keyboard: ReaderInputPreset.REVERSED,
+  });
+  expect(saved.body.manga?.overrides?.dimPercent).toBe(0);
+  expect((await reader.mutateSettings(overrides)).body).toEqual(saved.body);
+  const preserved = await reader.state(key, 'chapter-1');
+  expect(preserved.manga).toEqual(before.manga);
+  expect(preserved.progress).toEqual(before.progress);
+  const cleared = await reader.mutateSettings(mangaSettings(key, 1));
+  expect(cleared.body.manga?.overrides?.dimPercent).toBeUndefined();
+  expect(cleared.body.effectiveReader).toEqual(global.operation.value.reader);
+  const revision = cleared.body.accountRevision;
+  for (const invalid of [
+    { background: 0 },
+    { background: 4 },
+    { tapZones: 0 },
+    { keyboard: 4 },
+    { dimPercent: -1 },
+    { dimPercent: 81 },
+    { dimPercent: 0.5 },
+  ]) {
+    const response = await reader.request('/api/settings/mutations', {
+      method: 'POST',
+      headers: {
+        Origin: origin,
+        'X-App-Request': '1',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        mutationId: crypto.randomUUID(),
+        expectedRevision: 2,
+        setManga: { mangaKey: key, overrides: invalid },
+      }),
+    });
+    expect(response.status).toBe(400);
+  }
+  const after = await reader.settings(key);
+  expect(after.accountRevision).toBe(revision);
+  expect(after.manga?.revision).toBe(2);
+  expect(after.effectiveReader).toEqual(cleared.body.effectiveReader);
 });
 
 test('global, manga and reading-progress writes have independent CAS and each ACK is one committed snapshot', async () => {

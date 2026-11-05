@@ -28,7 +28,10 @@ export type GoldenType =
   | 'ChapterProgressPageResponse'
   | 'CategoryMutation'
   | 'CategoryMutationResponse'
-  | 'CategoryCatalogResponse';
+  | 'CategoryCatalogResponse'
+  | 'SettingsMutation'
+  | 'SettingsResponse'
+  | 'SettingsMutationResponse';
 
 export interface GoldenFixture {
   name: string;
@@ -245,7 +248,97 @@ const businessMutation: JsonObject = {
   expectedRevision: 0,
 };
 
+const globalReader: JsonObject = {
+  mode: 'READER_MODE_RIGHT_TO_LEFT',
+  pageLayout: 'READER_PAGE_LAYOUT_AUTO',
+  background: 'READER_BACKGROUND_WHITE',
+  dimPercent: 60,
+  tapZones: 'READER_INPUT_PRESET_REVERSED',
+  keyboard: 'READER_INPUT_PRESET_STANDARD',
+};
+const globalSettingsValues: JsonObject = {
+  theme: 'APP_THEME_SYSTEM',
+  reader: globalReader,
+};
+const readerOverrides: JsonObject = {
+  background: 'READER_BACKGROUND_THEME',
+  dimPercent: 0,
+  keyboard: 'READER_INPUT_PRESET_DISABLED',
+};
+const settingsSnapshot: JsonObject = {
+  schemaVersion: 1,
+  accountRevision: 8,
+  global: { revision: 3, values: globalSettingsValues },
+  manga: {
+    mangaKey: businessMangaKey,
+    revision: 2,
+    overrides: readerOverrides,
+  },
+  effectiveReader: { ...globalReader, ...readerOverrides },
+};
+
 export const goldenFixtures: GoldenFixture[] = [
+  {
+    name: 'settings-global-all-preferences',
+    type: 'SettingsMutation',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      expectedRevision: 3,
+      setGlobal: globalSettingsValues,
+    },
+  },
+  ...[readerOverrides, {}].map((overrides, index): GoldenFixture => ({
+    name:
+      index === 0
+        ? 'settings-override-explicit-zero'
+        : 'settings-clear-inherit',
+    type: 'SettingsMutation',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      expectedRevision: 2,
+      setManga: { mangaKey: businessMangaKey, overrides },
+    },
+  })),
+  {
+    name: 'settings-default-zero-dimming',
+    type: 'SettingsResponse',
+    value: {
+      schemaVersion: 1,
+      global: {
+        values: {
+          theme: 'APP_THEME_SYSTEM',
+          reader: {
+            mode: 'READER_MODE_LEFT_TO_RIGHT',
+            pageLayout: 'READER_PAGE_LAYOUT_AUTO',
+            background: 'READER_BACKGROUND_BLACK',
+            dimPercent: 0,
+            tapZones: 'READER_INPUT_PRESET_STANDARD',
+            keyboard: 'READER_INPUT_PRESET_STANDARD',
+          },
+        },
+      },
+      effectiveReader: {
+        mode: 'READER_MODE_LEFT_TO_RIGHT',
+        pageLayout: 'READER_PAGE_LAYOUT_AUTO',
+        background: 'READER_BACKGROUND_BLACK',
+        dimPercent: 0,
+        tapZones: 'READER_INPUT_PRESET_STANDARD',
+        keyboard: 'READER_INPUT_PRESET_STANDARD',
+      },
+    },
+  },
+  {
+    name: 'settings-effective-field-inheritance',
+    type: 'SettingsResponse',
+    value: settingsSnapshot,
+  },
+  {
+    name: 'settings-confirmed-explicit-zero',
+    type: 'SettingsMutationResponse',
+    value: { ...settingsSnapshot, mutationId: businessMutationId },
+  },
   ...(
     [
       ['setFavorite', { metadata: libraryMetadata, favorite: false }],
