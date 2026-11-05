@@ -179,13 +179,12 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
                           : null,
                       child: const Text('下载 JSON'),
                     ),
-                  if (!kIsWeb)
-                    OutlinedButton(
-                      onPressed: _recorder.state == ReaderBaselineState.stopped
-                          ? _copy
-                          : null,
-                      child: const Text('复制 JSON'),
-                    ),
+                  OutlinedButton(
+                    onPressed: _recorder.state == ReaderBaselineState.stopped
+                        ? _copy
+                        : null,
+                    child: const Text('复制 JSON'),
+                  ),
                 ],
               ),
               if (_recorder.state == ReaderBaselineState.stopped)

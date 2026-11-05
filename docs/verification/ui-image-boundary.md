@@ -113,7 +113,13 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 随后固定 `15ccc8020cb0c4090c4cc7847a02c2799a0244f4`，移除额外 Overlay，摘要和预览改为普通 Text，收起改为无需 Tooltip 的文字按钮，并删除仅用于文字选择的 semantics handle；完整 JSON 仍经文件下载或 Native 复制取得。该提交的 [CI 41943452206](https://github.com/Wybxc/karuyomi/actions/runs/41943452206) 为 completed/success，但三次相同视口的新文档复验仍各出现一次早期 RenderBox 异常及其栈，操作后的记录未新增错误，故该简化也没有修复初始焦点问题。原始记录为 `plain-focus-runs.json`；不能把三次新文档当作浏览器进程重启，也不能将旧 `5e1e014` 默认构建对照推广为当前所有条件均无错误。
 
-下一候选使用 Flutter 官方 `WidgetsBinding.instance.addPostFrameCallback`，在正式应用完成首帧布局后才挂载可聚焦的诊断控件，不改变 Source、图片链或 recorder。该候选的五项诊断测试、完整应用 131 项 Flutter 测试和静态分析已通过，但真实浏览器焦点门仍待复验；这些工程检查尚未证明问题已修复。
+随后固定 `d312a387e3e28b2e46cd2d8f6a3dc06d894ab219`，使用 Flutter 官方 `WidgetsBinding.instance.addPostFrameCallback`，在正式应用完成首帧布局后才挂载可聚焦的诊断控件，不改变 Source、图片链或 recorder。该提交的五项诊断测试、完整应用 131 项 Flutter 测试、静态分析和 [CI 41944689968](https://github.com/Wybxc/karuyomi/actions/runs/41944689968) 已通过；真实浏览器复验结果另列如下，不以这些工程检查代替运行证据。
+
+正式 `lib/main.dart` Web release 在 Codex 内置浏览器固定 1280×720、DPR 2、SDK 报告刷新率 60 Hz 下，三次新文档的 before/after 控制台 error 均为零，Tab/Shift+Tab 和进入浏览正常。点击启用无障碍未生效，本轮实际用 Enter 启用，保留这项操作差异。记录为 `post-frame-focus-runs.json`；该限定初始焦点分项通过，但不是三个浏览器进程，也不能证明所有无障碍激活方式、设备或焦点时序均已解决。前述两轮候选失败继续保留，未据此认定 Flutter SDK 缺陷。
+
+第三份文档继续通过正式 UI 进入原 xkcd 英文源及 `3319: Elevators`，漫画和原 TextInterceptor 文字图均实际可见，显式完成显示本地进度已保存并退出回详情。最终控制台记录 `post-frame-final-console.json` 为空。采集原始报告为 `post-frame-capture.json`，真实文件 296,257 字节，revision 与上述提交相同，含 33 个事件、512 个帧样本，`frameTimingStatus=associated`、`truncated=false`。独立复核确认事件时间单调且在采集期限内，全部带帧号事件精确匹配唯一原始帧；两份 acquire 的请求/返回 generation 一致，资源集合与 release 请求、发送和 ACK 一致且时序正确，两幅图均有对应 decoded viewport，`reader_exit_ack` 在两份释放 ACK 后到达。复核摘要为 `post-frame-integrity.json`。这仍是一次采集完整性与阅读功能样本，不是首图/跳转性能分布、Native、真实 Access 或进程/GPU 释放证明。
+
+本轮最初点击“下载 JSON”未取得落盘文件，随后从页面已经生成的 Blob 链接实际下载取得完整报告；不能把取得文件的结果写成该次按钮交互已通过。此限制与原始操作保留，工具下载等待时间不作性能指标。相关截图、最终控制台与完整报告均留在同一 ignored 证据目录。测试标签页已关闭、临时视口已恢复；服务会话退出 130 后另行确认端口 49816 无监听且无本次 probe/workerd 进程，本轮临时目录另按唯一 buildId 核对清理。
 
 默认对照原始记录为 `default-focus-runs.json`，成品与构建日志独立保留。三个标签页均已关闭，临时视口已恢复；服务退出后确认端口 49608 无监听且无本次 probe/workerd 进程，只删除匹配本 buildId 的 `karuyomi-source-probe-abtvn9` 临时目录，见 `default-focus-cleanup.json`。
 
