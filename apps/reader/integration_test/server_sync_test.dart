@@ -281,4 +281,7 @@ Map<String, Object?> _anchor(ReadingPosition value) => {
   'pageIndex': value.pageIndexHint,
   'page': value.pageIndexHint + 1,
   'normalizedOffset': value.normalizedOffset,
+  'normalizedX': value.normalizedX,
+  'viewportX': value.viewportX,
+  'viewportY': value.viewportY,
 };

@@ -11,14 +11,18 @@ final class ReadingPosition {
     required this.manifestVersion,
     required this.pageIndexHint,
     required this.normalizedOffset,
+    this.normalizedX = 0,
+    this.viewportX = 0,
+    this.viewportY = 0,
   }) {
     if (chapterKey.isEmpty || pageKey.isEmpty || manifestVersion.isEmpty) {
       throw ArgumentError('Reading anchors require stable identifiers');
     }
     if (pageIndexHint < 0 ||
-        !normalizedOffset.isFinite ||
-        normalizedOffset < 0 ||
-        normalizedOffset > 1) {
+        [normalizedOffset, normalizedX, viewportX, viewportY].any(
+          (coordinate) =>
+              !coordinate.isFinite || coordinate < 0 || coordinate > 1,
+        )) {
       throw ArgumentError('Invalid reading anchor');
     }
   }
@@ -27,7 +31,16 @@ final class ReadingPosition {
   final String pageKey;
   final String manifestVersion;
   final int pageIndexHint;
+
+  /// Original source-image y coordinate.
   final double normalizedOffset;
+
+  /// Original source-image x coordinate; RTL does not reverse it.
+  final double normalizedX;
+
+  /// Position of that source point within the reading viewport.
+  final double viewportX;
+  final double viewportY;
 }
 
 /// The reading view must acquire processed images through this boundary.

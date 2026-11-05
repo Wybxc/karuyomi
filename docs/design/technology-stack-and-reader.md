@@ -86,7 +86,7 @@ flowchart LR
 
 ### 位置恢复、屏幕与设置
 
-持久位置采用 `chapterKey + pageKey + manifestVersion + pageIndexHint + normalizedOffset`；归一化偏移相对原图坐标，并记录视口内锚点。缩放、裁白和双页显示要映射回同一原图位置。页面有稳定身份时优先匹配；源只返回易变签名 URL 时，不把该 URL 当永久 ID，按稳定元数据与序号降级；清单变化不能静默跳到另一页。
+持久位置采用 `chapterKey + pageKey + manifestVersion + pageIndexHint + normalizedOffset + normalizedX + viewportX + viewportY`；原图 y/x 与视口内锚点均用有限的 0–1 值，RTL 不镜像原图 x；具体布局与恢复约定见[阅读设置](reader-settings.md)。缩放、裁白和双页显示要映射回同一原图位置。页面有稳定身份时优先匹配；源只返回易变签名 URL 时，不把该 URL 当永久 ID，按稳定元数据与序号降级；清单变化不能静默跳到另一页。
 
 浏览器返回、旋转、平板分屏、地址栏变化或图片尺寸补全时，先定位逻辑页，再恢复页内锚点；跨设备同步同样使用该位置，不同步裸 scrollTop。当前回看位置和最远已读位置继续按主设计分开保存，写入采用节流、切章及时落盘和幂等 outbox。
 

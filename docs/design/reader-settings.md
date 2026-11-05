@@ -1,6 +1,6 @@
 # 非敏感阅读设置
 
-同步设置覆盖应用主题、阅读模式、页组、阅读背景、应用内调暗、点击区与键盘预设。Worker API + D1 是唯一业务权威，Web/iOS/Android 共用 `business.proto` 生成模型与标准 ProtoJSON。完整 P1 的适宽/适高与裁白仍按 [P1](../plan/p1-library-and-progress.md) 推进；实现与验收状态分别维护。
+同步设置覆盖应用主题、阅读模式、页组、图像适配、阅读背景、应用内调暗、点击区与键盘预设。Worker API + D1 是唯一业务权威，Web/iOS/Android 共用 `business.proto` 生成模型与标准 ProtoJSON。完整 P1 的裁白仍按 [P1](../plan/p1-library-and-progress.md) 推进；实现与验收状态分别维护。
 
 ## 全局默认与漫画覆盖
 
@@ -9,12 +9,13 @@
 | 应用主题   | SYSTEM / LIGHT / DARK                                | 全局；SYSTEM 由各端跟随本机系统外观 |
 | 阅读模式   | LEFT_TO_RIGHT / RIGHT_TO_LEFT / CONTINUOUS / WEBTOON | 全局默认，可逐漫画覆盖              |
 | 页组       | AUTO / SINGLE / DOUBLE                               | 全局默认，可逐漫画覆盖              |
+| 图像适配   | CONTAIN / WIDTH / HEIGHT                             | 全局默认，可逐漫画覆盖              |
 | 阅读背景   | BLACK / WHITE / THEME                                | 全局默认，可逐漫画覆盖              |
 | 应用内调暗 | 0–80 的整数百分比                                    | 全局默认，可逐漫画覆盖              |
 | 点击区     | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖              |
 | 键盘       | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖              |
 
-全局默认是 SYSTEM、LEFT_TO_RIGHT、AUTO、BLACK、调暗 0%、STANDARD 点击区与 STANDARD 键盘。AUTO 由客户端按实际可用宽度决定单双页，不同步设备宽度或当前计算结果；连续/Webtoon 不显示双页，但仍保留偏好，以便恢复分页模式。
+全局默认是 SYSTEM、LEFT_TO_RIGHT、AUTO、CONTAIN、BLACK、调暗 0%、STANDARD 点击区与 STANDARD 键盘。AUTO 由客户端按实际可用宽度决定单双页，不同步设备宽度或当前计算结果；连续/Webtoon 不显示双页，但仍保留偏好，以便恢复分页模式。
 
 漫画覆盖使用 `ReaderSettingsOverride` 的 optional 字段。字段缺省表示继承全局；显式 AUTO 表示覆盖为自动布局，不能当成继承。提交完整覆盖文档，未包含的字段恢复继承；空 `overrides` 清空全部覆盖。应用主题没有漫画覆盖。调暗覆盖的显式 0 表示不调暗，与缺省继承不同；D1 计算有效值时以字段 presence 合并，不能按数值真假选择默认值。全局变化会改变未覆盖字段的有效值，但不会修改漫画覆盖的 revision。
 
@@ -27,6 +28,16 @@
 点击预设用于分页模式的左右区域：STANDARD 沿阅读方向翻页，REVERSED 反转左右区域，DISABLED 关闭区域翻页；中央工具栏切换始终保留。滑动翻页与连续滚动维持各模式原有语义。
 
 键盘预设覆盖方向键、PageUp/PageDown、空格、Home/End。STANDARD 保留现有方向语义；REVERSED 反转相对翻页，Home/End 仍定位绝对首末；DISABLED 消费这些阅读导航键而不导航。设置表单和其它路由的键盘交互不受影响。显式导航按钮始终保留，偏好变化保持当前图像逻辑锚与真实末页观察规则。
+
+## 图像适配与二维位置
+
+图像适配在分页、双页、连续和 Webtoon 使用同一含义，以 UI 实际解码尺寸和当前阅读视口计算。CONTAIN（完整显示）让每张图完整落入其分配区域；WIDTH（适宽）使图宽等于分配宽度，允许纵向溢出；HEIGHT（适高）使图高等于视口高度，允许横向溢出。双页适宽各分一半宽度；双页适高按每张真实显示宽度组成页组。连续模式保留纵向列表，超宽图片可横向浏览。未解码时只用占位比例安排布局，不将占位当作真实图片观察。
+
+超出视口的内容必须可拖动到达；内容仍有可平移范围时，翻页手势不能抢走图片浏览，显式翻页控件仍可操作。缩放窗口使用当前适配偏好。默认 CONTAIN；漫画 optional 的显式 CONTAIN 表示覆盖完整显示，缺省才继承全局。
+
+`ReadingAnchor` 在稳定页身份和原图纵向 `normalizedOffset` 外保存原图横向 `normalizedX`，以及该点的 `viewportX/viewportY`。四个坐标均为有限的 0–1 值，不保存设备像素或变换矩阵。原图坐标不随 RTL 反转，RTL 只改变页组顺序和阅读起止边。用户平移或滚动时从视口顶部阅读起始侧的最近可见图像点取锚；居中留白时保留该点实际的视口位置。切换适配、页组、模式、视口尺寸，学习真实尺寸或重开时，用相同页与原图点恢复，再约束到新布局的可达范围。服务端投影与客户端恢复保留二维坐标；最远进度仍按页身份投影后的来源顺序和原图 y 比较，x 不加入字典序排序。
+
+观察依据当前 generation 已解码图片的实际矩形与视口交集，平移或缩放不因矩阵非单位就清除全部观察。自然完成仍由显式“读完本章”或“下一章”触发，且最后一页底边与阅读末边的交点必须实际可见；长图适宽顶部或宽图适高起始边刚出现不能使章节完成。图片只在 UI 解码，Source 宿主仍传输不透明编码字节。
 
 ## API 与原子状态
 
@@ -48,4 +59,4 @@
 
 连接确认、进入设置页、恢复前台和同身份重连时只读刷新。全局确认变化触发当前漫画重新读取有效设置，保留显式覆盖；来源顺序继续由阅读进度管理。父级应用设置、窗口变宽及切章不产生保存回调，迟到 viewport 数据不能覆盖父级偏好。成功确认的设置从服务端恢复，不在客户端另建权威偏好文件。
 
-实施状态见 [P2](../plan/p2-sync.md)，原有三项设置证据见[记录](../verification/reader-settings.md)，阅读外观与输入的工程范围及实际平台限制见[后续记录](../verification/reader-appearance.md)。
+图像适配与二维位置的工程范围及独立客户端门见[适配记录](../verification/reader-fit.md)。实施状态见 [P2](../plan/p2-sync.md)，原有三项设置证据见[记录](../verification/reader-settings.md)，阅读外观与输入的工程范围及实际平台限制见[后续记录](../verification/reader-appearance.md)。

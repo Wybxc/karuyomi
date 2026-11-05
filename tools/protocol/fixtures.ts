@@ -212,6 +212,9 @@ export const businessAnchor: JsonObject = {
   manifestVersion: 'manifest-golden',
   pageIndexHint: 1,
   normalizedOffset: 0.75,
+  normalizedX: 0.6,
+  viewportX: 0.25,
+  viewportY: 0.2,
 };
 export const businessProgress: JsonObject = {
   chapterKey: 'chapter-golden',
@@ -255,6 +258,7 @@ const globalReader: JsonObject = {
   dimPercent: 60,
   tapZones: 'READER_INPUT_PRESET_REVERSED',
   keyboard: 'READER_INPUT_PRESET_STANDARD',
+  fit: 'READER_FIT_WIDTH',
 };
 const globalSettingsValues: JsonObject = {
   theme: 'APP_THEME_SYSTEM',
@@ -264,6 +268,7 @@ const readerOverrides: JsonObject = {
   background: 'READER_BACKGROUND_THEME',
   dimPercent: 0,
   keyboard: 'READER_INPUT_PRESET_DISABLED',
+  fit: 'READER_FIT_CONTAIN',
 };
 const settingsSnapshot: JsonObject = {
   schemaVersion: 1,
@@ -302,6 +307,19 @@ export const goldenFixtures: GoldenFixture[] = [
     },
   })),
   {
+    name: 'settings-override-fit-height',
+    type: 'SettingsMutation',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      expectedRevision: 2,
+      setManga: {
+        mangaKey: businessMangaKey,
+        overrides: { fit: 'READER_FIT_HEIGHT' },
+      },
+    },
+  },
+  {
     name: 'settings-default-zero-dimming',
     type: 'SettingsResponse',
     value: {
@@ -316,6 +334,7 @@ export const goldenFixtures: GoldenFixture[] = [
             dimPercent: 0,
             tapZones: 'READER_INPUT_PRESET_STANDARD',
             keyboard: 'READER_INPUT_PRESET_STANDARD',
+            fit: 'READER_FIT_CONTAIN',
           },
         },
       },
@@ -326,6 +345,7 @@ export const goldenFixtures: GoldenFixture[] = [
         dimPercent: 0,
         tapZones: 'READER_INPUT_PRESET_STANDARD',
         keyboard: 'READER_INPUT_PRESET_STANDARD',
+        fit: 'READER_FIT_CONTAIN',
       },
     },
   },

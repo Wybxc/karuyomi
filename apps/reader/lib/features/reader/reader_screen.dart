@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -47,6 +48,7 @@ class ReaderScreen extends StatefulWidget {
     this.initialPosition,
     this.initialMode = ReadingMode.leftToRight,
     this.doublePage,
+    this.fit = ReaderFit.contain,
     this.background = ReaderBackground.black,
     this.dimPercent = 0,
     this.tapZones = ReaderInputPreset.standard,
@@ -77,6 +79,7 @@ class ReaderScreen extends StatefulWidget {
   /// this chapter unless this input changes; changing to null resumes automatic.
   final bool? doublePage;
 
+  final ReaderFit fit;
   final ReaderBackground background;
 
   /// Application content dimming only; never changes system screen brightness.
@@ -114,7 +117,11 @@ class ReaderScreen extends StatefulWidget {
   State<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-typedef _ReaderAppearance = ({ReaderBackground background, int dimPercent});
+typedef _ReaderAppearance = ({
+  ReaderBackground background,
+  int dimPercent,
+  ReaderFit fit,
+});
 
 class _ReaderScreenState extends State<ReaderScreen> {
   late final ValueNotifier<_ReaderAppearance> _appearance;
@@ -127,13 +134,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
   StreamSubscription<ImageSchedulerSnapshot>? _imagesSubscription;
   final _scroll = ScrollController();
   final _transform = TransformationController();
+  final _horizontal = <String, ScrollController>{};
   final _pointers = <int>{};
   Offset? _dragStart;
   bool _toolbar = true;
   bool _restoring = false;
   double _viewportWidth = 0;
   double _viewportHeight = 0;
-  bool _restoreScheduled = false;
+  int _restoreEpoch = 0;
   ReadingPosition? _pendingRestorePosition;
   String _windowSignature = '';
   bool _zoomed = false;
@@ -149,6 +157,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _appearance = ValueNotifier((
       background: widget.background,
       dimPercent: widget.dimPercent,
+      fit: widget.fit,
     ));
     _baseline = ReaderBaselineScope.read(context);
     _baseline?.event('reader_attached', {
@@ -163,6 +172,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
       mode: widget.initialMode,
       doublePage: widget.doublePage ?? false,
     );
+    if (widget.initialPosition == null && _reader.position != null) {
+      _reader.goToPage(0, normalizedX: _leadingX, viewportX: _leadingX);
+    }
     _readerSubscription = _reader.changes.listen((_) {
       _syncWindow();
       if (mounted) setState(() {});
@@ -188,7 +200,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
     });
     _restoring = true;
     _transform.value = Matrix4.identity();
-    _reader.goToPage(resolved.pageIndexHint, offset: resolved.normalizedOffset);
+    _reader.goToPage(
+      resolved.pageIndexHint,
+      offset: resolved.normalizedOffset,
+      normalizedX: resolved.normalizedX,
+      viewportX: resolved.viewportX,
+      viewportY: resolved.viewportY,
+    );
     _scheduleRestore();
   }
 
@@ -226,8 +244,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (!mounted || _restoring || _reader.position == null) return;
       final snapshot = _scheduler.snapshot;
       final manifest = _reader.manifest;
-      if ((!_reader.isContinuous && !_transform.value.isIdentity()) ||
-          ModalRoute.of(context)?.isCurrent == false) {
+      if (ModalRoute.of(context)?.isCurrent == false) {
         _recordViewport(const [], snapshot, blocked: true);
         widget.onViewportChanged?.call(
           ReaderViewportState(
@@ -241,60 +258,36 @@ class _ReaderScreenState extends State<ReaderScreen> {
         );
         return;
       }
-      final visible = <int>[];
-      var bottomOffset = 1.0;
-      var atEnd = false;
-      if (_reader.isContinuous) {
-        if (!_scroll.hasClients || _viewportHeight <= 0) return;
-        final top = _scroll.offset;
-        final bottom = top + _viewportHeight;
-        final offsets = _offsets;
-        for (var index = 0; index < manifest.pages.length; index++) {
-          if (offsets[index + 1] > top && offsets[index] < bottom) {
-            visible.add(index);
-          }
-        }
-        if (visible.isNotEmpty) {
-          final last = visible.last;
-          bottomOffset =
-              ((bottom - offsets[last]) / _pageHeight(manifest.pages[last]))
-                  .clamp(0.0, 1.0);
-        }
-        atEnd = _scroll.position.extentAfter <= 1;
-      } else {
-        visible.addAll(
-          _reader.spreads[_reader.spreadIndex].pages.map(
-            (page) => manifest.pages.indexWhere((item) => item.key == page.key),
-          ),
-        );
-        atEnd = !_reader.canAdvance;
-      }
-      bool decoded(int index) {
-        final image = snapshot.resources[manifest.pages[index].key];
-        return image != null && _decodedResources.contains(image.id);
-      }
+      final images = _visibleImages;
+      final visible = images.map((image) => image.index).toList();
+      bool decoded(_VisibleImage image) => _hasDecodedGeometry(image.index);
 
-      final shown = visible.where(decoded).toList();
-      final allVisible = visible.isNotEmpty && visible.every(decoded);
-      final observed = shown.isEmpty
+      final shown = images.where(decoded).toList();
+      final allVisible = images.isNotEmpty && images.every(decoded);
+      final last = shown.isEmpty ? null : shown.last;
+      final observed = last == null
           ? null
-          : manifest.positionAt(
-              shown.last,
-              offset: shown.last == visible.last ? bottomOffset : 1,
+          : _positionInImage(
+              last,
+              Offset(
+                _leadingX == 1 ? last.visible.left : last.visible.right,
+                last.visible.bottom,
+              ),
             );
-      if (_baseline?.recording == true) {
-        final offsets = _reader.isContinuous ? _offsets : null;
-        final contentVisible = offsets == null
-            ? visible
-            : visible
-                  .where(
-                    (index) =>
-                        offsets[index] + _pageHeight(manifest.pages[index]) >
-                        _scroll.offset,
-                  )
-                  .toList();
-        _recordViewport(contentVisible, snapshot);
-      }
+      final terminal = shown
+          .where((image) => image.index == manifest.pages.length - 1)
+          .firstOrNull;
+      final atEnd =
+          terminal != null &&
+          (Offset.zero & Size(_viewportWidth, _viewportHeight))
+              .inflate(1)
+              .contains(
+                Offset(
+                  _leadingX == 1 ? terminal.rect.left : terminal.rect.right,
+                  terminal.rect.bottom,
+                ),
+              );
+      _recordViewport(visible, snapshot);
       widget.onViewportChanged?.call(
         ReaderViewportState(
           current: _reader.position!,
@@ -336,6 +329,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
       'currentPageKey': position?.pageKey,
       'currentIndex': position?.pageIndexHint,
       'normalizedOffset': position?.normalizedOffset,
+      'normalizedX': position?.normalizedX,
+      'viewportX': position?.viewportX,
+      'viewportY': position?.viewportY,
+      'fit': widget.fit.name,
       'visible': [
         for (final index in visible)
           {
@@ -416,7 +413,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void didUpdateWidget(ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.background != widget.background ||
-        oldWidget.dimPercent != widget.dimPercent) {
+        oldWidget.dimPercent != widget.dimPercent ||
+        oldWidget.fit != widget.fit) {
       // The zoom route is a sibling of the rebuilding Reader route. Publish
       // after this frame rather than dirtying that sibling during its build.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -424,8 +422,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _appearance.value = (
           background: widget.background,
           dimPercent: widget.dimPercent,
+          fit: widget.fit,
         );
       });
+    }
+    if (oldWidget.fit != widget.fit) {
+      _restoring = true;
+      _transform.value = Matrix4.identity();
+      _scheduleRestore();
     }
     _scheduler.setPaused(widget.paused);
     if (oldWidget.positionRequest != widget.positionRequest) {
@@ -464,8 +468,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
+  double get _leadingX => _reader.mode == ReadingMode.rightToLeft ? 1 : 0;
   double get _gap => _reader.mode == ReadingMode.webtoon ? 0 : 12;
-  double _pageHeight(ReaderPage page) => _viewportWidth / page.aspectRatio;
+  Size get _viewport => Size(_viewportWidth, _viewportHeight);
+  Size _pageSize(ReaderPage page, {double? width}) => _fitImageSize(
+    page.aspectRatio,
+    Size(width ?? _viewportWidth, _viewportHeight),
+    widget.fit,
+  );
+  double _pageHeight(ReaderPage page) => _pageSize(page).height;
   List<double> get _offsets {
     final offsets = <double>[0];
     for (final page in _reader.manifest.pages) {
@@ -474,15 +485,175 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return offsets;
   }
 
+  _ReaderScene get _pagedScene => _spreadScene(
+    _reader.spreads[_reader.spreadIndex].displayPages(_reader.mode),
+    _viewport,
+    widget.fit,
+  );
+
+  double _horizontalOffset(String key) {
+    final controller = _horizontal[key];
+    return controller != null && controller.hasClients ? controller.offset : 0;
+  }
+
+  List<_VisibleImage> get _visibleImages {
+    if (_viewportWidth <= 0 || _viewportHeight <= 0) return const [];
+    final viewport = Offset.zero & _viewport;
+    final rects = <String, Rect>{};
+    if (_reader.isContinuous) {
+      if (!_scroll.hasClients) return const [];
+      final offsets = _offsets;
+      for (var index = 0; index < _reader.manifest.pages.length; index++) {
+        final page = _reader.manifest.pages[index];
+        final size = _pageSize(page);
+        final rect = Rect.fromLTWH(
+          math.max(0, (_viewportWidth - size.width) / 2) -
+              _horizontalOffset(page.key),
+          offsets[index] - _scroll.offset,
+          size.width,
+          size.height,
+        );
+        if (rect.overlaps(viewport)) rects[page.key] = rect;
+      }
+    } else {
+      for (final entry in _pagedScene.images.entries) {
+        rects[entry.key] = MatrixUtils.transformRect(
+          _transform.value,
+          entry.value,
+        );
+      }
+    }
+    return [
+      for (var index = 0; index < _reader.manifest.pages.length; index++)
+        if (rects[_reader.manifest.pages[index].key] case final Rect rect)
+          if (rect.overlaps(viewport))
+            _VisibleImage(index, rect, rect.intersect(viewport)),
+    ];
+  }
+
+  bool _hasDecodedGeometry(int index) {
+    final page = _reader.manifest.pages[index];
+    final snapshot = _scheduler.snapshot;
+    final resource = snapshot.resources[page.key];
+    final dimensions = resource == null
+        ? null
+        : snapshot.dimensions[resource.id];
+    return resource != null &&
+        resource.generation == widget.generation &&
+        _decodedResources.contains(resource.id) &&
+        dimensions != null &&
+        page.width == dimensions.width &&
+        page.height == dimensions.height;
+  }
+
+  ReadingPosition _positionInImage(_VisibleImage image, Offset point) =>
+      _reader.manifest.positionAt(
+        image.index,
+        offset: ((point.dy - image.rect.top) / image.rect.height).clamp(
+          0.0,
+          1.0,
+        ),
+        normalizedX: ((point.dx - image.rect.left) / image.rect.width).clamp(
+          0.0,
+          1.0,
+        ),
+        viewportX: (point.dx / _viewportWidth).clamp(0.0, 1.0),
+        viewportY: (point.dy / _viewportHeight).clamp(0.0, 1.0),
+      );
+
+  void _setViewportPosition(ReadingPosition position) {
+    final previous = _reader.position;
+    if (previous != null && _sameAnchor(previous, position)) return;
+    _reader.updateViewportAnchor(
+      position.pageIndexHint,
+      offset: position.normalizedOffset,
+      normalizedX: position.normalizedX,
+      viewportX: position.viewportX,
+      viewportY: position.viewportY,
+    );
+    // The controller publishes page changes; movement within a page is quiet.
+    if (previous?.pageKey == position.pageKey) {
+      widget.onPositionChanged?.call(position);
+    }
+  }
+
+  void _confirmViewportAnchor(ReadingPosition anchor) {
+    if (!_hasDecodedGeometry(anchor.pageIndexHint)) return;
+    final image = _visibleImages
+        .where((image) => image.index == anchor.pageIndexHint)
+        .firstOrNull;
+    if (image == null) return;
+    final point = Offset(
+      image.rect.left + image.rect.width * anchor.normalizedX,
+      image.rect.top + image.rect.height * anchor.normalizedOffset,
+    );
+    if (!(Offset.zero & _viewport).inflate(1).contains(point)) {
+      // A user may have panned before the first decoded frame. Only now can
+      // that visible point be sampled in genuine original-image coordinates.
+      _captureViewportAnchor();
+      return;
+    }
+    _setViewportPosition(
+      _reader.manifest.positionAt(
+        anchor.pageIndexHint,
+        offset: anchor.normalizedOffset,
+        normalizedX: anchor.normalizedX,
+        viewportX: (point.dx / _viewportWidth).clamp(0.0, 1.0),
+        viewportY: (point.dy / _viewportHeight).clamp(0.0, 1.0),
+      ),
+    );
+  }
+
+  void _captureViewportAnchor() {
+    if (_restoring) return;
+    final images = _visibleImages;
+    if (images.isEmpty) return;
+    final leading = Offset(_viewportWidth * _leadingX, 0);
+    Offset nearest(_VisibleImage image) => Offset(
+      leading.dx.clamp(image.visible.left, image.visible.right),
+      image.visible.top,
+    );
+    var selected = images.first;
+    for (final image in images.skip(1)) {
+      if ((nearest(image) - leading).distanceSquared <
+          (nearest(selected) - leading).distanceSquared) {
+        selected = image;
+      }
+    }
+    if (_hasDecodedGeometry(selected.index)) {
+      _setViewportPosition(_positionInImage(selected, nearest(selected)));
+    } else if (_reader.position?.pageIndexHint != selected.index) {
+      // Before decoding we can navigate to a page identity, but its guessed
+      // aspect ratio cannot establish an original-image point.
+      _setViewportPosition(
+        _reader.manifest.positionAt(
+          selected.index,
+          normalizedX: _leadingX,
+          viewportX: _leadingX,
+        ),
+      );
+    }
+  }
+
+  double _restoreTop(ReadingPosition anchor) =>
+      _offsets[anchor.pageIndexHint] +
+      _pageHeight(_reader.manifest.pages[anchor.pageIndexHint]) *
+          anchor.normalizedOffset -
+      _viewportHeight * anchor.viewportY;
+
+  void _onHorizontalScroll() {
+    if (!mounted || _restoring) return;
+    _captureViewportAnchor();
+    _scheduleViewport();
+  }
+
   void _syncWindow() {
     var pages = _reader.imageWindow();
     if (_reader.isContinuous && _viewportWidth > 0 && _viewportHeight > 0) {
       final offsets = _offsets;
       final anchor = _pendingRestorePosition ?? _reader.position;
       final top = _restoring && anchor != null
-          ? offsets[anchor.pageIndexHint] +
-                _pageHeight(_reader.manifest.pages[anchor.pageIndexHint]) *
-                    anchor.normalizedOffset
+          ? _restoreTop(anchor)
           : _scroll.hasClients
           ? _scroll.offset
           : 0.0;
@@ -519,49 +690,81 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _onScroll() {
     if (_restoring || !_scroll.hasClients || _viewportWidth <= 0) return;
-    final offsets = _offsets;
-    final top = _scroll.offset.clamp(0.0, _scroll.position.maxScrollExtent);
-    var index = 0;
-    while (index + 1 < offsets.length - 1 && offsets[index + 1] <= top) {
-      index++;
-    }
-    if (_reader.manifest.pages.isEmpty) return;
-    final height = _pageHeight(_reader.manifest.pages[index]);
-    final offset = ((top - offsets[index]) / height).clamp(0.0, 1.0);
-    _navigation('scroll', {
-      'targetIndex': index,
-      'offset': offset,
-      'scrollOffset': top,
-    });
-    _reader.updateViewportAnchor(index, offset: offset);
-    _syncWindow();
+    _captureViewportAnchor();
     final position = _reader.position;
-    if (position != null) widget.onPositionChanged?.call(position);
+    if (position != null) {
+      _navigation('scroll', {
+        'targetIndex': position.pageIndexHint,
+        'offset': position.normalizedOffset,
+        'normalizedX': position.normalizedX,
+        'scrollOffset': _scroll.offset,
+      });
+    }
+    _syncWindow();
     _scheduleViewport();
   }
 
   void _scheduleRestore() {
     _pendingRestorePosition = _reader.position;
     _restoring = true;
-    if (_restoreScheduled) return;
-    _restoreScheduled = true;
+    final epoch = ++_restoreEpoch;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _restoreScheduled = false;
-      if (!mounted) return;
+      if (!mounted || epoch != _restoreEpoch) return;
       final anchor = _pendingRestorePosition;
-      _pendingRestorePosition = null;
-      if (_reader.isContinuous && _scroll.hasClients && anchor != null) {
-        final offsets = _offsets;
-        final index = anchor.pageIndexHint;
-        final target =
-            offsets[index] +
-            _pageHeight(_reader.manifest.pages[index]) *
-                anchor.normalizedOffset;
-        _scroll.jumpTo(target.clamp(0.0, _scroll.position.maxScrollExtent));
+      if (anchor == null || _viewportWidth <= 0 || _viewportHeight <= 0) {
+        _restoring = false;
+        return;
       }
-      _restoring = false;
-      _syncWindow();
-      _scheduleViewport();
+      if (_reader.isContinuous && _scroll.hasClients) {
+        _scroll.jumpTo(
+          _restoreTop(anchor).clamp(0.0, _scroll.position.maxScrollExtent),
+        );
+      } else if (!_reader.isContinuous) {
+        final scene = _pagedScene;
+        final rect = scene.images[anchor.pageKey];
+        if (rect != null) {
+          _transform.value = _anchoredTransform(
+            scene.size,
+            _viewport,
+            Offset(
+              rect.left + rect.width * anchor.normalizedX,
+              rect.top + rect.height * anchor.normalizedOffset,
+            ),
+            Offset(
+              _viewportWidth * anchor.viewportX,
+              _viewportHeight * anchor.viewportY,
+            ),
+            _transform.value.getMaxScaleOnAxis(),
+          );
+        }
+      }
+      // A vertical jump may build the target page's horizontal ScrollPosition
+      // in the next layout. Keep observations blocked until that position exists.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || epoch != _restoreEpoch) return;
+        if (_reader.isContinuous) {
+          final page = _reader.manifest.pages[anchor.pageIndexHint];
+          final size = _pageSize(page);
+          final horizontal = _horizontal[page.key];
+          if (horizontal != null && horizontal.hasClients) {
+            final target =
+                math.max(0, (_viewportWidth - size.width) / 2) +
+                size.width * anchor.normalizedX -
+                _viewportWidth * anchor.viewportX;
+            horizontal.jumpTo(
+              target.clamp(0.0, horizontal.position.maxScrollExtent),
+            );
+          }
+        }
+        _pendingRestorePosition = null;
+        _restoring = false;
+        // Preserve the original image point, updating only where layout
+        // constraints place it in the viewport. Placeholder ratios never save.
+        _confirmViewportAnchor(anchor);
+        _syncWindow();
+        _scheduleViewport();
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -585,9 +788,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (_doublePagePreference == value) return;
     _navigation('layout', {'doublePage': value});
     setState(() => _doublePagePreference = value);
+    _restoring = true;
     _transform.value = Matrix4.identity();
     _applyDoublePagePreference();
-    _scheduleViewport();
+    _scheduleRestore();
     widget.onDoublePageChanged?.call(value);
   }
 
@@ -601,9 +805,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _goTo(int index) {
     if (_reader.manifest.pages.isEmpty) return;
+    _restoring = true;
     _transform.value = Matrix4.identity();
     _navigation('jump', {'targetIndex': index});
-    _reader.goToPage(index);
+    _reader.goToPage(index, normalizedX: _leadingX, viewportX: _leadingX);
     _scheduleRestore();
   }
 
@@ -612,7 +817,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _navigation('advance', {
       'targetPageKey': _reader.spreads[_reader.spreadIndex + 1].pages.first.key,
     });
-    _reader.advance();
+    _restoring = true;
+    final page = _reader.spreads[_reader.spreadIndex + 1].pages.first;
+    _reader.goToPage(
+      _reader.manifest.pages.indexWhere((item) => item.key == page.key),
+      normalizedX: _leadingX,
+      viewportX: _leadingX,
+    );
     _transform.value = Matrix4.identity();
     _scheduleRestore();
   }
@@ -622,7 +833,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _navigation('back', {
       'targetPageKey': _reader.spreads[_reader.spreadIndex - 1].pages.first.key,
     });
-    _reader.back();
+    _restoring = true;
+    final page = _reader.spreads[_reader.spreadIndex - 1].pages.first;
+    _reader.goToPage(
+      _reader.manifest.pages.indexWhere((item) => item.key == page.key),
+      normalizedX: _leadingX,
+      viewportX: _leadingX,
+    );
     _transform.value = Matrix4.identity();
     _scheduleRestore();
   }
@@ -630,13 +847,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _onTransform() {
     final zoomed = _transform.value.getMaxScaleOnAxis() > 1.01;
     if (_zoomed != zoomed && mounted) setState(() => _zoomed = zoomed);
+    _captureViewportAnchor();
     _scheduleViewport();
   }
 
   void _zoom(double factor) {
     final scale = _transform.value.getMaxScaleOnAxis();
     final next = (scale * factor).clamp(1.0, 5.0);
-    _transform.value = Matrix4.diagonal3Values(next, next, 1);
+    final center = Offset(_viewportWidth / 2, _viewportHeight / 2);
+    _transform.value = _anchoredTransform(
+      _pagedScene.size,
+      _viewport,
+      _transform.toScene(center),
+      center,
+      next,
+    );
   }
 
   void _afterImageNotification(VoidCallback action) {
@@ -671,12 +896,23 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   width: notification.width,
                   height: notification.height,
                 );
+                final firstFrame = !_decodedResources.contains(resource.id);
                 if (_scheduler.recordDecoded(
                   resource.id,
                   notification.width,
                   notification.height,
                 )) {
                   _decodedResources.add(resource.id);
+                  if (firstFrame &&
+                      !_restoring &&
+                      _reader.position?.pageKey == page.key &&
+                      page.width == notification.width &&
+                      page.height == notification.height) {
+                    // A matching late frame does not change the manifest. Its
+                    // geometry is already restored, so confirm once without
+                    // delaying observation or interrupting gestures.
+                    _confirmViewportAnchor(_reader.position!);
+                  }
                 } else {
                   _decodedResources.remove(resource.id);
                 }
@@ -785,10 +1021,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
               pool: pool,
               imageBuilder: widget.imageBuilder,
               appearance: _appearance,
+              aspectRatio: page.aspectRatio,
             ),
           ),
         ),
-      ).whenComplete(pin.close),
+      ).whenComplete(() async {
+        await pin.close();
+        if (mounted) _scheduleViewport();
+      }),
     );
   }
 
@@ -801,11 +1041,23 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _pageHeight(_reader.manifest.pages[index]) + _gap,
     itemBuilder: (context, index) {
       final page = _reader.manifest.pages[index];
+      final size = _pageSize(page);
       return Padding(
         padding: EdgeInsets.only(bottom: _gap),
-        child: GestureDetector(
+        child: _ContinuousImage(
+          key: ValueKey('continuous-image-${page.key}'),
+          pageKey: page.key,
+          viewportWidth: _viewportWidth,
+          imageSize: size,
+          onAttached: (controller) => _horizontal[page.key] = controller,
+          onDetached: (controller) {
+            if (identical(_horizontal[page.key], controller)) {
+              _horizontal.remove(page.key);
+            }
+          },
+          onMoved: _onHorizontalScroll,
           onDoubleTap: () => _openZoom(page),
-          child: SizedBox(width: _viewportWidth, child: _image(page)),
+          child: _image(page),
         ),
       );
     },
@@ -813,23 +1065,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Widget _paged() {
     final spread = _reader.spreads[_reader.spreadIndex];
+    final scene = _pagedScene;
+    final pannable =
+        _zoomed ||
+        scene.size.width > _viewportWidth + 1 ||
+        scene.size.height > _viewportHeight + 1;
     return Listener(
       onPointerDown: (event) {
         _pointers.add(event.pointer);
-        if (_pointers.length == 1 &&
-            _transform.value.getMaxScaleOnAxis() == 1) {
-          _dragStart = event.position;
-        } else {
-          _dragStart = null;
-        }
+        _dragStart = _pointers.length == 1 && !pannable ? event.position : null;
       },
       onPointerUp: (event) {
         final start = _dragStart;
         _pointers.remove(event.pointer);
         _dragStart = null;
-        if (start == null || _transform.value.getMaxScaleOnAxis() > 1.01) {
-          return;
-        }
+        if (start == null || pannable) return;
         final delta = event.position - start;
         if (delta.dx.abs() < 60 || delta.dx.abs() < delta.dy.abs()) return;
         final forward = _reader.mode == ReadingMode.rightToLeft
@@ -843,14 +1093,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
       },
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onDoubleTap: () =>
-            _zoom(_transform.value.getMaxScaleOnAxis() > 1 ? 0.2 : 2),
+        onDoubleTap: () => _zoom(_zoomed ? 0.2 : 2),
         onTapUp: (details) {
-          if (_transform.value.getMaxScaleOnAxis() > 1.01) return;
           final fraction = details.localPosition.dx / _viewportWidth;
           if (fraction > 1 / 3 && fraction < 2 / 3) {
             setState(() => _toolbar = !_toolbar);
-          } else if (widget.tapZones != ReaderInputPreset.disabled) {
+          } else if (!_zoomed &&
+              widget.tapZones != ReaderInputPreset.disabled) {
             final forward = _reader.mode == ReadingMode.rightToLeft
                 ? fraction < 1 / 3
                 : fraction > 2 / 3;
@@ -863,15 +1112,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
         child: InteractiveViewer(
           key: ValueKey('spread-${spread.pages.first.key}'),
           transformationController: _transform,
+          alignment: Alignment.topLeft,
+          constrained: false,
           minScale: 1,
           maxScale: 5,
-          panEnabled: _transform.value.getMaxScaleOnAxis() > 1.01,
-          child: Row(
-            textDirection: TextDirection.ltr,
-            children: [
-              for (final page in spread.displayPages(_reader.mode))
-                Expanded(child: _image(page)),
-            ],
+          panEnabled: pannable,
+          child: SizedBox(
+            width: scene.size.width,
+            height: scene.size.height,
+            child: Stack(
+              children: [
+                for (final page in spread.displayPages(_reader.mode))
+                  Positioned.fromRect(
+                    rect: scene.images[page.key]!,
+                    child: SizedBox(
+                      key: ValueKey('image-rect-${page.key}'),
+                      child: _image(page),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1011,7 +1271,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                   IconButton(
                     tooltip: '重置缩放',
-                    onPressed: () => _transform.value = Matrix4.identity(),
+                    onPressed: () {
+                      _restoring = true;
+                      _transform.value = Matrix4.identity();
+                      _scheduleRestore();
+                    },
                     icon: const Icon(Icons.fit_screen),
                   ),
                 ],
@@ -1116,6 +1380,154 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 }
 
+/// Each lazily built page owns its horizontal position and disposes it when
+/// leaving the list; the Reader only borrows live controllers for restoration.
+class _ContinuousImage extends StatefulWidget {
+  const _ContinuousImage({
+    super.key,
+    required this.pageKey,
+    required this.viewportWidth,
+    required this.imageSize,
+    required this.onAttached,
+    required this.onDetached,
+    required this.onMoved,
+    required this.onDoubleTap,
+    required this.child,
+  });
+  final String pageKey;
+  final double viewportWidth;
+  final Size imageSize;
+  final ValueChanged<ScrollController> onAttached;
+  final ValueChanged<ScrollController> onDetached;
+  final VoidCallback onMoved;
+  final VoidCallback onDoubleTap;
+  final Widget child;
+  @override
+  State<_ContinuousImage> createState() => _ContinuousImageState();
+}
+
+class _ContinuousImageState extends State<_ContinuousImage> {
+  final _controller = ScrollController();
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_moved);
+    widget.onAttached(_controller);
+  }
+
+  void _moved() => widget.onMoved();
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    key: ValueKey('horizontal-${widget.pageKey}'),
+    controller: _controller,
+    scrollDirection: Axis.horizontal,
+    child: GestureDetector(
+      onDoubleTap: widget.onDoubleTap,
+      child: SizedBox(
+        width: math.max(widget.viewportWidth, widget.imageSize.width),
+        height: widget.imageSize.height,
+        child: Center(
+          child: SizedBox(
+            key: ValueKey('image-rect-${widget.pageKey}'),
+            width: widget.imageSize.width,
+            height: widget.imageSize.height,
+            child: widget.child,
+          ),
+        ),
+      ),
+    ),
+  );
+  @override
+  void dispose() {
+    widget.onDetached(_controller);
+    _controller.dispose();
+    super.dispose();
+  }
+}
+
+final class _VisibleImage {
+  const _VisibleImage(this.index, this.rect, this.visible);
+  final int index;
+  final Rect rect;
+  final Rect visible;
+}
+
+final class _ReaderScene {
+  const _ReaderScene(this.size, this.images);
+  final Size size;
+  final Map<String, Rect> images;
+}
+
+Size _fitImageSize(double aspectRatio, Size cell, ReaderFit fit) {
+  final height = switch (fit) {
+    ReaderFit.contain => math.min(cell.height, cell.width / aspectRatio),
+    ReaderFit.width => cell.width / aspectRatio,
+    ReaderFit.height => cell.height,
+  };
+  return Size(height * aspectRatio, height);
+}
+
+_ReaderScene _spreadScene(
+  List<ReaderPage> pages,
+  Size viewport,
+  ReaderFit fit,
+) {
+  final cellWidth = viewport.width / pages.length;
+  final sizes = [
+    for (final page in pages)
+      _fitImageSize(page.aspectRatio, Size(cellWidth, viewport.height), fit),
+  ];
+  final contentWidth = fit == ReaderFit.height
+      ? sizes.fold(0.0, (width, size) => width + size.width)
+      : viewport.width;
+  final scene = Size(
+    math.max(viewport.width, contentWidth),
+    sizes.fold(
+      viewport.height,
+      (height, size) => math.max(height, size.height),
+    ),
+  );
+  final images = <String, Rect>{};
+  var left = (scene.width - contentWidth) / 2;
+  for (var index = 0; index < pages.length; index++) {
+    final size = sizes[index];
+    final width = fit == ReaderFit.height ? size.width : cellWidth;
+    images[pages[index].key] = Rect.fromLTWH(
+      left + (width - size.width) / 2,
+      math.max(0, (viewport.height - size.height) / 2),
+      size.width,
+      size.height,
+    );
+    left += width;
+  }
+  return _ReaderScene(scene, images);
+}
+
+Matrix4 _anchoredTransform(
+  Size scene,
+  Size viewport,
+  Offset imagePoint,
+  Offset viewportPoint,
+  double scale,
+) {
+  final x = (viewportPoint.dx - imagePoint.dx * scale)
+      .clamp(math.min(0.0, viewport.width - scene.width * scale), 0.0)
+      .toDouble();
+  final y = (viewportPoint.dy - imagePoint.dy * scale)
+      .clamp(math.min(0.0, viewport.height - scene.height * scale), 0.0)
+      .toDouble();
+  return Matrix4.diagonal3Values(scale, scale, 1)..setTranslationRaw(x, y, 0);
+}
+
+bool _sameAnchor(ReadingPosition first, ReadingPosition second) =>
+    first.chapterKey == second.chapterKey &&
+    first.pageKey == second.pageKey &&
+    first.manifestVersion == second.manifestVersion &&
+    (first.normalizedOffset - second.normalizedOffset).abs() < 0.000001 &&
+    (first.normalizedX - second.normalizedX).abs() < 0.000001 &&
+    (first.viewportX - second.viewportX).abs() < 0.000001 &&
+    (first.viewportY - second.viewportY).abs() < 0.000001;
+
 Color _readerBackgroundColor(
   BuildContext context,
   ReaderBackground background,
@@ -1173,11 +1585,13 @@ class _ZoomImageDialog extends StatefulWidget {
     required this.pool,
     required this.imageBuilder,
     required this.appearance,
+    required this.aspectRatio,
   });
   final ValueListenable<_ReaderAppearance> appearance;
   final ImageResource resource;
   final ReaderResourcePool pool;
   final ResourceImageBuilder imageBuilder;
+  final double aspectRatio;
 
   @override
   State<_ZoomImageDialog> createState() => _ZoomImageDialogState();
@@ -1185,13 +1599,126 @@ class _ZoomImageDialog extends StatefulWidget {
 
 class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   final _transform = TransformationController();
+  Size? _viewport;
+  _ReaderScene? _scene;
+  ReaderFit? _fit;
+  late double _aspectRatio = widget.aspectRatio;
+  int _layoutEpoch = 0;
 
   void _zoom(double factor) {
+    final scene = _scene;
+    final viewport = _viewport;
+    if (scene == null || viewport == null) return;
     final scale = (_transform.value.getMaxScaleOnAxis() * factor).clamp(
       1.0,
       5.0,
     );
-    _transform.value = Matrix4.diagonal3Values(scale, scale, 1);
+    final center = viewport.center(Offset.zero);
+    _transform.value = _anchoredTransform(
+      scene.size,
+      viewport,
+      _transform.toScene(center),
+      center,
+      scale,
+    );
+  }
+
+  Widget _content(ReaderFit fit, BoxConstraints constraints) {
+    final viewport = constraints.biggest;
+    final scene = _spreadScene(
+      [ReaderPage(key: widget.resource.id, width: _aspectRatio, height: 1)],
+      viewport,
+      fit,
+    );
+    if (_viewport != viewport ||
+        _fit != fit ||
+        _scene?.images[widget.resource.id] !=
+            scene.images[widget.resource.id]) {
+      final oldViewport = _viewport;
+      final oldRect = _scene?.images[widget.resource.id];
+      var normalized = Offset.zero;
+      var viewportPoint = Offset.zero;
+      if (oldRect != null && oldViewport != null) {
+        final rect = MatrixUtils.transformRect(_transform.value, oldRect);
+        final point = Offset(
+          0.0.clamp(rect.left, rect.right),
+          0.0.clamp(rect.top, rect.bottom),
+        );
+        normalized = Offset(
+          ((point.dx - rect.left) / rect.width).clamp(0.0, 1.0),
+          ((point.dy - rect.top) / rect.height).clamp(0.0, 1.0),
+        );
+        viewportPoint = Offset(
+          (point.dx / oldViewport.width).clamp(0.0, 1.0),
+          (point.dy / oldViewport.height).clamp(0.0, 1.0),
+        );
+      }
+      final scale = _fit != null && _fit != fit
+          ? 1.0
+          : _transform.value.getMaxScaleOnAxis();
+      _viewport = viewport;
+      _scene = scene;
+      _fit = fit;
+      final epoch = ++_layoutEpoch;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || epoch != _layoutEpoch) return;
+        final rect = scene.images[widget.resource.id]!;
+        _transform.value = _anchoredTransform(
+          scene.size,
+          viewport,
+          Offset(
+            rect.left + rect.width * normalized.dx,
+            rect.top + rect.height * normalized.dy,
+          ),
+          Offset(
+            viewport.width * viewportPoint.dx,
+            viewport.height * viewportPoint.dy,
+          ),
+          scale,
+        );
+      });
+    }
+    final rect = scene.images[widget.resource.id]!;
+    return InteractiveViewer(
+      transformationController: _transform,
+      alignment: Alignment.topLeft,
+      constrained: false,
+      minScale: 1,
+      maxScale: 5,
+      child: SizedBox(
+        width: scene.size.width,
+        height: scene.size.height,
+        child: Stack(
+          children: [
+            Positioned.fromRect(
+              rect: rect,
+              child: NotificationListener<ReaderImageDecoded>(
+                onNotification: (notification) {
+                  final ratio = notification.width / notification.height;
+                  if (notification.resourceId == widget.resource.id &&
+                      ratio != _aspectRatio) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _aspectRatio = ratio);
+                    });
+                    WidgetsBinding.instance.ensureVisualUpdate();
+                  }
+                  return false;
+                },
+                child: PinnedReaderImage(
+                  pool: widget.pool,
+                  image: widget.resource,
+                  builder: (context) => widget.imageBuilder(
+                    context,
+                    widget.resource,
+                    BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1219,7 +1746,7 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
                 ),
                 IconButton(
                   tooltip: '重置缩放',
-                  onPressed: () => _transform.value = Matrix4.identity(),
+                  onPressed: () => _zoom(0.2),
                   icon: const Icon(Icons.fit_screen),
                 ),
               ],
@@ -1227,21 +1754,9 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
             body: _ReaderContent(
               background: appearance.background,
               dimPercent: appearance.dimPercent,
-              child: InteractiveViewer(
-                transformationController: _transform,
-                minScale: 1,
-                maxScale: 5,
-                child: Center(
-                  child: PinnedReaderImage(
-                    pool: widget.pool,
-                    image: widget.resource,
-                    builder: (context) => widget.imageBuilder(
-                      context,
-                      widget.resource,
-                      BoxFit.contain,
-                    ),
-                  ),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) =>
+                    _content(appearance.fit, constraints),
               ),
             ),
           ),

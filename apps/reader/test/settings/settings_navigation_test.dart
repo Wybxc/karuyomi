@@ -119,6 +119,7 @@ Future<void> _globalDefaults(WidgetTester tester, {bool dark = false}) async {
   if (dark) await _choose<wire.AppTheme>(tester, '深色');
   await _choose<wire.ReaderMode>(tester, '从右到左');
   await _choose<wire.ReaderPageLayout>(tester, '双页');
+  await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
   await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '白色');
   await _dim(tester, 'global', zero: false);
   await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '反向');
@@ -205,6 +206,8 @@ void main() {
       expect(inherited!.global.theme, wire.AppTheme.APP_THEME_DARK);
       expect(inherited.overrides!.hasMode(), false);
       expect(inherited.overrides!.hasPageLayout(), false);
+      expect(inherited.overrides!.hasFit(), false);
+      expect(inherited.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
       expect(inherited.overrides!.hasBackground(), false);
       expect(inherited.overrides!.hasDimPercent(), false);
       expect(inherited.overrides!.hasTapZones(), false);
@@ -233,6 +236,7 @@ void main() {
       await _tap(tester, find.text('第一章'));
       expect(_reader(tester).initialMode, ReadingMode.rightToLeft);
       expect(_reader(tester).doublePage, true);
+      expect(_reader(tester).fit, ReaderFit.width);
       expect(_reader(tester).background, ReaderBackground.white);
       expect(_reader(tester).dimPercent, 40);
       expect(_reader(tester).tapZones, ReaderInputPreset.reversed);
@@ -265,6 +269,20 @@ void main() {
       await _tap(tester, find.text('保存全局设置'));
       final catalog = await _details(tester);
       await _tap(tester, find.text('第一章'));
+      final leafBeforeFit = _reader(tester).key;
+      await _tap(tester, find.text('阅读设置'));
+      await _chooseField<wire.ReaderFit>(tester, '图像适配', '适高');
+      await _tap(tester, find.text('保存本漫画设置'));
+      await _closeModal(tester);
+      expect(_reader(tester).key, leafBeforeFit);
+      expect(_reader(tester).fit, ReaderFit.height);
+      await _tap(tester, find.text('重新阅读本章'));
+      final reset = _reader(tester).positionRequest!.value!;
+      expect(reset.normalizedOffset, 0);
+      expect(reset.normalizedX, 1);
+      expect(reset.viewportX, 1);
+      expect(reset.viewportY, 0);
+      expect(_reader(tester).key, leafBeforeFit);
       await _tap(tester, find.byType(DropdownButton<ReadingMode>));
       await _tap(tester, find.text('从左到右').last);
       await _tap(
@@ -285,6 +303,7 @@ void main() {
         snapshot.overrides!.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_SINGLE,
       );
+      expect(snapshot.overrides!.fit, wire.ReaderFit.READER_FIT_HEIGHT);
       expect(
         snapshot.global.reader.mode,
         wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
@@ -296,6 +315,7 @@ void main() {
       await _tap(tester, find.text('阅读设置'));
       expect(find.byType(MangaSettingsEditor), findsOneWidget);
       final leafBeforeAppearance = _reader(tester).key;
+      await _chooseField<wire.ReaderFit>(tester, '图像适配', '完整显示');
       await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '黑色');
       await _tap(tester, find.byKey(const ValueKey('manga-dim-inherit')));
       await _dim(tester, 'manga', zero: true);
@@ -303,6 +323,7 @@ void main() {
       await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '反向');
       await _tap(tester, find.text('保存本漫画设置'));
       expect(_reader(tester).key, leafBeforeAppearance);
+      expect(_reader(tester).fit, ReaderFit.contain);
       expect(_reader(tester).background, ReaderBackground.black);
       expect(_reader(tester).dimPercent, 0);
       expect(_reader(tester).tapZones, ReaderInputPreset.standard);
@@ -310,7 +331,9 @@ void main() {
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
-      expect(snapshot!.overrides!.hasDimPercent(), true);
+      expect(snapshot!.overrides!.hasFit(), true);
+      expect(snapshot.overrides!.fit, wire.ReaderFit.READER_FIT_CONTAIN);
+      expect(snapshot.overrides!.hasDimPercent(), true);
       expect(snapshot.overrides!.dimPercent, 0);
       await _choose<wire.ReaderMode>(tester, '跟随全局');
       await _tap(tester, find.text('保存本漫画设置'));
@@ -346,6 +369,8 @@ void main() {
         () => catalog.settings!.loadManga(_mangaKey),
       );
       expect(snapshot!.overrides!.hasPageLayout(), true);
+      expect(snapshot.overrides!.hasFit(), true);
+      expect(snapshot.overrides!.fit, wire.ReaderFit.READER_FIT_CONTAIN);
       expect(snapshot.overrides!.hasDimPercent(), true);
       expect(snapshot.overrides!.dimPercent, 0);
       expect(
@@ -386,6 +411,7 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
       await tester.pumpAndSettle();
       expect(_reader(tester).key, isNot(firstLeaf));
+      expect(_reader(tester).fit, ReaderFit.contain);
       expect(_reader(tester).background, ReaderBackground.black);
       expect(_reader(tester).dimPercent, 0);
       expect(_reader(tester).tapZones, ReaderInputPreset.standard);
@@ -400,6 +426,7 @@ void main() {
       );
       await _leaveReader(tester, catalog);
       await _tap(tester, find.text('第一章'));
+      expect(_reader(tester).fit, ReaderFit.contain);
       expect(_reader(tester).doublePage, isNull);
       expect(
         tester
@@ -414,6 +441,7 @@ void main() {
         hasLength(writes),
       );
       await _tap(tester, find.text('阅读设置'));
+      await _chooseField<wire.ReaderFit>(tester, '图像适配', '跟随全局');
       await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '跟随全局');
       await _tap(tester, find.byKey(const ValueKey('manga-dim-inherit')));
       await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '跟随全局');
@@ -423,12 +451,14 @@ void main() {
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
-      expect(snapshot!.overrides!.hasBackground(), false);
+      expect(snapshot!.overrides!.hasFit(), false);
+      expect(snapshot.overrides!.hasBackground(), false);
       expect(snapshot.overrides!.hasDimPercent(), false);
       expect(snapshot.overrides!.hasTapZones(), false);
       expect(snapshot.overrides!.hasKeyboard(), false);
       await _closeModal(tester);
       expect(_reader(tester).key, leafBeforeInheritance);
+      expect(_reader(tester).fit, ReaderFit.width);
       expect(_reader(tester).background, ReaderBackground.white);
       expect(_reader(tester).dimPercent, 40);
       expect(_reader(tester).tapZones, ReaderInputPreset.reversed);
@@ -468,6 +498,14 @@ void main() {
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
       await _tap(tester, _navigation('浏览'));
       await _tap(tester, _navigation('设置'));
+      expect(
+        tester
+            .widget<DropdownButtonFormField<wire.ReaderFit>>(
+              _field<wire.ReaderFit>('图像适配'),
+            )
+            .initialValue,
+        wire.ReaderFit.READER_FIT_WIDTH,
+      );
       expect(
         tester
             .widget<DropdownButtonFormField<wire.ReaderBackground>>(
@@ -519,6 +557,7 @@ void main() {
       expect(platform.businessServer.appliedMutations, 1);
       final catalog = await _details(tester);
       await _tap(tester, find.text('第一章'));
+      expect(_reader(tester).fit, ReaderFit.width);
       expect(_reader(tester).background, ReaderBackground.white);
       expect(_reader(tester).dimPercent, 40);
       expect(_reader(tester).tapZones, ReaderInputPreset.reversed);

@@ -35,10 +35,25 @@ ChapterProgress observed(
   ChapterManifest pages,
   int index, {
   double offset = 0,
+  double normalizedX = 0,
+  double viewportX = 0,
+  double viewportY = 0,
 }) => ChapterProgress(current: pages.positionAt(0)).advance(
   manifest: pages,
-  current: pages.positionAt(index, offset: offset),
-  observed: pages.positionAt(index, offset: offset),
+  current: pages.positionAt(
+    index,
+    offset: offset,
+    normalizedX: normalizedX,
+    viewportX: viewportX,
+    viewportY: viewportY,
+  ),
+  observed: pages.positionAt(
+    index,
+    offset: offset,
+    normalizedX: normalizedX,
+    viewportX: viewportX,
+    viewportY: viewportY,
+  ),
 );
 
 void main() {
@@ -57,13 +72,27 @@ void main() {
     await repository.save(
       mangaKey: mangaKey,
       manifest: pages,
-      progress: observed(pages, 2, offset: .8),
+      progress: observed(
+        pages,
+        2,
+        offset: .8,
+        normalizedX: .2,
+        viewportX: .6,
+        viewportY: .9,
+      ),
       reversedOrder: true,
     );
     await repository.save(
       mangaKey: mangaKey,
       manifest: pages,
-      progress: observed(pages, 0, offset: .2),
+      progress: observed(
+        pages,
+        0,
+        offset: .2,
+        normalizedX: .8,
+        viewportX: .3,
+        viewportY: .4,
+      ),
       reversedOrder: true,
     );
     final second = client(server);
@@ -75,8 +104,29 @@ void main() {
     ))!;
     expect(saved.current.pageKey, 'one');
     expect(saved.current.normalizedOffset, .2);
+    expect(saved.current.normalizedX, .8);
+    expect(saved.current.viewportX, .3);
+    expect(saved.current.viewportY, .4);
     expect(saved.furthest!.pageKey, 'three');
     expect(saved.furthest!.normalizedOffset, .8);
+    expect(saved.furthest!.normalizedX, .2);
+    expect(saved.furthest!.viewportX, .6);
+    expect(saved.furthest!.viewportY, .9);
+    final reordered = ChapterManifest(
+      chapterKey: pages.chapterKey,
+      version: 'v2',
+      pages: pages.pages.reversed,
+    );
+    final projected = saved.advance(
+      manifest: reordered,
+      current: saved.current,
+    );
+    expect(projected.current.pageIndexHint, 2);
+    expect(projected.current.normalizedX, .8);
+    expect(projected.current.viewportX, .3);
+    expect(projected.current.viewportY, .4);
+    expect(projected.furthest!.pageIndexHint, 0);
+    expect(projected.furthest!.normalizedX, .2);
     expect((await remote.loadResume(mangaKey))!.reversedOrder, true);
   });
 

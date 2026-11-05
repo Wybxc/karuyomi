@@ -232,9 +232,15 @@ void validateBusinessAnchor(wire.ReadingAnchor value) {
   validateBusinessRevision(value.pageIndexHint);
   _require(
     value.pageIndexHint < _pageLimit &&
-        value.normalizedOffset.isFinite &&
-        value.normalizedOffset >= 0 &&
-        value.normalizedOffset <= 1,
+        [
+          value.normalizedOffset,
+          value.normalizedX,
+          value.viewportX,
+          value.viewportY,
+        ].every(
+          (coordinate) =>
+              coordinate.isFinite && coordinate >= 0 && coordinate <= 1,
+        ),
     'Invalid reading anchor',
   );
 }
@@ -376,6 +382,7 @@ void validateBusinessReaderSettings(wire.ReaderSettings value) {
     value.pageLayout.value >= 1 && value.pageLayout.value <= 3,
     'Invalid reader page layout',
   );
+  _require(value.fit.value >= 1 && value.fit.value <= 3, 'Invalid reader fit');
   _require(
     value.background.value >= 1 && value.background.value <= 3,
     'Invalid reader background',
@@ -403,6 +410,12 @@ void validateBusinessReaderOverrides(wire.ReaderSettingsOverride value) {
     _require(
       value.pageLayout.value >= 1 && value.pageLayout.value <= 3,
       'Invalid reader page layout override',
+    );
+  }
+  if (value.hasFit()) {
+    _require(
+      value.fit.value >= 1 && value.fit.value <= 3,
+      'Invalid reader fit override',
     );
   }
   if (value.hasBackground()) {
@@ -527,7 +540,11 @@ void validateBusinessSettingsResponse(
         value.effectiveReader.keyboard ==
             (overrides?.hasKeyboard() == true
                 ? overrides!.keyboard
-                : global.values.reader.keyboard),
+                : global.values.reader.keyboard) &&
+        value.effectiveReader.fit ==
+            (overrides?.hasFit() == true
+                ? overrides!.fit
+                : global.values.reader.fit),
     'Effective reader settings do not match confirmed values',
   );
   wire.encodeProtoJson(value, maxBytes: _responseLimit);

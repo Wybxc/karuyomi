@@ -394,7 +394,10 @@ bool _sameAnchor(ReadingPosition? a, ReadingPosition? b) =>
         a.pageKey == b.pageKey &&
         a.manifestVersion == b.manifestVersion &&
         a.pageIndexHint == b.pageIndexHint &&
-        a.normalizedOffset == b.normalizedOffset);
+        a.normalizedOffset == b.normalizedOffset &&
+        a.normalizedX == b.normalizedX &&
+        a.viewportX == b.viewportX &&
+        a.viewportY == b.viewportY);
 bool _sameProgress(ChapterProgress a, ChapterProgress b) =>
     a.epoch == b.epoch &&
     a.completed == b.completed &&

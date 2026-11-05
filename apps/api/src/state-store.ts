@@ -308,6 +308,9 @@ function projectAnchor(
     pageKey: anchor.pageKey,
     pageIndexHint: index,
     normalizedOffset: anchor.normalizedOffset,
+    normalizedX: anchor.normalizedX,
+    viewportX: anchor.viewportX,
+    viewportY: anchor.viewportY,
   });
 }
 

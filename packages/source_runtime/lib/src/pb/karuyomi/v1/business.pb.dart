@@ -941,6 +941,9 @@ class ReadingAnchor extends $pb.GeneratedMessage {
     $core.String? manifestVersion,
     $core.int? pageIndexHint,
     $core.double? normalizedOffset,
+    $core.double? normalizedX,
+    $core.double? viewportX,
+    $core.double? viewportY,
   }) {
     final result = ReadingAnchor._();
     if (chapterKey != null) result.chapterKey = chapterKey;
@@ -948,6 +951,9 @@ class ReadingAnchor extends $pb.GeneratedMessage {
     if (manifestVersion != null) result.manifestVersion = manifestVersion;
     if (pageIndexHint != null) result.pageIndexHint = pageIndexHint;
     if (normalizedOffset != null) result.normalizedOffset = normalizedOffset;
+    if (normalizedX != null) result.normalizedX = normalizedX;
+    if (viewportX != null) result.viewportX = viewportX;
+    if (viewportY != null) result.viewportY = viewportY;
     return result;
   }
 
@@ -970,6 +976,9 @@ class ReadingAnchor extends $pb.GeneratedMessage {
     ..aI(4, _omitFieldNames ? '' : 'pageIndexHint',
         fieldType: $pb.PbFieldType.OU3)
     ..aD(5, _omitFieldNames ? '' : 'normalizedOffset')
+    ..aD(6, _omitFieldNames ? '' : 'normalizedX')
+    ..aD(7, _omitFieldNames ? '' : 'viewportX')
+    ..aD(8, _omitFieldNames ? '' : 'viewportY')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1030,6 +1039,7 @@ class ReadingAnchor extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearPageIndexHint() => $_clearField(4);
 
+  /// Source-image y; viewport coordinates identify where that point appears.
   @$pb.TagNumber(5)
   $core.double get normalizedOffset => $_getN(4);
   @$pb.TagNumber(5)
@@ -1038,6 +1048,34 @@ class ReadingAnchor extends $pb.GeneratedMessage {
   $core.bool hasNormalizedOffset() => $_has(4);
   @$pb.TagNumber(5)
   void clearNormalizedOffset() => $_clearField(5);
+
+  /// Source-image x is physical and is not mirrored in RTL.
+  @$pb.TagNumber(6)
+  $core.double get normalizedX => $_getN(5);
+  @$pb.TagNumber(6)
+  set normalizedX($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasNormalizedX() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearNormalizedX() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.double get viewportX => $_getN(6);
+  @$pb.TagNumber(7)
+  set viewportX($core.double value) => $_setDouble(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasViewportX() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearViewportX() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.double get viewportY => $_getN(7);
+  @$pb.TagNumber(8)
+  set viewportY($core.double value) => $_setDouble(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasViewportY() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearViewportY() => $_clearField(8);
 }
 
 class ChapterProgressState extends $pb.GeneratedMessage {
@@ -2892,6 +2930,7 @@ class ReaderSettings extends $pb.GeneratedMessage {
     $core.int? dimPercent,
     ReaderInputPreset? tapZones,
     ReaderInputPreset? keyboard,
+    ReaderFit? fit,
   }) {
     final result = ReaderSettings._();
     if (mode != null) result.mode = mode;
@@ -2900,6 +2939,7 @@ class ReaderSettings extends $pb.GeneratedMessage {
     if (dimPercent != null) result.dimPercent = dimPercent;
     if (tapZones != null) result.tapZones = tapZones;
     if (keyboard != null) result.keyboard = keyboard;
+    if (fit != null) result.fit = fit;
     return result;
   }
 
@@ -2927,6 +2967,8 @@ class ReaderSettings extends $pb.GeneratedMessage {
         enumValues: ReaderInputPreset.values)
     ..aE<ReaderInputPreset>(6, _omitFieldNames ? '' : 'keyboard',
         enumValues: ReaderInputPreset.values)
+    ..aE<ReaderFit>(7, _omitFieldNames ? '' : 'fit',
+        enumValues: ReaderFit.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3005,6 +3047,15 @@ class ReaderSettings extends $pb.GeneratedMessage {
   $core.bool hasKeyboard() => $_has(5);
   @$pb.TagNumber(6)
   void clearKeyboard() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  ReaderFit get fit => $_getN(6);
+  @$pb.TagNumber(7)
+  set fit(ReaderFit value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasFit() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFit() => $_clearField(7);
 }
 
 /// Missing fields inherit the global reader preference. AUTO is an explicit
@@ -3017,6 +3068,7 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
     $core.int? dimPercent,
     ReaderInputPreset? tapZones,
     ReaderInputPreset? keyboard,
+    ReaderFit? fit,
   }) {
     final result = ReaderSettingsOverride._();
     if (mode != null) result.mode = mode;
@@ -3025,6 +3077,7 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
     if (dimPercent != null) result.dimPercent = dimPercent;
     if (tapZones != null) result.tapZones = tapZones;
     if (keyboard != null) result.keyboard = keyboard;
+    if (fit != null) result.fit = fit;
     return result;
   }
 
@@ -3052,6 +3105,8 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
         enumValues: ReaderInputPreset.values)
     ..aE<ReaderInputPreset>(6, _omitFieldNames ? '' : 'keyboard',
         enumValues: ReaderInputPreset.values)
+    ..aE<ReaderFit>(7, _omitFieldNames ? '' : 'fit',
+        enumValues: ReaderFit.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3131,6 +3186,15 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
   $core.bool hasKeyboard() => $_has(5);
   @$pb.TagNumber(6)
   void clearKeyboard() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  ReaderFit get fit => $_getN(6);
+  @$pb.TagNumber(7)
+  set fit(ReaderFit value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasFit() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFit() => $_clearField(7);
 }
 
 class GlobalSettingsValues extends $pb.GeneratedMessage {

@@ -67,13 +67,25 @@ final class ReaderController {
     _notify();
   }
 
-  void goToPage(int index, {double offset = 0}) {
+  void goToPage(
+    int index, {
+    double offset = 0,
+    double normalizedX = 0,
+    double viewportX = 0,
+    double viewportY = 0,
+  }) {
     if (_manifest.pages.isEmpty) return;
     if (index < 0 || index >= _manifest.pages.length) {
       throw RangeError.index(index, _manifest.pages);
     }
     _resolution = PositionResolution(
-      _manifest.positionAt(index, offset: offset),
+      _manifest.positionAt(
+        index,
+        offset: offset,
+        normalizedX: normalizedX,
+        viewportX: viewportX,
+        viewportY: viewportY,
+      ),
       PositionResolutionKind.exactPage,
     );
     _notify();
@@ -84,11 +96,23 @@ final class ReaderController {
 
   /// Scroll frames update the logical offset without rebuilding the whole view;
   /// page changes still notify controls and the image window.
-  void updateViewportAnchor(int index, {required double offset}) {
+  void updateViewportAnchor(
+    int index, {
+    required double offset,
+    double normalizedX = 0,
+    double viewportX = 0,
+    double viewportY = 0,
+  }) {
     if (_manifest.pages.isEmpty) return;
     final previousKey = position?.pageKey;
     _resolution = PositionResolution(
-      _manifest.positionAt(index, offset: offset),
+      _manifest.positionAt(
+        index,
+        offset: offset,
+        normalizedX: normalizedX,
+        viewportX: viewportX,
+        viewportY: viewportY,
+      ),
       PositionResolutionKind.exactPage,
     );
     if (previousKey != position?.pageKey) _notify();

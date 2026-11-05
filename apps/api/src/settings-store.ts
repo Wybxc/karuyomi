@@ -4,6 +4,7 @@ import {
   BusinessStateErrorCode as ErrorCode,
   GlobalSettingsValuesSchema,
   ReaderBackground,
+  ReaderFit,
   ReaderInputPreset,
   ReaderMode,
   ReaderPageLayout,
@@ -27,6 +28,7 @@ const defaultValues = toJsonString(
       mode: ReaderMode.LEFT_TO_RIGHT,
       pageLayout: ReaderPageLayout.AUTO,
       background: ReaderBackground.BLACK,
+      fit: ReaderFit.CONTAIN,
       dimPercent: 0,
       tapZones: ReaderInputPreset.STANDARD,
       keyboard: ReaderInputPreset.STANDARD,
@@ -51,7 +53,8 @@ function snapshotFieldsSql(mangaKeySql?: string): string {
       'background', COALESCE(json_extract(${overrides}, '$.background'), json_extract(${globalValuesSql}, '$.reader.background')),
       'dimPercent', COALESCE(json_extract(${overrides}, '$.dimPercent'), json_extract(${globalValuesSql}, '$.reader.dimPercent'), 0),
       'tapZones', COALESCE(json_extract(${overrides}, '$.tapZones'), json_extract(${globalValuesSql}, '$.reader.tapZones')),
-      'keyboard', COALESCE(json_extract(${overrides}, '$.keyboard'), json_extract(${globalValuesSql}, '$.reader.keyboard')))
+      'keyboard', COALESCE(json_extract(${overrides}, '$.keyboard'), json_extract(${globalValuesSql}, '$.reader.keyboard')),
+      'fit', COALESCE(json_extract(${overrides}, '$.fit'), json_extract(${globalValuesSql}, '$.reader.fit')))
     ${
       mangaKeySql
         ? `, 'manga', json_object('mangaKey', ${mangaKeySql},

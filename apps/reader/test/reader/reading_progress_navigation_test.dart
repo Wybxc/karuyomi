@@ -130,7 +130,13 @@ void main() {
         mangaKey: mangaKey,
         manifest: manifest,
         progress: ChapterProgress(
-          current: manifest.positionAt(2, offset: .7),
+          current: manifest.positionAt(
+            2,
+            offset: .7,
+            normalizedX: .6,
+            viewportX: .3,
+            viewportY: .2,
+          ),
           furthest: manifest.positionAt(2, offset: .7),
         ),
         reversedOrder: true,
@@ -165,6 +171,9 @@ void main() {
       expect(reopened.key, isNot(before.key));
       expect(reopened.initialPosition!.pageIndexHint, 2);
       expect(reopened.initialPosition!.normalizedOffset, .7);
+      expect(reopened.initialPosition!.normalizedX, .6);
+      expect(reopened.initialPosition!.viewportX, .3);
+      expect(reopened.initialPosition!.viewportY, .2);
       expect(reopened.initialMode, ReadingMode.webtoon);
       expect(reopened.doublePage, true);
       expect(find.text('重新打开本章'), findsNothing);
@@ -387,11 +396,23 @@ void main() {
           .onChanged!(ChapterOrder.reversed);
       await tester.pumpAndSettle();
       (leaf.positionRequest! as ValueNotifier<ReadingPosition?>).value =
-          secondManifest.positionAt(1, offset: .35);
+          secondManifest.positionAt(
+            1,
+            offset: .35,
+            normalizedX: .65,
+            viewportX: .25,
+            viewportY: .15,
+          );
       await tester.pumpAndSettle();
       leaf.onViewportChanged!(
         ReaderViewportState(
-          current: secondManifest.positionAt(1, offset: .35),
+          current: secondManifest.positionAt(
+            1,
+            offset: .35,
+            normalizedX: .65,
+            viewportX: .25,
+            viewportY: .15,
+          ),
           observed: secondManifest.positionAt(1, offset: .8),
           atEnd: false,
           windowReady: false,
@@ -415,6 +436,9 @@ void main() {
       expect(leaf.manifest.chapterKey, secondManifest.chapterKey);
       expect(leaf.initialPosition!.pageKey, secondManifest.pages[1].key);
       expect(leaf.initialPosition!.normalizedOffset, .35);
+      expect(leaf.initialPosition!.normalizedX, .65);
+      expect(leaf.initialPosition!.viewportX, .25);
+      expect(leaf.initialPosition!.viewportY, .15);
       expect(
         tester
             .widget<DropdownButton<ChapterOrder>>(

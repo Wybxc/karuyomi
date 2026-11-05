@@ -52,22 +52,50 @@ void main() {
       final manifest = chapter(List.generate(8, (i) => portrait('$i')));
       final controller = ReaderController(
         manifest: manifest,
-        initialPosition: manifest.positionAt(4, offset: 0.6),
+        initialPosition: manifest.positionAt(
+          4,
+          offset: 0.6,
+          normalizedX: .7,
+          viewportX: .3,
+          viewportY: .8,
+        ),
       );
       controller.setLayout(mode: ReadingMode.rightToLeft, doublePage: true);
       expect(controller.position!.pageKey, '4');
       expect(controller.position!.normalizedOffset, 0.6);
+      expect(controller.position!.normalizedX, .7);
+      expect(controller.position!.viewportX, .3);
+      expect(controller.position!.viewportY, .8);
       expect(
         controller.spreads[controller.spreadIndex].pages.map((p) => p.key),
         ['3', '4'],
       );
       controller.advance();
       expect(controller.position!.pageKey, '5');
+      expect(controller.position!.normalizedX, 0);
+      expect(controller.position!.viewportX, 0);
+      expect(controller.position!.viewportY, 0);
       controller.back();
       expect(controller.position!.pageKey, '3');
       controller.setLayout(mode: ReadingMode.webtoon);
       expect(controller.spreads.every((s) => s.pages.length == 1), isTrue);
       expect(controller.position!.pageKey, '3');
+      controller.updateViewportAnchor(
+        3,
+        offset: .2,
+        normalizedX: .6,
+        viewportX: .4,
+        viewportY: .5,
+      );
+      controller.setLayout(mode: ReadingMode.continuous);
+      expect(controller.position!.normalizedX, .6);
+      expect(controller.position!.viewportX, .4);
+      expect(controller.position!.viewportY, .5);
+      controller.goToPage(3);
+      expect(controller.position!.normalizedOffset, 0);
+      expect(controller.position!.normalizedX, 0);
+      expect(controller.position!.viewportX, 0);
+      expect(controller.position!.viewportY, 0);
       await controller.dispose();
     },
   );
@@ -81,10 +109,22 @@ void main() {
         portrait('a'),
         portrait('b'),
       ], version: '2');
-      final exact = resolvePosition(reordered, old.positionAt(1, offset: 0.4));
+      final exact = resolvePosition(
+        reordered,
+        old.positionAt(
+          1,
+          offset: 0.4,
+          normalizedX: .8,
+          viewportX: .6,
+          viewportY: .2,
+        ),
+      );
       expect(exact.kind, PositionResolutionKind.exactPage);
       expect(exact.position!.pageIndexHint, 2);
       expect(exact.position!.normalizedOffset, 0.4);
+      expect(exact.position!.normalizedX, .8);
+      expect(exact.position!.viewportX, .6);
+      expect(exact.position!.viewportY, .2);
       expect(exact.position!.manifestVersion, '2');
       final removed = resolvePosition(
         chapter([portrait('a')]),

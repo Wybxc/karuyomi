@@ -24,22 +24,49 @@ void main() {
     },
   );
 
-  test('backtracking retains furthest page and normalized offset', () {
-    final pages = manifest('v1', ['one', 'two', 'three']);
-    final read = ChapterProgress(current: pages.positionAt(0)).advance(
-      manifest: pages,
-      current: pages.positionAt(1, offset: .8),
-      observed: pages.positionAt(1, offset: .8),
-    );
-    final back = read.advance(
-      manifest: pages,
-      current: pages.positionAt(0),
-      observed: pages.positionAt(1, offset: .2),
-    );
-    expect(back.current.pageKey, 'one');
-    expect(back.furthest!.pageKey, 'two');
-    expect(back.furthest!.normalizedOffset, .8);
-  });
+  test(
+    'backtracking and horizontal movement retain furthest by page and y',
+    () {
+      final pages = manifest('v1', ['one', 'two', 'three']);
+      final read = ChapterProgress(current: pages.positionAt(0)).advance(
+        manifest: pages,
+        current: pages.positionAt(1, offset: .8),
+        observed: pages.positionAt(
+          1,
+          offset: .8,
+          normalizedX: .3,
+          viewportX: .4,
+          viewportY: .5,
+        ),
+      );
+      final back = read.advance(
+        manifest: pages,
+        current: pages.positionAt(
+          0,
+          offset: .2,
+          normalizedX: .8,
+          viewportX: .6,
+          viewportY: .7,
+        ),
+        observed: pages.positionAt(
+          1,
+          offset: .8,
+          normalizedX: .9,
+          viewportX: .1,
+          viewportY: .2,
+        ),
+      );
+      expect(back.current.pageKey, 'one');
+      expect(back.current.normalizedX, .8);
+      expect(back.current.viewportX, .6);
+      expect(back.current.viewportY, .7);
+      expect(back.furthest!.pageKey, 'two');
+      expect(back.furthest!.normalizedOffset, .8);
+      expect(back.furthest!.normalizedX, .3);
+      expect(back.furthest!.viewportX, .4);
+      expect(back.furthest!.viewportY, .5);
+    },
+  );
 
   test(
     'manifest reordering compares mapped stable pages, never old indexes',
@@ -52,9 +79,22 @@ void main() {
       );
       final moved = previous.advance(
         manifest: after,
-        current: after.positionAt(2),
+        current: before.positionAt(
+          0,
+          offset: .4,
+          normalizedX: .8,
+          viewportX: .6,
+          viewportY: .2,
+        ),
         observed: after.positionAt(2),
       );
+      expect(moved.current.pageKey, 'one');
+      expect(moved.current.pageIndexHint, 2);
+      expect(moved.current.manifestVersion, 'v2');
+      expect(moved.current.normalizedOffset, .4);
+      expect(moved.current.normalizedX, .8);
+      expect(moved.current.viewportX, .6);
+      expect(moved.current.viewportY, .2);
       expect(moved.furthest!.pageKey, 'one');
       expect(moved.furthest!.manifestVersion, 'v2');
       expect(moved.furthest!.pageIndexHint, 2);

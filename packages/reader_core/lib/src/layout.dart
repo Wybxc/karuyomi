@@ -40,12 +40,21 @@ final class ChapterManifest {
   final String version;
   final List<ReaderPage> pages;
 
-  ReadingPosition positionAt(int index, {double offset = 0}) => ReadingPosition(
+  ReadingPosition positionAt(
+    int index, {
+    double offset = 0,
+    double normalizedX = 0,
+    double viewportX = 0,
+    double viewportY = 0,
+  }) => ReadingPosition(
     chapterKey: chapterKey,
     pageKey: pages[index].key,
     manifestVersion: version,
     pageIndexHint: index,
     normalizedOffset: offset,
+    normalizedX: normalizedX,
+    viewportX: viewportX,
+    viewportY: viewportY,
   );
 }
 
@@ -120,7 +129,13 @@ PositionResolution resolvePosition(
   );
   if (index >= 0) {
     return PositionResolution(
-      manifest.positionAt(index, offset: previous.normalizedOffset),
+      manifest.positionAt(
+        index,
+        offset: previous.normalizedOffset,
+        normalizedX: previous.normalizedX,
+        viewportX: previous.viewportX,
+        viewportY: previous.viewportY,
+      ),
       PositionResolutionKind.exactPage,
     );
   }

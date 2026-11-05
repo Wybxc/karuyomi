@@ -34,6 +34,7 @@ wire.GlobalSettingsValues _global({
     mode: mode,
     pageLayout: layout,
     background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
+    fit: wire.ReaderFit.READER_FIT_CONTAIN,
     tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
     keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
   ),
@@ -59,6 +60,7 @@ wire.SettingsResponse _snapshot() => wire.SettingsResponse(
     mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
     pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
     background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
+    fit: wire.ReaderFit.READER_FIT_CONTAIN,
     tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
     keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
   ),
@@ -147,17 +149,17 @@ void main() {
         basedOnRevision: 0,
       );
       final business = server.manga(_key)!;
-      await repository.setGlobal(
-        values: _global(
-          mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
-          layout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
-        ),
-        basedOnRevision: 0,
-      );
+      final defaults = _global(
+        mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+        layout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+      )..reader.fit = wire.ReaderFit.READER_FIT_WIDTH;
+      await repository.setGlobal(values: defaults, basedOnRevision: 0);
       final inherited = await repository.loadManga(_key);
       expect(inherited.mangaRevision, 0);
       expect(inherited.overrides!.hasMode(), false);
       expect(inherited.overrides!.hasPageLayout(), false);
+      expect(inherited.overrides!.hasFit(), false);
+      expect(inherited.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
       expect(
         inherited.effectiveReader.mode,
         wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
@@ -170,6 +172,7 @@ void main() {
         mangaKey: _key,
         overrides: wire.ReaderSettingsOverride(
           pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
+          fit: wire.ReaderFit.READER_FIT_CONTAIN,
         ),
         basedOnRevision: 0,
       );
@@ -177,6 +180,8 @@ void main() {
       expect(explicit.globalRevision, 1);
       expect(explicit.overrides!.hasMode(), false);
       expect(explicit.overrides!.hasPageLayout(), true);
+      expect(explicit.overrides!.hasFit(), true);
+      expect(explicit.effectiveReader.fit, wire.ReaderFit.READER_FIT_CONTAIN);
       expect(
         explicit.effectiveReader.mode,
         wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
@@ -193,6 +198,8 @@ void main() {
       expect(cleared.mangaRevision, 2);
       expect(cleared.globalRevision, 1);
       expect(cleared.overrides!.hasPageLayout(), false);
+      expect(cleared.overrides!.hasFit(), false);
+      expect(cleared.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
       expect(
         cleared.effectiveReader.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
@@ -300,6 +307,7 @@ void main() {
                   dimPercent: 0,
                   tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
                   keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
+                  fit: wire.ReaderFit.READER_FIT_HEIGHT,
                 ),
                 basedOnRevision: 0,
               )
@@ -332,6 +340,8 @@ void main() {
         expect(sent.expectedRevision, 0);
         if (mangaScope) {
           expect(sent.setManga.overrides.hasDimPercent(), true);
+          expect(sent.setManga.overrides.hasFit(), true);
+          expect(result.effectiveReader.fit, wire.ReaderFit.READER_FIT_HEIGHT);
           expect(
             result.effectiveReader.background,
             wire.ReaderBackground.READER_BACKGROUND_WHITE,
@@ -446,6 +456,11 @@ void main() {
         _snapshot()..schemaVersion = 2,
         _snapshot()..manga.mangaKey = _otherKey,
         _snapshot()..global.values.theme = wire.AppTheme.APP_THEME_UNSPECIFIED,
+        _snapshot()
+          ..global.values.reader.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
+        _snapshot()
+          ..manga.overrides.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
+        _snapshot()..effectiveReader.fit = wire.ReaderFit.READER_FIT_HEIGHT,
         _snapshot()
           ..manga.overrides.mode = wire.ReaderMode.READER_MODE_UNSPECIFIED,
         _snapshot()

@@ -680,6 +680,12 @@ test('business state controls enforce identities, uint32, snapshots and transpor
   for (const current of [
     { ...businessAnchor, normalizedOffset: 1.01 },
     { ...businessAnchor, normalizedOffset: 'NaN' },
+    ...['normalizedX', 'viewportX', 'viewportY'].flatMap((field) => [
+      { ...businessAnchor, [field]: -0.01 },
+      { ...businessAnchor, [field]: 1.01 },
+      { ...businessAnchor, [field]: 'NaN' },
+      { ...businessAnchor, [field]: 'Infinity' },
+    ]),
     { ...businessAnchor, pageIndexHint: 0 },
     {
       ...businessAnchor,

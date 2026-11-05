@@ -222,6 +222,7 @@ const globalSettingsValues = {
     mode: 'READER_MODE_LEFT_TO_RIGHT',
     pageLayout: 'READER_PAGE_LAYOUT_AUTO',
     background: 'READER_BACKGROUND_BLACK',
+    fit: 'READER_FIT_CONTAIN',
     dimPercent: 0,
     tapZones: 'READER_INPUT_PRESET_STANDARD',
     keyboard: 'READER_INPUT_PRESET_STANDARD',
@@ -240,7 +241,11 @@ test('settings mutations require typed complete defaults and preserve per-field 
     ...manga,
     setManga: {
       ...manga.setManga,
-      overrides: { pageLayout: 'READER_PAGE_LAYOUT_AUTO', dimPercent: 0 },
+      overrides: {
+        pageLayout: 'READER_PAGE_LAYOUT_AUTO',
+        dimPercent: 0,
+        fit: 'READER_FIT_CONTAIN',
+      },
     },
   });
   if (explicit.operation.case !== 'setManga')
@@ -248,10 +253,12 @@ test('settings mutations require typed complete defaults and preserve per-field 
   expect(explicit.operation.value.overrides?.mode).toBeUndefined();
   expect(explicit.operation.value.overrides?.pageLayout).toBe(1);
   expect(explicit.operation.value.overrides?.dimPercent).toBe(0);
+  expect(explicit.operation.value.overrides?.fit).toBe(1);
   const inherited = settingsMutationSchema.parse(manga);
   if (inherited.operation.case !== 'setManga')
     throw new Error('Missing manga settings');
   expect(inherited.operation.value.overrides?.dimPercent).toBeUndefined();
+  expect(inherited.operation.value.overrides?.fit).toBeUndefined();
   for (const value of [
     base,
     { ...global, setManga: manga.setManga },
@@ -270,6 +277,9 @@ test('settings mutations require typed complete defaults and preserve per-field 
     { ...manga, setManga: { ...manga.setManga, overrides: { mode: 0 } } },
     { ...manga, setManga: { ...manga.setManga, overrides: { pageLayout: 4 } } },
     ...[
+      { fit: 0 },
+      { fit: 4 },
+      { fit: 1.5 },
       { background: 0 },
       { background: 4 },
       { tapZones: 0 },
@@ -327,6 +337,7 @@ test('settings replies verify the complete snapshot and effective defaults/overr
     { ...manga, manga: { ...manga.manga, overrides: undefined } },
     { ...manga, effectiveReader: globalSettingsValues.reader },
     ...[
+      { fit: 'READER_FIT_WIDTH' },
       { background: 'READER_BACKGROUND_WHITE' },
       { dimPercent: 1 },
       { tapZones: 'READER_INPUT_PRESET_DISABLED' },
@@ -465,4 +476,48 @@ test('chapter progress pages retain unread epochs, bound ordered UTF-8 identitie
       },
     }),
   ).not.toThrow();
+});
+
+test('reading anchors validate all source and viewport coordinates on both request and response boundaries', () => {
+  const anchor = {
+    chapterKey: 'chapter-1',
+    pageKey: 'page-1',
+    manifestVersion: 'manifest-1',
+    normalizedOffset: 0.4,
+    normalizedX: 1,
+    viewportX: 0.5,
+    viewportY: 0,
+  };
+  const mutation = (current: typeof anchor) => ({
+    ...base,
+    mangaKey: 'a'.repeat(64),
+    saveProgress: {
+      snapshot: {
+        chapterKey: anchor.chapterKey,
+        manifestVersion: anchor.manifestVersion,
+        pageKeys: [anchor.pageKey],
+      },
+      progress: { chapterKey: anchor.chapterKey, current },
+    },
+  });
+  const response = (current: typeof anchor) => ({
+    schemaVersion: 1,
+    manga: { mangaKey: 'a'.repeat(64) },
+    categoryCatalog: {},
+    progress: { chapterKey: anchor.chapterKey, current },
+  });
+  expect(() => stateMutationSchema.parse(mutation(anchor))).not.toThrow();
+  expect(() => mangaStateResponseSchema.parse(response(anchor))).not.toThrow();
+  for (const field of [
+    'normalizedOffset',
+    'normalizedX',
+    'viewportX',
+    'viewportY',
+  ]) {
+    for (const coordinate of [-0.1, 1.1, 'NaN', 'Infinity', '-Infinity']) {
+      const invalid = { ...anchor, [field]: coordinate };
+      expect(() => stateMutationSchema.parse(mutation(invalid))).toThrow();
+      expect(() => mangaStateResponseSchema.parse(response(invalid))).toThrow();
+    }
+  }
 });

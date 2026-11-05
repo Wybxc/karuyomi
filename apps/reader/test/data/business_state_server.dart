@@ -34,6 +34,7 @@ final class _Account {
         mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
         pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
         background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
+        fit: wire.ReaderFit.READER_FIT_CONTAIN,
         tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
         keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
       ),
@@ -392,6 +393,7 @@ final class TestBusinessServer implements ApiFetch {
         pageLayout: overrides?.hasPageLayout() == true
             ? overrides!.pageLayout
             : defaults.pageLayout,
+        fit: overrides?.hasFit() == true ? overrides!.fit : defaults.fit,
         background: overrides?.hasBackground() == true
             ? overrides!.background
             : defaults.background,
@@ -986,6 +988,9 @@ wire.ReadingAnchor? _project(
     manifestVersion: snapshot.manifestVersion,
     pageIndexHint: index,
     normalizedOffset: anchor.normalizedOffset,
+    normalizedX: anchor.normalizedX,
+    viewportX: anchor.viewportX,
+    viewportY: anchor.viewportY,
   );
 }
 

@@ -115,7 +115,13 @@ ReadingPosition? _project(ChapterManifest manifest, ReadingPosition position) {
   );
   return index < 0
       ? null
-      : manifest.positionAt(index, offset: position.normalizedOffset);
+      : manifest.positionAt(
+          index,
+          offset: position.normalizedOffset,
+          normalizedX: position.normalizedX,
+          viewportX: position.viewportX,
+          viewportY: position.viewportY,
+        );
 }
 
 ReadingPosition? _farther(

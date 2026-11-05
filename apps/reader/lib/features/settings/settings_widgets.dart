@@ -31,6 +31,12 @@ wire.ReaderPageLayout wirePageLayout(bool? value) => value == null
     : value
     ? wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE
     : wire.ReaderPageLayout.READER_PAGE_LAYOUT_SINGLE;
+ReaderFit readerFit(wire.ReaderFit value) => switch (value) {
+  wire.ReaderFit.READER_FIT_CONTAIN => ReaderFit.contain,
+  wire.ReaderFit.READER_FIT_WIDTH => ReaderFit.width,
+  wire.ReaderFit.READER_FIT_HEIGHT => ReaderFit.height,
+  _ => throw const FormatException('Unsupported reader fit'),
+};
 ReaderBackground readerBackground(wire.ReaderBackground value) =>
     switch (value) {
       wire.ReaderBackground.READER_BACKGROUND_BLACK => ReaderBackground.black,
@@ -65,6 +71,12 @@ const _layouts = <wire.ReaderPageLayout, String>{
   wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO: '自动',
   wire.ReaderPageLayout.READER_PAGE_LAYOUT_SINGLE: '单页',
   wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE: '双页',
+};
+
+const _fits = <wire.ReaderFit, String>{
+  wire.ReaderFit.READER_FIT_CONTAIN: '完整显示',
+  wire.ReaderFit.READER_FIT_WIDTH: '适宽',
+  wire.ReaderFit.READER_FIT_HEIGHT: '适高',
 };
 
 const _backgrounds = <wire.ReaderBackground, String>{
@@ -353,6 +365,29 @@ class _GlobalSettingsPanelState extends State<GlobalSettingsPanel> {
                     }
                   : null,
             ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<wire.ReaderFit>(
+              key: ValueKey(('global-fit', draft.reader.fit)),
+              initialValue: draft.reader.fit,
+              decoration: const InputDecoration(
+                labelText: '图像适配',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                for (final item in _fits.entries)
+                  DropdownMenuItem(value: item.key, child: Text(item.value)),
+              ],
+              onChanged: controller.canEdit
+                  ? (value) {
+                      if (value != null) {
+                        setState(() {
+                          _dirty = true;
+                          draft.reader.fit = value;
+                        });
+                      }
+                    }
+                  : null,
+            ),
             _ReaderAppearanceFields(
               scope: 'global',
               enabled: controller.canEdit,
@@ -519,6 +554,37 @@ class _MangaSettingsEditorState extends State<MangaSettingsEditor> {
                             draft.clearPageLayout();
                           } else {
                             draft.pageLayout = value;
+                          }
+                        })
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<wire.ReaderFit>(
+                  key: ValueKey((
+                    'manga-fit',
+                    draft.hasFit() ? draft.fit : null,
+                  )),
+                  initialValue: draft.hasFit() ? draft.fit : null,
+                  hint: const Text('跟随全局'),
+                  decoration: const InputDecoration(
+                    labelText: '图像适配',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('跟随全局')),
+                    for (final item in _fits.entries)
+                      DropdownMenuItem(
+                        value: item.key,
+                        child: Text(item.value),
+                      ),
+                  ],
+                  onChanged: controller.canEdit
+                      ? (value) => setState(() {
+                          _dirty = true;
+                          if (value == null) {
+                            draft.clearFit();
+                          } else {
+                            draft.fit = value;
                           }
                         })
                       : null,

@@ -3,6 +3,7 @@ import {
   BusinessStateErrorCode as ErrorCode,
   AppTheme,
   ReaderBackground,
+  ReaderFit,
   ReaderInputPreset,
   ReaderMode,
   ReaderPageLayout,
@@ -210,6 +211,12 @@ function save(
   epoch = 0,
   pages = ['first', 'middle', 'last'],
   observed = true,
+  coordinates: {
+    normalizedOffset?: number;
+    normalizedX?: number;
+    viewportX?: number;
+    viewportY?: number;
+  } = {},
 ): StateMutation {
   const anchor = {
     chapterKey: 'chapter-1',
@@ -217,6 +224,7 @@ function save(
     pageIndexHint: index,
     manifestVersion: `manifest-${pages.join('-')}`,
     normalizedOffset: 0.4,
+    ...coordinates,
   };
   return create(StateMutationSchema, {
     schemaVersion: businessSchemaVersion,
@@ -1051,6 +1059,7 @@ function globalSettings(
           mode,
           pageLayout,
           background: ReaderBackground.BLACK,
+          fit: ReaderFit.CONTAIN,
           dimPercent: 0,
           tapZones: ReaderInputPreset.STANDARD,
           keyboard: ReaderInputPreset.STANDARD,
@@ -1066,6 +1075,7 @@ function mangaSettings(
     mode?: ReaderMode;
     pageLayout?: ReaderPageLayout;
     background?: ReaderBackground;
+    fit?: ReaderFit;
     dimPercent?: number;
     tapZones?: ReaderInputPreset;
     keyboard?: ReaderInputPreset;
@@ -1168,7 +1178,7 @@ test('settings reads do not write, defaults inherit per field, and clearing over
   ).toBe(3);
 });
 
-test('appearance preferences preserve explicit zero, inherit all fields and reject invalid writes without touching reading state', async () => {
+test('appearance and fit preferences preserve explicit zero, inherit all fields and reject invalid writes without touching reading state', async () => {
   const reader = await client();
   const command = favorite();
   const key = command.mangaKey;
@@ -1178,6 +1188,7 @@ test('appearance preferences preserve explicit zero, inherit all fields and reje
   const defaults = await reader.settings(key);
   expect(defaults.effectiveReader).toMatchObject({
     background: ReaderBackground.BLACK,
+    fit: ReaderFit.CONTAIN,
     dimPercent: 0,
     tapZones: ReaderInputPreset.STANDARD,
     keyboard: ReaderInputPreset.STANDARD,
@@ -1187,6 +1198,7 @@ test('appearance preferences preserve explicit zero, inherit all fields and reje
     throw new Error('Missing reader defaults');
   Object.assign(global.operation.value.reader, {
     background: ReaderBackground.THEME,
+    fit: ReaderFit.WIDTH,
     dimPercent: 80,
     tapZones: ReaderInputPreset.REVERSED,
     keyboard: ReaderInputPreset.DISABLED,
@@ -1194,6 +1206,7 @@ test('appearance preferences preserve explicit zero, inherit all fields and reje
   expect((await reader.mutateSettings(global)).status).toBe(200);
   const overrides = mangaSettings(key, 0, {
     background: ReaderBackground.WHITE,
+    fit: ReaderFit.CONTAIN,
     dimPercent: 0,
     tapZones: ReaderInputPreset.DISABLED,
     keyboard: ReaderInputPreset.REVERSED,
@@ -1202,20 +1215,26 @@ test('appearance preferences preserve explicit zero, inherit all fields and reje
   expect(saved.status).toBe(200);
   expect(saved.body.effectiveReader).toMatchObject({
     background: ReaderBackground.WHITE,
+    fit: ReaderFit.CONTAIN,
     dimPercent: 0,
     tapZones: ReaderInputPreset.DISABLED,
     keyboard: ReaderInputPreset.REVERSED,
   });
   expect(saved.body.manga?.overrides?.dimPercent).toBe(0);
+  expect(saved.body.manga?.overrides?.fit).toBe(ReaderFit.CONTAIN);
   expect((await reader.mutateSettings(overrides)).body).toEqual(saved.body);
   const preserved = await reader.state(key, 'chapter-1');
   expect(preserved.manga).toEqual(before.manga);
   expect(preserved.progress).toEqual(before.progress);
   const cleared = await reader.mutateSettings(mangaSettings(key, 1));
   expect(cleared.body.manga?.overrides?.dimPercent).toBeUndefined();
+  expect(cleared.body.manga?.overrides?.fit).toBeUndefined();
   expect(cleared.body.effectiveReader).toEqual(global.operation.value.reader);
   const revision = cleared.body.accountRevision;
   for (const invalid of [
+    { fit: 0 },
+    { fit: 4 },
+    { fit: 1.5 },
     { background: 0 },
     { background: 4 },
     { tapZones: 0 },
@@ -1679,4 +1698,110 @@ test('exhausted chapter epochs reject both read and unread markers without chang
     expect(rejected.body.progress).toEqual(before.progress);
   }
   expect(await reader.state(key, 'chapter-1')).toEqual(before);
+});
+
+test('D1 retains two-dimensional current and furthest anchors across projection, clients and invalid writes', async () => {
+  const reader = await client();
+  const key = favorite().mangaKey;
+  const pages = ['first', 'middle', 'last'];
+  const coordinates = {
+    normalizedOffset: 0.7,
+    normalizedX: 0.2,
+    viewportX: 0.6,
+    viewportY: 0.8,
+  };
+  const initial = await reader.mutate(
+    save(key, 0, 1, 0, pages, true, coordinates),
+  );
+  expect(initial.status).toBe(200);
+  const horizontal = await reader.mutate(
+    save(key, 1, 1, 0, pages, true, {
+      ...coordinates,
+      normalizedX: 0.9,
+      viewportX: 0.3,
+    }),
+  );
+  expect(horizontal.body.progress?.current).toMatchObject({
+    ...coordinates,
+    normalizedX: 0.9,
+    viewportX: 0.3,
+  });
+  expect(horizontal.body.progress?.furthest).toMatchObject(coordinates);
+  const reordered = await reader.mutate(
+    save(key, 2, 2, 0, ['last', 'middle', 'first'], false, {
+      normalizedOffset: 0.4,
+      normalizedX: 1,
+      viewportX: 1,
+      viewportY: 0.5,
+    }),
+  );
+  expect(reordered.body.progress?.current).toMatchObject({
+    pageKey: 'first',
+    pageIndexHint: 2,
+    normalizedOffset: 0.4,
+    normalizedX: 1,
+    viewportX: 1,
+    viewportY: 0.5,
+  });
+  expect(reordered.body.progress?.furthest).toMatchObject({
+    ...coordinates,
+    pageKey: 'middle',
+    pageIndexHint: 1,
+    manifestVersion: 'manifest-last-middle-first',
+  });
+  const second = await client(reader.subject);
+  const canonical = await second.state(key, 'chapter-1');
+  expect(canonical.progress).toEqual(reordered.body.progress);
+  expect((await second.progress(key)).body.entries[0]).toEqual(
+    canonical.progress,
+  );
+  for (const invalid of [
+    { normalizedOffset: 1.1 },
+    { normalizedX: -0.1 },
+    { viewportX: 'NaN' },
+    { viewportY: 'Infinity' },
+  ]) {
+    const json = {
+      schemaVersion: 1,
+      mutationId: crypto.randomUUID(),
+      expectedRevision: 3,
+      mangaKey: key,
+      saveProgress: {
+        snapshot: {
+          chapterKey: 'chapter-1',
+          manifestVersion: 'invalid',
+          pageKeys: pages,
+        },
+        progress: {
+          chapterKey: 'chapter-1',
+          current: {
+            chapterKey: 'chapter-1',
+            pageKey: 'middle',
+            manifestVersion: 'invalid',
+            pageIndexHint: 1,
+            ...coordinates,
+            ...invalid,
+          },
+        },
+      },
+    };
+    const response = await reader.request('/api/state/mutations', {
+      method: 'POST',
+      headers: {
+        Origin: origin,
+        'X-App-Request': '1',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(json),
+    });
+    expect(response.status).toBe(400);
+  }
+  expect(await second.state(key, 'chapter-1')).toEqual(canonical);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+    )
+      .bind(reader.subject)
+      .first('count'),
+  ).toBe(3);
 });

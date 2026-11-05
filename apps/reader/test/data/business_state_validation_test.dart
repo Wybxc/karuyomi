@@ -34,6 +34,9 @@ wire.ReadingAnchor anchor({String chapterKey = 'chapter'}) =>
       pageKey: 'page',
       manifestVersion: 'manifest',
       normalizedOffset: 0.75,
+      normalizedX: .2,
+      viewportX: .6,
+      viewportY: .8,
     );
 
 void main() {
@@ -101,6 +104,12 @@ void main() {
         valid.deepCopy()..furthest.chapterKey = 'other',
         valid.deepCopy()..current.normalizedOffset = double.nan,
         valid.deepCopy()..current.normalizedOffset = 1.01,
+        valid.deepCopy()..current.normalizedX = -.1,
+        valid.deepCopy()..current.normalizedX = double.infinity,
+        valid.deepCopy()..current.viewportX = 1.1,
+        valid.deepCopy()..current.viewportX = double.nan,
+        valid.deepCopy()..current.viewportY = -.1,
+        valid.deepCopy()..current.viewportY = double.negativeInfinity,
         valid.deepCopy()..current.pageIndexHint = 2048,
         valid.deepCopy()..current.pageKey = '',
       ]) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter_test/flutter_test.dart';
@@ -47,6 +48,35 @@ Widget fixtureImage(BuildContext context, ImageResource resource, BoxFit fit) =>
       child: Center(child: Text(resource.id)),
     );
 
+ResourceImageBuilder decodedImage({int width = 600, int height = 900}) =>
+    (context, resource, fit) {
+      ReaderImageDecoded(
+        resource.id,
+        width: width,
+        height: height,
+      ).dispatch(context);
+      return fixtureImage(context, resource, fit);
+    };
+
+void expectRenderedAnchor(
+  WidgetTester tester,
+  ReadingPosition anchor,
+  Finder viewport,
+) {
+  final image = tester.getRect(
+    find.byKey(ValueKey('image-rect-${anchor.pageKey}')),
+  );
+  final bounds = tester.getRect(viewport);
+  expect(
+    image.left + image.width * anchor.normalizedX,
+    closeTo(bounds.left + bounds.width * anchor.viewportX, 1),
+  );
+  expect(
+    image.top + image.height * anchor.normalizedOffset,
+    closeTo(bounds.top + bounds.height * anchor.viewportY, 1),
+  );
+}
+
 Widget screen({
   required FixturePageProvider provider,
   required ChapterManifest manifest,
@@ -60,6 +90,8 @@ Widget screen({
   bool? doublePage,
   Widget? chapterControls,
   bool layoutSettingsEnabled = true,
+  ReaderFit fit = ReaderFit.contain,
+  ValueListenable<ReadingPosition?>? positionRequest,
   ReaderBackground background = ReaderBackground.black,
   int dimPercent = 0,
   ReaderInputPreset tapZones = ReaderInputPreset.standard,
@@ -74,6 +106,8 @@ Widget screen({
     doublePage: doublePage,
     chapterControls: chapterControls,
     layoutSettingsEnabled: layoutSettingsEnabled,
+    fit: fit,
+    positionRequest: positionRequest,
     background: background,
     dimPercent: dimPercent,
     tapZones: tapZones,
@@ -95,6 +129,435 @@ bool? pageLayoutPreference(WidgetTester tester) => tester
     .single;
 
 void main() {
+  testWidgets(
+    'width reaches the true long-image end and same-effective layout edits keep observing',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'long', width: 600, height: 3600)],
+      );
+      final viewports = <ReaderViewportState>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          fit: ReaderFit.width,
+          onViewport: viewports.add,
+          imageBuilder: decodedImage(width: 600, height: 3600),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'long');
+      expect(viewports.last.atEnd, false);
+      await tester.tap(find.text('单页'));
+      await tester.pumpAndSettle();
+      expect(pageLayoutPreference(tester), false);
+      expect(viewports.last.observed, isNotNull);
+      expect(viewports.last.atEnd, false);
+      final viewer = find.byType(InteractiveViewer);
+      await tester.drag(viewer, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 1'), findsOneWidget);
+      expect(viewports.last.current.normalizedOffset, greaterThan(0));
+      final image = tester.getRect(
+        find.byKey(const ValueKey('image-rect-long')),
+      );
+      final bounds = tester.getRect(viewer);
+      final controller = tester
+          .widget<InteractiveViewer>(viewer)
+          .transformationController!;
+      final matrix = controller.value.clone();
+      matrix.setEntry(1, 3, matrix.entry(1, 3) + bounds.bottom - image.bottom);
+      controller.value = matrix;
+      await tester.pumpAndSettle();
+      expect(viewports.last.atEnd, true);
+      expect(viewports.last.observed!.normalizedOffset, 1);
+      expect(provider.acquired.length, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(provider.released, ['runtime-1-long']);
+    },
+  );
+
+  testWidgets(
+    'height pans wide images and RTL double spreads to the reading end',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      for (final mode in [ReadingMode.leftToRight, ReadingMode.rightToLeft]) {
+        final provider = FixturePageProvider();
+        final manifest = ChapterManifest(
+          chapterKey: 'chapter',
+          version: '1',
+          pages: [ReaderPage(key: 'wide', width: 2400, height: 600)],
+        );
+        final viewports = <ReaderViewportState>[];
+        await tester.pumpWidget(
+          screen(
+            provider: provider,
+            manifest: manifest,
+            mode: mode,
+            fit: ReaderFit.height,
+            doublePage: false,
+            onViewport: viewports.add,
+            imageBuilder: decodedImage(width: 2400, height: 600),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(viewports.last.atEnd, false);
+        final viewer = find.byType(InteractiveViewer);
+        await tester.drag(
+          viewer,
+          Offset(mode == ReadingMode.rightToLeft ? 160 : -160, 0),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('1 / 1'), findsOneWidget);
+        final image = tester.getRect(
+          find.byKey(const ValueKey('image-rect-wide')),
+        );
+        final bounds = tester.getRect(viewer);
+        final controller = tester
+            .widget<InteractiveViewer>(viewer)
+            .transformationController!;
+        final matrix = controller.value.clone();
+        final adjustment = mode == ReadingMode.rightToLeft
+            ? bounds.left - image.left
+            : bounds.right - image.right;
+        matrix.setEntry(0, 3, matrix.entry(0, 3) + adjustment);
+        controller.value = matrix;
+        await tester.pumpAndSettle();
+        expect(viewports.last.atEnd, true);
+        expect(
+          viewports.last.observed!.normalizedX,
+          mode == ReadingMode.rightToLeft ? 0 : 1,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        expect(provider.released, ['runtime-1-wide']);
+      }
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [
+          for (var i = 0; i < 3; i++)
+            ReaderPage(key: 'page-$i', width: 900, height: 1000),
+        ],
+      );
+      final viewports = <ReaderViewportState>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          mode: ReadingMode.rightToLeft,
+          fit: ReaderFit.height,
+          doublePage: true,
+          onViewport: viewports.add,
+          imageBuilder: decodedImage(width: 900, height: 1000),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('下一页'));
+      await tester.pumpAndSettle();
+      expect(viewports.last.current.pageKey, 'page-1');
+      expect(viewports.last.current.normalizedX, 1);
+      expect(viewports.last.atEnd, false);
+      final viewer = find.byType(InteractiveViewer);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('image-rect-page-1'))).left,
+        greaterThan(
+          tester.getRect(find.byKey(const ValueKey('image-rect-page-2'))).left,
+        ),
+      );
+      await tester.drag(viewer, const Offset(140, 0));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('spread-page-1')), findsOneWidget);
+      tester.widget<InteractiveViewer>(viewer).transformationController!.value =
+          Matrix4.identity();
+      await tester.pumpAndSettle();
+      expect(viewports.last.atEnd, true);
+      expect(viewports.last.observed!.pageKey, 'page-2');
+      await tester.tap(find.byTooltip('上一页'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 3'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'continuous height is horizontally reachable and contain applies to Webtoon',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'wide', width: 2400, height: 600)],
+      );
+      final viewports = <ReaderViewportState>[];
+      Widget configured(ReadingMode mode, ReaderFit fit) => screen(
+        provider: provider,
+        manifest: manifest,
+        mode: mode,
+        fit: fit,
+        onViewport: viewports.add,
+        imageBuilder: decodedImage(width: 2400, height: 600),
+      );
+      await tester.pumpWidget(
+        configured(ReadingMode.continuous, ReaderFit.height),
+      );
+      await tester.pumpAndSettle();
+      expect(viewports.last.atEnd, false);
+      final horizontal = find.byKey(const ValueKey('horizontal-wide'));
+      await tester.drag(horizontal, const Offset(-160, 0));
+      await tester.pumpAndSettle();
+      final anchor = viewports.last.current;
+      expect(anchor.normalizedX, greaterThan(0));
+      final scroll = tester
+          .widget<SingleChildScrollView>(horizontal)
+          .controller!;
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(viewports.last.atEnd, true);
+      final last = viewports.last.current;
+      await tester.pumpWidget(
+        configured(ReadingMode.webtoon, ReaderFit.height),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        viewports.last.current.normalizedX,
+        closeTo(last.normalizedX, .001),
+      );
+      await tester.pumpWidget(
+        configured(ReadingMode.webtoon, ReaderFit.contain),
+      );
+      await tester.pumpAndSettle();
+      final image = tester.getSize(
+        find.byKey(const ValueKey('image-rect-wide')),
+      );
+      final viewport = tester.getSize(
+        find.byKey(const ValueKey('continuous-reader')),
+      );
+      expect(image.width, lessThanOrEqualTo(viewport.width));
+      expect(image.height, lessThanOrEqualTo(viewport.height));
+      expect(viewports.last.atEnd, true);
+      expect(provider.acquired.length, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(provider.released, ['runtime-1-wide']);
+    },
+  );
+
+  testWidgets(
+    'a late matching decoded frame confirms the actual 2D viewport only once',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'page-0', width: 600, height: 900)],
+      );
+      final requested = manifest.positionAt(
+        0,
+        offset: .65,
+        normalizedX: .7,
+        viewportX: .1,
+        viewportY: .05,
+      );
+      final viewports = <ReaderViewportState>[];
+      final positions = <ReadingPosition>[];
+      Widget configured({required bool decode}) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: requested,
+        onViewport: viewports.add,
+        onPosition: positions.add,
+        imageBuilder: decode ? decodedImage() : fixtureImage,
+      );
+      await tester.pumpWidget(configured(decode: false));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.current.viewportX, .1);
+      expect(viewports.last.current.viewportY, .05);
+      await tester.pumpWidget(configured(decode: true));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNotNull);
+      expect(viewports.last.current.normalizedX, .7);
+      expect(viewports.last.current.normalizedOffset, .65);
+      expectRenderedAnchor(
+        tester,
+        viewports.last.current,
+        find.byType(InteractiveViewer),
+      );
+      final count = positions.length;
+      await tester.pumpWidget(configured(decode: true));
+      await tester.pumpAndSettle();
+      expect(positions.length, count);
+      expect(tester.binding.hasScheduledFrame, false);
+      expect(provider.acquired.length, 1);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    '2D request survives unknown dimensions, fit, layout, resize, zoom and reopening',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'wide')],
+      );
+      final requested = manifest.positionAt(
+        0,
+        offset: .4,
+        normalizedX: .7,
+        viewportX: .25,
+        viewportY: .3,
+      );
+      final requests = ValueNotifier<ReadingPosition?>(requested);
+      addTearDown(requests.dispose);
+      final viewports = <ReaderViewportState>[];
+      final positions = <ReadingPosition>[];
+      var decode = false;
+      Widget configured(
+        ReadingMode mode,
+        ReaderFit fit, {
+        ReadingPosition? initial,
+      }) => screen(
+        provider: provider,
+        manifest: manifest,
+        mode: mode,
+        fit: fit,
+        position: initial ?? requested,
+        positionRequest: requests,
+        onViewport: viewports.add,
+        onPosition: positions.add,
+        imageBuilder: decode
+            ? decodedImage(width: 2400, height: 600)
+            : fixtureImage,
+      );
+      await tester.pumpWidget(
+        configured(ReadingMode.leftToRight, ReaderFit.height),
+      );
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.current.viewportX, .25);
+      expect(viewports.last.current.viewportY, .3);
+      decode = true;
+      await tester.pumpWidget(
+        configured(ReadingMode.leftToRight, ReaderFit.height),
+      );
+      await tester.pumpAndSettle();
+      void expectOriginalPoint(Finder viewport) {
+        final current = viewports.last.current;
+        expect(current.normalizedX, closeTo(.7, .001));
+        expect(current.normalizedOffset, closeTo(.4, .001));
+        expectRenderedAnchor(tester, current, viewport);
+      }
+
+      expectOriginalPoint(find.byType(InteractiveViewer));
+      await tester.pumpWidget(
+        configured(ReadingMode.leftToRight, ReaderFit.contain),
+      );
+      await tester.pumpAndSettle();
+      expectOriginalPoint(find.byType(InteractiveViewer));
+      await tester.pumpWidget(
+        configured(ReadingMode.continuous, ReaderFit.height),
+      );
+      await tester.pumpAndSettle();
+      final list = find.byKey(const ValueKey('continuous-reader'));
+      expectOriginalPoint(list);
+      tester.view.physicalSize = const Size(700, 500);
+      await tester.pumpAndSettle();
+      expectOriginalPoint(list);
+      final saved = viewports.last.current;
+      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        configured(ReadingMode.continuous, ReaderFit.width),
+      );
+      await tester.pumpAndSettle();
+      final dialog = find.byType(Dialog);
+      final dialogViewport = find.descendant(
+        of: dialog,
+        matching: find.byType(InteractiveViewer),
+      );
+      final dialogImage = find.descendant(
+        of: dialog,
+        matching: find.byKey(const ValueKey('runtime-1-wide')),
+      );
+      expect(
+        tester.getRect(dialogImage).width,
+        closeTo(tester.getRect(dialogViewport).width, 1),
+      );
+      await tester.pumpWidget(
+        configured(ReadingMode.continuous, ReaderFit.height),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(dialogImage).height,
+        closeTo(tester.getRect(dialogViewport).height, 1),
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNotNull);
+      final count = positions.length;
+      await tester.pump(const Duration(seconds: 1));
+      expect(positions.length, count);
+      expect(provider.acquired.length, 1);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        configured(ReadingMode.continuous, ReaderFit.height, initial: saved),
+      );
+      await tester.pumpAndSettle();
+      expectOriginalPoint(find.byKey(const ValueKey('continuous-reader')));
+      requests.value = manifest.positionAt(
+        0,
+        offset: .2,
+        normalizedX: .3,
+        viewportX: .1,
+        viewportY: .2,
+      );
+      await tester.pumpAndSettle();
+      expect(viewports.last.current.normalizedX, closeTo(.3, .001));
+      expect(viewports.last.current.normalizedOffset, closeTo(.2, .001));
+      expectRenderedAnchor(
+        tester,
+        viewports.last.current,
+        find.byKey(const ValueKey('continuous-reader')),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets(
     'tap presets respect reading direction while disabled keeps toolbar and swipes usable',
     (tester) async {
@@ -323,6 +786,7 @@ void main() {
         manifest: manifest,
         position: manifest.positionAt(4, offset: .3),
         mode: ReadingMode.continuous,
+        imageBuilder: decodedImage(),
         background: background,
         dimPercent: dimPercent,
         keyboard: ReaderInputPreset.disabled,
@@ -335,7 +799,7 @@ void main() {
       await tester.pumpAndSettle();
       final anchor = positions.last;
       final scrollable = tester.state<ScrollableState>(
-        find.descendant(of: list, matching: find.byType(Scrollable)),
+        find.descendant(of: list, matching: find.byType(Scrollable)).first,
       );
       final scrollOffset = scrollable.position.pixels;
       await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
@@ -918,7 +1382,7 @@ void main() {
   );
 
   testWidgets(
-    'zoom before decoding cannot mark a clipped final spread observed',
+    'zoom observes decoded intersections without completing a clipped final spread',
     (tester) async {
       final provider = FixturePageProvider();
       final manifest = ChapterManifest(
@@ -960,9 +1424,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(viewports.last.observed, isNull);
+      expect(viewports.last.observed, isNotNull);
       expect(viewports.last.atEnd, false);
-      expect(viewports.last.windowReady, false);
+      expect(viewports.last.windowReady, true);
       await tester.tap(find.byTooltip('重置缩放'));
       await tester.pumpAndSettle();
       expect(viewports.last.observed!.pageKey, 'page-20');
@@ -1069,6 +1533,8 @@ void main() {
         manifest: manifest,
         position: manifest.positionAt(4, offset: 0.3),
         mode: ReadingMode.continuous,
+        fit: ReaderFit.width,
+        imageBuilder: decodedImage(),
         onPosition: positions.add,
       ),
     );

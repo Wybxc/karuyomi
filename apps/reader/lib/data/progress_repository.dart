@@ -238,6 +238,9 @@ ReadingPosition _decodeAnchor(wire.ReadingAnchor value) {
     manifestVersion: value.manifestVersion,
     pageIndexHint: value.pageIndexHint,
     normalizedOffset: value.normalizedOffset,
+    normalizedX: value.normalizedX,
+    viewportX: value.viewportX,
+    viewportY: value.viewportY,
   );
 }
 
@@ -247,6 +250,9 @@ wire.ReadingAnchor _anchor(ReadingPosition value) => wire.ReadingAnchor(
   manifestVersion: value.manifestVersion,
   pageIndexHint: value.pageIndexHint,
   normalizedOffset: value.normalizedOffset,
+  normalizedX: value.normalizedX,
+  viewportX: value.viewportX,
+  viewportY: value.viewportY,
 );
 wire.ChapterProgressState _progress(ChapterProgress value) {
   final result = wire.ChapterProgressState(

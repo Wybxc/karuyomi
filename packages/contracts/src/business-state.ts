@@ -157,9 +157,15 @@ export function validateReadingAnchor(value: pb.ReadingAnchor): void {
   uint32(value.pageIndexHint);
   requireCondition(
     value.pageIndexHint < CHAPTER_PAGE_LIMIT &&
-      Number.isFinite(value.normalizedOffset) &&
-      value.normalizedOffset >= 0 &&
-      value.normalizedOffset <= 1,
+      [
+        value.normalizedOffset,
+        value.normalizedX,
+        value.viewportX,
+        value.viewportY,
+      ].every(
+        (coordinate) =>
+          Number.isFinite(coordinate) && coordinate >= 0 && coordinate <= 1,
+      ),
     'Invalid reading anchor',
   );
 }
@@ -555,6 +561,12 @@ export function validateReaderSettings(value: pb.ReaderSettings): void {
     'Unknown reader page layout',
   );
   requireCondition(
+    Number.isInteger(value.fit) &&
+      value.fit >= pb.ReaderFit.CONTAIN &&
+      value.fit <= pb.ReaderFit.HEIGHT,
+    'Unknown reader fit',
+  );
+  requireCondition(
     Number.isInteger(value.background) &&
       value.background >= pb.ReaderBackground.BLACK &&
       value.background <= pb.ReaderBackground.THEME,
@@ -591,6 +603,13 @@ export function validateReaderSettingsOverride(
         value.pageLayout >= pb.ReaderPageLayout.AUTO &&
         value.pageLayout <= pb.ReaderPageLayout.DOUBLE,
       'Unknown reader page layout override',
+    );
+  if (value.fit !== undefined)
+    requireCondition(
+      Number.isInteger(value.fit) &&
+        value.fit >= pb.ReaderFit.CONTAIN &&
+        value.fit <= pb.ReaderFit.HEIGHT,
+      'Unknown reader fit override',
     );
   if (value.background !== undefined)
     requireCondition(
@@ -706,7 +725,9 @@ function validateSettingsResponse(value: {
         value.effectiveReader.tapZones ===
           (value.manga?.overrides?.tapZones ?? defaults?.tapZones) &&
         value.effectiveReader.keyboard ===
-          (value.manga?.overrides?.keyboard ?? defaults?.keyboard),
+          (value.manga?.overrides?.keyboard ?? defaults?.keyboard) &&
+        value.effectiveReader.fit ===
+          (value.manga?.overrides?.fit ?? defaults?.fit),
       'Effective reader settings do not match their defaults and overrides',
     );
   }

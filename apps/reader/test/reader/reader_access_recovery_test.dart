@@ -210,6 +210,9 @@ void main() {
           manifestVersion: 'old',
           pageIndexHint: 2,
           normalizedOffset: .4,
+          normalizedX: .7,
+          viewportX: .6,
+          viewportY: .2,
         ),
         order: ChapterOrder.reversed,
         mode: ReadingMode.webtoon,
@@ -222,6 +225,18 @@ void main() {
       expect(restored.sourceId, sourceId);
       expect(restored.position!.pageKey, 'missing-page');
       expect(restored.position!.normalizedOffset, .4);
+      expect(restored.position!.normalizedX, .7);
+      expect(restored.position!.viewportX, .6);
+      expect(restored.position!.viewportY, .2);
+      final missingCoordinate = original.toJson();
+      if (missingCoordinate['position']
+          case final Map<String, Object?> anchor) {
+        anchor.remove('viewportY');
+      }
+      expect(
+        () => ReaderRecoveryContext.fromJson(missingCoordinate),
+        throwsFormatException,
+      );
       expect(restored.order, ChapterOrder.reversed);
       expect(restored.mode, ReadingMode.webtoon);
       expect(restored.doublePage, false);

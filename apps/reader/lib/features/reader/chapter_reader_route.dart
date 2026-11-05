@@ -65,6 +65,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   ChapterOrder _order = ChapterOrder.source;
   late ReadingMode _mode = widget.initialMode;
   late bool? _doublePage = widget.initialDoublePage;
+  ReaderFit _fit = ReaderFit.contain;
   ReaderBackground _background = ReaderBackground.black;
   int _dimPercent = 0;
   ReaderInputPreset _tapZones = ReaderInputPreset.standard;
@@ -172,6 +173,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       _background = settings_ui.readerBackground(
         value.effectiveReader.background,
       );
+      _fit = settings_ui.readerFit(value.effectiveReader.fit);
       _dimPercent = value.effectiveReader.dimPercent;
       _tapZones = settings_ui.readerInputPreset(value.effectiveReader.tapZones);
       _keyboard = settings_ui.readerInputPreset(value.effectiveReader.keyboard);
@@ -465,9 +467,26 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     setState(() => _busy = true);
     final reset = await progress.reset(_opened.manifest);
     if (!_closing && mounted) {
-      if (reset != null) {
+      if (reset != null &&
+          identical(_progress, progress) &&
+          widget.catalog.subject == _subject &&
+          widget.catalog.deploymentOrigin?.origin == _origin &&
+          widget.catalog.isCurrentSource(_source)) {
         _viewport = null;
-        _positionRequest.value = reset.current;
+        final first = reset.current;
+        final leadingX = _mode == ReadingMode.rightToLeft ? 1.0 : 0.0;
+        // Reset is confirmed by the server before the explicit local jump;
+        // only this new navigation uses the current direction's leading edge.
+        _positionRequest.value = ReadingPosition(
+          chapterKey: first.chapterKey,
+          pageKey: first.pageKey,
+          manifestVersion: first.manifestVersion,
+          pageIndexHint: first.pageIndexHint,
+          normalizedOffset: 0,
+          normalizedX: leadingX,
+          viewportX: leadingX,
+          viewportY: 0,
+        );
       }
       setState(() => _busy = false);
     }
@@ -889,6 +908,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       initialPosition: _initialPosition,
       initialMode: _mode,
       doublePage: _doublePage,
+      fit: _fit,
       background: _background,
       dimPercent: _dimPercent,
       tapZones: _tapZones,

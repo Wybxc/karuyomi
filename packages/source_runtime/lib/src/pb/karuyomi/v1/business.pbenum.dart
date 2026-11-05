@@ -193,5 +193,30 @@ class ReaderInputPreset extends $pb.ProtobufEnum {
   const ReaderInputPreset._(super.value, super.name);
 }
 
+class ReaderFit extends $pb.ProtobufEnum {
+  static const ReaderFit READER_FIT_UNSPECIFIED =
+      ReaderFit._(0, _omitEnumNames ? '' : 'READER_FIT_UNSPECIFIED');
+  static const ReaderFit READER_FIT_CONTAIN =
+      ReaderFit._(1, _omitEnumNames ? '' : 'READER_FIT_CONTAIN');
+  static const ReaderFit READER_FIT_WIDTH =
+      ReaderFit._(2, _omitEnumNames ? '' : 'READER_FIT_WIDTH');
+  static const ReaderFit READER_FIT_HEIGHT =
+      ReaderFit._(3, _omitEnumNames ? '' : 'READER_FIT_HEIGHT');
+
+  static const $core.List<ReaderFit> values = <ReaderFit>[
+    READER_FIT_UNSPECIFIED,
+    READER_FIT_CONTAIN,
+    READER_FIT_WIDTH,
+    READER_FIT_HEIGHT,
+  ];
+
+  static final $core.List<ReaderFit?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ReaderFit? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReaderFit._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

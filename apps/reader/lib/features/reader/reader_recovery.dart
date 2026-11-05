@@ -48,6 +48,9 @@ final class ReaderRecoveryContext {
         'manifestVersion': anchor.manifestVersion,
         'pageIndexHint': anchor.pageIndexHint,
         'normalizedOffset': anchor.normalizedOffset,
+        'normalizedX': anchor.normalizedX,
+        'viewportX': anchor.viewportX,
+        'viewportY': anchor.viewportY,
       },
   };
 
@@ -83,6 +86,9 @@ final class ReaderRecoveryContext {
           'manifestVersion': final String version,
           'pageIndexHint': final int index,
           'normalizedOffset': final num offset,
+          'normalizedX': final num normalizedX,
+          'viewportX': final num viewportX,
+          'viewportY': final num viewportY,
         } when anchorChapter == chapterKey) {
           position = ReadingPosition(
             chapterKey: anchorChapter,
@@ -90,6 +96,9 @@ final class ReaderRecoveryContext {
             manifestVersion: version,
             pageIndexHint: index,
             normalizedOffset: offset.toDouble(),
+            normalizedX: normalizedX.toDouble(),
+            viewportX: viewportX.toDouble(),
+            viewportY: viewportY.toDouble(),
           );
         } else {
           throw const FormatException('阅读恢复位置无效');

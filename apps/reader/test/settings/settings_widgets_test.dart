@@ -20,6 +20,7 @@ wire.GlobalSettingsValues _global({
   reader: wire.ReaderSettings(
     mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
     pageLayout: layout,
+    fit: wire.ReaderFit.READER_FIT_CONTAIN,
     background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
     tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
     keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,

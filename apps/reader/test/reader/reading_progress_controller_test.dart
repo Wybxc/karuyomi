@@ -82,6 +82,49 @@ void main() {
     },
   );
 
+  testWidgets(
+    'horizontal-only viewport changes debounce to a new confirmed current anchor',
+    (tester) async {
+      final pages = _manifest;
+      await controller.restore(pages);
+      controller.observe(
+        manifest: pages,
+        current: pages.positionAt(1, offset: .4),
+        reversedOrder: false,
+      );
+      expect(await controller.flush(), true);
+      for (final (x, viewportX, viewportY) in [
+        (.8, 0.0, 0.0),
+        (.8, .6, 0.0),
+        (.8, .6, .2),
+      ]) {
+        final revisions = server.appliedMutations;
+        controller.observe(
+          manifest: pages,
+          current: pages.positionAt(
+            1,
+            offset: .4,
+            normalizedX: x,
+            viewportX: viewportX,
+            viewportY: viewportY,
+          ),
+          reversedOrder: false,
+        );
+        expect(controller.unsaved, true);
+        await tester.pump(const Duration(milliseconds: 599));
+        expect(server.appliedMutations, revisions);
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(controller.unsaved, false);
+        expect(server.appliedMutations, revisions + 1);
+        final stored = server.progress(_key, pages.chapterKey)!.current;
+        expect(stored.normalizedOffset, .4);
+        expect(stored.normalizedX, x);
+        expect(stored.viewportX, viewportX);
+        expect(stored.viewportY, viewportY);
+      }
+    },
+  );
+
   test(
     'read failure does not block reading and write failure retains session draft for retry',
     () async {
