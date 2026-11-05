@@ -125,4 +125,4 @@ node apps/api/test/source-metadata-probe.ts \
 
 ## 验证边界
 
-工程测试证明本地真实 workerd/D1、正式路由和签名测试身份之间的闭环；浏览器独立会话范围按上节单独验收。它不代表生产 Cloudflare Access 登录、远程 D1 部署、Web/iOS/Android 跨端交互或真机阅读已经验收。分类、书签与非敏感设置仍需按计划接入相同服务端权威模型，不能由本记录推断已经实现。
+工程测试证明本地真实 workerd/D1、正式路由和签名测试身份之间的闭环；浏览器独立会话范围按上节单独验收。后续测试身份下 Web↔iOS 双向非默认页续读见[独立记录](native-server-state.md)，远程 D1 部署见[生产记录](server-state-production.md)。本记录不代表生产 Cloudflare Access 登录、Android 配对或真机阅读已经验收。分类、书签与非敏感设置仍需按计划接入相同服务端权威模型，不能由本记录推断已经实现。

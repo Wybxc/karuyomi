@@ -12,7 +12,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 ## 当前功能收尾（先实现，后集中验收）
 
-2026-11-05 按用户要求暂停新增浏览器、性能和多源采样，先补齐静态审查发现的功能缺口。已有浏览/搜索、详情/章序、正式 Source 图片通道、阅读布局/翻页/缩放、切章/有界邻章准备与本地进度已有产品接线；以下四项现已补齐并通过集中工程回归；完整 P0 的实际环境验收仍未通过：
+2026-11-05 按用户要求先补齐静态审查发现的功能缺口，再集中验收。浏览/搜索、详情/章序、正式 Source 图片通道、阅读布局/翻页/缩放、切章/有界邻章准备与进度已有产品接线，业务进度随后已切换到服务端权威；以下四项现已补齐并通过集中工程回归；完整 P0 的实际环境验收仍未通过：
 
 - [x] Access 失效进入阅读暂停：停止网络与预取，保留已交付图片和进度；用户手动认证后核对身份，重新打开当前章并恢复逻辑位置，不重放旧副作用请求。
 - [x] 同身份/repo/package/schema 的运行 namespace 持有跨标签页独占写入槽；启动冲突明确提示，关闭、启动失败或 Worker 终止后释放。
@@ -23,7 +23,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 功能行为、集中工程回归和新 ABI 的交付限制见[功能收尾记录](../verification/p0-feature-completion.md)。随后固定 `1f599cd` 已重编三个 v4 官方扩展，并通过 Web 元数据/原处理图片、xkcd 正式阅读及跨标签占用/释放分项，见[v4 运行记录](../verification/v4-source-runtime.md)；实际 TeaVM 的 owner/嵌套 enqueue/取消分项见[回调记录](../verification/teavm-enqueue.md)。固定 `13494a0` 的正式客户端/API 与这三包已部署，匿名静态交付及远端网络政策核对通过，见[生产记录](../verification/v4-production.md)。生产 Access 会话已失效，用户选择稍后登录；正向动态请求与恢复仍待验收。历史三源证据仍按原提交保留。
 
-当前 v4 正式 `lib/main.dart` 的 iOS Simulator App 与 Android arm64 调试 APK 已构建并核对实际包内材料、SQLite 映射和导出，见[Native 成品记录](../verification/v4-native-main.md)。CUA 仍无法连接 Simulator，App 未安装/启动；这项构建不改变 Native 正式主入口、生产 Access、真机和性能的待验收状态。
+当前 v4 正式 `lib/main.dart` 的 iOS Simulator App 与 Android arm64 调试 APK 已构建并核对实际包内材料、SQLite 映射和导出，见[Native 成品记录](../verification/v4-native-main.md)。该次因 CUA 无法连接 Simulator 而未安装/启动；随后已通过 Flutter 官方 `integration_test` 在全新 iOS 模拟器启动正式 `app.main()`，以真实 xkcd 完成图片、服务端保存及 Web↔iOS 双向非默认页续读，见[跨端记录](../verification/native-server-state.md)。当前 Android 正式主入口、生产 Access、真机和性能仍待验收。
 
 真实 TeaVM 的后续组合门已通过 64/65 pending callback 上限、约 30.05 秒 fatal drain、正式 manager 回收/排队拒绝/连接关闭及同 namespace 新 Worker 恢复，详见[回调组合记录](../verification/teavm-enqueue.md#实际-callback-上限fatal-drain-与-manager-回收)。产品常量未缩短，不能将受控 Source 成功推广为生产 Access 或 Native 通过。
 
@@ -33,7 +33,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和静态交付已实现                                                            | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 动态请求                                                   |
 | P0-F1 Web      | 串行 Worker、requestId/generation、清单/预算校验、取消/超时、Source ID 一致性和 Dart Web interop 已实现；真实 Chromium 初始化通过                                                  | 六项操作全部在线成功和图片阅读                                                                                       |
-| P0-F2 Native   | Dart 受管 WebView、可见登录、内置 host/Blob Worker 已实现；iOS 26.4 Simulator 本地受信 HTTPS 下初始化、cookie 携带及容器重建已有证据                                               | Cloudflare 生产 Access 正向会话、物理 iPhone、Android 真机与后台恢复                                                 |
+| P0-F2 Native   | Dart 受管 WebView、可见登录、内置 host/Blob Worker 已实现；iOS 26.4 Simulator 的正式主入口与 Web 双向续读、真实图片和 D1 确认分项通过                                              | Cloudflare 生产 Access 正向会话、当前 Android 主入口、物理设备与后台恢复                                             |
 | P0-F3 图片机制 | Web 产品已接原始 Page 会话、Source 图片链、64 KiB/ACK、Blob 资源及释放；真实章节首中末页解码通过；双端正式受管文件机制及进程重启、双端模拟器原 xkcd ReaderScreen 与进度恢复已验证  | 更广 Native Source、正式主入口、任意阶段取消与合计峰值                                                               |
 | P0-R 阅读核心  | 逻辑锚、单双页/LTR/RTL、竖向/Webtoon、缩放和有界 Provider 已实现；同路由切章、自动有界邻章准备、Drift 产品进度与 SQLite 文件/Web 关标签页及 双端模拟器原 xkcd 进程重启恢复分项通过 | 多源连续切章、浏览器进程恢复、超长图、物理设备与性能分布                                                             |
 | P0-B v2        | 帧协议、按需 Worker 流、operation/generation handle、Java Okio Source/有界上传 Sink 已实现；当前产品源码与构建清单统一为 v2，模拟 supplier 回归通过                                | 受控 HTTP/文件/Cache 同版及 Web xkcd fresh Cache/Worker 重建已通过；更广 Source、Access、Native 与合计资源门仍待验收 |
@@ -57,7 +57,7 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 已通过压缩、重定向、Cookie、HEAD/206、204/205/304、精确 Range、urlencoded/multipart、流式上传、截断上传/响应和三类取消门。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常；这些 Worker 分项不代替正式 Source/cache 或 Java 同版全部语义对照。当前只维护 v2，旧包需要重新构建。
 2. **验证缓冲与取消。** META/DATA 最多 64 KiB，正文请求最多 8 MiB、响应最多 64 MiB，适配队列最多四块。真实 workerd 的持续发送与显式 TCP reset/idle 门已使用 30 秒请求期限、1 秒取消窗口分别通过；固定 Web 主入口的原 Arknights 图片获取中退出、未完成 HTTPS 及时关闭、恢复阅读及最终 Worker/遥测/服务清理也已通过限定分项，见[取消证据](../verification/source-cancellation-web.md)。继续检查慢消费者、背压、迟到响应和 generation 销毁能终止上游并释放 handle；整体请求预算和两次读取之间的 idle timeout 分别验证。生产 Access、Native 与其它图片阶段不由本轮替代。协议细节见 [HTTP bridge](../HTTP-BRIDGE.md)。
 3. **完成图片剩余门槛。** Web 单页及真实 Flutter 阅读闭环已通过分项门，合同见[图片资源通道](../IMAGE-RESOURCES.md)。正式 Native 文件通道已实现：Android 采用锁定插件的六个常驻 ArrayBuffer 槽位，iOS 使用受管 WKDownload 薄扩展；iOS 模拟器实际 Flutter Headless/受信 HTTPS、文件解码与清理通过，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。iOS/Android 模拟器原 xkcd 经正式 ReaderScreen 显示及进度重启已分别通过固定材料分项，Cache v3 固定 `19b65f5` 原 xkcd 双端模拟器分项已复验，继续验收真机；机制分项不能代替这些门。内部 Bitmap/ImageDecoder 已改为二进制 handle、≤64 KiB 像素/字节块、解码前头部校验和 surface/decoder/font 合计账本；只查 bounds 不完整解码。JVM、受控时序、实际 TeaVM→Canvas 分项通过；取消仍等待 Java 退出，不扫描删除 Source 持有对象。详见 [graphics 合同](../IMAGE-RESOURCES.md#source-内部图形桥)。继续固定新 host 重新 AOT 并验收实际处理源；Cache/File 有界正文与共享 JVM/TeaVM 分项已通过，跨目录与合计存储预算、正式 Source 和移动环境继续按存储计划验收，终端与图形账本均不代表进程/GPU 实际峰值。不绕过插件直接读取原图 URL。当前图片交付边界已收敛为仅含身份、位置与编码字节数的不透明资源，不读取 MIME、尺寸或 EXIF，不提供 Source 编码页/分片/window 控制。Flutter 从实际 ImageInfo 学习尺寸并负责显示、布局和解码预算；这轮工程回归不自动继承旧版本的在线/终端验收。
-4. **汇合 P0-R / F4 / P0-C，并接入服务端进度确认。** 章序、切章与有界下一章准备已有实现：保留 Source 原序/反序与重复章节，在同一阅读路由等待旧资源 ACK 后切章；邻章不取图片，不推进进度。普通活动 Source 调用不冒充可抢占取消，过期准备结果等待返回后关闭。现有 Drift/SQLite 的章节、方向和页内偏移恢复证据继续保留，但不继续扩充独立本地业务权威。按 [P2](p2-sync.md)将当前位置、最远位置、阅读 epoch 与显式完成状态改由 Worker API + D1 保存；节流发送，切章/退出/后台切换尽力提交，服务端确认后才显示已保存。未确认草稿仅保留在当前会话，失败仍能阅读并可重试，不承诺关闭后恢复。新的恢复门要求清空客户端业务数据或使用全新客户端后，仍能从服务端恢复已确认章节和逻辑位置；完整跨端一致性另外按 P2 验收。Source 文件/HTTP Cache 与图片资源的本地存储仍各自保持既有所有权和限额。UI 直接解码的首图、跳转、滚动、CPU/RSS/GPU baseline 与真机验收继续，区域 decoder、降采样或分片只依据实测决定。
+4. **汇合 P0-R / F4 / P0-C，验收服务端进度确认。** 章序、切章与有界下一章准备已有实现：保留 Source 原序/反序与重复章节，在同一阅读路由等待旧资源 ACK 后切章；邻章不取图片，不推进进度。普通活动 Source 调用不冒充可抢占取消，过期准备结果等待返回后关闭。历史 Drift/SQLite 的章节、方向和页内偏移恢复证据继续保留，业务读写已移除。当前按 [P2](p2-sync.md)由 Worker API + D1 保存当前位置、最远位置、阅读 epoch 与显式完成状态；节流发送，切章/退出/后台切换尽力提交，服务端确认后才显示已保存。未确认草稿仅保留在当前会话，失败仍能阅读并可重试，不承诺关闭后恢复。测试身份下 Web↔iOS 的全新会话/安装已通过双向非默认页恢复，继续覆盖 Android、生产与并发；完整跨端一致性按 P2 验收。Source 文件/HTTP Cache 与图片资源的本地存储仍各自保持既有所有权和限额。UI 直接解码的首图、跳转、滚动、CPU/RSS/GPU baseline 与真机验收继续，区域 decoder、降采样或分片只依据实测决定。
 5. **完成实际部署与恢复。** 在真实 Access、Web 和移动容器验证登录/过期/回跳、Cookie 恢复、执行槽/文件恢复、跨包切换和后台重建；不自动重发无幂等保证的副作用请求。
 
 正式 `be5c3ed` Web 主入口现已通过官方 Arknights 1.6.1 → 1.6.2 的静态快照更新、重新连接与 DREAM 第 3 页首次续读；两版章节会话均关闭、两 Worker 最终终止，见[版本更新证据](../verification/extension-version-web.md)。新版仍走真实上游 200 并重新写入正文，不推广为 Cache 正文复用或零网络；Native 版本切换继续待验。同期正式 Native `lib/main.dart` 成品与正常 TLS/签名会话预验通过，但当前工具无法连接 Simulator 操作 UI，App 未安装/启动，见[主入口准备与阻断](../verification/native-main-entry.md)。生产 Access、Native 主入口和真机等完整 P0 门槛不变。

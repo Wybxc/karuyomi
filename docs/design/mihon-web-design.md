@@ -8,7 +8,7 @@
 
 **访问方式：前端公开，后端由 Cloudflare Access 鉴权。** 页面、共享材料与 Static Assets 扩展产物无需登录；个人数据、Source 网络桥和回调统一走同源 `/api` 和 `/api/*`，只允许本人通过 Access 访问。Access 登录不增加应用内账号系统，也不改变暂缓的“私密使用”范围。
 
-**首要设计目标：多端同步。** 同一部署、同一身份在 Web、iOS、Android 共享书架、分类、阅读进度、书签和非敏感设置。Worker API + D1 是唯一业务权威，客户端只保留当前会话内存状态、未确认草稿与可丢弃缓存；服务端确认后才能显示已保存。先实现跨端在线读写与恢复，再扩展完整外围功能。初版不建立持久本地业务数据库/outbox 或离线合并系统；现有本地书架/进度是待替换的过渡实现，历史验证不算同步完成。执行顺序与门槛见[P2 主线计划](../plan/p2-sync.md)。
+**首要设计目标：多端同步。** 同一部署、同一身份在 Web、iOS、Android 共享书架、分类、阅读进度、书签和非敏感设置。Worker API + D1 是唯一业务权威，客户端只保留当前会话内存状态、未确认草稿与可丢弃缓存；服务端确认后才能显示已保存。先实现跨端在线读写与恢复，再扩展完整外围功能。初版不建立持久本地业务数据库/outbox 或离线合并系统。收藏与阅读进度已接入服务端权威状态，本地业务 SQLite 已移除；分类、书签与同步设置尚待实施，历史本地验证不算同步完成。执行顺序与门槛见[P2 主线计划](../plan/p2-sync.md)。
 
 **当前交付决定：** Static Assets 是 Web 与 Native 扩展索引、清单和 AOT 的最终权威来源，每个扩展只发布最新 build。客户端依据 index/catalog 定位当前版本，由客户端或 Service Worker 管理更新与缓存；新分发路径不再要求向 GitHub Release 推送扩展；已有扩展和索引 Release 已按用户要求删除，不供客户端定位或下载。通用资源继续走 Web Static Assets / Native 内置。Worker 只负责个人数据与 Source 网络控制，不代理扩展正文、不签发私有下载地址，也不给客户端 GitHub 凭据。该决定覆盖此前的 R2 代理、Release 全客户端直下及 Web 镜像提案。**方案已确定，待实现验收：** 2026-11-03 的 Codex 内置浏览器 Release 直下/Range 实测报 `Failed to fetch`，初始 302 与最终 CDN 缺少 `Access-Control-Allow-Origin`；这是此前方案的失败证据。当前 Static Assets 发布、最新版 index/catalog、跨端下载、更新缓存、有界解压和完整加载链路仍须实测，不能把已选方案写成已通过。
 
@@ -271,7 +271,7 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 ## 6. 数据模型和同步语义
 
-核心表（字段为设计草案，需落实协议、D1 约束和原子写入；不要求保留原型本地模型）：
+下表为完整范围的目标模型。收藏、阅读进度及幂等结果的协议、D1 约束和原子写入已接入；分类、书签与同步设置等其余模型尚待实施。实际表与合同以源码及[P2 计划](../plan/p2-sync.md)为准，不要求保留原型本地模型：
 
 | 表                                                          | 关键字段与约束                                                                                                                                                                                        |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -330,19 +330,19 @@ Flutter 收藏与进度已改为 Worker API + D1，Drift/SQLite 业务路径已�
 
 ### 8.2 API 与登录流程
 
-下表为目标接口轮廓；同步业务接口、D1 模型和对应 `.proto` 尚待实现，不能据路径草案认定服务已存在。第一步采用当前状态读取与幂等变更，增量接口按实测需要另行引入。
+收藏与阅读进度已通过 `business.proto`、D1 模型及 `GET /api/library`、`GET /api/state/manga/:mangaKey`、`POST /api/state/mutations` 接入正式入口；分类、书签与同步设置尚待实施。下表同时保留其余目标接口轮廓，是否已实现以对应计划和源码为准，不能据路径草案认定服务已存在。初版采用当前状态读取与幂等变更，增量接口按实测需要另行引入。
 
-| 接口                                              | 行为                                                                                            |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `GET /api/auth/login`                             | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete`             |
-| `GET /api/bootstrap`                              | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT                       |
-| `POST /api/state/mutations`                       | 有界幂等变更，校验 expected revision/epoch，返回权威状态与服务端 revision                       |
-| `GET /api/library` / `GET /api/manga/:id`         | 查询服务端状态；Source 实时调用由浏览器执行                                                     |
-| `POST /api/runtime/sessions`                      | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例                                    |
-| `GET /api/runtime/events`                         | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                          |
-| `POST /api/bridge/http`、`/api/bridge/callback/*` | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法        |
-| `GET /api/covers/:id` / `POST /api/covers`        | 自定义封面读写，验证类型和大小                                                                  |
-| `GET /api/extensions/builds`                      | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准 |
+| 接口                                                  | 行为                                                                                            |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `GET /api/auth/login`                                 | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete`             |
+| `GET /api/bootstrap`                                  | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT                       |
+| `POST /api/state/mutations`                           | 有界幂等变更，校验 expected revision/epoch，返回权威状态与服务端 revision                       |
+| `GET /api/library` / `GET /api/state/manga/:mangaKey` | 查询服务端状态；Source 实时调用由浏览器执行                                                     |
+| `POST /api/runtime/sessions`                          | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例                                    |
+| `GET /api/runtime/events`                             | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                          |
+| `POST /api/bridge/http`、`/api/bridge/callback/*`     | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法        |
+| `GET /api/covers/:id` / `POST /api/covers`            | 自定义封面读写，验证类型和大小                                                                  |
+| `GET /api/extensions/builds`                          | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准 |
 
 旧 `/bridge/*`、`/extensions/*` 后端路径停止服务，不保留公开别名；新的后端功能必须进入 `/api/*`。未知 API 在鉴权后返回 JSON 404，不能返回 `index.html`。通用宿主/桥、Worker 引导与 WASM 由 Web Static Assets 或 Native 内置材料提供；构建清单与 AOT 在所有客户端均从 Static Assets 获取，只保留每扩展最新 build。删除 `/api/extensions/artifacts/:hash` 的扩展正文交付，不保留 R2 或 Worker 代理回退，也不新增私有下载地址/token 服务。
 
@@ -461,7 +461,7 @@ MangaDraft/Xiutaku 的业务轮耗时改善约 1.31/1.71 倍；ProjectSuki 受�
 - 首屏先显示公开 UI，Access 确认后读取 D1 当前业务状态并准备最近使用包；不以旧 CheerpJ 的 16 路径预加载清单驱动 TeaVM，也不自动读取各源目录来“预热”。
 - 采用第 5 节有界执行槽；普通文件恢复、HTTP Cache 命中、bundle 校验/解析/实例化均计入测量。按普通包与 ICU 重包分别测新 Worker、同包复用、跨包切换和压力回收。
 - P0 测“打开应用→首张漫画可见”及下一章，单列 Access 探测/交互登录、产物获取、文件恢复、宿主/Source 就绪、页面列表、图片请求/处理/解码；交互登录不混入引擎指标。覆盖桌面、Android Chrome、iOS Safari/PWA 和真实 Workers 出口；IndexedDB/Web Locks/CSP/回调不通过的平台明确限制。
-- 待测 UI 目标维持本地书架热开 <1 秒、缓存页操作 <100 ms；首图、重包和内存不以桌面本地报告直接定数值 SLA。记录成功率、分布、实际传输量和峰值，再确定目标设备预算。
+- 待测 UI 目标维持当前会话已确认书架视图热开 <1 秒、缓存页操作 <100 ms；服务端首读与重新验证单独测量。首图、重包和内存不以桌面本地报告直接定数值 SLA。记录成功率、分布、实际传输量和峰值，再确定目标设备预算。
 - runtime 请求/后台 enqueue 超时能终止并释放；检查会话过期、跨标签页写入、更新/缓存切换、HTTP Cache 异常写锁恢复与大文件吞吐。文件层单值存放正文、真实配额耗尽/断电、完整 POSIX 等边界继续保留。
 - 二进制桥的实现和验证进度以现行计划为准；在相同 TeaVM/输入/状态下比较原桥与新桥，不将换引擎收益归入桥改造。原版限速、Cookie 时钟和真实缓存保持正确，诊断模式干预只用于解释原因。
 - 发布还须验证完整 DTO/分页/filters/preferences、3–5 个常用与图片处理代表源完整章节、源迁移和同步；研究原型完成不替代这些产品功能。

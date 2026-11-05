@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,7 +114,7 @@ void main() {
           final furthest = _displayedFurthestPage(tester);
           return find.text('阅读进度已保存到服务端').evaluate().length == 1 &&
               furthest != null &&
-              furthest >= _targetPage;
+              furthest >= max(_startPage, _targetPage);
         });
         final repository = catalog.readingProgress;
         expect(repository, isNotNull);
@@ -129,7 +130,8 @@ void main() {
               .timeout(remaining);
           if (progress != null &&
               progress.current.pageIndexHint == _targetPage - 1 &&
-              (progress.furthest?.pageIndexHint ?? -1) >= _targetPage - 1 &&
+              (progress.furthest?.pageIndexHint ?? -1) >=
+                  max(_startPage, _targetPage) - 1 &&
               find.text('阅读进度已保存到服务端').evaluate().length == 1) {
             break;
           }
@@ -264,7 +266,10 @@ void _expectConfirmedProgress(
   final furthest = progress.furthest!;
   expect(furthest.chapterKey, manifest.chapterKey);
   expect(furthest.manifestVersion, manifest.version);
-  expect(furthest.pageIndexHint, greaterThanOrEqualTo(_targetPage - 1));
+  expect(
+    furthest.pageIndexHint,
+    greaterThanOrEqualTo(max(_startPage, _targetPage) - 1),
+  );
   expect(furthest.pageIndexHint, lessThan(manifest.pages.length));
   expect(furthest.pageKey, manifest.pages[furthest.pageIndexHint].key);
 }
