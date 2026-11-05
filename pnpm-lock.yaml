@@ -289,9 +289,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@bufbuild/protobuf':
+        specifier: 2.16.0
+        version: 2.16.0
       '@karuyomi/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@karuyomi/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4

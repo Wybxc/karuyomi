@@ -8,7 +8,7 @@ import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../runtime/runtime_platform_types.dart';
-import '../../data/reader_database.dart';
+import '../../data/business_state_client.dart';
 import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
@@ -114,7 +114,6 @@ final class CatalogController extends ChangeNotifier {
     required this.api,
     required this.runtime,
     required this.rebuildRuntime,
-    this.progressDatabase,
     this.deploymentOrigin,
   }) {
     _subscription = runtime.events.listen(_onRuntimeEvent);
@@ -123,30 +122,41 @@ final class CatalogController extends ChangeNotifier {
   final ApiFetch api;
   final SourceRuntime runtime;
   final Future<void> Function() rebuildRuntime;
-  final ReaderDatabase? progressDatabase;
   final Uri? deploymentOrigin;
   final _readingClients = <ReadingProgressController, int>{};
   Future<bool>? _progressClosing;
 
-  ProgressRepository? get readingProgress {
-    final database = progressDatabase;
+  BusinessStateClient? _businessClient;
+  LibraryRepository? _library;
+  ProgressRepository? _progress;
+
+  BusinessStateClient? get _confirmedBusinessClient {
     final origin = deploymentOrigin;
     final verifiedSubject = subject;
-    if (database == null || origin == null || verifiedSubject == null) {
-      return null;
+    if (origin == null || verifiedSubject == null) return null;
+    final identity = ProgressIdentity(origin: origin, subject: verifiedSubject);
+    if (_businessClient?.identity.key != identity.key) {
+      BusinessStateClient? retained;
+      for (final client in _readingClients.keys) {
+        if (client.repository.identity.key == identity.key) {
+          retained = client.repository.client;
+          retained.rebindApi(api, verifiedIdentity: identity);
+          break;
+        }
+      }
+      _businessClient =
+          retained ?? BusinessStateClient(api: api, identity: identity);
+      _library = LibraryRepository(_businessClient!);
+      _progress = ProgressRepository(_businessClient!);
     }
-    return ProgressRepository(
-      database,
-      ProgressIdentity(origin: origin, subject: verifiedSubject),
-    );
+    return _businessClient;
   }
 
-  LibraryRepository? get library {
-    final progress = readingProgress;
-    return progress == null
-        ? null
-        : LibraryRepository(progress.database, progress.identity);
-  }
+  ProgressRepository? get readingProgress =>
+      _confirmedBusinessClient == null ? null : _progress;
+
+  LibraryRepository? get library =>
+      _confirmedBusinessClient == null ? null : _library;
 
   ReadingProgressController? createReadingProgress(String mangaKey) {
     final repository = readingProgress;
@@ -191,8 +201,7 @@ final class CatalogController extends ChangeNotifier {
   bool get hasUnsavedReadingProgress =>
       _readingClients.keys.any((client) => client.unsaved);
 
-  /// Transfer only local database writers when a service container is replaced.
-  /// These retain their verified identity, not this Catalog or its runtime.
+  /// Session drafts retain their verified identity across service replacement.
   List<ReadingProgressController> takeUnsavedReadingProgress() {
     final clients = _readingClients.keys
         .where((client) => client.unsaved)
@@ -208,6 +217,13 @@ final class CatalogController extends ChangeNotifier {
     final sameIdentity =
         client.repository.identity.key == readingProgress?.identity.key;
     if (_progressClosing != null || !sameIdentity) return false;
+    final clientState = client.repository.client;
+    clientState.rebindApi(api, verifiedIdentity: readingProgress!.identity);
+    if (!identical(_businessClient, clientState)) {
+      _businessClient = clientState;
+      _library = LibraryRepository(clientState);
+      _progress = ProgressRepository(clientState);
+    }
     if (!_readingClients.containsKey(client)) {
       _readingClients[client] = 0;
       client.addListener(_notify);
@@ -216,12 +232,16 @@ final class CatalogController extends ChangeNotifier {
   }
 
   Future<bool> flushReadingProgress() async {
+    final identity = readingProgress?.identity.key;
     final results = await Future.wait(
-      _readingClients.keys.toList().map((client) => client.flush()),
+      _readingClients.keys
+          .where((client) => client.repository.identity.key == identity)
+          .toList()
+          .map((client) => client.flush()),
     );
     _retireSavedProgress();
     _notify();
-    return results.every((saved) => saved);
+    return results.every((saved) => saved) && !hasUnsavedReadingProgress;
   }
 
   void _retireSavedProgress() {
@@ -420,10 +440,9 @@ final class CatalogController extends ChangeNotifier {
       subject = null;
       email = null;
       builds = const [];
-      // Writers retain their original verified identity. Failed drafts remain
-      // retryable; closing the Catalog's progress service would prevent reuse.
-      await flushReadingProgress();
-      if (_closed || epoch != _epoch) return;
+      _notify();
+      // Confirm the cookie's current identity before attempting old drafts.
+      // An old subject's rejected POST must not interrupt the new bootstrap.
       if (_runtimeNeedsRebuild) {
         _rebuildingRuntime = true;
         try {
@@ -463,6 +482,18 @@ final class CatalogController extends ChangeNotifier {
       }
       if (_closed || epoch != _epoch) return;
       subject = confirmedSubject;
+      final state = _confirmedBusinessClient;
+      if (state != null) {
+        state.rebindApi(api, verifiedIdentity: state.identity);
+        for (final client in _readingClients.keys) {
+          if (client.repository.identity.key == state.identity.key) {
+            client.repository.client.rebindApi(
+              api,
+              verifiedIdentity: state.identity,
+            );
+          }
+        }
+      }
       email = confirmedEmail;
       builds = available;
       status = ServiceStatus.ready;
@@ -637,7 +668,7 @@ final class CatalogController extends ChangeNotifier {
       (build) => build.packageName == entry.packageName,
     );
     if (available.isEmpty) {
-      error = '这部漫画的漫画源当前不可用；收藏和本地进度仍保留。';
+      error = '这部漫画的漫画源当前不可用；服务端收藏和进度仍保留。';
       _notify();
       return null;
     }
@@ -648,7 +679,7 @@ final class CatalogController extends ChangeNotifier {
       (source) => source.id == entry.sourceId,
     );
     if (sources == null || sources.isEmpty) {
-      error = '当前扩展中找不到原漫画源；收藏和本地进度仍保留。';
+      error = '当前扩展中找不到原漫画源；服务端收藏和进度仍保留。';
       _notify();
       return null;
     }

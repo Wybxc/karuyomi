@@ -6,7 +6,7 @@
 
 当前各实际边界、quicktype/OpenAPI/FlatBuffers/GraphQL 与平台通道的适用范围见[数据交换评估](data-exchange-boundaries.md)。Protobuf 主控不意味着所有文件、原生平台通道和二进制 ABI 都必须套用同一种方案。
 
-2026-11-05，业务设计以多端同步为首要目标：Worker API + D1 是唯一业务权威，Flutter Web/iOS/Android 共用业务状态合同。现有运行时控制、bootstrap 和静态 DTO 已接入，不代表书架、进度、设置的读写与并发合同已实现；新增范围按[协议计划](../plan/cross-language-protocol.md)和[同步计划](../plan/p2-sync.md)优先推进。
+2026-11-05，业务设计以多端同步为首要目标：Worker API + D1 是唯一业务权威，Flutter Web/iOS/Android 共用业务状态合同。运行时控制、bootstrap 和静态 DTO 之外，`business.proto` 已覆盖收藏、完整 Manga 元数据、阅读锚、revision、epoch、mutation 与有界集合响应，并接入正式 Worker/Dart 读写。分类、书签和设置合同继续按[协议计划](../plan/cross-language-protocol.md)和[同步计划](../plan/p2-sync.md)优先推进。
 
 ## 比较
 

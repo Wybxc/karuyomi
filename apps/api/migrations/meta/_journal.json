@@ -22,6 +22,13 @@
       "when": 1793691421736,
       "tag": "0002_complete_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793858936508,
+      "tag": "0003_overconfident_champions",
+      "breakpoints": true
     }
   ]
 }

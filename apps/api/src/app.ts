@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { createHttpBridge } from './http-bridge.js';
+import { createStateRoutes } from './state-routes.js';
 import {
   protocolVersion,
   BootstrapStage,
@@ -75,6 +76,7 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
 
   app.get('/api/auth/login', (c) => {
     const returnTo = c.req.query('returnTo') ?? '/auth/complete';
+    const attempt = c.req.query('attempt');
     // Keep the login continuation on one of the public application routes.
     // In particular, never redirect back into Access or an arbitrary origin.
     if (
@@ -87,6 +89,20 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
       ].includes(returnTo)
     ) {
       return c.json({ error: 'invalid_return_to' }, 400);
+    }
+    if (attempt !== undefined) {
+      if (
+        returnTo !== '/auth/complete' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          attempt,
+        )
+      ) {
+        return c.json({ error: 'invalid_authentication_attempt' }, 400);
+      }
+      return c.redirect(
+        `${returnTo}?attempt=${encodeURIComponent(attempt)}`,
+        303,
+      );
     }
     return c.redirect(returnTo, 303);
   });
@@ -101,6 +117,7 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
     return c.json(encodeBootstrap(body));
   });
   app.route('/api/bridge', createHttpBridge());
+  app.route('/api', createStateRoutes());
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((_error, c) => c.json({ error: 'internal_error' }, 500));
   return app;

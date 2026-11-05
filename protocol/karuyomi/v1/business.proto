@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package karuyomi.v1;
+
+import "karuyomi/v1/control.proto";
+
+// Server-owned, account-scoped business state. Authentication is supplied by
+// the API transport, never by an identity field in the request body.
+message LibraryMetadata {
+  string package_name = 1;
+  string source_id = 2;
+  string source_name = 3;
+  string source_lang = 4;
+  Manga manga = 5;
+}
+
+message MangaResume {
+  string chapter_key = 1;
+  bool reversed_order = 2;
+}
+
+message MangaState {
+  string manga_key = 1;
+  // Covers every metadata, favorite, progress and resume mutation for a manga.
+  uint32 revision = 2;
+  LibraryMetadata metadata = 3;
+  bool favorite = 4;
+  uint32 added_at_seconds = 5;
+  MangaResume resume = 6;
+}
+
+message ReadingAnchor {
+  string chapter_key = 1;
+  string page_key = 2;
+  string manifest_version = 3;
+  uint32 page_index_hint = 4;
+  double normalized_offset = 5;
+}
+
+message ChapterProgressState {
+  string chapter_key = 1;
+  ReadingAnchor current = 2;
+  ReadingAnchor furthest = 3;
+  uint32 epoch = 4;
+  bool completed = 5;
+}
+
+// The server projects anchors by page identity, never by a stale index hint.
+message ChapterSnapshot {
+  string chapter_key = 1;
+  string manifest_version = 2;
+  repeated string page_keys = 3;
+}
+
+message SetFavorite {
+  LibraryMetadata metadata = 1;
+  bool favorite = 2;
+}
+
+message SaveProgress {
+  ChapterSnapshot snapshot = 1;
+  ChapterProgressState progress = 2;
+  bool reversed_order = 3;
+}
+
+message ResetProgress {
+  ChapterSnapshot snapshot = 1;
+  bool reversed_order = 2;
+}
+
+message StateMutation {
+  uint32 schema_version = 1;
+  // UUID, retained with the exact acknowledged response for idempotent retries.
+  string mutation_id = 2;
+  string manga_key = 3;
+  uint32 expected_revision = 4;
+  oneof operation {
+    SetFavorite set_favorite = 10;
+    LibraryMetadata update_metadata = 11;
+    SaveProgress save_progress = 12;
+    ResetProgress reset_progress = 13;
+  }
+}
+
+enum BusinessStateErrorCode {
+  BUSINESS_STATE_ERROR_CODE_UNSPECIFIED = 0;
+  BUSINESS_STATE_ERROR_CODE_INVALID_INPUT = 1;
+  BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT = 2;
+  BUSINESS_STATE_ERROR_CODE_STALE_EPOCH = 3;
+  BUSINESS_STATE_ERROR_CODE_IDEMPOTENCY_CONFLICT = 4;
+  BUSINESS_STATE_ERROR_CODE_UNAVAILABLE = 5;
+  BUSINESS_STATE_ERROR_CODE_LIMIT_EXCEEDED = 6;
+}
+
+message BusinessStateError {
+  BusinessStateErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
+
+message StateMutationResponse {
+  uint32 schema_version = 1;
+  string mutation_id = 2;
+  uint32 account_revision = 3;
+  MangaState manga = 4;
+  ChapterProgressState progress = 5;
+  BusinessStateError error = 6;
+}
+
+message MangaStateResponse {
+  uint32 schema_version = 1;
+  uint32 account_revision = 2;
+  MangaState manga = 3;
+  ChapterProgressState progress = 4;
+  BusinessStateError error = 5;
+}
+
+message LibraryPageResponse {
+  uint32 schema_version = 1;
+  // Subsequent pages must use this revision; a changed revision restarts paging.
+  uint32 account_revision = 2;
+  repeated MangaState entries = 3;
+  string next_key = 4;
+  BusinessStateError error = 5;
+}

@@ -40,8 +40,8 @@ Wrangler 4.156.1 的 D1 `--file --json` 会由另一套 logger 输出上传进�
 
 命令见 [EXTENSIONS](EXTENSIONS.md) 和 [TeaVM README](../runtime/teavm/README.md)。提交前仍须先 `pnpm format`，再 `pnpm format:check`，并通过真实 prek hook。
 
-## Drift 生成模型
+## 业务状态与生成模型
 
-以下是现有本地业务实现的生成约束；多端同步优先后的目标是直接用 Worker API + D1 替换其业务权威入口，见[P2](plan/p2-sync.md)。本轮仅调整计划，Drift 代码和检查尚未移除，不能提前跳过现有生成一致性门。
+收藏与阅读进度通过 `protocol/karuyomi/v1/business.proto` 生成 TypeScript/Dart 模型，`pnpm generate:check` 检查一致性；D1 表由 `apps/api/src/db/schema.ts` 定义，使用固定 Drizzle Kit 生成迁移。API 集成测试在真实 workerd/Miniflare D1 中执行受信 JWT、条件写入和原子失败验证。
 
-阅读进度数据库使用 `apps/reader/pubspec.yaml` 精确锁定的 Drift/Drift Dev 与官方 build_runner。修改表后在 `apps/reader/` 运行 `dart run build_runner build`，将自有表定义和官方 `reader_database.g.dart` 一起审阅提交。`pnpm flutter:check` 用官方生成器重建该目标并逐字节检查，发现差异时要求审阅生成结果；随后继续静态分析与测试。`.g.dart` 与现有 Protobuf 生成模型一样不参与普通源码再排版，类型分析与真实数据库测试仍包含它们。
+本地业务 Drift/SQLite、build_runner 和数据库 Web WASM/Worker 资产已移除。`pnpm flutter:check` 继续执行三个 Dart/Flutter 项目的静态分析、测试和格式检查；客户端仅保留会话状态，不再生成本地数据库代码。Source 自身文件/HTTP Cache 与业务数据分离，仍保留原有存储生命周期。

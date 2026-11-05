@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'data/reader_database.dart';
 import 'diagnostics/reader_baseline.dart';
 import 'diagnostics/reader_baseline_host.dart';
 import 'features/reader/reading_progress_controller.dart';
@@ -16,14 +15,8 @@ import 'runtime/platform_runtime.dart';
 void main() => runApp(const KaruyomiApp());
 
 class KaruyomiApp extends StatefulWidget {
-  const KaruyomiApp({
-    super.key,
-    this.platform,
-    this.database,
-    this.platformFactory,
-  });
+  const KaruyomiApp({super.key, this.platform, this.platformFactory});
   final PlatformRuntime? platform;
-  final ReaderDatabase? database;
   final PlatformRuntime Function(Uri? origin)? platformFactory;
 
   @override
@@ -59,7 +52,6 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
       themeMode: _themeMode,
       onThemeChanged: (value) => setState(() => _themeMode = value),
       platform: widget.platform,
-      database: widget.database,
       platformFactory: widget.platformFactory,
     ),
   );
@@ -71,14 +63,12 @@ class AppShell extends StatefulWidget {
     required this.themeMode,
     required this.onThemeChanged,
     this.platform,
-    this.database,
     this.platformFactory,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeChanged;
   final PlatformRuntime? platform;
-  final ReaderDatabase? database;
   final PlatformRuntime Function(Uri? origin)? platformFactory;
 
   @override
@@ -91,7 +81,6 @@ class _AppShellState extends State<AppShell> {
   CatalogController? _catalog;
   String? _configurationError;
   Map<String, Object?>? _pendingContinuation;
-  ReaderDatabase? _database;
   final _retiredProgress = <ReadingProgressController>{};
   bool _retryingProgress = false;
   bool _changingService = false;
@@ -127,8 +116,6 @@ class _AppShellState extends State<AppShell> {
         api: _platform!,
         runtime: _platform!.runtime,
         rebuildRuntime: _platform!.rebuild,
-        progressDatabase: _database ??=
-            widget.database ?? ReaderDatabase.open(),
         deploymentOrigin: _platform!.origin,
       );
       _configurationError = null;
@@ -248,7 +235,6 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     try {
-      await _saveBeforeWebAuthentication();
       if (!mounted) return;
       final authenticated = await platform.authenticate(
         context,
@@ -285,29 +271,14 @@ class _AppShellState extends State<AppShell> {
     if (platform == null || recovery.origin != platform.origin.origin) {
       throw StateError('服务已改变，请返回浏览');
     }
-    await _saveBeforeWebAuthentication();
     if (!mounted) return false;
-    // Web resumes through the next document's _connect. Native keeps this
-    // Reader until its visible login returns, then owns cleanup and reconnect.
+    // Authentication retains this document and its unconfirmed session drafts.
     final authenticated = await platform.authenticate(
       context,
       pending: {'tab': 1, 'reader': recovery.toJson()},
     );
-    if (!kIsWeb) platform.takePendingAuthentication();
+    platform.takePendingAuthentication();
     return authenticated;
-  }
-
-  Future<void> _saveBeforeWebAuthentication() async {
-    if (!kIsWeb) return;
-    await _catalog?.flushReadingProgress();
-    for (final client in _retiredProgress.toList()) {
-      if (!await client.flush()) continue;
-      if (_retiredProgress.remove(client)) client.dispose();
-    }
-    if (_catalog?.hasUnsavedReadingProgress == true ||
-        _retiredProgress.any((client) => client.unsaved)) {
-      throw StateError('本地进度尚未保存，当前阅读仍保留；请重试保存后登录。');
-    }
   }
 
   Future<void> _changeService() async {
@@ -511,8 +482,6 @@ class _AppShellState extends State<AppShell> {
   void dispose() {
     final catalog = _catalog;
     final platform = _platform;
-    final database = _database;
-    final ownsDatabase = widget.database == null;
     final retired = _retiredProgress.toList();
     catalog?.dispose();
     unawaited(() async {
@@ -522,7 +491,6 @@ class _AppShellState extends State<AppShell> {
         client.dispose();
       }
       await platform?.dispose();
-      if (ownsDatabase) await database?.close();
     }());
     _originField.dispose();
     super.dispose();

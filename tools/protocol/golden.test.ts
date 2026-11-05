@@ -30,6 +30,10 @@ import {
   SourceResultSchema,
   WorkerCommandSchema,
   WorkerResponseSchema,
+  StateMutationSchema,
+  StateMutationResponseSchema,
+  MangaStateResponseSchema,
+  LibraryPageResponseSchema,
 } from '@karuyomi/protocol';
 import * as contract from '../../packages/contracts/src/index.ts';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +50,12 @@ import {
   sourceId,
   type GoldenFixture,
   type GoldenType,
+  businessMangaKey,
+  businessMutationId,
+  businessSnapshot,
+  businessProgress,
+  businessAnchor,
+  libraryMetadata,
 } from './fixtures.ts';
 
 const schemas: Record<GoldenType, DescMessage> = {
@@ -64,6 +74,10 @@ const schemas: Record<GoldenType, DescMessage> = {
   ImageFrameControl: ImageFrameControlSchema,
   WorkerCommand: WorkerCommandSchema,
   WorkerResponse: WorkerResponseSchema,
+  StateMutation: StateMutationSchema,
+  StateMutationResponse: StateMutationResponseSchema,
+  MangaStateResponse: MangaStateResponseSchema,
+  LibraryPageResponse: LibraryPageResponseSchema,
 };
 
 function canonical(fixture: GoldenFixture): JsonValue {
@@ -209,6 +223,26 @@ test('opaque memo numeric lexemes and optional scalar presence are exact', () =>
 
 const invalidFixtures: GoldenFixture[] = [
   {
+    name: 'business-revision-overflow',
+    type: 'StateMutation',
+    value: { expectedRevision: 4294967296 },
+  },
+  {
+    name: 'business-revision-fraction',
+    type: 'StateMutation',
+    value: { expectedRevision: 1.5 },
+  },
+  {
+    name: 'business-identity-is-transport-only',
+    type: 'StateMutation',
+    value: { subject: 'body-subject' },
+  },
+  {
+    name: 'business-two-operations',
+    type: 'StateMutation',
+    value: { resetProgress: {}, saveProgress: {} },
+  },
+  {
     name: 'source-resource-has-no-image-metadata',
     type: 'ImageResource',
     value: {
@@ -330,6 +364,10 @@ test('product semantic validators accept the generated golden matrix', () => {
     Bootstrap: contract.bootstrapSchema.parse,
     WorkerCommand: contract.workerCommandSchema.parse,
     WorkerResponse: contract.workerResponseSchema.parse,
+    StateMutation: contract.stateMutationSchema.parse,
+    StateMutationResponse: contract.stateMutationResponseSchema.parse,
+    MangaStateResponse: contract.mangaStateResponseSchema.parse,
+    LibraryPageResponse: contract.libraryPageResponseSchema.parse,
   };
   for (const fixture of goldenFixtures) {
     const parse = parsers[fixture.type];
@@ -591,6 +629,163 @@ test('Worker envelopes bind Source and image request/generation/build identities
     contract.workerCommandSchema.parse({
       envelope: { ...envelope, protocolVersion: contract.protocolVersion + 1 },
       shutdown: {},
+    }),
+  );
+});
+
+test('business state controls enforce identities, uint32, snapshots and transport budgets', () => {
+  const mutation = {
+    schemaVersion: 1,
+    mutationId: businessMutationId,
+    mangaKey: businessMangaKey,
+    expectedRevision: 0,
+    saveProgress: { snapshot: businessSnapshot, progress: businessProgress },
+  };
+  assert.doesNotThrow(() => contract.stateMutationSchema.parse(mutation));
+  for (const change of [
+    { schemaVersion: 0 },
+    { mutationId: 'not-a-uuid' },
+    { mangaKey: 'not-a-canonical-key' },
+    { expectedRevision: -1 },
+    { expectedRevision: 4294967296 },
+    { expectedRevision: 1.5 },
+    { subject: 'untrusted-identity' },
+    { resetProgress: { snapshot: businessSnapshot } },
+  ])
+    assert.throws(() =>
+      contract.stateMutationSchema.parse({ ...mutation, ...change }),
+    );
+  for (const current of [
+    { ...businessAnchor, normalizedOffset: 1.01 },
+    { ...businessAnchor, normalizedOffset: 'NaN' },
+    { ...businessAnchor, pageIndexHint: 0 },
+    {
+      ...businessAnchor,
+      chapterKey: 'wrong-chapter',
+    },
+    {
+      ...businessAnchor,
+      manifestVersion: 'old-manifest',
+    },
+  ])
+    assert.throws(() =>
+      contract.stateMutationSchema.parse({
+        ...mutation,
+        saveProgress: {
+          snapshot: businessSnapshot,
+          progress: { ...businessProgress, current },
+        },
+      }),
+    );
+  assert.throws(() =>
+    contract.stateMutationSchema.parse({
+      ...mutation,
+      saveProgress: {
+        snapshot: { ...businessSnapshot, pageKeys: ['p-1', 'p-1'] },
+        progress: businessProgress,
+      },
+    }),
+  );
+  assert.throws(() =>
+    contract.stateMutationSchema.parse({
+      ...mutation,
+      saveProgress: {
+        snapshot: {
+          ...businessSnapshot,
+          pageKeys: Array.from({ length: 2049 }, (_, index) => `p-${index}`),
+        },
+        progress: businessProgress,
+      },
+    }),
+  );
+  assert.throws(() =>
+    contract.stateMutationSchema.parse({
+      ...mutation,
+      saveProgress: {
+        snapshot: businessSnapshot,
+        progress: { ...businessProgress, epoch: 4294967296 },
+      },
+    }),
+  );
+  const memo = JSON.stringify({
+    payload: 'x'.repeat(contract.SOURCE_MEMO_LIMIT - 14),
+  });
+  assert.equal(
+    new TextEncoder().encode(memo).byteLength,
+    contract.SOURCE_MEMO_LIMIT,
+  );
+  const setFavorite = {
+    metadata: { ...libraryMetadata, manga: { ...manga, memoJson: memo } },
+    favorite: true,
+  };
+  assert.throws(() =>
+    contract.stateMutationSchema.parse({
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      mangaKey: businessMangaKey,
+      setFavorite: {
+        metadata: { ...libraryMetadata, manga: { ...manga, title: '' } },
+        favorite: true,
+      },
+    }),
+  );
+  assert.doesNotThrow(() =>
+    contract.stateMutationSchema.parse({
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      mangaKey: businessMangaKey,
+      setFavorite,
+    }),
+  );
+  assert.throws(() =>
+    contract.stateMutationSchema.parse({
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      mangaKey: businessMangaKey,
+      setFavorite: {
+        ...setFavorite,
+        metadata: {
+          ...libraryMetadata,
+          manga: {
+            ...manga,
+            memoJson: JSON.stringify({
+              payload: 'x'.repeat(contract.SOURCE_MEMO_LIMIT),
+            }),
+          },
+        },
+      },
+    }),
+  );
+  assert.throws(() =>
+    contract.stateMutationSchema.parse({
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      mangaKey: businessMangaKey,
+      setFavorite: {
+        metadata: {
+          ...libraryMetadata,
+          sourceName: 'é'.repeat(contract.BUSINESS_REQUEST_LIMIT),
+        },
+        favorite: true,
+      },
+    }),
+  );
+  assert.doesNotThrow(() =>
+    contract.stateMutationResponseSchema.parse({
+      schemaVersion: 1,
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_INVALID_INPUT',
+        message: 'Could not parse mutation',
+      },
+    }),
+  );
+  assert.throws(() =>
+    contract.mangaStateResponseSchema.parse({ schemaVersion: 1 }),
+  );
+  assert.throws(() =>
+    contract.mangaStateResponseSchema.parse({
+      schemaVersion: 1,
+      error: { code: 999, message: 'Unknown error' },
     }),
   );
 });

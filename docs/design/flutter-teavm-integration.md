@@ -6,7 +6,7 @@
 
 首版决策固定为：Flutter 渲染阅读界面；扩展在浏览器/WebView 的 Worker 中执行；原生控制页通过当前单一 hostname 的 HTTPS origin 加载；控制消息与图片资源分开；默认一个扩展执行槽，按包复用。内嵌 JS 引擎、C/FFI 与 WasmGC 未采用，第 5–7 节仅保留评估记录，不形成实施阶段、自动回退路径或并行研究任务。
 
-多端同步是业务设计的首要目标。Web、iOS、Android 使用同一份业务协议和 Worker API + D1 权威状态；书架、进度和设置随服务端合同共同交付，不先建立各端独立业务数据库再补同步。当前本地书架/进度实现与历史恢复证据仍待按[同步计划](../plan/p2-sync.md)替换和重新验收，本次设计调整不代表业务 API 已经实现。
+多端同步是业务设计的首要目标。Web、iOS、Android 使用同一份业务协议和 Worker API + D1 权威状态；书架、进度和设置随服务端合同共同交付，不先建立各端独立业务数据库再补同步。收藏与进度已切换到同一服务端业务 API，本地业务 SQLite 已移除；历史本地恢复证据保留原范围，当前实际跨平台闭环按[同步计划](../plan/p2-sync.md)重新验收。
 
 Flutter widgets 替代此前 React UI 三选一；Dart 依赖交给 Pub，pnpm 继续管理 TypeScript 后端、JS 宿主和构建编排。Java/Maven/TeaVM 工具链保留。RN、SwiftUI 和纯 React PWA 不再是产品选型候选；Flutter Web 可按需要提供 PWA 安装外壳。
 

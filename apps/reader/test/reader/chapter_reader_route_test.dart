@@ -1,11 +1,8 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' show LazyDatabase, QueryExecutor;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
-import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
@@ -17,14 +14,12 @@ void main() {
   testWidgets(
     'exit during delayed progress restore closes unmounted provider and ignores late result',
     (tester) async {
-      final executor = Completer<QueryExecutor>();
-      final database = ReaderDatabase(LazyDatabase(() => executor.future));
+      final progressGate = Completer<void>();
       final platform = TestPlatform();
       final catalog = CatalogController(
         api: platform,
         runtime: platform.runtime,
         rebuildRuntime: platform.rebuild,
-        progressDatabase: database,
         deploymentOrigin: platform.origin,
       );
       await catalog.connect();
@@ -43,6 +38,9 @@ void main() {
         reference: catalog.sourceReference,
         logicalChapterKey: sequence.entries.first.key,
       ))!;
+      platform.beforeApiFetch = (path) async {
+        if (path.startsWith('/api/state/manga/')) await progressGate.future;
+      };
       await tester.pumpWidget(
         MaterialApp(
           home: ChapterReaderRoute(
@@ -62,7 +60,7 @@ void main() {
       expect(platform.imageControls.map((entry) => entry.$1), [
         'closePageSession',
       ]);
-      executor.complete(NativeDatabase.memory());
+      progressGate.complete();
       await tester.pumpAndSettle();
       expect(find.byType(ReaderScreen), findsNothing);
       expect(catalog.hasUnsavedReadingProgress, false);
@@ -70,7 +68,6 @@ void main() {
       await catalog.closeReadingProgress();
       catalog.dispose();
       await platform.dispose();
-      await database.close();
     },
   );
 

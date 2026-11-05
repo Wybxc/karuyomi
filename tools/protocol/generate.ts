@@ -48,6 +48,12 @@ export async function main(args: string[]): Promise<void> {
     : ROOT;
   try {
     await run('pnpm', ['exec', 'buf', 'generate', '--output', output]);
+    await writeFile(
+      path.join(output, 'packages/protocol/src/index.ts'),
+      warning +
+        "export * from './karuyomi/v1/control_pb.js';\n" +
+        "export * from './karuyomi/v1/business_pb.js';\n",
+    );
     if (check) {
       for (const directory of generatedDirectories) {
         const actualDirectory = path.join(ROOT, directory);

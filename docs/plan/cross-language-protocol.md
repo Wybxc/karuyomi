@@ -6,7 +6,7 @@
 
 正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v4，原型不兼容旧材料。v4 增加 host entry/HTTP owner 约束，IDL 新增 `storage_busy` 明确表示 namespace 执行槽占用；历史 v3 运行证据不自动覆盖 v4。
 
-以上已实现范围是运行时与现有 API 控制合同，**业务同步协议尚未实现**。多端同步现为首要设计目标，书架、进度和设置的 Worker API + D1 合同是当前优先待办，与 [P2](p2-sync.md)共同推进；不等待外围 UI 全部完成后再定义跨端状态。
+以上运行时与现有 API 控制合同之外，**收藏与阅读进度业务合同已接入**：`business.proto` 生成双端模型，正式 Worker/Dart 通过 ProtoJSON 交换带 revision、epoch 和 mutation ID 的状态；分类、书签与设置尚待扩展。多端同步现为首要设计目标，书架、进度和设置的 Worker API + D1 合同是当前优先待办，与 [P2](p2-sync.md)共同推进；不等待外围 UI 全部完成后再定义跨端状态。
 
 ## 当前优先待办：业务状态合同
 

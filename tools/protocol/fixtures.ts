@@ -20,7 +20,11 @@ export type GoldenType =
   | 'Bootstrap'
   | 'ImageFrameControl'
   | 'WorkerCommand'
-  | 'WorkerResponse';
+  | 'WorkerResponse'
+  | 'StateMutation'
+  | 'StateMutationResponse'
+  | 'MangaStateResponse'
+  | 'LibraryPageResponse';
 
 export interface GoldenFixture {
   name: string;
@@ -186,7 +190,114 @@ const envelope: JsonObject = {
   requestId,
 };
 
+export const libraryMetadata: JsonObject = {
+  packageName,
+  sourceId,
+  sourceName: 'Golden',
+  sourceLang: 'en',
+  manga,
+};
+export const businessMangaKey = 'd'.repeat(64);
+export const businessMutationId = 'f6c8c7ed-7db8-41d2-9e44-494281e61fd9';
+export const businessAnchor: JsonObject = {
+  chapterKey: 'chapter-golden',
+  pageKey: 'p-1',
+  manifestVersion: 'manifest-golden',
+  pageIndexHint: 1,
+  normalizedOffset: 0.75,
+};
+export const businessProgress: JsonObject = {
+  chapterKey: 'chapter-golden',
+  current: businessAnchor,
+  furthest: { ...businessAnchor, normalizedOffset: 1 },
+  epoch: 4294967295,
+  completed: true,
+};
+export const businessSnapshot: JsonObject = {
+  chapterKey: 'chapter-golden',
+  manifestVersion: 'manifest-golden',
+  pageKeys: ['p-0', 'p-1'],
+};
+export const businessManga: JsonObject = {
+  mangaKey: businessMangaKey,
+  revision: 4294967295,
+  metadata: libraryMetadata,
+  favorite: true,
+  addedAtSeconds: 4294967295,
+  resume: { chapterKey: 'chapter-golden', reversedOrder: true },
+};
+const businessMutation: JsonObject = {
+  schemaVersion: 1,
+  mutationId: businessMutationId,
+  mangaKey: businessMangaKey,
+  expectedRevision: 0,
+};
+
 export const goldenFixtures: GoldenFixture[] = [
+  ...(
+    [
+      ['setFavorite', { metadata: libraryMetadata, favorite: false }],
+      ['updateMetadata', libraryMetadata],
+      [
+        'saveProgress',
+        {
+          snapshot: businessSnapshot,
+          progress: businessProgress,
+          reversedOrder: true,
+        },
+      ],
+      ['resetProgress', { snapshot: businessSnapshot, reversedOrder: false }],
+    ] satisfies Array<[string, JsonObject]>
+  ).map(([operation, value]): GoldenFixture => ({
+    name: `business-mutation-${operation}`,
+    type: 'StateMutation',
+    value: { ...businessMutation, [operation]: value },
+  })),
+  {
+    name: 'business-mutation-confirmed-uint32-maximum',
+    type: 'StateMutationResponse',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      accountRevision: 4294967295,
+      manga: businessManga,
+      progress: businessProgress,
+    },
+  },
+  {
+    name: 'business-state-empty-first-read',
+    type: 'MangaStateResponse',
+    value: {
+      schemaVersion: 1,
+      accountRevision: 0,
+      manga: { mangaKey: businessMangaKey, revision: 0 },
+    },
+  },
+  {
+    name: 'business-library-page',
+    type: 'LibraryPageResponse',
+    value: {
+      schemaVersion: 1,
+      accountRevision: 7,
+      entries: [businessManga],
+      nextKey: businessMangaKey,
+    },
+  },
+  {
+    name: 'business-mutation-typed-conflict',
+    type: 'StateMutationResponse',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      accountRevision: 7,
+      manga: businessManga,
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT',
+        message: 'Changed on another device',
+        retryable: false,
+      },
+    },
+  },
   { name: 'manga-full-opaque-memo', type: 'Manga', value: manga },
   {
     name: 'manga-absent-optionals',

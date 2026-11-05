@@ -41,7 +41,7 @@
 
 **GraphQL** 适合未来独立、多实体、多客户端且需要字段裁剪的书架/目录查询 API；本项目目前没有该服务，Source 查询仍由原插件负责，宿主主控是命令/取消/租约，新增执行器与查询缓存没有明确收益。GraphQL 规范不附送各语言 SDK；Flutter 可用 Ferry 或 graphql_flutter 等成熟方案。图片仍应使用独立二进制交付，GraphQL 也不代替同步冲突或取消协议。[Ferry](https://ferrygraphql.com/docs/)、[graphql_flutter](https://github.com/zino-hofmann/graphql-flutter)、[二进制限制](https://graphql.org/learn/file-uploads/)
 
-Source `memo_json` 是扩展私有、不透明且有界的 JSON，不从样本推断固定业务模型。第三方上游 HTTP 格式不由本项目掌控，不能为了选择 IDL 修改官方 Source。Drift/SQLite 的原生/WASM 互操作由成熟库管理；仅同一 Dart 应用写读的本地进度/sessionStorage JSON 不算需要跨语言生成的自有协议。
+Source `memo_json` 是扩展私有、不透明且有界的 JSON，不从样本推断固定业务模型。第三方上游 HTTP 格式不由本项目掌控，不能为了选择 IDL 修改官方 Source。收藏与阅读进度通过 `business.proto` 的生成模型跨 Dart/Worker 交换；客户端业务 SQLite 已移除。仅同一 Dart 应用使用的临时页面恢复状态不算需要跨语言生成的自有协议。
 
 ## 后续顺序
 

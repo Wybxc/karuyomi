@@ -1,0 +1,181 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/data/business_state_validation.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
+
+wire.LibraryMetadata metadata({String? memo, String url = '/manga/test'}) =>
+    wire.LibraryMetadata(
+      packageName: 'source.test',
+      sourceId: '9007199254740993',
+      sourceName: 'Test',
+      sourceLang: 'en',
+      manga: wire.Manga(url: url, title: 'Test', memoJson: memo),
+    );
+
+wire.MangaState manga(String digit) => wire.MangaState(
+  mangaKey: sha256
+      .convert(
+        utf8.encode(
+          jsonEncode(['source.test', '9007199254740993', '/manga/test/$digit']),
+        ),
+      )
+      .toString(),
+  revision: 1,
+  metadata: metadata(url: '/manga/test/$digit'),
+  favorite: true,
+  addedAtSeconds: 2000000000,
+);
+
+wire.ReadingAnchor anchor({String chapterKey = 'chapter'}) =>
+    wire.ReadingAnchor(
+      chapterKey: chapterKey,
+      pageKey: 'page',
+      manifestVersion: 'manifest',
+      normalizedOffset: 0.75,
+    );
+
+void main() {
+  test('business integers are exact uint32 values', () {
+    for (final value in [0, 1, 0xffffffff]) {
+      expect(() => validateBusinessRevision(value), returnsNormally);
+    }
+    for (final value in [-1, 0x100000000, 9007199254740993]) {
+      expect(() => validateBusinessRevision(value), throwsFormatException);
+    }
+  });
+
+  test(
+    'metadata preserves opaque memo and bounds references, source IDs and bytes',
+    () {
+      const opaque = '{"large":9007199254740993,"decimal":123.4500}';
+      final value = metadata(memo: opaque);
+      validateBusinessMetadata(value);
+      expect(value.manga.memoJson, opaque);
+      final memo = jsonEncode({'payload': 'x' * (wire.sourceMemoLimit - 14)});
+      expect(utf8.encode(memo).length, wire.sourceMemoLimit);
+      expect(
+        () => validateBusinessMetadata(metadata(memo: memo)),
+        returnsNormally,
+      );
+      final invalid = <wire.LibraryMetadata>[
+        metadata()..sourceId = '9223372036854775808',
+        metadata()..sourceId = '-9223372036854775809',
+        metadata()..sourceName = '',
+        metadata()..sourceLang = '',
+        metadata()..clearManga(),
+        metadata()..manga.url = '',
+        metadata()..manga.title = '',
+        metadata()..manga.updateStrategy = 'UNKNOWN',
+        metadata(memo: '[]'),
+        metadata(memo: jsonEncode({'payload': 'x' * wire.sourceMemoLimit})),
+        metadata()..manga.title = 'é' * (96 * 1024),
+      ];
+      for (final item in invalid) {
+        expect(() => validateBusinessMetadata(item), throwsFormatException);
+      }
+    },
+  );
+
+  test(
+    'progress accepts unresolved historical pages but rejects invalid anchors',
+    () {
+      final valid = wire.ChapterProgressState(
+        chapterKey: 'chapter',
+        current: anchor(),
+        furthest: anchor()..manifestVersion = 'historical-manifest',
+        epoch: 0xffffffff,
+      );
+      expect(
+        () => validateBusinessProgress(valid, chapterKey: 'chapter'),
+        returnsNormally,
+      );
+      expect(
+        () => validateBusinessProgress(valid, chapterKey: 'other'),
+        throwsFormatException,
+      );
+      for (final item in [
+        valid.deepCopy()..clearCurrent(),
+        valid.deepCopy()..current.chapterKey = 'other',
+        valid.deepCopy()..furthest.chapterKey = 'other',
+        valid.deepCopy()..current.normalizedOffset = double.nan,
+        valid.deepCopy()..current.normalizedOffset = 1.01,
+        valid.deepCopy()..current.pageIndexHint = 2048,
+        valid.deepCopy()..current.pageKey = '',
+      ]) {
+        expect(() => validateBusinessProgress(item), throwsFormatException);
+      }
+    },
+  );
+
+  test(
+    'manga responses require canonical identity and metadata for favorites',
+    () {
+      expect(() => validateBusinessManga(manga('a')), returnsNormally);
+      expect(
+        () => validateBusinessManga(wire.MangaState(mangaKey: 'a' * 64)),
+        returnsNormally,
+      );
+      for (final item in [
+        manga('a')..mangaKey = 'opaque',
+        manga('a')..mangaKey = 'a' * 64,
+        manga('a')..clearMetadata(),
+        manga('a')..resume = wire.MangaResume(),
+      ]) {
+        expect(() => validateBusinessManga(item), throwsFormatException);
+      }
+    },
+  );
+
+  test(
+    'library pages require one ordered bounded snapshot and explicit typed errors',
+    () {
+      final entries = [manga('a'), manga('b')]
+        ..sort((a, b) => a.mangaKey.compareTo(b.mangaKey));
+      final valid = wire.LibraryPageResponse(
+        schemaVersion: 1,
+        accountRevision: 2,
+        entries: entries,
+        nextKey: entries.last.mangaKey,
+      );
+      expect(() => validateBusinessLibraryPage(valid), returnsNormally);
+      for (final item in [
+        valid.deepCopy()..schemaVersion = 2,
+        valid.deepCopy()..entries.setAll(0, entries.reversed),
+        valid.deepCopy()..entries.setAll(0, [entries.first, entries.first]),
+        valid.deepCopy()..nextKey = 'c' * 64,
+        valid.deepCopy()..entries.first.favorite = false,
+        wire.LibraryPageResponse(
+          schemaVersion: 1,
+          entries: List.generate(9, (index) => manga('$index')),
+        ),
+        valid.deepCopy()
+          ..error = wire.BusinessStateError(
+            code: wire
+                .BusinessStateErrorCode
+                .BUSINESS_STATE_ERROR_CODE_UNAVAILABLE,
+            message: 'Unavailable',
+          ),
+      ]) {
+        expect(() => validateBusinessLibraryPage(item), throwsFormatException);
+      }
+      final failure = wire.LibraryPageResponse(
+        schemaVersion: 1,
+        error: wire.BusinessStateError(
+          code: wire
+              .BusinessStateErrorCode
+              .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+          message: 'Library changed',
+        ),
+      );
+      expect(() => validateBusinessLibraryPage(failure), returnsNormally);
+      expect(
+        () => validateBusinessError(
+          wire.BusinessStateError(message: 'Unspecified error'),
+        ),
+        throwsFormatException,
+      );
+    },
+  );
+}

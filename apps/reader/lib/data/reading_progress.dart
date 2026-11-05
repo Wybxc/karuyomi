@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:reader_core/reader_core.dart';
 
-enum ProgressStorageMode { persistent, memoryOnly, unsafePersistence }
+enum ProgressStorageMode { serverConfirmed }
 
 /// Constructed only after bootstrap has confirmed the user's identity.
 final class ProgressIdentity {
@@ -84,7 +84,7 @@ final class ChapterProgress {
     );
   }
 
-  /// Merges a same-epoch write with the state read inside the SQL transaction.
+  /// Merges same-epoch progress; persisted merges happen atomically on Worker.
   /// A missing old page stays unresolved instead of borrowing its old index.
   ChapterProgress merge({
     required ChapterManifest manifest,

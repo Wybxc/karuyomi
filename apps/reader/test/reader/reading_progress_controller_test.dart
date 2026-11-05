@@ -1,14 +1,18 @@
-import 'package:drift/native.dart';
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
-import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/reader/reading_progress_controller.dart';
 import 'package:reader_core/reader_core.dart';
+import 'package:source_runtime/source_runtime.dart';
 
 import '../browse/fakes.dart';
+import '../data/business_state_server.dart';
 
+const _key = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 ChapterManifest get _manifest => ChapterManifest(
   chapterKey: 'chapter',
   version: 'v1',
@@ -18,35 +22,32 @@ ChapterManifest get _manifest => ChapterManifest(
     ReaderPage(key: 'three'),
   ],
 );
+ProgressIdentity get _identity => ProgressIdentity(
+  origin: Uri.parse('https://reader.example.com'),
+  subject: 'owner-subject',
+);
 
 void main() {
-  late ReaderDatabase database;
+  late TestBusinessServer server;
+  late BusinessStateClient shared;
   late ProgressRepository repository;
   late ReadingProgressController controller;
   setUp(() {
-    database = ReaderDatabase(
-      NativeDatabase.memory(),
-      storageMode: ProgressStorageMode.persistent,
-    );
-    repository = ProgressRepository(
-      database,
-      ProgressIdentity(
-        origin: Uri.parse('https://reader.example.com'),
-        subject: 'owner-subject',
-      ),
-    );
+    server = TestBusinessServer();
+    shared = BusinessStateClient(api: server, identity: _identity);
+    repository = ProgressRepository(shared);
     controller = ReadingProgressController(
       repository: repository,
-      mangaKey: 'manga',
+      mangaKey: _key,
     );
   });
   tearDown(() async {
     controller.dispose();
-    await database.close();
+    await shared.dispose();
   });
 
   test(
-    'navigation alone saves current, while only observed pages advance furthest',
+    'navigation is saved only after server confirmation; only viewport observation advances furthest',
     () async {
       final manifest = _manifest;
       expect(await controller.restore(manifest), isNull);
@@ -57,13 +58,8 @@ void main() {
       );
       expect(controller.unsaved, true);
       expect(await controller.flush(), true);
-      var saved = (await repository.loadChapter(
-        mangaKey: 'manga',
-        chapterKey: 'chapter',
-      ))!;
-      expect(saved.current.pageKey, 'one');
-      expect(saved.furthest, isNull);
-      expect(saved.completed, false);
+      expect(controller.storageMode, ProgressStorageMode.serverConfirmed);
+      expect(server.progress(_key, 'chapter')!.hasFurthest(), false);
       controller.observe(
         manifest: manifest,
         current: manifest.positionAt(2),
@@ -76,56 +72,75 @@ void main() {
         reversedOrder: true,
       );
       expect(await controller.flush(), true);
-      saved = (await repository.loadChapter(
-        mangaKey: 'manga',
-        chapterKey: 'chapter',
-      ))!;
+      final saved = server.progress(_key, 'chapter')!;
       expect(saved.current.pageIndexHint, 0);
       expect(saved.current.normalizedOffset, .2);
-      expect(saved.furthest!.pageIndexHint, 2);
-      expect(saved.furthest!.normalizedOffset, .9);
+      expect(saved.furthest.pageIndexHint, 2);
+      expect(saved.furthest.normalizedOffset, .9);
       expect(saved.completed, false);
-      expect((await repository.loadResume('manga'))!.reversedOrder, true);
+      expect(server.manga(_key)!.resume.reversedOrder, true);
     },
   );
 
-  test('failed SQLite transaction keeps dirty draft for exact retry', () async {
-    final manifest = _manifest;
-    await controller.restore(manifest);
-    await database.customStatement(
-      "CREATE TRIGGER reject_progress BEFORE INSERT ON manga_resume_rows BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END",
-    );
-    controller.observe(
-      manifest: manifest,
-      current: manifest.positionAt(1),
-      observed: manifest.positionAt(1, offset: .7),
-      reversedOrder: false,
-    );
-    expect(await controller.flush(), false);
-    expect(controller.unsaved, true);
-    expect(controller.error, contains('尚未保存'));
-    expect(
-      await repository.loadChapter(mangaKey: 'manga', chapterKey: 'chapter'),
-      isNull,
-    );
-    await database.customStatement('DROP TRIGGER reject_progress');
-    expect(await controller.flush(), true);
-    expect(controller.error, isNull);
-    expect(controller.unsaved, false);
-    final saved = (await repository.loadChapter(
-      mangaKey: 'manga',
-      chapterKey: 'chapter',
-    ))!;
-    expect(saved.current.pageKey, 'two');
-    expect(saved.furthest!.normalizedOffset, .7);
-  });
+  test(
+    'read failure does not block reading and write failure retains session draft for retry',
+    () async {
+      final manifest = _manifest;
+      server.failNextRequest = true;
+      expect(await controller.restore(manifest), isNull);
+      expect(controller.error, contains('阅读仍可继续'));
+      server.failWrites = true;
+      controller.observe(
+        manifest: manifest,
+        current: manifest.positionAt(1),
+        observed: manifest.positionAt(1, offset: .7),
+        reversedOrder: false,
+      );
+      expect(await controller.flush(), false);
+      expect(controller.unsaved, true);
+      expect(controller.error, contains('当前会话'));
+      expect(server.progress(_key, 'chapter'), isNull);
+      final firstBody = server.requests
+          .where((request) => request.method == 'POST')
+          .single
+          .body;
+      server.failWrites = false;
+      expect(await controller.flush(), true);
+      expect(controller.unsaved, false);
+      expect(controller.error, isNull);
+      expect(
+        server.requests.where((request) => request.method == 'POST').last.body,
+        firstBody,
+      );
+      expect(server.progress(_key, 'chapter')!.furthest.normalizedOffset, .7);
+    },
+  );
 
   test(
-    'missing old anchors return original notice and preserve unresolved far',
+    'lost save response keeps same mutation and only confirmation marks saved',
+    () async {
+      await controller.restore(_manifest);
+      controller.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(2),
+        reversedOrder: false,
+      );
+      server.loseNextResponse = true;
+      expect(await controller.flush(), false);
+      expect(controller.unsaved, true);
+      expect(server.appliedMutations, 1);
+      expect(await controller.flush(), true);
+      expect(server.appliedMutations, 1);
+      expect(controller.unsaved, false);
+    },
+  );
+
+  test(
+    'missing old anchor returns notice while unresolved furthest survives',
     () async {
       final old = _manifest;
       await repository.save(
-        mangaKey: 'manga',
+        mangaKey: _key,
         manifest: old,
         progress: ChapterProgress(
           current: old.positionAt(2),
@@ -138,8 +153,7 @@ void main() {
         version: 'v2',
         pages: [ReaderPage(key: 'new')],
       );
-      final original = await controller.restore(changed);
-      expect(original!.pageKey, 'three');
+      expect((await controller.restore(changed))!.pageKey, 'three');
       expect(controller.chapter('chapter')!.current.pageKey, 'new');
       expect(controller.chapter('chapter')!.furthestUnresolved(changed), true);
       controller.observe(
@@ -147,13 +161,13 @@ void main() {
         current: changed.positionAt(0),
         reversedOrder: false,
       );
-      await controller.flush();
-      expect(controller.chapter('chapter')!.furthest!.pageKey, 'three');
+      expect(await controller.flush(), true);
+      expect(server.progress(_key, 'chapter')!.furthest.pageKey, 'three');
     },
   );
 
   test(
-    'external epoch reset wins and stops stale route from rewriting it',
+    'epoch conflict stops stale view and reopening permits the new epoch',
     () async {
       final manifest = _manifest;
       await controller.restore(manifest);
@@ -164,94 +178,160 @@ void main() {
         reversedOrder: true,
       );
       await repository.reset(
-        mangaKey: 'manga',
+        mangaKey: _key,
         manifest: manifest,
         reversedOrder: false,
       );
-      await controller.flush();
-      expect(controller.chapter('chapter')!.epoch, 1);
+      expect(await controller.flush(), false);
       expect(controller.error, contains('其他窗口重置'));
+      expect(controller.chapter('chapter')!.epoch, 1);
+      expect(controller.unsaved, false);
       controller.observe(
         manifest: manifest,
         current: manifest.positionAt(2),
-        observed: manifest.positionAt(2),
         reversedOrder: true,
       );
       expect(controller.unsaved, false);
-      final saved = (await repository.loadChapter(
-        mangaKey: 'manga',
-        chapterKey: 'chapter',
-      ))!;
-      expect(saved.current.pageKey, 'one');
-      expect(saved.furthest, isNull);
-      expect((await repository.loadResume('manga'))!.reversedOrder, false);
-    },
-  );
-
-  test(
-    'reset is the only local operation advancing epoch and clearing completion',
-    () async {
-      final manifest = _manifest;
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'one');
       await controller.restore(manifest);
-      controller.observe(
-        manifest: manifest,
-        current: manifest.positionAt(2),
-        observed: manifest.positionAt(2, offset: 1),
-        reversedOrder: false,
-        complete: true,
-      );
-      await controller.flush();
-      expect(controller.chapter('chapter')!.completed, true);
-      final reset = (await controller.reset(manifest))!;
-      expect(reset.epoch, 1);
-      expect(reset.current.pageKey, 'one');
-      expect(reset.furthest, isNull);
-      expect(reset.completed, false);
-    },
-  );
-
-  testWidgets(
-    'continuous navigation is bounded by max wait, not just trailing debounce',
-    (tester) async {
-      controller.dispose();
-      controller = ReadingProgressController(
-        repository: repository,
-        mangaKey: 'manga',
-        debounce: const Duration(seconds: 1),
-        maxWait: const Duration(milliseconds: 50),
-      );
-      final manifest = _manifest;
-      await controller.restore(manifest);
-      controller.observe(
-        manifest: manifest,
-        current: manifest.positionAt(0),
-        reversedOrder: false,
-      );
-      await tester.pump(const Duration(milliseconds: 30));
       controller.observe(
         manifest: manifest,
         current: manifest.positionAt(1),
         reversedOrder: false,
       );
-      await tester.pump(const Duration(milliseconds: 21));
-      final saved = (await repository.loadChapter(
-        mangaKey: 'manga',
-        chapterKey: 'chapter',
-      ))!;
-      expect(saved.current.pageKey, 'two');
-      expect(controller.unsaved, false);
+      expect(await controller.flush(), true);
+      expect(server.progress(_key, 'chapter')!.epoch, 1);
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
     },
   );
 
   test(
-    'Catalog keeps failed detached owner, reuses it, then retires after retry',
+    'remote revision conflict requires reopening and does not overwrite',
     () async {
-      final platform = TestPlatform();
+      await controller.restore(_manifest);
+      controller.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(0),
+        reversedOrder: false,
+      );
+      final remote = BusinessStateClient(api: server, identity: _identity);
+      addTearDown(remote.dispose);
+      await ProgressRepository(remote).save(
+        mangaKey: _key,
+        manifest: _manifest,
+        progress: ChapterProgress(current: _manifest.positionAt(2)),
+        reversedOrder: true,
+      );
+      expect(await controller.flush(), false);
+      expect(controller.error, contains('其他设备更新'));
+      controller.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(1),
+        reversedOrder: false,
+      );
+      expect(controller.unsaved, false);
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'three');
+    },
+  );
+
+  test(
+    'lost reset response is an unsaved draft and flush cannot reset twice',
+    () async {
+      await controller.restore(_manifest);
+      controller.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(2),
+        observed: _manifest.positionAt(2),
+        reversedOrder: false,
+        complete: true,
+      );
+      expect(await controller.flush(), true);
+      server.loseNextResponse = true;
+      expect(await controller.reset(_manifest), isNull);
+      expect(controller.unsaved, true);
+      expect(server.progress(_key, 'chapter')!.epoch, 1);
+      controller.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(2),
+        reversedOrder: true,
+      );
+      expect(await controller.flush(), true);
+      expect(controller.unsaved, false);
+      expect(controller.chapter('chapter')!.epoch, 1);
+      expect(controller.chapter('chapter')!.furthest, isNull);
+      expect(controller.chapter('chapter')!.completed, false);
+      expect(server.progress(_key, 'chapter')!.epoch, 1);
+    },
+  );
+
+  test(
+    'a disposed client rejects late replies without notifying a replacement',
+    () async {
+      await controller.restore(_manifest);
+      final started = Completer<void>();
+      final release = Completer<void>();
+      server.beforeRequest = (request) async {
+        if (request.method == 'POST') {
+          started.complete();
+          await release.future;
+        }
+        return null;
+      };
+      controller.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(1),
+        reversedOrder: false,
+      );
+      final flushing = controller.flush();
+      await started.future;
+      controller.dispose();
+      await shared.dispose();
+      final replacement = BusinessStateClient(
+        api: server.forSubject('other'),
+        identity: ProgressIdentity(origin: _identity.origin, subject: 'other'),
+      );
+      addTearDown(replacement.dispose);
+      release.complete();
+      await flushing;
+      expect(await ProgressRepository(replacement).loadResume(_key), isNull);
+      expect(server.manga(_key, subject: 'other'), isNull);
+    },
+  );
+
+  testWidgets('continuous navigation flushes at maximum wait', (tester) async {
+    controller.dispose();
+    controller = ReadingProgressController(
+      repository: repository,
+      mangaKey: _key,
+      debounce: const Duration(seconds: 1),
+      maxWait: const Duration(milliseconds: 50),
+    );
+    await controller.restore(_manifest);
+    controller.observe(
+      manifest: _manifest,
+      current: _manifest.positionAt(0),
+      reversedOrder: false,
+    );
+    await tester.pump(const Duration(milliseconds: 30));
+    controller.observe(
+      manifest: _manifest,
+      current: _manifest.positionAt(1),
+      reversedOrder: false,
+    );
+    await tester.pump(const Duration(milliseconds: 21));
+    await tester.pump();
+    expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+    expect(controller.unsaved, false);
+  });
+
+  test(
+    'Catalog retains failed detached writer, reuses it and retires after confirmation',
+    () async {
+      final platform = TestPlatform(businessServer: server);
       final catalog = CatalogController(
         api: platform,
         runtime: platform.runtime,
         rebuildRuntime: platform.rebuild,
-        progressDatabase: database,
         deploymentOrigin: platform.origin,
       );
       addTearDown(() async {
@@ -259,66 +339,68 @@ void main() {
         await catalog.closeReadingProgress();
         await platform.dispose();
       });
-      expect(catalog.readingProgress, isNull); // No unverified test identity.
+      expect(catalog.readingProgress, isNull);
       await catalog.connect();
-      expect(catalog.readingProgress!.identity.subject, 'owner-subject');
-      final client = catalog.createReadingProgress('retained')!;
-      final manifest = _manifest;
-      await client.restore(manifest);
-      await database.customStatement(
-        "CREATE TRIGGER reject_progress BEFORE INSERT ON manga_resume_rows BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END",
-      );
-      client.observe(
-        manifest: manifest,
-        current: manifest.positionAt(2),
+      final writer = catalog.createReadingProgress(_key)!;
+      await writer.restore(_manifest);
+      server.failWrites = true;
+      writer.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(2),
         reversedOrder: true,
       );
-      await catalog.releaseReadingProgress(client);
+      await catalog.releaseReadingProgress(writer);
       expect(catalog.hasUnsavedReadingProgress, true);
-      expect(catalog.readingDraftResume('retained')!.chapterKey, 'chapter');
-      final reused = catalog.createReadingProgress('retained')!;
-      expect(reused, same(client));
-      await database.customStatement('DROP TRIGGER reject_progress');
+      expect(catalog.readingDraftResume(_key)!.chapterKey, 'chapter');
+      final reused = catalog.createReadingProgress(_key)!;
+      expect(reused, same(writer));
+      server.failWrites = false;
       expect(await catalog.flushReadingProgress(), true);
       await catalog.releaseReadingProgress(reused);
       expect(catalog.hasUnsavedReadingProgress, false);
       expect(
-        (await catalog.readingProgress!.loadResume('retained'))!.reversedOrder,
+        (await catalog.readingProgress!.loadResume(_key))!.reversedOrder,
         true,
       );
     },
   );
 
   test(
-    'returning to the verified identity adopts its draft instead of creating a stale competing writer',
+    'new service adopts only matching identity and rebinds the retained request',
     () async {
-      final firstPlatform = TestPlatform();
+      final original = TestPlatform(businessServer: server);
       final first = CatalogController(
-        api: firstPlatform,
-        runtime: firstPlatform.runtime,
-        rebuildRuntime: firstPlatform.rebuild,
-        progressDatabase: database,
-        deploymentOrigin: firstPlatform.origin,
+        api: original,
+        runtime: original.runtime,
+        rebuildRuntime: original.rebuild,
+        deploymentOrigin: original.origin,
       );
       await first.connect();
-      final draft = first.createReadingProgress('manga')!;
+      final draft = first.createReadingProgress(_key)!;
       await draft.restore(_manifest);
+      server.failWrites = true;
       draft.observe(
         manifest: _manifest,
         current: _manifest.positionAt(1),
         reversedOrder: true,
       );
-      final writers = first.takeUnsavedReadingProgress();
-      expect(writers.single, same(draft));
+      await draft.flush();
+      final initialBody = server.requests
+          .where((request) => request.method == 'POST')
+          .last
+          .body;
+      expect(first.takeUnsavedReadingProgress().single, same(draft));
       first.dispose();
       await first.closeReadingProgress();
-      await firstPlatform.dispose();
-      final wrongPlatform = TestPlatform(bootstrapSubject: 'other');
+      await original.dispose();
+      final wrongPlatform = TestPlatform(
+        businessServer: server,
+        bootstrapSubject: 'other',
+      );
       final wrong = CatalogController(
         api: wrongPlatform,
         runtime: wrongPlatform.runtime,
         rebuildRuntime: wrongPlatform.rebuild,
-        progressDatabase: database,
         deploymentOrigin: wrongPlatform.origin,
       );
       await wrong.connect();
@@ -326,107 +408,158 @@ void main() {
       wrong.dispose();
       await wrong.closeReadingProgress();
       await wrongPlatform.dispose();
-      final nextPlatform = TestPlatform();
+      final nextPlatform = TestPlatform(businessServer: server);
       final next = CatalogController(
         api: nextPlatform,
         runtime: nextPlatform.runtime,
         rebuildRuntime: nextPlatform.rebuild,
-        progressDatabase: database,
         deploymentOrigin: nextPlatform.origin,
       );
+      addTearDown(() async {
+        next.dispose();
+        await next.closeReadingProgress();
+        await nextPlatform.dispose();
+      });
       await next.connect();
       expect(next.adoptReadingProgress(draft), true);
-      final reused = next.createReadingProgress('manga')!;
-      expect(reused, same(draft));
-      expect(next.readingDraftResume('manga')!.reversedOrder, true);
-      await next.releaseReadingProgress(reused);
-      next.dispose();
-      await next.closeReadingProgress();
-      await nextPlatform.dispose();
+      expect(next.createReadingProgress(_key), same(draft));
+      server.failWrites = false;
+      expect(await next.flushReadingProgress(), true);
       expect(
-        (await repository.loadChapter(
-          mangaKey: 'manga',
-          chapterKey: 'chapter',
-        ))!.current.pageIndexHint,
-        1,
+        server.requests.where((request) => request.method == 'POST').last.body,
+        initialBody,
+      );
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+    },
+  );
+
+  test(
+    'identity bootstrap and current-session flush never submit an old identity draft',
+    () async {
+      final platform = TestPlatform(businessServer: server);
+      final catalog = CatalogController(
+        api: platform,
+        runtime: platform.runtime,
+        rebuildRuntime: platform.rebuild,
+        deploymentOrigin: platform.origin,
+      );
+      addTearDown(() async {
+        catalog.dispose();
+        await catalog.closeReadingProgress();
+        await platform.dispose();
+      });
+      await catalog.connect();
+      final original = catalog.createReadingProgress(_key)!;
+      await original.restore(_manifest);
+      server.failWrites = true;
+      original.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(1),
+        reversedOrder: true,
+      );
+      expect(await original.flush(), false);
+      final originalBody = server.requests
+          .where((request) => request.method == 'POST')
+          .single
+          .body;
+      server.failWrites = false;
+      var rejectedWrites = 0;
+      platform.bootstrapSubject = 'other';
+      platform.beforeApiFetch = (path) async {
+        if (path == '/api/state/mutations') {
+          rejectedWrites++;
+          // The real host emits this failure as an Access event, invalidating
+          // Catalog's epoch. Merely catching the write error cannot save the
+          // bootstrap that a pre-confirmation flush would interrupt.
+          throw const RuntimeException(
+            RuntimeErrorCode.accessDenied,
+            'The active cookie belongs to another identity',
+          );
+        }
+      };
+      await catalog.connect();
+      expect(catalog.status, ServiceStatus.ready);
+      expect(catalog.readingProgress!.identity.subject, 'other');
+      expect(rejectedWrites, 0);
+      expect(original.unsaved, true);
+      expect(await catalog.flushReadingProgress(), false);
+      expect(rejectedWrites, 0);
+      expect(catalog.status, ServiceStatus.ready);
+      expect(server.appliedMutations, 0);
+      platform.beforeApiFetch = null;
+      platform.bootstrapSubject = 'owner-subject';
+      await catalog.connect();
+      expect(catalog.status, ServiceStatus.ready);
+      expect(catalog.createReadingProgress(_key), same(original));
+      expect(await catalog.flushReadingProgress(), true);
+      expect(original.unsaved, false);
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+      expect(server.progress(_key, 'chapter', subject: 'other'), isNull);
+      expect(
+        server.requests.where((request) => request.method == 'POST').last.body,
+        originalBody,
+      );
+      expect(server.appliedMutations, 1);
+    },
+  );
+
+  test(
+    'same Catalog subject switch never sends old drafts as the next identity',
+    () async {
+      final platform = TestPlatform(businessServer: server);
+      final catalog = CatalogController(
+        api: platform,
+        runtime: platform.runtime,
+        rebuildRuntime: platform.rebuild,
+        deploymentOrigin: platform.origin,
+      );
+      addTearDown(() async {
+        catalog.dispose();
+        await catalog.closeReadingProgress();
+        await platform.dispose();
+      });
+      await catalog.connect();
+      final oldWriter = catalog.createReadingProgress(_key)!;
+      await oldWriter.restore(_manifest);
+      server.failWrites = true;
+      oldWriter.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(1),
+        reversedOrder: true,
+      );
+      await oldWriter.flush();
+      platform.bootstrapSubject = 'other';
+      await catalog.connect();
+      expect(catalog.readingProgress!.identity.subject, 'other');
+      expect(oldWriter.repository.identity.subject, 'owner-subject');
+      expect(catalog.adoptReadingProgress(oldWriter), false);
+      server.failWrites = false;
+      final nextWriter = catalog.createReadingProgress(_key)!;
+      expect(await nextWriter.restore(_manifest), isNull);
+      nextWriter.observe(
+        manifest: _manifest,
+        current: _manifest.positionAt(2),
+        reversedOrder: false,
+      );
+      expect(await nextWriter.flush(), true);
+      expect(
+        server.progress(_key, 'chapter', subject: 'other')!.current.pageKey,
+        'three',
+      );
+      expect(server.progress(_key, 'chapter'), isNull);
+      platform.bootstrapSubject = 'owner-subject';
+      await catalog.connect();
+      expect(catalog.createReadingProgress(_key), same(oldWriter));
+      expect(await catalog.flushReadingProgress(), true);
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+      expect(
+        server.progress(_key, 'chapter', subject: 'other')!.current.pageKey,
+        'three',
+      );
+      expect(
+        identical(oldWriter.repository.client, catalog.readingProgress!.client),
+        true,
       );
     },
   );
-  for (final failSave in [false, true]) {
-    test(
-      'same Catalog subject change retains original progress ownership (save failure=$failSave)',
-      () async {
-        final platform = TestPlatform();
-        final catalog = CatalogController(
-          api: platform,
-          runtime: platform.runtime,
-          rebuildRuntime: platform.rebuild,
-          progressDatabase: database,
-          deploymentOrigin: platform.origin,
-        );
-        addTearDown(() async {
-          catalog.dispose();
-          await catalog.closeReadingProgress();
-          await platform.dispose();
-        });
-        await catalog.connect();
-        await catalog.openBuild(catalog.builds.single);
-        final oldRepository = catalog.readingProgress!;
-        final oldWriter = catalog.createReadingProgress('manga')!;
-        await oldWriter.restore(_manifest);
-        oldWriter.observe(
-          manifest: _manifest,
-          current: _manifest.positionAt(1),
-          reversedOrder: true,
-        );
-        if (failSave) {
-          await database.customStatement(
-            "CREATE TRIGGER reject_switch_progress BEFORE INSERT ON manga_resume_rows BEGIN SELECT RAISE(ABORT, 'controlled switch write failure'); END",
-          );
-        }
-        platform.bootstrapSubject = 'other-subject';
-        await catalog.connect();
-        expect(catalog.status, ServiceStatus.ready);
-        expect(catalog.readingProgress!.identity.subject, 'other-subject');
-        expect(oldWriter.repository.identity.subject, 'owner-subject');
-        expect(oldWriter.unsaved, failSave);
-        expect(catalog.hasUnsavedReadingProgress, failSave);
-        final nextWriter = catalog.createReadingProgress('manga')!;
-        expect(nextWriter, isNot(same(oldWriter)));
-        expect(await nextWriter.restore(_manifest), isNull);
-        expect(await catalog.readingProgress!.loadResume('manga'), isNull);
-        expect(catalog.adoptReadingProgress(oldWriter), false);
-        if (failSave) {
-          await database.customStatement('DROP TRIGGER reject_switch_progress');
-          expect(await catalog.flushReadingProgress(), true);
-        }
-        final oldSaved = (await oldRepository.loadChapter(
-          mangaKey: 'manga',
-          chapterKey: 'chapter',
-        ))!;
-        expect(oldSaved.current.pageKey, 'two');
-        nextWriter.observe(
-          manifest: _manifest,
-          current: _manifest.positionAt(2),
-          reversedOrder: false,
-        );
-        await catalog.releaseReadingProgress(nextWriter);
-        await catalog.releaseReadingProgress(oldWriter);
-        expect(
-          (await oldRepository.loadChapter(
-            mangaKey: 'manga',
-            chapterKey: 'chapter',
-          ))!.current.pageKey,
-          'two',
-        );
-        expect(
-          (await catalog.readingProgress!.loadChapter(
-            mangaKey: 'manga',
-            chapterKey: 'chapter',
-          ))!.current.pageKey,
-          'three',
-        );
-      },
-    );
-  }
 }

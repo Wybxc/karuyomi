@@ -1,30 +1,30 @@
 import 'dart:async';
+import 'dart:convert';
 
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:karuyomi/data/library_repository.dart';
-import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
+import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
+import '../data/business_state_server.dart';
 
 void main() {
-  late ReaderDatabase database;
   late TestPlatform platform;
+  var serverNow = DateTime.utc(2026, 1, 1);
   late CatalogController controller;
 
   setUp(() async {
-    database = ReaderDatabase(NativeDatabase.memory());
-    platform = TestPlatform();
+    platform = TestPlatform(
+      businessServer: TestBusinessServer(now: () => serverNow),
+    );
     controller = CatalogController(
       api: platform,
       runtime: platform.runtime,
       rebuildRuntime: platform.rebuild,
-      progressDatabase: database,
       deploymentOrigin: platform.origin,
     );
     await controller.connect();
@@ -34,7 +34,6 @@ void main() {
     controller.dispose();
     await controller.closeReadingProgress();
     await platform.dispose();
-    await database.close();
   });
 
   Future<void> favorite({
@@ -42,11 +41,8 @@ void main() {
     String sourceName = '测试漫画源',
     DateTime? addedAt,
   }) async {
-    final repository = LibraryRepository(
-      database,
-      controller.library!.identity,
-      now: addedAt == null ? null : () => addedAt,
-    );
+    if (addedAt != null) serverNow = addedAt;
+    final repository = controller.library!;
     await repository.setFavorite(
       packageName: 'source.test',
       sourceId: sourceId,
@@ -228,11 +224,113 @@ void main() {
   );
 
   testWidgets(
-    'actual memory storage is identified before promising persistence',
+    'foreground refresh reads favorites created by an independent client',
+    (tester) async {
+      final remotePlatform = TestPlatform(
+        businessServer: platform.businessServer,
+      );
+      final remote = CatalogController(
+        api: remotePlatform,
+        runtime: remotePlatform.runtime,
+        rebuildRuntime: remotePlatform.rebuild,
+        deploymentOrigin: remotePlatform.origin,
+      );
+      try {
+        await remote.connect();
+        await show(tester);
+        expect(find.text('书架还是空的'), findsOneWidget);
+        await remote.library!.setFavorite(
+          packageName: 'source.test',
+          sourceId: sourceId,
+          sourceName: '测试漫画源',
+          sourceLang: 'zh',
+          manga: testManga,
+          favorite: true,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(testManga.title), findsNothing);
+        expect(find.text('书架还是空的'), findsOneWidget);
+        final readsBefore = platform.businessServer.requests
+            .where((request) => request.uri.path == '/api/library')
+            .length;
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(testManga.title), findsOneWidget);
+        expect(find.text('书架还是空的'), findsNothing);
+        expect(
+          platform.businessServer.requests
+              .where((request) => request.uri.path == '/api/library')
+              .length,
+          greaterThan(readsBefore),
+        );
+        expect(platform.invocations, isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      } finally {
+        remote.dispose();
+        await remote.closeReadingProgress();
+        await remotePlatform.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'manual refresh failure retains confirmed entries and reports a retryable notice',
+    (tester) async {
+      await favorite();
+      await show(tester);
+      expect(find.text(testManga.title), findsOneWidget);
+      platform.businessServer.beforeRequest = (request) {
+        if (request.uri.path != '/api/library') return null;
+        return ApiReply(
+          status: 503,
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode(
+            wire.encodeProtoJson(
+              wire.LibraryPageResponse(
+                schemaVersion: 1,
+                accountRevision: platform.businessServer.accountRevision,
+                error: wire.BusinessStateError(
+                  code: wire
+                      .BusinessStateErrorCode
+                      .BUSINESS_STATE_ERROR_CODE_UNAVAILABLE,
+                  message: 'Injected library refresh failure',
+                  retryable: true,
+                ),
+              ),
+            ),
+          ),
+          redirected: false,
+        );
+      };
+      await tester.tap(find.text('刷新服务端书架'));
+      await tester.pumpAndSettle();
+      expect(find.text(testManga.title), findsOneWidget);
+      expect(find.text('未能刷新服务端书架，当前显示上次确认的结果。'), findsOneWidget);
+      expect(find.text('书架还是空的'), findsNothing);
+      expect(controller.status, ServiceStatus.ready);
+      platform.businessServer.beforeRequest = null;
+      await tester.tap(find.text('刷新服务端书架'));
+      await tester.pumpAndSettle();
+      expect(find.text(testManga.title), findsOneWidget);
+      expect(find.text('未能刷新服务端书架，当前显示上次确认的结果。'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
+    'the shelf offers an explicit server refresh without local persistence',
     (tester) async {
       await show(tester);
-      expect(find.text('书架仅保存在此设备。'), findsOneWidget);
-      expect(find.text('书架当前仅保存在内存中，关闭应用后会丢失。'), findsOneWidget);
+      expect(find.text('刷新服务端书架'), findsOneWidget);
+      expect(find.text('书架仅保存在此设备。'), findsNothing);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

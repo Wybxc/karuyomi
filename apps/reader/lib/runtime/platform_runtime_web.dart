@@ -1,34 +1,24 @@
-import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'package:flutter/widgets.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:uuid/uuid.dart';
+import 'package:web/web.dart' as web;
+import 'popup_authentication.dart';
 import 'runtime_platform_types.dart';
 
 @JS('globalThis.karuyomiRuntime')
 external JSObject? get _runtimeHost;
 @JS('globalThis.location.origin')
 external JSString get _origin;
-@JS('globalThis.location')
-external _Location get _location;
-@JS('globalThis.sessionStorage')
-external _Storage get _storage;
-
-extension type _Location(JSObject _) implements JSObject {
-  external void assign(JSString url);
-}
-
-extension type _Storage(JSObject _) implements JSObject {
-  external JSString? getItem(JSString key);
-  external void setItem(JSString key, JSString value);
-  external void removeItem(JSString key);
-}
 
 PlatformRuntime createPlatformRuntime({Uri? origin}) => WebPlatformRuntime();
 
 final class WebPlatformRuntime extends PlatformRuntime {
-  static const _authenticationKey = 'karuyomi.authentication.v1';
+  PopupAuthentication? _authentication;
+  Map<String, Object?>? _pendingAuthentication;
+  bool _disposed = false;
 
   @override
   Uri get origin => Uri.parse(_origin.toDart);
@@ -39,26 +29,54 @@ final class WebPlatformRuntime extends PlatformRuntime {
     String returnTo = '/',
     Map<String, Object?> pending = const {},
   }) async {
-    final path = authenticationPath(returnTo);
+    if (_disposed) throw StateError('服务已关闭，请重新连接。');
+    if (_authentication != null) throw StateError('登录窗口已打开，请先完成或关闭。');
+    authenticationPath(returnTo);
     final continuation = {'returnTo': returnTo, 'pending': pending};
     wire.checkJsonBudget(continuation, maxBytes: wire.controlRequestLimit);
-    final state = jsonEncode(continuation);
-    _storage.setItem(_authenticationKey.toJS, state.toJS);
-    _location.assign(path.toJS);
-    return false;
+    final attempt = const Uuid().v4();
+    final path = Uri(
+      path: '/api/auth/login',
+      queryParameters: {'returnTo': '/auth/complete', 'attempt': attempt},
+    ).toString();
+    // Open synchronously before the first await, while the click still grants
+    // popup activation. The current app and its unconfirmed drafts stay alive.
+    final popup = web.window.open(
+      path,
+      'karuyomi-auth-$attempt',
+      'popup,width=520,height=720',
+    );
+    if (popup == null) throw StateError('浏览器阻止了登录窗口，请允许弹出窗口后重试。');
+    final authentication = PopupAuthentication();
+    _authentication = authentication;
+    _pendingAuthentication = continuation;
+    try {
+      return await authentication.wait(
+        origin: origin,
+        attempt: attempt,
+        readLocation: () {
+          try {
+            return Uri.tryParse(popup.location.href);
+          } catch (_) {
+            return null; // Reading the Access page's origin is not permitted.
+          }
+        },
+        isClosed: () => popup.closed,
+        close: () => popup.close(),
+      );
+    } catch (_) {
+      _pendingAuthentication = null;
+      rethrow;
+    } finally {
+      _authentication = null;
+    }
   }
 
   @override
   Map<String, Object?>? takePendingAuthentication() {
-    final value = _storage.getItem(_authenticationKey.toJS)?.toDart;
-    _storage.removeItem(_authenticationKey.toJS);
-    if (value == null) return null;
-    try {
-      final data = jsonDecode(value);
-      return data is Map ? Map<String, Object?>.from(data) : null;
-    } on FormatException {
-      return null;
-    }
+    final pending = _pendingAuthentication;
+    _pendingAuthentication = null;
+    return pending;
   }
 
   Future<JSObject> _host() async {
@@ -98,5 +116,10 @@ final class WebPlatformRuntime extends PlatformRuntime {
   }
 
   @override
-  Future<void> dispose() => runtime.dispose();
+  Future<void> dispose() {
+    _disposed = true;
+    _authentication?.cancel();
+    _pendingAuthentication = null;
+    return runtime.dispose();
+  }
 }

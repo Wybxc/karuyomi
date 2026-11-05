@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
@@ -64,7 +62,6 @@ final class _Fixture {
   }
 
   final platform = TestPlatform();
-  final database = ReaderDatabase(NativeDatabase.memory());
   late CatalogController catalog;
   bool expire = false;
   bool changedPages = false;
@@ -77,9 +74,7 @@ final class _Fixture {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      KaruyomiApp(platform: platform, database: database),
-    );
+    await tester.pumpWidget(KaruyomiApp(platform: platform));
     await tester.pumpAndSettle();
     await tester.tap(find.text('去浏览'));
     await tester.pumpAndSettle();
@@ -129,7 +124,6 @@ final class _Fixture {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await catalog.closeReadingProgress();
-    await database.close();
     expect(tester.takeException(), isNull);
   }
 }
@@ -334,7 +328,6 @@ void main() {
         mangaUrl: testManga.url,
         chapters: const [],
       ).mangaKey;
-      final oldRepository = fixture.catalog.readingProgress!;
       await fixture.catalog.flushReadingProgress();
       await fixture.pause(tester);
       final callsAtPause = fixture.platform.invocations.length;
@@ -361,9 +354,9 @@ void main() {
         isNull,
       );
       expect(
-        await oldRepository.loadChapter(
-          mangaKey: mangaKey,
-          chapterKey: original.manifest.chapterKey,
+        fixture.platform.businessServer.progress(
+          mangaKey,
+          original.manifest.chapterKey,
         ),
         isNotNull,
       );

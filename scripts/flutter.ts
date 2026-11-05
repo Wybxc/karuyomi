@@ -1,8 +1,7 @@
 import { execa, ExecaError } from 'execa';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { prepareDatabaseAssets } from '../tools/reader/database-assets.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const bin = process.platform === 'win32' ? 'flutter.bat' : 'flutter';
@@ -41,24 +40,6 @@ async function main(): Promise<void> {
       }
       break;
     case 'check': {
-      const app = path.join(root, 'apps/reader');
-      const generated = path.join(app, 'lib/data/reader_database.g.dart');
-      const expected = readFileSync(generated);
-      await run(
-        dart,
-        [
-          'run',
-          'build_runner',
-          'build',
-          '--build-filter=lib/data/reader_database.g.dart',
-        ],
-        { cwd: app },
-      );
-      if (!expected.equals(readFileSync(generated))) {
-        throw new Error(
-          'Drift generated code changed; review the generator output and rerun checks',
-        );
-      }
       for (const project of projects) {
         const cwd = path.join(root, project);
         if (project === 'apps/reader') {
@@ -97,7 +78,6 @@ async function main(): Promise<void> {
       break;
     }
     case 'build':
-      await prepareDatabaseAssets();
       await run(
         flutter,
         [
@@ -111,7 +91,6 @@ async function main(): Promise<void> {
       );
       break;
     case 'run':
-      await prepareDatabaseAssets();
       await run(flutter, ['run', '-d', 'chrome', ...process.argv.slice(3)], {
         cwd: path.join(root, 'apps/reader'),
         stdin: 'inherit',

@@ -12,10 +12,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MaterialCatalog } from '../packages/runtime-host/materials.ts';
 import { assembleExtensionAssets } from '../tools/extensions/assemble-assets.ts';
-import {
-  DATABASE_ASSETS,
-  verifyDatabaseAssets,
-} from '../tools/reader/database-assets.ts';
 
 const publicDir = new URL('../dist/public/', import.meta.url);
 const runtime = new URL('../packages/runtime-host/dist/', import.meta.url);
@@ -71,13 +67,6 @@ try {
 const rules = materials.map(
   (artifact: { path: string; contentType: string }) =>
     `${artifact.path}\n  Content-Type: ${artifact.contentType}\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff`,
-);
-await verifyDatabaseAssets(path.join(fileURLToPath(publicDir), 'database'));
-rules.push(
-  ...DATABASE_ASSETS.map(
-    (asset) =>
-      `/database/${asset.name}\n  Content-Type: ${asset.contentType}\n  Cache-Control: public, max-age=0, must-revalidate\n  X-Content-Type-Options: nosniff`,
-  ),
 );
 rules.push(
   '/runtime/materials.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',

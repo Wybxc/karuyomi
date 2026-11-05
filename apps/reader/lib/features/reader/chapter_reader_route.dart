@@ -172,7 +172,6 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     RecoveredReader? recovered;
     try {
       _recordViewport();
-      await _progress?.flush();
       if (!await authenticate(continuation) || _closing || !mounted) return;
       _mode = continuation.mode;
       _doublePage = continuation.doublePage;
@@ -264,8 +263,8 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         padding: const EdgeInsets.all(8),
         child: Text(
           widget.catalog.status == ServiceStatus.denied
-              ? '当前身份没有访问权限，已暂停新请求。当前画面与本地进度保留。'
-              : '访问验证已失效，已暂停新的图片和下一章请求。当前画面与本地进度保留。',
+              ? '当前身份没有访问权限，已暂停新请求。当前画面与未保存草稿保留。'
+              : '访问验证已失效，已暂停新的图片和下一章请求。当前画面与未保存草稿保留。',
         ),
       ),
       if (widget.onAuthenticate != null)
@@ -562,13 +561,11 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     final status =
         progress.error ??
         switch (progress.storageMode) {
-          ProgressStorageMode.memoryOnly => '仅当前会话记录，关闭后不会保留',
-          ProgressStorageMode.unsafePersistence => '本地存储不支持安全多窗口，请保持单窗口阅读',
-          ProgressStorageMode.persistent =>
+          ProgressStorageMode.serverConfirmed =>
             progress.unsaved || progress.awaitingViewport
-                ? '本地进度待保存'
-                : '本地进度已保存',
-          null => '正在连接本地进度存储',
+                ? '阅读进度待服务端确认'
+                : '阅读进度已保存到服务端',
+          null => '正在读取服务端进度',
         };
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),

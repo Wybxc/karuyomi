@@ -1,10 +1,5 @@
-import 'dart:io';
-
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:karuyomi/data/reader_database.dart';
-import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
@@ -14,10 +9,19 @@ import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
+import '../data/business_state_server.dart';
 
-TestPlatform _platform({Uri? origin, String subject = 'owner-subject'}) {
+TestPlatform _platform({
+  Uri? origin,
+  String subject = 'owner-subject',
+  TestBusinessServer? server,
+}) {
   var session = 0;
-  return TestPlatform(origin: origin, bootstrapSubject: subject)
+  return TestPlatform(
+      origin: origin,
+      bootstrapSubject: subject,
+      businessServer: server,
+    )
     ..invokeHandler = (call) async => switch (call.whichRequest()) {
       wire.SourceCall_Request.details => wire.SourceResult(manga: testManga),
       wire.SourceCall_Request.chapters => wire.SourceResult(
@@ -48,16 +52,11 @@ TestPlatform _platform({Uri? origin, String subject = 'owner-subject'}) {
 
 Future<CatalogController> _details(
   WidgetTester tester,
-  TestPlatform platform,
-  ReaderDatabase database, {
+  TestPlatform platform, {
   TestPlatform Function(Uri? origin)? factory,
 }) async {
   await tester.pumpWidget(
-    KaruyomiApp(
-      platform: platform,
-      database: database,
-      platformFactory: factory,
-    ),
+    KaruyomiApp(platform: platform, platformFactory: factory),
   );
   await tester.pumpAndSettle();
   await tester.tap(find.text('去浏览'));
@@ -75,11 +74,11 @@ Future<CatalogController> _details(
 
 void main() {
   testWidgets(
-    'failed storage never blocks service replacement; old identity writer retries without old runtime',
+    'failed save retains its original identity draft until that service reconnects',
     (tester) async {
-      final database = ReaderDatabase(NativeDatabase.memory());
-      addTearDown(database.close);
-      final original = _platform();
+      final server = TestBusinessServer();
+      final original = _platform(server: server);
+      final recovered = _platform(server: server);
       final replacement = _platform(
         origin: Uri.parse('https://other.example'),
         subject: 'other-subject',
@@ -87,10 +86,8 @@ void main() {
       final catalog = await _details(
         tester,
         original,
-        database,
         factory: (origin) {
-          expect(origin, replacement.origin);
-          return replacement;
+          return origin == original.origin ? recovered : replacement;
         },
       );
       await tester.tap(find.text('第一章'));
@@ -104,10 +101,7 @@ void main() {
         mangaUrl: testManga.url,
         chapters: const [],
       ).mangaKey;
-      final oldRepository = catalog.readingProgress!;
-      await database.customStatement(
-        "CREATE TRIGGER reject_progress BEFORE UPDATE ON manga_resume_rows BEGIN SELECT RAISE(ABORT, 'fixture disk failure'); END",
-      );
+      server.failWrites = true;
       (leaf.positionRequest! as ValueNotifier<ReadingPosition?>).value =
           manifest.positionAt(1, offset: .4);
       await tester.pumpAndSettle();
@@ -151,30 +145,30 @@ void main() {
       expect(await nextWriter.flush(), true);
       await nextCatalog.releaseReadingProgress(nextWriter);
       expect(
-        (await oldRepository.loadChapter(
-          mangaKey: mangaKey,
-          chapterKey: manifest.chapterKey,
-        ))!.current.pageIndexHint,
+        server.progress(mangaKey, manifest.chapterKey)!.current.pageIndexHint,
         0,
       );
-      await database.customStatement('DROP TRIGGER reject_progress');
+      server.failWrites = false;
       await tester.tap(find.text('设置').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField),
+        original.origin.toString(),
+      );
+      await tester.tap(find.text('连接服务'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('重试保存所有进度'));
       await tester.pumpAndSettle();
       expect(find.text('重试保存所有进度'), findsNothing);
       expect(
-        (await oldRepository.loadChapter(
-          mangaKey: mangaKey,
-          chapterKey: manifest.chapterKey,
-        ))!.current.pageIndexHint,
+        server.progress(mangaKey, manifest.chapterKey)!.current.pageIndexHint,
         1,
       );
       expect(
-        (await nextCatalog.readingProgress!.loadChapter(
-          mangaKey: mangaKey,
-          chapterKey: manifest.chapterKey,
-        ))!.current.pageIndexHint,
+        replacement.businessServer
+            .progress(mangaKey, manifest.chapterKey, subject: 'other-subject')!
+            .current
+            .pageIndexHint,
         2,
       );
       expect(original.controlCommands.length, oldControls);
@@ -186,22 +180,11 @@ void main() {
   );
 
   testWidgets(
-    'product routes save and resume exact chapter/offset after SQLite close and reopen',
+    'product routes save and resume exact chapter/offset on a separate client',
     (tester) async {
-      final directory = (await tester.runAsync(
-        () => Directory.systemTemp.createTemp('karuyomi-product-progress-'),
-      ))!;
-      final file = File('${directory.path}/reader.sqlite');
-      var database = ReaderDatabase(
-        NativeDatabase(file),
-        storageMode: ProgressStorageMode.persistent,
-      );
-      addTearDown(() async {
-        await database.close();
-        await directory.delete(recursive: true);
-      });
-      var platform = _platform();
-      var catalog = await _details(tester, platform, database);
+      final server = TestBusinessServer();
+      var platform = _platform(server: server);
+      var catalog = await _details(tester, platform);
       final mangaKey = ChapterSequence(
         packageName: 'source.test',
         sourceId: sourceId,
@@ -261,16 +244,8 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
-      await database.close();
-      final bytes = (await tester.runAsync(file.readAsBytes))!;
-      expect(String.fromCharCodes(bytes.take(15)), 'SQLite format 3');
-
-      database = ReaderDatabase(
-        NativeDatabase(file),
-        storageMode: ProgressStorageMode.persistent,
-      );
-      platform = _platform();
-      catalog = await _details(tester, platform, database);
+      platform = _platform(server: server);
+      catalog = await _details(tester, platform);
       expect(find.text('继续阅读'), findsOneWidget);
       await tester.tap(find.text('继续阅读'));
       await tester.pumpAndSettle();
@@ -320,44 +295,41 @@ void main() {
     },
   );
 
-  testWidgets('memory and failed writes are honest and never remove the Reader', (
-    tester,
-  ) async {
-    final database = ReaderDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final platform = _platform();
-    final catalog = await _details(tester, platform, database);
-    await tester.tap(find.text('第一章'));
-    await tester.pumpAndSettle();
-    expect(find.text('仅当前会话记录，关闭后不会保留'), findsOneWidget);
-    expect(find.text('本地进度已保存'), findsNothing);
-    await catalog.flushReadingProgress();
-    await database.customStatement(
-      "CREATE TRIGGER reject_progress BEFORE UPDATE ON manga_resume_rows BEGIN SELECT RAISE(ABORT, 'fixture disk failure'); END",
-    );
-    final leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
-    leaf.onViewportChanged!(
-      ReaderViewportState(
-        current: leaf.manifest.positionAt(1),
-        observed: null,
-        atEnd: false,
-        windowReady: false,
-      ),
-    );
-    expect(await catalog.flushReadingProgress(), false);
-    await tester.pump();
-    expect(find.byType(ReaderScreen), findsOneWidget);
-    expect(find.text('本地进度尚未保存，可重试；阅读仍可继续。'), findsOneWidget);
-    expect(find.text('重试保存'), findsOneWidget);
-    expect(find.text('本地进度已保存'), findsNothing);
-    await database.customStatement('DROP TRIGGER reject_progress');
-    await tester.tap(find.text('重试保存'));
-    await tester.pumpAndSettle();
-    expect(catalog.hasUnsavedReadingProgress, false);
-    expect(find.text('仅当前会话记录，关闭后不会保留'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-    await catalog.closeReadingProgress();
-  });
+  testWidgets(
+    'unconfirmed writes remain session drafts and never remove the Reader',
+    (tester) async {
+      final platform = _platform();
+      final catalog = await _details(tester, platform);
+      await tester.tap(find.text('第一章'));
+      await tester.pumpAndSettle();
+      expect(find.text('阅读进度待服务端确认'), findsOneWidget);
+      expect(find.text('阅读进度已保存到服务端'), findsNothing);
+      await catalog.flushReadingProgress();
+      platform.businessServer.failWrites = true;
+      final leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      leaf.onViewportChanged!(
+        ReaderViewportState(
+          current: leaf.manifest.positionAt(1),
+          observed: null,
+          atEnd: false,
+          windowReady: false,
+        ),
+      );
+      expect(await catalog.flushReadingProgress(), false);
+      await tester.pump();
+      expect(find.byType(ReaderScreen), findsOneWidget);
+      expect(find.text('进度尚未获服务器确认，可重试；草稿仅保留在当前会话。'), findsOneWidget);
+      expect(find.text('重试保存'), findsOneWidget);
+      expect(find.text('阅读进度已保存到服务端'), findsNothing);
+      platform.businessServer.failWrites = false;
+      await tester.tap(find.text('重试保存'));
+      await tester.pumpAndSettle();
+      expect(catalog.hasUnsavedReadingProgress, false);
+      expect(find.text('阅读进度已保存到服务端'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await catalog.closeReadingProgress();
+    },
+  );
 }

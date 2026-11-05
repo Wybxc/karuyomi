@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:reader_core/reader_core.dart';
 
+import '../../data/business_state_client.dart';
 import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
 
@@ -13,8 +14,14 @@ final class _PendingProgress {
   final bool reversedOrder;
 }
 
+final class _PendingReset {
+  const _PendingReset(this.manifest, this.reversedOrder);
+  final ChapterManifest manifest;
+  final bool reversedOrder;
+}
+
 /// Product write scheduling only. Anchor projection, furthest merging and epoch
-/// rules remain in ChapterProgress and the transactional Drift repository.
+/// rules remain in ChapterProgress and the authoritative Worker transaction.
 final class ReadingProgressController extends ChangeNotifier {
   ReadingProgressController({
     required this.repository,
@@ -28,6 +35,7 @@ final class ReadingProgressController extends ChangeNotifier {
   final Duration debounce;
   final Duration maxWait;
   final _pending = <String, _PendingProgress>{};
+  final _pendingResets = <String, _PendingReset>{};
   final _states = <String, ChapterProgress>{};
   final _conflicted = <String>{};
   final _navigationPending = <String>{};
@@ -42,7 +50,7 @@ final class ReadingProgressController extends ChangeNotifier {
   ProgressStorageMode? storageMode;
   String? error;
 
-  bool get unsaved => _pending.isNotEmpty;
+  bool get unsaved => _pending.isNotEmpty || _pendingResets.isNotEmpty;
   bool get awaitingViewport => _navigationPending.isNotEmpty;
   ChapterProgress? chapter(String key) => _states[key];
   MangaResume? get draftResume => _currentChapter == null
@@ -53,7 +61,7 @@ final class ReadingProgressController extends ChangeNotifier {
     if (manifest.pages.isEmpty || _closed) return null;
     ChapterProgress? stored = _pending[manifest.chapterKey]?.progress;
     try {
-      storageMode ??= await repository.database.storageMode;
+      storageMode = ProgressStorageMode.serverConfirmed;
       if (!_orderLoaded) {
         final resume = await repository.loadResume(mangaKey);
         if (resume != null) reversedOrder = resume.reversedOrder;
@@ -66,7 +74,7 @@ final class ReadingProgressController extends ChangeNotifier {
       error = null;
       _conflicted.remove(manifest.chapterKey);
     } catch (_) {
-      error = '未能读取本地进度，阅读仍可继续；保存失败时可重试。';
+      error = '未能读取服务器进度，阅读仍可继续；未确认的修改仅保留在当前会话。';
       stored ??= _states[manifest.chapterKey];
     }
     if (_closed) return null;
@@ -91,6 +99,7 @@ final class ReadingProgressController extends ChangeNotifier {
     if (_closed ||
         _conflicted.contains(manifest.chapterKey) ||
         _resetting.contains(manifest.chapterKey) ||
+        _pendingResets.containsKey(manifest.chapterKey) ||
         manifest.pages.isEmpty) {
       return;
     }
@@ -126,8 +135,9 @@ final class ReadingProgressController extends ChangeNotifier {
   }
 
   Future<bool> flush() async {
+    if (_closed) return !unsaved && _conflicted.isEmpty;
     _cancelTimers();
-    if (!unsaved && _flushing == null) return true;
+    if (!unsaved && _flushing == null) return _conflicted.isEmpty;
     if (_flushing != null) {
       await _flushing;
       // A new viewport can arrive in the completion microtask of the previous
@@ -143,21 +153,22 @@ final class ReadingProgressController extends ChangeNotifier {
       }
     }
     if (!unsaved) _cancelTimers();
-    return !unsaved;
+    return !unsaved && _conflicted.isEmpty;
   }
 
   Future<void> _drain() async {
-    while (_pending.isNotEmpty) {
+    while (_pending.isNotEmpty && !_closed) {
       final entry = _pending.entries.first;
       final draft = entry.value;
       try {
-        storageMode ??= await repository.database.storageMode;
+        storageMode = ProgressStorageMode.serverConfirmed;
         final saved = await repository.save(
           mangaKey: mangaKey,
           manifest: draft.manifest,
           progress: draft.progress,
           reversedOrder: draft.reversedOrder,
         );
+        if (_closed) return;
         if (saved.epoch != draft.progress.epoch) {
           _pending.remove(entry.key);
           _states[entry.key] = saved;
@@ -170,36 +181,87 @@ final class ReadingProgressController extends ChangeNotifier {
           }
           if (_conflicted.isEmpty) error = null;
         }
+      } on BusinessStateException catch (failure) {
+        if (_closed) return;
+        if (failure.conflict) {
+          _pending.remove(entry.key);
+          _conflicted.add(entry.key);
+          if (failure.progress != null) {
+            _states[entry.key] = decodeChapterProgress(failure.progress!);
+          }
+          error = failure.staleEpoch
+              ? '本章进度已在其他窗口重置，请重新打开本章。'
+              : '此作品已在其他设备更新，请重新打开本章后继续保存。';
+          _notify();
+          return;
+        }
+        error = '进度尚未获服务器确认，可重试；草稿仅保留在当前会话。';
+        _notify();
+        return;
       } catch (_) {
-        error = '本地进度尚未保存，可重试；阅读仍可继续。';
+        if (_closed) return;
+        error = '进度尚未保存到服务器，可重试；草稿仅保留在当前会话。';
         _notify();
         return; // Keep the exact dirty draft for a later explicit retry.
+      }
+    }
+    while (_pendingResets.isNotEmpty && !_closed) {
+      final entry = _pendingResets.entries.first;
+      try {
+        final saved = await repository.reset(
+          mangaKey: mangaKey,
+          manifest: entry.value.manifest,
+          reversedOrder: entry.value.reversedOrder,
+        );
+        if (_closed) return;
+        _pendingResets.remove(entry.key);
+        _conflicted.remove(entry.key);
+        _states[entry.key] = saved;
+        _currentChapter = entry.key;
+        storageMode = ProgressStorageMode.serverConfirmed;
+        error = null;
+      } on BusinessStateException catch (failure) {
+        if (_closed) return;
+        if (failure.conflict) {
+          _pendingResets.remove(entry.key);
+          _conflicted.add(entry.key);
+          error = '此作品已在其他设备更新，请重新打开本章后再重新阅读。';
+        } else {
+          error = '重新阅读尚未获服务器确认，请重试；草稿仅保留在当前会话。';
+        }
+        _notify();
+        return;
+      } catch (_) {
+        if (_closed) return;
+        error = '重新阅读尚未保存到服务器，请重试；草稿仅保留在当前会话。';
+        _notify();
+        return;
       }
     }
     _notify();
   }
 
   Future<ChapterProgress?> reset(ChapterManifest manifest) async {
-    if (_closed || manifest.pages.isEmpty) return null;
-    _resetting.add(manifest.chapterKey);
-    await flush();
-    try {
-      final reset = await repository.reset(
-        mangaKey: mangaKey,
-        manifest: manifest,
-        reversedOrder: reversedOrder,
-      );
-      _pending.remove(manifest.chapterKey);
-      _conflicted.remove(manifest.chapterKey);
-      _states[manifest.chapterKey] = reset;
-      _currentChapter = manifest.chapterKey;
-      error = null;
-      _notify();
-      return reset;
-    } catch (_) {
-      error = '重新阅读未能保存，请重试。';
-      _notify();
+    if (_closed ||
+        manifest.pages.isEmpty ||
+        _resetting.contains(manifest.chapterKey)) {
       return null;
+    }
+    _resetting.add(manifest.chapterKey);
+    try {
+      if (!_pendingResets.containsKey(manifest.chapterKey)) {
+        if (!await flush() || _closed) return null;
+        _pendingResets[manifest.chapterKey] = _PendingReset(
+          manifest,
+          reversedOrder,
+        );
+      }
+      _notify();
+      return await flush() &&
+              !_closed &&
+              !_conflicted.contains(manifest.chapterKey)
+          ? _states[manifest.chapterKey]
+          : null;
     } finally {
       _resetting.remove(manifest.chapterKey);
     }

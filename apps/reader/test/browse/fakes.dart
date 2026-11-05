@@ -5,6 +5,8 @@ import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
+import '../data/business_state_server.dart';
+
 const sourceId = '9223372036854775806';
 wire.Manga get testManga => wire.Manga(
   url: '/manga/opaque-source-ref',
@@ -16,9 +18,14 @@ wire.Manga get testManga => wire.Manga(
 );
 
 final class TestPlatform extends PlatformRuntime {
-  TestPlatform({Uri? origin, this.bootstrapSubject = 'owner-subject'})
-    : _origin = origin ?? Uri.parse('https://reader.example.com');
+  TestPlatform({
+    Uri? origin,
+    this.bootstrapSubject = 'owner-subject',
+    TestBusinessServer? businessServer,
+  }) : _origin = origin ?? Uri.parse('https://reader.example.com'),
+       businessServer = businessServer ?? TestBusinessServer();
   final Uri _origin;
+  final TestBusinessServer businessServer;
   String bootstrapSubject;
   int disposalCount = 0;
   int rebuildCount = 0;
@@ -99,7 +106,26 @@ final class TestPlatform extends PlatformRuntime {
     switch (request.whichCommand()) {
       case wire.ControlRequest_Command.fetchApi:
         await beforeApiFetch?.call(request.fetchApi.path);
-        response.api = _fetch(request.fetchApi.path);
+        if (request.fetchApi.path.startsWith('/api/library') ||
+            request.fetchApi.path.startsWith('/api/state/')) {
+          final reply = await businessServer.handle(
+            TestBusinessRequest(
+              path: request.fetchApi.path,
+              method: request.fetchApi.method,
+              headers: request.fetchApi.headers,
+              body: request.fetchApi.hasBody() ? request.fetchApi.body : null,
+            ),
+            subject: bootstrapSubject,
+          );
+          response.api = wire.ApiFetchResponse(
+            status: reply.status,
+            headers: reply.headers.entries,
+            body: reply.body,
+            redirected: reply.redirected,
+          );
+        } else {
+          response.api = _fetch(request.fetchApi.path);
+        }
       case wire.ControlRequest_Command.ready:
         response.hello = wire.RuntimeHello(
           protocolVersion: protocolVersion,

@@ -2,7 +2,7 @@
 
 个人漫画阅读应用。Flutter + TeaVM 浏览器宿主，Cloudflare Workers 后端。
 
-多端同步是首要设计目标：同一身份在 Web、iOS、Android 共用 Worker API + D1 的权威业务状态，客户端只保留当前会话状态和可丢弃缓存。当前按[同步计划](docs/plan/p2-sync.md)优先建立业务协议与服务端读写，并行收齐 [P0](docs/plan/p0-runtime-and-reading.md) 的真实阅读、Access 和设备验收；现有本地书架与进度仍待替换，不能当作多端同步已经实现。各阶段见[计划目录](docs/plan/README.md)。已部署域名为 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，当前代码是否完成线上验收以[验证记录](docs/VERIFICATION.md)为准。
+多端同步是首要设计目标：同一身份在 Web、iOS、Android 共用 Worker API + D1 的权威业务状态，客户端只保留当前会话状态和可丢弃缓存。收藏与阅读进度已按[同步计划](docs/plan/p2-sync.md)接入业务协议与服务端读写，并行收齐 [P0](docs/plan/p0-runtime-and-reading.md) 的真实阅读、Access 和设备验收；本地业务数据库已移除，实际跨平台闭环仍待验收，分类/书签/同步设置继续推进。各阶段见[计划目录](docs/plan/README.md)。已部署域名为 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，当前代码是否完成线上验收以[验证记录](docs/VERIFICATION.md)为准。
 
 Static Assets 是所有客户端扩展分发的权威来源，每包只部署最新可用构建。客户端刷新静态索引并切换当前版本，不再向 GitHub Release 发布扩展，也不经 Worker/R2 转发扩展正文。共享桥/WASM 在 Web 作为静态资源、Native 随应用打包。动态 Source 网络请求仍经 Access 保护的 HTTP v2 API。
 

@@ -1,18 +1,18 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
-import 'package:drift/drift.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
-import 'reader_database.dart';
+import 'business_state_client.dart';
+import 'business_state_validation.dart';
 import 'reading_progress.dart';
 
 String _mangaKey(String packageName, String sourceId, String mangaUrl) => sha256
     .convert(utf8.encode(jsonEncode([packageName, sourceId, mangaUrl])))
     .toString();
 
-/// Local metadata and an explicit favorite, scoped to a confirmed identity.
-/// Builds and runtime generations are deliberately excluded from manga identity.
+/// A confirmed server favorite. Builds and generations are excluded from its
+/// stable identity; the full Source snapshot retains its opaque memo text.
 final class LibraryEntry {
   LibraryEntry({
     required this.packageName,
@@ -36,64 +36,24 @@ final class LibraryEntry {
   String get url => snapshot.url;
 }
 
-/// P1 local favorites only. D1 business state and the P2 outbox are separate
-/// work; these rows must not be presented as already synchronized cloud state.
 final class LibraryRepository {
-  LibraryRepository(this.database, this.identity, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  LibraryRepository(this.client);
+  final BusinessStateClient client;
+  ProgressIdentity get identity => client.identity;
 
-  final ReaderDatabase database;
-  final ProgressIdentity identity;
-  final DateTime Function() _now;
+  Stream<List<LibraryEntry>> watchEntries() => client.watchLibrary().map(
+    (values) => List.unmodifiable(values.map(_entry)),
+  );
 
-  Stream<List<LibraryEntry>> watchEntries() {
-    final favorites = database.libraryFavoriteRows;
-    final manga = database.libraryMangaRows;
-    final query =
-        database.select(favorites).join([
-            innerJoin(
-              manga,
-              manga.identityKey.equalsExp(favorites.identityKey) &
-                  manga.mangaKey.equalsExp(favorites.mangaKey),
-            ),
-          ])
-          ..where(favorites.identityKey.equals(identity.key))
-          ..orderBy([
-            OrderingTerm.desc(favorites.addedAt),
-            OrderingTerm.asc(favorites.mangaKey),
-          ]);
-    return query.watch().map(
-      (rows) => List.unmodifiable(
-        rows.map((row) {
-          final metadata = row.readTable(manga);
-          return LibraryEntry(
-            packageName: metadata.packageName,
-            sourceId: metadata.sourceId,
-            sourceName: metadata.sourceName,
-            sourceLang: metadata.sourceLang,
-            manga: wire.decodeProtoJson(
-              wire.Manga(),
-              jsonDecode(metadata.mangaJson),
-            ),
-            addedAt: row.readTable(favorites).addedAt,
-          );
-        }),
-      ),
-    );
-  }
-
-  Stream<bool> watchFavorite(String mangaKey) =>
-      _favorite(mangaKey).watchSingleOrNull().map((row) => row != null);
+  Stream<bool> watchFavorite(String mangaKey) => client
+      .watchManga(mangaKey)
+      .map((state) => state?.favorite ?? false)
+      .distinct();
 
   Future<bool> contains(String mangaKey) async =>
-      await _favorite(mangaKey).getSingleOrNull() != null;
+      (await client.readManga(mangaKey)).manga.favorite;
 
-  SimpleSelectStatement<$LibraryFavoriteRowsTable, LibraryFavoriteRow>
-  _favorite(String mangaKey) => database.select(database.libraryFavoriteRows)
-    ..where(
-      (row) =>
-          row.identityKey.equals(identity.key) & row.mangaKey.equals(mangaKey),
-    );
+  Future<void> refresh() => client.refreshLibrary();
 
   Future<void> setFavorite({
     required String packageName,
@@ -110,34 +70,15 @@ final class LibraryRepository {
       sourceLang,
       manga,
     );
-    await database.transaction(() async {
-      if (favorite) {
-        await database
-            .into(database.libraryMangaRows)
-            .insertOnConflictUpdate(metadata);
-        // Updating metadata or repeating an add must not reorder the shelf.
-        await database
-            .into(database.libraryFavoriteRows)
-            .insert(
-              LibraryFavoriteRowsCompanion.insert(
-                identityKey: identity.key,
-                mangaKey: metadata.mangaKey.value,
-                addedAt: _now().toUtc(),
-              ),
-              mode: InsertMode.insertOrIgnore,
-            );
-      } else {
-        await (database.delete(database.libraryFavoriteRows)..where(
-              (row) =>
-                  row.identityKey.equals(identity.key) &
-                  row.mangaKey.equals(metadata.mangaKey.value),
-            ))
-            .go();
-      }
-    });
+    await client.mutate(
+      wire.StateMutation(
+        mangaKey: _mangaKey(packageName, sourceId, manga.url),
+        setFavorite: wire.SetFavorite(metadata: metadata, favorite: favorite),
+      ),
+    );
   }
 
-  /// Refreshing a detail never implicitly favorites it or creates shelf rows.
+  /// A detail refresh updates server metadata without implicitly favoriting it.
   Future<void> refreshMetadata({
     required String packageName,
     required String sourceId,
@@ -152,32 +93,51 @@ final class LibraryRepository {
       sourceLang,
       manga,
     );
-    await (database.update(database.libraryMangaRows)..where(
-          (row) =>
-              row.identityKey.equals(identity.key) &
-              row.mangaKey.equals(metadata.mangaKey.value),
-        ))
-        .write(metadata);
-  }
-
-  LibraryMangaRowsCompanion _metadata(
-    String packageName,
-    String sourceId,
-    String sourceName,
-    String sourceLang,
-    wire.Manga manga,
-  ) {
-    _validateMetadata(packageName, sourceId, sourceName, sourceLang, manga);
-    return LibraryMangaRowsCompanion.insert(
-      identityKey: identity.key,
-      mangaKey: _mangaKey(packageName, sourceId, manga.url),
-      packageName: packageName,
-      sourceId: sourceId,
-      sourceName: sourceName,
-      sourceLang: sourceLang,
-      mangaJson: jsonEncode(wire.encodeProtoJson(manga)),
+    await client.mutate(
+      wire.StateMutation(
+        mangaKey: _mangaKey(packageName, sourceId, manga.url),
+        updateMetadata: metadata,
+      ),
     );
   }
+}
+
+LibraryEntry _entry(wire.MangaState state) {
+  final metadata = state.metadata;
+  final entry = LibraryEntry(
+    packageName: metadata.packageName,
+    sourceId: metadata.sourceId,
+    sourceName: metadata.sourceName,
+    sourceLang: metadata.sourceLang,
+    manga: metadata.manga,
+    addedAt: DateTime.fromMillisecondsSinceEpoch(
+      state.addedAtSeconds * 1000,
+      isUtc: true,
+    ),
+  );
+  if (entry.mangaKey != state.mangaKey) {
+    throw const FormatException('Library metadata identity mismatch');
+  }
+  return entry;
+}
+
+wire.LibraryMetadata _metadata(
+  String packageName,
+  String sourceId,
+  String sourceName,
+  String sourceLang,
+  wire.Manga manga,
+) {
+  _validateMetadata(packageName, sourceId, sourceName, sourceLang, manga);
+  final result = wire.LibraryMetadata(
+    packageName: packageName,
+    sourceId: sourceId,
+    sourceName: sourceName,
+    sourceLang: sourceLang,
+    manga: manga.deepCopy(),
+  );
+  validateBusinessMetadata(result);
+  return result;
 }
 
 void _validateMetadata(
@@ -197,4 +157,5 @@ void _validateMetadata(
       'Library metadata requires a Source and manga identity',
     );
   }
+  if (manga.memoJson.isNotEmpty) wire.checkSourceMemo(manga.memoJson);
 }

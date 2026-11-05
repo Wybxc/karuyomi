@@ -176,6 +176,41 @@ test.each([
   },
 );
 
+test('popup login preserves one valid attempt on the fixed first-party callback', async () => {
+  const attempt = crypto.randomUUID();
+  const response = await app.request(
+    `https://read.example.com/api/auth/login?returnTo=/auth/complete&attempt=${attempt}`,
+    { headers: { 'Cf-Access-Jwt-Assertion': await token() } },
+    env,
+  );
+  expect(response.status).toBe(303);
+  expect(response.headers.get('location')).toBe(
+    `/auth/complete?attempt=${attempt}`,
+  );
+});
+
+test.each([
+  { returnTo: '/auth/complete', attempt: '' },
+  { returnTo: '/auth/complete', attempt: 'foreign-attempt' },
+  { returnTo: '/', attempt: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' },
+])(
+  'popup login rejects invalid attempts or callbacks: %j',
+  async ({ returnTo, attempt }) => {
+    const query = new URLSearchParams({ returnTo, attempt });
+    const response = await app.request(
+      `https://read.example.com/api/auth/login?${query}`,
+      {
+        headers: { 'Cf-Access-Jwt-Assertion': await token() },
+      },
+      env,
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'invalid_authentication_attempt',
+    });
+  },
+);
+
 test.each([
   'https://attacker.example',
   '//attacker.example',

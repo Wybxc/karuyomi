@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/library_repository.dart';
-import '../../data/reading_progress.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/catalog_page.dart';
 import '../reader/reader_recovery.dart';
@@ -30,18 +29,20 @@ class LibraryPage extends StatefulWidget {
   State<LibraryPage> createState() => _LibraryPageState();
 }
 
-class _LibraryPageState extends State<LibraryPage> {
+class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   final _search = TextEditingController();
   LibraryRepository? _repository;
   Stream<List<LibraryEntry>>? _entries;
-  Future<ProgressStorageMode>? _storageMode;
   _LibrarySort _sort = _LibrarySort.added;
   int _retry = 0;
+  ServiceStatus? _lastStatus;
   bool _opening = false;
+  String? _refreshError;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.controller?.addListener(_catalogChanged);
     _bindRepository();
   }
@@ -58,25 +59,47 @@ class _LibraryPageState extends State<LibraryPage> {
 
   void _catalogChanged() {
     if (!mounted) return;
+    final status = widget.controller?.status;
+    final reconnected = status == ServiceStatus.ready && _lastStatus != status;
+    _lastStatus = status;
     setState(_bindRepository);
+    if (reconnected) unawaited(_refresh());
   }
 
   void _bindRepository() {
     final next = widget.controller?.library;
-    if (_repository?.identity.key == next?.identity.key &&
-        identical(_repository?.database, next?.database)) {
+    if (identical(_repository, next)) {
       return;
     }
     _repository = next;
+    _refreshError = null;
     _entries = next?.watchEntries();
-    _storageMode = next?.database.storageMode;
     _search.clear();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
+  }
+
+  Future<void> _refresh() async {
+    final repository = _repository;
+    if (repository == null) return;
+    try {
+      await repository.refresh();
+      if (mounted && identical(repository, _repository)) {
+        setState(() => _refreshError = null);
+      }
+    } catch (_) {
+      if (mounted && identical(repository, _repository)) {
+        setState(() => _refreshError = '未能刷新服务端书架，当前显示上次确认的结果。');
+      }
+    }
   }
 
   void _retryStorage() => setState(() {
     _retry++;
     _entries = _repository?.watchEntries();
-    _storageMode = _repository?.database.storageMode;
   });
 
   Future<void> _open(LibraryEntry entry) async {
@@ -127,52 +150,27 @@ class _LibraryPageState extends State<LibraryPage> {
             const SizedBox(height: 12),
           ],
           if (widget.controller?.error case final error?) _notice(error),
+          if (_refreshError case final error?) _notice(error),
           if (widget.controller case final controller?)
             if (controller.status != ServiceStatus.ready)
               _connection(controller),
           if (_repository != null)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: Text('书架仅保存在此设备。'),
-            ),
-          if (_storageMode != null)
-            FutureBuilder<ProgressStorageMode>(
-              future: _storageMode,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Column(
-                    children: [
-                      _notice('无法确认本地书架的持久化状态。'),
-                      TextButton(
-                        onPressed: _retryStorage,
-                        child: const Text('重试检查存储'),
-                      ),
-                    ],
-                  );
-                }
-                return switch (snapshot.data) {
-                  ProgressStorageMode.memoryOnly => _notice(
-                    '书架当前仅保存在内存中，关闭应用后会丢失。',
-                  ),
-                  ProgressStorageMode.unsafePersistence => _notice(
-                    '当前浏览器存储无法保证安全持久化，请避免同时打开多个窗口。',
-                  ),
-                  _ => const SizedBox.shrink(),
-                };
-              },
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => unawaited(_refresh()),
+                icon: const Icon(Icons.sync),
+                label: const Text('刷新服务端书架'),
+              ),
             ),
           StreamBuilder<List<LibraryEntry>>(
-            key: ValueKey((
-              _repository?.database,
-              _repository?.identity.key,
-              _retry,
-            )),
+            key: ValueKey((_repository, _repository?.identity.key, _retry)),
             stream: _entries,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Column(
                   children: [
-                    _notice('未能读取本地书架，收藏不会自动删除。'),
+                    _notice('未能读取服务端书架，请重试。'),
                     TextButton(
                       onPressed: _retryStorage,
                       child: const Text('重试读取书架'),
@@ -191,7 +189,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 return _repository == null && widget.controller != null
                     ? const Padding(
                         padding: EdgeInsets.all(32),
-                        child: Text('连接并确认身份后显示本地书架。'),
+                        child: Text('连接并确认身份后显示服务端书架。'),
                       )
                     : _empty();
               }
@@ -353,6 +351,7 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void dispose() {
     widget.controller?.removeListener(_catalogChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _search.dispose();
     super.dispose();
   }

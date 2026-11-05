@@ -15,7 +15,9 @@
     "@karuyomi/contracts": "workspace:*",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.16",
-    "jose": "6.2.15"
+    "jose": "6.2.15",
+    "@bufbuild/protobuf": "2.16.0",
+    "@karuyomi/protocol": "workspace:*"
   },
   "devDependencies": {
     "drizzle-kit": "0.31.11",

@@ -1,21 +1,16 @@
 import 'dart:async';
 
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/diagnostics/reader_baseline_host.dart';
-import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'browse/fakes.dart';
 
 void main() {
-  late ReaderDatabase database;
-  setUp(() => database = ReaderDatabase(NativeDatabase.memory()));
-  tearDown(() => database.close());
   for (final size in [const Size(360, 800), const Size(1280, 900)]) {
     testWidgets('empty shell navigation at ${size.width}px', (tester) async {
       tester.view.physicalSize = size;
@@ -48,9 +43,7 @@ void main() {
     'chapter navigation preserves Source reference and Native reports its image gate',
     (tester) async {
       final platform = TestPlatform();
-      await tester.pumpWidget(
-        KaruyomiApp(platform: platform, database: database),
-      );
+      await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       await tester.tap(find.text('去浏览'));
       await tester.pumpAndSettle();
@@ -102,9 +95,7 @@ void main() {
     'chapter completion during details exit closes its session without opening Reader',
     (tester) async {
       final platform = TestPlatform();
-      await tester.pumpWidget(
-        KaruyomiApp(platform: platform, database: database),
-      );
+      await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       await tester.tap(find.text('去浏览'));
       await tester.pumpAndSettle();
@@ -170,9 +161,7 @@ void main() {
         'returnTo': '/',
         'pending': {'tab': 1, 'buildId': 'build-1', 'sourceId': sourceId},
       };
-      await tester.pumpWidget(
-        KaruyomiApp(platform: platform, database: database),
-      );
+      await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       expect(find.text('登录后继续浏览'), findsOneWidget);
       await tester.tap(find.text('登录').first);

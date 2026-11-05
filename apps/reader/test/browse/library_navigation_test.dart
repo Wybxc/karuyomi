@@ -1,9 +1,7 @@
 import 'dart:async';
 
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/library_repository.dart';
-import 'package:karuyomi/data/reader_database.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
@@ -11,20 +9,17 @@ import 'package:source_runtime/source_runtime.dart';
 import 'fakes.dart';
 
 void main() {
-  late ReaderDatabase database;
   late TestPlatform platform;
   late CatalogController catalog;
   late LibraryRepository library;
   late LibraryEntry entry;
 
   setUp(() async {
-    database = ReaderDatabase(NativeDatabase.memory());
     platform = TestPlatform();
     catalog = CatalogController(
       api: platform,
       runtime: platform.runtime,
       rebuildRuntime: platform.rebuild,
-      progressDatabase: database,
       deploymentOrigin: platform.origin,
     );
     await catalog.connect();
@@ -44,7 +39,6 @@ void main() {
     catalog.dispose();
     await catalog.closeReadingProgress();
     await platform.dispose();
-    await database.close();
   });
 
   test(
@@ -137,7 +131,7 @@ void main() {
       );
       expect(platform.openedBuilds, isEmpty);
       expect(await catalog.library!.watchEntries().first, isEmpty);
-      expect(await library.watchFavorite(entry.mangaKey).first, true);
+      expect(platform.businessServer.manga(entry.mangaKey)!.favorite, true);
     },
   );
 
@@ -168,7 +162,7 @@ void main() {
   );
 
   test(
-    'Access expiry preserves the local favorite and stops navigation',
+    'Access expiry preserves the confirmed favorite and stops navigation',
     () async {
       platform.invokeHandler = (_) async => throw const RuntimeException(
         RuntimeErrorCode.accessRequired,
@@ -215,9 +209,7 @@ void main() {
   test(
     'metadata write failure keeps the successfully fetched details usable',
     () async {
-      await database.customStatement(
-        "CREATE TRIGGER reject_metadata BEFORE UPDATE ON library_manga_rows BEGIN SELECT RAISE(ABORT, 'fixture storage full'); END",
-      );
+      platform.businessServer.failWrites = true;
       final details = await catalog.openLibraryEntry(
         entry,
         identityKey: library.identity.key,

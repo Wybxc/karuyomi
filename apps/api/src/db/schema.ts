@@ -1,4 +1,9 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from 'drizzle-orm/sqlite-core';
 
 // Business tables follow their P0/P1 contracts; no deferred modules are seeded.
 export const appMetadata = sqliteTable('app_metadata', {
@@ -14,3 +19,45 @@ export const extensionBuilds = sqliteTable('extension_builds', {
   createdAt: integer('created_at').notNull(),
   allowedHostsJson: text('allowed_hosts_json').notNull().default('[]'),
 });
+
+export const accountState = sqliteTable('account_state', {
+  subject: text('subject').primaryKey(),
+  revision: integer('revision').notNull().default(0),
+});
+
+export const mangaState = sqliteTable(
+  'manga_state',
+  {
+    subject: text('subject').notNull(),
+    mangaKey: text('manga_key').notNull(),
+    revision: integer('revision').notNull(),
+    favorite: integer('favorite', { mode: 'boolean' }).notNull(),
+    stateJson: text('state_json').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.subject, table.mangaKey] })],
+);
+
+export const chapterProgress = sqliteTable(
+  'chapter_progress',
+  {
+    subject: text('subject').notNull(),
+    mangaKey: text('manga_key').notNull(),
+    chapterKey: text('chapter_key').notNull(),
+    stateJson: text('state_json').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.mangaKey, table.chapterKey] }),
+  ],
+);
+
+export const stateMutations = sqliteTable(
+  'state_mutations',
+  {
+    subject: text('subject').notNull(),
+    mutationId: text('mutation_id').notNull(),
+    requestHash: text('request_hash').notNull(),
+    attemptNonce: text('attempt_nonce').notNull(),
+    responseJson: text('response_json').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.subject, table.mutationId] })],
+);

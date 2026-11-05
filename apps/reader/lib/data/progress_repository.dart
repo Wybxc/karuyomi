@@ -1,45 +1,31 @@
-import 'dart:convert';
-
-import 'package:drift/drift.dart';
 import 'package:reader_core/reader_core.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
-import 'reader_database.dart';
+import 'business_state_client.dart';
+import 'business_state_validation.dart';
 import 'reading_progress.dart';
 
 final class ProgressRepository {
-  ProgressRepository(this.database, this.identity);
-  final ReaderDatabase database;
-  final ProgressIdentity identity;
+  ProgressRepository(this.client);
+  final BusinessStateClient client;
+  ProgressIdentity get identity => client.identity;
 
   Future<ChapterProgress?> loadChapter({
     required String mangaKey,
     required String chapterKey,
   }) async {
-    final row =
-        await (database.select(database.chapterProgressRows)..where(
-              (row) =>
-                  row.identityKey.equals(identity.key) &
-                  row.mangaKey.equals(mangaKey) &
-                  row.chapterKey.equals(chapterKey),
-            ))
-            .getSingleOrNull();
-    return row == null ? null : _progress(row);
+    final result = await client.readManga(mangaKey, chapterKey: chapterKey);
+    return result.hasProgress() ? decodeChapterProgress(result.progress) : null;
   }
 
   Future<MangaResume?> loadResume(String mangaKey) async {
-    final row =
-        await (database.select(database.mangaResumeRows)..where(
-              (row) =>
-                  row.identityKey.equals(identity.key) &
-                  row.mangaKey.equals(mangaKey),
-            ))
-            .getSingleOrNull();
-    return row == null
-        ? null
-        : MangaResume(
-            chapterKey: row.chapterKey,
-            reversedOrder: row.reversedOrder,
-          );
+    final result = await client.readManga(mangaKey);
+    return result.manga.hasResume()
+        ? MangaResume(
+            chapterKey: result.manga.resume.chapterKey,
+            reversedOrder: result.manga.resume.reversedOrder,
+          )
+        : null;
   }
 
   Future<ChapterProgress> save({
@@ -47,78 +33,103 @@ final class ProgressRepository {
     required ChapterManifest manifest,
     required ChapterProgress progress,
     required bool reversedOrder,
-  }) => database.transaction(() async {
+  }) async {
     _validate(mangaKey, manifest, progress);
-    final stored = await loadChapter(
-      mangaKey: mangaKey,
-      chapterKey: manifest.chapterKey,
+    final result = await client.mutate(
+      wire.StateMutation(
+        mangaKey: mangaKey,
+        saveProgress: wire.SaveProgress(
+          snapshot: _snapshot(manifest),
+          progress: _progress(progress),
+          reversedOrder: reversedOrder,
+        ),
+      ),
     );
-    if (stored != null && progress.epoch < stored.epoch) return stored;
-    if (progress.epoch != (stored?.epoch ?? 0)) {
-      throw StateError('Only reset may advance the persisted reading epoch');
-    }
-    final merged = (stored ?? ChapterProgress(current: progress.current)).merge(
-      manifest: manifest,
-      incoming: progress,
-    );
-    await _write(mangaKey, manifest.chapterKey, merged, reversedOrder);
-    return merged;
-  });
+    return _confirmedProgress(result, manifest.chapterKey);
+  }
 
   Future<ChapterProgress> reset({
     required String mangaKey,
     required ChapterManifest manifest,
     required bool reversedOrder,
-  }) => database.transaction(() async {
+  }) async {
     if (mangaKey.isEmpty || manifest.pages.isEmpty) {
       throw ArgumentError(
         'Reset requires a nonempty chapter and manga identity',
       );
     }
-    final stored = await loadChapter(
-      mangaKey: mangaKey,
-      chapterKey: manifest.chapterKey,
+    final result = await client.mutate(
+      wire.StateMutation(
+        mangaKey: mangaKey,
+        resetProgress: wire.ResetProgress(
+          snapshot: _snapshot(manifest),
+          reversedOrder: reversedOrder,
+        ),
+      ),
     );
-    final reset = ChapterProgress(
-      current: manifest.positionAt(0),
-      epoch: (stored?.epoch ?? 0) + 1,
-    );
-    await _write(mangaKey, manifest.chapterKey, reset, reversedOrder);
-    return reset;
-  });
-
-  Future<void> _write(
-    String mangaKey,
-    String chapterKey,
-    ChapterProgress progress,
-    bool reversedOrder,
-  ) async {
-    await database
-        .into(database.chapterProgressRows)
-        .insertOnConflictUpdate(
-          ChapterProgressRowsCompanion.insert(
-            identityKey: identity.key,
-            mangaKey: mangaKey,
-            chapterKey: chapterKey,
-            currentJson: _encode(progress.current),
-            furthestJson: Value(
-              progress.furthest == null ? null : _encode(progress.furthest!),
-            ),
-            epoch: progress.epoch,
-            completed: progress.completed,
-          ),
-        );
-    await database
-        .into(database.mangaResumeRows)
-        .insertOnConflictUpdate(
-          MangaResumeRowsCompanion.insert(
-            identityKey: identity.key,
-            mangaKey: mangaKey,
-            chapterKey: chapterKey,
-            reversedOrder: reversedOrder,
-          ),
-        );
+    return _confirmedProgress(result, manifest.chapterKey);
   }
+}
+
+ChapterProgress _confirmedProgress(
+  wire.StateMutationResponse result,
+  String chapterKey,
+) {
+  if (!result.hasProgress() || result.progress.chapterKey != chapterKey) {
+    throw const FormatException('Progress response chapter mismatch');
+  }
+  return decodeChapterProgress(result.progress);
+}
+
+ChapterProgress decodeChapterProgress(wire.ChapterProgressState value) {
+  validateBusinessProgress(value);
+  return ChapterProgress(
+    current: _decodeAnchor(value.current),
+    furthest: value.hasFurthest() ? _decodeAnchor(value.furthest) : null,
+    epoch: value.epoch,
+    completed: value.completed,
+  );
+}
+
+ReadingPosition _decodeAnchor(wire.ReadingAnchor value) {
+  validateBusinessAnchor(value);
+  return ReadingPosition(
+    chapterKey: value.chapterKey,
+    pageKey: value.pageKey,
+    manifestVersion: value.manifestVersion,
+    pageIndexHint: value.pageIndexHint,
+    normalizedOffset: value.normalizedOffset,
+  );
+}
+
+wire.ReadingAnchor _anchor(ReadingPosition value) => wire.ReadingAnchor(
+  chapterKey: value.chapterKey,
+  pageKey: value.pageKey,
+  manifestVersion: value.manifestVersion,
+  pageIndexHint: value.pageIndexHint,
+  normalizedOffset: value.normalizedOffset,
+);
+wire.ChapterProgressState _progress(ChapterProgress value) {
+  final result = wire.ChapterProgressState(
+    chapterKey: value.current.chapterKey,
+    current: _anchor(value.current),
+    furthest: value.furthest == null ? null : _anchor(value.furthest!),
+    epoch: value.epoch,
+    completed: value.completed,
+  );
+  validateBusinessProgress(result);
+  return result;
+}
+
+wire.ChapterSnapshot _snapshot(ChapterManifest value) {
+  if (value.pages.length > 2048) {
+    throw ArgumentError('Chapter exceeds progress snapshot budget');
+  }
+  return wire.ChapterSnapshot(
+    chapterKey: value.chapterKey,
+    manifestVersion: value.version,
+    pageKeys: value.pages.map((page) => page.key),
+  );
 }
 
 void _validate(
@@ -134,36 +145,3 @@ void _validate(
     throw ArgumentError('Progress must belong to the current nonempty chapter');
   }
 }
-
-ChapterProgress _progress(ChapterProgressRow row) => ChapterProgress(
-  current: _decode(row.currentJson),
-  furthest: row.furthestJson == null ? null : _decode(row.furthestJson!),
-  epoch: row.epoch,
-  completed: row.completed,
-);
-
-String _encode(ReadingPosition value) => jsonEncode({
-  'chapterKey': value.chapterKey,
-  'pageKey': value.pageKey,
-  'manifestVersion': value.manifestVersion,
-  'pageIndexHint': value.pageIndexHint,
-  'normalizedOffset': value.normalizedOffset,
-});
-
-ReadingPosition _decode(String value) => switch (jsonDecode(value)) {
-  {
-    'chapterKey': String chapterKey,
-    'pageKey': String pageKey,
-    'manifestVersion': String version,
-    'pageIndexHint': int index,
-    'normalizedOffset': num offset,
-  } =>
-    ReadingPosition(
-      chapterKey: chapterKey,
-      pageKey: pageKey,
-      manifestVersion: version,
-      pageIndexHint: index,
-      normalizedOffset: offset.toDouble(),
-    ),
-  _ => throw const FormatException('Invalid persisted reading position'),
-};

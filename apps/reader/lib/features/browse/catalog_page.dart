@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
+import '../../data/business_state_client.dart';
 import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
 import '../reader/chapter_reader_route.dart';
@@ -291,7 +292,8 @@ class MangaDetailsPage extends StatefulWidget {
   State<MangaDetailsPage> createState() => _MangaDetailsPageState();
 }
 
-class _MangaDetailsPageState extends State<MangaDetailsPage> {
+class _MangaDetailsPageState extends State<MangaDetailsPage>
+    with WidgetsBindingObserver {
   CatalogController get controller => widget.controller;
   MangaEntry get manga => widget.manga;
   List<ChapterEntry> get chapters => widget.chapters;
@@ -308,6 +310,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final build = controller.activeBuild;
     if (build != null) {
       _sequence = ChapterSequence(
@@ -320,6 +323,26 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
       _favoriteStream = _library?.watchFavorite(_sequence!.mangaKey);
       unawaited(_refreshResume());
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshResume());
+      final key = _sequence?.mangaKey;
+      final library = _library;
+      if (key != null && library != null) {
+        unawaited(
+          library.contains(key).then<void>((_) {}, onError: (Object _) {}),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _refreshResume() async {
@@ -338,9 +361,12 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
         resume = null;
       }
     } catch (_) {
-      error = '未能读取本地阅读位置，仍可从章节列表打开。';
+      error = '未能读取服务端阅读位置，仍可从章节列表打开。';
     }
-    if (!mounted) return;
+    if (!mounted ||
+        controller.readingProgress?.identity.key != repository.identity.key) {
+      return;
+    }
     setState(() {
       _resume = resume;
       _resumeError = error;
@@ -377,10 +403,20 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
         manga: manga.snapshot,
         favorite: favorite,
       );
-    } catch (_) {
-      if (mounted) {
-        setState(() => _favoriteError = '收藏未能保存，请重试；仍可继续阅读。');
+    } catch (failure) {
+      var message = '收藏未能保存，请重试；仍可继续阅读。';
+      if (failure is BusinessStateException &&
+          failure.conflictedChapterKey != null) {
+        message = '此作品有阅读进度冲突，请重新打开相关章节后再修改收藏。';
+      } else if (failure is BusinessStateException && failure.conflict) {
+        try {
+          await repository.contains(_sequence!.mangaKey);
+          message = '此作品已在其他设备更新，已重新读取；请确认收藏状态后重试。';
+        } catch (_) {
+          message = '此作品已在其他设备更新，请刷新书架后重试。';
+        }
       }
+      if (mounted) setState(() => _favoriteError = message);
     } finally {
       if (mounted) setState(() => _savingFavorite = false);
     }

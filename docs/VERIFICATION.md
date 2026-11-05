@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-05，收藏与阅读进度已接入生成业务协议、Worker API 和 D1 权威状态，本地业务 SQLite 与对应 Web 资产已移除。真实 workerd/D1 的并发、幂等、身份、分页及原子失败测试见[服务端状态记录](verification/server-state.md)；本轮全格式、通用检查与 Flutter 三项目静态分析/测试通过（21/42/190 项）；实际跨端 UI 验收仍待完成，历史本地数据库恢复不代表当前同步完成。
+
 2026-11-03，本地 macOS。Flutter 3.47.5 / Dart 3.13.4、pnpm 12.6.0；仓库固定 Node 24.15.0，本轮也使用 Node 26.5.0 执行检查。TeaVM 固定 0.16.0 JS backend，验证 JDK 为 Oracle GraalVM 25.0.4、Maven 3.9.11。下表区分代码/分项测试、独立机制探针与尚未完成的产品验收，不以测试总数作为能力证明。
 
 当前图片交付已收敛为 Source 处理后的不透明编码资源，由 Flutter/UI 直接解码；工程回归、诊断性原 xkcd 阅读/恢复和默认关闭的计时采集入口见[UI 图片边界](verification/ui-image-boundary.md)。采集入口尚未取得正式性能数据，长图、真机与进程/GPU 门保持未通过。历史[编码页记录](verification/encoded-image-ownership.md)和[图片页控制记录](verification/image-page-controls.md)保留原输入与范围；其 host 编码页/tile 合同已退出当前产品路径。

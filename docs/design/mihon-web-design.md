@@ -251,7 +251,7 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 ### 会话与负载
 
 - 默认一个活跃执行槽；跨源搜索可按设备能力启用第二槽，全局同时最多两个。一个槽仅加载一个包，同包多个 Source 复用，前台 RPC 串行；依赖内部异步回调不加入阻塞自身的前台队列。跨包搜索按优先级排队，不能每安装一包就常驻一个 Worker。
-- 公开页面和本地书架首屏不等待扩展。Access 身份确认后，首屏显示完再按最近阅读作品按需准备一个包；预热不调用热门/搜索/章节或全仓扫描。用户请求复用同一初始化 Promise。重包默认只占一个槽，停止额外预热；是否扩容由移动端内存实测决定。
+- 公开页面与服务端书架视图不等待扩展初始化。Access 身份确认后，首屏显示完再按最近阅读作品按需准备一个包；预热不调用热门/搜索/章节或全仓扫描。用户请求复用同一初始化 Promise。重包默认只占一个槽，停止额外预热；是否扩容由移动端内存实测决定。
 - 同包页面切换复用实例；跨包调度先使用空闲槽，回收不活跃实例后启动目标包。当前阅读和图片任务优先。原型全局 `pending` 改为按实例/requestId 关联，所有消息检查 buildId、generation 和 Source；64 位 Source ID 不转 JS number。
 - 普通文件和 HTTP 缓存分库存储，按已确认身份/仓库/包/storageSchema 分区；同一包不同版本不并发写同一可变存储。升级先取消并排空旧实例，再切换已验证构建指针；只复用当前 schema；原型不实现旧 schema 迁移/兼容，必要时重建运行缓存。设置/阅读位置属于应用业务存储，不随实例销毁而消失。
 - 回收需追踪该实例的 HTTP、`enqueue` 后台请求、回调、图片和文件句柄；正常关闭给予有界清理时间，超时/卡死终止 Worker，撤销代次并 Abort 对应请求。关闭不能撤销上游已接受的 POST；不把整次 Source 调用自动重放到新实例来补偿。
@@ -286,7 +286,7 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 不建立历史事件、统计、任务租约、下载页、tracker、文件导入或备份表。首版读取 D1 当前状态，暂不要求 `change_log`、cursor 或 DO 通知；确有体量/延迟数据支持后再引入增量机制，其日志也不作为用户历史或备份。源站敏感凭证暂留当前客户端，不做云端凭证同步。
 
-现有 Flutter 本地书架/进度使用 Drift/SQLite，已通过的分项保留在[本地书架记录](../verification/p1-local-library.md)，但其持久业务读写入口需直接替换为 Worker API，不继续扩建本地权威表、不做旧数据迁移或长期双写。复用已验证的稳定作品键 `SHA256(JSON[packageName, sourceId, originalMangaUrl])`、完整 Protobuf Manga 快照、Source 名称/语言和阅读逻辑锚；buildId/generation 不进入作品身份。取消收藏保留进度，打开作品仍按当前静态索引定位原 package/Source，再主动取当前作品详情/章节。对已取得的业务视图做搜索/排序不触发 Source 请求；封面未接正式图片通道前使用占位图，不直接请求 thumbnail URL。实施状态见[P1](../plan/p1-library-and-progress.md)和[P2](../plan/p2-sync.md)。
+Flutter 收藏与进度已改为 Worker API + D1，Drift/SQLite 业务路径已移除。历史本地分项保留在[本地书架记录](../verification/p1-local-library.md)，不能代替当前跨端验收；不做旧数据迁移或长期双写。复用已验证的稳定作品键 `SHA256(JSON[packageName, sourceId, originalMangaUrl])`、完整 Protobuf Manga 快照、Source 名称/语言和阅读逻辑锚；buildId/generation 不进入作品身份。取消收藏保留进度，打开作品仍按当前静态索引定位原 package/Source，再主动取当前作品详情/章节。对已取得的业务视图做搜索/排序不触发 Source 请求；封面未接正式图片通道前使用占位图，不直接请求 thumbnail URL。实施状态见[P1](../plan/p1-library-and-progress.md)和[P2](../plan/p2-sync.md)。
 
 规范化 URL 只使用保守的 Source 明确规则；保留 release9 已验证的 URI 解码、空查询串和非法 URI 回退，不另加全局 decodeURIComponent、空格替换、删 query 或按标题去重。Source 换域不重新发明 ID；来源变化使用显式迁移。外部 64 位 ID 全部保持字符串。
 
