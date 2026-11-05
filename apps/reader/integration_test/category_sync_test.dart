@@ -1,0 +1,346 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:karuyomi/data/library_repository.dart';
+import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/features/library/library_page.dart';
+import 'package:karuyomi/main.dart' as app;
+import 'package:karuyomi/runtime/platform_runtime_native.dart';
+
+const _origin = String.fromEnvironment('APP_ORIGIN');
+const _phase = String.fromEnvironment('CATEGORY_PHASE');
+const _first = '分类同步·甲';
+const _second = '分类同步·乙';
+const _createdName = '跨端分类';
+const _sharedName = '共享分类';
+const _operationBudget = Duration(seconds: 120);
+
+void main() {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('Native category sync: $_phase', (tester) async {
+    _validateConfiguration();
+    app.main();
+    await tester.pump();
+    final catalog = tester
+        .widget<LibraryPage>(find.byType(LibraryPage))
+        .controller;
+    if (catalog == null) fail('正式 App 必须创建 CatalogController');
+    final platform = catalog.api;
+    if (platform is! NativePlatformRuntime) {
+      fail('此验收必须使用正式 NativePlatformRuntime');
+    }
+    expect(platform.origin.origin, Uri.parse(_origin).origin);
+    late final Map<String, Object?> result;
+
+    try {
+      await _waitFor(tester, 'Native 连接并显示两部预置收藏', () {
+        if (catalog.accessPaused || catalog.status == ServiceStatus.failed) {
+          fail('Native 连接未完成：${catalog.error ?? catalog.status.name}');
+        }
+        return catalog.status == ServiceStatus.ready &&
+            catalog.library != null &&
+            _tile(_first).evaluate().length == 1 &&
+            _tile(_second).evaluate().length == 1;
+      });
+      final repository = catalog.library!;
+      final before = await _readConfirmed(repository);
+      final after = await _runPhase(tester, repository, before);
+      final category = after.categories.singleOrNull;
+      expect(catalog.session, isNull, reason: '分类验收不能启动 Source');
+      expect(identical(catalog.library, repository), isTrue);
+      expect(tester.takeException(), isNull);
+      result = {
+        'phase': _phase,
+        'platform': Platform.operatingSystem,
+        'origin': platform.origin.origin,
+        'subject': repository.identity.subject,
+        'categoryRevision': after.categoryRevision,
+        'categoryId': category?.id,
+        'categoryName': category?.name,
+        'entries': [
+          for (final title in [_first, _second])
+            {
+              'title': title,
+              'revision': _entry(after, title).revision,
+              'categoryIds': _entry(after, title).categoryIds,
+            },
+        ],
+      };
+    } finally {
+      try {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await catalog.closeReadingProgress().timeout(_operationBudget);
+      } finally {
+        await platform.dispose().timeout(_operationBudget);
+      }
+    }
+    binding.reportData = {'CATEGORY_SYNC_RESULT': result};
+    debugPrint('CATEGORY_SYNC_RESULT ${jsonEncode(result)}');
+  }, timeout: const Timeout(Duration(minutes: 10)));
+}
+
+Future<LibraryView> _runPhase(
+  WidgetTester tester,
+  LibraryRepository repository,
+  LibraryView before,
+) async {
+  switch (_phase) {
+    case 'create':
+      _expectState(before);
+      await _expectShelf(tester);
+      await _tap(tester, find.text('管理分类'));
+      await _tap(tester, find.text('新建分类'));
+      await _nameAndSave(tester, _createdName);
+      await _waitForManager(tester, _createdName);
+      await _closeManager(tester);
+      final created = await _readConfirmed(repository);
+      _expectState(created, categoryName: _createdName);
+      await _assign(tester, _first, _createdName);
+      final after = await _readConfirmed(repository);
+      _expectState(after, categoryName: _createdName, firstAssigned: true);
+      expect(after.categories.single.id, created.categories.single.id);
+      await _expectShelf(
+        tester,
+        categoryName: _createdName,
+        firstAssigned: true,
+      );
+      return after;
+    case 'update':
+      _expectState(before, categoryName: _createdName, firstAssigned: true);
+      await _expectShelf(
+        tester,
+        categoryName: _createdName,
+        firstAssigned: true,
+      );
+      await _tap(tester, find.text('管理分类'));
+      await _tap(tester, find.byTooltip('重命名分类 $_createdName'));
+      await _nameAndSave(tester, _sharedName);
+      await _waitForManager(tester, _sharedName);
+      await _closeManager(tester);
+      final renamed = await _readConfirmed(repository);
+      _expectState(renamed, categoryName: _sharedName, firstAssigned: true);
+      expect(renamed.categories.single.id, before.categories.single.id);
+      await _assign(tester, _second, _sharedName);
+      final after = await _readConfirmed(repository);
+      _expectState(
+        after,
+        categoryName: _sharedName,
+        firstAssigned: true,
+        secondAssigned: true,
+      );
+      expect(after.categories.single.id, before.categories.single.id);
+      await _expectShelf(
+        tester,
+        categoryName: _sharedName,
+        firstAssigned: true,
+        secondAssigned: true,
+      );
+      return after;
+    case 'verify':
+    case 'delete':
+      _expectState(
+        before,
+        categoryName: _sharedName,
+        firstAssigned: true,
+        secondAssigned: true,
+      );
+      await _expectShelf(
+        tester,
+        categoryName: _sharedName,
+        firstAssigned: true,
+        secondAssigned: true,
+      );
+      if (_phase == 'verify') return before;
+      await _tap(tester, find.text('管理分类'));
+      await _tap(tester, find.byTooltip('删除分类 $_sharedName'));
+      await _tap(tester, find.text('删除'));
+      await _waitFor(
+        tester,
+        '删除获得确认并返回空分类目录',
+        () => find.text('还没有分类。').evaluate().length == 1,
+      );
+      await _closeManager(tester);
+      final after = await _readConfirmed(repository);
+      _expectState(after);
+      await _expectShelf(tester);
+      return after;
+    case 'verify-deleted':
+      _expectState(before);
+      await _expectShelf(tester);
+      await _tap(tester, find.widgetWithText(ChoiceChip, '未分类'));
+      await _expectShelf(tester);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '未分类'))
+            .selected,
+        isTrue,
+      );
+      return before;
+    default:
+      throw StateError('Unknown CATEGORY_PHASE: $_phase');
+  }
+}
+
+// watchView performs the repository's normal API refresh; no test state is injected.
+Future<LibraryView> _readConfirmed(LibraryRepository repository) =>
+    repository.watchView().first.timeout(_operationBudget);
+
+void _expectState(
+  LibraryView view, {
+  String? categoryName,
+  bool firstAssigned = false,
+  bool secondAssigned = false,
+}) {
+  expect(
+    view.entries.map((entry) => entry.title),
+    unorderedEquals([_first, _second]),
+  );
+  if (categoryName == null) {
+    expect(view.categories, isEmpty);
+  } else {
+    expect(view.categories, hasLength(1));
+    expect(view.categories.single.name, categoryName);
+  }
+  final categoryIds = view.categories.map((category) => category.id).toList();
+  expect(
+    _entry(view, _first).categoryIds,
+    firstAssigned ? categoryIds : isEmpty,
+  );
+  expect(
+    _entry(view, _second).categoryIds,
+    secondAssigned ? categoryIds : isEmpty,
+  );
+}
+
+LibraryEntry _entry(LibraryView view, String title) =>
+    view.entries.singleWhere((entry) => entry.title == title);
+
+Finder _tile(String title) => find.widgetWithText(ListTile, title);
+
+Future<void> _expectShelf(
+  WidgetTester tester, {
+  String? categoryName,
+  bool firstAssigned = false,
+  bool secondAssigned = false,
+}) => _waitFor(tester, '书架显示服务端确认的分类与收藏', () {
+  if (find.byType(AlertDialog).evaluate().isNotEmpty) return false;
+  for (final (title, assigned) in [
+    (_first, firstAssigned),
+    (_second, secondAssigned),
+  ]) {
+    final tile = _tile(title);
+    if (tile.evaluate().length != 1) return false;
+    final subtitle = tester.widget<ListTile>(tile).subtitle;
+    final expected = assigned ? categoryName : '未分类';
+    if (subtitle is! Text || subtitle.data?.endsWith('分类：$expected') != true) {
+      return false;
+    }
+  }
+  return categoryName == null
+      ? find.byType(ChoiceChip).evaluate().length == 2
+      : find.widgetWithText(ChoiceChip, categoryName).evaluate().length == 1;
+});
+
+Future<void> _nameAndSave(WidgetTester tester, String name) async {
+  final field = find.byType(TextFormField);
+  await _waitFor(tester, '分类名称编辑框', () => field.evaluate().length == 1);
+  await tester.enterText(field, name);
+  await _tap(tester, find.text('保存'));
+}
+
+Future<void> _waitForManager(WidgetTester tester, String name) =>
+    _waitFor(tester, '分类修改获得确认并返回管理窗口', () {
+      final rename = find.byWidgetPredicate(
+        (widget) =>
+            widget is IconButton &&
+            widget.tooltip == '重命名分类 $name' &&
+            widget.onPressed != null,
+      );
+      return find.byType(AlertDialog).evaluate().length == 1 &&
+          rename.evaluate().length == 1;
+    });
+
+Future<void> _closeManager(WidgetTester tester) async {
+  await _tap(tester, find.text('完成'));
+  await _waitFor(
+    tester,
+    '关闭分类管理窗口',
+    () => find.byType(AlertDialog).evaluate().isEmpty,
+  );
+}
+
+Future<void> _assign(
+  WidgetTester tester,
+  String title,
+  String categoryName,
+) async {
+  await _tap(tester, find.byTooltip('设置分类：$title'));
+  final checkbox = find.widgetWithText(CheckboxListTile, categoryName);
+  await _waitFor(tester, '漫画分类选择框', () => checkbox.evaluate().length == 1);
+  expect(tester.widget<CheckboxListTile>(checkbox).value, isFalse);
+  await _tap(tester, checkbox);
+  expect(tester.widget<CheckboxListTile>(checkbox).value, isTrue);
+  await _tap(tester, find.text('保存'));
+  await _waitFor(
+    tester,
+    '漫画关联获得服务端确认',
+    () => find.byType(AlertDialog).evaluate().isEmpty,
+  );
+}
+
+Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await _waitFor(tester, '操作控件 $finder', () => finder.evaluate().length == 1);
+  await tester.ensureVisible(finder);
+  await tester.pump(const Duration(milliseconds: 300));
+  await _waitFor(
+    tester,
+    '操作控件可点击',
+    () => finder.hitTestable().evaluate().length == 1,
+  );
+  await tester.tap(finder);
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
+Future<void> _waitFor(
+  WidgetTester tester,
+  String operation,
+  bool Function() ready,
+) async {
+  final elapsed = Stopwatch()..start();
+  while (!ready()) {
+    if (elapsed.elapsed >= _operationBudget) {
+      fail('$operation 超过 ${_operationBudget.inSeconds} 秒预算');
+    }
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+void _validateConfiguration() {
+  final origin = Uri.tryParse(_origin);
+  if (origin == null ||
+      origin.scheme != 'https' ||
+      origin.host.isEmpty ||
+      origin.userInfo.isNotEmpty ||
+      origin.hasQuery ||
+      origin.hasFragment ||
+      (origin.path.isNotEmpty && origin.path != '/')) {
+    fail('APP_ORIGIN 必须是单一 HTTPS 服务源');
+  }
+  if (!Platform.isAndroid && !Platform.isIOS) {
+    fail('此正式分类同步验收仅适用于 Android 或 iOS 设备/模拟器');
+  }
+  if (!{
+    'create',
+    'update',
+    'verify',
+    'delete',
+    'verify-deleted',
+  }.contains(_phase)) {
+    fail('CATEGORY_PHASE 须为 create/update/verify/delete/verify-deleted');
+  }
+}

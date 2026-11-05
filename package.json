@@ -42,7 +42,8 @@
     "test:browser": "vitest --config packages/runtime-host/vitest.browser.config.ts",
     "build:native-assets": "cpy \"packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}\" apps/reader/assets/runtime --flat",
     "acceptance:build": "pnpm build && pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts",
-    "acceptance:serve": "pnpm --filter @karuyomi/api exec node test/acceptance.ts"
+    "acceptance:serve": "pnpm --filter @karuyomi/api exec node test/acceptance.ts",
+    "acceptance:build:native": "pnpm build && pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts --mode native-acceptance"
   },
   "devDependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",

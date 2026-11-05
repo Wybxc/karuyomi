@@ -37,6 +37,8 @@ JS/TS 产品构建使用声明式 Vite 配置和官方 CLI；API 使用 Cloudfla
 
 正式 Flutter Web 的交互验收使用 `pnpm acceptance:build` 构建当前产品及独立 Vite 测试产物，再运行 `pnpm acceptance:serve`。入口直接使用 Cloudflare 官方 `createTestHarness()`，监听随机 loopback URL、应用真实 D1 迁移；同一个 URL 可在 Codex 内置浏览器打开两个独立标签页。测试入口为 loopback 请求签发临时 RS256 身份，随后仍经过正式 JWT、Origin 和业务请求头校验；它不替客户端补写 `X-App-Subject` 或 `X-App-Request`。该入口不进入生产构建，测试身份不能代替生产 Access 正向验收。按 Enter 或发送 SIGINT/SIGTERM 后关闭官方 harness，隔离 D1 状态随进程销毁。
 
+Native 分类验收使用 `pnpm acceptance:build:native` 的现有 Vite 配置 mode，将 Wrangler 的 `local_protocol` 与 `upstream_protocol` 一起声明为 HTTPS；两者必须一致，避免官方代理把 Worker 所见 scheme 改成 HTTP。通过官方 `WRANGLER_HTTPS_KEY_PATH` / `WRANGLER_HTTPS_CERT_PATH` 提供证书，Node 经 `NODE_EXTRA_CA_CERTS` 正常信任本轮 CA。可选 `ACCEPTANCE_FIXTURE=categories pnpm acceptance:serve` 经正式 API 初始化两部受控收藏；随后由 Flutter 官方 `integration_test/category_sync_test.dart` 执行五阶段 UI/确认读回。设备信任、阶段与命令见[Native 测试说明](../apps/reader/integration_test/README.md)。这个分类 fixture 不恢复旧 Source 在线服务，也不放松产品 HTTPS 检查。
+
 ## tools 与 Vite 的职责映射
 
 Vite 插件负责把当前构建的本地输入转换、校验和写入应用资源。扩展静态快照装配已直接内化到现有 `apps/api/vite.assets.ts`，删除独立的 tools 装配模块；不增加只转发一次调用的插件。原有当前索引可达性、材料身份、上传摘要和大小限额断言继续由插件构建测试覆盖。共享清单解析与校验仍供 AOT、注册和流水线复用，保留在所属领域模块。

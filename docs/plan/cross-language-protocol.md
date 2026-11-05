@@ -6,11 +6,11 @@
 
 正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v4，原型不兼容旧材料。v4 增加 host entry/HTTP owner 约束，IDL 新增 `storage_busy` 明确表示 namespace 执行槽占用；历史 v3 运行证据不自动覆盖 v4。
 
-以上运行时与现有 API 控制合同之外，**收藏与阅读进度业务合同已接入**：`business.proto` 生成双端模型，正式 Worker/Dart 通过 ProtoJSON 交换带 revision、epoch 和 mutation ID 的状态；分类、书签与设置尚待扩展。多端同步现为首要设计目标，书架、进度和设置的 Worker API + D1 合同是当前优先待办，与 [P2](p2-sync.md)共同推进；不等待外围 UI 全部完成后再定义跨端状态。
+以上运行时与现有 API 控制合同之外，**收藏、阅读进度与分类业务合同已接入**：`business.proto` 生成双端模型，正式 Worker/Dart 通过 ProtoJSON 交换带 revision、epoch 和 mutation ID 的状态；分类目录和漫画多分类关系已纳入同一生成合同，书签与设置尚待扩展。多端同步现为首要设计目标，书架、进度和设置的 Worker API + D1 合同是当前优先待办，与 [P2](p2-sync.md)共同推进；不等待外围 UI 全部完成后再定义跨端状态。
 
 ## 当前优先主线：业务状态合同
 
-1. 收藏与阅读进度的查询、写入、确认和标准错误已在 `business.proto` 接入；继续扩展分类、书签和非敏感设置。使用 Protobuf + Buf、TS/Dart 官方生成模型和 ProtoJSON，不新增竞争性的手写 DTO 或通用 Struct/Any。
+1. 收藏、阅读进度、分类目录和漫画多分类的查询、写入、确认及标准错误已在 `business.proto` 接入；继续扩展书签和非敏感设置。使用 Protobuf + Buf、TS/Dart 官方生成模型和 ProtoJSON，不新增竞争性的手写 DTO 或通用 Struct/Any。
 2. 已实现 `mutationId`、服务端 `revision`、CAS、阅读 `epoch`、数值范围与精确映射；后续功能复用同一约束。请求跟踪 ID、幂等 ID、资源 generation 各自负责不同约束；身份由鉴权上下文确定，不能信任正文指定的 subject。
 3. 已接入未登录/拒绝、格式与业务约束错误、revision/epoch 冲突、暂时不可用等标准结果和重试语义。成功结果返回服务端确认状态和 revision；同 mutationId 重试返回相同结果、不重复执行，后续功能继续覆盖这些回归。
 4. 当前状态有界分页、前台重新读取、分页 revision 与消息预算已接入，继续验证实际客户端的完整性和恢复。增量日志/cursor、DO 通知及持久 outbox 不作为初版前置。

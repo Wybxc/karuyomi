@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 // Separate output and Wrangler redirection from production and unit fixtures.
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   builder: { sharedConfigBuild: true },
   root: fileURLToPath(new URL('./test', import.meta.url)),
   publicDir: fileURLToPath(new URL('../../dist/public', import.meta.url)),
@@ -11,12 +11,17 @@ export default defineConfig({
     cloudflare({
       configPath: fileURLToPath(new URL('./wrangler.jsonc', import.meta.url)),
       remoteBindings: false,
-      config: {
+      config: (config) => ({
+        dev: {
+          ...config.dev,
+          local_protocol: mode === 'native-acceptance' ? 'https' : 'http',
+          upstream_protocol: mode === 'native-acceptance' ? 'https' : 'http',
+        },
         main: fileURLToPath(
           new URL('./test/acceptance-entry.ts', import.meta.url),
         ),
-      },
+      }),
     }),
   ],
   build: { target: 'es2022', emptyOutDir: true },
-});
+}));
