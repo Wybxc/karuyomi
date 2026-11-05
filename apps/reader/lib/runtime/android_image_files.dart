@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'native_image_files.dart';
@@ -44,6 +45,26 @@ final class AndroidImageFileStore implements NativeImageFileStore {
   bool _closed = false;
   Future<void>? _clearing;
   int _sequence = 0;
+  static Future<Directory>? _processDirectory;
+
+  static Future<Directory> _prepareProcessDirectory() async {
+    final cache = await getTemporaryDirectory();
+    final root = Directory('${cache.path}/karuyomi-images');
+    final type = await FileSystemEntity.type(root.path, followLinks: false);
+    if (type != FileSystemEntityType.notFound) {
+      if (type != FileSystemEntityType.directory) {
+        throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Native image directory is invalid',
+        );
+      }
+      // Only the first store in this process removes crash leftovers. Each
+      // live store owns a separate child, so closing one cannot clear another.
+      await root.delete(recursive: true);
+    }
+    await root.create();
+    return root.createTemp('run-');
+  }
 
   static Future<bool> supported() async {
     for (final feature in [
@@ -62,11 +83,23 @@ final class AndroidImageFileStore implements NativeImageFileStore {
   static Future<AndroidImageFileStore> bind(
     InAppWebViewController controller,
     Uri origin,
-  ) async => AndroidImageFileStore._(
-    controller,
-    origin,
-    await Directory.systemTemp.createTemp('karuyomi-images-'),
-  );
+  ) async {
+    final preparing = _processDirectory ??= _prepareProcessDirectory();
+    final Directory process;
+    try {
+      process = await preparing;
+    } catch (_) {
+      // A failed cleanup remains an error for every current waiter, but an
+      // explicit reconnect can retry after a temporary filesystem failure.
+      if (identical(_processDirectory, preparing)) _processDirectory = null;
+      rethrow;
+    }
+    return AndroidImageFileStore._(
+      controller,
+      origin,
+      await process.createTemp('store-'),
+    );
+  }
 
   String _key(String id, String generation) => '$generation\u0000$id';
 

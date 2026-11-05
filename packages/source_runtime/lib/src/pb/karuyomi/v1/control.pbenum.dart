@@ -47,6 +47,9 @@ class RuntimeErrorCode extends $pb.ProtobufEnum {
   static const RuntimeErrorCode RUNTIME_ERROR_CODE_LIMIT_EXCEEDED =
       RuntimeErrorCode._(
           10, _omitEnumNames ? '' : 'RUNTIME_ERROR_CODE_LIMIT_EXCEEDED');
+  static const RuntimeErrorCode RUNTIME_ERROR_CODE_STORAGE_BUSY =
+      RuntimeErrorCode._(
+          11, _omitEnumNames ? '' : 'RUNTIME_ERROR_CODE_STORAGE_BUSY');
 
   static const $core.List<RuntimeErrorCode> values = <RuntimeErrorCode>[
     RUNTIME_ERROR_CODE_UNSPECIFIED,
@@ -60,10 +63,11 @@ class RuntimeErrorCode extends $pb.ProtobufEnum {
     RUNTIME_ERROR_CODE_PROTOCOL_ERROR,
     RUNTIME_ERROR_CODE_INTEGRITY_ERROR,
     RUNTIME_ERROR_CODE_LIMIT_EXCEEDED,
+    RUNTIME_ERROR_CODE_STORAGE_BUSY,
   ];
 
   static final $core.List<RuntimeErrorCode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 10);
+      $pb.ProtobufEnum.$_initByValueList(values, 11);
   static RuntimeErrorCode? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

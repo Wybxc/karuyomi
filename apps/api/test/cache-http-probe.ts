@@ -311,7 +311,9 @@ export async function checkCacheHttp({
       Buffer.from('\n'),
       Buffer.from(driver.outputFiles[0]!.contents),
       compiled.bytes,
-      Buffer.from('\nself.main([]);self.cacheFailureRun();\n'),
+      Buffer.from(
+        '\nself.main([]);self.cacheFailureRun(...self.cacheFailureHttpOwner);\n',
+      ),
     ]);
     identity = {
       originalOkHttpSha256: ORIGINAL_SHA,

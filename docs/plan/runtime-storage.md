@@ -6,6 +6,8 @@
 
 已有浏览器桥机制门覆盖正常持久化、namespace 隔离、Cache editor 竞争/CAS 和文件 rename/unlink；图片 JVM oracle 明确使用 cacheless 链，不是 HTTP Cache 语义验收。证据参见 [Worker 桥](../verification/worker-bridges.md)，P0 总目标参见 [运行时计划](p0-runtime-and-reading.md)。
 
+2026-11-05 功能收尾新增 namespace 级执行写入门：manager 在创建 Worker 前取得 `karuyomi:source-writer:<namespace>` 独占 Web Lock，并持有至该 Worker 生命周期结束；启动失败、取消、Access 暂停、替换和销毁均释放，替换等待上次锁实际释放。另一标签页/窗口占用时通过正式 `storage_busy` 协议错误提示关闭旧实例，不把 buildId 加入 namespace，也不建设版本广播系统。此门与下述每个 File/Cache owner 的死亡回收锁分别承担执行互斥和句柄回收；新增行为已通过 manager 的真实 Web Locks 回归；实际浏览器跨标签页与 Native 多窗口仍须分别验收。
+
 ## 阶段一：Cache editor 生命周期
 
 **已实现并通过机制门**：2026-11-03，Codex 内置浏览器 Chromium 156 使用正式产物通过十组生命周期与失败终态回归；真实 Worker 终止后新 Worker 的首次 begin 成功，未等待旧五分钟过期时间。该结果不代表原 Java CacheInterceptor 或 Source 语义验收。

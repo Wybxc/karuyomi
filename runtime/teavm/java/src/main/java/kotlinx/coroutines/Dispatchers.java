@@ -8,14 +8,14 @@ public final class Dispatchers {
       new CoroutineDispatcher() {
         public void dispatch(CoroutineContext c, Runnable r) {
           new Thread(
-                  () -> {
+                  prototype.BrowserCall.bindOperation(() -> {
                     prototype.Bridge.trace("dispatch coroutine");
                     try {
                       r.run();
                     } catch (Throwable t) {
                       prototype.Bridge.trace("dispatcher error " + t);
                     }
-                  })
+                  }))
               .start();
         }
 

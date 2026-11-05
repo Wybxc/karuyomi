@@ -23,11 +23,15 @@ final class ReaderViewportState {
     required this.observed,
     required this.atEnd,
     required this.windowReady,
+    this.mode = ReadingMode.leftToRight,
+    this.doublePage,
   });
   final ReadingPosition current;
   final ReadingPosition? observed;
   final bool atEnd;
   final bool windowReady;
+  final ReadingMode mode;
+  final bool? doublePage;
 }
 
 /// An online chapter view. Images are exclusively acquired through the Source's
@@ -51,6 +55,7 @@ class ReaderScreen extends StatefulWidget {
     this.onAttached,
     this.onViewportChanged,
     this.positionRequest,
+    this.paused = false,
   });
 
   final ChapterManifest manifest;
@@ -79,6 +84,9 @@ class ReaderScreen extends StatefulWidget {
   /// Explicit navigation such as a persisted reading-epoch reset. It changes
   /// the logical viewport without replacing or reusing a closed provider.
   final ValueListenable<ReadingPosition?>? positionRequest;
+
+  /// Access loss freezes production while retaining the displayed resources.
+  final bool paused;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -164,6 +172,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       baseline: _baseline,
     );
     _scheduler = ImageScheduler(provider: _resourcePool);
+    _scheduler.setPaused(widget.paused);
     _imagesSubscription = _scheduler.changes.listen((snapshot) {
       final residentIds = snapshot.resources.values
           .map((image) => image.id)
@@ -196,6 +205,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
             observed: null,
             atEnd: false,
             windowReady: false,
+            mode: _reader.mode,
+            doublePage: _doublePageOverride ?? widget.doublePage,
           ),
         );
         return;
@@ -264,6 +275,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
               _scheduler.isIdle &&
               snapshot.errors.isEmpty &&
               snapshot.cleanupError == null,
+          mode: _reader.mode,
+          doublePage: _doublePageOverride ?? widget.doublePage,
         ),
       );
     });
@@ -372,6 +385,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _scheduler.setPaused(widget.paused);
     if (oldWidget.positionRequest != widget.positionRequest) {
       oldWidget.positionRequest?.removeListener(_applyPositionRequest);
       widget.positionRequest?.addListener(_applyPositionRequest);
@@ -649,7 +663,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
             }),
             const SizedBox(height: 8),
             FilledButton.tonal(
-              onPressed: () => _scheduler.retry(page.key),
+              onPressed: widget.paused
+                  ? null
+                  : () => _scheduler.retry(page.key),
               child: const Text('重试'),
             ),
           ],

@@ -50,6 +50,46 @@ Future<void> tick() => Future<void>.delayed(Duration.zero);
 
 void main() {
   test(
+    'Access pause retains owned images and cancels production until disposal',
+    () async {
+      final provider = ControlledProvider();
+      final scheduler = ImageScheduler(provider: provider, maxConcurrent: 1);
+      scheduler.setWindow(
+        chapterKey: 'chapter',
+        generation: 'g',
+        pages: pages(3),
+      );
+      final displayed = provider.requests.single;
+      provider.complete(displayed, bytes: 40);
+      await tick();
+      final inFlight = provider.requests.last;
+      expect(inFlight.pageKey, 'p1');
+
+      scheduler.setPaused(true);
+      scheduler.setWindow(chapterKey: 'chapter', generation: 'g', pages: []);
+      scheduler.retry('p2');
+      expect(provider.cancelled, [inFlight.requestId]);
+      expect(provider.released, isEmpty);
+      expect(scheduler.snapshot.resources['p0']?.id, displayed.requestId);
+      expect(scheduler.snapshot.residentBytes, 40);
+
+      provider.complete(inFlight);
+      await scheduler.settled;
+      expect(provider.requests, hasLength(2));
+      expect(provider.released, [inFlight.requestId]);
+      expect(scheduler.snapshot.resources['p0']?.id, displayed.requestId);
+
+      provider.releaseGate = Completer<void>();
+      final closing = scheduler.dispose();
+      expect(scheduler.snapshot.residentBytes, 40);
+      provider.releaseGate!.complete();
+      await closing;
+      expect(provider.released, [inFlight.requestId, displayed.requestId]);
+      expect(scheduler.snapshot.residentBytes, 0);
+    },
+  );
+
+  test(
     'idle includes pending release ACKs, not only visible loading',
     () async {
       final provider = ControlledProvider();

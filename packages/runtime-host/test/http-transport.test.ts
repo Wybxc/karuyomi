@@ -11,7 +11,10 @@ import {
   httpRequestMetaSchema,
   type HttpRequestMeta,
 } from '@karuyomi/contracts';
-import { BinaryHttpTransport } from '../src/http-transport.js';
+import {
+  BinaryHttpTransport,
+  HttpOwnerFailure,
+} from '../src/http-transport.js';
 
 const transports: BinaryHttpTransport[] = [];
 afterEach(() => {
@@ -20,8 +23,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function metadata(overrides: Record<string, unknown> = {}) {
+function metadata(
+  transport: BinaryHttpTransport,
+  overrides: Record<string, unknown> = {},
+) {
   return JSON.stringify({
+    operationRequestId: 'operation-1',
+    operationGeneration: 'generation-1',
+    operationToken: transport.operationToken,
     url: 'https://source.example/chapter',
     method: 'GET',
     headers: [['Cookie', 'source=private']],
@@ -122,7 +131,7 @@ test('binary upload retains exact bytes, local identities and Source headers', a
     });
   }) as typeof fetch);
   const handle = transport.open(
-    metadata({
+    metadata(transport, {
       method: 'POST',
       hasBody: true,
       bodyLength: upload.byteLength,
@@ -154,7 +163,7 @@ test('the production fetch default is called without binding the transport as it
   });
   vi.stubGlobal('fetch', fetcher);
   const transport = setup();
-  const handle = transport.open(metadata());
+  const handle = transport.open(metadata(transport));
   await transport.finish(handle);
   expect(await transport.read(handle, 1)).toBeNull();
   expect(fetcher).toHaveBeenCalledOnce();
@@ -180,7 +189,11 @@ test('a real connection drop before response headers carries the controlled retr
       generation: 'generation-1',
     });
     await expect(
-      transport.finish(transport.open(metadata())),
+      transport.finish(
+        transport.open(
+          metadata(transport, { operationRequestId: 'connection-drop' }),
+        ),
+      ),
     ).rejects.toMatchObject({
       code: 'source_error',
       message: 'Source bridge connection failed',
@@ -208,7 +221,7 @@ test.each([
   async ({ error, retryable }) => {
     const transport = setup(async () => Response.json(error, { status: 502 }));
     await expect(
-      transport.finish(transport.open(metadata())),
+      transport.finish(transport.open(metadata(transport))),
     ).rejects.toMatchObject({ code: 'source_error', retryable });
   },
 );
@@ -226,7 +239,7 @@ test('a broken META stream does not turn a received response into a retryable co
       ),
   );
   await expect(
-    transport.finish(transport.open(metadata())),
+    transport.finish(transport.open(metadata(transport))),
   ).rejects.toMatchObject({ retryable: false });
 });
 
@@ -235,7 +248,7 @@ test('error text alone cannot authorize a retry', async () => {
     throw Error('Network connection lost ECONNRESET');
   });
   await expect(
-    transport.finish(transport.open(metadata())),
+    transport.finish(transport.open(metadata(transport))),
   ).rejects.toMatchObject({ retryable: false });
 });
 
@@ -255,7 +268,7 @@ test('a stalled API error body remains bounded by the timeout and is never retry
         { status: 502, headers: { 'Content-Type': 'application/json' } },
       ),
   );
-  const handle = transport.open(metadata({ timeoutMs: 50 }));
+  const handle = transport.open(metadata(transport, { timeoutMs: 50 }));
   const pending = expect(transport.finish(handle)).rejects.toMatchObject({
     code: 'timeout',
     retryable: false,
@@ -303,7 +316,7 @@ test('a network drop after returned metadata and partial DATA is never retryable
       { headers: { 'Content-Type': HTTP_BRIDGE_MEDIA_TYPE } },
     );
   });
-  const handle = transport.open(metadata());
+  const handle = transport.open(metadata(transport));
   await transport.finish(handle);
   expect(await transport.read(handle, 1)).toEqual(new Uint8Array([1]));
   await expect(transport.read(handle, 1)).rejects.toMatchObject({
@@ -321,7 +334,7 @@ test.each([401, 403, 302])(
           status,
         })) as typeof fetch,
     );
-    const handle = transport.open(metadata());
+    const handle = transport.open(metadata(transport));
     await expect(transport.finish(handle)).rejects.toMatchObject({
       code: status === 403 ? 'access_denied' : 'access_required',
     });
@@ -340,7 +353,7 @@ test('login HTML and a different framed response identity are rejected before DA
     });
   }) as typeof fetch);
   await expect(
-    transport.finish(transport.open(metadata())),
+    transport.finish(transport.open(metadata(transport))),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   const login = setup(
     (async () =>
@@ -348,9 +361,11 @@ test('login HTML and a different framed response identity are rejected before DA
         headers: { 'Content-Type': 'text/html' },
       })) as typeof fetch,
   );
-  await expect(login.finish(login.open(metadata()))).rejects.toMatchObject({
-    code: 'access_required',
-  });
+  await expect(login.finish(login.open(metadata(login)))).rejects.toMatchObject(
+    {
+      code: 'access_required',
+    },
+  );
 });
 
 test('cancel, operation completion and generation changes release upstream streams', async () => {
@@ -369,7 +384,7 @@ test('cancel, operation completion and generation changes release upstream strea
       cancelled,
     );
   }) as typeof fetch);
-  const handle = transport.open(metadata());
+  const handle = transport.open(metadata(transport));
   await transport.finish(handle);
   transport.begin({ requestId: 'operation-2', generation: 'generation-2' });
   expect(signal.aborted).toBe(true);
@@ -390,7 +405,7 @@ test('timeout retains its cause and cancels a late response', async () => {
         resolve = yes;
       })) as typeof fetch,
   );
-  const handle = transport.open(metadata({ timeoutMs: 50 }));
+  const handle = transport.open(metadata(transport, { timeoutMs: 50 }));
   const pending = transport.finish(handle);
   const failure = expect(pending).rejects.toMatchObject({
     code: 'timeout',
@@ -418,7 +433,7 @@ test('timeout between body reads retains its cause while releasing the stream an
       cancelled,
     );
   });
-  const handle = transport.open(metadata({ timeoutMs: 50 }));
+  const handle = transport.open(metadata(transport, { timeoutMs: 50 }));
   await transport.finish(handle);
   expect(await transport.read(handle, 1)).toEqual(new Uint8Array([1]));
   await vi.advanceTimersByTimeAsync(51);
@@ -483,7 +498,7 @@ test('timeout during a pending body read cancels it with timeout rather than rea
       { headers: { 'Content-Type': HTTP_BRIDGE_MEDIA_TYPE } },
     );
   });
-  const handle = transport.open(metadata({ timeoutMs: 50 }));
+  const handle = transport.open(metadata(transport, { timeoutMs: 50 }));
   await transport.finish(handle);
   const pending = transport.read(handle, 1);
   const failed = expect(pending).rejects.toMatchObject({
@@ -505,7 +520,7 @@ test('terminal failure history is bounded, releases handle slots, and ends with 
   for (let index = 0; index < 20; index++) {
     expired.push(
       transport.open(
-        metadata({
+        metadata(transport, {
           timeoutMs: 1,
           method: 'POST',
           hasBody: true,
@@ -527,8 +542,10 @@ test('terminal failure history is bounded, releases handle slots, and ends with 
     code: 'timeout',
   });
   // Released uploads do not consume the four active-body slots or trigger fetch.
-  for (let index = 0; index < 4; index++) transport.open(metadata());
-  expect(() => transport.open(metadata())).toThrow('Too many open HTTP bodies');
+  for (let index = 0; index < 4; index++) transport.open(metadata(transport));
+  expect(() => transport.open(metadata(transport))).toThrow(
+    'Too many open HTTP bodies',
+  );
   expect(fetcher).not.toHaveBeenCalled();
   transport.end();
   expect(vi.getTimerCount()).toBe(0);
@@ -583,7 +600,7 @@ test('no DATA is pulled until read, and one pending read excludes another', asyn
       { headers: { 'Content-Type': HTTP_BRIDGE_MEDIA_TYPE } },
     );
   }) as typeof fetch);
-  const handle = transport.open(metadata());
+  const handle = transport.open(metadata(transport));
   await transport.finish(handle);
   expect(pulled).toBe(0);
   const pending = transport.read(handle, 1);
@@ -600,7 +617,7 @@ test('upload lengths, frame size and active handle budget are checked before fet
   const fetcher = vi.fn();
   const transport = setup(fetcher as typeof fetch);
   const handle = transport.open(
-    metadata({ method: 'POST', hasBody: true, bodyLength: 10 }),
+    metadata(transport, { method: 'POST', hasBody: true, bodyLength: 10 }),
   );
   expect(() =>
     transport.write(handle, new Uint8Array(HTTP_FRAME_LIMIT + 1)),
@@ -609,7 +626,46 @@ test('upload lengths, frame size and active handle budget are checked before fet
   await expect(transport.finish(handle)).rejects.toMatchObject({
     code: 'protocol_error',
   });
-  for (let i = 0; i < 4; i++) transport.open(metadata());
-  expect(() => transport.open(metadata())).toThrow('Too many open HTTP bodies');
+  for (let i = 0; i < 4; i++) transport.open(metadata(transport));
+  expect(() => transport.open(metadata(transport))).toThrow(
+    'Too many open HTTP bodies',
+  );
   expect(fetcher).not.toHaveBeenCalled();
 });
+
+test('an entry token fences late opens and handles even when control request identities repeat', async () => {
+  const transport = setup();
+  const oldMetadata = metadata(transport);
+  const handle = transport.open(oldMetadata);
+  const oldToken = transport.operationToken;
+  transport.begin({ requestId: 'operation-1', generation: 'generation-1' });
+  expect(transport.operationToken).not.toBe(oldToken);
+  expect(() => transport.open(oldMetadata)).toThrow(HttpOwnerFailure);
+  expect(() => transport.write(handle, new Uint8Array([1]))).toThrow(
+    HttpOwnerFailure,
+  );
+  await expect(transport.finish(handle)).rejects.toBeInstanceOf(
+    HttpOwnerFailure,
+  );
+  expect(() => transport.open(metadata(transport))).not.toThrow();
+});
+
+test.each(['operationRequestId', 'operationGeneration', 'operationToken'])(
+  'HTTP metadata requires its exact %s and strips ownership before the wire META',
+  async (field) => {
+    const transport = setup(async (_url, init) => {
+      if (!(init?.body instanceof Blob)) throw Error('Expected framed upload');
+      const reader = new HttpFrameReader(init.body.stream(), 8 * 1024 * 1024);
+      const wire = await reader.meta();
+      expect(wire).not.toHaveProperty('operationToken');
+      expect(wire).not.toHaveProperty('operationRequestId');
+      expect(wire).not.toHaveProperty('operationGeneration');
+      return framedResponse(httpRequestMetaSchema.parse(wire), []);
+    });
+    expect(() =>
+      transport.open(metadata(transport, { [field]: 'expired' })),
+    ).toThrow(HttpOwnerFailure);
+    const handle = transport.open(metadata(transport));
+    await transport.finish(handle);
+  },
+);

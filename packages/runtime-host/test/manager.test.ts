@@ -5,7 +5,9 @@ import {
   type WorkerCommand,
   type WorkerResponse,
   type SourcePayload,
+  type AcquireImage,
   workerCommandSchema,
+  processedImageSchema,
   messageJson,
   protocolVersion,
   encodeControlRequest,
@@ -19,6 +21,9 @@ import { createHello } from '../src/hello.js';
 import type { RuntimeDriver } from '../src/teavm-driver.js';
 import { VerifiedLoader } from '../src/verified-loader.js';
 import { installRuntime } from '../src/host-api.js';
+import { ImageResourceStore } from '../src/image-resources.js';
+import { ImageSink } from '../src/image-channel.js';
+import { RuntimeFailure } from '../src/errors.js';
 import { manifest } from './fixtures.js';
 
 class FakeWorker implements WorkerEndpoint {
@@ -34,10 +39,15 @@ class FakeWorker implements WorkerEndpoint {
   emit(data: unknown) {
     this.onmessage?.(new MessageEvent('message', { data }));
   }
-  postMessage(input: unknown) {
+  postMessage(input: unknown, transfer: Transferable[] = []) {
     const command = workerCommandSchema.parse(input);
     this.commands.push(command);
-    void this.runtime.receive(input);
+    void this.runtime.receive(
+      input,
+      transfer.filter(
+        (value): value is MessagePort => value instanceof MessagePort,
+      ),
+    );
   }
   terminate() {
     this.terminated = true;
@@ -70,10 +80,13 @@ const mangaPage = (url = '/manga', hasNextPage = false): SourcePayload => ({
   value: create(pb.MangaPageSchema, { mangas: [{ url }], hasNextPage }),
 });
 const managers: SourceRuntimeManager[] = [];
+const sinks: ImageSink[] = [];
 afterEach(async () => {
   for (const manager of managers.splice(0)) await manager.dispose();
+  for (const sink of sinks.splice(0)) sink.dispose();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 test('the public generated control entry correlates typed Source success and structured failures', async () => {
@@ -127,6 +140,10 @@ test('the public generated control entry correlates typed Source success and str
 async function setup(
   invoke: RuntimeDriver['invoke'] = async () => mangaPage(),
   initialBuild?: BuildManifest,
+  images?: {
+    store: ImageResourceStore;
+    acquire: NonNullable<RuntimeDriver['acquireImage']>;
+  },
 ) {
   const workers: FakeWorker[] = [];
   const workerUrls: URL[] = [];
@@ -136,6 +153,12 @@ async function setup(
     ]),
     invoke: vi.fn(invoke),
     close: vi.fn(async () => {}),
+    ...(images
+      ? {
+          acquireImage: vi.fn(images.acquire),
+          closePageSession: vi.fn(async () => ({ closed: true as const })),
+        }
+      : {}),
   };
   const build = initialBuild ?? (await manifest());
   const loader = new VerifiedLoader('https://read.example.com', (async () =>
@@ -154,9 +177,36 @@ async function setup(
       return worker;
     },
     loader,
+    60_000,
+    images ? { store: images.store } : {},
   );
   managers.push(manager);
   return { manager, workers, workerUrls, driver };
+}
+
+async function setupImages(invoke?: RuntimeDriver['invoke']) {
+  const store = new ImageResourceStore({ maxBytes: 5 });
+  const bytes = new Uint8Array([255, 0, 173]);
+  const value = await setup(invoke, undefined, {
+    store,
+    acquire: async (_source, _session, _page, port, id) => {
+      const sink = new ImageSink(port, id, () => {});
+      sinks.push(sink);
+      const handle = sink.open();
+      await sink.write(handle, bytes);
+      return processedImageSchema.parse(JSON.parse(await sink.close(handle)));
+    },
+  });
+  const session = await value.manager.open(options);
+  const request: AcquireImage = {
+    requestId: 'delivered-image',
+    sourceId: session.sources[0]!.id,
+    generation: session.generation,
+    pageSessionId: 'chapter-session',
+    pageKey: 'p-0',
+  };
+  const image = await value.manager.acquireImage(request);
+  return { ...value, store, bytes, session, request, image };
 }
 
 test('same build open is shared; only actual initialized Sources produce a session', async () => {
@@ -192,6 +242,7 @@ test('extension updates and Worker replacement retain the same storage namespace
     workerUrls[0]?.searchParams.get('fsNamespace'),
   );
 
+  await manager.dispose();
   const recreated = await setup(undefined, build);
   await recreated.manager.open(updatedOptions);
   expect(recreated.workerUrls[0]?.searchParams.get('plugin')).toBe(
@@ -427,6 +478,296 @@ test('dispose releases file ownership, stops Worker and forbids reuse', async ()
   await expect(manager.open(options)).rejects.toMatchObject({
     code: 'runtime_lost',
   });
+});
+
+test.each(['access_required', 'access_denied'] as const)(
+  '%s stops execution but retains delivered images, their budget and cleanup ownership',
+  async (code) => {
+    const failure = deferred<SourcePayload>();
+    const { manager, workers, driver, store, image, bytes, session, request } =
+      await setupImages(() => failure.promise);
+    const revoke = vi.spyOn(URL, 'revokeObjectURL');
+    const expected = {
+      code,
+      message: 'Original Access failure',
+      retryable: true,
+    };
+    const active = expect(
+      manager.invoke(call('expired', session.generation)),
+    ).rejects.toMatchObject(expected);
+    const queued = expect(
+      manager.invoke(call('prefetch', session.generation)),
+    ).rejects.toMatchObject(expected);
+    failure.reject(new RuntimeFailure(code, expected.message, true));
+    await active;
+    await queued;
+    expect(workers[0]?.terminated).toBe(true);
+    expect(driver.invoke).toHaveBeenCalledOnce();
+    expect(store.snapshot).toEqual({ resources: 1, bytes: bytes.byteLength });
+    expect(
+      new Uint8Array(await (await fetch(image.url)).arrayBuffer()),
+    ).toEqual(bytes);
+    await expect(
+      manager.invoke(call('paused', session.generation)),
+    ).rejects.toMatchObject(expected);
+    await expect(
+      manager.acquireImage({ ...request, requestId: 'paused-image' }),
+    ).rejects.toMatchObject(expected);
+    await expect(
+      manager.closePageSession({
+        pageSessionId: request.pageSessionId,
+        generation: request.generation,
+      }),
+    ).resolves.toEqual({ closed: true });
+    expect(driver.closePageSession).not.toHaveBeenCalled();
+    expect(revoke).not.toHaveBeenCalled();
+    const nextOwner = await setup();
+    await nextOwner.manager.open(options);
+    const release = {
+      resourceId: image.resourceId,
+      generation: image.generation,
+    };
+    await manager.releaseImage(release);
+    await manager.releaseImage(release);
+    expect(revoke).toHaveBeenCalledExactlyOnceWith(image.url);
+    expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
+  },
+);
+
+test('same-identity reconnect retains old UI resources and charges them until release', async () => {
+  const { manager, driver, store, session, image, request, bytes } =
+    await setupImages(async () => {
+      throw new RuntimeFailure('access_required', 'Session expired');
+    });
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  await expect(
+    manager.invoke(call('expire', session.generation)),
+  ).rejects.toMatchObject({ code: 'access_required' });
+  await manager.rebuild();
+  const reopened = await manager.open(options);
+  expect(reopened.generation).not.toBe(session.generation);
+  expect(revoke).not.toHaveBeenCalled();
+  expect(new Uint8Array(await (await fetch(image.url)).arrayBuffer())).toEqual(
+    bytes,
+  );
+  const nextRequest = { ...request, generation: reopened.generation };
+  await expect(
+    manager.acquireImage({ ...nextRequest, requestId: 'over-budget' }),
+  ).rejects.toMatchObject({ code: 'limit_exceeded' });
+  await vi.waitFor(() =>
+    expect(store.snapshot).toEqual({ resources: 1, bytes: bytes.byteLength }),
+  );
+  await manager.closePageSession({
+    pageSessionId: request.pageSessionId,
+    generation: session.generation,
+  });
+  expect(driver.closePageSession).not.toHaveBeenCalled();
+  await manager.releaseImage({
+    resourceId: image.resourceId,
+    generation: image.generation,
+  });
+  const fresh = await manager.acquireImage({
+    ...nextRequest,
+    requestId: 'after-release',
+  });
+  expect(fresh.generation).toBe(reopened.generation);
+  expect(store.snapshot).toEqual({ resources: 1, bytes: bytes.byteLength });
+  expect(revoke).toHaveBeenCalledExactlyOnceWith(image.url);
+});
+
+test('an image Access failure discards only the pending collector and retains the delivered sibling', async () => {
+  const { manager, driver, workers, store, image, request, bytes } =
+    await setupImages();
+  const acquire = driver.acquireImage;
+  if (!acquire) throw new Error('Image fixture requires an image driver');
+  acquire.mockRejectedValueOnce(
+    new RuntimeFailure('access_required', 'Image bridge session expired'),
+  );
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  await expect(
+    manager.acquireImage({ ...request, requestId: 'failed-image' }),
+  ).rejects.toMatchObject({
+    code: 'access_required',
+    message: 'Image bridge session expired',
+  });
+  expect(workers[0]?.terminated).toBe(true);
+  expect(store.snapshot).toEqual({ resources: 1, bytes: bytes.byteLength });
+  expect(revoke).not.toHaveBeenCalled();
+  expect(new Uint8Array(await (await fetch(image.url)).arrayBuffer())).toEqual(
+    bytes,
+  );
+  await manager.releaseImage({
+    resourceId: image.resourceId,
+    generation: image.generation,
+  });
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
+});
+
+test('disposing an Access-paused manager revokes all retained images', async () => {
+  const { manager, store, session, image } = await setupImages(async () => {
+    throw new RuntimeFailure('access_required', 'Session expired');
+  });
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  await expect(
+    manager.invoke(call('expire', session.generation)),
+  ).rejects.toMatchObject({ code: 'access_required' });
+  expect(store.snapshot.resources).toBe(1);
+  await manager.dispose();
+  expect(revoke).toHaveBeenCalledExactlyOnceWith(image.url);
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
+});
+
+test('a different identity clears retained images and late old cleanup cannot release new ownership', async () => {
+  const { manager, store, session, image, request, bytes } = await setupImages(
+    async () => {
+      throw new RuntimeFailure('access_required', 'Session expired');
+    },
+  );
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  await expect(
+    manager.invoke(call('expire', session.generation)),
+  ).rejects.toMatchObject({ code: 'access_required' });
+  const other = await manager.open({ ...options, identity: 'another-owner' });
+  expect(revoke).toHaveBeenCalledExactlyOnceWith(image.url);
+  expect(store.snapshot).toEqual({ resources: 0, bytes: 0 });
+  const current = await manager.acquireImage({
+    ...request,
+    generation: other.generation,
+    requestId: 'other-owner-image',
+  });
+  await manager.releaseImage({
+    resourceId: image.resourceId,
+    generation: image.generation,
+  });
+  await manager.closePageSession({
+    pageSessionId: request.pageSessionId,
+    generation: session.generation,
+  });
+  expect(store.snapshot).toEqual({ resources: 1, bytes: bytes.byteLength });
+  expect(
+    new Uint8Array(await (await fetch(current.url)).arrayBuffer()),
+  ).toEqual(bytes);
+});
+
+test('private API authentication failure also suspends the active Worker without revoking the UI image', async () => {
+  const { manager, workers, session, image, store } = await setupImages();
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('', { status: 401 })),
+  );
+  expect((await manager.fetchApi({ path: '/api/bootstrap' })).status).toBe(401);
+  expect(workers[0]?.terminated).toBe(true);
+  expect(store.snapshot.resources).toBe(1);
+  expect(revoke).not.toHaveBeenCalled();
+  await expect(
+    manager.invoke(call('after-api-failure', session.generation)),
+  ).rejects.toMatchObject({ code: 'access_required' });
+  await manager.releaseImage({
+    resourceId: image.resourceId,
+    generation: image.generation,
+  });
+  expect(revoke).toHaveBeenCalledExactlyOnceWith(image.url);
+});
+
+test('a delayed API authentication failure cannot suspend a replacement generation', async () => {
+  const { manager, workers } = await setup();
+  const first = await manager.open(options);
+  const response = deferred<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => response.promise),
+  );
+  const pending = manager.fetchApi({ path: '/api/bootstrap' });
+  const current = await manager.open({ ...options, userAgent: 'Replacement' });
+  expect(current.generation).not.toBe(first.generation);
+  response.resolve(new Response('', { status: 401 }));
+  expect((await pending).status).toBe(401);
+  expect(workers[1]?.terminated).toBe(false);
+  await expect(
+    manager.invoke(call('current-after-stale-401', current.generation)),
+  ).resolves.toMatchObject({ generation: current.generation });
+});
+
+test('real namespace Web Locks reject a second build and are released before disposal completes', async () => {
+  const first = await setup();
+  await first.manager.open(options);
+  const namespace = first.workerUrls[0]!.searchParams.get('plugin');
+  const lockName = `karuyomi:source-writer:${namespace}`;
+  expect((await navigator.locks.query()).held).toContainEqual(
+    expect.objectContaining({ name: lockName, mode: 'exclusive' }),
+  );
+  const second = await setup(undefined, {
+    ...(await manifest()),
+    buildId: 'other-build',
+    version: '2',
+  });
+  const nextOptions = {
+    ...options,
+    manifestPath: '/extensions/builds/other-build/manifest.json',
+  };
+  await expect(second.manager.open(nextOptions)).rejects.toMatchObject({
+    code: 'storage_busy',
+  });
+  expect(second.workers).toHaveLength(0);
+  expect(second.driver.open).not.toHaveBeenCalled();
+  await first.manager.dispose();
+  expect((await navigator.locks.query()).held).not.toContainEqual(
+    expect.objectContaining({ name: lockName }),
+  );
+  await second.manager.open(nextOptions);
+  expect(second.workers).toHaveLength(1);
+});
+
+test('failed or cancelled startup releases its namespace without a dangling writer', async () => {
+  const failed = await setup();
+  failed.driver.open.mockRejectedValueOnce(new Error('Initialization failed'));
+  await expect(failed.manager.open(options)).rejects.toMatchObject({
+    code: 'source_error',
+  });
+  expect(failed.workers[0]?.terminated).toBe(true);
+
+  const delayed = await setup();
+  const sources = deferred<Awaited<ReturnType<RuntimeDriver['open']>>>();
+  delayed.driver.open.mockImplementationOnce(() => sources.promise);
+  const cancelled = expect(delayed.manager.open(options)).rejects.toMatchObject(
+    {
+      code: 'runtime_lost',
+    },
+  );
+  await vi.waitFor(() => expect(delayed.workers).toHaveLength(1));
+  await delayed.manager.rebuild();
+  await cancelled;
+  expect(delayed.workers[0]?.terminated).toBe(true);
+  const next = await setup();
+  await next.manager.open(options);
+  sources.resolve([{ id: '9223372036854775806', name: 'Late', lang: 'en' }]);
+  expect(next.workers[0]?.terminated).toBe(false);
+});
+
+test('fatal runtime_lost terminates the Worker and rejects queued operations before reuse', async () => {
+  const failure = deferred<SourcePayload>();
+  const { manager, driver, workers } = await setup(() => failure.promise);
+  const session = await manager.open(options);
+  const active = expect(
+    manager.invoke(call('fatal-drain', session.generation)),
+  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  const queued = expect(
+    manager.invoke(call('never-started', session.generation)),
+  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  failure.reject(new RuntimeFailure('runtime_lost', 'Callbacks did not stop'));
+  await active;
+  await queued;
+  expect(workers[0]?.terminated).toBe(true);
+  expect(driver.invoke).toHaveBeenCalledOnce();
+  await expect(
+    manager.invoke(call('old-generation', session.generation)),
+  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  const current = await manager.open(options);
+  driver.invoke.mockResolvedValueOnce(mangaPage());
+  await expect(
+    manager.invoke(call('new-generation', current.generation)),
+  ).resolves.toMatchObject({ generation: current.generation });
 });
 
 test('the JSON control bridge permits only the catalog static GET paths without credentials', async () => {

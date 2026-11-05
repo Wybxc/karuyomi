@@ -2,7 +2,7 @@
 
 本文记录当前 Source → UI 的编码正文合同。协议定义在 `protocol/karuyomi/v1/control.proto`，TS 校验与资源所有权分别在 `packages/contracts/src/image-control.ts`、`packages/runtime-host/src/image-resources.ts`；Dart 接收在 `packages/source_runtime/lib/src/transport_runtime.dart`。实施状态见 [P0 计划](plan/p0-runtime-and-reading.md)，实际环境与范围见[验证记录](VERIFICATION.md)。传输成功不表示图片能解码、已显示或峰值受控。
 
-当前使用 `karuyomi-source-host-v3`，Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI；小控制消息采用 Protobuf 生成模型和标准 ProtoJSON，正文通过独立二进制通道。控制 protocolVersion 为 2，HTTP bridgeVersion 为 2，三者含义不同。项目原型直接更新当前合同和产物，不增加旧协议兼容层；代码、协议与依赖变化按实际输入重新构建。
+当前使用 `karuyomi-source-host-v4`，Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI；小控制消息采用 Protobuf 生成模型和标准 ProtoJSON，正文通过独立二进制通道。控制 protocolVersion 为 2，HTTP bridgeVersion 为 2，三者含义不同。项目原型直接更新当前合同和产物，不增加旧协议兼容层；代码、协议与依赖变化按实际输入重新构建。
 
 ## 职责边界
 
@@ -68,6 +68,8 @@ END 确认非空正文与总长度一致，暂存无 MIME type 的 Blob。内部
 当前图片控制只有 `acquireImage({requestId,sourceId,pageSessionId,pageKey,generation,timeoutMs?})`、`cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})` 和 `closePageSession({pageSessionId,generation})`。release 幂等，旧 generation 的结果不得进入当前会话。
 
 Source 调用共享串行槽，ACK 和取消通过独立图片通道到达生产者。取消先终止 sink 与当前 HTTP 句柄，再等待 Java 真正退出；`teaDone/teaFail` 没有调用身份，提前解锁会污染下一次操作。超过宽限则回收 Worker、失效 generation，由客户端重新打开章节，不重放 Source 图片操作。
+
+Access 失效使用阅读暂停路径：终止 Worker 与未完成的图片生产，已交付 UI 的 Blob 仍由其原 `resourceId/generation` 持有并计入预算，直到正常 release ACK。旧 generation 的新调用继续返回原鉴权错误；release、cancel 和已终止 Page 会话的 close 仍可清理。阅读器暂停图片调度与邻章准备并保留本地进度，用户手动重新登录后先卸载并确认旧 view 清理，再按同身份、同服务重新打开当前章和逻辑位置；身份改变不恢复旧作品。Native 登录页不自行重建正在显示图片的容器，清理与重建由阅读路由协调。
 
 已交付正文不再属于待取消的获取任务；迟到 cancel 或关闭 Page 会话不应误删它。Reader 等 widget、缩放 overlay 和实际 provider cache 解除引用后调用 release；容器 invalidate/dispose 清理本代正文和在途工作。失败、超限和迟到结果同样需要结束对应所有权。
 

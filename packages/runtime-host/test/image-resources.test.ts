@@ -25,6 +25,9 @@ function setup(
 ) {
   const store = new ImageResourceStore(options);
   stores.push(store);
+  return attach(store);
+}
+function attach(store: ImageResourceStore) {
   const image = store.create('generation');
   const channel = new MessageChannel();
   image.attach(channel.port1);
@@ -150,6 +153,60 @@ test('aggregate encoded bytes include resident resources and return on release',
   expect(value.store.snapshot).toEqual({ resources: 1, bytes: 3 });
   value.image.release();
   expect(value.store.snapshot).toEqual({ resources: 0, bytes: 0 });
+});
+
+test.each(['uploading', 'ended'] as const)(
+  'Access retention keeps published bytes charged while discarding an %s resource',
+  async (phase) => {
+    const value = setup({ maxBytes: 5 });
+    const resource = await value.image.publish(await prepare(value));
+    const revoke = vi.spyOn(URL, 'revokeObjectURL');
+    const pending = attach(value.store);
+    await pending.sink.write(pending.handle, new Uint8Array([1, 2]));
+    const prepared =
+      phase === 'ended'
+        ? processedImageSchema.parse(
+            JSON.parse(await pending.sink.close(pending.handle)),
+          )
+        : undefined;
+    const expired = new RuntimeFailure('access_required', 'Session expired');
+    value.store.retainPublished(expired);
+    expect(value.store.snapshot).toEqual({ resources: 1, bytes: 3 });
+    if (prepared)
+      await expect(pending.image.publish(prepared)).rejects.toMatchObject({
+        code: 'cancelled',
+      });
+    else await expect(pending.image.result).rejects.toBe(expired);
+    value.store.clear(new RuntimeFailure('runtime_lost', 'Reconnect'), true);
+    expect(revoke).not.toHaveBeenCalled();
+    expect(
+      new Uint8Array(await (await fetch(resource.url)).arrayBuffer()),
+    ).toEqual(new Uint8Array([0, 255, 7]));
+    const replacement = attach(value.store);
+    await expect(
+      replacement.sink.write(replacement.handle, new Uint8Array(3)),
+    ).rejects.toMatchObject({ code: 'limit_exceeded' });
+    expect(value.store.snapshot).toEqual({ resources: 1, bytes: 3 });
+    value.store.release(resource.resourceId, 'foreign-generation');
+    expect(revoke).not.toHaveBeenCalled();
+    value.store.release(resource.resourceId, resource.generation);
+    expect(revoke).toHaveBeenCalledExactlyOnceWith(resource.url);
+    expect(value.store.snapshot).toEqual({ resources: 0, bytes: 0 });
+  },
+);
+
+test('retained resources still occupy the resource budget and explicit teardown revokes them', async () => {
+  const value = setup({ maxResources: 1 });
+  const resource = await value.image.publish(await prepare(value));
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  value.store.retainPublished(new RuntimeFailure('access_denied', 'Denied'));
+  expect(() => value.store.create('replacement-generation')).toThrow(
+    'window is full',
+  );
+  value.store.clear(new RuntimeFailure('runtime_lost', 'Identity changed'));
+  expect(revoke).toHaveBeenCalledExactlyOnceWith(resource.url);
+  expect(value.store.snapshot).toEqual({ resources: 0, bytes: 0 });
+  expect(() => value.store.create('replacement-generation')).not.toThrow();
 });
 
 test.each(['resourceId', 'generation', 'byteLength'] as const)(

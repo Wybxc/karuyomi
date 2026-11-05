@@ -92,6 +92,7 @@ final class ImageScheduler {
   int _epoch = 0;
   int _requestCounter = 0;
   bool _disposed = false;
+  bool _paused = false;
   Object? _cleanupError;
   Completer<void>? _idle;
 
@@ -117,6 +118,19 @@ final class ImageScheduler {
     return (_idle ??= Completer<void>()).future;
   }
 
+  /// Pause production without retiring the images already presented by the UI.
+  /// The frozen window remains owned and charged until this view is replaced.
+  void setPaused(bool paused) {
+    if (_disposed || _paused == paused) return;
+    _paused = paused;
+    if (paused) {
+      for (final job in _active.values) {
+        _cancel(job);
+      }
+    }
+    _pump();
+  }
+
   int _estimatedCost(ReaderPage? page) {
     final image = _resources[page?.key];
     return image == null
@@ -132,6 +146,7 @@ final class ImageScheduler {
     required Iterable<ReaderPage> pages,
   }) {
     if (_disposed) throw StateError('Image scheduler is disposed');
+    if (_paused) return;
     if (chapterKey.isEmpty || generation.isEmpty) {
       throw ArgumentError('Image window requires a chapter and generation');
     }
@@ -201,6 +216,7 @@ final class ImageScheduler {
   void _pump() {
     if (_disposed) return;
     for (final page in _wanted.values) {
+      if (_paused) break;
       // Stop new production until cancellation/release is acknowledged. This
       // also bounds pending resources when the user rapidly switches chapters.
       if (_pendingCleanup.isNotEmpty || _cleanupError != null) break;

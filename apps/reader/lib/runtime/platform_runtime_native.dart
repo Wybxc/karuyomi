@@ -65,7 +65,8 @@ final class NativePlatformRuntime extends PlatformRuntime
         builder: (_) => _AuthenticationPage(origin: origin),
       ),
     );
-    if (authenticated == true) await rebuild();
+    // The caller retires its old Reader and awaits resource ACKs before it
+    // reconnects. Rebuilding here would delete files behind the visible page.
     return authenticated == true;
   }
 

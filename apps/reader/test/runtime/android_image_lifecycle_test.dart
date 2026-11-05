@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/runtime/android_image_files.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -115,6 +115,21 @@ final class _Controller extends PlatformInAppWebViewController {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory cache;
+  const paths = MethodChannel('plugins.flutter.io/path_provider');
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  setUpAll(() async {
+    cache = await Directory.systemTemp.createTemp('karuyomi-image-lifecycle-');
+    messenger.setMockMethodCallHandler(paths, (call) async {
+      if (call.method == 'getTemporaryDirectory') return cache.path;
+      throw MissingPluginException(call.method);
+    });
+  });
+  tearDownAll(() async {
+    messenger.setMockMethodCallHandler(paths, null);
+    if (await cache.exists()) await cache.delete(recursive: true);
+  });
   final request = wire.AcquireImage(
     requestId: 'copy',
     generation: 'generation',

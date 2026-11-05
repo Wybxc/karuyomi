@@ -11,9 +11,137 @@ import java.io.InterruptedIOException;
 
 /** Replaces only OkHttpClient.newCall; plugin interceptors still execute as JVM bytecode. */
 public final class BrowserCall implements Call {
+  private static final ThreadLocal<Operation> threadOperation = new ThreadLocal<>();
+  private static Operation activeOperation;
+
+  /** One exported host entry owns foreground HTTP and all callbacks it schedules. */
+  static final class Operation implements AutoCloseable {
+    private static final int MAX_BACKGROUND_CALLS = 64;
+    private static final long DRAIN_TIMEOUT_MS = 30000;
+    final String requestId;
+    final String generation;
+    final String token;
+    private final Set<BrowserCall> pending = new HashSet<>();
+    private boolean closed;
+    private Throwable callbackFailure;
+
+    Operation(String requestId, String generation, String token) {
+      this.requestId = requestId;
+      this.generation = generation;
+      this.token = token;
+    }
+
+    void enter() {
+      threadOperation.set(this);
+    }
+
+    void leave() {
+      threadOperation.remove();
+    }
+
+    synchronized void checkOpen() throws InterruptedIOException {
+      if (closed) throw new InterruptedIOException("Source operation expired or was cancelled");
+    }
+
+    synchronized void register(BrowserCall call) {
+      if (closed) throw new IllegalStateException("Source operation has ended");
+      if (pending.size() >= MAX_BACKGROUND_CALLS)
+        throw new IllegalStateException("Too many background HTTP callbacks");
+      pending.add(call);
+    }
+
+    synchronized void finished(BrowserCall call, Throwable failure) {
+      pending.remove(call);
+      if (failure != null && callbackFailure == null) callbackFailure = failure;
+      notifyAll();
+    }
+
+    void drain() throws Throwable {
+      drain(DRAIN_TIMEOUT_MS);
+    }
+
+    synchronized void drain(long timeoutMs) throws Throwable {
+      if (timeoutMs < 1 || timeoutMs > DRAIN_TIMEOUT_MS)
+        throw new IllegalArgumentException("HTTP callback drain deadline must be 1..30000 ms");
+      long deadline = System.nanoTime() + timeoutMs * 1000000;
+      while (!pending.isEmpty()) {
+        if (callbackFailure != null) throw callbackFailure;
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0)
+          throw new InterruptedIOException("Background HTTP callbacks exceeded drain deadline");
+        try {
+          wait(Math.max(1, remaining / 1000000));
+        } catch (InterruptedException error) {
+          Thread.currentThread().interrupt();
+          throw new InterruptedIOException("Interrupted while draining HTTP callbacks");
+        }
+      }
+      if (callbackFailure != null) throw callbackFailure;
+      closed = true;
+    }
+
+    synchronized boolean hasPending() {
+      return !pending.isEmpty();
+    }
+
+    public void close() {
+      List<BrowserCall> calls;
+      synchronized (this) {
+        closed = true;
+        calls = new ArrayList<>(pending);
+        pending.clear();
+        notifyAll();
+      }
+      for (BrowserCall call : calls) call.cancel();
+      synchronized (BrowserCall.class) {
+        if (activeOperation == this) activeOperation = null;
+      }
+    }
+  }
+
+  static synchronized Operation beginOperation(String requestId, String generation, String token) {
+    if (requestId == null
+        || requestId.isEmpty()
+        || generation == null
+        || generation.isEmpty()
+        || token == null
+        || token.isEmpty()) throw new IllegalArgumentException("Missing Source operation owner");
+    if (activeOperation != null) throw new IllegalStateException("Concurrent Source operation");
+    activeOperation = new Operation(requestId, generation, token);
+    return activeOperation;
+  }
+
+  private static Operation currentOperation() {
+    return threadOperation.get();
+  }
+
+  /** Capture before scheduling; an expired child must never adopt another entry. */
+  public static Runnable bindOperation(Runnable action) {
+    Operation owner = currentOperation();
+    return () -> {
+      Operation previous = currentOperation();
+      if (owner == null) threadOperation.remove();
+      else owner.enter();
+      try {
+        if (owner != null) {
+          try {
+            owner.checkOpen();
+          } catch (InterruptedIOException error) {
+            throw new IllegalStateException(error);
+          }
+        }
+        action.run();
+      } finally {
+        if (previous == null) threadOperation.remove();
+        else previous.enter();
+      }
+    };
+  }
+
   private final OkHttpClient client;
   private final Request request;
-  private boolean executed;
+  private Operation owner;
+  private volatile boolean executed;
   private volatile boolean cancelled;
   private final Set<String> httpHandles = new HashSet<>();
   private Call proxy;
@@ -34,15 +162,58 @@ public final class BrowserCall implements Call {
   }
 
   public void enqueue(Callback c) {
-    new Thread(
-            () -> {
-              try {
-                c.onResponse(this, execute());
-              } catch (IOException e) {
-                c.onFailure(this, e);
-              }
-            })
-        .start();
+    Objects.requireNonNull(c, "callback");
+    startExecution();
+    Operation operation = owner;
+    if (operation != null) operation.register(this);
+    try {
+      new Thread(
+              () -> {
+                if (operation != null) operation.enter();
+                Throwable failure = null;
+                try {
+                  Response response;
+                  try {
+                    response = executeOnce();
+                  } catch (IOException error) {
+                    if (operation != null) operation.checkOpen();
+                    c.onFailure(this, error);
+                    return;
+                  }
+                  try (Response closeAfterCallback = response) {
+                    if (operation != null) operation.checkOpen();
+                    c.onResponse(this, response);
+                  }
+                } catch (Throwable error) {
+                  failure = error;
+                  if (operation == null) Bridge.trace("HTTP callback failed: " + error);
+                } finally {
+                  // Close leaked handles even if an interceptor replaced the body.
+                  try {
+                    closeHandles();
+                  } catch (Throwable error) {
+                    if (failure == null) failure = error;
+                  }
+                  if (operation != null) {
+                    operation.finished(this, failure);
+                    operation.leave();
+                  }
+                }
+              })
+          .start();
+    } catch (Throwable error) {
+      if (operation != null) operation.finished(this, error);
+      throw error;
+    }
+  }
+
+  private void closeHandles() {
+    List<String> handles;
+    synchronized (this) {
+      handles = new ArrayList<>(httpHandles);
+      httpHandles.clear();
+    }
+    for (String handle : handles) cancelHandle(handle);
   }
 
   public void cancel() {
@@ -92,8 +263,18 @@ public final class BrowserCall implements Call {
   }
 
   public Response execute() throws IOException {
+    startExecution();
+    return executeOnce();
+  }
+
+  private synchronized void startExecution() {
     if (executed) throw new IllegalStateException("Already executed");
     executed = true;
+    owner = currentOperation();
+  }
+
+  private Response executeOnce() throws IOException {
+    if (owner != null) owner.checkOpen();
     Bridge.trace("execute " + request.url());
     List<Interceptor> list = new ArrayList<>(client.interceptors());
     list.add(this::follow);
@@ -373,12 +554,18 @@ public final class BrowserCall implements Call {
 
   private Response transportV2(Request request, int readMs) throws IOException {
     if (cancelled) throw new InterruptedIOException("Cancelled");
+    if (owner != null) owner.checkOpen();
     RequestBody body = request.body();
     if (body != null && body.isDuplex()) throw new IOException("Duplex HTTP upload is unsupported");
     long bodyLength = body == null ? 0 : body.contentLength();
     if (bodyLength < -1 || bodyLength > HttpRequestSink.MAX_REQUEST)
       throw new IOException("HTTP request body exceeds 8 MiB or has an invalid length");
     JsonObject metadata = new JsonObject();
+    if (owner != null) {
+      metadata.addProperty("operationRequestId", owner.requestId);
+      metadata.addProperty("operationGeneration", owner.generation);
+      metadata.addProperty("operationToken", owner.token);
+    }
     metadata.addProperty("url", request.url().toString());
     metadata.addProperty("method", request.method());
     JsonArray headers = new JsonArray();

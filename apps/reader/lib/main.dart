@@ -6,6 +6,8 @@ import 'data/reader_database.dart';
 import 'diagnostics/reader_baseline.dart';
 import 'diagnostics/reader_baseline_host.dart';
 import 'features/reader/reading_progress_controller.dart';
+import 'features/reader/reader_recovery.dart';
+import 'features/reader/chapter_reader_route.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
 import 'runtime/platform_runtime.dart';
@@ -169,6 +171,58 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     _pendingContinuation = null;
+    if (continuation['reader'] case final Object reader) {
+      try {
+        final recovery = ReaderRecoveryContext.fromJson(reader);
+        final recovered = await recoverReader(
+          controller,
+          recovery,
+          isCurrent: () => mounted && identical(controller, _catalog),
+        );
+        if (recovered == null) {
+          if (!mounted || !identical(controller, _catalog)) return;
+          throw StateError(controller.error ?? '阅读恢复未完成，请重新选择章节');
+        }
+        if (!mounted || !identical(controller, _catalog)) {
+          await recovered.opened.provider.close();
+          return;
+        }
+        try {
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => ChapterReaderRoute(
+                catalog: controller,
+                manga: recovered.manga,
+                source: recovered.source,
+                sequence: recovered.sequence,
+                initialChapter: recovered.chapter,
+                initialOpened: recovered.opened,
+                initialPosition: recovered.position,
+                initialOrder: recovery.order,
+                initialMode: recovery.mode,
+                initialDoublePage: recovery.doublePage,
+                onAuthenticate: _authenticateReader,
+              ),
+            ),
+          );
+        } finally {
+          await controller.closeChapter(recovered.opened);
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                error is StateError
+                    ? error.message.toString()
+                    : '阅读恢复状态无效，请重新选择章节',
+              ),
+            ),
+          );
+        }
+      }
+      return;
+    }
     final buildId = continuation['buildId'];
     final builds = controller.builds.where((build) => build.id == buildId);
     if (builds.isEmpty) return;
@@ -193,6 +247,8 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     try {
+      await _saveBeforeWebAuthentication();
+      if (!mounted) return;
       final authenticated = await platform.authenticate(
         context,
         pending: {
@@ -210,12 +266,46 @@ class _AppShellState extends State<AppShell> {
           pending is Map ? Map<String, Object?>.from(pending) : null,
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('登录未完成，请重试。')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError ? error.message.toString() : '登录未完成，请重试。',
+            ),
+          ),
+        );
       }
+    }
+  }
+
+  Future<bool> _authenticateReader(ReaderRecoveryContext recovery) async {
+    final platform = _platform;
+    if (platform == null || recovery.origin != platform.origin.origin) {
+      throw StateError('服务已改变，请返回浏览');
+    }
+    await _saveBeforeWebAuthentication();
+    if (!mounted) return false;
+    // Web resumes through the next document's _connect. Native keeps this
+    // Reader until its visible login returns, then owns cleanup and reconnect.
+    final authenticated = await platform.authenticate(
+      context,
+      pending: {'tab': 1, 'reader': recovery.toJson()},
+    );
+    if (!kIsWeb) platform.takePendingAuthentication();
+    return authenticated;
+  }
+
+  Future<void> _saveBeforeWebAuthentication() async {
+    if (!kIsWeb) return;
+    await _catalog?.flushReadingProgress();
+    for (final client in _retiredProgress.toList()) {
+      if (!await client.flush()) continue;
+      if (_retiredProgress.remove(client)) client.dispose();
+    }
+    if (_catalog?.hasUnsavedReadingProgress == true ||
+        _retiredProgress.any((client) => client.unsaved)) {
+      throw StateError('本地进度尚未保存，当前阅读仍保留；请重试保存后登录。');
     }
   }
 
@@ -272,6 +362,7 @@ class _AppShellState extends State<AppShell> {
       controller: _catalog,
       onConnect: () => unawaited(_connect()),
       onAuthenticate: () => unawaited(_authenticate()),
+      onAuthenticateReader: _authenticateReader,
       configurationError: _configurationError,
     ),
     _ => Align(

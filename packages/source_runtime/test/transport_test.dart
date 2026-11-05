@@ -6,6 +6,170 @@ import 'package:test/test.dart';
 import 'support/fake_runtime_transport.dart';
 
 void main() {
+  for (final (wireCode, code) in [
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+      RuntimeErrorCode.accessRequired,
+    ),
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED,
+      RuntimeErrorCode.accessDenied,
+    ),
+  ]) {
+    test(
+      'Access pause retains the original $code and permits resource cleanup before explicit reopen',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        final events = <RuntimeEvent>[];
+        final subscription = runtime.events.listen(events.add);
+        await runtime.open(build());
+        final image = await runtime.acquireImage(imageRequest());
+        var paused = true;
+        var generation = 'generation-1';
+        transport.handler = (call) async {
+          if (paused && call.hasInvoke()) {
+            return wire.ControlResponse(
+              requestId: call.requestId,
+              error: wire.RuntimeError(
+                code: wireCode,
+                message: 'Original Access decision',
+                javaClass: 'AccessSessionExpired',
+                retryable: true,
+              ),
+            );
+          }
+          final response = transport.respond(call);
+          if (call.hasOpen()) response.session.generation = generation;
+          if (call.hasInvoke()) response.source.generation = generation;
+          return response;
+        };
+        RuntimeException? original;
+        try {
+          await runtime.invoke(request());
+          fail('The Access decision must fail the Source call');
+        } on RuntimeException catch (error) {
+          original = error;
+        }
+        final controlsAtPause = transport.calls.length;
+        await expectLater(runtime.invoke(request()), throwsA(same(original)));
+        await expectLater(
+          runtime.acquireImage(imageRequest(id: 'later')),
+          throwsA(same(original)),
+        );
+        expect(transport.calls, hasLength(controlsAtPause));
+        expect(
+          original,
+          failure(code)
+              .having(
+                (error) => error.message,
+                'message',
+                'Original Access decision',
+              )
+              .having(
+                (error) => error.javaClass,
+                'javaClass',
+                'AccessSessionExpired',
+              )
+              .having((error) => error.retryable, 'retryable', true),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(events.single.code, code);
+        expect(events.single.generation, 'generation-1');
+        expect(
+          transport.calls.where((call) => call.hasReleaseImage()),
+          isEmpty,
+        );
+        await runtime.releaseImage(
+          ImageReleaseRequest(
+            resourceId: image.id,
+            generation: image.generation,
+          ),
+        );
+        await runtime.closePageSession(
+          const PageSessionRef(
+            pageSessionId: 'pages-1',
+            generation: 'generation-1',
+          ),
+        );
+        expect(
+          transport.calls.last.closePageSession.generation,
+          'generation-1',
+        );
+
+        paused = false;
+        generation = 'generation-2';
+        final reopened = await runtime.open(build());
+        expect(reopened.generation, generation);
+        expect(transport.calls.where((call) => call.hasOpen()), hasLength(2));
+        expect(
+          (await runtime.invoke(request(generation: generation))).generation,
+          generation,
+        );
+        runtime.containerLost('ordinary process loss');
+        await expectLater(
+          runtime.invoke(request(generation: generation)),
+          throwsA(failure(RuntimeErrorCode.runtimeLost)),
+        );
+        await subscription.cancel();
+        await runtime.dispose();
+      },
+    );
+  }
+
+  for (final isImage in [false, true]) {
+    test(
+      'late ${isImage ? 'image' : 'Source'} completion cannot resume a paused generation',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        await runtime.open(build());
+        final entered = Completer<void>();
+        final finish = Completer<void>();
+        transport.handler = (call) async {
+          if ((isImage && call.hasAcquireImage()) ||
+              (!isImage &&
+                  call.hasInvoke() &&
+                  call.invoke.requestId == 'slow')) {
+            entered.complete();
+            await finish.future;
+            return transport.respond(call);
+          }
+          if (call.hasInvoke()) {
+            return wire.ControlResponse(
+              requestId: call.requestId,
+              error: wire.RuntimeError(
+                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+                message: 'Pause the entire generation',
+              ),
+            );
+          }
+          return transport.respond(call);
+        };
+        final slowRequest = request();
+        slowRequest.call.requestId = 'slow';
+        final late = expectLater(
+          isImage
+              ? runtime.acquireImage(imageRequest())
+              : runtime.invoke(slowRequest),
+          throwsA(failure(RuntimeErrorCode.accessRequired)),
+        );
+        await entered.future;
+        await expectLater(
+          runtime.invoke(request()),
+          throwsA(failure(RuntimeErrorCode.accessRequired)),
+        );
+        finish.complete();
+        await late;
+        expect(
+          transport.calls.where((call) => call.hasReleaseImage()),
+          hasLength(isImage ? 1 : 0),
+        );
+        await runtime.dispose();
+      },
+    );
+  }
+
   test(
     'concurrent open shares generated session and decimal Source identity',
     () async {
@@ -138,38 +302,49 @@ void main() {
     await runtime.dispose();
   });
 
-  test(
-    'generated error preserves category, Java class, message and retryability',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      transport.handler = (call) async => call.hasInvoke()
-          ? wire.ControlResponse(
-              requestId: call.requestId,
-              error: wire.RuntimeError(
-                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_SOURCE_ERROR,
-                message: 'Explicit reference is required',
-                javaClass: 'java.lang.IllegalArgumentException',
-                retryable: true,
-              ),
-            )
-          : transport.respond(call);
-      await expectLater(
-        runtime.invoke(request()),
-        throwsA(
-          failure(RuntimeErrorCode.sourceError)
-              .having(
-                (error) => error.javaClass,
-                'javaClass',
-                'java.lang.IllegalArgumentException',
+  for (final (wireCode, code) in [
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_SOURCE_ERROR,
+      RuntimeErrorCode.sourceError,
+    ),
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY,
+      RuntimeErrorCode.storageBusy,
+    ),
+  ]) {
+    test(
+      'generated $code preserves category, Java class, message and retryability',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        await runtime.open(build());
+        transport.handler = (call) async => call.hasInvoke()
+            ? wire.ControlResponse(
+                requestId: call.requestId,
+                error: wire.RuntimeError(
+                  code: wireCode,
+                  message: 'Explicit reference is required',
+                  javaClass: 'java.lang.IllegalArgumentException',
+                  retryable: true,
+                ),
               )
-              .having((error) => error.retryable, 'retryable', true),
-        ),
-      );
-      await runtime.dispose();
-    },
-  );
+            : transport.respond(call);
+        await expectLater(
+          runtime.invoke(request()),
+          throwsA(
+            failure(code)
+                .having(
+                  (error) => error.javaClass,
+                  'javaClass',
+                  'java.lang.IllegalArgumentException',
+                )
+                .having((error) => error.retryable, 'retryable', true),
+          ),
+        );
+        await runtime.dispose();
+      },
+    );
+  }
 
   test('image control uses opaque handles and matching cleanup ACKs', () async {
     final transport = FakeTransport();

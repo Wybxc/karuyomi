@@ -116,7 +116,7 @@ public final class GreenCoroutines {
       if (started || cancelled) return false;
       started = true;
       new Thread(
-              () -> {
+              BrowserCall.bindOperation(() -> {
                 try {
                   w.finish(block(f, context), null);
                 } catch (Throwable t) {
@@ -128,7 +128,7 @@ public final class GreenCoroutines {
                   callbacks.clear();
                 }
                 for (var cb : list) cb.invoke(w.error);
-              })
+              }))
           .start();
       return true;
     }

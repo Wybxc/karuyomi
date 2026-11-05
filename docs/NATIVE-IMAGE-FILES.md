@@ -45,6 +45,8 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 这段私有平台 sink 使用 ArrayBuffer 正文和小 ACK/终态字符串，不改变公开 ProtoJSON Source 控制合同。取消需等 reader 退出、端点终态与本地写入结束；无法确认时返回 runtime_lost 并销毁容器。文件位于应用私有临时目录，release 删除文件。Android API 36 模拟器的真实 WebView 六槽传输与复用已通过；原版 xkcd 的正式 ReaderScreen 路径见下文，物理设备另行验收。
 
+Android 当前实现使用 `path_provider` 的应用缓存目录下专属 `karuyomi-images` 根目录；首次绑定的共享 Future 先删除上个进程的遗留目录，再建立本次运行目录。后续 store 各建子目录，正常 clear 只删除本 store，避免清理其他仍在使用的图片。此轮补齐异常退出后的回收功能，受控真实目录的清理/失败重试/活跃 store 隔离及既有释放回归通过；历史模拟器证据不自动覆盖新清理路径，真实 Android 进程恢复仍须验收。
+
 ## 预算与生命周期
 
 在途与驻留编码文件共同计入六资源、64 MiB 字节预算；没有图片像素或完整图/分片分类。复制在途和未确认清理的资源持续计费，manager 的 Blob 保留到对应 JS release 完成。iOS reservation 与 Android 文件表执行相同字节/资源边界，Android 使用固定六个二进制 port 槽。文件是额外磁盘副本；Flutter 解码缓存、Source 原业务的 graphics surface、GPU 和进程内存分别计量，文件预算不能代表它们或证明峰值通过。

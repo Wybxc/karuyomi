@@ -164,12 +164,18 @@ export async function checkDto(root = ROOT): Promise<void> {
       'runtime/teavm/java/src/main/java/eu/kanade/tachiyomi/network/OkHttpExtensionsKt.java',
       'tools/teavm/fixtures/image/prototype/Bridge.java',
       'tools/teavm/ImageTest.java',
+      'tools/teavm/EnqueueTest.java',
     ].map((file) => path.join(root, file)),
   ]);
   await oracle('java', [
     '-cp',
     imageOutput + path.delimiter + classpath,
     'prototype.ImageTest',
+  ]);
+  await oracle('java', [
+    '-cp',
+    imageOutput + path.delimiter + classpath,
+    'prototype.EnqueueTest',
   ]);
   // Check the product adapter as well as the original seed HttpSource. Java's
   // checked throws signature is absent from the original Kotlin bytecode.

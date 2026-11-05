@@ -267,6 +267,9 @@ final class CatalogController extends ChangeNotifier {
   bool _runtimeNeedsRebuild = false;
   bool _rebuildingRuntime = false;
 
+  bool get accessPaused =>
+      status == ServiceStatus.loginRequired || status == ServiceStatus.denied;
+
   void _notify() {
     if (!_closed) notifyListeners();
   }
@@ -361,6 +364,7 @@ final class CatalogController extends ChangeNotifier {
           RuntimeErrorCode.unsupportedCapability => '这个漫画源功能暂未支持',
           RuntimeErrorCode.integrityError => '构建校验失败，请重新加载',
           RuntimeErrorCode.sourceError => '漫画源请求失败，请重试',
+          RuntimeErrorCode.storageBusy => '这个漫画源已在其他标签页或窗口运行，请先关闭后再连接',
           RuntimeErrorCode.protocolError => '漫画源返回的数据与当前版本不兼容',
           _ => '漫画源请求失败，请稍后重试',
         };
@@ -521,7 +525,10 @@ final class CatalogController extends ChangeNotifier {
     return result;
   }
 
-  Future<void> selectSource(SourceInfo source) async {
+  Future<void> selectSource(
+    SourceInfo source, {
+    bool loadListing = true,
+  }) async {
     if (busy) return;
     if (!(session?.sources.any((value) => value.id == source.id) ?? false)) {
       return;
@@ -533,7 +540,11 @@ final class CatalogController extends ChangeNotifier {
     hasNextPage = false;
     query = '';
     listing = 'popular';
-    await loadMangas();
+    if (loadListing) {
+      await loadMangas();
+    } else {
+      _notify();
+    }
   }
 
   Future<void> loadMangas({
@@ -594,19 +605,30 @@ final class CatalogController extends ChangeNotifier {
   Future<
     ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})?
   >
-  details(MangaEntry manga) => _perform('正在加载详情和章节', () async {
-    final source = sourceReference;
-    final detail = MangaEntry(
-      (await _invoke(
-        wire.SourceCall(details: wire.MangaRequest(manga: manga.snapshot)),
-      )).manga,
-    );
-    final result = await _invoke(
-      wire.SourceCall(chapters: wire.MangaRequest(manga: detail.snapshot)),
-    );
-    final chapters = result.chapters.chapters.map(ChapterEntry.new).toList();
-    return (manga: detail, chapters: chapters, source: source);
-  });
+  details(MangaEntry manga, {bool Function()? shouldContinue}) =>
+      _perform<
+        ({
+          MangaEntry manga,
+          List<ChapterEntry> chapters,
+          CatalogSourceRef source,
+        })?
+      >('正在加载详情和章节', () async {
+        if (shouldContinue?.call() == false) return null;
+        final source = sourceReference;
+        final detail = MangaEntry(
+          (await _invoke(
+            wire.SourceCall(details: wire.MangaRequest(manga: manga.snapshot)),
+          )).manga,
+        );
+        if (shouldContinue?.call() == false) return null;
+        final result = await _invoke(
+          wire.SourceCall(chapters: wire.MangaRequest(manga: detail.snapshot)),
+        );
+        final chapters = result.chapters.chapters
+            .map(ChapterEntry.new)
+            .toList();
+        return (manga: detail, chapters: chapters, source: source);
+      });
 
   Future<OpenedChapter?> openChapter(
     MangaEntry manga,

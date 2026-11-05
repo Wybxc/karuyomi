@@ -467,9 +467,19 @@ test.each([
               { id: build.sourceIds[0], name: 'Test', lang: 'en' },
             ]),
           );
-        scope.hostInvoke = () => {
+        scope.hostInvoke = (
+          _source,
+          _operation,
+          _args,
+          operationRequestId,
+          operationGeneration,
+          operationToken,
+        ) => {
           const handle = scope.teaHttpOpen!(
             JSON.stringify({
+              operationRequestId,
+              operationGeneration,
+              operationToken,
               url: 'https://source.example/catalog',
               method: 'GET',
               headers: [],
@@ -565,9 +575,19 @@ test('the installed v2 finish callback carries a controlled connection flag thro
             { id: build.sourceIds[0], name: 'Test', lang: 'en' },
           ]),
         );
-      scope.hostInvoke = () => {
+      scope.hostInvoke = (
+        _source,
+        _operation,
+        _args,
+        operationRequestId,
+        operationGeneration,
+        operationToken,
+      ) => {
         const handle = scope.teaHttpOpen!(
           JSON.stringify({
+            operationRequestId,
+            operationGeneration,
+            operationToken,
             url: 'https://source.example/catalog',
             method: 'GET',
             headers: [],

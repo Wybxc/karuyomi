@@ -10,14 +10,18 @@ public final class CacheFailureProbe {
   public static void main(String[] args) {}
 
   @JSExport
-  public static void cacheFailureRun() {
+  public static void cacheFailureRun(String requestId, String generation, String token) {
+    BrowserCall.Operation owner = BrowserCall.beginOperation(requestId, generation, token);
     new Thread(
             () -> {
+              owner.enter();
               try {
-                done(
+                String result =
                     CacheFailureScenarios.run(
                             "http://fixture.example.org", new File("/failure-cache"))
-                        .toString());
+                        .toString();
+                owner.drain();
+                done(result);
               } catch (Throwable error) {
                 JsonObject result = new JsonObject();
                 result.addProperty("passed", false);
@@ -27,6 +31,9 @@ public final class CacheFailureProbe {
                   stack.append(frame).append('\n');
                 result.addProperty("stack", stack.toString());
                 done(result.toString());
+              } finally {
+                owner.close();
+                owner.leave();
               }
             })
         .start();

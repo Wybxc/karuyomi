@@ -44,6 +44,8 @@ final class RuntimeException implements Exception {
             RuntimeErrorCode.integrityError,
           wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_LIMIT_EXCEEDED =>
             RuntimeErrorCode.limitExceeded,
+          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY =>
+            RuntimeErrorCode.storageBusy,
           _ => RuntimeErrorCode.runtimeLost,
         },
         error.message,
@@ -76,6 +78,7 @@ final class TransportSourceRuntime implements SourceRuntime {
   String? _packageId;
   int _epoch = 0;
   bool _disposed = false;
+  RuntimeException? _accessFailure;
   Future<RuntimeSession>? _opening;
   String? _openKey;
   final _imageAcquisitions = <(String, String), _ImageAcquisition>{};
@@ -89,6 +92,7 @@ final class TransportSourceRuntime implements SourceRuntime {
     _session = null;
     _opening = null;
     _openKey = null;
+    _accessFailure = null;
     if (!_events.isClosed) {
       _events.add(
         RuntimeEvent(
@@ -201,10 +205,15 @@ final class TransportSourceRuntime implements SourceRuntime {
         );
       }
       if ({
-        RuntimeErrorCode.runtimeLost,
         RuntimeErrorCode.accessRequired,
         RuntimeErrorCode.accessDenied,
       }.contains(failure.code)) {
+        // Keep the old generation available for release/close. It has no
+        // execution capability while Access is paused, even for cached reads.
+        _accessFailure = failure;
+        _openKey = null;
+        _opening = null;
+      } else if (failure.code == RuntimeErrorCode.runtimeLost) {
         _session = null;
       }
       throw failure;
@@ -261,6 +270,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       );
     }
     final epoch = ++_epoch;
+    _accessFailure = null;
     _session = null;
     final hello = (await _exchange(
       wire.ControlRequest(ready: wire.Empty()),
@@ -317,6 +327,8 @@ final class TransportSourceRuntime implements SourceRuntime {
 
   @override
   Future<SourceResult> invoke(SourceRequest request) async {
+    final accessFailure = _accessFailure;
+    if (accessFailure != null) throw accessFailure;
     final session = _session;
     final call = request.call.deepCopy();
     if (session == null ||
@@ -355,6 +367,8 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Discarded a stale Source result',
       );
     }
+    final pausedFailure = _accessFailure;
+    if (pausedFailure != null) throw pausedFailure;
     if (response.whichPayload() != expected) {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
@@ -464,6 +478,8 @@ final class TransportSourceRuntime implements SourceRuntime {
 
   @override
   Future<ImageResource> acquireImage(ImageAcquireRequest request) async {
+    final accessFailure = _accessFailure;
+    if (accessFailure != null) throw accessFailure;
     final session = _imageRequestSession(request);
     final epoch = _epoch;
     final key = (request.generation, request.requestId);
@@ -505,6 +521,8 @@ final class TransportSourceRuntime implements SourceRuntime {
             'Discarded a stale image resource',
           );
         }
+        final pausedFailure = _accessFailure;
+        if (pausedFailure != null) throw pausedFailure;
         if (acquisition.cancelled) {
           throw const RuntimeException(
             RuntimeErrorCode.cancelled,

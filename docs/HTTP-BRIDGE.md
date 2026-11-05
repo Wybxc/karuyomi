@@ -142,6 +142,20 @@ message with `remote: true`. Other source exception messages are not reflected.
 
 ## Runtime and local adapter configuration
 
+Host ABI v4 binds each Java entry to `requestId`, `generation` and a fresh opaque
+operation token. Java HTTP metadata carries these three private owner fields;
+the local transport validates and removes them before creating wire META. Old
+owners cannot open a request or record a failure against a newer entry, even
+when init/load share the same public request identity. Coroutine dispatch
+explicitly propagates the owner.
+
+`BrowserCall.enqueue` registers before scheduling its thread. After the main
+Source result, the host waits up to 30 seconds for at most 64 concurrent callback
+tasks, including nested enqueue calls and response cleanup. Handled `onFailure`
+does not fail the parent operation. If drain expires or an abnormal return leaves
+callbacks running, the host reports `runtime_lost` and the manager terminates the
+Worker. Cancellation never replays a Source operation or its POST requests.
+
 The Worker explicitly enables `enable_request_signal` with compatibility date
 `2026-11-03`. Cloudflare only enables client-disconnection events by default at
 [`2026-11-17`](https://developers.cloudflare.com/changelog/post/2026-11-02-request-signal-default/).

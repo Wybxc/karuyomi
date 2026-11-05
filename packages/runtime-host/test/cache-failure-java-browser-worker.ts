@@ -5,6 +5,7 @@ import {
 } from '../../../runtime/teavm/bridge/bridge-common.js';
 
 declare global {
+  var cacheFailureHttpOwner: [string, string, string];
   var cacheFailureDone: ((json: string) => void) | undefined;
 }
 
@@ -30,10 +31,15 @@ for (const installed of [
     throw Error('Required Cache bridge function is not installed');
 }
 const transport = new BinaryHttpTransport(location.origin, 'v2-fixture');
-transport.begin({
+const token = transport.begin({
   requestId: 'cache-failure-java',
   generation: 'cache-failure-java',
 });
+scope.cacheFailureHttpOwner = [
+  'cache-failure-java',
+  'cache-failure-java',
+  token,
+];
 const active = new Set<string>();
 let maximumActive = 0,
   cancellations = 0;

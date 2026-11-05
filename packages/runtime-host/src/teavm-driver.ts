@@ -15,7 +15,11 @@ import {
 } from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
 import { VerifiedLoader } from './verified-loader.js';
-import { BinaryHttpTransport, type HttpCallContext } from './http-transport.js';
+import {
+  BinaryHttpTransport,
+  HttpOwnerFailure,
+  type HttpCallContext,
+} from './http-transport.js';
 import { ImageSink } from './image-channel.js';
 
 export interface RuntimeDriver {
@@ -42,17 +46,41 @@ export interface RuntimeDriver {
 }
 
 export interface TeaVMGlobals {
-  hostInit?: (userAgent: string) => void;
-  hostLoad?: () => void;
-  hostInvoke?: (sourceId: string, operation: string, argsJson: string) => void;
+  hostInit?: (
+    userAgent: string,
+    requestId: string,
+    generation: string,
+    operationToken: string,
+  ) => void;
+  hostLoad?: (
+    requestId: string,
+    generation: string,
+    operationToken: string,
+  ) => void;
+  hostInvoke?: (
+    sourceId: string,
+    operation: string,
+    argsJson: string,
+    requestId: string,
+    generation: string,
+    operationToken: string,
+  ) => void;
   hostAcquireImage?: (
     sourceId: string,
     pageSessionId: string,
     pageKey: string,
+    requestId: string,
+    generation: string,
+    operationToken: string,
   ) => void;
-  hostClosePageSession?: (pageSessionId: string) => void;
+  hostClosePageSession?: (
+    pageSessionId: string,
+    requestId: string,
+    generation: string,
+    operationToken: string,
+  ) => void;
   teaDone?: (value: string) => void;
-  teaFail?: (error: string) => void;
+  teaFail?: (error: string, discardRuntime?: boolean) => void;
   teaHttpOpen?: (request: string) => string;
   teaHttpWrite?: (handle: string, bytes: Uint8Array) => void;
   teaHttpFinish?: (handle: string) => Promise<string>;
@@ -123,14 +151,16 @@ export class TeaVMDriver implements RuntimeDriver {
         );
       }
     };
-    scope.teaFail = (message) => {
+    scope.teaFail = (message, discardRuntime) => {
       const waiter = this.waiter;
       this.waiter = undefined;
       const error =
         (this.bridgeFailure?.code === 'access_required' ||
         this.bridgeFailure?.code === 'access_denied'
           ? this.bridgeFailure
-          : (this.imageFailure ?? this.bridgeFailure)) ??
+          : discardRuntime
+            ? new RuntimeFailure('runtime_lost', message)
+            : (this.imageFailure ?? this.bridgeFailure)) ??
         new RuntimeFailure(
           'source_error',
           message,
@@ -185,21 +215,34 @@ export class TeaVMDriver implements RuntimeDriver {
   }
 
   private capture<T>(operation: () => T): T {
+    const token = this.binaryTransport?.operationToken;
     try {
       return operation();
     } catch (error) {
-      this.recordBridgeFailure(error);
+      this.recordCurrentBridgeFailure(error, token);
       throw error;
     }
   }
 
   private async captureAsync<T>(operation: () => Promise<T>): Promise<T> {
+    const token = this.binaryTransport?.operationToken;
     try {
       return await operation();
     } catch (error) {
-      this.recordBridgeFailure(error);
+      this.recordCurrentBridgeFailure(error, token);
       throw error;
     }
+  }
+
+  private recordCurrentBridgeFailure(
+    error: unknown,
+    token: string | undefined,
+  ): void {
+    if (
+      !(error instanceof HttpOwnerFailure) &&
+      token === this.binaryTransport?.operationToken
+    )
+      this.recordBridgeFailure(error);
   }
 
   private recordBridgeFailure(error: unknown): void {
@@ -210,7 +253,10 @@ export class TeaVMDriver implements RuntimeDriver {
       this.bridgeFailure = runtimeFailure(error);
   }
 
-  private call(start: () => void, context?: HttpCallContext): Promise<unknown> {
+  private call(
+    start: (owner: HttpCallContext, token: string) => void,
+    context?: HttpCallContext,
+  ): Promise<unknown> {
     if (this.closed)
       return Promise.reject(
         new RuntimeFailure('runtime_lost', 'TeaVM driver was closed'),
@@ -226,7 +272,7 @@ export class TeaVMDriver implements RuntimeDriver {
       requestId: crypto.randomUUID(),
       generation: this.fallbackGeneration,
     };
-    this.binaryTransport?.begin(owner);
+    const token = this.binary().begin(owner);
     try {
       this.scope.teaGraphicsBegin?.(owner);
     } catch (error) {
@@ -240,7 +286,7 @@ export class TeaVMDriver implements RuntimeDriver {
       this.bridgeFailure = undefined;
       this.waiter = { resolve, reject };
       try {
-        start();
+        start(owner, token);
       } catch (error) {
         this.waiter = undefined;
         reject(runtimeFailure(error));
@@ -302,8 +348,21 @@ export class TeaVMDriver implements RuntimeDriver {
         'This build does not export the complete Source and image host ABI',
       );
     }
-    await this.call(() => this.scope.hostInit!(userAgent), context);
-    const value = await this.call(() => this.scope.hostLoad!(), context);
+    await this.call(
+      (owner, token) =>
+        this.scope.hostInit!(
+          userAgent,
+          owner.requestId,
+          owner.generation,
+          token,
+        ),
+      context,
+    );
+    const value = await this.call(
+      (owner, token) =>
+        this.scope.hostLoad!(owner.requestId, owner.generation, token),
+      context,
+    );
     if (!Array.isArray(value))
       throw new RuntimeFailure(
         'protocol_error',
@@ -330,11 +389,14 @@ export class TeaVMDriver implements RuntimeDriver {
   ): Promise<SourcePayload> {
     const invocation = javaSourceInvocation(call);
     const raw = await this.call(
-      () =>
+      (owner, token) =>
         this.scope.hostInvoke!(
           call.sourceId,
           invocation.operation,
           invocation.argsJson,
+          owner.requestId,
+          owner.generation,
+          token,
         ),
       context,
     );
@@ -383,7 +445,15 @@ export class TeaVMDriver implements RuntimeDriver {
     this.imageFailure = undefined;
     try {
       const raw = await this.call(
-        () => this.scope.hostAcquireImage!(sourceId, pageSessionId, pageKey),
+        (owner, token) =>
+          this.scope.hostAcquireImage!(
+            sourceId,
+            pageSessionId,
+            pageKey,
+            owner.requestId,
+            owner.generation,
+            token,
+          ),
         context,
       );
       return raw;
@@ -399,7 +469,13 @@ export class TeaVMDriver implements RuntimeDriver {
     context: HttpCallContext,
   ): Promise<Closed> {
     const raw = await this.call(
-      () => this.scope.hostClosePageSession!(pageSessionId),
+      (owner, token) =>
+        this.scope.hostClosePageSession!(
+          pageSessionId,
+          owner.requestId,
+          owner.generation,
+          token,
+        ),
       context,
     );
     return closedSchema.parse(raw);

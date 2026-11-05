@@ -20,6 +20,7 @@ export interface ImageBudgets {
 /** Source output is opaque encoded data. Image interpretation belongs to the UI. */
 export class ImageResourceStore {
   private readonly images = new Map<string, ImageCollector>();
+  private readonly retained = new Set<string>();
   private bytes = 0;
   readonly limits;
 
@@ -67,6 +68,7 @@ export class ImageResourceStore {
   forget(image: ImageCollector): void {
     if (this.images.get(image.resourceId) !== image) return;
     this.images.delete(image.resourceId);
+    this.retained.delete(image.resourceId);
     this.bytes -= image.byteLength;
   }
 
@@ -75,8 +77,18 @@ export class ImageResourceStore {
     if (image?.generation === generation) image.release();
   }
 
-  clear(error: RuntimeFailure): void {
-    for (const image of [...this.images.values()]) image.release(error);
+  retainPublished(error: RuntimeFailure): void {
+    for (const image of [...this.images.values()]) {
+      if (image.published) this.retained.add(image.resourceId);
+      else image.release(error);
+    }
+  }
+
+  clear(error: RuntimeFailure, preserveRetained = false): void {
+    for (const image of [...this.images.values()]) {
+      if (!preserveRetained || !this.retained.has(image.resourceId))
+        image.release(error);
+    }
   }
 }
 
@@ -104,6 +116,10 @@ export class ImageCollector {
       this.reject = reject;
     });
     void this.result.catch(() => {});
+  }
+
+  get published(): boolean {
+    return !this.released && this.url !== undefined;
   }
 
   attach(port: MessagePort): void {

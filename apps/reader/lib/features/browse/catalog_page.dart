@@ -7,6 +7,7 @@ import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
+import '../reader/reader_recovery.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -15,11 +16,13 @@ class CatalogPage extends StatefulWidget {
     required this.onConnect,
     required this.onAuthenticate,
     this.configurationError,
+    this.onAuthenticateReader,
   });
   final CatalogController? controller;
   final VoidCallback onConnect;
   final VoidCallback onAuthenticate;
   final String? configurationError;
+  final ReaderAuthentication? onAuthenticateReader;
 
   @override
   State<CatalogPage> createState() => _CatalogPageState();
@@ -39,6 +42,7 @@ class _CatalogPageState extends State<CatalogPage> {
           manga: details.manga,
           chapters: details.chapters,
           source: details.source,
+          onAuthenticateReader: widget.onAuthenticateReader,
         ),
       ),
     );
@@ -274,11 +278,13 @@ class MangaDetailsPage extends StatefulWidget {
     required this.manga,
     required this.chapters,
     required this.source,
+    this.onAuthenticateReader,
   });
   final CatalogController controller;
   final MangaEntry manga;
   final List<ChapterEntry> chapters;
   final CatalogSourceRef source;
+  final ReaderAuthentication? onAuthenticateReader;
 
   @override
   State<MangaDetailsPage> createState() => _MangaDetailsPageState();
@@ -376,6 +382,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
           sequence: sequence,
           initialChapter: selected,
           initialOpened: opened,
+          onAuthenticate: widget.onAuthenticateReader,
         ),
       );
       await Navigator.of(context).push<void>(readerRoute);

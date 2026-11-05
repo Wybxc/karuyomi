@@ -77,6 +77,17 @@ void main() {
     expect(controller.builds, isEmpty);
   });
 
+  test('an occupied Source names the conflicting tab or window', () async {
+    await open();
+    platform.invokeHandler = (_) async => throw const RuntimeException(
+      RuntimeErrorCode.storageBusy,
+      'Source storage namespace is already in use',
+    );
+    await controller.loadMangas(search: 'occupied');
+    expect(controller.error, '这个漫画源已在其他标签页或窗口运行，请先关闭后再连接');
+    expect(controller.accessPaused, false);
+  });
+
   test(
     'Source data errors are visible and do not invent or discard prior items',
     () async {

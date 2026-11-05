@@ -44,6 +44,8 @@ final class TestPlatform extends PlatformRuntime {
     ),
   );
   int authCalls = 0;
+  String runtimeGeneration = 'generation-1';
+  Future<bool> Function()? authenticateHandler;
   final invocations = <wire.SourceCall>[];
   final imageControls = <(String, Map<String, Object?>)>[];
   final controlCommands = <wire.ControlRequest_Command>[];
@@ -103,7 +105,7 @@ final class TestPlatform extends PlatformRuntime {
         response.session = wire.RuntimeSession(
           protocolVersion: protocolVersion,
           workerInstanceId: 'worker-1',
-          generation: 'generation-1',
+          generation: runtimeGeneration,
           buildId: 'build-1',
           sources: [
             wire.SourceInfo(
@@ -157,7 +159,7 @@ final class TestPlatform extends PlatformRuntime {
             : await invokeHandler!(call);
         response.source = result.deepCopy()
           ..requestId = call.requestId
-          ..generation = 'generation-1'
+          ..generation = call.generation
           ..buildId = 'build-1';
       case wire.ControlRequest_Command.acquireImage:
         imageControls.add((
@@ -204,7 +206,7 @@ final class TestPlatform extends PlatformRuntime {
     ++authCalls;
     bootstrapStatus = 200;
     continuation = {'returnTo': returnTo, 'pending': pending};
-    return true;
+    return authenticateHandler == null ? true : await authenticateHandler!();
   }
 
   @override

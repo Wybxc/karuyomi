@@ -6,10 +6,12 @@
 
 `PageProvider.cancel` 的完成必须表示生产已停止；即使图片迟到，调度器也会释放它。`release` 必须确认对应对象 URL、临时文件及处理资源已释放。调度器等待清理确认后才启动新生产，清理失败时停止新请求。平台 Provider 仍需独立限制网络、正文处理和解码临时缓冲。
 
-章节入口现在调用原 Source 的 pages，保留 Java Page 会话；`ChapterPageProvider` 将逻辑页键映射到 opaque Page 引用，供真实 ReaderScreen 使用。资源携带的尺寸会更新布局，保留内容版本、当前逻辑页和归一化偏移。没有稳定 page URL 时，页键绑定完整内容版本，清单变化后明确按页码提示恢复。
+章节入口调用原 Source 的 pages，保留 Java Page 会话；`ChapterPageProvider` 将逻辑页键映射到 opaque Page 引用，供真实 ReaderScreen 使用。资源只携带身份、位置和编码字节数；Flutter 从实际 `ImageInfo` 学习尺寸并更新布局，保留内容版本、当前逻辑页和归一化偏移。没有稳定 page URL 时，页键绑定完整内容版本，清单变化后明确按页码提示恢复。
 
-调度器与显示组件分别持有资源。ReaderResourcePool 等待普通图片和缩放弹窗的显示引用全部撤销、帧结束及 Flutter ImageProvider 缓存清理后，才向 Source 确认释放；章节关闭等待该过程完成。Web 只显示受管 Blob URL，Native 只允许受管文件；本阶段 Native 图片获取明确不支持。
+调度器与显示组件分别持有资源。ReaderResourcePool 等待普通图片和缩放弹窗的显示引用全部撤销、帧结束及 Flutter ImageProvider 缓存清理后，才向 Source 确认释放；章节关闭等待该过程完成。Web 只显示受管 Blob URL，Native 使用已实现的 Android ArrayBuffer 文件通道和 iOS 受管下载通道，图片仍由 Flutter 解码。
 
-解码像素预算属于估算，不能作为实测进程/GPU内存；已知超过预算的巨图会明确拒绝显示。尚未实现超长图降采样/分片、裁白、完整阅读设置、章节接续和进度存储。真机触控、能耗、实际合计峰值与首图需要 P0-C 验收。
+章节接续、有界下一章准备和 Drift/SQLite 本地进度已接入正式目录、详情及阅读路由；切章等待旧资源释放确认，下一章准备不获取图片或推进进度。保存当前位置、最远位置与显式完成状态，失败写入保留草稿。实现状态与验收范围以 [P0 计划](../../../../../docs/plan/p0-runtime-and-reading.md)为准。
+
+解码像素预算属于估算，不能作为实测进程/GPU 内存；已知超过预算的巨图会明确拒绝显示。当前默认整图直接解码，超长图降采样/分片、裁白和完整阅读设置尚未实现。真机触控、能耗、实际合计峰值与首图仍需 P0-C 验收。
 
 `test/reader` 的 Provider/渲染夹具只属于开发测试；当前未增加测试漫画导航、用户文件导入或假源入口。

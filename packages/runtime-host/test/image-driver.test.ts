@@ -104,7 +104,16 @@ test('the installed image ABI sends typed bytes and survives HTTP operation clea
     { requestId: 'image', generation: 'generation' },
   );
   const resource = await image.publish(result);
-  expect(refs).toEqual([[build.sourceIds[0], 'page-session', 'p-0']]);
+  expect(refs).toEqual([
+    [
+      build.sourceIds[0],
+      'page-session',
+      'p-0',
+      'image',
+      'generation',
+      expect.any(String),
+    ],
+  ]);
   await driver.invoke(metadata(build.sourceIds[0]!), {
     requestId: 'metadata',
     generation: 'generation',
@@ -163,10 +172,20 @@ test('image cancellation closes a pending HTTP body but waits for swallowed Java
     );
   });
   const { driver, build } = await setup((scope) => {
-    scope.hostAcquireImage = () => {
+    scope.hostAcquireImage = (
+      _source,
+      _session,
+      _page,
+      operationRequestId,
+      operationGeneration,
+      operationToken,
+    ) => {
       void (async () => {
         const handle = scope.teaHttpOpen!(
           JSON.stringify({
+            operationRequestId,
+            operationGeneration,
+            operationToken,
             url: 'https://source.example/image',
             method: 'GET',
             headers: [],
@@ -222,9 +241,19 @@ test.each([401, 403])(
   async (status) => {
     vi.stubGlobal('fetch', async () => new Response('', { status }));
     const { driver, build } = await setup((scope) => {
-      scope.hostAcquireImage = () => {
+      scope.hostAcquireImage = (
+        _source,
+        _session,
+        _page,
+        operationRequestId,
+        operationGeneration,
+        operationToken,
+      ) => {
         const handle = scope.teaHttpOpen!(
           JSON.stringify({
+            operationRequestId,
+            operationGeneration,
+            operationToken,
             url: 'https://source.example/image',
             method: 'GET',
             headers: [],

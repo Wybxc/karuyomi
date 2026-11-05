@@ -92,6 +92,7 @@ final class SourceRequest {
 }
 
 enum RuntimeErrorCode {
+  storageBusy,
   cancelled,
   timeout,
   accessRequired,

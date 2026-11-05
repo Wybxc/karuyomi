@@ -6,12 +6,13 @@ import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** JVM-only HTTP platform fixture; never compiled into a product bundle. */
 public final class Bridge {
   private static final HttpClient client =
       HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
-  private static final Map<String, Exchange> exchanges = new HashMap<>();
+  private static final Map<String, Exchange> exchanges = new ConcurrentHashMap<>();
   private static IOException nextFailure;
 
   public static void failNextRequest(IOException error) {
@@ -32,8 +33,14 @@ public final class Bridge {
     return "";
   }
 
+  public static final class NetworkFailure extends IOException {
+    public NetworkFailure(String message) {
+      super(message);
+    }
+  }
+
   public static boolean networkFailure(IOException error) {
-    return false;
+    return error instanceof NetworkFailure;
   }
 
   public static String cache(String request) {
@@ -140,5 +147,9 @@ public final class Bridge {
 
   public static void closeTransport() throws IOException {
     for (String handle : new ArrayList<>(exchanges.keySet())) httpClose(handle);
+  }
+
+  public static int openHandles() {
+    return exchanges.size();
   }
 }

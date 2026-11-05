@@ -3,6 +3,7 @@ import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'package:flutter/widgets.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'runtime_platform_types.dart';
 
 @JS('globalThis.karuyomiRuntime')
@@ -39,10 +40,9 @@ final class WebPlatformRuntime extends PlatformRuntime {
     Map<String, Object?> pending = const {},
   }) async {
     final path = authenticationPath(returnTo);
-    final state = jsonEncode({'returnTo': returnTo, 'pending': pending});
-    if (state.length > 16384) {
-      throw ArgumentError('Authentication continuation exceeds its size limit');
-    }
+    final continuation = {'returnTo': returnTo, 'pending': pending};
+    wire.checkJsonBudget(continuation, maxBytes: wire.controlRequestLimit);
+    final state = jsonEncode(continuation);
     _storage.setItem(_authenticationKey.toJS, state.toJS);
     _location.assign(path.toJS);
     return false;

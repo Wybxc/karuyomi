@@ -21,8 +21,16 @@ export interface HttpCallContext {
   generation: string;
 }
 
+/** An expired Java owner must never record a failure against a later entry. */
+export class HttpOwnerFailure extends RuntimeFailure {
+  constructor() {
+    super('cancelled', 'HTTP operation owner expired or was cancelled');
+  }
+}
+
 interface HttpSession {
   owner: HttpCallContext;
+  operationToken: string;
   meta: HttpRequestMeta;
   chunks: Uint8Array<ArrayBuffer>[];
   size: number;
@@ -41,6 +49,7 @@ const HTTP_TERMINAL_LIMIT = 16;
 /** One operation owns its handles. No reads run ahead of the Java consumer. */
 export class BinaryHttpTransport {
   private context: HttpCallContext | undefined;
+  private token: string | undefined;
   private readonly sessions = new Map<string, HttpSession>();
   // Keep only small failure causes until the owning operation ends, never bodies.
   private readonly terminalFailures = new Map<string, RuntimeFailure>();
@@ -52,17 +61,24 @@ export class BinaryHttpTransport {
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
   ) {}
 
-  begin(context: HttpCallContext): void {
+  get operationToken(): string | undefined {
+    return this.token;
+  }
+
+  begin(context: HttpCallContext): string {
     if (this.closed)
       throw new RuntimeFailure('runtime_lost', 'HTTP transport was closed');
     this.end();
     this.context = { ...context };
+    this.token = crypto.randomUUID();
+    return this.token;
   }
 
   end(): void {
     for (const handle of this.sessions.keys()) this.close(handle);
     this.terminalFailures.clear();
     this.context = undefined;
+    this.token = undefined;
   }
 
   dispose(): void {
@@ -71,10 +87,8 @@ export class BinaryHttpTransport {
   }
 
   open(json: string): string {
-    if (this.closed || !this.context)
-      throw new RuntimeFailure('runtime_lost', 'No active Source operation');
-    if (this.sessions.size >= HTTP_HANDLE_LIMIT)
-      throw new RuntimeFailure('limit_exceeded', 'Too many open HTTP bodies');
+    if (this.closed || !this.context || !this.token)
+      throw new HttpOwnerFailure();
     // Reject oversized control input before parsing. Body bytes never enter JSON.
     if (json.length > HTTP_FRAME_LIMIT)
       throw new RuntimeFailure('limit_exceeded', 'HTTP metadata is too large');
@@ -86,8 +100,25 @@ export class BinaryHttpTransport {
     }
     if (!input || typeof input !== 'object' || Array.isArray(input))
       throw new RuntimeFailure('protocol_error', 'Invalid HTTP metadata');
+    if (
+      !('operationRequestId' in input) ||
+      input.operationRequestId !== this.context.requestId ||
+      !('operationGeneration' in input) ||
+      input.operationGeneration !== this.context.generation ||
+      !('operationToken' in input) ||
+      input.operationToken !== this.token
+    )
+      throw new HttpOwnerFailure();
+    if (this.sessions.size >= HTTP_HANDLE_LIMIT)
+      throw new RuntimeFailure('limit_exceeded', 'Too many open HTTP bodies');
+    const {
+      operationRequestId,
+      operationGeneration,
+      operationToken,
+      ...metadata
+    } = input;
     const parsed = httpRequestMetaSchema.safeParse({
-      ...input,
+      ...metadata,
       requestId: crypto.randomUUID(),
       runtimeGeneration: this.context.generation,
     });
@@ -103,6 +134,7 @@ export class BinaryHttpTransport {
     );
     this.sessions.set(handle, {
       owner: this.context,
+      operationToken: this.token,
       meta: parsed.data,
       chunks: [],
       size: 0,
@@ -310,16 +342,18 @@ export class BinaryHttpTransport {
   }
 
   private get(handle: string): HttpSession {
-    if (this.closed || !this.context) throw cancelledFailure(false);
+    if (this.closed || !this.context || !this.token)
+      throw new HttpOwnerFailure();
     const failure = this.terminalFailures.get(handle);
     if (failure) throw failure;
     const session = this.sessions.get(handle);
     if (
       !session ||
+      session.operationToken !== this.token ||
       session.owner.requestId !== this.context.requestId ||
       session.owner.generation !== this.context.generation
     )
-      throw cancelledFailure(false);
+      throw new HttpOwnerFailure();
     return session;
   }
 }

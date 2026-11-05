@@ -86,7 +86,12 @@ export class SourceRuntimeManager {
   private opening: Promise<RuntimeSession> | undefined;
   private openKey: string | undefined;
   private generation: string | undefined;
+  private identity: string | undefined;
+  private accessSuspension:
+    { generation: string; error: RuntimeFailure } | undefined;
   private controller: AbortController | undefined;
+  private releaseNamespace: (() => void) | undefined;
+  private namespaceReleased: Promise<void> = Promise.resolve();
   private disposed = false;
   private disposing: Promise<void> | undefined;
   private queue: Task[] = [];
@@ -136,9 +141,14 @@ export class SourceRuntimeManager {
     if (key === this.openKey && this.opening) return this.opening;
     if (key === this.openKey && this.session)
       return Promise.resolve(this.session);
-    this.invalidate(
-      new RuntimeFailure('runtime_lost', 'Extension slot was replaced'),
+    const replaced = new RuntimeFailure(
+      'runtime_lost',
+      'Extension slot was replaced',
     );
+    this.invalidate(replaced);
+    if (this.identity !== options.identity) this.images.clear(replaced);
+    this.identity = options.identity;
+    this.accessSuspension = undefined;
     this.openKey = key;
     const generation = crypto.randomUUID();
     this.generation = generation;
@@ -205,6 +215,8 @@ export class SourceRuntimeManager {
       ),
     );
     this.assertGeneration(generation);
+    await this.acquireNamespace(namespace, generation, signal);
+    this.assertGeneration(generation);
     const url = new URL(this.workerUrl);
     url.searchParams.set('plugin', namespace);
     url.searchParams.set('fsNamespace', namespace);
@@ -267,7 +279,8 @@ export class SourceRuntimeManager {
         );
         waiter.reject(error);
         if (error.code === 'access_required' || error.code === 'access_denied')
-          this.invalidate(error);
+          this.suspendAccess(error, generation);
+        else if (error.code === 'runtime_lost') this.invalidate(error);
       } else waiter.resolve(response);
     };
     worker.onerror = () => {
@@ -316,6 +329,55 @@ export class SourceRuntimeManager {
     return this.session;
   }
 
+  private async acquireNamespace(
+    namespace: string,
+    generation: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const locks = globalThis.navigator?.locks;
+    if (!locks)
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'Source storage requires Web Locks',
+      );
+    // A replacement must observe release of its own previous lifetime lock.
+    await this.namespaceReleased;
+    this.assertGeneration(generation);
+    await new Promise<void>((resolve, reject) => {
+      const lifetime = locks.request(
+        `karuyomi:source-writer:${namespace}`,
+        { mode: 'exclusive', ifAvailable: true },
+        (lock) => {
+          if (!lock)
+            throw new RuntimeFailure(
+              'storage_busy',
+              'This extension is already active in another tab or window. Close it before connecting here.',
+            );
+          if (signal.aborted || this.generation !== generation)
+            throw new RuntimeFailure(
+              'runtime_lost',
+              'Runtime startup was cancelled',
+            );
+          return new Promise<void>((release) => {
+            this.releaseNamespace = release;
+            resolve();
+          });
+        },
+      );
+      this.namespaceReleased = lifetime.catch(() => {});
+      void lifetime.catch((error: unknown) => {
+        reject(
+          error instanceof RuntimeFailure
+            ? error
+            : new RuntimeFailure(
+                'unsupported_capability',
+                'Source storage ownership could not be acquired',
+              ),
+        );
+      });
+    });
+  }
+
   private send(
     command: pb.WorkerCommand,
     transfer: Transferable[] = [],
@@ -349,6 +411,8 @@ export class SourceRuntimeManager {
         new RuntimeFailure('protocol_error', 'Invalid Source request'),
       );
     }
+    if (this.accessSuspension?.generation === call.generation)
+      return Promise.reject(this.accessSuspension.error);
     if (!this.session || call.generation !== this.session.generation)
       return Promise.reject(
         new RuntimeFailure(
@@ -562,6 +626,13 @@ export class SourceRuntimeManager {
     return Promise.resolve();
   }
 
+  private suspendAccess(error: RuntimeFailure, generation: string): void {
+    this.accessSuspension = { generation, error };
+    // Published resources belong to the UI until its normal release ACK.
+    this.images.retainPublished(error);
+    this.invalidate(error);
+  }
+
   private invalidate(error: RuntimeFailure): void {
     this.generation = undefined;
     this.session = undefined;
@@ -571,7 +642,9 @@ export class SourceRuntimeManager {
     this.controller = undefined;
     this.worker?.terminate();
     this.worker = undefined;
-    this.images.clear(error);
+    this.releaseNamespace?.();
+    this.releaseNamespace = undefined;
+    this.images.clear(error, true);
     for (const task of this.imageTasks.values()) {
       clearTimeout(task.cancelTimer);
       task.collector.release(error);
@@ -595,6 +668,8 @@ export class SourceRuntimeManager {
     if (!parsed.success)
       throw new RuntimeFailure('protocol_error', 'Invalid image request');
     const request = parsed.data;
+    if (this.accessSuspension?.generation === request.generation)
+      throw this.accessSuspension.error;
     if (this.imageOptions.enabled === false)
       throw new RuntimeFailure(
         'unsupported_capability',
@@ -797,6 +872,7 @@ export class SourceRuntimeManager {
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
+    const generation = this.generation;
     try {
       if (
         options.body &&
@@ -818,6 +894,22 @@ export class SourceRuntimeManager {
         cache: staticJson ? 'no-cache' : 'no-store',
         signal: controller.signal,
       });
+      if (privateApi && generation && this.generation === generation) {
+        const code =
+          response.status === 403
+            ? 'access_denied'
+            : response.type === 'opaqueredirect' ||
+                response.status === 401 ||
+                (response.status >= 300 && response.status < 400) ||
+                response.headers.get('content-type')?.includes('text/html')
+              ? 'access_required'
+              : undefined;
+        if (code)
+          this.suspendAccess(
+            new RuntimeFailure(code, 'Access no longer permits API requests'),
+            generation,
+          );
+      }
       if (
         response.type === 'opaqueredirect' ||
         (response.status >= 300 && response.status < 400)
@@ -897,5 +989,11 @@ export class SourceRuntimeManager {
     this.invalidate(
       new RuntimeFailure('runtime_lost', 'Runtime container was disposed'),
     );
+    this.images.clear(
+      new RuntimeFailure('runtime_lost', 'Runtime container was disposed'),
+    );
+    this.identity = undefined;
+    this.accessSuspension = undefined;
+    await this.namespaceReleased;
   }
 }

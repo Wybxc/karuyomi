@@ -18,43 +18,79 @@ public class TeaHost {
 
   public static void main(String[] args) {}
 
-  @JSExport
-  public static void hostInit(String userAgent) {
-    new Thread(
-            () -> {
-              try {
-                done(new JsonPrimitive(init(userAgent)).toString());
-              } catch (Throwable t) {
-                fail(describe(t));
-              }
-            })
-        .start();
+  @FunctionalInterface
+  private interface HostOperation {
+    String run() throws Throwable;
+  }
+
+  private static void startOperation(
+      String requestId, String generation, String token, HostOperation action, Runnable cleanup) {
+    BrowserCall.Operation owner;
+    try {
+      // Register before TeaVM schedules the host thread with setTimeout.
+      owner = BrowserCall.beginOperation(requestId, generation, token);
+    } catch (Throwable error) {
+      fail(describe(error), true);
+      return;
+    }
+    try {
+      new Thread(
+              () -> {
+                owner.enter();
+                try {
+                  String result = action.run();
+                  owner.drain();
+                  done(result);
+                } catch (Throwable error) {
+                  boolean unfinishedCallbacks = owner.hasPending();
+                  owner.close();
+                  try {
+                    cleanup.run();
+                  } catch (Throwable cleanupError) {
+                    Bridge.trace("Host operation cleanup failed: " + cleanupError);
+                  }
+                  // Cancelling HTTP cannot stop arbitrary plugin callback code.
+                  // Discard this Worker whenever background work did not finish.
+                  fail(describe(error), unfinishedCallbacks);
+                } finally {
+                  owner.close();
+                  owner.leave();
+                }
+              })
+          .start();
+    } catch (Throwable error) {
+      owner.close();
+      fail(describe(error), true);
+    }
   }
 
   @JSExport
-  public static void hostLoad() {
-    new Thread(
-            () -> {
-              try {
-                if (load() >= 0) done(sourceInfo());
-              } catch (Throwable t) {
-                fail(describe(t));
-              }
-            })
-        .start();
+  public static void hostInit(String userAgent, String requestId, String generation, String token) {
+    startOperation(
+        requestId,
+        generation,
+        token,
+        () -> new JsonPrimitive(init(userAgent)).toString(),
+        () -> {});
   }
 
   @JSExport
-  public static void hostSelect(String id) {
-    new Thread(
-            () -> {
-              try {
-                done(new JsonPrimitive(select(id)).toString());
-              } catch (Throwable t) {
-                fail(describe(t));
-              }
-            })
-        .start();
+  public static void hostLoad(String requestId, String generation, String token) {
+    startOperation(
+        requestId,
+        generation,
+        token,
+        () -> {
+          load();
+          return sourceInfo();
+        },
+        () -> {});
+  }
+
+  @JSExport
+  public static void hostSelect(String id, String requestId, String generation, String token) {
+    startOperation(
+        requestId, generation, token, () -> new JsonPrimitive(select(id)).toString(), () -> {});
   }
 
   @JSExport
@@ -107,20 +143,13 @@ public class TeaHost {
   }
 
   public static int load() {
-    try {
-      Object entry = new keiyoushi.source.Generated();
-      sources =
-          entry instanceof SourceFactory
-              ? ((SourceFactory) entry).createSources()
-              : List.of((Source) entry);
-      source = sources.get(0);
-      return sources.size();
-    } catch (Throwable t) {
-      StringBuilder b = new StringBuilder(t.toString());
-      for (StackTraceElement e : t.getStackTrace()) b.append("\n").append(e);
-      fail(b.toString());
-      return -1;
-    }
+    Object entry = new keiyoushi.source.Generated();
+    sources =
+        entry instanceof SourceFactory
+            ? ((SourceFactory) entry).createSources()
+            : List.of((Source) entry);
+    source = sources.get(0);
+    return sources.size();
   }
 
   public static String select(String id) {
@@ -137,143 +166,149 @@ public class TeaHost {
 
   /** Product RPC: explicit references and complete DTOs; no hidden selected manga. */
   @JSExport
-  public static void hostInvoke(String sourceId, String operation, String argsJson) {
-    new Thread(
-            () -> {
-              String createdPageSession = null;
-              try {
-                Source selected =
-                    sources.stream()
-                        .filter(s -> Long.toString(s.getId()).equals(sourceId))
-                        .findFirst()
-                        .orElseThrow(
-                            () -> new IllegalArgumentException("Unknown Source " + sourceId));
-                JsonObject args = JsonParser.parseString(argsJson).getAsJsonObject();
-                Object result =
-                    GreenCoroutines.block(
-                        (scope, continuation) -> {
-                          switch (operation) {
-                            case "popular":
-                              return selected.getPopularManga(HostDto.page(args), continuation);
-                            case "latest":
-                              if (!selected.getSupportsLatest())
-                                throw new UnsupportedOperationException(
-                                    "Source does not support latest");
-                              return selected.getLatestUpdates(HostDto.page(args), continuation);
-                            case "search":
-                              if (args.has("filters") && !args.getAsJsonArray("filters").isEmpty())
-                                throw new UnsupportedOperationException(
-                                    "Typed filter mapping is not implemented");
-                              return selected.getSearchManga(
-                                  HostDto.page(args),
-                                  HostDto.string(args, "query", ""),
-                                  selected.getFilterList(),
-                                  continuation);
-                            case "details":
-                            case "chapters":
-                              return selected.getMangaUpdate(
-                                  HostDto.manga(args.getAsJsonObject("manga")),
-                                  List.of(),
-                                  operation.equals("details"),
-                                  operation.equals("chapters"),
-                                  continuation);
-                            case "pages":
-                              return selected.getPageList(
-                                  HostDto.chapter(args.getAsJsonObject("chapter")), continuation);
-                            default:
-                              throw new UnsupportedOperationException(
-                                  "Unsupported Source operation " + operation);
-                          }
-                        },
-                        kotlinx.coroutines.Dispatchers.getDefault());
-                JsonElement dto;
-                if (result instanceof MangasPage) dto = HostDto.mangasPage((MangasPage) result);
-                else if (result instanceof SMangaUpdate) {
-                  SMangaUpdate update = (SMangaUpdate) result;
-                  if (operation.equals("chapters")) dto = HostDto.chapters(update.getChapters());
-                  else {
-                    SManga stored = HostDto.manga(args.getAsJsonObject("manga"));
-                    mergeManga(stored, update.getManga());
-                    dto = HostDto.manga(stored);
-                  }
-                } else if (operation.equals("pages") && result instanceof List) {
-                  PageSessions.Session session = pageSessions.open(selected, (List<Page>) result);
-                  createdPageSession = session.id;
-                  dto = HostDto.pages(session.id, session.pages);
-                } else throw new IllegalStateException("Unexpected result for " + operation);
-                String json = HostJson.write(dto);
-                if (createdPageSession != null
-                    && json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
-                        > PageSessions.MAX_DTO_BYTES)
-                  throw new IllegalArgumentException("Page metadata exceeds 2 MiB");
-                done(json);
-              } catch (Throwable t) {
-                if (createdPageSession != null) pageSessions.close(createdPageSession);
-                fail(describe(t));
-              }
-            })
-        .start();
+  public static void hostInvoke(
+      String sourceId,
+      String operation,
+      String argsJson,
+      String requestId,
+      String generation,
+      String token) {
+    String[] createdPageSession = new String[1];
+    startOperation(
+        requestId,
+        generation,
+        token,
+        () -> {
+          Source selected =
+              sources.stream()
+                  .filter(s -> Long.toString(s.getId()).equals(sourceId))
+                  .findFirst()
+                  .orElseThrow(() -> new IllegalArgumentException("Unknown Source " + sourceId));
+          JsonObject args = JsonParser.parseString(argsJson).getAsJsonObject();
+          Object result =
+              GreenCoroutines.block(
+                  (scope, continuation) -> {
+                    switch (operation) {
+                      case "popular":
+                        return selected.getPopularManga(HostDto.page(args), continuation);
+                      case "latest":
+                        if (!selected.getSupportsLatest())
+                          throw new UnsupportedOperationException("Source does not support latest");
+                        return selected.getLatestUpdates(HostDto.page(args), continuation);
+                      case "search":
+                        if (args.has("filters") && !args.getAsJsonArray("filters").isEmpty())
+                          throw new UnsupportedOperationException(
+                              "Typed filter mapping is not implemented");
+                        return selected.getSearchManga(
+                            HostDto.page(args),
+                            HostDto.string(args, "query", ""),
+                            selected.getFilterList(),
+                            continuation);
+                      case "details":
+                      case "chapters":
+                        return selected.getMangaUpdate(
+                            HostDto.manga(args.getAsJsonObject("manga")),
+                            List.of(),
+                            operation.equals("details"),
+                            operation.equals("chapters"),
+                            continuation);
+                      case "pages":
+                        return selected.getPageList(
+                            HostDto.chapter(args.getAsJsonObject("chapter")), continuation);
+                      default:
+                        throw new UnsupportedOperationException(
+                            "Unsupported Source operation " + operation);
+                    }
+                  },
+                  kotlinx.coroutines.Dispatchers.getDefault());
+          JsonElement dto;
+          if (result instanceof MangasPage) dto = HostDto.mangasPage((MangasPage) result);
+          else if (result instanceof SMangaUpdate) {
+            SMangaUpdate update = (SMangaUpdate) result;
+            if (operation.equals("chapters")) dto = HostDto.chapters(update.getChapters());
+            else {
+              SManga stored = HostDto.manga(args.getAsJsonObject("manga"));
+              mergeManga(stored, update.getManga());
+              dto = HostDto.manga(stored);
+            }
+          } else if (operation.equals("pages") && result instanceof List) {
+            PageSessions.Session session = pageSessions.open(selected, (List<Page>) result);
+            createdPageSession[0] = session.id;
+            dto = HostDto.pages(session.id, session.pages);
+          } else throw new IllegalStateException("Unexpected result for " + operation);
+          String json = HostJson.write(dto);
+          if (createdPageSession[0] != null
+              && json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+                  > PageSessions.MAX_DTO_BYTES)
+            throw new IllegalArgumentException("Page metadata exceeds 2 MiB");
+          return json;
+        },
+        () -> {
+          if (createdPageSession[0] != null) pageSessions.close(createdPageSession[0]);
+        });
   }
 
   @JSExport
-  public static void hostAcquireImage(String sourceId, String pageSessionId, String pageKey) {
-    new Thread(
-            () -> {
-              try {
-                Source selected =
-                    sources.stream()
-                        .filter(s -> Long.toString(s.getId()).equals(sourceId))
-                        .findFirst()
-                        .orElseThrow(
-                            () -> new IllegalArgumentException("Unknown Source " + sourceId));
-                if (!(selected instanceof eu.kanade.tachiyomi.source.online.HttpSource))
-                  throw new UnsupportedOperationException(
-                      "Image acquisition requires an HttpSource");
-                try (PageSessions.Lease lease =
-                    pageSessions.acquire(selected, sourceId, pageSessionId, pageKey)) {
-                  String resource =
-                      SourceImages.acquire(
-                          (eu.kanade.tachiyomi.source.online.HttpSource) selected,
-                          lease.page(),
-                          new SourceImages.Sink() {
-                            public String open() throws java.io.IOException {
-                              return Bridge.imageOpen();
-                            }
+  public static void hostAcquireImage(
+      String sourceId,
+      String pageSessionId,
+      String pageKey,
+      String requestId,
+      String generation,
+      String token) {
+    startOperation(
+        requestId,
+        generation,
+        token,
+        () -> {
+          Source selected =
+              sources.stream()
+                  .filter(s -> Long.toString(s.getId()).equals(sourceId))
+                  .findFirst()
+                  .orElseThrow(() -> new IllegalArgumentException("Unknown Source " + sourceId));
+          if (!(selected instanceof eu.kanade.tachiyomi.source.online.HttpSource))
+            throw new UnsupportedOperationException("Image acquisition requires an HttpSource");
+          try (PageSessions.Lease lease =
+              pageSessions.acquire(selected, sourceId, pageSessionId, pageKey)) {
+            String resource =
+                SourceImages.acquire(
+                    (eu.kanade.tachiyomi.source.online.HttpSource) selected,
+                    lease.page(),
+                    new SourceImages.Sink() {
+                      public String open() throws java.io.IOException {
+                        return Bridge.imageOpen();
+                      }
 
-                            public void write(String handle, byte[] bytes)
-                                throws java.io.IOException {
-                              Bridge.imageWrite(handle, bytes);
-                            }
+                      public void write(String handle, byte[] bytes) throws java.io.IOException {
+                        Bridge.imageWrite(handle, bytes);
+                      }
 
-                            public String close(String handle) throws java.io.IOException {
-                              return Bridge.imageClose(handle);
-                            }
+                      public String close(String handle) throws java.io.IOException {
+                        return Bridge.imageClose(handle);
+                      }
 
-                            public void cancel(String handle) throws java.io.IOException {
-                              Bridge.imageCancel(handle);
-                            }
-                          });
-                  done(resource);
-                }
-              } catch (Throwable error) {
-                fail(describe(error));
-              }
-            })
-        .start();
+                      public void cancel(String handle) throws java.io.IOException {
+                        Bridge.imageCancel(handle);
+                      }
+                    });
+            return resource;
+          }
+        },
+        () -> {});
   }
 
   @JSExport
-  public static void hostClosePageSession(String pageSessionId) {
-    new Thread(
-            () -> {
-              try {
-                pageSessions.close(pageSessionId);
-                done("{\"closed\":true}");
-              } catch (Throwable error) {
-                fail(describe(error));
-              }
-            })
-        .start();
+  public static void hostClosePageSession(
+      String pageSessionId, String requestId, String generation, String token) {
+    startOperation(
+        requestId,
+        generation,
+        token,
+        () -> {
+          pageSessions.close(pageSessionId);
+          return "{\"closed\":true}";
+        },
+        () -> {});
   }
 
   static void mergeManga(SManga stored, SManga update) {
@@ -326,6 +361,8 @@ public class TeaHost {
   @JSBody(params = "value", script = "self.teaDone(value);")
   static native void done(String value);
 
-  @JSBody(params = "error", script = "self.teaFail(error);")
-  static native void fail(String error);
+  @JSBody(
+      params = {"error", "discardRuntime"},
+      script = "self.teaFail(error,discardRuntime);")
+  static native void fail(String error, boolean discardRuntime);
 }

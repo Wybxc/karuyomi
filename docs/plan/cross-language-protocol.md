@@ -4,7 +4,7 @@
 
 消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，v3 Web、双端 Native 机制与原 xkcd Reader 分项通过，生产部署及剩余运行门待验收。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
 
-正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v3，原型不兼容旧材料。
+正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v4，原型不兼容旧材料。v4 增加 host entry/HTTP owner 约束，IDL 新增 `storage_busy` 明确表示 namespace 执行槽占用；历史 v3 运行证据不自动覆盖 v4。
 
 ## 已完成
 
