@@ -6,12 +6,18 @@ import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { zipSync } from 'fflate';
 import { getStreamAsBuffer } from 'get-stream';
 import isPlainObject from 'is-plain-obj';
+import sirv from 'sirv';
 import {
   hostAbi,
+  protocolVersion,
+  runtimeBaseline,
+  buildManifestSchema,
+  type BuildManifest,
   HTTP_BRIDGE_MEDIA_TYPE,
   HttpFrameReader,
   httpRequestMetaSchema,
@@ -106,6 +112,85 @@ async function compile(): Promise<void> {
   const bridges = await Promise.all(
     ['crypto', 'cache', 'file'].map(compileBridge),
   );
+  const hostScripts: BuildManifest['hostScripts'] = [];
+  await mkdir(path.join(WORK, 'public/runtime/materials'), { recursive: true });
+  for (const bytes of bridges) {
+    const hash = sha256(bytes);
+    await writeFile(path.join(WORK, 'public/runtime/materials', hash), bytes);
+    hostScripts.push({
+      path: '/runtime/materials/' + hash,
+      sha256: hash,
+      size: bytes.length,
+      contentType: 'application/javascript',
+    });
+  }
+  const encoded = gzipSync(compiled);
+  const bundleSha256 = sha256(compiled);
+  await mkdir(path.join(WORK, 'public/extensions/artifacts'), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(WORK, 'public/extensions/artifacts', bundleSha256 + '.gz'),
+    encoded,
+  );
+  const manifest = buildManifestSchema.parse({
+    protocolVersion,
+    hostAbi,
+    runtimeBaseline,
+    bridgeVersion: 2,
+    buildId: 'enqueue-manager',
+    repoId: 'controlled-enqueue',
+    packageName: 'controlled.enqueue.fixture',
+    version: '1',
+    storageSchema: '1',
+    sourceIds: ['1'],
+    bundle: {
+      path: '/extensions/artifacts/' + bundleSha256 + '.gz',
+      sha256: bundleSha256,
+      size: compiled.length,
+      contentType: 'application/javascript',
+      encoding: 'gzip',
+      encodedSha256: sha256(encoded),
+      encodedSize: encoded.length,
+    },
+    hostScripts,
+    resources: [],
+  });
+  await mkdir(path.join(WORK, 'public/extensions/builds/enqueue-manager'), {
+    recursive: true,
+  });
+  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  await writeFile(
+    path.join(WORK, 'public/extensions/builds/enqueue-manager/manifest.json'),
+    manifestBytes,
+  );
+  const scripts: Record<string, string> = {};
+  for (const [name, entry, format] of [
+    [
+      'manager-worker',
+      'packages/runtime-host/test/enqueue-java-manager-browser-worker.ts',
+      'iife',
+    ],
+    [
+      'manager-suite',
+      'packages/runtime-host/test/enqueue-java-manager-browser-suite.ts',
+      'esm',
+    ],
+  ] as const) {
+    const output = await build({
+      absWorkingDir: ROOT,
+      entryPoints: [entry],
+      bundle: true,
+      format,
+      platform: 'browser',
+      target: 'es2022',
+      write: false,
+    });
+    assert.equal(output.outputFiles.length, 1);
+    const bytes = output.outputFiles[0]!.contents;
+    await writeFile(path.join(WORK, 'public', name + '.js'), bytes);
+    scripts[name] = sha256(bytes);
+  }
   const driver = await build({
     absWorkingDir: ROOT,
     entryPoints: ['packages/runtime-host/test/enqueue-java-browser-worker.ts'],
@@ -136,9 +221,13 @@ async function compile(): Promise<void> {
         javaBundleBytes: compiled.length,
         fixtureSha256: sha256(fixture),
         workerSha256: sha256(worker),
+        managerScripts: scripts,
+        managerManifestSha256: sha256(manifestBytes),
+        managerBundleEncodedSha256: sha256(encoded),
+        hostScripts: hostScripts.map((value) => value.sha256),
         teavm: result.teavm,
         scope:
-          'Actual TeaVM TeaHost and BrowserCall, controlled Source and HTTP-v2 frames; no workerd, production Access, official Source or Native gate',
+          'Actual TeaVM TeaHost/BrowserCall and product manager/WorkerRuntime/TeaVMDriver/loader, controlled Source and HTTP-v2 frames; no workerd, production Access, official Source or Native gate',
       },
       null,
       2,
@@ -167,6 +256,41 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
     isPlainObject(identity) && identity.workerSha256 === sha256(worker),
     'Prepared Worker identity mismatch',
   );
+  assert(
+    isPlainObject(identity.managerScripts),
+    'Missing prepared manager script identities',
+  );
+  for (const name of ['manager-worker', 'manager-suite'])
+    assert.equal(
+      sha256(await readFile(path.join(WORK, 'public', name + '.js'))),
+      identity.managerScripts[name],
+      'Prepared manager script identity mismatch',
+    );
+  const manifestBytes = await readFile(
+    path.join(WORK, 'public/extensions/builds/enqueue-manager/manifest.json'),
+  );
+  assert.equal(
+    sha256(manifestBytes),
+    identity.managerManifestSha256,
+    'Prepared manifest identity mismatch',
+  );
+  const manifest = buildManifestSchema.parse(
+    JSON.parse(manifestBytes.toString()),
+  );
+  const encodedBundle = await readFile(
+    path.join(WORK, 'public', manifest.bundle.path),
+  );
+  assert.equal(
+    sha256(encodedBundle),
+    identity.managerBundleEncodedSha256,
+    'Prepared manager bundle identity mismatch',
+  );
+  for (const artifact of manifest.hostScripts)
+    assert.equal(
+      sha256(await readFile(path.join(WORK, 'public', artifact.path))),
+      artifact.sha256,
+      'Prepared manager bridge identity mismatch',
+    );
   await writeFile(
     reportPath,
     JSON.stringify(
@@ -190,6 +314,16 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
     resolveResult = resolve;
     rejectResult = reject;
   });
+  const staticFiles = sirv(path.join(WORK, 'public'), {
+    dev: true,
+    setHeaders(response, pathname) {
+      response.setHeader('Cache-Control', 'no-store');
+      if (pathname.includes('/runtime/materials/'))
+        response.setHeader('Content-Type', 'application/javascript');
+      if (pathname.endsWith('.gz'))
+        response.setHeader('Content-Type', 'application/gzip');
+    },
+  });
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? '/', 'http://127.0.0.1');
@@ -197,6 +331,22 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
       if (url.pathname === '/worker.js' && request.method === 'GET') {
         response.setHeader('Content-Type', 'text/javascript');
         response.end(worker);
+      } else if (
+        url.pathname === manifest.bundle.path &&
+        request.method === 'GET'
+      ) {
+        // The gzip artifact is opaque transport bytes, not HTTP content encoding.
+        response.writeHead(200, {
+          'Content-Type': 'application/gzip',
+          'Content-Length': encodedBundle.length,
+        });
+        response.end(encodedBundle);
+      } else if (
+        url.pathname === '/network-state' &&
+        request.method === 'GET'
+      ) {
+        response.setHeader('Content-Type', 'application/json');
+        response.end(JSON.stringify({ network }));
       } else if (url.pathname === '/event' && request.method === 'POST') {
         const event = (
           await getStreamAsBuffer(request, { maxBuffer: 1024 })
@@ -218,7 +368,11 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
         const target = new URL(meta.url);
         assert.equal(target.origin, 'https://fixture.example.org');
         assert.equal(meta.method, 'POST');
-        assert.equal(meta.runtimeGeneration, 'same-generation');
+        if (target.pathname === '/drain-timeout') {
+          assert.match(meta.runtimeGeneration, /^[a-f0-9-]{36}$/);
+          assert.equal(request.headers['x-runtime-build'], 'enqueue-manager');
+          assert.equal(meta.timeoutMs, 90000);
+        } else assert.equal(meta.runtimeGeneration, 'same-generation');
         while ((await reader.read(65536)) !== null) {
           /* Validate complete framed upload. */
         }
@@ -254,7 +408,11 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
             decoded: true,
           }),
         );
-        if (target.pathname === '/cancel') return; // Hold body until the actual Call cancels its fetch.
+        if (
+          target.pathname === '/cancel' ||
+          target.pathname === '/drain-timeout'
+        )
+          return;
         const finish = () => {
           if (response.destroyed) return;
           response.write(encodeDataFrame(encoded));
@@ -273,11 +431,10 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
       } else if (url.pathname === '/' && request.method === 'GET') {
         response.setHeader('Content-Type', 'text/html; charset=utf-8');
         response.end(
-          `<!doctype html><meta charset="utf-8"><title>Actual TeaVM enqueue gate</title><h1>Actual TeaVM enqueue gate</h1><p>Real TeaHost and BinaryHttpTransport. Controlled Source and HTTP-v2 endpoint; no production Access, official Source or Native claim.</p><pre>Running…</pre><script>const worker=new Worker('/worker.js');let reported=false;async function finish(report){if(reported)return;reported=true;report.userAgent=navigator.userAgent;document.querySelector('pre').textContent=JSON.stringify(report,null,2);try{await fetch('/result',{method:'POST',body:JSON.stringify(report)});}finally{worker.terminate();}}worker.onmessage=event=>{if(event.data.type==='enqueue-result')void finish(event.data);};worker.onerror=event=>void finish({passed:false,error:event.message,filename:event.filename,line:event.lineno,column:event.colno});</script>`,
+          `<!doctype html><meta charset="utf-8"><title>Actual TeaVM enqueue gate</title><h1>Actual TeaVM enqueue gate</h1><p>Real TeaHost, product manager/Worker/driver and HTTP-v2. Controlled Source and endpoint; no production Access, official Source or Native claim. The unchanged Java drain takes 30 seconds.</p><pre>Running basic owner cases…</pre><script type="module">import {runEnqueueManagerSuite} from '/manager-suite.js';const worker=new Worker('/worker.js');let reported=false;async function finish(basic){if(reported)return;reported=true;worker.terminate();let manager;try{if(basic.passed){document.querySelector('pre').textContent='Running pending limit and real 30-second fatal drain…';manager=await runEnqueueManagerSuite();}}catch(error){manager={passed:false,error:String(error),cleanupPassed:false};}const report={...basic,manager,passed:basic.passed===true&&manager?.passed===true,userAgent:navigator.userAgent};document.querySelector('pre').textContent=JSON.stringify(report,null,2);await fetch('/result',{method:'POST',body:JSON.stringify(report)});}worker.onmessage=event=>{if(event.data.type==='enqueue-result')void finish(event.data);};worker.onerror=event=>void finish({passed:false,error:event.message,filename:event.filename,line:event.lineno,column:event.colno});</script>`,
         );
       } else {
-        response.writeHead(404);
-        response.end();
+        staticFiles(request, response);
       }
     } catch (error) {
       if (!response.headersSent) response.writeHead(500);
@@ -314,6 +471,7 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
       '/next',
       '/deferred-foreground',
       '/deferred-background',
+      '/drain-timeout',
     ];
     const networkVerified =
       network.length === expected.length &&
@@ -322,6 +480,10 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
       ) &&
       network.every((event) => event.method === 'POST') &&
       network.find((event) => event.path === '/cancel')?.closed === true &&
+      network.find((event) => event.path === '/drain-timeout')?.closed ===
+        true &&
+      network.find((event) => event.path === '/drain-timeout')?.completed ===
+        false &&
       lateReleased;
     const passed =
       browser.passed === true &&
@@ -330,6 +492,10 @@ async function serve(port: number, timeoutMs: number): Promise<void> {
       isPlainObject(browser.http) &&
       browser.http.open === 0 &&
       browser.entries === 9 &&
+      isPlainObject(browser.manager) &&
+      browser.manager.passed === true &&
+      browser.manager.cleanupPassed === true &&
+      browser.manager.upstreamClosedBeforeServiceCleanup === true &&
       networkVerified;
     const report = { ...browser, passed, networkVerified, network, identity };
     await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n');

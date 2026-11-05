@@ -11,6 +11,8 @@
     "bitmap-lifetime-java-browser-suite.ts",
     "cache-failure-java-browser-worker.ts",
     "enqueue-java-browser-worker.ts",
+    "enqueue-java-manager-browser-worker.ts",
+    "enqueue-java-manager-browser-suite.ts",
     "storage-namespace-browser-suite.ts",
     "fixtures/storage-namespace-host.ts"
   ]

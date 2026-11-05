@@ -21,6 +21,10 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 功能行为、集中工程回归和新 ABI 的交付限制见[功能收尾记录](../verification/p0-feature-completion.md)。随后固定 `1f599cd` 已重编三个 v4 官方扩展，并通过 Web 元数据/原处理图片、xkcd 正式阅读及跨标签占用/释放分项，见[v4 运行记录](../verification/v4-source-runtime.md)；实际 TeaVM 的 owner/嵌套 enqueue/取消分项见[回调记录](../verification/teavm-enqueue.md)。固定 `13494a0` 的正式客户端/API 与这三包已部署，匿名静态交付及远端网络政策核对通过，见[生产记录](../verification/v4-production.md)。生产 Access 会话已失效，用户选择稍后登录；正向动态请求与恢复仍待验收。历史三源证据仍按原提交保留。
 
+当前 v4 正式 `lib/main.dart` 的 iOS Simulator App 与 Android arm64 调试 APK 已构建并核对实际包内材料、SQLite 映射和导出，见[Native 成品记录](../verification/v4-native-main.md)。CUA 仍无法连接 Simulator，App 未安装/启动；这项构建不改变 Native 正式主入口、生产 Access、真机和性能的待验收状态。
+
+真实 TeaVM 的后续组合门已通过 64/65 pending callback 上限、约 30.05 秒 fatal drain、正式 manager 回收/排队拒绝/连接关闭及同 namespace 新 Worker 恢复，详见[回调组合记录](../verification/teavm-enqueue.md#实际-callback-上限fatal-drain-与-manager-回收)。产品常量未缩短，不能将受控 Source 成功推广为生产 Access 或 Native 通过。
+
 ## 已完成与边界
 
 | 分项           | 已有实现或证据                                                                                                                                                                     | 尚不能据此认定的能力                                                                                                 |

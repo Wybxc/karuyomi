@@ -37,6 +37,10 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 随后固定 `13494a0` 的正式客户端/API 与这三包已部署，Worker version 为 `9a95d6e6-7578-4781-99aa-3d8bdae6b467`，snapshot revision 为 `702cc6bfb2974682bf1c83325458535a`。26 个匿名路径、三包完整性和旧资产 404 均通过，远端三包显式网络政策已核对，正式 checkpoint 已确认。完整身份与范围见[v4 生产记录](verification/v4-production.md)。当前 Access 会话失效，用户选择稍后登录；正向生产 bootstrap、Source 请求及阅读恢复待验收。`bootstrap.complete=false`，定时增量 CI 继续停用。
 
+当前 v4 的正式 `lib/main.dart` 已重新构建为 iOS Simulator App 和 Android arm64 调试 APK，双端实际包内 manifest/host/worker 与当前材料逐字节一致，SQLite 映射和导出通过，见[Native 构建记录](verification/v4-native-main.md)。iOS 首次官方库下载失败保留，使用经固定摘要校验的标准缓存后成功；未修改第三方 hook。CUA 仍无法连接 Simulator，App 未安装/启动，不能认定当前 Native UI、Source、Access 或真机通过。
+
+实际 TeaVM 回调门随后补齐产品 manager/Worker/driver 组合：64/65 pending 上限、真实约 30.05 秒 fatal drain、未发送的排队任务拒绝、上游连接关闭、namespace 释放及同 namespace 新 Worker/代次恢复均通过，见[组合记录](verification/teavm-enqueue.md#实际-callback-上限fatal-drain-与-manager-回收)。这是受控 Source/HTTP 端点，不代替官方 Source、生产 Access 或 Native。
+
 此前控制身份为 host ABI `karuyomi-source-host-v3` / protocolVersion 2，HTTP bridgeVersion 仍为 2。浏览器探针入口已迁至单一 control 和正式生成 codec。固定 `6e08ec9` 后，原版 Arknights Comics 已重新 AOT，并在 Codex 内置浏览器通过初始化、真实 Source 元数据和首中末图片门，见 [v3 运行证据](verification/protocol-v3-runtime.md)。该历史记录不证明 v3 的生产部署或剩余运行门，当前直接维护 v4。生产 Access 正向 bootstrap 的历史证据见下文。下文 v2 图片和 v1 部署证据仍保持原身份；冻结 `022d828` 全量未改动，不能把其产物装配进当前客户端。
 
 同日将正则供体类命名从补丁移入构建生成步骤，使用 `java-parser` token 位置保留原排版与字面量，再应用行为补丁；全部 13 份生成 Java 与拆分前逐字节一致，原输出摘要未改。回归覆盖刻意保留的上游类型转换、Lexer 引用与继承关系、字符串/文本块和注释不误改，以及源码/上下文/结果漂移拒绝。`toolchain/license.txt` 同时改名为 `android-sdk-license`，仅更新锁中的路径，41 字节内容与摘要不变。

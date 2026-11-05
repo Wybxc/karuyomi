@@ -35,6 +35,29 @@ node tools/teavm/check-enqueue.ts --serve-only --timeout-ms 180000
 
 在 Codex 内置浏览器打开输出的 loopback URL，页面自动执行并 POST 小报告；Node 写入 ignored `.local/v4-enqueue/browser-report.json` 后清理连接并退出，不需要下载文件。必须同时核对退出码、报告 `passed/networkVerified` 和 identity；`--serve-only` 不证明维护源码在构建后未变化，源码变化须重新 build。runner/driver 分别纳入 tools/bridges 严格类型检查与依赖检查，实际浏览器门保持手动执行。
 
-本次不可变通过报告保留为 `.local/v4-enqueue/browser-report-passed.json`，构建与检查日志同目录；不将机器输出提交源码。实际服务已退出、无监听或本次编译进程。30 秒 fatal drain 超时、并发上限、manager 回收的实际浏览器组合仍未在本门覆盖；已有 JVM/TS 回归不能代替这些实际运行门。
+该次不可变通过报告保留为 `.local/v4-enqueue/browser-report-passed.json`，构建与检查日志同目录；不将机器输出提交源码。实际服务已退出、无监听或本次编译进程。该次未覆盖 30 秒 fatal drain 超时、并发上限与 manager 回收组合；后续实际组合验收见下节，不能从原 JVM/TS 回归推导。
 
 验收后修正了夹具报告自身的失败路径：参数解析、构建和身份校验前复位为未通过，错误写入 `cliError`；页面无论报告 POST 成功与否均终止 Worker。随后注入非法参数与错误 Worker 摘要，两次 CLI 均退出 1、报告 `passed=false`，未残留旧通过结果；恢复原 identity 后确认实际 Worker 字节未变。负向报告也留在 ignored 目录，因此读取本次浏览器证据时应使用上述单独保存的通过报告，不能把最后一次负向命令的报告当作浏览器结果。报告 POST 失败的浏览器分支未做故障注入。
+
+## 实际 callback 上限、fatal drain 与 manager 回收
+
+2026-11-05，在同一产品运行时上扩展正式验收入口，共用一次新 fixture AOT。新增 browser suite 经真实 `SourceRuntimeManager → WorkerRuntime → TeaVMDriver → TeaHost/BrowserCall` 执行，不再只从 JS 直接调用 Java entry。产品源码、64 pending 上限和真实 30 秒 drain 常量未改；manager 调用预算显式设为 60 秒，受控 HTTP 期限为 90 秒，避免其他超时抢先触发。tools/bridges 严格类型检查、依赖检查及最终格式化后的 AOT 构建通过。
+
+最终身份为：
+
+- Java fixture SHA-256：`a2f3f97e2bac0a0cf6a3f2d93dad6a51e9f9e0e5281d07782f10a9e46b436e05`。
+- Java bundle：1939497 B，SHA-256 `3ee5e795947b66431d6f495e4e6a9e801f97ada12914670ce911b628174313af`。
+- manager suite SHA-256：`5af9bd5162f91f493a37b5a607e74b6ab179c9422d176691e016bbc664614626`；Worker 入口为 `enqueue-java-manager-browser-worker.ts`，原样导入产品 Worker，仅增加 fixture 事件观测。
+
+Codex 内置 Chromium 156 的浏览器报告、Node 网络后处理和 runner 退出码均通过。原九个 entry/36 项 owner 检查继续通过，新增 manager 的 16 项检查覆盖：
+
+1. 真实 application interceptor 生成受控 Response，64 个 enqueue 回调在协作 barrier 等待；第 65 次注册同步抛出既定上限错误，该回调从未启动。64 个回调各进入和完成一次，主 RPC 正常返回，下一 RPC 成功，Worker 保持存活。这验证 pending callback 上限，不打开 64 个 HTTP handle，也不混淆 transport 的独立四槽限制。
+2. Source 返回后，一个真实回调等待只发 META、不发 DATA/END 的 HTTP 正文。Java drain 约 30050.9 ms 后产生包含 `Background HTTP callbacks exceeded drain deadline` 的 fatal `runtime_lost`，由产品 Worker 发出生成协议的错误响应，未先触发 manager 的 60 秒 timeout。
+3. manager 对旧真实 Worker 恰好调用一次 terminate；排队 RPC 同样失败，命令从未发给 Worker。等待期间第二 manager 得到 `storage_busy`，fatal 后 namespace 实际释放；上游连接在报告与服务清理之前关闭，正文保持未完成。
+4. 新 manager 取得相同 namespace，Worker 实例和 generation 均更新。旧 manager 拒绝调用；新 manager 也拒绝旧 generation，且没有向新 Worker 发送该请求。当前 generation 的真实 Java RPC 成功，最终两个 Worker 各终止一次、manager dispose 全部完成。
+
+Node 另核对九个预期网络路径各只有一次 POST，其中原取消正文及新增 drain 正文连接均已关闭，新增正文没有成功 END；`networkVerified=true`、`cleanupPassed=true`、`upstreamClosedBeforeServiceCleanup=true`。观测包装器只记录后原样转发真实 Worker 消息，未模拟 driver、协议响应或终止结果；页面最终关闭不作为 manager 回收证据。
+
+首次组合运行因夹具使用 sirv 直接交付 `.gz`，被自动添加 HTTP Content-Encoding，产品加载器正确拒绝，未进入 manager 业务场景。正式工具现参照既有存储验收入口，对该已验证的 gzip 路径单独返回原始字节与 `application/gzip`，其他资源继续使用 sirv。失败报告 `browser-report-manager-initial-failed.json` 保留，不改写为 Source 或产品故障。修正后重新加载页面才取得上述完整通过。
+
+不可变最终报告为 ignored `.local/v4-enqueue/browser-report-manager-passed.json`，另保留 `manager-passed.png`、`build-manager-final.log` 与 `serve-manager-retry.log`；旧通过报告不覆盖。复验仍使用前文 build-only/serve-only 命令，页面自动上报，不需浏览器下载报告。该门仍为受控 Source 和本地 HTTP-v2 端点，不包含 workerd、真实上游、生产 Access、官方 Source 或 Native；不能据此提升扩展兼容标记或认定 P0 完成。

@@ -2,6 +2,8 @@
 
 2026-11-04，对固定 `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 的 Native 成品和本地 HTTPS 服务做独立预验。**正式 App UI 未运行，验收未通过**；本记录不替代既有受控 ReaderScreen 或 Source Cache 分项，也不代表生产 Access。
 
+2026-11-05，当前 v4 正式入口的双端构建与包内材料核对另见[新记录](v4-native-main.md)。它未运行 UI，也未复用本记录的旧证书或成品；下文保留 be5 当时的输入与限制。
+
 ## 固定输入与已验证范围
 
 构建入口是正式 `lib/main.dart`，AppID 为 `dev.karuyomi.karuyomi.nativemainbe5`，部署 origin 固定为 `https://localhost:9461`。未注入 runtime 或客户端身份。62 份 tracked Dart 的 Git blob、磁盘内容和输入摘要逐项一致；Runner.app 中的 manifest、host、worker 字节匹配共享材料 `63a061a11e24d1bd9a27bbe453960768035229afe3665be96d3302182d887a9d`。
