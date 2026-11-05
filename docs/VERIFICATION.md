@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-05，收藏与阅读进度已接入生成业务协议、Worker API 和 D1 权威状态，本地业务 SQLite 与对应 Web 资产已移除。真实 workerd/D1 的并发、幂等、身份、分页及原子失败测试见[服务端状态记录](verification/server-state.md)；本轮全格式、通用检查与 Flutter 三项目静态分析/测试通过（21/42/208 项）。Codex 内置浏览器已通过真实 xkcd 的独立会话收藏→阅读保存→重启续读，见[实际 Web 记录](verification/server-state.md#真实-web-独立会话闭环)；随后正式 iOS `app.main()` 与 Web 通过测试身份下的双向非默认页续读、真实图片及回看最远进度保持，三次官方集成测试通过，见[Web↔iOS 记录](verification/native-server-state.md)。客户端与业务 API 已[部署生产并通过匿名检查](verification/server-state-production.md)；Android 配对、生产 Access 正向与真机仍待完成，历史本地数据库恢复不代表当前同步完成。
+2026-11-05，收藏与阅读进度已接入生成业务协议、Worker API 和 D1 权威状态，本地业务 SQLite 与对应 Web 资产已移除。真实 workerd/D1 的并发、幂等、身份、分页及原子失败测试见[服务端状态记录](verification/server-state.md)；本轮全格式、通用检查与 Flutter 三项目静态分析/测试通过（21/42/208 项）。Codex 内置浏览器已通过真实 xkcd 的独立会话收藏→阅读保存→重启续读，见[实际 Web 记录](verification/server-state.md#真实-web-独立会话闭环)；随后正式 iOS `app.main()` 与 Web 通过测试身份下的双向非默认页续读、真实图片及回看最远进度保持，三次官方集成测试通过，见[Web↔iOS 记录](verification/native-server-state.md)。随后正式 Android 入口补齐 Web↔Android、iOS↔Android 双向非默认页续读，六次 Native 官方集成测试各 1/1 通过，新 Web 实际显示 Android 已确认的第 2 页真实文字图，见[Android 配对记录](verification/android-server-state.md)。客户端与业务 API 已[部署生产并通过匿名检查](verification/server-state-production.md)；实际并发/前台重取、生产 Access 正向与真机仍待完成，历史本地数据库恢复不代表当前同步完成。
 
 2026-11-03，本地 macOS。Flutter 3.47.5 / Dart 3.13.4、pnpm 12.6.0；仓库固定 Node 24.15.0，本轮也使用 Node 26.5.0 执行检查。TeaVM 固定 0.16.0 JS backend，验证 JDK 为 Oracle GraalVM 25.0.4、Maven 3.9.11。下表区分代码/分项测试、独立机制探针与尚未完成的产品验收，不以测试总数作为能力证明。
 
@@ -45,7 +45,7 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 P1 本地收藏书架随后接入正式 `main.dart`，支持详情收藏、搜索/排序、按当前索引重开原 Source 和继续阅读；真实 SQLite 文件关闭重开、已有进度增表保留、身份隔离及写入失败恢复通过，见[本地书架分项](verification/p1-local-library.md)。该实现只在当前设备保存，D1 云端状态与 outbox 未实现；组件 Source DTO/viewport 夹具不代替浏览器、Native UI 或生产验收。
 
-2026-11-05，用户将多端同步提升为首要设计目标，Worker API + D1 为唯一业务权威，见[调整后的主线](plan/p2-sync.md)。上述本地书架/进度证据按原实现保留，其业务持久化入口待替换；本次计划调整没有实现 D1 业务表、同步 API 或跨端恢复，不能据此提升验收状态。
+2026-11-05，用户将多端同步提升为首要设计目标，Worker API + D1 为唯一业务权威，见[调整后的主线](plan/p2-sync.md)。上述本地书架/进度证据按原实现保留。该次计划调整本身没有实现 D1 业务表、同步 API 或跨端恢复；随后实现及当前实际三端证据见本文开头，不以历史本地恢复或计划声明提升验收状态。
 
 此前控制身份为 host ABI `karuyomi-source-host-v3` / protocolVersion 2，HTTP bridgeVersion 仍为 2。浏览器探针入口已迁至单一 control 和正式生成 codec。固定 `6e08ec9` 后，原版 Arknights Comics 已重新 AOT，并在 Codex 内置浏览器通过初始化、真实 Source 元数据和首中末图片门，见 [v3 运行证据](verification/protocol-v3-runtime.md)。该历史记录不证明 v3 的生产部署或剩余运行门，当前直接维护 v4。生产 Access 正向 bootstrap 的历史证据见下文。下文 v2 图片和 v1 部署证据仍保持原身份；冻结 `022d828` 全量未改动，不能把其产物装配进当前客户端。
 

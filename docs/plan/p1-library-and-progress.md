@@ -4,7 +4,7 @@
 
 在 P0 真实阅读链路上完成可多端日用的书架、详情、阅读设置、进度与错误恢复。**多端同步是首要设计目标**：书架、分类、进度、书签和非敏感设置通过 Worker API 读写，以 D1 为唯一权威来源。P1 与前移的 [P2](p2-sync.md) 共同交付，先证明两个客户端共享收藏和继续阅读，再完善全部外围 UI。
 
-状态：**进行中，收藏与进度已切换到 Worker API + D1，测试身份下 Web↔iOS 基础闭环已通过**，见[跨端证据](../verification/native-server-state.md)。本地业务 SQLite、持久化依赖和数据库 Web 资产已移除；书架/进度共享服务端 revision 与确认路径。Android 配对、生产 Access、分类、书签、同步设置及完整日用流程仍待实施或验收，不能认定完整 P1 通过。
+状态：**进行中，收藏与进度已切换到 Worker API + D1，测试身份下 Web↔iOS、Web↔Android、iOS↔Android 的基础书架读回与双向非默认页续读已通过**，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。本地业务 SQLite、持久化依赖和数据库 Web 资产已移除；书架/进度共享服务端 revision 与确认路径。实际并发/前台重取、生产 Access、真机、分类、书签、同步设置及完整日用流程仍待实施或验收，不能认定完整 P1 通过。
 
 ## 已有基础与可复用证据
 

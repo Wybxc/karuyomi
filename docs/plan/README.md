@@ -4,25 +4,34 @@
 
 **首要设计目标是多端同步。** [P2](p2-sync.md) 提升为当前主线，与 [P1](p1-library-and-progress.md) 的数据模型、API 和客户端读写一起推进；阶段编号保留，不代表同步必须等完整本地书架之后才开始。Worker API + D1 为唯一业务权威，先打通同身份跨 Web/iOS/Android 的在线保存与恢复，再扩展外围功能。
 
-2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当前客户端/API `466acdd` 已部署，扩展快照不变，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)；Access 会话已失效，用户稍后登录，生产正向与真机仍待验收，完整 P0 未通过。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；真实 Web 独立会话及测试身份下 Web↔iOS 正式入口的双向非默认页续读已通过，见[跨端证据](../verification/native-server-state.md)。Android 配对、生产正向及分类/书签/设置继续按[P1](p1-library-and-progress.md)和[P2](p2-sync.md)推进。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
+2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当前客户端/API `466acdd` 已部署，扩展快照不变，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)；Access 会话已失效，用户稍后登录，生产正向与真机仍待验收，完整 P0 未通过。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；真实 Web 独立会话及测试身份下 Web↔iOS、Web↔Android、iOS↔Android 正式入口的基础书架读回与双向非默认页续读已通过，见[Web/iOS](../verification/native-server-state.md)和[Android 配对](../verification/android-server-state.md)。实际并发/前台重取、生产正向及分类/书签/设置继续按[P1](p1-library-and-progress.md)和[P2](p2-sync.md)推进。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
 
 ## 优先级与状态
 
 | 优先级                  | 计划                                                          | 当前状态与依赖                                                                                                                                           |
 | ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 当前主线 / 首要设计目标 | [P2 多设备同步](p2-sync.md)                                   | 收藏与进度的 Worker API + D1 和幂等读写已接入；真实 Web 独立会话及测试身份 Web↔iOS 双向续读已过；继续 Android/生产验收，再扩分类/书签/设置               |
-| 并行基础验收            | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | 四项功能已补齐；v4 Web 及 iOS 正式入口 xkcd 阅读/同步分项已过；当前 Android 主入口、生产 Access 与真机待验收                                             |
+| 当前主线 / 首要设计目标 | [P2 多设备同步](p2-sync.md)                                   | 收藏与进度的 Worker API + D1 已接入，测试身份三端组合双向续读已过；继续实际并发/恢复与生产验收，再按分类→书签→设置交付                                   |
+| 并行基础验收            | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | 四项功能已补齐；v4 Web 与双端模拟器正式入口 xkcd 阅读/同步分项已过；生产 Access、真机与其它完整门待验收                                                  |
 | 并行工程                | [工程、AOT 与发布](engineering-and-release.md)                | v4 三包已部署，匿名静态交付与网络政策核对通过；baseline 未完成，CI 仍 disabled_manually；v1/v3 checkpoint 仅保留历史冻结证据                             |
 | 与同步共同交付          | [P1 书架与进度](p1-library-and-progress.md)                   | 数据模型先按跨端权威状态设计；已切换收藏/进度读写入口；补跨端验收、分类/设置及完整日用流程                                                               |
 | 基础运行与书架具备后    | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                                     |
 | 持续推进                | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                                    |
-| 已实现待完整运行验收    | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；v4 Web/iOS 正式入口与业务协议分项通过；当前 Android 与生产正向仍待验收                                                |
+| 已实现待完整运行验收    | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；v4 Web 与双端模拟器正式入口及业务协议分项通过；生产正向和剩余运行门待验收                                             |
 | P0 存储子计划           | [运行时文件与 HTTP Cache](runtime-storage.md)                 | 有界组合存储、xkcd Web/Native Cache 与 Web A→B→A 后 304 正文复用通过；版本更新、更多 Source 与生产取消待验收                                             |
 | P0 文字布局子计划       | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收                               |
 | P0 图片解码子计划       | [阅读器图片解码与长图评估](reader-image-decoding.md)          | 默认 UI 直接解码，候选 codec 退出默认打包；xkcd 阅读/下载、Arknights/CuuTruyen 完整章/限定续读三源 Web 分项通过；多次 baseline、长图/EXIF/LOD 与真机待验 |
 | 已验收                  | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                                       |
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
+
+## 当前交付顺序
+
+1. 完成收藏和非默认页续读的三端实际配对，记录 Web↔iOS、Web↔Android、iOS↔Android 的双向读写与服务端确认；测试身份、生产 Access、模拟器与真机分别验收。
+2. 验收实际双客户端并发、响应丢失后的幂等重试、前台重取与断网恢复，确认冲突不覆盖另一端状态、最远进度不倒退、旧 epoch 不覆盖重新阅读。
+3. 按分类 → 书签 → 非敏感设置逐项交付，从 Protobuf 合同、D1 原子读写到 Flutter UI 一起完成；每项必须由第二客户端读回，不能仅实现单端后再排同步。
+4. 在上述基础上完善书架批量操作、详情筛选及其它外围 UI，再依据目标设备实测安排性能优化。生产 Access 和真机的 P0 基础验收并行推进，不因等待这些环境而停下可独立完成的同步功能。
+
+每个功能里程碑先完成实现，再进行有意义的集中验证；详细待办与验收条件以 [P2](p2-sync.md) 为准。
 
 ## 维护约定
 

@@ -2,7 +2,7 @@
 
 2026-11-04 按当前实现盘点。本文是选型评估，除已接入的 Protobuf 控制合同外，quicktype、OpenAPI、Pigeon 等建议尚未实施；不以生成类型、库的宣传或微基准替代真实边界和 TeaVM/AOT 验证。当前原型不考虑旧版兼容。
 
-2026-11-05，新增优先级决定：多端同步成为首要设计目标。Worker API + D1 的书架、进度和设置查询/变更是当前优先新增的跨语言边界，直接纳入已有 Protobuf + Buf；现有 bootstrap/控制协议不代表业务同步已实现。先完成在线权威读写，再评估其它生成器与可选 HTTP 文档工具，实施合同见[P2](../plan/p2-sync.md)。
+2026-11-05，多端同步成为首要设计目标。Worker API + D1 的收藏与阅读进度查询/变更已接入 `business.proto`，使用已有 Protobuf + Buf 双端生成模型；分类、书签和非敏感设置按同一路径逐项扩展。先完成在线权威读写及实际跨端验收，再评估其它生成器与可选 HTTP 文档工具，实施合同见[P2](../plan/p2-sync.md)。
 
 ## 先区分工具层次
 
@@ -18,7 +18,7 @@
 | Flutter Dart ↔ Web TS host / Native WebView TS host                    | JS interop / callAsyncJavaScript，标准 ProtoJSON；request/result oneof、错误、会话、取消、资源描述；Native 结果先转 JSON 文本再解析 | **继续 Protobuf + Buf**，同一合同覆盖两端。小控制消息保持 ProtoJSON，是否切 binary 由实际测量决定；OpenAPI/GraphQL 不对应这里的 transport                                                                                                       |
 | TS host ↔ TS Source Worker                                             | postMessage 的 WorkerCommand/WorkerResponse、图片控制描述与独立 MessagePort                                                         | 两端虽同为 TS，也继续共享 **Protobuf**。没有必要为同一链路再引第二套 schema                                                                                                                                                                     |
 | Source Java ↔ TeaVM JS 宿主                                            | JSExport/JSBody、HostDto/Gson JSON，TS 用生成合同解析；HTTP/图片/graphics 还包含 typed-array ABI                                    | **消息结构继续以现有 Protobuf 为目标合同，Java 生成模型尚待验证**。Java protobuf/javalite 与 quicktype 候选都须同 DTO 的 TeaVM 编译、输出、启动和包大小对照，不能直接宣称某个更轻；当前 Gson 树适配仍是实际实现                                 |
-| Worker HTTP API ↔ Flutter                                              | 当前为 /api/bootstrap、fetchApi 信封；书架/进度/设置的权威查询与变更尚待接入                                                        | **业务 DTO 继续 Protobuf + Buf**：查询、mutation ID、revision/CAS、epoch 和错误使用同一生成合同。OpenAPI 可补路径/鉴权/状态码与 SDK，但须复用已有模型，不阻塞基础同步或形成竞争 schema                                                          |
+| Worker HTTP API ↔ Flutter                                              | /api/bootstrap、fetchApi 信封；收藏与进度权威查询/变更已接入 business.proto，分类/书签/设置待扩展                                   | **业务 DTO 继续 Protobuf + Buf**：查询、mutation ID、revision/CAS、epoch 和错误使用同一生成合同。OpenAPI 可补路径/鉴权/状态码与 SDK，但须复用已有模型，不阻塞基础同步或形成竞争 schema                                                          |
 | 扩展静态索引/BuildManifest ↔ Dart/TS                                   | 静态 JSON，已经从 .proto 生成两端模型                                                                                               | **继续 Protobuf/ProtoJSON**；这是静态数据文件，不需要 GraphQL 服务或 OpenAPI 客户端生成                                                                                                                                                         |
 | TS 构建 → Native Dart 的内置 runtime manifest，以及 Dart → TS 注入配置 | NativeRuntimeAssets 手写解析 JSON；文件 path/hash/size、ABI、materialVersion，注入 workerSource/imageFiles                          | **JSON Schema + quicktype 是贴合文件格式的候选**，用于消除当前 shape 的重复；schema 要作为权威输入，生成器和检查选项固定。若只为这一份很小的 manifest 引入工具成本过大，也可将其加入现有 .proto。无论选哪条，都只维护一个结构来源，不能两份手写 |
 | Dart ↔ 自有 Swift 文件桥                                               | MethodChannel：bind/acquire/cancel/release/clear，小字典、文件 URI 和 ACK                                                           | **五者之外优先 Pigeon**。它直接生成 Dart/Swift 平台通道，比在平台通道外再套网络 IDL 更贴切；图片正文仍不进入 MethodChannel                                                                                                                      |
@@ -45,7 +45,7 @@ Source `memo_json` 是扩展私有、不透明且有界的 JSON，不从样本�
 
 ## 后续顺序
 
-1. 先为 Worker API + D1 权威业务状态新增 Protobuf 查询/幂等变更合同，并接 TS/Dart 实际跨端读写；保持现行主控和独立二进制正文，继续实际产品验收。
+1. 完成已接入的收藏/进度合同的三端一致性验收，按分类、书签、非敏感设置逐项扩展 Worker API + D1 的 Protobuf 查询/幂等变更合同，每项包含 TS/Dart 实际跨端读写；保持现行主控和独立二进制正文。
 2. 为自有 iOS 文件桥评估并接入 Pigeon；保留现有 HTTPS、绑定、期限、清理 ACK 和资源配额检查。
 3. Native runtime manifest 选择单一 schema/codegen 入口：优先对比 JSON Schema + quicktype 与新增 .proto 的维护成本，不保留双份手写 shape。
 4. Java 边界以真实 Manga/PageList/图片描述为固定输入，对比生成路径的 TeaVM 编译兼容、序列化正确性、AOT 增量体积与启动/解析成本，再决定引入哪一种 runtime。
