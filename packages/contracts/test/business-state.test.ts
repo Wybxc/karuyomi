@@ -1,5 +1,8 @@
 import { expect, test } from 'vitest';
 import {
+  settingsMutationSchema,
+  settingsResponseSchema,
+  settingsMutationResponseSchema,
   bookmarkPageResponseSchema,
   stateMutationResponseSchema,
   categoryMutationSchema,
@@ -207,6 +210,109 @@ test('bookmark pages are bounded, marked, ordered by SQLite UTF-8 identity, and 
       error: {
         code: 'BUSINESS_STATE_ERROR_CODE_UNAVAILABLE',
         message: 'identity changed',
+      },
+    }),
+  ).not.toThrow();
+});
+
+const globalSettingsValues = {
+  theme: 'APP_THEME_SYSTEM',
+  reader: {
+    mode: 'READER_MODE_LEFT_TO_RIGHT',
+    pageLayout: 'READER_PAGE_LAYOUT_AUTO',
+  },
+};
+
+test('settings mutations require typed complete defaults and preserve per-field override presence', () => {
+  const global = { ...base, setGlobal: globalSettingsValues };
+  expect(() => settingsMutationSchema.parse(global)).not.toThrow();
+  const manga = {
+    ...base,
+    setManga: { mangaKey: 'a'.repeat(64), overrides: {} },
+  };
+  expect(settingsMutationSchema.parse(manga).operation.case).toBe('setManga');
+  const explicit = settingsMutationSchema.parse({
+    ...manga,
+    setManga: {
+      ...manga.setManga,
+      overrides: { pageLayout: 'READER_PAGE_LAYOUT_AUTO' },
+    },
+  });
+  if (explicit.operation.case !== 'setManga')
+    throw new Error('Missing manga settings');
+  expect(explicit.operation.value.overrides?.mode).toBeUndefined();
+  expect(explicit.operation.value.overrides?.pageLayout).toBe(1);
+  for (const value of [
+    base,
+    { ...global, setManga: manga.setManga },
+    { ...base, setGlobal: { ...globalSettingsValues, theme: 0 } },
+    { ...base, setGlobal: { ...globalSettingsValues, theme: 99 } },
+    { ...base, setGlobal: { theme: 'APP_THEME_DARK' } },
+    {
+      ...base,
+      setGlobal: {
+        ...globalSettingsValues,
+        reader: { mode: 'READER_MODE_WEBTOON' },
+      },
+    },
+    { ...manga, setManga: { mangaKey: 'bad', overrides: {} } },
+    { ...manga, setManga: { mangaKey: 'a'.repeat(64) } },
+    { ...manga, setManga: { ...manga.setManga, overrides: { mode: 0 } } },
+    { ...manga, setManga: { ...manga.setManga, overrides: { pageLayout: 4 } } },
+    { ...global, expectedRevision: 4294967296 },
+  ])
+    expect(() => settingsMutationSchema.parse(value)).toThrow();
+});
+
+test('settings replies verify the complete snapshot and effective defaults/overrides', () => {
+  const defaults = {
+    schemaVersion: 1,
+    accountRevision: 3,
+    global: { revision: 1, values: globalSettingsValues },
+    effectiveReader: globalSettingsValues.reader,
+  };
+  expect(() => settingsResponseSchema.parse(defaults)).not.toThrow();
+  const manga = {
+    ...defaults,
+    manga: {
+      mangaKey: 'a'.repeat(64),
+      revision: 2,
+      overrides: { mode: 'READER_MODE_RIGHT_TO_LEFT' },
+    },
+    effectiveReader: {
+      ...globalSettingsValues.reader,
+      mode: 'READER_MODE_RIGHT_TO_LEFT',
+    },
+  };
+  expect(() =>
+    settingsMutationResponseSchema.parse({
+      ...manga,
+      mutationId: base.mutationId,
+    }),
+  ).not.toThrow();
+  for (const value of [
+    { ...defaults, global: undefined },
+    { ...defaults, global: { revision: 4, values: globalSettingsValues } },
+    { ...defaults, global: { revision: 1 } },
+    { ...defaults, effectiveReader: undefined },
+    { ...manga, manga: { ...manga.manga, revision: 4 } },
+    { ...manga, manga: { ...manga.manga, overrides: undefined } },
+    { ...manga, effectiveReader: globalSettingsValues.reader },
+    {
+      ...manga,
+      effectiveReader: {
+        ...manga.effectiveReader,
+        pageLayout: 'READER_PAGE_LAYOUT_DOUBLE',
+      },
+    },
+  ])
+    expect(() => settingsResponseSchema.parse(value)).toThrow();
+  expect(() =>
+    settingsResponseSchema.parse({
+      schemaVersion: 1,
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_UNAVAILABLE',
+        message: 'unavailable',
       },
     }),
   ).not.toThrow();

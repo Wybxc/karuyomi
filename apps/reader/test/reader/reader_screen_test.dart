@@ -52,9 +52,12 @@ Widget screen({
   ReadingMode mode = ReadingMode.leftToRight,
   ValueChanged<ReadingPosition>? onPosition,
   ValueChanged<ReaderViewportState>? onViewport,
+  ValueChanged<ReadingMode>? onMode,
+  ValueChanged<bool?>? onDoublePage,
   ResourceImageBuilder imageBuilder = fixtureImage,
   bool? doublePage,
   Widget? chapterControls,
+  bool layoutSettingsEnabled = true,
 }) => MaterialApp(
   home: ReaderScreen(
     manifest: manifest,
@@ -64,12 +67,22 @@ Widget screen({
     initialMode: mode,
     doublePage: doublePage,
     chapterControls: chapterControls,
+    layoutSettingsEnabled: layoutSettingsEnabled,
     onPositionChanged: onPosition,
     onViewportChanged: onViewport,
+    onModeChanged: onMode,
+    onDoublePageChanged: onDoublePage,
     imageBuilder: imageBuilder,
     imageEvictor: (_) async {},
   ),
 );
+
+bool? pageLayoutPreference(WidgetTester tester) => tester
+    .widget<SegmentedButton<bool?>>(
+      find.byKey(const ValueKey('reader-page-layout')),
+    )
+    .selected
+    .single;
 
 void main() {
   testWidgets(
@@ -186,45 +199,33 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
-      await tester.tap(find.byType(FilterChip));
+      expect(pageLayoutPreference(tester), isNull);
+      await tester.tap(find.text('单页'));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), false);
       expect(find.text('51 / 51'), findsOneWidget);
       expect(find.byKey(const ValueKey('runtime-1-page-49')), findsNothing);
 
       // Completion/save controls may gain a row without changing page width.
       panelHeight.value = 72;
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), false);
       expect(find.byKey(const ValueKey('runtime-1-page-49')), findsNothing);
 
       await tester.tapAt(tester.getCenter(find.byType(InteractiveViewer)));
       await tester.pump(kDoubleTapTimeout);
       await tester.pumpAndSettle();
-      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byKey(const ValueKey('reader-page-layout')), findsNothing);
       await tester.tapAt(tester.getCenter(find.byType(InteractiveViewer)));
       await tester.pump(kDoubleTapTimeout);
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), false);
 
       tester.view.physicalSize = const Size(800, 760);
       await tester.pumpAndSettle();
       tester.view.physicalSize = const Size(1200, 760);
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), false);
       expect(find.text('51 / 51'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -232,33 +233,56 @@ void main() {
     },
   );
 
-  testWidgets('automatic double-page follows width until the user selects it', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(800, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final provider = FixturePageProvider();
-    await tester.pumpWidget(
-      screen(provider: provider, manifest: fixtureChapter()),
-    );
-    await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
-    tester.view.physicalSize = const Size(1200, 900);
-    await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
-    tester.view.physicalSize = const Size(800, 900);
-    await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
-    await tester.tap(find.byType(FilterChip));
-    await tester.pumpAndSettle();
-    tester.view.physicalSize = const Size(800, 760);
-    await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-  });
+  testWidgets(
+    'automatic, single and double page selections preserve their policy',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final selections = <bool?>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          position: manifest.positionAt(1),
+          onDoublePage: selections.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(pageLayoutPreference(tester), isNull);
+      expect(find.byKey(const ValueKey('runtime-1-page-2')), findsNothing);
+      tester.view.physicalSize = const Size(1200, 900);
+      await tester.pumpAndSettle();
+      expect(pageLayoutPreference(tester), isNull);
+      expect(find.byKey(const ValueKey('runtime-1-page-2')), findsOneWidget);
+      expect(selections, isEmpty);
+      await tester.tap(find.text('单页'));
+      await tester.pumpAndSettle();
+      expect(pageLayoutPreference(tester), false);
+      expect(find.byKey(const ValueKey('runtime-1-page-2')), findsNothing);
+      tester.view.physicalSize = const Size(800, 900);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('双页'));
+      await tester.pumpAndSettle();
+      expect(pageLayoutPreference(tester), true);
+      expect(find.byKey(const ValueKey('runtime-1-page-2')), findsOneWidget);
+      await tester.tap(find.text('自动'));
+      await tester.pumpAndSettle();
+      expect(pageLayoutPreference(tester), isNull);
+      expect(find.byKey(const ValueKey('runtime-1-page-2')), findsNothing);
+      tester.view.physicalSize = const Size(1200, 900);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('runtime-1-page-2')), findsOneWidget);
+      expect(selections, [false, true, null]);
+      expect(find.text('2 / 20'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets(
     'changed doublePage input resets manual choice and null resumes automatic',
@@ -273,22 +297,16 @@ void main() {
         screen(provider: provider, manifest: manifest, doublePage: true),
       );
       await tester.pumpAndSettle();
-      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
-      await tester.tap(find.byType(FilterChip));
+      expect(pageLayoutPreference(tester), true);
+      await tester.tap(find.text('单页'));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), false);
       // Rebuilding an unchanged parent input must preserve the local choice.
       await tester.pumpWidget(
         screen(provider: provider, manifest: manifest, doublePage: true),
       );
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), false);
       await tester.pumpWidget(
         screen(provider: provider, manifest: manifest, doublePage: false),
       );
@@ -297,26 +315,20 @@ void main() {
         screen(provider: provider, manifest: manifest, doublePage: true),
       );
       await tester.pumpAndSettle();
-      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
-      await tester.tap(find.byType(FilterChip));
+      expect(pageLayoutPreference(tester), true);
+      await tester.tap(find.text('单页'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(screen(provider: provider, manifest: manifest));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), isNull);
       tester.view.physicalSize = const Size(1200, 900);
       await tester.pumpAndSettle();
-      expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+      expect(pageLayoutPreference(tester), isNull);
       await tester.pumpWidget(
         screen(provider: provider, manifest: manifest, doublePage: false),
       );
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<FilterChip>(find.byType(FilterChip)).selected,
-        false,
-      );
+      expect(pageLayoutPreference(tester), false);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
@@ -333,9 +345,9 @@ void main() {
     final manifest = fixtureChapter();
     await tester.pumpWidget(screen(provider: provider, manifest: manifest));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(FilterChip));
+    await tester.tap(find.text('单页'));
     await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
+    expect(pageLayoutPreference(tester), false);
     await tester.pumpWidget(
       screen(
         provider: provider,
@@ -347,7 +359,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, false);
+    expect(pageLayoutPreference(tester), false);
     await tester.pumpWidget(
       screen(
         provider: provider,
@@ -363,11 +375,146 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, true);
+    expect(pageLayoutPreference(tester), isNull);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+    'asynchronous parent layout applies at the same logical anchor without save callbacks',
+    (tester) async {
+      tester.view.physicalSize = const Size(1100, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final modes = <ReadingMode>[];
+      final pagePolicies = <bool?>[];
+      final viewports = <ReaderViewportState>[];
+      Widget configured(ReadingMode mode, bool? doublePage) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(5, offset: .35),
+        mode: mode,
+        doublePage: doublePage,
+        onMode: modes.add,
+        onDoublePage: pagePolicies.add,
+        onViewport: viewports.add,
+      );
+      await tester.pumpWidget(configured(ReadingMode.leftToRight, false));
+      await tester.pumpAndSettle();
+      final leaf = tester.state(find.byType(ReaderScreen));
+      await tester.pumpWidget(configured(ReadingMode.continuous, true));
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(ReaderScreen)), same(leaf));
+      expect(find.byKey(const ValueKey('continuous-reader')), findsOneWidget);
+      expect(viewports.last.current.pageKey, 'page-5');
+      expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
+      expect(viewports.last.doublePage, true);
+      await tester.pumpWidget(configured(ReadingMode.webtoon, null));
+      await tester.pumpAndSettle();
+      expect(viewports.last.mode, ReadingMode.webtoon);
+      expect(viewports.last.current.pageKey, 'page-5');
+      expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
+      expect(viewports.last.doublePage, isNull);
+      expect(modes, isEmpty);
+      expect(pagePolicies, isEmpty);
+      await tester.tap(find.byType(DropdownButton<ReadingMode>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从右到左').last);
+      await tester.pumpAndSettle();
+      expect(modes, [ReadingMode.rightToLeft]);
+      expect(viewports.last.current.pageKey, 'page-5');
+      expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
+      // A parent rebuild with its unchanged value cannot roll back a selection
+      // while the asynchronous settings acknowledgement is outstanding.
+      await tester.pumpWidget(configured(ReadingMode.webtoon, null));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButton<ReadingMode>>(
+              find.byType(DropdownButton<ReadingMode>),
+            )
+            .value,
+        ReadingMode.rightToLeft,
+      );
+      await tester.pumpWidget(configured(ReadingMode.rightToLeft, true));
+      await tester.pumpAndSettle();
+      expect(pageLayoutPreference(tester), true);
+      expect(modes, [ReadingMode.rightToLeft]);
+      expect(pagePolicies, isEmpty);
+      tester.view.physicalSize = const Size(600, 900);
+      await tester.pumpAndSettle();
+      expect(modes, [ReadingMode.rightToLeft]);
+      expect(pagePolicies, isEmpty);
+      expect(viewports.last.current.pageKey, 'page-5');
+      expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'pending settings disable layout edits while page navigation remains available',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final modes = <ReadingMode>[];
+      final pagePolicies = <bool?>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          doublePage: false,
+          layoutSettingsEnabled: false,
+          onMode: modes.add,
+          onDoublePage: pagePolicies.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButton<ReadingMode>>(
+              find.byType(DropdownButton<ReadingMode>),
+            )
+            .onChanged,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<SegmentedButton<bool?>>(
+              find.byKey(const ValueKey('reader-page-layout')),
+            )
+            .onSelectionChanged,
+        isNull,
+      );
+      await tester.tap(find.byTooltip('下一页'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 20'), findsOneWidget);
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          mode: ReadingMode.continuous,
+          doublePage: true,
+          layoutSettingsEnabled: false,
+          onMode: modes.add,
+          onDoublePage: pagePolicies.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('continuous-reader')), findsOneWidget);
+      expect(find.text('2 / 20'), findsOneWidget);
+      expect(modes, isEmpty);
+      expect(pagePolicies, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets(
     'decoded notification after a frame schedules its viewport observation',

@@ -86,6 +86,16 @@ void main() {
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
       expect(await catalog.flushReadingProgress(), true);
+      // Layout preferences now belong to the settings command path. Explicit
+      // choices must survive a progress reopen independently of viewport data.
+      tester
+          .widget<ReaderScreen>(find.byType(ReaderScreen))
+          .onDoublePageChanged!(true);
+      await tester.pumpAndSettle();
+      tester.widget<ReaderScreen>(find.byType(ReaderScreen)).onModeChanged!(
+        ReadingMode.webtoon,
+      );
+      await tester.pumpAndSettle();
       final before = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final manifest = before.manifest;
       final mangaKey = ChapterSequence(
@@ -124,8 +134,9 @@ void main() {
           observed: manifest.positionAt(1),
           atEnd: false,
           windowReady: true,
-          mode: ReadingMode.webtoon,
-          doublePage: true,
+          // A late viewport report cannot overwrite the confirmed preference.
+          mode: ReadingMode.leftToRight,
+          doublePage: null,
         ),
       );
       await tester.pumpAndSettle();

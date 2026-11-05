@@ -39,6 +39,57 @@ final $typed_data.Uint8List businessStateErrorCodeDescriptor = $convert.base64De
     'JPUl9DT0RFX1VOQVZBSUxBQkxFEAUSLAooQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9MSU1J'
     'VF9FWENFRURFRBAG');
 
+@$core.Deprecated('Use appThemeDescriptor instead')
+const AppTheme$json = {
+  '1': 'AppTheme',
+  '2': [
+    {'1': 'APP_THEME_UNSPECIFIED', '2': 0},
+    {'1': 'APP_THEME_SYSTEM', '2': 1},
+    {'1': 'APP_THEME_LIGHT', '2': 2},
+    {'1': 'APP_THEME_DARK', '2': 3},
+  ],
+};
+
+/// Descriptor for `AppTheme`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List appThemeDescriptor = $convert.base64Decode(
+    'CghBcHBUaGVtZRIZChVBUFBfVEhFTUVfVU5TUEVDSUZJRUQQABIUChBBUFBfVEhFTUVfU1lTVE'
+    'VNEAESEwoPQVBQX1RIRU1FX0xJR0hUEAISEgoOQVBQX1RIRU1FX0RBUksQAw==');
+
+@$core.Deprecated('Use readerModeDescriptor instead')
+const ReaderMode$json = {
+  '1': 'ReaderMode',
+  '2': [
+    {'1': 'READER_MODE_UNSPECIFIED', '2': 0},
+    {'1': 'READER_MODE_LEFT_TO_RIGHT', '2': 1},
+    {'1': 'READER_MODE_RIGHT_TO_LEFT', '2': 2},
+    {'1': 'READER_MODE_CONTINUOUS', '2': 3},
+    {'1': 'READER_MODE_WEBTOON', '2': 4},
+  ],
+};
+
+/// Descriptor for `ReaderMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List readerModeDescriptor = $convert.base64Decode(
+    'CgpSZWFkZXJNb2RlEhsKF1JFQURFUl9NT0RFX1VOU1BFQ0lGSUVEEAASHQoZUkVBREVSX01PRE'
+    'VfTEVGVF9UT19SSUdIVBABEh0KGVJFQURFUl9NT0RFX1JJR0hUX1RPX0xFRlQQAhIaChZSRUFE'
+    'RVJfTU9ERV9DT05USU5VT1VTEAMSFwoTUkVBREVSX01PREVfV0VCVE9PThAE');
+
+@$core.Deprecated('Use readerPageLayoutDescriptor instead')
+const ReaderPageLayout$json = {
+  '1': 'ReaderPageLayout',
+  '2': [
+    {'1': 'READER_PAGE_LAYOUT_UNSPECIFIED', '2': 0},
+    {'1': 'READER_PAGE_LAYOUT_AUTO', '2': 1},
+    {'1': 'READER_PAGE_LAYOUT_SINGLE', '2': 2},
+    {'1': 'READER_PAGE_LAYOUT_DOUBLE', '2': 3},
+  ],
+};
+
+/// Descriptor for `ReaderPageLayout`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List readerPageLayoutDescriptor = $convert.base64Decode(
+    'ChBSZWFkZXJQYWdlTGF5b3V0EiIKHlJFQURFUl9QQUdFX0xBWU9VVF9VTlNQRUNJRklFRBAAEh'
+    'sKF1JFQURFUl9QQUdFX0xBWU9VVF9BVVRPEAESHQoZUkVBREVSX1BBR0VfTEFZT1VUX1NJTkdM'
+    'RRACEh0KGVJFQURFUl9QQUdFX0xBWU9VVF9ET1VCTEUQAw==');
+
 @$core.Deprecated('Use libraryMetadataDescriptor instead')
 const LibraryMetadata$json = {
   '1': 'LibraryMetadata',
@@ -847,3 +898,314 @@ final $typed_data.Uint8List categoryCatalogResponseDescriptor = $convert.base64D
     'Y2F0ZWdvcnlfY2F0YWxvZxgDIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZ1IPY2'
     'F0ZWdvcnlDYXRhbG9nEjUKBWVycm9yGAQgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0'
     'ZUVycm9yUgVlcnJvcg==');
+
+@$core.Deprecated('Use readerSettingsDescriptor instead')
+const ReaderSettings$json = {
+  '1': 'ReaderSettings',
+  '2': [
+    {
+      '1': 'mode',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.karuyomi.v1.ReaderMode',
+      '10': 'mode'
+    },
+    {
+      '1': 'page_layout',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.karuyomi.v1.ReaderPageLayout',
+      '10': 'pageLayout'
+    },
+  ],
+};
+
+/// Descriptor for `ReaderSettings`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List readerSettingsDescriptor = $convert.base64Decode(
+    'Cg5SZWFkZXJTZXR0aW5ncxIrCgRtb2RlGAEgASgOMhcua2FydXlvbWkudjEuUmVhZGVyTW9kZV'
+    'IEbW9kZRI+CgtwYWdlX2xheW91dBgCIAEoDjIdLmthcnV5b21pLnYxLlJlYWRlclBhZ2VMYXlv'
+    'dXRSCnBhZ2VMYXlvdXQ=');
+
+@$core.Deprecated('Use readerSettingsOverrideDescriptor instead')
+const ReaderSettingsOverride$json = {
+  '1': 'ReaderSettingsOverride',
+  '2': [
+    {
+      '1': 'mode',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.karuyomi.v1.ReaderMode',
+      '9': 0,
+      '10': 'mode',
+      '17': true
+    },
+    {
+      '1': 'page_layout',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.karuyomi.v1.ReaderPageLayout',
+      '9': 1,
+      '10': 'pageLayout',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_mode'},
+    {'1': '_page_layout'},
+  ],
+};
+
+/// Descriptor for `ReaderSettingsOverride`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List readerSettingsOverrideDescriptor = $convert.base64Decode(
+    'ChZSZWFkZXJTZXR0aW5nc092ZXJyaWRlEjAKBG1vZGUYASABKA4yFy5rYXJ1eW9taS52MS5SZW'
+    'FkZXJNb2RlSABSBG1vZGWIAQESQwoLcGFnZV9sYXlvdXQYAiABKA4yHS5rYXJ1eW9taS52MS5S'
+    'ZWFkZXJQYWdlTGF5b3V0SAFSCnBhZ2VMYXlvdXSIAQFCBwoFX21vZGVCDgoMX3BhZ2VfbGF5b3'
+    'V0');
+
+@$core.Deprecated('Use globalSettingsValuesDescriptor instead')
+const GlobalSettingsValues$json = {
+  '1': 'GlobalSettingsValues',
+  '2': [
+    {
+      '1': 'theme',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.karuyomi.v1.AppTheme',
+      '10': 'theme'
+    },
+    {
+      '1': 'reader',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ReaderSettings',
+      '10': 'reader'
+    },
+  ],
+};
+
+/// Descriptor for `GlobalSettingsValues`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List globalSettingsValuesDescriptor = $convert.base64Decode(
+    'ChRHbG9iYWxTZXR0aW5nc1ZhbHVlcxIrCgV0aGVtZRgBIAEoDjIVLmthcnV5b21pLnYxLkFwcF'
+    'RoZW1lUgV0aGVtZRIzCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5n'
+    'c1IGcmVhZGVy');
+
+@$core.Deprecated('Use globalSettingsDescriptor instead')
+const GlobalSettings$json = {
+  '1': 'GlobalSettings',
+  '2': [
+    {'1': 'revision', '3': 1, '4': 1, '5': 13, '10': 'revision'},
+    {
+      '1': 'values',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.GlobalSettingsValues',
+      '10': 'values'
+    },
+  ],
+};
+
+/// Descriptor for `GlobalSettings`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List globalSettingsDescriptor = $convert.base64Decode(
+    'Cg5HbG9iYWxTZXR0aW5ncxIaCghyZXZpc2lvbhgBIAEoDVIIcmV2aXNpb24SOQoGdmFsdWVzGA'
+    'IgASgLMiEua2FydXlvbWkudjEuR2xvYmFsU2V0dGluZ3NWYWx1ZXNSBnZhbHVlcw==');
+
+@$core.Deprecated('Use mangaReaderSettingsDescriptor instead')
+const MangaReaderSettings$json = {
+  '1': 'MangaReaderSettings',
+  '2': [
+    {'1': 'manga_key', '3': 1, '4': 1, '5': 9, '10': 'mangaKey'},
+    {'1': 'revision', '3': 2, '4': 1, '5': 13, '10': 'revision'},
+    {
+      '1': 'overrides',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ReaderSettingsOverride',
+      '10': 'overrides'
+    },
+  ],
+};
+
+/// Descriptor for `MangaReaderSettings`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List mangaReaderSettingsDescriptor = $convert.base64Decode(
+    'ChNNYW5nYVJlYWRlclNldHRpbmdzEhsKCW1hbmdhX2tleRgBIAEoCVIIbWFuZ2FLZXkSGgoIcm'
+    'V2aXNpb24YAiABKA1SCHJldmlzaW9uEkEKCW92ZXJyaWRlcxgDIAEoCzIjLmthcnV5b21pLnYx'
+    'LlJlYWRlclNldHRpbmdzT3ZlcnJpZGVSCW92ZXJyaWRlcw==');
+
+@$core.Deprecated('Use setMangaReaderSettingsDescriptor instead')
+const SetMangaReaderSettings$json = {
+  '1': 'SetMangaReaderSettings',
+  '2': [
+    {'1': 'manga_key', '3': 1, '4': 1, '5': 9, '10': 'mangaKey'},
+    {
+      '1': 'overrides',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ReaderSettingsOverride',
+      '10': 'overrides'
+    },
+  ],
+};
+
+/// Descriptor for `SetMangaReaderSettings`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setMangaReaderSettingsDescriptor = $convert.base64Decode(
+    'ChZTZXRNYW5nYVJlYWRlclNldHRpbmdzEhsKCW1hbmdhX2tleRgBIAEoCVIIbWFuZ2FLZXkSQQ'
+    'oJb3ZlcnJpZGVzGAIgASgLMiMua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3NPdmVycmlkZVIJ'
+    'b3ZlcnJpZGVz');
+
+@$core.Deprecated('Use settingsMutationDescriptor instead')
+const SettingsMutation$json = {
+  '1': 'SettingsMutation',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'mutation_id', '3': 2, '4': 1, '5': 9, '10': 'mutationId'},
+    {
+      '1': 'expected_revision',
+      '3': 3,
+      '4': 1,
+      '5': 13,
+      '10': 'expectedRevision'
+    },
+    {
+      '1': 'set_global',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.GlobalSettingsValues',
+      '9': 0,
+      '10': 'setGlobal'
+    },
+    {
+      '1': 'set_manga',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SetMangaReaderSettings',
+      '9': 0,
+      '10': 'setManga'
+    },
+  ],
+  '8': [
+    {'1': 'operation'},
+  ],
+};
+
+/// Descriptor for `SettingsMutation`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List settingsMutationDescriptor = $convert.base64Decode(
+    'ChBTZXR0aW5nc011dGF0aW9uEiUKDnNjaGVtYV92ZXJzaW9uGAEgASgNUg1zY2hlbWFWZXJzaW'
+    '9uEh8KC211dGF0aW9uX2lkGAIgASgJUgptdXRhdGlvbklkEisKEWV4cGVjdGVkX3JldmlzaW9u'
+    'GAMgASgNUhBleHBlY3RlZFJldmlzaW9uEkIKCnNldF9nbG9iYWwYCiABKAsyIS5rYXJ1eW9taS'
+    '52MS5HbG9iYWxTZXR0aW5nc1ZhbHVlc0gAUglzZXRHbG9iYWwSQgoJc2V0X21hbmdhGAsgASgL'
+    'MiMua2FydXlvbWkudjEuU2V0TWFuZ2FSZWFkZXJTZXR0aW5nc0gAUghzZXRNYW5nYUILCglvcG'
+    'VyYXRpb24=');
+
+@$core.Deprecated('Use settingsResponseDescriptor instead')
+const SettingsResponse$json = {
+  '1': 'SettingsResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'account_revision', '3': 2, '4': 1, '5': 13, '10': 'accountRevision'},
+    {
+      '1': 'global',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.GlobalSettings',
+      '10': 'global'
+    },
+    {
+      '1': 'manga',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.MangaReaderSettings',
+      '10': 'manga'
+    },
+    {
+      '1': 'effective_reader',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ReaderSettings',
+      '10': 'effectiveReader'
+    },
+    {
+      '1': 'error',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `SettingsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List settingsResponseDescriptor = $convert.base64Decode(
+    'ChBTZXR0aW5nc1Jlc3BvbnNlEiUKDnNjaGVtYV92ZXJzaW9uGAEgASgNUg1zY2hlbWFWZXJzaW'
+    '9uEikKEGFjY291bnRfcmV2aXNpb24YAiABKA1SD2FjY291bnRSZXZpc2lvbhIzCgZnbG9iYWwY'
+    'AyABKAsyGy5rYXJ1eW9taS52MS5HbG9iYWxTZXR0aW5nc1IGZ2xvYmFsEjYKBW1hbmdhGAQgAS'
+    'gLMiAua2FydXlvbWkudjEuTWFuZ2FSZWFkZXJTZXR0aW5nc1IFbWFuZ2ESRgoQZWZmZWN0aXZl'
+    'X3JlYWRlchgFIAEoCzIbLmthcnV5b21pLnYxLlJlYWRlclNldHRpbmdzUg9lZmZlY3RpdmVSZW'
+    'FkZXISNQoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JSBWVy'
+    'cm9y');
+
+@$core.Deprecated('Use settingsMutationResponseDescriptor instead')
+const SettingsMutationResponse$json = {
+  '1': 'SettingsMutationResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'mutation_id', '3': 2, '4': 1, '5': 9, '10': 'mutationId'},
+    {'1': 'account_revision', '3': 3, '4': 1, '5': 13, '10': 'accountRevision'},
+    {
+      '1': 'global',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.GlobalSettings',
+      '10': 'global'
+    },
+    {
+      '1': 'manga',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.MangaReaderSettings',
+      '10': 'manga'
+    },
+    {
+      '1': 'effective_reader',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ReaderSettings',
+      '10': 'effectiveReader'
+    },
+    {
+      '1': 'error',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `SettingsMutationResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List settingsMutationResponseDescriptor = $convert.base64Decode(
+    'ChhTZXR0aW5nc011dGF0aW9uUmVzcG9uc2USJQoOc2NoZW1hX3ZlcnNpb24YASABKA1SDXNjaG'
+    'VtYVZlcnNpb24SHwoLbXV0YXRpb25faWQYAiABKAlSCm11dGF0aW9uSWQSKQoQYWNjb3VudF9y'
+    'ZXZpc2lvbhgDIAEoDVIPYWNjb3VudFJldmlzaW9uEjMKBmdsb2JhbBgEIAEoCzIbLmthcnV5b2'
+    '1pLnYxLkdsb2JhbFNldHRpbmdzUgZnbG9iYWwSNgoFbWFuZ2EYBSABKAsyIC5rYXJ1eW9taS52'
+    'MS5NYW5nYVJlYWRlclNldHRpbmdzUgVtYW5nYRJGChBlZmZlY3RpdmVfcmVhZGVyGAYgASgLMh'
+    'sua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3NSD2VmZmVjdGl2ZVJlYWRlchI1CgVlcnJvchgH'
+    'IAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvclIFZXJyb3I=');

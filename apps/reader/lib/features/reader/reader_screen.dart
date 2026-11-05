@@ -46,6 +46,9 @@ class ReaderScreen extends StatefulWidget {
     this.initialPosition,
     this.initialMode = ReadingMode.leftToRight,
     this.doublePage,
+    this.onModeChanged,
+    this.onDoublePageChanged,
+    this.layoutSettingsEnabled = true,
     this.onPositionChanged,
     this.imageBuilder = buildResourceImage,
     this.imageEvictor,
@@ -68,6 +71,13 @@ class ReaderScreen extends StatefulWidget {
   /// Defaults to automatic width-based layout. An in-reader selection lasts for
   /// this chapter unless this input changes; changing to null resumes automatic.
   final bool? doublePage;
+
+  /// User selections only; applying parent settings and resizing do not save.
+  final ValueChanged<ReadingMode>? onModeChanged;
+  final ValueChanged<bool?>? onDoublePageChanged;
+
+  /// Only disables settings edits; chapter navigation and zoom remain usable.
+  final bool layoutSettingsEnabled;
   final ValueChanged<ReadingPosition>? onPositionChanged;
   final ResourceImageBuilder imageBuilder;
   final Future<void> Function(ImageResource)? imageEvictor;
@@ -114,7 +124,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _zoomed = false;
   bool _dimensionsScheduled = false;
   bool _viewportScheduled = false;
-  bool? _doublePageOverride;
+  late bool? _doublePagePreference;
   final _decodedResources = <String>{};
   final _learnedDimensions = <String, ImageDimensions>{};
 
@@ -127,6 +137,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       'generation': widget.generation,
     });
     widget.onAttached?.call();
+    _doublePagePreference = widget.doublePage;
     _reader = ReaderController(
       manifest: widget.manifest,
       initialPosition: widget.initialPosition,
@@ -206,7 +217,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             atEnd: false,
             windowReady: false,
             mode: _reader.mode,
-            doublePage: _doublePageOverride ?? widget.doublePage,
+            doublePage: _doublePagePreference,
           ),
         );
         return;
@@ -276,7 +287,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               snapshot.errors.isEmpty &&
               snapshot.cleanupError == null,
           mode: _reader.mode,
-          doublePage: _doublePageOverride ?? widget.doublePage,
+          doublePage: _doublePagePreference,
         ),
       );
     });
@@ -409,8 +420,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
     if (oldWidget.doublePage != widget.doublePage ||
         oldWidget.manifest.chapterKey != widget.manifest.chapterKey) {
-      _doublePageOverride = null;
+      _doublePagePreference = widget.doublePage;
       _applyDoublePagePreference();
+    }
+    if (oldWidget.initialMode != widget.initialMode ||
+        oldWidget.manifest.chapterKey != widget.manifest.chapterKey) {
+      _applyMode(widget.initialMode);
     }
     if (oldWidget.generation != widget.generation) {
       _learnedDimensions.clear();
@@ -520,18 +535,35 @@ class _ReaderScreenState extends State<ReaderScreen> {
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  void _layout({ReadingMode? mode, bool? doublePage}) {
-    _navigation('layout', {'mode': mode?.name, 'doublePage': doublePage});
-    if (doublePage != null) _doublePageOverride = doublePage;
+  void _selectMode(ReadingMode mode) {
+    if (_reader.mode == mode) return;
+    _navigation('layout', {'mode': mode.name});
+    _applyMode(mode);
+    widget.onModeChanged?.call(mode);
+  }
+
+  void _applyMode(ReadingMode mode) {
+    if (_reader.mode == mode) return;
+    _restoring = true;
     _transform.value = Matrix4.identity();
-    _reader.setLayout(mode: mode, doublePage: doublePage);
+    _reader.setLayout(mode: mode);
     _scheduleRestore();
   }
 
+  void _selectDoublePage(bool? value) {
+    if (_doublePagePreference == value) return;
+    _navigation('layout', {'doublePage': value});
+    setState(() => _doublePagePreference = value);
+    _transform.value = Matrix4.identity();
+    _applyDoublePagePreference();
+    _scheduleViewport();
+    widget.onDoublePageChanged?.call(value);
+  }
+
   void _applyDoublePagePreference() {
-    final doublePage =
-        _doublePageOverride ?? widget.doublePage ?? _viewportWidth >= 900;
+    final doublePage = _doublePagePreference ?? _viewportWidth >= 900;
     if (_reader.doublePage == doublePage) return;
+    _restoring = true;
     _reader.setLayout(doublePage: doublePage);
     _scheduleRestore();
   }
@@ -959,16 +991,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         child: Text('条漫'),
                       ),
                     ],
-                    onChanged: (mode) {
-                      if (mode != null) _layout(mode: mode);
-                    },
+                    onChanged: widget.layoutSettingsEnabled
+                        ? (mode) {
+                            if (mode != null) _selectMode(mode);
+                          }
+                        : null,
                   ),
                 ),
                 if (!_reader.isContinuous)
-                  FilterChip(
-                    label: const Text('双页'),
-                    selected: _reader.doublePage,
-                    onSelected: (value) => _layout(doublePage: value),
+                  SegmentedButton<bool?>(
+                    key: const ValueKey('reader-page-layout'),
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: null, label: Text('自动')),
+                      ButtonSegment(value: false, label: Text('单页')),
+                      ButtonSegment(value: true, label: Text('双页')),
+                    ],
+                    selected: {_doublePagePreference},
+                    onSelectionChanged: widget.layoutSettingsEnabled
+                        ? (values) => _selectDoublePage(values.single)
+                        : null,
                   ),
               ],
             ),

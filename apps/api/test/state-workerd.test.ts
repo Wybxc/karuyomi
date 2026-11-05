@@ -1,6 +1,11 @@
 import { create, toJson, type MessageInitShape } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
+  AppTheme,
+  ReaderMode,
+  ReaderPageLayout,
+  SettingsMutationSchema,
+  type SettingsMutation,
   LibraryMetadataSchema,
   StateMutationSchema,
   type StateMutation,
@@ -9,6 +14,8 @@ import {
 } from '@karuyomi/protocol';
 import {
   businessSchemaVersion,
+  settingsResponseSchema,
+  settingsMutationResponseSchema,
   bookmarkPageResponseSchema,
   libraryPageResponseSchema,
   mangaStateResponseSchema,
@@ -101,6 +108,28 @@ async function client(subject: string = crypto.randomUUID()) {
       return {
         status: response.status,
         body: libraryPageResponseSchema.parse(await response.json()),
+      };
+    },
+    async settings(mangaKey?: string) {
+      const response = await this.request(
+        mangaKey ? `/api/settings/manga/${mangaKey}` : '/api/settings',
+      );
+      expect(response.status).toBe(200);
+      return settingsResponseSchema.parse(await response.json());
+    },
+    async mutateSettings(mutation: SettingsMutation) {
+      const response = await this.request('/api/settings/mutations', {
+        method: 'POST',
+        headers: {
+          Origin: origin,
+          'X-App-Request': '1',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(toJson(SettingsMutationSchema, mutation)),
+      });
+      return {
+        status: response.status,
+        body: settingsMutationResponseSchema.parse(await response.json()),
       };
     },
     async categories() {
@@ -990,4 +1019,316 @@ test('a failed bookmark batch leaves no bookmark, manga revision, account revisi
   expect((await reader.state(key, 'chapter-1')).bookmark?.bookmarked).toBe(
     true,
   );
+});
+
+function globalSettings(
+  expectedRevision = 0,
+  theme = AppTheme.DARK,
+  mode = ReaderMode.WEBTOON,
+  pageLayout = ReaderPageLayout.DOUBLE,
+) {
+  return create(SettingsMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    expectedRevision,
+    operation: {
+      case: 'setGlobal',
+      value: { theme, reader: { mode, pageLayout } },
+    },
+  });
+}
+function mangaSettings(
+  mangaKey: string,
+  expectedRevision = 0,
+  overrides: { mode?: ReaderMode; pageLayout?: ReaderPageLayout } = {},
+) {
+  return create(SettingsMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    expectedRevision,
+    operation: { case: 'setManga', value: { mangaKey, overrides } },
+  });
+}
+
+test('settings reads do not write, defaults inherit per field, and clearing overrides retains their CAS revision', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const key = favorite().mangaKey;
+  const initial = await first.settings();
+  expect(initial.global?.revision).toBe(0);
+  expect(initial.global?.values?.theme).toBe(AppTheme.SYSTEM);
+  expect(initial.effectiveReader).toMatchObject({
+    mode: ReaderMode.LEFT_TO_RIGHT,
+    pageLayout: ReaderPageLayout.AUTO,
+  });
+  expect(initial.manga).toBeUndefined();
+  const empty = await first.settings(key);
+  expect(empty.manga).toMatchObject({
+    mangaKey: key,
+    revision: 0,
+    overrides: {},
+  });
+  expect(empty.effectiveReader).toEqual(initial.effectiveReader);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM reader_settings WHERE subject = ?',
+    )
+      .bind(first.subject)
+      .first('count'),
+  ).toBe(0);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM account_state WHERE subject = ?',
+    )
+      .bind(first.subject)
+      .first('count'),
+  ).toBe(0);
+  expect((await first.mutateSettings(globalSettings())).status).toBe(200);
+  const override = await second.mutateSettings(
+    mangaSettings(key, 0, {
+      mode: ReaderMode.RIGHT_TO_LEFT,
+      pageLayout: ReaderPageLayout.AUTO,
+    }),
+  );
+  expect(override.body.manga?.revision).toBe(1);
+  expect(override.body.effectiveReader).toMatchObject({
+    mode: ReaderMode.RIGHT_TO_LEFT,
+    pageLayout: ReaderPageLayout.AUTO,
+  });
+  expect(
+    (
+      await first.mutateSettings(
+        globalSettings(
+          1,
+          AppTheme.LIGHT,
+          ReaderMode.CONTINUOUS,
+          ReaderPageLayout.SINGLE,
+        ),
+      )
+    ).status,
+  ).toBe(200);
+  const inherited = await second.mutateSettings(
+    mangaSettings(key, 1, { mode: ReaderMode.RIGHT_TO_LEFT }),
+  );
+  expect(inherited.body.manga?.overrides?.pageLayout).toBeUndefined();
+  expect(inherited.body.effectiveReader).toMatchObject({
+    mode: ReaderMode.RIGHT_TO_LEFT,
+    pageLayout: ReaderPageLayout.SINGLE,
+  });
+  const cleared = await first.mutateSettings(mangaSettings(key, 2));
+  expect(cleared.body.manga?.revision).toBe(3);
+  expect(cleared.body.effectiveReader).toMatchObject({
+    mode: ReaderMode.CONTINUOUS,
+    pageLayout: ReaderPageLayout.SINGLE,
+  });
+  expect(cleared.body.manga?.overrides?.mode).toBeUndefined();
+  const stale = await second.mutateSettings(
+    mangaSettings(key, 0, { mode: ReaderMode.WEBTOON }),
+  );
+  expect(stale.status).toBe(409);
+  expect(stale.body.manga?.revision).toBe(3);
+  expect((await second.settings(key)).manga?.overrides?.mode).toBeUndefined();
+  expect((await first.state(key)).manga?.revision).toBe(0);
+  expect((await first.library()).body.entries).toEqual([]);
+  expect(
+    await env.DB.prepare(
+      'SELECT revision FROM reader_settings WHERE subject = ? AND scope_key = ?',
+    )
+      .bind(first.subject, key)
+      .first('revision'),
+  ).toBe(3);
+});
+
+test('global, manga and reading-progress writes have independent CAS and each ACK is one committed snapshot', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const key = favorite().mangaKey;
+  const [global, manga] = await Promise.all([
+    first.mutateSettings(globalSettings()),
+    second.mutateSettings(
+      mangaSettings(key, 0, { mode: ReaderMode.RIGHT_TO_LEFT }),
+    ),
+  ]);
+  expect([global.status, manga.status]).toEqual([200, 200]);
+  expect(
+    [global.body.accountRevision, manga.body.accountRevision].sort(),
+  ).toEqual([1, 2]);
+  expect(manga.body.manga?.revision).toBe(1);
+  expect(
+    (manga.body.global?.revision ?? 0) + (manga.body.manga?.revision ?? 0),
+  ).toBe(manga.body.accountRevision);
+  expect(manga.body.global?.revision).toBe(
+    manga.body.accountRevision === 1 ? 0 : 1,
+  );
+  expect(manga.body.effectiveReader?.pageLayout).toBe(
+    manga.body.accountRevision === 1
+      ? ReaderPageLayout.AUTO
+      : ReaderPageLayout.DOUBLE,
+  );
+  const canonical = await first.settings(key);
+  expect(canonical.global?.revision).toBe(1);
+  expect(canonical.manga?.revision).toBe(1);
+  expect(canonical.effectiveReader).toMatchObject({
+    mode: ReaderMode.RIGHT_TO_LEFT,
+    pageLayout: ReaderPageLayout.DOUBLE,
+  });
+  const progress = await second.mutate(save(key, 0));
+  expect(progress.status).toBe(200);
+  expect(
+    (await first.mutateSettings(globalSettings(1, AppTheme.LIGHT))).status,
+  ).toBe(200);
+  expect(
+    (
+      await second.mutateSettings(
+        mangaSettings(key, 1, { pageLayout: ReaderPageLayout.SINGLE }),
+      )
+    ).status,
+  ).toBe(200);
+  const preserved = await first.state(key, 'chapter-1');
+  expect(preserved.manga?.revision).toBe(1);
+  expect(preserved.progress).toEqual(progress.body.progress);
+  expect(preserved.accountRevision).toBe(5);
+});
+
+test('settings CAS has one winner, durable retries retain their snapshot, and UUIDs cannot cross scopes or message kinds', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const a = globalSettings();
+  const b = globalSettings(0, AppTheme.LIGHT);
+  const results = await Promise.all([
+    first.mutateSettings(a),
+    second.mutateSettings(b),
+  ]);
+  expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+  const winner = results[0]?.status === 200 ? a : b;
+  const acknowledged = results.find((result) => result.status === 200)?.body;
+  expect(
+    (await first.mutateSettings(globalSettings(1, AppTheme.SYSTEM))).status,
+  ).toBe(200);
+  expect((await second.mutateSettings(winner)).body).toEqual(acknowledged);
+  expect((await second.settings()).global?.revision).toBe(2);
+  const changed = create(SettingsMutationSchema, {
+    ...winner,
+    expectedRevision: 2,
+  });
+  expect((await first.mutateSettings(changed)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  const differentScope = mangaSettings(favorite().mangaKey);
+  differentScope.mutationId = winner.mutationId;
+  expect((await first.mutateSettings(differentScope)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  const reusedFavorite = favorite();
+  reusedFavorite.mutationId = winner.mutationId;
+  expect((await first.mutate(reusedFavorite)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  const mangaCommand = favorite();
+  await first.mutate(mangaCommand);
+  const reusedSettings = globalSettings(2);
+  reusedSettings.mutationId = mangaCommand.mutationId;
+  expect((await first.mutateSettings(reusedSettings)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+});
+
+test('settings require the verified subject and write headers, and reject malformed, unknown or oversized values', async () => {
+  const owner = await client();
+  const other = await client();
+  const key = favorite().mangaKey;
+  await owner.mutateSettings(globalSettings());
+  await owner.mutateSettings(
+    mangaSettings(key, 0, { mode: ReaderMode.RIGHT_TO_LEFT }),
+  );
+  expect((await other.settings()).global?.revision).toBe(0);
+  expect((await other.settings(key)).manga?.revision).toBe(0);
+  for (const path of ['/api/settings', `/api/settings/manga/${key}`]) {
+    const forged = await other.request(path, {
+      headers: { 'X-App-Subject': owner.subject },
+    });
+    expect(forged.status).toBe(403);
+    expect(
+      settingsResponseSchema.parse(await forged.json()).error,
+    ).toBeDefined();
+  }
+  const forgedWrite = await other.request('/api/settings/mutations', {
+    method: 'POST',
+    headers: {
+      Origin: origin,
+      'X-App-Request': '1',
+      'X-App-Subject': owner.subject,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(toJson(SettingsMutationSchema, globalSettings())),
+  });
+  expect(forgedWrite.status).toBe(403);
+  expect(
+    settingsMutationResponseSchema.parse(await forgedWrite.json()).error,
+  ).toBeDefined();
+  expect(
+    (
+      await owner.request('/api/settings/mutations', {
+        method: 'POST',
+        body: '{}',
+      })
+    ).status,
+  ).toBe(403);
+  const values = toJson(SettingsMutationSchema, globalSettings(1));
+  for (const body of [
+    '{',
+    JSON.stringify({ ...values, unexpected: true }),
+    JSON.stringify({
+      ...values,
+      setGlobal: { theme: 99, reader: { mode: 1, pageLayout: 1 } },
+    }),
+    ' '.repeat(128 * 1024 + 1),
+  ]) {
+    const reply = await owner.request('/api/settings/mutations', {
+      method: 'POST',
+      headers: {
+        Origin: origin,
+        'X-App-Request': '1',
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
+    expect([400, 413]).toContain(reply.status);
+    expect(
+      settingsMutationResponseSchema.parse(await reply.json()).error,
+    ).toBeDefined();
+  }
+  const badKey = await owner.request('/api/settings/manga/not-a-key');
+  expect(badKey.status).toBe(400);
+  expect(settingsResponseSchema.parse(await badKey.json()).error).toBeDefined();
+  expect((await owner.settings()).global?.revision).toBe(1);
+});
+
+test('a settings batch failure rolls back values, scope/account revisions and its idempotency result', async () => {
+  const reader = await client();
+  const command = globalSettings();
+  await env.DB.exec(
+    `CREATE TRIGGER fail_settings BEFORE INSERT ON reader_settings WHEN NEW.subject = '${reader.subject}' BEGIN SELECT RAISE(ABORT, 'controlled settings failure'); END`,
+  );
+  try {
+    expect((await reader.mutateSettings(command)).status).toBe(503);
+    const canonical = await reader.settings();
+    expect(canonical.accountRevision).toBe(0);
+    expect(canonical.global?.revision).toBe(0);
+    expect(canonical.global?.values?.theme).toBe(AppTheme.SYSTEM);
+    expect(
+      await env.DB.prepare(
+        'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+      )
+        .bind(reader.subject)
+        .first('count'),
+    ).toBe(0);
+  } finally {
+    await env.DB.exec('DROP TRIGGER fail_settings');
+  }
+  const retried = await reader.mutateSettings(command);
+  expect(retried.status).toBe(200);
+  expect(retried.body.accountRevision).toBe(1);
+  expect(retried.body.global?.revision).toBe(1);
+  expect(retried.body.global?.values?.theme).toBe(AppTheme.DARK);
 });

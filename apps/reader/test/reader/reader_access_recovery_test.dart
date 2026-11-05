@@ -250,8 +250,10 @@ void main() {
             .onChanged!(ReadingMode.rightToLeft);
         await tester.pumpAndSettle();
         tester
-            .widget<FilterChip>(find.widgetWithText(FilterChip, '双页'))
-            .onSelected!(true);
+            .widget<SegmentedButton<bool?>>(
+              find.byKey(const ValueKey('reader-page-layout')),
+            )
+            .onSelectionChanged!({true});
         await tester.pumpAndSettle();
         final original = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
         final anchor = original.manifest.positionAt(1, offset: .4);

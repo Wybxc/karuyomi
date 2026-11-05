@@ -43,6 +43,13 @@
       "when": 1793898415096,
       "tag": "0005_clear_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793899845694,
+      "tag": "0006_eager_deathbird",
+      "breakpoints": true
     }
   ]
 }

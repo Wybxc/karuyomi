@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file karuyomi/v1/business.proto.
  */
 export const file_karuyomi_v1_business: GenFile = /*@__PURE__*/
-  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgizQEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUSFAoMY2F0ZWdvcnlfaWRzGAcgAygJIiQKCENhdGVnb3J5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiTgoPQ2F0ZWdvcnlDYXRhbG9nEhAKCHJldmlzaW9uGAEgASgNEikKCmNhdGVnb3JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeSJICg1TZXRDYXRlZ29yaWVzEhQKDGNhdGVnb3J5X2lkcxgBIAMoCRIhChlleHBlY3RlZF9jYXRhbG9nX3JldmlzaW9uGAIgASgNIjkKDkNyZWF0ZUNhdGVnb3J5EicKCGNhdGVnb3J5GAEgASgLMhUua2FydXlvbWkudjEuQ2F0ZWdvcnkiMwoOUmVuYW1lQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIpChFSZW9yZGVyQ2F0ZWdvcmllcxIUCgxjYXRlZ29yeV9pZHMYASADKAkiJQoORGVsZXRlQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkizQIKEENhdGVnb3J5TXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNgoPY3JlYXRlX2NhdGVnb3J5GAogASgLMhsua2FydXlvbWkudjEuQ3JlYXRlQ2F0ZWdvcnlIABI2Cg9yZW5hbWVfY2F0ZWdvcnkYCyABKAsyGy5rYXJ1eW9taS52MS5SZW5hbWVDYXRlZ29yeUgAEjwKEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRlZ29yaWVzSAASNgoPZGVsZXRlX2NhdGVnb3J5GA0gASgLMhsua2FydXlvbWkudjEuRGVsZXRlQ2F0ZWdvcnlIAEILCglvcGVyYXRpb24ihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIjoKD0NoYXB0ZXJCb29rbWFyaxITCgtjaGFwdGVyX2tleRgBIAEoCRISCgpib29rbWFya2VkGAIgASgIIjYKC1NldEJvb2ttYXJrEhMKC2NoYXB0ZXJfa2V5GAEgASgJEhIKCmJvb2ttYXJrZWQYAiABKAgiTwoLU2V0RmF2b3JpdGUSLgoIbWV0YWRhdGEYASABKAsyHC5rYXJ1eW9taS52MS5MaWJyYXJ5TWV0YWRhdGESEAoIZmF2b3JpdGUYAiABKAgiiwEKDFNhdmVQcm9ncmVzcxIuCghzbmFwc2hvdBgBIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJTbmFwc2hvdBIzCghwcm9ncmVzcxgCIAEoCzIhLmthcnV5b21pLnYxLkNoYXB0ZXJQcm9ncmVzc1N0YXRlEhYKDnJldmVyc2VkX29yZGVyGAMgASgIIlcKDVJlc2V0UHJvZ3Jlc3MSLgoIc25hcHNob3QYASABKAsyHC5rYXJ1eW9taS52MS5DaGFwdGVyU25hcHNob3QSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgitAMKDVN0YXRlTXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSEQoJbWFuZ2Ffa2V5GAMgASgJEhkKEWV4cGVjdGVkX3JldmlzaW9uGAQgASgNEjAKDHNldF9mYXZvcml0ZRgKIAEoCzIYLmthcnV5b21pLnYxLlNldEZhdm9yaXRlSAASNwoPdXBkYXRlX21ldGFkYXRhGAsgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhSAASMgoNc2F2ZV9wcm9ncmVzcxgMIAEoCzIZLmthcnV5b21pLnYxLlNhdmVQcm9ncmVzc0gAEjQKDnJlc2V0X3Byb2dyZXNzGA0gASgLMhoua2FydXlvbWkudjEuUmVzZXRQcm9ncmVzc0gAEjQKDnNldF9jYXRlZ29yaWVzGA4gASgLMhoua2FydXlvbWkudjEuU2V0Q2F0ZWdvcmllc0gAEjAKDHNldF9ib29rbWFyaxgPIAEoCzIYLmthcnV5b21pLnYxLlNldEJvb2ttYXJrSABCCwoJb3BlcmF0aW9uImsKEkJ1c2luZXNzU3RhdGVFcnJvchIxCgRjb2RlGAEgASgOMiMua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIPCgdtZXNzYWdlGAIgASgJEhEKCXJldHJ5YWJsZRgDIAEoCCLTAgoVU3RhdGVNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SJgoFbWFuZ2EYBCABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAUgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgHIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgIIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayK7AgoSTWFuZ2FTdGF0ZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SJgoFbWFuZ2EYAyABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAQgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgHIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayLMAQoUQm9va21hcmtQYWdlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRIRCgltYW5nYV9rZXkYAyABKAkSLQoHZW50cmllcxgEIAMoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyaxIQCghuZXh0X2tleRgFIAEoCRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciLrAQoTTGlicmFyeVBhZ2VSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIYChBhY2NvdW50X3JldmlzaW9uGAIgASgNEigKB2VudHJpZXMYAyADKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEhAKCG5leHRfa2V5GAQgASgJEi4KBWVycm9yGAUgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yEjYKEGNhdGVnb3J5X2NhdGFsb2cYBiABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2ciyQEKGENhdGVnb3J5TXV0YXRpb25SZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIYChBhY2NvdW50X3JldmlzaW9uGAMgASgNEjYKEGNhdGVnb3J5X2NhdGFsb2cYBCABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2cSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3IiswEKF0NhdGVnb3J5Q2F0YWxvZ1Jlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SNgoQY2F0ZWdvcnlfY2F0YWxvZxgDIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCgVlcnJvchgEIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvcirZAgoWQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASKwonQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9JTlZBTElEX0lOUFVUEAESLworQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9SRVZJU0lPTl9DT05GTElDVBACEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfU1RBTEVfRVBPQ0gQAxIyCi5CVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0lERU1QT1RFTkNZX0NPTkZMSUNUEAQSKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9VTkFWQUlMQUJMRRAFEiwKKEJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfTElNSVRfRVhDRUVERUQQBmIGcHJvdG8z", [file_karuyomi_v1_control]);
+  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgizQEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUSFAoMY2F0ZWdvcnlfaWRzGAcgAygJIiQKCENhdGVnb3J5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiTgoPQ2F0ZWdvcnlDYXRhbG9nEhAKCHJldmlzaW9uGAEgASgNEikKCmNhdGVnb3JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeSJICg1TZXRDYXRlZ29yaWVzEhQKDGNhdGVnb3J5X2lkcxgBIAMoCRIhChlleHBlY3RlZF9jYXRhbG9nX3JldmlzaW9uGAIgASgNIjkKDkNyZWF0ZUNhdGVnb3J5EicKCGNhdGVnb3J5GAEgASgLMhUua2FydXlvbWkudjEuQ2F0ZWdvcnkiMwoOUmVuYW1lQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIpChFSZW9yZGVyQ2F0ZWdvcmllcxIUCgxjYXRlZ29yeV9pZHMYASADKAkiJQoORGVsZXRlQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkizQIKEENhdGVnb3J5TXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNgoPY3JlYXRlX2NhdGVnb3J5GAogASgLMhsua2FydXlvbWkudjEuQ3JlYXRlQ2F0ZWdvcnlIABI2Cg9yZW5hbWVfY2F0ZWdvcnkYCyABKAsyGy5rYXJ1eW9taS52MS5SZW5hbWVDYXRlZ29yeUgAEjwKEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRlZ29yaWVzSAASNgoPZGVsZXRlX2NhdGVnb3J5GA0gASgLMhsua2FydXlvbWkudjEuRGVsZXRlQ2F0ZWdvcnlIAEILCglvcGVyYXRpb24ihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIjoKD0NoYXB0ZXJCb29rbWFyaxITCgtjaGFwdGVyX2tleRgBIAEoCRISCgpib29rbWFya2VkGAIgASgIIjYKC1NldEJvb2ttYXJrEhMKC2NoYXB0ZXJfa2V5GAEgASgJEhIKCmJvb2ttYXJrZWQYAiABKAgiTwoLU2V0RmF2b3JpdGUSLgoIbWV0YWRhdGEYASABKAsyHC5rYXJ1eW9taS52MS5MaWJyYXJ5TWV0YWRhdGESEAoIZmF2b3JpdGUYAiABKAgiiwEKDFNhdmVQcm9ncmVzcxIuCghzbmFwc2hvdBgBIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJTbmFwc2hvdBIzCghwcm9ncmVzcxgCIAEoCzIhLmthcnV5b21pLnYxLkNoYXB0ZXJQcm9ncmVzc1N0YXRlEhYKDnJldmVyc2VkX29yZGVyGAMgASgIIlcKDVJlc2V0UHJvZ3Jlc3MSLgoIc25hcHNob3QYASABKAsyHC5rYXJ1eW9taS52MS5DaGFwdGVyU25hcHNob3QSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgitAMKDVN0YXRlTXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSEQoJbWFuZ2Ffa2V5GAMgASgJEhkKEWV4cGVjdGVkX3JldmlzaW9uGAQgASgNEjAKDHNldF9mYXZvcml0ZRgKIAEoCzIYLmthcnV5b21pLnYxLlNldEZhdm9yaXRlSAASNwoPdXBkYXRlX21ldGFkYXRhGAsgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhSAASMgoNc2F2ZV9wcm9ncmVzcxgMIAEoCzIZLmthcnV5b21pLnYxLlNhdmVQcm9ncmVzc0gAEjQKDnJlc2V0X3Byb2dyZXNzGA0gASgLMhoua2FydXlvbWkudjEuUmVzZXRQcm9ncmVzc0gAEjQKDnNldF9jYXRlZ29yaWVzGA4gASgLMhoua2FydXlvbWkudjEuU2V0Q2F0ZWdvcmllc0gAEjAKDHNldF9ib29rbWFyaxgPIAEoCzIYLmthcnV5b21pLnYxLlNldEJvb2ttYXJrSABCCwoJb3BlcmF0aW9uImsKEkJ1c2luZXNzU3RhdGVFcnJvchIxCgRjb2RlGAEgASgOMiMua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIPCgdtZXNzYWdlGAIgASgJEhEKCXJldHJ5YWJsZRgDIAEoCCLTAgoVU3RhdGVNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SJgoFbWFuZ2EYBCABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAUgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgHIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgIIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayK7AgoSTWFuZ2FTdGF0ZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SJgoFbWFuZ2EYAyABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAQgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgHIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayLMAQoUQm9va21hcmtQYWdlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRIRCgltYW5nYV9rZXkYAyABKAkSLQoHZW50cmllcxgEIAMoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyaxIQCghuZXh0X2tleRgFIAEoCRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciLrAQoTTGlicmFyeVBhZ2VSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIYChBhY2NvdW50X3JldmlzaW9uGAIgASgNEigKB2VudHJpZXMYAyADKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEhAKCG5leHRfa2V5GAQgASgJEi4KBWVycm9yGAUgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yEjYKEGNhdGVnb3J5X2NhdGFsb2cYBiABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2ciyQEKGENhdGVnb3J5TXV0YXRpb25SZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIYChBhY2NvdW50X3JldmlzaW9uGAMgASgNEjYKEGNhdGVnb3J5X2NhdGFsb2cYBCABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2cSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3IiswEKF0NhdGVnb3J5Q2F0YWxvZ1Jlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SNgoQY2F0ZWdvcnlfY2F0YWxvZxgDIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCgVlcnJvchgEIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciJrCg5SZWFkZXJTZXR0aW5ncxIlCgRtb2RlGAEgASgOMhcua2FydXlvbWkudjEuUmVhZGVyTW9kZRIyCgtwYWdlX2xheW91dBgCIAEoDjIdLmthcnV5b21pLnYxLlJlYWRlclBhZ2VMYXlvdXQilgEKFlJlYWRlclNldHRpbmdzT3ZlcnJpZGUSKgoEbW9kZRgBIAEoDjIXLmthcnV5b21pLnYxLlJlYWRlck1vZGVIAIgBARI3CgtwYWdlX2xheW91dBgCIAEoDjIdLmthcnV5b21pLnYxLlJlYWRlclBhZ2VMYXlvdXRIAYgBAUIHCgVfbW9kZUIOCgxfcGFnZV9sYXlvdXQiaQoUR2xvYmFsU2V0dGluZ3NWYWx1ZXMSJAoFdGhlbWUYASABKA4yFS5rYXJ1eW9taS52MS5BcHBUaGVtZRIrCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5ncyJVCg5HbG9iYWxTZXR0aW5ncxIQCghyZXZpc2lvbhgBIAEoDRIxCgZ2YWx1ZXMYAiABKAsyIS5rYXJ1eW9taS52MS5HbG9iYWxTZXR0aW5nc1ZhbHVlcyJyChNNYW5nYVJlYWRlclNldHRpbmdzEhEKCW1hbmdhX2tleRgBIAEoCRIQCghyZXZpc2lvbhgCIAEoDRI2CglvdmVycmlkZXMYAyABKAsyIy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5nc092ZXJyaWRlImMKFlNldE1hbmdhUmVhZGVyU2V0dGluZ3MSEQoJbWFuZ2Ffa2V5GAEgASgJEjYKCW92ZXJyaWRlcxgCIAEoCzIjLmthcnV5b21pLnYxLlJlYWRlclNldHRpbmdzT3ZlcnJpZGUi2gEKEFNldHRpbmdzTXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNwoKc2V0X2dsb2JhbBgKIAEoCzIhLmthcnV5b21pLnYxLkdsb2JhbFNldHRpbmdzVmFsdWVzSAASOAoJc2V0X21hbmdhGAsgASgLMiMua2FydXlvbWkudjEuU2V0TWFuZ2FSZWFkZXJTZXR0aW5nc0gAQgsKCW9wZXJhdGlvbiKJAgoQU2V0dGluZ3NSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIYChBhY2NvdW50X3JldmlzaW9uGAIgASgNEisKBmdsb2JhbBgDIAEoCzIbLmthcnV5b21pLnYxLkdsb2JhbFNldHRpbmdzEi8KBW1hbmdhGAQgASgLMiAua2FydXlvbWkudjEuTWFuZ2FSZWFkZXJTZXR0aW5ncxI1ChBlZmZlY3RpdmVfcmVhZGVyGAUgASgLMhsua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3MSLgoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3IipgIKGFNldHRpbmdzTXV0YXRpb25SZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIYChBhY2NvdW50X3JldmlzaW9uGAMgASgNEisKBmdsb2JhbBgEIAEoCzIbLmthcnV5b21pLnYxLkdsb2JhbFNldHRpbmdzEi8KBW1hbmdhGAUgASgLMiAua2FydXlvbWkudjEuTWFuZ2FSZWFkZXJTZXR0aW5ncxI1ChBlZmZlY3RpdmVfcmVhZGVyGAYgASgLMhsua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3MSLgoFZXJyb3IYByABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3Iq2QIKFkJ1c2luZXNzU3RhdGVFcnJvckNvZGUSKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9VTlNQRUNJRklFRBAAEisKJ0JVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfSU5WQUxJRF9JTlBVVBABEi8KK0JVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfUkVWSVNJT05fQ09ORkxJQ1QQAhIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1NUQUxFX0VQT0NIEAMSMgouQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9JREVNUE9URU5DWV9DT05GTElDVBAEEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfVU5BVkFJTEFCTEUQBRIsCihCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0xJTUlUX0VYQ0VFREVEEAYqZAoIQXBwVGhlbWUSGQoVQVBQX1RIRU1FX1VOU1BFQ0lGSUVEEAASFAoQQVBQX1RIRU1FX1NZU1RFTRABEhMKD0FQUF9USEVNRV9MSUdIVBACEhIKDkFQUF9USEVNRV9EQVJLEAMqnAEKClJlYWRlck1vZGUSGwoXUkVBREVSX01PREVfVU5TUEVDSUZJRUQQABIdChlSRUFERVJfTU9ERV9MRUZUX1RPX1JJR0hUEAESHQoZUkVBREVSX01PREVfUklHSFRfVE9fTEVGVBACEhoKFlJFQURFUl9NT0RFX0NPTlRJTlVPVVMQAxIXChNSRUFERVJfTU9ERV9XRUJUT09OEAQqkQEKEFJlYWRlclBhZ2VMYXlvdXQSIgoeUkVBREVSX1BBR0VfTEFZT1VUX1VOU1BFQ0lGSUVEEAASGwoXUkVBREVSX1BBR0VfTEFZT1VUX0FVVE8QARIdChlSRUFERVJfUEFHRV9MQVlPVVRfU0lOR0xFEAISHQoZUkVBREVSX1BBR0VfTEFZT1VUX0RPVUJMRRADYgZwcm90bzM", [file_karuyomi_v1_control]);
 
 /**
  * Server-owned, account-scoped business state. Authentication is supplied by
@@ -1574,6 +1574,490 @@ export const CategoryCatalogResponseSchema: GenMessage<CategoryCatalogResponse, 
   messageDesc(file_karuyomi_v1_business, 26);
 
 /**
+ * @generated from message karuyomi.v1.ReaderSettings
+ */
+export type ReaderSettings = Message<"karuyomi.v1.ReaderSettings"> & {
+  /**
+   * @generated from field: karuyomi.v1.ReaderMode mode = 1;
+   */
+  mode: ReaderMode;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderPageLayout page_layout = 2;
+   */
+  pageLayout: ReaderPageLayout;
+};
+
+/**
+ * @generated from message karuyomi.v1.ReaderSettings
+ */
+export type ReaderSettingsJson = {
+  /**
+   * @generated from field: karuyomi.v1.ReaderMode mode = 1;
+   */
+  mode?: ReaderModeJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderPageLayout page_layout = 2;
+   */
+  pageLayout?: ReaderPageLayoutJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.ReaderSettings.
+ * Use `create(ReaderSettingsSchema)` to create a new message.
+ */
+export const ReaderSettingsSchema: GenMessage<ReaderSettings, {jsonType: ReaderSettingsJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 27);
+
+/**
+ * Missing fields inherit the global reader preference. AUTO is an explicit
+ * value, distinct from inheritance. An empty message clears all overrides.
+ *
+ * @generated from message karuyomi.v1.ReaderSettingsOverride
+ */
+export type ReaderSettingsOverride = Message<"karuyomi.v1.ReaderSettingsOverride"> & {
+  /**
+   * @generated from field: optional karuyomi.v1.ReaderMode mode = 1;
+   */
+  mode?: ReaderMode | undefined;
+
+  /**
+   * @generated from field: optional karuyomi.v1.ReaderPageLayout page_layout = 2;
+   */
+  pageLayout?: ReaderPageLayout | undefined;
+};
+
+/**
+ * Missing fields inherit the global reader preference. AUTO is an explicit
+ * value, distinct from inheritance. An empty message clears all overrides.
+ *
+ * @generated from message karuyomi.v1.ReaderSettingsOverride
+ */
+export type ReaderSettingsOverrideJson = {
+  /**
+   * @generated from field: optional karuyomi.v1.ReaderMode mode = 1;
+   */
+  mode?: ReaderModeJson;
+
+  /**
+   * @generated from field: optional karuyomi.v1.ReaderPageLayout page_layout = 2;
+   */
+  pageLayout?: ReaderPageLayoutJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.ReaderSettingsOverride.
+ * Use `create(ReaderSettingsOverrideSchema)` to create a new message.
+ */
+export const ReaderSettingsOverrideSchema: GenMessage<ReaderSettingsOverride, {jsonType: ReaderSettingsOverrideJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 28);
+
+/**
+ * @generated from message karuyomi.v1.GlobalSettingsValues
+ */
+export type GlobalSettingsValues = Message<"karuyomi.v1.GlobalSettingsValues"> & {
+  /**
+   * @generated from field: karuyomi.v1.AppTheme theme = 1;
+   */
+  theme: AppTheme;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettings reader = 2;
+   */
+  reader?: ReaderSettings | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.GlobalSettingsValues
+ */
+export type GlobalSettingsValuesJson = {
+  /**
+   * @generated from field: karuyomi.v1.AppTheme theme = 1;
+   */
+  theme?: AppThemeJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettings reader = 2;
+   */
+  reader?: ReaderSettingsJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.GlobalSettingsValues.
+ * Use `create(GlobalSettingsValuesSchema)` to create a new message.
+ */
+export const GlobalSettingsValuesSchema: GenMessage<GlobalSettingsValues, {jsonType: GlobalSettingsValuesJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 29);
+
+/**
+ * @generated from message karuyomi.v1.GlobalSettings
+ */
+export type GlobalSettings = Message<"karuyomi.v1.GlobalSettings"> & {
+  /**
+   * @generated from field: uint32 revision = 1;
+   */
+  revision: number;
+
+  /**
+   * @generated from field: karuyomi.v1.GlobalSettingsValues values = 2;
+   */
+  values?: GlobalSettingsValues | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.GlobalSettings
+ */
+export type GlobalSettingsJson = {
+  /**
+   * @generated from field: uint32 revision = 1;
+   */
+  revision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.GlobalSettingsValues values = 2;
+   */
+  values?: GlobalSettingsValuesJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.GlobalSettings.
+ * Use `create(GlobalSettingsSchema)` to create a new message.
+ */
+export const GlobalSettingsSchema: GenMessage<GlobalSettings, {jsonType: GlobalSettingsJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 30);
+
+/**
+ * @generated from message karuyomi.v1.MangaReaderSettings
+ */
+export type MangaReaderSettings = Message<"karuyomi.v1.MangaReaderSettings"> & {
+  /**
+   * @generated from field: string manga_key = 1;
+   */
+  mangaKey: string;
+
+  /**
+   * @generated from field: uint32 revision = 2;
+   */
+  revision: number;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettingsOverride overrides = 3;
+   */
+  overrides?: ReaderSettingsOverride | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.MangaReaderSettings
+ */
+export type MangaReaderSettingsJson = {
+  /**
+   * @generated from field: string manga_key = 1;
+   */
+  mangaKey?: string;
+
+  /**
+   * @generated from field: uint32 revision = 2;
+   */
+  revision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettingsOverride overrides = 3;
+   */
+  overrides?: ReaderSettingsOverrideJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.MangaReaderSettings.
+ * Use `create(MangaReaderSettingsSchema)` to create a new message.
+ */
+export const MangaReaderSettingsSchema: GenMessage<MangaReaderSettings, {jsonType: MangaReaderSettingsJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 31);
+
+/**
+ * @generated from message karuyomi.v1.SetMangaReaderSettings
+ */
+export type SetMangaReaderSettings = Message<"karuyomi.v1.SetMangaReaderSettings"> & {
+  /**
+   * @generated from field: string manga_key = 1;
+   */
+  mangaKey: string;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettingsOverride overrides = 2;
+   */
+  overrides?: ReaderSettingsOverride | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.SetMangaReaderSettings
+ */
+export type SetMangaReaderSettingsJson = {
+  /**
+   * @generated from field: string manga_key = 1;
+   */
+  mangaKey?: string;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettingsOverride overrides = 2;
+   */
+  overrides?: ReaderSettingsOverrideJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.SetMangaReaderSettings.
+ * Use `create(SetMangaReaderSettingsSchema)` to create a new message.
+ */
+export const SetMangaReaderSettingsSchema: GenMessage<SetMangaReaderSettings, {jsonType: SetMangaReaderSettingsJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 32);
+
+/**
+ * @generated from message karuyomi.v1.SettingsMutation
+ */
+export type SettingsMutation = Message<"karuyomi.v1.SettingsMutation"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId: string;
+
+  /**
+   * CAS for the selected scope, independent of reading-progress revisions.
+   *
+   * @generated from field: uint32 expected_revision = 3;
+   */
+  expectedRevision: number;
+
+  /**
+   * @generated from oneof karuyomi.v1.SettingsMutation.operation
+   */
+  operation: {
+    /**
+     * @generated from field: karuyomi.v1.GlobalSettingsValues set_global = 10;
+     */
+    value: GlobalSettingsValues;
+    case: "setGlobal";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.SetMangaReaderSettings set_manga = 11;
+     */
+    value: SetMangaReaderSettings;
+    case: "setManga";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * @generated from message karuyomi.v1.SettingsMutation
+ */
+export type SettingsMutationJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId?: string;
+
+  /**
+   * CAS for the selected scope, independent of reading-progress revisions.
+   *
+   * @generated from field: uint32 expected_revision = 3;
+   */
+  expectedRevision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.GlobalSettingsValues set_global = 10;
+   */
+  setGlobal?: GlobalSettingsValuesJson;
+
+  /**
+   * @generated from field: karuyomi.v1.SetMangaReaderSettings set_manga = 11;
+   */
+  setManga?: SetMangaReaderSettingsJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.SettingsMutation.
+ * Use `create(SettingsMutationSchema)` to create a new message.
+ */
+export const SettingsMutationSchema: GenMessage<SettingsMutation, {jsonType: SettingsMutationJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 33);
+
+/**
+ * @generated from message karuyomi.v1.SettingsResponse
+ */
+export type SettingsResponse = Message<"karuyomi.v1.SettingsResponse"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision: number;
+
+  /**
+   * @generated from field: karuyomi.v1.GlobalSettings global = 3;
+   */
+  global?: GlobalSettings | undefined;
+
+  /**
+   * Present only for a manga-scoped request, even when no row exists yet.
+   *
+   * @generated from field: karuyomi.v1.MangaReaderSettings manga = 4;
+   */
+  manga?: MangaReaderSettings | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettings effective_reader = 5;
+   */
+  effectiveReader?: ReaderSettings | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 6;
+   */
+  error?: BusinessStateError | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.SettingsResponse
+ */
+export type SettingsResponseJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.GlobalSettings global = 3;
+   */
+  global?: GlobalSettingsJson;
+
+  /**
+   * Present only for a manga-scoped request, even when no row exists yet.
+   *
+   * @generated from field: karuyomi.v1.MangaReaderSettings manga = 4;
+   */
+  manga?: MangaReaderSettingsJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettings effective_reader = 5;
+   */
+  effectiveReader?: ReaderSettingsJson;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 6;
+   */
+  error?: BusinessStateErrorJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.SettingsResponse.
+ * Use `create(SettingsResponseSchema)` to create a new message.
+ */
+export const SettingsResponseSchema: GenMessage<SettingsResponse, {jsonType: SettingsResponseJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 34);
+
+/**
+ * @generated from message karuyomi.v1.SettingsMutationResponse
+ */
+export type SettingsMutationResponse = Message<"karuyomi.v1.SettingsMutationResponse"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId: string;
+
+  /**
+   * @generated from field: uint32 account_revision = 3;
+   */
+  accountRevision: number;
+
+  /**
+   * @generated from field: karuyomi.v1.GlobalSettings global = 4;
+   */
+  global?: GlobalSettings | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.MangaReaderSettings manga = 5;
+   */
+  manga?: MangaReaderSettings | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettings effective_reader = 6;
+   */
+  effectiveReader?: ReaderSettings | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 7;
+   */
+  error?: BusinessStateError | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.SettingsMutationResponse
+ */
+export type SettingsMutationResponseJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId?: string;
+
+  /**
+   * @generated from field: uint32 account_revision = 3;
+   */
+  accountRevision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.GlobalSettings global = 4;
+   */
+  global?: GlobalSettingsJson;
+
+  /**
+   * @generated from field: karuyomi.v1.MangaReaderSettings manga = 5;
+   */
+  manga?: MangaReaderSettingsJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ReaderSettings effective_reader = 6;
+   */
+  effectiveReader?: ReaderSettingsJson;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 7;
+   */
+  error?: BusinessStateErrorJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.SettingsMutationResponse.
+ * Use `create(SettingsMutationResponseSchema)` to create a new message.
+ */
+export const SettingsMutationResponseSchema: GenMessage<SettingsMutationResponse, {jsonType: SettingsMutationResponseJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 35);
+
+/**
  * @generated from enum karuyomi.v1.BusinessStateErrorCode
  */
 export enum BusinessStateErrorCode {
@@ -1623,4 +2107,117 @@ export type BusinessStateErrorCodeJson = "BUSINESS_STATE_ERROR_CODE_UNSPECIFIED"
  */
 export const BusinessStateErrorCodeSchema: GenEnum<BusinessStateErrorCode, BusinessStateErrorCodeJson> = /*@__PURE__*/
   enumDesc(file_karuyomi_v1_business, 0);
+
+/**
+ * @generated from enum karuyomi.v1.AppTheme
+ */
+export enum AppTheme {
+  /**
+   * @generated from enum value: APP_THEME_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: APP_THEME_SYSTEM = 1;
+   */
+  SYSTEM = 1,
+
+  /**
+   * @generated from enum value: APP_THEME_LIGHT = 2;
+   */
+  LIGHT = 2,
+
+  /**
+   * @generated from enum value: APP_THEME_DARK = 3;
+   */
+  DARK = 3,
+}
+
+/**
+ * @generated from enum karuyomi.v1.AppTheme
+ */
+export type AppThemeJson = "APP_THEME_UNSPECIFIED" | "APP_THEME_SYSTEM" | "APP_THEME_LIGHT" | "APP_THEME_DARK";
+
+/**
+ * Describes the enum karuyomi.v1.AppTheme.
+ */
+export const AppThemeSchema: GenEnum<AppTheme, AppThemeJson> = /*@__PURE__*/
+  enumDesc(file_karuyomi_v1_business, 1);
+
+/**
+ * @generated from enum karuyomi.v1.ReaderMode
+ */
+export enum ReaderMode {
+  /**
+   * @generated from enum value: READER_MODE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: READER_MODE_LEFT_TO_RIGHT = 1;
+   */
+  LEFT_TO_RIGHT = 1,
+
+  /**
+   * @generated from enum value: READER_MODE_RIGHT_TO_LEFT = 2;
+   */
+  RIGHT_TO_LEFT = 2,
+
+  /**
+   * @generated from enum value: READER_MODE_CONTINUOUS = 3;
+   */
+  CONTINUOUS = 3,
+
+  /**
+   * @generated from enum value: READER_MODE_WEBTOON = 4;
+   */
+  WEBTOON = 4,
+}
+
+/**
+ * @generated from enum karuyomi.v1.ReaderMode
+ */
+export type ReaderModeJson = "READER_MODE_UNSPECIFIED" | "READER_MODE_LEFT_TO_RIGHT" | "READER_MODE_RIGHT_TO_LEFT" | "READER_MODE_CONTINUOUS" | "READER_MODE_WEBTOON";
+
+/**
+ * Describes the enum karuyomi.v1.ReaderMode.
+ */
+export const ReaderModeSchema: GenEnum<ReaderMode, ReaderModeJson> = /*@__PURE__*/
+  enumDesc(file_karuyomi_v1_business, 2);
+
+/**
+ * @generated from enum karuyomi.v1.ReaderPageLayout
+ */
+export enum ReaderPageLayout {
+  /**
+   * @generated from enum value: READER_PAGE_LAYOUT_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: READER_PAGE_LAYOUT_AUTO = 1;
+   */
+  AUTO = 1,
+
+  /**
+   * @generated from enum value: READER_PAGE_LAYOUT_SINGLE = 2;
+   */
+  SINGLE = 2,
+
+  /**
+   * @generated from enum value: READER_PAGE_LAYOUT_DOUBLE = 3;
+   */
+  DOUBLE = 3,
+}
+
+/**
+ * @generated from enum karuyomi.v1.ReaderPageLayout
+ */
+export type ReaderPageLayoutJson = "READER_PAGE_LAYOUT_UNSPECIFIED" | "READER_PAGE_LAYOUT_AUTO" | "READER_PAGE_LAYOUT_SINGLE" | "READER_PAGE_LAYOUT_DOUBLE";
+
+/**
+ * Describes the enum karuyomi.v1.ReaderPageLayout.
+ */
+export const ReaderPageLayoutSchema: GenEnum<ReaderPageLayout, ReaderPageLayoutJson> = /*@__PURE__*/
+  enumDesc(file_karuyomi_v1_business, 3);
 

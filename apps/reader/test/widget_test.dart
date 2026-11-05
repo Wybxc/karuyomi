@@ -34,7 +34,8 @@ void main() {
       expect(find.text('连接漫画服务'), findsOneWidget);
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();
-      expect(find.text('外观'), findsOneWidget);
+      expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<wire.AppTheme>), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }

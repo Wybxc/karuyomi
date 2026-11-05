@@ -26,6 +26,17 @@ final class _Account {
   final mangas = <String, wire.MangaState>{};
   final progress = <(String, String), wire.ChapterProgressState>{};
   final bookmarks = <(String, String)>{};
+  final globalSettings = wire.GlobalSettings(
+    revision: 0,
+    values: wire.GlobalSettingsValues(
+      theme: wire.AppTheme.APP_THEME_SYSTEM,
+      reader: wire.ReaderSettings(
+        mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
+        pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
+      ),
+    ),
+  );
+  final mangaSettings = <String, wire.MangaReaderSettings>{};
   final mutations = <String, (String, ApiReply)>{};
 }
 
@@ -110,6 +121,36 @@ final class TestBusinessServer implements ApiFetch {
       );
     }
     final account = _account(trustedSubject);
+    if (request.method == 'GET' &&
+        (request.uri.path == '/api/settings' ||
+            request.uri.path.startsWith('/api/settings/manga/'))) {
+      final key = request.uri.path == '/api/settings'
+          ? null
+          : request.uri.pathSegments.last;
+      return _reply(_settingsSnapshot(account, mangaKey: key));
+    }
+    if (request.method == 'POST' &&
+        request.uri.path == '/api/settings/mutations') {
+      if (failWrites) {
+        final mutation = wire.decodeProtoJson(
+          wire.SettingsMutation(),
+          jsonDecode(request.body!),
+        );
+        return _errorReply(
+          request,
+          wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_UNAVAILABLE,
+          'Injected business write failure',
+          status: 503,
+          mutationId: mutation.mutationId,
+        );
+      }
+      final response = _mutateSettings(account, request);
+      if (loseNextResponse) {
+        loseNextResponse = false;
+        throw StateError('Injected lost settings mutation response');
+      }
+      return response;
+    }
     if (request.method == 'GET' && request.uri.path == '/api/categories') {
       return _reply(
         wire.CategoryCatalogResponse(
@@ -276,6 +317,105 @@ final class TestBusinessServer implements ApiFetch {
     throw StateError(
       'Unexpected business API ${request.method} ${request.path}',
     );
+  }
+
+  wire.SettingsResponse _settingsSnapshot(
+    _Account account, {
+    String? mangaKey,
+  }) {
+    final manga = mangaKey == null
+        ? null
+        : (account.mangaSettings[mangaKey]?.deepCopy() ??
+              wire.MangaReaderSettings(
+                mangaKey: mangaKey,
+                overrides: wire.ReaderSettingsOverride(),
+              ));
+    final defaults = account.globalSettings.values.reader;
+    final overrides = manga?.overrides;
+    return wire.SettingsResponse(
+      schemaVersion: 1,
+      accountRevision: account.revision,
+      global: account.globalSettings.deepCopy(),
+      manga: manga,
+      effectiveReader: wire.ReaderSettings(
+        mode: overrides?.hasMode() == true ? overrides!.mode : defaults.mode,
+        pageLayout: overrides?.hasPageLayout() == true
+            ? overrides!.pageLayout
+            : defaults.pageLayout,
+      ),
+    );
+  }
+
+  ApiReply _mutateSettings(_Account account, TestBusinessRequest request) {
+    final mutation = wire.decodeProtoJson(
+      wire.SettingsMutation(),
+      jsonDecode(request.body!),
+      maxBytes: 128 * 1024,
+    );
+    final key = mutation.hasSetManga() ? mutation.setManga.mangaKey : null;
+    ApiReply response({wire.BusinessStateError? error, int status = 200}) {
+      final snapshot = _settingsSnapshot(account, mangaKey: key);
+      return _reply(
+        wire.SettingsMutationResponse(
+          schemaVersion: 1,
+          mutationId: mutation.mutationId,
+          accountRevision: snapshot.accountRevision,
+          global: snapshot.global,
+          manga: snapshot.hasManga() ? snapshot.manga : null,
+          effectiveReader: snapshot.effectiveReader,
+          error: error,
+        ),
+        status: status,
+      );
+    }
+
+    final fingerprint =
+        'settings\n${jsonEncode(wire.encodeProtoJson(mutation))}';
+    final previous = account.mutations[mutation.mutationId];
+    if (previous != null) {
+      return previous.$1 == fingerprint
+          ? previous.$2
+          : response(
+              error: _error(
+                wire
+                    .BusinessStateErrorCode
+                    .BUSINESS_STATE_ERROR_CODE_IDEMPOTENCY_CONFLICT,
+                'Mutation ID already has a different payload',
+              ),
+              status: 409,
+            );
+    }
+    final revision = key == null
+        ? account.globalSettings.revision
+        : (account.mangaSettings[key]?.revision ?? 0);
+    if (mutation.expectedRevision != revision) {
+      return response(
+        error: _error(
+          wire
+              .BusinessStateErrorCode
+              .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+          'Settings changed on another device',
+        ),
+        status: 409,
+      );
+    }
+    if (mutation.hasSetGlobal()) {
+      account.globalSettings.revision++;
+      account.globalSettings.values = mutation.setGlobal.deepCopy();
+    } else if (mutation.hasSetManga()) {
+      account.mangaSettings[key!] = wire.MangaReaderSettings(
+        mangaKey: key,
+        revision: revision + 1,
+        overrides: mutation.setManga.overrides.deepCopy(),
+      );
+    } else {
+      throw StateError('Missing settings operation');
+    }
+    account.revision++;
+    final reply = response();
+    account.mutations[mutation.mutationId] = (fingerprint, reply);
+    appliedMutations++;
+    return reply;
   }
 
   ApiReply _mutate(_Account account, TestBusinessRequest request) {
@@ -612,6 +752,22 @@ final class TestBusinessServer implements ApiFetch {
     String mutationId = '',
   }) {
     final error = _error(code, message);
+    if (request.uri.path == '/api/settings/mutations') {
+      return _reply(
+        wire.SettingsMutationResponse(
+          schemaVersion: 1,
+          mutationId: mutationId,
+          error: error,
+        ),
+        status: status,
+      );
+    }
+    if (request.uri.path.startsWith('/api/settings')) {
+      return _reply(
+        wire.SettingsResponse(schemaVersion: 1, error: error),
+        status: status,
+      );
+    }
     if (request.uri.path.endsWith('/bookmarks')) {
       return _reply(
         wire.BookmarkPageResponse(

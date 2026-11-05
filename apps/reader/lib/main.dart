@@ -10,6 +10,8 @@ import 'features/reader/chapter_reader_route.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
 import 'features/library/library_page.dart';
+import 'features/settings/settings_controller.dart';
+import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
 
 void main() => runApp(const KaruyomiApp());
@@ -75,10 +77,12 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _index = 0;
   PlatformRuntime? _platform;
   CatalogController? _catalog;
+  SettingsController? _settings;
+  ThemeMode _confirmedTheme = ThemeMode.system;
   String? _configurationError;
   Map<String, Object?>? _pendingContinuation;
   final _retiredProgress = <ReadingProgressController>{};
@@ -94,11 +98,73 @@ class _AppShellState extends State<AppShell> {
     Icons.tune_outlined,
   ];
 
-  void _select(int index) => setState(() => _index = index);
+  void _select(int index) {
+    setState(() => _index = index);
+    if (index == 2) unawaited(_settings?.refresh());
+  }
+
+  void _clearSettings() {
+    _settings?.removeListener(_settingsChanged);
+    _settings?.dispose();
+    _settings = null;
+  }
+
+  void _settingsChanged() {
+    if (!mounted) return;
+    final settings = _settings;
+    final snapshot = settings?.snapshot;
+    if (settings?.available == true && snapshot != null) {
+      _applyTheme(appTheme(snapshot.global.theme));
+    }
+    setState(() {});
+  }
+
+  void _applyTheme(ThemeMode value) {
+    if (_confirmedTheme == value) return;
+    _confirmedTheme = value;
+    widget.onThemeChanged(value);
+  }
+
+  void _catalogChanged() {
+    if (!mounted) return;
+    final catalog = _catalog;
+    _settings?.checkCurrent();
+    if (catalog == null || catalog.status != ServiceStatus.ready) return;
+    final repository = catalog.settings;
+    if (repository == null ||
+        (identical(repository, _settings?.repository) &&
+            _settings!.available)) {
+      return;
+    }
+    if (_settings?.repository.identity.key != repository.identity.key) {
+      _applyTheme(ThemeMode.system);
+    }
+    _clearSettings();
+    final subject = catalog.subject;
+    final origin = catalog.deploymentOrigin?.origin;
+    _settings = SettingsController(
+      repository: repository,
+      isCurrent: () =>
+          mounted &&
+          identical(catalog, _catalog) &&
+          !catalog.accessPaused &&
+          catalog.subject == subject &&
+          catalog.deploymentOrigin?.origin == origin &&
+          identical(catalog.settings, repository),
+    )..addListener(_settingsChanged);
+    unawaited(_settings!.refresh());
+    setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_settings?.refresh());
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _configure(widget.platform);
   }
 
@@ -117,7 +183,7 @@ class _AppShellState extends State<AppShell> {
         runtime: _platform!.runtime,
         rebuildRuntime: _platform!.rebuild,
         deploymentOrigin: _platform!.origin,
-      );
+      )..addListener(_catalogChanged);
       _configurationError = null;
       final continuation = _platform!.takePendingAuthentication();
       if (continuation?['pending'] case final Map pending) {
@@ -150,6 +216,7 @@ class _AppShellState extends State<AppShell> {
         if (!controller.adoptReadingProgress(client)) continue;
         _retiredProgress.remove(client);
       }
+      _catalogChanged();
       setState(() {});
     }
     if (!mounted ||
@@ -292,7 +359,10 @@ class _AppShellState extends State<AppShell> {
       }
       final old = _platform;
       final oldCatalog = _catalog;
+      _clearSettings();
+      _applyTheme(ThemeMode.system);
       if (oldCatalog != null) {
+        oldCatalog.removeListener(_catalogChanged);
         await oldCatalog.flushReadingProgress();
         _retiredProgress.addAll(oldCatalog.takeUnsavedReadingProgress());
         oldCatalog.dispose();
@@ -343,21 +413,13 @@ class _AppShellState extends State<AppShell> {
           children: [
             _connectionSettings(),
             const SizedBox(height: 24),
-            DropdownButtonFormField<ThemeMode>(
-              initialValue: widget.themeMode,
-              decoration: const InputDecoration(
-                labelText: '外观',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: ThemeMode.system, child: Text('跟随系统')),
-                DropdownMenuItem(value: ThemeMode.light, child: Text('浅色')),
-                DropdownMenuItem(value: ThemeMode.dark, child: Text('深色')),
-              ],
-              onChanged: (value) {
-                if (value != null) widget.onThemeChanged(value);
-              },
-            ),
+            if (_settings case final settings?)
+              GlobalSettingsPanel(
+                key: ObjectKey(settings),
+                controller: settings,
+              )
+            else
+              const Text('连接并确认身份后可读取和保存同步设置。'),
             const SizedBox(height: 24),
             const ListTile(
               contentPadding: EdgeInsets.zero,
@@ -483,6 +545,9 @@ class _AppShellState extends State<AppShell> {
     final catalog = _catalog;
     final platform = _platform;
     final retired = _retiredProgress.toList();
+    WidgetsBinding.instance.removeObserver(this);
+    _clearSettings();
+    catalog?.removeListener(_catalogChanged);
     catalog?.dispose();
     unawaited(() async {
       await catalog?.closeReadingProgress();

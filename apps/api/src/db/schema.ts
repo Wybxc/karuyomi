@@ -83,11 +83,23 @@ export const stateMutations = sqliteTable(
     requestHash: text('request_hash').notNull(),
     attemptNonce: text('attempt_nonce').notNull(),
     responseJson: text('response_json').notNull(),
-    kind: text('kind', { enum: ['manga', 'category'] })
+    kind: text('kind', { enum: ['manga', 'category', 'settings'] })
       .notNull()
       .default('manga'),
   },
   (table) => [primaryKey({ columns: [table.subject, table.mutationId] })],
+);
+
+export const readerSettings = sqliteTable(
+  'reader_settings',
+  {
+    subject: text('subject').notNull(),
+    // Empty key is the account default; manga overrides use canonical manga keys.
+    scopeKey: text('scope_key').notNull(),
+    revision: integer('revision').notNull(),
+    valuesJson: text('values_json').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.subject, table.scopeKey] })],
 );
 
 export const mangaCategories = sqliteTable(

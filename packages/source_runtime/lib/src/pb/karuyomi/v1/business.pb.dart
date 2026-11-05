@@ -2669,6 +2669,866 @@ class CategoryCatalogResponse extends $pb.GeneratedMessage {
   BusinessStateError ensureError() => $_ensure(3);
 }
 
+class ReaderSettings extends $pb.GeneratedMessage {
+  factory ReaderSettings({
+    ReaderMode? mode,
+    ReaderPageLayout? pageLayout,
+  }) {
+    final result = ReaderSettings._();
+    if (mode != null) result.mode = mode;
+    if (pageLayout != null) result.pageLayout = pageLayout;
+    return result;
+  }
+
+  ReaderSettings._();
+
+  factory ReaderSettings.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReaderSettings()..mergeFromBuffer(data, registry);
+  factory ReaderSettings.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReaderSettings()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReaderSettings',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ReaderSettings.$_createMessage)
+    ..aE<ReaderMode>(1, _omitFieldNames ? '' : 'mode',
+        enumValues: ReaderMode.values)
+    ..aE<ReaderPageLayout>(2, _omitFieldNames ? '' : 'pageLayout',
+        enumValues: ReaderPageLayout.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReaderSettings clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReaderSettings copyWith(void Function(ReaderSettings) updates) =>
+      super.copyWith((message) => updates(message as ReaderSettings))
+          as ReaderSettings;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ReaderSettings() / ReaderSettings.new instead')
+  static ReaderSettings create() => ReaderSettings._();
+  static $pb.GeneratedMessage $_createMessage() => ReaderSettings._();
+  @$core.override
+  ReaderSettings createEmptyInstance() => ReaderSettings._();
+  @$core.pragma('dart2js:noInline')
+  static ReaderSettings getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ReaderSettings>(
+          ReaderSettings.$_createMessage);
+  static ReaderSettings? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ReaderMode get mode => $_getN(0);
+  @$pb.TagNumber(1)
+  set mode(ReaderMode value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMode() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ReaderPageLayout get pageLayout => $_getN(1);
+  @$pb.TagNumber(2)
+  set pageLayout(ReaderPageLayout value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageLayout() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageLayout() => $_clearField(2);
+}
+
+/// Missing fields inherit the global reader preference. AUTO is an explicit
+/// value, distinct from inheritance. An empty message clears all overrides.
+class ReaderSettingsOverride extends $pb.GeneratedMessage {
+  factory ReaderSettingsOverride({
+    ReaderMode? mode,
+    ReaderPageLayout? pageLayout,
+  }) {
+    final result = ReaderSettingsOverride._();
+    if (mode != null) result.mode = mode;
+    if (pageLayout != null) result.pageLayout = pageLayout;
+    return result;
+  }
+
+  ReaderSettingsOverride._();
+
+  factory ReaderSettingsOverride.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReaderSettingsOverride()..mergeFromBuffer(data, registry);
+  factory ReaderSettingsOverride.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReaderSettingsOverride()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReaderSettingsOverride',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ReaderSettingsOverride.$_createMessage)
+    ..aE<ReaderMode>(1, _omitFieldNames ? '' : 'mode',
+        enumValues: ReaderMode.values)
+    ..aE<ReaderPageLayout>(2, _omitFieldNames ? '' : 'pageLayout',
+        enumValues: ReaderPageLayout.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReaderSettingsOverride clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReaderSettingsOverride copyWith(
+          void Function(ReaderSettingsOverride) updates) =>
+      super.copyWith((message) => updates(message as ReaderSettingsOverride))
+          as ReaderSettingsOverride;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ReaderSettingsOverride() / ReaderSettingsOverride.new instead')
+  static ReaderSettingsOverride create() => ReaderSettingsOverride._();
+  static $pb.GeneratedMessage $_createMessage() => ReaderSettingsOverride._();
+  @$core.override
+  ReaderSettingsOverride createEmptyInstance() => ReaderSettingsOverride._();
+  @$core.pragma('dart2js:noInline')
+  static ReaderSettingsOverride getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReaderSettingsOverride>(
+          ReaderSettingsOverride.$_createMessage);
+  static ReaderSettingsOverride? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ReaderMode get mode => $_getN(0);
+  @$pb.TagNumber(1)
+  set mode(ReaderMode value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMode() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ReaderPageLayout get pageLayout => $_getN(1);
+  @$pb.TagNumber(2)
+  set pageLayout(ReaderPageLayout value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageLayout() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageLayout() => $_clearField(2);
+}
+
+class GlobalSettingsValues extends $pb.GeneratedMessage {
+  factory GlobalSettingsValues({
+    AppTheme? theme,
+    ReaderSettings? reader,
+  }) {
+    final result = GlobalSettingsValues._();
+    if (theme != null) result.theme = theme;
+    if (reader != null) result.reader = reader;
+    return result;
+  }
+
+  GlobalSettingsValues._();
+
+  factory GlobalSettingsValues.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GlobalSettingsValues()..mergeFromBuffer(data, registry);
+  factory GlobalSettingsValues.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GlobalSettingsValues()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GlobalSettingsValues',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: GlobalSettingsValues.$_createMessage)
+    ..aE<AppTheme>(1, _omitFieldNames ? '' : 'theme',
+        enumValues: AppTheme.values)
+    ..aOM<ReaderSettings>(2, _omitFieldNames ? '' : 'reader',
+        subBuilder: ReaderSettings.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GlobalSettingsValues clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GlobalSettingsValues copyWith(void Function(GlobalSettingsValues) updates) =>
+      super.copyWith((message) => updates(message as GlobalSettingsValues))
+          as GlobalSettingsValues;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GlobalSettingsValues() / GlobalSettingsValues.new instead')
+  static GlobalSettingsValues create() => GlobalSettingsValues._();
+  static $pb.GeneratedMessage $_createMessage() => GlobalSettingsValues._();
+  @$core.override
+  GlobalSettingsValues createEmptyInstance() => GlobalSettingsValues._();
+  @$core.pragma('dart2js:noInline')
+  static GlobalSettingsValues getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GlobalSettingsValues>(
+          GlobalSettingsValues.$_createMessage);
+  static GlobalSettingsValues? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  AppTheme get theme => $_getN(0);
+  @$pb.TagNumber(1)
+  set theme(AppTheme value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTheme() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTheme() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ReaderSettings get reader => $_getN(1);
+  @$pb.TagNumber(2)
+  set reader(ReaderSettings value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasReader() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReader() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ReaderSettings ensureReader() => $_ensure(1);
+}
+
+class GlobalSettings extends $pb.GeneratedMessage {
+  factory GlobalSettings({
+    $core.int? revision,
+    GlobalSettingsValues? values,
+  }) {
+    final result = GlobalSettings._();
+    if (revision != null) result.revision = revision;
+    if (values != null) result.values = values;
+    return result;
+  }
+
+  GlobalSettings._();
+
+  factory GlobalSettings.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GlobalSettings()..mergeFromBuffer(data, registry);
+  factory GlobalSettings.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GlobalSettings()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GlobalSettings',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: GlobalSettings.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'revision', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<GlobalSettingsValues>(2, _omitFieldNames ? '' : 'values',
+        subBuilder: GlobalSettingsValues.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GlobalSettings clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GlobalSettings copyWith(void Function(GlobalSettings) updates) =>
+      super.copyWith((message) => updates(message as GlobalSettings))
+          as GlobalSettings;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use GlobalSettings() / GlobalSettings.new instead')
+  static GlobalSettings create() => GlobalSettings._();
+  static $pb.GeneratedMessage $_createMessage() => GlobalSettings._();
+  @$core.override
+  GlobalSettings createEmptyInstance() => GlobalSettings._();
+  @$core.pragma('dart2js:noInline')
+  static GlobalSettings getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<GlobalSettings>(
+          GlobalSettings.$_createMessage);
+  static GlobalSettings? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get revision => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set revision($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRevision() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRevision() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  GlobalSettingsValues get values => $_getN(1);
+  @$pb.TagNumber(2)
+  set values(GlobalSettingsValues value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValues() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValues() => $_clearField(2);
+  @$pb.TagNumber(2)
+  GlobalSettingsValues ensureValues() => $_ensure(1);
+}
+
+class MangaReaderSettings extends $pb.GeneratedMessage {
+  factory MangaReaderSettings({
+    $core.String? mangaKey,
+    $core.int? revision,
+    ReaderSettingsOverride? overrides,
+  }) {
+    final result = MangaReaderSettings._();
+    if (mangaKey != null) result.mangaKey = mangaKey;
+    if (revision != null) result.revision = revision;
+    if (overrides != null) result.overrides = overrides;
+    return result;
+  }
+
+  MangaReaderSettings._();
+
+  factory MangaReaderSettings.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MangaReaderSettings()..mergeFromBuffer(data, registry);
+  factory MangaReaderSettings.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MangaReaderSettings()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MangaReaderSettings',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: MangaReaderSettings.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'mangaKey')
+    ..aI(2, _omitFieldNames ? '' : 'revision', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<ReaderSettingsOverride>(3, _omitFieldNames ? '' : 'overrides',
+        subBuilder: ReaderSettingsOverride.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MangaReaderSettings clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MangaReaderSettings copyWith(void Function(MangaReaderSettings) updates) =>
+      super.copyWith((message) => updates(message as MangaReaderSettings))
+          as MangaReaderSettings;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use MangaReaderSettings() / MangaReaderSettings.new instead')
+  static MangaReaderSettings create() => MangaReaderSettings._();
+  static $pb.GeneratedMessage $_createMessage() => MangaReaderSettings._();
+  @$core.override
+  MangaReaderSettings createEmptyInstance() => MangaReaderSettings._();
+  @$core.pragma('dart2js:noInline')
+  static MangaReaderSettings getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MangaReaderSettings>(
+          MangaReaderSettings.$_createMessage);
+  static MangaReaderSettings? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get mangaKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set mangaKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMangaKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMangaKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get revision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set revision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRevision() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  ReaderSettingsOverride get overrides => $_getN(2);
+  @$pb.TagNumber(3)
+  set overrides(ReaderSettingsOverride value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOverrides() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOverrides() => $_clearField(3);
+  @$pb.TagNumber(3)
+  ReaderSettingsOverride ensureOverrides() => $_ensure(2);
+}
+
+class SetMangaReaderSettings extends $pb.GeneratedMessage {
+  factory SetMangaReaderSettings({
+    $core.String? mangaKey,
+    ReaderSettingsOverride? overrides,
+  }) {
+    final result = SetMangaReaderSettings._();
+    if (mangaKey != null) result.mangaKey = mangaKey;
+    if (overrides != null) result.overrides = overrides;
+    return result;
+  }
+
+  SetMangaReaderSettings._();
+
+  factory SetMangaReaderSettings.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetMangaReaderSettings()..mergeFromBuffer(data, registry);
+  factory SetMangaReaderSettings.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetMangaReaderSettings()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetMangaReaderSettings',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SetMangaReaderSettings.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'mangaKey')
+    ..aOM<ReaderSettingsOverride>(2, _omitFieldNames ? '' : 'overrides',
+        subBuilder: ReaderSettingsOverride.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetMangaReaderSettings clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetMangaReaderSettings copyWith(
+          void Function(SetMangaReaderSettings) updates) =>
+      super.copyWith((message) => updates(message as SetMangaReaderSettings))
+          as SetMangaReaderSettings;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SetMangaReaderSettings() / SetMangaReaderSettings.new instead')
+  static SetMangaReaderSettings create() => SetMangaReaderSettings._();
+  static $pb.GeneratedMessage $_createMessage() => SetMangaReaderSettings._();
+  @$core.override
+  SetMangaReaderSettings createEmptyInstance() => SetMangaReaderSettings._();
+  @$core.pragma('dart2js:noInline')
+  static SetMangaReaderSettings getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetMangaReaderSettings>(
+          SetMangaReaderSettings.$_createMessage);
+  static SetMangaReaderSettings? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get mangaKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set mangaKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMangaKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMangaKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ReaderSettingsOverride get overrides => $_getN(1);
+  @$pb.TagNumber(2)
+  set overrides(ReaderSettingsOverride value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOverrides() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOverrides() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ReaderSettingsOverride ensureOverrides() => $_ensure(1);
+}
+
+enum SettingsMutation_Operation { setGlobal, setManga, notSet }
+
+class SettingsMutation extends $pb.GeneratedMessage {
+  factory SettingsMutation({
+    $core.int? schemaVersion,
+    $core.String? mutationId,
+    $core.int? expectedRevision,
+    GlobalSettingsValues? setGlobal,
+    SetMangaReaderSettings? setManga,
+  }) {
+    final result = SettingsMutation._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (mutationId != null) result.mutationId = mutationId;
+    if (expectedRevision != null) result.expectedRevision = expectedRevision;
+    if (setGlobal != null) result.setGlobal = setGlobal;
+    if (setManga != null) result.setManga = setManga;
+    return result;
+  }
+
+  SettingsMutation._();
+
+  factory SettingsMutation.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SettingsMutation()..mergeFromBuffer(data, registry);
+  factory SettingsMutation.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SettingsMutation()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, SettingsMutation_Operation>
+      _SettingsMutation_OperationByTag = {
+    10: SettingsMutation_Operation.setGlobal,
+    11: SettingsMutation_Operation.setManga,
+    0: SettingsMutation_Operation.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SettingsMutation',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SettingsMutation.$_createMessage)
+    ..oo(0, [10, 11])
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(2, _omitFieldNames ? '' : 'mutationId')
+    ..aI(3, _omitFieldNames ? '' : 'expectedRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<GlobalSettingsValues>(10, _omitFieldNames ? '' : 'setGlobal',
+        subBuilder: GlobalSettingsValues.$_createMessage)
+    ..aOM<SetMangaReaderSettings>(11, _omitFieldNames ? '' : 'setManga',
+        subBuilder: SetMangaReaderSettings.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SettingsMutation clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SettingsMutation copyWith(void Function(SettingsMutation) updates) =>
+      super.copyWith((message) => updates(message as SettingsMutation))
+          as SettingsMutation;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SettingsMutation() / SettingsMutation.new instead')
+  static SettingsMutation create() => SettingsMutation._();
+  static $pb.GeneratedMessage $_createMessage() => SettingsMutation._();
+  @$core.override
+  SettingsMutation createEmptyInstance() => SettingsMutation._();
+  @$core.pragma('dart2js:noInline')
+  static SettingsMutation getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SettingsMutation>(
+          SettingsMutation.$_createMessage);
+  static SettingsMutation? _defaultInstance;
+
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  SettingsMutation_Operation whichOperation() =>
+      _SettingsMutation_OperationByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  void clearOperation() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mutationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mutationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMutationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMutationId() => $_clearField(2);
+
+  /// CAS for the selected scope, independent of reading-progress revisions.
+  @$pb.TagNumber(3)
+  $core.int get expectedRevision => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set expectedRevision($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpectedRevision() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpectedRevision() => $_clearField(3);
+
+  @$pb.TagNumber(10)
+  GlobalSettingsValues get setGlobal => $_getN(3);
+  @$pb.TagNumber(10)
+  set setGlobal(GlobalSettingsValues value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasSetGlobal() => $_has(3);
+  @$pb.TagNumber(10)
+  void clearSetGlobal() => $_clearField(10);
+  @$pb.TagNumber(10)
+  GlobalSettingsValues ensureSetGlobal() => $_ensure(3);
+
+  @$pb.TagNumber(11)
+  SetMangaReaderSettings get setManga => $_getN(4);
+  @$pb.TagNumber(11)
+  set setManga(SetMangaReaderSettings value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasSetManga() => $_has(4);
+  @$pb.TagNumber(11)
+  void clearSetManga() => $_clearField(11);
+  @$pb.TagNumber(11)
+  SetMangaReaderSettings ensureSetManga() => $_ensure(4);
+}
+
+class SettingsResponse extends $pb.GeneratedMessage {
+  factory SettingsResponse({
+    $core.int? schemaVersion,
+    $core.int? accountRevision,
+    GlobalSettings? global,
+    MangaReaderSettings? manga,
+    ReaderSettings? effectiveReader,
+    BusinessStateError? error,
+  }) {
+    final result = SettingsResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (global != null) result.global = global;
+    if (manga != null) result.manga = manga;
+    if (effectiveReader != null) result.effectiveReader = effectiveReader;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  SettingsResponse._();
+
+  factory SettingsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SettingsResponse()..mergeFromBuffer(data, registry);
+  factory SettingsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SettingsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SettingsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SettingsResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<GlobalSettings>(3, _omitFieldNames ? '' : 'global',
+        subBuilder: GlobalSettings.$_createMessage)
+    ..aOM<MangaReaderSettings>(4, _omitFieldNames ? '' : 'manga',
+        subBuilder: MangaReaderSettings.$_createMessage)
+    ..aOM<ReaderSettings>(5, _omitFieldNames ? '' : 'effectiveReader',
+        subBuilder: ReaderSettings.$_createMessage)
+    ..aOM<BusinessStateError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SettingsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SettingsResponse copyWith(void Function(SettingsResponse) updates) =>
+      super.copyWith((message) => updates(message as SettingsResponse))
+          as SettingsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SettingsResponse() / SettingsResponse.new instead')
+  static SettingsResponse create() => SettingsResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SettingsResponse._();
+  @$core.override
+  SettingsResponse createEmptyInstance() => SettingsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SettingsResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SettingsResponse>(
+          SettingsResponse.$_createMessage);
+  static SettingsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get accountRevision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set accountRevision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAccountRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAccountRevision() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  GlobalSettings get global => $_getN(2);
+  @$pb.TagNumber(3)
+  set global(GlobalSettings value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGlobal() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGlobal() => $_clearField(3);
+  @$pb.TagNumber(3)
+  GlobalSettings ensureGlobal() => $_ensure(2);
+
+  /// Present only for a manga-scoped request, even when no row exists yet.
+  @$pb.TagNumber(4)
+  MangaReaderSettings get manga => $_getN(3);
+  @$pb.TagNumber(4)
+  set manga(MangaReaderSettings value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasManga() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearManga() => $_clearField(4);
+  @$pb.TagNumber(4)
+  MangaReaderSettings ensureManga() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  ReaderSettings get effectiveReader => $_getN(4);
+  @$pb.TagNumber(5)
+  set effectiveReader(ReaderSettings value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEffectiveReader() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEffectiveReader() => $_clearField(5);
+  @$pb.TagNumber(5)
+  ReaderSettings ensureEffectiveReader() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  BusinessStateError get error => $_getN(5);
+  @$pb.TagNumber(6)
+  set error(BusinessStateError value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  BusinessStateError ensureError() => $_ensure(5);
+}
+
+class SettingsMutationResponse extends $pb.GeneratedMessage {
+  factory SettingsMutationResponse({
+    $core.int? schemaVersion,
+    $core.String? mutationId,
+    $core.int? accountRevision,
+    GlobalSettings? global,
+    MangaReaderSettings? manga,
+    ReaderSettings? effectiveReader,
+    BusinessStateError? error,
+  }) {
+    final result = SettingsMutationResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (mutationId != null) result.mutationId = mutationId;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (global != null) result.global = global;
+    if (manga != null) result.manga = manga;
+    if (effectiveReader != null) result.effectiveReader = effectiveReader;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  SettingsMutationResponse._();
+
+  factory SettingsMutationResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SettingsMutationResponse()..mergeFromBuffer(data, registry);
+  factory SettingsMutationResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SettingsMutationResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SettingsMutationResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SettingsMutationResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(2, _omitFieldNames ? '' : 'mutationId')
+    ..aI(3, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<GlobalSettings>(4, _omitFieldNames ? '' : 'global',
+        subBuilder: GlobalSettings.$_createMessage)
+    ..aOM<MangaReaderSettings>(5, _omitFieldNames ? '' : 'manga',
+        subBuilder: MangaReaderSettings.$_createMessage)
+    ..aOM<ReaderSettings>(6, _omitFieldNames ? '' : 'effectiveReader',
+        subBuilder: ReaderSettings.$_createMessage)
+    ..aOM<BusinessStateError>(7, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SettingsMutationResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SettingsMutationResponse copyWith(
+          void Function(SettingsMutationResponse) updates) =>
+      super.copyWith((message) => updates(message as SettingsMutationResponse))
+          as SettingsMutationResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SettingsMutationResponse() / SettingsMutationResponse.new instead')
+  static SettingsMutationResponse create() => SettingsMutationResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SettingsMutationResponse._();
+  @$core.override
+  SettingsMutationResponse createEmptyInstance() =>
+      SettingsMutationResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SettingsMutationResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SettingsMutationResponse>(
+          SettingsMutationResponse.$_createMessage);
+  static SettingsMutationResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mutationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mutationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMutationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMutationId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get accountRevision => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set accountRevision($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAccountRevision() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAccountRevision() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  GlobalSettings get global => $_getN(3);
+  @$pb.TagNumber(4)
+  set global(GlobalSettings value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasGlobal() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearGlobal() => $_clearField(4);
+  @$pb.TagNumber(4)
+  GlobalSettings ensureGlobal() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  MangaReaderSettings get manga => $_getN(4);
+  @$pb.TagNumber(5)
+  set manga(MangaReaderSettings value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasManga() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearManga() => $_clearField(5);
+  @$pb.TagNumber(5)
+  MangaReaderSettings ensureManga() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  ReaderSettings get effectiveReader => $_getN(5);
+  @$pb.TagNumber(6)
+  set effectiveReader(ReaderSettings value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasEffectiveReader() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEffectiveReader() => $_clearField(6);
+  @$pb.TagNumber(6)
+  ReaderSettings ensureEffectiveReader() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  BusinessStateError get error => $_getN(6);
+  @$pb.TagNumber(7)
+  set error(BusinessStateError value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearError() => $_clearField(7);
+  @$pb.TagNumber(7)
+  BusinessStateError ensureError() => $_ensure(6);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

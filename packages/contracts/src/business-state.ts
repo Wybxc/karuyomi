@@ -482,3 +482,148 @@ export const categoryMutationResponseSchema =
     validateCategoryResponse(value);
     return value;
   });
+
+export function validateReaderSettings(value: pb.ReaderSettings): void {
+  requireCondition(
+    Number.isInteger(value.mode) &&
+      value.mode >= pb.ReaderMode.LEFT_TO_RIGHT &&
+      value.mode <= pb.ReaderMode.WEBTOON,
+    'Unknown reader mode',
+  );
+  requireCondition(
+    Number.isInteger(value.pageLayout) &&
+      value.pageLayout >= pb.ReaderPageLayout.AUTO &&
+      value.pageLayout <= pb.ReaderPageLayout.DOUBLE,
+    'Unknown reader page layout',
+  );
+}
+
+export function validateReaderSettingsOverride(
+  value: pb.ReaderSettingsOverride,
+): void {
+  if (value.mode !== undefined)
+    requireCondition(
+      Number.isInteger(value.mode) &&
+        value.mode >= pb.ReaderMode.LEFT_TO_RIGHT &&
+        value.mode <= pb.ReaderMode.WEBTOON,
+      'Unknown reader mode override',
+    );
+  if (value.pageLayout !== undefined)
+    requireCondition(
+      Number.isInteger(value.pageLayout) &&
+        value.pageLayout >= pb.ReaderPageLayout.AUTO &&
+        value.pageLayout <= pb.ReaderPageLayout.DOUBLE,
+      'Unknown reader page layout override',
+    );
+}
+
+export function validateGlobalSettingsValues(
+  value: pb.GlobalSettingsValues,
+): void {
+  requireCondition(
+    Number.isInteger(value.theme) &&
+      value.theme >= pb.AppTheme.SYSTEM &&
+      value.theme <= pb.AppTheme.DARK,
+    'Unknown application theme',
+  );
+  requireFields(value, ['reader']);
+  validateReaderSettings(value.reader);
+}
+
+export const settingsMutationSchema = codec<pb.SettingsMutation>((input) => {
+  const value = parseMessage(
+    pb.SettingsMutationSchema,
+    input,
+    BUSINESS_REQUEST_LIMIT,
+  );
+  requireCondition(
+    value.schemaVersion === businessSchemaVersion,
+    'Unsupported business state schema',
+  );
+  mutationId.parse(value.mutationId);
+  uint32(value.expectedRevision);
+  switch (value.operation.case) {
+    case 'setGlobal':
+      validateGlobalSettingsValues(value.operation.value);
+      break;
+    case 'setManga':
+      mangaKey.parse(value.operation.value.mangaKey);
+      requireFields(value.operation.value, ['overrides']);
+      validateReaderSettingsOverride(value.operation.value.overrides);
+      break;
+    default:
+      throw new Error('A settings operation is required');
+  }
+  return value;
+});
+
+function validateSettingsResponse(value: {
+  schemaVersion: number;
+  accountRevision: number;
+  global?: pb.GlobalSettings | undefined;
+  manga?: pb.MangaReaderSettings | undefined;
+  effectiveReader?: pb.ReaderSettings | undefined;
+  error?: pb.BusinessStateError | undefined;
+}): void {
+  requireCondition(
+    value.schemaVersion === businessSchemaVersion,
+    'Unsupported business state schema',
+  );
+  uint32(value.accountRevision);
+  if (value.error) validateError(value.error);
+  if (!value.error || value.global || value.manga || value.effectiveReader)
+    requireFields(value, ['global', 'effectiveReader']);
+  if (value.global) {
+    uint32(value.global.revision);
+    requireCondition(
+      value.global.revision <= value.accountRevision,
+      'Global settings exceed account revision',
+    );
+    requireFields(value.global, ['values']);
+    validateGlobalSettingsValues(value.global.values);
+  }
+  if (value.manga) {
+    mangaKey.parse(value.manga.mangaKey);
+    uint32(value.manga.revision);
+    requireCondition(
+      value.manga.revision <= value.accountRevision,
+      'Manga settings exceed account revision',
+    );
+    requireFields(value.manga, ['overrides']);
+    validateReaderSettingsOverride(value.manga.overrides);
+  }
+  if (value.effectiveReader) {
+    validateReaderSettings(value.effectiveReader);
+    const defaults = value.global?.values?.reader;
+    requireCondition(
+      value.effectiveReader.mode ===
+        (value.manga?.overrides?.mode ?? defaults?.mode) &&
+        value.effectiveReader.pageLayout ===
+          (value.manga?.overrides?.pageLayout ?? defaults?.pageLayout),
+      'Effective reader settings do not match their defaults and overrides',
+    );
+  }
+}
+
+export const settingsResponseSchema = codec<pb.SettingsResponse>((input) => {
+  const value = parseMessage(
+    pb.SettingsResponseSchema,
+    input,
+    BUSINESS_RESPONSE_LIMIT,
+  );
+  validateSettingsResponse(value);
+  return value;
+});
+
+export const settingsMutationResponseSchema =
+  codec<pb.SettingsMutationResponse>((input) => {
+    const value = parseMessage(
+      pb.SettingsMutationResponseSchema,
+      input,
+      BUSINESS_RESPONSE_LIMIT,
+    );
+    if (!value.error || value.mutationId !== '')
+      mutationId.parse(value.mutationId);
+    validateSettingsResponse(value);
+    return value;
+  });

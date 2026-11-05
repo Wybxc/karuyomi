@@ -59,5 +59,84 @@ class BusinessStateErrorCode extends $pb.ProtobufEnum {
   const BusinessStateErrorCode._(super.value, super.name);
 }
 
+class AppTheme extends $pb.ProtobufEnum {
+  static const AppTheme APP_THEME_UNSPECIFIED =
+      AppTheme._(0, _omitEnumNames ? '' : 'APP_THEME_UNSPECIFIED');
+  static const AppTheme APP_THEME_SYSTEM =
+      AppTheme._(1, _omitEnumNames ? '' : 'APP_THEME_SYSTEM');
+  static const AppTheme APP_THEME_LIGHT =
+      AppTheme._(2, _omitEnumNames ? '' : 'APP_THEME_LIGHT');
+  static const AppTheme APP_THEME_DARK =
+      AppTheme._(3, _omitEnumNames ? '' : 'APP_THEME_DARK');
+
+  static const $core.List<AppTheme> values = <AppTheme>[
+    APP_THEME_UNSPECIFIED,
+    APP_THEME_SYSTEM,
+    APP_THEME_LIGHT,
+    APP_THEME_DARK,
+  ];
+
+  static final $core.List<AppTheme?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static AppTheme? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AppTheme._(super.value, super.name);
+}
+
+class ReaderMode extends $pb.ProtobufEnum {
+  static const ReaderMode READER_MODE_UNSPECIFIED =
+      ReaderMode._(0, _omitEnumNames ? '' : 'READER_MODE_UNSPECIFIED');
+  static const ReaderMode READER_MODE_LEFT_TO_RIGHT =
+      ReaderMode._(1, _omitEnumNames ? '' : 'READER_MODE_LEFT_TO_RIGHT');
+  static const ReaderMode READER_MODE_RIGHT_TO_LEFT =
+      ReaderMode._(2, _omitEnumNames ? '' : 'READER_MODE_RIGHT_TO_LEFT');
+  static const ReaderMode READER_MODE_CONTINUOUS =
+      ReaderMode._(3, _omitEnumNames ? '' : 'READER_MODE_CONTINUOUS');
+  static const ReaderMode READER_MODE_WEBTOON =
+      ReaderMode._(4, _omitEnumNames ? '' : 'READER_MODE_WEBTOON');
+
+  static const $core.List<ReaderMode> values = <ReaderMode>[
+    READER_MODE_UNSPECIFIED,
+    READER_MODE_LEFT_TO_RIGHT,
+    READER_MODE_RIGHT_TO_LEFT,
+    READER_MODE_CONTINUOUS,
+    READER_MODE_WEBTOON,
+  ];
+
+  static final $core.List<ReaderMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static ReaderMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReaderMode._(super.value, super.name);
+}
+
+class ReaderPageLayout extends $pb.ProtobufEnum {
+  static const ReaderPageLayout READER_PAGE_LAYOUT_UNSPECIFIED =
+      ReaderPageLayout._(
+          0, _omitEnumNames ? '' : 'READER_PAGE_LAYOUT_UNSPECIFIED');
+  static const ReaderPageLayout READER_PAGE_LAYOUT_AUTO =
+      ReaderPageLayout._(1, _omitEnumNames ? '' : 'READER_PAGE_LAYOUT_AUTO');
+  static const ReaderPageLayout READER_PAGE_LAYOUT_SINGLE =
+      ReaderPageLayout._(2, _omitEnumNames ? '' : 'READER_PAGE_LAYOUT_SINGLE');
+  static const ReaderPageLayout READER_PAGE_LAYOUT_DOUBLE =
+      ReaderPageLayout._(3, _omitEnumNames ? '' : 'READER_PAGE_LAYOUT_DOUBLE');
+
+  static const $core.List<ReaderPageLayout> values = <ReaderPageLayout>[
+    READER_PAGE_LAYOUT_UNSPECIFIED,
+    READER_PAGE_LAYOUT_AUTO,
+    READER_PAGE_LAYOUT_SINGLE,
+    READER_PAGE_LAYOUT_DOUBLE,
+  ];
+
+  static final $core.List<ReaderPageLayout?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ReaderPageLayout? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReaderPageLayout._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

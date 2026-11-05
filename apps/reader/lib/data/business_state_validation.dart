@@ -316,3 +316,117 @@ void validateBusinessLibraryPage(wire.LibraryPageResponse value) {
   }
   wire.encodeProtoJson(value, maxBytes: _responseLimit);
 }
+
+void validateBusinessMangaKey(String value) => _key(value);
+
+void validateBusinessReaderSettings(wire.ReaderSettings value) {
+  _require(
+    value.mode.value >= 1 && value.mode.value <= 4,
+    'Invalid reader mode',
+  );
+  _require(
+    value.pageLayout.value >= 1 && value.pageLayout.value <= 3,
+    'Invalid reader page layout',
+  );
+}
+
+void validateBusinessReaderOverrides(wire.ReaderSettingsOverride value) {
+  if (value.hasMode()) {
+    _require(
+      value.mode.value >= 1 && value.mode.value <= 4,
+      'Invalid reader mode override',
+    );
+  }
+  if (value.hasPageLayout()) {
+    _require(
+      value.pageLayout.value >= 1 && value.pageLayout.value <= 3,
+      'Invalid reader page layout override',
+    );
+  }
+}
+
+void validateBusinessGlobalSettings(wire.GlobalSettingsValues value) {
+  _require(
+    value.theme.value >= 1 && value.theme.value <= 3,
+    'Invalid application theme',
+  );
+  _require(value.hasReader(), 'Missing global reader defaults');
+  validateBusinessReaderSettings(value.reader);
+}
+
+void validateBusinessSettingsMutation(wire.SettingsMutation value) {
+  _require(value.schemaVersion == 1, 'Unsupported settings schema');
+  validateBusinessRevision(value.expectedRevision);
+  switch (value.whichOperation()) {
+    case wire.SettingsMutation_Operation.setGlobal:
+      validateBusinessGlobalSettings(value.setGlobal);
+    case wire.SettingsMutation_Operation.setManga:
+      _key(value.setManga.mangaKey);
+      _require(value.setManga.hasOverrides(), 'Missing reader overrides');
+      validateBusinessReaderOverrides(value.setManga.overrides);
+    case wire.SettingsMutation_Operation.notSet:
+      throw const FormatException('Settings operation is required');
+  }
+  wire.encodeProtoJson(value);
+}
+
+void validateBusinessSettingsResponse(
+  wire.SettingsResponse value, {
+  String? mangaKey,
+}) {
+  _require(value.schemaVersion == 1, 'Unsupported settings schema');
+  validateBusinessRevision(value.accountRevision);
+  if (mangaKey != null) _key(mangaKey);
+  if (value.hasError()) {
+    validateBusinessError(value.error);
+    // Authentication and transport failures need not carry a state snapshot.
+    if (!value.hasGlobal() &&
+        !value.hasManga() &&
+        !value.hasEffectiveReader()) {
+      return;
+    }
+  }
+  _require(
+    value.hasGlobal() && value.hasEffectiveReader(),
+    'Missing confirmed settings',
+  );
+  final global = value.global;
+  validateBusinessRevision(global.revision);
+  _require(
+    global.revision <= value.accountRevision,
+    'Global settings exceed account revision',
+  );
+  _require(global.hasValues(), 'Missing global settings values');
+  validateBusinessGlobalSettings(global.values);
+  _require(
+    value.hasManga() == (mangaKey != null),
+    'Settings response scope mismatch',
+  );
+  wire.ReaderSettingsOverride? overrides;
+  if (mangaKey != null) {
+    final manga = value.manga;
+    _key(manga.mangaKey);
+    _require(manga.mangaKey == mangaKey, 'Settings manga identity mismatch');
+    validateBusinessRevision(manga.revision);
+    _require(
+      manga.revision <= value.accountRevision,
+      'Manga settings exceed account revision',
+    );
+    _require(manga.hasOverrides(), 'Missing manga reader overrides');
+    validateBusinessReaderOverrides(manga.overrides);
+    overrides = manga.overrides;
+  }
+  validateBusinessReaderSettings(value.effectiveReader);
+  _require(
+    value.effectiveReader.mode ==
+            (overrides?.hasMode() == true
+                ? overrides!.mode
+                : global.values.reader.mode) &&
+        value.effectiveReader.pageLayout ==
+            (overrides?.hasPageLayout() == true
+                ? overrides!.pageLayout
+                : global.values.reader.pageLayout),
+    'Effective reader settings do not match confirmed values',
+  );
+  wire.encodeProtoJson(value, maxBytes: _responseLimit);
+}

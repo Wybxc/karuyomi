@@ -211,3 +211,89 @@ message CategoryCatalogResponse {
   CategoryCatalog category_catalog = 3;
   BusinessStateError error = 4;
 }
+
+enum AppTheme {
+  APP_THEME_UNSPECIFIED = 0;
+  APP_THEME_SYSTEM = 1;
+  APP_THEME_LIGHT = 2;
+  APP_THEME_DARK = 3;
+}
+
+enum ReaderMode {
+  READER_MODE_UNSPECIFIED = 0;
+  READER_MODE_LEFT_TO_RIGHT = 1;
+  READER_MODE_RIGHT_TO_LEFT = 2;
+  READER_MODE_CONTINUOUS = 3;
+  READER_MODE_WEBTOON = 4;
+}
+
+enum ReaderPageLayout {
+  READER_PAGE_LAYOUT_UNSPECIFIED = 0;
+  READER_PAGE_LAYOUT_AUTO = 1;
+  READER_PAGE_LAYOUT_SINGLE = 2;
+  READER_PAGE_LAYOUT_DOUBLE = 3;
+}
+
+message ReaderSettings {
+  ReaderMode mode = 1;
+  ReaderPageLayout page_layout = 2;
+}
+
+// Missing fields inherit the global reader preference. AUTO is an explicit
+// value, distinct from inheritance. An empty message clears all overrides.
+message ReaderSettingsOverride {
+  optional ReaderMode mode = 1;
+  optional ReaderPageLayout page_layout = 2;
+}
+
+message GlobalSettingsValues {
+  AppTheme theme = 1;
+  ReaderSettings reader = 2;
+}
+
+message GlobalSettings {
+  uint32 revision = 1;
+  GlobalSettingsValues values = 2;
+}
+
+message MangaReaderSettings {
+  string manga_key = 1;
+  uint32 revision = 2;
+  ReaderSettingsOverride overrides = 3;
+}
+
+message SetMangaReaderSettings {
+  string manga_key = 1;
+  ReaderSettingsOverride overrides = 2;
+}
+
+message SettingsMutation {
+  uint32 schema_version = 1;
+  string mutation_id = 2;
+  // CAS for the selected scope, independent of reading-progress revisions.
+  uint32 expected_revision = 3;
+  oneof operation {
+    GlobalSettingsValues set_global = 10;
+    SetMangaReaderSettings set_manga = 11;
+  }
+}
+
+message SettingsResponse {
+  uint32 schema_version = 1;
+  uint32 account_revision = 2;
+  GlobalSettings global = 3;
+  // Present only for a manga-scoped request, even when no row exists yet.
+  MangaReaderSettings manga = 4;
+  ReaderSettings effective_reader = 5;
+  BusinessStateError error = 6;
+}
+
+message SettingsMutationResponse {
+  uint32 schema_version = 1;
+  string mutation_id = 2;
+  uint32 account_revision = 3;
+  GlobalSettings global = 4;
+  MangaReaderSettings manga = 5;
+  ReaderSettings effective_reader = 6;
+  BusinessStateError error = 7;
+}

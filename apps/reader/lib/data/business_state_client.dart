@@ -85,6 +85,14 @@ final class _PendingCategoryMutation {
   BusinessStateException? rejection;
 }
 
+final class _PendingSettingsMutation {
+  _PendingSettingsMutation(this.fingerprint, this.request, this.body);
+  final String fingerprint;
+  final wire.SettingsMutation request;
+  final String body;
+  BusinessStateException? rejection;
+}
+
 /// A session cache bound to one confirmed origin and Access subject. All
 /// repositories share it so their writes use one revision per manga.
 final class BusinessStateClient {
@@ -104,6 +112,11 @@ final class BusinessStateClient {
   final _pending = <String, _PendingMutation>{};
   final _queues = <String, Future<void>>{};
   final _uuid = const Uuid();
+  final _pendingSettings = <String, _PendingSettingsMutation>{};
+  final _settings = <String, wire.SettingsResponse>{};
+  final _settingsChanges = StreamController<wire.SettingsResponse>.broadcast(
+    sync: true,
+  );
   List<wire.MangaState> _library = const [];
   wire.CategoryCatalog _catalog = wire.CategoryCatalog()..freeze();
   wire.CategoryCatalog _libraryCatalog = wire.CategoryCatalog()..freeze();
@@ -823,6 +836,198 @@ final class BusinessStateClient {
     return value;
   }
 
+  /// Settings have independent global/manga CAS and never replay another scope.
+  Stream<wire.SettingsResponse> watchSettings() => Stream.multi((sink) {
+    final subscription = _settingsChanges.stream.listen(
+      sink.add,
+      onError: sink.addError,
+      onDone: sink.close,
+    );
+    sink.onCancel = subscription.cancel;
+    final confirmed = _settings.values.toList()
+      ..sort((a, b) => a.accountRevision.compareTo(b.accountRevision));
+    for (final value in confirmed) {
+      sink.add(value);
+    }
+    if (_closed) sink.close();
+  });
+
+  ({wire.SettingsMutation request, bool retryable})? pendingSettings({
+    String? mangaKey,
+  }) {
+    if (_closed) return null;
+    final pending = _pendingSettings[_settingsScope(mangaKey)];
+    return pending == null
+        ? null
+        : (request: pending.request, retryable: pending.rejection == null);
+  }
+
+  Future<wire.SettingsResponse> readSettings({String? mangaKey}) {
+    if (mangaKey != null) validateBusinessMangaKey(mangaKey);
+    return _serial(
+      _settingsScope(mangaKey),
+      () => _readSettings(mangaKey: mangaKey, clearRejected: true),
+    );
+  }
+
+  Future<wire.SettingsResponse> _readSettings({
+    String? mangaKey,
+    bool clearRejected = false,
+  }) async {
+    final scope = _settingsScope(mangaKey);
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final reply = await _get(
+        mangaKey == null ? '/api/settings' : '/api/settings/manga/$mangaKey',
+      );
+      final value = wire.decodeProtoJson(
+        wire.SettingsResponse(),
+        jsonDecode(reply.body),
+        maxBytes: _responseLimit,
+      );
+      validateBusinessSettingsResponse(value, mangaKey: mangaKey);
+      if (value.hasError()) throw BusinessStateException(value.error);
+      _success(reply);
+      final previous = _settings[scope];
+      final global = _latestGlobalSettings;
+      if (value.accountRevision < _accountRevision ||
+          (global != null && value.global.revision < global.revision) ||
+          (mangaKey != null &&
+              previous != null &&
+              value.manga.revision < previous.manga.revision)) {
+        continue;
+      }
+      if (global != null &&
+          value.global.revision == global.revision &&
+          value.global != global) {
+        throw const FormatException('Global settings changed without revision');
+      }
+      if (mangaKey != null &&
+          previous != null &&
+          value.manga.revision == previous.manga.revision &&
+          value.manga != previous.manga) {
+        throw const FormatException('Manga settings changed without revision');
+      }
+      _ensureOpen();
+      final confirmed = value.deepCopy()..freeze();
+      _settings[scope] = confirmed;
+      _accountRevision = value.accountRevision;
+      if (clearRejected && _pendingSettings[scope]?.rejection != null) {
+        _pendingSettings.remove(scope);
+      }
+      _settingsChanges.add(confirmed);
+      return confirmed;
+    }
+    throw StateError('Settings changed repeatedly; refresh again');
+  }
+
+  wire.GlobalSettings? get _latestGlobalSettings {
+    wire.GlobalSettings? latest;
+    for (final value in _settings.values) {
+      if (latest == null || value.global.revision > latest.revision) {
+        latest = value.global;
+      }
+    }
+    return latest;
+  }
+
+  Future<wire.SettingsResponse> mutateSettings(
+    wire.SettingsMutation operation,
+  ) {
+    final command = operation.deepCopy()
+      ..schemaVersion = _schemaVersion
+      ..clearMutationId();
+    validateBusinessSettingsMutation(command);
+    final mangaKey = command.hasSetManga() ? command.setManga.mangaKey : null;
+    final scope = _settingsScope(mangaKey);
+    final fingerprint = jsonEncode(wire.encodeProtoJson(command));
+    return _serial(scope, () async {
+      final previous = _pendingSettings[scope];
+      if (previous != null) {
+        if (previous.fingerprint != fingerprint) {
+          throw StateError('请先重试原设置修改；已确认冲突请刷新后重新编辑。');
+        }
+        return _sendSettings(previous, mangaKey: mangaKey);
+      }
+      command.mutationId = _uuid.v4();
+      command.freeze();
+      final pending = _PendingSettingsMutation(
+        fingerprint,
+        command,
+        jsonEncode(wire.encodeProtoJson(command)),
+      );
+      _pendingSettings[scope] = pending;
+      return _sendSettings(pending, mangaKey: mangaKey);
+    });
+  }
+
+  Future<wire.SettingsResponse> _sendSettings(
+    _PendingSettingsMutation pending, {
+    String? mangaKey,
+  }) async {
+    _ensureOpen();
+    if (pending.rejection != null) throw pending.rejection!;
+    final reply = await api.fetchApi(
+      '/api/settings/mutations',
+      method: 'POST',
+      headers: {..._headers, 'Content-Type': 'application/json'},
+      body: pending.body,
+    );
+    _ensureOpen();
+    _budget(reply);
+    final value = wire.decodeProtoJson(
+      wire.SettingsMutationResponse(),
+      jsonDecode(reply.body),
+      maxBytes: _responseLimit,
+    );
+    if (value.mutationId != pending.request.mutationId &&
+        (!value.hasError() || value.mutationId.isNotEmpty)) {
+      throw const FormatException('Settings mutation identity mismatch');
+    }
+    final snapshot = wire.SettingsResponse(
+      schemaVersion: value.schemaVersion,
+      accountRevision: value.accountRevision,
+      global: value.hasGlobal() ? value.global : null,
+      manga: value.hasManga() ? value.manga : null,
+      effectiveReader: value.hasEffectiveReader()
+          ? value.effectiveReader
+          : null,
+      error: value.hasError() ? value.error : null,
+    );
+    validateBusinessSettingsResponse(snapshot, mangaKey: mangaKey);
+    if (value.hasError()) {
+      final failure = BusinessStateException(value.error);
+      if (!value.error.retryable) pending.rejection = failure;
+      throw failure;
+    }
+    _success(reply);
+    final revision = mangaKey == null
+        ? value.global.revision
+        : value.manga.revision;
+    if (revision != pending.request.expectedRevision + 1 ||
+        !_settingsMatch(pending.request, snapshot)) {
+      throw const FormatException(
+        'Settings ACK does not confirm the requested values',
+      );
+    }
+    // A persisted idempotency ACK may predate another device's write. Confirm
+    // current values with GET before exposing them as saved.
+    final current = await _readSettings(mangaKey: mangaKey);
+    if (!_settingsMatch(pending.request, current)) {
+      final failure = BusinessStateException(
+        wire.BusinessStateError(
+          code: wire
+              .BusinessStateErrorCode
+              .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+          message: 'Settings changed after this mutation was applied',
+        ),
+      );
+      pending.rejection = failure;
+      throw failure;
+    }
+    _pendingSettings.remove(_settingsScope(mangaKey));
+    return current;
+  }
+
   Future<ApiReply> _get(String path) async {
     _ensureOpen();
     final reply = await api.fetchApi(path, headers: _headers);
@@ -942,6 +1147,9 @@ final class BusinessStateClient {
     _pending.clear();
     _library = const [];
     _pendingCategory = null;
+    _pendingSettings.clear();
+    _settings.clear();
+    await _settingsChanges.close();
     _catalog = wire.CategoryCatalog()..freeze();
     _libraryCatalog = _catalog;
     await _changes.close();
@@ -963,3 +1171,13 @@ int _compareShelf(wire.MangaState a, wire.MangaState b) {
   final byDate = b.addedAtSeconds.compareTo(a.addedAtSeconds);
   return byDate == 0 ? a.mangaKey.compareTo(b.mangaKey) : byDate;
 }
+
+String _settingsScope(String? mangaKey) =>
+    mangaKey == null ? 'settings:global' : 'settings:manga:$mangaKey';
+
+bool _settingsMatch(
+  wire.SettingsMutation command,
+  wire.SettingsResponse value,
+) => command.hasSetGlobal()
+    ? value.global.values == command.setGlobal
+    : value.manga.overrides == command.setManga.overrides;
