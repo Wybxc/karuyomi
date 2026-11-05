@@ -4,23 +4,26 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run --outdir dist",
-    "typecheck": "tsc -p tsconfig.json",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json && tsc -p test/tsconfig.json",
     "types": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
     "@karuyomi/contracts": "workspace:*",
+    "@karuyomi/protocol": "workspace:*",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.16",
-    "jose": "6.2.15",
-    "@bufbuild/protobuf": "2.16.0",
-    "@karuyomi/protocol": "workspace:*"
+    "jose": "6.2.15"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1.67.0",
     "drizzle-kit": "0.31.11",
+    "vite": "8.3.6",
     "wrangler": "4.156.1"
   }
 }

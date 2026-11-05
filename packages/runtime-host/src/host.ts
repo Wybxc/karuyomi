@@ -5,7 +5,7 @@ import { installRuntime } from './host-api.js';
 if (!window.karuyomiRuntime)
   installRuntime(
     new SourceRuntimeManager(
-      new URL('./worker.js', import.meta.url),
+      new URL(/* @vite-ignore */ './worker.js', import.meta.url),
       (url) => new Worker(url),
       new VerifiedLoader(location.origin),
     ),

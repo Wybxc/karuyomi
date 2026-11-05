@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { build } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createContext, runInContext } from 'node:vm';
 import type { CryptoResult } from '../../../runtime/teavm/bridge/crypto-bridge.js';
+import { compileBridge } from '../materials.ts';
 
 interface BridgeMethods {
   teaCrypto?: (request: unknown) => Promise<CryptoResult>;
@@ -27,25 +27,8 @@ beforeAll(async () => {
     ),
   );
   wasmUrl = URL.createObjectURL(new Blob([wasm], { type: 'application/wasm' }));
-  for (const name of ['crypto', 'zstd', 'cache', 'file']) {
-    const result = await build({
-      entryPoints: [
-        fileURLToPath(
-          new URL(
-            '../../../runtime/teavm/bridge/' + name + '-bridge.ts',
-            import.meta.url,
-          ),
-        ),
-      ],
-      bundle: true,
-      write: false,
-      platform: 'browser',
-      format: 'iife',
-      target: 'es2022',
-      define: { 'import.meta.url': 'self.location.origin' },
-    });
-    bundles.set(name, result.outputFiles[0]!.text);
-  }
+  for (const name of ['crypto', 'zstd', 'cache', 'file'])
+    bundles.set(name, (await compileBridge(name)).toString('utf8'));
 });
 afterAll(() => URL.revokeObjectURL(wasmUrl));
 
@@ -98,6 +81,15 @@ function payload(value: string): Record<string, unknown> {
 }
 
 describe('typed classic Worker bridges with real WebCrypto and npm WASM', () => {
+  it('keeps classic bridge helpers private and WASM in its separate material', () => {
+    for (const [name, script] of bundles) {
+      expect(script).not.toContain('import.meta');
+      expect(script).not.toContain('data:application/wasm');
+      expect(sandbox(name)).not.toHaveProperty('KaruyomiBridge');
+    }
+    expect(requests).toEqual([]);
+  });
+
   it('matches RFC4231 HMAC and NIST AES-GCM binary vectors', async () => {
     const bridge = sandbox('crypto').teaCrypto!;
     const hmac = await bridge({

@@ -1,3 +1,4 @@
+import { buildProbeApi } from './probe-build.ts';
 /** Manual original-JVM / actual TeaVM CacheInterceptor gate against a deterministic real HTTP origin. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -21,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { build } from 'esbuild';
+import { build } from 'vite';
 import { execa } from 'execa';
 import { zipSync } from 'fflate';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
@@ -290,18 +291,32 @@ export async function checkCacheHttp({
       compileBridge('cache'),
       compileBridge('crypto'),
       build({
-        absWorkingDir: ROOT,
-        entryPoints: [
-          'packages/runtime-host/test/cache-failure-java-browser-worker.ts',
-        ],
-        bundle: true,
-        format: 'iife',
-        platform: 'browser',
-        target: 'es2022',
-        write: false,
+        root: ROOT,
+        configFile: false,
+        publicDir: false,
+        logLevel: 'error',
+        build: {
+          lib: {
+            entry: path.join(
+              ROOT,
+              'packages/runtime-host/test/cache-failure-java-browser-worker.ts',
+            ),
+            name: 'cacheFailureDriver',
+            formats: ['iife'],
+          },
+          target: 'es2022',
+          write: false,
+          minify: false,
+          rolldownOptions: { output: { codeSplitting: false } },
+        },
       }),
     ]);
-    assert(driver.outputFiles.length === 1);
+    assert(!Array.isArray(driver) && 'output' in driver);
+    const driverChunks = driver.output.filter(
+      (output) => output.type === 'chunk',
+    );
+    assert(driverChunks.length === 1 && driver.output.length === 1);
+
     const worker = Buffer.concat([
       Buffer.from(
         "self.karuyomiWorkerContext={plugin:'cache-failure-'+crypto.randomUUID()};\n",
@@ -309,7 +324,7 @@ export async function checkCacheHttp({
       crypto,
       cache,
       Buffer.from('\n'),
-      Buffer.from(driver.outputFiles[0]!.contents),
+      Buffer.from(driverChunks[0]!.code),
       compiled.bytes,
       Buffer.from(
         '\nself.main([]);self.cacheFailureRun(...self.cacheFailureHttpOwner);\n',
@@ -337,16 +352,7 @@ export async function checkCacheHttp({
     const keys = await generateKeyPair('RS256'),
       jwk = await exportJWK(keys.publicKey);
     jwk.kid = 'cache-failure-fixture';
-    const api = await build({
-      absWorkingDir: ROOT,
-      entryPoints: ['apps/api/test/workerd-entry.ts'],
-      bundle: true,
-      format: 'esm',
-      platform: 'browser',
-      target: 'es2022',
-      write: false,
-    });
-    assert(api.outputFiles.length === 1);
+    const { script: apiScript } = await buildProbeApi(work);
     const configuration = unstable_readConfig({
       config: path.join(ROOT, 'apps/api/wrangler.jsonc'),
     });
@@ -365,7 +371,7 @@ export async function checkCacheHttp({
     });
     const workerOptions: Parameters<typeof convertV4MiniflareOptions>[0] = {
       modules: true,
-      script: api.outputFiles[0]!.text,
+      script: apiScript,
       compatibilityDate: configuration.compatibility_date,
       compatibilityFlags: flags,
       resourcePersistencePath: path.join(work, 'workerd-state'),

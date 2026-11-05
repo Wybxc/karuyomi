@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { buildProbeApi } from './probe-build.ts';
 // Real workerd HTTP-v2 integration against a controlled binary HTTP origin.
 // Production entry points/configuration never import or enable this fixture.
 import assert from 'node:assert/strict';
@@ -43,9 +44,6 @@ import {
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const require = createRequire(new URL('../package.json', import.meta.url));
 const wranglerRequire = createRequire(require.resolve('wrangler'));
-const { build }: typeof import('esbuild') = await import(
-  wranglerRequire.resolve('esbuild')
-);
 const {
   Miniflare,
   convertV4MiniflareOptions,
@@ -268,15 +266,7 @@ try {
   const keys = await generateKeyPair('RS256');
   const jwk = await exportJWK(keys.publicKey);
   jwk.kid = 'http-v2-fixture';
-  const compiled = await build({
-    entryPoints: [path.join(root, 'apps/api/test/workerd-entry.ts')],
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    target: 'es2022',
-    write: false,
-  });
-  assert(compiled.outputFiles.length === 1);
+  const { script: apiScript } = await buildProbeApi(temporary);
   const config = unstable_readConfig(
     { config: path.join(root, 'apps/api/wrangler.jsonc') },
     { hideWarnings: true },
@@ -289,7 +279,7 @@ try {
         {
           name: 'http-v2-api',
           modules: true,
-          script: compiled.outputFiles[0]!.text,
+          script: apiScript,
           compatibilityDate: config.compatibility_date,
           compatibilityFlags: config.compatibility_flags,
           // Use the user Worker socket, with the product's request-signal flags.

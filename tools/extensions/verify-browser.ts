@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { build } from 'esbuild';
+import { build } from 'vite';
 import isRecord from 'is-plain-obj';
 import type { VerifiedInputs, ValidationReport } from './types.ts';
 import path from 'node:path';
@@ -131,17 +131,50 @@ finally{
   document.title=response.ok?'Extension validation complete':'Extension validation report rejected';
 }`;
   // Bundle the real generated codec into the page; the template stays legal JS.
+  const runnerEntry = path.join(
+    repositoryRoot,
+    'extension-validator.browser.js',
+  );
   const compiledRunner = await build({
-    stdin: { contents: runnerSource, resolveDir: repositoryRoot, loader: 'js' },
-    external: ['/runtime/host.js'],
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    target: 'es2022',
-    write: false,
+    configFile: false,
+    root: repositoryRoot,
+    publicDir: false,
+    logLevel: 'silent',
+    plugins: [
+      {
+        name: 'extension-validator-runner',
+        resolveId(id) {
+          if (id === runnerEntry) return runnerEntry;
+        },
+        load(id) {
+          if (id === runnerEntry) return runnerSource;
+        },
+      },
+    ],
+    build: {
+      target: 'es2022',
+      minify: false,
+      write: false,
+      lib: { entry: runnerEntry, formats: ['es'], fileName: () => 'runner.js' },
+      rolldownOptions: {
+        external: ['/runtime/host.js'],
+        output: { codeSplitting: false },
+      },
+    },
   });
-  const runner = compiledRunner.outputFiles[0]?.text;
-  if (!runner) throw new Error('Browser validator compilation failed');
+  const runnerOutput = (
+    Array.isArray(compiledRunner) ? compiledRunner : [compiledRunner]
+  ).flatMap((result) => ('output' in result ? result.output : []));
+  if (
+    runnerOutput.length !== 1 ||
+    runnerOutput[0]?.type !== 'chunk' ||
+    !runnerOutput[0].isEntry ||
+    runnerOutput[0].dynamicImports.length ||
+    runnerOutput[0].imports.length !== 1 ||
+    runnerOutput[0].imports[0] !== '/runtime/host.js'
+  )
+    throw new Error('Browser validator must compile to one JavaScript chunk');
+  const runner = runnerOutput[0].code;
   const server = createServer(async (request, response) => {
     try {
       response.setHeader('Cache-Control', 'no-store');

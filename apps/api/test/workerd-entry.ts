@@ -5,6 +5,8 @@ import { createAccessVerifier } from '../src/access.js';
 import { createApp } from '../src/app.js';
 import type { Bindings } from '../src/env.js';
 
+export { RuntimeSession } from '../src/runtime-session.js';
+
 export default {
   async fetch(
     request: Request,

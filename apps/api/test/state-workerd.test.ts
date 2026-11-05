@@ -15,67 +15,22 @@ import {
   categoryCatalogResponseSchema,
   categoryMutationResponseSchema,
 } from '@karuyomi/contracts';
-import { build } from 'esbuild';
+import { env, exports } from 'cloudflare:workers';
+import { applyD1Migrations } from 'cloudflare:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { createHash } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { beforeAll, expect, test } from 'vitest';
 
 const origin = 'https://read.example.com';
-let worker: Miniflare;
 let keys: Awaited<ReturnType<typeof generateKeyPair>>;
 
 beforeAll(async () => {
   keys = await generateKeyPair('RS256');
   const jwk = await exportJWK(keys.publicKey);
   jwk.kid = 'state-fixture';
-  const bundled = await build({
-    entryPoints: ['apps/api/test/workerd-entry.ts'],
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    target: 'es2022',
-    write: false,
-  });
-  const output = bundled.outputFiles[0];
-  if (!output) throw new Error('Missing API bundle');
-  worker = new Miniflare(
-    convertV4MiniflareOptions({
-      workers: [
-        {
-          name: 'state-api',
-          modules: true,
-          script: output.text,
-          compatibilityDate: '2026-11-03',
-          d1Databases: { DB: 'business-state-fixture' },
-          bindings: {
-            ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
-            ACCESS_AUD: 'state-fixture',
-            ACCESS_SUBJECT: '',
-            OWNER_EMAIL: 'owner@example.com',
-            APP_ORIGIN: origin,
-            PROBE_ACCESS_JWKS: JSON.stringify({ keys: [jwk] }),
-          },
-        },
-      ],
-    }),
-  );
-  const db = await worker.getD1Database('DB');
-  for (const name of (await readdir('apps/api/migrations'))
-    .filter((name) => name.endsWith('.sql'))
-    .sort()) {
-    for (const statement of (
-      await readFile(`apps/api/migrations/${name}`, 'utf8')
-    ).split('--> statement-breakpoint')) {
-      if (statement.trim()) await db.exec(statement.replaceAll('\n', ' '));
-    }
-  }
+  env.PROBE_ACCESS_JWKS = JSON.stringify({ keys: [jwk] });
+  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 }, 30_000);
-
-afterAll(async () => {
-  await worker?.dispose();
-});
 
 async function client(subject: string = crypto.randomUUID()) {
   const token = await new SignJWT({ email: 'owner@example.com' })
@@ -104,7 +59,7 @@ async function client(subject: string = crypto.randomUUID()) {
       new Headers(options.headers).forEach((value, key) =>
         merged.set(key, value),
       );
-      return worker.dispatchFetch(`${origin}${path}`, {
+      return exports.default.fetch(`${origin}${path}`, {
         ...options,
         headers: [...merged.entries()],
       });
@@ -425,7 +380,7 @@ test('subject-scoped state never follows a caller-supplied identity', async () =
     headers: { 'X-App-Subject': owner.subject },
   });
   expect(forgedSubject.status).toBe(403);
-  const missingToken = await worker.dispatchFetch(`${origin}/api/library`, {
+  const missingToken = await exports.default.fetch(`${origin}/api/library`, {
     headers: { 'X-App-Subject': owner.subject },
   });
   expect(missingToken.status).toBe(401);
@@ -458,7 +413,7 @@ test('small library pages use a single account revision and reject mixed snapsho
 test('a D1 batch failure rolls back state, idempotency and both revisions', async () => {
   const reader = await client();
   const mutation = save(favorite().mangaKey, 0);
-  const db = await worker.getD1Database('DB');
+  const db = env.DB;
   await db.exec(
     `CREATE TRIGGER fail_progress BEFORE INSERT ON chapter_progress WHEN NEW.subject = '${reader.subject}' BEGIN SELECT RAISE(ABORT, 'controlled batch failure'); END`,
   );
@@ -627,7 +582,7 @@ test('category catalog has independent CAS, ordering and current snapshot member
   expect((await first.library()).body.entries[0]?.categoryIds).toEqual(
     ids.slice().reverse(),
   );
-  const db = await worker.getD1Database('DB');
+  const db = env.DB;
   const stored = await db
     .prepare(
       'SELECT state_json FROM manga_state WHERE subject = ? AND manga_key = ?',
@@ -697,7 +652,7 @@ test('category deletion atomically changes relationship and both manga revision 
   expect(state.manga?.resume).toEqual(saved.body.manga?.resume);
   expect(state.manga?.metadata).toEqual(saved.body.manga?.metadata);
   expect(state.manga?.favorite).toBe(true);
-  const db = await worker.getD1Database('DB');
+  const db = env.DB;
   const row = await db
     .prepare(
       "SELECT revision, json_extract(state_json, '$.revision') json_revision FROM manga_state WHERE subject = ? AND manga_key = ?",
@@ -752,7 +707,7 @@ test('category mutation failure rolls back catalog, relationships, manga JSON an
   await first.mutate(add);
   await first.mutate(assign(add.mangaKey, 1, 1, [id]));
   const before = await first.state(add.mangaKey);
-  const db = await worker.getD1Database('DB');
+  const db = env.DB;
   await db.exec(
     `CREATE TRIGGER fail_category_delete BEFORE DELETE ON categories WHEN OLD.subject = '${first.subject}' BEGIN SELECT RAISE(ABORT, 'controlled category failure'); END`,
   );

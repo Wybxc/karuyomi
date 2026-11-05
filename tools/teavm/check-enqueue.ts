@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
-import { build } from 'esbuild';
+import { build } from 'vite';
 import { zipSync } from 'fflate';
 import { getStreamAsBuffer } from 'get-stream';
 import isPlainObject from 'is-plain-obj';
@@ -178,36 +178,75 @@ async function compile(): Promise<void> {
     ],
   ] as const) {
     const output = await build({
-      absWorkingDir: ROOT,
-      entryPoints: [entry],
-      bundle: true,
-      format,
-      platform: 'browser',
-      target: 'es2022',
-      write: false,
+      configFile: false,
+      root: ROOT,
+      publicDir: false,
+      logLevel: 'silent',
+      build: {
+        target: 'es2022',
+        minify: false,
+        write: false,
+        lib: {
+          entry: path.join(ROOT, entry),
+          name: 'KaruyomiEnqueueManager',
+          formats: [format === 'esm' ? 'es' : format],
+          fileName: () => name + '.js',
+        },
+        rolldownOptions: { output: { codeSplitting: false } },
+      },
     });
-    assert.equal(output.outputFiles.length, 1);
-    const bytes = output.outputFiles[0]!.contents;
+    const chunks = (Array.isArray(output) ? output : [output]).flatMap(
+      (value) => ('output' in value ? value.output : []),
+    );
+    assert(
+      chunks.length === 1 &&
+        chunks[0]?.type === 'chunk' &&
+        chunks[0].isEntry &&
+        !chunks[0].imports.length &&
+        !chunks[0].dynamicImports.length,
+    );
+    const bytes = Buffer.from(chunks[0].code);
     await writeFile(path.join(WORK, 'public', name + '.js'), bytes);
     scripts[name] = sha256(bytes);
   }
   const driver = await build({
-    absWorkingDir: ROOT,
-    entryPoints: ['packages/runtime-host/test/enqueue-java-browser-worker.ts'],
-    bundle: true,
-    format: 'iife',
-    platform: 'browser',
-    target: 'es2022',
-    write: false,
+    configFile: false,
+    root: ROOT,
+    publicDir: false,
+    logLevel: 'silent',
+    build: {
+      target: 'es2022',
+      minify: false,
+      write: false,
+      lib: {
+        entry: path.join(
+          ROOT,
+          'packages/runtime-host/test/enqueue-java-browser-worker.ts',
+        ),
+        name: 'KaruyomiEnqueueWorker',
+        formats: ['iife'],
+        fileName: () => 'enqueue-java-browser-worker.js',
+      },
+      rolldownOptions: { output: { codeSplitting: false } },
+    },
   });
-  assert.equal(driver.outputFiles.length, 1);
+  const driverOutput = (Array.isArray(driver) ? driver : [driver]).flatMap(
+    (value) => ('output' in value ? value.output : []),
+  );
+  assert(
+    driverOutput.length === 1 &&
+      driverOutput[0]?.type === 'chunk' &&
+      driverOutput[0].isEntry &&
+      !driverOutput[0].imports.length &&
+      !driverOutput[0].dynamicImports.length,
+  );
   const worker = Buffer.concat([
     Buffer.from(
       "self.karuyomiWorkerContext={plugin:'enqueue-'+crypto.randomUUID()};\n",
     ),
     ...bridges,
     Buffer.from('\n'),
-    Buffer.from(driver.outputFiles[0]!.contents),
+    Buffer.from(driverOutput[0].code),
     compiled,
     Buffer.from('\nself.main([]);self.enqueueFixtureStart();\n'),
   ]);

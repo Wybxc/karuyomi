@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { build, transform } from 'esbuild';
+import { build, transformWithOxc } from 'vite';
 import sharp from 'sharp';
 import sirv from 'sirv';
 import writeFileAtomic from 'write-file-atomic';
@@ -317,21 +317,32 @@ export async function prepareImageCodecWorkerBrowser(
   );
   // Evaluation tooling supplies its transport verifier; the candidate client has no Source dependency.
   await build({
-    absWorkingDir: ROOT,
-    entryPoints: ['packages/runtime-host/src/verified-loader.ts'],
-    outfile: path.join(publicDirectory, 'verified-loader.js'),
-    bundle: true,
-    platform: 'browser',
-    format: 'esm',
-    target: 'es2022',
-    legalComments: 'none',
+    configFile: false,
+    root: ROOT,
+    publicDir: false,
+    logLevel: 'silent',
+    build: {
+      outDir: publicDirectory,
+      emptyOutDir: false,
+      copyPublicDir: false,
+      target: 'es2022',
+      minify: false,
+      lib: {
+        entry: path.join(ROOT, 'packages/runtime-host/src/verified-loader.ts'),
+        formats: ['es'],
+        fileName: () => 'verified-loader.js',
+      },
+      rolldownOptions: { output: { codeSplitting: false, comments: false } },
+    },
   });
-  // The inline browser program is intentionally JavaScript. esbuild checks its syntax.
-  const script = await transform(BROWSER_SCRIPT, {
-    loader: 'js',
-    target: 'es2022',
-    format: 'esm',
-  });
+  // The inline browser program is intentionally JavaScript; Vite's transformer checks its syntax.
+  const script = await transformWithOxc(
+    BROWSER_SCRIPT,
+    'image-codec-worker.browser.js',
+    {
+      target: 'es2022',
+    },
+  );
   await writeFile(path.join(publicDirectory, 'runner.js'), script.code);
   await writeFile(path.join(publicDirectory, 'index.html'), HTML);
   return { directory, publicDirectory, config, contentTypes };

@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { build } from 'esbuild';
+import { build } from 'vite';
 import isPlainObject from 'is-plain-obj';
 import writeFileAtomic from 'write-file-atomic';
 import { compileBridge } from '../../packages/runtime-host/materials.ts';
@@ -34,20 +34,48 @@ export async function checkCacheStorage({
   );
   const cache = await compileBridge('cache');
   const [driver, suite] = await Promise.all(
-    ['cache-lifecycle-worker', 'cache-lifecycle-browser-suite'].map((name) =>
-      build({
-        absWorkingDir: ROOT,
-        entryPoints: ['packages/runtime-host/test/' + name + '.ts'],
-        bundle: true,
-        platform: 'browser',
-        format: name.endsWith('worker') ? 'iife' : 'esm',
-        target: 'es2022',
-        write: false,
-      }),
+    ['cache-lifecycle-worker', 'cache-lifecycle-browser-suite'].map(
+      async (name) => {
+        const result = await build({
+          configFile: false,
+          root: ROOT,
+          publicDir: false,
+          logLevel: 'silent',
+          build: {
+            target: 'es2022',
+            minify: false,
+            write: false,
+            lib: {
+              entry: path.join(
+                ROOT,
+                'packages/runtime-host/test/' + name + '.ts',
+              ),
+              name: 'KaruyomiCacheLifecycle',
+              formats: [name.endsWith('worker') ? 'iife' : 'es'],
+              fileName: () => name + '.js',
+            },
+            rolldownOptions: { output: { codeSplitting: false } },
+          },
+        });
+        const output = (Array.isArray(result) ? result : [result]).flatMap(
+          (value) => ('output' in value ? value.output : []),
+        );
+        if (
+          output.length !== 1 ||
+          output[0]?.type !== 'chunk' ||
+          !output[0].isEntry ||
+          output[0].imports.length ||
+          output[0].dynamicImports.length
+        )
+          throw Error(
+            'Cache browser test must compile to one JavaScript chunk',
+          );
+        return Buffer.from(output[0].code);
+      },
     ),
   );
-  const driverBytes = driver?.outputFiles?.[0]?.contents,
-    suiteBytes = suite?.outputFiles?.[0]?.contents;
+  const driverBytes = driver,
+    suiteBytes = suite;
   if (!driverBytes || !suiteBytes)
     throw Error('Missing Cache browser test output');
   const worker = Buffer.concat([cache, Buffer.from('\n'), driverBytes]);

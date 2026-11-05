@@ -1,3 +1,4 @@
+import { buildProbeApi } from './probe-build.ts';
 // Real workerd/D1 + actual Static Assets routing over a controlled local snapshot.
 // Only the separate test entry trusts this run's RSA public key.
 import assert from 'node:assert/strict';
@@ -69,9 +70,6 @@ const runTool = async (...args: string[]) =>
   ).stdout;
 const require = createRequire(new URL('../package.json', import.meta.url));
 const wranglerRequire = createRequire(require.resolve('wrangler'));
-const { build }: typeof import('esbuild') = await import(
-  wranglerRequire.resolve('esbuild')
-);
 const { Miniflare, convertV4MiniflareOptions }: typeof import('miniflare') =
   await import(wranglerRequire.resolve('miniflare'));
 let mf: import('miniflare').Miniflare | undefined;
@@ -122,18 +120,7 @@ try {
   const keys = await generateKeyPair('RS256');
   const jwk = await exportJWK(keys.publicKey);
   jwk.kid = 'isolated-workerd-probe';
-  const compiled = await build({
-    entryPoints: [path.join(api, 'test/workerd-entry.ts')],
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    target: 'es2022',
-    write: false,
-  });
-  assert(
-    compiled.outputFiles.length === 1,
-    'Expected one compiled Worker module',
-  );
+  const { script: apiScript } = await buildProbeApi(temporary);
   const config = unstable_readConfig(
     { config: path.join(api, 'wrangler.jsonc') },
     { hideWarnings: true },
@@ -152,7 +139,7 @@ try {
   mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
-      script: compiled.outputFiles[0]!.text,
+      script: apiScript,
       compatibilityDate: config.compatibility_date,
       compatibilityFlags: config.compatibility_flags,
       resourcePersistencePath: path.join(state, 'v3'),

@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { build, transformWithOxc } from 'vite';
 import type { Artifact } from '@karuyomi/contracts';
 import { prepareImageCodecArtifacts } from '../../tools/images/artifacts.ts';
 
@@ -56,24 +56,78 @@ export function nativeMaterialGroups(catalog: MaterialCatalog) {
 /** Compile the maintained TS bridges into the current material catalog. */
 export async function compileBridge(name: string): Promise<Buffer> {
   if (!scriptNames.includes(name)) throw new Error('Unknown runtime bridge');
+  const entryId = '\0karuyomi:bridge-entry';
   const result = await build({
-    absWorkingDir: root,
-    entryPoints: [`runtime/teavm/bridge/${name}-bridge.ts`],
-    bundle: true,
-    platform: 'browser',
-    format: 'iife',
-    target: 'es2022',
-    minify: false,
-    sourcemap: false,
-    write: false,
-    charset: 'utf8',
-    legalComments: 'none',
+    configFile: false,
+    root,
+    publicDir: false,
+    logLevel: 'warn',
+    plugins: [
+      {
+        name: 'classic-worker-import-meta',
+        enforce: 'pre',
+        transform: {
+          filter: { code: /import\.meta\.url/ },
+          handler(code, id) {
+            // Replace before Vite's asset pass can inline zstd's fallback WASM.
+            return transformWithOxc(code, id, {
+              define: { 'import.meta.url': 'self.location.origin' },
+              sourcemap: false,
+            });
+          },
+        },
+      },
+      {
+        name: 'runtime-bridge-entry',
+        resolveId(source) {
+          if (source === entryId) return entryId;
+        },
+        load(id) {
+          // Helpers exported by maintained bridge modules remain private to the IIFE.
+          if (id === entryId)
+            return `import ${JSON.stringify(path.join(root, `runtime/teavm/bridge/${name}-bridge.ts`))};`;
+        },
+      },
+    ],
+    build: {
+      target: 'es2022',
+      minify: false,
+      sourcemap: false,
+      write: false,
+      lib: {
+        entry: entryId,
+        name: 'KaruyomiBridge',
+        formats: ['iife'],
+        fileName: () => name + '-bridge.js',
+      },
+      rolldownOptions: {
+        cwd: root,
+        input: entryId,
+        output: { codeSplitting: false, comments: false },
+      },
+    },
     define: { 'import.meta.url': 'self.location.origin' },
   });
-  const output = result.outputFiles[0];
-  if (!output || result.outputFiles.length !== 1)
-    throw new Error('Invalid runtime bridge output');
-  return Buffer.from(output.contents);
+  return materialScriptBytes(result);
+}
+
+function materialScriptBytes(
+  result: Awaited<ReturnType<typeof build>>,
+): Buffer {
+  const bundles = Array.isArray(result) ? result : [result];
+  const bundle = bundles[0];
+  if (bundles.length !== 1 || !bundle || !('output' in bundle))
+    throw new Error('Expected one runtime material bundle');
+  const script = bundle.output[0];
+  if (
+    bundle.output.length !== 1 ||
+    script?.type !== 'chunk' ||
+    !script.isEntry ||
+    script.imports.length ||
+    script.dynamicImports.length
+  )
+    throw new Error('Runtime materials must be self-contained single files');
+  return Buffer.from(script.code);
 }
 
 export interface ImageCodecMaterialInput {
@@ -96,32 +150,53 @@ export interface CollectMaterialsOptions {
 async function compileImageCodecEntry(
   name: 'client' | 'worker',
 ): Promise<Buffer> {
+  const entryId = '\0karuyomi:image-codec-client';
   const result = await build({
-    absWorkingDir: root,
-    ...(name === 'worker'
-      ? { entryPoints: ['runtime/image-codec/worker.ts'] }
-      : {
-          stdin: {
-            contents: `export * from './runtime/image-codec/client.ts';\nexport * from './runtime/image-codec/assets.ts';`,
-            resolveDir: root,
-            sourcefile: 'image-codec-client.ts',
-            loader: 'ts',
-          },
-        }),
-    bundle: true,
-    platform: 'browser',
-    format: 'esm',
-    target: 'es2022',
-    minify: true,
-    sourcemap: false,
-    write: false,
-    charset: 'utf8',
-    legalComments: 'none',
+    configFile: false,
+    root,
+    publicDir: false,
+    logLevel: 'warn',
+    plugins: [
+      {
+        name: 'image-codec-client-entry',
+        resolveId(source) {
+          if (source === entryId) return entryId;
+        },
+        load(id) {
+          if (id === entryId)
+            return ['client', 'assets']
+              .map(
+                (module) =>
+                  `export * from ${JSON.stringify(path.join(root, `runtime/image-codec/${module}.ts`))};`,
+              )
+              .join('\n');
+        },
+      },
+    ],
+    build: {
+      target: 'es2022',
+      minify: 'oxc',
+      sourcemap: false,
+      write: false,
+      lib: {
+        entry:
+          name === 'worker'
+            ? path.join(root, 'runtime/image-codec/worker.ts')
+            : entryId,
+        formats: ['es'],
+        fileName: () => name + '.js',
+      },
+      rolldownOptions: {
+        cwd: root,
+        input:
+          name === 'worker'
+            ? path.join(root, 'runtime/image-codec/worker.ts')
+            : entryId,
+        output: { codeSplitting: false, comments: false },
+      },
+    },
   });
-  const output = result.outputFiles[0];
-  if (!output || result.outputFiles.length !== 1)
-    throw new Error('Invalid image codec entry output');
-  return Buffer.from(output.contents);
+  return materialScriptBytes(result);
 }
 
 /** Product materials exclude candidate image codecs unless explicitly requested. */

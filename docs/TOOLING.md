@@ -32,6 +32,8 @@ flowchart TD
 
 Wrangler 4.156.1 的 D1 `--file --json` 会由另一套 logger 输出上传进度，而错误日志级别又会抑制最终 JSON。仓库使用标准 pnpm patch，只修正 D1 `--json` 成功结果为独立 JSON 输出；执行器设置 `WRANGLER_LOG=error`，仍严格解析结果并拒绝非零退出及失败项。补丁由 `pnpm-workspace.yaml` 和锁文件固定，不维护本地复制的 CLI，也不通过截取输出寻找 JSON。
 
+API、runtime-host 与浏览器工具已从项目自有 esbuild 调用迁移到 Vite，Workers 集成测试同时接入 Cloudflare 官方 Vitest 插件；实施和验收条件见 [Vite 计划](plan/vite-build-and-testing.md)。API 仍在 Flutter/runtime/扩展资源组装之后构建，Vite 必须显式接入已组装的 `dist/public`。正式部署使用插件生成的 Wrangler 配置重定向；隔离探针同时使用临时 Vite `root` 和输出目录，避免测试构建改变生产部署定位。迁移的集中工程、harness 与内置浏览器 Cache 证据见 [验证记录](verification/vite-build-and-testing.md)；不将已有旧工具链证据改称 Vite 或官方测试集成证据。
+
 ## 构建身份与验证
 
 固定 checkout 中的工具模块、工具链锁、协议、材料、依赖锁和上游 pin 参与 host 输入身份。脚本迁移后建立新 baseline，不复用旧 Release/checkpoint 作为当前成果。批量构建仍需固定 supervisor、verifier 和 builder，动态 Source 请求的网络权限与公开静态分发分开。

@@ -103,7 +103,7 @@
       "from": {},
       "to": {
         "couldNotResolve": true,
-        "pathNot": "^cloudflare:workers$"
+        "pathNot": "^cloudflare:(workers|test)$"
       }
     },
     {

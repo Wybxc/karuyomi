@@ -1,4 +1,4 @@
-import { build, type BuildOptions } from 'esbuild';
+import { build, type InlineConfig } from 'vite';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,22 +11,60 @@ await mkdir(output, { recursive: true });
 const { catalog, data } = await prepareMaterials(output);
 const nativeGroups = nativeMaterialGroups(catalog);
 const common = {
-  absWorkingDir: directory,
-  bundle: true,
-  platform: 'browser',
-  target: 'es2022',
-  minify: true,
-  write: false,
-} satisfies BuildOptions;
+  configFile: false,
+  root: directory,
+  publicDir: false,
+  logLevel: 'warn',
+  build: {
+    target: 'es2022',
+    minify: 'oxc',
+    sourcemap: false,
+    write: false,
+    rolldownOptions: {
+      cwd: directory,
+      output: { codeSplitting: false, comments: false },
+    },
+  },
+} satisfies InlineConfig;
+function scriptBytes(result: Awaited<ReturnType<typeof build>>): Buffer {
+  const bundles = Array.isArray(result) ? result : [result];
+  const bundle = bundles[0];
+  if (bundles.length !== 1 || !bundle || !('output' in bundle))
+    throw new Error('Expected one runtime script bundle');
+  const script = bundle.output[0];
+  if (
+    bundle.output.length !== 1 ||
+    script?.type !== 'chunk' ||
+    !script.isEntry ||
+    script.imports.length ||
+    script.dynamicImports.length
+  )
+    throw new Error('Runtime scripts must be self-contained single files');
+  return Buffer.from(script.code);
+}
 const web = await Promise.all([
-  build({ ...common, entryPoints: ['src/host.ts'], format: 'esm' }),
-  build({ ...common, entryPoints: ['src/worker.ts'], format: 'iife' }),
+  build({
+    ...common,
+    build: {
+      ...common.build,
+      lib: { entry: 'src/host.ts', formats: ['es'], fileName: () => 'host.js' },
+    },
+  }),
+  build({
+    ...common,
+    build: {
+      ...common.build,
+      lib: {
+        entry: 'src/worker.ts',
+        name: 'KaruyomiWorker',
+        formats: ['iife'],
+        fileName: () => 'worker.js',
+      },
+    },
+  }),
 ]);
-await writeFile(path.join(output, 'host.js'), web[0]!.outputFiles[0]!.contents);
-await writeFile(
-  path.join(output, 'worker.js'),
-  web[1]!.outputFiles[0]!.contents,
-);
+await writeFile(path.join(output, 'host.js'), scriptBytes(web[0]));
+await writeFile(path.join(output, 'worker.js'), scriptBytes(web[1]));
 await cp(
   path.join(directory, 'public/host.html'),
   path.join(output, 'host.html'),
@@ -50,23 +88,31 @@ const embedded = Object.fromEntries(
 const nativeMaterialModule = `import {createNativeMaterialResolver} from ${JSON.stringify(path.join(directory, 'src/native-materials.ts'))};
 const values=${JSON.stringify(embedded)};
 export const nativeMaterials=createNativeMaterialResolver(values);`;
+const nativeMaterialId = '\0karuyomi:native-materials';
 const nativeWorker = await build({
   ...common,
-  entryPoints: ['src/worker.ts'],
-  format: 'iife',
+  build: {
+    ...common.build,
+    lib: {
+      entry: 'src/worker.ts',
+      name: 'KaruyomiWorker',
+      formats: ['iife'],
+      fileName: () => 'worker.js',
+    },
+  },
   plugins: [
     {
       name: 'embedded-native-materials',
-      setup(builder) {
-        builder.onResolve({ filter: /^\.\/materials\.js$/ }, () => ({
-          path: 'materials',
-          namespace: 'native-materials',
-        }));
-        builder.onLoad({ filter: /.*/, namespace: 'native-materials' }, () => ({
-          contents: nativeMaterialModule,
-          loader: 'js',
-          resolveDir: directory,
-        }));
+      enforce: 'pre',
+      resolveId(source, importer) {
+        if (
+          source === './materials.js' &&
+          importer?.startsWith(path.join(directory, 'src/'))
+        )
+          return nativeMaterialId;
+      },
+      load(id) {
+        if (id === nativeMaterialId) return nativeMaterialModule;
       },
     },
   ],
@@ -74,8 +120,15 @@ const nativeWorker = await build({
 // Source host contains no client image decoders or image metadata policy.
 const nativeHost = await build({
   ...common,
-  entryPoints: ['src/host.native.ts'],
-  format: 'iife',
+  build: {
+    ...common.build,
+    lib: {
+      entry: 'src/host.native.ts',
+      name: 'KaruyomiNativeHost',
+      formats: ['iife'],
+      fileName: () => 'host.js',
+    },
+  },
   define: {
     __KARUYOMI_MATERIAL_VERSION__: JSON.stringify(catalog.materialVersion),
   },
@@ -83,8 +136,8 @@ const nativeHost = await build({
 const nativeOutput = path.join(output, 'native');
 await mkdir(nativeOutput, { recursive: true });
 const nativeFiles = {
-  host: { name: 'host.js', bytes: nativeHost.outputFiles[0]!.contents },
-  worker: { name: 'worker.js', bytes: nativeWorker.outputFiles[0]!.contents },
+  host: { name: 'host.js', bytes: scriptBytes(nativeHost) },
+  worker: { name: 'worker.js', bytes: scriptBytes(nativeWorker) },
 };
 const files: Record<string, { path: string; sha256: string; size: number }> =
   {};

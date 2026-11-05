@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { buildProbeApi } from './probe-build.ts';
+import { build } from 'vite';
 // Loopback-only live-Source probe. Production entry points never import this.
 // Real workerd, policy-only D1, RS256 verification and the product HTTP bridge.
 import assert from 'node:assert/strict';
@@ -136,9 +138,6 @@ const environment = {
 };
 const require = createRequire(path.join(api, 'package.json'));
 const wranglerRequire = createRequire(require.resolve('wrangler'));
-const { build }: typeof import('esbuild') = await import(
-  wranglerRequire.resolve('esbuild')
-);
 const { Miniflare, convertV4MiniflareOptions }: typeof import('miniflare') =
   await import(wranglerRequire.resolve('miniflare'));
 const { generateKeyPair, exportJWK, SignJWT }: typeof import('jose') =
@@ -189,18 +188,7 @@ await execa(
 const keys = await generateKeyPair('RS256');
 const jwk = await exportJWK(keys.publicKey);
 jwk.kid = 'isolated-live-source-probe';
-const compiled = await build({
-  entryPoints: [path.join(api, 'test/workerd-entry.ts')],
-  bundle: true,
-  format: 'esm',
-  platform: 'browser',
-  target: 'es2022',
-  write: false,
-});
-assert(
-  compiled.outputFiles.length === 1,
-  'Expected one compiled Worker module',
-);
+const { script: apiScript } = await buildProbeApi(temporary);
 const config = unstable_readConfig(
   { config: path.join(api, 'wrangler.jsonc') },
   { hideWarnings: true },
@@ -214,7 +202,7 @@ assert(databaseId, 'D1 database identity missing from Wrangler configuration');
 const mf = new Miniflare(
   convertV4MiniflareOptions({
     modules: true,
-    script: compiled.outputFiles[0]!.text,
+    script: apiScript,
     compatibilityDate: config.compatibility_date,
     compatibilityFlags: config.compatibility_flags,
     unsafeDirectSockets: [
@@ -425,17 +413,36 @@ button.onclick = async () => {
     report.finished=true;await record('finished',true);
   }
 };`;
+const runnerEntry = path.join(root, 'source-probe-runner.js');
 const compiledRunner = await build({
-  stdin: { contents: runnerSource, resolveDir: root, loader: 'js' },
-  external: ['/runtime/host.js'],
-  bundle: true,
-  format: 'esm',
-  platform: 'browser',
-  target: 'es2022',
-  write: false,
+  root,
+  configFile: false,
+  publicDir: false,
+  logLevel: 'error',
+  plugins: [
+    {
+      name: 'source-probe-runner',
+      resolveId: (id) => (id === runnerEntry ? runnerEntry : undefined),
+      load: (id) => (id === runnerEntry ? runnerSource : undefined),
+    },
+  ],
+  build: {
+    lib: { entry: runnerEntry, formats: ['es'] },
+    target: 'es2022',
+    write: false,
+    minify: false,
+    rolldownOptions: {
+      external: ['/runtime/host.js'],
+      output: { codeSplitting: false },
+    },
+  },
 });
-const runner = compiledRunner.outputFiles[0]?.text;
-assert(runner, 'Expected one compiled browser probe module');
+assert(!Array.isArray(compiledRunner) && 'output' in compiledRunner);
+const runnerChunks = compiledRunner.output.filter(
+  (output) => output.type === 'chunk',
+);
+assert(runnerChunks.length === 1 && compiledRunner.output.length === 1);
+const runner = runnerChunks[0]!.code;
 const html = `<!doctype html><html lang="en"><meta charset="utf-8">
 <title>Karuyomi live Source probe</title>
 <style>body{font:14px system-ui;margin:24px;max-width:1000px}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{padding:12px}#images{display:flex;gap:12px;align-items:start}#images img{width:30%;max-height:480px;object-fit:contain;object-position:top}</style>

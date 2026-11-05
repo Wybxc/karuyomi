@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { build } from 'esbuild';
+import { build } from 'vite';
 import lockfile from 'proper-lockfile';
 import sirv from 'sirv';
 import writeFileAtomic from 'write-file-atomic';
@@ -176,16 +176,27 @@ export async function prepareImageOwnersBrowser(
     JSON.stringify(materials.catalog),
   );
   await build({
-    absWorkingDir: ROOT,
-    entryPoints: ['runtime/image-codec/test/source-image-browser-suite.ts'],
-    outfile: path.join(publicDirectory, 'runner.js'),
-    bundle: true,
-    platform: 'browser',
-    format: 'esm',
-    target: 'es2022',
-    minify: false,
-    sourcemap: true,
-    legalComments: 'none',
+    configFile: false,
+    root: ROOT,
+    publicDir: false,
+    logLevel: 'silent',
+    build: {
+      outDir: publicDirectory,
+      emptyOutDir: false,
+      copyPublicDir: false,
+      target: 'es2022',
+      minify: false,
+      sourcemap: true,
+      lib: {
+        entry: path.join(
+          ROOT,
+          'runtime/image-codec/test/source-image-browser-suite.ts',
+        ),
+        formats: ['es'],
+        fileName: () => 'runner.js',
+      },
+      rolldownOptions: { output: { codeSplitting: false, comments: false } },
+    },
   });
   await writeFile(path.join(publicDirectory, 'index.html'), HTML);
   return { directory, publicDirectory, config, contentTypes };

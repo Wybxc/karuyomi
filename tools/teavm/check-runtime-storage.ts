@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
-import { build } from 'esbuild';
+import { build } from 'vite';
 import sirv from 'sirv';
 import { getStreamAsBuffer } from 'get-stream';
 import writeFileAtomic from 'write-file-atomic';
@@ -83,16 +83,34 @@ export async function checkRuntimeStorage({
       ],
     ] as const) {
       const result = await build({
-        absWorkingDir: ROOT,
-        entryPoints: [entry],
-        bundle: true,
-        platform: 'browser',
-        format,
-        target: 'es2022',
-        write: false,
+        configFile: false,
+        root: ROOT,
+        publicDir: false,
+        logLevel: 'silent',
+        build: {
+          target: 'es2022',
+          minify: false,
+          write: false,
+          lib: {
+            entry: path.join(ROOT, entry),
+            name: 'KaruyomiStorageTest',
+            formats: [format === 'esm' ? 'es' : format],
+            fileName: () => name + '.js',
+          },
+          rolldownOptions: { output: { codeSplitting: false } },
+        },
       });
-      assert(result.outputFiles.length === 1);
-      const bytes = result.outputFiles[0]!.contents;
+      const output = (Array.isArray(result) ? result : [result]).flatMap(
+        (value) => ('output' in value ? value.output : []),
+      );
+      assert(
+        output.length === 1 &&
+          output[0]?.type === 'chunk' &&
+          output[0].isEntry &&
+          !output[0].imports.length &&
+          !output[0].dynamicImports.length,
+      );
+      const bytes = Buffer.from(output[0].code);
       await writeFile(path.join(publicDir, name + '.js'), bytes);
       scriptIdentity[name] = digest(bytes);
     }
@@ -100,19 +118,38 @@ export async function checkRuntimeStorage({
     const transports = new Map<string, Buffer>();
     for (const label of ['a', 'b']) {
       const result = await build({
-        absWorkingDir: ROOT,
-        entryPoints: [
-          'packages/runtime-host/test/fixtures/storage-namespace-host.ts',
-        ],
-        bundle: true,
-        platform: 'browser',
-        format: 'iife',
-        target: 'es2022',
-        write: false,
+        configFile: false,
+        root: ROOT,
+        publicDir: false,
+        logLevel: 'silent',
         define: { STORAGE_FIXTURE_BUILD: JSON.stringify(label) },
+        build: {
+          target: 'es2022',
+          minify: false,
+          write: false,
+          lib: {
+            entry: path.join(
+              ROOT,
+              'packages/runtime-host/test/fixtures/storage-namespace-host.ts',
+            ),
+            name: 'KaruyomiStorageFixture',
+            formats: ['iife'],
+            fileName: () => 'storage-namespace-host.js',
+          },
+          rolldownOptions: { output: { codeSplitting: false } },
+        },
       });
-      assert(result.outputFiles.length === 1);
-      const bytes = result.outputFiles[0]!.contents,
+      const output = (Array.isArray(result) ? result : [result]).flatMap(
+        (value) => ('output' in value ? value.output : []),
+      );
+      assert(
+        output.length === 1 &&
+          output[0]?.type === 'chunk' &&
+          output[0].isEntry &&
+          !output[0].imports.length &&
+          !output[0].dynamicImports.length,
+      );
+      const bytes = Buffer.from(output[0].code),
         sha256 = digest(bytes),
         encoded = gzipSync(bytes),
         relative = '/extensions/artifacts/' + sha256 + '.gz';
