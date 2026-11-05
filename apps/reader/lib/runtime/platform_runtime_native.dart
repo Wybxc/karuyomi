@@ -38,10 +38,13 @@ final class NativePlatformRuntime extends PlatformRuntime
   @override
   final Uri origin;
   HeadlessInAppWebView? _view;
+  Future<void>? _viewRunning;
   InAppWebViewController? _controller;
   Future<void>? _opening;
   int _generation = 0;
   bool _disposed = false;
+  bool _closing = false;
+  bool _hostReady = false;
   NativeImageControl? _images;
   Completer<void>? _containerEnded;
   Future<void>? _resetting;
@@ -105,7 +108,8 @@ final class NativePlatformRuntime extends PlatformRuntime
 
   Future<void> _startHost() async {
     final generation = ++_generation;
-    _containerEnded = Completer<void>();
+    final ended = Completer<void>();
+    _containerEnded = ended;
     final assets = await NativeRuntimeAssets.load();
     final imageFiles =
         Platform.isIOS ||
@@ -123,7 +127,7 @@ final class NativePlatformRuntime extends PlatformRuntime
         'This Android WebView cannot install the bundled runtime before page scripts',
       );
     }
-    if (_disposed || generation != _generation) {
+    if (_closing || _disposed || generation != _generation) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Native runtime container was replaced while loading app assets',
@@ -157,7 +161,9 @@ final class NativePlatformRuntime extends PlatformRuntime
         useOnRenderProcessGone: true,
       ),
       onWebViewCreated: (controller) {
-        if (generation == _generation) _controller = controller;
+        if (!_closing && !_disposed && generation == _generation) {
+          _controller = controller;
+        }
       },
       shouldOverrideUrlLoading: (controller, action) async {
         final target = action.request.url;
@@ -178,7 +184,11 @@ final class NativePlatformRuntime extends PlatformRuntime
         return NavigationActionPolicy.ALLOW;
       },
       onLoadStop: (controller, url) async {
-        if (generation != _generation || loaded.isCompleted || handshaking) {
+        if (_closing ||
+            _disposed ||
+            generation != _generation ||
+            loaded.isCompleted ||
+            handshaking) {
           return;
         }
         if (url == null || Uri.parse(url.toString()).origin != origin.origin) {
@@ -207,7 +217,11 @@ final class NativePlatformRuntime extends PlatformRuntime
               })();
             ''',
           );
-          if (generation != _generation || loaded.isCompleted || handshaking) {
+          if (_closing ||
+              _disposed ||
+              generation != _generation ||
+              loaded.isCompleted ||
+              handshaking) {
             return;
           }
           if (bridgeReady is! bool) {
@@ -239,10 +253,17 @@ final class NativePlatformRuntime extends PlatformRuntime
               ),
             },
           );
-          if (result?.error != null || result?.value is! String) {
-            throw const RuntimeException(
+          if (_closing || _disposed || generation != _generation) return;
+          if (result?.error != null) {
+            throw RuntimeException(
               RuntimeErrorCode.runtimeLost,
-              'Native runtime control handshake failed',
+              'Native runtime control handshake failed: ${result!.error}',
+            );
+          }
+          if (result?.value is! String) {
+            throw const RuntimeException(
+              RuntimeErrorCode.protocolError,
+              'Native runtime handshake did not return ProtoJSON text',
             );
           }
           final response = wire.decodeProtoJson(
@@ -268,7 +289,7 @@ final class NativePlatformRuntime extends PlatformRuntime
                     origin: origin,
                   )
                 : await AndroidImageFileStore.bind(controller, origin);
-            if (generation != _generation) {
+            if (_closing || _disposed || generation != _generation) {
               await files.clear();
               throw const RuntimeException(
                 RuntimeErrorCode.runtimeLost,
@@ -301,36 +322,74 @@ final class NativePlatformRuntime extends PlatformRuntime
           );
         }
       },
-      onWebContentProcessDidTerminate: (controller) => unawaited(rebuild()),
-      onRenderProcessGone: (controller, detail) => rebuild(),
+      onWebContentProcessDidTerminate: (controller) {
+        if (!_closing && !_disposed && generation == _generation) {
+          unawaited(rebuild());
+        }
+      },
+      onRenderProcessGone: (controller, detail) {
+        if (!_closing && !_disposed && generation == _generation) {
+          unawaited(rebuild());
+        }
+      },
     );
     final view = _view!;
+    // Listen to load/termination before the platform run ACK: Android can
+    // deliver callbacks before run() marks the view as running.
+    final running = Future<void>.microtask(view.run);
+    _viewRunning = running;
     try {
-      await view.run();
-      await loaded.future.timeout(const Duration(seconds: 20));
-    } catch (_) {
+      await Future.any<void>([
+        Future.wait<void>([running, loaded.future], eagerError: true),
+        ended.future.then<void>(
+          (_) => throw const RuntimeException(
+            RuntimeErrorCode.runtimeLost,
+            'Native runtime container ended during initialization',
+          ),
+        ),
+      ]).timeout(const Duration(seconds: 20));
+    } catch (error, stack) {
       if (generation == _generation) {
-        if (!_containerEnded!.isCompleted) _containerEnded!.complete();
+        if (!ended.isCompleted) ended.complete();
         ++_generation;
         _view = null;
+        _viewRunning = null;
         _controller = null;
         final images = _images;
         _images = null;
         try {
-          await images?.close();
-        } finally {
-          await view.dispose();
+          await _disposeHost(images, view, running);
+        } catch (cleanupError) {
+          debugPrint('Native runtime startup cleanup failed: $cleanupError');
         }
-      } else {
-        await view.dispose();
       }
-      rethrow;
+      // A reset/dispose that detached this generation owns its cleanup.
+      Error.throwWithStackTrace(error, stack);
     }
-    if (generation != _generation) {
+    if (_closing || _disposed || generation != _generation) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
         'Native runtime container was replaced',
       );
+    }
+    _hostReady = true;
+  }
+
+  Future<void> _disposeHost(
+    NativeImageControl? images,
+    HeadlessInAppWebView? view,
+    Future<void>? running,
+  ) async {
+    try {
+      await images?.close();
+    } finally {
+      // The plugin ignores dispose() until run() receives its platform ACK.
+      try {
+        await running;
+      } catch (_) {
+        // The startup caller receives the original run failure.
+      }
+      await view?.dispose();
     }
   }
 
@@ -342,6 +401,12 @@ final class NativePlatformRuntime extends PlatformRuntime
       maxBytes: wire.controlRequestLimit,
     );
     final command = message.whichCommand();
+    if (_closing && command != wire.ControlRequest_Command.dispose) {
+      throw const RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Native runtime container is closing',
+      );
+    }
     if ({wire.ControlRequest_Command.acquireImage}.contains(command) &&
         !Platform.isIOS &&
         !Platform.isAndroid) {
@@ -372,7 +437,7 @@ final class NativePlatformRuntime extends PlatformRuntime
         ),
       );
     }
-    if (command == wire.ControlRequest_Command.dispose && _view == null) {
+    if (command == wire.ControlRequest_Command.dispose && !_hostReady) {
       return wire.encodeProtoJson(
         wire.ControlResponse(
           requestId: message.requestId,
@@ -381,6 +446,7 @@ final class NativePlatformRuntime extends PlatformRuntime
       );
     }
     await _ensureHost();
+    final generation = _generation;
     try {
       final images = _images;
       if (command == wire.ControlRequest_Command.acquireImage) {
@@ -410,7 +476,7 @@ final class NativePlatformRuntime extends PlatformRuntime
         );
       }
       if (command == wire.ControlRequest_Command.dispose) await images?.close();
-      return await _callExistingHost(request, _generation);
+      return await _callExistingHost(request, generation);
     } catch (error, stack) {
       final failure = error is PlatformException
           ? RuntimeException(switch (error.code) {
@@ -429,7 +495,10 @@ final class NativePlatformRuntime extends PlatformRuntime
               RuntimeErrorCode.runtimeLost,
               'Native runtime operation failed',
             );
-      if (failure.code == RuntimeErrorCode.runtimeLost) {
+      if (failure.code == RuntimeErrorCode.runtimeLost &&
+          !_closing &&
+          !_disposed &&
+          generation == _generation) {
         unawaited(rebuild().catchError((Object _) {}));
       }
       Error.throwWithStackTrace(failure, stack);
@@ -463,22 +532,34 @@ final class NativePlatformRuntime extends PlatformRuntime
         ),
       ),
     ]);
-    if (generation != _generation ||
-        result?.error != null ||
-        result?.value is! String) {
+    if (_disposed || generation != _generation) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
-        'Native runtime call belongs to an expired or failed container',
+        'Native runtime call belongs to an expired container',
+      );
+    }
+    if (result?.error != null) {
+      throw RuntimeException(
+        RuntimeErrorCode.runtimeLost,
+        'Native runtime control call failed: ${result!.error}',
+      );
+    }
+    if (result?.value is! String) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Native runtime control did not return ProtoJSON text',
       );
     }
     return decodeNativeControlResult(result!.value);
   }
 
   @override
-  Future<void> rebuild() =>
-      _resetting ??= Future<void>.microtask(_reset).whenComplete(() {
-        _resetting = null;
-      });
+  Future<void> rebuild() {
+    if (_closing || _disposed) return Future<void>.value();
+    return _resetting ??= Future<void>.microtask(_reset).whenComplete(() {
+      _resetting = null;
+    });
+  }
 
   Future<void> _reset() async {
     runtime.containerLost('Native runtime container was rebuilt');
@@ -488,15 +569,14 @@ final class NativePlatformRuntime extends PlatformRuntime
     ++_generation;
     final images = _images;
     final view = _view;
+    final running = _viewRunning;
     _images = null;
     _view = null;
+    _viewRunning = null;
     _controller = null;
     _opening = null;
-    try {
-      await images?.close();
-    } finally {
-      await view?.dispose();
-    }
+    _hostReady = false;
+    await _disposeHost(images, view, running);
   }
 
   @override
@@ -504,6 +584,13 @@ final class NativePlatformRuntime extends PlatformRuntime
 
   Future<void> _dispose() async {
     if (_disposed) return;
+    _closing = true;
+    final opening = _opening;
+    if (!_hostReady &&
+        _containerEnded != null &&
+        !_containerEnded!.isCompleted) {
+      _containerEnded!.complete();
+    }
     try {
       await _resetting;
       await runtime.dispose();
@@ -515,14 +602,18 @@ final class NativePlatformRuntime extends PlatformRuntime
       ++_generation;
       final images = _images;
       final view = _view;
+      final running = _viewRunning;
       _images = null;
       _view = null;
+      _viewRunning = null;
       _controller = null;
       _opening = null;
+      _hostReady = false;
+      await _disposeHost(images, view, running);
       try {
-        await images?.close();
-      } finally {
-        await view?.dispose();
+        await opening;
+      } catch (_) {
+        // The pending caller receives its startup error; disposal owns cleanup.
       }
     }
   }

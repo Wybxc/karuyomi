@@ -17,8 +17,15 @@ final class TestController extends PlatformInAppWebViewController {
       );
   Object? readiness = false;
   Completer<Object?>? pendingReadiness;
+  Completer<CallAsyncJavaScriptResult?>? pendingHandshake;
+  Completer<CallAsyncJavaScriptResult?>? pendingControl;
+  Completer<void>? disposeAcknowledgement;
+  int disposeRequests = 0;
+  CallAsyncJavaScriptResult? handshakeResult;
+  CallAsyncJavaScriptResult? controlResult;
   int probes = 0;
   int handshakes = 0;
+  int controls = 0;
   final probeSources = <String>[];
 
   @override
@@ -41,7 +48,20 @@ final class TestController extends PlatformInAppWebViewController {
       wire.ControlRequest(),
       arguments['request'],
     );
-    if (request.requestId.startsWith('native-handshake-')) handshakes++;
+    if (request.hasDispose()) {
+      disposeRequests++;
+      await disposeAcknowledgement?.future;
+    } else if (request.requestId.startsWith('native-handshake-')) {
+      handshakes++;
+      final pending = pendingHandshake;
+      if (pending != null) return pending.future;
+      if (handshakeResult != null) return handshakeResult;
+    } else if (!request.hasDispose()) {
+      controls++;
+      final pending = pendingControl;
+      if (pending != null) return pending.future;
+      if (controlResult != null) return controlResult;
+    }
     return CallAsyncJavaScriptResult(
       value: jsonEncode(
         wire.encodeProtoJson(
@@ -66,14 +86,20 @@ final class TestController extends PlatformInAppWebViewController {
 }
 
 final class TestHeadless extends PlatformHeadlessInAppWebView {
-  TestHeadless(super.params) : super.implementation();
+  TestHeadless(super.params, {this.runAcknowledgement})
+    : super.implementation();
+  final Completer<void>? runAcknowledgement;
   final controller = TestController();
-  bool disposed = false;
+  bool runCompleted = false;
+  int disposals = 0;
+  bool get disposed => disposals > 0;
   @override
   Future<void> run() async {
     params.onWebViewCreated?.call(
       InAppWebViewController.fromPlatform(platform: controller),
     );
+    await runAcknowledgement?.future;
+    runCompleted = true;
   }
 
   void loadStopped() {
@@ -85,18 +111,29 @@ final class TestHeadless extends PlatformHeadlessInAppWebView {
 
   @override
   Future<void> dispose() async {
-    disposed = true;
+    disposals++;
   }
 }
 
 final class TestWebViewPlatform extends InAppWebViewPlatform {
   final created = Completer<TestHeadless>();
+  final views = <TestHeadless>[];
+  Completer<void>? nextRunAcknowledgement;
+  var _nextCreated = Completer<TestHeadless>();
+  Future<TestHeadless> get nextCreated => _nextCreated.future;
   @override
   PlatformHeadlessInAppWebView createPlatformHeadlessInAppWebView(
     PlatformHeadlessInAppWebViewCreationParams params,
   ) {
-    final view = TestHeadless(params);
-    created.complete(view);
+    final view = TestHeadless(
+      params,
+      runAcknowledgement: nextRunAcknowledgement,
+    );
+    nextRunAcknowledgement = null;
+    views.add(view);
+    if (!created.isCompleted) created.complete(view);
+    _nextCreated.complete(view);
+    _nextCreated = Completer<TestHeadless>();
     return view;
   }
 }
@@ -251,4 +288,276 @@ void main() {
     expect(view.controller.handshakes, 0);
     expect(view.disposed, isTrue);
   });
+
+  final runtimeLost = isA<RuntimeException>().having(
+    (error) => error.code,
+    'code',
+    RuntimeErrorCode.runtimeLost,
+  );
+
+  test(
+    'rebuild immediately ends initialization before any load stop',
+    () async {
+      final response = ready();
+      final rejected = expectLater(response, throwsA(runtimeLost));
+      final old = await platform.created.future;
+      await runtime.rebuild().timeout(const Duration(seconds: 2));
+      await rejected.timeout(const Duration(seconds: 2));
+      await flushCallbacks();
+      expect(old.disposals, 1);
+      expect(old.controller.probes, 0);
+      expect(old.controller.handshakes, 0);
+
+      final created = platform.nextCreated;
+      final nextResponse = ready();
+      final next = await created;
+      next.controller.readiness = true;
+      next.loadStopped();
+      await nextResponse;
+      expect(platform.views, hasLength(2));
+      expect(next.disposed, isFalse);
+    },
+  );
+
+  test('retired process callbacks cannot rebuild the current view', () async {
+    final firstResponse = ready();
+    final old = await platform.created.future;
+    old.controller.readiness = true;
+    old.loadStopped();
+    await firstResponse;
+    await runtime.rebuild();
+
+    final created = platform.nextCreated;
+    final nextResponse = ready();
+    final next = await created;
+    next.controller.readiness = true;
+    next.loadStopped();
+    await nextResponse;
+    final oldController = InAppWebViewController.fromPlatform(
+      platform: old.controller,
+    );
+    old.params.onRenderProcessGone?.call(
+      oldController,
+      RenderProcessGoneDetail(didCrash: true),
+    );
+    old.params.onWebContentProcessDidTerminate?.call(oldController);
+    await flushCallbacks();
+    await ready();
+    expect(platform.views, hasLength(2));
+    expect(old.disposals, 1);
+    expect(next.disposals, 0);
+  });
+
+  test(
+    'rebuild waits for the run acknowledgement before disposing once',
+    () async {
+      final acknowledgement = Completer<void>();
+      platform.nextRunAcknowledgement = acknowledgement;
+      addTearDown(() {
+        if (!acknowledgement.isCompleted) acknowledgement.complete();
+      });
+      final response = ready();
+      final rejected = expectLater(response, throwsA(runtimeLost));
+      final old = await platform.created.future;
+      var resetCompleted = false;
+      final resetting = runtime.rebuild().then((_) => resetCompleted = true);
+      await flushCallbacks();
+      expect(old.runCompleted, isFalse);
+      expect(old.disposals, 0);
+      expect(resetCompleted, isFalse);
+      acknowledgement.complete();
+      await resetting.timeout(const Duration(seconds: 2));
+      await rejected.timeout(const Duration(seconds: 2));
+      await flushCallbacks();
+      expect(old.runCompleted, isTrue);
+      expect(old.disposals, 1);
+
+      final created = platform.nextCreated;
+      final nextResponse = ready();
+      final next = await created;
+      next.controller.readiness = true;
+      next.loadStopped();
+      await nextResponse;
+      expect(next.disposals, 0);
+    },
+  );
+
+  test('a late failed handshake cannot retire a newer generation', () async {
+    final response = ready();
+    final rejected = expectLater(response, throwsA(runtimeLost));
+    final old = await platform.created.future;
+    final handshake = Completer<CallAsyncJavaScriptResult?>();
+    old.controller.pendingHandshake = handshake;
+    old.controller.readiness = true;
+    old.loadStopped();
+    await flushCallbacks();
+    expect(old.controller.handshakes, 1);
+    await runtime.rebuild();
+    await rejected.timeout(const Duration(seconds: 2));
+
+    final created = platform.nextCreated;
+    final nextResponse = ready();
+    final next = await created;
+    next.controller.readiness = true;
+    next.loadStopped();
+    await nextResponse;
+    handshake.complete(
+      CallAsyncJavaScriptResult(error: 'Error: expired-handshake'),
+    );
+    await flushCallbacks();
+    await ready();
+    expect(platform.views, hasLength(2));
+    expect(old.disposals, 1);
+    expect(next.disposals, 0);
+  });
+
+  test('a late failed control call cannot retire a newer generation', () async {
+    final firstResponse = ready();
+    final old = await platform.created.future;
+    old.controller.readiness = true;
+    old.loadStopped();
+    await firstResponse;
+    final call = Completer<CallAsyncJavaScriptResult?>();
+    old.controller.pendingControl = call;
+    final response = ready();
+    final rejected = expectLater(response, throwsA(runtimeLost));
+    await flushCallbacks();
+    expect(old.controller.controls, 2);
+    await runtime.rebuild();
+    await rejected.timeout(const Duration(seconds: 2));
+
+    final created = platform.nextCreated;
+    final nextResponse = ready();
+    final next = await created;
+    next.controller.readiness = true;
+    next.loadStopped();
+    await nextResponse;
+    call.completeError(
+      PlatformException(code: 'javascript', message: 'expired-control'),
+    );
+    await flushCallbacks();
+    await ready();
+    expect(platform.views, hasLength(2));
+    expect(old.disposals, 1);
+    expect(next.disposals, 0);
+  });
+
+  test('handshake JavaScript errors retain their transport detail', () async {
+    final response = ready();
+    final rejected = expectLater(
+      response,
+      throwsA(
+        runtimeLost.having(
+          (error) => error.message,
+          'message',
+          contains('handshake-sentinel'),
+        ),
+      ),
+    );
+    final view = await platform.created.future;
+    view.controller.readiness = true;
+    view.controller.handshakeResult = CallAsyncJavaScriptResult(
+      error: 'Error: handshake-sentinel',
+    );
+    view.loadStopped();
+    await rejected;
+    expect(view.disposals, 1);
+  });
+
+  test('control JavaScript errors retain their transport detail', () async {
+    final firstResponse = ready();
+    final view = await platform.created.future;
+    view.controller.readiness = true;
+    view.loadStopped();
+    await firstResponse;
+    view.controller.controlResult = CallAsyncJavaScriptResult(
+      error: 'Error: control-sentinel',
+    );
+    await expectLater(
+      ready(),
+      throwsA(
+        runtimeLost.having(
+          (error) => error.message,
+          'message',
+          contains('control-sentinel'),
+        ),
+      ),
+    );
+    await flushCallbacks();
+    expect(view.disposals, 1);
+  });
+
+  test(
+    'dispose ends unfinished initialization without reviving late callbacks',
+    () async {
+      final response = ready();
+      final rejected = expectLater(response, throwsA(runtimeLost));
+      final view = await platform.created.future;
+      await runtime.dispose().timeout(const Duration(seconds: 2));
+      await rejected.timeout(const Duration(seconds: 2));
+      await flushCallbacks();
+      expect(view.disposals, 1);
+      expect(view.controller.disposeRequests, 0);
+      final oldController = InAppWebViewController.fromPlatform(
+        platform: view.controller,
+      );
+      view.params.onWebViewCreated?.call(oldController);
+      view.controller.readiness = true;
+      view.loadStopped();
+      view.params.onRenderProcessGone?.call(
+        oldController,
+        RenderProcessGoneDetail(didCrash: true),
+      );
+      view.params.onWebContentProcessDidTerminate?.call(oldController);
+      await runtime.rebuild();
+      await flushCallbacks();
+      await expectLater(ready(), throwsA(runtimeLost));
+      expect(platform.views, hasLength(1));
+      expect(view.disposals, 1);
+      expect(view.controller.handshakes, 0);
+    },
+  );
+
+  test(
+    'dispose awaits the ready host acknowledgement and never revives it',
+    () async {
+      final response = ready();
+      final view = await platform.created.future;
+      view.controller.readiness = true;
+      view.loadStopped();
+      await response;
+      final acknowledgement = Completer<void>();
+      view.controller.disposeAcknowledgement = acknowledgement;
+      addTearDown(() {
+        if (!acknowledgement.isCompleted) acknowledgement.complete();
+      });
+      var disposed = false;
+      final closing = runtime.dispose().then((_) => disposed = true);
+      await flushCallbacks();
+      expect(view.controller.disposeRequests, 1);
+      expect(view.disposals, 0);
+      expect(disposed, isFalse);
+      await expectLater(ready(), throwsA(runtimeLost));
+      acknowledgement.complete();
+      await closing.timeout(const Duration(seconds: 2));
+      expect(disposed, isTrue);
+      expect(view.disposals, 1);
+      final oldController = InAppWebViewController.fromPlatform(
+        platform: view.controller,
+      );
+      view.params.onWebViewCreated?.call(oldController);
+      view.loadStopped();
+      view.params.onRenderProcessGone?.call(
+        oldController,
+        RenderProcessGoneDetail(didCrash: true),
+      );
+      view.params.onWebContentProcessDidTerminate?.call(oldController);
+      await runtime.rebuild();
+      await flushCallbacks();
+      await expectLater(ready(), throwsA(runtimeLost));
+      expect(platform.views, hasLength(1));
+      expect(view.disposals, 1);
+      expect(view.controller.disposeRequests, 1);
+    },
+  );
 }
