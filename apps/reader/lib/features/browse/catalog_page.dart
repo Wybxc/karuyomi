@@ -7,6 +7,8 @@ import '../../data/library_repository.dart';
 import '../../data/business_state_client.dart';
 import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
+import '../bookmarks/chapter_bookmarks_controller.dart';
+import '../bookmarks/bookmark_status.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
 import '../reader/reader_recovery.dart';
@@ -306,6 +308,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   Stream<bool>? _favoriteStream;
   bool _savingFavorite = false;
   String? _favoriteError;
+  ChapterBookmarksController? _bookmarks;
+  bool _onlyBookmarks = false;
 
   @override
   void initState() {
@@ -321,14 +325,34 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       );
       _library = controller.library;
       _favoriteStream = _library?.watchFavorite(_sequence!.mangaKey);
+      final repository = controller.bookmarks;
+      if (repository != null) {
+        _bookmarks = ChapterBookmarksController(
+          repository: repository,
+          mangaKey: _sequence!.mangaKey,
+          isCurrent: () =>
+              mounted &&
+              controller.isCurrentSource(source) &&
+              controller.bookmarks?.identity.key == repository.identity.key,
+        )..addListener(_bookmarksChanged);
+        unawaited(_bookmarks!.refresh());
+      }
       unawaited(_refreshResume());
     }
+    controller.addListener(_catalogChanged);
   }
+
+  void _bookmarksChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _catalogChanged() => _bookmarks?.checkCurrent();
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshResume());
+      unawaited(_bookmarks?.refresh());
       final key = _sequence?.mangaKey;
       final library = _library;
       if (key != null && library != null) {
@@ -342,6 +366,9 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    controller.removeListener(_catalogChanged);
+    _bookmarks?.removeListener(_bookmarksChanged);
+    _bookmarks?.dispose();
     super.dispose();
   }
 
@@ -501,6 +528,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       if (mounted) {
         setState(() => _opening = false);
         await _refreshResume();
+        await _bookmarks?.refresh();
       }
     }
   }
@@ -585,6 +613,46 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 12),
+                    if (_bookmarks case final bookmarks?) ...[
+                      Wrap(
+                        spacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          FilterChip(
+                            label: const Text('仅书签'),
+                            selected: _onlyBookmarks,
+                            onSelected: bookmarks.loaded
+                                ? (selected) =>
+                                      setState(() => _onlyBookmarks = selected)
+                                : null,
+                          ),
+                          Text(
+                            bookmarks.loaded
+                                ? '已标记 ${bookmarks.chapterKeys.length} 章'
+                                : '书签尚未确认',
+                          ),
+                        ],
+                      ),
+                      BookmarkStatus(controller: bookmarks),
+                      if (bookmarks.chapterKeys.any(
+                        (key) => !_sequence!.entries.any(
+                          (chapter) => chapter.key == key,
+                        ),
+                      ))
+                        const _Notice(
+                          text: '部分书签的章节未在当前列表中找到，原记录仍保留。',
+                          icon: Icons.info_outline,
+                        ),
+                      if (_onlyBookmarks &&
+                          !(_sequence?.entries.any(
+                                (chapter) => bookmarks.contains(chapter.key),
+                              ) ??
+                              false))
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('当前章节列表中没有书签'),
+                        ),
+                    ],
                     if (controller.busy) const LinearProgressIndicator(),
                     if (controller.error != null)
                       _Notice(
@@ -597,12 +665,26 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                         child: Text('这个漫画源没有返回章节'),
                       ),
                     for (var index = 0; index < chapters.length; index++)
-                      ListTile(
-                        enabled: !controller.busy && !_opening,
-                        leading: const Icon(Icons.article_outlined),
-                        title: Text(chapters[index].name),
-                        onTap: () => _openChapter(context, index),
-                      ),
+                      if (!_onlyBookmarks ||
+                          (_sequence != null &&
+                              (_bookmarks?.contains(
+                                    _sequence!.entries[index].key,
+                                  ) ??
+                                  false)))
+                        ListTile(
+                          enabled: !controller.busy && !_opening,
+                          leading: const Icon(Icons.article_outlined),
+                          title: Text(chapters[index].name),
+                          trailing: _bookmarks == null || _sequence == null
+                              ? null
+                              : ChapterBookmarkButton(
+                                  controller: _bookmarks!,
+                                  chapterKey: _sequence!.entries[index].key,
+                                  chapterName: chapters[index].name,
+                                  enabled: !controller.busy && !_opening,
+                                ),
+                          onTap: () => _openChapter(context, index),
+                        ),
                   ],
                 ),
               ),

@@ -17,6 +17,7 @@ export const BUSINESS_REQUEST_LIMIT = 128 * 1024;
 export const BUSINESS_RESPONSE_LIMIT = 2 * 1024 * 1024;
 export const LIBRARY_METADATA_LIMIT = 96 * 1024;
 export const LIBRARY_PAGE_SIZE = 8;
+export const BOOKMARK_PAGE_SIZE = 64;
 export const CHAPTER_PAGE_LIMIT = 2048;
 export const CATEGORY_LIMIT = 64;
 
@@ -162,6 +163,10 @@ export function validateReadingAnchor(value: pb.ReadingAnchor): void {
   );
 }
 
+export function validateChapterBookmark(value: pb.ChapterBookmark): void {
+  validId(value.chapterKey);
+}
+
 export function validateChapterProgress(value: pb.ChapterProgressState): void {
   validId(value.chapterKey);
   uint32(value.epoch);
@@ -246,6 +251,9 @@ export const stateMutationSchema = codec<pb.StateMutation>((input) => {
       requireFields(value.operation.value, ['snapshot']);
       validateChapterSnapshot(value.operation.value.snapshot);
       break;
+    case 'setBookmark':
+      validId(value.operation.value.chapterKey);
+      break;
     case 'setCategories':
       categoryIds(value.operation.value.categoryIds);
       uint32(value.operation.value.expectedCatalogRevision);
@@ -272,6 +280,7 @@ function validateResponse(value: {
   accountRevision: number;
   manga?: pb.MangaState | undefined;
   progress?: pb.ChapterProgressState | undefined;
+  bookmark?: pb.ChapterBookmark | undefined;
   error?: pb.BusinessStateError | undefined;
   categoryCatalog?: pb.CategoryCatalog | undefined;
 }): void {
@@ -284,6 +293,14 @@ function validateResponse(value: {
   else requireFields(value, ['manga', 'categoryCatalog']);
   if (value.manga) validateMangaState(value.manga);
   if (value.progress) validateChapterProgress(value.progress);
+  if (value.bookmark) {
+    validateChapterBookmark(value.bookmark);
+    requireCondition(
+      !value.progress ||
+        value.progress.chapterKey === value.bookmark.chapterKey,
+      'Bookmark and progress belong to different chapters',
+    );
+  }
   if (value.categoryCatalog) {
     validateCategoryCatalog(value.categoryCatalog);
     if (value.manga) validateMemberships(value.manga, value.categoryCatalog);
@@ -312,6 +329,65 @@ export const mangaStateResponseSchema = codec<pb.MangaStateResponse>(
       BUSINESS_RESPONSE_LIMIT,
     );
     validateResponse(value);
+    return value;
+  },
+);
+
+export const bookmarkPageResponseSchema = codec<pb.BookmarkPageResponse>(
+  (input) => {
+    const value = parseMessage(
+      pb.BookmarkPageResponseSchema,
+      input,
+      BUSINESS_RESPONSE_LIMIT,
+    );
+    requireCondition(
+      value.schemaVersion === businessSchemaVersion,
+      'Unsupported business state schema',
+    );
+    uint32(value.accountRevision);
+    if (!value.error || value.mangaKey !== '') mangaKey.parse(value.mangaKey);
+    if (value.error) {
+      validateError(value.error);
+      requireCondition(
+        value.entries.length === 0 && value.nextKey === '',
+        'Failed bookmark page cannot contain entries',
+      );
+    }
+    requireCondition(
+      value.entries.length <= BOOKMARK_PAGE_SIZE &&
+        new Set(value.entries.map((entry) => entry.chapterKey)).size ===
+          value.entries.length,
+      'Invalid bookmark page',
+    );
+    let previousKey: Uint8Array | undefined;
+    for (const entry of value.entries) {
+      validateChapterBookmark(entry);
+      requireCondition(
+        entry.bookmarked,
+        'Bookmark pages contain marked chapters only',
+      );
+      // SQLite BINARY orders UTF-8 bytes, including non-ASCII chapter identities.
+      const key = new TextEncoder().encode(entry.chapterKey);
+      if (previousKey) {
+        const different = previousKey.findIndex(
+          (byte, index) => byte !== key[index],
+        );
+        requireCondition(
+          different < 0
+            ? previousKey.length < key.length
+            : previousKey[different]! < (key[different] ?? -1),
+          'Bookmark page keys must be unique and ordered',
+        );
+      }
+      previousKey = key;
+    }
+    if (value.nextKey !== '') {
+      validId(value.nextKey);
+      requireCondition(
+        value.nextKey === value.entries.at(-1)?.chapterKey,
+        'Bookmark cursor must identify its last entry',
+      );
+    }
     return value;
   },
 );

@@ -6,6 +6,8 @@ import 'package:reader_core/reader_core.dart';
 import '../../data/reading_progress.dart';
 import '../../diagnostics/reader_baseline.dart';
 import '../browse/catalog_controller.dart';
+import '../bookmarks/chapter_bookmarks_controller.dart';
+import '../bookmarks/bookmark_status.dart';
 import 'chapter_sequence.dart';
 import 'chapter_preparation.dart';
 import 'reader_screen.dart';
@@ -79,6 +81,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   bool _recovering = false;
   bool _initializing = false;
   bool _refreshingProgress = false;
+  ChapterBookmarksController? _bookmarks;
 
   @override
   void initState() {
@@ -94,11 +97,34 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     WidgetsBinding.instance.addObserver(this);
     _progress = widget.catalog.createReadingProgress(_sequence.mangaKey);
     _progress?.addListener(_progressChanged);
+    _installBookmarks();
     if (_progress != null && _opened.manifest.pages.isNotEmpty) {
       _visible = false;
       _initializing = true;
       unawaited(_restoreInitial());
     }
+  }
+
+  void _installBookmarks() {
+    _bookmarks?.removeListener(_bookmarksChanged);
+    _bookmarks?.dispose();
+    _bookmarks = null;
+    final repository = widget.catalog.bookmarks;
+    if (repository == null) return;
+    _bookmarks = ChapterBookmarksController(
+      repository: repository,
+      mangaKey: _sequence.mangaKey,
+      isCurrent: () =>
+          mounted &&
+          !_closing &&
+          widget.catalog.subject == _subject &&
+          widget.catalog.deploymentOrigin?.origin == _origin,
+    )..addListener(_bookmarksChanged);
+    unawaited(_bookmarks!.refresh());
+  }
+
+  void _bookmarksChanged() {
+    if (!_closing && mounted) setState(() {});
   }
 
   Future<void> _restoreInitial() async {
@@ -122,6 +148,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
 
   void _catalogChanged() {
     if (_closing || !mounted) return;
+    _bookmarks?.checkCurrent();
     if (widget.catalog.accessPaused && !_accessPaused) {
       _recordViewport();
       setState(() => _accessPaused = true);
@@ -239,6 +266,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         _accessPaused = false;
         _visible = true;
       });
+      _installBookmarks();
       recovered = null;
     } catch (error) {
       if (!_closing && mounted) {
@@ -288,6 +316,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshProgress());
+      if (!_accessPaused && !_recovering) unawaited(_bookmarks?.refresh());
     } else {
       unawaited(_progress?.flush());
     }
@@ -553,6 +582,37 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         if (_error != null)
           Padding(padding: const EdgeInsets.all(8), child: Text(_error!)),
         if (_progress case final progress?) _progressControls(progress),
+        if (_bookmarks case final bookmarks?) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                !bookmarks.loaded
+                    ? bookmarks.busy
+                          ? '正在读取本章书签'
+                          : '本章书签尚未确认'
+                    : bookmarks.contains(_chapter.key)
+                    ? '本章已标记书签'
+                    : '本章未标记书签',
+              ),
+              ChapterBookmarkButton(
+                controller: bookmarks,
+                chapterKey: _chapter.key,
+                chapterName: _chapter.name,
+                enabled:
+                    !_busy &&
+                    !_accessPaused &&
+                    !_recovering &&
+                    !_refreshingProgress &&
+                    !_initializing,
+              ),
+            ],
+          ),
+          BookmarkStatus(
+            controller: bookmarks,
+            enabled: !_busy && !_accessPaused && !_recovering && !_initializing,
+          ),
+        ],
         Row(
           children: [
             TextButton.icon(
@@ -760,6 +820,8 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       unawaited(released);
     }
     widget.catalog.removeListener(_catalogChanged);
+    _bookmarks?.removeListener(_bookmarksChanged);
+    _bookmarks?.dispose();
     final preparationClosed = _preparation.close();
     if (!_viewAttached && !_viewClosed.isCompleted) {
       // setState may install a provider just before a pop removes this route,

@@ -9,6 +9,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../runtime/runtime_platform_types.dart';
 import '../../data/business_state_client.dart';
+import '../../data/bookmark_repository.dart';
 import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
@@ -129,6 +130,7 @@ final class CatalogController extends ChangeNotifier {
   BusinessStateClient? _businessClient;
   LibraryRepository? _library;
   ProgressRepository? _progress;
+  BookmarkRepository? _bookmarks;
 
   BusinessStateClient? get _confirmedBusinessClient {
     final origin = deploymentOrigin;
@@ -148,6 +150,7 @@ final class CatalogController extends ChangeNotifier {
           retained ?? BusinessStateClient(api: api, identity: identity);
       _library = LibraryRepository(_businessClient!);
       _progress = ProgressRepository(_businessClient!);
+      _bookmarks = BookmarkRepository(_businessClient!);
     }
     return _businessClient;
   }
@@ -157,6 +160,9 @@ final class CatalogController extends ChangeNotifier {
 
   LibraryRepository? get library =>
       _confirmedBusinessClient == null ? null : _library;
+
+  BookmarkRepository? get bookmarks =>
+      _confirmedBusinessClient == null ? null : _bookmarks;
 
   ReadingProgressController? createReadingProgress(String mangaKey) {
     final repository = readingProgress;
@@ -223,6 +229,7 @@ final class CatalogController extends ChangeNotifier {
       _businessClient = clientState;
       _library = LibraryRepository(clientState);
       _progress = ProgressRepository(clientState);
+      _bookmarks = BookmarkRepository(clientState);
     }
     if (!_readingClients.containsKey(client)) {
       _readingClients[client] = 0;

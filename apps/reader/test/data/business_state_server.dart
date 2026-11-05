@@ -25,6 +25,7 @@ final class _Account {
   final catalog = wire.CategoryCatalog();
   final mangas = <String, wire.MangaState>{};
   final progress = <(String, String), wire.ChapterProgressState>{};
+  final bookmarks = <(String, String)>{};
   final mutations = <String, (String, ApiReply)>{};
 }
 
@@ -62,6 +63,9 @@ final class TestBusinessServer implements ApiFetch {
   }) => _account(
     subject ?? defaultSubject,
   ).progress[(key, chapterKey)]?.deepCopy();
+
+  bool bookmarked(String key, String chapterKey, {String? subject}) =>
+      _account(subject ?? defaultSubject).bookmarks.contains((key, chapterKey));
 
   _Account _account(String subject) =>
       _accounts.putIfAbsent(subject, _Account.new);
@@ -199,6 +203,54 @@ final class TestBusinessServer implements ApiFetch {
       );
     }
     if (request.method == 'GET' &&
+        request.uri.pathSegments.length == 5 &&
+        request.uri.pathSegments.take(3).join('/') == 'api/state/manga' &&
+        request.uri.pathSegments.last == 'bookmarks') {
+      final key = request.uri.pathSegments[3];
+      final revision = request.uri.queryParameters['revision'];
+      if (revision != null && int.tryParse(revision) != account.revision) {
+        return _reply(
+          wire.BookmarkPageResponse(
+            schemaVersion: 1,
+            accountRevision: account.revision,
+            mangaKey: key,
+            error: _error(
+              wire
+                  .BusinessStateErrorCode
+                  .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+              'Bookmarks changed during pagination',
+            ),
+          ),
+          status: 409,
+        );
+      }
+      final after = request.uri.queryParameters['afterKey'] ?? '';
+      String order(String value) => String.fromCharCodes(utf8.encode(value));
+      final entries =
+          account.bookmarks
+              .where(
+                (entry) =>
+                    entry.$1 == key &&
+                    order(entry.$2).compareTo(order(after)) > 0,
+              )
+              .map((entry) => entry.$2)
+              .toList()
+            ..sort((a, b) => order(a).compareTo(order(b)));
+      final page = entries.take(64).toList();
+      return _reply(
+        wire.BookmarkPageResponse(
+          schemaVersion: 1,
+          accountRevision: account.revision,
+          mangaKey: key,
+          entries: page.map(
+            (chapterKey) =>
+                wire.ChapterBookmark(chapterKey: chapterKey, bookmarked: true),
+          ),
+          nextKey: entries.length > page.length ? page.last : '',
+        ),
+      );
+    }
+    if (request.method == 'GET' &&
         request.uri.path.startsWith('/api/state/manga/')) {
       final key = request.uri.pathSegments.last;
       final chapterKey = request.uri.queryParameters['chapterKey'];
@@ -212,6 +264,12 @@ final class TestBusinessServer implements ApiFetch {
           progress: chapterKey == null
               ? null
               : account.progress[(key, chapterKey)]?.deepCopy(),
+          bookmark: chapterKey == null
+              ? null
+              : wire.ChapterBookmark(
+                  chapterKey: chapterKey,
+                  bookmarked: account.bookmarks.contains((key, chapterKey)),
+                ),
         ),
       );
     }
@@ -272,6 +330,7 @@ final class TestBusinessServer implements ApiFetch {
     }
     final next = current.deepCopy();
     wire.ChapterProgressState? nextProgress;
+    wire.ChapterBookmark? nextBookmark;
     switch (mutation.whichOperation()) {
       case wire.StateMutation_Operation.setFavorite:
         next.metadata = mutation.setFavorite.metadata.deepCopy();
@@ -353,6 +412,20 @@ final class TestBusinessServer implements ApiFetch {
                 .where((category) => ids.contains(category.id))
                 .map((category) => category.id),
           );
+      case wire.StateMutation_Operation.setBookmark:
+        final operation = mutation.setBookmark;
+        if (operation.chapterKey.isEmpty || operation.chapterKey.length > 200) {
+          return _mutationError(
+            account,
+            mutation,
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Invalid bookmark chapter',
+          );
+        }
+        nextBookmark = wire.ChapterBookmark(
+          chapterKey: operation.chapterKey,
+          bookmarked: operation.bookmarked,
+        );
       case wire.StateMutation_Operation.notSet:
         throw StateError('Missing operation');
     }
@@ -363,6 +436,14 @@ final class TestBusinessServer implements ApiFetch {
       account.progress[(mutation.mangaKey, nextProgress.chapterKey)] =
           nextProgress;
     }
+    if (nextBookmark != null) {
+      final identity = (mutation.mangaKey, nextBookmark.chapterKey);
+      if (nextBookmark.bookmarked) {
+        account.bookmarks.add(identity);
+      } else {
+        account.bookmarks.remove(identity);
+      }
+    }
     final reply = _reply(
       wire.StateMutationResponse(
         schemaVersion: 1,
@@ -371,6 +452,7 @@ final class TestBusinessServer implements ApiFetch {
         categoryCatalog: account.catalog.deepCopy(),
         manga: next.deepCopy(),
         progress: nextProgress?.deepCopy(),
+        bookmark: nextBookmark?.deepCopy(),
       ),
     );
     account.mutations[mutation.mutationId] = (fingerprint, reply);
@@ -394,6 +476,15 @@ final class TestBusinessServer implements ApiFetch {
           account.mangas[mutation.mangaKey]?.deepCopy() ??
           wire.MangaState(mangaKey: mutation.mangaKey),
       progress: progress?.deepCopy(),
+      bookmark: mutation.hasSetBookmark()
+          ? wire.ChapterBookmark(
+              chapterKey: mutation.setBookmark.chapterKey,
+              bookmarked: account.bookmarks.contains((
+                mutation.mangaKey,
+                mutation.setBookmark.chapterKey,
+              )),
+            )
+          : null,
       error: _error(code, message),
     ),
     status: 409,
@@ -521,6 +612,16 @@ final class TestBusinessServer implements ApiFetch {
     String mutationId = '',
   }) {
     final error = _error(code, message);
+    if (request.uri.path.endsWith('/bookmarks')) {
+      return _reply(
+        wire.BookmarkPageResponse(
+          schemaVersion: 1,
+          mangaKey: request.uri.pathSegments[3],
+          error: error,
+        ),
+        status: status,
+      );
+    }
     if (request.uri.path == '/api/library') {
       return _reply(
         wire.LibraryPageResponse(schemaVersion: 1, error: error),

@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file karuyomi/v1/business.proto.
  */
 export const file_karuyomi_v1_business: GenFile = /*@__PURE__*/
-  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgizQEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUSFAoMY2F0ZWdvcnlfaWRzGAcgAygJIiQKCENhdGVnb3J5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiTgoPQ2F0ZWdvcnlDYXRhbG9nEhAKCHJldmlzaW9uGAEgASgNEikKCmNhdGVnb3JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeSJICg1TZXRDYXRlZ29yaWVzEhQKDGNhdGVnb3J5X2lkcxgBIAMoCRIhChlleHBlY3RlZF9jYXRhbG9nX3JldmlzaW9uGAIgASgNIjkKDkNyZWF0ZUNhdGVnb3J5EicKCGNhdGVnb3J5GAEgASgLMhUua2FydXlvbWkudjEuQ2F0ZWdvcnkiMwoOUmVuYW1lQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIpChFSZW9yZGVyQ2F0ZWdvcmllcxIUCgxjYXRlZ29yeV9pZHMYASADKAkiJQoORGVsZXRlQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkizQIKEENhdGVnb3J5TXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNgoPY3JlYXRlX2NhdGVnb3J5GAogASgLMhsua2FydXlvbWkudjEuQ3JlYXRlQ2F0ZWdvcnlIABI2Cg9yZW5hbWVfY2F0ZWdvcnkYCyABKAsyGy5rYXJ1eW9taS52MS5SZW5hbWVDYXRlZ29yeUgAEjwKEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRlZ29yaWVzSAASNgoPZGVsZXRlX2NhdGVnb3J5GA0gASgLMhsua2FydXlvbWkudjEuRGVsZXRlQ2F0ZWdvcnlIAEILCglvcGVyYXRpb24ihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIk8KC1NldEZhdm9yaXRlEi4KCG1ldGFkYXRhGAEgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAIgASgIIosBCgxTYXZlUHJvZ3Jlc3MSLgoIc25hcHNob3QYASABKAsyHC5rYXJ1eW9taS52MS5DaGFwdGVyU25hcHNob3QSMwoIcHJvZ3Jlc3MYAiABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIWCg5yZXZlcnNlZF9vcmRlchgDIAEoCCJXCg1SZXNldFByb2dyZXNzEi4KCHNuYXBzaG90GAEgASgLMhwua2FydXlvbWkudjEuQ2hhcHRlclNuYXBzaG90EhYKDnJldmVyc2VkX29yZGVyGAIgASgIIoIDCg1TdGF0ZU11dGF0aW9uEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhEKCW1hbmdhX2tleRgDIAEoCRIZChFleHBlY3RlZF9yZXZpc2lvbhgEIAEoDRIwCgxzZXRfZmF2b3JpdGUYCiABKAsyGC5rYXJ1eW9taS52MS5TZXRGYXZvcml0ZUgAEjcKD3VwZGF0ZV9tZXRhZGF0YRgLIAEoCzIcLmthcnV5b21pLnYxLkxpYnJhcnlNZXRhZGF0YUgAEjIKDXNhdmVfcHJvZ3Jlc3MYDCABKAsyGS5rYXJ1eW9taS52MS5TYXZlUHJvZ3Jlc3NIABI0Cg5yZXNldF9wcm9ncmVzcxgNIAEoCzIaLmthcnV5b21pLnYxLlJlc2V0UHJvZ3Jlc3NIABI0Cg5zZXRfY2F0ZWdvcmllcxgOIAEoCzIaLmthcnV5b21pLnYxLlNldENhdGVnb3JpZXNIAEILCglvcGVyYXRpb24iawoSQnVzaW5lc3NTdGF0ZUVycm9yEjEKBGNvZGUYASABKA4yIy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIIqMCChVTdGF0ZU11dGF0aW9uUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGAoQYWNjb3VudF9yZXZpc2lvbhgDIAEoDRImCgVtYW5nYRgEIAEoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSMwoIcHJvZ3Jlc3MYBSABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvchI2ChBjYXRlZ29yeV9jYXRhbG9nGAcgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nIosCChJNYW5nYVN0YXRlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRImCgVtYW5nYRgDIAEoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSMwoIcHJvZ3Jlc3MYBCABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIuCgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvchI2ChBjYXRlZ29yeV9jYXRhbG9nGAYgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nIusBChNMaWJyYXJ5UGFnZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SKAoHZW50cmllcxgDIAMoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSEAoIbmV4dF9rZXkYBCABKAkSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZyLJAQoYQ2F0ZWdvcnlNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SNgoQY2F0ZWdvcnlfY2F0YWxvZxgEIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciKzAQoXQ2F0ZWdvcnlDYXRhbG9nUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRI2ChBjYXRlZ29yeV9jYXRhbG9nGAMgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nEi4KBWVycm9yGAQgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yKtkCChZCdXNpbmVzc1N0YXRlRXJyb3JDb2RlEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfVU5TUEVDSUZJRUQQABIrCidCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0lOVkFMSURfSU5QVVQQARIvCitCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1JFVklTSU9OX0NPTkZMSUNUEAISKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9TVEFMRV9FUE9DSBADEjIKLkJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfSURFTVBPVEVOQ1lfQ09ORkxJQ1QQBBIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1VOQVZBSUxBQkxFEAUSLAooQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9MSU1JVF9FWENFRURFRBAGYgZwcm90bzM", [file_karuyomi_v1_control]);
+  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgizQEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUSFAoMY2F0ZWdvcnlfaWRzGAcgAygJIiQKCENhdGVnb3J5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiTgoPQ2F0ZWdvcnlDYXRhbG9nEhAKCHJldmlzaW9uGAEgASgNEikKCmNhdGVnb3JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeSJICg1TZXRDYXRlZ29yaWVzEhQKDGNhdGVnb3J5X2lkcxgBIAMoCRIhChlleHBlY3RlZF9jYXRhbG9nX3JldmlzaW9uGAIgASgNIjkKDkNyZWF0ZUNhdGVnb3J5EicKCGNhdGVnb3J5GAEgASgLMhUua2FydXlvbWkudjEuQ2F0ZWdvcnkiMwoOUmVuYW1lQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIpChFSZW9yZGVyQ2F0ZWdvcmllcxIUCgxjYXRlZ29yeV9pZHMYASADKAkiJQoORGVsZXRlQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkizQIKEENhdGVnb3J5TXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNgoPY3JlYXRlX2NhdGVnb3J5GAogASgLMhsua2FydXlvbWkudjEuQ3JlYXRlQ2F0ZWdvcnlIABI2Cg9yZW5hbWVfY2F0ZWdvcnkYCyABKAsyGy5rYXJ1eW9taS52MS5SZW5hbWVDYXRlZ29yeUgAEjwKEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRlZ29yaWVzSAASNgoPZGVsZXRlX2NhdGVnb3J5GA0gASgLMhsua2FydXlvbWkudjEuRGVsZXRlQ2F0ZWdvcnlIAEILCglvcGVyYXRpb24ihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIjoKD0NoYXB0ZXJCb29rbWFyaxITCgtjaGFwdGVyX2tleRgBIAEoCRISCgpib29rbWFya2VkGAIgASgIIjYKC1NldEJvb2ttYXJrEhMKC2NoYXB0ZXJfa2V5GAEgASgJEhIKCmJvb2ttYXJrZWQYAiABKAgiTwoLU2V0RmF2b3JpdGUSLgoIbWV0YWRhdGEYASABKAsyHC5rYXJ1eW9taS52MS5MaWJyYXJ5TWV0YWRhdGESEAoIZmF2b3JpdGUYAiABKAgiiwEKDFNhdmVQcm9ncmVzcxIuCghzbmFwc2hvdBgBIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJTbmFwc2hvdBIzCghwcm9ncmVzcxgCIAEoCzIhLmthcnV5b21pLnYxLkNoYXB0ZXJQcm9ncmVzc1N0YXRlEhYKDnJldmVyc2VkX29yZGVyGAMgASgIIlcKDVJlc2V0UHJvZ3Jlc3MSLgoIc25hcHNob3QYASABKAsyHC5rYXJ1eW9taS52MS5DaGFwdGVyU25hcHNob3QSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgitAMKDVN0YXRlTXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSEQoJbWFuZ2Ffa2V5GAMgASgJEhkKEWV4cGVjdGVkX3JldmlzaW9uGAQgASgNEjAKDHNldF9mYXZvcml0ZRgKIAEoCzIYLmthcnV5b21pLnYxLlNldEZhdm9yaXRlSAASNwoPdXBkYXRlX21ldGFkYXRhGAsgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhSAASMgoNc2F2ZV9wcm9ncmVzcxgMIAEoCzIZLmthcnV5b21pLnYxLlNhdmVQcm9ncmVzc0gAEjQKDnJlc2V0X3Byb2dyZXNzGA0gASgLMhoua2FydXlvbWkudjEuUmVzZXRQcm9ncmVzc0gAEjQKDnNldF9jYXRlZ29yaWVzGA4gASgLMhoua2FydXlvbWkudjEuU2V0Q2F0ZWdvcmllc0gAEjAKDHNldF9ib29rbWFyaxgPIAEoCzIYLmthcnV5b21pLnYxLlNldEJvb2ttYXJrSABCCwoJb3BlcmF0aW9uImsKEkJ1c2luZXNzU3RhdGVFcnJvchIxCgRjb2RlGAEgASgOMiMua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIPCgdtZXNzYWdlGAIgASgJEhEKCXJldHJ5YWJsZRgDIAEoCCLTAgoVU3RhdGVNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SJgoFbWFuZ2EYBCABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAUgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgHIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgIIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayK7AgoSTWFuZ2FTdGF0ZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SJgoFbWFuZ2EYAyABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAQgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgHIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayLMAQoUQm9va21hcmtQYWdlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRIRCgltYW5nYV9rZXkYAyABKAkSLQoHZW50cmllcxgEIAMoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyaxIQCghuZXh0X2tleRgFIAEoCRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciLrAQoTTGlicmFyeVBhZ2VSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIYChBhY2NvdW50X3JldmlzaW9uGAIgASgNEigKB2VudHJpZXMYAyADKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEhAKCG5leHRfa2V5GAQgASgJEi4KBWVycm9yGAUgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yEjYKEGNhdGVnb3J5X2NhdGFsb2cYBiABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2ciyQEKGENhdGVnb3J5TXV0YXRpb25SZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIYChBhY2NvdW50X3JldmlzaW9uGAMgASgNEjYKEGNhdGVnb3J5X2NhdGFsb2cYBCABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2cSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3IiswEKF0NhdGVnb3J5Q2F0YWxvZ1Jlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SNgoQY2F0ZWdvcnlfY2F0YWxvZxgDIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCgVlcnJvchgEIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvcirZAgoWQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASKwonQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9JTlZBTElEX0lOUFVUEAESLworQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9SRVZJU0lPTl9DT05GTElDVBACEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfU1RBTEVfRVBPQ0gQAxIyCi5CVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0lERU1QT1RFTkNZX0NPTkZMSUNUEAQSKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9VTkFWQUlMQUJMRRAFEiwKKEJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfTElNSVRfRVhDRUVERUQQBmIGcHJvdG8z", [file_karuyomi_v1_control]);
 
 /**
  * Server-owned, account-scoped business state. Authentication is supplied by
@@ -134,7 +134,7 @@ export type MangaState = Message<"karuyomi.v1.MangaState"> & {
   mangaKey: string;
 
   /**
-   * Covers every metadata, favorite, category, progress and resume mutation.
+   * Covers every metadata, favorite, category, bookmark, progress and resume mutation.
    *
    * @generated from field: uint32 revision = 2;
    */
@@ -176,7 +176,7 @@ export type MangaStateJson = {
   mangaKey?: string;
 
   /**
-   * Covers every metadata, favorite, category, progress and resume mutation.
+   * Covers every metadata, favorite, category, bookmark, progress and resume mutation.
    *
    * @generated from field: uint32 revision = 2;
    */
@@ -726,6 +726,80 @@ export const ChapterSnapshotSchema: GenMessage<ChapterSnapshot, {jsonType: Chapt
   messageDesc(file_karuyomi_v1_business, 13);
 
 /**
+ * @generated from message karuyomi.v1.ChapterBookmark
+ */
+export type ChapterBookmark = Message<"karuyomi.v1.ChapterBookmark"> & {
+  /**
+   * @generated from field: string chapter_key = 1;
+   */
+  chapterKey: string;
+
+  /**
+   * @generated from field: bool bookmarked = 2;
+   */
+  bookmarked: boolean;
+};
+
+/**
+ * @generated from message karuyomi.v1.ChapterBookmark
+ */
+export type ChapterBookmarkJson = {
+  /**
+   * @generated from field: string chapter_key = 1;
+   */
+  chapterKey?: string;
+
+  /**
+   * @generated from field: bool bookmarked = 2;
+   */
+  bookmarked?: boolean;
+};
+
+/**
+ * Describes the message karuyomi.v1.ChapterBookmark.
+ * Use `create(ChapterBookmarkSchema)` to create a new message.
+ */
+export const ChapterBookmarkSchema: GenMessage<ChapterBookmark, {jsonType: ChapterBookmarkJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 14);
+
+/**
+ * @generated from message karuyomi.v1.SetBookmark
+ */
+export type SetBookmark = Message<"karuyomi.v1.SetBookmark"> & {
+  /**
+   * @generated from field: string chapter_key = 1;
+   */
+  chapterKey: string;
+
+  /**
+   * @generated from field: bool bookmarked = 2;
+   */
+  bookmarked: boolean;
+};
+
+/**
+ * @generated from message karuyomi.v1.SetBookmark
+ */
+export type SetBookmarkJson = {
+  /**
+   * @generated from field: string chapter_key = 1;
+   */
+  chapterKey?: string;
+
+  /**
+   * @generated from field: bool bookmarked = 2;
+   */
+  bookmarked?: boolean;
+};
+
+/**
+ * Describes the message karuyomi.v1.SetBookmark.
+ * Use `create(SetBookmarkSchema)` to create a new message.
+ */
+export const SetBookmarkSchema: GenMessage<SetBookmark, {jsonType: SetBookmarkJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 15);
+
+/**
  * @generated from message karuyomi.v1.SetFavorite
  */
 export type SetFavorite = Message<"karuyomi.v1.SetFavorite"> & {
@@ -760,7 +834,7 @@ export type SetFavoriteJson = {
  * Use `create(SetFavoriteSchema)` to create a new message.
  */
 export const SetFavoriteSchema: GenMessage<SetFavorite, {jsonType: SetFavoriteJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 14);
+  messageDesc(file_karuyomi_v1_business, 16);
 
 /**
  * @generated from message karuyomi.v1.SaveProgress
@@ -807,7 +881,7 @@ export type SaveProgressJson = {
  * Use `create(SaveProgressSchema)` to create a new message.
  */
 export const SaveProgressSchema: GenMessage<SaveProgress, {jsonType: SaveProgressJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 15);
+  messageDesc(file_karuyomi_v1_business, 17);
 
 /**
  * @generated from message karuyomi.v1.ResetProgress
@@ -844,7 +918,7 @@ export type ResetProgressJson = {
  * Use `create(ResetProgressSchema)` to create a new message.
  */
 export const ResetProgressSchema: GenMessage<ResetProgress, {jsonType: ResetProgressJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 16);
+  messageDesc(file_karuyomi_v1_business, 18);
 
 /**
  * @generated from message karuyomi.v1.StateMutation
@@ -905,6 +979,12 @@ export type StateMutation = Message<"karuyomi.v1.StateMutation"> & {
      */
     value: SetCategories;
     case: "setCategories";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.SetBookmark set_bookmark = 15;
+     */
+    value: SetBookmark;
+    case: "setBookmark";
   } | { case: undefined; value?: undefined };
 };
 
@@ -958,6 +1038,11 @@ export type StateMutationJson = {
    * @generated from field: karuyomi.v1.SetCategories set_categories = 14;
    */
   setCategories?: SetCategoriesJson;
+
+  /**
+   * @generated from field: karuyomi.v1.SetBookmark set_bookmark = 15;
+   */
+  setBookmark?: SetBookmarkJson;
 };
 
 /**
@@ -965,7 +1050,7 @@ export type StateMutationJson = {
  * Use `create(StateMutationSchema)` to create a new message.
  */
 export const StateMutationSchema: GenMessage<StateMutation, {jsonType: StateMutationJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 17);
+  messageDesc(file_karuyomi_v1_business, 19);
 
 /**
  * @generated from message karuyomi.v1.BusinessStateError
@@ -1012,7 +1097,7 @@ export type BusinessStateErrorJson = {
  * Use `create(BusinessStateErrorSchema)` to create a new message.
  */
 export const BusinessStateErrorSchema: GenMessage<BusinessStateError, {jsonType: BusinessStateErrorJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 18);
+  messageDesc(file_karuyomi_v1_business, 20);
 
 /**
  * @generated from message karuyomi.v1.StateMutationResponse
@@ -1052,6 +1137,11 @@ export type StateMutationResponse = Message<"karuyomi.v1.StateMutationResponse">
    * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 7;
    */
   categoryCatalog?: CategoryCatalog | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.ChapterBookmark bookmark = 8;
+   */
+  bookmark?: ChapterBookmark | undefined;
 };
 
 /**
@@ -1092,6 +1182,11 @@ export type StateMutationResponseJson = {
    * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 7;
    */
   categoryCatalog?: CategoryCatalogJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ChapterBookmark bookmark = 8;
+   */
+  bookmark?: ChapterBookmarkJson;
 };
 
 /**
@@ -1099,7 +1194,7 @@ export type StateMutationResponseJson = {
  * Use `create(StateMutationResponseSchema)` to create a new message.
  */
 export const StateMutationResponseSchema: GenMessage<StateMutationResponse, {jsonType: StateMutationResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 19);
+  messageDesc(file_karuyomi_v1_business, 21);
 
 /**
  * @generated from message karuyomi.v1.MangaStateResponse
@@ -1134,6 +1229,11 @@ export type MangaStateResponse = Message<"karuyomi.v1.MangaStateResponse"> & {
    * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 6;
    */
   categoryCatalog?: CategoryCatalog | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.ChapterBookmark bookmark = 7;
+   */
+  bookmark?: ChapterBookmark | undefined;
 };
 
 /**
@@ -1169,6 +1269,11 @@ export type MangaStateResponseJson = {
    * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 6;
    */
   categoryCatalog?: CategoryCatalogJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ChapterBookmark bookmark = 7;
+   */
+  bookmark?: ChapterBookmarkJson;
 };
 
 /**
@@ -1176,7 +1281,92 @@ export type MangaStateResponseJson = {
  * Use `create(MangaStateResponseSchema)` to create a new message.
  */
 export const MangaStateResponseSchema: GenMessage<MangaStateResponse, {jsonType: MangaStateResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 20);
+  messageDesc(file_karuyomi_v1_business, 22);
+
+/**
+ * @generated from message karuyomi.v1.BookmarkPageResponse
+ */
+export type BookmarkPageResponse = Message<"karuyomi.v1.BookmarkPageResponse"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * Subsequent pages must use this revision; a changed revision restarts paging.
+   *
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision: number;
+
+  /**
+   * @generated from field: string manga_key = 3;
+   */
+  mangaKey: string;
+
+  /**
+   * Only bookmarked chapters are included, ordered by chapter identity.
+   *
+   * @generated from field: repeated karuyomi.v1.ChapterBookmark entries = 4;
+   */
+  entries: ChapterBookmark[];
+
+  /**
+   * @generated from field: string next_key = 5;
+   */
+  nextKey: string;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 6;
+   */
+  error?: BusinessStateError | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.BookmarkPageResponse
+ */
+export type BookmarkPageResponseJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * Subsequent pages must use this revision; a changed revision restarts paging.
+   *
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision?: number;
+
+  /**
+   * @generated from field: string manga_key = 3;
+   */
+  mangaKey?: string;
+
+  /**
+   * Only bookmarked chapters are included, ordered by chapter identity.
+   *
+   * @generated from field: repeated karuyomi.v1.ChapterBookmark entries = 4;
+   */
+  entries?: ChapterBookmarkJson[];
+
+  /**
+   * @generated from field: string next_key = 5;
+   */
+  nextKey?: string;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 6;
+   */
+  error?: BusinessStateErrorJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.BookmarkPageResponse.
+ * Use `create(BookmarkPageResponseSchema)` to create a new message.
+ */
+export const BookmarkPageResponseSchema: GenMessage<BookmarkPageResponse, {jsonType: BookmarkPageResponseJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 23);
 
 /**
  * @generated from message karuyomi.v1.LibraryPageResponse
@@ -1257,7 +1447,7 @@ export type LibraryPageResponseJson = {
  * Use `create(LibraryPageResponseSchema)` to create a new message.
  */
 export const LibraryPageResponseSchema: GenMessage<LibraryPageResponse, {jsonType: LibraryPageResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 21);
+  messageDesc(file_karuyomi_v1_business, 24);
 
 /**
  * @generated from message karuyomi.v1.CategoryMutationResponse
@@ -1324,7 +1514,7 @@ export type CategoryMutationResponseJson = {
  * Use `create(CategoryMutationResponseSchema)` to create a new message.
  */
 export const CategoryMutationResponseSchema: GenMessage<CategoryMutationResponse, {jsonType: CategoryMutationResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 22);
+  messageDesc(file_karuyomi_v1_business, 25);
 
 /**
  * @generated from message karuyomi.v1.CategoryCatalogResponse
@@ -1381,7 +1571,7 @@ export type CategoryCatalogResponseJson = {
  * Use `create(CategoryCatalogResponseSchema)` to create a new message.
  */
 export const CategoryCatalogResponseSchema: GenMessage<CategoryCatalogResponse, {jsonType: CategoryCatalogResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 23);
+  messageDesc(file_karuyomi_v1_business, 26);
 
 /**
  * @generated from enum karuyomi.v1.BusinessStateErrorCode

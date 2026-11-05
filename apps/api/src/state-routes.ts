@@ -2,6 +2,7 @@ import { create, toJson } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
   LibraryPageResponseSchema,
+  BookmarkPageResponseSchema,
   MangaStateResponseSchema,
   StateMutationResponseSchema,
   CategoryCatalogResponseSchema,
@@ -18,6 +19,7 @@ import type { AppEnv } from './env.js';
 import {
   applyMutation,
   readLibrary,
+  readBookmarkPage,
   readMangaState,
   StateError,
   readCategoryCatalog,
@@ -72,6 +74,12 @@ function mangaKey(value: string): string {
   return value;
 }
 
+function chapterKey(value: string): string {
+  if (!value || value.length > 200)
+    throw new StateError(ErrorCode.INVALID_INPUT, 'Invalid chapter key');
+  return value;
+}
+
 export function createStateRoutes() {
   const app = new Hono<AppEnv>();
   const bindSession: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -119,6 +127,17 @@ export function createStateRoutes() {
           403,
         );
       }
+      if (c.req.path.endsWith('/bookmarks'))
+        return c.json(
+          toJson(
+            BookmarkPageResponseSchema,
+            create(BookmarkPageResponseSchema, {
+              schemaVersion: businessSchemaVersion,
+              error,
+            }),
+          ),
+          403,
+        );
       if (c.req.path === '/api/state/mutations')
         return c.json(
           toJson(
@@ -145,6 +164,7 @@ export function createStateRoutes() {
   };
   app.use('/library', bindSession);
   app.use('/state/manga/:mangaKey', bindSession);
+  app.use('/state/manga/:mangaKey/bookmarks', bindSession);
   app.use('/state/mutations', bindSession);
   app.use('/categories', bindSession);
   app.use('/categories/mutations', bindSession);
@@ -247,15 +267,52 @@ export function createStateRoutes() {
       );
     }
   });
+  app.get('/state/manga/:mangaKey/bookmarks', async (c) => {
+    try {
+      const key = mangaKey(c.req.param('mangaKey'));
+      const after = c.req.query('afterKey') ?? '';
+      if (after) chapterKey(after);
+      const revisionText = c.req.query('revision');
+      if (
+        (after && revisionText === undefined) ||
+        (revisionText !== undefined &&
+          (!/^(0|[1-9][0-9]{0,9})$/.test(revisionText) ||
+            Number(revisionText) > 0xffff_ffff))
+      )
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Valid pagination revision is required',
+        );
+      const result = await readBookmarkPage(
+        c.env.DB,
+        c.get('identity').subject,
+        key,
+        after,
+        revisionText === undefined ? undefined : Number(revisionText),
+      );
+      return c.json(
+        toJson(BookmarkPageResponseSchema, result),
+        result.error ? 409 : 200,
+      );
+    } catch (error) {
+      const failure = stateFailure(error);
+      return c.json(
+        toJson(
+          BookmarkPageResponseSchema,
+          create(BookmarkPageResponseSchema, {
+            schemaVersion: businessSchemaVersion,
+            error: failure.error,
+          }),
+        ),
+        failure.status,
+      );
+    }
+  });
   app.get('/state/manga/:mangaKey', async (c) => {
     try {
       const key = mangaKey(c.req.param('mangaKey'));
       const chapter = c.req.query('chapterKey') ?? '';
-      if (chapter.length > 4096)
-        throw new StateError(
-          ErrorCode.INVALID_INPUT,
-          'Chapter key is too long',
-        );
+      if (chapter) chapterKey(chapter);
       const result = await readMangaState(
         c.env.DB,
         c.get('identity').subject,

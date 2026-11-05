@@ -275,7 +275,7 @@ class MangaState extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearMangaKey() => $_clearField(1);
 
-  /// Covers every metadata, favorite, category, progress and resume mutation.
+  /// Covers every metadata, favorite, category, bookmark, progress and resume mutation.
   @$pb.TagNumber(2)
   $core.int get revision => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -1228,6 +1228,144 @@ class ChapterSnapshot extends $pb.GeneratedMessage {
   $pb.PbList<$core.String> get pageKeys => $_getList(2);
 }
 
+class ChapterBookmark extends $pb.GeneratedMessage {
+  factory ChapterBookmark({
+    $core.String? chapterKey,
+    $core.bool? bookmarked,
+  }) {
+    final result = ChapterBookmark._();
+    if (chapterKey != null) result.chapterKey = chapterKey;
+    if (bookmarked != null) result.bookmarked = bookmarked;
+    return result;
+  }
+
+  ChapterBookmark._();
+
+  factory ChapterBookmark.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChapterBookmark()..mergeFromBuffer(data, registry);
+  factory ChapterBookmark.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChapterBookmark()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ChapterBookmark',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ChapterBookmark.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'chapterKey')
+    ..aOB(2, _omitFieldNames ? '' : 'bookmarked')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChapterBookmark clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChapterBookmark copyWith(void Function(ChapterBookmark) updates) =>
+      super.copyWith((message) => updates(message as ChapterBookmark))
+          as ChapterBookmark;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ChapterBookmark() / ChapterBookmark.new instead')
+  static ChapterBookmark create() => ChapterBookmark._();
+  static $pb.GeneratedMessage $_createMessage() => ChapterBookmark._();
+  @$core.override
+  ChapterBookmark createEmptyInstance() => ChapterBookmark._();
+  @$core.pragma('dart2js:noInline')
+  static ChapterBookmark getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ChapterBookmark>(
+          ChapterBookmark.$_createMessage);
+  static ChapterBookmark? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get chapterKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set chapterKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChapterKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChapterKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get bookmarked => $_getBF(1);
+  @$pb.TagNumber(2)
+  set bookmarked($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBookmarked() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBookmarked() => $_clearField(2);
+}
+
+class SetBookmark extends $pb.GeneratedMessage {
+  factory SetBookmark({
+    $core.String? chapterKey,
+    $core.bool? bookmarked,
+  }) {
+    final result = SetBookmark._();
+    if (chapterKey != null) result.chapterKey = chapterKey;
+    if (bookmarked != null) result.bookmarked = bookmarked;
+    return result;
+  }
+
+  SetBookmark._();
+
+  factory SetBookmark.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetBookmark()..mergeFromBuffer(data, registry);
+  factory SetBookmark.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetBookmark()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetBookmark',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SetBookmark.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'chapterKey')
+    ..aOB(2, _omitFieldNames ? '' : 'bookmarked')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetBookmark clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetBookmark copyWith(void Function(SetBookmark) updates) =>
+      super.copyWith((message) => updates(message as SetBookmark))
+          as SetBookmark;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SetBookmark() / SetBookmark.new instead')
+  static SetBookmark create() => SetBookmark._();
+  static $pb.GeneratedMessage $_createMessage() => SetBookmark._();
+  @$core.override
+  SetBookmark createEmptyInstance() => SetBookmark._();
+  @$core.pragma('dart2js:noInline')
+  static SetBookmark getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SetBookmark>(
+          SetBookmark.$_createMessage);
+  static SetBookmark? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get chapterKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set chapterKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChapterKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChapterKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get bookmarked => $_getBF(1);
+  @$pb.TagNumber(2)
+  set bookmarked($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBookmarked() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBookmarked() => $_clearField(2);
+}
+
 class SetFavorite extends $pb.GeneratedMessage {
   factory SetFavorite({
     LibraryMetadata? metadata,
@@ -1465,6 +1603,7 @@ enum StateMutation_Operation {
   saveProgress,
   resetProgress,
   setCategories,
+  setBookmark,
   notSet
 }
 
@@ -1479,6 +1618,7 @@ class StateMutation extends $pb.GeneratedMessage {
     SaveProgress? saveProgress,
     ResetProgress? resetProgress,
     SetCategories? setCategories,
+    SetBookmark? setBookmark,
   }) {
     final result = StateMutation._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1490,6 +1630,7 @@ class StateMutation extends $pb.GeneratedMessage {
     if (saveProgress != null) result.saveProgress = saveProgress;
     if (resetProgress != null) result.resetProgress = resetProgress;
     if (setCategories != null) result.setCategories = setCategories;
+    if (setBookmark != null) result.setBookmark = setBookmark;
     return result;
   }
 
@@ -1509,13 +1650,14 @@ class StateMutation extends $pb.GeneratedMessage {
     12: StateMutation_Operation.saveProgress,
     13: StateMutation_Operation.resetProgress,
     14: StateMutation_Operation.setCategories,
+    15: StateMutation_Operation.setBookmark,
     0: StateMutation_Operation.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'StateMutation',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: StateMutation.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14])
+    ..oo(0, [10, 11, 12, 13, 14, 15])
     ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
         fieldType: $pb.PbFieldType.OU3)
     ..aOS(2, _omitFieldNames ? '' : 'mutationId')
@@ -1532,6 +1674,8 @@ class StateMutation extends $pb.GeneratedMessage {
         subBuilder: ResetProgress.$_createMessage)
     ..aOM<SetCategories>(14, _omitFieldNames ? '' : 'setCategories',
         subBuilder: SetCategories.$_createMessage)
+    ..aOM<SetBookmark>(15, _omitFieldNames ? '' : 'setBookmark',
+        subBuilder: SetBookmark.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1561,6 +1705,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   StateMutation_Operation whichOperation() =>
       _StateMutation_OperationByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -1568,6 +1713,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   void clearOperation() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -1661,6 +1807,17 @@ class StateMutation extends $pb.GeneratedMessage {
   void clearSetCategories() => $_clearField(14);
   @$pb.TagNumber(14)
   SetCategories ensureSetCategories() => $_ensure(8);
+
+  @$pb.TagNumber(15)
+  SetBookmark get setBookmark => $_getN(9);
+  @$pb.TagNumber(15)
+  set setBookmark(SetBookmark value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasSetBookmark() => $_has(9);
+  @$pb.TagNumber(15)
+  void clearSetBookmark() => $_clearField(15);
+  @$pb.TagNumber(15)
+  SetBookmark ensureSetBookmark() => $_ensure(9);
 }
 
 class BusinessStateError extends $pb.GeneratedMessage {
@@ -1754,6 +1911,7 @@ class StateMutationResponse extends $pb.GeneratedMessage {
     ChapterProgressState? progress,
     BusinessStateError? error,
     CategoryCatalog? categoryCatalog,
+    ChapterBookmark? bookmark,
   }) {
     final result = StateMutationResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1763,6 +1921,7 @@ class StateMutationResponse extends $pb.GeneratedMessage {
     if (progress != null) result.progress = progress;
     if (error != null) result.error = error;
     if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
+    if (bookmark != null) result.bookmark = bookmark;
     return result;
   }
 
@@ -1792,6 +1951,8 @@ class StateMutationResponse extends $pb.GeneratedMessage {
         subBuilder: BusinessStateError.$_createMessage)
     ..aOM<CategoryCatalog>(7, _omitFieldNames ? '' : 'categoryCatalog',
         subBuilder: CategoryCatalog.$_createMessage)
+    ..aOM<ChapterBookmark>(8, _omitFieldNames ? '' : 'bookmark',
+        subBuilder: ChapterBookmark.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1888,6 +2049,17 @@ class StateMutationResponse extends $pb.GeneratedMessage {
   void clearCategoryCatalog() => $_clearField(7);
   @$pb.TagNumber(7)
   CategoryCatalog ensureCategoryCatalog() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  ChapterBookmark get bookmark => $_getN(7);
+  @$pb.TagNumber(8)
+  set bookmark(ChapterBookmark value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasBookmark() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBookmark() => $_clearField(8);
+  @$pb.TagNumber(8)
+  ChapterBookmark ensureBookmark() => $_ensure(7);
 }
 
 class MangaStateResponse extends $pb.GeneratedMessage {
@@ -1898,6 +2070,7 @@ class MangaStateResponse extends $pb.GeneratedMessage {
     ChapterProgressState? progress,
     BusinessStateError? error,
     CategoryCatalog? categoryCatalog,
+    ChapterBookmark? bookmark,
   }) {
     final result = MangaStateResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1906,6 +2079,7 @@ class MangaStateResponse extends $pb.GeneratedMessage {
     if (progress != null) result.progress = progress;
     if (error != null) result.error = error;
     if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
+    if (bookmark != null) result.bookmark = bookmark;
     return result;
   }
 
@@ -1934,6 +2108,8 @@ class MangaStateResponse extends $pb.GeneratedMessage {
         subBuilder: BusinessStateError.$_createMessage)
     ..aOM<CategoryCatalog>(6, _omitFieldNames ? '' : 'categoryCatalog',
         subBuilder: CategoryCatalog.$_createMessage)
+    ..aOM<ChapterBookmark>(7, _omitFieldNames ? '' : 'bookmark',
+        subBuilder: ChapterBookmark.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2019,6 +2195,137 @@ class MangaStateResponse extends $pb.GeneratedMessage {
   void clearCategoryCatalog() => $_clearField(6);
   @$pb.TagNumber(6)
   CategoryCatalog ensureCategoryCatalog() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  ChapterBookmark get bookmark => $_getN(6);
+  @$pb.TagNumber(7)
+  set bookmark(ChapterBookmark value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBookmark() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBookmark() => $_clearField(7);
+  @$pb.TagNumber(7)
+  ChapterBookmark ensureBookmark() => $_ensure(6);
+}
+
+class BookmarkPageResponse extends $pb.GeneratedMessage {
+  factory BookmarkPageResponse({
+    $core.int? schemaVersion,
+    $core.int? accountRevision,
+    $core.String? mangaKey,
+    $core.Iterable<ChapterBookmark>? entries,
+    $core.String? nextKey,
+    BusinessStateError? error,
+  }) {
+    final result = BookmarkPageResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (mangaKey != null) result.mangaKey = mangaKey;
+    if (entries != null) result.entries.addAll(entries);
+    if (nextKey != null) result.nextKey = nextKey;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  BookmarkPageResponse._();
+
+  factory BookmarkPageResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BookmarkPageResponse()..mergeFromBuffer(data, registry);
+  factory BookmarkPageResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BookmarkPageResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BookmarkPageResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: BookmarkPageResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'mangaKey')
+    ..pPM<ChapterBookmark>(4, _omitFieldNames ? '' : 'entries',
+        subBuilder: ChapterBookmark.$_createMessage)
+    ..aOS(5, _omitFieldNames ? '' : 'nextKey')
+    ..aOM<BusinessStateError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BookmarkPageResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BookmarkPageResponse copyWith(void Function(BookmarkPageResponse) updates) =>
+      super.copyWith((message) => updates(message as BookmarkPageResponse))
+          as BookmarkPageResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BookmarkPageResponse() / BookmarkPageResponse.new instead')
+  static BookmarkPageResponse create() => BookmarkPageResponse._();
+  static $pb.GeneratedMessage $_createMessage() => BookmarkPageResponse._();
+  @$core.override
+  BookmarkPageResponse createEmptyInstance() => BookmarkPageResponse._();
+  @$core.pragma('dart2js:noInline')
+  static BookmarkPageResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BookmarkPageResponse>(
+          BookmarkPageResponse.$_createMessage);
+  static BookmarkPageResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  /// Subsequent pages must use this revision; a changed revision restarts paging.
+  @$pb.TagNumber(2)
+  $core.int get accountRevision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set accountRevision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAccountRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAccountRevision() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get mangaKey => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set mangaKey($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMangaKey() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMangaKey() => $_clearField(3);
+
+  /// Only bookmarked chapters are included, ordered by chapter identity.
+  @$pb.TagNumber(4)
+  $pb.PbList<ChapterBookmark> get entries => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $core.String get nextKey => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set nextKey($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasNextKey() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearNextKey() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  BusinessStateError get error => $_getN(5);
+  @$pb.TagNumber(6)
+  set error(BusinessStateError value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  BusinessStateError ensureError() => $_ensure(5);
 }
 
 class LibraryPageResponse extends $pb.GeneratedMessage {

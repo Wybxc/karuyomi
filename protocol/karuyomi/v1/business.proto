@@ -21,7 +21,7 @@ message MangaResume {
 
 message MangaState {
   string manga_key = 1;
-  // Covers every metadata, favorite, category, progress and resume mutation.
+  // Covers every metadata, favorite, category, bookmark, progress and resume mutation.
   uint32 revision = 2;
   LibraryMetadata metadata = 3;
   bool favorite = 4;
@@ -97,6 +97,16 @@ message ChapterSnapshot {
   repeated string page_keys = 3;
 }
 
+message ChapterBookmark {
+  string chapter_key = 1;
+  bool bookmarked = 2;
+}
+
+message SetBookmark {
+  string chapter_key = 1;
+  bool bookmarked = 2;
+}
+
 message SetFavorite {
   LibraryMetadata metadata = 1;
   bool favorite = 2;
@@ -125,6 +135,7 @@ message StateMutation {
     SaveProgress save_progress = 12;
     ResetProgress reset_progress = 13;
     SetCategories set_categories = 14;
+    SetBookmark set_bookmark = 15;
   }
 }
 
@@ -152,6 +163,7 @@ message StateMutationResponse {
   ChapterProgressState progress = 5;
   BusinessStateError error = 6;
   CategoryCatalog category_catalog = 7;
+  ChapterBookmark bookmark = 8;
 }
 
 message MangaStateResponse {
@@ -161,6 +173,18 @@ message MangaStateResponse {
   ChapterProgressState progress = 4;
   BusinessStateError error = 5;
   CategoryCatalog category_catalog = 6;
+  ChapterBookmark bookmark = 7;
+}
+
+message BookmarkPageResponse {
+  uint32 schema_version = 1;
+  // Subsequent pages must use this revision; a changed revision restarts paging.
+  uint32 account_revision = 2;
+  string manga_key = 3;
+  // Only bookmarked chapters are included, ordered by chapter identity.
+  repeated ChapterBookmark entries = 4;
+  string next_key = 5;
+  BusinessStateError error = 6;
 }
 
 message LibraryPageResponse {

@@ -7,6 +7,7 @@ const _metadataLimit = 96 * 1024;
 const _responseLimit = 2 * 1024 * 1024;
 const _pageLimit = 2048;
 const _libraryPageSize = 8;
+const _bookmarkPageSize = 64;
 final _mangaKey = RegExp(r'^[a-f0-9]{64}$');
 final _sourceId = RegExp(r'^-?\d{1,19}$');
 final _minSourceId = BigInt.parse('-9223372036854775808');
@@ -89,6 +90,61 @@ void _key(String value) => _require(
   _mangaKey.hasMatch(value),
   'Business manga identity must be a canonical SHA-256 digest',
 );
+
+void validateBusinessChapterKey(String value) => _identity(value);
+
+void validateBusinessBookmark(
+  wire.ChapterBookmark value, {
+  String? chapterKey,
+}) {
+  _identity(value.chapterKey);
+  _require(
+    chapterKey == null || value.chapterKey == chapterKey,
+    'Bookmark belongs to another chapter',
+  );
+}
+
+void validateBusinessBookmarkPage(
+  wire.BookmarkPageResponse value, {
+  required String mangaKey,
+  String afterKey = '',
+}) {
+  _require(value.schemaVersion == 1, 'Unsupported business state schema');
+  validateBusinessRevision(value.accountRevision);
+  _key(value.mangaKey);
+  _require(value.mangaKey == mangaKey, 'Bookmark page manga mismatch');
+  _require(
+    value.entries.length <= _bookmarkPageSize,
+    'Bookmark page exceeds its entry budget',
+  );
+  if (afterKey.isNotEmpty) _identity(afterKey);
+  if (value.hasError()) {
+    validateBusinessError(value.error);
+    _require(
+      value.entries.isEmpty && value.nextKey.isEmpty,
+      'Failed bookmark page cannot contain entries',
+    );
+  }
+  // Match SQLite BINARY's UTF-8 ordering for opaque historical chapter keys.
+  String order(String key) => String.fromCharCodes(utf8.encode(key));
+  var previous = order(afterKey);
+  for (final bookmark in value.entries) {
+    validateBusinessBookmark(bookmark);
+    _require(bookmark.bookmarked, 'Bookmark pages contain only saved chapters');
+    final current = order(bookmark.chapterKey);
+    _require(previous.compareTo(current) < 0, 'Bookmark keys must be ordered');
+    previous = current;
+  }
+  if (value.nextKey.isNotEmpty) {
+    _identity(value.nextKey);
+    _require(
+      value.entries.isNotEmpty &&
+          value.nextKey == value.entries.last.chapterKey,
+      'Bookmark cursor must identify its last entry',
+    );
+  }
+  wire.encodeProtoJson(value, maxBytes: _responseLimit);
+}
 
 void validateBusinessRevision(int value) => _require(
   value >= 0 && value <= 0xffffffff,

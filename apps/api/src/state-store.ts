@@ -1,6 +1,8 @@
 import { create, fromJsonString, toJsonString } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
+  BookmarkPageResponseSchema,
+  ChapterBookmarkSchema,
   CategoryCatalogSchema,
   CategoryCatalogResponseSchema,
   CategoryMutationSchema,
@@ -13,6 +15,7 @@ import {
   StateMutationResponseSchema,
   StateMutationSchema,
   type ChapterProgressState,
+  type ChapterBookmark,
   type CategoryMutation,
   type CategoryMutationResponse,
   type ChapterSnapshot,
@@ -25,6 +28,7 @@ import {
 import {
   businessSchemaVersion,
   LIBRARY_PAGE_SIZE,
+  BOOKMARK_PAGE_SIZE,
   CATEGORY_LIMIT,
 } from '@karuyomi/contracts';
 
@@ -33,6 +37,7 @@ type SnapshotRow = {
   account_revision: number;
   manga_json: string | null;
   progress_json: string | null;
+  bookmarked: number;
   catalog_json: string;
 };
 type MutationRow = {
@@ -108,6 +113,7 @@ export async function readMangaState(
     COALESCE((SELECT revision FROM account_state WHERE subject = ?1), 0) account_revision,
     (SELECT ${mangaSql('m')} FROM manga_state m WHERE subject = ?1 AND manga_key = ?2) manga_json,
     (SELECT state_json FROM chapter_progress WHERE subject = ?1 AND manga_key = ?2 AND chapter_key = ?3) progress_json,
+    EXISTS (SELECT 1 FROM chapter_bookmarks WHERE subject = ?1 AND manga_key = ?2 AND chapter_key = ?3) bookmarked,
     ${catalogSql} catalog_json`,
     )
     .bind(subject, mangaKey, chapterKey)
@@ -121,6 +127,9 @@ export async function readMangaState(
     manga: row.manga_json
       ? fromJsonString(MangaStateSchema, row.manga_json)
       : create(MangaStateSchema, { mangaKey }),
+    ...(chapterKey
+      ? { bookmark: { chapterKey, bookmarked: row.bookmarked === 1 } }
+      : {}),
     ...(row.progress_json
       ? {
           progress: fromJsonString(
@@ -178,6 +187,57 @@ export async function readLibrary(
   if (response.entries.length > LIBRARY_PAGE_SIZE) {
     response.entries.length = LIBRARY_PAGE_SIZE;
     response.nextKey = response.entries.at(-1)?.mangaKey ?? '';
+  }
+  return response;
+}
+
+export async function readBookmarkPage(
+  db: D1Database,
+  subject: string,
+  mangaKey: string,
+  afterKey: string,
+  revision?: number,
+) {
+  // Account revision and bounded chapter keys are observed in one snapshot.
+  const row = await db
+    .prepare(
+      `SELECT
+    COALESCE((SELECT revision FROM account_state WHERE subject = ?1), 0) account_revision,
+    (SELECT json_group_array(json_object('chapterKey', chapter_key, 'bookmarked', json('true'))) FROM (
+      SELECT chapter_key FROM chapter_bookmarks WHERE subject = ?1 AND manga_key = ?2 AND chapter_key > ?3
+      ORDER BY chapter_key LIMIT ?4
+    )) entries_json`,
+    )
+    .bind(subject, mangaKey, afterKey, BOOKMARK_PAGE_SIZE + 1)
+    .first<{ account_revision: number; entries_json: string }>();
+  if (!row)
+    throw new StateError(
+      ErrorCode.UNAVAILABLE,
+      'Bookmarks are unavailable',
+      503,
+    );
+  const response = fromJsonString(
+    BookmarkPageResponseSchema,
+    JSON.stringify({
+      schemaVersion: businessSchemaVersion,
+      accountRevision: row.account_revision,
+      mangaKey,
+      entries: JSON.parse(row.entries_json),
+    }),
+  );
+  if (revision !== undefined && revision !== response.accountRevision) {
+    response.entries = [];
+    response.error = {
+      $typeName: 'karuyomi.v1.BusinessStateError',
+      code: ErrorCode.REVISION_CONFLICT,
+      message: 'Bookmarks changed; restart pagination',
+      retryable: false,
+    };
+    return response;
+  }
+  if (response.entries.length > BOOKMARK_PAGE_SIZE) {
+    response.entries.length = BOOKMARK_PAGE_SIZE;
+    response.nextKey = response.entries.at(-1)?.chapterKey ?? '';
   }
   return response;
 }
@@ -280,6 +340,7 @@ function nextProgress(
 
 function chapterFor(mutation: StateMutation): string {
   const operation = mutation.operation;
+  if (operation.case === 'setBookmark') return operation.value.chapterKey;
   return operation.case === 'saveProgress' || operation.case === 'resetProgress'
     ? (operation.value.snapshot?.chapterKey ?? '')
     : '';
@@ -297,6 +358,7 @@ function mutationError(
     categoryCatalog: state.categoryCatalog,
     ...(state.manga ? { manga: state.manga } : {}),
     ...(state.progress ? { progress: state.progress } : {}),
+    ...(state.bookmark ? { bookmark: state.bookmark } : {}),
     error: {
       code: error.code,
       message: error.message,
@@ -378,6 +440,7 @@ export async function applyMutation(
     );
   let manga: MangaState = create(MangaStateSchema, oldManga);
   let progress: ChapterProgressState | undefined;
+  let bookmark: ChapterBookmark | undefined;
   try {
     const operation = mutation.operation;
     if (operation.case === 'setFavorite') {
@@ -396,6 +459,11 @@ export async function applyMutation(
     } else if (operation.case === 'updateMetadata') {
       await validateMetadataKey(mutation.mangaKey, operation.value);
       manga.metadata = operation.value;
+    } else if (operation.case === 'setBookmark') {
+      bookmark = create(ChapterBookmarkSchema, {
+        chapterKey: operation.value.chapterKey,
+        bookmarked: operation.value.bookmarked,
+      });
     } else if (operation.case === 'setCategories') {
       const catalog = state.categoryCatalog;
       if (
@@ -420,7 +488,10 @@ export async function applyMutation(
       manga.categoryIds = catalog.categories
         .filter((category) => operation.value.categoryIds.includes(category.id))
         .map((category) => category.id);
-    } else {
+    } else if (
+      operation.case === 'saveProgress' ||
+      operation.case === 'resetProgress'
+    ) {
       progress = nextProgress(mutation, state.progress);
       if (progress)
         manga.resume = {
@@ -439,6 +510,7 @@ export async function applyMutation(
     mutationId: mutation.mutationId,
     manga,
     ...(progress ? { progress } : {}),
+    ...(bookmark ? { bookmark } : {}),
   });
   const nonce = crypto.randomUUID();
   const winner =
@@ -522,6 +594,33 @@ export async function applyMutation(
           mutation.mangaKey,
           JSON.stringify(assignment.categoryIds),
         ),
+    );
+  if (bookmark)
+    statements.push(
+      bookmark.bookmarked
+        ? db
+            .prepare(
+              `INSERT OR IGNORE INTO chapter_bookmarks(subject, manga_key, chapter_key)
+    SELECT ?1, ?4, ?5 WHERE ${winner}`,
+            )
+            .bind(
+              subject,
+              mutation.mutationId,
+              nonce,
+              mutation.mangaKey,
+              bookmark.chapterKey,
+            )
+        : db
+            .prepare(
+              `DELETE FROM chapter_bookmarks WHERE subject = ?1 AND manga_key = ?4 AND chapter_key = ?5 AND ${winner}`,
+            )
+            .bind(
+              subject,
+              mutation.mutationId,
+              nonce,
+              mutation.mangaKey,
+              bookmark.chapterKey,
+            ),
     );
   if (progress)
     statements.push(

@@ -4,7 +4,7 @@
 
 在 P0 真实阅读链路上完成可多端日用的书架、详情、阅读设置、进度与错误恢复。**多端同步是首要设计目标**：书架、分类、进度、书签和非敏感设置通过 Worker API 读写，以 D1 为唯一权威来源。P1 与前移的 [P2](p2-sync.md) 共同交付，先证明两个客户端共享收藏和继续阅读，再完善全部外围 UI。
 
-状态：**进行中，收藏与进度已切换到 Worker API + D1，测试身份下 Web↔iOS、Web↔Android、iOS↔Android 的基础书架读回与双向非默认页续读已通过**，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。本地业务 SQLite、持久化依赖和数据库 Web 资产已移除；书架/进度共享服务端 revision 与确认路径。实际双 Web 的手动刷新、远端重置、旧视图停止写入/写冲突和明确重开已通过[分项](../verification/concurrent-server-state.md)；同时写竞争、自动前台重取、故障恢复、生产 Access、真机、Web↔Native 分类、Android 初始化可靠性、书签、同步设置及完整日用流程仍待实施或验收，不能认定完整 P1 通过。
+状态：**进行中，收藏与进度已切换到 Worker API + D1，测试身份下 Web↔iOS、Web↔Android、iOS↔Android 的基础书架读回与双向非默认页续读已通过**，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。本地业务 SQLite、持久化依赖和数据库 Web 资产已移除；书架/进度共享服务端 revision 与确认路径。实际双 Web 的手动刷新、远端重置、旧视图停止写入/写冲突和明确重开已通过[分项](../verification/concurrent-server-state.md)；同时写竞争、自动前台重取、故障恢复、生产 Access、真机、Web↔Native 分类、Android 初始化可靠性、章节书签的独立客户端验收、同步设置及完整日用流程仍待实施或验收，不能认定完整 P1 通过。
 
 ## 已有基础与可复用证据
 
@@ -14,7 +14,7 @@
 
 ## 待办与实施顺序
 
-1. **与 P2 共用服务端业务底座。** 漫画、收藏、章节引用及进度/阅读位置的 `.proto` + Buf 双端协议、D1 模型、身份归属、mutation ID、revision 和冲突响应已接入；分类/多分类协议、D1 API 和 Flutter 数据层已接入，管理、筛选与多关联 UI 已接入并通过[真实双 Web 分项](../verification/category-ui-sync.md)，双 iOS 与 iOS↔Android 分类顺序门也已通过，Web↔Native 分类和 Android 初始化可靠性继续按 [P2](p2-sync.md) 推进；书签与同步设置随后逐项扩展。Worker 校验 Access 身份后读写 D1，客户端经同一 API 取得权威状态；具体幂等、并发和恢复门以 [P2](p2-sync.md) 为准。
+1. **与 P2 共用服务端业务底座。** 漫画、收藏、章节引用及进度/阅读位置的 `.proto` + Buf 双端协议、D1 模型、身份归属、mutation ID、revision 和冲突响应已接入；分类/多分类协议、D1 API 和 Flutter 数据层已接入，管理、筛选与多关联 UI 已接入并通过[真实双 Web 分项](../verification/category-ui-sync.md)，双 iOS 与 iOS↔Android 分类顺序门也已通过，Web↔Native 分类和 Android 初始化可靠性继续按 [P2](p2-sync.md) 推进；章节书签协议、D1 与正式详情/阅读入口已接入（见[记录](../verification/bookmarks.md)），独立客户端门待验；同步设置继续优先实施。Worker 校验 Access 身份后读写 D1，客户端经同一 API 取得权威状态；具体幂等、并发和恢复门以 [P2](p2-sync.md) 为准。
 2. **先验收收藏和继续阅读的双端闭环。** 现有书架与阅读进度已接到服务端读写确认路径，继续验证 A 端收藏、B 端读回并阅读、A 端恢复 B 已确认的位置。客户端仅保留当前页面内存状态和当前会话未确认草稿；本地权威数据库读写已移除，不增加旧数据导入、双写或兼容层。断网/Access 失效时保留已加载阅读、显示未保存状态并允许重试，不承诺应用关闭后保留未确认修改。
 3. 完成分类排序、书架搜索/过滤/批量操作、自定义封面及继续阅读 UI；每项采用同一 D1 权威状态和跨端合同。初版读取当前状态或有界分页，页面进入/恢复前台/重连时重取；可在已读取结果中即时搜索，不另存一份可独立修改的本地书架。未读数只使用主动取得的章节列表，不触发全书架查更新。封面走正式图片/私有对象通道，不用原图 URL 绕过插件处理。
 4. 完善详情章节搜索/排序/筛选、重复章节展示和范围已读操作；保留原 Source URL、稳定 ID、空/小数章节编号及来源顺序，不按标题全局去重。范围已读、标未读和重读也必须由服务端确认并在另一端读回。

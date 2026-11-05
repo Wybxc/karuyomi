@@ -9,6 +9,7 @@ import {
 } from '@karuyomi/protocol';
 import {
   businessSchemaVersion,
+  bookmarkPageResponseSchema,
   libraryPageResponseSchema,
   mangaStateResponseSchema,
   stateMutationResponseSchema,
@@ -85,6 +86,15 @@ async function client(subject: string = crypto.randomUUID()) {
       );
       expect(response.status).toBe(200);
       return mangaStateResponseSchema.parse(await response.json());
+    },
+    async bookmarks(mangaKey: string, query = '') {
+      const response = await this.request(
+        `/api/state/manga/${mangaKey}/bookmarks${query}`,
+      );
+      return {
+        status: response.status,
+        body: bookmarkPageResponseSchema.parse(await response.json()),
+      };
     },
     async library(query = '') {
       const response = await this.request(`/api/library${query}`);
@@ -759,4 +769,225 @@ test('catalog changes invalidate pagination, empty shelves expose categories and
     }),
   );
   expect(invalidReorder.status).toBe(400);
+});
+
+function bookmark(
+  mangaKey: string,
+  expectedRevision: number,
+  chapterKey: string,
+  bookmarked = true,
+) {
+  return create(StateMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    mangaKey,
+    expectedRevision,
+    operation: { case: 'setBookmark', value: { chapterKey, bookmarked } },
+  });
+}
+
+test('independent clients bookmark an unfavorited manga without metadata, preserve progress, and remove by chapter identity', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const add = favorite();
+  const empty = await first.state(add.mangaKey, 'chapter-1');
+  expect(empty.bookmark?.bookmarked).toBe(false);
+  expect(empty.manga?.revision).toBe(0);
+  const marked = await first.mutate(bookmark(add.mangaKey, 0, 'chapter-1'));
+  expect(marked.status).toBe(200);
+  expect(marked.body.bookmark).toMatchObject({
+    chapterKey: 'chapter-1',
+    bookmarked: true,
+  });
+  expect(marked.body.progress).toBeUndefined();
+  expect(marked.body.manga?.metadata).toBeUndefined();
+  expect(marked.body.manga?.resume).toBeUndefined();
+  expect((await second.library()).body.entries).toEqual([]);
+  expect(
+    (await second.state(add.mangaKey, 'chapter-1')).bookmark?.bookmarked,
+  ).toBe(true);
+  await second.mutate(
+    favorite(
+      1,
+      add.operation.case === 'setFavorite'
+        ? add.operation.value.metadata
+        : undefined,
+    ),
+  );
+  const progress = await second.mutate(save(add.mangaKey, 2));
+  const extra = await first.mutate(bookmark(add.mangaKey, 3, 'snapshot-other'));
+  expect(extra.body.manga?.resume).toEqual(progress.body.manga?.resume);
+  expect((await second.state(add.mangaKey, 'chapter-1')).progress).toEqual(
+    progress.body.progress,
+  );
+  const reset = create(StateMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    mangaKey: add.mangaKey,
+    expectedRevision: 4,
+    operation: {
+      case: 'resetProgress',
+      value: {
+        snapshot: {
+          chapterKey: 'chapter-1',
+          manifestVersion: 'reset',
+          pageKeys: ['first', 'last'],
+        },
+      },
+    },
+  });
+  const resetResult = await first.mutate(reset);
+  expect(resetResult.body.progress?.epoch).toBe(1);
+  await second.mutate(
+    favorite(
+      5,
+      add.operation.case === 'setFavorite'
+        ? add.operation.value.metadata
+        : undefined,
+      false,
+    ),
+  );
+  const preserved = await first.state(add.mangaKey, 'chapter-1');
+  expect(preserved.bookmark?.bookmarked).toBe(true);
+  expect(preserved.progress).toEqual(resetResult.body.progress);
+  expect(preserved.manga?.resume).toEqual(resetResult.body.manga?.resume);
+  expect((await second.library()).body.entries).toEqual([]);
+  expect(
+    (await second.bookmarks(add.mangaKey)).body.entries.map(
+      (entry) => entry.chapterKey,
+    ),
+  ).toEqual(['chapter-1', 'snapshot-other']);
+  const removed = await first.mutate(
+    bookmark(add.mangaKey, 6, 'chapter-1', false),
+  );
+  expect(removed.body.bookmark?.bookmarked).toBe(false);
+  const canonical = await second.state(add.mangaKey, 'chapter-1');
+  expect(canonical.bookmark?.bookmarked).toBe(false);
+  expect(canonical.progress).toEqual(resetResult.body.progress);
+  expect(canonical.manga?.resume).toEqual(resetResult.body.manga?.resume);
+  expect(
+    (await second.bookmarks(add.mangaKey)).body.entries.map(
+      (entry) => entry.chapterKey,
+    ),
+  ).toEqual(['snapshot-other']);
+});
+
+test('bookmark CAS has one winner and an old idempotent acknowledgement cannot resurrect a deleted bookmark', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const key = favorite().mangaKey;
+  const a = bookmark(key, 0, 'chapter-1');
+  const b = bookmark(key, 0, 'chapter-1');
+  const results = await Promise.all([first.mutate(a), second.mutate(b)]);
+  expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+  const winner = results[0]?.status === 200 ? a : b;
+  const acknowledged = results.find((result) => result.status === 200)?.body;
+  const losing = results[0]?.status === 409 ? results[0] : results[1];
+  expect(losing?.body.bookmark?.bookmarked).toBe(true);
+  const removed = await second.mutate(bookmark(key, 1, 'chapter-1', false));
+  expect(removed.body.manga?.revision).toBe(2);
+  expect((await first.mutate(winner)).body).toEqual(acknowledged);
+  const canonical = await first.state(key, 'chapter-1');
+  expect(canonical.manga?.revision).toBe(2);
+  expect(canonical.bookmark?.bookmarked).toBe(false);
+  expect((await first.bookmarks(key)).body.entries).toEqual([]);
+  const stale = await first.mutate(bookmark(key, 0, 'chapter-1'));
+  expect(stale.status).toBe(409);
+  expect(stale.body.bookmark?.bookmarked).toBe(false);
+  const changed = create(StateMutationSchema, {
+    ...winner,
+    expectedRevision: 2,
+  });
+  expect((await first.mutate(changed)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  expect((await second.state(key, 'chapter-1')).bookmark?.bookmarked).toBe(
+    false,
+  );
+});
+
+test('bookmark pages bind both first and later pages to one account revision and enforce their own identity', async () => {
+  const owner = await client();
+  const other = await client();
+  const key = favorite().mangaKey;
+  const empty = await owner.bookmarks(key);
+  expect(empty.body.entries).toEqual([]);
+  expect(empty.body.mangaKey).toBe(key);
+  for (let index = 0; index < 65; index++)
+    expect(
+      (
+        await owner.mutate(
+          bookmark(key, index, `chapter-${String(index).padStart(3, '0')}`),
+        )
+      ).status,
+    ).toBe(200);
+  const state = await owner.state(key);
+  const page = await owner.bookmarks(key, `?revision=${state.accountRevision}`);
+  expect(page.body.entries).toHaveLength(64);
+  expect(page.body.entries.every((entry) => entry.bookmarked)).toBe(true);
+  expect(page.body.nextKey).toBe('chapter-063');
+  const nextQuery = `?afterKey=${page.body.nextKey}&revision=${page.body.accountRevision}`;
+  const next = await owner.bookmarks(key, nextQuery);
+  expect(next.body.entries.map((entry) => entry.chapterKey)).toEqual([
+    'chapter-064',
+  ]);
+  expect(next.body.nextKey).toBe('');
+  expect((await other.bookmarks(key)).body.entries).toEqual([]);
+  expect((await other.state(key, 'chapter-000')).bookmark?.bookmarked).toBe(
+    false,
+  );
+  const forged = await other.request(`/api/state/manga/${key}/bookmarks`, {
+    headers: { 'X-App-Subject': owner.subject },
+  });
+  expect(forged.status).toBe(403);
+  expect(bookmarkPageResponseSchema.parse(await forged.json()).entries).toEqual(
+    [],
+  );
+  await owner.mutate(bookmark(key, 65, 'chapter-000', false));
+  for (const query of [nextQuery, `?revision=${page.body.accountRevision}`]) {
+    const stale = await owner.bookmarks(key, query);
+    expect(stale.status).toBe(409);
+    expect(stale.body.error?.code).toBe(ErrorCode.REVISION_CONFLICT);
+    expect(stale.body.entries).toEqual([]);
+    expect(stale.body.nextKey).toBe('');
+  }
+  for (const query of [
+    '?afterKey=chapter-001',
+    '?revision=-1',
+    '?revision=4294967296',
+    `?afterKey=${'x'.repeat(201)}&revision=66`,
+  ])
+    expect((await owner.bookmarks(key, query)).status).toBe(400);
+});
+
+test('a failed bookmark batch leaves no bookmark, manga revision, account revision or idempotent result', async () => {
+  const reader = await client();
+  const key = favorite().mangaKey;
+  const command = bookmark(key, 0, 'chapter-1');
+  await env.DB.exec(
+    `CREATE TRIGGER fail_bookmark BEFORE INSERT ON chapter_bookmarks WHEN NEW.subject = '${reader.subject}' BEGIN SELECT RAISE(ABORT, 'controlled bookmark failure'); END`,
+  );
+  try {
+    expect((await reader.mutate(command)).status).toBe(503);
+    const canonical = await reader.state(key, 'chapter-1');
+    expect(canonical.accountRevision).toBe(0);
+    expect(canonical.manga?.revision).toBe(0);
+    expect(canonical.bookmark?.bookmarked).toBe(false);
+    expect(
+      await env.DB.prepare(
+        'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+      )
+        .bind(reader.subject)
+        .first('count'),
+    ).toBe(0);
+  } finally {
+    await env.DB.exec('DROP TRIGGER fail_bookmark');
+  }
+  const retried = await reader.mutate(command);
+  expect(retried.status).toBe(200);
+  expect(retried.body.manga?.revision).toBe(1);
+  expect(retried.body.accountRevision).toBe(1);
+  expect((await reader.state(key, 'chapter-1')).bookmark?.bookmarked).toBe(
+    true,
+  );
 });

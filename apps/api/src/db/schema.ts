@@ -63,6 +63,18 @@ export const chapterProgress = sqliteTable(
   ],
 );
 
+export const chapterBookmarks = sqliteTable(
+  'chapter_bookmarks',
+  {
+    subject: text('subject').notNull(),
+    mangaKey: text('manga_key').notNull(),
+    chapterKey: text('chapter_key').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.mangaKey, table.chapterKey] }),
+  ],
+);
+
 export const stateMutations = sqliteTable(
   'state_mutations',
   {

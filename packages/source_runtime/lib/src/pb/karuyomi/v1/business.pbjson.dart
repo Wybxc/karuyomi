@@ -369,6 +369,34 @@ final $typed_data.Uint8List chapterSnapshotDescriptor = $convert.base64Decode(
     'FuaWZlc3RfdmVyc2lvbhgCIAEoCVIPbWFuaWZlc3RWZXJzaW9uEhsKCXBhZ2Vfa2V5cxgDIAMo'
     'CVIIcGFnZUtleXM=');
 
+@$core.Deprecated('Use chapterBookmarkDescriptor instead')
+const ChapterBookmark$json = {
+  '1': 'ChapterBookmark',
+  '2': [
+    {'1': 'chapter_key', '3': 1, '4': 1, '5': 9, '10': 'chapterKey'},
+    {'1': 'bookmarked', '3': 2, '4': 1, '5': 8, '10': 'bookmarked'},
+  ],
+};
+
+/// Descriptor for `ChapterBookmark`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List chapterBookmarkDescriptor = $convert.base64Decode(
+    'Cg9DaGFwdGVyQm9va21hcmsSHwoLY2hhcHRlcl9rZXkYASABKAlSCmNoYXB0ZXJLZXkSHgoKYm'
+    '9va21hcmtlZBgCIAEoCFIKYm9va21hcmtlZA==');
+
+@$core.Deprecated('Use setBookmarkDescriptor instead')
+const SetBookmark$json = {
+  '1': 'SetBookmark',
+  '2': [
+    {'1': 'chapter_key', '3': 1, '4': 1, '5': 9, '10': 'chapterKey'},
+    {'1': 'bookmarked', '3': 2, '4': 1, '5': 8, '10': 'bookmarked'},
+  ],
+};
+
+/// Descriptor for `SetBookmark`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setBookmarkDescriptor = $convert.base64Decode(
+    'CgtTZXRCb29rbWFyaxIfCgtjaGFwdGVyX2tleRgBIAEoCVIKY2hhcHRlcktleRIeCgpib29rbW'
+    'Fya2VkGAIgASgIUgpib29rbWFya2Vk');
+
 @$core.Deprecated('Use setFavoriteDescriptor instead')
 const SetFavorite$json = {
   '1': 'SetFavorite',
@@ -502,6 +530,15 @@ const StateMutation$json = {
       '9': 0,
       '10': 'setCategories'
     },
+    {
+      '1': 'set_bookmark',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SetBookmark',
+      '9': 0,
+      '10': 'setBookmark'
+    },
   ],
   '8': [
     {'1': 'operation'},
@@ -519,7 +556,8 @@ final $typed_data.Uint8List stateMutationDescriptor = $convert.base64Decode(
     'MS5TYXZlUHJvZ3Jlc3NIAFIMc2F2ZVByb2dyZXNzEkMKDnJlc2V0X3Byb2dyZXNzGA0gASgLMh'
     'oua2FydXlvbWkudjEuUmVzZXRQcm9ncmVzc0gAUg1yZXNldFByb2dyZXNzEkMKDnNldF9jYXRl'
     'Z29yaWVzGA4gASgLMhoua2FydXlvbWkudjEuU2V0Q2F0ZWdvcmllc0gAUg1zZXRDYXRlZ29yaW'
-    'VzQgsKCW9wZXJhdGlvbg==');
+    'VzEj0KDHNldF9ib29rbWFyaxgPIAEoCzIYLmthcnV5b21pLnYxLlNldEJvb2ttYXJrSABSC3Nl'
+    'dEJvb2ttYXJrQgsKCW9wZXJhdGlvbg==');
 
 @$core.Deprecated('Use businessStateErrorDescriptor instead')
 const BusinessStateError$json = {
@@ -583,6 +621,14 @@ const StateMutationResponse$json = {
       '6': '.karuyomi.v1.CategoryCatalog',
       '10': 'categoryCatalog'
     },
+    {
+      '1': 'bookmark',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ChapterBookmark',
+      '10': 'bookmark'
+    },
   ],
 };
 
@@ -594,7 +640,8 @@ final $typed_data.Uint8List stateMutationResponseDescriptor = $convert.base64Dec
     'EuTWFuZ2FTdGF0ZVIFbWFuZ2ESPQoIcHJvZ3Jlc3MYBSABKAsyIS5rYXJ1eW9taS52MS5DaGFw'
     'dGVyUHJvZ3Jlc3NTdGF0ZVIIcHJvZ3Jlc3MSNQoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS'
     '5CdXNpbmVzc1N0YXRlRXJyb3JSBWVycm9yEkcKEGNhdGVnb3J5X2NhdGFsb2cYByABKAsyHC5r'
-    'YXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2dSD2NhdGVnb3J5Q2F0YWxvZw==');
+    'YXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2dSD2NhdGVnb3J5Q2F0YWxvZxI4Cghib29rbWFyax'
+    'gIIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFya1IIYm9va21hcms=');
 
 @$core.Deprecated('Use mangaStateResponseDescriptor instead')
 const MangaStateResponse$json = {
@@ -634,6 +681,14 @@ const MangaStateResponse$json = {
       '6': '.karuyomi.v1.CategoryCatalog',
       '10': 'categoryCatalog'
     },
+    {
+      '1': 'bookmark',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ChapterBookmark',
+      '10': 'bookmark'
+    },
   ],
 };
 
@@ -645,7 +700,43 @@ final $typed_data.Uint8List mangaStateResponseDescriptor = $convert.base64Decode
     'syIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZVIIcHJvZ3Jlc3MSNQoFZXJyb3IY'
     'BSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JSBWVycm9yEkcKEGNhdGVnb3'
     'J5X2NhdGFsb2cYBiABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2dSD2NhdGVnb3J5'
-    'Q2F0YWxvZw==');
+    'Q2F0YWxvZxI4Cghib29rbWFyaxgHIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFya1'
+    'IIYm9va21hcms=');
+
+@$core.Deprecated('Use bookmarkPageResponseDescriptor instead')
+const BookmarkPageResponse$json = {
+  '1': 'BookmarkPageResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'account_revision', '3': 2, '4': 1, '5': 13, '10': 'accountRevision'},
+    {'1': 'manga_key', '3': 3, '4': 1, '5': 9, '10': 'mangaKey'},
+    {
+      '1': 'entries',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.ChapterBookmark',
+      '10': 'entries'
+    },
+    {'1': 'next_key', '3': 5, '4': 1, '5': 9, '10': 'nextKey'},
+    {
+      '1': 'error',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `BookmarkPageResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List bookmarkPageResponseDescriptor = $convert.base64Decode(
+    'ChRCb29rbWFya1BhZ2VSZXNwb25zZRIlCg5zY2hlbWFfdmVyc2lvbhgBIAEoDVINc2NoZW1hVm'
+    'Vyc2lvbhIpChBhY2NvdW50X3JldmlzaW9uGAIgASgNUg9hY2NvdW50UmV2aXNpb24SGwoJbWFu'
+    'Z2Ffa2V5GAMgASgJUghtYW5nYUtleRI2CgdlbnRyaWVzGAQgAygLMhwua2FydXlvbWkudjEuQ2'
+    'hhcHRlckJvb2ttYXJrUgdlbnRyaWVzEhkKCG5leHRfa2V5GAUgASgJUgduZXh0S2V5EjUKBWVy'
+    'cm9yGAYgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yUgVlcnJvcg==');
 
 @$core.Deprecated('Use libraryPageResponseDescriptor instead')
 const LibraryPageResponse$json = {

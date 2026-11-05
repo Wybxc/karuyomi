@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 import {
+  bookmarkPageResponseSchema,
+  stateMutationResponseSchema,
   categoryMutationSchema,
   categoryCatalogResponseSchema,
   mangaStateResponseSchema,
@@ -112,4 +114,100 @@ test('successful state replies require a bounded catalog and category identities
       categoryCatalog: { categories: [categories[0], categories[0]] },
     }),
   ).toThrow();
+});
+
+test('bookmark mutations and replies validate chapter identity without requiring metadata or progress', () => {
+  for (const bookmarked of [true, false]) {
+    expect(
+      stateMutationSchema.parse({
+        ...base,
+        mangaKey: 'a'.repeat(64),
+        setBookmark: { chapterKey: 'snapshot-chapter-1', bookmarked },
+      }).operation.case,
+    ).toBe('setBookmark');
+    expect(
+      stateMutationResponseSchema.parse({
+        schemaVersion: 1,
+        mutationId: base.mutationId,
+        accountRevision: 1,
+        manga: { mangaKey: 'a'.repeat(64), revision: 1 },
+        categoryCatalog: {},
+        bookmark: { chapterKey: 'snapshot-chapter-1', bookmarked },
+      }).bookmark?.bookmarked,
+    ).toBe(bookmarked);
+  }
+  for (const chapterKey of ['', 'x'.repeat(201)]) {
+    expect(() =>
+      stateMutationSchema.parse({
+        ...base,
+        mangaKey: 'a'.repeat(64),
+        setBookmark: { chapterKey, bookmarked: true },
+      }),
+    ).toThrow();
+    expect(() =>
+      mangaStateResponseSchema.parse({
+        schemaVersion: 1,
+        manga: { mangaKey: 'a'.repeat(64) },
+        categoryCatalog: {},
+        bookmark: { chapterKey, bookmarked: true },
+      }),
+    ).toThrow();
+  }
+});
+
+test('bookmark pages are bounded, marked, ordered by SQLite UTF-8 identity, and cursor-aligned', () => {
+  const page = {
+    schemaVersion: 1,
+    accountRevision: 2,
+    mangaKey: 'a'.repeat(64),
+    entries: [
+      { chapterKey: 'a', bookmarked: true },
+      { chapterKey: 'b', bookmarked: true },
+    ],
+    nextKey: 'b',
+  };
+  expect(() => bookmarkPageResponseSchema.parse(page)).not.toThrow();
+  expect(() =>
+    bookmarkPageResponseSchema.parse({
+      ...page,
+      entries: [
+        { chapterKey: '\ue000', bookmarked: true },
+        { chapterKey: '😀', bookmarked: true },
+      ],
+      nextKey: '😀',
+    }),
+  ).not.toThrow();
+  for (const invalid of [
+    { ...page, mangaKey: 'wrong' },
+    { ...page, entries: [page.entries[0], page.entries[0]] },
+    { ...page, entries: page.entries.slice().reverse() },
+    { ...page, entries: [{ chapterKey: 'a', bookmarked: false }], nextKey: '' },
+    { ...page, nextKey: 'c' },
+    {
+      ...page,
+      entries: Array.from({ length: 65 }, (_, index) => ({
+        chapterKey: String(index).padStart(3, '0'),
+        bookmarked: true,
+      })),
+      nextKey: '',
+    },
+    { ...page, accountRevision: 4294967296 },
+    {
+      ...page,
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT',
+        message: 'changed',
+      },
+    },
+  ])
+    expect(() => bookmarkPageResponseSchema.parse(invalid)).toThrow();
+  expect(() =>
+    bookmarkPageResponseSchema.parse({
+      schemaVersion: 1,
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_UNAVAILABLE',
+        message: 'identity changed',
+      },
+    }),
+  ).not.toThrow();
 });

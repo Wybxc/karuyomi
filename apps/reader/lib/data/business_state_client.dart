@@ -16,11 +16,13 @@ final class BusinessStateException implements Exception {
     this.error, {
     this.manga,
     this.progress,
+    this.bookmark,
     this.conflictedChapterKey,
   });
   final wire.BusinessStateError error;
   final wire.MangaState? manga;
   final wire.ChapterProgressState? progress;
+  final wire.ChapterBookmark? bookmark;
   final String? conflictedChapterKey;
   bool get staleEpoch =>
       error.code ==
@@ -62,6 +64,17 @@ final class BusinessLibrarySnapshot {
   BusinessLibrarySnapshot(this.entries, this.categoryCatalog);
   final List<wire.MangaState> entries;
   final wire.CategoryCatalog categoryCatalog;
+}
+
+final class BusinessBookmarksSnapshot {
+  BusinessBookmarksSnapshot({
+    required this.manga,
+    required this.accountRevision,
+    required this.entries,
+  });
+  final wire.MangaState manga;
+  final int accountRevision;
+  final List<wire.ChapterBookmark> entries;
 }
 
 final class _PendingCategoryMutation {
@@ -248,7 +261,7 @@ final class BusinessStateClient {
       _library = List.unmodifiable(entries);
       _pending.removeWhere(
         (_, pending) =>
-            pending.rejected && _operationChapter(pending.request) == null,
+            pending.rejected && _mutationChapter(pending.request) == null,
       );
       if (_pendingCategory?.rejection != null) _pendingCategory = null;
       _changes.add(null);
@@ -256,6 +269,84 @@ final class BusinessStateClient {
     }
     throw StateError('Library changed repeatedly; refresh again');
   }
+
+  ({String chapterKey, bool bookmarked, int basedOnRevision, bool retryable})?
+  pendingBookmark(String key) {
+    if (_closed) return null;
+    final pending = _pending[key];
+    if (pending == null || !pending.request.hasSetBookmark()) return null;
+    return (
+      chapterKey: pending.request.setBookmark.chapterKey,
+      bookmarked: pending.request.setBookmark.bookmarked,
+      basedOnRevision: pending.request.expectedRevision,
+      retryable: !pending.rejected,
+    );
+  }
+
+  /// Read the manga CAS and every bookmark page at one account revision.
+  Future<BusinessBookmarksSnapshot> readBookmarks(
+    String key,
+  ) => _serial(key, () async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final state = await _readManga(key);
+      final revision = state.accountRevision;
+      final entries = <wire.ChapterBookmark>[];
+      final cursors = <String>{};
+      var afterKey = '';
+      var restart = false;
+      do {
+        final path = Uri(
+          path: '/api/state/manga/$key/bookmarks',
+          queryParameters: {
+            if (afterKey.isNotEmpty) 'afterKey': afterKey,
+            'revision': '$revision',
+          },
+        ).toString();
+        final reply = await _get(path);
+        final page = wire.decodeProtoJson(
+          wire.BookmarkPageResponse(),
+          jsonDecode(reply.body),
+          maxBytes: _responseLimit,
+        );
+        validateBusinessBookmarkPage(page, mangaKey: key, afterKey: afterKey);
+        if (page.hasError()) {
+          final failure = BusinessStateException(page.error);
+          if (failure.conflict) {
+            restart = true;
+            break;
+          }
+          throw failure;
+        }
+        _success(reply);
+        if (page.accountRevision != revision || revision < _accountRevision) {
+          restart = true;
+          break;
+        }
+        entries.addAll(page.entries.map((entry) => entry.deepCopy()..freeze()));
+        afterKey = page.nextKey;
+        if (afterKey.isNotEmpty && !cursors.add(afterKey)) {
+          throw const FormatException('Bookmark cursor repeated');
+        }
+        if (entries.length > 10000 || cursors.length > 1000) {
+          throw const FormatException('Bookmarks exceed session budget');
+        }
+      } while (afterKey.isNotEmpty);
+      if (restart) continue;
+      _ensureOpen();
+      final rejected = _pending[key];
+      if (rejected != null &&
+          rejected.rejected &&
+          rejected.request.hasSetBookmark()) {
+        _pending.remove(key);
+      }
+      return BusinessBookmarksSnapshot(
+        manga: state.manga.deepCopy()..freeze(),
+        accountRevision: revision,
+        entries: List.unmodifiable(entries),
+      );
+    }
+    throw StateError('Bookmarks changed repeatedly; refresh again');
+  });
 
   Future<wire.MangaStateResponse> readManga(String key, {String? chapterKey}) =>
       _serial(key, () => _readManga(key, chapterKey: chapterKey));
@@ -276,6 +367,7 @@ final class BusinessStateClient {
     bool accept = true,
     int? knownLocalRevision,
   }) async {
+    if (chapterKey != null) validateBusinessChapterKey(chapterKey);
     final path = Uri(
       path: '/api/state/manga/$key',
       queryParameters: {'chapterKey': ?chapterKey},
@@ -295,10 +387,17 @@ final class BusinessStateClient {
     _success(reply);
     if (!value.hasManga() ||
         value.manga.mangaKey != key ||
-        (value.hasProgress() && value.progress.chapterKey != chapterKey)) {
+        (value.hasProgress() && value.progress.chapterKey != chapterKey) ||
+        (chapterKey != null &&
+            (!value.hasBookmark() ||
+                value.bookmark.chapterKey != chapterKey)) ||
+        (chapterKey == null && value.hasBookmark())) {
       throw const FormatException('Business state response identity mismatch');
     }
     validateBusinessManga(value.manga);
+    if (value.hasBookmark()) {
+      validateBusinessBookmark(value.bookmark, chapterKey: chapterKey);
+    }
     _validateCatalog(
       value.hasCategoryCatalog(),
       value.categoryCatalog,
@@ -326,7 +425,7 @@ final class BusinessStateClient {
     _ensureOpen();
     final rejected = _pending[key];
     if (rejected != null && rejected.rejected) {
-      final rejectedChapter = _operationChapter(rejected.request);
+      final rejectedChapter = _mutationChapter(rejected.request);
       // A shelf/resume read cannot resolve a reader's stale chapter view.
       // Only loading that chapter explicitly permits a new progress mutation.
       if (rejectedChapter == null || rejectedChapter == chapterKey) {
@@ -348,13 +447,25 @@ final class BusinessStateClient {
     command.clearMutationId();
     command.clearExpectedRevision();
     command.schemaVersion = _schemaVersion;
+    if (command.hasSetBookmark()) {
+      validateBusinessChapterKey(command.setBookmark.chapterKey);
+      if (basedOnRevision == null) {
+        throw ArgumentError('Bookmark requires its confirmed revision');
+      }
+      validateBusinessRevision(basedOnRevision);
+    }
     final fingerprint = jsonEncode(wire.encodeProtoJson(command));
     return _serial(command.mangaKey, () async {
       final previous = _pending[command.mangaKey];
       if (previous != null) {
-        if (previous.request.hasSetCategories() &&
+        if ((previous.request.hasSetCategories() ||
+                previous.request.hasSetBookmark()) &&
             previous.fingerprint != fingerprint) {
-          throw StateError('请先处理书架中的未确认分类修改。');
+          throw StateError(
+            previous.request.hasSetBookmark()
+                ? '请先处理该漫画的未确认书签修改。'
+                : '请先处理书架中的未确认分类修改。',
+          );
         }
         final result = await _send(previous);
         if (previous.fingerprint == fingerprint) return result;
@@ -365,6 +476,12 @@ final class BusinessStateClient {
       if (basedOnRevision != null &&
           (command.hasSetCategories()
               ? basedOnRevision != _manga[command.mangaKey]!.revision
+              : command.hasSetBookmark()
+              ? !hasOnlyLocalChangesSince(
+                  command.mangaKey,
+                  basedOnRevision: basedOnRevision,
+                  revision: _manga[command.mangaKey]!.revision,
+                )
               : basedOnRevision < (_remoteRevisions[command.mangaKey] ?? 0))) {
         throw BusinessStateException(
           wire.BusinessStateError(
@@ -374,7 +491,7 @@ final class BusinessStateClient {
             message: 'The reader view predates a confirmed server update',
           ),
           manga: _manga[command.mangaKey],
-          conflictedChapterKey: _operationChapter(command),
+          conflictedChapterKey: _mutationChapter(command),
         );
       }
       command.expectedRevision = _manga[command.mangaKey]!.revision;
@@ -418,6 +535,12 @@ final class BusinessStateClient {
         'Business mutation response identity mismatch',
       );
     }
+    if (value.hasBookmark()) {
+      validateBusinessBookmark(
+        value.bookmark,
+        chapterKey: _mutationChapter(pending.request),
+      );
+    }
     if (value.hasError()) {
       validateBusinessError(value.error);
       if (value.hasCategoryCatalog()) {
@@ -443,7 +566,8 @@ final class BusinessStateClient {
         value.error,
         manga: value.hasManga() ? value.manga : null,
         progress: value.hasProgress() ? value.progress : null,
-        conflictedChapterKey: _operationChapter(pending.request),
+        bookmark: value.hasBookmark() ? value.bookmark : null,
+        conflictedChapterKey: _mutationChapter(pending.request),
       );
       pending.failure = failure;
       throw failure;
@@ -463,6 +587,18 @@ final class BusinessStateClient {
     );
     validateBusinessMangaCategories(value.manga, value.categoryCatalog);
     final expectedChapter = _operationChapter(pending.request);
+    final bookmark = pending.request.hasSetBookmark()
+        ? pending.request.setBookmark
+        : null;
+    if (bookmark != null &&
+        (!value.hasBookmark() ||
+            value.bookmark.chapterKey != bookmark.chapterKey ||
+            value.bookmark.bookmarked != bookmark.bookmarked)) {
+      throw const FormatException('Mutation response bookmark mismatch');
+    }
+    if (bookmark == null && value.hasBookmark()) {
+      throw const FormatException('Unexpected mutation bookmark');
+    }
     if (expectedChapter != null &&
         (!value.hasProgress() ||
             value.progress.chapterKey != expectedChapter ||
@@ -486,11 +622,18 @@ final class BusinessStateClient {
             value.categoryCatalog.revision < _catalog.revision
         ? await _readManga(
             pending.request.mangaKey,
-            chapterKey: expectedChapter,
+            chapterKey: _mutationChapter(pending.request),
             knownLocalRevision: value.manga.revision,
           )
         : null;
-    if (value.manga.revision < (_manga[value.manga.mangaKey]?.revision ?? 0)) {
+    final bookmarkChanged =
+        bookmark != null &&
+        current != null &&
+        current.bookmark.bookmarked != bookmark.bookmarked;
+    if (bookmarkChanged ||
+        (bookmark == null &&
+            value.manga.revision <
+                (_manga[value.manga.mangaKey]?.revision ?? 0))) {
       final latestProgress = current?.hasProgress() == true
           ? current!.progress
           : null;
@@ -511,7 +654,8 @@ final class BusinessStateClient {
         ),
         manga: _manga[value.manga.mangaKey],
         progress: latestProgress,
-        conflictedChapterKey: expectedChapter,
+        bookmark: current?.hasBookmark() == true ? current!.bookmark : null,
+        conflictedChapterKey: _mutationChapter(pending.request),
       );
       pending.rejected = true;
       pending.failure = failure;
@@ -530,6 +674,16 @@ final class BusinessStateClient {
     );
     _ensureOpen();
     _changes.add(null);
+    if (bookmark != null && current != null) {
+      return wire.StateMutationResponse(
+        schemaVersion: _schemaVersion,
+        mutationId: value.mutationId,
+        accountRevision: current.accountRevision,
+        manga: current.manga,
+        categoryCatalog: current.categoryCatalog,
+        bookmark: current.bookmark,
+      );
+    }
     return value;
   }
 
@@ -800,6 +954,10 @@ String? _operationChapter(wire.StateMutation request) =>
     : request.hasResetProgress()
     ? request.resetProgress.snapshot.chapterKey
     : null;
+
+String? _mutationChapter(wire.StateMutation request) => request.hasSetBookmark()
+    ? request.setBookmark.chapterKey
+    : _operationChapter(request);
 
 int _compareShelf(wire.MangaState a, wire.MangaState b) {
   final byDate = b.addedAtSeconds.compareTo(a.addedAtSeconds);
