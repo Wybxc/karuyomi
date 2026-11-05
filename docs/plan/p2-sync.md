@@ -4,7 +4,7 @@
 
 **多端同步是首要设计目标和当前实施主线。** 同一部署、同一身份在 Flutter Web、iOS 和 Android 共享书架、分类、阅读进度、书签和非敏感设置。Worker API 负责业务读写，D1 保存唯一权威状态；功能从数据模型、协议到 UI 都按多端共同使用设计，不先完成一套独立本地产品再补同步。
 
-状态：**收藏与阅读进度的服务端底座已接入，工程检查及正式 Web/API 构建已通过；未部署生产，实际跨平台闭环待验收**。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。分类、书签与同步设置尚未实施。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
+状态：**收藏与阅读进度的服务端底座已接入，工程检查、正式 Web/API 构建及真实 Web 独立会话闭环已通过；未部署生产，实际跨平台闭环待验收**。Codex 内置浏览器已用正式 xkcd 与真实隔离 workerd/D1 完成 A 收藏→新 B 读书架并阅读保存→新 A 续读，见[证据](../verification/server-state.md#真实-web-独立会话闭环)。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。分类、书签与同步设置尚未实施。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
 
 ## 权威来源与初版边界
 

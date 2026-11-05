@@ -98,6 +98,31 @@ EXTENSION_ASSETS_DIR="$PWD/.local/v4-production/snapshot" pnpm build
 
 新增前台测试 14 项、inspect/CAS 测试 1 项、路由前台/失败重试 2 项和登录期间 reset 1 项。这些是组件与正式路由测试；真实内置浏览器、生产 Access 和 Native 生命周期验收仍独立进行。
 
+## 真实 Web 独立会话闭环
+
+同日以 `d1e280e` 的正式 Flutter Web 构建、原生产 xkcd v4 包和 Codex 内置浏览器完成同 origin 的 A→B→新 A 会话验收。入口为 `apps/api/test/source-metadata-probe.ts` 的正式 Flutter 模式，所有业务与 Source HTTP API 均进入真实 workerd 和同一隔离 D1，使用真实 RS256 测试身份 `probe-owner`；没有使用组件测试服务或改变原扩展代码。
+
+```sh
+SOURCE_PROBE_READER_DIR=apps/reader/build/web \
+SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
+SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
+SOURCE_PROBE_IMAGES=1 SOURCE_PROBE_PORT=8897 \
+SOURCE_PROBE_EVIDENCE=.local/server-state-web/xkcd-network.json \
+node apps/api/test/source-metadata-probe.ts \
+  .local/v4-source-validation/xkcd/manifest.json \
+  .local/v4-source-validation/xkcd/artifacts
+```
+
+| 操作                                                                 | 实际 UI 与权威读取结果                                                                                                                                                                      |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A 浏览原 Source，收藏 xkcd 后关闭标签                                | UI 变为“移出书架”；`GET /api/library` 的 account revision 为 1，favorite=true                                                                                                               |
+| 新 B 会话从书架进入详情，打开 `3320: House Majority` 并阅读到第 2 页 | 书架显示收藏 1 部；真实图片/文字页可见，UI 显示“阅读进度已保存到服务端”；对应 state revision 为 5，current/furthest 的 pageIndexHint 均为 1，furthest offset 为 1，epoch=0、completed=false |
+| 关闭 B，新 A 会话从书架进入详情，点击“继续阅读”                      | 正式阅读页直接恢复 `2 / 2`，显示服务端已保存；state revision 为 7，current/furthest 与 B 的已确认位置一致                                                                                   |
+
+三个文档使用同一 `http://127.0.0.1:8897`；依次关闭前一文档以释放 Source 文件写入锁，每个新文档重新 bootstrap、打开 Source 和读取 D1，扩展/HTTP 缓存可正常复用。详情刷新元数据及打开阅读都会产生合法写入，revision 不等同于点击次数。只读核对使用 `X-App-Request: 1`、`X-App-Subject: probe-owner`，经 library 取得 mangaKey、state 的 resume 取得 chapterKey，再读取指定章节；原始 JSON 与网络日志仅留在忽略目录。
+
+这完成真实 Web 独立会话的收藏→书架→阅读保存→重启续读基础门。没有执行生产 Access、两个并发阅读文档、远端修改时的实际前台重取或 Native 平台配对；不把本项升级为完整 P1/P2 验收。测试结束后已确认端口 8897、harness 与 workerd 子进程均退出。
+
 ## 验证边界
 
-这组测试证明本地真实 workerd/D1、正式路由和签名测试身份之间的闭环；两个客户端是独立 HTTP 调用方。它不代表生产 Cloudflare Access 登录、远程 D1 部署、浏览器 UI、Web/iOS/Android 跨端交互或真机阅读已经验收。分类、书签与非敏感设置仍需按计划接入相同服务端权威模型，不能由本记录推断已经实现。
+工程测试证明本地真实 workerd/D1、正式路由和签名测试身份之间的闭环；浏览器独立会话范围按上节单独验收。它不代表生产 Cloudflare Access 登录、远程 D1 部署、Web/iOS/Android 跨端交互或真机阅读已经验收。分类、书签与非敏感设置仍需按计划接入相同服务端权威模型，不能由本记录推断已经实现。
