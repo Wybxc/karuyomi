@@ -267,14 +267,17 @@ process.stdout.write(Buffer.alloc(5*1024*1024,97),()=>process.stderr.write(Buffe
     assert.equal(existsSync(sentinel), false);
     const bytes = readFileSync(log);
     assert.equal(bytes.length, 10 * 1024 * 1024);
-    assert.equal(
-      bytes.subarray(0, 5 * 1024 * 1024).every((byte) => byte === 97),
-      true,
-    );
-    assert.equal(
-      bytes.subarray(5 * 1024 * 1024).every((byte) => byte === 98),
-      true,
-    );
+    // Independent stdout/stderr pipes have no shared ordering guarantee.
+    // Verify both complete streams without imposing a scheduler-dependent merge.
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    for (const byte of bytes) {
+      if (byte === 97) stdoutBytes++;
+      else if (byte === 98) stderrBytes++;
+      else assert.fail(`Unexpected builder log byte: ${byte}`);
+    }
+    assert.equal(stdoutBytes, 5 * 1024 * 1024);
+    assert.equal(stderrBytes, 5 * 1024 * 1024);
   } finally {
     await processes.close();
     if (previous === undefined) delete process.env.KARUYOMI_TEST_CREDENTIAL;
