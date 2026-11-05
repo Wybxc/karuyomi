@@ -164,6 +164,23 @@ final class LibraryRepository {
         ),
       ),
       basedOnRevision: expectedMangaRevision,
+      requireExactRevision: true,
+    );
+  }
+
+  /// Remove a confirmed shelf entry without replacing its Source metadata.
+  Future<void> removeFavorite({
+    required String mangaKey,
+    required int expectedMangaRevision,
+  }) async {
+    validateBusinessRevision(expectedMangaRevision);
+    await client.mutate(
+      wire.StateMutation(
+        mangaKey: mangaKey,
+        setFavorite: wire.SetFavorite(favorite: false),
+      ),
+      basedOnRevision: expectedMangaRevision,
+      requireExactRevision: true,
     );
   }
 

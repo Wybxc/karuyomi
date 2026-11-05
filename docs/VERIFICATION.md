@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-06，正式书架已接入多选、逐漫画批量添加/移出分类和移出书架；冻结确认清单与 CAS，首失败停止，未确认项精确重试，余项显式继续。工程与组件结果维护在[批量操作记录](verification/library-batch.md)；实际独立客户端、生产和设备门仍待验收。
+
 2026-11-06，详情章节搜索、来源原序/反序和书签组合筛选已接入，保留重复条目、原始 Source DTO 及章节索引；4 项正式组件导航回归通过，含未返回详情状态时恢复服务端阅读顺序。集中检查与实际平台范围见[章节浏览记录](verification/chapter-browsing.md)。
 
 2026-11-05，收藏与阅读进度已接入生成业务协议、Worker API 和 D1 权威状态，本地业务 SQLite 与对应 Web 资产已移除。真实 workerd/D1 的并发、幂等、身份、分页及原子失败测试见[服务端状态记录](verification/server-state.md)；本轮全格式、通用检查与 Flutter 三项目静态分析/测试通过（21/42/208 项）。Codex 内置浏览器已通过真实 xkcd 的独立会话收藏→阅读保存→重启续读，见[实际 Web 记录](verification/server-state.md#真实-web-独立会话闭环)；随后正式 iOS `app.main()` 与 Web 通过测试身份下的双向非默认页续读、真实图片及回看最远进度保持，三次官方集成测试通过，见[Web↔iOS 记录](verification/native-server-state.md)。随后正式 Android 入口补齐 Web↔Android、iOS↔Android 双向非默认页续读，六次 Native 官方集成测试各 1/1 通过，新 Web 实际显示 Android 已确认的第 2 页真实文字图，见[Android 配对记录](verification/android-server-state.md)。双 Web 正式入口随后通过远端位置/epoch 更新保持旧画面、停止旧视图写入、未先刷新时正常写路径冲突及明确重开恢复，见[双会话记录](verification/concurrent-server-state.md)。客户端与业务 API 已[部署生产并通过匿名检查](verification/server-state-production.md)；同时写竞争、实际自动前台重取、故障恢复、生产 Access 正向与真机仍待完成，历史本地数据库恢复不代表当前同步完成。

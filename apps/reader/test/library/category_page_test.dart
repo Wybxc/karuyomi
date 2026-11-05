@@ -697,6 +697,62 @@ void main() {
   );
 
   testWidgets(
+    'a category edit blocked by another uncertain write can close without replaying that write',
+    (tester) async {
+      await create(tester);
+      final alpha = await favorite(tester, 'Alpha');
+      await show(tester);
+      Future<void> remove() => controller.library!.setFavorite(
+        packageName: alpha.packageName,
+        sourceId: alpha.sourceId,
+        sourceName: alpha.sourceName,
+        sourceLang: alpha.sourceLang,
+        manga: alpha.snapshot,
+        favorite: false,
+      );
+      platform.afterBusinessReply = (request, reply) {
+        if (request.method != 'POST' ||
+            request.uri.path != '/api/state/mutations') {
+          return reply;
+        }
+        platform.afterBusinessReply = null;
+        return const ApiReply(
+          status: 503,
+          headers: {'content-type': 'text/plain'},
+          body: 'Acknowledgement unavailable',
+          redirected: false,
+        );
+      };
+      await tester.runAsync(
+        () => expectLater(
+          remove(),
+          throwsA(isA<BusinessStateTransportException>()),
+        ),
+      );
+      final original = posts('/api/state/mutations').last.body;
+      final sent = posts('/api/state/mutations').length;
+      await tap(tester, find.byTooltip('设置分类：Alpha'));
+      await tap(tester, find.widgetWithText(CheckboxListTile, '想读'));
+      await tap(tester, find.text('保存'));
+      expect(find.textContaining('先处理原操作'), findsOneWidget);
+      expect(find.text('重新读取并关闭'), findsOneWidget);
+      expect(posts('/api/state/mutations'), hasLength(sent));
+      await tap(tester, find.text('重新读取并关闭'));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('处理未确认修改'), findsNothing);
+      expect(find.text('书架还是空的'), findsOneWidget);
+      expect(posts('/api/state/mutations'), hasLength(sent));
+      await tester.runAsync(remove);
+      expect(posts('/api/state/mutations'), hasLength(sent + 1));
+      expect(posts('/api/state/mutations').last.body, original);
+      expect(server.manga(alpha.mangaKey)!.categoryIds, isEmpty);
+      expect(server.manga(alpha.mangaKey)!.favorite, false);
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
     'deleting the selected category restores the all filter and keeps favorites',
     (tester) async {
       await create(tester);

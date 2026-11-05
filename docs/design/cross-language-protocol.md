@@ -6,7 +6,7 @@
 
 当前各实际边界、quicktype/OpenAPI/FlatBuffers/GraphQL 与平台通道的适用范围见[数据交换评估](data-exchange-boundaries.md)。Protobuf 主控不意味着所有文件、原生平台通道和二进制 ABI 都必须套用同一种方案。
 
-2026-11-05，业务设计以多端同步为首要目标：Worker API + D1 是唯一业务权威，Flutter Web/iOS/Android 共用业务状态合同。运行时控制、bootstrap 和静态 DTO 之外，`business.proto` 已覆盖收藏、完整 Manga 元数据、阅读锚、revision、epoch、mutation 与有界集合响应，并接入正式 Worker/Dart 读写。分类、书签和设置合同继续按[协议计划](../plan/cross-language-protocol.md)和[同步计划](../plan/p2-sync.md)优先推进。
+2026-11-06，业务设计以多端同步为首要目标：Worker API + D1 是唯一业务权威，Flutter Web/iOS/Android 共用业务状态合同。运行时控制、bootstrap 和静态 DTO 之外，`business.proto` 已覆盖收藏、完整 Manga 元数据、阅读锚、分类、章节书签、现有三项设置、revision、epoch、mutation 与有界集合响应，并接入正式 Worker/Dart 读写和 Flutter UI。三项设置为全局主题、四种阅读模式与 AUTO/SINGLE/DOUBLE 页组，后两项支持逐漫画覆盖/继承；工程与受控组件证据见[设置记录](../verification/reader-settings.md)。实际跨端、生产 Access、真机和其余 P1 设置仍按[协议计划](../plan/cross-language-protocol.md)、[P1](../plan/p1-library-and-progress.md)与[同步计划](../plan/p2-sync.md)继续实施或验收。
 
 ## 比较
 
@@ -59,7 +59,7 @@ Bebop 的版本边界也需明确：当前发布仓库的 latest 为 [v3.2.3](ht
 
 ## 同步优先的业务合同
 
-书架、分类、进度、书签和非敏感设置的 HTTP 请求/响应继续由同一 Protobuf + Buf 体系定义，TS/Dart 使用生成 codec；HTTP 方法、鉴权和状态码不能成为第二套业务模型来源。当前阶段先实现有界的当前状态查询与确认写入，前台重新读取后收敛；增量日志/cursor、DO 通知、持久本地 outbox 或离线合并只有在真实需求与测量成立后再规划。
+书架、分类、进度、书签和非敏感设置的 HTTP 请求/响应继续由同一 Protobuf + Buf 体系定义，TS/Dart 使用生成 codec；HTTP 方法、鉴权和状态码不能成为第二套业务模型来源。当前采用有界的当前状态查询与确认写入，前台重新读取后收敛的实际范围按[同步计划](../plan/p2-sync.md)验收；增量日志/cursor、DO 通知、持久本地 outbox 或离线合并只有在真实需求与测量成立后再规划。
 
 业务消息须表达 mutationId、服务端 revision、预期 revision 的条件更新、阅读 epoch、确认后的完整状态或受影响字段，以及标准错误。明确 revision/epoch 的数值范围与精确跨端表示；不依赖设备时间或隐式 JS Number 转换决定顺序。幂等重试保留原 mutationId，服务端提交但响应丢失时不得再执行一次 reset；不同消息不能因为复用幂等 ID 而被误认成同一操作。调用方身份来自通过验证的 Access 上下文，正文中的客户端标识只用于协议与去重。
 

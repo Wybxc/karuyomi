@@ -473,7 +473,9 @@ final class TestBusinessServer implements ApiFetch {
     wire.ChapterBookmark? nextBookmark;
     switch (mutation.whichOperation()) {
       case wire.StateMutation_Operation.setFavorite:
-        next.metadata = mutation.setFavorite.metadata.deepCopy();
+        if (mutation.setFavorite.hasMetadata()) {
+          next.metadata = mutation.setFavorite.metadata.deepCopy();
+        }
         if (mutation.setFavorite.favorite && !next.favorite) {
           next.addedAtSeconds = _now().millisecondsSinceEpoch ~/ 1000;
         }

@@ -8,6 +8,7 @@ import '../../data/business_state_client.dart';
 import '../../data/business_state_validation.dart';
 import '../../data/library_repository.dart';
 import '../browse/catalog_controller.dart';
+import 'library_batch.dart';
 
 const _changed = '分类或漫画已在其他设备修改，请重新读取后重开编辑。';
 const _expired = '身份或服务已变化，请关闭后重新打开。';
@@ -17,7 +18,7 @@ const _expired = '身份或服务已变化，请关闭后重新打开。';
 final _pendingEdits = Expando<_CategoryDraft>('unconfirmed category edit');
 
 bool hasPendingLibraryCategoryEdit(LibraryRepository repository) =>
-    _pendingEdits[repository] != null;
+    _pendingEdits[repository.client] != null;
 
 Future<void> showLibraryCategoryManager({
   required BuildContext context,
@@ -27,7 +28,8 @@ Future<void> showLibraryCategoryManager({
   required Listenable lifecycle,
   required bool Function() isCurrent,
 }) {
-  final pending = _pendingEdits[repository];
+  if (pendingLibraryBatch(repository) != null) return Future.value();
+  final pending = _pendingEdits[repository.client];
   if (pending?.entry != null) {
     return _showCommand(context, controller, lifecycle, isCurrent, pending!);
   }
@@ -53,6 +55,7 @@ Future<void> showLibraryCategoryPicker({
   required Listenable lifecycle,
   required bool Function() isCurrent,
 }) {
+  if (pendingLibraryBatch(repository) != null) return Future.value();
   if (hasPendingLibraryCategoryEdit(repository)) {
     return showLibraryCategoryManager(
       context: context,
@@ -142,16 +145,21 @@ final class _CategoryDraft extends ChangeNotifier {
 
   void _finish() {
     completed = true;
-    if (identical(_pendingEdits[repository], this)) {
-      _pendingEdits[repository] = null;
+    if (identical(_pendingEdits[repository.client], this)) {
+      _pendingEdits[repository.client] = null;
     }
   }
 
   Future<void> save() async {
     if (busy || blocked || completed) return;
-    final pending = _pendingEdits[repository];
+    if (pendingLibraryBatch(repository) != null) {
+      error = '请先处理书架中的未完成批量操作。';
+      notifyListeners();
+      return;
+    }
+    final pending = _pendingEdits[repository.client];
     if (pending != null && !identical(pending, this)) return;
-    _pendingEdits[repository] = this;
+    _pendingEdits[repository.client] = this;
     busy = true;
     attempted = true;
     error = null;
@@ -166,6 +174,9 @@ final class _CategoryDraft extends ChangeNotifier {
         confirmedView = await repository.watchView().first;
       }
       _finish();
+    } on BusinessPendingMutationException {
+      blocked = true;
+      error = '该漫画已有另一项未确认修改，请先处理原操作，再重新读取后重开分类编辑。';
     } on BusinessStateException catch (failure) {
       if (confirmed) {
         error = '修改已确认，但未能读取最新书架。请重试读取。';
@@ -309,7 +320,7 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
   @override
   void initState() {
     super.initState();
-    _follow(_pendingEdits[widget.repository]);
+    _follow(_pendingEdits[widget.repository.client]);
   }
 
   void _follow(_CategoryDraft? draft) {

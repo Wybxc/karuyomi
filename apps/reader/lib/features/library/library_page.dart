@@ -7,6 +7,8 @@ import '../browse/catalog_controller.dart';
 import '../browse/catalog_page.dart';
 import '../reader/reader_recovery.dart';
 import 'category_dialogs.dart';
+import 'library_batch.dart';
+import 'library_batch_dialogs.dart';
 
 enum _LibrarySort { added, title }
 
@@ -43,6 +45,8 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   ServiceStatus? _lastStatus;
   bool _opening = false;
   String? _refreshError;
+  final _selection = <String>{};
+  bool _selecting = false;
 
   @override
   void initState() {
@@ -74,10 +78,16 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   void _bindRepository() {
     final next = widget.controller?.library;
     _editLifecycle.value++;
+    if (widget.controller?.status != ServiceStatus.ready) {
+      _selection.clear();
+      _selecting = false;
+    }
     if (identical(_repository, next)) {
       return;
     }
     _repository = next;
+    _selection.clear();
+    _selecting = false;
     _refreshError = null;
     _views = next?.watchView();
     _categoryFilter = null;
@@ -154,7 +164,8 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
         controller == null ||
         repository == null ||
         controller.status != ServiceStatus.ready ||
-        controller.busy) {
+        controller.busy ||
+        pendingLibraryBatch(repository) != null) {
       return;
     }
     final route = ModalRoute.of(context);
@@ -164,6 +175,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
         !_disposing &&
         identical(widget.controller, controller) &&
         identical(_repository, repository) &&
+        identical(controller.library, repository) &&
         repository.identity.key == identityKey &&
         controller.status == ServiceStatus.ready &&
         route?.isActive == true;
@@ -188,6 +200,66 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
           lifecycle: _editLifecycle,
           isCurrent: isCurrent,
         );
+      }
+    } finally {
+      if (mounted) setState(() => _editing = false);
+    }
+  }
+
+  Set<String> _selectedKeys(LibraryView view) => view.entries
+      .where((entry) => _selection.contains(entry.mangaKey))
+      .map((entry) => entry.mangaKey)
+      .toSet();
+
+  void _toggleSelection(String key) => setState(() {
+    if (!_selection.add(key)) _selection.remove(key);
+  });
+
+  Future<void> _batch(LibraryView view, {LibraryBatchAction? action}) async {
+    final controller = widget.controller;
+    final repository = _repository;
+    if (_editing ||
+        _opening ||
+        controller == null ||
+        repository == null ||
+        controller.status != ServiceStatus.ready ||
+        controller.busy ||
+        hasPendingLibraryCategoryEdit(repository)) {
+      return;
+    }
+    final pending = pendingLibraryBatch(repository);
+    final keys = _selectedKeys(view);
+    if (pending == null && (action == null || keys.isEmpty)) return;
+    final route = ModalRoute.of(context);
+    final identityKey = repository.identity.key;
+    bool isCurrent() =>
+        mounted &&
+        !_disposing &&
+        identical(widget.controller, controller) &&
+        identical(_repository, repository) &&
+        identical(controller.library, repository) &&
+        repository.identity.key == identityKey &&
+        controller.status == ServiceStatus.ready &&
+        route?.isActive == true;
+    setState(() => _editing = true);
+    try {
+      final remaining = await showLibraryBatchDialog(
+        context: context,
+        controller: controller,
+        repository: repository,
+        view: view,
+        mangaKeys: keys,
+        action: pending?.action ?? action!,
+        lifecycle: _editLifecycle,
+        isCurrent: isCurrent,
+      );
+      if (isCurrent() && remaining != null) {
+        setState(() {
+          _selection
+            ..clear()
+            ..addAll(remaining);
+          _selecting = remaining.isNotEmpty;
+        });
       }
     } finally {
       if (mounted) setState(() => _editing = false);
@@ -328,6 +400,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     final repository = _repository;
     final pending =
         repository != null && hasPendingLibraryCategoryEdit(repository);
+    final batch = repository == null ? null : pendingLibraryBatch(repository);
     final available =
         !_editing &&
         !_opening &&
@@ -365,10 +438,23 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 8),
         ],
+        if (batch != null) ...[
+          _notice('有未完成的批量操作，当前列表仅显示服务端已确认的结果。'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('library-resume-batch'),
+              onPressed: available ? () => unawaited(_batch(view)) : null,
+              icon: const Icon(Icons.pending_actions),
+              label: const Text('继续处理批量操作'),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
-            onPressed: available && !pending
+            onPressed: available && !pending && batch == null && !_selecting
                 ? () => unawaited(_editCategories(view))
                 : null,
             icon: const Icon(Icons.folder_outlined),
@@ -420,6 +506,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     });
     final controller = widget.controller;
     final canOpen =
+        !_selecting &&
         !_opening &&
         controller?.busy == false &&
         controller?.status == ServiceStatus.ready;
@@ -428,7 +515,20 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
         canOpen &&
         !_editing &&
         repository != null &&
-        !hasPendingLibraryCategoryEdit(repository);
+        !hasPendingLibraryCategoryEdit(repository) &&
+        pendingLibraryBatch(repository) == null;
+    final canSelect =
+        !_opening &&
+        !_editing &&
+        controller?.busy == false &&
+        controller?.status == ServiceStatus.ready;
+    final hasPending =
+        repository != null &&
+        (hasPendingLibraryCategoryEdit(repository) ||
+            pendingLibraryBatch(repository) != null);
+    final selected = _selectedKeys(view);
+    final visibleKeys = visible.map((entry) => entry.mangaKey).toSet();
+    final hiddenCount = selected.difference(visibleKeys).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -459,6 +559,102 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 16),
         Text('收藏 ${entries.length} 部 · 当前显示 ${visible.length} 部'),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('library-selection-toggle'),
+            onPressed: canSelect && (_selecting || !hasPending)
+                ? () => setState(() {
+                    _selecting = !_selecting;
+                    if (!_selecting) _selection.clear();
+                  })
+                : null,
+            icon: Icon(_selecting ? Icons.close : Icons.checklist),
+            label: Text(_selecting ? '退出选择' : '选择漫画'),
+          ),
+        ),
+        if (_selecting) ...[
+          Text('已选 ${selected.length} 部 · 当前隐藏 $hiddenCount 部'),
+          if (hiddenCount > 0) const Text('批量操作包含隐藏选中的漫画，请在确认清单中核对。'),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton(
+                key: const ValueKey('library-select-visible'),
+                onPressed: canSelect && visible.isNotEmpty
+                    ? () => setState(() => _selection.addAll(visibleKeys))
+                    : null,
+                child: const Text('全选当前显示'),
+              ),
+              TextButton(
+                key: const ValueKey('library-deselect-visible'),
+                onPressed:
+                    canSelect && selected.intersection(visibleKeys).isNotEmpty
+                    ? () => setState(() => _selection.removeAll(visibleKeys))
+                    : null,
+                child: const Text('取消当前显示选择'),
+              ),
+              TextButton(
+                key: const ValueKey('library-clear-selection'),
+                onPressed: canSelect && selected.isNotEmpty
+                    ? () => setState(_selection.clear)
+                    : null,
+                child: const Text('清空选择'),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const ValueKey('library-batch-add-categories'),
+                onPressed:
+                    canSelect &&
+                        !hasPending &&
+                        selected.isNotEmpty &&
+                        view.categories.isNotEmpty
+                    ? () => unawaited(
+                        _batch(view, action: LibraryBatchAction.addCategories),
+                      )
+                    : null,
+                icon: const Icon(Icons.create_new_folder_outlined),
+                label: const Text('批量添加分类'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('library-batch-remove-categories'),
+                onPressed:
+                    canSelect &&
+                        !hasPending &&
+                        selected.isNotEmpty &&
+                        view.categories.isNotEmpty
+                    ? () => unawaited(
+                        _batch(
+                          view,
+                          action: LibraryBatchAction.removeCategories,
+                        ),
+                      )
+                    : null,
+                icon: const Icon(Icons.folder_off_outlined),
+                label: const Text('批量移出分类'),
+              ),
+              FilledButton.tonalIcon(
+                key: const ValueKey('library-batch-remove-favorites'),
+                onPressed: canSelect && !hasPending && selected.isNotEmpty
+                    ? () => unawaited(
+                        _batch(
+                          view,
+                          action: LibraryBatchAction.removeFavorites,
+                        ),
+                      )
+                    : null,
+                icon: const Icon(Icons.bookmark_remove_outlined),
+                label: const Text('批量移出书架'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 8),
         if (visible.isEmpty)
           const Padding(
@@ -469,7 +665,15 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
           Card(
             key: ValueKey(entry.mangaKey),
             child: ListTile(
-              leading: const Icon(Icons.menu_book_outlined),
+              leading: _selecting
+                  ? Checkbox(
+                      key: ValueKey(('library-select', entry.mangaKey)),
+                      value: selected.contains(entry.mangaKey),
+                      onChanged: canSelect
+                          ? (_) => _toggleSelection(entry.mangaKey)
+                          : null,
+                    )
+                  : const Icon(Icons.menu_book_outlined),
               title: Text(entry.title),
               subtitle: Text(
                 [
@@ -478,20 +682,36 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                   '分类：${entry.categoryIds.isEmpty ? '未分类' : view.categories.where((category) => entry.categoryIds.contains(category.id)).map((category) => category.name).join('、')}',
                 ].join('\n'),
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: '设置分类：${entry.title}',
-                    onPressed: canCategorize
-                        ? () => unawaited(_editCategories(view, entry: entry))
-                        : null,
-                    icon: const Icon(Icons.folder_outlined),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-              onTap: canOpen ? () => unawaited(_open(entry)) : null,
+              trailing: _selecting
+                  ? null
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: '设置分类：${entry.title}',
+                          onPressed: canCategorize
+                              ? () => unawaited(
+                                  _editCategories(view, entry: entry),
+                                )
+                              : null,
+                          icon: const Icon(Icons.folder_outlined),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+              onTap: _selecting
+                  ? canSelect
+                        ? () => _toggleSelection(entry.mangaKey)
+                        : null
+                  : canOpen
+                  ? () => unawaited(_open(entry))
+                  : null,
+              onLongPress: canSelect && !_selecting && !hasPending
+                  ? () => setState(() {
+                      _selecting = true;
+                      _selection.add(entry.mangaKey);
+                    })
+                  : null,
             ),
           ),
       ],

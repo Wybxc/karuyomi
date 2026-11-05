@@ -37,6 +37,12 @@ final class BusinessStateException implements Exception {
   String toString() => error.message;
 }
 
+final class BusinessPendingMutationException extends StateError {
+  BusinessPendingMutationException(this.mangaKey, String message)
+    : super(message);
+  final String mangaKey;
+}
+
 final class BusinessStateTransportException implements Exception {
   const BusinessStateTransportException(this.status);
   final int status;
@@ -50,11 +56,13 @@ final class _PendingMutation {
     this.request,
     this.body,
     this.accountRevision,
+    this.requireExactRevision,
   );
   final String fingerprint;
   final wire.StateMutation request;
   final String body;
   final int accountRevision;
+  final bool requireExactRevision;
   bool rejected = false;
   bool sent = false;
   BusinessStateException? failure;
@@ -454,12 +462,19 @@ final class BusinessStateClient {
   Future<wire.StateMutationResponse> mutate(
     wire.StateMutation operation, {
     int? basedOnRevision,
+    bool requireExactRevision = false,
   }) {
     final command = operation.deepCopy();
     if (command.mangaKey.isEmpty) throw ArgumentError('Missing manga key');
     command.clearMutationId();
     command.clearExpectedRevision();
     command.schemaVersion = _schemaVersion;
+    if (requireExactRevision) {
+      if (basedOnRevision == null) {
+        throw ArgumentError('Exact mutation requires its confirmed revision');
+      }
+      validateBusinessRevision(basedOnRevision);
+    }
     if (command.hasSetBookmark()) {
       validateBusinessChapterKey(command.setBookmark.chapterKey);
       if (basedOnRevision == null) {
@@ -471,6 +486,16 @@ final class BusinessStateClient {
     return _serial(command.mangaKey, () async {
       final previous = _pending[command.mangaKey];
       if (previous != null) {
+        if ((requireExactRevision || previous.requireExactRevision) &&
+            (!requireExactRevision ||
+                !previous.requireExactRevision ||
+                previous.fingerprint != fingerprint ||
+                basedOnRevision != previous.request.expectedRevision)) {
+          throw BusinessPendingMutationException(
+            command.mangaKey,
+            '该漫画有未确认的原操作，请先处理原操作后再开始新的修改。',
+          );
+        }
         if ((previous.request.hasSetCategories() ||
                 previous.request.hasSetBookmark()) &&
             previous.fingerprint != fingerprint) {
@@ -487,7 +512,7 @@ final class BusinessStateClient {
         await _readManga(command.mangaKey);
       }
       if (basedOnRevision != null &&
-          (command.hasSetCategories()
+          (requireExactRevision || command.hasSetCategories()
               ? basedOnRevision != _manga[command.mangaKey]!.revision
               : command.hasSetBookmark()
               ? !hasOnlyLocalChangesSince(
@@ -515,6 +540,7 @@ final class BusinessStateClient {
         command,
         jsonEncode(wire.encodeProtoJson(command)),
         _accountRevision,
+        requireExactRevision,
       );
       _pending[command.mangaKey] = pending;
       return _send(pending);
@@ -587,7 +613,9 @@ final class BusinessStateClient {
     }
     _success(reply);
     if (!value.hasManga() ||
-        value.manga.revision <= pending.request.expectedRevision ||
+        (pending.requireExactRevision
+            ? value.manga.revision != pending.request.expectedRevision + 1
+            : value.manga.revision <= pending.request.expectedRevision) ||
         value.accountRevision < value.manga.revision ||
         value.accountRevision < pending.accountRevision) {
       throw const FormatException('Mutation did not confirm a new revision');
@@ -599,6 +627,20 @@ final class BusinessStateClient {
       value.accountRevision,
     );
     validateBusinessMangaCategories(value.manga, value.categoryCatalog);
+    if (pending.requireExactRevision) {
+      final request = pending.request;
+      if (request.hasSetFavorite() &&
+          value.manga.favorite != request.setFavorite.favorite) {
+        throw const FormatException('Mutation response favorite mismatch');
+      }
+      if (request.hasSetCategories()) {
+        final expected = request.setCategories.categoryIds.toSet();
+        final actual = value.manga.categoryIds.toSet();
+        if (expected.length != actual.length || !actual.containsAll(expected)) {
+          throw const FormatException('Mutation response categories mismatch');
+        }
+      }
+    }
     final expectedChapter = _operationChapter(pending.request);
     final bookmark = pending.request.hasSetBookmark()
         ? pending.request.setBookmark
@@ -674,7 +716,6 @@ final class BusinessStateClient {
       pending.failure = failure;
       throw failure;
     }
-    _pending.remove(pending.request.mangaKey);
     final confirmedCatalog = current?.categoryCatalog ?? value.categoryCatalog;
     _acceptCatalog(confirmedCatalog);
     _accept(current?.manga ?? value.manga, local: true);
@@ -686,6 +727,7 @@ final class BusinessStateClient {
       confirmedCatalog,
     );
     _ensureOpen();
+    _pending.remove(pending.request.mangaKey);
     _changes.add(null);
     if (bookmark != null && current != null) {
       return wire.StateMutationResponse(
