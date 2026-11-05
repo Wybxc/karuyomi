@@ -75,10 +75,24 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 截图、网络记录、空导出和 `capture-1-failed.json` 保存在验证树 ignored `.local/ui-image-baseline/confirmed/`；失败记录保留。测试标签页已关闭，服务退出后确认端口 50188 无监听，且无本次 Node/workerd/Java/Gradle 子进程；仅删除匹配本 buildId 的临时快照/D1。
 
+## Web 报告下载完整性复验
+
+2026-11-05 核对实际下载文件。正式 UI 固定 `5e1e014340f96a390ce5a07be2f7f343fb14e24e`，通过精确锁定的 `cross_file` 下载完整 JSON；面板只布局摘要和最多 1024 字符预览。该提交只改变客户端导出，Source host 指纹仍为上述 `964de7e6…93b435`，复用固定 `8494757` 构建并已验证的原 xkcd AOT，未修改原 Source/JAR。对应 [CI 41857359648](https://github.com/Wybxc/karuyomi/actions/runs/41857359648) 已确认该完整提交为 completed/success。
+
+在新的 loopback origin、Codex 内置浏览器默认 1280×720 视口、已开启 Flutter 无障碍树、正式 `lib/main.dart` release、隔离 workerd/D1 和 RS256 测试身份下，从详情开始采集并进入原 xkcd `3319: Elevators`。漫画实际显示，改为单页后原 TextInterceptor 文字图可见；显式完成显示本地进度已保存及本章已读完，退出返回详情。报告环境记录 DPR 2 和 SDK 报告的刷新率 60 Hz；浏览器版本未取得，不猜测补齐。这些条件不是生产 Access、Native 或真机。
+
+60 秒自动停止后，点击“查看摘要”和“下载 JSON”，浏览器返回真实下载文件。复制该文件到 ignored 证据目录后，实际 UTF-8 JSON 可解析，大小为 278,785 字节，schema 为 `karuyomi.reader-baseline.v1`，revision 与上述 UI 提交一致。报告共有 33 个事件和 481 个帧样本，`truncated=false`；两份 acquire 结果、实际 ImageInfo、图片 frame/post-frame、目标 viewport 和导航 epoch 均保留。两个 `release_ack` 分别匹配已交付的资源与 generation，之后存在 `reader_exit_ack`；这证明本次观测到的释放控制完成，不代表浏览器 Blob/Flutter cache 或 RSS/GPU 全部归零。
+
+本次报告 `frameTimingStatus=associated`，未关联计时数为零，图片帧和事件帧缺失计时列表均为空；逐项核对确认事件时间单调且在采集期限内、全部事件帧号精确匹配真实帧、每份已获取资源均有对应释放 ACK，两幅图片均有 decoded viewport。没有使用回调到达时间或不同时钟相减补齐样本。报告 `startedAtUtc=2026-11-04T15:27:00.829Z`，属于一次采集和下载完整性样本；不能据此报告冷热首图/跳转分布、CPU、RSS、GPU 或真机性能通过。
+
+同页控制台在 `2026-11-04T15:26:01.945Z` 曾记录一次 `Bad state: RenderBox was not laid out`，早于上述采集开始。固定 release 栈与锁定 SDK 源码比对定位到视图焦点变化后的 ReadingOrderTraversalPolicy 排序：FocusNode.rect 读取尚未布局的 RenderSemanticsAnnotations.size。该路径不经过 JSON 或图片交付，具体焦点节点与触发时序仍待复验，现有证据不足以认定 SDK 缺陷。最终摘要和下载文件实际可用，但不能声称全程零错误，也未将该错误归因于大报告。旧 `8494757` 的导出失败与空文件继续保留，不由本次下载成功改写。
+
+原始报告 `xkcd-export-capture.json`、完整性复核 `export-integrity.json`、网络记录 `xkcd-export-network.json`、漫画/文字/下载结果截图 `export-*.jpg` 保存在固定验证树 ignored `.local/ui-image-baseline/confirmed/`。测试标签页已关闭，服务会话退出 130 后另行确认端口 53920 无监听，且无本次 Source probe/workerd/Gradle 进程；仅删除唯一匹配本 buildId 的 `karuyomi-source-probe-kur9sp` 临时快照/D1，没有只依赖退出码判断清理完成。下一步在当前不透明图片合同下复验 Arknights 正式完整章、下一章与首次续读，再按固定条件补齐多次 baseline 和目标设备指标。
+
 ## 性能依据与下一门
 
 现有顺序 PNG/JPEG 分片有正确性、条带缓冲、背压和取消机制证据，见[独立 codec 记录](long-image-codec.md)。16 MiB WASM heap 和 C payload 账本不等于进程 RSS、GPU 或 Flutter 端总峰值。尚无与 Flutter 直接解码、平台区域解码的同设备、同字节、同显示尺寸性能比较，不能据此选择默认分片算法。
 
 顺序扫尾、反向跳转时重扫、PNG 再编码和跨端复制的成本须实测。下一步先记录 UI 直接解码的冷热首帧、首/中/末跳转、往返滚动与缩放，再在相同输入上比较候选方案的 CPU、帧耗时、RSS/GPU 和总峰值。标准见[设计](../design/reader-image-decoding.md)，实施顺序见[计划](../plan/reader-image-decoding.md)。
 
-当前仅新增上述诊断性 Web 路由阅读分项，未重新完成 Native 产品交互，也未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。
+当前新增了上述诊断性 Web 路由阅读和报告下载完整性分项，未重新完成 Native 产品交互，也未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。
