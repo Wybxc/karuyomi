@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 
 describe('Vite runtime material output', () => {
-  it('contains five classic bridges and the exact npm WASM without candidate codecs', () => {
+  it('contains five classic bridges and the exact npm WASM', () => {
     expect(catalog.hostScripts.map((item) => item.logicalName)).toEqual([
       'crypto-bridge.js',
       'zstd-bridge.js',
@@ -59,8 +59,6 @@ describe('Vite runtime material output', () => {
         '80260eee5795ee8072bb5821e203730c74dca3909938f5ac1128da67f96223df',
       size: 251806,
     });
-    expect(catalog.imageCodecs).toEqual([]);
-    expect(catalog.sources.imageCodecs).toBeNull();
     expect(data.size).toBe(6);
   });
 

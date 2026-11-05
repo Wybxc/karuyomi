@@ -27,7 +27,7 @@ Bundle 清单记录 canonical `sha256/size/contentType`，以及 `encoding: gzip
 
 `inputFingerprint` 覆盖包名、版本、源码依赖闭包及 host 输入，用于 buildId、增量状态和 provenance。共享库、桥、工具链变化即使未修改扩展版本，也会产生新输入；无关上游提交不使所有包重建。`plan` 只选择缺失输入、明确不可用的成功记录，以及本地显式要求重试的失败输入。
 
-Source host 的第三方源码输入只包含已初始化、HEAD 与已提交 gitlink 一致且 tracked clean 的 TeaVM / Suwayomi 子模块；扩展上游归 Source 闭包身份。候选图片 codec 的源码、gitlink、初始化状态及 `.gitmodules` 配置不参与默认 Source AOT 身份，候选工具另行维护自己的输入身份。
+Source host 的第三方源码输入只包含已初始化、HEAD 与已提交 gitlink 一致且 tracked clean 的 TeaVM / Suwayomi 子模块；扩展上游归 Source 闭包身份。未采用的图片 codec 候选源码、专属工具及其专用上游依赖已删除，不再维护候选构建身份。
 
 构建失败保留同运行时的上次成功构建，同一失败输入不会自动反复重试。发现失败时，仍存在的 `sourcePath` 也保留上次成功；真正从上游删除的模块才退役。成功更新替换旧 build，快照仅保留当前可用版本。协议、ABI 或材料不匹配的旧成功只保留状态，标为 unavailable，不进入索引，也不复制旧 bundle；原型不维护兼容集合。
 

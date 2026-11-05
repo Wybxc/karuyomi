@@ -63,11 +63,7 @@ async function prepareStaticAssets(): Promise<void> {
   const catalog = runtimeMaterialCatalogSchema.parse(
     JSON.parse(await readFile(new URL('materials.json', runtime), 'utf8')),
   );
-  const materials = [
-    ...catalog.hostScripts,
-    ...catalog.resources,
-    ...catalog.imageCodecs,
-  ];
+  const materials = [...catalog.hostScripts, ...catalog.resources];
   const extensionCount = await assembleExtensionAssets(
     fileURLToPath(publicDir),
     catalog,

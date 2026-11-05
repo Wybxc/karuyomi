@@ -17,7 +17,7 @@
 - 使用仓库固定的 Node、pnpm、Flutter/Dart 版本：`.node-version`、`package.json`、`.fvmrc` 是版本依据。安装依赖运行 `pnpm install --frozen-lockfile`。
 - 安装提交检查：`pnpm hooks:install`；全库手动检查：`pnpm hooks:check`。
 - 通用检查：`pnpm check`；Dart/Flutter 检查：`pnpm flutter:check`；完整客户端与 API 构建：`pnpm build`。
-- Web/Worker/运行时 JS 构建使用声明式 Vite 配置与官方 CLI；依赖顺序写在包 scripts，项目特有资源合同放在 Vite 插件 hook。不恢复调用 `build()` / `createBuilder()` 的自有构建器或独立资源组装脚本。Flutter、Java/TeaVM 与 C/C++ 工具链继续使用各自正式工具。
+- Web/Worker/运行时 JS 构建使用声明式 Vite 配置与官方 CLI；依赖顺序写在包 scripts，项目特有资源合同放在 Vite 插件 hook。不恢复调用 `build()` / `createBuilder()` 的自有构建器或独立资源组装脚本。Flutter 与 Java/TeaVM 工具链继续使用各自正式工具。
 - Workers 集成测试使用 Cloudflare 官方 Vitest 插件，生成配置与 Static Assets 使用官方 Wrangler harness；浏览器测试使用官方 Vitest Browser，由 Vite 处理 TS/Worker 入口，不维护手工服务器或浏览器 runner。交互验收使用内置浏览器，preview 配置固定 `BROWSER=none`，防止自动打开默认浏览器。
 - TeaVM 工具链、原始 JAR 与 seed 按锁文件准备，入口见 `runtime/teavm/README.md`。准备后运行 `pnpm teavm:check` 验证 Java DTO 与有界 HTTP body。
 - `FLUTTER_ROOT` 可指定 Flutter SDK；原生构建和完整原生格式检查需要 macOS/Xcode。
@@ -48,7 +48,7 @@
 - 共享 runtime materials 作为 Web 静态资源交付，或打包进 Native 应用；不要把共享材料按扩展重复发布，也不要让 Native 通过网络回退读取这些内置资源。
 - Static Assets 是所有客户端扩展分发的最终权威来源。每个扩展只部署最新可用构建，由客户端或 Service Worker 检查索引、更新及清理旧缓存；不经 R2 或入口 Worker 转发正文，不在入口 Worker 脚本中内嵌。公开扩展下载不携带 GitHub 凭据或应用 Access 凭据。
 - 共享桥、WASM 等构建资源属于 Web Static Assets；Native 按已确定的方案内置。Source 原有请求头、Cookie、拦截器和图片处理语义必须通过正式运行时链路，不能用原图 URL 绕过插件处理。
-- 阅读图片交付边界只传插件处理后的不透明编码字节与资源身份（`resourceId/generation/byteLength/url`）。Source 宿主不检查图片 MIME、尺寸或方向，不预解码，也不决定完整图、分片或 LOD；图片识别、解码、尺寸学习、解码预算、缓存与分片由 UI 客户端负责。宿主仍校验传输字节/资源限额、generation 和生命周期；插件原业务主动执行的图片处理继续保留。客户端 codec 与 Source host 独立。当前默认使用 UI 直接解码，分片 codec 仅为候选，不进入默认构建或 Web/Native 打包；先取得同条件目标设备的首屏、跳转、滚动、CPU、RSS/GPU 对照证据，再决定是否采用，不能以机制可行性代替性能结论。
+- 阅读图片交付边界只传插件处理后的不透明编码字节与资源身份（`resourceId/generation/byteLength/url`）。Source 宿主不检查图片 MIME、尺寸或方向，不预解码，也不决定完整图、分片或 LOD；图片识别、解码、尺寸学习、解码预算、缓存与分片由 UI 客户端负责。宿主仍校验传输字节/资源限额、generation 和生命周期；插件原业务主动执行的图片处理继续保留。当前默认使用 Flutter/UI 直接解码；未被产品采用且缺少性能依据的自研分片候选源码和专属工具已删除。先建立真实 UI 基线，针对实测瓶颈优先评估成熟平台或第三方方案；取得同条件目标设备的首屏、跳转、滚动、CPU、RSS/GPU 对照证据后再决定优化，不能以机制可行性代替性能结论。
 - Worker TypeScript 与 Dart 的静态类型不能保证跨语言消息安全。交换边界需要统一协议、运行时解析、版本和大小校验，以及 requestId/generation 约束。
 - 跨语言协议已选定 Protobuf `.proto` + Buf，使用 Protobuf-ES / Google Dart 插件生成模型和 codec，小控制消息先采用标准 ProtoJSON；具体比较见 `docs/design/cross-language-protocol.md`，实施状态见 `docs/plan/cross-language-protocol.md`。IDL 位于 `protocol/`，双端生成并接入正式控制边界；生成一致性用 `pnpm generate:check` 检查。实际浏览器/原生运行证据须另外验收。业务预算、generation 与资源生命周期仍须校验；图片/HTTP 大正文保持独立二进制通道。Pigeon 适用于 Dart 与原生平台，不代替 TS Worker 协议。
 - 大正文与图片使用有界二进制通道，控制消息保持小；落实背压、限额、超时、取消、迟到结果丢弃和资源释放。

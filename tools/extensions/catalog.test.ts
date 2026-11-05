@@ -162,7 +162,7 @@ test('generated host outputs do not change fingerprints; stable JSON uses lexica
   );
 });
 
-test('candidate codec sources, artifact locks and caches stay outside the Source host identity', (t) => {
+test('Source bridge and Vite material plugin changes enter the host identity', (t) => {
   const f = fixture(t);
   for (const name of HOST_PATHS) {
     f.put(
@@ -171,26 +171,7 @@ test('candidate codec sources, artifact locks and caches stay outside the Source
     );
   }
   addHostTestSubmodules(f.root);
-  const candidateInputs = [
-    'runtime/image-codec/png.c',
-    'runtime/image-codec/worker.ts',
-    'runtime/image-codec/assets.ts',
-    'runtime/image-codec/tile-store.ts',
-    'runtime/image-codec/artifacts-lock.json',
-    'tools/images/build.ts',
-    'tools/images/artifacts.ts',
-  ];
-  for (const name of candidateInputs) f.put(name, 'candidate input v1\n');
   const before = hostFingerprint(f.root).fingerprint;
-  for (const name of candidateInputs) {
-    f.put(name, 'candidate input v2\n');
-    assert.equal(hostFingerprint(f.root).fingerprint, before, name);
-  }
-  f.put(
-    'runtime/image-codec/.local/build/generated.wasm',
-    'ignored cached build',
-  );
-  assert.equal(hostFingerprint(f.root).fingerprint, before);
 
   f.put('runtime/teavm/bridge/graphics-bridge.ts', 'changed Source bridge\n');
   const bridgeChanged = hostFingerprint(f.root).fingerprint;
@@ -202,7 +183,7 @@ test('candidate codec sources, artifact locks and caches stay outside the Source
   assert.notEqual(hostFingerprint(f.root).fingerprint, bridgeChanged);
 });
 
-test('candidate gitlinks, checkout state and configuration do not change the Source host identity', (t) => {
+test('extension source gitlinks and unrelated configuration do not change the Source host identity', (t) => {
   const f = fixture(t);
   for (const name of HOST_PATHS)
     f.put(
@@ -215,11 +196,7 @@ test('candidate gitlinks, checkout state and configuration do not change the Sou
     hostSubmodules(f.root).map((pin) => pin.path),
     [...HOST_SUBMODULE_PATHS],
   );
-  for (const name of [
-    'vendor/libspng',
-    'vendor/libjpeg-turbo',
-    'vendor/extensions-source',
-  ]) {
+  for (const name of ['vendor/extensions-source']) {
     addTestSubmodule(f.root, name);
     assert.equal(hostFingerprint(f.root).fingerprint, before);
     const directory = path.join(f.root, name);

@@ -25,7 +25,6 @@ export const runtimeMaterialCatalogSchema = z.object({
   materialVersion: sha256Schema,
   hostScripts: z.array(materialArtifactSchema),
   resources: z.array(materialArtifactSchema),
-  imageCodecs: z.array(materialArtifactSchema),
   sources: z.object({
     zstd: z.object({
       packageName: z.string().min(1),
@@ -34,13 +33,6 @@ export const runtimeMaterialCatalogSchema = z.object({
       sha256: sha256Schema,
       size: z.number().int().positive(),
     }),
-    imageCodecs: z
-      .object({
-        buildIdentity: z.string().min(1),
-        abi: z.string().min(1),
-        encoderAbi: z.string().min(1),
-      })
-      .nullable(),
   }),
 });
 

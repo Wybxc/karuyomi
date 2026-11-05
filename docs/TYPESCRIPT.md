@@ -4,7 +4,7 @@
 
 - `scripts/` 的格式化、Flutter、协议生成与领域操作入口。
 - runtime-host 的声明式 Vite 配置、专用资源插件、材料 catalog 与宿主。
-- 五个产品运行时桥：crypto、zstd、graphics、cache、file；独立图片 codec 候选。
+- 五个产品运行时桥：crypto、zstd、graphics、cache、file。
 - 扩展构建、静态快照、完整性与网络政策工具。
 - Cloudflare 官方 Workers/Test Harness、Vitest Browser 测试和 Vite fixture 配置。
 
@@ -18,7 +18,7 @@ pnpm test:extension-integrity
 pnpm --filter @karuyomi/runtime-host build
 ```
 
-总类型检查覆盖工作区产品、工具、Vite/测试配置、桥及独立候选 codec。迁移不使用 `any`、`@ts-nocheck` 或关闭严格检查。浏览器测试通过官方 Vite/Vitest 机制处理 TypeScript 和专用 Worker；旧模板式浏览器 runner 与 Source/socket 探针已退役。当前测试覆盖与尚未替代的真实 Source/Native 门见 [Vite 计划](plan/vite-build-and-testing.md)。
+总类型检查覆盖工作区产品、工具、Vite/测试配置及桥。未采用的图片 codec 候选源码与专属工具已删除；历史实现只按记录中的固定提交复验。迁移不使用 `any`、`@ts-nocheck` 或关闭严格检查。浏览器测试通过官方 Vite/Vitest 机制处理 TypeScript 和专用 Worker；旧模板式浏览器 runner 与 Source/socket 探针已退役。当前测试覆盖与尚未替代的真实 Source/Native 门见 [Vite 计划](plan/vite-build-and-testing.md)。
 
 Zstd 生成 glue 使用精确锁定 npm 依赖。原型不需要旧版本兼容，已删除冻结 JS 桥副本。生成 JS、依赖、AOT 和临时测试输出保留在忽略目录，不作为自有维护源码。GitHub 语言统计可能晚于提交刷新。
 

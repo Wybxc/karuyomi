@@ -13,9 +13,9 @@
 - `ImageDimensions` 是客户端布局模型，不进入 Source 描述。Reader 根据实际解码宽高学习页比例，保持逻辑页键、内容版本和页内归一化锚。预取成功不代表已读；解码失败或超预算资源不得推进 observed。
 - `ImageScheduler` 未获得客户端尺寸时沿用既有未知页估算，获得实际帧后按 `width × height × 4` 更新解码估算。编码正文和已知 decoded 成本在资源退休后继续保留到释放 ACK；widget pin、帧尾和实际 provider cache eviction 仍决定何时可归还文件/Blob。当前预算没有提高。
 - 这套后验账本限制接纳和后续生产，**不能证明平台整图 decoder 的初次临时分配或 GPU 峰值有界**。当前产品仍使用 Flutter 整图显示路径，尚未完成终端长图方案选型和性能验收。
-- 候选 codec 源码集中在 `runtime/image-codec/`，保留独立构建和测试入口，退出默认构建、Web 静态资源和 Native 打包。尚无真实 UI 性能对照支持把它选为默认；候选 Worker、tile store 或 WASM 算法均未接入当前 Reader。
+- 未采用且缺少真实 UI 性能对照的 `runtime/image-codec/` 候选源码、专属工具与构建配置已删除，不继续维护 Reader 未使用的实现。当前仅保留 Flutter/UI 直接解码路径，后续优化以实测瓶颈为依据。
 
-当前源码和候选库约束见[解码设计依据](../design/reader-image-decoding.md)，Source 交付与所有权见[图片资源通道](../IMAGE-RESOURCES.md)。
+当前边界与历史评估见[解码设计依据](../design/reader-image-decoding.md)，Source 交付与所有权见[图片资源通道](../IMAGE-RESOURCES.md)。
 
 ## 工程验证与历史证据
 
@@ -31,7 +31,7 @@
 
 以下历史材料保留原输入、环境、失败和证据范围，**其架构已被本轮客户端解码决策替代**：
 
-- [长图 codec 记录](../verification/long-image-codec.md)：固定 libspng/libjpeg-turbo、PNG 条带编码器、Node 和独立 Codex 内置浏览器 Worker 分项，及材料准备/打包的历史工程证据。独立解码、取消、背压、截尾和像素对照不代表 Reader 已接入，也不证明实际 UI 速度或进程/GPU 峰值。
+- [长图 codec 记录](../verification/long-image-codec.md)：固定 libspng/libjpeg-turbo、PNG 条带编码器、Node 和独立 Codex 内置浏览器 Worker 分项，及材料准备/打包的历史工程证据。候选源码可在 `a2251a6` 查阅；旧浏览器入口须使用原记录的更早 checkout。独立解码、取消、背压、截尾和像素对照不代表 Reader 已接入，也不证明实际 UI 速度或进程/GPU 峰值。
 - [编码页所有权记录](../verification/encoded-image-ownership.md)：历史 `EncodedImage/acquireEncodedImage`、Java 一致性/borrow 及合成正文 Web owner 机制。当前 Source 合同已删除这套图片信息与编码页分支，不保留兼容层。
 - [分片控制记录](../verification/image-page-controls.md)：历史 host `open/window/wait/release/close`、Dart/Native 小片文件和模拟边界。该合同已退出正式 Source 路径，不能继续列为产品能力或当前验收。
 - 此前普通图片、文字图恢复和模拟器 Source 阅读记录仍只证明各自固定版本。原 Web 黑屏、Android observed 调度、截断/progressive 不支持等失败与限制保持在原验证记录，不因架构调整改写为通过。
@@ -40,7 +40,7 @@
 
 1. **收敛并验证客户端直接解码路径。** 不透明资源合同与实际 `ImageInfo` 接线已经实现。原 xkcd Web 已观测到两份资源的 release ACK 和 reader exit ACK；继续核对双端传输、取消、迟到结果、文件/Blob 释放、真实 provider cache key 与帧尾 pin。当前 Arknights、CuuTruyen Web 完整章、下一章与首次续读已按当前合同分项复验；连同原 xkcd 已有三源限定 Web 证据，继续完成更多 Source、Native 主入口与目标设备恢复；诊断层初始焦点已通过上述限定复验，Web 完整 JSON 复制已提供，但内置浏览器实测读取为空，免下载确认的数据获取链仍待实现；按用户要求先补 P0 功能，再恢复采集；更广焦点条件仍需另外验收。
 2. **建立真实 UI 直接解码 baseline。** 默认关闭的采集入口已接正式 app 层，记录 acquire、实际 ImageInfo、逻辑 viewport、导航与 engine FrameTiming，并有界导出原始 JSON；用法与计量范围见[采集说明](../READER-BASELINE.md)。原 xkcd 的一次真实下载及报告完整性分项已通过，首次导出失败和采集前布局错误保留；入口回归或单次完整性均不等于实际性能门。固定同一原 Source、编码正文、构建版本和设备，覆盖普通图、长 JPEG/PNG、冷/热缓存、首图、中末页跳转、连续滚动、缩放与退出取消。Web 使用 Codex 内置浏览器；iOS/Android 区分模拟器和真机。记录首图可见时间及分布、跳转延迟、滚动卡顿/掉帧、CPU、RSS 和 GPU 峰值；明确运行次数、测量方法和无法取得的指标。
-3. **依据瓶颈比较成熟方案。** 先查正式 Flutter/平台成熟 decoder 与区域解码库；在同一编码输入和实际 UI 上比较直接解码、目标 raster/降采样、成熟区域 decoder，以及有证据支持时的候选 `runtime/image-codec`。包含解码、重编码、跨线程传输、Flutter 再解码、缓存和显存成本，不只比较 WASM 或单个函数耗时。默认方案由性能、格式覆盖、维护和可用性共同决定，不能先接线后补理由。
+3. **依据瓶颈比较成熟方案。** 优先查正式 Flutter/平台及第三方成熟 decoder 与区域解码库；针对实测瓶颈，在同一编码输入和实际 UI 上比较直接解码、目标 raster/降采样和成熟区域 decoder，取得收益证据后再接入优化。包含解码、重编码、跨线程传输、Flutter 再解码、缓存和显存成本，不只比较 WASM 或单个函数耗时。默认方案由性能、格式覆盖、维护和可用性共同决定，不能先接线后补理由。
 4. **必要时实施客户端长图方案。** 选型后才设计逻辑页、EXIF 八方向、LOD/可见覆盖、跨页单 codec、合计工作预算和帧尾释放。分片序号不得成为持久页键；缩放 dialog 与主阅读视图协调所有权，错误/取消/迟到结果不得污染当前 generation。全部图片知识保留在客户端，不重新扩展 Source/host 图片协议。
 5. **完成产品验收。** 在声明支持的 Web、iOS/Android 真机和格式上，验证真实长图首/中/末可辨、连续阅读、模式切换、旋转与缩放后的相同逻辑锚。对照 baseline 报告首图、滚动、CPU/RSS/GPU 和释放结果；缺少实测的格式、EXIF/LOD、Source 和设备继续列为待验。
 

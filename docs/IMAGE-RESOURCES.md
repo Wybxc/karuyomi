@@ -73,15 +73,15 @@ Access 失效使用阅读暂停路径：终止 Worker 与未完成的图片生�
 
 已交付正文不再属于待取消的获取任务；迟到 cancel 或关闭 Page 会话不应误删它。Reader 等 widget、缩放 overlay 和实际 provider cache 解除引用后调用 release；容器 invalidate/dispose 清理本代正文和在途工作。失败、超限和迟到结果同样需要结束对应所有权。
 
-## UI 解码与客户端 codec
+## UI 解码与长图评估
 
 普通图由 Flutter `Image` 消费同一受管 Blob/文件，`ResourceImage` 从该 provider 的实际 `ImageInfo` 获取尺寸，并在 `frameBuilder` 确认显示帧后通知 Reader。正文到达、预取或缓存命中本身不能推进阅读进度。客户端学习尺寸后更新布局与解码估算，保留逻辑页、manifest 版本和归一化锚点；当前 scheduler 估算不限制平台完整图 decoder 的瞬时峰值。
 
-`runtime/image-codec/` 保留独立 Worker、`assets.ts` 材料准备与 `tile-store.ts` 窗口/lease 管理，作为显式验证的分片候选；它与 Source host 相互独立，没有宿主页控制 API。当前默认产品只使用 UI 直接解码，不构建或打包候选 codec 到 Web Static Assets、Native 应用资源或 Source `host.js`。尚无同条件真机对照支持把候选设为默认；先测 UI 基线与候选的首屏、跳转、滚动、CPU、RSS/GPU，再决定是否接入。Reader 长图分片、LOD、方向坐标和设备峰值仍待决策与验证，见[解码设计](design/reader-image-decoding.md)。
+未采用且缺少性能依据的 `runtime/image-codec/` 候选源码、专属工具与构建配置已删除。默认产品使用 Flutter/UI 直接解码；先建立真实 UI 基线，再针对实测瓶颈优先评估成熟平台或第三方方案，并比较同条件首屏、跳转、滚动、CPU、RSS/GPU。Reader 长图分片、LOD、方向坐标和设备峰值仍待决策与验证，见[解码设计](design/reader-image-decoding.md)。
 
 ## 已替代合同与分层验收
 
-先前的 `EncodedImage/acquireEncodedImage`、`openImagePage/requestImageWindow/waitImageWindow/releaseImageTile/closeImagePage`、host 编码 borrow 和宿主图片 metadata/预解码已从正式协议与实现删除。[编码页所有权记录](verification/encoded-image-ownership.md)及[宿主页控制记录](verification/image-page-controls.md)保留原提交、素材和环境，属于历史证据，不能据此认定当前纯正文边界或 Reader 长图已验收。独立 codec 的[构建与 Worker 证据](verification/long-image-codec.md)也只适用于记录中的产物与执行范围。
+先前的 `EncodedImage/acquireEncodedImage`、`openImagePage/requestImageWindow/waitImageWindow/releaseImageTile/closeImagePage`、host 编码 borrow 和宿主图片 metadata/预解码已从正式协议与实现删除。[编码页所有权记录](verification/encoded-image-ownership.md)及[宿主页控制记录](verification/image-page-controls.md)保留原提交、素材和环境，属于历史证据，不能据此认定当前纯正文边界或 Reader 长图已验收。已删除候选 codec 的[构建与 Worker 证据](verification/long-image-codec.md)只适用于记录中的历史提交、产物与执行范围。
 
 验收分别覆盖：通道背压、序号、预算和取消；Java 原 Page、Source 绑定与处理后正文；UI 实际解码、显示、导航、尺寸与释放；真实 Web/Native Source 链以及设备进程/GPU 峰值。工程类型检查、模拟 supplier、独立 codec 与真实阅读结果不可互相替代。
 

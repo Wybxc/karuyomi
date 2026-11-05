@@ -1,6 +1,14 @@
 # Vite 与 Cloudflare 官方集成验证
 
-## 当前声明式重构（2026-11-05）
+## 删除未采用的候选 codec（2026-11-05）
+
+`runtime/image-codec`、`tools/images`、专属脚本与 Vite 配置已删除，同时移除 libspng/libjpeg-turbo submodule、sharp 与无调用的 undici 直接依赖。Dart、Native 与正式控制协议不依赖该候选；默认图片路径继续由 UI 直接解码。Source 主动执行的 Android 图片处理仍保留。
+
+最终默认 `pnpm build` 已通过，正式 catalog 只描述五桥与 zstd WASM；闲置候选字段已移除。新 materialVersion 为 `6175132a0e80c94491ab708894dac63d08c4e02b4507b9686b111de84339a839`，六材料实际大小和 SHA 匹配。版本变化来自清单元数据简化，不能沿用前一阶段的 materialVersion。忽略缓存移到 `.local/retired-image-codec-cache`，源码目录已不存在。
+
+以下 `a2251a6` 阶段的集中工程检查和 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42045547601) 已通过；它的独立候选构建记录是删除前的历史证据。当前清理后的 `pnpm check` 完整通过（359 项 Vitest；依赖检查覆盖 151 模块、490 条依赖），包含跨语言 golden、AOT 流水线/runner/完整性、上游补丁和 Cloudflare 工具回归。完整 `pnpm format` → `pnpm format:check`、默认 `pnpm build`、Wrangler 本地部署预演及 peer 检查通过。不将历史候选结果当作产品能力。
+
+## 声明式重构：a2251a6（2026-11-05）
 
 当前重构删除自有程序化 Vite builder、`materials.ts` 资源管理层、独立资产组装入口、手写测试服务器与浏览器 runner。资源生成与 Native 内嵌由 Vite 插件实现，工具只直接读取生成清单；静态扩展装配也内化为 API Vite 插件的一部分。本地集中验收已通过，环境为 macOS、Node 24.15.0、pnpm 12.6.0、Flutter 3.47.5 / Dart 3.13.4。以下分项已实际运行：
 

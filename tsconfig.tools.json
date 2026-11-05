@@ -13,7 +13,6 @@
     "packages/runtime-host/*.ts",
     "tools/extensions/*.ts",
     "apps/api/*.config.ts",
-    "vitest.config.ts",
-    "runtime/image-codec/*.test.ts"
+    "vitest.config.ts"
   ]
 }

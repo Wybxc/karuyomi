@@ -99,8 +99,6 @@ async function packageBuiltMaterials(scripts: ReadonlyMap<string, Buffer>) {
     runtimeBaseline,
     hostScripts,
     resources,
-    imageCodecs: [],
-    codecSource: null,
   };
   const catalog = runtimeMaterialCatalogSchema.parse({
     schemaVersion: 1,
@@ -110,8 +108,7 @@ async function packageBuiltMaterials(scripts: ReadonlyMap<string, Buffer>) {
     materialVersion: digest(Buffer.from(JSON.stringify(identity))),
     hostScripts,
     resources,
-    imageCodecs: [],
-    sources: { zstd: zstdSource, imageCodecs: null },
+    sources: { zstd: zstdSource },
   });
   return { catalog, data };
 }
@@ -191,8 +188,6 @@ export async function nativeRuntimeAssets(): Promise<Plugin> {
       scriptNames.map((name) => name + '-bridge.js').join('\n') ||
     catalog.resources.length !== 1 ||
     catalog.resources[0]?.sha256 !== zstdSource.sha256 ||
-    catalog.imageCodecs.length ||
-    catalog.sources.imageCodecs !== null ||
     source.packageName !== zstdSource.packageName ||
     source.version !== zstdSource.version ||
     source.file !== zstdSource.file ||

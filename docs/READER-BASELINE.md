@@ -1,6 +1,6 @@
 # 阅读器直接解码基线采集
 
-当前默认图片路径为 Flutter/UI 直接解码，候选分片不进入默认构建。本入口采集正式应用的原始事件和 Flutter 帧计时，用于建立对照条件；入口可用不代表性能门已通过。计划见 [图片解码](plan/reader-image-decoding.md)，实际证据见 [UI 图片边界](verification/ui-image-boundary.md)。
+当前默认图片路径为 Flutter/UI 直接解码，未采用的自研分片候选源码和专属工具已删除。本入口采集正式应用的原始事件和 Flutter 帧计时，用于建立对照条件；入口可用不代表性能门已通过。计划见 [图片解码](plan/reader-image-decoding.md)，实际证据见 [UI 图片边界](verification/ui-image-boundary.md)。
 
 ## 构建与使用
 
@@ -49,4 +49,4 @@ Web 文件下载直接使用精确锁定的 `cross_file`；每份报告复用一
 
 先通过一次采集完整性门，再对每类条件至少运行五次首图/跳转和固定滚动，保留全部原始样本、样本数、p50/max及按实际刷新率计算的帧预算统计。普通图不能代替长 JPEG/PNG，桌面和模拟器不能代替目标真机。iOS Simulator 在当前 SDK 只有 debug 运行，功能复验可以记录，性能不当作真机 profile/release 结论。
 
-当前采集器不测量物理屏幕呈现、CPU、RSS 或 GPU 内存。Native `ProcessInfo` 也只涵盖调用进程，不能自动包括 WebContent/GPU；Web JS heap、逻辑编码/decoded 字节与 Flutter cache 不替代完整进程集合的峰值。profile 可结合官方 integration_test/DevTools 作归因，正式 release 时延使用实际帧回调；缺失平台指标明确标为未采集。在同输入、同设备、同显示与缓存条件下完成对照后，再决定采用成熟区域 decoder、降采样或候选分片。
+当前采集器不测量物理屏幕呈现、CPU、RSS 或 GPU 内存。Native `ProcessInfo` 也只涵盖调用进程，不能自动包括 WebContent/GPU；Web JS heap、逻辑编码/decoded 字节与 Flutter cache 不替代完整进程集合的峰值。profile 可结合官方 integration_test/DevTools 作归因，正式 release 时延使用实际帧回调；缺失平台指标明确标为未采集。在同输入、同设备、同显示与缓存条件下完成对照后，再决定采用成熟区域 decoder、降采样或有实测收益的分片方案。

@@ -1,10 +1,10 @@
 # UI 图片职责边界与分片候选
 
-> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。未采用的 `runtime/image-codec/` 候选源码与专属工具已删除，源码可在 [a2251a6](https://github.com/Wybxc/karuyomi/tree/a2251a6/runtime/image-codec) 查阅；旧自定义探针、浏览器 runner 和构建命令仅适用于各节记录的历史 checkout，旧浏览器入口需回到更早版本，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access、Native 或真机性能门通过。
 
 2026-11-04，用户确定 Source/插件宿主只交付处理后的编码字节，图片识别与解码由 Flutter/UI 负责。本轮直接更新当前原型合同，不保留旧编码页或 host tile/window API。旧 [编码页所有权](encoded-image-ownership.md) 与 [分片控制](image-page-controls.md) 保留各自输入身份和当次证据，当前实现已替代它们。
 
-## 当前实现
+## 当时实现
 
 - `ProcessedImage` 只有 `resourceId/generation/byteLength`，`ImageResource` 增加受管 `url`；`ImageMeta` 为空。Proto/Buf 正式双端生成，TS/Dart 边界拒绝旧 MIME、尺寸及 encodedOnly 等字段。
 - Source collector 只处理 64 KiB/ACK、总计 64 MiB、六资源及 generation/生命周期；不解析图片头，不创建 bitmap，不获取 EXIF。Java `Sink.open()`/JSBody/TS 出口均已收敛无参，交付适配不读取图片 Content-Type；Java 成功描述与传输结果一致后才发布无图片类型的 Blob URL。插件原业务主动处理图片的路径继续保留。

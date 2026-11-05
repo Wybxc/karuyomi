@@ -62,7 +62,7 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 
 正式 `be5c3ed` Web 主入口现已通过官方 Arknights 1.6.1 → 1.6.2 的静态快照更新、重新连接与 DREAM 第 3 页首次续读；两版章节会话均关闭、两 Worker 最终终止，见[版本更新证据](../verification/extension-version-web.md)。新版仍走真实上游 200 并重新写入正文，不推广为 Cache 正文复用或零网络；Native 版本切换继续待验。同期正式 Native `lib/main.dart` 成品与正常 TLS/签名会话预验通过，但当前工具无法连接 Simulator 操作 UI，App 未安装/启动，见[主入口准备与阻断](../verification/native-main-entry.md)。生产 Access、Native 主入口和真机等完整 P0 门槛不变。
 
-图片解码按[独立子计划](reader-image-decoding.md)推进：Source/host 只交付不透明编码资源，Flutter 以实际 ImageInfo 尺寸更新布局与预算，退休资源计费保留至释放 ACK。当前仍为客户端整图显示，后验账本不证明初次 decoder 临时分配或 GPU 峰值有界，也没有调高整图预算。候选源码移至 runtime/image-codec，退出默认构建与 Web/Native 打包，尚未接入 Reader。先完成真实 UI 直接解码 baseline，并在相同输入/设备比较首图、跳转、滚动、CPU/RSS/GPU，再决定是否采用成熟区域解码、降采样或分片；Source 不重新感知图片信息。历史编码页/host tile 机制证据保留并标为已替代，原失败不覆盖。真实长图、EXIF/LOD、真机和实际峰值继续待验。
+图片解码按[独立子计划](reader-image-decoding.md)推进：Source/host 只交付不透明编码资源，Flutter 以实际 ImageInfo 尺寸更新布局与预算，退休资源计费保留至释放 ACK。当前仍为客户端整图显示，后验账本不证明初次 decoder 临时分配或 GPU 峰值有界，也没有调高整图预算。未采用的自研 codec 候选源码和专属工具已删除，历史评估保留原输入与限定结论。先完成真实 UI 直接解码 baseline，并在相同输入/设备比较首图、跳转、滚动、CPU/RSS/GPU，再决定是否采用成熟区域解码、降采样或分片；Source 不重新感知图片信息。历史编码页/host tile 机制证据保留并标为已替代，原失败不覆盖。真实长图、EXIF/LOD、真机和实际峰值继续待验。
 
 ## 验收
 

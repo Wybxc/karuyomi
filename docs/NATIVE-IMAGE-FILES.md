@@ -14,7 +14,7 @@ Source 仍从原 Page 实例调用图片处理链，经 Worker 的 64 KiB/ACK �
 
 `ImageResource` 只包含 `resourceId/generation/byteLength/url`。Source 宿主、Dart 文件桥与 Swift 下载器不检查 MIME、宽高或 EXIF，也不完整解码。Flutter 使用实际 `ImageProvider` 的同一条 `ImageStream` 学习尺寸，参与布局和解码预算；原 Source 业务主动执行的图片处理保留。
 
-此前的 `EncodedImage`、页/窗口/小片控制已从 Source 协议和 Native adapter 删除。历史[控制记录](verification/image-page-controls.md)保留原输入与范围，不能作为当前能力。独立分片库仅是客户端候选；没有与 UI 直接解码的同条件真机性能对照，已退出默认构建及 Web/Native 打包。下一步和门槛见[图片计划](plan/reader-image-decoding.md)。
+此前的 `EncodedImage`、页/窗口/小片控制已从 Source 协议和 Native adapter 删除。历史[控制记录](verification/image-page-controls.md)保留原输入与范围，不能作为当前能力。未采用的分片候选源码和专属工具已删除；当前由 Flutter/UI 直接解码，同条件真机性能对照与长图验收仍待完成。下一步和门槛见[图片计划](plan/reader-image-decoding.md)。
 
 ## iOS
 

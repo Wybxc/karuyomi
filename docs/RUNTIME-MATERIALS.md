@@ -24,9 +24,7 @@ pnpm --filter @karuyomi/runtime-host build
 pnpm build:native-assets
 ```
 
-普通客户端构建不需要私有 JVM seed 或 SDK 编译。默认 catalog 只有五桥与 Zstd WASM，`imageCodecs` 为空。PNG/JPEG decoder 与 PNG encoder 仍是显式性能候选，不进入默认 Web Static Assets、Native 应用或扩展 AOT 身份。
-
-候选 JavaScript 使用 `pnpm --filter @karuyomi/runtime-host build:image-codecs` 独立构建至 `packages/runtime-host/.local/image-codecs/`；其模块/WASM 构建依赖由 `runtime/image-codec/artifacts-lock.json` 固定，并由独立工具准备、验证。候选产物单独读取和验收，不合并到产品 catalog。维护命令见 [codec README](../runtime/image-codec/README.md)。
+普通客户端构建不需要私有 JVM seed 或 SDK 编译。catalog 只包含五桥与 Zstd WASM 六份正式材料，已删除闲置的 codec 字段。未被默认产品采用、缺少性能依据的图片 codec 候选源码、专属工具与构建配置已删除；图片由 Flutter/UI 直接解码。历史机制与限定结果保留在 [codec 记录](verification/long-image-codec.md)，不构成当前资源交付或性能验收。
 
 | 生成输出                                                              | 用途                                          |
 | --------------------------------------------------------------------- | --------------------------------------------- |
@@ -35,7 +33,6 @@ pnpm build:native-assets
 | `packages/runtime-host/dist/{host.js,worker.js}`                      | Web host ESM 与独立 classic Worker            |
 | `packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}` | Native 运行时；六份 Source 材料在 Worker 内嵌 |
 | `apps/reader/assets/runtime/{host.js,worker.js,manifest.json}`        | cpy-cli 复制的 Flutter 应用资源，不入库       |
-| `packages/runtime-host/.local/image-codecs/{client.js,worker.js}`     | 仅供显式候选验证的独立 JavaScript             |
 
 `materialVersion` 覆盖协议、ABI、材料顺序、路径、摘要、长度和 MIME。同一源码与锁定依赖须生成一致 catalog。当前 host ABI 为 `karuyomi-source-host-v4`、protocolVersion 为 2；Web/Native 材料与扩展须按同一身份重建。扩展 AOT 另有输入指纹与 bundle 摘要，Vite 配置及依赖锁属于构建输入。
 
@@ -45,7 +42,7 @@ pnpm build:native-assets
 
 API 的 `apps/api/vite.assets.ts` 插件在正式构建时装配静态资源，合并 MIME、nosniff 与一年 immutable 缓存规则；catalog 使用 no-cache。它排除 runtime/native 和 Flutter Web 复制出的 assets/assets/runtime，并遍历公开文件，防止原生 host/worker/manifest 以其它名字进入公开产物。
 
-Native 材料解析器只返回应用内字节，缺失时明确失败，不访问网络。扩展 bundle 与 Web 一样从静态索引加载。Dart 校验运行时 manifest 和 host/worker，再于受控 HTTPS 页面 document-start 注入。控制页采用 `/runtime/host.html` 或 Cloudflare 规范化后的 `/runtime/host`；动态 API 使用该 WebView 的同源 Access cookie。Native host 将当前 origin、plugin 与 fsNamespace 传给 Blob Worker，cache/file 桥据此使用当前构建命名空间。默认 host 不暴露候选图片 codec 接口；图片交付后由 Flutter/UI 解码。
+Native 材料解析器只返回应用内字节，缺失时明确失败，不访问网络。扩展 bundle 与 Web 一样从静态索引加载。Dart 校验运行时 manifest 和 host/worker，再于受控 HTTPS 页面 document-start 注入。控制页采用 `/runtime/host.html` 或 Cloudflare 规范化后的 `/runtime/host`；动态 API 使用该 WebView 的同源 Access cookie。Native host 将当前 origin、plugin 与 fsNamespace 传给 Blob Worker，cache/file 桥据此使用当前构建命名空间。图片交付后由 Flutter/UI 解码。
 
 ## 验证范围
 
@@ -55,4 +52,4 @@ BROWSER=none pnpm test:browser
 pnpm test:extension-integrity
 ```
 
-`pnpm test` 包含声明式预构建与材料测试，检查固定 WASM、实际材料摘要、MIME、catalog 身份、Native 独立字节所有权、候选与默认材料隔离，以及缺失材料无网络回退。官方 Browser 测试在真实 Worker、IndexedDB、Web Locks 与 Canvas 中验证已迁移的桥场景。仅有工程构建或 fixture 通过不能证明 Source 在线语义、图片阅读、Native 执行、生产 Access 或真机性能；当前覆盖见 [Vite 计划](plan/vite-build-and-testing.md)，实际门见 [VERIFICATION](VERIFICATION.md)。
+`pnpm test` 包含声明式预构建与材料测试，检查固定 WASM、实际材料摘要、MIME、catalog 身份、Native 独立字节所有权、正式材料文件集，以及缺失材料无网络回退。官方 Browser 测试在真实 Worker、IndexedDB、Web Locks 与 Canvas 中验证已迁移的桥场景。仅有工程构建或 fixture 通过不能证明 Source 在线语义、图片阅读、Native 执行、生产 Access 或真机性能；当前覆盖见 [Vite 计划](plan/vite-build-and-testing.md)，实际门见 [VERIFICATION](VERIFICATION.md)。

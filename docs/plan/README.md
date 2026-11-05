@@ -13,7 +13,7 @@
 | 当前主线 / 首要设计目标 | [P2 多设备同步](p2-sync.md)                                   | 收藏与进度的 Worker API + D1 已接入，测试身份三端组合双向续读已过；双 Web 刷新/重置/旧写冲突分项通过；继续故障/生命周期与生产验收，按分类→书签→设置交付  |
 | 并行基础验收            | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | 四项功能已补齐；v4 Web 与双端模拟器正式入口 xkcd 阅读/同步分项已过；生产 Access、真机与其它完整门待验收                                                  |
 | 并行工程                | [工程、AOT 与发布](engineering-and-release.md)                | v4 三包已部署，匿名静态交付与网络政策核对通过；baseline 未完成，CI 仍 disabled_manually；v1/v3 checkpoint 仅保留历史冻结证据                             |
-| 当前工程迁移            | [Vite 与 Cloudflare 官方测试集成](vite-build-and-testing.md)  | 已验收；声明式配置、材料插件与工具收敛完成，官方 Workers/harness、IAB Browser、完整构建及部署预演通过                                                    |
+| 当前工程迁移            | [Vite 与 Cloudflare 官方测试集成](vite-build-and-testing.md)  | 已验收；声明式配置、材料插件与工具收敛完成，未采用的候选 codec 已清理，官方 Workers/harness、IAB Browser、完整构建及部署预演通过                         |
 | 与同步共同交付          | [P1 书架与进度](p1-library-and-progress.md)                   | 数据模型先按跨端权威状态设计；已切换收藏/进度读写入口；补跨端验收、分类/设置及完整日用流程                                                               |
 | 基础运行与书架具备后    | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                                     |
 | 持续推进                | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                                    |

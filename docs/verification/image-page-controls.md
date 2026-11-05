@@ -1,5 +1,7 @@
 # 正式图片页与分片控制
 
+> 历史状态（2026-11-05）：本记录的 Source 页/窗口控制合同已被不透明编码资源边界替代，未采用的客户端 codec 源码和专属工具也已删除。候选源码可在 [a2251a6](https://github.com/Wybxc/karuyomi/tree/a2251a6/runtime/image-codec) 查阅；本文检查须按原始输入 checkout 复验，不能作为当前 Reader、Native 或真机性能验收。
+
 2026-11-04，正式 main 工作区。本轮把已发布的 Source 编码页、独立 codec/store 与 Web/Dart/Native 控制边界接通。Reader 尚未消费此合同；真实 Source 长图、八方向显示、Native 新 codec 执行与设备资源峰值仍待验收。[此前编码页与真实 Web owner 证据](encoded-image-ownership.md)保持其原有材料身份和范围，不能自动扩大为本轮正式控制或 Flutter 显示证据。
 
 ## 实现范围

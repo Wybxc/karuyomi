@@ -1,6 +1,6 @@
 # 长图 codec / WASM 机制验证
 
-> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。未采用的 `runtime/image-codec/` 候选源码与专属工具已删除，源码可在 [a2251a6](https://github.com/Wybxc/karuyomi/tree/a2251a6/runtime/image-codec) 查阅；旧自定义探针、浏览器 runner 和构建命令仅适用于各节记录的历史 checkout，旧浏览器入口需回到更早版本，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access、Native 或真机性能门通过。
 
 ## 结论与边界
 
@@ -193,7 +193,7 @@ JPEG 当前尚未覆盖 Web 缩放、Native、真实 Source、EXIF 方向、ICC/
 
 ## 正式源码构建与 Node 验收
 
-2026-11-04，macOS arm64。上述忽略目录内的历史机制随后内化为 `runtime/image-codec/{codec.h,png.c,jpeg.c}`、严格 TypeScript session 和 `tools/images` 构建/验收工具；真正上游由固定提交的 `vendor/libspng`、`vendor/libjpeg-turbo` submodule 提供。本节记录正式入口生成的新产物，不将前述旧 WASM 的浏览器或原生 oracle 结果移作新产物验收。构建和操作说明见 [image-codec README](../../runtime/image-codec/README.md)。
+2026-11-04，macOS arm64。上述忽略目录内的历史机制随后内化为 `runtime/image-codec/{codec.h,png.c,jpeg.c}`、严格 TypeScript session 和 `tools/images` 构建/验收工具；真正上游由固定提交的 `vendor/libspng`、`vendor/libjpeg-turbo` submodule 提供。本节记录正式入口生成的新产物，不将前述旧 WASM 的浏览器或原生 oracle 结果移作新产物验收。构建和操作说明见 [image-codec README](https://github.com/Wybxc/karuyomi/blob/a2251a6/runtime/image-codec/README.md)。
 
 实际工具为 Node 24.15.0、Python 3.15.2、CMake 4.4.5、官方 Emscripten 5.0.7-git / `263db4cffa6f9fc2ec514a70abac81362ea41849`、Clang 23.0.0git / `7b58716d96c3ae4c0c4e6f72e29b16137bb6224b`、Binaryen 129 / `version_125-430-gc6a5e65b7`。SDK 归档仍为本页已记录的官方 Darwin arm64 SHA-256 `37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c`；上游提交分别为 libspng `bab9f94a1186f8fda234b4e1cb65e1b9a77049cc`、libjpeg-turbo `7b4993786d856cbccabfc0ed2f923ba000e326cc`，zlib 1.3.1 来自固定官方 SDK port。参考图工具为锁定的 Sharp 0.35.5 / libvips 8.18.7 / mozjpeg `0826579`。
 
@@ -244,13 +244,13 @@ pnpm image-codecs:check \
   --report runtime/image-codec/.local/verification/formal-rerun/result.json
 ```
 
-输入或工具链变化时，使用构建命令返回的新身份目录；已有SDK/zlib归档可按 [README](../../runtime/image-codec/README.md) 的正式选项传入。普通 `pnpm test:image-codecs` 是不编译SDK的小夹具工程回归，不能替代这里的真实WASM命令。
+输入或工具链变化时，使用构建命令返回的新身份目录；已有SDK/zlib归档可按 [README](https://github.com/Wybxc/karuyomi/blob/a2251a6/runtime/image-codec/README.md) 的正式选项传入。普通 `pnpm test:image-codecs` 是不编译SDK的小夹具工程回归，不能替代这里的真实WASM命令。
 
 本节只证明正式源码在Node中的顺序解码与生命周期，以及上述同机重建。新产物尚未据此取得浏览器、Source图片链、Flutter、Native内置执行、tile/LOD/位置恢复或真实设备性能验收；也不代表全项目检查、P0或长图产品门通过。历史浏览器的Worker/ACK与原生缩放结果仍按各自输入和旧产物身份单独解释，正式16 Mi像素准入不因这份报告自动改变。
 
 ## 有界 PNG 编码器的 Node 验收
 
-2026-11-04，同一 macOS arm64 与上一节固定官方 SDK、Node 24.15.0、Sharp 0.35.5 环境，正式源码增加 `runtime/image-codec/encoder.{c,h}`，使用固定 libspng 编码 straight RGBA8 条带，ABI 为 `karuyomi-png-tiles-v1`。宽度1至4096、高度1至256，输入必须精确等于 `width * height * 4` 且不超过4 MiB，编码输出上限8 MiB；C 请求 payload 上限16 MiB，WASM heap 初始16 MiB、最大32 MiB。接口和构建说明见 [image-codec README](../../runtime/image-codec/README.md)。
+2026-11-04，同一 macOS arm64 与上一节固定官方 SDK、Node 24.15.0、Sharp 0.35.5 环境，正式源码增加 `runtime/image-codec/encoder.{c,h}`，使用固定 libspng 编码 straight RGBA8 条带，ABI 为 `karuyomi-png-tiles-v1`。宽度1至4096、高度1至256，输入必须精确等于 `width * height * 4` 且不超过4 MiB，编码输出上限8 MiB；C 请求 payload 上限16 MiB，WASM heap 初始16 MiB、最大32 MiB。接口和构建说明见 [image-codec README](https://github.com/Wybxc/karuyomi/blob/a2251a6/runtime/image-codec/README.md)。
 
 新构建身份为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。正式 CLI 在原19项之外增加5项编码器检查，本轮24项全部通过、进程 exit=0；原19项范围保留，PNG/JPEG 四份 JS/WASM 的大小和 SHA 与上一节完全相同。报告为忽略的 `runtime/image-codec/.local/verification/encoder-final/result.json`，SHA-256 `99a8f995914be55a59d266ba23ba90de2f9b26f332c8a0498a8bca14bb17d0d3`。
 

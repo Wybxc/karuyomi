@@ -9,7 +9,6 @@ export default defineConfig({
           include: [
             'apps/api/test/**/*.test.ts',
             'packages/*/test/**/*.test.ts',
-            'runtime/image-codec/test/**/*.test.ts',
           ],
           exclude: [
             'apps/api/test/state-workerd.test.ts',

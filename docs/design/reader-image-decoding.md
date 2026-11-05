@@ -4,7 +4,7 @@
 
 **Source 与宿主仅交付插件处理后的不透明编码正文；图片识别、解码、尺寸、方向、解码预算、缓存与分片由 UI 客户端负责。** 宿主只校验传输字节、资源身份、generation 和生命周期，不查看 MIME/图片头/EXIF，不预解码，也不选择完整图或 tile。原 Source 内部主动执行的解密、重排、Bitmap 等业务仍保留，不能改扩展源码或通过原图 URL 绕过处理。
 
-当前普通图路径已将宿主的 metadata 解析和完整 bitmap 校验移除。Flutter 从实际 `ImageInfo` 获取尺寸，在 `frameBuilder` 确认显示帧后才通知 Reader。客户端分片库仅作为候选保留，退出默认构建及 Web/Native 打包；尚无同条件真机性能证据支持将其设为默认。当前以 UI 直接解码建立基线，**长图阅读和进程/GPU 峰值门仍未通过**。
+当前普通图路径已将宿主的 metadata 解析和完整 bitmap 校验移除。Flutter 从实际 `ImageInfo` 获取尺寸，在 `frameBuilder` 确认显示帧后才通知 Reader。未采用的自研分片候选源码、专属工具与构建配置已删除；尚无同条件真机性能证据支持引入该方案。当前以 UI 直接解码建立基线，**长图阅读和进程/GPU 峰值门仍未通过**。
 
 现行资源合同见[图片资源通道](../IMAGE-RESOURCES.md)，实施状态见[长图计划](../plan/reader-image-decoding.md)与 [P0](../plan/p0-runtime-and-reading.md)，实际证据维护于 [VERIFICATION](../VERIFICATION.md)。先前[编码页所有权](../verification/encoded-image-ownership.md)与[宿主页控制](../verification/image-page-controls.md)属于已替代架构的历史工程证据，不是当前合同。
 
@@ -20,7 +20,7 @@ Web UI 的 provider 为受管 Blob 上的 `NetworkImage`，Native 为受管文�
 
 `ReaderResourcePool` 等待 widget/缩放 overlay pin、帧结束和实际 provider cache eviction，再释放编码正文。新增目标尺寸或 tile provider 时必须记录并驱逐所有实际 cache key，不能只重建原 provider 代替清理。`ReadingPosition` 的逻辑页与归一化锚点继续独立于临时资源、输出分辨率和 tile 边界。
 
-以下 SDK、候选库和 codec 机制评估保留当时固定版本、输入与环境。它们为 UI 解码设计提供依据；历史独立 Worker、Node 或浏览器结果均不自动升级为当前 Reader、Native 或真实设备验收。
+以下 SDK、候选库和 codec 机制评估保留当时固定版本、输入与环境。候选源码可在 `a2251a6` 查阅，旧浏览器入口按各记录的更早 checkout 复验。它们为 UI 解码设计提供依据；历史独立 Worker、Node 或浏览器结果均不自动升级为当前 Reader、Native 或真实设备验收。
 
 ## Flutter 与浏览器现成 API 的实际边界
 
@@ -79,7 +79,7 @@ wrapper 的 MIT 标识不覆盖全部底层库。该 npm 包的 `THIRD-PARTY-NOT
 
 固定 `libspng v0.7.3` 的 progressive row API 已在独立 Node Worker 与 Codex 内置浏览器的 Web Worker 中实际运行：1080×20000 / 1080×40000 的合成 RGBA8 非交错 PNG，在实际 16 MiB 非共享 WASM heap 中顺序输出全部像素。Node 完整流 SHA 匹配编码前原始 RGBA 生成基准；Node 和 Web 的首/中/末区域 SHA 分别匹配独立 libpng oracle，Web 未计算完整流 SHA。单个 256 行条带加 64 KiB ACK 通道没有建立完整 raster；首块取消会关闭 C 上下文。仅删除 IEND 的文件在全部行输出后仍失败，说明正式片资源必须能因后部错误整体作废。具体输入、构建器偏差、计量范围和剩余格式见[实验记录](../verification/long-image-codec.md)。
 
-这份历史机制证据使 libspng 成为当时顺序 PNG 路径的实际候选，本身未完成整套终端 codec 选型和产品验收。固定官方 macOS SDK 已重新构建并通过同样的 Node / Web 分项，独立新 WASM 身份与首轮分别保存；Linux 及跨主机一致性未验。当轮尚未维护正式构建入口、上游 submodule 或 Native 内置材料；当前工程化实现见后文，颜色/透明与方向合同、Native 内置执行及正式终端集成仍待验。RGB/灰度/调色板 tRNS、Adam7、16-bit、JPEG/WebP 等不套用这两张 RGBA 素材的结果。随机区域、反向读取和实际 Flutter 显示仍是后续实现门；新增 PNG tile 编码的 Node 验收另有独立产物与证据，不能沿用本段历史 Web 结果。
+这份历史机制证据使 libspng 成为当时顺序 PNG 路径的实际候选，本身未完成整套终端 codec 选型和产品验收。固定官方 macOS SDK 已重新构建并通过同样的 Node / Web 分项，独立新 WASM 身份与首轮分别保存；Linux 及跨主机一致性未验。当轮尚未维护正式构建入口、上游 submodule 或 Native 内置材料；后续曾工程化的实现见下述历史记录，候选现已删除，颜色/透明与方向合同、Native 内置执行及正式终端集成仍待验。RGB/灰度/调色板 tRNS、Adam7、16-bit、JPEG/WebP 等不套用这两张 RGBA 素材的结果。随机区域、反向读取和实际 Flutter 显示仍是后续实现门；新增 PNG tile 编码的 Node 验收另有独立产物与证据，不能沿用本段历史 Web 结果。
 
 ## libjpeg-turbo 顺序 JPEG 机制与采用边界
 
@@ -91,17 +91,19 @@ JPEG 先缩放再输出可以减小条带和终端 raster，但不使 progressiv
 
 首块 ACK 点取消后 C 账本归零；缺失 EOI 的文件在最后条带的扫描行阶段因 corrupt-data warning 失败，已输出片必须能整体作废。每个进入库的导出调用都有活跃错误恢复帧；完整输入最终仍经过 `finish_decompress()`。Codex 内置 Chromium 156 又实际通过两张完整尺寸的六个区域 SHA/Canvas、背压、取消、截断、progressive 拒绝及首块后强制 terminate 观察窗，无 SAB，五个协作终态 C 账本归零。Web 未计算完整流 SHA、未测缩放或强制终止后的 heap 释放；Native、EXIF/ICC/其它色彩、随机区域及正式 Source/Flutter 链仍待验，不关闭产品门。
 
-## 客户端 codec 候选与采用门槛
+## 历史客户端 codec 候选
 
-`runtime/image-codec/` 已内化 PNG/JPEG decoder、PNG encoder 的 C ABI、严格 TypeScript 顺序接口与独立 module Worker，真实上游通过 submodule 固定。构建和首批能力见 [codec README](../../runtime/image-codec/README.md)。`assets.ts`、`tile-store.ts`、`errors.ts` 已从 Source host 移至该客户端目录；二者互不依赖。Source 协议不再包含 `EncodedImage/acquireEncodedImage`、页/窗口/tile 控制或编码 borrow。
+本节及下一节记录的 `runtime/image-codec/`、专属工具和上游依赖已删除，保留实现约束与失败范围作为历史评估；源码与构建说明见固定 `a2251a6` 的 [codec README](https://github.com/Wybxc/karuyomi/blob/a2251a6/runtime/image-codec/README.md)，旧浏览器 runner 须使用各验证记录对应的更早 checkout。
+
+该候选当时内化了 PNG/JPEG decoder、PNG encoder 的 C ABI、严格 TypeScript 顺序接口与独立 module Worker，真实上游通过 submodule 固定。`assets.ts`、`tile-store.ts`、`errors.ts` 曾从 Source host 移至该客户端目录；二者互不依赖。Source 协议已删除 `EncodedImage/acquireEncodedImage`、页/窗口/tile 控制或编码 borrow。
 
 ### 独立 Worker 与材料
 
-`decodeImageTiles()` 接受客户端持有的 Blob，在读取前限制输入为 8 MiB。Worker 顺序解码 PNG/JPEG，将至多 256 行的 RGBA 条带编码为可独立解码的 PNG；传输块至多 64 KiB，逐块等待 ACK，消费者下一次 pull 才推进。当前 PNG 限非隔行 RGBA8、分母 1；JPEG 限 8-bit 单 scan 顺序 Huffman 灰度/RGB/YCbCr，支持分母 1/2/4。这些是客户端 codec 的局部能力和预算，不是 Source 传输的格式准入。
+`decodeImageTiles()` 接受客户端持有的 Blob，在读取前限制输入为 8 MiB。Worker 顺序解码 PNG/JPEG，将至多 256 行的 RGBA 条带编码为可独立解码的 PNG；传输块至多 64 KiB，逐块等待 ACK，消费者下一次 pull 才推进。当时 PNG 限非隔行 RGBA8、分母 1；JPEG 限 8-bit 单 scan 顺序 Huffman 灰度/RGB/YCbCr，支持分母 1/2/4。这些是客户端 codec 的局部能力和预算，不是 Source 传输的格式准入。
 
 header、tile 与 terminal 分开表达。tile 保留原图 `sourceRect`，IEND/EOI 与真实清理成功前为 provisional；尾部失败、取消或清理失败作废已交付片。专用 codec Worker 与 Source Worker 分开，取消解码不应销毁原 Page 会话。材料 URL 在 codec Worker 终止后释放；强制终止未取得的 heap 计量保持 null，不能写成已测归零。
 
-`assets.ts` 的 `prepareImageCodecAssets()` 接受验证工具或 UI 提供的材料目录和结构化 loader，所有必需 Worker/模块/WASM 验证后才创建 Blob URL；WASM 使用已取得字节，不通过相对 URL 回退下载。该入口仅供显式候选验证，默认产品构建不准备或发布 codec，也不将其放入 Web Static Assets、Native 应用资源或 Source `host.js`。旧 `MaterialCatalog.imageCodecs`、Native host 内嵌及后续独立 `assets/image-codec/` 装配均是已撤回的中间接线，不是现行默认交付。
+`assets.ts` 的 `prepareImageCodecAssets()` 接受验证工具或 UI 提供的材料目录和结构化 loader，所有必需 Worker/模块/WASM 验证后才创建 Blob URL；WASM 使用已取得字节，不通过相对 URL 回退下载。该入口当时仅供显式候选验证，未纳入默认产品构建、Web Static Assets、Native 应用资源或 Source `host.js`。旧产品 catalog 的 codec 字段、Native host 内嵌及后续独立 `assets/image-codec/` 装配均是已撤回的中间接线。
 
 [codec 历史记录](../verification/long-image-codec.md)分别保存正式 C 构建、Node 像素 oracle 与独立浏览器 Worker 的产物身份和验证范围。目录迁移后的工程回归不能替代新客户端接入的浏览器或 Native 实测，也不能把历史合成正文 owner 结果作为真实 Source 长图阅读结论。
 
@@ -109,7 +111,7 @@ header、tile 与 terminal 分开表达。tile 保留原图 `sourceRect`，IEND/
 
 `tile-store.ts` 的 `ImageTileStore` 保留单活动 codec、窗口请求、revision 快照/等待、有界扫尾和缺片时从持有编码正文重扫。调用方传入 Blob、格式与原始尺寸；这些信息必须来自 UI 自己的识别，不能新增 Source metadata 合同。store 只缓存所需窗口 PNG，缓存上限 16 MiB；显示 lease 至多 64 份、合计 32 Mi 像素，失效但尚未确认释放的片继续计费。store 不创建显示 URL 或 Native 文件。
 
-Reader 尚未消费此库。只有对照证据支持采用后，客户端接入才需拥有编码正文、创建受管显示资源、处理失效通知，并在 widget/overlay、实际 cache key、URL/文件和活动 codec 释放后归还对应预算。窗口关闭不得抹掉仍被显示 owner 持有的片。原 `ImagePageControl` 及 `openImagePage/requestImageWindow/waitImageWindow/releaseImageTile/closeImagePage` 已删除，不能将它们作为现行跨语言合同或恢复宿主编排。
+Reader 当时未消费此库。若未来对照证据支持采用类似方案，客户端接入才需拥有编码正文、创建受管显示资源、处理失效通知，并在 widget/overlay、实际 cache key、URL/文件和活动 codec 释放后归还对应预算。窗口关闭不得抹掉仍被显示 owner 持有的片。原 `ImagePageControl` 及 `openImagePage/requestImageWindow/waitImageWindow/releaseImageTile/closeImagePage` 已删除，不能将它们作为现行跨语言合同或恢复宿主编排。
 
 顺序 decoder 不能倒读。反向滚动和任意位置恢复需命中有界片缓存，或从已经持有的编码正文重新扫描；这不会重跑 Source。store 继续扫尾以确认真实 terminal，不能无限停在可见片后，也不能积存全部页 PNG/raster。新 UI adapter 须将 pending/complete/failed 和可见 Flutter frame 分开，最后一片、解码 terminal 与可见阅读进度均不是同一事件。
 
@@ -119,17 +121,17 @@ Reader 尚未消费此库。只有对照证据支持采用后，客户端接入�
 
 编码正文副本、codec heap/工作区、临时条带、PNG 缓存、传输块、Flutter decoded tile 和 GPU 资源分别计量。旧 LOD、zoom overlay 和释放未确认的显示引用也要计费；WASM 最大 heap、operation cache 或 scheduler 估算均不是进程总上限。对隔行 PNG、progressive/multiscan JPEG、动画等可能物化整图的输入，应由 UI 根据真实 codec 能力预留工作空间或明确报告不支持，不能令 Source host 筛选格式。
 
-## 依赖、静态材料与构建身份
+## 历史候选的依赖与构建身份
 
-`artifacts-lock.json` 固定候选 decoder、encoder、许可证与构建清单的归档，显式准备器在下载/导入边界验证并原子安装。默认产品构建与打包不消费该归档；历史公开下载、Linux 材料装配与 SDK 执行证据分别见[codec 验证](../verification/long-image-codec.md)。若后续通过采用门槛，再接入 Web 共享 Static Assets 或 Native 随应用资源，Native 不作网络回退。扩展分发规则不因候选 codec 改变。
+当时的 `artifacts-lock.json` 固定候选 decoder、encoder、许可证与构建清单归档，显式准备器在下载/导入边界验证并原子安装，默认产品构建与打包不消费该归档。历史公开下载、Linux 材料装配与 SDK 执行证据分别见[codec 验证](../verification/long-image-codec.md)。这些入口随候选一并删除。未来若采用有实测支持的客户端方案，其共享资源仍须通过 Web Static Assets 或 Native 应用内置交付，Native 不作网络回退。
 
-客户端 codec 的源码、gitlink 与初始化状态不进入 `tools/extensions/catalog.ts` 的默认 Source 身份；必需子模块只包含固定的 TeaVM/Suwayomi。客户端 codec 也不能由 runtime-host 正式执行路径导入。协议、contracts、材料构建定义和仓库锁文件仍按当前源码参与身份；具体输入变化以实际指纹为准。默认 `materialVersion` 不因未消费的候选 codec 变化而包含其材料；独立候选验收记录自己的产物身份。不得将新协议或材料混入历史冻结 AOT checkpoint；发布按当前输入和已完成的 baseline 推进。
+当时的候选源码、gitlink 与初始化状态未进入 `tools/extensions/catalog.ts` 的默认 Source 身份，也未由 runtime-host 正式执行路径导入。当前候选与闲置 catalog 字段均已删除；协议、contracts、材料构建定义和仓库锁文件按当前源码参与身份，具体变化以实际指纹为准。六份正式材料的字节不因本次清理改变，但简化 catalog 元数据仍可能改变 `materialVersion`，不得沿用历史值。不得将新协议或材料混入历史冻结 AOT checkpoint；发布按当前输入和已完成的 baseline 推进。
 
 ## 性能决策与剩余验收
 
 现有 Node/Worker 证据证明限定输入下可以顺序解码、输出小片并执行局部预算；它们没有测出该方案比 Flutter/平台直接解码更快、更省 CPU 或更低 RSS/GPU。额外 WASM 初始化、条带 PNG 重编码、复制与 Flutter 再解码均可能增加开销，不能因机制有界就选择它作为默认。
 
-下一步先使用相同 Source 处理后的编码字节、同设备、同显示尺寸与阅读操作建立 UI 直接解码基线，再显式运行候选。对照记录冷/热首个可见 frame、跳转到中部/末尾、连续与反向滚动、CPU 时间、峰值 RSS 和 GPU 占用；同时记录格式/尺寸限制及失败。不同像素、缓存状态、设备或计量范围的结果不得混成性能结论。只有真实需求与同条件证据支持，才决定是否采用、采用哪些输入范围，以及是否值得重新接入默认交付。
+下一步先使用相同 Source 处理后的编码字节、同设备、同显示尺寸与阅读操作建立 UI 直接解码基线，再针对实测瓶颈优先比较成熟平台或第三方方案。对照记录冷/热首个可见 frame、跳转到中部/末尾、连续与反向滚动、CPU 时间、峰值 RSS 和 GPU 占用；同时记录格式/尺寸限制及失败。不同像素、缓存状态、设备或计量范围的结果不得混成性能结论。只有真实需求与同条件证据支持，才决定是否采用、采用哪些输入范围，以及是否值得接入默认交付。
 
 仍需完成的产品门：
 

@@ -9,8 +9,6 @@
 ```mermaid
 flowchart TD
   CLI["scripts / CI：领域操作入口"] --> EXT["tools/extensions：发现、构建、验证、快照、网络政策"]
-  CLI --> IMG["tools/images：图像 codec 工具链与构建"]
-  IMG --> BASE
   CLI --> JVM["tools/teavm：工具链、上游补丁、Java 编译"]
   EXT --> JVM
   EXT --> BASE["第三方库 / Node 标准库"]
@@ -24,12 +22,10 @@ flowchart TD
 
 - `scripts/` 是仓库操作入口，不被工具模块或产品代码导入。CLI 参数解析与领域实现分开，领域函数可以直接测试。
 - `tools/extensions/` 负责扩展描述、输入指纹、隔离 AOT、静态当前快照、传输校验和网络授权元数据。注册、同步和流水线共享同一份清单与 gzip 校验，不再动态导入 CLI 文件。
-- `tools/images/` 负责图片 codec 的官方 SDK、portable 产物校验、原子安装与隔离缓存，不依赖扩展发布编排。`pnpm image-codecs:prepare` 准备锁定工具链，`pnpm image-codecs:build` 构建共同 ABI 的 PNG/JPEG decoder 与 PNG encoder WASM，`pnpm image-codecs:check --build <directory>` 另行执行真实长图回归。`pnpm image-codecs:prepare-artifacts` 为候选专项验收准备锁定 portable 归档；`pnpm image-codecs:package` 由已验证的本地构建生成归档与锁。候选 client/Worker 的 JS 构建使用独立 Vite 配置；旧浏览器专项 runner 已退役，历史结果不能充当当前产品验收。`pnpm test:image-codecs` 运行不下载 SDK 的归档、构建器和消费生命周期回归，已纳入 `pnpm check`。支持平台和当前集成范围见 [image-codec README](../runtime/image-codec/README.md)。
 - `tools/teavm/` 负责锁定工具链、seed、归档、上游补丁和 JVM 构建。工作目录由参数明确传入，不复制脚本后改变源码定位，不依赖扩展发布编排。
 - 通用进程、序列化、原子写入、归档、文件锁和并发直接使用成熟库。seed 成员、构建身份、checkpoint 与资源预算等项目规则留在所属领域，不重新搬出一套通用 helper。
-- `runtime/image-codec/` 的 C 与严格 TypeScript 是独立客户端候选库；它不导入自动化、测试或 Source host；Source host 同样不得导入该候选库。`tools/images/` 只依赖该领域与第三方库，不依赖扩展发布编排。
 - 产品 `src/` 不依赖工具或测试代码。contracts 只依赖底层生成协议包及库，独立于应用、运行时和自动化。
-- `packages/runtime-host/vite.materials.config.ts` 声明五桥 classic IIFE 与共享材料输出；`vite.config.ts` 声明 Web host ESM、Web Worker 和 Native host/Worker classic IIFE。资源生成、材料清单和 Native 内嵌集中在现有 `vite.runtime-plugin.ts` 的构建 hook 中。独立 `materials.ts` 已删除；contracts 只提供纯 `runtimeMaterialCatalogSchema` 模型及类型，消费者在调用点直接 `readFile` 已生成 catalog 并 `schema.parse`，再按需读取材料字节。`pnpm build:native-assets` 使用固定 cpy-cli 将三个 Native 文件复制进 Flutter。默认产品仅包含五桥与 Zstd WASM；候选 codec 通过独立 Vite CLI 生成并单独验收，不合并产品 catalog，也不进入扩展 AOT 的直接输入集合。
+- `packages/runtime-host/vite.materials.config.ts` 声明五桥 classic IIFE 与共享材料输出；`vite.config.ts` 声明 Web host ESM、Web Worker 和 Native host/Worker classic IIFE。资源生成、材料清单和 Native 内嵌集中在现有 `vite.runtime-plugin.ts` 的构建 hook 中。独立 `materials.ts` 已删除；contracts 只提供纯 `runtimeMaterialCatalogSchema` 模型及类型，消费者在调用点直接 `readFile` 已生成 catalog 并 `schema.parse`，再按需读取材料字节。`pnpm build:native-assets` 使用固定 cpy-cli 将三个 Native 文件复制进 Flutter。产品材料仅包含五桥与 Zstd WASM；未采用的图片 codec 候选源码、专属工具及 Vite 配置已删除。
 
 `pnpm check:dependencies` 使用固定版本 dependency-cruiser 检查循环、工具反向引用 CLI、重新引入 tools/lib 包装层、TeaVM 依赖扩展编排，以及产品导入工具/测试。类型依赖同样参与；`cloudflare:workers` 是平台提供的模块，其他无法解析的导入会报错。检查纳入 `pnpm check`。边界变化应调整模块归属，不能靠忽略规则掩盖循环。
 
@@ -43,18 +39,17 @@ JS/TS 产品构建使用声明式 Vite 配置和官方 CLI；API 使用 Cloudfla
 
 Vite 插件负责把当前构建的本地输入转换、校验和写入应用资源。扩展静态快照装配已直接内化到现有 `apps/api/vite.assets.ts`，删除独立的 tools 装配模块；不增加只转发一次调用的插件。原有当前索引可达性、材料身份、上传摘要和大小限额断言继续由插件构建测试覆盖。共享清单解析与校验仍供 AOT、注册和流水线复用，保留在所属领域模块。
 
-| 范围                                                       | 职责与当前归属                                                                                        | Vite 适用性                                                                                                                    |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/api/` 与 `packages/runtime-host/` 的 Vite 配置和插件 | Flutter/runtime/扩展快照静态装配、五桥与固定 WASM 材料、Native 内嵌及 manifest、候选 client/Worker JS | 已接入；产出直接属于应用构建，资源声明和项目规则放在现有配置/插件。候选 JS 保持独立 CLI，不加入默认产品。                      |
-| `tools/extensions/` 的发现、AOT 与流水线                   | catalog 输入闭包和指纹、隔离 builder、增量计划、checkpoint、失败保留、候选快照与部署确认              | 保留显式命令；跨包任务恢复、上游 Gradle/TeaVM 编译和发布状态不属于 Vite 模块图。流水线在启动 builder 前显式调用材料构建 CLI。  |
-| `tools/extensions/` 的网络授权与校验                       | registration、network-policies、assets 传输、有界 gzip、verify-manifest 与 verify-build 报告          | 保留领域函数和独立命令；DB 写入、线上读取、授权和验收有自己的输入与失败边界。资源插件可复用纯校验，默认 build 不触发远端操作。 |
-| `tools/teavm/`                                             | JDK/Maven/Android SDK 与 seed 准备、上游补丁和生成重命名、Java/TeaVM 编译、JVM/Android oracle         | 保留领域工具；这些步骤使用独立锁文件、缓存和编译器，产出供 AOT 或验证使用。给 execa 再套 Vite hook 不能替代工具链。            |
-| `tools/images/`                                            | SDK 准备、C/C++/CMake/WASM 构建、portable 归档导入与打包、真实 codec 回归                             | 保留候选工具 CLI；依赖安装、原生编译和验收独立于应用 JS 构建。候选 JS 的打包已经迁到独立 Vite 配置。                           |
-| `tools/protocol/`                                          | Buf 生成和一致性检查、官方 Dart protoc 插件启动                                                       | 保留官方生成命令；它同时生成受版本管理的 TS/Dart 源码，并服务于 Flutter、API 和运行时，执行时机独立于 Vite bundle。            |
-| `tools/cloudflare/`                                        | 部署隔离权限探针、检查上传结果并恢复远端基线                                                          | 保留显式验证入口；操作真实 Cloudflare 资源并使用部署凭据，不能附加到普通 build。                                               |
-| `scripts/` 与平台 CLI                                      | Flutter SDK、Web/Native 构建及检查；Drizzle 生成与 Wrangler D1 迁移                                   | 保留各自官方命令；Flutter、数据库迁移和平台工具链有独立生命周期。三个 Native 文件的复制直接使用 cpy-cli。                      |
+| 范围                                                       | 职责与当前归属                                                                                | Vite 适用性                                                                                                                    |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/` 与 `packages/runtime-host/` 的 Vite 配置和插件 | Flutter/runtime/扩展快照静态装配、五桥与固定 WASM 材料、Native 内嵌及 manifest                | 已接入；产出直接属于应用构建，资源声明和项目规则放在现有配置/插件。                                                            |
+| `tools/extensions/` 的发现、AOT 与流水线                   | catalog 输入闭包和指纹、隔离 builder、增量计划、checkpoint、失败保留、候选快照与部署确认      | 保留显式命令；跨包任务恢复、上游 Gradle/TeaVM 编译和发布状态不属于 Vite 模块图。流水线在启动 builder 前显式调用材料构建 CLI。  |
+| `tools/extensions/` 的网络授权与校验                       | registration、network-policies、assets 传输、有界 gzip、verify-manifest 与 verify-build 报告  | 保留领域函数和独立命令；DB 写入、线上读取、授权和验收有自己的输入与失败边界。资源插件可复用纯校验，默认 build 不触发远端操作。 |
+| `tools/teavm/`                                             | JDK/Maven/Android SDK 与 seed 准备、上游补丁和生成重命名、Java/TeaVM 编译、JVM/Android oracle | 保留领域工具；这些步骤使用独立锁文件、缓存和编译器，产出供 AOT 或验证使用。给 execa 再套 Vite hook 不能替代工具链。            |
+| `tools/protocol/`                                          | Buf 生成和一致性检查、官方 Dart protoc 插件启动                                               | 保留官方生成命令；它同时生成受版本管理的 TS/Dart 源码，并服务于 Flutter、API 和运行时，执行时机独立于 Vite bundle。            |
+| `tools/cloudflare/`                                        | 部署隔离权限探针、检查上传结果并恢复远端基线                                                  | 保留显式验证入口；操作真实 Cloudflare 资源并使用部署凭据，不能附加到普通 build。                                               |
+| `scripts/` 与平台 CLI                                      | Flutter SDK、Web/Native 构建及检查；Drizzle 生成与 Wrangler D1 迁移                           | 保留各自官方命令；Flutter、数据库迁移和平台工具链有独立生命周期。三个 Native 文件的复制直接使用 cpy-cli。                      |
 
-`model`、`types` 等纯模型及测试 fixture/helper 不承担构建编排，无需改成插件。后续新增可由 Vite 表达的 JS/静态资源步骤优先加入已有配置；下载、发布、DB 和网络副作用继续通过明确的命令执行。
+未采用的自研图片 codec 及其 SDK、归档、构建和验证入口已删除，历史范围见 [codec 记录](verification/long-image-codec.md)。`model`、`types` 等纯模型及测试 fixture/helper 不承担构建编排，无需改成插件。后续新增可由 Vite 表达的 JS/静态资源步骤优先加入已有配置；下载、发布、DB 和网络副作用继续通过明确的命令执行。
 
 ## 构建身份与验证
 
