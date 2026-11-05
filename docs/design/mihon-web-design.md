@@ -332,17 +332,17 @@ Flutter 收藏与进度已改为 Worker API + D1，Drift/SQLite 业务路径已�
 
 收藏与阅读进度已通过 `business.proto`、D1 模型及 `GET /api/library`、`GET /api/state/manga/:mangaKey`、`POST /api/state/mutations` 接入正式入口；分类和章节书签的协议、D1 与正式 UI 已接入，同步设置尚待实施；实际跨端范围仍以计划与证据为准。下表同时保留其余目标接口轮廓，是否已实现以对应计划和源码为准，不能据路径草案认定服务已存在。初版采用当前状态读取与幂等变更，增量接口按实测需要另行引入。
 
-| 接口                                                  | 行为                                                                                            |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `GET /api/auth/login`                                 | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete`             |
-| `GET /api/bootstrap`                                  | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT                       |
-| `POST /api/state/mutations`                           | 有界幂等变更，校验 expected revision/epoch，返回权威状态与服务端 revision                       |
-| `GET /api/library` / `GET /api/state/manga/:mangaKey` | 查询服务端状态；Source 实时调用由浏览器执行                                                     |
-| `POST /api/runtime/sessions`                          | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例                                    |
-| `GET /api/runtime/events`                             | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                          |
-| `POST /api/bridge/http`、`/api/bridge/callback/*`     | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法        |
-| `GET /api/covers/:id` / `POST /api/covers`            | 自定义封面读写，验证类型和大小                                                                  |
-| `GET /api/extensions/builds`                          | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准 |
+| 接口                                                      | 行为                                                                                                |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `GET /api/auth/login`                                     | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete`                 |
+| `GET /api/bootstrap`                                      | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT                           |
+| `POST /api/state/mutations`                               | 有界幂等变更，校验 expected revision/epoch，返回权威状态与服务端 revision                           |
+| `GET /api/library` / `GET /api/state/manga/:mangaKey`     | 查询服务端状态；Source 实时调用由浏览器执行                                                         |
+| `POST /api/runtime/sessions`                              | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例                                        |
+| `GET /api/runtime/events`                                 | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                              |
+| `POST /api/bridge/http`、`/api/bridge/callback/*`         | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法            |
+| `GET /api/covers/:assetId` / `POST /api/covers/:mangaKey` | 自定义封面读写，multipart 上传与当前身份引用，清除沿 state mutation；见[封面设计](custom-covers.md) |
+| `GET /api/extensions/builds`                              | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准     |
 
 旧 `/bridge/*`、`/extensions/*` 后端路径停止服务，不保留公开别名；新的后端功能必须进入 `/api/*`。未知 API 在鉴权后返回 JSON 404，不能返回 `index.html`。通用宿主/桥、Worker 引导与 WASM 由 Web Static Assets 或 Native 内置材料提供；构建清单与 AOT 在所有客户端均从 Static Assets 获取，只保留每扩展最新 build。删除 `/api/extensions/artifacts/:hash` 的扩展正文交付，不保留 R2 或 Worker 代理回退，也不新增私有下载地址/token 服务。
 

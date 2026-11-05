@@ -5,6 +5,8 @@ import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:uuid/uuid.dart';
 import 'package:web/web.dart' as web;
+import 'package:http/browser_client.dart';
+import 'cover_transport.dart';
 import 'popup_authentication.dart';
 import 'runtime_platform_types.dart';
 
@@ -19,6 +21,11 @@ final class WebPlatformRuntime extends PlatformRuntime {
   PopupAuthentication? _authentication;
   Map<String, Object?>? _pendingAuthentication;
   bool _disposed = false;
+  @override
+  late final CoverTransport coverTransport = HttpCoverTransport(
+    origin: origin,
+    createClient: BrowserClient.new,
+  );
 
   @override
   Uri get origin => Uri.parse(_origin.toDart);
@@ -118,6 +125,7 @@ final class WebPlatformRuntime extends PlatformRuntime {
   @override
   Future<void> dispose() {
     _disposed = true;
+    coverTransport.close();
     _authentication?.cancel();
     _pendingAuthentication = null;
     return runtime.dispose();

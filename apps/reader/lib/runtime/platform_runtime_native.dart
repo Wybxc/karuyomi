@@ -3,6 +3,8 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:http/io_client.dart';
+import 'cover_transport.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -37,6 +39,22 @@ final class NativePlatformRuntime extends PlatformRuntime
 
   @override
   final Uri origin;
+  @override
+  late final CoverTransport coverTransport = HttpCoverTransport(
+    origin: origin,
+    createClient: IOClient.new,
+    sessionHeaders: (target) async {
+      final cookies = await CookieManager.instance().getCookies(
+        url: WebUri(target.toString()),
+      );
+      return {
+        if (cookies.isNotEmpty)
+          'Cookie': cookies
+              .map((cookie) => '${cookie.name}=${cookie.value}')
+              .join('; '),
+      };
+    },
+  );
   HeadlessInAppWebView? _view;
   Future<void>? _viewRunning;
   InAppWebViewController? _controller;
@@ -583,6 +601,7 @@ final class NativePlatformRuntime extends PlatformRuntime
   Future<void> dispose() => _disposing ??= _dispose();
 
   Future<void> _dispose() async {
+    coverTransport.close();
     if (_disposed) return;
     _closing = true;
     final opening = _opening;

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/library_repository.dart';
+import '../../data/cover_repository.dart';
+import '../covers/custom_cover.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/catalog_page.dart';
 import '../reader/reader_recovery.dart';
@@ -35,6 +37,7 @@ class LibraryPage extends StatefulWidget {
 class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   final _search = TextEditingController();
   LibraryRepository? _repository;
+  CoverRepository? _covers;
   Stream<LibraryView>? _views;
   final _editLifecycle = ValueNotifier(0);
   String? _categoryFilter;
@@ -86,6 +89,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
       return;
     }
     _repository = next;
+    _covers = next == null ? null : CoverRepository(next.client);
     _selection.clear();
     _selecting = false;
     _refreshError = null;
@@ -673,7 +677,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                           ? (_) => _toggleSelection(entry.mangaKey)
                           : null,
                     )
-                  : const Icon(Icons.menu_book_outlined),
+                  : CustomCover(repository: _covers!, cover: entry.customCover),
               title: Text(entry.title),
               subtitle: Text(
                 [

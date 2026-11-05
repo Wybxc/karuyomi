@@ -50,6 +50,13 @@
       "when": 1793899845694,
       "tag": "0006_eager_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793913214192,
+      "tag": "0007_clumsy_victor_mancha",
+      "breakpoints": true
     }
   ]
 }

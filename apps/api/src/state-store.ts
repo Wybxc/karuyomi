@@ -1,4 +1,9 @@
-import { create, fromJsonString, toJsonString } from '@bufbuild/protobuf';
+import {
+  clone,
+  create,
+  fromJsonString,
+  toJsonString,
+} from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
   BookmarkPageResponseSchema,
@@ -8,6 +13,7 @@ import {
   CategoryMutationSchema,
   CategoryMutationResponseSchema,
   ChapterProgressStateSchema,
+  CustomCoverSchema,
   ChapterProgressPageResponseSchema,
   LibraryPageResponseSchema,
   MangaStateResponseSchema,
@@ -48,7 +54,7 @@ type MutationRow = {
   kind: string;
 };
 
-// The relation is authoritative. Manga JSON stores no second category list.
+// Relations are authoritative. Manga JSON stores no second category or cover reference.
 const catalogSql = `json_object('revision', COALESCE((SELECT categories_revision FROM account_state WHERE subject = ?1), 0),
   'categories', json((SELECT json_group_array(json_object('id', id, 'name', name)) FROM
     (SELECT id, name FROM categories WHERE subject = ?1 ORDER BY sort_order, id))))`;
@@ -58,7 +64,8 @@ function categoryIdsSql(mangaKeySql: string) {
     WHERE mc.subject = ?1 AND mc.manga_key = ${mangaKeySql} ORDER BY c.sort_order, c.id))`;
 }
 function mangaSql(alias: string) {
-  return `json_set(${alias}.state_json, '$.categoryIds', json(${categoryIdsSql(`${alias}.manga_key`)}))`;
+  return `json_set(${alias}.state_json, '$.categoryIds', json(${categoryIdsSql(`${alias}.manga_key`)}),
+    '$.customCover', json((SELECT descriptor_json FROM cover_assets WHERE subject = ?1 AND manga_key = ${alias}.manga_key)))`;
 }
 
 export class StateError extends Error {
@@ -438,6 +445,7 @@ export async function applyMutation(
   db: D1Database,
   subject: string,
   mutation: StateMutation,
+  uploadCover?: () => Promise<string>,
 ): Promise<{
   status: 200 | 400 | 409 | 413 | 503;
   response: StateMutationResponse;
@@ -505,12 +513,40 @@ export async function applyMutation(
         409,
       ),
     );
-  let manga: MangaState = create(MangaStateSchema, oldManga);
+  let manga: MangaState = clone(MangaStateSchema, oldManga);
   let progress: ChapterProgressState | undefined;
   let bookmark: ChapterBookmark | undefined;
+  let coverObjectKey: string | undefined;
   try {
     const operation = mutation.operation;
-    if (operation.case === 'setFavorite') {
+    if (operation.case === 'setCustomCover') {
+      const cover = operation.value.cover;
+      if (cover) {
+        if (!uploadCover)
+          throw new StateError(
+            ErrorCode.INVALID_INPUT,
+            'Cover images require multipart upload',
+          );
+        const used = await db
+          .prepare(
+            'SELECT manga_key, descriptor_json FROM cover_assets WHERE subject = ? AND asset_id = ?',
+          )
+          .bind(subject, cover.assetId)
+          .first<{ manga_key: string; descriptor_json: string }>();
+        const descriptorJson = toJsonString(CustomCoverSchema, cover);
+        if (
+          used &&
+          (used.manga_key !== mutation.mangaKey ||
+            used.descriptor_json !== descriptorJson)
+        )
+          throw new StateError(
+            ErrorCode.INVALID_INPUT,
+            'Cover identity is already in use',
+          );
+        coverObjectKey = await uploadCover();
+        manga.customCover = cover;
+      } else delete manga.customCover;
+    } else if (operation.case === 'setFavorite') {
       if (operation.value.metadata) {
         await validateMetadataKey(mutation.mangaKey, operation.value.metadata);
         manga.metadata = operation.value.metadata;
@@ -588,12 +624,20 @@ export async function applyMutation(
     mutation.operation.case === 'setCategories'
       ? mutation.operation.value
       : undefined;
+  const coverAssignment =
+    mutation.operation.case === 'setCustomCover'
+      ? mutation.operation.value
+      : undefined;
+  const cover = coverAssignment?.cover;
   const assignmentGate = assignment
     ? `AND COALESCE((SELECT categories_revision FROM account_state WHERE subject = ?1), 0) = ?9
     AND (SELECT count(*) FROM categories WHERE subject = ?1 AND id IN (SELECT value FROM json_each(?10))) = json_array_length(?10)`
-    : '';
-  const storedManga = create(MangaStateSchema, manga);
+    : cover
+      ? `AND NOT EXISTS (SELECT 1 FROM cover_assets WHERE subject = ?1 AND asset_id = ?9 AND (manga_key <> ?6 OR descriptor_json <> ?10))`
+      : '';
+  const storedManga = clone(MangaStateSchema, manga);
   storedManga.categoryIds = [];
+  delete storedManga.customCover;
   const gateBindings = [
     subject,
     mutation.mutationId,
@@ -608,7 +652,9 @@ export async function applyMutation(
           assignment.expectedCatalogRevision,
           JSON.stringify(assignment.categoryIds),
         ]
-      : []),
+      : cover
+        ? [cover.assetId, toJsonString(CustomCoverSchema, cover)]
+        : []),
   ];
   const statements = [
     db
@@ -644,6 +690,34 @@ export async function applyMutation(
         toJsonString(MangaStateSchema, storedManga),
       ),
   ];
+  if (coverAssignment) {
+    if (cover && coverObjectKey)
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO cover_assets(subject, manga_key, asset_id, object_key, descriptor_json)
+      SELECT ?1, ?4, ?5, ?6, ?7 WHERE ${winner}
+      ON CONFLICT(subject, manga_key) DO UPDATE SET asset_id = excluded.asset_id, object_key = excluded.object_key, descriptor_json = excluded.descriptor_json`,
+          )
+          .bind(
+            subject,
+            mutation.mutationId,
+            nonce,
+            mutation.mangaKey,
+            cover.assetId,
+            coverObjectKey,
+            toJsonString(CustomCoverSchema, cover),
+          ),
+      );
+    else
+      statements.push(
+        db
+          .prepare(
+            `DELETE FROM cover_assets WHERE subject = ?1 AND manga_key = ?4 AND ${winner}`,
+          )
+          .bind(subject, mutation.mutationId, nonce, mutation.mangaKey),
+      );
+  }
   if (assignment)
     statements.push(
       db

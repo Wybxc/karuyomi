@@ -188,7 +188,8 @@ final class TestBusinessServer implements ApiFetch {
       return response;
     }
     if (request.method == 'POST' &&
-        request.uri.path == '/api/state/mutations') {
+        (request.uri.path == '/api/state/mutations' ||
+            request.uri.path.startsWith('/api/covers/'))) {
       if (failWrites) {
         final mutation = wire.decodeProtoJson(
           wire.StateMutation(),
@@ -669,6 +670,22 @@ final class TestBusinessServer implements ApiFetch {
           chapterKey: operation.chapterKey,
           bookmarked: operation.bookmarked,
         );
+      case wire.StateMutation_Operation.setCustomCover:
+        if (mutation.setCustomCover.hasCover()) {
+          if (!request.uri.path.startsWith('/api/covers/')) {
+            return _mutationError(
+              account,
+              mutation,
+              wire
+                  .BusinessStateErrorCode
+                  .BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+              'Custom cover replacement requires a binary upload',
+            );
+          }
+          next.customCover = mutation.setCustomCover.cover.deepCopy();
+        } else {
+          next.clearCustomCover();
+        }
       case wire.StateMutation_Operation.notSet:
         throw StateError('Missing operation');
     }

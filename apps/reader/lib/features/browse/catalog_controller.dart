@@ -8,6 +8,7 @@ import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../runtime/runtime_platform_types.dart';
+import '../../runtime/cover_transport.dart';
 import '../../data/business_state_client.dart';
 import '../../data/bookmark_repository.dart';
 import '../../data/settings_repository.dart';
@@ -122,6 +123,15 @@ final class CatalogController extends ChangeNotifier {
   }
 
   final ApiFetch api;
+  CoverTransport? get _covers {
+    final transport = api;
+    if (transport is PlatformRuntime) return transport.coverTransport;
+    return switch (transport) {
+      CoverTransport covers => covers,
+      _ => null,
+    };
+  }
+
   final SourceRuntime runtime;
   final Future<void> Function() rebuildRuntime;
   final Uri? deploymentOrigin;
@@ -144,12 +154,13 @@ final class CatalogController extends ChangeNotifier {
       for (final client in _readingClients.keys) {
         if (client.repository.identity.key == identity.key) {
           retained = client.repository.client;
-          retained.rebindApi(api, verifiedIdentity: identity);
+          retained.rebindApi(api, verifiedIdentity: identity, covers: _covers);
           break;
         }
       }
       _businessClient =
-          retained ?? BusinessStateClient(api: api, identity: identity);
+          retained ??
+          BusinessStateClient(api: api, identity: identity, covers: _covers);
       _library = LibraryRepository(_businessClient!);
       _progress = ProgressRepository(_businessClient!);
       _bookmarks = BookmarkRepository(_businessClient!);
@@ -230,7 +241,11 @@ final class CatalogController extends ChangeNotifier {
         client.repository.identity.key == readingProgress?.identity.key;
     if (_progressClosing != null || !sameIdentity) return false;
     final clientState = client.repository.client;
-    clientState.rebindApi(api, verifiedIdentity: readingProgress!.identity);
+    clientState.rebindApi(
+      api,
+      verifiedIdentity: readingProgress!.identity,
+      covers: _covers,
+    );
     if (!identical(_businessClient, clientState)) {
       _businessClient = clientState;
       _library = LibraryRepository(clientState);
@@ -498,12 +513,13 @@ final class CatalogController extends ChangeNotifier {
       subject = confirmedSubject;
       final state = _confirmedBusinessClient;
       if (state != null) {
-        state.rebindApi(api, verifiedIdentity: state.identity);
+        state.rebindApi(api, verifiedIdentity: state.identity, covers: _covers);
         for (final client in _readingClients.keys) {
           if (client.repository.identity.key == state.identity.key) {
             client.repository.client.rebindApi(
               api,
               verifiedIdentity: state.identity,
+              covers: _covers,
             );
           }
         }

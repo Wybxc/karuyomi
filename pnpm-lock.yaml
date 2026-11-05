@@ -280,6 +280,9 @@ importers:
       vitest:
         specifier: 4.1.12
         version: 4.1.12(@types/node@26.6.6)(@vitest/browser-preview@4.1.12)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
+      wrangler:
+        specifier: 4.156.1
+        version: 4.156.1(patch_hash=4c400d62d70406b3c8e02673aae2d85dc1c5ef39607ad0d542ca00ded1cfd83c)(@types/node@26.6.6)
       write-file-atomic:
         specifier: 8.0.0
         version: 8.0.0
@@ -307,6 +310,9 @@ importers:
       hono:
         specifier: 4.13.16
         version: 4.13.16
+      image-dimensions:
+        specifier: 2.6.0
+        version: 2.6.0
       jose:
         specifier: 6.2.15
         version: 6.2.15

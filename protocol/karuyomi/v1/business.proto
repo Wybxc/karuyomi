@@ -19,6 +19,18 @@ message MangaResume {
   bool reversed_order = 2;
 }
 
+message CustomCover {
+  string asset_id = 1;
+  string content_type = 2;
+  uint32 byte_length = 3;
+  string sha256 = 4;
+}
+
+message SetCustomCover {
+  // Missing cover clears the current custom cover.
+  CustomCover cover = 1;
+}
+
 message MangaState {
   string manga_key = 1;
   // Covers every metadata, favorite, category, bookmark, progress and resume mutation.
@@ -28,6 +40,7 @@ message MangaState {
   uint32 added_at_seconds = 5;
   MangaResume resume = 6;
   repeated string category_ids = 7;
+  CustomCover custom_cover = 8;
 }
 
 message Category {
@@ -149,6 +162,7 @@ message StateMutation {
     SetCategories set_categories = 14;
     SetBookmark set_bookmark = 15;
     SetChapterRead set_chapter_read = 16;
+    SetCustomCover set_custom_cover = 17;
   }
 }
 

@@ -18,7 +18,8 @@
     "@karuyomi/protocol": "workspace:*",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.16",
-    "jose": "6.2.15"
+    "jose": "6.2.15",
+    "image-dimensions": "2.6.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.67.0",

@@ -358,6 +358,14 @@ export function createStateRoutes() {
         throw new StateError(ErrorCode.INVALID_INPUT, 'Invalid mutation');
       }
       mutationId = mutation.mutationId;
+      if (
+        mutation.operation.case === 'setCustomCover' &&
+        mutation.operation.value.cover
+      )
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Cover images require multipart upload',
+        );
       const result = await applyMutation(
         c.env.DB,
         c.get('identity').subject,

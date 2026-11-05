@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { createHttpBridge } from './http-bridge.js';
+import { createCoverRoutes } from './cover-routes.js';
 import { createStateRoutes } from './state-routes.js';
 import { createSettingsRoutes } from './settings-routes.js';
 import {
@@ -120,6 +121,7 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
   app.route('/api/bridge', createHttpBridge());
   app.route('/api', createStateRoutes());
   app.route('/api/settings', createSettingsRoutes());
+  app.route('/api/covers', createCoverRoutes());
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((_error, c) => c.json({ error: 'internal_error' }, 500));
   return app;

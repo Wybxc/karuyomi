@@ -275,11 +275,28 @@ void validateBusinessProgress(
   }
 }
 
+void validateBusinessCustomCover(wire.CustomCover value) {
+  _require(
+    _categoryId.hasMatch(value.assetId),
+    'Invalid custom cover identity',
+  );
+  _require(
+    value.contentType == 'image/jpeg' || value.contentType == 'image/png',
+    'Unsupported custom cover content type',
+  );
+  _require(
+    value.byteLength > 0 && value.byteLength <= 1024 * 1024,
+    'Custom cover exceeds its byte budget',
+  );
+  _require(_mangaKey.hasMatch(value.sha256), 'Invalid custom cover digest');
+}
+
 void validateBusinessManga(wire.MangaState value) {
   _key(value.mangaKey);
   validateBusinessRevision(value.revision);
   validateBusinessRevision(value.addedAtSeconds);
   validateBusinessCategoryIds(value.categoryIds);
+  if (value.hasCustomCover()) validateBusinessCustomCover(value.customCover);
   if (value.hasMetadata()) {
     validateBusinessMetadata(value.metadata);
     final expectedKey = sha256

@@ -180,6 +180,43 @@ final $typed_data.Uint8List mangaResumeDescriptor = $convert.base64Decode(
     'CgtNYW5nYVJlc3VtZRIfCgtjaGFwdGVyX2tleRgBIAEoCVIKY2hhcHRlcktleRIlCg5yZXZlcn'
     'NlZF9vcmRlchgCIAEoCFINcmV2ZXJzZWRPcmRlcg==');
 
+@$core.Deprecated('Use customCoverDescriptor instead')
+const CustomCover$json = {
+  '1': 'CustomCover',
+  '2': [
+    {'1': 'asset_id', '3': 1, '4': 1, '5': 9, '10': 'assetId'},
+    {'1': 'content_type', '3': 2, '4': 1, '5': 9, '10': 'contentType'},
+    {'1': 'byte_length', '3': 3, '4': 1, '5': 13, '10': 'byteLength'},
+    {'1': 'sha256', '3': 4, '4': 1, '5': 9, '10': 'sha256'},
+  ],
+};
+
+/// Descriptor for `CustomCover`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List customCoverDescriptor = $convert.base64Decode(
+    'CgtDdXN0b21Db3ZlchIZCghhc3NldF9pZBgBIAEoCVIHYXNzZXRJZBIhCgxjb250ZW50X3R5cG'
+    'UYAiABKAlSC2NvbnRlbnRUeXBlEh8KC2J5dGVfbGVuZ3RoGAMgASgNUgpieXRlTGVuZ3RoEhYK'
+    'BnNoYTI1NhgEIAEoCVIGc2hhMjU2');
+
+@$core.Deprecated('Use setCustomCoverDescriptor instead')
+const SetCustomCover$json = {
+  '1': 'SetCustomCover',
+  '2': [
+    {
+      '1': 'cover',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CustomCover',
+      '10': 'cover'
+    },
+  ],
+};
+
+/// Descriptor for `SetCustomCover`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setCustomCoverDescriptor = $convert.base64Decode(
+    'Cg5TZXRDdXN0b21Db3ZlchIuCgVjb3ZlchgBIAEoCzIYLmthcnV5b21pLnYxLkN1c3RvbUNvdm'
+    'VyUgVjb3Zlcg==');
+
 @$core.Deprecated('Use mangaStateDescriptor instead')
 const MangaState$json = {
   '1': 'MangaState',
@@ -205,6 +242,14 @@ const MangaState$json = {
       '10': 'resume'
     },
     {'1': 'category_ids', '3': 7, '4': 3, '5': 9, '10': 'categoryIds'},
+    {
+      '1': 'custom_cover',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CustomCover',
+      '10': 'customCover'
+    },
   ],
 };
 
@@ -215,7 +260,8 @@ final $typed_data.Uint8List mangaStateDescriptor = $convert.base64Decode(
     'dGFkYXRhUghtZXRhZGF0YRIaCghmYXZvcml0ZRgEIAEoCFIIZmF2b3JpdGUSKAoQYWRkZWRfYX'
     'Rfc2Vjb25kcxgFIAEoDVIOYWRkZWRBdFNlY29uZHMSMAoGcmVzdW1lGAYgASgLMhgua2FydXlv'
     'bWkudjEuTWFuZ2FSZXN1bWVSBnJlc3VtZRIhCgxjYXRlZ29yeV9pZHMYByADKAlSC2NhdGVnb3'
-    'J5SWRz');
+    'J5SWRzEjsKDGN1c3RvbV9jb3ZlchgIIAEoCzIYLmthcnV5b21pLnYxLkN1c3RvbUNvdmVyUgtj'
+    'dXN0b21Db3Zlcg==');
 
 @$core.Deprecated('Use categoryDescriptor instead')
 const Category$json = {
@@ -668,6 +714,15 @@ const StateMutation$json = {
       '9': 0,
       '10': 'setChapterRead'
     },
+    {
+      '1': 'set_custom_cover',
+      '3': 17,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SetCustomCover',
+      '9': 0,
+      '10': 'setCustomCover'
+    },
   ],
   '8': [
     {'1': 'operation'},
@@ -687,7 +742,9 @@ final $typed_data.Uint8List stateMutationDescriptor = $convert.base64Decode(
     'Z29yaWVzGA4gASgLMhoua2FydXlvbWkudjEuU2V0Q2F0ZWdvcmllc0gAUg1zZXRDYXRlZ29yaW'
     'VzEj0KDHNldF9ib29rbWFyaxgPIAEoCzIYLmthcnV5b21pLnYxLlNldEJvb2ttYXJrSABSC3Nl'
     'dEJvb2ttYXJrEkcKEHNldF9jaGFwdGVyX3JlYWQYECABKAsyGy5rYXJ1eW9taS52MS5TZXRDaG'
-    'FwdGVyUmVhZEgAUg5zZXRDaGFwdGVyUmVhZEILCglvcGVyYXRpb24=');
+    'FwdGVyUmVhZEgAUg5zZXRDaGFwdGVyUmVhZBJHChBzZXRfY3VzdG9tX2NvdmVyGBEgASgLMhsu'
+    'a2FydXlvbWkudjEuU2V0Q3VzdG9tQ292ZXJIAFIOc2V0Q3VzdG9tQ292ZXJCCwoJb3BlcmF0aW'
+    '9u');
 
 @$core.Deprecated('Use businessStateErrorDescriptor instead')
 const BusinessStateError$json = {

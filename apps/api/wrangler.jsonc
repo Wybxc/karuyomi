@@ -31,6 +31,7 @@
       "migrations_dir": "migrations",
     },
   ],
+  "r2_buckets": [{ "binding": "COVERS", "bucket_name": "karuyomi-covers" }],
   "durable_objects": {
     "bindings": [
       { "name": "RUNTIME_SESSIONS", "class_name": "RuntimeSession" },

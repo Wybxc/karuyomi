@@ -23,11 +23,18 @@ final class LibraryEntry {
     required this.addedAt,
     List<String> categoryIds = const [],
     this.revision = 0,
-  }) : snapshot = manga.deepCopy()..freeze(),
+    wire.CustomCover? customCover,
+  }) : customCover = customCover == null
+           ? null
+           : (customCover.deepCopy()..freeze()),
+       snapshot = manga.deepCopy()..freeze(),
        categoryIds = List.unmodifiable(categoryIds) {
     _validateMetadata(packageName, sourceId, sourceName, sourceLang, snapshot);
     validateBusinessCategoryIds(this.categoryIds);
     validateBusinessRevision(revision);
+    if (this.customCover != null) {
+      validateBusinessCustomCover(this.customCover!);
+    }
   }
 
   final String packageName;
@@ -38,6 +45,7 @@ final class LibraryEntry {
   final DateTime addedAt;
   final List<String> categoryIds;
   final int revision;
+  final wire.CustomCover? customCover;
   String get mangaKey => _mangaKey(packageName, sourceId, snapshot.url);
   String get title => snapshot.title;
   String get url => snapshot.url;
@@ -245,6 +253,7 @@ LibraryEntry _entry(wire.MangaState state) {
     ),
     categoryIds: state.categoryIds,
     revision: state.revision,
+    customCover: state.hasCustomCover() ? state.customCover : null,
   );
   if (entry.mangaKey != state.mangaKey) {
     throw const FormatException('Library metadata identity mismatch');

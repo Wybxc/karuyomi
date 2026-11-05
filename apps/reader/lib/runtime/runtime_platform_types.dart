@@ -3,6 +3,10 @@ import 'package:flutter/widgets.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
+import 'api_fetch.dart';
+import 'cover_transport.dart';
+export 'api_fetch.dart';
+
 /// Native returns JSON.stringify output so JS integer tokens survive the
 /// WebView's otherwise all-double JavaScript Number conversion.
 Object? decodeNativeControlResult(Object? value) {
@@ -15,31 +19,11 @@ Object? decodeNativeControlResult(Object? value) {
   return jsonDecode(value);
 }
 
-final class ApiReply {
-  const ApiReply({
-    required this.status,
-    required this.headers,
-    required this.body,
-    required this.redirected,
-  });
-  final int status;
-  final Map<String, String> headers;
-  final String body;
-  final bool redirected;
-}
-
-abstract interface class ApiFetch {
-  Future<ApiReply> fetchApi(
-    String path, {
-    String method = 'GET',
-    Map<String, String> headers = const {},
-    String? body,
-  });
-}
-
 abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
   late final TransportSourceRuntime runtime = TransportSourceRuntime(this);
   Uri get origin;
+
+  CoverTransport? get coverTransport => null;
 
   /// Web leaves this page; native returns after bootstrap confirms the cookie.
   Future<bool> authenticate(

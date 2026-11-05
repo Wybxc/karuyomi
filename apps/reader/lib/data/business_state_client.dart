@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:uuid/uuid.dart';
 
+import '../runtime/cover_transport.dart';
 import '../runtime/runtime_platform_types.dart';
 import 'business_state_validation.dart';
 import 'reading_progress.dart';
@@ -57,12 +59,14 @@ final class _PendingMutation {
     this.body,
     this.accountRevision,
     this.requireExactRevision,
+    this.coverBytes,
   );
   final String fingerprint;
   final wire.StateMutation request;
   final String body;
   final int accountRevision;
   final bool requireExactRevision;
+  final Uint8List? coverBytes;
   bool rejected = false;
   bool sent = false;
   BusinessStateException? failure;
@@ -118,13 +122,15 @@ final class BusinessStateClient {
   BusinessStateClient({
     required ApiFetch api,
     required ProgressIdentity identity,
-  }) : this._(api, identity);
+    CoverTransport? covers,
+  }) : this._(api, identity, covers);
 
-  BusinessStateClient._(this._api, this.identity);
+  BusinessStateClient._(this._api, this.identity, this._covers);
 
   ApiFetch _api;
   ApiFetch get api => _api;
   final ProgressIdentity identity;
+  CoverTransport? _covers;
   final _changes = StreamController<void>.broadcast(sync: true);
   final _manga = <String, wire.MangaState>{};
   final _remoteRevisions = <String, int>{};
@@ -153,12 +159,17 @@ final class BusinessStateClient {
       basedOnRevision <= revision &&
       basedOnRevision >= (_remoteRevisions[key] ?? 0);
 
-  void rebindApi(ApiFetch api, {required ProgressIdentity verifiedIdentity}) {
+  void rebindApi(
+    ApiFetch api, {
+    required ProgressIdentity verifiedIdentity,
+    CoverTransport? covers,
+  }) {
     _ensureOpen();
     if (verifiedIdentity.key != identity.key) {
       throw ArgumentError('A business session cannot change identity');
     }
     _api = api;
+    _covers = covers;
   }
 
   Map<String, String> get _headers => {
@@ -539,12 +550,56 @@ final class BusinessStateClient {
     return value;
   }
 
+  ({
+    wire.CustomCover? cover,
+    Uint8List? bytes,
+    int basedOnRevision,
+    bool retryable,
+  })?
+  pendingCover(String key) {
+    _ensureOpen();
+    final pending = _pending[key];
+    if (pending == null || !pending.request.hasSetCustomCover()) return null;
+    return (
+      cover: pending.request.setCustomCover.hasCover()
+          ? pending.request.setCustomCover.cover
+          : null,
+      bytes: pending.coverBytes,
+      basedOnRevision: pending.request.expectedRevision,
+      retryable: !pending.rejected,
+    );
+  }
+
+  Future<wire.StateMutationResponse> retryCover(String key) => _serial(key, () {
+    final pending = _pending[key];
+    if (pending == null || !pending.request.hasSetCustomCover()) {
+      throw StateError('No pending custom cover operation');
+    }
+    return _send(pending);
+  });
+
+  Future<Uint8List> readCover(wire.CustomCover cover) async {
+    _ensureOpen();
+    validateBusinessCustomCover(cover);
+    final transport = _covers;
+    if (transport == null) throw StateError('Cover transport is unavailable');
+    final bytes = await transport.readCover(
+      assetId: cover.assetId,
+      subject: identity.subject,
+      sha256: cover.sha256,
+      byteLength: cover.byteLength,
+    );
+    _ensureOpen();
+    return bytes;
+  }
+
   /// Operation objects contain no transport identity or revision. A failed
   /// attempt retains its exact request and UUID, including after a lost reply.
   Future<wire.StateMutationResponse> mutate(
     wire.StateMutation operation, {
     int? basedOnRevision,
     bool requireExactRevision = false,
+    Uint8List? coverBytes,
   }) {
     final command = operation.deepCopy();
     if (command.mangaKey.isEmpty) throw ArgumentError('Missing manga key');
@@ -570,6 +625,29 @@ final class BusinessStateClient {
         throw ArgumentError('Chapter read changes require an exact revision');
       }
     }
+    if (command.hasSetCustomCover()) {
+      if (!requireExactRevision) {
+        throw ArgumentError('Custom cover changes require an exact revision');
+      }
+      validateBusinessMangaKey(command.mangaKey);
+      if (command.setCustomCover.hasCover()) {
+        validateBusinessCustomCover(command.setCustomCover.cover);
+        if (coverBytes == null ||
+            coverBytes.length != command.setCustomCover.cover.byteLength) {
+          throw ArgumentError(
+            'Custom cover upload requires its original bytes',
+          );
+        }
+        if (_covers == null) throw StateError('Cover transport is unavailable');
+      } else if (coverBytes != null) {
+        throw ArgumentError('Clearing a custom cover cannot upload bytes');
+      }
+    } else if (coverBytes != null) {
+      throw ArgumentError('Only a custom cover mutation can upload bytes');
+    }
+    final upload = coverBytes == null
+        ? null
+        : Uint8List.fromList(coverBytes).asUnmodifiableView();
     final fingerprint = jsonEncode(wire.encodeProtoJson(command));
     return _serial(command.mangaKey, () async {
       final previous = _pending[command.mangaKey];
@@ -629,6 +707,7 @@ final class BusinessStateClient {
         jsonEncode(wire.encodeProtoJson(command)),
         _accountRevision,
         requireExactRevision,
+        upload,
       );
       _pending[command.mangaKey] = pending;
       return _send(pending);
@@ -640,12 +719,26 @@ final class BusinessStateClient {
     if (pending.rejected && pending.failure != null) throw pending.failure!;
     final retry = pending.sent;
     pending.sent = true;
-    final reply = await api.fetchApi(
-      '/api/state/mutations',
-      method: 'POST',
-      headers: {..._headers, 'Content-Type': 'application/json'},
-      body: pending.body,
-    );
+    final upload = pending.coverBytes;
+    final ApiReply reply;
+    if (upload != null) {
+      final transport = _covers;
+      if (transport == null) throw StateError('Cover transport is unavailable');
+      reply = await transport.uploadCover(
+        mangaKey: pending.request.mangaKey,
+        mutation: pending.body,
+        subject: identity.subject,
+        bytes: upload,
+        contentType: pending.request.setCustomCover.cover.contentType,
+      );
+    } else {
+      reply = await api.fetchApi(
+        '/api/state/mutations',
+        method: 'POST',
+        headers: {..._headers, 'Content-Type': 'application/json'},
+        body: pending.body,
+      );
+    }
     _ensureOpen();
     _budget(reply);
     final value = wire.decodeProtoJson(
@@ -729,6 +822,9 @@ final class BusinessStateClient {
         }
       }
     }
+    if (!_coverMatches(pending.request, value.manga)) {
+      throw const FormatException('Mutation response custom cover mismatch');
+    }
     final expectedChapter = _operationChapter(pending.request);
     final chapterRead = pending.request.hasSetChapterRead()
         ? pending.request.setChapterRead
@@ -788,7 +884,10 @@ final class BusinessStateClient {
         bookmark != null &&
         current != null &&
         current.bookmark.bookmarked != bookmark.bookmarked;
+    final coverChanged =
+        current != null && !_coverMatches(pending.request, current.manga);
     if (bookmarkChanged ||
+        coverChanged ||
         (bookmark == null &&
             value.manga.revision <
                 (_manga[value.manga.mangaKey]?.revision ?? 0))) {
@@ -1328,3 +1427,9 @@ bool _settingsMatch(
 ) => command.hasSetGlobal()
     ? value.global.values == command.setGlobal
     : value.manga.overrides == command.setManga.overrides;
+
+bool _coverMatches(wire.StateMutation request, wire.MangaState manga) =>
+    !request.hasSetCustomCover() ||
+    (request.setCustomCover.hasCover() == manga.hasCustomCover() &&
+        (!manga.hasCustomCover() ||
+            request.setCustomCover.cover == manga.customCover));

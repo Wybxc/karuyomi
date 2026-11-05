@@ -52,7 +52,7 @@ test('declared Vite assets bypass the Worker and retain their headers', async ()
   expect(host.headers.get('X-Karuyomi-Probe-Worker')).toBe('1');
 });
 
-test('generated Worker config applies D1 migrations and verifies the test JWT', async () => {
+test('generated Worker config applies D1 migrations, binds private R2 and verifies the test JWT', async () => {
   expect((await worker.fetch(`${origin}/api/categories`)).status).toBe(401);
   const token = await new SignJWT({ email: 'owner@example.com' })
     .setProtectedHeader({ alg: 'RS256', kid: 'vite-harness' })
@@ -75,4 +75,15 @@ test('generated Worker config applies D1 migrations and verifies the test JWT', 
     categories: [],
   });
   expect(catalog.error).toBeUndefined();
+  const bindings = await worker.getEnv();
+  expect(
+    await bindings.DB.prepare('SELECT count(*) count FROM cover_assets').first(
+      'count',
+    ),
+  ).toBe(0);
+  await bindings.COVERS.put('harness-private-cover', 'private R2 binding');
+  expect(
+    await (await bindings.COVERS.get('harness-private-cover'))?.text(),
+  ).toBe('private R2 binding');
+  await bindings.COVERS.delete('harness-private-cover');
 });

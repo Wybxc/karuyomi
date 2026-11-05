@@ -2,9 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
+import '../../data/cover_repository.dart';
+import '../covers/custom_cover.dart';
+import '../covers/custom_cover_editor.dart';
 import '../../data/business_state_client.dart';
 import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
@@ -311,7 +315,10 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   String? _resumeError;
   bool _opening = false;
   LibraryRepository? _library;
-  Stream<bool>? _favoriteStream;
+  Stream<wire.MangaState?>? _mangaStream;
+  CoverRepository? _covers;
+  final _coverLifecycle = ValueNotifier(0);
+  bool _editingCover = false;
   bool _savingFavorite = false;
   String? _favoriteError;
   ChapterBookmarksController? _bookmarks;
@@ -356,7 +363,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         );
       }
       _library = controller.library;
-      _favoriteStream = _library?.watchFavorite(_sequence!.mangaKey);
+      _mangaStream = _library?.client.watchManga(_sequence!.mangaKey);
+      if (_library != null) _covers = CoverRepository(_library!.client);
       final repository = controller.bookmarks;
       if (repository != null) {
         _bookmarks = ChapterBookmarksController(
@@ -414,6 +422,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
 
   void _detailsChanged() {
     if (!mounted) return;
+    _coverLifecycle.value++;
     if (SchedulerBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -429,6 +438,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     if (!_detailsExpired &&
         (controller.status != ServiceStatus.ready ||
             !controller.isCurrentSource(source) ||
+            (_library != null &&
+                !identical(controller.library?.client, _library?.client)) ||
             (progress != null &&
                 !identical(controller.readingProgress, progress.repository)))) {
       _detailsExpired = true;
@@ -458,6 +469,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
 
   @override
   void dispose() {
+    _coverLifecycle.value++;
+    _coverLifecycle.dispose();
     WidgetsBinding.instance.removeObserver(this);
     controller.removeListener(_catalogChanged);
     _bookmarks?.removeListener(_bookmarksChanged);
@@ -514,6 +527,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     final build = controller.activeBuild;
     final selectedSource = controller.activeSource;
     if (_savingFavorite ||
+        _editingCover ||
         repository == null ||
         build == null ||
         selectedSource == null ||
@@ -553,29 +567,109 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     }
   }
 
-  Widget _favoriteControl() => StreamBuilder<bool>(
-    stream: _favoriteStream,
+  Future<void> _editCover() async {
+    final repository = _covers;
+    final sequence = _sequence;
+    final catalog = controller;
+    final selectedSource = source;
+    final route = ModalRoute.of(context);
+    if (_editingCover ||
+        _savingFavorite ||
+        _opening ||
+        repository == null ||
+        sequence == null) {
+      return;
+    }
+    final identity = repository.identity.key;
+    bool current() =>
+        mounted &&
+        !_detailsExpired &&
+        identical(widget.controller, catalog) &&
+        identical(catalog.library?.client, repository.client) &&
+        repository.identity.key == identity &&
+        catalog.status == ServiceStatus.ready &&
+        catalog.isCurrentSource(selectedSource) &&
+        route?.isActive == true;
+    if (!current()) return;
+    setState(() => _editingCover = true);
+    try {
+      await showCustomCoverEditor(
+        context: context,
+        controller: catalog,
+        repository: repository,
+        mangaKey: sequence.mangaKey,
+        lifecycle: _coverLifecycle,
+        isCurrent: current,
+      );
+    } finally {
+      if (mounted) setState(() => _editingCover = false);
+    }
+  }
+
+  Widget _favoriteControl() => StreamBuilder<wire.MangaState?>(
+    key: ValueKey((_library?.client, _sequence?.mangaKey)),
+    stream: _mangaStream,
     builder: (context, snapshot) {
-      final favorite = snapshot.data ?? false;
+      final state = snapshot.data;
+      final favorite = state?.favorite ?? false;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          OutlinedButton.icon(
-            onPressed: !snapshot.hasData || _savingFavorite || _opening
-                ? null
-                : () => unawaited(_setFavorite(!favorite)),
-            icon: Icon(favorite ? Icons.bookmark : Icons.bookmark_add_outlined),
-            label: Text(
-              _savingFavorite
-                  ? '正在保存'
-                  : favorite
-                  ? '移出书架'
-                  : '加入书架',
-            ),
+          Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              CustomCover(
+                repository: _covers!,
+                cover: state?.hasCustomCover() == true
+                    ? state!.customCover
+                    : null,
+                width: 96,
+                height: 128,
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed:
+                        !snapshot.hasData ||
+                            _savingFavorite ||
+                            _opening ||
+                            _editingCover
+                        ? null
+                        : () => unawaited(_setFavorite(!favorite)),
+                    icon: Icon(
+                      favorite ? Icons.bookmark : Icons.bookmark_add_outlined,
+                    ),
+                    label: Text(
+                      _savingFavorite
+                          ? '正在保存'
+                          : favorite
+                          ? '移出书架'
+                          : '加入书架',
+                    ),
+                  ),
+                  TextButton.icon(
+                    key: const ValueKey('custom-cover-editor'),
+                    onPressed:
+                        !snapshot.hasData ||
+                            _savingFavorite ||
+                            _opening ||
+                            _editingCover
+                        ? null
+                        : () => unawaited(_editCover()),
+                    icon: const Icon(Icons.image_outlined),
+                    label: const Text('自定义封面'),
+                  ),
+                ],
+              ),
+            ],
           ),
           if (_favoriteError != null || snapshot.hasError)
             _Notice(
-              text: _favoriteError ?? '未能读取收藏状态，请返回书架重试；仍可继续阅读。',
+              text: _favoriteError ?? '未能读取作品状态，请返回书架重试；仍可继续阅读。',
               icon: Icons.warning_amber,
             ),
         ],
@@ -1177,6 +1271,10 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                 child: ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
+                    if (_library != null) ...[
+                      _favoriteControl(),
+                      const SizedBox(height: 16),
+                    ],
                     Text(
                       manga.title,
                       style: Theme.of(context).textTheme.headlineMedium,
@@ -1200,10 +1298,6 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                     if (manga.description?.isNotEmpty ?? false) ...[
                       const SizedBox(height: 16),
                       SelectableText(manga.description!),
-                    ],
-                    if (_library != null) ...[
-                      const SizedBox(height: 16),
-                      _favoriteControl(),
                     ],
                     const SizedBox(height: 32),
                     if (_resume case final resume?)

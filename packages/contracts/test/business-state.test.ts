@@ -545,3 +545,59 @@ test('reading anchors validate all source and viewport coordinates on both reque
     }
   }
 });
+
+test('custom covers preserve set/clear presence and validate descriptor identities, formats and byte budgets at every state boundary', () => {
+  const cover = {
+    assetId: id,
+    contentType: 'image/png',
+    byteLength: 1024,
+    sha256: 'a'.repeat(64),
+  };
+  const command = {
+    ...base,
+    mangaKey: 'a'.repeat(64),
+    setCustomCover: { cover },
+  };
+  const parsed = stateMutationSchema.parse(command);
+  expect(parsed.operation).toMatchObject({
+    case: 'setCustomCover',
+    value: { cover },
+  });
+  const removed = stateMutationSchema.parse({
+    ...command,
+    setCustomCover: {},
+  }).operation;
+  expect(removed.case).toBe('setCustomCover');
+  if (removed.case === 'setCustomCover')
+    expect(removed.value.cover).toBeUndefined();
+  const response = {
+    schemaVersion: 1,
+    manga: { mangaKey: command.mangaKey, customCover: cover },
+    categoryCatalog: {},
+  };
+  expect(
+    mangaStateResponseSchema.parse(response).manga?.customCover,
+  ).toMatchObject(cover);
+  for (const invalid of [
+    { ...cover, assetId: 'invalid' },
+    { ...cover, contentType: 'image/gif' },
+    { ...cover, byteLength: 0 },
+    { ...cover, byteLength: 1048577 },
+    { ...cover, byteLength: 1.1 },
+    { ...cover, sha256: 'A'.repeat(64) },
+    { ...cover, sha256: 'a'.repeat(63) },
+  ]) {
+    expect(() =>
+      stateMutationSchema.parse({
+        ...command,
+        setCustomCover: { cover: invalid },
+      }),
+    ).toThrow();
+    expect(() =>
+      mangaStateResponseSchema.parse({
+        ...response,
+        manga: { ...response.manga, customCover: invalid },
+      }),
+    ).toThrow();
+  }
+});

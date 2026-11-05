@@ -228,6 +228,12 @@ export const businessSnapshot: JsonObject = {
   manifestVersion: 'manifest-golden',
   pageKeys: ['p-0', 'p-1'],
 };
+export const businessCover: JsonObject = {
+  assetId: '35b6103d-08f4-4604-b958-42fe15c50377',
+  contentType: 'image/png',
+  byteLength: 1048576,
+  sha256: 'a'.repeat(64),
+};
 export const businessManga: JsonObject = {
   mangaKey: businessMangaKey,
   revision: 4294967295,
@@ -236,6 +242,7 @@ export const businessManga: JsonObject = {
   addedAtSeconds: 4294967295,
   resume: { chapterKey: 'chapter-golden', reversedOrder: true },
   categoryIds: ['f99489f0-3f30-4d7c-8cb1-0f456c40319d'],
+  customCover: businessCover,
 };
 const categoryCatalog: JsonObject = {
   revision: 3,
@@ -375,6 +382,7 @@ export const goldenFixtures: GoldenFixture[] = [
       ],
       ['resetProgress', { snapshot: businessSnapshot, reversedOrder: false }],
       ['setChapterRead', { chapterKey: 'chapter-golden', read: true }],
+      ['setCustomCover', { cover: businessCover }],
       [
         'setCategories',
         {
@@ -395,6 +403,11 @@ export const goldenFixtures: GoldenFixture[] = [
       ...businessMutation,
       setChapterRead: { chapterKey: 'chapter-golden', read: false },
     },
+  },
+  {
+    name: 'business-mutation-clear-custom-cover',
+    type: 'StateMutation',
+    value: { ...businessMutation, setCustomCover: {} },
   },
   {
     name: 'business-mutation-remove-favorite-without-metadata',

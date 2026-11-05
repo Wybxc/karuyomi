@@ -21,6 +21,8 @@ export const BOOKMARK_PAGE_SIZE = 64;
 export const CHAPTER_PROGRESS_PAGE_SIZE = 64;
 export const CHAPTER_PAGE_LIMIT = 2048;
 export const CATEGORY_LIMIT = 64;
+export const COVER_BYTE_LIMIT = 1024 * 1024;
+export const COVER_DIMENSION_LIMIT = 4096;
 
 const mutationId = z.uuid();
 const mangaKey = z.string().regex(/^[a-f0-9]{64}$/);
@@ -206,11 +208,21 @@ export function validateChapterSnapshot(value: pb.ChapterSnapshot): void {
   value.pageKeys.forEach(validId);
 }
 
+export function validateCustomCover(value: pb.CustomCover): void {
+  z.uuidv4().parse(value.assetId);
+  z.enum(['image/jpeg', 'image/png']).parse(value.contentType);
+  z.int().min(1).max(COVER_BYTE_LIMIT).parse(value.byteLength);
+  z.string()
+    .regex(/^[a-f0-9]{64}$/)
+    .parse(value.sha256);
+}
+
 export function validateMangaState(value: pb.MangaState): void {
   mangaKey.parse(value.mangaKey);
   uint32(value.revision);
   uint32(value.addedAtSeconds);
   if (value.metadata) validateLibraryMetadata(value.metadata);
+  if (value.customCover) validateCustomCover(value.customCover);
   requireCondition(
     !value.favorite || value.metadata !== undefined,
     'Favorite manga requires Source metadata',
@@ -233,6 +245,10 @@ export const stateMutationSchema = codec<pb.StateMutation>((input) => {
   mangaKey.parse(value.mangaKey);
   uint32(value.expectedRevision);
   switch (value.operation.case) {
+    case 'setCustomCover':
+      if (value.operation.value.cover)
+        validateCustomCover(value.operation.value.cover);
+      break;
     case 'setFavorite':
       if (value.operation.value.metadata)
         validateLibraryMetadata(value.operation.value.metadata);

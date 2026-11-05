@@ -200,6 +200,160 @@ class MangaResume extends $pb.GeneratedMessage {
   void clearReversedOrder() => $_clearField(2);
 }
 
+class CustomCover extends $pb.GeneratedMessage {
+  factory CustomCover({
+    $core.String? assetId,
+    $core.String? contentType,
+    $core.int? byteLength,
+    $core.String? sha256,
+  }) {
+    final result = CustomCover._();
+    if (assetId != null) result.assetId = assetId;
+    if (contentType != null) result.contentType = contentType;
+    if (byteLength != null) result.byteLength = byteLength;
+    if (sha256 != null) result.sha256 = sha256;
+    return result;
+  }
+
+  CustomCover._();
+
+  factory CustomCover.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CustomCover()..mergeFromBuffer(data, registry);
+  factory CustomCover.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CustomCover()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CustomCover',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CustomCover.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'assetId')
+    ..aOS(2, _omitFieldNames ? '' : 'contentType')
+    ..aI(3, _omitFieldNames ? '' : 'byteLength', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(4, _omitFieldNames ? '' : 'sha256')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CustomCover clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CustomCover copyWith(void Function(CustomCover) updates) =>
+      super.copyWith((message) => updates(message as CustomCover))
+          as CustomCover;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CustomCover() / CustomCover.new instead')
+  static CustomCover create() => CustomCover._();
+  static $pb.GeneratedMessage $_createMessage() => CustomCover._();
+  @$core.override
+  CustomCover createEmptyInstance() => CustomCover._();
+  @$core.pragma('dart2js:noInline')
+  static CustomCover getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CustomCover>(
+          CustomCover.$_createMessage);
+  static CustomCover? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get assetId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set assetId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAssetId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAssetId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get contentType => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set contentType($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasContentType() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearContentType() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get byteLength => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set byteLength($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasByteLength() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearByteLength() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get sha256 => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set sha256($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSha256() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSha256() => $_clearField(4);
+}
+
+class SetCustomCover extends $pb.GeneratedMessage {
+  factory SetCustomCover({
+    CustomCover? cover,
+  }) {
+    final result = SetCustomCover._();
+    if (cover != null) result.cover = cover;
+    return result;
+  }
+
+  SetCustomCover._();
+
+  factory SetCustomCover.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetCustomCover()..mergeFromBuffer(data, registry);
+  factory SetCustomCover.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetCustomCover()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetCustomCover',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SetCustomCover.$_createMessage)
+    ..aOM<CustomCover>(1, _omitFieldNames ? '' : 'cover',
+        subBuilder: CustomCover.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetCustomCover clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetCustomCover copyWith(void Function(SetCustomCover) updates) =>
+      super.copyWith((message) => updates(message as SetCustomCover))
+          as SetCustomCover;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SetCustomCover() / SetCustomCover.new instead')
+  static SetCustomCover create() => SetCustomCover._();
+  static $pb.GeneratedMessage $_createMessage() => SetCustomCover._();
+  @$core.override
+  SetCustomCover createEmptyInstance() => SetCustomCover._();
+  @$core.pragma('dart2js:noInline')
+  static SetCustomCover getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SetCustomCover>(
+          SetCustomCover.$_createMessage);
+  static SetCustomCover? _defaultInstance;
+
+  /// Missing cover clears the current custom cover.
+  @$pb.TagNumber(1)
+  CustomCover get cover => $_getN(0);
+  @$pb.TagNumber(1)
+  set cover(CustomCover value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCover() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCover() => $_clearField(1);
+  @$pb.TagNumber(1)
+  CustomCover ensureCover() => $_ensure(0);
+}
+
 class MangaState extends $pb.GeneratedMessage {
   factory MangaState({
     $core.String? mangaKey,
@@ -209,6 +363,7 @@ class MangaState extends $pb.GeneratedMessage {
     $core.int? addedAtSeconds,
     MangaResume? resume,
     $core.Iterable<$core.String>? categoryIds,
+    CustomCover? customCover,
   }) {
     final result = MangaState._();
     if (mangaKey != null) result.mangaKey = mangaKey;
@@ -218,6 +373,7 @@ class MangaState extends $pb.GeneratedMessage {
     if (addedAtSeconds != null) result.addedAtSeconds = addedAtSeconds;
     if (resume != null) result.resume = resume;
     if (categoryIds != null) result.categoryIds.addAll(categoryIds);
+    if (customCover != null) result.customCover = customCover;
     return result;
   }
 
@@ -244,6 +400,8 @@ class MangaState extends $pb.GeneratedMessage {
     ..aOM<MangaResume>(6, _omitFieldNames ? '' : 'resume',
         subBuilder: MangaResume.$_createMessage)
     ..pPS(7, _omitFieldNames ? '' : 'categoryIds')
+    ..aOM<CustomCover>(8, _omitFieldNames ? '' : 'customCover',
+        subBuilder: CustomCover.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -327,6 +485,17 @@ class MangaState extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(7)
   $pb.PbList<$core.String> get categoryIds => $_getList(6);
+
+  @$pb.TagNumber(8)
+  CustomCover get customCover => $_getN(7);
+  @$pb.TagNumber(8)
+  set customCover(CustomCover value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCustomCover() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCustomCover() => $_clearField(8);
+  @$pb.TagNumber(8)
+  CustomCover ensureCustomCover() => $_ensure(7);
 }
 
 class Category extends $pb.GeneratedMessage {
@@ -1714,6 +1883,7 @@ enum StateMutation_Operation {
   setCategories,
   setBookmark,
   setChapterRead,
+  setCustomCover,
   notSet
 }
 
@@ -1730,6 +1900,7 @@ class StateMutation extends $pb.GeneratedMessage {
     SetCategories? setCategories,
     SetBookmark? setBookmark,
     SetChapterRead? setChapterRead,
+    SetCustomCover? setCustomCover,
   }) {
     final result = StateMutation._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1743,6 +1914,7 @@ class StateMutation extends $pb.GeneratedMessage {
     if (setCategories != null) result.setCategories = setCategories;
     if (setBookmark != null) result.setBookmark = setBookmark;
     if (setChapterRead != null) result.setChapterRead = setChapterRead;
+    if (setCustomCover != null) result.setCustomCover = setCustomCover;
     return result;
   }
 
@@ -1764,13 +1936,14 @@ class StateMutation extends $pb.GeneratedMessage {
     14: StateMutation_Operation.setCategories,
     15: StateMutation_Operation.setBookmark,
     16: StateMutation_Operation.setChapterRead,
+    17: StateMutation_Operation.setCustomCover,
     0: StateMutation_Operation.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'StateMutation',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: StateMutation.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17])
     ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
         fieldType: $pb.PbFieldType.OU3)
     ..aOS(2, _omitFieldNames ? '' : 'mutationId')
@@ -1791,6 +1964,8 @@ class StateMutation extends $pb.GeneratedMessage {
         subBuilder: SetBookmark.$_createMessage)
     ..aOM<SetChapterRead>(16, _omitFieldNames ? '' : 'setChapterRead',
         subBuilder: SetChapterRead.$_createMessage)
+    ..aOM<SetCustomCover>(17, _omitFieldNames ? '' : 'setCustomCover',
+        subBuilder: SetCustomCover.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1822,6 +1997,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
   StateMutation_Operation whichOperation() =>
       _StateMutation_OperationByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -1831,6 +2007,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
   void clearOperation() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -1946,6 +2123,17 @@ class StateMutation extends $pb.GeneratedMessage {
   void clearSetChapterRead() => $_clearField(16);
   @$pb.TagNumber(16)
   SetChapterRead ensureSetChapterRead() => $_ensure(10);
+
+  @$pb.TagNumber(17)
+  SetCustomCover get setCustomCover => $_getN(11);
+  @$pb.TagNumber(17)
+  set setCustomCover(SetCustomCover value) => $_setField(17, value);
+  @$pb.TagNumber(17)
+  $core.bool hasSetCustomCover() => $_has(11);
+  @$pb.TagNumber(17)
+  void clearSetCustomCover() => $_clearField(17);
+  @$pb.TagNumber(17)
+  SetCustomCover ensureSetCustomCover() => $_ensure(11);
 }
 
 class BusinessStateError extends $pb.GeneratedMessage {

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/runtime/cover_transport.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -27,6 +28,9 @@ final class TestPlatform extends PlatformRuntime {
        businessServer = businessServer ?? TestBusinessServer();
   final Uri _origin;
   final TestBusinessServer businessServer;
+  CoverTransport? covers;
+  @override
+  CoverTransport? get coverTransport => covers;
   String bootstrapSubject;
   int disposalCount = 0;
   int rebuildCount = 0;

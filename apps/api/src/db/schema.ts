@@ -4,6 +4,7 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
 // Business tables follow their P0/P1 contracts; no deferred modules are seeded.
@@ -48,6 +49,26 @@ export const mangaState = sqliteTable(
     stateJson: text('state_json').notNull(),
   },
   (table) => [primaryKey({ columns: [table.subject, table.mangaKey] })],
+);
+
+export const coverAssets = sqliteTable(
+  'cover_assets',
+  {
+    subject: text('subject').notNull(),
+    mangaKey: text('manga_key').notNull(),
+    assetId: text('asset_id').notNull(),
+    objectKey: text('object_key').notNull(),
+    descriptorJson: text('descriptor_json').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.mangaKey] }),
+    uniqueIndex('cover_assets_subject_asset').on(table.subject, table.assetId),
+    uniqueIndex('cover_assets_object_key').on(table.objectKey),
+    foreignKey({
+      columns: [table.subject, table.mangaKey],
+      foreignColumns: [mangaState.subject, mangaState.mangaKey],
+    }).onDelete('cascade'),
+  ],
 );
 
 export const chapterProgress = sqliteTable(
