@@ -96,6 +96,7 @@ void main() {
       final library = LibraryRepository(shared);
       await favorite(library);
       final entry = (await library.watchEntries().first).single;
+      expect(entry.resume, isNull);
       final pages = ChapterManifest(
         chapterKey: 'chapter',
         version: 'v1',
@@ -108,6 +109,18 @@ void main() {
         progress: ChapterProgress(current: pages.positionAt(0, offset: .7)),
         reversedOrder: true,
       );
+      final confirmed = (await library.watchEntries().first).single;
+      expect(confirmed.resume!.chapterKey, 'chapter');
+      expect(confirmed.resume!.reversedOrder, true);
+      // A previous shelf projection remains an immutable confirmed snapshot.
+      expect(entry.resume, isNull);
+      final second = client(server);
+      addTearDown(second.dispose);
+      final remote = (await LibraryRepository(
+        second,
+      ).watchEntries().first).single;
+      expect(remote.resume!.chapterKey, confirmed.resume!.chapterKey);
+      expect(remote.resume!.reversedOrder, true);
       final updates = StreamIterator(library.watchFavorite(entry.mangaKey));
       addTearDown(updates.cancel);
       expect(await updates.moveNext(), true);
@@ -153,6 +166,21 @@ void main() {
       expect(saved.addedAt, addedAt);
     },
   );
+
+  test('library resume projection rejects an invalid chapter identity', () {
+    expect(
+      () => LibraryEntry(
+        packageName: 'test.extension',
+        sourceId: '1234567890123456789',
+        sourceName: 'Test Source',
+        sourceLang: 'en',
+        manga: manga(),
+        addedAt: DateTime.utc(2026),
+        resume: const MangaResume(chapterKey: '', reversedOrder: false),
+      ),
+      throwsFormatException,
+    );
+  });
 
   test('subjects and source/package identities are isolated', () async {
     final server = TestBusinessServer();

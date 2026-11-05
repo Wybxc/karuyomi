@@ -36,6 +36,8 @@ cd apps/reader
 flutter test test/covers/ test/runtime/cover_transport_test.dart
 ```
 
+提交 `cc59335` 的[项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/42116194785) 全部通过，包含 `pnpm check`、`pnpm flutter:check`、`pnpm build` 与本地 D1 migration。
+
 临时日志保留在忽略的 `.local/cover-*.log`。全库可复验入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。官方生成的 Worker runtime 类型保持生成器输出，其余自有文件补丁检查通过。
 
 ## 原生构建

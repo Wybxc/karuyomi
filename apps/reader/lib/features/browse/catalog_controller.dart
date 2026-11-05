@@ -731,7 +731,7 @@ final class CatalogController extends ChangeNotifier {
       );
     } catch (_) {
       if (current()) {
-        error = '书架资料未能更新，仍可继续阅读；稍后重新打开可重试。';
+        error = '书架资料尚未确认，仍可继续阅读；请返回书架处理未确认操作。';
         _notify();
       }
     }

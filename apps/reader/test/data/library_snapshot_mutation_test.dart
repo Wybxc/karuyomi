@@ -202,9 +202,9 @@ void main() {
     },
   );
 
-  for (final previous in ['favorite', 'progress']) {
+  for (final previous in ['favorite', 'progress', 'metadata']) {
     test(
-      'exact shelf edits do not resend a pending $previous command',
+      'shelf edits and incidental metadata refresh do not resend a pending $previous command',
       () async {
         await _favorite(library);
         final entry = await _entry(library);
@@ -216,8 +216,21 @@ void main() {
                 setFavorite: wire.SetFavorite(favorite: false),
               ),
             );
-          } else {
+          } else if (previous == 'progress') {
             await _saveProgress(client);
+          } else {
+            await client.mutate(
+              wire.StateMutation(
+                mangaKey: _mangaKey,
+                updateMetadata: wire.LibraryMetadata(
+                  packageName: 'source.test',
+                  sourceId: '123',
+                  sourceName: 'Source',
+                  sourceLang: 'zh',
+                  manga: _manga,
+                ),
+              ),
+            );
           }
         }
 
@@ -241,14 +254,73 @@ void main() {
           ),
           throwsA(_pending),
         );
+        await expectLater(
+          library.refreshMetadata(
+            packageName: 'source.test',
+            sourceId: '123',
+            sourceName: 'Source',
+            sourceLang: 'zh',
+            manga: _manga,
+          ),
+          throwsA(_pending),
+        );
+        expect(client.hasPendingMetadata(_mangaKey), previous == 'metadata');
+        if (previous != 'metadata') {
+          await expectLater(client.retryMetadata(_mangaKey), throwsStateError);
+        }
         expect(server.requests, hasLength(requests));
         final applied = server.appliedMutations;
-        await previousCommand();
+        if (previous == 'metadata') {
+          await client.retryMetadata(_mangaKey);
+          expect(client.hasPendingMetadata(_mangaKey), false);
+        } else {
+          await previousCommand();
+        }
         expect(_posts(server).last.body, original);
         expect(server.appliedMutations, applied);
       },
     );
   }
+
+  test(
+    'explicit metadata retry reads current state before resolving an old ACK',
+    () async {
+      await _favorite(library);
+      Future<void> refresh(LibraryRepository repository, wire.Manga manga) =>
+          repository.refreshMetadata(
+            packageName: 'source.test',
+            sourceId: '123',
+            sourceName: 'Source',
+            sourceLang: 'zh',
+            manga: manga,
+          );
+      server.loseNextResponse = true;
+      await expectLater(refresh(library, _manga), throwsStateError);
+      final original = _posts(server).last.body;
+      expect(client.hasPendingMetadata(_mangaKey), true);
+      await expectLater(refresh(library, _manga), throwsA(_pending));
+      final remote = _client(server);
+      addTearDown(remote.dispose);
+      final remoteManga = _manga..title = 'Newer confirmed metadata';
+      await refresh(LibraryRepository(remote), remoteManga);
+      final applied = server.appliedMutations;
+      final current = server.manga(_mangaKey)!;
+      await expectLater(client.retryMetadata(_mangaKey), throwsA(_conflict));
+      expect(_posts(server).last.body, original);
+      expect(server.appliedMutations, applied);
+      expect(server.manga(_mangaKey), current);
+      expect(client.hasPendingMetadata(_mangaKey), true);
+      final requests = server.requests.length;
+      await expectLater(client.retryMetadata(_mangaKey), throwsA(_conflict));
+      expect(server.requests, hasLength(requests));
+      final confirmed = await client.readManga(_mangaKey);
+      expect(confirmed.manga.metadata.manga.title, remoteManga.title);
+      expect(client.hasPendingMetadata(_mangaKey), false);
+      final posts = _posts(server).length;
+      await expectLater(client.retryMetadata(_mangaKey), throwsStateError);
+      expect(_posts(server), hasLength(posts));
+    },
+  );
 
   test(
     'an exact pending edit only accepts its same payload revision and mode',

@@ -313,6 +313,11 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   ChapterSequence? _sequence;
   MangaResume? _resume;
   String? _resumeError;
+  bool _resumeReadFailed = false;
+  bool _loadingResume = false;
+  int _resumeRequest = 0;
+  SequenceChapter? _failedChapter;
+  String? _chapterOpenError;
   bool _opening = false;
   LibraryRepository? _library;
   Stream<wire.MangaState?>? _mangaStream;
@@ -482,34 +487,46 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   }
 
   Future<void> _refreshResume() async {
+    final catalog = controller;
     final sequence = _sequence;
-    final repository = controller.readingProgress;
+    final repository = catalog.readingProgress;
     if (sequence == null || repository == null) return;
+    bool isCurrent() =>
+        mounted &&
+        !_detailsExpired &&
+        identical(controller, catalog) &&
+        identical(_sequence, sequence) &&
+        identical(catalog.readingProgress, repository) &&
+        catalog.status == ServiceStatus.ready &&
+        catalog.isCurrentSource(source);
+    if (!isCurrent()) return;
+    final request = ++_resumeRequest;
+    setState(() => _loadingResume = true);
     MangaResume? resume;
     String? error;
+    var readFailed = false;
     try {
-      resume =
-          controller.readingDraftResume(sequence.mangaKey) ??
-          await repository.loadResume(sequence.mangaKey);
-      if (resume != null &&
-          !sequence.entries.any((entry) => entry.key == resume!.chapterKey)) {
-        error = '章节清单已变化，无法确定上次章节；请从列表选择。';
-        resume = null;
-      }
+      final confirmed = await repository.loadResume(sequence.mangaKey);
+      resume = catalog.readingDraftResume(sequence.mangaKey) ?? confirmed;
     } catch (_) {
+      resume = catalog.readingDraftResume(sequence.mangaKey);
       error = '未能读取服务端阅读位置，仍可从章节列表打开。';
+      readFailed = true;
     }
-    if (!mounted ||
-        _detailsExpired ||
-        !identical(controller.readingProgress, repository)) {
-      return;
+    if (!isCurrent() || request != _resumeRequest) return;
+    if (resume != null &&
+        !sequence.entries.any((entry) => entry.key == resume!.chapterKey)) {
+      error = '章节清单已变化，无法确定上次章节；请从列表选择。';
+      resume = null;
     }
     setState(() {
+      _loadingResume = false;
       _resume = resume;
       _resumeError = error;
+      _resumeReadFailed = readFailed;
       // A user's list choice lasts for this detail page. Until then, the same
       // resume order supplies both the list and the reader's initial order.
-      if (!_chapterOrderChosen && error == null) {
+      if (!_chapterOrderChosen && (resume != null || error == null)) {
         _chapterOrder = resume?.reversedOrder == true
             ? ChapterOrder.reversed
             : ChapterOrder.source;
@@ -678,7 +695,13 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   );
 
   Future<void> _openChapter(BuildContext context, int index) async {
-    if (_opening || _selectingChapters || _detailsExpired) return;
+    if (!mounted ||
+        _opening ||
+        controller.busy ||
+        _selectingChapters ||
+        _detailsExpired) {
+      return;
+    }
     final catalog = controller;
     final selectedManga = manga;
     final selectedSource = source;
@@ -686,7 +709,9 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     final progress = catalog.readingProgress;
     final route = ModalRoute.of(context);
     final sequence = _sequence;
-    if (sequence == null) return;
+    if (sequence == null || index < 0 || index >= sequence.entries.length) {
+      return;
+    }
     bool isCurrent() =>
         mounted &&
         !_detailsExpired &&
@@ -700,7 +725,12 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         route?.isCurrent == true &&
         route?.isActive == true;
     if (!isCurrent()) return;
-    setState(() => _opening = true);
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    setState(() {
+      _opening = true;
+      _failedChapter = null;
+      _chapterOpenError = null;
+    });
     final selected = sequence.entries[index];
     final initialOrder = _chapterOrderChosen || _resume != null
         ? _chapterOrder
@@ -716,7 +746,33 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       logicalChapterKey: selected.key,
     );
     if (opened == null) {
-      if (mounted) setState(() => _opening = false);
+      if (mounted) {
+        setState(() {
+          _opening = false;
+          if (isCurrent()) {
+            _failedChapter = selected;
+            _chapterOpenError = catalog.error ?? '未能打开章节，请重试。';
+          }
+        });
+      }
+      if (context.mounted && isCurrent()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '未能打开「${selected.name}」：$_chapterOpenError',
+              key: const ValueKey('chapter-open-failure'),
+            ),
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: () {
+                if (isCurrent()) {
+                  unawaited(_openChapter(context, selected.sourceIndex));
+                }
+              },
+            ),
+          ),
+        );
+      }
       return;
     }
     if (!context.mounted || !isCurrent()) {
@@ -1196,7 +1252,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       ..._chapterReadControls(visible),
       Text('显示 ${visible.length} / ${chapters.length} 章'),
       if (controller.busy) const LinearProgressIndicator(),
-      if (controller.error != null)
+      if (controller.error != null && _chapterOpenError == null)
         _Notice(text: controller.error!, icon: Icons.error_outline),
       if (chapters.isEmpty)
         const Padding(padding: EdgeInsets.all(24), child: Text('这个漫画源没有返回章节'))
@@ -1300,6 +1356,21 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                       SelectableText(manga.description!),
                     ],
                     const SizedBox(height: 32),
+                    if (_failedChapter case final chapter?) ...[
+                      _Notice(
+                        text: '未能打开「${chapter.name}」：$_chapterOpenError',
+                        icon: Icons.error_outline,
+                      ),
+                      TextButton.icon(
+                        key: const ValueKey('retry-open-chapter'),
+                        onPressed:
+                            _opening || controller.busy || _selectingChapters
+                            ? null
+                            : () => _openChapter(context, chapter.sourceIndex),
+                        icon: const Icon(Icons.refresh),
+                        label: Text('重试打开「${chapter.name}」'),
+                      ),
+                    ],
                     if (_resume case final resume?)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16),
@@ -1319,6 +1390,19 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                       ),
                     if (_resumeError != null)
                       _Notice(text: _resumeError!, icon: Icons.info_outline),
+                    if (_resumeReadFailed)
+                      TextButton.icon(
+                        key: const ValueKey('retry-read-resume'),
+                        onPressed:
+                            _loadingResume ||
+                                _opening ||
+                                controller.busy ||
+                                _selectingChapters
+                            ? null
+                            : () => unawaited(_refreshResume()),
+                        icon: const Icon(Icons.refresh),
+                        label: Text(_loadingResume ? '正在读取阅读位置' : '重新读取阅读位置'),
+                      ),
                     if (controller.hasUnsavedReadingProgress) ...[
                       const _Notice(
                         text: '部分阅读进度尚未保存，当前会话仍保留记录。',

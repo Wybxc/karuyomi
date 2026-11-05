@@ -1,13 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../data/library_repository.dart';
+import '../../data/business_state_client.dart';
 import '../../data/cover_repository.dart';
 import '../covers/custom_cover.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/catalog_page.dart';
 import '../reader/reader_recovery.dart';
+import '../reader/chapter_reader_route.dart';
+import '../reader/chapter_sequence.dart';
 import 'category_dialogs.dart';
 import 'library_batch.dart';
 import 'library_batch_dialogs.dart';
@@ -47,7 +51,11 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   int _retry = 0;
   ServiceStatus? _lastStatus;
   bool _opening = false;
+  bool _catalogChangeScheduled = false;
   String? _refreshError;
+  String? _openError;
+  String? _retryingMetadata;
+  Object? _metadataAttempt;
   final _selection = <String>{};
   bool _selecting = false;
 
@@ -70,7 +78,18 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   }
 
   void _catalogChanged() {
-    if (!mounted) return;
+    if (!mounted || _disposing) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (!_catalogChangeScheduled) {
+        _catalogChangeScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _catalogChangeScheduled = false;
+          _catalogChanged();
+        });
+      }
+      return;
+    }
     final status = widget.controller?.status;
     final reconnected = status == ServiceStatus.ready && _lastStatus != status;
     _lastStatus = status;
@@ -93,6 +112,9 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     _selection.clear();
     _selecting = false;
     _refreshError = null;
+    _openError = null;
+    _retryingMetadata = null;
+    _metadataAttempt = null;
     _views = next?.watchView();
     _categoryFilter = null;
     _search.clear();
@@ -123,40 +145,216 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     _views = _repository?.watchView();
   });
 
-  Future<void> _open(LibraryEntry entry) async {
+  Future<void> _open(LibraryEntry entry, {bool continueReading = false}) async {
     final controller = widget.controller;
     final repository = _repository;
-    if (_opening || controller == null || repository == null) return;
+    if (_opening ||
+        _retryingMetadata != null ||
+        controller == null ||
+        repository == null) {
+      return;
+    }
     final route = ModalRoute.of(context);
     final identityKey = repository.identity.key;
     bool isCurrent() =>
         mounted &&
+        !_disposing &&
         identical(widget.controller, controller) &&
         identical(_repository, repository) &&
-        _repository?.identity.key == identityKey &&
+        identical(controller.library, repository) &&
+        repository.identity.key == identityKey &&
+        controller.status == ServiceStatus.ready &&
         route?.isCurrent == true &&
         route?.isActive == true;
-    setState(() => _opening = true);
+    if (!isCurrent()) return;
+    setState(() {
+      _opening = true;
+      _openError = null;
+    });
     try {
       final details = await controller.openLibraryEntry(
         entry,
         identityKey: identityKey,
         shouldContinue: isCurrent,
       );
-      if (!mounted || details == null || !isCurrent()) return;
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => MangaDetailsPage(
-            controller: controller,
-            manga: details.manga,
-            chapters: details.chapters,
-            source: details.source,
-            onAuthenticateReader: widget.onAuthenticateReader,
+      if (details == null || !isCurrent()) return;
+      Future<void> showDetails({String? notice}) async {
+        if (!isCurrent() || !controller.isCurrentSource(details.source)) return;
+        if (notice != null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(notice)));
+        }
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => MangaDetailsPage(
+              controller: controller,
+              manga: details.manga,
+              chapters: details.chapters,
+              source: details.source,
+              onAuthenticateReader: widget.onAuthenticateReader,
+            ),
           ),
-        ),
+        );
+      }
+
+      if (!continueReading) {
+        await showDetails();
+        return;
+      }
+      final progress = controller.readingProgress;
+      if (progress == null || progress.identity.key != identityKey) return;
+      // The shelf projects confirmed state. An explicit resume uses this
+      // session's unsaved navigation first, otherwise rereads current D1 state.
+      final draftResume = controller.readingDraftResume(entry.mangaKey);
+      final resume = draftResume ?? await progress.loadResume(entry.mangaKey);
+      bool sourceCurrent() =>
+          isCurrent() &&
+          identical(controller.readingProgress, progress) &&
+          controller.isCurrentSource(details.source);
+      if (!sourceCurrent()) return;
+      final sequence = ChapterSequence(
+        packageName: entry.packageName,
+        sourceId: details.source.sourceId,
+        mangaUrl: details.manga.url,
+        chapters: details.chapters.map((chapter) => chapter.snapshot),
       );
+      final chapterIndex = resume == null || sequence.mangaKey != entry.mangaKey
+          ? -1
+          : sequence.entries.indexWhere(
+              (chapter) => chapter.key == resume.chapterKey,
+            );
+      if (chapterIndex < 0) {
+        await showDetails(
+          notice: resume == null
+              ? '当前没有可继续的阅读位置，已打开详情，请选择章节。'
+              : '上次阅读的章节已不在当前清单，已打开详情，请选择章节。',
+        );
+        return;
+      }
+      final chapter = sequence.entries[chapterIndex];
+      final opened = await controller.openChapter(
+        details.manga,
+        ChapterEntry(chapter.snapshot),
+        reference: details.source,
+        logicalChapterKey: chapter.key,
+      );
+      if (opened == null) {
+        if (sourceCurrent()) {
+          setState(() => _openError = controller.error ?? '章节未能打开，请重试。');
+        }
+        return;
+      }
+      try {
+        if (!mounted || !sourceCurrent()) return;
+        final readerRoute = MaterialPageRoute<void>(
+          builder: (_) => ChapterReaderRoute(
+            catalog: controller,
+            manga: details.manga,
+            source: details.source,
+            sequence: sequence,
+            initialChapter: chapter,
+            initialOpened: opened,
+            initialOrder: draftResume == null
+                ? null
+                : draftResume.reversedOrder
+                ? ChapterOrder.reversed
+                : ChapterOrder.source,
+            onAuthenticate: widget.onAuthenticateReader,
+          ),
+        );
+        await Navigator.of(context).push<void>(readerRoute);
+        await readerRoute.completed;
+      } finally {
+        // Also owns a page session acquired after this shelf ceased to be
+        // current, or a route popped before its Reader leaf attached.
+        await controller.closeChapter(opened);
+      }
+    } catch (_) {
+      if (isCurrent()) {
+        setState(() => _openError = '未能打开继续阅读，请重试；原阅读位置和未确认草稿仍保留。');
+      }
     } finally {
+      if (isCurrent()) await _refresh();
       if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  Future<void> _retryMetadata(LibraryEntry entry) async {
+    final controller = widget.controller;
+    final repository = _repository;
+    if (_opening ||
+        _editing ||
+        _retryingMetadata != null ||
+        controller == null ||
+        repository == null ||
+        controller.busy ||
+        controller.status != ServiceStatus.ready ||
+        !repository.client.hasPendingMetadata(entry.mangaKey)) {
+      return;
+    }
+    final route = ModalRoute.of(context);
+    final identityKey = repository.identity.key;
+    final attempt = Object();
+    final originalCatalogError = controller.error;
+    bool isCurrent() =>
+        mounted &&
+        !_disposing &&
+        identical(_metadataAttempt, attempt) &&
+        identical(widget.controller, controller) &&
+        identical(_repository, repository) &&
+        identical(controller.library, repository) &&
+        repository.identity.key == identityKey &&
+        controller.status == ServiceStatus.ready &&
+        route?.isCurrent == true &&
+        route?.isActive == true;
+    setState(() {
+      _metadataAttempt = attempt;
+      _retryingMetadata = entry.mangaKey;
+      _openError = null;
+    });
+    try {
+      await repository.client.retryMetadata(entry.mangaKey);
+      if (!isCurrent()) return;
+      setState(() {
+        if (controller.error == originalCatalogError) controller.error = null;
+        _openError = '书架资料已获服务器确认。';
+      });
+      // A failed read after the ACK cannot make the completed write pending.
+      // Refresh has its own read-failure state and never resends the command.
+      await _refresh();
+    } on BusinessStateException catch (failure) {
+      if (!isCurrent()) return;
+      if (failure.conflict || !failure.error.retryable) {
+        try {
+          // A confirmed rejection permits a read to release the old pending
+          // command. Never turn opening a manga into another implicit write.
+          await repository.client.readManga(entry.mangaKey);
+          await repository.refresh();
+          if (!isCurrent()) return;
+          setState(() {
+            if (controller.error == originalCatalogError) {
+              controller.error = null;
+            }
+            _openError = '原书架资料修改未能确认，已读取服务器当前状态。请重新打开漫画取得最新资料。';
+          });
+        } catch (_) {
+          if (isCurrent()) {
+            setState(() => _openError = '原书架资料修改已被拒绝，当前状态未能读取；请刷新书架后重试。');
+          }
+        }
+      } else {
+        setState(() => _openError = '书架资料仍未获确认，原操作已保留，请明确重试保存。');
+      }
+    } catch (_) {
+      if (isCurrent()) setState(() => _openError = '书架资料仍未获确认，原操作已保留，请明确重试保存。');
+    } finally {
+      if (mounted && identical(_metadataAttempt, attempt)) {
+        setState(() {
+          _metadataAttempt = null;
+          _retryingMetadata = null;
+        });
+      }
     }
   }
 
@@ -165,6 +363,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     final repository = _repository;
     if (_editing ||
         _opening ||
+        _retryingMetadata != null ||
         controller == null ||
         repository == null ||
         controller.status != ServiceStatus.ready ||
@@ -224,6 +423,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     final repository = _repository;
     if (_editing ||
         _opening ||
+        _retryingMetadata != null ||
         controller == null ||
         repository == null ||
         controller.status != ServiceStatus.ready ||
@@ -283,6 +483,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
           ],
           if (widget.controller?.error case final error?) _notice(error),
           if (_refreshError case final error?) _notice(error),
+          if (_openError case final error?) _notice(error),
           if (widget.controller case final controller?)
             if (controller.status != ServiceStatus.ready)
               _connection(controller),
@@ -408,6 +609,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     final available =
         !_editing &&
         !_opening &&
+        _retryingMetadata == null &&
         widget.controller?.status == ServiceStatus.ready &&
         widget.controller?.busy == false;
     final selected = _filterFor(view);
@@ -512,6 +714,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     final canOpen =
         !_selecting &&
         !_opening &&
+        _retryingMetadata == null &&
         controller?.busy == false &&
         controller?.status == ServiceStatus.ready;
     final repository = _repository;
@@ -524,6 +727,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     final canSelect =
         !_opening &&
         !_editing &&
+        _retryingMetadata == null &&
         controller?.busy == false &&
         controller?.status == ServiceStatus.ready;
     final hasPending =
@@ -679,18 +883,56 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                     )
                   : CustomCover(repository: _covers!, cover: entry.customCover),
               title: Text(entry.title),
-              subtitle: Text(
-                [
-                  if (entry.snapshot.author.isNotEmpty) entry.snapshot.author,
-                  '${entry.sourceName} · ${entry.sourceLang}',
-                  '分类：${entry.categoryIds.isEmpty ? '未分类' : view.categories.where((category) => entry.categoryIds.contains(category.id)).map((category) => category.name).join('、')}',
-                ].join('\n'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    [
+                      if (entry.snapshot.author.isNotEmpty)
+                        entry.snapshot.author,
+                      '${entry.sourceName} · ${entry.sourceLang}',
+                      '分类：${entry.categoryIds.isEmpty ? '未分类' : view.categories.where((category) => entry.categoryIds.contains(category.id)).map((category) => category.name).join('、')}',
+                    ].join('\n'),
+                  ),
+                  if (repository?.client.hasPendingMetadata(entry.mangaKey) ==
+                      true)
+                    TextButton(
+                      key: ValueKey(('library-retry-metadata', entry.mangaKey)),
+                      onPressed: canOpen && !_editing
+                          ? () => unawaited(_retryMetadata(entry))
+                          : null,
+                      child: Text(
+                        _retryingMetadata == entry.mangaKey
+                            ? '正在重试保存书架资料'
+                            : '重试保存书架资料',
+                      ),
+                    ),
+                ],
               ),
               trailing: _selecting
                   ? null
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (entry.resume != null ||
+                            controller?.readingDraftResume(entry.mangaKey) !=
+                                null)
+                          IconButton(
+                            key: ValueKey(('library-continue', entry.mangaKey)),
+                            tooltip:
+                                controller?.readingDraftResume(
+                                      entry.mangaKey,
+                                    ) !=
+                                    null
+                                ? '继续阅读（未保存）：${entry.title}'
+                                : '继续阅读：${entry.title}',
+                            onPressed: canOpen
+                                ? () => unawaited(
+                                    _open(entry, continueReading: true),
+                                  )
+                                : null,
+                            icon: const Icon(Icons.play_arrow),
+                          ),
                         IconButton(
                           tooltip: '设置分类：${entry.title}',
                           onPressed: canCategorize

@@ -578,6 +578,19 @@ final class BusinessStateClient {
     return _send(pending);
   });
 
+  bool hasPendingMetadata(String key) =>
+      !_closed && (_pending[key]?.request.hasUpdateMetadata() ?? false);
+
+  /// Explicitly retries only the original metadata command, with its UUID and CAS.
+  Future<wire.StateMutationResponse> retryMetadata(String key) =>
+      _serial(key, () {
+        final pending = _pending[key];
+        if (pending == null || !pending.request.hasUpdateMetadata()) {
+          throw StateError('No pending metadata operation');
+        }
+        return _send(pending);
+      });
+
   Future<Uint8List> readCover(wire.CustomCover cover) async {
     _ensureOpen();
     validateBusinessCustomCover(cover);
@@ -599,6 +612,7 @@ final class BusinessStateClient {
     wire.StateMutation operation, {
     int? basedOnRevision,
     bool requireExactRevision = false,
+    bool allowPendingReplay = true,
     Uint8List? coverBytes,
   }) {
     final command = operation.deepCopy();
@@ -652,6 +666,12 @@ final class BusinessStateClient {
     return _serial(command.mangaKey, () async {
       final previous = _pending[command.mangaKey];
       if (previous != null) {
+        if (!allowPendingReplay) {
+          throw BusinessPendingMutationException(
+            command.mangaKey,
+            '该漫画有未确认的原操作，请显式处理原操作后再更新资料。',
+          );
+        }
         if ((requireExactRevision || previous.requireExactRevision) &&
             (!requireExactRevision ||
                 !previous.requireExactRevision ||

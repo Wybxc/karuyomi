@@ -36,6 +36,8 @@
 
 章节范围已读/标未读已复用现有进度表和作品 mutation，允许无真实锚的独立 epoch/已读状态；普通进度跨 manifest 保留章级已读值，标未读或重新阅读才清除。详情筛选、多选及范围确认已接入，串行 CAS 链、原请求重试、显式继续与旧窗口退役见[设计](../design/chapter-read-state.md)。真实 D1 与客户端组件分项见[验证记录](../verification/chapter-read-state.md)，独立客户端及生产门待验。
 
+书架直接续读和详情失败恢复沿用现有权威状态与正式 Reader：只按当前章节键定位，恢复时区分已确认视图和当前会话草稿；续读只读重取不 flush，附带资料更新不隐式重放原 pending，资料失败单独显式重试。设计见[阅读入口](../design/reading-entry.md)，功能及验收状态以 [P1](p1-library-and-progress.md#下一功能里程碑) 和[验证记录](../verification/reading-entry.md)为准。
+
 ## 实施顺序
 
 1. **先固定跨端合同与 D1 模型。** 定义漫画/收藏、章节引用、分类、多分类关联、书签、设置、当前继续阅读位置及最远进度；保留原 Source URL、字符串 ID、稳定作品/章节键和完整 Manga 快照。定义有界查询、mutation ID、服务端 revision、预期 revision、写入结果和冲突响应。D1 使用受支持的 batch、条件 SQL 和唯一约束保证业务修改、幂等结果及 revision 原子提交，Worker 不能以内存持有权威状态。
