@@ -5,11 +5,13 @@ import assert from 'node:assert/strict';
 import { unstable_readConfig } from 'wrangler';
 import { z } from 'zod';
 import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
 import { execa } from 'execa';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import type { IncomingMessage } from 'node:http';
+import type { IncomingMessage, RequestListener } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
+import { createSecureContext } from 'node:tls';
 import type { Socket } from 'node:net';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -40,6 +42,48 @@ import sirv from 'sirv';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const api = path.join(root, 'apps/api');
+const portSchema = z.coerce.number().int().min(1).max(65535);
+const httpPort = portSchema.parse(process.env.SOURCE_PROBE_PORT ?? 8897);
+const certificateFile = process.env.SOURCE_PROBE_TLS_CERT;
+const privateKeyFile = process.env.SOURCE_PROBE_TLS_KEY;
+assert(
+  (certificateFile === undefined) === (privateKeyFile === undefined),
+  'SOURCE_PROBE_TLS_CERT and SOURCE_PROBE_TLS_KEY must be supplied together',
+);
+const tlsOptions =
+  certificateFile !== undefined && privateKeyFile !== undefined
+    ? {
+        cert: await readFile(z.string().min(1).parse(certificateFile)),
+        key: await readFile(z.string().min(1).parse(privateKeyFile)),
+      }
+    : undefined;
+const httpsPort = tlsOptions
+  ? portSchema.parse(process.env.SOURCE_PROBE_TLS_PORT ?? 8898)
+  : undefined;
+assert(
+  httpsPort === undefined || httpsPort !== httpPort,
+  'SOURCE_PROBE_PORT and SOURCE_PROBE_TLS_PORT must be different',
+);
+assert(
+  process.env.SOURCE_PROBE_TLS_PORT === undefined || tlsOptions !== undefined,
+  'SOURCE_PROBE_TLS_PORT requires SOURCE_PROBE_TLS_CERT and SOURCE_PROBE_TLS_KEY',
+);
+if (tlsOptions) {
+  const certificate = new X509Certificate(tlsOptions.cert);
+  const now = Date.now();
+  assert(
+    certificate.validFromDate.getTime() <= now &&
+      now < certificate.validToDate.getTime(),
+    'Source probe TLS certificate is not currently valid',
+  );
+  assert(
+    certificate.checkHost('localhost', { subject: 'never' }),
+    'Source probe TLS certificate must cover localhost in its SAN',
+  );
+  // OpenSSL verifies certificate/key pairing. Clients must separately trust
+  // the issuing CA; this probe never changes system trust or TLS verification.
+  createSecureContext(tlsOptions);
+}
 const manifestFile = process.argv[2];
 assert(
   manifestFile,
@@ -227,6 +271,8 @@ interface LiveEvidence {
   allowedHosts: string[];
   productionAccessVerified: boolean;
   testOnlyOriginAlias: boolean;
+  tlsRequestPaths: Record<string, number>;
+  tlsRequestPathOverflow: boolean;
   network: NetworkEntry[];
   browser: unknown;
 }
@@ -238,12 +284,25 @@ const evidence: LiveEvidence = {
   allowedHosts,
   productionAccessVerified: false,
   testOnlyOriginAlias: true,
+  tlsRequestPaths: {},
+  tlsRequestPathOverflow: false,
   network,
   browser: null,
 };
+let pendingPersist: Promise<void> | undefined;
+let persistAgain = false;
 const persist = async () => {
-  await mkdir(path.dirname(evidenceFile), { recursive: true });
-  await writeFile(evidenceFile, JSON.stringify(evidence, null, 2) + '\n');
+  persistAgain = true;
+  pendingPersist ??= (async () => {
+    await mkdir(path.dirname(evidenceFile), { recursive: true });
+    while (persistAgain) {
+      persistAgain = false;
+      await writeFile(evidenceFile, JSON.stringify(evidence, null, 2) + '\n');
+    }
+  })().finally(() => {
+    pendingPersist = undefined;
+  });
+  await pendingPersist;
 };
 const runnerSource = `import '/runtime/host.js';
 import {create} from '@bufbuild/protobuf';
@@ -404,7 +463,7 @@ async function readBody(request: IncomingMessage, limit = 12 * 1024 * 1024) {
   }
   return Buffer.concat(chunks);
 }
-const server = createServer(async (request, response) => {
+const handleRequest: RequestListener = async (request, response) => {
   try {
     const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
     if (request.method === 'POST' && pathname === '/probe-result') {
@@ -694,6 +753,21 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (
+      ['GET', 'HEAD'].includes(request.method ?? '') &&
+      ['/runtime/host', '/runtime/host.html'].includes(pathname)
+    ) {
+      const hostHtml = await readFile(
+        path.join(root, 'dist/public/runtime/host.html'),
+      );
+      response.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Content-Length': hostHtml.byteLength,
+      });
+      response.end(request.method === 'HEAD' ? undefined : hostHtml);
+      return;
+    }
+    if (
       request.method === 'GET' &&
       ['/runtime/host.js', '/runtime/worker.js'].includes(pathname)
     ) {
@@ -720,30 +794,80 @@ const server = createServer(async (request, response) => {
       response.end(JSON.stringify({ error: 'probe_failed' }));
     } else response.destroy();
   }
-});
-await new Promise<void>((resolve) =>
-  server.listen(
-    Number(process.env.SOURCE_PROBE_PORT ?? 8897),
-    '127.0.0.1',
-    () => resolve(),
-  ),
-);
-const address = server.address();
-assert(address && typeof address !== 'string', 'Missing Source probe address');
-console.log(`Live Source metadata probe: http://127.0.0.1:${address.port}/`);
-if (readerAssets) {
-  console.log(`Flutter reader: http://127.0.0.1:${address.port}/`);
-  console.log(`Metadata/image gate: http://127.0.0.1:${address.port}/probe`);
-}
-console.log(`Evidence: ${evidenceFile}`);
+};
+const handleTlsRequest: RequestListener = async (request, response) => {
+  const pathname = new URL(request.url ?? '/', 'https://localhost').pathname;
+  const count = evidence.tlsRequestPaths[pathname];
+  if (count !== undefined) evidence.tlsRequestPaths[pathname] = count + 1;
+  else if (
+    pathname.length <= 2048 &&
+    Object.keys(evidence.tlsRequestPaths).length < 128
+  )
+    evidence.tlsRequestPaths[pathname] = 1;
+  else evidence.tlsRequestPathOverflow = true;
+  try {
+    await persist();
+  } catch (error) {
+    console.error('Could not persist TLS pathname evidence', error);
+  }
+  await handleRequest(request, response);
+};
+const listeners = [
+  {
+    server: createServer(handleRequest),
+    port: httpPort,
+    origin: `http://127.0.0.1:${httpPort}`,
+  },
+  ...(tlsOptions && httpsPort !== undefined
+    ? [
+        {
+          server: createHttpsServer(tlsOptions, handleTlsRequest),
+          port: httpsPort,
+          origin: `https://localhost:${httpsPort}`,
+        },
+      ]
+    : []),
+];
 let closing = false;
 async function close() {
   if (closing) return;
   closing = true;
-  server.close();
+  await Promise.all(
+    listeners.map(
+      ({ server }) =>
+        new Promise<void>((resolve) => {
+          server.close(() => resolve());
+          server.closeAllConnections();
+        }),
+    ),
+  );
+  await persist();
   await mf.dispose();
   await rm(temporary, { recursive: true, force: true });
-  process.exit(0);
 }
-process.on('SIGINT', () => void close());
-process.on('SIGTERM', () => void close());
+try {
+  await persist();
+  for (const { server, port } of listeners) {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '127.0.0.1', () => {
+        server.off('error', reject);
+        resolve();
+      });
+    });
+  }
+} catch (error) {
+  await close();
+  throw error;
+}
+for (const { origin } of listeners) {
+  console.log(`Live Source metadata probe: ${origin}/`);
+  if (readerAssets) {
+    console.log(`Flutter reader: ${origin}/`);
+    console.log(`Metadata/image gate: ${origin}/probe`);
+  }
+}
+console.log(`Evidence: ${evidenceFile}`);
+console.log(`Local D1 state: ${state}`);
+process.on('SIGINT', () => void close().then(() => process.exit(0)));
+process.on('SIGTERM', () => void close().then(() => process.exit(0)));

@@ -56,7 +56,7 @@ async function main(): Promise<void> {
         '--output=none',
         '--set-exit-if-changed',
         ...projects.flatMap((project) =>
-          ['lib', 'test', 'tool'].flatMap((directory) => {
+          ['lib', 'test', 'integration_test', 'tool'].flatMap((directory) => {
             const source = path.join(root, project, directory);
             return existsSync(source)
               ? readdirSync(source, { recursive: true, withFileTypes: true })

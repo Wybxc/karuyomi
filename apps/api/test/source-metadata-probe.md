@@ -23,6 +23,47 @@ The current Arknights Comics first title's metadata identifies `webusstatic.yo-s
 
 To exercise the actual Flutter UI against the same build and network boundary, first run `pnpm build` and set `SOURCE_PROBE_READER_DIR=apps/reader/build/web` when starting this harness. The normal built app is served at `/`, and the explicit metadata/image gate moves to `/probe`. Static Flutter files use the pinned `sirv` middleware; missing `/runtime`, `/extensions` and `/api` paths never fall back to the app. The app's bootstrap still passes through the test JWT verifier and isolated workerd. This verifies the local product flow, not a production Access login; use a real Source and the normal browse, chapter and reader controls.
 
+## Optional HTTPS and the Native main entry
+
+The HTTP listener always remains available at `http://127.0.0.1:8897`, with `SOURCE_PROBE_PORT` selecting its port. Supply both `SOURCE_PROBE_TLS_CERT` and `SOURCE_PROBE_TLS_KEY` to additionally listen at `https://localhost:8898`; `SOURCE_PROBE_TLS_PORT` selects that port. Both listeners bind only to `127.0.0.1`, use the exact same handler, and share one workerd/D1 instance. Ports must be different integers from 1 to 65535. Both listeners are closed together on shutdown or a listener startup failure.
+
+The certificate must be currently valid, contain `localhost` in its SAN, and match the private key. The Native platform must already trust its issuing CA through the normal platform trust mechanism. The built-in browser can use the HTTP listener while only an isolated iOS Simulator or Android debug App trusts the development CA. This harness never installs a certificate, changes trust settings or disables TLS verification; an expired historical fixture certificate cannot be reused.
+
+For example, after preparing trusted local certificate files and building the actual app:
+
+```sh
+SOURCE_PROBE_TLS_CERT="$PWD/.local/server-sync/tls/localhost.pem" \
+SOURCE_PROBE_TLS_KEY="$PWD/.local/server-sync/tls/localhost-key.pem" \
+SOURCE_PROBE_READER_DIR=apps/reader/build/web \
+SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
+SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
+SOURCE_PROBE_PORT=8897 \
+SOURCE_PROBE_TLS_PORT=8898 \
+SOURCE_PROBE_EVIDENCE=.local/server-sync/xkcd-network.json \
+node apps/api/test/source-metadata-probe.ts \
+  .local/v4-source-validation/xkcd/manifest.json \
+  .local/v4-source-validation/xkcd/artifacts
+```
+
+This prints both `http://127.0.0.1:8897` for the built-in browser and `https://localhost:8898` for Native. Configure a fresh Native build with the exact HTTPS `APP_ORIGIN`; iOS Simulator can reach the host loopback listener, and Android Emulator needs an explicit `adb reverse tcp:8898 tcp:8898`. Use an isolated debug App's exact-localhost Network Security Config if Android requires a development CA; keep system roots, hostname checks and pin validation intact. Do not change the production App's trust configuration. These two origins are explicit test-only aliases of the same account and database, not evidence of production Access or shared-cookie behavior.
+
+`GET` and `HEAD` on `/runtime/host` and `/runtime/host.html` serve the exact built `dist/public/runtime/host.html`, not a substitute control page. Run the normal build first so this file exists. The product Native document-start host and bundled materials remain responsible for the runtime; the harness does not inject a replacement Native runtime. The optional Web UI continues to use its built Flutter files and product Web host.
+
+All `/api/*` traffic, including library and state routes, reaches the same real workerd/D1 instance and verified `probe-owner` test subject. The probe supplies a signed test assertion on this explicit loopback hop; it does not exercise production Access, Native login cookies or an identity switch. Its network report records Source HTTP operations, not an automatic business mutation trace or Flutter UI verdict.
+
+The same ignored evidence report includes `tlsRequestPaths`: counts of pathnames received by the HTTPS listener only. It does not record request queries, headers or bodies, infer a platform from User-Agent, or alter serving behavior. The HTTP browser listener never contributes to these counts. At most 128 distinct pathnames of up to 2048 characters are retained; any excess sets `tlsRequestPathOverflow=true`, which invalidates a claim that all Native requests were observed. To establish that this run's Native client used its bundled runtime materials, first require a nonzero `/runtime/host` or `/runtime/host.html` count and `tlsRequestPathOverflow=false`, then verify zero requests to `/runtime/materials.json`, every `/runtime/materials/*` path, `/runtime/host.js` and `/runtime/worker.js`. Absent entries have count zero. Keep the HTTPS listener exclusive to that Native client during this observation; these counts do not independently identify a client or establish successful runtime initialization or reading.
+
+The startup log prints `Local D1 state: ...`. While this run is alive, that exact path can be used for read-only local inspection:
+
+```sh
+pnpm --filter @karuyomi/api exec wrangler d1 execute DB \
+  --local --persist-to /ABSOLUTE/PRINTED/STATE \
+  --command "SELECT revision FROM account_state WHERE subject = 'probe-owner'" \
+  --json
+```
+
+Never replace `--local` with `--remote` for probe evidence. Record UI actions/screenshots and read back the business API or these local rows separately; two clients of this harness are local integration evidence, not a production or physical-device verdict.
+
 The useful historical conclusions are summarized in [runtime evidence](../../../docs/verification/runtime-evidence.md); raw reports stay in the ignored local research archive. Those earlier Source results used HTTP v1 and do not establish v2 online compatibility. In that run on 2026-11-03, Chrome 156 returned 20 real entries for popular pages 1/2 and latest. Details and chapters were redirected to the upstream Human Verification page and failed with a structured Source error; pages could not proceed without a real chapter reference. No challenge was solved or bypassed.
 
 Search returned a catalog but did not transmit the ordinary text query. Inspection of the frozen original JAR confirmed this is the Source's own behavior: its request builder includes filters and pagination but omits the text query; full-URL searches use another path. This result does not establish correct text search semantics. The probe does not verify production Access, native device behavior, or a complete metadata/reading loop.
