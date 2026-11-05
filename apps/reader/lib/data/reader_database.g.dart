@@ -828,6 +828,764 @@ class MangaResumeRowsCompanion extends UpdateCompanion<MangaResumeRow> {
   }
 }
 
+class $LibraryMangaRowsTable extends LibraryMangaRows
+    with TableInfo<$LibraryMangaRowsTable, LibraryMangaRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LibraryMangaRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _identityKeyMeta = const VerificationMeta(
+    'identityKey',
+  );
+  @override
+  late final GeneratedColumn<String> identityKey = GeneratedColumn<String>(
+    'identity_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mangaKeyMeta = const VerificationMeta(
+    'mangaKey',
+  );
+  @override
+  late final GeneratedColumn<String> mangaKey = GeneratedColumn<String>(
+    'manga_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _packageNameMeta = const VerificationMeta(
+    'packageName',
+  );
+  @override
+  late final GeneratedColumn<String> packageName = GeneratedColumn<String>(
+    'package_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceNameMeta = const VerificationMeta(
+    'sourceName',
+  );
+  @override
+  late final GeneratedColumn<String> sourceName = GeneratedColumn<String>(
+    'source_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceLangMeta = const VerificationMeta(
+    'sourceLang',
+  );
+  @override
+  late final GeneratedColumn<String> sourceLang = GeneratedColumn<String>(
+    'source_lang',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mangaJsonMeta = const VerificationMeta(
+    'mangaJson',
+  );
+  @override
+  late final GeneratedColumn<String> mangaJson = GeneratedColumn<String>(
+    'manga_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    identityKey,
+    mangaKey,
+    packageName,
+    sourceId,
+    sourceName,
+    sourceLang,
+    mangaJson,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'library_manga_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LibraryMangaRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('identity_key')) {
+      context.handle(
+        _identityKeyMeta,
+        identityKey.isAcceptableOrUnknown(
+          data['identity_key']!,
+          _identityKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_identityKeyMeta);
+    }
+    if (data.containsKey('manga_key')) {
+      context.handle(
+        _mangaKeyMeta,
+        mangaKey.isAcceptableOrUnknown(data['manga_key']!, _mangaKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mangaKeyMeta);
+    }
+    if (data.containsKey('package_name')) {
+      context.handle(
+        _packageNameMeta,
+        packageName.isAcceptableOrUnknown(
+          data['package_name']!,
+          _packageNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_packageNameMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('source_name')) {
+      context.handle(
+        _sourceNameMeta,
+        sourceName.isAcceptableOrUnknown(data['source_name']!, _sourceNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceNameMeta);
+    }
+    if (data.containsKey('source_lang')) {
+      context.handle(
+        _sourceLangMeta,
+        sourceLang.isAcceptableOrUnknown(data['source_lang']!, _sourceLangMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceLangMeta);
+    }
+    if (data.containsKey('manga_json')) {
+      context.handle(
+        _mangaJsonMeta,
+        mangaJson.isAcceptableOrUnknown(data['manga_json']!, _mangaJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mangaJsonMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {identityKey, mangaKey};
+  @override
+  LibraryMangaRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LibraryMangaRow(
+      identityKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}identity_key'],
+      )!,
+      mangaKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}manga_key'],
+      )!,
+      packageName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}package_name'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      sourceName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_name'],
+      )!,
+      sourceLang: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_lang'],
+      )!,
+      mangaJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}manga_json'],
+      )!,
+    );
+  }
+
+  @override
+  $LibraryMangaRowsTable createAlias(String alias) {
+    return $LibraryMangaRowsTable(attachedDatabase, alias);
+  }
+}
+
+class LibraryMangaRow extends DataClass implements Insertable<LibraryMangaRow> {
+  final String identityKey;
+  final String mangaKey;
+  final String packageName;
+  final String sourceId;
+  final String sourceName;
+  final String sourceLang;
+  final String mangaJson;
+  const LibraryMangaRow({
+    required this.identityKey,
+    required this.mangaKey,
+    required this.packageName,
+    required this.sourceId,
+    required this.sourceName,
+    required this.sourceLang,
+    required this.mangaJson,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['identity_key'] = Variable<String>(identityKey);
+    map['manga_key'] = Variable<String>(mangaKey);
+    map['package_name'] = Variable<String>(packageName);
+    map['source_id'] = Variable<String>(sourceId);
+    map['source_name'] = Variable<String>(sourceName);
+    map['source_lang'] = Variable<String>(sourceLang);
+    map['manga_json'] = Variable<String>(mangaJson);
+    return map;
+  }
+
+  LibraryMangaRowsCompanion toCompanion(bool nullToAbsent) {
+    return LibraryMangaRowsCompanion(
+      identityKey: Value(identityKey),
+      mangaKey: Value(mangaKey),
+      packageName: Value(packageName),
+      sourceId: Value(sourceId),
+      sourceName: Value(sourceName),
+      sourceLang: Value(sourceLang),
+      mangaJson: Value(mangaJson),
+    );
+  }
+
+  factory LibraryMangaRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LibraryMangaRow(
+      identityKey: serializer.fromJson<String>(json['identityKey']),
+      mangaKey: serializer.fromJson<String>(json['mangaKey']),
+      packageName: serializer.fromJson<String>(json['packageName']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceName: serializer.fromJson<String>(json['sourceName']),
+      sourceLang: serializer.fromJson<String>(json['sourceLang']),
+      mangaJson: serializer.fromJson<String>(json['mangaJson']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'identityKey': serializer.toJson<String>(identityKey),
+      'mangaKey': serializer.toJson<String>(mangaKey),
+      'packageName': serializer.toJson<String>(packageName),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'sourceName': serializer.toJson<String>(sourceName),
+      'sourceLang': serializer.toJson<String>(sourceLang),
+      'mangaJson': serializer.toJson<String>(mangaJson),
+    };
+  }
+
+  LibraryMangaRow copyWith({
+    String? identityKey,
+    String? mangaKey,
+    String? packageName,
+    String? sourceId,
+    String? sourceName,
+    String? sourceLang,
+    String? mangaJson,
+  }) => LibraryMangaRow(
+    identityKey: identityKey ?? this.identityKey,
+    mangaKey: mangaKey ?? this.mangaKey,
+    packageName: packageName ?? this.packageName,
+    sourceId: sourceId ?? this.sourceId,
+    sourceName: sourceName ?? this.sourceName,
+    sourceLang: sourceLang ?? this.sourceLang,
+    mangaJson: mangaJson ?? this.mangaJson,
+  );
+  LibraryMangaRow copyWithCompanion(LibraryMangaRowsCompanion data) {
+    return LibraryMangaRow(
+      identityKey: data.identityKey.present
+          ? data.identityKey.value
+          : this.identityKey,
+      mangaKey: data.mangaKey.present ? data.mangaKey.value : this.mangaKey,
+      packageName: data.packageName.present
+          ? data.packageName.value
+          : this.packageName,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceName: data.sourceName.present
+          ? data.sourceName.value
+          : this.sourceName,
+      sourceLang: data.sourceLang.present
+          ? data.sourceLang.value
+          : this.sourceLang,
+      mangaJson: data.mangaJson.present ? data.mangaJson.value : this.mangaJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LibraryMangaRow(')
+          ..write('identityKey: $identityKey, ')
+          ..write('mangaKey: $mangaKey, ')
+          ..write('packageName: $packageName, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceName: $sourceName, ')
+          ..write('sourceLang: $sourceLang, ')
+          ..write('mangaJson: $mangaJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    identityKey,
+    mangaKey,
+    packageName,
+    sourceId,
+    sourceName,
+    sourceLang,
+    mangaJson,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LibraryMangaRow &&
+          other.identityKey == this.identityKey &&
+          other.mangaKey == this.mangaKey &&
+          other.packageName == this.packageName &&
+          other.sourceId == this.sourceId &&
+          other.sourceName == this.sourceName &&
+          other.sourceLang == this.sourceLang &&
+          other.mangaJson == this.mangaJson);
+}
+
+class LibraryMangaRowsCompanion extends UpdateCompanion<LibraryMangaRow> {
+  final Value<String> identityKey;
+  final Value<String> mangaKey;
+  final Value<String> packageName;
+  final Value<String> sourceId;
+  final Value<String> sourceName;
+  final Value<String> sourceLang;
+  final Value<String> mangaJson;
+  final Value<int> rowid;
+  const LibraryMangaRowsCompanion({
+    this.identityKey = const Value.absent(),
+    this.mangaKey = const Value.absent(),
+    this.packageName = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceName = const Value.absent(),
+    this.sourceLang = const Value.absent(),
+    this.mangaJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LibraryMangaRowsCompanion.insert({
+    required String identityKey,
+    required String mangaKey,
+    required String packageName,
+    required String sourceId,
+    required String sourceName,
+    required String sourceLang,
+    required String mangaJson,
+    this.rowid = const Value.absent(),
+  }) : identityKey = Value(identityKey),
+       mangaKey = Value(mangaKey),
+       packageName = Value(packageName),
+       sourceId = Value(sourceId),
+       sourceName = Value(sourceName),
+       sourceLang = Value(sourceLang),
+       mangaJson = Value(mangaJson);
+  static Insertable<LibraryMangaRow> custom({
+    Expression<String>? identityKey,
+    Expression<String>? mangaKey,
+    Expression<String>? packageName,
+    Expression<String>? sourceId,
+    Expression<String>? sourceName,
+    Expression<String>? sourceLang,
+    Expression<String>? mangaJson,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (identityKey != null) 'identity_key': identityKey,
+      if (mangaKey != null) 'manga_key': mangaKey,
+      if (packageName != null) 'package_name': packageName,
+      if (sourceId != null) 'source_id': sourceId,
+      if (sourceName != null) 'source_name': sourceName,
+      if (sourceLang != null) 'source_lang': sourceLang,
+      if (mangaJson != null) 'manga_json': mangaJson,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LibraryMangaRowsCompanion copyWith({
+    Value<String>? identityKey,
+    Value<String>? mangaKey,
+    Value<String>? packageName,
+    Value<String>? sourceId,
+    Value<String>? sourceName,
+    Value<String>? sourceLang,
+    Value<String>? mangaJson,
+    Value<int>? rowid,
+  }) {
+    return LibraryMangaRowsCompanion(
+      identityKey: identityKey ?? this.identityKey,
+      mangaKey: mangaKey ?? this.mangaKey,
+      packageName: packageName ?? this.packageName,
+      sourceId: sourceId ?? this.sourceId,
+      sourceName: sourceName ?? this.sourceName,
+      sourceLang: sourceLang ?? this.sourceLang,
+      mangaJson: mangaJson ?? this.mangaJson,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (identityKey.present) {
+      map['identity_key'] = Variable<String>(identityKey.value);
+    }
+    if (mangaKey.present) {
+      map['manga_key'] = Variable<String>(mangaKey.value);
+    }
+    if (packageName.present) {
+      map['package_name'] = Variable<String>(packageName.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (sourceName.present) {
+      map['source_name'] = Variable<String>(sourceName.value);
+    }
+    if (sourceLang.present) {
+      map['source_lang'] = Variable<String>(sourceLang.value);
+    }
+    if (mangaJson.present) {
+      map['manga_json'] = Variable<String>(mangaJson.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LibraryMangaRowsCompanion(')
+          ..write('identityKey: $identityKey, ')
+          ..write('mangaKey: $mangaKey, ')
+          ..write('packageName: $packageName, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceName: $sourceName, ')
+          ..write('sourceLang: $sourceLang, ')
+          ..write('mangaJson: $mangaJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LibraryFavoriteRowsTable extends LibraryFavoriteRows
+    with TableInfo<$LibraryFavoriteRowsTable, LibraryFavoriteRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LibraryFavoriteRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _identityKeyMeta = const VerificationMeta(
+    'identityKey',
+  );
+  @override
+  late final GeneratedColumn<String> identityKey = GeneratedColumn<String>(
+    'identity_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mangaKeyMeta = const VerificationMeta(
+    'mangaKey',
+  );
+  @override
+  late final GeneratedColumn<String> mangaKey = GeneratedColumn<String>(
+    'manga_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addedAtMeta = const VerificationMeta(
+    'addedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> addedAt = GeneratedColumn<DateTime>(
+    'added_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [identityKey, mangaKey, addedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'library_favorite_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LibraryFavoriteRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('identity_key')) {
+      context.handle(
+        _identityKeyMeta,
+        identityKey.isAcceptableOrUnknown(
+          data['identity_key']!,
+          _identityKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_identityKeyMeta);
+    }
+    if (data.containsKey('manga_key')) {
+      context.handle(
+        _mangaKeyMeta,
+        mangaKey.isAcceptableOrUnknown(data['manga_key']!, _mangaKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mangaKeyMeta);
+    }
+    if (data.containsKey('added_at')) {
+      context.handle(
+        _addedAtMeta,
+        addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_addedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {identityKey, mangaKey};
+  @override
+  LibraryFavoriteRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LibraryFavoriteRow(
+      identityKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}identity_key'],
+      )!,
+      mangaKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}manga_key'],
+      )!,
+      addedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}added_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LibraryFavoriteRowsTable createAlias(String alias) {
+    return $LibraryFavoriteRowsTable(attachedDatabase, alias);
+  }
+}
+
+class LibraryFavoriteRow extends DataClass
+    implements Insertable<LibraryFavoriteRow> {
+  final String identityKey;
+  final String mangaKey;
+  final DateTime addedAt;
+  const LibraryFavoriteRow({
+    required this.identityKey,
+    required this.mangaKey,
+    required this.addedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['identity_key'] = Variable<String>(identityKey);
+    map['manga_key'] = Variable<String>(mangaKey);
+    map['added_at'] = Variable<DateTime>(addedAt);
+    return map;
+  }
+
+  LibraryFavoriteRowsCompanion toCompanion(bool nullToAbsent) {
+    return LibraryFavoriteRowsCompanion(
+      identityKey: Value(identityKey),
+      mangaKey: Value(mangaKey),
+      addedAt: Value(addedAt),
+    );
+  }
+
+  factory LibraryFavoriteRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LibraryFavoriteRow(
+      identityKey: serializer.fromJson<String>(json['identityKey']),
+      mangaKey: serializer.fromJson<String>(json['mangaKey']),
+      addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'identityKey': serializer.toJson<String>(identityKey),
+      'mangaKey': serializer.toJson<String>(mangaKey),
+      'addedAt': serializer.toJson<DateTime>(addedAt),
+    };
+  }
+
+  LibraryFavoriteRow copyWith({
+    String? identityKey,
+    String? mangaKey,
+    DateTime? addedAt,
+  }) => LibraryFavoriteRow(
+    identityKey: identityKey ?? this.identityKey,
+    mangaKey: mangaKey ?? this.mangaKey,
+    addedAt: addedAt ?? this.addedAt,
+  );
+  LibraryFavoriteRow copyWithCompanion(LibraryFavoriteRowsCompanion data) {
+    return LibraryFavoriteRow(
+      identityKey: data.identityKey.present
+          ? data.identityKey.value
+          : this.identityKey,
+      mangaKey: data.mangaKey.present ? data.mangaKey.value : this.mangaKey,
+      addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LibraryFavoriteRow(')
+          ..write('identityKey: $identityKey, ')
+          ..write('mangaKey: $mangaKey, ')
+          ..write('addedAt: $addedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(identityKey, mangaKey, addedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LibraryFavoriteRow &&
+          other.identityKey == this.identityKey &&
+          other.mangaKey == this.mangaKey &&
+          other.addedAt == this.addedAt);
+}
+
+class LibraryFavoriteRowsCompanion extends UpdateCompanion<LibraryFavoriteRow> {
+  final Value<String> identityKey;
+  final Value<String> mangaKey;
+  final Value<DateTime> addedAt;
+  final Value<int> rowid;
+  const LibraryFavoriteRowsCompanion({
+    this.identityKey = const Value.absent(),
+    this.mangaKey = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LibraryFavoriteRowsCompanion.insert({
+    required String identityKey,
+    required String mangaKey,
+    required DateTime addedAt,
+    this.rowid = const Value.absent(),
+  }) : identityKey = Value(identityKey),
+       mangaKey = Value(mangaKey),
+       addedAt = Value(addedAt);
+  static Insertable<LibraryFavoriteRow> custom({
+    Expression<String>? identityKey,
+    Expression<String>? mangaKey,
+    Expression<DateTime>? addedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (identityKey != null) 'identity_key': identityKey,
+      if (mangaKey != null) 'manga_key': mangaKey,
+      if (addedAt != null) 'added_at': addedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LibraryFavoriteRowsCompanion copyWith({
+    Value<String>? identityKey,
+    Value<String>? mangaKey,
+    Value<DateTime>? addedAt,
+    Value<int>? rowid,
+  }) {
+    return LibraryFavoriteRowsCompanion(
+      identityKey: identityKey ?? this.identityKey,
+      mangaKey: mangaKey ?? this.mangaKey,
+      addedAt: addedAt ?? this.addedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (identityKey.present) {
+      map['identity_key'] = Variable<String>(identityKey.value);
+    }
+    if (mangaKey.present) {
+      map['manga_key'] = Variable<String>(mangaKey.value);
+    }
+    if (addedAt.present) {
+      map['added_at'] = Variable<DateTime>(addedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LibraryFavoriteRowsCompanion(')
+          ..write('identityKey: $identityKey, ')
+          ..write('mangaKey: $mangaKey, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ReaderDatabase extends GeneratedDatabase {
   _$ReaderDatabase(QueryExecutor e) : super(e);
   $ReaderDatabaseManager get managers => $ReaderDatabaseManager(this);
@@ -836,6 +1594,11 @@ abstract class _$ReaderDatabase extends GeneratedDatabase {
   late final $MangaResumeRowsTable mangaResumeRows = $MangaResumeRowsTable(
     this,
   );
+  late final $LibraryMangaRowsTable libraryMangaRows = $LibraryMangaRowsTable(
+    this,
+  );
+  late final $LibraryFavoriteRowsTable libraryFavoriteRows =
+      $LibraryFavoriteRowsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -843,6 +1606,8 @@ abstract class _$ReaderDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     chapterProgressRows,
     mangaResumeRows,
+    libraryMangaRows,
+    libraryFavoriteRows,
   ];
 }
 
@@ -1321,6 +2086,462 @@ typedef $$MangaResumeRowsTableProcessedTableManager =
       MangaResumeRow,
       PrefetchHooks Function()
     >;
+typedef $$LibraryMangaRowsTableCreateCompanionBuilder =
+    LibraryMangaRowsCompanion Function({
+      required String identityKey,
+      required String mangaKey,
+      required String packageName,
+      required String sourceId,
+      required String sourceName,
+      required String sourceLang,
+      required String mangaJson,
+      Value<int> rowid,
+    });
+typedef $$LibraryMangaRowsTableUpdateCompanionBuilder =
+    LibraryMangaRowsCompanion Function({
+      Value<String> identityKey,
+      Value<String> mangaKey,
+      Value<String> packageName,
+      Value<String> sourceId,
+      Value<String> sourceName,
+      Value<String> sourceLang,
+      Value<String> mangaJson,
+      Value<int> rowid,
+    });
+
+class $$LibraryMangaRowsTableFilterComposer
+    extends Composer<_$ReaderDatabase, $LibraryMangaRowsTable> {
+  $$LibraryMangaRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get identityKey => $composableBuilder(
+    column: $table.identityKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mangaKey => $composableBuilder(
+    column: $table.mangaKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceName => $composableBuilder(
+    column: $table.sourceName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceLang => $composableBuilder(
+    column: $table.sourceLang,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mangaJson => $composableBuilder(
+    column: $table.mangaJson,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LibraryMangaRowsTableOrderingComposer
+    extends Composer<_$ReaderDatabase, $LibraryMangaRowsTable> {
+  $$LibraryMangaRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get identityKey => $composableBuilder(
+    column: $table.identityKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mangaKey => $composableBuilder(
+    column: $table.mangaKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceName => $composableBuilder(
+    column: $table.sourceName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceLang => $composableBuilder(
+    column: $table.sourceLang,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mangaJson => $composableBuilder(
+    column: $table.mangaJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LibraryMangaRowsTableAnnotationComposer
+    extends Composer<_$ReaderDatabase, $LibraryMangaRowsTable> {
+  $$LibraryMangaRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get identityKey => $composableBuilder(
+    column: $table.identityKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mangaKey =>
+      $composableBuilder(column: $table.mangaKey, builder: (column) => column);
+
+  GeneratedColumn<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceName => $composableBuilder(
+    column: $table.sourceName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceLang => $composableBuilder(
+    column: $table.sourceLang,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mangaJson =>
+      $composableBuilder(column: $table.mangaJson, builder: (column) => column);
+}
+
+class $$LibraryMangaRowsTableTableManager
+    extends
+        RootTableManager<
+          _$ReaderDatabase,
+          $LibraryMangaRowsTable,
+          LibraryMangaRow,
+          $$LibraryMangaRowsTableFilterComposer,
+          $$LibraryMangaRowsTableOrderingComposer,
+          $$LibraryMangaRowsTableAnnotationComposer,
+          $$LibraryMangaRowsTableCreateCompanionBuilder,
+          $$LibraryMangaRowsTableUpdateCompanionBuilder,
+          (
+            LibraryMangaRow,
+            BaseReferences<
+              _$ReaderDatabase,
+              $LibraryMangaRowsTable,
+              LibraryMangaRow
+            >,
+          ),
+          LibraryMangaRow,
+          PrefetchHooks Function()
+        > {
+  $$LibraryMangaRowsTableTableManager(
+    _$ReaderDatabase db,
+    $LibraryMangaRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LibraryMangaRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LibraryMangaRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LibraryMangaRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> identityKey = const Value.absent(),
+                Value<String> mangaKey = const Value.absent(),
+                Value<String> packageName = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceName = const Value.absent(),
+                Value<String> sourceLang = const Value.absent(),
+                Value<String> mangaJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LibraryMangaRowsCompanion(
+                identityKey: identityKey,
+                mangaKey: mangaKey,
+                packageName: packageName,
+                sourceId: sourceId,
+                sourceName: sourceName,
+                sourceLang: sourceLang,
+                mangaJson: mangaJson,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String identityKey,
+                required String mangaKey,
+                required String packageName,
+                required String sourceId,
+                required String sourceName,
+                required String sourceLang,
+                required String mangaJson,
+                Value<int> rowid = const Value.absent(),
+              }) => LibraryMangaRowsCompanion.insert(
+                identityKey: identityKey,
+                mangaKey: mangaKey,
+                packageName: packageName,
+                sourceId: sourceId,
+                sourceName: sourceName,
+                sourceLang: sourceLang,
+                mangaJson: mangaJson,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$LibraryMangaRowsTable, LibraryMangaRow>(table),
+                  BaseReferences<
+                    _$ReaderDatabase,
+                    $LibraryMangaRowsTable,
+                    LibraryMangaRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LibraryMangaRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ReaderDatabase,
+      $LibraryMangaRowsTable,
+      LibraryMangaRow,
+      $$LibraryMangaRowsTableFilterComposer,
+      $$LibraryMangaRowsTableOrderingComposer,
+      $$LibraryMangaRowsTableAnnotationComposer,
+      $$LibraryMangaRowsTableCreateCompanionBuilder,
+      $$LibraryMangaRowsTableUpdateCompanionBuilder,
+      (
+        LibraryMangaRow,
+        BaseReferences<
+          _$ReaderDatabase,
+          $LibraryMangaRowsTable,
+          LibraryMangaRow
+        >,
+      ),
+      LibraryMangaRow,
+      PrefetchHooks Function()
+    >;
+typedef $$LibraryFavoriteRowsTableCreateCompanionBuilder =
+    LibraryFavoriteRowsCompanion Function({
+      required String identityKey,
+      required String mangaKey,
+      required DateTime addedAt,
+      Value<int> rowid,
+    });
+typedef $$LibraryFavoriteRowsTableUpdateCompanionBuilder =
+    LibraryFavoriteRowsCompanion Function({
+      Value<String> identityKey,
+      Value<String> mangaKey,
+      Value<DateTime> addedAt,
+      Value<int> rowid,
+    });
+
+class $$LibraryFavoriteRowsTableFilterComposer
+    extends Composer<_$ReaderDatabase, $LibraryFavoriteRowsTable> {
+  $$LibraryFavoriteRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get identityKey => $composableBuilder(
+    column: $table.identityKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mangaKey => $composableBuilder(
+    column: $table.mangaKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get addedAt => $composableBuilder(
+    column: $table.addedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LibraryFavoriteRowsTableOrderingComposer
+    extends Composer<_$ReaderDatabase, $LibraryFavoriteRowsTable> {
+  $$LibraryFavoriteRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get identityKey => $composableBuilder(
+    column: $table.identityKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mangaKey => $composableBuilder(
+    column: $table.mangaKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get addedAt => $composableBuilder(
+    column: $table.addedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LibraryFavoriteRowsTableAnnotationComposer
+    extends Composer<_$ReaderDatabase, $LibraryFavoriteRowsTable> {
+  $$LibraryFavoriteRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get identityKey => $composableBuilder(
+    column: $table.identityKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mangaKey =>
+      $composableBuilder(column: $table.mangaKey, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get addedAt =>
+      $composableBuilder(column: $table.addedAt, builder: (column) => column);
+}
+
+class $$LibraryFavoriteRowsTableTableManager
+    extends
+        RootTableManager<
+          _$ReaderDatabase,
+          $LibraryFavoriteRowsTable,
+          LibraryFavoriteRow,
+          $$LibraryFavoriteRowsTableFilterComposer,
+          $$LibraryFavoriteRowsTableOrderingComposer,
+          $$LibraryFavoriteRowsTableAnnotationComposer,
+          $$LibraryFavoriteRowsTableCreateCompanionBuilder,
+          $$LibraryFavoriteRowsTableUpdateCompanionBuilder,
+          (
+            LibraryFavoriteRow,
+            BaseReferences<
+              _$ReaderDatabase,
+              $LibraryFavoriteRowsTable,
+              LibraryFavoriteRow
+            >,
+          ),
+          LibraryFavoriteRow,
+          PrefetchHooks Function()
+        > {
+  $$LibraryFavoriteRowsTableTableManager(
+    _$ReaderDatabase db,
+    $LibraryFavoriteRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LibraryFavoriteRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LibraryFavoriteRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$LibraryFavoriteRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> identityKey = const Value.absent(),
+                Value<String> mangaKey = const Value.absent(),
+                Value<DateTime> addedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LibraryFavoriteRowsCompanion(
+                identityKey: identityKey,
+                mangaKey: mangaKey,
+                addedAt: addedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String identityKey,
+                required String mangaKey,
+                required DateTime addedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LibraryFavoriteRowsCompanion.insert(
+                identityKey: identityKey,
+                mangaKey: mangaKey,
+                addedAt: addedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$LibraryFavoriteRowsTable, LibraryFavoriteRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$ReaderDatabase,
+                    $LibraryFavoriteRowsTable,
+                    LibraryFavoriteRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LibraryFavoriteRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ReaderDatabase,
+      $LibraryFavoriteRowsTable,
+      LibraryFavoriteRow,
+      $$LibraryFavoriteRowsTableFilterComposer,
+      $$LibraryFavoriteRowsTableOrderingComposer,
+      $$LibraryFavoriteRowsTableAnnotationComposer,
+      $$LibraryFavoriteRowsTableCreateCompanionBuilder,
+      $$LibraryFavoriteRowsTableUpdateCompanionBuilder,
+      (
+        LibraryFavoriteRow,
+        BaseReferences<
+          _$ReaderDatabase,
+          $LibraryFavoriteRowsTable,
+          LibraryFavoriteRow
+        >,
+      ),
+      LibraryFavoriteRow,
+      PrefetchHooks Function()
+    >;
 
 class $ReaderDatabaseManager {
   final _$ReaderDatabase _db;
@@ -1329,4 +2550,8 @@ class $ReaderDatabaseManager {
       $$ChapterProgressRowsTableTableManager(_db, _db.chapterProgressRows);
   $$MangaResumeRowsTableTableManager get mangaResumeRows =>
       $$MangaResumeRowsTableTableManager(_db, _db.mangaResumeRows);
+  $$LibraryMangaRowsTableTableManager get libraryMangaRows =>
+      $$LibraryMangaRowsTableTableManager(_db, _db.libraryMangaRows);
+  $$LibraryFavoriteRowsTableTableManager get libraryFavoriteRows =>
+      $$LibraryFavoriteRowsTableTableManager(_db, _db.libraryFavoriteRows);
 }

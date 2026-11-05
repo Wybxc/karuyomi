@@ -283,9 +283,11 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 不建立历史事件、统计、任务租约、下载页、tracker、文件导入或备份表。`change_log` 仅保存有限期的同步增量，不作为用户历史记录或备份存储。源站敏感凭证暂留当前客户端，不做云端凭证同步。
 
+当前 Flutter 本地切片使用 Drift/SQLite，按受信 bootstrap subject + 部署 origin 隔离。漫画元数据和收藏关系分开保存，`mangaKey = SHA256(JSON[packageName, sourceId, originalMangaUrl])` 与阅读进度共用；buildId/generation 不进入作品身份。元数据保留完整 Protobuf Manga 的标准 ProtoJSON 和 Source 名称/语言；取消收藏保留元数据及阅读位置。打开书架作品时查当前静态索引，重新选择原 package/Source，再主动取该作品详情/章节；本地搜索与排序不触发 Source 请求。封面未接正式图片通道前使用占位图，不直接请求 thumbnail URL。此切片只在当前设备保存，不是已实现的 D1 镜像或同步；实施范围见[P1 计划](../plan/p1-library-and-progress.md)。
+
 规范化 URL 只使用保守的 Source 明确规则；保留 release9 已验证的 URI 解码、空查询串和非法 URI 回退，不另加全局 decodeURIComponent、空格替换、删 query 或按标题去重。Source 换域不重新发明 ID；来源变化使用显式迁移。外部 64 位 ID 全部保持字符串。
 
-**同步：** UI 先写 IndexedDB 和本地 outbox；在线后批量 push，服务端幂等处理并返回单调 revision；再用 cursor 拉取增量。DO 通知只提示“有更新”，D1 change log 才是真相。初版不开 D1 读副本；如后续启用，必须使用会话一致性机制保证读到自己的写入。
+**同步：** UI 先在 Drift/SQLite 事务写本地状态和 outbox；在线后批量 push，服务端幂等处理并返回单调 revision；再用 cursor 拉取增量。DO 通知只提示“有更新”，D1 change log 才是真相。初版不开 D1 读副本；如后续启用，必须使用会话一致性机制保证读到自己的写入。
 
 - 同一阅读 epoch 内的普通进度只前进；多设备旧离线页码不能使已读倒退。
 - “标为未读 / 重新阅读”是显式 reset，提升 epoch；旧 epoch 的进度不能覆盖新状态。两个离线 reset 冲突进入确认或确定性服务端规则，不能只比设备时钟。

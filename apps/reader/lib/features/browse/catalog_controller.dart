@@ -11,6 +11,7 @@ import '../../runtime/runtime_platform_types.dart';
 import '../../data/reader_database.dart';
 import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
+import '../../data/library_repository.dart';
 import '../reader/reading_progress_controller.dart';
 
 enum ServiceStatus {
@@ -138,6 +139,13 @@ final class CatalogController extends ChangeNotifier {
       database,
       ProgressIdentity(origin: origin, subject: verifiedSubject),
     );
+  }
+
+  LibraryRepository? get library {
+    final progress = readingProgress;
+    return progress == null
+        ? null
+        : LibraryRepository(progress.database, progress.identity);
   }
 
   ReadingProgressController? createReadingProgress(String mangaKey) {
@@ -600,6 +608,73 @@ final class CatalogController extends ChangeNotifier {
       sourceId: source.id,
       generation: current.generation,
     );
+  }
+
+  /// A saved manga identifies a package and Source, never an old build or
+  /// generation. Only the current static index may select its runtime.
+  Future<
+    ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})?
+  >
+  openLibraryEntry(
+    LibraryEntry entry, {
+    required String identityKey,
+    bool Function()? shouldContinue,
+  }) async {
+    if (_closed || busy) return null;
+    final repository = library;
+    if (repository == null || repository.identity.key != identityKey) {
+      return null;
+    }
+    final epoch = _epoch;
+    bool current() =>
+        !_closed &&
+        epoch == _epoch &&
+        status == ServiceStatus.ready &&
+        library?.identity.key == identityKey &&
+        shouldContinue?.call() != false;
+    if (!current()) return null;
+    final available = builds.where(
+      (build) => build.packageName == entry.packageName,
+    );
+    if (available.isEmpty) {
+      error = '这部漫画的漫画源当前不可用；收藏和本地进度仍保留。';
+      _notify();
+      return null;
+    }
+    final build = available.single;
+    await openBuild(build);
+    if (!current() || activeBuild?.id != build.id) return null;
+    final sources = session?.sources.where(
+      (source) => source.id == entry.sourceId,
+    );
+    if (sources == null || sources.isEmpty) {
+      error = '当前扩展中找不到原漫画源；收藏和本地进度仍保留。';
+      _notify();
+      return null;
+    }
+    final selectedSource = sources.single;
+    await selectSource(selectedSource, loadListing: false);
+    if (!current()) return null;
+    final result = await details(
+      MangaEntry(entry.snapshot),
+      shouldContinue: current,
+    );
+    if (result == null || !current()) return null;
+    try {
+      await repository.refreshMetadata(
+        packageName: entry.packageName,
+        sourceId: selectedSource.id,
+        sourceName: selectedSource.name,
+        sourceLang: selectedSource.lang,
+        manga: result.manga.snapshot,
+      );
+    } catch (_) {
+      if (current()) {
+        error = '书架资料未能更新，仍可继续阅读；稍后重新打开可重试。';
+        _notify();
+      }
+    }
+    return current() && isCurrentSource(result.source) ? result : null;
   }
 
   Future<

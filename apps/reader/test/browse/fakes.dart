@@ -25,6 +25,10 @@ final class TestPlatform extends PlatformRuntime {
   Future<void> Function(String path)? beforeApiFetch;
   Future<void> Function()? beforeRebuild;
   final openedIdentities = <String>[];
+  final openedBuilds = <String>[];
+  String manifestBuildId = 'build-1';
+  String _openedBuildId = 'build-1';
+  List<wire.SourceInfo>? sourceInventory;
   @override
   Uri get origin => _origin;
 
@@ -68,12 +72,14 @@ final class TestPlatform extends PlatformRuntime {
         ),
       ),
       '/extensions/index.json' => inventory,
-      '/extensions/builds/build-1/manifest.json' => wire.encodeProtoJson(
-        wire.BuildManifest(
-          buildId: 'build-1',
-          bundle: wire.BundleArtifact(sha256: 'a' * 64),
+      final String value
+          when value == '/extensions/builds/$manifestBuildId/manifest.json' =>
+        wire.encodeProtoJson(
+          wire.BuildManifest(
+            buildId: manifestBuildId,
+            bundle: wire.BundleArtifact(sha256: 'a' * 64),
+          ),
         ),
-      ),
       _ => throw StateError('Unexpected API path $path'),
     };
     return wire.ApiFetchResponse(
@@ -102,19 +108,23 @@ final class TestPlatform extends PlatformRuntime {
         );
       case wire.ControlRequest_Command.open:
         openedIdentities.add(request.open.identity);
+        openedBuilds.add(request.open.expectedBuildId);
+        _openedBuildId = request.open.expectedBuildId;
         response.session = wire.RuntimeSession(
           protocolVersion: protocolVersion,
           workerInstanceId: 'worker-1',
           generation: runtimeGeneration,
-          buildId: 'build-1',
-          sources: [
-            wire.SourceInfo(
-              id: sourceId,
-              name: '测试漫画源',
-              lang: 'zh',
-              supportsLatest: true,
-            ),
-          ],
+          buildId: _openedBuildId,
+          sources:
+              sourceInventory ??
+              [
+                wire.SourceInfo(
+                  id: sourceId,
+                  name: '测试漫画源',
+                  lang: 'zh',
+                  supportsLatest: true,
+                ),
+              ],
           capabilities: ['source-rpc'],
         );
       case wire.ControlRequest_Command.invoke:
@@ -160,7 +170,7 @@ final class TestPlatform extends PlatformRuntime {
         response.source = result.deepCopy()
           ..requestId = call.requestId
           ..generation = call.generation
-          ..buildId = 'build-1';
+          ..buildId = _openedBuildId;
       case wire.ControlRequest_Command.acquireImage:
         imageControls.add((
           'acquireImage',

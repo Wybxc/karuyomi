@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/reading_progress.dart';
+import '../../data/library_repository.dart';
 import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
 import '../reader/chapter_reader_route.dart';
@@ -299,6 +300,10 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
   MangaResume? _resume;
   String? _resumeError;
   bool _opening = false;
+  LibraryRepository? _library;
+  Stream<bool>? _favoriteStream;
+  bool _savingFavorite = false;
+  String? _favoriteError;
 
   @override
   void initState() {
@@ -311,6 +316,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
         mangaUrl: manga.url,
         chapters: chapters.map((chapter) => chapter.snapshot),
       );
+      _library = controller.library;
+      _favoriteStream = _library?.watchFavorite(_sequence!.mangaKey);
       unawaited(_refreshResume());
     }
   }
@@ -344,6 +351,70 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
     await controller.flushReadingProgress();
     await _refreshResume();
   }
+
+  Future<void> _setFavorite(bool favorite) async {
+    final repository = _library;
+    final build = controller.activeBuild;
+    final selectedSource = controller.activeSource;
+    if (_savingFavorite ||
+        repository == null ||
+        build == null ||
+        selectedSource == null ||
+        !controller.isCurrentSource(source) ||
+        controller.library?.identity.key != repository.identity.key) {
+      return;
+    }
+    setState(() {
+      _savingFavorite = true;
+      _favoriteError = null;
+    });
+    try {
+      await repository.setFavorite(
+        packageName: build.packageName,
+        sourceId: selectedSource.id,
+        sourceName: selectedSource.name,
+        sourceLang: selectedSource.lang,
+        manga: manga.snapshot,
+        favorite: favorite,
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() => _favoriteError = '收藏未能保存，请重试；仍可继续阅读。');
+      }
+    } finally {
+      if (mounted) setState(() => _savingFavorite = false);
+    }
+  }
+
+  Widget _favoriteControl() => StreamBuilder<bool>(
+    stream: _favoriteStream,
+    builder: (context, snapshot) {
+      final favorite = snapshot.data ?? false;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OutlinedButton.icon(
+            onPressed: !snapshot.hasData || _savingFavorite || _opening
+                ? null
+                : () => unawaited(_setFavorite(!favorite)),
+            icon: Icon(favorite ? Icons.bookmark : Icons.bookmark_add_outlined),
+            label: Text(
+              _savingFavorite
+                  ? '正在保存'
+                  : favorite
+                  ? '移出书架'
+                  : '加入书架',
+            ),
+          ),
+          if (_favoriteError != null || snapshot.hasError)
+            _Notice(
+              text: _favoriteError ?? '未能读取收藏状态，请返回书架重试；仍可继续阅读。',
+              icon: Icons.warning_amber,
+            ),
+        ],
+      );
+    },
+  );
 
   Future<void> _openChapter(BuildContext context, int index) async {
     if (_opening) return;
@@ -439,6 +510,10 @@ class _MangaDetailsPageState extends State<MangaDetailsPage> {
                     if (manga.description?.isNotEmpty ?? false) ...[
                       const SizedBox(height: 16),
                       SelectableText(manga.description!),
+                    ],
+                    if (_library != null) ...[
+                      const SizedBox(height: 16),
+                      _favoriteControl(),
                     ],
                     const SizedBox(height: 32),
                     if (_resume case final resume?)

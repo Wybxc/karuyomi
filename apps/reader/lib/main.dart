@@ -10,6 +10,7 @@ import 'features/reader/reader_recovery.dart';
 import 'features/reader/chapter_reader_route.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
+import 'features/library/library_page.dart';
 import 'runtime/platform_runtime.dart';
 
 void main() => runApp(const KaruyomiApp());
@@ -348,15 +349,12 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _page() => switch (_index) {
-    0 => _EmptyState(
-      icon: Icons.auto_stories_outlined,
-      title: '书架还是空的',
-      description: '从浏览添加你喜欢的漫画。',
-      action: FilledButton.icon(
-        onPressed: () => _select(1),
-        icon: const Icon(Icons.explore_outlined),
-        label: const Text('去浏览'),
-      ),
+    0 => LibraryPage(
+      controller: _catalog,
+      onBrowse: () => _select(1),
+      onConnect: () => unawaited(_connect()),
+      onAuthenticate: () => unawaited(_authenticate()),
+      onAuthenticateReader: _authenticateReader,
     ),
     1 => CatalogPage(
       controller: _catalog,
@@ -529,36 +527,4 @@ class _AppShellState extends State<AppShell> {
     _originField.dispose();
     super.dispose();
   }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.description,
-    this.action,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 64, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 24),
-          Text(title, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
-          Text(description, textAlign: TextAlign.center),
-          if (action != null) ...[const SizedBox(height: 24), action!],
-        ],
-      ),
-    ),
-  );
 }

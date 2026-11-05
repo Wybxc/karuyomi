@@ -35,7 +35,36 @@ class MangaResumeRows extends Table {
   Set<Column<Object>> get primaryKey => {identityKey, mangaKey};
 }
 
-@DriftDatabase(tables: [ChapterProgressRows, MangaResumeRows])
+class LibraryMangaRows extends Table {
+  TextColumn get identityKey => text()();
+  TextColumn get mangaKey => text()();
+  TextColumn get packageName => text()();
+  TextColumn get sourceId => text()();
+  TextColumn get sourceName => text()();
+  TextColumn get sourceLang => text()();
+  TextColumn get mangaJson => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {identityKey, mangaKey};
+}
+
+class LibraryFavoriteRows extends Table {
+  TextColumn get identityKey => text()();
+  TextColumn get mangaKey => text()();
+  DateTimeColumn get addedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {identityKey, mangaKey};
+}
+
+@DriftDatabase(
+  tables: [
+    ChapterProgressRows,
+    MangaResumeRows,
+    LibraryMangaRows,
+    LibraryFavoriteRows,
+  ],
+)
 class ReaderDatabase extends _$ReaderDatabase {
   ReaderDatabase(
     super.executor, {
@@ -84,5 +113,12 @@ class ReaderDatabase extends _$ReaderDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  // This schema only adds tables. Create the current set directly, preserving
+  // the unchanged progress tables without carrying old-version model branches.
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (migrator, from, to) => migrator.createAll(),
+  );
 }
