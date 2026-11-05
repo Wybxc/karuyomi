@@ -8,6 +8,7 @@ import {
   CategoryMutationSchema,
   CategoryMutationResponseSchema,
   ChapterProgressStateSchema,
+  ChapterProgressPageResponseSchema,
   LibraryPageResponseSchema,
   MangaStateResponseSchema,
   MangaStateSchema,
@@ -29,6 +30,7 @@ import {
   businessSchemaVersion,
   LIBRARY_PAGE_SIZE,
   BOOKMARK_PAGE_SIZE,
+  CHAPTER_PROGRESS_PAGE_SIZE,
   CATEGORY_LIMIT,
 } from '@karuyomi/contracts';
 
@@ -242,6 +244,57 @@ export async function readBookmarkPage(
   return response;
 }
 
+export async function readChapterProgressPage(
+  db: D1Database,
+  subject: string,
+  mangaKey: string,
+  afterKey: string,
+  revision?: number,
+) {
+  // Account revision and bounded chapter keys are observed in one snapshot.
+  const row = await db
+    .prepare(
+      `SELECT
+    COALESCE((SELECT revision FROM account_state WHERE subject = ?1), 0) account_revision,
+    (SELECT json_group_array(json(state_json)) FROM (
+      SELECT state_json FROM chapter_progress WHERE subject = ?1 AND manga_key = ?2 AND chapter_key > ?3
+      ORDER BY chapter_key LIMIT ?4
+    )) entries_json`,
+    )
+    .bind(subject, mangaKey, afterKey, CHAPTER_PROGRESS_PAGE_SIZE + 1)
+    .first<{ account_revision: number; entries_json: string }>();
+  if (!row)
+    throw new StateError(
+      ErrorCode.UNAVAILABLE,
+      'Chapter progress is unavailable',
+      503,
+    );
+  const response = fromJsonString(
+    ChapterProgressPageResponseSchema,
+    JSON.stringify({
+      schemaVersion: businessSchemaVersion,
+      accountRevision: row.account_revision,
+      mangaKey,
+      entries: JSON.parse(row.entries_json),
+    }),
+  );
+  if (revision !== undefined && revision !== response.accountRevision) {
+    response.entries = [];
+    response.error = {
+      $typeName: 'karuyomi.v1.BusinessStateError',
+      code: ErrorCode.REVISION_CONFLICT,
+      message: 'Chapter progress changed; restart pagination',
+      retryable: false,
+    };
+    return response;
+  }
+  if (response.entries.length > CHAPTER_PROGRESS_PAGE_SIZE) {
+    response.entries.length = CHAPTER_PROGRESS_PAGE_SIZE;
+    response.nextKey = response.entries.at(-1)?.chapterKey ?? '';
+  }
+  return response;
+}
+
 function projectAnchor(
   anchor: ReadingAnchor | undefined,
   snapshot: ChapterSnapshot,
@@ -283,6 +336,20 @@ function nextProgress(
   previous: ChapterProgressState | undefined,
 ): ChapterProgressState | undefined {
   const operation = mutation.operation;
+  if (operation.case === 'setChapterRead') {
+    if (previous?.epoch === MAX_REVISION)
+      throw new StateError(
+        ErrorCode.LIMIT_EXCEEDED,
+        'Progress epoch is exhausted',
+        409,
+      );
+    return create(ChapterProgressStateSchema, {
+      ...(operation.value.read ? previous : {}),
+      chapterKey: operation.value.chapterKey,
+      epoch: (previous?.epoch ?? 0) + 1,
+      completed: operation.value.read,
+    });
+  }
   if (operation.case === 'resetProgress') {
     const snapshot = operation.value.snapshot;
     if (!snapshot)
@@ -330,17 +397,14 @@ function nextProgress(
     current,
     ...(furthest ? { furthest } : {}),
     epoch: progress.epoch,
-    completed:
-      (previous?.completed === true &&
-        previous.current?.manifestVersion === snapshot.manifestVersion) ||
-      (progress.completed &&
-        progress.current.manifestVersion === snapshot.manifestVersion),
+    completed: previous?.completed === true || progress.completed,
   });
 }
 
 function chapterFor(mutation: StateMutation): string {
   const operation = mutation.operation;
-  if (operation.case === 'setBookmark') return operation.value.chapterKey;
+  if (operation.case === 'setBookmark' || operation.case === 'setChapterRead')
+    return operation.value.chapterKey;
   return operation.case === 'saveProgress' || operation.case === 'resetProgress'
     ? (operation.value.snapshot?.chapterKey ?? '')
     : '';
@@ -488,6 +552,8 @@ export async function applyMutation(
       manga.categoryIds = catalog.categories
         .filter((category) => operation.value.categoryIds.includes(category.id))
         .map((category) => category.id);
+    } else if (operation.case === 'setChapterRead') {
+      progress = nextProgress(mutation, state.progress);
     } else if (
       operation.case === 'saveProgress' ||
       operation.case === 'resetProgress'

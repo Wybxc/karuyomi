@@ -66,6 +66,7 @@ final class ReadingProgressController extends ChangeNotifier {
     final view = ++_viewSequence;
     ++_refreshSequence;
     final reopening = needsReopen(manifest.chapterKey);
+    ProgressSnapshot? loaded;
     ChapterProgress? stored = reopening
         ? null
         : _pending[manifest.chapterKey]?.progress;
@@ -78,6 +79,7 @@ final class ReadingProgressController extends ChangeNotifier {
         );
         if (_closed || view != _viewSequence) return null;
         _remember(manifest.chapterKey, state);
+        loaded = state;
         stored = state.progress;
         if (!_orderLoaded || reopening) {
           reversedOrder = state.resume?.reversedOrder ?? false;
@@ -97,8 +99,14 @@ final class ReadingProgressController extends ChangeNotifier {
     }
     if (_closed || view != _viewSequence) return null;
     final anchor = resolvePosition(manifest, stored?.current).position!;
-    _states[manifest.chapterKey] = (stored ?? ChapterProgress(current: anchor))
-        .advance(manifest: manifest, current: anchor);
+    _states[manifest.chapterKey] =
+        (stored ??
+                ChapterProgress(
+                  current: anchor,
+                  epoch: loaded?.epoch ?? 0,
+                  completed: loaded?.completed ?? false,
+                ))
+            .advance(manifest: manifest, current: anchor);
     // Opening a chapter records navigation even when its saved anchor has not
     // changed. Merely preparing its pages() session never calls this method.
     _navigationPending.add(manifest.chapterKey);
@@ -134,6 +142,8 @@ final class ReadingProgressController extends ChangeNotifier {
       if (!current()) return;
       final progressChanged =
           before == null ||
+          before.epoch != latest.epoch ||
+          before.completed != latest.completed ||
           !_sameNullableProgress(before.progress, latest.progress) ||
           !_sameResume(before.resume, latest.resume);
       final remoteRevisionChanged =
@@ -146,7 +156,7 @@ final class ReadingProgressController extends ChangeNotifier {
           );
       if (progressChanged || remoteRevisionChanged) {
         _conflicted.add(manifest.chapterKey);
-        error = before?.progress?.epoch != latest.progress?.epoch
+        error = before?.epoch != latest.epoch
             ? '本章进度已在其他设备重置，当前阅读位置保持不变。请重新打开本章后继续保存。'
             : progressChanged
             ? '阅读进度已在其他设备更新，当前阅读位置保持不变。请重新打开本章后继续保存。'
@@ -270,7 +280,7 @@ final class ReadingProgressController extends ChangeNotifier {
         if (failure.conflict) {
           _pending.remove(entry.key);
           _conflicted.add(entry.key);
-          if (failure.progress != null) {
+          if (failure.progress?.hasCurrent() == true) {
             _states[entry.key] = decodeChapterProgress(failure.progress!);
           }
           error = failure.staleEpoch

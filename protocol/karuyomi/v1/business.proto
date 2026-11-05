@@ -84,9 +84,11 @@ message ReadingAnchor {
 
 message ChapterProgressState {
   string chapter_key = 1;
+  // Anchors are absent for an unopened chapter marked from its detail list.
   ReadingAnchor current = 2;
   ReadingAnchor furthest = 3;
   uint32 epoch = 4;
+  // Chapter-level read state; only reset or marking unread clears it.
   bool completed = 5;
 }
 
@@ -105,6 +107,11 @@ message ChapterBookmark {
 message SetBookmark {
   string chapter_key = 1;
   bool bookmarked = 2;
+}
+
+message SetChapterRead {
+  string chapter_key = 1;
+  bool read = 2;
 }
 
 message SetFavorite {
@@ -136,6 +143,7 @@ message StateMutation {
     ResetProgress reset_progress = 13;
     SetCategories set_categories = 14;
     SetBookmark set_bookmark = 15;
+    SetChapterRead set_chapter_read = 16;
   }
 }
 
@@ -183,6 +191,17 @@ message BookmarkPageResponse {
   string manga_key = 3;
   // Only bookmarked chapters are included, ordered by chapter identity.
   repeated ChapterBookmark entries = 4;
+  string next_key = 5;
+  BusinessStateError error = 6;
+}
+
+message ChapterProgressPageResponse {
+  uint32 schema_version = 1;
+  // Subsequent pages must use this revision; a changed revision restarts paging.
+  uint32 account_revision = 2;
+  string manga_key = 3;
+  // Stored read/unread epochs and optional anchors, ordered by chapter identity.
+  repeated ChapterProgressState entries = 4;
   string next_key = 5;
   BusinessStateError error = 6;
 }

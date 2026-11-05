@@ -44,3 +44,5 @@ flutter test test/library/library_batch_test.dart test/library/library_batch_pag
 使用仓库固定的 Flutter SDK。完整工程入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`；集中检查只证明对应代码、组件与构建层级，不自动提升平台验收。
 
 仍待两个独立客户端在真实 D1 下验证批量读回、部分提交、断网/丢响应恢复和并发冲突；Web/iOS/Android、生产 Access、设备交互与真机门分别记录。服务端单漫画原子性沿用既有 [D1 状态](server-state.md)和[分类数据证据](category-state-data.md)，本轮没有新增跨漫画事务。
+
+后续核对发现正式 `SetFavorite` 合同无条件要求 metadata，上一里程碑的受控客户端通过没有覆盖无 metadata 移出被拒绝的路径。2026-11-06 已修复合同并补充独立真实 Worker/D1 回归，保留元数据、分类、resume、进度和书签等语义的结果见[章节状态记录](chapter-read-state.md#协议与真实-d1)。

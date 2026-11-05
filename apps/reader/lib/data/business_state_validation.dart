@@ -146,6 +146,49 @@ void validateBusinessBookmarkPage(
   wire.encodeProtoJson(value, maxBytes: _responseLimit);
 }
 
+void validateBusinessChapterProgressPage(
+  wire.ChapterProgressPageResponse value, {
+  required String mangaKey,
+  String afterKey = '',
+}) {
+  _require(value.schemaVersion == 1, 'Unsupported business state schema');
+  validateBusinessRevision(value.accountRevision);
+  _key(value.mangaKey);
+  _require(value.mangaKey == mangaKey, 'Progress page manga mismatch');
+  _require(
+    value.entries.length <= 64,
+    'Progress page exceeds its entry budget',
+  );
+  if (afterKey.isNotEmpty) _identity(afterKey);
+  if (value.hasError()) {
+    validateBusinessError(value.error);
+    _require(
+      value.entries.isEmpty && value.nextKey.isEmpty,
+      'Failed progress page cannot contain entries',
+    );
+  }
+  String order(String key) => String.fromCharCodes(utf8.encode(key));
+  var previous = order(afterKey);
+  for (final progress in value.entries) {
+    validateBusinessProgress(progress);
+    final current = order(progress.chapterKey);
+    _require(
+      previous.compareTo(current) < 0,
+      'Progress chapter keys must be ordered',
+    );
+    previous = current;
+  }
+  if (value.nextKey.isNotEmpty) {
+    _identity(value.nextKey);
+    _require(
+      value.entries.isNotEmpty &&
+          value.nextKey == value.entries.last.chapterKey,
+      'Progress cursor must identify its last entry',
+    );
+  }
+  wire.encodeProtoJson(value, maxBytes: _responseLimit);
+}
+
 void validateBusinessRevision(int value) => _require(
   value >= 0 && value <= 0xffffffff,
   'Business revision or epoch exceeds uint32',
@@ -206,11 +249,16 @@ void validateBusinessProgress(
     chapterKey == null || value.chapterKey == chapterKey,
     'Progress belongs to another chapter',
   );
-  _require(value.hasCurrent(), 'Progress requires a current anchor');
-  validateBusinessAnchor(value.current);
+  if (value.hasCurrent()) {
+    validateBusinessAnchor(value.current);
+    _require(
+      value.current.chapterKey == value.chapterKey,
+      'Current anchor belongs to another chapter',
+    );
+  }
   _require(
-    value.current.chapterKey == value.chapterKey,
-    'Current anchor belongs to another chapter',
+    !value.hasFurthest() || value.hasCurrent(),
+    'Furthest requires a current anchor',
   );
   if (value.hasFurthest()) {
     validateBusinessAnchor(value.furthest);

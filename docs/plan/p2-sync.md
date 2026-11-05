@@ -4,7 +4,7 @@
 
 **多端同步是首要设计目标和当前实施主线。** 同一部署、同一身份在 Flutter Web、iOS 和 Android 共享书架、分类、阅读进度、书签和非敏感设置。Worker API 负责业务读写，D1 保存唯一权威状态；功能从数据模型、协议到 UI 都按多端共同使用设计，不先完成一套独立本地产品再补同步。
 
-状态：**收藏与阅读进度的服务端底座已接入，工程检查、正式 Web/API 构建、真实 Web 独立会话及测试身份下三端组合的双向非默认页续读已通过；已部署生产并通过匿名静态/API访问边界检查，生产正向待验收**。Codex 内置浏览器与正式 iOS/Android `app.main()` 经真实隔离 workerd/D1，完成收藏读回、真实图片、双方保存和非默认页恢复，回看最远进度不倒退，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。同 origin Web 独立会话另见[证据](../verification/server-state.md#真实-web-独立会话闭环)。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。同时写竞争、自动前台重取、故障恢复、真机及生产 Access 正向继续验收；分类协议、D1 原子读写与 Flutter 数据层已实现并通过组件/真实 D1 检查；分类管理、筛选与多关联 UI 已实现，真实双 Web 分类分项已通过；双 iOS 与 iOS↔Android 分类顺序闭环已过，Web↔Native 分类、Android 初始化可靠性、章节书签与三项同步设置的独立客户端验收及其余 P1 设置继续推进。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
+状态：**收藏与阅读进度的服务端底座已接入，工程检查、正式 Web/API 构建、真实 Web 独立会话及测试身份下三端组合的双向非默认页续读已通过；已部署生产并通过匿名静态/API访问边界检查，生产正向待验收**。Codex 内置浏览器与正式 iOS/Android `app.main()` 经真实隔离 workerd/D1，完成收藏读回、真实图片、双方保存和非默认页恢复，回看最远进度不倒退，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。同 origin Web 独立会话另见[证据](../verification/server-state.md#真实-web-独立会话闭环)。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。同时写竞争、自动前台重取、故障恢复、真机及生产 Access 正向继续验收；分类协议、D1 原子读写与 Flutter 数据层已实现并通过组件/真实 D1 检查；分类管理、筛选与多关联 UI 已实现，真实双 Web 分类分项已通过；双 iOS 与 iOS↔Android 分类顺序闭环已过，Web↔Native 分类、Android 初始化可靠性、章节书签、范围已读/未读与三项同步设置的独立客户端验收及其余 P1 设置继续推进。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
 
 ## 权威来源与初版边界
 
@@ -17,7 +17,7 @@
 
 ## 当前实现与剩余主线
 
-- 已接入 `GET /api/library`、`GET /api/state/manga/:mangaKey` 和 `POST /api/state/mutations`。每页 8 部作品，请求上限 128 KiB、响应上限 2 MiB；清单最多 2048 个稳定 pageKey，完整 Source memo 保持不透明文本。
+- 已接入 `GET /api/library`、`GET /api/state/manga/:mangaKey`、`GET /api/state/manga/:mangaKey/progress` 和 `POST /api/state/mutations`。书架每页 8 部作品，章节进度每页最多 64 项并固定 account revision；请求上限 128 KiB、响应上限 2 MiB；清单最多 2048 个稳定 pageKey，完整 Source memo 保持不透明文本。
 - D1 按 Access subject 隔离 account/manga revision、分章进度与 mutation 结果；条件 SQL、唯一键和 nonce gate 在同一 batch 内提交。客户端固定首次请求的 mutation ID/正文，丢响应时复用，CAS/epoch 冲突明确停止旧视图写入。
 - 正式 Flutter 入口共用 `BusinessStateClient`，收藏与进度仅保存服务端确认状态；未确认进度只留当前会话，同一服务和身份恢复后重绑 API 再重试。书架进入、前台恢复、重连和手动刷新重取；本地搜索/排序只处理已确认视图。
 - Web 登录改为独立窗口，保留原页面与草稿；重新 bootstrap 确认身份前不提交旧身份草稿，恢复后只提交当前身份的 writer。进度冲突不能由收藏或书架刷新解除，旧幂等成功须核对当前权威状态。
@@ -31,6 +31,8 @@
 非敏感设置本轮同步已有的全局主题、四种阅读模式和 AUTO/SINGLE/DOUBLE 页组，阅读字段支持逐漫画覆盖或继承。协议、独立作用域 CAS、D1 原子确认快照及幂等 API 已接入，Dart 仓储、正式设置/阅读 UI 与集中工程检查通过，见[设置设计](../design/reader-settings.md)与[证据](../verification/reader-settings.md)。清空覆盖保留 revision，不因普通进度写入冲突；当前未取得独立客户端、生产或真机设置证据。适宽/适高、裁白、背景/应用内亮度及可配置输入仍按 P1 保留未实现。
 
 书架批量操作本轮复用单漫画 API，逐本串行确认，不增加跨漫画原子事务。确认清单冻结漫画与目录 revision；分类操作保留其它关联，移出书架不覆写元数据或清除进度。首失败停止，未确认项只能精确重试，剩余项须明确继续；已拒绝项只读刷新后结束旧批次，再重新确认。会话草稿以业务客户端为归属，同客户端 wrapper 重建保留恢复入口；旧窗口失效后不得续发或导航。设计见[批量操作](../design/library-batch.md)，工程与组件范围见[验证记录](../verification/library-batch.md)，真实跨端与故障门仍须另验。
+
+章节范围已读/标未读已复用现有进度表和作品 mutation，允许无真实锚的独立 epoch/已读状态；普通进度跨 manifest 保留章级已读值，标未读或重新阅读才清除。详情筛选、多选及范围确认已接入，串行 CAS 链、原请求重试、显式继续与旧窗口退役见[设计](../design/chapter-read-state.md)。真实 D1 与客户端组件分项见[验证记录](../verification/chapter-read-state.md)，独立客户端及生产门待验。
 
 ## 实施顺序
 

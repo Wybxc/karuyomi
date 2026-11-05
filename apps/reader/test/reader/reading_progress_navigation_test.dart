@@ -76,6 +76,21 @@ Future<CatalogController> _details(
       .controller;
 }
 
+Future<void> _revealDetails(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
+    final scrollable = find
+        .descendant(
+          of: find.byType(MangaDetailsPage),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.drag(scrollable, const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
+  }
+  await tester.ensureVisible(finder);
+}
+
 void main() {
   testWidgets(
     'foreground refresh keeps the viewport until explicit reopen adopts remote progress and order',
@@ -83,7 +98,7 @@ void main() {
       final server = TestBusinessServer();
       final platform = _platform(server: server);
       final catalog = await _details(tester, platform);
-      await tester.ensureVisible(find.text('第一章'));
+      await _revealDetails(tester, find.text('第一章'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
@@ -175,7 +190,7 @@ void main() {
       final server = TestBusinessServer();
       final platform = _platform(server: server);
       final catalog = await _details(tester, platform);
-      await tester.ensureVisible(find.text('第一章'));
+      await _revealDetails(tester, find.text('第一章'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
@@ -231,7 +246,7 @@ void main() {
           return origin == original.origin ? recovered : replacement;
         },
       );
-      await tester.ensureVisible(find.text('第一章'));
+      await _revealDetails(tester, find.text('第一章'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
@@ -334,7 +349,7 @@ void main() {
         mangaUrl: testManga.url,
         chapters: const [],
       ).mangaKey;
-      await tester.ensureVisible(find.text('第一章'));
+      await _revealDetails(tester, find.text('第一章'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
@@ -392,7 +407,7 @@ void main() {
       platform = _platform(server: server);
       catalog = await _details(tester, platform);
       expect(find.text('继续阅读'), findsOneWidget);
-      await tester.ensureVisible(find.text('继续阅读'));
+      await _revealDetails(tester, find.text('继续阅读'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('继续阅读'));
       await tester.pumpAndSettle();
@@ -447,7 +462,7 @@ void main() {
     (tester) async {
       final platform = _platform();
       final catalog = await _details(tester, platform);
-      await tester.ensureVisible(find.text('第一章'));
+      await _revealDetails(tester, find.text('第一章'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();

@@ -85,6 +85,17 @@ final class BusinessBookmarksSnapshot {
   final List<wire.ChapterBookmark> entries;
 }
 
+final class BusinessChapterProgressSnapshot {
+  BusinessChapterProgressSnapshot({
+    required this.manga,
+    required this.accountRevision,
+    required this.entries,
+  });
+  final wire.MangaState manga;
+  final int accountRevision;
+  final List<wire.ChapterProgressState> entries;
+}
+
 final class _PendingCategoryMutation {
   _PendingCategoryMutation(this.fingerprint, this.request, this.body);
   final String fingerprint;
@@ -369,6 +380,77 @@ final class BusinessStateClient {
     throw StateError('Bookmarks changed repeatedly; refresh again');
   });
 
+  /// Read all stored chapter statuses and the manga CAS at one account revision.
+  Future<BusinessChapterProgressSnapshot> readChapterProgress(
+    String key,
+  ) => _serial(key, () async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final state = await _readManga(key);
+      final revision = state.accountRevision;
+      final entries = <wire.ChapterProgressState>[];
+      final cursors = <String>{};
+      var afterKey = '';
+      var restart = false;
+      do {
+        final path = Uri(
+          path: '/api/state/manga/$key/progress',
+          queryParameters: {
+            if (afterKey.isNotEmpty) 'afterKey': afterKey,
+            'revision': '$revision',
+          },
+        ).toString();
+        final reply = await _get(path);
+        final page = wire.decodeProtoJson(
+          wire.ChapterProgressPageResponse(),
+          jsonDecode(reply.body),
+          maxBytes: _responseLimit,
+        );
+        validateBusinessChapterProgressPage(
+          page,
+          mangaKey: key,
+          afterKey: afterKey,
+        );
+        if (page.hasError()) {
+          final failure = BusinessStateException(page.error);
+          if (failure.conflict) {
+            restart = true;
+            break;
+          }
+          throw failure;
+        }
+        _success(reply);
+        if (page.accountRevision != revision || revision < _accountRevision) {
+          restart = true;
+          break;
+        }
+        entries.addAll(page.entries.map((entry) => entry.deepCopy()..freeze()));
+        afterKey = page.nextKey;
+        if (afterKey.isNotEmpty && !cursors.add(afterKey)) {
+          throw const FormatException('Progress cursor repeated');
+        }
+        if (entries.length > 10000 || cursors.length > 1000) {
+          throw const FormatException(
+            'Chapter progress exceeds session budget',
+          );
+        }
+      } while (afterKey.isNotEmpty);
+      if (restart) continue;
+      _ensureOpen();
+      final rejected = _pending[key];
+      if (rejected != null &&
+          rejected.rejected &&
+          rejected.request.hasSetChapterRead()) {
+        _pending.remove(key);
+      }
+      return BusinessChapterProgressSnapshot(
+        manga: state.manga.deepCopy()..freeze(),
+        accountRevision: revision,
+        entries: List.unmodifiable(entries),
+      );
+    }
+    throw StateError('Chapter progress changed repeatedly; refresh again');
+  });
+
   Future<wire.MangaStateResponse> readManga(String key, {String? chapterKey}) =>
       _serial(key, () => _readManga(key, chapterKey: chapterKey));
 
@@ -481,6 +563,12 @@ final class BusinessStateClient {
         throw ArgumentError('Bookmark requires its confirmed revision');
       }
       validateBusinessRevision(basedOnRevision);
+    }
+    if (command.hasSetChapterRead()) {
+      validateBusinessChapterKey(command.setChapterRead.chapterKey);
+      if (!requireExactRevision) {
+        throw ArgumentError('Chapter read changes require an exact revision');
+      }
     }
     final fingerprint = jsonEncode(wire.encodeProtoJson(command));
     return _serial(command.mangaKey, () async {
@@ -642,6 +730,20 @@ final class BusinessStateClient {
       }
     }
     final expectedChapter = _operationChapter(pending.request);
+    final chapterRead = pending.request.hasSetChapterRead()
+        ? pending.request.setChapterRead
+        : null;
+    if (chapterRead != null &&
+        (!value.hasProgress() ||
+            value.progress.completed != chapterRead.read ||
+            value.progress.epoch == 0 ||
+            (!chapterRead.read &&
+                (value.progress.hasCurrent() ||
+                    value.progress.hasFurthest())))) {
+      throw const FormatException(
+        'Mutation response chapter read state mismatch',
+      );
+    }
     final bookmark = pending.request.hasSetBookmark()
         ? pending.request.setBookmark
         : null;
@@ -657,8 +759,9 @@ final class BusinessStateClient {
     if (expectedChapter != null &&
         (!value.hasProgress() ||
             value.progress.chapterKey != expectedChapter ||
-            !value.progress.hasCurrent() ||
-            value.progress.current.chapterKey != expectedChapter ||
+            (chapterRead == null && !value.progress.hasCurrent()) ||
+            (value.progress.hasCurrent() &&
+                value.progress.current.chapterKey != expectedChapter) ||
             (value.progress.hasFurthest() &&
                 value.progress.furthest.chapterKey != expectedChapter))) {
       throw const FormatException(
@@ -1203,6 +1306,8 @@ String? _operationChapter(wire.StateMutation request) =>
     ? request.saveProgress.snapshot.chapterKey
     : request.hasResetProgress()
     ? request.resetProgress.snapshot.chapterKey
+    : request.hasSetChapterRead()
+    ? request.setChapterRead.chapterKey
     : null;
 
 String? _mutationChapter(wire.StateMutation request) => request.hasSetBookmark()

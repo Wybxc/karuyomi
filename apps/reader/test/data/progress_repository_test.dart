@@ -281,7 +281,7 @@ void main() {
   });
 
   test(
-    'changed snapshot preserves unresolved far and clears completion',
+    'changed snapshot preserves unresolved far and chapter completion',
     () async {
       final before = manifest();
       final completed = observed(before, 2).advance(
@@ -314,7 +314,7 @@ void main() {
         ),
         reversedOrder: false,
       );
-      expect(saved.completed, false);
+      expect(saved.completed, true);
       expect(saved.furthest!.pageKey, 'three');
       expect(saved.furthestUnresolved(after), true);
       expect(saved.current.pageKey, 'new');

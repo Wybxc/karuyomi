@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
@@ -12,6 +13,9 @@ import '../bookmarks/bookmark_status.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
 import '../reader/reader_recovery.dart';
+import '../progress/chapter_read_batch.dart';
+import '../progress/chapter_read_controller.dart';
+import '../progress/chapter_read_dialog.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -294,6 +298,8 @@ class MangaDetailsPage extends StatefulWidget {
   State<MangaDetailsPage> createState() => _MangaDetailsPageState();
 }
 
+enum _ChapterReadFilter { all, read, unread }
+
 class _MangaDetailsPageState extends State<MangaDetailsPage>
     with WidgetsBindingObserver {
   CatalogController get controller => widget.controller;
@@ -310,6 +316,15 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   String? _favoriteError;
   ChapterBookmarksController? _bookmarks;
   bool _onlyBookmarks = false;
+  ChapterReadController? _chapterRead;
+  _ChapterReadFilter _readFilter = _ChapterReadFilter.all;
+  bool _detailsExpired = false;
+  bool _selectingChapters = false;
+  bool _markingChapters = false;
+  final _chapterSelection = <String>{};
+  int _unmatchedChapterSelectionCount = 0;
+  String? _rangeStart;
+  String? _rangeEnd;
   final _chapterSearch = TextEditingController();
   ChapterOrder _chapterOrder = ChapterOrder.source;
   bool _chapterOrderChosen = false;
@@ -349,27 +364,88 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
           mangaKey: _sequence!.mangaKey,
           isCurrent: () =>
               mounted &&
+              !_detailsExpired &&
+              controller.status == ServiceStatus.ready &&
               controller.isCurrentSource(source) &&
-              controller.bookmarks?.identity.key == repository.identity.key,
+              identical(controller.bookmarks, repository),
         )..addListener(_bookmarksChanged);
         unawaited(_bookmarks!.refresh());
+      }
+      final progress = controller.readingProgress;
+      if (progress != null) {
+        _chapterRead = ChapterReadController(
+          repository: progress,
+          mangaKey: _sequence!.mangaKey,
+          isCurrent: () =>
+              mounted &&
+              !_detailsExpired &&
+              controller.status == ServiceStatus.ready &&
+              controller.isCurrentSource(source) &&
+              identical(controller.readingProgress, progress),
+        )..addListener(_detailsChanged);
+        unawaited(_chapterRead!.refresh());
       }
       unawaited(_refreshResume());
     }
     controller.addListener(_catalogChanged);
   }
 
-  void _bookmarksChanged() {
-    if (mounted) setState(() {});
+  @override
+  void didUpdateWidget(MangaDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller.removeListener(_catalogChanged);
+      controller.addListener(_catalogChanged);
+    }
+    if (!identical(oldWidget.controller, widget.controller) ||
+        !identical(oldWidget.source, widget.source) ||
+        !identical(oldWidget.manga, widget.manga) ||
+        !identical(oldWidget.chapters, widget.chapters)) {
+      _detailsExpired = true;
+      _chapterSelection.clear();
+      _selectingChapters = false;
+      _bookmarks?.checkCurrent();
+      _chapterRead?.checkCurrent();
+      _detailsChanged();
+    }
   }
 
-  void _catalogChanged() => _bookmarks?.checkCurrent();
+  void _bookmarksChanged() => _detailsChanged();
+
+  void _detailsChanged() {
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _catalogChanged() {
+    final progress = _chapterRead;
+    if (!_detailsExpired &&
+        (controller.status != ServiceStatus.ready ||
+            !controller.isCurrentSource(source) ||
+            (progress != null &&
+                !identical(controller.readingProgress, progress.repository)))) {
+      _detailsExpired = true;
+      _chapterSelection.clear();
+      _selectingChapters = false;
+      _detailsChanged();
+    }
+    _bookmarks?.checkCurrent();
+    progress?.checkCurrent();
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshResume());
       unawaited(_bookmarks?.refresh());
+      unawaited(_chapterRead?.refresh());
       final key = _sequence?.mangaKey;
       final library = _library;
       if (key != null && library != null) {
@@ -386,6 +462,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     controller.removeListener(_catalogChanged);
     _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
+    _chapterRead?.removeListener(_detailsChanged);
+    _chapterRead?.dispose();
     _chapterSearch.dispose();
     super.dispose();
   }
@@ -409,7 +487,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       error = '未能读取服务端阅读位置，仍可从章节列表打开。';
     }
     if (!mounted ||
-        controller.readingProgress?.identity.key != repository.identity.key) {
+        _detailsExpired ||
+        !identical(controller.readingProgress, repository)) {
       return;
     }
     setState(() {
@@ -505,10 +584,28 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   );
 
   Future<void> _openChapter(BuildContext context, int index) async {
-    if (_opening) return;
+    if (_opening || _selectingChapters || _detailsExpired) return;
+    final catalog = controller;
+    final selectedManga = manga;
+    final selectedSource = source;
+    final authenticate = widget.onAuthenticateReader;
+    final progress = catalog.readingProgress;
     final route = ModalRoute.of(context);
     final sequence = _sequence;
     if (sequence == null) return;
+    bool isCurrent() =>
+        mounted &&
+        !_detailsExpired &&
+        identical(controller, catalog) &&
+        identical(manga, selectedManga) &&
+        identical(source, selectedSource) &&
+        identical(_sequence, sequence) &&
+        identical(catalog.readingProgress, progress) &&
+        catalog.status == ServiceStatus.ready &&
+        catalog.isCurrentSource(selectedSource) &&
+        route?.isCurrent == true &&
+        route?.isActive == true;
+    if (!isCurrent()) return;
     setState(() => _opening = true);
     final selected = sequence.entries[index];
     final initialOrder = _chapterOrderChosen || _resume != null
@@ -518,47 +615,120 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       'action': 'open_chapter',
       'targetChapterKey': selected.key,
     });
-    final opened = await controller.openChapter(
-      manga,
+    final opened = await catalog.openChapter(
+      selectedManga,
       ChapterEntry(selected.snapshot),
-      reference: source,
+      reference: selectedSource,
       logicalChapterKey: selected.key,
     );
     if (opened == null) {
       if (mounted) setState(() => _opening = false);
       return;
     }
-    if (!context.mounted ||
-        route?.isCurrent != true ||
-        route?.isActive != true) {
-      await controller.closeChapter(opened);
+    if (!context.mounted || !isCurrent()) {
+      await catalog.closeChapter(opened);
       if (mounted) setState(() => _opening = false);
       return;
     }
     try {
       final readerRoute = MaterialPageRoute<void>(
         builder: (_) => ChapterReaderRoute(
-          catalog: controller,
-          manga: manga,
-          source: source,
+          catalog: catalog,
+          manga: selectedManga,
+          source: selectedSource,
           sequence: sequence,
           initialChapter: selected,
           initialOpened: opened,
           initialOrder: initialOrder,
-          onAuthenticate: widget.onAuthenticateReader,
+          onAuthenticate: authenticate,
         ),
       );
       await Navigator.of(context).push<void>(readerRoute);
       await readerRoute.completed;
-      await controller.flushReadingProgress();
+      await catalog.flushReadingProgress();
     } finally {
       // Also covers a route popped before its first Reader leaf mounted.
-      await controller.closeChapter(opened);
+      await catalog.closeChapter(opened);
       if (mounted) {
         setState(() => _opening = false);
-        await _refreshResume();
-        await _bookmarks?.refresh();
+        if (!_detailsExpired && identical(controller, catalog)) {
+          await _refreshResume();
+          await _bookmarks?.refresh();
+          await _chapterRead?.refresh();
+        }
       }
+    }
+  }
+
+  void _resetRange() {
+    _rangeStart = null;
+    _rangeEnd = null;
+  }
+
+  Future<void> _markChapters({bool? read}) async {
+    final progress = _chapterRead;
+    final sequence = _sequence;
+    if (progress == null ||
+        sequence == null ||
+        _markingChapters ||
+        _opening ||
+        !progress.available ||
+        progress.busy) {
+      return;
+    }
+    final repository = progress.repository;
+    final pending = pendingChapterReadBatch(repository, sequence.mangaKey);
+    final selectedChapters = sequence
+        .ordered(_chapterOrder)
+        .where((chapter) => _chapterSelection.contains(chapter.key))
+        .toList();
+    if (pending == null &&
+        (read == null || !progress.loaded || selectedChapters.isEmpty)) {
+      return;
+    }
+    final route = ModalRoute.of(context);
+    bool isCurrent() =>
+        mounted &&
+        !_detailsExpired &&
+        identical(_chapterRead, progress) &&
+        identical(controller.readingProgress, repository) &&
+        controller.status == ServiceStatus.ready &&
+        controller.isCurrentSource(source) &&
+        route?.isActive == true;
+    final draft =
+        pending ??
+        ChapterReadBatchDraft(
+          repository: repository,
+          mangaKey: sequence.mangaKey,
+          read: read!,
+          revision: progress.revision,
+          chapters: selectedChapters,
+        );
+    setState(() => _markingChapters = true);
+    try {
+      final remaining = await showChapterReadDialog(
+        context: context,
+        catalog: controller,
+        progress: progress,
+        draft: draft,
+        isCurrent: isCurrent,
+      );
+      if (isCurrent() && remaining != null) {
+        final currentKeys = sequence.entries
+            .map((chapter) => chapter.key)
+            .toSet();
+        final matched = remaining.intersection(currentKeys);
+        setState(() {
+          _chapterSelection
+            ..clear()
+            ..addAll(matched);
+          _unmatchedChapterSelectionCount = remaining.length - matched.length;
+          _selectingChapters = matched.isNotEmpty;
+          _resetRange();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _markingChapters = false);
     }
   }
 
@@ -588,12 +758,241 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     return details.isEmpty ? null : details.join(' · ');
   }
 
+  void _toggleChapter(String key) => setState(() {
+    if (!_chapterSelection.add(key)) _chapterSelection.remove(key);
+  });
+
+  List<Widget> _chapterReadControls(List<SequenceChapter> visible) {
+    final progress = _chapterRead;
+    if (progress == null) return [];
+    final pending = pendingChapterReadBatch(
+      progress.repository,
+      progress.mangaKey,
+    );
+    final available =
+        progress.available &&
+        !_opening &&
+        !_markingChapters &&
+        !controller.busy;
+    final canSelect = available && progress.loaded && !progress.busy;
+    final visibleKeys = visible.map((chapter) => chapter.key).toSet();
+    final hidden = _chapterSelection.difference(visibleKeys).length;
+    final start = visibleKeys.contains(_rangeStart) ? _rangeStart : null;
+    final end = visibleKeys.contains(_rangeEnd) ? _rangeEnd : null;
+    Widget rangeEndpoint(
+      String label,
+      String key,
+      String? value,
+      ValueChanged<String?> change,
+    ) => SizedBox(
+      width: 280,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            key: ValueKey(key),
+            value: value,
+            isExpanded: true,
+            items: [
+              for (final chapter in visible)
+                DropdownMenuItem(
+                  value: chapter.key,
+                  child: Text(
+                    '${chapter.name} · 来源第 ${chapter.sourceIndex + 1} 项',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: canSelect ? change : null,
+          ),
+        ),
+      ),
+    );
+    return [
+      Wrap(
+        spacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          for (final (filter, label) in [
+            (_ChapterReadFilter.all, '全部状态'),
+            (_ChapterReadFilter.read, '已读'),
+            (_ChapterReadFilter.unread, '未读'),
+          ])
+            ChoiceChip(
+              key: ValueKey(('chapter-read-filter', filter.name)),
+              label: Text(label),
+              selected: _readFilter == filter,
+              onSelected: filter == _ChapterReadFilter.all || progress.loaded
+                  ? (_) => setState(() {
+                      _readFilter = filter;
+                      _resetRange();
+                    })
+                  : null,
+            ),
+          TextButton.icon(
+            key: const ValueKey('chapter-read-refresh'),
+            onPressed: available && progress.canRefresh
+                ? () => unawaited(progress.refresh())
+                : null,
+            icon: const Icon(Icons.sync),
+            label: const Text('刷新章节状态'),
+          ),
+        ],
+      ),
+      if (progress.busy) const LinearProgressIndicator(),
+      if (progress.error case final error?)
+        _Notice(text: error, icon: Icons.warning_amber),
+      if (_unmatchedChapterSelectionCount > 0)
+        _Notice(
+          text:
+              '原清单中 $_unmatchedChapterSelectionCount 章已不在当前章节列表，未转入新选择，也未自动映射到其它章节。',
+          icon: Icons.info_outline,
+        ),
+      if (pending != null) ...[
+        const _Notice(
+          text: '有尚未结束的章节标记，列表仅显示服务端已确认的状态。',
+          icon: Icons.pending_actions,
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonal(
+            key: const ValueKey('chapter-read-resume'),
+            onPressed: available && !progress.busy
+                ? () => unawaited(_markChapters())
+                : null,
+            child: const Text('继续处理章节标记'),
+          ),
+        ),
+      ],
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: const ValueKey('chapter-selection-toggle'),
+          onPressed: canSelect && (_selectingChapters || pending == null)
+              ? () => setState(() {
+                  _selectingChapters = !_selectingChapters;
+                  _unmatchedChapterSelectionCount = 0;
+                  if (!_selectingChapters) _chapterSelection.clear();
+                  _resetRange();
+                })
+              : null,
+          icon: Icon(_selectingChapters ? Icons.close : Icons.checklist),
+          label: Text(_selectingChapters ? '退出章节选择' : '选择章节'),
+        ),
+      ),
+      if (_selectingChapters) ...[
+        Text('已选 ${_chapterSelection.length} 章 · 当前隐藏 $hidden 章'),
+        if (hidden > 0) const Text('标记包含隐藏选中的章节，请核对完整确认清单。'),
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton(
+              key: const ValueKey('chapter-select-visible'),
+              onPressed: canSelect && visible.isNotEmpty
+                  ? () => setState(() => _chapterSelection.addAll(visibleKeys))
+                  : null,
+              child: const Text('全选当前显示章节'),
+            ),
+            TextButton(
+              key: const ValueKey('chapter-deselect-visible'),
+              onPressed:
+                  canSelect &&
+                      _chapterSelection.intersection(visibleKeys).isNotEmpty
+                  ? () =>
+                        setState(() => _chapterSelection.removeAll(visibleKeys))
+                  : null,
+              child: const Text('取消当前显示章节选择'),
+            ),
+            TextButton(
+              key: const ValueKey('chapter-clear-selection'),
+              onPressed: canSelect && _chapterSelection.isNotEmpty
+                  ? () => setState(_chapterSelection.clear)
+                  : null,
+              child: const Text('清空章节选择'),
+            ),
+          ],
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            rangeEndpoint(
+              '范围起点',
+              'chapter-range-start',
+              start,
+              (value) => setState(() => _rangeStart = value),
+            ),
+            rangeEndpoint(
+              '范围终点',
+              'chapter-range-end',
+              end,
+              (value) => setState(() => _rangeEnd = value),
+            ),
+            OutlinedButton(
+              key: const ValueKey('chapter-select-range'),
+              onPressed: canSelect && start != null && end != null
+                  ? () => setState(() {
+                      final first = visible.indexWhere(
+                        (chapter) => chapter.key == start,
+                      );
+                      final last = visible.indexWhere(
+                        (chapter) => chapter.key == end,
+                      );
+                      final low = first < last ? first : last;
+                      final high = first > last ? first : last;
+                      _chapterSelection.addAll(
+                        visible
+                            .sublist(low, high + 1)
+                            .map((chapter) => chapter.key),
+                      );
+                    })
+                  : null,
+              child: const Text('选中此范围'),
+            ),
+          ],
+        ),
+        const Text('范围按当前显示顺序的两个端点选择，包含两端；重复条目分别保留。'),
+        Wrap(
+          spacing: 8,
+          children: [
+            FilledButton.tonal(
+              key: const ValueKey('chapter-mark-read'),
+              onPressed:
+                  canSelect && pending == null && _chapterSelection.isNotEmpty
+                  ? () => unawaited(_markChapters(read: true))
+                  : null,
+              child: const Text('标记所选已读'),
+            ),
+            OutlinedButton(
+              key: const ValueKey('chapter-mark-unread'),
+              onPressed:
+                  canSelect && pending == null && _chapterSelection.isNotEmpty
+                  ? () => unawaited(_markChapters(read: false))
+                  : null,
+              child: const Text('标记所选未读'),
+            ),
+          ],
+        ),
+      ],
+    ];
+  }
+
   List<Widget> _chapterList() {
     final sequence = _sequence;
     final query = _chapterSearch.text.trim().toLowerCase();
     final visible = (sequence?.ordered(_chapterOrder) ?? <SequenceChapter>[])
         .where((chapter) {
           if (_onlyBookmarks && !(_bookmarks?.contains(chapter.key) ?? false)) {
+            return false;
+          }
+          final completed = _chapterRead?.completed(chapter.key);
+          if (_readFilter == _ChapterReadFilter.read && completed != true) {
+            return false;
+          }
+          if (_readFilter == _ChapterReadFilter.unread && completed != false) {
             return false;
           }
           final text = [
@@ -614,7 +1013,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         key: const ValueKey('chapter-search'),
         controller: _chapterSearch,
         enabled: !_opening,
-        onChanged: (_) => setState(() {}),
+        onChanged: (_) => setState(_resetRange),
         decoration: InputDecoration(
           labelText: '搜索章节',
           hintText: '章节名、扫描组或章节号',
@@ -624,7 +1023,10 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
               : IconButton(
                   tooltip: '清空章节搜索',
                   icon: const Icon(Icons.clear),
-                  onPressed: () => setState(_chapterSearch.clear),
+                  onPressed: () => setState(() {
+                    _chapterSearch.clear();
+                    _resetRange();
+                  }),
                 ),
           border: const OutlineInputBorder(),
         ),
@@ -656,6 +1058,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                         setState(() {
                           _chapterOrder = order;
                           _chapterOrderChosen = true;
+                          _resetRange();
                         });
                       }
                     },
@@ -672,7 +1075,10 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
               label: const Text('仅书签'),
               selected: _onlyBookmarks,
               onSelected: bookmarks.loaded
-                  ? (selected) => setState(() => _onlyBookmarks = selected)
+                  ? (selected) => setState(() {
+                      _onlyBookmarks = selected;
+                      _resetRange();
+                    })
                   : null,
             ),
             Text(
@@ -693,6 +1099,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
             icon: Icons.info_outline,
           ),
       ],
+      ..._chapterReadControls(visible),
       Text('显示 ${visible.length} / ${chapters.length} 章'),
       if (controller.busy) const LinearProgressIndicator(),
       if (controller.error != null)
@@ -714,13 +1121,27 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         ListTile(
           key: ValueKey(chapter.key),
           enabled: !controller.busy && !_opening,
-          leading: const Icon(Icons.article_outlined),
+          leading: _selectingChapters
+              ? Checkbox(
+                  key: ValueKey(('chapter-select', chapter.key)),
+                  value: _chapterSelection.contains(chapter.key),
+                  onChanged: _markingChapters
+                      ? null
+                      : (_) => _toggleChapter(chapter.key),
+                )
+              : const Icon(Icons.article_outlined),
           title: Text(chapter.name),
-          subtitle: switch (_chapterSubtitle(chapter)) {
-            final subtitle? => Text(subtitle),
-            null => null,
-          },
-          trailing: _bookmarks == null
+          subtitle: Text(
+            [
+              ?_chapterSubtitle(chapter),
+              switch (_chapterRead?.completed(chapter.key)) {
+                true => '已读',
+                false => '未读',
+                null => '状态未知',
+              },
+            ].join(' · '),
+          ),
+          trailing: _selectingChapters || _bookmarks == null
               ? null
               : ChapterBookmarkButton(
                   controller: _bookmarks!,
@@ -728,7 +1149,11 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                   chapterName: chapter.name,
                   enabled: !controller.busy && !_opening,
                 ),
-          onTap: () => _openChapter(context, chapter.sourceIndex),
+          onTap: _selectingChapters
+              ? _markingChapters
+                    ? null
+                    : () => _toggleChapter(chapter.key)
+              : () => _openChapter(context, chapter.sourceIndex),
         ),
     ];
   }
@@ -738,7 +1163,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     appBar: AppBar(title: Text(manga.title)),
     body: AnimatedBuilder(
       animation: controller,
-      builder: (context, _) => !controller.isCurrentSource(source)
+      builder: (context, _) =>
+          _detailsExpired || !controller.isCurrentSource(source)
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -786,7 +1212,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                         child: FilledButton.icon(
                           icon: const Icon(Icons.play_arrow),
                           label: const Text('继续阅读'),
-                          onPressed: _opening || controller.busy
+                          onPressed:
+                              _opening || controller.busy || _selectingChapters
                               ? null
                               : () => _openChapter(
                                   context,

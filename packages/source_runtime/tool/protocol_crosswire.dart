@@ -34,6 +34,7 @@ Future<void> main() async {
         'StateMutationResponse' => wire.StateMutationResponse(),
         'MangaStateResponse' => wire.MangaStateResponse(),
         'LibraryPageResponse' => wire.LibraryPageResponse(),
+        'ChapterProgressPageResponse' => wire.ChapterProgressPageResponse(),
         'CategoryMutation' => wire.CategoryMutation(),
         'CategoryMutationResponse' => wire.CategoryMutationResponse(),
         'CategoryCatalogResponse' => wire.CategoryCatalogResponse(),

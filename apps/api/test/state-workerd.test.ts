@@ -17,6 +17,7 @@ import {
   settingsResponseSchema,
   settingsMutationResponseSchema,
   bookmarkPageResponseSchema,
+  chapterProgressPageResponseSchema,
   libraryPageResponseSchema,
   mangaStateResponseSchema,
   stateMutationResponseSchema,
@@ -101,6 +102,15 @@ async function client(subject: string = crypto.randomUUID()) {
       return {
         status: response.status,
         body: bookmarkPageResponseSchema.parse(await response.json()),
+      };
+    },
+    async progress(mangaKey: string, query = '') {
+      const response = await this.request(
+        `/api/state/manga/${mangaKey}/progress${query}`,
+      );
+      return {
+        status: response.status,
+        body: chapterProgressPageResponseSchema.parse(await response.json()),
       };
     },
     async library(query = '') {
@@ -375,7 +385,7 @@ test('navigation does not mark pages observed and absent furthest anchors remain
   expect(missing.body.progress?.furthest).toEqual(
     finished.body.progress?.furthest,
   );
-  expect(missing.body.progress?.completed).toBe(false);
+  expect(missing.body.progress?.completed).toBe(true);
   const found = await reader.mutate(
     save(key, 3, 0, 0, ['last', 'first', 'new-page'], false),
   );
@@ -1331,4 +1341,245 @@ test('a settings batch failure rolls back values, scope/account revisions and it
   expect(retried.body.accountRevision).toBe(1);
   expect(retried.body.global?.revision).toBe(1);
   expect(retried.body.global?.values?.theme).toBe(AppTheme.DARK);
+});
+
+function chapterRead(
+  mangaKey: string,
+  expectedRevision: number,
+  chapterKey: string,
+  read = true,
+) {
+  return create(StateMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    mangaKey,
+    expectedRevision,
+    operation: { case: 'setChapterRead', value: { chapterKey, read } },
+  });
+}
+
+test('unopened chapters can be marked read or unread without metadata, pages or resume, and ordinary saves preserve chapter read state', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const key = favorite().mangaKey;
+  const marked = await first.mutate(chapterRead(key, 0, 'chapter-1'));
+  expect(marked.status).toBe(200);
+  expect(marked.body.progress).toMatchObject({
+    chapterKey: 'chapter-1',
+    epoch: 1,
+    completed: true,
+  });
+  expect(marked.body.progress?.current).toBeUndefined();
+  expect(marked.body.progress?.furthest).toBeUndefined();
+  expect(marked.body.manga?.metadata).toBeUndefined();
+  expect(marked.body.manga?.resume).toBeUndefined();
+  expect(marked.body.manga?.favorite).toBe(false);
+  expect((await second.state(key, 'chapter-1')).progress).toEqual(
+    marked.body.progress,
+  );
+  const saved = await second.mutate(
+    save(key, 1, 0, 1, ['first', 'new-last'], false),
+  );
+  expect(saved.status).toBe(200);
+  expect(saved.body.progress?.completed).toBe(true);
+  expect(saved.body.progress?.furthest).toBeUndefined();
+  const unread = await first.mutate(chapterRead(key, 2, 'chapter-1', false));
+  expect(unread.status).toBe(200);
+  expect(unread.body.progress).toMatchObject({ epoch: 2, completed: false });
+  expect(unread.body.progress?.current).toBeUndefined();
+  expect(unread.body.progress?.furthest).toBeUndefined();
+  expect(unread.body.manga?.resume).toEqual(saved.body.manga?.resume);
+  const stale = await second.mutate(save(key, 3, 1, 1));
+  expect(stale.status).toBe(409);
+  expect(stale.body.error?.code).toBe(ErrorCode.STALE_EPOCH);
+  expect(stale.body.progress).toEqual(unread.body.progress);
+  const reopened = await second.mutate(
+    save(key, 3, 0, 2, ['first', 'last'], false),
+  );
+  expect(reopened.body.progress).toMatchObject({ epoch: 2, completed: false });
+  expect(reopened.body.progress?.current?.pageKey).toBe('first');
+  expect(reopened.body.progress?.furthest).toBeUndefined();
+  expect((await first.library()).body.entries).toEqual([]);
+});
+
+test('manual read preserves real anchors and other business fields, while unread and reset clear completion in their new epoch', async () => {
+  const reader = await client();
+  const add = favorite();
+  await reader.mutate(add);
+  const saved = await reader.mutate(save(add.mangaKey, 1));
+  const created = category();
+  await reader.mutateCategory(created);
+  await reader.mutate(assign(add.mangaKey, 2, 1, [createdId(created)]));
+  await reader.mutate(bookmark(add.mangaKey, 3, 'chapter-1'));
+  const before = await reader.state(add.mangaKey, 'chapter-1');
+  const marked = await reader.mutate(chapterRead(add.mangaKey, 4, 'chapter-1'));
+  expect(marked.status).toBe(200);
+  expect(marked.body.progress?.epoch).toBe(1);
+  expect(marked.body.progress?.current).toEqual(saved.body.progress?.current);
+  expect(marked.body.progress?.furthest).toEqual(saved.body.progress?.furthest);
+  const after = await reader.state(add.mangaKey, 'chapter-1');
+  expect(after.manga).toEqual({ ...before.manga, revision: 5 });
+  expect(after.bookmark).toEqual(before.bookmark);
+  const reset = await reader.mutate(
+    create(StateMutationSchema, {
+      schemaVersion: businessSchemaVersion,
+      mutationId: crypto.randomUUID(),
+      mangaKey: add.mangaKey,
+      expectedRevision: 5,
+      operation: {
+        case: 'resetProgress',
+        value: {
+          snapshot: {
+            chapterKey: 'chapter-1',
+            manifestVersion: 'reset',
+            pageKeys: ['first', 'last'],
+          },
+        },
+      },
+    }),
+  );
+  expect(reset.status).toBe(200);
+  expect(reset.body.progress).toMatchObject({ epoch: 2, completed: false });
+  expect(reset.body.progress?.current?.pageKey).toBe('first');
+  expect(reset.body.progress?.furthest).toBeUndefined();
+});
+
+test('read markers have one CAS winner and durable retries cannot repeat an epoch change or resurrect old read state', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const key = favorite().mangaKey;
+  const read = chapterRead(key, 0, 'chapter-1');
+  const unread = chapterRead(key, 0, 'chapter-1', false);
+  const results = await Promise.all([
+    first.mutate(read),
+    second.mutate(unread),
+  ]);
+  expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+  const winner = results[0]?.status === 200 ? read : unread;
+  const acknowledged = results.find((result) => result.status === 200)?.body;
+  const later = await first.mutate(chapterRead(key, 1, 'chapter-1', false));
+  expect(later.body.progress).toMatchObject({ epoch: 2, completed: false });
+  expect((await second.mutate(winner)).body).toEqual(acknowledged);
+  const current = await first.state(key, 'chapter-1');
+  expect(current.manga?.revision).toBe(2);
+  expect(current.progress).toEqual(later.body.progress);
+  const changed = create(StateMutationSchema, {
+    ...winner,
+    expectedRevision: 2,
+  });
+  expect((await first.mutate(changed)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+});
+
+test('progress pages include unread epochs, bound snapshot pagination and enforce verified subjects', async () => {
+  const owner = await client();
+  const other = await client();
+  const key = favorite().mangaKey;
+  expect((await owner.progress(key)).body.entries).toEqual([]);
+  for (let index = 0; index < 65; index++) {
+    expect(
+      (
+        await owner.mutate(
+          chapterRead(
+            key,
+            index,
+            `chapter-${String(index).padStart(3, '0')}`,
+            index % 2 === 0,
+          ),
+        )
+      ).status,
+    ).toBe(200);
+  }
+  const state = await owner.state(key);
+  const page = await owner.progress(key, `?revision=${state.accountRevision}`);
+  expect(page.status).toBe(200);
+  expect(page.body.entries).toHaveLength(64);
+  expect(page.body.entries[1]).toMatchObject({
+    chapterKey: 'chapter-001',
+    epoch: 1,
+    completed: false,
+  });
+  expect(page.body.nextKey).toBe('chapter-063');
+  const nextQuery = `?afterKey=${page.body.nextKey}&revision=${page.body.accountRevision}`;
+  const next = await owner.progress(key, nextQuery);
+  expect(next.body.entries.map((entry) => entry.chapterKey)).toEqual([
+    'chapter-064',
+  ]);
+  expect(next.body.nextKey).toBe('');
+  expect((await other.progress(key)).body.entries).toEqual([]);
+  const forged = await other.request(`/api/state/manga/${key}/progress`, {
+    headers: { 'X-App-Subject': owner.subject },
+  });
+  expect(forged.status).toBe(403);
+  expect(
+    chapterProgressPageResponseSchema.parse(await forged.json()).entries,
+  ).toEqual([]);
+  await owner.mutate(chapterRead(key, 65, 'chapter-000', false));
+  for (const query of [nextQuery, `?revision=${page.body.accountRevision}`]) {
+    const stale = await owner.progress(key, query);
+    expect(stale.status).toBe(409);
+    expect(stale.body.error?.code).toBe(ErrorCode.REVISION_CONFLICT);
+    expect(stale.body.entries).toEqual([]);
+    expect(stale.body.nextKey).toBe('');
+  }
+  for (const query of [
+    '?afterKey=chapter-001',
+    '?revision=-1',
+    '?revision=4294967296',
+    `?afterKey=${'x'.repeat(201)}&revision=66`,
+  ]) {
+    expect((await owner.progress(key, query)).status).toBe(400);
+  }
+});
+
+test('failed read-marker writes roll back chapter state, revisions and idempotency before an exact retry', async () => {
+  const reader = await client();
+  const key = favorite().mangaKey;
+  const command = chapterRead(key, 0, 'chapter-1', false);
+  await env.DB.exec(
+    `CREATE TRIGGER fail_read_marker BEFORE INSERT ON chapter_progress WHEN NEW.subject = '${reader.subject}' BEGIN SELECT RAISE(ABORT, 'controlled read-marker failure'); END`,
+  );
+  try {
+    expect((await reader.mutate(command)).status).toBe(503);
+    const canonical = await reader.state(key, 'chapter-1');
+    expect(canonical.accountRevision).toBe(0);
+    expect(canonical.manga?.revision).toBe(0);
+    expect(canonical.progress).toBeUndefined();
+    expect(
+      await env.DB.prepare(
+        'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+      )
+        .bind(reader.subject)
+        .first('count'),
+    ).toBe(0);
+  } finally {
+    await env.DB.exec('DROP TRIGGER fail_read_marker');
+  }
+  const retried = await reader.mutate(command);
+  expect(retried.status).toBe(200);
+  expect(retried.body.accountRevision).toBe(1);
+  expect(retried.body.progress).toMatchObject({ epoch: 1, completed: false });
+  expect((await reader.mutate(command)).body).toEqual(retried.body);
+});
+
+test('exhausted chapter epochs reject both read and unread markers without changing any state', async () => {
+  const reader = await client();
+  const key = favorite().mangaKey;
+  await reader.mutate(chapterRead(key, 0, 'chapter-1'));
+  await env.DB.prepare(
+    "UPDATE chapter_progress SET state_json = json_set(state_json, '$.epoch', 4294967295) WHERE subject = ? AND manga_key = ? AND chapter_key = 'chapter-1'",
+  )
+    .bind(reader.subject, key)
+    .run();
+  const before = await reader.state(key, 'chapter-1');
+  for (const read of [true, false]) {
+    const rejected = await reader.mutate(
+      chapterRead(key, 1, 'chapter-1', read),
+    );
+    expect(rejected.status).toBe(409);
+    expect(rejected.body.error?.code).toBe(ErrorCode.LIMIT_EXCEEDED);
+    expect(rejected.body.progress).toEqual(before.progress);
+  }
+  expect(await reader.state(key, 'chapter-1')).toEqual(before);
 });

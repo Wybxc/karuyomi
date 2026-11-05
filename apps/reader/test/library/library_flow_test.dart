@@ -27,6 +27,21 @@ Future<CatalogController> _browseDetails(WidgetTester tester) async {
       .controller;
 }
 
+Future<void> _revealDetails(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
+    final scrollable = find
+        .descendant(
+          of: find.byType(MangaDetailsPage),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.drag(scrollable, const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
+  }
+  await tester.ensureVisible(finder);
+}
+
 void main() {
   testWidgets(
     'favorite conflict refreshes the remote state and requires a new explicit action',
@@ -111,12 +126,12 @@ void main() {
     await tester.pumpWidget(KaruyomiApp(platform: platform));
     await tester.pumpAndSettle();
     var catalog = await _browseDetails(tester);
-    await tester.ensureVisible(find.text('加入书架'));
+    await _revealDetails(tester, find.text('加入书架'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('加入书架'));
     await tester.pumpAndSettle();
     expect(find.text('移出书架'), findsOneWidget);
-    await tester.ensureVisible(find.text('第 1 章'));
+    await _revealDetails(tester, find.text('第 1 章'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('第 1 章'));
     await tester.pumpAndSettle();
@@ -158,7 +173,7 @@ void main() {
       wire.SourceCall_Request.details,
       wire.SourceCall_Request.chapters,
     ]);
-    await tester.ensureVisible(find.text('继续阅读'));
+    await _revealDetails(tester, find.text('继续阅读'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('继续阅读'));
     await tester.pumpAndSettle();
@@ -168,7 +183,7 @@ void main() {
     expect(resumed.initialPosition!.normalizedOffset, .35);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('移出书架'));
+    await _revealDetails(tester, find.text('移出书架'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('移出书架'));
     await tester.pumpAndSettle();
@@ -191,7 +206,7 @@ void main() {
       await tester.pumpAndSettle();
       final catalog = await _browseDetails(tester);
       platform.businessServer.failWrites = true;
-      await tester.ensureVisible(find.text('加入书架'));
+      await _revealDetails(tester, find.text('加入书架'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('加入书架'));
       await tester.pumpAndSettle();
@@ -201,7 +216,7 @@ void main() {
         await tester.runAsync(() => catalog.library!.watchEntries().first),
         isEmpty,
       );
-      await tester.ensureVisible(find.text('第 1 章'));
+      await _revealDetails(tester, find.text('第 1 章'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('第 1 章'));
       await tester.pumpAndSettle();
@@ -209,7 +224,7 @@ void main() {
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
       platform.businessServer.failWrites = false;
-      await tester.ensureVisible(find.text('加入书架'));
+      await _revealDetails(tester, find.text('加入书架'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('加入书架'));
       await tester.pumpAndSettle();

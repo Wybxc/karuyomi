@@ -292,6 +292,53 @@ final class TestBusinessServer implements ApiFetch {
       );
     }
     if (request.method == 'GET' &&
+        request.uri.pathSegments.length == 5 &&
+        request.uri.pathSegments.take(3).join('/') == 'api/state/manga' &&
+        request.uri.pathSegments.last == 'progress') {
+      final key = request.uri.pathSegments[3];
+      final revision = request.uri.queryParameters['revision'];
+      if (revision != null && int.tryParse(revision) != account.revision) {
+        return _reply(
+          wire.ChapterProgressPageResponse(
+            schemaVersion: 1,
+            accountRevision: account.revision,
+            mangaKey: key,
+            error: _error(
+              wire
+                  .BusinessStateErrorCode
+                  .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+              'Chapter progress changed during pagination',
+            ),
+          ),
+          status: 409,
+        );
+      }
+      final after = request.uri.queryParameters['afterKey'] ?? '';
+      String order(String value) => String.fromCharCodes(utf8.encode(value));
+      final entries =
+          account.progress.entries
+              .where(
+                (entry) =>
+                    entry.key.$1 == key &&
+                    order(entry.key.$2).compareTo(order(after)) > 0,
+              )
+              .map((entry) => entry.value)
+              .toList()
+            ..sort(
+              (a, b) => order(a.chapterKey).compareTo(order(b.chapterKey)),
+            );
+      final page = entries.take(64).toList();
+      return _reply(
+        wire.ChapterProgressPageResponse(
+          schemaVersion: 1,
+          accountRevision: account.revision,
+          mangaKey: key,
+          entries: page.map((entry) => entry.deepCopy()),
+          nextKey: entries.length > page.length ? page.last.chapterKey : '',
+        ),
+      );
+    }
+    if (request.method == 'GET' &&
         request.uri.path.startsWith('/api/state/manga/')) {
       final key = request.uri.pathSegments.last;
       final chapterKey = request.uri.queryParameters['chapterKey'];
@@ -521,6 +568,39 @@ final class TestBusinessServer implements ApiFetch {
           chapterKey: nextProgress.chapterKey,
           reversedOrder: operation.reversedOrder,
         );
+      case wire.StateMutation_Operation.setChapterRead:
+        final operation = mutation.setChapterRead;
+        final before =
+            account.progress[(mutation.mangaKey, operation.chapterKey)];
+        if (operation.chapterKey.isEmpty || operation.chapterKey.length > 200) {
+          return _mutationError(
+            account,
+            mutation,
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Invalid progress chapter',
+          );
+        }
+        if (before?.epoch == 0xffffffff) {
+          return _mutationError(
+            account,
+            mutation,
+            wire
+                .BusinessStateErrorCode
+                .BUSINESS_STATE_ERROR_CODE_LIMIT_EXCEEDED,
+            'Progress epoch exhausted',
+          );
+        }
+        nextProgress = wire.ChapterProgressState(
+          chapterKey: operation.chapterKey,
+          current: operation.read && before?.hasCurrent() == true
+              ? before!.current.deepCopy()
+              : null,
+          furthest: operation.read && before?.hasFurthest() == true
+              ? before!.furthest.deepCopy()
+              : null,
+          epoch: (before?.epoch ?? 0) + 1,
+          completed: operation.read,
+        );
       case wire.StateMutation_Operation.setCategories:
         if (mutation.setCategories.expectedCatalogRevision !=
             account.catalog.revision) {
@@ -617,7 +697,15 @@ final class TestBusinessServer implements ApiFetch {
       manga:
           account.mangas[mutation.mangaKey]?.deepCopy() ??
           wire.MangaState(mangaKey: mutation.mangaKey),
-      progress: progress?.deepCopy(),
+      progress:
+          (progress ??
+                  (mutation.hasSetChapterRead()
+                      ? account.progress[(
+                          mutation.mangaKey,
+                          mutation.setChapterRead.chapterKey,
+                        )]
+                      : null))
+              ?.deepCopy(),
       bookmark: mutation.hasSetBookmark()
           ? wire.ChapterBookmark(
               chapterKey: mutation.setBookmark.chapterKey,
@@ -812,6 +900,17 @@ final class TestBusinessServer implements ApiFetch {
         status: status,
       );
     }
+    if (request.uri.pathSegments.length == 5 &&
+        request.uri.pathSegments.last == 'progress') {
+      return _reply(
+        wire.ChapterProgressPageResponse(
+          schemaVersion: 1,
+          mangaKey: request.uri.pathSegments[3],
+          error: error,
+        ),
+        status: status,
+      );
+    }
     return _reply(
       wire.MangaStateResponse(schemaVersion: 1, error: error),
       status: status,
@@ -910,10 +1009,6 @@ wire.ChapterProgressState _mergeProgress(
     current: current,
     furthest: furthest?.deepCopy(),
     epoch: incoming.epoch,
-    completed:
-        (before?.completed == true &&
-            before!.current.manifestVersion == snapshot.manifestVersion) ||
-        (incoming.completed &&
-            incoming.current.manifestVersion == snapshot.manifestVersion),
+    completed: before?.completed == true || incoming.completed,
   );
 }

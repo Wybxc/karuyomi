@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file karuyomi/v1/business.proto.
  */
 export const file_karuyomi_v1_business: GenFile = /*@__PURE__*/
-  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgizQEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUSFAoMY2F0ZWdvcnlfaWRzGAcgAygJIiQKCENhdGVnb3J5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiTgoPQ2F0ZWdvcnlDYXRhbG9nEhAKCHJldmlzaW9uGAEgASgNEikKCmNhdGVnb3JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeSJICg1TZXRDYXRlZ29yaWVzEhQKDGNhdGVnb3J5X2lkcxgBIAMoCRIhChlleHBlY3RlZF9jYXRhbG9nX3JldmlzaW9uGAIgASgNIjkKDkNyZWF0ZUNhdGVnb3J5EicKCGNhdGVnb3J5GAEgASgLMhUua2FydXlvbWkudjEuQ2F0ZWdvcnkiMwoOUmVuYW1lQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIpChFSZW9yZGVyQ2F0ZWdvcmllcxIUCgxjYXRlZ29yeV9pZHMYASADKAkiJQoORGVsZXRlQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkizQIKEENhdGVnb3J5TXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNgoPY3JlYXRlX2NhdGVnb3J5GAogASgLMhsua2FydXlvbWkudjEuQ3JlYXRlQ2F0ZWdvcnlIABI2Cg9yZW5hbWVfY2F0ZWdvcnkYCyABKAsyGy5rYXJ1eW9taS52MS5SZW5hbWVDYXRlZ29yeUgAEjwKEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRlZ29yaWVzSAASNgoPZGVsZXRlX2NhdGVnb3J5GA0gASgLMhsua2FydXlvbWkudjEuRGVsZXRlQ2F0ZWdvcnlIAEILCglvcGVyYXRpb24ihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIjoKD0NoYXB0ZXJCb29rbWFyaxITCgtjaGFwdGVyX2tleRgBIAEoCRISCgpib29rbWFya2VkGAIgASgIIjYKC1NldEJvb2ttYXJrEhMKC2NoYXB0ZXJfa2V5GAEgASgJEhIKCmJvb2ttYXJrZWQYAiABKAgiTwoLU2V0RmF2b3JpdGUSLgoIbWV0YWRhdGEYASABKAsyHC5rYXJ1eW9taS52MS5MaWJyYXJ5TWV0YWRhdGESEAoIZmF2b3JpdGUYAiABKAgiiwEKDFNhdmVQcm9ncmVzcxIuCghzbmFwc2hvdBgBIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJTbmFwc2hvdBIzCghwcm9ncmVzcxgCIAEoCzIhLmthcnV5b21pLnYxLkNoYXB0ZXJQcm9ncmVzc1N0YXRlEhYKDnJldmVyc2VkX29yZGVyGAMgASgIIlcKDVJlc2V0UHJvZ3Jlc3MSLgoIc25hcHNob3QYASABKAsyHC5rYXJ1eW9taS52MS5DaGFwdGVyU25hcHNob3QSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgitAMKDVN0YXRlTXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSEQoJbWFuZ2Ffa2V5GAMgASgJEhkKEWV4cGVjdGVkX3JldmlzaW9uGAQgASgNEjAKDHNldF9mYXZvcml0ZRgKIAEoCzIYLmthcnV5b21pLnYxLlNldEZhdm9yaXRlSAASNwoPdXBkYXRlX21ldGFkYXRhGAsgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhSAASMgoNc2F2ZV9wcm9ncmVzcxgMIAEoCzIZLmthcnV5b21pLnYxLlNhdmVQcm9ncmVzc0gAEjQKDnJlc2V0X3Byb2dyZXNzGA0gASgLMhoua2FydXlvbWkudjEuUmVzZXRQcm9ncmVzc0gAEjQKDnNldF9jYXRlZ29yaWVzGA4gASgLMhoua2FydXlvbWkudjEuU2V0Q2F0ZWdvcmllc0gAEjAKDHNldF9ib29rbWFyaxgPIAEoCzIYLmthcnV5b21pLnYxLlNldEJvb2ttYXJrSABCCwoJb3BlcmF0aW9uImsKEkJ1c2luZXNzU3RhdGVFcnJvchIxCgRjb2RlGAEgASgOMiMua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIPCgdtZXNzYWdlGAIgASgJEhEKCXJldHJ5YWJsZRgDIAEoCCLTAgoVU3RhdGVNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SJgoFbWFuZ2EYBCABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAUgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgHIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgIIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayK7AgoSTWFuZ2FTdGF0ZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SJgoFbWFuZ2EYAyABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAQgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCghib29rbWFyaxgHIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyayLMAQoUQm9va21hcmtQYWdlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRIRCgltYW5nYV9rZXkYAyABKAkSLQoHZW50cmllcxgEIAMoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFyaxIQCghuZXh0X2tleRgFIAEoCRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciLrAQoTTGlicmFyeVBhZ2VSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIYChBhY2NvdW50X3JldmlzaW9uGAIgASgNEigKB2VudHJpZXMYAyADKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEhAKCG5leHRfa2V5GAQgASgJEi4KBWVycm9yGAUgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yEjYKEGNhdGVnb3J5X2NhdGFsb2cYBiABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2ciyQEKGENhdGVnb3J5TXV0YXRpb25SZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIYChBhY2NvdW50X3JldmlzaW9uGAMgASgNEjYKEGNhdGVnb3J5X2NhdGFsb2cYBCABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2cSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3IiswEKF0NhdGVnb3J5Q2F0YWxvZ1Jlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SNgoQY2F0ZWdvcnlfY2F0YWxvZxgDIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCgVlcnJvchgEIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciJrCg5SZWFkZXJTZXR0aW5ncxIlCgRtb2RlGAEgASgOMhcua2FydXlvbWkudjEuUmVhZGVyTW9kZRIyCgtwYWdlX2xheW91dBgCIAEoDjIdLmthcnV5b21pLnYxLlJlYWRlclBhZ2VMYXlvdXQilgEKFlJlYWRlclNldHRpbmdzT3ZlcnJpZGUSKgoEbW9kZRgBIAEoDjIXLmthcnV5b21pLnYxLlJlYWRlck1vZGVIAIgBARI3CgtwYWdlX2xheW91dBgCIAEoDjIdLmthcnV5b21pLnYxLlJlYWRlclBhZ2VMYXlvdXRIAYgBAUIHCgVfbW9kZUIOCgxfcGFnZV9sYXlvdXQiaQoUR2xvYmFsU2V0dGluZ3NWYWx1ZXMSJAoFdGhlbWUYASABKA4yFS5rYXJ1eW9taS52MS5BcHBUaGVtZRIrCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5ncyJVCg5HbG9iYWxTZXR0aW5ncxIQCghyZXZpc2lvbhgBIAEoDRIxCgZ2YWx1ZXMYAiABKAsyIS5rYXJ1eW9taS52MS5HbG9iYWxTZXR0aW5nc1ZhbHVlcyJyChNNYW5nYVJlYWRlclNldHRpbmdzEhEKCW1hbmdhX2tleRgBIAEoCRIQCghyZXZpc2lvbhgCIAEoDRI2CglvdmVycmlkZXMYAyABKAsyIy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5nc092ZXJyaWRlImMKFlNldE1hbmdhUmVhZGVyU2V0dGluZ3MSEQoJbWFuZ2Ffa2V5GAEgASgJEjYKCW92ZXJyaWRlcxgCIAEoCzIjLmthcnV5b21pLnYxLlJlYWRlclNldHRpbmdzT3ZlcnJpZGUi2gEKEFNldHRpbmdzTXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNwoKc2V0X2dsb2JhbBgKIAEoCzIhLmthcnV5b21pLnYxLkdsb2JhbFNldHRpbmdzVmFsdWVzSAASOAoJc2V0X21hbmdhGAsgASgLMiMua2FydXlvbWkudjEuU2V0TWFuZ2FSZWFkZXJTZXR0aW5nc0gAQgsKCW9wZXJhdGlvbiKJAgoQU2V0dGluZ3NSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIYChBhY2NvdW50X3JldmlzaW9uGAIgASgNEisKBmdsb2JhbBgDIAEoCzIbLmthcnV5b21pLnYxLkdsb2JhbFNldHRpbmdzEi8KBW1hbmdhGAQgASgLMiAua2FydXlvbWkudjEuTWFuZ2FSZWFkZXJTZXR0aW5ncxI1ChBlZmZlY3RpdmVfcmVhZGVyGAUgASgLMhsua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3MSLgoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3IipgIKGFNldHRpbmdzTXV0YXRpb25SZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIYChBhY2NvdW50X3JldmlzaW9uGAMgASgNEisKBmdsb2JhbBgEIAEoCzIbLmthcnV5b21pLnYxLkdsb2JhbFNldHRpbmdzEi8KBW1hbmdhGAUgASgLMiAua2FydXlvbWkudjEuTWFuZ2FSZWFkZXJTZXR0aW5ncxI1ChBlZmZlY3RpdmVfcmVhZGVyGAYgASgLMhsua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3MSLgoFZXJyb3IYByABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3Iq2QIKFkJ1c2luZXNzU3RhdGVFcnJvckNvZGUSKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9VTlNQRUNJRklFRBAAEisKJ0JVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfSU5WQUxJRF9JTlBVVBABEi8KK0JVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfUkVWSVNJT05fQ09ORkxJQ1QQAhIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1NUQUxFX0VQT0NIEAMSMgouQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9JREVNUE9URU5DWV9DT05GTElDVBAEEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfVU5BVkFJTEFCTEUQBRIsCihCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0xJTUlUX0VYQ0VFREVEEAYqZAoIQXBwVGhlbWUSGQoVQVBQX1RIRU1FX1VOU1BFQ0lGSUVEEAASFAoQQVBQX1RIRU1FX1NZU1RFTRABEhMKD0FQUF9USEVNRV9MSUdIVBACEhIKDkFQUF9USEVNRV9EQVJLEAMqnAEKClJlYWRlck1vZGUSGwoXUkVBREVSX01PREVfVU5TUEVDSUZJRUQQABIdChlSRUFERVJfTU9ERV9MRUZUX1RPX1JJR0hUEAESHQoZUkVBREVSX01PREVfUklHSFRfVE9fTEVGVBACEhoKFlJFQURFUl9NT0RFX0NPTlRJTlVPVVMQAxIXChNSRUFERVJfTU9ERV9XRUJUT09OEAQqkQEKEFJlYWRlclBhZ2VMYXlvdXQSIgoeUkVBREVSX1BBR0VfTEFZT1VUX1VOU1BFQ0lGSUVEEAASGwoXUkVBREVSX1BBR0VfTEFZT1VUX0FVVE8QARIdChlSRUFERVJfUEFHRV9MQVlPVVRfU0lOR0xFEAISHQoZUkVBREVSX1BBR0VfTEFZT1VUX0RPVUJMRRADYgZwcm90bzM", [file_karuyomi_v1_control]);
+  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgizQEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUSFAoMY2F0ZWdvcnlfaWRzGAcgAygJIiQKCENhdGVnb3J5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiTgoPQ2F0ZWdvcnlDYXRhbG9nEhAKCHJldmlzaW9uGAEgASgNEikKCmNhdGVnb3JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeSJICg1TZXRDYXRlZ29yaWVzEhQKDGNhdGVnb3J5X2lkcxgBIAMoCRIhChlleHBlY3RlZF9jYXRhbG9nX3JldmlzaW9uGAIgASgNIjkKDkNyZWF0ZUNhdGVnb3J5EicKCGNhdGVnb3J5GAEgASgLMhUua2FydXlvbWkudjEuQ2F0ZWdvcnkiMwoOUmVuYW1lQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIpChFSZW9yZGVyQ2F0ZWdvcmllcxIUCgxjYXRlZ29yeV9pZHMYASADKAkiJQoORGVsZXRlQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkizQIKEENhdGVnb3J5TXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNgoPY3JlYXRlX2NhdGVnb3J5GAogASgLMhsua2FydXlvbWkudjEuQ3JlYXRlQ2F0ZWdvcnlIABI2Cg9yZW5hbWVfY2F0ZWdvcnkYCyABKAsyGy5rYXJ1eW9taS52MS5SZW5hbWVDYXRlZ29yeUgAEjwKEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRlZ29yaWVzSAASNgoPZGVsZXRlX2NhdGVnb3J5GA0gASgLMhsua2FydXlvbWkudjEuRGVsZXRlQ2F0ZWdvcnlIAEILCglvcGVyYXRpb24ihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIjoKD0NoYXB0ZXJCb29rbWFyaxITCgtjaGFwdGVyX2tleRgBIAEoCRISCgpib29rbWFya2VkGAIgASgIIjYKC1NldEJvb2ttYXJrEhMKC2NoYXB0ZXJfa2V5GAEgASgJEhIKCmJvb2ttYXJrZWQYAiABKAgiMwoOU2V0Q2hhcHRlclJlYWQSEwoLY2hhcHRlcl9rZXkYASABKAkSDAoEcmVhZBgCIAEoCCJPCgtTZXRGYXZvcml0ZRIuCghtZXRhZGF0YRgBIAEoCzIcLmthcnV5b21pLnYxLkxpYnJhcnlNZXRhZGF0YRIQCghmYXZvcml0ZRgCIAEoCCKLAQoMU2F2ZVByb2dyZXNzEi4KCHNuYXBzaG90GAEgASgLMhwua2FydXlvbWkudjEuQ2hhcHRlclNuYXBzaG90EjMKCHByb2dyZXNzGAIgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSFgoOcmV2ZXJzZWRfb3JkZXIYAyABKAgiVwoNUmVzZXRQcm9ncmVzcxIuCghzbmFwc2hvdBgBIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJTbmFwc2hvdBIWCg5yZXZlcnNlZF9vcmRlchgCIAEoCCLtAwoNU3RhdGVNdXRhdGlvbhIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIRCgltYW5nYV9rZXkYAyABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YBCABKA0SMAoMc2V0X2Zhdm9yaXRlGAogASgLMhgua2FydXlvbWkudjEuU2V0RmF2b3JpdGVIABI3Cg91cGRhdGVfbWV0YWRhdGEYCyABKAsyHC5rYXJ1eW9taS52MS5MaWJyYXJ5TWV0YWRhdGFIABIyCg1zYXZlX3Byb2dyZXNzGAwgASgLMhkua2FydXlvbWkudjEuU2F2ZVByb2dyZXNzSAASNAoOcmVzZXRfcHJvZ3Jlc3MYDSABKAsyGi5rYXJ1eW9taS52MS5SZXNldFByb2dyZXNzSAASNAoOc2V0X2NhdGVnb3JpZXMYDiABKAsyGi5rYXJ1eW9taS52MS5TZXRDYXRlZ29yaWVzSAASMAoMc2V0X2Jvb2ttYXJrGA8gASgLMhgua2FydXlvbWkudjEuU2V0Qm9va21hcmtIABI3ChBzZXRfY2hhcHRlcl9yZWFkGBAgASgLMhsua2FydXlvbWkudjEuU2V0Q2hhcHRlclJlYWRIAEILCglvcGVyYXRpb24iawoSQnVzaW5lc3NTdGF0ZUVycm9yEjEKBGNvZGUYASABKA4yIy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIItMCChVTdGF0ZU11dGF0aW9uUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGAoQYWNjb3VudF9yZXZpc2lvbhgDIAEoDRImCgVtYW5nYRgEIAEoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSMwoIcHJvZ3Jlc3MYBSABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvchI2ChBjYXRlZ29yeV9jYXRhbG9nGAcgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nEi4KCGJvb2ttYXJrGAggASgLMhwua2FydXlvbWkudjEuQ2hhcHRlckJvb2ttYXJrIrsCChJNYW5nYVN0YXRlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRImCgVtYW5nYRgDIAEoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSMwoIcHJvZ3Jlc3MYBCABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIuCgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvchI2ChBjYXRlZ29yeV9jYXRhbG9nGAYgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nEi4KCGJvb2ttYXJrGAcgASgLMhwua2FydXlvbWkudjEuQ2hhcHRlckJvb2ttYXJrIswBChRCb29rbWFya1BhZ2VSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRIYChBhY2NvdW50X3JldmlzaW9uGAIgASgNEhEKCW1hbmdhX2tleRgDIAEoCRItCgdlbnRyaWVzGAQgAygLMhwua2FydXlvbWkudjEuQ2hhcHRlckJvb2ttYXJrEhAKCG5leHRfa2V5GAUgASgJEi4KBWVycm9yGAYgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yItgBChtDaGFwdGVyUHJvZ3Jlc3NQYWdlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRIRCgltYW5nYV9rZXkYAyABKAkSMgoHZW50cmllcxgEIAMoCzIhLmthcnV5b21pLnYxLkNoYXB0ZXJQcm9ncmVzc1N0YXRlEhAKCG5leHRfa2V5GAUgASgJEi4KBWVycm9yGAYgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yIusBChNMaWJyYXJ5UGFnZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SKAoHZW50cmllcxgDIAMoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSEAoIbmV4dF9rZXkYBCABKAkSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZyLJAQoYQ2F0ZWdvcnlNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SNgoQY2F0ZWdvcnlfY2F0YWxvZxgEIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciKzAQoXQ2F0ZWdvcnlDYXRhbG9nUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRI2ChBjYXRlZ29yeV9jYXRhbG9nGAMgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nEi4KBWVycm9yGAQgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yImsKDlJlYWRlclNldHRpbmdzEiUKBG1vZGUYASABKA4yFy5rYXJ1eW9taS52MS5SZWFkZXJNb2RlEjIKC3BhZ2VfbGF5b3V0GAIgASgOMh0ua2FydXlvbWkudjEuUmVhZGVyUGFnZUxheW91dCKWAQoWUmVhZGVyU2V0dGluZ3NPdmVycmlkZRIqCgRtb2RlGAEgASgOMhcua2FydXlvbWkudjEuUmVhZGVyTW9kZUgAiAEBEjcKC3BhZ2VfbGF5b3V0GAIgASgOMh0ua2FydXlvbWkudjEuUmVhZGVyUGFnZUxheW91dEgBiAEBQgcKBV9tb2RlQg4KDF9wYWdlX2xheW91dCJpChRHbG9iYWxTZXR0aW5nc1ZhbHVlcxIkCgV0aGVtZRgBIAEoDjIVLmthcnV5b21pLnYxLkFwcFRoZW1lEisKBnJlYWRlchgCIAEoCzIbLmthcnV5b21pLnYxLlJlYWRlclNldHRpbmdzIlUKDkdsb2JhbFNldHRpbmdzEhAKCHJldmlzaW9uGAEgASgNEjEKBnZhbHVlcxgCIAEoCzIhLmthcnV5b21pLnYxLkdsb2JhbFNldHRpbmdzVmFsdWVzInIKE01hbmdhUmVhZGVyU2V0dGluZ3MSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEjYKCW92ZXJyaWRlcxgDIAEoCzIjLmthcnV5b21pLnYxLlJlYWRlclNldHRpbmdzT3ZlcnJpZGUiYwoWU2V0TWFuZ2FSZWFkZXJTZXR0aW5ncxIRCgltYW5nYV9rZXkYASABKAkSNgoJb3ZlcnJpZGVzGAIgASgLMiMua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3NPdmVycmlkZSLaAQoQU2V0dGluZ3NNdXRhdGlvbhIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRITCgttdXRhdGlvbl9pZBgCIAEoCRIZChFleHBlY3RlZF9yZXZpc2lvbhgDIAEoDRI3CgpzZXRfZ2xvYmFsGAogASgLMiEua2FydXlvbWkudjEuR2xvYmFsU2V0dGluZ3NWYWx1ZXNIABI4CglzZXRfbWFuZ2EYCyABKAsyIy5rYXJ1eW9taS52MS5TZXRNYW5nYVJlYWRlclNldHRpbmdzSABCCwoJb3BlcmF0aW9uIokCChBTZXR0aW5nc1Jlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SKwoGZ2xvYmFsGAMgASgLMhsua2FydXlvbWkudjEuR2xvYmFsU2V0dGluZ3MSLwoFbWFuZ2EYBCABKAsyIC5rYXJ1eW9taS52MS5NYW5nYVJlYWRlclNldHRpbmdzEjUKEGVmZmVjdGl2ZV9yZWFkZXIYBSABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5ncxIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciKmAgoYU2V0dGluZ3NNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SKwoGZ2xvYmFsGAQgASgLMhsua2FydXlvbWkudjEuR2xvYmFsU2V0dGluZ3MSLwoFbWFuZ2EYBSABKAsyIC5rYXJ1eW9taS52MS5NYW5nYVJlYWRlclNldHRpbmdzEjUKEGVmZmVjdGl2ZV9yZWFkZXIYBiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5ncxIuCgVlcnJvchgHIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvcirZAgoWQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASKwonQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9JTlZBTElEX0lOUFVUEAESLworQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9SRVZJU0lPTl9DT05GTElDVBACEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfU1RBTEVfRVBPQ0gQAxIyCi5CVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0lERU1QT1RFTkNZX0NPTkZMSUNUEAQSKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9VTkFWQUlMQUJMRRAFEiwKKEJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfTElNSVRfRVhDRUVERUQQBipkCghBcHBUaGVtZRIZChVBUFBfVEhFTUVfVU5TUEVDSUZJRUQQABIUChBBUFBfVEhFTUVfU1lTVEVNEAESEwoPQVBQX1RIRU1FX0xJR0hUEAISEgoOQVBQX1RIRU1FX0RBUksQAyqcAQoKUmVhZGVyTW9kZRIbChdSRUFERVJfTU9ERV9VTlNQRUNJRklFRBAAEh0KGVJFQURFUl9NT0RFX0xFRlRfVE9fUklHSFQQARIdChlSRUFERVJfTU9ERV9SSUdIVF9UT19MRUZUEAISGgoWUkVBREVSX01PREVfQ09OVElOVU9VUxADEhcKE1JFQURFUl9NT0RFX1dFQlRPT04QBCqRAQoQUmVhZGVyUGFnZUxheW91dBIiCh5SRUFERVJfUEFHRV9MQVlPVVRfVU5TUEVDSUZJRUQQABIbChdSRUFERVJfUEFHRV9MQVlPVVRfQVVUTxABEh0KGVJFQURFUl9QQUdFX0xBWU9VVF9TSU5HTEUQAhIdChlSRUFERVJfUEFHRV9MQVlPVVRfRE9VQkxFEANiBnByb3RvMw", [file_karuyomi_v1_control]);
 
 /**
  * Server-owned, account-scoped business state. Authentication is supplied by
@@ -617,6 +617,8 @@ export type ChapterProgressState = Message<"karuyomi.v1.ChapterProgressState"> &
   chapterKey: string;
 
   /**
+   * Anchors are absent for an unopened chapter marked from its detail list.
+   *
    * @generated from field: karuyomi.v1.ReadingAnchor current = 2;
    */
   current?: ReadingAnchor | undefined;
@@ -632,6 +634,8 @@ export type ChapterProgressState = Message<"karuyomi.v1.ChapterProgressState"> &
   epoch: number;
 
   /**
+   * Chapter-level read state; only reset or marking unread clears it.
+   *
    * @generated from field: bool completed = 5;
    */
   completed: boolean;
@@ -647,6 +651,8 @@ export type ChapterProgressStateJson = {
   chapterKey?: string;
 
   /**
+   * Anchors are absent for an unopened chapter marked from its detail list.
+   *
    * @generated from field: karuyomi.v1.ReadingAnchor current = 2;
    */
   current?: ReadingAnchorJson;
@@ -662,6 +668,8 @@ export type ChapterProgressStateJson = {
   epoch?: number;
 
   /**
+   * Chapter-level read state; only reset or marking unread clears it.
+   *
    * @generated from field: bool completed = 5;
    */
   completed?: boolean;
@@ -800,6 +808,43 @@ export const SetBookmarkSchema: GenMessage<SetBookmark, {jsonType: SetBookmarkJs
   messageDesc(file_karuyomi_v1_business, 15);
 
 /**
+ * @generated from message karuyomi.v1.SetChapterRead
+ */
+export type SetChapterRead = Message<"karuyomi.v1.SetChapterRead"> & {
+  /**
+   * @generated from field: string chapter_key = 1;
+   */
+  chapterKey: string;
+
+  /**
+   * @generated from field: bool read = 2;
+   */
+  read: boolean;
+};
+
+/**
+ * @generated from message karuyomi.v1.SetChapterRead
+ */
+export type SetChapterReadJson = {
+  /**
+   * @generated from field: string chapter_key = 1;
+   */
+  chapterKey?: string;
+
+  /**
+   * @generated from field: bool read = 2;
+   */
+  read?: boolean;
+};
+
+/**
+ * Describes the message karuyomi.v1.SetChapterRead.
+ * Use `create(SetChapterReadSchema)` to create a new message.
+ */
+export const SetChapterReadSchema: GenMessage<SetChapterRead, {jsonType: SetChapterReadJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 16);
+
+/**
  * @generated from message karuyomi.v1.SetFavorite
  */
 export type SetFavorite = Message<"karuyomi.v1.SetFavorite"> & {
@@ -834,7 +879,7 @@ export type SetFavoriteJson = {
  * Use `create(SetFavoriteSchema)` to create a new message.
  */
 export const SetFavoriteSchema: GenMessage<SetFavorite, {jsonType: SetFavoriteJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 16);
+  messageDesc(file_karuyomi_v1_business, 17);
 
 /**
  * @generated from message karuyomi.v1.SaveProgress
@@ -881,7 +926,7 @@ export type SaveProgressJson = {
  * Use `create(SaveProgressSchema)` to create a new message.
  */
 export const SaveProgressSchema: GenMessage<SaveProgress, {jsonType: SaveProgressJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 17);
+  messageDesc(file_karuyomi_v1_business, 18);
 
 /**
  * @generated from message karuyomi.v1.ResetProgress
@@ -918,7 +963,7 @@ export type ResetProgressJson = {
  * Use `create(ResetProgressSchema)` to create a new message.
  */
 export const ResetProgressSchema: GenMessage<ResetProgress, {jsonType: ResetProgressJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 18);
+  messageDesc(file_karuyomi_v1_business, 19);
 
 /**
  * @generated from message karuyomi.v1.StateMutation
@@ -985,6 +1030,12 @@ export type StateMutation = Message<"karuyomi.v1.StateMutation"> & {
      */
     value: SetBookmark;
     case: "setBookmark";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.SetChapterRead set_chapter_read = 16;
+     */
+    value: SetChapterRead;
+    case: "setChapterRead";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1043,6 +1094,11 @@ export type StateMutationJson = {
    * @generated from field: karuyomi.v1.SetBookmark set_bookmark = 15;
    */
   setBookmark?: SetBookmarkJson;
+
+  /**
+   * @generated from field: karuyomi.v1.SetChapterRead set_chapter_read = 16;
+   */
+  setChapterRead?: SetChapterReadJson;
 };
 
 /**
@@ -1050,7 +1106,7 @@ export type StateMutationJson = {
  * Use `create(StateMutationSchema)` to create a new message.
  */
 export const StateMutationSchema: GenMessage<StateMutation, {jsonType: StateMutationJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 19);
+  messageDesc(file_karuyomi_v1_business, 20);
 
 /**
  * @generated from message karuyomi.v1.BusinessStateError
@@ -1097,7 +1153,7 @@ export type BusinessStateErrorJson = {
  * Use `create(BusinessStateErrorSchema)` to create a new message.
  */
 export const BusinessStateErrorSchema: GenMessage<BusinessStateError, {jsonType: BusinessStateErrorJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 20);
+  messageDesc(file_karuyomi_v1_business, 21);
 
 /**
  * @generated from message karuyomi.v1.StateMutationResponse
@@ -1194,7 +1250,7 @@ export type StateMutationResponseJson = {
  * Use `create(StateMutationResponseSchema)` to create a new message.
  */
 export const StateMutationResponseSchema: GenMessage<StateMutationResponse, {jsonType: StateMutationResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 21);
+  messageDesc(file_karuyomi_v1_business, 22);
 
 /**
  * @generated from message karuyomi.v1.MangaStateResponse
@@ -1281,7 +1337,7 @@ export type MangaStateResponseJson = {
  * Use `create(MangaStateResponseSchema)` to create a new message.
  */
 export const MangaStateResponseSchema: GenMessage<MangaStateResponse, {jsonType: MangaStateResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 22);
+  messageDesc(file_karuyomi_v1_business, 23);
 
 /**
  * @generated from message karuyomi.v1.BookmarkPageResponse
@@ -1366,7 +1422,92 @@ export type BookmarkPageResponseJson = {
  * Use `create(BookmarkPageResponseSchema)` to create a new message.
  */
 export const BookmarkPageResponseSchema: GenMessage<BookmarkPageResponse, {jsonType: BookmarkPageResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 23);
+  messageDesc(file_karuyomi_v1_business, 24);
+
+/**
+ * @generated from message karuyomi.v1.ChapterProgressPageResponse
+ */
+export type ChapterProgressPageResponse = Message<"karuyomi.v1.ChapterProgressPageResponse"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * Subsequent pages must use this revision; a changed revision restarts paging.
+   *
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision: number;
+
+  /**
+   * @generated from field: string manga_key = 3;
+   */
+  mangaKey: string;
+
+  /**
+   * Stored read/unread epochs and optional anchors, ordered by chapter identity.
+   *
+   * @generated from field: repeated karuyomi.v1.ChapterProgressState entries = 4;
+   */
+  entries: ChapterProgressState[];
+
+  /**
+   * @generated from field: string next_key = 5;
+   */
+  nextKey: string;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 6;
+   */
+  error?: BusinessStateError | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.ChapterProgressPageResponse
+ */
+export type ChapterProgressPageResponseJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * Subsequent pages must use this revision; a changed revision restarts paging.
+   *
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision?: number;
+
+  /**
+   * @generated from field: string manga_key = 3;
+   */
+  mangaKey?: string;
+
+  /**
+   * Stored read/unread epochs and optional anchors, ordered by chapter identity.
+   *
+   * @generated from field: repeated karuyomi.v1.ChapterProgressState entries = 4;
+   */
+  entries?: ChapterProgressStateJson[];
+
+  /**
+   * @generated from field: string next_key = 5;
+   */
+  nextKey?: string;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 6;
+   */
+  error?: BusinessStateErrorJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.ChapterProgressPageResponse.
+ * Use `create(ChapterProgressPageResponseSchema)` to create a new message.
+ */
+export const ChapterProgressPageResponseSchema: GenMessage<ChapterProgressPageResponse, {jsonType: ChapterProgressPageResponseJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 25);
 
 /**
  * @generated from message karuyomi.v1.LibraryPageResponse
@@ -1447,7 +1588,7 @@ export type LibraryPageResponseJson = {
  * Use `create(LibraryPageResponseSchema)` to create a new message.
  */
 export const LibraryPageResponseSchema: GenMessage<LibraryPageResponse, {jsonType: LibraryPageResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 24);
+  messageDesc(file_karuyomi_v1_business, 26);
 
 /**
  * @generated from message karuyomi.v1.CategoryMutationResponse
@@ -1514,7 +1655,7 @@ export type CategoryMutationResponseJson = {
  * Use `create(CategoryMutationResponseSchema)` to create a new message.
  */
 export const CategoryMutationResponseSchema: GenMessage<CategoryMutationResponse, {jsonType: CategoryMutationResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 25);
+  messageDesc(file_karuyomi_v1_business, 27);
 
 /**
  * @generated from message karuyomi.v1.CategoryCatalogResponse
@@ -1571,7 +1712,7 @@ export type CategoryCatalogResponseJson = {
  * Use `create(CategoryCatalogResponseSchema)` to create a new message.
  */
 export const CategoryCatalogResponseSchema: GenMessage<CategoryCatalogResponse, {jsonType: CategoryCatalogResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 26);
+  messageDesc(file_karuyomi_v1_business, 28);
 
 /**
  * @generated from message karuyomi.v1.ReaderSettings
@@ -1608,7 +1749,7 @@ export type ReaderSettingsJson = {
  * Use `create(ReaderSettingsSchema)` to create a new message.
  */
 export const ReaderSettingsSchema: GenMessage<ReaderSettings, {jsonType: ReaderSettingsJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 27);
+  messageDesc(file_karuyomi_v1_business, 29);
 
 /**
  * Missing fields inherit the global reader preference. AUTO is an explicit
@@ -1651,7 +1792,7 @@ export type ReaderSettingsOverrideJson = {
  * Use `create(ReaderSettingsOverrideSchema)` to create a new message.
  */
 export const ReaderSettingsOverrideSchema: GenMessage<ReaderSettingsOverride, {jsonType: ReaderSettingsOverrideJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 28);
+  messageDesc(file_karuyomi_v1_business, 30);
 
 /**
  * @generated from message karuyomi.v1.GlobalSettingsValues
@@ -1688,7 +1829,7 @@ export type GlobalSettingsValuesJson = {
  * Use `create(GlobalSettingsValuesSchema)` to create a new message.
  */
 export const GlobalSettingsValuesSchema: GenMessage<GlobalSettingsValues, {jsonType: GlobalSettingsValuesJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 29);
+  messageDesc(file_karuyomi_v1_business, 31);
 
 /**
  * @generated from message karuyomi.v1.GlobalSettings
@@ -1725,7 +1866,7 @@ export type GlobalSettingsJson = {
  * Use `create(GlobalSettingsSchema)` to create a new message.
  */
 export const GlobalSettingsSchema: GenMessage<GlobalSettings, {jsonType: GlobalSettingsJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 30);
+  messageDesc(file_karuyomi_v1_business, 32);
 
 /**
  * @generated from message karuyomi.v1.MangaReaderSettings
@@ -1772,7 +1913,7 @@ export type MangaReaderSettingsJson = {
  * Use `create(MangaReaderSettingsSchema)` to create a new message.
  */
 export const MangaReaderSettingsSchema: GenMessage<MangaReaderSettings, {jsonType: MangaReaderSettingsJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 31);
+  messageDesc(file_karuyomi_v1_business, 33);
 
 /**
  * @generated from message karuyomi.v1.SetMangaReaderSettings
@@ -1809,7 +1950,7 @@ export type SetMangaReaderSettingsJson = {
  * Use `create(SetMangaReaderSettingsSchema)` to create a new message.
  */
 export const SetMangaReaderSettingsSchema: GenMessage<SetMangaReaderSettings, {jsonType: SetMangaReaderSettingsJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 32);
+  messageDesc(file_karuyomi_v1_business, 34);
 
 /**
  * @generated from message karuyomi.v1.SettingsMutation
@@ -1887,7 +2028,7 @@ export type SettingsMutationJson = {
  * Use `create(SettingsMutationSchema)` to create a new message.
  */
 export const SettingsMutationSchema: GenMessage<SettingsMutation, {jsonType: SettingsMutationJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 33);
+  messageDesc(file_karuyomi_v1_business, 35);
 
 /**
  * @generated from message karuyomi.v1.SettingsResponse
@@ -1968,7 +2109,7 @@ export type SettingsResponseJson = {
  * Use `create(SettingsResponseSchema)` to create a new message.
  */
 export const SettingsResponseSchema: GenMessage<SettingsResponse, {jsonType: SettingsResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 34);
+  messageDesc(file_karuyomi_v1_business, 36);
 
 /**
  * @generated from message karuyomi.v1.SettingsMutationResponse
@@ -2055,7 +2196,7 @@ export type SettingsMutationResponseJson = {
  * Use `create(SettingsMutationResponseSchema)` to create a new message.
  */
 export const SettingsMutationResponseSchema: GenMessage<SettingsMutationResponse, {jsonType: SettingsMutationResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 35);
+  messageDesc(file_karuyomi_v1_business, 37);
 
 /**
  * @generated from enum karuyomi.v1.BusinessStateErrorCode

@@ -10,10 +10,36 @@ final class ProgressSnapshot {
     required this.revision,
     required this.progress,
     required this.resume,
+    required this.epoch,
+    required this.completed,
   });
   final int revision;
   final ChapterProgress? progress;
   final MangaResume? resume;
+  final int epoch;
+  final bool completed;
+}
+
+final class ChapterReadState {
+  const ChapterReadState({
+    required this.chapterKey,
+    required this.epoch,
+    required this.completed,
+  });
+  final String chapterKey;
+  final int epoch;
+  final bool completed;
+}
+
+final class MangaProgressSnapshot {
+  MangaProgressSnapshot({
+    required this.revision,
+    required this.accountRevision,
+    required Map<String, ChapterReadState> chapters,
+  }) : chapters = Map.unmodifiable(chapters);
+  final int revision;
+  final int accountRevision;
+  final Map<String, ChapterReadState> chapters;
 }
 
 final class ProgressRepository {
@@ -45,6 +71,41 @@ final class ProgressRepository {
   }) async {
     final result = await client.inspectManga(mangaKey, chapterKey: chapterKey);
     return _state(result.manga, result.hasProgress() ? result.progress : null);
+  }
+
+  Future<MangaProgressSnapshot> loadAll(String mangaKey) async {
+    final value = await client.readChapterProgress(mangaKey);
+    return MangaProgressSnapshot(
+      revision: value.manga.revision,
+      accountRevision: value.accountRevision,
+      chapters: {
+        for (final entry in value.entries)
+          entry.chapterKey: ChapterReadState(
+            chapterKey: entry.chapterKey,
+            epoch: entry.epoch,
+            completed: entry.completed,
+          ),
+      },
+    );
+  }
+
+  Future<ProgressSnapshot> setChapterRead({
+    required String mangaKey,
+    required String chapterKey,
+    required bool read,
+    required int basedOnRevision,
+  }) async {
+    validateBusinessChapterKey(chapterKey);
+    validateBusinessRevision(basedOnRevision);
+    final value = await client.mutate(
+      wire.StateMutation(
+        mangaKey: mangaKey,
+        setChapterRead: wire.SetChapterRead(chapterKey: chapterKey, read: read),
+      ),
+      basedOnRevision: basedOnRevision,
+      requireExactRevision: true,
+    );
+    return _confirmedState(value, chapterKey);
   }
 
   Future<MangaResume?> loadResume(String mangaKey) async {
@@ -141,7 +202,11 @@ ProgressSnapshot _state(
   wire.ChapterProgressState? progress,
 ) => ProgressSnapshot(
   revision: manga.revision,
-  progress: progress == null ? null : decodeChapterProgress(progress),
+  progress: progress?.hasCurrent() == true
+      ? decodeChapterProgress(progress!)
+      : null,
+  epoch: progress?.epoch ?? 0,
+  completed: progress?.completed ?? false,
   resume: manga.hasResume()
       ? MangaResume(
           chapterKey: manga.resume.chapterKey,
@@ -152,6 +217,11 @@ ProgressSnapshot _state(
 
 ChapterProgress decodeChapterProgress(wire.ChapterProgressState value) {
   validateBusinessProgress(value);
+  if (!value.hasCurrent()) {
+    throw const FormatException(
+      'An unpositioned chapter state has no reading anchor',
+    );
+  }
   return ChapterProgress(
     current: _decodeAnchor(value.current),
     furthest: value.hasFurthest() ? _decodeAnchor(value.furthest) : null,

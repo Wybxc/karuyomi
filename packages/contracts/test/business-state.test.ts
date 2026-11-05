@@ -4,6 +4,7 @@ import {
   settingsResponseSchema,
   settingsMutationResponseSchema,
   bookmarkPageResponseSchema,
+  chapterProgressPageResponseSchema,
   stateMutationResponseSchema,
   categoryMutationSchema,
   categoryCatalogResponseSchema,
@@ -313,6 +314,118 @@ test('settings replies verify the complete snapshot and effective defaults/overr
       error: {
         code: 'BUSINESS_STATE_ERROR_CODE_UNAVAILABLE',
         message: 'unavailable',
+      },
+    }),
+  ).not.toThrow();
+});
+
+test('chapter read mutations need no pages while anchorless replies never weaken save-progress input validation', () => {
+  const mangaKey = 'a'.repeat(64);
+  for (const read of [true, false]) {
+    expect(
+      stateMutationSchema.parse({
+        ...base,
+        mangaKey,
+        setChapterRead: { chapterKey: 'chapter-1', read },
+      }).operation.case,
+    ).toBe('setChapterRead');
+    expect(
+      stateMutationResponseSchema.parse({
+        schemaVersion: 1,
+        mutationId: base.mutationId,
+        accountRevision: 1,
+        manga: { mangaKey, revision: 1 },
+        categoryCatalog: {},
+        progress: { chapterKey: 'chapter-1', epoch: 1, completed: read },
+      }).progress?.completed,
+    ).toBe(read);
+  }
+  const anchor = {
+    chapterKey: 'chapter-1',
+    pageKey: 'page-1',
+    manifestVersion: 'manifest-1',
+  };
+  for (const chapterKey of ['', 'x'.repeat(201)]) {
+    expect(() =>
+      stateMutationSchema.parse({
+        ...base,
+        mangaKey,
+        setChapterRead: { chapterKey, read: true },
+      }),
+    ).toThrow();
+  }
+  expect(() =>
+    stateMutationSchema.parse({
+      ...base,
+      mangaKey,
+      saveProgress: {
+        snapshot: {
+          chapterKey: 'chapter-1',
+          manifestVersion: 'manifest-1',
+          pageKeys: ['page-1'],
+        },
+        progress: { chapterKey: 'chapter-1', epoch: 1, completed: true },
+      },
+    }),
+  ).toThrow();
+  expect(() =>
+    mangaStateResponseSchema.parse({
+      schemaVersion: 1,
+      manga: { mangaKey },
+      categoryCatalog: {},
+      progress: { chapterKey: 'chapter-1', epoch: 1, furthest: anchor },
+    }),
+  ).toThrow();
+});
+
+test('chapter progress pages retain unread epochs, bound ordered UTF-8 identities and align their cursor', () => {
+  const page = {
+    schemaVersion: 1,
+    accountRevision: 2,
+    mangaKey: 'a'.repeat(64),
+    entries: [
+      { chapterKey: 'a', epoch: 1, completed: true },
+      { chapterKey: 'b', epoch: 2, completed: false },
+    ],
+    nextKey: 'b',
+  };
+  expect(() => chapterProgressPageResponseSchema.parse(page)).not.toThrow();
+  expect(() =>
+    chapterProgressPageResponseSchema.parse({
+      ...page,
+      entries: [{ chapterKey: '\ue000' }, { chapterKey: '😀' }],
+      nextKey: '😀',
+    }),
+  ).not.toThrow();
+  for (const invalid of [
+    { ...page, mangaKey: 'wrong' },
+    { ...page, entries: [page.entries[0], page.entries[0]] },
+    { ...page, entries: page.entries.slice().reverse() },
+    { ...page, nextKey: 'c' },
+    { ...page, entries: [{ chapterKey: 'a', epoch: 4294967296 }], nextKey: '' },
+    {
+      ...page,
+      entries: Array.from({ length: 65 }, (_, index) => ({
+        chapterKey: String(index).padStart(3, '0'),
+      })),
+      nextKey: '',
+    },
+    { ...page, accountRevision: 4294967296 },
+    {
+      ...page,
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT',
+        message: 'changed',
+      },
+    },
+  ])
+    expect(() => chapterProgressPageResponseSchema.parse(invalid)).toThrow();
+  expect(() =>
+    chapterProgressPageResponseSchema.parse({
+      schemaVersion: 1,
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_UNAVAILABLE',
+        message: 'identity changed',
       },
     }),
   ).not.toThrow();

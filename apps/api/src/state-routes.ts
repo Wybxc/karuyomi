@@ -3,6 +3,7 @@ import {
   BusinessStateErrorCode as ErrorCode,
   LibraryPageResponseSchema,
   BookmarkPageResponseSchema,
+  ChapterProgressPageResponseSchema,
   MangaStateResponseSchema,
   StateMutationResponseSchema,
   CategoryCatalogResponseSchema,
@@ -20,6 +21,7 @@ import {
   applyMutation,
   readLibrary,
   readBookmarkPage,
+  readChapterProgressPage,
   readMangaState,
   StateError,
   readCategoryCatalog,
@@ -96,6 +98,17 @@ export function createStateRoutes() {
           ),
           403,
         );
+      if (c.req.path.endsWith('/progress'))
+        return c.json(
+          toJson(
+            ChapterProgressPageResponseSchema,
+            create(ChapterProgressPageResponseSchema, {
+              schemaVersion: businessSchemaVersion,
+              error,
+            }),
+          ),
+          403,
+        );
       if (c.req.path === '/api/state/mutations')
         return c.json(
           toJson(
@@ -123,6 +136,7 @@ export function createStateRoutes() {
   app.use('/library', bindSession);
   app.use('/state/manga/:mangaKey', bindSession);
   app.use('/state/manga/:mangaKey/bookmarks', bindSession);
+  app.use('/state/manga/:mangaKey/progress', bindSession);
   app.use('/state/mutations', bindSession);
   app.use('/categories', bindSession);
   app.use('/categories/mutations', bindSession);
@@ -258,6 +272,47 @@ export function createStateRoutes() {
         toJson(
           BookmarkPageResponseSchema,
           create(BookmarkPageResponseSchema, {
+            schemaVersion: businessSchemaVersion,
+            error: failure.error,
+          }),
+        ),
+        failure.status,
+      );
+    }
+  });
+  app.get('/state/manga/:mangaKey/progress', async (c) => {
+    try {
+      const key = mangaKey(c.req.param('mangaKey'));
+      const after = c.req.query('afterKey') ?? '';
+      if (after) chapterKey(after);
+      const revisionText = c.req.query('revision');
+      if (
+        (after && revisionText === undefined) ||
+        (revisionText !== undefined &&
+          (!/^(0|[1-9][0-9]{0,9})$/.test(revisionText) ||
+            Number(revisionText) > 0xffff_ffff))
+      )
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Valid pagination revision is required',
+        );
+      const result = await readChapterProgressPage(
+        c.env.DB,
+        c.get('identity').subject,
+        key,
+        after,
+        revisionText === undefined ? undefined : Number(revisionText),
+      );
+      return c.json(
+        toJson(ChapterProgressPageResponseSchema, result),
+        result.error ? 409 : 200,
+      );
+    } catch (error) {
+      const failure = stateFailure(error);
+      return c.json(
+        toJson(
+          ChapterProgressPageResponseSchema,
+          create(ChapterProgressPageResponseSchema, {
             schemaVersion: businessSchemaVersion,
             error: failure.error,
           }),

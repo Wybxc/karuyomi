@@ -1111,6 +1111,7 @@ class ChapterProgressState extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearChapterKey() => $_clearField(1);
 
+  /// Anchors are absent for an unopened chapter marked from its detail list.
   @$pb.TagNumber(2)
   ReadingAnchor get current => $_getN(1);
   @$pb.TagNumber(2)
@@ -1142,6 +1143,7 @@ class ChapterProgressState extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearEpoch() => $_clearField(4);
 
+  /// Chapter-level read state; only reset or marking unread clears it.
   @$pb.TagNumber(5)
   $core.bool get completed => $_getBF(4);
   @$pb.TagNumber(5)
@@ -1364,6 +1366,75 @@ class SetBookmark extends $pb.GeneratedMessage {
   $core.bool hasBookmarked() => $_has(1);
   @$pb.TagNumber(2)
   void clearBookmarked() => $_clearField(2);
+}
+
+class SetChapterRead extends $pb.GeneratedMessage {
+  factory SetChapterRead({
+    $core.String? chapterKey,
+    $core.bool? read,
+  }) {
+    final result = SetChapterRead._();
+    if (chapterKey != null) result.chapterKey = chapterKey;
+    if (read != null) result.read = read;
+    return result;
+  }
+
+  SetChapterRead._();
+
+  factory SetChapterRead.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetChapterRead()..mergeFromBuffer(data, registry);
+  factory SetChapterRead.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetChapterRead()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetChapterRead',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SetChapterRead.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'chapterKey')
+    ..aOB(2, _omitFieldNames ? '' : 'read')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetChapterRead clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetChapterRead copyWith(void Function(SetChapterRead) updates) =>
+      super.copyWith((message) => updates(message as SetChapterRead))
+          as SetChapterRead;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SetChapterRead() / SetChapterRead.new instead')
+  static SetChapterRead create() => SetChapterRead._();
+  static $pb.GeneratedMessage $_createMessage() => SetChapterRead._();
+  @$core.override
+  SetChapterRead createEmptyInstance() => SetChapterRead._();
+  @$core.pragma('dart2js:noInline')
+  static SetChapterRead getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SetChapterRead>(
+          SetChapterRead.$_createMessage);
+  static SetChapterRead? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get chapterKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set chapterKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChapterKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChapterKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get read => $_getBF(1);
+  @$pb.TagNumber(2)
+  set read($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRead() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRead() => $_clearField(2);
 }
 
 class SetFavorite extends $pb.GeneratedMessage {
@@ -1604,6 +1675,7 @@ enum StateMutation_Operation {
   resetProgress,
   setCategories,
   setBookmark,
+  setChapterRead,
   notSet
 }
 
@@ -1619,6 +1691,7 @@ class StateMutation extends $pb.GeneratedMessage {
     ResetProgress? resetProgress,
     SetCategories? setCategories,
     SetBookmark? setBookmark,
+    SetChapterRead? setChapterRead,
   }) {
     final result = StateMutation._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1631,6 +1704,7 @@ class StateMutation extends $pb.GeneratedMessage {
     if (resetProgress != null) result.resetProgress = resetProgress;
     if (setCategories != null) result.setCategories = setCategories;
     if (setBookmark != null) result.setBookmark = setBookmark;
+    if (setChapterRead != null) result.setChapterRead = setChapterRead;
     return result;
   }
 
@@ -1651,13 +1725,14 @@ class StateMutation extends $pb.GeneratedMessage {
     13: StateMutation_Operation.resetProgress,
     14: StateMutation_Operation.setCategories,
     15: StateMutation_Operation.setBookmark,
+    16: StateMutation_Operation.setChapterRead,
     0: StateMutation_Operation.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'StateMutation',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: StateMutation.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
     ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
         fieldType: $pb.PbFieldType.OU3)
     ..aOS(2, _omitFieldNames ? '' : 'mutationId')
@@ -1676,6 +1751,8 @@ class StateMutation extends $pb.GeneratedMessage {
         subBuilder: SetCategories.$_createMessage)
     ..aOM<SetBookmark>(15, _omitFieldNames ? '' : 'setBookmark',
         subBuilder: SetBookmark.$_createMessage)
+    ..aOM<SetChapterRead>(16, _omitFieldNames ? '' : 'setChapterRead',
+        subBuilder: SetChapterRead.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1706,6 +1783,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   StateMutation_Operation whichOperation() =>
       _StateMutation_OperationByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -1714,6 +1792,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   void clearOperation() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -1818,6 +1897,17 @@ class StateMutation extends $pb.GeneratedMessage {
   void clearSetBookmark() => $_clearField(15);
   @$pb.TagNumber(15)
   SetBookmark ensureSetBookmark() => $_ensure(9);
+
+  @$pb.TagNumber(16)
+  SetChapterRead get setChapterRead => $_getN(10);
+  @$pb.TagNumber(16)
+  set setChapterRead(SetChapterRead value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasSetChapterRead() => $_has(10);
+  @$pb.TagNumber(16)
+  void clearSetChapterRead() => $_clearField(16);
+  @$pb.TagNumber(16)
+  SetChapterRead ensureSetChapterRead() => $_ensure(10);
 }
 
 class BusinessStateError extends $pb.GeneratedMessage {
@@ -2306,6 +2396,131 @@ class BookmarkPageResponse extends $pb.GeneratedMessage {
   /// Only bookmarked chapters are included, ordered by chapter identity.
   @$pb.TagNumber(4)
   $pb.PbList<ChapterBookmark> get entries => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $core.String get nextKey => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set nextKey($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasNextKey() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearNextKey() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  BusinessStateError get error => $_getN(5);
+  @$pb.TagNumber(6)
+  set error(BusinessStateError value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  BusinessStateError ensureError() => $_ensure(5);
+}
+
+class ChapterProgressPageResponse extends $pb.GeneratedMessage {
+  factory ChapterProgressPageResponse({
+    $core.int? schemaVersion,
+    $core.int? accountRevision,
+    $core.String? mangaKey,
+    $core.Iterable<ChapterProgressState>? entries,
+    $core.String? nextKey,
+    BusinessStateError? error,
+  }) {
+    final result = ChapterProgressPageResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (mangaKey != null) result.mangaKey = mangaKey;
+    if (entries != null) result.entries.addAll(entries);
+    if (nextKey != null) result.nextKey = nextKey;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  ChapterProgressPageResponse._();
+
+  factory ChapterProgressPageResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChapterProgressPageResponse()..mergeFromBuffer(data, registry);
+  factory ChapterProgressPageResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChapterProgressPageResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ChapterProgressPageResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ChapterProgressPageResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'mangaKey')
+    ..pPM<ChapterProgressState>(4, _omitFieldNames ? '' : 'entries',
+        subBuilder: ChapterProgressState.$_createMessage)
+    ..aOS(5, _omitFieldNames ? '' : 'nextKey')
+    ..aOM<BusinessStateError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChapterProgressPageResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChapterProgressPageResponse copyWith(
+          void Function(ChapterProgressPageResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ChapterProgressPageResponse))
+          as ChapterProgressPageResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ChapterProgressPageResponse() / ChapterProgressPageResponse.new instead')
+  static ChapterProgressPageResponse create() =>
+      ChapterProgressPageResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ChapterProgressPageResponse._();
+  @$core.override
+  ChapterProgressPageResponse createEmptyInstance() =>
+      ChapterProgressPageResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ChapterProgressPageResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ChapterProgressPageResponse>(
+          ChapterProgressPageResponse.$_createMessage);
+  static ChapterProgressPageResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  /// Subsequent pages must use this revision; a changed revision restarts paging.
+  @$pb.TagNumber(2)
+  $core.int get accountRevision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set accountRevision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAccountRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAccountRevision() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get mangaKey => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set mangaKey($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMangaKey() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMangaKey() => $_clearField(3);
+
+  /// Stored read/unread epochs and optional anchors, ordered by chapter identity.
+  @$pb.TagNumber(4)
+  $pb.PbList<ChapterProgressState> get entries => $_getList(3);
 
   @$pb.TagNumber(5)
   $core.String get nextKey => $_getSZ(4);

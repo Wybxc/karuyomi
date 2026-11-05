@@ -18,6 +18,7 @@ export const BUSINESS_RESPONSE_LIMIT = 2 * 1024 * 1024;
 export const LIBRARY_METADATA_LIMIT = 96 * 1024;
 export const LIBRARY_PAGE_SIZE = 8;
 export const BOOKMARK_PAGE_SIZE = 64;
+export const CHAPTER_PROGRESS_PAGE_SIZE = 64;
 export const CHAPTER_PAGE_LIMIT = 2048;
 export const CATEGORY_LIMIT = 64;
 
@@ -170,13 +171,15 @@ export function validateChapterBookmark(value: pb.ChapterBookmark): void {
 export function validateChapterProgress(value: pb.ChapterProgressState): void {
   validId(value.chapterKey);
   uint32(value.epoch);
-  requireFields(value, ['current']);
-  validateReadingAnchor(value.current);
-  requireCondition(
-    value.current.chapterKey === value.chapterKey,
-    'Current anchor belongs to a different chapter',
-  );
+  if (value.current) {
+    validateReadingAnchor(value.current);
+    requireCondition(
+      value.current.chapterKey === value.chapterKey,
+      'Current anchor belongs to a different chapter',
+    );
+  }
   if (value.furthest) {
+    requireFields(value, ['current']);
     validateReadingAnchor(value.furthest);
     requireCondition(
       value.furthest.chapterKey === value.chapterKey,
@@ -225,8 +228,8 @@ export const stateMutationSchema = codec<pb.StateMutation>((input) => {
   uint32(value.expectedRevision);
   switch (value.operation.case) {
     case 'setFavorite':
-      requireFields(value.operation.value, ['metadata']);
-      validateLibraryMetadata(value.operation.value.metadata);
+      if (value.operation.value.metadata)
+        validateLibraryMetadata(value.operation.value.metadata);
       break;
     case 'updateMetadata':
       validateLibraryMetadata(value.operation.value);
@@ -252,6 +255,7 @@ export const stateMutationSchema = codec<pb.StateMutation>((input) => {
       validateChapterSnapshot(value.operation.value.snapshot);
       break;
     case 'setBookmark':
+    case 'setChapterRead':
       validId(value.operation.value.chapterKey);
       break;
     case 'setCategories':
@@ -391,6 +395,60 @@ export const bookmarkPageResponseSchema = codec<pb.BookmarkPageResponse>(
     return value;
   },
 );
+
+export const chapterProgressPageResponseSchema =
+  codec<pb.ChapterProgressPageResponse>((input) => {
+    const value = parseMessage(
+      pb.ChapterProgressPageResponseSchema,
+      input,
+      BUSINESS_RESPONSE_LIMIT,
+    );
+    requireCondition(
+      value.schemaVersion === businessSchemaVersion,
+      'Unsupported business state schema',
+    );
+    uint32(value.accountRevision);
+    if (!value.error || value.mangaKey !== '') mangaKey.parse(value.mangaKey);
+    if (value.error) {
+      validateError(value.error);
+      requireCondition(
+        value.entries.length === 0 && value.nextKey === '',
+        'Failed chapter progress page cannot contain entries',
+      );
+    }
+    requireCondition(
+      value.entries.length <= CHAPTER_PROGRESS_PAGE_SIZE &&
+        new Set(value.entries.map((entry) => entry.chapterKey)).size ===
+          value.entries.length,
+      'Invalid chapter progress page',
+    );
+    let previousKey: Uint8Array | undefined;
+    for (const entry of value.entries) {
+      validateChapterProgress(entry);
+      // SQLite BINARY orders UTF-8 bytes, including non-ASCII chapter identities.
+      const key = new TextEncoder().encode(entry.chapterKey);
+      if (previousKey) {
+        const different = previousKey.findIndex(
+          (byte, index) => byte !== key[index],
+        );
+        requireCondition(
+          different < 0
+            ? previousKey.length < key.length
+            : previousKey[different]! < (key[different] ?? -1),
+          'Chapter progress page keys must be unique and ordered',
+        );
+      }
+      previousKey = key;
+    }
+    if (value.nextKey !== '') {
+      validId(value.nextKey);
+      requireCondition(
+        value.nextKey === value.entries.at(-1)?.chapterKey,
+        'Chapter progress cursor must identify its last entry',
+      );
+    }
+    return value;
+  });
 
 export const libraryPageResponseSchema = codec<pb.LibraryPageResponse>(
   (input) => {

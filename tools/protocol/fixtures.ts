@@ -25,6 +25,7 @@ export type GoldenType =
   | 'StateMutationResponse'
   | 'MangaStateResponse'
   | 'LibraryPageResponse'
+  | 'ChapterProgressPageResponse'
   | 'CategoryMutation'
   | 'CategoryMutationResponse'
   | 'CategoryCatalogResponse';
@@ -258,6 +259,7 @@ export const goldenFixtures: GoldenFixture[] = [
         },
       ],
       ['resetProgress', { snapshot: businessSnapshot, reversedOrder: false }],
+      ['setChapterRead', { chapterKey: 'chapter-golden', read: true }],
       [
         'setCategories',
         {
@@ -271,6 +273,46 @@ export const goldenFixtures: GoldenFixture[] = [
     type: 'StateMutation',
     value: { ...businessMutation, [operation]: value },
   })),
+  {
+    name: 'business-mutation-mark-unread-default-false',
+    type: 'StateMutation',
+    value: {
+      ...businessMutation,
+      setChapterRead: { chapterKey: 'chapter-golden', read: false },
+    },
+  },
+  {
+    name: 'business-mutation-remove-favorite-without-metadata',
+    type: 'StateMutation',
+    value: { ...businessMutation, setFavorite: { favorite: false } },
+  },
+  ...[false, true].map((completed): GoldenFixture => ({
+    name: `business-mutation-unpositioned-${completed ? 'read' : 'unread'}`,
+    type: 'StateMutationResponse',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      accountRevision: 7,
+      manga: businessManga,
+      progress: { chapterKey: 'chapter-golden', epoch: 1, completed },
+      categoryCatalog,
+    },
+  })),
+  {
+    name: 'business-chapter-progress-page-with-unpositioned-state',
+    type: 'ChapterProgressPageResponse',
+    value: {
+      schemaVersion: 1,
+      accountRevision: 7,
+      mangaKey: businessMangaKey,
+      entries: [
+        { chapterKey: 'chapter-a', epoch: 1, completed: true },
+        { chapterKey: 'chapter-b', epoch: 2, completed: false },
+        businessProgress,
+      ],
+      nextKey: 'chapter-golden',
+    },
+  },
   {
     name: 'business-mutation-confirmed-uint32-maximum',
     type: 'StateMutationResponse',

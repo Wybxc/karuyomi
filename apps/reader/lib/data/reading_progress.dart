@@ -78,9 +78,7 @@ final class ChapterProgress {
       current: resolvedCurrent,
       furthest: _farther(manifest, furthest, resolvedObserved),
       epoch: epoch,
-      completed:
-          (completed && this.current.manifestVersion == manifest.version) ||
-          complete,
+      completed: completed || complete,
     );
   }
 
@@ -98,10 +96,7 @@ final class ChapterProgress {
       current: resolvedCurrent,
       furthest: _farther(manifest, furthest, incoming.furthest),
       epoch: epoch,
-      completed:
-          (completed && current.manifestVersion == manifest.version) ||
-          (incoming.completed &&
-              incoming.current.manifestVersion == manifest.version),
+      completed: completed || incoming.completed,
     );
   }
 }

@@ -54,6 +54,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('真实源 DTO 测试'));
       await tester.pumpAndSettle();
+      expect(find.text('漫画源返回的完整简介'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('第 1 章'),
         160,
@@ -67,7 +68,6 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('漫画源返回的完整简介'), findsOneWidget);
       expect(find.text('第 1 章'), findsOneWidget);
       expect(find.byType(Image), findsNothing);
       expect(

@@ -79,47 +79,50 @@ void main() {
     expect(moved.furthestUnresolved(after), true);
   });
 
-  test('only explicit observed final page completes this manifest version', () {
-    final pages = manifest('v1', ['one', 'two']);
-    final initial = ChapterProgress(current: pages.positionAt(0));
-    expect(
-      () => initial.advance(
+  test(
+    'observed completion requires the last page and remains chapter-level',
+    () {
+      final pages = manifest('v1', ['one', 'two']);
+      final initial = ChapterProgress(current: pages.positionAt(0));
+      expect(
+        () => initial.advance(
+          manifest: pages,
+          current: pages.positionAt(1),
+          complete: true,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => initial.advance(
+          manifest: pages,
+          current: pages.positionAt(0),
+          observed: pages.positionAt(0),
+          complete: true,
+        ),
+        throwsArgumentError,
+      );
+      final completed = initial.advance(
         manifest: pages,
         current: pages.positionAt(1),
+        observed: pages.positionAt(1),
         complete: true,
-      ),
-      throwsArgumentError,
-    );
-    expect(
-      () => initial.advance(
-        manifest: pages,
-        current: pages.positionAt(0),
-        observed: pages.positionAt(0),
-        complete: true,
-      ),
-      throwsArgumentError,
-    );
-    final completed = initial.advance(
-      manifest: pages,
-      current: pages.positionAt(1),
-      observed: pages.positionAt(1),
-      complete: true,
-    );
-    expect(completed.completed, true);
-    expect(
-      completed
-          .advance(manifest: pages, current: pages.positionAt(0))
-          .completed,
-      true,
-    );
-    final changed = manifest('v2', ['one', 'two', 'new']);
-    expect(
-      completed
-          .advance(manifest: changed, current: changed.positionAt(0))
-          .completed,
-      false,
-    );
-  });
+      );
+      expect(completed.completed, true);
+      expect(
+        completed
+            .advance(manifest: pages, current: pages.positionAt(0))
+            .completed,
+        true,
+      );
+      final changed = manifest('v2', ['one', 'two', 'new']);
+      expect(
+        completed
+            .advance(manifest: changed, current: changed.positionAt(0))
+            .completed,
+        true,
+      );
+    },
+  );
 
   test('identity scopes deployment origin and authenticated subject', () {
     final identity = ProgressIdentity(
