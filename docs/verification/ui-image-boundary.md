@@ -101,7 +101,7 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 另一次 60 秒有界采集在 DREAM 第 43 页后开始推进，覆盖第 44–51 页、切换 HEARTBEAT 第 1–3 页和退出。真实下载 JSON 为 879,608 字节，含 152 个事件及 1,472 个帧样本，`truncated=false`、`frameTimingStatus=associated`。事件时间单调且在采集期限内，带帧号事件均精确匹配原始计时，图片和事件缺帧列表为空。报告有 11 份捕获期 acquire 结果，全部对应到 14 个 `release_ack`；额外 3 份释放属于采集前已持有的资源，不能把 acquire 与释放总数误写为相等。14 份 release 请求、发送和 ACK 的资源/generation 集合一致，DREAM 切章和 HEARTBEAT 退出分别有一个 `reader_exit_ack`。这份报告只证明该采集区间内的生命周期，未覆盖前 43 页全部资源，也不包含随后首次续读的完整采集，不能代表整个浏览器、Flutter cache、RSS/GPU 或进程峰值全部释放。
 
-控制台记录仍只有一次早期焦点异常及其栈两条 entry，时间为 `2026-11-05T00:11:36.496Z`，早于报告开始 `00:18:49.695Z`；后续阅读未新增错误记录。它与上述 ReadingOrderTraversalPolicy 路径一致，具体触发原因和默认构建对照继续验收，不把本轮功能成功写成全程零错误。
+控制台记录仍只有一次早期焦点异常及其栈两条 entry，时间为 `2026-11-05T00:11:36.496Z`，早于报告开始 `00:18:49.695Z`；后续阅读未新增错误记录。它与上述 ReadingOrderTraversalPolicy 路径一致，具体触发原因和诊断层修复继续验收，默认构建对照见下节；不把本轮功能成功写成全程零错误。
 
 逐页截图 `arknights-pages/01.jpg` 至 `51.jpg`、操作记录 `arknights-current-ui-steps.json`、完成/首次续读截图、`arknights-heartbeat-ui.json`、`arknights-resume-ui.txt`、`arknights-lifecycle-capture.json`、`arknights-current-network.json` 和 `arknights-console-errors.json` 保存在同一 ignored 证据目录。`arknights-run-cleanup.json` 记录标签页已关闭，服务会话退出 130 后端口 61624 无监听，且无本次 Source probe/workerd 进程；仅删除唯一匹配本 buildId 的 `karuyomi-source-probe-B9DSM0` 临时快照/D1。当前产物未发布为已兼容，仍不以这两个源的限定 Web 分项替代 3–5 源、Native、真实 Access、长图/EXIF 或真机门。
 
@@ -109,7 +109,7 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 在同一固定 `5e1e014` 源码、相同材料下，另行构建默认未启用 `READER_BASELINE` 的正式 Web release，独立输出到 ignored `.local/ui-image-baseline/default-web`，保留原采集版。Codex 内置浏览器临时固定为 1280×720；三次新文档加载均执行启用无障碍、Tab/Shift+Tab 和进入浏览，操作前后的控制台 error 数均为零，且界面不含性能采集按钮。这是三个新文档的默认构建对照，不是三个浏览器进程，也不能证明所有条件下不会发生焦点问题。
 
-官方 [Flutter #193287](https://github.com/flutter/flutter/issues/193287) 记录同一稳定 SDK 中 builder 外层 Overlay 的同类焦点遍历栈，但其示例同时含 SelectionArea，不能直接认定与本项目完全同因。当前最小候选用锁定 SDK 的 `Overlay.wrap` 接管诊断 entry 生命周期，移除手写 entry 创建、更新和释放，保持 Source、图片链和 recorder 不变。工程回归及后续固定版本浏览器对照分别记录；仅收敛到官方组件不能预先宣布焦点异常已修复。
+官方 [Flutter #193287](https://github.com/flutter/flutter/issues/193287) 记录同一稳定 SDK 中 builder 外层 Overlay 的同类焦点遍历栈，但其示例同时含 SelectionArea，不能直接认定与本项目完全同因。当前最小候选用锁定 SDK 的 `Overlay.wrap` 接管诊断 entry 生命周期，移除手写 entry 创建、更新和释放，保持 Source、图片链和 recorder 不变。五项诊断测试、静态分析与对应 CI 通过；随后固定 `235f2dff2e7b83c4f4c7a905fd6572384acc71bb` 的三次同条件新文档复验均在启用无障碍前记录同一焦点异常，因此该候选未修复问题。原始记录为 `overlay-wrap-focus-runs.json`。进一步简化候选移除额外 Overlay，摘要和预览使用普通 Text，收起使用无需 Tooltip 的文字按钮，删除仅用于文字选择的 semantics handle；完整 JSON 仍经文件下载或 Native 复制取得，真实浏览器门另行验证。
 
 默认对照原始记录为 `default-focus-runs.json`，成品与构建日志独立保留。三个标签页均已关闭，临时视口已恢复；服务退出后确认端口 49608 无监听且无本次 probe/workerd 进程，只删除匹配本 buildId 的 `karuyomi-source-probe-abtvn9` 临时目录，见 `default-focus-cleanup.json`。
 

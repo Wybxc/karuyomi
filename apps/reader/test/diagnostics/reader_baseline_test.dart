@@ -240,14 +240,12 @@ void main() {
       await tester.tap(find.text('查看摘要'));
       await tester.pumpAndSettle();
       final preview = tester
-          .widget<SelectableText>(
-            find.byKey(const ValueKey('reader-baseline-preview')),
-          )
+          .widget<Text>(find.byKey(const ValueKey('reader-baseline-preview')))
           .data!;
       expect(preview.length, lessThanOrEqualTo(1024));
       expect(complete, startsWith(preview));
       final paragraphs = tester
-          .widgetList<SelectableText>(find.byType(SelectableText))
+          .widgetList<Text>(find.byType(Text))
           .map((text) => text.data ?? '');
       expect(paragraphs.every((text) => text.length <= 1024), true);
       expect(tester.takeException(), isNull);
@@ -311,7 +309,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('开始采集'));
       await tester.pump();
-      await tester.tap(find.byTooltip('收起性能采集'));
+      await tester.tap(find.text('收起性能采集'));
       await tester.pump();
       expect(find.text('正式 UI'), findsOneWidget);
       await tester.tap(find.text('性能采集'));
@@ -323,9 +321,7 @@ void main() {
       await tester.tap(find.text('查看摘要'));
       await tester.pump();
       final preview = tester
-          .widget<SelectableText>(
-            find.byKey(const ValueKey('reader-baseline-preview')),
-          )
+          .widget<Text>(find.byKey(const ValueKey('reader-baseline-preview')))
           .data!;
       final text = recorder.exportJson();
       expect(preview.length, lessThanOrEqualTo(1024));
@@ -339,7 +335,6 @@ void main() {
         jsonDecode(text)['environment']['refreshRateHz'],
         tester.view.display.refreshRate,
       );
-      expect(tester.binding.semanticsEnabled, true);
       await tester.tap(find.text('复制 JSON'));
       await tester.pump();
       expect(clipboard, text);
