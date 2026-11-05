@@ -1,5 +1,7 @@
 # 文本布局运行证据
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 ## 范围与正式入口
 
 本阶段针对未经修改的 TextInterceptor 使用的 `Html.fromHtml(...).toString()`、`TextPaint`、旧构造器 `StaticLayout` 和 `draw`。正式共同场景为 `tools/teavm/TextLayoutScenarios.java`；真实 Canvas 机制场景为 `packages/runtime-host/test/text-layout-browser-suite.ts`。

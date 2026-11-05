@@ -94,7 +94,7 @@
         "path": "^tools/extensions/(?:assets|verify-manifest)\\.ts$"
       },
       "to": {
-        "path": "^tools/extensions/(?:pipeline|builder|registration|network-policies|verify-browser|verify-build)\\.ts$"
+        "path": "^tools/extensions/(?:pipeline|builder|registration|network-policies|verify-build)\\.ts$"
       }
     },
     {

@@ -1,5 +1,7 @@
 # 正式 Web Source 图片获取中退出与恢复
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，Codex 内置浏览器通过正式 Flutter 主入口，在官方 Arknights Comics 1.6.2 的图片获取中返回详情，再正常继续阅读。修正测试传输后的 `run-MUmONL` gate 3 **通过该固定 Source、大 PNG 流暂停阶段的主动取消与恢复分项**：真实 HTTPS 响应尚未收完，浏览器断开经适配器 TCP reset 后约 12 ms 记录到 HTTPS aborted/close，距原 Source 约 10 秒期限尚有约 8 秒；同一 Worker 恢复首图和原取消页，最终取得完整遥测检查点与正常关停。旧轮等待超时、已收完小图及中间 popular 400 的失败保留在下文。
 
 所有原报告的 `passed=false`、`productUiPassed=false` 原样保留：夹具没有自动赋予通过状态的逻辑，本分项结论来自关联事件、实际 UI 和最终检查点。`productionAccessVerified=false` 不变，不推广为生产 Access、Native、所有取消阶段或完整 P0 验收。

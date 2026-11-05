@@ -1,19 +1,8 @@
 {
   "extends": "../../../runtime/teavm/bridge/tsconfig.json",
-  "include": [
-    "bridge-browser-suite.ts",
-    "cache-lifecycle-worker.ts",
-    "cache-lifecycle-browser-suite.ts",
-    "file-lifecycle-worker.ts",
-    "file-lifecycle-browser-suite.ts",
-    "text-layout-browser-suite.ts",
-    "bitmap-lifetime-browser-suite.ts",
-    "bitmap-lifetime-java-browser-suite.ts",
-    "cache-failure-java-browser-worker.ts",
-    "enqueue-java-browser-worker.ts",
-    "enqueue-java-manager-browser-worker.ts",
-    "enqueue-java-manager-browser-suite.ts",
-    "storage-namespace-browser-suite.ts",
-    "fixtures/storage-namespace-host.ts"
-  ]
+  "compilerOptions": {
+    "lib": ["ES2022", "ES2025.Float16", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["vite/client"]
+  },
+  "include": ["browser/**/*.ts"]
 }

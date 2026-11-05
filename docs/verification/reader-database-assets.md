@@ -1,5 +1,9 @@
 # Web 数据库资源构建
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
+本文的 Drift/SQLite 本地业务数据库资产与旧 `assemble-assets.ts` 入口均已移除；业务权威现为 Worker API + D1。下列命令和文件清单只记录该轮历史输入，当前资源装配使用 API Vite 插件，不能按旧命令复验。
+
 2026-11-04。正式构建模块 `tools/reader/database-assets.ts` 为 Flutter Web 开发与 release 准备同一套官方 Drift 2.35.3 资源；项目不维护改写版 worker 或 WASM。
 
 ## 固定资源与入口

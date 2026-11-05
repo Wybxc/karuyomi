@@ -1,5 +1,7 @@
 # v3 控制协议运行证据
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-03，固定项目提交 `6e08ec9` 的独立工作树，Node 24.15.0、Temurin JDK 25.0.5+8、TeaVM 0.16.0 JS backend。扩展上游固定 `efa93f5a3537856fe830450bbe33f69d21d28167`，原版 Arknights Comics 1.6.2，未修改扩展业务源码或原始 JAR。本次只验证该提交的材料，不代表后续 Native 或 graphics 改动已通过同一门。
 
 ## 构建身份

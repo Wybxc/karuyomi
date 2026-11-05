@@ -1,5 +1,7 @@
 # 运行时文件与 HTTP Cache
 
+> 入口更新（2026-11-05）：本计划的领域目标与未完成验收继续有效；下文历史验证涉及的旧自定义探针/浏览器 runner 已退役，旧命令仅适用于原记录提交。当前声明式构建和官方测试入口见 [Vite 计划](vite-build-and-testing.md)，覆盖须重新核对，不能因删除旧测试而抬高状态。
+
 ## 目标与状态
 
 为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。iOS/Android 模拟器的 Cache 桥 39 组机制及最终容器销毁也已通过；真实 manager 的 namespace 切换与同键 Cache/files 256 MiB allocated 组合门已通过受控 ABI 分项；原 xkcd 的 Web 元数据 fresh Cache、实际 manager/Worker 重建，以及双端模拟器正式 Native runtime 的原 Java Source 冷热 / 容器重建复用已通过新 AOT 分项；App / 浏览器进程重启、更广 Source 与产品切换仍待验收。
@@ -19,7 +21,7 @@
 - editor token、Java handle、entry version 和 clear generation 继续约束提交；外来 Worker 不能提交或 abort 活 owner 的 editor。Java `Cache.close()` 只清理对应 handle，不影响同 Worker 的其他 Cache 实例。
 - `put` 的真实 IDB request failure 等到事务 abort/回滚结束后，再以独立小事务按 editor、Worker/Java handle 和 generation 清理；原始失败仍向调用方报告。清理不会删除期间替换的 editor、owner 或 generation。
 - begin 在第一个异步等待前登记 pending attempt，close/delete 同步失效同 handle 的在途 attempt；主事务复查，避免关闭后迟到 begin 重建锁。Java delete 先标记 closed，再发送明确的 delete 操作；evictAll 仍为 clear，不关闭 handle。完成后即删除跟踪记录，不保留无限增长的 closed handle 历史表。
-- 独立正式浏览器入口为 `packages/runtime-host/test/cache-lifecycle-browser-suite.ts` 和 `cache-lifecycle-worker.ts`；由正式 `compileBridge('cache')` 产物驱动，使用真实 Worker、IndexedDB 和 Web Locks。
+- 当时独立浏览器入口为 `packages/runtime-host/test/cache-lifecycle-browser-suite.ts` 和 `cache-lifecycle-worker.ts`，由 `compileBridge('cache')` 驱动真实 Worker、IndexedDB 和 Web Locks；这些入口现已退役。当前官方 Browser 场景见 [Vite 计划](vite-build-and-testing.md)，其覆盖不自动等同全部历史门。
 
 验收：A 写入完整条目后 begin 新 editor，活 A 期间 B 竞争失败；terminate A 后 B 立即 begin 成功，旧完整字节/版本保留，旧 editor 无法提交；活 Worker 锁不被误清理；并发唯一 editor、Java handle close、CAS 和 clear generation 均保持有效。附加门以真实 IndexedDB `ConstraintError` 触发产品事务 abort，验证旧完整条目不变、活 Worker 的下一次 begin 成功，及清理期间替代 editor/真实活 owner/新 generation 不被误删；另以受控 Web Locks 探测延迟验证 close/delete 先完成时在途 begin 被拒绝，clear 后原活 handle 仍可 begin。故障与延迟只由测试 driver 注入，存储和锁仍使用浏览器标准实现。严格类型检查使用 `pnpm typecheck:bridges`。临时服务和原始报告留在忽略目录，不作为维护源码。
 

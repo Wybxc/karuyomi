@@ -11,7 +11,11 @@ export default defineConfig({
             'packages/*/test/**/*.test.ts',
             'runtime/image-codec/test/**/*.test.ts',
           ],
-          exclude: ['apps/api/test/state-workerd.test.ts'],
+          exclude: [
+            'apps/api/test/state-workerd.test.ts',
+            'apps/api/test/*-worker.test.ts',
+            '**/*.browser.test.ts',
+          ],
           environment: 'node',
         },
       },

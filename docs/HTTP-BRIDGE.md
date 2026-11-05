@@ -163,56 +163,46 @@ The bridge still passes its abort signal explicitly to upstream fetches. This
 configuration is necessary for cancellation, but is not itself evidence that a
 particular browser or Native request closes its upstream connection.
 
-Local workerd probes read the date, flags and D1 binding from Wrangler's official
-configuration reader. Node adapters use `Readable.fromWeb` with the same abort
-signal as the response pipeline or upload, so cancellation reaches a default
-reader even while its next read is pending. Async-generator cleanup alone cannot
-provide that guarantee. The frame reader only requires the default reader's
-`read`, `cancel` and `releaseLock` methods; it does not require platform-specific
-BYOB or pipe transforms.
+Current Workers tests use the Cloudflare official Vitest integration and real
+D1 migrations. Their outbound requests use the official MSW integration. No
+custom socket adapter is part of the current regression entry point. The frame
+reader requires only the default reader's `read`, `cancel` and `releaseLock`
+methods; it does not require platform-specific BYOB or pipe transforms.
 
 ## Regression checks
 
 ```sh
-pnpm exec vitest run packages/contracts/test/http-frames.test.ts apps/api/test/http-probe-streams.test.ts
+pnpm test
 pnpm --filter @karuyomi/contracts typecheck
-pnpm test:http-bridge
 ```
 
-Tests cover byte-level splitting, an input chunk larger than a frame, no
-background prefetch, partial-buffer transfer, UTF-8 byte budgets, length checks
-before payload reads, both terminal forms, exact u64 counts, trailing data,
-malformed input and pending-read cancellation. Adapter queue limits, actual
-network cancellation and HTTP response semantics require their own integration
-tests. `test:http-bridge` runs real workerd against a controlled local HTTP
-origin with actual gzip/Brotli bytes, signed test JWTs and isolated D1 state.
-It checks decoding, repeated cookies, status/body rules, streamed uploads,
-early-response validation and connection cancellation without internet or JVM
-dependencies. This integration is part of `pnpm check`; it is not evidence of
-real Source behavior or a production Access session.
+The root test command first builds runtime and test fixtures with Vite CLI, then
+runs Node and official Workers Vitest projects. Frame tests cover byte-level
+splitting, oversized transport chunks, partial-buffer transfer, UTF-8 budgets,
+length validation, terminal forms, exact u64 counts, trailing data, malformed
+input and pending-read cancellation. [Workers HTTP tests](../apps/api/test/http-worker.test.ts)
+exercise the real route, RS256 verifier and D1 policy with controlled outbound
+responses: status/body rules, cookies, Range, uploads, form data, truncation,
+deadlines and consumer cancellation. Gzip uses actual compressed bytes; the
+Brotli case checks an already decoded response boundary and does not establish
+real network decompression.
 
-The client connects to the user Worker socket with pinned Undici. The controlled
-origin uses a separate Worker with `enable_request_signal` and
-`request_signal_passthrough`, then a native external HTTP proxy binding. This
-avoids Miniflare's generated Node-handler Worker, whose independent compatibility
-settings can hide an idle origin's cancellation. Product authentication and
-target checks still run unchanged. Cloudflare documents the incoming-signal and
-[subrequest passthrough flags](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#passthrough-abortsignal-of-incoming-request-to-subrequests)
-separately.
+MSW cancellation checks observe the simulated upstream signal. They do not
+prove a remote origin's TCP connection closed, nor actual HTTP/2 or HTTP/3
+cancellation. Source behavior, production Access and Native requests remain
+separate acceptance gates; coverage is tracked in the [Vite plan](plan/vite-build-and-testing.md).
 
-Cancellation cases use a 30-second request deadline and require an active origin
-to close within one second, measured from the cancellation action through both
-local completion and origin closure. They cover ordinary body cancellation and
-AbortSignal while the origin is sending data, plus explicit TCP reset while the
-origin is paused after its first block. The idle cases identify that reset in
-their names and report. Ordinary local `destroy()` alone did not promptly notify
-the idle peer in a separate controlled comparison; it is not evidence of a TCP
-reset or remote cancellation. These are loopback HTTP/1 gates, not production
-HTTP/2, HTTP/3 or browser-to-origin evidence.
+## Historical socket evidence
 
-The independent [shared Java Cache failure gate](verification/cache-http-failures.md)
-passes 50 checks on both the untouched original JVM and actual TeaVM in Chromium
-156, including truncated bodies and cancellation after an exact 8192-byte prefix.
-It separately observes two real relay TCP resets and all four origin response
-closures. This is a manual loopback HTTP/1 gate with a signed test identity; it
-does not establish production HTTP/2, HTTP/3, Access, Source or Native cancellation.
+The custom HTTP/socket probes and their commands were retired on 2026-11-05.
+Their original code remains available at the
+[historical commit](https://github.com/Wybxc/karuyomi/tree/f623a8263c87ac198ff3882fd3eade1072e6abfc/apps/api/test).
+Earlier loopback HTTP/1 runs used a user Worker socket, a controlled origin and
+explicit TCP reset while the origin was idle. Those fixed-input results remain
+in [Source cancellation](verification/source-cancellation-web.md) and
+[Java Cache failures](verification/cache-http-failures.md), including the
+untouched JVM/TeaVM comparison. They do not become current regression coverage
+merely because the route now has official fixture tests. Ordinary local stream
+destruction was not evidence of remote cancellation in those runs. Current
+Source, production Access, Native and real connection-close behavior require
+their own fresh evidence.

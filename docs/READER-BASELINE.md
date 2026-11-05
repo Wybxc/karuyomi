@@ -8,12 +8,14 @@
 
 ```sh
 pnpm --filter @karuyomi/runtime-host build
-node scripts/assemble-native-assets.ts
+pnpm build:native-assets
 pnpm flutter:setup
 node scripts/flutter.ts build \
   --dart-define=READER_BASELINE=true \
   --dart-define=BASELINE_REVISION=<完整提交号>
 ```
+
+运行采集还需要可正常登录、访问 Source 和保存业务状态的后端。旧 Source 测试服务已退役；历史本地采集命令仅对原固定 checkout 有效，当前工程 fixture 不提供完整 Source/Native 测量链。当前入口见 [Vite 计划](plan/vite-build-and-testing.md)。
 
 通过正式 Flutter 入口使用“性能采集”。在需要测量的操作之前打开面板、开始采集并收起面板，正常进入章节、跳页或滚动，再打开面板停止。停止后最多等待 1.5 秒接收已开始帧的计时。使用“查看摘要”确认事件、帧数与截断状态；面板只显示最多 1024 字符的预览，不布局完整报告。Web 和 Native 均提供“复制 JSON”，Web 另保留“下载 JSON”。`3d7684c` 的 Web 实测中，按钮显示“已请求复制 JSON”，但 Codex 内置浏览器剪贴板接口读到空字符串；自动获取链尚未通过，不能据此宣称已解决下载确认问题。后续需实现并验证无需逐次下载确认的数据获取方式；当前按用户要求先补 P0 功能，暂停新增采集。“已请求下载”只表示调用已发起，必须另行检查实际文件存在、可解析且包含完整正文。默认每次最多 60 秒、12,000 个事件及 12,000 个帧样本；触及限额的报告标为 truncated。关闭应用会撤销计时回调、定时器与本次下载的 Blob URL。
 

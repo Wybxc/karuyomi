@@ -1,5 +1,7 @@
 # Cache v3 材料的三源在线复验
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，主代理使用 Codex 内置浏览器 Chromium 156，验证固定提交 `31555e8e367405501b7f485f534f533e0299a6cd` 的 xkcd、Arknights Comics 与 CuuTruyen。三源均通过真实元数据、原 Source 图片处理、浏览器解码及资源释放门；这不是 Cache 冷热命中、运行中取消、完整连续阅读、生产 Access 或 Native 验收。
 
 ## 固定输入

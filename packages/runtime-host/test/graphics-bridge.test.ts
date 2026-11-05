@@ -1,4 +1,4 @@
-/** Controlled codec timing tests; real Canvas correctness lives in bridge-browser-suite. */
+/** Controlled codec timing tests; real Canvas semantics run in browser/bridges.browser.test.ts. */
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createGraphicsBridge } from '../../../runtime/teavm/bridge/graphics-bridge.js';
 import { deferred, pngHeader } from './image-fixtures.js';

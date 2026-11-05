@@ -86,13 +86,15 @@ pnpm image-codecs:check --build runtime/image-codec/.local/build/<identity>
 
 此前 Web catalog、Native host 内嵌以及独立 `assets/image-codec/` 目录的装配均为已撤回的中间接线。候选退出默认材料与应用打包；若后续性能证据支持采用，再明确接入共享 Web Static Assets 或 Native 随应用资源，不能通过 Source host 隐式消费。
 
-独立浏览器验收工具显式装配候选 catalog、client、loader 与 Worker：
+候选 JavaScript 通过独立声明式 Vite 配置生成，不进入默认产品材料：
 
 ```sh
-pnpm image-codecs:check-worker --output .local/image-codec-worker/acceptance
+pnpm --filter @karuyomi/runtime-host build:image-codecs
 ```
 
-CLI 准备夹具和增量逐 tile Node 基准后提供 localhost URL；使用 Codex 内置浏览器点击运行，报告保存在同一忽略目录。工具检查四幅长图与高熵最大条带的全部 PNG SHA/几何、pull/ACK、取消、截尾和恢复，只保留首/中/末三幅预览；不会积存整图 raster。独立 Sharp 像素正确性由另行执行的 24 项 Node 门提供。通过页面关闭服务或 SIGINT 退出，服务还有有界存活期限。`--prepare-only` 只准备；可选 `--build <directory>` 校验并使用本地 builder 目录。
+输出为 `packages/runtime-host/.local/image-codecs/{client.js,worker.js}`。候选 JavaScript 与下述 portable C/C++ 产物独立准备、验证，不合并到产品的 `materials.json`，也不存在材料收集 API。
+
+原 `image-codecs:check-worker` 自定义浏览器 runner 已于 2026-11-05 退役。历史长图 PNG 摘要、几何、ACK/pull、取消、截尾及恢复结果仍保留在[codec 验证](../../docs/verification/long-image-codec.md)，其命令只适用于原固定 checkout。当前官方 Browser 桥测试不等价于完整候选长图验收；候选新产物的浏览器、Native 和直接解码性能对照仍待单独执行。当前构建与测试入口见 [Vite 计划](../../docs/plan/vite-build-and-testing.md)。
 
 ## 供显式候选验证使用的固定产物
 

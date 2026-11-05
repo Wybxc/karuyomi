@@ -17,6 +17,8 @@
 - 使用仓库固定的 Node、pnpm、Flutter/Dart 版本：`.node-version`、`package.json`、`.fvmrc` 是版本依据。安装依赖运行 `pnpm install --frozen-lockfile`。
 - 安装提交检查：`pnpm hooks:install`；全库手动检查：`pnpm hooks:check`。
 - 通用检查：`pnpm check`；Dart/Flutter 检查：`pnpm flutter:check`；完整客户端与 API 构建：`pnpm build`。
+- Web/Worker/运行时 JS 构建使用声明式 Vite 配置与官方 CLI；依赖顺序写在包 scripts，项目特有资源合同放在 Vite 插件 hook。不恢复调用 `build()` / `createBuilder()` 的自有构建器或独立资源组装脚本。Flutter、Java/TeaVM 与 C/C++ 工具链继续使用各自正式工具。
+- Workers 集成测试使用 Cloudflare 官方 Vitest 插件，生成配置与 Static Assets 使用官方 Wrangler harness；浏览器测试使用官方 Vitest Browser，由 Vite 处理 TS/Worker 入口，不维护手工服务器或浏览器 runner。交互验收使用内置浏览器，preview 配置固定 `BROWSER=none`，防止自动打开默认浏览器。
 - TeaVM 工具链、原始 JAR 与 seed 按锁文件准备，入口见 `runtime/teavm/README.md`。准备后运行 `pnpm teavm:check` 验证 Java DTO 与有界 HTTP body。
 - `FLUTTER_ROOT` 可指定 Flutter SDK；原生构建和完整原生格式检查需要 macOS/Xcode。
 

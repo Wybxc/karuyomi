@@ -27,6 +27,6 @@ export default defineConfig({
   ],
   test: {
     name: 'workers',
-    include: ['test/state-workerd.test.ts'],
+    include: ['test/state-workerd.test.ts', 'test/*-worker.test.ts'],
   },
 });

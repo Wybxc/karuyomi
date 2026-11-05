@@ -1,5 +1,7 @@
 # 实际 TeaVM 的 enqueue 与 RPC owner
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-05，Codex 内置 Chromium 156 使用项目正式 TeaHost、BrowserCall 和二进制 HTTP transport，执行受控 Source 的嵌套回调、异常、取消与跨 RPC 所有权分项。浏览器报告与 Node 后处理均通过，命令退出 0。产品运行时代码固定为 `1f599cd`；三个官方 Source 的独立在线证据见[v4 运行记录](v4-source-runtime.md)。
 
 ## 输入与范围

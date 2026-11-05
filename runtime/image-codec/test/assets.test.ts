@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { digest } from '../../../packages/runtime-host/materials.ts';
+import { createHash } from 'node:crypto';
 import {
   createImageCodecAssetProvider,
   prepareImageCodecAssets,
@@ -22,7 +22,7 @@ function fixture() {
     'encoder.wasm',
   ]) {
     const bytes = new TextEncoder().encode('Fixture ' + name);
-    const sha256 = digest(bytes);
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
     const contentType = name.endsWith('.wasm')
       ? 'application/wasm'
       : 'application/javascript';

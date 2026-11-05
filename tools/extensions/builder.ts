@@ -19,7 +19,7 @@ import writeFileAtomic from 'write-file-atomic';
 import isRecord from 'is-plain-obj';
 import { z } from 'zod';
 import { buildManifestSchema } from '../../packages/contracts/src/index.ts';
-import { collectMaterials } from '../../packages/runtime-host/materials.ts';
+import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import { prepareRuntime, LOCK } from '../teavm/runtime.ts';
 import type { PreparedRuntime } from '../teavm/runtime.ts';
 import { prepareSources } from '../teavm/upstream-sources.ts';
@@ -155,7 +155,17 @@ export function put(
 }
 
 export async function materialCatalog() {
-  const { catalog } = await collectMaterials({ includeWasmBytes: false });
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      readFileSync(
+        new URL(
+          '../../packages/runtime-host/dist/materials.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ),
+  );
   const bytes = Buffer.from(JSON.stringify(catalog, null, 2) + '\n');
   return {
     catalog,

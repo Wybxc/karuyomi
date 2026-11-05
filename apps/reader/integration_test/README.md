@@ -1,11 +1,13 @@
 # Native 服务端同步集成测试
 
+> 入口状态（2026-11-05）：Flutter 官方测试驱动保留；原 Source HTTP/HTTPS 配套服务已退役。下列命令是驱动使用模板，当前源码不能再按旧服务说明直接复验。新的官方 Workers/Browser fixture 尚未提供同等 Source + Native 完整在线链路，不能据工程测试将此门标为通过。当前重构见 [Vite 计划](../../../docs/plan/vite-build-and-testing.md)。
+
 `server_sync_test.dart` 通过 Flutter 官方 `integration_test` 启动正式 `app.main()`，使用真正的 Native WebView、内置运行时材料、Source、阅读 UI 和业务 API。它不注入测试 PlatformRuntime、内存业务服务或图片 supplier。
 
 ## 前置条件
 
 1. 准备当前 xkcd v4 构建、Native 内置材料与正式 Web 构建，入口见仓库构建说明。
-2. 按 [Source 测试服务](../../api/test/source-metadata-probe.md)启动同一进程的 HTTP/HTTPS 监听。它们共享一个真实 workerd/D1；HTTP 供 Codex 内置浏览器，HTTPS 供 Native。两条测试 origin 是明确的测试代理别名，不代表生产 Access/Cookie 验收。
+2. 准备支持当前 Source HTTP、业务 API、同一身份和同一 D1 的测试后端，Web 与 Native 均需正常访问。原[Source 测试服务](../../api/test/source-metadata-probe.md)曾在同一进程提供 HTTP/HTTPS 代理别名，现仅保留历史说明；当前官方 fixture 不自动替代它，也不证明生产 Access/Cookie 行为。后端恢复前，本目录完整在线验收保持未完成。
 3. Native 必须正常信任 HTTPS 证书。建议创建可丢弃模拟器，只向该设备添加本轮测试 CA；不修改产品 TLS、Mac 全局信任或已有设备信任，不接受证书错误。
 4. 从内置浏览器的正式 UI 收藏英文 xkcd。初次运行测试前保留第 1 页进度或尚无进度；测试从服务端书架进入该作品。
 

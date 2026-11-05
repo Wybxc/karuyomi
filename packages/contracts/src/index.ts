@@ -7,3 +7,4 @@ export * from './http-frames.ts';
 export * from './image-control.ts';
 export * from './image-frames.ts';
 export * from './business-state.ts';
+export * from './runtime-materials.ts';

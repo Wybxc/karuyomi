@@ -1,5 +1,7 @@
 # 普通文件运行证据
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，当前普通文件实现完成二进制分块、typed idb、inode、配额与 owner 生命周期。以下三个测试层级独立记录；均不代表正式 Source、Native 或性能验收。设计见[普通文件存储](../design/runtime-file-storage.md)，后续门见[运行时存储计划](../plan/runtime-storage.md)。
 
 ## 浏览器桥机制

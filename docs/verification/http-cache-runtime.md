@@ -1,5 +1,7 @@
 # HTTP Cache 运行证据
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04。正文分块、Cache 生命周期、namespace 总预算与共享 Java 场景已通过以下门；同一 namespace 的 Cache/files 组合压力、正式 Source、生产 Access 和 Native Cache 仍须分别验收。普通文件分层机制见[文件运行证据](file-storage-runtime.md)，固定分区合同见[Cache 存储设计](../design/runtime-cache-storage.md)。不能把本记录作为整个存储或阅读能力完成的证明。
 
 ## 正式维护入口

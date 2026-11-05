@@ -5,7 +5,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { collectMaterials } from '../../packages/runtime-host/materials.ts';
+import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import type {
   BuildManifest,
   ExtensionIndex,
@@ -47,7 +47,17 @@ export async function verifyMetadata(
   if (manifest.hostScripts.length || manifest.resources.length) {
     const catalog =
       materialCatalog ??
-      (await collectMaterials({ includeWasmBytes: false })).catalog;
+      runtimeMaterialCatalogSchema.parse(
+        JSON.parse(
+          await readFile(
+            new URL(
+              '../../packages/runtime-host/dist/materials.json',
+              import.meta.url,
+            ),
+            'utf8',
+          ),
+        ),
+      );
     verifyMaterialReferences(manifest, catalog);
   }
   return manifest;

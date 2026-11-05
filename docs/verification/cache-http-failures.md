@@ -1,5 +1,7 @@
 # Java HTTP Cache 截断与取消验证
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，官方原 JVM 与实际 TeaVM 在 Codex 内置 Chromium 156 各通过同一份四场景、50 项 Java 断言；最终正式 runner 退出 0，连接关闭检查也全部通过。本门独立于[HTTP Cache 历史场景](http-cache-runtime.md)的 18/13/7/8 计数，不修改或合并历史结果。它验证受控 HTTP，不代表正式 Source、生产 Access 或 Native 已通过相同取消门。
 
 ## 场景与实际链路
@@ -34,7 +36,7 @@ TeaVM 从当前维护模板生成忽略的临时工程，使用正式 `prepareSo
 
 ## 复验与失败报告
 
-准备仓库锁定 Node、依赖、JVM 工具链和 seed 后，在当前 checkout 运行：
+以下为历史复验命令：仅在原固定 checkout 准备该版 Node、依赖、JVM 工具链和 seed 后运行；当前源码已删除这些专属夹具和 runner。历史实现见 [f623a82](https://github.com/Wybxc/karuyomi/tree/f623a8263c87ac198ff3882fd3eade1072e6abfc/tools/teavm)。
 
 ```sh
 node apps/api/test/cache-http-probe.ts --port 0 --timeout-ms 300000
@@ -42,7 +44,7 @@ node apps/api/test/cache-http-probe.ts --port 0 --timeout-ms 300000
 node apps/api/test/cache-http-probe.ts --jvm-only
 ```
 
-复用入口只维护 fixture、oracle、受控 origin 和 API 编排，不提交生成的 Maven 工程、下载 JAR、缓存或产物。它只编译当前官方桥，不保留选择旧桥的分支；历史输入应在固定 Git checkout 复验。两份 Java 入口分别是 `CacheFailureOracle.java` 和 `fixtures/cache-failure/CacheFailureProbe.java`，浏览器 driver 为 `packages/runtime-host/test/cache-failure-java-browser-worker.ts`。严格检查为 `pnpm typecheck:tools`、`pnpm exec tsc -p packages/runtime-host/test/tsconfig.bridge-browser.json` 与 `pnpm check:dependencies`。
+历史复用入口当时维护 fixture、oracle、受控 origin 和 API 编排，不提交生成的 Maven 工程、下载 JAR、缓存或产物。它只编译当前官方桥，不保留选择旧桥的分支；历史输入应在固定 Git checkout 复验。两份 Java 入口分别是 `CacheFailureOracle.java` 和 `fixtures/cache-failure/CacheFailureProbe.java`，浏览器 driver 为 `packages/runtime-host/test/cache-failure-java-browser-worker.ts`。严格检查为 `pnpm typecheck:tools`、`pnpm exec tsc -p packages/runtime-host/test/tsconfig.bridge-browser.json` 与 `pnpm check:dependencies`。
 
 每次运行在准备/编译前写入新的失败初态。最终报告位于忽略的 `.local/cache-failure-http/browser-report.json`，含实际脚本、共享 Java、Java bundle、Worker 和桥摘要；原 JVM 报告在同目录 `jvm-report.json`。成功退出 0。未打开浏览器的实际 `--timeout-ms 1000` 门退出 1，写入 deadline exceeded，并经异步 finally 清理；SIGTERM 的真实门在 stdout URL ready 后发送一次信号，写入明确 interrupted、本轮 identity，然后按锁定 Miniflare 自身 exit-hook 退出 143。该信号路径不声称执行了 runner 的异步 finally，也不承诺编译中立即停止 Maven；独立 TCP 检查确认 harness、workerd API、origin 三个端口均 ECONNREFUSED。
 

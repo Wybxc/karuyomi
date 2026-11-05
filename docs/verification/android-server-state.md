@@ -1,5 +1,7 @@
 # Android 服务端状态与 Native 配对验证
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-05：正式 Flutter 入口已通过测试身份下的 Web↔Android、iOS↔Android 非默认页恢复，以及 Native 正式阅读和 D1 保存。四次 Android、两次 iOS 官方集成测试各 1/1 通过，新 Web 会话实际恢复 Android 保存的第 2 页。Native HTTPS 观测未见共享材料网络回退；本轮后台进程、端口与临时设备目录已完成清理复核。本记录不代表完整 P1/P2、生产 Access 或真机验收。
 
 ## 输入与测试边界

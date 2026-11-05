@@ -1,5 +1,7 @@
 # Web 与 iOS 服务端状态验证
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-05：正式 Flutter 入口已完成本地真实 workerd/D1 下的 Web 收藏、iOS 阅读保存、Web 非默认页续读及回看保存。首轮两次 iOS 官方集成测试通过；随后独立隔离 run 从 Web 保存第 2 页，全新 Native 恢复第 2 页并回看保存第 1 页，通过第三次集成测试，补齐 Web↔iOS 双向非默认位置恢复。完整 P1/P2、生产 Access、Android 配对与真机仍待验收。
 
 ## 输入、身份与环境

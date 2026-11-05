@@ -15,6 +15,7 @@
 git submodule update --init --recursive
 node scripts/prepare-runtime.ts --android
 node tools/teavm/check-dto.ts
+pnpm --filter @karuyomi/runtime-host build:materials
 node scripts/build-extension.ts --descriptor PATH_TO_DESCRIPTOR --output PATH_TO_OUTPUT
 ```
 
@@ -34,13 +35,15 @@ Source 的默认网络配置由 owned `eu/kanade/tachiyomi/network/NetworkHelper
 
 正式图片通道保留原 Java Page 与 Source 图片处理链，经有界二进制通道交付不透明编码字节。Web 使用受管 Blob URL，Android/iOS 交接受管临时文件，再由同一 Flutter 图片入口识别、解码和显示；宿主不读取 MIME、尺寸或方向，不预解码。取消、generation、字节预算和释放确认分别由对应 owner 落实，详见[图片资源合同](../../docs/IMAGE-RESOURCES.md)及 [Native 文件合同](../../docs/NATIVE-IMAGE-FILES.md)。
 
-正式浏览器/网络集成回归使用产品 JS、直接静态 gzip、真实 workerd 与仅含网络策略的隔离 D1，并在独立测试入口验证 RS256 测试签名：
+当前工程回归使用声明式 Vite 预构建、Cloudflare 官方 Workers Vitest/Test Harness，以及官方 Vitest Browser Preview：
 
 ```sh
-pnpm --filter @karuyomi/runtime-host build
-node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
+pnpm test
+BROWSER=none pnpm test:browser
 ```
 
-打开脚本输出的 localhost 页面运行。它核对清单/hash 与实际 `hostInit/hostLoad`，再尝试真实漫画资料操作；设置 `SOURCE_PROBE_IMAGES=1` 可验证原 Source 图片处理、浏览器解码和资源释放。当前 v4 的三源分项见 [v4 运行记录](../../docs/verification/v4-source-runtime.md)；入口参数、历史上游挑战与搜索行为见 [集成回归说明](../../apps/api/test/source-metadata-probe.md) 与 [实测摘要](../../docs/verification/runtime-evidence.md)。测试签名不替代生产 Access，浏览器分项不替代 Native、真机或完整阅读验收。
+浏览器测试用 Codex 内置浏览器打开 Preview 报告的 URL。旧 Source HTTP/HTTPS 服务、自定义 socket/HTTP 探针和浏览器 runner 已退役；旧命令仅适用于记录中的历史 checkout。当前官方 fixture 覆盖不等于指定 AOT 的 `hostInit/hostLoad`、真实漫画资料操作或 Source 图片处理验收，也尚未替代 Native 完整在线门。构建与覆盖见 [Vite 计划](../../docs/plan/vite-build-and-testing.md)。
 
-独立字节、回调与 iOS 研究工程和旧导入/构建脚本只保留在被忽略的 `.local/research/`。必要基线摘要、关键门槛与已知失败已归并到 [验证要点](../../docs/verification/runtime-evidence.md)，其中 R2/v1 记录属于历史机制证据。当前 Java、Worker 和 API 只维护 HTTP v2，已有分帧、Okio 按需消费及受控 workerd 网络取消回归；真实 Source/Cache 同版对照、图片资源、移动端内存和产品实测仍按 [HTTP 桥](../../docs/HTTP-BRIDGE.md) 与 [VERIFICATION](../../docs/VERIFICATION.md) 单独验收，不能据机制测试宣称 P0-B 完成。
+历史 v4 三源分项见 [v4 运行记录](../../docs/verification/v4-source-runtime.md)；退役入口、上游挑战及搜索行为见 [历史集成说明](../../apps/api/test/source-metadata-probe.md)与[实测摘要](../../docs/verification/runtime-evidence.md)。原日期、材料与结果保留，测试签名仍不替代生产 Access，浏览器分项不替代 Native、真机或完整阅读验收。
+
+独立字节、回调与 iOS 研究工程和旧导入/构建脚本只保留在被忽略的 `.local/research/`。必要基线摘要、关键门槛与已知失败已归并到 [验证要点](../../docs/verification/runtime-evidence.md)，其中 R2/v1 记录属于历史机制证据。当前 Java、Worker 和 API 只维护 HTTP v2，已有分帧、Okio 按需消费及历史受控 workerd 网络取消证据；当前官方 Workers 回归的取消覆盖使用模拟 upstream，不证明真实 TCP reset；真实 Source/Cache 同版对照、图片资源、移动端内存和产品实测仍按 [HTTP 桥](../../docs/HTTP-BRIDGE.md) 与 [VERIFICATION](../../docs/VERIFICATION.md) 单独验收，不能据机制测试宣称 P0-B 完成。

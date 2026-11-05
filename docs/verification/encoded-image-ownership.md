@@ -1,5 +1,7 @@
 # 编码页与分片所有权
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04：`EncodedImage`、Source 接收链、TS / Dart 控制解析及独立 `ImageTileStore` 已实现。这是长图产品接线的中间层；Reader 仍使用完整图路径，真实 Source 长图、Native codec 执行、方向显示和进程 / GPU 峰值尚未验收。当前控制身份仍为 protocolVersion 2 / host ABI v3，Java 图片桥原样传递描述；新代码、协议和依赖进入新的 host / material 输入身份，不修改旧 AOT checkpoint。
 
 ## 工程与所有权边界

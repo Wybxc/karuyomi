@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
-import { lstat, open } from 'node:fs/promises';
+import { lstat, open, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
+import { TextDecoder } from 'node:util';
 import * as contracts from '../../packages/contracts/src/index.ts';
 import type {
   Artifact,
@@ -16,7 +17,6 @@ import type {
   ValidationReport,
   VerifiedPayload,
 } from './types.ts';
-import { collectMaterials } from '../../packages/runtime-host/materials.ts';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -344,10 +344,27 @@ export async function verifyIntegrity(
     });
     const hasMaterials =
       manifest.hostScripts.length + manifest.resources.length > 0;
-    const materials = hasMaterials ? await collectMaterials() : undefined;
-    if (materials) verifyMaterialReferences(manifest, materials.catalog);
+    const catalog = hasMaterials
+      ? contracts.runtimeMaterialCatalogSchema.parse(
+          JSON.parse(
+            await readFile(
+              new URL(
+                '../../packages/runtime-host/dist/materials.json',
+                import.meta.url,
+              ),
+              'utf8',
+            ),
+          ),
+        )
+      : undefined;
+    if (catalog) verifyMaterialReferences(manifest, catalog);
     for (const artifact of [...manifest.hostScripts, ...manifest.resources]) {
-      const bytes = materials?.data.get(artifact.sha256)?.bytes;
+      const bytes = await readFile(
+        new URL(
+          '../../packages/runtime-host/dist/materials/' + artifact.sha256,
+          import.meta.url,
+        ),
+      );
       if (!bytes || bytes.length !== artifact.size)
         throw new VerificationFailure(
           'size_mismatch',
@@ -402,88 +419,4 @@ export async function verifyIntegrity(
     report.failure = failure(error);
     return { report };
   }
-}
-
-export function completeBrowserValidation(
-  base: ValidationReport,
-  input: unknown,
-  networkAttempts: number,
-): ValidationReport {
-  const value = isRecord(input) ? input : {};
-  const report = structuredClone(base);
-  report.browser = {
-    userAgent: typeof value.userAgent === 'string' ? value.userAgent : '',
-    indexedDb: value.indexedDb === true,
-    networkAttempts,
-  };
-  if (networkAttempts > 0) {
-    report.stages.browserLoad = 'passed';
-    report.stages.workerInit = 'failed';
-    report.failure = {
-      code: 'network_required',
-      message:
-        'Initialization attempted an HTTP bridge request; release initialization validation does not permit Source network access',
-    };
-    return report;
-  }
-  if (
-    !/(?:Chrome|Chromium)\/\d+/.test(report.browser.userAgent) ||
-    value.indexedDb !== true
-  ) {
-    report.stages.browserLoad = 'failed';
-    report.failure = {
-      code: 'browser_environment',
-      message: 'A real Chromium browser with working IndexedDB is required',
-    };
-    return report;
-  }
-  report.stages.browserLoad = 'passed';
-  const session = contracts.runtimeSessionSchema.safeParse(value.session);
-  const hello = contracts.runtimeHelloSchema.safeParse(value.hello);
-  const browserFailure = isRecord(value.failure) ? value.failure : {};
-  const sources = session.success ? session.data.sources : undefined;
-  const ids = sources?.map((source) => source.id) ?? [];
-  if (
-    !sources ||
-    !hello.success ||
-    !session.success ||
-    value.failure ||
-    value.buildId !== base.buildId ||
-    value.manifestSha256 !== base.manifestSha256 ||
-    hello.data.protocolVersion !== base.protocolVersion ||
-    hello.data.hostAbi !== base.hostAbi ||
-    hello.data.runtimeBaseline !== base.runtimeBaseline ||
-    hello.data.sourceReady !== false ||
-    session.data.protocolVersion !== base.protocolVersion ||
-    session.data.buildId !== base.buildId ||
-    new Set(ids).size !== ids.length ||
-    JSON.stringify([...ids].sort()) !==
-      JSON.stringify([...(base.sourceIds ?? [])].sort())
-  ) {
-    report.stages.workerInit = 'failed';
-    report.failure = {
-      code:
-        typeof browserFailure.code === 'string'
-          ? browserFailure.code
-          : 'worker_init_failed',
-      message:
-        typeof browserFailure.message === 'string'
-          ? browserFailure.message.slice(0, 2000)
-          : 'Real Worker initialization or Source identity validation failed',
-    };
-    return report;
-  }
-  report.valid = true;
-  report.runtimeReady = true;
-  report.stages.workerInit = 'passed';
-  report.capabilities.push(
-    'chromium-worker-initialized',
-    'indexeddb-available',
-    'manifest-source-identities',
-  );
-  report.sources = sources;
-  delete report.failure;
-  report.scope =
-    'Real Chromium Worker hostInit/hostLoad with IndexedDB and verified local artifacts. No live Source operations, private network or production Access validation; online compatibility remains untested.';
-  return report;
 }

@@ -195,7 +195,10 @@ test('candidate codec sources, artifact locks and caches stay outside the Source
   f.put('runtime/teavm/bridge/graphics-bridge.ts', 'changed Source bridge\n');
   const bridgeChanged = hostFingerprint(f.root).fingerprint;
   assert.notEqual(bridgeChanged, before);
-  f.put('packages/runtime-host/materials.ts', 'changed Source materials\n');
+  f.put(
+    'packages/runtime-host/vite.runtime-plugin.ts',
+    'changed Source materials\n',
+  );
   assert.notEqual(hostFingerprint(f.root).fingerprint, bridgeChanged);
 });
 

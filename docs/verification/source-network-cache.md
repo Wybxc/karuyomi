@@ -1,5 +1,7 @@
 # Source 默认 HTTP Cache 配置
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 状态：**宿主配置已修复；新固定 AOT 的原 xkcd Source 已在 Web 实测 metadata fresh Cache 正文复用及实际 manager/Worker 销毁重建后的复用；同一 AOT 的 iOS / Android 模拟器正式 Native runtime 亦已通过冷热与容器重建复用**。双端分层证据见[原 Source Native Cache](source-cache-native.md)。本轮没有发生 304，图片保持原 cacheless 行为。本项不替代 [Cache 正文与失败语义](http-cache-runtime.md)、[namespace 机制门](cache-v3-native.md) 或 [31555e8 三源在线门](cache-v3-sources.md)。
 
 ## 已复现的缺口

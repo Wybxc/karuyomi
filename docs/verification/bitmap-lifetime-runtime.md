@@ -1,5 +1,7 @@
 # Bitmap 所有权与自然回收
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 ## 实现与边界
 
 Bitmap 现在实际持有 opaque JSO lease，取 surface ID 时同步验证该对象确由 bridge 创建，并通过 WeakRef.deref 保持本 JavaScript job 的活引用。Surface Map 只弱持 lease；FinalizationRegistry 的 held value 只有单调 surface ID，回调仅执行同步、幂等 retire，不进入 Fiber/异步 Java 桥。Canvas 保持对 Java Bitmap 的正常强引用。

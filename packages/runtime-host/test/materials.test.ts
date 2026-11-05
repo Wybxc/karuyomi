@@ -1,187 +1,140 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { buildManifestSchema } from '@karuyomi/contracts';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+import { readFile, readdir } from 'node:fs/promises';
+import { Script } from 'node:vm';
+import { z } from 'zod';
 import {
-  collectMaterials,
-  digest,
-  nativeMaterialGroups,
-  prepareMaterials,
-} from '../materials.ts';
-import { prepareImageCodecArtifacts } from '../../../tools/images/artifacts.ts';
-
-vi.mock('../../../tools/images/artifacts.ts', () => ({
-  prepareImageCodecArtifacts: vi.fn(() => {
-    throw new Error('Default builds must not prepare candidate codecs');
-  }),
-}));
-
-import { imageCodecMaterialFixture } from './image-codec-material-fixture.ts';
+  buildManifestSchema,
+  runtimeMaterialCatalogSchema,
+  type RuntimeMaterialCatalog,
+} from '@karuyomi/contracts';
 import { createNativeMaterialResolver } from '../src/native-materials.js';
 import { VerifiedLoader } from '../src/verified-loader.js';
 import { isNativeControlPage } from '../src/native-location.js';
 import { manifest } from './fixtures.js';
 
-const temporary: string[] = [];
-afterEach(async () => {
-  await Promise.all(
-    temporary
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true })),
+let catalog: RuntimeMaterialCatalog;
+const data = new Map<string, Buffer>();
+beforeAll(async () => {
+  catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL('../dist/materials.json', import.meta.url),
+        'utf8',
+      ),
+    ),
   );
+  for (const artifact of [...catalog.hostScripts, ...catalog.resources])
+    data.set(
+      artifact.sha256,
+      await readFile(
+        new URL('../dist/materials/' + artifact.sha256, import.meta.url),
+      ),
+    );
 });
 
-async function codecFixture() {
-  const directory = await mkdtemp(
-    path.join(tmpdir(), 'karuyomi-codec-materials-'),
-  );
-  temporary.push(directory);
-  return imageCodecMaterialFixture(directory);
-}
-async function currentMaterials(includeWasmBytes = true) {
-  return collectMaterials({
-    includeWasmBytes,
-    includeImageCodecs: true,
-    imageCodecArtifacts: await codecFixture(),
-  });
-}
-
-describe('current runtime materials', () => {
-  it('default product materials exclude candidate codecs without preparing them', async () => {
-    const metadata = await collectMaterials({ includeWasmBytes: false });
-    const full = await collectMaterials();
-    expect(full.catalog).toEqual(metadata.catalog);
-    expect(full.catalog.imageCodecs).toEqual([]);
-    expect(full.catalog.sources.imageCodecs).toBeNull();
-    expect(full.data.size).toBe(6);
-    expect(metadata.data.size).toBe(5);
-    expect(prepareImageCodecArtifacts).not.toHaveBeenCalled();
-  });
-
-  it('compiles deterministic classic JS from TS with the exact npm WASM identity', async () => {
-    const metadata = await currentMaterials(false);
-    const full = await currentMaterials();
-    expect(full.catalog).toEqual(metadata.catalog);
-    expect(full.data.size).toBe(18);
-    expect(metadata.data.size).toBe(14);
-    expect(full.catalog.imageCodecs.map((item) => item.logicalName)).toEqual([
-      'client.js',
-      'worker.js',
-      'png.mjs',
-      'png.wasm',
-      'jpeg.mjs',
-      'jpeg.wasm',
-      'encoder.mjs',
-      'encoder.wasm',
-      'licenses/libspng-LICENSE.txt',
-      'licenses/libjpeg-turbo-LICENSE.md',
-      'licenses/libjpeg-turbo-README.ijg',
-      'licenses/zlib-README',
-    ]);
-    expect(full.catalog.sources.imageCodecs).toEqual({
-      buildIdentity: '1'.repeat(64),
-      abi: 'karuyomi-image-strips-v1',
-      encoderAbi: 'karuyomi-png-tiles-v1',
-    });
-    const worker = full.catalog.imageCodecs.find(
-      (item) => item.logicalName === 'worker.js',
-    )!;
-    expect(full.data.get(worker.sha256)!.bytes.toString('utf8')).not.toMatch(
-      /(?:^|;)\s*import(?:\s|\{)/m,
-    );
-    expect(full.catalog.hostScripts.map((item) => item.logicalName)).toEqual([
+describe('Vite runtime material output', () => {
+  it('contains five classic bridges and the exact npm WASM without candidate codecs', () => {
+    expect(catalog.hostScripts.map((item) => item.logicalName)).toEqual([
       'crypto-bridge.js',
       'zstd-bridge.js',
       'graphics-bridge.js',
       'cache-bridge.js',
       'file-bridge.js',
     ]);
-    expect(full.catalog.resources).toEqual([
+    expect(catalog.resources).toEqual([
       expect.objectContaining({
         logicalName: 'zstd.wasm',
         size: 251806,
         sha256:
           '80260eee5795ee8072bb5821e203730c74dca3909938f5ac1128da67f96223df',
+        contentType: 'application/wasm',
       }),
     ]);
-    for (const [sha256, { bytes }] of full.data)
-      expect(digest(bytes)).toBe(sha256);
-    for (const artifact of full.catalog.hostScripts) {
-      const text = full.data.get(artifact.sha256)!.bytes.toString('utf8');
-      expect(text).not.toContain('import.meta');
-      expect(text).not.toMatch(/^import\s/m);
+    expect(catalog.sources.zstd).toEqual({
+      packageName: '@bokuweb/zstd-wasm',
+      version: '0.0.27',
+      file: 'dist/web/zstd.wasm',
+      sha256:
+        '80260eee5795ee8072bb5821e203730c74dca3909938f5ac1128da67f96223df',
+      size: 251806,
+    });
+    expect(catalog.imageCodecs).toEqual([]);
+    expect(catalog.sources.imageCodecs).toBeNull();
+    expect(data.size).toBe(6);
+  });
+
+  it('emits exactly six hash-addressed files whose bytes match the catalog', async () => {
+    expect(
+      (await readdir(new URL('../dist/materials', import.meta.url))).sort(),
+    ).toEqual([...data.keys()].sort());
+    for (const artifact of [...catalog.hostScripts, ...catalog.resources]) {
+      const bytes = data.get(artifact.sha256);
+      if (!bytes)
+        throw new Error('Missing generated material: ' + artifact.logicalName);
+      expect(bytes.length).toBe(artifact.size);
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+        artifact.sha256,
+      );
+      expect(artifact.path).toBe('/runtime/materials/' + artifact.sha256);
+      if (artifact.contentType === 'application/javascript') {
+        const script = bytes.toString('utf8');
+        expect(script).not.toContain('import.meta');
+        expect(script).not.toContain('data:application/wasm');
+        expect(() => new Script(script)).not.toThrow();
+      }
     }
   });
 
-  it('codec build provenance and artifact changes participate in materialVersion without entering Source preload groups', async () => {
-    const imageCodecArtifacts = await codecFixture();
-    const first = await collectMaterials({
-      includeImageCodecs: true,
-      imageCodecArtifacts,
-    });
-    const second = await collectMaterials({
-      includeImageCodecs: true,
-      imageCodecArtifacts: {
-        ...imageCodecArtifacts,
-        manifest: { ...imageCodecArtifacts.manifest, identity: '2'.repeat(64) },
-      },
-    });
-    expect(second.catalog.materialVersion).not.toBe(
-      first.catalog.materialVersion,
-    );
-    const changed = Buffer.from('Changed packaging fixture: png.mjs');
-    await writeFile(
-      path.join(imageCodecArtifacts.directory, 'png.mjs'),
-      changed,
-    );
-    const third = await collectMaterials({
-      includeImageCodecs: true,
-      imageCodecArtifacts: {
-        ...imageCodecArtifacts,
-        manifest: {
-          ...imageCodecArtifacts.manifest,
-          artifacts: {
-            ...imageCodecArtifacts.manifest.artifacts,
-            'png.mjs': { size: changed.length, sha256: digest(changed) },
-          },
-        },
-      },
-    });
-    expect(third.catalog.materialVersion).not.toBe(
-      first.catalog.materialVersion,
-    );
-    expect(second.catalog.hostScripts).toEqual(first.catalog.hostScripts);
-    expect(second.catalog.resources).toEqual(first.catalog.resources);
-    const codecHashes = new Set(
-      first.catalog.imageCodecs.map((item) => item.sha256),
-    );
-    expect(
-      [...first.catalog.hostScripts, ...first.catalog.resources].some((item) =>
-        codecHashes.has(item.sha256),
+  it('embeds the same six materials into the Native Worker and binds both scripts in its manifest', async () => {
+    const nativeManifest: unknown = JSON.parse(
+      await readFile(
+        new URL('../dist/native/manifest.json', import.meta.url),
+        'utf8',
       ),
-    ).toBe(false);
-  });
-
-  it('Native Source groups contain no client codec assets', async () => {
-    const { catalog } = await currentMaterials();
-    const native = nativeMaterialGroups(catalog);
-    expect(native).toEqual({
-      sourceWorker: [...catalog.hostScripts, ...catalog.resources],
-    });
-    const clientHashes = new Set(
-      catalog.imageCodecs.map((item) => item.sha256),
     );
-    expect(
-      native.sourceWorker.some((item) => clientHashes.has(item.sha256)),
-    ).toBe(false);
-    expect(
-      catalog.imageCodecs.some((item) => item.logicalName === 'client.js'),
-    ).toBe(true);
+    const outputFile = z.object({
+      path: z.string(),
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      size: z.number().int().positive(),
+    });
+    const { files } = z
+      .object({
+        files: z.object({
+          host: outputFile.extend({ path: z.literal('host.js') }),
+          worker: outputFile.extend({ path: z.literal('worker.js') }),
+        }),
+      })
+      .parse(nativeManifest);
+    expect(nativeManifest).toEqual({
+      schemaVersion: 1,
+      protocolVersion: catalog.protocolVersion,
+      hostAbi: catalog.hostAbi,
+      runtimeBaseline: catalog.runtimeBaseline,
+      materialVersion: catalog.materialVersion,
+      files,
+      materials: [...catalog.hostScripts, ...catalog.resources],
+      sources: catalog.sources,
+    });
+    for (const [name, file] of Object.entries(files)) {
+      const bytes = await readFile(
+        new URL('../dist/native/' + file.path, import.meta.url),
+      );
+      expect(bytes.length).toBe(file.size);
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+        file.sha256,
+      );
+      const script = bytes.toString('utf8');
+      expect(script).not.toContain('import.meta');
+      expect(() => new Script(script)).not.toThrow();
+      if (name === 'host') expect(script).toContain(catalog.materialVersion);
+      else
+        for (const material of data.values())
+          expect(script).toContain(material.toString('base64'));
+    }
   });
 
   it('fetches current shared materials only through static Web paths', async () => {
-    const { catalog, data } = await currentMaterials();
     const build = {
       ...(await manifest()),
       hostScripts: catalog.hostScripts,
@@ -189,7 +142,8 @@ describe('current runtime materials', () => {
     };
     expect(buildManifestSchema.safeParse(build).success).toBe(true);
     for (const role of ['hostScripts', 'resources'] as const) {
-      const material = build[role][0]!;
+      const material = build[role][0];
+      if (!material) throw new Error('Expected product material');
       expect(
         buildManifestSchema.safeParse({
           ...build,
@@ -213,29 +167,32 @@ describe('current runtime materials', () => {
           cache: 'force-cache',
           redirect: 'manual',
         });
-        const material = data.get(url.pathname.split('/').pop()!)!;
-        return new Response(new Uint8Array(material.bytes), {
-          headers: { 'content-type': material.contentType },
+        const artifact = [...catalog.hostScripts, ...catalog.resources].find(
+          (entry) => entry.path === url.pathname,
+        );
+        const bytes = artifact && data.get(artifact.sha256);
+        if (!artifact || !bytes) throw new Error('Unexpected material request');
+        return new Response(new Uint8Array(bytes), {
+          headers: { 'content-type': artifact.contentType },
         });
       },
     );
-    for (const artifact of [
-      ...catalog.hostScripts,
-      ...catalog.resources,
-      ...catalog.imageCodecs,
-    ]) {
+    for (const artifact of [...catalog.hostScripts, ...catalog.resources]) {
       const bytes = await loader.sharedArtifact(
         artifact,
         new AbortController().signal,
         artifact.contentType === 'application/javascript',
       );
-      expect(digest(bytes)).toBe(artifact.sha256);
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+        artifact.sha256,
+      );
     }
-    expect(requests).toHaveLength(18);
+    expect(requests).toHaveLength(6);
     expect(requests.every((url) => url.startsWith('/runtime/materials/'))).toBe(
       true,
     );
-    const artifact = catalog.hostScripts[0]!;
+    const artifact = catalog.hostScripts[0];
+    if (!artifact) throw new Error('Expected classic bridge');
     await expect(
       loader.sharedArtifact(
         { ...artifact, path: '/api/extensions/artifacts/' + artifact.sha256 },
@@ -243,86 +200,61 @@ describe('current runtime materials', () => {
         true,
       ),
     ).rejects.toMatchObject({ code: 'integrity_error' });
-    expect(requests).toHaveLength(18);
-  });
-
-  it('writes only current hash-addressed public bytes and a matching catalog', async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), 'karuyomi-materials-'));
-    temporary.push(directory);
-    const { catalog, data } = await prepareMaterials(directory, {
-      includeImageCodecs: true,
-      imageCodecArtifacts: await codecFixture(),
-    });
-    expect((await readdir(directory)).sort()).toEqual([
-      'materials',
-      'materials.json',
-    ]);
-    expect(
-      JSON.parse(
-        await readFile(path.join(directory, 'materials.json'), 'utf8'),
-      ),
-    ).toEqual(catalog);
-    expect((await readdir(path.join(directory, 'materials'))).sort()).toEqual(
-      [...data.keys()].sort(),
-    );
-    for (const artifact of [
-      ...catalog.hostScripts,
-      ...catalog.resources,
-      ...catalog.imageCodecs,
-    ]) {
-      const bytes = await readFile(
-        path.join(directory, 'materials', artifact.sha256),
-      );
-      expect(bytes.length).toBe(artifact.size);
-      expect(digest(bytes)).toBe(artifact.sha256);
-      expect(artifact.path).toBe('/runtime/materials/' + artifact.sha256);
-    }
+    expect(requests).toHaveLength(6);
   });
 });
 
 describe('native material resolver', () => {
   it('returns owned current bytes and never falls back to HTTP for missing materials', async () => {
-    const { catalog, data } = await currentMaterials();
-    const supported = [
-      ...catalog.hostScripts,
-      ...catalog.resources,
-      ...catalog.imageCodecs,
-    ];
+    const supported = [...catalog.hostScripts, ...catalog.resources];
     const encoded = Object.fromEntries(
-      [...data].map(([sha256, value]) => [
-        sha256,
-        {
-          base64: value.bytes.toString('base64'),
-          contentType: value.contentType,
-        },
-      ]),
+      supported.map((artifact) => {
+        const bytes = data.get(artifact.sha256);
+        if (!bytes) throw new Error('Missing generated material');
+        return [
+          artifact.sha256,
+          {
+            base64: bytes.toString('base64'),
+            contentType: artifact.contentType,
+          },
+        ];
+      }),
     );
     const resolver = createNativeMaterialResolver(encoded);
     for (const artifact of supported) {
-      const material = resolver(artifact.sha256)!;
-      expect(digest(material.bytes)).toBe(artifact.sha256);
-      material.bytes[0] ^= 1;
-      expect(digest(resolver(artifact.sha256)!.bytes)).toBe(artifact.sha256);
+      const material = resolver(artifact.sha256);
+      if (!material) throw new Error('Missing bundled material');
+      expect(createHash('sha256').update(material.bytes).digest('hex')).toBe(
+        artifact.sha256,
+      );
+      const first = material.bytes[0];
+      if (first === undefined) throw new Error('Expected nonempty material');
+      material.bytes[0] = first ^ 1;
+      const next = resolver(artifact.sha256);
+      if (!next) throw new Error('Missing bundled material');
+      expect(createHash('sha256').update(next.bytes).digest('hex')).toBe(
+        artifact.sha256,
+      );
     }
     let requests = 0;
     const loader = new VerifiedLoader(
       'https://read.example.com',
       async () => {
         ++requests;
-        throw Error('Native materials must be bundled');
+        throw new Error('Native materials must be bundled');
       },
       resolver,
     );
-    for (const artifact of supported)
-      expect(
-        digest(
-          await loader.sharedArtifact(
-            artifact,
-            new AbortController().signal,
-            artifact.contentType === 'application/javascript',
-          ),
-        ),
-      ).toBe(artifact.sha256);
+    for (const artifact of supported) {
+      const bytes = await loader.sharedArtifact(
+        artifact,
+        new AbortController().signal,
+        artifact.contentType === 'application/javascript',
+      );
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+        artifact.sha256,
+      );
+    }
     await expect(
       loader.sharedArtifact(
         {

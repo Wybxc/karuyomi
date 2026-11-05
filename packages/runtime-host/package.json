@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "build": "node build.ts"
+    "build": "pnpm build:materials && vite build --config vite.config.ts",
+    "build:materials": "vite build --config vite.materials.config.ts",
+    "build:image-codecs": "vite build --config vite.image-codecs.config.ts"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.16.0",
@@ -14,6 +16,7 @@
   },
   "devDependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",
-    "vite": "8.3.6"
+    "vite": "8.3.6",
+    "zod": "4.6.7"
   }
 }

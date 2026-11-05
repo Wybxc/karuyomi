@@ -1,5 +1,7 @@
 # 长图 codec / WASM 机制验证
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 ## 结论与边界
 
 2026-11-04，固定 libspng 的顺序行解码已通过 Node Worker 的两张大尺寸合成 PNG、ACK 边界取消及缺失 IEND 尾部四项机制测试。完整 RGBA 输出分别为 86,400,000 B 与 172,800,000 B，实际 WASM 线性 heap 均为 16 MiB；没有在 WASM 中建立完整 raster。该证据推进[长图计划](../plan/reader-image-decoding.md)的 codec 可交付性门，尚未接入 Source、Flutter 或 Native 产品，也不证明进程/GPU 峰值。随后同一素材又通过官方 macOS SDK 的独立重建和 Node / Web 复验，见下方第二轮；首轮组合工具链证据保留原样。

@@ -19,7 +19,7 @@ Bundle 清单记录 canonical `sha256/size/contentType`，以及 `encoding: gzip
 
 所有客户端获取索引、清单和 bundle 时均使用 `credentials: omit`。索引/清单使用 no-cache，内容寻址 bundle 使用 immutable 缓存。共享材料只能引用 `/runtime/materials/<sha256>`，来源与 Native 内置规则见[共享运行时材料](RUNTIME-MATERIALS.md)。
 
-`scripts/assemble-assets.ts` 仅复制当前索引可达的清单与 gzip，拒绝索引/清单身份不一致、不可用材料、超限或编码摘要错误。部署快照不包含旧版本目录、未引用 bundle、构建 provenance 或日志。普通无快照的本地客户端构建会生成空索引；正式部署必须显式设置 `EXTENSION_ASSETS_DIR`，缺失目录会报错。
+`apps/api/vite.assets.ts` 的 Vite 资源插件仅复制当前索引可达的清单与 gzip，拒绝索引/清单身份不一致、不可用材料、超限或编码摘要错误。部署快照不包含旧版本目录、未引用 bundle、构建 provenance 或日志。普通无快照的本地客户端构建会生成空索引；正式部署必须显式设置 `EXTENSION_ASSETS_DIR`，缺失目录会报错。
 
 ## 发现、输入身份与失败保留
 
@@ -62,7 +62,7 @@ node tools/extensions/pipeline.ts bootstrap \
   --jobs 1 --finalize
 ```
 
-runner 检查冻结 checkout 的提交、干净 host 输入、指纹、submodule 和上游提交，调用该 checkout 的构建器和材料入口。`--output` 保持在同一目录，可复用相邻 `builds/<inputFingerprint>/`。磁盘结果必须重新做当前完整性校验，不能凭 JSON 恢复信任。
+runner 检查冻结 checkout 的提交、干净 host 输入、指纹、submodule 和上游提交，先在该 checkout 运行声明式 Vite CLI `pnpm --filter @karuyomi/runtime-host build:materials`，再调用构建器并直接读取已生成 catalog。材料读取不隐式编译。`--output` 保持在同一目录，可复用相邻 `builds/<inputFingerprint>/`。磁盘结果必须重新做当前完整性校验，不能凭 JSON 恢复信任。
 
 `--limit N` 可分批；分批候选部署并确认 checkpoint 后，下一批才会跳过这些输入。全部发现输入都有成功或明确失败记录时才加 `--finalize`。baseline 完成只表示覆盖结束，不表示全部 Source 可运行。`CI=true` 或 `GITHUB_ACTIONS=true` 禁止首次全量、冻结计划恢复和 finalize。
 
@@ -125,19 +125,17 @@ node tools/extensions/pipeline.ts build \
   --output output/INPUT_FINGERPRINT
 ```
 
-编译成功可以交付为 `compiled_unverified`，保持 `runtimeReady=false`。只有匹配 buildId/manifest SHA 的真实 Worker/browser gate 均通过才为 `browser_verified`；初始化成功不证明在线 Source、图片或真机支持。人工验证使用当前 gzip 目录：
+编译成功可以交付为 `compiled_unverified`，保持 `runtimeReady=false`。只有匹配 buildId/manifest SHA 的真实 Worker/browser gate 均通过才为 `browser_verified`；初始化成功不证明在线 Source、图片或真机支持。当前完整性验证使用 gzip 目录，先准备匹配的共享材料：
 
 ```sh
+pnpm --filter @karuyomi/runtime-host build:materials
 node tools/extensions/verify-build.ts --directory DIR --report DIR/validation.json
-node tools/extensions/verify-build.ts --directory DIR --report DIR/validation.json \
-  --serve --timeout-ms 120000
 pnpm test:extensions
 pnpm test:extension-build
 pnpm test:extension-integrity
-pnpm test:extension-assets
 ```
 
-默认完整性通过但未运行浏览器时退出 2，报告 `valid=false`、`runtimeReady=false`、`browser_not_run`；失败退出 1，实际浏览器通过才退出 0。`--serve` 只监听 loopback，由人或 Codex 内置浏览器运行真实产品 Worker/IndexedDB；`onlineCompatibility` 仍为 `not_tested`。单元测试不使用真实 Source、生产 Access 或远程部署凭据。
+当前 verifier 只做完整性验证：通过时仍退出 2，报告 `valid=false`、`runtimeReady=false`、`browser_not_run`；失败退出 1。旧动态浏览器 verifier 及 `--serve`/`--timeout-ms` 已退役，历史 `browser_verified` 仅适用于当时固定的 build/manifest。官方 Browser fixture 入口为 `BROWSER=none pnpm test:browser`，它不加载指定扩展，不能将该目录标为 `browser_verified`；`onlineCompatibility` 保持 `not_tested`。真实扩展初始化、在线 Source 和 Native 完整门须另行建立并记录，不能以单元测试代替。静态装配边界由 `pnpm test` 的 API Vite 插件单元测试和官方 harness 验证。当前测试结构见 [Vite 计划](plan/vite-build-and-testing.md)。
 
 项目 CI 使用 `.github/workflows/project-ci.yml`，仅分支 push/PR 触发。历史 Release 传输、旧宿主 bulk 与旧 R2 探针只保留测量背景，不是当前恢复入口；有用体积数据见 [AOT 包体分析](AOT-SIZE.md)，实际门槛见 [VERIFICATION](VERIFICATION.md)。
 

@@ -99,7 +99,16 @@ function fixture(t: TestContext) {
   put('host.txt', 'frozen host');
   put('tools/extensions/builder.ts', builder);
   put('protocol.json', JSON.stringify(protocol));
-  put('package.json', '{"type":"module"}');
+  put(
+    'package.json',
+    JSON.stringify({
+      name: '@karuyomi/runtime-host',
+      type: 'module',
+      scripts: {
+        'build:materials': `node --input-type=module -e "import fs from 'node:fs';const catalog={...JSON.parse(fs.readFileSync('protocol.json','utf8')),bridgeVersion:2,hostScripts:[],resources:[]};fs.mkdirSync('packages/runtime-host/dist',{recursive:true});fs.writeFileSync('packages/runtime-host/dist/materials.json',JSON.stringify(catalog));"`,
+      },
+    }),
+  );
   commit();
   addHostTestSubmodules(checkout);
   const upstream = path.join(checkout, 'vendor/extensions-source');
@@ -228,6 +237,56 @@ test('runner executes frozen same-layer builder, strips credentials and reuses v
     ),
     '',
   );
+});
+test('runner awaits material preparation before starting builders and reuses it for the checkout', async (t) => {
+  const f = fixture(t);
+  const ready = path.join(f.checkout, '.local/materials-ready');
+  f.put(
+    'tools/extensions/builder.ts',
+    builder.replace(
+      'const raw=',
+      "if(!fs.existsSync(path.join(process.cwd(),'.local/materials-ready')))throw new Error('Builder started before materials were ready');\nfs.appendFileSync(path.join(output,'builder-started'),'started\\n');\nconst raw=",
+    ),
+  );
+  f.commit();
+  f.refresh();
+  let preparations = 0;
+  const pipeline = new ExtensionPipeline({
+    materials: async (checkout) => {
+      assert.equal(checkout, f.checkout);
+      preparations++;
+      // Delay makes a missing await observable by the real builder process.
+      await delay(100);
+      mkdirSync(path.dirname(ready), { recursive: true });
+      writeFileSync(ready, 'ready');
+      return materials;
+    },
+  });
+  const firstOutput = path.join(f.root, 'first-delivery');
+  const options = { checkout: f.checkout };
+  const first = await pipeline.buildOne(f.descriptor, firstOutput, options);
+  assert.equal(
+    resultOf(first).status,
+    'built',
+    JSON.stringify(resultOf(first)),
+  );
+  const second = await pipeline.buildOne(
+    f.descriptor,
+    path.join(f.root, 'second-delivery'),
+    options,
+  );
+  assert.equal(
+    resultOf(second).status,
+    'built',
+    JSON.stringify(resultOf(second)),
+  );
+  const cached = await pipeline.buildOne(f.descriptor, firstOutput, options);
+  assert.deepEqual(resultOf(cached), resultOf(first));
+  assert.equal(
+    readFileSync(path.join(firstOutput, 'builder-started'), 'utf8'),
+    'started\n',
+  );
+  assert.equal(preparations, 1);
 });
 test('builder preserves Unicode and shell metacharacter arguments and streams large logs without inheriting credentials', async (t) => {
   const f = fixture(t);

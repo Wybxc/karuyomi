@@ -1,15 +1,36 @@
 # Vite 与 Cloudflare 官方集成验证
 
+## 当前声明式重构（2026-11-05）
+
+当前重构删除自有程序化 Vite builder、`materials.ts` 资源管理层、独立资产组装入口、手写测试服务器与浏览器 runner。资源生成与 Native 内嵌由 Vite 插件实现，工具只直接读取生成清单；静态扩展装配也内化为 API Vite 插件的一部分。本地集中验收已通过，环境为 macOS、Node 24.15.0、pnpm 12.6.0、Flutter 3.47.5 / Dart 3.13.4。以下分项已实际运行：
+
+- `pnpm test:build` 使用官方 Vite CLI，依次生成共享材料、Web/Native runtime、API 静态夹具；候选 codec JS 保留独立声明式构建入口。无测试内调用 Vite build。
+- `pnpm exec vitest run --project workers`：HTTP 21 项与状态 15 项，共 36/36。官方 Workers 插件、正式 D1 migrations、RS256 JWT 与 `@msw/cloudflare`；gzip 为真实压缩字节，Brotli 仅为已解码边界。消费者取消与 deadline 中止模拟 upstream 已验证，不宣称真实 TCP reset 或 incoming socket abort。
+- 官方 `createTestHarness`：声明式生成配置的两项测试通过，覆盖静态字节、headers、Worker 绕过、307、401、JWT 与 D1。
+- 官方 Vitest Browser：Codex 内置浏览器实际打开官方生成的 session URL，7/7 通过，覆盖 IndexedDB、Web Locks、真实 Worker 生命周期、文件句柄和 OffscreenCanvas。`BROWSER=none` 固定在配置；之前误由默认浏览器执行的结果不计入本轮 IAB 证据。runner 已结束，临时日志在忽略目录 `.local/verification/vitest-browser-2026-11-05.log`。
+
+- `pnpm check` 完整通过：386 项 Vitest、跨语言 golden、扩展发现/runner/完整性、上游补丁、Cloudflare 权限工具与候选 codec 回归；严格类型及依赖检查覆盖 179 模块、595 条依赖。冻结 builder 新回归确认材料先准备且同 checkout 只准备一次。
+- `pnpm flutter:check` 三项目静态分析和测试通过（21/42/220）；完整 `pnpm format` → `pnpm format:check` 通过，包含原生语言。peer 依赖检查无冲突。
+- 最终 `pnpm build` 完整通过。API 的 `sharedConfigBuild: true` 确保静态组装 hook 仅执行一次；57 份输入静态文件与 client 输出逐字节一致，额外仅 `.assetsignore`。Native payload 排除验证通过。开发输入为空扩展索引，未上传或覆盖生产快照。
+- 最终无 `--config` 的 `wrangler deploy --dry-run` 使用正式 Vite 配置重定向；Static Assets、D1、Durable Object、域名及迁移目录定位正确。本地 D1 migrations 成功。测试构建前后生产重定向 SHA 不变。
+- Vite 插件重构前后六材料与 catalog 字节一致，materialVersion 保持 `97334724ed5cfd0b688d10c82f219893442260986c77b6ea1a4ce4a4e959a4ff`。Native manifest 的实际脚本 hash/size 与内嵌六材料由产物测试验证；contracts 声明 `sideEffects: false` 以避免未使用 schema 初始化进入宿主。
+
+本轮删除旧 Source/HTTP/socket/static/cache 探针及独立浏览器 suites；历史专项记录保留对应提交与执行环境，不作为当前可复验入口。扩展完整性工具继续输出 `compiled_unverified` / `runtimeReady=false`，不把已删除动态 runner 的构建结果当作运行通过。
+
+## 历史迁移：f623a82
+
+以下为程序化 Vite 初次迁移的历史证据。后续声明式重构已删除其 probe builder、HTTP socket 专项与浏览器 runner；测试数和复验入口只适用于 [f623a82](https://github.com/Wybxc/karuyomi/tree/f623a82)。
+
 2026-11-05，本地 macOS、Node 24.15.0、pnpm 12.6.0、Flutter 3.47.5 / Dart 3.13.4。构建依赖固定为 Vite 8.3.6、Cloudflare Vite 插件 1.67.0 和官方 Vitest 插件 1.6.0，锁文件保留精确传递依赖。产品 Wrangler 4.156.1 与既有 D1 JSON 输出补丁保持原版本。
 
-## 工程与产物
+### 工程与产物
 
 - `pnpm check` 完整通过，含生成一致性、严格类型检查、依赖层级、369 项 Vitest 测试、跨语言 golden、扩展流水线、HTTP 桥及候选图片工具测试。新增 API 配置、Workers 测试和官方 harness 均进入类型检查；依赖检查覆盖 212 模块、788 条依赖。
 - `pnpm flutter:check` 三项目静态分析与测试通过，分别为 21、42、220 项。`pnpm format` 后完整 `pnpm format:check` 通过，包含原生格式检查。
 - `pnpm build` 完整通过：Vite 宿主 → Native 材料组装 → Flutter Web → 静态组装 → Cloudflare Vite Worker/client 构建。本次为开发空扩展索引，组装检查 55 个文件，确认 Native payload 未进入公开树；没有部署空索引或替换生产快照。
 - 正式 `wrangler deploy --dry-run` 使用 `apps/api/.wrangler/deploy/config.json` 重定向到 `dist/karuyomi/wrangler.json`，识别相邻 `dist/client` 以及 ASSETS、D1、Durable Object、既定 vars 和域名。输出文件与输入静态树逐项核对，额外文件仅为插件生成的 `.assetsignore`。
 
-## 正式测试集成
+### 正式测试集成
 
 `apps/api/vitest.config.ts` 使用官方 `cloudflareTest()`，测试直接在 workerd 中访问 `cloudflare:workers` 和 `cloudflare:test`，通过官方 D1 migration API 应用正式迁移。15 项业务测试全部通过；移开尚未构建的 `dist/public` 后独立重跑也通过，测试不依赖上次前端构建。
 
@@ -17,7 +38,7 @@
 
 HTTP v2 专项使用同一 Cloudflare Vite 配置构建测试 API，24 项受控 HTTP 检查通过，包含压缩字节、Range/表单、上传、截断、超时与取消/TCP reset。此专项保留 Miniflare 的原生用户 Worker socket 和受控 outbound service：官方普通请求代理不能代替这里的连接关闭证据。没有保留自有 esbuild 打包入口。
 
-## 宿主与浏览器
+### 宿主与浏览器
 
 Web host 保持 ESM，独立 Worker 保持 classic IIFE；Native host/Worker 内嵌全部 6 份共享材料，manifest 的大小与哈希匹配。Vite 资产转换前替换桥的 `import.meta.url`，避免将 zstd WASM 再次内联到桥中。仓库根与包目录执行得到相同材料身份；新 `materialVersion` 为 `97334724ed5cfd0b688d10c82f219893442260986c77b6ea1a4ce4a4e959a4ff`。
 

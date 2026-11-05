@@ -17,4 +17,6 @@ Source HTTP 使用 v2 有界二进制协议，向 `/api/bridge/http` 发送小 m
 
 图片内容解释、解码与缓存属于 UI。当前默认使用 Flutter/平台直接解码；`runtime/image-codec` 仅作为独立候选维护，不进入默认构建与 Web/Native 打包，尚无同条件真机性能证据支持默认采用。
 
-工程检查入口：`pnpm --filter @karuyomi/runtime-host typecheck`、`pnpm exec vitest run packages/runtime-host/test`、`pnpm --filter @karuyomi/runtime-host build`。真实 Source、Access、图片阅读与设备峰值分别验收，范围见 [VERIFICATION](../../docs/VERIFICATION.md)；本地工程测试不能代替产品运行结果。
+构建入口为 `pnpm --filter @karuyomi/runtime-host build`，通过声明式 Vite CLI 先生成六份共享材料，再构建 Web/Native 宿主。资源生成、材料清单与 Native 内嵌集中在 `vite.runtime-plugin.ts`；独立 `materials.ts` 已删除。`@karuyomi/contracts` 提供纯 `runtimeMaterialCatalogSchema` 模型及类型，消费者直接 `readFile` 已生成的 `dist/materials.json` 并用该 schema 解析，再按需读取字节。候选 codec 使用独立 `build:image-codecs` CLI，不合并产品 catalog。
+
+工程检查使用 `pnpm --filter @karuyomi/runtime-host typecheck`、`pnpm test` 及 `BROWSER=none pnpm test:browser`；后者用 Codex 内置浏览器打开官方 Preview URL。当前测试结构见 [Vite 计划](../../docs/plan/vite-build-and-testing.md)。真实 Source、Access、Native、图片阅读与设备峰值分别验收，范围见 [VERIFICATION](../../docs/VERIFICATION.md)；本地 fixture 通过不能代替产品结果。

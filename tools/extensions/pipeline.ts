@@ -519,27 +519,26 @@ export class ExtensionPipeline {
       value = this.materialProvider
         ? this.materialProvider(checkout)
         : Promise.resolve().then(() => {
+            execaSync(
+              'pnpm',
+              ['--filter', '@karuyomi/runtime-host', 'build:materials'],
+              {
+                cwd: checkout,
+                shell: false,
+                stdin: 'ignore',
+                preferLocal: false,
+                verbose: 'none',
+                maxBuffer: 2 * 1024 * 1024,
+              },
+            );
             const catalog: unknown = JSON.parse(
-              execaSync(
-                process.execPath,
-                [
-                  path.join(
-                    checkout,
-                    'packages/runtime-host/prepare-materials.ts',
-                  ),
-                  '--print',
-                ],
-                {
-                  shell: false,
-                  stdin: 'ignore',
-                  preferLocal: false,
-                  stripFinalNewline: false,
-                  verbose: 'none',
-                  cwd: checkout,
-                  encoding: 'utf8',
-                  maxBuffer: 2 * 1024 * 1024,
-                },
-              ).stdout,
+              readFileSync(
+                path.join(
+                  checkout,
+                  'packages/runtime-host/dist/materials.json',
+                ),
+                'utf8',
+              ),
             );
             if (!isRecord(catalog))
               throw new Error('Invalid runtime material catalog');
@@ -691,6 +690,7 @@ export class ExtensionPipeline {
             !['GH_TOKEN', 'GITHUB_TOKEN', 'CLOUDFLARE_API_TOKEN'].includes(key),
         ),
       );
+      await this.currentRuntime(checkout);
       const log = path.join(output, 'build.log');
       writeFileSync(log, '');
       await processes.run(

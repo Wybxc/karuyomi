@@ -1,5 +1,7 @@
 # 有界图形宿主的真实 Source 分项
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-03 至 04，固定主仓库 `15a3900f63f0023a491414e08cd040c0772f71ce`、扩展源码 `efa93f5a3537856fe830450bbe33f69d21d28167`。工具链/原 JAR 与 Source 业务源码未修改。新材料包含二进制有界 graphics 与 Worker lifetime Cache editor；不包含后续正在实现的 Cache 正文分块。
 
 host 输入指纹 `5d83479c087a11e609b9b4234312e4647af9d612ea1d72c3113412a061b1a85d`，材料版本 `8c615d89210ff6a9d3d0d2846449da1489c82466c580f22134e3359a70a7728f`。控制身份为 host ABI v3 / protocolVersion 2，HTTP bridgeVersion 2。六包本地 AOT 与 gzip 完整性通过：

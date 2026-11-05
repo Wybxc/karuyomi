@@ -1,5 +1,7 @@
 # Web 完整章与下一章阅读
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，主代理在 Codex 内置 Chromium 156，以固定 `b4f72f70804f12caef21bb51a17cb5adad6982d4` 的正式 Flutter Web release，通过两源完整章的逐页显示、进度保存与同路由下一章阅读。这里使用本地受控 RS256 身份及隔离 workerd/D1，不是生产 Access、Native、物理设备或性能验收。
 
 ## 固定输入

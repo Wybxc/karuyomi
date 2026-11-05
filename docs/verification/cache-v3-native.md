@@ -1,12 +1,14 @@
 # Cache v3 移动 WebView 机制验收
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，固定 `31555e8e367405501b7f485f534f533e0299a6cd`，Android 与 iOS 的真实 WebView 均通过未修改的正式 **39 组** Cache 桥套件，最终 `HeadlessInAppWebView.dispose()` 成功。这是移动引擎中的 Worker / IndexedDB / Web Locks 机制门，未运行 Java CacheInterceptor 或正式 Source，不代表生产 Access、物理设备、完整 Native Cache 或性能验收。
 
 ## 输入与结果
 
 独立受管树为 `/Users/wybxc/.codex/worktrees/native-cache-v3-validation/karuyomi`，受跟踪文件保持干净。使用 Node 24.15.0、锁定的 npm 依赖、Flutter 3.47.5 / Dart 3.13.4 和官方 `flutter_inappwebview 6.2.0-beta.3`。无需 Java、seed 或扩展 AOT。
 
-正式 `compileBridge('cache')` 与 [Worker driver](../../packages/runtime-host/test/cache-lifecycle-worker.ts)、[browser suite](../../packages/runtime-host/test/cache-lifecycle-browser-suite.ts) 由固定源码编译。以下实际服务字节与 [Chromium 39 组主报告](http-cache-runtime.md#namespace-固定分区门) 逐项一致：
+正式 `compileBridge('cache')` 与 [Worker driver](https://github.com/Wybxc/karuyomi/blob/f623a8263c87ac198ff3882fd3eade1072e6abfc/packages/runtime-host/test/cache-lifecycle-worker.ts)、[browser suite](https://github.com/Wybxc/karuyomi/blob/f623a8263c87ac198ff3882fd3eade1072e6abfc/packages/runtime-host/test/cache-lifecycle-browser-suite.ts) 由固定源码编译。以下实际服务字节与 [Chromium 39 组主报告](http-cache-runtime.md#namespace-固定分区门) 逐项一致：
 
 | 产物                      | SHA-256                                                            |
 | ------------------------- | ------------------------------------------------------------------ |
@@ -33,7 +35,7 @@ Native 驱动只加载正式页面，读取其原始结果，并在 finally 中�
 
 ## 复验与本地材料
 
-正式 [runner](../../tools/teavm/check-cache-storage.ts) 可从干净检出使用；Native 夹具与 HTTPS 编排仅保留在上述固定树 ignored 的 `.local/cache-native/`，不是新产品入口：
+正式 [runner](https://github.com/Wybxc/karuyomi/blob/f623a8263c87ac198ff3882fd3eade1072e6abfc/tools/teavm/check-cache-storage.ts) 可从干净检出使用；Native 夹具与 HTTPS 编排仅保留在上述固定树 ignored 的 `.local/cache-native/`，不是新产品入口：
 
 ```sh
 # 固定树根目录；按仓库固定版本安装依赖

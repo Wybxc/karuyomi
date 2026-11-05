@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Trusted post-deployment operation; AOT jobs never receive D1 credentials.
+import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { collectMaterials } from '../../packages/runtime-host/materials.ts';
+import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import { parseManifest } from './verify-manifest.ts';
 import type { BuildManifest } from '../../packages/contracts/src/index.ts';
 import {
@@ -69,7 +70,17 @@ export async function currentBuilds(
     );
     assertIndexIdentity(manifest, descriptor);
     if (manifest.hostScripts.length || manifest.resources.length)
-      catalog ??= (await collectMaterials({ includeWasmBytes: false })).catalog;
+      catalog ??= runtimeMaterialCatalogSchema.parse(
+        JSON.parse(
+          await readFile(
+            new URL(
+              '../../packages/runtime-host/dist/materials.json',
+              import.meta.url,
+            ),
+            'utf8',
+          ),
+        ),
+      );
     await verifyMetadata(manifest, catalog);
     current.set(manifest.packageName, manifest);
   }

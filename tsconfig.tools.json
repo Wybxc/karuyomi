@@ -12,7 +12,6 @@
     "tools/**/*.ts",
     "packages/runtime-host/*.ts",
     "tools/extensions/*.ts",
-    "apps/api/test/*-probe.ts",
     "apps/api/*.config.ts",
     "vitest.config.ts",
     "runtime/image-codec/*.test.ts"

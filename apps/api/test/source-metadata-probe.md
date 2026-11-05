@@ -1,4 +1,6 @@
-# Live Source metadata probe
+# Historical live Source metadata probe (retired)
+
+> Retired on 2026-11-05. This document preserves the original harness contract, inputs, commands and results. The custom Source HTTP/HTTPS service and socket adapter have been removed; every command and `SOURCE_PROBE_*` option below applies only to historical checkouts. See the [historical implementation](https://github.com/Wybxc/karuyomi/blob/f623a8263c87ac198ff3882fd3eade1072e6abfc/apps/api/test/source-metadata-probe.ts), the [current test structure](README.md), and the [Vite plan](../../../docs/plan/vite-build-and-testing.md). Current official fixtures do not replace live Source, paired Native service, production Access or connection-close acceptance.
 
 This loopback harness loads the actual product TeaVM build through its public static manifest and explicit gzip artifact loader. It runs the product `/api/bridge/http` route in real workerd with isolated policy-only D1 state and an explicit `www.mangadraft.com` network policy. Its separate test entry verifies a real RS256 test JWT; the localhost proxy supplies that test assertion and maps its origin to the test API origin. It does not change or bypass authentication in the production entry point.
 

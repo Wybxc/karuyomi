@@ -1,5 +1,7 @@
 # Reader 帧调度修复与 Native Source 重启复验
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，Reader 修复 `5267181` 已提交；从 Cache v3 基线 `31555e8` cherry-pick 后，独立验证树实际提交为 `19b65f5258e9097e92cf52f40f59f17728c8ad62`。Android 和 iOS 模拟器均完成原版 xkcd 的正式 Catalog → ReaderScreen 两页阅读、已保存 UI、进程重启恢复及最终清理。输入和操作仍由 ignored 夹具驱动，不代表生产 Access、人工物理手势、真机或性能验收。
 
 ## 固定输入

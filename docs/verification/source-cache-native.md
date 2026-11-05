@@ -1,5 +1,7 @@
 # 原 xkcd Source 的 Native HTTP Cache
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 状态：**iOS / Android 模拟器均通过原 Java Source 的 metadata 冷请求、热正文复用及正式 Native 容器重建后复用**。两端均通过正式 `NativePlatformRuntime` 加载同一原扩展 AOT；不是受控 TS supplier、桥机制门或 Java 精确 hit 计数。没有更改图片 cacheless 行为。
 
 ## 固定输入与执行环境

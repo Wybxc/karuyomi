@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { createContext, runInContext } from 'node:vm';
 import type { CryptoResult } from '../../../runtime/teavm/bridge/crypto-bridge.js';
-import { compileBridge } from '../materials.ts';
+import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 
 interface BridgeMethods {
   teaCrypto?: (request: unknown) => Promise<CryptoResult>;
@@ -18,17 +17,35 @@ beforeEach(() => {
   requests.length = 0;
 });
 beforeAll(async () => {
-  const wasm = await readFile(
-    fileURLToPath(
-      new URL(
-        '../node_modules/@bokuweb/zstd-wasm/dist/web/zstd.wasm',
-        import.meta.url,
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL('../dist/materials.json', import.meta.url),
+        'utf8',
       ),
     ),
   );
+  const wasmArtifact = catalog.resources.find(
+    (entry) => entry.logicalName === 'zstd.wasm',
+  );
+  if (!wasmArtifact) throw new Error('Missing generated zstd WASM');
+  const wasm = await readFile(
+    new URL('../dist/materials/' + wasmArtifact.sha256, import.meta.url),
+  );
   wasmUrl = URL.createObjectURL(new Blob([wasm], { type: 'application/wasm' }));
-  for (const name of ['crypto', 'zstd', 'cache', 'file'])
-    bundles.set(name, (await compileBridge(name)).toString('utf8'));
+  for (const name of ['crypto', 'zstd', 'cache', 'file']) {
+    const artifact = catalog.hostScripts.find(
+      (entry) => entry.logicalName === name + '-bridge.js',
+    );
+    if (!artifact) throw new Error('Missing generated bridge: ' + name);
+    bundles.set(
+      name,
+      await readFile(
+        new URL('../dist/materials/' + artifact.sha256, import.meta.url),
+        'utf8',
+      ),
+    );
+  }
 });
 afterAll(() => URL.revokeObjectURL(wasmUrl));
 

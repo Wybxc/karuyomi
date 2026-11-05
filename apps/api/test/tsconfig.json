@@ -5,7 +5,9 @@
   },
   "include": [
     "state-workerd.test.ts",
+    "*-worker.test.ts",
     "vite-harness.test.ts",
+    "vite-assets.test.ts",
     "worker-test-env.d.ts",
     "../worker-configuration.d.ts"
   ]

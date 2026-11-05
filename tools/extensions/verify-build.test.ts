@@ -19,10 +19,8 @@ import type {
   BundleArtifact,
 } from '../../packages/contracts/src/index.ts';
 import isRecord from 'is-plain-obj';
-import type { ValidationFailure } from './types.ts';
-import { collectMaterials } from '../../packages/runtime-host/materials.ts';
+import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import {
-  completeBrowserValidation,
   repositoryRoot,
   verifyIntegrity,
   parseExtensionIndex,
@@ -229,7 +227,17 @@ test('the shared contract parser enforces the static current-package index', asy
 });
 
 test('shared materials use verified host bytes without per-build copies', async (t) => {
-  const { catalog, data } = await collectMaterials();
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL(
+          '../../packages/runtime-host/dist/materials.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ),
+  );
   const { directory } = await fixture(t, (manifest: FixtureManifest) => {
     manifest.hostScripts = catalog.hostScripts;
     manifest.resources = catalog.resources;
@@ -241,13 +249,28 @@ test('shared materials use verified host bytes without per-build copies', async 
   for (const material of [...catalog.hostScripts, ...catalog.resources]) {
     assert.deepEqual(
       payloads?.get(material.path)?.bytes,
-      data.get(material.sha256)?.bytes,
+      await readFile(
+        new URL(
+          '../../packages/runtime-host/dist/materials/' + material.sha256,
+          import.meta.url,
+        ),
+      ),
     );
   }
 });
 
 test('shared materials cannot substitute hash, metadata, role or logical name', async (t) => {
-  const { catalog } = await collectMaterials();
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL(
+          '../../packages/runtime-host/dist/materials.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ),
+  );
   for (const edit of [
     (manifest: FixtureManifest) => {
       manifest.hostScripts[0]!.size += 1;
@@ -279,7 +302,17 @@ test('shared materials cannot substitute hash, metadata, role or logical name', 
 });
 
 test('private runtime bridge copies are rejected', async (t) => {
-  const { catalog } = await collectMaterials();
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL(
+          '../../packages/runtime-host/dist/materials.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ),
+  );
   const { directory } = await fixture(t, (manifest) => {
     const material = catalog.hostScripts[0];
     assert(material);
@@ -397,75 +430,4 @@ test('CLI cannot replace manifest/artifact inputs with its report', async (t) =>
     assert.equal(result.code, 64);
     assert.deepEqual(await readFile(reportFile), before);
   }
-});
-
-test('browser result reducer rejects missing browser, identity and Source evidence', async (t) => {
-  const { directory } = await fixture(t);
-  const { report: base } = await verifyIntegrity(directory);
-  // Synthetic unit data exercises rejection paths only. Actual passed reports
-  // require the separate real browser runner and product Worker initialization.
-  const value = {
-    userAgent: 'Chrome/156.0',
-    indexedDb: true,
-    buildId: base.buildId,
-    manifestSha256: base.manifestSha256,
-    hello: {
-      ...protocol,
-      generation: 'w',
-      capabilities: [],
-      sourceReady: false,
-    },
-    session: {
-      protocolVersion: base.protocolVersion,
-      buildId: base.buildId,
-      generation: 'g',
-      workerInstanceId: 'w',
-      sources: (base.sourceIds ?? []).map((id) => ({
-        id,
-        name: 'Test',
-        lang: 'en',
-      })),
-    },
-  };
-  type BrowserFixture = typeof value & { failure?: ValidationFailure };
-  for (const edit of [
-    (copy: BrowserFixture) => {
-      copy.indexedDb = false;
-    },
-    (copy: BrowserFixture) => {
-      copy.userAgent = 'Node';
-    },
-    (copy: BrowserFixture) => {
-      copy.buildId = 'different-build';
-    },
-    (copy: BrowserFixture) => {
-      copy.manifestSha256 = '0'.repeat(64);
-    },
-    (copy: BrowserFixture) => {
-      copy.hello.sourceReady = true;
-    },
-    (copy: BrowserFixture) => {
-      copy.hello.hostAbi = 'wrong';
-    },
-    (copy: BrowserFixture) => {
-      copy.session.sources = [];
-    },
-    (copy: BrowserFixture) => {
-      copy.session.generation = '';
-    },
-    (copy: BrowserFixture) => {
-      copy.failure = { code: 'source_error', message: 'Initialization failed' };
-    },
-  ]) {
-    const copy: BrowserFixture = structuredClone(value);
-    edit(copy);
-    const result = completeBrowserValidation(base, copy, 0);
-    assert.equal(result.valid, false);
-    assert.equal(result.runtimeReady, false);
-    assert.ok(result.failure);
-  }
-  const network = completeBrowserValidation(base, value, 1);
-  assert.equal(network.valid, false);
-  assert.equal(network.failure?.code, 'network_required');
-  assert.equal(completeBrowserValidation(base, null, 0).valid, false);
 });

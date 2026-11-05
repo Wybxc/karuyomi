@@ -5,7 +5,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
-import { collectMaterials } from '../../packages/runtime-host/materials.ts';
+import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import { repositoryRoot } from './verify-manifest.ts';
 import {
   database,
@@ -245,7 +245,17 @@ test('malformed and incompatible manifests are rejected by the shared contract',
 });
 test('shared materials are catalog-checked without per-build transfers', async (t) => {
   const f = await fixture(t);
-  const { catalog } = await collectMaterials({ includeWasmBytes: false });
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL(
+          '../../packages/runtime-host/dist/materials.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ),
+  );
   const manifest = {
     ...f.manifest,
     hostScripts: catalog.hostScripts,
@@ -265,7 +275,17 @@ test('shared materials are catalog-checked without per-build transfers', async (
 });
 test('bundle cannot substitute a material and materials cannot be encoded bundles', async (t) => {
   const f = await fixture(t);
-  const { catalog } = await collectMaterials({ includeWasmBytes: false });
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL(
+          '../../packages/runtime-host/dist/materials.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ),
+  );
   const material = catalog.hostScripts[0];
   assert(material);
   await assert.rejects(

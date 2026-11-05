@@ -1,5 +1,7 @@
 # UI 图片职责边界与分片候选
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，用户确定 Source/插件宿主只交付处理后的编码字节，图片识别与解码由 Flutter/UI 负责。本轮直接更新当前原型合同，不保留旧编码页或 host tile/window API。旧 [编码页所有权](encoded-image-ownership.md) 与 [分片控制](image-page-controls.md) 保留各自输入身份和当次证据，当前实现已替代它们。
 
 ## 当前实现

@@ -1,5 +1,7 @@
 # Manager namespace 与组合存储验证
 
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+
 2026-11-04，Codex 内置 Chromium 156 通过 **11 组**真实 manager/Worker/IndexedDB/Web Locks 检查，正式 runner 退出 0。这补充了[Cache 39 组](http-cache-runtime.md)与[普通文件 14 组](file-storage-runtime.md)各自的机制门：同一产品派生键下，两套数据库实际达到合计 **256 MiB allocated**，同时验证构建更新后的数据保留与 identity/repo/package/storageSchema 隔离。
 
 本门使用明确标注的 **受控 TypeScript host ABI fixture**。执行的是产品 `SourceRuntimeManager`、`VerifiedLoader`、`src/worker.ts`、`WorkerRuntime`、`TeaVMDriver` 和 canonical Cache/file 桥；没有运行 TeaVM 生成的 Java bundle、原 CacheInterceptor 或官方 Source。测试 identity 是本轮夹具输入，静态资源由 loopback 服务提供；不能据此宣称真实 Access、Native、正式 Source 更新、浏览器/应用进程重启、物理磁盘或进程内存通过。
