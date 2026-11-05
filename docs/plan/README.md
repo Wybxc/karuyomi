@@ -4,13 +4,13 @@
 
 **首要设计目标是多端同步。** [P2](p2-sync.md) 提升为当前主线，与 [P1](p1-library-and-progress.md) 的数据模型、API 和客户端读写一起推进；阶段编号保留，不代表同步必须等完整本地书架之后才开始。Worker API + D1 为唯一业务权威，先打通同身份跨 Web/iOS/Android 的在线保存与恢复，再扩展外围功能。
 
-2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当前客户端/API `466acdd` 已部署，扩展快照不变，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)；Access 会话已失效，用户稍后登录，生产正向与真机仍待验收，完整 P0 未通过。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；真实 Web 独立会话及测试身份下 Web↔iOS、Web↔Android、iOS↔Android 正式入口的基础书架读回与双向非默认页续读已通过，见[Web/iOS](../verification/native-server-state.md)和[Android 配对](../verification/android-server-state.md)。实际并发/前台重取、生产正向及分类/书签/设置继续按[P1](p1-library-and-progress.md)和[P2](p2-sync.md)推进。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
+2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当前客户端/API `466acdd` 已部署，扩展快照不变，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)；Access 会话已失效，用户稍后登录，生产正向与真机仍待验收，完整 P0 未通过。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；真实 Web 独立会话及测试身份下 Web↔iOS、Web↔Android、iOS↔Android 正式入口的基础书架读回与双向非默认页续读已通过，见[Web/iOS](../verification/native-server-state.md)和[Android 配对](../verification/android-server-state.md)。双 Web 的手动刷新、远端重置与旧写冲突分项随后通过[验收](../verification/concurrent-server-state.md)；同时写竞争、自动前台重取、故障恢复、生产正向及分类/书签/设置继续按[P1](p1-library-and-progress.md)和[P2](p2-sync.md)推进。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
 
 ## 优先级与状态
 
 | 优先级                  | 计划                                                          | 当前状态与依赖                                                                                                                                           |
 | ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 当前主线 / 首要设计目标 | [P2 多设备同步](p2-sync.md)                                   | 收藏与进度的 Worker API + D1 已接入，测试身份三端组合双向续读已过；继续实际并发/恢复与生产验收，再按分类→书签→设置交付                                   |
+| 当前主线 / 首要设计目标 | [P2 多设备同步](p2-sync.md)                                   | 收藏与进度的 Worker API + D1 已接入，测试身份三端组合双向续读已过；双 Web 刷新/重置/旧写冲突分项通过；继续故障/生命周期与生产验收，按分类→书签→设置交付  |
 | 并行基础验收            | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | 四项功能已补齐；v4 Web 与双端模拟器正式入口 xkcd 阅读/同步分项已过；生产 Access、真机与其它完整门待验收                                                  |
 | 并行工程                | [工程、AOT 与发布](engineering-and-release.md)                | v4 三包已部署，匿名静态交付与网络政策核对通过；baseline 未完成，CI 仍 disabled_manually；v1/v3 checkpoint 仅保留历史冻结证据                             |
 | 与同步共同交付          | [P1 书架与进度](p1-library-and-progress.md)                   | 数据模型先按跨端权威状态设计；已切换收藏/进度读写入口；补跨端验收、分类/设置及完整日用流程                                                               |

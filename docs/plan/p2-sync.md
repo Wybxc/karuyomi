@@ -4,7 +4,7 @@
 
 **多端同步是首要设计目标和当前实施主线。** 同一部署、同一身份在 Flutter Web、iOS 和 Android 共享书架、分类、阅读进度、书签和非敏感设置。Worker API 负责业务读写，D1 保存唯一权威状态；功能从数据模型、协议到 UI 都按多端共同使用设计，不先完成一套独立本地产品再补同步。
 
-状态：**收藏与阅读进度的服务端底座已接入，工程检查、正式 Web/API 构建、真实 Web 独立会话及测试身份下三端组合的双向非默认页续读已通过；已部署生产并通过匿名静态/API访问边界检查，生产正向待验收**。Codex 内置浏览器与正式 iOS/Android `app.main()` 经真实隔离 workerd/D1，完成收藏读回、真实图片、双方保存和非默认页恢复，回看最远进度不倒退，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。同 origin Web 独立会话另见[证据](../verification/server-state.md#真实-web-独立会话闭环)。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。实际并发/前台重取、真机及生产 Access 正向继续验收；分类、书签与同步设置尚未实施。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
+状态：**收藏与阅读进度的服务端底座已接入，工程检查、正式 Web/API 构建、真实 Web 独立会话及测试身份下三端组合的双向非默认页续读已通过；已部署生产并通过匿名静态/API访问边界检查，生产正向待验收**。Codex 内置浏览器与正式 iOS/Android `app.main()` 经真实隔离 workerd/D1，完成收藏读回、真实图片、双方保存和非默认页恢复，回看最远进度不倒退，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。同 origin Web 独立会话另见[证据](../verification/server-state.md#真实-web-独立会话闭环)。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。同时写竞争、自动前台重取、故障恢复、真机及生产 Access 正向继续验收；分类、书签与同步设置尚未实施。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
 
 ## 权威来源与初版边界
 
@@ -21,8 +21,8 @@
 - D1 按 Access subject 隔离 account/manga revision、分章进度与 mutation 结果；条件 SQL、唯一键和 nonce gate 在同一 batch 内提交。客户端固定首次请求的 mutation ID/正文，丢响应时复用，CAS/epoch 冲突明确停止旧视图写入。
 - 正式 Flutter 入口共用 `BusinessStateClient`，收藏与进度仅保存服务端确认状态；未确认进度只留当前会话，同一服务和身份恢复后重绑 API 再重试。书架进入、前台恢复、重连和手动刷新重取；本地搜索/排序只处理已确认视图。
 - Web 登录改为独立窗口，保留原页面与草稿；重新 bootstrap 确认身份前不提交旧身份草稿，恢复后只提交当前身份的 writer。进度冲突不能由收藏或书架刷新解除，旧幂等成功须核对当前权威状态。
-- 阅读中的章节保持当前页面；后台尽力提交、恢复前台和显式刷新已接入。刷新先用当前视图的 revision 提交未确认草稿，再只读检查服务端；发现其他端修改进度、epoch 或继续阅读状态时，保持画面并停止旧视图写入，用户明确“重新打开本章”后才采用服务端位置和章节顺序。书架或详情读取不能替旧阅读视图推进写入基线。实际浏览器与 Native 生命周期仍待验收。
-- 测试身份下 Web↔iOS、Web↔Android、iOS↔Android 的基础书架读回、真实阅读和双向非默认页续读已通过；继续生产 Access、真机与实际并发/前台重取。分类、书签及非敏感设置随后采用同一权威模型。模拟器正式入口分项不等于 Native 视觉、触控或真机验收；真实平台验收仍按下方完整条件，组件共享测试服务不能替代。
+- 阅读中的章节保持当前页面；后台尽力提交、恢复前台和显式刷新已接入。刷新先用当前视图的 revision 提交未确认草稿，再只读检查服务端；发现其他端修改进度、epoch 或继续阅读状态时，保持画面并停止旧视图写入，用户明确“重新打开本章”后才采用服务端位置和章节顺序。书架或详情读取不能替旧阅读视图推进写入基线。两个实际 Web 文档经同一隔离 D1 已通过手动刷新保持画面、远端 epoch 重置、停止旧视图写入、未先刷新时正式写路径冲突及明确重开恢复，见[双会话证据](../verification/concurrent-server-state.md)。实际自动前台事件与 Native 生命周期仍待验收。
+- 测试身份下 Web↔iOS、Web↔Android、iOS↔Android 的基础书架读回、真实阅读和双向非默认页续读已通过；继续生产 Access、真机、实际自动前台重取、丢响应/断网恢复及同时到达的写竞争。分类、书签及非敏感设置随后采用同一权威模型。模拟器正式入口分项不等于 Native 视觉、触控或真机验收；真实平台验收仍按下方完整条件，组件共享测试服务不能替代。
 
 ## 实施顺序
 
