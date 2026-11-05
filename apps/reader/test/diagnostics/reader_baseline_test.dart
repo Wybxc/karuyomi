@@ -223,6 +223,7 @@ void main() {
           ),
         ),
       );
+      await tester.pump();
       var currentFrame = 42;
       recorder.setFrameNumberReaderForTesting(() => currentFrame);
       await tester.tap(find.text('性能采集'));
@@ -305,6 +306,7 @@ void main() {
           ),
         ),
       );
+      await tester.pump();
       await tester.tap(find.text('性能采集'));
       await tester.pump();
       await tester.tap(find.text('开始采集'));

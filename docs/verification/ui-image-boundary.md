@@ -109,7 +109,11 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 在同一固定 `5e1e014` 源码、相同材料下，另行构建默认未启用 `READER_BASELINE` 的正式 Web release，独立输出到 ignored `.local/ui-image-baseline/default-web`，保留原采集版。Codex 内置浏览器临时固定为 1280×720；三次新文档加载均执行启用无障碍、Tab/Shift+Tab 和进入浏览，操作前后的控制台 error 数均为零，且界面不含性能采集按钮。这是三个新文档的默认构建对照，不是三个浏览器进程，也不能证明所有条件下不会发生焦点问题。
 
-官方 [Flutter #193287](https://github.com/flutter/flutter/issues/193287) 记录同一稳定 SDK 中 builder 外层 Overlay 的同类焦点遍历栈，但其示例同时含 SelectionArea，不能直接认定与本项目完全同因。当前最小候选用锁定 SDK 的 `Overlay.wrap` 接管诊断 entry 生命周期，移除手写 entry 创建、更新和释放，保持 Source、图片链和 recorder 不变。五项诊断测试、静态分析与对应 CI 通过；随后固定 `235f2dff2e7b83c4f4c7a905fd6572384acc71bb` 的三次同条件新文档复验均在启用无障碍前记录同一焦点异常，因此该候选未修复问题。原始记录为 `overlay-wrap-focus-runs.json`。进一步简化候选移除额外 Overlay，摘要和预览使用普通 Text，收起使用无需 Tooltip 的文字按钮，删除仅用于文字选择的 semantics handle；完整 JSON 仍经文件下载或 Native 复制取得，真实浏览器门另行验证。
+官方 [Flutter #193287](https://github.com/flutter/flutter/issues/193287) 记录同一稳定 SDK 中 builder 外层 Overlay 的同类焦点遍历栈，但其示例同时含 SelectionArea，不能直接认定与本项目完全同因。首轮候选用锁定 SDK 的 `Overlay.wrap` 接管诊断 entry 生命周期，移除手写 entry 创建、更新和释放，保持 Source、图片链和 recorder 不变。五项诊断测试、静态分析与对应 CI 通过；随后固定 `235f2dff2e7b83c4f4c7a905fd6572384acc71bb` 的三次同条件新文档复验均在启用无障碍前记录同一焦点异常，因此该候选未修复问题。原始记录为 `overlay-wrap-focus-runs.json`。
+
+随后固定 `15ccc8020cb0c4090c4cc7847a02c2799a0244f4`，移除额外 Overlay，摘要和预览改为普通 Text，收起改为无需 Tooltip 的文字按钮，并删除仅用于文字选择的 semantics handle；完整 JSON 仍经文件下载或 Native 复制取得。该提交的 [CI 41943452206](https://github.com/Wybxc/karuyomi/actions/runs/41943452206) 为 completed/success，但三次相同视口的新文档复验仍各出现一次早期 RenderBox 异常及其栈，操作后的记录未新增错误，故该简化也没有修复初始焦点问题。原始记录为 `plain-focus-runs.json`；不能把三次新文档当作浏览器进程重启，也不能将旧 `5e1e014` 默认构建对照推广为当前所有条件均无错误。
+
+下一候选使用 Flutter 官方 `WidgetsBinding.instance.addPostFrameCallback`，在正式应用完成首帧布局后才挂载可聚焦的诊断控件，不改变 Source、图片链或 recorder。该候选的五项诊断测试、完整应用 131 项 Flutter 测试和静态分析已通过，但真实浏览器焦点门仍待复验；这些工程检查尚未证明问题已修复。
 
 默认对照原始记录为 `default-focus-runs.json`，成品与构建日志独立保留。三个标签页均已关闭，临时视口已恢复；服务退出后确认端口 49608 无监听且无本次 probe/workerd 进程，只删除匹配本 buildId 的 `karuyomi-source-probe-abtvn9` 临时目录，见 `default-focus-cleanup.json`。
 

@@ -41,6 +41,7 @@ class _ReaderBaselineContents extends StatefulWidget {
 
 class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
   final _recorder = ReaderBaselineRecorder();
+  bool _controlsReady = false;
   bool _open = false;
   String? _json;
   String? _summary;
@@ -53,6 +54,10 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
   void initState() {
     super.initState();
     _recorder.addListener(_changed);
+    // Let the app finish its first layout before adding focusable diagnostics.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _controlsReady = true);
+    });
   }
 
   void _changed() {
@@ -65,24 +70,25 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
     child: Stack(
       children: [
         widget.child,
-        Positioned(
-          right: 8,
-          top: MediaQuery.paddingOf(context).top + 8,
-          child: _open
-              ? _panel()
-              : Material(
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(20),
-                  child: TextButton.icon(
-                    onPressed: () {
-                      _recorder.event('capture_panel_opened');
-                      setState(() => _open = true);
-                    },
-                    icon: const Icon(Icons.speed),
-                    label: const Text('性能采集'),
+        if (_controlsReady)
+          Positioned(
+            right: 8,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: _open
+                ? _panel()
+                : Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(20),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        _recorder.event('capture_panel_opened');
+                        setState(() => _open = true);
+                      },
+                      icon: const Icon(Icons.speed),
+                      label: const Text('性能采集'),
+                    ),
                   ),
-                ),
-        ),
+          ),
       ],
     ),
   );
