@@ -4,7 +4,7 @@
 
 ## 固定输入与交付身份
 
-工作树为 `/Users/wybxc/.codex/worktrees/ui-image-baseline-validation/karuyomi`。正式 planner 扫描 1448 包、0 discovery failure，仅顺序构建本次三包；构建期间 host 输入保持固定。未启动全量 AOT、未部署、未修改历史 v1/v3 checkpoint，也未完成新的全量 baseline。
+工作树为 `/Users/wybxc/.codex/worktrees/ui-image-baseline-validation/karuyomi`。正式 planner 扫描 1448 包、0 discovery failure，仅顺序构建本次三包；构建期间 host 输入保持固定。该次验证未启动全量 AOT、未部署、未修改历史 v1/v3 checkpoint，也未完成新的全量 baseline。随后三包与正式客户端/API 已部署，部署范围和匿名验收另见[生产记录](v4-production.md)，不改写本记录的本地运行范围。
 
 - host 输入指纹：`d76795dcf2d36e8e6ec89447446e4b1a16d491f21fbf4c47eae37a4d1041613b`。
 - 材料版本：`629d6e30fe3a1ac956e39630354cfd5ce390923c4b07af2a0603a181d348d11b`；catalog SHA-256：`9215919337449082bac57f9946027088bc870b0490036777ad6ad224aa98109f`。

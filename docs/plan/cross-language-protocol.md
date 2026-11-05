@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，v3 Web、双端 Native 机制与原 xkcd Reader 分项通过，生产部署及剩余运行门待验收。** 选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
+消除 TS schema 与 Dart wire DTO 手写重复，让 Worker、宿主与 Flutter 从同一份协议生成模型和标准 codec。**已实现，v4 三包已部署并通过匿名交付验收，生产正向与当前 Native 运行门待验收。** v4 Web 与历史双端 Native 机制、原 xkcd Reader 分项保留各自实际范围。选定 Protobuf `.proto` + Buf + Protobuf-ES / Google Dart 插件；小型控制消息使用 ProtoJSON，图片/HTTP 大正文仍走独立二进制通道。决策比较与限制见[设计文档](../design/cross-language-protocol.md)。
 
 正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v4，原型不兼容旧材料。v4 增加 host entry/HTTP owner 约束，IDL 新增 `storage_busy` 明确表示 namespace 执行槽占用；历史 v3 运行证据不自动覆盖 v4。
 
@@ -16,9 +16,9 @@
 
 ## 待验收
 
-1. 固定 `6e08ec9` 的新指纹代表包已通过真实 Web Source 控制、首中末图片、重复释放与会话关闭，见 [v3 运行证据](../verification/protocol-v3-runtime.md)。继续验证实际取消和后续材料变更；不能复用旧 v2 或不同材料的证据。
-2. iOS 模拟器正式 NativePlatformRuntime 已通过真实 Headless 握手和受控 Blob 文件交接，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。固定 `a15c030` 的真实 Source 首中末文件、取消与容器重建也已分项通过；固定 `d76e8a4` 的双端 Native 图片机制、SQLite 真重启及 iOS 原 xkcd 正式 ReaderScreen/进度恢复也已通过分项，输入与测试驱动范围见[Native 记录](../verification/native-dependencies.md)；固定 `8eef7b4` 的 Android 原 xkcd Reader/force-stop 恢复及退出也已通过分项，仍须验收当前 Cache v3 材料、物理设备和生产 Access。编译、mock 和 Dart golden 不能替代这些门。
-3. 新材料与静态快照、生产 Access 分项验收后再更新部署记录。固定 `022d828` v1 队列保持独立，尚不能部署为当前协议成果。
+1. 固定 `6e08ec9` 的代表包通过真实 Web Source 控制、首中末图片、重复释放与会话关闭，仅为历史 [v3 运行证据](../verification/protocol-v3-runtime.md)。当前 v4 三包已本地重编并通过限定 Web Source/图片、xkcd 阅读及跨标签写入分项，见[v4 运行证据](../verification/v4-source-runtime.md)；实际 TeaVM owner/enqueue/取消另见[回调证据](../verification/teavm-enqueue.md)。继续验收生产控制链与剩余取消门，不能复用旧 v2/v3 或不同材料的证据。
+2. iOS 模拟器正式 NativePlatformRuntime 已通过真实 Headless 握手和受控 Blob 文件交接，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。固定 `a15c030` 的真实 Source 首中末文件、取消与容器重建也已分项通过；固定 `d76e8a4` 的双端 Native 图片机制、SQLite 真重启及 iOS 原 xkcd 正式 ReaderScreen/进度恢复也已通过分项，输入与测试驱动范围见[Native 记录](../verification/native-dependencies.md)；固定 `8eef7b4` 的 Android 原 xkcd Reader/force-stop 恢复及退出也已通过分项。以上均按原材料保留，仍须验收当前 v4 材料的 Native 正式主入口、物理设备和生产 Access。编译、mock 和 Dart golden 不能替代这些门。
+3. 固定 `13494a0` 的当前材料与 v4 三包静态快照已部署，匿名 26 路径和远端仅三包 verified 的准确 host 政策已核对，见[生产部署记录](../verification/v4-production.md)。部署 revision 与 baseline 状态以[工程计划](engineering-and-release.md)为准；部署不代表已通过真实 Access 控制链。当前 Access 会话已失效，用户答复稍后登录，生产正向与 Native 主入口仍未验收。固定 `022d828` v1 及 `b4f72f7` v3 checkpoint 仅保留历史冻结证据，不得直接覆盖当前生产；baseline 未完成，CI 继续 `disabled_manually`。
 
 ## 后续边界评估
 
