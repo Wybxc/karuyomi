@@ -105,6 +105,31 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 逐页截图 `arknights-pages/01.jpg` 至 `51.jpg`、操作记录 `arknights-current-ui-steps.json`、完成/首次续读截图、`arknights-heartbeat-ui.json`、`arknights-resume-ui.txt`、`arknights-lifecycle-capture.json`、`arknights-current-network.json` 和 `arknights-console-errors.json` 保存在同一 ignored 证据目录。`arknights-run-cleanup.json` 记录标签页已关闭，服务会话退出 130 后端口 61624 无监听，且无本次 Source probe/workerd 进程；仅删除唯一匹配本 buildId 的 `karuyomi-source-probe-B9DSM0` 临时快照/D1。当前产物未发布为已兼容，仍不以这两个源的限定 Web 分项替代 3–5 源、Native、真实 Access、长图/EXIF 或真机门。
 
+## 当前合同的 CuuTruyen 完整章与首次续读
+
+2026-11-05，正式 `lib/main.dart` Web release 固定构建于 `d312a387e3e28b2e46cd2d8f6a3dc06d894ab219`，在 Codex 内置浏览器 1280×720、DPR 2、SDK 报告刷新率 60 Hz 下，加载原版 CuuTruyen 1.6.2。AOT 由正式 planner/builder 在固定 `235f2dff2e7b83c4f4c7a905fd6572384acc71bb` 下单包生成；后续 UI 修改未改变 Source host 输入，因此复用该已验证产物。host 指纹仍为上述 `964de7e6…93b435`，共享材料仍为 `0b2ce107…f6ff`。原扩展业务源码与 JAR 均未修改，没有用原图 URL 绕过插件处理。
+
+| 身份           | 当前输入与产物                                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Build / Source | `ext-vi.cuutruyen-9a62fe39e82df9f89b386bac44b6fc55` / `8222087175453285202`                                                   |
+| 原 JAR         | `tachiyomi-vi.cuutruyen-v1.6.2.jar`，150,434 字节；SHA-256 `5bdd45cd036c0be02097bd025d359293d33485848210fcd809ad063715e263ce` |
+| Canonical JS   | 2,105,205 字节；SHA-256 `2737346daa92ee0abb0d62505791c5460110ce850b44cb497950b8ff8024aea2`                                    |
+| gzip           | 658,441 字节；SHA-256 `118eb67f3100261576e263cc449b98d3dc49470d10cca4a5bd0f068a5a56ac27`                                      |
+
+本轮使用新的 loopback origin `http://127.0.0.1:51065/`、隔离 workerd/D1 与真实 RS256 测试验签。正式首页经“浏览／漫画源／CuuTruyen · vi／热门”进入 `Spy x Family (FULL HD)`，原 Source 返回 manga `152`、`Chương 142`（chapter `98727`）。23 页逐页显示并保存，末页显式点击“读完本章”后显示“23 / 23／本地进度已保存／最远：第 23 页 · 本章已读完”。随后用正式“下一章”进入 `Chương 141`（chapter `97844`，27 页），显示并保存第 1–3 页；退出详情后“继续阅读”首次恢复第 3 页。恢复时默认双页开启，画面实际同时显示第 3、4 页，状态为“3 / 27／本地进度已保存／最远：第 4 页”。这是同一标签页内路由重开，不是关标签页或浏览器进程重启恢复。
+
+保留两项工具操作失败：第 3 页首次 locator 未匹配带 Tooltip 的标签，未推进且仍停在第 2 页，重新定位后第 3 页实际保存；续读等待预设“最远第 3 页”超时，但新的完整 AX 与截图证实上述双页 3+4 和最远第 4 页，不能据错误预期判为产品失败。操作记录共 24 项，含第 1–23 页与未推进尝试。第 1 页 AX 单项只有关闭双页的 diff，首图截图与当时完整 AX 则确认 1/23 和保存状态；第 2–23 页记录均有对应已保存状态。23 张编号截图连续齐全，独立审阅另视觉抽查第 1、2、12、23 页；下一章三张截图和恢复双页画面也已核对。
+
+网络与独立图片门按 generation 分开：正式 UI 的 `859004e8…c4a7` 有 40 个请求，bridge 全为 200，上游为 39 个 200 和 1 个 304，无 bridgeError；其中 34 次图片请求对应 29 个 URL，包含预取与重复传输，不能当作已读页数。另在 `/probe` 使用 `3f3971fb…ae77` 运行元数据与图片门，10 个请求的 bridge 全为 200，上游为 6 个 200 和 4 个 304。热门两页、搜索、latest、详情、175 章及 23 页清单共七项操作成功，23 页均带 DRM 引用；首/中/末索引 0/11/22 经原 Source 图片处理后可解码，正文长度为 746,910 / 493,881 / 563,725 字节，尺寸为 2048×1152 / 1024×1606 / 2048×1223。三图重复释放、Blob URL 撤销及 Page session 关闭通过，`finished=true`、`imageGate=passed`。这项抽样门与完整章 UI 分项分别成立。原拦截器的解码、Canvas 条带重排与 JPEG95 保留；网络正文摘要记录的是上游 scrambled 图片，不能当作处理后资源摘要。显式允许域为 `cuutruyen.net,hetcuutruyen.net,storage-bravo.cuutruyen.net,storage-charlie.cuutruyen.net`。
+
+有限生命周期采集在第 16 页后开始，实际 JSON 为 336,474 字节，revision 为上述 UI 提交，含 110 个事件与 511 个唯一帧样本；60.063201 秒自动停止，最后生命周期事件位于 31.589801 秒。事件时间单调，44 个带帧号事件均精确匹配原始帧，`truncated=false`、`frameTimingStatus=associated`，缺帧列表与未关联计时数为空/零；只按 frameNumber 关联，不用回调到达时间或不同时钟相减补齐。
+
+采集记录第 16→23 页的七次推进及切到 141 章；第 17–23 页和下一章首图有实际 ImageInfo、image frame 与 decoded viewport。9 次 acquire 均返回且 generation 匹配：142 章第 18–23 页的 6 份资源在窗口内释放，另 3 份是 141 章第 1–3 页的取得，后两页仅属预取，不能由取得推定显示。9 份 release 请求、发送与 ACK 的资源/generation 集合相同，其中 3 份属于采集前已持有资源。**只有一个 `reader_exit_ack`，对应 142→141 切章；这份报告不覆盖之后返回详情、首次续读及其退出。** 下一章 3 份资源未在窗口内释放不能据此判泄漏，也不能声称整轮所有资源已由此报告证明释放；同样不能推广为浏览器 Blob/Flutter cache、RSS/GPU 或进程峰值归零。
+
+`cuutruyen-console-errors.json` 为 `[]`，只证明本轮记录范围内没有 error。原始材料保存在固定验证树 `/Users/wybxc/.codex/worktrees/ui-image-baseline-validation/karuyomi/.local/ui-image-baseline/confirmed/`：`cuutruyen-pages/01.jpg`–`23.jpg`、`cuutruyen-current-ui-steps.json`、`cuutruyen-completed-ui.txt`、`cuutruyen-next-ui.json`、`cuutruyen-resume-initial-ui.txt` 与截图、`cuutruyen-current-network.json`、`cuutruyen-lifecycle-capture.json`。独立复核摘要为 `cuutruyen-evidence-integrity.json` 与 `cuutruyen-lifecycle-integrity.json`，完整构建身份在 `cuutruyen/provenance.json`。`cuutruyen-current-cleanup.json` 记录测试标签页已关闭、视口已恢复，服务退出 130 后端口 51065 无监听、无本次 probe/workerd 进程，仅删除核对后的 `karuyomi-source-probe-wDK87y` 临时快照/D1。
+
+本轮不更新发布兼容标记，产物仍未发布，构建记录仍为 `compiled_unverified` / `runtimeReady=false`。加上原 xkcd 与 Arknights，当前不透明合同已有三源限定 Web 阅读与恢复分项；没有完成生产 Access、Native 主入口、真实长图/EXIF/LOD、真机性能或 P0 总验收。
+
 ## 初始焦点对照与诊断层收敛
 
 在同一固定 `5e1e014` 源码、相同材料下，另行构建默认未启用 `READER_BASELINE` 的正式 Web release，独立输出到 ignored `.local/ui-image-baseline/default-web`，保留原采集版。Codex 内置浏览器临时固定为 1280×720；三次新文档加载均执行启用无障碍、Tab/Shift+Tab 和进入浏览，操作前后的控制台 error 数均为零，且界面不含性能采集按钮。这是三个新文档的默认构建对照，不是三个浏览器进程，也不能证明所有条件下不会发生焦点问题。
@@ -129,4 +154,4 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 顺序扫尾、反向跳转时重扫、PNG 再编码和跨端复制的成本须实测。下一步先记录 UI 直接解码的冷热首帧、首/中/末跳转、往返滚动与缩放，再在相同输入上比较候选方案的 CPU、帧耗时、RSS/GPU 和总峰值。标准见[设计](../design/reader-image-decoding.md)，实施顺序见[计划](../plan/reader-image-decoding.md)。
 
-当前已新增原 xkcd 阅读/下载完整性和 Arknights 当前合同下完整章/下一章/首次续读分项，未重新完成 Native 产品交互，也未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。
+当前已新增原 xkcd 阅读/下载完整性，以及 Arknights、CuuTruyen 当前合同下完整章/下一章/首次续读的三源限定 Web 分项；各次 UI、采集窗口与独立图片门分别保留范围。未重新完成 Native 产品交互，也未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。
