@@ -2,7 +2,7 @@
 
 本目录维护项目的 Java 兼容层、Source RPC 和浏览器桥。研究交付 release9 是历史起点；项目源码在这里继续开发，不受旧逐文件冻结清单约束。真正第三方源码通过根目录 `vendor/` submodules 固定，上游改动通过明确补丁物化。
 
-- `java/`：正式 Java 源码、JCL/Android/库 ABI 适配、Maven 配置与服务注册。`hostInvoke(sourceId, operation, argsJson)` 使用完整 DTO、分页与显式漫画/章节引用。
+- `java/`：正式 Java 源码、JCL/Android/库 ABI 适配、Maven 配置与服务注册。`hostInvoke` 使用完整 DTO、分页与显式漫画/章节引用；各宿主 entry 接收 requestId、generation 和独立 token，将 HTTP 与异步回调绑定到发起 RPC。
 - `patches/teavm/`：针对固定 TeaVM 上游的兼容补丁；[物化工具](../../tools/teavm/upstream-sources.ts) 校验原始和输出摘要，只写隔离构建目录。
 - `bridge/`：严格 TypeScript 产品浏览器桥。Zstd 只读取已校验的共享材料映射，Web 使用静态字节，Native 使用应用内字节。
 - `toolchain-lock.json`、`toolchain/`：工具版本、下载摘要、runtime seed 材料与 Android SDK 元数据。`toolchain/android-sdk-license` 是复制到 SDK `licenses/` 的协议接受摘要记录；协议正文在相邻 XML 元数据中。
@@ -30,7 +30,9 @@ Source 的默认网络配置由 owned `eu/kanade/tachiyomi/network/NetworkHelper
 
 ## 运行与回归
 
-当前 Java 边界支持 `popular`、`latest`、`search`、`details`、`chapters`、`pages`；非默认筛选显式拒绝，filters/preferences 映射仍待实现。图片需另接可取消、释放的二进制资源通道，当前产品明确不支持。
+当前 Java 边界支持 `popular`、`latest`、`search`、`details`、`chapters`、`pages`；非默认筛选显式拒绝，filters/preferences 映射仍待实现。当前合同为 `hostAbi=karuyomi-source-host-v4`、`protocolVersion=2`、HTTP `bridgeVersion=2`；旧 ABI 扩展需要重新构建，不提供兼容回退。原 Source 的 `enqueue` 在首次执行时绑定 RPC owner，主结果返回前有界等待回调结束；无法确认收尾时丢弃运行时，不把迟到结果归入下一个 RPC。
+
+正式图片通道保留原 Java Page 与 Source 图片处理链，经有界二进制通道交付不透明编码字节。Web 使用受管 Blob URL，Android/iOS 交接受管临时文件，再由同一 Flutter 图片入口识别、解码和显示；宿主不读取 MIME、尺寸或方向，不预解码。取消、generation、字节预算和释放确认分别由对应 owner 落实，详见[图片资源合同](../../docs/IMAGE-RESOURCES.md)及 [Native 文件合同](../../docs/NATIVE-IMAGE-FILES.md)。
 
 正式浏览器/网络集成回归使用产品 JS、直接静态 gzip、真实 workerd 与仅含网络策略的隔离 D1，并在独立测试入口验证 RS256 测试签名：
 
@@ -39,6 +41,6 @@ pnpm --filter @karuyomi/runtime-host build
 node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO_OUTPUT/artifacts
 ```
 
-打开脚本输出的 localhost 页面运行。它核对清单/hash 与实际 `hostInit/hostLoad`，再尝试真实漫画资料操作；范围、上游 Human Verification 阻断和原 Source 搜索行为见 [集成回归说明](../../apps/api/test/source-metadata-probe.md) 与 [实测摘要](../../docs/verification/runtime-evidence.md)。测试签名不替代生产 Access。
+打开脚本输出的 localhost 页面运行。它核对清单/hash 与实际 `hostInit/hostLoad`，再尝试真实漫画资料操作；设置 `SOURCE_PROBE_IMAGES=1` 可验证原 Source 图片处理、浏览器解码和资源释放。当前 v4 的三源分项见 [v4 运行记录](../../docs/verification/v4-source-runtime.md)；入口参数、历史上游挑战与搜索行为见 [集成回归说明](../../apps/api/test/source-metadata-probe.md) 与 [实测摘要](../../docs/verification/runtime-evidence.md)。测试签名不替代生产 Access，浏览器分项不替代 Native、真机或完整阅读验收。
 
 独立字节、回调与 iOS 研究工程和旧导入/构建脚本只保留在被忽略的 `.local/research/`。必要基线摘要、关键门槛与已知失败已归并到 [验证要点](../../docs/verification/runtime-evidence.md)，其中 R2/v1 记录属于历史机制证据。当前 Java、Worker 和 API 只维护 HTTP v2，已有分帧、Okio 按需消费及受控 workerd 网络取消回归；真实 Source/Cache 同版对照、图片资源、移动端内存和产品实测仍按 [HTTP 桥](../../docs/HTTP-BRIDGE.md) 与 [VERIFICATION](../../docs/VERIFICATION.md) 单独验收，不能据机制测试宣称 P0-B 完成。

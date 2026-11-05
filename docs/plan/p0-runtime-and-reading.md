@@ -19,7 +19,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 本轮先完成四项功能，再集中运行回归、构建与实际环境验收。提交前格式化、静态类型与依赖检查继续执行。生产 Access、Native 主入口、真机与性能门是独立的待验收项，不通过重复采样代替缺失功能；候选分片、LOD 与性能优化不扩大本轮实现范围。
 
-功能行为、集中工程回归和新 ABI 的交付限制见[功能收尾记录](../verification/p0-feature-completion.md)。当前尚未重建并在线验收 v4 官方 Source，也未部署；历史三源分项仍按原提交保留。
+功能行为、集中工程回归和新 ABI 的交付限制见[功能收尾记录](../verification/p0-feature-completion.md)。随后固定 `1f599cd` 已重编三个 v4 官方扩展，并通过 Web 元数据/原处理图片、xkcd 正式阅读及跨标签占用/释放分项，见[v4 运行记录](../verification/v4-source-runtime.md)；实际 TeaVM 的 owner/嵌套 enqueue/取消分项见[回调记录](../verification/teavm-enqueue.md)。这些本地产物尚未部署，历史三源证据仍按原提交保留。
 
 ## 已完成与边界
 

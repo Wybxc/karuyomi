@@ -24,3 +24,5 @@
 当前 host ABI 为 `karuyomi-source-host-v4`，protocolVersion 2、HTTP bridgeVersion 2 不变。Java 调用约定已改变，必须按新指纹重建扩展 AOT 和配套材料；旧 v3 输入、checkpoint 与证据保留原身份，不能混装或推广为 v4 通过。此次没有启动全量发布器或部署。
 
 受控 JVM、TS 和 Flutter 回归分别证明自身边界，不代表真实生产 Access 失效/回跳、v4 官方 Source 在线阅读、Native 主入口、真机或性能验收。P0 总状态仍为进行中；历史三源限定阅读证据见[图片边界记录](ui-image-boundary.md)，不以功能代码或工程检查替代总验收。
+
+本记录之后，固定 `1f599cd` 已取得三个 v4 原 Source 的 Web 元数据/图片、xkcd 正式阅读及跨标签写入门证据，见[v4 分项](v4-source-runtime.md)；后台回调也已通过[实际 TeaVM 分项](teavm-enqueue.md)。这些后续结果按各自输入和范围成立，不改变上文本地空索引构建的范围，也不代表部署、生产 Access 或 Native 通过。

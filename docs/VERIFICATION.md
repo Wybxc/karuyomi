@@ -33,6 +33,8 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 2026-11-05 功能收尾后当前 host ABI 为 `karuyomi-source-host-v4`，protocolVersion 2 / HTTP bridgeVersion 2 不变。Access 阅读暂停/同身份恢复、namespace 执行互斥、后台 enqueue owner/drain 和 Android 异常退出文件清理已实现，先完成实现再集中回归，见[功能收尾记录](verification/p0-feature-completion.md)。新 Java 调用约定需要重建 AOT 与 Web/Native 材料；下述历史 Source、Native 与生产记录保留原提交/ABI，不自动计为 v4 通过。
 
+随后固定 `1f599cd` 的三包 v4 原 Source 已重新 AOT，在内置 Chromium 156 通过元数据、原图片处理、2/3/3 张图片解码与释放；正式 Flutter xkcd 阅读完成、同 namespace 第二标签占用失败及关闭持有标签后重开也通过，见[v4 分项](verification/v4-source-runtime.md)。另以真实 TeaHost/BrowserCall AOT 和受控 Source/HTTP-v2 端点通过嵌套 enqueue、异常、取消及旧 owner 隔离，见[回调分项](verification/teavm-enqueue.md)。本轮未部署，不提升流水线兼容标记，不替代生产 Access、Native 或真机验收。
+
 此前控制身份为 host ABI `karuyomi-source-host-v3` / protocolVersion 2，HTTP bridgeVersion 仍为 2。浏览器探针入口已迁至单一 control 和正式生成 codec。固定 `6e08ec9` 后，原版 Arknights Comics 已重新 AOT，并在 Codex 内置浏览器通过初始化、真实 Source 元数据和首中末图片门，见 [v3 运行证据](verification/protocol-v3-runtime.md)。Native Reader 界面、运行中取消与当前 v3 部署仍须分项验收。生产 Access 正向 bootstrap 的单独证据见下文。下文 v2 图片和 v1 部署证据仍保持原身份；冻结 `022d828` 全量未改动，不能把其产物装配进当前客户端。
 
 同日将正则供体类命名从补丁移入构建生成步骤，使用 `java-parser` token 位置保留原排版与字面量，再应用行为补丁；全部 13 份生成 Java 与拆分前逐字节一致，原输出摘要未改。回归覆盖刻意保留的上游类型转换、Lexer 引用与继承关系、字符串/文本块和注释不误改，以及源码/上下文/结果漂移拒绝。`toolchain/license.txt` 同时改名为 `android-sdk-license`，仅更新锁中的路径，41 字节内容与摘要不变。

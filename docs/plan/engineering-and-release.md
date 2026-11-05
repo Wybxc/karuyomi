@@ -6,7 +6,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
-2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。Web/Native 材料及扩展必须按 v4 新指纹一起重建；旧 v3 产物在加载前明确拒绝，不提供兼容回退。下文 v1/v3 全量记录均为历史冻结批次，其 checkpoint 不修改、不混装；当前先集中验证已补功能，不启动新的全量发布器或启用定时 CI。
+2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。Web/Native 材料及扩展必须按 v4 新指纹一起重建；旧 v3 产物在加载前明确拒绝，不提供兼容回退。固定 `1f599cd` 的 xkcd、Arknights、CuuTruyen 已本地重编并通过限定 Web 运行/图片分项，见[v4 运行证据](../verification/v4-source-runtime.md)；尚未部署，也未重做完整发布验收。下文 v1/v3 全量记录均为历史冻结批次，其 checkpoint 不修改、不混装；当前不启动新的全量发布器或启用定时 CI。
 
 ## 已完成
 
@@ -29,7 +29,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证与可信部署后的网络政策同步。固定提交 `022d828` 的两包真实 AOT / 内置浏览器初始化、线上匿名 gzip 下载和旧版本远端清理均通过，D1 仅继承已有域名授权。固定该提交的本地单并发全量已经启动，队列包含剩余 1,446 包，尚未完成 baseline。首次全量最终部署、有界 CI 部署及客户端真实更新/旧缓存清理仍需收齐证据；CI 在完整 baseline 部署前继续停用。Actions secrets、全 TS 自动化、依赖规则与固定 Node 24 检查已验证，详细证据见 [VERIFICATION](../VERIFICATION.md)。
 
-当前 Protobuf 控制合同使用 host ABI `karuyomi-source-host-v4`、protocolVersion 2，HTTP bridgeVersion 保持 2；原型不兼容旧控制协议或 Page DTO。历史 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用当前客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v4 包须按新指纹重新构建和验收。完整 baseline 尚未部署、ABI 更新尚未验证前，不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
+当前 Protobuf 控制合同使用 host ABI `karuyomi-source-host-v4`、protocolVersion 2，HTTP bridgeVersion 保持 2；原型不兼容旧控制协议或 Page DTO。历史 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用当前客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v4 包须按新指纹重新构建和验收。三包本地运行不等于完整发布或 baseline 验收，完成并部署新 baseline 前不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
 
 2026-11-04，当前 hostFingerprint `46e63625a0e1920d284c1077de8aca939f8948d1e50694259834f0846844e0db` 的三包候选已通过正式交付校验。重连 / 布局修复后的客户端现已从固定 `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 成功完成正式 build、API Worker dry-run 与静态组装一致性检查；`main.dart.js` SHA-256 为 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`。host 输入、三包 AOT、共享材料 `63a061a…7a9d` 和 Native 内置 runtime 字节与原 b4 候选一致，静态索引 / 清单精确匹配，仅包含索引引用产物，MIME 规则正确。固定树跟踪输入干净，未改 checkpoint。
 
