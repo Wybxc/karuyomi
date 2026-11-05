@@ -296,6 +296,7 @@ void main() {
               wire.LibraryPageResponse(
                 schemaVersion: 1,
                 accountRevision: platform.businessServer.accountRevision,
+                categoryCatalog: wire.CategoryCatalog(),
                 error: wire.BusinessStateError(
                   code: wire
                       .BusinessStateErrorCode

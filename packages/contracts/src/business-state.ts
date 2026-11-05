@@ -18,9 +18,86 @@ export const BUSINESS_RESPONSE_LIMIT = 2 * 1024 * 1024;
 export const LIBRARY_METADATA_LIMIT = 96 * 1024;
 export const LIBRARY_PAGE_SIZE = 8;
 export const CHAPTER_PAGE_LIMIT = 2048;
+export const CATEGORY_LIMIT = 64;
 
 const mutationId = z.uuid();
 const mangaKey = z.string().regex(/^[a-f0-9]{64}$/);
+const categoryId = z.uuidv4();
+
+function categoryIds(values: string[]): void {
+  requireCondition(
+    values.length <= CATEGORY_LIMIT && new Set(values).size === values.length,
+    'Category identities must be unique and within budget',
+  );
+  values.forEach((id) => categoryId.parse(id));
+}
+
+function categoryName(value: string): void {
+  requireCondition(
+    value === value.trim() &&
+      value.length > 0 &&
+      [...value].length <= 100 &&
+      new TextEncoder().encode(value).byteLength <= 256 &&
+      [...value].every((scalar) => {
+        const point = scalar.codePointAt(0)!;
+        return point < 0xd800 || point > 0xdfff;
+      }),
+    'Category name must be trimmed and within budget',
+  );
+}
+
+export function validateCategoryCatalog(value: pb.CategoryCatalog): void {
+  uint32(value.revision);
+  categoryIds(value.categories.map((category) => category.id));
+  value.categories.forEach((category) => categoryName(category.name));
+}
+
+function validateMemberships(
+  manga: pb.MangaState,
+  catalog: pb.CategoryCatalog,
+): void {
+  const projected = catalog.categories
+    .filter((category) => manga.categoryIds.includes(category.id))
+    .map((category) => category.id);
+  requireCondition(
+    JSON.stringify(projected) === JSON.stringify(manga.categoryIds),
+    'Manga categories must follow the current catalog',
+  );
+}
+
+export const categoryMutationSchema = codec<pb.CategoryMutation>((input) => {
+  const value = parseMessage(
+    pb.CategoryMutationSchema,
+    input,
+    BUSINESS_REQUEST_LIMIT,
+  );
+  requireCondition(
+    value.schemaVersion === businessSchemaVersion,
+    'Unsupported business state schema',
+  );
+  mutationId.parse(value.mutationId);
+  uint32(value.expectedRevision);
+  switch (value.operation.case) {
+    case 'createCategory':
+      requireFields(value.operation.value, ['category']);
+      categoryId.parse(value.operation.value.category.id);
+      categoryName(value.operation.value.category.name);
+      break;
+    case 'renameCategory':
+      categoryId.parse(value.operation.value.categoryId);
+      categoryName(value.operation.value.name);
+      break;
+    case 'reorderCategories':
+      categoryIds(value.operation.value.categoryIds);
+      break;
+    case 'deleteCategory':
+      categoryId.parse(value.operation.value.categoryId);
+      break;
+    default:
+      throw new Error('A category mutation operation is required');
+  }
+  return value;
+});
 
 function uint32(value: number): void {
   requireCondition(
@@ -125,6 +202,7 @@ export function validateMangaState(value: pb.MangaState): void {
     'Favorite manga requires Source metadata',
   );
   if (value.resume) validId(value.resume.chapterKey);
+  categoryIds(value.categoryIds);
 }
 
 export const stateMutationSchema = codec<pb.StateMutation>((input) => {
@@ -168,6 +246,10 @@ export const stateMutationSchema = codec<pb.StateMutation>((input) => {
       requireFields(value.operation.value, ['snapshot']);
       validateChapterSnapshot(value.operation.value.snapshot);
       break;
+    case 'setCategories':
+      categoryIds(value.operation.value.categoryIds);
+      uint32(value.operation.value.expectedCatalogRevision);
+      break;
     default:
       throw new Error('A business state mutation operation is required');
   }
@@ -191,6 +273,7 @@ function validateResponse(value: {
   manga?: pb.MangaState | undefined;
   progress?: pb.ChapterProgressState | undefined;
   error?: pb.BusinessStateError | undefined;
+  categoryCatalog?: pb.CategoryCatalog | undefined;
 }): void {
   requireCondition(
     value.schemaVersion === businessSchemaVersion,
@@ -198,9 +281,13 @@ function validateResponse(value: {
   );
   uint32(value.accountRevision);
   if (value.error) validateError(value.error);
-  else requireFields(value, ['manga']);
+  else requireFields(value, ['manga', 'categoryCatalog']);
   if (value.manga) validateMangaState(value.manga);
   if (value.progress) validateChapterProgress(value.progress);
+  if (value.categoryCatalog) {
+    validateCategoryCatalog(value.categoryCatalog);
+    if (value.manga) validateMemberships(value.manga, value.categoryCatalog);
+  }
 }
 
 export const stateMutationResponseSchema = codec<pb.StateMutationResponse>(
@@ -241,6 +328,8 @@ export const libraryPageResponseSchema = codec<pb.LibraryPageResponse>(
       'Unsupported business state schema',
     );
     uint32(value.accountRevision);
+    if (!value.error) requireFields(value, ['categoryCatalog']);
+    if (value.categoryCatalog) validateCategoryCatalog(value.categoryCatalog);
     if (value.error) {
       validateError(value.error);
       requireCondition(
@@ -257,6 +346,8 @@ export const libraryPageResponseSchema = codec<pb.LibraryPageResponse>(
     let previousKey: string | undefined;
     for (const entry of value.entries) {
       validateMangaState(entry);
+      if (value.categoryCatalog)
+        validateMemberships(entry, value.categoryCatalog);
       requireCondition(entry.favorite, 'Library entries must be favorites');
       requireCondition(
         previousKey === undefined || previousKey < entry.mangaKey,
@@ -274,3 +365,44 @@ export const libraryPageResponseSchema = codec<pb.LibraryPageResponse>(
     return value;
   },
 );
+
+function validateCategoryResponse(value: {
+  schemaVersion: number;
+  accountRevision: number;
+  categoryCatalog?: pb.CategoryCatalog | undefined;
+  error?: pb.BusinessStateError | undefined;
+}): void {
+  requireCondition(
+    value.schemaVersion === businessSchemaVersion,
+    'Unsupported business state schema',
+  );
+  uint32(value.accountRevision);
+  if (value.error) validateError(value.error);
+  else requireFields(value, ['categoryCatalog']);
+  if (value.categoryCatalog) validateCategoryCatalog(value.categoryCatalog);
+}
+
+export const categoryCatalogResponseSchema = codec<pb.CategoryCatalogResponse>(
+  (input) => {
+    const value = parseMessage(
+      pb.CategoryCatalogResponseSchema,
+      input,
+      BUSINESS_RESPONSE_LIMIT,
+    );
+    validateCategoryResponse(value);
+    return value;
+  },
+);
+
+export const categoryMutationResponseSchema =
+  codec<pb.CategoryMutationResponse>((input) => {
+    const value = parseMessage(
+      pb.CategoryMutationResponseSchema,
+      input,
+      BUSINESS_RESPONSE_LIMIT,
+    );
+    if (!value.error || value.mutationId !== '')
+      mutationId.parse(value.mutationId);
+    validateCategoryResponse(value);
+    return value;
+  });

@@ -1,5 +1,6 @@
 import {
   integer,
+  foreignKey,
   primaryKey,
   sqliteTable,
   text,
@@ -23,7 +24,19 @@ export const extensionBuilds = sqliteTable('extension_builds', {
 export const accountState = sqliteTable('account_state', {
   subject: text('subject').primaryKey(),
   revision: integer('revision').notNull().default(0),
+  categoriesRevision: integer('categories_revision').notNull().default(0),
 });
+
+export const categories = sqliteTable(
+  'categories',
+  {
+    subject: text('subject').notNull(),
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    sortOrder: integer('sort_order').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.subject, table.id] })],
+);
 
 export const mangaState = sqliteTable(
   'manga_state',
@@ -58,6 +71,29 @@ export const stateMutations = sqliteTable(
     requestHash: text('request_hash').notNull(),
     attemptNonce: text('attempt_nonce').notNull(),
     responseJson: text('response_json').notNull(),
+    kind: text('kind', { enum: ['manga', 'category'] })
+      .notNull()
+      .default('manga'),
   },
   (table) => [primaryKey({ columns: [table.subject, table.mutationId] })],
+);
+
+export const mangaCategories = sqliteTable(
+  'manga_categories',
+  {
+    subject: text('subject').notNull(),
+    mangaKey: text('manga_key').notNull(),
+    categoryId: text('category_id').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.mangaKey, table.categoryId] }),
+    foreignKey({
+      columns: [table.subject, table.mangaKey],
+      foreignColumns: [mangaState.subject, mangaState.mangaKey],
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.subject, table.categoryId],
+      foreignColumns: [categories.subject, categories.id],
+    }).onDelete('cascade'),
+  ],
 );

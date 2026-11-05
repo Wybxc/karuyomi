@@ -1,15 +1,19 @@
-import { create, toJson } from '@bufbuild/protobuf';
+import { create, toJson, type MessageInitShape } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
   LibraryMetadataSchema,
   StateMutationSchema,
   type StateMutation,
+  CategoryMutationSchema,
+  type CategoryMutation,
 } from '@karuyomi/protocol';
 import {
   businessSchemaVersion,
   libraryPageResponseSchema,
   mangaStateResponseSchema,
   stateMutationResponseSchema,
+  categoryCatalogResponseSchema,
+  categoryMutationResponseSchema,
 } from '@karuyomi/contracts';
 import { build } from 'esbuild';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
@@ -132,6 +136,26 @@ async function client(subject: string = crypto.randomUUID()) {
       return {
         status: response.status,
         body: libraryPageResponseSchema.parse(await response.json()),
+      };
+    },
+    async categories() {
+      const response = await this.request('/api/categories');
+      expect(response.status).toBe(200);
+      return categoryCatalogResponseSchema.parse(await response.json());
+    },
+    async mutateCategory(mutation: CategoryMutation) {
+      const response = await this.request('/api/categories/mutations', {
+        method: 'POST',
+        headers: {
+          Origin: origin,
+          'X-App-Request': '1',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(toJson(CategoryMutationSchema, mutation)),
+      });
+      return {
+        status: response.status,
+        body: categoryMutationResponseSchema.parse(await response.json()),
       };
     },
   };
@@ -510,4 +534,274 @@ test('metadata updates use the stable source identity and malformed or oversized
     ).toBeDefined();
   }
   expect((await reader.state(add.mangaKey)).manga?.revision).toBe(2);
+});
+
+function category(
+  name = '分类',
+  expectedRevision = 0,
+  id = crypto.randomUUID(),
+) {
+  return create(CategoryMutationSchema, {
+    schemaVersion: 1,
+    mutationId: crypto.randomUUID(),
+    expectedRevision,
+    operation: { case: 'createCategory', value: { category: { id, name } } },
+  });
+}
+function categoryCommand(
+  expectedRevision: number,
+  operation: NonNullable<
+    MessageInitShape<typeof CategoryMutationSchema>['operation']
+  >,
+) {
+  return create(CategoryMutationSchema, {
+    schemaVersion: 1,
+    mutationId: crypto.randomUUID(),
+    expectedRevision,
+    operation,
+  });
+}
+function assign(
+  mangaKey: string,
+  expectedRevision: number,
+  expectedCatalogRevision: number,
+  categoryIds: string[],
+) {
+  return create(StateMutationSchema, {
+    schemaVersion: 1,
+    mutationId: crypto.randomUUID(),
+    mangaKey,
+    expectedRevision,
+    operation: {
+      case: 'setCategories',
+      value: { categoryIds, expectedCatalogRevision },
+    },
+  });
+}
+function createdId(mutation: CategoryMutation) {
+  if (
+    mutation.operation.case !== 'createCategory' ||
+    !mutation.operation.value.category
+  )
+    throw new Error('Missing create category');
+  return mutation.operation.value.category.id;
+}
+
+test('category catalog has independent CAS, ordering and current snapshot membership projection', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  expect((await first.categories()).categoryCatalog?.revision).toBe(0);
+  const a = category('同名');
+  const b = category('同名', 1);
+  expect((await first.mutateCategory(a)).body.categoryCatalog?.revision).toBe(
+    1,
+  );
+  expect((await second.mutateCategory(b)).status).toBe(200);
+  const ids = [createdId(a), createdId(b)];
+  const add = favorite();
+  await first.mutate(add);
+  expect(
+    (await first.mutate(assign(add.mangaKey, 1, 2, ids.slice().reverse()))).body
+      .manga?.categoryIds,
+  ).toEqual(ids);
+  const renamed = await second.mutateCategory(
+    categoryCommand(2, {
+      case: 'renameCategory',
+      value: { categoryId: ids[0]!, name: '工作日' },
+    }),
+  );
+  expect(renamed.body.categoryCatalog?.revision).toBe(3);
+  const reordered = await second.mutateCategory(
+    categoryCommand(3, {
+      case: 'reorderCategories',
+      value: { categoryIds: ids.slice().reverse() },
+    }),
+  );
+  expect(
+    reordered.body.categoryCatalog?.categories.map((value) => value.id),
+  ).toEqual(ids.slice().reverse());
+  const state = await first.state(add.mangaKey);
+  expect(state.manga?.revision).toBe(2);
+  expect(state.manga?.categoryIds).toEqual(ids.slice().reverse());
+  expect(state.categoryCatalog).toEqual(reordered.body.categoryCatalog);
+  expect((await first.library()).body.entries[0]?.categoryIds).toEqual(
+    ids.slice().reverse(),
+  );
+  const db = await worker.getD1Database('DB');
+  const stored = await db
+    .prepare(
+      'SELECT state_json FROM manga_state WHERE subject = ? AND manga_key = ?',
+    )
+    .bind(first.subject, add.mangaKey)
+    .first<string>('state_json');
+  expect(JSON.parse(stored ?? '{}').categoryIds).toBeUndefined();
+  expect(
+    (await first.mutate(assign(add.mangaKey, 2, 2, []))).body.error?.code,
+  ).toBe(ErrorCode.REVISION_CONFLICT);
+  expect(
+    (await first.mutate(assign(add.mangaKey, 1, 4, []))).body.error?.code,
+  ).toBe(ErrorCode.REVISION_CONFLICT);
+  expect(
+    (await first.mutate(assign(add.mangaKey, 2, 4, [crypto.randomUUID()])))
+      .status,
+  ).toBe(400);
+});
+
+test('category CAS has one winner, retries keep original snapshots and mutation UUIDs cannot cross message kinds', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const a = category();
+  const b = category();
+  const results = await Promise.all([
+    first.mutateCategory(a),
+    second.mutateCategory(b),
+  ]);
+  expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+  const winner = results[0]?.status === 200 ? a : b;
+  const acknowledged = results.find((result) => result.status === 200)?.body;
+  await second.mutateCategory(category('later', 1));
+  expect((await first.mutateCategory(winner)).body).toEqual(acknowledged);
+  const reused = favorite();
+  reused.mutationId = winner.mutationId;
+  expect((await first.mutate(reused)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  const mangaMutation = favorite();
+  await first.mutate(mangaMutation);
+  const inverse = category('inverse', 2);
+  inverse.mutationId = mangaMutation.mutationId;
+  expect((await first.mutateCategory(inverse)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  expect((await first.categories()).categoryCatalog?.revision).toBe(2);
+});
+
+test('category deletion atomically changes relationship and both manga revision representations without changing progress', async () => {
+  const first = await client();
+  const add = favorite();
+  await first.mutate(add);
+  const saved = await first.mutate(save(add.mangaKey, 1));
+  const created = category();
+  await first.mutateCategory(created);
+  const id = createdId(created);
+  await first.mutate(assign(add.mangaKey, 2, 1, [id]));
+  const removed = await first.mutateCategory(
+    categoryCommand(1, { case: 'deleteCategory', value: { categoryId: id } }),
+  );
+  expect(removed.status).toBe(200);
+  expect(removed.body.categoryCatalog?.categories).toEqual([]);
+  const state = await first.state(add.mangaKey, 'chapter-1');
+  expect(state.manga?.revision).toBe(4);
+  expect(state.manga?.categoryIds).toEqual([]);
+  expect(state.progress).toEqual(saved.body.progress);
+  expect(state.manga?.resume).toEqual(saved.body.manga?.resume);
+  expect(state.manga?.metadata).toEqual(saved.body.manga?.metadata);
+  expect(state.manga?.favorite).toBe(true);
+  const db = await worker.getD1Database('DB');
+  const row = await db
+    .prepare(
+      "SELECT revision, json_extract(state_json, '$.revision') json_revision FROM manga_state WHERE subject = ? AND manga_key = ?",
+    )
+    .bind(first.subject, add.mangaKey)
+    .first();
+  expect(row).toEqual({ revision: 4, json_revision: 4 });
+  expect(
+    await db
+      .prepare('SELECT count(*) n FROM manga_categories WHERE subject = ?')
+      .bind(first.subject)
+      .first('n'),
+  ).toBe(0);
+  expect((await first.mutate(assign(add.mangaKey, 3, 1, [id]))).status).toBe(
+    409,
+  );
+});
+
+test('racing category deletion and new membership cannot leave dangling categories or overwrite progress', async () => {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const first = await client();
+    const second = await client(first.subject);
+    const add = favorite();
+    await first.mutate(add);
+    const created = category();
+    await first.mutateCategory(created);
+    const id = createdId(created);
+    const [assigned, deleted] = await Promise.all([
+      first.mutate(assign(add.mangaKey, 1, 1, [id])),
+      second.mutateCategory(
+        categoryCommand(1, {
+          case: 'deleteCategory',
+          value: { categoryId: id },
+        }),
+      ),
+    ]);
+    expect(deleted.status).toBe(200);
+    expect([200, 409]).toContain(assigned.status);
+    const state = await first.state(add.mangaKey);
+    expect(state.manga?.categoryIds).toEqual([]);
+    expect(state.manga?.revision).toBe(assigned.status === 200 ? 3 : 1);
+    expect(state.categoryCatalog?.categories).toEqual([]);
+  }
+});
+
+test('category mutation failure rolls back catalog, relationships, manga JSON and all revisions', async () => {
+  const first = await client();
+  const created = category();
+  await first.mutateCategory(created);
+  const id = createdId(created);
+  const add = favorite();
+  await first.mutate(add);
+  await first.mutate(assign(add.mangaKey, 1, 1, [id]));
+  const before = await first.state(add.mangaKey);
+  const db = await worker.getD1Database('DB');
+  await db.exec(
+    `CREATE TRIGGER fail_category_delete BEFORE DELETE ON categories WHEN OLD.subject = '${first.subject}' BEGIN SELECT RAISE(ABORT, 'controlled category failure'); END`,
+  );
+  const request = categoryCommand(1, {
+    case: 'deleteCategory',
+    value: { categoryId: id },
+  });
+  expect((await first.mutateCategory(request)).status).toBe(503);
+  expect(await first.state(add.mangaKey)).toEqual(before);
+  expect(
+    await db
+      .prepare(
+        'SELECT count(*) n FROM state_mutations WHERE subject = ? AND mutation_id = ?',
+      )
+      .bind(first.subject, request.mutationId)
+      .first('n'),
+  ).toBe(0);
+  await db.exec('DROP TRIGGER fail_category_delete');
+  expect((await first.mutateCategory(request)).status).toBe(200);
+});
+
+test('catalog changes invalidate pagination, empty shelves expose categories and subject boundaries remain enforced', async () => {
+  const first = await client();
+  const other = await client();
+  const created = category();
+  await first.mutateCategory(created);
+  const empty = await first.library();
+  expect(empty.body.entries).toEqual([]);
+  expect(empty.body.categoryCatalog?.categories[0]?.id).toBe(
+    createdId(created),
+  );
+  expect((await other.categories()).categoryCatalog?.categories).toEqual([]);
+  const forged = await other.request('/api/categories', {
+    headers: { 'X-App-Subject': first.subject },
+  });
+  expect(forged.status).toBe(403);
+  for (let index = 0; index < 9; index++) await first.mutate(favorite());
+  const page = await first.library();
+  await first.mutateCategory(category('new category', 1));
+  const stale = await first.library(
+    `?afterKey=${page.body.nextKey}&revision=${page.body.accountRevision}`,
+  );
+  expect(stale.status).toBe(409);
+  expect(stale.body.entries).toEqual([]);
+  const invalidReorder = await first.mutateCategory(
+    categoryCommand(2, {
+      case: 'reorderCategories',
+      value: { categoryIds: [] },
+    }),
+  );
+  expect(invalidReorder.status).toBe(400);
 });

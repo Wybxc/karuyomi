@@ -34,6 +34,9 @@ Future<void> main() async {
         'StateMutationResponse' => wire.StateMutationResponse(),
         'MangaStateResponse' => wire.MangaStateResponse(),
         'LibraryPageResponse' => wire.LibraryPageResponse(),
+        'CategoryMutation' => wire.CategoryMutation(),
+        'CategoryMutationResponse' => wire.CategoryMutationResponse(),
+        'CategoryCatalogResponse' => wire.CategoryCatalogResponse(),
         _ => throw const FormatException('Unknown protocol fixture type'),
       };
       wire.decodeProtoJson(message, input['value']);

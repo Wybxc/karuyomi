@@ -136,12 +136,15 @@ void main() {
       final valid = wire.LibraryPageResponse(
         schemaVersion: 1,
         accountRevision: 2,
+        categoryCatalog: wire.CategoryCatalog(),
         entries: entries,
         nextKey: entries.last.mangaKey,
       );
       expect(() => validateBusinessLibraryPage(valid), returnsNormally);
       for (final item in [
         valid.deepCopy()..schemaVersion = 2,
+        valid.deepCopy()..clearCategoryCatalog(),
+        valid.deepCopy()..categoryCatalog.revision = 3,
         valid.deepCopy()..entries.setAll(0, entries.reversed),
         valid.deepCopy()..entries.setAll(0, [entries.first, entries.first]),
         valid.deepCopy()..nextKey = 'c' * 64,
@@ -174,6 +177,65 @@ void main() {
         () => validateBusinessError(
           wire.BusinessStateError(message: 'Unspecified error'),
         ),
+        throwsFormatException,
+      );
+    },
+  );
+
+  test(
+    'category catalogs enforce identities, UTF-8 names and association order',
+    () {
+      const first = '10000000-0000-4000-8000-000000000001';
+      const second = '10000000-0000-4000-8000-000000000002';
+      final catalog = wire.CategoryCatalog(
+        revision: 2,
+        categories: [
+          wire.Category(id: first, name: '重复'),
+          wire.Category(id: second, name: '重复'),
+        ],
+      );
+      expect(() => validateBusinessCategoryCatalog(catalog), returnsNormally);
+      expect(() => validateBusinessCategoryName('😀' * 64), returnsNormally);
+      for (final name in ['', ' blank', 'blank ', 'a' * 101, '😀' * 65]) {
+        expect(() => validateBusinessCategoryName(name), throwsFormatException);
+      }
+      for (final invalid in [
+        catalog.deepCopy()..categories.last.id = first,
+        catalog.deepCopy()
+          ..categories.last.id = '10000000-0000-1000-8000-000000000002',
+        catalog.deepCopy()..categories.last.name = ' invalid ',
+        wire.CategoryCatalog(
+          categories: List.generate(
+            65,
+            (i) => wire.Category(
+              id: '10000000-0000-4000-8000-${i.toRadixString(16).padLeft(12, '0')}',
+              name: 'Category',
+            ),
+          ),
+        ),
+      ]) {
+        expect(
+          () => validateBusinessCategoryCatalog(invalid),
+          throwsFormatException,
+        );
+      }
+      final state = manga('a')..categoryIds.addAll([first, second]);
+      expect(
+        () => validateBusinessMangaCategories(state, catalog),
+        returnsNormally,
+      );
+      state.categoryIds
+        ..clear()
+        ..addAll([second, first]);
+      expect(
+        () => validateBusinessMangaCategories(state, catalog),
+        throwsFormatException,
+      );
+      state.categoryIds
+        ..clear()
+        ..add('10000000-0000-4000-8000-000000000003');
+      expect(
+        () => validateBusinessMangaCategories(state, catalog),
         throwsFormatException,
       );
     },

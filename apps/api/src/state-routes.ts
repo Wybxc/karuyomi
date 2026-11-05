@@ -4,11 +4,14 @@ import {
   LibraryPageResponseSchema,
   MangaStateResponseSchema,
   StateMutationResponseSchema,
+  CategoryCatalogResponseSchema,
+  CategoryMutationResponseSchema,
 } from '@karuyomi/protocol';
 import {
   businessSchemaVersion,
   BUSINESS_REQUEST_LIMIT,
   stateMutationSchema,
+  categoryMutationSchema,
 } from '@karuyomi/contracts';
 import { Hono, type MiddlewareHandler } from 'hono';
 import type { AppEnv } from './env.js';
@@ -17,6 +20,8 @@ import {
   readLibrary,
   readMangaState,
   StateError,
+  readCategoryCatalog,
+  applyCategoryMutation,
 } from './state-store.js';
 
 async function requestJson(request: Request): Promise<unknown> {
@@ -88,6 +93,32 @@ export function createStateRoutes() {
           ),
           403,
         );
+      if (
+        c.req.path === '/api/categories' ||
+        c.req.path === '/api/categories/mutations'
+      ) {
+        if (c.req.path === '/api/categories')
+          return c.json(
+            toJson(
+              CategoryCatalogResponseSchema,
+              create(CategoryCatalogResponseSchema, {
+                schemaVersion: businessSchemaVersion,
+                error,
+              }),
+            ),
+            403,
+          );
+        return c.json(
+          toJson(
+            CategoryMutationResponseSchema,
+            create(CategoryMutationResponseSchema, {
+              schemaVersion: businessSchemaVersion,
+              error,
+            }),
+          ),
+          403,
+        );
+      }
       if (c.req.path === '/api/state/mutations')
         return c.json(
           toJson(
@@ -115,6 +146,68 @@ export function createStateRoutes() {
   app.use('/library', bindSession);
   app.use('/state/manga/:mangaKey', bindSession);
   app.use('/state/mutations', bindSession);
+  app.use('/categories', bindSession);
+  app.use('/categories/mutations', bindSession);
+  app.get('/categories', async (c) => {
+    try {
+      return c.json(
+        toJson(
+          CategoryCatalogResponseSchema,
+          await readCategoryCatalog(c.env.DB, c.get('identity').subject),
+        ),
+      );
+    } catch (error) {
+      const failure = stateFailure(error);
+      return c.json(
+        toJson(
+          CategoryCatalogResponseSchema,
+          create(CategoryCatalogResponseSchema, {
+            schemaVersion: businessSchemaVersion,
+            error: failure.error,
+          }),
+        ),
+        failure.status,
+      );
+    }
+  });
+  app.post('/categories/mutations', async (c) => {
+    let mutationId = '';
+    try {
+      let mutation;
+      try {
+        mutation = categoryMutationSchema.parse(await requestJson(c.req.raw));
+      } catch (error) {
+        if (error instanceof StateError) throw error;
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Invalid category mutation',
+        );
+      }
+      mutationId = mutation.mutationId;
+      const result = await applyCategoryMutation(
+        c.env.DB,
+        c.get('identity').subject,
+        mutation,
+      );
+      return c.json(
+        toJson(CategoryMutationResponseSchema, result.response),
+        result.status,
+      );
+    } catch (error) {
+      const failure = stateFailure(error);
+      return c.json(
+        toJson(
+          CategoryMutationResponseSchema,
+          create(CategoryMutationResponseSchema, {
+            schemaVersion: businessSchemaVersion,
+            mutationId,
+            error: failure.error,
+          }),
+        ),
+        failure.status,
+      );
+    }
+  });
   app.get('/library', async (c) => {
     try {
       const after = c.req.query('afterKey') ?? '';

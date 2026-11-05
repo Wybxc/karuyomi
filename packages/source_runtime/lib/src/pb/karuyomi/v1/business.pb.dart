@@ -208,6 +208,7 @@ class MangaState extends $pb.GeneratedMessage {
     $core.bool? favorite,
     $core.int? addedAtSeconds,
     MangaResume? resume,
+    $core.Iterable<$core.String>? categoryIds,
   }) {
     final result = MangaState._();
     if (mangaKey != null) result.mangaKey = mangaKey;
@@ -216,6 +217,7 @@ class MangaState extends $pb.GeneratedMessage {
     if (favorite != null) result.favorite = favorite;
     if (addedAtSeconds != null) result.addedAtSeconds = addedAtSeconds;
     if (resume != null) result.resume = resume;
+    if (categoryIds != null) result.categoryIds.addAll(categoryIds);
     return result;
   }
 
@@ -241,6 +243,7 @@ class MangaState extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..aOM<MangaResume>(6, _omitFieldNames ? '' : 'resume',
         subBuilder: MangaResume.$_createMessage)
+    ..pPS(7, _omitFieldNames ? '' : 'categoryIds')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -272,7 +275,7 @@ class MangaState extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearMangaKey() => $_clearField(1);
 
-  /// Covers every metadata, favorite, progress and resume mutation for a manga.
+  /// Covers every metadata, favorite, category, progress and resume mutation.
   @$pb.TagNumber(2)
   $core.int get revision => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -321,6 +324,614 @@ class MangaState extends $pb.GeneratedMessage {
   void clearResume() => $_clearField(6);
   @$pb.TagNumber(6)
   MangaResume ensureResume() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<$core.String> get categoryIds => $_getList(6);
+}
+
+class Category extends $pb.GeneratedMessage {
+  factory Category({
+    $core.String? id,
+    $core.String? name,
+  }) {
+    final result = Category._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    return result;
+  }
+
+  Category._();
+
+  factory Category.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Category()..mergeFromBuffer(data, registry);
+  factory Category.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Category()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Category',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: Category.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Category clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Category copyWith(void Function(Category) updates) =>
+      super.copyWith((message) => updates(message as Category)) as Category;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Category() / Category.new instead')
+  static Category create() => Category._();
+  static $pb.GeneratedMessage $_createMessage() => Category._();
+  @$core.override
+  Category createEmptyInstance() => Category._();
+  @$core.pragma('dart2js:noInline')
+  static Category getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Category>(Category.$_createMessage);
+  static Category? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+}
+
+class CategoryCatalog extends $pb.GeneratedMessage {
+  factory CategoryCatalog({
+    $core.int? revision,
+    $core.Iterable<Category>? categories,
+  }) {
+    final result = CategoryCatalog._();
+    if (revision != null) result.revision = revision;
+    if (categories != null) result.categories.addAll(categories);
+    return result;
+  }
+
+  CategoryCatalog._();
+
+  factory CategoryCatalog.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryCatalog()..mergeFromBuffer(data, registry);
+  factory CategoryCatalog.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryCatalog()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CategoryCatalog',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CategoryCatalog.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'revision', fieldType: $pb.PbFieldType.OU3)
+    ..pPM<Category>(2, _omitFieldNames ? '' : 'categories',
+        subBuilder: Category.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryCatalog clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryCatalog copyWith(void Function(CategoryCatalog) updates) =>
+      super.copyWith((message) => updates(message as CategoryCatalog))
+          as CategoryCatalog;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CategoryCatalog() / CategoryCatalog.new instead')
+  static CategoryCatalog create() => CategoryCatalog._();
+  static $pb.GeneratedMessage $_createMessage() => CategoryCatalog._();
+  @$core.override
+  CategoryCatalog createEmptyInstance() => CategoryCatalog._();
+  @$core.pragma('dart2js:noInline')
+  static CategoryCatalog getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CategoryCatalog>(
+          CategoryCatalog.$_createMessage);
+  static CategoryCatalog? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get revision => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set revision($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRevision() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRevision() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<Category> get categories => $_getList(1);
+}
+
+class SetCategories extends $pb.GeneratedMessage {
+  factory SetCategories({
+    $core.Iterable<$core.String>? categoryIds,
+    $core.int? expectedCatalogRevision,
+  }) {
+    final result = SetCategories._();
+    if (categoryIds != null) result.categoryIds.addAll(categoryIds);
+    if (expectedCatalogRevision != null)
+      result.expectedCatalogRevision = expectedCatalogRevision;
+    return result;
+  }
+
+  SetCategories._();
+
+  factory SetCategories.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetCategories()..mergeFromBuffer(data, registry);
+  factory SetCategories.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetCategories()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetCategories',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SetCategories.$_createMessage)
+    ..pPS(1, _omitFieldNames ? '' : 'categoryIds')
+    ..aI(2, _omitFieldNames ? '' : 'expectedCatalogRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetCategories clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetCategories copyWith(void Function(SetCategories) updates) =>
+      super.copyWith((message) => updates(message as SetCategories))
+          as SetCategories;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SetCategories() / SetCategories.new instead')
+  static SetCategories create() => SetCategories._();
+  static $pb.GeneratedMessage $_createMessage() => SetCategories._();
+  @$core.override
+  SetCategories createEmptyInstance() => SetCategories._();
+  @$core.pragma('dart2js:noInline')
+  static SetCategories getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SetCategories>(
+          SetCategories.$_createMessage);
+  static SetCategories? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get categoryIds => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.int get expectedCatalogRevision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set expectedCatalogRevision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasExpectedCatalogRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearExpectedCatalogRevision() => $_clearField(2);
+}
+
+class CreateCategory extends $pb.GeneratedMessage {
+  factory CreateCategory({
+    Category? category,
+  }) {
+    final result = CreateCategory._();
+    if (category != null) result.category = category;
+    return result;
+  }
+
+  CreateCategory._();
+
+  factory CreateCategory.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateCategory()..mergeFromBuffer(data, registry);
+  factory CreateCategory.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateCategory()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateCategory',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CreateCategory.$_createMessage)
+    ..aOM<Category>(1, _omitFieldNames ? '' : 'category',
+        subBuilder: Category.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateCategory clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateCategory copyWith(void Function(CreateCategory) updates) =>
+      super.copyWith((message) => updates(message as CreateCategory))
+          as CreateCategory;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CreateCategory() / CreateCategory.new instead')
+  static CreateCategory create() => CreateCategory._();
+  static $pb.GeneratedMessage $_createMessage() => CreateCategory._();
+  @$core.override
+  CreateCategory createEmptyInstance() => CreateCategory._();
+  @$core.pragma('dart2js:noInline')
+  static CreateCategory getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CreateCategory>(
+          CreateCategory.$_createMessage);
+  static CreateCategory? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Category get category => $_getN(0);
+  @$pb.TagNumber(1)
+  set category(Category value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCategory() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCategory() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Category ensureCategory() => $_ensure(0);
+}
+
+class RenameCategory extends $pb.GeneratedMessage {
+  factory RenameCategory({
+    $core.String? categoryId,
+    $core.String? name,
+  }) {
+    final result = RenameCategory._();
+    if (categoryId != null) result.categoryId = categoryId;
+    if (name != null) result.name = name;
+    return result;
+  }
+
+  RenameCategory._();
+
+  factory RenameCategory.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RenameCategory()..mergeFromBuffer(data, registry);
+  factory RenameCategory.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RenameCategory()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RenameCategory',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: RenameCategory.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'categoryId')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RenameCategory clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RenameCategory copyWith(void Function(RenameCategory) updates) =>
+      super.copyWith((message) => updates(message as RenameCategory))
+          as RenameCategory;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use RenameCategory() / RenameCategory.new instead')
+  static RenameCategory create() => RenameCategory._();
+  static $pb.GeneratedMessage $_createMessage() => RenameCategory._();
+  @$core.override
+  RenameCategory createEmptyInstance() => RenameCategory._();
+  @$core.pragma('dart2js:noInline')
+  static RenameCategory getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RenameCategory>(
+          RenameCategory.$_createMessage);
+  static RenameCategory? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get categoryId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set categoryId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCategoryId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCategoryId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+}
+
+class ReorderCategories extends $pb.GeneratedMessage {
+  factory ReorderCategories({
+    $core.Iterable<$core.String>? categoryIds,
+  }) {
+    final result = ReorderCategories._();
+    if (categoryIds != null) result.categoryIds.addAll(categoryIds);
+    return result;
+  }
+
+  ReorderCategories._();
+
+  factory ReorderCategories.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReorderCategories()..mergeFromBuffer(data, registry);
+  factory ReorderCategories.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReorderCategories()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReorderCategories',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ReorderCategories.$_createMessage)
+    ..pPS(1, _omitFieldNames ? '' : 'categoryIds')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReorderCategories clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReorderCategories copyWith(void Function(ReorderCategories) updates) =>
+      super.copyWith((message) => updates(message as ReorderCategories))
+          as ReorderCategories;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ReorderCategories() / ReorderCategories.new instead')
+  static ReorderCategories create() => ReorderCategories._();
+  static $pb.GeneratedMessage $_createMessage() => ReorderCategories._();
+  @$core.override
+  ReorderCategories createEmptyInstance() => ReorderCategories._();
+  @$core.pragma('dart2js:noInline')
+  static ReorderCategories getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ReorderCategories>(
+          ReorderCategories.$_createMessage);
+  static ReorderCategories? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get categoryIds => $_getList(0);
+}
+
+class DeleteCategory extends $pb.GeneratedMessage {
+  factory DeleteCategory({
+    $core.String? categoryId,
+  }) {
+    final result = DeleteCategory._();
+    if (categoryId != null) result.categoryId = categoryId;
+    return result;
+  }
+
+  DeleteCategory._();
+
+  factory DeleteCategory.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteCategory()..mergeFromBuffer(data, registry);
+  factory DeleteCategory.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteCategory()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteCategory',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: DeleteCategory.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'categoryId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteCategory clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteCategory copyWith(void Function(DeleteCategory) updates) =>
+      super.copyWith((message) => updates(message as DeleteCategory))
+          as DeleteCategory;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DeleteCategory() / DeleteCategory.new instead')
+  static DeleteCategory create() => DeleteCategory._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteCategory._();
+  @$core.override
+  DeleteCategory createEmptyInstance() => DeleteCategory._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteCategory getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DeleteCategory>(
+          DeleteCategory.$_createMessage);
+  static DeleteCategory? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get categoryId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set categoryId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCategoryId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCategoryId() => $_clearField(1);
+}
+
+enum CategoryMutation_Operation {
+  createCategory,
+  renameCategory,
+  reorderCategories,
+  deleteCategory,
+  notSet
+}
+
+class CategoryMutation extends $pb.GeneratedMessage {
+  factory CategoryMutation({
+    $core.int? schemaVersion,
+    $core.String? mutationId,
+    $core.int? expectedRevision,
+    CreateCategory? createCategory,
+    RenameCategory? renameCategory,
+    ReorderCategories? reorderCategories,
+    DeleteCategory? deleteCategory,
+  }) {
+    final result = CategoryMutation._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (mutationId != null) result.mutationId = mutationId;
+    if (expectedRevision != null) result.expectedRevision = expectedRevision;
+    if (createCategory != null) result.createCategory = createCategory;
+    if (renameCategory != null) result.renameCategory = renameCategory;
+    if (reorderCategories != null) result.reorderCategories = reorderCategories;
+    if (deleteCategory != null) result.deleteCategory = deleteCategory;
+    return result;
+  }
+
+  CategoryMutation._();
+
+  factory CategoryMutation.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryMutation()..mergeFromBuffer(data, registry);
+  factory CategoryMutation.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryMutation()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, CategoryMutation_Operation>
+      _CategoryMutation_OperationByTag = {
+    10: CategoryMutation_Operation.createCategory,
+    11: CategoryMutation_Operation.renameCategory,
+    12: CategoryMutation_Operation.reorderCategories,
+    13: CategoryMutation_Operation.deleteCategory,
+    0: CategoryMutation_Operation.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CategoryMutation',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CategoryMutation.$_createMessage)
+    ..oo(0, [10, 11, 12, 13])
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(2, _omitFieldNames ? '' : 'mutationId')
+    ..aI(3, _omitFieldNames ? '' : 'expectedRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<CreateCategory>(10, _omitFieldNames ? '' : 'createCategory',
+        subBuilder: CreateCategory.$_createMessage)
+    ..aOM<RenameCategory>(11, _omitFieldNames ? '' : 'renameCategory',
+        subBuilder: RenameCategory.$_createMessage)
+    ..aOM<ReorderCategories>(12, _omitFieldNames ? '' : 'reorderCategories',
+        subBuilder: ReorderCategories.$_createMessage)
+    ..aOM<DeleteCategory>(13, _omitFieldNames ? '' : 'deleteCategory',
+        subBuilder: DeleteCategory.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryMutation clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryMutation copyWith(void Function(CategoryMutation) updates) =>
+      super.copyWith((message) => updates(message as CategoryMutation))
+          as CategoryMutation;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CategoryMutation() / CategoryMutation.new instead')
+  static CategoryMutation create() => CategoryMutation._();
+  static $pb.GeneratedMessage $_createMessage() => CategoryMutation._();
+  @$core.override
+  CategoryMutation createEmptyInstance() => CategoryMutation._();
+  @$core.pragma('dart2js:noInline')
+  static CategoryMutation getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CategoryMutation>(
+          CategoryMutation.$_createMessage);
+  static CategoryMutation? _defaultInstance;
+
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  CategoryMutation_Operation whichOperation() =>
+      _CategoryMutation_OperationByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  void clearOperation() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mutationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mutationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMutationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMutationId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get expectedRevision => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set expectedRevision($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpectedRevision() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpectedRevision() => $_clearField(3);
+
+  @$pb.TagNumber(10)
+  CreateCategory get createCategory => $_getN(3);
+  @$pb.TagNumber(10)
+  set createCategory(CreateCategory value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasCreateCategory() => $_has(3);
+  @$pb.TagNumber(10)
+  void clearCreateCategory() => $_clearField(10);
+  @$pb.TagNumber(10)
+  CreateCategory ensureCreateCategory() => $_ensure(3);
+
+  @$pb.TagNumber(11)
+  RenameCategory get renameCategory => $_getN(4);
+  @$pb.TagNumber(11)
+  set renameCategory(RenameCategory value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasRenameCategory() => $_has(4);
+  @$pb.TagNumber(11)
+  void clearRenameCategory() => $_clearField(11);
+  @$pb.TagNumber(11)
+  RenameCategory ensureRenameCategory() => $_ensure(4);
+
+  @$pb.TagNumber(12)
+  ReorderCategories get reorderCategories => $_getN(5);
+  @$pb.TagNumber(12)
+  set reorderCategories(ReorderCategories value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasReorderCategories() => $_has(5);
+  @$pb.TagNumber(12)
+  void clearReorderCategories() => $_clearField(12);
+  @$pb.TagNumber(12)
+  ReorderCategories ensureReorderCategories() => $_ensure(5);
+
+  @$pb.TagNumber(13)
+  DeleteCategory get deleteCategory => $_getN(6);
+  @$pb.TagNumber(13)
+  set deleteCategory(DeleteCategory value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasDeleteCategory() => $_has(6);
+  @$pb.TagNumber(13)
+  void clearDeleteCategory() => $_clearField(13);
+  @$pb.TagNumber(13)
+  DeleteCategory ensureDeleteCategory() => $_ensure(6);
 }
 
 class ReadingAnchor extends $pb.GeneratedMessage {
@@ -853,6 +1464,7 @@ enum StateMutation_Operation {
   updateMetadata,
   saveProgress,
   resetProgress,
+  setCategories,
   notSet
 }
 
@@ -866,6 +1478,7 @@ class StateMutation extends $pb.GeneratedMessage {
     LibraryMetadata? updateMetadata,
     SaveProgress? saveProgress,
     ResetProgress? resetProgress,
+    SetCategories? setCategories,
   }) {
     final result = StateMutation._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -876,6 +1489,7 @@ class StateMutation extends $pb.GeneratedMessage {
     if (updateMetadata != null) result.updateMetadata = updateMetadata;
     if (saveProgress != null) result.saveProgress = saveProgress;
     if (resetProgress != null) result.resetProgress = resetProgress;
+    if (setCategories != null) result.setCategories = setCategories;
     return result;
   }
 
@@ -894,13 +1508,14 @@ class StateMutation extends $pb.GeneratedMessage {
     11: StateMutation_Operation.updateMetadata,
     12: StateMutation_Operation.saveProgress,
     13: StateMutation_Operation.resetProgress,
+    14: StateMutation_Operation.setCategories,
     0: StateMutation_Operation.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'StateMutation',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: StateMutation.$_createMessage)
-    ..oo(0, [10, 11, 12, 13])
+    ..oo(0, [10, 11, 12, 13, 14])
     ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
         fieldType: $pb.PbFieldType.OU3)
     ..aOS(2, _omitFieldNames ? '' : 'mutationId')
@@ -915,6 +1530,8 @@ class StateMutation extends $pb.GeneratedMessage {
         subBuilder: SaveProgress.$_createMessage)
     ..aOM<ResetProgress>(13, _omitFieldNames ? '' : 'resetProgress',
         subBuilder: ResetProgress.$_createMessage)
+    ..aOM<SetCategories>(14, _omitFieldNames ? '' : 'setCategories',
+        subBuilder: SetCategories.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -943,12 +1560,14 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   StateMutation_Operation whichOperation() =>
       _StateMutation_OperationByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   void clearOperation() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -1031,6 +1650,17 @@ class StateMutation extends $pb.GeneratedMessage {
   void clearResetProgress() => $_clearField(13);
   @$pb.TagNumber(13)
   ResetProgress ensureResetProgress() => $_ensure(7);
+
+  @$pb.TagNumber(14)
+  SetCategories get setCategories => $_getN(8);
+  @$pb.TagNumber(14)
+  set setCategories(SetCategories value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasSetCategories() => $_has(8);
+  @$pb.TagNumber(14)
+  void clearSetCategories() => $_clearField(14);
+  @$pb.TagNumber(14)
+  SetCategories ensureSetCategories() => $_ensure(8);
 }
 
 class BusinessStateError extends $pb.GeneratedMessage {
@@ -1123,6 +1753,7 @@ class StateMutationResponse extends $pb.GeneratedMessage {
     MangaState? manga,
     ChapterProgressState? progress,
     BusinessStateError? error,
+    CategoryCatalog? categoryCatalog,
   }) {
     final result = StateMutationResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1131,6 +1762,7 @@ class StateMutationResponse extends $pb.GeneratedMessage {
     if (manga != null) result.manga = manga;
     if (progress != null) result.progress = progress;
     if (error != null) result.error = error;
+    if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
     return result;
   }
 
@@ -1158,6 +1790,8 @@ class StateMutationResponse extends $pb.GeneratedMessage {
         subBuilder: ChapterProgressState.$_createMessage)
     ..aOM<BusinessStateError>(6, _omitFieldNames ? '' : 'error',
         subBuilder: BusinessStateError.$_createMessage)
+    ..aOM<CategoryCatalog>(7, _omitFieldNames ? '' : 'categoryCatalog',
+        subBuilder: CategoryCatalog.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1243,6 +1877,17 @@ class StateMutationResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(6);
   @$pb.TagNumber(6)
   BusinessStateError ensureError() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  CategoryCatalog get categoryCatalog => $_getN(6);
+  @$pb.TagNumber(7)
+  set categoryCatalog(CategoryCatalog value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCategoryCatalog() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCategoryCatalog() => $_clearField(7);
+  @$pb.TagNumber(7)
+  CategoryCatalog ensureCategoryCatalog() => $_ensure(6);
 }
 
 class MangaStateResponse extends $pb.GeneratedMessage {
@@ -1252,6 +1897,7 @@ class MangaStateResponse extends $pb.GeneratedMessage {
     MangaState? manga,
     ChapterProgressState? progress,
     BusinessStateError? error,
+    CategoryCatalog? categoryCatalog,
   }) {
     final result = MangaStateResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1259,6 +1905,7 @@ class MangaStateResponse extends $pb.GeneratedMessage {
     if (manga != null) result.manga = manga;
     if (progress != null) result.progress = progress;
     if (error != null) result.error = error;
+    if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
     return result;
   }
 
@@ -1285,6 +1932,8 @@ class MangaStateResponse extends $pb.GeneratedMessage {
         subBuilder: ChapterProgressState.$_createMessage)
     ..aOM<BusinessStateError>(5, _omitFieldNames ? '' : 'error',
         subBuilder: BusinessStateError.$_createMessage)
+    ..aOM<CategoryCatalog>(6, _omitFieldNames ? '' : 'categoryCatalog',
+        subBuilder: CategoryCatalog.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1359,6 +2008,17 @@ class MangaStateResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(5);
   @$pb.TagNumber(5)
   BusinessStateError ensureError() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  CategoryCatalog get categoryCatalog => $_getN(5);
+  @$pb.TagNumber(6)
+  set categoryCatalog(CategoryCatalog value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCategoryCatalog() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCategoryCatalog() => $_clearField(6);
+  @$pb.TagNumber(6)
+  CategoryCatalog ensureCategoryCatalog() => $_ensure(5);
 }
 
 class LibraryPageResponse extends $pb.GeneratedMessage {
@@ -1368,6 +2028,7 @@ class LibraryPageResponse extends $pb.GeneratedMessage {
     $core.Iterable<MangaState>? entries,
     $core.String? nextKey,
     BusinessStateError? error,
+    CategoryCatalog? categoryCatalog,
   }) {
     final result = LibraryPageResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1375,6 +2036,7 @@ class LibraryPageResponse extends $pb.GeneratedMessage {
     if (entries != null) result.entries.addAll(entries);
     if (nextKey != null) result.nextKey = nextKey;
     if (error != null) result.error = error;
+    if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
     return result;
   }
 
@@ -1400,6 +2062,8 @@ class LibraryPageResponse extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'nextKey')
     ..aOM<BusinessStateError>(5, _omitFieldNames ? '' : 'error',
         subBuilder: BusinessStateError.$_createMessage)
+    ..aOM<CategoryCatalog>(6, _omitFieldNames ? '' : 'categoryCatalog',
+        subBuilder: CategoryCatalog.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1466,6 +2130,236 @@ class LibraryPageResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(5);
   @$pb.TagNumber(5)
   BusinessStateError ensureError() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  CategoryCatalog get categoryCatalog => $_getN(5);
+  @$pb.TagNumber(6)
+  set categoryCatalog(CategoryCatalog value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCategoryCatalog() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCategoryCatalog() => $_clearField(6);
+  @$pb.TagNumber(6)
+  CategoryCatalog ensureCategoryCatalog() => $_ensure(5);
+}
+
+class CategoryMutationResponse extends $pb.GeneratedMessage {
+  factory CategoryMutationResponse({
+    $core.int? schemaVersion,
+    $core.String? mutationId,
+    $core.int? accountRevision,
+    CategoryCatalog? categoryCatalog,
+    BusinessStateError? error,
+  }) {
+    final result = CategoryMutationResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (mutationId != null) result.mutationId = mutationId;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  CategoryMutationResponse._();
+
+  factory CategoryMutationResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryMutationResponse()..mergeFromBuffer(data, registry);
+  factory CategoryMutationResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryMutationResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CategoryMutationResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CategoryMutationResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(2, _omitFieldNames ? '' : 'mutationId')
+    ..aI(3, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<CategoryCatalog>(4, _omitFieldNames ? '' : 'categoryCatalog',
+        subBuilder: CategoryCatalog.$_createMessage)
+    ..aOM<BusinessStateError>(5, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryMutationResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryMutationResponse copyWith(
+          void Function(CategoryMutationResponse) updates) =>
+      super.copyWith((message) => updates(message as CategoryMutationResponse))
+          as CategoryMutationResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CategoryMutationResponse() / CategoryMutationResponse.new instead')
+  static CategoryMutationResponse create() => CategoryMutationResponse._();
+  static $pb.GeneratedMessage $_createMessage() => CategoryMutationResponse._();
+  @$core.override
+  CategoryMutationResponse createEmptyInstance() =>
+      CategoryMutationResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CategoryMutationResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CategoryMutationResponse>(
+          CategoryMutationResponse.$_createMessage);
+  static CategoryMutationResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mutationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mutationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMutationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMutationId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get accountRevision => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set accountRevision($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAccountRevision() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAccountRevision() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  CategoryCatalog get categoryCatalog => $_getN(3);
+  @$pb.TagNumber(4)
+  set categoryCatalog(CategoryCatalog value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCategoryCatalog() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCategoryCatalog() => $_clearField(4);
+  @$pb.TagNumber(4)
+  CategoryCatalog ensureCategoryCatalog() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  BusinessStateError get error => $_getN(4);
+  @$pb.TagNumber(5)
+  set error(BusinessStateError value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearError() => $_clearField(5);
+  @$pb.TagNumber(5)
+  BusinessStateError ensureError() => $_ensure(4);
+}
+
+class CategoryCatalogResponse extends $pb.GeneratedMessage {
+  factory CategoryCatalogResponse({
+    $core.int? schemaVersion,
+    $core.int? accountRevision,
+    CategoryCatalog? categoryCatalog,
+    BusinessStateError? error,
+  }) {
+    final result = CategoryCatalogResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  CategoryCatalogResponse._();
+
+  factory CategoryCatalogResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryCatalogResponse()..mergeFromBuffer(data, registry);
+  factory CategoryCatalogResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CategoryCatalogResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CategoryCatalogResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CategoryCatalogResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<CategoryCatalog>(3, _omitFieldNames ? '' : 'categoryCatalog',
+        subBuilder: CategoryCatalog.$_createMessage)
+    ..aOM<BusinessStateError>(4, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryCatalogResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CategoryCatalogResponse copyWith(
+          void Function(CategoryCatalogResponse) updates) =>
+      super.copyWith((message) => updates(message as CategoryCatalogResponse))
+          as CategoryCatalogResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CategoryCatalogResponse() / CategoryCatalogResponse.new instead')
+  static CategoryCatalogResponse create() => CategoryCatalogResponse._();
+  static $pb.GeneratedMessage $_createMessage() => CategoryCatalogResponse._();
+  @$core.override
+  CategoryCatalogResponse createEmptyInstance() => CategoryCatalogResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CategoryCatalogResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CategoryCatalogResponse>(
+          CategoryCatalogResponse.$_createMessage);
+  static CategoryCatalogResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get accountRevision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set accountRevision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAccountRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAccountRevision() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  CategoryCatalog get categoryCatalog => $_getN(2);
+  @$pb.TagNumber(3)
+  set categoryCatalog(CategoryCatalog value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCategoryCatalog() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCategoryCatalog() => $_clearField(3);
+  @$pb.TagNumber(3)
+  CategoryCatalog ensureCategoryCatalog() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  BusinessStateError get error => $_getN(3);
+  @$pb.TagNumber(4)
+  set error(BusinessStateError value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearError() => $_clearField(4);
+  @$pb.TagNumber(4)
+  BusinessStateError ensureError() => $_ensure(3);
 }
 
 const $core.bool _omitFieldNames =

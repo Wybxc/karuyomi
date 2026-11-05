@@ -21,12 +21,57 @@ message MangaResume {
 
 message MangaState {
   string manga_key = 1;
-  // Covers every metadata, favorite, progress and resume mutation for a manga.
+  // Covers every metadata, favorite, category, progress and resume mutation.
   uint32 revision = 2;
   LibraryMetadata metadata = 3;
   bool favorite = 4;
   uint32 added_at_seconds = 5;
   MangaResume resume = 6;
+  repeated string category_ids = 7;
+}
+
+message Category {
+  string id = 1;
+  string name = 2;
+}
+
+message CategoryCatalog {
+  uint32 revision = 1;
+  repeated Category categories = 2;
+}
+
+message SetCategories {
+  repeated string category_ids = 1;
+  uint32 expected_catalog_revision = 2;
+}
+
+message CreateCategory {
+  Category category = 1;
+}
+
+message RenameCategory {
+  string category_id = 1;
+  string name = 2;
+}
+
+message ReorderCategories {
+  repeated string category_ids = 1;
+}
+
+message DeleteCategory {
+  string category_id = 1;
+}
+
+message CategoryMutation {
+  uint32 schema_version = 1;
+  string mutation_id = 2;
+  uint32 expected_revision = 3;
+  oneof operation {
+    CreateCategory create_category = 10;
+    RenameCategory rename_category = 11;
+    ReorderCategories reorder_categories = 12;
+    DeleteCategory delete_category = 13;
+  }
 }
 
 message ReadingAnchor {
@@ -79,6 +124,7 @@ message StateMutation {
     LibraryMetadata update_metadata = 11;
     SaveProgress save_progress = 12;
     ResetProgress reset_progress = 13;
+    SetCategories set_categories = 14;
   }
 }
 
@@ -105,6 +151,7 @@ message StateMutationResponse {
   MangaState manga = 4;
   ChapterProgressState progress = 5;
   BusinessStateError error = 6;
+  CategoryCatalog category_catalog = 7;
 }
 
 message MangaStateResponse {
@@ -113,6 +160,7 @@ message MangaStateResponse {
   MangaState manga = 3;
   ChapterProgressState progress = 4;
   BusinessStateError error = 5;
+  CategoryCatalog category_catalog = 6;
 }
 
 message LibraryPageResponse {
@@ -122,4 +170,20 @@ message LibraryPageResponse {
   repeated MangaState entries = 3;
   string next_key = 4;
   BusinessStateError error = 5;
+  CategoryCatalog category_catalog = 6;
+}
+
+message CategoryMutationResponse {
+  uint32 schema_version = 1;
+  string mutation_id = 2;
+  uint32 account_revision = 3;
+  CategoryCatalog category_catalog = 4;
+  BusinessStateError error = 5;
+}
+
+message CategoryCatalogResponse {
+  uint32 schema_version = 1;
+  uint32 account_revision = 2;
+  CategoryCatalog category_catalog = 3;
+  BusinessStateError error = 4;
 }

@@ -58,6 +58,20 @@ final class _PendingMutation {
   BusinessStateException? failure;
 }
 
+final class BusinessLibrarySnapshot {
+  BusinessLibrarySnapshot(this.entries, this.categoryCatalog);
+  final List<wire.MangaState> entries;
+  final wire.CategoryCatalog categoryCatalog;
+}
+
+final class _PendingCategoryMutation {
+  _PendingCategoryMutation(this.fingerprint, this.request, this.body);
+  final String fingerprint;
+  final wire.CategoryMutation request;
+  final String body;
+  BusinessStateException? rejection;
+}
+
 /// A session cache bound to one confirmed origin and Access subject. All
 /// repositories share it so their writes use one revision per manga.
 final class BusinessStateClient {
@@ -78,6 +92,9 @@ final class BusinessStateClient {
   final _queues = <String, Future<void>>{};
   final _uuid = const Uuid();
   List<wire.MangaState> _library = const [];
+  wire.CategoryCatalog _catalog = wire.CategoryCatalog()..freeze();
+  wire.CategoryCatalog _libraryCatalog = wire.CategoryCatalog()..freeze();
+  _PendingCategoryMutation? _pendingCategory;
   int _accountRevision = 0;
   bool _closed = false;
   Future<void>? _refreshing;
@@ -105,20 +122,28 @@ final class BusinessStateClient {
     'Accept': 'application/json',
   };
 
-  Stream<List<wire.MangaState>> watchLibrary() => Stream.multi((sink) {
-    final subscription = _changes.stream.listen(
-      (_) => sink.add(_library),
-      onError: sink.addError,
-      onDone: sink.close,
-    );
-    sink.onCancel = subscription.cancel;
-    refreshLibrary().then(
-      (_) {
-        if (!_closed) sink.add(_library);
-      },
-      onError: (Object error, StackTrace stack) => sink.addError(error, stack),
-    );
-  });
+  Stream<List<wire.MangaState>> watchLibrary() =>
+      watchLibrarySnapshot().map((view) => view.entries);
+
+  BusinessLibrarySnapshot get _librarySnapshot =>
+      BusinessLibrarySnapshot(_library, _libraryCatalog);
+
+  Stream<BusinessLibrarySnapshot> watchLibrarySnapshot() =>
+      Stream.multi((sink) {
+        final subscription = _changes.stream.listen(
+          (_) => sink.add(_librarySnapshot),
+          onError: sink.addError,
+          onDone: sink.close,
+        );
+        sink.onCancel = subscription.cancel;
+        refreshLibrary().then(
+          (_) {
+            if (!_closed) sink.add(_librarySnapshot);
+          },
+          onError: (Object error, StackTrace stack) =>
+              sink.addError(error, stack),
+        );
+      });
 
   Stream<wire.MangaState?> watchManga(String key) => Stream.multi((sink) {
     final subscription = _changes.stream.listen(
@@ -148,6 +173,7 @@ final class BusinessStateClient {
       final cursors = <String>{};
       String afterKey = '';
       int? revision;
+      wire.CategoryCatalog? catalog;
       var restart = false;
       do {
         final path = Uri(
@@ -178,6 +204,12 @@ final class BusinessStateClient {
           restart = true;
           break;
         }
+        if (catalog != null && catalog != page.categoryCatalog) {
+          throw const FormatException(
+            'Library pages contain different category catalogs',
+          );
+        }
+        catalog = page.categoryCatalog;
         revision = page.accountRevision;
         for (final manga in page.entries) {
           if (afterKey.isNotEmpty && manga.mangaKey.compareTo(afterKey) <= 0) {
@@ -203,6 +235,9 @@ final class BusinessStateClient {
       } while (afterKey.isNotEmpty);
       if (restart) continue;
       _ensureOpen();
+      if (catalog!.revision < _catalog.revision) continue;
+      _acceptCatalog(catalog);
+      _libraryCatalog = _catalog;
       _accountRevision = revision ?? _accountRevision;
       final keys = entries.map((entry) => entry.mangaKey).toSet();
       _manga.removeWhere((key, value) => value.favorite && !keys.contains(key));
@@ -215,6 +250,7 @@ final class BusinessStateClient {
         (_, pending) =>
             pending.rejected && _operationChapter(pending.request) == null,
       );
+      if (_pendingCategory?.rejection != null) _pendingCategory = null;
       _changes.add(null);
       return;
     }
@@ -263,6 +299,12 @@ final class BusinessStateClient {
       throw const FormatException('Business state response identity mismatch');
     }
     validateBusinessManga(value.manga);
+    _validateCatalog(
+      value.hasCategoryCatalog(),
+      value.categoryCatalog,
+      value.accountRevision,
+    );
+    validateBusinessMangaCategories(value.manga, value.categoryCatalog);
     if (value.hasProgress()) {
       validateBusinessProgress(value.progress, chapterKey: chapterKey);
     }
@@ -272,11 +314,16 @@ final class BusinessStateClient {
       throw StateError('Business state response predates this session');
     }
     if (!accept) return value;
+    if (value.categoryCatalog.revision < _catalog.revision) {
+      throw StateError('Business category response predates this session');
+    }
+    _acceptCatalog(value.categoryCatalog);
     _accept(value.manga, local: value.manga.revision == knownLocalRevision);
-    _updateLibrary(value.manga);
     _accountRevision = value.accountRevision > _accountRevision
         ? value.accountRevision
         : _accountRevision;
+    await _updateLibraryConfirmed(value.manga, value.categoryCatalog);
+    _ensureOpen();
     final rejected = _pending[key];
     if (rejected != null && rejected.rejected) {
       final rejectedChapter = _operationChapter(rejected.request);
@@ -312,7 +359,9 @@ final class BusinessStateClient {
         await _readManga(command.mangaKey);
       }
       if (basedOnRevision != null &&
-          basedOnRevision < (_remoteRevisions[command.mangaKey] ?? 0)) {
+          (command.hasSetCategories()
+              ? basedOnRevision != _manga[command.mangaKey]!.revision
+              : basedOnRevision < (_remoteRevisions[command.mangaKey] ?? 0))) {
         throw BusinessStateException(
           wire.BusinessStateError(
             code: wire
@@ -367,7 +416,18 @@ final class BusinessStateClient {
     }
     if (value.hasError()) {
       validateBusinessError(value.error);
-      if (value.hasManga()) validateBusinessManga(value.manga);
+      if (value.hasCategoryCatalog()) {
+        _validateCatalog(true, value.categoryCatalog, value.accountRevision);
+      }
+      if (value.hasManga()) {
+        validateBusinessManga(value.manga);
+        _validateCatalog(
+          value.hasCategoryCatalog(),
+          value.categoryCatalog,
+          value.accountRevision,
+        );
+        validateBusinessMangaCategories(value.manga, value.categoryCatalog);
+      }
       if (value.hasProgress()) {
         validateBusinessProgress(
           value.progress,
@@ -392,6 +452,12 @@ final class BusinessStateClient {
       throw const FormatException('Mutation did not confirm a new revision');
     }
     validateBusinessManga(value.manga);
+    _validateCatalog(
+      value.hasCategoryCatalog(),
+      value.categoryCatalog,
+      value.accountRevision,
+    );
+    validateBusinessMangaCategories(value.manga, value.categoryCatalog);
     final expectedChapter = _operationChapter(pending.request);
     if (expectedChapter != null &&
         (!value.hasProgress() ||
@@ -410,7 +476,10 @@ final class BusinessStateClient {
     // Idempotency confirms that the original write happened, not that its
     // result is still current. Refresh ambiguous retries and known old replies
     // before acknowledging a draft, even if a shelf refresh evicted this key.
-    final current = retry || value.accountRevision < _accountRevision
+    final current =
+        retry ||
+            value.accountRevision < _accountRevision ||
+            value.categoryCatalog.revision < _catalog.revision
         ? await _readManga(
             pending.request.mangaKey,
             chapterKey: expectedChapter,
@@ -445,12 +514,152 @@ final class BusinessStateClient {
       throw failure;
     }
     _pending.remove(pending.request.mangaKey);
-    _accept(value.manga, local: true);
+    final confirmedCatalog = current?.categoryCatalog ?? value.categoryCatalog;
+    _acceptCatalog(confirmedCatalog);
+    _accept(current?.manga ?? value.manga, local: true);
     _accountRevision = value.accountRevision > _accountRevision
         ? value.accountRevision
         : _accountRevision;
-    _updateLibrary(_manga[value.manga.mangaKey]!);
+    await _updateLibraryConfirmed(
+      _manga[value.manga.mangaKey]!,
+      confirmedCatalog,
+    );
+    _ensureOpen();
     _changes.add(null);
+    return value;
+  }
+
+  /// Catalog commands have their own queue, independent of manga progress and
+  /// associations. A retry retains the exact UUID, CAS and serialized body.
+  Future<wire.CategoryMutationResponse> mutateCategories(
+    wire.CategoryMutation operation,
+  ) {
+    final command = operation.deepCopy();
+    command.clearMutationId();
+    command.schemaVersion = _schemaVersion;
+    validateBusinessCategoryMutation(command);
+    final fingerprint = jsonEncode(wire.encodeProtoJson(command));
+    return _serial('categories', () async {
+      final previous = _pendingCategory;
+      if (previous != null) {
+        final result = await _sendCategories(previous);
+        if (previous.fingerprint == fingerprint) return result;
+      }
+      command.mutationId = _uuid.v4();
+      command.freeze();
+      final pending = _PendingCategoryMutation(
+        fingerprint,
+        command,
+        jsonEncode(wire.encodeProtoJson(command)),
+      );
+      _pendingCategory = pending;
+      return _sendCategories(pending);
+    });
+  }
+
+  Future<wire.CategoryCatalogResponse> readCategories() =>
+      _serial('categories', _readCategories);
+
+  Future<wire.CategoryCatalogResponse> _readCategories() async {
+    final reply = await _get('/api/categories');
+    final value = wire.decodeProtoJson(
+      wire.CategoryCatalogResponse(),
+      jsonDecode(reply.body),
+      maxBytes: _responseLimit,
+    );
+    _version(value.schemaVersion);
+    validateBusinessRevision(value.accountRevision);
+    if (value.hasError()) {
+      validateBusinessError(value.error);
+      throw BusinessStateException(value.error);
+    }
+    _success(reply);
+    _validateCatalog(
+      value.hasCategoryCatalog(),
+      value.categoryCatalog,
+      value.accountRevision,
+    );
+    if (value.accountRevision < _accountRevision ||
+        value.categoryCatalog.revision < _catalog.revision) {
+      throw StateError('Business category response predates this session');
+    }
+    _acceptCatalog(value.categoryCatalog);
+    _accountRevision = value.accountRevision;
+    // Directory reads can invalidate every displayed association. Publish the
+    // catalog together with a shelf from the same authoritative snapshot.
+    await refreshLibrary();
+    _ensureOpen();
+    return value;
+  }
+
+  Future<wire.CategoryMutationResponse> _sendCategories(
+    _PendingCategoryMutation pending,
+  ) async {
+    _ensureOpen();
+    if (pending.rejection != null) throw pending.rejection!;
+    final reply = await api.fetchApi(
+      '/api/categories/mutations',
+      method: 'POST',
+      headers: {..._headers, 'Content-Type': 'application/json'},
+      body: pending.body,
+    );
+    _ensureOpen();
+    _budget(reply);
+    final value = wire.decodeProtoJson(
+      wire.CategoryMutationResponse(),
+      jsonDecode(reply.body),
+      maxBytes: _responseLimit,
+    );
+    _version(value.schemaVersion);
+    validateBusinessRevision(value.accountRevision);
+    if (value.mutationId != pending.request.mutationId) {
+      throw const FormatException(
+        'Category mutation response identity mismatch',
+      );
+    }
+    if (value.hasCategoryCatalog()) {
+      _validateCatalog(true, value.categoryCatalog, value.accountRevision);
+    }
+    if (value.hasError()) {
+      validateBusinessError(value.error);
+      final failure = BusinessStateException(value.error);
+      if (!value.error.retryable) pending.rejection = failure;
+      throw failure;
+    }
+    _success(reply);
+    _validateCatalog(
+      value.hasCategoryCatalog(),
+      value.categoryCatalog,
+      value.accountRevision,
+    );
+    if (value.categoryCatalog.revision !=
+        pending.request.expectedRevision + 1) {
+      throw const FormatException(
+        'Category mutation did not confirm a new revision',
+      );
+    }
+    // Even a successful ACK can be an old idempotency record. Read back the
+    // current catalog before accepting it; a deleted category stays deleted.
+    await _readCategories();
+    if (_catalog.revision != value.categoryCatalog.revision) {
+      final failure = BusinessStateException(
+        wire.BusinessStateError(
+          code: wire
+              .BusinessStateErrorCode
+              .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+          message: 'Categories changed after this mutation was applied',
+        ),
+      );
+      _pendingCategory = pending;
+      pending.rejection = failure;
+      throw failure;
+    }
+    if (_catalog != value.categoryCatalog) {
+      throw const FormatException(
+        'Category ACK differs from confirmed catalog',
+      );
+    }
+    _pendingCategory = null;
     return value;
   }
 
@@ -473,6 +682,39 @@ final class BusinessStateClient {
       }
       _manga[value.mangaKey] = value.deepCopy()..freeze();
     }
+  }
+
+  void _validateCatalog(
+    bool present,
+    wire.CategoryCatalog catalog,
+    int accountRevision,
+  ) {
+    if (!present) throw const FormatException('Missing category catalog');
+    validateBusinessCategoryCatalog(catalog);
+    if (catalog.revision > accountRevision) {
+      throw const FormatException('Category revision exceeds account revision');
+    }
+  }
+
+  void _acceptCatalog(wire.CategoryCatalog value) {
+    if (value.revision < _catalog.revision) return;
+    if (value.revision == _catalog.revision && value != _catalog) {
+      throw const FormatException(
+        'Category contents changed without a revision',
+      );
+    }
+    _catalog = value.deepCopy()..freeze();
+  }
+
+  Future<void> _updateLibraryConfirmed(
+    wire.MangaState value,
+    wire.CategoryCatalog catalog,
+  ) async {
+    if (catalog != _libraryCatalog) {
+      await refreshLibrary();
+      return;
+    }
+    _updateLibrary(value);
   }
 
   void _updateLibrary(wire.MangaState value) {
@@ -539,6 +781,9 @@ final class BusinessStateClient {
     _remoteRevisions.clear();
     _pending.clear();
     _library = const [];
+    _pendingCategory = null;
+    _catalog = wire.CategoryCatalog()..freeze();
+    _libraryCatalog = _catalog;
     await _changes.close();
   }
 }

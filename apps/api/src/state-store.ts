@@ -1,6 +1,10 @@
 import { create, fromJsonString, toJsonString } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
+  CategoryCatalogSchema,
+  CategoryCatalogResponseSchema,
+  CategoryMutationSchema,
+  CategoryMutationResponseSchema,
   ChapterProgressStateSchema,
   LibraryPageResponseSchema,
   MangaStateResponseSchema,
@@ -9,6 +13,8 @@ import {
   StateMutationResponseSchema,
   StateMutationSchema,
   type ChapterProgressState,
+  type CategoryMutation,
+  type CategoryMutationResponse,
   type ChapterSnapshot,
   type LibraryMetadata,
   type MangaState,
@@ -16,15 +22,37 @@ import {
   type StateMutation,
   type StateMutationResponse,
 } from '@karuyomi/protocol';
-import { businessSchemaVersion, LIBRARY_PAGE_SIZE } from '@karuyomi/contracts';
+import {
+  businessSchemaVersion,
+  LIBRARY_PAGE_SIZE,
+  CATEGORY_LIMIT,
+} from '@karuyomi/contracts';
 
 const MAX_REVISION = 0xffff_ffff;
 type SnapshotRow = {
   account_revision: number;
   manga_json: string | null;
   progress_json: string | null;
+  catalog_json: string;
 };
-type MutationRow = { request_hash: string; response_json: string };
+type MutationRow = {
+  request_hash: string;
+  response_json: string;
+  kind: string;
+};
+
+// The relation is authoritative. Manga JSON stores no second category list.
+const catalogSql = `json_object('revision', COALESCE((SELECT categories_revision FROM account_state WHERE subject = ?1), 0),
+  'categories', json((SELECT json_group_array(json_object('id', id, 'name', name)) FROM
+    (SELECT id, name FROM categories WHERE subject = ?1 ORDER BY sort_order, id))))`;
+function categoryIdsSql(mangaKeySql: string) {
+  return `(SELECT json_group_array(category_id) FROM (
+    SELECT mc.category_id FROM manga_categories mc JOIN categories c ON c.subject = mc.subject AND c.id = mc.category_id
+    WHERE mc.subject = ?1 AND mc.manga_key = ${mangaKeySql} ORDER BY c.sort_order, c.id))`;
+}
+function mangaSql(alias: string) {
+  return `json_set(${alias}.state_json, '$.categoryIds', json(${categoryIdsSql(`${alias}.manga_key`)}))`;
+}
 
 export class StateError extends Error {
   constructor(
@@ -78,8 +106,9 @@ export async function readMangaState(
     .prepare(
       `SELECT
     COALESCE((SELECT revision FROM account_state WHERE subject = ?1), 0) account_revision,
-    (SELECT state_json FROM manga_state WHERE subject = ?1 AND manga_key = ?2) manga_json,
-    (SELECT state_json FROM chapter_progress WHERE subject = ?1 AND manga_key = ?2 AND chapter_key = ?3) progress_json`,
+    (SELECT ${mangaSql('m')} FROM manga_state m WHERE subject = ?1 AND manga_key = ?2) manga_json,
+    (SELECT state_json FROM chapter_progress WHERE subject = ?1 AND manga_key = ?2 AND chapter_key = ?3) progress_json,
+    ${catalogSql} catalog_json`,
     )
     .bind(subject, mangaKey, chapterKey)
     .first<SnapshotRow>();
@@ -88,6 +117,7 @@ export async function readMangaState(
   return create(MangaStateResponseSchema, {
     schemaVersion: businessSchemaVersion,
     accountRevision: row.account_revision,
+    categoryCatalog: fromJsonString(CategoryCatalogSchema, row.catalog_json),
     manga: row.manga_json
       ? fromJsonString(MangaStateSchema, row.manga_json)
       : create(MangaStateSchema, { mangaKey }),
@@ -112,13 +142,18 @@ export async function readLibrary(
     .prepare(
       `SELECT
     COALESCE((SELECT revision FROM account_state WHERE subject = ?1), 0) account_revision,
+    ${catalogSql} catalog_json,
     (SELECT json_group_array(json(state_json)) FROM (
-      SELECT state_json FROM manga_state WHERE subject = ?1 AND favorite = 1 AND manga_key > ?2
+      SELECT ${mangaSql('m')} state_json FROM manga_state m WHERE subject = ?1 AND favorite = 1 AND manga_key > ?2
       ORDER BY manga_key LIMIT ?3
     )) entries_json`,
     )
     .bind(subject, afterKey, LIBRARY_PAGE_SIZE + 1)
-    .first<{ account_revision: number; entries_json: string }>();
+    .first<{
+      account_revision: number;
+      entries_json: string;
+      catalog_json: string;
+    }>();
   if (!row)
     throw new StateError(ErrorCode.UNAVAILABLE, 'Library is unavailable', 503);
   const response = fromJsonString(
@@ -126,6 +161,7 @@ export async function readLibrary(
     JSON.stringify({
       schemaVersion: businessSchemaVersion,
       accountRevision: row.account_revision,
+      categoryCatalog: JSON.parse(row.catalog_json),
       entries: JSON.parse(row.entries_json),
     }),
   );
@@ -258,6 +294,7 @@ function mutationError(
     schemaVersion: businessSchemaVersion,
     mutationId: mutation.mutationId,
     accountRevision: state.accountRevision,
+    categoryCatalog: state.categoryCatalog,
     ...(state.manga ? { manga: state.manga } : {}),
     ...(state.progress ? { progress: state.progress } : {}),
     error: {
@@ -277,17 +314,17 @@ export async function applyMutation(
   response: StateMutationResponse;
 }> {
   const requestHash = await hashText(
-    toJsonString(StateMutationSchema, mutation),
+    'manga\n' + toJsonString(StateMutationSchema, mutation),
   );
   const findMutation = () =>
     db
       .prepare(
-        'SELECT request_hash, response_json FROM state_mutations WHERE subject = ? AND mutation_id = ?',
+        'SELECT kind, request_hash, response_json FROM state_mutations WHERE subject = ? AND mutation_id = ?',
       )
       .bind(subject, mutation.mutationId)
       .first<MutationRow>();
   const existing = await findMutation();
-  if (existing?.request_hash === requestHash)
+  if (existing?.kind === 'manga' && existing.request_hash === requestHash)
     return {
       status: 200,
       response: fromJsonString(
@@ -359,6 +396,30 @@ export async function applyMutation(
     } else if (operation.case === 'updateMetadata') {
       await validateMetadataKey(mutation.mangaKey, operation.value);
       manga.metadata = operation.value;
+    } else if (operation.case === 'setCategories') {
+      const catalog = state.categoryCatalog;
+      if (
+        !catalog ||
+        operation.value.expectedCatalogRevision !== catalog.revision
+      )
+        throw new StateError(
+          ErrorCode.REVISION_CONFLICT,
+          'Category catalog changed',
+          409,
+        );
+      if (
+        !manga.metadata ||
+        operation.value.categoryIds.some(
+          (id) => !catalog.categories.some((category) => category.id === id),
+        )
+      )
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Manga metadata and existing categories are required',
+        );
+      manga.categoryIds = catalog.categories
+        .filter((category) => operation.value.categoryIds.includes(category.id))
+        .map((category) => category.id);
     } else {
       progress = nextProgress(mutation, state.progress);
       if (progress)
@@ -382,6 +443,32 @@ export async function applyMutation(
   const nonce = crypto.randomUUID();
   const winner =
     'EXISTS (SELECT 1 FROM state_mutations WHERE subject = ?1 AND mutation_id = ?2 AND attempt_nonce = ?3)';
+  const assignment =
+    mutation.operation.case === 'setCategories'
+      ? mutation.operation.value
+      : undefined;
+  const assignmentGate = assignment
+    ? `AND COALESCE((SELECT categories_revision FROM account_state WHERE subject = ?1), 0) = ?9
+    AND (SELECT count(*) FROM categories WHERE subject = ?1 AND id IN (SELECT value FROM json_each(?10))) = json_array_length(?10)`
+    : '';
+  const storedManga = create(MangaStateSchema, manga);
+  storedManga.categoryIds = [];
+  const gateBindings = [
+    subject,
+    mutation.mutationId,
+    requestHash,
+    nonce,
+    toJsonString(StateMutationResponseSchema, response),
+    mutation.mangaKey,
+    mutation.expectedRevision,
+    MAX_REVISION,
+    ...(assignment
+      ? [
+          assignment.expectedCatalogRevision,
+          JSON.stringify(assignment.categoryIds),
+        ]
+      : []),
+  ];
   const statements = [
     db
       .prepare(
@@ -390,20 +477,11 @@ export async function applyMutation(
       .bind(subject),
     db
       .prepare(
-        `INSERT OR IGNORE INTO state_mutations(subject, mutation_id, request_hash, attempt_nonce, response_json)
-      SELECT ?1, ?2, ?3, ?4, ?5 WHERE COALESCE((SELECT revision FROM manga_state WHERE subject = ?1 AND manga_key = ?6), 0) = ?7
-      AND (SELECT revision FROM account_state WHERE subject = ?1) < ?8`,
+        `INSERT OR IGNORE INTO state_mutations(subject, mutation_id, request_hash, attempt_nonce, response_json, kind)
+      SELECT ?1, ?2, ?3, ?4, ?5, 'manga' WHERE COALESCE((SELECT revision FROM manga_state WHERE subject = ?1 AND manga_key = ?6), 0) = ?7
+      AND (SELECT revision FROM account_state WHERE subject = ?1) < ?8 ${assignmentGate}`,
       )
-      .bind(
-        subject,
-        mutation.mutationId,
-        requestHash,
-        nonce,
-        toJsonString(StateMutationResponseSchema, response),
-        mutation.mangaKey,
-        mutation.expectedRevision,
-        MAX_REVISION,
-      ),
+      .bind(...gateBindings),
     db
       .prepare(
         `UPDATE account_state SET revision = revision + 1 WHERE subject = ?1 AND ${winner}`,
@@ -422,9 +500,29 @@ export async function applyMutation(
         mutation.mangaKey,
         manga.revision,
         manga.favorite ? 1 : 0,
-        toJsonString(MangaStateSchema, manga),
+        toJsonString(MangaStateSchema, storedManga),
       ),
   ];
+  if (assignment)
+    statements.push(
+      db
+        .prepare(
+          `DELETE FROM manga_categories WHERE subject = ?1 AND manga_key = ?4 AND ${winner}`,
+        )
+        .bind(subject, mutation.mutationId, nonce, mutation.mangaKey),
+      db
+        .prepare(
+          `INSERT INTO manga_categories(subject, manga_key, category_id)
+      SELECT ?1, ?4, value FROM json_each(?5) WHERE ${winner}`,
+        )
+        .bind(
+          subject,
+          mutation.mutationId,
+          nonce,
+          mutation.mangaKey,
+          JSON.stringify(assignment.categoryIds),
+        ),
+    );
   if (progress)
     statements.push(
       db
@@ -446,15 +544,16 @@ export async function applyMutation(
     db
       .prepare(
         `UPDATE state_mutations SET response_json = json_set(response_json, '$.accountRevision',
-    (SELECT revision FROM account_state WHERE subject = ?1)) WHERE subject = ?1 AND mutation_id = ?2 AND attempt_nonce = ?3`,
+    (SELECT revision FROM account_state WHERE subject = ?1), '$.categoryCatalog', json(${catalogSql}),
+    '$.manga.categoryIds', json(${categoryIdsSql('?4')})) WHERE subject = ?1 AND mutation_id = ?2 AND attempt_nonce = ?3`,
       )
-      .bind(subject, mutation.mutationId, nonce),
+      .bind(subject, mutation.mutationId, nonce, mutation.mangaKey),
   );
   // D1 batches are transactional. The nonce gates every effect so a duplicate
   // request or concurrent loser cannot increment revisions or apply stale data.
   await db.batch(statements);
   const committed = await findMutation();
-  if (committed?.request_hash === requestHash)
+  if (committed?.kind === 'manga' && committed.request_hash === requestHash)
     return {
       status: 200,
       response: fromJsonString(
@@ -484,4 +583,286 @@ export async function applyMutation(
       ),
     ),
   };
+}
+
+export async function readCategoryCatalog(db: D1Database, subject: string) {
+  const row = await db
+    .prepare(
+      `SELECT
+    COALESCE((SELECT revision FROM account_state WHERE subject = ?1), 0) account_revision,
+    ${catalogSql} catalog_json`,
+    )
+    .bind(subject)
+    .first<{ account_revision: number; catalog_json: string }>();
+  if (!row)
+    throw new StateError(
+      ErrorCode.UNAVAILABLE,
+      'Categories are unavailable',
+      503,
+    );
+  return create(CategoryCatalogResponseSchema, {
+    schemaVersion: businessSchemaVersion,
+    accountRevision: row.account_revision,
+    categoryCatalog: fromJsonString(CategoryCatalogSchema, row.catalog_json),
+  });
+}
+
+export async function applyCategoryMutation(
+  db: D1Database,
+  subject: string,
+  mutation: CategoryMutation,
+): Promise<{
+  status: 200 | 400 | 409 | 413 | 503;
+  response: CategoryMutationResponse;
+}> {
+  const requestHash = await hashText(
+    'category\n' + toJsonString(CategoryMutationSchema, mutation),
+  );
+  const findMutation = () =>
+    db
+      .prepare(
+        'SELECT kind, request_hash, response_json FROM state_mutations WHERE subject = ? AND mutation_id = ?',
+      )
+      .bind(subject, mutation.mutationId)
+      .first<MutationRow>();
+  const existing = await findMutation();
+  if (existing?.kind === 'category' && existing.request_hash === requestHash)
+    return {
+      status: 200,
+      response: fromJsonString(
+        CategoryMutationResponseSchema,
+        existing.response_json,
+      ),
+    };
+  const state = await readCategoryCatalog(db, subject);
+  const failure = (error: StateError, canonical = state) => ({
+    status: error.status,
+    response: create(CategoryMutationResponseSchema, {
+      schemaVersion: businessSchemaVersion,
+      mutationId: mutation.mutationId,
+      accountRevision: canonical.accountRevision,
+      categoryCatalog: canonical.categoryCatalog,
+      error: {
+        code: error.code,
+        message: error.message,
+        retryable: error.status === 503,
+      },
+    }),
+  });
+  if (existing)
+    return failure(
+      new StateError(
+        ErrorCode.IDEMPOTENCY_CONFLICT,
+        'Mutation ID was used for different content',
+        409,
+      ),
+    );
+  const catalog = state.categoryCatalog;
+  if (!catalog)
+    throw new StateError(
+      ErrorCode.UNAVAILABLE,
+      'Categories are unavailable',
+      503,
+    );
+  if (catalog.revision !== mutation.expectedRevision)
+    return failure(
+      new StateError(
+        ErrorCode.REVISION_CONFLICT,
+        'Category catalog changed',
+        409,
+      ),
+    );
+  if (
+    catalog.revision === MAX_REVISION ||
+    state.accountRevision === MAX_REVISION
+  )
+    return failure(
+      new StateError(
+        ErrorCode.LIMIT_EXCEEDED,
+        'State revision is exhausted',
+        409,
+      ),
+    );
+  const operation = mutation.operation;
+  let ids = catalog.categories.map((category) => category.id);
+  if (operation.case === 'createCategory') {
+    const category = operation.value.category;
+    if (!category || ids.includes(category.id))
+      return failure(
+        new StateError(
+          ErrorCode.INVALID_INPUT,
+          'A new category identity is required',
+        ),
+      );
+    if (ids.length >= CATEGORY_LIMIT)
+      return failure(
+        new StateError(
+          ErrorCode.LIMIT_EXCEEDED,
+          'Category catalog is full',
+          413,
+        ),
+      );
+    ids = [...ids, category.id];
+  } else if (
+    operation.case === 'renameCategory' ||
+    operation.case === 'deleteCategory'
+  ) {
+    if (!ids.includes(operation.value.categoryId))
+      return failure(
+        new StateError(ErrorCode.INVALID_INPUT, 'Category does not exist'),
+      );
+    if (operation.case === 'deleteCategory')
+      ids = ids.filter((id) => id !== operation.value.categoryId);
+  } else if (operation.case === 'reorderCategories') {
+    if (
+      operation.value.categoryIds.length !== ids.length ||
+      ids.some((id) => !operation.value.categoryIds.includes(id))
+    )
+      return failure(
+        new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Reorder must contain every category exactly once',
+        ),
+      );
+    ids = operation.value.categoryIds;
+  } else
+    return failure(
+      new StateError(
+        ErrorCode.INVALID_INPUT,
+        'A category operation is required',
+      ),
+    );
+  const nonce = crypto.randomUUID();
+  const winner =
+    'EXISTS (SELECT 1 FROM state_mutations WHERE subject = ?1 AND mutation_id = ?2 AND attempt_nonce = ?3)';
+  const deleteCategoryId =
+    operation.case === 'deleteCategory' ? operation.value.categoryId : '';
+  const response = create(CategoryMutationResponseSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: mutation.mutationId,
+  });
+  const statements = [
+    db
+      .prepare(
+        'INSERT OR IGNORE INTO account_state(subject, revision, categories_revision) VALUES (?, 0, 0)',
+      )
+      .bind(subject),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO state_mutations(subject, mutation_id, request_hash, attempt_nonce, response_json, kind)
+      SELECT ?1, ?2, ?3, ?4, ?5, 'category'
+      WHERE (SELECT categories_revision FROM account_state WHERE subject = ?1) = ?6
+      AND (SELECT revision FROM account_state WHERE subject = ?1) < ?7 AND ?6 < ?7
+      AND NOT EXISTS (SELECT 1 FROM manga_state m JOIN manga_categories mc ON m.subject = mc.subject AND m.manga_key = mc.manga_key
+        WHERE m.subject = ?1 AND mc.category_id = ?8 AND m.revision >= ?7)`,
+      )
+      .bind(
+        subject,
+        mutation.mutationId,
+        requestHash,
+        nonce,
+        toJsonString(CategoryMutationResponseSchema, response),
+        mutation.expectedRevision,
+        MAX_REVISION,
+        deleteCategoryId,
+      ),
+    db
+      .prepare(
+        `UPDATE account_state SET revision = revision + 1, categories_revision = categories_revision + 1
+      WHERE subject = ?1 AND ${winner}`,
+      )
+      .bind(subject, mutation.mutationId, nonce),
+  ];
+  if (operation.case === 'createCategory') {
+    const category = operation.value.category;
+    if (!category)
+      throw new StateError(ErrorCode.INVALID_INPUT, 'A category is required');
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO categories(subject, id, name, sort_order) SELECT ?1, ?4, ?5, ?6 WHERE ${winner}`,
+        )
+        .bind(
+          subject,
+          mutation.mutationId,
+          nonce,
+          category.id,
+          category.name,
+          ids.length - 1,
+        ),
+    );
+  } else if (operation.case === 'renameCategory') {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE categories SET name = ?5 WHERE subject = ?1 AND id = ?4 AND ${winner}`,
+        )
+        .bind(
+          subject,
+          mutation.mutationId,
+          nonce,
+          operation.value.categoryId,
+          operation.value.name,
+        ),
+    );
+  } else if (operation.case === 'deleteCategory') {
+    // Membership can change after the initial catalog read. Select affected
+    // rows inside this transaction, before removing any relation, and patch
+    // only their revisions so progress/resume/metadata remain untouched.
+    statements.push(
+      db
+        .prepare(
+          `UPDATE manga_state SET revision = revision + 1, state_json = json_set(state_json, '$.revision', revision + 1)
+        WHERE subject = ?1 AND ${winner} AND manga_key IN (
+          SELECT manga_key FROM manga_categories WHERE subject = ?1 AND category_id = ?4)`,
+        )
+        .bind(subject, mutation.mutationId, nonce, operation.value.categoryId),
+      db
+        .prepare(
+          `DELETE FROM manga_categories WHERE subject = ?1 AND category_id = ?4 AND ${winner}`,
+        )
+        .bind(subject, mutation.mutationId, nonce, operation.value.categoryId),
+      db
+        .prepare(
+          `DELETE FROM categories WHERE subject = ?1 AND id = ?4 AND ${winner}`,
+        )
+        .bind(subject, mutation.mutationId, nonce, operation.value.categoryId),
+    );
+  }
+  statements.push(
+    db
+      .prepare(
+        `UPDATE categories SET sort_order = (SELECT key FROM json_each(?4) WHERE value = categories.id)
+      WHERE subject = ?1 AND ${winner}`,
+      )
+      .bind(subject, mutation.mutationId, nonce, JSON.stringify(ids)),
+    db
+      .prepare(
+        `UPDATE state_mutations SET response_json = json_set(response_json, '$.accountRevision',
+      (SELECT revision FROM account_state WHERE subject = ?1), '$.categoryCatalog', json(${catalogSql}))
+      WHERE subject = ?1 AND mutation_id = ?2 AND attempt_nonce = ?3`,
+      )
+      .bind(subject, mutation.mutationId, nonce),
+  );
+  await db.batch(statements);
+  const committed = await findMutation();
+  if (committed?.kind === 'category' && committed.request_hash === requestHash)
+    return {
+      status: 200,
+      response: fromJsonString(
+        CategoryMutationResponseSchema,
+        committed.response_json,
+      ),
+    };
+  const canonical = await readCategoryCatalog(db, subject);
+  return failure(
+    new StateError(
+      committed ? ErrorCode.IDEMPOTENCY_CONFLICT : ErrorCode.REVISION_CONFLICT,
+      committed
+        ? 'Mutation ID was used for different content'
+        : 'Category catalog changed',
+      409,
+    ),
+    canonical,
+  );
 }

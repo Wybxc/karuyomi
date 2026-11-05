@@ -11,6 +11,70 @@ final _mangaKey = RegExp(r'^[a-f0-9]{64}$');
 final _sourceId = RegExp(r'^-?\d{1,19}$');
 final _minSourceId = BigInt.parse('-9223372036854775808');
 final _maxSourceId = BigInt.parse('9223372036854775807');
+final _categoryId = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+);
+
+void validateBusinessCategoryId(String value) =>
+    _require(_categoryId.hasMatch(value), 'Invalid category identity');
+
+void validateBusinessCategoryName(String value) => _require(
+  value.isNotEmpty &&
+      value.trim() == value &&
+      value.runes.length <= 100 &&
+      utf8.encode(value).length <= 256,
+  'Invalid category name',
+);
+
+void validateBusinessCategoryIds(Iterable<String> values) {
+  _require(values.length <= 64, 'Category associations exceed budget');
+  final unique = <String>{};
+  for (final id in values) {
+    validateBusinessCategoryId(id);
+    _require(unique.add(id), 'Duplicate category identity');
+  }
+}
+
+void validateBusinessCategoryCatalog(wire.CategoryCatalog value) {
+  validateBusinessRevision(value.revision);
+  validateBusinessCategoryIds(value.categories.map((category) => category.id));
+  for (final category in value.categories) {
+    validateBusinessCategoryName(category.name);
+  }
+}
+
+void validateBusinessMangaCategories(
+  wire.MangaState manga,
+  wire.CategoryCatalog catalog,
+) {
+  var previous = -1;
+  for (final id in manga.categoryIds) {
+    final index = catalog.categories.indexWhere(
+      (category) => category.id == id,
+    );
+    _require(index > previous, 'Manga categories do not match catalog order');
+    previous = index;
+  }
+}
+
+void validateBusinessCategoryMutation(wire.CategoryMutation value) {
+  validateBusinessRevision(value.expectedRevision);
+  switch (value.whichOperation()) {
+    case wire.CategoryMutation_Operation.createCategory:
+      _require(value.createCategory.hasCategory(), 'Category is required');
+      validateBusinessCategoryId(value.createCategory.category.id);
+      validateBusinessCategoryName(value.createCategory.category.name);
+    case wire.CategoryMutation_Operation.renameCategory:
+      validateBusinessCategoryId(value.renameCategory.categoryId);
+      validateBusinessCategoryName(value.renameCategory.name);
+    case wire.CategoryMutation_Operation.reorderCategories:
+      validateBusinessCategoryIds(value.reorderCategories.categoryIds);
+    case wire.CategoryMutation_Operation.deleteCategory:
+      validateBusinessCategoryId(value.deleteCategory.categoryId);
+    case wire.CategoryMutation_Operation.notSet:
+      throw const FormatException('Category operation is required');
+  }
+}
 
 void _require(bool condition, String message) {
   if (!condition) throw FormatException(message);
@@ -105,6 +169,7 @@ void validateBusinessManga(wire.MangaState value) {
   _key(value.mangaKey);
   validateBusinessRevision(value.revision);
   validateBusinessRevision(value.addedAtSeconds);
+  validateBusinessCategoryIds(value.categoryIds);
   if (value.hasMetadata()) {
     validateBusinessMetadata(value.metadata);
     final expectedKey = sha256
@@ -160,9 +225,25 @@ void validateBusinessLibraryPage(wire.LibraryPageResponse value) {
       'Failed library page cannot contain entries',
     );
   }
+  _require(
+    value.hasError() || value.hasCategoryCatalog(),
+    'Missing category catalog',
+  );
+  if (value.hasCategoryCatalog()) {
+    validateBusinessCategoryCatalog(value.categoryCatalog);
+    _require(
+      value.categoryCatalog.revision <= value.accountRevision,
+      'Category catalog exceeds account revision',
+    );
+  }
   String? previousKey;
   for (final manga in value.entries) {
     validateBusinessManga(manga);
+    _require(
+      manga.revision <= value.accountRevision,
+      'Manga exceeds account revision',
+    );
+    validateBusinessMangaCategories(manga, value.categoryCatalog);
     _require(manga.favorite, 'Library entries must be favorites');
     _require(
       previousKey == null || previousKey.compareTo(manga.mangaKey) < 0,

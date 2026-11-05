@@ -29,6 +29,13 @@
       "when": 1793858936508,
       "tag": "0003_overconfident_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793877975387,
+      "tag": "0004_even_nomad",
+      "breakpoints": true
     }
   ]
 }

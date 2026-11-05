@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file karuyomi/v1/business.proto.
  */
 export const file_karuyomi_v1_business: GenFile = /*@__PURE__*/
-  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgitwEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIk8KC1NldEZhdm9yaXRlEi4KCG1ldGFkYXRhGAEgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAIgASgIIosBCgxTYXZlUHJvZ3Jlc3MSLgoIc25hcHNob3QYASABKAsyHC5rYXJ1eW9taS52MS5DaGFwdGVyU25hcHNob3QSMwoIcHJvZ3Jlc3MYAiABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIWCg5yZXZlcnNlZF9vcmRlchgDIAEoCCJXCg1SZXNldFByb2dyZXNzEi4KCHNuYXBzaG90GAEgASgLMhwua2FydXlvbWkudjEuQ2hhcHRlclNuYXBzaG90EhYKDnJldmVyc2VkX29yZGVyGAIgASgIIswCCg1TdGF0ZU11dGF0aW9uEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhEKCW1hbmdhX2tleRgDIAEoCRIZChFleHBlY3RlZF9yZXZpc2lvbhgEIAEoDRIwCgxzZXRfZmF2b3JpdGUYCiABKAsyGC5rYXJ1eW9taS52MS5TZXRGYXZvcml0ZUgAEjcKD3VwZGF0ZV9tZXRhZGF0YRgLIAEoCzIcLmthcnV5b21pLnYxLkxpYnJhcnlNZXRhZGF0YUgAEjIKDXNhdmVfcHJvZ3Jlc3MYDCABKAsyGS5rYXJ1eW9taS52MS5TYXZlUHJvZ3Jlc3NIABI0Cg5yZXNldF9wcm9ncmVzcxgNIAEoCzIaLmthcnV5b21pLnYxLlJlc2V0UHJvZ3Jlc3NIAEILCglvcGVyYXRpb24iawoSQnVzaW5lc3NTdGF0ZUVycm9yEjEKBGNvZGUYASABKA4yIy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIIusBChVTdGF0ZU11dGF0aW9uUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGAoQYWNjb3VudF9yZXZpc2lvbhgDIAEoDRImCgVtYW5nYRgEIAEoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSMwoIcHJvZ3Jlc3MYBSABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciLTAQoSTWFuZ2FTdGF0ZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SJgoFbWFuZ2EYAyABKAsyFy5rYXJ1eW9taS52MS5NYW5nYVN0YXRlEjMKCHByb2dyZXNzGAQgASgLMiEua2FydXlvbWkudjEuQ2hhcHRlclByb2dyZXNzU3RhdGUSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3IiswEKE0xpYnJhcnlQYWdlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRIoCgdlbnRyaWVzGAMgAygLMhcua2FydXlvbWkudjEuTWFuZ2FTdGF0ZRIQCghuZXh0X2tleRgEIAEoCRIuCgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvcirZAgoWQnVzaW5lc3NTdGF0ZUVycm9yQ29kZRIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASKwonQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9JTlZBTElEX0lOUFVUEAESLworQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9SRVZJU0lPTl9DT05GTElDVBACEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfU1RBTEVfRVBPQ0gQAxIyCi5CVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0lERU1QT1RFTkNZX0NPTkZMSUNUEAQSKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9VTkFWQUlMQUJMRRAFEiwKKEJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfTElNSVRfRVhDRUVERUQQBmIGcHJvdG8z", [file_karuyomi_v1_control]);
+  fileDesc("ChprYXJ1eW9taS92MS9idXNpbmVzcy5wcm90bxILa2FydXlvbWkudjEihwEKD0xpYnJhcnlNZXRhZGF0YRIUCgxwYWNrYWdlX25hbWUYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhMKC3NvdXJjZV9uYW1lGAMgASgJEhMKC3NvdXJjZV9sYW5nGAQgASgJEiEKBW1hbmdhGAUgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiOgoLTWFuZ2FSZXN1bWUSEwoLY2hhcHRlcl9rZXkYASABKAkSFgoOcmV2ZXJzZWRfb3JkZXIYAiABKAgizQEKCk1hbmdhU3RhdGUSEQoJbWFuZ2Ffa2V5GAEgASgJEhAKCHJldmlzaW9uGAIgASgNEi4KCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAQgASgIEhgKEGFkZGVkX2F0X3NlY29uZHMYBSABKA0SKAoGcmVzdW1lGAYgASgLMhgua2FydXlvbWkudjEuTWFuZ2FSZXN1bWUSFAoMY2F0ZWdvcnlfaWRzGAcgAygJIiQKCENhdGVnb3J5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiTgoPQ2F0ZWdvcnlDYXRhbG9nEhAKCHJldmlzaW9uGAEgASgNEikKCmNhdGVnb3JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeSJICg1TZXRDYXRlZ29yaWVzEhQKDGNhdGVnb3J5X2lkcxgBIAMoCRIhChlleHBlY3RlZF9jYXRhbG9nX3JldmlzaW9uGAIgASgNIjkKDkNyZWF0ZUNhdGVnb3J5EicKCGNhdGVnb3J5GAEgASgLMhUua2FydXlvbWkudjEuQ2F0ZWdvcnkiMwoOUmVuYW1lQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIpChFSZW9yZGVyQ2F0ZWdvcmllcxIUCgxjYXRlZ29yeV9pZHMYASADKAkiJQoORGVsZXRlQ2F0ZWdvcnkSEwoLY2F0ZWdvcnlfaWQYASABKAkizQIKEENhdGVnb3J5TXV0YXRpb24SFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGQoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKA0SNgoPY3JlYXRlX2NhdGVnb3J5GAogASgLMhsua2FydXlvbWkudjEuQ3JlYXRlQ2F0ZWdvcnlIABI2Cg9yZW5hbWVfY2F0ZWdvcnkYCyABKAsyGy5rYXJ1eW9taS52MS5SZW5hbWVDYXRlZ29yeUgAEjwKEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRlZ29yaWVzSAASNgoPZGVsZXRlX2NhdGVnb3J5GA0gASgLMhsua2FydXlvbWkudjEuRGVsZXRlQ2F0ZWdvcnlIAEILCglvcGVyYXRpb24ihAEKDVJlYWRpbmdBbmNob3ISEwoLY2hhcHRlcl9rZXkYASABKAkSEAoIcGFnZV9rZXkYAiABKAkSGAoQbWFuaWZlc3RfdmVyc2lvbhgDIAEoCRIXCg9wYWdlX2luZGV4X2hpbnQYBCABKA0SGQoRbm9ybWFsaXplZF9vZmZzZXQYBSABKAEiqAEKFENoYXB0ZXJQcm9ncmVzc1N0YXRlEhMKC2NoYXB0ZXJfa2V5GAEgASgJEisKB2N1cnJlbnQYAiABKAsyGi5rYXJ1eW9taS52MS5SZWFkaW5nQW5jaG9yEiwKCGZ1cnRoZXN0GAMgASgLMhoua2FydXlvbWkudjEuUmVhZGluZ0FuY2hvchINCgVlcG9jaBgEIAEoDRIRCgljb21wbGV0ZWQYBSABKAgiUwoPQ2hhcHRlclNuYXBzaG90EhMKC2NoYXB0ZXJfa2V5GAEgASgJEhgKEG1hbmlmZXN0X3ZlcnNpb24YAiABKAkSEQoJcGFnZV9rZXlzGAMgAygJIk8KC1NldEZhdm9yaXRlEi4KCG1ldGFkYXRhGAEgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhEhAKCGZhdm9yaXRlGAIgASgIIosBCgxTYXZlUHJvZ3Jlc3MSLgoIc25hcHNob3QYASABKAsyHC5rYXJ1eW9taS52MS5DaGFwdGVyU25hcHNob3QSMwoIcHJvZ3Jlc3MYAiABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIWCg5yZXZlcnNlZF9vcmRlchgDIAEoCCJXCg1SZXNldFByb2dyZXNzEi4KCHNuYXBzaG90GAEgASgLMhwua2FydXlvbWkudjEuQ2hhcHRlclNuYXBzaG90EhYKDnJldmVyc2VkX29yZGVyGAIgASgIIoIDCg1TdGF0ZU11dGF0aW9uEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhEKCW1hbmdhX2tleRgDIAEoCRIZChFleHBlY3RlZF9yZXZpc2lvbhgEIAEoDRIwCgxzZXRfZmF2b3JpdGUYCiABKAsyGC5rYXJ1eW9taS52MS5TZXRGYXZvcml0ZUgAEjcKD3VwZGF0ZV9tZXRhZGF0YRgLIAEoCzIcLmthcnV5b21pLnYxLkxpYnJhcnlNZXRhZGF0YUgAEjIKDXNhdmVfcHJvZ3Jlc3MYDCABKAsyGS5rYXJ1eW9taS52MS5TYXZlUHJvZ3Jlc3NIABI0Cg5yZXNldF9wcm9ncmVzcxgNIAEoCzIaLmthcnV5b21pLnYxLlJlc2V0UHJvZ3Jlc3NIABI0Cg5zZXRfY2F0ZWdvcmllcxgOIAEoCzIaLmthcnV5b21pLnYxLlNldENhdGVnb3JpZXNIAEILCglvcGVyYXRpb24iawoSQnVzaW5lc3NTdGF0ZUVycm9yEjEKBGNvZGUYASABKA4yIy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIIqMCChVTdGF0ZU11dGF0aW9uUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SEwoLbXV0YXRpb25faWQYAiABKAkSGAoQYWNjb3VudF9yZXZpc2lvbhgDIAEoDRImCgVtYW5nYRgEIAEoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSMwoIcHJvZ3Jlc3MYBSABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIuCgVlcnJvchgGIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvchI2ChBjYXRlZ29yeV9jYXRhbG9nGAcgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nIosCChJNYW5nYVN0YXRlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRImCgVtYW5nYRgDIAEoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSMwoIcHJvZ3Jlc3MYBCABKAsyIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZRIuCgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvchI2ChBjYXRlZ29yeV9jYXRhbG9nGAYgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nIusBChNMaWJyYXJ5UGFnZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhgKEGFjY291bnRfcmV2aXNpb24YAiABKA0SKAoHZW50cmllcxgDIAMoCzIXLmthcnV5b21pLnYxLk1hbmdhU3RhdGUSEAoIbmV4dF9rZXkYBCABKAkSLgoFZXJyb3IYBSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3ISNgoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZyLJAQoYQ2F0ZWdvcnlNdXRhdGlvblJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEhMKC211dGF0aW9uX2lkGAIgASgJEhgKEGFjY291bnRfcmV2aXNpb24YAyABKA0SNgoQY2F0ZWdvcnlfY2F0YWxvZxgEIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZxIuCgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvciKzAQoXQ2F0ZWdvcnlDYXRhbG9nUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YASABKA0SGAoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDRI2ChBjYXRlZ29yeV9jYXRhbG9nGAMgASgLMhwua2FydXlvbWkudjEuQ2F0ZWdvcnlDYXRhbG9nEi4KBWVycm9yGAQgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yKtkCChZCdXNpbmVzc1N0YXRlRXJyb3JDb2RlEikKJUJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfVU5TUEVDSUZJRUQQABIrCidCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX0lOVkFMSURfSU5QVVQQARIvCitCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1JFVklTSU9OX0NPTkZMSUNUEAISKQolQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9TVEFMRV9FUE9DSBADEjIKLkJVU0lORVNTX1NUQVRFX0VSUk9SX0NPREVfSURFTVBPVEVOQ1lfQ09ORkxJQ1QQBBIpCiVCVVNJTkVTU19TVEFURV9FUlJPUl9DT0RFX1VOQVZBSUxBQkxFEAUSLAooQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9MSU1JVF9FWENFRURFRBAGYgZwcm90bzM", [file_karuyomi_v1_control]);
 
 /**
  * Server-owned, account-scoped business state. Authentication is supplied by
@@ -134,7 +134,7 @@ export type MangaState = Message<"karuyomi.v1.MangaState"> & {
   mangaKey: string;
 
   /**
-   * Covers every metadata, favorite, progress and resume mutation for a manga.
+   * Covers every metadata, favorite, category, progress and resume mutation.
    *
    * @generated from field: uint32 revision = 2;
    */
@@ -159,6 +159,11 @@ export type MangaState = Message<"karuyomi.v1.MangaState"> & {
    * @generated from field: karuyomi.v1.MangaResume resume = 6;
    */
   resume?: MangaResume | undefined;
+
+  /**
+   * @generated from field: repeated string category_ids = 7;
+   */
+  categoryIds: string[];
 };
 
 /**
@@ -171,7 +176,7 @@ export type MangaStateJson = {
   mangaKey?: string;
 
   /**
-   * Covers every metadata, favorite, progress and resume mutation for a manga.
+   * Covers every metadata, favorite, category, progress and resume mutation.
    *
    * @generated from field: uint32 revision = 2;
    */
@@ -196,6 +201,11 @@ export type MangaStateJson = {
    * @generated from field: karuyomi.v1.MangaResume resume = 6;
    */
   resume?: MangaResumeJson;
+
+  /**
+   * @generated from field: repeated string category_ids = 7;
+   */
+  categoryIds?: string[];
 };
 
 /**
@@ -204,6 +214,331 @@ export type MangaStateJson = {
  */
 export const MangaStateSchema: GenMessage<MangaState, {jsonType: MangaStateJson}> = /*@__PURE__*/
   messageDesc(file_karuyomi_v1_business, 2);
+
+/**
+ * @generated from message karuyomi.v1.Category
+ */
+export type Category = Message<"karuyomi.v1.Category"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * @generated from message karuyomi.v1.Category
+ */
+export type CategoryJson = {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id?: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.Category.
+ * Use `create(CategorySchema)` to create a new message.
+ */
+export const CategorySchema: GenMessage<Category, {jsonType: CategoryJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 3);
+
+/**
+ * @generated from message karuyomi.v1.CategoryCatalog
+ */
+export type CategoryCatalog = Message<"karuyomi.v1.CategoryCatalog"> & {
+  /**
+   * @generated from field: uint32 revision = 1;
+   */
+  revision: number;
+
+  /**
+   * @generated from field: repeated karuyomi.v1.Category categories = 2;
+   */
+  categories: Category[];
+};
+
+/**
+ * @generated from message karuyomi.v1.CategoryCatalog
+ */
+export type CategoryCatalogJson = {
+  /**
+   * @generated from field: uint32 revision = 1;
+   */
+  revision?: number;
+
+  /**
+   * @generated from field: repeated karuyomi.v1.Category categories = 2;
+   */
+  categories?: CategoryJson[];
+};
+
+/**
+ * Describes the message karuyomi.v1.CategoryCatalog.
+ * Use `create(CategoryCatalogSchema)` to create a new message.
+ */
+export const CategoryCatalogSchema: GenMessage<CategoryCatalog, {jsonType: CategoryCatalogJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 4);
+
+/**
+ * @generated from message karuyomi.v1.SetCategories
+ */
+export type SetCategories = Message<"karuyomi.v1.SetCategories"> & {
+  /**
+   * @generated from field: repeated string category_ids = 1;
+   */
+  categoryIds: string[];
+
+  /**
+   * @generated from field: uint32 expected_catalog_revision = 2;
+   */
+  expectedCatalogRevision: number;
+};
+
+/**
+ * @generated from message karuyomi.v1.SetCategories
+ */
+export type SetCategoriesJson = {
+  /**
+   * @generated from field: repeated string category_ids = 1;
+   */
+  categoryIds?: string[];
+
+  /**
+   * @generated from field: uint32 expected_catalog_revision = 2;
+   */
+  expectedCatalogRevision?: number;
+};
+
+/**
+ * Describes the message karuyomi.v1.SetCategories.
+ * Use `create(SetCategoriesSchema)` to create a new message.
+ */
+export const SetCategoriesSchema: GenMessage<SetCategories, {jsonType: SetCategoriesJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 5);
+
+/**
+ * @generated from message karuyomi.v1.CreateCategory
+ */
+export type CreateCategory = Message<"karuyomi.v1.CreateCategory"> & {
+  /**
+   * @generated from field: karuyomi.v1.Category category = 1;
+   */
+  category?: Category | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.CreateCategory
+ */
+export type CreateCategoryJson = {
+  /**
+   * @generated from field: karuyomi.v1.Category category = 1;
+   */
+  category?: CategoryJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.CreateCategory.
+ * Use `create(CreateCategorySchema)` to create a new message.
+ */
+export const CreateCategorySchema: GenMessage<CreateCategory, {jsonType: CreateCategoryJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 6);
+
+/**
+ * @generated from message karuyomi.v1.RenameCategory
+ */
+export type RenameCategory = Message<"karuyomi.v1.RenameCategory"> & {
+  /**
+   * @generated from field: string category_id = 1;
+   */
+  categoryId: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * @generated from message karuyomi.v1.RenameCategory
+ */
+export type RenameCategoryJson = {
+  /**
+   * @generated from field: string category_id = 1;
+   */
+  categoryId?: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.RenameCategory.
+ * Use `create(RenameCategorySchema)` to create a new message.
+ */
+export const RenameCategorySchema: GenMessage<RenameCategory, {jsonType: RenameCategoryJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 7);
+
+/**
+ * @generated from message karuyomi.v1.ReorderCategories
+ */
+export type ReorderCategories = Message<"karuyomi.v1.ReorderCategories"> & {
+  /**
+   * @generated from field: repeated string category_ids = 1;
+   */
+  categoryIds: string[];
+};
+
+/**
+ * @generated from message karuyomi.v1.ReorderCategories
+ */
+export type ReorderCategoriesJson = {
+  /**
+   * @generated from field: repeated string category_ids = 1;
+   */
+  categoryIds?: string[];
+};
+
+/**
+ * Describes the message karuyomi.v1.ReorderCategories.
+ * Use `create(ReorderCategoriesSchema)` to create a new message.
+ */
+export const ReorderCategoriesSchema: GenMessage<ReorderCategories, {jsonType: ReorderCategoriesJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 8);
+
+/**
+ * @generated from message karuyomi.v1.DeleteCategory
+ */
+export type DeleteCategory = Message<"karuyomi.v1.DeleteCategory"> & {
+  /**
+   * @generated from field: string category_id = 1;
+   */
+  categoryId: string;
+};
+
+/**
+ * @generated from message karuyomi.v1.DeleteCategory
+ */
+export type DeleteCategoryJson = {
+  /**
+   * @generated from field: string category_id = 1;
+   */
+  categoryId?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.DeleteCategory.
+ * Use `create(DeleteCategorySchema)` to create a new message.
+ */
+export const DeleteCategorySchema: GenMessage<DeleteCategory, {jsonType: DeleteCategoryJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 9);
+
+/**
+ * @generated from message karuyomi.v1.CategoryMutation
+ */
+export type CategoryMutation = Message<"karuyomi.v1.CategoryMutation"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId: string;
+
+  /**
+   * @generated from field: uint32 expected_revision = 3;
+   */
+  expectedRevision: number;
+
+  /**
+   * @generated from oneof karuyomi.v1.CategoryMutation.operation
+   */
+  operation: {
+    /**
+     * @generated from field: karuyomi.v1.CreateCategory create_category = 10;
+     */
+    value: CreateCategory;
+    case: "createCategory";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.RenameCategory rename_category = 11;
+     */
+    value: RenameCategory;
+    case: "renameCategory";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.ReorderCategories reorder_categories = 12;
+     */
+    value: ReorderCategories;
+    case: "reorderCategories";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.DeleteCategory delete_category = 13;
+     */
+    value: DeleteCategory;
+    case: "deleteCategory";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * @generated from message karuyomi.v1.CategoryMutation
+ */
+export type CategoryMutationJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId?: string;
+
+  /**
+   * @generated from field: uint32 expected_revision = 3;
+   */
+  expectedRevision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.CreateCategory create_category = 10;
+   */
+  createCategory?: CreateCategoryJson;
+
+  /**
+   * @generated from field: karuyomi.v1.RenameCategory rename_category = 11;
+   */
+  renameCategory?: RenameCategoryJson;
+
+  /**
+   * @generated from field: karuyomi.v1.ReorderCategories reorder_categories = 12;
+   */
+  reorderCategories?: ReorderCategoriesJson;
+
+  /**
+   * @generated from field: karuyomi.v1.DeleteCategory delete_category = 13;
+   */
+  deleteCategory?: DeleteCategoryJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.CategoryMutation.
+ * Use `create(CategoryMutationSchema)` to create a new message.
+ */
+export const CategoryMutationSchema: GenMessage<CategoryMutation, {jsonType: CategoryMutationJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 10);
 
 /**
  * @generated from message karuyomi.v1.ReadingAnchor
@@ -270,7 +605,7 @@ export type ReadingAnchorJson = {
  * Use `create(ReadingAnchorSchema)` to create a new message.
  */
 export const ReadingAnchorSchema: GenMessage<ReadingAnchor, {jsonType: ReadingAnchorJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 3);
+  messageDesc(file_karuyomi_v1_business, 11);
 
 /**
  * @generated from message karuyomi.v1.ChapterProgressState
@@ -337,7 +672,7 @@ export type ChapterProgressStateJson = {
  * Use `create(ChapterProgressStateSchema)` to create a new message.
  */
 export const ChapterProgressStateSchema: GenMessage<ChapterProgressState, {jsonType: ChapterProgressStateJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 4);
+  messageDesc(file_karuyomi_v1_business, 12);
 
 /**
  * The server projects anchors by page identity, never by a stale index hint.
@@ -388,7 +723,7 @@ export type ChapterSnapshotJson = {
  * Use `create(ChapterSnapshotSchema)` to create a new message.
  */
 export const ChapterSnapshotSchema: GenMessage<ChapterSnapshot, {jsonType: ChapterSnapshotJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 5);
+  messageDesc(file_karuyomi_v1_business, 13);
 
 /**
  * @generated from message karuyomi.v1.SetFavorite
@@ -425,7 +760,7 @@ export type SetFavoriteJson = {
  * Use `create(SetFavoriteSchema)` to create a new message.
  */
 export const SetFavoriteSchema: GenMessage<SetFavorite, {jsonType: SetFavoriteJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 6);
+  messageDesc(file_karuyomi_v1_business, 14);
 
 /**
  * @generated from message karuyomi.v1.SaveProgress
@@ -472,7 +807,7 @@ export type SaveProgressJson = {
  * Use `create(SaveProgressSchema)` to create a new message.
  */
 export const SaveProgressSchema: GenMessage<SaveProgress, {jsonType: SaveProgressJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 7);
+  messageDesc(file_karuyomi_v1_business, 15);
 
 /**
  * @generated from message karuyomi.v1.ResetProgress
@@ -509,7 +844,7 @@ export type ResetProgressJson = {
  * Use `create(ResetProgressSchema)` to create a new message.
  */
 export const ResetProgressSchema: GenMessage<ResetProgress, {jsonType: ResetProgressJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 8);
+  messageDesc(file_karuyomi_v1_business, 16);
 
 /**
  * @generated from message karuyomi.v1.StateMutation
@@ -564,6 +899,12 @@ export type StateMutation = Message<"karuyomi.v1.StateMutation"> & {
      */
     value: ResetProgress;
     case: "resetProgress";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.SetCategories set_categories = 14;
+     */
+    value: SetCategories;
+    case: "setCategories";
   } | { case: undefined; value?: undefined };
 };
 
@@ -612,6 +953,11 @@ export type StateMutationJson = {
    * @generated from field: karuyomi.v1.ResetProgress reset_progress = 13;
    */
   resetProgress?: ResetProgressJson;
+
+  /**
+   * @generated from field: karuyomi.v1.SetCategories set_categories = 14;
+   */
+  setCategories?: SetCategoriesJson;
 };
 
 /**
@@ -619,7 +965,7 @@ export type StateMutationJson = {
  * Use `create(StateMutationSchema)` to create a new message.
  */
 export const StateMutationSchema: GenMessage<StateMutation, {jsonType: StateMutationJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 9);
+  messageDesc(file_karuyomi_v1_business, 17);
 
 /**
  * @generated from message karuyomi.v1.BusinessStateError
@@ -666,7 +1012,7 @@ export type BusinessStateErrorJson = {
  * Use `create(BusinessStateErrorSchema)` to create a new message.
  */
 export const BusinessStateErrorSchema: GenMessage<BusinessStateError, {jsonType: BusinessStateErrorJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 10);
+  messageDesc(file_karuyomi_v1_business, 18);
 
 /**
  * @generated from message karuyomi.v1.StateMutationResponse
@@ -701,6 +1047,11 @@ export type StateMutationResponse = Message<"karuyomi.v1.StateMutationResponse">
    * @generated from field: karuyomi.v1.BusinessStateError error = 6;
    */
   error?: BusinessStateError | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 7;
+   */
+  categoryCatalog?: CategoryCatalog | undefined;
 };
 
 /**
@@ -736,6 +1087,11 @@ export type StateMutationResponseJson = {
    * @generated from field: karuyomi.v1.BusinessStateError error = 6;
    */
   error?: BusinessStateErrorJson;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 7;
+   */
+  categoryCatalog?: CategoryCatalogJson;
 };
 
 /**
@@ -743,7 +1099,7 @@ export type StateMutationResponseJson = {
  * Use `create(StateMutationResponseSchema)` to create a new message.
  */
 export const StateMutationResponseSchema: GenMessage<StateMutationResponse, {jsonType: StateMutationResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 11);
+  messageDesc(file_karuyomi_v1_business, 19);
 
 /**
  * @generated from message karuyomi.v1.MangaStateResponse
@@ -773,6 +1129,11 @@ export type MangaStateResponse = Message<"karuyomi.v1.MangaStateResponse"> & {
    * @generated from field: karuyomi.v1.BusinessStateError error = 5;
    */
   error?: BusinessStateError | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 6;
+   */
+  categoryCatalog?: CategoryCatalog | undefined;
 };
 
 /**
@@ -803,6 +1164,11 @@ export type MangaStateResponseJson = {
    * @generated from field: karuyomi.v1.BusinessStateError error = 5;
    */
   error?: BusinessStateErrorJson;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 6;
+   */
+  categoryCatalog?: CategoryCatalogJson;
 };
 
 /**
@@ -810,7 +1176,7 @@ export type MangaStateResponseJson = {
  * Use `create(MangaStateResponseSchema)` to create a new message.
  */
 export const MangaStateResponseSchema: GenMessage<MangaStateResponse, {jsonType: MangaStateResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 12);
+  messageDesc(file_karuyomi_v1_business, 20);
 
 /**
  * @generated from message karuyomi.v1.LibraryPageResponse
@@ -842,6 +1208,11 @@ export type LibraryPageResponse = Message<"karuyomi.v1.LibraryPageResponse"> & {
    * @generated from field: karuyomi.v1.BusinessStateError error = 5;
    */
   error?: BusinessStateError | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 6;
+   */
+  categoryCatalog?: CategoryCatalog | undefined;
 };
 
 /**
@@ -874,6 +1245,11 @@ export type LibraryPageResponseJson = {
    * @generated from field: karuyomi.v1.BusinessStateError error = 5;
    */
   error?: BusinessStateErrorJson;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 6;
+   */
+  categoryCatalog?: CategoryCatalogJson;
 };
 
 /**
@@ -881,7 +1257,131 @@ export type LibraryPageResponseJson = {
  * Use `create(LibraryPageResponseSchema)` to create a new message.
  */
 export const LibraryPageResponseSchema: GenMessage<LibraryPageResponse, {jsonType: LibraryPageResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_business, 13);
+  messageDesc(file_karuyomi_v1_business, 21);
+
+/**
+ * @generated from message karuyomi.v1.CategoryMutationResponse
+ */
+export type CategoryMutationResponse = Message<"karuyomi.v1.CategoryMutationResponse"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId: string;
+
+  /**
+   * @generated from field: uint32 account_revision = 3;
+   */
+  accountRevision: number;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 4;
+   */
+  categoryCatalog?: CategoryCatalog | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 5;
+   */
+  error?: BusinessStateError | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.CategoryMutationResponse
+ */
+export type CategoryMutationResponseJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * @generated from field: string mutation_id = 2;
+   */
+  mutationId?: string;
+
+  /**
+   * @generated from field: uint32 account_revision = 3;
+   */
+  accountRevision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 4;
+   */
+  categoryCatalog?: CategoryCatalogJson;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 5;
+   */
+  error?: BusinessStateErrorJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.CategoryMutationResponse.
+ * Use `create(CategoryMutationResponseSchema)` to create a new message.
+ */
+export const CategoryMutationResponseSchema: GenMessage<CategoryMutationResponse, {jsonType: CategoryMutationResponseJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 22);
+
+/**
+ * @generated from message karuyomi.v1.CategoryCatalogResponse
+ */
+export type CategoryCatalogResponse = Message<"karuyomi.v1.CategoryCatalogResponse"> & {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion: number;
+
+  /**
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision: number;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 3;
+   */
+  categoryCatalog?: CategoryCatalog | undefined;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 4;
+   */
+  error?: BusinessStateError | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.CategoryCatalogResponse
+ */
+export type CategoryCatalogResponseJson = {
+  /**
+   * @generated from field: uint32 schema_version = 1;
+   */
+  schemaVersion?: number;
+
+  /**
+   * @generated from field: uint32 account_revision = 2;
+   */
+  accountRevision?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.CategoryCatalog category_catalog = 3;
+   */
+  categoryCatalog?: CategoryCatalogJson;
+
+  /**
+   * @generated from field: karuyomi.v1.BusinessStateError error = 4;
+   */
+  error?: BusinessStateErrorJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.CategoryCatalogResponse.
+ * Use `create(CategoryCatalogResponseSchema)` to create a new message.
+ */
+export const CategoryCatalogResponseSchema: GenMessage<CategoryCatalogResponse, {jsonType: CategoryCatalogResponseJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_business, 23);
 
 /**
  * @generated from enum karuyomi.v1.BusinessStateErrorCode

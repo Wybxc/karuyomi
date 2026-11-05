@@ -103,6 +103,7 @@ const MangaState$json = {
       '6': '.karuyomi.v1.MangaResume',
       '10': 'resume'
     },
+    {'1': 'category_ids', '3': 7, '4': 3, '5': 9, '10': 'categoryIds'},
   ],
 };
 
@@ -112,7 +113,187 @@ final $typed_data.Uint8List mangaStateDescriptor = $convert.base64Decode(
     'ABKA1SCHJldmlzaW9uEjgKCG1ldGFkYXRhGAMgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1l'
     'dGFkYXRhUghtZXRhZGF0YRIaCghmYXZvcml0ZRgEIAEoCFIIZmF2b3JpdGUSKAoQYWRkZWRfYX'
     'Rfc2Vjb25kcxgFIAEoDVIOYWRkZWRBdFNlY29uZHMSMAoGcmVzdW1lGAYgASgLMhgua2FydXlv'
-    'bWkudjEuTWFuZ2FSZXN1bWVSBnJlc3VtZQ==');
+    'bWkudjEuTWFuZ2FSZXN1bWVSBnJlc3VtZRIhCgxjYXRlZ29yeV9pZHMYByADKAlSC2NhdGVnb3'
+    'J5SWRz');
+
+@$core.Deprecated('Use categoryDescriptor instead')
+const Category$json = {
+  '1': 'Category',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+  ],
+};
+
+/// Descriptor for `Category`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List categoryDescriptor = $convert.base64Decode(
+    'CghDYXRlZ29yeRIOCgJpZBgBIAEoCVICaWQSEgoEbmFtZRgCIAEoCVIEbmFtZQ==');
+
+@$core.Deprecated('Use categoryCatalogDescriptor instead')
+const CategoryCatalog$json = {
+  '1': 'CategoryCatalog',
+  '2': [
+    {'1': 'revision', '3': 1, '4': 1, '5': 13, '10': 'revision'},
+    {
+      '1': 'categories',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.Category',
+      '10': 'categories'
+    },
+  ],
+};
+
+/// Descriptor for `CategoryCatalog`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List categoryCatalogDescriptor = $convert.base64Decode(
+    'Cg9DYXRlZ29yeUNhdGFsb2cSGgoIcmV2aXNpb24YASABKA1SCHJldmlzaW9uEjUKCmNhdGVnb3'
+    'JpZXMYAiADKAsyFS5rYXJ1eW9taS52MS5DYXRlZ29yeVIKY2F0ZWdvcmllcw==');
+
+@$core.Deprecated('Use setCategoriesDescriptor instead')
+const SetCategories$json = {
+  '1': 'SetCategories',
+  '2': [
+    {'1': 'category_ids', '3': 1, '4': 3, '5': 9, '10': 'categoryIds'},
+    {
+      '1': 'expected_catalog_revision',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '10': 'expectedCatalogRevision'
+    },
+  ],
+};
+
+/// Descriptor for `SetCategories`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setCategoriesDescriptor = $convert.base64Decode(
+    'Cg1TZXRDYXRlZ29yaWVzEiEKDGNhdGVnb3J5X2lkcxgBIAMoCVILY2F0ZWdvcnlJZHMSOgoZZX'
+    'hwZWN0ZWRfY2F0YWxvZ19yZXZpc2lvbhgCIAEoDVIXZXhwZWN0ZWRDYXRhbG9nUmV2aXNpb24=');
+
+@$core.Deprecated('Use createCategoryDescriptor instead')
+const CreateCategory$json = {
+  '1': 'CreateCategory',
+  '2': [
+    {
+      '1': 'category',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.Category',
+      '10': 'category'
+    },
+  ],
+};
+
+/// Descriptor for `CreateCategory`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createCategoryDescriptor = $convert.base64Decode(
+    'Cg5DcmVhdGVDYXRlZ29yeRIxCghjYXRlZ29yeRgBIAEoCzIVLmthcnV5b21pLnYxLkNhdGVnb3'
+    'J5UghjYXRlZ29yeQ==');
+
+@$core.Deprecated('Use renameCategoryDescriptor instead')
+const RenameCategory$json = {
+  '1': 'RenameCategory',
+  '2': [
+    {'1': 'category_id', '3': 1, '4': 1, '5': 9, '10': 'categoryId'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+  ],
+};
+
+/// Descriptor for `RenameCategory`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List renameCategoryDescriptor = $convert.base64Decode(
+    'Cg5SZW5hbWVDYXRlZ29yeRIfCgtjYXRlZ29yeV9pZBgBIAEoCVIKY2F0ZWdvcnlJZBISCgRuYW'
+    '1lGAIgASgJUgRuYW1l');
+
+@$core.Deprecated('Use reorderCategoriesDescriptor instead')
+const ReorderCategories$json = {
+  '1': 'ReorderCategories',
+  '2': [
+    {'1': 'category_ids', '3': 1, '4': 3, '5': 9, '10': 'categoryIds'},
+  ],
+};
+
+/// Descriptor for `ReorderCategories`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List reorderCategoriesDescriptor = $convert.base64Decode(
+    'ChFSZW9yZGVyQ2F0ZWdvcmllcxIhCgxjYXRlZ29yeV9pZHMYASADKAlSC2NhdGVnb3J5SWRz');
+
+@$core.Deprecated('Use deleteCategoryDescriptor instead')
+const DeleteCategory$json = {
+  '1': 'DeleteCategory',
+  '2': [
+    {'1': 'category_id', '3': 1, '4': 1, '5': 9, '10': 'categoryId'},
+  ],
+};
+
+/// Descriptor for `DeleteCategory`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteCategoryDescriptor = $convert.base64Decode(
+    'Cg5EZWxldGVDYXRlZ29yeRIfCgtjYXRlZ29yeV9pZBgBIAEoCVIKY2F0ZWdvcnlJZA==');
+
+@$core.Deprecated('Use categoryMutationDescriptor instead')
+const CategoryMutation$json = {
+  '1': 'CategoryMutation',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'mutation_id', '3': 2, '4': 1, '5': 9, '10': 'mutationId'},
+    {
+      '1': 'expected_revision',
+      '3': 3,
+      '4': 1,
+      '5': 13,
+      '10': 'expectedRevision'
+    },
+    {
+      '1': 'create_category',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CreateCategory',
+      '9': 0,
+      '10': 'createCategory'
+    },
+    {
+      '1': 'rename_category',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.RenameCategory',
+      '9': 0,
+      '10': 'renameCategory'
+    },
+    {
+      '1': 'reorder_categories',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ReorderCategories',
+      '9': 0,
+      '10': 'reorderCategories'
+    },
+    {
+      '1': 'delete_category',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.DeleteCategory',
+      '9': 0,
+      '10': 'deleteCategory'
+    },
+  ],
+  '8': [
+    {'1': 'operation'},
+  ],
+};
+
+/// Descriptor for `CategoryMutation`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List categoryMutationDescriptor = $convert.base64Decode(
+    'ChBDYXRlZ29yeU11dGF0aW9uEiUKDnNjaGVtYV92ZXJzaW9uGAEgASgNUg1zY2hlbWFWZXJzaW'
+    '9uEh8KC211dGF0aW9uX2lkGAIgASgJUgptdXRhdGlvbklkEisKEWV4cGVjdGVkX3JldmlzaW9u'
+    'GAMgASgNUhBleHBlY3RlZFJldmlzaW9uEkYKD2NyZWF0ZV9jYXRlZ29yeRgKIAEoCzIbLmthcn'
+    'V5b21pLnYxLkNyZWF0ZUNhdGVnb3J5SABSDmNyZWF0ZUNhdGVnb3J5EkYKD3JlbmFtZV9jYXRl'
+    'Z29yeRgLIAEoCzIbLmthcnV5b21pLnYxLlJlbmFtZUNhdGVnb3J5SABSDnJlbmFtZUNhdGVnb3'
+    'J5Ek8KEnJlb3JkZXJfY2F0ZWdvcmllcxgMIAEoCzIeLmthcnV5b21pLnYxLlJlb3JkZXJDYXRl'
+    'Z29yaWVzSABSEXJlb3JkZXJDYXRlZ29yaWVzEkYKD2RlbGV0ZV9jYXRlZ29yeRgNIAEoCzIbLm'
+    'thcnV5b21pLnYxLkRlbGV0ZUNhdGVnb3J5SABSDmRlbGV0ZUNhdGVnb3J5QgsKCW9wZXJhdGlv'
+    'bg==');
 
 @$core.Deprecated('Use readingAnchorDescriptor instead')
 const ReadingAnchor$json = {
@@ -312,6 +493,15 @@ const StateMutation$json = {
       '9': 0,
       '10': 'resetProgress'
     },
+    {
+      '1': 'set_categories',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SetCategories',
+      '9': 0,
+      '10': 'setCategories'
+    },
   ],
   '8': [
     {'1': 'operation'},
@@ -327,8 +517,9 @@ final $typed_data.Uint8List stateMutationDescriptor = $convert.base64Decode(
     'dGUSRwoPdXBkYXRlX21ldGFkYXRhGAsgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYX'
     'RhSABSDnVwZGF0ZU1ldGFkYXRhEkAKDXNhdmVfcHJvZ3Jlc3MYDCABKAsyGS5rYXJ1eW9taS52'
     'MS5TYXZlUHJvZ3Jlc3NIAFIMc2F2ZVByb2dyZXNzEkMKDnJlc2V0X3Byb2dyZXNzGA0gASgLMh'
-    'oua2FydXlvbWkudjEuUmVzZXRQcm9ncmVzc0gAUg1yZXNldFByb2dyZXNzQgsKCW9wZXJhdGlv'
-    'bg==');
+    'oua2FydXlvbWkudjEuUmVzZXRQcm9ncmVzc0gAUg1yZXNldFByb2dyZXNzEkMKDnNldF9jYXRl'
+    'Z29yaWVzGA4gASgLMhoua2FydXlvbWkudjEuU2V0Q2F0ZWdvcmllc0gAUg1zZXRDYXRlZ29yaW'
+    'VzQgsKCW9wZXJhdGlvbg==');
 
 @$core.Deprecated('Use businessStateErrorDescriptor instead')
 const BusinessStateError$json = {
@@ -384,6 +575,14 @@ const StateMutationResponse$json = {
       '6': '.karuyomi.v1.BusinessStateError',
       '10': 'error'
     },
+    {
+      '1': 'category_catalog',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CategoryCatalog',
+      '10': 'categoryCatalog'
+    },
   ],
 };
 
@@ -394,7 +593,8 @@ final $typed_data.Uint8List stateMutationResponseDescriptor = $convert.base64Dec
     'c2lvbhgDIAEoDVIPYWNjb3VudFJldmlzaW9uEi0KBW1hbmdhGAQgASgLMhcua2FydXlvbWkudj'
     'EuTWFuZ2FTdGF0ZVIFbWFuZ2ESPQoIcHJvZ3Jlc3MYBSABKAsyIS5rYXJ1eW9taS52MS5DaGFw'
     'dGVyUHJvZ3Jlc3NTdGF0ZVIIcHJvZ3Jlc3MSNQoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS'
-    '5CdXNpbmVzc1N0YXRlRXJyb3JSBWVycm9y');
+    '5CdXNpbmVzc1N0YXRlRXJyb3JSBWVycm9yEkcKEGNhdGVnb3J5X2NhdGFsb2cYByABKAsyHC5r'
+    'YXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2dSD2NhdGVnb3J5Q2F0YWxvZw==');
 
 @$core.Deprecated('Use mangaStateResponseDescriptor instead')
 const MangaStateResponse$json = {
@@ -426,6 +626,14 @@ const MangaStateResponse$json = {
       '6': '.karuyomi.v1.BusinessStateError',
       '10': 'error'
     },
+    {
+      '1': 'category_catalog',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CategoryCatalog',
+      '10': 'categoryCatalog'
+    },
   ],
 };
 
@@ -435,7 +643,9 @@ final $typed_data.Uint8List mangaStateResponseDescriptor = $convert.base64Decode
     'Npb24SKQoQYWNjb3VudF9yZXZpc2lvbhgCIAEoDVIPYWNjb3VudFJldmlzaW9uEi0KBW1hbmdh'
     'GAMgASgLMhcua2FydXlvbWkudjEuTWFuZ2FTdGF0ZVIFbWFuZ2ESPQoIcHJvZ3Jlc3MYBCABKA'
     'syIS5rYXJ1eW9taS52MS5DaGFwdGVyUHJvZ3Jlc3NTdGF0ZVIIcHJvZ3Jlc3MSNQoFZXJyb3IY'
-    'BSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JSBWVycm9y');
+    'BSABKAsyHy5rYXJ1eW9taS52MS5CdXNpbmVzc1N0YXRlRXJyb3JSBWVycm9yEkcKEGNhdGVnb3'
+    'J5X2NhdGFsb2cYBiABKAsyHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2dSD2NhdGVnb3J5'
+    'Q2F0YWxvZw==');
 
 @$core.Deprecated('Use libraryPageResponseDescriptor instead')
 const LibraryPageResponse$json = {
@@ -460,6 +670,14 @@ const LibraryPageResponse$json = {
       '6': '.karuyomi.v1.BusinessStateError',
       '10': 'error'
     },
+    {
+      '1': 'category_catalog',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CategoryCatalog',
+      '10': 'categoryCatalog'
+    },
   ],
 };
 
@@ -469,4 +687,72 @@ final $typed_data.Uint8List libraryPageResponseDescriptor = $convert.base64Decod
     'JzaW9uEikKEGFjY291bnRfcmV2aXNpb24YAiABKA1SD2FjY291bnRSZXZpc2lvbhIxCgdlbnRy'
     'aWVzGAMgAygLMhcua2FydXlvbWkudjEuTWFuZ2FTdGF0ZVIHZW50cmllcxIZCghuZXh0X2tleR'
     'gEIAEoCVIHbmV4dEtleRI1CgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3Rh'
-    'dGVFcnJvclIFZXJyb3I=');
+    'dGVFcnJvclIFZXJyb3ISRwoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLk'
+    'NhdGVnb3J5Q2F0YWxvZ1IPY2F0ZWdvcnlDYXRhbG9n');
+
+@$core.Deprecated('Use categoryMutationResponseDescriptor instead')
+const CategoryMutationResponse$json = {
+  '1': 'CategoryMutationResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'mutation_id', '3': 2, '4': 1, '5': 9, '10': 'mutationId'},
+    {'1': 'account_revision', '3': 3, '4': 1, '5': 13, '10': 'accountRevision'},
+    {
+      '1': 'category_catalog',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CategoryCatalog',
+      '10': 'categoryCatalog'
+    },
+    {
+      '1': 'error',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `CategoryMutationResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List categoryMutationResponseDescriptor = $convert.base64Decode(
+    'ChhDYXRlZ29yeU11dGF0aW9uUmVzcG9uc2USJQoOc2NoZW1hX3ZlcnNpb24YASABKA1SDXNjaG'
+    'VtYVZlcnNpb24SHwoLbXV0YXRpb25faWQYAiABKAlSCm11dGF0aW9uSWQSKQoQYWNjb3VudF9y'
+    'ZXZpc2lvbhgDIAEoDVIPYWNjb3VudFJldmlzaW9uEkcKEGNhdGVnb3J5X2NhdGFsb2cYBCABKA'
+    'syHC5rYXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2dSD2NhdGVnb3J5Q2F0YWxvZxI1CgVlcnJv'
+    'chgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvclIFZXJyb3I=');
+
+@$core.Deprecated('Use categoryCatalogResponseDescriptor instead')
+const CategoryCatalogResponse$json = {
+  '1': 'CategoryCatalogResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'account_revision', '3': 2, '4': 1, '5': 13, '10': 'accountRevision'},
+    {
+      '1': 'category_catalog',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CategoryCatalog',
+      '10': 'categoryCatalog'
+    },
+    {
+      '1': 'error',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `CategoryCatalogResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List categoryCatalogResponseDescriptor = $convert.base64Decode(
+    'ChdDYXRlZ29yeUNhdGFsb2dSZXNwb25zZRIlCg5zY2hlbWFfdmVyc2lvbhgBIAEoDVINc2NoZW'
+    '1hVmVyc2lvbhIpChBhY2NvdW50X3JldmlzaW9uGAIgASgNUg9hY2NvdW50UmV2aXNpb24SRwoQ'
+    'Y2F0ZWdvcnlfY2F0YWxvZxgDIAEoCzIcLmthcnV5b21pLnYxLkNhdGVnb3J5Q2F0YWxvZ1IPY2'
+    'F0ZWdvcnlDYXRhbG9nEjUKBWVycm9yGAQgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0'
+    'ZUVycm9yUgVlcnJvcg==');

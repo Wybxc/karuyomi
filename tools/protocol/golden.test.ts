@@ -34,6 +34,9 @@ import {
   StateMutationResponseSchema,
   MangaStateResponseSchema,
   LibraryPageResponseSchema,
+  CategoryMutationSchema,
+  CategoryMutationResponseSchema,
+  CategoryCatalogResponseSchema,
 } from '@karuyomi/protocol';
 import * as contract from '../../packages/contracts/src/index.ts';
 import { fileURLToPath } from 'node:url';
@@ -78,6 +81,9 @@ const schemas: Record<GoldenType, DescMessage> = {
   StateMutationResponse: StateMutationResponseSchema,
   MangaStateResponse: MangaStateResponseSchema,
   LibraryPageResponse: LibraryPageResponseSchema,
+  CategoryMutation: CategoryMutationSchema,
+  CategoryMutationResponse: CategoryMutationResponseSchema,
+  CategoryCatalogResponse: CategoryCatalogResponseSchema,
 };
 
 function canonical(fixture: GoldenFixture): JsonValue {
@@ -368,6 +374,9 @@ test('product semantic validators accept the generated golden matrix', () => {
     StateMutationResponse: contract.stateMutationResponseSchema.parse,
     MangaStateResponse: contract.mangaStateResponseSchema.parse,
     LibraryPageResponse: contract.libraryPageResponseSchema.parse,
+    CategoryMutation: contract.categoryMutationSchema.parse,
+    CategoryMutationResponse: contract.categoryMutationResponseSchema.parse,
+    CategoryCatalogResponse: contract.categoryCatalogResponseSchema.parse,
   };
   for (const fixture of goldenFixtures) {
     const parse = parsers[fixture.type];

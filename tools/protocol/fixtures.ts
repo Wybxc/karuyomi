@@ -24,7 +24,10 @@ export type GoldenType =
   | 'StateMutation'
   | 'StateMutationResponse'
   | 'MangaStateResponse'
-  | 'LibraryPageResponse';
+  | 'LibraryPageResponse'
+  | 'CategoryMutation'
+  | 'CategoryMutationResponse'
+  | 'CategoryCatalogResponse';
 
 export interface GoldenFixture {
   name: string;
@@ -225,6 +228,14 @@ export const businessManga: JsonObject = {
   favorite: true,
   addedAtSeconds: 4294967295,
   resume: { chapterKey: 'chapter-golden', reversedOrder: true },
+  categoryIds: ['f99489f0-3f30-4d7c-8cb1-0f456c40319d'],
+};
+const categoryCatalog: JsonObject = {
+  revision: 3,
+  categories: [
+    { id: 'f99489f0-3f30-4d7c-8cb1-0f456c40319d', name: '漫画😀' },
+    { id: '5c70b182-c978-4650-b1d0-6c87c33c1048', name: '漫画😀' },
+  ],
 };
 const businessMutation: JsonObject = {
   schemaVersion: 1,
@@ -247,6 +258,13 @@ export const goldenFixtures: GoldenFixture[] = [
         },
       ],
       ['resetProgress', { snapshot: businessSnapshot, reversedOrder: false }],
+      [
+        'setCategories',
+        {
+          categoryIds: ['f99489f0-3f30-4d7c-8cb1-0f456c40319d'],
+          expectedCatalogRevision: 3,
+        },
+      ],
     ] satisfies Array<[string, JsonObject]>
   ).map(([operation, value]): GoldenFixture => ({
     name: `business-mutation-${operation}`,
@@ -262,6 +280,7 @@ export const goldenFixtures: GoldenFixture[] = [
       accountRevision: 4294967295,
       manga: businessManga,
       progress: businessProgress,
+      categoryCatalog,
     },
   },
   {
@@ -271,6 +290,7 @@ export const goldenFixtures: GoldenFixture[] = [
       schemaVersion: 1,
       accountRevision: 0,
       manga: { mangaKey: businessMangaKey, revision: 0 },
+      categoryCatalog: {},
     },
   },
   {
@@ -281,6 +301,7 @@ export const goldenFixtures: GoldenFixture[] = [
       accountRevision: 7,
       entries: [businessManga],
       nextKey: businessMangaKey,
+      categoryCatalog,
     },
   },
   {
@@ -291,11 +312,66 @@ export const goldenFixtures: GoldenFixture[] = [
       mutationId: businessMutationId,
       accountRevision: 7,
       manga: businessManga,
+      categoryCatalog,
       error: {
         code: 'BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT',
         message: 'Changed on another device',
         retryable: false,
       },
+    },
+  },
+  ...(
+    [
+      [
+        'createCategory',
+        {
+          category: {
+            id: 'f99489f0-3f30-4d7c-8cb1-0f456c40319d',
+            name: '漫画😀',
+          },
+        },
+      ],
+      [
+        'renameCategory',
+        { categoryId: 'f99489f0-3f30-4d7c-8cb1-0f456c40319d', name: '以后读' },
+      ],
+      [
+        'reorderCategories',
+        {
+          categoryIds: [
+            '5c70b182-c978-4650-b1d0-6c87c33c1048',
+            'f99489f0-3f30-4d7c-8cb1-0f456c40319d',
+          ],
+        },
+      ],
+      [
+        'deleteCategory',
+        { categoryId: 'f99489f0-3f30-4d7c-8cb1-0f456c40319d' },
+      ],
+    ] satisfies Array<[string, JsonObject]>
+  ).map(([operation, value]): GoldenFixture => ({
+    name: `category-mutation-${operation}`,
+    type: 'CategoryMutation',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      expectedRevision: 3,
+      [operation]: value,
+    },
+  })),
+  {
+    name: 'category-empty-first-read',
+    type: 'CategoryCatalogResponse',
+    value: { schemaVersion: 1, categoryCatalog: {} },
+  },
+  {
+    name: 'category-confirmed-catalog',
+    type: 'CategoryMutationResponse',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      accountRevision: 7,
+      categoryCatalog,
     },
   },
   { name: 'manga-full-opaque-memo', type: 'Manga', value: manga },

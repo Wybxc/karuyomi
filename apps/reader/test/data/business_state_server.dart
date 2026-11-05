@@ -22,6 +22,7 @@ final class TestBusinessRequest {
 
 final class _Account {
   int revision = 0;
+  final catalog = wire.CategoryCatalog();
   final mangas = <String, wire.MangaState>{};
   final progress = <(String, String), wire.ChapterProgressState>{};
   final mutations = <String, (String, ApiReply)>{};
@@ -48,6 +49,8 @@ final class TestBusinessServer implements ApiFetch {
   TestBusinessServer get fetch => this;
   int get accountRevision => _account(defaultSubject).revision;
   int accountRevisionFor(String subject) => _account(subject).revision;
+  wire.CategoryCatalog catalog({String? subject}) =>
+      _account(subject ?? defaultSubject).catalog.deepCopy();
   ApiFetch forSubject(String subject) => _SubjectApi(this, subject);
 
   wire.MangaState? manga(String key, {String? subject}) =>
@@ -103,6 +106,37 @@ final class TestBusinessServer implements ApiFetch {
       );
     }
     final account = _account(trustedSubject);
+    if (request.method == 'GET' && request.uri.path == '/api/categories') {
+      return _reply(
+        wire.CategoryCatalogResponse(
+          schemaVersion: 1,
+          accountRevision: account.revision,
+          categoryCatalog: account.catalog.deepCopy(),
+        ),
+      );
+    }
+    if (request.method == 'POST' &&
+        request.uri.path == '/api/categories/mutations') {
+      if (failWrites) {
+        final mutation = wire.decodeProtoJson(
+          wire.CategoryMutation(),
+          jsonDecode(request.body!),
+        );
+        return _errorReply(
+          request,
+          wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_UNAVAILABLE,
+          'Injected business write failure',
+          status: 503,
+          mutationId: mutation.mutationId,
+        );
+      }
+      final response = _mutateCategories(account, request);
+      if (loseNextResponse) {
+        loseNextResponse = false;
+        throw StateError('Injected lost business mutation response');
+      }
+      return response;
+    }
     if (request.method == 'POST' &&
         request.uri.path == '/api/state/mutations') {
       if (failWrites) {
@@ -133,6 +167,7 @@ final class TestBusinessServer implements ApiFetch {
           wire.LibraryPageResponse(
             schemaVersion: 1,
             accountRevision: account.revision,
+            categoryCatalog: account.catalog.deepCopy(),
             error: _error(
               wire
                   .BusinessStateErrorCode
@@ -157,6 +192,7 @@ final class TestBusinessServer implements ApiFetch {
         wire.LibraryPageResponse(
           schemaVersion: 1,
           accountRevision: account.revision,
+          categoryCatalog: account.catalog.deepCopy(),
           entries: page,
           nextKey: entries.length > page.length ? page.last.mangaKey : '',
         ),
@@ -170,6 +206,7 @@ final class TestBusinessServer implements ApiFetch {
         wire.MangaStateResponse(
           schemaVersion: 1,
           accountRevision: account.revision,
+          categoryCatalog: account.catalog.deepCopy(),
           manga:
               account.mangas[key]?.deepCopy() ?? wire.MangaState(mangaKey: key),
           progress: chapterKey == null
@@ -208,7 +245,7 @@ final class TestBusinessServer implements ApiFetch {
         mutationId: mutation.mutationId,
       );
     }
-    final fingerprint = jsonEncode(wire.encodeProtoJson(mutation));
+    final fingerprint = 'manga\n${jsonEncode(wire.encodeProtoJson(mutation))}';
     final previous = account.mutations[mutation.mutationId];
     if (previous != null) {
       return previous.$1 == fingerprint
@@ -283,6 +320,39 @@ final class TestBusinessServer implements ApiFetch {
           chapterKey: nextProgress.chapterKey,
           reversedOrder: operation.reversedOrder,
         );
+      case wire.StateMutation_Operation.setCategories:
+        if (mutation.setCategories.expectedCatalogRevision !=
+            account.catalog.revision) {
+          return _mutationError(
+            account,
+            mutation,
+            wire
+                .BusinessStateErrorCode
+                .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+            'Categories changed on another device',
+          );
+        }
+        final ids = mutation.setCategories.categoryIds;
+        if (!next.hasMetadata() ||
+            ids.any(
+              (id) => !account.catalog.categories.any(
+                (category) => category.id == id,
+              ),
+            )) {
+          return _mutationError(
+            account,
+            mutation,
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Unknown manga or category',
+          );
+        }
+        next.categoryIds
+          ..clear()
+          ..addAll(
+            account.catalog.categories
+                .where((category) => ids.contains(category.id))
+                .map((category) => category.id),
+          );
       case wire.StateMutation_Operation.notSet:
         throw StateError('Missing operation');
     }
@@ -298,6 +368,7 @@ final class TestBusinessServer implements ApiFetch {
         schemaVersion: 1,
         mutationId: mutation.mutationId,
         accountRevision: account.revision,
+        categoryCatalog: account.catalog.deepCopy(),
         manga: next.deepCopy(),
         progress: nextProgress?.deepCopy(),
       ),
@@ -318,6 +389,7 @@ final class TestBusinessServer implements ApiFetch {
       schemaVersion: 1,
       mutationId: mutation.mutationId,
       accountRevision: account.revision,
+      categoryCatalog: account.catalog.deepCopy(),
       manga:
           account.mangas[mutation.mangaKey]?.deepCopy() ??
           wire.MangaState(mangaKey: mutation.mangaKey),
@@ -326,6 +398,120 @@ final class TestBusinessServer implements ApiFetch {
     ),
     status: 409,
   );
+
+  ApiReply _mutateCategories(_Account account, TestBusinessRequest request) {
+    final mutation = wire.decodeProtoJson(
+      wire.CategoryMutation(),
+      jsonDecode(request.body!),
+      maxBytes: 128 * 1024,
+    );
+    final fingerprint =
+        'category\n${jsonEncode(wire.encodeProtoJson(mutation))}';
+    final previous = account.mutations[mutation.mutationId];
+    ApiReply failure(wire.BusinessStateErrorCode code, String message) =>
+        _reply(
+          wire.CategoryMutationResponse(
+            schemaVersion: 1,
+            mutationId: mutation.mutationId,
+            accountRevision: account.revision,
+            categoryCatalog: account.catalog.deepCopy(),
+            error: _error(code, message),
+          ),
+          status: 409,
+        );
+    if (previous != null) {
+      return previous.$1 == fingerprint
+          ? previous.$2
+          : failure(
+              wire
+                  .BusinessStateErrorCode
+                  .BUSINESS_STATE_ERROR_CODE_IDEMPOTENCY_CONFLICT,
+              'Mutation ID already has a different payload',
+            );
+    }
+    if (mutation.expectedRevision != account.catalog.revision) {
+      return failure(
+        wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+        'Categories changed on another device',
+      );
+    }
+    final categories = account.catalog.categories;
+    switch (mutation.whichOperation()) {
+      case wire.CategoryMutation_Operation.createCategory:
+        final category = mutation.createCategory.category;
+        if (categories.any((value) => value.id == category.id) ||
+            categories.length >= 64) {
+          return failure(
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Invalid new category',
+          );
+        }
+        categories.add(category.deepCopy());
+      case wire.CategoryMutation_Operation.renameCategory:
+        final category = categories
+            .where((value) => value.id == mutation.renameCategory.categoryId)
+            .firstOrNull;
+        if (category == null) {
+          return failure(
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Unknown category',
+          );
+        }
+        category.name = mutation.renameCategory.name;
+      case wire.CategoryMutation_Operation.reorderCategories:
+        final ids = mutation.reorderCategories.categoryIds;
+        if (ids.length != categories.length ||
+            ids.toSet().length != categories.length ||
+            categories.any((category) => !ids.contains(category.id))) {
+          return failure(
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Reorder requires every category',
+          );
+        }
+        final ordered = ids
+            .map((id) => categories.firstWhere((category) => category.id == id))
+            .toList();
+        categories
+          ..clear()
+          ..addAll(ordered);
+        for (final manga in account.mangas.values) {
+          final sorted = ids.where(manga.categoryIds.contains).toList();
+          manga.categoryIds
+            ..clear()
+            ..addAll(sorted);
+        }
+      case wire.CategoryMutation_Operation.deleteCategory:
+        final id = mutation.deleteCategory.categoryId;
+        if (!categories.any((category) => category.id == id)) {
+          return failure(
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Unknown category',
+          );
+        }
+        categories.removeWhere((category) => category.id == id);
+        for (final manga in account.mangas.values) {
+          if (manga.categoryIds.remove(id)) manga.revision++;
+        }
+      case wire.CategoryMutation_Operation.notSet:
+        return failure(
+          wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+          'Missing category operation',
+        );
+    }
+    account.revision++;
+    account.catalog.revision++;
+    final response = _reply(
+      wire.CategoryMutationResponse(
+        schemaVersion: 1,
+        mutationId: mutation.mutationId,
+        accountRevision: account.revision,
+        categoryCatalog: account.catalog.deepCopy(),
+      ),
+    );
+    account.mutations[mutation.mutationId] = (fingerprint, response);
+    appliedMutations++;
+    return response;
+  }
 
   ApiReply _errorReply(
     TestBusinessRequest request,
@@ -348,6 +534,22 @@ final class TestBusinessServer implements ApiFetch {
           mutationId: mutationId,
           error: error,
         ),
+        status: status,
+      );
+    }
+    if (request.uri.path == '/api/categories/mutations') {
+      return _reply(
+        wire.CategoryMutationResponse(
+          schemaVersion: 1,
+          mutationId: mutationId,
+          error: error,
+        ),
+        status: status,
+      );
+    }
+    if (request.uri.path == '/api/categories') {
+      return _reply(
+        wire.CategoryCatalogResponse(schemaVersion: 1, error: error),
         status: status,
       );
     }

@@ -21,8 +21,13 @@ final class LibraryEntry {
     required this.sourceLang,
     required wire.Manga manga,
     required this.addedAt,
-  }) : snapshot = manga.deepCopy()..freeze() {
+    List<String> categoryIds = const [],
+    this.revision = 0,
+  }) : snapshot = manga.deepCopy()..freeze(),
+       categoryIds = List.unmodifiable(categoryIds) {
     _validateMetadata(packageName, sourceId, sourceName, sourceLang, snapshot);
+    validateBusinessCategoryIds(this.categoryIds);
+    validateBusinessRevision(revision);
   }
 
   final String packageName;
@@ -31,9 +36,29 @@ final class LibraryEntry {
   final String sourceLang;
   final wire.Manga snapshot;
   final DateTime addedAt;
+  final List<String> categoryIds;
+  final int revision;
   String get mangaKey => _mangaKey(packageName, sourceId, snapshot.url);
   String get title => snapshot.title;
   String get url => snapshot.url;
+}
+
+final class LibraryCategory {
+  const LibraryCategory({required this.id, required this.name});
+  final String id;
+  final String name;
+}
+
+final class LibraryView {
+  LibraryView({
+    required List<LibraryEntry> entries,
+    required List<LibraryCategory> categories,
+    required this.categoryRevision,
+  }) : entries = List.unmodifiable(entries),
+       categories = List.unmodifiable(categories);
+  final List<LibraryEntry> entries;
+  final List<LibraryCategory> categories;
+  final int categoryRevision;
 }
 
 final class LibraryRepository {
@@ -41,9 +66,20 @@ final class LibraryRepository {
   final BusinessStateClient client;
   ProgressIdentity get identity => client.identity;
 
-  Stream<List<LibraryEntry>> watchEntries() => client.watchLibrary().map(
-    (values) => List.unmodifiable(values.map(_entry)),
+  Stream<LibraryView> watchView() => client.watchLibrarySnapshot().map(
+    (view) => LibraryView(
+      entries: view.entries.map(_entry).toList(),
+      categories: view.categoryCatalog.categories
+          .map(
+            (category) => LibraryCategory(id: category.id, name: category.name),
+          )
+          .toList(),
+      categoryRevision: view.categoryCatalog.revision,
+    ),
   );
+
+  Stream<List<LibraryEntry>> watchEntries() =>
+      watchView().map((view) => view.entries);
 
   Stream<bool> watchFavorite(String mangaKey) => client
       .watchManga(mangaKey)
@@ -54,6 +90,82 @@ final class LibraryRepository {
       (await client.readManga(mangaKey)).manga.favorite;
 
   Future<void> refresh() => client.refreshLibrary();
+
+  Future<void> createCategory({
+    required String categoryId,
+    required String name,
+    required int expectedRevision,
+  }) async {
+    await client.mutateCategories(
+      wire.CategoryMutation(
+        expectedRevision: expectedRevision,
+        createCategory: wire.CreateCategory(
+          category: wire.Category(id: categoryId, name: name.trim()),
+        ),
+      ),
+    );
+  }
+
+  Future<void> renameCategory({
+    required String categoryId,
+    required String name,
+    required int expectedRevision,
+  }) async {
+    await client.mutateCategories(
+      wire.CategoryMutation(
+        expectedRevision: expectedRevision,
+        renameCategory: wire.RenameCategory(
+          categoryId: categoryId,
+          name: name.trim(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> reorderCategories({
+    required List<String> categoryIds,
+    required int expectedRevision,
+  }) async {
+    await client.mutateCategories(
+      wire.CategoryMutation(
+        expectedRevision: expectedRevision,
+        reorderCategories: wire.ReorderCategories(categoryIds: categoryIds),
+      ),
+    );
+  }
+
+  Future<void> deleteCategory({
+    required String categoryId,
+    required int expectedRevision,
+  }) async {
+    await client.mutateCategories(
+      wire.CategoryMutation(
+        expectedRevision: expectedRevision,
+        deleteCategory: wire.DeleteCategory(categoryId: categoryId),
+      ),
+    );
+  }
+
+  Future<void> setCategories({
+    required String mangaKey,
+    required List<String> categoryIds,
+    required int expectedCatalogRevision,
+    required int expectedMangaRevision,
+  }) async {
+    validateBusinessCategoryIds(categoryIds);
+    validateBusinessRevision(expectedCatalogRevision);
+    validateBusinessRevision(expectedMangaRevision);
+    await client.mutate(
+      wire.StateMutation(
+        mangaKey: mangaKey,
+        setCategories: wire.SetCategories(
+          categoryIds: categoryIds,
+          expectedCatalogRevision: expectedCatalogRevision,
+        ),
+      ),
+      basedOnRevision: expectedMangaRevision,
+    );
+  }
 
   Future<void> setFavorite({
     required String packageName,
@@ -114,6 +226,8 @@ LibraryEntry _entry(wire.MangaState state) {
       state.addedAtSeconds * 1000,
       isUtc: true,
     ),
+    categoryIds: state.categoryIds,
+    revision: state.revision,
   );
   if (entry.mangaKey != state.mangaKey) {
     throw const FormatException('Library metadata identity mismatch');
