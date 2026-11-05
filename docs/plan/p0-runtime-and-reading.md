@@ -8,6 +8,8 @@ P0 的实现选择以最简单直接的真实端到端路径为先：先完成�
 
 P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合。工程发布另见[工程计划](engineering-and-release.md)，分项证据和复验命令见 [VERIFICATION](../VERIFICATION.md)。
 
+2026-11-05，项目将多端同步提升为首要设计目标。当前业务开发按 [P2](p2-sync.md)优先建立 Worker API + D1 权威状态与跨端确认语义，P1 的书架、进度和设置随该合同推进；P0 的真实阅读、生产 Access、Native 主入口和真机门继续保留，不作为推迟同步设计与实现的理由。下述 Drift/SQLite 恢复结果记录现有实现，不能作为未来业务权威或跨端恢复的验收替代。
+
 ## 当前功能收尾（先实现，后集中验收）
 
 2026-11-05 按用户要求暂停新增浏览器、性能和多源采样，先补齐静态审查发现的功能缺口。已有浏览/搜索、详情/章序、正式 Source 图片通道、阅读布局/翻页/缩放、切章/有界邻章准备与本地进度已有产品接线；以下四项现已补齐并通过集中工程回归；完整 P0 的实际环境验收仍未通过：
@@ -55,7 +57,7 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 1. **收齐 P0-B。** 真实 workerd 与受控 origin 已通过压缩、重定向、Cookie、HEAD/206、204/205/304、精确 Range、urlencoded/multipart、流式上传、截断上传/响应和三类取消门。继续固定输入比较原 JVM 基线与当前 v2 的响应字节、原 Source 输出和异常；这些 Worker 分项不代替正式 Source/cache 或 Java 同版全部语义对照。当前只维护 v2，旧包需要重新构建。
 2. **验证缓冲与取消。** META/DATA 最多 64 KiB，正文请求最多 8 MiB、响应最多 64 MiB，适配队列最多四块。真实 workerd 的持续发送与显式 TCP reset/idle 门已使用 30 秒请求期限、1 秒取消窗口分别通过；固定 Web 主入口的原 Arknights 图片获取中退出、未完成 HTTPS 及时关闭、恢复阅读及最终 Worker/遥测/服务清理也已通过限定分项，见[取消证据](../verification/source-cancellation-web.md)。继续检查慢消费者、背压、迟到响应和 generation 销毁能终止上游并释放 handle；整体请求预算和两次读取之间的 idle timeout 分别验证。生产 Access、Native 与其它图片阶段不由本轮替代。协议细节见 [HTTP bridge](../HTTP-BRIDGE.md)。
 3. **完成图片剩余门槛。** Web 单页及真实 Flutter 阅读闭环已通过分项门，合同见[图片资源通道](../IMAGE-RESOURCES.md)。正式 Native 文件通道已实现：Android 采用锁定插件的六个常驻 ArrayBuffer 槽位，iOS 使用受管 WKDownload 薄扩展；iOS 模拟器实际 Flutter Headless/受信 HTTPS、文件解码与清理通过，见 [Native 文件证据](../NATIVE-IMAGE-FILES.md)。iOS/Android 模拟器原 xkcd 经正式 ReaderScreen 显示及进度重启已分别通过固定材料分项，Cache v3 固定 `19b65f5` 原 xkcd 双端模拟器分项已复验，继续验收真机；机制分项不能代替这些门。内部 Bitmap/ImageDecoder 已改为二进制 handle、≤64 KiB 像素/字节块、解码前头部校验和 surface/decoder/font 合计账本；只查 bounds 不完整解码。JVM、受控时序、实际 TeaVM→Canvas 分项通过；取消仍等待 Java 退出，不扫描删除 Source 持有对象。详见 [graphics 合同](../IMAGE-RESOURCES.md#source-内部图形桥)。继续固定新 host 重新 AOT 并验收实际处理源；Cache/File 有界正文与共享 JVM/TeaVM 分项已通过，跨目录与合计存储预算、正式 Source 和移动环境继续按存储计划验收，终端与图形账本均不代表进程/GPU 实际峰值。不绕过插件直接读取原图 URL。当前图片交付边界已收敛为仅含身份、位置与编码字节数的不透明资源，不读取 MIME、尺寸或 EXIF，不提供 Source 编码页/分片/window 控制。Flutter 从实际 ImageInfo 学习尺寸并负责显示、布局和解码预算；这轮工程回归不自动继承旧版本的在线/终端验收。
-4. **汇合 P0-R / F4 / P0-C（章序、切章、有界准备与产品本地进度已实现，实际环境门继续验收）。** 保留 Source 原序/反序与重复章节，在同一阅读路由等待旧资源 ACK 后切章。末页由 Flutter 实际解码显示、图片窗口含清理均空闲且 Source 元数据槽空闲时，自动准备至多一个下一章页面会话；邻章不取图片，不推进进度。普通活动 Source 调用不冒充可抢占取消，过期准备结果等待返回后关闭。Drift/SQLite 分开保存当前位置、最远位置、阅读 epoch 与显式完成状态；节流写入，切章/退出/后台切换提交，写入失败保留可重试草稿。正式产品路由的 SQLite 文件关闭重开已覆盖章节、方向和页内偏移；继续验证浏览器进程和完整 Native 主入口产品流程恢复。Web 数据库 WASM/worker 随静态资源交付，Native 使用正式 SQLite；内存与不安全多窗口模式明确提示，不冒称已保存。随后先完成正式 UI 直接解码的首图、跳转、滚动、CPU/RSS/GPU baseline，再依据对照决定成熟区域 decoder、降采样或分片；触控/缩放、位置恢复、真实长图与 EXIF/LOD 分别验收。
+4. **汇合 P0-R / F4 / P0-C，并接入服务端进度确认。** 章序、切章与有界下一章准备已有实现：保留 Source 原序/反序与重复章节，在同一阅读路由等待旧资源 ACK 后切章；邻章不取图片，不推进进度。普通活动 Source 调用不冒充可抢占取消，过期准备结果等待返回后关闭。现有 Drift/SQLite 的章节、方向和页内偏移恢复证据继续保留，但不继续扩充独立本地业务权威。按 [P2](p2-sync.md)将当前位置、最远位置、阅读 epoch 与显式完成状态改由 Worker API + D1 保存；节流发送，切章/退出/后台切换尽力提交，服务端确认后才显示已保存。未确认草稿仅保留在当前会话，失败仍能阅读并可重试，不承诺关闭后恢复。新的恢复门要求清空客户端业务数据或使用全新客户端后，仍能从服务端恢复已确认章节和逻辑位置；完整跨端一致性另外按 P2 验收。Source 文件/HTTP Cache 与图片资源的本地存储仍各自保持既有所有权和限额。UI 直接解码的首图、跳转、滚动、CPU/RSS/GPU baseline 与真机验收继续，区域 decoder、降采样或分片只依据实测决定。
 5. **完成实际部署与恢复。** 在真实 Access、Web 和移动容器验证登录/过期/回跳、Cookie 恢复、执行槽/文件恢复、跨包切换和后台重建；不自动重发无幂等保证的副作用请求。
 
 正式 `be5c3ed` Web 主入口现已通过官方 Arknights 1.6.1 → 1.6.2 的静态快照更新、重新连接与 DREAM 第 3 页首次续读；两版章节会话均关闭、两 Worker 最终终止，见[版本更新证据](../verification/extension-version-web.md)。新版仍走真实上游 200 并重新写入正文，不推广为 Cache 正文复用或零网络；Native 版本切换继续待验。同期正式 Native `lib/main.dart` 成品与正常 TLS/签名会话预验通过，但当前工具无法连接 Simulator 操作 UI，App 未安装/启动，见[主入口准备与阻断](../verification/native-main-entry.md)。生产 Access、Native 主入口和真机等完整 P0 门槛不变。
@@ -67,6 +69,6 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 - P0-A：原输入/工具链/ABI/实际执行身份一致；Source IDs 与清单吻合；文件与 HTTP Cache 在重启、取消和版本切换后语义正确。
 - P0-B：Workers↔浏览器、浏览器↔Java 两段正文均无整段 Gson/Base64；固定输入字节/异常一致；慢消费缓冲有界，上游取消与 Access 通过。
 - P0-F / P0-R：Web 与声明支持的 iOS/Android 真机完成 DTO、取消、容器恢复及图片释放；翻页、惯性滚动与缩放不争抢，旋转和布局切换保持逻辑锚。
-- P0-C：3–5 个未修改原版源覆盖直图、特殊请求头、图片处理；完整章首中末页和下一章可交互阅读，进度落盘。记录手机/重包首图分布及进程/GPU 合计峰值，不用桌面或模拟器机制数字替代。
+- P0-C：3–5 个未修改原版源覆盖直图、特殊请求头、图片处理；完整章首中末页和下一章可交互阅读，进度经 Worker API 确认保存到 D1，全新客户端可恢复已确认的逻辑位置。跨端并发与冲突门按 [P2](p2-sync.md)验收。记录手机/重包首图分布及进程/GPU 合计峰值，不用桌面或模拟器机制数字替代。
 
 只在以上门槛汇合后标记 P0 通过；独立探针、编译、完整性或初始化成功分别保留其证据层级。

@@ -42,4 +42,6 @@ Wrangler 4.156.1 的 D1 `--file --json` 会由另一套 logger 输出上传进�
 
 ## Drift 生成模型
 
+以下是现有本地业务实现的生成约束；多端同步优先后的目标是直接用 Worker API + D1 替换其业务权威入口，见[P2](plan/p2-sync.md)。本轮仅调整计划，Drift 代码和检查尚未移除，不能提前跳过现有生成一致性门。
+
 阅读进度数据库使用 `apps/reader/pubspec.yaml` 精确锁定的 Drift/Drift Dev 与官方 build_runner。修改表后在 `apps/reader/` 运行 `dart run build_runner build`，将自有表定义和官方 `reader_database.g.dart` 一起审阅提交。`pnpm flutter:check` 用官方生成器重建该目标并逐字节检查，发现差异时要求审阅生成结果；随后继续静态分析与测试。`.g.dart` 与现有 Protobuf 生成模型一样不参与普通源码再排版，类型分析与真实数据库测试仍包含它们。

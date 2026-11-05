@@ -2,23 +2,25 @@
 
 这里维护当前可执行计划；[总览](../PLAN.md)只保留架构与范围。各主题的已完成、待办和验收只在对应计划维护，测试命令与实际环境证据统一引用 [VERIFICATION](../VERIFICATION.md)，操作契约引用主题文档，避免复制实时测试数、发布数量和日志。
 
-2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。固定 `13494a0` 的 v4 三包已部署，匿名 26 路径及三包网络政策核对通过，见[生产部署记录](../verification/v4-production.md)；Access 会话已失效，用户稍后登录，生产正向与 Native 主入口仍待验收，完整 P0 未通过。P1 本地收藏/书架已接正式路由并通过组件与 SQLite 重开门，完整分类/设置及云端状态未完成，见[P1 计划](p1-library-and-progress.md)；P1–P4 完整范围尚未验收。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
+**首要设计目标是多端同步。** [P2](p2-sync.md) 提升为当前主线，与 [P1](p1-library-and-progress.md) 的数据模型、API 和客户端读写一起推进；阶段编号保留，不代表同步必须等完整本地书架之后才开始。Worker API + D1 为唯一业务权威，先打通同身份跨 Web/iOS/Android 的在线保存与恢复，再扩展外围功能。
+
+2026-11-05：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。固定 `13494a0` 的 v4 三包已部署，匿名 26 路径及三包网络政策核对通过，见[生产部署记录](../verification/v4-production.md)；Access 会话已失效，用户稍后登录，生产正向与 Native 主入口仍待验收，完整 P0 未通过。现有本地书架/进度通过组件与 SQLite 重开门，但属于待替换的本地业务权威路径；跨端业务协议、D1 状态与同步尚未实现，见[P1](p1-library-and-progress.md)和[P2](p2-sync.md)。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
 
 ## 优先级与状态
 
-| 优先级               | 计划                                                          | 当前状态与依赖                                                                                                                                           |
-| -------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 当前主线             | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | 四项功能已补齐；v4 三源 Web 图片、xkcd 阅读、跨标签冲突/释放和实际 enqueue 分项已过；生产 Access、Native 主入口与真机待验收                              |
-| 并行工程             | [工程、AOT 与发布](engineering-and-release.md)                | v4 三包已部署，匿名静态交付与网络政策核对通过；baseline 未完成，CI 仍 disabled_manually；v1/v3 checkpoint 仅保留历史冻结证据                             |
-| 并行功能推进         | [P1 书架与进度](p1-library-and-progress.md)                   | 本地进度、收藏/搜索/排序及经详情继续阅读已接产品；组件/SQLite 重开通过，本地书架实际环境、分类/设置、云端状态及完整日用流程待验收                        |
-| P1 状态模型确定后    | [P2 多设备同步](p2-sync.md)                                   | 语义已规划；业务表、outbox、push/pull 与冲突恢复待实现                                                                                                   |
-| 基础运行与书架具备后 | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                                     |
-| 持续推进             | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                                    |
-| 已实现待运行验收     | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；v4 三包已部署，匿名验收通过；历史 Native/双端模拟器分项保留，当前生产正向与 Native 运行门待验收                       |
-| P0 存储子计划        | [运行时文件与 HTTP Cache](runtime-storage.md)                 | 有界组合存储、xkcd Web/Native Cache 与 Web A→B→A 后 304 正文复用通过；版本更新、更多 Source 与生产取消待验收                                             |
-| P0 文字布局子计划    | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收                               |
-| P0 图片解码子计划    | [阅读器图片解码与长图评估](reader-image-decoding.md)          | 默认 UI 直接解码，候选 codec 退出默认打包；xkcd 阅读/下载、Arknights/CuuTruyen 完整章/限定续读三源 Web 分项通过；多次 baseline、长图/EXIF/LOD 与真机待验 |
-| 已验收               | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                                       |
+| 优先级                  | 计划                                                          | 当前状态与依赖                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 当前主线 / 首要设计目标 | [P2 多设备同步](p2-sync.md)                                   | 先完成 Worker API + D1 权威状态、幂等写入与跨端在线恢复；现有本地书架/进度待替换，不以本地通过代替同步验收                                               |
+| 并行基础验收            | [P0 运行时与真实阅读](p0-runtime-and-reading.md)              | 四项功能已补齐；v4 三源 Web 图片、xkcd 阅读、跨标签冲突/释放和实际 enqueue 分项已过；生产 Access、Native 主入口与真机待验收                              |
+| 并行工程                | [工程、AOT 与发布](engineering-and-release.md)                | v4 三包已部署，匿名静态交付与网络政策核对通过；baseline 未完成，CI 仍 disabled_manually；v1/v3 checkpoint 仅保留历史冻结证据                             |
+| 与同步共同交付          | [P1 书架与进度](p1-library-and-progress.md)                   | 数据模型先按跨端权威状态设计；现有本地功能保留证据，先替换读写入口，再补分类/设置及完整日用流程                                                          |
+| 基础运行与书架具备后    | [P3 扩展管理与源迁移](p3-extensions-and-migration.md)         | AOT 工程流水线已有实现；用户安装/设置/迁移流程待实现                                                                                                     |
+| 持续推进                | [P4 Source 覆盖与性能](p4-source-coverage-and-performance.md) | 少量编译/初始化及网络证据；完整源覆盖和移动性能未验收                                                                                                    |
+| 已实现待运行验收        | [跨语言协议方案](cross-language-protocol.md)                  | Protobuf + Buf 正式双端控制已接入；v4 三包已部署，匿名验收通过；历史 Native/双端模拟器分项保留，当前生产正向与 Native 运行门待验收                       |
+| P0 存储子计划           | [运行时文件与 HTTP Cache](runtime-storage.md)                 | 有界组合存储、xkcd Web/Native Cache 与 Web A→B→A 后 304 正文复用通过；版本更新、更多 Source 与生产取消待验收                                             |
+| P0 文字布局子计划       | [普通文本与 TextInterceptor](text-layout.md)                  | 普通文本、xkcd 两页/可见文字、原 Source 重复处理及编码取消分项通过；空闲 GC 与测试压力分开记录，长期/Native 生命周期待验收                               |
+| P0 图片解码子计划       | [阅读器图片解码与长图评估](reader-image-decoding.md)          | 默认 UI 直接解码，候选 codec 退出默认打包；xkcd 阅读/下载、Arknights/CuuTruyen 完整章/限定续读三源 Web 分项通过；多次 baseline、长图/EXIF/LOD 与真机待验 |
+| 已验收                  | [执行器与公共工具收敛](tooling-processes.md)                  | tools/lib 已删除并直接使用成熟库；日志、凭据隔离、进程树、状态锁和完整工程检查通过                                                                       |
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
 

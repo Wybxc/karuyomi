@@ -41,7 +41,9 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 实际 TeaVM 回调门随后补齐产品 manager/Worker/driver 组合：64/65 pending 上限、真实约 30.05 秒 fatal drain、未发送的排队任务拒绝、上游连接关闭、namespace 释放及同 namespace 新 Worker/代次恢复均通过，见[组合记录](verification/teavm-enqueue.md#实际-callback-上限fatal-drain-与-manager-回收)。这是受控 Source/HTTP 端点，不代替官方 Source、生产 Access 或 Native。
 
-P1 本地收藏书架随后接入正式 `main.dart`，支持详情收藏、搜索/排序、按当前索引重开原 Source 和继续阅读；真实 SQLite 文件关闭重开、已有进度增表保留、身份隔离及写入失败恢复通过，见[本地书架分项](verification/p1-local-library.md)。该切片只在当前设备保存，D1 云端状态与 outbox 未实现；组件 Source DTO/viewport 夹具不代替浏览器、Native UI 或生产验收。
+P1 本地收藏书架随后接入正式 `main.dart`，支持详情收藏、搜索/排序、按当前索引重开原 Source 和继续阅读；真实 SQLite 文件关闭重开、已有进度增表保留、身份隔离及写入失败恢复通过，见[本地书架分项](verification/p1-local-library.md)。该实现只在当前设备保存，D1 云端状态与 outbox 未实现；组件 Source DTO/viewport 夹具不代替浏览器、Native UI 或生产验收。
+
+2026-11-05，用户将多端同步提升为首要设计目标，Worker API + D1 为唯一业务权威，见[调整后的主线](plan/p2-sync.md)。上述本地书架/进度证据按原实现保留，其业务持久化入口待替换；本次计划调整没有实现 D1 业务表、同步 API 或跨端恢复，不能据此提升验收状态。
 
 此前控制身份为 host ABI `karuyomi-source-host-v3` / protocolVersion 2，HTTP bridgeVersion 仍为 2。浏览器探针入口已迁至单一 control 和正式生成 codec。固定 `6e08ec9` 后，原版 Arknights Comics 已重新 AOT，并在 Codex 内置浏览器通过初始化、真实 Source 元数据和首中末图片门，见 [v3 运行证据](verification/protocol-v3-runtime.md)。该历史记录不证明 v3 的生产部署或剩余运行门，当前直接维护 v4。生产 Access 正向 bootstrap 的历史证据见下文。下文 v2 图片和 v1 部署证据仍保持原身份；冻结 `022d828` 全量未改动，不能把其产物装配进当前客户端。
 

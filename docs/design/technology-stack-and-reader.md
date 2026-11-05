@@ -6,7 +6,9 @@
 
 **当前交付边界：** Static Assets 是 Web 与 Native 扩展的最终权威来源，只发布每扩展最新 build；index/catalog 决定版本，客户端或 Service Worker 管理更新与缓存。不再要求扩展 Release 发布，已有扩展和索引 Release 已按用户要求删除。通用 host/桥/WASM 使用 Web Static Assets 或 Native 内置材料；Worker 只处理个人数据和 Source 网络控制，不经 R2/Worker 交付扩展正文，不向客户端发放 GitHub 凭据。此前 Release Web 直下/Range 因 CORS 失败；当前 Static Assets 方案已确定，发布与完整加载仍待实现验收，具体限制见主设计。
 
-前端的首要工程目标是跨端阅读。本文 Web 方案覆盖桌面 Chrome / Firefox / Safari、Android Chrome / PWA、iPhone Safari / PWA 和 iPad 的触控、横屏及分屏；原生阅读器增加各平台图片、手势、存储、Access 会话与 WebView 生命周期验收。通用的逻辑位置、图片预算和源处理链要求保留，具体语言与组件由已确定的 Dart/Flutter 和平台 adapter 承担。
+跨端阅读是产品的基础能力。本文 Web 方案覆盖桌面 Chrome / Firefox / Safari、Android Chrome / PWA、iPhone Safari / PWA 和 iPad 的触控、横屏及分屏；原生阅读器增加各平台图片、手势、存储、Access 会话与 WebView 生命周期验收。通用的逻辑位置、图片预算和源处理链要求保留，具体语言与组件由已确定的 Dart/Flutter 和平台 adapter 承担。
+
+2026-11-05 起，产品首要设计目标是多端同步：Worker API + D1 为书架、进度与设置的唯一业务权威，客户端维护当前会话状态和可丢弃缓存。本文下述 Dexie/IndexedDB 业务镜像、持久 outbox、先完整本地 UI 再补 P2 的顺序均为历史方案，不再作为当前实施要求；不适用于仍需保留的 Source 普通文件/HTTP Cache。当前实施以[P2 主线](../plan/p2-sync.md)和主设计第 6 节为准，先完成在线跨端确认与恢复。
 
 ## 1. 历史 React UI 选型
 

@@ -6,6 +6,8 @@
 
 当前各实际边界、quicktype/OpenAPI/FlatBuffers/GraphQL 与平台通道的适用范围见[数据交换评估](data-exchange-boundaries.md)。Protobuf 主控不意味着所有文件、原生平台通道和二进制 ABI 都必须套用同一种方案。
 
+2026-11-05，业务设计以多端同步为首要目标：Worker API + D1 是唯一业务权威，Flutter Web/iOS/Android 共用业务状态合同。现有运行时控制、bootstrap 和静态 DTO 已接入，不代表书架、进度、设置的读写与并发合同已实现；新增范围按[协议计划](../plan/cross-language-protocol.md)和[同步计划](../plan/p2-sync.md)优先推进。
+
 ## 比较
 
 IDL 定义消息结构，encoding 定义字节表示，transport 管理投递和生命周期，三者分别选择。Protobuf 可以用 binary 或 ProtoJSON；换编码不会自动解决重复手写 DTO。Protobuf-ES 用同一份生成 schema 支持这两种编码。[官方序列化说明](https://protobufes.com/guides/serialization/)
@@ -54,6 +56,14 @@ Bebop 的版本边界也需明确：当前发布仓库的 latest 为 [v3.2.3](ht
 - Worker 使用生成 codec 处理可序列化控制信息。MessagePort / transferable ArrayBuffer 保持独立附件；图片与 HTTP 正文保留现有有界二进制流、ACK、取消和资源所有权，不进入 ProtoJSON 的 bytes 字段，不编码成整图 Base64。
 - 不引入 gRPC、Connect 服务框架或第二个 HTTP transport；当前选择只统一数据合同。以后只有测量证明必要，才在已支持二进制的边界使用同一 schema 的 binary codec。
 - Java 生成模型不放入第一批强制范围。其 protobuf runtime 在 TeaVM 的可达代码和每包 AOT 体积需要单独实测；第一批先在 TS 宿主校验 Java 结果，再转换为生成消息。不能把 JVM 库可用当作 TeaVM 已通过。
+
+## 同步优先的业务合同
+
+书架、分类、进度、书签和非敏感设置的 HTTP 请求/响应继续由同一 Protobuf + Buf 体系定义，TS/Dart 使用生成 codec；HTTP 方法、鉴权和状态码不能成为第二套业务模型来源。当前阶段先实现有界的当前状态查询与确认写入，前台重新读取后收敛；增量日志/cursor、DO 通知、持久本地 outbox 或离线合并只有在真实需求与测量成立后再规划。
+
+业务消息须表达 mutationId、服务端 revision、预期 revision 的条件更新、阅读 epoch、确认后的完整状态或受影响字段，以及标准错误。明确 revision/epoch 的数值范围与精确跨端表示；不依赖设备时间或隐式 JS Number 转换决定顺序。幂等重试保留原 mutationId，服务端提交但响应丢失时不得再执行一次 reset；不同消息不能因为复用幂等 ID 而被误认成同一操作。调用方身份来自通过验证的 Access 上下文，正文中的客户端标识只用于协议与去重。
+
+CAS 冲突、旧 epoch、非法业务输入、鉴权失败与暂时故障必须分别返回标准结果；客户端按结果重新读取、提示冲突或有限重试，不能把全部错误都重放为新写入。生成模型只负责结构解析，D1 条件 SQL/唯一约束/事务边界仍须落实并验收。原始正文、条目/字段长度、分页和写入批次均有明确预算；状态查询在分页期间不能因并发变更悄悄漏项。业务缓存在客户端可丢弃，收到服务端确认才标记已保存；未确认草稿限当前会话，不承诺关闭后恢复。
 
 ## 类型和验证规则
 

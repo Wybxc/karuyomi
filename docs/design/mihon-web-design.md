@@ -1,12 +1,14 @@
 # 个人漫画阅读 App 设计
 
-设计日期：2026-11-01；最近修订：2026-11-03。本文是可持续修改的现行设计，不再冻结。当前工程已建立并有分项实现和验证，P0 尚未完整验收；执行状态见[计划目录](../plan/README.md)与[验证记录](../VERIFICATION.md)。TeaVM 0.16.0 JavaScript backend / release9 是项目宿主的研究起点，不是要求产品源码保持原样的快照。
+设计日期：2026-11-01；最近修订：2026-11-05。本文是可持续修改的现行设计，不再冻结。当前工程已建立并有分项实现和验证，P0 尚未完整验收；执行状态见[计划目录](../plan/README.md)与[验证记录](../VERIFICATION.md)。TeaVM 0.16.0 JavaScript backend / release9 是项目宿主的研究起点，不是要求产品源码保持原样的快照。
 
 **选型已确定：Flutter + TeaVM，采用浏览器宿主路线。首版功能为浏览漫画源、管理书架、在线阅读。** 移动端原生优先、桌面端浏览器优先，并尽量共享代码；允许以一定桌面性能换取移动性能。Flutter Web 通过 JS interop 连接 TeaVM Worker，iOS/Android 通过系统 WebView 内的 Worker 复用同版 TeaVM JS 宿主；统一 Dart 接口，原生图片通道与鉴权仍待验证。具体方式见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)。RN、SwiftUI 与纯 React PWA 不再是选型候选。后端采用 Cloudflare Workers API + D1 + Durable Objects，R2 仅用于需要的私有个人对象（如自定义封面），无需常驻 JVM、容器或自有服务器。扩展仅在应用打开时按需执行，关闭后停止；不承诺后台任务续跑。完整 Mihon 功能仅作为长期参考，首版范围以下表为准。
 
 **部署与信任范围：一个 hostname、一个入口 Worker；浏览器按需运行按扩展包 AOT 编译的 TeaVM 模块。** 使用数量受限的 WebWorker 执行槽，复用当前包实例；扩展按应用依赖信任。分包是产物与状态管理需要，不新增跨 origin 沙箱或每包 JVM。源站脚本保留局部执行边界。CheerpJ 保留为开发对照，产品不自动切换引擎。
 
 **访问方式：前端公开，后端由 Cloudflare Access 鉴权。** 页面、共享材料与 Static Assets 扩展产物无需登录；个人数据、Source 网络桥和回调统一走同源 `/api` 和 `/api/*`，只允许本人通过 Access 访问。Access 登录不增加应用内账号系统，也不改变暂缓的“私密使用”范围。
+
+**首要设计目标：多端同步。** 同一部署、同一身份在 Web、iOS、Android 共享书架、分类、阅读进度、书签和非敏感设置。Worker API + D1 是唯一业务权威，客户端只保留当前会话内存状态、未确认草稿与可丢弃缓存；服务端确认后才能显示已保存。先实现跨端在线读写与恢复，再扩展完整外围功能。初版不建立持久本地业务数据库/outbox 或离线合并系统；现有本地书架/进度是待替换的过渡实现，历史验证不算同步完成。执行顺序与门槛见[P2 主线计划](../plan/p2-sync.md)。
 
 **当前交付决定：** Static Assets 是 Web 与 Native 扩展索引、清单和 AOT 的最终权威来源，每个扩展只发布最新 build。客户端依据 index/catalog 定位当前版本，由客户端或 Service Worker 管理更新与缓存；新分发路径不再要求向 GitHub Release 推送扩展；已有扩展和索引 Release 已按用户要求删除，不供客户端定位或下载。通用资源继续走 Web Static Assets / Native 内置。Worker 只负责个人数据与 Source 网络控制，不代理扩展正文、不签发私有下载地址，也不给客户端 GitHub 凭据。该决定覆盖此前的 R2 代理、Release 全客户端直下及 Web 镜像提案。**方案已确定，待实现验收：** 2026-11-03 的 Codex 内置浏览器 Release 直下/Range 实测报 `Failed to fetch`，初始 302 与最终 CDN 缺少 `Access-Control-Allow-Origin`；这是此前方案的失败证据。当前 Static Assets 发布、最新版 index/catalog、跨端下载、更新缓存、有界解压和完整加载链路仍须实测，不能把已选方案写成已通过。
 
@@ -32,7 +34,7 @@
 
 | 模块         | 目标行为                                                                                               | 实现和限制                                                                                                                                                          |
 | ------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 书架         | 收藏、分类、多分类、排序、过滤、搜索、未读角标、批量操作、自定义封面                                   | D1 保存，IndexedDB 本地镜像；封面放私有 R2 / 本地缓存；未读数只按最近一次读取到的章节列表计算                                                                       |
+| 书架         | 收藏、分类、多分类、排序、过滤、搜索、未读角标、批量操作、自定义封面                                   | D1 权威保存，客户端维护内存视图；封面放私有 R2 / 可丢弃缓存；未读数只按最近一次读取到的章节列表计算                                                                 |
 | 浏览         | 源列表、语言、收藏源、热门、最新、搜索、分页、源自定义筛选                                             | 调用原版 Source；源未实现的能力隐藏或明确禁用                                                                                                                       |
 | 跨源搜索     | 已启用源并发搜索，结果分源展示、可取消                                                                 | 有界并发、逐源返回；一个慢源不阻塞全部结果                                                                                                                          |
 | 扩展管理     | 添加仓库、安装、更新、卸载                                                                             | 原版 JAR 或 APK 转换产物在本地/CI 按包 AOT；安装已验证构建，没有产物时显示待构建/不支持；只发布最新 build；客户端或 Service Worker 管理更新和缓存，不做后台扩展执行 |
@@ -70,7 +72,7 @@
 - **浏览**：先选源，再看热门/最新/搜索。全局搜索独立入口，源结果逐组出现。能力提示区分“待检查 / 可读 / 需登录 / 受限 / 不支持”。
 - **设置**：分类、扩展、阅读设置、基本同步状态和诊断。移除更新、下载、历史、追踪、本地文件、备份和隐私模块的入口。
 
-未登录时仍能打开以上页面外壳、阅读器说明和非敏感本地设置；需要后端的操作显示“登录后连接”，通过 Cloudflare Access 完成验证后回到原页面。首次访问显示空态，不能将真实书架、扩展配置或凭证写进公开 HTML。已有本地镜像的处理见第 7 节。
+未登录时仍能打开以上页面外壳和阅读器说明；需要业务数据的操作显示“登录后连接”，通过 Cloudflare Access 完成验证后回到原页面，再读取 D1 的当前状态。不能将真实书架、扩展配置或凭证写进公开 HTML；当前会话失效的处理见第 7 节。
 
 窄屏至少支持 360px，触控目标约 44px；所有核心操作有可见标签/无障碍名称、键盘焦点、非颜色状态说明。交互示意中的作品和状态均为虚构示例。
 
@@ -83,12 +85,13 @@ flowchart TB
   Build[开发机或 CI · 原版 JAR / APK 转换 · TeaVM AOT]
   subgraph Browser[用户浏览器]
     UI[Flutter Web 页面与阅读器]
-    Local[IndexedDB · 业务镜像 / 扩展文件 / HTTP 缓存]
+    Local[IndexedDB · 扩展文件 / HTTP 缓存]
+    State[内存业务视图 / 未确认草稿]
     Runtime[SourceRuntime 管理器 · 有界执行槽]
     Tea[WebWorker · 单包 TeaVM JS 模块]
     Scripts[局部脚本适配 · JS / sandbox WebView]
     Images[图像处理]
-    UI <--> Local
+    UI <--> State
     UI <--> Runtime
     Runtime <-->|postMessage / RPC| Tea
     Tea <--> Local
@@ -125,12 +128,12 @@ UI 创建同源通用 Worker 引导；Web 与 Native 均从 Static Assets 的 in
 | TeaVM WebWorker                       | 编译后的 Source、OkHttp、协作调度、图像/文件适配                                  | 任意新 JAR 动态类加载、云端常驻任务                     |
 | 单一入口 Worker                       | Access JWT、个人数据/安装状态 API、Source HTTP/回调桥                             | AOT 正文代理、TeaVM 编译、Java/dex2jar、无限制开放代理  |
 | 局部脚本适配                          | sandbox WebView、绑定回调与超时                                                   | 向网页脚本提供应用凭证或完整 API                        |
-| D1                                    | 书架、章节元数据、进度、设置、同步增量、已安装构建指针                            | 图片 blob 或扩展运行文件                                |
+| D1                                    | 书架、章节元数据、进度、设置的权威状态、幂等记录与 revision、已安装构建指针       | 图片 blob 或扩展运行文件                                |
 | Durable Object                        | 会话代次、必要的跨云端回调关联、WebSocket 通知                                    | 扩展执行、图片正文、永久保存 Promise                    |
 | GitHub Release（构建依赖）            | 仅锁定的 runtime seed，不属于扩展分发路径                                         | 新扩展发布、客户端定位或下载                            |
 | Static Assets / Native 内置材料       | Static Assets 提供全客户端最新扩展与权威 catalog；共享材料 Web 静态 / Native 内置 | 按扩展重复发布共享材料                                  |
 | R2（个人对象）                        | 自定义封面等私有个人数据                                                          | 扩展 AOT/共享材料交付、漫画整章归档                     |
-| IndexedDB / Web Locks                 | 业务镜像、按身份/扩展隔离的普通文件与 HTTP Cache、实例所有权                      | 云同步扩展文件、永久离线保证                            |
+| IndexedDB / Web Locks                 | 按身份/扩展隔离的普通文件与 HTTP Cache、实例所有权                                | 书架/进度业务权威、云同步扩展文件、永久离线保证         |
 | Service Worker                        | 公开 app shell 缓存与版本切换，API 走网络                                         | 保存 Access 登录响应、预缓存全仓 bundle、维持运行时常驻 |
 
 不引入 KV、Queues、Workflows、Cron 或持久 job 队列。原插件前台会话内的异步网络任务需要追踪和取消；应用关闭后停止，不变成后台更新服务。DO 保留会话协调用途；可在浏览器内完成的回调直接用绑定的消息通道，不强制经过云端。
@@ -139,9 +142,9 @@ UI 创建同源通用 Worker 引导；Web 与 Native 均从 Static Assets 的 in
 
 客户端确定为 **Flutter / Dart**，共享阅读核心和 UI，平台资源通过适配器实现。移动帧耗时、图片内存、能耗、首图和恢复优先；桌面允许额外渲染/启动成本，但须达到日用与兼容性门槛。Flutter widgets 替代此前 React UI 三选一，Dart 依赖由 Pub 管理；pnpm 保留 TS/JS 依赖与任务编排，这是本次 Flutter 选型带来的工具链调整。先验证 flutter_inappwebview 原生容器与 Web 直接 Worker 适配，不默认将其 iframe Web 实现作为全端入口。
 
-后端继续使用 **pnpm workspace + Hono + Zod + jose + D1 / Drizzle + Durable Objects**；需要私有个人对象时使用 R2，不存放扩展产物。Flutter Web 产物交给入口 Worker 的 Static Assets；Flutter SDK 构建 UI，Wrangler 构建部署 Worker。Java / Maven / TeaVM 和 Python 构建工具单独固定版本，由 pnpm scripts 编排。当前接入方案见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)；[原技术栈文档](./technology-stack-and-reader.md)保留通用阅读规范、后端方案及历史 React/RN 分析，React 依赖不再是产品前置条件。
+后端继续使用 **pnpm workspace + Hono + Zod + jose + D1 / Drizzle + Durable Objects**；需要私有个人对象时使用 R2，不存放扩展产物。Flutter Web 产物交给入口 Worker 的 Static Assets；Flutter SDK 构建 UI，Wrangler 构建部署 Worker。Java / Maven / TeaVM 构建工具单独固定版本，由 pnpm scripts 中的 TypeScript 入口编排。当前接入方案见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)；[原技术栈文档](./technology-stack-and-reader.md)保留通用阅读规范、后端方案及历史 React/RN 分析，React 依赖不再是产品前置条件。
 
-跨端漫画阅读器仍是首要交付：页序、单双页、RTL、逻辑位置、图片窗口、像素内存、缩放和平移、旋转后的锚点恢复进入 P0。阅读核心使用 Dart，不依赖后端或 TeaVM 实现；PageProvider 返回可释放图片资源，Web 与原生分别实现资源交付，不要求 UI 持有全部正文。
+跨端漫画阅读器仍须完成 P0 验收：页序、单双页、RTL、逻辑位置、图片窗口、像素内存、缩放和平移、旋转后的锚点恢复进入 P0。阅读核心使用 Dart，不依赖后端或 TeaVM 实现；PageProvider 返回可释放图片资源，Web 与原生分别实现资源交付，不要求 UI 持有全部正文。
 
 iOS 下 WebKit 在安全策略允许时可对 TeaVM JS 使用 JIT；Flutter 原生端使用 WKWebView 宿主。Flutter AOT 不会自动加速 TeaVM，也不消除 WebView 启动和图片交接成本；尚无本项目 iOS 对照数据。真机测量使用 HTTPS，区分首次执行、预热后 CPU 和完整首图。内嵌 JS 引擎、TeaVM C/FFI 与 WasmGC 未采用，仅保留评估记录，不形成当前实施或研究任务。
 
@@ -268,43 +271,43 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 ## 6. 数据模型和同步语义
 
-核心表（字段为设计草案，需正式迁移约束）：
+核心表（字段为设计草案，需落实协议、D1 约束和原子写入；不要求保留原型本地模型）：
 
 | 表                                                          | 关键字段与约束                                                                                                                                                                                        |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `repositories`, `extensions`, `extension_builds`, `sources` | 仓库/包/版本、原输入哈希、转换版本、TeaVM/宿主/桥 ABI、bundle/资源哈希、storageSchema、能力和允许域名；安装项指向已验证 buildId，Static Assets index/catalog 用于安装定位，归档及构建来源用于问题追溯 |
-| `manga`, `library_entries`                                  | 内部 UUID；唯一 `(source_key, source_url)`；收藏/元数据分离                                                                                                                                           |
-| `chapters`                                                  | UUID、manga_id、source_url、number_text/number_value、source_order、scanlator；唯一 `(manga_id, source_url)`                                                                                          |
+| `manga`, `library_entries`                                  | 受信 subject、稳定作品键、package/source/original URL；收藏/元数据分离，包含状态 revision                                                                                                             |
+| `chapters`                                                  | manga_id、原 Source 引用、number_text/number_value、source_order、scanlator；重复引用保留序列发生位置，不按标题或 URL 全局去重                                                                        |
 | `categories`, `entry_categories`                            | 自定义顺序，多对多关系                                                                                                                                                                                |
 | `chapter_progress`, `bookmarks`, `reading_positions`        | 已读、书签、每部作品当前章节/页码、页面内偏移、清单版本、阅读 epoch、客户端 ID、服务端 revision；不保存时间线事件                                                                                     |
 | `reader_settings`, `source_preferences`                     | 全局/漫画覆盖，typed values；敏感项分离                                                                                                                                                               |
-| `sync_mutations`, `change_log`                              | 客户端 ID、幂等 mutation ID、单调服务端序号、删除墓碑；客户端 ID 只用于同步，不建设设备会话管理模块                                                                                                   |
+| `sync_mutations`                                            | 受信 subject、幂等 mutation ID、操作内容身份、已确认结果及 revision；重复请求不重复执行，也不允许同 ID 更换内容                                                                                       |
 | `cover_assets`                                              | 自定义封面对象路径、类型、大小、校验和及所属条目                                                                                                                                                      |
 
-不建立历史事件、统计、任务租约、下载页、tracker、文件导入或备份表。`change_log` 仅保存有限期的同步增量，不作为用户历史记录或备份存储。源站敏感凭证暂留当前客户端，不做云端凭证同步。
+不建立历史事件、统计、任务租约、下载页、tracker、文件导入或备份表。首版读取 D1 当前状态，暂不要求 `change_log`、cursor 或 DO 通知；确有体量/延迟数据支持后再引入增量机制，其日志也不作为用户历史或备份。源站敏感凭证暂留当前客户端，不做云端凭证同步。
 
-当前 Flutter 本地切片使用 Drift/SQLite，按受信 bootstrap subject + 部署 origin 隔离。漫画元数据和收藏关系分开保存，`mangaKey = SHA256(JSON[packageName, sourceId, originalMangaUrl])` 与阅读进度共用；buildId/generation 不进入作品身份。元数据保留完整 Protobuf Manga 的标准 ProtoJSON 和 Source 名称/语言；取消收藏保留元数据及阅读位置。打开书架作品时查当前静态索引，重新选择原 package/Source，再主动取该作品详情/章节；本地搜索与排序不触发 Source 请求。封面未接正式图片通道前使用占位图，不直接请求 thumbnail URL。此切片只在当前设备保存，不是已实现的 D1 镜像或同步；实施范围见[P1 计划](../plan/p1-library-and-progress.md)。
+现有 Flutter 本地书架/进度使用 Drift/SQLite，已通过的分项保留在[本地书架记录](../verification/p1-local-library.md)，但其持久业务读写入口需直接替换为 Worker API，不继续扩建本地权威表、不做旧数据迁移或长期双写。复用已验证的稳定作品键 `SHA256(JSON[packageName, sourceId, originalMangaUrl])`、完整 Protobuf Manga 快照、Source 名称/语言和阅读逻辑锚；buildId/generation 不进入作品身份。取消收藏保留进度，打开作品仍按当前静态索引定位原 package/Source，再主动取当前作品详情/章节。对已取得的业务视图做搜索/排序不触发 Source 请求；封面未接正式图片通道前使用占位图，不直接请求 thumbnail URL。实施状态见[P1](../plan/p1-library-and-progress.md)和[P2](../plan/p2-sync.md)。
 
 规范化 URL 只使用保守的 Source 明确规则；保留 release9 已验证的 URI 解码、空查询串和非法 URI 回退，不另加全局 decodeURIComponent、空格替换、删 query 或按标题去重。Source 换域不重新发明 ID；来源变化使用显式迁移。外部 64 位 ID 全部保持字符串。
 
-**同步：** UI 先在 Drift/SQLite 事务写本地状态和 outbox；在线后批量 push，服务端幂等处理并返回单调 revision；再用 cursor 拉取增量。DO 通知只提示“有更新”，D1 change log 才是真相。初版不开 D1 读副本；如后续启用，必须使用会话一致性机制保证读到自己的写入。
+**同步：** 客户端通过同一套 Protobuf/ProtoJSON 业务 API 读写 D1 当前状态。每次变更携带稳定 mutation ID 和所需的 expected revision/epoch；Worker 在 D1 原子校验、应用并记录结果后返回权威状态与 revision。客户端仅在确认后标记已保存，失败或响应丢失时保持当前会话的明确待保存状态，用同一 mutation ID 有限重试。进入书架/详情、继续阅读、应用恢复前台和显式刷新时重取服务端状态；初版先使用有界全量/分页读取，不依赖持久 outbox、离线合并、增量日志或实时通知。初版不开 D1 读副本；未来若启用，仍必须保证读到自己的写入。
 
-- 同一阅读 epoch 内的普通进度只前进；多设备旧离线页码不能使已读倒退。
-- “标为未读 / 重新阅读”是显式 reset，提升 epoch；旧 epoch 的进度不能覆盖新状态。两个离线 reset 冲突进入确认或确定性服务端规则，不能只比设备时钟。
+- 同一阅读 epoch 内最远进度不倒退；只有同一清单或可靠稳定页映射下才比较位置，不跨清单直接比较旧序号。
+- “标为未读 / 重新阅读”由服务端显式提升 epoch；迟到请求与未确认重试携带旧 epoch 时不能覆盖新状态。并发 reset 使用 revision 前置条件处理，不能只比设备时钟。
 - “当前继续阅读位置”与“最远读到位置”分开；回看第 5 页不把第 20 页的完成进度抹掉。
-- 分类、标签、设置按字段 revision 或操作合并；破坏性删除使用墓碑。过期太久的设备必须全量重同步，避免已删除项目复活。
-- 同步只涉及保留模块的结构化状态；不传输漫画图片、历史事件、后台任务或源站敏感凭证。网络中断时可暂存当前状态变更，重连后提交，但不因此承诺离线阅读。
+- 分类、标签、设置按实体/字段 revision 或明确操作更新；删除后仍须有版本前置条件，防止旧请求复活项目。冲突返回服务端状态，不静默以客户端旧视图覆盖。当前继续阅读位置的并发规则与最远进度分开定义，远端变化不强制跳转正在阅读的页面。
+- 同步只涉及保留模块的结构化状态；不传输图片、历史事件、后台任务或源站敏感凭证。断网时仍可看已加载页面，当前会话内保留有界草稿并提示未保存；关闭前未获确认的变更不承诺恢复，不因此引入离线阅读或离线写入系统。
 
 ## 7. 前台请求与错误恢复
 
 请求状态：`idle → loading → success`，旁路包括 `cancelled`、`access_required`、`access_denied`、`source_login_required`、`needs_verification`、`error`。Access 登录与漫画站账号/验证是两种独立状态，不能把上游 401/403 当作应用会话过期。状态属于当前浏览器会话，不持久化成服务端任务。
 
-1. 无需登录即可加载前端。首次访问展示空态和“登录后连接”；已有客户端可先只读显示本地书架镜像并标注“尚未连接”。后台请求 `/api/bootstrap` 确认 Access 身份，成功后才同步并启用后端操作；未登录不强制跳转，不扫描书架检查新章。
+1. 无需登录即可加载前端。首次访问展示空态和“登录后连接”；请求 `/api/bootstrap` 确认 Access 身份后读取 D1 当前业务状态。同一会话内已确认的视图可暂时保留并标注连接状态；新进程不能把旧本地表作为真实书架。未登录不强制跳转，不扫描书架检查新章。
 2. 完成 Access 验证并显示首屏后，按第 5 节预热最近使用包的执行槽；用户浏览源、搜索、打开详情或章节时，复用正在初始化/已就绪的运行时，按需加载扩展并提交带 requestId 的请求。详情页可主动重新读取当前作品的元数据/章节，不建立更新页或批量检查队列。
 3. 用户切换搜索条件、退出页面或关闭应用时，取消不再需要的请求和预取；旧结果通过 requestId / runtimeGeneration 检查后丢弃。
 4. 执行槽或 DO 会话中断后重建实例/会话；保留已保存阅读位置和扩展已提交文件，按实际副作用能力有限重试安全读取。下次打开按当前页面需要重新请求，不自动补发旧后台 POST。
 5. GET 类瞬时网络错误有限退避并加抖动；429 遵循 Retry-After；验证、源站登录、Access 拒绝分别提示；无幂等保证的 POST 不盲目重试。网络断开不能直接判定 Access 已失效。
-6. Access 会话失效时暂停新的网络桥调用、同步和预取，保留当前已加载页面与阅读位置；未提交进度留在当前用户的本地 outbox，重新验证同一身份后再提交。不自动清空 IndexedDB，也不自动跳转打断阅读；Access 保护云端请求，不给已有本地数据加应用锁。
+6. Access 会话失效时暂停新的网络桥调用、业务提交和预取，保留当前已加载页面与当前身份的会话内草稿，明确显示未保存；重新验证同一身份后，先核对服务端 revision/epoch，再重试原幂等操作。身份或服务变化后不能把草稿提交给新身份；不自动跳转打断阅读，也不承诺未确认变更在关闭后保留。
 
 阅读进度按节流批次保存，切章和显式退出时尽力提交；不依赖 unload 一定成功。前台读取与状态同步分别处理，单个源失败不会阻塞书架操作。此阶段不需要云端任务领取、heartbeat、checkpoint 或下载完成协议；浏览器存储层的内部锁/租约只用于一致性和异常回收。
 
@@ -327,17 +330,19 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 ### 8.2 API 与登录流程
 
-| 接口                                                 | 行为                                                                                            |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `GET /api/auth/login`                                | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete`             |
-| `GET /api/bootstrap`                                 | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT                       |
-| `POST /api/sync/push` / `GET /api/sync/pull?cursor=` | 幂等变更批次、分页增量                                                                          |
-| `GET /api/library` / `GET /api/manga/:id`            | 查询服务端状态；Source 实时调用由浏览器执行                                                     |
-| `POST /api/runtime/sessions`                         | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例                                    |
-| `GET /api/runtime/events`                            | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                          |
-| `POST /api/bridge/http`、`/api/bridge/callback/*`    | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法        |
-| `GET /api/covers/:id` / `POST /api/covers`           | 自定义封面读写，验证类型和大小                                                                  |
-| `GET /api/extensions/builds`                         | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准 |
+下表为目标接口轮廓；同步业务接口、D1 模型和对应 `.proto` 尚待实现，不能据路径草案认定服务已存在。第一步采用当前状态读取与幂等变更，增量接口按实测需要另行引入。
+
+| 接口                                              | 行为                                                                                            |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `GET /api/auth/login`                             | 顶层页面导航入口；Access 验证后由 Worker 校验 JWT，固定 303 跳转到 `/auth/complete`             |
+| `GET /api/bootstrap`                              | 已验证身份的最小标识、会话到期时间、协议、设置、当前 revision；不返回 JWT                       |
+| `POST /api/state/mutations`                       | 有界幂等变更，校验 expected revision/epoch，返回权威状态与服务端 revision                       |
+| `GET /api/library` / `GET /api/manga/:id`         | 查询服务端状态；Source 实时调用由浏览器执行                                                     |
+| `POST /api/runtime/sessions`                      | 在 Access 授权会话下建立运行会话，登记客户端、代次和回调实例                                    |
+| `GET /api/runtime/events`                         | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                          |
+| `POST /api/bridge/http`、`/api/bridge/callback/*` | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法        |
+| `GET /api/covers/:id` / `POST /api/covers`        | 自定义封面读写，验证类型和大小                                                                  |
+| `GET /api/extensions/builds`                      | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准 |
 
 旧 `/bridge/*`、`/extensions/*` 后端路径停止服务，不保留公开别名；新的后端功能必须进入 `/api/*`。未知 API 在鉴权后返回 JSON 404，不能返回 `index.html`。通用宿主/桥、Worker 引导与 WASM 由 Web Static Assets 或 Native 内置材料提供；构建清单与 AOT 在所有客户端均从 Static Assets 获取，只保留每扩展最新 build。删除 `/api/extensions/artifacts/:hash` 的扩展正文交付，不保留 R2 或 Worker 代理回退，也不新增私有下载地址/token 服务。
 
@@ -386,7 +391,7 @@ Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Pat
 
 业务数据、登录返回和错误响应使用 `Cache-Control: private, no-store`；API 不进入 Service Worker Cache Storage 或公共 CDN 缓存。公开 AOT 与共享材料不使用 Access 私有缓存重验证：AOT 按 Static Assets index/catalog 定位最新 build 并校验下载字节，由客户端或 Service Worker 管理更新缓存，共享材料使用内容寻址静态缓存。公开缓存与个人运行文件/HTTP Cache 分开所有权；缓存命中、版本变化和解压上限仍须实测。
 
-书架镜像、阅读临时图片按已验证身份和内容版本分区；身份未确认前不上传 outbox。公开扩展产物缓存可以独立于身份，但安装指针、Source 偏好和运行文件仍按身份隔离。仅加载符合当前协议/材料集合的构建；原型不为旧产物增加兼容分支。普通文件/HTTP Cache 是原扩展内部运行状态，不能作为 Access 授权凭据。服务端若引入私有对象缓存，必须在 JWT 校验后读取。日志去除 cookie、JWT、token、请求正文与带凭证 URL；DO 回调标识不放长期 URL 日志里。正式版删除 `/api/results` 等原型测试入口。
+内存业务视图、未确认草稿和阅读临时图片按已验证身份、部署 origin 与内容版本分区；身份未确认前不提交业务变更，身份切换后不复用原草稿。公开扩展产物缓存可以独立于身份，但安装指针、Source 偏好和运行文件仍按身份隔离。仅加载符合当前协议/材料集合的构建；原型不为旧产物增加兼容分支。普通文件/HTTP Cache 是原扩展内部运行状态，不能作为书架业务权威或 Access 授权凭据。服务端若引入私有对象缓存，必须在 JWT 校验后读取。日志去除 cookie、JWT、token、请求正文与带凭证 URL；DO 回调标识不放长期 URL 日志里。正式版删除 `/api/results` 等原型测试入口。
 
 首版按个人应用信任所安装的原版扩展，接受它们共享应用级权限；原版来源与哈希用于追溯构建身份，不代表代码已通过安全审计。完整扩展隔离不属于首版发布条件。若特定源无法通过正常受限网络请求或手动账号配置访问，保留为受限源，不承诺自动绕过站点挑战。
 
@@ -411,7 +416,7 @@ Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Pat
 
 Static Assets 是所有客户端扩展 AOT 的最终来源，只保留每扩展最新 build；GitHub Release（构建依赖） 仅仅锁定的 runtime seed，不属于扩展分发路径；首次本地构建和 CI 增量直接更新 Static Assets，依靠 checkpoint 与构建缓存恢复。正文不经过 R2 或 Worker 代理，也不编入 UI 或入口 Worker 脚本。通用 host、桥、WASM 等共享材料使用 Web Static Assets 或 Native 内置资源，不随每个扩展重复发布；Native 材料缺失时明确失败，不从网络回退。构建时生成确定性 gzip 与传输元数据，下载/解压分别验证不同字节域，后续执行复用已验证的字节，不重复 hash 同一份数据。当前发布器迁移尚待实施；最新版发布、index/catalog 更新、客户端或 Service Worker 缓存切换、跨端下载/CSP 与有界解压仍须实测；目前这项交付决策不等于产品链路已通过。AOT JS 仍需解析执行，传输优化不能掩盖实例化内存。
 
-R2 如启用只保存自定义封面等私有个人对象，D1 只含保留业务表，DO 只协调会话/通知；不增加漫画归档、备份、任务消费者或 Cron。生产不依赖 CheerpJ 官方 CDN；开发对照仍遵循其许可。断网可展示已有本地镜像和加载页，不承诺新扩展离线启动或完整章节可读。
+R2 如启用只保存自定义封面等私有个人对象，D1 只含保留业务表，DO 只协调会话/可选通知；不增加漫画归档、备份、任务消费者或 Cron。生产不依赖 CheerpJ 官方 CDN；开发对照仍遵循其许可。断网可保留当前会话已加载的业务视图和图片，明确未确认写入状态；不承诺重启后未保存数据恢复、新扩展离线启动或完整章节可读。
 
 ## 10. 运行时决定、证据与性能预算
 
@@ -453,7 +458,7 @@ MangaDraft/Xiutaku 的业务轮耗时改善约 1.31/1.71 倍；ProjectSuki 受�
 
 ### 产品启动、内存与发布门槛
 
-- 首屏先显示公开 UI/本地镜像，Access 确认后准备最近使用包；不以旧 CheerpJ 的 16 路径预加载清单驱动 TeaVM，也不自动读取各源目录来“预热”。
+- 首屏先显示公开 UI，Access 确认后读取 D1 当前业务状态并准备最近使用包；不以旧 CheerpJ 的 16 路径预加载清单驱动 TeaVM，也不自动读取各源目录来“预热”。
 - 采用第 5 节有界执行槽；普通文件恢复、HTTP Cache 命中、bundle 校验/解析/实例化均计入测量。按普通包与 ICU 重包分别测新 Worker、同包复用、跨包切换和压力回收。
 - P0 测“打开应用→首张漫画可见”及下一章，单列 Access 探测/交互登录、产物获取、文件恢复、宿主/Source 就绪、页面列表、图片请求/处理/解码；交互登录不混入引擎指标。覆盖桌面、Android Chrome、iOS Safari/PWA 和真实 Workers 出口；IndexedDB/Web Locks/CSP/回调不通过的平台明确限制。
 - 待测 UI 目标维持本地书架热开 <1 秒、缓存页操作 <100 ms；首图、重包和内存不以桌面本地报告直接定数值 SLA。记录成功率、分布、实际传输量和峰值，再确定目标设备预算。
@@ -471,23 +476,23 @@ Worker 仅为 Source 网络桥流式转发上游 HTTP 正文，不转发扩展 A
 
 ## 11. 实施顺序与验收
 
-| 阶段                           | 交付内容                                                                                                                  | 必须通过                                                                                                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P0-F：Flutter 接入验证         | 共用 Dart 接口；Web interop/Worker；原生 WebView/Worker；Access 与资源通道；优先 iOS 图片探针                             | 协议/DTO/取消/恢复一致；图片字节正确、缓冲有界、无整图字符串中转；移动总峰值/首图可测；不再比选 UI 框架                                                                  |
-| P0-R：跨端阅读器基线           | Flutter 工程；独立 Dart 阅读核心；分页与长条视图；局部缩放、逻辑位置、图片窗口；仅开发使用的固定图片夹具                  | 声明支持的 Android / iPhone 真机及桌面浏览器验证翻页、惯性滚动与缩放不争抢；旋转、单双页及图片尺寸变化保持锚点；连续阅读内存受控；测试夹具不计入真实源支持               |
-| P0-A：TeaVM 公共宿主与产物运行 | 当前项目宿主；按包 AOT 清单与 Static Assets 最新扩展交付；有界执行槽；文件/HTTP Cache；单 hostname、公开 UI 和 Access API | 原输入/构建/执行哈希与 ABI 一致；执行前校验；原桥下产品宿主相关语义回归；存储重启/取消/版本切换正确；首屏不等运行时                                                      |
-| P0-B：TeaVM 二进制网络桥       | JSO/byte[]/ArrayBuffer 探针；v2 帧；Worker 流、Okio/fiber 有界读取、取消/限额                                             | 固定响应语义与字节一致；body 无整段 Gson/Base64；慢消费者缓冲有界；与同版原桥对照；HTTP Cache/图片/异常不回退，Access 通过                                               |
-| P0-C：真实在线阅读与移动部署   | P0-R 接入 SourceRuntime / PageProvider；完整 DTO/分页、图片拦截器/处理、进度落盘、异步回调、实际 Workers/Access 与客户端  | 3–5 个原版源覆盖直图/请求头/图片处理；原生图片桥及 Access 会话通过；完整章节首中末页及下一章可交互阅读；测手机/重包首图与合计峰值；跨包切换/回收恢复不串状态或重发副作用 |
-| P1：可日用核心                 | 书架/分类/详情；完善阅读模式与全部阅读设置；基本进度、书签和继续阅读；PWA 更新恢复；实际所需的局部脚本适配                | 重启保持书架和阅读位置；按需读取当前作品章节；网络错误可重试；移动端手势、键盘、平板分屏可用；已支持的远程脚本路径通过局部接口、存储访问与超时检查                       |
-| P2：基本多设备同步             | 书架、分类、进度、书签与非敏感设置的增量同步                                                                              | 两设备同时修改/短暂断网后上线不倒退；标未读不被旧进度覆盖；不生成历史统计事件或后台任务；DO 重启不串回调                                                                 |
-| P3：源管理与迁移               | 扩展仓库/最新版更新与缓存、完整筛选与设置、源迁移                                                                         | 每个兼容操作有真实 fixture；扩展更新失败可重试且不误用旧协议；迁移预览准确且保留原条目，不依赖备份或追踪模块                                                             |
-| P4：覆盖与优化                 | 扩大候选 Source 集、在线图片格式兼容、性能/可访问性                                                                       | 按源、版本、浏览器、Cloudflare 出口记录结果；基准不混入合成输入或前置跳过；不增加暂缓模块                                                                                |
+| 阶段                             | 交付内容                                                                                                                    | 必须通过                                                                                                                                                                 |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P0-F：Flutter 接入验证           | 共用 Dart 接口；Web interop/Worker；原生 WebView/Worker；Access 与资源通道；优先 iOS 图片探针                               | 协议/DTO/取消/恢复一致；图片字节正确、缓冲有界、无整图字符串中转；移动总峰值/首图可测；不再比选 UI 框架                                                                  |
+| P0-R：跨端阅读器基线             | Flutter 工程；独立 Dart 阅读核心；分页与长条视图；局部缩放、逻辑位置、图片窗口；仅开发使用的固定图片夹具                    | 声明支持的 Android / iPhone 真机及桌面浏览器验证翻页、惯性滚动与缩放不争抢；旋转、单双页及图片尺寸变化保持锚点；连续阅读内存受控；测试夹具不计入真实源支持               |
+| P0-A：TeaVM 公共宿主与产物运行   | 当前项目宿主；按包 AOT 清单与 Static Assets 最新扩展交付；有界执行槽；文件/HTTP Cache；单 hostname、公开 UI 和 Access API   | 原输入/构建/执行哈希与 ABI 一致；执行前校验；原桥下产品宿主相关语义回归；存储重启/取消/版本切换正确；首屏不等运行时                                                      |
+| P0-B：TeaVM 二进制网络桥         | JSO/byte[]/ArrayBuffer 探针；v2 帧；Worker 流、Okio/fiber 有界读取、取消/限额                                               | 固定响应语义与字节一致；body 无整段 Gson/Base64；慢消费者缓冲有界；与同版原桥对照；HTTP Cache/图片/异常不回退，Access 通过                                               |
+| P0-C：真实在线阅读与移动部署     | P0-R 接入 SourceRuntime / PageProvider；完整 DTO/分页、图片拦截器/处理、D1 进度确认、异步回调、实际 Workers/Access 与客户端 | 3–5 个原版源覆盖直图/请求头/图片处理；原生图片桥及 Access 会话通过；完整章节首中末页及下一章可交互阅读；测手机/重包首图与合计峰值；跨包切换/回收恢复不串状态或重发副作用 |
+| P2：多设备同步（首要主线）       | 先建立 Worker API + D1 权威状态、统一业务协议、幂等写入/revision 和前台重取，再与 P1 一起扩展分类/书签/设置                 | 独立客户端 A 写入确认后 B 可读取并继续阅读；并发、响应丢失重试及 reset/旧 epoch 正确；身份隔离；不以本地 SQLite、共享内存或模拟 supplier 代替跨端证据                    |
+| P1：可日用核心（与同步共同交付） | 书架/分类/详情；完善阅读模式与全部阅读设置；基本进度、书签和继续阅读；PWA 更新恢复；实际所需的局部脚本适配                  | 重启后从服务端恢复已确认书架/位置；新业务状态按同步合同交付；按需取章、网络重试、触控/键盘/分屏和已支持远程脚本边界通过，不另建本地权威系统                              |
+| P3：源管理与迁移                 | 扩展仓库/最新版更新与缓存、完整筛选与设置、源迁移                                                                           | 每个兼容操作有真实 fixture；扩展更新失败可重试且不误用旧协议；迁移预览准确且保留原条目，不依赖备份或追踪模块                                                             |
+| P4：覆盖与优化                   | 扩大候选 Source 集、在线图片格式兼容、性能/可访问性                                                                         | 按源、版本、浏览器、Cloudflare 出口记录结果；基准不混入合成输入或前置跳过；不增加暂缓模块                                                                                |
 
 Access 专项验收：
 
 - 新浏览器无 Cookie 能打开首页、SPA 深链接及静态资源，不被送往登录页；个人书架、配置和对象不能从公开资源获得。
 - 未登录、过期、伪造 JWT、错 issuer/AUD、非本人身份均不能访问 `/api` 或任一 API 子路由；仅携带邮箱头或回调标识也失败。边缘拒绝与 Worker JWT 校验分别覆盖，密钥轮换后有效会话仍可用。
-- 点击登录、Access 验证、固定回跳、bootstrap 和原路由恢复完整通过；取消或拒绝登录没有循环跳转。会话过期暂停后台请求，重新登录恢复；断网与漫画站 401/403 不误报 Access 失效，未提交进度不丢失。
+- 点击登录、Access 验证、固定回跳、bootstrap 和原路由恢复完整通过；取消或拒绝登录没有循环跳转。会话过期暂停后台请求，当前会话保留明确的未确认草稿；同身份重新登录后核对服务端状态再提交。断网与漫画站 401/403 不误报 Access 失效，不把未确认写入显示为已保存。
 - 验证静态文件同名 API、未知 API、裸 `/api`、路径尾斜杠及编码变体，不得绕过中间件、读到私有数据或返回 SPA 成功页；`workers.dev`、版本预览和 R2 公网入口不可作为后端替代入口。
 - API/登录响应不被 Service Worker 或共享缓存保存；凭证不出现在公开 bundle、URL、日志或上游请求中。个人对象的 304/206 也须鉴权，过期会话不能凭 ETag 获得成功响应；图片网络桥和 WebSocket 使用正确 Access 会话。公开扩展下载不依赖应用 Cookie/Authorization/Access 头；真实 Web/Native Static Assets 下载、index/catalog 更新、缓存切换、解压及摘要验证通过后才能执行，登录 HTML 或错误页不可当作 JS。
 - 旧 iframe 同步回调不能靠 Bypass 恢复；声明支持的脚本路径必须通过异步中转、Access 鉴权、实例约束及无主线程死锁验证。iOS PWA 顶层登录回跳和 Cookie 可用性单独实测，不假定与普通浏览器完全一致。

@@ -2,7 +2,7 @@
 
 个人漫画阅读应用。Flutter + TeaVM 浏览器宿主，Cloudflare Workers 后端。
 
-项目正在实施 [P0](docs/plan/p0-runtime-and-reading.md)，各阶段见[计划目录](docs/plan/README.md)。已有真实 AOT 初始化、完整 DTO、资料浏览界面和独立阅读核心；产品图片通道与完整在线阅读尚未接通。已部署域名为 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，当前代码是否完成线上验收以[验证记录](docs/VERIFICATION.md)为准。
+多端同步是首要设计目标：同一身份在 Web、iOS、Android 共用 Worker API + D1 的权威业务状态，客户端只保留当前会话状态和可丢弃缓存。当前按[同步计划](docs/plan/p2-sync.md)优先建立业务协议与服务端读写，并行收齐 [P0](docs/plan/p0-runtime-and-reading.md) 的真实阅读、Access 和设备验收；现有本地书架与进度仍待替换，不能当作多端同步已经实现。各阶段见[计划目录](docs/plan/README.md)。已部署域名为 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，当前代码是否完成线上验收以[验证记录](docs/VERIFICATION.md)为准。
 
 Static Assets 是所有客户端扩展分发的权威来源，每包只部署最新可用构建。客户端刷新静态索引并切换当前版本，不再向 GitHub Release 发布扩展，也不经 Worker/R2 转发扩展正文。共享桥/WASM 在 Web 作为静态资源、Native 随应用打包。动态 Source 网络请求仍经 Access 保护的 HTTP v2 API。
 
@@ -55,7 +55,7 @@ pnpm dev
 
 `pnpm build` 构建宿主、Flutter Web、静态目录并执行 Wrangler dry-run，不会部署。默认没有本地扩展快照时生成空开发索引；正式部署必须显式设置 `EXTENSION_ASSETS_DIR`，避免遗漏快照。当前没有注册 Service Worker，客户端重新连接时刷新索引。
 
-提交前先运行 `pnpm format`，再运行 `pnpm format:check` 和适当测试。prek 由 pnpm 精确锁定，完整原生格式检查需要 macOS/Xcode；Ubuntu CI 使用 portable 检查。项目规则见 [AGENTS.md](AGENTS.md)。修改 `packages/contracts/protocol.json` 后运行 `pnpm generate`；跨语言完整 DTO 的单一 schema 方案仍待决定。
+提交前先运行 `pnpm format`，再运行 `pnpm format:check` 和适当测试。prek 由 pnpm 精确锁定，完整原生格式检查需要 macOS/Xcode；Ubuntu CI 使用 portable 检查。项目规则见 [AGENTS.md](AGENTS.md)。跨语言消息以 `protocol/` 中的 Protobuf `.proto` 为唯一结构来源；修改后运行 `pnpm generate`，用 `pnpm generate:check` 核对两端生成结果。已有运行时控制合同不等于书架、进度和设置的业务同步合同已经实现。
 
 ## TeaVM 与静态扩展
 
@@ -80,4 +80,4 @@ Actions 使用 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，所需权限
 
 扩展和索引旧 Release 已删除，锁定的 TeaVM runtime seed Release 保留为构建依赖。当前原型只维护当前协议、ABI 和材料，不维护旧版兼容层；上线前重建当前宿主代表包并应用 D1 网络政策迁移。
 
-后续按[计划目录](docs/plan/README.md)推进 Source/cache、产品图片、生产 Access 和完整阅读，再实施书架/进度、同步、用户扩展与覆盖性能。
+后续业务开发优先按[同步计划](docs/plan/p2-sync.md)完成服务端权威状态、跨端读写和一致性闭环，书架、进度和设置随同一合同交付；Source/cache、真实阅读、生产 Access 和设备门继续按 [P0](docs/plan/p0-runtime-and-reading.md)验收，不等待所有外围界面完成后再补同步。用户扩展与覆盖性能等范围见[计划目录](docs/plan/README.md)。

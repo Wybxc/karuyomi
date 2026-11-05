@@ -6,6 +6,16 @@
 
 正式 Web/Native 控制入口统一为 `control(ControlRequest ProtoJSON) → ControlResponse ProtoJSON`；Source 与 Worker 使用生成 oneof，bootstrap/静态索引/清单和图片控制也从同一 IDL 解析。Java 保留 Gson DTO，仅将私有 memo 转成严格有界的 `memoJson` 字符串，避免跨 JS 数字精度损失；未引入 Java protobuf runtime。当前身份为 protocolVersion 2 / host ABI v4，原型不兼容旧材料。v4 增加 host entry/HTTP owner 约束，IDL 新增 `storage_busy` 明确表示 namespace 执行槽占用；历史 v3 运行证据不自动覆盖 v4。
 
+以上已实现范围是运行时与现有 API 控制合同，**业务同步协议尚未实现**。多端同步现为首要设计目标，书架、进度和设置的 Worker API + D1 合同是当前优先待办，与 [P2](p2-sync.md)共同推进；不等待外围 UI 全部完成后再定义跨端状态。
+
+## 当前优先待办：业务状态合同
+
+1. 在 `protocol/` 增加书架、分类、阅读进度、书签和非敏感设置的状态查询、写入命令、确认结果及标准错误；继续使用 Protobuf + Buf、TS/Dart 官方生成模型和 ProtoJSON，不新增竞争性的手写 DTO 或通用 Struct/Any。
+2. 明确 `mutationId` 幂等身份、服务端 `revision`、预期 revision 的 CAS 条件、阅读 `epoch` 与已确认状态；规定数值范围和精确跨端映射。请求跟踪 ID、幂等 ID、资源 generation 各自负责不同约束；身份由鉴权上下文确定，不能信任正文指定的 subject。
+3. 定义未登录/拒绝、格式与业务约束错误、revision 冲突、旧 epoch、暂时不可用等标准结果及可重试语义。成功结果返回服务端确认状态和 revision；提交成功但响应丢失后，用同一 mutationId 重试必须得到相同业务结果，不能重复执行 reset 或收藏操作。
+4. 查询先支持当前状态的有界全量/分页读取及前台重新读取，覆盖完整性和分页快照语义；明确原始消息、条目数量、字符串、分页和写入批次的预算。增量日志/cursor、DO 通知及持久 outbox 不作为初版前置。
+5. 补 TS↔Dart golden、非法输入与 D1/正式 API 集成回归，验证两独立客户端的读取、确认、并发冲突、同 epoch 最远进度与 reset。客户端只保留会话内草稿和可丢弃缓存，服务端确认才表示已保存；真实 Web/iOS/Android 跨端运行需另外验收。
+
 ## 已完成
 
 - `.proto` 定义、Buf format/lint/build、精确锁定的 ES/Dart 生成器，生成 TS 经 `@karuyomi/protocol` 正常编译为 ESM。
@@ -36,3 +46,4 @@
 - 产品边界不再维护同一消息结构的 TS Zod 与手写 Dart 解析副本；业务与资源状态校验仍真实执行。
 - 双端传输字段、presence、oneof 和错误解释一致；真实 Worker/WebView 控制链可用。
 - 图片和 HTTP 流仍保持有界分块、背压、取消与所有权；没有新增大正文 JSON/Base64 通道。
+- 新增业务合同由同一 `.proto` 生成双端模型，正式 API 对幂等、revision/CAS、epoch 和预算作运行时校验；两个独立客户端共享服务端确认状态。运行时控制协议已有证据不能替代这一门。

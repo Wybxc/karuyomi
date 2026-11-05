@@ -6,6 +6,8 @@
 
 首版决策固定为：Flutter 渲染阅读界面；扩展在浏览器/WebView 的 Worker 中执行；原生控制页通过当前单一 hostname 的 HTTPS origin 加载；控制消息与图片资源分开；默认一个扩展执行槽，按包复用。内嵌 JS 引擎、C/FFI 与 WasmGC 未采用，第 5–7 节仅保留评估记录，不形成实施阶段、自动回退路径或并行研究任务。
 
+多端同步是业务设计的首要目标。Web、iOS、Android 使用同一份业务协议和 Worker API + D1 权威状态；书架、进度和设置随服务端合同共同交付，不先建立各端独立业务数据库再补同步。当前本地书架/进度实现与历史恢复证据仍待按[同步计划](../plan/p2-sync.md)替换和重新验收，本次设计调整不代表业务 API 已经实现。
+
 Flutter widgets 替代此前 React UI 三选一；Dart 依赖交给 Pub，pnpm 继续管理 TypeScript 后端、JS 宿主和构建编排。Java/Maven/TeaVM 工具链保留。RN、SwiftUI 和纯 React PWA 不再是产品选型候选；Flutter Web 可按需要提供 PWA 安装外壳。
 
 ## 1. 跨平台需要统一到哪一层
@@ -156,7 +158,7 @@ TeaVM 官方 WasmGC loader 面向浏览器、WebWorker、Node.js。Flutter Web �
 
 交互登录必须可见且符合实际 IdP 行为。若使用系统认证会话，要显式验证与 WebView 的会话交接；不能假设外部浏览器登录成功即使隐藏 WebView 自动获权。Cloudflare Access 仍保护全部后端，前端壳公开，不内置 service token 或增加应用账号系统。
 
-Dart 业务存储与 TeaVM 文件/HTTP Cache 分开所有权。原生业务镜像使用平台持久化，Web 使用浏览器存储；TeaVM 首版继续复用原浏览器缓存语义，按身份/包/版本分区。移动原生图片临时文件与 WebView 缓存共同计入预算，不引入整章离线保存。
+Dart 业务数据通过 ApiClient 读写 Worker API，D1 是书架、分类、进度、书签和非敏感设置的唯一权威；Web/Native 只保留当前会话状态和可丢弃缓存，收到服务端确认才标记已保存。当前会话的未确认草稿可重试，断网不阻断已加载阅读，但不承诺关闭后保留，也不建设持久 outbox 或离线合并层。现有 Drift/SQLite 业务路径待直接替换，不维护双写或旧数据库转换。TeaVM 文件/HTTP Cache 仍独立所有权，继续复用浏览器存储语义并按身份/包/版本分区；图片临时文件与 WebView 缓存共同计入预算，不引入整章离线保存。
 
 工程边界：
 
@@ -165,7 +167,7 @@ Dart 业务存储与 TeaVM 文件/HTTP Cache 分开所有权。原生业务镜�
 - Worker API：TypeScript/Hono、Access/jose、D1/DO，按个人对象需要使用 R2；不承载扩展正文，也不提供私有 GitHub 下载 token 服务。
 - Java/Maven：锁定 TeaVM 工具链与真实上游 submodule，每包 AOT 编译；项目宿主持续维护，变化后更新构建指纹并回归。
 - 原生插件：仅管理必要的 WebView/字节通道/临时资源，平台代码不进入业务 UI。
-- 当前使用版本化控制协议及各端运行时解析；统一 IDL 已选定 Protobuf + Buf、双端生成与 ProtoJSON 小控制消息，尚未实施，比较与边界见[协议决策](cross-language-protocol.md)。Dart Native 与 Web 用条件导入选择 adapter，Web 条件使用 dart.library.js_interop，支持范围由实际 JS/Wasm 构建验证。
+- 当前运行时控制协议使用 Protobuf + Buf 双端生成与 ProtoJSON 小控制消息，正式边界已接入，实际运行范围以[协议计划](../plan/cross-language-protocol.md)为准。业务状态查询、幂等写入、revision/epoch、条件更新和标准错误需在同一协议体系中新增；现有控制握手不证明业务同步已完成。比较与边界见[协议决策](cross-language-protocol.md)。Dart Native 与 Web 用条件导入选择 adapter，Web 条件使用 dart.library.js_interop，支持范围由实际 JS/Wasm 构建验证。
 
 不建立全平台假同步接口，不在 UI 层暴露 Java对象、任意 JS 引擎对象或平台裸指针。
 

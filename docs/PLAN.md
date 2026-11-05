@@ -4,11 +4,14 @@
 
 ## 已确定的方向与范围
 
+- **多端同步是首要设计目标。** 同一部署、同一 Access 身份在 Web、iOS、Android 共享书架、分类、进度、书签和非敏感设置；Worker API + D1 是唯一业务权威。客户端只维护当前会话状态、未确认草稿及可丢弃缓存，保存以服务端确认结果为准。先完成跨端在线闭环，再扩展完整书架和阅读设置；同步计划沿用 [P2](plan/p2-sync.md) 文件名，但已提升为当前主线，不再等待 P1 全部完成。
 - Flutter / Dart 负责 UI 和独立阅读核心；iOS、Android 原生优先，桌面使用 Flutter Web。
 - TeaVM 0.16.0 JavaScript backend / release9 是运行基线。Web 通过 JS interop 连接 Worker；原生通过系统 WebView 控制同版 Worker。不重选框架或执行引擎。
 - 单 hostname、单 Cloudflare Worker：公开 Flutter shell 和 `/runtime/`，后端与个人数据放在 Access 保护的 `/api`、`/api/*`，Worker 再校验 JWT。
 - Static Assets 是所有客户端的扩展分发权威源，每包只部署最新可用构建，由客户端或 Service Worker 管理更新与缓存。扩展不再发布到 GitHub Release，Worker/R2 不代理正文。共享桥/WASM 在 Web 作为 Static Assets、Native 随应用打包；Java/Maven、原 JAR 与 seed 只用于构建。
 - 首版保留浏览、书架、在线阅读、基本进度、同步和源管理；暂缓模块及各阶段完整范围见[计划索引](plan/README.md)。原型阶段不维护旧协议、旧材料或旧发布格式兼容。
+
+现有本地书架和 SQLite 进度是已实现的过渡状态，不能作为多端同步完成的证据；后续直接替换其业务权威读写入口，不建设旧本地数据迁移或长期双写。初版通过幂等写入、服务端 revision/冲突语义及前台重新读取收敛，不要求持久 outbox、离线冲突合并、增量日志或实时通知先行。P0 的真实阅读、生产 Access 和设备验收继续推进，不能因同步优先而跳过。
 
 ## 设计依据
 
