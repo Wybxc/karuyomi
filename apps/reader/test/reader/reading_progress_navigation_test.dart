@@ -83,6 +83,8 @@ void main() {
       final server = TestBusinessServer();
       final platform = _platform(server: server);
       final catalog = await _details(tester, platform);
+      await tester.ensureVisible(find.text('第一章'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
       expect(await catalog.flushReadingProgress(), true);
@@ -173,6 +175,8 @@ void main() {
       final server = TestBusinessServer();
       final platform = _platform(server: server);
       final catalog = await _details(tester, platform);
+      await tester.ensureVisible(find.text('第一章'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
       expect(await catalog.flushReadingProgress(), true);
@@ -227,6 +231,8 @@ void main() {
           return origin == original.origin ? recovered : replacement;
         },
       );
+      await tester.ensureVisible(find.text('第一章'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
       await catalog.flushReadingProgress();
@@ -328,6 +334,8 @@ void main() {
         mangaUrl: testManga.url,
         chapters: const [],
       ).mangaKey;
+      await tester.ensureVisible(find.text('第一章'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
       var leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
@@ -384,6 +392,8 @@ void main() {
       platform = _platform(server: server);
       catalog = await _details(tester, platform);
       expect(find.text('继续阅读'), findsOneWidget);
+      await tester.ensureVisible(find.text('继续阅读'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('继续阅读'));
       await tester.pumpAndSettle();
       leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
@@ -437,6 +447,8 @@ void main() {
     (tester) async {
       final platform = _platform();
       final catalog = await _details(tester, platform);
+      await tester.ensureVisible(find.text('第一章'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
       expect(find.text('阅读进度待服务端确认'), findsOneWidget);

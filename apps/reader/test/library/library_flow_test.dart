@@ -111,9 +111,13 @@ void main() {
     await tester.pumpWidget(KaruyomiApp(platform: platform));
     await tester.pumpAndSettle();
     var catalog = await _browseDetails(tester);
+    await tester.ensureVisible(find.text('加入书架'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('加入书架'));
     await tester.pumpAndSettle();
     expect(find.text('移出书架'), findsOneWidget);
+    await tester.ensureVisible(find.text('第 1 章'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('第 1 章'));
     await tester.pumpAndSettle();
     final initialReader = tester.widget<ReaderScreen>(
@@ -154,6 +158,8 @@ void main() {
       wire.SourceCall_Request.details,
       wire.SourceCall_Request.chapters,
     ]);
+    await tester.ensureVisible(find.text('继续阅读'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('继续阅读'));
     await tester.pumpAndSettle();
     final resumed = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
@@ -161,6 +167,8 @@ void main() {
     expect(resumed.initialPosition!.pageKey, manifest.pages.single.key);
     expect(resumed.initialPosition!.normalizedOffset, .35);
     await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('移出书架'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('移出书架'));
     await tester.pumpAndSettle();
@@ -183,6 +191,8 @@ void main() {
       await tester.pumpAndSettle();
       final catalog = await _browseDetails(tester);
       platform.businessServer.failWrites = true;
+      await tester.ensureVisible(find.text('加入书架'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('加入书架'));
       await tester.pumpAndSettle();
       expect(find.text('收藏未能保存，请重试；仍可继续阅读。'), findsOneWidget);
@@ -191,12 +201,16 @@ void main() {
         await tester.runAsync(() => catalog.library!.watchEntries().first),
         isEmpty,
       );
+      await tester.ensureVisible(find.text('第 1 章'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('第 1 章'));
       await tester.pumpAndSettle();
       expect(find.byType(ReaderScreen), findsOneWidget);
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
       platform.businessServer.failWrites = false;
+      await tester.ensureVisible(find.text('加入书架'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('加入书架'));
       await tester.pumpAndSettle();
       expect(find.text('移出书架'), findsOneWidget);

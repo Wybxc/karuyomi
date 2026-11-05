@@ -54,6 +54,19 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('真实源 DTO 测试'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('第 1 章'),
+        160,
+        // The outer Scrollable is the detail ListView; fields and menus can
+        // contain their own nested Scrollables.
+        scrollable: find
+            .descendant(
+              of: find.byType(MangaDetailsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('漫画源返回的完整简介'), findsOneWidget);
       expect(find.text('第 1 章'), findsOneWidget);
       expect(find.byType(Image), findsNothing);
@@ -105,6 +118,19 @@ void main() {
       await tester.tap(find.text('测试漫画源 · zh'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('真实源 DTO 测试'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('第 1 章'),
+        160,
+        // The outer Scrollable is the detail ListView; fields and menus can
+        // contain their own nested Scrollables.
+        scrollable: find
+            .descendant(
+              of: find.byType(MangaDetailsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.pumpAndSettle();
 
       final pages = Completer<wire.SourceResult>();

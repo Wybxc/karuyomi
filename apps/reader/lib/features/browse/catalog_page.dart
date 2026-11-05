@@ -310,6 +310,11 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   String? _favoriteError;
   ChapterBookmarksController? _bookmarks;
   bool _onlyBookmarks = false;
+  final _chapterSearch = TextEditingController();
+  ChapterOrder _chapterOrder = ChapterOrder.source;
+  bool _chapterOrderChosen = false;
+  final _chapterNameCounts = <String, int>{};
+  final _chapterUrlCounts = <String, int>{};
 
   @override
   void initState() {
@@ -323,6 +328,18 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         mangaUrl: manga.url,
         chapters: chapters.map((chapter) => chapter.snapshot),
       );
+      for (final chapter in _sequence!.entries) {
+        _chapterNameCounts.update(
+          chapter.name,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+        _chapterUrlCounts.update(
+          chapter.snapshot.url,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
       _library = controller.library;
       _favoriteStream = _library?.watchFavorite(_sequence!.mangaKey);
       final repository = controller.bookmarks;
@@ -369,6 +386,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     controller.removeListener(_catalogChanged);
     _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
+    _chapterSearch.dispose();
     super.dispose();
   }
 
@@ -397,6 +415,13 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     setState(() {
       _resume = resume;
       _resumeError = error;
+      // A user's list choice lasts for this detail page. Until then, the same
+      // resume order supplies both the list and the reader's initial order.
+      if (!_chapterOrderChosen && error == null) {
+        _chapterOrder = resume?.reversedOrder == true
+            ? ChapterOrder.reversed
+            : ChapterOrder.source;
+      }
     });
   }
 
@@ -486,6 +511,9 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     if (sequence == null) return;
     setState(() => _opening = true);
     final selected = sequence.entries[index];
+    final initialOrder = _chapterOrderChosen || _resume != null
+        ? _chapterOrder
+        : null;
     ReaderBaselineScope.read(context)?.event('navigation', {
       'action': 'open_chapter',
       'targetChapterKey': selected.key,
@@ -516,6 +544,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
           sequence: sequence,
           initialChapter: selected,
           initialOpened: opened,
+          initialOrder: initialOrder,
           onAuthenticate: widget.onAuthenticateReader,
         ),
       );
@@ -531,6 +560,177 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         await _bookmarks?.refresh();
       }
     }
+  }
+
+  String? _chapterNumber(SequenceChapter chapter) {
+    final snapshot = chapter.snapshot;
+    final number = snapshot.chapterNumber;
+    if (!snapshot.hasChapterNumber() || !number.isFinite || number < 0) {
+      return null;
+    }
+    return number == number.truncateToDouble()
+        ? number.toStringAsFixed(0)
+        : number.toString();
+  }
+
+  String? _chapterSubtitle(SequenceChapter chapter) {
+    final number = _chapterNumber(chapter);
+    final scanlator = chapter.snapshot.scanlator.trim();
+    final sameName = (_chapterNameCounts[chapter.name] ?? 0) > 1;
+    final sameUrl = (_chapterUrlCounts[chapter.snapshot.url] ?? 0) > 1;
+    final details = [
+      if (number != null) '第 $number 章',
+      if (scanlator.isNotEmpty) '扫描组：$scanlator',
+      if (sameName) '同名章节',
+      if (sameUrl) '重复链接',
+      if (sameName || sameUrl) '来源第 ${chapter.sourceIndex + 1} 项',
+    ];
+    return details.isEmpty ? null : details.join(' · ');
+  }
+
+  List<Widget> _chapterList() {
+    final sequence = _sequence;
+    final query = _chapterSearch.text.trim().toLowerCase();
+    final visible = (sequence?.ordered(_chapterOrder) ?? <SequenceChapter>[])
+        .where((chapter) {
+          if (_onlyBookmarks && !(_bookmarks?.contains(chapter.key) ?? false)) {
+            return false;
+          }
+          final text = [
+            chapter.name,
+            chapter.snapshot.scanlator,
+            if (_chapterNumber(chapter) case final number?) '第 $number 章',
+          ].join('\n').toLowerCase();
+          return text.contains(query);
+        })
+        .toList();
+    return [
+      Text(
+        '章节（${chapters.length}）',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      const SizedBox(height: 12),
+      TextField(
+        key: const ValueKey('chapter-search'),
+        controller: _chapterSearch,
+        enabled: !_opening,
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(
+          labelText: '搜索章节',
+          hintText: '章节名、扫描组或章节号',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _chapterSearch.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: '清空章节搜索',
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => setState(_chapterSearch.clear),
+                ),
+          border: const OutlineInputBorder(),
+        ),
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          const Text('章节排序'),
+          const SizedBox(width: 16),
+          Expanded(
+            child: DropdownButton<ChapterOrder>(
+              key: const ValueKey('chapter-list-order'),
+              value: _chapterOrder,
+              isExpanded: true,
+              items: const [
+                DropdownMenuItem(
+                  value: ChapterOrder.source,
+                  child: Text('来源顺序'),
+                ),
+                DropdownMenuItem(
+                  value: ChapterOrder.reversed,
+                  child: Text('反向来源顺序'),
+                ),
+              ],
+              onChanged: _opening
+                  ? null
+                  : (order) {
+                      if (order != null) {
+                        setState(() {
+                          _chapterOrder = order;
+                          _chapterOrderChosen = true;
+                        });
+                      }
+                    },
+            ),
+          ),
+        ],
+      ),
+      if (_bookmarks case final bookmarks?) ...[
+        Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            FilterChip(
+              label: const Text('仅书签'),
+              selected: _onlyBookmarks,
+              onSelected: bookmarks.loaded
+                  ? (selected) => setState(() => _onlyBookmarks = selected)
+                  : null,
+            ),
+            Text(
+              bookmarks.loaded
+                  ? '已标记 ${bookmarks.chapterKeys.length} 章'
+                  : '书签尚未确认',
+            ),
+          ],
+        ),
+        BookmarkStatus(controller: bookmarks),
+        if (bookmarks.chapterKeys.any(
+          (key) =>
+              !(sequence?.entries.any((chapter) => chapter.key == key) ??
+                  false),
+        ))
+          const _Notice(
+            text: '部分书签的章节未在当前列表中找到，原记录仍保留。',
+            icon: Icons.info_outline,
+          ),
+      ],
+      Text('显示 ${visible.length} / ${chapters.length} 章'),
+      if (controller.busy) const LinearProgressIndicator(),
+      if (controller.error != null)
+        _Notice(text: controller.error!, icon: Icons.error_outline),
+      if (chapters.isEmpty)
+        const Padding(padding: EdgeInsets.all(24), child: Text('这个漫画源没有返回章节'))
+      else if (visible.isEmpty)
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            query.isEmpty && _onlyBookmarks
+                ? '当前章节列表中没有书签'
+                : _onlyBookmarks
+                ? '没有符合搜索和书签筛选的章节'
+                : '没有匹配的章节',
+          ),
+        ),
+      for (final chapter in visible)
+        ListTile(
+          key: ValueKey(chapter.key),
+          enabled: !controller.busy && !_opening,
+          leading: const Icon(Icons.article_outlined),
+          title: Text(chapter.name),
+          subtitle: switch (_chapterSubtitle(chapter)) {
+            final subtitle? => Text(subtitle),
+            null => null,
+          },
+          trailing: _bookmarks == null
+              ? null
+              : ChapterBookmarkButton(
+                  controller: _bookmarks!,
+                  chapterKey: chapter.key,
+                  chapterName: chapter.name,
+                  enabled: !controller.busy && !_opening,
+                ),
+          onTap: () => _openChapter(context, chapter.sourceIndex),
+        ),
+    ];
   }
 
   @override
@@ -608,83 +808,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                         child: const Text('重试保存进度'),
                       ),
                     ],
-                    Text(
-                      '章节（${chapters.length}）',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 12),
-                    if (_bookmarks case final bookmarks?) ...[
-                      Wrap(
-                        spacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          FilterChip(
-                            label: const Text('仅书签'),
-                            selected: _onlyBookmarks,
-                            onSelected: bookmarks.loaded
-                                ? (selected) =>
-                                      setState(() => _onlyBookmarks = selected)
-                                : null,
-                          ),
-                          Text(
-                            bookmarks.loaded
-                                ? '已标记 ${bookmarks.chapterKeys.length} 章'
-                                : '书签尚未确认',
-                          ),
-                        ],
-                      ),
-                      BookmarkStatus(controller: bookmarks),
-                      if (bookmarks.chapterKeys.any(
-                        (key) => !_sequence!.entries.any(
-                          (chapter) => chapter.key == key,
-                        ),
-                      ))
-                        const _Notice(
-                          text: '部分书签的章节未在当前列表中找到，原记录仍保留。',
-                          icon: Icons.info_outline,
-                        ),
-                      if (_onlyBookmarks &&
-                          !(_sequence?.entries.any(
-                                (chapter) => bookmarks.contains(chapter.key),
-                              ) ??
-                              false))
-                        const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Text('当前章节列表中没有书签'),
-                        ),
-                    ],
-                    if (controller.busy) const LinearProgressIndicator(),
-                    if (controller.error != null)
-                      _Notice(
-                        text: controller.error!,
-                        icon: Icons.error_outline,
-                      ),
-                    if (chapters.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('这个漫画源没有返回章节'),
-                      ),
-                    for (var index = 0; index < chapters.length; index++)
-                      if (!_onlyBookmarks ||
-                          (_sequence != null &&
-                              (_bookmarks?.contains(
-                                    _sequence!.entries[index].key,
-                                  ) ??
-                                  false)))
-                        ListTile(
-                          enabled: !controller.busy && !_opening,
-                          leading: const Icon(Icons.article_outlined),
-                          title: Text(chapters[index].name),
-                          trailing: _bookmarks == null || _sequence == null
-                              ? null
-                              : ChapterBookmarkButton(
-                                  controller: _bookmarks!,
-                                  chapterKey: _sequence!.entries[index].key,
-                                  chapterName: chapters[index].name,
-                                  enabled: !controller.busy && !_opening,
-                                ),
-                          onTap: () => _openChapter(context, index),
-                        ),
+                    ..._chapterList(),
                   ],
                 ),
               ),
