@@ -6,6 +6,7 @@ import '../../data/library_repository.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/catalog_page.dart';
 import '../reader/reader_recovery.dart';
+import 'category_dialogs.dart';
 
 enum _LibrarySort { added, title }
 
@@ -32,7 +33,11 @@ class LibraryPage extends StatefulWidget {
 class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   final _search = TextEditingController();
   LibraryRepository? _repository;
-  Stream<List<LibraryEntry>>? _entries;
+  Stream<LibraryView>? _views;
+  final _editLifecycle = ValueNotifier(0);
+  String? _categoryFilter;
+  bool _editing = false;
+  bool _disposing = false;
   _LibrarySort _sort = _LibrarySort.added;
   int _retry = 0;
   ServiceStatus? _lastStatus;
@@ -68,12 +73,14 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
 
   void _bindRepository() {
     final next = widget.controller?.library;
+    _editLifecycle.value++;
     if (identical(_repository, next)) {
       return;
     }
     _repository = next;
     _refreshError = null;
-    _entries = next?.watchEntries();
+    _views = next?.watchView();
+    _categoryFilter = null;
     _search.clear();
   }
 
@@ -99,7 +106,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
 
   void _retryStorage() => setState(() {
     _retry++;
-    _entries = _repository?.watchEntries();
+    _views = _repository?.watchView();
   });
 
   Future<void> _open(LibraryEntry entry) async {
@@ -111,6 +118,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     bool isCurrent() =>
         mounted &&
         identical(widget.controller, controller) &&
+        identical(_repository, repository) &&
         _repository?.identity.key == identityKey &&
         route?.isCurrent == true &&
         route?.isActive == true;
@@ -135,6 +143,54 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
       );
     } finally {
       if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  Future<void> _editCategories(LibraryView view, {LibraryEntry? entry}) async {
+    final controller = widget.controller;
+    final repository = _repository;
+    if (_editing ||
+        _opening ||
+        controller == null ||
+        repository == null ||
+        controller.status != ServiceStatus.ready ||
+        controller.busy) {
+      return;
+    }
+    final route = ModalRoute.of(context);
+    final identityKey = repository.identity.key;
+    bool isCurrent() =>
+        mounted &&
+        !_disposing &&
+        identical(widget.controller, controller) &&
+        identical(_repository, repository) &&
+        repository.identity.key == identityKey &&
+        controller.status == ServiceStatus.ready &&
+        route?.isActive == true;
+    setState(() => _editing = true);
+    try {
+      if (entry == null) {
+        await showLibraryCategoryManager(
+          context: context,
+          controller: controller,
+          repository: repository,
+          view: view,
+          lifecycle: _editLifecycle,
+          isCurrent: isCurrent,
+        );
+      } else {
+        await showLibraryCategoryPicker(
+          context: context,
+          controller: controller,
+          repository: repository,
+          view: view,
+          entry: entry,
+          lifecycle: _editLifecycle,
+          isCurrent: isCurrent,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _editing = false);
     }
   }
 
@@ -163,11 +219,11 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                 label: const Text('刷新服务端书架'),
               ),
             ),
-          StreamBuilder<List<LibraryEntry>>(
+          StreamBuilder<LibraryView>(
             key: ValueKey((_repository, _repository?.identity.key, _retry)),
-            stream: _entries,
+            stream: _views,
             builder: (context, snapshot) {
-              if (snapshot.hasError) {
+              if (snapshot.hasError && !snapshot.hasData) {
                 return Column(
                   children: [
                     _notice('未能读取服务端书架，请重试。'),
@@ -178,14 +234,14 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                   ],
                 );
               }
-              if (_entries != null && !snapshot.hasData) {
+              if (_views != null && !snapshot.hasData) {
                 return const Padding(
                   padding: EdgeInsets.all(32),
                   child: Center(child: Text('正在读取书架')),
                 );
               }
-              final entries = snapshot.data ?? const <LibraryEntry>[];
-              if (entries.isEmpty) {
+              final view = snapshot.data;
+              if (view == null) {
                 return _repository == null && widget.controller != null
                     ? const Padding(
                         padding: EdgeInsets.all(32),
@@ -193,7 +249,14 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                       )
                     : _empty();
               }
-              return _library(entries);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (snapshot.hasError) _notice('未能读取服务端书架，当前显示上次确认的结果。'),
+                  _categoryControls(view),
+                  if (view.entries.isEmpty) _empty() else _library(view),
+                ],
+              );
             },
           ),
         ],
@@ -251,9 +314,94 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     ),
   );
 
-  Widget _library(List<LibraryEntry> entries) {
+  String? _filterFor(LibraryView view) {
+    final selected = _categoryFilter;
+    if (selected != null &&
+        selected.isNotEmpty &&
+        !view.categories.any((category) => category.id == selected)) {
+      return null;
+    }
+    return selected;
+  }
+
+  Widget _categoryControls(LibraryView view) {
+    final repository = _repository;
+    final pending =
+        repository != null && hasPendingLibraryCategoryEdit(repository);
+    final available =
+        !_editing &&
+        !_opening &&
+        widget.controller?.status == ServiceStatus.ready &&
+        widget.controller?.busy == false;
+    final selected = _filterFor(view);
+    Widget chip(String? value, String label) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Tooltip(
+        message: label,
+        child: ChoiceChip(
+          label: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 200),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          selected: selected == value,
+          onSelected: (_) => setState(() => _categoryFilter = value),
+        ),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (pending) ...[
+          _notice('有一项分类修改尚未处理。请继续原修改，当前列表仅显示服务端已确认的结果。'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              onPressed: available
+                  ? () => unawaited(_editCategories(view))
+                  : null,
+              icon: const Icon(Icons.pending_actions),
+              label: const Text('处理未确认修改'),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: available && !pending
+                ? () => unawaited(_editCategories(view))
+                : null,
+            icon: const Icon(Icons.folder_outlined),
+            label: const Text('管理分类'),
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              chip(null, '全部'),
+              chip('', '未分类'),
+              for (final category in view.categories)
+                chip(category.id, category.name),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _library(LibraryView view) {
+    final entries = view.entries;
     final query = _search.text.trim().toLowerCase();
+    final filter = _filterFor(view);
     final visible = entries.where((entry) {
+      if (filter == '' && entry.categoryIds.isNotEmpty) return false;
+      if (filter != null &&
+          filter.isNotEmpty &&
+          !entry.categoryIds.contains(filter)) {
+        return false;
+      }
       final text = [
         entry.title,
         entry.snapshot.author,
@@ -275,6 +423,12 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
         !_opening &&
         controller?.busy == false &&
         controller?.status == ServiceStatus.ready;
+    final repository = _repository;
+    final canCategorize =
+        canOpen &&
+        !_editing &&
+        repository != null &&
+        !hasPendingLibraryCategoryEdit(repository);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -321,9 +475,22 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                 [
                   if (entry.snapshot.author.isNotEmpty) entry.snapshot.author,
                   '${entry.sourceName} · ${entry.sourceLang}',
+                  '分类：${entry.categoryIds.isEmpty ? '未分类' : view.categories.where((category) => entry.categoryIds.contains(category.id)).map((category) => category.name).join('、')}',
                 ].join('\n'),
               ),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: '设置分类：${entry.title}',
+                    onPressed: canCategorize
+                        ? () => unawaited(_editCategories(view, entry: entry))
+                        : null,
+                    icon: const Icon(Icons.folder_outlined),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
               onTap: canOpen ? () => unawaited(_open(entry)) : null,
             ),
           ),
@@ -350,6 +517,9 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _disposing = true;
+    _editLifecycle.value++;
+    _editLifecycle.dispose();
     widget.controller?.removeListener(_catalogChanged);
     WidgetsBinding.instance.removeObserver(this);
     _search.dispose();

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
@@ -30,6 +31,8 @@ final class TestPlatform extends PlatformRuntime {
   int disposalCount = 0;
   int rebuildCount = 0;
   Future<void> Function(String path)? beforeApiFetch;
+  FutureOr<ApiReply> Function(TestBusinessRequest request, ApiReply reply)?
+  afterBusinessReply;
   Future<void> Function()? beforeRebuild;
   final openedIdentities = <String>[];
   final openedBuilds = <String>[];
@@ -107,16 +110,21 @@ final class TestPlatform extends PlatformRuntime {
       case wire.ControlRequest_Command.fetchApi:
         await beforeApiFetch?.call(request.fetchApi.path);
         if (request.fetchApi.path.startsWith('/api/library') ||
+            request.fetchApi.path.startsWith('/api/categories') ||
             request.fetchApi.path.startsWith('/api/state/')) {
-          final reply = await businessServer.handle(
-            TestBusinessRequest(
-              path: request.fetchApi.path,
-              method: request.fetchApi.method,
-              headers: request.fetchApi.headers,
-              body: request.fetchApi.hasBody() ? request.fetchApi.body : null,
-            ),
+          final businessRequest = TestBusinessRequest(
+            path: request.fetchApi.path,
+            method: request.fetchApi.method,
+            headers: request.fetchApi.headers,
+            body: request.fetchApi.hasBody() ? request.fetchApi.body : null,
+          );
+          final serverReply = await businessServer.handle(
+            businessRequest,
             subject: bootstrapSubject,
           );
+          final reply =
+              await afterBusinessReply?.call(businessRequest, serverReply) ??
+              serverReply;
           response.api = wire.ApiFetchResponse(
             status: reply.status,
             headers: reply.headers.entries,

@@ -82,6 +82,100 @@ final class _ResponseGate implements ApiFetch {
 }
 
 void main() {
+  for (final loseReply in [false, true]) {
+    test(
+      'only explicit directory retry sends an uncertain command (lost reply: $loseReply)',
+      () async {
+        final server = TestBusinessServer();
+        final client = _client(server);
+        addTearDown(client.dispose);
+        final repository = LibraryRepository(client);
+        if (loseReply) {
+          server.loseNextResponse = true;
+        } else {
+          server.beforeRequest = (request) {
+            if (request.method == 'POST') {
+              throw StateError('Injected transport failure');
+            }
+            return null;
+          };
+        }
+        await expectLater(_create(repository), throwsStateError);
+        server.beforeRequest = null;
+        final original = server.requests.last.body;
+        final requestCount = server.requests.length;
+        await expectLater(_create(repository, id: _second), throwsStateError);
+        expect(server.requests, hasLength(requestCount));
+        expect(server.appliedMutations, loseReply ? 1 : 0);
+        await _create(repository);
+        expect(
+          server.requests
+              .where((request) => request.method == 'POST')
+              .map((request) => request.body),
+          [original, original],
+        );
+        expect(server.appliedMutations, 1);
+        await _create(repository, id: _second, revision: 1);
+        expect((await repository.watchView().first).categories, hasLength(2));
+      },
+    );
+
+    test(
+      'metadata and changed membership cannot implicitly retry a category edit (lost reply: $loseReply)',
+      () async {
+        final server = TestBusinessServer();
+        final client = _client(server);
+        addTearDown(client.dispose);
+        final repository = LibraryRepository(client);
+        await _create(repository);
+        await _favorite(repository);
+        final entry = (await repository.watchEntries().first).single;
+        Future<void> edit(List<String> ids) => repository.setCategories(
+          mangaKey: entry.mangaKey,
+          categoryIds: ids,
+          expectedCatalogRevision: 1,
+          expectedMangaRevision: entry.revision,
+        );
+        Future<void> metadata() => repository.refreshMetadata(
+          packageName: entry.packageName,
+          sourceId: entry.sourceId,
+          sourceName: entry.sourceName,
+          sourceLang: entry.sourceLang,
+          manga: wire.Manga(url: entry.url, title: 'Refreshed'),
+        );
+        if (loseReply) {
+          server.loseNextResponse = true;
+        } else {
+          server.beforeRequest = (request) {
+            if (request.method == 'POST') {
+              throw StateError('Injected transport failure');
+            }
+            return null;
+          };
+        }
+        await expectLater(edit([_first]), throwsStateError);
+        server.beforeRequest = null;
+        final original = server.requests.last.body;
+        final requestCount = server.requests.length;
+        await expectLater(metadata(), throwsStateError);
+        await expectLater(edit([]), throwsStateError);
+        expect(server.requests, hasLength(requestCount));
+        expect(server.appliedMutations, loseReply ? 3 : 2);
+        await edit([_first]);
+        final posts = server.requests
+            .where((request) => request.method == 'POST')
+            .toList();
+        expect(posts[2].body, original);
+        expect(posts[3].body, original);
+        expect(server.appliedMutations, 3);
+        await metadata();
+        expect(
+          (await repository.watchEntries().first).single.title,
+          'Refreshed',
+        );
+      },
+    );
+  }
   test(
     'lost category replies retry the exact UUID and body only once',
     () async {

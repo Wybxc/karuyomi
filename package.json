@@ -36,11 +36,13 @@
     "hooks:install": "prek install",
     "format:check:portable": "node scripts/format.ts --check --portable",
     "hooks:check": "prek run --all-files --show-diff-on-failure",
-    "check:dependencies": "depcruise --config .dependency-cruiser.json scripts tools packages apps/api/src apps/api/test runtime/teavm/bridge apps/api/vite.config.ts apps/api/vitest.config.ts vitest.config.ts apps/api/vite.test.config.ts",
+    "check:dependencies": "depcruise --config .dependency-cruiser.json scripts tools packages apps/api/src apps/api/test runtime/teavm/bridge apps/api/vite.config.ts apps/api/vitest.config.ts vitest.config.ts apps/api/vite.test.config.ts apps/api/vite.acceptance.config.ts",
     "test:cloudflare-probe": "node --test tools/cloudflare/*.test.ts",
     "test:build": "pnpm --filter @karuyomi/runtime-host build && pnpm --filter @karuyomi/api exec vite build --config vite.test.config.ts",
     "test:browser": "vitest --config packages/runtime-host/vitest.browser.config.ts",
-    "build:native-assets": "cpy \"packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}\" apps/reader/assets/runtime --flat"
+    "build:native-assets": "cpy \"packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}\" apps/reader/assets/runtime --flat",
+    "acceptance:build": "pnpm build && pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts",
+    "acceptance:serve": "pnpm --filter @karuyomi/api exec node test/acceptance.ts"
   },
   "devDependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",

@@ -352,6 +352,10 @@ final class BusinessStateClient {
     return _serial(command.mangaKey, () async {
       final previous = _pending[command.mangaKey];
       if (previous != null) {
+        if (previous.request.hasSetCategories() &&
+            previous.fingerprint != fingerprint) {
+          throw StateError('请先处理书架中的未确认分类修改。');
+        }
         final result = await _send(previous);
         if (previous.fingerprint == fingerprint) return result;
       }
@@ -542,8 +546,10 @@ final class BusinessStateClient {
     return _serial('categories', () async {
       final previous = _pendingCategory;
       if (previous != null) {
-        final result = await _sendCategories(previous);
-        if (previous.fingerprint == fingerprint) return result;
+        if (previous.fingerprint != fingerprint) {
+          throw StateError('请先处理书架中的未确认分类修改。');
+        }
+        return _sendCategories(previous);
       }
       command.mutationId = _uuid.v4();
       command.freeze();
