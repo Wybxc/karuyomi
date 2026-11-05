@@ -49,6 +49,7 @@ class ReaderScreen extends StatefulWidget {
     this.initialMode = ReadingMode.leftToRight,
     this.doublePage,
     this.fit = ReaderFit.contain,
+    this.cropBorders = false,
     this.background = ReaderBackground.black,
     this.dimPercent = 0,
     this.tapZones = ReaderInputPreset.standard,
@@ -80,6 +81,7 @@ class ReaderScreen extends StatefulWidget {
   final bool? doublePage;
 
   final ReaderFit fit;
+  final bool cropBorders;
   final ReaderBackground background;
 
   /// Application content dimming only; never changes system screen brightness.
@@ -121,6 +123,8 @@ typedef _ReaderAppearance = ({
   ReaderBackground background,
   int dimPercent,
   ReaderFit fit,
+  bool cropBorders,
+  Map<String, _ImageCrop> crops,
 });
 
 class _ReaderScreenState extends State<ReaderScreen> {
@@ -150,6 +154,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   late bool? _doublePagePreference;
   final _decodedResources = <String>{};
   final _learnedDimensions = <String, ImageDimensions>{};
+  final _crops = <String, _ImageCrop>{};
+  bool _resetCropGeometry = false;
 
   @override
   void initState() {
@@ -158,6 +164,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
       background: widget.background,
       dimPercent: widget.dimPercent,
       fit: widget.fit,
+      cropBorders: widget.cropBorders,
+      crops: const {},
     ));
     _baseline = ReaderBaselineScope.read(context);
     _baseline?.event('reader_attached', {
@@ -214,6 +222,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _windowSignature = '';
     _decodedResources.clear();
     _learnedDimensions.clear();
+    _crops.clear();
+    _resetCropGeometry = true;
     _resourcePool = ReaderResourcePool(
       widget.provider,
       evict: widget.imageEvictor,
@@ -226,11 +236,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
           .map((image) => image.id)
           .toSet();
       _decodedResources.removeWhere((id) => !residentIds.contains(id));
+      final cropCount = _crops.length;
+      _crops.removeWhere(
+        (id, crop) =>
+            !residentIds.contains(id) ||
+            snapshot.dimensions[id]?.width != crop.width ||
+            snapshot.dimensions[id]?.height != crop.height,
+      );
+      if (cropCount != _crops.length) _publishAppearance();
       _scheduleDimensions();
       _scheduleViewport();
       if (mounted) setState(() {});
     });
     _syncWindow();
+    _publishAppearance();
   }
 
   void _scheduleViewport() {
@@ -333,6 +352,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       'viewportX': position?.viewportX,
       'viewportY': position?.viewportY,
       'fit': widget.fit.name,
+      'cropBorders': widget.cropBorders,
       'visible': [
         for (final index in visible)
           {
@@ -381,18 +401,32 @@ class _ReaderScreenState extends State<ReaderScreen> {
         final dimensions =
             _learnedDimensions[page.key] ??
             (image == null ? null : snapshot.dimensions[image.id]);
-        if (dimensions == null ||
-            (page.width == dimensions.width &&
-                page.height == dimensions.height)) {
+        final width = dimensions?.width.toDouble() ?? page.width;
+        final height = dimensions?.height.toDouble() ?? page.height;
+        final crop = image == null ? null : _acceptedCrop(image.id);
+        // Keep already learned list geometry when a page leaves the resource
+        // window. A new resource remains unobservable until its own ROI arrives.
+        final ratio = !widget.cropBorders
+            ? null
+            : crop != null && width != null && height != null
+            ? width / height * crop.bounds.width / crop.bounds.height
+            : _resetCropGeometry
+            ? null
+            : page.contentAspectRatio;
+        if (page.width == width &&
+            page.height == height &&
+            page.contentAspectRatio == ratio) {
           return page;
         }
         changed = true;
         return ReaderPage(
           key: page.key,
-          width: dimensions.width.toDouble(),
-          height: dimensions.height.toDouble(),
+          width: width,
+          height: height,
+          contentAspectRatio: ratio,
         );
       }).toList();
+      _resetCropGeometry = false;
       if (!changed) return;
       // Dimensions are learned layout data, not a change to page identity.
       _restoring = true;
@@ -414,21 +448,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.background != widget.background ||
         oldWidget.dimPercent != widget.dimPercent ||
-        oldWidget.fit != widget.fit) {
-      // The zoom route is a sibling of the rebuilding Reader route. Publish
-      // after this frame rather than dirtying that sibling during its build.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _appearance.value = (
-          background: widget.background,
-          dimPercent: widget.dimPercent,
-          fit: widget.fit,
-        );
-      });
+        oldWidget.fit != widget.fit ||
+        oldWidget.cropBorders != widget.cropBorders) {
+      _publishAppearance();
     }
-    if (oldWidget.fit != widget.fit) {
+    if (oldWidget.fit != widget.fit ||
+        oldWidget.cropBorders != widget.cropBorders) {
       _restoring = true;
       _transform.value = Matrix4.identity();
+      _scheduleDimensions();
       _scheduleRestore();
     }
     _scheduler.setPaused(widget.paused);
@@ -449,8 +477,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (oldWidget.manifest.chapterKey != widget.manifest.chapterKey ||
           oldWidget.manifest.version != widget.manifest.version) {
         _learnedDimensions.clear();
+        _crops.clear();
+        _resetCropGeometry = true;
+        _publishAppearance();
       }
       _reader.updateManifest(widget.manifest);
+      _scheduleDimensions();
       _scheduleRestore();
     }
     if (oldWidget.doublePage != widget.doublePage ||
@@ -464,8 +496,89 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
     if (oldWidget.generation != widget.generation) {
       _learnedDimensions.clear();
+      _crops.clear();
+      _resetCropGeometry = true;
+      _publishAppearance();
+      _scheduleDimensions();
+      _scheduleRestore();
       _syncWindow();
     }
+  }
+
+  void _publishAppearance() {
+    // An open zoom route is a sibling; never dirty it in the Reader's build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _appearance.value = (
+        background: widget.background,
+        dimPercent: widget.dimPercent,
+        fit: widget.fit,
+        cropBorders: widget.cropBorders,
+        crops: Map.unmodifiable({
+          for (final id in _crops.keys)
+            if (_acceptedCrop(id) case final _ImageCrop crop) id: crop,
+        }),
+      );
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  _ImageCrop? _acceptedCrop(String id) {
+    final crop = _crops[id];
+    final dimensions = _scheduler.snapshot.dimensions[id];
+    return crop != null &&
+            dimensions?.width == crop.width &&
+            dimensions?.height == crop.height
+        ? crop
+        : null;
+  }
+
+  Rect _cropBounds(ReaderPage page) {
+    if (!widget.cropBorders) return _fullImage;
+    final resource = _scheduler.snapshot.resources[page.key];
+    return resource == null
+        ? _fullImage
+        : _acceptedCrop(resource.id)?.bounds ?? _fullImage;
+  }
+
+  void _acceptCrop(
+    String pageKey,
+    ImageResource expected,
+    ReaderImageCrop notification,
+  ) {
+    if (!widget.cropBorders ||
+        notification.resourceId != expected.id ||
+        expected.generation != widget.generation ||
+        !_validCrop(notification.bounds)) {
+      return;
+    }
+    final snapshot = _scheduler.snapshot;
+    final current = snapshot.resources[pageKey];
+    final dimensions = snapshot.dimensions[expected.id];
+    if (current?.id != expected.id ||
+        current?.generation != widget.generation ||
+        !_decodedResources.contains(expected.id) ||
+        dimensions?.width != notification.width ||
+        dimensions?.height != notification.height) {
+      return;
+    }
+    final crop = _ImageCrop(
+      notification.bounds,
+      notification.width,
+      notification.height,
+    );
+    final previous = _crops[expected.id];
+    if (previous?.bounds == crop.bounds &&
+        previous?.width == crop.width &&
+        previous?.height == crop.height) {
+      return;
+    }
+    _crops[expected.id] = crop;
+    _restoring = true;
+    _scheduleDimensions();
+    _scheduleRestore();
+    _publishAppearance();
+    setState(() {});
   }
 
   double get _leadingX => _reader.mode == ReadingMode.rightToLeft ? 1 : 0;
@@ -543,23 +656,34 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _decodedResources.contains(resource.id) &&
         dimensions != null &&
         page.width == dimensions.width &&
-        page.height == dimensions.height;
+        page.height == dimensions.height &&
+        (!widget.cropBorders || _acceptedCrop(resource.id) != null);
   }
 
-  ReadingPosition _positionInImage(_VisibleImage image, Offset point) =>
-      _reader.manifest.positionAt(
-        image.index,
-        offset: ((point.dy - image.rect.top) / image.rect.height).clamp(
-          0.0,
-          1.0,
-        ),
-        normalizedX: ((point.dx - image.rect.left) / image.rect.width).clamp(
-          0.0,
-          1.0,
-        ),
-        viewportX: (point.dx / _viewportWidth).clamp(0.0, 1.0),
-        viewportY: (point.dy / _viewportHeight).clamp(0.0, 1.0),
-      );
+  ReadingPosition _positionInImage(_VisibleImage image, Offset point) {
+    final crop = _cropBounds(_reader.manifest.pages[image.index]);
+    return _reader.manifest.positionAt(
+      image.index,
+      offset:
+          crop.top +
+          ((point.dy - image.rect.top) / image.rect.height).clamp(0.0, 1.0) *
+              crop.height,
+      normalizedX:
+          crop.left +
+          ((point.dx - image.rect.left) / image.rect.width).clamp(0.0, 1.0) *
+              crop.width,
+      viewportX: (point.dx / _viewportWidth).clamp(0.0, 1.0),
+      viewportY: (point.dy / _viewportHeight).clamp(0.0, 1.0),
+    );
+  }
+
+  Offset _pointWithinCrop(ReadingPosition anchor) {
+    final crop = _cropBounds(_reader.manifest.pages[anchor.pageIndexHint]);
+    return Offset(
+      ((anchor.normalizedX - crop.left) / crop.width).clamp(0.0, 1.0),
+      ((anchor.normalizedOffset - crop.top) / crop.height).clamp(0.0, 1.0),
+    );
+  }
 
   void _setViewportPosition(ReadingPosition position) {
     final previous = _reader.position;
@@ -583,9 +707,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
         .where((image) => image.index == anchor.pageIndexHint)
         .firstOrNull;
     if (image == null) return;
+    final normalized = _pointWithinCrop(anchor);
+    final crop = _cropBounds(_reader.manifest.pages[anchor.pageIndexHint]);
+    final original = Offset(
+      crop.left + crop.width * normalized.dx,
+      crop.top + crop.height * normalized.dy,
+    );
     final point = Offset(
-      image.rect.left + image.rect.width * anchor.normalizedX,
-      image.rect.top + image.rect.height * anchor.normalizedOffset,
+      image.rect.left + image.rect.width * normalized.dx,
+      image.rect.top + image.rect.height * normalized.dy,
     );
     if (!(Offset.zero & _viewport).inflate(1).contains(point)) {
       // A user may have panned before the first decoded frame. Only now can
@@ -596,8 +726,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _setViewportPosition(
       _reader.manifest.positionAt(
         anchor.pageIndexHint,
-        offset: anchor.normalizedOffset,
-        normalizedX: anchor.normalizedX,
+        offset: original.dy,
+        normalizedX: original.dx,
         viewportX: (point.dx / _viewportWidth).clamp(0.0, 1.0),
         viewportY: (point.dy / _viewportHeight).clamp(0.0, 1.0),
       ),
@@ -638,7 +768,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   double _restoreTop(ReadingPosition anchor) =>
       _offsets[anchor.pageIndexHint] +
       _pageHeight(_reader.manifest.pages[anchor.pageIndexHint]) *
-          anchor.normalizedOffset -
+          _pointWithinCrop(anchor).dy -
       _viewportHeight * anchor.viewportY;
 
   void _onHorizontalScroll() {
@@ -727,8 +857,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
             scene.size,
             _viewport,
             Offset(
-              rect.left + rect.width * anchor.normalizedX,
-              rect.top + rect.height * anchor.normalizedOffset,
+              rect.left + rect.width * _pointWithinCrop(anchor).dx,
+              rect.top + rect.height * _pointWithinCrop(anchor).dy,
             ),
             Offset(
               _viewportWidth * anchor.viewportX,
@@ -749,7 +879,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           if (horizontal != null && horizontal.hasClients) {
             final target =
                 math.max(0, (_viewportWidth - size.width) / 2) +
-                size.width * anchor.normalizedX -
+                size.width * _pointWithinCrop(anchor).dx -
                 _viewportWidth * anchor.viewportX;
             horizontal.jumpTo(
               target.clamp(0.0, horizontal.position.maxScrollExtent),
@@ -932,11 +1062,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
               }
               return true;
             },
-            child: PinnedReaderImage(
-              key: ValueKey('display-${resource.id}'),
-              pool: _resourcePool,
-              image: resource,
-              builder: (context) => widget.imageBuilder(context, resource, fit),
+            child: ReaderImageCropScope(
+              enabled: widget.cropBorders,
+              child: NotificationListener<ReaderImageCrop>(
+                onNotification: (notification) {
+                  _afterImageNotification(
+                    () => _acceptCrop(page.key, resource, notification),
+                  );
+                  return true;
+                },
+                child: _CroppedImage(
+                  bounds: _cropBounds(page),
+                  child: PinnedReaderImage(
+                    key: ValueKey('display-${resource.id}'),
+                    pool: _resourcePool,
+                    image: resource,
+                    builder: (context) =>
+                        widget.imageBuilder(context, resource, fit),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -1016,12 +1161,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
               }
               return true;
             },
-            child: _ZoomImageDialog(
-              resource: resource,
-              pool: pool,
-              imageBuilder: widget.imageBuilder,
-              appearance: _appearance,
-              aspectRatio: page.aspectRatio,
+            child: NotificationListener<ReaderImageCrop>(
+              onNotification: (notification) {
+                _afterImageNotification(() {
+                  if (!identical(scheduler, _scheduler)) return;
+                  _acceptCrop(page.key, resource, notification);
+                });
+                return true;
+              },
+              child: _ZoomImageDialog(
+                resource: resource,
+                pool: pool,
+                imageBuilder: widget.imageBuilder,
+                appearance: _appearance,
+                aspectRatio: page.originalAspectRatio,
+              ),
             ),
           ),
         ),
@@ -1445,6 +1599,52 @@ class _ContinuousImageState extends State<_ContinuousImage> {
   }
 }
 
+const _fullImage = Rect.fromLTRB(0, 0, 1, 1);
+
+final class _ImageCrop {
+  const _ImageCrop(this.bounds, this.width, this.height);
+  final Rect bounds;
+  final int width;
+  final int height;
+}
+
+bool _validCrop(Rect bounds) =>
+    [
+      bounds.left,
+      bounds.top,
+      bounds.right,
+      bounds.bottom,
+    ].every((value) => value.isFinite && value >= 0 && value <= 1) &&
+    bounds.width > 0 &&
+    bounds.height > 0;
+
+/// Repositions the same complete image under a clip. Its provider, encoded
+/// bytes, decoded frame and resource ownership are unchanged by trimming.
+class _CroppedImage extends StatelessWidget {
+  const _CroppedImage({required this.bounds, required this.child});
+  final Rect bounds;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => ClipRect(
+      child: SizedBox.expand(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: -constraints.maxWidth * bounds.left / bounds.width,
+              top: -constraints.maxHeight * bounds.top / bounds.height,
+              width: constraints.maxWidth / bounds.width,
+              height: constraints.maxHeight / bounds.height,
+              child: child,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 final class _VisibleImage {
   const _VisibleImage(this.index, this.rect, this.visible);
   final int index;
@@ -1602,6 +1802,7 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   Size? _viewport;
   _ReaderScene? _scene;
   ReaderFit? _fit;
+  Rect _crop = _fullImage;
   late double _aspectRatio = widget.aspectRatio;
   int _layoutEpoch = 0;
 
@@ -1623,15 +1824,27 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
     );
   }
 
-  Widget _content(ReaderFit fit, BoxConstraints constraints) {
+  Widget _content(_ReaderAppearance appearance, BoxConstraints constraints) {
+    final fit = appearance.fit;
+    final crop = appearance.cropBorders
+        ? appearance.crops[widget.resource.id]?.bounds ?? _fullImage
+        : _fullImage;
     final viewport = constraints.biggest;
     final scene = _spreadScene(
-      [ReaderPage(key: widget.resource.id, width: _aspectRatio, height: 1)],
+      [
+        ReaderPage(
+          key: widget.resource.id,
+          width: _aspectRatio,
+          height: 1,
+          contentAspectRatio: _aspectRatio * crop.width / crop.height,
+        ),
+      ],
       viewport,
       fit,
     );
     if (_viewport != viewport ||
         _fit != fit ||
+        _crop != crop ||
         _scene?.images[widget.resource.id] !=
             scene.images[widget.resource.id]) {
       final oldViewport = _viewport;
@@ -1645,8 +1858,12 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
           0.0.clamp(rect.top, rect.bottom),
         );
         normalized = Offset(
-          ((point.dx - rect.left) / rect.width).clamp(0.0, 1.0),
-          ((point.dy - rect.top) / rect.height).clamp(0.0, 1.0),
+          _crop.left +
+              ((point.dx - rect.left) / rect.width).clamp(0.0, 1.0) *
+                  _crop.width,
+          _crop.top +
+              ((point.dy - rect.top) / rect.height).clamp(0.0, 1.0) *
+                  _crop.height,
         );
         viewportPoint = Offset(
           (point.dx / oldViewport.width).clamp(0.0, 1.0),
@@ -1659,6 +1876,7 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
       _viewport = viewport;
       _scene = scene;
       _fit = fit;
+      _crop = crop;
       final epoch = ++_layoutEpoch;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || epoch != _layoutEpoch) return;
@@ -1667,8 +1885,12 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
           scene.size,
           viewport,
           Offset(
-            rect.left + rect.width * normalized.dx,
-            rect.top + rect.height * normalized.dy,
+            rect.left +
+                rect.width *
+                    ((normalized.dx - crop.left) / crop.width).clamp(0.0, 1.0),
+            rect.top +
+                rect.height *
+                    ((normalized.dy - crop.top) / crop.height).clamp(0.0, 1.0),
           ),
           Offset(
             viewport.width * viewportPoint.dx,
@@ -1692,25 +1914,31 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
           children: [
             Positioned.fromRect(
               rect: rect,
-              child: NotificationListener<ReaderImageDecoded>(
-                onNotification: (notification) {
-                  final ratio = notification.width / notification.height;
-                  if (notification.resourceId == widget.resource.id &&
-                      ratio != _aspectRatio) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) setState(() => _aspectRatio = ratio);
-                    });
-                    WidgetsBinding.instance.ensureVisualUpdate();
-                  }
-                  return false;
-                },
-                child: PinnedReaderImage(
-                  pool: widget.pool,
-                  image: widget.resource,
-                  builder: (context) => widget.imageBuilder(
-                    context,
-                    widget.resource,
-                    BoxFit.contain,
+              child: ReaderImageCropScope(
+                enabled: appearance.cropBorders,
+                child: _CroppedImage(
+                  bounds: crop,
+                  child: NotificationListener<ReaderImageDecoded>(
+                    onNotification: (notification) {
+                      final ratio = notification.width / notification.height;
+                      if (notification.resourceId == widget.resource.id &&
+                          ratio != _aspectRatio) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) setState(() => _aspectRatio = ratio);
+                        });
+                        WidgetsBinding.instance.ensureVisualUpdate();
+                      }
+                      return false;
+                    },
+                    child: PinnedReaderImage(
+                      pool: widget.pool,
+                      image: widget.resource,
+                      builder: (context) => widget.imageBuilder(
+                        context,
+                        widget.resource,
+                        BoxFit.contain,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1756,7 +1984,7 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
               dimPercent: appearance.dimPercent,
               child: LayoutBuilder(
                 builder: (context, constraints) =>
-                    _content(appearance.fit, constraints),
+                    _content(appearance, constraints),
               ),
             ),
           ),

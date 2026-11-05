@@ -223,6 +223,7 @@ const globalSettingsValues = {
     pageLayout: 'READER_PAGE_LAYOUT_AUTO',
     background: 'READER_BACKGROUND_BLACK',
     fit: 'READER_FIT_CONTAIN',
+    cropBorders: false,
     dimPercent: 0,
     tapZones: 'READER_INPUT_PRESET_STANDARD',
     keyboard: 'READER_INPUT_PRESET_STANDARD',
@@ -245,6 +246,7 @@ test('settings mutations require typed complete defaults and preserve per-field 
         pageLayout: 'READER_PAGE_LAYOUT_AUTO',
         dimPercent: 0,
         fit: 'READER_FIT_CONTAIN',
+        cropBorders: false,
       },
     },
   });
@@ -254,11 +256,13 @@ test('settings mutations require typed complete defaults and preserve per-field 
   expect(explicit.operation.value.overrides?.pageLayout).toBe(1);
   expect(explicit.operation.value.overrides?.dimPercent).toBe(0);
   expect(explicit.operation.value.overrides?.fit).toBe(1);
+  expect(explicit.operation.value.overrides?.cropBorders).toBe(false);
   const inherited = settingsMutationSchema.parse(manga);
   if (inherited.operation.case !== 'setManga')
     throw new Error('Missing manga settings');
   expect(inherited.operation.value.overrides?.dimPercent).toBeUndefined();
   expect(inherited.operation.value.overrides?.fit).toBeUndefined();
+  expect(inherited.operation.value.overrides?.cropBorders).toBeUndefined();
   for (const value of [
     base,
     { ...global, setManga: manga.setManga },
@@ -277,6 +281,11 @@ test('settings mutations require typed complete defaults and preserve per-field 
     { ...manga, setManga: { ...manga.setManga, overrides: { mode: 0 } } },
     { ...manga, setManga: { ...manga.setManga, overrides: { pageLayout: 4 } } },
     ...[
+      { cropBorders: 0 },
+      { cropBorders: 1 },
+      { cropBorders: 'false' },
+      { cropBorders: 'true' },
+      { cropBorders: {} },
       { fit: 0 },
       { fit: 4 },
       { fit: 1.5 },
@@ -328,6 +337,20 @@ test('settings replies verify the complete snapshot and effective defaults/overr
       mutationId: base.mutationId,
     }),
   ).not.toThrow();
+  const croppedDefaults = {
+    ...globalSettingsValues,
+    reader: { ...globalSettingsValues.reader, cropBorders: true },
+  };
+  expect(() =>
+    settingsResponseSchema.parse({
+      ...manga,
+      global: { ...defaults.global, values: croppedDefaults },
+      manga: {
+        ...manga.manga,
+        overrides: { mode: 'READER_MODE_RIGHT_TO_LEFT', cropBorders: false },
+      },
+    }),
+  ).not.toThrow();
   for (const value of [
     { ...defaults, global: undefined },
     { ...defaults, global: { revision: 4, values: globalSettingsValues } },
@@ -337,6 +360,7 @@ test('settings replies verify the complete snapshot and effective defaults/overr
     { ...manga, manga: { ...manga.manga, overrides: undefined } },
     { ...manga, effectiveReader: globalSettingsValues.reader },
     ...[
+      { cropBorders: true },
       { fit: 'READER_FIT_WIDTH' },
       { background: 'READER_BACKGROUND_WHITE' },
       { dimPercent: 1 },

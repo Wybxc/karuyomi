@@ -35,6 +35,7 @@ final class _Account {
         pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
         background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
         fit: wire.ReaderFit.READER_FIT_CONTAIN,
+        cropBorders: false,
         tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
         keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
       ),
@@ -394,6 +395,9 @@ final class TestBusinessServer implements ApiFetch {
             ? overrides!.pageLayout
             : defaults.pageLayout,
         fit: overrides?.hasFit() == true ? overrides!.fit : defaults.fit,
+        cropBorders: overrides?.hasCropBorders() == true
+            ? overrides!.cropBorders
+            : defaults.cropBorders,
         background: overrides?.hasBackground() == true
             ? overrides!.background
             : defaults.background,

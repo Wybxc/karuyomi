@@ -727,7 +727,9 @@ function validateSettingsResponse(value: {
         value.effectiveReader.keyboard ===
           (value.manga?.overrides?.keyboard ?? defaults?.keyboard) &&
         value.effectiveReader.fit ===
-          (value.manga?.overrides?.fit ?? defaults?.fit),
+          (value.manga?.overrides?.fit ?? defaults?.fit) &&
+        value.effectiveReader.cropBorders ===
+          (value.manga?.overrides?.cropBorders ?? defaults?.cropBorders),
       'Effective reader settings do not match their defaults and overrides',
     );
   }

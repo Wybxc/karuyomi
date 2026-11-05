@@ -18,7 +18,7 @@
 
 当前图片交付已收敛为 Source 处理后的不透明编码资源，由 Flutter/UI 直接解码；工程回归、诊断性原 xkcd 阅读/恢复和默认关闭的计时采集入口见[UI 图片边界](verification/ui-image-boundary.md)。采集入口尚未取得正式性能数据，长图、真机与进程/GPU 门保持未通过。历史[编码页记录](verification/encoded-image-ownership.md)和[图片页控制记录](verification/image-page-controls.md)保留原输入与范围；其 host 编码页/tile 合同已退出当前产品路径。
 
-2026-11-06，现有三项非敏感设置的协议、D1、API 与正式 Flutter UI 已接入：全局主题、四种阅读模式、AUTO/SINGLE/DOUBLE 页组及逐字段漫画覆盖。独立作用域 CAS、原子确认快照、幂等、继承和清空覆盖的后端分项通过；客户端/集中工程检查已通过；结果及仍待验收的实际跨端、生产和真机门分别维护在[设置记录](verification/reader-settings.md)。完整 P1 的适宽/适高、裁白、背景/亮度与可配置输入仍未实现。
+2026-11-06，现有三项非敏感设置的协议、D1、API 与正式 Flutter UI 已接入：全局主题、四种阅读模式、AUTO/SINGLE/DOUBLE 页组及逐字段漫画覆盖。独立作用域 CAS、原子确认快照、幂等、继承和清空覆盖的后端分项通过；客户端/集中工程检查已通过；结果及仍待验收的实际跨端、生产和真机门分别维护在[设置记录](verification/reader-settings.md)。背景/亮度与可配置输入、适宽/适高及裁白随后已实现，分别见[外观记录](verification/reader-appearance.md)、[适配记录](verification/reader-fit.md)和[裁白记录](verification/reader-crop.md)；独立客户端与设备门分别维护。
 
 ## 工程与代码验证
 
@@ -275,6 +275,8 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 阅读外观与输入预设沿用正式设置确认链路，协议与真实 D1、受控数据/组件以及实际平台证据分别记录，见[本轮设置记录](verification/reader-appearance.md)。
 
 完整显示/适宽/适高与原图二维位置、视口锚沿同一正式设置和进度链路实现，协议、真实 D1、受控客户端及平台门分别见[适配记录](verification/reader-fit.md)。
+
+同步裁白已接入同一正式设置链路，真实 PNG 的 Flutter 解码与默认 Reader 路径、资源所有权及独立平台限制见[裁白记录](verification/reader-crop.md)。
 
 ## 尚未通过的门槛
 

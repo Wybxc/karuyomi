@@ -1076,6 +1076,7 @@ function mangaSettings(
     pageLayout?: ReaderPageLayout;
     background?: ReaderBackground;
     fit?: ReaderFit;
+    cropBorders?: boolean;
     dimPercent?: number;
     tapZones?: ReaderInputPreset;
     keyboard?: ReaderInputPreset;
@@ -1178,7 +1179,7 @@ test('settings reads do not write, defaults inherit per field, and clearing over
   ).toBe(3);
 });
 
-test('appearance and fit preferences preserve explicit zero, inherit all fields and reject invalid writes without touching reading state', async () => {
+test('reader preferences preserve explicit zero and false, inherit all fields and reject invalid writes without touching reading state', async () => {
   const reader = await client();
   const command = favorite();
   const key = command.mangaKey;
@@ -1189,6 +1190,7 @@ test('appearance and fit preferences preserve explicit zero, inherit all fields 
   expect(defaults.effectiveReader).toMatchObject({
     background: ReaderBackground.BLACK,
     fit: ReaderFit.CONTAIN,
+    cropBorders: false,
     dimPercent: 0,
     tapZones: ReaderInputPreset.STANDARD,
     keyboard: ReaderInputPreset.STANDARD,
@@ -1199,6 +1201,7 @@ test('appearance and fit preferences preserve explicit zero, inherit all fields 
   Object.assign(global.operation.value.reader, {
     background: ReaderBackground.THEME,
     fit: ReaderFit.WIDTH,
+    cropBorders: true,
     dimPercent: 80,
     tapZones: ReaderInputPreset.REVERSED,
     keyboard: ReaderInputPreset.DISABLED,
@@ -1207,6 +1210,7 @@ test('appearance and fit preferences preserve explicit zero, inherit all fields 
   const overrides = mangaSettings(key, 0, {
     background: ReaderBackground.WHITE,
     fit: ReaderFit.CONTAIN,
+    cropBorders: false,
     dimPercent: 0,
     tapZones: ReaderInputPreset.DISABLED,
     keyboard: ReaderInputPreset.REVERSED,
@@ -1216,12 +1220,14 @@ test('appearance and fit preferences preserve explicit zero, inherit all fields 
   expect(saved.body.effectiveReader).toMatchObject({
     background: ReaderBackground.WHITE,
     fit: ReaderFit.CONTAIN,
+    cropBorders: false,
     dimPercent: 0,
     tapZones: ReaderInputPreset.DISABLED,
     keyboard: ReaderInputPreset.REVERSED,
   });
   expect(saved.body.manga?.overrides?.dimPercent).toBe(0);
   expect(saved.body.manga?.overrides?.fit).toBe(ReaderFit.CONTAIN);
+  expect(saved.body.manga?.overrides?.cropBorders).toBe(false);
   expect((await reader.mutateSettings(overrides)).body).toEqual(saved.body);
   const preserved = await reader.state(key, 'chapter-1');
   expect(preserved.manga).toEqual(before.manga);
@@ -1229,9 +1235,15 @@ test('appearance and fit preferences preserve explicit zero, inherit all fields 
   const cleared = await reader.mutateSettings(mangaSettings(key, 1));
   expect(cleared.body.manga?.overrides?.dimPercent).toBeUndefined();
   expect(cleared.body.manga?.overrides?.fit).toBeUndefined();
+  expect(cleared.body.manga?.overrides?.cropBorders).toBeUndefined();
   expect(cleared.body.effectiveReader).toEqual(global.operation.value.reader);
   const revision = cleared.body.accountRevision;
   for (const invalid of [
+    { cropBorders: 0 },
+    { cropBorders: 1 },
+    { cropBorders: 'false' },
+    { cropBorders: 'true' },
+    { cropBorders: {} },
     { fit: 0 },
     { fit: 4 },
     { fit: 1.5 },

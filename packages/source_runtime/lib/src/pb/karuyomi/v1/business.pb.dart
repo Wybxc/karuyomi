@@ -2931,6 +2931,7 @@ class ReaderSettings extends $pb.GeneratedMessage {
     ReaderInputPreset? tapZones,
     ReaderInputPreset? keyboard,
     ReaderFit? fit,
+    $core.bool? cropBorders,
   }) {
     final result = ReaderSettings._();
     if (mode != null) result.mode = mode;
@@ -2940,6 +2941,7 @@ class ReaderSettings extends $pb.GeneratedMessage {
     if (tapZones != null) result.tapZones = tapZones;
     if (keyboard != null) result.keyboard = keyboard;
     if (fit != null) result.fit = fit;
+    if (cropBorders != null) result.cropBorders = cropBorders;
     return result;
   }
 
@@ -2969,6 +2971,7 @@ class ReaderSettings extends $pb.GeneratedMessage {
         enumValues: ReaderInputPreset.values)
     ..aE<ReaderFit>(7, _omitFieldNames ? '' : 'fit',
         enumValues: ReaderFit.values)
+    ..aOB(8, _omitFieldNames ? '' : 'cropBorders')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3056,6 +3059,15 @@ class ReaderSettings extends $pb.GeneratedMessage {
   $core.bool hasFit() => $_has(6);
   @$pb.TagNumber(7)
   void clearFit() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get cropBorders => $_getBF(7);
+  @$pb.TagNumber(8)
+  set cropBorders($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCropBorders() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCropBorders() => $_clearField(8);
 }
 
 /// Missing fields inherit the global reader preference. AUTO is an explicit
@@ -3069,6 +3081,7 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
     ReaderInputPreset? tapZones,
     ReaderInputPreset? keyboard,
     ReaderFit? fit,
+    $core.bool? cropBorders,
   }) {
     final result = ReaderSettingsOverride._();
     if (mode != null) result.mode = mode;
@@ -3078,6 +3091,7 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
     if (tapZones != null) result.tapZones = tapZones;
     if (keyboard != null) result.keyboard = keyboard;
     if (fit != null) result.fit = fit;
+    if (cropBorders != null) result.cropBorders = cropBorders;
     return result;
   }
 
@@ -3107,6 +3121,7 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
         enumValues: ReaderInputPreset.values)
     ..aE<ReaderFit>(7, _omitFieldNames ? '' : 'fit',
         enumValues: ReaderFit.values)
+    ..aOB(8, _omitFieldNames ? '' : 'cropBorders')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3195,6 +3210,15 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
   $core.bool hasFit() => $_has(6);
   @$pb.TagNumber(7)
   void clearFit() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get cropBorders => $_getBF(7);
+  @$pb.TagNumber(8)
+  set cropBorders($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCropBorders() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCropBorders() => $_clearField(8);
 }
 
 class GlobalSettingsValues extends $pb.GeneratedMessage {

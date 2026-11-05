@@ -259,6 +259,7 @@ const globalReader: JsonObject = {
   tapZones: 'READER_INPUT_PRESET_REVERSED',
   keyboard: 'READER_INPUT_PRESET_STANDARD',
   fit: 'READER_FIT_WIDTH',
+  cropBorders: true,
 };
 const globalSettingsValues: JsonObject = {
   theme: 'APP_THEME_SYSTEM',
@@ -269,6 +270,7 @@ const readerOverrides: JsonObject = {
   dimPercent: 0,
   keyboard: 'READER_INPUT_PRESET_DISABLED',
   fit: 'READER_FIT_CONTAIN',
+  cropBorders: false,
 };
 const settingsSnapshot: JsonObject = {
   schemaVersion: 1,

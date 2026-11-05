@@ -1067,6 +1067,7 @@ const ReaderSettings$json = {
       '6': '.karuyomi.v1.ReaderFit',
       '10': 'fit'
     },
+    {'1': 'crop_borders', '3': 8, '4': 1, '5': 8, '10': 'cropBorders'},
   ],
 };
 
@@ -1078,7 +1079,8 @@ final $typed_data.Uint8List readerSettingsDescriptor = $convert.base64Decode(
     'JhY2tncm91bmRSCmJhY2tncm91bmQSHwoLZGltX3BlcmNlbnQYBCABKA1SCmRpbVBlcmNlbnQS'
     'OwoJdGFwX3pvbmVzGAUgASgOMh4ua2FydXlvbWkudjEuUmVhZGVySW5wdXRQcmVzZXRSCHRhcF'
     'pvbmVzEjoKCGtleWJvYXJkGAYgASgOMh4ua2FydXlvbWkudjEuUmVhZGVySW5wdXRQcmVzZXRS'
-    'CGtleWJvYXJkEigKA2ZpdBgHIAEoDjIWLmthcnV5b21pLnYxLlJlYWRlckZpdFIDZml0');
+    'CGtleWJvYXJkEigKA2ZpdBgHIAEoDjIWLmthcnV5b21pLnYxLlJlYWRlckZpdFIDZml0EiEKDG'
+    'Nyb3BfYm9yZGVycxgIIAEoCFILY3JvcEJvcmRlcnM=');
 
 @$core.Deprecated('Use readerSettingsOverrideDescriptor instead')
 const ReaderSettingsOverride$json = {
@@ -1153,6 +1155,15 @@ const ReaderSettingsOverride$json = {
       '10': 'fit',
       '17': true
     },
+    {
+      '1': 'crop_borders',
+      '3': 8,
+      '4': 1,
+      '5': 8,
+      '9': 7,
+      '10': 'cropBorders',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_mode'},
@@ -1162,6 +1173,7 @@ const ReaderSettingsOverride$json = {
     {'1': '_tap_zones'},
     {'1': '_keyboard'},
     {'1': '_fit'},
+    {'1': '_crop_borders'},
   ],
 };
 
@@ -1174,9 +1186,10 @@ final $typed_data.Uint8List readerSettingsOverrideDescriptor = $convert.base64De
     'Y2VudBgEIAEoDUgDUgpkaW1QZXJjZW50iAEBEkAKCXRhcF96b25lcxgFIAEoDjIeLmthcnV5b2'
     '1pLnYxLlJlYWRlcklucHV0UHJlc2V0SARSCHRhcFpvbmVziAEBEj8KCGtleWJvYXJkGAYgASgO'
     'Mh4ua2FydXlvbWkudjEuUmVhZGVySW5wdXRQcmVzZXRIBVIIa2V5Ym9hcmSIAQESLQoDZml0GA'
-    'cgASgOMhYua2FydXlvbWkudjEuUmVhZGVyRml0SAZSA2ZpdIgBAUIHCgVfbW9kZUIOCgxfcGFn'
-    'ZV9sYXlvdXRCDQoLX2JhY2tncm91bmRCDgoMX2RpbV9wZXJjZW50QgwKCl90YXBfem9uZXNCCw'
-    'oJX2tleWJvYXJkQgYKBF9maXQ=');
+    'cgASgOMhYua2FydXlvbWkudjEuUmVhZGVyRml0SAZSA2ZpdIgBARImCgxjcm9wX2JvcmRlcnMY'
+    'CCABKAhIB1ILY3JvcEJvcmRlcnOIAQFCBwoFX21vZGVCDgoMX3BhZ2VfbGF5b3V0Qg0KC19iYW'
+    'NrZ3JvdW5kQg4KDF9kaW1fcGVyY2VudEIMCgpfdGFwX3pvbmVzQgsKCV9rZXlib2FyZEIGCgRf'
+    'Zml0Qg8KDV9jcm9wX2JvcmRlcnM=');
 
 @$core.Deprecated('Use globalSettingsValuesDescriptor instead')
 const GlobalSettingsValues$json = {

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
@@ -11,6 +13,9 @@ import 'package:karuyomi/features/reader/resource_image.dart';
 import 'package:reader_core/reader_core.dart';
 
 final class FixturePageProvider implements PageProvider {
+  FixturePageProvider({this.location, this.byteLength = 100});
+  final Uri? location;
+  final int byteLength;
   final acquired = <PageRef>[];
   final released = <String>[];
   final cancelled = <String>[];
@@ -21,8 +26,10 @@ final class FixturePageProvider implements PageProvider {
     return ImageResource(
       id: '${ref.generation}-${ref.pageKey}',
       generation: ref.generation,
-      location: Uri.parse('https://processed-fixture.invalid/${ref.pageKey}'),
-      byteLength: 100,
+      location:
+          location ??
+          Uri.parse('https://processed-fixture.invalid/${ref.pageKey}'),
+      byteLength: byteLength,
     );
   }
 
@@ -91,6 +98,8 @@ Widget screen({
   Widget? chapterControls,
   bool layoutSettingsEnabled = true,
   ReaderFit fit = ReaderFit.contain,
+  bool cropBorders = false,
+  String generation = 'runtime-1',
   ValueListenable<ReadingPosition?>? positionRequest,
   ReaderBackground background = ReaderBackground.black,
   int dimPercent = 0,
@@ -100,13 +109,14 @@ Widget screen({
   home: ReaderScreen(
     manifest: manifest,
     provider: provider,
-    generation: 'runtime-1',
+    generation: generation,
     initialPosition: position,
     initialMode: mode,
     doublePage: doublePage,
     chapterControls: chapterControls,
     layoutSettingsEnabled: layoutSettingsEnabled,
     fit: fit,
+    cropBorders: cropBorders,
     positionRequest: positionRequest,
     background: background,
     dimPercent: dimPercent,
@@ -121,6 +131,26 @@ Widget screen({
   ),
 );
 
+void expectOriginalImageAnchor(
+  WidgetTester tester,
+  ReadingPosition anchor,
+  Finder viewport, {
+  String generation = 'runtime-1',
+}) {
+  final original = tester.getRect(
+    find.byKey(ValueKey('$generation-${anchor.pageKey}')),
+  );
+  final bounds = tester.getRect(viewport);
+  expect(
+    original.left + original.width * anchor.normalizedX,
+    closeTo(bounds.left + bounds.width * anchor.viewportX, 1),
+  );
+  expect(
+    original.top + original.height * anchor.normalizedOffset,
+    closeTo(bounds.top + bounds.height * anchor.viewportY, 1),
+  );
+}
+
 bool? pageLayoutPreference(WidgetTester tester) => tester
     .widget<SegmentedButton<bool?>>(
       find.byKey(const ValueKey('reader-page-layout')),
@@ -129,6 +159,483 @@ bool? pageLayoutPreference(WidgetTester tester) => tester
     .single;
 
 void main() {
+  testWidgets(
+    'default reader image pipeline trims actual file pixels and preserves original anchors',
+    (tester) async {
+      final bitmap = img.Image(width: 80, height: 100, numChannels: 4);
+      img.fill(bitmap, color: img.ColorRgba8(255, 255, 255, 255));
+      img.fillRect(
+        bitmap,
+        x1: 20,
+        y1: 25,
+        x2: 59,
+        y2: 74,
+        color: img.ColorRgba8(20, 40, 80, 255),
+      );
+      final bytes = img.encodePng(bitmap);
+      final directory = (await tester.runAsync(
+        () => Directory.systemTemp.createTemp('karuyomi-reader-crop-'),
+      ))!;
+      final file = File('${directory.path}/page.png');
+      final manifest = ChapterManifest(
+        chapterKey: 'actual-crop',
+        version: '1',
+        pages: [ReaderPage(key: 'page')],
+      );
+      final provider = FixturePageProvider(
+        location: file.uri,
+        byteLength: bytes.length,
+      );
+      final viewports = <ReaderViewportState>[];
+      try {
+        await tester.runAsync(() => file.writeAsBytes(bytes));
+        await tester.pumpWidget(
+          screen(
+            provider: provider,
+            manifest: manifest,
+            cropBorders: true,
+            imageBuilder: buildResourceImage,
+            onViewport: viewports.add,
+          ),
+        );
+        final timeout = Stopwatch()..start();
+        while ((viewports.isEmpty || !viewports.last.windowReady) &&
+            timeout.elapsed < const Duration(seconds: 5)) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        await tester.pumpAndSettle();
+        expect(viewports.last.windowReady, true);
+        expect(viewports.last.atEnd, true);
+        expect(viewports.last.observed!.normalizedOffset, closeTo(.77, .001));
+        expect(viewports.last.observed!.normalizedX, closeTo(.775, .001));
+        final anchor = viewports.last.current;
+        expect(anchor.normalizedOffset, closeTo(.23, .001));
+        expect(anchor.normalizedX, closeTo(.225, .001));
+        expect(provider.acquired, hasLength(1));
+        await tester.pumpWidget(
+          screen(
+            provider: provider,
+            manifest: manifest,
+            cropBorders: false,
+            imageBuilder: buildResourceImage,
+            onViewport: viewports.add,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(viewports.last.windowReady, true);
+        expect(viewports.last.observed!.normalizedOffset, 1);
+        expect(viewports.last.observed!.normalizedX, 1);
+        expect(
+          viewports.last.current.normalizedOffset,
+          closeTo(anchor.normalizedOffset, .001),
+        );
+        expect(
+          viewports.last.current.normalizedX,
+          closeTo(anchor.normalizedX, .001),
+        );
+        expect(provider.acquired, hasLength(1));
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await FileImage(file).evict();
+        await tester.runAsync(() => directory.delete(recursive: true));
+      }
+      expect(provider.released, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'late crop bounds gate observation, preserve original anchors and finish at content end',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'long', width: 600, height: 3600)],
+      );
+      final viewports = <ReaderViewportState>[];
+      BuildContext? imageContext;
+      Widget configured(bool crop) => screen(
+        provider: provider,
+        manifest: manifest,
+        cropBorders: crop,
+        fit: ReaderFit.width,
+        onViewport: viewports.add,
+        imageBuilder: (context, resource, fit) {
+          imageContext = context;
+          ReaderImageDecoded(
+            resource.id,
+            width: 600,
+            height: 3600,
+          ).dispatch(context);
+          return fixtureImage(context, resource, fit);
+        },
+      );
+      await tester.pumpWidget(configured(true));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.windowReady, false);
+      expect(viewports.last.atEnd, false);
+      ReaderImageCrop(
+        'runtime-1-long',
+        bounds: const Rect.fromLTRB(.1, .25, .9, .75),
+        width: 600,
+        height: 3600,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNotNull);
+      expect(viewports.last.windowReady, true);
+      expect(viewports.last.current.normalizedX, closeTo(.1, .001));
+      expect(viewports.last.current.normalizedOffset, closeTo(.25, .001));
+      expect(viewports.last.atEnd, false);
+      final viewer = find.byType(InteractiveViewer);
+      expectOriginalImageAnchor(tester, viewports.last.current, viewer);
+      await tester.drag(viewer, const Offset(0, -150));
+      await tester.pumpAndSettle();
+      expectOriginalImageAnchor(tester, viewports.last.current, viewer);
+      final image = tester.getRect(
+        find.byKey(const ValueKey('image-rect-long')),
+      );
+      final bounds = tester.getRect(viewer);
+      final controller = tester
+          .widget<InteractiveViewer>(viewer)
+          .transformationController!;
+      final matrix = controller.value.clone();
+      matrix.setEntry(1, 3, matrix.entry(1, 3) + bounds.bottom - image.bottom);
+      controller.value = matrix;
+      await tester.pumpAndSettle();
+      expect(viewports.last.atEnd, true);
+      expect(viewports.last.observed!.normalizedOffset, closeTo(.75, .001));
+      final current = viewports.last.current;
+      await tester.pumpWidget(configured(false));
+      await tester.pumpAndSettle();
+      expect(
+        viewports.last.current.normalizedX,
+        closeTo(current.normalizedX, .001),
+      );
+      expect(
+        viewports.last.current.normalizedOffset,
+        closeTo(current.normalizedOffset, .001),
+      );
+      expectOriginalImageAnchor(tester, viewports.last.current, viewer);
+      expect(viewports.last.atEnd, false);
+      expect(provider.acquired.length, 1);
+      expect(provider.released, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(provider.released, ['runtime-1-long']);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'crop aspect ratio regroups RTL pages without changing original decode dimensions',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [
+          for (var index = 0; index < 3; index++)
+            ReaderPage(key: 'page-$index', width: 1200, height: 600),
+        ],
+      );
+      final viewports = <ReaderViewportState>[];
+      Widget configured(bool crop) => screen(
+        provider: provider,
+        manifest: manifest,
+        cropBorders: crop,
+        fit: ReaderFit.height,
+        mode: ReadingMode.rightToLeft,
+        doublePage: true,
+        onViewport: viewports.add,
+        imageBuilder: (context, resource, fit) {
+          ReaderImageDecoded(
+            resource.id,
+            width: 1200,
+            height: 600,
+          ).dispatch(context);
+          ReaderImageCrop(
+            resource.id,
+            bounds: const Rect.fromLTRB(.3, 0, .7, 1),
+            width: 1200,
+            height: 600,
+          ).dispatch(context);
+          return fixtureImage(context, resource, fit);
+        },
+      );
+      await tester.pumpWidget(configured(true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('下一页'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('下一页'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('spread-page-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('image-rect-page-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('image-rect-page-2')), findsOneWidget);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('image-rect-page-1'))).left,
+        greaterThan(
+          tester.getRect(find.byKey(const ValueKey('image-rect-page-2'))).left,
+        ),
+      );
+      final viewer = find.byType(InteractiveViewer);
+      expectOriginalImageAnchor(tester, viewports.last.current, viewer);
+      tester.widget<InteractiveViewer>(viewer).transformationController!.value =
+          Matrix4.identity();
+      await tester.pumpAndSettle();
+      expect(viewports.last.atEnd, true);
+      expect(viewports.last.observed!.normalizedX, closeTo(.3, .001));
+      expect(viewports.last.observed!.pageKey, 'page-2');
+      final activeAcquires = provider.acquired
+          .where((page) => page.pageKey != 'page-0')
+          .length;
+      await tester.pumpWidget(configured(false));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('spread-page-2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('image-rect-page-1')), findsNothing);
+      expect(viewports.last.observed, isNotNull);
+      // Regrouping changes whether the cover belongs to the adjacent prefetch
+      // window; the two displayed resources themselves must not be reacquired.
+      expect(
+        provider.acquired.where((page) => page.pageKey != 'page-0').length,
+        activeAcquires,
+      );
+      expect(provider.acquired.map((page) => page.pageKey).toSet(), {
+        'page-0',
+        'page-1',
+        'page-2',
+      });
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(provider.released.toSet().length, 3);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'crop in continuous and zoom keeps original 2D points across live settings and resize',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      var activeProvider = provider;
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'page-0')],
+      );
+      final anchor = manifest.positionAt(
+        0,
+        offset: .6,
+        normalizedX: .7,
+        viewportX: .3,
+        viewportY: .4,
+      );
+      final viewports = <ReaderViewportState>[];
+      Widget configured(bool crop, ReadingMode mode, ReaderFit fit) => screen(
+        provider: activeProvider,
+        manifest: manifest,
+        position: anchor,
+        cropBorders: crop,
+        mode: mode,
+        fit: fit,
+        onViewport: viewports.add,
+        imageBuilder: (context, resource, fit) {
+          ReaderImageDecoded(
+            resource.id,
+            width: 900,
+            height: 1200,
+          ).dispatch(context);
+          ReaderImageCrop(
+            resource.id,
+            bounds: const Rect.fromLTRB(.1, .2, .9, .8),
+            width: 900,
+            height: 1200,
+          ).dispatch(context);
+          return fixtureImage(context, resource, fit);
+        },
+      );
+      await tester.pumpWidget(
+        configured(true, ReadingMode.continuous, ReaderFit.height),
+      );
+      await tester.pumpAndSettle();
+      final list = find.byKey(const ValueKey('continuous-reader'));
+      expect(viewports.last.current.normalizedX, closeTo(.7, .001));
+      expect(viewports.last.current.normalizedOffset, closeTo(.6, .001));
+      expectOriginalImageAnchor(tester, viewports.last.current, list);
+      await tester.pumpWidget(
+        configured(true, ReadingMode.webtoon, ReaderFit.width),
+      );
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(700, 500);
+      await tester.pumpAndSettle();
+      expect(viewports.last.current.normalizedX, closeTo(.7, .001));
+      expect(viewports.last.current.normalizedOffset, closeTo(.6, .001));
+      expectOriginalImageAnchor(tester, viewports.last.current, list);
+      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.pumpAndSettle();
+      final dialog = find.byType(Dialog);
+      final original = find.descendant(
+        of: dialog,
+        matching: find.byKey(const ValueKey('runtime-1-page-0')),
+      );
+      final croppedWidth = tester.getRect(original).width;
+      final acquired = provider.acquired.length;
+      await tester.pumpWidget(
+        configured(false, ReadingMode.webtoon, ReaderFit.width),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(original).width, lessThan(croppedWidth));
+      await tester.pumpWidget(
+        configured(true, ReadingMode.webtoon, ReaderFit.width),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(original).width, closeTo(croppedWidth, 1));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(viewports.last.current.normalizedX, closeTo(.7, .001));
+      expect(viewports.last.current.normalizedOffset, closeTo(.6, .001));
+      expectOriginalImageAnchor(tester, viewports.last.current, list);
+      expect(provider.acquired.length, acquired);
+      expect(provider.released, isEmpty);
+      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.pumpAndSettle();
+      final oldImageContext = tester.element(original);
+      final replacement = FixturePageProvider();
+      activeProvider = replacement;
+      await tester.pumpWidget(
+        configured(true, ReadingMode.webtoon, ReaderFit.width),
+      );
+      await tester.pumpAndSettle();
+      final contentSize = tester.getSize(
+        find.byKey(const ValueKey('image-rect-page-0')),
+      );
+      ReaderImageCrop(
+        'runtime-1-page-0',
+        bounds: const Rect.fromLTRB(.2, .3, .8, .7),
+        width: 900,
+        height: 1200,
+      ).dispatch(oldImageContext);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byKey(const ValueKey('image-rect-page-0'))),
+        contentSize,
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(provider.released, ['runtime-1-page-0']);
+      expect(replacement.acquired.length, 1);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(provider.released.length, 1);
+      expect(replacement.released, ['runtime-1-page-0']);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'invalid, stale-size and old-generation crops never make pending images observable',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'page-0', width: 600, height: 900)],
+      );
+      final viewports = <ReaderViewportState>[];
+      BuildContext? imageContext;
+      Widget configured(String generation) => screen(
+        provider: provider,
+        manifest: manifest,
+        generation: generation,
+        cropBorders: true,
+        onViewport: viewports.add,
+        imageBuilder: (context, resource, fit) {
+          imageContext = context;
+          ReaderImageDecoded(
+            resource.id,
+            width: 600,
+            height: 900,
+          ).dispatch(context);
+          return fixtureImage(context, resource, fit);
+        },
+      );
+      await tester.pumpWidget(configured('runtime-1'));
+      await tester.pumpAndSettle();
+      for (final bounds in [
+        const Rect.fromLTRB(-.1, 0, 1, 1),
+        const Rect.fromLTRB(0, 0, 0, 1),
+        Rect.fromLTRB(double.nan, 0, 1, 1),
+      ]) {
+        ReaderImageCrop(
+          'runtime-1-page-0',
+          bounds: bounds,
+          width: 600,
+          height: 900,
+        ).dispatch(imageContext!);
+      }
+      ReaderImageCrop(
+        'runtime-1-page-0',
+        bounds: const Rect.fromLTRB(.1, .1, .9, .9),
+        width: 300,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.windowReady, false);
+      ReaderImageCrop(
+        'runtime-1-page-0',
+        bounds: const Rect.fromLTRB(0, 0, 1, 1),
+        width: 600,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.atEnd, true);
+      await tester.pumpWidget(configured('runtime-2'));
+      await tester.pumpAndSettle();
+      ReaderImageCrop(
+        'runtime-1-page-0',
+        bounds: const Rect.fromLTRB(.1, .1, .9, .9),
+        width: 600,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      expect(viewports.last.atEnd, false);
+      ReaderImageCrop(
+        'runtime-2-page-0',
+        bounds: const Rect.fromLTRB(0, 0, 1, 1),
+        width: 600,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.windowReady, true);
+      expect(viewports.last.atEnd, true);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(provider.released.toSet(), {
+        'runtime-1-page-0',
+        'runtime-2-page-0',
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'width reaches the true long-image end and same-effective layout edits keep observing',
     (tester) async {

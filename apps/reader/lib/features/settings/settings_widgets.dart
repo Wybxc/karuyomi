@@ -388,6 +388,29 @@ class _GlobalSettingsPanelState extends State<GlobalSettingsPanel> {
                     }
                   : null,
             ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<bool>(
+              key: ValueKey(('global-crop-borders', draft.reader.cropBorders)),
+              initialValue: draft.reader.cropBorders,
+              decoration: const InputDecoration(
+                labelText: '裁白',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: false, child: Text('关闭')),
+                DropdownMenuItem(value: true, child: Text('开启')),
+              ],
+              onChanged: controller.canEdit
+                  ? (value) {
+                      if (value != null) {
+                        setState(() {
+                          _dirty = true;
+                          draft.reader.cropBorders = value;
+                        });
+                      }
+                    }
+                  : null,
+            ),
             _ReaderAppearanceFields(
               scope: 'global',
               enabled: controller.canEdit,
@@ -585,6 +608,36 @@ class _MangaSettingsEditorState extends State<MangaSettingsEditor> {
                             draft.clearFit();
                           } else {
                             draft.fit = value;
+                          }
+                        })
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<bool>(
+                  key: ValueKey((
+                    'manga-crop-borders',
+                    draft.hasCropBorders() ? draft.cropBorders : null,
+                  )),
+                  initialValue: draft.hasCropBorders()
+                      ? draft.cropBorders
+                      : null,
+                  hint: const Text('跟随全局'),
+                  decoration: const InputDecoration(
+                    labelText: '裁白',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('跟随全局')),
+                    DropdownMenuItem(value: false, child: Text('关闭')),
+                    DropdownMenuItem(value: true, child: Text('开启')),
+                  ],
+                  onChanged: controller.canEdit
+                      ? (value) => setState(() {
+                          _dirty = true;
+                          if (value == null) {
+                            draft.clearCropBorders();
+                          } else {
+                            draft.cropBorders = value;
                           }
                         })
                       : null,

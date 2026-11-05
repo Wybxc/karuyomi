@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:karuyomi/features/reader/resource_image.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:reader_core/reader_core.dart';
@@ -53,12 +54,18 @@ Widget image({
   required List<ReaderImageDecoded> decoded,
   required List<ReaderImageFailed> failures,
   ReaderBaselineRecorder? baseline,
+  bool cropBorders = false,
+  List<ReaderImageCrop>? crops,
+  List<ReaderImageCropWork>? works,
 }) => baseline == null
     ? imageContent(
         resource: resource,
         provider: provider,
         decoded: decoded,
         failures: failures,
+        cropBorders: cropBorders,
+        crops: crops,
+        works: works,
       )
     : ReaderBaselineScope(
         recorder: baseline,
@@ -67,6 +74,9 @@ Widget image({
           provider: provider,
           decoded: decoded,
           failures: failures,
+          cropBorders: cropBorders,
+          crops: crops,
+          works: works,
         ),
       );
 
@@ -75,22 +85,38 @@ Widget imageContent({
   required ImageProvider<Object> provider,
   required List<ReaderImageDecoded> decoded,
   required List<ReaderImageFailed> failures,
+  bool cropBorders = false,
+  List<ReaderImageCrop>? crops,
+  List<ReaderImageCropWork>? works,
 }) => Directionality(
   textDirection: TextDirection.ltr,
-  child: NotificationListener<ReaderImageDecoded>(
-    onNotification: (notification) {
-      decoded.add(notification);
+  child: NotificationListener<ReaderImageCropWork>(
+    onNotification: (work) {
+      works?.add(work);
       return true;
     },
-    child: NotificationListener<ReaderImageFailed>(
-      onNotification: (notification) {
-        failures.add(notification);
+    child: NotificationListener<ReaderImageCrop>(
+      onNotification: (crop) {
+        crops?.add(crop);
         return true;
       },
-      child: ResourceImage(
-        resource: resource,
-        fit: BoxFit.contain,
-        imageProvider: provider,
+      child: NotificationListener<ReaderImageDecoded>(
+        onNotification: (notification) {
+          decoded.add(notification);
+          return true;
+        },
+        child: NotificationListener<ReaderImageFailed>(
+          onNotification: (notification) {
+            failures.add(notification);
+            return true;
+          },
+          child: ResourceImage(
+            resource: resource,
+            fit: BoxFit.contain,
+            imageProvider: provider,
+            cropBorders: cropBorders,
+          ),
+        ),
       ),
     ),
   ),
@@ -137,7 +163,147 @@ Future<void> finishDecode(
   await tester.pumpAndSettle();
 }
 
+Future<void> finishCrop(
+  WidgetTester tester,
+  List<ReaderImageCrop> crops,
+  int count,
+) async {
+  final timeout = Stopwatch()..start();
+  while (crops.length < count && timeout.elapsed < const Duration(seconds: 5)) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump();
+  }
+  expect(
+    crops,
+    hasLength(count),
+    reason: 'The actual UI pixel readback must finish',
+  );
+  await tester.pumpAndSettle();
+}
+
+Uint8List borderedPng({
+  int white = 255,
+  bool content = true,
+  bool darkBorder = false,
+  bool transparent = false,
+}) {
+  final bitmap = img.Image(width: 80, height: 100, numChannels: 4);
+  img.fill(
+    bitmap,
+    color: img.ColorRgba8(
+      darkBorder ? 20 : white,
+      darkBorder ? 30 : white,
+      darkBorder ? 40 : white,
+      transparent ? 0 : 255,
+    ),
+  );
+  if (content) {
+    img.fillRect(
+      bitmap,
+      x1: 20,
+      y1: 25,
+      x2: 59,
+      y2: 74,
+      color: img.ColorRgba8(20, 40, 80, 255),
+    );
+  }
+  return img.encodePng(bitmap);
+}
+
 void main() {
+  testWidgets(
+    'white border detection reuses the displayed codec and toggles cached geometry',
+    (tester) async {
+      final provider = CountingImageProvider(borderedPng());
+      final encoded = resource('crop');
+      final decoded = <ReaderImageDecoded>[];
+      final failures = <ReaderImageFailed>[];
+      final crops = <ReaderImageCrop>[];
+      final works = <ReaderImageCropWork>[];
+      Widget page(bool enabled) => image(
+        resource: encoded,
+        provider: provider,
+        decoded: decoded,
+        failures: failures,
+        cropBorders: enabled,
+        crops: crops,
+        works: works,
+      );
+      await tester.pumpWidget(page(false));
+      await finishDecode(tester, provider);
+      expect(crops, isEmpty);
+      expect(works, isEmpty);
+      await tester.pumpWidget(page(true));
+      await finishCrop(tester, crops, 1);
+      expect(crops.single.bounds, const ui.Rect.fromLTRB(.225, .23, .775, .77));
+      expect(crops.single.width, 80);
+      expect(crops.single.height, 100);
+      expect(crops.single.resourceId, 'crop');
+      expect(provider.loads, 1);
+      expect(provider.decodes, 1);
+      expect(works, hasLength(1));
+      await tester.pumpWidget(page(false));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(page(true));
+      await finishCrop(tester, crops, 2);
+      expect(crops.last.bounds, crops.first.bounds);
+      expect(works, hasLength(1));
+      expect(provider.loads, 1);
+      expect(provider.decodes, 1);
+      expect(failures, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await provider.evict();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'near white margins trim while blank and colored edges retain the complete image',
+    (tester) async {
+      for (final variant in [0, 1, 2, 3]) {
+        final provider = CountingImageProvider(
+          borderedPng(
+            white: 250,
+            content: variant != 1,
+            darkBorder: variant == 2,
+            transparent: variant == 3,
+          ),
+        );
+        final decoded = <ReaderImageDecoded>[];
+        final failures = <ReaderImageFailed>[];
+        final crops = <ReaderImageCrop>[];
+        await tester.pumpWidget(
+          image(
+            resource: resource('variant-$variant'),
+            provider: provider,
+            decoded: decoded,
+            failures: failures,
+            cropBorders: true,
+            crops: crops,
+          ),
+        );
+        await finishDecode(tester, provider);
+        await finishCrop(tester, crops, 1);
+        expect(
+          crops.single.bounds,
+          variant == 0
+              ? const ui.Rect.fromLTRB(.225, .23, .775, .77)
+              : const ui.Rect.fromLTWH(0, 0, 1, 1),
+        );
+        expect(provider.loads, 1);
+        expect(provider.decodes, 1);
+        expect(failures, isEmpty);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await provider.evict();
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   // Real, encoded 3x2 PNG. Only CountingImageProvider's decoder reads these bytes.
   final png = base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAEUlEQVR4nGOoV3D4D8MMyBwAjN4LNZqBoewAAAAASUVORK5CYII=',
@@ -277,22 +443,32 @@ void main() {
     (tester) async {
       final provider = CountingImageProvider(png);
       final encoded = resource('paused');
+      final crops = <ReaderImageCrop>[];
       final decoded = <ReaderImageDecoded>[];
       final failures = <ReaderImageFailed>[];
-      Widget pausedImage(bool enabled) => TickerMode(
+      Widget pausedImage(bool enabled, {bool crop = false}) => TickerMode(
         enabled: enabled,
         child: image(
           resource: encoded,
           provider: provider,
           decoded: decoded,
           failures: failures,
+          cropBorders: crop,
+          crops: crops,
         ),
       );
       await tester.pumpWidget(pausedImage(false));
       await finishDecode(tester, provider);
       expect(decoded, hasLength(1));
       expect(provider.completer?.hasListeners, false);
-      await tester.pumpWidget(pausedImage(true));
+      await tester.pumpWidget(pausedImage(false, crop: true));
+      // Pixel readback is still pending; enabling crop must not restart the
+      // paused completer while waiting for it.
+      expect(crops, isEmpty);
+      expect(provider.completer?.hasListeners, false);
+      await finishCrop(tester, crops, 1);
+      expect(provider.completer?.hasListeners, false);
+      await tester.pumpWidget(pausedImage(true, crop: true));
       await tester.pumpAndSettle();
       expect(provider.completer?.hasListeners, true);
       expect(provider.loads, 1);
@@ -310,9 +486,12 @@ void main() {
       final provider = CountingImageProvider(png);
       final decoded = <ReaderImageDecoded>[];
       final failures = <ReaderImageFailed>[];
+      final crops = <ReaderImageCrop>[];
       await tester.pumpWidget(
         image(
           resource: resource('late'),
+          cropBorders: true,
+          crops: crops,
           provider: provider,
           decoded: decoded,
           failures: failures,
@@ -322,6 +501,7 @@ void main() {
       await finishDecode(tester, provider);
       expect(decoded, isEmpty);
       expect(failures, isEmpty);
+      expect(crops, isEmpty);
       await provider.evict();
       expect(tester.takeException(), isNull);
     },

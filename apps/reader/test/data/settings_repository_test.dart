@@ -132,6 +132,7 @@ void main() {
         value.effectiveReader.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
       );
+      expect(value.effectiveReader.cropBorders, false);
       expect(value.mangaKey, isNull);
       expect(value.mangaRevision, isNull);
       expect(value.overrides, isNull);
@@ -210,10 +211,11 @@ void main() {
   );
 
   test(
-    'appearance overrides distinguish explicit zero from inheritance and preserve unrelated defaults',
+    'reader overrides distinguish explicit zero and false from inheritance and preserve unrelated defaults',
     () async {
       final global = _global();
       global.reader
+        ..cropBorders = true
         ..background = wire.ReaderBackground.READER_BACKGROUND_THEME
         ..dimPercent = 80
         ..tapZones = wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED
@@ -222,9 +224,14 @@ void main() {
       final explicit = await repository.setManga(
         mangaKey: _key,
         basedOnRevision: 0,
-        overrides: wire.ReaderSettingsOverride(dimPercent: 0),
+        overrides: wire.ReaderSettingsOverride(
+          dimPercent: 0,
+          cropBorders: false,
+        ),
       );
       expect(explicit.overrides!.hasDimPercent(), true);
+      expect(explicit.overrides!.hasCropBorders(), true);
+      expect(explicit.effectiveReader.cropBorders, false);
       expect(explicit.effectiveReader.dimPercent, 0);
       expect(explicit.effectiveReader.background, global.reader.background);
       expect(explicit.effectiveReader.tapZones, global.reader.tapZones);
@@ -235,6 +242,8 @@ void main() {
         overrides: wire.ReaderSettingsOverride(),
       );
       expect(cleared.overrides!.hasDimPercent(), false);
+      expect(cleared.overrides!.hasCropBorders(), false);
+      expect(cleared.effectiveReader.cropBorders, true);
       expect(cleared.effectiveReader, global.reader);
     },
   );
@@ -308,6 +317,7 @@ void main() {
                   tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
                   keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
                   fit: wire.ReaderFit.READER_FIT_HEIGHT,
+                  cropBorders: false,
                 ),
                 basedOnRevision: 0,
               )
@@ -341,6 +351,8 @@ void main() {
         if (mangaScope) {
           expect(sent.setManga.overrides.hasDimPercent(), true);
           expect(sent.setManga.overrides.hasFit(), true);
+          expect(sent.setManga.overrides.hasCropBorders(), true);
+          expect(result.effectiveReader.cropBorders, false);
           expect(result.effectiveReader.fit, wire.ReaderFit.READER_FIT_HEIGHT);
           expect(
             result.effectiveReader.background,
@@ -454,6 +466,7 @@ void main() {
     () async {
       final invalid = <wire.SettingsResponse>[
         _snapshot()..schemaVersion = 2,
+        _snapshot()..effectiveReader.cropBorders = true,
         _snapshot()..manga.mangaKey = _otherKey,
         _snapshot()..global.values.theme = wire.AppTheme.APP_THEME_UNSPECIFIED,
         _snapshot()

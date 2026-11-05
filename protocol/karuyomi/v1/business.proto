@@ -288,6 +288,7 @@ message ReaderSettings {
   ReaderInputPreset tap_zones = 5;
   ReaderInputPreset keyboard = 6;
   ReaderFit fit = 7;
+  bool crop_borders = 8;
 }
 
 // Missing fields inherit the global reader preference. AUTO is an explicit
@@ -300,6 +301,7 @@ message ReaderSettingsOverride {
   optional ReaderInputPreset tap_zones = 5;
   optional ReaderInputPreset keyboard = 6;
   optional ReaderFit fit = 7;
+  optional bool crop_borders = 8;
 }
 
 message GlobalSettingsValues {

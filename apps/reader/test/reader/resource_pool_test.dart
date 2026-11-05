@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
+import 'package:karuyomi/features/reader/resource_image.dart';
 import 'package:karuyomi/features/reader/resource_pool.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:reader_core/reader_core.dart';
@@ -24,6 +26,47 @@ final class PoolFixture implements PageProvider {
 }
 
 void main() {
+  testWidgets(
+    'crop pixel work keeps a pool pin after the displaying widget leaves',
+    (tester) async {
+      final fixture = PoolFixture();
+      final pool = ReaderResourcePool(fixture, evict: (_) async {});
+      final encoded = await pool.acquire(
+        const PageRef(
+          requestId: 'crop',
+          chapterKey: 'c',
+          pageKey: 'p',
+          generation: 'g',
+        ),
+      );
+      final work = Completer<void>();
+      BuildContext? imageContext;
+      await tester.pumpWidget(
+        PinnedReaderImage(
+          pool: pool,
+          image: encoded,
+          builder: (context) {
+            imageContext = context;
+            return const SizedBox.shrink();
+          },
+        ),
+      );
+      ReaderImageCropWork(encoded.id, work.future).dispatch(imageContext!);
+      var released = false;
+      final release = pool.release(encoded.id).then((_) => released = true);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(released, false);
+      expect(fixture.releases, isEmpty);
+      work.complete();
+      await tester.pump();
+      await tester.pumpAndSettle();
+      await release;
+      expect(fixture.releases, ['image']);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'release ACK remains owned but does not leak into a new capture',
     (tester) async {

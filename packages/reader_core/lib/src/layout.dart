@@ -1,19 +1,33 @@
 import 'resources.dart';
 
 final class ReaderPage {
-  ReaderPage({required this.key, this.width, this.height}) {
+  ReaderPage({
+    required this.key,
+    this.width,
+    this.height,
+    this.contentAspectRatio,
+  }) {
     if (key.isEmpty) throw ArgumentError('Page key cannot be empty');
     if ((width == null) != (height == null) ||
         (width != null && (!width!.isFinite || width! <= 0)) ||
         (height != null && (!height!.isFinite || height! <= 0))) {
       throw ArgumentError('Page dimensions must be finite positive pairs');
     }
+    if (contentAspectRatio != null &&
+        (!contentAspectRatio!.isFinite || contentAspectRatio! <= 0)) {
+      throw ArgumentError('Content aspect ratio must be finite and positive');
+    }
   }
 
   final String key;
   final double? width;
   final double? height;
-  double get aspectRatio => width == null ? 2 / 3 : width! / height!;
+
+  /// Learned display geometry only; source dimensions and decode budgets remain
+  /// those of the complete original image.
+  final double? contentAspectRatio;
+  double get originalAspectRatio => width == null ? 2 / 3 : width! / height!;
+  double get aspectRatio => contentAspectRatio ?? originalAspectRatio;
   bool get isLandscape => aspectRatio > 1;
 
   /// Diagnostic estimate only; this is not measured process or GPU memory.

@@ -29,6 +29,7 @@ const defaultValues = toJsonString(
       pageLayout: ReaderPageLayout.AUTO,
       background: ReaderBackground.BLACK,
       fit: ReaderFit.CONTAIN,
+      cropBorders: false,
       dimPercent: 0,
       tapZones: ReaderInputPreset.STANDARD,
       keyboard: ReaderInputPreset.STANDARD,
@@ -54,7 +55,8 @@ function snapshotFieldsSql(mangaKeySql?: string): string {
       'dimPercent', COALESCE(json_extract(${overrides}, '$.dimPercent'), json_extract(${globalValuesSql}, '$.reader.dimPercent'), 0),
       'tapZones', COALESCE(json_extract(${overrides}, '$.tapZones'), json_extract(${globalValuesSql}, '$.reader.tapZones')),
       'keyboard', COALESCE(json_extract(${overrides}, '$.keyboard'), json_extract(${globalValuesSql}, '$.reader.keyboard')),
-      'fit', COALESCE(json_extract(${overrides}, '$.fit'), json_extract(${globalValuesSql}, '$.reader.fit')))
+      'fit', COALESCE(json_extract(${overrides}, '$.fit'), json_extract(${globalValuesSql}, '$.reader.fit')),
+      'cropBorders', json(CASE WHEN COALESCE(json_extract(${overrides}, '$.cropBorders'), json_extract(${globalValuesSql}, '$.reader.cropBorders'), 0) THEN 'true' ELSE 'false' END))
     ${
       mangaKeySql
         ? `, 'manga', json_object('mangaKey', ${mangaKeySql},

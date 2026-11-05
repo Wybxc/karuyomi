@@ -544,7 +544,11 @@ void validateBusinessSettingsResponse(
         value.effectiveReader.fit ==
             (overrides?.hasFit() == true
                 ? overrides!.fit
-                : global.values.reader.fit),
+                : global.values.reader.fit) &&
+        value.effectiveReader.cropBorders ==
+            (overrides?.hasCropBorders() == true
+                ? overrides!.cropBorders
+                : global.values.reader.cropBorders),
     'Effective reader settings do not match confirmed values',
   );
   wire.encodeProtoJson(value, maxBytes: _responseLimit);

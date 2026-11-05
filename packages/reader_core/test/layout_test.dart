@@ -8,6 +8,37 @@ ChapterManifest chapter(List<ReaderPage> pages, {String version = '1'}) =>
 
 void main() {
   test(
+    'learned content geometry controls spreads while original decode budgets remain intact',
+    () {
+      final cropped = ReaderPage(
+        key: 'cropped',
+        width: 1200,
+        height: 600,
+        contentAspectRatio: .8,
+      );
+      final manifest = chapter([portrait('cover'), cropped, portrait('next')]);
+      expect(
+        groupPages(
+          manifest,
+          doublePage: true,
+        ).map((spread) => spread.pages.map((page) => page.key).toList()),
+        [
+          ['cover'],
+          ['cropped', 'next'],
+        ],
+      );
+      expect(cropped.originalAspectRatio, 2);
+      expect(cropped.estimatedDecodedBytes, 1200 * 600 * 4);
+      for (final ratio in [0.0, -1.0, double.infinity, double.nan]) {
+        expect(
+          () => ReaderPage(key: 'invalid', contentAspectRatio: ratio),
+          throwsArgumentError,
+        );
+      }
+    },
+  );
+
+  test(
     'cover and landscape are alone; portrait spreads preserve source order',
     () {
       final manifest = chapter([

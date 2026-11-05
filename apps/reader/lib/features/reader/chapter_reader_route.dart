@@ -66,6 +66,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   late ReadingMode _mode = widget.initialMode;
   late bool? _doublePage = widget.initialDoublePage;
   ReaderFit _fit = ReaderFit.contain;
+  bool _cropBorders = false;
   ReaderBackground _background = ReaderBackground.black;
   int _dimPercent = 0;
   ReaderInputPreset _tapZones = ReaderInputPreset.standard;
@@ -174,6 +175,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         value.effectiveReader.background,
       );
       _fit = settings_ui.readerFit(value.effectiveReader.fit);
+      _cropBorders = value.effectiveReader.cropBorders;
       _dimPercent = value.effectiveReader.dimPercent;
       _tapZones = settings_ui.readerInputPreset(value.effectiveReader.tapZones);
       _keyboard = settings_ui.readerInputPreset(value.effectiveReader.keyboard);
@@ -909,6 +911,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       initialMode: _mode,
       doublePage: _doublePage,
       fit: _fit,
+      cropBorders: _cropBorders,
       background: _background,
       dimPercent: _dimPercent,
       tapZones: _tapZones,

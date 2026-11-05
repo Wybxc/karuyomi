@@ -20,6 +20,7 @@ dependencies:
     path: ../../packages/source_runtime
   cross_file: 0.3.5+2
   web: 1.1.2
+  image: 4.12.0
 dev_dependencies:
   protobuf: 6.1.0
   flutter_test:

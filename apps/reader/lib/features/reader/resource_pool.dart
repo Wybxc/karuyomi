@@ -194,7 +194,16 @@ class _PinnedReaderImageState extends State<PinnedReaderImage> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(context);
+  Widget build(BuildContext context) =>
+      NotificationListener<ReaderImageCropWork>(
+        onNotification: (work) {
+          if (work.resourceId != widget.image.id) return false;
+          final pin = widget.pool.pin(widget.image.id);
+          unawaited(work.finished.whenComplete(pin.close));
+          return true;
+        },
+        child: Builder(builder: widget.builder),
+      );
   @override
   void dispose() {
     unawaited(_pin.close());
