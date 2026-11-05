@@ -1217,7 +1217,9 @@ final class BusinessStateClient {
       final pending = _PendingSettingsMutation(
         fingerprint,
         command,
-        jsonEncode(wire.encodeProtoJson(command)),
+        jsonEncode(
+          wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
+        ),
       );
       _pendingSettings[scope] = pending;
       return _sendSettings(pending, mangaKey: mangaKey);

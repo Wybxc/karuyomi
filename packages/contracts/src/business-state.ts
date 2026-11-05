@@ -21,6 +21,7 @@ export const BOOKMARK_PAGE_SIZE = 64;
 export const CHAPTER_PROGRESS_PAGE_SIZE = 64;
 export const CHAPTER_PAGE_LIMIT = 2048;
 export const CATEGORY_LIMIT = 64;
+export const FAVORITE_SOURCE_LIMIT = 128;
 export const COVER_BYTE_LIMIT = 1024 * 1024;
 export const COVER_DIMENSION_LIMIT = 4096;
 
@@ -651,6 +652,35 @@ export function validateReaderSettingsOverride(
       );
 }
 
+export function validateFavoriteSource(value: pb.FavoriteSource): void {
+  validId(value.packageName);
+  validSourceId(value.sourceId);
+  requireCondition(
+    value.sourceName.length > 0 &&
+      value.sourceName.length <= 256 &&
+      value.sourceLang.length > 0 &&
+      value.sourceLang.length <= 64,
+    'Invalid favorite Source display metadata',
+  );
+}
+
+export function validateFavoriteSources(values: pb.FavoriteSource[]): void {
+  requireCondition(
+    values.length <= FAVORITE_SOURCE_LIMIT,
+    'Favorite Sources exceed their count budget',
+  );
+  const identities = new Set<string>();
+  for (const source of values) {
+    validateFavoriteSource(source);
+    const identity = JSON.stringify([source.packageName, source.sourceId]);
+    requireCondition(
+      !identities.has(identity),
+      'Duplicate favorite Source identity',
+    );
+    identities.add(identity);
+  }
+}
+
 export function validateGlobalSettingsValues(
   value: pb.GlobalSettingsValues,
 ): void {
@@ -662,6 +692,7 @@ export function validateGlobalSettingsValues(
   );
   requireFields(value, ['reader']);
   validateReaderSettings(value.reader);
+  validateFavoriteSources(value.favoriteSources);
 }
 
 export const settingsMutationSchema = codec<pb.SettingsMutation>((input) => {

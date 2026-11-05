@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/business_state_client.dart';
+import 'package:karuyomi/data/business_state_validation.dart';
 import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
@@ -137,6 +138,69 @@ void main() {
       expect(value.mangaRevision, isNull);
       expect(value.overrides, isNull);
       expect(writes(), isEmpty);
+    },
+  );
+
+  test(
+    'adding a mutation UUID rejects an oversized final body without sending or retaining a draft',
+    () async {
+      final values = _global()
+        ..favoriteSources.addAll(
+          List.generate(
+            businessFavoriteSourceLimit,
+            (index) => wire.FavoriteSource(
+              packageName: 'p' * 200,
+              sourceId: '$index',
+              sourceName: 'a' * 256,
+              sourceLang: 'a' * 64,
+            ),
+          ),
+        );
+      final draft = wire.SettingsMutation(schemaVersion: 1, setGlobal: values);
+      int bodyBytes(wire.SettingsMutation value) => utf8
+          .encode(
+            jsonEncode(
+              wire.encodeProtoJson(value, maxBytes: wire.controlJsonLimit),
+            ),
+          )
+          .length;
+      var remaining = wire.controlRequestLimit - bodyBytes(draft);
+      expect(remaining, inInclusiveRange(1, businessFavoriteSourceLimit * 512));
+      for (final source in values.favoriteSources) {
+        final wide = remaining > 512 ? 256 : remaining ~/ 2;
+        remaining -= wide * 2;
+        final doubleByte = remaining == 1 && wide < 256 ? 1 : 0;
+        remaining -= doubleByte;
+        source.sourceName =
+            '${'界' * wide}${'é' * doubleByte}${'a' * (256 - wide - doubleByte)}';
+        if (remaining == 0) break;
+      }
+      expect(remaining, 0);
+      expect(bodyBytes(draft), wire.controlRequestLimit);
+      expect(() => validateBusinessSettingsMutation(draft), returnsNormally);
+      expect(
+        bodyBytes(
+          draft.deepCopy()..mutationId = '12345678-1234-4234-8234-123456789abc',
+        ),
+        greaterThan(wire.controlRequestLimit),
+      );
+
+      await expectLater(
+        repository.setGlobal(values: values, basedOnRevision: 0),
+        throwsFormatException,
+      );
+      expect(server.requests, isEmpty);
+      expect(repository.pendingGlobal(), isNull);
+      expect(server.appliedMutations, 0);
+
+      final saved = await repository.setGlobal(
+        values: _global(),
+        basedOnRevision: 0,
+      );
+      expect(saved.globalRevision, 1);
+      expect(writes(), hasLength(1));
+      expect(repository.pendingGlobal(), isNull);
+      expect(server.appliedMutations, 1);
     },
   );
 

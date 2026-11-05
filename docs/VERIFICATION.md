@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-06，收藏源与快捷打开已接入生成全局设置、既有 Worker API + D1 和正式浏览入口。稳定 package/source 身份、完整全局 CAS、原请求重试与打开边界见[设计](design/source-favorites.md)；合同/API、共享 Dart 数据及其余工程检查的实际范围见[收藏源记录](verification/source-favorites.md)。独立客户端、真实 Source/索引更新、生产 Access 与目标设备继续验收，不能把本轮受控组件结果当成完整 P3 通过。
+
 2026-11-06，书架直接续读、详情失败显式重试、续读位置只读重取及书架资料原请求重试已接入正式 Flutter 入口。稳定章节/位置/顺序恢复、未确认写隔离和迟到结果边界的受控组件记录见[续读与恢复](verification/reading-entry.md)，设计见[阅读入口](design/reading-entry.md)。实际 Source、独立客户端、生产 Access 和目标设备分别验收，不将本轮组件结果提升为完整 P1/P2 通过。
 
 2026-11-06，自定义封面已接入生成业务协议、Worker API、D1 当前引用、私有 R2 及正式详情/书架 UI；上传使用独立二进制 multipart 与同一作品 mutation 的 CAS/ACK，清除沿 JSON mutation。共享数据回归已实测，结果与其余集中检查待补项统一见[自定义封面记录](verification/custom-covers.md)，对象宽限清理和身份边界见[设计](design/custom-covers.md)。独立客户端、实际 Native Cookie、生产私有 bucket 配置和部署尚未验收，不能据此认定完整 P1/P2 通过。

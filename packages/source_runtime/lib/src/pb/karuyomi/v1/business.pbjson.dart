@@ -1248,6 +1248,23 @@ final $typed_data.Uint8List readerSettingsOverrideDescriptor = $convert.base64De
     'NrZ3JvdW5kQg4KDF9kaW1fcGVyY2VudEIMCgpfdGFwX3pvbmVzQgsKCV9rZXlib2FyZEIGCgRf'
     'Zml0Qg8KDV9jcm9wX2JvcmRlcnM=');
 
+@$core.Deprecated('Use favoriteSourceDescriptor instead')
+const FavoriteSource$json = {
+  '1': 'FavoriteSource',
+  '2': [
+    {'1': 'package_name', '3': 1, '4': 1, '5': 9, '10': 'packageName'},
+    {'1': 'source_id', '3': 2, '4': 1, '5': 9, '10': 'sourceId'},
+    {'1': 'source_name', '3': 3, '4': 1, '5': 9, '10': 'sourceName'},
+    {'1': 'source_lang', '3': 4, '4': 1, '5': 9, '10': 'sourceLang'},
+  ],
+};
+
+/// Descriptor for `FavoriteSource`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List favoriteSourceDescriptor = $convert.base64Decode(
+    'Cg5GYXZvcml0ZVNvdXJjZRIhCgxwYWNrYWdlX25hbWUYASABKAlSC3BhY2thZ2VOYW1lEhsKCX'
+    'NvdXJjZV9pZBgCIAEoCVIIc291cmNlSWQSHwoLc291cmNlX25hbWUYAyABKAlSCnNvdXJjZU5h'
+    'bWUSHwoLc291cmNlX2xhbmcYBCABKAlSCnNvdXJjZUxhbmc=');
+
 @$core.Deprecated('Use globalSettingsValuesDescriptor instead')
 const GlobalSettingsValues$json = {
   '1': 'GlobalSettingsValues',
@@ -1268,6 +1285,14 @@ const GlobalSettingsValues$json = {
       '6': '.karuyomi.v1.ReaderSettings',
       '10': 'reader'
     },
+    {
+      '1': 'favorite_sources',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.FavoriteSource',
+      '10': 'favoriteSources'
+    },
   ],
 };
 
@@ -1275,7 +1300,8 @@ const GlobalSettingsValues$json = {
 final $typed_data.Uint8List globalSettingsValuesDescriptor = $convert.base64Decode(
     'ChRHbG9iYWxTZXR0aW5nc1ZhbHVlcxIrCgV0aGVtZRgBIAEoDjIVLmthcnV5b21pLnYxLkFwcF'
     'RoZW1lUgV0aGVtZRIzCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5n'
-    'c1IGcmVhZGVy');
+    'c1IGcmVhZGVyEkYKEGZhdm9yaXRlX3NvdXJjZXMYAyADKAsyGy5rYXJ1eW9taS52MS5GYXZvcm'
+    'l0ZVNvdXJjZVIPZmF2b3JpdGVTb3VyY2Vz');
 
 @$core.Deprecated('Use globalSettingsDescriptor instead')
 const GlobalSettings$json = {

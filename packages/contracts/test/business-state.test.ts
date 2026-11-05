@@ -604,3 +604,79 @@ test('custom covers preserve set/clear presence and validate descriptor identiti
     ).toThrow();
   }
 });
+
+test('favorite Sources retain exact signed identities and enforce pair uniqueness, fields, counts and control-message budgets', () => {
+  const source = {
+    packageName: 'source.test',
+    sourceId: '9007199254740993',
+    sourceName: 'Original 名称',
+    sourceLang: 'zh-Hant',
+  };
+  const valid = [
+    source,
+    { ...source, packageName: 'source.other' },
+    { ...source, sourceId: '-9223372036854775808' },
+  ];
+  const request = (favoriteSources: object[]) => ({
+    ...base,
+    setGlobal: { ...globalSettingsValues, favoriteSources },
+  });
+  const response = (favoriteSources: object[]) => ({
+    schemaVersion: 1,
+    accountRevision: 1,
+    global: {
+      revision: 1,
+      values: { ...globalSettingsValues, favoriteSources },
+    },
+    effectiveReader: globalSettingsValues.reader,
+  });
+  const parsed = settingsMutationSchema.parse(request(valid));
+  if (parsed.operation.case !== 'setGlobal')
+    throw new Error('Missing global settings');
+  expect(
+    parsed.operation.value.favoriteSources.map((item) => item.sourceId),
+  ).toEqual(valid.map((item) => item.sourceId));
+  expect(
+    settingsResponseSchema.parse(response(valid)).global?.values
+      ?.favoriteSources,
+  ).toMatchObject(valid);
+  const maximum = Array.from({ length: 128 }, (_, index) => ({
+    ...source,
+    sourceId: String(index),
+  }));
+  expect(() => settingsMutationSchema.parse(request(maximum))).not.toThrow();
+  for (const favoriteSources of [
+    [
+      source,
+      { ...source, sourceName: 'Duplicate identity with another label' },
+    ],
+    [...maximum, { ...source, sourceId: '128' }],
+    ...[
+      { ...source, packageName: '' },
+      { ...source, packageName: 'p'.repeat(201) },
+      { ...source, sourceId: '' },
+      { ...source, sourceId: '9223372036854775808' },
+      { ...source, sourceId: '-9223372036854775809' },
+      { ...source, sourceId: '1.5' },
+      { ...source, sourceName: '' },
+      { ...source, sourceName: 'n'.repeat(257) },
+      { ...source, sourceLang: '' },
+      { ...source, sourceLang: 'l'.repeat(65) },
+      { ...source, buildId: 'obsolete-build' },
+    ].map((invalid) => [invalid]),
+  ]) {
+    expect(() =>
+      settingsMutationSchema.parse(request(favoriteSources)),
+    ).toThrow();
+    expect(() =>
+      settingsResponseSchema.parse(response(favoriteSources)),
+    ).toThrow();
+  }
+  const oversized = maximum.map((item) => ({
+    ...item,
+    packageName: '字'.repeat(200),
+    sourceName: '字'.repeat(256),
+    sourceLang: '字'.repeat(64),
+  }));
+  expect(() => settingsMutationSchema.parse(request(oversized))).toThrow();
+});

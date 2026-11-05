@@ -39,6 +39,24 @@ wire.ReadingAnchor anchor({String chapterKey = 'chapter'}) =>
       viewportY: .8,
     );
 
+wire.SettingsMutation favoriteSourceSettings(
+  Iterable<wire.FavoriteSource> sources,
+) => wire.SettingsMutation(
+  schemaVersion: 1,
+  setGlobal: wire.GlobalSettingsValues(
+    theme: wire.AppTheme.APP_THEME_SYSTEM,
+    reader: wire.ReaderSettings(
+      mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
+      pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
+      background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
+      fit: wire.ReaderFit.READER_FIT_CONTAIN,
+      tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+      keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
+    ),
+    favoriteSources: sources,
+  ),
+);
+
 void main() {
   test('business integers are exact uint32 values', () {
     for (final value in [0, 1, 0xffffffff]) {
@@ -245,6 +263,90 @@ void main() {
         ..add('10000000-0000-4000-8000-000000000003');
       expect(
         () => validateBusinessMangaCategories(state, catalog),
+        throwsFormatException,
+      );
+    },
+  );
+  test(
+    'favorite Sources retain signed identities and validate complete settings at both boundaries',
+    () {
+      final source = wire.FavoriteSource(
+        packageName: 'source.test',
+        sourceId: '9007199254740993',
+        sourceName: 'Original 名称',
+        sourceLang: 'zh-Hant',
+      );
+      final valid = [
+        source,
+        source.deepCopy()..packageName = 'source.other',
+        source.deepCopy()..sourceId = '-9223372036854775808',
+      ];
+      wire.SettingsResponse response(Iterable<wire.FavoriteSource> sources) {
+        final values = favoriteSourceSettings(sources).setGlobal;
+        return wire.SettingsResponse(
+          schemaVersion: 1,
+          accountRevision: 1,
+          global: wire.GlobalSettings(revision: 1, values: values),
+          effectiveReader: values.reader.deepCopy(),
+        );
+      }
+
+      final request = favoriteSourceSettings(valid);
+      validateBusinessSettingsMutation(request);
+      validateBusinessSettingsResponse(response(valid));
+      expect(
+        request.setGlobal.favoriteSources.map((item) => item.sourceId),
+        valid.map((item) => item.sourceId),
+      );
+      final maximum = List.generate(
+        128,
+        (index) => source.deepCopy()..sourceId = '$index',
+      );
+      expect(
+        () => validateBusinessSettingsMutation(favoriteSourceSettings(maximum)),
+        returnsNormally,
+      );
+      for (final sources in [
+        [
+          source,
+          source.deepCopy()
+            ..sourceName = 'Duplicate identity with another label',
+        ],
+        [...maximum, source.deepCopy()..sourceId = '128'],
+        ...[
+          source.deepCopy()..packageName = '',
+          source.deepCopy()..packageName = 'p' * 201,
+          source.deepCopy()..sourceId = '',
+          source.deepCopy()..sourceId = '9223372036854775808',
+          source.deepCopy()..sourceId = '-9223372036854775809',
+          source.deepCopy()..sourceId = '1.5',
+          source.deepCopy()..sourceName = '',
+          source.deepCopy()..sourceName = 'n' * 257,
+          source.deepCopy()..sourceLang = '',
+          source.deepCopy()..sourceLang = 'l' * 65,
+        ].map((invalid) => [invalid]),
+      ]) {
+        expect(
+          () =>
+              validateBusinessSettingsMutation(favoriteSourceSettings(sources)),
+          throwsFormatException,
+        );
+        expect(
+          () => validateBusinessSettingsResponse(response(sources)),
+          throwsFormatException,
+        );
+      }
+      final oversized = maximum
+          .map(
+            (item) => item.deepCopy()
+              ..packageName = '字' * 200
+              ..sourceName = '字' * 256
+              ..sourceLang = '字' * 64,
+          )
+          .toList();
+      expect(
+        () =>
+            validateBusinessSettingsMutation(favoriteSourceSettings(oversized)),
         throwsFormatException,
       );
     },

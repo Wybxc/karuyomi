@@ -8,6 +8,7 @@ import {
   ReaderMode,
   ReaderPageLayout,
   SettingsMutationSchema,
+  FavoriteSourceSchema,
   type SettingsMutation,
   LibraryMetadataSchema,
   StateMutationSchema,
@@ -1046,6 +1047,7 @@ function globalSettings(
   theme = AppTheme.DARK,
   mode = ReaderMode.WEBTOON,
   pageLayout = ReaderPageLayout.DOUBLE,
+  favoriteSources: MessageInitShape<typeof FavoriteSourceSchema>[] = [],
 ) {
   return create(SettingsMutationSchema, {
     schemaVersion: businessSchemaVersion,
@@ -1055,6 +1057,7 @@ function globalSettings(
       case: 'setGlobal',
       value: {
         theme,
+        favoriteSources,
         reader: {
           mode,
           pageLayout,
@@ -1816,4 +1819,158 @@ test('D1 retains two-dimensional current and furthest anchors across projection,
       .bind(reader.subject)
       .first('count'),
   ).toBe(3);
+});
+
+test('favorite Sources use confirmed global CAS and durable ACKs never restore removed Sources or overwrite reader preferences', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const other = await client();
+  const source = {
+    packageName: 'source.test',
+    sourceId: '9007199254740993',
+    sourceName: 'Original 名称',
+    sourceLang: 'zh-Hant',
+  };
+  const sources = [
+    source,
+    { ...source, packageName: 'source.other' },
+    { ...source, sourceId: '-9223372036854775808' },
+  ];
+  const initial = await first.settings();
+  expect(initial.global?.values?.favoriteSources).toEqual([]);
+  const add = globalSettings(
+    0,
+    AppTheme.DARK,
+    ReaderMode.WEBTOON,
+    ReaderPageLayout.DOUBLE,
+    sources,
+  );
+  const saved = await first.mutateSettings(add);
+  expect(saved.status).toBe(200);
+  expect(saved.body.global?.values?.favoriteSources).toMatchObject(sources);
+  const confirmed = await second.settings();
+  expect(confirmed.global).toEqual(saved.body.global);
+  const stored = await env.DB.prepare(
+    "SELECT values_json FROM reader_settings WHERE subject = ? AND scope_key = ''",
+  )
+    .bind(first.subject)
+    .first<string>('values_json');
+  expect(JSON.parse(stored!).favoriteSources).toEqual(sources);
+  const stale = await second.mutateSettings(
+    globalSettings(
+      0,
+      AppTheme.LIGHT,
+      ReaderMode.LEFT_TO_RIGHT,
+      ReaderPageLayout.SINGLE,
+      [],
+    ),
+  );
+  expect(stale.status).toBe(409);
+  expect(stale.body.error?.code).toBe(ErrorCode.REVISION_CONFLICT);
+  expect(stale.body.global).toEqual(saved.body.global);
+  const remove = globalSettings(
+    1,
+    AppTheme.DARK,
+    ReaderMode.WEBTOON,
+    ReaderPageLayout.DOUBLE,
+    [source],
+  );
+  const removed = await second.mutateSettings(remove);
+  expect(removed.status).toBe(200);
+  expect(removed.body.global?.values?.reader).toEqual(
+    saved.body.global?.values?.reader,
+  );
+  expect(removed.body.global?.values?.theme).toBe(AppTheme.DARK);
+  expect((await first.mutateSettings(add)).body).toEqual(saved.body);
+  expect((await first.settings()).global).toEqual(removed.body.global);
+  const clear = await first.mutateSettings(
+    globalSettings(
+      2,
+      AppTheme.DARK,
+      ReaderMode.WEBTOON,
+      ReaderPageLayout.DOUBLE,
+      [],
+    ),
+  );
+  expect(clear.status).toBe(200);
+  expect((await second.mutateSettings(remove)).body).toEqual(removed.body);
+  const final = await second.settings();
+  expect(final.global?.values?.favoriteSources).toEqual([]);
+  expect(final.global?.values?.reader).toEqual(
+    saved.body.global?.values?.reader,
+  );
+  expect(final.global?.revision).toBe(3);
+  expect((await other.settings()).global).toEqual(initial.global);
+  expect((await first.state(favorite().mangaKey)).manga?.revision).toBe(0);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+    )
+      .bind(first.subject)
+      .first('count'),
+  ).toBe(3);
+});
+
+test('invalid favorite Source fields, duplicate pairs, counts and oversized settings cannot alter D1 state', async () => {
+  const owner = await client();
+  const source = {
+    packageName: 'source.test',
+    sourceId: '9007199254740993',
+    sourceName: 'Original 名称',
+    sourceLang: 'zh-Hant',
+  };
+  await owner.mutateSettings(
+    globalSettings(
+      0,
+      AppTheme.DARK,
+      ReaderMode.WEBTOON,
+      ReaderPageLayout.DOUBLE,
+      [source],
+    ),
+  );
+  const before = await owner.settings();
+  const maximum = Array.from({ length: 128 }, (_, index) => ({
+    ...source,
+    sourceId: String(index),
+  }));
+  for (const { sources, status } of [
+    {
+      sources: [source, { ...source, sourceName: 'Duplicate identity' }],
+      status: 400,
+    },
+    { sources: [...maximum, { ...source, sourceId: '128' }], status: 400 },
+    { sources: [{ ...source, sourceId: '9223372036854775808' }], status: 400 },
+    { sources: [{ ...source, packageName: '' }], status: 400 },
+    { sources: [{ ...source, sourceName: 'n'.repeat(257) }], status: 400 },
+    { sources: [{ ...source, sourceLang: '' }], status: 400 },
+    {
+      sources: maximum.map((item) => ({
+        ...item,
+        packageName: '字'.repeat(200),
+        sourceName: '字'.repeat(256),
+        sourceLang: '字'.repeat(64),
+      })),
+      status: 413,
+    },
+  ]) {
+    const rejected = await owner.mutateSettings(
+      globalSettings(
+        1,
+        AppTheme.LIGHT,
+        ReaderMode.LEFT_TO_RIGHT,
+        ReaderPageLayout.SINGLE,
+        sources,
+      ),
+    );
+    expect(rejected.status).toBe(status);
+    expect(rejected.body.error).toBeDefined();
+  }
+  expect(await owner.settings()).toEqual(before);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+    )
+      .bind(owner.subject)
+      .first('count'),
+  ).toBe(1);
 });

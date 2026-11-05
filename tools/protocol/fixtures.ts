@@ -271,6 +271,15 @@ const globalReader: JsonObject = {
 const globalSettingsValues: JsonObject = {
   theme: 'APP_THEME_SYSTEM',
   reader: globalReader,
+  favoriteSources: [
+    { packageName, sourceId, sourceName: 'Source 漫画', sourceLang: 'zh-Hant' },
+    {
+      packageName: `${packageName}.other`,
+      sourceId: '-9223372036854775808',
+      sourceName: 'Other',
+      sourceLang: 'all',
+    },
+  ],
 };
 const readerOverrides: JsonObject = {
   background: 'READER_BACKGROUND_THEME',

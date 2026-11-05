@@ -3409,14 +3409,111 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
   void clearCropBorders() => $_clearField(8);
 }
 
+/// Source identity stays independent of the currently published build or runtime.
+/// Names and languages are display snapshots, never identity components.
+class FavoriteSource extends $pb.GeneratedMessage {
+  factory FavoriteSource({
+    $core.String? packageName,
+    $core.String? sourceId,
+    $core.String? sourceName,
+    $core.String? sourceLang,
+  }) {
+    final result = FavoriteSource._();
+    if (packageName != null) result.packageName = packageName;
+    if (sourceId != null) result.sourceId = sourceId;
+    if (sourceName != null) result.sourceName = sourceName;
+    if (sourceLang != null) result.sourceLang = sourceLang;
+    return result;
+  }
+
+  FavoriteSource._();
+
+  factory FavoriteSource.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FavoriteSource()..mergeFromBuffer(data, registry);
+  factory FavoriteSource.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FavoriteSource()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FavoriteSource',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FavoriteSource.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'packageName')
+    ..aOS(2, _omitFieldNames ? '' : 'sourceId')
+    ..aOS(3, _omitFieldNames ? '' : 'sourceName')
+    ..aOS(4, _omitFieldNames ? '' : 'sourceLang')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FavoriteSource clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FavoriteSource copyWith(void Function(FavoriteSource) updates) =>
+      super.copyWith((message) => updates(message as FavoriteSource))
+          as FavoriteSource;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FavoriteSource() / FavoriteSource.new instead')
+  static FavoriteSource create() => FavoriteSource._();
+  static $pb.GeneratedMessage $_createMessage() => FavoriteSource._();
+  @$core.override
+  FavoriteSource createEmptyInstance() => FavoriteSource._();
+  @$core.pragma('dart2js:noInline')
+  static FavoriteSource getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FavoriteSource>(
+          FavoriteSource.$_createMessage);
+  static FavoriteSource? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get packageName => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set packageName($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPackageName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPackageName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sourceId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sourceId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSourceId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSourceId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get sourceName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set sourceName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSourceName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSourceName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get sourceLang => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set sourceLang($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSourceLang() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSourceLang() => $_clearField(4);
+}
+
 class GlobalSettingsValues extends $pb.GeneratedMessage {
   factory GlobalSettingsValues({
     AppTheme? theme,
     ReaderSettings? reader,
+    $core.Iterable<FavoriteSource>? favoriteSources,
   }) {
     final result = GlobalSettingsValues._();
     if (theme != null) result.theme = theme;
     if (reader != null) result.reader = reader;
+    if (favoriteSources != null) result.favoriteSources.addAll(favoriteSources);
     return result;
   }
 
@@ -3437,6 +3534,8 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
         enumValues: AppTheme.values)
     ..aOM<ReaderSettings>(2, _omitFieldNames ? '' : 'reader',
         subBuilder: ReaderSettings.$_createMessage)
+    ..pPM<FavoriteSource>(3, _omitFieldNames ? '' : 'favoriteSources',
+        subBuilder: FavoriteSource.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3481,6 +3580,9 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
   void clearReader() => $_clearField(2);
   @$pb.TagNumber(2)
   ReaderSettings ensureReader() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<FavoriteSource> get favoriteSources => $_getList(2);
 }
 
 class GlobalSettings extends $pb.GeneratedMessage {

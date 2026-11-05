@@ -52,6 +52,17 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('测试漫画源 · zh'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('真实源 DTO 测试'),
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byType(CatalogPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('真实源 DTO 测试'));
       await tester.pumpAndSettle();
       expect(find.text('漫画源返回的完整简介'), findsOneWidget);
@@ -116,6 +127,17 @@ void main() {
       await tester.tap(find.text('source.test · 1.0'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('测试漫画源 · zh'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('真实源 DTO 测试'),
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byType(CatalogPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('真实源 DTO 测试'));
       await tester.pumpAndSettle();

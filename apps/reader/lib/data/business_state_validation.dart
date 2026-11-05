@@ -8,6 +8,7 @@ const _responseLimit = 2 * 1024 * 1024;
 const _pageLimit = 2048;
 const _libraryPageSize = 8;
 const _bookmarkPageSize = 64;
+const businessFavoriteSourceLimit = 128;
 final _mangaKey = RegExp(r'^[a-f0-9]{64}$');
 final _sourceId = RegExp(r'^-?\d{1,19}$');
 final _minSourceId = BigInt.parse('-9223372036854775808');
@@ -196,12 +197,7 @@ void validateBusinessRevision(int value) => _require(
 
 void validateBusinessMetadata(wire.LibraryMetadata value) {
   _identity(value.packageName);
-  _require(_sourceId.hasMatch(value.sourceId), 'Invalid Source identity');
-  final id = BigInt.parse(value.sourceId);
-  _require(
-    id >= _minSourceId && id <= _maxSourceId,
-    'Source identity exceeds signed int64',
-  );
+  _validateSourceId(value.sourceId);
   _require(
     value.sourceName.isNotEmpty &&
         value.sourceName.length <= 256 &&
@@ -461,6 +457,42 @@ void validateBusinessReaderOverrides(wire.ReaderSettingsOverride value) {
   }
 }
 
+void _validateSourceId(String value) {
+  _require(_sourceId.hasMatch(value), 'Invalid Source identity');
+  final id = BigInt.parse(value);
+  _require(
+    id >= _minSourceId && id <= _maxSourceId,
+    'Source identity exceeds signed int64',
+  );
+}
+
+void validateBusinessFavoriteSource(wire.FavoriteSource value) {
+  _identity(value.packageName);
+  _validateSourceId(value.sourceId);
+  _require(
+    value.sourceName.isNotEmpty &&
+        value.sourceName.length <= 256 &&
+        value.sourceLang.isNotEmpty &&
+        value.sourceLang.length <= 64,
+    'Invalid favorite Source display metadata',
+  );
+}
+
+void validateBusinessFavoriteSources(Iterable<wire.FavoriteSource> values) {
+  _require(
+    values.length <= businessFavoriteSourceLimit,
+    'Favorite Sources exceed their count budget',
+  );
+  final identities = <(String, String)>{};
+  for (final source in values) {
+    validateBusinessFavoriteSource(source);
+    _require(
+      identities.add((source.packageName, source.sourceId)),
+      'Duplicate favorite Source identity',
+    );
+  }
+}
+
 void validateBusinessGlobalSettings(wire.GlobalSettingsValues value) {
   _require(
     value.theme.value >= 1 && value.theme.value <= 3,
@@ -468,6 +500,7 @@ void validateBusinessGlobalSettings(wire.GlobalSettingsValues value) {
   );
   _require(value.hasReader(), 'Missing global reader defaults');
   validateBusinessReaderSettings(value.reader);
+  validateBusinessFavoriteSources(value.favoriteSources);
 }
 
 void validateBusinessSettingsMutation(wire.SettingsMutation value) {
@@ -483,7 +516,7 @@ void validateBusinessSettingsMutation(wire.SettingsMutation value) {
     case wire.SettingsMutation_Operation.notSet:
       throw const FormatException('Settings operation is required');
   }
-  wire.encodeProtoJson(value);
+  wire.encodeProtoJson(value, maxBytes: wire.controlRequestLimit);
 }
 
 void validateBusinessSettingsResponse(

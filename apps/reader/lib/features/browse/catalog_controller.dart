@@ -10,6 +10,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import '../../runtime/runtime_platform_types.dart';
 import '../../runtime/cover_transport.dart';
 import '../../data/business_state_client.dart';
+import '../../data/business_state_validation.dart';
 import '../../data/bookmark_repository.dart';
 import '../../data/settings_repository.dart';
 import '../../data/progress_repository.dart';
@@ -531,44 +532,47 @@ final class CatalogController extends ChangeNotifier {
   }
 
   Future<void> openBuild(CatalogBuild build) async {
-    if (busy) return;
+    await _perform('正在加载漫画源', () => _loadBuild(build));
+  }
+
+  Future<void> _loadBuild(
+    CatalogBuild build, {
+    bool Function()? shouldContinue,
+  }) async {
+    if (shouldContinue?.call() == false) return;
     lastBuildId = build.id;
     lastSourceId = null;
-    await _perform('正在加载漫画源', () async {
-      final epoch = _epoch;
-      _dropSession();
-      final identity = subject;
-      if (identity == null) {
-        throw const RuntimeException(RuntimeErrorCode.accessRequired, '身份未确认');
-      }
-      final manifest = wire.decodeProtoJson(
-        wire.BuildManifest(),
-        await _get(build.manifestPath),
-      );
-      if (_closed || epoch != _epoch) return;
-      if (manifest.buildId != build.id ||
-          !manifest.hasBundle() ||
-          manifest.bundle.sha256.isEmpty) {
-        throw const FormatException('构建标识不匹配');
-      }
-      _runtimeNeedsRebuild = true;
-      final loaded = await runtime.open(
-        BuildDescriptor(
-          buildId: build.id,
-          manifestUri: Uri.parse(build.manifestPath),
-          sha256: manifest.bundle.sha256,
-          identity: identity,
-          packageId: build.packageName,
-        ),
-      );
-      if (_closed || epoch != _epoch) return;
-      activeBuild = build;
-      session = loaded;
-      activeSource = null;
-      mangas = const [];
-      page = 0;
-      hasNextPage = false;
-    });
+    final epoch = _epoch;
+    _dropSession();
+    final identity = subject;
+    if (identity == null) {
+      throw const RuntimeException(RuntimeErrorCode.accessRequired, '身份未确认');
+    }
+    final response = await _get(build.manifestPath);
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    final manifest = wire.decodeProtoJson(wire.BuildManifest(), response);
+    if (manifest.buildId != build.id ||
+        !manifest.hasBundle() ||
+        manifest.bundle.sha256.isEmpty) {
+      throw const FormatException('构建标识不匹配');
+    }
+    _runtimeNeedsRebuild = true;
+    final loaded = await runtime.open(
+      BuildDescriptor(
+        buildId: build.id,
+        manifestUri: Uri.parse(build.manifestPath),
+        sha256: manifest.bundle.sha256,
+        identity: identity,
+        packageId: build.packageName,
+      ),
+    );
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    activeBuild = build;
+    session = loaded;
+    activeSource = null;
+    mangas = const [];
+    page = 0;
+    hasNextPage = false;
   }
 
   Future<SourceResult> _invoke(wire.SourceCall call) async {
@@ -598,9 +602,17 @@ final class CatalogController extends ChangeNotifier {
     SourceInfo source, {
     bool loadListing = true,
   }) async {
-    if (busy) return;
+    if (busy || !_setSource(source)) return;
+    if (loadListing) {
+      await loadMangas();
+    } else {
+      _notify();
+    }
+  }
+
+  bool _setSource(SourceInfo source) {
     if (!(session?.sources.any((value) => value.id == source.id) ?? false)) {
-      return;
+      return false;
     }
     activeSource = source;
     lastSourceId = source.id;
@@ -609,11 +621,7 @@ final class CatalogController extends ChangeNotifier {
     hasNextPage = false;
     query = '';
     listing = 'popular';
-    if (loadListing) {
-      await loadMangas();
-    } else {
-      _notify();
-    }
+    return true;
   }
 
   Future<void> loadMangas({
@@ -621,35 +629,44 @@ final class CatalogController extends ChangeNotifier {
     String? operation,
     bool more = false,
   }) async {
-    await _perform('正在加载漫画', () async {
-      final selectedQuery = search ?? query;
-      final selectedListing =
-          operation ??
-          (search != null
-              ? (search.trim().isEmpty ? 'popular' : 'search')
-              : listing);
-      final selectedPage = more ? page + 1 : 1;
-      final call = switch (selectedListing) {
-        'popular' => wire.SourceCall(
-          popular: wire.PageRequest(page: selectedPage),
-        ),
-        'latest' => wire.SourceCall(
-          latest: wire.PageRequest(page: selectedPage),
-        ),
-        'search' => wire.SourceCall(
-          search: wire.SearchRequest(page: selectedPage, query: selectedQuery),
-        ),
-        _ => throw const FormatException('未知漫画列表操作'),
-      };
-      final result = (await _invoke(call)).mangaPage;
-      final entries = result.mangas.map(MangaEntry.new).toList();
-      if (_closed) return;
-      mangas = more ? [...mangas, ...entries] : entries;
-      page = selectedPage;
-      query = selectedQuery;
-      listing = selectedListing;
-      hasNextPage = result.hasNextPage;
-    });
+    await _perform(
+      '正在加载漫画',
+      () => _loadListing(search: search, operation: operation, more: more),
+    );
+  }
+
+  Future<void> _loadListing({
+    String? search,
+    String? operation,
+    bool more = false,
+    bool Function()? shouldContinue,
+  }) async {
+    if (shouldContinue?.call() == false) return;
+    final selectedQuery = search ?? query;
+    final selectedListing =
+        operation ??
+        (search != null
+            ? (search.trim().isEmpty ? 'popular' : 'search')
+            : listing);
+    final selectedPage = more ? page + 1 : 1;
+    final call = switch (selectedListing) {
+      'popular' => wire.SourceCall(
+        popular: wire.PageRequest(page: selectedPage),
+      ),
+      'latest' => wire.SourceCall(latest: wire.PageRequest(page: selectedPage)),
+      'search' => wire.SourceCall(
+        search: wire.SearchRequest(page: selectedPage, query: selectedQuery),
+      ),
+      _ => throw const FormatException('未知漫画列表操作'),
+    };
+    final result = (await _invoke(call)).mangaPage;
+    if (_closed || shouldContinue?.call() == false) return;
+    final entries = result.mangas.map(MangaEntry.new).toList();
+    mangas = more ? [...mangas, ...entries] : entries;
+    page = selectedPage;
+    query = selectedQuery;
+    listing = selectedListing;
+    hasNextPage = result.hasNextPage;
   }
 
   bool isCurrentSource(CatalogSourceRef reference) =>
@@ -669,6 +686,63 @@ final class CatalogController extends ChangeNotifier {
       sourceId: source.id,
       generation: current.generation,
     );
+  }
+
+  /// Resolve a stable favorite against the current index; all opening stages
+  /// share one busy operation so manual Source selection cannot interleave.
+  Future<bool> openFavoriteSource(
+    wire.FavoriteSource favorite, {
+    required String identityKey,
+    bool Function()? shouldContinue,
+  }) async {
+    if (_closed || busy || status != ServiceStatus.ready) return false;
+    final repository = settings;
+    if (repository == null || repository.identity.key != identityKey) {
+      return false;
+    }
+    final selected = favorite.deepCopy()..freeze();
+    try {
+      validateBusinessFavoriteSource(selected);
+    } on FormatException {
+      error = '收藏源资料无效，请重新读取服务端设置。';
+      _notify();
+      return false;
+    }
+    final epoch = _epoch;
+    bool current() =>
+        !_closed &&
+        epoch == _epoch &&
+        status == ServiceStatus.ready &&
+        settings?.identity.key == identityKey &&
+        identical(settings?.client, repository.client) &&
+        shouldContinue?.call() != false;
+    if (!current()) return false;
+    final available = builds.where(
+      (build) => build.packageName == selected.packageName,
+    );
+    if (available.isEmpty) {
+      error = '这个收藏源的扩展当前不可用，收藏仍保留。';
+      _notify();
+      return false;
+    }
+    final build = available.single;
+    final opened = await _perform<bool>('正在打开收藏源', () async {
+      await _loadBuild(build, shouldContinue: current);
+      if (!current() || activeBuild?.id != build.id) return false;
+      final sources = session?.sources.where(
+        (source) => source.id == selected.sourceId,
+      );
+      if (sources == null || sources.isEmpty) {
+        error = '当前扩展中找不到这个收藏源，收藏仍保留。';
+        return false;
+      }
+      if (!_setSource(sources.single)) return false;
+      final reference = sourceReference;
+      bool sourceCurrent() => current() && isCurrentSource(reference);
+      await _loadListing(shouldContinue: sourceCurrent);
+      return sourceCurrent() && page == 1;
+    });
+    return opened ?? false;
   }
 
   /// A saved manga identifies a package and Source, never an old build or

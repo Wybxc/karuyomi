@@ -16,12 +16,18 @@ import '../data/business_state_server.dart';
 Future<CatalogController> _browseDetails(WidgetTester tester) async {
   await tester.tap(find.text('去浏览'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('source.test · 1.0'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('测试漫画源 · zh'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('真实源 DTO 测试'));
-  await tester.pumpAndSettle();
+  final catalog = find.byType(CatalogPage);
+  final scrollable = find
+      .descendant(of: catalog, matching: find.byType(Scrollable))
+      .first;
+  for (final label in ['source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+    final target = find.descendant(of: catalog, matching: find.text(label));
+    await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
       .controller;

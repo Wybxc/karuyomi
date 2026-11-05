@@ -20,6 +20,7 @@ import '../reader/reader_recovery.dart';
 import '../progress/chapter_read_batch.dart';
 import '../progress/chapter_read_controller.dart';
 import '../progress/chapter_read_dialog.dart';
+import '../sources/favorite_sources.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -146,6 +147,10 @@ class _CatalogPageState extends State<CatalogPage> {
                     label: const Text('重新连接'),
                   ),
                 ],
+              ),
+              FavoriteSourcesPanel(
+                key: const ValueKey('catalog-favorite-sources'),
+                catalog: controller,
               ),
               if (controller.hasUnsavedReadingProgress) ...[
                 const _Notice(
