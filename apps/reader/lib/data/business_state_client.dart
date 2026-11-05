@@ -73,6 +73,7 @@ final class BusinessStateClient {
   final ProgressIdentity identity;
   final _changes = StreamController<void>.broadcast(sync: true);
   final _manga = <String, wire.MangaState>{};
+  final _remoteRevisions = <String, int>{};
   final _pending = <String, _PendingMutation>{};
   final _queues = <String, Future<void>>{};
   final _uuid = const Uuid();
@@ -80,6 +81,15 @@ final class BusinessStateClient {
   int _accountRevision = 0;
   bool _closed = false;
   Future<void>? _refreshing;
+
+  bool hasOnlyLocalChangesSince(
+    String key, {
+    required int basedOnRevision,
+    required int revision,
+  }) =>
+      _manga[key]?.revision == revision &&
+      basedOnRevision <= revision &&
+      basedOnRevision >= (_remoteRevisions[key] ?? 0);
 
   void rebindApi(ApiFetch api, {required ProgressIdentity verifiedIdentity}) {
     _ensureOpen();
@@ -214,9 +224,21 @@ final class BusinessStateClient {
   Future<wire.MangaStateResponse> readManga(String key, {String? chapterKey}) =>
       _serial(key, () => _readManga(key, chapterKey: chapterKey));
 
+  /// Inspect foreground state without advancing a writer's CAS view or
+  /// resolving a rejected mutation owned by another reader or repository.
+  Future<wire.MangaStateResponse> inspectManga(
+    String key, {
+    required String chapterKey,
+  }) => _serial(
+    key,
+    () => _readManga(key, chapterKey: chapterKey, accept: false),
+  );
+
   Future<wire.MangaStateResponse> _readManga(
     String key, {
     String? chapterKey,
+    bool accept = true,
+    int? knownLocalRevision,
   }) async {
     final path = Uri(
       path: '/api/state/manga/$key',
@@ -249,7 +271,8 @@ final class BusinessStateClient {
         value.accountRevision < value.manga.revision) {
       throw StateError('Business state response predates this session');
     }
-    _accept(value.manga);
+    if (!accept) return value;
+    _accept(value.manga, local: value.manga.revision == knownLocalRevision);
     _updateLibrary(value.manga);
     _accountRevision = value.accountRevision > _accountRevision
         ? value.accountRevision
@@ -269,7 +292,10 @@ final class BusinessStateClient {
 
   /// Operation objects contain no transport identity or revision. A failed
   /// attempt retains its exact request and UUID, including after a lost reply.
-  Future<wire.StateMutationResponse> mutate(wire.StateMutation operation) {
+  Future<wire.StateMutationResponse> mutate(
+    wire.StateMutation operation, {
+    int? basedOnRevision,
+  }) {
     final command = operation.deepCopy();
     if (command.mangaKey.isEmpty) throw ArgumentError('Missing manga key');
     command.clearMutationId();
@@ -284,6 +310,19 @@ final class BusinessStateClient {
       }
       if (!_manga.containsKey(command.mangaKey)) {
         await _readManga(command.mangaKey);
+      }
+      if (basedOnRevision != null &&
+          basedOnRevision < (_remoteRevisions[command.mangaKey] ?? 0)) {
+        throw BusinessStateException(
+          wire.BusinessStateError(
+            code: wire
+                .BusinessStateErrorCode
+                .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+            message: 'The reader view predates a confirmed server update',
+          ),
+          manga: _manga[command.mangaKey],
+          conflictedChapterKey: _operationChapter(command),
+        );
       }
       command.expectedRevision = _manga[command.mangaKey]!.revision;
       command.mutationId = _uuid.v4();
@@ -375,6 +414,7 @@ final class BusinessStateClient {
         ? await _readManga(
             pending.request.mangaKey,
             chapterKey: expectedChapter,
+            knownLocalRevision: value.manga.revision,
           )
         : null;
     if (value.manga.revision < (_manga[value.manga.mangaKey]?.revision ?? 0)) {
@@ -405,7 +445,7 @@ final class BusinessStateClient {
       throw failure;
     }
     _pending.remove(pending.request.mangaKey);
-    _accept(value.manga);
+    _accept(value.manga, local: true);
     _accountRevision = value.accountRevision > _accountRevision
         ? value.accountRevision
         : _accountRevision;
@@ -422,8 +462,15 @@ final class BusinessStateClient {
     return reply;
   }
 
-  void _accept(wire.MangaState value) {
-    if (value.revision >= (_manga[value.mangaKey]?.revision ?? 0)) {
+  void _accept(wire.MangaState value, {bool local = false}) {
+    final previous = _manga[value.mangaKey]?.revision ?? 0;
+    if (value.revision >= previous) {
+      if (!local && value.revision > previous) {
+        final remote = _remoteRevisions[value.mangaKey] ?? 0;
+        _remoteRevisions[value.mangaKey] = value.revision > remote
+            ? value.revision
+            : remote;
+      }
       _manga[value.mangaKey] = value.deepCopy()..freeze();
     }
   }
@@ -489,6 +536,7 @@ final class BusinessStateClient {
     if (_closed) return;
     _closed = true;
     _manga.clear();
+    _remoteRevisions.clear();
     _pending.clear();
     _library = const [];
     await _changes.close();

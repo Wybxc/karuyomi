@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/data/business_state_client.dart';
+import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
@@ -129,6 +131,69 @@ final class _Fixture {
 }
 
 void main() {
+  testWidgets(
+    'remote reset during login fences the preserved view until explicit reopen',
+    (tester) async {
+      final fixture = _Fixture();
+      await fixture.open(tester);
+      final original = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      final manifest = original.manifest;
+      (original.positionRequest! as ValueNotifier<ReadingPosition?>).value =
+          manifest.positionAt(2, offset: .6);
+      await tester.pumpAndSettle();
+      expect(await fixture.catalog.flushReadingProgress(), true);
+      final mangaKey = ChapterSequence(
+        packageName: 'source.test',
+        sourceId: sourceId,
+        mangaUrl: testManga.url,
+        chapters: const [],
+      ).mangaKey;
+      final remote = BusinessStateClient(
+        api: fixture.platform.businessServer,
+        identity: fixture.catalog.readingProgress!.identity,
+      );
+      final repository = ProgressRepository(remote);
+      await fixture.pause(tester);
+      fixture.expire = false;
+      fixture.platform.authenticateHandler = () async {
+        await repository.reset(
+          mangaKey: mangaKey,
+          manifest: manifest,
+          reversedOrder: false,
+        );
+        return true;
+      };
+      await tester.tap(find.text('重新登录并恢复本章'));
+      await tester.pumpAndSettle();
+      final resumed = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      expect(resumed.paused, false);
+      expect(resumed.initialPosition!.pageIndexHint, 2);
+      expect(resumed.initialPosition!.normalizedOffset, .6);
+      expect(find.text('重新打开本章'), findsOneWidget);
+      expect(await fixture.catalog.flushReadingProgress(), false);
+      var stored = fixture.platform.businessServer.progress(
+        mangaKey,
+        manifest.chapterKey,
+      )!;
+      expect(stored.epoch, 1);
+      expect(stored.current.pageIndexHint, 0);
+      await tester.tap(find.text('重新打开本章'));
+      await tester.pumpAndSettle();
+      final reopened = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      expect(reopened.initialPosition!.pageIndexHint, 0);
+      expect(find.text('重新打开本章'), findsNothing);
+      expect(await fixture.catalog.flushReadingProgress(), true);
+      stored = fixture.platform.businessServer.progress(
+        mangaKey,
+        manifest.chapterKey,
+      )!;
+      expect(stored.epoch, 1);
+      expect(stored.current.pageIndexHint, 0);
+      await fixture.close(tester);
+      await remote.dispose();
+    },
+  );
+
   test(
     'stored login context retains opaque DTO, logical anchor and layout, and rejects oversized state',
     () {

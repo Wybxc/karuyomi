@@ -5,6 +5,17 @@ import 'business_state_client.dart';
 import 'business_state_validation.dart';
 import 'reading_progress.dart';
 
+final class ProgressSnapshot {
+  const ProgressSnapshot({
+    required this.revision,
+    required this.progress,
+    required this.resume,
+  });
+  final int revision;
+  final ChapterProgress? progress;
+  final MangaResume? resume;
+}
+
 final class ProgressRepository {
   ProgressRepository(this.client);
   final BusinessStateClient client;
@@ -14,8 +25,26 @@ final class ProgressRepository {
     required String mangaKey,
     required String chapterKey,
   }) async {
+    return (await loadChapterState(
+      mangaKey: mangaKey,
+      chapterKey: chapterKey,
+    )).progress;
+  }
+
+  Future<ProgressSnapshot> loadChapterState({
+    required String mangaKey,
+    required String chapterKey,
+  }) async {
     final result = await client.readManga(mangaKey, chapterKey: chapterKey);
-    return result.hasProgress() ? decodeChapterProgress(result.progress) : null;
+    return _state(result.manga, result.hasProgress() ? result.progress : null);
+  }
+
+  Future<ProgressSnapshot> inspectChapter({
+    required String mangaKey,
+    required String chapterKey,
+  }) async {
+    final result = await client.inspectManga(mangaKey, chapterKey: chapterKey);
+    return _state(result.manga, result.hasProgress() ? result.progress : null);
   }
 
   Future<MangaResume?> loadResume(String mangaKey) async {
@@ -33,6 +62,19 @@ final class ProgressRepository {
     required ChapterManifest manifest,
     required ChapterProgress progress,
     required bool reversedOrder,
+  }) async => (await saveState(
+    mangaKey: mangaKey,
+    manifest: manifest,
+    progress: progress,
+    reversedOrder: reversedOrder,
+  )).progress!;
+
+  Future<ProgressSnapshot> saveState({
+    required String mangaKey,
+    required ChapterManifest manifest,
+    required ChapterProgress progress,
+    required bool reversedOrder,
+    int? basedOnRevision,
   }) async {
     _validate(mangaKey, manifest, progress);
     final result = await client.mutate(
@@ -44,14 +86,26 @@ final class ProgressRepository {
           reversedOrder: reversedOrder,
         ),
       ),
+      basedOnRevision: basedOnRevision,
     );
-    return _confirmedProgress(result, manifest.chapterKey);
+    return _confirmedState(result, manifest.chapterKey);
   }
 
   Future<ChapterProgress> reset({
     required String mangaKey,
     required ChapterManifest manifest,
     required bool reversedOrder,
+  }) async => (await resetState(
+    mangaKey: mangaKey,
+    manifest: manifest,
+    reversedOrder: reversedOrder,
+  )).progress!;
+
+  Future<ProgressSnapshot> resetState({
+    required String mangaKey,
+    required ChapterManifest manifest,
+    required bool reversedOrder,
+    int? basedOnRevision,
   }) async {
     if (mangaKey.isEmpty || manifest.pages.isEmpty) {
       throw ArgumentError(
@@ -66,20 +120,35 @@ final class ProgressRepository {
           reversedOrder: reversedOrder,
         ),
       ),
+      basedOnRevision: basedOnRevision,
     );
-    return _confirmedProgress(result, manifest.chapterKey);
+    return _confirmedState(result, manifest.chapterKey);
   }
 }
 
-ChapterProgress _confirmedProgress(
+ProgressSnapshot _confirmedState(
   wire.StateMutationResponse result,
   String chapterKey,
 ) {
   if (!result.hasProgress() || result.progress.chapterKey != chapterKey) {
     throw const FormatException('Progress response chapter mismatch');
   }
-  return decodeChapterProgress(result.progress);
+  return _state(result.manga, result.progress);
 }
+
+ProgressSnapshot _state(
+  wire.MangaState manga,
+  wire.ChapterProgressState? progress,
+) => ProgressSnapshot(
+  revision: manga.revision,
+  progress: progress == null ? null : decodeChapterProgress(progress),
+  resume: manga.hasResume()
+      ? MangaResume(
+          chapterKey: manga.resume.chapterKey,
+          reversedOrder: manga.resume.reversedOrder,
+        )
+      : null,
+);
 
 ChapterProgress decodeChapterProgress(wire.ChapterProgressState value) {
   validateBusinessProgress(value);

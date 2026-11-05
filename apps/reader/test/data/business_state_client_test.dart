@@ -43,6 +43,49 @@ void main() {
   tearDown(() => client.dispose());
 
   test(
+    'foreground inspection does not advance the mutation CAS revision',
+    () async {
+      await client.readManga(_key);
+      final remote = BusinessStateClient(api: server, identity: _identity);
+      addTearDown(remote.dispose);
+      await ProgressRepository(remote).save(
+        mangaKey: _key,
+        manifest: _pages,
+        progress: ChapterProgress(current: _pages.positionAt(1)),
+        reversedOrder: true,
+      );
+      final inspected = await client.inspectManga(_key, chapterKey: 'chapter');
+      expect(inspected.manga.revision, 1);
+      await expectLater(
+        ProgressRepository(client).save(
+          mangaKey: _key,
+          manifest: _pages,
+          progress: ChapterProgress(current: _pages.positionAt(0)),
+          reversedOrder: false,
+        ),
+        throwsA(
+          isA<BusinessStateException>().having(
+            (failure) => failure.conflict,
+            'CAS stayed at original view',
+            true,
+          ),
+        ),
+      );
+      final request = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(
+          server.requests
+              .where((request) => request.method == 'POST')
+              .last
+              .body!,
+        ),
+      );
+      expect(request.expectedRevision, 0);
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+    },
+  );
+
+  test(
     'favorite retries and shelf refresh cannot clear a reader-owned CAS conflict',
     () async {
       final library = LibraryRepository(client);

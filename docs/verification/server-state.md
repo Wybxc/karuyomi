@@ -87,6 +87,17 @@ EXTENSION_ASSETS_DIR="$PWD/.local/v4-production/snapshot" pnpm build
 - 正式 Flutter Web release、已有 v4 三包快照的 Static Assets 组装与 Worker dry-run 构建通过；默认空索引构建也通过，不能将它代替含三包的组装检查。共享 materialVersion 仍为 `629d6e30fe3a1ac956e39630354cfd5ce390923c4b07af2a0603a181d348d11b`，未启动新的全量 AOT；新 API/D1 及客户端尚未部署生产，也未构建/安装本轮 Native App。
 - 本地业务数据库、Drift/build_runner 依赖、生成模型和数据库 Web 资产已移除；Source 文件/HTTP Cache、扩展缓存与图片资源的原存储未改变。
 
+## 阅读中前台重取与登录恢复
+
+同日新增 `reading_progress_refresh_test.dart` 及正式路由回归，完整 `pnpm flutter:check` 通过：三个项目分析无问题，测试分别为 21、42、208 项。`pnpm check` 再次通过，包括 23 个 Vitest 文件、358 项测试及完整工具/协议/workerd 检查；含原生产三包的 `pnpm build` 与 Worker dry-run 通过，扩展静态目录与原快照逐字节相同，共享材料版本未变。
+
+- 恢复前台与“刷新进度”先以当前阅读视图的已确认 revision 提交草稿，再只读检查服务器；inspect 不推进共享客户端的 CAS 基线，不解除别章或旧 mutation 的冲突。
+- 其他端改变 current、furthest、epoch、resume 或未知来源的作品 revision 时，当前画面与锚点保持不变；旧视图不能再保存，必须明确“重新打开本章”才采用服务器位置及章节顺序。同一客户端已经确认的收藏操作仍可共享连续 revision。
+- 显式重开复用章节切换的旧 provider 清理 ACK，在新 leaf 挂载前完成；当前阅读模式及双页选择保留。刷新 503 可重试，迟到读取、新 viewport、切章及 dispose 不污染新视图。
+- Access 登录恢复沿用旧阅读视图的基线，通过相同只读检查决定是否需要重开；不能读取新 epoch 后把旧 continuation 位置写回。组件回归在登录回调内用第二客户端 reset，确认恢复仍保留原画面、服务器首页未被覆盖，明确重开后才采用新 epoch。
+
+新增前台测试 14 项、inspect/CAS 测试 1 项、路由前台/失败重试 2 项和登录期间 reset 1 项。这些是组件与正式路由测试；真实内置浏览器、生产 Access 和 Native 生命周期验收仍独立进行。
+
 ## 验证边界
 
 这组测试证明本地真实 workerd/D1、正式路由和签名测试身份之间的闭环；两个客户端是独立 HTTP 调用方。它不代表生产 Cloudflare Access 登录、远程 D1 部署、浏览器 UI、Web/iOS/Android 跨端交互或真机阅读已经验收。分类、书签与非敏感设置仍需按计划接入相同服务端权威模型，不能由本记录推断已经实现。

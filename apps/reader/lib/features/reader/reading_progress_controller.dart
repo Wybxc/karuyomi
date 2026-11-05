@@ -37,6 +37,7 @@ final class ReadingProgressController extends ChangeNotifier {
   final _pending = <String, _PendingProgress>{};
   final _pendingResets = <String, _PendingReset>{};
   final _states = <String, ChapterProgress>{};
+  final _confirmed = <String, ProgressSnapshot>{};
   final _conflicted = <String>{};
   final _navigationPending = <String>{};
   final _resetting = <String>{};
@@ -45,6 +46,8 @@ final class ReadingProgressController extends ChangeNotifier {
   Future<void>? _flushing;
   bool _closed = false;
   bool _orderLoaded = false;
+  int _viewSequence = 0;
+  int _refreshSequence = 0;
   String? _currentChapter;
   bool reversedOrder = false;
   ProgressStorageMode? storageMode;
@@ -53,31 +56,46 @@ final class ReadingProgressController extends ChangeNotifier {
   bool get unsaved => _pending.isNotEmpty || _pendingResets.isNotEmpty;
   bool get awaitingViewport => _navigationPending.isNotEmpty;
   ChapterProgress? chapter(String key) => _states[key];
+  bool needsReopen(String chapterKey) => _conflicted.contains(chapterKey);
   MangaResume? get draftResume => _currentChapter == null
       ? null
       : MangaResume(chapterKey: _currentChapter!, reversedOrder: reversedOrder);
 
   Future<ReadingPosition?> restore(ChapterManifest manifest) async {
     if (manifest.pages.isEmpty || _closed) return null;
-    ChapterProgress? stored = _pending[manifest.chapterKey]?.progress;
+    final view = ++_viewSequence;
+    ++_refreshSequence;
+    final reopening = needsReopen(manifest.chapterKey);
+    ChapterProgress? stored = reopening
+        ? null
+        : _pending[manifest.chapterKey]?.progress;
     try {
       storageMode = ProgressStorageMode.serverConfirmed;
-      if (!_orderLoaded) {
-        final resume = await repository.loadResume(mangaKey);
-        if (resume != null) reversedOrder = resume.reversedOrder;
+      if (stored == null) {
+        final state = await repository.loadChapterState(
+          mangaKey: mangaKey,
+          chapterKey: manifest.chapterKey,
+        );
+        if (_closed || view != _viewSequence) return null;
+        _remember(manifest.chapterKey, state);
+        stored = state.progress;
+        if (!_orderLoaded || reopening) {
+          reversedOrder = state.resume?.reversedOrder ?? false;
+        }
         _orderLoaded = true;
       }
-      stored ??= await repository.loadChapter(
-        mangaKey: mangaKey,
-        chapterKey: manifest.chapterKey,
-      );
+      if (reopening) {
+        _pending.remove(manifest.chapterKey);
+        _pendingResets.remove(manifest.chapterKey);
+      }
       error = null;
       _conflicted.remove(manifest.chapterKey);
     } catch (_) {
+      if (_closed || view != _viewSequence) return null;
       error = '未能读取服务器进度，阅读仍可继续；未确认的修改仅保留在当前会话。';
       stored ??= _states[manifest.chapterKey];
     }
-    if (_closed) return null;
+    if (_closed || view != _viewSequence) return null;
     final anchor = resolvePosition(manifest, stored?.current).position!;
     _states[manifest.chapterKey] = (stored ?? ChapterProgress(current: anchor))
         .advance(manifest: manifest, current: anchor);
@@ -87,6 +105,68 @@ final class ReadingProgressController extends ChangeNotifier {
     _notify();
     // Return the original anchor so ReaderScreen can show missing-page notice.
     return stored?.current;
+  }
+
+  /// Foreground refresh never moves the current viewport. Unconfirmed writes
+  /// keep their original CAS view; an observed server change requires reopening.
+  Future<void> refreshFromServer(ChapterManifest manifest) async {
+    if (_closed ||
+        manifest.pages.isEmpty ||
+        needsReopen(manifest.chapterKey) ||
+        _resetting.isNotEmpty) {
+      return;
+    }
+    final refresh = ++_refreshSequence;
+    final view = _viewSequence;
+    bool current() =>
+        !_closed && refresh == _refreshSequence && view == _viewSequence;
+    _cancelTimers();
+    if (unsaved || _flushing != null) {
+      if (!await flush() || !current()) return;
+    }
+    if (!current()) return;
+    final before = _confirmed[manifest.chapterKey];
+    try {
+      final latest = await repository.inspectChapter(
+        mangaKey: mangaKey,
+        chapterKey: manifest.chapterKey,
+      );
+      if (!current()) return;
+      final progressChanged =
+          before == null ||
+          !_sameNullableProgress(before.progress, latest.progress) ||
+          !_sameResume(before.resume, latest.resume);
+      final remoteRevisionChanged =
+          before != null &&
+          latest.revision != before.revision &&
+          !repository.client.hasOnlyLocalChangesSince(
+            mangaKey,
+            basedOnRevision: before.revision,
+            revision: latest.revision,
+          );
+      if (progressChanged || remoteRevisionChanged) {
+        _conflicted.add(manifest.chapterKey);
+        error = before?.progress?.epoch != latest.progress?.epoch
+            ? '本章进度已在其他设备重置，当前阅读位置保持不变。请重新打开本章后继续保存。'
+            : progressChanged
+            ? '阅读进度已在其他设备更新，当前阅读位置保持不变。请重新打开本章后继续保存。'
+            : '此作品已在其他设备更新，当前阅读位置保持不变。请重新打开本章后继续保存。';
+      } else if (_conflicted.isEmpty) {
+        _remember(manifest.chapterKey, latest);
+        error = null;
+      }
+      _notify();
+    } catch (_) {
+      if (!current()) return;
+      error = '未能刷新服务器进度，当前阅读位置保持不变，可重试。';
+      _notify();
+    }
+  }
+
+  void _remember(String chapterKey, ProgressSnapshot snapshot) {
+    if (snapshot.revision >= (_confirmed[chapterKey]?.revision ?? 0)) {
+      _confirmed[chapterKey] = snapshot;
+    }
   }
 
   void observe({
@@ -122,6 +202,7 @@ final class ReadingProgressController extends ChangeNotifier {
       return;
     }
     final wasUnsaved = unsaved;
+    ++_viewSequence;
     _states[manifest.chapterKey] = after;
     _pending[manifest.chapterKey] = _PendingProgress(
       manifest,
@@ -162,13 +243,16 @@ final class ReadingProgressController extends ChangeNotifier {
       final draft = entry.value;
       try {
         storageMode = ProgressStorageMode.serverConfirmed;
-        final saved = await repository.save(
+        final confirmed = await repository.saveState(
           mangaKey: mangaKey,
           manifest: draft.manifest,
           progress: draft.progress,
           reversedOrder: draft.reversedOrder,
+          basedOnRevision: _confirmed[entry.key]?.revision,
         );
         if (_closed) return;
+        final saved = confirmed.progress!;
+        _remember(entry.key, confirmed);
         if (saved.epoch != draft.progress.epoch) {
           _pending.remove(entry.key);
           _states[entry.key] = saved;
@@ -208,12 +292,15 @@ final class ReadingProgressController extends ChangeNotifier {
     while (_pendingResets.isNotEmpty && !_closed) {
       final entry = _pendingResets.entries.first;
       try {
-        final saved = await repository.reset(
+        final confirmed = await repository.resetState(
           mangaKey: mangaKey,
           manifest: entry.value.manifest,
           reversedOrder: entry.value.reversedOrder,
+          basedOnRevision: _confirmed[entry.key]?.revision,
         );
         if (_closed) return;
+        final saved = confirmed.progress!;
+        _remember(entry.key, confirmed);
         _pendingResets.remove(entry.key);
         _conflicted.remove(entry.key);
         _states[entry.key] = saved;
@@ -248,6 +335,8 @@ final class ReadingProgressController extends ChangeNotifier {
       return null;
     }
     _resetting.add(manifest.chapterKey);
+    ++_viewSequence;
+    ++_refreshSequence;
     try {
       if (!_pendingResets.containsKey(manifest.chapterKey)) {
         if (!await flush() || _closed) return null;
@@ -301,3 +390,13 @@ bool _sameProgress(ChapterProgress a, ChapterProgress b) =>
     a.completed == b.completed &&
     _sameAnchor(a.current, b.current) &&
     _sameAnchor(a.furthest, b.furthest);
+
+bool _sameNullableProgress(ChapterProgress? a, ChapterProgress? b) =>
+    identical(a, b) || (a != null && b != null && _sameProgress(a, b));
+
+bool _sameResume(MangaResume? a, MangaResume? b) =>
+    identical(a, b) ||
+    (a != null &&
+        b != null &&
+        a.chapterKey == b.chapterKey &&
+        a.reversedOrder == b.reversedOrder);

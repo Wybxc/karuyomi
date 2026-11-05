@@ -78,6 +78,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   bool _accessPaused = false;
   bool _recovering = false;
   bool _initializing = false;
+  bool _refreshingProgress = false;
 
   @override
   void initState() {
@@ -145,6 +146,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     final origin = _origin;
     if (_recovering ||
         _busy ||
+        _refreshingProgress ||
         _initializing ||
         _closing ||
         authenticate == null ||
@@ -212,7 +214,10 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         throw StateError(widget.catalog.error ?? '当前章节恢复未完成，可重新连接');
       }
       final next = recovered;
-      final storedPosition = await _progress?.restore(next.opened.manifest);
+      // Reauthentication resumes the existing view; it is not an explicit
+      // acceptance of another device's progress. Keep its original CAS/epoch
+      // until a deliberate reopen adopts the current server position.
+      await _progress?.refreshFromServer(next.opened.manifest);
       if (_closing || !mounted) return;
       if (widget.catalog.status != ServiceStatus.ready ||
           widget.catalog.subject != subject ||
@@ -225,7 +230,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         _source = next.source;
         _chapter = next.chapter;
         _opened = next.opened;
-        _initialPosition = next.position ?? storedPosition;
+        _initialPosition = next.position;
         _viewport = null;
         _positionRequest.value = null;
         _viewClosed = Completer<void>();
@@ -269,7 +274,8 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       ),
       if (widget.onAuthenticate != null)
         FilledButton.icon(
-          onPressed: _recovering || _busy || _initializing
+          onPressed:
+              _recovering || _busy || _initializing || _refreshingProgress
               ? null
               : () => unawaited(_recoverReading()),
           icon: const Icon(Icons.login),
@@ -280,7 +286,33 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) unawaited(_progress?.flush());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshProgress());
+    } else {
+      unawaited(_progress?.flush());
+    }
+  }
+
+  Future<void> _refreshProgress() async {
+    final progress = _progress;
+    if (progress == null ||
+        _refreshingProgress ||
+        _closing ||
+        _busy ||
+        _recovering ||
+        _initializing ||
+        _accessPaused ||
+        !widget.catalog.isCurrentSource(_source)) {
+      return;
+    }
+    setState(() => _refreshingProgress = true);
+    try {
+      await progress.refreshFromServer(_opened.manifest);
+    } finally {
+      if (!_closing && mounted) {
+        setState(() => _refreshingProgress = false);
+      }
+    }
   }
 
   void _recordViewport({bool complete = false}) {
@@ -297,14 +329,14 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
 
   Future<void> _finishChapter() async {
     final canComplete = _viewport?.atEnd == true && _viewport?.observed != null;
-    if (_busy || _recovering || !canComplete) return;
+    if (_busy || _recovering || _refreshingProgress || !canComplete) return;
     _recordViewport(complete: true);
     await _progress?.flush();
   }
 
   Future<void> _resetChapter() async {
     final progress = _progress;
-    if (_busy || _recovering || progress == null) return;
+    if (_busy || _recovering || _refreshingProgress || progress == null) return;
     setState(() => _busy = true);
     final reset = await progress.reset(_opened.manifest);
     if (!_closing && mounted) {
@@ -413,16 +445,17 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     }());
   }
 
-  Future<void> _move(SequenceChapter target) {
+  Future<void> _move(SequenceChapter target, {bool reopen = false}) {
     if (_busy ||
         _closing ||
         _accessPaused ||
         _recovering ||
-        target.key == _chapter.key) {
+        _refreshingProgress ||
+        (target.key == _chapter.key && !reopen)) {
       return Future.value();
     }
     ReaderBaselineScope.read(context)?.event('navigation', {
-      'action': 'change_chapter',
+      'action': reopen ? 'reopen_chapter' : 'change_chapter',
       'fromChapterKey': _chapter.key,
       'targetChapterKey': target.key,
     });
@@ -458,10 +491,15 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         return;
       }
       if (_closing || !mounted) return;
-      setState(() => _visible = false);
+      setState(() {
+        _mode = _viewport?.mode ?? _mode;
+        _doublePage = _viewport?.doublePage ?? _doublePage;
+        _visible = false;
+      });
       await _viewClosed.future;
       if (_closing || !mounted) return;
       await _progress?.flush();
+      final adoptingServerState = _progress?.needsReopen(target.key) ?? false;
       final position = await _progress?.restore(next.manifest);
       if (_closing || !mounted) return;
       if (!widget.catalog.isCurrentSource(source)) {
@@ -474,6 +512,12 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         _viewAttached = false;
         _viewport = null;
         _initialPosition = position;
+        if (adoptingServerState &&
+            _progress?.needsReopen(target.key) == false) {
+          _order = _progress!.reversedOrder
+              ? ChapterOrder.reversed
+              : ChapterOrder.source;
+        }
         _positionRequest.value = null;
         _preparationAttempt = null;
         _visible = true;
@@ -513,7 +557,11 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
           children: [
             TextButton.icon(
               onPressed:
-                  _busy || _accessPaused || _recovering || previous == null
+                  _busy ||
+                      _accessPaused ||
+                      _recovering ||
+                      _refreshingProgress ||
+                      previous == null
                   ? null
                   : () => unawaited(_move(previous)),
               icon: const Icon(Icons.navigate_before),
@@ -533,7 +581,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
                     child: Text('反向来源顺序'),
                   ),
                 ],
-                onChanged: _busy || _recovering
+                onChanged: _busy || _recovering || _refreshingProgress
                     ? null
                     : (order) {
                         if (order != null) _changeOrder(order);
@@ -541,7 +589,12 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
               ),
             ),
             TextButton.icon(
-              onPressed: _busy || _accessPaused || _recovering || next == null
+              onPressed:
+                  _busy ||
+                      _accessPaused ||
+                      _recovering ||
+                      _refreshingProgress ||
+                      next == null
                   ? null
                   : () => unawaited(_move(next)),
               icon: const Icon(Icons.navigate_next),
@@ -558,6 +611,9 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     final saved = progress.chapter(_chapter.key);
     final unresolved = saved?.furthestUnresolved(_opened.manifest) ?? false;
     final far = saved?.furthest;
+    final needsReopen = progress.needsReopen(_chapter.key);
+    final disabled =
+        _busy || _recovering || _accessPaused || _refreshingProgress;
     final status =
         progress.error ??
         switch (progress.storageMode) {
@@ -581,17 +637,32 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
           Wrap(
             alignment: WrapAlignment.center,
             children: [
+              TextButton.icon(
+                onPressed: disabled
+                    ? null
+                    : needsReopen
+                    ? () => unawaited(_move(_chapter, reopen: true))
+                    : () => unawaited(_refreshProgress()),
+                icon: const Icon(Icons.sync),
+                label: Text(
+                  _refreshingProgress
+                      ? '正在刷新进度'
+                      : needsReopen
+                      ? '重新打开本章'
+                      : '刷新进度',
+                ),
+              ),
               TextButton(
                 onPressed:
-                    _busy || _recovering || _opened.manifest.pages.isEmpty
+                    disabled || needsReopen || _opened.manifest.pages.isEmpty
                     ? null
                     : () => unawaited(_resetChapter()),
                 child: const Text('重新阅读本章'),
               ),
               TextButton(
                 onPressed:
-                    _busy ||
-                        _recovering ||
+                    disabled ||
+                        needsReopen ||
                         _viewport?.atEnd != true ||
                         _viewport?.observed == null ||
                         saved?.completed == true
@@ -599,9 +670,11 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
                     : () => unawaited(_finishChapter()),
                 child: const Text('读完本章'),
               ),
-              if (progress.error != null && progress.unsaved)
+              if (progress.error != null && progress.unsaved && !needsReopen)
                 TextButton(
-                  onPressed: () => unawaited(progress.flush()),
+                  onPressed: disabled
+                      ? null
+                      : () => unawaited(progress.flush()),
                   child: const Text('重试保存'),
                 ),
             ],

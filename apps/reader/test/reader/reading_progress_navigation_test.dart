@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/data/business_state_client.dart';
+import 'package:karuyomi/data/progress_repository.dart';
+import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/main.dart';
+import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -73,6 +77,128 @@ Future<CatalogController> _details(
 }
 
 void main() {
+  testWidgets(
+    'foreground refresh keeps the viewport until explicit reopen adopts remote progress and order',
+    (tester) async {
+      final server = TestBusinessServer();
+      final platform = _platform(server: server);
+      final catalog = await _details(tester, platform);
+      await tester.tap(find.text('第一章'));
+      await tester.pumpAndSettle();
+      expect(await catalog.flushReadingProgress(), true);
+      final before = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      final manifest = before.manifest;
+      final mangaKey = ChapterSequence(
+        packageName: 'source.test',
+        sourceId: sourceId,
+        mangaUrl: testManga.url,
+        chapters: const [],
+      ).mangaKey;
+      final remote = BusinessStateClient(
+        api: server,
+        identity: catalog.readingProgress!.identity,
+      );
+      final repository = ProgressRepository(remote);
+      await repository.save(
+        mangaKey: mangaKey,
+        manifest: manifest,
+        progress: ChapterProgress(
+          current: manifest.positionAt(2, offset: .7),
+          furthest: manifest.positionAt(2, offset: .7),
+        ),
+        reversedOrder: true,
+      );
+      final remoteRevision = server.accountRevision;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('重新打开本章'), findsOneWidget);
+      final unchanged = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      expect(unchanged.key, before.key);
+      expect(unchanged.initialPosition, before.initialPosition);
+      expect(unchanged.positionRequest!.value, before.positionRequest!.value);
+      unchanged.onViewportChanged!(
+        ReaderViewportState(
+          current: manifest.positionAt(1),
+          observed: manifest.positionAt(1),
+          atEnd: false,
+          windowReady: true,
+          mode: ReadingMode.webtoon,
+          doublePage: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(await catalog.flushReadingProgress(), false);
+      expect(server.accountRevision, remoteRevision);
+      await tester.tap(find.text('重新打开本章'));
+      await tester.pumpAndSettle();
+      final reopened = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      expect(reopened.key, isNot(before.key));
+      expect(reopened.initialPosition!.pageIndexHint, 2);
+      expect(reopened.initialPosition!.normalizedOffset, .7);
+      expect(reopened.initialMode, ReadingMode.webtoon);
+      expect(reopened.doublePage, true);
+      expect(find.text('重新打开本章'), findsNothing);
+      expect(
+        tester
+            .widget<DropdownButton<ChapterOrder>>(
+              find.byType(DropdownButton<ChapterOrder>),
+            )
+            .value,
+        ChapterOrder.reversed,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await catalog.closeReadingProgress();
+      await remote.dispose();
+    },
+  );
+
+  testWidgets(
+    'failed foreground refresh keeps reading available and the explicit refresh retries',
+    (tester) async {
+      final server = TestBusinessServer();
+      final platform = _platform(server: server);
+      final catalog = await _details(tester, platform);
+      await tester.tap(find.text('第一章'));
+      await tester.pumpAndSettle();
+      expect(await catalog.flushReadingProgress(), true);
+      final before = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      var failChapterRead = true;
+      server.beforeRequest = (request) {
+        if (failChapterRead &&
+            request.uri.queryParameters.containsKey('chapterKey')) {
+          failChapterRead = false;
+          return const ApiReply(
+            status: 503,
+            headers: {'content-type': 'text/plain'},
+            body: 'Injected foreground chapter read failure',
+            redirected: false,
+          );
+        }
+        return null;
+      };
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('未能刷新服务器进度，当前阅读位置保持不变，可重试。'), findsOneWidget);
+      expect(
+        tester.widget<ReaderScreen>(find.byType(ReaderScreen)).key,
+        before.key,
+      );
+      await tester.tap(find.text('刷新进度'));
+      await tester.pumpAndSettle();
+      expect(find.text('未能刷新服务器进度，当前阅读位置保持不变，可重试。'), findsNothing);
+      expect(find.text('阅读进度已保存到服务端'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await catalog.closeReadingProgress();
+    },
+  );
+
   testWidgets(
     'failed save retains its original identity draft until that service reconnects',
     (tester) async {
