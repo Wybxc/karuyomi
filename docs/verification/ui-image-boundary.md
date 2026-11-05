@@ -89,10 +89,34 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 原始报告 `xkcd-export-capture.json`、完整性复核 `export-integrity.json`、网络记录 `xkcd-export-network.json`、漫画/文字/下载结果截图 `export-*.jpg` 保存在固定验证树 ignored `.local/ui-image-baseline/confirmed/`。测试标签页已关闭，服务会话退出 130 后另行确认端口 53920 无监听，且无本次 Source probe/workerd/Gradle 进程；仅删除唯一匹配本 buildId 的 `karuyomi-source-probe-kur9sp` 临时快照/D1，没有只依赖退出码判断清理完成。下一步在当前不透明图片合同下复验 Arknights 正式完整章、下一章与首次续读，再按固定条件补齐多次 baseline 和目标设备指标。
 
+## 当前合同的 Arknights 完整章与首次续读
+
+2026-11-05，在独立验证树复用上述正式 UI `5e1e014` 和不透明图片合同，加载未修改的 Arknights Comics 1.6.2 原 JAR。buildId 为 `ext-en.arknightscomics-664db9291ee98ae9231b39a4aa2d536b`，canonical JS SHA-256 为 `e6def8e3e5fcca10057be1ecaf384418e3087e58ef95a012e6d8fefc9133a162`，原 JAR SHA-256 为 `e1a706cc4b504af04bf2ebbb3046d36421a949fca0633e69166e34415d657cf3`；host 指纹与共享材料仍为上述当前版本。没有修改扩展业务源码、原 JAR 或绕过 Source 直接加载原图。
+
+正式 `lib/main.dart` Web release 在新的本地 origin、Codex 内置浏览器、已启用无障碍树、隔离 workerd/D1 和真实 RS256 测试验签下，从首页进入源和 `Prelude Suite: The Lone Walker`。DREAM 的 51 页逐页实际显示，页码和本地已保存进度逐页推进；末页显式完成后实际显示“本地进度已保存／本章已读完”。随后使用正式“下一章”进入 HEARTBEAT，依次显示并保存第 1–3 页；退出回详情后“继续阅读”首次恢复 HEARTBEAT 第 3 页，图片和已保存状态均可见。该恢复属于同一标签页内路由重开，不是关标签页、浏览器进程、Native 或生产 Access 恢复。
+
+本轮保留操作中的限制：第 12 页曾发生 locator 等待超时，之后新的 AX 状态确认实际已保存；首次尝试第 23 页时仍停在第 22 页，刷新观察后再次操作才成功到达并保存第 23 页。没有把这次未推进尝试算作成功。51 张编号截图齐全，操作记录包含页 2–51 的全部已保存状态及上述失败尝试。视口过程中由 1280×720 变为约 453×764；后段采集报告记录 DPR 2、SDK 刷新率 60 Hz，因此本轮是可用性和续读功能门，不作固定显示条件的性能比较。
+
+隔离网络记录共 65 个 GET，HTTP bridge 和上游状态均为 200，其中 59 个为图片响应，没有网络错误记录。这个计数不等于实际显示页数；实际阅读范围由 UI 状态和截图证明。原 Source 的网络请求和处理路径保持有效，本地允许域名明确为 `arknights.global` 与 `webusstatic.yo-star.com`，没有据此推定生产网络政策或 Access 已通过。
+
+另一次 60 秒有界采集在 DREAM 第 43 页后开始推进，覆盖第 44–51 页、切换 HEARTBEAT 第 1–3 页和退出。真实下载 JSON 为 879,608 字节，含 152 个事件及 1,472 个帧样本，`truncated=false`、`frameTimingStatus=associated`。事件时间单调且在采集期限内，带帧号事件均精确匹配原始计时，图片和事件缺帧列表为空。报告有 11 份捕获期 acquire 结果，全部对应到 14 个 `release_ack`；额外 3 份释放属于采集前已持有的资源，不能把 acquire 与释放总数误写为相等。14 份 release 请求、发送和 ACK 的资源/generation 集合一致，DREAM 切章和 HEARTBEAT 退出分别有一个 `reader_exit_ack`。这份报告只证明该采集区间内的生命周期，未覆盖前 43 页全部资源，也不包含随后首次续读的完整采集，不能代表整个浏览器、Flutter cache、RSS/GPU 或进程峰值全部释放。
+
+控制台记录仍只有一次早期焦点异常及其栈两条 entry，时间为 `2026-11-05T00:11:36.496Z`，早于报告开始 `00:18:49.695Z`；后续阅读未新增错误记录。它与上述 ReadingOrderTraversalPolicy 路径一致，具体触发原因和默认构建对照继续验收，不把本轮功能成功写成全程零错误。
+
+逐页截图 `arknights-pages/01.jpg` 至 `51.jpg`、操作记录 `arknights-current-ui-steps.json`、完成/首次续读截图、`arknights-heartbeat-ui.json`、`arknights-resume-ui.txt`、`arknights-lifecycle-capture.json`、`arknights-current-network.json` 和 `arknights-console-errors.json` 保存在同一 ignored 证据目录。`arknights-run-cleanup.json` 记录标签页已关闭，服务会话退出 130 后端口 61624 无监听，且无本次 Source probe/workerd 进程；仅删除唯一匹配本 buildId 的 `karuyomi-source-probe-B9DSM0` 临时快照/D1。当前产物未发布为已兼容，仍不以这两个源的限定 Web 分项替代 3–5 源、Native、真实 Access、长图/EXIF 或真机门。
+
+## 初始焦点对照与诊断层收敛
+
+在同一固定 `5e1e014` 源码、相同材料下，另行构建默认未启用 `READER_BASELINE` 的正式 Web release，独立输出到 ignored `.local/ui-image-baseline/default-web`，保留原采集版。Codex 内置浏览器临时固定为 1280×720；三次新文档加载均执行启用无障碍、Tab/Shift+Tab 和进入浏览，操作前后的控制台 error 数均为零，且界面不含性能采集按钮。这是三个新文档的默认构建对照，不是三个浏览器进程，也不能证明所有条件下不会发生焦点问题。
+
+官方 [Flutter #193287](https://github.com/flutter/flutter/issues/193287) 记录同一稳定 SDK 中 builder 外层 Overlay 的同类焦点遍历栈，但其示例同时含 SelectionArea，不能直接认定与本项目完全同因。当前最小候选用锁定 SDK 的 `Overlay.wrap` 接管诊断 entry 生命周期，移除手写 entry 创建、更新和释放，保持 Source、图片链和 recorder 不变。工程回归及后续固定版本浏览器对照分别记录；仅收敛到官方组件不能预先宣布焦点异常已修复。
+
+默认对照原始记录为 `default-focus-runs.json`，成品与构建日志独立保留。三个标签页均已关闭，临时视口已恢复；服务退出后确认端口 49608 无监听且无本次 probe/workerd 进程，只删除匹配本 buildId 的 `karuyomi-source-probe-abtvn9` 临时目录，见 `default-focus-cleanup.json`。
+
 ## 性能依据与下一门
 
 现有顺序 PNG/JPEG 分片有正确性、条带缓冲、背压和取消机制证据，见[独立 codec 记录](long-image-codec.md)。16 MiB WASM heap 和 C payload 账本不等于进程 RSS、GPU 或 Flutter 端总峰值。尚无与 Flutter 直接解码、平台区域解码的同设备、同字节、同显示尺寸性能比较，不能据此选择默认分片算法。
 
 顺序扫尾、反向跳转时重扫、PNG 再编码和跨端复制的成本须实测。下一步先记录 UI 直接解码的冷热首帧、首/中/末跳转、往返滚动与缩放，再在相同输入上比较候选方案的 CPU、帧耗时、RSS/GPU 和总峰值。标准见[设计](../design/reader-image-decoding.md)，实施顺序见[计划](../plan/reader-image-decoding.md)。
 
-当前新增了上述诊断性 Web 路由阅读和报告下载完整性分项，未重新完成 Native 产品交互，也未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。
+当前已新增原 xkcd 阅读/下载完整性和 Arknights 当前合同下完整章/下一章/首次续读分项，未重新完成 Native 产品交互，也未证明真实长图、EXIF/LOD、生产 Access、真机性能或 P0 通过。学习实际尺寸发生在客户端解码后，当前估算账本不能限制平台整图解码的瞬时峰值。

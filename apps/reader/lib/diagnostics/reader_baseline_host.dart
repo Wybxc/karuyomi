@@ -11,7 +11,7 @@ import 'reader_baseline_file_cleanup_stub.dart'
 
 /// Mounted only in an explicitly enabled build. The normal app has no recorder,
 /// timings listener, performance overlay, or global JavaScript export hook.
-class ReaderBaselineHost extends StatefulWidget {
+class ReaderBaselineHost extends StatelessWidget {
   const ReaderBaselineHost({
     super.key,
     required this.child,
@@ -20,33 +20,16 @@ class ReaderBaselineHost extends StatefulWidget {
   final Widget child;
   @visibleForTesting
   final Future<void> Function(XFile file)? saveReportForTesting;
-  @override
-  State<ReaderBaselineHost> createState() => _ReaderBaselineHostState();
-}
 
-class _ReaderBaselineHostState extends State<ReaderBaselineHost> {
-  // MaterialApp.builder sits above its Navigator. Give the diagnostic controls
-  // their own official Overlay so tooltips and text selection also work here.
-  late final _entry = OverlayEntry(
-    builder: (context) => _ReaderBaselineContents(
-      saveReportForTesting: widget.saveReportForTesting,
-      child: widget.child,
+  @override
+  Widget build(BuildContext context) => Overlay.wrap(
+    // MaterialApp.builder sits above its Navigator. The SDK owns this overlay's
+    // entry lifecycle for diagnostic tooltips and text selection.
+    child: _ReaderBaselineContents(
+      saveReportForTesting: saveReportForTesting,
+      child: child,
     ),
   );
-  @override
-  Widget build(BuildContext context) => Overlay(initialEntries: [_entry]);
-  @override
-  void didUpdateWidget(ReaderBaselineHost oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _entry.markNeedsBuild();
-  }
-
-  @override
-  void dispose() {
-    _entry.remove();
-    _entry.dispose();
-    super.dispose();
-  }
 }
 
 class _ReaderBaselineContents extends StatefulWidget {

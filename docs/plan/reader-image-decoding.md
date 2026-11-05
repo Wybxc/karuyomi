@@ -4,7 +4,7 @@
 
 保持 Source 原有图片获取和处理语义，使 Web 与 Native 阅读器在真实客户端中完成解码、布局、显示及资源释放。先测量 Flutter 直接解码的正式 UI 基线，再依据首图、交互和内存数据决定是否采用分片、降采样或成熟区域解码器。
 
-状态：**进行中，Source 图片交付已收敛为不透明编码资源，客户端实际帧尺寸与预算接线已实现；原 xkcd Web 阅读及一次报告下载完整性已通过分项，当前路径的多次真实 UI 性能基线、长图、EXIF/LOD 与真机验收仍待完成。** 本计划是 [P0 阅读计划](p0-runtime-and-reading.md)的图片子计划，不能以编译、逻辑预算或独立 codec 机制关闭产品门。
+状态：**进行中，Source 图片交付已收敛为不透明编码资源，客户端实际帧尺寸与预算接线已实现；原 xkcd Web 下载完整性及 Arknights 当前合同下完整章/下一章/首次续读已通过分项，当前路径的多次真实 UI 性能基线、长图、EXIF/LOD 与真机验收仍待完成。** 本计划是 [P0 阅读计划](p0-runtime-and-reading.md)的图片子计划，不能以编译、逻辑预算或独立 codec 机制关闭产品门。
 
 ## 当前架构与实现边界
 
@@ -23,6 +23,8 @@
 
 当前合同下，正式 Web release 的原 xkcd 漫画、TextInterceptor 文字图、显式完成及退出已通过分项；采集入口在保留首次导出失败后，完成一次真实 JSON 下载、正文解析、帧号关联和释放 ACK 完整性门。该单次样本不是首图/跳转性能分布；同页在采集开始前仍有一次 RenderBox 未布局错误待排查。固定输入、运行条件、CI 与限制见[UI 图片证据](../verification/ui-image-boundary.md#web-报告下载完整性复验)。
 
+原 Arknights DREAM 51 页、显式完成、下一章 HEARTBEAT 第 1–3 页及同标签页首次续读第 3 页也已通过当前合同的正式 Web 分项；后段采集观测到资源释放和章节退出 ACK，具体计数与区间只在证据记录维护。视口中途变化，采集未覆盖前 43 页全部生命周期；不能据此声称全章性能、进程/GPU 释放或诊断层初始焦点问题已解决。操作重试、固定身份与范围见[当前完整章记录](../verification/ui-image-boundary.md#当前合同的-arknights-完整章与首次续读)。
+
 以下历史材料保留原输入、环境、失败和证据范围，**其架构已被本轮客户端解码决策替代**：
 
 - [长图 codec 记录](../verification/long-image-codec.md)：固定 libspng/libjpeg-turbo、PNG 条带编码器、Node 和独立 Codex 内置浏览器 Worker 分项，及材料准备/打包的历史工程证据。独立解码、取消、背压、截尾和像素对照不代表 Reader 已接入，也不证明实际 UI 速度或进程/GPU 峰值。
@@ -32,7 +34,7 @@
 
 ## 实施顺序与待办
 
-1. **收敛并验证客户端直接解码路径。** 不透明资源合同与实际 `ImageInfo` 接线已经实现。原 xkcd Web 已观测到两份资源的 release ACK 和 reader exit ACK；继续核对双端传输、取消、迟到结果、文件/Blob 释放、真实 provider cache key 与帧尾 pin。下一项先复验当前合同下 Arknights 的正式完整章、下一章与首次续读，明确与旧证据的材料版本差异。
+1. **收敛并验证客户端直接解码路径。** 不透明资源合同与实际 `ImageInfo` 接线已经实现。原 xkcd Web 已观测到两份资源的 release ACK 和 reader exit ACK；继续核对双端传输、取消、迟到结果、文件/Blob 释放、真实 provider cache key 与帧尾 pin。当前 Arknights Web 完整章、下一章与首次续读已按新材料分项复验；继续完成更多 Source、Native 主入口与目标设备恢复，并核对焦点异常的默认构建对照。
 2. **建立真实 UI 直接解码 baseline。** 默认关闭的采集入口已接正式 app 层，记录 acquire、实际 ImageInfo、逻辑 viewport、导航与 engine FrameTiming，并有界导出原始 JSON；用法与计量范围见[采集说明](../READER-BASELINE.md)。原 xkcd 的一次真实下载及报告完整性分项已通过，首次导出失败和采集前布局错误保留；入口回归或单次完整性均不等于实际性能门。固定同一原 Source、编码正文、构建版本和设备，覆盖普通图、长 JPEG/PNG、冷/热缓存、首图、中末页跳转、连续滚动、缩放与退出取消。Web 使用 Codex 内置浏览器；iOS/Android 区分模拟器和真机。记录首图可见时间及分布、跳转延迟、滚动卡顿/掉帧、CPU、RSS 和 GPU 峰值；明确运行次数、测量方法和无法取得的指标。
 3. **依据瓶颈比较成熟方案。** 先查正式 Flutter/平台成熟 decoder 与区域解码库；在同一编码输入和实际 UI 上比较直接解码、目标 raster/降采样、成熟区域 decoder，以及有证据支持时的候选 `runtime/image-codec`。包含解码、重编码、跨线程传输、Flutter 再解码、缓存和显存成本，不只比较 WASM 或单个函数耗时。默认方案由性能、格式覆盖、维护和可用性共同决定，不能先接线后补理由。
 4. **必要时实施客户端长图方案。** 选型后才设计逻辑页、EXIF 八方向、LOD/可见覆盖、跨页单 codec、合计工作预算和帧尾释放。分片序号不得成为持久页键；缩放 dialog 与主阅读视图协调所有权，错误/取消/迟到结果不得污染当前 generation。全部图片知识保留在客户端，不重新扩展 Source/host 图片协议。
