@@ -6017,6 +6017,89 @@ class BundleArtifact extends $pb.GeneratedMessage {
   void clearEncodedSize() => $_clearField(7);
 }
 
+/// Display metadata from the unchanged official extension build.
+/// Runtime capabilities still come from actual Source initialization.
+class CatalogSource extends $pb.GeneratedMessage {
+  factory CatalogSource({
+    $core.String? id,
+    $core.String? name,
+    $core.String? lang,
+  }) {
+    final result = CatalogSource._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (lang != null) result.lang = lang;
+    return result;
+  }
+
+  CatalogSource._();
+
+  factory CatalogSource.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CatalogSource()..mergeFromBuffer(data, registry);
+  factory CatalogSource.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CatalogSource()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CatalogSource',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CatalogSource.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'lang')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CatalogSource clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CatalogSource copyWith(void Function(CatalogSource) updates) =>
+      super.copyWith((message) => updates(message as CatalogSource))
+          as CatalogSource;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CatalogSource() / CatalogSource.new instead')
+  static CatalogSource create() => CatalogSource._();
+  static $pb.GeneratedMessage $_createMessage() => CatalogSource._();
+  @$core.override
+  CatalogSource createEmptyInstance() => CatalogSource._();
+  @$core.pragma('dart2js:noInline')
+  static CatalogSource getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CatalogSource>(
+          CatalogSource.$_createMessage);
+  static CatalogSource? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get lang => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set lang($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLang() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLang() => $_clearField(3);
+}
+
 class BuildManifest extends $pb.GeneratedMessage {
   factory BuildManifest({
     $core.int? protocolVersion,
@@ -6032,6 +6115,7 @@ class BuildManifest extends $pb.GeneratedMessage {
     BundleArtifact? bundle,
     $core.Iterable<Artifact>? hostScripts,
     $core.Iterable<Artifact>? resources,
+    $core.Iterable<CatalogSource>? sources,
   }) {
     final result = BuildManifest._();
     if (protocolVersion != null) result.protocolVersion = protocolVersion;
@@ -6047,6 +6131,7 @@ class BuildManifest extends $pb.GeneratedMessage {
     if (bundle != null) result.bundle = bundle;
     if (hostScripts != null) result.hostScripts.addAll(hostScripts);
     if (resources != null) result.resources.addAll(resources);
+    if (sources != null) result.sources.addAll(sources);
     return result;
   }
 
@@ -6081,6 +6166,8 @@ class BuildManifest extends $pb.GeneratedMessage {
         subBuilder: Artifact.$_createMessage)
     ..pPM<Artifact>(13, _omitFieldNames ? '' : 'resources',
         subBuilder: Artifact.$_createMessage)
+    ..pPM<CatalogSource>(14, _omitFieldNames ? '' : 'sources',
+        subBuilder: CatalogSource.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6205,6 +6292,10 @@ class BuildManifest extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(13)
   $pb.PbList<Artifact> get resources => $_getList(12);
+
+  /// Complete metadata for exactly source_ids, without running the extension.
+  @$pb.TagNumber(14)
+  $pb.PbList<CatalogSource> get sources => $_getList(13);
 }
 
 class ExtensionBuildDescriptor extends $pb.GeneratedMessage {
@@ -6215,6 +6306,7 @@ class ExtensionBuildDescriptor extends $pb.GeneratedMessage {
     $core.String? version,
     $core.Iterable<$core.String>? sourceIds,
     $core.String? manifestPath,
+    $core.Iterable<CatalogSource>? sources,
   }) {
     final result = ExtensionBuildDescriptor._();
     if (buildId != null) result.buildId = buildId;
@@ -6223,6 +6315,7 @@ class ExtensionBuildDescriptor extends $pb.GeneratedMessage {
     if (version != null) result.version = version;
     if (sourceIds != null) result.sourceIds.addAll(sourceIds);
     if (manifestPath != null) result.manifestPath = manifestPath;
+    if (sources != null) result.sources.addAll(sources);
     return result;
   }
 
@@ -6245,6 +6338,8 @@ class ExtensionBuildDescriptor extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'version')
     ..pPS(5, _omitFieldNames ? '' : 'sourceIds')
     ..aOS(6, _omitFieldNames ? '' : 'manifestPath')
+    ..pPM<CatalogSource>(7, _omitFieldNames ? '' : 'sources',
+        subBuilder: CatalogSource.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6319,6 +6414,9 @@ class ExtensionBuildDescriptor extends $pb.GeneratedMessage {
   $core.bool hasManifestPath() => $_has(5);
   @$pb.TagNumber(6)
   void clearManifestPath() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<CatalogSource> get sources => $_getList(6);
 }
 
 class ExtensionIndex extends $pb.GeneratedMessage {

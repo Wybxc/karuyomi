@@ -193,6 +193,7 @@ class Fixture {
           packageName: descriptor.packageName,
           version: descriptor.versionName,
           sourceIds: ['1'],
+          sources: [{ id: '1', name: 'Fixture', lang: 'en' }],
           storageSchema: '1',
           bundle: reference,
         }) + '\n',
@@ -275,6 +276,20 @@ test('complete gzip-only snapshot commits checkpoint only after remote confirmat
       .digest('hex'),
   );
   assert.equal(candidate.bootstrap.complete, true);
+  assert.deepEqual((await f.index()).builds[0]?.sources, [
+    { id: '1', name: 'Fixture', lang: 'en' },
+  ]);
+  const current = await parseManifest(
+    readFileSync(
+      path.join(
+        f.snapshot,
+        'extensions/builds',
+        descriptor.buildId,
+        'manifest.json',
+      ),
+    ),
+  );
+  assert.deepEqual(current.sources, (await f.index()).builds[0]?.sources);
   assert.equal(
     (await f.index()).builds[0]?.manifestPath,
     '/extensions/builds/' + descriptor.buildId + '/manifest.json',

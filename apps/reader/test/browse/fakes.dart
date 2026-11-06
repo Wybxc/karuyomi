@@ -10,6 +10,8 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import '../data/business_state_server.dart';
 
 const sourceId = '9223372036854775806';
+wire.CatalogSource get testCatalogSource =>
+    wire.CatalogSource(id: sourceId, name: '测试漫画源', lang: 'zh');
 wire.Manga get testManga => wire.Manga(
   url: '/manga/opaque-source-ref',
   title: '真实源 DTO 测试',
@@ -42,6 +44,7 @@ final class TestPlatform extends PlatformRuntime {
   final openedBuilds = <String>[];
   final preferenceBootstraps = <wire.PreferenceBootstrap>[];
   String manifestBuildId = 'build-1';
+  wire.BuildManifest? manifestOverride;
   String _openedBuildId = 'build-1';
   List<wire.SourceInfo>? sourceInventory;
   @override
@@ -56,7 +59,9 @@ final class TestPlatform extends PlatformRuntime {
         wire.ExtensionBuildDescriptor(
           buildId: 'build-1',
           packageName: 'eu.kanade.source.test',
+          repoId: 'keiyoushi',
           sourceIds: [sourceId],
+          sources: [testCatalogSource],
           version: '1.0',
           manifestPath: '/extensions/builds/build-1/manifest.json',
         ),
@@ -74,6 +79,22 @@ final class TestPlatform extends PlatformRuntime {
   Future<void> Function(String pageSessionId)? closePageSessionHandler;
   bool closeAcknowledged = true;
 
+  wire.BuildManifest _currentManifest() {
+    final index = wire.decodeProtoJson(wire.ExtensionIndex(), inventory);
+    final build = index.builds.singleWhere(
+      (build) => build.buildId == manifestBuildId,
+    );
+    return wire.BuildManifest(
+      buildId: build.buildId,
+      packageName: build.packageName,
+      repoId: build.repoId,
+      version: build.version,
+      sourceIds: build.sourceIds,
+      sources: build.sources.map((source) => source.deepCopy()),
+      bundle: wire.BundleArtifact(sha256: 'a' * 64),
+    );
+  }
+
   wire.ApiFetchResponse _fetch(String path) {
     final response = switch (path) {
       '/api/bootstrap' => wire.encodeProtoJson(
@@ -90,14 +111,7 @@ final class TestPlatform extends PlatformRuntime {
       '/extensions/index.json' => inventory,
       final String value
           when value == '/extensions/builds/$manifestBuildId/manifest.json' =>
-        wire.encodeProtoJson(
-          wire.BuildManifest(
-            buildId: manifestBuildId,
-            sourceIds:
-                sourceInventory?.map((source) => source.id) ?? [sourceId],
-            bundle: wire.BundleArtifact(sha256: 'a' * 64),
-          ),
-        ),
+        wire.encodeProtoJson(manifestOverride ?? _currentManifest()),
       _ => throw StateError('Unexpected API path $path'),
     };
     return wire.ApiFetchResponse(

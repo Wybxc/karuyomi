@@ -13,7 +13,11 @@ Static Assets 是 Web 与 Native 的扩展权威来源。每个包只部署最�
 | `/extensions/artifacts/<canonicalSHA>.gz`    | 唯一 AOT 交付文件；`application/gzip`、一年 immutable          |
 | `/extensions/build-state.json`               | 增量调度状态与已完成 baseline 标记；no-cache，不作为客户端目录 |
 
-索引每个包只含一个 build，字段为 `buildId/packageName/repoId/version/sourceIds/manifestPath`。`manifestPath` 必须绑定该 buildId；索引上限 2 MiB、5,000 包。build-state 与客户端索引分开维护，以 `indexSha256` 绑定索引的精确字节，状态上限 16 MiB。
+索引每个包只含一个 build，字段为 `buildId/packageName/repoId/version/sourceIds/sources/manifestPath`。`sources` 为完整 `CatalogSource{id,name,lang}` 列表，与 manifest 的同名字段一致，且每个 ID 与 `sourceIds` 一一匹配；每包 1–500 个唯一 signed int64 十进制字符串 ID，名称去空白后非空且最多 500 个 UTF-16 code units，语言最多 64 个且允许空值。`manifestPath` 必须绑定 buildId；manifest 上限 64KiB，完整索引上限 2MiB、5,000 包。build-state 与客户端索引分开维护，以 `indexSha256` 绑定索引的精确字节，状态上限 16MiB。
+
+Source 资料由官方 Gradle `keiyoushi-source-info.json` 的 `metadata.sources` 产生，builder 校验后写 manifest，快照再原样投影到 index。目录只列当前最新可用构建，不包含尚未构建或无可用交付的上游包；名称/语言用于加载前的展示与本地语言筛选，不声明运行时能力或网络可用。不为筛选下载或执行其它扩展，账户安装/卸载也不是目录成员关系。设计见[语言筛选](design/source-language-filter.md)。
+
+装配、登记和客户端打开前核对索引与 manifest 的构建身份及 Source 资料；不一致明确要求刷新，不能静默改用另一资料源。原型不支持缺少 `sources` 的旧格式 fallback；协议/host 输入变化后按固定新输入重建候选，不能将旧清单补标签后当成新 AOT。
 
 Bundle 清单记录 canonical `sha256/size/contentType`，以及 `encoding: gzip`、`encodedSha256/encodedSize`。canonical 上限 64 MiB，gzip 文件上限 25 MiB；路径绑定 canonical SHA。gzip 使用 level 9、mtime 0、无文件名的固定编码。它是应用显式解压的文件，HTTP 响应不能附加 `Content-Encoding: gzip`。客户端先验证收到的 gzip 长度/摘要，再有界解压并验证 canonical 长度/摘要，最后执行 JavaScript；不读取 raw 资产或私有 API 回退。
 

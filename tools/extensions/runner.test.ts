@@ -61,7 +61,7 @@ if('GH_TOKEN' in process.env||'GITHUB_TOKEN' in process.env||'CLOUDFLARE_API_TOK
 if(process.cwd()!==path.resolve(import.meta.dirname,'../..'))throw new Error('Wrong working directory');
 const raw=Buffer.from('const frozen = true;'), encoded=gzipSync(raw); const hash=(b)=>createHash('sha256').update(b).digest('hex'); const sha=hash(raw);
 fs.mkdirSync(path.join(output,'artifacts'),{recursive:true}); fs.writeFileSync(path.join(output,'artifacts',sha+'.gz'),encoded);
-const m={...JSON.parse(fs.readFileSync(path.join(process.cwd(),'protocol.json'),'utf8')),bridgeVersion:2,buildId:d.buildId,packageName:d.packageName,repoId:'fixture',version:d.versionName,storageSchema:'1',sourceIds:['1'],hostScripts:[],resources:[],bundle:{sha256:sha,path:'/extensions/artifacts/'+sha+'.gz',size:raw.length,contentType:'text/javascript',encoding:'gzip',encodedSha256:hash(encoded),encodedSize:encoded.length}};
+const m={...JSON.parse(fs.readFileSync(path.join(process.cwd(),'protocol.json'),'utf8')),bridgeVersion:2,buildId:d.buildId,packageName:d.packageName,repoId:'fixture',version:d.versionName,storageSchema:'1',sourceIds:['1'],sources:[{id:'1',name:'Fixture',lang:'en'}],hostScripts:[],resources:[],bundle:{sha256:sha,path:'/extensions/artifacts/'+sha+'.gz',size:raw.length,contentType:'text/javascript',encoding:'gzip',encodedSha256:hash(encoded),encodedSize:encoded.length}};
 fs.writeFileSync(path.join(output,'manifest.json'),JSON.stringify(m));fs.writeFileSync(path.join(output,'provenance.json'),JSON.stringify({descriptor:d}));
 `;
 function fixture(t: TestContext) {

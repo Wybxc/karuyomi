@@ -1178,12 +1178,13 @@ export function staticIndex(manifests: BuildManifest[]): ExtensionIndex {
     schemaVersion: 1,
     builds: [...manifests]
       .sort((a, b) => (a.packageName < b.packageName ? -1 : 1))
-      .map(({ buildId, packageName, repoId, version, sourceIds }) => ({
+      .map(({ buildId, packageName, repoId, version, sourceIds, sources }) => ({
         buildId,
         packageName,
         repoId,
         version,
         sourceIds,
+        sources,
         manifestPath: '/extensions/builds/' + buildId + '/manifest.json',
       })),
   };

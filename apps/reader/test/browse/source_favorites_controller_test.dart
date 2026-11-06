@@ -18,6 +18,9 @@ wire.ExtensionBuildDescriptor _build(String id, String packageName) =>
     wire.ExtensionBuildDescriptor(
       buildId: id,
       packageName: packageName,
+      repoId: 'keiyoushi',
+      sourceIds: [sourceId],
+      sources: [testCatalogSource],
       version: '2.0',
       manifestPath: '/extensions/builds/$id/manifest.json',
     );

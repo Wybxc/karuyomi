@@ -133,7 +133,14 @@ export function assertIndexIdentity(
   if (
     !descriptor ||
     !(
-      ['buildId', 'packageName', 'repoId', 'version', 'sourceIds'] as const
+      [
+        'buildId',
+        'packageName',
+        'repoId',
+        'version',
+        'sourceIds',
+        'sources',
+      ] as const
     ).every((key) => isDeepStrictEqual(descriptor[key], manifest[key]))
   )
     throw new Error('Build is not current in the static index');

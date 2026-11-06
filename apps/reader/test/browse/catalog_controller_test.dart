@@ -147,6 +147,9 @@ void main() {
           {
             'buildId': 'build-2',
             'packageName': 'eu.kanade.source.test',
+            'repoId': 'keiyoushi',
+            'sourceIds': [sourceId],
+            'sources': [wire.encodeProtoJson(testCatalogSource)],
             'version': '2.0',
             'manifestPath': '/extensions/builds/build-2/manifest.json',
           },
@@ -341,6 +344,9 @@ void main() {
     final entry = {
       'buildId': 'build-1',
       'packageName': 'eu.kanade.source.test',
+      'repoId': 'keiyoushi',
+      'sourceIds': [sourceId],
+      'sources': [wire.encodeProtoJson(testCatalogSource)],
       'version': '1.0',
       'manifestPath': '/extensions/builds/build-1/manifest.json',
     };

@@ -189,6 +189,7 @@ test('static index accepts more than 64KiB, validates current package uniqueness
     repoId: 'repo',
     version: '1',
     sourceIds: [String(index)],
+    sources: [{ id: String(index), name: 'Source ' + index, lang: 'en' }],
     manifestPath: '/extensions/builds/build-' + index + '/manifest.json',
   }));
   const value = { schemaVersion: 1, builds };

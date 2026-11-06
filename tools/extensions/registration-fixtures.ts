@@ -50,6 +50,7 @@ export async function fixture(
         version: '1',
         storageSchema: '1',
         sourceIds: ['9223372036854775807'],
+        sources: [{ id: '9223372036854775807', name: 'Fixture', lang: 'en' }],
         bundle: {
           path: `/extensions/artifacts/${sha256}.gz`,
           sha256,
@@ -81,6 +82,7 @@ export async function snapshot(directory: string, manifest: BuildManifest) {
         repoId: manifest.repoId,
         version: manifest.version,
         sourceIds: manifest.sourceIds,
+        sources: manifest.sources,
         manifestPath,
       },
     ],

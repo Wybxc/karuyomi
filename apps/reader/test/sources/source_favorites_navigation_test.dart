@@ -296,6 +296,9 @@ void main() {
             wire.ExtensionBuildDescriptor(
               buildId: 'build-2',
               packageName: 'eu.kanade.source.test',
+              repoId: 'keiyoushi',
+              sourceIds: [sourceId],
+              sources: [testCatalogSource],
               version: '2.0',
               manifestPath: '/extensions/builds/build-2/manifest.json',
             ),

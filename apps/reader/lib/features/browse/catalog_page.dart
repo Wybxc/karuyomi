@@ -43,10 +43,34 @@ class CatalogPage extends StatefulWidget {
   State<CatalogPage> createState() => _CatalogPageState();
 }
 
+// Keep the identity-bound settings view mounted when filtering changes the
+// directory's height; scrolling alone must not start another settings read.
+class _CatalogFavorites extends StatefulWidget {
+  const _CatalogFavorites({super.key, required this.catalog});
+  final CatalogController catalog;
+
+  @override
+  State<_CatalogFavorites> createState() => _CatalogFavoritesState();
+}
+
+class _CatalogFavoritesState extends State<_CatalogFavorites>
+    with AutomaticKeepAliveClientMixin<_CatalogFavorites> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return FavoriteSourcesPanel(catalog: widget.catalog);
+  }
+}
+
 class _CatalogPageState extends State<CatalogPage> {
   final _search = TextEditingController();
   String? _sourceLanguage;
   Object? _sourceLanguageSession;
+  String? _catalogLanguage;
+  Object? _catalogLanguageIdentity;
 
   Future<void> _details(MangaEntry entry) async {
     final controller = widget.controller!;
@@ -131,6 +155,20 @@ class _CatalogPageState extends State<CatalogPage> {
       _sourceLanguageSession = languageSession;
       _sourceLanguage = null;
     }
+    if (status == ServiceStatus.ready && controller != null) {
+      final identity = (controller, controller.subject);
+      if (_catalogLanguageIdentity != identity) {
+        _catalogLanguageIdentity = identity;
+        _catalogLanguage = null;
+      }
+      final languages = controller.builds
+          .expand((build) => build.sources)
+          .map((source) => source.lang)
+          .toSet();
+      if (_catalogLanguage != null && !languages.contains(_catalogLanguage)) {
+        _catalogLanguage = null;
+      }
+    }
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
@@ -163,7 +201,7 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                widget.configurationError ?? '连接你的服务，加载已安装的漫画源。',
+                widget.configurationError ?? '连接你的服务，浏览目录中的漫画源。',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -205,7 +243,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                 ],
               ),
-              FavoriteSourcesPanel(
+              _CatalogFavorites(
                 key: const ValueKey('catalog-favorite-sources'),
                 catalog: controller,
               ),
@@ -230,27 +268,10 @@ class _CatalogPageState extends State<CatalogPage> {
               ],
               if (controller.builds.isEmpty)
                 const _Notice(
-                  text: '尚未安装漫画源。安装后重新连接即可浏览。',
+                  text: '当前目录没有可用构建，请稍后重新连接以刷新目录。',
                   icon: Icons.extension_outlined,
                 ),
-              if (controller.builds.isNotEmpty) ...[
-                Text('漫画源', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final build in controller.builds)
-                      ChoiceChip(
-                        label: Text('${build.packageName} · ${build.version}'),
-                        selected: controller.activeBuild?.id == build.id,
-                        onSelected: busy
-                            ? null
-                            : (_) => controller.openBuild(build),
-                      ),
-                  ],
-                ),
-              ],
+              if (controller.builds.isNotEmpty) _catalogChoices(controller),
               if (controller.session != null) ...[
                 const SizedBox(height: 16),
                 _sourceChoices(controller),
@@ -347,6 +368,118 @@ class _CatalogPageState extends State<CatalogPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _catalogChoices(CatalogController controller) {
+    final sources = controller.builds.expand((build) => build.sources).toList();
+    final languages = sources.map((source) => source.lang).toSet().toList()
+      ..sort();
+    bool matches(wire.CatalogSource source) =>
+        _catalogLanguage == null || source.lang == _catalogLanguage;
+    final visible = controller.builds
+        .where((build) => build.sources.any(matches))
+        .toList();
+    final matchingSources = sources.where(matches).length;
+    final active = controller.activeBuild;
+    final activeHidden =
+        active != null && !visible.any((build) => build.id == active.id);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('扩展目录', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: '目录语言',
+                  border: OutlineInputBorder(),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    key: const ValueKey('catalog-language-filter'),
+                    value: _catalogLanguage,
+                    isExpanded: true,
+                    isDense: true,
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('全部语言'),
+                      ),
+                      for (final language in languages)
+                        DropdownMenuItem<String>(
+                          value: language,
+                          child: Text(language.isEmpty ? '未标注语言' : language),
+                        ),
+                    ],
+                    onChanged: controller.busy
+                        ? null
+                        : (language) =>
+                              setState(() => _catalogLanguage = language),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              key: const ValueKey('catalog-language-clear'),
+              onPressed: controller.busy || _catalogLanguage == null
+                  ? null
+                  : () => setState(() => _catalogLanguage = null),
+              child: const Text('清除筛选'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '匹配 ${visible.length} / ${controller.builds.length} 个扩展 · '
+          '$matchingSources / ${sources.length} 个漫画源',
+          key: const ValueKey('catalog-language-count'),
+        ),
+        if (activeHidden)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('当前使用扩展：${active.packageName}（不在当前目录筛选中）'),
+          ),
+        const SizedBox(height: 8),
+        if (visible.isEmpty) const Text('当前目录没有匹配语言的可用构建，请清除筛选。'),
+        for (final build in visible)
+          Card(
+            key: ValueKey(('catalog-build', build.id)),
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ChoiceChip(
+                    key: ValueKey(('catalog-build-open', build.id)),
+                    label: Text('${build.packageName} · ${build.version}'),
+                    selected: active?.id == build.id,
+                    onSelected: controller.busy
+                        ? null
+                        : (_) => controller.openBuild(build),
+                  ),
+                  for (final source in build.sources.where(matches))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '${source.name} · '
+                        '${source.lang.isEmpty ? '未标注语言' : source.lang}',
+                        key: ValueKey((
+                          'catalog-build-source',
+                          build.id,
+                          source.id,
+                        )),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 

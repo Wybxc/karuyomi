@@ -53,6 +53,7 @@ interface FixtureManifest {
   bridgeVersion: number;
   storageSchema: string;
   sourceIds: string[];
+  sources: { id: string; name: string; lang: string }[];
   bundle: Omit<BundleArtifact, 'contentType' | 'encoding'> & {
     contentType: string;
     encoding: string;
@@ -87,6 +88,7 @@ async function fixture(
     bridgeVersion: 2,
     storageSchema: 'test-v1',
     sourceIds: ['1234567890123456789'],
+    sources: [{ id: '1234567890123456789', name: 'Fixture', lang: 'en' }],
     bundle: {
       path: '/extensions/artifacts/' + sha256 + '.gz',
       sha256,
@@ -209,6 +211,7 @@ test('the shared contract parser enforces the static current-package index', asy
     repoId: 'repo',
     version: '1',
     sourceIds: ['123'],
+    sources: [{ id: '123', name: 'Fixture', lang: 'en' }],
     manifestPath: '/extensions/builds/test-build/manifest.json',
   };
   const index = { schemaVersion: 1, builds: [descriptor] };

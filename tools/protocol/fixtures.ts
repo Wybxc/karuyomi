@@ -107,6 +107,11 @@ const descriptor: JsonObject = {
   repoId: 'keiyoushi/extensions-source',
   version: '1.6.1',
   sourceIds: [sourceId, '-9223372036854775808', '9223372036854775807'],
+  sources: [
+    { id: sourceId, name: 'Golden 源', lang: 'zh' },
+    { id: '-9223372036854775808', name: 'Minimum', lang: 'en' },
+    { id: '9223372036854775807', name: 'Maximum', lang: 'all' },
+  ],
   manifestPath: `/extensions/builds/${buildId}/manifest.json`,
 };
 
@@ -121,6 +126,7 @@ export const buildManifest: JsonObject = {
   version: '1.6.1',
   storageSchema: '1',
   sourceIds: [sourceId],
+  sources: [{ id: sourceId, name: 'Golden 源', lang: 'zh' }],
   bundle: {
     path: `/extensions/artifacts/${sha256}.gz`,
     sha256,

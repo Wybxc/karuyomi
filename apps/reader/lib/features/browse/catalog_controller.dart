@@ -29,17 +29,60 @@ enum ServiceStatus {
   failed,
 }
 
+final _catalogSourceId = RegExp(r'^-?\d{1,19}$');
+final _catalogMinSourceId = BigInt.parse('-9223372036854775808');
+final _catalogMaxSourceId = BigInt.parse('9223372036854775807');
+
+bool _validCatalogSourceId(String id) {
+  if (!_catalogSourceId.hasMatch(id)) return false;
+  final value = BigInt.parse(id);
+  return value >= _catalogMinSourceId && value <= _catalogMaxSourceId;
+}
+
+List<wire.CatalogSource> _catalogSources(
+  Iterable<String> sourceIds,
+  Iterable<wire.CatalogSource> sources,
+) {
+  final ids = sourceIds.toList(growable: false);
+  final metadata = sources.toList(growable: false);
+  if (ids.isEmpty ||
+      ids.length > 500 ||
+      metadata.length != ids.length ||
+      ids.toSet().length != ids.length ||
+      ids.any((id) => !_validCatalogSourceId(id)) ||
+      metadata.any(
+        (source) =>
+            !_validCatalogSourceId(source.id) ||
+            source.name.trim().isEmpty ||
+            source.name.length > 500 ||
+            source.lang.length > 64,
+      )) {
+    throw const FormatException('扩展目录中的漫画源资料不完整');
+  }
+  final metadataIds = metadata.map((source) => source.id).toSet();
+  if (metadataIds.length != ids.length || !metadataIds.containsAll(ids)) {
+    throw const FormatException('扩展目录中的漫画源标识不匹配');
+  }
+  return List.unmodifiable(
+    metadata.map((source) => source.deepCopy()..freeze()),
+  );
+}
+
 final class CatalogBuild {
-  const CatalogBuild({
+  const CatalogBuild._({
     required this.id,
     required this.packageName,
+    required this.repoId,
     required this.version,
     required this.manifestPath,
+    required this.sources,
   });
   final String id;
   final String packageName;
+  final String repoId;
   final String version;
   final String manifestPath;
+  final List<wire.CatalogSource> sources;
 
   factory CatalogBuild.fromProto(wire.ExtensionBuildDescriptor value) {
     final id = value.buildId;
@@ -47,14 +90,18 @@ final class CatalogBuild {
     if (!RegExp(r'^[a-zA-Z0-9._-]{1,200}$').hasMatch(id) ||
         path != '/extensions/builds/$id/manifest.json' ||
         value.packageName.isEmpty ||
+        value.repoId.isEmpty ||
+        value.repoId.length > 200 ||
         value.version.isEmpty) {
       throw const FormatException('扩展清单路径与构建不匹配');
     }
-    return CatalogBuild(
+    return CatalogBuild._(
       id: id,
       packageName: value.packageName,
+      repoId: value.repoId,
       version: value.version,
       manifestPath: path,
+      sources: _catalogSources(value.sourceIds, value.sources),
     );
   }
 }
@@ -587,7 +634,7 @@ final class CatalogController extends ChangeNotifier {
         }
       }
       email = confirmedEmail;
-      builds = available;
+      builds = List.unmodifiable(available);
       status = ServiceStatus.ready;
     });
   }
@@ -629,6 +676,24 @@ final class CatalogController extends ChangeNotifier {
         !manifest.hasBundle() ||
         manifest.bundle.sha256.isEmpty) {
       throw const FormatException('构建标识不匹配');
+    }
+    List<wire.CatalogSource> manifestSources;
+    try {
+      manifestSources = _catalogSources(manifest.sourceIds, manifest.sources);
+    } on FormatException {
+      throw const FormatException('扩展资料与当前目录不匹配，请重新连接以刷新目录');
+    }
+    final expectedSources = {
+      for (final source in build.sources) source.id: (source.name, source.lang),
+    };
+    if (manifest.packageName != build.packageName ||
+        manifest.repoId != build.repoId ||
+        manifest.version != build.version ||
+        manifestSources.length != expectedSources.length ||
+        manifestSources.any(
+          (source) => expectedSources[source.id] != (source.name, source.lang),
+        )) {
+      throw const FormatException('扩展资料与当前目录不匹配，请重新连接以刷新目录');
     }
     final bootstrap = wire.PreferenceBootstrap(packageName: build.packageName);
     // Removed Sources retain their account values without being injected into

@@ -843,6 +843,38 @@ test('the JSON control bridge permits only the catalog static GET paths without 
   );
 });
 
+test.each([
+  ['/extensions/builds/test-build/manifest.json', 64 * 1024],
+  ['/extensions/index.json', 2 * 1024 * 1024],
+  ['/api/bootstrap', 2 * 1024 * 1024],
+])('the JSON control bridge bounds %s while streaming', async (path, limit) => {
+  const { manager } = await setup();
+  const atLimit = new Uint8Array(limit).fill(120);
+  const fetcher = vi.fn(async () => new Response(atLimit));
+  vi.stubGlobal('fetch', fetcher);
+  expect((await manager.fetchApi({ path })).body).toHaveLength(limit);
+
+  const cancel = vi.fn();
+  let chunks = 0;
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (chunks === 0) controller.enqueue(atLimit);
+        else if (chunks === 1) controller.enqueue(new Uint8Array([120]));
+        else controller.close();
+        chunks += 1;
+      },
+      cancel,
+    },
+    { highWaterMark: 0 },
+  );
+  fetcher.mockImplementationOnce(async () => new Response(stream));
+  await expect(manager.fetchApi({ path })).rejects.toMatchObject({
+    code: 'limit_exceeded',
+  });
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
 test('typed bootstrap keeps long width in open identity, reaches the Worker, and changed values force a new generation', async () => {
   const { manager, driver, workers } = await setup();
   const preferenceBootstrap = create(pb.PreferenceBootstrapSchema, {

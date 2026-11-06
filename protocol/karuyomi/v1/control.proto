@@ -443,6 +443,13 @@ message BundleArtifact {
   string encoded_sha256 = 6;
   uint32 encoded_size = 7;
 }
+// Display metadata from the unchanged official extension build.
+// Runtime capabilities still come from actual Source initialization.
+message CatalogSource {
+  string id = 1;
+  string name = 2;
+  string lang = 3;
+}
 message BuildManifest {
   uint32 protocol_version = 1;
   string host_abi = 2;
@@ -457,6 +464,8 @@ message BuildManifest {
   BundleArtifact bundle = 11;
   repeated Artifact host_scripts = 12;
   repeated Artifact resources = 13;
+  // Complete metadata for exactly source_ids, without running the extension.
+  repeated CatalogSource sources = 14;
 }
 message ExtensionBuildDescriptor {
   string build_id = 1;
@@ -465,6 +474,7 @@ message ExtensionBuildDescriptor {
   string version = 4;
   repeated string source_ids = 5;
   string manifest_path = 6;
+  repeated CatalogSource sources = 7;
 }
 message ExtensionIndex {
   uint32 schema_version = 1;

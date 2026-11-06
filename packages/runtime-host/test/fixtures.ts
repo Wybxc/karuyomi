@@ -33,6 +33,7 @@ export async function manifest(): Promise<BuildManifest> {
     packageName: 'eu.kanade.tachiyomi.extension.test',
     storageSchema: '1',
     sourceIds: ['9223372036854775806'],
+    sources: [{ id: '9223372036854775806', name: 'Fixture', lang: 'en' }],
     bundle: await artifact(),
     hostScripts: [],
     resources: [],

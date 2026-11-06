@@ -60,6 +60,7 @@ async function fixture() {
         repoId: 'test',
         version: '2',
         sourceIds: ['123'],
+        sources: [{ id: '123', name: 'Fixture', lang: 'en' }],
         manifestPath,
       },
     ],
@@ -91,6 +92,7 @@ async function fixture() {
       version: '2',
       storageSchema: '1',
       sourceIds: ['123'],
+      sources: [{ id: '123', name: 'Fixture', lang: 'en' }],
       bundle: {
         path: bundlePath,
         sha256: hash,
@@ -178,5 +180,23 @@ test('codec materials cannot become extension host scripts or Source Worker prel
   await assert.rejects(
     assembleExtensionAssets(f.target, f.catalog),
     /unavailable runtime materials/,
+  );
+});
+
+test('assembly rejects catalog labels or languages that differ from the exact manifest', async () => {
+  const f = await fixture();
+  const manifest = buildManifestSchema.parse(
+    JSON.parse(
+      await readFile(path.join(f.source, f.manifestPath.slice(1)), 'utf8'),
+    ),
+  );
+  const source = manifest.sources[0];
+  assert(source);
+  source.name = 'Different label';
+  source.lang = 'zh';
+  await f.put(f.manifestPath.slice(1), JSON.stringify(manifest));
+  await assert.rejects(
+    assembleExtensionAssets(f.target, f.catalog),
+    /disagree/,
   );
 });

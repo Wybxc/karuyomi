@@ -19,17 +19,20 @@ export type Artifact = Present<
 >;
 export type ResourceArtifact = Present<Artifact, 'logicalName'>;
 export type BundleArtifact = Required<PlainMessage<pb.BundleArtifact>>;
+export type CatalogSource = Required<PlainMessage<pb.CatalogSource>>;
 export type BuildManifest = Omit<
   Required<PlainMessage<pb.BuildManifest>>,
-  'bundle' | 'hostScripts' | 'resources'
+  'bundle' | 'hostScripts' | 'resources' | 'sources'
 > & {
+  sources: CatalogSource[];
   bundle: BundleArtifact;
   hostScripts: Artifact[];
   resources: ResourceArtifact[];
 };
-export type ExtensionBuildDescriptor = Required<
-  PlainMessage<pb.ExtensionBuildDescriptor>
->;
+export type ExtensionBuildDescriptor = Omit<
+  Required<PlainMessage<pb.ExtensionBuildDescriptor>>,
+  'sources'
+> & { sources: CatalogSource[] };
 export type ExtensionIndex = Omit<
   Required<PlainMessage<pb.ExtensionIndex>>,
   'builds'
@@ -73,6 +76,28 @@ function validSources(values: string[]): void {
     'Source identities must be nonempty and unique',
   );
   values.forEach(validSourceId);
+}
+function catalogSources(
+  values: pb.CatalogSource[],
+  sourceIds: string[],
+): CatalogSource[] {
+  const sources = values.map((source) => {
+    const value = plain(source);
+    requireFields(value, ['id', 'name', 'lang']);
+    validSourceId(value.id);
+    boundedText(value.name, 500);
+    requireCondition(value.name.trim().length > 0, 'Invalid Source name');
+    requireCondition(value.lang.length <= 64, 'Invalid Source language');
+    return value;
+  });
+  const ids = new Set(sources.map((source) => source.id));
+  requireCondition(
+    sources.length === sourceIds.length &&
+      ids.size === sources.length &&
+      sourceIds.every((id) => ids.has(id)),
+    'Catalog metadata must describe exactly the declared Source identities',
+  );
+  return sources;
 }
 function validSize(size: number, max: number): void {
   requireCondition(size > 0 && size <= max, 'Artifact exceeds its byte budget');
@@ -156,6 +181,7 @@ export const buildManifestSchema = codec<BuildManifest>((input) => {
     'bundle',
     'hostScripts',
     'resources',
+    'sources',
   ]);
   requireCondition(
     value.protocolVersion === protocolVersion &&
@@ -170,6 +196,7 @@ export const buildManifestSchema = codec<BuildManifest>((input) => {
   boundedText(value.version, 100);
   boundedText(value.storageSchema, 100);
   validSources(value.sourceIds);
+  const sources = catalogSources(value.sources, value.sourceIds);
   const bundle = bundleArtifactSchema.parse(
     messageJson(pb.BundleArtifactSchema, value.bundle),
   );
@@ -187,7 +214,7 @@ export const buildManifestSchema = codec<BuildManifest>((input) => {
       96 * 1024 * 1024,
     'Build exceeds the runtime loading budget',
   );
-  return { ...value, bundle, hostScripts, resources };
+  return { ...value, bundle, hostScripts, resources, sources };
 });
 
 export const extensionBuildDescriptorSchema = codec<ExtensionBuildDescriptor>(
@@ -200,6 +227,7 @@ export const extensionBuildDescriptorSchema = codec<ExtensionBuildDescriptor>(
       'version',
       'sourceIds',
       'manifestPath',
+      'sources',
     ]);
     buildIdSchema.parse(value.buildId);
     boundedText(value.packageName, 200);
@@ -211,7 +239,10 @@ export const extensionBuildDescriptorSchema = codec<ExtensionBuildDescriptor>(
         `/extensions/builds/${value.buildId}/manifest.json`,
       'Manifest path must match its build',
     );
-    return value;
+    return {
+      ...value,
+      sources: catalogSources(value.sources, value.sourceIds),
+    };
   },
 );
 

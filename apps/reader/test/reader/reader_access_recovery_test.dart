@@ -82,7 +82,7 @@ final class _Fixture {
     await tester.pumpAndSettle();
     await tester.tap(find.text('eu.kanade.source.test · 1.0'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('测试漫画源 · zh'));
+    await tester.tap(find.byKey(ValueKey(('catalog-source', sourceId))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('真实源 DTO 测试'));
     await tester.pumpAndSettle();

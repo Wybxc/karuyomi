@@ -20,12 +20,12 @@ Future<CatalogController> _browseDetails(WidgetTester tester) async {
   final scrollable = find
       .descendant(of: catalog, matching: find.byType(Scrollable))
       .first;
-  for (final label in [
-    'eu.kanade.source.test · 1.0',
-    '测试漫画源 · zh',
-    '真实源 DTO 测试',
+  for (final finder in [
+    find.text('eu.kanade.source.test · 1.0'),
+    find.byKey(ValueKey(('catalog-source', sourceId))),
+    find.text('真实源 DTO 测试'),
   ]) {
-    final target = find.descendant(of: catalog, matching: find.text(label));
+    final target = find.descendant(of: catalog, matching: finder);
     await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
     await tester.ensureVisible(target);
     await tester.pumpAndSettle();

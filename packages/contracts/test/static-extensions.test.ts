@@ -30,6 +30,7 @@ const build = {
   version: '1',
   storageSchema: '1',
   sourceIds: ['123'],
+  sources: [{ id: '123', name: 'Fixture', lang: 'en' }],
   bundle,
   hostScripts: [],
   resources: [],
@@ -86,6 +87,7 @@ test('the static index binds manifest paths to one current build per package', (
     repoId: build.repoId,
     version: build.version,
     sourceIds: build.sourceIds,
+    sources: build.sources,
     manifestPath: '/extensions/builds/test-build/manifest.json',
   };
   const index = { schemaVersion: 1, builds: [descriptor] };
@@ -123,4 +125,62 @@ test('the static index binds manifest paths to one current build per package', (
     },
   ])
     expect(extensionIndexSchema.safeParse(value).success).toBe(false);
+});
+
+test('static Source metadata is complete, bounded and bound to the declared identities', () => {
+  const descriptor = {
+    buildId: build.buildId,
+    packageName: build.packageName,
+    repoId: build.repoId,
+    version: build.version,
+    sourceIds: build.sourceIds,
+    manifestPath: '/extensions/builds/test-build/manifest.json',
+  };
+  const invalid = [
+    undefined,
+    [],
+    [{ id: '456', name: 'Other', lang: 'zh' }],
+    [...build.sources, ...build.sources],
+    [{ id: '123', name: '', lang: 'zh' }],
+    [{ id: '123', name: '   ', lang: 'zh' }],
+    [{ id: '123', name: 'x'.repeat(501), lang: 'zh' }],
+    [{ id: '123', name: 'Fixture', lang: 'x'.repeat(65) }],
+    [{ id: 123, name: 'Fixture', lang: 'zh' }],
+    [{ id: '123', name: 'Fixture', lang: 'zh', supportsLatest: true }],
+  ];
+  for (const sources of invalid) {
+    expect(buildManifestSchema.safeParse({ ...build, sources }).success).toBe(
+      false,
+    );
+    expect(
+      extensionIndexSchema.safeParse({
+        schemaVersion: 1,
+        builds: [{ ...descriptor, sources }],
+      }).success,
+    ).toBe(false);
+  }
+  const sources = [{ id: '123', name: 'x'.repeat(500), lang: 'x'.repeat(64) }];
+  expect(buildManifestSchema.parse({ ...build, sources }).sources).toEqual(
+    sources,
+  );
+});
+
+test('static metadata preserves language values and signed identities without runtime capability claims', () => {
+  const sourceIds = ['-9223372036854775808', '9223372036854775807'];
+  const sources = [
+    { id: sourceIds[1], name: '多语种源', lang: 'all' },
+    { id: sourceIds[0], name: '未标注', lang: '' },
+  ];
+  expect(
+    buildManifestSchema.parse({ ...build, sourceIds, sources }).sources,
+  ).toEqual(sources);
+  for (const id of ['-9223372036854775809', '9223372036854775808']) {
+    expect(
+      buildManifestSchema.safeParse({
+        ...build,
+        sourceIds: [id],
+        sources: [{ id, name: 'Fixture', lang: 'en' }],
+      }).success,
+    ).toBe(false);
+  }
 });

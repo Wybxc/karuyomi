@@ -319,6 +319,14 @@ test('registration requires current static descriptor and exact normalized manif
     ['buildId', 'old'],
     ['version', 'other'],
     ['sourceIds', ['1']],
+    [
+      'sources',
+      f.manifest.sources.map((source) => ({
+        ...source,
+        name: 'Different label',
+        lang: 'zh',
+      })),
+    ],
     ['manifestPath', 'https://other.example/manifest'],
   ] as const) {
     await writeFile(

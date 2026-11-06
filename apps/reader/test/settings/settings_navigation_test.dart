@@ -130,7 +130,7 @@ Future<void> _globalDefaults(WidgetTester tester, {bool dark = false}) async {
 Future<CatalogController> _details(WidgetTester tester) async {
   await _tap(tester, _navigation('浏览'));
   await _tap(tester, find.text('eu.kanade.source.test · 1.0'));
-  await _tap(tester, find.text('测试漫画源 · zh'));
+  await _tap(tester, find.byKey(ValueKey(('catalog-source', sourceId))));
   await _tap(tester, find.text('真实源 DTO 测试'));
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))

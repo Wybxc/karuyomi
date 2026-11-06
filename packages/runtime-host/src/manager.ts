@@ -920,9 +920,12 @@ export class SourceRuntimeManager {
       Partial<Pick<PlainMessage<pb.ApiFetchRequest>, 'headers'>>,
   ): Promise<PlainMessage<pb.ApiFetchResponse>> {
     const url = new URL(options.path, this.workerUrl.origin);
+    const staticManifest = staticManifestPathSchema.safeParse(
+      options.path,
+    ).success;
     const staticJson =
-      options.path === '/extensions/index.json' ||
-      staticManifestPathSchema.safeParse(options.path).success;
+      options.path === '/extensions/index.json' || staticManifest;
+    const maxResponseBytes = staticManifest ? 64 * 1024 : 2 * 1024 * 1024;
     const privateApi =
       url.pathname === '/api' || url.pathname.startsWith('/api/');
     if (
@@ -1006,7 +1009,7 @@ export class SourceRuntimeManager {
             const result = await reader.read();
             if (result.done) break;
             bytes += result.value.byteLength;
-            if (bytes > 2 * 1024 * 1024)
+            if (bytes > maxResponseBytes)
               throw new RuntimeFailure(
                 'limit_exceeded',
                 'API control response is too large',

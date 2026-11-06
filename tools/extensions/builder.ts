@@ -488,6 +488,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       packageName: descriptor.packageName,
       version: metadata.versionName,
       sourceIds: metadata.sources.map((source) => source.id).sort(),
+      sources: [...metadata.sources].sort((a, b) =>
+        a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+      ),
       protocolVersion: materials.protocolVersion,
       hostAbi: materials.hostAbi,
       runtimeBaseline: materials.runtimeBaseline,
@@ -511,6 +514,8 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     if (serializedManifest === undefined)
       throw new Error('Build manifest is not JSON');
     const manifestBytes = Buffer.from(serializedManifest + '\n');
+    if (manifestBytes.length > 64 * 1024)
+      throw new Error('Build manifest exceeds 64 KiB');
     const provenance = {
       schemaVersion: 1,
       descriptor,

@@ -184,7 +184,8 @@ export async function assembleExtensionAssets(
       manifest.packageName !== build.packageName ||
       manifest.repoId !== build.repoId ||
       manifest.version !== build.version ||
-      JSON.stringify(manifest.sourceIds) !== JSON.stringify(build.sourceIds)
+      JSON.stringify(manifest.sourceIds) !== JSON.stringify(build.sourceIds) ||
+      JSON.stringify(manifest.sources) !== JSON.stringify(build.sources)
     )
       throw new Error('Static extension index and manifest disagree');
     for (const [references, expected] of [

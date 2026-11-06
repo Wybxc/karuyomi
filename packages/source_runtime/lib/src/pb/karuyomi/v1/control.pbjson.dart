@@ -1982,6 +1982,21 @@ final $typed_data.Uint8List bundleArtifactDescriptor = $convert.base64Decode(
     'VHlwZRIaCghlbmNvZGluZxgFIAEoCVIIZW5jb2RpbmcSJQoOZW5jb2RlZF9zaGEyNTYYBiABKA'
     'lSDWVuY29kZWRTaGEyNTYSIQoMZW5jb2RlZF9zaXplGAcgASgNUgtlbmNvZGVkU2l6ZQ==');
 
+@$core.Deprecated('Use catalogSourceDescriptor instead')
+const CatalogSource$json = {
+  '1': 'CatalogSource',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'lang', '3': 3, '4': 1, '5': 9, '10': 'lang'},
+  ],
+};
+
+/// Descriptor for `CatalogSource`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List catalogSourceDescriptor = $convert.base64Decode(
+    'Cg1DYXRhbG9nU291cmNlEg4KAmlkGAEgASgJUgJpZBISCgRuYW1lGAIgASgJUgRuYW1lEhIKBG'
+    'xhbmcYAyABKAlSBGxhbmc=');
+
 @$core.Deprecated('Use buildManifestDescriptor instead')
 const BuildManifest$json = {
   '1': 'BuildManifest',
@@ -2020,6 +2035,14 @@ const BuildManifest$json = {
       '6': '.karuyomi.v1.Artifact',
       '10': 'resources'
     },
+    {
+      '1': 'sources',
+      '3': 14,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogSource',
+      '10': 'sources'
+    },
   ],
 };
 
@@ -2034,7 +2057,8 @@ final $typed_data.Uint8List buildManifestDescriptor = $convert.base64Decode(
     'GAogAygJUglzb3VyY2VJZHMSMwoGYnVuZGxlGAsgASgLMhsua2FydXlvbWkudjEuQnVuZGxlQX'
     'J0aWZhY3RSBmJ1bmRsZRI4Cgxob3N0X3NjcmlwdHMYDCADKAsyFS5rYXJ1eW9taS52MS5BcnRp'
     'ZmFjdFILaG9zdFNjcmlwdHMSMwoJcmVzb3VyY2VzGA0gAygLMhUua2FydXlvbWkudjEuQXJ0aW'
-    'ZhY3RSCXJlc291cmNlcw==');
+    'ZhY3RSCXJlc291cmNlcxI0Cgdzb3VyY2VzGA4gAygLMhoua2FydXlvbWkudjEuQ2F0YWxvZ1Nv'
+    'dXJjZVIHc291cmNlcw==');
 
 @$core.Deprecated('Use extensionBuildDescriptorDescriptor instead')
 const ExtensionBuildDescriptor$json = {
@@ -2046,6 +2070,14 @@ const ExtensionBuildDescriptor$json = {
     {'1': 'version', '3': 4, '4': 1, '5': 9, '10': 'version'},
     {'1': 'source_ids', '3': 5, '4': 3, '5': 9, '10': 'sourceIds'},
     {'1': 'manifest_path', '3': 6, '4': 1, '5': 9, '10': 'manifestPath'},
+    {
+      '1': 'sources',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogSource',
+      '10': 'sources'
+    },
   ],
 };
 
@@ -2054,7 +2086,8 @@ final $typed_data.Uint8List extensionBuildDescriptorDescriptor = $convert.base64
     'ChhFeHRlbnNpb25CdWlsZERlc2NyaXB0b3ISGQoIYnVpbGRfaWQYASABKAlSB2J1aWxkSWQSIQ'
     'oMcGFja2FnZV9uYW1lGAIgASgJUgtwYWNrYWdlTmFtZRIXCgdyZXBvX2lkGAMgASgJUgZyZXBv'
     'SWQSGAoHdmVyc2lvbhgEIAEoCVIHdmVyc2lvbhIdCgpzb3VyY2VfaWRzGAUgAygJUglzb3VyY2'
-    'VJZHMSIwoNbWFuaWZlc3RfcGF0aBgGIAEoCVIMbWFuaWZlc3RQYXRo');
+    'VJZHMSIwoNbWFuaWZlc3RfcGF0aBgGIAEoCVIMbWFuaWZlc3RQYXRoEjQKB3NvdXJjZXMYByAD'
+    'KAsyGi5rYXJ1eW9taS52MS5DYXRhbG9nU291cmNlUgdzb3VyY2Vz');
 
 @$core.Deprecated('Use extensionIndexDescriptor instead')
 const ExtensionIndex$json = {
