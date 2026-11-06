@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
@@ -8,6 +10,7 @@ import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/runtime/platform_runtime_native.dart' as native;
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -105,12 +108,15 @@ Future<void> _start(
   WidgetTester tester,
   TestPlatform platform, {
   Size size = const Size(1100, 1800),
+  PlatformRuntime Function(Uri? origin)? factory,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(KaruyomiApp(platform: platform));
+  await tester.pumpWidget(
+    KaruyomiApp(platform: platform, platformFactory: factory),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -179,6 +185,330 @@ Future<void> _finish(WidgetTester tester, CatalogController catalog) async {
 }
 
 void main() {
+  for (final trailingSlash in [false, true]) {
+    testWidgets(
+      'native same-service reconnect${trailingSlash ? ' with a trailing slash' : ''} preserves the exact pending settings mutation',
+      (tester) async {
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        final replacement = TestPlatform(
+          businessServer: platform.businessServer,
+          seedDefaultInstallation: false,
+        );
+        final factoryOrigins = <Uri?>[];
+        await _start(
+          tester,
+          platform,
+          factory: (origin) {
+            factoryOrigins.add(origin);
+            return replacement;
+          },
+        );
+        await _tap(tester, _navigation('设置'));
+        final initial = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        final originalRevision = initial.snapshot!.globalRevision;
+        await _choose<wire.AppTheme>(tester, '深色');
+        platform.afterBusinessReply = (request, reply) {
+          if (request.method != 'POST' ||
+              request.uri.path != '/api/settings/mutations') {
+            return reply;
+          }
+          platform.afterBusinessReply = null;
+          return ApiReply(
+            status: reply.status,
+            headers: reply.headers,
+            redirected: reply.redirected,
+            body: '{',
+          );
+        };
+        await _tap(tester, find.text('保存全局设置'));
+        final originalRequest = platform.businessServer.requests
+            .where((request) => request.uri.path == '/api/settings/mutations')
+            .single;
+        final originalMutation = wire.decodeProtoJson(
+          wire.SettingsMutation(),
+          jsonDecode(originalRequest.body!),
+        );
+        expect(originalMutation.mutationId, isNotEmpty);
+        expect(originalMutation.expectedRevision, originalRevision);
+        expect(originalMutation.setGlobal.theme, wire.AppTheme.APP_THEME_DARK);
+        expect(initial.pending, isNotNull);
+        expect(platform.businessServer.appliedMutations, 1);
+        expect(platform.openedBuilds, isEmpty);
+        await tester.enterText(
+          find.byType(TextField),
+          '${platform.origin.origin}${trailingSlash ? '/' : ''}',
+        );
+        await _tap(tester, find.text('连接服务'));
+        final reconnected = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        expect(reconnected.pending, isNotNull);
+        expect(reconnected.pending!.basedOnRevision, originalRevision);
+        expect(
+          reconnected.pending!.global!.theme,
+          wire.AppTheme.APP_THEME_DARK,
+        );
+        expect(reconnected.repository.client, same(initial.repository.client));
+        expect(factoryOrigins, isEmpty);
+        expect(platform.rebuildCount, 1);
+        expect(platform.disposalCount, 0);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.uri.path == '/api/settings/mutations',
+          ),
+          hasLength(1),
+        );
+        expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
+        await _tap(tester, find.text('重试原设置操作'));
+        final requests = platform.businessServer.requests
+            .where((request) => request.uri.path == '/api/settings/mutations')
+            .toList();
+        final retriedMutation = wire.decodeProtoJson(
+          wire.SettingsMutation(),
+          jsonDecode(requests.last.body!),
+        );
+        expect(requests.map((request) => request.body), [
+          originalRequest.body,
+          originalRequest.body,
+        ]);
+        expect(retriedMutation.mutationId, originalMutation.mutationId);
+        expect(retriedMutation.expectedRevision, originalRevision);
+        expect(platform.businessServer.appliedMutations, 1);
+        expect(reconnected.pending, isNull);
+        expect(find.text('重试原设置操作'), findsNothing);
+        expect(
+          tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+          ThemeMode.dark,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  for (final invalidOrigin in [
+    'https://reader.example.com/path',
+    'http://reader.example.com',
+    'https://[',
+  ]) {
+    testWidgets(
+      'rejected service address $invalidOrigin preserves pending settings for an exact retry',
+      (tester) async {
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        final factoryOrigins = <Uri?>[];
+        await _start(
+          tester,
+          platform,
+          factory: (origin) {
+            factoryOrigins.add(origin);
+            return native.createPlatformRuntime(origin: origin);
+          },
+        );
+        await _tap(tester, _navigation('设置'));
+        final initial = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        await _choose<wire.AppTheme>(tester, '深色');
+        platform.afterBusinessReply = (request, reply) {
+          if (request.method != 'POST' ||
+              request.uri.path != '/api/settings/mutations') {
+            return reply;
+          }
+          platform.afterBusinessReply = null;
+          return ApiReply(
+            status: reply.status,
+            headers: reply.headers,
+            redirected: reply.redirected,
+            body: '{',
+          );
+        };
+        await _tap(tester, find.text('保存全局设置'));
+        final originalRequest = platform.businessServer.requests
+            .where((request) => request.uri.path == '/api/settings/mutations')
+            .single;
+        final pending = initial.pending;
+        expect(pending, isNotNull);
+        await tester.enterText(find.byType(TextField), invalidOrigin);
+        await _tap(tester, find.text('连接服务'));
+        expect(find.byType(GlobalSettingsPanel), findsOneWidget);
+        final rejected = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        expect(rejected, same(initial));
+        expect(rejected.pending, isNotNull);
+        expect(rejected.pending!.basedOnRevision, pending!.basedOnRevision);
+        expect(rejected.pending!.global, pending.global);
+        expect(rejected.pending!.retryable, pending.retryable);
+        expect(rejected.available, true);
+        expect(platform.disposalCount, 0);
+        expect(platform.rebuildCount, 0);
+        expect(platform.businessServer.appliedMutations, 1);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.uri.path == '/api/settings/mutations',
+          ),
+          hasLength(1),
+        );
+        expect(find.textContaining('请先在设置中填写服务的 HTTPS 地址'), findsOneWidget);
+        expect(
+          factoryOrigins,
+          Uri.tryParse(invalidOrigin) == null
+              ? isEmpty
+              : [Uri.parse(invalidOrigin)],
+        );
+        await tester.enterText(
+          find.byType(TextField),
+          platform.origin.toString(),
+        );
+        await _tap(tester, find.text('连接服务'));
+        final reconnected = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        expect(reconnected.pending, isNotNull);
+        expect(reconnected.repository.client, same(initial.repository.client));
+        expect(find.textContaining('请先在设置中填写服务的 HTTPS 地址'), findsNothing);
+        await _tap(tester, find.text('重试原设置操作'));
+        expect(
+          platform.businessServer.requests
+              .where((request) => request.uri.path == '/api/settings/mutations')
+              .map((request) => request.body),
+          [originalRequest.body, originalRequest.body],
+        );
+        expect(platform.businessServer.appliedMutations, 1);
+        expect(reconnected.pending, isNull);
+        expect(platform.openedBuilds, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  for (final changeOrigin in [true, false]) {
+    testWidgets(
+      'native ${changeOrigin ? 'service' : 'subject'} changes isolate pending settings from the new identity',
+      (tester) async {
+        final original = TestPlatform(seedDefaultInstallation: false);
+        final replacement = TestPlatform(
+          origin: changeOrigin
+              ? Uri.parse('https://other.example')
+              : original.origin,
+          bootstrapSubject: changeOrigin ? 'owner-subject' : 'other-subject',
+          businessServer: changeOrigin ? null : original.businessServer,
+          seedDefaultInstallation: false,
+        );
+        final factoryOrigins = <Uri?>[];
+        await _start(
+          tester,
+          original,
+          factory: (origin) {
+            factoryOrigins.add(origin);
+            return replacement;
+          },
+        );
+        await _tap(tester, _navigation('设置'));
+        final previous = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        await _choose<wire.AppTheme>(tester, '深色');
+        original.afterBusinessReply = (request, reply) {
+          if (request.method != 'POST' ||
+              request.uri.path != '/api/settings/mutations') {
+            return reply;
+          }
+          original.afterBusinessReply = null;
+          return ApiReply(
+            status: reply.status,
+            headers: reply.headers,
+            redirected: reply.redirected,
+            body: '{',
+          );
+        };
+        await _tap(tester, find.text('保存全局设置'));
+        final oldRequest = original.businessServer.requests
+            .where((request) => request.uri.path == '/api/settings/mutations')
+            .single;
+        final oldMutation = wire.decodeProtoJson(
+          wire.SettingsMutation(),
+          jsonDecode(oldRequest.body!),
+        );
+        expect(previous.pending, isNotNull);
+        if (!changeOrigin) {
+          original.bootstrapSubject = replacement.bootstrapSubject;
+        }
+        await tester.enterText(
+          find.byType(TextField),
+          replacement.origin.toString(),
+        );
+        await _tap(tester, find.text('连接服务'));
+        final current = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        expect(current.repository.identity.origin, replacement.origin);
+        expect(
+          current.repository.identity.subject,
+          replacement.bootstrapSubject,
+        );
+        expect(current.pending, isNull);
+        expect(current.snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+        expect(previous.available, false);
+        expect(previous.canRetry, false);
+        expect(await tester.runAsync(previous.retry), false);
+        expect(find.text('重试原设置操作'), findsNothing);
+        expect(
+          original.businessServer.requests.where(
+            (request) => request.uri.path == '/api/settings/mutations',
+          ),
+          hasLength(1),
+        );
+        if (changeOrigin) {
+          expect(factoryOrigins, [replacement.origin]);
+          expect(original.disposalCount, 1);
+          expect(
+            replacement.businessServer.requests.where(
+              (request) => request.uri.path == '/api/settings/mutations',
+            ),
+            isEmpty,
+          );
+        } else {
+          expect(factoryOrigins, isEmpty);
+          expect(original.rebuildCount, 1);
+          expect(original.disposalCount, 0);
+        }
+        await _choose<wire.AppTheme>(tester, '浅色');
+        await _tap(tester, find.text('保存全局设置'));
+        final newRequest = replacement.businessServer.requests
+            .where((request) => request.uri.path == '/api/settings/mutations')
+            .last;
+        final newMutation = wire.decodeProtoJson(
+          wire.SettingsMutation(),
+          jsonDecode(newRequest.body!),
+        );
+        expect(newMutation.mutationId, isNot(oldMutation.mutationId));
+        expect(newMutation.expectedRevision, 0);
+        expect(newMutation.setGlobal.theme, wire.AppTheme.APP_THEME_LIGHT);
+        expect(
+          newRequest.headers['X-App-Subject'],
+          replacement.bootstrapSubject,
+        );
+        expect(current.pending, isNull);
+        expect(current.snapshot!.global.theme, wire.AppTheme.APP_THEME_LIGHT);
+        expect(original.businessServer.appliedMutations, changeOrigin ? 1 : 2);
+        if (changeOrigin) {
+          expect(replacement.businessServer.appliedMutations, 1);
+        }
+        expect(original.openedBuilds, isEmpty);
+        expect(replacement.openedBuilds, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets(
     'global settings save confirms the app theme and reader defaults are inherited by a manga',
     (tester) async {

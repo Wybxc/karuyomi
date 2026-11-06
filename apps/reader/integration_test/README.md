@@ -1,6 +1,6 @@
 # Native 服务端同步集成测试
 
-`category_sync_test.dart` 使用正式 `app.main()`、`NativePlatformRuntime` 和业务 repository 验证分类；独立于 Source 阅读。`server_sync_test.dart` 保留原阅读驱动，其旧配套服务状态单独见下节。普通无设备 `flutter test` 不执行本目录；`flutter analyze` 与仓库格式检查仍覆盖它。
+`category_sync_test.dart` 和 `settings_sync_test.dart` 使用正式 `app.main()`、`NativePlatformRuntime` 和业务 repository 验证分类与全局设置；独立于 Source 阅读。`server_sync_test.dart` 保留原阅读驱动，其旧配套服务状态单独见下节。普通无设备 `flutter test` 不执行本目录；`flutter analyze` 与仓库格式检查仍覆盖它。
 
 ## 分类同步
 
@@ -31,6 +31,33 @@ flutter test integration_test/category_sync_test.dart --no-pub \
 五阶段分别验证创建并关联甲、第二端读回后改名并关联乙、第一端重启读回两关系、删除分类保留收藏、第一端重启确认两部未分类。实际操作经过分类 UI，并由 repository 正常 API 重新读取已确认快照；每个阶段有操作预算和最终运行时释放，输出 `CATEGORY_SYNC_RESULT` 和 binding `reportData`。Web 双会话使用单独 HTTP 模式入口，证据与 Native 分别记录；同一 HTTPS 的混合会话须另行取得正常浏览器信任和实测结果。
 
 本入口只证明实际执行的平台组合和操作，不代表 Source、生产 Access、同时写竞争、网络故障、物理触控或真机性能。当前证据见[分类同步记录](../../../docs/verification/category-ui-sync.md)。完成后按 Enter 关闭 harness，停止测试进程并删除本轮专用设备。
+
+## 全局设置同步
+
+`settings_sync_test.dart` 复用上面的正式产品构建、官方 HTTPS harness 和设备信任配置；启动服务时不设置 `ACCEPTANCE_FIXTURE` 或 Source policies，使用空 D1 与零扩展索引。两个客户端必须使用同一个实际 HTTPS origin 和服务输出的 subject。Android 的隔离 debug 副本按上面的精确主机 CA 配置，并逐文件核对当前产品 Dart、驱动、锁文件与内置材料；不要复用历史副本的旧业务源码。
+
+每阶段先从该服务经正常 TLS 校验 GET `/api/settings`，使用 `Origin`、`X-App-Subject` 与 `X-App-Request: 1` 正常业务头，取得完整当前 `SettingsResponse`。将本阶段配置保存到忽略的本地 JSON 文件；`SETTINGS_EXPECT_JSON` 是完整响应经 JSON 编码后的字符串，不是手工填写 revision 或嵌套对象。配置包含：
+
+| 字段                   | 内容                                           |
+| ---------------------- | ---------------------------------------------- |
+| `APP_ORIGIN`           | 官方 harness 的实际 HTTPS origin               |
+| `SETTINGS_SUBJECT`     | 本次服务已确认的 subject                       |
+| `SETTINGS_PHASE`       | `verify` 或 `write`                            |
+| `SETTINGS_EXPECT_JSON` | 本阶段完整当前 SettingsResponse 的 JSON 字符串 |
+| `SETTINGS_PRESET`      | 仅写阶段填写，取下述两个预设之一               |
+
+在 `apps/reader` 使用固定 SDK 运行：
+
+```sh
+flutter test integration_test/settings_sync_test.dart --no-pub \
+  -d DEVICE_ID \
+  --dart-define-from-file=/absolute/path/.local/settings-native/phase.json \
+  --reporter expanded
+```
+
+依次运行 A `verify` → B `write`（`dark-rtl-double-width-crop`）→ A 新进程 `verify` → A 新进程 `write`（`light-webtoon-auto-height-no-crop`）→ B 新进程 `verify`。每阶段重新取得当前完整快照作为前置；保存成功后不要盲目重跑旧写阶段。正式表单修改主题、阅读模式、页组、适配和裁白，其它字段与列表保留。驱动验证草稿不提前应用主题、服务端确认后清除 pending，并输出完整 `SETTINGS_SYNC_RESULT`。
+
+这组顺序操作证明实际执行平台间的全局设置读写与新进程恢复；漫画覆盖、同时写竞争、丢响应、自动前台、Web↔Native、生产 Access 和真机分别验收。全局默认 false/0 与 optional 漫画覆盖的 presence 语义不同，驱动按生成 getter 核对非 optional 值。实际结果与剩余门见[设置记录](../../../docs/verification/reader-settings.md)。完成后关闭 harness，移除本轮 reverse、测试安装与专用设备，结束测试进程。
 
 ## Source 阅读与筛选验收
 

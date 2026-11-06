@@ -168,15 +168,24 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _configure(widget.platform);
   }
 
+  PlatformRuntime _createPlatform() {
+    final configured = _originField.text.trim();
+    return (widget.platformFactory ??
+        ((origin) => createPlatformRuntime(origin: origin)))(
+      configured.isEmpty ? null : Uri.parse(configured),
+    );
+  }
+
+  void _configurationFailed(Object error) {
+    _configurationError = switch (error) {
+      ArgumentError() || FormatException() => '请先在设置中填写服务的 HTTPS 地址。',
+      _ => '服务初始化未完成，请在设置中重新连接。',
+    };
+  }
+
   void _configure([PlatformRuntime? injected]) {
     try {
-      final configured = _originField.text.trim();
-      _platform =
-          injected ??
-          (widget.platformFactory ??
-              ((origin) => createPlatformRuntime(origin: origin)))(
-            configured.isEmpty ? null : Uri.parse(configured),
-          );
+      _platform = injected ?? _createPlatform();
       _originField.text = _platform!.origin.toString();
       _catalog = CatalogController(
         api: _platform!,
@@ -195,10 +204,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         if (!mounted) return;
         unawaited(_connect(_pendingContinuation));
       });
-    } on ArgumentError {
-      _configurationError = '请先在设置中填写服务的 HTTPS 地址。';
-    } catch (_) {
-      _configurationError = '服务初始化未完成，请在设置中重新连接。';
+    } catch (error) {
+      _configurationFailed(error);
     }
   }
 
@@ -361,27 +368,60 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (_changingService) return;
     setState(() => _changingService = true);
     try {
-      if (kIsWeb && _platform != null) {
-        await _platform!.rebuild();
-        if (mounted) await _connect();
+      final platform = _platform;
+      final requested = Uri.tryParse(_originField.text.trim());
+      final sameService =
+          platform != null &&
+          (requested == platform.origin.replace(path: '') ||
+              requested == platform.origin.replace(path: '/'));
+      // Reconnecting the same service keeps identity-bound pending commands.
+      // Bootstrap still verifies the current subject before they can be retried.
+      if (platform != null && (kIsWeb || sameService)) {
+        await platform.rebuild();
+        if (mounted) {
+          setState(() {
+            _configurationError = null;
+            _originField.text = platform.origin.toString();
+          });
+          await _connect();
+        }
         return;
       }
-      final old = _platform;
-      final oldCatalog = _catalog;
-      _clearSettings();
-      _applyTheme(ThemeMode.system);
-      if (oldCatalog != null) {
-        oldCatalog.removeListener(_catalogChanged);
-        await oldCatalog.flushReadingProgress();
-        _retiredProgress.addAll(oldCatalog.takeUnsavedReadingProgress());
-        oldCatalog.dispose();
-        await oldCatalog.closeReadingProgress();
+      // Validate with the real platform constructor before retiring a session.
+      final PlatformRuntime candidate;
+      try {
+        candidate = _createPlatform();
+      } catch (error) {
+        if (mounted) setState(() => _configurationFailed(error));
+        return;
       }
-      _catalog = null;
-      _platform = null;
-      if (old != null) await old.dispose();
-      if (!mounted) return;
-      setState(_configure);
+      var adopted = false;
+      try {
+        final old = _platform;
+        final oldCatalog = _catalog;
+        _clearSettings();
+        _applyTheme(ThemeMode.system);
+        if (oldCatalog != null) {
+          oldCatalog.removeListener(_catalogChanged);
+          await oldCatalog.flushReadingProgress();
+          if (!mounted) return;
+          _retiredProgress.addAll(oldCatalog.takeUnsavedReadingProgress());
+          oldCatalog.dispose();
+          _catalog = null;
+          await oldCatalog.closeReadingProgress();
+        }
+        if (!mounted) return;
+        _catalog = null;
+        _platform = null;
+        if (old != null) await old.dispose();
+        if (!mounted) return;
+        setState(() {
+          adopted = true;
+          _configure(candidate);
+        });
+      } finally {
+        if (!adopted) await candidate.dispose();
+      }
     } finally {
       if (mounted) setState(() => _changingService = false);
     }

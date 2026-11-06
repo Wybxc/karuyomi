@@ -88,6 +88,22 @@ flutter test integration_test/settings_sync_test.dart --no-pub -d <simulator-udi
 
 上述新证据覆盖全局设置的 Web↔Web、iOS 模拟器↔iOS 模拟器在线读写。漫画继承/覆盖/清空、实际丢响应原操作恢复、可靠前台恢复、Web↔Native、Android、生产 Access、真机手势及性能仍须分别验收。
 
+## 2026-11-07：同服务重连与无效配置的受控回归
+
+后续只读复审发现两个正式 AppShell 路径会丢失未确认命令的入口：Native 点击“连接服务”即使仍是原 origin，也会替换 Catalog / 设置仓储；无效新地址则会先拆除旧服务，再由 Native 构造器拒绝配置。修复后，同一已验证服务的空路径和根尾斜杠使用原平台重建运行时，再 bootstrap 确认当前 subject，保留同身份的 BusinessStateClient 和原 pending；不会因重新连接自动重发设置写入。
+
+切换服务先用正式平台构造器验证候选，失败时保留旧设置面板、会话和原命令；尚未采用的候选由 `finally` 释放。真正切换 origin 或 bootstrap 返回不同 subject 时，旧编辑永久退役，新身份使用独立命令与 CAS。只读复核同时检查了候选所有权、卸载期间的释放和身份隔离。
+
+正式 `settings_navigation_test.dart` 全文件 10/10 通过，其中原有 3 项导航回归保留，新增 7 项为：
+
+- 同服务空路径、根尾斜杠两种重连：业务 supplier 已提交但 ACK 正文截断；重连只 bootstrap / 重读，原 UUID、正文、expectedRevision 留在当前会话。只有明确点“重试原设置操作”才重发逐字相同正文，累计仅应用一次写入。
+- 三种无效地址：额外路径、HTTP 与畸形 URI。修复前 3/3 均因设置面板丢失失败；修复后配置被拒而旧 pending 保持可处理，改回原服务再明确重试成功，原 POST 正文不变。
+- 真正切换服务、同服务切换 subject：旧编辑不能重试，也不向新身份发送旧命令；新写使用新 UUID、当前身份和独立 CAS。
+
+独立验收只读审查产品差异，并核对红日志与最终 `All tests passed`。修复前证据在 `/private/tmp/karuyomi-settings-invalid-origin-red.log`，完整导航绿日志在 `/private/tmp/karuyomi-settings-reconnect-final-green.log`。最终完整 `pnpm flutter:check` 通过：reader_core 22、source_runtime 78、客户端 584，三个项目静态分析无问题，日志为 `.local/settings-reconnect-final-flutter-check.log`。这是正式 AppShell 与受控 TestPlatform / 业务 supplier 的组件回归，未新增真实设备丢响应、Access 续期或网络故障验收。
+
+固定提交 `2123b5b7d6fcf897f0120e1873001f398363b968` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42288468310) 已独立核对为 completed / success。上述后续 AppShell 修复与固定 `2123b5b` 的设备副本是不同输入，不能用旧设备运行或该 CI 证明本节新修复已在设备执行。
+
 ## 可复验入口
 
 ```sh
