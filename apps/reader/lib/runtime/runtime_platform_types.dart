@@ -5,6 +5,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import 'api_fetch.dart';
 import 'cover_transport.dart';
+import 'catalog_transport.dart';
 export 'api_fetch.dart';
 
 /// Native returns JSON.stringify output so JS integer tokens survive the
@@ -22,6 +23,9 @@ Object? decodeNativeControlResult(Object? value) {
 abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
   late final TransportSourceRuntime runtime = TransportSourceRuntime(this);
   Uri get origin;
+  CatalogTransport? _catalogTransport;
+  CatalogTransport get catalogTransport =>
+      _catalogTransport ??= HttpCatalogTransport();
 
   CoverTransport? get coverTransport => null;
 

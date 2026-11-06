@@ -13,6 +13,9 @@ import {
   type HttpRequestMeta,
   type HttpResponseMeta,
   HttpFrameError,
+  type CatalogReference,
+  catalogReferenceSchema,
+  buildIdSchema,
 } from '@karuyomi/contracts';
 import { RuntimeFailure } from './errors.js';
 
@@ -46,6 +49,12 @@ interface HttpSession {
 const HTTP_HANDLE_LIMIT = 4;
 const HTTP_TERMINAL_LIMIT = 16;
 
+export interface HttpBuildIdentity {
+  buildId: string;
+  catalog: CatalogReference;
+  bundleSha256: string;
+}
+
 /** One operation owns its handles. No reads run ahead of the Java consumer. */
 export class BinaryHttpTransport {
   private context: HttpCallContext | undefined;
@@ -55,11 +64,21 @@ export class BinaryHttpTransport {
   private readonly terminalFailures = new Map<string, RuntimeFailure>();
   private closed = false;
 
+  private readonly build: HttpBuildIdentity;
+
   constructor(
     private readonly origin: string,
-    private readonly buildId: string,
+    build: HttpBuildIdentity,
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
-  ) {}
+  ) {
+    this.build = {
+      buildId: buildIdSchema.parse(build.buildId),
+      catalog: catalogReferenceSchema.parse(build.catalog),
+      bundleSha256: build.bundleSha256,
+    };
+    if (!/^[a-f0-9]{64}$/.test(build.bundleSha256))
+      throw new RuntimeFailure('protocol_error', 'Invalid HTTP build digest');
+  }
 
   get operationToken(): string | undefined {
     return this.token;
@@ -197,7 +216,10 @@ export class BinaryHttpTransport {
               'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
               Accept: HTTP_BRIDGE_MEDIA_TYPE,
               'X-App-Request': '1',
-              'X-Runtime-Build': this.buildId,
+              'X-Runtime-Build': this.build.buildId,
+              'X-Runtime-Catalog': this.build.catalog.catalogUrl,
+              'X-Runtime-Repo': this.build.catalog.repoId,
+              'X-Runtime-Bundle': this.build.bundleSha256,
             },
             body,
             credentials: 'same-origin',

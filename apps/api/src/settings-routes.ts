@@ -107,6 +107,19 @@ export function createSettingsRoutes() {
           'Invalid settings mutation',
         );
       }
+      if (
+        mutation.operation.case === 'setGlobal' &&
+        mutation.operation.value.repositories.some(
+          (repository) =>
+            repository.catalogUrl ===
+            `${c.env.APP_ORIGIN}/extensions/index.json`,
+        )
+      ) {
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'The default repository is implicit and cannot be registered twice',
+        );
+      }
       mutationId = mutation.mutationId;
       const result = await applySettingsMutation(
         c.env.DB,

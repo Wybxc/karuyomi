@@ -3,6 +3,10 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:test/test.dart';
 
 const sourceId = '9223372036854775806';
+wire.CatalogReference catalog() => wire.CatalogReference(
+  catalogUrl: 'https://reader.example/extensions/index.json',
+  repoId: 'repo',
+);
 
 final class FakeTransport implements RuntimeTransport {
   final calls = <wire.ControlRequest>[];
@@ -21,6 +25,7 @@ final class FakeTransport implements RuntimeTransport {
       case wire.ControlRequest_Command.open:
         response.session = wire.RuntimeSession(
           protocolVersion: protocolVersion,
+          catalog: request.open.catalog.deepCopy(),
           buildId: 'build-1',
           workerInstanceId: 'worker-1',
           generation: 'generation-1',
@@ -85,6 +90,7 @@ final class ManagedTransport
 BuildDescriptor build({String identity = 'owner', String? path}) =>
     BuildDescriptor(
       buildId: 'build-1',
+      catalog: catalog(),
       manifestUri: Uri.parse(
         path ?? '/extensions/builds/build-1/manifest.json',
       ),

@@ -143,6 +143,7 @@ void main() {
       await open();
       platform.inventory = {
         'schemaVersion': 1,
+        'repoId': 'keiyoushi',
         'builds': [
           {
             'buildId': 'build-2',
@@ -355,6 +356,7 @@ void main() {
     };
     platform.inventory = {
       'schemaVersion': 1,
+      'repoId': 'keiyoushi',
       'builds': [entry, entry],
     };
     await controller.connect();

@@ -609,6 +609,7 @@ final class NativePlatformRuntime extends PlatformRuntime
 
   Future<void> _dispose() async {
     coverTransport.close();
+    catalogTransport.close();
     if (_disposed) return;
     _closing = true;
     final opening = _opening;

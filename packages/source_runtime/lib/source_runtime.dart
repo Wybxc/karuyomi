@@ -17,6 +17,7 @@ abstract interface class SourceRuntime {
   Future<RuntimeSession> open(BuildDescriptor build);
   Future<wire.PreparedBuild> prepareBuild({
     required String preparationId,
+    required wire.CatalogReference catalog,
     required wire.ExtensionBuildDescriptor build,
   });
   Future<void> cancelPreparation(String preparationId);
@@ -78,6 +79,7 @@ final class PageSessionRef {
 final class BuildDescriptor {
   const BuildDescriptor({
     required this.buildId,
+    required this.catalog,
     required this.manifestUri,
     required this.sha256,
     this.identity = '',
@@ -86,6 +88,7 @@ final class BuildDescriptor {
   });
 
   final String buildId;
+  final wire.CatalogReference catalog;
   final Uri manifestUri;
   final String sha256;
 

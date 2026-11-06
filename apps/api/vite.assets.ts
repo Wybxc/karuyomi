@@ -165,7 +165,8 @@ export async function assembleExtensionAssets(
       throw error;
     await writeFile(
       path.join(destination, 'index.json'),
-      JSON.stringify({ schemaVersion: 1, builds: [] }) + '\n',
+      JSON.stringify({ schemaVersion: 1, repoId: 'keiyoushi', builds: [] }) +
+        '\n',
     );
     return 0;
   }

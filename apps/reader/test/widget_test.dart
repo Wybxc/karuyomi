@@ -192,7 +192,11 @@ void main() {
       final platform = TestPlatform()..bootstrapStatus = 401;
       platform.continuation = {
         'returnTo': '/',
-        'pending': {'tab': 1, 'buildId': 'build-1', 'sourceId': sourceId},
+        'pending': {
+          'tab': 1,
+          'packageName': 'eu.kanade.source.test',
+          'sourceId': sourceId,
+        },
       };
       await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();

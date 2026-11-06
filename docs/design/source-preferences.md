@@ -18,7 +18,7 @@ change listener 返回 true 才执行该控件的标准持久化；返回 false 
 
 ## 原对象、构造顺序与生命周期
 
-客户端先 GET 整包已确认设置，再形成 `PreferenceBootstrap(packageName,sources)`。driver 根据已验证 manifest 的 packageName 生成可信同步规则，作为 `PreferenceHostConfiguration` 传给 `hostLoad`。Java 使用 init 创建的原 Application 和原 SharedPreferences.Editor，在 `Generated/createSources` 之前注入 `source_<id>`；不能构造 Source 后才更新设置，因为构造函数、lazy client 和 headers 可能已经读取旧值。
+客户端先 GET 整包已确认设置，再形成 `PreferenceBootstrap(packageName,sources)`。driver 根据应用 origin、确认的 CatalogReference 和已验证 manifest 的 packageName 生成可信同步规则，作为 `PreferenceHostConfiguration` 传给 `hostLoad`。Java 使用 init 创建的原 Application 和原 SharedPreferences.Editor，在 `Generated/createSources` 之前注入 `source_<id>`；不能构造 Source 后才更新设置，因为构造函数、lazy client 和 headers 可能已经读取旧值。
 
 保留原 Preference 实例、具体子类和 listener。必要的 Preference 分组、dependency 和有界 headless 编辑元数据属于项目宿主 ABI 适配；不替换整个 Context，不改扩展源码或原 JAR。原 bind 超出已实现的 headless 方法子集时呈现 unsupported；不伪造 Activity、按钮或 Android UI 成功。密码行不回显原 summary/default。
 
@@ -28,16 +28,16 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 
 ## 同步许可与业务 API
 
-唯一可信许可表为 `packages/contracts/src/source-preference-policy.ts`，同时用于 driver 配置 Java 分区与 Worker API 校验。许可按 package、可选 Source ID、实际存储 key 和值类型配置，不信任插件描述或客户端自行声称 ACCOUNT。初始只批准已核对的 Komiic、MangaFire、AsuraScans 和 MangaKatana 非敏感键；后者保留 UI key 和 listener 别名键。未知文本、未知 key 和秘密值留在 `sessionValues`，绝不整体上传 `getAll()`。
+唯一可信许可表为 `packages/contracts/src/source-preference-policy.ts`，同时用于 driver 配置 Java 分区与 Worker API 校验。许可按 package、可选 Source ID、实际存储 key 和值类型配置，不信任插件描述或客户端自行声称 ACCOUNT。仅可信应用默认目录与 `keiyoushi` 获得许可；额外仓库返回空规则，不能因自报相同 package/repoId 获得同步权限。响应和 ACK 回显来源及实际 syncRules，entries 逐项按实际规则校验。初始只批准已核对的 Komiic、MangaFire、AsuraScans 和 MangaKatana 非敏感键；后者保留 UI key 和 listener 别名键。未知文本、未知 key 和秘密值留在 `sessionValues`，绝不整体上传 `getAll()`。
 
-- GET `/api/source-preferences/packages/:packageName` 返回该身份整包 `SourcePreferencesResponse`。
-- POST `/api/source-preferences/mutations` 接收 mutationId、packageName、sourceId、expectedRevision 和完整 entries，返回确认的 Source 状态与 accountRevision。
+- GET `/api/source-preferences/packages/:packageName?catalogUrl=...&repoId=...` 返回该身份、该来源的整包 `SourcePreferencesResponse`。
+- POST `/api/source-preferences/mutations` 接收 mutationId、CatalogReference、packageName、sourceId、expectedRevision 和完整 entries，返回确认的 Source 状态与 accountRevision。
 
-每个 `(subject,packageName,sourceId)` 独立 CAS，整组 entries 替换；遗漏的键删除，清空后仍保留 revision 行。D1 batch 原子维护 Source revision、account revision 和持久幂等确认；包内 Source 数量与总字节配额在同一写入门验证，不能被并发跨 Source 请求绕过。
+每个 `(subject,catalogUrl,repoId,packageName,sourceId)` 独立 CAS，整组 entries 替换；遗漏的键删除，清空后仍保留 revision 行。D1 batch 原子维护 Source revision、account revision 和持久幂等确认；包内 Source 数量与总字节配额在同一写入门验证，不能被并发跨 Source 请求绕过。
 
-编辑基线必须是该 Source 构造时注入的 revision/entries。打开设置页先 GET；若与构造基线不同，先重开 Source 再取描述，不能把旧 runtime 的值套到新 revision 上。编辑后只上传 snapshot.syncValues；sessionValues 在当前部署/身份会话内保留，供确认后重开注入。
+编辑基线必须是该 Source 构造时注入的 revision/entries。打开设置页先 GET；若与构造基线不同，先重开 Source 再取描述，不能把旧 runtime 的值套到新 revision 上。编辑后只上传 snapshot.syncValues；sessionValues 在当前部署/身份会话内按 catalog URL、repoId、package 和 Source 隔离保留，供确认后重开注入。
 
-业务响应丢失时保留冻结的 UUID、body 和 CAS，显式重试只重发这份业务请求，不重跑插件回调。收到旧幂等 ACK 后再次 GET 整包再重开，不能用旧 ACK 回退 runtime 基线。只读刷新不重放 pending；冲突、显式放弃或未知运行结果都读取当前 D1 后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿；切换身份/部署清空客户端秘密值。
+业务响应丢失时保留冻结的 UUID、body 和 CAS，显式重试只重发这份业务请求，不重跑插件回调。收到旧幂等 ACK 后再次 GET 整包再重开，不能用旧 ACK 回退 runtime 基线。只读刷新不重放 pending；冲突、显式放弃或未知运行结果都读取当前 D1 后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿；切换身份/部署清空客户端秘密值；同包换仓不能注入原仓秘密、D1 值或可变存储。额外仓库边界见[设计](additional-repositories.md)。
 
 ## 统一限额
 

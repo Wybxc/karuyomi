@@ -26,6 +26,7 @@ void main() {
       ..inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(
           schemaVersion: 1,
+          repoId: 'keiyoushi',
           builds: [
             wire.ExtensionBuildDescriptor(
               buildId: 'build-1',

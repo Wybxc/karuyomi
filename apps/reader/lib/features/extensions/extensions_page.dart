@@ -3,13 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
+import '../../data/settings_repository.dart';
+import '../../data/business_state_validation.dart';
 import '../browse/catalog_controller.dart';
 import '../settings/settings_widgets.dart';
 import 'extensions_controller.dart';
 
 class ExtensionsPage extends StatefulWidget {
-  const ExtensionsPage({super.key, required this.catalog});
+  const ExtensionsPage({
+    super.key,
+    required this.catalog,
+    required this.repository,
+  });
   final CatalogController catalog;
+  final SettingsRepository repository;
 
   @override
   State<ExtensionsPage> createState() => _ExtensionsPageState();
@@ -26,10 +33,11 @@ class _ExtensionsPageState extends State<ExtensionsPage>
     WidgetsBinding.instance.addObserver(this);
     _controller = ExtensionsController(
       catalog: widget.catalog,
+      repository: widget.repository,
       isCurrent: () => mounted && ModalRoute.of(context)?.isActive == true,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_controller.refresh());
+      if (mounted) unawaited(_controller.refresh(catalogToo: true));
     });
   }
 
@@ -39,6 +47,138 @@ class _ExtensionsPageState extends State<ExtensionsPage>
         ModalRoute.of(context)?.isCurrent == true) {
       unawaited(_controller.refresh());
     }
+  }
+
+  Future<void> _addRepository() async {
+    var address = '';
+    var label = '';
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('预览额外仓库'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('仓库必须公开提供 HTTPS 静态目录及 CORS，应用凭据不会发送给仓库。'),
+              TextField(
+                key: const ValueKey('repository-url'),
+                onChanged: (value) => address = value,
+                decoration: const InputDecoration(
+                  labelText: '仓库地址或 /extensions/index.json URL',
+                ),
+              ),
+              TextField(
+                key: const ValueKey('repository-name'),
+                onChanged: (value) => label = value,
+                maxLength: 100,
+                decoration: const InputDecoration(labelText: '名称（可选）'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            key: const ValueKey('repository-preview-submit'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('只读预览'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted || !_controller.canEdit) return;
+    final preview = await _controller.previewRepository(address, label);
+    if (!mounted || !_controller.available || preview == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认添加仓库'),
+        content: SingleChildScrollView(
+          child: Text(
+            '${preview.repository.name}\n${preview.repository.catalogUrl}\n身份：${preview.repository.repoId}\n当前 ${preview.builds.length} 个扩展。添加仓库不会安装或运行代码，网络登记另行显示。',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            key: const ValueKey('repository-add-confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认添加'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) await _controller.addRepository(preview);
+  }
+
+  Future<void> _removeRepository(wire.ExtensionRepository repository) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('移除仓库'),
+        content: Text(
+          '移除“${repository.name}”后关闭其运行槽；安装选择、书架、进度与来源数据保留。重新添加同一仓库后可继续准备和使用。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            key: const ValueKey('repository-remove-confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认移除'),
+          ),
+        ],
+      ),
+    );
+    if (accepted == true && mounted) {
+      await _controller.removeRepository(repository);
+    }
+  }
+
+  Future<void> _install(CatalogBuild build) async {
+    final previous = _controller.installed
+        .where((value) => value.packageName == build.packageName)
+        .firstOrNull;
+    final replacing =
+        previous != null &&
+        (previous.catalogUrl != build.catalogUrl ||
+            previous.repoId != build.repoId);
+    if (replacing) {
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认替换扩展来源'),
+          content: Text(
+            '${build.packageName} 当前来自 ${previous.catalogUrl}。\n将改用 ${build.catalogUrl}（${build.repoId}）；原书架、收藏源和阅读记录保留，设置、Cookie及登录会话按仓库隔离，不继承到新仓库。准备完成并由服务端确认后关闭原运行槽。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              key: const ValueKey('extension-replace-confirm'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('准备并确认替换'),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true || !mounted) return;
+    }
+    await _controller.install(
+      build,
+      replacing: replacing ? (previous.deepCopy()..freeze()) : null,
+    );
   }
 
   bool _matches(String packageName, Iterable<wire.CatalogSource> sources) =>
@@ -73,7 +213,38 @@ class _ExtensionsPageState extends State<ExtensionsPage>
               catalog.catalogUrl,
               key: const ValueKey('extensions-catalog-url'),
             ),
-            const Text('扩展从当前服务的静态目录获取。'),
+            const Text('扩展从已确认仓库的公开静态目录获取。代码准备与漫画源网络登记分别检查。'),
+            Text('仓库 ${catalog.repositories.length - 1} / 16（另含固定默认仓库）'),
+            for (final repository in catalog.repositories)
+              Card(
+                child: ListTile(
+                  title: Text(repository.name),
+                  subtitle: Text(
+                    '${repository.catalogUrl}\n身份：${repository.repoId}\n${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}${catalog.networkPolicyErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}',
+                  ),
+                  trailing: repository.catalogUrl == catalog.catalogUrl
+                      ? const Text('默认')
+                      : IconButton(
+                          key: ValueKey((
+                            'repository-remove',
+                            repository.catalogUrl,
+                          )),
+                          tooltip: '移除仓库',
+                          onPressed: controller.canEdit
+                              ? () => unawaited(_removeRepository(repository))
+                              : null,
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                ),
+              ),
+            TextButton.icon(
+              key: const ValueKey('repositories-add'),
+              onPressed: controller.canEdit && catalog.repositories.length <= 16
+                  ? () => unawaited(_addRepository())
+                  : null,
+              icon: const Icon(Icons.add),
+              label: const Text('预览并添加仓库'),
+            ),
             if (controller.busy) const LinearProgressIndicator(),
             if (controller.message case final value?)
               Text(value, key: const ValueKey('extensions-message')),
@@ -144,6 +315,12 @@ class _ExtensionsPageState extends State<ExtensionsPage>
                       in pending.global?.favoriteSources ??
                           <wire.FavoriteSource>[])
                     Text('收藏源：${favorite.sourceName} · ${favorite.sourceLang}'),
+                  for (final repository
+                      in pending.global?.repositories ??
+                          <wire.ExtensionRepository>[])
+                    Text(
+                      '仓库：${repository.name} · ${repository.catalogUrl} · ${repository.repoId}',
+                    ),
                   for (final extension
                       in pending.global?.installedExtensions ??
                           <wire.InstalledExtension>[])
@@ -182,17 +359,30 @@ class _ExtensionsPageState extends State<ExtensionsPage>
             Text('当前目录可用扩展', style: Theme.of(context).textTheme.titleMedium),
             for (final build in catalog.builds)
               if (!installed.any(
-                    (value) => value.packageName == build.packageName,
+                    (value) =>
+                        value.packageName == build.packageName &&
+                        value.catalogUrl == build.catalogUrl &&
+                        value.repoId == build.repoId,
                   ) &&
                   _matches(build.packageName, build.sources))
                 Card(
-                  key: ValueKey(('extension-available', build.packageName)),
+                  key: ValueKey((
+                    'extension-available',
+                    build.catalogUrl,
+                    build.packageName,
+                  )),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('${build.packageName} · ${build.version}'),
+                        Text('${build.catalogUrl} · ${build.repoId}'),
+                        Text(
+                          catalog.isNetworkRegistered(build)
+                              ? '网络已登记，打开时校验精确构建'
+                              : '代码可准备；网络待登记或尚未读取',
+                        ),
                         for (final source in build.sources)
                           Text(
                             '${source.name} · ${source.lang.isEmpty ? '未标注语言' : source.lang}',
@@ -200,13 +390,27 @@ class _ExtensionsPageState extends State<ExtensionsPage>
                         FilledButton.tonal(
                           key: ValueKey((
                             'extension-install',
+                            build.catalogUrl,
                             build.packageName,
                           )),
                           onPressed:
-                              controller.canEdit && installed.length < 128
-                              ? () => unawaited(controller.install(build))
+                              controller.canEdit &&
+                                  (installed.length < 128 ||
+                                      installed.any(
+                                        (value) =>
+                                            value.packageName ==
+                                            build.packageName,
+                                      ))
+                              ? () => unawaited(_install(build))
                               : null,
-                          child: const Text('准备并安装'),
+                          child: Text(
+                            installed.any(
+                                  (value) =>
+                                      value.packageName == build.packageName,
+                                )
+                                ? '准备并替换来源'
+                                : '准备并安装',
+                          ),
                         ),
                       ],
                     ),
@@ -246,9 +450,19 @@ class _ExtensionsPageState extends State<ExtensionsPage>
   Widget _installed(wire.InstalledExtension extension, Set<String> cached) {
     final controller = _controller;
     final latest = widget.catalog.builds
-        .where((build) => build.packageName == extension.packageName)
+        .where(
+          (build) =>
+              build.packageName == extension.packageName &&
+              build.catalogUrl == extension.catalogUrl &&
+              build.repoId == extension.repoId,
+        )
         .firstOrNull;
-    final supported = extension.catalogUrl == widget.catalog.catalogUrl;
+    final supported = widget.catalog.isRepositoryRegistered(
+      wire.CatalogReference(
+        catalogUrl: extension.catalogUrl,
+        repoId: extension.repoId,
+      ),
+    );
     final isCurrent =
         supported &&
         latest?.repoId == extension.repoId &&
@@ -262,10 +476,21 @@ class _ExtensionsPageState extends State<ExtensionsPage>
           children: [
             Text(extension.packageName),
             Text('账户选择：${extension.buildId}'),
+            Text('${extension.catalogUrl} · ${extension.repoId}'),
+            if (latest != null)
+              Text(
+                widget.catalog.isNetworkRegistered(
+                      latest,
+                      sha256: extension.bundleSha256,
+                    )
+                    ? '网络已登记'
+                    : '代码与账户选择保留；网络待登记或尚未读取',
+              ),
             Text(
               cached.contains(extension.bundleSha256) ? '本机产物已准备' : '本机尚未准备',
             ),
-            if (!isCurrent) Text(supported ? '所选构建已下架，请手动更新。' : '这个仓库尚未接入。'),
+            if (!isCurrent)
+              Text(supported ? '所选构建已下架，请手动更新。' : '这个仓库已移除，请重新预览并添加。'),
             if (latest != null) Text('当前目录：${latest.version} · ${latest.id}'),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -293,7 +518,7 @@ class _ExtensionsPageState extends State<ExtensionsPage>
                   FilledButton.tonal(
                     key: ValueKey(('extension-update', extension.packageName)),
                     onPressed: controller.canEdit
-                        ? () => unawaited(controller.install(latest))
+                        ? () => unawaited(_install(latest))
                         : null,
                     child: const Text('准备并确认更新'),
                   ),

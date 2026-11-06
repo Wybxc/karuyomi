@@ -2,18 +2,18 @@
 
 ## 目标与状态
 
-将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开、包内语言筛选已实现待独立运行验收；静态目录语言筛选已实现、集中工程检查通过，实际 Source/平台待验收；typed Source 筛选已实现，两包 v5 AOT 与 CuuTruyen Web 分项通过；typed preferences v6 正式链、Komiic AOT 与 Web 设置/新文档恢复分项通过，其它 Source/平台待验收；默认仓库扩展管理合同、准备/缓存及管理入口已接入，功能与独立集中工程检查通过，实际平台待验收；源迁移功能与独立集中工程检查通过，真实 Source/平台待验收；额外仓库待实现**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
+将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开、包内语言筛选已实现待独立运行验收；静态目录语言筛选已实现、集中工程检查通过，实际 Source/平台待验收；typed Source 筛选已实现，两包 v5 AOT 与 CuuTruyen Web 分项通过；typed preferences v6 正式链、Komiic AOT 与 Web 设置/新文档恢复分项通过，其它 Source/平台待验收；默认仓库扩展管理合同、准备/缓存及管理入口已接入，功能与独立集中工程检查通过，实际平台待验收；源迁移功能与独立集中工程检查通过，真实 Source/平台待验收；额外仓库正式链已接入，验收见[子计划](additional-repositories.md)**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
 
 ## 已有基础
 
 - 官方上游 submodule、按包 builder、manifest/provenance、失败隔离与最新版 Static Assets 工程入口已有实现。
 - manifest 记录包/版本、Source IDs、完整 `CatalogSource` 名称/语言、ABI、storage schema 与资源身份；静态索引投影相同资料，运行时按构建/代次隔离并检查实际 Source IDs。
-- 默认仓库的账户安装、启用、精确构建选择、手动更新和卸载链路已接入，功能与独立集中工程检查通过，实际平台待验收；静态索引仅提供构建，D1 确认清单决定使用意图。额外仓库待实现；[源迁移](source-migration.md)的正式合同、原子 API、数据层与向导已接入，独立集中工程检查通过，实际 Source/平台待验收。
+- 默认仓库的账户安装、启用、精确构建选择、手动更新和卸载链路已接入，功能与独立集中工程检查通过，实际平台待验收；静态索引仅提供构建，D1 确认清单决定使用意图。额外仓库正式链已接入，验收见[子计划](additional-repositories.md)；[源迁移](source-migration.md)的正式合同、原子 API、数据层与向导已接入，独立集中工程检查通过，实际 Source/平台待验收。
 - 收藏源复用生成全局设置、D1、CAS 与原请求幂等，正式浏览中可收藏/取消并快捷打开；设计见[收藏源](../design/source-favorites.md)，工程与独立客户端门见[验证记录](../verification/source-favorites.md)。
 
 ## 待办
 
-1. 按[扩展管理子计划](extension-management.md)推进默认仓库里程碑的实际客户端验收。D1 的 `InstalledExtension` 确认意图、不执行扩展的准备、单层有界缓存、手动更新/启停/卸载与精确选择已实现，独立集中工程检查、完整 Flutter 回归与构建通过，不能据此标为真实三端完成。额外仓库的登记、验证、更新/移除、身份冲突，以及 Static Assets 权威和 Source 网络政策接入仍待落实；不缩为只有默认仓库。无 AOT 产物时明确待构建/不支持，不从网页启动远程编译。
+1. 按[扩展管理子计划](extension-management.md)推进默认仓库里程碑的实际客户端验收。D1 的 `InstalledExtension` 确认意图、不执行扩展的准备、单层有界缓存、手动更新/启停/卸载与精确选择已实现，独立集中工程检查、完整 Flutter 回归与构建通过，不能据此标为真实三端完成。额外仓库的账户登记、预览、刷新/移除、身份冲突、完整来源隔离及 Source 网络登记已按[子计划](additional-repositories.md)接入；实际平台验收另行推进。无 AOT 产物时明确待构建/不支持，不从网页启动远程编译。
 2. 验收已接入的精确 `closeBuild(buildId,generation)`：调用方先处理请求、阅读资源和存储写锁，manager 等待 shutdown ACK 与 namespace/产物引用释放；旧代不影响新槽，失败显示并显式恢复。定向受控测试不是实际 Source 关闭证据。
 3. 服务器仅保留每包最新可用构建。客户端检查索引、明确切换所选版本并通过受管缓存清理旧副本；可枚举、可删除与占用状态已接入，实际 Web/Native 持久性和清理待验收。下架构建的 `404 build_not_found` 与 Access 登录/权限错误分开；不承诺远端历史版本回滚，不维护旧协议或旧材料兼容层。卸载保留书架、分类、进度、书签、收藏源及 Source 数据。
 4. Source 自定义筛选已接入 typed 链路，两包 v5 AOT 与 CuuTruyen Web 分项已过，继续其余真实 Source/平台验收；typed Source preferences 已按[子计划](source-preferences.md)接入 v6 正式合同、开关、文本/密码、单/多选、分组、依赖项与刷新，并通过 Komiic Web 设置/新文档恢复分项，继续其它控件与跨端验收。保留原 Preference 对象、监听器及实际存储变化；D1 确认可同步非敏感值，敏感值留当前客户端，不整体同步 SharedPreferences。不把 Android 自定义 Activity 设置页当成已支持。
@@ -48,11 +48,11 @@ typed preferences 已接入正式设置入口并通过 Komiic v6 AOT、Web 设�
 
 ## 扩展管理里程碑
 
-**默认仓库链路已接入，功能与独立集中工程检查通过，实际平台待验收；额外仓库未实现。** [子计划](extension-management.md)维护完整范围，[设计](../design/extension-management.md)确定 `InstalledExtension`、全局 CAS/pending、准备/取消、代码缓存与关闭合同，[验证记录](../verification/extension-management.md)区分已过集中工程与实际平台门。
+**默认仓库链路已接入，功能与独立集中工程检查通过，实际平台待验收；额外仓库正式来源链已接入，工程与实际平台分别验收。** [子计划](extension-management.md)维护完整范围，[设计](../design/extension-management.md)确定 `InstalledExtension`、全局 CAS/pending、准备/取消、代码缓存与关闭合同，[验证记录](../verification/extension-management.md)区分已过集中工程与实际平台门。
 
 D1 保存账户清单、enabled 和精确 build/hash，缺记录不自动安装；本机准备只下载/验证代码，不执行 Source。缓存直接使用 idb，128 项/256MiB，shared pin 保护使用中产物；运行槽精确关闭并等待 ACK/释放。安装和更新先准备后按原 CAS 确认，检查更新不自动换版；四打开路径、实际调用和图片 provider 共用确认门禁。停用/卸载以账户确认驱动，关闭/清理失败单独展示，保留业务、Source 数据与 HTTP Cache。
 
-扩展管理功能提交的全库检查与构建已通过，真实客户端待验收；后续固定 `ad869d2` 三包 AOT 候选通过，仅 `compiled_unverified`，未部署或写正式 checkpoint，见[候选证据](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。额外仓库的添加、验证、更新/移除、身份冲突与网络政策完整接入继续保留，默认目录已有连接不算该能力；不将本里程碑当作完整 P3 完成。
+扩展管理功能提交的全库检查与构建已通过，真实客户端待验收；后续固定 `ad869d2` 三包 AOT 候选通过，仅 `compiled_unverified`，未部署或写正式 checkpoint，见[候选证据](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。额外仓库的添加、验证、刷新/移除、身份冲突和来源网络政策已按[子计划](additional-repositories.md)接入，实际外仓、Source/平台与独立客户端继续验收；能力目录和有界跨源搜索仍未完成，不将本里程碑当作完整 P3 完成。
 
 ## 源迁移里程碑
 

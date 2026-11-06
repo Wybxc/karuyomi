@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/runtime/catalog_transport.dart';
 import 'package:karuyomi/runtime/cover_transport.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -55,6 +56,11 @@ final class TestPlatform extends PlatformRuntime {
   }
   final Uri _origin;
   final TestBusinessServer businessServer;
+  @override
+  late final CatalogTransport catalogTransport = _TestCatalogTransport(this);
+  final publicDocuments = <String, Object?>{};
+  final publicReads = <Uri>[];
+  final policyDocuments = <String, wire.ExtensionNetworkPoliciesResponse>{};
   CoverTransport? covers;
   @override
   CoverTransport? get coverTransport => covers;
@@ -80,6 +86,7 @@ final class TestPlatform extends PlatformRuntime {
   Object? inventory = wire.encodeProtoJson(
     wire.ExtensionIndex(
       schemaVersion: 1,
+      repoId: 'keiyoushi',
       builds: [
         wire.ExtensionBuildDescriptor(
           buildId: 'build-1',
@@ -123,6 +130,7 @@ final class TestPlatform extends PlatformRuntime {
         ),
       ),
       subject: bootstrapSubject,
+      advanceRevision: true,
     );
   }
 
@@ -143,6 +151,34 @@ final class TestPlatform extends PlatformRuntime {
   }
 
   wire.ApiFetchResponse _fetch(String path) {
+    final uri = Uri.parse(path);
+    if (uri.path == '/api/extensions/network-policies') {
+      final url = uri.queryParameters['catalogUrl']!;
+      final repo = uri.queryParameters['repoId']!;
+      final index = wire.decodeProtoJson(wire.ExtensionIndex(), inventory);
+      final value =
+          policyDocuments[url] ??
+          wire.ExtensionNetworkPoliciesResponse(
+            schemaVersion: 1,
+            catalog: wire.CatalogReference(catalogUrl: url, repoId: repo),
+            builds:
+                url == '${origin.origin}/extensions/index.json' &&
+                    repo == index.repoId
+                ? index.builds.map(
+                    (build) => wire.ExtensionNetworkPolicy(
+                      buildId: build.buildId,
+                      packageName: build.packageName,
+                      bundleSha256: 'a' * 64,
+                    ),
+                  )
+                : const <wire.ExtensionNetworkPolicy>[],
+          );
+      return wire.ApiFetchResponse(
+        status: 200,
+        headers: {'content-type': 'application/json'}.entries,
+        body: jsonEncode(wire.encodeProtoJson(value)),
+      );
+    }
     final response = switch (path) {
       '/api/bootstrap' => wire.encodeProtoJson(
         wire.Bootstrap(
@@ -219,6 +255,7 @@ final class TestPlatform extends PlatformRuntime {
         _liveBuild = _openedBuildId;
         response.session = wire.RuntimeSession(
           protocolVersion: protocolVersion,
+          catalog: request.open.catalog.deepCopy(),
           workerInstanceId: 'worker-1',
           generation: runtimeGeneration,
           buildId: _openedBuildId,
@@ -252,6 +289,7 @@ final class TestPlatform extends PlatformRuntime {
             contentType: 'application/javascript',
           );
           response.preparedBuild = wire.PreparedBuild(
+            catalog: prepare.catalog.deepCopy(),
             build: prepare.build.deepCopy(),
             bundleSha256: 'a' * 64,
             byteLength: 256,
@@ -391,6 +429,44 @@ final class TestPlatform extends PlatformRuntime {
   @override
   Future<void> dispose() {
     disposalCount++;
+    catalogTransport.close();
     return runtime.dispose();
   }
+}
+
+final class _TestCatalogTransport implements CatalogTransport {
+  _TestCatalogTransport(this.platform);
+  final TestPlatform platform;
+  @override
+  Future<Object?> read(
+    Uri uri, {
+    bool Function()? shouldContinue,
+    Future<void>? cancelled,
+  }) async {
+    if (shouldContinue?.call() == false) {
+      throw StateError('Cancelled public read');
+    }
+    platform.publicReads.add(uri);
+    await platform.beforeApiFetch?.call(uri.path);
+    if (shouldContinue?.call() == false) {
+      throw StateError('Cancelled public read');
+    }
+    if (platform.publicDocuments.containsKey(uri.toString())) {
+      return platform.publicDocuments[uri.toString()];
+    }
+    if (uri.origin != platform.origin.origin) {
+      throw StateError('Unknown public repository');
+    }
+    final value = platform._fetch(uri.path);
+    if (value.status != 200 ||
+        !Map.fromEntries(
+          value.headers.entries,
+        ).values.contains('application/json')) {
+      throw const FormatException('Public repository is unavailable');
+    }
+    return jsonDecode(value.body);
+  }
+
+  @override
+  void close() {}
 }

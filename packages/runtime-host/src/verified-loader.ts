@@ -3,6 +3,8 @@ import {
   bundleArtifactSchema,
   extensionIndexSchema,
   staticManifestPathSchema,
+  catalogReferenceSchema,
+  type CatalogReference,
   type Artifact,
   type BundleArtifact,
   type BuildManifest,
@@ -35,13 +37,15 @@ export class VerifiedLoader {
   ) {}
 
   private async response(
+    catalog: CatalogReference,
     path: string,
     signal: AbortSignal,
     immutable = false,
   ): Promise<Response> {
-    const url = new URL(path, this.origin);
+    catalogReferenceSchema.parse(catalog);
+    const url = new URL(path, catalog.catalogUrl);
     if (
-      url.origin !== this.origin ||
+      url.origin !== new URL(catalog.catalogUrl).origin ||
       url.pathname !== path ||
       !(
         path === '/extensions/index.json' ||
@@ -53,7 +57,7 @@ export class VerifiedLoader {
     ) {
       throw new RuntimeFailure(
         'protocol_error',
-        'Extensions must use the same-origin static catalog',
+        'Extension assets must belong to the selected static catalog',
       );
     }
     const response = await this.fetcher(url.href, {
@@ -155,14 +159,18 @@ export class VerifiedLoader {
     }
   }
 
-  async manifest(path: string, signal: AbortSignal): Promise<BuildManifest> {
+  async manifest(
+    catalog: CatalogReference,
+    path: string,
+    signal: AbortSignal,
+  ): Promise<BuildManifest> {
     if (!staticManifestPathSchema.safeParse(path).success) {
       throw new RuntimeFailure(
         'protocol_error',
         'Invalid static build manifest path',
       );
     }
-    const response = await this.response(path, signal);
+    const response = await this.response(catalog, path, signal);
     if (
       response.headers
         .get('content-type')
@@ -178,7 +186,10 @@ export class VerifiedLoader {
       const manifest = buildManifestSchema.parse(
         JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)),
       );
-      if (path !== `/extensions/builds/${manifest.buildId}/manifest.json`)
+      if (
+        path !== `/extensions/builds/${manifest.buildId}/manifest.json` ||
+        manifest.repoId !== catalog.repoId
+      )
         throw Error('Manifest identity mismatch');
       return manifest;
     } catch {
@@ -189,8 +200,15 @@ export class VerifiedLoader {
     }
   }
 
-  async index(signal: AbortSignal): Promise<ExtensionIndex> {
-    const response = await this.response('/extensions/index.json', signal);
+  async index(
+    catalog: CatalogReference,
+    signal: AbortSignal,
+  ): Promise<ExtensionIndex> {
+    const response = await this.response(
+      catalog,
+      '/extensions/index.json',
+      signal,
+    );
     if (
       response.headers
         .get('content-type')
@@ -206,9 +224,12 @@ export class VerifiedLoader {
     }
     const bytes = await this.readBounded(response, 2 * 1024 * 1024, signal);
     try {
-      return extensionIndexSchema.parse(
+      const index = extensionIndexSchema.parse(
         JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)),
       );
+      if (index.repoId !== catalog.repoId)
+        throw Error('Catalog identity mismatch');
+      return index;
     } catch {
       throw new RuntimeFailure(
         'protocol_error',
@@ -218,9 +239,11 @@ export class VerifiedLoader {
   }
 
   async prepare(
+    catalog: CatalogReference,
     build: ExtensionBuildDescriptor,
     signal: AbortSignal,
   ): Promise<{
+    catalog: CatalogReference;
     build: ExtensionBuildDescriptor;
     bundleSha256: string;
     byteLength: number;
@@ -230,7 +253,7 @@ export class VerifiedLoader {
         'unsupported_capability',
         'Managed extension preparation requires an artifact cache',
       );
-    const index = await this.index(signal);
+    const index = await this.index(catalog, signal);
     const current = index.builds.find(
       (value) => value.packageName === build.packageName,
     );
@@ -246,7 +269,7 @@ export class VerifiedLoader {
         'source_error',
         'The selected extension is no longer current; refresh the catalog',
       );
-    const manifest = await this.manifest(build.manifestPath, signal);
+    const manifest = await this.manifest(catalog, build.manifestPath, signal);
     const descriptor: ExtensionBuildDescriptor = {
       buildId: manifest.buildId,
       packageName: manifest.packageName,
@@ -292,9 +315,10 @@ export class VerifiedLoader {
       }
       signal.throwIfAborted();
     }
-    const bytes = await this.artifact(manifest.bundle, signal, true);
+    const bytes = await this.artifact(catalog, manifest.bundle, signal, true);
     signal.throwIfAborted();
     return {
+      catalog: { ...catalog },
       build: current,
       bundleSha256: manifest.bundle.sha256,
       byteLength: bytes.byteLength,
@@ -302,10 +326,12 @@ export class VerifiedLoader {
   }
 
   async artifact(
+    catalog: CatalogReference,
     artifact: BundleArtifact,
     signal: AbortSignal,
     script = false,
   ): Promise<Uint8Array<ArrayBuffer>> {
+    catalogReferenceSchema.parse(catalog);
     if (
       !bundleArtifactSchema.safeParse(artifact).success ||
       artifact.path !== `/extensions/artifacts/${artifact.sha256}.gz`
@@ -332,7 +358,12 @@ export class VerifiedLoader {
       const cached = await this.cache?.read(artifact, signal);
       signal.throwIfAborted();
       if (cached) return cached;
-      const response = await this.response(artifact.path, signal, true);
+      const response = await this.response(
+        catalog,
+        artifact.path,
+        signal,
+        true,
+      );
       const mime = response.headers
         .get('content-type')
         ?.split(';')[0]

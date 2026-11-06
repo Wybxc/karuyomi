@@ -1364,48 +1364,76 @@ final class BusinessStateClient {
   }
 
   ({wire.SourcePreferencesMutation request, bool retryable})?
-  pendingSourcePreferences(String packageName, String sourceId) {
+  pendingSourcePreferences(
+    String packageName,
+    String sourceId, {
+    required wire.CatalogReference catalog,
+  }) {
     if (_closed) return null;
     final pending =
-        _pendingSourcePreferences[_sourcePreferenceKey(packageName, sourceId)];
+        _pendingSourcePreferences[_sourcePreferenceKey(
+          catalog,
+          packageName,
+          sourceId,
+        )];
     return pending == null
         ? null
         : (request: pending.request, retryable: pending.rejection == null);
   }
 
-  bool hasPendingSourcePreferences(String packageName) =>
+  bool hasPendingSourcePreferences(
+    String packageName, {
+    required wire.CatalogReference catalog,
+  }) =>
       !_closed &&
       _pendingSourcePreferences.values.any(
-        (pending) => pending.request.packageName == packageName,
+        (pending) =>
+            pending.request.packageName == packageName &&
+            pending.request.catalog == catalog,
       );
 
   Future<wire.SourcePreferencesResponse> readSourcePreferences(
-    String packageName,
-  ) {
+    String packageName, {
+    required wire.CatalogReference catalog,
+  }) {
+    validateBusinessCatalogReference(catalog);
     validateSourcePreferencesIdentity(packageName);
     return _serial(
-      'source-preferences:$packageName',
-      () => _readSourcePreferences(packageName, clearRejected: true),
+      'source-preferences:${_sourcePreferenceScope(catalog, packageName)}',
+      () => _readSourcePreferences(
+        packageName,
+        catalog: catalog,
+        clearRejected: true,
+      ),
     );
   }
 
   Future<wire.SourcePreferencesResponse> _readSourcePreferences(
     String packageName, {
+    required wire.CatalogReference catalog,
     bool clearRejected = false,
   }) async {
     for (var attempt = 0; attempt < 3; attempt++) {
       final reply = await _get(
-        '/api/source-preferences/packages/${Uri.encodeComponent(packageName)}',
+        Uri(
+          path:
+              '/api/source-preferences/packages/${Uri.encodeComponent(packageName)}',
+          queryParameters: {
+            'catalogUrl': catalog.catalogUrl,
+            'repoId': catalog.repoId,
+          },
+        ).toString(),
       );
       final value = wire.decodeProtoJson(
         wire.SourcePreferencesResponse(),
         jsonDecode(reply.body),
         maxBytes: 128 * 1024,
       );
-      validateSourcePreferencesResponse(value, packageName);
+      validateSourcePreferencesResponse(value, packageName, catalog: catalog);
       if (value.hasError()) throw BusinessStateException(value.error);
       _success(reply);
-      final previous = _sourcePreferences[packageName];
+      final previous =
+          _sourcePreferences[_sourcePreferenceScope(catalog, packageName)];
       if (value.accountRevision < _accountRevision) continue;
       var stale = false;
       for (final old in previous?.sources ?? <wire.SourcePreferences>[]) {
@@ -1426,12 +1454,14 @@ final class BusinessStateClient {
       if (stale) continue;
       _ensureOpen();
       final confirmed = value.deepCopy()..freeze();
-      _sourcePreferences[packageName] = confirmed;
+      _sourcePreferences[_sourcePreferenceScope(catalog, packageName)] =
+          confirmed;
       _accountRevision = value.accountRevision;
       if (clearRejected) {
         _pendingSourcePreferences.removeWhere(
           (_, pending) =>
               pending.request.packageName == packageName &&
+              pending.request.catalog == catalog &&
               pending.rejection != null,
         );
       }
@@ -1446,6 +1476,7 @@ final class BusinessStateClient {
     final command = operation.deepCopy()
       ..schemaVersion = _schemaVersion
       ..clearMutationId();
+    validateBusinessCatalogReference(command.catalog);
     validateSourcePreferencesIdentity(command.packageName, command.sourceId);
     validateBusinessRevision(command.expectedRevision);
     final entries = canonicalPreferenceEntries(command.entries);
@@ -1456,50 +1487,72 @@ final class BusinessStateClient {
     final fingerprint = jsonEncode(
       wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
     );
-    final key = _sourcePreferenceKey(command.packageName, command.sourceId);
-    return _serial('source-preferences:${command.packageName}', () {
-      final previous = _pendingSourcePreferences[key];
-      if (previous != null) {
-        if (previous.fingerprint != fingerprint) {
-          throw StateError('请先处理这个漫画源未确认的原设置操作。');
+    final key = _sourcePreferenceKey(
+      command.catalog,
+      command.packageName,
+      command.sourceId,
+    );
+    return _serial(
+      'source-preferences:${_sourcePreferenceScope(command.catalog, command.packageName)}',
+      () {
+        final previous = _pendingSourcePreferences[key];
+        if (previous != null) {
+          if (previous.fingerprint != fingerprint) {
+            throw StateError('请先处理这个漫画源未确认的原设置操作。');
+          }
+          return _sendSourcePreferences(previous);
         }
-        return _sendSourcePreferences(previous);
-      }
-      command.mutationId = _uuid.v4();
-      final body = jsonEncode(
-        wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
-      );
-      command.freeze();
-      final pending = _PendingSourcePreferencesMutation(
-        fingerprint,
-        command,
-        body,
-      );
-      _pendingSourcePreferences[key] = pending;
-      return _sendSourcePreferences(pending);
-    });
+        command.mutationId = _uuid.v4();
+        final body = jsonEncode(
+          wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
+        );
+        command.freeze();
+        final pending = _PendingSourcePreferencesMutation(
+          fingerprint,
+          command,
+          body,
+        );
+        _pendingSourcePreferences[key] = pending;
+        return _sendSourcePreferences(pending);
+      },
+    );
   }
 
   Future<wire.SourcePreferencesResponse> retrySourcePreferences(
     String packageName,
-    String sourceId,
-  ) => _serial('source-preferences:$packageName', () {
-    final pending =
-        _pendingSourcePreferences[_sourcePreferenceKey(packageName, sourceId)];
-    if (pending == null) throw StateError('没有待确认的原漫画源设置。');
-    return _sendSourcePreferences(pending);
-  });
+    String sourceId, {
+    required wire.CatalogReference catalog,
+  }) => _serial(
+    'source-preferences:${_sourcePreferenceScope(catalog, packageName)}',
+    () {
+      final pending =
+          _pendingSourcePreferences[_sourcePreferenceKey(
+            catalog,
+            packageName,
+            sourceId,
+          )];
+      if (pending == null) throw StateError('没有待确认的原漫画源设置。');
+      return _sendSourcePreferences(pending);
+    },
+  );
 
   Future<wire.SourcePreferencesResponse> discardSourcePreferences(
     String packageName,
-    String sourceId,
-  ) => _serial('source-preferences:$packageName', () async {
-    final current = await _readSourcePreferences(packageName);
-    _pendingSourcePreferences.remove(
-      _sourcePreferenceKey(packageName, sourceId),
-    );
-    return current;
-  });
+    String sourceId, {
+    required wire.CatalogReference catalog,
+  }) => _serial(
+    'source-preferences:${_sourcePreferenceScope(catalog, packageName)}',
+    () async {
+      final current = await _readSourcePreferences(
+        packageName,
+        catalog: catalog,
+      );
+      _pendingSourcePreferences.remove(
+        _sourcePreferenceKey(catalog, packageName, sourceId),
+      );
+      return current;
+    },
+  );
 
   Future<wire.SourcePreferencesResponse> _sendSourcePreferences(
     _PendingSourcePreferencesMutation pending,
@@ -1520,6 +1573,9 @@ final class BusinessStateClient {
       maxBytes: 128 * 1024,
     );
     _version(value.schemaVersion);
+    if (!value.hasCatalog() || value.catalog != pending.request.catalog) {
+      throw const FormatException('Source settings ACK repository mismatch');
+    }
     validateBusinessRevision(value.accountRevision);
     if (value.mutationId != pending.request.mutationId &&
         (!value.hasError() || value.mutationId.isNotEmpty)) {
@@ -1547,7 +1603,10 @@ final class BusinessStateClient {
         'Source settings ACK differs from submitted values',
       );
     }
-    final current = await _readSourcePreferences(pending.request.packageName);
+    final current = await _readSourcePreferences(
+      pending.request.packageName,
+      catalog: pending.request.catalog,
+    );
     final matches = current.sources.where(
       (source) => source.sourceId == pending.request.sourceId,
     );
@@ -1569,6 +1628,7 @@ final class BusinessStateClient {
     }
     _pendingSourcePreferences.remove(
       _sourcePreferenceKey(
+        pending.request.catalog,
         pending.request.packageName,
         pending.request.sourceId,
       ),
@@ -1746,5 +1806,13 @@ bool _coverMatches(wire.StateMutation request, wire.MangaState manga) =>
         (!manga.hasCustomCover() ||
             request.setCustomCover.cover == manga.customCover));
 
-String _sourcePreferenceKey(String packageName, String sourceId) =>
-    jsonEncode([packageName, sourceId]);
+String _sourcePreferenceScope(
+  wire.CatalogReference catalog,
+  String packageName,
+) => jsonEncode([catalog.catalogUrl, catalog.repoId, packageName]);
+
+String _sourcePreferenceKey(
+  wire.CatalogReference catalog,
+  String packageName,
+  String sourceId,
+) => jsonEncode([catalog.catalogUrl, catalog.repoId, packageName, sourceId]);

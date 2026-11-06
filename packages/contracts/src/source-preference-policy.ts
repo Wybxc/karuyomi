@@ -2,7 +2,7 @@ import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
 import { requireCondition } from './codec.ts';
 import { validatePreferenceEntries } from './preferences-control.ts';
-import { validSourceId } from './static-control.ts';
+import { validSourceId, validateCatalogReference } from './static-control.ts';
 
 type Rule = { key: string; kind: pb.PreferenceValueKind; sourceId?: string };
 
@@ -49,6 +49,39 @@ export function preferenceSyncRules(
   return (rules ?? []).map((rule) => create(pb.PreferenceSyncRuleSchema, rule));
 }
 
+export function preferenceSyncRulesForCatalog(
+  packageName: string,
+  catalog: { catalogUrl: string; repoId: string },
+  appOrigin: string,
+): pb.PreferenceSyncRule[] {
+  validateCatalogReference(catalog);
+  return catalog.repoId === 'keiyoushi' &&
+    catalog.catalogUrl === `${new URL(appOrigin).origin}/extensions/index.json`
+    ? preferenceSyncRules(packageName)
+    : [];
+}
+export function validatePreferenceSyncRuleSubset(
+  packageName: string,
+  rules: readonly pb.PreferenceSyncRule[],
+): void {
+  const reviewed = preferenceSyncRules(packageName);
+  const keys = new Set<string>();
+  for (const rule of rules) {
+    const key = JSON.stringify([rule.key, rule.sourceId ?? null]);
+    requireCondition(
+      !keys.has(key) &&
+        reviewed.some(
+          (candidate) =>
+            candidate.key === rule.key &&
+            candidate.kind === rule.kind &&
+            candidate.sourceId === rule.sourceId,
+        ),
+      'Preference sync rules exceed reviewed policy',
+    );
+    keys.add(key);
+  }
+}
+
 function valueKind(value: pb.PreferenceValue): pb.PreferenceValueKind {
   switch (value.value.case) {
     case 'boolean':
@@ -72,10 +105,11 @@ export function validateSyncedPreferenceEntries(
   packageName: string,
   sourceId: string,
   entries: readonly pb.PreferenceEntry[],
+  rules: readonly pb.PreferenceSyncRule[] = preferenceSyncRules(packageName),
 ): void {
+  validatePreferenceSyncRuleSubset(packageName, rules);
   validSourceId(sourceId);
   validatePreferenceEntries(entries);
-  const rules = preferenceSyncRules(packageName);
   for (const entry of entries) {
     const rule = rules.find(
       (candidate) =>

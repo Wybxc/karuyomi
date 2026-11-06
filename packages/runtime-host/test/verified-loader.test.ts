@@ -1,3 +1,4 @@
+import { catalog } from './fixtures.js';
 import { expect, test, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { ExtensionArtifactCache } from '../src/extension-artifact-cache.js';
@@ -26,9 +27,9 @@ test('static gzip fetch omits credentials and verifies both byte domains', async
       }),
   );
   const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
-  expect(await loader.artifact(await artifact(), signal(), true)).toEqual(
-    bytes,
-  );
+  expect(
+    await loader.artifact(catalog, await artifact(), signal(), true),
+  ).toEqual(bytes);
   expect(fetcher).toHaveBeenCalledWith(
     `${origin}${(await artifact()).path}`,
     expect.objectContaining({
@@ -50,7 +51,9 @@ test('each gzip byte domain is hashed exactly once at the loading boundary', asy
           headers: { 'Content-Type': 'application/gzip' },
         }),
     );
-    expect(await loader.artifact(value, signal(), true)).toEqual(bytes);
+    expect(await loader.artifact(catalog, value, signal(), true)).toEqual(
+      bytes,
+    );
     expect(digest).toHaveBeenCalledTimes(2);
     expect(digest.mock.calls.map((call) => call[1].byteLength)).toEqual([
       encodedBytes.length,
@@ -80,7 +83,7 @@ test('gzip validation rejects a valid compressed hash with wrong canonical hash 
         }),
     );
     await expect(
-      loader.artifact(changed, signal(), true),
+      loader.artifact(catalog, changed, signal(), true),
     ).rejects.toMatchObject({
       code: changed.size < value.size ? 'limit_exceeded' : 'integrity_error',
     });
@@ -104,7 +107,7 @@ test('truncated gzip and a small compressed decompression bomb fail before execu
         }),
     );
     await expect(
-      loader.artifact(changed, signal(), true),
+      loader.artifact(catalog, changed, signal(), true),
     ).rejects.toMatchObject({
       code: encoded === bomb ? 'limit_exceeded' : 'integrity_error',
     });
@@ -124,7 +127,7 @@ test('the gzip file cannot be transparently marked as HTTP content encoding', as
       }),
   );
   await expect(
-    loader.artifact(await artifact(), signal(), true),
+    loader.artifact(catalog, await artifact(), signal(), true),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   expect(cancelled).toHaveBeenCalledOnce();
 });
@@ -153,7 +156,12 @@ test('aborting an encoded download cancels its reader even when a custom fetch i
       ),
   );
   const controller = new AbortController();
-  const pending = loader.artifact(await artifact(), controller.signal, true);
+  const pending = loader.artifact(
+    catalog,
+    await artifact(),
+    controller.signal,
+    true,
+  );
   const failure = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   await started;
   controller.abort();
@@ -167,6 +175,7 @@ test('static manifest path must match its returned build and cannot use API fall
   const loader = new VerifiedLoader(origin, fetcher);
   expect(
     await loader.manifest(
+      catalog,
       '/extensions/builds/test-build/manifest.json',
       signal(),
     ),
@@ -180,7 +189,11 @@ test('static manifest path must match its returned build and cannot use API fall
     }),
   );
   await expect(
-    loader.manifest('/extensions/builds/other/manifest.json', signal()),
+    loader.manifest(
+      catalog,
+      '/extensions/builds/other/manifest.json',
+      signal(),
+    ),
   ).rejects.toMatchObject({ code: 'protocol_error' });
 });
 
@@ -188,16 +201,16 @@ test('static index accepts more than 64KiB, validates current package uniqueness
   const builds = Array.from({ length: 1000 }, (_, index) => ({
     buildId: 'build-' + index,
     packageName: 'package-' + index,
-    repoId: 'repo',
+    repoId: catalog.repoId,
     version: '1',
     sourceIds: [String(index)],
     sources: [{ id: String(index), name: 'Source ' + index, lang: 'en' }],
     manifestPath: '/extensions/builds/build-' + index + '/manifest.json',
   }));
-  const value = { schemaVersion: 1, builds };
+  const value = { schemaVersion: 1, repoId: catalog.repoId, builds };
   const fetcher = vi.fn(async () => Response.json(value));
   expect(
-    (await new VerifiedLoader(origin, fetcher).index(signal())).builds,
+    (await new VerifiedLoader(origin, fetcher).index(catalog, signal())).builds,
   ).toHaveLength(1000);
   expect(fetcher).toHaveBeenCalledWith(
     origin + '/extensions/index.json',
@@ -206,7 +219,7 @@ test('static index accepts more than 64KiB, validates current package uniqueness
   const duplicate = new VerifiedLoader(origin, async () =>
     Response.json({ ...value, builds: [builds[0], builds[0]] }),
   );
-  await expect(duplicate.index(signal())).rejects.toMatchObject({
+  await expect(duplicate.index(catalog, signal())).rejects.toMatchObject({
     code: 'protocol_error',
   });
   const oversized = new VerifiedLoader(
@@ -216,7 +229,7 @@ test('static index accepts more than 64KiB, validates current package uniqueness
         headers: { 'Content-Type': 'application/json' },
       }),
   );
-  await expect(oversized.index(signal())).rejects.toMatchObject({
+  await expect(oversized.index(catalog, signal())).rejects.toMatchObject({
     code: 'limit_exceeded',
   });
 });
@@ -233,7 +246,7 @@ test.each([
       (async () => new Response('', { status })) as typeof fetch,
     );
     await expect(
-      loader.artifact(await artifact(), signal(), true),
+      loader.artifact(catalog, await artifact(), signal(), true),
     ).rejects.toMatchObject({ code });
   },
 );
@@ -250,7 +263,7 @@ test('login HTML is never executed as a bundle, even with HTTP 200', async () =>
   const importScript = vi.fn();
   const driver = new TeaVMDriver(scope, loader, importScript, origin);
   await expect(
-    driver.open(await manifest(), 'test', signal()),
+    driver.open(await manifest(), 'test', signal(), catalog),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   expect(importScript).not.toHaveBeenCalled();
 });
@@ -268,7 +281,7 @@ test('hash mismatch never reaches script execution', async () => {
   const importScript = vi.fn();
   const driver = new TeaVMDriver({}, loader, importScript, origin);
   await expect(
-    driver.open(await manifest(), 'test', signal()),
+    driver.open(await manifest(), 'test', signal(), catalog),
   ).rejects.toMatchObject({ code: 'integrity_error' });
   expect(importScript).not.toHaveBeenCalled();
 });
@@ -282,7 +295,7 @@ test('streamed over-budget and truncated artifacts fail before execution', async
       })) as typeof fetch,
   );
   await expect(
-    short.artifact(await artifact(), signal(), true),
+    short.artifact(catalog, await artifact(), signal(), true),
   ).rejects.toMatchObject({ code: 'integrity_error' });
   const long = new VerifiedLoader(
     origin,
@@ -292,7 +305,7 @@ test('streamed over-budget and truncated artifacts fail before execution', async
       })) as typeof fetch,
   );
   await expect(
-    long.artifact(await artifact(), signal(), true),
+    long.artifact(catalog, await artifact(), signal(), true),
   ).rejects.toMatchObject({ code: 'limit_exceeded' });
 });
 
@@ -301,12 +314,13 @@ test('cross-origin and old API manifest paths cannot be fetched', async () => {
   const loader = new VerifiedLoader(origin, fetcher as typeof fetch);
   await expect(
     loader.manifest(
+      catalog,
       'https://attacker.example/extensions/builds/test/manifest.json',
       signal(),
     ),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   await expect(
-    loader.manifest('/api/extensions/builds/test/manifest', signal()),
+    loader.manifest(catalog, '/api/extensions/builds/test/manifest', signal()),
   ).rejects.toMatchObject({ code: 'protocol_error' });
   expect(fetcher).not.toHaveBeenCalled();
 });
@@ -334,6 +348,7 @@ test('Web shared materials always use credential-free static digest paths', asyn
   );
   await expect(
     loader.artifact(
+      catalog,
       { ...(await artifact()), path: `/runtime/materials/${value.sha256}` },
       signal(),
       true,
@@ -407,7 +422,11 @@ test('incompatible manifest ABI is rejected as protocol error', async () => {
   const loader = new VerifiedLoader(origin, (async () =>
     Response.json(value)) as typeof fetch);
   await expect(
-    loader.manifest('/extensions/builds/test-build/manifest.json', signal()),
+    loader.manifest(
+      catalog,
+      '/extensions/builds/test-build/manifest.json',
+      signal(),
+    ),
   ).rejects.toMatchObject({ code: 'protocol_error' });
 });
 
@@ -436,7 +455,7 @@ test('real TeaVM export handshake validates loaded Source IDs before readiness',
     origin,
   );
   await expect(
-    driver.open(await manifest(), 'test', signal()),
+    driver.open(await manifest(), 'test', signal(), catalog),
   ).rejects.toMatchObject({ code: 'integrity_error' });
 });
 
@@ -516,7 +535,7 @@ test.each([
         'teaHttpRead',
         'teaHttpWrite',
       ]);
-      await driver.open(build, 'test', signal());
+      await driver.open(build, 'test', signal(), catalog);
       await expect(
         driver.invoke(sourceCall(build.sourceIds[0]!)),
       ).rejects.toMatchObject({ code });
@@ -530,6 +549,9 @@ test.each([
             'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
             'X-App-Request': '1',
             'X-Runtime-Build': build.buildId,
+            'X-Runtime-Catalog': catalog.catalogUrl,
+            'X-Runtime-Repo': catalog.repoId,
+            'X-Runtime-Bundle': build.bundle.sha256,
           }),
         }),
       );
@@ -608,7 +630,7 @@ test('the installed v2 finish callback carries a controlled connection flag thro
     origin,
   );
   try {
-    await driver.open(build, 'test', signal());
+    await driver.open(build, 'test', signal(), catalog);
     await expect(
       driver.invoke(sourceCall(build.sourceIds[0]!)),
     ).rejects.toMatchObject({
@@ -646,7 +668,11 @@ test('Native preparation checks installed material identity without fetching mat
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(String(input)).pathname;
     if (path === '/extensions/index.json')
-      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+      return Response.json({
+        schemaVersion: 1,
+        repoId: catalog.repoId,
+        builds: [descriptor],
+      });
     if (path === descriptor.manifestPath) return Response.json(build);
     if (path === build.bundle.path)
       return new Response(encodedBytes, {
@@ -671,19 +697,23 @@ test('Native preparation checks installed material identity without fetching mat
     material,
   ]);
   try {
-    await expect(missing.prepare(descriptor, signal())).rejects.toMatchObject({
+    await expect(
+      missing.prepare(catalog, descriptor, signal()),
+    ).rejects.toMatchObject({
       code: 'unsupported_capability',
     });
     expect(
       fetcher.mock.calls.map(([input]) => new URL(String(input)).pathname),
     ).toEqual(['/extensions/index.json', descriptor.manifestPath]);
-    const prepared = await loader.prepare(descriptor, signal());
+    const prepared = await loader.prepare(catalog, descriptor, signal());
     expect(prepared.bundleSha256).toBe(build.bundle.sha256);
     expect(prepared.byteLength).toBe(bytes.byteLength);
     const calls = fetcher.mock.calls.length;
     const digest = vi.spyOn(crypto.subtle, 'digest');
     try {
-      expect(await next.artifact(build.bundle, signal(), true)).toEqual(bytes);
+      expect(
+        await next.artifact(catalog, build.bundle, signal(), true),
+      ).toEqual(bytes);
       expect(fetcher).toHaveBeenCalledTimes(calls);
       expect(digest).not.toHaveBeenCalled();
     } finally {
@@ -696,4 +726,80 @@ test('Native preparation checks installed material identity without fetching mat
     await firstCache.close();
     await secondCache.close();
   }
+});
+
+test('an additional catalog owns extension bytes while shared materials stay on the app origin', async () => {
+  const external = {
+    catalogUrl: 'https://extensions.example/extensions/index.json',
+    repoId: 'additional',
+  };
+  const build = { ...(await manifest()), repoId: external.repoId };
+  const manifestPath = `/extensions/builds/${build.buildId}/manifest.json`;
+  const descriptor = {
+    buildId: build.buildId,
+    repoId: build.repoId,
+    packageName: build.packageName,
+    version: build.version,
+    sourceIds: build.sourceIds,
+    sources: build.sources,
+    manifestPath,
+  };
+  const fetcher = vi.fn(
+    async (input: RequestInfo | URL, _options?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname.startsWith('/runtime/materials/')) {
+        expect(url.origin).toBe(origin);
+        return new Response(bytes, {
+          headers: { 'Content-Type': 'application/javascript' },
+        });
+      }
+      expect(url.origin).toBe('https://extensions.example');
+      if (url.pathname === '/extensions/index.json')
+        return Response.json({
+          schemaVersion: 1,
+          repoId: external.repoId,
+          builds: [descriptor],
+        });
+      if (url.pathname === manifestPath) return Response.json(build);
+      return new Response(encodedBytes, {
+        headers: { 'Content-Type': 'application/gzip' },
+      });
+    },
+  );
+  const loader = new VerifiedLoader(origin, fetcher);
+  expect((await loader.index(external, signal())).builds).toEqual([descriptor]);
+  expect(await loader.manifest(external, manifestPath, signal())).toEqual(
+    build,
+  );
+  expect(await loader.artifact(external, build.bundle, signal(), true)).toEqual(
+    bytes,
+  );
+  expect(
+    await loader.sharedArtifact(
+      { ...(await sharedArtifact()), contentType: 'application/javascript' },
+      signal(),
+      true,
+    ),
+  ).toEqual(bytes);
+  for (const [, options] of fetcher.mock.calls)
+    expect(options).toMatchObject({ credentials: 'omit', redirect: 'manual' });
+});
+
+test('catalog and manifest repository claims must match the selected repository', async () => {
+  const build = await manifest();
+  const loader = new VerifiedLoader(origin, async () => Response.json(build));
+  const foreign = { ...catalog, repoId: 'foreign' };
+  await expect(
+    loader.manifest(
+      foreign,
+      '/extensions/builds/test-build/manifest.json',
+      signal(),
+    ),
+  ).rejects.toMatchObject({ code: 'protocol_error' });
+  const indexLoader = new VerifiedLoader(origin, async () =>
+    Response.json({ schemaVersion: 1, repoId: catalog.repoId, builds: [] }),
+  );
+  await expect(indexLoader.index(foreign, signal())).rejects.toMatchObject({
+    code: 'protocol_error',
+  });
 });

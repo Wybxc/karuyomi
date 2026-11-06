@@ -214,7 +214,11 @@ test('the shared contract parser enforces the static current-package index', asy
     sources: [{ id: '123', name: 'Fixture', lang: 'en' }],
     manifestPath: '/extensions/builds/test-build/manifest.json',
   };
-  const index = { schemaVersion: 1, builds: [descriptor] };
+  const index = {
+    schemaVersion: 1,
+    repoId: descriptor.repoId,
+    builds: [descriptor],
+  };
   assert.deepEqual(
     await parseExtensionIndex(Buffer.from(JSON.stringify(index))),
     index,

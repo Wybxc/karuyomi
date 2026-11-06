@@ -7,6 +7,10 @@ import {
 } from '@karuyomi/contracts';
 import { gzipSync } from 'node:zlib';
 import { sha256 } from '../src/verified-loader.js';
+export const catalog = {
+  catalogUrl: 'https://read.example.com/extensions/index.json',
+  repoId: 'test-repo',
+};
 export const bytes = new TextEncoder().encode('self.productBuild = true;');
 export const encodedBytes = new Uint8Array(gzipSync(bytes));
 export const artifact = async (): Promise<BundleArtifact> => {

@@ -42,7 +42,8 @@ final class _Account {
     ),
   );
   final mangaSettings = <String, wire.MangaReaderSettings>{};
-  final sourcePreferences = <(String, String), wire.SourcePreferences>{};
+  final sourcePreferences =
+      <(String, String, String, String), wire.SourcePreferences>{};
   final mutations = <String, (String, ApiReply)>{};
 }
 
@@ -91,8 +92,14 @@ final class TestBusinessServer implements ApiFetch {
   void seedInstalledExtensions(
     Iterable<wire.InstalledExtension> values, {
     String? subject,
+    bool advanceRevision = false,
   }) {
-    final settings = _account(subject ?? defaultSubject).globalSettings.values;
+    final account = _account(subject ?? defaultSubject);
+    final settings = account.globalSettings.values;
+    if (advanceRevision) {
+      account.globalSettings.revision++;
+      account.revision++;
+    }
     settings.installedExtensions
       ..clear()
       ..addAll(values.map((value) => value.deepCopy()));
@@ -146,9 +153,18 @@ final class TestBusinessServer implements ApiFetch {
           schemaVersion: 1,
           accountRevision: account.revision,
           packageName: packageName,
-          sources: account.sourcePreferences.values.where(
-            (source) => source.packageName == packageName,
+          catalog: wire.CatalogReference(
+            catalogUrl: request.uri.queryParameters['catalogUrl'],
+            repoId: request.uri.queryParameters['repoId'],
           ),
+          sources: account.sourcePreferences.entries
+              .where(
+                (entry) =>
+                    entry.key.$1 == request.uri.queryParameters['catalogUrl'] &&
+                    entry.key.$2 == request.uri.queryParameters['repoId'] &&
+                    entry.key.$3 == packageName,
+              )
+              .map((entry) => entry.value),
         ),
       );
     }
@@ -482,7 +498,12 @@ final class TestBusinessServer implements ApiFetch {
         mutationId: mutation.mutationId,
       );
     }
-    final key = (mutation.packageName, mutation.sourceId);
+    final key = (
+      mutation.catalog.catalogUrl,
+      mutation.catalog.repoId,
+      mutation.packageName,
+      mutation.sourceId,
+    );
     final revision = account.sourcePreferences[key]?.revision ?? 0;
     if (mutation.expectedRevision != revision) {
       return _errorReply(
@@ -507,6 +528,7 @@ final class TestBusinessServer implements ApiFetch {
         mutationId: mutation.mutationId,
         accountRevision: account.revision,
         preferences: preferences,
+        catalog: mutation.catalog,
       ),
     );
     account.mutations[mutation.mutationId] = (fingerprint, reply);
@@ -1083,6 +1105,12 @@ final class TestBusinessServer implements ApiFetch {
         wire.SourcePreferencesMutationResponse(
           schemaVersion: 1,
           mutationId: mutationId,
+          catalog: wire
+              .decodeProtoJson(
+                wire.SourcePreferencesMutation(),
+                jsonDecode(request.body!),
+              )
+              .catalog,
           error: error,
         ),
         status: status,
@@ -1093,6 +1121,10 @@ final class TestBusinessServer implements ApiFetch {
         wire.SourcePreferencesResponse(
           schemaVersion: 1,
           packageName: request.uri.pathSegments.last,
+          catalog: wire.CatalogReference(
+            catalogUrl: request.uri.queryParameters['catalogUrl'],
+            repoId: request.uri.queryParameters['repoId'],
+          ),
           error: error,
         ),
         status: status,

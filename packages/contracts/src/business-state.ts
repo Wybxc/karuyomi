@@ -10,7 +10,14 @@ import {
   SOURCE_MEMO_LIMIT,
   validateJsonDepth,
 } from './codec.ts';
-import { buildIdSchema, validId, validSourceId } from './static-control.ts';
+import {
+  buildIdSchema,
+  validId,
+  validSourceId,
+  validateExtensionCatalogUrl,
+  validateCatalogReference,
+} from './static-control.ts';
+export { validateExtensionCatalogUrl } from './static-control.ts';
 
 export const businessSchemaVersion = 1;
 export const BUSINESS_REQUEST_LIMIT = 128 * 1024;
@@ -24,6 +31,7 @@ export const CATEGORY_LIMIT = 64;
 export const MIGRATION_CHAPTER_LIMIT = 256;
 export const FAVORITE_SOURCE_LIMIT = 128;
 export const INSTALLED_EXTENSION_LIMIT = 128;
+export const EXTENSION_REPOSITORY_LIMIT = 16;
 export const EXTENSION_CATALOG_URL_LIMIT = 2048;
 export const COVER_BYTE_LIMIT = 1024 * 1024;
 export const COVER_DIMENSION_LIMIT = 4096;
@@ -726,24 +734,9 @@ export function validateFavoriteSources(values: pb.FavoriteSource[]): void {
   }
 }
 
-export function validateExtensionCatalogUrl(value: string): void {
-  requireCondition(
-    value.length > 0 && value.length <= EXTENSION_CATALOG_URL_LIMIT,
-    'Extension catalog URL exceeds its length budget',
-  );
-  const url = new URL(value);
-  requireCondition(
-    value === `${url.origin}/extensions/index.json` &&
-      (url.protocol === 'https:' ||
-        (url.protocol === 'http:' &&
-          ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))),
-    'Extension catalog must use a canonical HTTPS URL or local development origin',
-  );
-}
-
 export function validateInstalledExtension(value: pb.InstalledExtension): void {
   validateExtensionCatalogUrl(value.catalogUrl);
-  validId(value.repoId);
+  buildIdSchema.parse(value.repoId);
   validId(value.packageName);
   buildIdSchema.parse(value.buildId);
   z.string()
@@ -773,6 +766,65 @@ export function validateInstalledExtensions(
   }
 }
 
+export function validateExtensionRepositories(
+  values: readonly pb.ExtensionRepository[],
+): void {
+  requireCondition(
+    values.length <= EXTENSION_REPOSITORY_LIMIT,
+    'Too many extension repositories',
+  );
+  const urls = new Set<string>();
+  const ids = new Set<string>();
+  for (const value of values) {
+    validateCatalogReference(value);
+    requireCondition(
+      value.repoId !== 'keiyoushi',
+      'Default repository identity is implicit',
+    );
+    requireCondition(
+      value.name.length > 0 &&
+        value.name.length <= 100 &&
+        value.name === value.name.trim(),
+      'Invalid repository display name',
+    );
+    requireCondition(
+      !urls.has(value.catalogUrl) && !ids.has(value.repoId),
+      'Duplicate repository URL or identity',
+    );
+    urls.add(value.catalogUrl);
+    ids.add(value.repoId);
+  }
+}
+export const extensionNetworkPoliciesResponseSchema =
+  codec<pb.ExtensionNetworkPoliciesResponse>((input) => {
+    const value = parseMessage(
+      pb.ExtensionNetworkPoliciesResponseSchema,
+      input,
+      BUSINESS_RESPONSE_LIMIT,
+    );
+    requireCondition(
+      value.schemaVersion === businessSchemaVersion &&
+        value.builds.length <= 5000,
+      'Invalid extension network policies response',
+    );
+    requireFields(value, ['catalog']);
+    validateCatalogReference(value.catalog);
+    const builds = new Set<string>();
+    const packages = new Set<string>();
+    for (const build of value.builds) {
+      buildIdSchema.parse(build.buildId);
+      validId(build.packageName);
+      mangaKey.parse(build.bundleSha256);
+      requireCondition(
+        !builds.has(build.buildId) && !packages.has(build.packageName),
+        'Duplicate current network build',
+      );
+      builds.add(build.buildId);
+      packages.add(build.packageName);
+    }
+    return value;
+  });
+
 export function validateGlobalSettingsValues(
   value: pb.GlobalSettingsValues,
 ): void {
@@ -786,6 +838,7 @@ export function validateGlobalSettingsValues(
   validateReaderSettings(value.reader);
   validateFavoriteSources(value.favoriteSources);
   validateInstalledExtensions(value.installedExtensions);
+  validateExtensionRepositories(value.repositories);
 }
 
 export const settingsMutationSchema = codec<pb.SettingsMutation>((input) => {

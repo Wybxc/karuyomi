@@ -25,9 +25,21 @@ import {
 test('policy-only registration and identical retry are idempotent', async (t) => {
   const f = await fixture(t);
   const db = await database(t);
-  transaction(db, registrationSql(f.manifest, ['example.org']));
+  transaction(
+    db,
+    registrationSql(f.manifest, ['example.org'], {
+      catalogUrl: 'https://read.example.com/extensions/index.json',
+      repoId: f.manifest.repoId,
+    }),
+  );
   const before = db.prepare('SELECT * FROM extension_builds').all();
-  transaction(db, registrationSql(f.manifest, ['example.org']));
+  transaction(
+    db,
+    registrationSql(f.manifest, ['example.org'], {
+      catalogUrl: 'https://read.example.com/extensions/index.json',
+      repoId: f.manifest.repoId,
+    }),
+  );
   assert.deepEqual(db.prepare('SELECT * FROM extension_builds').all(), before);
   assert.equal(before[0]?.status, 'verified');
   assert(
@@ -48,12 +60,23 @@ test('policy-only registration and identical retry are idempotent', async (t) =>
 test('new current build replaces previous package policy', async (t) => {
   const f = await fixture(t);
   const db = await database(t);
-  transaction(db, registrationSql(f.manifest, ['example.org']));
   transaction(
     db,
-    registrationSql({ ...f.manifest, buildId: 'next-current' }, [
-      'new.example.org',
-    ]),
+    registrationSql(f.manifest, ['example.org'], {
+      catalogUrl: 'https://read.example.com/extensions/index.json',
+      repoId: f.manifest.repoId,
+    }),
+  );
+  transaction(
+    db,
+    registrationSql(
+      { ...f.manifest, buildId: 'next-current' },
+      ['new.example.org'],
+      {
+        catalogUrl: 'https://read.example.com/extensions/index.json',
+        repoId: { ...f.manifest, buildId: 'next-current' }.repoId,
+      },
+    ),
   );
   const rows = db.prepare('SELECT * FROM extension_builds').all();
   assert.equal(rows.length, 1);
@@ -63,7 +86,13 @@ test('new current build replaces previous package policy', async (t) => {
 test('build identity and policy conflicts roll back the entire batch', async (t) => {
   const f = await fixture(t);
   const db = await database(t);
-  transaction(db, registrationSql(f.manifest, ['example.org']));
+  transaction(
+    db,
+    registrationSql(f.manifest, ['example.org'], {
+      catalogUrl: 'https://read.example.com/extensions/index.json',
+      repoId: f.manifest.repoId,
+    }),
+  );
   const before = db.prepare('SELECT * FROM extension_builds').all();
   for (const [manifest, hosts] of [
     [
@@ -81,7 +110,10 @@ test('build identity and policy conflicts roll back the entire batch', async (t)
         transaction(
           db,
           "INSERT INTO app_metadata VALUES ('rollback','marker');\n" +
-            registrationSql(manifest, hosts),
+            registrationSql(manifest, hosts, {
+              catalogUrl: 'https://read.example.com/extensions/index.json',
+              repoId: manifest.repoId,
+            }),
         ),
       /NOT NULL/,
     );
@@ -386,17 +418,39 @@ test('local CLI registers authoritative metadata without local bundle files', as
 test('registration retires policies removed from the current static index', async (t) => {
   const f = await fixture(t);
   const db = await database(t);
-  transaction(db, registrationSql(f.manifest, ['example.org']));
+  transaction(
+    db,
+    registrationSql(f.manifest, ['example.org'], {
+      catalogUrl: 'https://read.example.com/extensions/index.json',
+      repoId: f.manifest.repoId,
+    }),
+  );
   transaction(
     db,
     registrationSql(
       { ...f.manifest, packageName: 'removed.package', buildId: 'removed' },
       ['example.org'],
+      {
+        catalogUrl: 'https://read.example.com/extensions/index.json',
+        repoId: {
+          ...f.manifest,
+          packageName: 'removed.package',
+          buildId: 'removed',
+        }.repoId,
+      },
     ),
   );
   transaction(
     db,
-    registrationSql(f.manifest, ['example.org'], new Set([f.manifest.buildId])),
+    registrationSql(
+      f.manifest,
+      ['example.org'],
+      {
+        catalogUrl: 'https://read.example.com/extensions/index.json',
+        repoId: f.manifest.repoId,
+      },
+      new Set([f.manifest.buildId]),
+    ),
   );
   assert.equal(db.prepare('SELECT * FROM extension_builds').all().length, 1);
 });
@@ -440,7 +494,7 @@ test('remote CLI rejects snapshots and refuses stale deployed current identity',
     /require --local/,
   );
   t.mock.method(globalThis, 'fetch', async () =>
-    Response.json({ schemaVersion: 1, builds: [] }),
+    Response.json({ schemaVersion: 1, repoId: f.manifest.repoId, builds: [] }),
   );
   let calls = 0;
   await assert.rejects(
@@ -559,3 +613,68 @@ test('real local Wrangler file execution returns strict JSON and rejects SQL fai
   );
 });
 import { ExecaError } from 'execa';
+
+test('same package registrations are independent across catalogs and global build collisions roll back retirement', async (t) => {
+  const f = await fixture(t);
+  const db = await database(t);
+  const first = {
+    catalogUrl: 'https://read.example.com/extensions/index.json',
+    repoId: f.manifest.repoId,
+  };
+  const second = {
+    catalogUrl: 'https://external.example.org/extensions/index.json',
+    repoId: 'external',
+  };
+  const external = {
+    ...f.manifest,
+    repoId: second.repoId,
+    buildId: 'external-build',
+  };
+  transaction(db, registrationSql(f.manifest, ['example.org'], first));
+  transaction(db, registrationSql(external, ['external.example.org'], second));
+  assert.equal(
+    db.prepare('SELECT count(*) n FROM extension_builds').get()?.n,
+    2,
+  );
+  const before = db
+    .prepare('SELECT * FROM extension_builds ORDER BY build_id')
+    .all();
+  assert.throws(
+    () =>
+      transaction(
+        db,
+        registrationSql(
+          { ...external, buildId: f.manifest.buildId },
+          ['external.example.org'],
+          second,
+          new Set([f.manifest.buildId]),
+        ),
+      ),
+    /NOT NULL/,
+  );
+  assert.deepEqual(
+    db.prepare('SELECT * FROM extension_builds ORDER BY build_id').all(),
+    before,
+  );
+  transaction(
+    db,
+    registrationSql(
+      { ...f.manifest, buildId: 'next-default' },
+      ['example.org'],
+      first,
+      new Set(['next-default']),
+    ),
+  );
+  assert.equal(
+    db
+      .prepare(
+        'SELECT allowed_hosts_json FROM extension_builds WHERE build_id=?',
+      )
+      .get(external.buildId)?.allowed_hosts_json,
+    '["external.example.org"]',
+  );
+  assert.equal(
+    db.prepare('SELECT count(*) n FROM extension_builds').get()?.n,
+    2,
+  );
+});

@@ -212,7 +212,12 @@ async function initializeSourcePolicies(
       ),
     );
     await verifyStaticAuthority(manifest, load);
-    await bindings.DB.exec(registrationSql(manifest, policy.allowedHosts));
+    await bindings.DB.exec(
+      registrationSql(manifest, policy.allowedHosts, {
+        catalogUrl: origin + '/extensions/index.json',
+        repoId: manifest.repoId,
+      }),
+    );
   }
   console.log(`ACCEPTANCE_SOURCE_POLICY_COUNT=${policies.length}`);
 }

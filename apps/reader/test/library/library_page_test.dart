@@ -170,7 +170,7 @@ void main() {
     (tester) async {
       await favorite();
       platform.inventory = wire.encodeProtoJson(
-        wire.ExtensionIndex(schemaVersion: 1),
+        wire.ExtensionIndex(schemaVersion: 1, repoId: 'keiyoushi'),
       );
       await controller.connect();
       await show(tester);

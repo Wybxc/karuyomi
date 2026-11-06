@@ -1,3 +1,4 @@
+import { catalog } from './fixtures.js';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   HTTP_BRIDGE_MEDIA_TYPE,
@@ -76,7 +77,7 @@ test('open rejects AOT exports without the image ABI before initialization', asy
   const initialized = vi.fn();
   scope.teaDone = initialized;
   await expect(
-    driver.open(build, 'test', new AbortController().signal),
+    driver.open(build, 'test', new AbortController().signal, catalog),
   ).rejects.toMatchObject({ code: 'unsupported_capability' });
   expect(initialized).not.toHaveBeenCalled();
 });
@@ -93,7 +94,7 @@ test('the installed image ABI sends typed bytes and survives HTTP operation clea
       })().catch((error) => scope.teaFail!(String(error)));
     };
   });
-  await driver.open(build, 'test', new AbortController().signal);
+  await driver.open(build, 'test', new AbortController().signal, catalog);
   const { store, image, channel } = collector();
   const result = await driver.acquireImage(
     build.sourceIds[0]!,
@@ -206,7 +207,7 @@ test('image cancellation closes a pending HTTP body but waits for swallowed Java
       })().catch((error) => scope.teaFail!(String(error)));
     };
   });
-  await driver.open(build, 'test', new AbortController().signal);
+  await driver.open(build, 'test', new AbortController().signal, catalog);
   const { image, channel } = collector();
   const result = driver.acquireImage(
     build.sourceIds[0]!,
@@ -265,7 +266,7 @@ test.each([401, 403])(
         void scope.teaHttpFinish!(handle).catch(() => scope.teaDone!('{}'));
       };
     });
-    await driver.open(build, 'test', new AbortController().signal);
+    await driver.open(build, 'test', new AbortController().signal, catalog);
     const { image, channel } = collector();
     await expect(
       driver.acquireImage(
@@ -298,7 +299,7 @@ test('graphics cancellation marks the owner but keeps the Java entry locked unti
       void unwind.promise.then(() => scope.teaFail!('cancelled graphics'));
     };
   });
-  await driver.open(build, 'test', new AbortController().signal);
+  await driver.open(build, 'test', new AbortController().signal, catalog);
   const { image, channel } = collector();
   const result = driver.acquireImage(
     build.sourceIds[0]!,
@@ -330,7 +331,7 @@ test('graphics aggregate limit survives the Java string error callback', async (
       );
     globals.hostAcquireImage = () => {};
   });
-  await driver.open(build, 'test', new AbortController().signal);
+  await driver.open(build, 'test', new AbortController().signal, catalog);
   scope.hostInvoke = () => {
     void scope.teaGraphicsAsync!({ op: 'decode' }).catch(() =>
       scope.teaFail!('java.lang.RuntimeException: raster budget'),

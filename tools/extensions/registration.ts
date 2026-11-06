@@ -6,7 +6,12 @@ import { createRequire } from 'node:module';
 import { URL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
+import {
+  runtimeMaterialCatalogSchema,
+  catalogReferenceSchema,
+  validateExtensionCatalogUrl,
+  type CatalogReference,
+} from '@karuyomi/contracts';
 import type {
   BuildManifest,
   ExtensionIndex,
@@ -30,8 +35,13 @@ export type MetadataLoader = (
   limit: number,
 ) => Promise<Uint8Array>;
 export type PolicyDestination =
-  | { mode: 'remote' }
-  | { mode: 'local'; staticRoot: string; persistTo?: string };
+  | { mode: 'remote'; catalogUrl?: string }
+  | {
+      mode: 'local';
+      staticRoot: string;
+      persistTo?: string;
+      catalogUrl?: string;
+    };
 export type D1Executor = (
   arguments_: readonly string[],
   destination: PolicyDestination,
@@ -98,16 +108,22 @@ export const quote = (value: string): string =>
 export function registrationSql(
   manifest: BuildManifest,
   hosts: readonly string[],
+  catalog: CatalogReference,
   currentBuildIds?: ReadonlySet<string>,
 ): string {
+  catalogReferenceSchema.parse(catalog);
+  if (catalog.repoId !== manifest.repoId)
+    throw new Error('Manifest repository differs from registration scope');
   const build = quote(manifest.buildId);
   const packageName = quote(manifest.packageName);
   const policy = quote(JSON.stringify(networkHosts(hosts)));
   const digest = quote(manifest.bundle.sha256);
+  const scope = `catalog_url=${quote(catalog.catalogUrl)} AND repo_id=${quote(catalog.repoId)}`;
   const retire = currentBuildIds
-    ? 'DELETE FROM extension_builds' +
+    ? 'DELETE FROM extension_builds WHERE ' +
+      scope +
       (currentBuildIds.size
-        ? ` WHERE build_id NOT IN (${[...currentBuildIds].sort().map(quote).join(',')})`
+        ? ` AND build_id NOT IN (${[...currentBuildIds].sort().map(quote).join(',')})`
         : '') +
       ';\n'
     : '';
@@ -115,8 +131,8 @@ export function registrationSql(
   // identity/policy conflicts and rolls back preceding retirement statements.
   return (
     retire +
-    `DELETE FROM extension_builds WHERE package_name=${packageName} AND build_id<>${build};\n` +
-    `INSERT INTO extension_builds (build_id,package_name,bundle_sha256,status,created_at,allowed_hosts_json) VALUES (${build},${packageName},${digest},'verified',unixepoch(),${policy}) ON CONFLICT(build_id) DO UPDATE SET bundle_sha256=CASE WHEN extension_builds.package_name=excluded.package_name AND extension_builds.bundle_sha256=excluded.bundle_sha256 AND json(extension_builds.allowed_hosts_json)=json(excluded.allowed_hosts_json) THEN extension_builds.bundle_sha256 ELSE NULL END,status='verified';\n`
+    `DELETE FROM extension_builds WHERE ${scope} AND package_name=${packageName} AND build_id<>${build};\n` +
+    `INSERT INTO extension_builds (build_id,package_name,catalog_url,repo_id,bundle_sha256,status,created_at,allowed_hosts_json) VALUES (${build},${packageName},${quote(catalog.catalogUrl)},${quote(catalog.repoId)},${digest},'verified',unixepoch(),${policy}) ON CONFLICT(build_id) DO UPDATE SET bundle_sha256=CASE WHEN extension_builds.catalog_url=excluded.catalog_url AND extension_builds.repo_id=excluded.repo_id AND extension_builds.package_name=excluded.package_name AND extension_builds.bundle_sha256=excluded.bundle_sha256 AND json(extension_builds.allowed_hosts_json)=json(excluded.allowed_hosts_json) THEN extension_builds.bundle_sha256 ELSE NULL END,status='verified';\n`
   );
 }
 
@@ -216,21 +232,32 @@ export function deployedLoader(origin: string): MetadataLoader {
     }
   };
 }
-export async function destinationLoader(
+export async function destinationCatalogUrl(
   destination: PolicyDestination,
-): Promise<MetadataLoader> {
-  if (destination.mode === 'local')
-    return snapshotLoader(destination.staticRoot);
+): Promise<string> {
+  if (destination.catalogUrl) return destination.catalogUrl;
   const configuration = await readFile(
     path.join(repositoryRoot, 'apps/api/wrangler.jsonc'),
     'utf8',
   );
   const origin = /"APP_ORIGIN":\s*"([^"\n]+)"/.exec(configuration)?.[1];
   if (!origin) throw new Error('APP_ORIGIN is missing');
-  return deployedLoader(origin);
+  const url = origin + '/extensions/index.json';
+  validateExtensionCatalogUrl(url);
+  return url;
+}
+export async function destinationLoader(
+  destination: PolicyDestination,
+): Promise<MetadataLoader> {
+  if (destination.mode === 'local')
+    return snapshotLoader(destination.staticRoot);
+  return deployedLoader(
+    new URL(await destinationCatalogUrl(destination)).origin,
+  );
 }
 
 export const destinationOptions = {
+  'catalog-url': { type: 'string' },
   local: { type: 'boolean' },
   remote: { type: 'boolean' },
   'static-root': { type: 'string' },
@@ -242,9 +269,11 @@ export function policyDestination(
     remote?: boolean;
     'static-root'?: string;
     'persist-to'?: string;
+    'catalog-url'?: string;
   },
   required = false,
 ): PolicyDestination | undefined {
+  if (values['catalog-url']) validateExtensionCatalogUrl(values['catalog-url']);
   if (values.local && values.remote)
     throw new Error('--local and --remote are mutually exclusive');
   if ((values['static-root'] || values['persist-to']) && !values.local)
@@ -254,13 +283,18 @@ export function policyDestination(
       throw new Error('--local requires an explicit --static-root snapshot');
     return {
       mode: 'local',
+      ...(values['catalog-url'] ? { catalogUrl: values['catalog-url'] } : {}),
       staticRoot: path.resolve(values['static-root']),
       ...(values['persist-to']
         ? { persistTo: path.resolve(values['persist-to']) }
         : {}),
     };
   }
-  if (values.remote) return { mode: 'remote' };
+  if (values.remote)
+    return {
+      mode: 'remote',
+      ...(values['catalog-url'] ? { catalogUrl: values['catalog-url'] } : {}),
+    };
   if (required) throw new Error('Specify --local or --remote');
   return undefined;
 }
@@ -349,7 +383,7 @@ export async function registrationMain(
   });
   if (values.help) {
     console.log(
-      'node tools/extensions/registration.ts MANIFEST [--allow-host HOST] [--remote | --local --static-root SNAPSHOT] [--persist-to STATE]',
+      'node tools/extensions/registration.ts MANIFEST [--allow-host HOST] [--remote | --local --static-root SNAPSHOT] [--persist-to STATE] [--catalog-url URL]',
     );
     return;
   }
@@ -382,7 +416,15 @@ export async function registrationMain(
   );
   if (destination)
     await writePolicyTransaction(
-      registrationSql(manifest, hosts, current),
+      registrationSql(
+        manifest,
+        hosts,
+        {
+          catalogUrl: await destinationCatalogUrl(destination),
+          repoId: manifest.repoId,
+        },
+        current,
+      ),
       destination,
       execute,
     );

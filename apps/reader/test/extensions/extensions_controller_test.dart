@@ -31,7 +31,11 @@ void main() {
       deploymentOrigin: platform.origin,
     );
     await catalog.connect();
-    manager = ExtensionsController(catalog: catalog, isCurrent: () => current);
+    manager = ExtensionsController(
+      catalog: catalog,
+      repository: catalog.settings!,
+      isCurrent: () => current,
+    );
     await manager.refresh();
   });
   tearDown(() async {
@@ -92,6 +96,7 @@ void main() {
       );
       final second = ExtensionsController(
         catalog: catalog,
+        repository: catalog.settings!,
         isCurrent: () => true,
       );
       addTearDown(second.dispose);
@@ -192,6 +197,7 @@ void main() {
       manager.dispose();
       manager = ExtensionsController(
         catalog: catalog,
+        repository: catalog.settings!,
         isCurrent: () => current,
       );
       await manager.refresh();
@@ -402,7 +408,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(600, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      MaterialApp(home: ExtensionsPage(catalog: catalog)),
+      MaterialApp(
+        home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -432,7 +440,11 @@ void main() {
       await tap(
         tester,
         find.byKey(
-          const ValueKey(('extension-install', 'eu.kanade.source.test')),
+          ValueKey((
+            'extension-install',
+            catalog.catalogUrl,
+            'eu.kanade.source.test',
+          )),
         ),
       );
       expect(

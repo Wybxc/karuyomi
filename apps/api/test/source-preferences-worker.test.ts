@@ -1,5 +1,6 @@
 import { create, toJson } from '@bufbuild/protobuf';
 import {
+  extensionNetworkPoliciesResponseSchema,
   sourcePreferencesMutationResponseSchema,
   sourcePreferencesResponseSchema,
   SOURCE_PREFERENCES_PACKAGE_LIMIT,
@@ -46,6 +47,10 @@ function command(
 ) {
   return create(pb.SourcePreferencesMutationSchema, {
     schemaVersion: 1,
+    catalog: {
+      catalogUrl: origin + '/extensions/index.json',
+      repoId: 'keiyoushi',
+    },
     mutationId: crypto.randomUUID(),
     packageName,
     sourceId: id,
@@ -77,9 +82,20 @@ async function client(subject = crypto.randomUUID()) {
         headers: [...headers.entries()],
       });
     },
-    async read(packageName = komiic) {
+    async read(
+      packageName = komiic,
+      catalog = {
+        catalogUrl: origin + '/extensions/index.json',
+        repoId: 'keiyoushi',
+      },
+    ) {
       const response = await this.request(
-        '/api/source-preferences/packages/' + packageName,
+        '/api/source-preferences/packages/' +
+          packageName +
+          '?catalogUrl=' +
+          encodeURIComponent(catalog.catalogUrl) +
+          '&repoId=' +
+          encodeURIComponent(catalog.repoId),
       );
       expect(response.status).toBe(200);
       return sourcePreferencesResponseSchema.parse(await response.json());
@@ -323,4 +339,127 @@ test('UTF-8 package entries budget is enforced across concurrent source writes w
     200,
   );
   expect((await reader.read(fire)).accountRevision).toBe(4);
+});
+
+test('catalog namespace isolates the same package and an external keiyoushi name cannot inherit account sync permission', async () => {
+  const reader = await client();
+  const main = {
+    catalogUrl: origin + '/extensions/index.json',
+    repoId: 'keiyoushi',
+  };
+  const external = {
+    catalogUrl: 'https://other.example.org/extensions/index.json',
+    repoId: 'keiyoushi',
+  };
+  const saved = await reader.mutate(command([text('preferred_mirror', '1')]));
+  expect(saved.status).toBe(200);
+  expect(saved.body.catalog).toMatchObject(main);
+  expect(saved.body.syncRules.length).toBeGreaterThan(0);
+  const externalRead = await reader.read(komiic, external);
+  expect(externalRead.catalog).toMatchObject(external);
+  expect(externalRead.sources).toEqual([]);
+  expect(externalRead.syncRules).toEqual([]);
+  const rejected = await reader.mutate({
+    ...command([text('preferred_mirror', '0')]),
+    catalog: create(pb.CatalogReferenceSchema, external),
+  });
+  expect(rejected.status).toBe(400);
+  expect(rejected.body.catalog).toMatchObject(external);
+  expect(rejected.body.syncRules).toEqual([]);
+  const empty = {
+    ...command([]),
+    catalog: create(pb.CatalogReferenceSchema, external),
+  };
+  const externalSaved = await reader.mutate(empty);
+  expect(externalSaved.status).toBe(200);
+  expect(externalSaved.body.preferences?.revision).toBe(1);
+  expect((await reader.read()).sources[0]?.entries).toEqual(
+    saved.body.preferences?.entries,
+  );
+  expect((await reader.read(komiic, external)).sources[0]?.entries).toEqual([]);
+  expect((await reader.mutate(empty)).body).toEqual(externalSaved.body);
+  const changedScope = await reader.mutate({
+    ...empty,
+    catalog: create(pb.CatalogReferenceSchema, main),
+  });
+  expect(changedScope.body.error?.code).toBe(
+    pb.BusinessStateErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  expect(changedScope.body.catalog).toMatchObject(main);
+});
+
+test('network policy readiness lists only exact catalog bindings and verified build receipts', async () => {
+  const reader = await client();
+  const suffix = crypto.randomUUID();
+  const packageName = 'eu.kanade.fixture.' + suffix;
+  const external = {
+    catalogUrl: 'https://other.example.org/extensions/index.json',
+    repoId: 'other',
+  };
+  const insert = (id: string, repo: string, url: string, status: string) =>
+    env.DB.prepare(
+      'INSERT INTO extension_builds (build_id,package_name,catalog_url,repo_id,bundle_sha256,status,created_at,allowed_hosts_json) VALUES (?,?,?,?,?,?,?,?)',
+    )
+      .bind(id, packageName, url, repo, 'a'.repeat(64), status, 0, '[]')
+      .run();
+  await insert(
+    'default-' + suffix,
+    'keiyoushi',
+    origin + '/extensions/index.json',
+    'verified',
+  );
+  await insert(
+    'external-' + suffix,
+    external.repoId,
+    external.catalogUrl,
+    'verified',
+  );
+  const response = await reader.request(
+    '/api/extensions/network-policies?catalogUrl=' +
+      encodeURIComponent(external.catalogUrl) +
+      '&repoId=' +
+      external.repoId,
+  );
+  expect(response.status).toBe(200);
+  const policy = extensionNetworkPoliciesResponseSchema.parse(
+    await response.json(),
+  );
+  expect(policy.catalog).toMatchObject(external);
+  expect(
+    policy.builds.filter((build) => build.packageName === packageName),
+  ).toMatchObject([
+    {
+      buildId: 'external-' + suffix,
+      packageName,
+      bundleSha256: 'a'.repeat(64),
+    },
+  ]);
+  await env.DB.prepare('UPDATE extension_builds SET status=? WHERE build_id=?')
+    .bind('disabled', 'external-' + suffix)
+    .run();
+  const disabled = await reader.request(
+    '/api/extensions/network-policies?catalogUrl=' +
+      encodeURIComponent(external.catalogUrl) +
+      '&repoId=' +
+      external.repoId,
+  );
+  expect(
+    extensionNetworkPoliciesResponseSchema
+      .parse(await disabled.json())
+      .builds.some((build) => build.packageName === packageName),
+  ).toBe(false);
+  expect(
+    (
+      await reader.request(
+        '/api/extensions/network-policies?catalogUrl=' +
+          encodeURIComponent(external.catalogUrl) +
+          '&repoId=other',
+        { headers: { 'X-App-Subject': 'stale' } },
+      )
+    ).status,
+  ).toBe(403);
+  expect(
+    (await reader.request('/api/extensions/network-policies?repoId=other'))
+      .status,
+  ).toBe(400);
 });

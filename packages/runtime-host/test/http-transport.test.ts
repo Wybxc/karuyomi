@@ -16,6 +16,14 @@ import {
   HttpOwnerFailure,
 } from '../src/http-transport.js';
 
+const buildIdentity = {
+  buildId: 'test-build',
+  catalog: {
+    catalogUrl: 'https://read.example/extensions/index.json',
+    repoId: 'test-repo',
+  },
+  bundleSha256: 'a'.repeat(64),
+};
 const transports: BinaryHttpTransport[] = [];
 afterEach(() => {
   for (const transport of transports.splice(0)) transport.dispose();
@@ -44,7 +52,7 @@ function metadata(
 function setup(fetcher?: typeof fetch) {
   const transport = new BinaryHttpTransport(
     'https://read.example',
-    'test-build',
+    buildIdentity,
     fetcher,
   );
   transports.push(transport);
@@ -107,6 +115,11 @@ test('binary upload retains exact bytes, local identities and Source headers', a
     });
     const headers = new Headers(init?.headers);
     expect(headers.get('x-runtime-build')).toBe('test-build');
+    expect(headers.get('x-runtime-catalog')).toBe(
+      buildIdentity.catalog.catalogUrl,
+    );
+    expect(headers.get('x-runtime-repo')).toBe(buildIdentity.catalog.repoId);
+    expect(headers.get('x-runtime-bundle')).toBe(buildIdentity.bundleSha256);
     expect(headers.get('accept')).toBe(HTTP_BRIDGE_MEDIA_TYPE);
     expect(headers.get('cookie')).toBeNull();
     const reader = new HttpFrameReader(
@@ -181,7 +194,7 @@ test('a real connection drop before response headers carries the controlled retr
       throw Error('Expected TCP server');
     const transport = new BinaryHttpTransport(
       `http://127.0.0.1:${address.port}`,
-      'test-build',
+      buildIdentity,
     );
     transports.push(transport);
     transport.begin({

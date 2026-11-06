@@ -2,6 +2,7 @@ import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
 import type {
   BuildManifest,
+  CatalogReference,
   SourceInfo,
   SourceCall,
   SourcePayload,
@@ -10,13 +11,14 @@ import type {
 } from '@karuyomi/contracts';
 import {
   sourceInfoSchema,
+  catalogReferenceSchema,
   javaSourceInvocation,
   parseJavaSourcePayload,
   processedImageSchema,
   closedSchema,
   messageJson,
   validatePreferenceBootstrap,
-  preferenceSyncRules,
+  preferenceSyncRulesForCatalog,
   validateSyncedPreferenceEntries,
 } from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
@@ -33,6 +35,7 @@ export interface RuntimeDriver {
     manifest: BuildManifest,
     userAgent: string,
     signal: AbortSignal,
+    catalog: CatalogReference,
     context?: HttpCallContext,
     preferences?: pb.PreferenceBootstrap,
   ): Promise<SourceInfo[]>;
@@ -116,7 +119,7 @@ export interface TeaVMGlobals {
   karuyomiResources?: Record<string, string>;
 }
 
-/** Executes only authenticated, hash-checked release9-derived classic scripts. */
+/** Executes hash-checked release9-derived classic scripts from the selected catalog. */
 export class TeaVMDriver implements RuntimeDriver {
   private waiter:
     { resolve(value: unknown): void; reject(error: unknown): void } | undefined;
@@ -124,6 +127,7 @@ export class TeaVMDriver implements RuntimeDriver {
   private readonly objectUrls = new Set<string>();
   private closed = false;
   private packageName: string | undefined;
+  private syncRules: pb.PreferenceSyncRule[] = [];
   private binaryTransport: BinaryHttpTransport | undefined;
   private imageSink: ImageSink | undefined;
   private imageFailure: RuntimeFailure | undefined;
@@ -311,11 +315,18 @@ export class TeaVMDriver implements RuntimeDriver {
     manifest: BuildManifest,
     userAgent: string,
     signal: AbortSignal,
+    catalog: CatalogReference,
     context?: HttpCallContext,
     preferences = create(pb.PreferenceBootstrapSchema, {
       packageName: manifest.packageName,
     }),
   ): Promise<SourceInfo[]> {
+    catalog = catalogReferenceSchema.parse(catalog);
+    if (catalog.repoId !== manifest.repoId)
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Catalog does not match this extension',
+      );
     validatePreferenceBootstrap(preferences);
     if (
       preferences.packageName !== manifest.packageName ||
@@ -328,20 +339,26 @@ export class TeaVMDriver implements RuntimeDriver {
         'Preference bootstrap does not belong to this extension',
       );
     this.packageName = manifest.packageName;
+    this.syncRules = preferenceSyncRulesForCatalog(
+      manifest.packageName,
+      catalog,
+      this.origin,
+    );
     const preferenceConfiguration = JSON.stringify(
       messageJson(
         pb.PreferenceHostConfigurationSchema,
         create(pb.PreferenceHostConfigurationSchema, {
           bootstrap: preferences,
-          syncRules: preferenceSyncRules(manifest.packageName),
+          syncRules: this.syncRules,
         }),
       ),
     );
     this.binaryTransport?.dispose();
-    this.binaryTransport = new BinaryHttpTransport(
-      this.origin,
-      manifest.buildId,
-    );
+    this.binaryTransport = new BinaryHttpTransport(this.origin, {
+      buildId: manifest.buildId,
+      catalog,
+      bundleSha256: manifest.bundle.sha256,
+    });
     this.scope.karuyomiResources = {};
     for (const resource of manifest.resources) {
       const bytes = await this.loader.sharedArtifact(resource, signal);
@@ -367,7 +384,7 @@ export class TeaVMDriver implements RuntimeDriver {
     };
     for (const artifact of manifest.hostScripts)
       execute(await this.loader.sharedArtifact(artifact, signal, true));
-    execute(await this.loader.artifact(manifest.bundle, signal, true));
+    execute(await this.loader.artifact(catalog, manifest.bundle, signal, true));
     this.installGraphicsFailures();
     if (
       !this.scope.hostInit ||
@@ -450,6 +467,7 @@ export class TeaVMDriver implements RuntimeDriver {
         this.packageName,
         call.sourceId,
         snapshot.syncValues,
+        this.syncRules,
       );
     return payload;
   }

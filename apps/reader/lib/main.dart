@@ -278,11 +278,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
       return;
     }
-    final buildId = continuation['buildId'];
-    final builds = controller.builds.where((build) => build.id == buildId);
-    if (builds.isEmpty) return;
-    await controller.openBuild(builds.first);
-    if (!mounted || !identical(controller, _catalog)) return;
+    final packageName = continuation['packageName'];
+    if (packageName is! String) return;
+    final build = await controller.openSelectedBuild(
+      packageName,
+      shouldContinue: () => mounted && identical(controller, _catalog),
+    );
+    if (!mounted ||
+        !identical(controller, _catalog) ||
+        build == null ||
+        controller.activeBuild?.catalog != build.catalog ||
+        controller.activeBuild?.id != build.id) {
+      return;
+    }
     final sourceId = continuation['sourceId'];
     final sources = controller.session?.sources.where(
       (source) => source.id == sourceId,
@@ -308,7 +316,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         pending: {
           ...?_pendingContinuation,
           'tab': _index,
-          if (_catalog?.lastBuildId != null) 'buildId': _catalog!.lastBuildId,
+          if (_catalog?.lastPackageName != null)
+            'packageName': _catalog!.lastPackageName,
           if (_catalog?.lastSourceId != null)
             'sourceId': _catalog!.lastSourceId,
           if (_catalog?.query.isNotEmpty == true) 'query': _catalog!.query,

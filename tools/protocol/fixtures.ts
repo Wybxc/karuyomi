@@ -34,7 +34,8 @@ export type GoldenType =
   | 'SettingsMutationResponse'
   | 'SourcePreferencesMutation'
   | 'SourcePreferencesResponse'
-  | 'SourcePreferencesMutationResponse';
+  | 'SourcePreferencesMutationResponse'
+  | 'ExtensionNetworkPoliciesResponse';
 
 export interface GoldenFixture {
   name: string;
@@ -53,6 +54,10 @@ const packageName = 'eu.kanade.tachiyomi.extension.en.golden';
 const sha256 = 'a'.repeat(64);
 const encodedSha256 = 'b'.repeat(64);
 const materialSha256 = 'c'.repeat(64);
+export const catalog: JsonObject = {
+  catalogUrl: 'https://read.example.com/extensions/index.json',
+  repoId: 'keiyoushi',
+};
 
 export const manga: JsonObject = {
   url: '/manga/漫画?a=1&b=2',
@@ -104,7 +109,7 @@ export const imageResource: JsonObject = {
 const descriptor: JsonObject = {
   buildId,
   packageName,
-  repoId: 'keiyoushi/extensions-source',
+  repoId: 'keiyoushi',
   version: '1.6.1',
   sourceIds: [sourceId, '-9223372036854775808', '9223372036854775807'],
   sources: [
@@ -122,7 +127,7 @@ export const buildManifest: JsonObject = {
   bridgeVersion: 2,
   buildId,
   packageName,
-  repoId: 'keiyoushi/extensions-source',
+  repoId: 'keiyoushi',
   version: '1.6.1',
   storageSchema: '1',
   sourceIds: [sourceId],
@@ -223,6 +228,7 @@ const sources: JsonObject[] = [
 ];
 
 const session: JsonObject = {
+  catalog,
   protocolVersion,
   workerInstanceId: 'worker-golden',
   generation,
@@ -319,6 +325,13 @@ const globalReader: JsonObject = {
   cropBorders: true,
 };
 const globalSettingsValues: JsonObject = {
+  repositories: [
+    {
+      catalogUrl: 'http://[::1]:8787/extensions/index.json',
+      repoId: 'other',
+      name: 'Other 仓库',
+    },
+  ],
   theme: 'APP_THEME_SYSTEM',
   reader: globalReader,
   installedExtensions: [
@@ -443,11 +456,21 @@ const sourcePreferences: JsonObject = {
 
 export const goldenFixtures: GoldenFixture[] = [
   {
+    name: 'extension-network-policy-readiness',
+    type: 'ExtensionNetworkPoliciesResponse',
+    value: {
+      schemaVersion: 1,
+      catalog,
+      builds: [{ buildId, packageName, bundleSha256: sha256 }],
+    },
+  },
+  {
     name: 'preferences-open-bootstrap',
     type: 'ControlRequest',
     value: {
       requestId,
       open: {
+        catalog,
         manifestPath: `/extensions/builds/${buildId}/manifest.json`,
         identity: 'golden-owner',
         expectedBuildId: buildId,
@@ -462,6 +485,7 @@ export const goldenFixtures: GoldenFixture[] = [
     value: {
       envelope,
       open: {
+        catalog,
         manifest: buildManifest,
         userAgent: 'Golden/1.0',
         preferenceBootstrap,
@@ -526,6 +550,7 @@ export const goldenFixtures: GoldenFixture[] = [
     value: {
       schemaVersion: 1,
       mutationId: businessMutationId,
+      catalog,
       packageName: preferenceBusinessPackage,
       sourceId,
       expectedRevision: 0,
@@ -537,8 +562,13 @@ export const goldenFixtures: GoldenFixture[] = [
     type: 'SourcePreferencesResponse',
     value: {
       schemaVersion: 1,
+      catalog,
       packageName: preferenceBusinessPackage,
       accountRevision: 2,
+      syncRules: [
+        { key: 'preferred_mirror', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+        { key: 'CHAPTER_FILTER', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+      ],
       sources: [sourcePreferences],
     },
   },
@@ -549,6 +579,11 @@ export const goldenFixtures: GoldenFixture[] = [
       schemaVersion: 1,
       mutationId: businessMutationId,
       accountRevision: 2,
+      catalog,
+      syncRules: [
+        { key: 'preferred_mirror', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+        { key: 'CHAPTER_FILTER', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+      ],
       preferences: sourcePreferences,
     },
   },
@@ -867,7 +902,7 @@ export const goldenFixtures: GoldenFixture[] = [
   {
     name: 'static-current-index',
     type: 'ExtensionIndex',
-    value: { schemaVersion: 1, builds: [descriptor] },
+    value: { schemaVersion: 1, repoId: 'keiyoushi', builds: [descriptor] },
   },
   {
     name: 'bootstrap',
@@ -936,6 +971,7 @@ export const goldenFixtures: GoldenFixture[] = [
       [
         'open',
         {
+          catalog,
           manifestPath: descriptor.manifestPath ?? '',
           identity: 'owner',
           userAgent: '',
@@ -956,7 +992,10 @@ export const goldenFixtures: GoldenFixture[] = [
         },
       ],
       ['dispose', {}],
-      ['prepareBuild', { preparationId: 'prepare-golden', build: descriptor }],
+      [
+        'prepareBuild',
+        { preparationId: 'prepare-golden', build: descriptor, catalog },
+      ],
       ['cancelPreparation', { preparationId: 'prepare-golden' }],
       ['extensionCache', {}],
       ['forgetExtensionArtifact', { sha256 }],
@@ -982,7 +1021,7 @@ export const goldenFixtures: GoldenFixture[] = [
       ['session', session],
       [
         'preparedBuild',
-        { build: descriptor, bundleSha256: sha256, byteLength: 1024 },
+        { build: descriptor, bundleSha256: sha256, byteLength: 1024, catalog },
       ],
       [
         'extensionCache',
@@ -1040,7 +1079,7 @@ export const goldenFixtures: GoldenFixture[] = [
   })),
   ...(
     [
-      ['open', { manifest: buildManifest, userAgent: 'Golden/1.0' }],
+      ['open', { manifest: buildManifest, userAgent: 'Golden/1.0', catalog }],
       [
         'acquireImage',
         { request: imageRequest, resourceId: 'resource-golden' },

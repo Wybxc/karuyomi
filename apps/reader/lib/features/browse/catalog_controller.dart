@@ -9,6 +9,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../runtime/runtime_platform_types.dart';
 import '../../runtime/cover_transport.dart';
+import '../../runtime/catalog_transport.dart';
 import '../../data/business_state_client.dart';
 import '../../data/business_state_validation.dart';
 import '../../data/bookmark_repository.dart';
@@ -71,6 +72,7 @@ List<wire.CatalogSource> _catalogSources(
 final class CatalogBuild {
   const CatalogBuild._({
     required this.id,
+    required this.catalogUrl,
     required this.packageName,
     required this.repoId,
     required this.version,
@@ -78,6 +80,9 @@ final class CatalogBuild {
     required this.sources,
   });
   final String id;
+  final String catalogUrl;
+  wire.CatalogReference get catalog =>
+      wire.CatalogReference(catalogUrl: catalogUrl, repoId: repoId);
   final String packageName;
   final String repoId;
   final String version;
@@ -94,7 +99,11 @@ final class CatalogBuild {
     sources: sources.map((source) => source.deepCopy()),
   );
 
-  factory CatalogBuild.fromProto(wire.ExtensionBuildDescriptor value) {
+  factory CatalogBuild.fromProto(
+    wire.ExtensionBuildDescriptor value, {
+    required String catalogUrl,
+  }) {
+    validateBusinessCatalogUrl(catalogUrl);
     final id = value.buildId;
     final path = value.manifestPath;
     if (!RegExp(r'^[a-zA-Z0-9._-]{1,200}$').hasMatch(id) ||
@@ -107,6 +116,7 @@ final class CatalogBuild {
     }
     return CatalogBuild._(
       id: id,
+      catalogUrl: catalogUrl,
       packageName: value.packageName,
       repoId: value.repoId,
       version: value.version,
@@ -185,11 +195,22 @@ final class CatalogController extends ChangeNotifier {
     required this.runtime,
     required this.rebuildRuntime,
     this.deploymentOrigin,
-  }) {
+    CatalogTransport? catalogs,
+  }) : publicCatalogs =
+           catalogs ??
+           (api is PlatformRuntime
+               ? api.catalogTransport
+               : HttpCatalogTransport()) {
     _subscription = runtime.events.listen(_onRuntimeEvent);
   }
 
+  final _catalogCancelled = Completer<void>();
   final ApiFetch api;
+  final CatalogTransport publicCatalogs;
+  final repositoryErrors = <String, String>{};
+  final _catalogBuilds = <String, List<CatalogBuild>>{};
+  final networkPolicies = <String, wire.ExtensionNetworkPoliciesResponse>{};
+  final networkPolicyErrors = <String, String>{};
   CoverTransport? get _covers {
     final transport = api;
     if (transport is PlatformRuntime) return transport.coverTransport;
@@ -219,8 +240,9 @@ final class CatalogController extends ChangeNotifier {
   SourcePreferencesRepository? _sourcePreferences;
   SourcePreferencesSnapshot? loadedSourcePreferences;
   final _sessionPreferenceValues =
-      <(String, String), List<wire.PreferenceEntry>>{};
-  final _preferenceRecoveries = <(String, String), SourcePreferencesTarget>{};
+      <(String, String, String, String), List<wire.PreferenceEntry>>{};
+  final _preferenceRecoveries =
+      <(String, String, String, String), SourcePreferencesTarget>{};
   String? _preferenceIdentity;
   String? _preferenceRequestId;
 
@@ -230,10 +252,18 @@ final class CatalogController extends ChangeNotifier {
   List<SourcePreferencesTarget> get sourcePreferenceRecoveries =>
       List.unmodifiable(_preferenceRecoveries.values);
 
+  (String, String, String, String) _preferenceScope(
+    CatalogBuild build,
+    String sourceId,
+  ) => (build.catalogUrl, build.repoId, build.packageName, sourceId);
+
   bool get sourcePreferencesBlocked =>
       activeBuild != null &&
       _preferenceRecoveries.keys.any(
-        (key) => key.$1 == activeBuild!.packageName,
+        (key) =>
+            key.$1 == activeBuild!.catalogUrl &&
+            key.$2 == activeBuild!.repoId &&
+            key.$3 == activeBuild!.packageName,
       );
 
   SourcePreferencesTarget? get currentPreferencesTarget =>
@@ -308,6 +338,162 @@ final class CatalogController extends ChangeNotifier {
     return '${origin.origin}/extensions/index.json';
   }
 
+  wire.CatalogReference get defaultCatalog =>
+      wire.CatalogReference(catalogUrl: catalogUrl, repoId: 'keiyoushi');
+
+  List<wire.ExtensionRepository> get repositories => [
+    wire.ExtensionRepository(
+      catalogUrl: catalogUrl,
+      repoId: 'keiyoushi',
+      name: '默认仓库',
+    ),
+    ...?installationSettings?.global.repositories.where(
+      (value) => value.catalogUrl != catalogUrl,
+    ),
+  ];
+
+  bool isRepositoryRegistered(wire.CatalogReference reference) =>
+      repositories.any(
+        (value) =>
+            value.catalogUrl == reference.catalogUrl &&
+            value.repoId == reference.repoId,
+      );
+
+  bool allowsAccountPreferences(CatalogBuild build) =>
+      build.catalog == defaultCatalog;
+
+  void _publishCatalogs() {
+    final allowed = repositories
+        .map(
+          (value) => catalogReferenceKey(
+            wire.CatalogReference(
+              catalogUrl: value.catalogUrl,
+              repoId: value.repoId,
+            ),
+          ),
+        )
+        .toSet();
+    _catalogBuilds.removeWhere((key, _) => !allowed.contains(key));
+    networkPolicies.removeWhere((key, _) => !allowed.contains(key));
+    builds = List.unmodifiable(
+      _catalogBuilds.values.expand((values) => values),
+    );
+  }
+
+  Future<({wire.CatalogReference catalog, List<CatalogBuild> builds})>
+  previewRepository(
+    String url, {
+    bool Function()? shouldContinue,
+    Future<void>? cancelled,
+  }) async {
+    validateBusinessCatalogUrl(url);
+    final index = wire.decodeProtoJson(
+      wire.ExtensionIndex(),
+      await publicCatalogs.read(
+        Uri.parse(url),
+        shouldContinue: shouldContinue,
+        cancelled: Future.any([_catalogCancelled.future, ?cancelled]),
+      ),
+    );
+    if (shouldContinue?.call() == false) throw StateError('仓库预览已失效。');
+    final reference = wire.CatalogReference(
+      catalogUrl: url,
+      repoId: index.repoId,
+    );
+    validateBusinessCatalogReference(reference);
+    final available = index.builds
+        .map((value) => CatalogBuild.fromProto(value, catalogUrl: url))
+        .toList();
+    if (index.schemaVersion != 1 ||
+        available.length > 5000 ||
+        available.any((build) => build.repoId != reference.repoId)) {
+      throw const FormatException('仓库索引身份、版本或构建资料无效。');
+    }
+    if (available.map((build) => build.packageName).toSet().length !=
+        available.length) {
+      throw const FormatException('扩展目录必须每包只包含一个当前版本。');
+    }
+    if (available.map((build) => build.id).toSet().length != available.length) {
+      throw const FormatException('扩展目录构建标识不能重复。');
+    }
+    return (
+      catalog: reference..freeze(),
+      builds: List<CatalogBuild>.unmodifiable(available),
+    );
+  }
+
+  Future<void> _refreshRepository(
+    wire.CatalogReference reference, {
+    bool Function()? shouldContinue,
+    Future<void>? cancelled,
+  }) async {
+    final key = catalogReferenceKey(reference);
+    final document = await previewRepository(
+      reference.catalogUrl,
+      shouldContinue: shouldContinue,
+      cancelled: cancelled,
+    );
+    if (_closed ||
+        shouldContinue?.call() == false ||
+        !isRepositoryRegistered(reference)) {
+      return;
+    }
+    if (document.catalog != reference) {
+      throw const FormatException('仓库身份已改变，请移除后重新预览并确认。');
+    }
+    _catalogBuilds[key] = document.builds;
+    repositoryErrors.remove(key);
+    _publishCatalogs();
+  }
+
+  Future<void> refreshNetworkPolicies(
+    wire.CatalogReference reference, {
+    bool Function()? shouldContinue,
+  }) async {
+    final query = Uri(
+      queryParameters: {
+        'catalogUrl': reference.catalogUrl,
+        'repoId': reference.repoId,
+      },
+    ).query;
+    final value = wire.decodeProtoJson(
+      wire.ExtensionNetworkPoliciesResponse(),
+      await _get('/api/extensions/network-policies?$query'),
+    );
+    if (_closed ||
+        shouldContinue?.call() == false ||
+        !isRepositoryRegistered(reference)) {
+      return;
+    }
+    if (value.schemaVersion != 1 ||
+        !value.hasCatalog() ||
+        value.catalog != reference ||
+        value.builds.length > 5000 ||
+        value.builds.any(
+          (build) =>
+              !RegExp(r'^[A-Za-z0-9._-]{1,200}$').hasMatch(build.buildId) ||
+              build.packageName.isEmpty ||
+              !RegExp(r'^[a-f0-9]{64}$').hasMatch(build.bundleSha256),
+        ) ||
+        value.builds.map((build) => build.packageName).toSet().length !=
+            value.builds.length) {
+      throw const FormatException('漫画源网络登记回复无效。');
+    }
+    networkPolicies[catalogReferenceKey(reference)] = value.deepCopy()
+      ..freeze();
+    networkPolicyErrors.remove(catalogReferenceKey(reference));
+    _notify();
+  }
+
+  bool isNetworkRegistered(CatalogBuild build, {String? sha256}) =>
+      networkPolicies[catalogReferenceKey(build.catalog)]?.builds.any(
+        (value) =>
+            value.buildId == build.id &&
+            value.packageName == build.packageName &&
+            (sha256 == null || value.bundleSha256 == sha256),
+      ) ??
+      false;
+
   List<wire.InstalledExtension> get installedExtensions =>
       installationSettings?.global.installedExtensions ?? const [];
 
@@ -322,7 +508,8 @@ final class CatalogController extends ChangeNotifier {
     final installed = installedExtension(build.packageName);
     return installed != null &&
         installed.enabled &&
-        installed.catalogUrl == catalogUrl &&
+        isRepositoryRegistered(build.catalog) &&
+        installed.catalogUrl == build.catalogUrl &&
         installed.repoId == build.repoId &&
         installed.buildId == build.id &&
         (sha256 == null || installed.bundleSha256 == sha256);
@@ -340,6 +527,7 @@ final class CatalogController extends ChangeNotifier {
       return;
     }
     installationSettings = value;
+    _publishCatalogs();
     if (extensionUnavailableReason != null) {
       unawaited(retireUnavailableExtension().catchError((Object _) {}));
     }
@@ -360,26 +548,44 @@ final class CatalogController extends ChangeNotifier {
   Future<CatalogBuild> resolveInstalledBuild(
     String packageName, {
     CatalogBuild? requested,
+    bool Function()? shouldContinue,
   }) async {
+    if (_closed || shouldContinue?.call() == false) {
+      throw StateError('打开操作已失效。');
+    }
     await refreshInstallations();
+    if (_closed || shouldContinue?.call() == false) {
+      throw StateError('打开操作已失效。');
+    }
     final selected = installedExtension(packageName);
     if (selected == null) throw const FormatException('扩展尚未安装，请先进入扩展管理。');
     if (!selected.enabled) throw const FormatException('扩展已停用，请先在扩展管理中启用。');
-    if (selected.catalogUrl != catalogUrl) {
-      throw const FormatException('这个扩展来自尚未接入的仓库，请在扩展管理中处理。');
+    final selectedCatalog = wire.CatalogReference(
+      catalogUrl: selected.catalogUrl,
+      repoId: selected.repoId,
+    );
+    if (!isRepositoryRegistered(selectedCatalog)) {
+      throw const FormatException('这个扩展的仓库已移除，请重新添加原仓库。');
+    }
+    await _refreshRepository(selectedCatalog, shouldContinue: shouldContinue);
+    if (_closed || shouldContinue?.call() == false) {
+      throw StateError('打开操作已失效。');
     }
     final matches = builds.where(
       (build) =>
           build.packageName == packageName &&
+          build.catalogUrl == selected.catalogUrl &&
           build.repoId == selected.repoId &&
           build.id == selected.buildId,
     );
     if (matches.length != 1) {
-      throw const FormatException('所选构建已下架，请在扩展管理中检查并手动更新。');
+      throw const FormatException('扩展当前不可用：所选构建已下架，请在扩展管理中检查并手动更新。');
     }
     final build = matches.single;
     if (requested != null &&
-        (requested.id != build.id || requested.repoId != build.repoId)) {
+        (requested.id != build.id ||
+            requested.repoId != build.repoId ||
+            requested.catalogUrl != build.catalogUrl)) {
       throw const FormatException('请打开账户已选择的构建；更新需在扩展管理中确认。');
     }
     return build;
@@ -494,27 +700,57 @@ final class CatalogController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> refreshCatalog() async {
+  Future<void> refreshCatalog({
+    bool Function()? shouldContinue,
+    Future<void>? cancelled,
+  }) async {
     final epoch = _epoch;
-    final identity = subject;
-    if (_closed || identity == null || status != ServiceStatus.ready) {
+    final client = _confirmedBusinessClient;
+    if (_closed ||
+        client == null ||
+        !{ServiceStatus.ready, ServiceStatus.failed}.contains(status)) {
       throw StateError('身份未确认');
     }
-    final inventory = wire.decodeProtoJson(
-      wire.ExtensionIndex(),
-      await _get('/extensions/index.json'),
-    );
-    final available = inventory.builds.map(CatalogBuild.fromProto).toList();
-    if (inventory.schemaVersion != 1 ||
-        available.length > 5000 ||
-        available.map((build) => build.packageName).toSet().length !=
-            available.length) {
-      throw const FormatException('扩展索引必须每包只包含一个当前版本');
+    bool current() =>
+        !_closed &&
+        epoch == _epoch &&
+        identical(_confirmedBusinessClient, client) &&
+        shouldContinue?.call() != false;
+    for (final repository in repositories) {
+      final reference = wire.CatalogReference(
+        catalogUrl: repository.catalogUrl,
+        repoId: repository.repoId,
+      );
+      try {
+        await _refreshRepository(
+          reference,
+          shouldContinue: current,
+          cancelled: cancelled,
+        );
+      } catch (_) {
+        if (!current()) return;
+        repositoryErrors[catalogReferenceKey(reference)] =
+            '仓库读取失败；账户选择未改变，可单独重试。';
+      }
+      if (!current()) return;
+      try {
+        await refreshNetworkPolicies(reference, shouldContinue: current);
+      } on RuntimeException catch (failure) {
+        if ({
+          RuntimeErrorCode.accessRequired,
+          RuntimeErrorCode.accessDenied,
+        }.contains(failure.code)) {
+          rethrow;
+        }
+        networkPolicyErrors[catalogReferenceKey(reference)] =
+            '网络登记尚未读取，Source 暂不能打开。';
+      } catch (_) {
+        if (!current()) return;
+        networkPolicyErrors[catalogReferenceKey(reference)] =
+            '网络登记尚未读取，Source 暂不能打开。';
+      }
+      if (!current()) return;
     }
-    if (_closed || epoch != _epoch || subject != identity) {
-      throw StateError('身份或服务已改变');
-    }
-    builds = List.unmodifiable(available);
     _notify();
   }
 
@@ -656,6 +892,7 @@ final class CatalogController extends ChangeNotifier {
   String? _filterRequestId;
   bool _filterRequestLoadsSnapshot = false;
   String? lastBuildId;
+  String? lastPackageName;
   String? lastSourceId;
   int _requestSequence = 0;
   int _epoch = 0;
@@ -820,6 +1057,8 @@ final class CatalogController extends ChangeNotifier {
       subject = null;
       email = null;
       builds = const [];
+      _catalogBuilds.clear();
+      networkPolicies.clear();
       _notify();
       // Confirm the cookie's current identity before attempting old drafts.
       // An old subject's rejected POST must not interrupt the new bootstrap.
@@ -846,20 +1085,14 @@ final class CatalogController extends ChangeNotifier {
       if (confirmedSubject.isEmpty || confirmedEmail.isEmpty) {
         throw const FormatException('服务返回的数据不完整');
       }
-      final inventory = wire.decodeProtoJson(
-        wire.ExtensionIndex(),
-        await _get('/extensions/index.json'),
+      final document = await previewRepository(
+        catalogUrl,
+        shouldContinue: () => !_closed && epoch == _epoch,
       );
-      if (_closed || epoch != _epoch) return;
-      if (inventory.schemaVersion != 1) {
-        throw const FormatException('扩展索引版本不兼容');
+      if (document.catalog != defaultCatalog) {
+        throw const FormatException('默认仓库身份不匹配。');
       }
-      final available = inventory.builds.map(CatalogBuild.fromProto).toList();
-      if (available.length > 5000 ||
-          available.map((build) => build.packageName).toSet().length !=
-              available.length) {
-        throw const FormatException('扩展索引必须每包只包含一个当前版本');
-      }
+      final available = document.builds;
       if (_closed || epoch != _epoch) return;
       subject = confirmedSubject;
       final state = _confirmedBusinessClient;
@@ -876,8 +1109,29 @@ final class CatalogController extends ChangeNotifier {
         }
       }
       email = confirmedEmail;
-      builds = List.unmodifiable(available);
+      _catalogBuilds[catalogReferenceKey(defaultCatalog)] = available;
+      _publishCatalogs();
       status = ServiceStatus.ready;
+      await refreshInstallations();
+      if (_closed || epoch != _epoch) return;
+      for (final repository in repositories.where(
+        (value) => value.catalogUrl != catalogUrl,
+      )) {
+        final reference = wire.CatalogReference(
+          catalogUrl: repository.catalogUrl,
+          repoId: repository.repoId,
+        );
+        try {
+          await _refreshRepository(
+            reference,
+            shouldContinue: () => !_closed && epoch == _epoch,
+          );
+        } catch (_) {
+          if (_closed || epoch != _epoch) return;
+          repositoryErrors[catalogReferenceKey(reference)] =
+              '仓库读取失败；安装与业务记录保留。';
+        }
+      }
     });
   }
 
@@ -889,45 +1143,95 @@ final class CatalogController extends ChangeNotifier {
     CatalogBuild build, {
     bool Function()? shouldContinue,
   }) async {
-    if (shouldContinue?.call() == false) return;
     final openingEpoch = _epoch;
-    await resolveInstalledBuild(build.packageName, requested: build);
+    final selected = await resolveInstalledBuild(
+      build.packageName,
+      requested: build,
+      shouldContinue: shouldContinue,
+    );
     if (_closed || openingEpoch != _epoch || shouldContinue?.call() == false) {
       return;
     }
+    await _loadResolvedBuild(selected, shouldContinue: shouldContinue);
+  }
+
+  Future<CatalogBuild?> openSelectedBuild(
+    String packageName, {
+    bool Function()? shouldContinue,
+  }) => _perform<CatalogBuild?>('正在打开账户选择的扩展', () async {
+    final epoch = _epoch;
+    final build = await resolveInstalledBuild(
+      packageName,
+      shouldContinue: shouldContinue,
+    );
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) {
+      return null;
+    }
+    await _loadResolvedBuild(build, shouldContinue: shouldContinue);
+    return !_closed &&
+            epoch == _epoch &&
+            shouldContinue?.call() != false &&
+            activeBuild?.catalog == build.catalog &&
+            activeBuild?.id == build.id
+        ? build
+        : null;
+  });
+
+  Future<void> _loadResolvedBuild(
+    CatalogBuild build, {
+    bool Function()? shouldContinue,
+  }) async {
+    final openingEpoch = _epoch;
     await _retiringExtension;
     if (_closed || openingEpoch != _epoch || shouldContinue?.call() == false) {
       return;
     }
     lastBuildId = build.id;
+    lastPackageName = build.packageName;
     lastSourceId = null;
     final epoch = _epoch;
     final preferences = sourcePreferences;
     if (preferences == null) {
       throw StateError('Source settings identity is unavailable');
     }
-    if (preferences.hasPendingPackage(build.packageName)) {
+    if (preferences.hasPendingPackage(
+      build.packageName,
+      catalog: build.catalog,
+    )) {
       throw const FormatException('这个扩展有未确认的设置，请先处理原设置操作。');
     }
-    if (_preferenceRecoveries.keys.any((key) => key.$1 == build.packageName)) {
+    if (_preferenceRecoveries.keys.any(
+      (key) =>
+          key.$1 == build.catalogUrl &&
+          key.$2 == build.repoId &&
+          key.$3 == build.packageName,
+    )) {
       await _rebuildForPreferences();
       if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     }
     final previous = session;
     if (previous != null &&
         (activeBuild?.id != build.id ||
-            activeBuild?.packageName != build.packageName)) {
+            activeBuild?.packageName != build.packageName ||
+            activeBuild?.catalog != build.catalog)) {
       await closeManagedBuild(_activeBundleSha256!);
       if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     }
     _dropSession();
-    final confirmedPreferences = await preferences.load(build.packageName);
+    final confirmedPreferences = await preferences.load(
+      build.packageName,
+      catalog: build.catalog,
+    );
     if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     final identity = subject;
     if (identity == null) {
       throw const RuntimeException(RuntimeErrorCode.accessRequired, '身份未确认');
     }
-    final response = await _get(build.manifestPath);
+    final response = await publicCatalogs.read(
+      Uri.parse(build.catalogUrl).resolve(build.manifestPath),
+      shouldContinue: shouldContinue,
+      cancelled: _catalogCancelled.future,
+    );
     if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     final manifest = wire.decodeProtoJson(wire.BuildManifest(), response);
     if (manifest.buildId != build.id ||
@@ -956,6 +1260,11 @@ final class CatalogController extends ChangeNotifier {
     if (!_allowsBuild(build, sha256: manifest.bundle.sha256)) {
       throw const FormatException('构建与账户选择不匹配，请重新读取扩展管理。');
     }
+    await refreshNetworkPolicies(build.catalog, shouldContinue: shouldContinue);
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    if (!isNetworkRegistered(build, sha256: manifest.bundle.sha256)) {
+      throw const FormatException('扩展代码可准备，但此构建尚未登记漫画源网络权限。');
+    }
     final bootstrap = wire.PreferenceBootstrap(packageName: build.packageName);
     // Removed Sources retain their account values without being injected into
     // an extension that no longer constructs that namespace.
@@ -965,7 +1274,7 @@ final class CatalogController extends ChangeNotifier {
         for (final entry in confirmedPreferences.source(id).entries)
           entry.key: entry,
         for (final entry
-            in _sessionPreferenceValues[(build.packageName, id)] ??
+            in _sessionPreferenceValues[_preferenceScope(build, id)] ??
                 <wire.PreferenceEntry>[])
           entry.key: entry,
       };
@@ -983,6 +1292,7 @@ final class CatalogController extends ChangeNotifier {
     final loaded = await runtime.open(
       BuildDescriptor(
         buildId: build.id,
+        catalog: build.catalog,
         manifestUri: Uri.parse(build.manifestPath),
         sha256: manifest.bundle.sha256,
         identity: identity,
@@ -1004,7 +1314,12 @@ final class CatalogController extends ChangeNotifier {
     _activeBundleSha256 = manifest.bundle.sha256;
     session = loaded;
     loadedSourcePreferences = confirmedPreferences;
-    _preferenceRecoveries.removeWhere((key, _) => key.$1 == build.packageName);
+    _preferenceRecoveries.removeWhere(
+      (key, _) =>
+          key.$1 == build.catalogUrl &&
+          key.$2 == build.repoId &&
+          key.$3 == build.packageName,
+    );
     activeSource = null;
     mangas = const [];
     page = 0;
@@ -1065,6 +1380,35 @@ final class CatalogController extends ChangeNotifier {
         matching.length != 1 ||
         !_setSource(matching.single)) {
       throw const FormatException('当前扩展中找不到所选漫画源。');
+    }
+    status = ServiceStatus.ready;
+    return sourceReference;
+  });
+
+  Future<CatalogSourceRef?> openSelectedSource({
+    required String packageName,
+    required String sourceId,
+    required bool Function() shouldContinue,
+  }) => _perform<CatalogSourceRef?>('正在打开账户选择的漫画源', () async {
+    if (accessPaused || subject == null || !shouldContinue()) return null;
+    if (status == ServiceStatus.failed && _runtimeNeedsRebuild) {
+      await _rebuildForPreferences();
+      if (!shouldContinue()) return null;
+    }
+    final build = await resolveInstalledBuild(
+      packageName,
+      shouldContinue: shouldContinue,
+    );
+    if (!shouldContinue()) return null;
+    await _loadResolvedBuild(build, shouldContinue: shouldContinue);
+    if (!shouldContinue() ||
+        activeBuild?.catalog != build.catalog ||
+        activeBuild?.id != build.id) {
+      return null;
+    }
+    final sources = session?.sources.where((source) => source.id == sourceId);
+    if (sources == null || sources.length != 1 || !_setSource(sources.single)) {
+      throw const FormatException('当前账户扩展中找不到原漫画源。');
     }
     status = ServiceStatus.ready;
     return sourceReference;
@@ -1319,6 +1663,8 @@ final class CatalogController extends ChangeNotifier {
   }
 
   bool isCurrentPreferencesTarget(SourcePreferencesTarget target) =>
+      activeBuild?.id == target.build.id &&
+      activeBuild?.catalog == target.build.catalog &&
       activeBuild?.packageName == target.build.packageName &&
       activeSource?.id == target.source.id &&
       session != null;
@@ -1346,17 +1692,22 @@ final class CatalogController extends ChangeNotifier {
         sourcePreferences?.identity.key == identity &&
         shouldContinue?.call() != false;
     final reopened = await _perform<bool>('正在重新打开漫画源', () async {
+      final selectedBuild = await resolveInstalledBuild(
+        target.build.packageName,
+        requested: target.build,
+        shouldContinue: current,
+      );
+      if (!current()) return false;
       await _rebuildForPreferences();
       if (!current()) return false;
       // The explicit rebuild already retired the mutated generation.
       _preferenceRecoveries.removeWhere(
-        (key, _) => key.$1 == target.build.packageName,
+        (key, _) =>
+            key.$1 == target.build.catalogUrl &&
+            key.$2 == target.build.repoId &&
+            key.$3 == target.build.packageName,
       );
-      final selectedBuild = await resolveInstalledBuild(
-        target.build.packageName,
-      );
-      if (!current()) return false;
-      await _loadBuild(selectedBuild, shouldContinue: current);
+      await _loadResolvedBuild(selectedBuild, shouldContinue: current);
       if (!current()) return false;
       final matching = session?.sources.where(
         (source) => source.id == target.source.id,
@@ -1371,6 +1722,33 @@ final class CatalogController extends ChangeNotifier {
     if (reopened != true || !current()) return false;
     await loadMangas();
     return current() && isCurrentPreferencesTarget(target);
+  }
+
+  wire.PreferenceSnapshot _scopePreferenceSnapshot(
+    CatalogBuild build,
+    wire.PreferenceSnapshot original,
+  ) {
+    if (allowsAccountPreferences(build)) return original.deepCopy()..freeze();
+    final value = original.deepCopy();
+    void sessionOnly(Iterable<wire.PreferenceNode> nodes) {
+      for (final node in nodes) {
+        node.syncScope =
+            wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_CLIENT_SESSION;
+        if (node.hasGroup()) sessionOnly(node.group.nodes);
+      }
+    }
+
+    sessionOnly(value.nodes);
+    final entries = <String, wire.PreferenceEntry>{
+      for (final entry in value.syncValues) entry.key: entry,
+      for (final entry in value.sessionValues) entry.key: entry,
+    };
+    value.syncValues.clear();
+    value.sessionValues
+      ..clear()
+      ..addAll(canonicalPreferenceEntries(entries.values));
+    wire.validatePreferenceSnapshot(value);
+    return value..freeze();
   }
 
   Future<wire.PreferenceSnapshot?> describeSourcePreferences(
@@ -1396,7 +1774,7 @@ final class CatalogController extends ChangeNotifier {
         return throw const FormatException('设置页面已关闭');
       }
       if (!result.hasPreferences()) throw const FormatException('漫画源未返回设置');
-      return result.preferences.deepCopy()..freeze();
+      return _scopePreferenceSnapshot(target.build, result.preferences);
     });
   }
 
@@ -1413,7 +1791,7 @@ final class CatalogController extends ChangeNotifier {
       return null;
     }
     wire.validatePreferenceEditRequest(request);
-    _preferenceRecoveries[(target.build.packageName, target.source.id)] =
+    _preferenceRecoveries[_preferenceScope(target.build, target.source.id)] =
         target;
     return _perform<wire.PreferenceEditResult>('正在应用漫画源设置', () async {
       final result = await _invoke(
@@ -1431,7 +1809,9 @@ final class CatalogController extends ChangeNotifier {
       if (!result.hasPreferenceEdit()) {
         throw const FormatException('漫画源未确认设置操作');
       }
-      return result.preferenceEdit.deepCopy()..freeze();
+      final edited = result.preferenceEdit.deepCopy();
+      edited.snapshot = _scopePreferenceSnapshot(target.build, edited.snapshot);
+      return edited..freeze();
     });
   }
 
@@ -1454,7 +1834,7 @@ final class CatalogController extends ChangeNotifier {
     List<wire.PreferenceEntry> entries,
   ) {
     wire.validatePreferenceEntries(entries);
-    _sessionPreferenceValues[(target.build.packageName, target.source.id)] =
+    _sessionPreferenceValues[_preferenceScope(target.build, target.source.id)] =
         List.unmodifiable(entries.map((entry) => entry.deepCopy()..freeze()));
   }
 
@@ -1507,17 +1887,13 @@ final class CatalogController extends ChangeNotifier {
         identical(settings?.client, repository.client) &&
         shouldContinue?.call() != false;
     if (!current()) return false;
-    final available = builds.where(
-      (build) => build.packageName == selected.packageName,
-    );
-    if (available.isEmpty) {
-      error = '这个收藏源的扩展当前不可用，收藏仍保留。';
-      _notify();
-      return false;
-    }
-    final build = available.single;
     final opened = await _perform<bool>('正在打开收藏源', () async {
-      await _loadBuild(build, shouldContinue: current);
+      final build = await resolveInstalledBuild(
+        selected.packageName,
+        shouldContinue: current,
+      );
+      if (!current()) return false;
+      await _loadResolvedBuild(build, shouldContinue: current);
       if (!current() || activeBuild?.id != build.id) return false;
       final sources = session?.sources.where(
         (source) => source.id == selected.sourceId,
@@ -1558,16 +1934,11 @@ final class CatalogController extends ChangeNotifier {
         library?.identity.key == identityKey &&
         shouldContinue?.call() != false;
     if (!current()) return null;
-    final available = builds.where(
-      (build) => build.packageName == entry.packageName,
+    final build = await openSelectedBuild(
+      entry.packageName,
+      shouldContinue: current,
     );
-    if (available.isEmpty) {
-      error = '这部漫画的漫画源当前不可用；服务端收藏和进度仍保留。';
-      _notify();
-      return null;
-    }
-    final build = available.single;
-    await openBuild(build);
+    if (build == null) return null;
     if (!current() || activeBuild?.id != build.id) return null;
     final sources = session?.sources.where(
       (source) => source.id == entry.sourceId,
@@ -1745,6 +2116,7 @@ final class CatalogController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (!_catalogCancelled.isCompleted) _catalogCancelled.complete();
     _closed = true;
     final requestId = _filterRequestId;
     if (requestId != null) unawaited(cancelSourceFilterRequest(requestId));

@@ -7,6 +7,12 @@ package karuyomi.v1;
 
 message Empty {}
 
+// Public static delivery identity, separate from the application/API origin.
+message CatalogReference {
+  string catalog_url = 1;
+  string repo_id = 2;
+}
+
 enum RuntimeErrorCode {
   RUNTIME_ERROR_CODE_UNSPECIFIED = 0;
   RUNTIME_ERROR_CODE_CANCELLED = 1;
@@ -54,6 +60,7 @@ message RuntimeSession {
   string build_id = 4;
   repeated SourceInfo sources = 5;
   repeated string capabilities = 6;
+  CatalogReference catalog = 7;
 }
 
 message RpcEnvelope {
@@ -71,6 +78,7 @@ message OpenRequest {
   optional string expected_build_id = 4;
   optional string expected_bundle_sha256 = 5;
   PreferenceBootstrap preference_bootstrap = 6;
+  CatalogReference catalog = 7;
 }
 
 message Manga {
@@ -479,6 +487,7 @@ message ExtensionBuildDescriptor {
 message ExtensionIndex {
   uint32 schema_version = 1;
   repeated ExtensionBuildDescriptor builds = 2;
+  string repo_id = 3;
   // The current latest-only index is complete. There is no pagination cursor.
 }
 message Identity {
@@ -515,6 +524,7 @@ message ApiFetchResponse {
 message PrepareBuildRequest {
   string preparation_id = 1;
   ExtensionBuildDescriptor build = 2;
+  CatalogReference catalog = 3;
 }
 message CancelPreparationRequest {
   string preparation_id = 1;
@@ -523,6 +533,7 @@ message PreparedBuild {
   ExtensionBuildDescriptor build = 1;
   string bundle_sha256 = 2;
   uint32 byte_length = 3;
+  CatalogReference catalog = 4;
 }
 message CachedExtensionArtifact {
   string sha256 = 1;
@@ -585,6 +596,7 @@ message OpenWorker {
   BuildManifest manifest = 1;
   string user_agent = 2;
   PreferenceBootstrap preference_bootstrap = 3;
+  CatalogReference catalog = 4;
 }
 message AcquireImageWorker {
   AcquireImage request = 1;

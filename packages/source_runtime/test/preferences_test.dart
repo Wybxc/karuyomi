@@ -76,6 +76,7 @@ BuildDescriptor _build([wire.PreferenceBootstrap? bootstrap]) {
   final original = build();
   return BuildDescriptor(
     buildId: original.buildId,
+    catalog: original.catalog,
     manifestUri: original.manifestUri,
     sha256: original.sha256,
     identity: original.identity,

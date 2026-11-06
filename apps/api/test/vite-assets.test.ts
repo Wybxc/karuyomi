@@ -53,6 +53,7 @@ async function fixture() {
   const manifestPath = '/extensions/builds/current-build/manifest.json';
   const index = {
     schemaVersion: 1,
+    repoId: 'test',
     builds: [
       {
         buildId: 'current-build',

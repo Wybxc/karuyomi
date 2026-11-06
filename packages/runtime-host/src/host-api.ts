@@ -3,6 +3,8 @@ import {
   encodeControlResponse,
   runtimeErrorMessage,
   plain,
+  catalogReferenceSchema,
+  messageJson,
 } from '@karuyomi/contracts';
 import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
@@ -55,7 +57,18 @@ function createRuntimeApi(manager: SourceRuntimeManager) {
               case: 'session',
               value: create(
                 pb.RuntimeSessionSchema,
-                await manager.open(plain(request.command.value)),
+                await manager.open({
+                  ...plain(request.command.value),
+                  catalog: catalogReferenceSchema.parse(
+                    messageJson(
+                      pb.CatalogReferenceSchema,
+                      create(
+                        pb.CatalogReferenceSchema,
+                        request.command.value.catalog,
+                      ),
+                    ),
+                  ),
+                }),
               ),
             };
             break;

@@ -108,6 +108,20 @@ const Empty$json = {
 final $typed_data.Uint8List emptyDescriptor =
     $convert.base64Decode('CgVFbXB0eQ==');
 
+@$core.Deprecated('Use catalogReferenceDescriptor instead')
+const CatalogReference$json = {
+  '1': 'CatalogReference',
+  '2': [
+    {'1': 'catalog_url', '3': 1, '4': 1, '5': 9, '10': 'catalogUrl'},
+    {'1': 'repo_id', '3': 2, '4': 1, '5': 9, '10': 'repoId'},
+  ],
+};
+
+/// Descriptor for `CatalogReference`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List catalogReferenceDescriptor = $convert.base64Decode(
+    'ChBDYXRhbG9nUmVmZXJlbmNlEh8KC2NhdGFsb2dfdXJsGAEgASgJUgpjYXRhbG9nVXJsEhcKB3'
+    'JlcG9faWQYAiABKAlSBnJlcG9JZA==');
+
 @$core.Deprecated('Use runtimeErrorDescriptor instead')
 const RuntimeError$json = {
   '1': 'RuntimeError',
@@ -227,6 +241,14 @@ const RuntimeSession$json = {
       '10': 'sources'
     },
     {'1': 'capabilities', '3': 6, '4': 3, '5': 9, '10': 'capabilities'},
+    {
+      '1': 'catalog',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
   ],
 };
 
@@ -236,7 +258,8 @@ final $typed_data.Uint8List runtimeSessionDescriptor = $convert.base64Decode(
     'Npb24SLAoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJUhB3b3JrZXJJbnN0YW5jZUlkEh4KCmdl'
     'bmVyYXRpb24YAyABKAlSCmdlbmVyYXRpb24SGQoIYnVpbGRfaWQYBCABKAlSB2J1aWxkSWQSMQ'
     'oHc291cmNlcxgFIAMoCzIXLmthcnV5b21pLnYxLlNvdXJjZUluZm9SB3NvdXJjZXMSIgoMY2Fw'
-    'YWJpbGl0aWVzGAYgAygJUgxjYXBhYmlsaXRpZXM=');
+    'YWJpbGl0aWVzGAYgAygJUgxjYXBhYmlsaXRpZXMSNwoHY2F0YWxvZxgHIAEoCzIdLmthcnV5b2'
+    '1pLnYxLkNhdGFsb2dSZWZlcmVuY2VSB2NhdGFsb2c=');
 
 @$core.Deprecated('Use rpcEnvelopeDescriptor instead')
 const RpcEnvelope$json = {
@@ -304,6 +327,14 @@ const OpenRequest$json = {
       '6': '.karuyomi.v1.PreferenceBootstrap',
       '10': 'preferenceBootstrap'
     },
+    {
+      '1': 'catalog',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
   ],
   '8': [
     {'1': '_user_agent'},
@@ -319,8 +350,9 @@ final $typed_data.Uint8List openRequestDescriptor = $convert.base64Decode(
     'iAEBEi8KEWV4cGVjdGVkX2J1aWxkX2lkGAQgASgJSAFSD2V4cGVjdGVkQnVpbGRJZIgBARI5Ch'
     'ZleHBlY3RlZF9idW5kbGVfc2hhMjU2GAUgASgJSAJSFGV4cGVjdGVkQnVuZGxlU2hhMjU2iAEB'
     'ElMKFHByZWZlcmVuY2VfYm9vdHN0cmFwGAYgASgLMiAua2FydXlvbWkudjEuUHJlZmVyZW5jZU'
-    'Jvb3RzdHJhcFITcHJlZmVyZW5jZUJvb3RzdHJhcEINCgtfdXNlcl9hZ2VudEIUChJfZXhwZWN0'
-    'ZWRfYnVpbGRfaWRCGQoXX2V4cGVjdGVkX2J1bmRsZV9zaGEyNTY=');
+    'Jvb3RzdHJhcFITcHJlZmVyZW5jZUJvb3RzdHJhcBI3CgdjYXRhbG9nGAcgASgLMh0ua2FydXlv'
+    'bWkudjEuQ2F0YWxvZ1JlZmVyZW5jZVIHY2F0YWxvZ0INCgtfdXNlcl9hZ2VudEIUChJfZXhwZW'
+    'N0ZWRfYnVpbGRfaWRCGQoXX2V4cGVjdGVkX2J1bmRsZV9zaGEyNTY=');
 
 @$core.Deprecated('Use mangaDescriptor instead')
 const Manga$json = {
@@ -2102,6 +2134,7 @@ const ExtensionIndex$json = {
       '6': '.karuyomi.v1.ExtensionBuildDescriptor',
       '10': 'builds'
     },
+    {'1': 'repo_id', '3': 3, '4': 1, '5': 9, '10': 'repoId'},
   ],
 };
 
@@ -2109,7 +2142,7 @@ const ExtensionIndex$json = {
 final $typed_data.Uint8List extensionIndexDescriptor = $convert.base64Decode(
     'Cg5FeHRlbnNpb25JbmRleBIlCg5zY2hlbWFfdmVyc2lvbhgBIAEoDVINc2NoZW1hVmVyc2lvbh'
     'I9CgZidWlsZHMYAiADKAsyJS5rYXJ1eW9taS52MS5FeHRlbnNpb25CdWlsZERlc2NyaXB0b3JS'
-    'BmJ1aWxkcw==');
+    'BmJ1aWxkcxIXCgdyZXBvX2lkGAMgASgJUgZyZXBvSWQ=');
 
 @$core.Deprecated('Use identityDescriptor instead')
 const Identity$json = {
@@ -2248,6 +2281,14 @@ const PrepareBuildRequest$json = {
       '6': '.karuyomi.v1.ExtensionBuildDescriptor',
       '10': 'build'
     },
+    {
+      '1': 'catalog',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
   ],
 };
 
@@ -2255,7 +2296,8 @@ const PrepareBuildRequest$json = {
 final $typed_data.Uint8List prepareBuildRequestDescriptor = $convert.base64Decode(
     'ChNQcmVwYXJlQnVpbGRSZXF1ZXN0EiUKDnByZXBhcmF0aW9uX2lkGAEgASgJUg1wcmVwYXJhdG'
     'lvbklkEjsKBWJ1aWxkGAIgASgLMiUua2FydXlvbWkudjEuRXh0ZW5zaW9uQnVpbGREZXNjcmlw'
-    'dG9yUgVidWlsZA==');
+    'dG9yUgVidWlsZBI3CgdjYXRhbG9nGAMgASgLMh0ua2FydXlvbWkudjEuQ2F0YWxvZ1JlZmVyZW'
+    '5jZVIHY2F0YWxvZw==');
 
 @$core.Deprecated('Use cancelPreparationRequestDescriptor instead')
 const CancelPreparationRequest$json = {
@@ -2285,6 +2327,14 @@ const PreparedBuild$json = {
     },
     {'1': 'bundle_sha256', '3': 2, '4': 1, '5': 9, '10': 'bundleSha256'},
     {'1': 'byte_length', '3': 3, '4': 1, '5': 13, '10': 'byteLength'},
+    {
+      '1': 'catalog',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
   ],
 };
 
@@ -2292,7 +2342,8 @@ const PreparedBuild$json = {
 final $typed_data.Uint8List preparedBuildDescriptor = $convert.base64Decode(
     'Cg1QcmVwYXJlZEJ1aWxkEjsKBWJ1aWxkGAEgASgLMiUua2FydXlvbWkudjEuRXh0ZW5zaW9uQn'
     'VpbGREZXNjcmlwdG9yUgVidWlsZBIjCg1idW5kbGVfc2hhMjU2GAIgASgJUgxidW5kbGVTaGEy'
-    'NTYSHwoLYnl0ZV9sZW5ndGgYAyABKA1SCmJ5dGVMZW5ndGg=');
+    'NTYSHwoLYnl0ZV9sZW5ndGgYAyABKA1SCmJ5dGVMZW5ndGgSNwoHY2F0YWxvZxgEIAEoCzIdLm'
+    'thcnV5b21pLnYxLkNhdGFsb2dSZWZlcmVuY2VSB2NhdGFsb2c=');
 
 @$core.Deprecated('Use cachedExtensionArtifactDescriptor instead')
 const CachedExtensionArtifact$json = {
@@ -2688,6 +2739,14 @@ const OpenWorker$json = {
       '6': '.karuyomi.v1.PreferenceBootstrap',
       '10': 'preferenceBootstrap'
     },
+    {
+      '1': 'catalog',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
   ],
 };
 
@@ -2696,7 +2755,8 @@ final $typed_data.Uint8List openWorkerDescriptor = $convert.base64Decode(
     'CgpPcGVuV29ya2VyEjYKCG1hbmlmZXN0GAEgASgLMhoua2FydXlvbWkudjEuQnVpbGRNYW5pZm'
     'VzdFIIbWFuaWZlc3QSHQoKdXNlcl9hZ2VudBgCIAEoCVIJdXNlckFnZW50ElMKFHByZWZlcmVu'
     'Y2VfYm9vdHN0cmFwGAMgASgLMiAua2FydXlvbWkudjEuUHJlZmVyZW5jZUJvb3RzdHJhcFITcH'
-    'JlZmVyZW5jZUJvb3RzdHJhcA==');
+    'JlZmVyZW5jZUJvb3RzdHJhcBI3CgdjYXRhbG9nGAQgASgLMh0ua2FydXlvbWkudjEuQ2F0YWxv'
+    'Z1JlZmVyZW5jZVIHY2F0YWxvZw==');
 
 @$core.Deprecated('Use acquireImageWorkerDescriptor instead')
 const AcquireImageWorker$json = {

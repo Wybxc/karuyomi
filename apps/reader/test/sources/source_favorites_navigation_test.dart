@@ -295,6 +295,7 @@ void main() {
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(
           schemaVersion: 1,
+          repoId: 'keiyoushi',
           builds: [
             wire.ExtensionBuildDescriptor(
               buildId: 'build-2',
@@ -325,7 +326,7 @@ void main() {
       expect(catalog.mangas.single.title, testManga.title);
       expect(platform.invocations.single.hasPopular(), true);
       platform.inventory = wire.encodeProtoJson(
-        wire.ExtensionIndex(schemaVersion: 1),
+        wire.ExtensionIndex(schemaVersion: 1, repoId: 'keiyoushi'),
       );
       await catalog.connect();
       await tester.pumpAndSettle();

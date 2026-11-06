@@ -46,6 +46,36 @@ export type Bootstrap = Omit<
   identity: Required<PlainMessage<pb.Identity>>;
 };
 
+export type CatalogReference = Required<PlainMessage<pb.CatalogReference>>;
+
+export function validateExtensionCatalogUrl(value: string): void {
+  requireCondition(
+    value.length > 0 && value.length <= 2048,
+    'Invalid catalog URL length',
+  );
+  const url = new URL(value);
+  requireCondition(
+    value === `${url.origin}/extensions/index.json` &&
+      (url.protocol === 'https:' ||
+        (url.protocol === 'http:' &&
+          ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))),
+    'Extension catalog must use a canonical HTTPS URL or local development origin',
+  );
+}
+export function validateCatalogReference(value: {
+  catalogUrl: string;
+  repoId: string;
+}): void {
+  validateExtensionCatalogUrl(value.catalogUrl);
+  buildIdSchema.parse(value.repoId);
+}
+export const catalogReferenceSchema = codec<CatalogReference>((input) => {
+  const value = plainMessage(pb.CatalogReferenceSchema, input);
+  requireFields(value, ['catalogUrl', 'repoId']);
+  validateCatalogReference(value);
+  return value;
+});
+
 export const buildIdSchema = z.string().regex(/^[a-zA-Z0-9._-]{1,200}$/);
 export const staticManifestPathSchema = z
   .string()
@@ -192,7 +222,7 @@ export const buildManifestSchema = codec<BuildManifest>((input) => {
   );
   buildIdSchema.parse(value.buildId);
   boundedText(value.packageName, 200);
-  boundedText(value.repoId, 200);
+  buildIdSchema.parse(value.repoId);
   boundedText(value.version, 100);
   boundedText(value.storageSchema, 100);
   validSources(value.sourceIds);
@@ -231,7 +261,7 @@ export const extensionBuildDescriptorSchema = codec<ExtensionBuildDescriptor>(
     ]);
     buildIdSchema.parse(value.buildId);
     boundedText(value.packageName, 200);
-    boundedText(value.repoId, 200);
+    buildIdSchema.parse(value.repoId);
     boundedText(value.version, 100);
     validSources(value.sourceIds);
     requireCondition(
@@ -248,7 +278,8 @@ export const extensionBuildDescriptorSchema = codec<ExtensionBuildDescriptor>(
 
 export const extensionIndexSchema = codec<ExtensionIndex>((input) => {
   const value = plainMessage(pb.ExtensionIndexSchema, input);
-  requireFields(value, ['schemaVersion', 'builds']);
+  requireFields(value, ['schemaVersion', 'builds', 'repoId']);
+  buildIdSchema.parse(value.repoId);
   requireCondition(
     value.schemaVersion === 1 && value.builds.length <= 5000,
     'Invalid extension index',
@@ -259,7 +290,9 @@ export const extensionIndexSchema = codec<ExtensionIndex>((input) => {
     ),
   );
   requireCondition(
-    new Set(builds.map((build) => build.packageName)).size === builds.length &&
+    builds.every((build) => build.repoId === value.repoId) &&
+      new Set(builds.map((build) => build.packageName)).size ===
+        builds.length &&
       new Set(builds.map((build) => build.buildId)).size === builds.length,
     'The static index must contain one current build per package',
   );

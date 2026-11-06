@@ -71,9 +71,18 @@ afterAll(() => network.disable());
 
 async function registerBuild(id: string, status: string, policy: string) {
   await env.DB.prepare(
-    'INSERT INTO extension_builds (build_id,package_name,bundle_sha256,status,created_at,allowed_hosts_json) VALUES (?,?,?,?,?,?)',
+    'INSERT INTO extension_builds (build_id,package_name,bundle_sha256,status,created_at,allowed_hosts_json,catalog_url,repo_id) VALUES (?,?,?,?,?,?,?,?)',
   )
-    .bind(id, id, 'a'.repeat(64), status, 0, policy)
+    .bind(
+      id,
+      id,
+      'a'.repeat(64),
+      status,
+      0,
+      policy,
+      appOrigin + '/extensions/index.json',
+      'keiyoushi',
+    )
     .run();
 }
 
@@ -135,6 +144,9 @@ function dispatch(
       'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
       Accept: HTTP_BRIDGE_MEDIA_TYPE,
       'X-Runtime-Build': buildId,
+      'X-Runtime-Catalog': appOrigin + '/extensions/index.json',
+      'X-Runtime-Repo': 'keiyoushi',
+      'X-Runtime-Bundle': 'a'.repeat(64),
       'X-App-Request': '1',
       Origin: appOrigin,
       'Cf-Access-Jwt-Assertion': signed,
@@ -469,6 +481,16 @@ test('auth, origin, protocol and D1 build policy failures never fetch upstream',
       status: 404,
       error: 'build_not_found',
     },
+    ...[
+      {
+        'X-Runtime-Catalog': 'https://other.example.org/extensions/index.json',
+      },
+      { 'X-Runtime-Repo': 'other' },
+      { 'X-Runtime-Bundle': 'b'.repeat(64) },
+      { 'X-Runtime-Catalog': '' },
+      { 'X-Runtime-Repo': '' },
+      { 'X-Runtime-Bundle': '' },
+    ].map((headers) => ({ headers, status: 404, error: 'build_not_found' })),
     {
       headers: { 'Content-Type': 'application/json' },
       status: 415,

@@ -1403,6 +1403,69 @@ final $typed_data.Uint8List installedExtensionDescriptor = $convert.base64Decode
     'bWUSGQoIYnVpbGRfaWQYBCABKAlSB2J1aWxkSWQSIwoNYnVuZGxlX3NoYTI1NhgFIAEoCVIMYn'
     'VuZGxlU2hhMjU2EhgKB2VuYWJsZWQYBiABKAhSB2VuYWJsZWQ=');
 
+@$core.Deprecated('Use extensionRepositoryDescriptor instead')
+const ExtensionRepository$json = {
+  '1': 'ExtensionRepository',
+  '2': [
+    {'1': 'catalog_url', '3': 1, '4': 1, '5': 9, '10': 'catalogUrl'},
+    {'1': 'repo_id', '3': 2, '4': 1, '5': 9, '10': 'repoId'},
+    {'1': 'name', '3': 3, '4': 1, '5': 9, '10': 'name'},
+  ],
+};
+
+/// Descriptor for `ExtensionRepository`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List extensionRepositoryDescriptor = $convert.base64Decode(
+    'ChNFeHRlbnNpb25SZXBvc2l0b3J5Eh8KC2NhdGFsb2dfdXJsGAEgASgJUgpjYXRhbG9nVXJsEh'
+    'cKB3JlcG9faWQYAiABKAlSBnJlcG9JZBISCgRuYW1lGAMgASgJUgRuYW1l');
+
+@$core.Deprecated('Use extensionNetworkPolicyDescriptor instead')
+const ExtensionNetworkPolicy$json = {
+  '1': 'ExtensionNetworkPolicy',
+  '2': [
+    {'1': 'build_id', '3': 1, '4': 1, '5': 9, '10': 'buildId'},
+    {'1': 'package_name', '3': 2, '4': 1, '5': 9, '10': 'packageName'},
+    {'1': 'bundle_sha256', '3': 3, '4': 1, '5': 9, '10': 'bundleSha256'},
+  ],
+};
+
+/// Descriptor for `ExtensionNetworkPolicy`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List extensionNetworkPolicyDescriptor = $convert.base64Decode(
+    'ChZFeHRlbnNpb25OZXR3b3JrUG9saWN5EhkKCGJ1aWxkX2lkGAEgASgJUgdidWlsZElkEiEKDH'
+    'BhY2thZ2VfbmFtZRgCIAEoCVILcGFja2FnZU5hbWUSIwoNYnVuZGxlX3NoYTI1NhgDIAEoCVIM'
+    'YnVuZGxlU2hhMjU2');
+
+@$core.Deprecated('Use extensionNetworkPoliciesResponseDescriptor instead')
+const ExtensionNetworkPoliciesResponse$json = {
+  '1': 'ExtensionNetworkPoliciesResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {
+      '1': 'catalog',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
+    {
+      '1': 'builds',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.ExtensionNetworkPolicy',
+      '10': 'builds'
+    },
+  ],
+};
+
+/// Descriptor for `ExtensionNetworkPoliciesResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List extensionNetworkPoliciesResponseDescriptor =
+    $convert.base64Decode(
+        'CiBFeHRlbnNpb25OZXR3b3JrUG9saWNpZXNSZXNwb25zZRIlCg5zY2hlbWFfdmVyc2lvbhgBIA'
+        'EoDVINc2NoZW1hVmVyc2lvbhI3CgdjYXRhbG9nGAIgASgLMh0ua2FydXlvbWkudjEuQ2F0YWxv'
+        'Z1JlZmVyZW5jZVIHY2F0YWxvZxI7CgZidWlsZHMYAyADKAsyIy5rYXJ1eW9taS52MS5FeHRlbn'
+        'Npb25OZXR3b3JrUG9saWN5UgZidWlsZHM=');
+
 @$core.Deprecated('Use globalSettingsValuesDescriptor instead')
 const GlobalSettingsValues$json = {
   '1': 'GlobalSettingsValues',
@@ -1439,6 +1502,14 @@ const GlobalSettingsValues$json = {
       '6': '.karuyomi.v1.InstalledExtension',
       '10': 'installedExtensions'
     },
+    {
+      '1': 'repositories',
+      '3': 5,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.ExtensionRepository',
+      '10': 'repositories'
+    },
   ],
 };
 
@@ -1448,7 +1519,9 @@ final $typed_data.Uint8List globalSettingsValuesDescriptor = $convert.base64Deco
     'RoZW1lUgV0aGVtZRIzCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5n'
     'c1IGcmVhZGVyEkYKEGZhdm9yaXRlX3NvdXJjZXMYAyADKAsyGy5rYXJ1eW9taS52MS5GYXZvcm'
     'l0ZVNvdXJjZVIPZmF2b3JpdGVTb3VyY2VzElIKFGluc3RhbGxlZF9leHRlbnNpb25zGAQgAygL'
-    'Mh8ua2FydXlvbWkudjEuSW5zdGFsbGVkRXh0ZW5zaW9uUhNpbnN0YWxsZWRFeHRlbnNpb25z');
+    'Mh8ua2FydXlvbWkudjEuSW5zdGFsbGVkRXh0ZW5zaW9uUhNpbnN0YWxsZWRFeHRlbnNpb25zEk'
+    'QKDHJlcG9zaXRvcmllcxgFIAMoCzIgLmthcnV5b21pLnYxLkV4dGVuc2lvblJlcG9zaXRvcnlS'
+    'DHJlcG9zaXRvcmllcw==');
 
 @$core.Deprecated('Use globalSettingsDescriptor instead')
 const GlobalSettings$json = {
@@ -1713,6 +1786,22 @@ const SourcePreferencesResponse$json = {
       '6': '.karuyomi.v1.BusinessStateError',
       '10': 'error'
     },
+    {
+      '1': 'catalog',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
+    {
+      '1': 'sync_rules',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceSyncRule',
+      '10': 'syncRules'
+    },
   ],
 };
 
@@ -1722,7 +1811,9 @@ final $typed_data.Uint8List sourcePreferencesResponseDescriptor = $convert.base6
     'hlbWFWZXJzaW9uEikKEGFjY291bnRfcmV2aXNpb24YAiABKA1SD2FjY291bnRSZXZpc2lvbhIh'
     'CgxwYWNrYWdlX25hbWUYAyABKAlSC3BhY2thZ2VOYW1lEjgKB3NvdXJjZXMYBCADKAsyHi5rYX'
     'J1eW9taS52MS5Tb3VyY2VQcmVmZXJlbmNlc1IHc291cmNlcxI1CgVlcnJvchgFIAEoCzIfLmth'
-    'cnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvclIFZXJyb3I=');
+    'cnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvclIFZXJyb3ISNwoHY2F0YWxvZxgGIAEoCzIdLm'
+    'thcnV5b21pLnYxLkNhdGFsb2dSZWZlcmVuY2VSB2NhdGFsb2cSPgoKc3luY19ydWxlcxgHIAMo'
+    'CzIfLmthcnV5b21pLnYxLlByZWZlcmVuY2VTeW5jUnVsZVIJc3luY1J1bGVz');
 
 @$core.Deprecated('Use sourcePreferencesMutationDescriptor instead')
 const SourcePreferencesMutation$json = {
@@ -1747,6 +1838,14 @@ const SourcePreferencesMutation$json = {
       '6': '.karuyomi.v1.PreferenceEntry',
       '10': 'entries'
     },
+    {
+      '1': 'catalog',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
   ],
 };
 
@@ -1756,7 +1855,8 @@ final $typed_data.Uint8List sourcePreferencesMutationDescriptor = $convert.base6
     'hlbWFWZXJzaW9uEh8KC211dGF0aW9uX2lkGAIgASgJUgptdXRhdGlvbklkEiEKDHBhY2thZ2Vf'
     'bmFtZRgDIAEoCVILcGFja2FnZU5hbWUSGwoJc291cmNlX2lkGAQgASgJUghzb3VyY2VJZBIrCh'
     'FleHBlY3RlZF9yZXZpc2lvbhgFIAEoDVIQZXhwZWN0ZWRSZXZpc2lvbhI2CgdlbnRyaWVzGAYg'
-    'AygLMhwua2FydXlvbWkudjEuUHJlZmVyZW5jZUVudHJ5UgdlbnRyaWVz');
+    'AygLMhwua2FydXlvbWkudjEuUHJlZmVyZW5jZUVudHJ5UgdlbnRyaWVzEjcKB2NhdGFsb2cYBy'
+    'ABKAsyHS5rYXJ1eW9taS52MS5DYXRhbG9nUmVmZXJlbmNlUgdjYXRhbG9n');
 
 @$core.Deprecated('Use sourcePreferencesMutationResponseDescriptor instead')
 const SourcePreferencesMutationResponse$json = {
@@ -1781,6 +1881,22 @@ const SourcePreferencesMutationResponse$json = {
       '6': '.karuyomi.v1.BusinessStateError',
       '10': 'error'
     },
+    {
+      '1': 'catalog',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CatalogReference',
+      '10': 'catalog'
+    },
+    {
+      '1': 'sync_rules',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceSyncRule',
+      '10': 'syncRules'
+    },
   ],
 };
 
@@ -1790,4 +1906,7 @@ final $typed_data.Uint8List sourcePreferencesMutationResponseDescriptor = $conve
     'ABKA1SDXNjaGVtYVZlcnNpb24SHwoLbXV0YXRpb25faWQYAiABKAlSCm11dGF0aW9uSWQSKQoQ'
     'YWNjb3VudF9yZXZpc2lvbhgDIAEoDVIPYWNjb3VudFJldmlzaW9uEkAKC3ByZWZlcmVuY2VzGA'
     'QgASgLMh4ua2FydXlvbWkudjEuU291cmNlUHJlZmVyZW5jZXNSC3ByZWZlcmVuY2VzEjUKBWVy'
-    'cm9yGAUgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yUgVlcnJvcg==');
+    'cm9yGAUgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yUgVlcnJvchI3CgdjYX'
+    'RhbG9nGAYgASgLMh0ua2FydXlvbWkudjEuQ2F0YWxvZ1JlZmVyZW5jZVIHY2F0YWxvZxI+Cgpz'
+    'eW5jX3J1bGVzGAcgAygLMh8ua2FydXlvbWkudjEuUHJlZmVyZW5jZVN5bmNSdWxlUglzeW5jUn'
+    'VsZXM=');

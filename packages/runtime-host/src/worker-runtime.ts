@@ -7,6 +7,7 @@ import {
   runtimeErrorMessage,
   sourceResultFor,
   requireCondition,
+  catalogReferenceSchema,
   type BuildManifest,
   type WorkerCommand,
 } from '@karuyomi/contracts';
@@ -81,12 +82,23 @@ export class WorkerRuntime {
           const manifest = buildManifestSchema.parse(
             messageJson(pb.BuildManifestSchema, opening.manifest),
           );
+          const catalog = catalogReferenceSchema.parse(
+            messageJson(
+              pb.CatalogReferenceSchema,
+              create(pb.CatalogReferenceSchema, opening.catalog),
+            ),
+          );
+          requireCondition(
+            manifest.repoId === catalog.repoId,
+            'Worker catalog mismatch',
+          );
           this.generation = envelope.generation;
           this.manifest = manifest;
           const sources = await this.driver.open(
             manifest,
             opening.userAgent,
             this.controller.signal,
+            catalog,
             { requestId: envelope.requestId, generation: envelope.generation },
             opening.preferenceBootstrap,
           );
@@ -97,6 +109,7 @@ export class WorkerRuntime {
               workerInstanceId: this.workerInstanceId,
               generation: envelope.generation,
               buildId: envelope.buildId,
+              catalog,
               sources,
               capabilities: [
                 'source-rpc',

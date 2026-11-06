@@ -12,8 +12,14 @@ import '../settings/settings_controller.dart';
 /// Account intent reuses the identity-bound global settings queue. Artifacts
 /// remain disposable local copies; preparation never opens a Source.
 final class ExtensionsController extends ChangeNotifier {
-  ExtensionsController({required this.catalog, required this.isCurrent})
-    : repository = catalog.settings! {
+  ExtensionsController({
+    required this.catalog,
+    required this.repository,
+    required this.isCurrent,
+  }) {
+    if (!identical(catalog.settings, repository) || catalog.accessPaused) {
+      _retire();
+    }
     settings = SettingsController(
       repository: repository,
       isCurrent: () => available,
@@ -22,6 +28,7 @@ final class ExtensionsController extends ChangeNotifier {
     catalog.addListener(_changed);
   }
 
+  final _cancelled = Completer<void>();
   final CatalogController catalog;
   final SettingsRepository repository;
   final bool Function() isCurrent;
@@ -32,31 +39,46 @@ final class ExtensionsController extends ChangeNotifier {
   String? _preparationId;
   bool _busy = false;
   bool _disposed = false;
+  bool _retired = false;
 
   bool get available =>
       !_disposed &&
+      !_retired &&
       isCurrent() &&
       identical(catalog.settings, repository) &&
-      catalog.status == ServiceStatus.ready;
+      {ServiceStatus.ready, ServiceStatus.failed}.contains(catalog.status);
   bool get busy => _busy || settings.busy;
   bool get canEdit => available && !busy && !catalog.busy && settings.canEdit;
   bool get preparing => _preparationId != null;
   List<wire.InstalledExtension> get installed =>
       settings.snapshot?.global.installedExtensions ?? const [];
 
+  void _retire() {
+    _retired = true;
+    if (!_cancelled.isCompleted) _cancelled.complete();
+  }
+
   void _changed() {
+    if (!identical(catalog.settings, repository) || catalog.accessPaused) {
+      _retire();
+    }
     if (!_disposed) notifyListeners();
   }
 
   Future<void> refresh({bool catalogToo = false}) async {
     if (!available || busy) return;
     await _run(() async {
-      if (catalogToo) await catalog.refreshCatalog();
-      if (!available) return;
       final refreshed = await settings.refresh();
       if (!available) return;
       if (refreshed) {
         await catalog.applyConfirmedInstallations(settings.snapshot!);
+      }
+      if (!available) return;
+      if (catalogToo || catalog.repositories.length > 1) {
+        await catalog.refreshCatalog(
+          shouldContinue: () => available,
+          cancelled: _cancelled.future,
+        );
       }
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
@@ -64,7 +86,10 @@ final class ExtensionsController extends ChangeNotifier {
     });
   }
 
-  Future<void> install(CatalogBuild build) async {
+  Future<void> install(
+    CatalogBuild build, {
+    wire.InstalledExtension? replacing,
+  }) async {
     final initial = settings.snapshot;
     if (!canEdit || initial == null) return;
     final values = initial.global.deepCopy();
@@ -74,6 +99,32 @@ final class ExtensionsController extends ChangeNotifier {
     if (previous == null &&
         values.installedExtensions.length >= businessInstalledExtensionLimit) {
       error = '最多安装 $businessInstalledExtensionLimit 个扩展，请先卸载不再使用的扩展。';
+      _changed();
+      return;
+    }
+    if (!catalog.isRepositoryRegistered(build.catalog)) {
+      error = '仓库尚未确认添加，不能安装。';
+      _changed();
+      return;
+    }
+    final crossRepository =
+        previous != null &&
+        (previous.catalogUrl != build.catalogUrl ||
+            previous.repoId != build.repoId);
+    if (crossRepository && replacing != previous) {
+      error = '同包扩展来自另一个仓库，请明确确认替换；账户选择已变化时需重新确认。';
+      _changed();
+      return;
+    }
+    if (previous != null &&
+        catalog.sourcePreferences!.hasPendingPackage(
+          build.packageName,
+          catalog: wire.CatalogReference(
+            catalogUrl: previous.catalogUrl,
+            repoId: previous.repoId,
+          ),
+        )) {
+      error = '原仓库仍有未确认的漫画源设置，请先处理原请求。';
       _changed();
       return;
     }
@@ -87,6 +138,7 @@ final class ExtensionsController extends ChangeNotifier {
       try {
         prepared = await catalog.runtime.prepareBuild(
           preparationId: id,
+          catalog: build.catalog,
           build: build.toProto(),
         );
       } catch (_) {
@@ -103,7 +155,7 @@ final class ExtensionsController extends ChangeNotifier {
       );
       values.installedExtensions.add(
         wire.InstalledExtension(
-          catalogUrl: catalog.catalogUrl,
+          catalogUrl: build.catalogUrl,
           repoId: build.repoId,
           packageName: build.packageName,
           buildId: prepared.build.buildId,
@@ -117,12 +169,106 @@ final class ExtensionsController extends ChangeNotifier {
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
       if (saved) {
-        message = '账户扩展选择已确认，本机产物已准备。';
+        message =
+            catalog.isNetworkRegistered(build, sha256: prepared.bundleSha256)
+            ? '账户扩展选择已确认，本机产物已准备；打开时将重新校验网络登记。'
+            : '账户扩展选择已确认，代码已准备；网络待登记，暂不能打开漫画源。';
         if (previous != null &&
             previous.bundleSha256 != prepared.bundleSha256) {
           await _cleanup(previous.bundleSha256);
         }
       }
+    });
+  }
+
+  Future<RepositoryPreview?> previewRepository(String url, String name) async {
+    if (!canEdit || settings.snapshot == null) return null;
+    RepositoryPreview? result;
+    final baseline = settings.snapshot!;
+    await _run(() async {
+      final uri = Uri.parse(url.trim());
+      if (uri.userInfo.isNotEmpty) {
+        throw const FormatException('仓库地址不能包含用户名或密码。');
+      }
+      final canonical =
+          (uri.path.isEmpty || uri.path == '/') &&
+              !uri.hasQuery &&
+              !uri.hasFragment
+          ? '${uri.origin}/extensions/index.json'
+          : url.trim();
+      validateBusinessCatalogUrl(canonical);
+      final document = await catalog.previewRepository(
+        canonical,
+        shouldContinue: () => available,
+        cancelled: _cancelled.future,
+      );
+      if (!available) return;
+      final repository = wire.ExtensionRepository(
+        catalogUrl: document.catalog.catalogUrl,
+        repoId: document.catalog.repoId,
+        name: name.trim().isEmpty ? uri.host : name.trim(),
+      );
+      _validateNewRepository(repository, baseline.global.repositories);
+      result = RepositoryPreview(
+        repository: repository..freeze(),
+        builds: document.builds,
+        baseline: baseline,
+      );
+    });
+    return result;
+  }
+
+  void _validateNewRepository(
+    wire.ExtensionRepository repository,
+    Iterable<wire.ExtensionRepository> existing,
+  ) {
+    if (repository.catalogUrl == catalog.catalogUrl ||
+        repository.repoId == catalog.defaultCatalog.repoId) {
+      throw const FormatException('默认仓库地址和身份保留，不能添加重复仓库。');
+    }
+    validateBusinessRepositories([...existing, repository]);
+  }
+
+  Future<void> addRepository(RepositoryPreview preview) async {
+    if (!canEdit) return;
+    final values = preview.baseline.global.deepCopy();
+    await _run(() async {
+      _validateNewRepository(preview.repository, values.repositories);
+      values.repositories.add(preview.repository.deepCopy());
+      final saved = await settings.saveGlobal(
+        values,
+        preview.baseline.globalRevision,
+      );
+      if (!saved || !available) return;
+      await catalog.applyConfirmedInstallations(settings.snapshot!);
+      if (!available) return;
+      await catalog.refreshCatalog(
+        shouldContinue: () => available,
+        cancelled: _cancelled.future,
+      );
+      if (available) message = '仓库已由账户确认，安装选择未改变。';
+    });
+  }
+
+  Future<void> removeRepository(wire.ExtensionRepository repository) async {
+    final initial = settings.snapshot;
+    if (!canEdit ||
+        initial == null ||
+        repository.catalogUrl == catalog.catalogUrl ||
+        repository.repoId == catalog.defaultCatalog.repoId) {
+      return;
+    }
+    final values = initial.global.deepCopy();
+    values.repositories.removeWhere(
+      (value) =>
+          value.catalogUrl == repository.catalogUrl &&
+          value.repoId == repository.repoId,
+    );
+    await _run(() async {
+      final saved = await settings.saveGlobal(values, initial.globalRevision);
+      if (!saved || !available) return;
+      message = '仓库已移除；安装选择、书架和来源数据保留，对应运行槽将关闭。';
+      await catalog.applyConfirmedInstallations(settings.snapshot!);
     });
   }
 
@@ -176,10 +322,11 @@ final class ExtensionsController extends ChangeNotifier {
           (build) =>
               build.id == extension.buildId &&
               build.packageName == extension.packageName &&
-              build.repoId == extension.repoId,
+              build.repoId == extension.repoId &&
+              build.catalogUrl == extension.catalogUrl,
         )
         .firstOrNull;
-    if (extension.catalogUrl != catalog.catalogUrl || build == null) {
+    if (build == null || !catalog.isRepositoryRegistered(build.catalog)) {
       error = '所选构建已下架或仓库尚未接入，请检查并手动更新。';
       _changed();
       return;
@@ -192,6 +339,7 @@ final class ExtensionsController extends ChangeNotifier {
       try {
         prepared = await catalog.runtime.prepareBuild(
           preparationId: id,
+          catalog: build.catalog,
           build: build.toProto(),
         );
       } catch (_) {
@@ -290,6 +438,7 @@ final class ExtensionsController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (!_cancelled.isCompleted) _cancelled.complete();
     final id = _preparationId;
     _preparationId = null;
     _disposed = true;
@@ -303,4 +452,15 @@ final class ExtensionsController extends ChangeNotifier {
     catalog.removeListener(_changed);
     super.dispose();
   }
+}
+
+final class RepositoryPreview {
+  const RepositoryPreview({
+    required this.repository,
+    required this.builds,
+    required this.baseline,
+  });
+  final wire.ExtensionRepository repository;
+  final List<CatalogBuild> builds;
+  final SettingsSnapshot baseline;
 }

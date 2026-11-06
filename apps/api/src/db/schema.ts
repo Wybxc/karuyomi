@@ -13,14 +13,26 @@ export const appMetadata = sqliteTable('app_metadata', {
   value: text('value').notNull(),
 });
 
-export const extensionBuilds = sqliteTable('extension_builds', {
-  buildId: text('build_id').primaryKey(),
-  packageName: text('package_name').notNull().unique(),
-  bundleSha256: text('bundle_sha256').notNull(),
-  status: text('status', { enum: ['verified', 'disabled'] }).notNull(),
-  createdAt: integer('created_at').notNull(),
-  allowedHostsJson: text('allowed_hosts_json').notNull().default('[]'),
-});
+export const extensionBuilds = sqliteTable(
+  'extension_builds',
+  {
+    buildId: text('build_id').primaryKey(),
+    packageName: text('package_name').notNull(),
+    catalogUrl: text('catalog_url').notNull(),
+    repoId: text('repo_id').notNull(),
+    bundleSha256: text('bundle_sha256').notNull(),
+    status: text('status', { enum: ['verified', 'disabled'] }).notNull(),
+    createdAt: integer('created_at').notNull(),
+    allowedHostsJson: text('allowed_hosts_json').notNull().default('[]'),
+  },
+  (table) => [
+    uniqueIndex('extension_builds_catalog_package_unique').on(
+      table.catalogUrl,
+      table.repoId,
+      table.packageName,
+    ),
+  ],
+);
 
 export const accountState = sqliteTable('account_state', {
   subject: text('subject').primaryKey(),
@@ -149,12 +161,22 @@ export const sourcePreferences = sqliteTable(
   'source_preferences',
   {
     subject: text('subject').notNull(),
+    catalogUrl: text('catalog_url').notNull(),
+    repoId: text('repo_id').notNull(),
     packageName: text('package_name').notNull(),
     sourceId: text('source_id').notNull(),
     revision: integer('revision').notNull(),
     entriesJson: text('entries_json').notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.subject, table.packageName, table.sourceId] }),
+    primaryKey({
+      columns: [
+        table.subject,
+        table.catalogUrl,
+        table.repoId,
+        table.packageName,
+        table.sourceId,
+      ],
+    }),
   ],
 );

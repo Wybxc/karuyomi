@@ -1,3 +1,4 @@
+import { catalog } from './fixtures.js';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   type AcquireImage,
@@ -94,6 +95,7 @@ async function setup(
   managers.push(manager);
   const session = await manager.open({
     manifestPath: '/extensions/builds/test-build/manifest.json',
+    catalog,
     identity: 'owner',
   });
   const request: AcquireImage = {

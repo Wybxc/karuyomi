@@ -247,8 +247,14 @@ final class TransportSourceRuntime implements SourceRuntime {
   @override
   Future<wire.PreparedBuild> prepareBuild({
     required String preparationId,
+    required wire.CatalogReference catalog,
     required wire.ExtensionBuildDescriptor build,
   }) async {
+    wire.validateCatalogReference(catalog);
+    _extensionRequire(
+      build.repoId == catalog.repoId,
+      'Preparation repository mismatch',
+    );
     _extensionRequire(
       _extensionControlId.hasMatch(preparationId),
       'Invalid preparation identity',
@@ -270,6 +276,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       wire.ControlRequest(
         prepareBuild: wire.PrepareBuildRequest(
           preparationId: preparationId,
+          catalog: catalog,
           build: selected,
         ),
       ),
@@ -277,6 +284,8 @@ final class TransportSourceRuntime implements SourceRuntime {
     )).preparedBuild;
     _extensionRequire(
       value.hasBuild() &&
+          value.hasCatalog() &&
+          value.catalog == catalog &&
           value.build == selected &&
           _extensionDigest.hasMatch(value.bundleSha256) &&
           value.byteLength > 0 &&
@@ -403,8 +412,10 @@ final class TransportSourceRuntime implements SourceRuntime {
         );
       }
     }
+    wire.validateCatalogReference(build.catalog);
     final openingBuild = BuildDescriptor(
       buildId: build.buildId,
+      catalog: build.catalog.deepCopy()..freeze(),
       manifestUri: build.manifestUri,
       sha256: build.sha256,
       identity: build.identity,
@@ -412,6 +423,8 @@ final class TransportSourceRuntime implements SourceRuntime {
       preferenceBootstrap: bootstrap,
     );
     final key = [
+      build.catalog.catalogUrl,
+      build.catalog.repoId,
       build.buildId,
       build.manifestUri.toString(),
       build.sha256,
@@ -483,6 +496,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       wire.ControlRequest(
         open: wire.OpenRequest(
           manifestPath: build.manifestUri.toString(),
+          catalog: build.catalog,
           identity: build.identity,
           expectedBuildId: build.buildId,
           expectedBundleSha256: build.sha256,
@@ -497,7 +511,9 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Runtime open result belongs to an expired container',
       );
     }
-    if (response.protocolVersion != protocolVersion ||
+    if (!response.hasCatalog() ||
+        response.catalog != build.catalog ||
+        response.protocolVersion != protocolVersion ||
         response.buildId != build.buildId ||
         response.generation.isEmpty ||
         response.workerInstanceId.isEmpty ||

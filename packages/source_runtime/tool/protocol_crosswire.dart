@@ -23,6 +23,8 @@ Future<void> main() async {
         'ImageResource' => wire.ImageResource(),
         'BuildManifest' => wire.BuildManifest(),
         'ExtensionIndex' => wire.ExtensionIndex(),
+        'ExtensionNetworkPoliciesResponse' =>
+          wire.ExtensionNetworkPoliciesResponse(),
         'Bootstrap' => wire.Bootstrap(),
         'ImageFrameControl' => wire.ImageFrameControl(),
         'RuntimeHello' => wire.RuntimeHello(),

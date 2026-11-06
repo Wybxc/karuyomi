@@ -14,8 +14,13 @@ final class SourcePreferencesController extends ChangeNotifier {
   SourcePreferencesController({
     required this.catalog,
     required this.target,
+    required this.repository,
     required this.isCurrent,
-  }) : repository = catalog.sourcePreferences! {
+  }) {
+    if (!identical(catalog.sourcePreferences, repository) ||
+        catalog.accessPaused) {
+      _retire();
+    }
     catalog.addListener(_catalogChanged);
   }
   final CatalogController catalog;
@@ -29,20 +34,36 @@ final class SourcePreferencesController extends ChangeNotifier {
   String? _requestId;
   bool busy = false;
   bool _disposed = false;
+  bool _retired = false;
   bool needsRecovery = false;
   CatalogSourceRef? _reference;
   String? _worker;
 
+  void _retire() {
+    _retired = true;
+    error = '身份或服务已改变，请关闭后重新打开漫画源设置。';
+  }
+
   void _catalogChanged() {
-    if (!_disposed) notifyListeners();
+    if (_disposed) return;
+    if (!identical(catalog.sourcePreferences, repository) ||
+        catalog.accessPaused) {
+      _retire();
+    }
+    notifyListeners();
   }
 
   bool get available =>
       !_disposed &&
+      !_retired &&
+      !catalog.accessPaused &&
       isCurrent() &&
-      identical(catalog.sourcePreferences?.client, repository.client);
-  SourcePreferencesDraft? get pending =>
-      repository.pending(target.build.packageName, target.source.id);
+      identical(catalog.sourcePreferences, repository);
+  SourcePreferencesDraft? get pending => repository.pending(
+    target.build.packageName,
+    target.source.id,
+    catalog: target.build.catalog,
+  );
   bool get canEdit =>
       available &&
       !busy &&
@@ -60,7 +81,10 @@ final class SourcePreferencesController extends ChangeNotifier {
       a.revision == b.revision && samePreferenceEntries(a.entries, b.entries);
 
   Future<bool> load({bool reopen = false}) => _perform(() async {
-    final latest = await repository.load(target.build.packageName);
+    final latest = await repository.load(
+      target.build.packageName,
+      catalog: target.build.catalog,
+    );
     if (!available) return false;
     final current = latest.source(target.source.id);
     if (pending != null) {
@@ -148,11 +172,13 @@ final class SourcePreferencesController extends ChangeNotifier {
         target,
         result.snapshot.sessionValues,
       );
-      if (!samePreferenceEntries(
-        result.snapshot.syncValues,
-        baseline.entries,
-      )) {
+      if (catalog.allowsAccountPreferences(target.build) &&
+          !samePreferenceEntries(
+            result.snapshot.syncValues,
+            baseline.entries,
+          )) {
         await repository.save(
+          catalog: target.build.catalog,
           packageName: target.build.packageName,
           sourceId: target.source.id,
           basedOnRevision: baseline.revision,
@@ -174,7 +200,11 @@ final class SourcePreferencesController extends ChangeNotifier {
       return Future.value(false);
     }
     return _perform(() async {
-      await repository.retry(target.build.packageName, target.source.id);
+      await repository.retry(
+        target.build.packageName,
+        target.source.id,
+        catalog: target.build.catalog,
+      );
       if (!available) return false;
       message = '原设置操作已确认。';
       return _reopenAndDescribe();
@@ -184,7 +214,11 @@ final class SourcePreferencesController extends ChangeNotifier {
   Future<bool> recover() {
     if (!available || busy) return Future.value(false);
     return _perform(() async {
-      await repository.discard(target.build.packageName, target.source.id);
+      await repository.discard(
+        target.build.packageName,
+        target.source.id,
+        catalog: target.build.catalog,
+      );
       if (!available) return false;
       message = '已读取服务端当前状态；不会撤销可能已成功的原写入。';
       return _reopenAndDescribe();

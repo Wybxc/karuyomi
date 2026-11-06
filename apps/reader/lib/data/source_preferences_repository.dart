@@ -5,11 +5,17 @@ import 'reading_progress.dart';
 
 final class SourcePreferencesSnapshot {
   SourcePreferencesSnapshot(wire.SourcePreferencesResponse value)
-    : packageName = value.packageName,
+    : catalog = value.catalog.deepCopy()..freeze(),
+      syncRules = List.unmodifiable(
+        value.syncRules.map((rule) => rule.deepCopy()..freeze()),
+      ),
+      packageName = value.packageName,
       accountRevision = value.accountRevision,
       sources = List.unmodifiable(
         value.sources.map((source) => source.deepCopy()..freeze()),
       );
+  final wire.CatalogReference catalog;
+  final List<wire.PreferenceSyncRule> syncRules;
   final String packageName;
   final int accountRevision;
   final List<wire.SourcePreferences> sources;
@@ -36,22 +42,35 @@ final class SourcePreferencesRepository {
   final BusinessStateClient client;
   ProgressIdentity get identity => client.identity;
 
-  SourcePreferencesDraft? pending(String packageName, String sourceId) {
-    final value = client.pendingSourcePreferences(packageName, sourceId);
+  SourcePreferencesDraft? pending(
+    String packageName,
+    String sourceId, {
+    required wire.CatalogReference catalog,
+  }) {
+    final value = client.pendingSourcePreferences(
+      packageName,
+      sourceId,
+      catalog: catalog,
+    );
     return value == null
         ? null
         : SourcePreferencesDraft(value.request, value.retryable);
   }
 
-  bool hasPendingPackage(String packageName) =>
-      client.hasPendingSourcePreferences(packageName);
+  bool hasPendingPackage(
+    String packageName, {
+    required wire.CatalogReference catalog,
+  }) => client.hasPendingSourcePreferences(packageName, catalog: catalog);
 
-  Future<SourcePreferencesSnapshot> load(String packageName) async =>
-      SourcePreferencesSnapshot(
-        await client.readSourcePreferences(packageName),
-      );
+  Future<SourcePreferencesSnapshot> load(
+    String packageName, {
+    required wire.CatalogReference catalog,
+  }) async => SourcePreferencesSnapshot(
+    await client.readSourcePreferences(packageName, catalog: catalog),
+  );
 
   Future<SourcePreferencesSnapshot> save({
+    required wire.CatalogReference catalog,
     required String packageName,
     required String sourceId,
     required int basedOnRevision,
@@ -59,6 +78,7 @@ final class SourcePreferencesRepository {
   }) async => SourcePreferencesSnapshot(
     await client.mutateSourcePreferences(
       wire.SourcePreferencesMutation(
+        catalog: catalog,
         packageName: packageName,
         sourceId: sourceId,
         expectedRevision: basedOnRevision,
@@ -69,17 +89,27 @@ final class SourcePreferencesRepository {
 
   Future<SourcePreferencesSnapshot> retry(
     String packageName,
-    String sourceId,
-  ) async => SourcePreferencesSnapshot(
-    await client.retrySourcePreferences(packageName, sourceId),
+    String sourceId, {
+    required wire.CatalogReference catalog,
+  }) async => SourcePreferencesSnapshot(
+    await client.retrySourcePreferences(
+      packageName,
+      sourceId,
+      catalog: catalog,
+    ),
   );
 
   /// Reading current server values does not undo a request that may have
   /// committed. It only abandons this session's uncertain draft explicitly.
   Future<SourcePreferencesSnapshot> discard(
     String packageName,
-    String sourceId,
-  ) async => SourcePreferencesSnapshot(
-    await client.discardSourcePreferences(packageName, sourceId),
+    String sourceId, {
+    required wire.CatalogReference catalog,
+  }) async => SourcePreferencesSnapshot(
+    await client.discardSourcePreferences(
+      packageName,
+      sourceId,
+      catalog: catalog,
+    ),
   );
 }

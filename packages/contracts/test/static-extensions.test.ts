@@ -90,7 +90,11 @@ test('the static index binds manifest paths to one current build per package', (
     sources: build.sources,
     manifestPath: '/extensions/builds/test-build/manifest.json',
   };
-  const index = { schemaVersion: 1, builds: [descriptor] };
+  const index = {
+    schemaVersion: 1,
+    repoId: build.repoId,
+    builds: [descriptor],
+  };
   expect(extensionIndexSchema.parse(index)).toEqual(index);
   for (const value of [
     { ...index, nextCursor: 'next' },
@@ -155,6 +159,7 @@ test('static Source metadata is complete, bounded and bound to the declared iden
     expect(
       extensionIndexSchema.safeParse({
         schemaVersion: 1,
+        repoId: build.repoId,
         builds: [{ ...descriptor, sources }],
       }).success,
     ).toBe(false);

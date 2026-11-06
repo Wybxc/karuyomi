@@ -34,8 +34,13 @@ void validateSourcePreferences(
 
 void validateSourcePreferencesResponse(
   wire.SourcePreferencesResponse value,
-  String packageName,
-) {
+  String packageName, {
+  required wire.CatalogReference catalog,
+}) {
+  validateBusinessCatalogReference(catalog);
+  if (!value.hasCatalog() || value.catalog != catalog) {
+    throw const FormatException('Source preference repository mismatch');
+  }
   if (value.schemaVersion != 1 || value.packageName != packageName) {
     throw const FormatException('Source preference response identity mismatch');
   }

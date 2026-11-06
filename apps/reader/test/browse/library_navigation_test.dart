@@ -47,6 +47,7 @@ void main() {
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(
           schemaVersion: 1,
+          repoId: 'keiyoushi',
           builds: [
             wire.ExtensionBuildDescriptor(
               buildId: 'build-2',
@@ -86,7 +87,9 @@ void main() {
   test(
     'unavailable package keeps the favorite and never opens another Source',
     () async {
-      catalog.builds = const [];
+      platform.inventory = wire.encodeProtoJson(
+        wire.ExtensionIndex(schemaVersion: 1, repoId: 'keiyoushi'),
+      );
       expect(
         await catalog.openLibraryEntry(
           entry,
@@ -94,7 +97,7 @@ void main() {
         ),
         isNull,
       );
-      expect(catalog.error, contains('漫画源当前不可用'));
+      expect(catalog.error, contains('已下架'));
       expect(platform.openedBuilds, isEmpty);
       expect(platform.invocations, isEmpty);
       expect(

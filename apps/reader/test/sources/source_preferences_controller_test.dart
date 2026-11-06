@@ -20,6 +20,7 @@ void main() {
     'settings for a removed Source stay in D1 without blocking the current extension',
     () async {
       await fixture.repository.save(
+        catalog: fixture.catalog.defaultCatalog,
         packageName: preferencePackage,
         sourceId: '-999',
         basedOnRevision: 0,
@@ -35,6 +36,7 @@ void main() {
       expect(fixture.platform.preferenceBootstraps.last.sources, isEmpty);
       final retained = (await fixture.repository.load(
         preferencePackage,
+        catalog: fixture.catalog.defaultCatalog,
       )).source('-999');
       expect(retained.revision, 1);
       expect(retained.entries.single.value.boolean, true);
@@ -96,6 +98,7 @@ void main() {
       );
       addTearDown(remote.dispose);
       await SourcePreferencesRepository(remote).save(
+        catalog: fixture.catalog.defaultCatalog,
         packageName: preferencePackage,
         sourceId: sourceId,
         basedOnRevision: 0,
@@ -114,6 +117,7 @@ void main() {
       );
       final current = (await fixture.repository.load(
         preferencePackage,
+        catalog: fixture.catalog.defaultCatalog,
       )).source(sourceId);
       expect(current.revision, 2);
       expect(
@@ -169,6 +173,7 @@ void main() {
       expect(fixture.callbacks, 1);
       final current = (await fixture.repository.load(
         preferencePackage,
+        catalog: fixture.catalog.defaultCatalog,
       )).source(sourceId);
       expect(current.entries.single.key, 'dependent');
       expect(current.entries.single.value.boolean, true);

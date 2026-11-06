@@ -51,6 +51,7 @@ final class ImageRuntime implements SourceRuntime {
   @override
   Future<wire.PreparedBuild> prepareBuild({
     required String preparationId,
+    required wire.CatalogReference catalog,
     required wire.ExtensionBuildDescriptor build,
   }) => throw UnimplementedError();
   @override

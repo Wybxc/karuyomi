@@ -14,6 +14,7 @@ import {
   validHash,
   buildIdSchema,
   extensionBuildDescriptorSchema,
+  validateCatalogReference,
 } from './static-control.ts';
 import {
   rpcEnvelopeSchema,
@@ -49,11 +50,26 @@ export function validateWorkerCommand(value: pb.WorkerCommand): WorkerCommand {
   const rpc = envelope(value.envelope);
   switch (value.command.case) {
     case 'open':
+      requireCondition(
+        value.command.value.catalog !== undefined,
+        'Open catalog is required',
+      );
+      validateCatalogReference(value.command.value.catalog);
       if (value.command.value.preferenceBootstrap)
         validatePreferenceBootstrap(value.command.value.preferenceBootstrap);
       requireCondition(
         value.command.value.manifest !== undefined,
         'Worker manifest is required',
+      );
+      requireCondition(
+        value.command.value.catalog !== undefined,
+        'Worker catalog is required',
+      );
+      validateCatalogReference(value.command.value.catalog);
+      requireCondition(
+        value.command.value.catalog.repoId ===
+          value.command.value.manifest.repoId,
+        'Worker catalog identity mismatch',
       );
       buildManifestSchema.parse(
         messageJson(pb.BuildManifestSchema, value.command.value.manifest),
@@ -166,6 +182,16 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
     case 'extensionCache':
       break;
     case 'prepareBuild':
+      requireCondition(
+        value.command.value.catalog !== undefined,
+        'Preparation catalog is required',
+      );
+      validateCatalogReference(value.command.value.catalog);
+      requireCondition(
+        value.command.value.catalog.repoId ===
+          value.command.value.build?.repoId,
+        'Preparation catalog identity mismatch',
+      );
       validId(value.command.value.preparationId);
       requireCondition(
         value.command.value.build !== undefined,
@@ -189,6 +215,11 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
       validId(value.command.value.generation);
       break;
     case 'open':
+      requireCondition(
+        value.command.value.catalog !== undefined,
+        'Open catalog is required',
+      );
+      validateCatalogReference(value.command.value.catalog);
       if (value.command.value.preferenceBootstrap)
         validatePreferenceBootstrap(value.command.value.preferenceBootstrap);
       staticManifestPathSchema.parse(value.command.value.manifestPath);
@@ -280,6 +311,15 @@ export function validateControlResponse(
       break;
     case 'preparedBuild': {
       const prepared = value.result.value;
+      requireCondition(
+        prepared.catalog !== undefined,
+        'Prepared catalog is required',
+      );
+      validateCatalogReference(prepared.catalog);
+      requireCondition(
+        prepared.catalog.repoId === prepared.build?.repoId,
+        'Prepared catalog identity mismatch',
+      );
       requireCondition(
         prepared.build !== undefined,
         'A prepared catalog build is required',

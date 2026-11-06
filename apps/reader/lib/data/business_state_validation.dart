@@ -10,6 +10,7 @@ const _libraryPageSize = 8;
 const _bookmarkPageSize = 64;
 const businessFavoriteSourceLimit = 128;
 const businessInstalledExtensionLimit = 128;
+const businessRepositoryLimit = 16;
 final _mangaKey = RegExp(r'^[a-f0-9]{64}$');
 final _sourceId = RegExp(r'^-?\d{1,19}$');
 final _minSourceId = BigInt.parse('-9223372036854775808');
@@ -510,9 +511,48 @@ void validateBusinessCatalogUrl(String value) {
   );
 }
 
+String catalogReferenceKey(wire.CatalogReference catalog) =>
+    jsonEncode([catalog.catalogUrl, catalog.repoId]);
+
+void validateBusinessCatalogReference(wire.CatalogReference catalog) {
+  validateBusinessCatalogUrl(catalog.catalogUrl);
+  wire.validateCatalogReference(catalog);
+}
+
+void validateBusinessRepositories(Iterable<wire.ExtensionRepository> values) {
+  _require(
+    values.length <= businessRepositoryLimit,
+    'Too many extension repositories',
+  );
+  final urls = <String>{};
+  final repoIds = <String>{};
+  for (final value in values) {
+    validateBusinessCatalogUrl(value.catalogUrl);
+    validateBusinessCatalogReference(
+      wire.CatalogReference(catalogUrl: value.catalogUrl, repoId: value.repoId),
+    );
+    _require(
+      value.repoId != 'keiyoushi',
+      'Default repository identity is reserved',
+    );
+    _require(
+      value.name.trim() == value.name &&
+          value.name.isNotEmpty &&
+          value.name.length <= 100,
+      'Invalid repository name',
+    );
+    _require(
+      urls.add(value.catalogUrl) && repoIds.add(value.repoId),
+      'Duplicate repository catalog URL or identity',
+    );
+  }
+}
+
 void validateBusinessInstalledExtension(wire.InstalledExtension value) {
   validateBusinessCatalogUrl(value.catalogUrl);
-  _identity(value.repoId);
+  validateBusinessCatalogReference(
+    wire.CatalogReference(catalogUrl: value.catalogUrl, repoId: value.repoId),
+  );
   _identity(value.packageName);
   _require(
     RegExp(r'^[A-Za-z0-9._-]{1,200}$').hasMatch(value.buildId) &&
@@ -547,6 +587,7 @@ void validateBusinessGlobalSettings(wire.GlobalSettingsValues value) {
   validateBusinessReaderSettings(value.reader);
   validateBusinessFavoriteSources(value.favoriteSources);
   validateBusinessInstalledExtensions(value.installedExtensions);
+  validateBusinessRepositories(value.repositories);
 }
 
 void validateBusinessSettingsMutation(wire.SettingsMutation value) {

@@ -21,11 +21,13 @@ import {
   type ImageResource,
   staticManifestPathSchema,
   extensionBuildDescriptorSchema,
+  catalogReferenceSchema,
   validId,
   workerResponseSchema,
   type RpcEnvelope,
   type RuntimeHello,
   type RuntimeSession,
+  type CatalogReference,
   type SourceCall,
   type SourceResult,
   type Closed,
@@ -47,7 +49,9 @@ export interface WorkerEndpoint {
   postMessage(command: unknown, transfer?: Transferable[]): void;
   terminate(): void;
 }
-export type OpenOptions = PlainMessage<pb.OpenRequest>;
+export type OpenOptions = Omit<PlainMessage<pb.OpenRequest>, 'catalog'> & {
+  catalog: CatalogReference;
+};
 interface TaskBase {
   requestId: string;
   reject(error: unknown): void;
@@ -161,6 +165,11 @@ export class SourceRuntimeManager {
         ),
       );
     try {
+      if (!options.catalog) throw new Error('A catalog is required');
+      options = {
+        ...options,
+        catalog: catalogReferenceSchema.parse(options.catalog),
+      };
       if (options.preferenceBootstrap) {
         const bootstrap = clone(
           pb.PreferenceBootstrapSchema,
@@ -173,12 +182,13 @@ export class SourceRuntimeManager {
       return Promise.reject(
         new RuntimeFailure(
           'protocol_error',
-          'Invalid Source preference bootstrap',
+          'Invalid catalog or Source preference bootstrap',
         ),
       );
     }
     const key = JSON.stringify([
       options.identity,
+      options.catalog,
       options.manifestPath,
       options.expectedBuildId,
       options.expectedBundleSha256,
@@ -243,7 +253,12 @@ export class SourceRuntimeManager {
     generation: string,
     signal: AbortSignal,
   ): Promise<RuntimeSession> {
-    const manifest = await this.loader.manifest(options.manifestPath, signal);
+    const catalog = catalogReferenceSchema.parse(options.catalog);
+    const manifest = await this.loader.manifest(
+      catalog,
+      options.manifestPath,
+      signal,
+    );
     if (
       (options.expectedBuildId &&
         options.expectedBuildId !== manifest.buildId) ||
@@ -259,7 +274,9 @@ export class SourceRuntimeManager {
     const namespace = await sha256(
       new TextEncoder().encode(
         JSON.stringify([
+          this.workerUrl.origin,
           options.identity,
+          catalog.catalogUrl,
           manifest.repoId,
           manifest.packageName,
           manifest.storageSchema,
@@ -356,6 +373,7 @@ export class SourceRuntimeManager {
           case: 'open',
           value: {
             manifest,
+            catalog,
             userAgent: options.userAgent ?? 'Karuyomi/0.1',
             preferenceBootstrap: options.preferenceBootstrap,
           },
@@ -374,6 +392,8 @@ export class SourceRuntimeManager {
     if (
       result.generation !== generation ||
       result.buildId !== manifest.buildId ||
+      result.catalog.catalogUrl !== catalog.catalogUrl ||
+      result.catalog.repoId !== catalog.repoId ||
       result.workerInstanceId !== envelope.workerInstanceId
     ) {
       throw new RuntimeFailure(
@@ -977,8 +997,15 @@ export class SourceRuntimeManager {
         new RuntimeFailure('storage_busy', 'Wait for local artifact cleanup'),
       );
     let build;
+    let catalog;
     try {
       validId(input.preparationId);
+      catalog = catalogReferenceSchema.parse(
+        messageJson(
+          pb.CatalogReferenceSchema,
+          create(pb.CatalogReferenceSchema, input.catalog),
+        ),
+      );
       if (!input.build) throw new Error('A catalog build is required');
       build = extensionBuildDescriptorSchema.parse(
         messageJson(pb.ExtensionBuildDescriptorSchema, input.build),
@@ -988,7 +1015,7 @@ export class SourceRuntimeManager {
         new RuntimeFailure('protocol_error', 'Invalid build preparation'),
       );
     }
-    const key = JSON.stringify(build);
+    const key = JSON.stringify([catalog, build]);
     if (this.preparation) {
       if (
         this.preparation.id === input.preparationId &&
@@ -1011,7 +1038,7 @@ export class SourceRuntimeManager {
       60_000,
     );
     const done = this.loader
-      .prepare(build, controller.signal)
+      .prepare(catalog, build, controller.signal)
       .then((value) => {
         controller.signal.throwIfAborted();
         return create(pb.PreparedBuildSchema, value);

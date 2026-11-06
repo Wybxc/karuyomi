@@ -12,6 +12,10 @@ import 'business_state_server.dart';
 
 const _package = 'eu.kanade.source.test';
 const _source = '9223372036854775806';
+wire.CatalogReference get _catalog => wire.CatalogReference(
+  catalogUrl: 'https://reader.example/extensions/index.json',
+  repoId: 'keiyoushi',
+);
 wire.PreferenceEntry _entry(String key, wire.PreferenceValue value) =>
     wire.PreferenceEntry(key: key, value: value);
 wire.PreferenceEntry _toggle(bool value) =>
@@ -73,6 +77,7 @@ void main() {
     int revision = 0,
     String source = _source,
   }) => repository.save(
+    catalog: _catalog,
     packageName: _package,
     sourceId: source,
     basedOnRevision: revision,
@@ -82,7 +87,7 @@ void main() {
   test(
     'missing sources have immutable revision zero; full typed replacement preserves false, empty and Long precision',
     () async {
-      final first = await repository.load(_package);
+      final first = await repository.load(_package, catalog: _catalog);
       expect(first.sources, isEmpty);
       expect(first.source(_source).revision, 0);
       expect(first.source(_source).isFrozen, true);
@@ -125,18 +130,37 @@ void main() {
       final body = writes().single.body;
       final replacement = SourcePreferencesRepository(client);
       expect(
-        replacement.pending(_package, _source)!.request.expectedRevision,
+        replacement
+            .pending(_package, _source, catalog: _catalog)!
+            .request
+            .expectedRevision,
         0,
       );
-      expect(replacement.pending(_package, _source)!.retryable, true);
-      expect((await replacement.load(_package)).source(_source).revision, 1);
+      expect(
+        replacement.pending(_package, _source, catalog: _catalog)!.retryable,
+        true,
+      );
+      expect(
+        (await replacement.load(
+          _package,
+          catalog: _catalog,
+        )).source(_source).revision,
+        1,
+      );
       expect(writes(), hasLength(1));
-      expect(replacement.pending(_package, _source), isNotNull);
-      final confirmed = await replacement.retry(_package, _source);
+      expect(
+        replacement.pending(_package, _source, catalog: _catalog),
+        isNotNull,
+      );
+      final confirmed = await replacement.retry(
+        _package,
+        _source,
+        catalog: _catalog,
+      );
       expect(confirmed.source(_source).revision, 1);
       expect(writes().map((request) => request.body), [body, body]);
       expect(server.appliedMutations, 1);
-      expect(repository.pending(_package, _source), isNull);
+      expect(repository.pending(_package, _source, catalog: _catalog), isNull);
     },
   );
 
@@ -148,13 +172,14 @@ void main() {
       final remote = _client(server);
       addTearDown(remote.dispose);
       await SourcePreferencesRepository(remote).save(
+        catalog: _catalog,
         packageName: _package,
         sourceId: _source,
         basedOnRevision: 1,
         entries: [_toggle(false)],
       );
       await expectLater(
-        repository.retry(_package, _source),
+        repository.retry(_package, _source, catalog: _catalog),
         throwsA(
           isA<BusinessStateException>().having(
             (failure) => failure.conflict,
@@ -163,17 +188,20 @@ void main() {
           ),
         ),
       );
-      expect(repository.pending(_package, _source)!.retryable, false);
+      expect(
+        repository.pending(_package, _source, catalog: _catalog)!.retryable,
+        false,
+      );
       final count = writes().length;
       await expectLater(
-        repository.retry(_package, _source),
+        repository.retry(_package, _source, catalog: _catalog),
         throwsA(isA<BusinessStateException>()),
       );
       expect(writes(), hasLength(count));
-      final latest = await repository.load(_package);
+      final latest = await repository.load(_package, catalog: _catalog);
       expect(latest.source(_source).revision, 2);
       expect(latest.source(_source).entries.single.value.boolean, false);
-      expect(repository.pending(_package, _source), isNull);
+      expect(repository.pending(_package, _source, catalog: _catalog), isNull);
     },
   );
 
@@ -189,13 +217,20 @@ void main() {
       final body = writes().single.body;
       await save([_toggle(false)], source: '-123');
       expect(writes(), hasLength(2));
-      await repository.load(_package);
-      expect(repository.pending(_package, _source), isNotNull);
+      await repository.load(_package, catalog: _catalog);
+      expect(
+        repository.pending(_package, _source, catalog: _catalog),
+        isNotNull,
+      );
       expect(writes().first.body, body);
-      expect(repository.pending(_package, '-123'), isNull);
-      final current = await repository.discard(_package, _source);
+      expect(repository.pending(_package, '-123', catalog: _catalog), isNull);
+      final current = await repository.discard(
+        _package,
+        _source,
+        catalog: _catalog,
+      );
       expect(current.source(_source).revision, 0);
-      expect(repository.pending(_package, _source), isNull);
+      expect(repository.pending(_package, _source, catalog: _catalog), isNull);
       expect(writes(), hasLength(2));
     },
   );
@@ -217,7 +252,7 @@ void main() {
         throwsFormatException,
       );
       expect(server.requests, isEmpty);
-      expect(repository.pending(_package, _source), isNull);
+      expect(repository.pending(_package, _source, catalog: _catalog), isNull);
       server.beforeRequest = (_) => ApiReply(
         status: 200,
         headers: const {'content-type': 'application/json'},
@@ -231,8 +266,11 @@ void main() {
           ),
         ),
       );
-      await expectLater(repository.load(_package), throwsFormatException);
-      expect(repository.pending(_package, _source), isNull);
+      await expectLater(
+        repository.load(_package, catalog: _catalog),
+        throwsFormatException,
+      );
+      expect(repository.pending(_package, _source, catalog: _catalog), isNull);
     },
   );
 
@@ -248,13 +286,13 @@ void main() {
       final failed = expectLater(writing, throwsStateError);
       await gate.received.future;
       await client.dispose();
-      expect(repository.pending(_package, _source), isNull);
+      expect(repository.pending(_package, _source, catalog: _catalog), isNull);
       final next = _client(server.forSubject('other'), 'other');
       addTearDown(next.dispose);
       expect(
         (await SourcePreferencesRepository(
           next,
-        ).load(_package)).source(_source).revision,
+        ).load(_package, catalog: _catalog)).source(_source).revision,
         0,
       );
       gate.release.complete();
@@ -262,9 +300,10 @@ void main() {
       final original = _client(server);
       addTearDown(original.dispose);
       expect(
-        (await SourcePreferencesRepository(
-          original,
-        ).load(_package)).source(_source).entries.single.value.boolean,
+        (await SourcePreferencesRepository(original).load(
+          _package,
+          catalog: _catalog,
+        )).source(_source).entries.single.value.boolean,
         true,
       );
     },

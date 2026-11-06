@@ -1,3 +1,4 @@
+import { catalog } from './fixtures.js';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   type BuildManifest,
@@ -7,6 +8,7 @@ import {
   type SourcePayload,
   type AcquireImage,
   workerCommandSchema,
+  workerResponseSchema,
   processedImageSchema,
   messageJson,
   protocolVersion,
@@ -67,6 +69,7 @@ function deferred<T>() {
 }
 const options = {
   manifestPath: '/extensions/builds/test-build/manifest.json',
+  catalog,
   identity: 'verified-owner',
 };
 const call = (id: string, generation: string, timeoutMs?: number): SourceCall =>
@@ -147,6 +150,7 @@ async function setup(
     acquire: NonNullable<RuntimeDriver['acquireImage']>;
   },
   loaderOverride?: VerifiedLoader,
+  appOrigin = 'https://read.example.com',
 ) {
   const workers: FakeWorker[] = [];
   const workerUrls: URL[] = [];
@@ -166,10 +170,10 @@ async function setup(
   const build = initialBuild ?? (await manifest());
   const loader =
     loaderOverride ??
-    new VerifiedLoader('https://read.example.com', (async () =>
+    new VerifiedLoader(appOrigin, (async () =>
       Response.json(build)) as typeof fetch);
   const manager = new SourceRuntimeManager(
-    new URL('https://read.example.com/runtime/worker.js'),
+    new URL('/runtime/worker.js', appOrigin),
     (url) => {
       expect(url.searchParams.get('plugin')).toMatch(/^[a-f0-9]{64}$/);
       expect(url.searchParams.get('plugin')).toBe(
@@ -272,6 +276,7 @@ test.each([
     await isolated.manager.open({
       ...options,
       identity: identity ?? options.identity,
+      catalog: { ...catalog, repoId: changes.repoId ?? catalog.repoId },
     });
     const baselineNamespace =
       baseline.workerUrls[0]?.searchParams.get('plugin');
@@ -1114,7 +1119,11 @@ test('preparation uses only static delivery, shares verified bytes, and leaves a
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(String(input)).pathname;
     if (path === '/extensions/index.json')
-      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+      return Response.json({
+        schemaVersion: 1,
+        repoId: catalog.repoId,
+        builds: [descriptor],
+      });
     if (path === options.manifestPath) return Response.json(build);
     if (path === build.bundle.path)
       return new Response(encodedBytes, {
@@ -1145,7 +1154,11 @@ test('preparation uses only static delivery, shares verified bytes, and leaves a
           requestId: 'prepare-control',
           command: {
             case: 'prepareBuild',
-            value: { preparationId: 'prepare-first', build: descriptor },
+            value: {
+              preparationId: 'prepare-first',
+              build: descriptor,
+              catalog,
+            },
           },
         }),
       ),
@@ -1160,7 +1173,7 @@ test('preparation uses only static delivery, shares verified bytes, and leaves a
   );
   const digest = vi.spyOn(crypto.subtle, 'digest');
   await expect(
-    loader.artifact(build.bundle, new AbortController().signal, true),
+    loader.artifact(catalog, build.bundle, new AbortController().signal, true),
   ).resolves.toHaveLength(build.bundle.size);
   expect(digest).not.toHaveBeenCalled();
   const session = await manager.open(options);
@@ -1171,6 +1184,7 @@ test('preparation uses only static delivery, shares verified bytes, and leaves a
   await expect(
     manager.prepareBuild(
       create(pb.PrepareBuildRequestSchema, {
+        catalog,
         preparationId: 'prepare-failure',
         build: descriptor,
       }),
@@ -1216,7 +1230,11 @@ test('forget cancels and drains preparation before removal so a late download ca
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(String(input)).pathname;
     if (path === '/extensions/index.json')
-      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+      return Response.json({
+        schemaVersion: 1,
+        repoId: catalog.repoId,
+        builds: [descriptor],
+      });
     if (path === options.manifestPath) return Response.json(build);
     if (block)
       return new Response(
@@ -1251,6 +1269,7 @@ test('forget cancels and drains preparation before removal so a late download ca
   );
   const preparation = manager.prepareBuild(
     create(pb.PrepareBuildRequestSchema, {
+      catalog,
       preparationId: 'to-cancel',
       build: descriptor,
     }),
@@ -1267,6 +1286,7 @@ test('forget cancels and drains preparation before removal so a late download ca
   block = false;
   await manager.prepareBuild(
     create(pb.PrepareBuildRequestSchema, {
+      catalog,
       preparationId: 'new-preparation',
       build: descriptor,
     }),
@@ -1290,19 +1310,23 @@ test('disposing rejects new work while cancellation drains and rejects a late pr
     Response.json(build),
   );
   const drain = deferred<{
+    catalog: typeof catalog;
     build: typeof descriptor;
     bundleSha256: string;
     byteLength: number;
   }>();
   const aborted = deferred<void>();
-  vi.spyOn(loader, 'prepare').mockImplementation(async (_build, signal) => {
-    signal.addEventListener('abort', () => aborted.resolve(), { once: true });
-    return drain.promise;
-  });
+  vi.spyOn(loader, 'prepare').mockImplementation(
+    async (_catalog, _build, signal) => {
+      signal.addEventListener('abort', () => aborted.resolve(), { once: true });
+      return drain.promise;
+    },
+  );
   const { manager } = await setup(undefined, undefined, undefined, loader);
   const session = await manager.open(options);
   const preparation = manager.prepareBuild(
     create(pb.PrepareBuildRequestSchema, {
+      catalog,
       preparationId: 'dispose-preparation',
       build: descriptor,
     }),
@@ -1327,6 +1351,7 @@ test('disposing rejects new work while cancellation drains and rejects a late pr
     ),
   ).rejects.toMatchObject({ code: 'runtime_lost' });
   drain.resolve({
+    catalog,
     build: descriptor,
     bundleSha256: build.bundle.sha256,
     byteLength: build.bundle.size,
@@ -1351,7 +1376,11 @@ test('preparation deadline cancels a stalled body without terminating an active 
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(String(input)).pathname;
     if (path === '/extensions/index.json')
-      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+      return Response.json({
+        schemaVersion: 1,
+        repoId: catalog.repoId,
+        builds: [descriptor],
+      });
     if (path === options.manifestPath) return Response.json(build);
     return new Response(
       new ReadableStream<Uint8Array>(
@@ -1384,6 +1413,7 @@ test('preparation deadline cancels a stalled body without terminating an active 
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   const preparation = manager.prepareBuild(
     create(pb.PrepareBuildRequestSchema, {
+      catalog,
       preparationId: 'deadline-preparation',
       build: descriptor,
     }),
@@ -1490,4 +1520,68 @@ test('failed shutdown remains unacknowledged and an explicit rebuild confirms re
   await expect(
     manager.invoke(call('after-explicit-reset', next.generation)),
   ).resolves.toMatchObject({ generation: next.generation });
+});
+
+test('the same repository ID at a new catalog origin cannot inherit files or Cookies', async () => {
+  const { manager, workerUrls } = await setup();
+  const first = await manager.open(options);
+  const replacement = await manager.open({
+    ...options,
+    catalog: {
+      ...catalog,
+      catalogUrl: 'https://mirror.example/extensions/index.json',
+    },
+  });
+  expect(replacement.generation).not.toBe(first.generation);
+  expect(replacement.catalog.catalogUrl).toBe(
+    'https://mirror.example/extensions/index.json',
+  );
+  expect(workerUrls[1]?.searchParams.get('fsNamespace')).not.toBe(
+    workerUrls[0]?.searchParams.get('fsNamespace'),
+  );
+});
+
+test('a session ACK from another catalog is rejected before Source readiness', async () => {
+  const { manager, workers, driver } = await setup();
+  driver.open.mockImplementationOnce(async () => {
+    const worker = workers[0]!;
+    const emit = worker.emit.bind(worker);
+    worker.emit = (data) => {
+      const response = workerResponseSchema.parse(data);
+      if (response.result.case === 'session')
+        response.result.value.catalog = create(pb.CatalogReferenceSchema, {
+          ...catalog,
+          catalogUrl: 'https://foreign.example/extensions/index.json',
+        });
+      emit(messageJson(pb.WorkerResponseSchema, response));
+    };
+    return [{ id: '9223372036854775806', name: 'Test', lang: 'en' }];
+  });
+  await expect(manager.open(options)).rejects.toMatchObject({
+    code: 'protocol_error',
+  });
+  expect(workers[0]?.terminated).toBe(true);
+});
+
+test('Native namespaces isolate the same subject and external repository across API deployments', async () => {
+  const external = {
+    ...options,
+    catalog: {
+      ...catalog,
+      catalogUrl: 'https://external.example/extensions/index.json',
+    },
+  };
+  const first = await setup();
+  const second = await setup(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    'https://another-app.example',
+  );
+  await first.manager.open(external);
+  await second.manager.open(external);
+  expect(first.workerUrls[0]?.searchParams.get('fsNamespace')).not.toBe(
+    second.workerUrls[0]?.searchParams.get('fsNamespace'),
+  );
 });

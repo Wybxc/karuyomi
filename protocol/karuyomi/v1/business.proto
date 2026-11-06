@@ -363,11 +363,30 @@ message InstalledExtension {
   bool enabled = 6;
 }
 
+message ExtensionRepository {
+  string catalog_url = 1;
+  string repo_id = 2;
+  string name = 3;
+}
+
+message ExtensionNetworkPolicy {
+  string build_id = 1;
+  string package_name = 2;
+  string bundle_sha256 = 3;
+}
+
+message ExtensionNetworkPoliciesResponse {
+  uint32 schema_version = 1;
+  CatalogReference catalog = 2;
+  repeated ExtensionNetworkPolicy builds = 3;
+}
+
 message GlobalSettingsValues {
   AppTheme theme = 1;
   ReaderSettings reader = 2;
   repeated FavoriteSource favorite_sources = 3;
   repeated InstalledExtension installed_extensions = 4;
+  repeated ExtensionRepository repositories = 5;
 }
 
 message GlobalSettings {
@@ -432,6 +451,8 @@ message SourcePreferencesResponse {
   string package_name = 3;
   repeated SourcePreferences sources = 4;
   BusinessStateError error = 5;
+  CatalogReference catalog = 6;
+  repeated PreferenceSyncRule sync_rules = 7;
 }
 message SourcePreferencesMutation {
   uint32 schema_version = 1;
@@ -440,6 +461,7 @@ message SourcePreferencesMutation {
   string source_id = 4;
   uint32 expected_revision = 5;
   repeated PreferenceEntry entries = 6;
+  CatalogReference catalog = 7;
 }
 message SourcePreferencesMutationResponse {
   uint32 schema_version = 1;
@@ -447,4 +469,6 @@ message SourcePreferencesMutationResponse {
   uint32 account_revision = 3;
   SourcePreferences preferences = 4;
   BusinessStateError error = 5;
+  CatalogReference catalog = 6;
+  repeated PreferenceSyncRule sync_rules = 7;
 }

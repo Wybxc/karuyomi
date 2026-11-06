@@ -10,12 +10,16 @@ const build = {
   manifestPath: '/extensions/builds/test-build/manifest.json',
   sources: [{ id: '-9223372036854775808', name: 'Source', lang: '' }],
 };
+const catalog = {
+  catalogUrl: 'https://read.example.com/extensions/index.json',
+  repoId: 'keiyoushi',
+};
 const sha256 = 'a'.repeat(64);
 
 test('management controls preserve exact preparation and close identities', () => {
   const request = parseControlRequest({
     requestId: 'control',
-    prepareBuild: { preparationId: 'prepare', build },
+    prepareBuild: { preparationId: 'prepare', build, catalog },
   });
   expect(request.command.case).toBe('prepareBuild');
   if (request.command.case !== 'prepareBuild') throw new Error('Wrong command');
@@ -29,9 +33,9 @@ test('management controls preserve exact preparation and close identities', () =
     }).command.case,
   ).toBe('closeBuild');
   for (const prepareBuild of [
-    { preparationId: '', build },
+    { preparationId: '', build, catalog },
     { preparationId: 'prepare' },
-    { preparationId: 'prepare', build: { ...build, sources: [] } },
+    { preparationId: 'prepare', catalog, build: { ...build, sources: [] } },
   ])
     expect(() =>
       parseControlRequest({ requestId: 'control', prepareBuild }),
@@ -52,7 +56,7 @@ test('management controls preserve exact preparation and close identities', () =
 });
 
 test('a prepared response describes bounded code, without claiming Source runtime readiness', () => {
-  const preparedBuild = { build, bundleSha256: sha256, byteLength: 1 };
+  const preparedBuild = { catalog, build, bundleSha256: sha256, byteLength: 1 };
   expect(
     parseControlResponse({ requestId: 'control', preparedBuild }).result.case,
   ).toBe('preparedBuild');
@@ -93,5 +97,30 @@ test('cache status cannot exceed byte/count budgets or misstate the receipt tota
   ])
     expect(() =>
       parseControlResponse({ requestId: 'control', extensionCache: changed }),
+    ).toThrow();
+});
+
+test('open control requires a canonical catalog and a header-safe repository identity', () => {
+  const open = { identity: 'owner', manifestPath: build.manifestPath, catalog };
+  expect(parseControlRequest({ requestId: 'open', open }).command.case).toBe(
+    'open',
+  );
+  for (const changed of [
+    { ...open, catalog: undefined },
+    { ...open, catalog: { ...catalog, repoId: 'unsafe/name' } },
+    {
+      ...open,
+      catalog: {
+        ...catalog,
+        catalogUrl: 'https://read.example.com/other.json',
+      },
+    },
+    {
+      ...open,
+      catalog: { ...catalog, catalogUrl: catalog.catalogUrl + '?token=1' },
+    },
+  ])
+    expect(() =>
+      parseControlRequest({ requestId: 'open', open: changed }),
     ).toThrow();
 });

@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 import 'package:web/web.dart' as web;
 import 'package:http/browser_client.dart';
 import 'cover_transport.dart';
+import 'catalog_transport.dart';
+import 'catalog_transport_web.dart';
 import 'popup_authentication.dart';
 import 'runtime_platform_types.dart';
 
@@ -21,6 +23,8 @@ final class WebPlatformRuntime extends PlatformRuntime {
   PopupAuthentication? _authentication;
   Map<String, Object?>? _pendingAuthentication;
   bool _disposed = false;
+  @override
+  late final CatalogTransport catalogTransport = WebCatalogTransport();
   @override
   late final CoverTransport coverTransport = HttpCoverTransport(
     origin: origin,
@@ -126,6 +130,7 @@ final class WebPlatformRuntime extends PlatformRuntime {
   Future<void> dispose() {
     _disposed = true;
     coverTransport.close();
+    catalogTransport.close();
     _authentication?.cancel();
     _pendingAuthentication = null;
     return runtime.dispose();

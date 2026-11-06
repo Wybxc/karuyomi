@@ -54,6 +54,7 @@ void main() {
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(
           schemaVersion: 1,
+          repoId: 'keiyoushi',
           builds: [_build('build-2', 'eu.kanade.source.test')],
         ),
       );
@@ -71,6 +72,7 @@ void main() {
       expect(
         await catalog.openFavoriteSource(_favorite, identityKey: identity()),
         true,
+        reason: catalog.error,
       );
       expect(platform.openedBuilds, ['build-2']);
       expect(catalog.activeBuild!.id, 'build-2');
@@ -98,6 +100,7 @@ void main() {
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(
           schemaVersion: 1,
+          repoId: 'keiyoushi',
           builds: [
             _build('build-other', 'source.other'),
             _build('build-current', 'eu.kanade.source.test'),
@@ -112,6 +115,7 @@ void main() {
       expect(
         await catalog.openFavoriteSource(_favorite, identityKey: identity()),
         true,
+        reason: catalog.error,
       );
       expect(platform.openedBuilds, ['build-current']);
       expect(catalog.activeBuild!.packageName, 'eu.kanade.source.test');
@@ -126,7 +130,7 @@ void main() {
         await catalog.openFavoriteSource(favorite, identityKey: identity()),
         false,
       );
-      expect(catalog.error, '这个收藏源的扩展当前不可用，收藏仍保留。');
+      expect(catalog.error, contains('尚未安装'));
       expect(platform.openedBuilds, isEmpty);
       expect(platform.invocations, isEmpty);
       expect(catalog.status, ServiceStatus.ready);

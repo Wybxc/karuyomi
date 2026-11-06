@@ -15,6 +15,7 @@ import {
   SettingsMutationSchema,
   FavoriteSourceSchema,
   InstalledExtensionSchema,
+  ExtensionRepositorySchema,
   GlobalSettingsValuesSchema,
   type SettingsMutation,
   LibraryMetadataSchema,
@@ -2700,4 +2701,80 @@ test('migration 128KiB transport budget rejects an otherwise bounded mapping bef
   expect(response.status).toBe(413);
   expect(response.body.error?.code).toBe(ErrorCode.LIMIT_EXCEEDED);
   expect((await owner.state(target.mangaKey)).manga?.revision).toBe(0);
+});
+
+test('additional repositories share global CAS and UUID receipts, reserve the default, and retain removed-catalog installations', async () => {
+  const first = await client(),
+    second = await client(first.subject);
+  const repositories = Array.from({ length: 16 }, (_, index) => ({
+    catalogUrl: `https://repo${index}.example.org/extensions/index.json`,
+    repoId: `repo-${index}`,
+    name: `Repo ${index}`,
+  }));
+  const command = globalSettings();
+  if (command.operation.case !== 'setGlobal')
+    throw new Error('Missing global settings');
+  command.operation.value.repositories = repositories.map((value) =>
+    create(ExtensionRepositorySchema, value),
+  );
+  const saved = await first.mutateSettings(command);
+  expect(saved.status).toBe(200);
+  expect(saved.body.global?.values?.repositories).toMatchObject(repositories);
+  expect((await second.settings()).global).toEqual(saved.body.global);
+  expect((await second.mutateSettings(command)).body).toEqual(saved.body);
+  const stale = globalSettings();
+  expect((await second.mutateSettings(stale)).status).toBe(409);
+  for (const invalid of [
+    [
+      ...repositories,
+      {
+        catalogUrl: 'https://seventeen.example.org/extensions/index.json',
+        repoId: 'seventeen',
+        name: 'Seventeen',
+      },
+    ],
+    [{ ...repositories[0]!, repoId: 'keiyoushi' }],
+    [{ ...repositories[0]!, catalogUrl: origin + '/extensions/index.json' }],
+    [
+      repositories[0]!,
+      { ...repositories[1]!, repoId: repositories[0]!.repoId },
+    ],
+    [
+      repositories[0]!,
+      { ...repositories[1]!, catalogUrl: repositories[0]!.catalogUrl },
+    ],
+  ]) {
+    const mutation = globalSettings(1);
+    if (mutation.operation.case !== 'setGlobal')
+      throw new Error('Missing global settings');
+    mutation.operation.value.repositories = invalid.map((value) =>
+      create(ExtensionRepositorySchema, value),
+    );
+    expect((await first.mutateSettings(mutation)).status).toBe(400);
+  }
+  const remove = globalSettings(
+    1,
+    AppTheme.SYSTEM,
+    ReaderMode.WEBTOON,
+    ReaderPageLayout.SINGLE,
+    [],
+    [
+      {
+        catalogUrl: repositories[0]!.catalogUrl,
+        repoId: repositories[0]!.repoId,
+        packageName: 'eu.kanade.fixture',
+        buildId: 'selected',
+        bundleSha256: 'a'.repeat(64),
+        enabled: true,
+      },
+    ],
+  );
+  const removed = await first.mutateSettings(remove);
+  expect(removed.status).toBe(200);
+  expect(removed.body.global?.values?.repositories).toEqual([]);
+  expect(removed.body.global?.values?.installedExtensions[0]?.repoId).toBe(
+    'repo-0',
+  );
+  expect((await second.mutateSettings(command)).body).toEqual(saved.body);
+  expect((await second.settings()).global).toEqual(removed.body.global);
 });

@@ -159,11 +159,11 @@ Future<RecoveredReader?> recoverReader(
       catalog.subject == context.subject &&
       catalog.deploymentOrigin?.origin == context.origin;
   if (!current()) return null;
-  final builds = catalog.builds.where(
-    (build) => build.packageName == context.packageName,
+  final build = await catalog.openSelectedBuild(
+    context.packageName,
+    shouldContinue: current,
   );
-  if (builds.isEmpty) throw StateError('原漫画源已不可用，请返回浏览选择');
-  await catalog.openBuild(builds.single);
+  if (build == null) throw StateError(catalog.error ?? '原漫画源已不可用，请返回浏览选择');
   if (!current()) return null;
   final sources = catalog.session?.sources.where(
     (source) => source.id == context.sourceId,

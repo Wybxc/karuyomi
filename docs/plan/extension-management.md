@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-**状态：已实现待实际平台验收。默认 Static Assets 仓库的账户合同、准备与缓存、关闭协议及正式管理入口已实现，独立集中工程检查、完整 Flutter 回归与构建通过。** 设计见[账户扩展与本机准备](../design/extension-management.md)，实际通过层级见[验证记录](../verification/extension-management.md)。额外仓库接入仍未实现，不以默认仓库入口代替完整 P3 范围。上级计划见 [P3](p3-extensions-and-migration.md)。
+**状态：已实现待实际平台验收。默认 Static Assets 仓库的账户合同、准备与缓存、关闭协议及正式管理入口已实现，独立集中工程检查、完整 Flutter 回归与构建通过。** 设计见[账户扩展与本机准备](../design/extension-management.md)，实际通过层级见[验证记录](../verification/extension-management.md)。额外仓库的正式来源链与管理入口也已接入，独立工程和实际平台门按[额外仓库子计划](additional-repositories.md)验收；不以工程通过代替完整 P3。上级计划见 [P3](p3-extensions-and-migration.md)。
 
 目标是让同一身份在 Web、iOS、Android 使用同一份账户扩展清单，区分账户已确认的使用意图、本机准备情况和正在运行的精确构建。安装准备不执行扩展，更新由用户明确发起，切换前关闭原运行槽，卸载后清理不再使用的本机扩展副本。
 
@@ -19,7 +19,7 @@
 - 浏览开包、目录 Source、收藏源与书架打开共同遵守已确认安装、enabled、仓库、精确 build 和 bundle hash；实际调用与章节图片 provider 同样有门禁。下架构建需手动更新，不因索引刷新静默换版。
 - 停用、改选或卸载先确认账户意图，再关闭对应章节/provider 和精确运行槽；关闭或副本删除失败单独显示、可重试。卸载保留书架、分类、进度、书签、收藏源、Source 数据与 HTTP Cache；共享 materials 仍走 Web Static Assets / Native 内置材料，不按扩展重复缓存。
 
-以上是当前接入范围，集中检查与真实客户端验收以验证记录为准。`catalogUrl/repoId` 字段并不意味着客户端已支持添加额外仓库。
+以上是默认仓库的接入范围；额外仓库的添加、移除、同包替换及来源隔离见[独立子计划](additional-repositories.md)。集中工程与真实客户端验收分别记录。
 
 ## 下一步
 
@@ -33,8 +33,8 @@
 
 ### 额外仓库与完整 P3
 
-- 设计并接入额外仓库的登记、验证、更新与移除，包括与既定 Static Assets 权威、公开下载及 Source 网络政策的关系。
-- 明确跨仓库同包替换、仓库身份冲突、构建来源及允许网络目标。账户合同采用 package 唯一，不能在相同业务身份下静默并装同包。
+- [额外仓库](additional-repositories.md)的登记、预览、刷新与移除已接入；继续真实 Static Assets、Source、Native 和独立客户端验收。
+- 同包跨仓明确确认、URL/repoId 冲突、准备/会话来源回显和按来源网络登记已落实。账户合同保持 package 唯一；实际运行证据另验。
 - 没有当前 AOT 产物时展示待构建或不支持，不从客户端启动远程编译。未知仓库或下架构建保留账户记录并显示不可用，不在只读刷新时删除。
 - 迁移、能力目录和有界跨源搜索继续按上级 P3 推进；本里程碑不缩减这些待办。
 

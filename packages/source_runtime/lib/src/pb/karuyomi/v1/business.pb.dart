@@ -3943,12 +3943,265 @@ class InstalledExtension extends $pb.GeneratedMessage {
   void clearEnabled() => $_clearField(6);
 }
 
+class ExtensionRepository extends $pb.GeneratedMessage {
+  factory ExtensionRepository({
+    $core.String? catalogUrl,
+    $core.String? repoId,
+    $core.String? name,
+  }) {
+    final result = ExtensionRepository._();
+    if (catalogUrl != null) result.catalogUrl = catalogUrl;
+    if (repoId != null) result.repoId = repoId;
+    if (name != null) result.name = name;
+    return result;
+  }
+
+  ExtensionRepository._();
+
+  factory ExtensionRepository.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionRepository()..mergeFromBuffer(data, registry);
+  factory ExtensionRepository.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionRepository()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ExtensionRepository',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ExtensionRepository.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'catalogUrl')
+    ..aOS(2, _omitFieldNames ? '' : 'repoId')
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionRepository clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionRepository copyWith(void Function(ExtensionRepository) updates) =>
+      super.copyWith((message) => updates(message as ExtensionRepository))
+          as ExtensionRepository;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use ExtensionRepository() / ExtensionRepository.new instead')
+  static ExtensionRepository create() => ExtensionRepository._();
+  static $pb.GeneratedMessage $_createMessage() => ExtensionRepository._();
+  @$core.override
+  ExtensionRepository createEmptyInstance() => ExtensionRepository._();
+  @$core.pragma('dart2js:noInline')
+  static ExtensionRepository getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ExtensionRepository>(
+          ExtensionRepository.$_createMessage);
+  static ExtensionRepository? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get catalogUrl => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set catalogUrl($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCatalogUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCatalogUrl() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get repoId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set repoId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRepoId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRepoId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+}
+
+class ExtensionNetworkPolicy extends $pb.GeneratedMessage {
+  factory ExtensionNetworkPolicy({
+    $core.String? buildId,
+    $core.String? packageName,
+    $core.String? bundleSha256,
+  }) {
+    final result = ExtensionNetworkPolicy._();
+    if (buildId != null) result.buildId = buildId;
+    if (packageName != null) result.packageName = packageName;
+    if (bundleSha256 != null) result.bundleSha256 = bundleSha256;
+    return result;
+  }
+
+  ExtensionNetworkPolicy._();
+
+  factory ExtensionNetworkPolicy.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionNetworkPolicy()..mergeFromBuffer(data, registry);
+  factory ExtensionNetworkPolicy.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionNetworkPolicy()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ExtensionNetworkPolicy',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ExtensionNetworkPolicy.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'buildId')
+    ..aOS(2, _omitFieldNames ? '' : 'packageName')
+    ..aOS(3, _omitFieldNames ? '' : 'bundleSha256')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionNetworkPolicy clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionNetworkPolicy copyWith(
+          void Function(ExtensionNetworkPolicy) updates) =>
+      super.copyWith((message) => updates(message as ExtensionNetworkPolicy))
+          as ExtensionNetworkPolicy;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ExtensionNetworkPolicy() / ExtensionNetworkPolicy.new instead')
+  static ExtensionNetworkPolicy create() => ExtensionNetworkPolicy._();
+  static $pb.GeneratedMessage $_createMessage() => ExtensionNetworkPolicy._();
+  @$core.override
+  ExtensionNetworkPolicy createEmptyInstance() => ExtensionNetworkPolicy._();
+  @$core.pragma('dart2js:noInline')
+  static ExtensionNetworkPolicy getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ExtensionNetworkPolicy>(
+          ExtensionNetworkPolicy.$_createMessage);
+  static ExtensionNetworkPolicy? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get buildId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set buildId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuildId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuildId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get packageName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set packageName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPackageName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPackageName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get bundleSha256 => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set bundleSha256($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBundleSha256() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBundleSha256() => $_clearField(3);
+}
+
+class ExtensionNetworkPoliciesResponse extends $pb.GeneratedMessage {
+  factory ExtensionNetworkPoliciesResponse({
+    $core.int? schemaVersion,
+    $0.CatalogReference? catalog,
+    $core.Iterable<ExtensionNetworkPolicy>? builds,
+  }) {
+    final result = ExtensionNetworkPoliciesResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (catalog != null) result.catalog = catalog;
+    if (builds != null) result.builds.addAll(builds);
+    return result;
+  }
+
+  ExtensionNetworkPoliciesResponse._();
+
+  factory ExtensionNetworkPoliciesResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionNetworkPoliciesResponse()..mergeFromBuffer(data, registry);
+  factory ExtensionNetworkPoliciesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionNetworkPoliciesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ExtensionNetworkPoliciesResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ExtensionNetworkPoliciesResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<$0.CatalogReference>(2, _omitFieldNames ? '' : 'catalog',
+        subBuilder: $0.CatalogReference.$_createMessage)
+    ..pPM<ExtensionNetworkPolicy>(3, _omitFieldNames ? '' : 'builds',
+        subBuilder: ExtensionNetworkPolicy.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionNetworkPoliciesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionNetworkPoliciesResponse copyWith(
+          void Function(ExtensionNetworkPoliciesResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ExtensionNetworkPoliciesResponse))
+          as ExtensionNetworkPoliciesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ExtensionNetworkPoliciesResponse() / ExtensionNetworkPoliciesResponse.new instead')
+  static ExtensionNetworkPoliciesResponse create() =>
+      ExtensionNetworkPoliciesResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ExtensionNetworkPoliciesResponse._();
+  @$core.override
+  ExtensionNetworkPoliciesResponse createEmptyInstance() =>
+      ExtensionNetworkPoliciesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ExtensionNetworkPoliciesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ExtensionNetworkPoliciesResponse>(
+          ExtensionNetworkPoliciesResponse.$_createMessage);
+  static ExtensionNetworkPoliciesResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $0.CatalogReference get catalog => $_getN(1);
+  @$pb.TagNumber(2)
+  set catalog($0.CatalogReference value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCatalog() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCatalog() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $0.CatalogReference ensureCatalog() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<ExtensionNetworkPolicy> get builds => $_getList(2);
+}
+
 class GlobalSettingsValues extends $pb.GeneratedMessage {
   factory GlobalSettingsValues({
     AppTheme? theme,
     ReaderSettings? reader,
     $core.Iterable<FavoriteSource>? favoriteSources,
     $core.Iterable<InstalledExtension>? installedExtensions,
+    $core.Iterable<ExtensionRepository>? repositories,
   }) {
     final result = GlobalSettingsValues._();
     if (theme != null) result.theme = theme;
@@ -3956,6 +4209,7 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
     if (favoriteSources != null) result.favoriteSources.addAll(favoriteSources);
     if (installedExtensions != null)
       result.installedExtensions.addAll(installedExtensions);
+    if (repositories != null) result.repositories.addAll(repositories);
     return result;
   }
 
@@ -3980,6 +4234,8 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
         subBuilder: FavoriteSource.$_createMessage)
     ..pPM<InstalledExtension>(4, _omitFieldNames ? '' : 'installedExtensions',
         subBuilder: InstalledExtension.$_createMessage)
+    ..pPM<ExtensionRepository>(5, _omitFieldNames ? '' : 'repositories',
+        subBuilder: ExtensionRepository.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4030,6 +4286,9 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(4)
   $pb.PbList<InstalledExtension> get installedExtensions => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<ExtensionRepository> get repositories => $_getList(4);
 }
 
 class GlobalSettings extends $pb.GeneratedMessage {
@@ -4770,6 +5029,8 @@ class SourcePreferencesResponse extends $pb.GeneratedMessage {
     $core.String? packageName,
     $core.Iterable<SourcePreferences>? sources,
     BusinessStateError? error,
+    $0.CatalogReference? catalog,
+    $core.Iterable<$0.PreferenceSyncRule>? syncRules,
   }) {
     final result = SourcePreferencesResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -4777,6 +5038,8 @@ class SourcePreferencesResponse extends $pb.GeneratedMessage {
     if (packageName != null) result.packageName = packageName;
     if (sources != null) result.sources.addAll(sources);
     if (error != null) result.error = error;
+    if (catalog != null) result.catalog = catalog;
+    if (syncRules != null) result.syncRules.addAll(syncRules);
     return result;
   }
 
@@ -4802,6 +5065,10 @@ class SourcePreferencesResponse extends $pb.GeneratedMessage {
         subBuilder: SourcePreferences.$_createMessage)
     ..aOM<BusinessStateError>(5, _omitFieldNames ? '' : 'error',
         subBuilder: BusinessStateError.$_createMessage)
+    ..aOM<$0.CatalogReference>(6, _omitFieldNames ? '' : 'catalog',
+        subBuilder: $0.CatalogReference.$_createMessage)
+    ..pPM<$0.PreferenceSyncRule>(7, _omitFieldNames ? '' : 'syncRules',
+        subBuilder: $0.PreferenceSyncRule.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4870,6 +5137,20 @@ class SourcePreferencesResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(5);
   @$pb.TagNumber(5)
   BusinessStateError ensureError() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  $0.CatalogReference get catalog => $_getN(5);
+  @$pb.TagNumber(6)
+  set catalog($0.CatalogReference value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCatalog() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCatalog() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.CatalogReference ensureCatalog() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<$0.PreferenceSyncRule> get syncRules => $_getList(6);
 }
 
 class SourcePreferencesMutation extends $pb.GeneratedMessage {
@@ -4880,6 +5161,7 @@ class SourcePreferencesMutation extends $pb.GeneratedMessage {
     $core.String? sourceId,
     $core.int? expectedRevision,
     $core.Iterable<$0.PreferenceEntry>? entries,
+    $0.CatalogReference? catalog,
   }) {
     final result = SourcePreferencesMutation._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -4888,6 +5170,7 @@ class SourcePreferencesMutation extends $pb.GeneratedMessage {
     if (sourceId != null) result.sourceId = sourceId;
     if (expectedRevision != null) result.expectedRevision = expectedRevision;
     if (entries != null) result.entries.addAll(entries);
+    if (catalog != null) result.catalog = catalog;
     return result;
   }
 
@@ -4913,6 +5196,8 @@ class SourcePreferencesMutation extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..pPM<$0.PreferenceEntry>(6, _omitFieldNames ? '' : 'entries',
         subBuilder: $0.PreferenceEntry.$_createMessage)
+    ..aOM<$0.CatalogReference>(7, _omitFieldNames ? '' : 'catalog',
+        subBuilder: $0.CatalogReference.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4988,6 +5273,17 @@ class SourcePreferencesMutation extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(6)
   $pb.PbList<$0.PreferenceEntry> get entries => $_getList(5);
+
+  @$pb.TagNumber(7)
+  $0.CatalogReference get catalog => $_getN(6);
+  @$pb.TagNumber(7)
+  set catalog($0.CatalogReference value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCatalog() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCatalog() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $0.CatalogReference ensureCatalog() => $_ensure(6);
 }
 
 class SourcePreferencesMutationResponse extends $pb.GeneratedMessage {
@@ -4997,6 +5293,8 @@ class SourcePreferencesMutationResponse extends $pb.GeneratedMessage {
     $core.int? accountRevision,
     SourcePreferences? preferences,
     BusinessStateError? error,
+    $0.CatalogReference? catalog,
+    $core.Iterable<$0.PreferenceSyncRule>? syncRules,
   }) {
     final result = SourcePreferencesMutationResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -5004,6 +5302,8 @@ class SourcePreferencesMutationResponse extends $pb.GeneratedMessage {
     if (accountRevision != null) result.accountRevision = accountRevision;
     if (preferences != null) result.preferences = preferences;
     if (error != null) result.error = error;
+    if (catalog != null) result.catalog = catalog;
+    if (syncRules != null) result.syncRules.addAll(syncRules);
     return result;
   }
 
@@ -5030,6 +5330,10 @@ class SourcePreferencesMutationResponse extends $pb.GeneratedMessage {
         subBuilder: SourcePreferences.$_createMessage)
     ..aOM<BusinessStateError>(5, _omitFieldNames ? '' : 'error',
         subBuilder: BusinessStateError.$_createMessage)
+    ..aOM<$0.CatalogReference>(6, _omitFieldNames ? '' : 'catalog',
+        subBuilder: $0.CatalogReference.$_createMessage)
+    ..pPM<$0.PreferenceSyncRule>(7, _omitFieldNames ? '' : 'syncRules',
+        subBuilder: $0.PreferenceSyncRule.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5108,6 +5412,20 @@ class SourcePreferencesMutationResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(5);
   @$pb.TagNumber(5)
   BusinessStateError ensureError() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  $0.CatalogReference get catalog => $_getN(5);
+  @$pb.TagNumber(6)
+  set catalog($0.CatalogReference value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCatalog() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCatalog() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.CatalogReference ensureCatalog() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<$0.PreferenceSyncRule> get syncRules => $_getList(6);
 }
 
 const $core.bool _omitFieldNames =

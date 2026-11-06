@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -33,6 +35,7 @@ final class MigrationController extends ChangeNotifier {
     repository = MigrationRepository(client);
     if (!identical(catalog.library?.client, client) || catalog.accessPaused) {
       _retired = true;
+      if (!_cancelled.isCompleted) _cancelled.complete();
       error = '身份或服务已改变，请关闭后重新开始迁移。';
     }
     catalog.addListener(_catalogChanged);
@@ -89,6 +92,7 @@ final class MigrationController extends ChangeNotifier {
   String? error;
   String? notice;
   bool _busy = false;
+  final _cancelled = Completer<void>();
   bool _disposed = false;
   bool _retired = false;
   int _epoch = 0;
@@ -106,6 +110,7 @@ final class MigrationController extends ChangeNotifier {
     if (_disposed) return;
     if (!identical(catalog.library?.client, client) || catalog.accessPaused) {
       _retired = true;
+      if (!_cancelled.isCompleted) _cancelled.complete();
       ++_epoch;
       error = '身份或服务已改变，请关闭后重新开始迁移。';
     }
@@ -116,6 +121,11 @@ final class MigrationController extends ChangeNotifier {
     if (!available || busy) return;
     await _run((epoch) async {
       await catalog.refreshInstallations();
+      if (!_current(epoch)) return;
+      await catalog.refreshCatalog(
+        shouldContinue: () => _current(epoch),
+        cancelled: _cancelled.future,
+      );
       if (!_current(epoch)) return;
       final original = await client.readManga(
         sourceKey,
@@ -130,7 +140,8 @@ final class MigrationController extends ChangeNotifier {
           if (catalog.installedExtensions.any(
             (installed) =>
                 installed.enabled &&
-                installed.catalogUrl == catalog.catalogUrl &&
+                installed.catalogUrl == build.catalogUrl &&
+                catalog.isRepositoryRegistered(build.catalog) &&
                 installed.repoId == build.repoId &&
                 installed.packageName == build.packageName &&
                 installed.buildId == build.id,
@@ -146,12 +157,8 @@ final class MigrationController extends ChangeNotifier {
   Future<void> readOriginalChapters() async {
     if (!canChange || selectedSource != null) return;
     await _run((epoch) async {
-      final build = catalog.builds
-          .where((build) => build.packageName == seed.metadata.packageName)
-          .firstOrNull;
-      if (build == null) throw const FormatException('原扩展不可用，可继续仅迁移收藏和分类。');
-      final ref = await catalog.openMigrationSource(
-        build: build,
+      final ref = await catalog.openSelectedSource(
+        packageName: seed.metadata.packageName,
         sourceId: seed.metadata.sourceId,
         shouldContinue: () => _current(epoch),
       );
@@ -467,6 +474,7 @@ final class MigrationController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (!_cancelled.isCompleted) _cancelled.complete();
     _disposed = true;
     ++_epoch;
     catalog.removeListener(_catalogChanged);

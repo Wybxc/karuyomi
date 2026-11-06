@@ -17,6 +17,71 @@ wire.ExtensionBuildDescriptor descriptor() => wire.ExtensionBuildDescriptor(
 );
 
 void main() {
+  test('preparation rejects a reply for a different catalog origin', () async {
+    final transport = FakeTransport();
+    final runtime = TransportSourceRuntime(transport);
+    addTearDown(runtime.dispose);
+    transport.handler = (request) async => request.hasPrepareBuild()
+        ? wire.ControlResponse(
+            requestId: request.requestId,
+            preparedBuild: wire.PreparedBuild(
+              build: request.prepareBuild.build,
+              catalog: wire.CatalogReference(
+                catalogUrl: 'https://other.example/extensions/index.json',
+                repoId: 'repo',
+              ),
+              bundleSha256: 'a' * 64,
+              byteLength: 12,
+            ),
+          )
+        : transport.respond(request);
+    await expectLater(
+      runtime.prepareBuild(
+        preparationId: 'prepare-1',
+        catalog: catalog(),
+        build: descriptor(),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test(
+    'open cache includes catalog identity and validates the returned session catalog',
+    () async {
+      final transport = FakeTransport();
+      final runtime = TransportSourceRuntime(transport);
+      addTearDown(runtime.dispose);
+      final original = build();
+      await runtime.open(original);
+      final external = BuildDescriptor(
+        buildId: original.buildId,
+        catalog: wire.CatalogReference(
+          catalogUrl: 'https://other.example/extensions/index.json',
+          repoId: original.catalog.repoId,
+        ),
+        manifestUri: original.manifestUri,
+        sha256: original.sha256,
+        identity: original.identity,
+        packageId: original.packageId,
+      );
+      final opened = await runtime.open(external);
+      expect(opened.catalog, external.catalog);
+      expect(
+        transport.calls.where((request) => request.hasOpen()),
+        hasLength(2),
+      );
+      transport.handler = (request) async {
+        final response = transport.respond(request);
+        if (request.hasOpen()) response.session.catalog = external.catalog;
+        return response;
+      };
+      await expectLater(
+        runtime.open(original),
+        throwsA(failure(RuntimeErrorCode.protocolError)),
+      );
+    },
+  );
+
   test(
     'prepare/cache are frozen independent controls and cannot open or invoke a Source',
     () async {
@@ -28,6 +93,7 @@ void main() {
             requestId: request.requestId,
             preparedBuild: wire.PreparedBuild(
               build: request.prepareBuild.build.deepCopy(),
+              catalog: request.prepareBuild.catalog.deepCopy(),
               bundleSha256: 'a' * 64,
               byteLength: 12,
             ),
@@ -55,6 +121,7 @@ void main() {
       final input = descriptor();
       final prepared = await runtime.prepareBuild(
         preparationId: 'prepare-1',
+        catalog: catalog(),
         build: input,
       );
       input.sources.single.name = 'changed';
@@ -98,7 +165,11 @@ void main() {
         return transport.respond(call);
       };
       await expectLater(
-        runtime.prepareBuild(preparationId: 'p', build: descriptor()),
+        runtime.prepareBuild(
+          preparationId: 'p',
+          catalog: catalog(),
+          build: descriptor(),
+        ),
         throwsA(failure(RuntimeErrorCode.runtimeLost)),
       );
       await expectLater(

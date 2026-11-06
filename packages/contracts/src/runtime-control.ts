@@ -15,7 +15,12 @@ import {
   validateJsonDepth,
 } from './codec.ts';
 import { hostAbi, protocolVersion, runtimeBaseline } from './generated.ts';
-import { validId, validSourceId } from './static-control.ts';
+import {
+  validId,
+  validSourceId,
+  catalogReferenceSchema,
+  type CatalogReference,
+} from './static-control.ts';
 import {
   validatePreferenceEditRequest,
   validatePreferenceSnapshot,
@@ -29,8 +34,8 @@ export type SourceInfo = PlainMessage<pb.SourceInfo> &
   Required<Pick<PlainMessage<pb.SourceInfo>, 'id' | 'name' | 'lang'>>;
 export type RuntimeSession = Omit<
   Required<PlainMessage<pb.RuntimeSession>>,
-  'sources'
-> & { sources: SourceInfo[] };
+  'sources' | 'catalog'
+> & { sources: SourceInfo[]; catalog: CatalogReference };
 export type RpcEnvelope = Required<PlainMessage<pb.RpcEnvelope>>;
 export type SourceCall = pb.SourceCall;
 export type SourceResult = pb.SourceResult;
@@ -120,7 +125,11 @@ export const runtimeSessionSchema = codec<RuntimeSession>((input) => {
     'buildId',
     'sources',
     'capabilities',
+    'catalog',
   ]);
+  const catalog = catalogReferenceSchema.parse(
+    messageJson(pb.CatalogReferenceSchema, value.catalog),
+  );
   requireCondition(
     value.protocolVersion === protocolVersion,
     'Incompatible runtime protocol',
@@ -134,7 +143,7 @@ export const runtimeSessionSchema = codec<RuntimeSession>((input) => {
       new Set(sources.map((source) => source.id)).size === sources.length,
     'Sources must be nonempty and unique',
   );
-  return { ...value, sources };
+  return { ...value, sources, catalog };
 });
 export const rpcEnvelopeSchema = codec<RpcEnvelope>((input) => {
   const value = plainMessage(pb.RpcEnvelopeSchema, input);

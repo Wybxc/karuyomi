@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { createHttpBridge } from './http-bridge.js';
+import { createExtensionRoutes } from './extension-routes.js';
 import { createCoverRoutes } from './cover-routes.js';
 import { createStateRoutes } from './state-routes.js';
 import { createSettingsRoutes } from './settings-routes.js';
@@ -120,6 +121,7 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
     return c.json(encodeBootstrap(body));
   });
   app.route('/api/bridge', createHttpBridge());
+  app.route('/api/extensions', createExtensionRoutes());
   app.route('/api', createStateRoutes());
   app.route('/api/settings', createSettingsRoutes());
   app.route('/api/source-preferences', createSourcePreferencesRoutes());

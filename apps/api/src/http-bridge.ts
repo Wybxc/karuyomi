@@ -554,9 +554,15 @@ export function createHttpBridge() {
     if (!buildId || buildId.length > 200)
       return c.json({ error: 'runtime_build_required' }, 400);
     const row = await c.env.DB.prepare(
-      'SELECT allowed_hosts_json FROM extension_builds WHERE build_id = ? AND status = ?',
+      'SELECT allowed_hosts_json FROM extension_builds WHERE build_id = ? AND catalog_url = ? AND repo_id = ? AND bundle_sha256 = ? AND status = ?',
     )
-      .bind(buildId, 'verified')
+      .bind(
+        buildId,
+        c.req.header('X-Runtime-Catalog') ?? '',
+        c.req.header('X-Runtime-Repo') ?? '',
+        c.req.header('X-Runtime-Bundle') ?? '',
+        'verified',
+      )
       .first<{ allowed_hosts_json: string }>();
     if (!row) return c.json({ error: 'build_not_found' }, 404);
     let hosts: unknown;

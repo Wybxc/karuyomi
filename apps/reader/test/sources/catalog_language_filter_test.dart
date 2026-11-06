@@ -38,14 +38,23 @@ List<wire.ExtensionBuildDescriptor> _builds() => [
 ];
 
 Object _index(List<wire.ExtensionBuildDescriptor> builds) =>
-    wire.encodeProtoJson(wire.ExtensionIndex(schemaVersion: 1, builds: builds));
+    wire.encodeProtoJson(
+      wire.ExtensionIndex(
+        schemaVersion: 1,
+        repoId: 'keiyoushi',
+        builds: builds,
+      ),
+    );
 
 void main() {
   test(
     'catalog metadata retains exact Source identities and frozen snapshots',
     () {
       final descriptor = _builds().first;
-      final build = CatalogBuild.fromProto(descriptor);
+      final build = CatalogBuild.fromProto(
+        descriptor,
+        catalogUrl: 'https://reader.example/extensions/index.json',
+      );
       expect(build.repoId, 'keiyoushi');
       expect(build.sources.map((source) => source.id), [
         sourceId,
@@ -62,8 +71,20 @@ void main() {
         () => build.sources.first.name = 'mutation',
         throwsUnsupportedError,
       );
-      expect(CatalogBuild.fromProto(_builds()[2]).sources.single.id, '0043');
-      expect(CatalogBuild.fromProto(_builds()[3]).sources.single.lang, '');
+      expect(
+        CatalogBuild.fromProto(
+          _builds()[2],
+          catalogUrl: 'https://reader.example/extensions/index.json',
+        ).sources.single.id,
+        '0043',
+      );
+      expect(
+        CatalogBuild.fromProto(
+          _builds()[3],
+          catalogUrl: 'https://reader.example/extensions/index.json',
+        ).sources.single.lang,
+        '',
+      );
     },
   );
 
@@ -93,7 +114,10 @@ void main() {
       };
       for (final entry in invalid.entries) {
         expect(
-          () => CatalogBuild.fromProto(entry.value),
+          () => CatalogBuild.fromProto(
+            entry.value,
+            catalogUrl: 'https://reader.example/extensions/index.json',
+          ),
           throwsFormatException,
           reason: entry.key,
         );

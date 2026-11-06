@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
+import '../../data/source_preferences_repository.dart';
 import '../browse/catalog_controller.dart';
 import 'source_preferences_controller.dart';
 
@@ -11,9 +12,11 @@ class SourcePreferencesSheet extends StatefulWidget {
     super.key,
     required this.catalog,
     required this.target,
+    required this.repository,
   });
   final CatalogController catalog;
   final SourcePreferencesTarget target;
+  final SourcePreferencesRepository repository;
 
   @override
   State<SourcePreferencesSheet> createState() => _SourcePreferencesSheetState();
@@ -21,16 +24,15 @@ class SourcePreferencesSheet extends StatefulWidget {
 
 class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
   late final SourcePreferencesController _controller;
-  late final String _identity;
   bool _closing = false;
 
   @override
   void initState() {
     super.initState();
-    _identity = widget.catalog.sourcePreferences!.identity.key;
     _controller = SourcePreferencesController(
       catalog: widget.catalog,
       target: widget.target,
+      repository: widget.repository,
       isCurrent: () => _current,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -41,7 +43,8 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
   bool get _current =>
       mounted &&
       !_closing &&
-      widget.catalog.sourcePreferences?.identity.key == _identity &&
+      identical(widget.catalog.sourcePreferences, widget.repository) &&
+      !widget.catalog.accessPaused &&
       ModalRoute.of(context)?.isActive == true;
 
   Future<void> _text(wire.PreferenceNode node, List<int> path) async {

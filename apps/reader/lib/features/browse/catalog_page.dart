@@ -113,10 +113,11 @@ class _CatalogPageState extends State<CatalogPage> {
   Future<void> _preferences([SourcePreferencesTarget? target]) async {
     final catalog = widget.controller;
     final selected = target ?? catalog?.currentPreferencesTarget;
+    final repository = catalog?.sourcePreferences;
     if (catalog == null ||
         selected == null ||
         catalog.busy ||
-        catalog.sourcePreferences == null) {
+        repository == null) {
       return;
     }
     await showModalBottomSheet<void>(
@@ -125,7 +126,11 @@ class _CatalogPageState extends State<CatalogPage> {
       useSafeArea: true,
       builder: (_) => FractionallySizedBox(
         heightFactor: .9,
-        child: SourcePreferencesSheet(catalog: catalog, target: selected),
+        child: SourcePreferencesSheet(
+          catalog: catalog,
+          target: selected,
+          repository: repository,
+        ),
       ),
     );
   }
@@ -241,14 +246,19 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                   TextButton.icon(
                     key: const ValueKey('extensions-manage'),
-                    onPressed: busy
+                    onPressed: busy || controller.settings == null
                         ? null
-                        : () => Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  ExtensionsPage(catalog: controller),
-                            ),
-                          ),
+                        : () {
+                            final repository = controller.settings!;
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => ExtensionsPage(
+                                  catalog: controller,
+                                  repository: repository,
+                                ),
+                              ),
+                            );
+                          },
                     icon: const Icon(Icons.extension_outlined),
                     label: const Text('扩展管理'),
                   ),

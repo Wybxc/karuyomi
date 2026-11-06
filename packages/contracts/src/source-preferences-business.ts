@@ -11,10 +11,11 @@ import {
   requireCondition,
   requireFields,
 } from './codec.ts';
-import { validSourceId } from './static-control.ts';
+import { validSourceId, validateCatalogReference } from './static-control.ts';
 import {
   validatePreferencePackageName,
   validateSyncedPreferenceEntries,
+  validatePreferenceSyncRuleSubset,
 } from './source-preference-policy.ts';
 
 export const SOURCE_PREFERENCES_PACKAGE_LIMIT = 64;
@@ -37,7 +38,10 @@ function uint32(value: number): void {
   );
 }
 
-export function validateSourcePreferences(value: pb.SourcePreferences): void {
+export function validateSourcePreferences(
+  value: pb.SourcePreferences,
+  rules?: readonly pb.PreferenceSyncRule[],
+): void {
   validatePreferencePackageName(value.packageName);
   validSourceId(value.sourceId);
   uint32(value.revision);
@@ -45,6 +49,7 @@ export function validateSourcePreferences(value: pb.SourcePreferences): void {
     value.packageName,
     value.sourceId,
     value.entries,
+    rules,
   );
 }
 
@@ -80,6 +85,8 @@ export const sourcePreferencesMutationSchema =
       value.schemaVersion === businessSchemaVersion,
       'Unsupported business state schema',
     );
+    requireFields(value, ['catalog']);
+    validateCatalogReference(value.catalog);
     uuid.parse(value.mutationId);
     uint32(value.expectedRevision);
     validateSyncedPreferenceEntries(
@@ -98,6 +105,10 @@ export const sourcePreferencesResponseSchema =
       SOURCE_PREFERENCES_RESPONSE_LIMIT,
     );
     validateEnvelope(value);
+    if (!value.error) requireFields(value, ['catalog']);
+    if (value.catalog) validateCatalogReference(value.catalog);
+    if (!value.error || value.packageName !== '')
+      validatePreferenceSyncRuleSubset(value.packageName, value.syncRules);
     if (!value.error || value.packageName !== '')
       validatePreferencePackageName(value.packageName);
     requireCondition(
@@ -107,7 +118,7 @@ export const sourcePreferencesResponseSchema =
     const identities = new Set<string>();
     let bytes = 0;
     for (const source of value.sources) {
-      validateSourcePreferences(source);
+      validateSourcePreferences(source, value.syncRules);
       requireCondition(
         source.packageName === value.packageName &&
           source.revision <= value.accountRevision &&
@@ -134,10 +145,17 @@ export const sourcePreferencesMutationResponseSchema =
       SOURCE_PREFERENCES_RESPONSE_LIMIT,
     );
     validateEnvelope(value);
+    if (!value.error) requireFields(value, ['catalog']);
+    if (value.catalog) validateCatalogReference(value.catalog);
+    if (value.preferences)
+      validatePreferenceSyncRuleSubset(
+        value.preferences.packageName,
+        value.syncRules,
+      );
     if (!value.error || value.mutationId !== '') uuid.parse(value.mutationId);
     if (!value.error) requireFields(value, ['preferences']);
     if (value.preferences) {
-      validateSourcePreferences(value.preferences);
+      validateSourcePreferences(value.preferences, value.syncRules);
       requireCondition(
         value.preferences.revision <= value.accountRevision,
         'Source preferences exceed account revision',

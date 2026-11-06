@@ -75,6 +75,7 @@ export async function snapshot(directory: string, manifest: BuildManifest) {
   const manifestPath = `/extensions/builds/${manifest.buildId}/manifest.json`;
   const index: ExtensionIndex = {
     schemaVersion: 1,
+    repoId: manifest.repoId,
     builds: [
       {
         buildId: manifest.buildId,

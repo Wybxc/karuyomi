@@ -119,3 +119,18 @@ void checkSourceMemo(String value) {
   }
   _checkJsonNesting(decoded);
 }
+
+void validateCatalogReference(CatalogReference value) {
+  final uri = Uri.tryParse(value.catalogUrl);
+  if (value.catalogUrl.length > 2048 ||
+      uri == null ||
+      !uri.hasAuthority ||
+      !(uri.scheme == 'https' ||
+          (uri.scheme == 'http' &&
+              {'localhost', '127.0.0.1', '::1'}.contains(uri.host))) ||
+      uri.userInfo.isNotEmpty ||
+      value.catalogUrl != '${uri.origin}/extensions/index.json' ||
+      !RegExp(r'^[A-Za-z0-9._-]{1,200}$').hasMatch(value.repoId)) {
+    throw const FormatException('Invalid canonical catalog reference');
+  }
+}

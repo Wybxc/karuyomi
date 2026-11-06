@@ -15,7 +15,12 @@ const komiic = 'eu.kanade.tachiyomi.extension.zh.komiic';
 const fire = 'eu.kanade.tachiyomi.extension.all.mangafire';
 const katana = 'eu.kanade.tachiyomi.extension.en.mangakatana';
 const sourceId = '792932060924485302';
+const catalog = {
+  catalogUrl: 'https://read.example.com/extensions/index.json',
+  repoId: 'keiyoushi',
+};
 const base = {
+  catalog,
   schemaVersion: 1,
   mutationId: 'a281b912-5bdb-4640-b7bc-d33bd721f8c4',
   packageName: komiic,
@@ -129,6 +134,10 @@ test('full replacement keeps false and empty values while source and package JSO
   expect(() =>
     sourcePreferencesResponseSchema.parse({
       schemaVersion: 1,
+      catalog,
+      syncRules: preferenceSyncRules(fire).map((rule) =>
+        toJson(pb.PreferenceSyncRuleSchema, rule),
+      ),
       accountRevision: 1,
       packageName: fire,
       sources: [source, { ...source, sourceId: '2' }],
@@ -137,6 +146,10 @@ test('full replacement keeps false and empty values while source and package JSO
   expect(() =>
     sourcePreferencesResponseSchema.parse({
       schemaVersion: 1,
+      catalog,
+      syncRules: preferenceSyncRules(fire).map((rule) =>
+        toJson(pb.PreferenceSyncRuleSchema, rule),
+      ),
       accountRevision: 1,
       packageName: fire,
       sources: [
@@ -156,6 +169,10 @@ test('package and mutation responses enforce package identity, unique scopes and
     entries: [{ key: 'preferred_mirror', value: { text: '1' } }],
   };
   const response = {
+    catalog,
+    syncRules: preferenceSyncRules(komiic).map((rule) =>
+      toJson(pb.PreferenceSyncRuleSchema, rule),
+    ),
     schemaVersion: 1,
     accountRevision: 1,
     packageName: komiic,

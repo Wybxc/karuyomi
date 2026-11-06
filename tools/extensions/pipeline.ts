@@ -1174,8 +1174,11 @@ export function finalizeBaseline(
   };
 }
 export function staticIndex(manifests: BuildManifest[]): ExtensionIndex {
+  if (manifests.some((manifest) => manifest.repoId !== 'keiyoushi'))
+    throw new Error('Default pipeline cannot publish another repository');
   return {
     schemaVersion: 1,
+    repoId: 'keiyoushi',
     builds: [...manifests]
       .sort((a, b) => (a.packageName < b.packageName ? -1 : 1))
       .map(({ buildId, packageName, repoId, version, sourceIds, sources }) => ({

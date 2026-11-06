@@ -211,6 +211,7 @@ final class PreferenceFixture {
   SourcePreferencesController editor({bool Function()? isCurrent}) =>
       SourcePreferencesController(
         catalog: catalog,
+        repository: repository,
         target:
             catalog.currentPreferencesTarget ??
             catalog.sourcePreferenceRecoveries.single,

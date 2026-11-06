@@ -101,9 +101,9 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 ## 网络策略
 
-静态分发无需 Access。D1 仅保存当前 build 的 Source 网络策略，不保存扩展清单或正文；`/api` 继续校验 Access、Origin 和显式域名白名单。
+静态分发无需 Access。D1 的扩展登记表仅保存按来源绑定的当前 build 网络策略，不保存静态目录或扩展正文；账户安装意图另存于全局业务设置。`/api` 继续校验 Access、Origin 和显式域名白名单。
 
-部署后的 `network-policies.ts --remote` 将已批准 package 的域名策略切换到当前 build，退役已不在索引中的策略；它不自动批准新包、不从请求学习白名单，也不下载 gzip。首次批准一个当前包时，明确指定允许的 hostname：
+部署后的 `network-policies.ts --remote` 仅在指定 catalog URL、由该 index 确定的 repoId 内将已批准 package 的域名策略切换到当前 build，退役该来源中已不在索引的策略；默认 CI 不清理额外仓库；它不自动批准新包、不从请求学习白名单，也不下载 gzip。首次批准一个当前包时，明确指定允许的 hostname：
 
 ```sh
 node tools/extensions/registration.ts PATH_TO_OUTPUT/manifest.json \
@@ -111,6 +111,21 @@ node tools/extensions/registration.ts PATH_TO_OUTPUT/manifest.json \
 ```
 
 远程注册先核对部署 origin 的当前 index/manifest；本地测试必须使用 `--local --static-root SNAPSHOT`。注册只解析元数据，不读取本地 gzip、不下载正文，也不重复计算扩展摘要；上传/下载边界负责完整性校验。构建任务不持有 Cloudflare 部署凭据；上游 Gradle/AOT 子进程移除 GitHub 和 Cloudflare 凭据。runtime seed 是独立构建依赖，不属于扩展发布。
+
+额外仓库使用同一工具并显式指定来源：
+
+```sh
+pnpm --filter @karuyomi/runtime-host build
+pnpm exec node tools/extensions/registration.ts MANIFEST \
+  --remote --catalog-url https://repo.example/extensions/index.json \
+  --allow-host source.example
+pnpm exec node tools/extensions/network-policies.ts \
+  --remote --catalog-url https://repo.example/extensions/index.json
+```
+
+`--catalog-url` 只改变 index/manifest 的读取来源；共享材料始终按本项目构建出的 `packages/runtime-host/dist/materials.json` 核对，外仓不重复托管材料，也不能替代受信材料清单。额外仓库须与当前应用 ABI/materials 一致，并为浏览器及 Native 内置 WebView 的运行时下载提供 CORS。代码公开可准备与 Source 网络已登记是两个状态，客户端通过 typed 只读接口区分。
+
+登记、hosts 继承、退役和同步删除均限定来源；跨仓 buildId 冲突拒绝，即使 digest 相同也不覆盖。HTTP 桥同时匹配 buildId、catalog URL、repoId 与 bundle digest，不能只凭 buildId 调用。`0009` 是原型重建：清空无来源的旧网络登记和 Source 设置，并撤销旧设置写入收据。部署前须规划按当前来源重新登记；不要盲目套用迁移后把未登记状态当成可运行。它不删除书架、进度和账户安装意图。本轮功能提交不表示已部署该迁移。
 
 ## 增量 CI 与验证层级
 

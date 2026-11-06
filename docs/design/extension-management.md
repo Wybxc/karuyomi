@@ -17,7 +17,7 @@ Worker API + D1 保存同一身份的扩展使用意图；Static Assets 提供�
 
 清单最多 128 项，package 唯一；同包跨仓库替换需要明确操作，不并装共享业务身份的两个副本。缺记录就是未安装，不自动将目录迁为已安装。字段在 TS/Dart 边界解析，不能只信生成类型。
 
-`catalogUrl` 最长 2048 字符，使用规范化 origin 加精确 `/extensions/index.json`，无 userinfo、query 或 fragment，包括空的 `?`/`#`。网络仓库要求 HTTPS；开发 HTTP 仅允许 literal localhost、127.0.0.1 或 [::1]。当前正式 UI 仅连接部署 origin 的默认仓库，额外仓库添加与网络政策接入仍待实现；预留字段不是已经具备额外仓库能力的证明。
+`catalogUrl` 最长 2048 字符，使用规范化 origin 加精确 `/extensions/index.json`，无 userinfo、query 或 fragment，包括空的 `?`/`#`。网络仓库要求 HTTPS；开发 HTTP 仅允许 literal localhost、127.0.0.1 或 [::1]。额外仓库的账户登记、同包替换、来源隔离和网络政策以[额外仓库设计](additional-repositories.md)为准，实施与验收状态分别维护。
 
 复用现有身份绑定 `SettingsRepository/SettingsController`、全局 CAS 与 mutation UUID；不新增扩展业务数据库或 outbox。修改复制完整已确认全局值，保留主题、阅读偏好和收藏源。安装/更新在准备开始前固定完整值与 revision，准备完成后按原 CAS 提交；发生并发变更时明确冲突，由用户重新读取并确认。
 
@@ -25,11 +25,11 @@ Worker API + D1 保存同一身份的扩展使用意图；Static Assets 提供�
 
 ## 准备与缓存
 
-`control.proto` 增加 `prepareBuild/cancelPreparation/extensionCache/forgetExtensionArtifact/closeBuild`。准备请求带唯一 preparation ID 与完整目录 descriptor，响应给出同一 descriptor、bundle digest 和字节数。控制消息继续使用生成 ProtoJSON 和运行时语义校验；代码字节沿独立有界下载路径。
+`control.proto` 增加 `prepareBuild/cancelPreparation/extensionCache/forgetExtensionArtifact/closeBuild`。准备请求带唯一 preparation ID 与完整目录 descriptor，请求同时携带必填 CatalogReference；响应回显相同来源和 descriptor、bundle digest 及字节数。控制消息继续使用生成 ProtoJSON 和运行时语义校验；代码字节沿独立有界下载路径。
 
 `VerifiedLoader.prepare` 重新读取当前索引，核对 descriptor 与 manifest，检查共享材料，然后下载/解压/校验 bundle。比较使用生成 Protobuf 消息语义，不依赖 JSON 属性顺序。整个流程不创建 Source Worker、不构造或调用 Source，不执行代码。Web 共享材料来自公开 Static Assets；Native 依照打包 metadata 检查可用性，缺少材料提示更新应用，不从网络补齐内置材料。
 
-manager 同时只允许一个准备，相同 ID/descriptor 复用进行中的结果，其它准备明确 busy；设置 60 秒 AbortSignal 期限。取消按 ID，等待当前操作收尾，防止迟到下载在清理之后重新提交缓存。准备失败不主动终止正在使用的 Source。
+manager 同时只允许一个准备，相同 ID/来源/descriptor 复用进行中的结果，其它准备明确 busy；设置 60 秒 AbortSignal 期限。取消按 ID，等待当前操作收尾，防止迟到下载在清理之后重新提交缓存。准备失败不主动终止正在使用的 Source。
 
 代码缓存直接引入 `idb@8.0.4`，在宿主同源 IndexedDB 分存 metadata 与 canonical JS bytes，使用同一事务提交。默认预算为 128 产物 / 256MiB；重复 digest 不重复计费，无 LRU 或多级缓存。缓存记录保存传输验证收据，本地命中核对元数据/字节长度，复用收据而不重算 hash。达到预算后用户清理无用副本再准备。
 

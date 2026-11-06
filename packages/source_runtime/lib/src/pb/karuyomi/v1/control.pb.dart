@@ -60,6 +60,76 @@ class Empty extends $pb.GeneratedMessage {
   static Empty? _defaultInstance;
 }
 
+/// Public static delivery identity, separate from the application/API origin.
+class CatalogReference extends $pb.GeneratedMessage {
+  factory CatalogReference({
+    $core.String? catalogUrl,
+    $core.String? repoId,
+  }) {
+    final result = CatalogReference._();
+    if (catalogUrl != null) result.catalogUrl = catalogUrl;
+    if (repoId != null) result.repoId = repoId;
+    return result;
+  }
+
+  CatalogReference._();
+
+  factory CatalogReference.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CatalogReference()..mergeFromBuffer(data, registry);
+  factory CatalogReference.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CatalogReference()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CatalogReference',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CatalogReference.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'catalogUrl')
+    ..aOS(2, _omitFieldNames ? '' : 'repoId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CatalogReference clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CatalogReference copyWith(void Function(CatalogReference) updates) =>
+      super.copyWith((message) => updates(message as CatalogReference))
+          as CatalogReference;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CatalogReference() / CatalogReference.new instead')
+  static CatalogReference create() => CatalogReference._();
+  static $pb.GeneratedMessage $_createMessage() => CatalogReference._();
+  @$core.override
+  CatalogReference createEmptyInstance() => CatalogReference._();
+  @$core.pragma('dart2js:noInline')
+  static CatalogReference getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CatalogReference>(
+          CatalogReference.$_createMessage);
+  static CatalogReference? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get catalogUrl => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set catalogUrl($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCatalogUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCatalogUrl() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get repoId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set repoId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRepoId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRepoId() => $_clearField(2);
+}
+
 class RuntimeError extends $pb.GeneratedMessage {
   factory RuntimeError({
     RuntimeErrorCode? code,
@@ -378,6 +448,7 @@ class RuntimeSession extends $pb.GeneratedMessage {
     $core.String? buildId,
     $core.Iterable<SourceInfo>? sources,
     $core.Iterable<$core.String>? capabilities,
+    CatalogReference? catalog,
   }) {
     final result = RuntimeSession._();
     if (protocolVersion != null) result.protocolVersion = protocolVersion;
@@ -386,6 +457,7 @@ class RuntimeSession extends $pb.GeneratedMessage {
     if (buildId != null) result.buildId = buildId;
     if (sources != null) result.sources.addAll(sources);
     if (capabilities != null) result.capabilities.addAll(capabilities);
+    if (catalog != null) result.catalog = catalog;
     return result;
   }
 
@@ -410,6 +482,8 @@ class RuntimeSession extends $pb.GeneratedMessage {
     ..pPM<SourceInfo>(5, _omitFieldNames ? '' : 'sources',
         subBuilder: SourceInfo.$_createMessage)
     ..pPS(6, _omitFieldNames ? '' : 'capabilities')
+    ..aOM<CatalogReference>(7, _omitFieldNames ? '' : 'catalog',
+        subBuilder: CatalogReference.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -475,6 +549,17 @@ class RuntimeSession extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(6)
   $pb.PbList<$core.String> get capabilities => $_getList(5);
+
+  @$pb.TagNumber(7)
+  CatalogReference get catalog => $_getN(6);
+  @$pb.TagNumber(7)
+  set catalog(CatalogReference value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCatalog() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCatalog() => $_clearField(7);
+  @$pb.TagNumber(7)
+  CatalogReference ensureCatalog() => $_ensure(6);
 }
 
 class RpcEnvelope extends $pb.GeneratedMessage {
@@ -591,6 +676,7 @@ class OpenRequest extends $pb.GeneratedMessage {
     $core.String? expectedBuildId,
     $core.String? expectedBundleSha256,
     PreferenceBootstrap? preferenceBootstrap,
+    CatalogReference? catalog,
   }) {
     final result = OpenRequest._();
     if (manifestPath != null) result.manifestPath = manifestPath;
@@ -601,6 +687,7 @@ class OpenRequest extends $pb.GeneratedMessage {
       result.expectedBundleSha256 = expectedBundleSha256;
     if (preferenceBootstrap != null)
       result.preferenceBootstrap = preferenceBootstrap;
+    if (catalog != null) result.catalog = catalog;
     return result;
   }
 
@@ -624,6 +711,8 @@ class OpenRequest extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'expectedBundleSha256')
     ..aOM<PreferenceBootstrap>(6, _omitFieldNames ? '' : 'preferenceBootstrap',
         subBuilder: PreferenceBootstrap.$_createMessage)
+    ..aOM<CatalogReference>(7, _omitFieldNames ? '' : 'catalog',
+        subBuilder: CatalogReference.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -703,6 +792,17 @@ class OpenRequest extends $pb.GeneratedMessage {
   void clearPreferenceBootstrap() => $_clearField(6);
   @$pb.TagNumber(6)
   PreferenceBootstrap ensurePreferenceBootstrap() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  CatalogReference get catalog => $_getN(6);
+  @$pb.TagNumber(7)
+  set catalog(CatalogReference value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCatalog() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCatalog() => $_clearField(7);
+  @$pb.TagNumber(7)
+  CatalogReference ensureCatalog() => $_ensure(6);
 }
 
 class Manga extends $pb.GeneratedMessage {
@@ -6423,10 +6523,12 @@ class ExtensionIndex extends $pb.GeneratedMessage {
   factory ExtensionIndex({
     $core.int? schemaVersion,
     $core.Iterable<ExtensionBuildDescriptor>? builds,
+    $core.String? repoId,
   }) {
     final result = ExtensionIndex._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
     if (builds != null) result.builds.addAll(builds);
+    if (repoId != null) result.repoId = repoId;
     return result;
   }
 
@@ -6447,6 +6549,7 @@ class ExtensionIndex extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..pPM<ExtensionBuildDescriptor>(2, _omitFieldNames ? '' : 'builds',
         subBuilder: ExtensionBuildDescriptor.$_createMessage)
+    ..aOS(3, _omitFieldNames ? '' : 'repoId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6482,6 +6585,15 @@ class ExtensionIndex extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<ExtensionBuildDescriptor> get builds => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.String get repoId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set repoId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRepoId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRepoId() => $_clearField(3);
 }
 
 class Identity extends $pb.GeneratedMessage {
@@ -6836,10 +6948,12 @@ class PrepareBuildRequest extends $pb.GeneratedMessage {
   factory PrepareBuildRequest({
     $core.String? preparationId,
     ExtensionBuildDescriptor? build,
+    CatalogReference? catalog,
   }) {
     final result = PrepareBuildRequest._();
     if (preparationId != null) result.preparationId = preparationId;
     if (build != null) result.build = build;
+    if (catalog != null) result.catalog = catalog;
     return result;
   }
 
@@ -6859,6 +6973,8 @@ class PrepareBuildRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'preparationId')
     ..aOM<ExtensionBuildDescriptor>(2, _omitFieldNames ? '' : 'build',
         subBuilder: ExtensionBuildDescriptor.$_createMessage)
+    ..aOM<CatalogReference>(3, _omitFieldNames ? '' : 'catalog',
+        subBuilder: CatalogReference.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6903,6 +7019,17 @@ class PrepareBuildRequest extends $pb.GeneratedMessage {
   void clearBuild() => $_clearField(2);
   @$pb.TagNumber(2)
   ExtensionBuildDescriptor ensureBuild() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  CatalogReference get catalog => $_getN(2);
+  @$pb.TagNumber(3)
+  set catalog(CatalogReference value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCatalog() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCatalog() => $_clearField(3);
+  @$pb.TagNumber(3)
+  CatalogReference ensureCatalog() => $_ensure(2);
 }
 
 class CancelPreparationRequest extends $pb.GeneratedMessage {
@@ -6970,11 +7097,13 @@ class PreparedBuild extends $pb.GeneratedMessage {
     ExtensionBuildDescriptor? build,
     $core.String? bundleSha256,
     $core.int? byteLength,
+    CatalogReference? catalog,
   }) {
     final result = PreparedBuild._();
     if (build != null) result.build = build;
     if (bundleSha256 != null) result.bundleSha256 = bundleSha256;
     if (byteLength != null) result.byteLength = byteLength;
+    if (catalog != null) result.catalog = catalog;
     return result;
   }
 
@@ -6995,6 +7124,8 @@ class PreparedBuild extends $pb.GeneratedMessage {
         subBuilder: ExtensionBuildDescriptor.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'bundleSha256')
     ..aI(3, _omitFieldNames ? '' : 'byteLength', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<CatalogReference>(4, _omitFieldNames ? '' : 'catalog',
+        subBuilder: CatalogReference.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7047,6 +7178,17 @@ class PreparedBuild extends $pb.GeneratedMessage {
   $core.bool hasByteLength() => $_has(2);
   @$pb.TagNumber(3)
   void clearByteLength() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  CatalogReference get catalog => $_getN(3);
+  @$pb.TagNumber(4)
+  set catalog(CatalogReference value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCatalog() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCatalog() => $_clearField(4);
+  @$pb.TagNumber(4)
+  CatalogReference ensureCatalog() => $_ensure(3);
 }
 
 class CachedExtensionArtifact extends $pb.GeneratedMessage {
@@ -8018,12 +8160,14 @@ class OpenWorker extends $pb.GeneratedMessage {
     BuildManifest? manifest,
     $core.String? userAgent,
     PreferenceBootstrap? preferenceBootstrap,
+    CatalogReference? catalog,
   }) {
     final result = OpenWorker._();
     if (manifest != null) result.manifest = manifest;
     if (userAgent != null) result.userAgent = userAgent;
     if (preferenceBootstrap != null)
       result.preferenceBootstrap = preferenceBootstrap;
+    if (catalog != null) result.catalog = catalog;
     return result;
   }
 
@@ -8045,6 +8189,8 @@ class OpenWorker extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'userAgent')
     ..aOM<PreferenceBootstrap>(3, _omitFieldNames ? '' : 'preferenceBootstrap',
         subBuilder: PreferenceBootstrap.$_createMessage)
+    ..aOM<CatalogReference>(4, _omitFieldNames ? '' : 'catalog',
+        subBuilder: CatalogReference.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8097,6 +8243,17 @@ class OpenWorker extends $pb.GeneratedMessage {
   void clearPreferenceBootstrap() => $_clearField(3);
   @$pb.TagNumber(3)
   PreferenceBootstrap ensurePreferenceBootstrap() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  CatalogReference get catalog => $_getN(3);
+  @$pb.TagNumber(4)
+  set catalog(CatalogReference value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCatalog() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCatalog() => $_clearField(4);
+  @$pb.TagNumber(4)
+  CatalogReference ensureCatalog() => $_ensure(3);
 }
 
 class AcquireImageWorker extends $pb.GeneratedMessage {

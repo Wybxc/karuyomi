@@ -13,7 +13,10 @@ void main() {
   });
   tearDown(() => fixture.close());
 
-  Future<void> open(WidgetTester tester) async {
+  Future<void> open(
+    WidgetTester tester, {
+    Future<void> Function()? beforeFirstFrame,
+  }) async {
     tester.view.physicalSize = const Size(480, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -40,6 +43,7 @@ void main() {
     await tester.scrollUntilVisible(button, 300, scrollable: scrollable);
     await tester.ensureVisible(button);
     await tester.tap(button);
+    await beforeFirstFrame?.call();
     await tester.pumpAndSettle();
     expect(find.byType(SourcePreferencesSheet), findsOneWidget);
   }
@@ -167,4 +171,88 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+  for (final denied in [true, false]) {
+    testWidgets(
+      'settings sheet keeps the clicked repository when ${denied ? 'Access fails' : 'the account changes'} before its first frame',
+      (tester) async {
+        final clicked = fixture.repository;
+        var requests = 0;
+        final invocations = fixture.platform.invocations.length;
+        final opened = fixture.platform.openedBuilds.length;
+        await open(
+          tester,
+          beforeFirstFrame: () async {
+            if (denied) {
+              fixture.platform.bootstrapStatus = 403;
+            } else {
+              fixture.platform.bootstrapSubject = 'other-subject';
+            }
+            await fixture.catalog.connect();
+            requests = fixture.platform.businessServer.requests
+                .where(
+                  (request) =>
+                      request.uri.path.startsWith('/api/source-preferences/'),
+                )
+                .length;
+          },
+        );
+        expect(tester.takeException(), isNull);
+        expect(
+          fixture.platform.businessServer.requests.where(
+            (request) =>
+                request.uri.path.startsWith('/api/source-preferences/'),
+          ),
+          hasLength(requests),
+        );
+        expect(
+          fixture.platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          isEmpty,
+        );
+        expect(fixture.platform.invocations, hasLength(invocations));
+        expect(fixture.platform.openedBuilds, hasLength(opened));
+        expect(fixture.postedBodies, isEmpty);
+        expect(find.text('身份或服务已改变，请关闭后重新打开漫画源设置。'), findsOneWidget);
+        fixture.platform.bootstrapStatus = 200;
+        fixture.platform.bootstrapSubject = 'owner-subject';
+        await fixture.catalog.connect();
+        if (denied) {
+          expect(identical(fixture.repository, clicked), true);
+        }
+        requests = fixture.platform.businessServer.requests
+            .where(
+              (request) =>
+                  request.uri.path.startsWith('/api/source-preferences/'),
+            )
+            .length;
+        await tester.pumpAndSettle();
+        final refresh = find.byKey(
+          const ValueKey('source-preferences-refresh'),
+        );
+        await tester.ensureVisible(refresh);
+        await tester.tap(refresh);
+        await tester.pumpAndSettle();
+        expect(
+          fixture.platform.businessServer.requests.where(
+            (request) =>
+                request.uri.path.startsWith('/api/source-preferences/'),
+          ),
+          hasLength(requests),
+        );
+        expect(
+          fixture.platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          isEmpty,
+        );
+        expect(fixture.platform.invocations, hasLength(invocations));
+        expect(fixture.platform.openedBuilds, hasLength(opened));
+        expect(fixture.postedBodies, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byTooltip('关闭设置'));
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 }

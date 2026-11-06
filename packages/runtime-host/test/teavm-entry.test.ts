@@ -1,3 +1,4 @@
+import { catalog } from './fixtures.js';
 import { afterEach, expect, test, vi } from 'vitest';
 import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
@@ -17,6 +18,7 @@ afterEach(async () => {
 async function setup(
   buildOverride?: BuildManifest,
   preferences?: pb.PreferenceBootstrap,
+  catalogOverride?: { catalogUrl: string; repoId: string },
 ) {
   const build = buildOverride ?? (await manifest());
   const configurations: string[] = [];
@@ -75,6 +77,10 @@ async function setup(
     build,
     'test',
     new AbortController().signal,
+    catalogOverride ?? {
+      catalogUrl: 'https://reader.example/extensions/index.json',
+      repoId: build.repoId,
+    },
     context,
     preferences,
   );
@@ -295,6 +301,7 @@ test('hostLoad receives confirmed and session bootstrap before source constructi
   const build = {
     ...(await manifest()),
     packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
+    repoId: 'keiyoushi',
   };
   const bootstrap = create(pb.PreferenceBootstrapSchema, {
     packageName: build.packageName,
@@ -346,6 +353,7 @@ test('typed preference edits invoke Java once and reject Source claims that unap
   const build = {
     ...(await manifest()),
     packageName: 'eu.kanade.tachiyomi.extension.en.mangakatana',
+    repoId: 'keiyoushi',
   };
   const { driver, scope, context, call } = await setup(build);
   const invoked = vi.fn((_source: string, operation: string, args: string) => {
@@ -433,10 +441,46 @@ test('foreign-package and undeclared-source bootstrap fail before importing or r
         await manifest(),
         'test',
         new AbortController().signal,
+        catalog,
         undefined,
         bootstrap,
       ),
     ).rejects.toMatchObject({ code: 'protocol_error' });
     expect(importer).not.toHaveBeenCalled();
   }
+});
+
+test('an external catalog claiming the official package and repo ID cannot approve account preferences', async () => {
+  const build = {
+    ...(await manifest()),
+    repoId: 'keiyoushi',
+    packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
+  };
+  const { driver, scope, context, call, configurations } = await setup(
+    build,
+    undefined,
+    {
+      catalogUrl: 'https://foreign.example/extensions/index.json',
+      repoId: 'keiyoushi',
+    },
+  );
+  expect(JSON.parse(configurations[0]!).syncRules).toBeUndefined();
+  scope.hostInvoke = () =>
+    scope.teaDone!(
+      JSON.stringify({
+        snapshotId: 'external-preferences',
+        nodes: [],
+        syncValues: [{ key: 'preferred_mirror', value: { text: '1' } }],
+      }),
+    );
+  await expect(
+    driver.invoke(
+      create(pb.SourceCallSchema, {
+        ...context,
+        sourceId: call.sourceId,
+        request: { case: 'getPreferences', value: {} },
+      }),
+      context,
+    ),
+  ).rejects.toThrow('not approved');
 });
