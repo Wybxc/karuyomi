@@ -133,8 +133,11 @@ public class PatchLibraries {
                               false);
                           return;
                         }
-                        if (owner.equals("java/lang/Thread")
-                            && name.equals("setContextClassLoader")) {
+                        if ((owner.equals("java/lang/Thread")
+                                || owner.equals(
+                                    "kotlinx/coroutines/scheduling/CoroutineScheduler$Worker"))
+                            && name.equals("setContextClassLoader")
+                            && desc.equals("(Ljava/lang/ClassLoader;)V")) {
                           super.visitMethodInsn(
                               Opcodes.INVOKESTATIC,
                               "prototype/PlatformSupport",

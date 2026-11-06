@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-状态：**迁移未实现；代码审计与隔离实验已完成，当前产品仍使用自研协程入口。** 本计划细化 [P0 宿主](p0-runtime-and-reading.md) 的 Kotlin 执行语义，与 [Source preferences](source-preferences.md) 和[跨语言边界](../design/cross-language-protocol.md)配合。
+状态：**产品迁移进行中；官方核心的真实挂起、取消与 Default 隔离闭环已通过，平台修复和宿主所有权集成分开推进。当前产品仍使用自研入口。** 本计划细化 [P0 宿主](p0-runtime-and-reading.md) 的 Kotlin 执行语义，与 [Source preferences](source-preferences.md) 和[跨语言边界](../design/cross-language-protocol.md)配合。
 
 优先复用已锁定的 `kotlinx-coroutines-core-jvm-1.11.0.jar`，保留官方 `Job`、`Deferred`、结构化并发、取消和 builder 语义，把项目代码缩小到 TeaVM 平台调度、计时、HTTP 取消及 operation 生命周期集成。下一步交付是验证并接入官方核心所需的最小平台适配，不是继续补写一套 `Job` 实现。既有 Source 原业务源码与原始 JAR 保持不变，不为旧宿主增加兼容分支。
 
@@ -39,12 +39,12 @@
 
 TeaVM 维护者在 [2024 年的讨论](https://groups.google.com/g/teavm/c/ipcePs1mHAc)区分了 TeaVM 的线程/阻塞兼容变换与 Kotlin 语言层的 suspend/Continuation，并展示了 Promise 桥接。该示例说明 suspend 可以独立桥接 JavaScript；它没有实现 `kotlinx.coroutines.Job`、调度、取消或结构化并发，也没有证明锁定的官方核心 JAR 可直接完整运行。该讨论同样不能用于断言所有协程库均不受支持。
 
-固定输入、五种隔离变体、JVM / AOT / Node 结果与本机复验命令见[验证记录](../verification/coroutine-runtime.md)。正式兼容层下官方核心已跨过 AOT 门；Node 同步 `runBlocking` 返回，但 `async` / `launch` 子体未启动，首次 `await` 在 5 秒 watchdog 内未完成。取消、`finally` 与后续 Default 阶段尚未到达，正式迁移仍未通过运行门。下一步只定位子任务入队、事件循环恢复与首次挂起等待，不从裸 TeaVM 缺类推断项目工具链缺类，也不从编译成功推断运行兼容。
+固定输入、原五轮及后续定位、JVM / AOT / Node 结果与本机复验命令见[验证记录](../verification/coroutine-runtime.md)。最初 await 停滞已定因为平台把 `parkNanos(0)` 当无限等待；平台窄修与官方可选堆栈恢复配置后，debug 和普通 AOT 的全官方核心均完成真实 suspend、取消清理和 Default 闭环。当前下一步是正式平台回归及 operation owner/lease 集成；不从裸 TeaVM 缺类推断项目缺类，也不将隔离 fixture 通过记为产品迁移或真实 Source 通过。
 
 ## 实施顺序与边界
 
 1. **固定官方核心与项目平台基线。** 使用[工具链锁](../../runtime/teavm/toolchain-lock.json)内的官方 1.11.0 核心及现有 Kotlin stdlib，不替换 Source JAR。先按正式构建的 `java/compat`、TeaVM 上下文补丁和依赖适配流程复验，记录实际可达调用链。已存在的兼容类先检查 ABI 和行为，不因为裸 classlib 报缺类就重写同一类。
-2. **打通官方核心的首个真实挂起闭环。** 在隔离构建副本中去掉自有 `BuildersKt` / `CoroutineScopeKt` 同名覆盖，保留官方 builder、Job/Deferred 状态机及父子关系。先定位已复现的“子 body 未运行、首次 await 未返回”，按阶段断言验证入队、事件循环恢复和入口等待；在它闭环前不扩展全库兼容。仅为已复现的调度、时钟、类加载或诊断平台缺口提供最小适配；每个覆盖说明所需方法和保留的官方语义。不能用吞异常、空实现、忽略类型检查或恢复自研 `Task` 路径换取 AOT 通过。
+2. **打通官方核心的首个真实挂起闭环。** 在隔离构建副本中去掉自有 `BuildersKt` / `CoroutineScopeKt` 同名覆盖，保留官方 builder、Job/Deferred 状态机及父子关系。已用真实 fixture 打通最初 await、delay、取消与 Default；将确认的平台修复接入正式检查，并明确 TeaVM 下可选堆栈恢复配置。保持阶段断言，不扩展无实际调用依据的全库兼容。仅为已复现的调度、时钟、类加载或诊断平台缺口提供最小适配；每个覆盖说明所需方法和保留的官方语义。不能用吞异常、空实现、忽略类型检查或恢复自研 `Task` 路径换取 AOT 通过。
 3. **收敛宿主调度与入口。** 选择能实际运行官方核心的 cooperative dispatcher / timer；若最外层入口改为 Continuation→Promise，只改宿主 entry 桥，不把语言级桥接宣称成官方 builder 实现。operation owner 必须跨 suspension、delay、恢复和 completion 保持归属，lease 覆盖整段后台工作，不能在一次 dispatcher runnable 结束时提前视为工作完成。保留 generation、HTTP 取消、配额、超时、drain 和过期任务拒绝；GlobalScope 后台工作也不能借用下一 entry。
 4. **按语义门替换产品路径。** 先在官方核心 JVM oracle 与固定 TeaVM AOT 上对照，再接回真实 Source 的 browse / filters / preferences / 图片与关闭流程。语义和平台分项通过后删除不再调用的 `GreenCoroutines` 与覆盖类，更新构建输入身份并按既有增量流程本地重建代表扩展。未通过的包仍单独记录，不继续补写通用自研 Job 作为替代路线。
 

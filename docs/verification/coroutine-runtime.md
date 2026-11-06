@@ -24,6 +24,36 @@ JVM 上原始与阶段 fixture 均执行通过；阶段版 `staged/jvm.log` 包�
 
 后两轮 Node 输出均到 `STAGE_SYNC_DONE`、`STAGE_ASYNC_CREATED`、`STAGE_LAUNCH_CREATED`，但没有进入 async 或 launch 子 body，停在首次 `result.await()`。同步 `runBlocking` 已完成；`yield/delay`、取消 / finally 及尾部 Default 阶段均未到达，不能计为通过。现有证据将下一步收敛到子任务入队、事件循环恢复与首次挂起等待，尚不足以判定唯一根因，也不能据 AOT 成功替换产品路径。两组包大小只是不同隔离构建的结果，不是性能或优化对照结论。
 
+## 首次挂起根因与后续闭环
+
+在原五轮之后，新隔离变体保留同一固定平台输入和全部官方核心，以生成 JS 的有界 trace 定位首次挂起：async/launch 已进入 BlockingEventLoop 队列；父 block 返回挂起后 `processNextEvent` 返回 0，官方 `runBlocking` 调用 `LockSupport.parkNanos(0)`。项目兼容层误将其转为 `Thread.wait(0)`，导致无限等待、队列不再前进。
+
+[JDK 官方合同](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/LockSupport.html#parkNanos(long)>)规定非正等待时间无操作，且不消费已有 permit；`park()` 则另行等待。候选平台窄修区分两者，保留原 monitor/permit 路径，并保留上轮精确的 `CoroutineScheduler$Worker.setContextClassLoader(ClassLoader)` 继承调用适配。
+
+修正后真实 async/await、launch/join、yield/delay 均运行，取消阶段暴露另一个独立的诊断平台问题：官方堆栈恢复初始化读取 `new Exception().stackTrace[0]`；该 Node 环境没有 TeaVM `$rt_decodeStack`，空栈产生读取 `$fileName` 的 TypeError。原 CoroutinesInternalError 和 JS stack 保留，未吞异常。只在隔离 fixture 入口使用官方配置 `kotlinx.coroutines.stacktrace.recovery=false` 后，全官方核心完整通过；该配置仅关闭可选协程诊断堆栈重建，不改 Job、取消或异常传播。
+
+| 隔离验证                                      | 实际结果                                                                                  |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 平台窄修、保留官方堆栈恢复                    | 通过原 await 停点；取消阶段发生上述诊断 TypeError，watchdog exit 2                        |
+| 平台窄修、官方关闭堆栈恢复配置、debug AOT     | JVM/Node 完整 staged 通过，Node exit 0                                                    |
+| 平台窄修、未关闭恢复、普通 minified AOT       | 仍在取消阶段发生同一诊断错误，不能归因于仅 debug 探针                                     |
+| 平台窄修、官方关闭恢复配置、普通 minified AOT | Node 完整 staged 通过，exit 0                                                             |
+| LockSupport 边界 fixture                      | JVM 与正式 TeaVM AOT/Node 通过非正值、预 permit、unpark、正等待超时与 interrupt flag 分项 |
+
+完整 staged 包括同步 `runBlocking`、`async/await=21`、`launch/join`、`yield/delay`、`cancelAndJoin/finally` 和 `withContext(Dispatchers.Default)=42`。固定 TeaVM 的 `TClass.desiredAssertionStatus()` 恒 true；本项目 debug 配置只控制 sourceMaps/minifying，普通产物同样须正确处理可选堆栈恢复。LockSupport 边界覆盖 0、-1、MIN_VALUE 及 blocker overload、非正值保留 permit、MAX_VALUE 正等待消费已有 permit、`park(Object)` 等待另一线程 unpark、正等待和中断标志，不宣称穷尽所有竞争或 spurious return。
+
+详细固定输入、候选 patch、命令和产物摘要位于 `/private/tmp/karuyomi-official-coroutines-probe/diagnostic-eventloop/RESULTS.md` 与 `results.json`，原失败日志均保留。该轮所有自启构建和 Node 已结束。平台修复的正式落盘与工程检查另按当前提交记录，隔离官方配置尚未接入产品入口。
+
+正式平台修复的回归已接入 `pnpm teavm:check`：
+
+- `LockSupportContract` 在未修改 JDK 与仅 `--patch-module` 当前自有 LockSupport 的两个 JVM 上执行同一 17 项行为合同并比较结果。原兼容层的非正值调用先在有界 join 内失败，修复后通过；没有以源字符串比较代替执行。
+- `PatchLibrariesTest` 对合成调用 JAR 和锁定官方核心的临时副本运行真实生产补丁器。8 项 owner/方法/签名边界、实际 Worker 继承调用、非 class 资源保留与原核心未变检查通过。它检查转换字节码，完整官方协程的运行证据仍以上面的独立 AOT fixture 为准。
+- 完整 `pnpm teavm:check`、`pnpm typecheck:tools` 与 `pnpm check:dependencies` 通过。新入口仅依赖 TeaVM 领域模块；JDK 优先使用明确 `JAVA_HOME`，否则按现有工具链锁的平台 home 选择。检查不修改原 JAR，临时目录 finally 清理，线程和子进程均有界。
+
+该检查入口的完整字节码部分需要本地锁定 seed 和已有 ASM 依赖，未因此扩大公开 CI 的下载或伪称普通 CI 已执行私有工具链 oracle。原失败、检查结果和详细日志留在 `/private/tmp/karuyomi-platform-*.log` 及对应忽略目录。
+
+这组结果证明官方核心可以完成真实挂起与取消闭环；尚未证明正式宿主的 operation owner/lease、GlobalScope、旧 LAZY/completion、HTTP、drain、配额或真实 Source。产品仍使用原自有入口，不能把本轮 fixture 计为已完成迁移、浏览器或 Native 通过。
+
 ## 本机复验入口
 
 在临时材料仍存在、项目工具链已准备的前提下，以下命令分别复验 JVM、正式兼容层阶段 AOT 和 Node 执行。`kotlin-command.json` 保留 Kotlin 编译的完整 argv；裸 TeaVM 的 Maven 入口与其独立 `pom.xml` 也保留在该目录。临时目录清理后需按上述固定输入重建，不能把这些路径当作项目正式构建入口。

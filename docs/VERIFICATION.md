@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-06，官方 `kotlinx-coroutines-core-jvm` 的隔离试验已完成：正式项目兼容层与一处精确继承调用适配后 AOT 成功；Node 同步 `runBlocking` 返回，但首次 `await` 停住且子协程未开始。JVM、编译与实际 JS 结果分别见[协程验证](verification/coroutine-runtime.md)，迁移未实施，后续按[计划](plan/coroutine-runtime.md)打通挂起和宿主生命周期。
+2026-11-06，官方 `kotlinx-coroutines-core-jvm` 的首次 await 停滞已定因为平台 `parkNanos(0)` 的错误无限等待；平台窄修与官方可选堆栈恢复配置后，debug/普通 AOT 的真实 suspend、取消/finally 和 Default 隔离闭环通过。原失败与后续结果分别见[协程验证](verification/coroutine-runtime.md)，产品仍为自有入口，继续按[计划](plan/coroutine-runtime.md)落实正式平台修复和宿主 owner/lease 集成。
 
 2026-11-06，typed Source preferences 的 v6 控制合同、原 Preference 回调、构造前注入、D1 独立 CAS API、客户端秘密值与 Flutter 设置/重开路径已实现；集中工程检查、固定 Komiic AOT、正式 Web 设置/重开和新文档恢复分项通过；其它控件、Native 及生产门见[设置记录](verification/source-preferences.md)，正式决定见[设计](design/source-preferences.md)。历史 v4/v5 证据不自动覆盖 v6。
 

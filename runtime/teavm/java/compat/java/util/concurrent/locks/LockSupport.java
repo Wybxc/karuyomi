@@ -14,7 +14,7 @@ public class LockSupport {
   }
 
   public static void park() {
-    parkNanos(0);
+    parkMillis(0);
   }
 
   public static void park(Object b) {
@@ -26,11 +26,16 @@ public class LockSupport {
   }
 
   public static void parkNanos(long n) {
+    if (n <= 0) return;
+    parkMillis(Math.max(1, n / 1000000));
+  }
+
+  private static void parkMillis(long millis) {
     Thread t = Thread.currentThread();
     synchronized (t) {
       if (Boolean.TRUE.equals(permits.remove(t))) return;
       try {
-        t.wait(n == 0 ? 0 : Math.max(1, n / 1000000));
+        t.wait(millis);
       } catch (InterruptedException e) {
         t.interrupt();
       }
