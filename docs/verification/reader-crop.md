@@ -36,4 +36,4 @@ flutter test test/settings/ test/reader/resource_image_test.dart test/reader/res
 
 全库入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。临时日志位于忽略的 `.local/crop-*.log`、`.local/reader-crop-*.log` 与 `/private/tmp/karuyomi-crop-settings-regression.log`。
 
-两个独立客户端经真实 D1 双向恢复裁白、进程重启、生产 Access、浏览器/Web GPU 读取、iOS/Android 与真机手势和性能仍须分别验收。本轮不部署生产，不能把工程通过当作完整 P1/P2 验收；下一功能继续自定义封面。
+后续全局裁白开关的双 Web 与双 iOS 顺序读回、新文档/进程恢复分项见[设置记录](reader-settings.md)；实际裁白效果、漫画覆盖、生产 Access、浏览器/Web GPU 读取、其余平台与真机手势和性能仍须分别验收。本轮不部署生产，不能把工程通过当作完整 P1/P2 验收；自定义封面已继续接入，见[对应记录](custom-covers.md)。

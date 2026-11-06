@@ -42,4 +42,4 @@ flutter test test/settings/ test/reader/reading_progress_navigation_test.dart te
 
 全库入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。临时日志保留在忽略的 `.local/fit-*.log` 与 `.local/reader-fit-screen.log`。
 
-两个独立客户端经真实 D1 的设置与二维位置双向读回、进程重启、生产 Access、iOS/Android 与真机手势仍须分别验收。本轮不部署生产；裁白和自定义封面仍按 [P1](../plan/p1-library-and-progress.md) 继续实现，不把本轮工程通过当作完整 P1/P2 验收。
+后续全局适配偏好的双 Web 与双 iOS 顺序读回、新文档/进程恢复分项见[设置记录](reader-settings.md)；实际阅读二维位置、生产 Access、其余平台和真机手势仍须分别验收。本轮不部署生产；裁白和自定义封面已继续接入，分别见[裁白](reader-crop.md)与[自定义封面](custom-covers.md)，不把工程通过当作完整 P1/P2 验收。
