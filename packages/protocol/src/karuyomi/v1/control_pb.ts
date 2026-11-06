@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file karuyomi/v1/control.proto.
  */
 export const file_karuyomi_v1_control: GenFile = /*@__PURE__*/
-  fileDesc("ChlrYXJ1eW9taS92MS9jb250cm9sLnByb3RvEgtrYXJ1eW9taS52MSIHCgVFbXB0eSKHAQoMUnVudGltZUVycm9yEisKBGNvZGUYASABKA4yHS5rYXJ1eW9taS52MS5SdW50aW1lRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIEhcKCmphdmFfY2xhc3MYBCABKAlIAIgBAUINCgtfamF2YV9jbGFzcyKUAQoMUnVudGltZUhlbGxvEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SEAoIaG9zdF9hYmkYAiABKAkSGAoQcnVudGltZV9iYXNlbGluZRgDIAEoCRISCgpnZW5lcmF0aW9uGAQgASgJEhQKDGNhcGFiaWxpdGllcxgFIAMoCRIUCgxzb3VyY2VfcmVhZHkYBiABKAgiigEKClNvdXJjZUluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRsYW5nGAMgASgJEhwKD3N1cHBvcnRzX2xhdGVzdBgEIAEoCEgAiAEBEhUKCGJhc2VfdXJsGAUgASgJSAGIAQFCEgoQX3N1cHBvcnRzX2xhdGVzdEILCglfYmFzZV91cmwirAEKDlJ1bnRpbWVTZXNzaW9uEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSKAoHc291cmNlcxgFIAMoCzIXLmthcnV5b21pLnYxLlNvdXJjZUluZm8SFAoMY2FwYWJpbGl0aWVzGAYgAygJIn0KC1JwY0VudmVsb3BlEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSEgoKcmVxdWVzdF9pZBgFIAEoCSLUAQoLT3BlblJlcXVlc3QSFQoNbWFuaWZlc3RfcGF0aBgBIAEoCRIQCghpZGVudGl0eRgCIAEoCRIXCgp1c2VyX2FnZW50GAMgASgJSACIAQESHgoRZXhwZWN0ZWRfYnVpbGRfaWQYBCABKAlIAYgBARIjChZleHBlY3RlZF9idW5kbGVfc2hhMjU2GAUgASgJSAKIAQFCDQoLX3VzZXJfYWdlbnRCFAoSX2V4cGVjdGVkX2J1aWxkX2lkQhkKF19leHBlY3RlZF9idW5kbGVfc2hhMjU2Is0CCgVNYW5nYRILCgN1cmwYASABKAkSDQoFdGl0bGUYAiABKAkSEwoGYXV0aG9yGAMgASgJSACIAQESEwoGYXJ0aXN0GAQgASgJSAGIAQESGAoLZGVzY3JpcHRpb24YBSABKAlIAogBARISCgVnZW5yZRgGIAEoCUgDiAEBEg4KBmdlbnJlcxgHIAMoCRIOCgZzdGF0dXMYCCABKAUSGgoNdGh1bWJuYWlsX3VybBgJIAEoCUgEiAEBEhMKC2luaXRpYWxpemVkGAogASgIEhcKD3VwZGF0ZV9zdHJhdGVneRgLIAEoCRIWCgltZW1vX2pzb24YDCABKAlIBYgBAUIJCgdfYXV0aG9yQgkKB19hcnRpc3RCDgoMX2Rlc2NyaXB0aW9uQggKBl9nZW5yZUIQCg5fdGh1bWJuYWlsX3VybEIMCgpfbWVtb19qc29uIssBCgdDaGFwdGVyEgsKA3VybBgBIAEoCRIMCgRuYW1lGAIgASgJEhsKDmNoYXB0ZXJfbnVtYmVyGAMgASgCSACIAQESFgoJc2NhbmxhdG9yGAQgASgJSAGIAQESEwoLZGF0ZV91cGxvYWQYBSABKAkSFAoMc291cmNlX29yZGVyGAYgASgNEhYKCW1lbW9fanNvbhgHIAEoCUgCiAEBQhEKD19jaGFwdGVyX251bWJlckIMCgpfc2NhbmxhdG9yQgwKCl9tZW1vX2pzb24icAoEUGFnZRIQCghwYWdlX2tleRgBIAEoCRINCgVpbmRleBgCIAEoDRIUCgxzb3VyY2VfaW5kZXgYAyABKAUSCwoDdXJsGAQgASgJEhYKCWltYWdlX3VybBgFIAEoCUgAiAEBQgwKCl9pbWFnZV91cmwiGwoLUGFnZVJlcXVlc3QSDAoEcGFnZRgBIAEoDSIsCg1TZWFyY2hSZXF1ZXN0EgwKBHBhZ2UYASABKA0SDQoFcXVlcnkYAiABKAkiMQoMTWFuZ2FSZXF1ZXN0EiEKBW1hbmdhGAEgASgLMhIua2FydXlvbWkudjEuTWFuZ2EiNwoOQ2hhcHRlclJlcXVlc3QSJQoHY2hhcHRlchgBIAEoCzIULmthcnV5b21pLnYxLkNoYXB0ZXIijAMKClNvdXJjZUNhbGwSEgoKcmVxdWVzdF9pZBgBIAEoCRIRCglzb3VyY2VfaWQYAiABKAkSFwoKdGltZW91dF9tcxgDIAEoDUgBiAEBEhIKCmdlbmVyYXRpb24YBCABKAkSKwoHcG9wdWxhchgKIAEoCzIYLmthcnV5b21pLnYxLlBhZ2VSZXF1ZXN0SAASKgoGbGF0ZXN0GAsgASgLMhgua2FydXlvbWkudjEuUGFnZVJlcXVlc3RIABIsCgZzZWFyY2gYDCABKAsyGi5rYXJ1eW9taS52MS5TZWFyY2hSZXF1ZXN0SAASLAoHZGV0YWlscxgNIAEoCzIZLmthcnV5b21pLnYxLk1hbmdhUmVxdWVzdEgAEi0KCGNoYXB0ZXJzGA4gASgLMhkua2FydXlvbWkudjEuTWFuZ2FSZXF1ZXN0SAASLAoFcGFnZXMYDyABKAsyGy5rYXJ1eW9taS52MS5DaGFwdGVyUmVxdWVzdEgAQgkKB3JlcXVlc3RCDQoLX3RpbWVvdXRfbXMiRgoJTWFuZ2FQYWdlEiIKBm1hbmdhcxgBIAMoCzISLmthcnV5b21pLnYxLk1hbmdhEhUKDWhhc19uZXh0X3BhZ2UYAiABKAgiNQoLQ2hhcHRlckxpc3QSJgoIY2hhcHRlcnMYASADKAsyFC5rYXJ1eW9taS52MS5DaGFwdGVyIkUKCFBhZ2VMaXN0EhcKD3BhZ2Vfc2Vzc2lvbl9pZBgBIAEoCRIgCgVwYWdlcxgCIAMoCzIRLmthcnV5b21pLnYxLlBhZ2UigAIKDFNvdXJjZVJlc3VsdBISCgpyZXF1ZXN0X2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkSEAoIYnVpbGRfaWQYAyABKAkSLAoKbWFuZ2FfcGFnZRgKIAEoCzIWLmthcnV5b21pLnYxLk1hbmdhUGFnZUgAEiMKBW1hbmdhGAsgASgLMhIua2FydXlvbWkudjEuTWFuZ2FIABIsCghjaGFwdGVycxgMIAEoCzIYLmthcnV5b21pLnYxLkNoYXB0ZXJMaXN0SAASKgoJcGFnZV9saXN0GA0gASgLMhUua2FydXlvbWkudjEuUGFnZUxpc3RIAEIJCgdwYXlsb2FkIj0KE0NhbmNlbFNvdXJjZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIpwBCgxBY3F1aXJlSW1hZ2USEgoKcmVxdWVzdF9pZBgBIAEoCRIRCglzb3VyY2VfaWQYAiABKAkSFwoPcGFnZV9zZXNzaW9uX2lkGAMgASgJEhAKCHBhZ2Vfa2V5GAQgASgJEhIKCmdlbmVyYXRpb24YBSABKAkSFwoKdGltZW91dF9tcxgGIAEoDUgAiAEBQg0KC190aW1lb3V0X21zIjUKC0NhbmNlbEltYWdlEhIKCnJlcXVlc3RfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCSI3CgxSZWxlYXNlSW1hZ2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCSI/ChBDbG9zZVBhZ2VTZXNzaW9uEhcKD3BhZ2Vfc2Vzc2lvbl9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIhwKCFJlbGVhc2VkEhAKCHJlbGVhc2VkGAEgASgIIhgKBkNsb3NlZBIOCgZjbG9zZWQYASABKAgiHgoJQ29tcGxldGVkEhEKCWNvbXBsZXRlZBgBIAEoCCJOCg5Qcm9jZXNzZWRJbWFnZRITCgtyZXNvdXJjZV9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJEhMKC2J5dGVfbGVuZ3RoGAMgASgNIloKDUltYWdlUmVzb3VyY2USEwoLcmVzb3VyY2VfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRITCgtieXRlX2xlbmd0aBgDIAEoDRILCgN1cmwYBCABKAkiCwoJSW1hZ2VNZXRhIi0KCUltYWdlRGF0YRILCgNzZXEYASABKA0SEwoLYnl0ZV9sZW5ndGgYAiABKA0iLAoISW1hZ2VFbmQSCwoDc2VxGAEgASgNEhMKC3RvdGFsX2J5dGVzGAIgASgNIlgKCEltYWdlQWNrEgsKA3NlcRgBIAEoDRIyCghyZXNvdXJjZRgCIAEoCzIbLmthcnV5b21pLnYxLlByb2Nlc3NlZEltYWdlSACIAQFCCwoJX3Jlc291cmNlIuQBChFJbWFnZUZyYW1lQ29udHJvbBImCgRtZXRhGAEgASgLMhYua2FydXlvbWkudjEuSW1hZ2VNZXRhSAASJgoEZGF0YRgCIAEoCzIWLmthcnV5b21pLnYxLkltYWdlRGF0YUgAEiQKA2VuZBgDIAEoCzIVLmthcnV5b21pLnYxLkltYWdlRW5kSAASJAoDYWNrGAQgASgLMhUua2FydXlvbWkudjEuSW1hZ2VBY2tIABIqCgVhYm9ydBgFIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAQgcKBWZyYW1lIo4BCghBcnRpZmFjdBIMCgRwYXRoGAEgASgJEg4KBnNoYTI1NhgCIAEoCRIMCgRzaXplGAMgASgNEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUgAiAEBEhkKDGxvZ2ljYWxfbmFtZRgFIAEoCUgBiAEBQg8KDV9jb250ZW50X3R5cGVCDwoNX2xvZ2ljYWxfbmFtZSKSAQoOQnVuZGxlQXJ0aWZhY3QSDAoEcGF0aBgBIAEoCRIOCgZzaGEyNTYYAiABKAkSDAoEc2l6ZRgDIAEoDRIUCgxjb250ZW50X3R5cGUYBCABKAkSEAoIZW5jb2RpbmcYBSABKAkSFgoOZW5jb2RlZF9zaGEyNTYYBiABKAkSFAoMZW5jb2RlZF9zaXplGAcgASgNIucCCg1CdWlsZE1hbmlmZXN0EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SEAoIaG9zdF9hYmkYAiABKAkSGAoQcnVudGltZV9iYXNlbGluZRgDIAEoCRIWCg5icmlkZ2VfdmVyc2lvbhgEIAEoDRIQCghidWlsZF9pZBgFIAEoCRIUCgxwYWNrYWdlX25hbWUYBiABKAkSDwoHcmVwb19pZBgHIAEoCRIPCgd2ZXJzaW9uGAggASgJEhYKDnN0b3JhZ2Vfc2NoZW1hGAkgASgJEhIKCnNvdXJjZV9pZHMYCiADKAkSKwoGYnVuZGxlGAsgASgLMhsua2FydXlvbWkudjEuQnVuZGxlQXJ0aWZhY3QSKwoMaG9zdF9zY3JpcHRzGAwgAygLMhUua2FydXlvbWkudjEuQXJ0aWZhY3QSKAoJcmVzb3VyY2VzGA0gAygLMhUua2FydXlvbWkudjEuQXJ0aWZhY3QijwEKGEV4dGVuc2lvbkJ1aWxkRGVzY3JpcHRvchIQCghidWlsZF9pZBgBIAEoCRIUCgxwYWNrYWdlX25hbWUYAiABKAkSDwoHcmVwb19pZBgDIAEoCRIPCgd2ZXJzaW9uGAQgASgJEhIKCnNvdXJjZV9pZHMYBSADKAkSFQoNbWFuaWZlc3RfcGF0aBgGIAEoCSJfCg5FeHRlbnNpb25JbmRleBIWCg5zY2hlbWFfdmVyc2lvbhgBIAEoDRI1CgZidWlsZHMYAiADKAsyJS5rYXJ1eW9taS52MS5FeHRlbnNpb25CdWlsZERlc2NyaXB0b3IiKgoISWRlbnRpdHkSDwoHc3ViamVjdBgBIAEoCRINCgVlbWFpbBgCIAEoCSKOAQoJQm9vdHN0cmFwEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SJwoIaWRlbnRpdHkYAiABKAsyFS5rYXJ1eW9taS52MS5JZGVudGl0eRISCgpleHBpcmVzX2F0GAMgASgBEioKBXN0YWdlGAQgASgOMhsua2FydXlvbWkudjEuQm9vdHN0cmFwU3RhZ2UixwEKD0FwaUZldGNoUmVxdWVzdBIMCgRwYXRoGAEgASgJEhMKBm1ldGhvZBgCIAEoCUgAiAEBEjoKB2hlYWRlcnMYAyADKAsyKS5rYXJ1eW9taS52MS5BcGlGZXRjaFJlcXVlc3QuSGVhZGVyc0VudHJ5EhEKBGJvZHkYBCABKAlIAYgBARouCgxIZWFkZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIJCgdfbWV0aG9kQgcKBV9ib2R5IrEBChBBcGlGZXRjaFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoDRI7CgdoZWFkZXJzGAIgAygLMioua2FydXlvbWkudjEuQXBpRmV0Y2hSZXNwb25zZS5IZWFkZXJzRW50cnkSDAoEYm9keRgDIAEoCRISCgpyZWRpcmVjdGVkGAQgASgIGi4KDEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIrUECg5Db250cm9sUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEiMKBXJlYWR5GAogASgLMhIua2FydXlvbWkudjEuRW1wdHlIABIoCgRvcGVuGAsgASgLMhgua2FydXlvbWkudjEuT3BlblJlcXVlc3RIABIpCgZpbnZva2UYDCABKAsyFy5rYXJ1eW9taS52MS5Tb3VyY2VDYWxsSAASMgoGY2FuY2VsGA0gASgLMiAua2FydXlvbWkudjEuQ2FuY2VsU291cmNlUmVxdWVzdEgAEjIKDWFjcXVpcmVfaW1hZ2UYDiABKAsyGS5rYXJ1eW9taS52MS5BY3F1aXJlSW1hZ2VIABIwCgxjYW5jZWxfaW1hZ2UYDyABKAsyGC5rYXJ1eW9taS52MS5DYW5jZWxJbWFnZUgAEjIKDXJlbGVhc2VfaW1hZ2UYECABKAsyGS5rYXJ1eW9taS52MS5SZWxlYXNlSW1hZ2VIABI7ChJjbG9zZV9wYWdlX3Nlc3Npb24YESABKAsyHS5rYXJ1eW9taS52MS5DbG9zZVBhZ2VTZXNzaW9uSAASJQoHcmVidWlsZBgSIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SAASMQoJZmV0Y2hfYXBpGBMgASgLMhwua2FydXlvbWkudjEuQXBpRmV0Y2hSZXF1ZXN0SAASJQoHZGlzcG9zZRgUIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SABCCQoHY29tbWFuZCK+AwoPQ29udHJvbFJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKAkSKgoFaGVsbG8YCiABKAsyGS5rYXJ1eW9taS52MS5SdW50aW1lSGVsbG9IABIuCgdzZXNzaW9uGAsgASgLMhsua2FydXlvbWkudjEuUnVudGltZVNlc3Npb25IABIrCgZzb3VyY2UYDCABKAsyGS5rYXJ1eW9taS52MS5Tb3VyY2VSZXN1bHRIABIrCgVpbWFnZRgNIAEoCzIaLmthcnV5b21pLnYxLkltYWdlUmVzb3VyY2VIABIpCghyZWxlYXNlZBgOIAEoCzIVLmthcnV5b21pLnYxLlJlbGVhc2VkSAASJQoGY2xvc2VkGA8gASgLMhMua2FydXlvbWkudjEuQ2xvc2VkSAASKwoJY29tcGxldGVkGBAgASgLMhYua2FydXlvbWkudjEuQ29tcGxldGVkSAASLAoDYXBpGBEgASgLMh0ua2FydXlvbWkudjEuQXBpRmV0Y2hSZXNwb25zZUgAEioKBWVycm9yGBIgASgLMhkua2FydXlvbWkudjEuUnVudGltZUVycm9ySABCCAoGcmVzdWx0Ik4KCk9wZW5Xb3JrZXISLAoIbWFuaWZlc3QYASABKAsyGi5rYXJ1eW9taS52MS5CdWlsZE1hbmlmZXN0EhIKCnVzZXJfYWdlbnQYAiABKAkiVQoSQWNxdWlyZUltYWdlV29ya2VyEioKB3JlcXVlc3QYASABKAsyGS5rYXJ1eW9taS52MS5BY3F1aXJlSW1hZ2USEwoLcmVzb3VyY2VfaWQYAiABKAkiuQIKDVdvcmtlckNvbW1hbmQSKgoIZW52ZWxvcGUYASABKAsyGC5rYXJ1eW9taS52MS5ScGNFbnZlbG9wZRInCgRvcGVuGAogASgLMhcua2FydXlvbWkudjEuT3BlbldvcmtlckgAEikKBmludm9rZRgLIAEoCzIXLmthcnV5b21pLnYxLlNvdXJjZUNhbGxIABI4Cg1hY3F1aXJlX2ltYWdlGAwgASgLMh8ua2FydXlvbWkudjEuQWNxdWlyZUltYWdlV29ya2VySAASOwoSY2xvc2VfcGFnZV9zZXNzaW9uGA0gASgLMh0ua2FydXlvbWkudjEuQ2xvc2VQYWdlU2Vzc2lvbkgAEiYKCHNodXRkb3duGA4gASgLMhIua2FydXlvbWkudjEuRW1wdHlIAEIJCgdjb21tYW5kIqQCCg5Xb3JrZXJSZXNwb25zZRIqCghlbnZlbG9wZRgBIAEoCzIYLmthcnV5b21pLnYxLlJwY0VudmVsb3BlEi4KB3Nlc3Npb24YCiABKAsyGy5rYXJ1eW9taS52MS5SdW50aW1lU2Vzc2lvbkgAEisKBnNvdXJjZRgLIAEoCzIZLmthcnV5b21pLnYxLlNvdXJjZVJlc3VsdEgAEiwKBWltYWdlGAwgASgLMhsua2FydXlvbWkudjEuUHJvY2Vzc2VkSW1hZ2VIABIlCgZjbG9zZWQYDSABKAsyEy5rYXJ1eW9taS52MS5DbG9zZWRIABIqCgVlcnJvchgOIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAQggKBnJlc3VsdCraAwoQUnVudGltZUVycm9yQ29kZRIiCh5SVU5USU1FX0VSUk9SX0NPREVfVU5TUEVDSUZJRUQQABIgChxSVU5USU1FX0VSUk9SX0NPREVfQ0FOQ0VMTEVEEAESHgoaUlVOVElNRV9FUlJPUl9DT0RFX1RJTUVPVVQQAhImCiJSVU5USU1FX0VSUk9SX0NPREVfQUNDRVNTX1JFUVVJUkVEEAMSJAogUlVOVElNRV9FUlJPUl9DT0RFX0FDQ0VTU19ERU5JRUQQBBIjCh9SVU5USU1FX0VSUk9SX0NPREVfU09VUkNFX0VSUk9SEAUSLQopUlVOVElNRV9FUlJPUl9DT0RFX1VOU1VQUE9SVEVEX0NBUEFCSUxJVFkQBhIjCh9SVU5USU1FX0VSUk9SX0NPREVfUlVOVElNRV9MT1NUEAcSJQohUlVOVElNRV9FUlJPUl9DT0RFX1BST1RPQ09MX0VSUk9SEAgSJgoiUlVOVElNRV9FUlJPUl9DT0RFX0lOVEVHUklUWV9FUlJPUhAJEiUKIVJVTlRJTUVfRVJST1JfQ09ERV9MSU1JVF9FWENFRURFRBAKEiMKH1JVTlRJTUVfRVJST1JfQ09ERV9TVE9SQUdFX0JVU1kQCypnCg5Cb290c3RyYXBTdGFnZRIfChtCT09UU1RSQVBfU1RBR0VfVU5TUEVDSUZJRUQQABIcChhCT09UU1RSQVBfU1RBR0VfU0NBRkZPTEQQARIWChJCT09UU1RSQVBfU1RBR0VfUDAQAmIGcHJvdG8z");
+  fileDesc("ChlrYXJ1eW9taS92MS9jb250cm9sLnByb3RvEgtrYXJ1eW9taS52MSIHCgVFbXB0eSKHAQoMUnVudGltZUVycm9yEisKBGNvZGUYASABKA4yHS5rYXJ1eW9taS52MS5SdW50aW1lRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkSEQoJcmV0cnlhYmxlGAMgASgIEhcKCmphdmFfY2xhc3MYBCABKAlIAIgBAUINCgtfamF2YV9jbGFzcyKUAQoMUnVudGltZUhlbGxvEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SEAoIaG9zdF9hYmkYAiABKAkSGAoQcnVudGltZV9iYXNlbGluZRgDIAEoCRISCgpnZW5lcmF0aW9uGAQgASgJEhQKDGNhcGFiaWxpdGllcxgFIAMoCRIUCgxzb3VyY2VfcmVhZHkYBiABKAgiigEKClNvdXJjZUluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRsYW5nGAMgASgJEhwKD3N1cHBvcnRzX2xhdGVzdBgEIAEoCEgAiAEBEhUKCGJhc2VfdXJsGAUgASgJSAGIAQFCEgoQX3N1cHBvcnRzX2xhdGVzdEILCglfYmFzZV91cmwirAEKDlJ1bnRpbWVTZXNzaW9uEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSKAoHc291cmNlcxgFIAMoCzIXLmthcnV5b21pLnYxLlNvdXJjZUluZm8SFAoMY2FwYWJpbGl0aWVzGAYgAygJIn0KC1JwY0VudmVsb3BlEhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SGgoSd29ya2VyX2luc3RhbmNlX2lkGAIgASgJEhIKCmdlbmVyYXRpb24YAyABKAkSEAoIYnVpbGRfaWQYBCABKAkSEgoKcmVxdWVzdF9pZBgFIAEoCSLUAQoLT3BlblJlcXVlc3QSFQoNbWFuaWZlc3RfcGF0aBgBIAEoCRIQCghpZGVudGl0eRgCIAEoCRIXCgp1c2VyX2FnZW50GAMgASgJSACIAQESHgoRZXhwZWN0ZWRfYnVpbGRfaWQYBCABKAlIAYgBARIjChZleHBlY3RlZF9idW5kbGVfc2hhMjU2GAUgASgJSAKIAQFCDQoLX3VzZXJfYWdlbnRCFAoSX2V4cGVjdGVkX2J1aWxkX2lkQhkKF19leHBlY3RlZF9idW5kbGVfc2hhMjU2Is0CCgVNYW5nYRILCgN1cmwYASABKAkSDQoFdGl0bGUYAiABKAkSEwoGYXV0aG9yGAMgASgJSACIAQESEwoGYXJ0aXN0GAQgASgJSAGIAQESGAoLZGVzY3JpcHRpb24YBSABKAlIAogBARISCgVnZW5yZRgGIAEoCUgDiAEBEg4KBmdlbnJlcxgHIAMoCRIOCgZzdGF0dXMYCCABKAUSGgoNdGh1bWJuYWlsX3VybBgJIAEoCUgEiAEBEhMKC2luaXRpYWxpemVkGAogASgIEhcKD3VwZGF0ZV9zdHJhdGVneRgLIAEoCRIWCgltZW1vX2pzb24YDCABKAlIBYgBAUIJCgdfYXV0aG9yQgkKB19hcnRpc3RCDgoMX2Rlc2NyaXB0aW9uQggKBl9nZW5yZUIQCg5fdGh1bWJuYWlsX3VybEIMCgpfbWVtb19qc29uIssBCgdDaGFwdGVyEgsKA3VybBgBIAEoCRIMCgRuYW1lGAIgASgJEhsKDmNoYXB0ZXJfbnVtYmVyGAMgASgCSACIAQESFgoJc2NhbmxhdG9yGAQgASgJSAGIAQESEwoLZGF0ZV91cGxvYWQYBSABKAkSFAoMc291cmNlX29yZGVyGAYgASgNEhYKCW1lbW9fanNvbhgHIAEoCUgCiAEBQhEKD19jaGFwdGVyX251bWJlckIMCgpfc2NhbmxhdG9yQgwKCl9tZW1vX2pzb24icAoEUGFnZRIQCghwYWdlX2tleRgBIAEoCRINCgVpbmRleBgCIAEoDRIUCgxzb3VyY2VfaW5kZXgYAyABKAUSCwoDdXJsGAQgASgJEhYKCWltYWdlX3VybBgFIAEoCUgAiAEBQgwKCl9pbWFnZV91cmwiGwoLUGFnZVJlcXVlc3QSDAoEcGFnZRgBIAEoDSIbCgpGaWx0ZXJUZXh0Eg0KBXN0YXRlGAEgASgJIh8KDkZpbHRlckNoZWNrQm94Eg0KBXN0YXRlGAEgASgIIh8KDkZpbHRlclRyaVN0YXRlEg0KBXN0YXRlGAEgASgNIi4KDEZpbHRlclNlbGVjdBIPCgdvcHRpb25zGAEgAygJEg0KBXN0YXRlGAIgASgNIjcKE0ZpbHRlclNvcnRTZWxlY3Rpb24SDQoFaW5kZXgYASABKA0SEQoJYXNjZW5kaW5nGAIgASgIIlkKD0ZpbHRlclNvcnRTdGF0ZRI4CglzZWxlY3Rpb24YASABKAsyIC5rYXJ1eW9taS52MS5GaWx0ZXJTb3J0U2VsZWN0aW9uSACIAQFCDAoKX3NlbGVjdGlvbiJKCgpGaWx0ZXJTb3J0Eg8KB29wdGlvbnMYASADKAkSKwoFc3RhdGUYAiABKAsyHC5rYXJ1eW9taS52MS5GaWx0ZXJTb3J0U3RhdGUiNQoLRmlsdGVyR3JvdXASJgoFbm9kZXMYASADKAsyFy5rYXJ1eW9taS52MS5GaWx0ZXJOb2RlIv8CCgpGaWx0ZXJOb2RlEgwKBG5hbWUYASABKAkSJAoGaGVhZGVyGAIgASgLMhIua2FydXlvbWkudjEuRW1wdHlIABInCglzZXBhcmF0b3IYAyABKAsyEi5rYXJ1eW9taS52MS5FbXB0eUgAEicKBHRleHQYBCABKAsyFy5rYXJ1eW9taS52MS5GaWx0ZXJUZXh0SAASMAoJY2hlY2tfYm94GAUgASgLMhsua2FydXlvbWkudjEuRmlsdGVyQ2hlY2tCb3hIABIwCgl0cmlfc3RhdGUYBiABKAsyGy5rYXJ1eW9taS52MS5GaWx0ZXJUcmlTdGF0ZUgAEisKBnNlbGVjdBgHIAEoCzIZLmthcnV5b21pLnYxLkZpbHRlclNlbGVjdEgAEicKBHNvcnQYCCABKAsyFy5rYXJ1eW9taS52MS5GaWx0ZXJTb3J0SAASKQoFZ3JvdXAYCSABKAsyGC5rYXJ1eW9taS52MS5GaWx0ZXJHcm91cEgAQgYKBGtpbmQiTwoRR2V0RmlsdGVyc1JlcXVlc3QSIQoUcmV0YWluZWRfc25hcHNob3RfaWQYASABKAlIAIgBAUIXChVfcmV0YWluZWRfc25hcHNob3RfaWQiTQoORmlsdGVyU25hcHNob3QSEwoLc25hcHNob3RfaWQYASABKAkSJgoFbm9kZXMYAiADKAsyFy5rYXJ1eW9taS52MS5GaWx0ZXJOb2RlIp8BCgxGaWx0ZXJVcGRhdGUSDAoEcGF0aBgBIAMoDRIOCgR0ZXh0GAIgASgJSAASEwoJY2hlY2tfYm94GAMgASgISAASEwoJdHJpX3N0YXRlGAQgASgNSAASEAoGc2VsZWN0GAUgASgNSAASLAoEc29ydBgGIAEoCzIcLmthcnV5b21pLnYxLkZpbHRlclNvcnRTdGF0ZUgAQgcKBXN0YXRlIlIKD0ZpbHRlclNlbGVjdGlvbhITCgtzbmFwc2hvdF9pZBgBIAEoCRIqCgd1cGRhdGVzGAIgAygLMhkua2FydXlvbWkudjEuRmlsdGVyVXBkYXRlIlsKDVNlYXJjaFJlcXVlc3QSDAoEcGFnZRgBIAEoDRINCgVxdWVyeRgCIAEoCRItCgdmaWx0ZXJzGAMgASgLMhwua2FydXlvbWkudjEuRmlsdGVyU2VsZWN0aW9uIjEKDE1hbmdhUmVxdWVzdBIhCgVtYW5nYRgBIAEoCzISLmthcnV5b21pLnYxLk1hbmdhIjcKDkNoYXB0ZXJSZXF1ZXN0EiUKB2NoYXB0ZXIYASABKAsyFC5rYXJ1eW9taS52MS5DaGFwdGVyIsMDCgpTb3VyY2VDYWxsEhIKCnJlcXVlc3RfaWQYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhcKCnRpbWVvdXRfbXMYAyABKA1IAYgBARISCgpnZW5lcmF0aW9uGAQgASgJEisKB3BvcHVsYXIYCiABKAsyGC5rYXJ1eW9taS52MS5QYWdlUmVxdWVzdEgAEioKBmxhdGVzdBgLIAEoCzIYLmthcnV5b21pLnYxLlBhZ2VSZXF1ZXN0SAASLAoGc2VhcmNoGAwgASgLMhoua2FydXlvbWkudjEuU2VhcmNoUmVxdWVzdEgAEiwKB2RldGFpbHMYDSABKAsyGS5rYXJ1eW9taS52MS5NYW5nYVJlcXVlc3RIABItCghjaGFwdGVycxgOIAEoCzIZLmthcnV5b21pLnYxLk1hbmdhUmVxdWVzdEgAEiwKBXBhZ2VzGA8gASgLMhsua2FydXlvbWkudjEuQ2hhcHRlclJlcXVlc3RIABI1CgtnZXRfZmlsdGVycxgQIAEoCzIeLmthcnV5b21pLnYxLkdldEZpbHRlcnNSZXF1ZXN0SABCCQoHcmVxdWVzdEINCgtfdGltZW91dF9tcyJGCglNYW5nYVBhZ2USIgoGbWFuZ2FzGAEgAygLMhIua2FydXlvbWkudjEuTWFuZ2ESFQoNaGFzX25leHRfcGFnZRgCIAEoCCI1CgtDaGFwdGVyTGlzdBImCghjaGFwdGVycxgBIAMoCzIULmthcnV5b21pLnYxLkNoYXB0ZXIiRQoIUGFnZUxpc3QSFwoPcGFnZV9zZXNzaW9uX2lkGAEgASgJEiAKBXBhZ2VzGAIgAygLMhEua2FydXlvbWkudjEuUGFnZSKwAgoMU291cmNlUmVzdWx0EhIKCnJlcXVlc3RfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCRIQCghidWlsZF9pZBgDIAEoCRIsCgptYW5nYV9wYWdlGAogASgLMhYua2FydXlvbWkudjEuTWFuZ2FQYWdlSAASIwoFbWFuZ2EYCyABKAsyEi5rYXJ1eW9taS52MS5NYW5nYUgAEiwKCGNoYXB0ZXJzGAwgASgLMhgua2FydXlvbWkudjEuQ2hhcHRlckxpc3RIABIqCglwYWdlX2xpc3QYDSABKAsyFS5rYXJ1eW9taS52MS5QYWdlTGlzdEgAEi4KB2ZpbHRlcnMYDiABKAsyGy5rYXJ1eW9taS52MS5GaWx0ZXJTbmFwc2hvdEgAQgkKB3BheWxvYWQiPQoTQ2FuY2VsU291cmNlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkinAEKDEFjcXVpcmVJbWFnZRISCgpyZXF1ZXN0X2lkGAEgASgJEhEKCXNvdXJjZV9pZBgCIAEoCRIXCg9wYWdlX3Nlc3Npb25faWQYAyABKAkSEAoIcGFnZV9rZXkYBCABKAkSEgoKZ2VuZXJhdGlvbhgFIAEoCRIXCgp0aW1lb3V0X21zGAYgASgNSACIAQFCDQoLX3RpbWVvdXRfbXMiNQoLQ2FuY2VsSW1hZ2USEgoKcmVxdWVzdF9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIjcKDFJlbGVhc2VJbWFnZRITCgtyZXNvdXJjZV9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIj8KEENsb3NlUGFnZVNlc3Npb24SFwoPcGFnZV9zZXNzaW9uX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkiHAoIUmVsZWFzZWQSEAoIcmVsZWFzZWQYASABKAgiGAoGQ2xvc2VkEg4KBmNsb3NlZBgBIAEoCCIeCglDb21wbGV0ZWQSEQoJY29tcGxldGVkGAEgASgIIk4KDlByb2Nlc3NlZEltYWdlEhMKC3Jlc291cmNlX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAkSEwoLYnl0ZV9sZW5ndGgYAyABKA0iWgoNSW1hZ2VSZXNvdXJjZRITCgtyZXNvdXJjZV9pZBgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJEhMKC2J5dGVfbGVuZ3RoGAMgASgNEgsKA3VybBgEIAEoCSILCglJbWFnZU1ldGEiLQoJSW1hZ2VEYXRhEgsKA3NlcRgBIAEoDRITCgtieXRlX2xlbmd0aBgCIAEoDSIsCghJbWFnZUVuZBILCgNzZXEYASABKA0SEwoLdG90YWxfYnl0ZXMYAiABKA0iWAoISW1hZ2VBY2sSCwoDc2VxGAEgASgNEjIKCHJlc291cmNlGAIgASgLMhsua2FydXlvbWkudjEuUHJvY2Vzc2VkSW1hZ2VIAIgBAUILCglfcmVzb3VyY2Ui5AEKEUltYWdlRnJhbWVDb250cm9sEiYKBG1ldGEYASABKAsyFi5rYXJ1eW9taS52MS5JbWFnZU1ldGFIABImCgRkYXRhGAIgASgLMhYua2FydXlvbWkudjEuSW1hZ2VEYXRhSAASJAoDZW5kGAMgASgLMhUua2FydXlvbWkudjEuSW1hZ2VFbmRIABIkCgNhY2sYBCABKAsyFS5rYXJ1eW9taS52MS5JbWFnZUFja0gAEioKBWFib3J0GAUgASgLMhkua2FydXlvbWkudjEuUnVudGltZUVycm9ySABCBwoFZnJhbWUijgEKCEFydGlmYWN0EgwKBHBhdGgYASABKAkSDgoGc2hhMjU2GAIgASgJEgwKBHNpemUYAyABKA0SGQoMY29udGVudF90eXBlGAQgASgJSACIAQESGQoMbG9naWNhbF9uYW1lGAUgASgJSAGIAQFCDwoNX2NvbnRlbnRfdHlwZUIPCg1fbG9naWNhbF9uYW1lIpIBCg5CdW5kbGVBcnRpZmFjdBIMCgRwYXRoGAEgASgJEg4KBnNoYTI1NhgCIAEoCRIMCgRzaXplGAMgASgNEhQKDGNvbnRlbnRfdHlwZRgEIAEoCRIQCghlbmNvZGluZxgFIAEoCRIWCg5lbmNvZGVkX3NoYTI1NhgGIAEoCRIUCgxlbmNvZGVkX3NpemUYByABKA0i5wIKDUJ1aWxkTWFuaWZlc3QSGAoQcHJvdG9jb2xfdmVyc2lvbhgBIAEoDRIQCghob3N0X2FiaRgCIAEoCRIYChBydW50aW1lX2Jhc2VsaW5lGAMgASgJEhYKDmJyaWRnZV92ZXJzaW9uGAQgASgNEhAKCGJ1aWxkX2lkGAUgASgJEhQKDHBhY2thZ2VfbmFtZRgGIAEoCRIPCgdyZXBvX2lkGAcgASgJEg8KB3ZlcnNpb24YCCABKAkSFgoOc3RvcmFnZV9zY2hlbWEYCSABKAkSEgoKc291cmNlX2lkcxgKIAMoCRIrCgZidW5kbGUYCyABKAsyGy5rYXJ1eW9taS52MS5CdW5kbGVBcnRpZmFjdBIrCgxob3N0X3NjcmlwdHMYDCADKAsyFS5rYXJ1eW9taS52MS5BcnRpZmFjdBIoCglyZXNvdXJjZXMYDSADKAsyFS5rYXJ1eW9taS52MS5BcnRpZmFjdCKPAQoYRXh0ZW5zaW9uQnVpbGREZXNjcmlwdG9yEhAKCGJ1aWxkX2lkGAEgASgJEhQKDHBhY2thZ2VfbmFtZRgCIAEoCRIPCgdyZXBvX2lkGAMgASgJEg8KB3ZlcnNpb24YBCABKAkSEgoKc291cmNlX2lkcxgFIAMoCRIVCg1tYW5pZmVzdF9wYXRoGAYgASgJIl8KDkV4dGVuc2lvbkluZGV4EhYKDnNjaGVtYV92ZXJzaW9uGAEgASgNEjUKBmJ1aWxkcxgCIAMoCzIlLmthcnV5b21pLnYxLkV4dGVuc2lvbkJ1aWxkRGVzY3JpcHRvciIqCghJZGVudGl0eRIPCgdzdWJqZWN0GAEgASgJEg0KBWVtYWlsGAIgASgJIo4BCglCb290c3RyYXASGAoQcHJvdG9jb2xfdmVyc2lvbhgBIAEoDRInCghpZGVudGl0eRgCIAEoCzIVLmthcnV5b21pLnYxLklkZW50aXR5EhIKCmV4cGlyZXNfYXQYAyABKAESKgoFc3RhZ2UYBCABKA4yGy5rYXJ1eW9taS52MS5Cb290c3RyYXBTdGFnZSLHAQoPQXBpRmV0Y2hSZXF1ZXN0EgwKBHBhdGgYASABKAkSEwoGbWV0aG9kGAIgASgJSACIAQESOgoHaGVhZGVycxgDIAMoCzIpLmthcnV5b21pLnYxLkFwaUZldGNoUmVxdWVzdC5IZWFkZXJzRW50cnkSEQoEYm9keRgEIAEoCUgBiAEBGi4KDEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQgkKB19tZXRob2RCBwoFX2JvZHkisQEKEEFwaUZldGNoUmVzcG9uc2USDgoGc3RhdHVzGAEgASgNEjsKB2hlYWRlcnMYAiADKAsyKi5rYXJ1eW9taS52MS5BcGlGZXRjaFJlc3BvbnNlLkhlYWRlcnNFbnRyeRIMCgRib2R5GAMgASgJEhIKCnJlZGlyZWN0ZWQYBCABKAgaLgoMSGVhZGVyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEitQQKDkNvbnRyb2xSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSIwoFcmVhZHkYCiABKAsyEi5rYXJ1eW9taS52MS5FbXB0eUgAEigKBG9wZW4YCyABKAsyGC5rYXJ1eW9taS52MS5PcGVuUmVxdWVzdEgAEikKBmludm9rZRgMIAEoCzIXLmthcnV5b21pLnYxLlNvdXJjZUNhbGxIABIyCgZjYW5jZWwYDSABKAsyIC5rYXJ1eW9taS52MS5DYW5jZWxTb3VyY2VSZXF1ZXN0SAASMgoNYWNxdWlyZV9pbWFnZRgOIAEoCzIZLmthcnV5b21pLnYxLkFjcXVpcmVJbWFnZUgAEjAKDGNhbmNlbF9pbWFnZRgPIAEoCzIYLmthcnV5b21pLnYxLkNhbmNlbEltYWdlSAASMgoNcmVsZWFzZV9pbWFnZRgQIAEoCzIZLmthcnV5b21pLnYxLlJlbGVhc2VJbWFnZUgAEjsKEmNsb3NlX3BhZ2Vfc2Vzc2lvbhgRIAEoCzIdLmthcnV5b21pLnYxLkNsb3NlUGFnZVNlc3Npb25IABIlCgdyZWJ1aWxkGBIgASgLMhIua2FydXlvbWkudjEuRW1wdHlIABIxCglmZXRjaF9hcGkYEyABKAsyHC5rYXJ1eW9taS52MS5BcGlGZXRjaFJlcXVlc3RIABIlCgdkaXNwb3NlGBQgASgLMhIua2FydXlvbWkudjEuRW1wdHlIAEIJCgdjb21tYW5kIr4DCg9Db250cm9sUmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoCRIqCgVoZWxsbxgKIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVIZWxsb0gAEi4KB3Nlc3Npb24YCyABKAsyGy5rYXJ1eW9taS52MS5SdW50aW1lU2Vzc2lvbkgAEisKBnNvdXJjZRgMIAEoCzIZLmthcnV5b21pLnYxLlNvdXJjZVJlc3VsdEgAEisKBWltYWdlGA0gASgLMhoua2FydXlvbWkudjEuSW1hZ2VSZXNvdXJjZUgAEikKCHJlbGVhc2VkGA4gASgLMhUua2FydXlvbWkudjEuUmVsZWFzZWRIABIlCgZjbG9zZWQYDyABKAsyEy5rYXJ1eW9taS52MS5DbG9zZWRIABIrCgljb21wbGV0ZWQYECABKAsyFi5rYXJ1eW9taS52MS5Db21wbGV0ZWRIABIsCgNhcGkYESABKAsyHS5rYXJ1eW9taS52MS5BcGlGZXRjaFJlc3BvbnNlSAASKgoFZXJyb3IYEiABKAsyGS5rYXJ1eW9taS52MS5SdW50aW1lRXJyb3JIAEIICgZyZXN1bHQiTgoKT3BlbldvcmtlchIsCghtYW5pZmVzdBgBIAEoCzIaLmthcnV5b21pLnYxLkJ1aWxkTWFuaWZlc3QSEgoKdXNlcl9hZ2VudBgCIAEoCSJVChJBY3F1aXJlSW1hZ2VXb3JrZXISKgoHcmVxdWVzdBgBIAEoCzIZLmthcnV5b21pLnYxLkFjcXVpcmVJbWFnZRITCgtyZXNvdXJjZV9pZBgCIAEoCSK5AgoNV29ya2VyQ29tbWFuZBIqCghlbnZlbG9wZRgBIAEoCzIYLmthcnV5b21pLnYxLlJwY0VudmVsb3BlEicKBG9wZW4YCiABKAsyFy5rYXJ1eW9taS52MS5PcGVuV29ya2VySAASKQoGaW52b2tlGAsgASgLMhcua2FydXlvbWkudjEuU291cmNlQ2FsbEgAEjgKDWFjcXVpcmVfaW1hZ2UYDCABKAsyHy5rYXJ1eW9taS52MS5BY3F1aXJlSW1hZ2VXb3JrZXJIABI7ChJjbG9zZV9wYWdlX3Nlc3Npb24YDSABKAsyHS5rYXJ1eW9taS52MS5DbG9zZVBhZ2VTZXNzaW9uSAASJgoIc2h1dGRvd24YDiABKAsyEi5rYXJ1eW9taS52MS5FbXB0eUgAQgkKB2NvbW1hbmQipAIKDldvcmtlclJlc3BvbnNlEioKCGVudmVsb3BlGAEgASgLMhgua2FydXlvbWkudjEuUnBjRW52ZWxvcGUSLgoHc2Vzc2lvbhgKIAEoCzIbLmthcnV5b21pLnYxLlJ1bnRpbWVTZXNzaW9uSAASKwoGc291cmNlGAsgASgLMhkua2FydXlvbWkudjEuU291cmNlUmVzdWx0SAASLAoFaW1hZ2UYDCABKAsyGy5rYXJ1eW9taS52MS5Qcm9jZXNzZWRJbWFnZUgAEiUKBmNsb3NlZBgNIAEoCzITLmthcnV5b21pLnYxLkNsb3NlZEgAEioKBWVycm9yGA4gASgLMhkua2FydXlvbWkudjEuUnVudGltZUVycm9ySABCCAoGcmVzdWx0KtoDChBSdW50aW1lRXJyb3JDb2RlEiIKHlJVTlRJTUVfRVJST1JfQ09ERV9VTlNQRUNJRklFRBAAEiAKHFJVTlRJTUVfRVJST1JfQ09ERV9DQU5DRUxMRUQQARIeChpSVU5USU1FX0VSUk9SX0NPREVfVElNRU9VVBACEiYKIlJVTlRJTUVfRVJST1JfQ09ERV9BQ0NFU1NfUkVRVUlSRUQQAxIkCiBSVU5USU1FX0VSUk9SX0NPREVfQUNDRVNTX0RFTklFRBAEEiMKH1JVTlRJTUVfRVJST1JfQ09ERV9TT1VSQ0VfRVJST1IQBRItCilSVU5USU1FX0VSUk9SX0NPREVfVU5TVVBQT1JURURfQ0FQQUJJTElUWRAGEiMKH1JVTlRJTUVfRVJST1JfQ09ERV9SVU5USU1FX0xPU1QQBxIlCiFSVU5USU1FX0VSUk9SX0NPREVfUFJPVE9DT0xfRVJST1IQCBImCiJSVU5USU1FX0VSUk9SX0NPREVfSU5URUdSSVRZX0VSUk9SEAkSJQohUlVOVElNRV9FUlJPUl9DT0RFX0xJTUlUX0VYQ0VFREVEEAoSIwofUlVOVElNRV9FUlJPUl9DT0RFX1NUT1JBR0VfQlVTWRALKmcKDkJvb3RzdHJhcFN0YWdlEh8KG0JPT1RTVFJBUF9TVEFHRV9VTlNQRUNJRklFRBAAEhwKGEJPT1RTVFJBUF9TVEFHRV9TQ0FGRk9MRBABEhYKEkJPT1RTVFJBUF9TVEFHRV9QMBACYgZwcm90bzM");
 
 /**
  * @generated from message karuyomi.v1.Empty
@@ -776,6 +776,582 @@ export const PageRequestSchema: GenMessage<PageRequest, {jsonType: PageRequestJs
   messageDesc(file_karuyomi_v1_control, 10);
 
 /**
+ * Filter paths use zero-based indexes from the top-level list. Snapshots are
+ * ephemeral and belong to the Source and generation that produced them.
+ *
+ * @generated from message karuyomi.v1.FilterText
+ */
+export type FilterText = Message<"karuyomi.v1.FilterText"> & {
+  /**
+   * @generated from field: string state = 1;
+   */
+  state: string;
+};
+
+/**
+ * Filter paths use zero-based indexes from the top-level list. Snapshots are
+ * ephemeral and belong to the Source and generation that produced them.
+ *
+ * @generated from message karuyomi.v1.FilterText
+ */
+export type FilterTextJson = {
+  /**
+   * @generated from field: string state = 1;
+   */
+  state?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterText.
+ * Use `create(FilterTextSchema)` to create a new message.
+ */
+export const FilterTextSchema: GenMessage<FilterText, {jsonType: FilterTextJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 11);
+
+/**
+ * @generated from message karuyomi.v1.FilterCheckBox
+ */
+export type FilterCheckBox = Message<"karuyomi.v1.FilterCheckBox"> & {
+  /**
+   * @generated from field: bool state = 1;
+   */
+  state: boolean;
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterCheckBox
+ */
+export type FilterCheckBoxJson = {
+  /**
+   * @generated from field: bool state = 1;
+   */
+  state?: boolean;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterCheckBox.
+ * Use `create(FilterCheckBoxSchema)` to create a new message.
+ */
+export const FilterCheckBoxSchema: GenMessage<FilterCheckBox, {jsonType: FilterCheckBoxJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 12);
+
+/**
+ * @generated from message karuyomi.v1.FilterTriState
+ */
+export type FilterTriState = Message<"karuyomi.v1.FilterTriState"> & {
+  /**
+   * Original Source states: 0 ignore, 1 include, 2 exclude.
+   *
+   * @generated from field: uint32 state = 1;
+   */
+  state: number;
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterTriState
+ */
+export type FilterTriStateJson = {
+  /**
+   * Original Source states: 0 ignore, 1 include, 2 exclude.
+   *
+   * @generated from field: uint32 state = 1;
+   */
+  state?: number;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterTriState.
+ * Use `create(FilterTriStateSchema)` to create a new message.
+ */
+export const FilterTriStateSchema: GenMessage<FilterTriState, {jsonType: FilterTriStateJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 13);
+
+/**
+ * @generated from message karuyomi.v1.FilterSelect
+ */
+export type FilterSelect = Message<"karuyomi.v1.FilterSelect"> & {
+  /**
+   * @generated from field: repeated string options = 1;
+   */
+  options: string[];
+
+  /**
+   * @generated from field: uint32 state = 2;
+   */
+  state: number;
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterSelect
+ */
+export type FilterSelectJson = {
+  /**
+   * @generated from field: repeated string options = 1;
+   */
+  options?: string[];
+
+  /**
+   * @generated from field: uint32 state = 2;
+   */
+  state?: number;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterSelect.
+ * Use `create(FilterSelectSchema)` to create a new message.
+ */
+export const FilterSelectSchema: GenMessage<FilterSelect, {jsonType: FilterSelectJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 14);
+
+/**
+ * @generated from message karuyomi.v1.FilterSortSelection
+ */
+export type FilterSortSelection = Message<"karuyomi.v1.FilterSortSelection"> & {
+  /**
+   * @generated from field: uint32 index = 1;
+   */
+  index: number;
+
+  /**
+   * @generated from field: bool ascending = 2;
+   */
+  ascending: boolean;
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterSortSelection
+ */
+export type FilterSortSelectionJson = {
+  /**
+   * @generated from field: uint32 index = 1;
+   */
+  index?: number;
+
+  /**
+   * @generated from field: bool ascending = 2;
+   */
+  ascending?: boolean;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterSortSelection.
+ * Use `create(FilterSortSelectionSchema)` to create a new message.
+ */
+export const FilterSortSelectionSchema: GenMessage<FilterSortSelection, {jsonType: FilterSortSelectionJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 15);
+
+/**
+ * @generated from message karuyomi.v1.FilterSortState
+ */
+export type FilterSortState = Message<"karuyomi.v1.FilterSortState"> & {
+  /**
+   * Absence explicitly means the Source's nullable sort selection.
+   *
+   * @generated from field: optional karuyomi.v1.FilterSortSelection selection = 1;
+   */
+  selection?: FilterSortSelection | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterSortState
+ */
+export type FilterSortStateJson = {
+  /**
+   * Absence explicitly means the Source's nullable sort selection.
+   *
+   * @generated from field: optional karuyomi.v1.FilterSortSelection selection = 1;
+   */
+  selection?: FilterSortSelectionJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterSortState.
+ * Use `create(FilterSortStateSchema)` to create a new message.
+ */
+export const FilterSortStateSchema: GenMessage<FilterSortState, {jsonType: FilterSortStateJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 16);
+
+/**
+ * @generated from message karuyomi.v1.FilterSort
+ */
+export type FilterSort = Message<"karuyomi.v1.FilterSort"> & {
+  /**
+   * @generated from field: repeated string options = 1;
+   */
+  options: string[];
+
+  /**
+   * @generated from field: karuyomi.v1.FilterSortState state = 2;
+   */
+  state?: FilterSortState | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterSort
+ */
+export type FilterSortJson = {
+  /**
+   * @generated from field: repeated string options = 1;
+   */
+  options?: string[];
+
+  /**
+   * @generated from field: karuyomi.v1.FilterSortState state = 2;
+   */
+  state?: FilterSortStateJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterSort.
+ * Use `create(FilterSortSchema)` to create a new message.
+ */
+export const FilterSortSchema: GenMessage<FilterSort, {jsonType: FilterSortJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 17);
+
+/**
+ * @generated from message karuyomi.v1.FilterGroup
+ */
+export type FilterGroup = Message<"karuyomi.v1.FilterGroup"> & {
+  /**
+   * @generated from field: repeated karuyomi.v1.FilterNode nodes = 1;
+   */
+  nodes: FilterNode[];
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterGroup
+ */
+export type FilterGroupJson = {
+  /**
+   * @generated from field: repeated karuyomi.v1.FilterNode nodes = 1;
+   */
+  nodes?: FilterNodeJson[];
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterGroup.
+ * Use `create(FilterGroupSchema)` to create a new message.
+ */
+export const FilterGroupSchema: GenMessage<FilterGroup, {jsonType: FilterGroupJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 18);
+
+/**
+ * @generated from message karuyomi.v1.FilterNode
+ */
+export type FilterNode = Message<"karuyomi.v1.FilterNode"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from oneof karuyomi.v1.FilterNode.kind
+   */
+  kind: {
+    /**
+     * @generated from field: karuyomi.v1.Empty header = 2;
+     */
+    value: Empty;
+    case: "header";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.Empty separator = 3;
+     */
+    value: Empty;
+    case: "separator";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterText text = 4;
+     */
+    value: FilterText;
+    case: "text";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterCheckBox check_box = 5;
+     */
+    value: FilterCheckBox;
+    case: "checkBox";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterTriState tri_state = 6;
+     */
+    value: FilterTriState;
+    case: "triState";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterSelect select = 7;
+     */
+    value: FilterSelect;
+    case: "select";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterSort sort = 8;
+     */
+    value: FilterSort;
+    case: "sort";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterGroup group = 9;
+     */
+    value: FilterGroup;
+    case: "group";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterNode
+ */
+export type FilterNodeJson = {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name?: string;
+
+  /**
+   * @generated from field: karuyomi.v1.Empty header = 2;
+   */
+  header?: EmptyJson;
+
+  /**
+   * @generated from field: karuyomi.v1.Empty separator = 3;
+   */
+  separator?: EmptyJson;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterText text = 4;
+   */
+  text?: FilterTextJson;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterCheckBox check_box = 5;
+   */
+  checkBox?: FilterCheckBoxJson;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterTriState tri_state = 6;
+   */
+  triState?: FilterTriStateJson;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterSelect select = 7;
+   */
+  select?: FilterSelectJson;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterSort sort = 8;
+   */
+  sort?: FilterSortJson;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterGroup group = 9;
+   */
+  group?: FilterGroupJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterNode.
+ * Use `create(FilterNodeSchema)` to create a new message.
+ */
+export const FilterNodeSchema: GenMessage<FilterNode, {jsonType: FilterNodeJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 19);
+
+/**
+ * @generated from message karuyomi.v1.GetFiltersRequest
+ */
+export type GetFiltersRequest = Message<"karuyomi.v1.GetFiltersRequest"> & {
+  /**
+   * Keep the client's applied snapshot while publishing a fresh draft.
+   *
+   * @generated from field: optional string retained_snapshot_id = 1;
+   */
+  retainedSnapshotId?: string | undefined;
+};
+
+/**
+ * @generated from message karuyomi.v1.GetFiltersRequest
+ */
+export type GetFiltersRequestJson = {
+  /**
+   * Keep the client's applied snapshot while publishing a fresh draft.
+   *
+   * @generated from field: optional string retained_snapshot_id = 1;
+   */
+  retainedSnapshotId?: string;
+};
+
+/**
+ * Describes the message karuyomi.v1.GetFiltersRequest.
+ * Use `create(GetFiltersRequestSchema)` to create a new message.
+ */
+export const GetFiltersRequestSchema: GenMessage<GetFiltersRequest, {jsonType: GetFiltersRequestJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 20);
+
+/**
+ * @generated from message karuyomi.v1.FilterSnapshot
+ */
+export type FilterSnapshot = Message<"karuyomi.v1.FilterSnapshot"> & {
+  /**
+   * @generated from field: string snapshot_id = 1;
+   */
+  snapshotId: string;
+
+  /**
+   * @generated from field: repeated karuyomi.v1.FilterNode nodes = 2;
+   */
+  nodes: FilterNode[];
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterSnapshot
+ */
+export type FilterSnapshotJson = {
+  /**
+   * @generated from field: string snapshot_id = 1;
+   */
+  snapshotId?: string;
+
+  /**
+   * @generated from field: repeated karuyomi.v1.FilterNode nodes = 2;
+   */
+  nodes?: FilterNodeJson[];
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterSnapshot.
+ * Use `create(FilterSnapshotSchema)` to create a new message.
+ */
+export const FilterSnapshotSchema: GenMessage<FilterSnapshot, {jsonType: FilterSnapshotJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 21);
+
+/**
+ * @generated from message karuyomi.v1.FilterUpdate
+ */
+export type FilterUpdate = Message<"karuyomi.v1.FilterUpdate"> & {
+  /**
+   * @generated from field: repeated uint32 path = 1;
+   */
+  path: number[];
+
+  /**
+   * @generated from oneof karuyomi.v1.FilterUpdate.state
+   */
+  state: {
+    /**
+     * @generated from field: string text = 2;
+     */
+    value: string;
+    case: "text";
+  } | {
+    /**
+     * @generated from field: bool check_box = 3;
+     */
+    value: boolean;
+    case: "checkBox";
+  } | {
+    /**
+     * @generated from field: uint32 tri_state = 4;
+     */
+    value: number;
+    case: "triState";
+  } | {
+    /**
+     * @generated from field: uint32 select = 5;
+     */
+    value: number;
+    case: "select";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterSortState sort = 6;
+     */
+    value: FilterSortState;
+    case: "sort";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterUpdate
+ */
+export type FilterUpdateJson = {
+  /**
+   * @generated from field: repeated uint32 path = 1;
+   */
+  path?: number[];
+
+  /**
+   * @generated from field: string text = 2;
+   */
+  text?: string;
+
+  /**
+   * @generated from field: bool check_box = 3;
+   */
+  checkBox?: boolean;
+
+  /**
+   * @generated from field: uint32 tri_state = 4;
+   */
+  triState?: number;
+
+  /**
+   * @generated from field: uint32 select = 5;
+   */
+  select?: number;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterSortState sort = 6;
+   */
+  sort?: FilterSortStateJson;
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterUpdate.
+ * Use `create(FilterUpdateSchema)` to create a new message.
+ */
+export const FilterUpdateSchema: GenMessage<FilterUpdate, {jsonType: FilterUpdateJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 22);
+
+/**
+ * @generated from message karuyomi.v1.FilterSelection
+ */
+export type FilterSelection = Message<"karuyomi.v1.FilterSelection"> & {
+  /**
+   * @generated from field: string snapshot_id = 1;
+   */
+  snapshotId: string;
+
+  /**
+   * Every editable leaf is supplied, including false, zero and null sort.
+   *
+   * @generated from field: repeated karuyomi.v1.FilterUpdate updates = 2;
+   */
+  updates: FilterUpdate[];
+};
+
+/**
+ * @generated from message karuyomi.v1.FilterSelection
+ */
+export type FilterSelectionJson = {
+  /**
+   * @generated from field: string snapshot_id = 1;
+   */
+  snapshotId?: string;
+
+  /**
+   * Every editable leaf is supplied, including false, zero and null sort.
+   *
+   * @generated from field: repeated karuyomi.v1.FilterUpdate updates = 2;
+   */
+  updates?: FilterUpdateJson[];
+};
+
+/**
+ * Describes the message karuyomi.v1.FilterSelection.
+ * Use `create(FilterSelectionSchema)` to create a new message.
+ */
+export const FilterSelectionSchema: GenMessage<FilterSelection, {jsonType: FilterSelectionJson}> = /*@__PURE__*/
+  messageDesc(file_karuyomi_v1_control, 23);
+
+/**
  * @generated from message karuyomi.v1.SearchRequest
  */
 export type SearchRequest = Message<"karuyomi.v1.SearchRequest"> & {
@@ -785,11 +1361,16 @@ export type SearchRequest = Message<"karuyomi.v1.SearchRequest"> & {
   page: number;
 
   /**
-   * Typed filter mapping is not implemented. No untyped filter payload exists.
-   *
    * @generated from field: string query = 2;
    */
   query: string;
+
+  /**
+   * Omission requests the Source defaults; a present selection is explicit.
+   *
+   * @generated from field: karuyomi.v1.FilterSelection filters = 3;
+   */
+  filters?: FilterSelection | undefined;
 };
 
 /**
@@ -802,11 +1383,16 @@ export type SearchRequestJson = {
   page?: number;
 
   /**
-   * Typed filter mapping is not implemented. No untyped filter payload exists.
-   *
    * @generated from field: string query = 2;
    */
   query?: string;
+
+  /**
+   * Omission requests the Source defaults; a present selection is explicit.
+   *
+   * @generated from field: karuyomi.v1.FilterSelection filters = 3;
+   */
+  filters?: FilterSelectionJson;
 };
 
 /**
@@ -814,7 +1400,7 @@ export type SearchRequestJson = {
  * Use `create(SearchRequestSchema)` to create a new message.
  */
 export const SearchRequestSchema: GenMessage<SearchRequest, {jsonType: SearchRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 11);
+  messageDesc(file_karuyomi_v1_control, 24);
 
 /**
  * @generated from message karuyomi.v1.MangaRequest
@@ -841,7 +1427,7 @@ export type MangaRequestJson = {
  * Use `create(MangaRequestSchema)` to create a new message.
  */
 export const MangaRequestSchema: GenMessage<MangaRequest, {jsonType: MangaRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 12);
+  messageDesc(file_karuyomi_v1_control, 25);
 
 /**
  * @generated from message karuyomi.v1.ChapterRequest
@@ -868,7 +1454,7 @@ export type ChapterRequestJson = {
  * Use `create(ChapterRequestSchema)` to create a new message.
  */
 export const ChapterRequestSchema: GenMessage<ChapterRequest, {jsonType: ChapterRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 13);
+  messageDesc(file_karuyomi_v1_control, 26);
 
 /**
  * @generated from message karuyomi.v1.SourceCall
@@ -933,6 +1519,12 @@ export type SourceCall = Message<"karuyomi.v1.SourceCall"> & {
      */
     value: ChapterRequest;
     case: "pages";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.GetFiltersRequest get_filters = 16;
+     */
+    value: GetFiltersRequest;
+    case: "getFilters";
   } | { case: undefined; value?: undefined };
 };
 
@@ -989,6 +1581,11 @@ export type SourceCallJson = {
    * @generated from field: karuyomi.v1.ChapterRequest pages = 15;
    */
   pages?: ChapterRequestJson;
+
+  /**
+   * @generated from field: karuyomi.v1.GetFiltersRequest get_filters = 16;
+   */
+  getFilters?: GetFiltersRequestJson;
 };
 
 /**
@@ -996,7 +1593,7 @@ export type SourceCallJson = {
  * Use `create(SourceCallSchema)` to create a new message.
  */
 export const SourceCallSchema: GenMessage<SourceCall, {jsonType: SourceCallJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 14);
+  messageDesc(file_karuyomi_v1_control, 27);
 
 /**
  * @generated from message karuyomi.v1.MangaPage
@@ -1033,7 +1630,7 @@ export type MangaPageJson = {
  * Use `create(MangaPageSchema)` to create a new message.
  */
 export const MangaPageSchema: GenMessage<MangaPage, {jsonType: MangaPageJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 15);
+  messageDesc(file_karuyomi_v1_control, 28);
 
 /**
  * @generated from message karuyomi.v1.ChapterList
@@ -1060,7 +1657,7 @@ export type ChapterListJson = {
  * Use `create(ChapterListSchema)` to create a new message.
  */
 export const ChapterListSchema: GenMessage<ChapterList, {jsonType: ChapterListJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 16);
+  messageDesc(file_karuyomi_v1_control, 29);
 
 /**
  * @generated from message karuyomi.v1.PageList
@@ -1097,7 +1694,7 @@ export type PageListJson = {
  * Use `create(PageListSchema)` to create a new message.
  */
 export const PageListSchema: GenMessage<PageList, {jsonType: PageListJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 17);
+  messageDesc(file_karuyomi_v1_control, 30);
 
 /**
  * @generated from message karuyomi.v1.SourceResult
@@ -1145,6 +1742,12 @@ export type SourceResult = Message<"karuyomi.v1.SourceResult"> & {
      */
     value: PageList;
     case: "pageList";
+  } | {
+    /**
+     * @generated from field: karuyomi.v1.FilterSnapshot filters = 14;
+     */
+    value: FilterSnapshot;
+    case: "filters";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1186,6 +1789,11 @@ export type SourceResultJson = {
    * @generated from field: karuyomi.v1.PageList page_list = 13;
    */
   pageList?: PageListJson;
+
+  /**
+   * @generated from field: karuyomi.v1.FilterSnapshot filters = 14;
+   */
+  filters?: FilterSnapshotJson;
 };
 
 /**
@@ -1193,7 +1801,7 @@ export type SourceResultJson = {
  * Use `create(SourceResultSchema)` to create a new message.
  */
 export const SourceResultSchema: GenMessage<SourceResult, {jsonType: SourceResultJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 18);
+  messageDesc(file_karuyomi_v1_control, 31);
 
 /**
  * @generated from message karuyomi.v1.CancelSourceRequest
@@ -1230,7 +1838,7 @@ export type CancelSourceRequestJson = {
  * Use `create(CancelSourceRequestSchema)` to create a new message.
  */
 export const CancelSourceRequestSchema: GenMessage<CancelSourceRequest, {jsonType: CancelSourceRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 19);
+  messageDesc(file_karuyomi_v1_control, 32);
 
 /**
  * @generated from message karuyomi.v1.AcquireImage
@@ -1307,7 +1915,7 @@ export type AcquireImageJson = {
  * Use `create(AcquireImageSchema)` to create a new message.
  */
 export const AcquireImageSchema: GenMessage<AcquireImage, {jsonType: AcquireImageJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 20);
+  messageDesc(file_karuyomi_v1_control, 33);
 
 /**
  * @generated from message karuyomi.v1.CancelImage
@@ -1344,7 +1952,7 @@ export type CancelImageJson = {
  * Use `create(CancelImageSchema)` to create a new message.
  */
 export const CancelImageSchema: GenMessage<CancelImage, {jsonType: CancelImageJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 21);
+  messageDesc(file_karuyomi_v1_control, 34);
 
 /**
  * @generated from message karuyomi.v1.ReleaseImage
@@ -1381,7 +1989,7 @@ export type ReleaseImageJson = {
  * Use `create(ReleaseImageSchema)` to create a new message.
  */
 export const ReleaseImageSchema: GenMessage<ReleaseImage, {jsonType: ReleaseImageJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 22);
+  messageDesc(file_karuyomi_v1_control, 35);
 
 /**
  * @generated from message karuyomi.v1.ClosePageSession
@@ -1418,7 +2026,7 @@ export type ClosePageSessionJson = {
  * Use `create(ClosePageSessionSchema)` to create a new message.
  */
 export const ClosePageSessionSchema: GenMessage<ClosePageSession, {jsonType: ClosePageSessionJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 23);
+  messageDesc(file_karuyomi_v1_control, 36);
 
 /**
  * @generated from message karuyomi.v1.Released
@@ -1445,7 +2053,7 @@ export type ReleasedJson = {
  * Use `create(ReleasedSchema)` to create a new message.
  */
 export const ReleasedSchema: GenMessage<Released, {jsonType: ReleasedJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 24);
+  messageDesc(file_karuyomi_v1_control, 37);
 
 /**
  * @generated from message karuyomi.v1.Closed
@@ -1472,7 +2080,7 @@ export type ClosedJson = {
  * Use `create(ClosedSchema)` to create a new message.
  */
 export const ClosedSchema: GenMessage<Closed, {jsonType: ClosedJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 25);
+  messageDesc(file_karuyomi_v1_control, 38);
 
 /**
  * @generated from message karuyomi.v1.Completed
@@ -1499,7 +2107,7 @@ export type CompletedJson = {
  * Use `create(CompletedSchema)` to create a new message.
  */
 export const CompletedSchema: GenMessage<Completed, {jsonType: CompletedJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 26);
+  messageDesc(file_karuyomi_v1_control, 39);
 
 /**
  * An opaque Source-processed body. Image interpretation belongs to the UI.
@@ -1550,7 +2158,7 @@ export type ProcessedImageJson = {
  * Use `create(ProcessedImageSchema)` to create a new message.
  */
 export const ProcessedImageSchema: GenMessage<ProcessedImage, {jsonType: ProcessedImageJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 27);
+  messageDesc(file_karuyomi_v1_control, 40);
 
 /**
  * @generated from message karuyomi.v1.ImageResource
@@ -1607,7 +2215,7 @@ export type ImageResourceJson = {
  * Use `create(ImageResourceSchema)` to create a new message.
  */
 export const ImageResourceSchema: GenMessage<ImageResource, {jsonType: ImageResourceJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 28);
+  messageDesc(file_karuyomi_v1_control, 41);
 
 /**
  * @generated from message karuyomi.v1.ImageMeta
@@ -1626,7 +2234,7 @@ export type ImageMetaJson = {
  * Use `create(ImageMetaSchema)` to create a new message.
  */
 export const ImageMetaSchema: GenMessage<ImageMeta, {jsonType: ImageMetaJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 29);
+  messageDesc(file_karuyomi_v1_control, 42);
 
 /**
  * @generated from message karuyomi.v1.ImageData
@@ -1663,7 +2271,7 @@ export type ImageDataJson = {
  * Use `create(ImageDataSchema)` to create a new message.
  */
 export const ImageDataSchema: GenMessage<ImageData, {jsonType: ImageDataJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 30);
+  messageDesc(file_karuyomi_v1_control, 43);
 
 /**
  * @generated from message karuyomi.v1.ImageEnd
@@ -1700,7 +2308,7 @@ export type ImageEndJson = {
  * Use `create(ImageEndSchema)` to create a new message.
  */
 export const ImageEndSchema: GenMessage<ImageEnd, {jsonType: ImageEndJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 31);
+  messageDesc(file_karuyomi_v1_control, 44);
 
 /**
  * @generated from message karuyomi.v1.ImageAck
@@ -1737,7 +2345,7 @@ export type ImageAckJson = {
  * Use `create(ImageAckSchema)` to create a new message.
  */
 export const ImageAckSchema: GenMessage<ImageAck, {jsonType: ImageAckJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 32);
+  messageDesc(file_karuyomi_v1_control, 45);
 
 /**
  * @generated from message karuyomi.v1.ImageFrameControl
@@ -1814,7 +2422,7 @@ export type ImageFrameControlJson = {
  * Use `create(ImageFrameControlSchema)` to create a new message.
  */
 export const ImageFrameControlSchema: GenMessage<ImageFrameControl, {jsonType: ImageFrameControlJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 33);
+  messageDesc(file_karuyomi_v1_control, 46);
 
 /**
  * @generated from message karuyomi.v1.Artifact
@@ -1881,7 +2489,7 @@ export type ArtifactJson = {
  * Use `create(ArtifactSchema)` to create a new message.
  */
 export const ArtifactSchema: GenMessage<Artifact, {jsonType: ArtifactJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 34);
+  messageDesc(file_karuyomi_v1_control, 47);
 
 /**
  * @generated from message karuyomi.v1.BundleArtifact
@@ -1968,7 +2576,7 @@ export type BundleArtifactJson = {
  * Use `create(BundleArtifactSchema)` to create a new message.
  */
 export const BundleArtifactSchema: GenMessage<BundleArtifact, {jsonType: BundleArtifactJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 35);
+  messageDesc(file_karuyomi_v1_control, 48);
 
 /**
  * @generated from message karuyomi.v1.BuildManifest
@@ -2115,7 +2723,7 @@ export type BuildManifestJson = {
  * Use `create(BuildManifestSchema)` to create a new message.
  */
 export const BuildManifestSchema: GenMessage<BuildManifest, {jsonType: BuildManifestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 36);
+  messageDesc(file_karuyomi_v1_control, 49);
 
 /**
  * @generated from message karuyomi.v1.ExtensionBuildDescriptor
@@ -2192,7 +2800,7 @@ export type ExtensionBuildDescriptorJson = {
  * Use `create(ExtensionBuildDescriptorSchema)` to create a new message.
  */
 export const ExtensionBuildDescriptorSchema: GenMessage<ExtensionBuildDescriptor, {jsonType: ExtensionBuildDescriptorJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 37);
+  messageDesc(file_karuyomi_v1_control, 50);
 
 /**
  * @generated from message karuyomi.v1.ExtensionIndex
@@ -2233,7 +2841,7 @@ export type ExtensionIndexJson = {
  * Use `create(ExtensionIndexSchema)` to create a new message.
  */
 export const ExtensionIndexSchema: GenMessage<ExtensionIndex, {jsonType: ExtensionIndexJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 38);
+  messageDesc(file_karuyomi_v1_control, 51);
 
 /**
  * @generated from message karuyomi.v1.Identity
@@ -2270,7 +2878,7 @@ export type IdentityJson = {
  * Use `create(IdentitySchema)` to create a new message.
  */
 export const IdentitySchema: GenMessage<Identity, {jsonType: IdentityJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 39);
+  messageDesc(file_karuyomi_v1_control, 52);
 
 /**
  * @generated from message karuyomi.v1.Bootstrap
@@ -2333,7 +2941,7 @@ export type BootstrapJson = {
  * Use `create(BootstrapSchema)` to create a new message.
  */
 export const BootstrapSchema: GenMessage<Bootstrap, {jsonType: BootstrapJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 40);
+  messageDesc(file_karuyomi_v1_control, 53);
 
 /**
  * @generated from message karuyomi.v1.ApiFetchRequest
@@ -2390,7 +2998,7 @@ export type ApiFetchRequestJson = {
  * Use `create(ApiFetchRequestSchema)` to create a new message.
  */
 export const ApiFetchRequestSchema: GenMessage<ApiFetchRequest, {jsonType: ApiFetchRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 41);
+  messageDesc(file_karuyomi_v1_control, 54);
 
 /**
  * @generated from message karuyomi.v1.ApiFetchResponse
@@ -2447,7 +3055,7 @@ export type ApiFetchResponseJson = {
  * Use `create(ApiFetchResponseSchema)` to create a new message.
  */
 export const ApiFetchResponseSchema: GenMessage<ApiFetchResponse, {jsonType: ApiFetchResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 42);
+  messageDesc(file_karuyomi_v1_control, 55);
 
 /**
  * @generated from message karuyomi.v1.ControlRequest
@@ -2600,7 +3208,7 @@ export type ControlRequestJson = {
  * Use `create(ControlRequestSchema)` to create a new message.
  */
 export const ControlRequestSchema: GenMessage<ControlRequest, {jsonType: ControlRequestJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 43);
+  messageDesc(file_karuyomi_v1_control, 56);
 
 /**
  * @generated from message karuyomi.v1.ControlResponse
@@ -2731,7 +3339,7 @@ export type ControlResponseJson = {
  * Use `create(ControlResponseSchema)` to create a new message.
  */
 export const ControlResponseSchema: GenMessage<ControlResponse, {jsonType: ControlResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 44);
+  messageDesc(file_karuyomi_v1_control, 57);
 
 /**
  * @generated from message karuyomi.v1.OpenWorker
@@ -2768,7 +3376,7 @@ export type OpenWorkerJson = {
  * Use `create(OpenWorkerSchema)` to create a new message.
  */
 export const OpenWorkerSchema: GenMessage<OpenWorker, {jsonType: OpenWorkerJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 45);
+  messageDesc(file_karuyomi_v1_control, 58);
 
 /**
  * @generated from message karuyomi.v1.AcquireImageWorker
@@ -2805,7 +3413,7 @@ export type AcquireImageWorkerJson = {
  * Use `create(AcquireImageWorkerSchema)` to create a new message.
  */
 export const AcquireImageWorkerSchema: GenMessage<AcquireImageWorker, {jsonType: AcquireImageWorkerJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 46);
+  messageDesc(file_karuyomi_v1_control, 59);
 
 /**
  * @generated from message karuyomi.v1.WorkerCommand
@@ -2892,7 +3500,7 @@ export type WorkerCommandJson = {
  * Use `create(WorkerCommandSchema)` to create a new message.
  */
 export const WorkerCommandSchema: GenMessage<WorkerCommand, {jsonType: WorkerCommandJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 47);
+  messageDesc(file_karuyomi_v1_control, 60);
 
 /**
  * @generated from message karuyomi.v1.WorkerResponse
@@ -2979,7 +3587,7 @@ export type WorkerResponseJson = {
  * Use `create(WorkerResponseSchema)` to create a new message.
  */
 export const WorkerResponseSchema: GenMessage<WorkerResponse, {jsonType: WorkerResponseJson}> = /*@__PURE__*/
-  messageDesc(file_karuyomi_v1_control, 48);
+  messageDesc(file_karuyomi_v1_control, 61);
 
 /**
  * @generated from enum karuyomi.v1.RuntimeErrorCode

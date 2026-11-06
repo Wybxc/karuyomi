@@ -3,9 +3,12 @@ library;
 
 import 'dart:convert';
 import 'package:protobuf/protobuf.dart';
+import 'src/pb/karuyomi/v1/control.pb.dart';
 
 export 'src/pb/karuyomi/v1/control.pb.dart';
 export 'src/pb/karuyomi/v1/business.pb.dart';
+
+part 'src/filter_validation.dart';
 
 const controlJsonLimit = 8 * 1024 * 1024;
 const controlRequestLimit = 128 * 1024;

@@ -1161,14 +1161,1043 @@ class PageRequest extends $pb.GeneratedMessage {
   void clearPage() => $_clearField(1);
 }
 
+/// Filter paths use zero-based indexes from the top-level list. Snapshots are
+/// ephemeral and belong to the Source and generation that produced them.
+class FilterText extends $pb.GeneratedMessage {
+  factory FilterText({
+    $core.String? state,
+  }) {
+    final result = FilterText._();
+    if (state != null) result.state = state;
+    return result;
+  }
+
+  FilterText._();
+
+  factory FilterText.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterText()..mergeFromBuffer(data, registry);
+  factory FilterText.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterText()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterText',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterText.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'state')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterText clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterText copyWith(void Function(FilterText) updates) =>
+      super.copyWith((message) => updates(message as FilterText)) as FilterText;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterText() / FilterText.new instead')
+  static FilterText create() => FilterText._();
+  static $pb.GeneratedMessage $_createMessage() => FilterText._();
+  @$core.override
+  FilterText createEmptyInstance() => FilterText._();
+  @$core.pragma('dart2js:noInline')
+  static FilterText getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FilterText>(FilterText.$_createMessage);
+  static FilterText? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get state => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set state($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasState() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearState() => $_clearField(1);
+}
+
+class FilterCheckBox extends $pb.GeneratedMessage {
+  factory FilterCheckBox({
+    $core.bool? state,
+  }) {
+    final result = FilterCheckBox._();
+    if (state != null) result.state = state;
+    return result;
+  }
+
+  FilterCheckBox._();
+
+  factory FilterCheckBox.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterCheckBox()..mergeFromBuffer(data, registry);
+  factory FilterCheckBox.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterCheckBox()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterCheckBox',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterCheckBox.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'state')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterCheckBox clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterCheckBox copyWith(void Function(FilterCheckBox) updates) =>
+      super.copyWith((message) => updates(message as FilterCheckBox))
+          as FilterCheckBox;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterCheckBox() / FilterCheckBox.new instead')
+  static FilterCheckBox create() => FilterCheckBox._();
+  static $pb.GeneratedMessage $_createMessage() => FilterCheckBox._();
+  @$core.override
+  FilterCheckBox createEmptyInstance() => FilterCheckBox._();
+  @$core.pragma('dart2js:noInline')
+  static FilterCheckBox getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterCheckBox>(
+          FilterCheckBox.$_createMessage);
+  static FilterCheckBox? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get state => $_getBF(0);
+  @$pb.TagNumber(1)
+  set state($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasState() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearState() => $_clearField(1);
+}
+
+class FilterTriState extends $pb.GeneratedMessage {
+  factory FilterTriState({
+    $core.int? state,
+  }) {
+    final result = FilterTriState._();
+    if (state != null) result.state = state;
+    return result;
+  }
+
+  FilterTriState._();
+
+  factory FilterTriState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterTriState()..mergeFromBuffer(data, registry);
+  factory FilterTriState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterTriState()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterTriState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterTriState.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'state', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterTriState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterTriState copyWith(void Function(FilterTriState) updates) =>
+      super.copyWith((message) => updates(message as FilterTriState))
+          as FilterTriState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterTriState() / FilterTriState.new instead')
+  static FilterTriState create() => FilterTriState._();
+  static $pb.GeneratedMessage $_createMessage() => FilterTriState._();
+  @$core.override
+  FilterTriState createEmptyInstance() => FilterTriState._();
+  @$core.pragma('dart2js:noInline')
+  static FilterTriState getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterTriState>(
+          FilterTriState.$_createMessage);
+  static FilterTriState? _defaultInstance;
+
+  /// Original Source states: 0 ignore, 1 include, 2 exclude.
+  @$pb.TagNumber(1)
+  $core.int get state => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set state($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasState() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearState() => $_clearField(1);
+}
+
+class FilterSelect extends $pb.GeneratedMessage {
+  factory FilterSelect({
+    $core.Iterable<$core.String>? options,
+    $core.int? state,
+  }) {
+    final result = FilterSelect._();
+    if (options != null) result.options.addAll(options);
+    if (state != null) result.state = state;
+    return result;
+  }
+
+  FilterSelect._();
+
+  factory FilterSelect.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSelect()..mergeFromBuffer(data, registry);
+  factory FilterSelect.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSelect()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterSelect',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterSelect.$_createMessage)
+    ..pPS(1, _omitFieldNames ? '' : 'options')
+    ..aI(2, _omitFieldNames ? '' : 'state', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSelect clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSelect copyWith(void Function(FilterSelect) updates) =>
+      super.copyWith((message) => updates(message as FilterSelect))
+          as FilterSelect;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterSelect() / FilterSelect.new instead')
+  static FilterSelect create() => FilterSelect._();
+  static $pb.GeneratedMessage $_createMessage() => FilterSelect._();
+  @$core.override
+  FilterSelect createEmptyInstance() => FilterSelect._();
+  @$core.pragma('dart2js:noInline')
+  static FilterSelect getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterSelect>(
+          FilterSelect.$_createMessage);
+  static FilterSelect? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get options => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.int get state => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set state($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearState() => $_clearField(2);
+}
+
+class FilterSortSelection extends $pb.GeneratedMessage {
+  factory FilterSortSelection({
+    $core.int? index,
+    $core.bool? ascending,
+  }) {
+    final result = FilterSortSelection._();
+    if (index != null) result.index = index;
+    if (ascending != null) result.ascending = ascending;
+    return result;
+  }
+
+  FilterSortSelection._();
+
+  factory FilterSortSelection.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSortSelection()..mergeFromBuffer(data, registry);
+  factory FilterSortSelection.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSortSelection()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterSortSelection',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterSortSelection.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'index', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(2, _omitFieldNames ? '' : 'ascending')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSortSelection clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSortSelection copyWith(void Function(FilterSortSelection) updates) =>
+      super.copyWith((message) => updates(message as FilterSortSelection))
+          as FilterSortSelection;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use FilterSortSelection() / FilterSortSelection.new instead')
+  static FilterSortSelection create() => FilterSortSelection._();
+  static $pb.GeneratedMessage $_createMessage() => FilterSortSelection._();
+  @$core.override
+  FilterSortSelection createEmptyInstance() => FilterSortSelection._();
+  @$core.pragma('dart2js:noInline')
+  static FilterSortSelection getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FilterSortSelection>(
+          FilterSortSelection.$_createMessage);
+  static FilterSortSelection? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get index => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set index($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasIndex() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIndex() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get ascending => $_getBF(1);
+  @$pb.TagNumber(2)
+  set ascending($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAscending() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAscending() => $_clearField(2);
+}
+
+class FilterSortState extends $pb.GeneratedMessage {
+  factory FilterSortState({
+    FilterSortSelection? selection,
+  }) {
+    final result = FilterSortState._();
+    if (selection != null) result.selection = selection;
+    return result;
+  }
+
+  FilterSortState._();
+
+  factory FilterSortState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSortState()..mergeFromBuffer(data, registry);
+  factory FilterSortState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSortState()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterSortState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterSortState.$_createMessage)
+    ..aOM<FilterSortSelection>(1, _omitFieldNames ? '' : 'selection',
+        subBuilder: FilterSortSelection.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSortState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSortState copyWith(void Function(FilterSortState) updates) =>
+      super.copyWith((message) => updates(message as FilterSortState))
+          as FilterSortState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterSortState() / FilterSortState.new instead')
+  static FilterSortState create() => FilterSortState._();
+  static $pb.GeneratedMessage $_createMessage() => FilterSortState._();
+  @$core.override
+  FilterSortState createEmptyInstance() => FilterSortState._();
+  @$core.pragma('dart2js:noInline')
+  static FilterSortState getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterSortState>(
+          FilterSortState.$_createMessage);
+  static FilterSortState? _defaultInstance;
+
+  /// Absence explicitly means the Source's nullable sort selection.
+  @$pb.TagNumber(1)
+  FilterSortSelection get selection => $_getN(0);
+  @$pb.TagNumber(1)
+  set selection(FilterSortSelection value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSelection() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSelection() => $_clearField(1);
+  @$pb.TagNumber(1)
+  FilterSortSelection ensureSelection() => $_ensure(0);
+}
+
+class FilterSort extends $pb.GeneratedMessage {
+  factory FilterSort({
+    $core.Iterable<$core.String>? options,
+    FilterSortState? state,
+  }) {
+    final result = FilterSort._();
+    if (options != null) result.options.addAll(options);
+    if (state != null) result.state = state;
+    return result;
+  }
+
+  FilterSort._();
+
+  factory FilterSort.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSort()..mergeFromBuffer(data, registry);
+  factory FilterSort.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSort()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterSort',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterSort.$_createMessage)
+    ..pPS(1, _omitFieldNames ? '' : 'options')
+    ..aOM<FilterSortState>(2, _omitFieldNames ? '' : 'state',
+        subBuilder: FilterSortState.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSort clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSort copyWith(void Function(FilterSort) updates) =>
+      super.copyWith((message) => updates(message as FilterSort)) as FilterSort;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterSort() / FilterSort.new instead')
+  static FilterSort create() => FilterSort._();
+  static $pb.GeneratedMessage $_createMessage() => FilterSort._();
+  @$core.override
+  FilterSort createEmptyInstance() => FilterSort._();
+  @$core.pragma('dart2js:noInline')
+  static FilterSort getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FilterSort>(FilterSort.$_createMessage);
+  static FilterSort? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get options => $_getList(0);
+
+  @$pb.TagNumber(2)
+  FilterSortState get state => $_getN(1);
+  @$pb.TagNumber(2)
+  set state(FilterSortState value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearState() => $_clearField(2);
+  @$pb.TagNumber(2)
+  FilterSortState ensureState() => $_ensure(1);
+}
+
+class FilterGroup extends $pb.GeneratedMessage {
+  factory FilterGroup({
+    $core.Iterable<FilterNode>? nodes,
+  }) {
+    final result = FilterGroup._();
+    if (nodes != null) result.nodes.addAll(nodes);
+    return result;
+  }
+
+  FilterGroup._();
+
+  factory FilterGroup.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterGroup()..mergeFromBuffer(data, registry);
+  factory FilterGroup.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterGroup()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterGroup',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterGroup.$_createMessage)
+    ..pPM<FilterNode>(1, _omitFieldNames ? '' : 'nodes',
+        subBuilder: FilterNode.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterGroup clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterGroup copyWith(void Function(FilterGroup) updates) =>
+      super.copyWith((message) => updates(message as FilterGroup))
+          as FilterGroup;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterGroup() / FilterGroup.new instead')
+  static FilterGroup create() => FilterGroup._();
+  static $pb.GeneratedMessage $_createMessage() => FilterGroup._();
+  @$core.override
+  FilterGroup createEmptyInstance() => FilterGroup._();
+  @$core.pragma('dart2js:noInline')
+  static FilterGroup getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterGroup>(
+          FilterGroup.$_createMessage);
+  static FilterGroup? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<FilterNode> get nodes => $_getList(0);
+}
+
+enum FilterNode_Kind {
+  header,
+  separator,
+  text,
+  checkBox,
+  triState,
+  select,
+  sort,
+  group,
+  notSet
+}
+
+class FilterNode extends $pb.GeneratedMessage {
+  factory FilterNode({
+    $core.String? name,
+    Empty? header,
+    Empty? separator,
+    FilterText? text,
+    FilterCheckBox? checkBox,
+    FilterTriState? triState,
+    FilterSelect? select,
+    FilterSort? sort,
+    FilterGroup? group,
+  }) {
+    final result = FilterNode._();
+    if (name != null) result.name = name;
+    if (header != null) result.header = header;
+    if (separator != null) result.separator = separator;
+    if (text != null) result.text = text;
+    if (checkBox != null) result.checkBox = checkBox;
+    if (triState != null) result.triState = triState;
+    if (select != null) result.select = select;
+    if (sort != null) result.sort = sort;
+    if (group != null) result.group = group;
+    return result;
+  }
+
+  FilterNode._();
+
+  factory FilterNode.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterNode()..mergeFromBuffer(data, registry);
+  factory FilterNode.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterNode()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, FilterNode_Kind> _FilterNode_KindByTag = {
+    2: FilterNode_Kind.header,
+    3: FilterNode_Kind.separator,
+    4: FilterNode_Kind.text,
+    5: FilterNode_Kind.checkBox,
+    6: FilterNode_Kind.triState,
+    7: FilterNode_Kind.select,
+    8: FilterNode_Kind.sort,
+    9: FilterNode_Kind.group,
+    0: FilterNode_Kind.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterNode',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterNode.$_createMessage)
+    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9])
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOM<Empty>(2, _omitFieldNames ? '' : 'header',
+        subBuilder: Empty.$_createMessage)
+    ..aOM<Empty>(3, _omitFieldNames ? '' : 'separator',
+        subBuilder: Empty.$_createMessage)
+    ..aOM<FilterText>(4, _omitFieldNames ? '' : 'text',
+        subBuilder: FilterText.$_createMessage)
+    ..aOM<FilterCheckBox>(5, _omitFieldNames ? '' : 'checkBox',
+        subBuilder: FilterCheckBox.$_createMessage)
+    ..aOM<FilterTriState>(6, _omitFieldNames ? '' : 'triState',
+        subBuilder: FilterTriState.$_createMessage)
+    ..aOM<FilterSelect>(7, _omitFieldNames ? '' : 'select',
+        subBuilder: FilterSelect.$_createMessage)
+    ..aOM<FilterSort>(8, _omitFieldNames ? '' : 'sort',
+        subBuilder: FilterSort.$_createMessage)
+    ..aOM<FilterGroup>(9, _omitFieldNames ? '' : 'group',
+        subBuilder: FilterGroup.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterNode clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterNode copyWith(void Function(FilterNode) updates) =>
+      super.copyWith((message) => updates(message as FilterNode)) as FilterNode;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterNode() / FilterNode.new instead')
+  static FilterNode create() => FilterNode._();
+  static $pb.GeneratedMessage $_createMessage() => FilterNode._();
+  @$core.override
+  FilterNode createEmptyInstance() => FilterNode._();
+  @$core.pragma('dart2js:noInline')
+  static FilterNode getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FilterNode>(FilterNode.$_createMessage);
+  static FilterNode? _defaultInstance;
+
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
+  FilterNode_Kind whichKind() => _FilterNode_KindByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
+  void clearKind() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  Empty get header => $_getN(1);
+  @$pb.TagNumber(2)
+  set header(Empty value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasHeader() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearHeader() => $_clearField(2);
+  @$pb.TagNumber(2)
+  Empty ensureHeader() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  Empty get separator => $_getN(2);
+  @$pb.TagNumber(3)
+  set separator(Empty value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSeparator() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSeparator() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Empty ensureSeparator() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  FilterText get text => $_getN(3);
+  @$pb.TagNumber(4)
+  set text(FilterText value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasText() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearText() => $_clearField(4);
+  @$pb.TagNumber(4)
+  FilterText ensureText() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  FilterCheckBox get checkBox => $_getN(4);
+  @$pb.TagNumber(5)
+  set checkBox(FilterCheckBox value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCheckBox() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCheckBox() => $_clearField(5);
+  @$pb.TagNumber(5)
+  FilterCheckBox ensureCheckBox() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  FilterTriState get triState => $_getN(5);
+  @$pb.TagNumber(6)
+  set triState(FilterTriState value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTriState() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTriState() => $_clearField(6);
+  @$pb.TagNumber(6)
+  FilterTriState ensureTriState() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  FilterSelect get select => $_getN(6);
+  @$pb.TagNumber(7)
+  set select(FilterSelect value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasSelect() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSelect() => $_clearField(7);
+  @$pb.TagNumber(7)
+  FilterSelect ensureSelect() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  FilterSort get sort => $_getN(7);
+  @$pb.TagNumber(8)
+  set sort(FilterSort value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasSort() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSort() => $_clearField(8);
+  @$pb.TagNumber(8)
+  FilterSort ensureSort() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  FilterGroup get group => $_getN(8);
+  @$pb.TagNumber(9)
+  set group(FilterGroup value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasGroup() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearGroup() => $_clearField(9);
+  @$pb.TagNumber(9)
+  FilterGroup ensureGroup() => $_ensure(8);
+}
+
+class GetFiltersRequest extends $pb.GeneratedMessage {
+  factory GetFiltersRequest({
+    $core.String? retainedSnapshotId,
+  }) {
+    final result = GetFiltersRequest._();
+    if (retainedSnapshotId != null)
+      result.retainedSnapshotId = retainedSnapshotId;
+    return result;
+  }
+
+  GetFiltersRequest._();
+
+  factory GetFiltersRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetFiltersRequest()..mergeFromBuffer(data, registry);
+  factory GetFiltersRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetFiltersRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetFiltersRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: GetFiltersRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'retainedSnapshotId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFiltersRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFiltersRequest copyWith(void Function(GetFiltersRequest) updates) =>
+      super.copyWith((message) => updates(message as GetFiltersRequest))
+          as GetFiltersRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use GetFiltersRequest() / GetFiltersRequest.new instead')
+  static GetFiltersRequest create() => GetFiltersRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetFiltersRequest._();
+  @$core.override
+  GetFiltersRequest createEmptyInstance() => GetFiltersRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetFiltersRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<GetFiltersRequest>(
+          GetFiltersRequest.$_createMessage);
+  static GetFiltersRequest? _defaultInstance;
+
+  /// Keep the client's applied snapshot while publishing a fresh draft.
+  @$pb.TagNumber(1)
+  $core.String get retainedSnapshotId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set retainedSnapshotId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRetainedSnapshotId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRetainedSnapshotId() => $_clearField(1);
+}
+
+class FilterSnapshot extends $pb.GeneratedMessage {
+  factory FilterSnapshot({
+    $core.String? snapshotId,
+    $core.Iterable<FilterNode>? nodes,
+  }) {
+    final result = FilterSnapshot._();
+    if (snapshotId != null) result.snapshotId = snapshotId;
+    if (nodes != null) result.nodes.addAll(nodes);
+    return result;
+  }
+
+  FilterSnapshot._();
+
+  factory FilterSnapshot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSnapshot()..mergeFromBuffer(data, registry);
+  factory FilterSnapshot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSnapshot()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterSnapshot',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterSnapshot.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'snapshotId')
+    ..pPM<FilterNode>(2, _omitFieldNames ? '' : 'nodes',
+        subBuilder: FilterNode.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSnapshot copyWith(void Function(FilterSnapshot) updates) =>
+      super.copyWith((message) => updates(message as FilterSnapshot))
+          as FilterSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterSnapshot() / FilterSnapshot.new instead')
+  static FilterSnapshot create() => FilterSnapshot._();
+  static $pb.GeneratedMessage $_createMessage() => FilterSnapshot._();
+  @$core.override
+  FilterSnapshot createEmptyInstance() => FilterSnapshot._();
+  @$core.pragma('dart2js:noInline')
+  static FilterSnapshot getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterSnapshot>(
+          FilterSnapshot.$_createMessage);
+  static FilterSnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get snapshotId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set snapshotId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSnapshotId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSnapshotId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<FilterNode> get nodes => $_getList(1);
+}
+
+enum FilterUpdate_State { text, checkBox, triState, select, sort, notSet }
+
+class FilterUpdate extends $pb.GeneratedMessage {
+  factory FilterUpdate({
+    $core.Iterable<$core.int>? path,
+    $core.String? text,
+    $core.bool? checkBox,
+    $core.int? triState,
+    $core.int? select,
+    FilterSortState? sort,
+  }) {
+    final result = FilterUpdate._();
+    if (path != null) result.path.addAll(path);
+    if (text != null) result.text = text;
+    if (checkBox != null) result.checkBox = checkBox;
+    if (triState != null) result.triState = triState;
+    if (select != null) result.select = select;
+    if (sort != null) result.sort = sort;
+    return result;
+  }
+
+  FilterUpdate._();
+
+  factory FilterUpdate.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterUpdate()..mergeFromBuffer(data, registry);
+  factory FilterUpdate.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterUpdate()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, FilterUpdate_State>
+      _FilterUpdate_StateByTag = {
+    2: FilterUpdate_State.text,
+    3: FilterUpdate_State.checkBox,
+    4: FilterUpdate_State.triState,
+    5: FilterUpdate_State.select,
+    6: FilterUpdate_State.sort,
+    0: FilterUpdate_State.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterUpdate',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterUpdate.$_createMessage)
+    ..oo(0, [2, 3, 4, 5, 6])
+    ..p<$core.int>(1, _omitFieldNames ? '' : 'path', $pb.PbFieldType.KU3)
+    ..aOS(2, _omitFieldNames ? '' : 'text')
+    ..aOB(3, _omitFieldNames ? '' : 'checkBox')
+    ..aI(4, _omitFieldNames ? '' : 'triState', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'select', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<FilterSortState>(6, _omitFieldNames ? '' : 'sort',
+        subBuilder: FilterSortState.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterUpdate clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterUpdate copyWith(void Function(FilterUpdate) updates) =>
+      super.copyWith((message) => updates(message as FilterUpdate))
+          as FilterUpdate;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterUpdate() / FilterUpdate.new instead')
+  static FilterUpdate create() => FilterUpdate._();
+  static $pb.GeneratedMessage $_createMessage() => FilterUpdate._();
+  @$core.override
+  FilterUpdate createEmptyInstance() => FilterUpdate._();
+  @$core.pragma('dart2js:noInline')
+  static FilterUpdate getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterUpdate>(
+          FilterUpdate.$_createMessage);
+  static FilterUpdate? _defaultInstance;
+
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  FilterUpdate_State whichState() => _FilterUpdate_StateByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  void clearState() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.int> get path => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get text => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set text($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasText() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearText() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get checkBox => $_getBF(2);
+  @$pb.TagNumber(3)
+  set checkBox($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCheckBox() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCheckBox() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get triState => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set triState($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTriState() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTriState() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get select => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set select($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSelect() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSelect() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  FilterSortState get sort => $_getN(5);
+  @$pb.TagNumber(6)
+  set sort(FilterSortState value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSort() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSort() => $_clearField(6);
+  @$pb.TagNumber(6)
+  FilterSortState ensureSort() => $_ensure(5);
+}
+
+class FilterSelection extends $pb.GeneratedMessage {
+  factory FilterSelection({
+    $core.String? snapshotId,
+    $core.Iterable<FilterUpdate>? updates,
+  }) {
+    final result = FilterSelection._();
+    if (snapshotId != null) result.snapshotId = snapshotId;
+    if (updates != null) result.updates.addAll(updates);
+    return result;
+  }
+
+  FilterSelection._();
+
+  factory FilterSelection.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSelection()..mergeFromBuffer(data, registry);
+  factory FilterSelection.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      FilterSelection()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FilterSelection',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: FilterSelection.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'snapshotId')
+    ..pPM<FilterUpdate>(2, _omitFieldNames ? '' : 'updates',
+        subBuilder: FilterUpdate.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSelection clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FilterSelection copyWith(void Function(FilterSelection) updates) =>
+      super.copyWith((message) => updates(message as FilterSelection))
+          as FilterSelection;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use FilterSelection() / FilterSelection.new instead')
+  static FilterSelection create() => FilterSelection._();
+  static $pb.GeneratedMessage $_createMessage() => FilterSelection._();
+  @$core.override
+  FilterSelection createEmptyInstance() => FilterSelection._();
+  @$core.pragma('dart2js:noInline')
+  static FilterSelection getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FilterSelection>(
+          FilterSelection.$_createMessage);
+  static FilterSelection? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get snapshotId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set snapshotId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSnapshotId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSnapshotId() => $_clearField(1);
+
+  /// Every editable leaf is supplied, including false, zero and null sort.
+  @$pb.TagNumber(2)
+  $pb.PbList<FilterUpdate> get updates => $_getList(1);
+}
+
 class SearchRequest extends $pb.GeneratedMessage {
   factory SearchRequest({
     $core.int? page,
     $core.String? query,
+    FilterSelection? filters,
   }) {
     final result = SearchRequest._();
     if (page != null) result.page = page;
     if (query != null) result.query = query;
+    if (filters != null) result.filters = filters;
     return result;
   }
 
@@ -1187,6 +2216,8 @@ class SearchRequest extends $pb.GeneratedMessage {
       createEmptyInstance: SearchRequest.$_createMessage)
     ..aI(1, _omitFieldNames ? '' : 'page', fieldType: $pb.PbFieldType.OU3)
     ..aOS(2, _omitFieldNames ? '' : 'query')
+    ..aOM<FilterSelection>(3, _omitFieldNames ? '' : 'filters',
+        subBuilder: FilterSelection.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1228,6 +2259,18 @@ class SearchRequest extends $pb.GeneratedMessage {
   $core.bool hasQuery() => $_has(1);
   @$pb.TagNumber(2)
   void clearQuery() => $_clearField(2);
+
+  /// Omission requests the Source defaults; a present selection is explicit.
+  @$pb.TagNumber(3)
+  FilterSelection get filters => $_getN(2);
+  @$pb.TagNumber(3)
+  set filters(FilterSelection value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFilters() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFilters() => $_clearField(3);
+  @$pb.TagNumber(3)
+  FilterSelection ensureFilters() => $_ensure(2);
 }
 
 class MangaRequest extends $pb.GeneratedMessage {
@@ -1357,6 +2400,7 @@ enum SourceCall_Request {
   details,
   chapters,
   pages,
+  getFilters,
   notSet
 }
 
@@ -1372,6 +2416,7 @@ class SourceCall extends $pb.GeneratedMessage {
     MangaRequest? details,
     MangaRequest? chapters,
     ChapterRequest? pages,
+    GetFiltersRequest? getFilters,
   }) {
     final result = SourceCall._();
     if (requestId != null) result.requestId = requestId;
@@ -1384,6 +2429,7 @@ class SourceCall extends $pb.GeneratedMessage {
     if (details != null) result.details = details;
     if (chapters != null) result.chapters = chapters;
     if (pages != null) result.pages = pages;
+    if (getFilters != null) result.getFilters = getFilters;
     return result;
   }
 
@@ -1404,13 +2450,14 @@ class SourceCall extends $pb.GeneratedMessage {
     13: SourceCall_Request.details,
     14: SourceCall_Request.chapters,
     15: SourceCall_Request.pages,
+    16: SourceCall_Request.getFilters,
     0: SourceCall_Request.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'SourceCall',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: SourceCall.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'sourceId')
     ..aI(3, _omitFieldNames ? '' : 'timeoutMs', fieldType: $pb.PbFieldType.OU3)
@@ -1427,6 +2474,8 @@ class SourceCall extends $pb.GeneratedMessage {
         subBuilder: MangaRequest.$_createMessage)
     ..aOM<ChapterRequest>(15, _omitFieldNames ? '' : 'pages',
         subBuilder: ChapterRequest.$_createMessage)
+    ..aOM<GetFiltersRequest>(16, _omitFieldNames ? '' : 'getFilters',
+        subBuilder: GetFiltersRequest.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1455,6 +2504,7 @@ class SourceCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   SourceCall_Request whichRequest() =>
       _SourceCall_RequestByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -1463,6 +2513,7 @@ class SourceCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   void clearRequest() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -1566,6 +2617,17 @@ class SourceCall extends $pb.GeneratedMessage {
   void clearPages() => $_clearField(15);
   @$pb.TagNumber(15)
   ChapterRequest ensurePages() => $_ensure(9);
+
+  @$pb.TagNumber(16)
+  GetFiltersRequest get getFilters => $_getN(10);
+  @$pb.TagNumber(16)
+  set getFilters(GetFiltersRequest value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasGetFilters() => $_has(10);
+  @$pb.TagNumber(16)
+  void clearGetFilters() => $_clearField(16);
+  @$pb.TagNumber(16)
+  GetFiltersRequest ensureGetFilters() => $_ensure(10);
 }
 
 class MangaPage extends $pb.GeneratedMessage {
@@ -1744,7 +2806,14 @@ class PageList extends $pb.GeneratedMessage {
   $pb.PbList<Page> get pages => $_getList(1);
 }
 
-enum SourceResult_Payload { mangaPage, manga, chapters, pageList, notSet }
+enum SourceResult_Payload {
+  mangaPage,
+  manga,
+  chapters,
+  pageList,
+  filters,
+  notSet
+}
 
 class SourceResult extends $pb.GeneratedMessage {
   factory SourceResult({
@@ -1755,6 +2824,7 @@ class SourceResult extends $pb.GeneratedMessage {
     Manga? manga,
     ChapterList? chapters,
     PageList? pageList,
+    FilterSnapshot? filters,
   }) {
     final result = SourceResult._();
     if (requestId != null) result.requestId = requestId;
@@ -1764,6 +2834,7 @@ class SourceResult extends $pb.GeneratedMessage {
     if (manga != null) result.manga = manga;
     if (chapters != null) result.chapters = chapters;
     if (pageList != null) result.pageList = pageList;
+    if (filters != null) result.filters = filters;
     return result;
   }
 
@@ -1782,13 +2853,14 @@ class SourceResult extends $pb.GeneratedMessage {
     11: SourceResult_Payload.manga,
     12: SourceResult_Payload.chapters,
     13: SourceResult_Payload.pageList,
+    14: SourceResult_Payload.filters,
     0: SourceResult_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'SourceResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: SourceResult.$_createMessage)
-    ..oo(0, [10, 11, 12, 13])
+    ..oo(0, [10, 11, 12, 13, 14])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'generation')
     ..aOS(3, _omitFieldNames ? '' : 'buildId')
@@ -1800,6 +2872,8 @@ class SourceResult extends $pb.GeneratedMessage {
         subBuilder: ChapterList.$_createMessage)
     ..aOM<PageList>(13, _omitFieldNames ? '' : 'pageList',
         subBuilder: PageList.$_createMessage)
+    ..aOM<FilterSnapshot>(14, _omitFieldNames ? '' : 'filters',
+        subBuilder: FilterSnapshot.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1828,12 +2902,14 @@ class SourceResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   SourceResult_Payload whichPayload() =>
       _SourceResult_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -1906,6 +2982,17 @@ class SourceResult extends $pb.GeneratedMessage {
   void clearPageList() => $_clearField(13);
   @$pb.TagNumber(13)
   PageList ensurePageList() => $_ensure(6);
+
+  @$pb.TagNumber(14)
+  FilterSnapshot get filters => $_getN(7);
+  @$pb.TagNumber(14)
+  set filters(FilterSnapshot value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasFilters() => $_has(7);
+  @$pb.TagNumber(14)
+  void clearFilters() => $_clearField(14);
+  @$pb.TagNumber(14)
+  FilterSnapshot ensureFilters() => $_ensure(7);
 }
 
 class CancelSourceRequest extends $pb.GeneratedMessage {

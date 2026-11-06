@@ -317,6 +317,12 @@ final class CatalogController extends ChangeNotifier {
   int page = 0;
   String query = '';
   String listing = 'popular';
+  wire.FilterSnapshot? sourceFilterSnapshot;
+  wire.FilterSelection? appliedSourceFilters;
+  String? sourceFilterError;
+  int _filterRequestEpoch = 0;
+  String? _filterRequestId;
+  bool _filterRequestLoadsSnapshot = false;
   String? lastBuildId;
   String? lastSourceId;
   int _requestSequence = 0;
@@ -363,7 +369,17 @@ final class CatalogController extends ChangeNotifier {
     _notify();
   }
 
+  void _clearSourceFilters() {
+    ++_filterRequestEpoch;
+    _filterRequestId = null;
+    _filterRequestLoadsSnapshot = false;
+    sourceFilterSnapshot = null;
+    appliedSourceFilters = null;
+    sourceFilterError = null;
+  }
+
   void _dropSession() {
+    _clearSourceFilters();
     session = null;
     activeSource = null;
     activeBuild = null;
@@ -575,7 +591,10 @@ final class CatalogController extends ChangeNotifier {
     hasNextPage = false;
   }
 
-  Future<SourceResult> _invoke(wire.SourceCall call) async {
+  Future<SourceResult> _invoke(
+    wire.SourceCall call, {
+    void Function(String requestId)? onRequest,
+  }) async {
     final epoch = _epoch;
     final current = session;
     final build = activeBuild;
@@ -587,6 +606,7 @@ final class CatalogController extends ChangeNotifier {
     call.generation = current.generation;
     call.sourceId = source.id;
     call.timeoutMs = 30000;
+    onRequest?.call(call.requestId);
     final result = await runtime.invoke(
       SourceRequest(packageId: build.packageName, call: call),
     );
@@ -614,6 +634,7 @@ final class CatalogController extends ChangeNotifier {
     if (!(session?.sources.any((value) => value.id == source.id) ?? false)) {
       return false;
     }
+    _clearSourceFilters();
     activeSource = source;
     lastSourceId = source.id;
     mangas = const [];
@@ -640,14 +661,21 @@ final class CatalogController extends ChangeNotifier {
     String? operation,
     bool more = false,
     bool Function()? shouldContinue,
+    wire.FilterSelection? filters,
+    void Function(String requestId)? onRequest,
   }) async {
     if (shouldContinue?.call() == false) return;
     final selectedQuery = search ?? query;
     final selectedListing =
         operation ??
         (search != null
-            ? (search.trim().isEmpty ? 'popular' : 'search')
+            ? (search.trim().isEmpty && appliedSourceFilters == null
+                  ? 'popular'
+                  : 'search')
             : listing);
+    final selectedFilters = selectedListing == 'search'
+        ? filters ?? appliedSourceFilters
+        : null;
     final selectedPage = more ? page + 1 : 1;
     final call = switch (selectedListing) {
       'popular' => wire.SourceCall(
@@ -655,18 +683,161 @@ final class CatalogController extends ChangeNotifier {
       ),
       'latest' => wire.SourceCall(latest: wire.PageRequest(page: selectedPage)),
       'search' => wire.SourceCall(
-        search: wire.SearchRequest(page: selectedPage, query: selectedQuery),
+        search: wire.SearchRequest(
+          page: selectedPage,
+          query: selectedQuery,
+          filters: selectedFilters?.deepCopy(),
+        ),
       ),
       _ => throw const FormatException('未知漫画列表操作'),
     };
-    final result = (await _invoke(call)).mangaPage;
+    final result = (await _invoke(call, onRequest: onRequest)).mangaPage;
     if (_closed || shouldContinue?.call() == false) return;
     final entries = result.mangas.map(MangaEntry.new).toList();
     mangas = more ? [...mangas, ...entries] : entries;
     page = selectedPage;
     query = selectedQuery;
     listing = selectedListing;
+    appliedSourceFilters = selectedFilters?.deepCopy()?..freeze();
     hasNextPage = result.hasNextPage;
+  }
+
+  /// Filter descriptions and selections are disposable Source session state,
+  /// independent of confirmed account settings and unapplied editor changes.
+  Future<bool> loadSourceFilters({
+    bool reset = false,
+    bool Function()? shouldContinue,
+    void Function(String requestId)? onRequest,
+  }) async {
+    if (_closed ||
+        busy ||
+        activeSource == null ||
+        shouldContinue?.call() == false) {
+      return false;
+    }
+    if (!reset && sourceFilterSnapshot != null) return true;
+    final reference = sourceReference;
+    final identity = subject;
+    final worker = session!.workerInstanceId;
+    final epoch = ++_filterRequestEpoch;
+    bool current() =>
+        !_closed &&
+        epoch == _filterRequestEpoch &&
+        subject == identity &&
+        session?.workerInstanceId == worker &&
+        isCurrentSource(reference) &&
+        shouldContinue?.call() != false;
+    sourceFilterError = null;
+    final loaded = await _perform<bool>('正在加载筛选条件', () async {
+      try {
+        final result = await _invoke(
+          wire.SourceCall(
+            getFilters: wire.GetFiltersRequest(
+              retainedSnapshotId: appliedSourceFilters?.snapshotId,
+            ),
+          ),
+          onRequest: (id) {
+            _filterRequestId = id;
+            _filterRequestLoadsSnapshot = true;
+            onRequest?.call(id);
+          },
+        );
+        if (!current()) {
+          // The host may already have replaced its draft while this sheet was
+          // closing. Never reuse the old draft, or touch a newer session cache.
+          if (epoch == _filterRequestEpoch) sourceFilterSnapshot = null;
+          return false;
+        }
+        if (!result.hasFilters()) throw const FormatException('漫画源未返回筛选条件');
+        sourceFilterSnapshot = result.filters.deepCopy()..freeze();
+        return true;
+      } catch (_) {
+        // A failed or lost reset may already have replaced the host draft.
+        if (epoch == _filterRequestEpoch) sourceFilterSnapshot = null;
+        if (!current()) return false;
+        rethrow;
+      } finally {
+        if (epoch == _filterRequestEpoch) {
+          _filterRequestId = null;
+          _filterRequestLoadsSnapshot = false;
+        }
+      }
+    });
+    if (!current()) return false;
+    if (loaded != true) {
+      sourceFilterError = error ?? '筛选条件尚未加载，可重试；仍可默认浏览。';
+      _notify();
+    }
+    return loaded == true;
+  }
+
+  Future<bool> applySourceFilters(
+    wire.FilterSelection selection, {
+    required String search,
+    bool Function()? shouldContinue,
+    void Function(String requestId)? onRequest,
+  }) async {
+    if (_closed ||
+        busy ||
+        activeSource == null ||
+        shouldContinue?.call() == false) {
+      return false;
+    }
+    if (sourceFilterSnapshot?.snapshotId != selection.snapshotId) return false;
+    final selected = selection.deepCopy()..freeze();
+    final reference = sourceReference;
+    final identity = subject;
+    final worker = session!.workerInstanceId;
+    final epoch = ++_filterRequestEpoch;
+    bool current() =>
+        !_closed &&
+        epoch == _filterRequestEpoch &&
+        subject == identity &&
+        session?.workerInstanceId == worker &&
+        isCurrentSource(reference) &&
+        shouldContinue?.call() != false;
+    final applied = await _perform<bool>('正在应用筛选条件', () async {
+      try {
+        await _loadListing(
+          search: search,
+          operation: 'search',
+          filters: selected,
+          shouldContinue: current,
+          onRequest: (id) {
+            _filterRequestId = id;
+            _filterRequestLoadsSnapshot = false;
+            onRequest?.call(id);
+          },
+        );
+        return current();
+      } catch (_) {
+        if (!current()) return false;
+        rethrow;
+      } finally {
+        if (epoch == _filterRequestEpoch) _filterRequestId = null;
+      }
+    });
+    return applied == true && current();
+  }
+
+  Future<void> cancelSourceFilterRequest(String requestId) async {
+    if (_filterRequestId != requestId) return;
+    ++_filterRequestEpoch;
+    _filterRequestId = null;
+    if (_filterRequestLoadsSnapshot) sourceFilterSnapshot = null;
+    _filterRequestLoadsSnapshot = false;
+    // Invalidate this _perform before releasing busy, so a late completion
+    // cannot clear a subsequent action. The runtime may also retire its worker.
+    ++_epoch;
+    busy = false;
+    activity = null;
+    _notify();
+    try {
+      await runtime.cancel(requestId);
+    } on RuntimeException {
+      // Closing a sheet must not turn an already expired request into a new UI
+      // failure. Its invalidated epoch still prevents a late publication.
+    }
   }
 
   bool isCurrentSource(CatalogSourceRef reference) =>
@@ -953,6 +1124,8 @@ final class CatalogController extends ChangeNotifier {
   @override
   void dispose() {
     _closed = true;
+    final requestId = _filterRequestId;
+    if (requestId != null) unawaited(cancelSourceFilterRequest(requestId));
     ++_epoch;
     unawaited(_subscription.cancel());
     super.dispose();

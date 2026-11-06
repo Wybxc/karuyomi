@@ -340,7 +340,19 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Source request belongs to an expired or different runtime',
       );
     }
+    try {
+      if (call.hasGetFilters()) wire.validateGetFiltersRequest(call.getFilters);
+      if (call.hasSearch() && call.search.hasFilters()) {
+        wire.validateFilterSelection(call.search.filters);
+      }
+    } on FormatException {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Invalid Source filter request',
+      );
+    }
     final expected = switch (call.whichRequest()) {
+      wire.SourceCall_Request.getFilters => wire.SourceResult_Payload.filters,
       wire.SourceCall_Request.popular ||
       wire.SourceCall_Request.latest ||
       wire.SourceCall_Request.search => wire.SourceResult_Payload.mangaPage,
@@ -381,6 +393,8 @@ final class TransportSourceRuntime implements SourceRuntime {
       }
 
       switch (response.whichPayload()) {
+        case wire.SourceResult_Payload.filters:
+          wire.validateFilterSnapshot(response.filters);
         case wire.SourceResult_Payload.mangaPage:
           response.mangaPage.mangas.forEach(manga);
         case wire.SourceResult_Payload.manga:

@@ -430,19 +430,350 @@ const PageRequest$json = {
 final $typed_data.Uint8List pageRequestDescriptor =
     $convert.base64Decode('CgtQYWdlUmVxdWVzdBISCgRwYWdlGAEgASgNUgRwYWdl');
 
+@$core.Deprecated('Use filterTextDescriptor instead')
+const FilterText$json = {
+  '1': 'FilterText',
+  '2': [
+    {'1': 'state', '3': 1, '4': 1, '5': 9, '10': 'state'},
+  ],
+};
+
+/// Descriptor for `FilterText`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterTextDescriptor =
+    $convert.base64Decode('CgpGaWx0ZXJUZXh0EhQKBXN0YXRlGAEgASgJUgVzdGF0ZQ==');
+
+@$core.Deprecated('Use filterCheckBoxDescriptor instead')
+const FilterCheckBox$json = {
+  '1': 'FilterCheckBox',
+  '2': [
+    {'1': 'state', '3': 1, '4': 1, '5': 8, '10': 'state'},
+  ],
+};
+
+/// Descriptor for `FilterCheckBox`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterCheckBoxDescriptor = $convert
+    .base64Decode('Cg5GaWx0ZXJDaGVja0JveBIUCgVzdGF0ZRgBIAEoCFIFc3RhdGU=');
+
+@$core.Deprecated('Use filterTriStateDescriptor instead')
+const FilterTriState$json = {
+  '1': 'FilterTriState',
+  '2': [
+    {'1': 'state', '3': 1, '4': 1, '5': 13, '10': 'state'},
+  ],
+};
+
+/// Descriptor for `FilterTriState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterTriStateDescriptor = $convert
+    .base64Decode('Cg5GaWx0ZXJUcmlTdGF0ZRIUCgVzdGF0ZRgBIAEoDVIFc3RhdGU=');
+
+@$core.Deprecated('Use filterSelectDescriptor instead')
+const FilterSelect$json = {
+  '1': 'FilterSelect',
+  '2': [
+    {'1': 'options', '3': 1, '4': 3, '5': 9, '10': 'options'},
+    {'1': 'state', '3': 2, '4': 1, '5': 13, '10': 'state'},
+  ],
+};
+
+/// Descriptor for `FilterSelect`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterSelectDescriptor = $convert.base64Decode(
+    'CgxGaWx0ZXJTZWxlY3QSGAoHb3B0aW9ucxgBIAMoCVIHb3B0aW9ucxIUCgVzdGF0ZRgCIAEoDV'
+    'IFc3RhdGU=');
+
+@$core.Deprecated('Use filterSortSelectionDescriptor instead')
+const FilterSortSelection$json = {
+  '1': 'FilterSortSelection',
+  '2': [
+    {'1': 'index', '3': 1, '4': 1, '5': 13, '10': 'index'},
+    {'1': 'ascending', '3': 2, '4': 1, '5': 8, '10': 'ascending'},
+  ],
+};
+
+/// Descriptor for `FilterSortSelection`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterSortSelectionDescriptor = $convert.base64Decode(
+    'ChNGaWx0ZXJTb3J0U2VsZWN0aW9uEhQKBWluZGV4GAEgASgNUgVpbmRleBIcCglhc2NlbmRpbm'
+    'cYAiABKAhSCWFzY2VuZGluZw==');
+
+@$core.Deprecated('Use filterSortStateDescriptor instead')
+const FilterSortState$json = {
+  '1': 'FilterSortState',
+  '2': [
+    {
+      '1': 'selection',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterSortSelection',
+      '9': 0,
+      '10': 'selection',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_selection'},
+  ],
+};
+
+/// Descriptor for `FilterSortState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterSortStateDescriptor = $convert.base64Decode(
+    'Cg9GaWx0ZXJTb3J0U3RhdGUSQwoJc2VsZWN0aW9uGAEgASgLMiAua2FydXlvbWkudjEuRmlsdG'
+    'VyU29ydFNlbGVjdGlvbkgAUglzZWxlY3Rpb26IAQFCDAoKX3NlbGVjdGlvbg==');
+
+@$core.Deprecated('Use filterSortDescriptor instead')
+const FilterSort$json = {
+  '1': 'FilterSort',
+  '2': [
+    {'1': 'options', '3': 1, '4': 3, '5': 9, '10': 'options'},
+    {
+      '1': 'state',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterSortState',
+      '10': 'state'
+    },
+  ],
+};
+
+/// Descriptor for `FilterSort`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterSortDescriptor = $convert.base64Decode(
+    'CgpGaWx0ZXJTb3J0EhgKB29wdGlvbnMYASADKAlSB29wdGlvbnMSMgoFc3RhdGUYAiABKAsyHC'
+    '5rYXJ1eW9taS52MS5GaWx0ZXJTb3J0U3RhdGVSBXN0YXRl');
+
+@$core.Deprecated('Use filterGroupDescriptor instead')
+const FilterGroup$json = {
+  '1': 'FilterGroup',
+  '2': [
+    {
+      '1': 'nodes',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterNode',
+      '10': 'nodes'
+    },
+  ],
+};
+
+/// Descriptor for `FilterGroup`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterGroupDescriptor = $convert.base64Decode(
+    'CgtGaWx0ZXJHcm91cBItCgVub2RlcxgBIAMoCzIXLmthcnV5b21pLnYxLkZpbHRlck5vZGVSBW'
+    '5vZGVz');
+
+@$core.Deprecated('Use filterNodeDescriptor instead')
+const FilterNode$json = {
+  '1': 'FilterNode',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {
+      '1': 'header',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.Empty',
+      '9': 0,
+      '10': 'header'
+    },
+    {
+      '1': 'separator',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.Empty',
+      '9': 0,
+      '10': 'separator'
+    },
+    {
+      '1': 'text',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterText',
+      '9': 0,
+      '10': 'text'
+    },
+    {
+      '1': 'check_box',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterCheckBox',
+      '9': 0,
+      '10': 'checkBox'
+    },
+    {
+      '1': 'tri_state',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterTriState',
+      '9': 0,
+      '10': 'triState'
+    },
+    {
+      '1': 'select',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterSelect',
+      '9': 0,
+      '10': 'select'
+    },
+    {
+      '1': 'sort',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterSort',
+      '9': 0,
+      '10': 'sort'
+    },
+    {
+      '1': 'group',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterGroup',
+      '9': 0,
+      '10': 'group'
+    },
+  ],
+  '8': [
+    {'1': 'kind'},
+  ],
+};
+
+/// Descriptor for `FilterNode`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterNodeDescriptor = $convert.base64Decode(
+    'CgpGaWx0ZXJOb2RlEhIKBG5hbWUYASABKAlSBG5hbWUSLAoGaGVhZGVyGAIgASgLMhIua2FydX'
+    'lvbWkudjEuRW1wdHlIAFIGaGVhZGVyEjIKCXNlcGFyYXRvchgDIAEoCzISLmthcnV5b21pLnYx'
+    'LkVtcHR5SABSCXNlcGFyYXRvchItCgR0ZXh0GAQgASgLMhcua2FydXlvbWkudjEuRmlsdGVyVG'
+    'V4dEgAUgR0ZXh0EjoKCWNoZWNrX2JveBgFIAEoCzIbLmthcnV5b21pLnYxLkZpbHRlckNoZWNr'
+    'Qm94SABSCGNoZWNrQm94EjoKCXRyaV9zdGF0ZRgGIAEoCzIbLmthcnV5b21pLnYxLkZpbHRlcl'
+    'RyaVN0YXRlSABSCHRyaVN0YXRlEjMKBnNlbGVjdBgHIAEoCzIZLmthcnV5b21pLnYxLkZpbHRl'
+    'clNlbGVjdEgAUgZzZWxlY3QSLQoEc29ydBgIIAEoCzIXLmthcnV5b21pLnYxLkZpbHRlclNvcn'
+    'RIAFIEc29ydBIwCgVncm91cBgJIAEoCzIYLmthcnV5b21pLnYxLkZpbHRlckdyb3VwSABSBWdy'
+    'b3VwQgYKBGtpbmQ=');
+
+@$core.Deprecated('Use getFiltersRequestDescriptor instead')
+const GetFiltersRequest$json = {
+  '1': 'GetFiltersRequest',
+  '2': [
+    {
+      '1': 'retained_snapshot_id',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'retainedSnapshotId',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_retained_snapshot_id'},
+  ],
+};
+
+/// Descriptor for `GetFiltersRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getFiltersRequestDescriptor = $convert.base64Decode(
+    'ChFHZXRGaWx0ZXJzUmVxdWVzdBI1ChRyZXRhaW5lZF9zbmFwc2hvdF9pZBgBIAEoCUgAUhJyZX'
+    'RhaW5lZFNuYXBzaG90SWSIAQFCFwoVX3JldGFpbmVkX3NuYXBzaG90X2lk');
+
+@$core.Deprecated('Use filterSnapshotDescriptor instead')
+const FilterSnapshot$json = {
+  '1': 'FilterSnapshot',
+  '2': [
+    {'1': 'snapshot_id', '3': 1, '4': 1, '5': 9, '10': 'snapshotId'},
+    {
+      '1': 'nodes',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterNode',
+      '10': 'nodes'
+    },
+  ],
+};
+
+/// Descriptor for `FilterSnapshot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterSnapshotDescriptor = $convert.base64Decode(
+    'Cg5GaWx0ZXJTbmFwc2hvdBIfCgtzbmFwc2hvdF9pZBgBIAEoCVIKc25hcHNob3RJZBItCgVub2'
+    'RlcxgCIAMoCzIXLmthcnV5b21pLnYxLkZpbHRlck5vZGVSBW5vZGVz');
+
+@$core.Deprecated('Use filterUpdateDescriptor instead')
+const FilterUpdate$json = {
+  '1': 'FilterUpdate',
+  '2': [
+    {'1': 'path', '3': 1, '4': 3, '5': 13, '10': 'path'},
+    {'1': 'text', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'text'},
+    {'1': 'check_box', '3': 3, '4': 1, '5': 8, '9': 0, '10': 'checkBox'},
+    {'1': 'tri_state', '3': 4, '4': 1, '5': 13, '9': 0, '10': 'triState'},
+    {'1': 'select', '3': 5, '4': 1, '5': 13, '9': 0, '10': 'select'},
+    {
+      '1': 'sort',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterSortState',
+      '9': 0,
+      '10': 'sort'
+    },
+  ],
+  '8': [
+    {'1': 'state'},
+  ],
+};
+
+/// Descriptor for `FilterUpdate`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterUpdateDescriptor = $convert.base64Decode(
+    'CgxGaWx0ZXJVcGRhdGUSEgoEcGF0aBgBIAMoDVIEcGF0aBIUCgR0ZXh0GAIgASgJSABSBHRleH'
+    'QSHQoJY2hlY2tfYm94GAMgASgISABSCGNoZWNrQm94Eh0KCXRyaV9zdGF0ZRgEIAEoDUgAUgh0'
+    'cmlTdGF0ZRIYCgZzZWxlY3QYBSABKA1IAFIGc2VsZWN0EjIKBHNvcnQYBiABKAsyHC5rYXJ1eW'
+    '9taS52MS5GaWx0ZXJTb3J0U3RhdGVIAFIEc29ydEIHCgVzdGF0ZQ==');
+
+@$core.Deprecated('Use filterSelectionDescriptor instead')
+const FilterSelection$json = {
+  '1': 'FilterSelection',
+  '2': [
+    {'1': 'snapshot_id', '3': 1, '4': 1, '5': 9, '10': 'snapshotId'},
+    {
+      '1': 'updates',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterUpdate',
+      '10': 'updates'
+    },
+  ],
+};
+
+/// Descriptor for `FilterSelection`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List filterSelectionDescriptor = $convert.base64Decode(
+    'Cg9GaWx0ZXJTZWxlY3Rpb24SHwoLc25hcHNob3RfaWQYASABKAlSCnNuYXBzaG90SWQSMwoHdX'
+    'BkYXRlcxgCIAMoCzIZLmthcnV5b21pLnYxLkZpbHRlclVwZGF0ZVIHdXBkYXRlcw==');
+
 @$core.Deprecated('Use searchRequestDescriptor instead')
 const SearchRequest$json = {
   '1': 'SearchRequest',
   '2': [
     {'1': 'page', '3': 1, '4': 1, '5': 13, '10': 'page'},
     {'1': 'query', '3': 2, '4': 1, '5': 9, '10': 'query'},
+    {
+      '1': 'filters',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterSelection',
+      '10': 'filters'
+    },
   ],
 };
 
 /// Descriptor for `SearchRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List searchRequestDescriptor = $convert.base64Decode(
     'Cg1TZWFyY2hSZXF1ZXN0EhIKBHBhZ2UYASABKA1SBHBhZ2USFAoFcXVlcnkYAiABKAlSBXF1ZX'
-    'J5');
+    'J5EjYKB2ZpbHRlcnMYAyABKAsyHC5rYXJ1eW9taS52MS5GaWx0ZXJTZWxlY3Rpb25SB2ZpbHRl'
+    'cnM=');
 
 @$core.Deprecated('Use mangaRequestDescriptor instead')
 const MangaRequest$json = {
@@ -554,6 +885,15 @@ const SourceCall$json = {
       '9': 0,
       '10': 'pages'
     },
+    {
+      '1': 'get_filters',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.GetFiltersRequest',
+      '9': 0,
+      '10': 'getFilters'
+    },
   ],
   '8': [
     {'1': 'request'},
@@ -571,7 +911,9 @@ final $typed_data.Uint8List sourceCallDescriptor = $convert.base64Decode(
     'NlYXJjaFJlcXVlc3RIAFIGc2VhcmNoEjUKB2RldGFpbHMYDSABKAsyGS5rYXJ1eW9taS52MS5N'
     'YW5nYVJlcXVlc3RIAFIHZGV0YWlscxI3CghjaGFwdGVycxgOIAEoCzIZLmthcnV5b21pLnYxLk'
     '1hbmdhUmVxdWVzdEgAUghjaGFwdGVycxIzCgVwYWdlcxgPIAEoCzIbLmthcnV5b21pLnYxLkNo'
-    'YXB0ZXJSZXF1ZXN0SABSBXBhZ2VzQgkKB3JlcXVlc3RCDQoLX3RpbWVvdXRfbXM=');
+    'YXB0ZXJSZXF1ZXN0SABSBXBhZ2VzEkEKC2dldF9maWx0ZXJzGBAgASgLMh4ua2FydXlvbWkudj'
+    'EuR2V0RmlsdGVyc1JlcXVlc3RIAFIKZ2V0RmlsdGVyc0IJCgdyZXF1ZXN0Qg0KC190aW1lb3V0'
+    'X21z');
 
 @$core.Deprecated('Use mangaPageDescriptor instead')
 const MangaPage$json = {
@@ -678,6 +1020,15 @@ const SourceResult$json = {
       '9': 0,
       '10': 'pageList'
     },
+    {
+      '1': 'filters',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.FilterSnapshot',
+      '9': 0,
+      '10': 'filters'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -691,7 +1042,8 @@ final $typed_data.Uint8List sourceResultDescriptor = $convert.base64Decode(
     'Z2FfcGFnZRgKIAEoCzIWLmthcnV5b21pLnYxLk1hbmdhUGFnZUgAUgltYW5nYVBhZ2USKgoFbW'
     'FuZ2EYCyABKAsyEi5rYXJ1eW9taS52MS5NYW5nYUgAUgVtYW5nYRI2CghjaGFwdGVycxgMIAEo'
     'CzIYLmthcnV5b21pLnYxLkNoYXB0ZXJMaXN0SABSCGNoYXB0ZXJzEjQKCXBhZ2VfbGlzdBgNIA'
-    'EoCzIVLmthcnV5b21pLnYxLlBhZ2VMaXN0SABSCHBhZ2VMaXN0QgkKB3BheWxvYWQ=');
+    'EoCzIVLmthcnV5b21pLnYxLlBhZ2VMaXN0SABSCHBhZ2VMaXN0EjcKB2ZpbHRlcnMYDiABKAsy'
+    'Gy5rYXJ1eW9taS52MS5GaWx0ZXJTbmFwc2hvdEgAUgdmaWx0ZXJzQgkKB3BheWxvYWQ=');
 
 @$core.Deprecated('Use cancelSourceRequestDescriptor instead')
 const CancelSourceRequest$json = {

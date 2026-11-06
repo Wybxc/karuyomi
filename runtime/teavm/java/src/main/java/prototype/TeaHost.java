@@ -15,6 +15,7 @@ public class TeaHost {
   static List<SChapter> chapters;
   static List<Page> pages;
   static final PageSessions pageSessions = new PageSessions();
+  static final HostFilters filters = new HostFilters();
 
   public static void main(String[] args) {}
 
@@ -25,10 +26,21 @@ public class TeaHost {
 
   private static void startOperation(
       String requestId, String generation, String token, HostOperation action, Runnable cleanup) {
+    startOperation(requestId, generation, token, action, cleanup, () -> {});
+  }
+
+  private static void startOperation(
+      String requestId,
+      String generation,
+      String token,
+      HostOperation action,
+      Runnable cleanup,
+      Runnable afterDrain) {
     BrowserCall.Operation owner;
     try {
       // Register before TeaVM schedules the host thread with setTimeout.
       owner = BrowserCall.beginOperation(requestId, generation, token);
+      filters.observeGeneration(generation);
     } catch (Throwable error) {
       fail(describe(error), true);
       return;
@@ -40,6 +52,7 @@ public class TeaHost {
                 try {
                   String result = action.run();
                   owner.drain();
+                  afterDrain.run();
                   done(result);
                 } catch (Throwable error) {
                   boolean unfinishedCallbacks = owner.hasPending();
@@ -101,6 +114,7 @@ public class TeaHost {
 
   public static String init(String userAgent) {
     pageSessions.clear();
+    filters.clear();
     PersistentFileSystem.install();
     System.setProperty("http.agent", userAgent);
     android.app.Application app = new android.app.Application();
@@ -143,6 +157,7 @@ public class TeaHost {
   }
 
   public static int load() {
+    filters.clear();
     Object entry = new keiyoushi.source.Generated();
     sources =
         entry instanceof SourceFactory
@@ -174,6 +189,7 @@ public class TeaHost {
       String generation,
       String token) {
     String[] createdPageSession = new String[1];
+    HostFilters.Candidate[] filterCandidate = new HostFilters.Candidate[1];
     startOperation(
         requestId,
         generation,
@@ -184,6 +200,8 @@ public class TeaHost {
                   .filter(s -> Long.toString(s.getId()).equals(sourceId))
                   .findFirst()
                   .orElseThrow(() -> new IllegalArgumentException("Unknown Source " + sourceId));
+          if (operation.equals("getFilters") || operation.equals("search"))
+            HostFilters.checkRequest(argsJson);
           JsonObject args = JsonParser.parseString(argsJson).getAsJsonObject();
           Object result =
               GreenCoroutines.block(
@@ -195,14 +213,19 @@ public class TeaHost {
                         if (!selected.getSupportsLatest())
                           throw new UnsupportedOperationException("Source does not support latest");
                         return selected.getLatestUpdates(HostDto.page(args), continuation);
+                      case "getFilters":
+                        filterCandidate[0] = filters.capture(selected, generation, args);
+                        return filterCandidate[0];
                       case "search":
-                        if (args.has("filters") && !args.getAsJsonArray("filters").isEmpty())
-                          throw new UnsupportedOperationException(
-                              "Typed filter mapping is not implemented");
+                        FilterList selection =
+                            args.has("filters")
+                                ? filters.apply(
+                                    selected, generation, args.getAsJsonObject("filters"))
+                                : selected.getFilterList();
                         return selected.getSearchManga(
                             HostDto.page(args),
                             HostDto.string(args, "query", ""),
-                            selected.getFilterList(),
+                            selection,
                             continuation);
                       case "details":
                       case "chapters":
@@ -222,7 +245,9 @@ public class TeaHost {
                   },
                   kotlinx.coroutines.Dispatchers.getDefault());
           JsonElement dto;
-          if (result instanceof MangasPage) dto = HostDto.mangasPage((MangasPage) result);
+          if (result instanceof HostFilters.Candidate)
+            dto = ((HostFilters.Candidate) result).description();
+          else if (result instanceof MangasPage) dto = HostDto.mangasPage((MangasPage) result);
           else if (result instanceof SMangaUpdate) {
             SMangaUpdate update = (SMangaUpdate) result;
             if (operation.equals("chapters")) dto = HostDto.chapters(update.getChapters());
@@ -245,6 +270,9 @@ public class TeaHost {
         },
         () -> {
           if (createdPageSession[0] != null) pageSessions.close(createdPageSession[0]);
+        },
+        () -> {
+          if (filterCandidate[0] != null) filters.commit(filterCandidate[0]);
         });
   }
 

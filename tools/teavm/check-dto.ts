@@ -53,8 +53,10 @@ export async function checkDto(root = ROOT): Promise<void> {
     output,
     ...[
       'runtime/teavm/java/src/main/java/prototype/HostDto.java',
+      'runtime/teavm/java/src/main/java/prototype/HostFilters.java',
       'runtime/teavm/java/src/main/java/prototype/HostJson.java',
       'tools/teavm/HostDtoTest.java',
+      'tools/teavm/HostFiltersTest.java',
       'runtime/teavm/java/src/main/java/prototype/HttpBodySource.java',
       'runtime/teavm/java/src/main/java/prototype/HttpRequestSink.java',
       'tools/teavm/HttpBodyTest.java',
@@ -64,6 +66,7 @@ export async function checkDto(root = ROOT): Promise<void> {
   ]);
   for (const oracleClass of [
     'prototype.HostDtoTest',
+    'prototype.HostFiltersTest',
     'prototype.HttpBodyTest',
     'prototype.GraphicsTest',
   ])

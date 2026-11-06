@@ -21,6 +21,7 @@ import '../progress/chapter_read_batch.dart';
 import '../progress/chapter_read_controller.dart';
 import '../progress/chapter_read_dialog.dart';
 import '../sources/favorite_sources.dart';
+import '../sources/source_filters.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -59,6 +60,24 @@ class _CatalogPageState extends State<CatalogPage> {
           source: details.source,
           onAuthenticateReader: widget.onAuthenticateReader,
         ),
+      ),
+    );
+  }
+
+  Future<void> _filters() async {
+    final controller = widget.controller;
+    if (controller == null ||
+        controller.busy ||
+        controller.activeSource == null) {
+      return;
+    }
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .9,
+        child: SourceFiltersSheet(catalog: controller, query: _search.text),
       ),
     );
   }
@@ -229,6 +248,16 @@ class _CatalogPageState extends State<CatalogPage> {
                 Wrap(
                   spacing: 8,
                   children: [
+                    OutlinedButton.icon(
+                      key: const ValueKey('source-filters-open'),
+                      onPressed: busy ? null : _filters,
+                      icon: const Icon(Icons.filter_list),
+                      label: Text(
+                        controller.appliedSourceFilters == null
+                            ? '筛选'
+                            : '筛选（已应用）',
+                      ),
+                    ),
                     for (final item in [('popular', '热门'), ('latest', '最新')])
                       if (item.$1 != 'latest' ||
                           controller.activeSource?.hasSupportsLatest() !=

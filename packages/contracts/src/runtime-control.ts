@@ -217,6 +217,154 @@ export function validatePageList(value: pb.PageList): void {
   });
   jsonText(messageJson(pb.PageListSchema, value), PAGE_LIST_JSON_LIMIT);
 }
+export const FILTER_DEPTH_LIMIT = 8;
+export const FILTER_NODE_LIMIT = 256;
+export const FILTER_OPTION_LIMIT = 256;
+export const FILTER_LABEL_LIMIT = 512;
+export const FILTER_TEXT_LIMIT = 4096;
+export const FILTER_SNAPSHOT_JSON_LIMIT = 256 * 1024;
+
+function validFilterIndex(value: number, limit = FILTER_OPTION_LIMIT): void {
+  requireCondition(
+    Number.isInteger(value) && value >= 0 && value < limit,
+    'Filter index exceeds its range',
+  );
+}
+function validFilterSortState(
+  value: pb.FilterSortState,
+  options = FILTER_OPTION_LIMIT,
+): void {
+  if (value.selection !== undefined)
+    validFilterIndex(value.selection.index, options);
+}
+function validFilterOptions(values: string[]): void {
+  requireCondition(
+    values.length > 0 &&
+      values.length <= FILTER_OPTION_LIMIT &&
+      values.every((value) => value.length <= FILTER_LABEL_LIMIT),
+    'Filter options exceed their count or label budget',
+  );
+}
+export function validateFilterSnapshot(value: pb.FilterSnapshot): void {
+  validId(value.snapshotId);
+  let count = 0;
+  function visit(nodes: pb.FilterNode[], depth: number): void {
+    requireCondition(
+      depth <= FILTER_DEPTH_LIMIT,
+      'Filter tree exceeds its depth budget',
+    );
+    for (const node of nodes) {
+      requireCondition(
+        ++count <= FILTER_NODE_LIMIT,
+        'Filter tree exceeds its node budget',
+      );
+      requireCondition(
+        node.name.length <= FILTER_LABEL_LIMIT,
+        'Filter label exceeds its budget',
+      );
+      switch (node.kind.case) {
+        case 'header':
+        case 'separator':
+        case 'checkBox':
+          break;
+        case 'text':
+          requireCondition(
+            node.kind.value.state.length <= FILTER_TEXT_LIMIT,
+            'Filter text exceeds its budget',
+          );
+          break;
+        case 'triState':
+          validFilterIndex(node.kind.value.state, 3);
+          break;
+        case 'select':
+          validFilterOptions(node.kind.value.options);
+          validFilterIndex(
+            node.kind.value.state,
+            node.kind.value.options.length,
+          );
+          break;
+        case 'sort':
+          validFilterOptions(node.kind.value.options);
+          requireFields(node.kind.value, ['state']);
+          validFilterSortState(
+            node.kind.value.state,
+            node.kind.value.options.length,
+          );
+          break;
+        case 'group':
+          if (node.kind.value.nodes.length)
+            visit(node.kind.value.nodes, depth + 1);
+          break;
+        default:
+          throw new Error('A filter node must select a supported kind');
+      }
+    }
+  }
+  visit(value.nodes, 1);
+  jsonText(
+    messageJson(pb.FilterSnapshotSchema, value),
+    FILTER_SNAPSHOT_JSON_LIMIT,
+  );
+}
+export function validateFilterSelection(value: pb.FilterSelection): void {
+  validId(value.snapshotId);
+  requireCondition(
+    value.updates.length <= FILTER_NODE_LIMIT,
+    'Filter updates exceed their count budget',
+  );
+  const paths = new Set<string>();
+  for (const update of value.updates) {
+    requireCondition(
+      update.path.length > 0 && update.path.length <= FILTER_DEPTH_LIMIT,
+      'Filter path exceeds its depth budget',
+    );
+    update.path.forEach((index) => validFilterIndex(index, FILTER_NODE_LIMIT));
+    const path = JSON.stringify(update.path);
+    requireCondition(!paths.has(path), 'Duplicate filter update path');
+    paths.add(path);
+    switch (update.state.case) {
+      case 'text':
+        requireCondition(
+          update.state.value.length <= FILTER_TEXT_LIMIT,
+          'Filter text exceeds its budget',
+        );
+        break;
+      case 'checkBox':
+        break;
+      case 'triState':
+        validFilterIndex(update.state.value, 3);
+        break;
+      case 'select':
+        validFilterIndex(update.state.value);
+        break;
+      case 'sort':
+        validFilterSortState(update.state.value);
+        break;
+      default:
+        throw new Error('A filter update must select an editable state');
+    }
+  }
+  jsonText(messageJson(pb.FilterSelectionSchema, value), SOURCE_ARGUMENT_LIMIT);
+}
+export const filterSnapshotSchema = codec((input) => {
+  const value = parseMessage(
+    pb.FilterSnapshotSchema,
+    input,
+    FILTER_SNAPSHOT_JSON_LIMIT,
+  );
+  validateFilterSnapshot(value);
+  return value;
+});
+export const filterSelectionSchema = codec((input) => {
+  const value = parseMessage(
+    pb.FilterSelectionSchema,
+    input,
+    SOURCE_ARGUMENT_LIMIT,
+  );
+  validateFilterSelection(value);
+  return value;
+});
+
 export function validateSourceCall(value: SourceCall): SourceCall {
   validId(value.requestId);
   validId(value.generation);
@@ -234,6 +382,15 @@ export function validateSourceCall(value: SourceCall): SourceCall {
         value.request.value.page > 0 && value.request.value.page <= 2147483647,
         'Invalid Source page',
       );
+      if (
+        value.request.case === 'search' &&
+        value.request.value.filters !== undefined
+      )
+        validateFilterSelection(value.request.value.filters);
+      break;
+    case 'getFilters':
+      if (value.request.value.retainedSnapshotId !== undefined)
+        validId(value.request.value.retainedSnapshotId);
       break;
     case 'details':
     case 'chapters':
@@ -269,6 +426,13 @@ export function javaSourceInvocation(value: SourceCall): {
   validateSourceCall(value);
   const request = value.request;
   switch (request.case) {
+    case 'getFilters':
+      return {
+        operation: 'getFilters',
+        argsJson: JSON.stringify(
+          messageJson(pb.GetFiltersRequestSchema, request.value),
+        ),
+      };
     case 'popular':
     case 'latest':
       return {
@@ -308,6 +472,10 @@ export function parseJavaSourcePayload(
   input: unknown,
 ): SourcePayload {
   switch (call.request.case) {
+    case 'getFilters': {
+      const value = filterSnapshotSchema.parse(input);
+      return { case: 'filters', value };
+    }
     case 'popular':
     case 'latest':
     case 'search': {
@@ -341,6 +509,9 @@ export function parseJavaSourcePayload(
 export function validateSourceResult(value: SourceResult): SourceResult {
   [value.requestId, value.generation, value.buildId].forEach(validId);
   switch (value.payload.case) {
+    case 'filters':
+      validateFilterSnapshot(value.payload.value);
+      break;
     case 'mangaPage':
       value.payload.value.mangas.forEach(validManga);
       break;
@@ -367,13 +538,15 @@ export function sourceResultFor(
   payload: SourcePayload,
 ): SourceResult {
   const expected =
-    call.request.case === 'pages'
-      ? 'pageList'
-      : call.request.case === 'details'
-        ? 'manga'
-        : call.request.case === 'chapters'
-          ? 'chapters'
-          : 'mangaPage';
+    call.request.case === 'getFilters'
+      ? 'filters'
+      : call.request.case === 'pages'
+        ? 'pageList'
+        : call.request.case === 'details'
+          ? 'manga'
+          : call.request.case === 'chapters'
+            ? 'chapters'
+            : 'mangaPage';
   requireCondition(
     payload.case === expected,
     'Source result does not match its request',

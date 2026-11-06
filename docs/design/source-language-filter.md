@@ -1,6 +1,6 @@
 # 当前包的 Source 语言筛选
 
-浏览页的语言筛选只作用于当前已加载扩展返回的 `SourceInfo` 列表。它帮助用户在同一包的多个 Source 中选择语言；全目录检索、收藏源同步和 Source 业务筛选各有独立边界。实施状态见 [P3](../plan/p3-extensions-and-migration.md#当前功能里程碑)，工程与实际运行证据见[验证记录](../verification/source-language-filter.md)。
+浏览页的语言筛选只作用于当前已加载扩展返回的 `SourceInfo` 列表。它帮助用户在同一包的多个 Source 中选择语言；全目录检索、收藏源同步和 Source 业务筛选各有独立边界。实施状态见 [P3](../plan/p3-extensions-and-migration.md#包内语言筛选里程碑)，工程与实际运行证据见[验证记录](../verification/source-language-filter.md)。
 
 ## 列表投影与状态
 

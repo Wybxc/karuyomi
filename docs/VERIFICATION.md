@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-06，typed Source 筛选的 Protobuf、原 Java Filter 子类保留、Flutter 编辑及空查询搜索/分页链路已接入；本次开发 host ABI 升为 v5。显式快照保留和活动取消的运行代次回收边界见[设计](design/source-filters.md)，工程结果与代表 AOT、真实 Source 及平台的待验门统一见[筛选记录](verification/source-filters.md)。历史 v4 生产与在线结果仍绑定原构建，不自动覆盖新 ABI。
+
 2026-11-06，正式浏览页的当前包 Source 语言筛选已实现；仅投影已加载 `SourceInfo.lang`，切换包或 generation 重置，不改变已选 Source、不为筛选请求 Source 或写业务状态。设计见[包内语言筛选](design/source-language-filter.md)，正式组件结果与仍待完成的实际 Source/平台门维护在[验证记录](verification/source-language-filter.md)，不宣称全目录语言检索已实现。
 
 2026-11-06，收藏源与快捷打开已接入生成全局设置、既有 Worker API + D1 和正式浏览入口。稳定 package/source 身份、完整全局 CAS、原请求重试与打开边界见[设计](design/source-favorites.md)；合同/API、共享 Dart 数据及其余工程检查的实际范围见[收藏源记录](verification/source-favorites.md)。独立客户端、真实 Source/索引更新、生产 Access 与目标设备继续验收，不能把本轮受控组件结果当成完整 P3 通过。
@@ -55,7 +57,7 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 同期接入唯一 `.proto` 与 Buf，Protobuf-ES/Dart 官方生成模型用于正式 API、Source/Worker 与 Web/Native 控制边界；`pnpm generate:check` 检查生成文件全集和字节，9 项实际 TS↔Dart golden 覆盖 ProtoJSON/二进制、oneof、可选字段、精确 memo 数字文本及业务预算。`pnpm flutter:check` 的静态分析及 71 项测试通过；`pnpm build` 完成宿主、Native 材料、Flutter Web release、空扩展索引组装及 API Wrangler dry-run。Java DTO、HTTP body、图片和 Locale oracle 也通过。复验范围和命令见[协议计划](plan/cross-language-protocol.md)与[工具计划](plan/tooling-processes.md)。
 
-2026-11-05 功能收尾后当前 host ABI 为 `karuyomi-source-host-v4`，protocolVersion 2 / HTTP bridgeVersion 2 不变。Access 阅读暂停/同身份恢复、namespace 执行互斥、后台 enqueue owner/drain 和 Android 异常退出文件清理已实现，先完成实现再集中回归，见[功能收尾记录](verification/p0-feature-completion.md)。新 Java 调用约定需要重建 AOT 与 Web/Native 材料；下述历史 Source、Native 与生产记录保留原提交/ABI，不自动计为 v4 通过。
+2026-11-05 功能收尾时 host ABI 为 `karuyomi-source-host-v4`，protocolVersion 2 / HTTP bridgeVersion 2 不变。Access 阅读暂停/同身份恢复、namespace 执行互斥、后台 enqueue owner/drain 和 Android 异常退出文件清理已实现，先完成实现再集中回归，见[功能收尾记录](verification/p0-feature-completion.md)。新 Java 调用约定需要重建 AOT 与 Web/Native 材料；下述历史 Source、Native 与生产记录保留原提交/ABI，不自动计为 v4 通过。
 
 随后固定 `1f599cd` 的三包 v4 原 Source 已重新 AOT，在内置 Chromium 156 通过元数据、原图片处理、2/3/3 张图片解码与释放；正式 Flutter xkcd 阅读完成、同 namespace 第二标签占用失败及关闭持有标签后重开也通过，见[v4 分项](verification/v4-source-runtime.md)。另以真实 TeaHost/BrowserCall AOT 和受控 Source/HTTP-v2 端点通过嵌套 enqueue、异常、取消及旧 owner 隔离，见[回调分项](verification/teavm-enqueue.md)。该次本地验证未部署，不提升流水线兼容标记，不替代生产 Access、Native 或真机验收。
 

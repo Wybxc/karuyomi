@@ -178,3 +178,104 @@ test.each([false, true])(
     });
   },
 );
+
+test('typed filter snapshots pass through the owned Java entry with the retained query identity', async () => {
+  const { driver, scope, context, call } = await setup();
+  const entries: { source: string; operation: string; args: string }[] = [];
+  scope.hostInvoke = (
+    source,
+    operation,
+    args,
+    requestId,
+    generation,
+    token,
+  ) => {
+    expect({ requestId, generation }).toEqual(context);
+    expect(token).not.toBe('');
+    entries.push({ source, operation, args });
+    scope.teaDone!(
+      JSON.stringify({
+        snapshotId: 'filters-current',
+        nodes: [
+          {
+            name: 'Order',
+            sort: { options: ['Recent', 'Popular'], state: {} },
+          },
+          {
+            name: 'Tags',
+            group: { nodes: [{ name: 'Fantasy', checkBox: { state: false } }] },
+          },
+        ],
+      }),
+    );
+  };
+  const result = await driver.invoke(
+    create(pb.SourceCallSchema, {
+      ...context,
+      sourceId: call.sourceId,
+      request: {
+        case: 'getFilters',
+        value: { retainedSnapshotId: 'filters-applied' },
+      },
+    }),
+    context,
+  );
+  expect(entries).toEqual([
+    {
+      source: call.sourceId,
+      operation: 'getFilters',
+      args: JSON.stringify({ retainedSnapshotId: 'filters-applied' }),
+    },
+  ]);
+  expect(result.case).toBe('filters');
+  if (result.case !== 'filters')
+    throw new Error('Expected the filter snapshot payload');
+  expect(result.value.snapshotId).toBe('filters-current');
+  expect(result.value.nodes[0]?.kind.case).toBe('sort');
+  expect(result.value.nodes[1]?.kind.case).toBe('group');
+});
+
+test('filtered search preserves explicit false, null sorting and nested paths in Java arguments', async () => {
+  const { driver, scope, context, call } = await setup();
+  let argumentsJson = '';
+  scope.hostInvoke = (_source, operation, args) => {
+    expect(operation).toBe('search');
+    argumentsJson = args;
+    scope.teaDone!('{"mangas":[],"hasNextPage":true}');
+  };
+  const result = await driver.invoke(
+    create(pb.SourceCallSchema, {
+      ...context,
+      sourceId: call.sourceId,
+      request: {
+        case: 'search',
+        value: {
+          page: 2,
+          query: '',
+          filters: {
+            snapshotId: 'filters-applied',
+            updates: [
+              { path: [0], state: { case: 'sort', value: {} } },
+              { path: [1, 0], state: { case: 'checkBox', value: false } },
+            ],
+          },
+        },
+      },
+    }),
+    context,
+  );
+  expect(JSON.parse(argumentsJson)).toEqual({
+    page: 2,
+    filters: {
+      snapshotId: 'filters-applied',
+      updates: [
+        { path: [0], sort: {} },
+        { path: [1, 0], checkBox: false },
+      ],
+    },
+  });
+  expect(result.case).toBe('mangaPage');
+  if (result.case !== 'mangaPage')
+    throw new Error('Expected filtered search results');
+  expect(result.value.hasNextPage).toBe(true);
+});

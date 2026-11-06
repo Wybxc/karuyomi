@@ -48,6 +48,7 @@ interface TaskBase {
   requestId: string;
   reject(error: unknown): void;
   timer: ReturnType<typeof setTimeout>;
+  completed?: true;
 }
 interface SourceTask extends TaskBase {
   kind: 'source';
@@ -511,6 +512,7 @@ export class SourceRuntimeManager {
           // before finally, and cancellation only applies to pending production.
           this.imageTasks.delete(task.requestId);
           clearTimeout(task.timer);
+          task.completed = true;
           task.resolve(resource);
         } else if (task.kind === 'source') {
           if (response.result.case !== 'source')
@@ -518,25 +520,30 @@ export class SourceRuntimeManager {
               'protocol_error',
               'Worker did not return a Source result',
             );
-          task.resolve(
-            sourceResultFor(task.call, buildId, response.result.value.payload),
+          const result = sourceResultFor(
+            task.call,
+            buildId,
+            response.result.value.payload,
           );
+          task.completed = true;
+          task.resolve(result);
         } else {
           if (response.result.case !== 'closed')
             throw new RuntimeFailure(
               'protocol_error',
               'Worker did not acknowledge page-session close',
             );
-          task.resolve(
-            closedSchema.parse(
-              messageJson(pb.ClosedSchema, response.result.value),
-            ),
+          const result = closedSchema.parse(
+            messageJson(pb.ClosedSchema, response.result.value),
           );
+          task.completed = true;
+          task.resolve(result);
         }
       })
-      .catch((error: unknown) =>
-        task.reject(task.kind === 'image' ? (task.failure ?? error) : error),
-      )
+      .catch((error: unknown) => {
+        task.completed = true;
+        task.reject(task.kind === 'image' ? (task.failure ?? error) : error);
+      })
       .finally(() => {
         clearTimeout(task.timer);
         if (task.kind === 'image') {
@@ -553,6 +560,7 @@ export class SourceRuntimeManager {
   }
 
   private expire(task: Task): void {
+    if (task.completed) return;
     if (task.kind === 'image') {
       void this.stopImage(
         task,
@@ -587,7 +595,7 @@ export class SourceRuntimeManager {
   cancel(requestId: string, generation?: string): Promise<void> {
     if (generation !== undefined && generation !== this.generation)
       return Promise.resolve();
-    if (this.active?.requestId === requestId) {
+    if (this.active?.requestId === requestId && !this.active.completed) {
       if (this.active.kind === 'image')
         return this.cancelImage({
           requestId,
@@ -599,12 +607,14 @@ export class SourceRuntimeManager {
           'Source request was cancelled; the Worker was recycled',
         ),
       );
-      this.invalidate(
-        new RuntimeFailure(
-          'runtime_lost',
-          'Active Source cancellation invalidated the generation',
-        ),
+      const retired = new RuntimeFailure(
+        'runtime_lost',
+        'Active Source cancellation invalidated the generation',
       );
+      this.invalidate(retired);
+      // The caller of the cancel command must also learn that its session
+      // was retired, even if the original invoke response was already lost.
+      return Promise.reject(retired);
     } else {
       const task = this.queue.find((queued) => queued.requestId === requestId);
       if (task) {

@@ -328,12 +328,16 @@ test('queued cancellation never calls the Source or destroys a running sibling',
   const a = manager.invoke(call('active', session.generation));
   const b = manager.invoke(call('queued', session.generation));
   const cancelled = expect(b).rejects.toMatchObject({ code: 'cancelled' });
+  await manager.cancel('active', 'obsolete-generation');
+  expect(workers[0]?.terminated).toBe(false);
   await manager.cancel('queued');
   await cancelled;
   expect(workers[0]?.terminated).toBe(false);
   expect(driver.invoke).toHaveBeenCalledTimes(1);
   active.resolve(mangaPage());
   await a;
+  await manager.cancel('active', session.generation);
+  expect(workers[0]?.terminated).toBe(false);
 });
 
 test('active cancellation recycles the generation and rejects queued work without replay', async () => {
@@ -344,7 +348,25 @@ test('active cancellation recycles the generation and rejects queued work withou
   const b = manager.invoke(call('queued', session.generation));
   const cancelled = expect(a).rejects.toMatchObject({ code: 'cancelled' });
   const lost = expect(b).rejects.toMatchObject({ code: 'runtime_lost' });
-  await manager.cancel('active');
+  vi.stubGlobal('window', { addEventListener: vi.fn() });
+  const api = installRuntime(manager);
+  const response = parseControlResponse(
+    await api.control(
+      encodeControlRequest(
+        create(pb.ControlRequestSchema, {
+          requestId: 'cancel-control',
+          command: {
+            case: 'cancel',
+            value: { requestId: 'active', generation: session.generation },
+          },
+        }),
+      ),
+    ),
+  );
+  expect(response.result).toMatchObject({
+    case: 'error',
+    value: { code: pb.RuntimeErrorCode.RUNTIME_LOST },
+  });
   await cancelled;
   await lost;
   expect(workers[0]?.terminated).toBe(true);

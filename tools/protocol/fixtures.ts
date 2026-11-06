@@ -146,10 +146,51 @@ const error: JsonObject = {
   javaClass: 'java.io.IOException',
 };
 
+export const filterSnapshot: JsonObject = {
+  snapshotId: 'filter-snapshot-golden',
+  nodes: [
+    { name: '标题', header: {} },
+    { name: '', separator: {} },
+    { name: '文字', text: { state: '' } },
+    { name: '勾选', checkBox: { state: false } },
+    { name: '三态', triState: { state: 0 } },
+    { name: '单选', select: { options: ['全部', '选项😀'], state: 0 } },
+    { name: '排序', sort: { options: ['更新', '名称'], state: {} } },
+    {
+      name: '分组',
+      group: {
+        nodes: [
+          { name: '标签', checkBox: { state: true } },
+          {
+            name: '显式首项',
+            sort: {
+              options: ['最新'],
+              state: { selection: { index: 0, ascending: false } },
+            },
+          },
+        ],
+      },
+    },
+  ],
+};
+export const filterSelection: JsonObject = {
+  snapshotId: 'filter-snapshot-golden',
+  updates: [
+    { path: [2], text: '' },
+    { path: [3], checkBox: false },
+    { path: [4], triState: 0 },
+    { path: [5], select: 0 },
+    { path: [6], sort: {} },
+    { path: [7, 0], checkBox: true },
+    { path: [7, 1], sort: { selection: { index: 0, ascending: false } } },
+  ],
+};
+
 const calls: ReadonlyArray<readonly [string, JsonObject]> = [
   ['popular', { page: 1 }],
   ['latest', { page: 2147483647 }],
-  ['search', { page: 2, query: '漫画 😀' }],
+  ['search', { page: 2, query: '漫画 😀', filters: filterSelection }],
+  ['getFilters', { retainedSnapshotId: 'filter-snapshot-golden' }],
   ['details', { manga }],
   ['chapters', { manga }],
   ['pages', { chapter }],
@@ -624,6 +665,7 @@ export const goldenFixtures: GoldenFixture[] = [
       ['manga', manga],
       ['chapters', { chapters: [chapter] }],
       ['pageList', pageList],
+      ['filters', filterSnapshot],
     ] satisfies Array<[string, JsonObject]>
   ).flatMap(([payload, value]): GoldenFixture[] => {
     const result: JsonObject = {

@@ -111,10 +111,78 @@ message Page {
 message PageRequest {
   uint32 page = 1;
 }
+// Filter paths use zero-based indexes from the top-level list. Snapshots are
+// ephemeral and belong to the Source and generation that produced them.
+message FilterText {
+  string state = 1;
+}
+message FilterCheckBox {
+  bool state = 1;
+}
+message FilterTriState {
+  // Original Source states: 0 ignore, 1 include, 2 exclude.
+  uint32 state = 1;
+}
+message FilterSelect {
+  repeated string options = 1;
+  uint32 state = 2;
+}
+message FilterSortSelection {
+  uint32 index = 1;
+  bool ascending = 2;
+}
+message FilterSortState {
+  // Absence explicitly means the Source's nullable sort selection.
+  optional FilterSortSelection selection = 1;
+}
+message FilterSort {
+  repeated string options = 1;
+  FilterSortState state = 2;
+}
+message FilterGroup {
+  repeated FilterNode nodes = 1;
+}
+message FilterNode {
+  string name = 1;
+  oneof kind {
+    Empty header = 2;
+    Empty separator = 3;
+    FilterText text = 4;
+    FilterCheckBox check_box = 5;
+    FilterTriState tri_state = 6;
+    FilterSelect select = 7;
+    FilterSort sort = 8;
+    FilterGroup group = 9;
+  }
+}
+message GetFiltersRequest {
+  // Keep the client's applied snapshot while publishing a fresh draft.
+  optional string retained_snapshot_id = 1;
+}
+message FilterSnapshot {
+  string snapshot_id = 1;
+  repeated FilterNode nodes = 2;
+}
+message FilterUpdate {
+  repeated uint32 path = 1;
+  oneof state {
+    string text = 2;
+    bool check_box = 3;
+    uint32 tri_state = 4;
+    uint32 select = 5;
+    FilterSortState sort = 6;
+  }
+}
+message FilterSelection {
+  string snapshot_id = 1;
+  // Every editable leaf is supplied, including false, zero and null sort.
+  repeated FilterUpdate updates = 2;
+}
 message SearchRequest {
   uint32 page = 1;
   string query = 2;
-  // Typed filter mapping is not implemented. No untyped filter payload exists.
+  // Omission requests the Source defaults; a present selection is explicit.
+  FilterSelection filters = 3;
 }
 message MangaRequest {
   Manga manga = 1;
@@ -135,6 +203,7 @@ message SourceCall {
     MangaRequest details = 13;
     MangaRequest chapters = 14;
     ChapterRequest pages = 15;
+    GetFiltersRequest get_filters = 16;
   }
 }
 
@@ -159,6 +228,7 @@ message SourceResult {
     Manga manga = 11;
     ChapterList chapters = 12;
     PageList page_list = 13;
+    FilterSnapshot filters = 14;
   }
 }
 
