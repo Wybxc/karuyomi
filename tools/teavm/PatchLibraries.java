@@ -1,7 +1,7 @@
+import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.zip.*;
-import java.io.*;
 import org.objectweb.asm.*;
 
 /** Adapt only host/dependency libraries. Extension input JAR is never rewritten. */
@@ -58,9 +58,56 @@ public class PatchLibraries {
                       method.visitEnd();
                       return null;
                     }
-                    return new MethodVisitor(Opcodes.ASM9, super.visitMethod(a, n, d, s, ex)) {
+                    boolean completionWrapper =
+                        r.getClassName().equals("kotlinx/coroutines/JobSupport")
+                            && n.equals("completeStateFinalization")
+                            && d.equals("(Lkotlinx/coroutines/Incomplete;Ljava/lang/Object;)V");
+                    return new MethodVisitor(
+                        Opcodes.ASM9,
+                        super.visitMethod(
+                            a, completionWrapper ? "hostCompleteStateFinalization" : n, d, s, ex)) {
                       public void visitCode() {
                         super.visitCode();
+                        if (r.getClassName().equals("kotlinx/coroutines/AbstractCoroutine")
+                            && n.equals("<init>")
+                            && d.equals("(Lkotlin/coroutines/CoroutineContext;ZZ)V")) {
+                          super.visitVarInsn(Opcodes.ALOAD, 1);
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/HostCoroutines",
+                              "capture",
+                              "(Lkotlin/coroutines/CoroutineContext;)Lkotlin/coroutines/CoroutineContext;",
+                              false);
+                          super.visitVarInsn(Opcodes.ASTORE, 1);
+                        }
+                        if (r.getClassName().equals("kotlinx/coroutines/JobSupport")
+                            && n.equals("startInternal")
+                            && d.equals("(Ljava/lang/Object;)I")) {
+                          super.visitVarInsn(Opcodes.ALOAD, 0);
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/HostCoroutines",
+                              "beforeStart",
+                              "(Lkotlinx/coroutines/Job;)V",
+                              false);
+                        }
+                        if (r.getClassName().equals("kotlinx/coroutines/JobSupport")
+                            && n.equals("invokeOnCompletion")
+                            && (d.equals(
+                                    "(Lkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/DisposableHandle;")
+                                || d.equals(
+                                    "(ZZLkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/DisposableHandle;"))) {
+                          int parameter = d.startsWith("(ZZ") ? 3 : 1;
+                          super.visitVarInsn(Opcodes.ALOAD, 0);
+                          super.visitVarInsn(Opcodes.ALOAD, parameter);
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/HostCoroutines",
+                              "captureCompletion",
+                              "(Lkotlinx/coroutines/Job;Lkotlin/jvm/functions/Function1;)Lkotlin/jvm/functions/Function1;",
+                              false);
+                          super.visitVarInsn(Opcodes.ASTORE, parameter);
+                        }
                         if (Boolean.getBoolean("trace")
                             && r.getClassName().startsWith("kotlinx/coroutines/")
                             && (n.equals("<init>") && r.getClassName().endsWith("AbstractCoroutine")
@@ -175,9 +222,94 @@ public class PatchLibraries {
                               false);
                           return;
                         }
+                        if (r.getClassName().equals("kotlinx/coroutines/AbstractCoroutine")
+                            && n.equals("<init>")
+                            && d.equals("(Lkotlin/coroutines/CoroutineContext;ZZ)V")
+                            && owner.equals("kotlinx/coroutines/JobSupport")
+                            && name.equals("<init>")
+                            && desc.equals("(Z)V")) {
+                          super.visitMethodInsn(op, owner, name, desc, itf);
+                          super.visitVarInsn(Opcodes.ALOAD, 0);
+                          super.visitVarInsn(Opcodes.ALOAD, 1);
+                          super.visitVarInsn(Opcodes.ILOAD, 3);
+                          super.visitMethodInsn(
+                              Opcodes.INVOKESTATIC,
+                              "prototype/HostCoroutines",
+                              "created",
+                              "(Lkotlinx/coroutines/Job;Lkotlin/coroutines/CoroutineContext;Z)V",
+                              false);
+                          return;
+                        }
                         super.visitMethodInsn(op, owner, name, desc, itf);
                       }
                     };
+                  }
+
+                  public void visitEnd() {
+                    if (r.getClassName().equals("kotlinx/coroutines/JobSupport")) {
+                      MethodVisitor method =
+                          super.visitMethod(
+                              Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+                              "completeStateFinalization",
+                              "(Lkotlinx/coroutines/Incomplete;Ljava/lang/Object;)V",
+                              null,
+                              null);
+                      Label start = new Label(), end = new Label(), handler = new Label();
+                      method.visitCode();
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKESTATIC,
+                          "prototype/HostCoroutines",
+                          "completing",
+                          "(Lkotlinx/coroutines/Job;)Lprototype/HostCoroutines$CompletionScope;",
+                          false);
+                      method.visitVarInsn(Opcodes.ASTORE, 3);
+                      method.visitLabel(start);
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitVarInsn(Opcodes.ALOAD, 1);
+                      method.visitVarInsn(Opcodes.ALOAD, 2);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKESPECIAL,
+                          r.getClassName(),
+                          "hostCompleteStateFinalization",
+                          "(Lkotlinx/coroutines/Incomplete;Ljava/lang/Object;)V",
+                          false);
+                      method.visitLabel(end);
+                      method.visitVarInsn(Opcodes.ALOAD, 3);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKEVIRTUAL,
+                          "prototype/HostCoroutines$CompletionScope",
+                          "close",
+                          "()V",
+                          false);
+                      method.visitInsn(Opcodes.RETURN);
+                      method.visitLabel(handler);
+                      method.visitFrame(
+                          Opcodes.F_FULL,
+                          4,
+                          new Object[] {
+                            r.getClassName(),
+                            "kotlinx/coroutines/Incomplete",
+                            "java/lang/Object",
+                            "prototype/HostCoroutines$CompletionScope"
+                          },
+                          1,
+                          new Object[] {"java/lang/Throwable"});
+                      method.visitVarInsn(Opcodes.ASTORE, 4);
+                      method.visitVarInsn(Opcodes.ALOAD, 3);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKEVIRTUAL,
+                          "prototype/HostCoroutines$CompletionScope",
+                          "close",
+                          "()V",
+                          false);
+                      method.visitVarInsn(Opcodes.ALOAD, 4);
+                      method.visitInsn(Opcodes.ATHROW);
+                      method.visitTryCatchBlock(start, end, handler, null);
+                      method.visitMaxs(3, 5);
+                      method.visitEnd();
+                    }
+                    super.visitEnd();
                   }
                 },
                 0);

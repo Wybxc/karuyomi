@@ -28,14 +28,14 @@ public final class SourceImages {
   public static String acquire(HttpSource source, Page page, Sink sink) throws IOException {
     if (page.getImageUrl() == null) {
       String url =
-          GreenCoroutines.<String>block(
+          HostCoroutines.<String>block(
               (scope, continuation) -> source.getImageUrl(page, continuation),
               Dispatchers.getDefault());
       if (url == null || url.isEmpty()) throw new IOException("Source returned an empty image URL");
       page.setImageUrl(url);
     }
     Response response =
-        GreenCoroutines.<Response>block(
+        HostCoroutines.<Response>block(
             (scope, continuation) -> {
               try {
                 return requestImage(source, page, continuation);

@@ -8,6 +8,11 @@ import kotlin.coroutines.*;
 import org.teavm.jso.*;
 
 public class TeaHost {
+  // TeaVM may provide an empty diagnostic stack; retain official exception propagation.
+  static {
+    System.setProperty("kotlinx.coroutines.stacktrace.recovery", "false");
+  }
+
   public static eu.kanade.tachiyomi.network.NetworkHelper network;
   static List<Source> sources;
   static Source source;
@@ -241,7 +246,7 @@ public class TeaHost {
             return "";
           }
           Object result =
-              GreenCoroutines.block(
+              HostCoroutines.block(
                   (scope, continuation) -> {
                     switch (operation) {
                       case "popular":

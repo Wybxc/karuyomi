@@ -6,6 +6,11 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import kotlin.Unit;
+import kotlin.ResultKt;
+import kotlin.coroutines.Continuation;
+import kotlin.coroutines.AbstractCoroutineContextElement;
+import kotlin.coroutines.CoroutineContext;
+import kotlin.coroutines.intrinsics.IntrinsicsKt;
 import kotlin.coroutines.EmptyCoroutineContext;
 import kotlinx.coroutines.*;
 import okhttp3.*;
@@ -15,9 +20,55 @@ import okio.*;
 public final class EnqueueTest {
   static int assertions;
 
+  static final class CapturedCoroutineFailure extends AbstractCoroutineContextElement
+      implements CoroutineExceptionHandler {
+    final AtomicInteger count = new AtomicInteger();
+    final AtomicReference<Throwable> failure = new AtomicReference<>();
+
+    CapturedCoroutineFailure() {
+      super(CoroutineExceptionHandler.Key);
+    }
+
+    public void handleException(CoroutineContext context, Throwable error) {
+      count.incrementAndGet();
+      failure.compareAndSet(null, error);
+    }
+  }
+
   static synchronized void check(boolean value) {
     assertions++;
     if (!value) throw new AssertionError("enqueue assertion " + assertions);
+  }
+
+  static <T> Object failed(Continuation<? super T> continuation, Throwable error) {
+    continuation.resumeWith(ResultKt.createFailure(error));
+    return IntrinsicsKt.getCOROUTINE_SUSPENDED();
+  }
+
+  static <T> T value(Deferred<T> deferred) throws InterruptedException {
+    return BuildersKt.runBlocking(
+        HostCoroutines.entryContext(EmptyCoroutineContext.INSTANCE),
+        (scope, continuation) -> deferred.await(continuation));
+  }
+
+  static void officialCoreIdentity(String expected) throws Exception {
+    java.nio.file.Path core = java.nio.file.Path.of(expected).toRealPath();
+    for (Class<?> type :
+        new Class<?>[] {
+          BuildersKt.class, CoroutineScopeKt.class, Dispatchers.class, JobSupport.class
+        }) {
+      java.nio.file.Path actual =
+          java.nio.file.Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI())
+              .toRealPath();
+      if (!core.equals(actual))
+        throw new AssertionError("Unexpected coroutine runtime for " + type + ": " + actual);
+    }
+    try {
+      Class.forName("prototype.GreenCoroutines", false, EnqueueTest.class.getClassLoader());
+      throw new AssertionError("Old GreenCoroutines runtime is reachable");
+    } catch (ClassNotFoundException expectedMissing) {
+      System.out.println("OFFICIAL_CORE_IDENTITY_PASS " + core);
+    }
   }
 
   static void await(CountDownLatch latch) throws IOException {
@@ -381,7 +432,7 @@ public final class EnqueueTest {
                   written.set(true);
                   return Unit.INSTANCE;
                 } catch (IOException error) {
-                  throw GreenCoroutines.propagate(error);
+                  return failed(continuation, error);
                 }
               });
       task.invokeOnCompletion(error -> {
@@ -424,7 +475,7 @@ public final class EnqueueTest {
                 try {
                   await(release);
                 } catch (IOException error) {
-                  throw GreenCoroutines.propagate(error);
+                  return failed(continuation, error);
                 }
                 finished.set(true);
                 return Unit.INSTANCE;
@@ -432,11 +483,11 @@ public final class EnqueueTest {
       await(entered);
       task.cancel(new CancellationException("cancelled by Source"));
       CompletableFuture<Void> delivered = drainAsync(owner);
-      check(task.isCompleted() && task.isCancelled());
+      check(!task.isCompleted() && task.isCancelled());
       check(owner.hasPending() && !delivered.isDone() && !finished.get());
       release.countDown();
       delivered.get(3, TimeUnit.SECONDS);
-      check(finished.get() && !owner.hasPending());
+      check(finished.get() && task.isCompleted() && !owner.hasPending());
     } finally {
       release.countDown();
       owner.close();
@@ -447,11 +498,11 @@ public final class EnqueueTest {
   static void lazyTaskKeepsOriginalOwner() throws Throwable {
     BrowserCall.Operation old = BrowserCall.beginOperation("lazy", "generation", "old-lazy-token");
     AtomicInteger bodies = new AtomicInteger();
-    GreenCoroutines.Task<Unit> lazy;
+    Deferred<Unit> lazy;
     old.enter();
     try {
       lazy =
-          new GreenCoroutines.Task<>(
+          BuildersKt.<Unit>async(
               GlobalScope.INSTANCE,
               EmptyCoroutineContext.INSTANCE,
               CoroutineStart.LAZY,
@@ -468,21 +519,23 @@ public final class EnqueueTest {
     BrowserCall.Operation next = BrowserCall.beginOperation("lazy", "generation", "new-lazy-token");
     next.enter();
     try {
+      IllegalStateException rejected = null;
       try {
         lazy.start();
         throw new AssertionError("Lazy task adopted a later Source operation");
       } catch (IllegalStateException expected) {
-        check(expected.getMessage().equals("Source operation has ended"));
+        rejected = expected;
+        check(expected.getCause() instanceof InterruptedIOException);
       }
       check(lazy.isCompleted() && !lazy.isActive() && bodies.get() == 0 && !next.hasPending());
       try {
-        lazy.value();
+        value(lazy);
         throw new AssertionError("Expired lazy waiter was not completed with failure");
-      } catch (IllegalStateException expected) {
-        check(expected.getMessage().equals("Source operation has ended"));
+      } catch (CancellationException expected) {
+        check(expected.getCause() == rejected);
       }
-      GreenCoroutines.Task<Unit> cancelled =
-          new GreenCoroutines.Task<>(
+      Deferred<Unit> cancelled =
+          BuildersKt.<Unit>async(
               GlobalScope.INSTANCE,
               EmptyCoroutineContext.INSTANCE,
               CoroutineStart.LAZY,
@@ -503,13 +556,14 @@ public final class EnqueueTest {
     BrowserCall.Operation old =
         BrowserCall.beginOperation("lazy-callback", "generation", "old-callback-token");
     AtomicInteger completionCalls = new AtomicInteger(), childCalls = new AtomicInteger();
-    GreenCoroutines.Task<Unit> lazy;
+    CapturedCoroutineFailure rejectedCallbacks = new CapturedCoroutineFailure();
+    Deferred<Unit> lazy;
     old.enter();
     try {
       lazy =
-          new GreenCoroutines.Task<>(
+          BuildersKt.<Unit>async(
               GlobalScope.INSTANCE,
-              EmptyCoroutineContext.INSTANCE,
+              rejectedCallbacks,
               CoroutineStart.LAZY,
               (scope, continuation) -> Unit.INSTANCE);
       lazy.invokeOnCompletion(error -> {
@@ -517,7 +571,7 @@ public final class EnqueueTest {
         try (Response response = call(new OkHttpClient.Builder().build(), endpoint).execute()) {
           check(response.code() == 200);
         } catch (IOException failure) {
-          throw GreenCoroutines.propagate(failure);
+          throw new UncheckedIOException(failure);
         }
         BuildersKt.launch(
             GlobalScope.INSTANCE,
@@ -547,6 +601,17 @@ public final class EnqueueTest {
       }
       check(completionCalls.get() == 0 && childCalls.get() == 0 && posts.get() == previousPosts);
       check(!next.hasPending());
+      check(rejectedCallbacks.count.get() == 1);
+      Throwable reported = rejectedCallbacks.failure.get();
+      check(reported instanceof CompletionHandlerException);
+      check(
+          reported.getCause() instanceof IllegalStateException
+              && reported.getCause().getCause() instanceof InterruptedIOException
+              && reported
+                  .getCause()
+                  .getCause()
+                  .getMessage()
+                  .equals("Source operation expired or was cancelled"));
       try {
         lazy.invokeOnCompletion(error -> {
           completionCalls.incrementAndGet();
@@ -557,6 +622,7 @@ public final class EnqueueTest {
         check(expected.getCause() instanceof InterruptedIOException);
       }
       check(completionCalls.get() == 0 && !next.hasPending());
+      check(rejectedCallbacks.count.get() == 1);
       next.drain();
     } finally {
       next.close();
@@ -578,8 +644,8 @@ public final class EnqueueTest {
       } catch (IllegalStateException expected) {
         check(expected.getMessage().contains("background Source tasks"));
       }
-      GreenCoroutines.Task<Unit> overflow =
-          new GreenCoroutines.Task<>(
+      Deferred<Unit> overflow =
+          BuildersKt.<Unit>async(
               GlobalScope.INSTANCE,
               EmptyCoroutineContext.INSTANCE,
               CoroutineStart.LAZY,
@@ -715,16 +781,16 @@ public final class EnqueueTest {
     IOException failure = new IOException("Source-handled async error");
     owner.enter();
     try {
-      GreenCoroutines.Task<Unit> task =
-          new GreenCoroutines.Task<>(
+      Deferred<Unit> task =
+          BuildersKt.<Unit>async(
               GlobalScope.INSTANCE,
               EmptyCoroutineContext.INSTANCE,
               CoroutineStart.DEFAULT,
               (scope, continuation) -> {
-                throw GreenCoroutines.propagate(failure);
+                return failed(continuation, failure);
               });
       try {
-        task.value();
+        value(task);
         throw new AssertionError("Deferred error disappeared");
       } catch (Throwable expected) {
         check(expected == failure);
@@ -738,6 +804,7 @@ public final class EnqueueTest {
   }
 
   public static void main(String[] args) throws Throwable {
+    officialCoreIdentity(args[0]);
     boundBeforeRunMustDrain();
     AtomicInteger posts = new AtomicInteger();
     HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

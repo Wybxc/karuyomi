@@ -1,5 +1,7 @@
 import {
   existsSync,
+  copyFileSync,
+  rmSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -35,7 +37,6 @@ export async function checkDto(root = ROOT): Promise<void> {
       'Prepare verified runtime materials using node scripts/prepare-runtime.ts',
     );
   mkdirSync(output, { recursive: true });
-  const classpath = jars.join(path.delimiter);
   const oracle = execa({
     shell: false,
     stdin: 'ignore',
@@ -44,7 +45,40 @@ export async function checkDto(root = ROOT): Promise<void> {
     buffer: false,
     preferLocal: false,
     verbose: 'none',
+    timeout: 30_000,
+    forceKillAfterDelay: 1000,
   });
+  // Execute the same core bytecode adaptation as AOT, using a fresh copied JAR.
+  const coreName = 'kotlinx-coroutines-core-jvm-1.11.0.jar',
+    originalCore = jars.find((file) => path.basename(file) === coreName),
+    coroutinesOutput = path.join(output, 'official-coroutines'),
+    toolsOutput = path.join(coroutinesOutput, 'tools'),
+    core = path.join(coroutinesOutput, coreName),
+    asm = path.join(
+      root,
+      'runtime/teavm/.local/build-cache/m2/org/ow2/asm/asm/9.9.1/asm-9.9.1.jar',
+    );
+  if (!originalCore) throw new Error('Missing locked official coroutine core');
+  rmSync(coroutinesOutput, { recursive: true, force: true });
+  mkdirSync(toolsOutput, { recursive: true });
+  copyFileSync(originalCore, core);
+  await oracle('javac', [
+    '--release',
+    '17',
+    '-cp',
+    asm,
+    '-d',
+    toolsOutput,
+    path.join(root, 'tools/teavm/PatchLibraries.java'),
+  ]);
+  await oracle('java', [
+    '-cp',
+    [toolsOutput, asm].join(path.delimiter),
+    'PatchLibraries',
+    core,
+  ]);
+  jars = jars.map((file) => (file === originalCore ? core : file));
+  const classpath = jars.join(path.delimiter);
   await oracle('javac', [
     '--release',
     '17',
@@ -181,6 +215,8 @@ export async function checkDto(root = ROOT): Promise<void> {
     'prototype.CacheSinkTest',
   ]);
   const imageOutput = path.join(output, 'image');
+  // Migration must not leave old Green/facade .class files reachable.
+  rmSync(imageOutput, { recursive: true, force: true });
   mkdirSync(imageOutput, { recursive: true });
   await oracle('javac', [
     '--release',
@@ -195,9 +231,9 @@ export async function checkDto(root = ROOT): Promise<void> {
       'runtime/teavm/java/src/main/java/prototype/BrowserCall.java',
       'runtime/teavm/java/src/main/java/prototype/PageSessions.java',
       'runtime/teavm/java/src/main/java/prototype/SourceImages.java',
-      'runtime/teavm/java/src/main/java/prototype/GreenCoroutines.java',
-      'runtime/teavm/java/src/main/java/kotlinx/coroutines/BuildersKt.java',
-      'runtime/teavm/java/src/main/java/kotlinx/coroutines/Dispatchers.java',
+      'runtime/teavm/java/src/main/java/prototype/HostCoroutines.java',
+      'runtime/teavm/java/src/main/java/prototype/PlatformSupport.java',
+      'runtime/teavm/java/src/main/java/prototype/jcl/LocaleState.java',
       'runtime/teavm/java/src/main/java/eu/kanade/tachiyomi/network/OkHttpExtensionsKt.java',
       'tools/teavm/fixtures/image/prototype/Bridge.java',
       'tools/teavm/ImageTest.java',
@@ -213,6 +249,7 @@ export async function checkDto(root = ROOT): Promise<void> {
     '-cp',
     imageOutput + path.delimiter + classpath,
     'prototype.EnqueueTest',
+    core,
   ]);
   // Check the product adapter as well as the original seed HttpSource. Java's
   // checked throws signature is absent from the original Kotlin bytecode.

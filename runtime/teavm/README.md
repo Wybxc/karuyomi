@@ -33,7 +33,7 @@ Source 的默认网络配置由 owned `eu/kanade/tachiyomi/network/NetworkHelper
 
 当前 Java 边界支持 `popular`、`latest`、`search`、`details`、`chapters`、`pages`、`getFilters`、`getPreferences` 与 `editPreference`；typed filters 保留原具体子类并按完整叶状态应用，描述使用有界快照和显式保留引用，详见 [Source 筛选](../../docs/design/source-filters.md)。Source preferences 保留原控件和 listener，构造前注入确认值、编辑后排空重读，并经 D1 确认和容器重开生效，详见 [Source 设置](../../docs/design/source-preferences.md)。当前合同为 `hostAbi=karuyomi-source-host-v6`、`protocolVersion=2`、HTTP `bridgeVersion=2`；旧 ABI 扩展需要重新构建，不提供兼容回退。原 Source 的 `enqueue` 在首次执行时绑定 RPC owner，主结果返回前有界等待回调结束；无法确认收尾时丢弃运行时，不把迟到结果归入下一个 RPC。
 
-协程核心 JAR 已在工具链中锁定；当前产品仍由自有 `BuildersKt` / `CoroutineScopeKt` / `Dispatchers` 和 `GreenCoroutines` 覆盖部分入口，不能当作完整官方 kotlinx 语义。官方核心的隔离挂起与取消已取得证据，平台边界回归纳入 `pnpm teavm:check`；正式产品迁移还需保留 operation owner 与完整 Job 生命周期的工作 lease，见[计划](../../docs/plan/coroutine-runtime.md)及[分层验证](../../docs/verification/coroutine-runtime.md)。
+协程使用工具链锁定的官方 `kotlinx-coroutines-core-jvm-1.11.0.jar`，由 TeaVM 一起编译；自研 Green Job 和四个同名 kotlinx 覆盖已删除。`HostCoroutines` 与构建副本的精确生命周期接点只管理 operation owner / lease，Job、builder、取消和 dispatcher 保留官方实现；TeaHost 提前关闭 TeaVM 下不可用的可选堆栈恢复。隔离 Kotlin 语义与归属分项、正式 JVM oracle、HTTP 子任务取消缺口和真实 Source 的验收分别见[计划](../../docs/plan/coroutine-runtime.md)及[验证](../../docs/verification/coroutine-runtime.md)。
 
 正式图片通道保留原 Java Page 与 Source 图片处理链，经有界二进制通道交付不透明编码字节。Web 使用受管 Blob URL，Android/iOS 交接受管临时文件，再由同一 Flutter 图片入口识别、解码和显示；宿主不读取 MIME、尺寸或方向，不预解码。取消、generation、字节预算和释放确认分别由对应 owner 落实，详见[图片资源合同](../../docs/IMAGE-RESOURCES.md)及 [Native 文件合同](../../docs/NATIVE-IMAGE-FILES.md)。
 

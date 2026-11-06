@@ -1,6 +1,6 @@
 # 官方 kotlinx.coroutines 隔离验证
 
-2026-11-06，验证能否以官方核心替换当前自有协程入口；迁移目标和验收维护在[协程运行时计划](../plan/coroutine-runtime.md)。本轮未修改正式运行时，未发布扩展。
+2026-11-06，官方核心已接入正式源码，自有 Green Job 与四个 kotlinx 覆盖已删除。早期隔离、平台修复及后续 owner 候选分别记录；代表 Source、HTTP 子任务取消和 Native 不据此视为通过。迁移目标和待办见[协程运行时计划](../plan/coroutine-runtime.md)。以下原五轮是接入前的历史证据。
 
 ## 固定输入与隔离范围
 
@@ -52,7 +52,7 @@ JVM 上原始与阶段 fixture 均执行通过；阶段版 `staged/jvm.log` 包�
 
 该检查入口的完整字节码部分需要本地锁定 seed 和已有 ASM 依赖，未因此扩大公开 CI 的下载或伪称普通 CI 已执行私有工具链 oracle。原失败、检查结果和详细日志留在 `/private/tmp/karuyomi-platform-*.log` 及对应忽略目录。
 
-这组结果证明官方核心可以完成真实挂起与取消闭环；尚未证明正式宿主的 operation owner/lease、GlobalScope、旧 LAZY/completion、HTTP、drain、配额或真实 Source。产品仍使用原自有入口，不能把本轮 fixture 计为已完成迁移、浏览器或 Native 通过。
+这组结果证明官方核心可以完成真实挂起与取消闭环；尚未证明正式宿主的 operation owner/lease、GlobalScope、旧 LAZY/completion、HTTP、drain、配额或真实 Source。该阶段产品仍使用原自有入口，不能把该轮 fixture 计为已完成迁移、浏览器或 Native 通过；后续接入见下节。
 
 ## 本机复验入口
 
@@ -68,3 +68,35 @@ node run-node.cjs project-compat-inherited-owner-staged/work/public/teavm/corout
 ```
 
 上述 AOT 命令需使用仓库锁定的 Node，并设置与正式 TeaVM 构建一致的 `JAVA_HOME`；`run.ts` 通过固定 Maven 路径和 `TEAVM_DEBUG=1` 调用正式构建。Node runner 为主入口回调设置 5 秒 watchdog，超时只表示该环境在限时内未完成，不等于已测得浏览器行为。
+
+## 官方核心与请求归属 v2
+
+后续候选从 `a6dce64273e1165ba2744605227e4d631453bcde` 固定源码建立，正式最小 patch 以已包含平台修复的 `9b10390` 为基准。材料在 `/private/tmp/karuyomi-coroutine-owner-candidate-v2`，v1 保留在无 `-v2` 后缀目录。原始官方 core SHA-256 仍为 `d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa`，与锁一致。seed 的 host JAR 没有 Green 或四个同名 kotlinx class；不存在删除自有源码后反而暴露 seed 旧覆盖的情况。
+
+冻结 `HostCoroutines.java` 的 SHA-256 为 `f942830213816453bcb4eba072aa805505c6ff69085c924558571b257509c1fc`，生产 `PatchLibraries.java` 为 `f1c8f7698edd0ef5cb727ae226924a1089c954e983da26af546b2d742975e625`。正式接入使用同两份源码，不包含临时 compiler、JAR、stub、HTTP server 或 Node runner。TeaHost 与 SourceImages 三处入口使用官方 runBlocking；TeaHost 静态初始化在 Source 构造前设置官方堆栈恢复开关。
+
+v1 审查确认三项需要修正的边界：过期/超额 LAZY 启动只抛错误、未完成其 waiter；ThreadContextElement 更新路径会向外抛过期错误；普通 `CompletableDeferred` 注册的旧完成回调会借后续请求执行。v2 分别改为官方 Job.cancel 后传播启动拒绝、context element 纯设置/恢复、公开 Function1 注册入口捕获原 owner。未增加全局 Job registry 或另一套取消状态机，未保留冗余的 JobNode.invoke hooks。普通持久 Job 本身不占工作 lease。
+
+| 实际验证                                          | 结果与范围                                                                                                                                                                                            |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 同一真实 Kotlin fixture 的 JVM / TeaVM AOT / Node | 全部 exit 0；AOT 4,262,875 B / 13.40 s。此为机制 fixture 体积，不是代表 Source 包体或性能对照。                                                                                                       |
+| 七组官方语义                                      | 取消中与 finally 后完成分离；父失败与兄弟取消；正常 LAZY；DEFAULT / ATOMIC / UNDISPATCHED 首段；ensureActive；withContext 调度/返回取消；失败 Job 的独立 join，均通过。                               |
+| 请求归属和 lease                                  | GlobalScope 排队前保留配额；delay/await 恢复原 owner；Deferred 原 IOException 可捕获；未处理 launch 失败交给原 context handler；HTTP / 后续 finally / 完成链结束前 drain 不返回，均通过。             |
+| 限额与失败清理                                    | 64 项配额、取消排队清理、dispatcher 拒绝；超额/过期 LAZY 被取消且 await 完成，旧 body 不运行，均通过。                                                                                                |
+| 跨请求复用                                        | A 创建的持久 scope 在 B 新建工作归 B；A 的旧任务及已完成任务的 immediate callback 不借 B；generic CompletableDeferred 旧回调拒绝、新 B 回调仍执行且不泄漏 lease，均通过。                             |
+| 独立 ThreadContext oracle                         | 复制冻结源码和原始官方 core，运行真实生产补丁器；经官方 ThreadContextKt 多 element 更新/恢复，过期 owner 不抛、仍禁止旧请求工作，B 与另一 ThreadLocal marker 恢复。独立 generic/context 两项 exit 0。 |
+| 有界 HTTP supplier                                | JVM 和 Node 各 1 次回环请求，Node 最后 handles=0；不是 workerd、正式 harness 或真实 Source 验收，未覆盖 child Job.cancel 到 Call.cancel。                                                             |
+
+v2 故意给已关闭请求的旧 LAZY 注册完成回调，官方通过 CompletionHandlerException 报告原 owner fence 拒绝；fixture 仍验证旧回调/body 均未执行、waiter 已取消完成、下一 owner 恢复。该诊断不作为无关日志忽略，也不通过修改核心吞异常。后续正式 JVM oracle 显式检查其异常通道。
+
+详细输入、编译 argv、结果与清理保存在上述目录 `RESULTS-v2.md`、`results-v2.json`、`fixture/*-command.json`、`aot-v2.log`、`fixture/jvm-v2.log`、`node-v2.log`。独立审查的两份输入摘要和运行结果在 `/private/tmp/karuyomi-owner-review/provenance.json` 与 `result.log`。候选自启 JVM、Node 和 HTTP 进程均已退出。
+
+### 正式回归接线
+
+`pnpm teavm:check` 从锁定原 core 新建副本，并用生产 PatchLibraries 处理；清除旧 image oracle 类目录，编译当前 HostCoroutines，再执行全部原有 Enqueue 场景。运行时检查 BuildersKt、CoroutineScopeKt、Dispatchers、JobSupport 的实际 code source 是该官方副本，并拒绝任何可达 GreenCoroutines。单个 javac/java 子进程有 30 秒期限，避免挂起占住后续检查。
+
+旧测试中“运行中的 cancel 立即 completed”改为官方合同：cancelled 为真，body/finally 未结束前 completed 为假，结束后才 completed。过期 LAZY 的启动错误仍需 owner-expired cause，后续 await 则验证官方 CancellationException 精确引用同一启动拒绝原因。保留原场景与失败门，不在 fixture 手动 cancel 掩盖宿主缺陷。
+
+正式 `pnpm teavm:check` 已 exit 0：Enqueue 85 项断言通过（原 81 项保留，新增 4 项显式 completion 异常通道断言），8355 项图片/处理后正文合同在 seed 与 owned HttpSource 各通过；DTO、filters、preferences、HTTP body、缓存、文件、网络和两项平台 oracle 同时通过。`pnpm check` 全部 exit 0，包含 418 项 Vitest 集成测试、协议生成一致性、严格类型、依赖层级和工具测试；全库 `pnpm format` 与完整 `pnpm format:check` 通过。没有改动 Dart 产品代码，未将之前的 Flutter 检查重复计成本轮执行。详细日志留在 `/private/tmp/karuyomi-official-core-*.log`。
+
+代表 Source 仍待固定本提交重建后验收；临时 Node supplier 不能代替这一层、Native 或生产。
