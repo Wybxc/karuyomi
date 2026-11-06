@@ -4,6 +4,7 @@ import { VerifiedLoader } from './verified-loader.js';
 import { ExtensionArtifactCache } from './extension-artifact-cache.js';
 import { WorkerRuntime } from './worker-runtime.js';
 import { nativeMaterials } from './materials.js';
+import { setRuntimeDiagnosticSink } from './runtime-diagnostics.js';
 
 // Classic Worker is required for TeaVM's JS backend and its global JS exports.
 declare function importScripts(...urls: string[]): void;
@@ -16,6 +17,10 @@ if (context && context.origin !== location.origin) {
   throw new Error('Native Worker origin does not match its document');
 }
 const origin = context?.origin ?? location.origin;
+if (import.meta.env.VITE_KARUYOMI_RUNTIME_DIAGNOSTICS === '1')
+  setRuntimeDiagnosticSink((diagnostic) =>
+    globalThis.postMessage({ type: 'runtime-diagnostic', diagnostic }),
+  );
 const driver = new TeaVMDriver(
   globalThis as TeaVMGlobals,
   new VerifiedLoader(

@@ -29,6 +29,10 @@ import {
   type HttpCallContext,
 } from './http-transport.js';
 import { ImageSink } from './image-channel.js';
+import {
+  reportRuntimeDiagnostic,
+  teaVMDiagnosticSchema,
+} from './runtime-diagnostics.js';
 
 export interface RuntimeDriver {
   open(
@@ -114,6 +118,18 @@ export interface TeaVMGlobals {
   teaGraphicsBytesWrite?: (handle: string, bytes: Uint8Array) => void;
   teaGraphicsBytesRead?: (handle: string, maximum: number) => Uint8Array | null;
   teaGraphicsBytesDetach?: (handle: string) => void;
+  teaCache?: (request: string) => Promise<string>;
+  teaCacheRead?: (
+    readerId: string,
+    handle: string,
+    maximum: number,
+  ) => Promise<Uint8Array | null>;
+  teaCacheWrite?: (
+    editorId: string,
+    handle: string,
+    sequence: number,
+    bytes: Uint8Array,
+  ) => Promise<boolean>;
   teaBrowser?: () => never;
   teaFileSystemClose?: () => Promise<void>;
   karuyomiResources?: Record<string, string>;
@@ -269,6 +285,7 @@ export class TeaVMDriver implements RuntimeDriver {
   private call(
     start: (owner: HttpCallContext, token: string) => void,
     context?: HttpCallContext,
+    operation = 'host',
   ): Promise<unknown> {
     if (this.closed)
       return Promise.reject(
@@ -295,6 +312,7 @@ export class TeaVMDriver implements RuntimeDriver {
       );
     }
     this.graphicsContext = owner;
+    this.diagnostic(operation, 'begin');
     return new Promise((resolve, reject) => {
       this.bridgeFailure = undefined;
       this.waiter = { resolve, reject };
@@ -305,6 +323,7 @@ export class TeaVMDriver implements RuntimeDriver {
         reject(runtimeFailure(error));
       }
     }).finally(() => {
+      this.diagnostic(operation, 'settled');
       this.binaryTransport?.end();
       this.scope.teaGraphicsEnd?.(owner.requestId, owner.generation);
       this.graphicsContext = undefined;
@@ -386,6 +405,7 @@ export class TeaVMDriver implements RuntimeDriver {
       execute(await this.loader.sharedArtifact(artifact, signal, true));
     execute(await this.loader.artifact(catalog, manifest.bundle, signal, true));
     this.installGraphicsFailures();
+    this.installCacheDiagnostics();
     if (
       !this.scope.hostInit ||
       !this.scope.hostLoad ||
@@ -454,6 +474,7 @@ export class TeaVMDriver implements RuntimeDriver {
           token,
         ),
       context,
+      invocation.operation,
     );
     const payload = parseJavaSourcePayload(call, raw);
     const snapshot =
@@ -568,6 +589,107 @@ export class TeaVMDriver implements RuntimeDriver {
       for (const url of this.objectUrls) URL.revokeObjectURL(url);
       this.objectUrls.clear();
     }
+  }
+
+  private diagnostic(
+    operation: string,
+    phase: string,
+    detail?: { sequence: number; byteLength?: number; eof?: boolean },
+  ): void {
+    if (import.meta.env.VITE_KARUYOMI_RUNTIME_DIAGNOSTICS !== '1') return;
+    const diagnostic = teaVMDiagnosticSchema.safeParse({
+      component: 'teavm',
+      requestId: this.graphicsContext?.requestId,
+      generation: this.graphicsContext?.generation,
+      operation,
+      phase,
+      ...detail,
+    });
+    if (diagnostic.success) reportRuntimeDiagnostic(diagnostic.data);
+  }
+
+  private installCacheDiagnostics(): void {
+    if (import.meta.env.VITE_KARUYOMI_RUNTIME_DIAGNOSTICS !== '1') return;
+    let sequence = 0;
+    const cache = this.scope.teaCache;
+    if (cache)
+      this.scope.teaCache = async (input) => {
+        const current = ++sequence;
+        // Only emit known operation names, never raw bridge input or errors.
+        let operation = 'cache-control';
+        try {
+          const request: unknown = JSON.parse(input);
+          if (
+            request !== null &&
+            typeof request === 'object' &&
+            'operation' in request &&
+            typeof request.operation === 'string' &&
+            [
+              'get',
+              'begin',
+              'commit',
+              'update',
+              'remove',
+              'abort',
+              'reader-close',
+              'close',
+              'delete',
+              'clear',
+              'urls',
+              'initialize',
+              'flush',
+              'size',
+            ].includes(request.operation)
+          )
+            operation = 'cache-' + request.operation;
+        } catch {
+          // The bridge still owns parsing and validation.
+        }
+        this.diagnostic(operation, 'begin', { sequence: current });
+        try {
+          const result = await cache(input);
+          this.diagnostic(operation, 'resolved', { sequence: current });
+          return result;
+        } catch (error) {
+          this.diagnostic(operation, 'rejected', { sequence: current });
+          throw error;
+        }
+      };
+    const read = this.scope.teaCacheRead;
+    if (read)
+      this.scope.teaCacheRead = async (readerId, handle, maximum) => {
+        const current = ++sequence;
+        this.diagnostic('cache-read', 'begin', { sequence: current });
+        try {
+          const result = await read(readerId, handle, maximum);
+          this.diagnostic('cache-read', 'resolved', {
+            sequence: current,
+            byteLength: result?.byteLength ?? 0,
+            eof: result === null,
+          });
+          return result;
+        } catch (error) {
+          this.diagnostic('cache-read', 'rejected', { sequence: current });
+          throw error;
+        }
+      };
+    const write = this.scope.teaCacheWrite;
+    if (write)
+      this.scope.teaCacheWrite = async (editorId, handle, index, bytes) => {
+        const current = ++sequence;
+        this.diagnostic('cache-write', 'begin', {
+          sequence: current,
+          byteLength: bytes.byteLength,
+        });
+        try {
+          const result = await write(editorId, handle, index, bytes);
+          this.diagnostic('cache-write', 'resolved', { sequence: current });
+          return result;
+        } catch (error) {
+          this.diagnostic('cache-write', 'rejected', { sequence: current });
+          throw error;
+        }
+      };
   }
 
   private cancelGraphics(): void {

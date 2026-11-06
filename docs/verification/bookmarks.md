@@ -66,6 +66,12 @@ A 随后关闭，B 是同 origin 的全新 Web 文档。B 从正式书架打开�
 
 该驱动严格分析无问题，但未在设备执行。最终完整 `pnpm flutter:check` 通过：Reader Core 22、Source Runtime 86、Reader 597 项，三项目分析无问题，173 份 Dart 格式零变化。独立读取 `.local/bookmarks-driver-analyze.log` 与 `.local/bookmarks-flutter-check.log` 核对分析及通过标志；旧逻辑红日志为 `.local/metadata-noop-before.log`。本节工程与受控回归不替代尚未通过的独立文档、Native、故障恢复或生产 Access 门。
 
+## 2026-11-07：新文档章节超时的精确诊断
+
+后续以 `bdc54de` 为基线，在新的正式 HTTP harness `51864` 复现 A 添加目标书签后关闭、新文档 B 从书架重开。默认关闭的宿主阶段诊断确认 B 的 init / load / details 已完成，`ui-2` 的章节调用在缓存 get Promise 返回后仍未完成，最终命中默认 30 秒 invoke 超时；这不是此前 `61327` 未精确计时结论的补写。独立六路 GET 在 B 调用前后逐字段相同，account / manga / global revision 保持 3 / 2 / 1，目标书签仍为 true，但 B 未到正式详情，因此第二文档读回与跨端门仍未通过。
+
+输入、构建开关、原始证据、纯缓存桥机制测试与尚未确定的根因见[Source 重开诊断](source-reopen.md)。没有把缓存 Promise 返回当作缓存命中或 Java callback 已恢复，也没有调整超时掩盖问题。
+
 ## 尚待验收
 
 - 两个独立客户端的标记→第二端读回→第二端移除→第一端重新读取，以及重启、自动前台刷新和真实丢响应恢复。

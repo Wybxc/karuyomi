@@ -18,6 +18,10 @@ import {
   buildIdSchema,
 } from '@karuyomi/contracts';
 import { RuntimeFailure } from './errors.js';
+import {
+  reportRuntimeDiagnostic,
+  type HttpDiagnosticStage,
+} from './runtime-diagnostics.js';
 
 export interface HttpCallContext {
   requestId: string;
@@ -44,6 +48,7 @@ interface HttpSession {
   response?: HttpResponseMeta;
   reading: boolean;
   failure?: RuntimeFailure;
+  diagnostics: { startedAt: number; readCount: number } | undefined;
 }
 
 const HTTP_HANDLE_LIMIT = 4;
@@ -161,6 +166,10 @@ export class BinaryHttpTransport {
       timer,
       phase: 'upload',
       reading: false,
+      diagnostics:
+        import.meta.env.VITE_KARUYOMI_RUNTIME_DIAGNOSTICS === '1'
+          ? { startedAt: performance.now(), readCount: 0 }
+          : undefined,
     });
     return handle;
   }
@@ -205,6 +214,7 @@ export class BinaryHttpTransport {
     parts.push(encodeEndFrame(session.size));
     const body = new Blob(parts, { type: HTTP_BRIDGE_MEDIA_TYPE });
     session.chunks = [];
+    this.diagnose(handle, session, 'finish-fetch');
     try {
       let response: Response;
       try {
@@ -228,6 +238,7 @@ export class BinaryHttpTransport {
             signal: session.controller.signal,
           },
         );
+        this.diagnose(handle, session, 'response');
       } catch (error) {
         if (session.failure) throw session.failure;
         // The endpoint and fetch options are host-controlled. A native TypeError
@@ -294,9 +305,11 @@ export class BinaryHttpTransport {
       this.get(handle);
       session.response = parsed.data;
       session.phase = 'response';
+      this.diagnose(handle, session, 'meta');
       return JSON.stringify({ ...parsed.data, handle });
     } catch (error) {
       const failure = session.failure ?? transportFailure(error);
+      this.diagnose(handle, session, 'error');
       this.close(handle, failure);
       throw failure;
     }
@@ -316,6 +329,9 @@ export class BinaryHttpTransport {
       throw new RuntimeFailure('protocol_error', 'Invalid HTTP body read');
     if (session.phase === 'eof') return null;
     session.reading = true;
+    const firstRead = session.diagnostics?.readCount === 0;
+    if (session.diagnostics) session.diagnostics.readCount++;
+    if (firstRead) this.diagnose(handle, session, 'first-read');
     try {
       const chunk = await session.reader.read(maxBytes);
       this.get(handle);
@@ -333,10 +349,12 @@ export class BinaryHttpTransport {
       if (chunk === null) {
         session.phase = 'eof';
         clearTimeout(session.timer);
-      }
+        this.diagnose(handle, session, 'eof');
+      } else if (firstRead) this.diagnose(handle, session, 'first-read-result');
       return chunk;
     } catch (error) {
       const failure = session.failure ?? transportFailure(error);
+      this.diagnose(handle, session, 'error');
       this.close(handle, failure);
       throw failure;
     } finally {
@@ -348,6 +366,7 @@ export class BinaryHttpTransport {
   close(handle: string, reason = cancelledFailure(false)): void {
     const session = this.sessions.get(handle);
     if (!session) return;
+    this.diagnose(handle, session, 'close');
     this.sessions.delete(handle);
     session.failure = reason;
     if (reason.code !== 'cancelled') {
@@ -361,6 +380,25 @@ export class BinaryHttpTransport {
     session.chunks = [];
     session.controller.abort(reason);
     void session.reader?.cancel().catch(() => {});
+  }
+
+  private diagnose(
+    handle: string,
+    session: HttpSession,
+    stage: HttpDiagnosticStage,
+  ): void {
+    if (!session.diagnostics) return;
+    reportRuntimeDiagnostic({
+      component: 'http',
+      requestId: session.owner.requestId,
+      generation: session.owner.generation,
+      handle,
+      stage,
+      phase: session.phase,
+      elapsedMs: Math.round(performance.now() - session.diagnostics.startedAt),
+      readCount: session.diagnostics.readCount,
+      bytesRead: session.reader?.bytesRead ?? 0,
+    });
   }
 
   private get(handle: string): HttpSession {

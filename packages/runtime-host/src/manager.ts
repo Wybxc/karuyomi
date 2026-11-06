@@ -38,6 +38,11 @@ import {
 import { create, clone } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
 import { createHello } from './hello.js';
+import {
+  javaCacheStageSchema,
+  reportRuntimeDiagnostic,
+  runtimeDiagnosticSchema,
+} from './runtime-diagnostics.js';
 import { RuntimeFailure } from './errors.js';
 import { sha256, VerifiedLoader } from './verified-loader.js';
 import { ImageResourceStore, type ImageCollector } from './image-resources.js';
@@ -333,6 +338,40 @@ export class SourceRuntimeManager {
     };
     worker.onmessage = ({ data }) => {
       if (this.generation !== generation) return;
+      if (
+        import.meta.env.VITE_KARUYOMI_RUNTIME_DIAGNOSTICS === '1' &&
+        data !== null &&
+        typeof data === 'object' &&
+        'type' in data &&
+        data.type === 'trace' &&
+        'message' in data
+      ) {
+        const stage = javaCacheStageSchema.safeParse(data.message);
+        if (stage.success)
+          reportRuntimeDiagnostic({
+            component: 'java-cache',
+            generation,
+            stage: stage.data,
+          });
+        return;
+      }
+      if (
+        import.meta.env.VITE_KARUYOMI_RUNTIME_DIAGNOSTICS === '1' &&
+        data !== null &&
+        typeof data === 'object' &&
+        'type' in data &&
+        data.type === 'runtime-diagnostic' &&
+        'diagnostic' in data
+      ) {
+        const diagnostic = runtimeDiagnosticSchema.safeParse(data.diagnostic);
+        if (
+          diagnostic.success &&
+          (diagnostic.data.generation === undefined ||
+            diagnostic.data.generation === generation)
+        )
+          reportRuntimeDiagnostic(diagnostic.data);
+        return;
+      }
       const parsed = workerResponseSchema.safeParse(data);
       if (!parsed.success) return;
       const response = parsed.data;

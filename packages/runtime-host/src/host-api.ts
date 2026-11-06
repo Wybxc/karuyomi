@@ -78,6 +78,10 @@ function createRuntimeApi(
     async control(input: unknown): Promise<pb.ControlResponseJson> {
       let requestId = 'invalid-control';
       let slotId = pb.RuntimeSlot.UNSPECIFIED;
+      let command: pb.ControlRequest['command']['case'];
+      let generation: string | undefined;
+      let sourceRequestId: string | undefined;
+      let sourceOperation: pb.SourceCall['request']['case'];
       // Correlate malformed requests when their transport identity is readable;
       // all command structure is still owned by the generated parser below.
       if (
@@ -106,6 +110,17 @@ function createRuntimeApi(
         const request = parseControlRequest(input);
         requestId = request.requestId;
         slotId = request.slotId;
+        command = request.command.case;
+        if (request.command.case === 'invoke') {
+          sourceRequestId = request.command.value.requestId;
+          sourceOperation = request.command.value.request.case;
+        }
+        if (
+          request.command.value &&
+          'generation' in request.command.value &&
+          typeof request.command.value.generation === 'string'
+        )
+          generation = request.command.value.generation;
         if (disposed || rebuilding)
           throw new RuntimeFailure(
             'runtime_lost',
@@ -290,6 +305,26 @@ function createRuntimeApi(
                 'protocol_error',
                 'Invalid runtime control request',
               );
+        if (
+          import.meta.env.VITE_KARUYOMI_RUNTIME_DIAGNOSTICS === '1' &&
+          ['runtime_lost', 'timeout', 'protocol_error'].includes(failure.code)
+        )
+          console.warn(
+            'Karuyomi runtime control failed',
+            JSON.stringify({
+              requestId,
+              slotId,
+              command,
+              generation,
+              sourceRequestId,
+              sourceOperation,
+              code: failure.code,
+              deadlineExceeded:
+                failure.code === 'timeout' &&
+                failure.message ===
+                  'Source request deadline exceeded; the Worker was recycled',
+            }),
+          );
         if (slotId === pb.RuntimeSlot.UNSPECIFIED) throw failure;
         result = {
           case: 'error',

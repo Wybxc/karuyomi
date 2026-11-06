@@ -98,6 +98,37 @@ test('real Worker lifetime locks exclude active editors and reclaim a dead owner
   );
 });
 
+test('a new Worker reads committed cache bytes on its first operation after the old Worker stops', async () => {
+  const namespace = crypto.randomUUID();
+  const bytes = Uint8Array.from({ length: 131079 }, (_, index) => index % 251);
+  const first = start(namespace);
+  await store(first.api, bytes);
+  stop(first);
+
+  const second = start(namespace);
+  const entry = object((await second.api.cache('get')).entry);
+  expect(entry.length).toBe(bytes.length);
+  const reader = text(entry.reader);
+  const received = new Uint8Array(bytes.length);
+  const chunkLengths: number[] = [];
+  let offset = 0;
+  while (true) {
+    const chunk = await second.api.readCache(reader);
+    if (chunk === null) break;
+    expect(chunk.length).toBeGreaterThan(0);
+    expect(chunk.length).toBeLessThanOrEqual(65536);
+    received.set(chunk, offset);
+    offset += chunk.length;
+    chunkLengths.push(chunk.length);
+  }
+  expect(offset).toBe(bytes.length);
+  expect(chunkLengths).toEqual([65536, 65536, 7]);
+  expect(received).toEqual(bytes);
+  expect(await second.api.cache('reader-close', { reader })).toEqual({});
+  expect(await second.api.cache('reader-close', { reader })).toEqual({});
+  stop(second);
+});
+
 test('cache clear invalidates a staged generation and binary chunks remain bounded', async () => {
   const { api } = start();
   const editor = await stage(api, new Uint8Array([1, 2, 3]));
