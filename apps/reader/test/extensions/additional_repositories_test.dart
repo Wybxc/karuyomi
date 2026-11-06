@@ -10,6 +10,7 @@ import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/runtime/catalog_transport.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart' as runtime;
 
 import '../browse/fakes.dart';
 import '../data/business_state_server.dart';
@@ -104,6 +105,129 @@ void main() {
     expect(manager.error, isNull);
     return catalog.builds.singleWhere((build) => build.catalogUrl == extraUrl);
   }
+
+  test(
+    'management network-policy reads carry the confirmed subject for initial and post-add refreshes',
+    () async {
+      await manager.refresh(catalogToo: true);
+      expect(manager.error, isNull);
+      expect(catalog.networkPolicyErrors, isEmpty);
+      expect(platform.networkPolicyRequests, hasLength(1));
+      await addExtra();
+      expect(platform.networkPolicyRequests, hasLength(3));
+      for (final request in platform.networkPolicyRequests) {
+        expect(request.method, 'GET');
+        expect(request.headers['X-App-Subject'], 'owner-subject');
+        expect(request.headers['X-App-Request'], '1');
+        expect(request.headers['Accept'], 'application/json');
+      }
+      expect(
+        Uri.parse(platform.networkPolicyRequests.last.path).queryParameters,
+        {'catalogUrl': extraUrl, 'repoId': 'community'},
+      );
+      expect(catalog.networkPolicyErrors, isEmpty);
+    },
+  );
+
+  for (final status in [401, 403, 302, 200]) {
+    test(
+      'network-policy Access response $status pauses the old session and retires management',
+      () async {
+        await catalog.openSelectedBuild(preferencePackage);
+        expect(catalog.session, isNotNull);
+        expect(catalog.isNetworkRegistered(catalog.builds.single), true);
+        platform.networkPolicyReply = wire.ApiFetchResponse(
+          status: status,
+          redirected: status == 302,
+          headers: {
+            'content-type': status == 200 ? 'text/html' : 'application/json',
+          }.entries,
+          body: status == 200 ? '<html>login</html>' : '{"error":"access"}',
+        );
+        await expectLater(
+          catalog.refreshNetworkPolicies(catalog.defaultCatalog),
+          throwsA(
+            isA<runtime.RuntimeException>().having(
+              (failure) => failure.code,
+              'Access response',
+              status == 403
+                  ? runtime.RuntimeErrorCode.accessDenied
+                  : runtime.RuntimeErrorCode.accessRequired,
+            ),
+          ),
+        );
+        expect(
+          catalog.status,
+          status == 403 ? ServiceStatus.denied : ServiceStatus.loginRequired,
+        );
+        expect(catalog.session, isNull);
+        expect(catalog.isNetworkRegistered(catalog.builds.single), false);
+        expect(manager.available, false);
+        expect(manager.error, contains('身份或服务已改变'));
+        expect(posts(), isEmpty);
+      },
+    );
+  }
+
+  test(
+    'ordinary network-policy failure keeps the account and current Source, clears stale readiness and blocks a later open',
+    () async {
+      await catalog.openSelectedBuild(preferencePackage);
+      final generation = catalog.session!.generation;
+      expect(catalog.isNetworkRegistered(catalog.builds.single), true);
+      platform.networkPolicyReply = wire.ApiFetchResponse(
+        status: 503,
+        headers: {'content-type': 'application/json'}.entries,
+        body: '{"error":"unavailable"}',
+      );
+      await expectLater(
+        catalog.refreshNetworkPolicies(catalog.defaultCatalog),
+        throwsA(
+          isA<BusinessStateTransportException>().having(
+            (failure) => failure.status,
+            'service status',
+            503,
+          ),
+        ),
+      );
+      expect(catalog.status, ServiceStatus.ready);
+      expect(catalog.session!.generation, generation);
+      expect(catalog.isNetworkRegistered(catalog.builds.single), false);
+      expect(manager.available, true);
+      expect(await catalog.openSelectedBuild(preferencePackage), isNull);
+      expect(catalog.error, isNotNull);
+      expect(platform.openedBuilds, ['build-1']);
+      expect(catalog.session, isNull);
+      expect(posts(), isEmpty);
+    },
+  );
+
+  test(
+    'a network-policy reply from the retired subject cannot pause or populate the new account',
+    () async {
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      platform.beforeApiFetch = (path) async {
+        if (!path.startsWith('/api/extensions/network-policies')) return;
+        entered.complete();
+        await release.future;
+      };
+      addTearDown(() {
+        if (!release.isCompleted) release.complete();
+      });
+      final reading = catalog.refreshNetworkPolicies(catalog.defaultCatalog);
+      final failed = expectLater(reading, throwsStateError);
+      await entered.future;
+      platform.bootstrapSubject = 'other-subject';
+      await catalog.connect();
+      expect(catalog.subject, 'other-subject');
+      release.complete();
+      await failed;
+      expect(catalog.status, ServiceStatus.ready);
+      expect(catalog.networkPolicies, isEmpty);
+      expect(posts(), isEmpty);
+    },
+  );
 
   test(
     'preview is read-only; confirming one global CAS synchronizes the repository without installing',

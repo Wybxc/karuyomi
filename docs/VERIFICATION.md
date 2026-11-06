@@ -2,9 +2,9 @@
 
 2026-11-06，官方 `kotlinx-coroutines-core-jvm` 已接入正式源码，自有 Green Job 与四个同名覆盖已删除。正式工程及远端 CI、JVM/AOT 的真实挂起与取消/父子/启动语义、owner/lease 分项通过；固定新 AOT 经正式 Web 主入口完成 BH3 协程详情及 21 页阅读、Komiic 镜像设置/重开与筛选分页，见[协程验证](verification/coroutine-runtime.md)。HTTP await 已恢复 seed 上游可取消实现，响应所有权及 ACK 前清理的正式 JVM 202 项与完整工程检查通过；随后固定 `48c4526` 的正式 TeaVM / Node HTTP 取消子门通过，clab 后台重建两包及本机正式 harness 构建/静态装配/三路径 HTTP 200 通过；Node 最终 runner 使用显式退出，尚非自然 idle，IAB provider 不可用导致该次实际 Source/UI 未执行。两包保持 `compiled_unverified/runtimeReady=false`，无部署或正式 checkpoint 变更；产品取消、Native / 生产等剩余门继续按[计划](plan/coroutine-runtime.md)验收。
 
-2026-11-07，默认仓库扩展管理的账户确认清单、准备/取消、有界缓存、手动更新、启停/卸载与精确关闭/显式重建已接入，独立集中检查、445 项 Vitest、22 + 63 + 470 项 Flutter/Dart 测试与完整构建通过，见[扩展管理验证](verification/extension-management.md)。本轮构建为 0 扩展的工程产物；IAB provider 不可用，新协议真实 Source、独立客户端、Native 和生产门继续按[计划](plan/extension-management.md)验收。
+2026-11-07，默认仓库扩展管理的账户确认清单、准备/取消、有界缓存、手动更新、启停/卸载与精确关闭/显式重建已接入，独立集中检查、445 项 Vitest、22 + 63 + 470 项 Flutter/Dart 测试与完整构建通过，见[扩展管理验证](verification/extension-management.md)。初次构建为 0 扩展，彼时 IAB provider 不可用；随后当前候选的 Web 分项见下文，Native 和生产门继续按[计划](plan/extension-management.md)验收。
 
-2026-11-07，额外仓库的账户登记、只读预览与刷新、同包明确换仓、完整来源回显、存储/设置隔离及按来源网络政策已接入，独立集中工程检查、465 项 Vitest、22 + 68 + 527 项 Dart/Flutter 与完整构建通过。精确范围见[额外仓库验证](verification/additional-repositories.md)；本轮工程构建仍为 0 个扩展，真实 Source、Native 与生产待验收，`0009` 尚未部署。
+2026-11-07，额外仓库的账户登记、只读预览与刷新、同包明确换仓、完整来源回显、存储/设置隔离及按来源网络政策已接入，独立集中工程检查、465 项 Vitest、22 + 68 + 527 项 Dart/Flutter 与完整构建通过。随后真实 IAB 发现并修复网络登记 GET 缺身份头，完整 Flutter 回归重跑至 22 + 68 + 534 项全部通过；固定当前三包 AOT 已取回，官方 Vite 装配 64 个 Static Assets / 3 扩展。空外仓管理、max-age 再验证、双 Web 顺序收敛及默认 xkcd 安装/两页真实阅读分项通过，独立 D1 确认收藏与第 2 页进度。精确范围与限制见[额外仓库验证](verification/additional-repositories.md)；真实外仓代码、Native 与生产待验收，`0009` 尚未部署。
 
 2026-11-07，源迁移正式合同、三 CAS D1 原子写、只读预览与书架/详情向导已接入，并通过独立集中工程检查、完整 Flutter 回归与客户端/API 构建，实际范围见[迁移验证](verification/source-migration.md)。真实 Source、独立客户端、Native 和生产迁移仍待验收；工程通过不覆盖这些层级。
 

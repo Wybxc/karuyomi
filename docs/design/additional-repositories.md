@@ -26,6 +26,8 @@ Source 设置也以 `(catalogUrl, repoId, package, source)` 隔离。D1 的非�
 
 代码可以公开准备，Source 网络调用仍需要应用操作员登记。只读 `GET /api/extensions/network-policies?catalogUrl=...&repoId=...` 返回该来源的 `buildId/packageName/bundleSha256` 登记状态。客户端分别展示“代码可准备”和“网络待登记”，打开必须匹配已登记来源、构建和 digest。
 
+网络登记读取属于账户 API，通过已确认身份的业务客户端携带 `X-App-Subject`，服务端核对当前 Access subject；它不复用公开目录的无凭据下载通道。请求绑定业务客户端和连接代次，旧身份的迟到回复不能写入新会话。刷新开始清除该来源的旧就绪结果，普通网络失败保留当前 Source 和账户意图，后续打开须重新读取成功；登录失效或拒绝访问则暂停旧会话并退休管理页，重新确认身份后再打开。
+
 `/api/bridge/http` 每次精确核对 `X-Runtime-Build`、`X-Runtime-Catalog`、`X-Runtime-Repo`、`X-Runtime-Bundle`。buildId 是全局登记主键，跨仓重复 ID 明确冲突，即使 digest 相同也不覆盖。包唯一约束、hosts 继承、退役和同步删除都限定在 `(catalogUrl, repoId)`，默认 CI 不删除外仓登记，也不跨仓继承网络目标。
 
 原型迁移 `0009` 重建无来源的网络政策与 Source 设置表，并撤销旧 Source 设置写入收据。它不保留旧协议回退；部署前须规划重登记；应用该迁移后、实际运行验收前，按当前来源重新登记网络政策。书架、分类、进度、书签和全局账户意图不因此重建。操作命令与发布限制见[扩展发布](../EXTENSIONS.md)。

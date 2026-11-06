@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-**状态：已实现待实际平台验收。默认 Static Assets 仓库的账户合同、准备与缓存、关闭协议及正式管理入口已实现，独立集中工程检查、完整 Flutter 回归与构建通过。** 设计见[账户扩展与本机准备](../design/extension-management.md)，实际通过层级见[验证记录](../verification/extension-management.md)。额外仓库的正式来源链与管理入口也已接入，独立工程和实际平台门按[额外仓库子计划](additional-repositories.md)验收；不以工程通过代替完整 P3。上级计划见 [P3](p3-extensions-and-migration.md)。
+**状态：已实现待实际平台验收。默认 Static Assets 仓库的账户合同、准备与缓存、关闭协议及正式管理入口已实现，独立集中工程检查、完整 Flutter 回归与构建通过；当前 AOT 的 Web 准备/安装、双标签精确选择与 xkcd 两页阅读分项通过，其余平台及完整生命周期待验收。** 设计见[账户扩展与本机准备](../design/extension-management.md)，实际通过层级见[验证记录](../verification/extension-management.md)。额外仓库的正式来源链与管理入口也已接入，独立工程和实际平台门按[额外仓库子计划](additional-repositories.md)验收；不以工程通过代替完整 P3。上级计划见 [P3](p3-extensions-and-migration.md)。
 
 目标是让同一身份在 Web、iOS、Android 使用同一份账户扩展清单，区分账户已确认的使用意图、本机准备情况和正在运行的精确构建。安装准备不执行扩展，更新由用户明确发起，切换前关闭原运行槽，卸载后清理不再使用的本机扩展副本。
 
@@ -33,7 +33,7 @@
 
 ### 额外仓库与完整 P3
 
-- [额外仓库](additional-repositories.md)的登记、预览、刷新与移除已接入；继续真实 Static Assets、Source、Native 和独立客户端验收。
+- [额外仓库](additional-repositories.md)的登记、预览、刷新与移除已接入；空外仓 Web 元数据管理与双标签顺序收敛已过，继续真实外仓代码、Native 和独立设备验收。
 - 同包跨仓明确确认、URL/repoId 冲突、准备/会话来源回显和按来源网络登记已落实。账户合同保持 package 唯一；实际运行证据另验。
 - 没有当前 AOT 产物时展示待构建或不支持，不从客户端启动远程编译。未知仓库或下架构建保留账户记录并显示不可用，不在只读刷新时删除。
 - 迁移、能力目录和有界跨源搜索继续按上级 P3 推进；本里程碑不缩减这些待办。

@@ -450,35 +450,45 @@ final class CatalogController extends ChangeNotifier {
     wire.CatalogReference reference, {
     bool Function()? shouldContinue,
   }) async {
-    final query = Uri(
-      queryParameters: {
-        'catalogUrl': reference.catalogUrl,
-        'repoId': reference.repoId,
-      },
-    ).query;
-    final value = wire.decodeProtoJson(
-      wire.ExtensionNetworkPoliciesResponse(),
-      await _get('/api/extensions/network-policies?$query'),
-    );
-    if (_closed ||
-        shouldContinue?.call() == false ||
-        !isRepositoryRegistered(reference)) {
-      return;
+    final client = _confirmedBusinessClient;
+    if (_closed || client == null || shouldContinue?.call() == false) {
+      throw StateError('网络登记查询身份未确认或操作已失效。');
     }
-    if (value.schemaVersion != 1 ||
-        !value.hasCatalog() ||
-        value.catalog != reference ||
-        value.builds.length > 5000 ||
-        value.builds.any(
-          (build) =>
-              !RegExp(r'^[A-Za-z0-9._-]{1,200}$').hasMatch(build.buildId) ||
-              build.packageName.isEmpty ||
-              !RegExp(r'^[a-f0-9]{64}$').hasMatch(build.bundleSha256),
-        ) ||
-        value.builds.map((build) => build.packageName).toSet().length !=
-            value.builds.length) {
-      throw const FormatException('漫画源网络登记回复无效。');
+    final epoch = _epoch;
+    bool current() =>
+        !_closed &&
+        epoch == _epoch &&
+        identical(_confirmedBusinessClient, client) &&
+        shouldContinue?.call() != false;
+    // A failed refresh must not leave an earlier readiness result usable.
+    networkPolicies.remove(catalogReferenceKey(reference));
+    late final wire.ExtensionNetworkPoliciesResponse value;
+    try {
+      value = await client.readExtensionNetworkPolicies(
+        reference,
+        shouldContinue: current,
+      );
+    } on BusinessStateTransportException catch (failure) {
+      if (!current()) return;
+      if ({200, 401, 403}.contains(failure.status)) {
+        final denied = failure.status == 403;
+        ++_epoch;
+        busy = false;
+        activity = null;
+        error = denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录';
+        status = denied ? ServiceStatus.denied : ServiceStatus.loginRequired;
+        _dropSession();
+        _notify();
+        throw RuntimeException(
+          denied
+              ? RuntimeErrorCode.accessDenied
+              : RuntimeErrorCode.accessRequired,
+          denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录',
+        );
+      }
+      rethrow;
     }
+    if (!current() || !isRepositoryRegistered(reference)) return;
     networkPolicies[catalogReferenceKey(reference)] = value.deepCopy()
       ..freeze();
     networkPolicyErrors.remove(catalogReferenceKey(reference));

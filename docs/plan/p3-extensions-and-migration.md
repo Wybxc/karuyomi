@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开、包内语言筛选已实现待独立运行验收；静态目录语言筛选已实现、集中工程检查通过，实际 Source/平台待验收；typed Source 筛选已实现，两包 v5 AOT 与 CuuTruyen Web 分项通过；typed preferences v6 正式链、Komiic AOT 与 Web 设置/新文档恢复分项通过，其它 Source/平台待验收；默认仓库扩展管理合同、准备/缓存及管理入口已接入，功能与独立集中工程检查通过，实际平台待验收；源迁移功能与独立集中工程检查通过，真实 Source/平台待验收；额外仓库正式链已接入，验收见[子计划](additional-repositories.md)**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
+将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开、包内语言筛选已实现待独立运行验收；静态目录语言筛选已实现、集中工程检查通过，实际 Source/平台待验收；typed Source 筛选已实现，两包 v5 AOT 与 CuuTruyen Web 分项通过；typed preferences v6 正式链、Komiic AOT 与 Web 设置/新文档恢复分项通过，其它 Source/平台待验收；默认仓库扩展管理合同、准备/缓存及管理入口已接入，功能与独立集中工程检查通过，实际平台待验收；源迁移功能与独立集中工程检查通过，真实 Source/平台待验收；额外仓库正式链、当前三包 AOT、Web 管理及默认 xkcd 安装/阅读分项已通过，剩余实际外仓与平台门见[子计划](additional-repositories.md)**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
 
 ## 已有基础
 

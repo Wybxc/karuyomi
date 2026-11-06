@@ -55,6 +55,7 @@ final class ExtensionsController extends ChangeNotifier {
 
   void _retire() {
     _retired = true;
+    error = '身份或服务已改变，请关闭后重新打开扩展管理。';
     if (!_cancelled.isCompleted) _cancelled.complete();
   }
 

@@ -106,6 +106,8 @@ final class TestPlatform extends PlatformRuntime {
   final invocations = <wire.SourceCall>[];
   final imageControls = <(String, Map<String, Object?>)>[];
   final controlCommands = <wire.ControlRequest_Command>[];
+  final networkPolicyRequests = <wire.ApiFetchRequest>[];
+  wire.ApiFetchResponse? networkPolicyReply;
   Map<String, Object?>? continuation;
   Future<wire.SourceResult> Function(wire.SourceCall call)? invokeHandler;
   Future<void> Function(String pageSessionId)? closePageSessionHandler;
@@ -214,7 +216,18 @@ final class TestPlatform extends PlatformRuntime {
     switch (request.whichCommand()) {
       case wire.ControlRequest_Command.fetchApi:
         await beforeApiFetch?.call(request.fetchApi.path);
-        if (request.fetchApi.path.startsWith('/api/library') ||
+        if (Uri.parse(request.fetchApi.path).path ==
+            '/api/extensions/network-policies') {
+          networkPolicyRequests.add(request.fetchApi.deepCopy()..freeze());
+          response.api =
+              request.fetchApi.headers['X-App-Subject'] != bootstrapSubject
+              ? wire.ApiFetchResponse(
+                  status: 403,
+                  headers: {'content-type': 'application/json'}.entries,
+                  body: '{"error":"identity_changed"}',
+                )
+              : networkPolicyReply?.deepCopy() ?? _fetch(request.fetchApi.path);
+        } else if (request.fetchApi.path.startsWith('/api/library') ||
             request.fetchApi.path.startsWith('/api/categories') ||
             request.fetchApi.path.startsWith('/api/settings') ||
             request.fetchApi.path.startsWith('/api/source-preferences/') ||

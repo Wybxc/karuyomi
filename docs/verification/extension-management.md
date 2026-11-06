@@ -51,7 +51,7 @@ pnpm test:protocol
 
 ## 待实际运行验收
 
-当前 Codex 内置浏览器 provider 不可用：可用 browser 清单为空，创建 IAB 标签返回 `Browser is not available`，`open_in_codex` 仅 queued；未操作其它桌面浏览器。生产 Access 用户选择稍后登录，该会话不作为本轮已完成证据。
+本节初次集中验收时，Codex 内置浏览器 provider 不可用：可用 browser 清单为空，创建 IAB 标签返回 `Browser is not available`，`open_in_codex` 仅 queued；未操作其它桌面浏览器。生产 Access 用户选择稍后登录，该会话不作为本轮已完成证据。
 
 尚待在符合当前元数据/协议的新固定 AOT 与正式客户端完成：
 
@@ -61,7 +61,7 @@ pnpm test:protocol
 - 下架构建提示与 `build_not_found` 分层，不自动换版，也不把缓存命中当在线能力。
 - 生产 Access 和真机门；该功能提交当时尚无新 AOT 或 Native App 构建/运行、部署、checkpoint 变更；后续固定三包候选另见下节。
 
-额外仓库添加、移除与网络政策接入仍未实现，须依完整 P3 另做真实用例；默认仓库管理入口不计为这项能力通过。
+额外仓库随后已接入正式合同、账户读写与运行来源隔离；当前工程与实际浏览器门见[额外仓库验证](additional-repositories.md)。本节早期默认仓库入口证据不自动覆盖额外仓库。
 
 ## 固定 ad869d2 三包 AOT 候选
 
@@ -80,3 +80,38 @@ xkcd 正式 Gradle metadata 含 en/ru/es/zh/fr 五个 Source，BH3/Komiic 各一
 全部仍为 `compiled_unverified/runtimeReady=false`，没有部署、Release 或正式 checkpoint 写入，baseline 未完成。该固定输入包含当时的目录元数据和扩展管理协议，尚无后续源迁移变更；后续实际验收须核对产品 host/材料身份，不能据此宣称新协议、真实 Source、浏览器或 Native 通过。
 
 候选 snapshot 位于 `/private/tmp/karuyomi-clab-extensions-ad869d2/remote-results/results/snapshot`，正式 materials catalog 位于同一 `results/materials.json`；`RESULTS.md`、saved plan、summary 和原始日志均保留在该临时目录，不提交大产物。复验以同一固定 checkout、锁定环境及 saved plan 调用正式 `tools/extensions/pipeline.ts build` / `prepare-snapshot`；正式发布、checkpoint 和单发布器约束仍以 [EXTENSIONS](../EXTENSIONS.md) 为准。
+
+## 固定 3ed3945 三包 AOT 候选
+
+2026-11-07，`fedora@clab` 独立目录 `/home/fedora/karuyomi-builds/repositories-3ed39454a4da-20261106182253` 固定已推送提交 `3ed39454a4daf819cd64a9afba6b3f43fc0cdfe2`。Linux x86_64、Node 24.15.0、pnpm 12.6.0、Temurin JDK 25.0.5+8；正式工具链锁/seed 校验和 tracked 输入清洁检查通过。实际 gitlink 为：
+
+- Keiyoushi `efa93f5a3537856fe830450bbe33f69d21d28167`。
+- Suwayomi `6b481e8b62938b9c060eb210b934e0fbfdfa466b`。
+- TeaVM `e87d452e4bd70c77b9e19314a46c3d6971c148b6`。
+
+三包官方 Gradle → TeaVM → 正式 pipeline 完整性 → `prepare-snapshot` 全部通过，没有修改官方业务源码或原 JAR。新候选由该固定输入正式生成，index 顶层 `repoId=keiyoushi`，没有给旧产物补字段。
+
+| 包        | buildId                                          | canonical / gzip 字节 |
+| --------- | ------------------------------------------------ | --------------------- |
+| all.xkcd  | `ext-all.xkcd-5bf877b13dad1a2515bfd386fab67e96`  | 4467911 / 929622      |
+| zh.bh3    | `ext-zh.bh3-76d8d8b7f32917e1ff3b14b9b02e4e66`    | 4321383 / 886415      |
+| zh.komiic | `ext-zh.komiic-cc36675b6c8282249f6de47b539d2af9` | 1865559 / 573768      |
+
+hostFingerprint 为 `514ca5ff478539a30536a3d789d6d262550a88a09c390c4b5fffbad3ef3d9e82`，materialVersion 为 `24275ab6ea0ae12e91869699faabba7024272784b2d6d1d243be69ec67bfb9de`。候选 revision `cbe847ea98be46e688111c1c864c5e1b`，3 available / 0 unavailable / 0 failed / 1445 pending，`bootstrap.complete=false`。全部仍为 `compiled_unverified/runtimeReady=false`；这些事实只证明编译、完整性与静态候选，不是 Source、浏览器、Native 或生产 Access 通过。
+
+首次临时 TS 监督器误用 execa 10 的直接事件接口，在 plan/Gradle 前退出；实际 `ps` 确认旧进程退出后，修为正式 `nodeChildProcess` 接口并恢复。原脚本和失败日志保留，仍以最初 18:22:55Z 起算 90 分钟总期限，18:31:55Z 终态 exit 0，没有改固定产品输入或启动重复发布器。最终 controller PID1010850、timeout PID1010859 均已不存在；扫描本任务 cwd 下的 node/java/gradle/timeout 也为空。未部署、未发布 Release、未写正式 checkpoint，baseline 未完成。
+
+候选 `EXTENSION_ASSETS_DIR` 为 `/private/tmp/karuyomi-clab-repositories-aot-mwoketc7/remote-results/results/snapshot`，正式材料位于同一 `results/materials.json`。归档 5748409 字节、SHA-256 `59673e7ddb4ad18b63258cb96d8630299ee85cad4b4840fde703a16c53a14e4c`，取回边界仅校验一次；收据 `/private/tmp/karuyomi-clab-repositories-aot-mwoketc7/transfer-receipt.json` 后续直接复用，没有重新计算扩展摘要。结构化 summary、saved plan、环境与进程收尾证据和原始日志均留该临时目录，不提交大产物或机器输出。
+
+在同一固定 checkout 和锁定环境中，按 saved plan 使用正式入口复验：
+
+```sh
+node tools/extensions/pipeline.ts build --plan ../results/selected-plan.json --key INPUT_FINGERPRINT --output ../results/builds/INPUT_FINGERPRINT
+node tools/extensions/pipeline.ts prepare-snapshot --plan ../results/selected-plan.json --state ../results/state.json --results ../results/builds --assets-dir ../results/snapshot
+```
+
+`results/state.json` 保持不存在。后续客户端验收须核对当前 host/材料身份，以独立运行记录为准；正式发布约束仍按 [EXTENSIONS](../EXTENSIONS.md)。
+
+## 当前 AOT 的 Web 管理与阅读分项
+
+固定 `3ed3945` 候选随后经官方 API Vite 配置装配至本地验收 Static Assets，正式 Flutter Web 与 Codex 内置浏览器通过默认 xkcd 的准备/安装、第二独立应用标签读回精确账户选择、英语 Source 列表/详情和两页真实阅读及服务端进度确认。完整步骤、初次身份请求缺口、修复回归和限制统一见[额外仓库验证](additional-repositories.md#codex-内置浏览器与真实-source-分项)。这不覆盖 Native、独立设备冷缓存、换仓、并发竞争、生产或完整启停/卸载矩阵，候选状态保持不变。
