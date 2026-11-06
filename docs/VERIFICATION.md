@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-06，typed Source 筛选的 Protobuf、原 Java Filter 子类保留、Flutter 编辑及空查询搜索/分页链路已接入；本次开发 host ABI 升为 v5。显式快照保留和活动取消的运行代次回收边界见[设计](design/source-filters.md)，工程结果与代表 AOT、真实 Source 及平台的待验门统一见[筛选记录](verification/source-filters.md)。历史 v4 生产与在线结果仍绑定原构建，不自动覆盖新 ABI。
+2026-11-06，typed Source 筛选的 Protobuf、原 Java Filter 子类保留、Flutter 编辑及空查询搜索/分页链路已接入；本次开发 host ABI 升为 v5。修复后的两包代表 AOT 与 CuuTruyen 真实 Web 动态标签、空 query、分页及重置草稿关闭后继续原查询分项通过。显式快照保留和活动取消的运行代次回收边界见[设计](design/source-filters.md)，工程结果、固定构建身份与其余真实 Source/平台待验门统一见[筛选记录](verification/source-filters.md)。历史 v4 生产与在线结果仍绑定原构建，不自动覆盖新 ABI。
 
 2026-11-06，正式浏览页的当前包 Source 语言筛选已实现；仅投影已加载 `SourceInfo.lang`，切换包或 generation 重置，不改变已选 Source、不为筛选请求 Source 或写业务状态。设计见[包内语言筛选](design/source-language-filter.md)，正式组件结果与仍待完成的实际 Source/平台门维护在[验证记录](verification/source-language-filter.md)，不宣称全目录语言检索已实现。
 

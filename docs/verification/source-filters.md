@@ -1,6 +1,6 @@
 # typed Source 筛选验证
 
-2026-11-06，本地 macOS，正式 Source 筛选已接入 Protobuf、TS/Dart 解析、Java 原具体子类适配与 Flutter 浏览入口。设计见[Source 筛选](../design/source-filters.md)，范围与待办见[P3](../plan/p3-extensions-and-migration.md)。状态为**已实现并通过集中工程检查，两包 v5 AOT 已构建；真实筛选验收发现后台生命周期缺口，修复后的 AOT 与在线流程继续验收**。
+2026-11-06，本地 macOS，正式 Source 筛选已接入 Protobuf、TS/Dart 解析、Java 原具体子类适配与 Flutter 浏览入口。设计见[Source 筛选](../design/source-filters.md)，范围与待办见[P3](../plan/p3-extensions-and-migration.md)。状态为**已实现并通过集中工程检查，修复后的两包 v5 AOT 与 CuuTruyen 真实 Web 动态筛选、空 query 和分页分项通过；其它 Source、Native 与生产仍待验收**。
 
 ## 合同与宿主
 
@@ -36,6 +36,28 @@ Codex 内置浏览器通过正式 Flutter 入口取得 CuuTruyen 真实热门列
 
 另一个先失败后修复的组合用例覆盖：旧 entry 创建 LAZY 并注册 completion，下一 entry 启动时不能通过失败回调取得新 owner。任务及完成回调均固定原 owner，过期执行被拒绝；调度构造/start 失败释放 lease，运行中 cancel 不假装已收尾。最终 Enqueue oracle 81 断言及完整 `pnpm teavm:check` 通过，包含已有 HostFilters、HTTP、图形、Cache、文件与网络配置检查。正式 JVM 清单显式编译自有 `BuildersKt` / `Dispatchers`，避免误跑 seed 旧实现。该结果不能代替修复后真实 AOT 与在线复验。
 
+## 修复后真实 Web 分项
+
+固定 `398d7cd706df8890b6e3a5a1fcd30778a67971fb` 重新建立独立构建目录，三个上游提交不变，重新生成完整 1448 包计划并仅选择两包；没有复用旧 225 AOT。两包官方编译、AOT 和完整性均通过，当前身份如下：
+
+| 扩展            | buildId                                             | canonical SHA-256                                                  | gzip / canonical 字节 |
+| --------------- | --------------------------------------------------- | ------------------------------------------------------------------ | --------------------- |
+| Komiic 1.6.11   | `ext-zh.komiic-24610b0a4af797f80c60c31a855753f2`    | `e97c95b04be69a1205c7c1bca6fc589148e13fe5ed0c61a51ee9c25ddec2988f` | 518459 / 1645185      |
+| CuuTruyen 1.6.2 | `ext-vi.cuutruyen-7559296f3f46f7a92fae64848cbc7fa6` | `4c91374613713a152cde0c75f0c84ad82d513f139c40a1ffdefd0a2252154c5d` | 662801 / 2126391      |
+
+正式 `prepare-snapshot` 的候选 revision 为 `0c9a02ff39614caaacbe770b8b210546`，仅两包可用、1446 包 pending，`bootstrap.complete=false`；独立 checkpoint 仍不存在，未部署或提交发布状态。正式 `acceptance:build` 携此快照通过。本次代码提交的[远端 CI](https://github.com/Wybxc/karuyomi/actions/runs/42146488877)也通过，包含通用检查、Flutter 分析/回归、工程构建及本地 D1 迁移；Source 在线证据仍以以下实际浏览器操作为准。
+
+Codex 内置浏览器，正式 Flutter → manager/TeaHost → 原 CuuTruyen → 官方 workerd HTTP 桥，使用隔离测试身份及显式主机政策，实际通过：
+
+1. 打开 Source 后取得真实热门列表。第一次筛选请求等待后台收尾，原描述仍为 `Tap 'Reset' to load filters`；显式重置后出现原 `Thể loại` Group 和 CheckBox 标签。
+2. 选择非默认 `đã hoàn thành`（已完结），搜索框保持空，显式应用成功。界面显示“筛选（已应用）”，热门/最新不选中；首批返回 Hoshi Mamoru Inu、HoloX Meetings、Senkou Girl 等。这不是以热门替代空 query 搜索。
+3. “加载更多”成功追加下一页，看到 NOT A HOUSEHUSBAND、IDOLiSH7 LIVE4BIT Beyond the period Special Book 等新条目；重新打开面板，已完结仍为已选。
+4. 在面板重置，新草稿的已完结变为未选；直接关闭而不应用，原查询和结果仍保留。无需重新连接，再次“加载更多”成功追加第三页，包括 Ritou No Umi、Parade、Aho-Girl 等。新描述没有逐出原已应用快照，纯草稿关闭没有回收当前会话。
+
+Komiic 的 Select 描述首轮已能呈现，但其默认 `komiic.com` 在当前环境的独立网络探测中 TLS 连接重置，在线搜索未通过。上游同一 Source 通过 `preferred_mirror` 设置选择 `.com` / `.cc`，不是两个 Source；`.cc` 直接查询成功仅作诊断，产品尚无正式 preferences 入口，未改 URL、注入镜像值或修改原扩展来冒充验收。后续按[Source 设置计划](../plan/source-preferences.md)接入原镜像设置后再验证。
+
+此轮只登记 CuuTruyen 的真实 Web 筛选分项，不覆盖所有八类的实际 Source、Native、生产 Access、完整阅读或设备性能。两包自动化记录仍保持 `compiled_unverified/runtimeReady=false`。验收服务正常关闭，构建进程已结束；截图、完整计划、候选和详细日志保留在忽略的本地目录，不提交产物。
+
 ## 复验与交付限制
 
 ```sh
@@ -48,6 +70,6 @@ flutter test test/sources/source_filters_controller_test.dart test/sources/sourc
 
 新能力要求 `hostAbi=karuyomi-source-host-v5`，protocolVersion / bridgeVersion 仍为 2；旧 v4 AOT 不兼容，必须以固定提交重新规划和构建，不把旧三包的浏览/图片结果当成筛选通过。Komiic 仅在空关键词搜索中应用其 Select/Group；原 Header 保留。CuuTruyen 动态标签可能先返回重置提示，须按原后台链路完成后再显式重置确认。
 
-首轮两包 v5 AOT 已构建，修复后的固定输入仍须重新 AOT 并验收，尚未部署。实际空 query、非默认选择与后续页，动态标签、Native、独立客户端、生产 Access 和目标设备须另外记录。编译/完整性仍只能记 compiled_unverified/runtimeReady=false；首次全量 baseline 与增量 CI 状态不因新增筛选而提升。
+修复后的两包 v5 AOT 与上述 CuuTruyen Web 分项已通过，尚未部署。其它 Source/筛选类型、Native、独立客户端、生产 Access 和目标设备须另外记录。编译/完整性仍只能记 compiled_unverified/runtimeReady=false；首次全量 baseline 与增量 CI 状态不因新增筛选而提升。
 
 临时完整日志留在忽略的 `.local/typed-filters-*.log` 和 `/private/tmp/karuyomi-source-filters-*.log`，不将机器输出提交入库。

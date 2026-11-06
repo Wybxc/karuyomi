@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开已实现待独立客户端验收，包内语言筛选已实现待实际 Source/平台验收，typed Source 筛选已实现待新 ABI AOT 和实际 Source 验收；扩展管理与 typed preferences 未实现、正式合同待定，其余迁移待实现**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
+将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开已实现待独立客户端验收，包内语言筛选已实现待实际 Source/平台验收，typed Source 筛选已实现，两包 v5 AOT 与 CuuTruyen Web 分项通过，其余 Source/平台待验收；扩展管理与 typed preferences 未实现、正式合同待定，其余迁移待实现**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
 
 ## 已有基础
 
@@ -16,7 +16,7 @@
 1. 按[扩展管理子计划](extension-management.md)实现仓库添加、账户扩展安装成员关系、启用/停用、卸载、手动更新、精确当前构建选择及用户可见错误。D1 保存账户已确认意图，本机准备状态和可丢弃产物缓存单独呈现；安装准备不执行扩展。额外仓库的登记、验证、更新/移除、身份冲突，以及接入 Static Assets 权威和 Source 网络政策的设计仍待落实，不缩为只有默认仓库。无 AOT 产物时明确待构建/不支持，不从网页启动远程编译。
 2. 补齐切换前带预期 build/generation 的执行槽关闭与排空 ACK，处理取消、阅读资源和存储写锁，避免跨标签页/实例同时写相同可变 namespace；失败时提供准确状态和显式恢复。现有强制失效不等于可复用关闭完成。
 3. 服务器仅保留每包最新可用构建。客户端检查索引、明确切换所选版本并通过受管缓存清理旧副本；当前尚缺可枚举、可删除的产物缓存和占用状态。下架构建的 `404 build_not_found` 与 Access 登录/权限错误分开；不承诺远端历史版本回滚，不维护旧协议或旧材料兼容层。卸载保留书架、分类、进度、书签、收藏源及 Source 数据。
-4. Source 自定义筛选已接入 typed 链路，继续新 ABI AOT 与真实 Source 验收；按[typed Source preferences 子计划](source-preferences.md)确定正式合同并实现开关、文本/密码、单/多选、分组、依赖项与刷新。保留原 Preference 对象、监听器及实际存储变化；D1 确认可同步非敏感值，敏感值留当前客户端，不整体同步 SharedPreferences。不把 Android 自定义 Activity 设置页当成已支持。
+4. Source 自定义筛选已接入 typed 链路，两包 v5 AOT 与 CuuTruyen Web 分项已过，继续其余真实 Source/平台验收；按[typed Source preferences 子计划](source-preferences.md)确定正式合同并实现开关、文本/密码、单/多选、分组、依赖项与刷新。保留原 Preference 对象、监听器及实际存储变化；D1 确认可同步非敏感值，敏感值留当前客户端，不整体同步 SharedPreferences。不把 Android 自定义 Activity 设置页当成已支持。
 5. 收藏源与快捷打开已实现，补实际独立客户端及索引更新验收；包内语言筛选已实现，继续全目录语言筛选、能力提示及有界跨源搜索，各源独立返回、可取消，一个慢源不阻塞全部结果。仅声明实际验证的登录/验证码/脚本能力。
 6. 实现源迁移：搜索候选 → 用户确认作品 → 预览章节映射 → 创建目标收藏 → 复制明确匹配的分类/已读/书签。章节号、标题、扫描组辅助匹配；模糊项不自动标已读。
 
@@ -34,9 +34,9 @@
 
 ## typed Source 筛选里程碑
 
-**typed Source 筛选：已实现待新 ABI AOT 和真实 Source 验收。** 具体合同与生命周期见[设计](../design/source-filters.md)。 从原 Source 的 `getFilterList` 枚举有界 Filter 子类树，通过正式协议描述可编辑状态；应用时按绑定的列表快照与有界路径回写原具体子类的 `state`，保留扩展业务中的 `filterIsInstance` 语义，不能用通用替代对象冒充原 Filter。筛选状态绑定当前 Source、generation 与清单快照，切换会话后旧引用失效。
+**typed Source 筛选：已实现，两包 v5 AOT 与 CuuTruyen Web 动态标签、空 query 和分页分项通过，其余 Source/平台待验收。** 具体合同与生命周期见[设计](../design/source-filters.md)。 从原 Source 的 `getFilterList` 枚举有界 Filter 子类树，通过正式协议描述可编辑状态；应用时按绑定的列表快照与有界路径回写原具体子类的 `state`，保留扩展业务中的 `filterIsInstance` 语义，不能用通用替代对象冒充原 Filter。筛选状态绑定当前 Source、generation 与清单快照，切换会话后旧引用失效。
 
-显式应用后调用正式 `search`，空 query 也必须走搜索，不能自动退为热门；后续分页复用同一份已应用状态。类型与路径/大小/数量校验、嵌套状态处理、取消和迟到结果边界已接入并通过集中工程检查；继续使用真实 Source 验证原具体子类状态被业务识别，以及空 query 与后续页沿用筛选。工程结果和剩余真实运行门维护在[筛选验证记录](../verification/source-filters.md)；组件或 JVM/宿主适配测试不替代实际在线筛选验收。现有三包中的 CuuTruyen 可作代表候选：上游使用 `Group<TagCheckBox>` 和远端动态标签，适合验证重置、具体子类和空 query；已有默认浏览与图片证据不能覆盖筛选。
+显式应用后调用正式 `search`，空 query 也必须走搜索，不能自动退为热门；后续分页复用同一份已应用状态。类型与路径/大小/数量校验、嵌套状态处理、取消和迟到结果边界已接入并通过集中工程检查；CuuTruyen 已通过真实动态标签、非默认已完结、空 query、后续页，以及重置草稿关闭后继续原查询分页；其它类型与平台继续验收。工程结果和剩余真实运行门维护在[筛选验证记录](../verification/source-filters.md)；组件或 JVM/宿主适配测试不替代实际在线筛选验收。CuuTruyen 上游使用 `Group<TagCheckBox>` 与远端动态标签，本轮记录绑定修复后 v5 AOT；历史默认浏览与图片证据仍不自动覆盖新构建。
 
 typed preferences 按[独立子计划](source-preferences.md)继续，本里程碑不宣称已支持 Source 设置页。[扩展管理](extension-management.md)、全目录元数据、有界跨源搜索和用户确认迁移继续保留完整待办；不以零散界面改动代替这些流程。
 
