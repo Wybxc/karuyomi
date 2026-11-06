@@ -148,6 +148,29 @@ message ResetProgress {
   bool reversed_order = 2;
 }
 
+// Explicit user-confirmed one-to-one chapter identities; flags select positive
+// source read/bookmark state only. Source page anchors never cross sources.
+message ChapterMigration {
+  string source_chapter_key = 1;
+  string target_chapter_key = 2;
+  bool copy_read = 3;
+  bool copy_bookmark = 4;
+}
+
+message MigrateFrom {
+  string source_manga_key = 1;
+  uint32 expected_source_revision = 2;
+  uint32 expected_catalog_revision = 3;
+  LibraryMetadata target_metadata = 4;
+  bool copy_categories = 5;
+  repeated ChapterMigration chapters = 6;
+}
+
+message MigrationResult {
+  uint32 copied_read_chapters = 1;
+  uint32 copied_bookmarks = 2;
+}
+
 message StateMutation {
   uint32 schema_version = 1;
   // UUID, retained with the exact acknowledged response for idempotent retries.
@@ -163,6 +186,7 @@ message StateMutation {
     SetBookmark set_bookmark = 15;
     SetChapterRead set_chapter_read = 16;
     SetCustomCover set_custom_cover = 17;
+    MigrateFrom migrate_from = 18;
   }
 }
 
@@ -191,6 +215,7 @@ message StateMutationResponse {
   BusinessStateError error = 6;
   CategoryCatalog category_catalog = 7;
   ChapterBookmark bookmark = 8;
+  MigrationResult migration = 9;
 }
 
 message MangaStateResponse {

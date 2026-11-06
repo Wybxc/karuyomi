@@ -4,6 +4,8 @@
 
 2026-11-07，默认仓库扩展管理的账户确认清单、准备/取消、有界缓存、手动更新、启停/卸载与精确关闭/显式重建已接入，独立集中检查、445 项 Vitest、22 + 63 + 470 项 Flutter/Dart 测试与完整构建通过，见[扩展管理验证](verification/extension-management.md)。本轮构建为 0 扩展的工程产物；IAB provider 不可用，新协议真实 Source、独立客户端、Native 和生产门继续按[计划](plan/extension-management.md)验收。
 
+2026-11-07，源迁移正式合同、三 CAS D1 原子写、只读预览与书架/详情向导已接入，并通过独立集中工程检查、完整 Flutter 回归与客户端/API 构建，实际范围见[迁移验证](verification/source-migration.md)。真实 Source、独立客户端、Native 和生产迁移仍待验收；工程通过不覆盖这些层级。
+
 2026-11-06，typed Source preferences 的 v6 控制合同、原 Preference 回调、构造前注入、D1 独立 CAS API、客户端秘密值与 Flutter 设置/重开路径已实现；集中工程检查、固定 Komiic AOT、正式 Web 设置/重开和新文档恢复分项通过；其它控件、Native 及生产门见[设置记录](verification/source-preferences.md)，正式决定见[设计](design/source-preferences.md)。历史 v4/v5 证据不自动覆盖 v6。
 
 2026-11-06，typed Source 筛选的 Protobuf、原 Java Filter 子类保留、Flutter 编辑及空查询搜索/分页链路已接入；本次开发 host ABI 升为 v5。修复后的两包代表 AOT 与 CuuTruyen 真实 Web 动态标签、空 query、分页及重置草稿关闭后继续原查询分项通过。显式快照保留和活动取消的运行代次回收边界见[设计](design/source-filters.md)，工程结果、固定构建身份与其余真实 Source/平台待验门统一见[筛选记录](verification/source-filters.md)。历史 v4 生产与在线结果仍绑定原构建，不自动覆盖新 ABI。

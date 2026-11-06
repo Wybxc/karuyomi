@@ -639,6 +639,9 @@ final class TestBusinessServer implements ApiFetch {
     final next = current.deepCopy();
     wire.ChapterProgressState? nextProgress;
     wire.ChapterBookmark? nextBookmark;
+    wire.MigrationResult? migration;
+    final migratedProgress = <wire.ChapterProgressState>[];
+    final migratedBookmarks = <String>[];
     switch (mutation.whichOperation()) {
       case wire.StateMutation_Operation.setFavorite:
         if (mutation.setFavorite.hasMetadata()) {
@@ -785,6 +788,95 @@ final class TestBusinessServer implements ApiFetch {
         } else {
           next.clearCustomCover();
         }
+      case wire.StateMutation_Operation.migrateFrom:
+        final operation = mutation.migrateFrom;
+        final source = account.mangas[operation.sourceMangaKey];
+        if (source?.hasMetadata() != true ||
+            operation.sourceMangaKey == mutation.mangaKey) {
+          return _mutationError(
+            account,
+            mutation,
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Migration requires a distinct known source',
+          );
+        }
+        if (source!.revision != operation.expectedSourceRevision ||
+            account.catalog.revision != operation.expectedCatalogRevision) {
+          return _mutationError(
+            account,
+            mutation,
+            wire
+                .BusinessStateErrorCode
+                .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+            'Migration preview changed',
+          );
+        }
+        final sources = <String>{};
+        final targets = <String>{};
+        if (operation.chapters.length > 256 ||
+            operation.chapters.any(
+              (chapter) =>
+                  !sources.add(chapter.sourceChapterKey) ||
+                  !targets.add(chapter.targetChapterKey) ||
+                  (!chapter.copyRead && !chapter.copyBookmark),
+            )) {
+          return _mutationError(
+            account,
+            mutation,
+            wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+            'Migration needs bounded one-to-one chapters',
+          );
+        }
+        if (!next.hasMetadata()) {
+          next.metadata = operation.targetMetadata.deepCopy();
+        }
+        if (!next.favorite) {
+          next.addedAtSeconds = _now().millisecondsSinceEpoch ~/ 1000;
+        }
+        next.favorite = true;
+        if (operation.copyCategories) {
+          final categories = {...next.categoryIds, ...source.categoryIds};
+          next.categoryIds
+            ..clear()
+            ..addAll(
+              account.catalog.categories
+                  .where((category) => categories.contains(category.id))
+                  .map((category) => category.id),
+            );
+        }
+        for (final chapter in operation.chapters) {
+          final originalProgress = account
+              .progress[(operation.sourceMangaKey, chapter.sourceChapterKey)];
+          if (chapter.copyRead &&
+              originalProgress?.completed == true &&
+              !account.progress.containsKey((
+                mutation.mangaKey,
+                chapter.targetChapterKey,
+              ))) {
+            migratedProgress.add(
+              wire.ChapterProgressState(
+                chapterKey: chapter.targetChapterKey,
+                completed: true,
+                epoch: 1,
+              ),
+            );
+          }
+          if (chapter.copyBookmark &&
+              account.bookmarks.contains((
+                operation.sourceMangaKey,
+                chapter.sourceChapterKey,
+              )) &&
+              !account.bookmarks.contains((
+                mutation.mangaKey,
+                chapter.targetChapterKey,
+              ))) {
+            migratedBookmarks.add(chapter.targetChapterKey);
+          }
+        }
+        migration = wire.MigrationResult(
+          copiedReadChapters: migratedProgress.length,
+          copiedBookmarks: migratedBookmarks.length,
+        );
       case wire.StateMutation_Operation.notSet:
         throw StateError('Missing operation');
     }
@@ -803,6 +895,12 @@ final class TestBusinessServer implements ApiFetch {
         account.bookmarks.remove(identity);
       }
     }
+    for (final progress in migratedProgress) {
+      account.progress[(mutation.mangaKey, progress.chapterKey)] = progress;
+    }
+    for (final chapter in migratedBookmarks) {
+      account.bookmarks.add((mutation.mangaKey, chapter));
+    }
     final reply = _reply(
       wire.StateMutationResponse(
         schemaVersion: 1,
@@ -812,6 +910,7 @@ final class TestBusinessServer implements ApiFetch {
         manga: next.deepCopy(),
         progress: nextProgress?.deepCopy(),
         bookmark: nextBookmark?.deepCopy(),
+        migration: migration,
       ),
     );
     account.mutations[mutation.mutationId] = (fingerprint, reply);

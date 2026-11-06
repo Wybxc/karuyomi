@@ -22,6 +22,8 @@ import '../progress/chapter_read_controller.dart';
 import '../progress/chapter_read_dialog.dart';
 import '../sources/favorite_sources.dart';
 import '../extensions/extensions_page.dart';
+import '../migration/migration_controller.dart';
+import '../migration/migration_page.dart';
 import '../sources/source_filters.dart';
 import '../sources/source_preferences.dart';
 
@@ -639,6 +641,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   final _coverLifecycle = ValueNotifier(0);
   bool _editingCover = false;
   bool _savingFavorite = false;
+  bool _migrating = false;
   String? _favoriteError;
   ChapterBookmarksController? _bookmarks;
   bool _onlyBookmarks = false;
@@ -895,6 +898,48 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       if (mounted) setState(() => _favoriteError = message);
     } finally {
       if (mounted) setState(() => _savingFavorite = false);
+    }
+  }
+
+  Future<void> _migrate() async {
+    final build = controller.activeBuild;
+    final selectedSource = controller.activeSource;
+    final client = _library?.client;
+    if (_migrating ||
+        _opening ||
+        _savingFavorite ||
+        _editingCover ||
+        _detailsExpired ||
+        client == null ||
+        !identical(controller.library?.client, client) ||
+        _sequence == null ||
+        build == null ||
+        selectedSource == null ||
+        controller.busy ||
+        controller.status != ServiceStatus.ready ||
+        !controller.isCurrentSource(source)) {
+      return;
+    }
+    final seed = MigrationSeed(
+      metadata: wire.LibraryMetadata(
+        packageName: build.packageName,
+        sourceId: selectedSource.id,
+        sourceName: selectedSource.name,
+        sourceLang: selectedSource.lang,
+        manga: manga.snapshot,
+      ),
+      sequence: _sequence,
+    );
+    setState(() => _migrating = true);
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) =>
+              MigrationPage(catalog: controller, client: client, seed: seed),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _migrating = false);
     }
   }
 
@@ -1624,7 +1669,30 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(manga.title)),
+    appBar: AppBar(
+      title: Text(manga.title),
+      actions: [
+        PopupMenuButton<String>(
+          key: const ValueKey('details-more'),
+          enabled:
+              !_migrating &&
+              !_detailsExpired &&
+              !_opening &&
+              !_savingFavorite &&
+              !_editingCover &&
+              _library != null &&
+              _sequence != null &&
+              controller.status == ServiceStatus.ready &&
+              !controller.busy,
+          onSelected: (value) {
+            if (value == 'migrate') unawaited(_migrate());
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'migrate', child: Text('迁移到其他漫画源')),
+          ],
+        ),
+      ],
+    ),
     body: AnimatedBuilder(
       animation: controller,
       builder: (context, _) =>

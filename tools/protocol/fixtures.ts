@@ -632,6 +632,30 @@ export const goldenFixtures: GoldenFixture[] = [
   ...(
     [
       ['setFavorite', { metadata: libraryMetadata, favorite: false }],
+      [
+        'migrateFrom',
+        {
+          sourceMangaKey: 'b'.repeat(64),
+          expectedSourceRevision: 0,
+          expectedCatalogRevision: 3,
+          targetMetadata: libraryMetadata,
+          copyCategories: true,
+          chapters: [
+            {
+              sourceChapterKey: 'source-read',
+              targetChapterKey: 'target-read',
+              copyRead: true,
+              copyBookmark: false,
+            },
+            {
+              sourceChapterKey: 'source-bookmark',
+              targetChapterKey: 'target-bookmark',
+              copyRead: false,
+              copyBookmark: true,
+            },
+          ],
+        },
+      ],
       ['updateMetadata', libraryMetadata],
       [
         'saveProgress',
@@ -657,6 +681,18 @@ export const goldenFixtures: GoldenFixture[] = [
     type: 'StateMutation',
     value: { ...businessMutation, [operation]: value },
   })),
+  {
+    name: 'business-migration-confirmed',
+    type: 'StateMutationResponse',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      accountRevision: 7,
+      manga: businessManga,
+      categoryCatalog,
+      migration: { copiedReadChapters: 1, copiedBookmarks: 0 },
+    },
+  },
   {
     name: 'business-mutation-mark-unread-default-false',
     type: 'StateMutation',

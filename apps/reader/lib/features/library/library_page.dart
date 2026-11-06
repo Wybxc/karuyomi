@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/library_repository.dart';
 import '../../data/business_state_client.dart';
@@ -12,6 +13,8 @@ import '../browse/catalog_page.dart';
 import '../reader/reader_recovery.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
+import '../migration/migration_controller.dart';
+import '../migration/migration_page.dart';
 import 'category_dialogs.dart';
 import 'library_batch.dart';
 import 'library_batch_dialogs.dart';
@@ -276,6 +279,49 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
       }
     } finally {
       if (isCurrent()) await _refresh();
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  Future<void> _migrate(LibraryEntry entry) async {
+    final catalog = widget.controller;
+    final repository = _repository;
+    if (_opening ||
+        _editing ||
+        _retryingMetadata != null ||
+        catalog == null ||
+        repository == null ||
+        catalog.busy ||
+        catalog.status != ServiceStatus.ready ||
+        !identical(catalog.library, repository)) {
+      return;
+    }
+    final client = repository.client;
+    setState(() => _opening = true);
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => MigrationPage(
+            catalog: catalog,
+            client: client,
+            seed: MigrationSeed(
+              metadata: wire.LibraryMetadata(
+                packageName: entry.packageName,
+                sourceId: entry.sourceId,
+                sourceName: entry.sourceName,
+                sourceLang: entry.sourceLang,
+                manga: entry.snapshot,
+              ),
+            ),
+          ),
+        ),
+      );
+      if (mounted &&
+          identical(_repository, repository) &&
+          identical(catalog.library?.client, repository.client)) {
+        await _refresh();
+      }
+    } finally {
       if (mounted) setState(() => _opening = false);
     }
   }
@@ -941,6 +987,20 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
                                 )
                               : null,
                           icon: const Icon(Icons.folder_outlined),
+                        ),
+                        PopupMenuButton<String>(
+                          key: ValueKey(('library-more', entry.mangaKey)),
+                          tooltip: '更多操作：${entry.title}',
+                          enabled: canOpen && !_editing,
+                          onSelected: (value) {
+                            if (value == 'migrate') unawaited(_migrate(entry));
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'migrate',
+                              child: Text('迁移到其他漫画源'),
+                            ),
+                          ],
                         ),
                         const Icon(Icons.chevron_right),
                       ],

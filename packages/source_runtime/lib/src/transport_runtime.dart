@@ -73,7 +73,9 @@ final class TransportSourceRuntime implements SourceRuntime {
   final RuntimeTransport transport;
   final int _instanceId = ++_instanceSequence;
   int _controlSequence = 0;
-  final _events = StreamController<RuntimeEvent>.broadcast();
+  // Container state and its invalidation event must change in one turn.
+  // Delayed delivery can otherwise retire a replacement opened after rebuild.
+  final _events = StreamController<RuntimeEvent>.broadcast(sync: true);
   RuntimeSession? _session;
   String? _packageId;
   int _epoch = 0;
@@ -210,18 +212,7 @@ final class TransportSourceRuntime implements SourceRuntime {
             RuntimeErrorCode.accessRequired,
             RuntimeErrorCode.accessDenied,
           }.contains(failure.code);
-      if (!_events.isClosed &&
-          !localImageTimeout &&
-          !management &&
-          !independentApiFailure) {
-        _events.add(
-          RuntimeEvent(
-            generation: _session?.generation ?? '',
-            code: failure.code,
-            message: failure.message,
-          ),
-        );
-      }
+      final failedGeneration = _session?.generation ?? '';
       if (!management &&
           {
             RuntimeErrorCode.accessRequired,
@@ -236,6 +227,18 @@ final class TransportSourceRuntime implements SourceRuntime {
           !independentApiFailure &&
           failure.code == RuntimeErrorCode.runtimeLost) {
         _session = null;
+      }
+      if (!_events.isClosed &&
+          !localImageTimeout &&
+          !management &&
+          !independentApiFailure) {
+        _events.add(
+          RuntimeEvent(
+            generation: failedGeneration,
+            code: failure.code,
+            message: failure.message,
+          ),
+        );
       }
       throw failure;
     }

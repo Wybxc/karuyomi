@@ -242,6 +242,91 @@ void main() {
     await runtime.dispose();
   });
 
+  test(
+    'container invalidation is observed before a replacement can be opened',
+    () async {
+      final transport = FakeTransport();
+      final runtime = TransportSourceRuntime(transport);
+      await runtime.open(build());
+      final events = <RuntimeEvent>[];
+      Future<void>? invalidatedCall;
+      final subscription = runtime.events.listen((event) {
+        events.add(event);
+        invalidatedCall = expectLater(
+          runtime.invoke(request()),
+          throwsA(failure(RuntimeErrorCode.runtimeLost)),
+        );
+      });
+      runtime.containerLost('explicit rebuild');
+      expect(events.single.message, 'explicit rebuild');
+      expect(events.single.generation, isEmpty);
+      await invalidatedCall;
+      expect(transport.calls.where((call) => call.hasInvoke()), isEmpty);
+      transport.handler = (call) async {
+        final response = transport.respond(call);
+        if (call.hasOpen()) response.session.generation = 'generation-2';
+        if (call.hasInvoke()) response.source.generation = 'generation-2';
+        return response;
+      };
+      expect((await runtime.open(build())).generation, 'generation-2');
+      expect(
+        (await runtime.invoke(request(generation: 'generation-2'))).generation,
+        'generation-2',
+      );
+      expect(events, hasLength(1));
+      await subscription.cancel();
+      await runtime.dispose();
+    },
+  );
+
+  for (final (wireCode, code) in [
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+      RuntimeErrorCode.runtimeLost,
+    ),
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+      RuntimeErrorCode.accessRequired,
+    ),
+  ]) {
+    test(
+      'synchronous $code events observe the committed failure state',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        await runtime.open(build());
+        var invokeCount = 0;
+        transport.handler = (call) async {
+          if (call.hasInvoke() && ++invokeCount == 1) {
+            return wire.ControlResponse(
+              requestId: call.requestId,
+              error: wire.RuntimeError(
+                code: wireCode,
+                message: 'invalidate current session',
+              ),
+            );
+          }
+          return transport.respond(call);
+        };
+        Future<void>? observerCall;
+        final events = <RuntimeEvent>[];
+        final subscription = runtime.events.listen((event) {
+          events.add(event);
+          observerCall = expectLater(
+            runtime.invoke(request()),
+            throwsA(failure(code)),
+          );
+        });
+        await expectLater(runtime.invoke(request()), throwsA(failure(code)));
+        expect(events.single.generation, 'generation-1');
+        await observerCall;
+        expect(invokeCount, 1);
+        await subscription.cancel();
+        await runtime.dispose();
+      },
+    );
+  }
+
   test('container replacement discards late generated Source result', () async {
     final transport = FakeTransport();
     final runtime = TransportSourceRuntime(transport);

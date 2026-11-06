@@ -824,3 +824,149 @@ test('installed extension records reject duplicate packages, malformed catalog i
   }));
   expect(() => settingsMutationSchema.parse(request(oversized))).toThrow();
 });
+
+const migrationMetadata = {
+  packageName: 'eu.kanade.target',
+  sourceId: '123',
+  sourceName: 'Target',
+  sourceLang: 'en',
+  manga: { url: '/manga/target', title: 'Target' },
+};
+const migrationRequest = {
+  ...base,
+  mangaKey: 'a'.repeat(64),
+  migrateFrom: {
+    sourceMangaKey: 'b'.repeat(64),
+    expectedSourceRevision: 3,
+    expectedCatalogRevision: 2,
+    targetMetadata: migrationMetadata,
+    copyCategories: true,
+    chapters: [
+      {
+        sourceChapterKey: 'source',
+        targetChapterKey: 'target',
+        copyRead: true,
+        copyBookmark: true,
+      },
+    ],
+  },
+};
+
+test('migration contract selects distinct manga and bounded one-to-one chapter actions', () => {
+  expect(stateMutationSchema.parse(migrationRequest).operation.case).toBe(
+    'migrateFrom',
+  );
+  const input = migrationRequest.migrateFrom;
+  for (const operation of [
+    { ...input, sourceMangaKey: migrationRequest.mangaKey },
+    { ...input, sourceMangaKey: 'invalid' },
+    { ...input, expectedSourceRevision: -1 },
+    { ...input, expectedCatalogRevision: 4294967296 },
+    { ...input, targetMetadata: undefined },
+    { ...input, chapters: [input.chapters[0], input.chapters[0]] },
+    {
+      ...input,
+      chapters: [
+        input.chapters[0],
+        { ...input.chapters[0], targetChapterKey: 'second' },
+      ],
+    },
+    {
+      ...input,
+      chapters: [
+        input.chapters[0],
+        { ...input.chapters[0], sourceChapterKey: 'second' },
+      ],
+    },
+    { ...input, chapters: [{ ...input.chapters[0], sourceChapterKey: '' }] },
+    {
+      ...input,
+      chapters: [{ ...input.chapters[0], targetChapterKey: 'a'.repeat(201) }],
+    },
+    {
+      ...input,
+      chapters: [
+        { ...input.chapters[0], copyRead: false, copyBookmark: false },
+      ],
+    },
+    {
+      ...input,
+      chapters: Array.from({ length: 257 }, (_, index) => ({
+        sourceChapterKey: `s-${index}`,
+        targetChapterKey: `t-${index}`,
+        copyRead: true,
+      })),
+    },
+  ])
+    expect(() =>
+      stateMutationSchema.parse({
+        ...migrationRequest,
+        migrateFrom: operation,
+      }),
+    ).toThrow();
+  expect(() =>
+    stateMutationSchema.parse({
+      ...migrationRequest,
+      migrateFrom: { ...input, chapters: [] },
+    }),
+  ).not.toThrow();
+  expect(() =>
+    stateMutationSchema.parse({
+      ...migrationRequest,
+      migrateFrom: {
+        ...input,
+        chapters: Array.from({ length: 256 }, (_, index) => ({
+          sourceChapterKey: `s-${index}`,
+          targetChapterKey: `t-${index}`,
+          copyRead: true,
+        })),
+      },
+    }),
+  ).not.toThrow();
+});
+
+test('migration result counts are bounded, never coexist with errors or singular chapter results, and body budget remains 128KiB', () => {
+  const ack = {
+    schemaVersion: 1,
+    mutationId: base.mutationId,
+    accountRevision: 4,
+    manga: { mangaKey: 'a'.repeat(64), revision: 4 },
+    categoryCatalog: {},
+    migration: { copiedReadChapters: 256, copiedBookmarks: 0 },
+  };
+  expect(() => stateMutationResponseSchema.parse(ack)).not.toThrow();
+  for (const extra of [
+    { migration: { copiedReadChapters: 257 } },
+    { migration: { copiedBookmarks: -1 } },
+    { bookmark: { chapterKey: 'target', bookmarked: true } },
+    { progress: { chapterKey: 'target', epoch: 1, completed: true } },
+    {
+      error: {
+        code: 'BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT',
+        message: 'changed',
+      },
+    },
+  ])
+    expect(() =>
+      stateMutationResponseSchema.parse({ ...ack, ...extra }),
+    ).toThrow();
+  const longKey = (prefix: string, index: number) =>
+    `${prefix}-${index}-`.padEnd(200, 'x');
+  expect(() =>
+    stateMutationSchema.parse({
+      ...migrationRequest,
+      migrateFrom: {
+        ...migrationRequest.migrateFrom,
+        targetMetadata: {
+          ...migrationMetadata,
+          manga: { ...migrationMetadata.manga, description: 'x'.repeat(60000) },
+        },
+        chapters: Array.from({ length: 256 }, (_, index) => ({
+          sourceChapterKey: longKey('s', index),
+          targetChapterKey: longKey('t', index),
+          copyRead: true,
+        })),
+      },
+    }),
+  ).toThrow();
+});

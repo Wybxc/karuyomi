@@ -649,3 +649,34 @@ void validateBusinessSettingsResponse(
   );
   wire.encodeProtoJson(value, maxBytes: _responseLimit);
 }
+
+const businessMigrationChapterLimit = 256;
+void validateBusinessMigrateFrom(
+  wire.MigrateFrom value, {
+  required String targetKey,
+}) {
+  validateBusinessMangaKey(value.sourceMangaKey);
+  validateBusinessMangaKey(targetKey);
+  validateBusinessRevision(value.expectedSourceRevision);
+  validateBusinessRevision(value.expectedCatalogRevision);
+  validateBusinessMetadata(value.targetMetadata);
+  validateBusinessManga(
+    wire.MangaState(mangaKey: targetKey, metadata: value.targetMetadata),
+  );
+  if (value.sourceMangaKey == targetKey ||
+      !value.hasTargetMetadata() ||
+      value.chapters.length > businessMigrationChapterLimit) {
+    throw const FormatException('迁移作品或章节数量无效。');
+  }
+  final sources = <String>{};
+  final targets = <String>{};
+  for (final chapter in value.chapters) {
+    validateBusinessChapterKey(chapter.sourceChapterKey);
+    validateBusinessChapterKey(chapter.targetChapterKey);
+    if ((!chapter.copyRead && !chapter.copyBookmark) ||
+        !sources.add(chapter.sourceChapterKey) ||
+        !targets.add(chapter.targetChapterKey)) {
+      throw const FormatException('迁移章节必须是有明确标记的一对一映射。');
+    }
+  }
+}

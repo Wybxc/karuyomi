@@ -21,6 +21,7 @@ export const BOOKMARK_PAGE_SIZE = 64;
 export const CHAPTER_PROGRESS_PAGE_SIZE = 64;
 export const CHAPTER_PAGE_LIMIT = 2048;
 export const CATEGORY_LIMIT = 64;
+export const MIGRATION_CHAPTER_LIMIT = 256;
 export const FAVORITE_SOURCE_LIMIT = 128;
 export const INSTALLED_EXTENSION_LIMIT = 128;
 export const EXTENSION_CATALOG_URL_LIMIT = 2048;
@@ -248,6 +249,35 @@ export const stateMutationSchema = codec<pb.StateMutation>((input) => {
   mangaKey.parse(value.mangaKey);
   uint32(value.expectedRevision);
   switch (value.operation.case) {
+    case 'migrateFrom': {
+      const operation = value.operation.value;
+      mangaKey.parse(operation.sourceMangaKey);
+      requireCondition(
+        operation.sourceMangaKey !== value.mangaKey,
+        'Migration requires distinct source and target manga',
+      );
+      uint32(operation.expectedSourceRevision);
+      uint32(operation.expectedCatalogRevision);
+      requireFields(operation, ['targetMetadata']);
+      validateLibraryMetadata(operation.targetMetadata);
+      requireCondition(
+        operation.chapters.length <= MIGRATION_CHAPTER_LIMIT &&
+          new Set(operation.chapters.map((chapter) => chapter.sourceChapterKey))
+            .size === operation.chapters.length &&
+          new Set(operation.chapters.map((chapter) => chapter.targetChapterKey))
+            .size === operation.chapters.length,
+        'Migration chapter mapping must be bounded and one-to-one',
+      );
+      for (const chapter of operation.chapters) {
+        validId(chapter.sourceChapterKey);
+        validId(chapter.targetChapterKey);
+        requireCondition(
+          chapter.copyRead || chapter.copyBookmark,
+          'A migration chapter must select read state or bookmark',
+        );
+      }
+      break;
+    }
     case 'setCustomCover':
       if (value.operation.value.cover)
         validateCustomCover(value.operation.value.cover);
@@ -346,6 +376,19 @@ export const stateMutationResponseSchema = codec<pb.StateMutationResponse>(
     if (!value.error || value.mutationId !== '')
       mutationId.parse(value.mutationId);
     validateResponse(value);
+    if (value.migration) {
+      requireCondition(
+        !value.error && !value.progress && !value.bookmark,
+        'Migration result cannot contain an error or single-chapter result',
+      );
+      uint32(value.migration.copiedReadChapters);
+      uint32(value.migration.copiedBookmarks);
+      requireCondition(
+        value.migration.copiedReadChapters <= MIGRATION_CHAPTER_LIMIT &&
+          value.migration.copiedBookmarks <= MIGRATION_CHAPTER_LIMIT,
+        'Migration result exceeds chapter budget',
+      );
+    }
     return value;
   },
 );

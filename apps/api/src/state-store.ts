@@ -19,6 +19,7 @@ import {
   MangaStateResponseSchema,
   MangaStateSchema,
   ReadingAnchorSchema,
+  MigrationResultSchema,
   StateMutationResponseSchema,
   StateMutationSchema,
   type ChapterProgressState,
@@ -517,9 +518,106 @@ export async function applyMutation(
   let progress: ChapterProgressState | undefined;
   let bookmark: ChapterBookmark | undefined;
   let coverObjectKey: string | undefined;
+  let migration:
+    | {
+        sourceMangaKey: string;
+        expectedSourceRevision: number;
+        expectedCatalogRevision: number;
+        categories: string[];
+        readChapters: string[];
+        bookmarks: string[];
+      }
+    | undefined;
   try {
     const operation = mutation.operation;
-    if (operation.case === 'setCustomCover') {
+    if (operation.case === 'migrateFrom') {
+      const input = operation.value;
+      if (!input.targetMetadata)
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Migration requires target metadata',
+        );
+      await validateMetadataKey(mutation.mangaKey, input.targetMetadata);
+      const source = await readMangaState(db, subject, input.sourceMangaKey);
+      if (!source.manga?.metadata)
+        throw new StateError(
+          ErrorCode.INVALID_INPUT,
+          'Migration source metadata is required',
+        );
+      if (source.manga.revision !== input.expectedSourceRevision)
+        throw new StateError(
+          ErrorCode.REVISION_CONFLICT,
+          'Migration source revision changed',
+          409,
+        );
+      if (state.categoryCatalog?.revision !== input.expectedCatalogRevision)
+        throw new StateError(
+          ErrorCode.REVISION_CONFLICT,
+          'Category catalog changed',
+          409,
+        );
+      const categories = input.copyCategories ? source.manga.categoryIds : [];
+      const members = new Set([...manga.categoryIds, ...categories]);
+      manga.categoryIds = state.categoryCatalog.categories
+        .filter((category) => members.has(category.id))
+        .map((category) => category.id);
+      // Existing target business state is preserved. Only an absent metadata
+      // snapshot is populated from the user's confirmed original Source DTO.
+      manga.metadata ??= input.targetMetadata;
+      if (!manga.favorite) manga.addedAtSeconds = Math.floor(Date.now() / 1000);
+      manga.favorite = true;
+      const mappings = JSON.stringify(input.chapters);
+      const rows = await db
+        .prepare(
+          `SELECT
+        json_extract(mapping.value, '$.targetChapterKey') target_key,
+        json_extract(mapping.value, '$.copyRead') copy_read,
+        json_extract(mapping.value, '$.copyBookmark') copy_bookmark,
+        COALESCE(json_extract(source_progress.state_json, '$.completed'), 0) source_completed,
+        target_progress.chapter_key IS NOT NULL target_has_progress,
+        EXISTS (SELECT 1 FROM chapter_bookmarks WHERE subject = ?1 AND manga_key = ?2
+          AND chapter_key = json_extract(mapping.value, '$.sourceChapterKey')) source_bookmarked,
+        EXISTS (SELECT 1 FROM chapter_bookmarks WHERE subject = ?1 AND manga_key = ?3
+          AND chapter_key = json_extract(mapping.value, '$.targetChapterKey')) target_bookmarked
+        FROM json_each(?4) mapping
+        LEFT JOIN chapter_progress source_progress ON source_progress.subject = ?1 AND source_progress.manga_key = ?2
+          AND source_progress.chapter_key = json_extract(mapping.value, '$.sourceChapterKey')
+        LEFT JOIN chapter_progress target_progress ON target_progress.subject = ?1 AND target_progress.manga_key = ?3
+          AND target_progress.chapter_key = json_extract(mapping.value, '$.targetChapterKey')`,
+        )
+        .bind(subject, input.sourceMangaKey, mutation.mangaKey, mappings)
+        .all<{
+          target_key: string;
+          copy_read: number;
+          copy_bookmark: number;
+          source_completed: number;
+          target_has_progress: number;
+          source_bookmarked: number;
+          target_bookmarked: number;
+        }>();
+      migration = {
+        sourceMangaKey: input.sourceMangaKey,
+        expectedSourceRevision: input.expectedSourceRevision,
+        expectedCatalogRevision: input.expectedCatalogRevision,
+        categories,
+        readChapters: rows.results
+          .filter(
+            (row) =>
+              row.copy_read === 1 &&
+              row.source_completed === 1 &&
+              row.target_has_progress === 0,
+          )
+          .map((row) => row.target_key),
+        bookmarks: rows.results
+          .filter(
+            (row) =>
+              row.copy_bookmark === 1 &&
+              row.source_bookmarked === 1 &&
+              row.target_bookmarked === 0,
+          )
+          .map((row) => row.target_key),
+      };
+    } else if (operation.case === 'setCustomCover') {
       const cover = operation.value.cover;
       if (cover) {
         if (!uploadCover)
@@ -616,6 +714,14 @@ export async function applyMutation(
     manga,
     ...(progress ? { progress } : {}),
     ...(bookmark ? { bookmark } : {}),
+    ...(migration
+      ? {
+          migration: create(MigrationResultSchema, {
+            copiedReadChapters: migration.readChapters.length,
+            copiedBookmarks: migration.bookmarks.length,
+          }),
+        }
+      : {}),
   });
   const nonce = crypto.randomUUID();
   const winner =
@@ -629,12 +735,15 @@ export async function applyMutation(
       ? mutation.operation.value
       : undefined;
   const cover = coverAssignment?.cover;
-  const assignmentGate = assignment
-    ? `AND COALESCE((SELECT categories_revision FROM account_state WHERE subject = ?1), 0) = ?9
+  const assignmentGate = migration
+    ? `AND EXISTS (SELECT 1 FROM manga_state WHERE subject = ?1 AND manga_key = ?9 AND revision = ?10)
+    AND COALESCE((SELECT categories_revision FROM account_state WHERE subject = ?1), 0) = ?11`
+    : assignment
+      ? `AND COALESCE((SELECT categories_revision FROM account_state WHERE subject = ?1), 0) = ?9
     AND (SELECT count(*) FROM categories WHERE subject = ?1 AND id IN (SELECT value FROM json_each(?10))) = json_array_length(?10)`
-    : cover
-      ? `AND NOT EXISTS (SELECT 1 FROM cover_assets WHERE subject = ?1 AND asset_id = ?9 AND (manga_key <> ?6 OR descriptor_json <> ?10))`
-      : '';
+      : cover
+        ? `AND NOT EXISTS (SELECT 1 FROM cover_assets WHERE subject = ?1 AND asset_id = ?9 AND (manga_key <> ?6 OR descriptor_json <> ?10))`
+        : '';
   const storedManga = clone(MangaStateSchema, manga);
   storedManga.categoryIds = [];
   delete storedManga.customCover;
@@ -647,14 +756,20 @@ export async function applyMutation(
     mutation.mangaKey,
     mutation.expectedRevision,
     MAX_REVISION,
-    ...(assignment
+    ...(migration
       ? [
-          assignment.expectedCatalogRevision,
-          JSON.stringify(assignment.categoryIds),
+          migration.sourceMangaKey,
+          migration.expectedSourceRevision,
+          migration.expectedCatalogRevision,
         ]
-      : cover
-        ? [cover.assetId, toJsonString(CustomCoverSchema, cover)]
-        : []),
+      : assignment
+        ? [
+            assignment.expectedCatalogRevision,
+            JSON.stringify(assignment.categoryIds),
+          ]
+        : cover
+          ? [cover.assetId, toJsonString(CustomCoverSchema, cover)]
+          : []),
   ];
   const statements = [
     db
@@ -690,6 +805,50 @@ export async function applyMutation(
         toJsonString(MangaStateSchema, storedManga),
       ),
   ];
+  if (migration) {
+    // All mapping effects use three bounded JSON arrays, not a statement per
+    // chapter. The same nonce gates them behind source/target/catalog CAS.
+    statements.push(
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO manga_categories(subject, manga_key, category_id)
+        SELECT ?1, ?4, value FROM json_each(?5) WHERE ${winner}`,
+        )
+        .bind(
+          subject,
+          mutation.mutationId,
+          nonce,
+          mutation.mangaKey,
+          JSON.stringify(migration.categories),
+        ),
+      db
+        .prepare(
+          `INSERT INTO chapter_progress(subject, manga_key, chapter_key, state_json)
+        SELECT ?1, ?4, value, json_object('chapterKey', value, 'epoch', 1, 'completed', json('true'))
+        FROM json_each(?5) WHERE ${winner}
+        ON CONFLICT(subject, manga_key, chapter_key) DO NOTHING`,
+        )
+        .bind(
+          subject,
+          mutation.mutationId,
+          nonce,
+          mutation.mangaKey,
+          JSON.stringify(migration.readChapters),
+        ),
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO chapter_bookmarks(subject, manga_key, chapter_key)
+        SELECT ?1, ?4, value FROM json_each(?5) WHERE ${winner}`,
+        )
+        .bind(
+          subject,
+          mutation.mutationId,
+          nonce,
+          mutation.mangaKey,
+          JSON.stringify(migration.bookmarks),
+        ),
+    );
+  }
   if (coverAssignment) {
     if (cover && coverObjectKey)
       statements.push(

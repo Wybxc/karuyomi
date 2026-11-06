@@ -1046,6 +1046,56 @@ final class CatalogController extends ChangeNotifier {
     return result;
   }
 
+  /// Migration searches use the ordinary installed Source runtime without
+  /// mutating the browse page's query, pagination or manga results.
+  Future<CatalogSourceRef?> openMigrationSource({
+    required CatalogBuild build,
+    required String sourceId,
+    required bool Function() shouldContinue,
+  }) => _perform<CatalogSourceRef?>('正在打开迁移目标漫画源', () async {
+    if (accessPaused || subject == null || !shouldContinue()) return null;
+    if (status == ServiceStatus.failed && _runtimeNeedsRebuild) {
+      await _rebuildForPreferences();
+      if (!shouldContinue()) return null;
+    }
+    await _loadBuild(build, shouldContinue: shouldContinue);
+    if (!shouldContinue() || activeBuild?.id != build.id) return null;
+    final matching = session?.sources.where((source) => source.id == sourceId);
+    if (matching == null ||
+        matching.length != 1 ||
+        !_setSource(matching.single)) {
+      throw const FormatException('当前扩展中找不到所选漫画源。');
+    }
+    status = ServiceStatus.ready;
+    return sourceReference;
+  });
+
+  Future<({List<MangaEntry> mangas, bool hasNextPage})?>
+  searchMigrationTargets({
+    required CatalogSourceRef source,
+    required String query,
+    required int page,
+    required bool Function() shouldContinue,
+  }) => _perform<({List<MangaEntry> mangas, bool hasNextPage})?>(
+    '正在搜索迁移目标',
+    () async {
+      if (!shouldContinue() || !isCurrentSource(source)) return null;
+      if (query.trim().isEmpty || query.length > 500 || page < 1) {
+        throw const FormatException('请输入不超过500字的搜索词。');
+      }
+      final result = (await _invoke(
+        wire.SourceCall(
+          search: wire.SearchRequest(query: query.trim(), page: page),
+        ),
+      )).mangaPage;
+      if (!shouldContinue() || !isCurrentSource(source)) return null;
+      return (
+        mangas: result.mangas.map(MangaEntry.new).toList(),
+        hasNextPage: result.hasNextPage,
+      );
+    },
+  );
+
   Future<void> selectSource(
     SourceInfo source, {
     bool loadListing = true,

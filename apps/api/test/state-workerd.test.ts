@@ -1,4 +1,9 @@
-import { create, toJson, type MessageInitShape } from '@bufbuild/protobuf';
+import {
+  clone,
+  create,
+  toJson,
+  type MessageInitShape,
+} from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
   AppTheme,
@@ -35,6 +40,7 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createHash } from 'node:crypto';
 import { beforeAll, expect, test } from 'vitest';
+import { applyMutation } from '../src/state-store.js';
 
 const origin = 'https://read.example.com';
 let keys: Awaited<ReturnType<typeof generateKeyPair>>;
@@ -2248,4 +2254,450 @@ test('invalid or oversized installed extension lists cannot change D1 values, re
       .bind(owner.subject)
       .first('count'),
   ).toBe(1);
+});
+
+function migrate(
+  source: StateMutation,
+  target: StateMutation,
+  sourceRevision: number,
+  targetRevision = 0,
+  catalogRevision = 0,
+) {
+  if (
+    target.operation.case !== 'setFavorite' ||
+    !target.operation.value.metadata
+  )
+    throw new Error('Target fixture metadata is required');
+  return create(StateMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    mangaKey: target.mangaKey,
+    expectedRevision: targetRevision,
+    operation: {
+      case: 'migrateFrom',
+      value: {
+        sourceMangaKey: source.mangaKey,
+        expectedSourceRevision: sourceRevision,
+        expectedCatalogRevision: catalogRevision,
+        targetMetadata: target.operation.value.metadata,
+        copyCategories: true,
+        chapters: [
+          {
+            sourceChapterKey: 'source-read',
+            targetChapterKey: 'target-read',
+            copyRead: true,
+            copyBookmark: true,
+          },
+          {
+            sourceChapterKey: 'source-bookmark',
+            targetChapterKey: 'target-bookmark',
+            copyRead: true,
+            copyBookmark: true,
+          },
+        ],
+      },
+    },
+  });
+}
+
+test('migration atomically favorites a target, unions categories and copies only positive explicitly mapped flags while retaining the entire source', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const source = favorite(0, metadata(), false);
+  const target = favorite();
+  const group = category('迁移分类');
+  await first.mutateCategory(group);
+  await first.mutate(source);
+  await first.mutate(assign(source.mangaKey, 1, 1, [createdId(group)]));
+  await first.mutate(chapterRead(source.mangaKey, 2, 'source-read'));
+  await first.mutate(bookmark(source.mangaKey, 3, 'source-bookmark'));
+  await first.mutate(chapterRead(source.mangaKey, 4, 'unmapped-read'));
+  const before = await first.state(source.mangaKey, 'source-read');
+  const command = migrate(source, target, 5, 0, 1);
+  const result = await first.mutate(command);
+  expect(result.status).toBe(200);
+  expect(result.body.migration).toMatchObject({
+    copiedReadChapters: 1,
+    copiedBookmarks: 1,
+  });
+  expect(result.body.manga).toMatchObject({
+    favorite: true,
+    revision: 1,
+    categoryIds: [createdId(group)],
+  });
+  expect(result.body.manga?.metadata).toEqual(
+    target.operation.case === 'setFavorite'
+      ? target.operation.value.metadata
+      : undefined,
+  );
+  expect(result.body.manga?.resume).toBeUndefined();
+  const copiedRead = await second.state(target.mangaKey, 'target-read');
+  expect(copiedRead.progress).toMatchObject({
+    chapterKey: 'target-read',
+    epoch: 1,
+    completed: true,
+  });
+  expect(copiedRead.progress?.current).toBeUndefined();
+  expect(copiedRead.progress?.furthest).toBeUndefined();
+  expect(
+    (await second.state(target.mangaKey, 'target-bookmark')).bookmark
+      ?.bookmarked,
+  ).toBe(true);
+  expect(
+    (await second.state(target.mangaKey, 'target-bookmark')).progress,
+  ).toBeUndefined();
+  expect(
+    (await second.state(target.mangaKey, 'unmapped-read')).progress,
+  ).toBeUndefined();
+  const after = await second.state(source.mangaKey, 'source-read');
+  expect(after.manga).toEqual(before.manga);
+  expect(after.progress).toEqual(before.progress);
+  expect(
+    (await second.state(source.mangaKey, 'source-bookmark')).bookmark
+      ?.bookmarked,
+  ).toBe(true);
+});
+
+test('migration preserves existing target metadata, every progress row including unread epochs and anchors, resume and custom cover', async () => {
+  const owner = await client();
+  const source = favorite();
+  const target = favorite();
+  const sourceGroup = category('来源分类');
+  const targetGroup = category('目标分类', 1);
+  await owner.mutateCategory(sourceGroup);
+  await owner.mutateCategory(targetGroup);
+  await owner.mutate(source);
+  await owner.mutate(assign(source.mangaKey, 1, 2, [createdId(sourceGroup)]));
+  await owner.mutate(chapterRead(source.mangaKey, 2, 'source-read'));
+  await owner.mutate(bookmark(source.mangaKey, 3, 'source-read'));
+  await owner.mutate(bookmark(source.mangaKey, 4, 'source-bookmark'));
+  await owner.mutate(chapterRead(source.mangaKey, 5, 'source-bookmark'));
+  await owner.mutate(target);
+  await owner.mutate(assign(target.mangaKey, 1, 2, [createdId(targetGroup)]));
+  await owner.mutate(save(target.mangaKey, 2, 1, 0));
+  await owner.mutate(chapterRead(target.mangaKey, 3, 'target-read', false));
+  await owner.mutate(bookmark(target.mangaKey, 4, 'target-bookmark'));
+  const cover = {
+    assetId: crypto.randomUUID(),
+    contentType: 'image/png',
+    byteLength: 1,
+    sha256: 'a'.repeat(64),
+  };
+  await env.DB.prepare(
+    'INSERT INTO cover_assets(subject, manga_key, asset_id, object_key, descriptor_json) VALUES (?, ?, ?, ?, ?)',
+  )
+    .bind(
+      owner.subject,
+      target.mangaKey,
+      cover.assetId,
+      `fixture/${cover.assetId}`,
+      JSON.stringify(cover),
+    )
+    .run();
+  const before = await owner.state(target.mangaKey, 'chapter-1');
+  const unread = await owner.state(target.mangaKey, 'target-read');
+  const command = migrate(source, target, 6, 5, 2);
+  if (
+    command.operation.case !== 'migrateFrom' ||
+    !command.operation.value.targetMetadata?.manga
+  )
+    throw new Error('Missing migration');
+  command.operation.value.targetMetadata.manga.title =
+    'Fresh confirmed Source DTO';
+  command.operation.value.chapters.push({
+    $typeName: 'karuyomi.v1.ChapterMigration',
+    sourceChapterKey: 'source-bookmark',
+    targetChapterKey: 'chapter-1',
+    copyRead: true,
+    copyBookmark: false,
+  });
+  // Keep the map one-to-one: the final entry replaces the original bookmark mapping.
+  command.operation.value.chapters.splice(1, 1);
+  const result = await owner.mutate(command);
+  expect(result.status).toBe(200);
+  expect(result.body.migration).toMatchObject({
+    copiedReadChapters: 0,
+    copiedBookmarks: 1,
+  });
+  expect(result.body.manga?.metadata).toEqual(before.manga?.metadata);
+  expect(result.body.manga?.resume).toEqual(before.manga?.resume);
+  expect(result.body.manga?.customCover).toEqual(before.manga?.customCover);
+  expect(result.body.manga?.addedAtSeconds).toBe(before.manga?.addedAtSeconds);
+  expect(result.body.manga?.categoryIds).toEqual([
+    createdId(sourceGroup),
+    createdId(targetGroup),
+  ]);
+  expect((await owner.state(target.mangaKey, 'chapter-1')).progress).toEqual(
+    before.progress,
+  );
+  expect((await owner.state(target.mangaKey, 'target-read')).progress).toEqual(
+    unread.progress,
+  );
+  expect(
+    (await owner.state(target.mangaKey, 'target-bookmark')).bookmark
+      ?.bookmarked,
+  ).toBe(true);
+});
+
+test('migration source, target and category CAS are checked again at the atomic batch, not only in the preceding reads', async () => {
+  for (const changed of ['source', 'target', 'catalog']) {
+    const owner = await client();
+    const source = favorite();
+    const target = favorite();
+    const group = category('初始');
+    await owner.mutateCategory(group);
+    await owner.mutate(source);
+    await owner.mutate(chapterRead(source.mangaKey, 1, 'source-read'));
+    const command = migrate(source, target, 2, 0, 1);
+    let expectedTarget: Awaited<ReturnType<typeof owner.state>> | undefined;
+    const gatedDb = new Proxy(env.DB, {
+      get(database, property) {
+        if (property === 'batch')
+          return async (statements: D1PreparedStatement[]) => {
+            if (changed === 'source')
+              expect(
+                (await owner.mutate(bookmark(source.mangaKey, 2, 'concurrent')))
+                  .status,
+              ).toBe(200);
+            if (changed === 'target')
+              expect(
+                (await owner.mutate(bookmark(target.mangaKey, 0, 'concurrent')))
+                  .status,
+              ).toBe(200);
+            if (changed === 'catalog')
+              expect(
+                (
+                  await owner.mutateCategory(
+                    categoryCommand(1, {
+                      case: 'renameCategory',
+                      value: { categoryId: createdId(group), name: '已更名' },
+                    }),
+                  )
+                ).status,
+              ).toBe(200);
+            expectedTarget = await owner.state(target.mangaKey, 'target-read');
+            return database.batch(statements);
+          };
+        const value: unknown = Reflect.get(database, property, database);
+        return typeof value === 'function' ? value.bind(database) : value;
+      },
+    });
+    const result = await applyMutation(gatedDb, owner.subject, command);
+    expect(result.status).toBe(409);
+    expect(result.response.error?.code).toBe(ErrorCode.REVISION_CONFLICT);
+    const actual = await owner.state(target.mangaKey, 'target-read');
+    expect(actual.manga).toEqual(expectedTarget?.manga);
+    expect(actual.progress).toBeUndefined();
+    expect(
+      (await owner.bookmarks(target.mangaKey)).body.entries.map(
+        (value) => value.chapterKey,
+      ),
+    ).toEqual(changed === 'target' ? ['concurrent'] : []);
+    expect(
+      await env.DB.prepare(
+        'SELECT count(*) count FROM state_mutations WHERE subject = ? AND mutation_id = ?',
+      )
+        .bind(owner.subject, command.mutationId)
+        .first('count'),
+    ).toBe(0);
+  }
+});
+
+test('migration UUID retries return one durable result, different bodies conflict and a different UUID with stale target CAS cannot partially apply', async () => {
+  const owner = await client();
+  const source = favorite();
+  const target = favorite();
+  await owner.mutate(source);
+  await owner.mutate(chapterRead(source.mangaKey, 1, 'source-read'));
+  const command = migrate(source, target, 2);
+  const replies = await Promise.all([
+    owner.mutate(command),
+    owner.mutate(command),
+  ]);
+  expect(replies.map((value) => value.status)).toEqual([200, 200]);
+  expect(replies[0]?.body).toEqual(replies[1]?.body);
+  expect(replies[0]?.body.migration?.copiedReadChapters).toBe(1);
+  const changed = clone(StateMutationSchema, command);
+  if (changed.operation.case !== 'migrateFrom')
+    throw new Error('Missing migration');
+  changed.operation.value.copyCategories = false;
+  expect((await owner.mutate(changed)).body.error?.code).toBe(
+    ErrorCode.IDEMPOTENCY_CONFLICT,
+  );
+  changed.mutationId = crypto.randomUUID();
+  expect((await owner.mutate(changed)).body.error?.code).toBe(
+    ErrorCode.REVISION_CONFLICT,
+  );
+  const result = await owner.state(target.mangaKey, 'target-read');
+  expect(result.manga?.revision).toBe(1);
+  expect(result.progress?.epoch).toBe(1);
+  expect((await owner.mutate(command)).body).toEqual(replies[0]?.body);
+});
+
+test('migration is account scoped, validates confirmed target identity and accepts a source with metadata but no favorite', async () => {
+  const owner = await client();
+  const other = await client();
+  const source = favorite(0, metadata(), false);
+  const target = favorite();
+  await owner.mutate(source);
+  await owner.mutate(bookmark(source.mangaKey, 1, 'source-bookmark'));
+  const command = migrate(source, target, 2);
+  expect((await other.mutate(command)).status).toBe(400);
+  expect((await other.state(target.mangaKey)).manga?.revision).toBe(0);
+  const invalid = clone(StateMutationSchema, command);
+  if (
+    invalid.operation.case !== 'migrateFrom' ||
+    !invalid.operation.value.targetMetadata?.manga
+  )
+    throw new Error('Missing metadata');
+  invalid.operation.value.targetMetadata.manga.url = '/different-identity';
+  expect((await owner.mutate(invalid)).status).toBe(400);
+  expect((await owner.state(target.mangaKey)).manga?.revision).toBe(0);
+  expect((await owner.mutate(command)).status).toBe(200);
+  expect((await other.state(target.mangaKey)).manga?.revision).toBe(0);
+});
+
+test('migration failure rolls back favorite, category, progress, counters and idempotency row, then retries the identical command', async () => {
+  const owner = await client();
+  const source = favorite();
+  const target = favorite();
+  const group = category();
+  await owner.mutateCategory(group);
+  await owner.mutate(source);
+  await owner.mutate(assign(source.mangaKey, 1, 1, [createdId(group)]));
+  await owner.mutate(chapterRead(source.mangaKey, 2, 'source-read'));
+  await owner.mutate(bookmark(source.mangaKey, 3, 'source-bookmark'));
+  const command = migrate(source, target, 4, 0, 1);
+  const before = await owner.state(target.mangaKey);
+  await env.DB.exec(
+    `CREATE TRIGGER fail_migration BEFORE INSERT ON chapter_bookmarks WHEN NEW.subject = '${owner.subject}' BEGIN SELECT RAISE(ABORT, 'controlled migration failure'); END`,
+  );
+  try {
+    expect((await owner.mutate(command)).status).toBe(503);
+    const current = await owner.state(target.mangaKey, 'target-read');
+    expect(current.accountRevision).toBe(before.accountRevision);
+    expect(current.manga?.revision).toBe(0);
+    expect(current.manga?.categoryIds).toEqual([]);
+    expect(current.progress).toBeUndefined();
+    expect(
+      await env.DB.prepare(
+        'SELECT count(*) count FROM state_mutations WHERE subject = ? AND mutation_id = ?',
+      )
+        .bind(owner.subject, command.mutationId)
+        .first('count'),
+    ).toBe(0);
+  } finally {
+    await env.DB.exec('DROP TRIGGER fail_migration');
+  }
+  const retried = await owner.mutate(command);
+  expect(retried.status).toBe(200);
+  expect(retried.body.migration).toMatchObject({
+    copiedReadChapters: 1,
+    copiedBookmarks: 1,
+  });
+});
+
+test('migration handles 256 selected chapters in one bounded batch, honors copy flags, and rejects larger selections without implicit partial work', async () => {
+  const owner = await client();
+  const source = favorite();
+  const target = favorite();
+  await owner.mutate(source);
+  const keys = Array.from({ length: 256 }, (_, index) => `source-${index}`);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO chapter_progress(subject,manga_key,chapter_key,state_json)
+      SELECT ?1,?2,value,json_object('chapterKey',value,'epoch',1,'completed',json('true')) FROM json_each(?3)`,
+    ).bind(owner.subject, source.mangaKey, JSON.stringify(keys)),
+    env.DB.prepare(
+      'INSERT INTO chapter_bookmarks(subject,manga_key,chapter_key) SELECT ?1,?2,value FROM json_each(?3)',
+    ).bind(owner.subject, source.mangaKey, JSON.stringify(keys)),
+  ]);
+  const command = migrate(source, target, 1);
+  if (command.operation.case !== 'migrateFrom')
+    throw new Error('Missing migration');
+  command.operation.value.chapters = keys.map((key, index) => ({
+    $typeName: 'karuyomi.v1.ChapterMigration',
+    sourceChapterKey: key,
+    targetChapterKey: `target-${index}`,
+    copyRead: index % 2 === 0,
+    copyBookmark: index % 2 !== 0,
+  }));
+  const excessive = clone(StateMutationSchema, command);
+  if (excessive.operation.case !== 'migrateFrom')
+    throw new Error('Missing migration');
+  excessive.operation.value.chapters.push({
+    $typeName: 'karuyomi.v1.ChapterMigration',
+    sourceChapterKey: 'extra-source',
+    targetChapterKey: 'extra-target',
+    copyRead: true,
+    copyBookmark: false,
+  });
+  expect((await owner.mutate(excessive)).status).toBe(400);
+  expect((await owner.state(target.mangaKey)).manga?.revision).toBe(0);
+  let statementCount = 0;
+  const measuredDb = new Proxy(env.DB, {
+    get(database, property) {
+      if (property === 'batch')
+        return async (statements: D1PreparedStatement[]) => {
+          statementCount = statements.length;
+          return database.batch(statements);
+        };
+      const value: unknown = Reflect.get(database, property, database);
+      return typeof value === 'function' ? value.bind(database) : value;
+    },
+  });
+  const result = await applyMutation(measuredDb, owner.subject, command);
+  expect(result.status).toBe(200);
+  expect(result.response.migration).toMatchObject({
+    copiedReadChapters: 128,
+    copiedBookmarks: 128,
+  });
+  expect(statementCount).toBe(8);
+  expect(
+    (await owner.state(target.mangaKey, 'target-0')).progress?.completed,
+  ).toBe(true);
+  expect(
+    (await owner.state(target.mangaKey, 'target-0')).bookmark?.bookmarked,
+  ).toBe(false);
+  expect(
+    (await owner.state(target.mangaKey, 'target-1')).progress,
+  ).toBeUndefined();
+  expect(
+    (await owner.state(target.mangaKey, 'target-1')).bookmark?.bookmarked,
+  ).toBe(true);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM chapter_progress WHERE subject=? AND manga_key=?',
+    )
+      .bind(owner.subject, target.mangaKey)
+      .first('count'),
+  ).toBe(128);
+});
+
+test('migration 128KiB transport budget rejects an otherwise bounded mapping before any target effect', async () => {
+  const owner = await client();
+  const source = favorite();
+  const target = favorite();
+  await owner.mutate(source);
+  const command = migrate(source, target, 1);
+  if (
+    command.operation.case !== 'migrateFrom' ||
+    !command.operation.value.targetMetadata?.manga
+  )
+    throw new Error('Missing migration');
+  command.operation.value.targetMetadata.manga.description = 'x'.repeat(60000);
+  command.operation.value.chapters = Array.from(
+    { length: 256 },
+    (_, index) => ({
+      $typeName: 'karuyomi.v1.ChapterMigration',
+      sourceChapterKey: `s-${index}-`.padEnd(200, 'x'),
+      targetChapterKey: `t-${index}-`.padEnd(200, 'x'),
+      copyRead: true,
+      copyBookmark: false,
+    }),
+  );
+  const response = await owner.mutate(command);
+  expect(response.status).toBe(413);
+  expect(response.body.error?.code).toBe(ErrorCode.LIMIT_EXCEEDED);
+  expect((await owner.state(target.mangaKey)).manga?.revision).toBe(0);
 });

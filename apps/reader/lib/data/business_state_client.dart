@@ -11,6 +11,8 @@ import 'business_state_validation.dart';
 import 'reading_progress.dart';
 import 'source_preferences_validation.dart';
 
+part 'business_state_migration.dart';
+
 const _schemaVersion = 1;
 const _responseLimit = 2 * 1024 * 1024;
 
@@ -145,6 +147,7 @@ final class BusinessStateClient {
   final _remoteRevisions = <String, int>{};
   final _pending = <String, _PendingMutation>{};
   final _queues = <String, Future<void>>{};
+  final _migrationClaims = <String, Object>{};
   final _uuid = const Uuid();
   final _pendingSettings = <String, _PendingSettingsMutation>{};
   final _sourcePreferences = <String, wire.SourcePreferencesResponse>{};
@@ -316,7 +319,9 @@ final class BusinessStateClient {
       _library = List.unmodifiable(entries);
       _pending.removeWhere(
         (_, pending) =>
-            pending.rejected && _mutationChapter(pending.request) == null,
+            pending.rejected &&
+            !pending.request.hasMigrateFrom() &&
+            _mutationChapter(pending.request) == null,
       );
       if (_pendingCategory?.rejection != null) _pendingCategory = null;
       _changes.add(null);
@@ -340,10 +345,18 @@ final class BusinessStateClient {
 
   /// Read the manga CAS and every bookmark page at one account revision.
   Future<BusinessBookmarksSnapshot> readBookmarks(
-    String key,
-  ) => _serial(key, () async {
+    String key, {
+    bool Function()? shouldContinue,
+    bool updateSession = true,
+  }) => _serial(key, () async {
     for (var attempt = 0; attempt < 3; attempt++) {
-      final state = await _readManga(key);
+      _checkContinue(shouldContinue);
+      final state = await _readManga(
+        key,
+        shouldContinue: shouldContinue,
+        accept: updateSession,
+      );
+      _checkContinue(shouldContinue);
       final revision = state.accountRevision;
       final entries = <wire.ChapterBookmark>[];
       final cursors = <String>{};
@@ -357,7 +370,9 @@ final class BusinessStateClient {
             'revision': '$revision',
           },
         ).toString();
+        _checkContinue(shouldContinue);
         final reply = await _get(path);
+        _checkContinue(shouldContinue);
         final page = wire.decodeProtoJson(
           wire.BookmarkPageResponse(),
           jsonDecode(reply.body),
@@ -389,7 +404,8 @@ final class BusinessStateClient {
       if (restart) continue;
       _ensureOpen();
       final rejected = _pending[key];
-      if (rejected != null &&
+      if (updateSession &&
+          rejected != null &&
           rejected.rejected &&
           rejected.request.hasSetBookmark()) {
         _pending.remove(key);
@@ -405,10 +421,18 @@ final class BusinessStateClient {
 
   /// Read all stored chapter statuses and the manga CAS at one account revision.
   Future<BusinessChapterProgressSnapshot> readChapterProgress(
-    String key,
-  ) => _serial(key, () async {
+    String key, {
+    bool Function()? shouldContinue,
+    bool updateSession = true,
+  }) => _serial(key, () async {
     for (var attempt = 0; attempt < 3; attempt++) {
-      final state = await _readManga(key);
+      _checkContinue(shouldContinue);
+      final state = await _readManga(
+        key,
+        shouldContinue: shouldContinue,
+        accept: updateSession,
+      );
+      _checkContinue(shouldContinue);
       final revision = state.accountRevision;
       final entries = <wire.ChapterProgressState>[];
       final cursors = <String>{};
@@ -422,7 +446,9 @@ final class BusinessStateClient {
             'revision': '$revision',
           },
         ).toString();
+        _checkContinue(shouldContinue);
         final reply = await _get(path);
+        _checkContinue(shouldContinue);
         final page = wire.decodeProtoJson(
           wire.ChapterProgressPageResponse(),
           jsonDecode(reply.body),
@@ -460,7 +486,8 @@ final class BusinessStateClient {
       if (restart) continue;
       _ensureOpen();
       final rejected = _pending[key];
-      if (rejected != null &&
+      if (updateSession &&
+          rejected != null &&
           rejected.rejected &&
           rejected.request.hasSetChapterRead()) {
         _pending.remove(key);
@@ -474,8 +501,20 @@ final class BusinessStateClient {
     throw StateError('Chapter progress changed repeatedly; refresh again');
   });
 
-  Future<wire.MangaStateResponse> readManga(String key, {String? chapterKey}) =>
-      _serial(key, () => _readManga(key, chapterKey: chapterKey));
+  Future<wire.MangaStateResponse> readManga(
+    String key, {
+    String? chapterKey,
+    bool Function()? shouldContinue,
+    bool updateSession = true,
+  }) => _serial(
+    key,
+    () => _readManga(
+      key,
+      chapterKey: chapterKey,
+      shouldContinue: shouldContinue,
+      accept: updateSession,
+    ),
+  );
 
   /// Inspect foreground state without advancing a writer's CAS view or
   /// resolving a rejected mutation owned by another reader or repository.
@@ -491,14 +530,17 @@ final class BusinessStateClient {
     String key, {
     String? chapterKey,
     bool accept = true,
+    bool Function()? shouldContinue,
     int? knownLocalRevision,
   }) async {
+    _checkContinue(shouldContinue);
     if (chapterKey != null) validateBusinessChapterKey(chapterKey);
     final path = Uri(
       path: '/api/state/manga/$key',
       queryParameters: {'chapterKey': ?chapterKey},
     ).toString();
     final reply = await _get(path);
+    _checkContinue(shouldContinue);
     final value = wire.decodeProtoJson(
       wire.MangaStateResponse(),
       jsonDecode(reply.body),
@@ -538,10 +580,10 @@ final class BusinessStateClient {
         value.accountRevision < value.manga.revision) {
       throw StateError('Business state response predates this session');
     }
-    if (!accept) return value;
     if (value.categoryCatalog.revision < _catalog.revision) {
       throw StateError('Business category response predates this session');
     }
+    if (!accept) return value;
     _acceptCatalog(value.categoryCatalog);
     _accept(value.manga, local: value.manga.revision == knownLocalRevision);
     _accountRevision = value.accountRevision > _accountRevision
@@ -550,7 +592,9 @@ final class BusinessStateClient {
     await _updateLibraryConfirmed(value.manga, value.categoryCatalog);
     _ensureOpen();
     final rejected = _pending[key];
-    if (rejected != null && rejected.rejected) {
+    if (rejected != null &&
+        rejected.rejected &&
+        !rejected.request.hasMigrateFrom()) {
       final rejectedChapter = _mutationChapter(rejected.request);
       // A shelf/resume read cannot resolve a reader's stale chapter view.
       // Only loading that chapter explicitly permits a new progress mutation.
@@ -628,6 +672,10 @@ final class BusinessStateClient {
     Uint8List? coverBytes,
   }) {
     final command = operation.deepCopy();
+    if (command.hasMigrateFrom()) {
+      throw ArgumentError('Use the migration command with both manga queues');
+    }
+    _assertNoMigration(command.mangaKey);
     if (command.mangaKey.isEmpty) throw ArgumentError('Missing manga key');
     command.clearMutationId();
     command.clearExpectedRevision();
@@ -676,6 +724,7 @@ final class BusinessStateClient {
         : Uint8List.fromList(coverBytes).asUnmodifiableView();
     final fingerprint = jsonEncode(wire.encodeProtoJson(command));
     return _serial(command.mangaKey, () async {
+      _assertNoMigration(command.mangaKey);
       final previous = _pending[command.mangaKey];
       if (previous != null) {
         if (!allowPendingReplay) {
@@ -749,6 +798,9 @@ final class BusinessStateClient {
   Future<wire.StateMutationResponse> _send(_PendingMutation pending) async {
     _ensureOpen();
     if (pending.rejected && pending.failure != null) throw pending.failure!;
+    if (!pending.request.hasMigrateFrom()) {
+      _assertNoMigration(pending.request.mangaKey);
+    }
     final retry = pending.sent;
     pending.sent = true;
     final upload = pending.coverBytes;
@@ -832,6 +884,9 @@ final class BusinessStateClient {
         value.accountRevision < value.manga.revision ||
         value.accountRevision < pending.accountRevision) {
       throw const FormatException('Mutation did not confirm a new revision');
+    }
+    if (pending.request.hasMigrateFrom()) {
+      _validateMigrationAck(pending.request.migrateFrom, value);
     }
     validateBusinessManga(value.manga);
     _validateCatalog(
@@ -981,12 +1036,14 @@ final class BusinessStateClient {
   Future<wire.CategoryMutationResponse> mutateCategories(
     wire.CategoryMutation operation,
   ) {
+    _assertNoMigrationCatalog();
     final command = operation.deepCopy();
     command.clearMutationId();
     command.schemaVersion = _schemaVersion;
     validateBusinessCategoryMutation(command);
     final fingerprint = jsonEncode(wire.encodeProtoJson(command));
     return _serial('categories', () async {
+      _assertNoMigrationCatalog();
       final previous = _pendingCategory;
       if (previous != null) {
         if (previous.fingerprint != fingerprint) {
@@ -1584,6 +1641,11 @@ final class BusinessStateClient {
     _library = List.unmodifiable(next);
   }
 
+  void _checkContinue(bool Function()? shouldContinue) {
+    _ensureOpen();
+    if (shouldContinue?.call() == false) throw StateError('迁移页面已关闭。');
+  }
+
   Future<T> _serial<T>(String key, Future<T> Function() action) {
     final before = _queues[key] ?? Future<void>.value();
     final result = before.then((_) {
@@ -1636,6 +1698,7 @@ final class BusinessStateClient {
     _manga.clear();
     _remoteRevisions.clear();
     _pending.clear();
+    _migrationClaims.clear();
     _library = const [];
     _pendingCategory = null;
     _pendingSourcePreferences.clear();

@@ -1875,6 +1875,292 @@ class ResetProgress extends $pb.GeneratedMessage {
   void clearReversedOrder() => $_clearField(2);
 }
 
+/// Explicit user-confirmed one-to-one chapter identities; flags select positive
+/// source read/bookmark state only. Source page anchors never cross sources.
+class ChapterMigration extends $pb.GeneratedMessage {
+  factory ChapterMigration({
+    $core.String? sourceChapterKey,
+    $core.String? targetChapterKey,
+    $core.bool? copyRead,
+    $core.bool? copyBookmark,
+  }) {
+    final result = ChapterMigration._();
+    if (sourceChapterKey != null) result.sourceChapterKey = sourceChapterKey;
+    if (targetChapterKey != null) result.targetChapterKey = targetChapterKey;
+    if (copyRead != null) result.copyRead = copyRead;
+    if (copyBookmark != null) result.copyBookmark = copyBookmark;
+    return result;
+  }
+
+  ChapterMigration._();
+
+  factory ChapterMigration.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChapterMigration()..mergeFromBuffer(data, registry);
+  factory ChapterMigration.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChapterMigration()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ChapterMigration',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ChapterMigration.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sourceChapterKey')
+    ..aOS(2, _omitFieldNames ? '' : 'targetChapterKey')
+    ..aOB(3, _omitFieldNames ? '' : 'copyRead')
+    ..aOB(4, _omitFieldNames ? '' : 'copyBookmark')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChapterMigration clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChapterMigration copyWith(void Function(ChapterMigration) updates) =>
+      super.copyWith((message) => updates(message as ChapterMigration))
+          as ChapterMigration;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ChapterMigration() / ChapterMigration.new instead')
+  static ChapterMigration create() => ChapterMigration._();
+  static $pb.GeneratedMessage $_createMessage() => ChapterMigration._();
+  @$core.override
+  ChapterMigration createEmptyInstance() => ChapterMigration._();
+  @$core.pragma('dart2js:noInline')
+  static ChapterMigration getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ChapterMigration>(
+          ChapterMigration.$_createMessage);
+  static ChapterMigration? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sourceChapterKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sourceChapterKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourceChapterKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourceChapterKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get targetChapterKey => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set targetChapterKey($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTargetChapterKey() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTargetChapterKey() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get copyRead => $_getBF(2);
+  @$pb.TagNumber(3)
+  set copyRead($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCopyRead() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCopyRead() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get copyBookmark => $_getBF(3);
+  @$pb.TagNumber(4)
+  set copyBookmark($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCopyBookmark() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCopyBookmark() => $_clearField(4);
+}
+
+class MigrateFrom extends $pb.GeneratedMessage {
+  factory MigrateFrom({
+    $core.String? sourceMangaKey,
+    $core.int? expectedSourceRevision,
+    $core.int? expectedCatalogRevision,
+    LibraryMetadata? targetMetadata,
+    $core.bool? copyCategories,
+    $core.Iterable<ChapterMigration>? chapters,
+  }) {
+    final result = MigrateFrom._();
+    if (sourceMangaKey != null) result.sourceMangaKey = sourceMangaKey;
+    if (expectedSourceRevision != null)
+      result.expectedSourceRevision = expectedSourceRevision;
+    if (expectedCatalogRevision != null)
+      result.expectedCatalogRevision = expectedCatalogRevision;
+    if (targetMetadata != null) result.targetMetadata = targetMetadata;
+    if (copyCategories != null) result.copyCategories = copyCategories;
+    if (chapters != null) result.chapters.addAll(chapters);
+    return result;
+  }
+
+  MigrateFrom._();
+
+  factory MigrateFrom.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MigrateFrom()..mergeFromBuffer(data, registry);
+  factory MigrateFrom.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MigrateFrom()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MigrateFrom',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: MigrateFrom.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sourceMangaKey')
+    ..aI(2, _omitFieldNames ? '' : 'expectedSourceRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'expectedCatalogRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<LibraryMetadata>(4, _omitFieldNames ? '' : 'targetMetadata',
+        subBuilder: LibraryMetadata.$_createMessage)
+    ..aOB(5, _omitFieldNames ? '' : 'copyCategories')
+    ..pPM<ChapterMigration>(6, _omitFieldNames ? '' : 'chapters',
+        subBuilder: ChapterMigration.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MigrateFrom clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MigrateFrom copyWith(void Function(MigrateFrom) updates) =>
+      super.copyWith((message) => updates(message as MigrateFrom))
+          as MigrateFrom;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use MigrateFrom() / MigrateFrom.new instead')
+  static MigrateFrom create() => MigrateFrom._();
+  static $pb.GeneratedMessage $_createMessage() => MigrateFrom._();
+  @$core.override
+  MigrateFrom createEmptyInstance() => MigrateFrom._();
+  @$core.pragma('dart2js:noInline')
+  static MigrateFrom getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<MigrateFrom>(
+          MigrateFrom.$_createMessage);
+  static MigrateFrom? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sourceMangaKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sourceMangaKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourceMangaKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourceMangaKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get expectedSourceRevision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set expectedSourceRevision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasExpectedSourceRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearExpectedSourceRevision() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get expectedCatalogRevision => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set expectedCatalogRevision($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpectedCatalogRevision() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpectedCatalogRevision() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  LibraryMetadata get targetMetadata => $_getN(3);
+  @$pb.TagNumber(4)
+  set targetMetadata(LibraryMetadata value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTargetMetadata() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTargetMetadata() => $_clearField(4);
+  @$pb.TagNumber(4)
+  LibraryMetadata ensureTargetMetadata() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  $core.bool get copyCategories => $_getBF(4);
+  @$pb.TagNumber(5)
+  set copyCategories($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCopyCategories() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCopyCategories() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<ChapterMigration> get chapters => $_getList(5);
+}
+
+class MigrationResult extends $pb.GeneratedMessage {
+  factory MigrationResult({
+    $core.int? copiedReadChapters,
+    $core.int? copiedBookmarks,
+  }) {
+    final result = MigrationResult._();
+    if (copiedReadChapters != null)
+      result.copiedReadChapters = copiedReadChapters;
+    if (copiedBookmarks != null) result.copiedBookmarks = copiedBookmarks;
+    return result;
+  }
+
+  MigrationResult._();
+
+  factory MigrationResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MigrationResult()..mergeFromBuffer(data, registry);
+  factory MigrationResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MigrationResult()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MigrationResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: MigrationResult.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'copiedReadChapters',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'copiedBookmarks',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MigrationResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MigrationResult copyWith(void Function(MigrationResult) updates) =>
+      super.copyWith((message) => updates(message as MigrationResult))
+          as MigrationResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use MigrationResult() / MigrationResult.new instead')
+  static MigrationResult create() => MigrationResult._();
+  static $pb.GeneratedMessage $_createMessage() => MigrationResult._();
+  @$core.override
+  MigrationResult createEmptyInstance() => MigrationResult._();
+  @$core.pragma('dart2js:noInline')
+  static MigrationResult getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<MigrationResult>(
+          MigrationResult.$_createMessage);
+  static MigrationResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get copiedReadChapters => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set copiedReadChapters($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCopiedReadChapters() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCopiedReadChapters() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get copiedBookmarks => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set copiedBookmarks($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCopiedBookmarks() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCopiedBookmarks() => $_clearField(2);
+}
+
 enum StateMutation_Operation {
   setFavorite,
   updateMetadata,
@@ -1884,6 +2170,7 @@ enum StateMutation_Operation {
   setBookmark,
   setChapterRead,
   setCustomCover,
+  migrateFrom,
   notSet
 }
 
@@ -1901,6 +2188,7 @@ class StateMutation extends $pb.GeneratedMessage {
     SetBookmark? setBookmark,
     SetChapterRead? setChapterRead,
     SetCustomCover? setCustomCover,
+    MigrateFrom? migrateFrom,
   }) {
     final result = StateMutation._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -1915,6 +2203,7 @@ class StateMutation extends $pb.GeneratedMessage {
     if (setBookmark != null) result.setBookmark = setBookmark;
     if (setChapterRead != null) result.setChapterRead = setChapterRead;
     if (setCustomCover != null) result.setCustomCover = setCustomCover;
+    if (migrateFrom != null) result.migrateFrom = migrateFrom;
     return result;
   }
 
@@ -1937,13 +2226,14 @@ class StateMutation extends $pb.GeneratedMessage {
     15: StateMutation_Operation.setBookmark,
     16: StateMutation_Operation.setChapterRead,
     17: StateMutation_Operation.setCustomCover,
+    18: StateMutation_Operation.migrateFrom,
     0: StateMutation_Operation.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'StateMutation',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: StateMutation.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
     ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
         fieldType: $pb.PbFieldType.OU3)
     ..aOS(2, _omitFieldNames ? '' : 'mutationId')
@@ -1966,6 +2256,8 @@ class StateMutation extends $pb.GeneratedMessage {
         subBuilder: SetChapterRead.$_createMessage)
     ..aOM<SetCustomCover>(17, _omitFieldNames ? '' : 'setCustomCover',
         subBuilder: SetCustomCover.$_createMessage)
+    ..aOM<MigrateFrom>(18, _omitFieldNames ? '' : 'migrateFrom',
+        subBuilder: MigrateFrom.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1998,6 +2290,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   StateMutation_Operation whichOperation() =>
       _StateMutation_OperationByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -2008,6 +2301,7 @@ class StateMutation extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   void clearOperation() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -2134,6 +2428,17 @@ class StateMutation extends $pb.GeneratedMessage {
   void clearSetCustomCover() => $_clearField(17);
   @$pb.TagNumber(17)
   SetCustomCover ensureSetCustomCover() => $_ensure(11);
+
+  @$pb.TagNumber(18)
+  MigrateFrom get migrateFrom => $_getN(12);
+  @$pb.TagNumber(18)
+  set migrateFrom(MigrateFrom value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasMigrateFrom() => $_has(12);
+  @$pb.TagNumber(18)
+  void clearMigrateFrom() => $_clearField(18);
+  @$pb.TagNumber(18)
+  MigrateFrom ensureMigrateFrom() => $_ensure(12);
 }
 
 class BusinessStateError extends $pb.GeneratedMessage {
@@ -2228,6 +2533,7 @@ class StateMutationResponse extends $pb.GeneratedMessage {
     BusinessStateError? error,
     CategoryCatalog? categoryCatalog,
     ChapterBookmark? bookmark,
+    MigrationResult? migration,
   }) {
     final result = StateMutationResponse._();
     if (schemaVersion != null) result.schemaVersion = schemaVersion;
@@ -2238,6 +2544,7 @@ class StateMutationResponse extends $pb.GeneratedMessage {
     if (error != null) result.error = error;
     if (categoryCatalog != null) result.categoryCatalog = categoryCatalog;
     if (bookmark != null) result.bookmark = bookmark;
+    if (migration != null) result.migration = migration;
     return result;
   }
 
@@ -2269,6 +2576,8 @@ class StateMutationResponse extends $pb.GeneratedMessage {
         subBuilder: CategoryCatalog.$_createMessage)
     ..aOM<ChapterBookmark>(8, _omitFieldNames ? '' : 'bookmark',
         subBuilder: ChapterBookmark.$_createMessage)
+    ..aOM<MigrationResult>(9, _omitFieldNames ? '' : 'migration',
+        subBuilder: MigrationResult.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2376,6 +2685,17 @@ class StateMutationResponse extends $pb.GeneratedMessage {
   void clearBookmark() => $_clearField(8);
   @$pb.TagNumber(8)
   ChapterBookmark ensureBookmark() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  MigrationResult get migration => $_getN(8);
+  @$pb.TagNumber(9)
+  set migration(MigrationResult value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasMigration() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearMigration() => $_clearField(9);
+  @$pb.TagNumber(9)
+  MigrationResult ensureMigration() => $_ensure(8);
 }
 
 class MangaStateResponse extends $pb.GeneratedMessage {

@@ -637,6 +637,105 @@ final $typed_data.Uint8List resetProgressDescriptor = $convert.base64Decode(
     'NuYXBzaG90UghzbmFwc2hvdBIlCg5yZXZlcnNlZF9vcmRlchgCIAEoCFINcmV2ZXJzZWRPcmRl'
     'cg==');
 
+@$core.Deprecated('Use chapterMigrationDescriptor instead')
+const ChapterMigration$json = {
+  '1': 'ChapterMigration',
+  '2': [
+    {
+      '1': 'source_chapter_key',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '10': 'sourceChapterKey'
+    },
+    {
+      '1': 'target_chapter_key',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '10': 'targetChapterKey'
+    },
+    {'1': 'copy_read', '3': 3, '4': 1, '5': 8, '10': 'copyRead'},
+    {'1': 'copy_bookmark', '3': 4, '4': 1, '5': 8, '10': 'copyBookmark'},
+  ],
+};
+
+/// Descriptor for `ChapterMigration`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List chapterMigrationDescriptor = $convert.base64Decode(
+    'ChBDaGFwdGVyTWlncmF0aW9uEiwKEnNvdXJjZV9jaGFwdGVyX2tleRgBIAEoCVIQc291cmNlQ2'
+    'hhcHRlcktleRIsChJ0YXJnZXRfY2hhcHRlcl9rZXkYAiABKAlSEHRhcmdldENoYXB0ZXJLZXkS'
+    'GwoJY29weV9yZWFkGAMgASgIUghjb3B5UmVhZBIjCg1jb3B5X2Jvb2ttYXJrGAQgASgIUgxjb3'
+    'B5Qm9va21hcms=');
+
+@$core.Deprecated('Use migrateFromDescriptor instead')
+const MigrateFrom$json = {
+  '1': 'MigrateFrom',
+  '2': [
+    {'1': 'source_manga_key', '3': 1, '4': 1, '5': 9, '10': 'sourceMangaKey'},
+    {
+      '1': 'expected_source_revision',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '10': 'expectedSourceRevision'
+    },
+    {
+      '1': 'expected_catalog_revision',
+      '3': 3,
+      '4': 1,
+      '5': 13,
+      '10': 'expectedCatalogRevision'
+    },
+    {
+      '1': 'target_metadata',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.LibraryMetadata',
+      '10': 'targetMetadata'
+    },
+    {'1': 'copy_categories', '3': 5, '4': 1, '5': 8, '10': 'copyCategories'},
+    {
+      '1': 'chapters',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.ChapterMigration',
+      '10': 'chapters'
+    },
+  ],
+};
+
+/// Descriptor for `MigrateFrom`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List migrateFromDescriptor = $convert.base64Decode(
+    'CgtNaWdyYXRlRnJvbRIoChBzb3VyY2VfbWFuZ2Ffa2V5GAEgASgJUg5zb3VyY2VNYW5nYUtleR'
+    'I4ChhleHBlY3RlZF9zb3VyY2VfcmV2aXNpb24YAiABKA1SFmV4cGVjdGVkU291cmNlUmV2aXNp'
+    'b24SOgoZZXhwZWN0ZWRfY2F0YWxvZ19yZXZpc2lvbhgDIAEoDVIXZXhwZWN0ZWRDYXRhbG9nUm'
+    'V2aXNpb24SRQoPdGFyZ2V0X21ldGFkYXRhGAQgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1l'
+    'dGFkYXRhUg50YXJnZXRNZXRhZGF0YRInCg9jb3B5X2NhdGVnb3JpZXMYBSABKAhSDmNvcHlDYX'
+    'RlZ29yaWVzEjkKCGNoYXB0ZXJzGAYgAygLMh0ua2FydXlvbWkudjEuQ2hhcHRlck1pZ3JhdGlv'
+    'blIIY2hhcHRlcnM=');
+
+@$core.Deprecated('Use migrationResultDescriptor instead')
+const MigrationResult$json = {
+  '1': 'MigrationResult',
+  '2': [
+    {
+      '1': 'copied_read_chapters',
+      '3': 1,
+      '4': 1,
+      '5': 13,
+      '10': 'copiedReadChapters'
+    },
+    {'1': 'copied_bookmarks', '3': 2, '4': 1, '5': 13, '10': 'copiedBookmarks'},
+  ],
+};
+
+/// Descriptor for `MigrationResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List migrationResultDescriptor = $convert.base64Decode(
+    'Cg9NaWdyYXRpb25SZXN1bHQSMAoUY29waWVkX3JlYWRfY2hhcHRlcnMYASABKA1SEmNvcGllZF'
+    'JlYWRDaGFwdGVycxIpChBjb3BpZWRfYm9va21hcmtzGAIgASgNUg9jb3BpZWRCb29rbWFya3M=');
+
 @$core.Deprecated('Use stateMutationDescriptor instead')
 const StateMutation$json = {
   '1': 'StateMutation',
@@ -723,6 +822,15 @@ const StateMutation$json = {
       '9': 0,
       '10': 'setCustomCover'
     },
+    {
+      '1': 'migrate_from',
+      '3': 18,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.MigrateFrom',
+      '9': 0,
+      '10': 'migrateFrom'
+    },
   ],
   '8': [
     {'1': 'operation'},
@@ -743,8 +851,9 @@ final $typed_data.Uint8List stateMutationDescriptor = $convert.base64Decode(
     'VzEj0KDHNldF9ib29rbWFyaxgPIAEoCzIYLmthcnV5b21pLnYxLlNldEJvb2ttYXJrSABSC3Nl'
     'dEJvb2ttYXJrEkcKEHNldF9jaGFwdGVyX3JlYWQYECABKAsyGy5rYXJ1eW9taS52MS5TZXRDaG'
     'FwdGVyUmVhZEgAUg5zZXRDaGFwdGVyUmVhZBJHChBzZXRfY3VzdG9tX2NvdmVyGBEgASgLMhsu'
-    'a2FydXlvbWkudjEuU2V0Q3VzdG9tQ292ZXJIAFIOc2V0Q3VzdG9tQ292ZXJCCwoJb3BlcmF0aW'
-    '9u');
+    'a2FydXlvbWkudjEuU2V0Q3VzdG9tQ292ZXJIAFIOc2V0Q3VzdG9tQ292ZXISPQoMbWlncmF0ZV'
+    '9mcm9tGBIgASgLMhgua2FydXlvbWkudjEuTWlncmF0ZUZyb21IAFILbWlncmF0ZUZyb21CCwoJ'
+    'b3BlcmF0aW9u');
 
 @$core.Deprecated('Use businessStateErrorDescriptor instead')
 const BusinessStateError$json = {
@@ -816,6 +925,14 @@ const StateMutationResponse$json = {
       '6': '.karuyomi.v1.ChapterBookmark',
       '10': 'bookmark'
     },
+    {
+      '1': 'migration',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.MigrationResult',
+      '10': 'migration'
+    },
   ],
 };
 
@@ -828,7 +945,8 @@ final $typed_data.Uint8List stateMutationResponseDescriptor = $convert.base64Dec
     'dGVyUHJvZ3Jlc3NTdGF0ZVIIcHJvZ3Jlc3MSNQoFZXJyb3IYBiABKAsyHy5rYXJ1eW9taS52MS'
     '5CdXNpbmVzc1N0YXRlRXJyb3JSBWVycm9yEkcKEGNhdGVnb3J5X2NhdGFsb2cYByABKAsyHC5r'
     'YXJ1eW9taS52MS5DYXRlZ29yeUNhdGFsb2dSD2NhdGVnb3J5Q2F0YWxvZxI4Cghib29rbWFyax'
-    'gIIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFya1IIYm9va21hcms=');
+    'gIIAEoCzIcLmthcnV5b21pLnYxLkNoYXB0ZXJCb29rbWFya1IIYm9va21hcmsSOgoJbWlncmF0'
+    'aW9uGAkgASgLMhwua2FydXlvbWkudjEuTWlncmF0aW9uUmVzdWx0UgltaWdyYXRpb24=');
 
 @$core.Deprecated('Use mangaStateResponseDescriptor instead')
 const MangaStateResponse$json = {
