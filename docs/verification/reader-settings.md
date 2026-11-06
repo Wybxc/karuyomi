@@ -102,7 +102,43 @@ flutter test integration_test/settings_sync_test.dart --no-pub -d <simulator-udi
 
 独立验收只读审查产品差异，并核对红日志与最终 `All tests passed`。修复前证据在 `/private/tmp/karuyomi-settings-invalid-origin-red.log`，完整导航绿日志在 `/private/tmp/karuyomi-settings-reconnect-final-green.log`。最终完整 `pnpm flutter:check` 通过：reader_core 22、source_runtime 78、客户端 584，三个项目静态分析无问题，日志为 `.local/settings-reconnect-final-flutter-check.log`。这是正式 AppShell 与受控 TestPlatform / 业务 supplier 的组件回归，未新增真实设备丢响应、Access 续期或网络故障验收。
 
-固定提交 `2123b5b7d6fcf897f0120e1873001f398363b968` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42288468310) 已独立核对为 completed / success。上述后续 AppShell 修复与固定 `2123b5b` 的设备副本是不同输入，不能用旧设备运行或该 CI 证明本节新修复已在设备执行。
+固定提交 `2123b5b7d6fcf897f0120e1873001f398363b968` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42288468310) 和本节修复提交 `eee2b8115ccf215bb8d1c57dd7bec76d16333195` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42292436578) 均已独立核对为 completed / success。上述 AppShell 修复与固定 `2123b5b` 的设备副本是不同输入，不能用旧设备运行证明本节新修复已在设备执行。
+
+## 2026-11-07：零 Source 业务 API 的受控 Access 恢复
+
+后续审计发现，私有 API 在尚未打开 Source 时返回 401、403、跳转或登录 HTML，宿主只把它们作为 HTTP 结果交付，未向 Dart 发出结构化 Access 错误。因此设置保存可能保留未确认命令，却没有进入正式登录恢复入口。修复后，当前请求所属代际的私有 API 401、跳转及 HTML 返回 `access_required`，403 返回 `access_denied`，经正式 ProtoJSON 控制响应进入 Dart 的 Access 暂停和 Catalog 登录状态；公开扩展目录、业务 409 与 5xx 仍保留原 HTTP 语义。
+
+运行时宿主使用受控 Fetch Response 与正式 `host-api.control` 验证零 Source 和已有 Source 两种状态，包含普通和 opaque 跳转、HTML Content-Type 大小写、响应正文取消失败，以及资源保留。manager 78 项与 Native/image 17 项合计 95/95 通过；这不是连接真实 Access 服务的 HTTP 验收。独立复审还发现正文 `cancel()` 的异步窗口：清理旧失败响应时若已打开新 Source，旧错误不能暂停新代。零/已有 Source 两项回归修复前均失败；修复后先等待正文取消，再在同步发布段检查当前 generation 和 disposed，过期响应保留 HTTP 状态并返回空正文，不重读已取消的流。红绿日志分别为 `/private/tmp/karuyomi-api-access-cleanup-{red,green}.log`。
+
+Dart 的正式 `TransportSourceRuntime` 用生成的 `ControlResponse` 和受控传输覆盖零/已有 Source × Access required/denied 四种错误。另四项延迟 envelope 回归在修复前均因旧 `RuntimeEvent` 污染新 Source 失败；修复后仅将过期 Access 错误交给原调用者，不修改新会话的 Access 状态或发出事件。成功业务 ACK 继续独立于 Source 换代。晚交付红绿证据为 `/private/tmp/karuyomi-api-access-delivery-{red,green}.log`。
+
+正式 AppShell 新增两项零 Source 设置回归，全导航文件 12/12 通过：受控业务 supplier 已应用设置后返回 typed Access required/denied 错误，UI 显示正式登录入口，暂停编辑并保留原命令；登录恢复保留原 BusinessStateClient，不自动重发写入；明确点击“重试原设置操作”才重发逐字相同的 UUID / 正文 / CAS，累计只应用一次。该组件测试直接提供结构化错误，未把它记作实际 Fetch、登录弹窗或生产 Access 续期。日志为 `/private/tmp/karuyomi-settings-access-navigation.log`。
+
+扩大回归执行完整 `packages/runtime-host/test`，14 个文件 / 217 项全部通过，日志为 `.local/settings-api-access-host-all.log`；上述 95 项是其中的定向集合。全仓 `pnpm typecheck` 与 `pnpm check:dependencies` 通过，依赖检查为 179 模块 / 590 依赖无违规，分别记录在 `.local/settings-api-access-{typecheck,dependencies}.log`。
+
+最终完整 `pnpm check` 通过，包含 33 个文件 / 505 项 Vitest、协议 golden 和全部工具测试；完整 `pnpm flutter:check` 为 reader_core 22、source_runtime 86、客户端 586 项，三个项目静态分析无问题、172 个 Dart 文件格式零差异，日志为 `.local/settings-api-access-final-{check,flutter-check}.log`。完整 `pnpm build` 通过并核对 57 个静态文件 / 0 个当前扩展，日志为 `.local/settings-api-access-final-build.log`；该零扩展工程构建不计为在线 Source 或生产 Access 验收。
+
+## 2026-11-07：Android↔iOS 同服务全局设置同步
+
+本轮新建 Android Pixel 9 / API 36 Google APIs ARM64 模拟器和 iPhone 17 Pro / iOS 26.4 模拟器，使用同一个正式 HTTPS acceptance 服务 `https://127.0.0.1:52754`、同一 subject `acceptance-owner` 和同一真实 D1。服务从 revision 0 开始，所有写入均通过正式 `app.main`、NativePlatformRuntime 与设置表单发起；独立验收只发正常校验证书的 GET，没有代写业务状态。各阶段为独立 `flutter test` 调用和新应用进程，实际报告平台分别为 `android` / `ios`，不是 Web 模式或单平台改写标签。
+
+| 阶段               | account/global revision 与实际结果                 |
+| ------------------ | -------------------------------------------------- |
+| iOS 首次只读       | 0→0，SYSTEM / LTR / AUTO / CONTAIN、裁白 false。   |
+| Android 正式保存   | 0→1，DARK / RTL / DOUBLE / WIDTH、裁白 true。      |
+| iOS 新进程只读     | 1→1，读回 Android 保存的完整设置。                 |
+| iOS 正式保存       | 1→2，LIGHT / WEBTOON / AUTO / HEIGHT、裁白 false。 |
+| Android 新进程只读 | 2→2，读回 iOS 保存的完整设置。                     |
+
+独立验收解析全部五份 `SETTINGS_SYNC_RESULT` 与通过标志，每阶段 GET 核对完整 global / effectiveReader 和 revision；最后的完整权威响应与 iOS 写后相同，没有新增写入。保存前草稿不改变应用主题或已确认设置，ACK 和当前 GET 确认后才应用主题并清除 pending。裁白关闭后的正式 TS ProtoJSON 实际省略 `cropBorders=false`，Android 仍正确确认和恢复；调暗始终为 0，不据此声称非零调暗归零已在该设备组合验收。背景 BLACK、输入预设 STANDARD 和三个空列表保持不变；零扩展索引、无 Source 会话，也未创建未保存阅读进度。
+
+两平台产品固定在 `2123b5b7d6fcf897f0120e1873001f398363b968` 的同一忽略副本。逐文件身份记录共 95 项；验收驱动之外的 94 项输入在本轮保持不变。首次 iOS 只读使用驱动 SHA-256 `5e15a9014e4ee9cffbec836fd424a9e0cd50e8ea21d7ab055e2ffca4f44e6319`，其余成功阶段使用追加测试 CA 输入的正式驱动 `4ffc0a9c056a9c00beb6a5ebba59479e3100d2a892cf19715f073b9fbd15903b`。主树同期的同服务重连和 Access 恢复修复没有混入该固定副本，不能用本节设备结果证明这些新修复已在设备运行。
+
+首次 Android 写入尝试在进入表单前失败，D1 仍为 0；独立诊断取得 Dart `dart:io` 的 `CERTIFICATE_VERIFY_FAILED / unable to get local issuer certificate`，说明 WebView 的测试 CA 配置没有覆盖 Dart HTTP 的信任。正式集成驱动随后新增可选 `SETTINGS_TEST_CA_BASE64`：仅允许已校验的 Android `https://127.0.0.1` origin，用标准库解码本轮 CA 文件字节后，向测试进程默认 `SecurityContext` 追加信任，保留系统根与主机名校验。没有使用 `badCertificateCallback`、`HttpOverrides` 或修改产品 TLS。多行 PEM 参数曾在 Flutter Android 编译层失败，改用标准 Base64 后，先通过独立只读预检确认 revision 仍为 0，才重新进入正式写阶段；这些环境与准备失败日志均保留，没有计作额外业务写入，也没有声称修复了产品启动可靠性。
+
+复验沿上节官方 HTTPS harness 和[正式驱动说明](../../apps/reader/integration_test/README.md)，按每阶段前的完整 GET 生成本地 `--dart-define-from-file` 配置。Android 的配置额外填写本轮 CA 原始字节的标准 Base64 字符串；iOS 不传该字段。完整产品副本、源码身份、配置和运行日志保留在 `.local/settings-android-ios-20261107/`，独立原始响应与审计快照在 `/private/tmp/karuyomi-settings-android-ios-*.json`。这组证据覆盖模拟器 Android↔iOS 同服务的全局设置在线写入和新进程读回；没有验证 Web↔Native、并发竞争、网络故障、生产 Access、真实手动触控或真机性能。
+
+本轮汇总为 `.local/settings-android-ios-20261107/results.json`，保留完整报告、按阶段的驱动 SHA、失败分类、输入身份及清理记录。HTTPS harness 与 Android emulator 均正常 exit 0；端口 52754 已释放，专用 Android AVD 和 iOS 模拟器均已删除，确认 ADB 无设备后关闭本轮 server。独立只读检查未发现可归因本轮的测试、设备或服务进程残留；原有 iOS 设备的元数据差异按实际结果保留在汇总中。
 
 ## 可复验入口
 
@@ -119,7 +155,7 @@ pnpm exec vitest run --project workers apps/api/test/state-workerd.test.ts
 ## 尚待验收与完整范围
 
 - 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；漫画继承/覆盖/清空、实际丢响应恢复和同时请求竞争仍待独立客户端验收。
-- Web↔iOS↔Android 实际组合、可靠前台恢复、生产 Access、Native 手动触控与真机。
+- Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；Web↔Native、可靠前台恢复、生产 Access、Native 手动触控与真机仍待验收。
 - 该轮三项设置之后，阅读背景、应用内调暗与点击区/键盘预设已继续接入，结果分别见[后续记录](reader-appearance.md)；适宽/适高与裁白已实现，分别见[图像适配](reader-fit.md)和[同步裁白](reader-crop.md)。
 
 当前交付顺序见 [P1](../plan/p1-library-and-progress.md) 与 [P2](../plan/p2-sync.md)。生产、跨端和真机门未因上述工程与组件测试通过。

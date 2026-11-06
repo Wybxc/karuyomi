@@ -172,7 +172,9 @@ async function setup(
     ...(images
       ? {
           acquireImage: vi.fn(images.acquire),
-          closePageSession: vi.fn(async () => ({ closed: true as const })),
+          closePageSession: vi.fn(async (_pageSessionId: string) => ({
+            closed: true as const,
+          })),
         }
       : {}),
   };
@@ -693,6 +695,295 @@ test('a different identity clears retained images and late old cleanup cannot re
   ).toEqual(bytes);
 });
 
+const apiAccessCases = [
+  [
+    '401',
+    401,
+    'application/json',
+    'access_required',
+    pb.RuntimeErrorCode.ACCESS_REQUIRED,
+  ],
+  [
+    '403',
+    403,
+    'application/json',
+    'access_denied',
+    pb.RuntimeErrorCode.ACCESS_DENIED,
+  ],
+  [
+    'redirect',
+    302,
+    'text/plain',
+    'access_required',
+    pb.RuntimeErrorCode.ACCESS_REQUIRED,
+  ],
+  [
+    'HTML login',
+    200,
+    'text/html; charset=utf-8',
+    'access_required',
+    pb.RuntimeErrorCode.ACCESS_REQUIRED,
+  ],
+  [
+    'mixed-case HTML login',
+    200,
+    'Text/HTML; charset=utf-8',
+    'access_required',
+    pb.RuntimeErrorCode.ACCESS_REQUIRED,
+  ],
+] as const;
+
+for (const activeSource of [false, true]) {
+  test.each(apiAccessCases)(
+    `private API %s becomes a structured Access failure (active Source=${activeSource})`,
+    async (_name, status, contentType, code) => {
+      const { manager, workers } = await setup();
+      const session = activeSource ? await manager.open(options) : undefined;
+      const cancel = vi.fn();
+      const pull = vi.fn(
+        (controller: ReadableStreamDefaultController<Uint8Array>) => {
+          controller.enqueue(new TextEncoder().encode('Access response body'));
+          controller.close();
+        },
+      );
+      const body = new ReadableStream<Uint8Array>(
+        { pull, cancel },
+        { highWaterMark: 0 },
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          async () =>
+            new Response(body, {
+              status,
+              headers: { 'Content-Type': contentType },
+            }),
+        ),
+      );
+      await expect(
+        manager.fetchApi({ path: '/api/settings' }),
+      ).rejects.toMatchObject({ code });
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(pull).not.toHaveBeenCalled();
+      expect(workers).toHaveLength(activeSource ? 1 : 0);
+      if (session) {
+        expect(workers[0]?.terminated).toBe(true);
+        await expect(
+          manager.invoke(call('after-api-access-failure', session.generation)),
+        ).rejects.toMatchObject({ code });
+      }
+    },
+  );
+}
+
+test.each(apiAccessCases)(
+  'the public ProtoJSON control entry correlates private API %s as an Access error without a Source',
+  async (_name, status, contentType, _code, wireCode) => {
+    const { manager, workers } = await setup();
+    vi.stubGlobal('window', { addEventListener: vi.fn() });
+    const createSearch = vi.fn(() => {
+      throw new Error('This account request must not create a Source slot');
+    });
+    const api = installRuntime(manager, createSearch);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('Access response', {
+            status,
+            headers: { 'Content-Type': contentType },
+          }),
+      ),
+    );
+    const response = parseControlResponse(
+      await api.control(
+        encodeControlRequest(
+          create(pb.ControlRequestSchema, {
+            slotId: pb.RuntimeSlot.FOREGROUND,
+            requestId: 'account-access-error',
+            command: {
+              case: 'fetchApi',
+              value: { path: '/api/settings', method: 'GET' },
+            },
+          }),
+        ),
+      ),
+    );
+    expect(response).toMatchObject({
+      slotId: pb.RuntimeSlot.FOREGROUND,
+      requestId: 'account-access-error',
+      result: { case: 'error', value: { code: wireCode } },
+    });
+    expect(workers).toHaveLength(0);
+    expect(createSearch).not.toHaveBeenCalled();
+  },
+);
+
+test('an opaque private API redirect becomes an Access error before a Source opens', async () => {
+  const { manager, workers } = await setup();
+  class OpaqueRedirectResponse extends Response {
+    override get type(): ResponseType {
+      return 'opaqueredirect';
+    }
+  }
+  const response = new OpaqueRedirectResponse('Opaque login', { status: 200 });
+  const cancel = vi.spyOn(response.body!, 'cancel');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => response),
+  );
+  await expect(
+    manager.fetchApi({ path: '/api/settings' }),
+  ).rejects.toMatchObject({ code: 'access_required' });
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(workers).toHaveLength(0);
+});
+
+test.each([
+  ['/api/settings', 409, 'application/json'],
+  ['/api/settings', 500, 'application/json'],
+  ['/extensions/index.json', 401, 'application/json'],
+  ['/extensions/builds/test-build/manifest.json', 403, 'application/json'],
+  ['/extensions/index.json', 302, 'text/plain'],
+  ['/extensions/index.json', 200, 'text/html'],
+] as const)(
+  'non-Access API or public catalog response %s %i remains an HTTP result',
+  async (path, status, contentType) => {
+    const { manager, workers } = await setup();
+    const session = await manager.open(options);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('Original HTTP body', {
+            status,
+            headers: { 'Content-Type': contentType },
+          }),
+      ),
+    );
+    const response = await manager.fetchApi({ path });
+    expect(response.status).toBe(status);
+    expect(response.redirected).toBe(status === 302);
+    expect(response.body).toBe(status === 302 ? '' : 'Original HTTP body');
+    expect(workers[0]?.terminated).toBe(false);
+    await expect(
+      manager.invoke(call('after-raw-http-response', session.generation)),
+    ).resolves.toMatchObject({ generation: session.generation });
+  },
+);
+
+test('response cleanup failure does not replace the original API Access decision', async () => {
+  const { manager } = await setup();
+  const cancel = vi.fn(() =>
+    Promise.reject(new Error('Response cleanup failed')),
+  );
+  const body = new ReadableStream<Uint8Array>({ cancel }, { highWaterMark: 0 });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(body, { status: 403 })),
+  );
+  await expect(
+    manager.fetchApi({ path: '/api/settings' }),
+  ).rejects.toMatchObject({
+    code: 'access_denied',
+    message: 'Access no longer permits API requests',
+  });
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
+test('an account API Access failure from before the first Source cannot pause that later Source', async () => {
+  const { manager, workers } = await setup();
+  const response = deferred<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => response.promise),
+  );
+  const pending = manager.fetchApi({ path: '/api/settings' });
+  const session = await manager.open(options);
+  response.resolve(new Response('', { status: 401 }));
+  expect((await pending).status).toBe(401);
+  expect(workers[0]?.terminated).toBe(false);
+  await expect(
+    manager.invoke(call('after-earlier-account-failure', session.generation)),
+  ).resolves.toMatchObject({ generation: session.generation });
+});
+
+for (const activeSource of [false, true]) {
+  test(`an API Access body cleanup cannot publish an error to a replacement Source (active Source=${activeSource})`, async () => {
+    const { manager, workers } = await setup();
+    if (activeSource) await manager.open(options);
+    const cancelling = deferred<void>();
+    const cancelled = deferred<void>();
+    const body = new ReadableStream<Uint8Array>(
+      {
+        cancel() {
+          cancelling.resolve();
+          return cancelled.promise;
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const getReader = vi.spyOn(body, 'getReader');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(body, {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
+    );
+    vi.stubGlobal('window', { addEventListener: vi.fn() });
+    const api = installRuntime(manager, () => {
+      throw new Error('Search is not used');
+    });
+    const pending = api.control(
+      encodeControlRequest(
+        create(pb.ControlRequestSchema, {
+          requestId: 'account-error-during-cleanup',
+          slotId: pb.RuntimeSlot.FOREGROUND,
+          command: { case: 'fetchApi', value: { path: '/api/settings' } },
+        }),
+      ),
+    );
+    await cancelling.promise;
+    try {
+      const current = await manager.open({
+        ...options,
+        userAgent: 'Replacement during Access cleanup',
+      });
+      cancelled.resolve();
+      const response = parseControlResponse(await pending);
+      expect(response).toMatchObject({
+        requestId: 'account-error-during-cleanup',
+        slotId: pb.RuntimeSlot.FOREGROUND,
+        result: { case: 'api', value: { status: 401, body: '' } },
+      });
+      expect(getReader).not.toHaveBeenCalled();
+      expect(workers.at(-1)?.terminated).toBe(false);
+      await expect(
+        manager.invoke(call('after-old-access-cleanup', current.generation)),
+      ).resolves.toMatchObject({ generation: current.generation });
+    } finally {
+      cancelled.resolve();
+    }
+  });
+}
+
+test('a disposed manager does not publish a late account Access failure', async () => {
+  const { manager } = await setup();
+  const response = deferred<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => response.promise),
+  );
+  const pending = manager.fetchApi({ path: '/api/settings' });
+  await manager.dispose();
+  response.resolve(new Response('', { status: 401 }));
+  expect((await pending).status).toBe(401);
+});
+
 test('private API authentication failure also suspends the active Worker without revoking the UI image', async () => {
   const { manager, workers, session, image, store } = await setupImages();
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
@@ -700,7 +991,9 @@ test('private API authentication failure also suspends the active Worker without
     'fetch',
     vi.fn(async () => new Response('', { status: 401 })),
   );
-  expect((await manager.fetchApi({ path: '/api/bootstrap' })).status).toBe(401);
+  await expect(
+    manager.fetchApi({ path: '/api/bootstrap' }),
+  ).rejects.toMatchObject({ code: 'access_required' });
   expect(workers[0]?.terminated).toBe(true);
   expect(store.snapshot.resources).toBe(1);
   expect(revoke).not.toHaveBeenCalled();
@@ -1522,7 +1815,7 @@ test('failed shutdown remains unacknowledged and an explicit rebuild confirms re
         create(pb.ControlRequestSchema, {
           slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'recover-after-failed-shutdown',
-          command: { case: 'rebuild', value: {} },
+          command: { case: 'rebuild', value: create(pb.EmptySchema) },
         }),
       ),
     ),
@@ -1745,14 +2038,21 @@ test('search-slot rebuild and disposal do not replace foreground and a later sea
   });
   await openSearch();
   expect(
-    (await control(pb.RuntimeSlot.SEARCH, { case: 'rebuild', value: {} }))
-      .result.case,
+    (
+      await control(pb.RuntimeSlot.SEARCH, {
+        case: 'rebuild',
+        value: create(pb.EmptySchema),
+      })
+    ).result.case,
   ).toBe('completed');
   expect(first.workers[0]?.terminated).toBe(true);
   expect(foreground.workers[0]?.terminated).toBe(false);
   await openSearch();
   expect(createSearch).toHaveBeenCalledOnce();
-  await control(pb.RuntimeSlot.SEARCH, { case: 'dispose', value: {} });
+  await control(pb.RuntimeSlot.SEARCH, {
+    case: 'dispose',
+    value: create(pb.EmptySchema),
+  });
   expect(first.workers.every((worker) => worker.terminated)).toBe(true);
   expect(foreground.workers[0]?.terminated).toBe(false);
   await openSearch();
@@ -1821,7 +2121,7 @@ test('a search open started alongside disposal waits for the old manager before 
   // Both calls begin in the same turn, before disposal publishes its promise.
   const closing = control(pb.RuntimeSlot.SEARCH, {
     case: 'dispose',
-    value: {},
+    value: create(pb.EmptySchema),
   });
   const reopening = openSearch();
   await vi.waitFor(() => expect(disposingFirst).toHaveBeenCalledOnce());

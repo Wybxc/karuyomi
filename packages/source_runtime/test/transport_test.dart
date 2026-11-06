@@ -16,6 +16,140 @@ void main() {
       RuntimeErrorCode.accessDenied,
     ),
   ]) {
+    for (final withSource in [false, true]) {
+      test(
+        'late API $code cannot pause a replacement Source (previous Source=$withSource)',
+        () async {
+          final transport = FakeTransport();
+          final runtime = TransportSourceRuntime(transport);
+          final events = <RuntimeEvent>[];
+          final subscription = runtime.events.listen(events.add);
+          if (withSource) await runtime.open(build());
+          final entered = Completer<void>();
+          final release = Completer<void>();
+          transport.handler = (call) async {
+            if (call.hasFetchApi()) {
+              entered.complete();
+              await release.future;
+              return wire.ControlResponse(
+                slotId: call.slotId,
+                requestId: call.requestId,
+                error: wire.RuntimeError(
+                  code: wireCode,
+                  message: 'Old private API Access decision',
+                ),
+              );
+            }
+            final response = transport.respond(call);
+            if (call.hasOpen()) {
+              response.session.generation = 'replacement-generation';
+            }
+            if (call.hasInvoke()) {
+              response.source.generation = 'replacement-generation';
+            }
+            return response;
+          };
+          final old = expectLater(
+            runtime.fetchApi(wire.ApiFetchRequest(path: '/api/settings')),
+            throwsA(failure(code)),
+          );
+          await entered.future;
+          await runtime.open(build(identity: 'replacement-owner'));
+          events.clear();
+          release.complete();
+          await old;
+          expect(events, isEmpty);
+          expect(
+            (await runtime.invoke(
+              request(generation: 'replacement-generation'),
+            )).generation,
+            'replacement-generation',
+          );
+          await subscription.cancel();
+          await runtime.dispose();
+        },
+      );
+    }
+  }
+
+  for (final (wireCode, code) in [
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+      RuntimeErrorCode.accessRequired,
+    ),
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED,
+      RuntimeErrorCode.accessDenied,
+    ),
+  ]) {
+    for (final withSource in [false, true]) {
+      test(
+        'private API $code pauses the client with Source=$withSource',
+        () async {
+          final transport = FakeTransport();
+          final runtime = TransportSourceRuntime(transport);
+          final events = <RuntimeEvent>[];
+          final subscription = runtime.events.listen(events.add);
+          if (withSource) await runtime.open(build());
+          transport.handler = (call) async {
+            if (call.hasFetchApi()) {
+              return wire.ControlResponse(
+                slotId: call.slotId,
+                requestId: call.requestId,
+                error: wire.RuntimeError(
+                  code: wireCode,
+                  message: 'Private API Access decision',
+                ),
+              );
+            }
+            return transport.respond(call);
+          };
+          await expectLater(
+            runtime.fetchApi(wire.ApiFetchRequest(path: '/api/settings')),
+            throwsA(failure(code)),
+          );
+          expect(events.single.code, code);
+          expect(events.single.generation, withSource ? 'generation-1' : '');
+          if (withSource) {
+            await expectLater(
+              runtime.invoke(request()),
+              throwsA(failure(code)),
+            );
+          } else {
+            expect(transport.calls.where((call) => call.hasOpen()), isEmpty);
+          }
+          transport.handler = (call) async {
+            if (!call.hasFetchApi()) return transport.respond(call);
+            return wire.ControlResponse(
+              slotId: call.slotId,
+              requestId: call.requestId,
+              api: wire.ApiFetchResponse(status: 200, body: '{}'),
+            );
+          };
+          expect(
+            (await runtime.fetchApi(
+              wire.ApiFetchRequest(path: '/api/bootstrap'),
+            )).status,
+            200,
+          );
+          expect(events, hasLength(1));
+          await subscription.cancel();
+          await runtime.dispose();
+        },
+      );
+    }
+  }
+
+  for (final (wireCode, code) in [
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+      RuntimeErrorCode.accessRequired,
+    ),
+    (
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED,
+      RuntimeErrorCode.accessDenied,
+    ),
+  ]) {
     test(
       'Access pause retains the original $code and permits resource cleanup before explicit reopen',
       () async {

@@ -13,6 +13,7 @@ import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:karuyomi/runtime/platform_runtime_native.dart' as native;
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart' show RuntimeException;
 
 import '../browse/fakes.dart';
 
@@ -185,6 +186,79 @@ Future<void> _finish(WidgetTester tester, CatalogController catalog) async {
 }
 
 void main() {
+  for (final denied in [false, true]) {
+    testWidgets(
+      'zero-Source settings Access ${denied ? 'denial' : 'expiry'} exposes login recovery and retains the exact pending command',
+      (tester) async {
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await _start(tester, platform);
+        await _tap(tester, _navigation('设置'));
+        final initial = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        await _choose<wire.AppTheme>(tester, '深色');
+        platform.afterBusinessReply = (request, reply) {
+          if (request.method != 'POST' ||
+              request.uri.path != '/api/settings/mutations') {
+            return reply;
+          }
+          platform.afterBusinessReply = null;
+          // The host's generated Access control error arrives after the
+          // supplier applied this write; only an exact retry can confirm it.
+          throw RuntimeException.fromProto(
+            wire.RuntimeError(
+              code: denied
+                  ? wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED
+                  : wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+              message: 'Private API Access decision',
+            ),
+          );
+        };
+        await _tap(tester, find.text('保存全局设置'));
+        final originalRequest = platform.businessServer.requests
+            .where((request) => request.uri.path == '/api/settings/mutations')
+            .single;
+        expect(initial.pending, isNotNull);
+        expect(initial.available, false);
+        expect(initial.canRetry, false);
+        expect(
+          find.text(denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录'),
+          findsOneWidget,
+        );
+        expect(platform.businessServer.appliedMutations, 1);
+        expect(platform.openedBuilds, isEmpty);
+        await _tap(tester, find.text('登录'));
+        final recovered = tester
+            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+            .controller;
+        expect(platform.authCalls, 1);
+        expect(recovered.repository.client, same(initial.repository.client));
+        expect(recovered.pending, isNotNull);
+        expect(recovered.canRetry, true);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.uri.path == '/api/settings/mutations',
+          ),
+          hasLength(1),
+        );
+        await _tap(tester, find.text('重试原设置操作'));
+        expect(
+          platform.businessServer.requests
+              .where((request) => request.uri.path == '/api/settings/mutations')
+              .map((request) => request.body),
+          [originalRequest.body, originalRequest.body],
+        );
+        expect(platform.businessServer.appliedMutations, 1);
+        expect(recovered.pending, isNull);
+        expect(recovered.snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+        expect(platform.openedBuilds, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   for (final trailingSlash in [false, true]) {
     testWidgets(
       'native same-service reconnect${trailingSlash ? ' with a trailing slash' : ''} preserves the exact pending settings mutation',

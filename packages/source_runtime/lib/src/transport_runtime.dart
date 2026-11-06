@@ -216,6 +216,16 @@ final class TransportSourceRuntime implements SourceRuntime {
           requestGeneration != _session?.generation) {
         throw failure;
       }
+      // Account ACKs survive Source replacement, but a late Access decision
+      // must not pause the Source opened after that API request began.
+      if (command == wire.ControlRequest_Command.fetchApi &&
+          epoch != _epoch &&
+          {
+            RuntimeErrorCode.accessRequired,
+            RuntimeErrorCode.accessDenied,
+          }.contains(failure.code)) {
+        throw failure;
+      }
       final localImageTimeout =
           failure.code == RuntimeErrorCode.timeout &&
           {

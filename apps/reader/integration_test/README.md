@@ -36,15 +36,18 @@ flutter test integration_test/category_sync_test.dart --no-pub \
 
 `settings_sync_test.dart` 复用上面的正式产品构建、官方 HTTPS harness 和设备信任配置；启动服务时不设置 `ACCEPTANCE_FIXTURE` 或 Source policies，使用空 D1 与零扩展索引。两个客户端必须使用同一个实际 HTTPS origin 和服务输出的 subject。Android 的隔离 debug 副本按上面的精确主机 CA 配置，并逐文件核对当前产品 Dart、驱动、锁文件与内置材料；不要复用历史副本的旧业务源码。
 
+Android 的 WebView 与 Dart HTTP 客户端分别维护证书信任；上面的 Network Security Config 只配置 WebView。使用本地 CA 时，在该驱动的阶段配置中额外传入 `SETTINGS_TEST_CA_BASE64` 的标准 Base64 字符串（对本轮 PEM 文件的原始字节编码，不是文件路径）。驱动仅允许 Android 且已校验的 `https://127.0.0.1` origin，在 `app.main()` 前用 Dart 标准库解码后向当前测试进程的默认 `SecurityContext` 追加本轮 CA；保留既有根证书与主机名校验，不使用 `HttpOverrides` 或 `badCertificateCallback`，不改变产品 TLS。iOS 不传该字段，继续由专用模拟器正常信任证书。
+
 每阶段先从该服务经正常 TLS 校验 GET `/api/settings`，使用 `Origin`、`X-App-Subject` 与 `X-App-Request: 1` 正常业务头，取得完整当前 `SettingsResponse`。将本阶段配置保存到忽略的本地 JSON 文件；`SETTINGS_EXPECT_JSON` 是完整响应经 JSON 编码后的字符串，不是手工填写 revision 或嵌套对象。配置包含：
 
-| 字段                   | 内容                                           |
-| ---------------------- | ---------------------------------------------- |
-| `APP_ORIGIN`           | 官方 harness 的实际 HTTPS origin               |
-| `SETTINGS_SUBJECT`     | 本次服务已确认的 subject                       |
-| `SETTINGS_PHASE`       | `verify` 或 `write`                            |
-| `SETTINGS_EXPECT_JSON` | 本阶段完整当前 SettingsResponse 的 JSON 字符串 |
-| `SETTINGS_PRESET`      | 仅写阶段填写，取下述两个预设之一               |
+| 字段                      | 内容                                                |
+| ------------------------- | --------------------------------------------------- |
+| `APP_ORIGIN`              | 官方 harness 的实际 HTTPS origin                    |
+| `SETTINGS_SUBJECT`        | 本次服务已确认的 subject                            |
+| `SETTINGS_PHASE`          | `verify` 或 `write`                                 |
+| `SETTINGS_EXPECT_JSON`    | 本阶段完整当前 SettingsResponse 的 JSON 字符串      |
+| `SETTINGS_PRESET`         | 仅写阶段填写，取下述两个预设之一                    |
+| `SETTINGS_TEST_CA_BASE64` | 可选，仅 Android loopback 本地 CA 文件字节的 Base64 |
 
 在 `apps/reader` 使用固定 SDK 运行：
 

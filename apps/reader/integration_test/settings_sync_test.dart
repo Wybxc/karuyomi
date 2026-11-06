@@ -19,6 +19,7 @@ const _subject = String.fromEnvironment('SETTINGS_SUBJECT');
 const _phase = String.fromEnvironment('SETTINGS_PHASE');
 const _expectedJson = String.fromEnvironment('SETTINGS_EXPECT_JSON');
 const _preset = String.fromEnvironment('SETTINGS_PRESET');
+const _testCaBase64 = String.fromEnvironment('SETTINGS_TEST_CA_BASE64');
 const _operationBudget = Duration(seconds: 120);
 const _presets = {
   'dark-rtl-double-width-crop',
@@ -30,6 +31,11 @@ void main() {
 
   testWidgets('Native global settings sync: $_phase', (tester) async {
     final expected = _validateConfiguration();
+    if (_testCaBase64.isNotEmpty) {
+      SecurityContext.defaultContext.setTrustedCertificatesBytes(
+        base64Decode(_testCaBase64),
+      );
+    }
     app.main();
     await tester.pump();
     final catalog = tester
@@ -91,6 +97,7 @@ void main() {
         'phase': _phase,
         'preset': _phase == 'write' ? _preset : null,
         'platform': Platform.operatingSystem,
+        'androidLoopbackTestCa': _testCaBase64.isNotEmpty,
         'origin': repository.identity.origin.origin,
         'subject': repository.identity.subject,
         'before': _report(before),
@@ -396,6 +403,10 @@ wire.SettingsResponse _validateConfiguration() {
   }
   if (!Platform.isAndroid && !Platform.isIOS) {
     fail('此正式设置同步验收仅适用于 Android 或 iOS 设备/模拟器');
+  }
+  if (_testCaBase64.isNotEmpty &&
+      (!Platform.isAndroid || origin.host != '127.0.0.1')) {
+    fail('SETTINGS_TEST_CA_BASE64 仅适用于 Android 的 HTTPS 127.0.0.1 验收');
   }
   if (_subject.isEmpty || _subject.length > 1000) {
     fail('SETTINGS_SUBJECT 须为本次已确认身份');

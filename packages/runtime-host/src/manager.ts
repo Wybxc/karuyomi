@@ -1278,26 +1278,46 @@ export class SourceRuntimeManager {
         cache: staticJson ? 'no-cache' : 'no-store',
         signal: controller.signal,
       });
-      if (privateApi && generation && this.generation === generation) {
+      const redirected =
+        response.type === 'opaqueredirect' ||
+        (response.status >= 300 && response.status < 400);
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      if (privateApi && !this.disposed && this.generation === generation) {
         const code =
           response.status === 403
             ? 'access_denied'
-            : response.type === 'opaqueredirect' ||
+            : redirected ||
                 response.status === 401 ||
-                (response.status >= 300 && response.status < 400) ||
-                response.headers.get('content-type')?.includes('text/html')
+                response.headers
+                  .get('content-type')
+                  ?.toLowerCase()
+                  .includes('text/html')
               ? 'access_required'
               : undefined;
-        if (code)
-          this.suspendAccess(
-            new RuntimeFailure(code, 'Access no longer permits API requests'),
-            generation,
-          );
+        if (code) {
+          await response.body?.cancel().catch(() => {});
+          // Cleanup may yield to a replacement Source. Publish the Access
+          // decision only while this request still belongs to the current slot.
+          if (!this.disposed && this.generation === generation) {
+            const failure = new RuntimeFailure(
+              code,
+              'Access no longer permits API requests',
+            );
+            if (generation) this.suspendAccess(failure, generation);
+            throw failure;
+          }
+          return {
+            status: response.status,
+            headers: redirected ? {} : headers,
+            body: '',
+            redirected,
+          };
+        }
       }
-      if (
-        response.type === 'opaqueredirect' ||
-        (response.status >= 300 && response.status < 400)
-      ) {
+      if (redirected) {
         await response.body?.cancel();
         return {
           status: response.status,
@@ -1306,10 +1326,6 @@ export class SourceRuntimeManager {
           redirected: true,
         };
       }
-      const headers: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let body = '',
