@@ -9,6 +9,7 @@
 - TeaVM 0.16.0 JavaScript backend / release9 是运行基线。Web 通过 JS interop 连接 Worker；原生通过系统 WebView 控制同版 Worker。不重选框架或执行引擎。
 - 单 hostname、单 Cloudflare Worker：公开 Flutter shell 和 `/runtime/`，后端与个人数据放在 Access 保护的 `/api`、`/api/*`，Worker 再校验 JWT。
 - Static Assets 是所有客户端的扩展分发权威源，每包只部署最新可用构建，由客户端或 Service Worker 管理更新与缓存。扩展不再发布到 GitHub Release，Worker/R2 不代理正文。共享桥/WASM 在 Web 作为 Static Assets、Native 随应用打包；Java/Maven、原 JAR 与 seed 只用于构建。
+- [能力提示与有界跨源搜索](plan/cross-source-search.md)复用已确认安装和最多两个独立槽；Source 结果逐组返回，搜索与活动阅读互斥，取消/关闭确认后才交还主线。功能已接线，独立服务与 UI 回归、完整工程和构建通过，实际平台验收继续推进。
 - 首版保留浏览、书架、在线阅读、基本进度、同步和源管理；暂缓模块及各阶段完整范围见[计划索引](plan/README.md)。原型阶段不维护旧协议、旧材料或旧发布格式兼容。
 
 收藏、进度与分类已接入 Worker API + D1、双端生成协议与幂等确认路径，本地业务 SQLite 已移除；工程和实际跨平台验收分别推进，历史本地恢复证据不能作为多端同步完成的证据。初版通过幂等写入、服务端 revision/冲突语义及前台重新读取收敛，不要求持久 outbox、离线冲突合并、增量日志或实时通知先行。P0 的真实阅读、生产 Access 和设备验收继续推进，不能因同步优先而跳过。

@@ -97,11 +97,14 @@ afterEach(async () => {
 test('the public generated control entry correlates typed Source success and structured failures', async () => {
   const { manager, driver } = await setup();
   vi.stubGlobal('window', { addEventListener: vi.fn() });
-  const api = installRuntime(manager);
+  const api = installRuntime(manager, () => {
+    throw new Error('Search is not used by this foreground fixture');
+  });
   const opening = parseControlResponse(
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
+          slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'control-open',
           command: { case: 'open', value: options },
         }),
@@ -115,6 +118,7 @@ test('the public generated control entry correlates typed Source success and str
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
+          slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'control-source',
           command: {
             case: 'invoke',
@@ -130,7 +134,12 @@ test('the public generated control entry correlates typed Source success and str
     value: { requestId: 'source-call', payload: { case: 'mangaPage' } },
   });
   const invalid = parseControlResponse(
-    await api.control({ requestId: 'conflicting', ready: {}, dispose: {} }),
+    await api.control({
+      requestId: 'conflicting',
+      slotId: 'RUNTIME_SLOT_FOREGROUND',
+      ready: {},
+      dispose: {},
+    }),
   );
   expect(invalid).toMatchObject({
     requestId: 'conflicting',
@@ -359,11 +368,14 @@ test('active cancellation recycles the generation and rejects queued work withou
   const cancelled = expect(a).rejects.toMatchObject({ code: 'cancelled' });
   const lost = expect(b).rejects.toMatchObject({ code: 'runtime_lost' });
   vi.stubGlobal('window', { addEventListener: vi.fn() });
-  const api = installRuntime(manager);
+  const api = installRuntime(manager, () => {
+    throw new Error('Search is not used by this foreground fixture');
+  });
   const response = parseControlResponse(
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
+          slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'cancel-control',
           command: {
             case: 'cancel',
@@ -1146,11 +1158,14 @@ test('preparation uses only static delivery, shares verified bytes, and leaves a
   );
   const apiWindow = { addEventListener: vi.fn() };
   vi.stubGlobal('window', apiWindow);
-  const api = installRuntime(manager);
+  const api = installRuntime(manager, () => {
+    throw new Error('Search is not used by this foreground fixture');
+  });
   const response = parseControlResponse(
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
+          slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'prepare-control',
           command: {
             case: 'prepareBuild',
@@ -1498,11 +1513,14 @@ test('failed shutdown remains unacknowledged and an explicit rebuild confirms re
     code: 'runtime_lost',
   });
   vi.stubGlobal('window', { addEventListener: vi.fn() });
-  const api = installRuntime(manager);
+  const api = installRuntime(manager, () => {
+    throw new Error('Search is not used by this foreground fixture');
+  });
   const reset = parseControlResponse(
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
+          slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'recover-after-failed-shutdown',
           command: { case: 'rebuild', value: {} },
         }),
@@ -1584,4 +1602,291 @@ test('Native namespaces isolate the same subject and external repository across 
   expect(first.workerUrls[0]?.searchParams.get('fsNamespace')).not.toBe(
     second.workerUrls[0]?.searchParams.get('fsNamespace'),
   );
+});
+
+test('the two explicit slots make independent progress and a search cancellation preserves foreground work', async () => {
+  const foregroundWaiter = deferred<SourcePayload>();
+  const searchWaiter = deferred<SourcePayload>();
+  const foreground = await setup(() => foregroundWaiter.promise);
+  const build = {
+    ...(await manifest()),
+    buildId: 'search-build',
+    packageName: 'test.search',
+  };
+  const search = await setup(() => searchWaiter.promise, build);
+  vi.stubGlobal('window', { addEventListener: vi.fn() });
+  const createSearch = vi.fn(() => search.manager);
+  const api = installRuntime(foreground.manager, createSearch);
+  const control = (
+    slotId: pb.RuntimeSlot,
+    command: pb.ControlRequest['command'],
+  ) =>
+    api
+      .control(
+        encodeControlRequest(
+          create(pb.ControlRequestSchema, {
+            requestId: crypto.randomUUID(),
+            slotId,
+            command,
+          }),
+        ),
+      )
+      .then(parseControlResponse);
+  const main = await control(pb.RuntimeSlot.FOREGROUND, {
+    case: 'open',
+    value: create(pb.OpenRequestSchema, options),
+  });
+  expect(createSearch).not.toHaveBeenCalled();
+  if (main.result.case !== 'session')
+    throw new Error('Expected foreground session');
+  const extra = await control(pb.RuntimeSlot.SEARCH, {
+    case: 'open',
+    value: create(pb.OpenRequestSchema, {
+      ...options,
+      manifestPath: '/extensions/builds/search-build/manifest.json',
+    }),
+  });
+  if (extra.result.case !== 'session')
+    throw new Error('Expected search session');
+  expect(main.slotId).toBe(pb.RuntimeSlot.FOREGROUND);
+  expect(extra.slotId).toBe(pb.RuntimeSlot.SEARCH);
+  expect(extra.result.value.capabilities).not.toContain('source-preferences');
+  expect(extra.result.value.capabilities).not.toContain(
+    'processed-image-resources',
+  );
+  expect(main.result.value.generation).not.toBe(extra.result.value.generation);
+  const mainCall = control(pb.RuntimeSlot.FOREGROUND, {
+    case: 'invoke',
+    value: call('slow-main', main.result.value.generation),
+  });
+  const searchCall = create(pb.SourceCallSchema, {
+    requestId: 'fast-search',
+    sourceId: '9223372036854775806',
+    generation: extra.result.value.generation,
+    request: { case: 'search', value: { page: 1, query: 'query' } },
+  });
+  const extraCall = control(pb.RuntimeSlot.SEARCH, {
+    case: 'invoke',
+    value: searchCall,
+  });
+  await vi.waitFor(() => expect(search.driver.invoke).toHaveBeenCalledOnce());
+  searchWaiter.resolve(mangaPage('/independent-search'));
+  expect((await extraCall).slotId).toBe(pb.RuntimeSlot.SEARCH);
+  expect(foreground.workers[0]?.terminated).toBe(false);
+  search.driver.invoke.mockImplementationOnce(
+    () => new Promise<SourcePayload>(() => {}),
+  );
+  const pending = control(pb.RuntimeSlot.SEARCH, {
+    case: 'invoke',
+    value: { ...searchCall, requestId: 'cancel-search' },
+  });
+  await vi.waitFor(() => expect(search.driver.invoke).toHaveBeenCalledTimes(2));
+  const cancelled = await control(pb.RuntimeSlot.SEARCH, {
+    case: 'cancel',
+    value: create(pb.CancelSourceRequestSchema, {
+      requestId: 'cancel-search',
+      generation: searchCall.generation,
+    }),
+  });
+  expect(cancelled.result.case).toBe('error');
+  expect((await pending).result.case).toBe('error');
+  expect(search.workers[0]?.terminated).toBe(true);
+  expect(foreground.workers[0]?.terminated).toBe(false);
+  foregroundWaiter.resolve(mangaPage('/foreground-survived'));
+  expect((await mainCall).result.case).toBe('source');
+  expect(createSearch).toHaveBeenCalledOnce();
+  await api.dispose();
+});
+
+test('search-slot rebuild and disposal do not replace foreground and a later search gets one fresh manager', async () => {
+  const foreground = await setup();
+  const build = {
+    ...(await manifest()),
+    buildId: 'search-build',
+    packageName: 'test.search',
+  };
+  const first = await setup(undefined, build);
+  const second = await setup(undefined, build);
+  const waiting = [first.manager, second.manager];
+  const createSearch = vi.fn(() => {
+    const manager = waiting.shift();
+    if (!manager)
+      throw new Error('More than one replacement search manager was created');
+    return manager;
+  });
+  vi.stubGlobal('window', { addEventListener: vi.fn() });
+  const api = installRuntime(foreground.manager, createSearch);
+  const control = (
+    slotId: pb.RuntimeSlot,
+    command: pb.ControlRequest['command'],
+  ) =>
+    api
+      .control(
+        encodeControlRequest(
+          create(pb.ControlRequestSchema, {
+            requestId: crypto.randomUUID(),
+            slotId,
+            command,
+          }),
+        ),
+      )
+      .then(parseControlResponse);
+  const openSearch = () =>
+    control(pb.RuntimeSlot.SEARCH, {
+      case: 'open',
+      value: create(pb.OpenRequestSchema, {
+        ...options,
+        manifestPath: '/extensions/builds/search-build/manifest.json',
+      }),
+    });
+  await control(pb.RuntimeSlot.FOREGROUND, {
+    case: 'open',
+    value: create(pb.OpenRequestSchema, options),
+  });
+  await openSearch();
+  expect(
+    (await control(pb.RuntimeSlot.SEARCH, { case: 'rebuild', value: {} }))
+      .result.case,
+  ).toBe('completed');
+  expect(first.workers[0]?.terminated).toBe(true);
+  expect(foreground.workers[0]?.terminated).toBe(false);
+  await openSearch();
+  expect(createSearch).toHaveBeenCalledOnce();
+  await control(pb.RuntimeSlot.SEARCH, { case: 'dispose', value: {} });
+  expect(first.workers.every((worker) => worker.terminated)).toBe(true);
+  expect(foreground.workers[0]?.terminated).toBe(false);
+  await openSearch();
+  expect(createSearch).toHaveBeenCalledTimes(2);
+  expect(second.workers).toHaveLength(1);
+  await api.rebuild();
+  expect(foreground.workers[0]?.terminated).toBe(true);
+  expect(second.workers[0]?.terminated).toBe(true);
+  await api.dispose();
+});
+
+test('a search open started alongside disposal waits for the old manager before using one replacement', async () => {
+  const foreground = await setup();
+  const build = {
+    ...(await manifest()),
+    buildId: 'search-build',
+    packageName: 'test.search',
+  };
+  const first = await setup(undefined, build);
+  const second = await setup(undefined, build);
+  const waiting = [first.manager, second.manager];
+  const createSearch = vi.fn(() => {
+    const manager = waiting.shift();
+    if (!manager)
+      throw new Error('More than one replacement search manager was created');
+    return manager;
+  });
+  vi.stubGlobal('window', { addEventListener: vi.fn() });
+  const api = installRuntime(foreground.manager, createSearch);
+  const control = (
+    slotId: pb.RuntimeSlot,
+    command: pb.ControlRequest['command'],
+  ) =>
+    api
+      .control(
+        encodeControlRequest(
+          create(pb.ControlRequestSchema, {
+            requestId: crypto.randomUUID(),
+            slotId,
+            command,
+          }),
+        ),
+      )
+      .then(parseControlResponse);
+  const openSearch = () =>
+    control(pb.RuntimeSlot.SEARCH, {
+      case: 'open',
+      value: create(pb.OpenRequestSchema, {
+        ...options,
+        manifestPath: '/extensions/builds/search-build/manifest.json',
+      }),
+    });
+  await control(pb.RuntimeSlot.FOREGROUND, {
+    case: 'open',
+    value: create(pb.OpenRequestSchema, options),
+  });
+  await openSearch();
+  const gate = deferred<void>();
+  const disposeFirst = first.manager.dispose.bind(first.manager);
+  const disposingFirst = vi
+    .spyOn(first.manager, 'dispose')
+    .mockImplementationOnce(async () => {
+      await disposeFirst();
+      await gate.promise;
+    });
+  // Both calls begin in the same turn, before disposal publishes its promise.
+  const closing = control(pb.RuntimeSlot.SEARCH, {
+    case: 'dispose',
+    value: {},
+  });
+  const reopening = openSearch();
+  await vi.waitFor(() => expect(disposingFirst).toHaveBeenCalledOnce());
+  expect(createSearch).toHaveBeenCalledOnce();
+  expect(second.workers).toHaveLength(0);
+  gate.resolve();
+  expect((await closing).result.case).toBe('completed');
+  expect((await reopening).result.case).toBe('session');
+  expect(createSearch).toHaveBeenCalledTimes(2);
+  expect(first.workers.every((worker) => worker.terminated)).toBe(true);
+  expect(second.workers).toHaveLength(1);
+  expect(foreground.workers[0]?.terminated).toBe(false);
+  await api.dispose();
+});
+
+test('invalid slots and forbidden search controls create no search manager; pagehide closes both existing slots', async () => {
+  const foreground = await setup();
+  const search = await setup(undefined, {
+    ...(await manifest()),
+    buildId: 'search-build',
+    packageName: 'test.search',
+  });
+  let onPageHide: (() => void) | undefined;
+  vi.stubGlobal('window', {
+    addEventListener: vi.fn((name: string, listener: () => void) => {
+      if (name === 'pagehide') onPageHide = listener;
+    }),
+  });
+  const createSearch = vi.fn(() => search.manager);
+  const api = installRuntime(foreground.manager, createSearch);
+  for (const slotId of [undefined, 0, 3, 'RUNTIME_SLOT_UNSPECIFIED'])
+    await expect(
+      api.control({ requestId: 'invalid-slot', slotId, ready: {} }),
+    ).rejects.toMatchObject({ code: 'protocol_error' });
+  for (const command of ['fetchApi', 'extensionCache', 'acquireImage']) {
+    const reply = parseControlResponse(
+      await api.control({
+        requestId: 'forbidden',
+        slotId: 'RUNTIME_SLOT_SEARCH',
+        [command]: {},
+      }),
+    );
+    expect(reply.slotId).toBe(pb.RuntimeSlot.SEARCH);
+    expect(reply.result.case).toBe('error');
+  }
+  expect(createSearch).not.toHaveBeenCalled();
+  for (const [slotId, manifestPath] of [
+    [pb.RuntimeSlot.FOREGROUND, options.manifestPath],
+    [pb.RuntimeSlot.SEARCH, '/extensions/builds/search-build/manifest.json'],
+  ] as const)
+    await api.control(
+      encodeControlRequest(
+        create(pb.ControlRequestSchema, {
+          requestId: crypto.randomUUID(),
+          slotId,
+          command: { case: 'open', value: { ...options, manifestPath } },
+        }),
+      ),
+    );
+  expect(foreground.workers).toHaveLength(1);
+  expect(search.workers).toHaveLength(1);
+  onPageHide?.();
+  await vi.waitFor(() => {
+    expect(foreground.workers[0]?.terminated).toBe(true);
+    expect(search.workers[0]?.terminated).toBe(true);
+  });
+  await expect(api.rebuild()).rejects.toMatchObject({ code: 'runtime_lost' });
 });

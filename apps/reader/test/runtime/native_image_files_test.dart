@@ -65,6 +65,7 @@ final class Files implements NativeImageFileStore {
 
 wire.ControlRequest acquire(int index, {int timeout = 60000}) =>
     wire.ControlRequest(
+      slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
       requestId: 'control-$index',
       acquireImage: wire.AcquireImage(
         requestId: 'request-$index',
@@ -77,10 +78,12 @@ wire.ControlRequest acquire(int index, {int timeout = 60000}) =>
     );
 wire.ControlRequest release(String id, {String generation = 'g'}) =>
     wire.ControlRequest(
+      slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
       requestId: 'release',
       releaseImage: wire.ReleaseImage(resourceId: id, generation: generation),
     );
 wire.ControlRequest cancel(int index) => wire.ControlRequest(
+  slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
   requestId: 'cancel',
   cancelImage: wire.CancelImage(requestId: 'request-$index', generation: 'g'),
 );
@@ -102,6 +105,7 @@ void main() {
     byteLength = 1234;
     handler = (request) async => request.hasAcquireImage()
         ? wire.ControlResponse(
+            slotId: request.slotId,
             requestId: request.requestId,
             image: wire.ImageResource(
               resourceId: 'r-${request.acquireImage.requestId}',
@@ -111,6 +115,7 @@ void main() {
             ),
           )
         : wire.ControlResponse(
+            slotId: request.slotId,
             requestId: request.requestId,
             released: wire.Released(released: true),
           );
@@ -127,6 +132,136 @@ void main() {
     await images.close();
     if (await directory.exists()) await directory.delete(recursive: true);
   });
+
+  for (final slot in [
+    wire.RuntimeSlot.RUNTIME_SLOT_UNSPECIFIED,
+    wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+  ]) {
+    test(
+      'image acquire rejects $slot before host or file operations',
+      () async {
+        final invalid = acquire(1)..slotId = slot;
+        await expectLater(
+          images.acquire(invalid),
+          throwsA(code(RuntimeErrorCode.protocolError)),
+        );
+        expect(calls, isEmpty);
+        expect(files.copied.isCompleted, false);
+        expect(files.files, isEmpty);
+      },
+    );
+
+    test(
+      'image cancel rejects $slot before touching an active foreground owner',
+      () async {
+        final permitCopy = Completer<void>();
+        files.permitCopy = permitCopy;
+        final pending = images.acquire(acquire(1));
+        await files.copied.future;
+        await expectLater(
+          images.cancel(cancel(1)..slotId = slot),
+          throwsA(code(RuntimeErrorCode.protocolError)),
+        );
+        expect(calls, hasLength(1));
+        expect(files.cancelled, 0);
+        expect(files.releases, 0);
+        expect(permitCopy.isCompleted, false);
+        permitCopy.complete();
+        final image = (await pending).image;
+        final location = Uri.parse(image.url);
+        expect(images.owns(image.resourceId, 'g', location), true);
+        await expectLater(
+          images.cancel(cancel(1)..slotId = slot),
+          throwsA(code(RuntimeErrorCode.protocolError)),
+        );
+        expect(calls, hasLength(1));
+        expect(files.cancelled, 0);
+        expect(files.releases, 0);
+        expect(images.owns(image.resourceId, 'g', location), true);
+        expect(await File.fromUri(location).exists(), true);
+        await images.release(release(image.resourceId));
+      },
+    );
+
+    test(
+      'image release rejects $slot before touching a retained foreground file',
+      () async {
+        final image = (await images.acquire(acquire(1))).image;
+        final location = Uri.parse(image.url);
+        await expectLater(
+          images.release(release(image.resourceId)..slotId = slot),
+          throwsA(code(RuntimeErrorCode.protocolError)),
+        );
+        expect(calls, hasLength(1));
+        expect(files.cancelled, 0);
+        expect(files.releases, 0);
+        expect(images.owns(image.resourceId, 'g', location), true);
+        expect(await File.fromUri(location).exists(), true);
+        expect(files.files, contains(image.resourceId));
+        await images.release(release(image.resourceId));
+        expect(images.owns(image.resourceId, 'g', location), false);
+        expect(await File.fromUri(location).exists(), false);
+      },
+    );
+  }
+
+  for (final slot in [
+    wire.RuntimeSlot.RUNTIME_SLOT_UNSPECIFIED,
+    wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+  ]) {
+    test(
+      'an image response from $slot cannot create a foreground file',
+      () async {
+        final original = handler;
+        handler = (request) async {
+          final response = await original(request);
+          if (request.hasAcquireImage()) response.slotId = slot;
+          return response;
+        };
+        await expectLater(
+          images.acquire(acquire(1)),
+          throwsA(code(RuntimeErrorCode.runtimeLost)),
+        );
+        expect(files.files, isEmpty);
+        expect(files.copied.isCompleted, false);
+        expect(
+          calls.every(
+            (request) =>
+                request.slotId == wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+          ),
+          true,
+        );
+      },
+    );
+
+    test(
+      'cleanup ACK from $slot is rejected without changing its destination slot',
+      () async {
+        final image = (await images.acquire(acquire(1))).image;
+        final original = handler;
+        handler = (request) async {
+          final response = await original(request);
+          if (request.hasReleaseImage()) response.slotId = slot;
+          return response;
+        };
+        await expectLater(
+          images.release(release(image.resourceId)),
+          throwsA(code(RuntimeErrorCode.runtimeLost)),
+        );
+        expect(
+          calls
+              .where((request) => request.hasReleaseImage())
+              .every(
+                (request) =>
+                    request.slotId == wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+              ),
+          true,
+        );
+        handler = original;
+        await images.release(release(image.resourceId));
+      },
+    );
+  }
 
   test(
     'only a completed managed file is owned; stale release and late cancel preserve it',
@@ -183,6 +318,7 @@ void main() {
         if (request.hasAcquireImage()) return source.future;
         source.complete(
           wire.ControlResponse(
+            slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
             requestId: 'control-1',
             error: wire.RuntimeError(
               code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED,
@@ -191,6 +327,7 @@ void main() {
           ),
         );
         return wire.ControlResponse(
+          slotId: request.slotId,
           requestId: request.requestId,
           released: wire.Released(released: true),
         );
@@ -237,6 +374,7 @@ void main() {
     () async {
       final resource = (await images.acquire(acquire(1))).image;
       handler = (request) async => wire.ControlResponse(
+        slotId: request.slotId,
         requestId: request.requestId,
         error: wire.RuntimeError(
           code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
@@ -297,6 +435,7 @@ void main() {
             }
             if (request.hasReleaseImage() && failure == 'host') {
               return wire.ControlResponse(
+                slotId: request.slotId,
                 requestId: request.requestId,
                 error: wire.RuntimeError(
                   code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
@@ -305,6 +444,7 @@ void main() {
               );
             }
             return wire.ControlResponse(
+              slotId: request.slotId,
               requestId: request.requestId,
               released: wire.Released(released: true),
             );
@@ -345,6 +485,7 @@ void main() {
           expect(ended, false);
           source.complete(
             wire.ControlResponse(
+              slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
               requestId: identity == 'requestId'
                   ? 'foreign-control'
                   : 'control-1',
@@ -389,6 +530,7 @@ void main() {
         if (request.hasAcquireImage()) return source.future;
         if (request.hasCancelImage()) cancelled.complete();
         return wire.ControlResponse(
+          slotId: request.slotId,
           requestId: request.requestId,
           released: wire.Released(released: true),
         );
@@ -427,6 +569,7 @@ void main() {
           return reply.future;
         }
         return wire.ControlResponse(
+          slotId: request.slotId,
           requestId: request.requestId,
           released: wire.Released(released: true),
         );
@@ -474,6 +617,7 @@ void main() {
           return reply.future;
         }
         return wire.ControlResponse(
+          slotId: request.slotId,
           requestId: request.requestId,
           released: wire.Released(released: true),
         );
@@ -551,6 +695,7 @@ void main() {
         if (!localFailure) {
           handler = (request) async => request.hasReleaseImage()
               ? wire.ControlResponse(
+                  slotId: request.slotId,
                   requestId: request.requestId,
                   error: wire.RuntimeError(
                     code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT,
@@ -619,6 +764,7 @@ void main() {
     () async {
       final resource = (await images.acquire(acquire(1))).image;
       handler = (request) async => wire.ControlResponse(
+        slotId: request.slotId,
         requestId: request.requestId,
         image: resource.deepCopy()
           ..url = 'blob:https://reader.example/duplicate',

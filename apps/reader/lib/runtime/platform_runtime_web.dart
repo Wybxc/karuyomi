@@ -122,8 +122,7 @@ final class WebPlatformRuntime extends PlatformRuntime {
 
   @override
   Future<void> rebuild() async {
-    runtime.containerLost('Web runtime slot must be opened again');
-    await runtime.rebuildHost();
+    await Future.wait([runtime.rebuildHost(), searchRuntime.rebuildHost()]);
   }
 
   @override
@@ -133,6 +132,6 @@ final class WebPlatformRuntime extends PlatformRuntime {
     catalogTransport.close();
     _authentication?.cancel();
     _pendingAuthentication = null;
-    return runtime.dispose();
+    return Future.wait([runtime.dispose(), searchRuntime.dispose()]);
   }
 }

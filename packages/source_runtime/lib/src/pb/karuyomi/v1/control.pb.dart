@@ -7519,6 +7519,7 @@ enum ControlRequest_Command {
 class ControlRequest extends $pb.GeneratedMessage {
   factory ControlRequest({
     $core.String? requestId,
+    RuntimeSlot? slotId,
     Empty? ready,
     OpenRequest? open,
     SourceCall? invoke,
@@ -7538,6 +7539,7 @@ class ControlRequest extends $pb.GeneratedMessage {
   }) {
     final result = ControlRequest._();
     if (requestId != null) result.requestId = requestId;
+    if (slotId != null) result.slotId = slotId;
     if (ready != null) result.ready = ready;
     if (open != null) result.open = open;
     if (invoke != null) result.invoke = invoke;
@@ -7593,6 +7595,8 @@ class ControlRequest extends $pb.GeneratedMessage {
       createEmptyInstance: ControlRequest.$_createMessage)
     ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aE<RuntimeSlot>(2, _omitFieldNames ? '' : 'slotId',
+        enumValues: RuntimeSlot.values)
     ..aOM<Empty>(10, _omitFieldNames ? '' : 'ready',
         subBuilder: Empty.$_createMessage)
     ..aOM<OpenRequest>(11, _omitFieldNames ? '' : 'open',
@@ -7696,184 +7700,193 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearRequestId() => $_clearField(1);
 
+  @$pb.TagNumber(2)
+  RuntimeSlot get slotId => $_getN(1);
+  @$pb.TagNumber(2)
+  set slotId(RuntimeSlot value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSlotId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSlotId() => $_clearField(2);
+
   @$pb.TagNumber(10)
-  Empty get ready => $_getN(1);
+  Empty get ready => $_getN(2);
   @$pb.TagNumber(10)
   set ready(Empty value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasReady() => $_has(1);
+  $core.bool hasReady() => $_has(2);
   @$pb.TagNumber(10)
   void clearReady() => $_clearField(10);
   @$pb.TagNumber(10)
-  Empty ensureReady() => $_ensure(1);
+  Empty ensureReady() => $_ensure(2);
 
   @$pb.TagNumber(11)
-  OpenRequest get open => $_getN(2);
+  OpenRequest get open => $_getN(3);
   @$pb.TagNumber(11)
   set open(OpenRequest value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasOpen() => $_has(2);
+  $core.bool hasOpen() => $_has(3);
   @$pb.TagNumber(11)
   void clearOpen() => $_clearField(11);
   @$pb.TagNumber(11)
-  OpenRequest ensureOpen() => $_ensure(2);
+  OpenRequest ensureOpen() => $_ensure(3);
 
   @$pb.TagNumber(12)
-  SourceCall get invoke => $_getN(3);
+  SourceCall get invoke => $_getN(4);
   @$pb.TagNumber(12)
   set invoke(SourceCall value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasInvoke() => $_has(3);
+  $core.bool hasInvoke() => $_has(4);
   @$pb.TagNumber(12)
   void clearInvoke() => $_clearField(12);
   @$pb.TagNumber(12)
-  SourceCall ensureInvoke() => $_ensure(3);
+  SourceCall ensureInvoke() => $_ensure(4);
 
   @$pb.TagNumber(13)
-  CancelSourceRequest get cancel => $_getN(4);
+  CancelSourceRequest get cancel => $_getN(5);
   @$pb.TagNumber(13)
   set cancel(CancelSourceRequest value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasCancel() => $_has(4);
+  $core.bool hasCancel() => $_has(5);
   @$pb.TagNumber(13)
   void clearCancel() => $_clearField(13);
   @$pb.TagNumber(13)
-  CancelSourceRequest ensureCancel() => $_ensure(4);
+  CancelSourceRequest ensureCancel() => $_ensure(5);
 
   @$pb.TagNumber(14)
-  AcquireImage get acquireImage => $_getN(5);
+  AcquireImage get acquireImage => $_getN(6);
   @$pb.TagNumber(14)
   set acquireImage(AcquireImage value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasAcquireImage() => $_has(5);
+  $core.bool hasAcquireImage() => $_has(6);
   @$pb.TagNumber(14)
   void clearAcquireImage() => $_clearField(14);
   @$pb.TagNumber(14)
-  AcquireImage ensureAcquireImage() => $_ensure(5);
+  AcquireImage ensureAcquireImage() => $_ensure(6);
 
   @$pb.TagNumber(15)
-  CancelImage get cancelImage => $_getN(6);
+  CancelImage get cancelImage => $_getN(7);
   @$pb.TagNumber(15)
   set cancelImage(CancelImage value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasCancelImage() => $_has(6);
+  $core.bool hasCancelImage() => $_has(7);
   @$pb.TagNumber(15)
   void clearCancelImage() => $_clearField(15);
   @$pb.TagNumber(15)
-  CancelImage ensureCancelImage() => $_ensure(6);
+  CancelImage ensureCancelImage() => $_ensure(7);
 
   @$pb.TagNumber(16)
-  ReleaseImage get releaseImage => $_getN(7);
+  ReleaseImage get releaseImage => $_getN(8);
   @$pb.TagNumber(16)
   set releaseImage(ReleaseImage value) => $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasReleaseImage() => $_has(7);
+  $core.bool hasReleaseImage() => $_has(8);
   @$pb.TagNumber(16)
   void clearReleaseImage() => $_clearField(16);
   @$pb.TagNumber(16)
-  ReleaseImage ensureReleaseImage() => $_ensure(7);
+  ReleaseImage ensureReleaseImage() => $_ensure(8);
 
   @$pb.TagNumber(17)
-  ClosePageSession get closePageSession => $_getN(8);
+  ClosePageSession get closePageSession => $_getN(9);
   @$pb.TagNumber(17)
   set closePageSession(ClosePageSession value) => $_setField(17, value);
   @$pb.TagNumber(17)
-  $core.bool hasClosePageSession() => $_has(8);
+  $core.bool hasClosePageSession() => $_has(9);
   @$pb.TagNumber(17)
   void clearClosePageSession() => $_clearField(17);
   @$pb.TagNumber(17)
-  ClosePageSession ensureClosePageSession() => $_ensure(8);
+  ClosePageSession ensureClosePageSession() => $_ensure(9);
 
   @$pb.TagNumber(18)
-  Empty get rebuild => $_getN(9);
+  Empty get rebuild => $_getN(10);
   @$pb.TagNumber(18)
   set rebuild(Empty value) => $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasRebuild() => $_has(9);
+  $core.bool hasRebuild() => $_has(10);
   @$pb.TagNumber(18)
   void clearRebuild() => $_clearField(18);
   @$pb.TagNumber(18)
-  Empty ensureRebuild() => $_ensure(9);
+  Empty ensureRebuild() => $_ensure(10);
 
   @$pb.TagNumber(19)
-  ApiFetchRequest get fetchApi => $_getN(10);
+  ApiFetchRequest get fetchApi => $_getN(11);
   @$pb.TagNumber(19)
   set fetchApi(ApiFetchRequest value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasFetchApi() => $_has(10);
+  $core.bool hasFetchApi() => $_has(11);
   @$pb.TagNumber(19)
   void clearFetchApi() => $_clearField(19);
   @$pb.TagNumber(19)
-  ApiFetchRequest ensureFetchApi() => $_ensure(10);
+  ApiFetchRequest ensureFetchApi() => $_ensure(11);
 
   @$pb.TagNumber(20)
-  Empty get dispose => $_getN(11);
+  Empty get dispose => $_getN(12);
   @$pb.TagNumber(20)
   set dispose(Empty value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasDispose() => $_has(11);
+  $core.bool hasDispose() => $_has(12);
   @$pb.TagNumber(20)
   void clearDispose() => $_clearField(20);
   @$pb.TagNumber(20)
-  Empty ensureDispose() => $_ensure(11);
+  Empty ensureDispose() => $_ensure(12);
 
   @$pb.TagNumber(21)
-  PrepareBuildRequest get prepareBuild => $_getN(12);
+  PrepareBuildRequest get prepareBuild => $_getN(13);
   @$pb.TagNumber(21)
   set prepareBuild(PrepareBuildRequest value) => $_setField(21, value);
   @$pb.TagNumber(21)
-  $core.bool hasPrepareBuild() => $_has(12);
+  $core.bool hasPrepareBuild() => $_has(13);
   @$pb.TagNumber(21)
   void clearPrepareBuild() => $_clearField(21);
   @$pb.TagNumber(21)
-  PrepareBuildRequest ensurePrepareBuild() => $_ensure(12);
+  PrepareBuildRequest ensurePrepareBuild() => $_ensure(13);
 
   @$pb.TagNumber(22)
-  CancelPreparationRequest get cancelPreparation => $_getN(13);
+  CancelPreparationRequest get cancelPreparation => $_getN(14);
   @$pb.TagNumber(22)
   set cancelPreparation(CancelPreparationRequest value) =>
       $_setField(22, value);
   @$pb.TagNumber(22)
-  $core.bool hasCancelPreparation() => $_has(13);
+  $core.bool hasCancelPreparation() => $_has(14);
   @$pb.TagNumber(22)
   void clearCancelPreparation() => $_clearField(22);
   @$pb.TagNumber(22)
-  CancelPreparationRequest ensureCancelPreparation() => $_ensure(13);
+  CancelPreparationRequest ensureCancelPreparation() => $_ensure(14);
 
   @$pb.TagNumber(23)
-  Empty get extensionCache => $_getN(14);
+  Empty get extensionCache => $_getN(15);
   @$pb.TagNumber(23)
   set extensionCache(Empty value) => $_setField(23, value);
   @$pb.TagNumber(23)
-  $core.bool hasExtensionCache() => $_has(14);
+  $core.bool hasExtensionCache() => $_has(15);
   @$pb.TagNumber(23)
   void clearExtensionCache() => $_clearField(23);
   @$pb.TagNumber(23)
-  Empty ensureExtensionCache() => $_ensure(14);
+  Empty ensureExtensionCache() => $_ensure(15);
 
   @$pb.TagNumber(24)
-  ForgetExtensionArtifactRequest get forgetExtensionArtifact => $_getN(15);
+  ForgetExtensionArtifactRequest get forgetExtensionArtifact => $_getN(16);
   @$pb.TagNumber(24)
   set forgetExtensionArtifact(ForgetExtensionArtifactRequest value) =>
       $_setField(24, value);
   @$pb.TagNumber(24)
-  $core.bool hasForgetExtensionArtifact() => $_has(15);
+  $core.bool hasForgetExtensionArtifact() => $_has(16);
   @$pb.TagNumber(24)
   void clearForgetExtensionArtifact() => $_clearField(24);
   @$pb.TagNumber(24)
   ForgetExtensionArtifactRequest ensureForgetExtensionArtifact() =>
-      $_ensure(15);
+      $_ensure(16);
 
   @$pb.TagNumber(25)
-  CloseBuildRequest get closeBuild => $_getN(16);
+  CloseBuildRequest get closeBuild => $_getN(17);
   @$pb.TagNumber(25)
   set closeBuild(CloseBuildRequest value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasCloseBuild() => $_has(16);
+  $core.bool hasCloseBuild() => $_has(17);
   @$pb.TagNumber(25)
   void clearCloseBuild() => $_clearField(25);
   @$pb.TagNumber(25)
-  CloseBuildRequest ensureCloseBuild() => $_ensure(16);
+  CloseBuildRequest ensureCloseBuild() => $_ensure(17);
 }
 
 enum ControlResponse_Result {
@@ -7894,6 +7907,7 @@ enum ControlResponse_Result {
 class ControlResponse extends $pb.GeneratedMessage {
   factory ControlResponse({
     $core.String? requestId,
+    RuntimeSlot? slotId,
     RuntimeHello? hello,
     RuntimeSession? session,
     SourceResult? source,
@@ -7908,6 +7922,7 @@ class ControlResponse extends $pb.GeneratedMessage {
   }) {
     final result = ControlResponse._();
     if (requestId != null) result.requestId = requestId;
+    if (slotId != null) result.slotId = slotId;
     if (hello != null) result.hello = hello;
     if (session != null) result.session = session;
     if (source != null) result.source = source;
@@ -7952,6 +7967,8 @@ class ControlResponse extends $pb.GeneratedMessage {
       createEmptyInstance: ControlResponse.$_createMessage)
     ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aE<RuntimeSlot>(2, _omitFieldNames ? '' : 'slotId',
+        enumValues: RuntimeSlot.values)
     ..aOM<RuntimeHello>(10, _omitFieldNames ? '' : 'hello',
         subBuilder: RuntimeHello.$_createMessage)
     ..aOM<RuntimeSession>(11, _omitFieldNames ? '' : 'session',
@@ -8033,126 +8050,135 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearRequestId() => $_clearField(1);
 
+  @$pb.TagNumber(2)
+  RuntimeSlot get slotId => $_getN(1);
+  @$pb.TagNumber(2)
+  set slotId(RuntimeSlot value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSlotId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSlotId() => $_clearField(2);
+
   @$pb.TagNumber(10)
-  RuntimeHello get hello => $_getN(1);
+  RuntimeHello get hello => $_getN(2);
   @$pb.TagNumber(10)
   set hello(RuntimeHello value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasHello() => $_has(1);
+  $core.bool hasHello() => $_has(2);
   @$pb.TagNumber(10)
   void clearHello() => $_clearField(10);
   @$pb.TagNumber(10)
-  RuntimeHello ensureHello() => $_ensure(1);
+  RuntimeHello ensureHello() => $_ensure(2);
 
   @$pb.TagNumber(11)
-  RuntimeSession get session => $_getN(2);
+  RuntimeSession get session => $_getN(3);
   @$pb.TagNumber(11)
   set session(RuntimeSession value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasSession() => $_has(2);
+  $core.bool hasSession() => $_has(3);
   @$pb.TagNumber(11)
   void clearSession() => $_clearField(11);
   @$pb.TagNumber(11)
-  RuntimeSession ensureSession() => $_ensure(2);
+  RuntimeSession ensureSession() => $_ensure(3);
 
   @$pb.TagNumber(12)
-  SourceResult get source => $_getN(3);
+  SourceResult get source => $_getN(4);
   @$pb.TagNumber(12)
   set source(SourceResult value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasSource() => $_has(3);
+  $core.bool hasSource() => $_has(4);
   @$pb.TagNumber(12)
   void clearSource() => $_clearField(12);
   @$pb.TagNumber(12)
-  SourceResult ensureSource() => $_ensure(3);
+  SourceResult ensureSource() => $_ensure(4);
 
   @$pb.TagNumber(13)
-  ImageResource get image => $_getN(4);
+  ImageResource get image => $_getN(5);
   @$pb.TagNumber(13)
   set image(ImageResource value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasImage() => $_has(4);
+  $core.bool hasImage() => $_has(5);
   @$pb.TagNumber(13)
   void clearImage() => $_clearField(13);
   @$pb.TagNumber(13)
-  ImageResource ensureImage() => $_ensure(4);
+  ImageResource ensureImage() => $_ensure(5);
 
   @$pb.TagNumber(14)
-  Released get released => $_getN(5);
+  Released get released => $_getN(6);
   @$pb.TagNumber(14)
   set released(Released value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasReleased() => $_has(5);
+  $core.bool hasReleased() => $_has(6);
   @$pb.TagNumber(14)
   void clearReleased() => $_clearField(14);
   @$pb.TagNumber(14)
-  Released ensureReleased() => $_ensure(5);
+  Released ensureReleased() => $_ensure(6);
 
   @$pb.TagNumber(15)
-  Closed get closed => $_getN(6);
+  Closed get closed => $_getN(7);
   @$pb.TagNumber(15)
   set closed(Closed value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasClosed() => $_has(6);
+  $core.bool hasClosed() => $_has(7);
   @$pb.TagNumber(15)
   void clearClosed() => $_clearField(15);
   @$pb.TagNumber(15)
-  Closed ensureClosed() => $_ensure(6);
+  Closed ensureClosed() => $_ensure(7);
 
   @$pb.TagNumber(16)
-  Completed get completed => $_getN(7);
+  Completed get completed => $_getN(8);
   @$pb.TagNumber(16)
   set completed(Completed value) => $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasCompleted() => $_has(7);
+  $core.bool hasCompleted() => $_has(8);
   @$pb.TagNumber(16)
   void clearCompleted() => $_clearField(16);
   @$pb.TagNumber(16)
-  Completed ensureCompleted() => $_ensure(7);
+  Completed ensureCompleted() => $_ensure(8);
 
   @$pb.TagNumber(17)
-  ApiFetchResponse get api => $_getN(8);
+  ApiFetchResponse get api => $_getN(9);
   @$pb.TagNumber(17)
   set api(ApiFetchResponse value) => $_setField(17, value);
   @$pb.TagNumber(17)
-  $core.bool hasApi() => $_has(8);
+  $core.bool hasApi() => $_has(9);
   @$pb.TagNumber(17)
   void clearApi() => $_clearField(17);
   @$pb.TagNumber(17)
-  ApiFetchResponse ensureApi() => $_ensure(8);
+  ApiFetchResponse ensureApi() => $_ensure(9);
 
   @$pb.TagNumber(18)
-  RuntimeError get error => $_getN(9);
+  RuntimeError get error => $_getN(10);
   @$pb.TagNumber(18)
   set error(RuntimeError value) => $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasError() => $_has(9);
+  $core.bool hasError() => $_has(10);
   @$pb.TagNumber(18)
   void clearError() => $_clearField(18);
   @$pb.TagNumber(18)
-  RuntimeError ensureError() => $_ensure(9);
+  RuntimeError ensureError() => $_ensure(10);
 
   @$pb.TagNumber(19)
-  PreparedBuild get preparedBuild => $_getN(10);
+  PreparedBuild get preparedBuild => $_getN(11);
   @$pb.TagNumber(19)
   set preparedBuild(PreparedBuild value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasPreparedBuild() => $_has(10);
+  $core.bool hasPreparedBuild() => $_has(11);
   @$pb.TagNumber(19)
   void clearPreparedBuild() => $_clearField(19);
   @$pb.TagNumber(19)
-  PreparedBuild ensurePreparedBuild() => $_ensure(10);
+  PreparedBuild ensurePreparedBuild() => $_ensure(11);
 
   @$pb.TagNumber(20)
-  ExtensionCacheState get extensionCache => $_getN(11);
+  ExtensionCacheState get extensionCache => $_getN(12);
   @$pb.TagNumber(20)
   set extensionCache(ExtensionCacheState value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasExtensionCache() => $_has(11);
+  $core.bool hasExtensionCache() => $_has(12);
   @$pb.TagNumber(20)
   void clearExtensionCache() => $_clearField(20);
   @$pb.TagNumber(20)
-  ExtensionCacheState ensureExtensionCache() => $_ensure(11);
+  ExtensionCacheState ensureExtensionCache() => $_ensure(12);
 }
 
 class OpenWorker extends $pb.GeneratedMessage {

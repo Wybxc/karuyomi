@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-07，有界跨源搜索已接入明确双槽控制协议、正式搜索服务和 Flutter 独立页面；独立服务 10 项、界面/控制器 17 项、完整通用检查 614 项、Dart/Flutter 22 + 78 + 573 项、全库格式与完整构建通过；实际 Source/Native/生产待验收。范围、发现并修复的取消/关闭竞态及实际运行待验门见[跨源搜索记录](verification/cross-source-search.md)。
+
 2026-11-06，官方 `kotlinx-coroutines-core-jvm` 已接入正式源码，自有 Green Job 与四个同名覆盖已删除。正式工程及远端 CI、JVM/AOT 的真实挂起与取消/父子/启动语义、owner/lease 分项通过；固定新 AOT 经正式 Web 主入口完成 BH3 协程详情及 21 页阅读、Komiic 镜像设置/重开与筛选分页，见[协程验证](verification/coroutine-runtime.md)。HTTP await 已恢复 seed 上游可取消实现，响应所有权及 ACK 前清理的正式 JVM 202 项与完整工程检查通过；随后固定 `48c4526` 的正式 TeaVM / Node HTTP 取消子门通过，clab 后台重建两包及本机正式 harness 构建/静态装配/三路径 HTTP 200 通过；Node 最终 runner 使用显式退出，尚非自然 idle，IAB provider 不可用导致该次实际 Source/UI 未执行。两包保持 `compiled_unverified/runtimeReady=false`，无部署或正式 checkpoint 变更；产品取消、Native / 生产等剩余门继续按[计划](plan/coroutine-runtime.md)验收。
 
 2026-11-07，默认仓库扩展管理的账户确认清单、准备/取消、有界缓存、手动更新、启停/卸载与精确关闭/显式重建已接入，独立集中检查、445 项 Vitest、22 + 63 + 470 项 Flutter/Dart 测试与完整构建通过，见[扩展管理验证](verification/extension-management.md)。初次构建为 0 扩展，彼时 IAB provider 不可用；随后当前候选的 Web 分项见下文，Native 和生产门继续按[计划](plan/extension-management.md)验收。

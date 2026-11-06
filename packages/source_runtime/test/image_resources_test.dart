@@ -291,6 +291,7 @@ void main() {
       }
       transport.handler = (call) async => call.hasReleaseImage()
           ? wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               released: wire.Released(),
             )

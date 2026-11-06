@@ -426,6 +426,7 @@ test('business presence, error categories and ACK meaning fail closed', () => {
     assert.throws(() =>
       contract.parseControlResponse({
         requestId: 'r',
+        slotId: 'RUNTIME_SLOT_FOREGROUND',
         error: { code, message: 'Unknown error' },
       }),
     );
@@ -433,6 +434,7 @@ test('business presence, error categories and ACK meaning fail closed', () => {
     assert.throws(() =>
       contract.parseControlResponse({
         requestId: 'r',
+        slotId: 'RUNTIME_SLOT_FOREGROUND',
         [field]: { [field]: false },
       }),
     );
@@ -505,6 +507,7 @@ test('UTF-8 request/memo, page-window and image transfer budgets are bounded', (
     );
   const request = {
     requestId: 'r',
+    slotId: 'RUNTIME_SLOT_FOREGROUND',
     invoke: sourceCall({ search: { page: 1, query: '' } }),
   };
   const remaining =

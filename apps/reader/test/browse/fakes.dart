@@ -212,7 +212,10 @@ final class TestPlatform extends PlatformRuntime {
   Future<Object?> control(Map<String, Object?> json) async {
     final request = wire.decodeProtoJson(wire.ControlRequest(), json);
     controlCommands.add(request.whichCommand());
-    final response = wire.ControlResponse(requestId: request.requestId);
+    final response = wire.ControlResponse(
+      slotId: request.slotId,
+      requestId: request.requestId,
+    );
     switch (request.whichCommand()) {
       case wire.ControlRequest_Command.fetchApi:
         await beforeApiFetch?.call(request.fetchApi.path);

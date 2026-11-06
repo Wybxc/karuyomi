@@ -456,6 +456,34 @@ const sourcePreferences: JsonObject = {
 
 export const goldenFixtures: GoldenFixture[] = [
   {
+    name: 'search-slot-search',
+    type: 'ControlRequest',
+    value: {
+      requestId,
+      slotId: 'RUNTIME_SLOT_SEARCH',
+      invoke: {
+        requestId,
+        generation,
+        sourceId,
+        search: { page: 1, query: '漫画' },
+      },
+    },
+  },
+  {
+    name: 'search-slot-result',
+    type: 'ControlResponse',
+    value: {
+      requestId,
+      slotId: 'RUNTIME_SLOT_SEARCH',
+      source: {
+        requestId,
+        generation,
+        buildId,
+        mangaPage: { mangas: [manga], hasNextPage: false },
+      },
+    },
+  },
+  {
     name: 'extension-network-policy-readiness',
     type: 'ExtensionNetworkPoliciesResponse',
     value: {
@@ -468,6 +496,7 @@ export const goldenFixtures: GoldenFixture[] = [
     name: 'preferences-open-bootstrap',
     type: 'ControlRequest',
     value: {
+      slotId: 'RUNTIME_SLOT_FOREGROUND',
       requestId,
       open: {
         catalog,
@@ -932,7 +961,7 @@ export const goldenFixtures: GoldenFixture[] = [
       {
         name: `control-invoke-${operation}`,
         type: 'ControlRequest',
-        value: { requestId, invoke: call },
+        value: { requestId, slotId: 'RUNTIME_SLOT_FOREGROUND', invoke: call },
       },
       {
         name: `worker-invoke-${operation}`,
@@ -961,7 +990,7 @@ export const goldenFixtures: GoldenFixture[] = [
       {
         name: `control-source-${payload}`,
         type: 'ControlResponse',
-        value: { requestId, source: result },
+        value: { requestId, slotId: 'RUNTIME_SLOT_FOREGROUND', source: result },
       },
     ];
   }),
@@ -1004,7 +1033,7 @@ export const goldenFixtures: GoldenFixture[] = [
   ).map(([command, value]): GoldenFixture => ({
     name: `control-request-${command}`,
     type: 'ControlRequest',
-    value: { requestId, [command]: value },
+    value: { requestId, slotId: 'RUNTIME_SLOT_FOREGROUND', [command]: value },
   })),
   ...(
     [
@@ -1052,7 +1081,7 @@ export const goldenFixtures: GoldenFixture[] = [
   ).map(([result, value]): GoldenFixture => ({
     name: `control-response-${result}`,
     type: 'ControlResponse',
-    value: { requestId, [result]: value },
+    value: { requestId, slotId: 'RUNTIME_SLOT_FOREGROUND', [result]: value },
   })),
   ...(
     [

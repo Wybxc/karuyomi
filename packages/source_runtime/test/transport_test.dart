@@ -30,6 +30,7 @@ void main() {
         transport.handler = (call) async {
           if (paused && call.hasInvoke()) {
             return wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               error: wire.RuntimeError(
                 code: wireCode,
@@ -137,6 +138,7 @@ void main() {
           }
           if (call.hasInvoke()) {
             return wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               error: wire.RuntimeError(
                 code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
@@ -299,6 +301,7 @@ void main() {
         transport.handler = (call) async {
           if (call.hasInvoke() && ++invokeCount == 1) {
             return wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               error: wire.RuntimeError(
                 code: wireCode,
@@ -405,6 +408,7 @@ void main() {
         await runtime.open(build());
         transport.handler = (call) async => call.hasInvoke()
             ? wire.ControlResponse(
+                slotId: call.slotId,
                 requestId: call.requestId,
                 error: wire.RuntimeError(
                   code: wireCode,
@@ -462,6 +466,7 @@ void main() {
     expect(transport.calls.where((call) => call.hasCancel()), isEmpty);
     transport.handler = (call) async => call.hasReleaseImage()
         ? wire.ControlResponse(
+            slotId: call.slotId,
             requestId: call.requestId,
             released: wire.Released(),
           )
@@ -626,6 +631,7 @@ void main() {
     var code = wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT;
     transport.handler = (call) async => call.hasAcquireImage()
         ? wire.ControlResponse(
+            slotId: call.slotId,
             requestId: call.requestId,
             error: wire.RuntimeError(
               code: code,
@@ -677,6 +683,7 @@ void main() {
           entered.complete();
           await release.future;
           return wire.ControlResponse(
+            slotId: call.slotId,
             requestId: call.requestId,
             error: lateError
                 ? wire.RuntimeError(
@@ -733,6 +740,7 @@ void main() {
           if (call.hasInvoke()) response.source.generation = generation;
           if (call.hasReleaseImage() && cleanupFails) {
             return wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               error: wire.RuntimeError(
                 code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,

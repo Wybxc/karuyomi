@@ -556,6 +556,7 @@ void main() {
               await editResult.future;
               if (outcome == 'failed') {
                 return wire.ControlResponse(
+                  slotId: call.slotId,
                   requestId: call.requestId,
                   error: wire.RuntimeError(
                     code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_SOURCE_ERROR,

@@ -366,7 +366,9 @@ test('public page-session close waits for the Worker acknowledgement and returns
   const acknowledgement = deferred<{ closed: true }>();
   closePageSession.mockImplementationOnce(() => acknowledgement.promise);
   vi.stubGlobal('window', { addEventListener: vi.fn() });
-  const api = installRuntime(manager);
+  const api = installRuntime(manager, () => {
+    throw new Error('Search is not used by this foreground fixture');
+  });
   const input = {
     pageSessionId: request.pageSessionId,
     generation: request.generation,
@@ -377,6 +379,7 @@ test('public page-session close waits for the Worker acknowledgement and returns
       await api.control(
         encodeControlRequest(
           create(pb.ControlRequestSchema, {
+            slotId: pb.RuntimeSlot.FOREGROUND,
             requestId: 'control-close',
             command: { case: 'closePageSession', value: input },
           }),
@@ -436,11 +439,14 @@ test('formal host control delivers opaque Source bytes once with only ownership 
   );
   const { manager, request, store } = await setup(acquire);
   vi.stubGlobal('window', { addEventListener: vi.fn() });
-  const api = installRuntime(manager);
+  const api = installRuntime(manager, () => {
+    throw new Error('Search is not used by this foreground fixture');
+  });
   const response = parseControlResponse(
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
+          slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'opaque-control',
           command: { case: 'acquireImage', value: request },
         }),
@@ -468,6 +474,7 @@ test('formal host control delivers opaque Source bytes once with only ownership 
     await api.control(
       encodeControlRequest(
         create(pb.ControlRequestSchema, {
+          slotId: pb.RuntimeSlot.FOREGROUND,
           requestId: 'opaque-release',
           command: {
             case: 'releaseImage',

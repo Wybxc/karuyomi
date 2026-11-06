@@ -173,8 +173,35 @@ export const encodeWorkerCommand = (value: pb.WorkerCommand) =>
 export const encodeWorkerResponse = (value: pb.WorkerResponse) =>
   messageJson(pb.WorkerResponseSchema, validateWorkerResponse(value));
 
+function validateRuntimeSlot(slot: pb.RuntimeSlot): void {
+  requireCondition(
+    slot === pb.RuntimeSlot.FOREGROUND || slot === pb.RuntimeSlot.SEARCH,
+    'An explicit runtime slot is required',
+  );
+}
+
 export function validateControlRequest(value: ControlRequest): ControlRequest {
   validId(value.requestId);
+  validateRuntimeSlot(value.slotId);
+  if (value.slotId === pb.RuntimeSlot.SEARCH) {
+    requireCondition(
+      [
+        'ready',
+        'open',
+        'invoke',
+        'cancel',
+        'closeBuild',
+        'rebuild',
+        'dispose',
+      ].includes(value.command.case ?? ''),
+      'The search slot only supports Source search and its lifecycle',
+    );
+    if (value.command.case === 'invoke')
+      requireCondition(
+        value.command.value.request.case === 'search',
+        'The search slot only accepts search calls',
+      );
+  }
   switch (value.command.case) {
     case 'ready':
     case 'rebuild':
@@ -271,6 +298,14 @@ export function validateControlResponse(
   value: ControlResponse,
 ): ControlResponse {
   validId(value.requestId);
+  validateRuntimeSlot(value.slotId);
+  if (value.slotId === pb.RuntimeSlot.SEARCH)
+    requireCondition(
+      ['hello', 'session', 'source', 'closed', 'completed', 'error'].includes(
+        value.result.case ?? '',
+      ),
+      'Invalid search slot control response',
+    );
   switch (value.result.case) {
     case 'hello':
       runtimeHelloSchema.parse(

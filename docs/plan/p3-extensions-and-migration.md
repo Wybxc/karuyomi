@@ -17,7 +17,7 @@
 2. 验收已接入的精确 `closeBuild(buildId,generation)`：调用方先处理请求、阅读资源和存储写锁，manager 等待 shutdown ACK 与 namespace/产物引用释放；旧代不影响新槽，失败显示并显式恢复。定向受控测试不是实际 Source 关闭证据。
 3. 服务器仅保留每包最新可用构建。客户端检查索引、明确切换所选版本并通过受管缓存清理旧副本；可枚举、可删除与占用状态已接入，实际 Web/Native 持久性和清理待验收。下架构建的 `404 build_not_found` 与 Access 登录/权限错误分开；不承诺远端历史版本回滚，不维护旧协议或旧材料兼容层。卸载保留书架、分类、进度、书签、收藏源及 Source 数据。
 4. Source 自定义筛选已接入 typed 链路，两包 v5 AOT 与 CuuTruyen Web 分项已过，继续其余真实 Source/平台验收；typed Source preferences 已按[子计划](source-preferences.md)接入 v6 正式合同、开关、文本/密码、单/多选、分组、依赖项与刷新，并通过 Komiic Web 设置/新文档恢复分项，继续其它控件与跨端验收。保留原 Preference 对象、监听器及实际存储变化；D1 确认可同步非敏感值，敏感值留当前客户端，不整体同步 SharedPreferences。不把 Android 自定义 Activity 设置页当成已支持。
-5. 收藏源与快捷打开已实现，补实际独立客户端及索引更新验收；包内与当前可用静态目录语言筛选已实现，新增目录集中工程检查通过，实际 Source/平台待验收；继续能力提示及有界跨源搜索，各源独立返回、可取消，一个慢源不阻塞全部结果。仅声明实际验证的登录/验证码/脚本能力。
+5. 收藏源与快捷打开已实现，补实际独立客户端及索引更新验收；包内与当前可用静态目录语言筛选已实现，新增目录集中工程检查通过，实际 Source/平台待验收；[能力提示与有界跨源搜索](cross-source-search.md)已接入双槽、逐源结果和正式 UI，独立服务/UI、完整工程与构建通过，实际 Source/平台待验收。仅声明实际验证的登录/验证码/脚本能力。
 6. 按[源迁移子计划](source-migration.md)完成“搜索候选 → 用户确认作品 → 预览一对一章节映射 → 原子补充目标收藏/分类/已读/书签”。正式协议与 D1 三 CAS 原子写、Flutter 数据层、书架/详情入口和向导已实现，独立集中工程检查与构建通过。模糊项须手动确认，原条目与目标已有状态保留，不跨源复制页面位置，不把工程检查当作实际 Source/多端完成。
 
 ## 收藏源里程碑
@@ -36,7 +36,7 @@
 
 浏览页在未加载扩展前展示目录 Source 名称/语言，提供语言选择、扩展/Source 计数和清除；只使用当前索引，不下载或执行其它包，不含 pending/unavailable 上游。当前来源被隐藏仍保留上下文，包内筛选保持独立；资料只作展示，不宣称网络或运行能力。设计与历史证据分别见[语言筛选](../design/source-language-filter.md)和[验证记录](../verification/source-language-filter.md)。
 
-本轮合同、正式组件、完整检查与空目录工程构建通过，实际 Source 静态装配、Codex 内置浏览器与 Native 门另验。当前 host 指纹包含业务协议与生成代码，其变化进入正式增量构建判定；后续 AOT 须使用当前固定输入，不复用旧格式清单。能力目录、有界跨源搜索、账户安装/卸载与迁移继续保留原待办。
+本轮合同、正式组件、完整检查与空目录工程构建通过，实际 Source 静态装配、Codex 内置浏览器与 Native 门另验。当前 host 指纹包含业务协议与生成代码，其变化进入正式增量构建判定；后续 AOT 须使用当前固定输入，不复用旧格式清单。账户安装/卸载、迁移与[能力提示及跨源搜索](cross-source-search.md)的当前状态分别维护在子计划，工程检查不能代替其实际 Source/平台验收。
 
 ## typed Source 筛选里程碑
 
@@ -44,7 +44,7 @@
 
 显式应用后调用正式 `search`，空 query 也必须走搜索，不能自动退为热门；后续分页复用同一份已应用状态。类型与路径/大小/数量校验、嵌套状态处理、取消和迟到结果边界已接入并通过集中工程检查；CuuTruyen 已通过真实动态标签、非默认已完结、空 query、后续页，以及重置草稿关闭后继续原查询分页；其它类型与平台继续验收。工程结果和剩余真实运行门维护在[筛选验证记录](../verification/source-filters.md)；组件或 JVM/宿主适配测试不替代实际在线筛选验收。CuuTruyen 上游使用 `Group<TagCheckBox>` 与远端动态标签，本轮记录绑定修复后 v5 AOT；历史默认浏览与图片证据仍不自动覆盖新构建。
 
-typed preferences 已接入正式设置入口并通过 Komiic v6 AOT、Web 设置与新文档恢复分项，按[独立子计划](source-preferences.md)继续其它 Source 与跨端验收。[扩展管理](extension-management.md)、能力目录、有界跨源搜索和用户确认迁移继续保留完整待办；不以零散界面改动代替这些流程。
+typed preferences 已接入正式设置入口并通过 Komiic v6 AOT、Web 设置与新文档恢复分项，按[独立子计划](source-preferences.md)继续其它 Source 与跨端验收。[扩展管理](extension-management.md)、[能力提示与跨源搜索](cross-source-search.md)和[用户确认迁移](source-migration.md)按各子计划推进独立验收；不以零散界面改动代替这些流程。
 
 ## 扩展管理里程碑
 
@@ -52,7 +52,7 @@ typed preferences 已接入正式设置入口并通过 Komiic v6 AOT、Web 设�
 
 D1 保存账户清单、enabled 和精确 build/hash，缺记录不自动安装；本机准备只下载/验证代码，不执行 Source。缓存直接使用 idb，128 项/256MiB，shared pin 保护使用中产物；运行槽精确关闭并等待 ACK/释放。安装和更新先准备后按原 CAS 确认，检查更新不自动换版；四打开路径、实际调用和图片 provider 共用确认门禁。停用/卸载以账户确认驱动，关闭/清理失败单独展示，保留业务、Source 数据与 HTTP Cache。
 
-扩展管理功能提交的全库检查与构建已通过，真实客户端待验收；后续固定 `ad869d2` 三包 AOT 候选通过，仅 `compiled_unverified`，未部署或写正式 checkpoint，见[候选证据](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。额外仓库的添加、验证、刷新/移除、身份冲突和来源网络政策已按[子计划](additional-repositories.md)接入，实际外仓、Source/平台与独立客户端继续验收；能力目录和有界跨源搜索仍未完成，不将本里程碑当作完整 P3 完成。
+扩展管理功能提交的全库检查与构建已通过，真实客户端待验收；后续固定 `ad869d2` 三包 AOT 候选通过，仅 `compiled_unverified`，未部署或写正式 checkpoint，见[候选证据](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。额外仓库的添加、验证、刷新/移除、身份冲突和来源网络政策已按[子计划](additional-repositories.md)接入，实际外仓、Source/平台与独立客户端继续验收；[能力提示与有界跨源搜索](cross-source-search.md)已接入，独立服务回归已过，实际运行门待验收，不将本里程碑当作完整 P3 完成。
 
 ## 源迁移里程碑
 
@@ -66,9 +66,17 @@ D1 保存账户清单、enabled 和精确 build/hash，缺记录不自动安装�
 
 运行时保留原 Preference 对象和回调语义，处理拒绝、别名写入与动态描述；非敏感值由 D1 条件写入确认并在构造 Source 前注入，秘密值留当前客户端。待确认业务请求只显式重试原 UUID/body，不重跑 Source listener；冲突或未知运行结果经回收重开恢复。工程与真实运行证据分别维护在[记录](../verification/source-preferences.md)，已有筛选证据不覆盖设置能力。
 
+## 能力提示与有界跨源搜索里程碑
+
+**已实现待独立验收。** [子计划](cross-source-search.md)维护范围与验收，[设计](../design/cross-source-search.md)确定两个物理槽、无活动阅读时独占、完整包 namespace 分组和同包串行。用户明确选择已确认 Source，各源独立返回、手动分页和取消；结束、离页与进入正式详情均需关闭或 reset 确认后交还主线。数量预算不截断或隐式分批，身份退休不自动恢复旧查询。
+
+能力说明复用实际 `supportsLatest`、宿主能力和当前操作错误，不新增人工能力矩阵或推断登录/验证码。UI 定向回归通过，服务调度、完整工程和真实 Source/平台待独立验收；不把受控 UI 结果当作跨源在线能力完成。
+
 ## 验收
 
 - 安装/手动升级/卸载与旧缓存清理流程有真实构建用例；中断、拒绝、存储冲突或缺失材料均明确失败，不能以隐式旧版本 fallback 掩盖问题。
 - 已开放的筛选和设置逐项有真实 Source 证据；敏感项不泄漏到公开资源或多设备同步。
 - 源迁移预览与最终写入一致，原条目完整保留，用户另行决定移除；不自动快照、不依赖备份/追踪模块。
 - Source URL/ID 保持稳定；换域和来源变化走显式规则，不用全局解码或按标题去重制造新身份。
+
+独立服务、UI、双槽合同、完整通用与 Flutter 回归及构建已通过；受控 transport 与组件不能作为真实双 Worker、Source 或平台证据，精确层级见[跨源搜索验证](../verification/cross-source-search.md)。

@@ -14,7 +14,10 @@ final class FakeTransport implements RuntimeTransport {
   Object? Function(wire.ControlRequest, Map<String, Object?>)? corrupt;
 
   wire.ControlResponse respond(wire.ControlRequest request) {
-    final response = wire.ControlResponse(requestId: request.requestId);
+    final response = wire.ControlResponse(
+      slotId: request.slotId,
+      requestId: request.requestId,
+    );
     switch (request.whichCommand()) {
       case wire.ControlRequest_Command.ready:
         response.hello = wire.RuntimeHello(
@@ -60,6 +63,13 @@ final class FakeTransport implements RuntimeTransport {
   @override
   Future<Object?> control(Map<String, Object?> json) async {
     final request = wire.decodeProtoJson(wire.ControlRequest(), json);
+    expect(
+      request.slotId,
+      anyOf(
+        wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+        wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+      ),
+    );
     calls.add(request.deepCopy()..freeze());
     final response = handler == null
         ? respond(request)

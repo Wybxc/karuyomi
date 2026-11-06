@@ -22,6 +22,7 @@ import '../progress/chapter_read_controller.dart';
 import '../progress/chapter_read_dialog.dart';
 import '../sources/favorite_sources.dart';
 import '../extensions/extensions_page.dart';
+import '../search/cross_source_search_page.dart';
 import '../migration/migration_controller.dart';
 import '../migration/migration_page.dart';
 import '../sources/source_filters.dart';
@@ -87,6 +88,58 @@ class _CatalogPageState extends State<CatalogPage> {
           chapters: details.chapters,
           source: details.source,
           onAuthenticateReader: widget.onAuthenticateReader,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _crossSourceSearch() async {
+    final catalog = widget.controller;
+    final client = catalog?.library?.client;
+    if (catalog == null || client == null || catalog.busy) return;
+    final CatalogSourceSearch service;
+    try {
+      service = catalog.createSourceSearch();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError ? error.message.toString() : error.toString(),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CrossSourceSearchPage(
+          service: service,
+          onOpen: (details) async {
+            bool current() =>
+                mounted &&
+                !catalog.accessPaused &&
+                identical(catalog.library?.client, client) &&
+                catalog.isCurrentSource(details.source);
+            if (!current()) return;
+            await Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => current()
+                    ? MangaDetailsPage(
+                        controller: catalog,
+                        manga: details.manga,
+                        chapters: details.chapters,
+                        source: details.source,
+                        onAuthenticateReader: widget.onAuthenticateReader,
+                      )
+                    : Scaffold(
+                        appBar: AppBar(title: const Text('作品已失效')),
+                        body: const Center(child: Text('身份或漫画源已改变，请返回后重新搜索。')),
+                      ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -269,6 +322,17 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                 ],
               ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('cross-source-search-open'),
+                  onPressed: busy || controller.library == null
+                      ? null
+                      : _crossSourceSearch,
+                  icon: const Icon(Icons.manage_search),
+                  label: const Text('跨源搜索'),
+                ),
+              ),
               _CatalogFavorites(
                 key: const ValueKey('catalog-favorite-sources'),
                 catalog: controller,
@@ -361,6 +425,15 @@ class _CatalogPageState extends State<CatalogPage> {
                         ),
                   ],
                 ),
+                if (controller.activeSource?.hasSupportsLatest() == true &&
+                    controller.activeSource?.supportsLatest == false)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      '此漫画源不提供最新更新列表，可使用热门或搜索。',
+                      key: ValueKey('source-latest-unsupported'),
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 if (!busy && controller.mangas.isEmpty)
                   const Padding(

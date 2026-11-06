@@ -68,7 +68,18 @@ final class _ImageOwner {
 }
 
 final class TransportSourceRuntime implements SourceRuntime {
-  TransportSourceRuntime(this.transport);
+  TransportSourceRuntime(
+    this.transport, {
+    this.slotId = wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+  }) {
+    if (!{
+      wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+      wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+    }.contains(slotId)) {
+      throw ArgumentError.value(slotId, 'slotId', 'Unknown runtime slot');
+    }
+  }
+  final wire.RuntimeSlot slotId;
   static int _instanceSequence = 0;
   final RuntimeTransport transport;
   final int _instanceId = ++_instanceSequence;
@@ -79,6 +90,7 @@ final class TransportSourceRuntime implements SourceRuntime {
   RuntimeSession? _session;
   String? _packageId;
   int _epoch = 0;
+  int _containerEpoch = 0;
   bool _disposed = false;
   bool _preferencesEdited = false;
   RuntimeException? _accessFailure;
@@ -90,7 +102,8 @@ final class TransportSourceRuntime implements SourceRuntime {
   @override
   Stream<RuntimeEvent> get events => _events.stream;
 
-  void containerLost(String message) {
+  void containerLost(String message, {bool containerWide = true}) {
+    if (containerWide) ++_containerEpoch;
     ++_epoch;
     _session = null;
     _opening = null;
@@ -100,6 +113,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       _events.add(
         RuntimeEvent(
           generation: '',
+          containerWide: containerWide,
           code: RuntimeErrorCode.runtimeLost,
           message: message,
         ),
@@ -113,6 +127,14 @@ final class TransportSourceRuntime implements SourceRuntime {
   ) async {
     final command = request.whichCommand();
     final epoch = _epoch;
+    final containerEpoch = _containerEpoch;
+    final independentControl = {
+      wire.ControlRequest_Command.fetchApi,
+      wire.ControlRequest_Command.prepareBuild,
+      wire.ControlRequest_Command.cancelPreparation,
+      wire.ControlRequest_Command.extensionCache,
+      wire.ControlRequest_Command.forgetExtensionArtifact,
+    }.contains(command);
     final requestGeneration = switch (command) {
       wire.ControlRequest_Command.invoke => request.invoke.generation,
       wire.ControlRequest_Command.cancel => request.cancel.generation,
@@ -127,7 +149,8 @@ final class TransportSourceRuntime implements SourceRuntime {
       _ => null,
     };
     bool current() =>
-        epoch == _epoch &&
+        containerEpoch == _containerEpoch &&
+        (independentControl || epoch == _epoch) &&
         (!_disposed || command == wire.ControlRequest_Command.dispose);
     const expired = RuntimeException(
       RuntimeErrorCode.runtimeLost,
@@ -140,6 +163,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       );
     }
     request.requestId = 'control-$_instanceId-${++_controlSequence}';
+    request.slotId = slotId;
     try {
       final response = wire.decodeProtoJson(
         wire.ControlResponse(),
@@ -148,7 +172,8 @@ final class TransportSourceRuntime implements SourceRuntime {
       final ownsImageResult =
           command == wire.ControlRequest_Command.acquireImage &&
           response.whichResult() == wire.ControlResponse_Result.image;
-      if (response.requestId != request.requestId) {
+      if (response.requestId != request.requestId ||
+          response.slotId != slotId) {
         if (ownsImageResult) {
           await _releaseRejectedImage(
             response.image,
@@ -936,7 +961,9 @@ final class TransportSourceRuntime implements SourceRuntime {
     return response;
   }
 
+  @override
   Future<void> rebuildHost() async {
+    containerLost('Runtime slot was reset', containerWide: false);
     _requireAck(
       (await _exchange(
         wire.ControlRequest(rebuild: wire.Empty()),
@@ -949,6 +976,7 @@ final class TransportSourceRuntime implements SourceRuntime {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    ++_containerEpoch;
     ++_epoch;
     _session = null;
     try {

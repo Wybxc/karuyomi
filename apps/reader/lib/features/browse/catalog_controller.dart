@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
+import 'package:pool/pool.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -20,6 +21,8 @@ import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
 import '../reader/reading_progress_controller.dart';
+
+part 'catalog_search.dart';
 
 enum ServiceStatus {
   disconnected,
@@ -196,7 +199,9 @@ final class CatalogController extends ChangeNotifier {
     required this.rebuildRuntime,
     this.deploymentOrigin,
     CatalogTransport? catalogs,
-  }) : publicCatalogs =
+    SourceRuntime? searchRuntime,
+  }) : _searchRuntimeOverride = searchRuntime,
+       publicCatalogs =
            catalogs ??
            (api is PlatformRuntime
                ? api.catalogTransport
@@ -221,6 +226,9 @@ final class CatalogController extends ChangeNotifier {
   }
 
   final SourceRuntime runtime;
+  final SourceRuntime? _searchRuntimeOverride;
+  _CatalogSourceSearch? _searchOwner;
+  final _searchScopes = <_CatalogSourceSearch>{};
   final Future<void> Function() rebuildRuntime;
   final Uri? deploymentOrigin;
   final _readingClients = <ReadingProgressController, int>{};
@@ -919,6 +927,14 @@ final class CatalogController extends ChangeNotifier {
 
   void _onRuntimeEvent(RuntimeEvent event) {
     if (_closed) return;
+    if (_searchOwner != null &&
+        !event.containerWide &&
+        !{
+          RuntimeErrorCode.accessRequired,
+          RuntimeErrorCode.accessDenied,
+        }.contains(event.code)) {
+      return;
+    }
     // A reconnect intentionally invalidates the old container before bootstrap.
     // Platform rebuild still owns Worker, WebView and native file cleanup.
     if (_rebuildingRuntime && event.code == RuntimeErrorCode.runtimeLost) {
@@ -1001,7 +1017,7 @@ final class CatalogController extends ChangeNotifier {
   }
 
   Future<T?> _perform<T>(String label, Future<T> Function() action) async {
-    if (busy || _closed) return null;
+    if (busy || _closed || _searchOwner != null) return null;
     final epoch = _epoch;
     busy = true;
     activity = label;
@@ -1059,6 +1075,17 @@ final class CatalogController extends ChangeNotifier {
 
   Future<void> connect() async {
     if (busy || _closed) return;
+    final search = _searchOwner;
+    if (search != null) {
+      try {
+        await search.close();
+      } catch (_) {
+        error = '搜索资源尚未关闭，请重试连接。';
+        _notify();
+        return;
+      }
+      if (busy || _closed) return;
+    }
     ++_epoch;
     await _perform('正在连接服务', () async {
       final epoch = _epoch;
@@ -1228,11 +1255,55 @@ final class CatalogController extends ChangeNotifier {
       if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     }
     _dropSession();
+    final prepared = await _createSourceDescriptor(
+      build,
+      preferences,
+      shouldContinue: shouldContinue,
+    );
+    if (prepared == null) return;
+    _runtimeNeedsRebuild = true;
+    final loaded = await runtime.open(prepared.descriptor);
+    if (_closed ||
+        epoch != _epoch ||
+        shouldContinue?.call() == false ||
+        !_allowsBuild(build, sha256: prepared.descriptor.sha256)) {
+      await runtime.closeBuild(
+        buildId: loaded.buildId,
+        generation: loaded.generation,
+      );
+      return;
+    }
+    activeBuild = build;
+    _activeBundleSha256 = prepared.descriptor.sha256;
+    session = loaded;
+    loadedSourcePreferences = prepared.preferences;
+    _preferenceRecoveries.removeWhere(
+      (key, _) =>
+          key.$1 == build.catalogUrl &&
+          key.$2 == build.repoId &&
+          key.$3 == build.packageName,
+    );
+    activeSource = null;
+    mangas = const [];
+    page = 0;
+    hasNextPage = false;
+  }
+
+  Future<({BuildDescriptor descriptor, SourcePreferencesSnapshot preferences})?>
+  _createSourceDescriptor(
+    CatalogBuild build,
+    SourcePreferencesRepository preferences, {
+    bool Function()? shouldContinue,
+    Future<void>? cancelled,
+  }) async {
+    final epoch = _epoch;
     final confirmedPreferences = await preferences.load(
       build.packageName,
       catalog: build.catalog,
     );
-    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) {
+      return null;
+    }
     final identity = subject;
     if (identity == null) {
       throw const RuntimeException(RuntimeErrorCode.accessRequired, '身份未确认');
@@ -1240,9 +1311,11 @@ final class CatalogController extends ChangeNotifier {
     final response = await publicCatalogs.read(
       Uri.parse(build.catalogUrl).resolve(build.manifestPath),
       shouldContinue: shouldContinue,
-      cancelled: _catalogCancelled.future,
+      cancelled: Future.any([_catalogCancelled.future, ?cancelled]),
     );
-    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) {
+      return null;
+    }
     final manifest = wire.decodeProtoJson(wire.BuildManifest(), response);
     if (manifest.buildId != build.id ||
         !manifest.hasBundle() ||
@@ -1271,7 +1344,9 @@ final class CatalogController extends ChangeNotifier {
       throw const FormatException('构建与账户选择不匹配，请重新读取扩展管理。');
     }
     await refreshNetworkPolicies(build.catalog, shouldContinue: shouldContinue);
-    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) {
+      return null;
+    }
     if (!isNetworkRegistered(build, sha256: manifest.bundle.sha256)) {
       throw const FormatException('扩展代码可准备，但此构建尚未登记漫画源网络权限。');
     }
@@ -1298,9 +1373,8 @@ final class CatalogController extends ChangeNotifier {
       }
     }
     wire.validatePreferenceBootstrap(bootstrap);
-    _runtimeNeedsRebuild = true;
-    final loaded = await runtime.open(
-      BuildDescriptor(
+    return (
+      descriptor: BuildDescriptor(
         buildId: build.id,
         catalog: build.catalog,
         manifestUri: Uri.parse(build.manifestPath),
@@ -1309,31 +1383,8 @@ final class CatalogController extends ChangeNotifier {
         packageId: build.packageName,
         preferenceBootstrap: bootstrap,
       ),
+      preferences: confirmedPreferences,
     );
-    if (_closed ||
-        epoch != _epoch ||
-        shouldContinue?.call() == false ||
-        !_allowsBuild(build, sha256: manifest.bundle.sha256)) {
-      await runtime.closeBuild(
-        buildId: loaded.buildId,
-        generation: loaded.generation,
-      );
-      return;
-    }
-    activeBuild = build;
-    _activeBundleSha256 = manifest.bundle.sha256;
-    session = loaded;
-    loadedSourcePreferences = confirmedPreferences;
-    _preferenceRecoveries.removeWhere(
-      (key, _) =>
-          key.$1 == build.catalogUrl &&
-          key.$2 == build.repoId &&
-          key.$3 == build.packageName,
-    );
-    activeSource = null;
-    mangas = const [];
-    page = 0;
-    hasNextPage = false;
   }
 
   Future<SourceResult> _invoke(
@@ -1397,6 +1448,7 @@ final class CatalogController extends ChangeNotifier {
 
   Future<CatalogSourceRef?> openSelectedSource({
     required String packageName,
+    CatalogBuild? requested,
     required String sourceId,
     required bool Function() shouldContinue,
   }) => _perform<CatalogSourceRef?>('正在打开账户选择的漫画源', () async {
@@ -1407,6 +1459,7 @@ final class CatalogController extends ChangeNotifier {
     }
     final build = await resolveInstalledBuild(
       packageName,
+      requested: requested,
       shouldContinue: shouldContinue,
     );
     if (!shouldContinue()) return null;
@@ -2126,6 +2179,9 @@ final class CatalogController extends ChangeNotifier {
 
   @override
   void dispose() {
+    for (final scope in _searchScopes.toList()) {
+      scope.dispose();
+    }
     if (!_catalogCancelled.isCompleted) _catalogCancelled.complete();
     _closed = true;
     final requestId = _filterRequestId;

@@ -265,6 +265,7 @@ final class NativePlatformRuntime extends PlatformRuntime
               'materialVersion': assets.materialVersion,
               'request': wire.encodeProtoJson(
                 wire.ControlRequest(
+                  slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
                   requestId: 'native-handshake-$generation',
                   ready: wire.Empty(),
                 ),
@@ -292,6 +293,7 @@ final class NativePlatformRuntime extends PlatformRuntime
             throw RuntimeException.fromProto(response.error);
           }
           if (response.requestId != 'native-handshake-$generation' ||
+              response.slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND ||
               response.whichResult() != wire.ControlResponse_Result.hello ||
               !isCompatibleHost(response.hello) ||
               response.hello.runtimeBaseline != runtimeBaseline) {
@@ -419,6 +421,27 @@ final class NativePlatformRuntime extends PlatformRuntime
       maxBytes: wire.controlRequestLimit,
     );
     final command = message.whichCommand();
+    if (!{
+      wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+      wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+    }.contains(message.slotId)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Unknown runtime slot',
+      );
+    }
+    if (message.slotId == wire.RuntimeSlot.RUNTIME_SLOT_SEARCH &&
+        {
+          wire.ControlRequest_Command.acquireImage,
+          wire.ControlRequest_Command.cancelImage,
+          wire.ControlRequest_Command.releaseImage,
+          wire.ControlRequest_Command.closePageSession,
+        }.contains(command)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.unsupportedCapability,
+        'Search slot does not own reading images',
+      );
+    }
     if (_closing && command != wire.ControlRequest_Command.dispose) {
       throw const RuntimeException(
         RuntimeErrorCode.runtimeLost,
@@ -445,6 +468,7 @@ final class NativePlatformRuntime extends PlatformRuntime
       return wire.encodeProtoJson(
         wire.ControlResponse(
           requestId: message.requestId,
+          slotId: message.slotId,
           closed:
               {
                 wire.ControlRequest_Command.closePageSession,
@@ -466,6 +490,7 @@ final class NativePlatformRuntime extends PlatformRuntime
       return wire.encodeProtoJson(
         wire.ControlResponse(
           requestId: message.requestId,
+          slotId: message.slotId,
           completed: wire.Completed(completed: true),
         ),
       );
@@ -500,7 +525,10 @@ final class NativePlatformRuntime extends PlatformRuntime
           maxBytes: wire.controlJsonLimit,
         );
       }
-      if (command == wire.ControlRequest_Command.dispose) await images?.close();
+      if (command == wire.ControlRequest_Command.dispose &&
+          message.slotId == wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND) {
+        await images?.close();
+      }
       return await _callExistingHost(request, generation);
     } catch (error, stack) {
       final failure = error is PlatformException
@@ -588,6 +616,7 @@ final class NativePlatformRuntime extends PlatformRuntime
 
   Future<void> _reset() async {
     runtime.containerLost('Native runtime container was rebuilt');
+    searchRuntime.containerLost('Native runtime container was rebuilt');
     if (_containerEnded != null && !_containerEnded!.isCompleted) {
       _containerEnded!.complete();
     }
@@ -620,7 +649,7 @@ final class NativePlatformRuntime extends PlatformRuntime
     }
     try {
       await _resetting;
-      await runtime.dispose();
+      await Future.wait([runtime.dispose(), searchRuntime.dispose()]);
     } finally {
       _disposed = true;
       if (_containerEnded != null && !_containerEnded!.isCompleted) {

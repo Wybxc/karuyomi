@@ -14,6 +14,7 @@ final class ApiRuntime extends PlatformRuntime {
     final request = wire.decodeProtoJson(wire.ControlRequest(), json);
     return {
       'requestId': request.requestId,
+      'slotId': request.slotId.name,
       'api': {
         'status': status,
         'headers': {'content-type': 'application/json'},
@@ -94,7 +95,7 @@ void main() {
 
   test('Native JSON text preserves integer tokens and rejects Number maps', () {
     final decoded = decodeNativeControlResult(
-      '{"requestId":"c","api":{"status":200,"body":"{}"}}',
+      '{"requestId":"c","slotId":"RUNTIME_SLOT_FOREGROUND","api":{"status":200,"body":"{}"}}',
     );
     expect(
       wire.decodeProtoJson(wire.ControlResponse(), decoded).api.status,

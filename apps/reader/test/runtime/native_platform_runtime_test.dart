@@ -21,6 +21,7 @@ final class TestController extends PlatformInAppWebViewController {
   Completer<CallAsyncJavaScriptResult?>? pendingControl;
   Completer<void>? disposeAcknowledgement;
   int disposeRequests = 0;
+  final disposeSlots = <wire.RuntimeSlot>[];
   CallAsyncJavaScriptResult? handshakeResult;
   CallAsyncJavaScriptResult? controlResult;
   int probes = 0;
@@ -50,6 +51,7 @@ final class TestController extends PlatformInAppWebViewController {
     );
     if (request.hasDispose()) {
       disposeRequests++;
+      disposeSlots.add(request.slotId);
       await disposeAcknowledgement?.future;
     } else if (request.requestId.startsWith('native-handshake-')) {
       handshakes++;
@@ -66,6 +68,7 @@ final class TestController extends PlatformInAppWebViewController {
       value: jsonEncode(
         wire.encodeProtoJson(
           wire.ControlResponse(
+            slotId: request.slotId,
             requestId: request.requestId,
             hello: request.hasReady()
                 ? wire.RuntimeHello(
@@ -195,7 +198,11 @@ void main() {
   });
   Future<Object?> ready() => runtime.control(
     wire.encodeProtoJson(
-      wire.ControlRequest(requestId: 'product-ready', ready: wire.Empty()),
+      wire.ControlRequest(
+        slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+        requestId: 'product-ready',
+        ready: wire.Empty(),
+      ),
     ),
   );
   Future<void> flushCallbacks() => Future<void>.delayed(Duration.zero);
@@ -488,6 +495,54 @@ void main() {
   });
 
   test(
+    'a search slot runtime error response does not replace the foreground WebView',
+    () async {
+      final first = ready();
+      final view = await platform.created.future;
+      view.controller.readiness = true;
+      view.loadStopped();
+      await first;
+      view.controller.controlResult = CallAsyncJavaScriptResult(
+        value: jsonEncode(
+          wire.encodeProtoJson(
+            wire.ControlResponse(
+              requestId: 'search-ready',
+              slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+              error: wire.RuntimeError(
+                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+                message: 'Search worker ended',
+              ),
+            ),
+          ),
+        ),
+      );
+      final response = wire.decodeProtoJson(
+        wire.ControlResponse(),
+        await runtime.control(
+          wire.encodeProtoJson(
+            wire.ControlRequest(
+              requestId: 'search-ready',
+              slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+              ready: wire.Empty(),
+            ),
+          ),
+        ),
+      );
+      expect(response.slotId, wire.RuntimeSlot.RUNTIME_SLOT_SEARCH);
+      expect(
+        response.error.code,
+        wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+      );
+      await flushCallbacks();
+      expect(view.disposals, 0);
+      view.controller.controlResult = null;
+      await ready();
+      expect(platform.views, hasLength(1));
+      expect(view.disposals, 0);
+    },
+  );
+
+  test(
     'dispose ends unfinished initialization without reviving late callbacks',
     () async {
       final response = ready();
@@ -534,7 +589,14 @@ void main() {
       var disposed = false;
       final closing = runtime.dispose().then((_) => disposed = true);
       await flushCallbacks();
-      expect(view.controller.disposeRequests, 1);
+      expect(view.controller.disposeRequests, 2);
+      expect(
+        view.controller.disposeSlots,
+        unorderedEquals([
+          wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+          wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+        ]),
+      );
       expect(view.disposals, 0);
       expect(disposed, isFalse);
       await expectLater(ready(), throwsA(runtimeLost));
@@ -557,7 +619,14 @@ void main() {
       await expectLater(ready(), throwsA(runtimeLost));
       expect(platform.views, hasLength(1));
       expect(view.disposals, 1);
-      expect(view.controller.disposeRequests, 1);
+      expect(view.controller.disposeRequests, 2);
+      expect(
+        view.controller.disposeSlots,
+        unorderedEquals([
+          wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+          wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+        ]),
+      );
     },
   );
 }

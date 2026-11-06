@@ -162,5 +162,29 @@ class BootstrapStage extends $pb.ProtobufEnum {
   const BootstrapStage._(super.value, super.name);
 }
 
+/// The application owns one foreground slot and one search slot. A slot is
+/// explicit at every control boundary; it is not part of the Source/Java ABI.
+class RuntimeSlot extends $pb.ProtobufEnum {
+  static const RuntimeSlot RUNTIME_SLOT_UNSPECIFIED =
+      RuntimeSlot._(0, _omitEnumNames ? '' : 'RUNTIME_SLOT_UNSPECIFIED');
+  static const RuntimeSlot RUNTIME_SLOT_FOREGROUND =
+      RuntimeSlot._(1, _omitEnumNames ? '' : 'RUNTIME_SLOT_FOREGROUND');
+  static const RuntimeSlot RUNTIME_SLOT_SEARCH =
+      RuntimeSlot._(2, _omitEnumNames ? '' : 'RUNTIME_SLOT_SEARCH');
+
+  static const $core.List<RuntimeSlot> values = <RuntimeSlot>[
+    RUNTIME_SLOT_UNSPECIFIED,
+    RUNTIME_SLOT_FOREGROUND,
+    RUNTIME_SLOT_SEARCH,
+  ];
+
+  static final $core.List<RuntimeSlot?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static RuntimeSlot? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const RuntimeSlot._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

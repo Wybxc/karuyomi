@@ -103,6 +103,7 @@ void main() {
             entered.complete();
             await finish.future;
             return wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               error: wire.RuntimeError(
                 code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED,
@@ -112,6 +113,7 @@ void main() {
           }
           if (retired && call.hasCancel()) {
             return wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               error: wire.RuntimeError(
                 code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,

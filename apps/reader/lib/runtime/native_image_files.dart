@@ -145,6 +145,12 @@ final class NativeImageControl {
       _resources[_key(id, generation)]?.location == location;
 
   Future<wire.ControlResponse> acquire(wire.ControlRequest control) async {
+    if (control.slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Image request must use the foreground slot',
+      );
+    }
     final request = control.acquireImage;
     final key = _key(request.requestId, request.generation);
     if (_closed) {
@@ -165,7 +171,7 @@ final class NativeImageControl {
         'Native image resource limit reached',
       );
     }
-    final task = _ImageTask(request);
+    final task = _ImageTask(request, control.slotId);
     _tasks[key] = task;
     final timer = Timer(
       Duration(
@@ -194,6 +200,7 @@ final class NativeImageControl {
           task.resource = image;
         }
         if (response.requestId != control.requestId ||
+            response.slotId != control.slotId ||
             (response.hasImage() &&
                 response.image.generation != request.generation)) {
           const failure = RuntimeException(
@@ -215,7 +222,8 @@ final class NativeImageControl {
           );
         }),
       ]);
-      if (response.requestId != control.requestId) {
+      if (response.requestId != control.requestId ||
+          response.slotId != control.slotId) {
         throw const RuntimeException(
           RuntimeErrorCode.protocolError,
           'Image response identity mismatch',
@@ -359,6 +367,7 @@ final class NativeImageControl {
       throw RuntimeException.fromProto(response.error);
     }
     if (response.requestId != request.requestId ||
+        response.slotId != request.slotId ||
         response.whichResult() != wire.ControlResponse_Result.released ||
         !response.released.released) {
       throw const RuntimeException(
@@ -376,6 +385,7 @@ final class NativeImageControl {
             _cleanup(
               wire.ControlRequest(
                 requestId: 'native-cancel-${++_sequence}',
+                slotId: task.slotId,
                 cancelImage: wire.CancelImage(
                   requestId: task.request.requestId,
                   generation: task.request.generation,
@@ -408,6 +418,12 @@ final class NativeImageControl {
   }
 
   Future<wire.ControlResponse> cancel(wire.ControlRequest control) async {
+    if (control.slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Native images require the foreground runtime slot',
+      );
+    }
     final request = control.cancelImage;
     final task = _tasks[_key(request.requestId, request.generation)];
     if (task == null) {
@@ -417,6 +433,7 @@ final class NativeImageControl {
       ]);
       return wire.ControlResponse(
         requestId: control.requestId,
+        slotId: control.slotId,
         released: wire.Released(released: true),
       );
     }
@@ -436,6 +453,7 @@ final class NativeImageControl {
     if (failure != null) throw failure;
     return wire.ControlResponse(
       requestId: control.requestId,
+      slotId: control.slotId,
       released: wire.Released(released: true),
     );
   }
@@ -455,6 +473,7 @@ final class NativeImageControl {
             _cleanup(
               wire.ControlRequest(
                 requestId: 'native-release-${++_sequence}',
+                slotId: task.slotId,
                 releaseImage: wire.ReleaseImage(
                   resourceId: image.resourceId,
                   generation: image.generation,
@@ -481,6 +500,12 @@ final class NativeImageControl {
   }
 
   Future<wire.ControlResponse> release(wire.ControlRequest control) async {
+    if (control.slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Native images require the foreground runtime slot',
+      );
+    }
     final request = control.releaseImage;
     final key = _key(request.resourceId, request.generation);
     final task = _resources[key];
@@ -492,6 +517,7 @@ final class NativeImageControl {
     _resources.remove(key);
     return wire.ControlResponse(
       requestId: control.requestId,
+      slotId: control.slotId,
       released: wire.Released(released: true),
     );
   }
@@ -523,7 +549,8 @@ final class NativeImageControl {
 }
 
 final class _ImageTask {
-  _ImageTask(this.request);
+  _ImageTask(this.request, this.slotId);
+  final wire.RuntimeSlot slotId;
   final wire.AcquireImage request;
   final done = Completer<void>();
   final interrupted = Completer<void>();

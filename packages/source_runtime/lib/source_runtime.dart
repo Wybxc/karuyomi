@@ -34,6 +34,7 @@ abstract interface class SourceRuntime {
   Future<void> cancelImage(ImageCancelRequest request);
   Future<void> releaseImage(ImageReleaseRequest request);
   Future<void> closePageSession(PageSessionRef session);
+  Future<void> rebuildHost();
   Future<void> dispose();
 }
 
@@ -130,7 +131,9 @@ final class RuntimeEvent {
     required this.generation,
     required this.code,
     this.message,
+    this.containerWide = false,
   });
+  final bool containerWide;
   final String generation;
   final RuntimeErrorCode code;
   final String? message;

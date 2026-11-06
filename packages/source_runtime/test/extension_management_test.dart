@@ -23,6 +23,7 @@ void main() {
     addTearDown(runtime.dispose);
     transport.handler = (request) async => request.hasPrepareBuild()
         ? wire.ControlResponse(
+            slotId: request.slotId,
             requestId: request.requestId,
             preparedBuild: wire.PreparedBuild(
               build: request.prepareBuild.build,
@@ -90,6 +91,7 @@ void main() {
       transport.handler = (request) async {
         if (request.hasPrepareBuild()) {
           return wire.ControlResponse(
+            slotId: request.slotId,
             requestId: request.requestId,
             preparedBuild: wire.PreparedBuild(
               build: request.prepareBuild.build.deepCopy(),
@@ -101,6 +103,7 @@ void main() {
         }
         if (request.hasExtensionCache()) {
           return wire.ControlResponse(
+            slotId: request.slotId,
             requestId: request.requestId,
             extensionCache: wire.ExtensionCacheState(
               artifacts: [
@@ -149,6 +152,7 @@ void main() {
       transport.handler = (call) async {
         if (call.hasPrepareBuild() || call.hasExtensionCache()) {
           return wire.ControlResponse(
+            slotId: call.slotId,
             requestId: call.requestId,
             error: wire.RuntimeError(
               code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
@@ -158,6 +162,7 @@ void main() {
         }
         if (call.hasCloseBuild()) {
           return wire.ControlResponse(
+            slotId: call.slotId,
             requestId: call.requestId,
             closed: wire.Closed(closed: false),
           );
@@ -185,6 +190,7 @@ void main() {
       expect(events, isEmpty);
       transport.handler = (call) async => call.hasCloseBuild()
           ? wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               closed: wire.Closed(closed: true),
             )
@@ -224,6 +230,7 @@ void main() {
       expect(events, isEmpty);
       transport.handler = (call) async => call.hasFetchApi()
           ? wire.ControlResponse(
+              slotId: call.slotId,
               requestId: call.requestId,
               error: wire.RuntimeError(
                 code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
@@ -258,6 +265,7 @@ void main() {
         entered.complete();
         await release.future;
         return wire.ControlResponse(
+          slotId: call.slotId,
           requestId: call.requestId,
           closed: wire.Closed(closed: true),
         );

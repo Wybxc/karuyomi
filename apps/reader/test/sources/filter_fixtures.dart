@@ -84,6 +84,7 @@ final class FilterRuntimeTransport implements RuntimeTransport {
     return wire.encodeProtoJson(
       wire.ControlResponse(
         requestId: request.requestId,
+        slotId: request.slotId,
         error: wire.RuntimeError(
           code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
           message: 'Active Source cancellation retired its worker',

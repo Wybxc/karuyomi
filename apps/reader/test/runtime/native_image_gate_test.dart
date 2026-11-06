@@ -5,6 +5,30 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 void main() {
   test(
+    'Native rejects missing control slot before attempting a WebView',
+    () async {
+      final platform = NativePlatformRuntime(
+        Uri.parse('https://reader.example'),
+      );
+      await expectLater(
+        platform.control(
+          wire.encodeProtoJson(
+            wire.ControlRequest(requestId: 'missing-slot', ready: wire.Empty()),
+          ),
+        ),
+        throwsA(
+          isA<RuntimeException>().having(
+            (error) => error.code,
+            'code',
+            RuntimeErrorCode.protocolError,
+          ),
+        ),
+      );
+      await platform.dispose();
+    },
+  );
+
+  test(
     'Native image acquire is unsupported before creating any WebView',
     () async {
       final platform = NativePlatformRuntime(
@@ -14,6 +38,7 @@ void main() {
         platform.control(
           wire.encodeProtoJson(
             wire.ControlRequest(
+              slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
               requestId: 'image',
               acquireImage: wire.AcquireImage(
                 requestId: 'i',
@@ -40,6 +65,7 @@ void main() {
               await platform.control(
                 wire.encodeProtoJson(
                   wire.ControlRequest(
+                    slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
                     requestId: 'close',
                     closePageSession: wire.ClosePageSession(
                       pageSessionId: 'expired',
@@ -60,6 +86,7 @@ void main() {
               await platform.control(
                 wire.encodeProtoJson(
                   wire.ControlRequest(
+                    slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
                     requestId: 'release',
                     releaseImage: wire.ReleaseImage(
                       resourceId: 'expired',

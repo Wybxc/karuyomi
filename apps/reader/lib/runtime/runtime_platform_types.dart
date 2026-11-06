@@ -22,6 +22,10 @@ Object? decodeNativeControlResult(Object? value) {
 
 abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
   late final TransportSourceRuntime runtime = TransportSourceRuntime(this);
+  late final TransportSourceRuntime searchRuntime = TransportSourceRuntime(
+    this,
+    slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+  );
   Uri get origin;
   CatalogTransport? _catalogTransport;
   CatalogTransport get catalogTransport =>

@@ -7,6 +7,8 @@ import 'package:test/test.dart';
 import 'support/fake_runtime_transport.dart';
 
 final class ImageRuntime implements SourceRuntime {
+  @override
+  Future<void> rebuildHost() async {}
   final acquisitions = <ImageAcquireRequest>[];
   final cancellations = <ImageCancelRequest>[];
   final releases = <ImageReleaseRequest>[];
@@ -125,12 +127,14 @@ void main() {
       transport.handler = (call) async {
         if (call.hasReleaseImage() && ++releaseAttempts == 1) {
           return wire.ControlResponse(
+            slotId: call.slotId,
             requestId: call.requestId,
             released: wire.Released(released: false),
           );
         }
         if (call.hasClosePageSession() && ++closeAttempts == 1) {
           return wire.ControlResponse(
+            slotId: call.slotId,
             requestId: call.requestId,
             closed: wire.Closed(closed: false),
           );

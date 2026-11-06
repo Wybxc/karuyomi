@@ -554,8 +554,17 @@ message CloseBuildRequest {
   string generation = 2;
 }
 
+// The application owns one foreground slot and one search slot. A slot is
+// explicit at every control boundary; it is not part of the Source/Java ABI.
+enum RuntimeSlot {
+  RUNTIME_SLOT_UNSPECIFIED = 0;
+  RUNTIME_SLOT_FOREGROUND = 1;
+  RUNTIME_SLOT_SEARCH = 2;
+}
+
 message ControlRequest {
   string request_id = 1;
+  RuntimeSlot slot_id = 2;
   oneof command {
     Empty ready = 10;
     OpenRequest open = 11;
@@ -577,6 +586,7 @@ message ControlRequest {
 }
 message ControlResponse {
   string request_id = 1;
+  RuntimeSlot slot_id = 2;
   oneof result {
     RuntimeHello hello = 10;
     RuntimeSession session = 11;
