@@ -32,16 +32,26 @@ flutter test integration_test/category_sync_test.dart --no-pub \
 
 本入口只证明实际执行的平台组合和操作，不代表 Source、生产 Access、同时写竞争、网络故障、物理触控或真机性能。当前证据见[分类同步记录](../../../docs/verification/category-ui-sync.md)。完成后按 Enter 关闭 harness，停止测试进程并删除本轮专用设备。
 
-## Source 阅读驱动（旧服务已退役）
+## Source 阅读与筛选验收
 
-> 入口状态（2026-11-05）：`server_sync_test.dart` 的原 Source HTTP/HTTPS 配套服务已退役。以下阅读命令是驱动使用模板，当前源码不能再按旧服务说明直接复验。新的官方 Workers/Browser fixture 尚未提供同等 Source + Native 完整在线链路，不能据工程测试或分类验收将此门标为通过。当前重构见 [Vite 计划](../../../docs/plan/vite-build-and-testing.md)。
+官方 harness 现在可以按显式主机列表注册当前静态快照中的真实 Source。先用固定提交构建与当前 ABI 匹配的候选快照，再运行正式构建：
+
+```sh
+EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build
+ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.komiic","allowedHosts":["komiic.com"]}]' \
+  pnpm acceptance:serve
+```
+
+`ACCEPTANCE_SOURCE_POLICIES` 是本地验收配置，最多 16 包、每包 32 个明确 hostname，总输入不超过 32 KiB；不能填 URL、通配符或省略真实请求主机。入口从本轮官方 Static Assets 读取并验证索引、清单和资源权威关系，经正式 `registrationSql` 生成网络政策，写入隔离 D1。不存在于当前索引的包或无效政策会在输出就绪 URL 前失败；不更改生产 D1、公开资产或发布状态。无需伪造 Source supplier 或关闭正式网络检查。对额外图片域名、重定向域名仍须逐项确认后声明。
+
+Native 使用 `pnpm acceptance:build:native`，并按上文证书和设备要求启动同一官方 HTTPS harness；同时设置 `ACCEPTANCE_SOURCE_POLICIES`。HTTP 模式用于内置浏览器，不作为 Native TLS 或生产 Access 的证据。以下 Source 驱动可复用该服务，但新的正式链路仍须实际执行各平台门，不能把配置就绪当成在线验收通过。旧自有服务已退役，历史记录保留原环境。
 
 `server_sync_test.dart` 通过 Flutter 官方 `integration_test` 启动正式 `app.main()`，使用真正的 Native WebView、内置运行时材料、Source、阅读 UI 和业务 API。它不注入测试 PlatformRuntime、内存业务服务或图片 supplier。
 
 ### 前置条件
 
-1. 准备当前 xkcd v4 构建、Native 内置材料与正式 Web 构建，入口见仓库构建说明。
-2. 准备支持当前 Source HTTP、业务 API、同一身份和同一 D1 的测试后端，Web 与 Native 均需正常访问。原[Source 测试服务](../../api/test/source-metadata-probe.md)曾在同一进程提供 HTTP/HTTPS 代理别名，现仅保留历史说明；当前官方 fixture 不自动替代它，也不证明生产 Access/Cookie 行为。后端恢复前，本目录完整在线验收保持未完成。
+1. 准备与当前宿主 ABI 匹配的真实 xkcd 构建、Native 内置材料与正式 Web 构建，入口见仓库构建说明；旧 v4 构建不可混入 v5 验收。
+2. 按上文配置 xkcd 的实际网络政策，启动官方 HTTPS harness。Web 与 Native 使用同一实际 origin、测试身份与隔离 D1。原[Source 测试服务](../../api/test/source-metadata-probe.md)只保留历史说明；本地签名身份不证明生产 Access/Cookie 行为。
 3. Native 必须正常信任 HTTPS 证书。建议创建可丢弃模拟器，只向该设备添加本轮测试 CA；不修改产品 TLS、Mac 全局信任或已有设备信任，不接受证书错误。
 4. 从内置浏览器的正式 UI 收藏英文 xkcd。初次运行测试前保留第 1 页进度或尚无进度；测试从服务端书架进入该作品。
 
@@ -50,7 +60,7 @@ flutter test integration_test/category_sync_test.dart --no-pub \
 ```sh
 flutter test integration_test/server_sync_test.dart \
   -d IOS_SIMULATOR_UUID \
-  --dart-define=APP_ORIGIN=https://localhost:8898 \
+  --dart-define=APP_ORIGIN=https://127.0.0.1:PORT \
   '--dart-define=SYNC_CHAPTER_LABEL=3319: Elevators' \
   --dart-define=SYNC_START_PAGE=1 \
   --dart-define=SYNC_TARGET_PAGE=2 \

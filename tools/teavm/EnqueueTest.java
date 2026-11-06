@@ -5,6 +5,9 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
+import kotlin.Unit;
+import kotlin.coroutines.EmptyCoroutineContext;
+import kotlinx.coroutines.*;
 import okhttp3.*;
 import okio.*;
 
@@ -310,7 +313,432 @@ public final class EnqueueTest {
     }
   }
 
+  static void boundBeforeRunMustDrain() throws Throwable {
+    BrowserCall.Operation owner =
+        BrowserCall.beginOperation("scheduled", "generation", "scheduled-token");
+    AtomicBoolean completed = new AtomicBoolean();
+    owner.enter();
+    try {
+      Runnable child = BrowserCall.bindOperation(() -> completed.set(true));
+      try {
+        owner.drain(25);
+        throw new AssertionError("Drain completed before the bound child was even scheduled");
+      } catch (InterruptedIOException expected) {
+        check(expected.getMessage().contains("drain deadline"));
+      }
+      check(owner.hasPending());
+      child.run();
+      owner.drain();
+      check(completed.get() && !owner.hasPending());
+    } finally {
+      owner.close();
+      owner.leave();
+    }
+  }
+
+  static CompletableFuture<Void> drainAsync(BrowserCall.Operation owner) {
+    CompletableFuture<Void> result = new CompletableFuture<>();
+    new Thread(
+            () -> {
+              try {
+                owner.drain();
+                result.complete(null);
+              } catch (Throwable error) {
+                result.completeExceptionally(error);
+              }
+            })
+        .start();
+    return result;
+  }
+
+  static void globalScopeIncludesPostHttpWork(String endpoint, AtomicInteger posts)
+      throws Throwable {
+    BrowserCall.Operation owner =
+        BrowserCall.beginOperation("global", "generation", "global-token");
+    CountDownLatch entered = new CountDownLatch(1),
+        allowHttp = new CountDownLatch(1),
+        writing = new CountDownLatch(1),
+        allowWrite = new CountDownLatch(1);
+    AtomicBoolean written = new AtomicBoolean(), completedCallback = new AtomicBoolean();
+    int previousPosts = posts.get();
+    owner.enter();
+    try {
+      Job task =
+          BuildersKt.launch(
+              GlobalScope.INSTANCE,
+              Dispatchers.getIO(),
+              CoroutineStart.DEFAULT,
+              (scope, continuation) -> {
+                entered.countDown();
+                try {
+                  await(allowHttp);
+                  try (Response response =
+                      call(new OkHttpClient.Builder().build(), endpoint).execute()) {
+                    check(response.body().bytes().length > 0);
+                  }
+                  writing.countDown();
+                  await(allowWrite);
+                  written.set(true);
+                  return Unit.INSTANCE;
+                } catch (IOException error) {
+                  throw GreenCoroutines.propagate(error);
+                }
+              });
+      task.invokeOnCompletion(error -> {
+        completedCallback.set(true);
+        return Unit.INSTANCE;
+      });
+      await(entered);
+      CompletableFuture<Void> delivered = drainAsync(owner);
+      check(owner.hasPending() && !delivered.isDone());
+      allowHttp.countDown();
+      await(writing);
+      check(Bridge.openHandles() == 0 && posts.get() == previousPosts + 1);
+      check(!written.get() && !task.isCompleted() && owner.hasPending() && !delivered.isDone());
+      allowWrite.countDown();
+      delivered.get(3, TimeUnit.SECONDS);
+      check(written.get() && task.isCompleted() && completedCallback.get());
+      check(!owner.hasPending());
+    } finally {
+      allowHttp.countDown();
+      allowWrite.countDown();
+      owner.close();
+      owner.leave();
+    }
+  }
+
+  static void runningCancellationDoesNotFinishWork() throws Throwable {
+    BrowserCall.Operation owner =
+        BrowserCall.beginOperation("cancel-global", "generation", "cancel-token");
+    CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+    AtomicBoolean finished = new AtomicBoolean();
+    owner.enter();
+    try {
+      Job task =
+          BuildersKt.launch(
+              GlobalScope.INSTANCE,
+              Dispatchers.getIO(),
+              CoroutineStart.DEFAULT,
+              (scope, continuation) -> {
+                entered.countDown();
+                try {
+                  await(release);
+                } catch (IOException error) {
+                  throw GreenCoroutines.propagate(error);
+                }
+                finished.set(true);
+                return Unit.INSTANCE;
+              });
+      await(entered);
+      task.cancel(new CancellationException("cancelled by Source"));
+      CompletableFuture<Void> delivered = drainAsync(owner);
+      check(task.isCompleted() && task.isCancelled());
+      check(owner.hasPending() && !delivered.isDone() && !finished.get());
+      release.countDown();
+      delivered.get(3, TimeUnit.SECONDS);
+      check(finished.get() && !owner.hasPending());
+    } finally {
+      release.countDown();
+      owner.close();
+      owner.leave();
+    }
+  }
+
+  static void lazyTaskKeepsOriginalOwner() throws Throwable {
+    BrowserCall.Operation old = BrowserCall.beginOperation("lazy", "generation", "old-lazy-token");
+    AtomicInteger bodies = new AtomicInteger();
+    GreenCoroutines.Task<Unit> lazy;
+    old.enter();
+    try {
+      lazy =
+          new GreenCoroutines.Task<>(
+              GlobalScope.INSTANCE,
+              EmptyCoroutineContext.INSTANCE,
+              CoroutineStart.LAZY,
+              (scope, continuation) -> {
+                bodies.incrementAndGet();
+                return Unit.INSTANCE;
+              });
+      check(!old.hasPending());
+      old.drain();
+    } finally {
+      old.close();
+      old.leave();
+    }
+    BrowserCall.Operation next = BrowserCall.beginOperation("lazy", "generation", "new-lazy-token");
+    next.enter();
+    try {
+      try {
+        lazy.start();
+        throw new AssertionError("Lazy task adopted a later Source operation");
+      } catch (IllegalStateException expected) {
+        check(expected.getMessage().equals("Source operation has ended"));
+      }
+      check(lazy.isCompleted() && !lazy.isActive() && bodies.get() == 0 && !next.hasPending());
+      try {
+        lazy.value();
+        throw new AssertionError("Expired lazy waiter was not completed with failure");
+      } catch (IllegalStateException expected) {
+        check(expected.getMessage().equals("Source operation has ended"));
+      }
+      GreenCoroutines.Task<Unit> cancelled =
+          new GreenCoroutines.Task<>(
+              GlobalScope.INSTANCE,
+              EmptyCoroutineContext.INSTANCE,
+              CoroutineStart.LAZY,
+              (scope, continuation) -> {
+                throw new AssertionError("Cancelled lazy body ran");
+              });
+      cancelled.cancel(new CancellationException("never started"));
+      check(!cancelled.start() && cancelled.isCompleted() && !next.hasPending());
+      next.drain();
+    } finally {
+      next.close();
+      next.leave();
+    }
+  }
+
+  static void expiredCompletionCannotAdoptAnotherOwner(String endpoint, AtomicInteger posts)
+      throws Throwable {
+    BrowserCall.Operation old =
+        BrowserCall.beginOperation("lazy-callback", "generation", "old-callback-token");
+    AtomicInteger completionCalls = new AtomicInteger(), childCalls = new AtomicInteger();
+    GreenCoroutines.Task<Unit> lazy;
+    old.enter();
+    try {
+      lazy =
+          new GreenCoroutines.Task<>(
+              GlobalScope.INSTANCE,
+              EmptyCoroutineContext.INSTANCE,
+              CoroutineStart.LAZY,
+              (scope, continuation) -> Unit.INSTANCE);
+      lazy.invokeOnCompletion(error -> {
+        completionCalls.incrementAndGet();
+        try (Response response = call(new OkHttpClient.Builder().build(), endpoint).execute()) {
+          check(response.code() == 200);
+        } catch (IOException failure) {
+          throw GreenCoroutines.propagate(failure);
+        }
+        BuildersKt.launch(
+            GlobalScope.INSTANCE,
+            Dispatchers.getIO(),
+            CoroutineStart.DEFAULT,
+            (scope, continuation) -> {
+              childCalls.incrementAndGet();
+              return Unit.INSTANCE;
+            });
+        return Unit.INSTANCE;
+      });
+      old.drain();
+    } finally {
+      old.close();
+      old.leave();
+    }
+    BrowserCall.Operation next =
+        BrowserCall.beginOperation("lazy-callback", "generation", "new-callback-token");
+    int previousPosts = posts.get();
+    next.enter();
+    try {
+      try {
+        lazy.start();
+        throw new AssertionError("Expired lazy task started");
+      } catch (IllegalStateException expected) {
+        check(lazy.isCompleted());
+      }
+      check(completionCalls.get() == 0 && childCalls.get() == 0 && posts.get() == previousPosts);
+      check(!next.hasPending());
+      try {
+        lazy.invokeOnCompletion(error -> {
+          completionCalls.incrementAndGet();
+          return Unit.INSTANCE;
+        });
+        throw new AssertionError("Expired immediate completion callback ran under another owner");
+      } catch (IllegalStateException expected) {
+        check(expected.getCause() instanceof InterruptedIOException);
+      }
+      check(completionCalls.get() == 0 && !next.hasPending());
+      next.drain();
+    } finally {
+      next.close();
+      next.leave();
+    }
+  }
+
+  static void workAndHttpHaveIndependentBudgets() throws Throwable {
+    BrowserCall.Operation owner =
+        BrowserCall.beginOperation("work-limit", "generation", "limit-token");
+    java.util.List<BrowserCall.BoundOperation> work = new java.util.ArrayList<>();
+    java.util.List<BrowserCall> http = new java.util.ArrayList<>();
+    owner.enter();
+    try {
+      for (int index = 0; index < 64; index++) work.add(BrowserCall.bindOperation(() -> {}));
+      try {
+        BrowserCall.bindOperation(() -> {});
+        throw new AssertionError("Unbounded Source work accepted");
+      } catch (IllegalStateException expected) {
+        check(expected.getMessage().contains("background Source tasks"));
+      }
+      GreenCoroutines.Task<Unit> overflow =
+          new GreenCoroutines.Task<>(
+              GlobalScope.INSTANCE,
+              EmptyCoroutineContext.INSTANCE,
+              CoroutineStart.LAZY,
+              (scope, continuation) -> {
+                throw new AssertionError("Unscheduled body ran");
+              });
+      try {
+        overflow.start();
+        throw new AssertionError("Over-limit task scheduled");
+      } catch (IllegalStateException expected) {
+        check(overflow.isCompleted());
+      }
+      for (int index = 0; index < 64; index++) {
+        BrowserCall call =
+            (BrowserCall) call(new OkHttpClient.Builder().build(), "https://fixture.invalid/");
+        owner.register(call);
+        http.add(call);
+      }
+      BrowserCall extra =
+          (BrowserCall) call(new OkHttpClient.Builder().build(), "https://fixture.invalid/");
+      try {
+        owner.register(extra);
+        throw new AssertionError("Unbounded HTTP accepted");
+      } catch (IllegalStateException expected) {
+        check(expected.getMessage().contains("HTTP callbacks"));
+      }
+      for (BrowserCall.BoundOperation child : work) child.run();
+      check(owner.hasPending());
+      for (BrowserCall call : http) owner.finished(call, null);
+      owner.drain();
+      check(!owner.hasPending());
+    } finally {
+      owner.close();
+      owner.leave();
+    }
+  }
+
+  static void singleUseAndSchedulingFailures() throws Throwable {
+    BrowserCall.Operation owner =
+        BrowserCall.beginOperation("schedule", "generation", "schedule-token");
+    AtomicInteger runs = new AtomicInteger();
+    owner.enter();
+    try {
+      BrowserCall.BoundOperation cancelled = BrowserCall.bindOperation(runs::incrementAndGet);
+      cancelled.close();
+      cancelled.close();
+      check(!owner.hasPending());
+      try {
+        cancelled.run();
+        throw new AssertionError("Cancelled reservation ran");
+      } catch (IllegalStateException expected) {
+        check(runs.get() == 0);
+      }
+      BrowserCall.BoundOperation once = BrowserCall.bindOperation(runs::incrementAndGet);
+      once.run();
+      try {
+        once.run();
+        throw new AssertionError("One-shot task ran twice");
+      } catch (IllegalStateException expected) {
+        check(runs.get() == 1);
+      }
+      once.close();
+      check(!owner.hasPending());
+      for (boolean failAtStart : java.util.List.of(false, true)) {
+        BrowserCall.BoundOperation rejected = BrowserCall.bindOperation(runs::incrementAndGet);
+        OutOfMemoryError failure = new OutOfMemoryError("fixture scheduling failure");
+        try {
+          BrowserCall.startBoundThread(
+              rejected,
+              () -> {
+                if (!failAtStart) throw failure;
+                return new Thread() {
+                  public synchronized void start() {
+                    throw failure;
+                  }
+                };
+              });
+          throw new AssertionError("Thread scheduling failure was swallowed");
+        } catch (OutOfMemoryError expected) {
+          check(expected == failure && !owner.hasPending() && runs.get() == 1);
+        }
+      }
+      owner.drain();
+    } finally {
+      owner.close();
+      owner.leave();
+    }
+  }
+
+  static void closingRejectsDrainAndLateWork() throws Throwable {
+    BrowserCall.Operation old = BrowserCall.beginOperation("closing", "generation", "closing-old");
+    AtomicBoolean ran = new AtomicBoolean();
+    BrowserCall.BoundOperation late;
+    old.enter();
+    try {
+      late = BrowserCall.bindOperation(() -> ran.set(true));
+      CompletableFuture<Void> drained = drainAsync(old);
+      old.close();
+      try {
+        drained.get(3, TimeUnit.SECONDS);
+        throw new AssertionError("Closed operation drained successfully");
+      } catch (ExecutionException expected) {
+        check(expected.getCause() instanceof InterruptedIOException);
+      }
+    } finally {
+      old.close();
+      old.leave();
+    }
+    BrowserCall.Operation next = BrowserCall.beginOperation("closing", "generation", "closing-new");
+    next.enter();
+    try {
+      try {
+        late.run();
+        throw new AssertionError("Late work adopted the next operation");
+      } catch (IllegalStateException expected) {
+        check(expected.getCause() instanceof InterruptedIOException);
+      }
+      check(!ran.get() && !next.hasPending());
+      BrowserCall.BoundOperation current = BrowserCall.bindOperation(() -> ran.set(true));
+      check(next.hasPending());
+      current.run();
+      next.drain();
+      check(ran.get() && !next.hasPending());
+    } finally {
+      next.close();
+      next.leave();
+    }
+  }
+
+  static void deferredFailureKeepsSourceRecovery() throws Throwable {
+    BrowserCall.Operation owner =
+        BrowserCall.beginOperation("deferred-error", "generation", "deferred-token");
+    IOException failure = new IOException("Source-handled async error");
+    owner.enter();
+    try {
+      GreenCoroutines.Task<Unit> task =
+          new GreenCoroutines.Task<>(
+              GlobalScope.INSTANCE,
+              EmptyCoroutineContext.INSTANCE,
+              CoroutineStart.DEFAULT,
+              (scope, continuation) -> {
+                throw GreenCoroutines.propagate(failure);
+              });
+      try {
+        task.value();
+        throw new AssertionError("Deferred error disappeared");
+      } catch (Throwable expected) {
+        check(expected == failure);
+      }
+      owner.drain();
+      check(!owner.hasPending());
+    } finally {
+      owner.close();
+      owner.leave();
+    }
+  }
+
   public static void main(String[] args) throws Throwable {
+    boundBeforeRunMustDrain();
     AtomicInteger posts = new AtomicInteger();
     HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext(
@@ -332,6 +760,14 @@ public final class EnqueueTest {
       postFailureIsDeliveredOnce(endpoint, posts);
       timeoutAndOldOwner(endpoint, posts);
       creationDoesNotBindExecution(endpoint, posts);
+      globalScopeIncludesPostHttpWork(endpoint, posts);
+      runningCancellationDoesNotFinishWork();
+      lazyTaskKeepsOriginalOwner();
+      expiredCompletionCannotAdoptAnotherOwner(endpoint, posts);
+      workAndHttpHaveIndependentBudgets();
+      singleUseAndSchedulingFailures();
+      closingRejectsDrainAndLateWork();
+      deferredFailureKeepsSourceRecovery();
       System.out.println("EnqueueTest: " + assertions + " assertions passed");
     } finally {
       Bridge.closeTransport();

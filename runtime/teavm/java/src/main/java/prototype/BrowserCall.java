@@ -6,6 +6,7 @@ import okio.Okio;
 import okio.Timeout;
 import com.google.gson.*;
 import java.util.*;
+import java.util.function.Supplier;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 
@@ -17,11 +18,13 @@ public final class BrowserCall implements Call {
   /** One exported host entry owns foreground HTTP and all callbacks it schedules. */
   static final class Operation implements AutoCloseable {
     private static final int MAX_BACKGROUND_CALLS = 64;
+    private static final int MAX_BACKGROUND_WORK = 64;
     private static final long DRAIN_TIMEOUT_MS = 30000;
     final String requestId;
     final String generation;
     final String token;
     private final Set<BrowserCall> pending = new HashSet<>();
+    private final Set<BoundOperation> work = new HashSet<>();
     private boolean closed;
     private Throwable callbackFailure;
 
@@ -56,6 +59,18 @@ public final class BrowserCall implements Call {
       notifyAll();
     }
 
+    synchronized void registerWork(BoundOperation child) {
+      if (closed) throw new IllegalStateException("Source operation has ended");
+      if (work.size() >= MAX_BACKGROUND_WORK)
+        throw new IllegalStateException("Too many background Source tasks");
+      work.add(child);
+    }
+
+    synchronized void finishedWork(BoundOperation child) {
+      work.remove(child);
+      notifyAll();
+    }
+
     void drain() throws Throwable {
       drain(DRAIN_TIMEOUT_MS);
     }
@@ -64,11 +79,12 @@ public final class BrowserCall implements Call {
       if (timeoutMs < 1 || timeoutMs > DRAIN_TIMEOUT_MS)
         throw new IllegalArgumentException("HTTP callback drain deadline must be 1..30000 ms");
       long deadline = System.nanoTime() + timeoutMs * 1000000;
-      while (!pending.isEmpty()) {
+      while (hasPending()) {
+        checkOpen();
         if (callbackFailure != null) throw callbackFailure;
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0)
-          throw new InterruptedIOException("Background HTTP callbacks exceeded drain deadline");
+          throw new InterruptedIOException("Background Source work exceeded drain deadline");
         try {
           wait(Math.max(1, remaining / 1000000));
         } catch (InterruptedException error) {
@@ -76,12 +92,13 @@ public final class BrowserCall implements Call {
           throw new InterruptedIOException("Interrupted while draining HTTP callbacks");
         }
       }
+      checkOpen();
       if (callbackFailure != null) throw callbackFailure;
       closed = true;
     }
 
     synchronized boolean hasPending() {
-      return !pending.isEmpty();
+      return !pending.isEmpty() || !work.isEmpty();
     }
 
     public void close() {
@@ -90,6 +107,7 @@ public final class BrowserCall implements Call {
         closed = true;
         calls = new ArrayList<>(pending);
         pending.clear();
+        work.clear();
         notifyAll();
       }
       for (BrowserCall call : calls) call.cancel();
@@ -111,31 +129,94 @@ public final class BrowserCall implements Call {
     return activeOperation;
   }
 
-  private static Operation currentOperation() {
+  static Operation currentOperation() {
     return threadOperation.get();
   }
 
-  /** Capture before scheduling; an expired child must never adopt another entry. */
-  public static Runnable bindOperation(Runnable action) {
-    Operation owner = currentOperation();
-    return () -> {
-      Operation previous = currentOperation();
-      if (owner == null) threadOperation.remove();
-      else owner.enter();
-      try {
-        if (owner != null) {
-          try {
-            owner.checkOpen();
-          } catch (InterruptedIOException error) {
-            throw new IllegalStateException(error);
-          }
-        }
-        action.run();
-      } finally {
-        if (previous == null) threadOperation.remove();
-        else previous.enter();
+  /** A one-shot reservation covers queueing, execution, HTTP and post-response work. */
+  public static final class BoundOperation implements Runnable, AutoCloseable {
+    private final Operation owner;
+    private final Runnable action;
+    private boolean started;
+    private boolean settled;
+
+    private BoundOperation(Operation owner, Runnable action) {
+      this.owner = owner;
+      this.action = Objects.requireNonNull(action, "action");
+      if (owner != null) owner.registerWork(this);
+    }
+
+    public void run() {
+      synchronized (this) {
+        if (started || settled) throw new IllegalStateException("Source task was already consumed");
+        started = true;
       }
-    };
+      try {
+        runInOperation(owner, action);
+      } finally {
+        finish();
+      }
+    }
+
+    private void finish() {
+      synchronized (this) {
+        if (settled) return;
+        settled = true;
+      }
+      if (owner != null) owner.finishedWork(this);
+    }
+
+    /** Release a reservation only if execution has not started; running work owns its finally. */
+    public void close() {
+      synchronized (this) {
+        if (started || settled) return;
+        settled = true;
+      }
+      if (owner != null) owner.finishedWork(this);
+    }
+  }
+
+  /** Enter the original owner without reserving another task while an existing task settles. */
+  static void runInOperation(Operation owner, Runnable action) {
+    Operation previous = currentOperation();
+    if (owner == null) threadOperation.remove();
+    else owner.enter();
+    try {
+      if (owner != null) {
+        try {
+          owner.checkOpen();
+        } catch (InterruptedIOException error) {
+          throw new IllegalStateException(error);
+        }
+      }
+      action.run();
+    } finally {
+      if (previous == null) threadOperation.remove();
+      else previous.enter();
+    }
+  }
+
+  /** Capture before scheduling; an expired child must never adopt another entry. */
+  public static BoundOperation bindOperation(Runnable action) {
+    return bindOperation(currentOperation(), action);
+  }
+
+  static BoundOperation bindOperation(Operation owner, Runnable action) {
+    return new BoundOperation(owner, action);
+  }
+
+  public static void startBoundThread(Runnable action) {
+    BoundOperation child = bindOperation(action);
+    startBoundThread(child, () -> new Thread(child));
+  }
+
+  static void startBoundThread(BoundOperation child, Supplier<Thread> thread) {
+    try {
+      thread.get().start();
+    } catch (Throwable error) {
+      child.close();
+      throw error;
+    }
   }
 
   private final OkHttpClient client;

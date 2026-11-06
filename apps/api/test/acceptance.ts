@@ -5,7 +5,19 @@ import {
 } from '@karuyomi/contracts';
 import { StateMutationSchema } from '@karuyomi/protocol';
 import { exportJWK, exportPKCS8, generateKeyPair } from 'jose';
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
+import { getStreamAsBuffer } from 'get-stream';
+import { z } from 'zod';
+import {
+  loadStaticIndex,
+  MANIFEST_METADATA_LIMIT,
+  registrationSql,
+  verifyMetadata,
+  verifyStaticAuthority,
+  type MetadataLoader,
+} from '../../../tools/extensions/registration.ts';
+import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { fileURLToPath, URL } from 'node:url';
 import { createTestHarness, type TestHarnessOptions } from 'wrangler';
 import type { AcceptanceBindings } from './acceptance-entry.ts';
@@ -66,6 +78,12 @@ try {
     throw new Error('Acceptance listener changed while configuring its origin');
   }
   await server.getWorker<AcceptanceBindings>().applyD1Migrations('DB');
+  if (!stopRequested && process.env.ACCEPTANCE_SOURCE_POLICIES) {
+    await initializeSourcePolicies(
+      url.origin,
+      process.env.ACCEPTANCE_SOURCE_POLICIES,
+    );
+  }
   if (!stopRequested && fixture === 'categories') {
     await initializeCategoryFixture(url.origin);
   }
@@ -142,4 +160,59 @@ async function initializeCategoryFixture(origin: string): Promise<void> {
       throw new Error(`Category fixture was not confirmed for ${title}`);
     }
   }
+}
+
+/** Local Source acceptance still uses current static metadata and explicit hosts. */
+async function initializeSourcePolicies(
+  origin: string,
+  input: string,
+): Promise<void> {
+  if (Buffer.byteLength(input, 'utf8') > 32 * 1024)
+    throw new Error('Oversized acceptance Source policies');
+  const policies = z
+    .array(
+      z
+        .object({
+          packageName: z.string().min(1).max(200),
+          allowedHosts: z.array(z.string().min(1).max(253)).min(1).max(32),
+        })
+        .strict(),
+    )
+    .min(1)
+    .max(16)
+    .parse(JSON.parse(input));
+  if (
+    new Set(policies.map((value) => value.packageName)).size !== policies.length
+  ) {
+    throw new Error('Duplicate acceptance Source package policy');
+  }
+  const load: MetadataLoader = async (pathname, maximum) => {
+    const response = await server.fetch(new URL(pathname, origin).href, {
+      redirect: 'manual',
+    });
+    if (response.status !== 200 || !response.body) {
+      throw new Error(`Acceptance static metadata HTTP ${response.status}`);
+    }
+    return getStreamAsBuffer(response.body, { maxBuffer: maximum });
+  };
+  const index = await loadStaticIndex(load);
+  const bindings = await server.getWorker<AcceptanceBindings>().getEnv();
+  for (const policy of policies) {
+    if (stopRequested) return;
+    const entry = index.builds.find(
+      (value) => value.packageName === policy.packageName,
+    );
+    if (!entry)
+      throw new Error(
+        'Acceptance Source is absent from the current static index',
+      );
+    const manifest = await verifyMetadata(
+      await parseManifest(
+        await load(entry.manifestPath, MANIFEST_METADATA_LIMIT),
+      ),
+    );
+    await verifyStaticAuthority(manifest, load);
+    await bindings.DB.exec(registrationSql(manifest, policy.allowedHosts));
+  }
+  console.log(`ACCEPTANCE_SOURCE_POLICY_COUNT=${policies.length}`);
 }

@@ -7,16 +7,14 @@ public final class Dispatchers {
   private static final CoroutineDispatcher D =
       new CoroutineDispatcher() {
         public void dispatch(CoroutineContext c, Runnable r) {
-          new Thread(
-                  prototype.BrowserCall.bindOperation(() -> {
-                    prototype.Bridge.trace("dispatch coroutine");
-                    try {
-                      r.run();
-                    } catch (Throwable t) {
-                      prototype.Bridge.trace("dispatcher error " + t);
-                    }
-                  }))
-              .start();
+          prototype.BrowserCall.startBoundThread(() -> {
+            prototype.Bridge.trace("dispatch coroutine");
+            try {
+              r.run();
+            } catch (Throwable t) {
+              prototype.Bridge.trace("dispatcher error " + t);
+            }
+          });
         }
 
         public boolean isDispatchNeeded(CoroutineContext c) {

@@ -49,15 +49,15 @@ public final class GreenCoroutines {
   }
 
   static final class Waiter<T> {
-    boolean complete;
+    volatile boolean complete;
     Object result;
     Throwable error;
 
     synchronized void finish(Object r, Throwable e) {
       if (complete) return;
-      complete = true;
       result = r;
       error = e;
+      complete = true;
       notifyAll();
     }
 
@@ -97,7 +97,9 @@ public final class GreenCoroutines {
             ? super CoroutineScope, ? super Continuation<? super T>, ? extends Object>
         f;
     private final CoroutineContext context;
-    private boolean started, cancelled;
+    private boolean started;
+    private volatile boolean cancelled;
+    private final BrowserCall.Operation owner;
     private final List<Function1<? super Throwable, Unit>> callbacks = new ArrayList<>();
 
     public Task(
@@ -108,6 +110,7 @@ public final class GreenCoroutines {
       super(Job.Key);
       this.context = scope.getCoroutineContext().plus(c);
       this.f = f;
+      this.owner = BrowserCall.currentOperation();
       if (scope instanceof Scope) ((Scope) scope).children.add(this);
       if (start != CoroutineStart.LAZY) start();
     }
@@ -115,22 +118,57 @@ public final class GreenCoroutines {
     public synchronized boolean start() {
       if (started || cancelled) return false;
       started = true;
-      new Thread(
-              BrowserCall.bindOperation(() -> {
-                try {
-                  w.finish(block(f, context), null);
-                } catch (Throwable t) {
-                  w.finish(null, t);
-                }
-                List<Function1<? super Throwable, Unit>> list;
-                synchronized (this) {
-                  list = new ArrayList<>(callbacks);
-                  callbacks.clear();
-                }
-                for (var cb : list) cb.invoke(w.error);
-              }))
-          .start();
+      BrowserCall.BoundOperation child = null;
+      try {
+        child =
+            BrowserCall.bindOperation(
+                owner,
+                () -> {
+                  try {
+                    if (!cancelled) w.finish(block(f, context), null);
+                  } catch (Throwable t) {
+                    w.finish(null, t);
+                  }
+                  completeCallbacks();
+                });
+        BrowserCall.BoundOperation scheduled = child;
+        BrowserCall.startBoundThread(
+            scheduled,
+            () ->
+                new Thread(() -> {
+                  try {
+                    scheduled.run();
+                  } catch (Throwable error) {
+                    if (w.complete) throw propagate(error);
+                    w.finish(null, error);
+                    completeCallbacks();
+                  }
+                }));
+      } catch (Throwable error) {
+        if (child != null) child.close();
+        w.finish(null, error);
+        try {
+          completeCallbacks();
+        } catch (Throwable callbackError) {
+          error.addSuppressed(callbackError);
+        }
+        throw propagate(error);
+      }
       return true;
+    }
+
+    private void completeCallbacks() {
+      List<Function1<? super Throwable, Unit>> list;
+      synchronized (this) {
+        list = new ArrayList<>(callbacks);
+        callbacks.clear();
+      }
+      if (!list.isEmpty())
+        BrowserCall.runInOperation(
+            owner,
+            () -> {
+              for (var callback : list) callback.invoke(w.error);
+            });
     }
 
     public T value() {
@@ -212,7 +250,7 @@ public final class GreenCoroutines {
     public synchronized DisposableHandle invokeOnCompletion(
         boolean onCancelling, boolean immediate, Function1<? super Throwable, Unit> f) {
       if (w.complete) {
-        if (immediate) f.invoke(w.error);
+        if (immediate) BrowserCall.runInOperation(owner, () -> f.invoke(w.error));
       } else callbacks.add(f);
       return () -> {
         synchronized (this) {

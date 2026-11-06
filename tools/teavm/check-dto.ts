@@ -164,6 +164,8 @@ export async function checkDto(root = ROOT): Promise<void> {
       'runtime/teavm/java/src/main/java/prototype/PageSessions.java',
       'runtime/teavm/java/src/main/java/prototype/SourceImages.java',
       'runtime/teavm/java/src/main/java/prototype/GreenCoroutines.java',
+      'runtime/teavm/java/src/main/java/kotlinx/coroutines/BuildersKt.java',
+      'runtime/teavm/java/src/main/java/kotlinx/coroutines/Dispatchers.java',
       'runtime/teavm/java/src/main/java/eu/kanade/tachiyomi/network/OkHttpExtensionsKt.java',
       'tools/teavm/fixtures/image/prototype/Bridge.java',
       'tools/teavm/ImageTest.java',

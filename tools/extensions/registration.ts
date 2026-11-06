@@ -3,6 +3,7 @@
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { URL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
