@@ -62,6 +62,40 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
 
 这组顺序操作证明实际执行平台间的全局设置读写与新进程恢复；漫画覆盖、同时写竞争、丢响应、自动前台、Web↔Native、生产 Access 和真机分别验收。全局默认 false/0 与 optional 漫画覆盖的 presence 语义不同，驱动按生成 getter 核对非 optional 值。实际结果与剩余门见[设置记录](../../../docs/verification/reader-settings.md)。完成后关闭 harness，移除本轮 reverse、测试安装与专用设备，结束测试进程。
 
+## 章节书签同步
+
+`bookmarks_sync_test.dart` 使用正式 `app.main()` → `NativePlatformRuntime` → 服务端真实 xkcd 书架点击 → `MangaDetailsPage` → `ChapterBookmarkButton`。复用下节的当前 Source 产物、网络政策与官方 HTTPS harness。它只在详情标记章节，不进入 Reader、不请求阅读页或图片；本轮书架不得有自定义封面。iOS 使用正常设备信任，不传测试 CA；Android 如需本地 CA，可按全局设置驱动相同的标准追加方式传 `BOOKMARKS_TEST_CA_BASE64`，仅允许 Android 的 `https://127.0.0.1`，保留系统根证书与 hostname 检查。
+
+先在正式 UI 安装并收藏目标 xkcd，打开一次详情使 Source 资料稳定，再从同一服务和 subject 只读取得下列三份**同 account revision** 的完整响应：`GET /api/settings`、`GET /api/state/manga/:mangaKey`（不带 `chapterKey`）、`GET /api/state/manga/:mangaKey/bookmarks?revision=ACCOUNT_REVISION`。请求使用前述正常业务头。书签响应必须没有 `nextKey`，本轮最多 64 个书签；驱动另完整读取进度并限最多 64 项，不截断集合。Source 资料若在本阶段打开时改变，严格前置会失败；应在准备阶段稳定后重新 GET，不放宽零写断言或重跑旧写阶段。
+
+将配置保存到忽略的本地 JSON 文件。三项 `EXPECT_*_JSON` 都是完整响应再经 JSON 编码的**字符串**，不是嵌套对象，也不只填 revision：
+
+| 字段                                             | 内容                                                                            |
+| ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `APP_ORIGIN`                                     | 官方 harness 实际 HTTPS origin                                                  |
+| `BOOKMARKS_SUBJECT`                              | 本次服务已确认的 subject                                                        |
+| `BOOKMARKS_PACKAGE_NAME` / `BOOKMARKS_SOURCE_ID` | 已确认安装的真实 xkcd package 和精确 Source ID                                  |
+| `BOOKMARKS_MANGA_URL`                            | Source DTO 的精确作品 URL                                                       |
+| `BOOKMARKS_CHAPTER_URL`                          | Source DTO 的精确章节 URL；必须在当前清单中唯一，不使用章节标签或浏览器地址替代 |
+| `BOOKMARKS_PHASE`                                | `verify`、`set` 或 `remove`                                                     |
+| `BOOKMARKS_EXPECT_SETTINGS_JSON`                 | 完整 `SettingsResponse`，不含漫画作用域                                         |
+| `BOOKMARKS_EXPECT_STATE_JSON`                    | 完整 `MangaStateResponse`，含当前收藏与分类目录，不含分章 progress/bookmark     |
+| `BOOKMARKS_EXPECT_BOOKMARKS_JSON`                | 完整、无 `nextKey` 的 `BookmarkPageResponse`                                    |
+| `BOOKMARKS_TEST_CA_BASE64`                       | 可选，仅 Android loopback 本轮 CA 文件原始字节的标准 Base64                     |
+
+在 `apps/reader` 使用固定 SDK：
+
+```sh
+flutter test integration_test/bookmarks_sync_test.dart --no-pub \
+  -d DEVICE_ID \
+  --dart-define-from-file=/absolute/path/.local/bookmarks-native/phase.json \
+  --reporter expanded
+```
+
+建议先由 Web 正式 UI 添加目标书签，再运行 Native 新进程 `verify` → Native `remove` → Web 刷新读回；反向可运行 Native `set` → 独立客户端读回。每阶段重新取得准确前置；`set` 要求目标原先不存在，`remove` 要求已存在。`verify` 打开书架与详情全程不允许业务 revision 推进；写阶段先确认完整前置集合，再点正式图标，等待 pending 清空、无错误及完整重读，严格要求 manga/account revision 各仅增加 1、只改变目标书签。全局与漫画设置、分类、收藏、资料、封面、resume 和所有已有章节进度必须不变。
+
+驱动按正式 `ChapterSequence` 从唯一 exact URL 算稳定 key；章节名仅用于列表搜索，不承担身份。单操作预算 120 秒、主体总预算 10 分钟，finally 正式 unmount 并等待 Native disposal ACK，成功输出 `BOOKMARKS_SYNC_RESULT` 与 binding reportData。只有实际运行的平台组合可登记通过；驱动分析不证明 Native、跨端、故障恢复、生产 Access 或真机通过。结束后按上文清理 harness、reverse、测试进程及专用设备。
+
 ## Source 阅读与筛选验收
 
 官方 harness 现在可以按显式主机列表注册当前静态快照中的真实 Source。先用固定提交构建与当前 ABI 匹配的候选快照，再运行正式构建：

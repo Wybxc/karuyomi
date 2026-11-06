@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-07，修复书架无差异打开仍更新资料、推进共享 CAS 的问题，14 项定向回归及完整 Flutter 检查通过，见[阅读入口](verification/reading-entry.md)。书签实际 Web 添加/筛选与独立 D1 核对通过分项；新文档 Source 重开/调用失败，双客户端往返未通过。正式 Native 书签驱动仅严格分析通过，HTTPS 浏览器信任、实际平台与生产门分别保留，见[书签记录](verification/bookmarks.md)。
+
 2026-11-07，全局设置的真实双 Web 与双 iOS 模拟器顺序往返、新文档/进程恢复分项通过；双 Web 旧 CAS 拒绝与明确重读通过。修复了 Dart 显式 false/0 与标准 ProtoJSON 省略默认值导致的确认误判，完整 Flutter 检查、格式与构建通过。实际范围、修前失败与其余平台/漫画覆盖/故障门见[设置记录](verification/reader-settings.md)，不计为完整 P1/P2 或生产验收。
 
 2026-11-07，有界跨源搜索的正式协议、服务与 Flutter 页面已接入。完整工程检查与 Web 三包真实 Source 的前台交接、空结果/原错误隔离、CuuTruyen 分页、活动停止和详情/图片阅读分项通过；浏览器发现的前台关闭竞态已修复并推送。物理双 Worker 独立观测、更多 Source、Native 和生产仍待验，精确输入、独立 D1 核对及限制见[跨源搜索记录](verification/cross-source-search.md)。

@@ -27,12 +27,14 @@ void main() {
   late BusinessStateClient remote;
   late Map<String, ChapterManifest> manifests;
   late List<wire.Chapter> chapters;
+  late wire.Manga detailManga;
   Future<void> Function(wire.SourceCall call)? beforePages;
   var nextSession = 0;
 
   setUp(() async {
     nextSession = 0;
     beforePages = null;
+    detailManga = testManga;
     chapters = [
       wire.Chapter(url: '/one', name: '第一章'),
       wire.Chapter(url: '/two', name: '第二章'),
@@ -41,7 +43,7 @@ void main() {
       ..invokeHandler = (call) async {
         switch (call.whichRequest()) {
           case wire.SourceCall_Request.details:
-            return wire.SourceResult(manga: testManga);
+            return wire.SourceResult(manga: detailManga);
           case wire.SourceCall_Request.chapters:
             return wire.SourceResult(
               chapters: wire.ChapterList(chapters: chapters),
@@ -389,6 +391,7 @@ void main() {
   testWidgets(
     'lost metadata acknowledgement retries only its original command and separates a failed shelf read',
     (tester) async {
+      detailManga = testManga..title = 'Source refreshed metadata';
       var loseAck = true;
       final entered = Completer<void>();
       final release = Completer<void>();

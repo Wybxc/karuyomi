@@ -2019,18 +2019,24 @@ final class CatalogController extends ChangeNotifier {
       shouldContinue: current,
     );
     if (result == null || !current()) return null;
-    try {
-      await repository.refreshMetadata(
-        packageName: entry.packageName,
-        sourceId: selectedSource.id,
-        sourceName: selectedSource.name,
-        sourceLang: selectedSource.lang,
-        manga: result.manga.snapshot,
-      );
-    } catch (_) {
-      if (current()) {
-        error = '书架资料尚未确认，仍可继续阅读；请返回书架处理未确认操作。';
-        _notify();
+    // Opening an unchanged shelf entry must not advance the shared manga CAS
+    // or interfere with another device's bookmark/category draft.
+    if (entry.sourceName != selectedSource.name ||
+        entry.sourceLang != selectedSource.lang ||
+        entry.snapshot != result.manga.snapshot) {
+      try {
+        await repository.refreshMetadata(
+          packageName: entry.packageName,
+          sourceId: selectedSource.id,
+          sourceName: selectedSource.name,
+          sourceLang: selectedSource.lang,
+          manga: result.manga.snapshot,
+        );
+      } catch (_) {
+        if (current()) {
+          error = '书架资料尚未确认，仍可继续阅读；请返回书架处理未确认操作。';
+          _notify();
+        }
       }
     }
     return current() && isCurrentSource(result.source) ? result : null;

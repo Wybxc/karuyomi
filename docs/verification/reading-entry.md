@@ -32,6 +32,16 @@ flutter test test/library/ test/browse/details_recovery_test.dart test/browse/ch
 
 `pnpm build` 完整通过，包含 Web/Native runtime 材料、Flutter Web release 及 Worker/Static Assets。提交前执行全库 `pnpm format`、完整 `pnpm format:check` 和正常 prek；临时构建/格式输出保留在忽略的 `.local/reading-entry-*.log`。本轮未修改原生插件或构建设置，也未重新构建/运行 Native App，不把共用 Dart 检查和 Web 构建等同于原生验收。
 
+## 无差异打开与跨端 CAS
+
+2026-11-07，修复书架每次打开详情都提交资料更新的问题。Source 名称、语言及完整 Manga 快照不变时不发送 mutation，避免无意义地推进作品 revision，使另一端的书签编辑产生冲突；真正变化仍保存，不改变原资料请求的 CAS、幂等或显式重试语义。
+
+`library_navigation_test.dart` 14 项通过，包含重复打开零写后另一业务客户端持原 revision 成功标书签、Source 名称/语言/opaque memo 变化、旧书架项不覆盖远端新资料、失 ACK 原命令在无差异打开后保留并精确重试，以及真正变更保存失败后仍可阅读。新增跨端 CAS 回归对照旧实现先失败（两次打开多提交两次），修复后通过。既有书架资料失响应组件夹具改为明确变化的 Source 快照，继续验证真实写入的恢复路径。
+
+完整 `pnpm flutter:check` 通过：三个项目严格分析无问题，reader_core 22、source_runtime 86、客户端 597 项，173 份 Dart 文件格式一致；新 Native 书签驱动也通过严格分析。全库格式和完整 Web/Native 材料、Flutter Web、API 构建通过。日志保留于忽略的 `.local/bookmarks-*.log`，旧实现对照与集中回归位于 `.local/metadata-noop-*.log`。
+
+真实 Web 书签准备发现新文档 Source 重开/调用失败，尚未取得实际平台上无差异打开零 revision 的证据；不能以受控回归代替该运行门。实际观察、D1 核对及 HTTPS 信任限制见[书签记录](bookmarks.md)。
+
 ## 独立运行门
 
 新增入口仍需在 Codex 内置浏览器、Web/Native 独立客户端、生产 Access 及目标设备分别验收。现有三端经详情续读的历史证据不能自动扩展为新书架按钮验收。实际 Source 的章节变化、临时故障、身份恢复、屏幕与输入交互须保留真实环境证据。

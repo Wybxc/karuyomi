@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/data/bookmark_repository.dart';
+import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -216,8 +219,252 @@ void main() {
   );
 
   test(
+    'unchanged shelf details do not write or invalidate another device bookmark',
+    () async {
+      platform.invokeHandler = (call) async => switch (call.whichRequest()) {
+        wire.SourceCall_Request.details => wire.SourceResult(
+          manga: entry.snapshot,
+        ),
+        wire.SourceCall_Request.chapters => wire.SourceResult(
+          chapters: wire.ChapterList(),
+        ),
+        _ => throw StateError('Unexpected listing'),
+      };
+      final remote = BusinessStateClient(
+        api: platform.businessServer.forSubject(library.identity.subject),
+        identity: library.identity,
+      );
+      addTearDown(remote.dispose);
+      final before = await remote.readManga(entry.mangaKey);
+      final writes = platform.businessServer.appliedMutations;
+      for (var i = 0; i < 2; i++) {
+        final details = await catalog.openLibraryEntry(
+          entry,
+          identityKey: library.identity.key,
+        );
+        expect(details, isNotNull);
+        expect(catalog.error, isNull);
+      }
+      expect(platform.businessServer.appliedMutations, writes);
+      expect(platform.businessServer.accountRevision, before.accountRevision);
+      final bookmark = await BookmarkRepository(remote).set(
+        mangaKey: entry.mangaKey,
+        chapterKey: 'chapter',
+        bookmarked: true,
+        basedOnRevision: before.manga.revision,
+      );
+      expect(bookmark.bookmarked, true);
+      expect(bookmark.revision, before.manga.revision + 1);
+      expect(platform.businessServer.appliedMutations, writes + 1);
+    },
+  );
+
+  test(
+    'unchanged stale shelf details preserve another client metadata without a POST',
+    () async {
+      final remote = BusinessStateClient(
+        api: platform.businessServer.forSubject(library.identity.subject),
+        identity: library.identity,
+      );
+      addTearDown(remote.dispose);
+      final changed = entry.snapshot.deepCopy()
+        ..title = 'Another device confirmed this title';
+      await LibraryRepository(remote).refreshMetadata(
+        packageName: entry.packageName,
+        sourceId: entry.sourceId,
+        sourceName: entry.sourceName,
+        sourceLang: entry.sourceLang,
+        manga: changed,
+      );
+      final confirmed = await remote.readManga(entry.mangaKey);
+      expect(confirmed.manga.metadata.manga.title, isNot(entry.title));
+      final posts = platform.businessServer.requests
+          .where((request) => request.method == 'POST')
+          .length;
+      final writes = platform.businessServer.appliedMutations;
+      platform.invokeHandler = (call) async => switch (call.whichRequest()) {
+        wire.SourceCall_Request.details => wire.SourceResult(
+          manga: entry.snapshot,
+        ),
+        wire.SourceCall_Request.chapters => wire.SourceResult(
+          chapters: wire.ChapterList(),
+        ),
+        _ => throw StateError('Unexpected listing'),
+      };
+
+      final details = await catalog.openLibraryEntry(
+        entry,
+        identityKey: library.identity.key,
+      );
+      expect(details, isNotNull);
+      expect(details!.manga.snapshot, entry.snapshot);
+      expect(catalog.error, isNull);
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.method == 'POST',
+        ),
+        hasLength(posts),
+      );
+      expect(platform.businessServer.appliedMutations, writes);
+      expect(
+        platform.businessServer.accountRevision,
+        confirmed.accountRevision,
+      );
+      expect(library.client.hasPendingMetadata(entry.mangaKey), false);
+      final after = await remote.readManga(entry.mangaKey);
+      expect(wire.encodeProtoJson(after), wire.encodeProtoJson(confirmed));
+    },
+  );
+
+  test(
+    'unchanged shelf details keep a lost metadata command for its exact explicit retry',
+    () async {
+      final changed = entry.snapshot.deepCopy()
+        ..title = 'Metadata whose acknowledgement was lost';
+      platform.invokeHandler = (call) async => switch (call.whichRequest()) {
+        wire.SourceCall_Request.details => wire.SourceResult(manga: changed),
+        wire.SourceCall_Request.chapters => wire.SourceResult(
+          chapters: wire.ChapterList(),
+        ),
+        _ => throw StateError('Unexpected listing'),
+      };
+      platform.businessServer.loseNextResponse = true;
+      final firstDetails = await catalog.openLibraryEntry(
+        entry,
+        identityKey: library.identity.key,
+      );
+      expect(firstDetails, isNotNull);
+      expect(firstDetails!.manga.snapshot, changed);
+      expect(catalog.error, contains('尚未确认'));
+      expect(library.client.hasPendingMetadata(entry.mangaKey), true);
+      final original = platform.businessServer.requests.lastWhere(
+        (request) => request.method == 'POST',
+      );
+      final originalCommand = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(original.body!),
+      );
+      expect(originalCommand.hasUpdateMetadata(), true);
+      expect(originalCommand.mutationId, isNotEmpty);
+      expect(originalCommand.expectedRevision, entry.revision);
+      expect(originalCommand.updateMetadata.manga, changed);
+      final posts = platform.businessServer.requests
+          .where((request) => request.method == 'POST')
+          .length;
+      final writes = platform.businessServer.appliedMutations;
+      final revision = platform.businessServer.accountRevision;
+      final applied = platform.businessServer.manga(entry.mangaKey)!;
+      expect(applied.metadata.manga, changed);
+
+      // The Source now reports exactly the old row. Its read-only open must
+      // neither replay the uncertain write nor discard its immutable command.
+      platform.invokeHandler = (call) async => switch (call.whichRequest()) {
+        wire.SourceCall_Request.details => wire.SourceResult(
+          manga: entry.snapshot,
+        ),
+        wire.SourceCall_Request.chapters => wire.SourceResult(
+          chapters: wire.ChapterList(),
+        ),
+        _ => throw StateError('Unexpected listing'),
+      };
+      final details = await catalog.openLibraryEntry(
+        entry,
+        identityKey: library.identity.key,
+      );
+      expect(details, isNotNull);
+      expect(details!.manga.snapshot, entry.snapshot);
+      expect(library.client.hasPendingMetadata(entry.mangaKey), true);
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.method == 'POST',
+        ),
+        hasLength(posts),
+      );
+      expect(platform.businessServer.appliedMutations, writes);
+      expect(platform.businessServer.accountRevision, revision);
+      expect(
+        wire.encodeProtoJson(platform.businessServer.manga(entry.mangaKey)!),
+        wire.encodeProtoJson(applied),
+      );
+
+      final confirmed = await library.client.retryMetadata(entry.mangaKey);
+      final retried = platform.businessServer.requests.lastWhere(
+        (request) => request.method == 'POST',
+      );
+      final retriedCommand = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(retried.body!),
+      );
+      expect(retried.body, original.body);
+      expect(retriedCommand.mutationId, originalCommand.mutationId);
+      expect(retriedCommand.expectedRevision, originalCommand.expectedRevision);
+      expect(confirmed.mutationId, originalCommand.mutationId);
+      expect(confirmed.manga.metadata.manga, changed);
+      expect(confirmed.manga.revision, applied.revision);
+      expect(library.client.hasPendingMetadata(entry.mangaKey), false);
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.method == 'POST',
+        ),
+        hasLength(posts + 1),
+      );
+      expect(platform.businessServer.appliedMutations, writes);
+      expect(platform.businessServer.accountRevision, revision);
+      expect(
+        wire.encodeProtoJson(platform.businessServer.manga(entry.mangaKey)!),
+        wire.encodeProtoJson(applied),
+      );
+    },
+  );
+
+  for (final field in ['name', 'language', 'memo']) {
+    test('shelf refresh persists a changed Source $field', () async {
+      platform.sourceInventory = [
+        wire.SourceInfo(
+          id: sourceId,
+          name: field == 'name' ? 'Renamed Source' : entry.sourceName,
+          lang: field == 'language' ? 'en' : entry.sourceLang,
+        ),
+      ];
+      final manga = testManga;
+      if (field == 'memo') manga.memoJson = '{"opaque":"new memo"}';
+      platform.invokeHandler = (call) async => switch (call.whichRequest()) {
+        wire.SourceCall_Request.details => wire.SourceResult(manga: manga),
+        wire.SourceCall_Request.chapters => wire.SourceResult(
+          chapters: wire.ChapterList(),
+        ),
+        _ => throw StateError('Unexpected listing'),
+      };
+      final revision = platform.businessServer.accountRevision;
+      final details = await catalog.openLibraryEntry(
+        entry,
+        identityKey: library.identity.key,
+      );
+      expect(details, isNotNull);
+      expect(catalog.error, isNull);
+      final updated = (await library.watchEntries().first).single;
+      expect(updated.snapshot, manga);
+      expect(updated.sourceName, platform.sourceInventory!.single.name);
+      expect(updated.sourceLang, platform.sourceInventory!.single.lang);
+      expect(updated.addedAt, entry.addedAt);
+      expect(platform.businessServer.accountRevision, revision + 1);
+    });
+  }
+
+  test(
     'metadata write failure keeps the successfully fetched details usable',
     () async {
+      platform.invokeHandler = (call) async => switch (call.whichRequest()) {
+        wire.SourceCall_Request.details => wire.SourceResult(
+          manga: testManga..title = 'Changed before failed save',
+        ),
+        wire.SourceCall_Request.chapters => wire.SourceResult(
+          chapters: wire.ChapterList(
+            chapters: [wire.Chapter(url: '/chapter', name: 'Chapter')],
+          ),
+        ),
+        _ => throw StateError('Unexpected listing'),
+      };
       platform.businessServer.failWrites = true;
       final details = await catalog.openLibraryEntry(
         entry,
