@@ -842,3 +842,166 @@ test('the JSON control bridge permits only the catalog static GET paths without 
     }),
   );
 });
+
+test('typed bootstrap keeps long width in open identity, reaches the Worker, and changed values force a new generation', async () => {
+  const { manager, driver, workers } = await setup();
+  const preferenceBootstrap = create(pb.PreferenceBootstrapSchema, {
+    packageName: 'eu.kanade.tachiyomi.extension.test',
+    sources: [
+      {
+        sourceId: '9223372036854775806',
+        entries: [
+          {
+            key: 'session-long',
+            value: {
+              value: { case: 'longInteger', value: 9223372036854775807n },
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const opening = { ...options, preferenceBootstrap };
+  const first = await manager.open(opening);
+  expect(await manager.open(opening)).toEqual(first);
+  expect(driver.open).toHaveBeenCalledTimes(1);
+  const sent = workers[0]?.commands.find(
+    (command) => command.command.case === 'open',
+  );
+  if (sent?.command.case !== 'open') throw new Error('Expected Worker open');
+  expect(sent.command.value.preferenceBootstrap).toEqual(preferenceBootstrap);
+  const second = await manager.open({
+    ...options,
+    preferenceBootstrap: create(pb.PreferenceBootstrapSchema, {
+      packageName: preferenceBootstrap.packageName,
+      sources: [
+        {
+          sourceId: '9223372036854775806',
+          entries: [
+            {
+              key: 'session-long',
+              value: { value: { case: 'longInteger', value: 0n } },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  expect(second.generation).not.toBe(first.generation);
+  expect(workers[0]?.terminated).toBe(true);
+  expect(driver.open).toHaveBeenCalledTimes(2);
+});
+
+test.each(['accepted', 'vetoed', 'failed'] as const)(
+  'a %s preference edit runs once, blocks queued and future work, and requires a fresh confirmed generation',
+  async (outcome) => {
+    const waiting = deferred<SourcePayload>();
+    const { manager, driver, workers } = await setup(async (request) => {
+      if (request.request.case === 'editPreference') return waiting.promise;
+      return mangaPage();
+    });
+    const session = await manager.open(options);
+    const editing = manager.invoke(
+      create(pb.SourceCallSchema, {
+        requestId: 'edit-once',
+        sourceId: '9223372036854775806',
+        generation: session.generation,
+        request: {
+          case: 'editPreference',
+          value: {
+            snapshotId: 'prefs-1',
+            path: [0],
+            command: {
+              case: 'change',
+              value: { value: { case: 'boolean', value: false } },
+            },
+          },
+        },
+      }),
+    );
+    const editResult =
+      outcome === 'failed'
+        ? expect(editing).rejects.toMatchObject({ code: 'source_error' })
+        : expect(editing).resolves.toMatchObject({
+            payload: { case: 'preferenceEdit' },
+          });
+    await expect(
+      manager.invoke(call('later-read', session.generation)),
+    ).rejects.toMatchObject({ code: 'protocol_error' });
+    await expect(
+      manager.invoke(
+        create(pb.SourceCallSchema, {
+          requestId: 'repeated-edit',
+          sourceId: '9223372036854775806',
+          generation: session.generation,
+          request: { case: 'getPreferences', value: {} },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'protocol_error' });
+    if (outcome === 'failed')
+      waiting.reject(
+        new RuntimeFailure('source_error', 'listener failed after mutation'),
+      );
+    else
+      waiting.resolve({
+        case: 'preferenceEdit',
+        value: create(pb.PreferenceEditResultSchema, {
+          accepted: outcome === 'accepted',
+          snapshot: { snapshotId: 'prefs-2' },
+        }),
+      });
+    await editResult;
+    await expect(
+      manager.invoke(call('after-edit', session.generation)),
+    ).rejects.toMatchObject({ code: 'protocol_error' });
+    expect(driver.invoke).toHaveBeenCalledTimes(1);
+    const reopened = await manager.open(options);
+    expect(reopened.generation).not.toBe(session.generation);
+    expect(workers[0]?.terminated).toBe(true);
+    expect(driver.open).toHaveBeenCalledTimes(2);
+    await manager.invoke(call('confirmed-read', reopened.generation));
+    expect(driver.invoke).toHaveBeenCalledTimes(2);
+  },
+);
+
+test('requests already queued behind a preference edit are rejected before their Source listener or page work starts', async () => {
+  const reading = deferred<SourcePayload>();
+  const editing = deferred<SourcePayload>();
+  const { manager, driver } = await setup(async (request) =>
+    request.request.case === 'editPreference'
+      ? editing.promise
+      : reading.promise,
+  );
+  const session = await manager.open(options);
+  const activeRead = manager.invoke(call('before-edit', session.generation));
+  const edit = manager.invoke(
+    create(pb.SourceCallSchema, {
+      requestId: 'queued-edit',
+      sourceId: '9223372036854775806',
+      generation: session.generation,
+      request: {
+        case: 'editPreference',
+        value: {
+          snapshotId: 'prefs-1',
+          path: [0],
+          command: { case: 'click', value: {} },
+        },
+      },
+    }),
+  );
+  const blocked = expect(
+    manager.invoke(call('queued-after-edit', session.generation)),
+  ).rejects.toMatchObject({ code: 'protocol_error' });
+  reading.resolve(mangaPage());
+  await activeRead;
+  await vi.waitFor(() => expect(driver.invoke).toHaveBeenCalledTimes(2));
+  await blocked;
+  editing.resolve({
+    case: 'preferenceEdit',
+    value: create(pb.PreferenceEditResultSchema, {
+      snapshot: { snapshotId: 'prefs-2' },
+    }),
+  });
+  await edit;
+  expect(driver.invoke).toHaveBeenCalledTimes(2);
+});

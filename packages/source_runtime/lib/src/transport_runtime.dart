@@ -78,6 +78,7 @@ final class TransportSourceRuntime implements SourceRuntime {
   String? _packageId;
   int _epoch = 0;
   bool _disposed = false;
+  bool _preferencesEdited = false;
   RuntimeException? _accessFailure;
   Future<RuntimeSession>? _opening;
   String? _openKey;
@@ -222,19 +223,39 @@ final class TransportSourceRuntime implements SourceRuntime {
 
   @override
   Future<RuntimeSession> open(BuildDescriptor build) {
+    final bootstrap = build.preferenceBootstrap?.deepCopy();
+    bootstrap?.freeze();
+    if (bootstrap != null) {
+      wire.validatePreferenceBootstrap(bootstrap);
+      if (build.packageId != null && bootstrap.packageName != build.packageId) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Preference bootstrap package does not match the selected extension',
+        );
+      }
+    }
+    final openingBuild = BuildDescriptor(
+      buildId: build.buildId,
+      manifestUri: build.manifestUri,
+      sha256: build.sha256,
+      identity: build.identity,
+      packageId: build.packageId,
+      preferenceBootstrap: bootstrap,
+    );
     final key = [
       build.buildId,
       build.manifestUri.toString(),
       build.sha256,
       build.identity,
       build.packageId ?? '',
+      bootstrap == null ? '' : jsonEncode(wire.encodeProtoJson(bootstrap)),
     ].join('\u0000');
-    if (_openKey == key) {
+    if (!_preferencesEdited && _openKey == key) {
       if (_opening != null) return _opening!;
       if (_session != null) return Future.value(_session);
     }
     _openKey = key;
-    final opening = _open(build);
+    final opening = _open(openingBuild);
     _opening = opening;
     unawaited(
       opening.then<void>(
@@ -270,6 +291,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       );
     }
     final epoch = ++_epoch;
+    _preferencesEdited = false;
     _accessFailure = null;
     _session = null;
     final hello = (await _exchange(
@@ -295,6 +317,7 @@ final class TransportSourceRuntime implements SourceRuntime {
           identity: build.identity,
           expectedBuildId: build.buildId,
           expectedBundleSha256: build.sha256,
+          preferenceBootstrap: build.preferenceBootstrap,
         ),
       ),
       wire.ControlResponse_Result.session,
@@ -320,6 +343,18 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Runtime session does not match the requested build',
       );
     }
+    final bootstrap = build.preferenceBootstrap;
+    if (bootstrap != null &&
+        bootstrap.sources.any(
+          (source) => !response.sources.any(
+            (candidate) => candidate.id == source.sourceId,
+          ),
+        )) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Preference bootstrap contains a Source outside this extension',
+      );
+    }
     _packageId = build.packageId;
     response.freeze();
     return _session = response;
@@ -327,6 +362,7 @@ final class TransportSourceRuntime implements SourceRuntime {
 
   @override
   Future<SourceResult> invoke(SourceRequest request) async {
+    _requireConfirmedPreferences();
     final accessFailure = _accessFailure;
     if (accessFailure != null) throw accessFailure;
     final session = _session;
@@ -341,6 +377,9 @@ final class TransportSourceRuntime implements SourceRuntime {
       );
     }
     try {
+      if (call.hasEditPreference()) {
+        wire.validatePreferenceEditRequest(call.editPreference);
+      }
       if (call.hasGetFilters()) wire.validateGetFiltersRequest(call.getFilters);
       if (call.hasSearch() && call.search.hasFilters()) {
         wire.validateFilterSelection(call.search.filters);
@@ -348,10 +387,14 @@ final class TransportSourceRuntime implements SourceRuntime {
     } on FormatException {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
-        'Invalid Source filter request',
+        'Invalid Source control request',
       );
     }
     final expected = switch (call.whichRequest()) {
+      wire.SourceCall_Request.getPreferences =>
+        wire.SourceResult_Payload.preferences,
+      wire.SourceCall_Request.editPreference =>
+        wire.SourceResult_Payload.preferenceEdit,
       wire.SourceCall_Request.getFilters => wire.SourceResult_Payload.filters,
       wire.SourceCall_Request.popular ||
       wire.SourceCall_Request.latest ||
@@ -365,6 +408,9 @@ final class TransportSourceRuntime implements SourceRuntime {
       ),
     };
     final epoch = _epoch;
+    // A dispatched callback can mutate storage even if its response is lost.
+    // Only a fresh confirmed bootstrap and generation may resume Source work.
+    if (call.hasEditPreference()) _preferencesEdited = true;
     final response = (await _exchange(
       wire.ControlRequest(invoke: call),
       wire.ControlResponse_Result.source,
@@ -393,6 +439,10 @@ final class TransportSourceRuntime implements SourceRuntime {
       }
 
       switch (response.whichPayload()) {
+        case wire.SourceResult_Payload.preferences:
+          wire.validatePreferenceSnapshot(response.preferences);
+        case wire.SourceResult_Payload.preferenceEdit:
+          wire.validatePreferenceEditResult(response.preferenceEdit);
         case wire.SourceResult_Payload.filters:
           wire.validateFilterSnapshot(response.filters);
         case wire.SourceResult_Payload.mangaPage:
@@ -422,6 +472,15 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
     response.freeze();
     return response;
+  }
+
+  void _requireConfirmedPreferences() {
+    if (_preferencesEdited) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Confirm Source preferences and reopen the runtime before continuing',
+      );
+    }
   }
 
   @override
@@ -492,6 +551,7 @@ final class TransportSourceRuntime implements SourceRuntime {
 
   @override
   Future<ImageResource> acquireImage(ImageAcquireRequest request) async {
+    _requireConfirmedPreferences();
     final accessFailure = _accessFailure;
     if (accessFailure != null) throw accessFailure;
     final session = _imageRequestSession(request);

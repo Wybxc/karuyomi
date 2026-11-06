@@ -40,6 +40,7 @@ final class TestPlatform extends PlatformRuntime {
   Future<void> Function()? beforeRebuild;
   final openedIdentities = <String>[];
   final openedBuilds = <String>[];
+  final preferenceBootstraps = <wire.PreferenceBootstrap>[];
   String manifestBuildId = 'build-1';
   String _openedBuildId = 'build-1';
   List<wire.SourceInfo>? sourceInventory;
@@ -54,7 +55,8 @@ final class TestPlatform extends PlatformRuntime {
       builds: [
         wire.ExtensionBuildDescriptor(
           buildId: 'build-1',
-          packageName: 'source.test',
+          packageName: 'eu.kanade.source.test',
+          sourceIds: [sourceId],
           version: '1.0',
           manifestPath: '/extensions/builds/build-1/manifest.json',
         ),
@@ -91,6 +93,8 @@ final class TestPlatform extends PlatformRuntime {
         wire.encodeProtoJson(
           wire.BuildManifest(
             buildId: manifestBuildId,
+            sourceIds:
+                sourceInventory?.map((source) => source.id) ?? [sourceId],
             bundle: wire.BundleArtifact(sha256: 'a' * 64),
           ),
         ),
@@ -116,6 +120,7 @@ final class TestPlatform extends PlatformRuntime {
         if (request.fetchApi.path.startsWith('/api/library') ||
             request.fetchApi.path.startsWith('/api/categories') ||
             request.fetchApi.path.startsWith('/api/settings') ||
+            request.fetchApi.path.startsWith('/api/source-preferences/') ||
             request.fetchApi.path.startsWith('/api/state/')) {
           final businessRequest = TestBusinessRequest(
             path: request.fetchApi.path,
@@ -147,6 +152,7 @@ final class TestPlatform extends PlatformRuntime {
         );
       case wire.ControlRequest_Command.open:
         openedIdentities.add(request.open.identity);
+        preferenceBootstraps.add(request.open.preferenceBootstrap.deepCopy());
         openedBuilds.add(request.open.expectedBuildId);
         _openedBuildId = request.open.expectedBuildId;
         response.session = wire.RuntimeSession(

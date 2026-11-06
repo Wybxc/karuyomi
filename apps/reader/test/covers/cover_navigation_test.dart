@@ -63,7 +63,12 @@ Future<CatalogController> _details(
 ) async {
   await tester.pumpWidget(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
-  for (final text in ['去浏览', 'source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+  for (final text in [
+    '去浏览',
+    'eu.kanade.source.test · 1.0',
+    '测试漫画源 · zh',
+    '真实源 DTO 测试',
+  ]) {
     await _tap(tester, find.text(text));
   }
   return tester
@@ -269,7 +274,7 @@ void main() {
         covers: transport,
       );
       await LibraryRepository(remote).setFavorite(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         sourceName: '测试漫画源',
         sourceLang: 'zh',

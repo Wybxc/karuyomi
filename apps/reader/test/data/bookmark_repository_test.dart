@@ -101,7 +101,7 @@ void main() {
       final library = LibraryRepository(client);
       final manga = wire.Manga(url: '/manga/bookmarks', title: 'Bookmarks');
       Future<void> favorite(bool value) => library.setFavorite(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: '123',
         sourceName: 'Test',
         sourceLang: 'en',

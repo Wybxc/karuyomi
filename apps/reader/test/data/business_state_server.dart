@@ -42,6 +42,7 @@ final class _Account {
     ),
   );
   final mangaSettings = <String, wire.MangaReaderSettings>{};
+  final sourcePreferences = <(String, String), wire.SourcePreferences>{};
   final mutations = <String, (String, ApiReply)>{};
 }
 
@@ -126,6 +127,42 @@ final class TestBusinessServer implements ApiFetch {
       );
     }
     final account = _account(trustedSubject);
+    if (request.method == 'GET' &&
+        request.uri.path.startsWith('/api/source-preferences/packages/')) {
+      final packageName = request.uri.pathSegments.last;
+      return _reply(
+        wire.SourcePreferencesResponse(
+          schemaVersion: 1,
+          accountRevision: account.revision,
+          packageName: packageName,
+          sources: account.sourcePreferences.values.where(
+            (source) => source.packageName == packageName,
+          ),
+        ),
+      );
+    }
+    if (request.method == 'POST' &&
+        request.uri.path == '/api/source-preferences/mutations') {
+      final mutation = wire.decodeProtoJson(
+        wire.SourcePreferencesMutation(),
+        jsonDecode(request.body!),
+      );
+      if (failWrites) {
+        return _errorReply(
+          request,
+          wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_UNAVAILABLE,
+          'Injected source settings write failure',
+          status: 503,
+          mutationId: mutation.mutationId,
+        );
+      }
+      final reply = _mutateSourcePreferences(account, request, mutation);
+      if (loseNextResponse) {
+        loseNextResponse = false;
+        throw StateError('Injected lost source settings response');
+      }
+      return reply;
+    }
     if (request.method == 'GET' &&
         (request.uri.path == '/api/settings' ||
             request.uri.path.startsWith('/api/settings/manga/'))) {
@@ -413,6 +450,57 @@ final class TestBusinessServer implements ApiFetch {
             : defaults.keyboard,
       ),
     );
+  }
+
+  ApiReply _mutateSourcePreferences(
+    _Account account,
+    TestBusinessRequest request,
+    wire.SourcePreferencesMutation mutation,
+  ) {
+    final fingerprint = 'source-preferences\n${request.body}';
+    final previous = account.mutations[mutation.mutationId];
+    if (previous != null) {
+      if (previous.$1 == fingerprint) return previous.$2;
+      return _errorReply(
+        request,
+        wire
+            .BusinessStateErrorCode
+            .BUSINESS_STATE_ERROR_CODE_IDEMPOTENCY_CONFLICT,
+        'Mutation ID already has a different payload',
+        status: 409,
+        mutationId: mutation.mutationId,
+      );
+    }
+    final key = (mutation.packageName, mutation.sourceId);
+    final revision = account.sourcePreferences[key]?.revision ?? 0;
+    if (mutation.expectedRevision != revision) {
+      return _errorReply(
+        request,
+        wire.BusinessStateErrorCode.BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+        'Source settings changed on another device',
+        status: 409,
+        mutationId: mutation.mutationId,
+      );
+    }
+    final preferences = wire.SourcePreferences(
+      packageName: mutation.packageName,
+      sourceId: mutation.sourceId,
+      revision: revision + 1,
+      entries: mutation.entries,
+    );
+    account.sourcePreferences[key] = preferences.deepCopy();
+    account.revision++;
+    final reply = _reply(
+      wire.SourcePreferencesMutationResponse(
+        schemaVersion: 1,
+        mutationId: mutation.mutationId,
+        accountRevision: account.revision,
+        preferences: preferences,
+      ),
+    );
+    account.mutations[mutation.mutationId] = (fingerprint, reply);
+    appliedMutations++;
+    return reply;
   }
 
   ApiReply _mutateSettings(_Account account, TestBusinessRequest request) {
@@ -880,6 +968,26 @@ final class TestBusinessServer implements ApiFetch {
     String mutationId = '',
   }) {
     final error = _error(code, message);
+    if (request.uri.path == '/api/source-preferences/mutations') {
+      return _reply(
+        wire.SourcePreferencesMutationResponse(
+          schemaVersion: 1,
+          mutationId: mutationId,
+          error: error,
+        ),
+        status: status,
+      );
+    }
+    if (request.uri.path.startsWith('/api/source-preferences/packages/')) {
+      return _reply(
+        wire.SourcePreferencesResponse(
+          schemaVersion: 1,
+          packageName: request.uri.pathSegments.last,
+          error: error,
+        ),
+        status: status,
+      );
+    }
     if (request.uri.path == '/api/settings/mutations') {
       return _reply(
         wire.SettingsMutationResponse(

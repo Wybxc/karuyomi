@@ -29,13 +29,15 @@ void main() {
           builds: [
             wire.ExtensionBuildDescriptor(
               buildId: 'build-1',
-              packageName: 'source.test',
+              packageName: 'eu.kanade.source.test',
+              sourceIds: [sourceId, _secondSourceId, '42', '43', '44'],
               version: '1.0',
               manifestPath: '/extensions/builds/build-1/manifest.json',
             ),
             wire.ExtensionBuildDescriptor(
               buildId: 'build-2',
-              packageName: 'source.other',
+              packageName: 'eu.kanade.source.other',
+              sourceIds: [sourceId, _secondSourceId, '42', '43', '44'],
               version: '2.0',
               manifestPath: '/extensions/builds/build-2/manifest.json',
             ),
@@ -161,9 +163,9 @@ void main() {
       await chooseLanguage(tester, 'zh');
       expect(find.text('匹配 2 / 5 个漫画源'), findsOneWidget);
       platform.manifestBuildId = 'build-2';
-      await tap(tester, find.text('source.other · 2.0'));
+      await tap(tester, find.text('eu.kanade.source.other · 2.0'));
       await reveal(tester, languageFilter());
-      expect(catalog.activeBuild!.packageName, 'source.other');
+      expect(catalog.activeBuild!.packageName, 'eu.kanade.source.other');
       expect(
         tester.widget<DropdownButton<String>>(languageFilter()).value,
         isNull,
@@ -176,7 +178,7 @@ void main() {
       platform.runtimeGeneration = 'generation-2';
       await catalog.connect();
       await tester.pumpAndSettle();
-      await tap(tester, find.text('source.other · 2.0'));
+      await tap(tester, find.text('eu.kanade.source.other · 2.0'));
       await reveal(tester, languageFilter());
       expect(catalog.session!.generation, 'generation-2');
       expect(
@@ -199,7 +201,7 @@ void main() {
       expect(clearFilter(), findsNothing);
       expect(find.byKey(const ValueKey('source-language-count')), findsNothing);
       expect(platform.invocations, isEmpty);
-      await tap(tester, find.text('source.test · 1.0'));
+      await tap(tester, find.text('eu.kanade.source.test · 1.0'));
       await reveal(tester, languageFilter());
       expect(find.text('匹配 5 / 5 个漫画源'), findsOneWidget);
       expect(

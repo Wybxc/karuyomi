@@ -16,6 +16,13 @@ import {
 } from './codec.ts';
 import { hostAbi, protocolVersion, runtimeBaseline } from './generated.ts';
 import { validId, validSourceId } from './static-control.ts';
+import {
+  validatePreferenceEditRequest,
+  validatePreferenceSnapshot,
+  validatePreferenceEditResult,
+  preferenceSnapshotSchema,
+  preferenceEditResultSchema,
+} from './preferences-control.ts';
 
 export type RuntimeHello = Required<PlainMessage<pb.RuntimeHello>>;
 export type SourceInfo = PlainMessage<pb.SourceInfo> &
@@ -388,6 +395,11 @@ export function validateSourceCall(value: SourceCall): SourceCall {
       )
         validateFilterSelection(value.request.value.filters);
       break;
+    case 'getPreferences':
+      break;
+    case 'editPreference':
+      validatePreferenceEditRequest(value.request.value);
+      break;
     case 'getFilters':
       if (value.request.value.retainedSnapshotId !== undefined)
         validId(value.request.value.retainedSnapshotId);
@@ -426,6 +438,18 @@ export function javaSourceInvocation(value: SourceCall): {
   validateSourceCall(value);
   const request = value.request;
   switch (request.case) {
+    case 'getPreferences':
+      return {
+        operation: request.case,
+        argsJson: JSON.stringify(messageJson(pb.EmptySchema, request.value)),
+      };
+    case 'editPreference':
+      return {
+        operation: request.case,
+        argsJson: JSON.stringify(
+          messageJson(pb.PreferenceEditRequestSchema, request.value),
+        ),
+      };
     case 'getFilters':
       return {
         operation: 'getFilters',
@@ -472,6 +496,16 @@ export function parseJavaSourcePayload(
   input: unknown,
 ): SourcePayload {
   switch (call.request.case) {
+    case 'getPreferences':
+      return {
+        case: 'preferences',
+        value: preferenceSnapshotSchema.parse(input),
+      };
+    case 'editPreference':
+      return {
+        case: 'preferenceEdit',
+        value: preferenceEditResultSchema.parse(input),
+      };
     case 'getFilters': {
       const value = filterSnapshotSchema.parse(input);
       return { case: 'filters', value };
@@ -509,6 +543,12 @@ export function parseJavaSourcePayload(
 export function validateSourceResult(value: SourceResult): SourceResult {
   [value.requestId, value.generation, value.buildId].forEach(validId);
   switch (value.payload.case) {
+    case 'preferences':
+      validatePreferenceSnapshot(value.payload.value);
+      break;
+    case 'preferenceEdit':
+      validatePreferenceEditResult(value.payload.value);
+      break;
     case 'filters':
       validateFilterSnapshot(value.payload.value);
       break;
@@ -538,15 +578,19 @@ export function sourceResultFor(
   payload: SourcePayload,
 ): SourceResult {
   const expected =
-    call.request.case === 'getFilters'
-      ? 'filters'
-      : call.request.case === 'pages'
-        ? 'pageList'
-        : call.request.case === 'details'
-          ? 'manga'
-          : call.request.case === 'chapters'
-            ? 'chapters'
-            : 'mangaPage';
+    call.request.case === 'getPreferences'
+      ? 'preferences'
+      : call.request.case === 'editPreference'
+        ? 'preferenceEdit'
+        : call.request.case === 'getFilters'
+          ? 'filters'
+          : call.request.case === 'pages'
+            ? 'pageList'
+            : call.request.case === 'details'
+              ? 'manga'
+              : call.request.case === 'chapters'
+                ? 'chapters'
+                : 'mangaPage';
   requireCondition(
     payload.case === expected,
     'Source result does not match its request',

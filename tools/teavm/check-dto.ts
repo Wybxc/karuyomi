@@ -75,6 +75,37 @@ export async function checkDto(root = ROOT): Promise<void> {
       output + path.delimiter + classpath,
       oracleClass,
     ]);
+  // Preference ABI must resolve the real host Context before the Android SDK stubs.
+  const preferenceClasspath = [
+    ...jars.filter((file) => path.basename(file).startsWith('host-')),
+    ...jars.filter((file) => !path.basename(file).startsWith('host-')),
+  ].join(path.delimiter);
+  const preferenceSources = [
+    'prototype/HostPreferences.java',
+    'android/view/View.java',
+    'android/widget/TextView.java',
+    'android/widget/EditText.java',
+    'android/text/method/PasswordTransformationMethod.java',
+    'androidx/preference/Preference.java',
+    'androidx/preference/PreferenceGroup.java',
+    'androidx/preference/PreferenceScreen.java',
+    'androidx/preference/PreferenceCategory.java',
+  ].map((file) => path.join(root, 'runtime/teavm/java/src/main/java', file));
+  await oracle('javac', [
+    '--release',
+    '17',
+    '-cp',
+    output + path.delimiter + preferenceClasspath,
+    '-d',
+    output,
+    ...preferenceSources,
+    path.join(root, 'tools/teavm/HostPreferencesTest.java'),
+  ]);
+  await oracle('java', [
+    '-cp',
+    output + path.delimiter + preferenceClasspath,
+    'prototype.HostPreferencesTest',
+  ]);
   // The seed OkHttp JAR has its newCall bytecode adapted for BrowserCall.
   // Oracle execution must use the untouched same-version upstream artifact.
   const originalDependencies = path.join(output, 'cache-original-dependencies');

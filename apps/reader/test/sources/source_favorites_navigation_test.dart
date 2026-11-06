@@ -16,7 +16,7 @@ import '../browse/fakes.dart';
 import '../data/business_state_server.dart';
 
 wire.FavoriteSource _favorite({
-  String package = 'source.test',
+  String package = 'eu.kanade.source.test',
   String name = '旧来源名称',
 }) => wire.FavoriteSource(
   packageName: package,
@@ -130,7 +130,11 @@ void main() {
   }
 
   Finder toggle() => find.byKey(
-    const ValueKey(('source-favorite-toggle', 'source.test', sourceId)),
+    const ValueKey((
+      'source-favorite-toggle',
+      'eu.kanade.source.test',
+      sourceId,
+    )),
   );
   Finder open(String package) =>
       find.byKey(ValueKey(('favorite-source-open', package, sourceId)));
@@ -144,7 +148,7 @@ void main() {
       )
       .toList();
   Future<void> loadCurrent(WidgetTester tester) async {
-    await tap(tester, find.text('source.test · 1.0'));
+    await tap(tester, find.text('eu.kanade.source.test · 1.0'));
     if (toggle().evaluate().isEmpty) await tap(tester, find.text('收藏的漫画源'));
     await reveal(tester, toggle());
   }
@@ -171,10 +175,14 @@ void main() {
       await catalog.openBuild(catalog.builds.single);
       await show(tester);
       // Opening a confirmed favorite remains usable at capacity.
-      await tap(tester, open('source.test'));
+      await tap(tester, open('eu.kanade.source.test'));
       expect(catalog.activeSource!.id, sourceId);
       final newToggle = find.byKey(
-        const ValueKey(('source-favorite-toggle', 'source.test', '42')),
+        const ValueKey((
+          'source-favorite-toggle',
+          'eu.kanade.source.test',
+          '42',
+        )),
       );
       await reveal(tester, newToggle);
       expect(
@@ -205,7 +213,7 @@ void main() {
       expect(
         confirmed.global.favoriteSources.any(
           (source) =>
-              source.packageName == 'source.test' &&
+              source.packageName == 'eu.kanade.source.test' &&
               source.sourceId == sourceId,
         ),
         false,
@@ -213,7 +221,8 @@ void main() {
       expect(
         confirmed.global.favoriteSources.any(
           (source) =>
-              source.packageName == 'source.test' && source.sourceId == '42',
+              source.packageName == 'eu.kanade.source.test' &&
+              source.sourceId == '42',
         ),
         true,
       );
@@ -250,7 +259,7 @@ void main() {
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
       expect(tester.widget<IconButton>(toggle()).onPressed, isNull);
-      expect(open('source.test'), findsNothing);
+      expect(open('eu.kanade.source.test'), findsNothing);
       final command = wire.decodeProtoJson(
         wire.SettingsMutation(),
         jsonDecode(posts().last.body!),
@@ -260,13 +269,13 @@ void main() {
       expect(command.setGlobal.favoriteSources.single.sourceId, sourceId);
       release.complete();
       await tester.pumpAndSettle();
-      expect(open('source.test'), findsOneWidget);
+      expect(open('eu.kanade.source.test'), findsOneWidget);
       expect(
         tester.widget<IconButton>(toggle()).icon,
         isA<Icon>().having((icon) => icon.icon, 'saved star', Icons.star),
       );
-      await tap(tester, remove('source.test'));
-      expect(open('source.test'), findsNothing);
+      await tap(tester, remove('eu.kanade.source.test'));
+      expect(open('eu.kanade.source.test'), findsNothing);
       final confirmed = await remoteSettings.loadGlobal();
       expect(confirmed.global.favoriteSources, isEmpty);
       expect(confirmed.global.reader, original.reader);
@@ -286,7 +295,7 @@ void main() {
           builds: [
             wire.ExtensionBuildDescriptor(
               buildId: 'build-2',
-              packageName: 'source.test',
+              packageName: 'eu.kanade.source.test',
               version: '2.0',
               manifestPath: '/extensions/builds/build-2/manifest.json',
             ),
@@ -302,7 +311,7 @@ void main() {
       await show(tester);
       expect(catalog.session, isNull);
       expect(find.text('旧来源名称'), findsOneWidget);
-      await tap(tester, open('source.test'));
+      await tap(tester, open('eu.kanade.source.test'));
       expect(platform.openedBuilds, ['build-2']);
       expect(catalog.activeSource!.id, sourceId);
       expect(catalog.activeSource!.name, '当前来源名称');
@@ -314,10 +323,10 @@ void main() {
       );
       await catalog.connect();
       await tester.pumpAndSettle();
-      await tap(tester, open('source.test'));
+      await tap(tester, open('eu.kanade.source.test'));
       expect(catalog.error, contains('扩展当前不可用'));
-      expect(open('source.test'), findsOneWidget);
-      await tap(tester, remove('source.test'));
+      expect(open('eu.kanade.source.test'), findsOneWidget);
+      await tap(tester, remove('eu.kanade.source.test'));
       expect(
         (await remoteSettings.loadGlobal()).global.favoriteSources,
         isEmpty,
@@ -447,14 +456,17 @@ void main() {
         );
       };
       await show(tester);
-      await reveal(tester, open('source.test'));
-      await tester.tap(open('source.test'));
+      await reveal(tester, open('eu.kanade.source.test'));
+      await tester.tap(open('eu.kanade.source.test'));
       await tester.pump();
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
       expect(catalog.busy, true);
-      expect(tester.widget<IconButton>(open('source.test')).onPressed, isNull);
+      expect(
+        tester.widget<IconButton>(open('eu.kanade.source.test')).onPressed,
+        isNull,
+      );
       unawaited(
         Navigator.of(tester.element(find.byType(CatalogPage))).push<void>(
           MaterialPageRoute<void>(

@@ -31,7 +31,7 @@ void main() {
     await catalog.openBuild(catalog.builds.single);
     await catalog.selectSource(catalog.session!.sources.single);
     sequence = ChapterSequence(
-      packageName: 'source.test',
+      packageName: 'eu.kanade.source.test',
       sourceId: sourceId,
       mangaUrl: '/manga',
       chapters: [

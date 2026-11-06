@@ -97,7 +97,7 @@ void main() {
   Future<LibraryEntry> favorite(WidgetTester tester, String title) async {
     final entry = await tester.runAsync(() async {
       await controller.library!.setFavorite(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         sourceName: '测试漫画源',
         sourceLang: 'zh',

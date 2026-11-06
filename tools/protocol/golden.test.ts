@@ -41,6 +41,9 @@ import {
   SettingsMutationSchema,
   SettingsResponseSchema,
   SettingsMutationResponseSchema,
+  SourcePreferencesMutationSchema,
+  SourcePreferencesResponseSchema,
+  SourcePreferencesMutationResponseSchema,
 } from '@karuyomi/protocol';
 import * as contract from '../../packages/contracts/src/index.ts';
 import { fileURLToPath } from 'node:url';
@@ -92,6 +95,9 @@ const schemas: Record<GoldenType, DescMessage> = {
   SettingsMutation: SettingsMutationSchema,
   SettingsResponse: SettingsResponseSchema,
   SettingsMutationResponse: SettingsMutationResponseSchema,
+  SourcePreferencesMutation: SourcePreferencesMutationSchema,
+  SourcePreferencesResponse: SourcePreferencesResponseSchema,
+  SourcePreferencesMutationResponse: SourcePreferencesMutationResponseSchema,
 };
 
 function canonical(fixture: GoldenFixture): JsonValue {
@@ -390,6 +396,10 @@ test('product semantic validators accept the generated golden matrix', () => {
     SettingsMutation: contract.settingsMutationSchema.parse,
     SettingsResponse: contract.settingsResponseSchema.parse,
     SettingsMutationResponse: contract.settingsMutationResponseSchema.parse,
+    SourcePreferencesMutation: contract.sourcePreferencesMutationSchema.parse,
+    SourcePreferencesResponse: contract.sourcePreferencesResponseSchema.parse,
+    SourcePreferencesMutationResponse:
+      contract.sourcePreferencesMutationResponseSchema.parse,
   };
   for (const fixture of goldenFixtures) {
     const parse = parsers[fixture.type];

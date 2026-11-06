@@ -3,6 +3,7 @@ import {
   runtimeHelloSchema,
   runtimeSessionSchema,
   validateSourceCall,
+  validatePreferenceBootstrap,
   sourceResultFor,
   runtimeErrorData,
   encodeWorkerCommand,
@@ -30,7 +31,7 @@ import {
   type PlainMessage,
   type WorkerCommand,
 } from '@karuyomi/contracts';
-import { create } from '@bufbuild/protobuf';
+import { create, clone } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
 import { createHello } from './hello.js';
 import { RuntimeFailure } from './errors.js';
@@ -94,6 +95,7 @@ export class SourceRuntimeManager {
   private releaseNamespace: (() => void) | undefined;
   private namespaceReleased: Promise<void> = Promise.resolve();
   private disposed = false;
+  private preferencesEdited = false;
   private disposing: Promise<void> | undefined;
   private queue: Task[] = [];
   private active: Task | undefined;
@@ -132,15 +134,38 @@ export class SourceRuntimeManager {
           'A confirmed Access identity is required',
         ),
       );
+    try {
+      if (options.preferenceBootstrap) {
+        const bootstrap = clone(
+          pb.PreferenceBootstrapSchema,
+          create(pb.PreferenceBootstrapSchema, options.preferenceBootstrap),
+        );
+        validatePreferenceBootstrap(bootstrap);
+        options = { ...options, preferenceBootstrap: bootstrap };
+      }
+    } catch {
+      return Promise.reject(
+        new RuntimeFailure(
+          'protocol_error',
+          'Invalid Source preference bootstrap',
+        ),
+      );
+    }
     const key = JSON.stringify([
       options.identity,
       options.manifestPath,
       options.expectedBuildId,
       options.expectedBundleSha256,
       options.userAgent,
+      options.preferenceBootstrap
+        ? messageJson(
+            pb.PreferenceBootstrapSchema,
+            create(pb.PreferenceBootstrapSchema, options.preferenceBootstrap),
+          )
+        : null,
     ]);
     if (key === this.openKey && this.opening) return this.opening;
-    if (key === this.openKey && this.session)
+    if (key === this.openKey && this.session && !this.preferencesEdited)
       return Promise.resolve(this.session);
     const replaced = new RuntimeFailure(
       'runtime_lost',
@@ -295,7 +320,11 @@ export class SourceRuntimeManager {
         envelope: { ...envelope, requestId: crypto.randomUUID() },
         command: {
           case: 'open',
-          value: { manifest, userAgent: options.userAgent ?? 'Karuyomi/0.1' },
+          value: {
+            manifest,
+            userAgent: options.userAgent ?? 'Karuyomi/0.1',
+            preferenceBootstrap: options.preferenceBootstrap,
+          },
         },
       }),
     );
@@ -412,6 +441,8 @@ export class SourceRuntimeManager {
         new RuntimeFailure('protocol_error', 'Invalid Source request'),
       );
     }
+    if (this.preferencesEdited)
+      return Promise.reject(this.preferenceConfirmationError());
     if (this.accessSuspension?.generation === call.generation)
       return Promise.reject(this.accessSuspension.error);
     if (!this.session || call.generation !== this.session.generation)
@@ -462,6 +493,26 @@ export class SourceRuntimeManager {
     const task = this.queue.shift();
     if (!task) return;
     this.active = task;
+    if (task.kind === 'source' && task.call.request.case === 'editPreference') {
+      this.preferencesEdited = true;
+      const blocked = this.queue.filter(
+        (queued) => queued.kind !== 'page-session',
+      );
+      this.queue = this.queue.filter(
+        (queued) => queued.kind === 'page-session',
+      );
+      for (const queued of blocked) {
+        clearTimeout(queued.timer);
+        queued.completed = true;
+        if (queued.kind === 'image') {
+          queued.collector.release(this.preferenceConfirmationError());
+          queued.port.close();
+          this.imageTasks.delete(queued.requestId);
+          queued.settle();
+        }
+        queued.reject(this.preferenceConfirmationError());
+      }
+    }
     const { protocolVersion, workerInstanceId, generation, buildId } =
       this.session;
     const envelope = {
@@ -645,6 +696,7 @@ export class SourceRuntimeManager {
 
   private invalidate(error: RuntimeFailure): void {
     this.generation = undefined;
+    this.preferencesEdited = false;
     this.session = undefined;
     this.opening = undefined;
     this.openKey = undefined;
@@ -678,6 +730,7 @@ export class SourceRuntimeManager {
     if (!parsed.success)
       throw new RuntimeFailure('protocol_error', 'Invalid image request');
     const request = parsed.data;
+    if (this.preferencesEdited) throw this.preferenceConfirmationError();
     if (this.accessSuspension?.generation === request.generation)
       throw this.accessSuspension.error;
     if (this.imageOptions.enabled === false)
@@ -831,6 +884,13 @@ export class SourceRuntimeManager {
     })();
     this.closedPageSessions.set(parsed.data.pageSessionId, closing);
     return closing;
+  }
+
+  private preferenceConfirmationError(): RuntimeFailure {
+    return new RuntimeFailure(
+      'protocol_error',
+      'Confirm Source preferences and reopen the runtime before continuing',
+    );
   }
 
   private reserveRequest(requestId: string): void {

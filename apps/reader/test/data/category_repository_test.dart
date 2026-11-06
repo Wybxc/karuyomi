@@ -34,7 +34,7 @@ Future<void> _favorite(
   LibraryRepository repository, [
   String url = '/manga/test',
 ]) => repository.setFavorite(
-  packageName: 'source.test',
+  packageName: 'eu.kanade.source.test',
   sourceId: '123',
   sourceName: 'Test',
   sourceLang: 'en',

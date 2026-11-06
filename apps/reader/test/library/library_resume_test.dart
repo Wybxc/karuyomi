@@ -75,7 +75,7 @@ void main() {
     await catalog.connect();
     final library = catalog.library!;
     await library.setFavorite(
-      packageName: 'source.test',
+      packageName: 'eu.kanade.source.test',
       sourceId: sourceId,
       sourceName: '测试漫画源',
       sourceLang: 'zh',

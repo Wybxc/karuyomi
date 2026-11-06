@@ -56,14 +56,14 @@ void main() {
       await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       await _tap(tester, find.text('去浏览'));
-      await _tap(tester, find.text('source.test · 1.0'));
+      await _tap(tester, find.text('eu.kanade.source.test · 1.0'));
       await _tap(tester, find.text('测试漫画源 · zh'));
       await _tap(tester, find.text('真实源 DTO 测试'));
       final catalog = tester
           .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
           .controller;
       final sequence = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: testManga.url,
         chapters: _chapters,

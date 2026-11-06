@@ -1,3 +1,5 @@
+import { create } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
 import type {
   BuildManifest,
   SourceInfo,
@@ -12,6 +14,10 @@ import {
   parseJavaSourcePayload,
   processedImageSchema,
   closedSchema,
+  messageJson,
+  validatePreferenceBootstrap,
+  preferenceSyncRules,
+  validateSyncedPreferenceEntries,
 } from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
 import { VerifiedLoader } from './verified-loader.js';
@@ -28,6 +34,7 @@ export interface RuntimeDriver {
     userAgent: string,
     signal: AbortSignal,
     context?: HttpCallContext,
+    preferences?: pb.PreferenceBootstrap,
   ): Promise<SourceInfo[]>;
   invoke(call: SourceCall, context?: HttpCallContext): Promise<SourcePayload>;
   close(): Promise<void>;
@@ -53,6 +60,7 @@ export interface TeaVMGlobals {
     operationToken: string,
   ) => void;
   hostLoad?: (
+    configJson: string,
     requestId: string,
     generation: string,
     operationToken: string,
@@ -115,6 +123,7 @@ export class TeaVMDriver implements RuntimeDriver {
   private bridgeFailure: RuntimeFailure | undefined;
   private readonly objectUrls = new Set<string>();
   private closed = false;
+  private packageName: string | undefined;
   private binaryTransport: BinaryHttpTransport | undefined;
   private imageSink: ImageSink | undefined;
   private imageFailure: RuntimeFailure | undefined;
@@ -303,7 +312,31 @@ export class TeaVMDriver implements RuntimeDriver {
     userAgent: string,
     signal: AbortSignal,
     context?: HttpCallContext,
+    preferences = create(pb.PreferenceBootstrapSchema, {
+      packageName: manifest.packageName,
+    }),
   ): Promise<SourceInfo[]> {
+    validatePreferenceBootstrap(preferences);
+    if (
+      preferences.packageName !== manifest.packageName ||
+      preferences.sources.some(
+        (source) => !manifest.sourceIds.includes(source.sourceId),
+      )
+    )
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Preference bootstrap does not belong to this extension',
+      );
+    this.packageName = manifest.packageName;
+    const preferenceConfiguration = JSON.stringify(
+      messageJson(
+        pb.PreferenceHostConfigurationSchema,
+        create(pb.PreferenceHostConfigurationSchema, {
+          bootstrap: preferences,
+          syncRules: preferenceSyncRules(manifest.packageName),
+        }),
+      ),
+    );
     this.binaryTransport?.dispose();
     this.binaryTransport = new BinaryHttpTransport(
       this.origin,
@@ -360,7 +393,12 @@ export class TeaVMDriver implements RuntimeDriver {
     );
     const value = await this.call(
       (owner, token) =>
-        this.scope.hostLoad!(owner.requestId, owner.generation, token),
+        this.scope.hostLoad!(
+          preferenceConfiguration,
+          owner.requestId,
+          owner.generation,
+          token,
+        ),
       context,
     );
     if (!Array.isArray(value))
@@ -400,7 +438,20 @@ export class TeaVMDriver implements RuntimeDriver {
         ),
       context,
     );
-    return parseJavaSourcePayload(call, raw);
+    const payload = parseJavaSourcePayload(call, raw);
+    const snapshot =
+      payload.case === 'preferences'
+        ? payload.value
+        : payload.case === 'preferenceEdit'
+          ? payload.value.snapshot
+          : undefined;
+    if (snapshot && this.packageName)
+      validateSyncedPreferenceEntries(
+        this.packageName,
+        call.sourceId,
+        snapshot.syncValues,
+      );
+    return payload;
   }
 
   async acquireImage(

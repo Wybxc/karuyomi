@@ -38,7 +38,7 @@
 
 显式应用后调用正式 `search`，空 query 也必须走搜索，不能自动退为热门；后续分页复用同一份已应用状态。类型与路径/大小/数量校验、嵌套状态处理、取消和迟到结果边界已接入并通过集中工程检查；CuuTruyen 已通过真实动态标签、非默认已完结、空 query、后续页，以及重置草稿关闭后继续原查询分页；其它类型与平台继续验收。工程结果和剩余真实运行门维护在[筛选验证记录](../verification/source-filters.md)；组件或 JVM/宿主适配测试不替代实际在线筛选验收。CuuTruyen 上游使用 `Group<TagCheckBox>` 与远端动态标签，本轮记录绑定修复后 v5 AOT；历史默认浏览与图片证据仍不自动覆盖新构建。
 
-typed preferences 按[独立子计划](source-preferences.md)继续，本里程碑不宣称已支持 Source 设置页。[扩展管理](extension-management.md)、全目录元数据、有界跨源搜索和用户确认迁移继续保留完整待办；不以零散界面改动代替这些流程。
+typed preferences 已接入正式设置入口，按[独立子计划](source-preferences.md)继续 v6 AOT、真实 Source 与跨端验收。[扩展管理](extension-management.md)、全目录元数据、有界跨源搜索和用户确认迁移继续保留完整待办；不以零散界面改动代替这些流程。
 
 ## 扩展管理里程碑
 
@@ -48,9 +48,9 @@ typed preferences 按[独立子计划](source-preferences.md)继续，本里程�
 
 ## typed Source preferences 里程碑
 
-**未实现，正式合同待定。** [子计划](source-preferences.md)记录固定上游和锁定 seed 的实际调查、合同待定点与完整链路任务。范围保留开关、文本/密码、单/多选、分组、依赖与刷新；正式 IDL、限额、敏感分类、存储键映射及支持的 Android 兼容 ABI 需要统一后实施。
+**已实现，集中工程检查通过，真实 Source 与独立客户端待验收。** [子计划](source-preferences.md)和[设计](../design/source-preferences.md)记录正式 v6 IDL、限额、敏感分类、实际存储分区与原 Preference 适配。开关、文本/密码、单/多选、分组、依赖、动作及确认后重开刷新已接入。
 
-运行时须保留原 Preference 对象和回调语义，处理拒绝、别名写入与动态描述；非敏感值由 D1 条件写入确认，并在构造 Source 前注入，敏感值留当前客户端。待确认业务请求只显式重试原 UUID/body，不重跑 Source listener；冲突或未知运行时状态经回收重开恢复。Flutter 入口、取消/身份/代次边界、生效刷新与独立客户端在线一致性均属于交付范围，源码调查或已有筛选证据不代表设置能力已完成。
+运行时保留原 Preference 对象和回调语义，处理拒绝、别名写入与动态描述；非敏感值由 D1 条件写入确认并在构造 Source 前注入，秘密值留当前客户端。待确认业务请求只显式重试原 UUID/body，不重跑 Source listener；冲突或未知运行结果经回收重开恢复。工程与真实运行证据分别维护在[记录](../verification/source-preferences.md)，已有筛选证据不覆盖设置能力。
 
 ## 验收
 

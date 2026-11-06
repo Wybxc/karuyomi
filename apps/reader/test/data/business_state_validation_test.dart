@@ -7,7 +7,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 wire.LibraryMetadata metadata({String? memo, String url = '/manga/test'}) =>
     wire.LibraryMetadata(
-      packageName: 'source.test',
+      packageName: 'eu.kanade.source.test',
       sourceId: '9007199254740993',
       sourceName: 'Test',
       sourceLang: 'en',
@@ -18,7 +18,11 @@ wire.MangaState manga(String digit) => wire.MangaState(
   mangaKey: sha256
       .convert(
         utf8.encode(
-          jsonEncode(['source.test', '9007199254740993', '/manga/test/$digit']),
+          jsonEncode([
+            'eu.kanade.source.test',
+            '9007199254740993',
+            '/manga/test/$digit',
+          ]),
         ),
       )
       .toString(),
@@ -271,7 +275,7 @@ void main() {
     'favorite Sources retain signed identities and validate complete settings at both boundaries',
     () {
       final source = wire.FavoriteSource(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: '9007199254740993',
         sourceName: 'Original 名称',
         sourceLang: 'zh-Hant',

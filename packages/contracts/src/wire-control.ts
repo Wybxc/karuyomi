@@ -1,4 +1,5 @@
 import * as pb from '@karuyomi/protocol';
+import { validatePreferenceBootstrap } from './preferences-control.ts';
 import {
   codec,
   messageJson,
@@ -45,6 +46,8 @@ export function validateWorkerCommand(value: pb.WorkerCommand): WorkerCommand {
   const rpc = envelope(value.envelope);
   switch (value.command.case) {
     case 'open':
+      if (value.command.value.preferenceBootstrap)
+        validatePreferenceBootstrap(value.command.value.preferenceBootstrap);
       requireCondition(
         value.command.value.manifest !== undefined,
         'Worker manifest is required',
@@ -159,6 +162,8 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
     case 'dispose':
       break;
     case 'open':
+      if (value.command.value.preferenceBootstrap)
+        validatePreferenceBootstrap(value.command.value.preferenceBootstrap);
       staticManifestPathSchema.parse(value.command.value.manifestPath);
       requireCondition(
         value.command.value.identity.length > 0 &&

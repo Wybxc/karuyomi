@@ -31,7 +31,7 @@ Source 的默认网络配置由 owned `eu/kanade/tachiyomi/network/NetworkHelper
 
 ## 运行与回归
 
-当前 Java 边界支持 `popular`、`latest`、`search`、`details`、`chapters`、`pages` 与 `getFilters`；typed filters 保留原具体子类并按完整叶状态应用，描述使用有界快照和显式保留引用，详见 [Source 筛选](../../docs/design/source-filters.md)。preferences 映射仍待实现。当前合同为 `hostAbi=karuyomi-source-host-v5`、`protocolVersion=2`、HTTP `bridgeVersion=2`；旧 ABI 扩展需要重新构建，不提供兼容回退。原 Source 的 `enqueue` 在首次执行时绑定 RPC owner，主结果返回前有界等待回调结束；无法确认收尾时丢弃运行时，不把迟到结果归入下一个 RPC。
+当前 Java 边界支持 `popular`、`latest`、`search`、`details`、`chapters`、`pages`、`getFilters`、`getPreferences` 与 `editPreference`；typed filters 保留原具体子类并按完整叶状态应用，描述使用有界快照和显式保留引用，详见 [Source 筛选](../../docs/design/source-filters.md)。Source preferences 保留原控件和 listener，构造前注入确认值、编辑后排空重读，并经 D1 确认和容器重开生效，详见 [Source 设置](../../docs/design/source-preferences.md)。当前合同为 `hostAbi=karuyomi-source-host-v6`、`protocolVersion=2`、HTTP `bridgeVersion=2`；旧 ABI 扩展需要重新构建，不提供兼容回退。原 Source 的 `enqueue` 在首次执行时绑定 RPC owner，主结果返回前有界等待回调结束；无法确认收尾时丢弃运行时，不把迟到结果归入下一个 RPC。
 
 正式图片通道保留原 Java Page 与 Source 图片处理链，经有界二进制通道交付不透明编码字节。Web 使用受管 Blob URL，Android/iOS 交接受管临时文件，再由同一 Flutter 图片入口识别、解码和显示；宿主不读取 MIME、尺寸或方向，不预解码。取消、generation、字节预算和释放确认分别由对应 owner 落实，详见[图片资源合同](../../docs/IMAGE-RESOURCES.md)及 [Native 文件合同](../../docs/NATIVE-IMAGE-FILES.md)。
 

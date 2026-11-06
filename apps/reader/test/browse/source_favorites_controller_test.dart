@@ -8,7 +8,7 @@ import 'package:source_runtime/source_runtime.dart';
 import 'fakes.dart';
 
 wire.FavoriteSource get _favorite => wire.FavoriteSource(
-  packageName: 'source.test',
+  packageName: 'eu.kanade.source.test',
   sourceId: sourceId,
   sourceName: '已保存的名称',
   sourceLang: 'zh',
@@ -51,7 +51,7 @@ void main() {
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(
           schemaVersion: 1,
-          builds: [_build('build-2', 'source.test')],
+          builds: [_build('build-2', 'eu.kanade.source.test')],
         ),
       );
       platform.manifestBuildId = 'build-2';
@@ -94,7 +94,7 @@ void main() {
           schemaVersion: 1,
           builds: [
             _build('build-other', 'source.other'),
-            _build('build-current', 'source.test'),
+            _build('build-current', 'eu.kanade.source.test'),
           ],
         ),
       );
@@ -105,7 +105,7 @@ void main() {
         true,
       );
       expect(platform.openedBuilds, ['build-current']);
-      expect(catalog.activeBuild!.packageName, 'source.test');
+      expect(catalog.activeBuild!.packageName, 'eu.kanade.source.test');
     },
   );
 

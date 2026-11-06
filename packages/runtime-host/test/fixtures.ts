@@ -30,7 +30,7 @@ export async function manifest(): Promise<BuildManifest> {
     buildId: 'test-build',
     repoId: 'test-repo',
     version: '1',
-    packageName: 'test.extension',
+    packageName: 'eu.kanade.tachiyomi.extension.test',
     storageSchema: '1',
     sourceIds: ['9223372036854775806'],
     bundle: await artifact(),

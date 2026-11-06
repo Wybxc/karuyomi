@@ -25,7 +25,7 @@ void main() {
     await catalog.connect();
     library = catalog.library!;
     await library.setFavorite(
-      packageName: 'source.test',
+      packageName: 'eu.kanade.source.test',
       sourceId: sourceId,
       sourceName: '测试漫画源',
       sourceLang: 'zh',
@@ -50,7 +50,7 @@ void main() {
           builds: [
             wire.ExtensionBuildDescriptor(
               buildId: 'build-2',
-              packageName: 'source.test',
+              packageName: 'eu.kanade.source.test',
               version: '2.0',
               manifestPath: '/extensions/builds/build-2/manifest.json',
             ),

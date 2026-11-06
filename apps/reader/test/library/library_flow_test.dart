@@ -20,7 +20,11 @@ Future<CatalogController> _browseDetails(WidgetTester tester) async {
   final scrollable = find
       .descendant(of: catalog, matching: find.byType(Scrollable))
       .first;
-  for (final label in ['source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+  for (final label in [
+    'eu.kanade.source.test · 1.0',
+    '测试漫画源 · zh',
+    '真实源 DTO 测试',
+  ]) {
     final target = find.descendant(of: catalog, matching: find.text(label));
     await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
     await tester.ensureVisible(target);
@@ -65,7 +69,7 @@ void main() {
       final remoteLibrary = LibraryRepository(remoteClient);
       try {
         await remoteLibrary.setFavorite(
-          packageName: 'source.test',
+          packageName: 'eu.kanade.source.test',
           sourceId: sourceId,
           sourceName: '测试漫画源',
           sourceLang: 'zh',

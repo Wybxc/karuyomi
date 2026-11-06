@@ -47,7 +47,7 @@ List<wire.Chapter> get _chapters => [
 ];
 
 ChapterSequence get _sequence => ChapterSequence(
-  packageName: 'source.test',
+  packageName: 'eu.kanade.source.test',
   sourceId: sourceId,
   mangaUrl: testManga.url,
   chapters: _chapters,
@@ -121,7 +121,11 @@ Future<CatalogController> _details(
   final scrollable = find
       .descendant(of: catalog, matching: find.byType(Scrollable))
       .first;
-  for (final label in ['source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+  for (final label in [
+    'eu.kanade.source.test · 1.0',
+    '测试漫画源 · zh',
+    '真实源 DTO 测试',
+  ]) {
     final target = find.descendant(of: catalog, matching: find.text(label));
     await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
     await tester.ensureVisible(target);
@@ -471,7 +475,7 @@ void main() {
         wire.Chapter(url: '/new-chapter', name: '新增章'),
       ];
       final changedSequence = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: testManga.url,
         chapters: changedChapters,

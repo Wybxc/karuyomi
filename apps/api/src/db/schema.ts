@@ -104,7 +104,9 @@ export const stateMutations = sqliteTable(
     requestHash: text('request_hash').notNull(),
     attemptNonce: text('attempt_nonce').notNull(),
     responseJson: text('response_json').notNull(),
-    kind: text('kind', { enum: ['manga', 'category', 'settings'] })
+    kind: text('kind', {
+      enum: ['manga', 'category', 'settings', 'source_preferences'],
+    })
       .notNull()
       .default('manga'),
   },
@@ -140,5 +142,19 @@ export const mangaCategories = sqliteTable(
       columns: [table.subject, table.categoryId],
       foreignColumns: [categories.subject, categories.id],
     }).onDelete('cascade'),
+  ],
+);
+
+export const sourcePreferences = sqliteTable(
+  'source_preferences',
+  {
+    subject: text('subject').notNull(),
+    packageName: text('package_name').notNull(),
+    sourceId: text('source_id').notNull(),
+    revision: integer('revision').notNull(),
+    entriesJson: text('entries_json').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.packageName, table.sourceId] }),
   ],
 );

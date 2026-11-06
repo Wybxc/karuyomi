@@ -99,7 +99,12 @@ void main() {
       expect(platform.invocations.last.search.page, 2);
       expect(platform.invocations.last.search.filters, applied);
       expect(catalog.appliedSourceFilters, applied);
-      expect(platform.businessServer.requests, isEmpty);
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.method == 'POST',
+        ),
+        isEmpty,
+      );
     },
   );
 

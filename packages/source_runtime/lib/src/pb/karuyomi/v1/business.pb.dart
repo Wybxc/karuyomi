@@ -4225,6 +4225,444 @@ class SettingsMutationResponse extends $pb.GeneratedMessage {
   BusinessStateError ensureError() => $_ensure(6);
 }
 
+/// Source values are independent of reading settings and build/generation IDs.
+/// Full replacement allows removing a stored key without conflating it with
+/// false, zero, an empty string or an empty string set.
+class SourcePreferences extends $pb.GeneratedMessage {
+  factory SourcePreferences({
+    $core.String? packageName,
+    $core.String? sourceId,
+    $core.int? revision,
+    $core.Iterable<$0.PreferenceEntry>? entries,
+  }) {
+    final result = SourcePreferences._();
+    if (packageName != null) result.packageName = packageName;
+    if (sourceId != null) result.sourceId = sourceId;
+    if (revision != null) result.revision = revision;
+    if (entries != null) result.entries.addAll(entries);
+    return result;
+  }
+
+  SourcePreferences._();
+
+  factory SourcePreferences.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferences()..mergeFromBuffer(data, registry);
+  factory SourcePreferences.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferences()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourcePreferences',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourcePreferences.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'packageName')
+    ..aOS(2, _omitFieldNames ? '' : 'sourceId')
+    ..aI(3, _omitFieldNames ? '' : 'revision', fieldType: $pb.PbFieldType.OU3)
+    ..pPM<$0.PreferenceEntry>(4, _omitFieldNames ? '' : 'entries',
+        subBuilder: $0.PreferenceEntry.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferences clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferences copyWith(void Function(SourcePreferences) updates) =>
+      super.copyWith((message) => updates(message as SourcePreferences))
+          as SourcePreferences;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SourcePreferences() / SourcePreferences.new instead')
+  static SourcePreferences create() => SourcePreferences._();
+  static $pb.GeneratedMessage $_createMessage() => SourcePreferences._();
+  @$core.override
+  SourcePreferences createEmptyInstance() => SourcePreferences._();
+  @$core.pragma('dart2js:noInline')
+  static SourcePreferences getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SourcePreferences>(
+          SourcePreferences.$_createMessage);
+  static SourcePreferences? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get packageName => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set packageName($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPackageName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPackageName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sourceId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sourceId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSourceId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSourceId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get revision => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set revision($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRevision() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRevision() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<$0.PreferenceEntry> get entries => $_getList(3);
+}
+
+class SourcePreferencesResponse extends $pb.GeneratedMessage {
+  factory SourcePreferencesResponse({
+    $core.int? schemaVersion,
+    $core.int? accountRevision,
+    $core.String? packageName,
+    $core.Iterable<SourcePreferences>? sources,
+    BusinessStateError? error,
+  }) {
+    final result = SourcePreferencesResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (packageName != null) result.packageName = packageName;
+    if (sources != null) result.sources.addAll(sources);
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  SourcePreferencesResponse._();
+
+  factory SourcePreferencesResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferencesResponse()..mergeFromBuffer(data, registry);
+  factory SourcePreferencesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferencesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourcePreferencesResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourcePreferencesResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'packageName')
+    ..pPM<SourcePreferences>(4, _omitFieldNames ? '' : 'sources',
+        subBuilder: SourcePreferences.$_createMessage)
+    ..aOM<BusinessStateError>(5, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferencesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferencesResponse copyWith(
+          void Function(SourcePreferencesResponse) updates) =>
+      super.copyWith((message) => updates(message as SourcePreferencesResponse))
+          as SourcePreferencesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SourcePreferencesResponse() / SourcePreferencesResponse.new instead')
+  static SourcePreferencesResponse create() => SourcePreferencesResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SourcePreferencesResponse._();
+  @$core.override
+  SourcePreferencesResponse createEmptyInstance() =>
+      SourcePreferencesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SourcePreferencesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SourcePreferencesResponse>(
+          SourcePreferencesResponse.$_createMessage);
+  static SourcePreferencesResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get accountRevision => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set accountRevision($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAccountRevision() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAccountRevision() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get packageName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set packageName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPackageName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPackageName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<SourcePreferences> get sources => $_getList(3);
+
+  @$pb.TagNumber(5)
+  BusinessStateError get error => $_getN(4);
+  @$pb.TagNumber(5)
+  set error(BusinessStateError value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearError() => $_clearField(5);
+  @$pb.TagNumber(5)
+  BusinessStateError ensureError() => $_ensure(4);
+}
+
+class SourcePreferencesMutation extends $pb.GeneratedMessage {
+  factory SourcePreferencesMutation({
+    $core.int? schemaVersion,
+    $core.String? mutationId,
+    $core.String? packageName,
+    $core.String? sourceId,
+    $core.int? expectedRevision,
+    $core.Iterable<$0.PreferenceEntry>? entries,
+  }) {
+    final result = SourcePreferencesMutation._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (mutationId != null) result.mutationId = mutationId;
+    if (packageName != null) result.packageName = packageName;
+    if (sourceId != null) result.sourceId = sourceId;
+    if (expectedRevision != null) result.expectedRevision = expectedRevision;
+    if (entries != null) result.entries.addAll(entries);
+    return result;
+  }
+
+  SourcePreferencesMutation._();
+
+  factory SourcePreferencesMutation.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferencesMutation()..mergeFromBuffer(data, registry);
+  factory SourcePreferencesMutation.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferencesMutation()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourcePreferencesMutation',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourcePreferencesMutation.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(2, _omitFieldNames ? '' : 'mutationId')
+    ..aOS(3, _omitFieldNames ? '' : 'packageName')
+    ..aOS(4, _omitFieldNames ? '' : 'sourceId')
+    ..aI(5, _omitFieldNames ? '' : 'expectedRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..pPM<$0.PreferenceEntry>(6, _omitFieldNames ? '' : 'entries',
+        subBuilder: $0.PreferenceEntry.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferencesMutation clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferencesMutation copyWith(
+          void Function(SourcePreferencesMutation) updates) =>
+      super.copyWith((message) => updates(message as SourcePreferencesMutation))
+          as SourcePreferencesMutation;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SourcePreferencesMutation() / SourcePreferencesMutation.new instead')
+  static SourcePreferencesMutation create() => SourcePreferencesMutation._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SourcePreferencesMutation._();
+  @$core.override
+  SourcePreferencesMutation createEmptyInstance() =>
+      SourcePreferencesMutation._();
+  @$core.pragma('dart2js:noInline')
+  static SourcePreferencesMutation getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SourcePreferencesMutation>(
+          SourcePreferencesMutation.$_createMessage);
+  static SourcePreferencesMutation? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mutationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mutationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMutationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMutationId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get packageName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set packageName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPackageName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPackageName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get sourceId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set sourceId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSourceId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSourceId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get expectedRevision => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set expectedRevision($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasExpectedRevision() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearExpectedRevision() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<$0.PreferenceEntry> get entries => $_getList(5);
+}
+
+class SourcePreferencesMutationResponse extends $pb.GeneratedMessage {
+  factory SourcePreferencesMutationResponse({
+    $core.int? schemaVersion,
+    $core.String? mutationId,
+    $core.int? accountRevision,
+    SourcePreferences? preferences,
+    BusinessStateError? error,
+  }) {
+    final result = SourcePreferencesMutationResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (mutationId != null) result.mutationId = mutationId;
+    if (accountRevision != null) result.accountRevision = accountRevision;
+    if (preferences != null) result.preferences = preferences;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  SourcePreferencesMutationResponse._();
+
+  factory SourcePreferencesMutationResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferencesMutationResponse()..mergeFromBuffer(data, registry);
+  factory SourcePreferencesMutationResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferencesMutationResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourcePreferencesMutationResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourcePreferencesMutationResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(2, _omitFieldNames ? '' : 'mutationId')
+    ..aI(3, _omitFieldNames ? '' : 'accountRevision',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<SourcePreferences>(4, _omitFieldNames ? '' : 'preferences',
+        subBuilder: SourcePreferences.$_createMessage)
+    ..aOM<BusinessStateError>(5, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferencesMutationResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferencesMutationResponse copyWith(
+          void Function(SourcePreferencesMutationResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as SourcePreferencesMutationResponse))
+          as SourcePreferencesMutationResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SourcePreferencesMutationResponse() / SourcePreferencesMutationResponse.new instead')
+  static SourcePreferencesMutationResponse create() =>
+      SourcePreferencesMutationResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SourcePreferencesMutationResponse._();
+  @$core.override
+  SourcePreferencesMutationResponse createEmptyInstance() =>
+      SourcePreferencesMutationResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SourcePreferencesMutationResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SourcePreferencesMutationResponse>(
+          SourcePreferencesMutationResponse.$_createMessage);
+  static SourcePreferencesMutationResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mutationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mutationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMutationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMutationId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get accountRevision => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set accountRevision($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAccountRevision() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAccountRevision() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  SourcePreferences get preferences => $_getN(3);
+  @$pb.TagNumber(4)
+  set preferences(SourcePreferences value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPreferences() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPreferences() => $_clearField(4);
+  @$pb.TagNumber(4)
+  SourcePreferences ensurePreferences() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  BusinessStateError get error => $_getN(4);
+  @$pb.TagNumber(5)
+  set error(BusinessStateError value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearError() => $_clearField(5);
+  @$pb.TagNumber(5)
+  BusinessStateError ensureError() => $_ensure(4);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

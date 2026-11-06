@@ -9,6 +9,7 @@ export 'src/pb/karuyomi/v1/control.pb.dart';
 export 'src/pb/karuyomi/v1/business.pb.dart';
 
 part 'src/filter_validation.dart';
+part 'src/preference_validation.dart';
 
 const controlJsonLimit = 8 * 1024 * 1024;
 const controlRequestLimit = 128 * 1024;
@@ -69,6 +70,7 @@ T decodeProtoJson<T extends GeneratedMessage>(
 // requires one explicit command/result, matching Protobuf-ES. Reflect generated
 // descriptors rather than maintaining another list of protocol fields.
 void _checkOneofFields(GeneratedMessage message, Map<Object?, Object?> value) {
+  if (message is PreferenceValue) _checkPreferenceValueJson(value);
   final fields = <String, FieldInfo<Object?>>{};
   for (final field in message.info_.fieldInfo.values) {
     fields[field.name] = field;

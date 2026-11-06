@@ -25,7 +25,7 @@ BusinessStateClient _client(ApiFetch api) => BusinessStateClient(
 Future<LibraryView> _seed(LibraryRepository repository) async {
   for (final title in ['甲', '乙', '丙']) {
     await repository.setFavorite(
-      packageName: 'source.test',
+      packageName: 'eu.kanade.source.test',
       sourceId: '123',
       sourceName: 'Test Source',
       sourceLang: 'zh',

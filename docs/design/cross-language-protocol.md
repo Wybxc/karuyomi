@@ -78,3 +78,7 @@ CAS 冲突、旧 epoch、非法业务输入、鉴权失败与暂时故障必须�
 生成和格式入口继续使用项目自有 TypeScript 编排，领域工具不能反向依赖 scripts。Buf 负责 `.proto` 格式、lint、schema build 与标准插件调用；CI 校验生成结果无漂移，分别执行严格 TS/Dart 检查和跨语言 golden round-trip/非法输入测试。[Buf 生成](https://buf.build/docs/generate/)
 
 原型阶段允许破坏性变化，直接同步更新当前协议、生成代码、测试和 ABI；不添加旧格式回退，也不把 `buf breaking` 设为必须维护兼容的门禁。协议定义、codec、调用方和真实 Web/Native 控制链均通过后，才将实施状态改为完成。
+
+## Source 设置边界
+
+Source 设置使用同一 Protobuf + Buf 合同，完整设计见[Source 设置](source-preferences.md)。控制边界描述原 Preference 树和 typed change/click，业务边界保存经可信许可表批准的非敏感 entries；图片/HTTP 正文仍走独立二进制通道。int32/long/float 保留 SharedPreferences 存储类型，long 在 ProtoJSON 中传十进制字符串，解码前拒绝溢出；缺省、false、0、空文本与空集合分别处理。源构造前的整包 bootstrap、树和实际存储都有整体预算，不能依赖静态生成类型代替运行时校验。

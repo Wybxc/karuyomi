@@ -17,7 +17,11 @@ Future<void> _browseDetails(WidgetTester tester) async {
   final scrollable = find
       .descendant(of: catalog, matching: find.byType(Scrollable))
       .first;
-  for (final label in ['source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+  for (final label in [
+    'eu.kanade.source.test · 1.0',
+    '测试漫画源 · zh',
+    '真实源 DTO 测试',
+  ]) {
     final target = find.descendant(of: catalog, matching: find.text(label));
     await tester.scrollUntilVisible(target, 180, scrollable: scrollable);
     await tester.pumpAndSettle();
@@ -196,7 +200,7 @@ void main() {
       await tester.tap(find.text('登录').first);
       await tester.pumpAndSettle();
       expect(platform.authCalls, 1);
-      expect(find.text('source.test · 1.0'), findsOneWidget);
+      expect(find.text('eu.kanade.source.test · 1.0'), findsOneWidget);
       expect(find.text('owner@example.com'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('真实源 DTO 测试'),

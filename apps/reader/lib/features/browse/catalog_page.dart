@@ -22,6 +22,7 @@ import '../progress/chapter_read_controller.dart';
 import '../progress/chapter_read_dialog.dart';
 import '../sources/favorite_sources.dart';
 import '../sources/source_filters.dart';
+import '../sources/source_preferences.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -78,6 +79,26 @@ class _CatalogPageState extends State<CatalogPage> {
       builder: (_) => FractionallySizedBox(
         heightFactor: .9,
         child: SourceFiltersSheet(catalog: controller, query: _search.text),
+      ),
+    );
+  }
+
+  Future<void> _preferences([SourcePreferencesTarget? target]) async {
+    final catalog = widget.controller;
+    final selected = target ?? catalog?.currentPreferencesTarget;
+    if (catalog == null ||
+        selected == null ||
+        catalog.busy ||
+        catalog.sourcePreferences == null) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .9,
+        child: SourcePreferencesSheet(catalog: catalog, target: selected),
       ),
     );
   }
@@ -188,6 +209,15 @@ class _CatalogPageState extends State<CatalogPage> {
                 key: const ValueKey('catalog-favorite-sources'),
                 catalog: controller,
               ),
+              for (final target in controller.sourcePreferenceRecoveries)
+                ListTile(
+                  title: Text('${target.source.name}的设置需要处理'),
+                  subtitle: const Text('旧漫画源已暂停；可处理原保存请求或读取服务端状态后重新打开。'),
+                  trailing: TextButton(
+                    onPressed: busy ? null : () => _preferences(target),
+                    child: const Text('处理设置'),
+                  ),
+                ),
               if (controller.hasUnsavedReadingProgress) ...[
                 const _Notice(
                   text: '部分阅读进度尚未保存，当前会话仍保留记录。',
@@ -257,6 +287,12 @@ class _CatalogPageState extends State<CatalogPage> {
                             ? '筛选'
                             : '筛选（已应用）',
                       ),
+                    ),
+                    OutlinedButton.icon(
+                      key: const ValueKey('source-preferences-open'),
+                      onPressed: busy ? null : () => _preferences(),
+                      icon: const Icon(Icons.tune),
+                      label: const Text('漫画源设置'),
                     ),
                     for (final item in [('popular', '热门'), ('latest', '最新')])
                       if (item.$1 != 'latest' ||

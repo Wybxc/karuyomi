@@ -43,7 +43,7 @@ List<wire.Chapter> get _chapters => [
 ];
 
 ChapterSequence get _sequence => ChapterSequence(
-  packageName: 'source.test',
+  packageName: 'eu.kanade.source.test',
   sourceId: sourceId,
   mangaUrl: testManga.url,
   chapters: _chapters,
@@ -86,7 +86,7 @@ Future<CatalogController> _details(
   await tester.pumpWidget(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
   await _tap(tester, find.text('去浏览'));
-  await _tap(tester, find.text('source.test · 1.0'));
+  await _tap(tester, find.text('eu.kanade.source.test · 1.0'));
   await _tap(tester, find.text('测试漫画源 · zh'));
   if (settleDetails) {
     await _tap(tester, find.text('真实源 DTO 测试'));

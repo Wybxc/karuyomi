@@ -41,6 +41,10 @@ Future<void> main() async {
         'SettingsMutation' => wire.SettingsMutation(),
         'SettingsResponse' => wire.SettingsResponse(),
         'SettingsMutationResponse' => wire.SettingsMutationResponse(),
+        'SourcePreferencesMutation' => wire.SourcePreferencesMutation(),
+        'SourcePreferencesResponse' => wire.SourcePreferencesResponse(),
+        'SourcePreferencesMutationResponse' =>
+          wire.SourcePreferencesMutationResponse(),
         _ => throw const FormatException('Unknown protocol fixture type'),
       };
       wire.decodeProtoJson(message, input['value']);

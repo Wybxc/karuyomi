@@ -12,6 +12,7 @@
 
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'control.pbenum.dart';
@@ -589,6 +590,7 @@ class OpenRequest extends $pb.GeneratedMessage {
     $core.String? userAgent,
     $core.String? expectedBuildId,
     $core.String? expectedBundleSha256,
+    PreferenceBootstrap? preferenceBootstrap,
   }) {
     final result = OpenRequest._();
     if (manifestPath != null) result.manifestPath = manifestPath;
@@ -597,6 +599,8 @@ class OpenRequest extends $pb.GeneratedMessage {
     if (expectedBuildId != null) result.expectedBuildId = expectedBuildId;
     if (expectedBundleSha256 != null)
       result.expectedBundleSha256 = expectedBundleSha256;
+    if (preferenceBootstrap != null)
+      result.preferenceBootstrap = preferenceBootstrap;
     return result;
   }
 
@@ -618,6 +622,8 @@ class OpenRequest extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'userAgent')
     ..aOS(4, _omitFieldNames ? '' : 'expectedBuildId')
     ..aOS(5, _omitFieldNames ? '' : 'expectedBundleSha256')
+    ..aOM<PreferenceBootstrap>(6, _omitFieldNames ? '' : 'preferenceBootstrap',
+        subBuilder: PreferenceBootstrap.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -686,6 +692,17 @@ class OpenRequest extends $pb.GeneratedMessage {
   $core.bool hasExpectedBundleSha256() => $_has(4);
   @$pb.TagNumber(5)
   void clearExpectedBundleSha256() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  PreferenceBootstrap get preferenceBootstrap => $_getN(5);
+  @$pb.TagNumber(6)
+  set preferenceBootstrap(PreferenceBootstrap value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPreferenceBootstrap() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPreferenceBootstrap() => $_clearField(6);
+  @$pb.TagNumber(6)
+  PreferenceBootstrap ensurePreferenceBootstrap() => $_ensure(5);
 }
 
 class Manga extends $pb.GeneratedMessage {
@@ -2393,6 +2410,1579 @@ class ChapterRequest extends $pb.GeneratedMessage {
   Chapter ensureChapter() => $_ensure(0);
 }
 
+/// Typed Android Source preferences. Storage entries describe the real
+/// `source_<id>` SharedPreferences namespace, including listener alias writes.
+class PreferenceStringSet extends $pb.GeneratedMessage {
+  factory PreferenceStringSet({
+    $core.Iterable<$core.String>? values,
+  }) {
+    final result = PreferenceStringSet._();
+    if (values != null) result.values.addAll(values);
+    return result;
+  }
+
+  PreferenceStringSet._();
+
+  factory PreferenceStringSet.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceStringSet()..mergeFromBuffer(data, registry);
+  factory PreferenceStringSet.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceStringSet()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceStringSet',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceStringSet.$_createMessage)
+    ..pPS(1, _omitFieldNames ? '' : 'values')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceStringSet clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceStringSet copyWith(void Function(PreferenceStringSet) updates) =>
+      super.copyWith((message) => updates(message as PreferenceStringSet))
+          as PreferenceStringSet;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use PreferenceStringSet() / PreferenceStringSet.new instead')
+  static PreferenceStringSet create() => PreferenceStringSet._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceStringSet._();
+  @$core.override
+  PreferenceStringSet createEmptyInstance() => PreferenceStringSet._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceStringSet getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceStringSet>(
+          PreferenceStringSet.$_createMessage);
+  static PreferenceStringSet? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get values => $_getList(0);
+}
+
+enum PreferenceValue_Value {
+  boolean,
+  text,
+  integer,
+  decimal,
+  strings,
+  longInteger,
+  notSet
+}
+
+class PreferenceValue extends $pb.GeneratedMessage {
+  factory PreferenceValue({
+    $core.bool? boolean,
+    $core.String? text,
+    $core.int? integer,
+    $core.double? decimal,
+    PreferenceStringSet? strings,
+    $fixnum.Int64? longInteger,
+  }) {
+    final result = PreferenceValue._();
+    if (boolean != null) result.boolean = boolean;
+    if (text != null) result.text = text;
+    if (integer != null) result.integer = integer;
+    if (decimal != null) result.decimal = decimal;
+    if (strings != null) result.strings = strings;
+    if (longInteger != null) result.longInteger = longInteger;
+    return result;
+  }
+
+  PreferenceValue._();
+
+  factory PreferenceValue.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceValue()..mergeFromBuffer(data, registry);
+  factory PreferenceValue.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceValue()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, PreferenceValue_Value>
+      _PreferenceValue_ValueByTag = {
+    1: PreferenceValue_Value.boolean,
+    2: PreferenceValue_Value.text,
+    3: PreferenceValue_Value.integer,
+    4: PreferenceValue_Value.decimal,
+    5: PreferenceValue_Value.strings,
+    6: PreferenceValue_Value.longInteger,
+    0: PreferenceValue_Value.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceValue',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceValue.$_createMessage)
+    ..oo(0, [1, 2, 3, 4, 5, 6])
+    ..aOB(1, _omitFieldNames ? '' : 'boolean')
+    ..aOS(2, _omitFieldNames ? '' : 'text')
+    ..aI(3, _omitFieldNames ? '' : 'integer', fieldType: $pb.PbFieldType.OS3)
+    ..aD(4, _omitFieldNames ? '' : 'decimal', fieldType: $pb.PbFieldType.OF)
+    ..aOM<PreferenceStringSet>(5, _omitFieldNames ? '' : 'strings',
+        subBuilder: PreferenceStringSet.$_createMessage)
+    ..a<$fixnum.Int64>(
+        6, _omitFieldNames ? '' : 'longInteger', $pb.PbFieldType.OS6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceValue clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceValue copyWith(void Function(PreferenceValue) updates) =>
+      super.copyWith((message) => updates(message as PreferenceValue))
+          as PreferenceValue;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceValue() / PreferenceValue.new instead')
+  static PreferenceValue create() => PreferenceValue._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceValue._();
+  @$core.override
+  PreferenceValue createEmptyInstance() => PreferenceValue._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceValue getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceValue>(
+          PreferenceValue.$_createMessage);
+  static PreferenceValue? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  PreferenceValue_Value whichValue() =>
+      _PreferenceValue_ValueByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  void clearValue() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.bool get boolean => $_getBF(0);
+  @$pb.TagNumber(1)
+  set boolean($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBoolean() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBoolean() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get text => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set text($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasText() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearText() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get integer => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set integer($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasInteger() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearInteger() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get decimal => $_getN(3);
+  @$pb.TagNumber(4)
+  set decimal($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDecimal() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDecimal() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  PreferenceStringSet get strings => $_getN(4);
+  @$pb.TagNumber(5)
+  set strings(PreferenceStringSet value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStrings() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStrings() => $_clearField(5);
+  @$pb.TagNumber(5)
+  PreferenceStringSet ensureStrings() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get longInteger => $_getI64(5);
+  @$pb.TagNumber(6)
+  set longInteger($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLongInteger() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLongInteger() => $_clearField(6);
+}
+
+class PreferenceEntry extends $pb.GeneratedMessage {
+  factory PreferenceEntry({
+    $core.String? key,
+    PreferenceValue? value,
+  }) {
+    final result = PreferenceEntry._();
+    if (key != null) result.key = key;
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  PreferenceEntry._();
+
+  factory PreferenceEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceEntry()..mergeFromBuffer(data, registry);
+  factory PreferenceEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceEntry()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceEntry',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceEntry.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'key')
+    ..aOM<PreferenceValue>(2, _omitFieldNames ? '' : 'value',
+        subBuilder: PreferenceValue.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceEntry copyWith(void Function(PreferenceEntry) updates) =>
+      super.copyWith((message) => updates(message as PreferenceEntry))
+          as PreferenceEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceEntry() / PreferenceEntry.new instead')
+  static PreferenceEntry create() => PreferenceEntry._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceEntry._();
+  @$core.override
+  PreferenceEntry createEmptyInstance() => PreferenceEntry._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceEntry getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceEntry>(
+          PreferenceEntry.$_createMessage);
+  static PreferenceEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get key => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set key($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  PreferenceValue get value => $_getN(1);
+  @$pb.TagNumber(2)
+  set value(PreferenceValue value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValue() => $_clearField(2);
+  @$pb.TagNumber(2)
+  PreferenceValue ensureValue() => $_ensure(1);
+}
+
+class SourcePreferenceValues extends $pb.GeneratedMessage {
+  factory SourcePreferenceValues({
+    $core.String? sourceId,
+    $core.Iterable<PreferenceEntry>? entries,
+  }) {
+    final result = SourcePreferenceValues._();
+    if (sourceId != null) result.sourceId = sourceId;
+    if (entries != null) result.entries.addAll(entries);
+    return result;
+  }
+
+  SourcePreferenceValues._();
+
+  factory SourcePreferenceValues.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferenceValues()..mergeFromBuffer(data, registry);
+  factory SourcePreferenceValues.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourcePreferenceValues()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourcePreferenceValues',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourcePreferenceValues.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sourceId')
+    ..pPM<PreferenceEntry>(2, _omitFieldNames ? '' : 'entries',
+        subBuilder: PreferenceEntry.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferenceValues clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourcePreferenceValues copyWith(
+          void Function(SourcePreferenceValues) updates) =>
+      super.copyWith((message) => updates(message as SourcePreferenceValues))
+          as SourcePreferenceValues;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SourcePreferenceValues() / SourcePreferenceValues.new instead')
+  static SourcePreferenceValues create() => SourcePreferenceValues._();
+  static $pb.GeneratedMessage $_createMessage() => SourcePreferenceValues._();
+  @$core.override
+  SourcePreferenceValues createEmptyInstance() => SourcePreferenceValues._();
+  @$core.pragma('dart2js:noInline')
+  static SourcePreferenceValues getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SourcePreferenceValues>(
+          SourcePreferenceValues.$_createMessage);
+  static SourcePreferenceValues? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sourceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sourceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<PreferenceEntry> get entries => $_getList(1);
+}
+
+class PreferenceBootstrap extends $pb.GeneratedMessage {
+  factory PreferenceBootstrap({
+    $core.String? packageName,
+    $core.Iterable<SourcePreferenceValues>? sources,
+  }) {
+    final result = PreferenceBootstrap._();
+    if (packageName != null) result.packageName = packageName;
+    if (sources != null) result.sources.addAll(sources);
+    return result;
+  }
+
+  PreferenceBootstrap._();
+
+  factory PreferenceBootstrap.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceBootstrap()..mergeFromBuffer(data, registry);
+  factory PreferenceBootstrap.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceBootstrap()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceBootstrap',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceBootstrap.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'packageName')
+    ..pPM<SourcePreferenceValues>(2, _omitFieldNames ? '' : 'sources',
+        subBuilder: SourcePreferenceValues.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceBootstrap clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceBootstrap copyWith(void Function(PreferenceBootstrap) updates) =>
+      super.copyWith((message) => updates(message as PreferenceBootstrap))
+          as PreferenceBootstrap;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use PreferenceBootstrap() / PreferenceBootstrap.new instead')
+  static PreferenceBootstrap create() => PreferenceBootstrap._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceBootstrap._();
+  @$core.override
+  PreferenceBootstrap createEmptyInstance() => PreferenceBootstrap._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceBootstrap getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceBootstrap>(
+          PreferenceBootstrap.$_createMessage);
+  static PreferenceBootstrap? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get packageName => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set packageName($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPackageName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPackageName() => $_clearField(1);
+
+  /// Only namespaces with values need an entry. Missing keys use Source defaults.
+  @$pb.TagNumber(2)
+  $pb.PbList<SourcePreferenceValues> get sources => $_getList(1);
+}
+
+class PreferenceSyncRule extends $pb.GeneratedMessage {
+  factory PreferenceSyncRule({
+    $core.String? key,
+    PreferenceValueKind? kind,
+    $core.String? sourceId,
+  }) {
+    final result = PreferenceSyncRule._();
+    if (key != null) result.key = key;
+    if (kind != null) result.kind = kind;
+    if (sourceId != null) result.sourceId = sourceId;
+    return result;
+  }
+
+  PreferenceSyncRule._();
+
+  factory PreferenceSyncRule.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceSyncRule()..mergeFromBuffer(data, registry);
+  factory PreferenceSyncRule.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceSyncRule()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceSyncRule',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceSyncRule.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'key')
+    ..aE<PreferenceValueKind>(2, _omitFieldNames ? '' : 'kind',
+        enumValues: PreferenceValueKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'sourceId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceSyncRule clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceSyncRule copyWith(void Function(PreferenceSyncRule) updates) =>
+      super.copyWith((message) => updates(message as PreferenceSyncRule))
+          as PreferenceSyncRule;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceSyncRule() / PreferenceSyncRule.new instead')
+  static PreferenceSyncRule create() => PreferenceSyncRule._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceSyncRule._();
+  @$core.override
+  PreferenceSyncRule createEmptyInstance() => PreferenceSyncRule._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceSyncRule getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceSyncRule>(
+          PreferenceSyncRule.$_createMessage);
+  static PreferenceSyncRule? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get key => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set key($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  PreferenceValueKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(PreferenceValueKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  /// Missing means the approved key has the same meaning throughout this package.
+  @$pb.TagNumber(3)
+  $core.String get sourceId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set sourceId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSourceId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSourceId() => $_clearField(3);
+}
+
+/// Constructed by the host from the package's owned policy, never from a Source
+/// claiming that arbitrary keys are safe to send to the business API.
+class PreferenceHostConfiguration extends $pb.GeneratedMessage {
+  factory PreferenceHostConfiguration({
+    PreferenceBootstrap? bootstrap,
+    $core.Iterable<PreferenceSyncRule>? syncRules,
+  }) {
+    final result = PreferenceHostConfiguration._();
+    if (bootstrap != null) result.bootstrap = bootstrap;
+    if (syncRules != null) result.syncRules.addAll(syncRules);
+    return result;
+  }
+
+  PreferenceHostConfiguration._();
+
+  factory PreferenceHostConfiguration.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceHostConfiguration()..mergeFromBuffer(data, registry);
+  factory PreferenceHostConfiguration.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceHostConfiguration()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceHostConfiguration',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceHostConfiguration.$_createMessage)
+    ..aOM<PreferenceBootstrap>(1, _omitFieldNames ? '' : 'bootstrap',
+        subBuilder: PreferenceBootstrap.$_createMessage)
+    ..pPM<PreferenceSyncRule>(2, _omitFieldNames ? '' : 'syncRules',
+        subBuilder: PreferenceSyncRule.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceHostConfiguration clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceHostConfiguration copyWith(
+          void Function(PreferenceHostConfiguration) updates) =>
+      super.copyWith(
+              (message) => updates(message as PreferenceHostConfiguration))
+          as PreferenceHostConfiguration;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PreferenceHostConfiguration() / PreferenceHostConfiguration.new instead')
+  static PreferenceHostConfiguration create() =>
+      PreferenceHostConfiguration._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      PreferenceHostConfiguration._();
+  @$core.override
+  PreferenceHostConfiguration createEmptyInstance() =>
+      PreferenceHostConfiguration._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceHostConfiguration getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceHostConfiguration>(
+          PreferenceHostConfiguration.$_createMessage);
+  static PreferenceHostConfiguration? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  PreferenceBootstrap get bootstrap => $_getN(0);
+  @$pb.TagNumber(1)
+  set bootstrap(PreferenceBootstrap value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBootstrap() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBootstrap() => $_clearField(1);
+  @$pb.TagNumber(1)
+  PreferenceBootstrap ensureBootstrap() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<PreferenceSyncRule> get syncRules => $_getList(1);
+}
+
+class PreferenceOption extends $pb.GeneratedMessage {
+  factory PreferenceOption({
+    $core.String? label,
+    $core.String? value,
+  }) {
+    final result = PreferenceOption._();
+    if (label != null) result.label = label;
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  PreferenceOption._();
+
+  factory PreferenceOption.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceOption()..mergeFromBuffer(data, registry);
+  factory PreferenceOption.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceOption()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceOption',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceOption.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'label')
+    ..aOS(2, _omitFieldNames ? '' : 'value')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceOption clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceOption copyWith(void Function(PreferenceOption) updates) =>
+      super.copyWith((message) => updates(message as PreferenceOption))
+          as PreferenceOption;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceOption() / PreferenceOption.new instead')
+  static PreferenceOption create() => PreferenceOption._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceOption._();
+  @$core.override
+  PreferenceOption createEmptyInstance() => PreferenceOption._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceOption getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceOption>(
+          PreferenceOption.$_createMessage);
+  static PreferenceOption? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get label => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set label($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLabel() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLabel() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get value => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set value($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValue() => $_clearField(2);
+}
+
+class PreferenceToggle extends $pb.GeneratedMessage {
+  factory PreferenceToggle({
+    $core.bool? value,
+  }) {
+    final result = PreferenceToggle._();
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  PreferenceToggle._();
+
+  factory PreferenceToggle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceToggle()..mergeFromBuffer(data, registry);
+  factory PreferenceToggle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceToggle()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceToggle',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceToggle.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'value')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceToggle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceToggle copyWith(void Function(PreferenceToggle) updates) =>
+      super.copyWith((message) => updates(message as PreferenceToggle))
+          as PreferenceToggle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceToggle() / PreferenceToggle.new instead')
+  static PreferenceToggle create() => PreferenceToggle._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceToggle._();
+  @$core.override
+  PreferenceToggle createEmptyInstance() => PreferenceToggle._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceToggle getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceToggle>(
+          PreferenceToggle.$_createMessage);
+  static PreferenceToggle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get value => $_getBF(0);
+  @$pb.TagNumber(1)
+  set value($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasValue() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearValue() => $_clearField(1);
+}
+
+class PreferenceText extends $pb.GeneratedMessage {
+  factory PreferenceText({
+    $core.String? value,
+    $core.bool? secret,
+    $core.int? inputType,
+  }) {
+    final result = PreferenceText._();
+    if (value != null) result.value = value;
+    if (secret != null) result.secret = secret;
+    if (inputType != null) result.inputType = inputType;
+    return result;
+  }
+
+  PreferenceText._();
+
+  factory PreferenceText.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceText()..mergeFromBuffer(data, registry);
+  factory PreferenceText.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceText()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceText',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceText.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'value')
+    ..aOB(2, _omitFieldNames ? '' : 'secret')
+    ..aI(3, _omitFieldNames ? '' : 'inputType')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceText clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceText copyWith(void Function(PreferenceText) updates) =>
+      super.copyWith((message) => updates(message as PreferenceText))
+          as PreferenceText;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceText() / PreferenceText.new instead')
+  static PreferenceText create() => PreferenceText._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceText._();
+  @$core.override
+  PreferenceText createEmptyInstance() => PreferenceText._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceText getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceText>(
+          PreferenceText.$_createMessage);
+  static PreferenceText? _defaultInstance;
+
+  /// Missing is distinct from an explicitly stored empty string.
+  @$pb.TagNumber(1)
+  $core.String get value => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set value($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasValue() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearValue() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get secret => $_getBF(1);
+  @$pb.TagNumber(2)
+  set secret($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSecret() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSecret() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get inputType => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set inputType($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasInputType() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearInputType() => $_clearField(3);
+}
+
+class PreferenceChoice extends $pb.GeneratedMessage {
+  factory PreferenceChoice({
+    $core.Iterable<PreferenceOption>? options,
+    $core.String? value,
+  }) {
+    final result = PreferenceChoice._();
+    if (options != null) result.options.addAll(options);
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  PreferenceChoice._();
+
+  factory PreferenceChoice.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceChoice()..mergeFromBuffer(data, registry);
+  factory PreferenceChoice.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceChoice()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceChoice',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceChoice.$_createMessage)
+    ..pPM<PreferenceOption>(1, _omitFieldNames ? '' : 'options',
+        subBuilder: PreferenceOption.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'value')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceChoice clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceChoice copyWith(void Function(PreferenceChoice) updates) =>
+      super.copyWith((message) => updates(message as PreferenceChoice))
+          as PreferenceChoice;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceChoice() / PreferenceChoice.new instead')
+  static PreferenceChoice create() => PreferenceChoice._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceChoice._();
+  @$core.override
+  PreferenceChoice createEmptyInstance() => PreferenceChoice._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceChoice getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceChoice>(
+          PreferenceChoice.$_createMessage);
+  static PreferenceChoice? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PreferenceOption> get options => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get value => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set value($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValue() => $_clearField(2);
+}
+
+class PreferenceMultiChoice extends $pb.GeneratedMessage {
+  factory PreferenceMultiChoice({
+    $core.Iterable<PreferenceOption>? options,
+    $core.Iterable<$core.String>? values,
+  }) {
+    final result = PreferenceMultiChoice._();
+    if (options != null) result.options.addAll(options);
+    if (values != null) result.values.addAll(values);
+    return result;
+  }
+
+  PreferenceMultiChoice._();
+
+  factory PreferenceMultiChoice.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceMultiChoice()..mergeFromBuffer(data, registry);
+  factory PreferenceMultiChoice.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceMultiChoice()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceMultiChoice',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceMultiChoice.$_createMessage)
+    ..pPM<PreferenceOption>(1, _omitFieldNames ? '' : 'options',
+        subBuilder: PreferenceOption.$_createMessage)
+    ..pPS(2, _omitFieldNames ? '' : 'values')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceMultiChoice clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceMultiChoice copyWith(
+          void Function(PreferenceMultiChoice) updates) =>
+      super.copyWith((message) => updates(message as PreferenceMultiChoice))
+          as PreferenceMultiChoice;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PreferenceMultiChoice() / PreferenceMultiChoice.new instead')
+  static PreferenceMultiChoice create() => PreferenceMultiChoice._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceMultiChoice._();
+  @$core.override
+  PreferenceMultiChoice createEmptyInstance() => PreferenceMultiChoice._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceMultiChoice getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceMultiChoice>(
+          PreferenceMultiChoice.$_createMessage);
+  static PreferenceMultiChoice? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PreferenceOption> get options => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<$core.String> get values => $_getList(1);
+}
+
+class PreferenceGroup extends $pb.GeneratedMessage {
+  factory PreferenceGroup({
+    $core.Iterable<PreferenceNode>? nodes,
+  }) {
+    final result = PreferenceGroup._();
+    if (nodes != null) result.nodes.addAll(nodes);
+    return result;
+  }
+
+  PreferenceGroup._();
+
+  factory PreferenceGroup.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceGroup()..mergeFromBuffer(data, registry);
+  factory PreferenceGroup.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceGroup()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceGroup',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceGroup.$_createMessage)
+    ..pPM<PreferenceNode>(1, _omitFieldNames ? '' : 'nodes',
+        subBuilder: PreferenceNode.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceGroup clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceGroup copyWith(void Function(PreferenceGroup) updates) =>
+      super.copyWith((message) => updates(message as PreferenceGroup))
+          as PreferenceGroup;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceGroup() / PreferenceGroup.new instead')
+  static PreferenceGroup create() => PreferenceGroup._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceGroup._();
+  @$core.override
+  PreferenceGroup createEmptyInstance() => PreferenceGroup._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceGroup getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceGroup>(
+          PreferenceGroup.$_createMessage);
+  static PreferenceGroup? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PreferenceNode> get nodes => $_getList(0);
+}
+
+class PreferenceUnsupported extends $pb.GeneratedMessage {
+  factory PreferenceUnsupported({
+    $core.String? reason,
+  }) {
+    final result = PreferenceUnsupported._();
+    if (reason != null) result.reason = reason;
+    return result;
+  }
+
+  PreferenceUnsupported._();
+
+  factory PreferenceUnsupported.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceUnsupported()..mergeFromBuffer(data, registry);
+  factory PreferenceUnsupported.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceUnsupported()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceUnsupported',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceUnsupported.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'reason')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceUnsupported clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceUnsupported copyWith(
+          void Function(PreferenceUnsupported) updates) =>
+      super.copyWith((message) => updates(message as PreferenceUnsupported))
+          as PreferenceUnsupported;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PreferenceUnsupported() / PreferenceUnsupported.new instead')
+  static PreferenceUnsupported create() => PreferenceUnsupported._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceUnsupported._();
+  @$core.override
+  PreferenceUnsupported createEmptyInstance() => PreferenceUnsupported._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceUnsupported getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceUnsupported>(
+          PreferenceUnsupported.$_createMessage);
+  static PreferenceUnsupported? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get reason => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set reason($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasReason() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearReason() => $_clearField(1);
+}
+
+enum PreferenceNode_Kind {
+  toggle,
+  text,
+  choice,
+  multiChoice,
+  group,
+  action,
+  unsupported,
+  notSet
+}
+
+class PreferenceNode extends $pb.GeneratedMessage {
+  factory PreferenceNode({
+    $core.String? key,
+    $core.String? title,
+    $core.String? summary,
+    $core.bool? enabled,
+    $core.bool? visible,
+    PreferenceSyncScope? syncScope,
+    PreferenceValue? defaultValue,
+    PreferenceToggle? toggle,
+    PreferenceText? text,
+    PreferenceChoice? choice,
+    PreferenceMultiChoice? multiChoice,
+    PreferenceGroup? group,
+    Empty? action,
+    PreferenceUnsupported? unsupported,
+  }) {
+    final result = PreferenceNode._();
+    if (key != null) result.key = key;
+    if (title != null) result.title = title;
+    if (summary != null) result.summary = summary;
+    if (enabled != null) result.enabled = enabled;
+    if (visible != null) result.visible = visible;
+    if (syncScope != null) result.syncScope = syncScope;
+    if (defaultValue != null) result.defaultValue = defaultValue;
+    if (toggle != null) result.toggle = toggle;
+    if (text != null) result.text = text;
+    if (choice != null) result.choice = choice;
+    if (multiChoice != null) result.multiChoice = multiChoice;
+    if (group != null) result.group = group;
+    if (action != null) result.action = action;
+    if (unsupported != null) result.unsupported = unsupported;
+    return result;
+  }
+
+  PreferenceNode._();
+
+  factory PreferenceNode.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceNode()..mergeFromBuffer(data, registry);
+  factory PreferenceNode.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceNode()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, PreferenceNode_Kind>
+      _PreferenceNode_KindByTag = {
+    10: PreferenceNode_Kind.toggle,
+    11: PreferenceNode_Kind.text,
+    12: PreferenceNode_Kind.choice,
+    13: PreferenceNode_Kind.multiChoice,
+    14: PreferenceNode_Kind.group,
+    15: PreferenceNode_Kind.action,
+    16: PreferenceNode_Kind.unsupported,
+    0: PreferenceNode_Kind.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceNode',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceNode.$_createMessage)
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
+    ..aOS(1, _omitFieldNames ? '' : 'key')
+    ..aOS(2, _omitFieldNames ? '' : 'title')
+    ..aOS(3, _omitFieldNames ? '' : 'summary')
+    ..aOB(4, _omitFieldNames ? '' : 'enabled')
+    ..aOB(5, _omitFieldNames ? '' : 'visible')
+    ..aE<PreferenceSyncScope>(6, _omitFieldNames ? '' : 'syncScope',
+        enumValues: PreferenceSyncScope.values)
+    ..aOM<PreferenceValue>(7, _omitFieldNames ? '' : 'defaultValue',
+        subBuilder: PreferenceValue.$_createMessage)
+    ..aOM<PreferenceToggle>(10, _omitFieldNames ? '' : 'toggle',
+        subBuilder: PreferenceToggle.$_createMessage)
+    ..aOM<PreferenceText>(11, _omitFieldNames ? '' : 'text',
+        subBuilder: PreferenceText.$_createMessage)
+    ..aOM<PreferenceChoice>(12, _omitFieldNames ? '' : 'choice',
+        subBuilder: PreferenceChoice.$_createMessage)
+    ..aOM<PreferenceMultiChoice>(13, _omitFieldNames ? '' : 'multiChoice',
+        subBuilder: PreferenceMultiChoice.$_createMessage)
+    ..aOM<PreferenceGroup>(14, _omitFieldNames ? '' : 'group',
+        subBuilder: PreferenceGroup.$_createMessage)
+    ..aOM<Empty>(15, _omitFieldNames ? '' : 'action',
+        subBuilder: Empty.$_createMessage)
+    ..aOM<PreferenceUnsupported>(16, _omitFieldNames ? '' : 'unsupported',
+        subBuilder: PreferenceUnsupported.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceNode clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceNode copyWith(void Function(PreferenceNode) updates) =>
+      super.copyWith((message) => updates(message as PreferenceNode))
+          as PreferenceNode;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceNode() / PreferenceNode.new instead')
+  static PreferenceNode create() => PreferenceNode._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceNode._();
+  @$core.override
+  PreferenceNode createEmptyInstance() => PreferenceNode._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceNode getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceNode>(
+          PreferenceNode.$_createMessage);
+  static PreferenceNode? _defaultInstance;
+
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
+  PreferenceNode_Kind whichKind() =>
+      _PreferenceNode_KindByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
+  void clearKind() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.String get key => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set key($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get title => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set title($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTitle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTitle() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get summary => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set summary($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSummary() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSummary() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get enabled => $_getBF(3);
+  @$pb.TagNumber(4)
+  set enabled($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasEnabled() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearEnabled() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get visible => $_getBF(4);
+  @$pb.TagNumber(5)
+  set visible($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasVisible() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearVisible() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  PreferenceSyncScope get syncScope => $_getN(5);
+  @$pb.TagNumber(6)
+  set syncScope(PreferenceSyncScope value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSyncScope() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSyncScope() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  PreferenceValue get defaultValue => $_getN(6);
+  @$pb.TagNumber(7)
+  set defaultValue(PreferenceValue value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasDefaultValue() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDefaultValue() => $_clearField(7);
+  @$pb.TagNumber(7)
+  PreferenceValue ensureDefaultValue() => $_ensure(6);
+
+  @$pb.TagNumber(10)
+  PreferenceToggle get toggle => $_getN(7);
+  @$pb.TagNumber(10)
+  set toggle(PreferenceToggle value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasToggle() => $_has(7);
+  @$pb.TagNumber(10)
+  void clearToggle() => $_clearField(10);
+  @$pb.TagNumber(10)
+  PreferenceToggle ensureToggle() => $_ensure(7);
+
+  @$pb.TagNumber(11)
+  PreferenceText get text => $_getN(8);
+  @$pb.TagNumber(11)
+  set text(PreferenceText value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasText() => $_has(8);
+  @$pb.TagNumber(11)
+  void clearText() => $_clearField(11);
+  @$pb.TagNumber(11)
+  PreferenceText ensureText() => $_ensure(8);
+
+  @$pb.TagNumber(12)
+  PreferenceChoice get choice => $_getN(9);
+  @$pb.TagNumber(12)
+  set choice(PreferenceChoice value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasChoice() => $_has(9);
+  @$pb.TagNumber(12)
+  void clearChoice() => $_clearField(12);
+  @$pb.TagNumber(12)
+  PreferenceChoice ensureChoice() => $_ensure(9);
+
+  @$pb.TagNumber(13)
+  PreferenceMultiChoice get multiChoice => $_getN(10);
+  @$pb.TagNumber(13)
+  set multiChoice(PreferenceMultiChoice value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasMultiChoice() => $_has(10);
+  @$pb.TagNumber(13)
+  void clearMultiChoice() => $_clearField(13);
+  @$pb.TagNumber(13)
+  PreferenceMultiChoice ensureMultiChoice() => $_ensure(10);
+
+  @$pb.TagNumber(14)
+  PreferenceGroup get group => $_getN(11);
+  @$pb.TagNumber(14)
+  set group(PreferenceGroup value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasGroup() => $_has(11);
+  @$pb.TagNumber(14)
+  void clearGroup() => $_clearField(14);
+  @$pb.TagNumber(14)
+  PreferenceGroup ensureGroup() => $_ensure(11);
+
+  @$pb.TagNumber(15)
+  Empty get action => $_getN(12);
+  @$pb.TagNumber(15)
+  set action(Empty value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasAction() => $_has(12);
+  @$pb.TagNumber(15)
+  void clearAction() => $_clearField(15);
+  @$pb.TagNumber(15)
+  Empty ensureAction() => $_ensure(12);
+
+  @$pb.TagNumber(16)
+  PreferenceUnsupported get unsupported => $_getN(13);
+  @$pb.TagNumber(16)
+  set unsupported(PreferenceUnsupported value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasUnsupported() => $_has(13);
+  @$pb.TagNumber(16)
+  void clearUnsupported() => $_clearField(16);
+  @$pb.TagNumber(16)
+  PreferenceUnsupported ensureUnsupported() => $_ensure(13);
+}
+
+class PreferenceSnapshot extends $pb.GeneratedMessage {
+  factory PreferenceSnapshot({
+    $core.String? snapshotId,
+    $core.Iterable<PreferenceNode>? nodes,
+    $core.Iterable<PreferenceEntry>? syncValues,
+    $core.Iterable<PreferenceEntry>? sessionValues,
+  }) {
+    final result = PreferenceSnapshot._();
+    if (snapshotId != null) result.snapshotId = snapshotId;
+    if (nodes != null) result.nodes.addAll(nodes);
+    if (syncValues != null) result.syncValues.addAll(syncValues);
+    if (sessionValues != null) result.sessionValues.addAll(sessionValues);
+    return result;
+  }
+
+  PreferenceSnapshot._();
+
+  factory PreferenceSnapshot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceSnapshot()..mergeFromBuffer(data, registry);
+  factory PreferenceSnapshot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceSnapshot()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceSnapshot',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceSnapshot.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'snapshotId')
+    ..pPM<PreferenceNode>(2, _omitFieldNames ? '' : 'nodes',
+        subBuilder: PreferenceNode.$_createMessage)
+    ..pPM<PreferenceEntry>(3, _omitFieldNames ? '' : 'syncValues',
+        subBuilder: PreferenceEntry.$_createMessage)
+    ..pPM<PreferenceEntry>(4, _omitFieldNames ? '' : 'sessionValues',
+        subBuilder: PreferenceEntry.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceSnapshot copyWith(void Function(PreferenceSnapshot) updates) =>
+      super.copyWith((message) => updates(message as PreferenceSnapshot))
+          as PreferenceSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceSnapshot() / PreferenceSnapshot.new instead')
+  static PreferenceSnapshot create() => PreferenceSnapshot._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceSnapshot._();
+  @$core.override
+  PreferenceSnapshot createEmptyInstance() => PreferenceSnapshot._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceSnapshot getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceSnapshot>(
+          PreferenceSnapshot.$_createMessage);
+  static PreferenceSnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get snapshotId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set snapshotId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSnapshotId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSnapshotId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<PreferenceNode> get nodes => $_getList(1);
+
+  /// Full actual stored values in each partition; never upload session_values.
+  @$pb.TagNumber(3)
+  $pb.PbList<PreferenceEntry> get syncValues => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<PreferenceEntry> get sessionValues => $_getList(3);
+}
+
+enum PreferenceEditRequest_Command { change, click, notSet }
+
+class PreferenceEditRequest extends $pb.GeneratedMessage {
+  factory PreferenceEditRequest({
+    $core.String? snapshotId,
+    $core.Iterable<$core.int>? path,
+    PreferenceValue? change,
+    Empty? click,
+  }) {
+    final result = PreferenceEditRequest._();
+    if (snapshotId != null) result.snapshotId = snapshotId;
+    if (path != null) result.path.addAll(path);
+    if (change != null) result.change = change;
+    if (click != null) result.click = click;
+    return result;
+  }
+
+  PreferenceEditRequest._();
+
+  factory PreferenceEditRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceEditRequest()..mergeFromBuffer(data, registry);
+  factory PreferenceEditRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceEditRequest()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, PreferenceEditRequest_Command>
+      _PreferenceEditRequest_CommandByTag = {
+    3: PreferenceEditRequest_Command.change,
+    4: PreferenceEditRequest_Command.click,
+    0: PreferenceEditRequest_Command.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceEditRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceEditRequest.$_createMessage)
+    ..oo(0, [3, 4])
+    ..aOS(1, _omitFieldNames ? '' : 'snapshotId')
+    ..p<$core.int>(2, _omitFieldNames ? '' : 'path', $pb.PbFieldType.KU3)
+    ..aOM<PreferenceValue>(3, _omitFieldNames ? '' : 'change',
+        subBuilder: PreferenceValue.$_createMessage)
+    ..aOM<Empty>(4, _omitFieldNames ? '' : 'click',
+        subBuilder: Empty.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceEditRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceEditRequest copyWith(
+          void Function(PreferenceEditRequest) updates) =>
+      super.copyWith((message) => updates(message as PreferenceEditRequest))
+          as PreferenceEditRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PreferenceEditRequest() / PreferenceEditRequest.new instead')
+  static PreferenceEditRequest create() => PreferenceEditRequest._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceEditRequest._();
+  @$core.override
+  PreferenceEditRequest createEmptyInstance() => PreferenceEditRequest._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceEditRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceEditRequest>(
+          PreferenceEditRequest.$_createMessage);
+  static PreferenceEditRequest? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  PreferenceEditRequest_Command whichCommand() =>
+      _PreferenceEditRequest_CommandByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  void clearCommand() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.String get snapshotId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set snapshotId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSnapshotId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSnapshotId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<$core.int> get path => $_getList(1);
+
+  @$pb.TagNumber(3)
+  PreferenceValue get change => $_getN(2);
+  @$pb.TagNumber(3)
+  set change(PreferenceValue value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasChange() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearChange() => $_clearField(3);
+  @$pb.TagNumber(3)
+  PreferenceValue ensureChange() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  Empty get click => $_getN(3);
+  @$pb.TagNumber(4)
+  set click(Empty value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasClick() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearClick() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Empty ensureClick() => $_ensure(3);
+}
+
+class PreferenceEditResult extends $pb.GeneratedMessage {
+  factory PreferenceEditResult({
+    $core.bool? accepted,
+    $core.bool? clickHandled,
+    PreferenceSnapshot? snapshot,
+  }) {
+    final result = PreferenceEditResult._();
+    if (accepted != null) result.accepted = accepted;
+    if (clickHandled != null) result.clickHandled = clickHandled;
+    if (snapshot != null) result.snapshot = snapshot;
+    return result;
+  }
+
+  PreferenceEditResult._();
+
+  factory PreferenceEditResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceEditResult()..mergeFromBuffer(data, registry);
+  factory PreferenceEditResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceEditResult()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceEditResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceEditResult.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'accepted')
+    ..aOB(2, _omitFieldNames ? '' : 'clickHandled')
+    ..aOM<PreferenceSnapshot>(3, _omitFieldNames ? '' : 'snapshot',
+        subBuilder: PreferenceSnapshot.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceEditResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceEditResult copyWith(void Function(PreferenceEditResult) updates) =>
+      super.copyWith((message) => updates(message as PreferenceEditResult))
+          as PreferenceEditResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PreferenceEditResult() / PreferenceEditResult.new instead')
+  static PreferenceEditResult create() => PreferenceEditResult._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceEditResult._();
+  @$core.override
+  PreferenceEditResult createEmptyInstance() => PreferenceEditResult._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceEditResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceEditResult>(
+          PreferenceEditResult.$_createMessage);
+  static PreferenceEditResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get accepted => $_getBF(0);
+  @$pb.TagNumber(1)
+  set accepted($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAccepted() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAccepted() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get clickHandled => $_getBF(1);
+  @$pb.TagNumber(2)
+  set clickHandled($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasClickHandled() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearClickHandled() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  PreferenceSnapshot get snapshot => $_getN(2);
+  @$pb.TagNumber(3)
+  set snapshot(PreferenceSnapshot value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSnapshot() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSnapshot() => $_clearField(3);
+  @$pb.TagNumber(3)
+  PreferenceSnapshot ensureSnapshot() => $_ensure(2);
+}
+
 enum SourceCall_Request {
   popular,
   latest,
@@ -2401,6 +3991,8 @@ enum SourceCall_Request {
   chapters,
   pages,
   getFilters,
+  getPreferences,
+  editPreference,
   notSet
 }
 
@@ -2417,6 +4009,8 @@ class SourceCall extends $pb.GeneratedMessage {
     MangaRequest? chapters,
     ChapterRequest? pages,
     GetFiltersRequest? getFilters,
+    Empty? getPreferences,
+    PreferenceEditRequest? editPreference,
   }) {
     final result = SourceCall._();
     if (requestId != null) result.requestId = requestId;
@@ -2430,6 +4024,8 @@ class SourceCall extends $pb.GeneratedMessage {
     if (chapters != null) result.chapters = chapters;
     if (pages != null) result.pages = pages;
     if (getFilters != null) result.getFilters = getFilters;
+    if (getPreferences != null) result.getPreferences = getPreferences;
+    if (editPreference != null) result.editPreference = editPreference;
     return result;
   }
 
@@ -2451,13 +4047,15 @@ class SourceCall extends $pb.GeneratedMessage {
     14: SourceCall_Request.chapters,
     15: SourceCall_Request.pages,
     16: SourceCall_Request.getFilters,
+    17: SourceCall_Request.getPreferences,
+    18: SourceCall_Request.editPreference,
     0: SourceCall_Request.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'SourceCall',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: SourceCall.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'sourceId')
     ..aI(3, _omitFieldNames ? '' : 'timeoutMs', fieldType: $pb.PbFieldType.OU3)
@@ -2476,6 +4074,10 @@ class SourceCall extends $pb.GeneratedMessage {
         subBuilder: ChapterRequest.$_createMessage)
     ..aOM<GetFiltersRequest>(16, _omitFieldNames ? '' : 'getFilters',
         subBuilder: GetFiltersRequest.$_createMessage)
+    ..aOM<Empty>(17, _omitFieldNames ? '' : 'getPreferences',
+        subBuilder: Empty.$_createMessage)
+    ..aOM<PreferenceEditRequest>(18, _omitFieldNames ? '' : 'editPreference',
+        subBuilder: PreferenceEditRequest.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2505,6 +4107,8 @@ class SourceCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   SourceCall_Request whichRequest() =>
       _SourceCall_RequestByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -2514,6 +4118,8 @@ class SourceCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   void clearRequest() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -2628,6 +4234,28 @@ class SourceCall extends $pb.GeneratedMessage {
   void clearGetFilters() => $_clearField(16);
   @$pb.TagNumber(16)
   GetFiltersRequest ensureGetFilters() => $_ensure(10);
+
+  @$pb.TagNumber(17)
+  Empty get getPreferences => $_getN(11);
+  @$pb.TagNumber(17)
+  set getPreferences(Empty value) => $_setField(17, value);
+  @$pb.TagNumber(17)
+  $core.bool hasGetPreferences() => $_has(11);
+  @$pb.TagNumber(17)
+  void clearGetPreferences() => $_clearField(17);
+  @$pb.TagNumber(17)
+  Empty ensureGetPreferences() => $_ensure(11);
+
+  @$pb.TagNumber(18)
+  PreferenceEditRequest get editPreference => $_getN(12);
+  @$pb.TagNumber(18)
+  set editPreference(PreferenceEditRequest value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasEditPreference() => $_has(12);
+  @$pb.TagNumber(18)
+  void clearEditPreference() => $_clearField(18);
+  @$pb.TagNumber(18)
+  PreferenceEditRequest ensureEditPreference() => $_ensure(12);
 }
 
 class MangaPage extends $pb.GeneratedMessage {
@@ -2812,6 +4440,8 @@ enum SourceResult_Payload {
   chapters,
   pageList,
   filters,
+  preferences,
+  preferenceEdit,
   notSet
 }
 
@@ -2825,6 +4455,8 @@ class SourceResult extends $pb.GeneratedMessage {
     ChapterList? chapters,
     PageList? pageList,
     FilterSnapshot? filters,
+    PreferenceSnapshot? preferences,
+    PreferenceEditResult? preferenceEdit,
   }) {
     final result = SourceResult._();
     if (requestId != null) result.requestId = requestId;
@@ -2835,6 +4467,8 @@ class SourceResult extends $pb.GeneratedMessage {
     if (chapters != null) result.chapters = chapters;
     if (pageList != null) result.pageList = pageList;
     if (filters != null) result.filters = filters;
+    if (preferences != null) result.preferences = preferences;
+    if (preferenceEdit != null) result.preferenceEdit = preferenceEdit;
     return result;
   }
 
@@ -2854,13 +4488,15 @@ class SourceResult extends $pb.GeneratedMessage {
     12: SourceResult_Payload.chapters,
     13: SourceResult_Payload.pageList,
     14: SourceResult_Payload.filters,
+    15: SourceResult_Payload.preferences,
+    16: SourceResult_Payload.preferenceEdit,
     0: SourceResult_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'SourceResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: SourceResult.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'generation')
     ..aOS(3, _omitFieldNames ? '' : 'buildId')
@@ -2874,6 +4510,10 @@ class SourceResult extends $pb.GeneratedMessage {
         subBuilder: PageList.$_createMessage)
     ..aOM<FilterSnapshot>(14, _omitFieldNames ? '' : 'filters',
         subBuilder: FilterSnapshot.$_createMessage)
+    ..aOM<PreferenceSnapshot>(15, _omitFieldNames ? '' : 'preferences',
+        subBuilder: PreferenceSnapshot.$_createMessage)
+    ..aOM<PreferenceEditResult>(16, _omitFieldNames ? '' : 'preferenceEdit',
+        subBuilder: PreferenceEditResult.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2903,6 +4543,8 @@ class SourceResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   SourceResult_Payload whichPayload() =>
       _SourceResult_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -2910,6 +4552,8 @@ class SourceResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -2993,6 +4637,28 @@ class SourceResult extends $pb.GeneratedMessage {
   void clearFilters() => $_clearField(14);
   @$pb.TagNumber(14)
   FilterSnapshot ensureFilters() => $_ensure(7);
+
+  @$pb.TagNumber(15)
+  PreferenceSnapshot get preferences => $_getN(8);
+  @$pb.TagNumber(15)
+  set preferences(PreferenceSnapshot value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasPreferences() => $_has(8);
+  @$pb.TagNumber(15)
+  void clearPreferences() => $_clearField(15);
+  @$pb.TagNumber(15)
+  PreferenceSnapshot ensurePreferences() => $_ensure(8);
+
+  @$pb.TagNumber(16)
+  PreferenceEditResult get preferenceEdit => $_getN(9);
+  @$pb.TagNumber(16)
+  set preferenceEdit(PreferenceEditResult value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasPreferenceEdit() => $_has(9);
+  @$pb.TagNumber(16)
+  void clearPreferenceEdit() => $_clearField(16);
+  @$pb.TagNumber(16)
+  PreferenceEditResult ensurePreferenceEdit() => $_ensure(9);
 }
 
 class CancelSourceRequest extends $pb.GeneratedMessage {
@@ -5591,10 +7257,13 @@ class OpenWorker extends $pb.GeneratedMessage {
   factory OpenWorker({
     BuildManifest? manifest,
     $core.String? userAgent,
+    PreferenceBootstrap? preferenceBootstrap,
   }) {
     final result = OpenWorker._();
     if (manifest != null) result.manifest = manifest;
     if (userAgent != null) result.userAgent = userAgent;
+    if (preferenceBootstrap != null)
+      result.preferenceBootstrap = preferenceBootstrap;
     return result;
   }
 
@@ -5614,6 +7283,8 @@ class OpenWorker extends $pb.GeneratedMessage {
     ..aOM<BuildManifest>(1, _omitFieldNames ? '' : 'manifest',
         subBuilder: BuildManifest.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'userAgent')
+    ..aOM<PreferenceBootstrap>(3, _omitFieldNames ? '' : 'preferenceBootstrap',
+        subBuilder: PreferenceBootstrap.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5655,6 +7326,17 @@ class OpenWorker extends $pb.GeneratedMessage {
   $core.bool hasUserAgent() => $_has(1);
   @$pb.TagNumber(2)
   void clearUserAgent() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  PreferenceBootstrap get preferenceBootstrap => $_getN(2);
+  @$pb.TagNumber(3)
+  set preferenceBootstrap(PreferenceBootstrap value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPreferenceBootstrap() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPreferenceBootstrap() => $_clearField(3);
+  @$pb.TagNumber(3)
+  PreferenceBootstrap ensurePreferenceBootstrap() => $_ensure(2);
 }
 
 class AcquireImageWorker extends $pb.GeneratedMessage {

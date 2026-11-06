@@ -46,6 +46,44 @@ final $typed_data.Uint8List runtimeErrorCodeDescriptor = $convert.base64Decode(
     'RZX0VSUk9SEAkSJQohUlVOVElNRV9FUlJPUl9DT0RFX0xJTUlUX0VYQ0VFREVEEAoSIwofUlVO'
     'VElNRV9FUlJPUl9DT0RFX1NUT1JBR0VfQlVTWRAL');
 
+@$core.Deprecated('Use preferenceValueKindDescriptor instead')
+const PreferenceValueKind$json = {
+  '1': 'PreferenceValueKind',
+  '2': [
+    {'1': 'PREFERENCE_VALUE_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'PREFERENCE_VALUE_KIND_BOOLEAN', '2': 1},
+    {'1': 'PREFERENCE_VALUE_KIND_TEXT', '2': 2},
+    {'1': 'PREFERENCE_VALUE_KIND_INTEGER', '2': 3},
+    {'1': 'PREFERENCE_VALUE_KIND_DECIMAL', '2': 4},
+    {'1': 'PREFERENCE_VALUE_KIND_STRINGS', '2': 5},
+    {'1': 'PREFERENCE_VALUE_KIND_LONG_INTEGER', '2': 6},
+  ],
+};
+
+/// Descriptor for `PreferenceValueKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List preferenceValueKindDescriptor = $convert.base64Decode(
+    'ChNQcmVmZXJlbmNlVmFsdWVLaW5kEiUKIVBSRUZFUkVOQ0VfVkFMVUVfS0lORF9VTlNQRUNJRk'
+    'lFRBAAEiEKHVBSRUZFUkVOQ0VfVkFMVUVfS0lORF9CT09MRUFOEAESHgoaUFJFRkVSRU5DRV9W'
+    'QUxVRV9LSU5EX1RFWFQQAhIhCh1QUkVGRVJFTkNFX1ZBTFVFX0tJTkRfSU5URUdFUhADEiEKHV'
+    'BSRUZFUkVOQ0VfVkFMVUVfS0lORF9ERUNJTUFMEAQSIQodUFJFRkVSRU5DRV9WQUxVRV9LSU5E'
+    'X1NUUklOR1MQBRImCiJQUkVGRVJFTkNFX1ZBTFVFX0tJTkRfTE9OR19JTlRFR0VSEAY=');
+
+@$core.Deprecated('Use preferenceSyncScopeDescriptor instead')
+const PreferenceSyncScope$json = {
+  '1': 'PreferenceSyncScope',
+  '2': [
+    {'1': 'PREFERENCE_SYNC_SCOPE_UNSPECIFIED', '2': 0},
+    {'1': 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION', '2': 1},
+    {'1': 'PREFERENCE_SYNC_SCOPE_ACCOUNT', '2': 2},
+  ],
+};
+
+/// Descriptor for `PreferenceSyncScope`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List preferenceSyncScopeDescriptor = $convert.base64Decode(
+    'ChNQcmVmZXJlbmNlU3luY1Njb3BlEiUKIVBSRUZFUkVOQ0VfU1lOQ19TQ09QRV9VTlNQRUNJRk'
+    'lFRBAAEigKJFBSRUZFUkVOQ0VfU1lOQ19TQ09QRV9DTElFTlRfU0VTU0lPThABEiEKHVBSRUZF'
+    'UkVOQ0VfU1lOQ19TQ09QRV9BQ0NPVU5UEAI=');
+
 @$core.Deprecated('Use bootstrapStageDescriptor instead')
 const BootstrapStage$json = {
   '1': 'BootstrapStage',
@@ -258,6 +296,14 @@ const OpenRequest$json = {
       '10': 'expectedBundleSha256',
       '17': true
     },
+    {
+      '1': 'preference_bootstrap',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceBootstrap',
+      '10': 'preferenceBootstrap'
+    },
   ],
   '8': [
     {'1': '_user_agent'},
@@ -272,8 +318,9 @@ final $typed_data.Uint8List openRequestDescriptor = $convert.base64Decode(
     'RlbnRpdHkYAiABKAlSCGlkZW50aXR5EiIKCnVzZXJfYWdlbnQYAyABKAlIAFIJdXNlckFnZW50'
     'iAEBEi8KEWV4cGVjdGVkX2J1aWxkX2lkGAQgASgJSAFSD2V4cGVjdGVkQnVpbGRJZIgBARI5Ch'
     'ZleHBlY3RlZF9idW5kbGVfc2hhMjU2GAUgASgJSAJSFGV4cGVjdGVkQnVuZGxlU2hhMjU2iAEB'
-    'Qg0KC191c2VyX2FnZW50QhQKEl9leHBlY3RlZF9idWlsZF9pZEIZChdfZXhwZWN0ZWRfYnVuZG'
-    'xlX3NoYTI1Ng==');
+    'ElMKFHByZWZlcmVuY2VfYm9vdHN0cmFwGAYgASgLMiAua2FydXlvbWkudjEuUHJlZmVyZW5jZU'
+    'Jvb3RzdHJhcFITcHJlZmVyZW5jZUJvb3RzdHJhcEINCgtfdXNlcl9hZ2VudEIUChJfZXhwZWN0'
+    'ZWRfYnVpbGRfaWRCGQoXX2V4cGVjdGVkX2J1bmRsZV9zaGEyNTY=');
 
 @$core.Deprecated('Use mangaDescriptor instead')
 const Manga$json = {
@@ -815,6 +862,512 @@ final $typed_data.Uint8List chapterRequestDescriptor = $convert.base64Decode(
     'Cg5DaGFwdGVyUmVxdWVzdBIuCgdjaGFwdGVyGAEgASgLMhQua2FydXlvbWkudjEuQ2hhcHRlcl'
     'IHY2hhcHRlcg==');
 
+@$core.Deprecated('Use preferenceStringSetDescriptor instead')
+const PreferenceStringSet$json = {
+  '1': 'PreferenceStringSet',
+  '2': [
+    {'1': 'values', '3': 1, '4': 3, '5': 9, '10': 'values'},
+  ],
+};
+
+/// Descriptor for `PreferenceStringSet`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceStringSetDescriptor =
+    $convert.base64Decode(
+        'ChNQcmVmZXJlbmNlU3RyaW5nU2V0EhYKBnZhbHVlcxgBIAMoCVIGdmFsdWVz');
+
+@$core.Deprecated('Use preferenceValueDescriptor instead')
+const PreferenceValue$json = {
+  '1': 'PreferenceValue',
+  '2': [
+    {'1': 'boolean', '3': 1, '4': 1, '5': 8, '9': 0, '10': 'boolean'},
+    {'1': 'text', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'text'},
+    {'1': 'integer', '3': 3, '4': 1, '5': 17, '9': 0, '10': 'integer'},
+    {'1': 'decimal', '3': 4, '4': 1, '5': 2, '9': 0, '10': 'decimal'},
+    {
+      '1': 'strings',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceStringSet',
+      '9': 0,
+      '10': 'strings'
+    },
+    {'1': 'long_integer', '3': 6, '4': 1, '5': 18, '9': 0, '10': 'longInteger'},
+  ],
+  '8': [
+    {'1': 'value'},
+  ],
+};
+
+/// Descriptor for `PreferenceValue`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceValueDescriptor = $convert.base64Decode(
+    'Cg9QcmVmZXJlbmNlVmFsdWUSGgoHYm9vbGVhbhgBIAEoCEgAUgdib29sZWFuEhQKBHRleHQYAi'
+    'ABKAlIAFIEdGV4dBIaCgdpbnRlZ2VyGAMgASgRSABSB2ludGVnZXISGgoHZGVjaW1hbBgEIAEo'
+    'AkgAUgdkZWNpbWFsEjwKB3N0cmluZ3MYBSABKAsyIC5rYXJ1eW9taS52MS5QcmVmZXJlbmNlU3'
+    'RyaW5nU2V0SABSB3N0cmluZ3MSIwoMbG9uZ19pbnRlZ2VyGAYgASgSSABSC2xvbmdJbnRlZ2Vy'
+    'QgcKBXZhbHVl');
+
+@$core.Deprecated('Use preferenceEntryDescriptor instead')
+const PreferenceEntry$json = {
+  '1': 'PreferenceEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceValue',
+      '10': 'value'
+    },
+  ],
+};
+
+/// Descriptor for `PreferenceEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceEntryDescriptor = $convert.base64Decode(
+    'Cg9QcmVmZXJlbmNlRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSMgoFdmFsdWUYAiABKAsyHC5rYX'
+    'J1eW9taS52MS5QcmVmZXJlbmNlVmFsdWVSBXZhbHVl');
+
+@$core.Deprecated('Use sourcePreferenceValuesDescriptor instead')
+const SourcePreferenceValues$json = {
+  '1': 'SourcePreferenceValues',
+  '2': [
+    {'1': 'source_id', '3': 1, '4': 1, '5': 9, '10': 'sourceId'},
+    {
+      '1': 'entries',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceEntry',
+      '10': 'entries'
+    },
+  ],
+};
+
+/// Descriptor for `SourcePreferenceValues`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourcePreferenceValuesDescriptor = $convert.base64Decode(
+    'ChZTb3VyY2VQcmVmZXJlbmNlVmFsdWVzEhsKCXNvdXJjZV9pZBgBIAEoCVIIc291cmNlSWQSNg'
+    'oHZW50cmllcxgCIAMoCzIcLmthcnV5b21pLnYxLlByZWZlcmVuY2VFbnRyeVIHZW50cmllcw==');
+
+@$core.Deprecated('Use preferenceBootstrapDescriptor instead')
+const PreferenceBootstrap$json = {
+  '1': 'PreferenceBootstrap',
+  '2': [
+    {'1': 'package_name', '3': 1, '4': 1, '5': 9, '10': 'packageName'},
+    {
+      '1': 'sources',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.SourcePreferenceValues',
+      '10': 'sources'
+    },
+  ],
+};
+
+/// Descriptor for `PreferenceBootstrap`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceBootstrapDescriptor = $convert.base64Decode(
+    'ChNQcmVmZXJlbmNlQm9vdHN0cmFwEiEKDHBhY2thZ2VfbmFtZRgBIAEoCVILcGFja2FnZU5hbW'
+    'USPQoHc291cmNlcxgCIAMoCzIjLmthcnV5b21pLnYxLlNvdXJjZVByZWZlcmVuY2VWYWx1ZXNS'
+    'B3NvdXJjZXM=');
+
+@$core.Deprecated('Use preferenceSyncRuleDescriptor instead')
+const PreferenceSyncRule$json = {
+  '1': 'PreferenceSyncRule',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {
+      '1': 'kind',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.karuyomi.v1.PreferenceValueKind',
+      '10': 'kind'
+    },
+    {
+      '1': 'source_id',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'sourceId',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_source_id'},
+  ],
+};
+
+/// Descriptor for `PreferenceSyncRule`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceSyncRuleDescriptor = $convert.base64Decode(
+    'ChJQcmVmZXJlbmNlU3luY1J1bGUSEAoDa2V5GAEgASgJUgNrZXkSNAoEa2luZBgCIAEoDjIgLm'
+    'thcnV5b21pLnYxLlByZWZlcmVuY2VWYWx1ZUtpbmRSBGtpbmQSIAoJc291cmNlX2lkGAMgASgJ'
+    'SABSCHNvdXJjZUlkiAEBQgwKCl9zb3VyY2VfaWQ=');
+
+@$core.Deprecated('Use preferenceHostConfigurationDescriptor instead')
+const PreferenceHostConfiguration$json = {
+  '1': 'PreferenceHostConfiguration',
+  '2': [
+    {
+      '1': 'bootstrap',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceBootstrap',
+      '10': 'bootstrap'
+    },
+    {
+      '1': 'sync_rules',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceSyncRule',
+      '10': 'syncRules'
+    },
+  ],
+};
+
+/// Descriptor for `PreferenceHostConfiguration`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceHostConfigurationDescriptor =
+    $convert.base64Decode(
+        'ChtQcmVmZXJlbmNlSG9zdENvbmZpZ3VyYXRpb24SPgoJYm9vdHN0cmFwGAEgASgLMiAua2FydX'
+        'lvbWkudjEuUHJlZmVyZW5jZUJvb3RzdHJhcFIJYm9vdHN0cmFwEj4KCnN5bmNfcnVsZXMYAiAD'
+        'KAsyHy5rYXJ1eW9taS52MS5QcmVmZXJlbmNlU3luY1J1bGVSCXN5bmNSdWxlcw==');
+
+@$core.Deprecated('Use preferenceOptionDescriptor instead')
+const PreferenceOption$json = {
+  '1': 'PreferenceOption',
+  '2': [
+    {'1': 'label', '3': 1, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+};
+
+/// Descriptor for `PreferenceOption`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceOptionDescriptor = $convert.base64Decode(
+    'ChBQcmVmZXJlbmNlT3B0aW9uEhQKBWxhYmVsGAEgASgJUgVsYWJlbBIUCgV2YWx1ZRgCIAEoCV'
+    'IFdmFsdWU=');
+
+@$core.Deprecated('Use preferenceToggleDescriptor instead')
+const PreferenceToggle$json = {
+  '1': 'PreferenceToggle',
+  '2': [
+    {'1': 'value', '3': 1, '4': 1, '5': 8, '10': 'value'},
+  ],
+};
+
+/// Descriptor for `PreferenceToggle`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceToggleDescriptor = $convert
+    .base64Decode('ChBQcmVmZXJlbmNlVG9nZ2xlEhQKBXZhbHVlGAEgASgIUgV2YWx1ZQ==');
+
+@$core.Deprecated('Use preferenceTextDescriptor instead')
+const PreferenceText$json = {
+  '1': 'PreferenceText',
+  '2': [
+    {'1': 'value', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'value', '17': true},
+    {'1': 'secret', '3': 2, '4': 1, '5': 8, '10': 'secret'},
+    {'1': 'input_type', '3': 3, '4': 1, '5': 5, '10': 'inputType'},
+  ],
+  '8': [
+    {'1': '_value'},
+  ],
+};
+
+/// Descriptor for `PreferenceText`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceTextDescriptor = $convert.base64Decode(
+    'Cg5QcmVmZXJlbmNlVGV4dBIZCgV2YWx1ZRgBIAEoCUgAUgV2YWx1ZYgBARIWCgZzZWNyZXQYAi'
+    'ABKAhSBnNlY3JldBIdCgppbnB1dF90eXBlGAMgASgFUglpbnB1dFR5cGVCCAoGX3ZhbHVl');
+
+@$core.Deprecated('Use preferenceChoiceDescriptor instead')
+const PreferenceChoice$json = {
+  '1': 'PreferenceChoice',
+  '2': [
+    {
+      '1': 'options',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceOption',
+      '10': 'options'
+    },
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'value', '17': true},
+  ],
+  '8': [
+    {'1': '_value'},
+  ],
+};
+
+/// Descriptor for `PreferenceChoice`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceChoiceDescriptor = $convert.base64Decode(
+    'ChBQcmVmZXJlbmNlQ2hvaWNlEjcKB29wdGlvbnMYASADKAsyHS5rYXJ1eW9taS52MS5QcmVmZX'
+    'JlbmNlT3B0aW9uUgdvcHRpb25zEhkKBXZhbHVlGAIgASgJSABSBXZhbHVliAEBQggKBl92YWx1'
+    'ZQ==');
+
+@$core.Deprecated('Use preferenceMultiChoiceDescriptor instead')
+const PreferenceMultiChoice$json = {
+  '1': 'PreferenceMultiChoice',
+  '2': [
+    {
+      '1': 'options',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceOption',
+      '10': 'options'
+    },
+    {'1': 'values', '3': 2, '4': 3, '5': 9, '10': 'values'},
+  ],
+};
+
+/// Descriptor for `PreferenceMultiChoice`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceMultiChoiceDescriptor = $convert.base64Decode(
+    'ChVQcmVmZXJlbmNlTXVsdGlDaG9pY2USNwoHb3B0aW9ucxgBIAMoCzIdLmthcnV5b21pLnYxLl'
+    'ByZWZlcmVuY2VPcHRpb25SB29wdGlvbnMSFgoGdmFsdWVzGAIgAygJUgZ2YWx1ZXM=');
+
+@$core.Deprecated('Use preferenceGroupDescriptor instead')
+const PreferenceGroup$json = {
+  '1': 'PreferenceGroup',
+  '2': [
+    {
+      '1': 'nodes',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceNode',
+      '10': 'nodes'
+    },
+  ],
+};
+
+/// Descriptor for `PreferenceGroup`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceGroupDescriptor = $convert.base64Decode(
+    'Cg9QcmVmZXJlbmNlR3JvdXASMQoFbm9kZXMYASADKAsyGy5rYXJ1eW9taS52MS5QcmVmZXJlbm'
+    'NlTm9kZVIFbm9kZXM=');
+
+@$core.Deprecated('Use preferenceUnsupportedDescriptor instead')
+const PreferenceUnsupported$json = {
+  '1': 'PreferenceUnsupported',
+  '2': [
+    {'1': 'reason', '3': 1, '4': 1, '5': 9, '10': 'reason'},
+  ],
+};
+
+/// Descriptor for `PreferenceUnsupported`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceUnsupportedDescriptor =
+    $convert.base64Decode(
+        'ChVQcmVmZXJlbmNlVW5zdXBwb3J0ZWQSFgoGcmVhc29uGAEgASgJUgZyZWFzb24=');
+
+@$core.Deprecated('Use preferenceNodeDescriptor instead')
+const PreferenceNode$json = {
+  '1': 'PreferenceNode',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'summary', '3': 3, '4': 1, '5': 9, '10': 'summary'},
+    {'1': 'enabled', '3': 4, '4': 1, '5': 8, '10': 'enabled'},
+    {'1': 'visible', '3': 5, '4': 1, '5': 8, '10': 'visible'},
+    {
+      '1': 'sync_scope',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.karuyomi.v1.PreferenceSyncScope',
+      '10': 'syncScope'
+    },
+    {
+      '1': 'default_value',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceValue',
+      '10': 'defaultValue'
+    },
+    {
+      '1': 'toggle',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceToggle',
+      '9': 0,
+      '10': 'toggle'
+    },
+    {
+      '1': 'text',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceText',
+      '9': 0,
+      '10': 'text'
+    },
+    {
+      '1': 'choice',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceChoice',
+      '9': 0,
+      '10': 'choice'
+    },
+    {
+      '1': 'multi_choice',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceMultiChoice',
+      '9': 0,
+      '10': 'multiChoice'
+    },
+    {
+      '1': 'group',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceGroup',
+      '9': 0,
+      '10': 'group'
+    },
+    {
+      '1': 'action',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.Empty',
+      '9': 0,
+      '10': 'action'
+    },
+    {
+      '1': 'unsupported',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceUnsupported',
+      '9': 0,
+      '10': 'unsupported'
+    },
+  ],
+  '8': [
+    {'1': 'kind'},
+  ],
+};
+
+/// Descriptor for `PreferenceNode`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceNodeDescriptor = $convert.base64Decode(
+    'Cg5QcmVmZXJlbmNlTm9kZRIQCgNrZXkYASABKAlSA2tleRIUCgV0aXRsZRgCIAEoCVIFdGl0bG'
+    'USGAoHc3VtbWFyeRgDIAEoCVIHc3VtbWFyeRIYCgdlbmFibGVkGAQgASgIUgdlbmFibGVkEhgK'
+    'B3Zpc2libGUYBSABKAhSB3Zpc2libGUSPwoKc3luY19zY29wZRgGIAEoDjIgLmthcnV5b21pLn'
+    'YxLlByZWZlcmVuY2VTeW5jU2NvcGVSCXN5bmNTY29wZRJBCg1kZWZhdWx0X3ZhbHVlGAcgASgL'
+    'Mhwua2FydXlvbWkudjEuUHJlZmVyZW5jZVZhbHVlUgxkZWZhdWx0VmFsdWUSNwoGdG9nZ2xlGA'
+    'ogASgLMh0ua2FydXlvbWkudjEuUHJlZmVyZW5jZVRvZ2dsZUgAUgZ0b2dnbGUSMQoEdGV4dBgL'
+    'IAEoCzIbLmthcnV5b21pLnYxLlByZWZlcmVuY2VUZXh0SABSBHRleHQSNwoGY2hvaWNlGAwgAS'
+    'gLMh0ua2FydXlvbWkudjEuUHJlZmVyZW5jZUNob2ljZUgAUgZjaG9pY2USRwoMbXVsdGlfY2hv'
+    'aWNlGA0gASgLMiIua2FydXlvbWkudjEuUHJlZmVyZW5jZU11bHRpQ2hvaWNlSABSC211bHRpQ2'
+    'hvaWNlEjQKBWdyb3VwGA4gASgLMhwua2FydXlvbWkudjEuUHJlZmVyZW5jZUdyb3VwSABSBWdy'
+    'b3VwEiwKBmFjdGlvbhgPIAEoCzISLmthcnV5b21pLnYxLkVtcHR5SABSBmFjdGlvbhJGCgt1bn'
+    'N1cHBvcnRlZBgQIAEoCzIiLmthcnV5b21pLnYxLlByZWZlcmVuY2VVbnN1cHBvcnRlZEgAUgt1'
+    'bnN1cHBvcnRlZEIGCgRraW5k');
+
+@$core.Deprecated('Use preferenceSnapshotDescriptor instead')
+const PreferenceSnapshot$json = {
+  '1': 'PreferenceSnapshot',
+  '2': [
+    {'1': 'snapshot_id', '3': 1, '4': 1, '5': 9, '10': 'snapshotId'},
+    {
+      '1': 'nodes',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceNode',
+      '10': 'nodes'
+    },
+    {
+      '1': 'sync_values',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceEntry',
+      '10': 'syncValues'
+    },
+    {
+      '1': 'session_values',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceEntry',
+      '10': 'sessionValues'
+    },
+  ],
+};
+
+/// Descriptor for `PreferenceSnapshot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceSnapshotDescriptor = $convert.base64Decode(
+    'ChJQcmVmZXJlbmNlU25hcHNob3QSHwoLc25hcHNob3RfaWQYASABKAlSCnNuYXBzaG90SWQSMQ'
+    'oFbm9kZXMYAiADKAsyGy5rYXJ1eW9taS52MS5QcmVmZXJlbmNlTm9kZVIFbm9kZXMSPQoLc3lu'
+    'Y192YWx1ZXMYAyADKAsyHC5rYXJ1eW9taS52MS5QcmVmZXJlbmNlRW50cnlSCnN5bmNWYWx1ZX'
+    'MSQwoOc2Vzc2lvbl92YWx1ZXMYBCADKAsyHC5rYXJ1eW9taS52MS5QcmVmZXJlbmNlRW50cnlS'
+    'DXNlc3Npb25WYWx1ZXM=');
+
+@$core.Deprecated('Use preferenceEditRequestDescriptor instead')
+const PreferenceEditRequest$json = {
+  '1': 'PreferenceEditRequest',
+  '2': [
+    {'1': 'snapshot_id', '3': 1, '4': 1, '5': 9, '10': 'snapshotId'},
+    {'1': 'path', '3': 2, '4': 3, '5': 13, '10': 'path'},
+    {
+      '1': 'change',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceValue',
+      '9': 0,
+      '10': 'change'
+    },
+    {
+      '1': 'click',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.Empty',
+      '9': 0,
+      '10': 'click'
+    },
+  ],
+  '8': [
+    {'1': 'command'},
+  ],
+};
+
+/// Descriptor for `PreferenceEditRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceEditRequestDescriptor = $convert.base64Decode(
+    'ChVQcmVmZXJlbmNlRWRpdFJlcXVlc3QSHwoLc25hcHNob3RfaWQYASABKAlSCnNuYXBzaG90SW'
+    'QSEgoEcGF0aBgCIAMoDVIEcGF0aBI2CgZjaGFuZ2UYAyABKAsyHC5rYXJ1eW9taS52MS5QcmVm'
+    'ZXJlbmNlVmFsdWVIAFIGY2hhbmdlEioKBWNsaWNrGAQgASgLMhIua2FydXlvbWkudjEuRW1wdH'
+    'lIAFIFY2xpY2tCCQoHY29tbWFuZA==');
+
+@$core.Deprecated('Use preferenceEditResultDescriptor instead')
+const PreferenceEditResult$json = {
+  '1': 'PreferenceEditResult',
+  '2': [
+    {'1': 'accepted', '3': 1, '4': 1, '5': 8, '10': 'accepted'},
+    {'1': 'click_handled', '3': 2, '4': 1, '5': 8, '10': 'clickHandled'},
+    {
+      '1': 'snapshot',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceSnapshot',
+      '10': 'snapshot'
+    },
+  ],
+};
+
+/// Descriptor for `PreferenceEditResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceEditResultDescriptor = $convert.base64Decode(
+    'ChRQcmVmZXJlbmNlRWRpdFJlc3VsdBIaCghhY2NlcHRlZBgBIAEoCFIIYWNjZXB0ZWQSIwoNY2'
+    'xpY2tfaGFuZGxlZBgCIAEoCFIMY2xpY2tIYW5kbGVkEjsKCHNuYXBzaG90GAMgASgLMh8ua2Fy'
+    'dXlvbWkudjEuUHJlZmVyZW5jZVNuYXBzaG90UghzbmFwc2hvdA==');
+
 @$core.Deprecated('Use sourceCallDescriptor instead')
 const SourceCall$json = {
   '1': 'SourceCall',
@@ -894,6 +1447,24 @@ const SourceCall$json = {
       '9': 0,
       '10': 'getFilters'
     },
+    {
+      '1': 'get_preferences',
+      '3': 17,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.Empty',
+      '9': 0,
+      '10': 'getPreferences'
+    },
+    {
+      '1': 'edit_preference',
+      '3': 18,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceEditRequest',
+      '9': 0,
+      '10': 'editPreference'
+    },
   ],
   '8': [
     {'1': 'request'},
@@ -912,8 +1483,10 @@ final $typed_data.Uint8List sourceCallDescriptor = $convert.base64Decode(
     'YW5nYVJlcXVlc3RIAFIHZGV0YWlscxI3CghjaGFwdGVycxgOIAEoCzIZLmthcnV5b21pLnYxLk'
     '1hbmdhUmVxdWVzdEgAUghjaGFwdGVycxIzCgVwYWdlcxgPIAEoCzIbLmthcnV5b21pLnYxLkNo'
     'YXB0ZXJSZXF1ZXN0SABSBXBhZ2VzEkEKC2dldF9maWx0ZXJzGBAgASgLMh4ua2FydXlvbWkudj'
-    'EuR2V0RmlsdGVyc1JlcXVlc3RIAFIKZ2V0RmlsdGVyc0IJCgdyZXF1ZXN0Qg0KC190aW1lb3V0'
-    'X21z');
+    'EuR2V0RmlsdGVyc1JlcXVlc3RIAFIKZ2V0RmlsdGVycxI9Cg9nZXRfcHJlZmVyZW5jZXMYESAB'
+    'KAsyEi5rYXJ1eW9taS52MS5FbXB0eUgAUg5nZXRQcmVmZXJlbmNlcxJNCg9lZGl0X3ByZWZlcm'
+    'VuY2UYEiABKAsyIi5rYXJ1eW9taS52MS5QcmVmZXJlbmNlRWRpdFJlcXVlc3RIAFIOZWRpdFBy'
+    'ZWZlcmVuY2VCCQoHcmVxdWVzdEINCgtfdGltZW91dF9tcw==');
 
 @$core.Deprecated('Use mangaPageDescriptor instead')
 const MangaPage$json = {
@@ -1029,6 +1602,24 @@ const SourceResult$json = {
       '9': 0,
       '10': 'filters'
     },
+    {
+      '1': 'preferences',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceSnapshot',
+      '9': 0,
+      '10': 'preferences'
+    },
+    {
+      '1': 'preference_edit',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceEditResult',
+      '9': 0,
+      '10': 'preferenceEdit'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -1043,7 +1634,10 @@ final $typed_data.Uint8List sourceResultDescriptor = $convert.base64Decode(
     'FuZ2EYCyABKAsyEi5rYXJ1eW9taS52MS5NYW5nYUgAUgVtYW5nYRI2CghjaGFwdGVycxgMIAEo'
     'CzIYLmthcnV5b21pLnYxLkNoYXB0ZXJMaXN0SABSCGNoYXB0ZXJzEjQKCXBhZ2VfbGlzdBgNIA'
     'EoCzIVLmthcnV5b21pLnYxLlBhZ2VMaXN0SABSCHBhZ2VMaXN0EjcKB2ZpbHRlcnMYDiABKAsy'
-    'Gy5rYXJ1eW9taS52MS5GaWx0ZXJTbmFwc2hvdEgAUgdmaWx0ZXJzQgkKB3BheWxvYWQ=');
+    'Gy5rYXJ1eW9taS52MS5GaWx0ZXJTbmFwc2hvdEgAUgdmaWx0ZXJzEkMKC3ByZWZlcmVuY2VzGA'
+    '8gASgLMh8ua2FydXlvbWkudjEuUHJlZmVyZW5jZVNuYXBzaG90SABSC3ByZWZlcmVuY2VzEkwK'
+    'D3ByZWZlcmVuY2VfZWRpdBgQIAEoCzIhLmthcnV5b21pLnYxLlByZWZlcmVuY2VFZGl0UmVzdW'
+    'x0SABSDnByZWZlcmVuY2VFZGl0QgkKB3BheWxvYWQ=');
 
 @$core.Deprecated('Use cancelSourceRequestDescriptor instead')
 const CancelSourceRequest$json = {
@@ -1852,13 +2446,23 @@ const OpenWorker$json = {
       '10': 'manifest'
     },
     {'1': 'user_agent', '3': 2, '4': 1, '5': 9, '10': 'userAgent'},
+    {
+      '1': 'preference_bootstrap',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceBootstrap',
+      '10': 'preferenceBootstrap'
+    },
   ],
 };
 
 /// Descriptor for `OpenWorker`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List openWorkerDescriptor = $convert.base64Decode(
     'CgpPcGVuV29ya2VyEjYKCG1hbmlmZXN0GAEgASgLMhoua2FydXlvbWkudjEuQnVpbGRNYW5pZm'
-    'VzdFIIbWFuaWZlc3QSHQoKdXNlcl9hZ2VudBgCIAEoCVIJdXNlckFnZW50');
+    'VzdFIIbWFuaWZlc3QSHQoKdXNlcl9hZ2VudBgCIAEoCVIJdXNlckFnZW50ElMKFHByZWZlcmVu'
+    'Y2VfYm9vdHN0cmFwGAMgASgLMiAua2FydXlvbWkudjEuUHJlZmVyZW5jZUJvb3RzdHJhcFITcH'
+    'JlZmVyZW5jZUJvb3RzdHJhcA==');
 
 @$core.Deprecated('Use acquireImageWorkerDescriptor instead')
 const AcquireImageWorker$json = {

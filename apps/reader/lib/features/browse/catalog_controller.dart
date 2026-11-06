@@ -13,6 +13,8 @@ import '../../data/business_state_client.dart';
 import '../../data/business_state_validation.dart';
 import '../../data/bookmark_repository.dart';
 import '../../data/settings_repository.dart';
+import '../../data/source_preferences_repository.dart';
+import '../../data/source_preferences_validation.dart';
 import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
@@ -95,6 +97,13 @@ final class CatalogSourceRef {
   final String generation;
 }
 
+final class SourcePreferencesTarget {
+  SourcePreferencesTarget({required this.build, required SourceInfo source})
+    : source = source.deepCopy()..freeze();
+  final CatalogBuild build;
+  final SourceInfo source;
+}
+
 final class OpenedChapter {
   const OpenedChapter({
     required this.manifest,
@@ -144,12 +153,45 @@ final class CatalogController extends ChangeNotifier {
   ProgressRepository? _progress;
   BookmarkRepository? _bookmarks;
   SettingsRepository? _settings;
+  SourcePreferencesRepository? _sourcePreferences;
+  SourcePreferencesSnapshot? loadedSourcePreferences;
+  final _sessionPreferenceValues =
+      <(String, String), List<wire.PreferenceEntry>>{};
+  final _preferenceRecoveries = <(String, String), SourcePreferencesTarget>{};
+  String? _preferenceIdentity;
+  String? _preferenceRequestId;
+
+  SourcePreferencesRepository? get sourcePreferences =>
+      _confirmedBusinessClient == null ? null : _sourcePreferences;
+
+  List<SourcePreferencesTarget> get sourcePreferenceRecoveries =>
+      List.unmodifiable(_preferenceRecoveries.values);
+
+  bool get sourcePreferencesBlocked =>
+      activeBuild != null &&
+      _preferenceRecoveries.keys.any(
+        (key) => key.$1 == activeBuild!.packageName,
+      );
+
+  SourcePreferencesTarget? get currentPreferencesTarget =>
+      activeBuild == null || activeSource == null
+      ? null
+      : SourcePreferencesTarget(build: activeBuild!, source: activeSource!);
 
   BusinessStateClient? get _confirmedBusinessClient {
-    final origin = deploymentOrigin;
+    final transport = api;
+    final origin =
+        deploymentOrigin ??
+        (transport is PlatformRuntime ? transport.origin : null);
     final verifiedSubject = subject;
     if (origin == null || verifiedSubject == null) return null;
     final identity = ProgressIdentity(origin: origin, subject: verifiedSubject);
+    if (_preferenceIdentity != identity.key) {
+      _sessionPreferenceValues.clear();
+      _preferenceRecoveries.clear();
+      loadedSourcePreferences = null;
+      _preferenceIdentity = identity.key;
+    }
     if (_businessClient?.identity.key != identity.key) {
       BusinessStateClient? retained;
       for (final client in _readingClients.keys) {
@@ -166,6 +208,7 @@ final class CatalogController extends ChangeNotifier {
       _progress = ProgressRepository(_businessClient!);
       _bookmarks = BookmarkRepository(_businessClient!);
       _settings = SettingsRepository(_businessClient!);
+      _sourcePreferences = SourcePreferencesRepository(_businessClient!);
     }
     return _businessClient;
   }
@@ -253,6 +296,7 @@ final class CatalogController extends ChangeNotifier {
       _progress = ProgressRepository(clientState);
       _bookmarks = BookmarkRepository(clientState);
       _settings = SettingsRepository(clientState);
+      _sourcePreferences = SourcePreferencesRepository(clientState);
     }
     if (!_readingClients.containsKey(client)) {
       _readingClients[client] = 0;
@@ -383,6 +427,7 @@ final class CatalogController extends ChangeNotifier {
     session = null;
     activeSource = null;
     activeBuild = null;
+    loadedSourcePreferences = null;
     mangas = const [];
     page = 0;
     hasNextPage = false;
@@ -559,7 +604,20 @@ final class CatalogController extends ChangeNotifier {
     lastBuildId = build.id;
     lastSourceId = null;
     final epoch = _epoch;
+    final preferences = sourcePreferences;
+    if (preferences == null) {
+      throw StateError('Source settings identity is unavailable');
+    }
+    if (preferences.hasPendingPackage(build.packageName)) {
+      throw const FormatException('这个扩展有未确认的设置，请先处理原设置操作。');
+    }
+    if (_preferenceRecoveries.keys.any((key) => key.$1 == build.packageName)) {
+      await _rebuildForPreferences();
+      if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    }
     _dropSession();
+    final confirmedPreferences = await preferences.load(build.packageName);
+    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     final identity = subject;
     if (identity == null) {
       throw const RuntimeException(RuntimeErrorCode.accessRequired, '身份未确认');
@@ -572,6 +630,29 @@ final class CatalogController extends ChangeNotifier {
         manifest.bundle.sha256.isEmpty) {
       throw const FormatException('构建标识不匹配');
     }
+    final bootstrap = wire.PreferenceBootstrap(packageName: build.packageName);
+    // Removed Sources retain their account values without being injected into
+    // an extension that no longer constructs that namespace.
+    final sourceIds = manifest.sourceIds.toSet();
+    for (final id in sourceIds) {
+      final entries = <String, wire.PreferenceEntry>{
+        for (final entry in confirmedPreferences.source(id).entries)
+          entry.key: entry,
+        for (final entry
+            in _sessionPreferenceValues[(build.packageName, id)] ??
+                <wire.PreferenceEntry>[])
+          entry.key: entry,
+      };
+      if (entries.isNotEmpty) {
+        bootstrap.sources.add(
+          wire.SourcePreferenceValues(
+            sourceId: id,
+            entries: canonicalPreferenceEntries(entries.values),
+          ),
+        );
+      }
+    }
+    wire.validatePreferenceBootstrap(bootstrap);
     _runtimeNeedsRebuild = true;
     final loaded = await runtime.open(
       BuildDescriptor(
@@ -580,11 +661,14 @@ final class CatalogController extends ChangeNotifier {
         sha256: manifest.bundle.sha256,
         identity: identity,
         packageId: build.packageName,
+        preferenceBootstrap: bootstrap,
       ),
     );
     if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     activeBuild = build;
     session = loaded;
+    loadedSourcePreferences = confirmedPreferences;
+    _preferenceRecoveries.removeWhere((key, _) => key.$1 == build.packageName);
     activeSource = null;
     mangas = const [];
     page = 0;
@@ -594,7 +678,11 @@ final class CatalogController extends ChangeNotifier {
   Future<SourceResult> _invoke(
     wire.SourceCall call, {
     void Function(String requestId)? onRequest,
+    bool allowPreferenceEdit = false,
   }) async {
+    if (sourcePreferencesBlocked && !allowPreferenceEdit) {
+      throw const FormatException('漫画源设置尚未确认或需要重开，请先处理设置。');
+    }
     final epoch = _epoch;
     final current = session;
     final build = activeBuild;
@@ -838,6 +926,142 @@ final class CatalogController extends ChangeNotifier {
       // Closing a sheet must not turn an already expired request into a new UI
       // failure. Its invalidated epoch still prevents a late publication.
     }
+  }
+
+  bool isCurrentPreferencesTarget(SourcePreferencesTarget target) =>
+      activeBuild?.packageName == target.build.packageName &&
+      activeSource?.id == target.source.id &&
+      session != null;
+
+  Future<void> _rebuildForPreferences() async {
+    _rebuildingRuntime = true;
+    try {
+      await rebuildRuntime();
+      _runtimeNeedsRebuild = false;
+    } finally {
+      _rebuildingRuntime = false;
+    }
+  }
+
+  Future<bool> reopenSourcePreferences(
+    SourcePreferencesTarget target, {
+    bool Function()? shouldContinue,
+  }) async {
+    if (_closed || busy || shouldContinue?.call() == false) return false;
+    final epoch = _epoch;
+    final identity = sourcePreferences?.identity.key;
+    bool current() =>
+        !_closed &&
+        epoch == _epoch &&
+        sourcePreferences?.identity.key == identity &&
+        shouldContinue?.call() != false;
+    final reopened = await _perform<bool>('正在重新打开漫画源', () async {
+      await _rebuildForPreferences();
+      if (!current()) return false;
+      // The explicit rebuild already retired the mutated generation.
+      _preferenceRecoveries.removeWhere(
+        (key, _) => key.$1 == target.build.packageName,
+      );
+      await _loadBuild(target.build, shouldContinue: current);
+      if (!current()) return false;
+      final matching = session?.sources.where(
+        (source) => source.id == target.source.id,
+      );
+      if (matching == null || matching.isEmpty) {
+        throw const FormatException('当前扩展中找不到原漫画源。');
+      }
+      final selected = _setSource(matching.single);
+      if (selected) status = ServiceStatus.ready;
+      return selected;
+    });
+    if (reopened != true || !current()) return false;
+    await loadMangas();
+    return current() && isCurrentPreferencesTarget(target);
+  }
+
+  Future<wire.PreferenceSnapshot?> describeSourcePreferences(
+    SourcePreferencesTarget target, {
+    bool Function()? shouldContinue,
+    void Function(String)? onRequest,
+  }) async {
+    if (!isCurrentPreferencesTarget(target) ||
+        sourcePreferencesBlocked ||
+        shouldContinue?.call() == false) {
+      return null;
+    }
+    return _perform<wire.PreferenceSnapshot>('正在读取漫画源设置', () async {
+      final result = await _invoke(
+        wire.SourceCall(getPreferences: wire.Empty()),
+        onRequest: (id) {
+          _preferenceRequestId = id;
+          onRequest?.call(id);
+        },
+      );
+      _preferenceRequestId = null;
+      if (shouldContinue?.call() == false) {
+        return throw const FormatException('设置页面已关闭');
+      }
+      if (!result.hasPreferences()) throw const FormatException('漫画源未返回设置');
+      return result.preferences.deepCopy()..freeze();
+    });
+  }
+
+  Future<wire.PreferenceEditResult?> editSourcePreference(
+    SourcePreferencesTarget target,
+    wire.PreferenceEditRequest request, {
+    bool Function()? shouldContinue,
+    void Function(String)? onRequest,
+  }) async {
+    if (!isCurrentPreferencesTarget(target) ||
+        sourcePreferencesBlocked ||
+        busy ||
+        shouldContinue?.call() == false) {
+      return null;
+    }
+    wire.validatePreferenceEditRequest(request);
+    _preferenceRecoveries[(target.build.packageName, target.source.id)] =
+        target;
+    return _perform<wire.PreferenceEditResult>('正在应用漫画源设置', () async {
+      final result = await _invoke(
+        wire.SourceCall(editPreference: request.deepCopy()),
+        allowPreferenceEdit: true,
+        onRequest: (id) {
+          _preferenceRequestId = id;
+          onRequest?.call(id);
+        },
+      );
+      _preferenceRequestId = null;
+      if (shouldContinue?.call() == false) {
+        return throw const FormatException('设置页面已关闭');
+      }
+      if (!result.hasPreferenceEdit()) {
+        throw const FormatException('漫画源未确认设置操作');
+      }
+      return result.preferenceEdit.deepCopy()..freeze();
+    });
+  }
+
+  Future<void> cancelSourcePreferenceRequest(String requestId) async {
+    if (_preferenceRequestId != requestId) return;
+    _preferenceRequestId = null;
+    ++_epoch;
+    busy = false;
+    activity = null;
+    _notify();
+    try {
+      await runtime.cancel(requestId);
+    } on RuntimeException {
+      // The real cancellation reports container loss through runtime.events.
+    }
+  }
+
+  void retainSourceSessionPreferences(
+    SourcePreferencesTarget target,
+    List<wire.PreferenceEntry> entries,
+  ) {
+    wire.validatePreferenceEntries(entries);
+    _sessionPreferenceValues[(target.build.packageName, target.source.id)] =
+        List.unmodifiable(entries.map((entry) => entry.deepCopy()..freeze()));
   }
 
   bool isCurrentSource(CatalogSourceRef reference) =>

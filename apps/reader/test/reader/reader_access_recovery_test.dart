@@ -80,7 +80,7 @@ final class _Fixture {
     await tester.pumpAndSettle();
     await tester.tap(find.text('去浏览'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('source.test · 1.0'));
+    await tester.tap(find.text('eu.kanade.source.test · 1.0'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('测试漫画源 · zh'));
     await tester.pumpAndSettle();
@@ -100,7 +100,7 @@ final class _Fixture {
     await expectLater(
       platform.runtime.invoke(
         SourceRequest(
-          packageId: 'source.test',
+          packageId: 'eu.kanade.source.test',
           call: wire.SourceCall(
             requestId: 'expire',
             generation: session.generation,
@@ -143,7 +143,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(await fixture.catalog.flushReadingProgress(), true);
       final mangaKey = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: testManga.url,
         chapters: const [],
@@ -200,7 +200,7 @@ void main() {
       final original = ReaderRecoveryContext(
         origin: 'https://reader.example.com',
         subject: 'owner',
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         manga: testManga..memoJson = _memo,
         chapterKey: 'chapter',
@@ -278,7 +278,7 @@ void main() {
         await fixture.catalog.flushReadingProgress();
         final repository = fixture.catalog.readingProgress!;
         final mangaKey = ChapterSequence(
-          packageName: 'source.test',
+          packageName: 'eu.kanade.source.test',
           sourceId: sourceId,
           mangaUrl: testManga.url,
           chapters: const [],
@@ -405,7 +405,7 @@ void main() {
       await fixture.open(tester);
       final original = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final mangaKey = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: testManga.url,
         chapters: const [],
@@ -519,7 +519,7 @@ void main() {
       await expectLater(
         fixture.platform.runtime.invoke(
           SourceRequest(
-            packageId: 'source.test',
+            packageId: 'eu.kanade.source.test',
             call: wire.SourceCall(
               requestId: 'expire-hop',
               generation: session.generation,

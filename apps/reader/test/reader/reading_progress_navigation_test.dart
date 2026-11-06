@@ -69,7 +69,11 @@ Future<CatalogController> _details(
   final scrollable = find
       .descendant(of: catalog, matching: find.byType(Scrollable))
       .first;
-  for (final label in ['source.test · 1.0', '测试漫画源 · zh', '真实源 DTO 测试']) {
+  for (final label in [
+    'eu.kanade.source.test · 1.0',
+    '测试漫画源 · zh',
+    '真实源 DTO 测试',
+  ]) {
     final target = find.descendant(of: catalog, matching: find.text(label));
     await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
     await tester.ensureVisible(target);
@@ -122,7 +126,7 @@ void main() {
       final before = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final manifest = before.manifest;
       final mangaKey = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: testManga.url,
         chapters: const [],
@@ -269,7 +273,7 @@ void main() {
       final leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final manifest = leaf.manifest;
       final mangaKey = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: testManga.url,
         chapters: const [],
@@ -359,7 +363,7 @@ void main() {
       var platform = _platform(server: server);
       var catalog = await _details(tester, platform);
       final mangaKey = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: testManga.url,
         chapters: const [],

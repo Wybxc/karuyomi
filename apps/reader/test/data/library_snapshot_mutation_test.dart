@@ -21,7 +21,7 @@ wire.Manga get _manga => wire.Manga(
   memoJson: '{"opaque":"retained"}',
 );
 String get _mangaKey => ChapterSequence(
-  packageName: 'source.test',
+  packageName: 'eu.kanade.source.test',
   sourceId: '123',
   mangaUrl: _manga.url,
   chapters: const [],
@@ -36,7 +36,7 @@ BusinessStateClient _client(ApiFetch api) => BusinessStateClient(
 );
 
 Future<void> _favorite(LibraryRepository library) => library.setFavorite(
-  packageName: 'source.test',
+  packageName: 'eu.kanade.source.test',
   sourceId: '123',
   sourceName: 'Source',
   sourceLang: 'zh',
@@ -223,7 +223,7 @@ void main() {
               wire.StateMutation(
                 mangaKey: _mangaKey,
                 updateMetadata: wire.LibraryMetadata(
-                  packageName: 'source.test',
+                  packageName: 'eu.kanade.source.test',
                   sourceId: '123',
                   sourceName: 'Source',
                   sourceLang: 'zh',
@@ -256,7 +256,7 @@ void main() {
         );
         await expectLater(
           library.refreshMetadata(
-            packageName: 'source.test',
+            packageName: 'eu.kanade.source.test',
             sourceId: '123',
             sourceName: 'Source',
             sourceLang: 'zh',
@@ -288,7 +288,7 @@ void main() {
       await _favorite(library);
       Future<void> refresh(LibraryRepository repository, wire.Manga manga) =>
           repository.refreshMetadata(
-            packageName: 'source.test',
+            packageName: 'eu.kanade.source.test',
             sourceId: '123',
             sourceName: 'Source',
             sourceLang: 'zh',

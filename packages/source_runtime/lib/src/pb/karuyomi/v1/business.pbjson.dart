@@ -1517,3 +1517,130 @@ final $typed_data.Uint8List settingsMutationResponseDescriptor = $convert.base64
     'MS5NYW5nYVJlYWRlclNldHRpbmdzUgVtYW5nYRJGChBlZmZlY3RpdmVfcmVhZGVyGAYgASgLMh'
     'sua2FydXlvbWkudjEuUmVhZGVyU2V0dGluZ3NSD2VmZmVjdGl2ZVJlYWRlchI1CgVlcnJvchgH'
     'IAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvclIFZXJyb3I=');
+
+@$core.Deprecated('Use sourcePreferencesDescriptor instead')
+const SourcePreferences$json = {
+  '1': 'SourcePreferences',
+  '2': [
+    {'1': 'package_name', '3': 1, '4': 1, '5': 9, '10': 'packageName'},
+    {'1': 'source_id', '3': 2, '4': 1, '5': 9, '10': 'sourceId'},
+    {'1': 'revision', '3': 3, '4': 1, '5': 13, '10': 'revision'},
+    {
+      '1': 'entries',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceEntry',
+      '10': 'entries'
+    },
+  ],
+};
+
+/// Descriptor for `SourcePreferences`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourcePreferencesDescriptor = $convert.base64Decode(
+    'ChFTb3VyY2VQcmVmZXJlbmNlcxIhCgxwYWNrYWdlX25hbWUYASABKAlSC3BhY2thZ2VOYW1lEh'
+    'sKCXNvdXJjZV9pZBgCIAEoCVIIc291cmNlSWQSGgoIcmV2aXNpb24YAyABKA1SCHJldmlzaW9u'
+    'EjYKB2VudHJpZXMYBCADKAsyHC5rYXJ1eW9taS52MS5QcmVmZXJlbmNlRW50cnlSB2VudHJpZX'
+    'M=');
+
+@$core.Deprecated('Use sourcePreferencesResponseDescriptor instead')
+const SourcePreferencesResponse$json = {
+  '1': 'SourcePreferencesResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'account_revision', '3': 2, '4': 1, '5': 13, '10': 'accountRevision'},
+    {'1': 'package_name', '3': 3, '4': 1, '5': 9, '10': 'packageName'},
+    {
+      '1': 'sources',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.SourcePreferences',
+      '10': 'sources'
+    },
+    {
+      '1': 'error',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `SourcePreferencesResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourcePreferencesResponseDescriptor = $convert.base64Decode(
+    'ChlTb3VyY2VQcmVmZXJlbmNlc1Jlc3BvbnNlEiUKDnNjaGVtYV92ZXJzaW9uGAEgASgNUg1zY2'
+    'hlbWFWZXJzaW9uEikKEGFjY291bnRfcmV2aXNpb24YAiABKA1SD2FjY291bnRSZXZpc2lvbhIh'
+    'CgxwYWNrYWdlX25hbWUYAyABKAlSC3BhY2thZ2VOYW1lEjgKB3NvdXJjZXMYBCADKAsyHi5rYX'
+    'J1eW9taS52MS5Tb3VyY2VQcmVmZXJlbmNlc1IHc291cmNlcxI1CgVlcnJvchgFIAEoCzIfLmth'
+    'cnV5b21pLnYxLkJ1c2luZXNzU3RhdGVFcnJvclIFZXJyb3I=');
+
+@$core.Deprecated('Use sourcePreferencesMutationDescriptor instead')
+const SourcePreferencesMutation$json = {
+  '1': 'SourcePreferencesMutation',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'mutation_id', '3': 2, '4': 1, '5': 9, '10': 'mutationId'},
+    {'1': 'package_name', '3': 3, '4': 1, '5': 9, '10': 'packageName'},
+    {'1': 'source_id', '3': 4, '4': 1, '5': 9, '10': 'sourceId'},
+    {
+      '1': 'expected_revision',
+      '3': 5,
+      '4': 1,
+      '5': 13,
+      '10': 'expectedRevision'
+    },
+    {
+      '1': 'entries',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceEntry',
+      '10': 'entries'
+    },
+  ],
+};
+
+/// Descriptor for `SourcePreferencesMutation`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourcePreferencesMutationDescriptor = $convert.base64Decode(
+    'ChlTb3VyY2VQcmVmZXJlbmNlc011dGF0aW9uEiUKDnNjaGVtYV92ZXJzaW9uGAEgASgNUg1zY2'
+    'hlbWFWZXJzaW9uEh8KC211dGF0aW9uX2lkGAIgASgJUgptdXRhdGlvbklkEiEKDHBhY2thZ2Vf'
+    'bmFtZRgDIAEoCVILcGFja2FnZU5hbWUSGwoJc291cmNlX2lkGAQgASgJUghzb3VyY2VJZBIrCh'
+    'FleHBlY3RlZF9yZXZpc2lvbhgFIAEoDVIQZXhwZWN0ZWRSZXZpc2lvbhI2CgdlbnRyaWVzGAYg'
+    'AygLMhwua2FydXlvbWkudjEuUHJlZmVyZW5jZUVudHJ5UgdlbnRyaWVz');
+
+@$core.Deprecated('Use sourcePreferencesMutationResponseDescriptor instead')
+const SourcePreferencesMutationResponse$json = {
+  '1': 'SourcePreferencesMutationResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {'1': 'mutation_id', '3': 2, '4': 1, '5': 9, '10': 'mutationId'},
+    {'1': 'account_revision', '3': 3, '4': 1, '5': 13, '10': 'accountRevision'},
+    {
+      '1': 'preferences',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SourcePreferences',
+      '10': 'preferences'
+    },
+    {
+      '1': 'error',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `SourcePreferencesMutationResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourcePreferencesMutationResponseDescriptor = $convert.base64Decode(
+    'CiFTb3VyY2VQcmVmZXJlbmNlc011dGF0aW9uUmVzcG9uc2USJQoOc2NoZW1hX3ZlcnNpb24YAS'
+    'ABKA1SDXNjaGVtYVZlcnNpb24SHwoLbXV0YXRpb25faWQYAiABKAlSCm11dGF0aW9uSWQSKQoQ'
+    'YWNjb3VudF9yZXZpc2lvbhgDIAEoDVIPYWNjb3VudFJldmlzaW9uEkAKC3ByZWZlcmVuY2VzGA'
+    'QgASgLMh4ua2FydXlvbWkudjEuU291cmNlUHJlZmVyZW5jZXNSC3ByZWZlcmVuY2VzEjUKBWVy'
+    'cm9yGAUgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NTdGF0ZUVycm9yUgVlcnJvcg==');

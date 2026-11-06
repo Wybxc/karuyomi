@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
-import { type SourceCall } from '@karuyomi/contracts';
+import { type BuildManifest, type SourceCall } from '@karuyomi/contracts';
 import { TeaVMDriver, type TeaVMGlobals } from '../src/teavm-driver.js';
 import { HttpOwnerFailure } from '../src/http-transport.js';
 import { VerifiedLoader } from '../src/verified-loader.js';
@@ -14,8 +14,12 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function setup() {
-  const build = await manifest();
+async function setup(
+  buildOverride?: BuildManifest,
+  preferences?: pb.PreferenceBootstrap,
+) {
+  const build = buildOverride ?? (await manifest());
+  const configurations: string[] = [];
   const scope: TeaVMGlobals = {};
   const entries: {
     kind: string;
@@ -37,7 +41,8 @@ async function setup() {
         entries.push({ kind: 'init', requestId, generation, token });
         scope.teaDone!('"ready"');
       };
-      scope.hostLoad = (requestId, generation, token) => {
+      scope.hostLoad = (configuration, requestId, generation, token) => {
+        configurations.push(configuration);
         entries.push({ kind: 'load', requestId, generation, token });
         scope.teaDone!(
           JSON.stringify([
@@ -66,7 +71,13 @@ async function setup() {
   );
   drivers.push(driver);
   const context = { requestId: 'same-request', generation: 'same-generation' };
-  await driver.open(build, 'test', new AbortController().signal, context);
+  await driver.open(
+    build,
+    'test',
+    new AbortController().signal,
+    context,
+    preferences,
+  );
   const sourceId = build.sourceIds[0];
   if (!sourceId) throw Error('Fixture must declare a Source');
   const call: SourceCall = create(pb.SourceCallSchema, {
@@ -74,7 +85,7 @@ async function setup() {
     sourceId,
     request: { case: 'popular', value: { page: 1 } },
   });
-  return { driver, scope, entries, context, call };
+  return { driver, scope, entries, context, call, configurations };
 }
 
 function metadata(
@@ -278,4 +289,154 @@ test('filtered search preserves explicit false, null sorting and nested paths in
   if (result.case !== 'mangaPage')
     throw new Error('Expected filtered search results');
   expect(result.value.hasNextPage).toBe(true);
+});
+
+test('hostLoad receives confirmed and session bootstrap before source construction and the owned package sync policy', async () => {
+  const build = {
+    ...(await manifest()),
+    packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
+  };
+  const bootstrap = create(pb.PreferenceBootstrapSchema, {
+    packageName: build.packageName,
+    sources: [
+      {
+        sourceId: build.sourceIds[0],
+        entries: [
+          {
+            key: 'preferred_mirror',
+            value: { value: { case: 'text', value: '1' } },
+          },
+          {
+            key: 'session-long',
+            value: {
+              value: { case: 'longInteger', value: 9223372036854775807n },
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const { configurations, entries } = await setup(build, bootstrap);
+  expect(entries.map((entry) => entry.kind)).toEqual(['init', 'load']);
+  expect(configurations).toHaveLength(1);
+  expect(JSON.parse(configurations[0]!)).toEqual({
+    bootstrap: {
+      packageName: build.packageName,
+      sources: [
+        {
+          sourceId: build.sourceIds[0],
+          entries: [
+            { key: 'preferred_mirror', value: { text: '1' } },
+            {
+              key: 'session-long',
+              value: { longInteger: '9223372036854775807' },
+            },
+          ],
+        },
+      ],
+    },
+    syncRules: [
+      { key: 'preferred_mirror', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+      { key: 'CHAPTER_FILTER', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+    ],
+  });
+});
+
+test('typed preference edits invoke Java once and reject Source claims that unapproved secrets are synchronized', async () => {
+  const build = {
+    ...(await manifest()),
+    packageName: 'eu.kanade.tachiyomi.extension.en.mangakatana',
+  };
+  const { driver, scope, context, call } = await setup(build);
+  const invoked = vi.fn((_source: string, operation: string, args: string) => {
+    expect(operation).toBe('editPreference');
+    expect(JSON.parse(args)).toEqual({
+      snapshotId: 'prefs-1',
+      path: [0],
+      change: { text: '' },
+    });
+    scope.teaDone!(
+      JSON.stringify({
+        accepted: false,
+        snapshot: {
+          snapshotId: 'prefs-2',
+          nodes: [],
+          syncValues: [{ key: 'SERVER_PREFERENCE', value: { text: 'mk' } }],
+          sessionValues: [{ key: 'token', value: { text: 'secret' } }],
+        },
+      }),
+    );
+  });
+  scope.hostInvoke = invoked;
+  const editing = create(pb.SourceCallSchema, {
+    ...context,
+    sourceId: call.sourceId,
+    request: {
+      case: 'editPreference',
+      value: {
+        snapshotId: 'prefs-1',
+        path: [0],
+        command: {
+          case: 'change',
+          value: { value: { case: 'text', value: '' } },
+        },
+      },
+    },
+  });
+  const result = await driver.invoke(editing, context);
+  expect(invoked).toHaveBeenCalledOnce();
+  expect(result.case).toBe('preferenceEdit');
+  if (result.case !== 'preferenceEdit' || !result.value.snapshot)
+    throw new Error('Expected edit snapshot');
+  expect(result.value.accepted).toBe(false);
+  expect(result.value.snapshot.syncValues[0]?.key).toBe('SERVER_PREFERENCE');
+  scope.hostInvoke = vi.fn(() =>
+    scope.teaDone!(
+      JSON.stringify({
+        snapshotId: 'invalid',
+        nodes: [],
+        syncValues: [{ key: 'token', value: { text: 'secret' } }],
+      }),
+    ),
+  );
+  await expect(
+    driver.invoke(
+      create(pb.SourceCallSchema, {
+        ...context,
+        sourceId: call.sourceId,
+        request: { case: 'getPreferences', value: {} },
+      }),
+      context,
+    ),
+  ).rejects.toThrow('not approved');
+  expect(scope.hostInvoke).toHaveBeenCalledOnce();
+});
+
+test('foreign-package and undeclared-source bootstrap fail before importing or running the extension', async () => {
+  for (const bootstrap of [
+    create(pb.PreferenceBootstrapSchema, { packageName: 'eu.kanade.other' }),
+    create(pb.PreferenceBootstrapSchema, {
+      packageName: 'eu.kanade.tachiyomi.extension.test',
+      sources: [{ sourceId: '1' }],
+    }),
+  ]) {
+    const importer = vi.fn();
+    const driver = new TeaVMDriver(
+      {},
+      new VerifiedLoader('https://reader.example', vi.fn()),
+      importer,
+      'https://reader.example',
+    );
+    drivers.push(driver);
+    await expect(
+      driver.open(
+        await manifest(),
+        'test',
+        new AbortController().signal,
+        undefined,
+        bootstrap,
+      ),
+    ).rejects.toMatchObject({ code: 'protocol_error' });
+    expect(importer).not.toHaveBeenCalled();
+  }
 });

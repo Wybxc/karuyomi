@@ -146,7 +146,7 @@ void main() {
         'builds': [
           {
             'buildId': 'build-2',
-            'packageName': 'source.test',
+            'packageName': 'eu.kanade.source.test',
             'version': '2.0',
             'manifestPath': '/extensions/builds/build-2/manifest.json',
           },
@@ -210,7 +210,7 @@ void main() {
       await expectLater(
         platform.runtime.invoke(
           SourceRequest(
-            packageId: 'source.test',
+            packageId: 'eu.kanade.source.test',
             call: wire.SourceCall(
               requestId: 'old-after-reconnect',
               generation: 'generation-1',
@@ -340,7 +340,7 @@ void main() {
   test('static index rejects duplicate package versions', () async {
     final entry = {
       'buildId': 'build-1',
-      'packageName': 'source.test',
+      'packageName': 'eu.kanade.source.test',
       'version': '1.0',
       'manifestPath': '/extensions/builds/build-1/manifest.json',
     };

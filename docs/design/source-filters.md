@@ -18,6 +18,6 @@
 
 ## 原型交付边界
 
-本次 host ABI 升为 `karuyomi-source-host-v5`，传输协议版本仍为 2；旧 ABI 扩展必须重建，不维护兼容回退。筛选是会话查询状态，不引入 D1、持久 outbox 或 Source preferences 设置系统。
+筛选初次引入时 host ABI 为 `karuyomi-source-host-v5`；当前 Source 设置进一步升为 [v6](source-preferences.md)，筛选合同继续保留，传输协议版本仍为 2；旧 ABI 扩展必须重建，不维护兼容回退。筛选是会话查询状态，不引入 D1、持久 outbox 或 Source preferences 设置系统。
 
 Komiic 的 Select 子类同时实现其自有业务接口，空查询搜索才应用筛选；它可作为静态选择与原子类保留的实际候选。界面保留 Source 自身关于关键词与筛选组合的 Header，不承诺插件没有实现的组合。CuuTruyen 的动态标签 Group/CheckBox 可作动态验收候选。其 getFilterList 可能先返回缓存或重置提示，再通过原后台机制取得标签；宿主不改写插件业务，也不把初次返回提示当成标签已加载。宿主在调度后台 coroutine 前登记有界工作 lease，等待 HTTP 及后续缓存写入/完成回调真正结束；LAZY 固定创建时 owner，未启动不占 lease，过期任务和完成回调不能采用下一 entry。工作与 HTTP 回调分别限 64 个，共用 30 秒 drain 期限。代表 AOT、真实在线筛选、空查询和分页均须另行实测。JVM、TS/Dart 合同与组件检查不能替代这些门。

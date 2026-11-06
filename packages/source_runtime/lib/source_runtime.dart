@@ -1,6 +1,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:reader_core/reader_core.dart';
 import 'control_protocol.dart' as wire;
 import 'src/generated.dart';
@@ -69,6 +70,7 @@ final class BuildDescriptor {
     required this.sha256,
     this.identity = '',
     this.packageId,
+    this.preferenceBootstrap,
   });
 
   final String buildId;
@@ -78,6 +80,9 @@ final class BuildDescriptor {
   /// Confirmed Access subject. Never a JWT or service token.
   final String identity;
   final String? packageId;
+
+  /// Confirmed account values plus current client session values, injected before Source construction.
+  final wire.PreferenceBootstrap? preferenceBootstrap;
 }
 
 typedef RuntimeSession = wire.RuntimeSession;

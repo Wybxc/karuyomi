@@ -27,7 +27,7 @@ void main() {
       await catalog.selectSource(catalog.session!.sources.single);
       final manga = catalog.mangas.single;
       final sequence = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: manga.url,
         chapters: [wire.Chapter(url: '/one', name: '一')],
@@ -90,7 +90,7 @@ void main() {
         await catalog.selectSource(catalog.session!.sources.single);
         final manga = catalog.mangas.single;
         final sequence = ChapterSequence(
-          packageName: 'source.test',
+          packageName: 'eu.kanade.source.test',
           sourceId: sourceId,
           mangaUrl: manga.url,
           chapters: [
@@ -231,7 +231,7 @@ void main() {
       await catalog.selectSource(catalog.session!.sources.single);
       final manga = catalog.mangas.single;
       final sequence = ChapterSequence(
-        packageName: 'source.test',
+        packageName: 'eu.kanade.source.test',
         sourceId: sourceId,
         mangaUrl: manga.url,
         chapters: [

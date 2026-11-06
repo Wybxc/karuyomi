@@ -44,7 +44,7 @@ void main() {
     if (addedAt != null) serverNow = addedAt;
     final repository = controller.library!;
     await repository.setFavorite(
-      packageName: 'source.test',
+      packageName: 'eu.kanade.source.test',
       sourceId: sourceId,
       sourceName: sourceName,
       sourceLang: 'zh',
@@ -240,7 +240,7 @@ void main() {
         await show(tester);
         expect(find.text('书架还是空的'), findsOneWidget);
         await remote.library!.setFavorite(
-          packageName: 'source.test',
+          packageName: 'eu.kanade.source.test',
           sourceId: sourceId,
           sourceName: '测试漫画源',
           sourceLang: 'zh',

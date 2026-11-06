@@ -9,6 +9,7 @@ import '../runtime/cover_transport.dart';
 import '../runtime/runtime_platform_types.dart';
 import 'business_state_validation.dart';
 import 'reading_progress.dart';
+import 'source_preferences_validation.dart';
 
 const _schemaVersion = 1;
 const _responseLimit = 2 * 1024 * 1024;
@@ -116,6 +117,14 @@ final class _PendingSettingsMutation {
   BusinessStateException? rejection;
 }
 
+final class _PendingSourcePreferencesMutation {
+  _PendingSourcePreferencesMutation(this.fingerprint, this.request, this.body);
+  final String fingerprint;
+  final wire.SourcePreferencesMutation request;
+  final String body;
+  BusinessStateException? rejection;
+}
+
 /// A session cache bound to one confirmed origin and Access subject. All
 /// repositories share it so their writes use one revision per manga.
 final class BusinessStateClient {
@@ -138,6 +147,9 @@ final class BusinessStateClient {
   final _queues = <String, Future<void>>{};
   final _uuid = const Uuid();
   final _pendingSettings = <String, _PendingSettingsMutation>{};
+  final _sourcePreferences = <String, wire.SourcePreferencesResponse>{};
+  final _pendingSourcePreferences =
+      <String, _PendingSourcePreferencesMutation>{};
   final _settings = <String, wire.SettingsResponse>{};
   final _settingsChanges = StreamController<wire.SettingsResponse>.broadcast(
     sync: true,
@@ -1294,6 +1306,219 @@ final class BusinessStateClient {
     return current;
   }
 
+  ({wire.SourcePreferencesMutation request, bool retryable})?
+  pendingSourcePreferences(String packageName, String sourceId) {
+    if (_closed) return null;
+    final pending =
+        _pendingSourcePreferences[_sourcePreferenceKey(packageName, sourceId)];
+    return pending == null
+        ? null
+        : (request: pending.request, retryable: pending.rejection == null);
+  }
+
+  bool hasPendingSourcePreferences(String packageName) =>
+      !_closed &&
+      _pendingSourcePreferences.values.any(
+        (pending) => pending.request.packageName == packageName,
+      );
+
+  Future<wire.SourcePreferencesResponse> readSourcePreferences(
+    String packageName,
+  ) {
+    validateSourcePreferencesIdentity(packageName);
+    return _serial(
+      'source-preferences:$packageName',
+      () => _readSourcePreferences(packageName, clearRejected: true),
+    );
+  }
+
+  Future<wire.SourcePreferencesResponse> _readSourcePreferences(
+    String packageName, {
+    bool clearRejected = false,
+  }) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final reply = await _get(
+        '/api/source-preferences/packages/${Uri.encodeComponent(packageName)}',
+      );
+      final value = wire.decodeProtoJson(
+        wire.SourcePreferencesResponse(),
+        jsonDecode(reply.body),
+        maxBytes: 128 * 1024,
+      );
+      validateSourcePreferencesResponse(value, packageName);
+      if (value.hasError()) throw BusinessStateException(value.error);
+      _success(reply);
+      final previous = _sourcePreferences[packageName];
+      if (value.accountRevision < _accountRevision) continue;
+      var stale = false;
+      for (final old in previous?.sources ?? <wire.SourcePreferences>[]) {
+        final matching = value.sources.where(
+          (source) => source.sourceId == old.sourceId,
+        );
+        if (matching.isEmpty || matching.single.revision < old.revision) {
+          stale = true;
+          break;
+        }
+        if (matching.single.revision == old.revision &&
+            !samePreferenceEntries(matching.single.entries, old.entries)) {
+          throw const FormatException(
+            'Source settings changed without revision',
+          );
+        }
+      }
+      if (stale) continue;
+      _ensureOpen();
+      final confirmed = value.deepCopy()..freeze();
+      _sourcePreferences[packageName] = confirmed;
+      _accountRevision = value.accountRevision;
+      if (clearRejected) {
+        _pendingSourcePreferences.removeWhere(
+          (_, pending) =>
+              pending.request.packageName == packageName &&
+              pending.rejection != null,
+        );
+      }
+      return confirmed;
+    }
+    throw StateError('Source settings changed repeatedly; refresh again');
+  }
+
+  Future<wire.SourcePreferencesResponse> mutateSourcePreferences(
+    wire.SourcePreferencesMutation operation,
+  ) {
+    final command = operation.deepCopy()
+      ..schemaVersion = _schemaVersion
+      ..clearMutationId();
+    validateSourcePreferencesIdentity(command.packageName, command.sourceId);
+    validateBusinessRevision(command.expectedRevision);
+    final entries = canonicalPreferenceEntries(command.entries);
+    wire.validatePreferenceEntries(entries);
+    command.entries
+      ..clear()
+      ..addAll(entries);
+    final fingerprint = jsonEncode(
+      wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
+    );
+    final key = _sourcePreferenceKey(command.packageName, command.sourceId);
+    return _serial('source-preferences:${command.packageName}', () {
+      final previous = _pendingSourcePreferences[key];
+      if (previous != null) {
+        if (previous.fingerprint != fingerprint) {
+          throw StateError('请先处理这个漫画源未确认的原设置操作。');
+        }
+        return _sendSourcePreferences(previous);
+      }
+      command.mutationId = _uuid.v4();
+      final body = jsonEncode(
+        wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
+      );
+      command.freeze();
+      final pending = _PendingSourcePreferencesMutation(
+        fingerprint,
+        command,
+        body,
+      );
+      _pendingSourcePreferences[key] = pending;
+      return _sendSourcePreferences(pending);
+    });
+  }
+
+  Future<wire.SourcePreferencesResponse> retrySourcePreferences(
+    String packageName,
+    String sourceId,
+  ) => _serial('source-preferences:$packageName', () {
+    final pending =
+        _pendingSourcePreferences[_sourcePreferenceKey(packageName, sourceId)];
+    if (pending == null) throw StateError('没有待确认的原漫画源设置。');
+    return _sendSourcePreferences(pending);
+  });
+
+  Future<wire.SourcePreferencesResponse> discardSourcePreferences(
+    String packageName,
+    String sourceId,
+  ) => _serial('source-preferences:$packageName', () async {
+    final current = await _readSourcePreferences(packageName);
+    _pendingSourcePreferences.remove(
+      _sourcePreferenceKey(packageName, sourceId),
+    );
+    return current;
+  });
+
+  Future<wire.SourcePreferencesResponse> _sendSourcePreferences(
+    _PendingSourcePreferencesMutation pending,
+  ) async {
+    _ensureOpen();
+    if (pending.rejection != null) throw pending.rejection!;
+    final reply = await api.fetchApi(
+      '/api/source-preferences/mutations',
+      method: 'POST',
+      headers: {..._headers, 'Content-Type': 'application/json'},
+      body: pending.body,
+    );
+    _ensureOpen();
+    _budget(reply);
+    final value = wire.decodeProtoJson(
+      wire.SourcePreferencesMutationResponse(),
+      jsonDecode(reply.body),
+      maxBytes: 128 * 1024,
+    );
+    _version(value.schemaVersion);
+    validateBusinessRevision(value.accountRevision);
+    if (value.mutationId != pending.request.mutationId &&
+        (!value.hasError() || value.mutationId.isNotEmpty)) {
+      throw const FormatException('Source settings mutation identity mismatch');
+    }
+    if (value.hasError()) {
+      final failure = BusinessStateException(value.error);
+      if (!value.error.retryable) pending.rejection = failure;
+      throw failure;
+    }
+    _success(reply);
+    if (!value.hasPreferences()) {
+      throw const FormatException(
+        'Source settings ACK has no confirmed values',
+      );
+    }
+    validateSourcePreferences(value.preferences, pending.request.packageName);
+    if (value.preferences.sourceId != pending.request.sourceId ||
+        value.preferences.revision != pending.request.expectedRevision + 1 ||
+        !samePreferenceEntries(
+          value.preferences.entries,
+          pending.request.entries,
+        )) {
+      throw const FormatException(
+        'Source settings ACK differs from submitted values',
+      );
+    }
+    final current = await _readSourcePreferences(pending.request.packageName);
+    final matches = current.sources.where(
+      (source) => source.sourceId == pending.request.sourceId,
+    );
+    if (matches.isEmpty ||
+        !samePreferenceEntries(
+          matches.single.entries,
+          pending.request.entries,
+        )) {
+      final failure = BusinessStateException(
+        wire.BusinessStateError(
+          code: wire
+              .BusinessStateErrorCode
+              .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT,
+          message: 'Source settings changed after this mutation was applied',
+        ),
+      );
+      pending.rejection = failure;
+      throw failure;
+    }
+    _pendingSourcePreferences.remove(
+      _sourcePreferenceKey(
+        pending.request.packageName,
+        pending.request.sourceId,
+      ),
+    );
+    return current;
+  }
+
   Future<ApiReply> _get(String path) async {
     _ensureOpen();
     final reply = await api.fetchApi(path, headers: _headers);
@@ -1413,6 +1638,8 @@ final class BusinessStateClient {
     _pending.clear();
     _library = const [];
     _pendingCategory = null;
+    _pendingSourcePreferences.clear();
+    _sourcePreferences.clear();
     _pendingSettings.clear();
     _settings.clear();
     await _settingsChanges.close();
@@ -1455,3 +1682,6 @@ bool _coverMatches(wire.StateMutation request, wire.MangaState manga) =>
     (request.setCustomCover.hasCover() == manga.hasCustomCover() &&
         (!manga.hasCustomCover() ||
             request.setCustomCover.cover == manga.customCover));
+
+String _sourcePreferenceKey(String packageName, String sourceId) =>
+    jsonEncode([packageName, sourceId]);

@@ -31,7 +31,10 @@ export type GoldenType =
   | 'CategoryCatalogResponse'
   | 'SettingsMutation'
   | 'SettingsResponse'
-  | 'SettingsMutationResponse';
+  | 'SettingsMutationResponse'
+  | 'SourcePreferencesMutation'
+  | 'SourcePreferencesResponse'
+  | 'SourcePreferencesMutationResponse';
 
 export interface GoldenFixture {
   name: string;
@@ -341,7 +344,191 @@ const settingsSnapshot: JsonObject = {
   effectiveReader: { ...globalReader, ...readerOverrides },
 };
 
+const preferenceEntries: JsonObject[] = [
+  { key: 'off', value: { boolean: false } },
+  { key: 'empty', value: { text: '' } },
+  { key: 'int', value: { integer: -2147483648 } },
+  { key: 'long', value: { longInteger: '9223372036854775807' } },
+  { key: 'float', value: { decimal: 1.5 } },
+  { key: 'set', value: { strings: { values: [] } } },
+];
+const preferenceBootstrap: JsonObject = {
+  packageName,
+  sources: [{ sourceId, entries: preferenceEntries }],
+};
+const preferenceSnapshot: JsonObject = {
+  snapshotId: 'preferences-golden',
+  nodes: [
+    {
+      key: 'off',
+      title: '开关',
+      enabled: true,
+      visible: true,
+      syncScope: 'PREFERENCE_SYNC_SCOPE_ACCOUNT',
+      defaultValue: { boolean: false },
+      toggle: { value: false },
+    },
+    {
+      key: 'empty',
+      title: '凭证',
+      enabled: true,
+      visible: true,
+      syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION',
+      text: { value: '', secret: true, inputType: 129 },
+    },
+    {
+      key: 'choice',
+      syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION',
+      choice: {
+        options: [{ label: '镜像', value: '1' }],
+        value: 'unavailable',
+      },
+    },
+    {
+      syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION',
+      group: {
+        nodes: [
+          {
+            key: 'multi',
+            syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION',
+            multiChoice: { options: [], values: [] },
+          },
+        ],
+      },
+    },
+    { syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION', action: {} },
+    {
+      syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION',
+      unsupported: { reason: 'Activity is unavailable' },
+    },
+  ],
+  syncValues: [preferenceEntries[0]!],
+  sessionValues: preferenceEntries.slice(1),
+};
+const preferenceBusinessPackage = 'eu.kanade.tachiyomi.extension.zh.komiic';
+const preferenceBusinessEntries: JsonObject[] = [
+  { key: 'preferred_mirror', value: { text: '' } },
+  { key: 'CHAPTER_FILTER', value: { text: '0' } },
+];
+const sourcePreferences: JsonObject = {
+  packageName: preferenceBusinessPackage,
+  sourceId,
+  revision: 1,
+  entries: preferenceBusinessEntries,
+};
+
 export const goldenFixtures: GoldenFixture[] = [
+  {
+    name: 'preferences-open-bootstrap',
+    type: 'ControlRequest',
+    value: {
+      requestId,
+      open: {
+        manifestPath: `/extensions/builds/${buildId}/manifest.json`,
+        identity: 'golden-owner',
+        expectedBuildId: buildId,
+        expectedBundleSha256: sha256,
+        preferenceBootstrap,
+      },
+    },
+  },
+  {
+    name: 'preferences-worker-bootstrap',
+    type: 'WorkerCommand',
+    value: {
+      envelope,
+      open: {
+        manifest: buildManifest,
+        userAgent: 'Golden/1.0',
+        preferenceBootstrap,
+      },
+    },
+  },
+  {
+    name: 'preferences-read',
+    type: 'SourceCall',
+    value: { requestId, generation, sourceId, getPreferences: {} },
+  },
+  {
+    name: 'preferences-change-empty',
+    type: 'SourceCall',
+    value: {
+      requestId,
+      generation,
+      sourceId,
+      editPreference: {
+        snapshotId: 'preferences-golden',
+        path: [3, 0],
+        change: { strings: { values: [] } },
+      },
+    },
+  },
+  {
+    name: 'preferences-click',
+    type: 'SourceCall',
+    value: {
+      requestId,
+      generation,
+      sourceId,
+      editPreference: {
+        snapshotId: 'preferences-golden',
+        path: [4],
+        click: {},
+      },
+    },
+  },
+  {
+    name: 'preferences-snapshot',
+    type: 'SourceResult',
+    value: { requestId, generation, buildId, preferences: preferenceSnapshot },
+  },
+  {
+    name: 'preferences-veto-result',
+    type: 'SourceResult',
+    value: {
+      requestId,
+      generation,
+      buildId,
+      preferenceEdit: {
+        accepted: false,
+        clickHandled: false,
+        snapshot: preferenceSnapshot,
+      },
+    },
+  },
+  {
+    name: 'preferences-business-mutation',
+    type: 'SourcePreferencesMutation',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      packageName: preferenceBusinessPackage,
+      sourceId,
+      expectedRevision: 0,
+      entries: preferenceBusinessEntries,
+    },
+  },
+  {
+    name: 'preferences-business-response',
+    type: 'SourcePreferencesResponse',
+    value: {
+      schemaVersion: 1,
+      packageName: preferenceBusinessPackage,
+      accountRevision: 2,
+      sources: [sourcePreferences],
+    },
+  },
+  {
+    name: 'preferences-business-ack',
+    type: 'SourcePreferencesMutationResponse',
+    value: {
+      schemaVersion: 1,
+      mutationId: businessMutationId,
+      accountRevision: 2,
+      preferences: sourcePreferences,
+    },
+  },
+
   {
     name: 'settings-global-all-preferences',
     type: 'SettingsMutation',

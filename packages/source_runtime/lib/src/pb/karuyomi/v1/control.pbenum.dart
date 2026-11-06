@@ -74,6 +74,72 @@ class RuntimeErrorCode extends $pb.ProtobufEnum {
   const RuntimeErrorCode._(super.value, super.name);
 }
 
+class PreferenceValueKind extends $pb.ProtobufEnum {
+  static const PreferenceValueKind PREFERENCE_VALUE_KIND_UNSPECIFIED =
+      PreferenceValueKind._(
+          0, _omitEnumNames ? '' : 'PREFERENCE_VALUE_KIND_UNSPECIFIED');
+  static const PreferenceValueKind PREFERENCE_VALUE_KIND_BOOLEAN =
+      PreferenceValueKind._(
+          1, _omitEnumNames ? '' : 'PREFERENCE_VALUE_KIND_BOOLEAN');
+  static const PreferenceValueKind PREFERENCE_VALUE_KIND_TEXT =
+      PreferenceValueKind._(
+          2, _omitEnumNames ? '' : 'PREFERENCE_VALUE_KIND_TEXT');
+  static const PreferenceValueKind PREFERENCE_VALUE_KIND_INTEGER =
+      PreferenceValueKind._(
+          3, _omitEnumNames ? '' : 'PREFERENCE_VALUE_KIND_INTEGER');
+  static const PreferenceValueKind PREFERENCE_VALUE_KIND_DECIMAL =
+      PreferenceValueKind._(
+          4, _omitEnumNames ? '' : 'PREFERENCE_VALUE_KIND_DECIMAL');
+  static const PreferenceValueKind PREFERENCE_VALUE_KIND_STRINGS =
+      PreferenceValueKind._(
+          5, _omitEnumNames ? '' : 'PREFERENCE_VALUE_KIND_STRINGS');
+  static const PreferenceValueKind PREFERENCE_VALUE_KIND_LONG_INTEGER =
+      PreferenceValueKind._(
+          6, _omitEnumNames ? '' : 'PREFERENCE_VALUE_KIND_LONG_INTEGER');
+
+  static const $core.List<PreferenceValueKind> values = <PreferenceValueKind>[
+    PREFERENCE_VALUE_KIND_UNSPECIFIED,
+    PREFERENCE_VALUE_KIND_BOOLEAN,
+    PREFERENCE_VALUE_KIND_TEXT,
+    PREFERENCE_VALUE_KIND_INTEGER,
+    PREFERENCE_VALUE_KIND_DECIMAL,
+    PREFERENCE_VALUE_KIND_STRINGS,
+    PREFERENCE_VALUE_KIND_LONG_INTEGER,
+  ];
+
+  static final $core.List<PreferenceValueKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static PreferenceValueKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PreferenceValueKind._(super.value, super.name);
+}
+
+class PreferenceSyncScope extends $pb.ProtobufEnum {
+  static const PreferenceSyncScope PREFERENCE_SYNC_SCOPE_UNSPECIFIED =
+      PreferenceSyncScope._(
+          0, _omitEnumNames ? '' : 'PREFERENCE_SYNC_SCOPE_UNSPECIFIED');
+  static const PreferenceSyncScope PREFERENCE_SYNC_SCOPE_CLIENT_SESSION =
+      PreferenceSyncScope._(
+          1, _omitEnumNames ? '' : 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION');
+  static const PreferenceSyncScope PREFERENCE_SYNC_SCOPE_ACCOUNT =
+      PreferenceSyncScope._(
+          2, _omitEnumNames ? '' : 'PREFERENCE_SYNC_SCOPE_ACCOUNT');
+
+  static const $core.List<PreferenceSyncScope> values = <PreferenceSyncScope>[
+    PREFERENCE_SYNC_SCOPE_UNSPECIFIED,
+    PREFERENCE_SYNC_SCOPE_CLIENT_SESSION,
+    PREFERENCE_SYNC_SCOPE_ACCOUNT,
+  ];
+
+  static final $core.List<PreferenceSyncScope?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static PreferenceSyncScope? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PreferenceSyncScope._(super.value, super.name);
+}
+
 class BootstrapStage extends $pb.ProtobufEnum {
   static const BootstrapStage BOOTSTRAP_STAGE_UNSPECIFIED =
       BootstrapStage._(0, _omitEnumNames ? '' : 'BOOTSTRAP_STAGE_UNSPECIFIED');

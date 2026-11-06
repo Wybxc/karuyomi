@@ -70,6 +70,7 @@ message OpenRequest {
   optional string user_agent = 3;
   optional string expected_build_id = 4;
   optional string expected_bundle_sha256 = 5;
+  PreferenceBootstrap preference_bootstrap = 6;
 }
 
 message Manga {
@@ -191,6 +192,126 @@ message ChapterRequest {
   Chapter chapter = 1;
 }
 
+// Typed Android Source preferences. Storage entries describe the real
+// `source_<id>` SharedPreferences namespace, including listener alias writes.
+message PreferenceStringSet {
+  repeated string values = 1;
+}
+message PreferenceValue {
+  oneof value {
+    bool boolean = 1;
+    string text = 2;
+    sint32 integer = 3;
+    float decimal = 4;
+    PreferenceStringSet strings = 5;
+    sint64 long_integer = 6;
+  }
+}
+message PreferenceEntry {
+  string key = 1;
+  PreferenceValue value = 2;
+}
+message SourcePreferenceValues {
+  string source_id = 1;
+  repeated PreferenceEntry entries = 2;
+}
+message PreferenceBootstrap {
+  string package_name = 1;
+  // Only namespaces with values need an entry. Missing keys use Source defaults.
+  repeated SourcePreferenceValues sources = 2;
+}
+enum PreferenceValueKind {
+  PREFERENCE_VALUE_KIND_UNSPECIFIED = 0;
+  PREFERENCE_VALUE_KIND_BOOLEAN = 1;
+  PREFERENCE_VALUE_KIND_TEXT = 2;
+  PREFERENCE_VALUE_KIND_INTEGER = 3;
+  PREFERENCE_VALUE_KIND_DECIMAL = 4;
+  PREFERENCE_VALUE_KIND_STRINGS = 5;
+  PREFERENCE_VALUE_KIND_LONG_INTEGER = 6;
+}
+message PreferenceSyncRule {
+  string key = 1;
+  PreferenceValueKind kind = 2;
+  // Missing means the approved key has the same meaning throughout this package.
+  optional string source_id = 3;
+}
+// Constructed by the host from the package's owned policy, never from a Source
+// claiming that arbitrary keys are safe to send to the business API.
+message PreferenceHostConfiguration {
+  PreferenceBootstrap bootstrap = 1;
+  repeated PreferenceSyncRule sync_rules = 2;
+}
+enum PreferenceSyncScope {
+  PREFERENCE_SYNC_SCOPE_UNSPECIFIED = 0;
+  PREFERENCE_SYNC_SCOPE_CLIENT_SESSION = 1;
+  PREFERENCE_SYNC_SCOPE_ACCOUNT = 2;
+}
+message PreferenceOption {
+  string label = 1;
+  string value = 2;
+}
+message PreferenceToggle {
+  bool value = 1;
+}
+message PreferenceText {
+  // Missing is distinct from an explicitly stored empty string.
+  optional string value = 1;
+  bool secret = 2;
+  int32 input_type = 3;
+}
+message PreferenceChoice {
+  repeated PreferenceOption options = 1;
+  optional string value = 2;
+}
+message PreferenceMultiChoice {
+  repeated PreferenceOption options = 1;
+  repeated string values = 2;
+}
+message PreferenceGroup {
+  repeated PreferenceNode nodes = 1;
+}
+message PreferenceUnsupported {
+  string reason = 1;
+}
+message PreferenceNode {
+  string key = 1;
+  string title = 2;
+  string summary = 3;
+  bool enabled = 4;
+  bool visible = 5;
+  PreferenceSyncScope sync_scope = 6;
+  PreferenceValue default_value = 7;
+  oneof kind {
+    PreferenceToggle toggle = 10;
+    PreferenceText text = 11;
+    PreferenceChoice choice = 12;
+    PreferenceMultiChoice multi_choice = 13;
+    PreferenceGroup group = 14;
+    Empty action = 15;
+    PreferenceUnsupported unsupported = 16;
+  }
+}
+message PreferenceSnapshot {
+  string snapshot_id = 1;
+  repeated PreferenceNode nodes = 2;
+  // Full actual stored values in each partition; never upload session_values.
+  repeated PreferenceEntry sync_values = 3;
+  repeated PreferenceEntry session_values = 4;
+}
+message PreferenceEditRequest {
+  string snapshot_id = 1;
+  repeated uint32 path = 2;
+  oneof command {
+    PreferenceValue change = 3;
+    Empty click = 4;
+  }
+}
+message PreferenceEditResult {
+  bool accepted = 1;
+  bool click_handled = 2;
+  PreferenceSnapshot snapshot = 3;
+}
+
 message SourceCall {
   string request_id = 1;
   string source_id = 2;
@@ -204,6 +325,8 @@ message SourceCall {
     MangaRequest chapters = 14;
     ChapterRequest pages = 15;
     GetFiltersRequest get_filters = 16;
+    Empty get_preferences = 17;
+    PreferenceEditRequest edit_preference = 18;
   }
 }
 
@@ -229,6 +352,8 @@ message SourceResult {
     ChapterList chapters = 12;
     PageList page_list = 13;
     FilterSnapshot filters = 14;
+    PreferenceSnapshot preferences = 15;
+    PreferenceEditResult preference_edit = 16;
   }
 }
 
@@ -410,6 +535,7 @@ message ControlResponse {
 message OpenWorker {
   BuildManifest manifest = 1;
   string user_agent = 2;
+  PreferenceBootstrap preference_bootstrap = 3;
 }
 message AcquireImageWorker {
   AcquireImage request = 1;

@@ -379,3 +379,35 @@ message SettingsMutationResponse {
   ReaderSettings effective_reader = 6;
   BusinessStateError error = 7;
 }
+
+// Source values are independent of reading settings and build/generation IDs.
+// Full replacement allows removing a stored key without conflating it with
+// false, zero, an empty string or an empty string set.
+message SourcePreferences {
+  string package_name = 1;
+  string source_id = 2;
+  uint32 revision = 3;
+  repeated PreferenceEntry entries = 4;
+}
+message SourcePreferencesResponse {
+  uint32 schema_version = 1;
+  uint32 account_revision = 2;
+  string package_name = 3;
+  repeated SourcePreferences sources = 4;
+  BusinessStateError error = 5;
+}
+message SourcePreferencesMutation {
+  uint32 schema_version = 1;
+  string mutation_id = 2;
+  string package_name = 3;
+  string source_id = 4;
+  uint32 expected_revision = 5;
+  repeated PreferenceEntry entries = 6;
+}
+message SourcePreferencesMutationResponse {
+  uint32 schema_version = 1;
+  string mutation_id = 2;
+  uint32 account_revision = 3;
+  SourcePreferences preferences = 4;
+  BusinessStateError error = 5;
+}

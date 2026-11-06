@@ -20,6 +20,7 @@ export class WorkerRuntime {
   private generation: string | undefined;
   private manifest: BuildManifest | undefined;
   private busy = false;
+  private preferencesEdited = false;
   private controller = new AbortController();
 
   constructor(
@@ -87,6 +88,7 @@ export class WorkerRuntime {
             opening.userAgent,
             this.controller.signal,
             { requestId: envelope.requestId, generation: envelope.generation },
+            opening.preferenceBootstrap,
           );
           this.reply(command, {
             case: 'session',
@@ -100,6 +102,7 @@ export class WorkerRuntime {
                 'source-rpc',
                 'explicit-references',
                 'complete-dto',
+                'source-preferences',
                 'cancel-by-worker-recycle',
                 ...(this.driver.acquireImage && this.driver.closePageSession
                   ? ['processed-image-resources']
@@ -110,6 +113,7 @@ export class WorkerRuntime {
           break;
         }
         case 'invoke': {
+          this.requireConfirmedPreferences();
           const call = command.command.value;
           if (!this.manifest)
             throw new RuntimeFailure(
@@ -121,6 +125,8 @@ export class WorkerRuntime {
               'protocol_error',
               'Source does not belong to the loaded build',
             );
+          if (call.request.case === 'editPreference')
+            this.preferencesEdited = true;
           const payload = await this.driver.invoke(call, {
             requestId: envelope.requestId,
             generation: envelope.generation,
@@ -132,6 +138,7 @@ export class WorkerRuntime {
           break;
         }
         case 'acquireImage': {
+          this.requireConfirmedPreferences();
           const acquiring = command.command.value;
           requireCondition(
             acquiring.request !== undefined,
@@ -213,6 +220,14 @@ export class WorkerRuntime {
       for (const port of ports) port.close();
       this.busy = false;
     }
+  }
+
+  private requireConfirmedPreferences(): void {
+    if (this.preferencesEdited)
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Confirm Source preferences and reopen the runtime before continuing',
+      );
   }
 
   private reply(

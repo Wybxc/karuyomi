@@ -16,6 +16,8 @@ public class TeaHost {
   static List<Page> pages;
   static final PageSessions pageSessions = new PageSessions();
   static final HostFilters filters = new HostFilters();
+  static final HostPreferences preferences = new HostPreferences();
+  static android.app.Application application;
 
   public static void main(String[] args) {}
 
@@ -36,11 +38,23 @@ public class TeaHost {
       HostOperation action,
       Runnable cleanup,
       Runnable afterDrain) {
+    startOperation(requestId, generation, token, action, cleanup, afterDrain, null);
+  }
+
+  private static void startOperation(
+      String requestId,
+      String generation,
+      String token,
+      HostOperation action,
+      Runnable cleanup,
+      Runnable afterDrain,
+      HostOperation afterDrainResult) {
     BrowserCall.Operation owner;
     try {
       // Register before TeaVM schedules the host thread with setTimeout.
       owner = BrowserCall.beginOperation(requestId, generation, token);
       filters.observeGeneration(generation);
+      preferences.observeGeneration(generation);
     } catch (Throwable error) {
       fail(describe(error), true);
       return;
@@ -53,6 +67,10 @@ public class TeaHost {
                   String result = action.run();
                   owner.drain();
                   afterDrain.run();
+                  if (afterDrainResult != null) {
+                    String finalResult = afterDrainResult.run();
+                    if (finalResult != null) result = finalResult;
+                  }
                   done(result);
                 } catch (Throwable error) {
                   boolean unfinishedCallbacks = owner.hasPending();
@@ -88,12 +106,15 @@ public class TeaHost {
   }
 
   @JSExport
-  public static void hostLoad(String requestId, String generation, String token) {
+  public static void hostLoad(
+      String configJson, String requestId, String generation, String token) {
     startOperation(
         requestId,
         generation,
         token,
         () -> {
+          preferences.configure(application, configJson);
+          preferences.observeGeneration(generation);
           load();
           return sourceInfo();
         },
@@ -115,9 +136,11 @@ public class TeaHost {
   public static String init(String userAgent) {
     pageSessions.clear();
     filters.clear();
+    preferences.clear();
     PersistentFileSystem.install();
     System.setProperty("http.agent", userAgent);
     android.app.Application app = new android.app.Application();
+    application = app;
     network = new eu.kanade.tachiyomi.network.NetworkHelper(app);
     uy.kohesive.injekt.InjektKt.getInjekt().addSingleton(() -> android.content.Context.class, app);
     uy.kohesive.injekt.InjektKt.getInjekt()
@@ -190,6 +213,8 @@ public class TeaHost {
       String token) {
     String[] createdPageSession = new String[1];
     HostFilters.Candidate[] filterCandidate = new HostFilters.Candidate[1];
+    HostPreferences.Read[] preferenceRead = new HostPreferences.Read[1];
+    HostPreferences.Edit[] preferenceEdit = new HostPreferences.Edit[1];
     startOperation(
         requestId,
         generation,
@@ -202,7 +227,19 @@ public class TeaHost {
                   .orElseThrow(() -> new IllegalArgumentException("Unknown Source " + sourceId));
           if (operation.equals("getFilters") || operation.equals("search"))
             HostFilters.checkRequest(argsJson);
+          if (operation.equals("getPreferences") || operation.equals("editPreference"))
+            HostPreferences.checkRequest(argsJson);
           JsonObject args = JsonParser.parseString(argsJson).getAsJsonObject();
+          if (operation.equals("getPreferences")) {
+            if (!args.keySet().isEmpty())
+              throw new IllegalArgumentException("Unexpected preference request fields");
+            preferenceRead[0] = preferences.beginRead(selected, application, generation);
+            return "";
+          }
+          if (operation.equals("editPreference")) {
+            preferenceEdit[0] = preferences.beginEdit(selected, generation, args);
+            return "";
+          }
           Object result =
               GreenCoroutines.block(
                   (scope, continuation) -> {
@@ -273,6 +310,13 @@ public class TeaHost {
         },
         () -> {
           if (filterCandidate[0] != null) filters.commit(filterCandidate[0]);
+        },
+        () -> {
+          if (preferenceRead[0] != null)
+            return HostJson.write(preferences.finishRead(preferenceRead[0]));
+          if (preferenceEdit[0] != null)
+            return HostJson.write(preferences.finishEdit(preferenceEdit[0]));
+          return null;
         });
   }
 
