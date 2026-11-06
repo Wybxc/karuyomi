@@ -51,17 +51,24 @@ export async function checkDto(root = ROOT): Promise<void> {
   // Execute the same core bytecode adaptation as AOT, using a fresh copied JAR.
   const coreName = 'kotlinx-coroutines-core-jvm-1.11.0.jar',
     originalCore = jars.find((file) => path.basename(file) === coreName),
+    originalHost = jars.find((file) => path.basename(file).startsWith('host-')),
     coroutinesOutput = path.join(output, 'official-coroutines'),
     toolsOutput = path.join(coroutinesOutput, 'tools'),
     core = path.join(coroutinesOutput, coreName),
+    host = path.join(
+      coroutinesOutput,
+      originalHost ? path.basename(originalHost) : 'missing-host.jar',
+    ),
     asm = path.join(
       root,
       'runtime/teavm/.local/build-cache/m2/org/ow2/asm/asm/9.9.1/asm-9.9.1.jar',
     );
   if (!originalCore) throw new Error('Missing locked official coroutine core');
+  if (!originalHost) throw new Error('Missing locked host seed');
   rmSync(coroutinesOutput, { recursive: true, force: true });
   mkdirSync(toolsOutput, { recursive: true });
   copyFileSync(originalCore, core);
+  copyFileSync(originalHost, host);
   await oracle('javac', [
     '--release',
     '17',
@@ -76,8 +83,11 @@ export async function checkDto(root = ROOT): Promise<void> {
     [toolsOutput, asm].join(path.delimiter),
     'PatchLibraries',
     core,
+    host,
   ]);
-  jars = jars.map((file) => (file === originalCore ? core : file));
+  jars = jars.map((file) =>
+    file === originalCore ? core : file === originalHost ? host : file,
+  );
   const classpath = jars.join(path.delimiter);
   await oracle('javac', [
     '--release',
@@ -234,10 +244,10 @@ export async function checkDto(root = ROOT): Promise<void> {
       'runtime/teavm/java/src/main/java/prototype/HostCoroutines.java',
       'runtime/teavm/java/src/main/java/prototype/PlatformSupport.java',
       'runtime/teavm/java/src/main/java/prototype/jcl/LocaleState.java',
-      'runtime/teavm/java/src/main/java/eu/kanade/tachiyomi/network/OkHttpExtensionsKt.java',
       'tools/teavm/fixtures/image/prototype/Bridge.java',
       'tools/teavm/ImageTest.java',
       'tools/teavm/EnqueueTest.java',
+      'tools/teavm/HttpAwaitTest.java',
     ].map((file) => path.join(root, file)),
   ]);
   await oracle('java', [
@@ -250,6 +260,29 @@ export async function checkDto(root = ROOT): Promise<void> {
     imageOutput + path.delimiter + classpath,
     'prototype.EnqueueTest',
     core,
+  ]);
+  await oracle('javac', [
+    '--release',
+    '17',
+    '-cp',
+    asm,
+    '-d',
+    imageOutput,
+    path.join(root, 'tools/teavm/SeedAdapterIdentity.java'),
+  ]);
+  await oracle('java', [
+    '-cp',
+    [imageOutput, asm].join(path.delimiter),
+    'prototype.SeedAdapterIdentity',
+    originalHost,
+    host,
+  ]);
+  await oracle('java', [
+    '-cp',
+    imageOutput + path.delimiter + classpath,
+    'prototype.HttpAwaitTest',
+    core,
+    host,
   ]);
   // Check the product adapter as well as the original seed HttpSource. Java's
   // checked throws signature is absent from the original Kotlin bytecode.

@@ -1,4 +1,4 @@
-# 官方 kotlinx.coroutines 隔离验证
+# 官方 kotlinx.coroutines 验证
 
 2026-11-06，官方核心已接入正式源码，自有 Green Job 与四个 kotlinx 覆盖已删除。正式工程检查和固定新 AOT 的 BH3 / Komiic Web 分项通过；早期隔离、平台修复、owner 候选和真实 Source 分层记录，HTTP 子任务取消、Native 与生产仍独立待验。迁移目标和待办见[协程运行时计划](../plan/coroutine-runtime.md)。以下原五轮是接入前的历史证据。
 
@@ -130,3 +130,24 @@ ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.ko
 5. 原动态分类树返回，选择“搞笑”并应用后显示“筛选（已应用）”，出现雅尼貓、敗犬女主太多了等新结果；“加载更多”追加被俘者的嘆息等条目。重新打开筛选，“搞笑”仍已选，关闭编辑后原查询保持。这里是可见分页与保留证据，未抓取上游 GraphQL 变量。
 
 本轮限测试身份的 Web 分项，不覆盖 preference veto / 回调次数 / 丢 ACK、单个 Job 到 HTTP 的取消、迟到竞争、Native、生产 Access 或真机。正式验收服务已正常退出，61010 端口拒绝连接，所有本轮构建器已结束。详细固定输入、原 provenance 和构建日志在独立目录 `.local/official-core-harness/summary.json` 及同目录日志；截图为 `/private/tmp/karuyomi-official-core-bh3-reading.jpg`、`/private/tmp/karuyomi-official-core-komiic-filter.jpg`。这些临时产物不提交源码库。
+
+## 复用上游 HTTP suspend adapter
+
+后续候选从固定 `7e8fe769` 建立于 `/private/tmp/karuyomi-http-coroutines-candidate`。实际 seed 字节码的 await 已使用 CancellableContinuation、`invokeOnCancellation(Call.cancel)` 与 enqueue，awaitSuccess 保留上游 Kotlin 状态机；实际 seed 不含当前 vendor Kotlin 的堆栈切片代码，不能混同两份输入。项目删除阻塞 execute 的同名覆盖，直接复用依赖实现，没有新写 continuation。
+
+seed 的 newCachelessCallWithProgress 仅 newCall，仍需项目图片集成；补丁器只按精确 owner / 名称 / descriptor 接管这一个方法，委托 BrowserCall，保留原 cacheless / progress。SeedAdapterIdentity 用 ASM 排除该方法及非语义 debug / frame 后比较原始与副本，确认 5 个 await / continuation class 不变；原 JAR 不修改。
+
+原 BrowserCall 在 onResponse 返回后立即关闭正文，恢复到其它 dispatcher 的消费者可能读到已关闭资源。现在按 OkHttp 所有权交付，独立跟踪最多 64 份未关闭响应，与回调 / 工作 lease 分开；这是 Java 资源限额，正式二进制 HTTP 仍限 4 并发。最终正文 close 在 finally 关闭该 Call 遗留 transport handle，即使 interceptor 换 body 也回收；实际释放后才删除登记，已关闭响应不累计占额。
+
+成功 drain 等待工作与回调后，锁外关闭遗留响应；另一线程正在 close 时，沿同一个原总 deadline 等待真实 release。清理异常阻止成功 ACK，并继续清理其它响应。超时后 hasPending 保留未清资源，TeaHost 要求回收 Worker。清理 set / restore 原 owner，不能借新请求启动 HTTP。Java 不能抢占任意同步 body.close，外层 Source / Worker deadline 仍是最终边界。
+
+冻结候选实际 JVM 结果：
+
+- Java HttpAwaitTest 202 / 202：真实 seed await / 官方 Deferred，延迟消费、交付前后取消及 finally、IOException / 非 2xx、换 body、连续 70 次关闭、64 / 65 限额与释放复用、ACK 前清理及异常、确定性等待态、25 ms 清理超时保留 pending、原 owner 上下文均通过。
+- 额外真实 Kotlin suspend fixture 168 / 168，原 Enqueue 85 / 85，两路 seed / owned HttpSource 图片各 8355 / 8355；各 JVM exit 0、stderr 空、无超时。正式回归内化 Java fixture，不搬入临时 K2 compiler 或整套探针。
+- 8 个原调用边界、5 个精确 cacheless 正负例、官方 Worker 继承调用、seed suspend 保留、网络配置和两个 TS 入口严格类型均通过。
+- 两个负向版本确定失败：换回原 BrowserCall 在第 7 断言发现 callback 提早关闭；移除 drain 等待也被确定性事件门拒绝。
+
+冻结摘要见候选目录 integration/frozen-sha256.json，实际结果 final-run.log，负向日志在 red/；候选进程已退出。本节仅证明隔离 JVM，尚非本次 HTTP 变更后的 TeaVM AOT、正式 Source、Native 或生产取消验收，前一节 7e8 结果不能自动覆盖新适配。
+
+正式接入后，主仓库完整 `pnpm teavm:check` exit 0，实际执行上述 Java 202、Enqueue 85、seed suspend 保留、两路图片各 8355，以及全部现有 DTO / filters / preferences / HTTP / cache / file / network / platform oracle。`pnpm check` exit 0，418 项 Vitest、跨语言 golden、生成一致性、严格类型、依赖层级和工具回归均通过；全库 `pnpm format` 与完整 `pnpm format:check` 通过。本轮未改 Dart 产品代码，未重复本地 Flutter 全套。详细日志留在 `/private/tmp/karuyomi-http-upstream-*.log`。

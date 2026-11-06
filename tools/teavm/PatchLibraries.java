@@ -58,6 +58,22 @@ public class PatchLibraries {
                       method.visitEnd();
                       return null;
                     }
+                    if (r.getClassName().equals("eu/kanade/tachiyomi/network/OkHttpExtensionsKt")
+                        && n.equals("newCachelessCallWithProgress")
+                        && d.equals(
+                            "(Lokhttp3/OkHttpClient;Lokhttp3/Request;Leu/kanade/tachiyomi/network/ProgressListener;)Lokhttp3/Call;")) {
+                      MethodVisitor method = super.visitMethod(a, n, d, s, ex);
+                      method.visitCode();
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitVarInsn(Opcodes.ALOAD, 1);
+                      method.visitVarInsn(Opcodes.ALOAD, 2);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKESTATIC, "prototype/BrowserCall", n, d, false);
+                      method.visitInsn(Opcodes.ARETURN);
+                      method.visitMaxs(3, 3);
+                      method.visitEnd();
+                      return null;
+                    }
                     boolean completionWrapper =
                         r.getClassName().equals("kotlinx/coroutines/JobSupport")
                             && n.equals("completeStateFinalization")

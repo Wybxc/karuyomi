@@ -33,7 +33,8 @@ TeaVM 维护者的 [2024 年讨论](https://groups.google.com/g/teavm/c/ipcePs1m
 - [x] **真实 suspend 与已知语义差异：** 同一 Kotlin fixture 的 JVM/AOT 分项对照通过；不以仅编译成功代替执行。
 - [x] **隔离归属：** delay/HTTP/完成回调不提前释放 lease；过期 LAZY 拒绝且其官方 waiter 完成；generic completion 不借下一请求；配额/调度失败清理；ThreadContext 与其它 element 正确恢复。
 - [x] **正式工程回归：** `pnpm teavm:check` 使用同一生产补丁器处理的官方 core 副本，保留 Enqueue 全部有效场景，验证运行时类来源且旧 Green 不可达；Enqueue 85 项断言、完整格式与 `pnpm check`（含 418 项集成测试）均通过；按本里程碑提交。
-- [ ] **HTTP 子任务取消：** 当前 `OkHttpExtensionsKt.await/awaitSuccess` 仍调用阻塞 `Call.execute()`；单个 Job 取消尚未接入 Call.cancel。优先评估直接复用官方/上游成熟 coroutine HTTP adapter，保持响应资源释放；不能把请求级回收或普通 HTTP 通过记作这一门通过。
+- [x] **HTTP 上游适配与 JVM 分项：** 删除自有阻塞 `OkHttpExtensionsKt`，恢复 seed 的可取消 await / awaitSuccess；只精确适配图片 cacheless / progress 方法。BrowserCall 交付后保留正文，关闭归还独立 64 资源额度，drain 在原总期限内清理后才允许成功确认，超时保留回收信号。隔离真实 seed / 官方 core 的 Java 202、Kotlin 168、原 Enqueue 85 及两路图片各 8355 断言通过；完整 `pnpm teavm:check`、`pnpm check`（418 项集成测试）、全库格式化与完整格式检查均通过。
+- [ ] **HTTP AOT / 产品取消：** 固定新提交重建，实际验证真实 suspend / 单个 Job 到 Call.cancel、响应消费和 Worker 收尾。不能用 JVM、请求级回收或前轮 Source 阅读代替这一门。
 - [x] **代表 Source Web 分项：** 固定 `7e8fe769` 独立重建两包，通过正式 harness / Flutter 主入口完成 BH3 真实 async / await 详情、21 页阅读与服务端进度确认，以及 Komiic 原镜像设置 / Source 重开、动态筛选 / 分页 / 已应用保留。仅登记实际范围，未部署，自动构建记录仍为 `compiled_unverified` / `runtimeReady=false`。
 - [ ] **剩余 Source / 生命周期门：** preference veto / 回调次数 / 丢 ACK、取消迟到竞争与直接资源计数分别验收；继续更多 Source 与平台覆盖，不能由页面正常切换推断所有清理门通过。
 - [ ] **交付边界：** Web 实际验收、Native、生产 Access 和真机分别列证据；不据隔离 fixture 通过升级其它层级。全量 baseline 和 CI 增量仍按原计划独立处理。

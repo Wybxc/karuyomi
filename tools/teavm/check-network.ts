@@ -1,5 +1,5 @@
 /** Verify the locked seed gap and the owned Source network configuration separately. */
-import { mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execa } from 'execa';
@@ -12,6 +12,8 @@ export async function checkNetwork(root = ROOT): Promise<void> {
     output = path.join(local, 'network-test'),
     seedOutput = path.join(output, 'seed'),
     ownedOutput = path.join(output, 'owned'),
+    toolsOutput = path.join(output, 'tools'),
+    adaptedHost = path.join(output, 'host-44fb93b22828.jar'),
     jars = readdirSync(materials)
       .filter((name) => name.endsWith('.jar'))
       .sort()
@@ -39,10 +41,12 @@ export async function checkNetwork(root = ROOT): Promise<void> {
       buffer: false,
       preferLocal: false,
       verbose: 'none',
+      timeout: 30_000,
+      forceKillAfterDelay: 1000,
     });
   // Old class files must not turn a missing owned input into a passing check.
   rmSync(output, { recursive: true, force: true });
-  for (const directory of [seedOutput, ownedOutput])
+  for (const directory of [seedOutput, ownedOutput, toolsOutput])
     mkdirSync(directory, { recursive: true });
   await execute('javac', [
     '--release',
@@ -60,16 +64,41 @@ export async function checkNetwork(root = ROOT): Promise<void> {
     'seed',
     pathToFileURL(host).href,
   ]);
+  // Preserve the real seed suspend adapter; only the image integration method is adapted.
+  const asm = path.join(
+    local,
+    'build-cache/m2/org/ow2/asm/asm/9.9.1/asm-9.9.1.jar',
+  );
+  copyFileSync(host, adaptedHost);
   await execute('javac', [
     '--release',
     '17',
     '-cp',
-    classpath,
+    asm,
+    '-d',
+    toolsOutput,
+    path.join(root, 'tools/teavm/PatchLibraries.java'),
+  ]);
+  await execute('java', [
+    '-cp',
+    [toolsOutput, asm].join(path.delimiter),
+    'PatchLibraries',
+    adaptedHost,
+  ]);
+  const ownedClasspath = [
+    adaptedHost,
+    ...jars.filter((file) => file !== host),
+    ...teavmJars,
+  ].join(path.delimiter);
+  await execute('javac', [
+    '--release',
+    '17',
+    '-cp',
+    ownedClasspath,
     '-d',
     ownedOutput,
     ...[
       'eu/kanade/tachiyomi/network/NetworkHelper',
-      'eu/kanade/tachiyomi/network/OkHttpExtensionsKt',
       'okhttp3/OkHttpClient',
       'okhttp3/Cache',
       'prototype/Bridge',
@@ -86,7 +115,7 @@ export async function checkNetwork(root = ROOT): Promise<void> {
   ]);
   await execute('java', [
     '-cp',
-    [ownedOutput, classpath].join(path.delimiter),
+    [ownedOutput, ownedClasspath].join(path.delimiter),
     'prototype.NetworkHelperTest',
     'owned',
     pathToFileURL(ownedOutput + path.sep).href,

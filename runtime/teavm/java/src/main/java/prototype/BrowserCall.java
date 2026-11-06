@@ -1,14 +1,14 @@
 package prototype;
 
+import com.google.gson.*;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.util.*;
+import java.util.function.Supplier;
 import okhttp3.*;
 import okio.BufferedSink;
 import okio.Okio;
 import okio.Timeout;
-import com.google.gson.*;
-import java.util.*;
-import java.util.function.Supplier;
-import java.io.IOException;
-import java.io.InterruptedIOException;
 
 /** Replaces only OkHttpClient.newCall; plugin interceptors still execute as JVM bytecode. */
 public final class BrowserCall implements Call {
@@ -19,12 +19,14 @@ public final class BrowserCall implements Call {
   static final class Operation implements AutoCloseable {
     private static final int MAX_BACKGROUND_CALLS = 64;
     private static final int MAX_BACKGROUND_WORK = 64;
+    private static final int MAX_OPEN_RESPONSES = 64;
     private static final long DRAIN_TIMEOUT_MS = 30000;
     final String requestId;
     final String generation;
     final String token;
     private final Set<BrowserCall> pending = new HashSet<>();
     private final Set<BoundOperation> work = new HashSet<>();
+    private final Set<BrowserCall> responses = new HashSet<>();
     private boolean closed;
     private Throwable callbackFailure;
 
@@ -59,6 +61,18 @@ public final class BrowserCall implements Call {
       notifyAll();
     }
 
+    synchronized void retainResponse(BrowserCall call) throws IOException {
+      checkOpen();
+      if (responses.size() >= MAX_OPEN_RESPONSES)
+        throw new IOException("Too many open Source HTTP responses");
+      responses.add(call);
+    }
+
+    synchronized void releasedResponse(BrowserCall call) {
+      responses.remove(call);
+      notifyAll();
+    }
+
     synchronized void registerWork(BoundOperation child) {
       if (closed) throw new IllegalStateException("Source operation has ended");
       if (work.size() >= MAX_BACKGROUND_WORK)
@@ -75,42 +89,84 @@ public final class BrowserCall implements Call {
       drain(DRAIN_TIMEOUT_MS);
     }
 
-    synchronized void drain(long timeoutMs) throws Throwable {
-      if (timeoutMs < 1 || timeoutMs > DRAIN_TIMEOUT_MS)
-        throw new IllegalArgumentException("HTTP callback drain deadline must be 1..30000 ms");
-      long deadline = System.nanoTime() + timeoutMs * 1000000;
-      while (hasPending()) {
+    void drain(long timeoutMs) throws Throwable {
+      List<BrowserCall> abandoned;
+      long deadline;
+      synchronized (this) {
+        if (timeoutMs < 1 || timeoutMs > DRAIN_TIMEOUT_MS)
+          throw new IllegalArgumentException("HTTP callback drain deadline must be 1..30000 ms");
+        deadline = System.nanoTime() + timeoutMs * 1000000;
+        while (hasPending()) {
+          checkOpen();
+          if (callbackFailure != null) throw callbackFailure;
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0)
+            throw new InterruptedIOException("Background Source work exceeded drain deadline");
+          try {
+            wait(Math.max(1, remaining / 1000000));
+          } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedIOException("Interrupted while draining HTTP callbacks");
+          }
+        }
         checkOpen();
         if (callbackFailure != null) throw callbackFailure;
-        long remaining = deadline - System.nanoTime();
-        if (remaining <= 0)
-          throw new InterruptedIOException("Background Source work exceeded drain deadline");
-        try {
-          wait(Math.max(1, remaining / 1000000));
-        } catch (InterruptedException error) {
-          Thread.currentThread().interrupt();
-          throw new InterruptedIOException("Interrupted while draining HTTP callbacks");
+        closed = true;
+        abandoned = new ArrayList<>(responses);
+      }
+      // A successful entry must release abandoned responses before its ACK, outside owner locks.
+      Throwable cleanup = cancelCalls(abandoned);
+      synchronized (this) {
+        // Another consumer may already be closing a response. Its finally still owns release.
+        while (!responses.isEmpty()) {
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0) {
+            InterruptedIOException error =
+                new InterruptedIOException("HTTP response cleanup exceeded drain deadline");
+            if (cleanup != null) error.addSuppressed(cleanup);
+            throw error;
+          }
+          try {
+            wait(Math.max(1, remaining / 1000000));
+          } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedIOException("Interrupted while closing HTTP responses");
+          }
         }
       }
-      checkOpen();
-      if (callbackFailure != null) throw callbackFailure;
-      closed = true;
+      if (cleanup != null) throw cleanup;
+    }
+
+    private static Throwable cancelCalls(List<BrowserCall> calls) {
+      Throwable failure = null;
+      for (BrowserCall call : calls) {
+        try {
+          call.cancel();
+        } catch (Throwable error) {
+          if (failure == null) failure = error;
+          else if (failure != error) failure.addSuppressed(error);
+        }
+      }
+      return failure;
     }
 
     synchronized boolean hasPending() {
-      return !pending.isEmpty() || !work.isEmpty();
+      return !pending.isEmpty() || !work.isEmpty() || closed && !responses.isEmpty();
     }
 
     public void close() {
       List<BrowserCall> calls;
       synchronized (this) {
         closed = true;
-        calls = new ArrayList<>(pending);
+        Set<BrowserCall> all = new HashSet<>(pending);
+        all.addAll(responses);
+        calls = new ArrayList<>(all);
         pending.clear();
         work.clear();
         notifyAll();
       }
-      for (BrowserCall call : calls) call.cancel();
+      Throwable failure = cancelCalls(calls);
+      if (failure != null) Bridge.trace("HTTP response cleanup failed: " + failure);
       synchronized (BrowserCall.class) {
         if (activeOperation == this) activeOperation = null;
       }
@@ -226,6 +282,7 @@ public final class BrowserCall implements Call {
   private volatile boolean cancelled;
   private final Set<String> httpHandles = new HashSet<>();
   private Call proxy;
+  private OwnedResponseBody responseBody;
 
   private BrowserCall(OkHttpClient c, Request r) {
     client = c;
@@ -242,6 +299,23 @@ public final class BrowserCall implements Call {
     return request;
   }
 
+  /** Preserve the source image cache/progress integration while retaining seed suspend adapters. */
+  public static Call newCachelessCallWithProgress(
+      OkHttpClient client, Request request, eu.kanade.tachiyomi.network.ProgressListener listener) {
+    return client
+        .newBuilder()
+        .cache(null)
+        .addNetworkInterceptor(chain -> {
+          Response response = chain.proceed(chain.request());
+          return response
+              .newBuilder()
+              .body(new eu.kanade.tachiyomi.network.ProgressResponseBody(response.body(), listener))
+              .build();
+        })
+        .build()
+        .newCall(request);
+  }
+
   public void enqueue(Callback c) {
     Objects.requireNonNull(c, "callback");
     startExecution();
@@ -252,28 +326,32 @@ public final class BrowserCall implements Call {
               () -> {
                 if (operation != null) operation.enter();
                 Throwable failure = null;
+                Response response = null;
+                boolean delivered = false;
                 try {
-                  Response response;
                   try {
-                    response = executeOnce();
+                    response = executeOwned();
                   } catch (IOException error) {
                     if (operation != null) operation.checkOpen();
                     c.onFailure(this, error);
                     return;
                   }
-                  try (Response closeAfterCallback = response) {
-                    if (operation != null) operation.checkOpen();
-                    c.onResponse(this, response);
-                  }
+                  if (operation != null) operation.checkOpen();
+                  c.onResponse(this, response);
+                  // OkHttp transfers ownership to the callback, which may resume another
+                  // dispatcher.
+                  delivered = true;
                 } catch (Throwable error) {
                   failure = error;
                   if (operation == null) Bridge.trace("HTTP callback failed: " + error);
                 } finally {
-                  // Close leaked handles even if an interceptor replaced the body.
-                  try {
-                    closeHandles();
-                  } catch (Throwable error) {
-                    if (failure == null) failure = error;
+                  if (!delivered) {
+                    try {
+                      if (response != null) response.close();
+                      else closeHandles();
+                    } catch (Throwable error) {
+                      if (failure == null) failure = error;
+                    }
                   }
                   if (operation != null) {
                     operation.finished(this, failure);
@@ -288,6 +366,86 @@ public final class BrowserCall implements Call {
     }
   }
 
+  /** Only the final interceptor body is exposed; original transport handles remain a fallback. */
+  private final class OwnedResponseBody extends ResponseBody {
+    private final ResponseBody original;
+    private final okio.BufferedSource source;
+    private boolean released;
+
+    OwnedResponseBody(ResponseBody original) {
+      this.original = original;
+      source =
+          Okio.buffer(
+              new okio.ForwardingSource(original.source()) {
+                public void close() {
+                  release();
+                }
+              });
+    }
+
+    public MediaType contentType() {
+      return original.contentType();
+    }
+
+    public long contentLength() {
+      return original.contentLength();
+    }
+
+    public okio.BufferedSource source() {
+      return source;
+    }
+
+    private void release() {
+      synchronized (this) {
+        if (released) return;
+        released = true;
+      }
+      Operation previous = currentOperation();
+      if (owner == null) threadOperation.remove();
+      else owner.enter();
+      try {
+        // Cleanup must run even for a closed owner, while any new work still sees that owner.
+        original.close();
+      } finally {
+        if (previous == null) threadOperation.remove();
+        else previous.enter();
+        try {
+          closeHandles();
+        } finally {
+          synchronized (BrowserCall.this) {
+            if (responseBody == this) responseBody = null;
+          }
+          if (owner != null) owner.releasedResponse(BrowserCall.this);
+        }
+      }
+    }
+  }
+
+  private Response executeOwned() throws IOException {
+    Response response = null;
+    OwnedResponseBody body = null;
+    try {
+      response = executeOnce();
+      body = new OwnedResponseBody(response.body());
+      synchronized (this) {
+        if (cancelled) throw new InterruptedIOException("Cancelled");
+        if (owner != null) owner.retainResponse(this);
+        responseBody = body;
+      }
+      return response.newBuilder().body(body).build();
+    } catch (IOException | RuntimeException | Error error) {
+      try {
+        if (body != null) body.release();
+        else if (response != null) response.close();
+      } catch (Throwable cleanup) {
+        error.addSuppressed(cleanup);
+      } finally {
+        closeHandles();
+      }
+      throw error;
+    }
+  }
+
   private void closeHandles() {
     List<String> handles;
     synchronized (this) {
@@ -298,13 +456,16 @@ public final class BrowserCall implements Call {
   }
 
   public void cancel() {
-    List<String> handles;
+    OwnedResponseBody body;
     synchronized (this) {
       cancelled = true;
-      handles = new ArrayList<>(httpHandles);
-      httpHandles.clear();
+      body = responseBody;
     }
-    for (String handle : handles) cancelHandle(handle);
+    try {
+      if (body != null) body.close();
+    } finally {
+      closeHandles();
+    }
   }
 
   public boolean isExecuted() {
@@ -345,7 +506,7 @@ public final class BrowserCall implements Call {
 
   public Response execute() throws IOException {
     startExecution();
-    return executeOnce();
+    return executeOwned();
   }
 
   private synchronized void startExecution() {

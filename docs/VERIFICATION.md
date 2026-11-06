@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-06，官方 `kotlinx-coroutines-core-jvm` 已接入正式源码，自有 Green Job 与四个同名覆盖已删除。正式工程及远端 CI、JVM/AOT 的真实挂起与取消/父子/启动语义、owner/lease 分项通过；固定新 AOT 经正式 Web 主入口完成 BH3 协程详情及 21 页阅读、Komiic 镜像设置/重开与筛选分页，见[协程验证](verification/coroutine-runtime.md)。HTTP 子任务取消及 Native / 生产等剩余门继续按[计划](plan/coroutine-runtime.md)验收。
+2026-11-06，官方 `kotlinx-coroutines-core-jvm` 已接入正式源码，自有 Green Job 与四个同名覆盖已删除。正式工程及远端 CI、JVM/AOT 的真实挂起与取消/父子/启动语义、owner/lease 分项通过；固定新 AOT 经正式 Web 主入口完成 BH3 协程详情及 21 页阅读、Komiic 镜像设置/重开与筛选分页，见[协程验证](verification/coroutine-runtime.md)。HTTP await 已恢复 seed 上游可取消实现，响应所有权及 ACK 前清理的正式 JVM 202 项与完整工程检查通过；新 AOT / 产品取消及 Native / 生产等剩余门继续按[计划](plan/coroutine-runtime.md)验收。
 
 2026-11-06，typed Source preferences 的 v6 控制合同、原 Preference 回调、构造前注入、D1 独立 CAS API、客户端秘密值与 Flutter 设置/重开路径已实现；集中工程检查、固定 Komiic AOT、正式 Web 设置/重开和新文档恢复分项通过；其它控件、Native 及生产门见[设置记录](verification/source-preferences.md)，正式决定见[设计](design/source-preferences.md)。历史 v4/v5 证据不自动覆盖 v6。
 

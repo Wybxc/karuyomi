@@ -98,6 +98,57 @@ public final class PatchLibrariesTest {
     return methods.values().stream().flatMap(List::stream).filter(expected::equals).count();
   }
 
+  private static void cachelessCases(Path work) throws Exception {
+    String owner = "eu/kanade/tachiyomi/network/OkHttpExtensionsKt";
+    String name = "newCachelessCallWithProgress";
+    String descriptor =
+        "(Lokhttp3/OkHttpClient;Lokhttp3/Request;Leu/kanade/tachiyomi/network/ProgressListener;)Lokhttp3/Call;";
+    List<Example> cases =
+        List.of(
+            new Example("cacheless", owner, name, descriptor, true),
+            new Example(
+                "cachelessOtherOwner", "fixtures/OtherHttpExtensionsKt", name, descriptor, false),
+            new Example("cachelessSimilarOwner", owner + "Other", name, descriptor, false),
+            new Example("cachelessOtherName", owner, "otherCachelessCall", descriptor, false),
+            new Example(
+                "cachelessOtherSignature",
+                owner,
+                name,
+                "(Lokhttp3/OkHttpClient;Lokhttp3/Request;Ljava/lang/Object;)Lokhttp3/Call;",
+                false));
+    for (Example example : cases) {
+      ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+      writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, example.owner, null, "java/lang/Object", null);
+      MethodVisitor method =
+          writer.visitMethod(
+              Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+              example.name,
+              example.descriptor,
+              null,
+              null);
+      method.visitCode();
+      method.visitInsn(Opcodes.ACONST_NULL);
+      method.visitInsn(Opcodes.ARETURN);
+      method.visitMaxs(0, 0);
+      method.visitEnd();
+      writer.visitEnd();
+      Path archive = work.resolve(example.label + ".jar");
+      try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(archive))) {
+        output.putNextEntry(new ZipEntry(example.owner + ".class"));
+        output.write(writer.toByteArray());
+        output.closeEntry();
+      }
+      PatchLibraries.main(new String[] {archive.toString()});
+      List<Invocation> actual = calls(read(archive, example.owner + ".class")).get(example.name);
+      List<Invocation> expected =
+          example.adapted
+              ? List.of(
+                  new Invocation(Opcodes.INVOKESTATIC, "prototype/BrowserCall", name, descriptor))
+              : List.of();
+      require(expected.equals(actual), "Unexpected cacheless adaptation: " + example.label);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     Path originalCore = Path.of(args[0]);
     Path work = Path.of(args[1]);
@@ -157,7 +208,9 @@ public final class PatchLibrariesTest {
     require(
         Arrays.equals(originalWorker, read(originalCore, workerClass)),
         "Original official core changed");
+    cachelessCases(work);
     System.out.println(
-        "PatchLibraries: 8 invocation cases and the official inherited Worker call passed");
+        "PatchLibraries: 8 invocation cases, 5 precise cacheless cases and the official inherited"
+            + " Worker call passed");
   }
 }
