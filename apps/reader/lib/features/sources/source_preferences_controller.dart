@@ -161,9 +161,9 @@ final class SourcePreferencesController extends ChangeNotifier {
         if (!available) return false;
       }
       message = result.accepted
-          ? '设置已确认，正在重新打开漫画源。'
+          ? '设置已确认。'
           : request.hasClick()
-          ? (result.clickHandled ? '操作已处理，正在重新打开漫画源。' : '漫画源未处理此操作；实际设置已重新读取。')
+          ? (result.clickHandled ? '操作已处理。' : '漫画源未处理此操作；实际设置已重新读取。')
           : '漫画源未接受输入；已保留原回调的实际结果。';
       return _reopenAndDescribe();
     });

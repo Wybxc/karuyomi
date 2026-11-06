@@ -50,7 +50,7 @@ Native 使用 `pnpm acceptance:build:native`，并按上文证书和设备要求
 
 ### 前置条件
 
-1. 准备与当前宿主 ABI 匹配的真实 xkcd 构建、Native 内置材料与正式 Web 构建，入口见仓库构建说明；旧 v4 构建不可混入 v5 验收。
+1. 准备与当前宿主 ABI 匹配的真实 xkcd 构建、Native 内置材料与正式 Web 构建，入口见仓库构建说明；只使用与当前 ABI 一致的产物，旧 v4/v5 构建不可混入 v6 验收。
 2. 按上文配置 xkcd 的实际网络政策，启动官方 HTTPS harness。Web 与 Native 使用同一实际 origin、测试身份与隔离 D1。原[Source 测试服务](../../api/test/source-metadata-probe.md)只保留历史说明；本地签名身份不证明生产 Access/Cookie 行为。
 3. Native 必须正常信任 HTTPS 证书。建议创建可丢弃模拟器，只向该设备添加本轮测试 CA；不修改产品 TLS、Mac 全局信任或已有设备信任，不接受证书错误。
 4. 从内置浏览器的正式 UI 收藏英文 xkcd。初次运行测试前保留第 1 页进度或尚无进度；测试从服务端书架进入该作品。

@@ -2,11 +2,13 @@
 
 ## 目标与状态
 
-状态：**已实现，集中工程检查已通过；v6 AOT、真实 Source 和独立客户端验收待进行。** 本计划细化 [P3](p3-extensions-and-migration.md) 的 Source 设置待办。沿用[跨语言协议设计](../design/cross-language-protocol.md)与[同步计划](p2-sync.md)，完成同一身份在 Web/iOS/Android 的非敏感 Source 设置在线读写、运行时生效和失败恢复；敏感凭证留在当前客户端，不进入普通同步。
+状态：**已实现，集中工程检查、固定 v6 AOT 与 Komiic Web 设置/新文档恢复分项通过；其它控件、Native 与生产待验收。** 本计划细化 [P3](p3-extensions-and-migration.md) 的 Source 设置待办。沿用[跨语言协议设计](../design/cross-language-protocol.md)与[同步计划](p2-sync.md)，完成同一身份在 Web/iOS/Android 的非敏感 Source 设置在线读写、运行时生效和失败恢复；敏感凭证留在当前客户端，不进入普通同步。
 
-交付范围是开关、文本/密码、单选、多选、分组、依赖项与修改后刷新。保留 Source 原 Preference 对象和回调语义，不修改官方扩展业务源码。Android 自定义 Activity、任意自定义对话框或 WebView 登录不因出现设置入口而视为已支持。下述消息名、字段、数据表与流程细节均为实施建议，尚未写入正式 IDL 或产品代码。
+交付范围是开关、文本/密码、单选、多选、分组、依赖项与修改后刷新。保留 Source 原 Preference 对象和回调语义，不修改官方扩展业务源码。Android 自定义 Activity、任意自定义对话框或 WebView 登录不因出现设置入口而视为已支持。正式消息、字段、数据表和流程以当前 IDL、产品代码及[设计](../design/source-preferences.md)为准。
 
-## 已核实的基础与缺口
+## 实施前核实的基础
+
+以下记录实施前的 ABI 与行为调查，用于解释适配依据；当前已实现范围见下方任务和设计，不把历史缺口当成现状。
 
 - 正式 `TeaHost.hostInvoke` 已有浏览、详情、图片和 typed filters 调用，尚无 preferences 操作；Flutter、TS/Dart 控制合同和 API 也没有 Source 设置链路。
 - 固定 Suwayomi 的 `ConfigurableSource.setupPreferenceScreen` 与 Keiyoushi 的 `getPreferences` 均使用 `source_$id` SharedPreferences。Source ID 保持原十进制字符串，不能转成 JS Number。
@@ -60,7 +62,7 @@
 | 证据/候选                                                                                                                                                                                                                                                                | 已核实事实与用途                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | [ConfigurableSource](../../vendor/suwayomi-server/server/src/main/kotlin/eu/kanade/tachiyomi/source/ConfigurableSource.kt)、[Keiyoushi Preferences](../../vendor/extensions-source/core/src/main/kotlin/keiyoushi/utils/Preferences.kt)                                  | setupPreferenceScreen 与 `source_$id` 存储约定；Source ID 不能丢 Long 精度。                                  |
-| [TeaHost](../../runtime/teavm/java/src/main/java/prototype/TeaHost.java)、[driver](../../packages/runtime-host/src/teavm-driver.ts)                                                                                                                                      | 当前 init → load → Source 调用顺序；需在构造原 Source 前引入确认设置。                                        |
+| [TeaHost](../../runtime/teavm/java/src/main/java/prototype/TeaHost.java)、[driver](../../packages/runtime-host/src/teavm-driver.ts)                                                                                                                                      | init → load → Source 调用顺序；当前已在构造原 Source 前引入确认设置。                                         |
 | [现有依赖适配](../../tools/teavm/build.ts)、[上游 Preference](../../vendor/suwayomi-server/AndroidCompat/src/main/java/androidx/preference/Preference.java)、[上游设置调用](../../vendor/suwayomi-server/server/src/main/kotlin/suwayomi/tachidesk/manga/impl/Source.kt) | owned 类由构建隔离替换依赖同名类；上游 stub 与 seed 存在差别，不直接套用上游先保存后回调的行为。              |
 | [AsuraScans](../../vendor/extensions-source/src/en/asurascans/src/eu/kanade/tachiyomi/extension/en/asurascans/AsuraScans.kt)                                                                                                                                             | 单开关隐藏付费章节，适合首个非敏感设置在线闭环。                                                              |
 | [MangaFire](../../vendor/extensions-source/src/all/mangafire/src/eu/kanade/tachiyomi/extension/all/mangafire/MangaFire.kt)                                                                                                                                               | 多选、summary 和 mergeChapters → preferOfficial 的 enabled 依赖，要求保留原回调与原对象。                     |
@@ -76,7 +78,9 @@
 - [x] TS/Dart 合同与 Java oracle：原子类保留、默认值/false/空集合、合法选项、重复/非法路径、整体预算、listener-veto、click、别名写入、依赖与 summary 刷新；SharedPreferences Editor 和监听器语义有实际断言。
 - [x] 官方 workerd + 真实 D1：同身份另一客户端读回、不同身份隔离、CAS 冲突、原 UUID/body 重试只应用一次、旧 ACK 不覆盖新值；普通 API 明确拒绝不属于同步策略的值，不能靠日志脱敏掩盖正文泄漏。
 - [x] 正式 Dart/Flutter 控制与业务链的工程回归：D1 值在 Source 构造前生效；丢 ACK 不重跑回调；只读刷新不重放 pending；关闭/取消/换身份及迟到响应不复活旧状态；未确认草稿有明确可恢复路径。
-- [ ] 按确定后的 ABI 本地重建固定候选 AOT，通过正式入口验证开关、单/多选、文本/密码、veto、别名、依赖及刷新；如源站不可用，记录具体失败和未通过门，不用 supplier 结果替代。
+- [x] 按 v6 ABI 在固定提交的独立目录本地重建 Komiic，通过完整性及静态装配门；候选保持 compiled_unverified/runtimeReady=false。
+- [x] Komiic 正式 Web 入口切换原镜像设置、确认到 D1、重开并加载真实热门；第二项保存保留前一值，新 Web 文档从确认状态恢复两项非默认值。实际范围见[记录](../verification/source-preferences.md#komiic-v6-真实-web-分项)。
+- [ ] 继续通过正式入口验证开关、多选、文本/密码、veto、别名、依赖及刷新；如源站不可用，记录具体失败和未通过门，不用 supplier 结果替代。
 - [ ] 同一身份的 Web 与独立 Native 客户端读取并修改非敏感值后收敛，重开 Source 使用服务端确认值；敏感凭证不随另一端设置同步。Web/iOS/Android 分别记录实际通过范围。
 - [ ] 扩展自定义 Activity/不支持的 bind 行为明确提示，受影响项失败不冒充保存成功，也不破坏其余可用浏览路径。
 

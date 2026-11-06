@@ -2,7 +2,7 @@
 
 2026-11-06，官方 `kotlinx-coroutines-core-jvm` 的隔离试验已完成：正式项目兼容层与一处精确继承调用适配后 AOT 成功；Node 同步 `runBlocking` 返回，但首次 `await` 停住且子协程未开始。JVM、编译与实际 JS 结果分别见[协程验证](verification/coroutine-runtime.md)，迁移未实施，后续按[计划](plan/coroutine-runtime.md)打通挂起和宿主生命周期。
 
-2026-11-06，typed Source preferences 的 v6 控制合同、原 Preference 回调、构造前注入、D1 独立 CAS API、客户端秘密值与 Flutter 设置/重开路径已实现；工程回归和仍待完成的真实 Source、独立客户端及生产门见[设置记录](verification/source-preferences.md)，正式决定见[设计](design/source-preferences.md)。历史 v4/v5 证据不自动覆盖 v6。
+2026-11-06，typed Source preferences 的 v6 控制合同、原 Preference 回调、构造前注入、D1 独立 CAS API、客户端秘密值与 Flutter 设置/重开路径已实现；集中工程检查、固定 Komiic AOT、正式 Web 设置/重开和新文档恢复分项通过；其它控件、Native 及生产门见[设置记录](verification/source-preferences.md)，正式决定见[设计](design/source-preferences.md)。历史 v4/v5 证据不自动覆盖 v6。
 
 2026-11-06，typed Source 筛选的 Protobuf、原 Java Filter 子类保留、Flutter 编辑及空查询搜索/分页链路已接入；本次开发 host ABI 升为 v5。修复后的两包代表 AOT 与 CuuTruyen 真实 Web 动态标签、空 query、分页及重置草稿关闭后继续原查询分项通过。显式快照保留和活动取消的运行代次回收边界见[设计](design/source-filters.md)，工程结果、固定构建身份与其余真实 Source/平台待验门统一见[筛选记录](verification/source-filters.md)。历史 v4 生产与在线结果仍绑定原构建，不自动覆盖新 ABI。
 

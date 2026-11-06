@@ -22,10 +22,43 @@
 
 详细临时日志位于 main 忽略目录 `.local/source-preferences-*.log`；Java oracle 和全源编译的临时日志在 `/private/tmp/karuyomi-source-preferences-*.log`。不提交机器输出或临时工程。
 
+## Komiic v6 真实 Web 分项
+
+固定 `384627e9f58e6f940effe57d6c6a2d06b32eb016` 的独立 clone，锁定的上游和工具链不变，生成完整 1448 包计划后只选 Komiic 1.6.11。未复用 v5 AOT，未改变全量 baseline 或发布 checkpoint。
+
+| 身份                  | 本轮值                                                             |
+| --------------------- | ------------------------------------------------------------------ |
+| buildId               | `ext-zh.komiic-8b3f71f1f85cd5857db8abaf969f23c7`                   |
+| host ABI / Source     | `karuyomi-source-host-v6` / `792932060924485302`                   |
+| canonical SHA-256     | `c0b8c15661e322d8a5a6f2c2616a0b9c5ea8d557d4f40041b51658971a9a681a` |
+| gzip / canonical 字节 | 527464 / 1674394                                                   |
+| 候选 revision         | `06720893a860473e9f54ff4575473974`                                 |
+
+官方 Gradle、TeaVM AOT、完整性、索引/manifest 和正式静态装配检查通过。候选仅 1 包 available、1447 包 pending，bootstrap 未完成；仍为 `compiled_unverified/runtimeReady=false`，未部署。
+
+客户端/API 使用 `54594de` 的正式 `acceptance:build`，携该候选通过；它与 `384627e` 的产品源码相同，仅多协程调查文档。官方 Wrangler `createTestHarness` 应用正式迁移，使用隔离 D1、真实 RS256 测试身份和明确 `komiic.com` / `komiic.cc` 网络政策。Codex 内置 Chromium、正式 Flutter → manager/TeaHost → 原 Source → 正式 HTTP 桥实际通过：
+
+1. 打开默认 Source，`.com` 的热门请求失败；设置入口仍可用，原控件显示镜像 `komiic.com` 与“同時顯示卷和章節”。
+2. 仅通过原镜像控件选择 `komiic.cc` 并应用。D1 的 Source revision 变为 1，保存 `preferred_mirror` 的原始字符串值 `1`；重开后的原设置显示 `.cc`，热门真实返回“腦洞學生會”“鬼畜英雄”“ONE PIECE航海王”等作品。未改 URL、Source JAR 或业务源码。
+3. 再通过原控件选择“僅顯示章節”。D1 revision 变为 2，同时保留 `CHAPTER_FILTER=chapter` 与 `preferred_mirror=1`，没有因完整分区替换丢失上一设置。
+4. 关闭第一个标签，打开全新 Web 文档并重新加载扩展和 Source。没有再次编辑，首个热门请求成功；设置页显示 `komiic.cc` 与“僅顯示章節”。这是相同 origin 的独立文档/Worker，确认值由 D1 读取并在 Source 构造前注入；不是独立 Native 安装或浏览器 profile。
+
+设置恢复已有可视记录。此后继续打开筛选时浏览器报告该临时标签已不属于当前会话，标签清单为空；没有实际执行新的 Komiic 筛选门，不将本轮热门成功登记为筛选或完整阅读通过。官方验收服务随后按 Enter 正常关闭。
+
+界面还发现成功后提示一直写“正在重新打开”，已改为准确的确认完成提示；原控制器与正式组件回归 10 项通过，该文案修正不扩展上述运行证据。工程提交 `384627e` 与文档提交 `54594de` 的[通用 CI](https://github.com/Wybxc/karuyomi/actions/runs/42154045691)均已通过，含完整检查、Flutter、构建和本地迁移。
+
+复验入口：
+
+```sh
+EXTENSION_ASSETS_DIR=/private/tmp/karuyomi-source-preferences-384627e/.local/source-preferences-validation/snapshot pnpm acceptance:build
+ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.komiic","allowedHosts":["komiic.com","komiic.cc"]}]' pnpm acceptance:serve
+```
+
+固定输入、独立 state 与本机路径见该 clone 的忽略目录 `.local/source-preferences-validation/`。临时 clone 清理后需按上述固定输入重新构建，不将产物或详细日志入库。
+
 ## 尚未通过的运行门
 
-- [ ] v6 固定候选 AOT；不能复用 v5 的 CuuTruyen 筛选/分页证据。
-- [ ] 真实 Source 设置入口：构造前偏好生效、原 change/click、veto、实际别名、动态依赖及重新浏览。Komiic 镜像必须通过原 `preferred_mirror` 控件选择，不能改 URL/JAR。
+- [ ] 其它真实 Source 控件、原 click/veto、实际别名、动态依赖、密码/会话值与刷新；Komiic 仅通过本轮明确的原单选/镜像和新文档恢复分项。
 - [ ] 同一身份 Web 与独立 Native 读取/修改非敏感设置后收敛，确认旧 ACK 不回退 Source 构造基线。
 - [ ] Web/iOS/Android 各自正式入口、取消/身份切换及秘密值仅当前会话的实际运行。
 - [ ] 生产 Access 正向和目标真机门。
