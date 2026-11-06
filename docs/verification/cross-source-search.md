@@ -60,6 +60,46 @@
 
 本轮本地候选与构建记录保留在 `/private/tmp/karuyomi-local-cross-search-aot-9b98d006-7b4V07/results/`，独立输入审计、D1 原始响应与阶段快照为 `/private/tmp/karuyomi-cross-source-search-{aot-input-audit,web-*}.json`。详细机器输出和产物不入库；后续继续使用官方 harness、正式 UI 和原 Source 设置验证，未使用手写服务器或直接业务写入补足 UI 结果。
 
+## 2026-11-07：含关闭修复的四包 Web 复验
+
+新的官方 Vite / Wrangler harness 为 `http://127.0.0.1:56104`，subject 仍为 `acceptance-owner`，使用新的空 D1；它与上节端口的账户状态相互独立。本轮子代理的内置浏览器 provider 不可用，因此由主代理独占 Codex 内置浏览器实际操作，独立验收代理只读核对 API、候选输入和截图；没有切换其它浏览器。客户端包含 `e71f657` 的已安装 Source 名称筛选修复与 `637d322494b2465fda4864091b7bf7d7c59a5aba` 的关闭认领修复；四包 AOT 仍固定在 `9b98d006`，没有用旧提交的 CI 代替新客户端检查。
+
+前三包构建不变，新增 CuuTruyen（vi，Source `8222087175453285202`），构建为 `ext-vi.cuutruyen-6a74c453163c495195b6d9b0727bbff3`。四包快照位于 `/private/tmp/karuyomi-local-cuutruyen-aot-9b98d006-kNsNNZ/results/snapshot-four`，provenance 的上游、host commit 与 fingerprint 一致；文件大小与 manifest 相符，复用已验证哈希，没有重新计算产物哈希。候选仍为 `compiled_unverified` / `runtimeReady=false`，未部署生产。
+
+独立 GET 确认初始 bootstrap / settings / library / 静态索引均为 HTTP 200，account/global revision 为 0，书架为空，目录为四包八个 Source。主代理通过正式 UI 准备并安装四包后，独立 GET 确认为 revision 4、四条精确 catalog / package / build / bundle hash 均匹配且启用，阅读设置仍为默认。随后管理页搜索“崩坏”仍显示已安装 BH3 的启用与卸载控件，没有实际禁用或卸载；独立重读完整设置与安装后相同，revision 仍为 4。该筛选修复的正式记录另见[扩展管理验证](extension-management.md)。
+
+### 前台交接、结果隔离与真实分页
+
+先通过普通浏览打开 CuuTruyen，并实际得到包括 `Spy x Family` 的热门作品；保留普通 Source 后进入跨源搜索，选择 xkcd en / ru、CuuTruyen、BH3，共四个 Source、三个包，冻结非空查询 `a`。xkcd ru 的 Source ID 为 `3742763978853704441`，其余 ID 见本页表格与上述 CuuTruyen 记录。
+
+浏览器先观察 xkcd en 与 CuuTruyen 同时显示正在搜索，同包 ru 与第三包 BH3 等待；随后 en / ru 各返回 0，CuuTruyen 返回 24 项，BH3 返回原实现的 `No search`，没有再次出现 `RangeError`。这完成了有普通前台 Source 时的实际交接与逐源结果隔离分项；UI 同时显示活动状态不能代替实际 Worker 数量或底层关闭 ACK 的仪器证据。
+
+只点击 CuuTruyen 的“此源下一页”，加载中保留已有 24 项，完成后累计 48 项，并出现第二页的不同标题（包括 `Oniichan…`、`Manga Giáng Sinh…`）。第三页完成后累计 72 项。固定上游的非空搜索确实携带 `q` / `page` / `per_page=24`，本轮同时取得正式 UI 的不同页结果，没有将 Komiic 不带页号的非空搜索当作分页。
+
+第 3 页的一次停止尝试在点击前已完成、控件消失，因此不算取消。随后发起第 4 页，在同一次浏览器操作中读取到“正在搜索、72 项、停止此源”后点击现有停止控件；下一份新状态明确变为“已停止、72 项、重试此源”，没有追加到 96 项。再次滚动检查仍为停止 72 项，其它 xkcd 结果保持不变。截图为 `/private/tmp/karuyomi-cross-search-four-{page1-isolation,page2,stopped}.jpg`。
+
+分页后独立 GET 确认 account/global 仍为 4，四包安装与阅读默认未变，书架仍空，CuuTruyen 无 Source 设置 snapshot。阶段原始响应为 `/private/tmp/karuyomi-cross-source-search-web-four-{baseline,installed,page2-state}.json`，详细机器输出不入库。
+
+### 从跨源结果进入正式详情、图片与服务端进度
+
+在已停止的 72 项中点击 CuuTruyen 的 `A Manga About a Couple Choosing Earrings`，实际进入正式详情，显示作者 `Mikazuki Lamp`、`romance` / `slice of life` 与 1 个章节。点击 `Chương 1 Oneshot` 进入正式阅读，1/5 的真实图片可见；下一页后显示 2/5，AUTO 双页同时呈现第 2、3 页真实图片。新状态明确显示阅读进度已保存到服务端、最远第 3 页。独立审阅详情与第 2 页截图，图片走原 Source 的正式处理及产品阅读链路，没有以直接图片 URL 补足。
+
+独立 GET `/api/settings` 确认 account revision 为 7，global revision 仍为 4，四条安装和全局阅读默认未变。`/api/library` 仅列收藏，本次没有收藏该作品，因此仍为空；没有为验收额外写入收藏。
+
+为定位非收藏漫画的业务 key，按授权只进行一次官方 CuuTruyen 搜索 API 的只读查询，精确标题与作者唯一匹配 id `2414`，章节 id `42231`。这次直接 API 读取只用于定位记录，不算 Source 搜索或阅读证据。按当前 `LibraryRepository` / `ChapterSequence` 算法，以 package、Source ID、原始漫画 / 章节 URL 生成 key，catalog 精确性独立核对，不改变业务身份算法。正式 GET `/api/state/manga/:mangaKey` 及 `/progress` 均为 HTTP 200：
+
+- manga key 为 `dbe3a8aed5902a94b76a655438bddba1748cdc1eb8b204c07d387da3b251bed3`，manga revision 为 3、account revision 为 7。
+- resume 与进度均指向 `3759806d3531144a653c4d7c981bc7db8501303eba29b9f6aa8b019dfb039da3`，与原章节 URL `42231` 的正式 key 相同。
+- current `pageIndexHint=1`、furthest `pageIndexHint=2`，分别对应第 2 页当前位置与第 3 页最远阅读，与实际双页状态一致；没有标记全章读完。
+
+此非收藏进度记录没有漫画 metadata，不能称 D1 返回了作品标题；标题、作者与原 URL 的绑定来自实际详情截图、单次精确查询和 key 一致性。原始证据为 `/private/tmp/karuyomi-cross-source-search-web-four-reader-{state,progress}.json`，截图为 `/private/tmp/karuyomi-cross-search-four-{detail,reader-page1,reader-page2}.jpg`。这只证明该构建该作品已观察的图片与进度，不证明全 5 页、所有包、Native 或生产 Access。
+
+### 本次工程检查
+
+主代理在冻结修复后完整运行 `pnpm format` → macOS `pnpm format:check`、`pnpm flutter:check`、`pnpm build` 和官方 acceptance Vite 构建，均退出 0。独立读取最终日志核对三个项目分析无问题、Reader Core 22 / Source Runtime 86 / Reader 591 项通过、172 份 Dart 格式零变化，依赖检查为 179 模块 / 590 依赖无违规。日志为 `.local/search-slot-claim-{format,format-check,flutter-check-final,dependencies,build,acceptance-build}.log`。本轮本地没有重复完整 `pnpm check` 的记录。独立一次查询确认精确客户端提交 `637d322494b2465fda4864091b7bf7d7c59a5aba` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42301547558) 为 completed / success，`pnpm check`、`pnpm flutter:check`、`pnpm build`、`pnpm db:migrate:local` 各步成功；不将旧 `9b98d006` 的 CI 当作此修复结果。这些工程结果不替代上述真实 Source 分项。
+
+本轮官方 harness 以 stdin 换行正常关闭、退出 0；`56104` 无监听，原 workerd PID `32636` 已退出，旧 `52409` 也已关闭。四包 AOT controller / JVM 与唯一 CI watch 均已正常退出，没有遗留本轮验收服务。
+
 ## 尚未通过的层级
 
-已取得的固定三包 Web 分项见上节；真实运行同时发现了前台关闭竞态，修复后的浏览器复验仍须完成。两个包有作品的独立返回、真实单源分页、活动停止、跨源结果进入详情与阅读、实际双 Worker 数量与生命周期，以及 Native、生产 Access、独立设备和真机性能均未因上述分项通过。测试中的两个 transport 不能当作真实双 Worker 运行证据；Source 能力说明使用实际目录、原实现或运行事实，不推断登录、验证码或脚本支持。
+固定三包发现的前台关闭竞态已有四包客户端复验；真实单源分页和活动停止的具体范围见上节。跨源结果进入详情、限定图片阅读与服务端进度已取得上述实际记录；两个包同时返回作品、实际双 Worker 数量与生命周期，以及 Native、生产 Access、独立设备和真机性能仍未因上述分项通过。测试中的两个 transport 不能当作真实双 Worker 运行证据；Source 能力说明使用实际目录、原实现或运行事实，不推断登录、验证码或脚本支持。

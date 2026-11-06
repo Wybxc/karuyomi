@@ -121,3 +121,5 @@ node tools/extensions/pipeline.ts prepare-snapshot --plan ../results/selected-pl
 2026-11-07，基于 `9b98d00` 的正式 Reader 变更：管理页原先对已安装项只匹配包名，同时又从可用区排除已安装项，导致按 Source 名搜索时更新、停用和卸载入口消失。现在从相同 `catalogUrl/repoId/packageName` 的当前目录读取 Source 名；目录缺失仍可按包名找到，不借用其它仓库同包的名称。
 
 固定 Flutter SDK 的 `test/extensions/extensions_controller_test.dart` 与 `test/extensions/additional_repositories_test.dart` 共 41 项通过。新增正式页面回归覆盖安装后源名搜索保留管理入口、目录缺失仍按包名搜索、同包跨仓双向搜索隔离，以及搜索零账户写入、零扩展准备或执行。原源名回归在旧逻辑先失败、修复后通过；日志 `/private/tmp/karuyomi-installed-source-search-{red,green}.log`。这是受控平台的正式组件验证，实际浏览器、Native 和生产行为分别验收。
+
+修复提交 `e71f657` 随后在官方本地 harness `http://127.0.0.1:56104/` 的正式 Flutter Web、Codex 内置浏览器实际验证：四包安装后，管理页搜索“崩坏”，BH3 已安装卡、启用开关与卸载按钮仍可见，其余三包被筛掉。验收子代理只读核对搜索前后完整设置相同，`accountRevision/globalRevision` 均保持 4，没有代点启停或卸载。截图 `/private/tmp/karuyomi-installed-source-search-web.jpg`，只读收据 `/private/tmp/karuyomi-cross-source-search-web-installed-name-filter.json`。此分项不代替真实更新、停用或卸载验收。
