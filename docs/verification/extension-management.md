@@ -115,3 +115,9 @@ node tools/extensions/pipeline.ts prepare-snapshot --plan ../results/selected-pl
 ## 当前 AOT 的 Web 管理与阅读分项
 
 固定 `3ed3945` 候选随后经官方 API Vite 配置装配至本地验收 Static Assets，正式 Flutter Web 与 Codex 内置浏览器通过默认 xkcd 的准备/安装、第二独立应用标签读回精确账户选择、英语 Source 列表/详情和两页真实阅读及服务端进度确认。完整步骤、初次身份请求缺口、修复回归和限制统一见[额外仓库验证](additional-repositories.md#codex-内置浏览器与真实-source-分项)。这不覆盖 Native、独立设备冷缓存、换仓、并发竞争、生产或完整启停/卸载矩阵，候选状态保持不变。
+
+## 已安装扩展的源名称搜索
+
+2026-11-07，基于 `9b98d00` 的正式 Reader 变更：管理页原先对已安装项只匹配包名，同时又从可用区排除已安装项，导致按 Source 名搜索时更新、停用和卸载入口消失。现在从相同 `catalogUrl/repoId/packageName` 的当前目录读取 Source 名；目录缺失仍可按包名找到，不借用其它仓库同包的名称。
+
+固定 Flutter SDK 的 `test/extensions/extensions_controller_test.dart` 与 `test/extensions/additional_repositories_test.dart` 共 41 项通过。新增正式页面回归覆盖安装后源名搜索保留管理入口、目录缺失仍按包名搜索、同包跨仓双向搜索隔离，以及搜索零账户写入、零扩展准备或执行。原源名回归在旧逻辑先失败、修复后通过；日志 `/private/tmp/karuyomi-installed-source-search-{red,green}.log`。这是受控平台的正式组件验证，实际浏览器、Native 和生产行为分别验收。

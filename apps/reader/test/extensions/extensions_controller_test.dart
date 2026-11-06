@@ -484,6 +484,80 @@ void main() {
   );
 
   testWidgets(
+    'installed source name search keeps management actions without account writes',
+    (tester) async {
+      await manager.install(catalog.builds.single);
+      final posts = platform.businessServer.requests
+          .where((request) => request.method == 'POST')
+          .length;
+      await show(tester);
+      final search = find.byKey(const ValueKey('extensions-search'));
+      await tester.enterText(search, testCatalogSource.name);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          const ValueKey(('extension-installed', 'eu.kanade.source.test')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey(('extension-enabled', 'eu.kanade.source.test')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey(('extension-uninstall', 'eu.kanade.source.test')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length,
+        posts,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'missing catalog metadata still allows installed package name search',
+    (tester) async {
+      await manager.install(catalog.builds.single);
+      platform.inventory = wire.encodeProtoJson(
+        wire.ExtensionIndex(schemaVersion: 1, repoId: 'keiyoushi'),
+      );
+      final posts = platform.businessServer.requests
+          .where((request) => request.method == 'POST')
+          .length;
+      await show(tester);
+      expect(catalog.builds, isEmpty);
+      await tester.enterText(
+        find.byKey(const ValueKey('extensions-search')),
+        'eu.kanade.source.test',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          const ValueKey(('extension-uninstall', 'eu.kanade.source.test')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length,
+        posts,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'unknown global pending disables new edits and refreshing the page never posts the draft',
     (tester) async {
       platform.businessServer.loseNextResponse = true;

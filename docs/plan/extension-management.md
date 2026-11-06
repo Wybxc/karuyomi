@@ -12,6 +12,7 @@
 
 - `InstalledExtension` 保存 `catalogUrl/repoId/packageName/buildId/bundleSha256/enabled`，位于生成协议的全局设置，最多 128 项，同一个包只能选择一个仓库与构建。没有记录就是未安装，不从静态索引自动生成账户成员。
 - D1 保存账户已确认意图，沿用全局设置 CAS、原 mutation UUID/body 和确认后重取。准备开始时复制完整全局值并固定 revision；准备结束不重读一个新 CAS 覆盖并发修改。任意未知 ACK 的全局 pending 阻止新编辑，只能显式重试整份原请求；只读刷新不重放写入。
+- 管理页搜索同时匹配包名和当前同来源目录的漫画源名称。已安装项按 `catalogUrl/repoId/packageName` 获取元数据，目录缺失仍可按包名找到；不同仓库的同包名称不互相借用，搜索不写账户或启动扩展。
 - 默认仓库使用当前部署 origin 的 `/extensions/index.json`。已确认清单和当前目录分别呈现；检查更新只重读目录，不自动切换。安装、更新先 `prepareBuild`，再确认账户选择；本机缺副本可独立准备，不写账户选择。
 - 准备重新核对当前索引与 manifest，沿正式有界下载、解压和完整性路径取得代码，不创建 Source Worker 或调用 Source。manager 仅允许一个准备任务，关联 preparation ID，设置 60 秒取消信号，取消完成前等待下载与缓存操作收尾。
 - 扩展代码直接使用 `idb@8.0.4` 的单层可丢弃 IndexedDB 缓存；metadata 与 canonical JS bytes 原子写入，最多 128 项 / 256MiB。下载验证收据在本地复用，不再次 hash；占用可以查询，单副本可以删除。Web Locks 的 shared pin 保护准备与活动构建，删除须取得排他锁；不全清 IndexedDB 或 WebView 数据。

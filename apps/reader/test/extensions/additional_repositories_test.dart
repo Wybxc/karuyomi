@@ -30,12 +30,18 @@ wire.ExtensionBuildDescriptor get extraDescriptor =>
       sources: [testCatalogSource],
       manifestPath: '/extensions/builds/community-1/manifest.json',
     );
-void seedPublic(TestPlatform platform) {
+void seedPublic(TestPlatform platform, {String? sourceName}) {
+  final source = testCatalogSource;
+  if (sourceName != null) source.name = sourceName;
+  final descriptor = extraDescriptor;
+  descriptor.sources
+    ..clear()
+    ..add(source);
   platform.publicDocuments[extraUrl] = wire.encodeProtoJson(
     wire.ExtensionIndex(
       schemaVersion: 1,
       repoId: 'community',
-      builds: [extraDescriptor],
+      builds: [descriptor],
     ),
   );
   platform.publicDocuments['https://community.example/extensions/builds/community-1/manifest.json'] =
@@ -46,7 +52,7 @@ void seedPublic(TestPlatform platform) {
           repoId: 'community',
           version: '1.0',
           sourceIds: [sourceId],
-          sources: [testCatalogSource],
+          sources: [source],
           bundle: wire.BundleArtifact(sha256: 'a' * 64),
         ),
       );
@@ -696,6 +702,58 @@ void main() {
         ),
         true,
       );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'installed source-name search keeps same-package repository identities separate',
+    (tester) async {
+      const extraSourceName = '外仓独有漫画源';
+      seedPublic(platform, sourceName: extraSourceName);
+      await addExtra();
+      expect(manager.installed.single.catalogUrl, catalog.catalogUrl);
+      expect(manager.installed.single.repoId, catalog.defaultCatalog.repoId);
+      final before = posts().length;
+      await tester.binding.setSurfaceSize(const Size(900, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final search = find.byKey(const ValueKey('extensions-search'));
+      final installed = find.byKey(
+        const ValueKey(('extension-installed', preferencePackage)),
+      );
+      final enabled = find.byKey(
+        const ValueKey(('extension-enabled', preferencePackage)),
+      );
+      final uninstall = find.byKey(
+        const ValueKey(('extension-uninstall', preferencePackage)),
+      );
+      final available = find.byKey(
+        const ValueKey(('extension-available', extraUrl, preferencePackage)),
+      );
+
+      await tester.enterText(search, extraSourceName);
+      await tester.pumpAndSettle();
+      expect(available, findsOneWidget);
+      expect(installed, findsNothing);
+      expect(enabled, findsNothing);
+      expect(uninstall, findsNothing);
+
+      await tester.enterText(search, testCatalogSource.name);
+      await tester.pumpAndSettle();
+      expect(installed, findsOneWidget);
+      expect(enabled, findsOneWidget);
+      expect(uninstall, findsOneWidget);
+      expect(available, findsNothing);
+      expect(posts(), hasLength(before));
+      expect(platform.preparations, isEmpty);
+      expect(platform.openedBuilds, isEmpty);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

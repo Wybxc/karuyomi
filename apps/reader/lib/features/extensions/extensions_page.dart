@@ -186,6 +186,17 @@ class _ExtensionsPageState extends State<ExtensionsPage>
       packageName.toLowerCase().contains(_query) ||
       sources.any((source) => source.name.toLowerCase().contains(_query));
 
+  CatalogBuild? _latestBuild(wire.InstalledExtension extension) => widget
+      .catalog
+      .builds
+      .where(
+        (build) =>
+            build.packageName == extension.packageName &&
+            build.catalogUrl == extension.catalogUrl &&
+            build.repoId == extension.repoId,
+      )
+      .firstOrNull;
+
   String _bytes(int value) =>
       '${(value / (1024 * 1024)).toStringAsFixed(1)} MiB';
 
@@ -353,7 +364,10 @@ class _ExtensionsPageState extends State<ExtensionsPage>
             if (controller.settings.snapshot != null && installed.isEmpty)
               const Text('账户尚未安装扩展。'),
             for (final extension in installed)
-              if (_matches(extension.packageName, const []))
+              if (_matches(
+                extension.packageName,
+                _latestBuild(extension)?.sources ?? const [],
+              ))
                 _installed(extension, cached),
             const SizedBox(height: 16),
             Text('当前目录可用扩展', style: Theme.of(context).textTheme.titleMedium),
@@ -449,14 +463,7 @@ class _ExtensionsPageState extends State<ExtensionsPage>
 
   Widget _installed(wire.InstalledExtension extension, Set<String> cached) {
     final controller = _controller;
-    final latest = widget.catalog.builds
-        .where(
-          (build) =>
-              build.packageName == extension.packageName &&
-              build.catalogUrl == extension.catalogUrl &&
-              build.repoId == extension.repoId,
-        )
-        .firstOrNull;
+    final latest = _latestBuild(extension);
     final supported = widget.catalog.isRepositoryRegistered(
       wire.CatalogReference(
         catalogUrl: extension.catalogUrl,
