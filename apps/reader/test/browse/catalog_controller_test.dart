@@ -194,6 +194,9 @@ void main() {
     () async {
       await open();
       platform.bootstrapSubject = 'other-subject';
+      platform.seedInstalledBuilds(
+        wire.decodeProtoJson(wire.ExtensionIndex(), platform.inventory).builds,
+      );
       final entered = Completer<void>();
       final release = Completer<void>();
       platform.beforeApiFetch = (path) async {

@@ -42,6 +42,8 @@ final class ChapterPageProvider implements PageProvider {
   final _releases = <String, Future<void>>{};
   final _requestIds = <String>{};
   bool _closed = false;
+  bool _closeConfirmed = false;
+  bool get isClosed => _closeConfirmed;
   Future<void>? _closing;
 
   @override
@@ -115,12 +117,23 @@ final class ChapterPageProvider implements PageProvider {
   @override
   Future<void> cancel(String requestId) {
     if (!_pending.containsKey(requestId)) return Future.value();
-    return _cancellations.putIfAbsent(
+    final cancellation = _cancellations.putIfAbsent(
       requestId,
       () => runtime.cancelImage(
         ImageCancelRequest(requestId: requestId, generation: generation),
       ),
     );
+    unawaited(
+      cancellation.then(
+        (_) {},
+        onError: (Object error, StackTrace stack) {
+          if (identical(_cancellations[requestId], cancellation)) {
+            _cancellations.remove(requestId);
+          }
+        },
+      ),
+    );
+    return cancellation;
   }
 
   @override
@@ -134,17 +147,34 @@ final class ChapterPageProvider implements PageProvider {
       );
       _resources.remove(resourceId);
     });
-    // Successful cleanup needs no tombstone. Keep failed futures so a later
-    // close cannot claim successful cleanup without the platform's ACK.
-    unawaited(
-      release.then((_) {
+    // Retain ownership until ACK; a failed attempt may retry the same identity.
+    void settled() {
+      if (identical(_releases[resourceId], release)) {
         _releases.remove(resourceId);
-      }, onError: (Object error, StackTrace stack) {}),
+      }
+    }
+
+    unawaited(
+      release.then(
+        (_) => settled(),
+        onError: (Object error, StackTrace stack) => settled(),
+      ),
     );
     return release;
   }
 
-  Future<void> close() => _closing ??= _close();
+  Future<void> close() {
+    final closing = _closing ??= _close();
+    unawaited(
+      closing.then(
+        (_) {},
+        onError: (Object error, StackTrace stack) {
+          if (identical(_closing, closing)) _closing = null;
+        },
+      ),
+    );
+    return closing;
+  }
 
   Future<void> _close() async {
     _closed = true;
@@ -156,5 +186,6 @@ final class ChapterPageProvider implements PageProvider {
     await runtime.closePageSession(
       PageSessionRef(pageSessionId: pageSessionId, generation: generation),
     );
+    _closeConfirmed = true;
   }
 }

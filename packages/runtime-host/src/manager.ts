@@ -20,6 +20,8 @@ import {
   type ClosePageSession,
   type ImageResource,
   staticManifestPathSchema,
+  extensionBuildDescriptorSchema,
+  validId,
   workerResponseSchema,
   type RpcEnvelope,
   type RuntimeHello,
@@ -37,6 +39,7 @@ import { createHello } from './hello.js';
 import { RuntimeFailure } from './errors.js';
 import { sha256, VerifiedLoader } from './verified-loader.js';
 import { ImageResourceStore, type ImageCollector } from './image-resources.js';
+import type { ExtensionArtifactPin } from './extension-artifact-cache.js';
 
 export interface WorkerEndpoint {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -94,6 +97,20 @@ export class SourceRuntimeManager {
   private controller: AbortController | undefined;
   private releaseNamespace: (() => void) | undefined;
   private namespaceReleased: Promise<void> = Promise.resolve();
+  private artifactPin: ExtensionArtifactPin | undefined;
+  private artifactReleased: Promise<void> = Promise.resolve();
+  private preparation:
+    | {
+        id: string;
+        key: string;
+        controller: AbortController;
+        done: Promise<pb.PreparedBuild>;
+      }
+    | undefined;
+  private cacheCleaning = false;
+  private closingBuild:
+    { key: string; done: Promise<{ closed: true }> } | undefined;
+  private lastClosedBuild: string | undefined;
   private disposed = false;
   private preferencesEdited = false;
   private disposing: Promise<void> | undefined;
@@ -123,6 +140,15 @@ export class SourceRuntimeManager {
   }
 
   open(options: OpenOptions): Promise<RuntimeSession> {
+    if (this.closingBuild)
+      return Promise.reject(
+        new RuntimeFailure(
+          'source_error',
+          'Wait for the current build to close',
+          true,
+        ),
+      );
+    this.lastClosedBuild = undefined;
     if (this.disposed)
       return Promise.reject(
         new RuntimeFailure('runtime_lost', 'Runtime container is disposed'),
@@ -243,6 +269,14 @@ export class SourceRuntimeManager {
     this.assertGeneration(generation);
     await this.acquireNamespace(namespace, generation, signal);
     this.assertGeneration(generation);
+    const pin = await this.loader.cache?.retain(manifest.bundle.sha256, signal);
+    if (this.generation !== generation) {
+      pin?.release();
+      await pin?.released;
+      this.assertGeneration(generation);
+    }
+    this.artifactPin = pin;
+    this.artifactReleased = pin?.released ?? Promise.resolve();
     const url = new URL(this.workerUrl);
     url.searchParams.set('plugin', namespace);
     url.searchParams.set('fsNamespace', namespace);
@@ -433,6 +467,18 @@ export class SourceRuntimeManager {
   }
 
   invoke(input: SourceCall): Promise<SourceResult> {
+    if (this.disposed)
+      return Promise.reject(
+        new RuntimeFailure('runtime_lost', 'Runtime container is disposed'),
+      );
+    if (this.closingBuild)
+      return Promise.reject(
+        new RuntimeFailure(
+          'source_error',
+          'The current build is closing',
+          true,
+        ),
+      );
     let call: SourceCall;
     try {
       call = validateSourceCall(input);
@@ -704,6 +750,8 @@ export class SourceRuntimeManager {
     this.controller = undefined;
     this.worker?.terminate();
     this.worker = undefined;
+    this.artifactPin?.release();
+    this.artifactPin = undefined;
     this.releaseNamespace?.();
     this.releaseNamespace = undefined;
     this.images.clear(error, true);
@@ -726,6 +774,14 @@ export class SourceRuntimeManager {
   }
 
   async acquireImage(input: AcquireImage): Promise<ImageResource> {
+    if (this.disposed)
+      throw new RuntimeFailure('runtime_lost', 'Runtime container is disposed');
+    if (this.closingBuild)
+      throw new RuntimeFailure(
+        'source_error',
+        'The current build is closing',
+        true,
+      );
     const parsed = acquireImageSchema.safeParse(input);
     if (!parsed.success)
       throw new RuntimeFailure('protocol_error', 'Invalid image request');
@@ -883,6 +939,10 @@ export class SourceRuntimeManager {
       return { closed: true };
     })();
     this.closedPageSessions.set(parsed.data.pageSessionId, closing);
+    void closing.catch(() => {
+      if (this.closedPageSessions.get(parsed.data.pageSessionId) === closing)
+        this.closedPageSessions.delete(parsed.data.pageSessionId);
+    });
     return closing;
   }
 
@@ -907,11 +967,235 @@ export class SourceRuntimeManager {
     this.requestIds.add(requestId);
   }
 
-  rebuild(): Promise<void> {
+  prepareBuild(input: pb.PrepareBuildRequest): Promise<pb.PreparedBuild> {
+    if (this.disposed)
+      return Promise.reject(
+        new RuntimeFailure('runtime_lost', 'Runtime container is disposed'),
+      );
+    if (this.cacheCleaning)
+      return Promise.reject(
+        new RuntimeFailure('storage_busy', 'Wait for local artifact cleanup'),
+      );
+    let build;
+    try {
+      validId(input.preparationId);
+      if (!input.build) throw new Error('A catalog build is required');
+      build = extensionBuildDescriptorSchema.parse(
+        messageJson(pb.ExtensionBuildDescriptorSchema, input.build),
+      );
+    } catch {
+      return Promise.reject(
+        new RuntimeFailure('protocol_error', 'Invalid build preparation'),
+      );
+    }
+    const key = JSON.stringify(build);
+    if (this.preparation) {
+      if (
+        this.preparation.id === input.preparationId &&
+        this.preparation.key === key
+      )
+        return this.preparation.done;
+      return Promise.reject(
+        new RuntimeFailure(
+          'storage_busy',
+          'Another extension is being prepared',
+        ),
+      );
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () =>
+        controller.abort(
+          new RuntimeFailure('timeout', 'Extension preparation timed out'),
+        ),
+      60_000,
+    );
+    const done = this.loader
+      .prepare(build, controller.signal)
+      .then((value) => {
+        controller.signal.throwIfAborted();
+        return create(pb.PreparedBuildSchema, value);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) throw controller.signal.reason;
+        throw error;
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (this.preparation?.controller === controller)
+          this.preparation = undefined;
+      });
+    this.preparation = { id: input.preparationId, key, controller, done };
+    return done;
+  }
+
+  async cancelPreparation(preparationId: string): Promise<void> {
+    const preparation = this.preparation;
+    if (preparation?.id !== preparationId) return;
+    preparation.controller.abort(
+      new RuntimeFailure('cancelled', 'Extension preparation was cancelled'),
+    );
+    await preparation.done.catch(() => {});
+  }
+
+  async extensionCache(): Promise<pb.ExtensionCacheState> {
+    if (this.disposed)
+      throw new RuntimeFailure('runtime_lost', 'Runtime container is disposed');
+    const cache = this.loader.cache;
+    if (!cache)
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'Managed artifact caching is unavailable',
+      );
+    const artifacts = await cache.entries();
+    return create(pb.ExtensionCacheStateSchema, {
+      artifacts,
+      totalBytes: artifacts.reduce(
+        (sum, artifact) => sum + artifact.byteLength,
+        0,
+      ),
+      maxBytes: cache.maxBytes,
+      maxArtifacts: cache.maxArtifacts,
+    });
+  }
+
+  async forgetExtensionArtifact(sha256: string): Promise<void> {
+    if (this.disposed)
+      throw new RuntimeFailure('runtime_lost', 'Runtime container is disposed');
+    if (!/^[a-f0-9]{64}$/.test(sha256))
+      throw new RuntimeFailure('protocol_error', 'Invalid artifact digest');
+    const cache = this.loader.cache;
+    if (!cache)
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'Managed artifact caching is unavailable',
+      );
+    if (this.cacheCleaning)
+      throw new RuntimeFailure(
+        'storage_busy',
+        'Artifact cleanup is already running',
+      );
+    this.cacheCleaning = true;
+    try {
+      if (this.preparation) await this.cancelPreparation(this.preparation.id);
+      await cache.remove(sha256);
+    } finally {
+      this.cacheCleaning = false;
+    }
+  }
+
+  closeBuild(input: pb.CloseBuildRequest): Promise<{ closed: true }> {
+    if (this.disposed)
+      return Promise.reject(
+        new RuntimeFailure('runtime_lost', 'Runtime container is disposed'),
+      );
+    const key = JSON.stringify([input.buildId, input.generation]);
+    if (this.closingBuild) {
+      if (this.closingBuild.key === key) return this.closingBuild.done;
+      return Promise.reject(
+        new RuntimeFailure(
+          'source_error',
+          'A different build is closing',
+          true,
+        ),
+      );
+    }
+    if (this.lastClosedBuild === key) return Promise.resolve({ closed: true });
+    if (
+      !this.session ||
+      this.session.buildId !== input.buildId ||
+      this.session.generation !== input.generation
+    )
+      return Promise.reject(
+        new RuntimeFailure(
+          'runtime_lost',
+          'Close request belongs to an expired build',
+        ),
+      );
+    if (
+      (this.active && !this.active.completed) ||
+      this.queue.length ||
+      this.images.snapshot.resources
+    )
+      return Promise.reject(
+        new RuntimeFailure(
+          'source_error',
+          'Close reading resources and wait for active requests before closing this build',
+          true,
+        ),
+      );
+    const done = this.closeCurrentBuild(input.generation)
+      .then((value) => {
+        this.lastClosedBuild = key;
+        return value;
+      })
+      .finally(() => {
+        if (this.closingBuild?.key === key) this.closingBuild = undefined;
+      });
+    this.closingBuild = { key, done };
+    return done;
+  }
+
+  private async closeCurrentBuild(
+    generation: string,
+  ): Promise<{ closed: true }> {
+    const session = this.session;
+    if (!session)
+      throw new RuntimeFailure('runtime_lost', 'The build is no longer active');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const response = await Promise.race([
+        this.send(
+          create(pb.WorkerCommandSchema, {
+            envelope: { ...session, requestId: crypto.randomUUID() },
+            command: { case: 'shutdown', value: {} },
+          }),
+        ),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () =>
+              reject(
+                new RuntimeFailure(
+                  'timeout',
+                  'Build shutdown was not acknowledged',
+                ),
+              ),
+            5000,
+          );
+        }),
+      ]);
+      this.assertGeneration(generation);
+      if (response.result.case !== 'closed' || !response.result.value.closed)
+        throw new RuntimeFailure(
+          'protocol_error',
+          'Build shutdown was not acknowledged',
+        );
+      this.invalidate(
+        new RuntimeFailure('runtime_lost', 'The extension build was closed'),
+      );
+      await Promise.all([this.namespaceReleased, this.artifactReleased]);
+      return { closed: true };
+    } catch (error) {
+      if (this.generation === generation) {
+        this.invalidate(
+          new RuntimeFailure(
+            'runtime_lost',
+            'Build shutdown failed; the Worker was recycled',
+          ),
+        );
+        await Promise.all([this.namespaceReleased, this.artifactReleased]);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async rebuild(): Promise<void> {
     this.invalidate(
       new RuntimeFailure('runtime_lost', 'Runtime container was rebuilt'),
     );
-    return Promise.resolve();
+    await Promise.all([this.namespaceReleased, this.artifactReleased]);
   }
 
   /** Private APIs share Access cookies; the public catalog permits only GET. */
@@ -1034,6 +1318,7 @@ export class SourceRuntimeManager {
 
   private async disposeRuntime(): Promise<void> {
     this.disposed = true;
+    if (this.preparation) await this.cancelPreparation(this.preparation.id);
     // A quiet Worker can commit/release filesystem ownership before termination.
     if (this.session && !this.active) {
       const envelope: RpcEnvelope = {
@@ -1067,6 +1352,7 @@ export class SourceRuntimeManager {
     );
     this.identity = undefined;
     this.accessSuspension = undefined;
-    await this.namespaceReleased;
+    await Promise.all([this.namespaceReleased, this.artifactReleased]);
+    await this.loader.cache?.close();
   }
 }

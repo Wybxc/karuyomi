@@ -368,39 +368,53 @@ final class NativeImageControl {
     }
   }
 
-  Future<void> _abort(_ImageTask task) => task.aborting ??= () async {
-    try {
-      await Future.any([
-        Future.wait([
-          _cleanup(
-            wire.ControlRequest(
-              requestId: 'native-cancel-${++_sequence}',
-              cancelImage: wire.CancelImage(
-                requestId: task.request.requestId,
-                generation: task.request.generation,
+  Future<void> _abort(_ImageTask task) {
+    final aborting = task.aborting ??= () async {
+      try {
+        await Future.any([
+          Future.wait([
+            _cleanup(
+              wire.ControlRequest(
+                requestId: 'native-cancel-${++_sequence}',
+                cancelImage: wire.CancelImage(
+                  requestId: task.request.requestId,
+                  generation: task.request.generation,
+                ),
               ),
             ),
-          ),
-          store.cancel(task.request.requestId, task.request.generation),
-        ]).then<void>((_) {}),
-        _filesCleared.future,
-      ]);
-    } catch (_) {
-      task.failure = const RuntimeException(
-        RuntimeErrorCode.runtimeLost,
-        'Native image cancellation could not be confirmed',
-      );
-      rethrow;
-    } finally {
-      if (!task.interrupted.isCompleted) task.interrupted.complete();
-    }
-  }();
+            store.cancel(task.request.requestId, task.request.generation),
+          ]).then<void>((_) {}),
+          _filesCleared.future,
+        ]);
+      } catch (_) {
+        task.failure = const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Native image cancellation could not be confirmed',
+        );
+        rethrow;
+      } finally {
+        if (!task.interrupted.isCompleted) task.interrupted.complete();
+      }
+    }();
+    unawaited(
+      aborting.then(
+        (_) {},
+        onError: (Object error, StackTrace stack) {
+          if (identical(task.aborting, aborting)) task.aborting = null;
+        },
+      ),
+    );
+    return aborting;
+  }
 
   Future<wire.ControlResponse> cancel(wire.ControlRequest control) async {
     final request = control.cancelImage;
     final task = _tasks[_key(request.requestId, request.generation)];
     if (task == null) {
-      await _cleanup(control);
+      await Future.wait([
+        _cleanup(control),
+        store.cancel(request.requestId, request.generation),
+      ]);
       return wire.ControlResponse(
         requestId: control.requestId,
         released: wire.Released(released: true),
@@ -426,34 +440,45 @@ final class NativeImageControl {
     );
   }
 
-  Future<void> _releaseTask(_ImageTask task) => task.releasing ??= () async {
-    final image = task.resource;
-    if (image == null) return;
-    if (_closed) {
-      // clear() owns every local file once teardown starts. Its ACK also
-      // covers a local release Future whose platform callback never returns.
-      await _filesCleared.future;
-    } else {
-      await _whileOpen(
-        Future.wait([
-          store.release(image.resourceId, image.generation),
-          _cleanup(
-            wire.ControlRequest(
-              requestId: 'native-release-${++_sequence}',
-              releaseImage: wire.ReleaseImage(
-                resourceId: image.resourceId,
-                generation: image.generation,
+  Future<void> _releaseTask(_ImageTask task) {
+    final releasing = task.releasing ??= () async {
+      final image = task.resource;
+      if (image == null) return;
+      if (_closed) {
+        // clear() owns every local file once teardown starts. Its ACK also
+        // covers a local release Future whose platform callback never returns.
+        await _filesCleared.future;
+      } else {
+        await _whileOpen(
+          Future.wait([
+            store.release(image.resourceId, image.generation),
+            _cleanup(
+              wire.ControlRequest(
+                requestId: 'native-release-${++_sequence}',
+                releaseImage: wire.ReleaseImage(
+                  resourceId: image.resourceId,
+                  generation: image.generation,
+                ),
               ),
             ),
-          ),
-        ]).then<void>((_) {}),
-      );
-    }
-    if (task.reserved) {
-      task.reserved = false;
-      _bytes -= image.byteLength;
-    }
-  }();
+          ]).then<void>((_) {}),
+        );
+      }
+      if (task.reserved) {
+        task.reserved = false;
+        _bytes -= image.byteLength;
+      }
+    }();
+    unawaited(
+      releasing.then(
+        (_) {},
+        onError: (Object error, StackTrace stack) {
+          if (identical(task.releasing, releasing)) task.releasing = null;
+        },
+      ),
+    );
+    return releasing;
+  }
 
   Future<wire.ControlResponse> release(wire.ControlRequest control) async {
     final request = control.releaseImage;

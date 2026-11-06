@@ -107,6 +107,7 @@ void main() {
 
     setUp(() async {
       platform = TestPlatform()..inventory = _index(_builds());
+      platform.seedInstalledBuilds(_builds());
       catalog = CatalogController(
         api: platform,
         runtime: platform.runtime,

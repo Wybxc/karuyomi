@@ -10,7 +10,7 @@ import {
   SOURCE_MEMO_LIMIT,
   validateJsonDepth,
 } from './codec.ts';
-import { validId, validSourceId } from './static-control.ts';
+import { buildIdSchema, validId, validSourceId } from './static-control.ts';
 
 export const businessSchemaVersion = 1;
 export const BUSINESS_REQUEST_LIMIT = 128 * 1024;
@@ -22,6 +22,8 @@ export const CHAPTER_PROGRESS_PAGE_SIZE = 64;
 export const CHAPTER_PAGE_LIMIT = 2048;
 export const CATEGORY_LIMIT = 64;
 export const FAVORITE_SOURCE_LIMIT = 128;
+export const INSTALLED_EXTENSION_LIMIT = 128;
+export const EXTENSION_CATALOG_URL_LIMIT = 2048;
 export const COVER_BYTE_LIMIT = 1024 * 1024;
 export const COVER_DIMENSION_LIMIT = 4096;
 
@@ -681,6 +683,53 @@ export function validateFavoriteSources(values: pb.FavoriteSource[]): void {
   }
 }
 
+export function validateExtensionCatalogUrl(value: string): void {
+  requireCondition(
+    value.length > 0 && value.length <= EXTENSION_CATALOG_URL_LIMIT,
+    'Extension catalog URL exceeds its length budget',
+  );
+  const url = new URL(value);
+  requireCondition(
+    value === `${url.origin}/extensions/index.json` &&
+      (url.protocol === 'https:' ||
+        (url.protocol === 'http:' &&
+          ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))),
+    'Extension catalog must use a canonical HTTPS URL or local development origin',
+  );
+}
+
+export function validateInstalledExtension(value: pb.InstalledExtension): void {
+  validateExtensionCatalogUrl(value.catalogUrl);
+  validId(value.repoId);
+  validId(value.packageName);
+  buildIdSchema.parse(value.buildId);
+  z.string()
+    .regex(/^[a-f0-9]{64}$/)
+    .parse(value.bundleSha256);
+  requireCondition(
+    typeof value.enabled === 'boolean',
+    'Invalid extension enabled state',
+  );
+}
+
+export function validateInstalledExtensions(
+  values: pb.InstalledExtension[],
+): void {
+  requireCondition(
+    values.length <= INSTALLED_EXTENSION_LIMIT,
+    'Installed extensions exceed their count budget',
+  );
+  const packages = new Set<string>();
+  for (const extension of values) {
+    validateInstalledExtension(extension);
+    requireCondition(
+      !packages.has(extension.packageName),
+      'An installed package has more than one selected build',
+    );
+    packages.add(extension.packageName);
+  }
+}
+
 export function validateGlobalSettingsValues(
   value: pb.GlobalSettingsValues,
 ): void {
@@ -693,6 +742,7 @@ export function validateGlobalSettingsValues(
   requireFields(value, ['reader']);
   validateReaderSettings(value.reader);
   validateFavoriteSources(value.favoriteSources);
+  validateInstalledExtensions(value.installedExtensions);
 }
 
 export const settingsMutationSchema = codec<pb.SettingsMutation>((input) => {

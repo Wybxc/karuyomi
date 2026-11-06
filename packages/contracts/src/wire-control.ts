@@ -11,6 +11,9 @@ import {
   buildManifestSchema,
   staticManifestPathSchema,
   validId,
+  validHash,
+  buildIdSchema,
+  extensionBuildDescriptorSchema,
 } from './static-control.ts';
 import {
   rpcEnvelopeSchema,
@@ -160,6 +163,30 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
     case 'ready':
     case 'rebuild':
     case 'dispose':
+    case 'extensionCache':
+      break;
+    case 'prepareBuild':
+      validId(value.command.value.preparationId);
+      requireCondition(
+        value.command.value.build !== undefined,
+        'A catalog build is required',
+      );
+      extensionBuildDescriptorSchema.parse(
+        messageJson(
+          pb.ExtensionBuildDescriptorSchema,
+          value.command.value.build,
+        ),
+      );
+      break;
+    case 'cancelPreparation':
+      validId(value.command.value.preparationId);
+      break;
+    case 'forgetExtensionArtifact':
+      validHash(value.command.value.sha256);
+      break;
+    case 'closeBuild':
+      buildIdSchema.parse(value.command.value.buildId);
+      validId(value.command.value.generation);
       break;
     case 'open':
       if (value.command.value.preferenceBootstrap)
@@ -251,6 +278,54 @@ export function validateControlResponse(
         'Invalid API response status',
       );
       break;
+    case 'preparedBuild': {
+      const prepared = value.result.value;
+      requireCondition(
+        prepared.build !== undefined,
+        'A prepared catalog build is required',
+      );
+      extensionBuildDescriptorSchema.parse(
+        messageJson(pb.ExtensionBuildDescriptorSchema, prepared.build),
+      );
+      validHash(prepared.bundleSha256);
+      requireCondition(
+        prepared.byteLength > 0 && prepared.byteLength <= 64 * 1024 * 1024,
+        'Invalid prepared artifact size',
+      );
+      break;
+    }
+    case 'extensionCache': {
+      const cache = value.result.value;
+      requireCondition(
+        cache.maxBytes > 0 &&
+          cache.maxBytes <= 256 * 1024 * 1024 &&
+          cache.maxArtifacts > 0 &&
+          cache.maxArtifacts <= 128 &&
+          cache.artifacts.length <= cache.maxArtifacts,
+        'Invalid extension cache budget',
+      );
+      const hashes = new Set<string>();
+      let total = 0;
+      for (const artifact of cache.artifacts) {
+        validHash(artifact.sha256);
+        requireCondition(
+          !hashes.has(artifact.sha256) &&
+            artifact.byteLength > 0 &&
+            artifact.byteLength <= 64 * 1024 * 1024 &&
+            ['application/javascript', 'text/javascript'].includes(
+              artifact.contentType,
+            ),
+          'Invalid cached artifact',
+        );
+        hashes.add(artifact.sha256);
+        total += artifact.byteLength;
+      }
+      requireCondition(
+        total === cache.totalBytes && total <= cache.maxBytes,
+        'Invalid extension cache accounting',
+      );
+      break;
+    }
     case 'error':
       runtimeErrorData(value.result.value);
       break;

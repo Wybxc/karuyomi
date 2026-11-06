@@ -65,7 +65,7 @@ export function validSourceId(value: string): void {
 function boundedText(value: string, max: number): void {
   requireCondition(value.length > 0 && value.length <= max, 'Invalid text');
 }
-function validHash(value: string): void {
+export function validHash(value: string): void {
   requireCondition(/^[a-f0-9]{64}$/.test(value), 'Invalid SHA-256 digest');
 }
 function validSources(values: string[]): void {

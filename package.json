@@ -67,6 +67,7 @@
     "dependency-cruiser": "18.7.1",
     "diff": "9.0.0",
     "execa": "10.2.1",
+    "fake-indexeddb": "6.2.7",
     "fflate": "0.8.3",
     "get-stream": "9.0.1",
     "idb": "8.0.4",
@@ -84,9 +85,9 @@
     "typescript": "6.0.3",
     "vite": "8.3.6",
     "vitest": "4.1.12",
+    "wrangler": "4.156.1",
     "write-file-atomic": "8.0.0",
     "yauzl": "3.4.0",
-    "zod": "4.6.7",
-    "wrangler": "4.156.1"
+    "zod": "4.6.7"
   }
 }

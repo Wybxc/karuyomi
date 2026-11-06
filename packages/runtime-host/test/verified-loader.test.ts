@@ -1,4 +1,6 @@
 import { expect, test, vi } from 'vitest';
+import 'fake-indexeddb/auto';
+import { ExtensionArtifactCache } from '../src/extension-artifact-cache.js';
 import { HTTP_BRIDGE_MEDIA_TYPE } from '@karuyomi/contracts';
 import { create } from '@bufbuild/protobuf';
 import * as pb from '@karuyomi/protocol';
@@ -622,5 +624,76 @@ test('the installed v2 finish callback carries a controlled connection flag thro
   } finally {
     await driver.close();
     vi.unstubAllGlobals();
+  }
+});
+
+test('Native preparation checks installed material identity without fetching material bytes and shares the verified cache across loaders', async () => {
+  const material = {
+    ...(await sharedArtifact()),
+    contentType: 'application/javascript',
+    logicalName: 'bridge.js',
+  };
+  const build = { ...(await manifest()), hostScripts: [material] };
+  const descriptor = {
+    buildId: build.buildId,
+    repoId: build.repoId,
+    packageName: build.packageName,
+    version: build.version,
+    sourceIds: build.sourceIds,
+    sources: build.sources,
+    manifestPath: `/extensions/builds/${build.buildId}/manifest.json`,
+  };
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/extensions/index.json')
+      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+    if (path === descriptor.manifestPath) return Response.json(build);
+    if (path === build.bundle.path)
+      return new Response(encodedBytes, {
+        headers: { 'Content-Type': 'application/gzip' },
+      });
+    throw new Error('Unexpected network material request ' + path);
+  });
+  const name = crypto.randomUUID();
+  const firstCache = new ExtensionArtifactCache(name);
+  const secondCache = new ExtensionArtifactCache(name);
+  const missing = new VerifiedLoader(
+    origin,
+    fetcher,
+    undefined,
+    firstCache,
+    [],
+  );
+  const loader = new VerifiedLoader(origin, fetcher, undefined, firstCache, [
+    material,
+  ]);
+  const next = new VerifiedLoader(origin, fetcher, undefined, secondCache, [
+    material,
+  ]);
+  try {
+    await expect(missing.prepare(descriptor, signal())).rejects.toMatchObject({
+      code: 'unsupported_capability',
+    });
+    expect(
+      fetcher.mock.calls.map(([input]) => new URL(String(input)).pathname),
+    ).toEqual(['/extensions/index.json', descriptor.manifestPath]);
+    const prepared = await loader.prepare(descriptor, signal());
+    expect(prepared.bundleSha256).toBe(build.bundle.sha256);
+    expect(prepared.byteLength).toBe(bytes.byteLength);
+    const calls = fetcher.mock.calls.length;
+    const digest = vi.spyOn(crypto.subtle, 'digest');
+    try {
+      expect(await next.artifact(build.bundle, signal(), true)).toEqual(bytes);
+      expect(fetcher).toHaveBeenCalledTimes(calls);
+      expect(digest).not.toHaveBeenCalled();
+    } finally {
+      digest.mockRestore();
+    }
+    expect((await firstCache.entries()).map((entry) => entry.sha256)).toEqual([
+      build.bundle.sha256,
+    ]);
+  } finally {
+    await firstCache.close();
+    await secondCache.close();
   }
 });

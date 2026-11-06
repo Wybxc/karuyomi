@@ -229,6 +229,7 @@ export async function nativeRuntimeAssets(): Promise<Plugin> {
               __KARUYOMI_MATERIAL_VERSION__: JSON.stringify(
                 catalog.materialVersion,
               ),
+              __KARUYOMI_NATIVE_MATERIALS__: JSON.stringify(sourceMaterials),
             },
           },
         },

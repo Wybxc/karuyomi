@@ -2235,6 +2235,134 @@ final $typed_data.Uint8List apiFetchResponseDescriptor = $convert.base64Decode(
     'oMSGVhZGVyc0VudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToC'
     'OAE=');
 
+@$core.Deprecated('Use prepareBuildRequestDescriptor instead')
+const PrepareBuildRequest$json = {
+  '1': 'PrepareBuildRequest',
+  '2': [
+    {'1': 'preparation_id', '3': 1, '4': 1, '5': 9, '10': 'preparationId'},
+    {
+      '1': 'build',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ExtensionBuildDescriptor',
+      '10': 'build'
+    },
+  ],
+};
+
+/// Descriptor for `PrepareBuildRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List prepareBuildRequestDescriptor = $convert.base64Decode(
+    'ChNQcmVwYXJlQnVpbGRSZXF1ZXN0EiUKDnByZXBhcmF0aW9uX2lkGAEgASgJUg1wcmVwYXJhdG'
+    'lvbklkEjsKBWJ1aWxkGAIgASgLMiUua2FydXlvbWkudjEuRXh0ZW5zaW9uQnVpbGREZXNjcmlw'
+    'dG9yUgVidWlsZA==');
+
+@$core.Deprecated('Use cancelPreparationRequestDescriptor instead')
+const CancelPreparationRequest$json = {
+  '1': 'CancelPreparationRequest',
+  '2': [
+    {'1': 'preparation_id', '3': 1, '4': 1, '5': 9, '10': 'preparationId'},
+  ],
+};
+
+/// Descriptor for `CancelPreparationRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List cancelPreparationRequestDescriptor =
+    $convert.base64Decode(
+        'ChhDYW5jZWxQcmVwYXJhdGlvblJlcXVlc3QSJQoOcHJlcGFyYXRpb25faWQYASABKAlSDXByZX'
+        'BhcmF0aW9uSWQ=');
+
+@$core.Deprecated('Use preparedBuildDescriptor instead')
+const PreparedBuild$json = {
+  '1': 'PreparedBuild',
+  '2': [
+    {
+      '1': 'build',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ExtensionBuildDescriptor',
+      '10': 'build'
+    },
+    {'1': 'bundle_sha256', '3': 2, '4': 1, '5': 9, '10': 'bundleSha256'},
+    {'1': 'byte_length', '3': 3, '4': 1, '5': 13, '10': 'byteLength'},
+  ],
+};
+
+/// Descriptor for `PreparedBuild`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preparedBuildDescriptor = $convert.base64Decode(
+    'Cg1QcmVwYXJlZEJ1aWxkEjsKBWJ1aWxkGAEgASgLMiUua2FydXlvbWkudjEuRXh0ZW5zaW9uQn'
+    'VpbGREZXNjcmlwdG9yUgVidWlsZBIjCg1idW5kbGVfc2hhMjU2GAIgASgJUgxidW5kbGVTaGEy'
+    'NTYSHwoLYnl0ZV9sZW5ndGgYAyABKA1SCmJ5dGVMZW5ndGg=');
+
+@$core.Deprecated('Use cachedExtensionArtifactDescriptor instead')
+const CachedExtensionArtifact$json = {
+  '1': 'CachedExtensionArtifact',
+  '2': [
+    {'1': 'sha256', '3': 1, '4': 1, '5': 9, '10': 'sha256'},
+    {'1': 'byte_length', '3': 2, '4': 1, '5': 13, '10': 'byteLength'},
+    {'1': 'content_type', '3': 3, '4': 1, '5': 9, '10': 'contentType'},
+  ],
+};
+
+/// Descriptor for `CachedExtensionArtifact`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List cachedExtensionArtifactDescriptor = $convert.base64Decode(
+    'ChdDYWNoZWRFeHRlbnNpb25BcnRpZmFjdBIWCgZzaGEyNTYYASABKAlSBnNoYTI1NhIfCgtieX'
+    'RlX2xlbmd0aBgCIAEoDVIKYnl0ZUxlbmd0aBIhCgxjb250ZW50X3R5cGUYAyABKAlSC2NvbnRl'
+    'bnRUeXBl');
+
+@$core.Deprecated('Use extensionCacheStateDescriptor instead')
+const ExtensionCacheState$json = {
+  '1': 'ExtensionCacheState',
+  '2': [
+    {
+      '1': 'artifacts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.CachedExtensionArtifact',
+      '10': 'artifacts'
+    },
+    {'1': 'total_bytes', '3': 2, '4': 1, '5': 13, '10': 'totalBytes'},
+    {'1': 'max_bytes', '3': 3, '4': 1, '5': 13, '10': 'maxBytes'},
+    {'1': 'max_artifacts', '3': 4, '4': 1, '5': 13, '10': 'maxArtifacts'},
+  ],
+};
+
+/// Descriptor for `ExtensionCacheState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List extensionCacheStateDescriptor = $convert.base64Decode(
+    'ChNFeHRlbnNpb25DYWNoZVN0YXRlEkIKCWFydGlmYWN0cxgBIAMoCzIkLmthcnV5b21pLnYxLk'
+    'NhY2hlZEV4dGVuc2lvbkFydGlmYWN0UglhcnRpZmFjdHMSHwoLdG90YWxfYnl0ZXMYAiABKA1S'
+    'CnRvdGFsQnl0ZXMSGwoJbWF4X2J5dGVzGAMgASgNUghtYXhCeXRlcxIjCg1tYXhfYXJ0aWZhY3'
+    'RzGAQgASgNUgxtYXhBcnRpZmFjdHM=');
+
+@$core.Deprecated('Use forgetExtensionArtifactRequestDescriptor instead')
+const ForgetExtensionArtifactRequest$json = {
+  '1': 'ForgetExtensionArtifactRequest',
+  '2': [
+    {'1': 'sha256', '3': 1, '4': 1, '5': 9, '10': 'sha256'},
+  ],
+};
+
+/// Descriptor for `ForgetExtensionArtifactRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List forgetExtensionArtifactRequestDescriptor =
+    $convert.base64Decode(
+        'Ch5Gb3JnZXRFeHRlbnNpb25BcnRpZmFjdFJlcXVlc3QSFgoGc2hhMjU2GAEgASgJUgZzaGEyNT'
+        'Y=');
+
+@$core.Deprecated('Use closeBuildRequestDescriptor instead')
+const CloseBuildRequest$json = {
+  '1': 'CloseBuildRequest',
+  '2': [
+    {'1': 'build_id', '3': 1, '4': 1, '5': 9, '10': 'buildId'},
+    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
+  ],
+};
+
+/// Descriptor for `CloseBuildRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List closeBuildRequestDescriptor = $convert.base64Decode(
+    'ChFDbG9zZUJ1aWxkUmVxdWVzdBIZCghidWlsZF9pZBgBIAEoCVIHYnVpbGRJZBIeCgpnZW5lcm'
+    'F0aW9uGAIgASgJUgpnZW5lcmF0aW9u');
+
 @$core.Deprecated('Use controlRequestDescriptor instead')
 const ControlRequest$json = {
   '1': 'ControlRequest',
@@ -2339,6 +2467,51 @@ const ControlRequest$json = {
       '9': 0,
       '10': 'dispose'
     },
+    {
+      '1': 'prepare_build',
+      '3': 21,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PrepareBuildRequest',
+      '9': 0,
+      '10': 'prepareBuild'
+    },
+    {
+      '1': 'cancel_preparation',
+      '3': 22,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CancelPreparationRequest',
+      '9': 0,
+      '10': 'cancelPreparation'
+    },
+    {
+      '1': 'extension_cache',
+      '3': 23,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.Empty',
+      '9': 0,
+      '10': 'extensionCache'
+    },
+    {
+      '1': 'forget_extension_artifact',
+      '3': 24,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ForgetExtensionArtifactRequest',
+      '9': 0,
+      '10': 'forgetExtensionArtifact'
+    },
+    {
+      '1': 'close_build',
+      '3': 25,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.CloseBuildRequest',
+      '9': 0,
+      '10': 'closeBuild'
+    },
   ],
   '8': [
     {'1': 'command'},
@@ -2359,7 +2532,14 @@ final $typed_data.Uint8List controlRequestDescriptor = $convert.base64Decode(
     'NzaW9uSABSEGNsb3NlUGFnZVNlc3Npb24SLgoHcmVidWlsZBgSIAEoCzISLmthcnV5b21pLnYx'
     'LkVtcHR5SABSB3JlYnVpbGQSOwoJZmV0Y2hfYXBpGBMgASgLMhwua2FydXlvbWkudjEuQXBpRm'
     'V0Y2hSZXF1ZXN0SABSCGZldGNoQXBpEi4KB2Rpc3Bvc2UYFCABKAsyEi5rYXJ1eW9taS52MS5F'
-    'bXB0eUgAUgdkaXNwb3NlQgkKB2NvbW1hbmQ=');
+    'bXB0eUgAUgdkaXNwb3NlEkcKDXByZXBhcmVfYnVpbGQYFSABKAsyIC5rYXJ1eW9taS52MS5Qcm'
+    'VwYXJlQnVpbGRSZXF1ZXN0SABSDHByZXBhcmVCdWlsZBJWChJjYW5jZWxfcHJlcGFyYXRpb24Y'
+    'FiABKAsyJS5rYXJ1eW9taS52MS5DYW5jZWxQcmVwYXJhdGlvblJlcXVlc3RIAFIRY2FuY2VsUH'
+    'JlcGFyYXRpb24SPQoPZXh0ZW5zaW9uX2NhY2hlGBcgASgLMhIua2FydXlvbWkudjEuRW1wdHlI'
+    'AFIOZXh0ZW5zaW9uQ2FjaGUSaQoZZm9yZ2V0X2V4dGVuc2lvbl9hcnRpZmFjdBgYIAEoCzIrLm'
+    'thcnV5b21pLnYxLkZvcmdldEV4dGVuc2lvbkFydGlmYWN0UmVxdWVzdEgAUhdmb3JnZXRFeHRl'
+    'bnNpb25BcnRpZmFjdBJBCgtjbG9zZV9idWlsZBgZIAEoCzIeLmthcnV5b21pLnYxLkNsb3NlQn'
+    'VpbGRSZXF1ZXN0SABSCmNsb3NlQnVpbGRCCQoHY29tbWFuZA==');
 
 @$core.Deprecated('Use controlResponseDescriptor instead')
 const ControlResponse$json = {
@@ -2447,6 +2627,24 @@ const ControlResponse$json = {
       '9': 0,
       '10': 'error'
     },
+    {
+      '1': 'prepared_build',
+      '3': 19,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreparedBuild',
+      '9': 0,
+      '10': 'preparedBuild'
+    },
+    {
+      '1': 'extension_cache',
+      '3': 20,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ExtensionCacheState',
+      '9': 0,
+      '10': 'extensionCache'
+    },
   ],
   '8': [
     {'1': 'result'},
@@ -2464,7 +2662,10 @@ final $typed_data.Uint8List controlResponseDescriptor = $convert.base64Decode(
     'a2FydXlvbWkudjEuQ2xvc2VkSABSBmNsb3NlZBI2Cgljb21wbGV0ZWQYECABKAsyFi5rYXJ1eW'
     '9taS52MS5Db21wbGV0ZWRIAFIJY29tcGxldGVkEjEKA2FwaRgRIAEoCzIdLmthcnV5b21pLnYx'
     'LkFwaUZldGNoUmVzcG9uc2VIAFIDYXBpEjEKBWVycm9yGBIgASgLMhkua2FydXlvbWkudjEuUn'
-    'VudGltZUVycm9ySABSBWVycm9yQggKBnJlc3VsdA==');
+    'VudGltZUVycm9ySABSBWVycm9yEkMKDnByZXBhcmVkX2J1aWxkGBMgASgLMhoua2FydXlvbWku'
+    'djEuUHJlcGFyZWRCdWlsZEgAUg1wcmVwYXJlZEJ1aWxkEksKD2V4dGVuc2lvbl9jYWNoZRgUIA'
+    'EoCzIgLmthcnV5b21pLnYxLkV4dGVuc2lvbkNhY2hlU3RhdGVIAFIOZXh0ZW5zaW9uQ2FjaGVC'
+    'CAoGcmVzdWx0');
 
 @$core.Deprecated('Use openWorkerDescriptor instead')
 const OpenWorker$json = {

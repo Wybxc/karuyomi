@@ -68,6 +68,9 @@ void main() {
           ],
         ),
       );
+    platform.seedInstalledBuilds(
+      wire.decodeProtoJson(wire.ExtensionIndex(), platform.inventory).builds,
+    );
     catalog = CatalogController(
       api: platform,
       runtime: platform.runtime,

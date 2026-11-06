@@ -33,6 +33,7 @@ test.each([
   vi.stubGlobal('window', runtimeWindow);
   vi.stubGlobal('location', new URL('https://read.example/runtime/host'));
   vi.stubGlobal('__KARUYOMI_MATERIAL_VERSION__', 'test-materials');
+  vi.stubGlobal('__KARUYOMI_NATIVE_MATERIALS__', []);
 
   await import('../src/host.native.js');
 

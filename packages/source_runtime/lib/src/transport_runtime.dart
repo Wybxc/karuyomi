@@ -121,6 +121,7 @@ final class TransportSourceRuntime implements SourceRuntime {
         request.releaseImage.generation,
       wire.ControlRequest_Command.closePageSession =>
         request.closePageSession.generation,
+      wire.ControlRequest_Command.closeBuild => request.closeBuild.generation,
       _ => null,
     };
     bool current() =>
@@ -196,7 +197,23 @@ final class TransportSourceRuntime implements SourceRuntime {
             wire.ControlRequest_Command.releaseImage,
             wire.ControlRequest_Command.closePageSession,
           }.contains(command);
-      if (!_events.isClosed && !localImageTimeout) {
+      final management = {
+        wire.ControlRequest_Command.prepareBuild,
+        wire.ControlRequest_Command.cancelPreparation,
+        wire.ControlRequest_Command.extensionCache,
+        wire.ControlRequest_Command.forgetExtensionArtifact,
+        wire.ControlRequest_Command.closeBuild,
+      }.contains(command);
+      final independentApiFailure =
+          command == wire.ControlRequest_Command.fetchApi &&
+          !{
+            RuntimeErrorCode.accessRequired,
+            RuntimeErrorCode.accessDenied,
+          }.contains(failure.code);
+      if (!_events.isClosed &&
+          !localImageTimeout &&
+          !management &&
+          !independentApiFailure) {
         _events.add(
           RuntimeEvent(
             generation: _session?.generation ?? '',
@@ -205,19 +222,168 @@ final class TransportSourceRuntime implements SourceRuntime {
           ),
         );
       }
-      if ({
-        RuntimeErrorCode.accessRequired,
-        RuntimeErrorCode.accessDenied,
-      }.contains(failure.code)) {
+      if (!management &&
+          {
+            RuntimeErrorCode.accessRequired,
+            RuntimeErrorCode.accessDenied,
+          }.contains(failure.code)) {
         // Keep the old generation available for release/close. It has no
         // execution capability while Access is paused, even for cached reads.
         _accessFailure = failure;
         _openKey = null;
         _opening = null;
-      } else if (failure.code == RuntimeErrorCode.runtimeLost) {
+      } else if (!management &&
+          !independentApiFailure &&
+          failure.code == RuntimeErrorCode.runtimeLost) {
         _session = null;
       }
       throw failure;
+    }
+  }
+
+  @override
+  Future<wire.PreparedBuild> prepareBuild({
+    required String preparationId,
+    required wire.ExtensionBuildDescriptor build,
+  }) async {
+    _extensionRequire(
+      _extensionControlId.hasMatch(preparationId),
+      'Invalid preparation identity',
+    );
+    _extensionRequire(
+      _extensionControlId.hasMatch(build.buildId) &&
+          build.manifestPath ==
+              '/extensions/builds/${build.buildId}/manifest.json' &&
+          build.packageName.isNotEmpty &&
+          build.packageName.length <= 200 &&
+          build.repoId.isNotEmpty &&
+          build.repoId.length <= 200 &&
+          build.sources.isNotEmpty &&
+          build.sources.length <= 500,
+      'Invalid preparation descriptor',
+    );
+    final selected = build.deepCopy()..freeze();
+    final value = (await _exchange(
+      wire.ControlRequest(
+        prepareBuild: wire.PrepareBuildRequest(
+          preparationId: preparationId,
+          build: selected,
+        ),
+      ),
+      wire.ControlResponse_Result.preparedBuild,
+    )).preparedBuild;
+    _extensionRequire(
+      value.hasBuild() &&
+          value.build == selected &&
+          _extensionDigest.hasMatch(value.bundleSha256) &&
+          value.byteLength > 0 &&
+          value.byteLength <= 64 * 1024 * 1024,
+      'Prepared extension does not match the selected build',
+    );
+    return value.deepCopy()..freeze();
+  }
+
+  @override
+  Future<wire.ExtensionCacheState> extensionCache() async {
+    final value = (await _exchange(
+      wire.ControlRequest(extensionCache: wire.Empty()),
+      wire.ControlResponse_Result.extensionCache,
+    )).extensionCache;
+    _extensionRequire(
+      value.maxArtifacts == 128 &&
+          value.maxBytes == 256 * 1024 * 1024 &&
+          value.artifacts.length <= value.maxArtifacts &&
+          value.totalBytes <= value.maxBytes,
+      'Invalid extension cache budget',
+    );
+    final digests = <String>{};
+    var total = 0;
+    for (final artifact in value.artifacts) {
+      _extensionRequire(
+        _extensionDigest.hasMatch(artifact.sha256) &&
+            digests.add(artifact.sha256) &&
+            artifact.byteLength > 0 &&
+            artifact.byteLength <= 64 * 1024 * 1024 &&
+            {
+              'application/javascript',
+              'text/javascript',
+            }.contains(artifact.contentType),
+        'Invalid cached extension artifact',
+      );
+      total += artifact.byteLength;
+    }
+    _extensionRequire(
+      total == value.totalBytes,
+      'Extension cache size does not match its artifacts',
+    );
+    return value.deepCopy()..freeze();
+  }
+
+  @override
+  Future<void> cancelPreparation(String preparationId) async {
+    _extensionRequire(
+      _extensionControlId.hasMatch(preparationId),
+      'Invalid preparation identity',
+    );
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(
+          cancelPreparation: wire.CancelPreparationRequest(
+            preparationId: preparationId,
+          ),
+        ),
+        wire.ControlResponse_Result.completed,
+      )).completed.completed,
+    );
+  }
+
+  @override
+  Future<void> forgetExtensionArtifact(String sha256) async {
+    _extensionRequire(
+      _extensionDigest.hasMatch(sha256),
+      'Invalid extension digest',
+    );
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(
+          forgetExtensionArtifact: wire.ForgetExtensionArtifactRequest(
+            sha256: sha256,
+          ),
+        ),
+        wire.ControlResponse_Result.completed,
+      )).completed.completed,
+    );
+  }
+
+  @override
+  Future<void> closeBuild({
+    required String buildId,
+    required String generation,
+  }) async {
+    _extensionRequire(
+      _extensionControlId.hasMatch(buildId) &&
+          generation.isNotEmpty &&
+          generation.length <= 200,
+      'Invalid extension close identity',
+    );
+    _requireAck(
+      (await _exchange(
+        wire.ControlRequest(
+          closeBuild: wire.CloseBuildRequest(
+            buildId: buildId,
+            generation: generation,
+          ),
+        ),
+        wire.ControlResponse_Result.closed,
+      )).closed.closed,
+    );
+    if (_session?.buildId == buildId && _session?.generation == generation) {
+      ++_epoch;
+      _session = null;
+      _opening = null;
+      _openKey = null;
+      _preferencesEdited = false;
+      _accessFailure = null;
     }
   }
 
@@ -706,7 +872,17 @@ final class TransportSourceRuntime implements SourceRuntime {
       }
     }
 
-    return owner == null ? release() : owner.releasing ??= release();
+    if (owner == null) return release();
+    final releasing = owner.releasing ??= release();
+    unawaited(
+      releasing.then(
+        (_) {},
+        onError: (Object error, StackTrace stack) {
+          if (identical(owner.releasing, releasing)) owner.releasing = null;
+        },
+      ),
+    );
+    return releasing;
   }
 
   @override

@@ -39,6 +39,7 @@ wire.GlobalSettingsValues _values({
     cropBorders: true,
   ),
   favoriteSources: favorites,
+  installedExtensions: [testInstalledExtension()],
 );
 
 void main() {
@@ -288,7 +289,9 @@ void main() {
   testWidgets(
     'confirmed favorites open the current build without a prior package selection and remain removable when unavailable',
     (tester) async {
-      await seed(_values(favorites: [_favorite()]));
+      final selected = _values(favorites: [_favorite()]);
+      selected.installedExtensions.single.buildId = 'build-2';
+      await seed(selected);
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(
           schemaVersion: 1,

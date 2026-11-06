@@ -438,6 +438,7 @@ final class NativePlatformRuntime extends PlatformRuntime
           wire.ControlRequest_Command.cancelImage,
           wire.ControlRequest_Command.releaseImage,
           wire.ControlRequest_Command.closePageSession,
+          wire.ControlRequest_Command.closeBuild,
         }.contains(command)) {
       // Cleanup of an expired handle must not create a replacement WebView.
       await _resetting;
@@ -445,11 +446,17 @@ final class NativePlatformRuntime extends PlatformRuntime
         wire.ControlResponse(
           requestId: message.requestId,
           closed:
-              {wire.ControlRequest_Command.closePageSession}.contains(command)
+              {
+                wire.ControlRequest_Command.closePageSession,
+                wire.ControlRequest_Command.closeBuild,
+              }.contains(command)
               ? wire.Closed(closed: true)
               : null,
           released:
-              {wire.ControlRequest_Command.closePageSession}.contains(command)
+              {
+                wire.ControlRequest_Command.closePageSession,
+                wire.ControlRequest_Command.closeBuild,
+              }.contains(command)
               ? null
               : wire.Released(released: true),
         ),

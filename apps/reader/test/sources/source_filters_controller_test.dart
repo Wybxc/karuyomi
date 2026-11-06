@@ -273,6 +273,11 @@ void main() {
         runtime.containerLost('Expired old generation');
         await Future<void>.delayed(Duration.zero);
         platform.bootstrapSubject = 'new-subject';
+        platform.seedInstalledBuilds(
+          wire
+              .decodeProtoJson(wire.ExtensionIndex(), platform.inventory)
+              .builds,
+        );
         platform.runtimeGeneration = 'new-generation';
         platform.invokeHandler = (call) async => call.hasGetFilters()
             ? wire.SourceResult(filters: filterSnapshot('new-snapshot'))

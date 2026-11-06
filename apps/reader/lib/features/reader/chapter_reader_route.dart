@@ -245,6 +245,9 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     if (_closing || !mounted) return;
     _bookmarks?.checkCurrent();
     _settings?.checkCurrent();
+    if (widget.catalog.extensionUnavailableReason case final reason?) {
+      setState(() => _error = reason);
+    }
     if (widget.catalog.accessPaused && !_accessPaused) {
       _recordViewport();
       setState(() => _accessPaused = true);

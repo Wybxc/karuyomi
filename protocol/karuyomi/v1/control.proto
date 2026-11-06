@@ -511,6 +511,38 @@ message ApiFetchResponse {
   bool redirected = 4;
 }
 
+// Local preparation never constructs or executes a Source.
+message PrepareBuildRequest {
+  string preparation_id = 1;
+  ExtensionBuildDescriptor build = 2;
+}
+message CancelPreparationRequest {
+  string preparation_id = 1;
+}
+message PreparedBuild {
+  ExtensionBuildDescriptor build = 1;
+  string bundle_sha256 = 2;
+  uint32 byte_length = 3;
+}
+message CachedExtensionArtifact {
+  string sha256 = 1;
+  uint32 byte_length = 2;
+  string content_type = 3;
+}
+message ExtensionCacheState {
+  repeated CachedExtensionArtifact artifacts = 1;
+  uint32 total_bytes = 2;
+  uint32 max_bytes = 3;
+  uint32 max_artifacts = 4;
+}
+message ForgetExtensionArtifactRequest {
+  string sha256 = 1;
+}
+message CloseBuildRequest {
+  string build_id = 1;
+  string generation = 2;
+}
+
 message ControlRequest {
   string request_id = 1;
   oneof command {
@@ -525,6 +557,11 @@ message ControlRequest {
     Empty rebuild = 18;
     ApiFetchRequest fetch_api = 19;
     Empty dispose = 20;
+    PrepareBuildRequest prepare_build = 21;
+    CancelPreparationRequest cancel_preparation = 22;
+    Empty extension_cache = 23;
+    ForgetExtensionArtifactRequest forget_extension_artifact = 24;
+    CloseBuildRequest close_build = 25;
   }
 }
 message ControlResponse {
@@ -539,6 +576,8 @@ message ControlResponse {
     Completed completed = 16;
     ApiFetchResponse api = 17;
     RuntimeError error = 18;
+    PreparedBuild prepared_build = 19;
+    ExtensionCacheState extension_cache = 20;
   }
 }
 

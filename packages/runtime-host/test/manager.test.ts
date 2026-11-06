@@ -24,7 +24,9 @@ import { installRuntime } from '../src/host-api.js';
 import { ImageResourceStore } from '../src/image-resources.js';
 import { ImageSink } from '../src/image-channel.js';
 import { RuntimeFailure } from '../src/errors.js';
-import { manifest } from './fixtures.js';
+import 'fake-indexeddb/auto';
+import { manifest, bytes, encodedBytes } from './fixtures.js';
+import { ExtensionArtifactCache } from '../src/extension-artifact-cache.js';
 
 class FakeWorker implements WorkerEndpoint {
   onmessage: WorkerEndpoint['onmessage'] = null;
@@ -144,6 +146,7 @@ async function setup(
     store: ImageResourceStore;
     acquire: NonNullable<RuntimeDriver['acquireImage']>;
   },
+  loaderOverride?: VerifiedLoader,
 ) {
   const workers: FakeWorker[] = [];
   const workerUrls: URL[] = [];
@@ -161,8 +164,10 @@ async function setup(
       : {}),
   };
   const build = initialBuild ?? (await manifest());
-  const loader = new VerifiedLoader('https://read.example.com', (async () =>
-    Response.json(build)) as typeof fetch);
+  const loader =
+    loaderOverride ??
+    new VerifiedLoader('https://read.example.com', (async () =>
+      Response.json(build)) as typeof fetch);
   const manager = new SourceRuntimeManager(
     new URL('https://read.example.com/runtime/worker.js'),
     (url) => {
@@ -1036,4 +1041,453 @@ test('requests already queued behind a preference edit are rejected before their
   });
   await edit;
   expect(driver.invoke).toHaveBeenCalledTimes(2);
+});
+
+test('close waits for shutdown ACK, rejects opening while closing, and old close cannot stop the next generation', async () => {
+  const { manager, driver, workers } = await setup();
+  const session = await manager.open(options);
+  const gate = deferred<void>();
+  driver.close.mockImplementationOnce(async () => gate.promise);
+  const input = create(pb.CloseBuildRequestSchema, {
+    buildId: session.buildId,
+    generation: session.generation,
+  });
+  const closing = manager.closeBuild(input);
+  expect(manager.closeBuild(input)).toBe(closing);
+  await expect(manager.open(options)).rejects.toMatchObject({
+    code: 'source_error',
+  });
+  expect(workers[0]?.terminated).toBe(false);
+  gate.resolve();
+  await expect(closing).resolves.toEqual({ closed: true });
+  expect(workers[0]?.terminated).toBe(true);
+  await expect(manager.closeBuild(input)).resolves.toEqual({ closed: true });
+  const next = await manager.open(options);
+  expect(next.generation).not.toBe(session.generation);
+  await expect(manager.closeBuild(input)).rejects.toMatchObject({
+    code: 'runtime_lost',
+  });
+  expect(workers[1]?.terminated).toBe(false);
+  await expect(
+    manager.invoke(call('after-old-close', next.generation)),
+  ).resolves.toMatchObject({ generation: next.generation });
+});
+
+test('close refuses active requests without losing the current Source and shutdown failure does not claim ACK', async () => {
+  const gate = deferred<SourcePayload>();
+  const { manager, driver, workers } = await setup(() => gate.promise);
+  const session = await manager.open(options);
+  const invoked = manager.invoke(call('still-running', session.generation));
+  const input = create(pb.CloseBuildRequestSchema, {
+    buildId: session.buildId,
+    generation: session.generation,
+  });
+  await expect(manager.closeBuild(input)).rejects.toMatchObject({
+    code: 'source_error',
+  });
+  expect(workers[0]?.terminated).toBe(false);
+  gate.resolve(mangaPage());
+  await invoked;
+  driver.close.mockRejectedValueOnce(
+    new RuntimeFailure('source_error', 'close failed'),
+  );
+  await expect(manager.closeBuild(input)).rejects.toMatchObject({
+    code: 'source_error',
+  });
+  expect(workers[0]?.terminated).toBe(true);
+  await expect(manager.closeBuild(input)).rejects.toMatchObject({
+    code: 'runtime_lost',
+  });
+});
+
+test('preparation uses only static delivery, shares verified bytes, and leaves an active Source intact', async () => {
+  const build = await manifest();
+  const descriptor = {
+    buildId: build.buildId,
+    packageName: build.packageName,
+    repoId: build.repoId,
+    version: build.version,
+    sourceIds: build.sourceIds,
+    manifestPath: options.manifestPath,
+    sources: build.sources,
+  };
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/extensions/index.json')
+      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+    if (path === options.manifestPath) return Response.json(build);
+    if (path === build.bundle.path)
+      return new Response(encodedBytes, {
+        headers: { 'Content-Type': 'application/gzip' },
+      });
+    throw new Error('Unexpected path ' + path);
+  });
+  const cache = new ExtensionArtifactCache(crypto.randomUUID());
+  const loader = new VerifiedLoader(
+    'https://read.example.com',
+    fetcher,
+    undefined,
+    cache,
+  );
+  const { manager, driver, workers } = await setup(
+    undefined,
+    undefined,
+    undefined,
+    loader,
+  );
+  const apiWindow = { addEventListener: vi.fn() };
+  vi.stubGlobal('window', apiWindow);
+  const api = installRuntime(manager);
+  const response = parseControlResponse(
+    await api.control(
+      encodeControlRequest(
+        create(pb.ControlRequestSchema, {
+          requestId: 'prepare-control',
+          command: {
+            case: 'prepareBuild',
+            value: { preparationId: 'prepare-first', build: descriptor },
+          },
+        }),
+      ),
+    ),
+  );
+  expect(response.result.case).toBe('preparedBuild');
+  expect(workers).toHaveLength(0);
+  expect(driver.open).not.toHaveBeenCalled();
+  expect(driver.invoke).not.toHaveBeenCalled();
+  expect((await manager.extensionCache()).artifacts[0]?.sha256).toBe(
+    build.bundle.sha256,
+  );
+  const digest = vi.spyOn(crypto.subtle, 'digest');
+  await expect(
+    loader.artifact(build.bundle, new AbortController().signal, true),
+  ).resolves.toHaveLength(build.bundle.size);
+  expect(digest).not.toHaveBeenCalled();
+  const session = await manager.open(options);
+  await expect(
+    manager.forgetExtensionArtifact(build.bundle.sha256),
+  ).rejects.toMatchObject({ code: 'storage_busy' });
+  fetcher.mockResolvedValueOnce(new Response('unavailable', { status: 503 }));
+  await expect(
+    manager.prepareBuild(
+      create(pb.PrepareBuildRequestSchema, {
+        preparationId: 'prepare-failure',
+        build: descriptor,
+      }),
+    ),
+  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  expect(workers[0]?.terminated).toBe(false);
+  await expect(
+    manager.invoke(call('after-preparation-failure', session.generation)),
+  ).resolves.toMatchObject({ generation: session.generation });
+  await manager.closeBuild(
+    create(pb.CloseBuildRequestSchema, {
+      buildId: session.buildId,
+      generation: session.generation,
+    }),
+  );
+  await manager.forgetExtensionArtifact(build.bundle.sha256);
+  expect((await manager.extensionCache()).totalBytes).toBe(0);
+  await manager.dispose();
+  const open = vi.spyOn(indexedDB, 'open');
+  await expect(manager.extensionCache()).rejects.toMatchObject({
+    code: 'runtime_lost',
+  });
+  await expect(
+    manager.forgetExtensionArtifact(build.bundle.sha256),
+  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  expect(open).not.toHaveBeenCalled();
+});
+
+test('forget cancels and drains preparation before removal so a late download cannot restore deleted bytes', async () => {
+  const build = await manifest();
+  const descriptor = {
+    buildId: build.buildId,
+    packageName: build.packageName,
+    repoId: build.repoId,
+    version: build.version,
+    sourceIds: build.sourceIds,
+    manifestPath: options.manifestPath,
+    sources: build.sources,
+  };
+  const started = deferred<void>();
+  const cancelled = vi.fn();
+  let block = true;
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/extensions/index.json')
+      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+    if (path === options.manifestPath) return Response.json(build);
+    if (block)
+      return new Response(
+        new ReadableStream<Uint8Array>(
+          {
+            pull() {
+              started.resolve();
+              return new Promise<void>(() => {});
+            },
+            cancel: cancelled,
+          },
+          { highWaterMark: 0 },
+        ),
+        { headers: { 'Content-Type': 'application/gzip' } },
+      );
+    return new Response(encodedBytes, {
+      headers: { 'Content-Type': 'application/gzip' },
+    });
+  });
+  const cache = new ExtensionArtifactCache(crypto.randomUUID());
+  const loader = new VerifiedLoader(
+    'https://read.example.com',
+    fetcher,
+    undefined,
+    cache,
+  );
+  const { manager, workers } = await setup(
+    undefined,
+    undefined,
+    undefined,
+    loader,
+  );
+  const preparation = manager.prepareBuild(
+    create(pb.PrepareBuildRequestSchema, {
+      preparationId: 'to-cancel',
+      build: descriptor,
+    }),
+  );
+  const rejected = expect(preparation).rejects.toMatchObject({
+    code: 'cancelled',
+  });
+  await started.promise;
+  await manager.forgetExtensionArtifact(build.bundle.sha256);
+  await rejected;
+  expect(cancelled).toHaveBeenCalledOnce();
+  expect((await manager.extensionCache()).artifacts).toEqual([]);
+  expect(workers).toHaveLength(0);
+  block = false;
+  await manager.prepareBuild(
+    create(pb.PrepareBuildRequestSchema, {
+      preparationId: 'new-preparation',
+      build: descriptor,
+    }),
+  );
+  await manager.cancelPreparation('to-cancel');
+  expect((await manager.extensionCache()).artifacts).toHaveLength(1);
+});
+
+test('disposing rejects new work while cancellation drains and rejects a late preparation result', async () => {
+  const build = await manifest();
+  const descriptor = {
+    buildId: build.buildId,
+    packageName: build.packageName,
+    repoId: build.repoId,
+    version: build.version,
+    sourceIds: build.sourceIds,
+    manifestPath: options.manifestPath,
+    sources: build.sources,
+  };
+  const loader = new VerifiedLoader('https://read.example.com', async () =>
+    Response.json(build),
+  );
+  const drain = deferred<{
+    build: typeof descriptor;
+    bundleSha256: string;
+    byteLength: number;
+  }>();
+  const aborted = deferred<void>();
+  vi.spyOn(loader, 'prepare').mockImplementation(async (_build, signal) => {
+    signal.addEventListener('abort', () => aborted.resolve(), { once: true });
+    return drain.promise;
+  });
+  const { manager } = await setup(undefined, undefined, undefined, loader);
+  const session = await manager.open(options);
+  const preparation = manager.prepareBuild(
+    create(pb.PrepareBuildRequestSchema, {
+      preparationId: 'dispose-preparation',
+      build: descriptor,
+    }),
+  );
+  const failure = expect(preparation).rejects.toMatchObject({
+    code: 'cancelled',
+  });
+  const disposing = manager.dispose();
+  await aborted.promise;
+  await expect(
+    manager.invoke(call('during-disposal', session.generation)),
+  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  await expect(
+    manager.acquireImage(
+      create(pb.AcquireImageSchema, {
+        requestId: 'image-during-disposal',
+        generation: session.generation,
+        sourceId: session.sources[0]!.id,
+        pageSessionId: 'page-session',
+        pageKey: 'page-key',
+      }),
+    ),
+  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  drain.resolve({
+    build: descriptor,
+    bundleSha256: build.bundle.sha256,
+    byteLength: build.bundle.size,
+  });
+  await failure;
+  await disposing;
+});
+
+test('preparation deadline cancels a stalled body without terminating an active Source', async () => {
+  const build = await manifest();
+  const descriptor = {
+    buildId: build.buildId,
+    packageName: build.packageName,
+    repoId: build.repoId,
+    version: build.version,
+    sourceIds: build.sourceIds,
+    manifestPath: options.manifestPath,
+    sources: build.sources,
+  };
+  const started = deferred<void>();
+  const cancelled = vi.fn();
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/extensions/index.json')
+      return Response.json({ schemaVersion: 1, builds: [descriptor] });
+    if (path === options.manifestPath) return Response.json(build);
+    return new Response(
+      new ReadableStream<Uint8Array>(
+        {
+          pull() {
+            started.resolve();
+            return new Promise<void>(() => {});
+          },
+          cancel: cancelled,
+        },
+        { highWaterMark: 0 },
+      ),
+      { headers: { 'Content-Type': 'application/gzip' } },
+    );
+  });
+  const cache = new ExtensionArtifactCache(crypto.randomUUID());
+  const loader = new VerifiedLoader(
+    'https://read.example.com',
+    fetcher,
+    undefined,
+    cache,
+  );
+  const { manager, workers } = await setup(
+    undefined,
+    undefined,
+    undefined,
+    loader,
+  );
+  const session = await manager.open(options);
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const preparation = manager.prepareBuild(
+    create(pb.PrepareBuildRequestSchema, {
+      preparationId: 'deadline-preparation',
+      build: descriptor,
+    }),
+  );
+  const failure = expect(preparation).rejects.toMatchObject({
+    code: 'timeout',
+  });
+  await started.promise;
+  await vi.advanceTimersByTimeAsync(60_000);
+  await failure;
+  expect(cancelled).toHaveBeenCalledOnce();
+  expect(workers[0]?.terminated).toBe(false);
+  expect((await manager.extensionCache()).artifacts).toEqual([]);
+  await expect(
+    manager.invoke(call('after-deadline', session.generation)),
+  ).resolves.toMatchObject({ generation: session.generation });
+});
+
+test('a transient page-session close failure can retry the original identity and only a successful ACK is retained', async () => {
+  const { manager, driver, workers, session, image, request } =
+    await setupImages();
+  await manager.releaseImage({
+    resourceId: image.resourceId,
+    generation: session.generation,
+  });
+  driver.closePageSession!.mockRejectedValueOnce(
+    new RuntimeFailure('source_error', 'Temporary cleanup failure', true),
+  );
+  const input = {
+    pageSessionId: request.pageSessionId,
+    generation: session.generation,
+  };
+  await expect(manager.closePageSession(input)).rejects.toMatchObject({
+    code: 'source_error',
+  });
+  expect(workers[0]?.terminated).toBe(false);
+  const retry = manager.closePageSession(input);
+  expect(manager.closePageSession(input)).toBe(retry);
+  await expect(retry).resolves.toEqual({ closed: true });
+  await expect(manager.closePageSession(input)).resolves.toEqual({
+    closed: true,
+  });
+  expect(driver.closePageSession).toHaveBeenCalledTimes(2);
+  expect(driver.closePageSession!.mock.calls.map(([id]) => id)).toEqual([
+    request.pageSessionId,
+    request.pageSessionId,
+  ]);
+  await expect(
+    manager.invoke(call('after-cleanup-retry', session.generation)),
+  ).resolves.toMatchObject({ generation: session.generation });
+});
+
+test('failed shutdown remains unacknowledged and an explicit rebuild confirms reset before removing the cached artifact', async () => {
+  const build = await manifest();
+  const cache = new ExtensionArtifactCache(crypto.randomUUID());
+  await cache.storeVerified(build.bundle, bytes);
+  const loader = new VerifiedLoader(
+    'https://read.example.com',
+    async () => Response.json(build),
+    undefined,
+    cache,
+  );
+  const { manager, driver, workers } = await setup(
+    undefined,
+    undefined,
+    undefined,
+    loader,
+  );
+  const session = await manager.open(options);
+  const input = create(pb.CloseBuildRequestSchema, {
+    buildId: session.buildId,
+    generation: session.generation,
+  });
+  driver.close.mockRejectedValueOnce(
+    new RuntimeFailure('source_error', 'Shutdown did not finish'),
+  );
+  await expect(manager.closeBuild(input)).rejects.toMatchObject({
+    code: 'source_error',
+  });
+  expect(workers[0]?.terminated).toBe(true);
+  await expect(manager.closeBuild(input)).rejects.toMatchObject({
+    code: 'runtime_lost',
+  });
+  vi.stubGlobal('window', { addEventListener: vi.fn() });
+  const api = installRuntime(manager);
+  const reset = parseControlResponse(
+    await api.control(
+      encodeControlRequest(
+        create(pb.ControlRequestSchema, {
+          requestId: 'recover-after-failed-shutdown',
+          command: { case: 'rebuild', value: {} },
+        }),
+      ),
+    ),
+  );
+  expect(reset.result.case).toBe('completed');
+  await manager.forgetExtensionArtifact(build.bundle.sha256);
+  expect((await manager.extensionCache()).artifacts).toEqual([]);
+  await expect(manager.closeBuild(input)).rejects.toMatchObject({
+    code: 'runtime_lost',
+  });
+  const next = await manager.open(options);
+  expect(next.generation).not.toBe(session.generation);
+  await expect(
+    manager.invoke(call('after-explicit-reset', next.generation)),
+  ).resolves.toMatchObject({ generation: next.generation });
 });

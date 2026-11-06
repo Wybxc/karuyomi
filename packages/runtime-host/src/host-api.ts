@@ -111,6 +111,43 @@ function createRuntimeApi(manager: SourceRuntimeManager) {
               ),
             };
             break;
+          case 'prepareBuild':
+            result = {
+              case: 'preparedBuild',
+              value: await manager.prepareBuild(request.command.value),
+            };
+            break;
+          case 'cancelPreparation':
+            await manager.cancelPreparation(
+              request.command.value.preparationId,
+            );
+            result = {
+              case: 'completed',
+              value: create(pb.CompletedSchema, { completed: true }),
+            };
+            break;
+          case 'extensionCache':
+            result = {
+              case: 'extensionCache',
+              value: await manager.extensionCache(),
+            };
+            break;
+          case 'forgetExtensionArtifact':
+            await manager.forgetExtensionArtifact(request.command.value.sha256);
+            result = {
+              case: 'completed',
+              value: create(pb.CompletedSchema, { completed: true }),
+            };
+            break;
+          case 'closeBuild':
+            result = {
+              case: 'closed',
+              value: create(
+                pb.ClosedSchema,
+                await manager.closeBuild(request.command.value),
+              ),
+            };
+            break;
           case 'rebuild':
             await manager.rebuild();
             result = {

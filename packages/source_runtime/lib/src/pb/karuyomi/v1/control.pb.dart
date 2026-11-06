@@ -6831,6 +6831,529 @@ class ApiFetchResponse extends $pb.GeneratedMessage {
   void clearRedirected() => $_clearField(4);
 }
 
+/// Local preparation never constructs or executes a Source.
+class PrepareBuildRequest extends $pb.GeneratedMessage {
+  factory PrepareBuildRequest({
+    $core.String? preparationId,
+    ExtensionBuildDescriptor? build,
+  }) {
+    final result = PrepareBuildRequest._();
+    if (preparationId != null) result.preparationId = preparationId;
+    if (build != null) result.build = build;
+    return result;
+  }
+
+  PrepareBuildRequest._();
+
+  factory PrepareBuildRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PrepareBuildRequest()..mergeFromBuffer(data, registry);
+  factory PrepareBuildRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PrepareBuildRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PrepareBuildRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PrepareBuildRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'preparationId')
+    ..aOM<ExtensionBuildDescriptor>(2, _omitFieldNames ? '' : 'build',
+        subBuilder: ExtensionBuildDescriptor.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PrepareBuildRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PrepareBuildRequest copyWith(void Function(PrepareBuildRequest) updates) =>
+      super.copyWith((message) => updates(message as PrepareBuildRequest))
+          as PrepareBuildRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use PrepareBuildRequest() / PrepareBuildRequest.new instead')
+  static PrepareBuildRequest create() => PrepareBuildRequest._();
+  static $pb.GeneratedMessage $_createMessage() => PrepareBuildRequest._();
+  @$core.override
+  PrepareBuildRequest createEmptyInstance() => PrepareBuildRequest._();
+  @$core.pragma('dart2js:noInline')
+  static PrepareBuildRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PrepareBuildRequest>(
+          PrepareBuildRequest.$_createMessage);
+  static PrepareBuildRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get preparationId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set preparationId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPreparationId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPreparationId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ExtensionBuildDescriptor get build => $_getN(1);
+  @$pb.TagNumber(2)
+  set build(ExtensionBuildDescriptor value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBuild() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBuild() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ExtensionBuildDescriptor ensureBuild() => $_ensure(1);
+}
+
+class CancelPreparationRequest extends $pb.GeneratedMessage {
+  factory CancelPreparationRequest({
+    $core.String? preparationId,
+  }) {
+    final result = CancelPreparationRequest._();
+    if (preparationId != null) result.preparationId = preparationId;
+    return result;
+  }
+
+  CancelPreparationRequest._();
+
+  factory CancelPreparationRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPreparationRequest()..mergeFromBuffer(data, registry);
+  factory CancelPreparationRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPreparationRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CancelPreparationRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CancelPreparationRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'preparationId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPreparationRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPreparationRequest copyWith(
+          void Function(CancelPreparationRequest) updates) =>
+      super.copyWith((message) => updates(message as CancelPreparationRequest))
+          as CancelPreparationRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CancelPreparationRequest() / CancelPreparationRequest.new instead')
+  static CancelPreparationRequest create() => CancelPreparationRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CancelPreparationRequest._();
+  @$core.override
+  CancelPreparationRequest createEmptyInstance() =>
+      CancelPreparationRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CancelPreparationRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CancelPreparationRequest>(
+          CancelPreparationRequest.$_createMessage);
+  static CancelPreparationRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get preparationId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set preparationId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPreparationId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPreparationId() => $_clearField(1);
+}
+
+class PreparedBuild extends $pb.GeneratedMessage {
+  factory PreparedBuild({
+    ExtensionBuildDescriptor? build,
+    $core.String? bundleSha256,
+    $core.int? byteLength,
+  }) {
+    final result = PreparedBuild._();
+    if (build != null) result.build = build;
+    if (bundleSha256 != null) result.bundleSha256 = bundleSha256;
+    if (byteLength != null) result.byteLength = byteLength;
+    return result;
+  }
+
+  PreparedBuild._();
+
+  factory PreparedBuild.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreparedBuild()..mergeFromBuffer(data, registry);
+  factory PreparedBuild.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreparedBuild()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreparedBuild',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreparedBuild.$_createMessage)
+    ..aOM<ExtensionBuildDescriptor>(1, _omitFieldNames ? '' : 'build',
+        subBuilder: ExtensionBuildDescriptor.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'bundleSha256')
+    ..aI(3, _omitFieldNames ? '' : 'byteLength', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreparedBuild clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreparedBuild copyWith(void Function(PreparedBuild) updates) =>
+      super.copyWith((message) => updates(message as PreparedBuild))
+          as PreparedBuild;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreparedBuild() / PreparedBuild.new instead')
+  static PreparedBuild create() => PreparedBuild._();
+  static $pb.GeneratedMessage $_createMessage() => PreparedBuild._();
+  @$core.override
+  PreparedBuild createEmptyInstance() => PreparedBuild._();
+  @$core.pragma('dart2js:noInline')
+  static PreparedBuild getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreparedBuild>(
+          PreparedBuild.$_createMessage);
+  static PreparedBuild? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ExtensionBuildDescriptor get build => $_getN(0);
+  @$pb.TagNumber(1)
+  set build(ExtensionBuildDescriptor value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuild() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuild() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ExtensionBuildDescriptor ensureBuild() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get bundleSha256 => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set bundleSha256($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBundleSha256() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBundleSha256() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get byteLength => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set byteLength($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasByteLength() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearByteLength() => $_clearField(3);
+}
+
+class CachedExtensionArtifact extends $pb.GeneratedMessage {
+  factory CachedExtensionArtifact({
+    $core.String? sha256,
+    $core.int? byteLength,
+    $core.String? contentType,
+  }) {
+    final result = CachedExtensionArtifact._();
+    if (sha256 != null) result.sha256 = sha256;
+    if (byteLength != null) result.byteLength = byteLength;
+    if (contentType != null) result.contentType = contentType;
+    return result;
+  }
+
+  CachedExtensionArtifact._();
+
+  factory CachedExtensionArtifact.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CachedExtensionArtifact()..mergeFromBuffer(data, registry);
+  factory CachedExtensionArtifact.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CachedExtensionArtifact()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CachedExtensionArtifact',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CachedExtensionArtifact.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sha256')
+    ..aI(2, _omitFieldNames ? '' : 'byteLength', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'contentType')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CachedExtensionArtifact clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CachedExtensionArtifact copyWith(
+          void Function(CachedExtensionArtifact) updates) =>
+      super.copyWith((message) => updates(message as CachedExtensionArtifact))
+          as CachedExtensionArtifact;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CachedExtensionArtifact() / CachedExtensionArtifact.new instead')
+  static CachedExtensionArtifact create() => CachedExtensionArtifact._();
+  static $pb.GeneratedMessage $_createMessage() => CachedExtensionArtifact._();
+  @$core.override
+  CachedExtensionArtifact createEmptyInstance() => CachedExtensionArtifact._();
+  @$core.pragma('dart2js:noInline')
+  static CachedExtensionArtifact getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CachedExtensionArtifact>(
+          CachedExtensionArtifact.$_createMessage);
+  static CachedExtensionArtifact? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sha256 => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sha256($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSha256() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSha256() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get byteLength => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set byteLength($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasByteLength() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearByteLength() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get contentType => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set contentType($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasContentType() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearContentType() => $_clearField(3);
+}
+
+class ExtensionCacheState extends $pb.GeneratedMessage {
+  factory ExtensionCacheState({
+    $core.Iterable<CachedExtensionArtifact>? artifacts,
+    $core.int? totalBytes,
+    $core.int? maxBytes,
+    $core.int? maxArtifacts,
+  }) {
+    final result = ExtensionCacheState._();
+    if (artifacts != null) result.artifacts.addAll(artifacts);
+    if (totalBytes != null) result.totalBytes = totalBytes;
+    if (maxBytes != null) result.maxBytes = maxBytes;
+    if (maxArtifacts != null) result.maxArtifacts = maxArtifacts;
+    return result;
+  }
+
+  ExtensionCacheState._();
+
+  factory ExtensionCacheState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionCacheState()..mergeFromBuffer(data, registry);
+  factory ExtensionCacheState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ExtensionCacheState()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ExtensionCacheState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ExtensionCacheState.$_createMessage)
+    ..pPM<CachedExtensionArtifact>(1, _omitFieldNames ? '' : 'artifacts',
+        subBuilder: CachedExtensionArtifact.$_createMessage)
+    ..aI(2, _omitFieldNames ? '' : 'totalBytes', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'maxBytes', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'maxArtifacts',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionCacheState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ExtensionCacheState copyWith(void Function(ExtensionCacheState) updates) =>
+      super.copyWith((message) => updates(message as ExtensionCacheState))
+          as ExtensionCacheState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use ExtensionCacheState() / ExtensionCacheState.new instead')
+  static ExtensionCacheState create() => ExtensionCacheState._();
+  static $pb.GeneratedMessage $_createMessage() => ExtensionCacheState._();
+  @$core.override
+  ExtensionCacheState createEmptyInstance() => ExtensionCacheState._();
+  @$core.pragma('dart2js:noInline')
+  static ExtensionCacheState getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ExtensionCacheState>(
+          ExtensionCacheState.$_createMessage);
+  static ExtensionCacheState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<CachedExtensionArtifact> get artifacts => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.int get totalBytes => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set totalBytes($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTotalBytes() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTotalBytes() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get maxBytes => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set maxBytes($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMaxBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMaxBytes() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get maxArtifacts => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set maxArtifacts($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMaxArtifacts() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMaxArtifacts() => $_clearField(4);
+}
+
+class ForgetExtensionArtifactRequest extends $pb.GeneratedMessage {
+  factory ForgetExtensionArtifactRequest({
+    $core.String? sha256,
+  }) {
+    final result = ForgetExtensionArtifactRequest._();
+    if (sha256 != null) result.sha256 = sha256;
+    return result;
+  }
+
+  ForgetExtensionArtifactRequest._();
+
+  factory ForgetExtensionArtifactRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForgetExtensionArtifactRequest()..mergeFromBuffer(data, registry);
+  factory ForgetExtensionArtifactRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForgetExtensionArtifactRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ForgetExtensionArtifactRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ForgetExtensionArtifactRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sha256')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForgetExtensionArtifactRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForgetExtensionArtifactRequest copyWith(
+          void Function(ForgetExtensionArtifactRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ForgetExtensionArtifactRequest))
+          as ForgetExtensionArtifactRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ForgetExtensionArtifactRequest() / ForgetExtensionArtifactRequest.new instead')
+  static ForgetExtensionArtifactRequest create() =>
+      ForgetExtensionArtifactRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ForgetExtensionArtifactRequest._();
+  @$core.override
+  ForgetExtensionArtifactRequest createEmptyInstance() =>
+      ForgetExtensionArtifactRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ForgetExtensionArtifactRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ForgetExtensionArtifactRequest>(
+          ForgetExtensionArtifactRequest.$_createMessage);
+  static ForgetExtensionArtifactRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sha256 => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sha256($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSha256() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSha256() => $_clearField(1);
+}
+
+class CloseBuildRequest extends $pb.GeneratedMessage {
+  factory CloseBuildRequest({
+    $core.String? buildId,
+    $core.String? generation,
+  }) {
+    final result = CloseBuildRequest._();
+    if (buildId != null) result.buildId = buildId;
+    if (generation != null) result.generation = generation;
+    return result;
+  }
+
+  CloseBuildRequest._();
+
+  factory CloseBuildRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CloseBuildRequest()..mergeFromBuffer(data, registry);
+  factory CloseBuildRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CloseBuildRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CloseBuildRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: CloseBuildRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'buildId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CloseBuildRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CloseBuildRequest copyWith(void Function(CloseBuildRequest) updates) =>
+      super.copyWith((message) => updates(message as CloseBuildRequest))
+          as CloseBuildRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CloseBuildRequest() / CloseBuildRequest.new instead')
+  static CloseBuildRequest create() => CloseBuildRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CloseBuildRequest._();
+  @$core.override
+  CloseBuildRequest createEmptyInstance() => CloseBuildRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CloseBuildRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CloseBuildRequest>(
+          CloseBuildRequest.$_createMessage);
+  static CloseBuildRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get buildId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set buildId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuildId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuildId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+}
+
 enum ControlRequest_Command {
   ready,
   open,
@@ -6843,6 +7366,11 @@ enum ControlRequest_Command {
   rebuild,
   fetchApi,
   dispose,
+  prepareBuild,
+  cancelPreparation,
+  extensionCache,
+  forgetExtensionArtifact,
+  closeBuild,
   notSet
 }
 
@@ -6860,6 +7388,11 @@ class ControlRequest extends $pb.GeneratedMessage {
     Empty? rebuild,
     ApiFetchRequest? fetchApi,
     Empty? dispose,
+    PrepareBuildRequest? prepareBuild,
+    CancelPreparationRequest? cancelPreparation,
+    Empty? extensionCache,
+    ForgetExtensionArtifactRequest? forgetExtensionArtifact,
+    CloseBuildRequest? closeBuild,
   }) {
     final result = ControlRequest._();
     if (requestId != null) result.requestId = requestId;
@@ -6874,6 +7407,12 @@ class ControlRequest extends $pb.GeneratedMessage {
     if (rebuild != null) result.rebuild = rebuild;
     if (fetchApi != null) result.fetchApi = fetchApi;
     if (dispose != null) result.dispose = dispose;
+    if (prepareBuild != null) result.prepareBuild = prepareBuild;
+    if (cancelPreparation != null) result.cancelPreparation = cancelPreparation;
+    if (extensionCache != null) result.extensionCache = extensionCache;
+    if (forgetExtensionArtifact != null)
+      result.forgetExtensionArtifact = forgetExtensionArtifact;
+    if (closeBuild != null) result.closeBuild = closeBuild;
     return result;
   }
 
@@ -6899,13 +7438,18 @@ class ControlRequest extends $pb.GeneratedMessage {
     18: ControlRequest_Command.rebuild,
     19: ControlRequest_Command.fetchApi,
     20: ControlRequest_Command.dispose,
+    21: ControlRequest_Command.prepareBuild,
+    22: ControlRequest_Command.cancelPreparation,
+    23: ControlRequest_Command.extensionCache,
+    24: ControlRequest_Command.forgetExtensionArtifact,
+    25: ControlRequest_Command.closeBuild,
     0: ControlRequest_Command.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlRequest.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOM<Empty>(10, _omitFieldNames ? '' : 'ready',
         subBuilder: Empty.$_createMessage)
@@ -6929,6 +7473,18 @@ class ControlRequest extends $pb.GeneratedMessage {
         subBuilder: ApiFetchRequest.$_createMessage)
     ..aOM<Empty>(20, _omitFieldNames ? '' : 'dispose',
         subBuilder: Empty.$_createMessage)
+    ..aOM<PrepareBuildRequest>(21, _omitFieldNames ? '' : 'prepareBuild',
+        subBuilder: PrepareBuildRequest.$_createMessage)
+    ..aOM<CancelPreparationRequest>(
+        22, _omitFieldNames ? '' : 'cancelPreparation',
+        subBuilder: CancelPreparationRequest.$_createMessage)
+    ..aOM<Empty>(23, _omitFieldNames ? '' : 'extensionCache',
+        subBuilder: Empty.$_createMessage)
+    ..aOM<ForgetExtensionArtifactRequest>(
+        24, _omitFieldNames ? '' : 'forgetExtensionArtifact',
+        subBuilder: ForgetExtensionArtifactRequest.$_createMessage)
+    ..aOM<CloseBuildRequest>(25, _omitFieldNames ? '' : 'closeBuild',
+        subBuilder: CloseBuildRequest.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6964,6 +7520,11 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
   ControlRequest_Command whichCommand() =>
       _ControlRequest_CommandByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -6977,6 +7538,11 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
   void clearCommand() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -7108,6 +7674,64 @@ class ControlRequest extends $pb.GeneratedMessage {
   void clearDispose() => $_clearField(20);
   @$pb.TagNumber(20)
   Empty ensureDispose() => $_ensure(11);
+
+  @$pb.TagNumber(21)
+  PrepareBuildRequest get prepareBuild => $_getN(12);
+  @$pb.TagNumber(21)
+  set prepareBuild(PrepareBuildRequest value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasPrepareBuild() => $_has(12);
+  @$pb.TagNumber(21)
+  void clearPrepareBuild() => $_clearField(21);
+  @$pb.TagNumber(21)
+  PrepareBuildRequest ensurePrepareBuild() => $_ensure(12);
+
+  @$pb.TagNumber(22)
+  CancelPreparationRequest get cancelPreparation => $_getN(13);
+  @$pb.TagNumber(22)
+  set cancelPreparation(CancelPreparationRequest value) =>
+      $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasCancelPreparation() => $_has(13);
+  @$pb.TagNumber(22)
+  void clearCancelPreparation() => $_clearField(22);
+  @$pb.TagNumber(22)
+  CancelPreparationRequest ensureCancelPreparation() => $_ensure(13);
+
+  @$pb.TagNumber(23)
+  Empty get extensionCache => $_getN(14);
+  @$pb.TagNumber(23)
+  set extensionCache(Empty value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasExtensionCache() => $_has(14);
+  @$pb.TagNumber(23)
+  void clearExtensionCache() => $_clearField(23);
+  @$pb.TagNumber(23)
+  Empty ensureExtensionCache() => $_ensure(14);
+
+  @$pb.TagNumber(24)
+  ForgetExtensionArtifactRequest get forgetExtensionArtifact => $_getN(15);
+  @$pb.TagNumber(24)
+  set forgetExtensionArtifact(ForgetExtensionArtifactRequest value) =>
+      $_setField(24, value);
+  @$pb.TagNumber(24)
+  $core.bool hasForgetExtensionArtifact() => $_has(15);
+  @$pb.TagNumber(24)
+  void clearForgetExtensionArtifact() => $_clearField(24);
+  @$pb.TagNumber(24)
+  ForgetExtensionArtifactRequest ensureForgetExtensionArtifact() =>
+      $_ensure(15);
+
+  @$pb.TagNumber(25)
+  CloseBuildRequest get closeBuild => $_getN(16);
+  @$pb.TagNumber(25)
+  set closeBuild(CloseBuildRequest value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasCloseBuild() => $_has(16);
+  @$pb.TagNumber(25)
+  void clearCloseBuild() => $_clearField(25);
+  @$pb.TagNumber(25)
+  CloseBuildRequest ensureCloseBuild() => $_ensure(16);
 }
 
 enum ControlResponse_Result {
@@ -7120,6 +7744,8 @@ enum ControlResponse_Result {
   completed,
   api,
   error,
+  preparedBuild,
+  extensionCache,
   notSet
 }
 
@@ -7135,6 +7761,8 @@ class ControlResponse extends $pb.GeneratedMessage {
     Completed? completed,
     ApiFetchResponse? api,
     RuntimeError? error,
+    PreparedBuild? preparedBuild,
+    ExtensionCacheState? extensionCache,
   }) {
     final result = ControlResponse._();
     if (requestId != null) result.requestId = requestId;
@@ -7147,6 +7775,8 @@ class ControlResponse extends $pb.GeneratedMessage {
     if (completed != null) result.completed = completed;
     if (api != null) result.api = api;
     if (error != null) result.error = error;
+    if (preparedBuild != null) result.preparedBuild = preparedBuild;
+    if (extensionCache != null) result.extensionCache = extensionCache;
     return result;
   }
 
@@ -7170,13 +7800,15 @@ class ControlResponse extends $pb.GeneratedMessage {
     16: ControlResponse_Result.completed,
     17: ControlResponse_Result.api,
     18: ControlResponse_Result.error,
+    19: ControlResponse_Result.preparedBuild,
+    20: ControlResponse_Result.extensionCache,
     0: ControlResponse_Result.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlResponse.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOM<RuntimeHello>(10, _omitFieldNames ? '' : 'hello',
         subBuilder: RuntimeHello.$_createMessage)
@@ -7196,6 +7828,10 @@ class ControlResponse extends $pb.GeneratedMessage {
         subBuilder: ApiFetchResponse.$_createMessage)
     ..aOM<RuntimeError>(18, _omitFieldNames ? '' : 'error',
         subBuilder: RuntimeError.$_createMessage)
+    ..aOM<PreparedBuild>(19, _omitFieldNames ? '' : 'preparedBuild',
+        subBuilder: PreparedBuild.$_createMessage)
+    ..aOM<ExtensionCacheState>(20, _omitFieldNames ? '' : 'extensionCache',
+        subBuilder: ExtensionCacheState.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7229,6 +7865,8 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(19)
+  @$pb.TagNumber(20)
   ControlResponse_Result whichResult() =>
       _ControlResponse_ResultByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -7240,6 +7878,8 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(19)
+  @$pb.TagNumber(20)
   void clearResult() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -7349,6 +7989,28 @@ class ControlResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(18);
   @$pb.TagNumber(18)
   RuntimeError ensureError() => $_ensure(9);
+
+  @$pb.TagNumber(19)
+  PreparedBuild get preparedBuild => $_getN(10);
+  @$pb.TagNumber(19)
+  set preparedBuild(PreparedBuild value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasPreparedBuild() => $_has(10);
+  @$pb.TagNumber(19)
+  void clearPreparedBuild() => $_clearField(19);
+  @$pb.TagNumber(19)
+  PreparedBuild ensurePreparedBuild() => $_ensure(10);
+
+  @$pb.TagNumber(20)
+  ExtensionCacheState get extensionCache => $_getN(11);
+  @$pb.TagNumber(20)
+  set extensionCache(ExtensionCacheState value) => $_setField(20, value);
+  @$pb.TagNumber(20)
+  $core.bool hasExtensionCache() => $_has(11);
+  @$pb.TagNumber(20)
+  void clearExtensionCache() => $_clearField(20);
+  @$pb.TagNumber(20)
+  ExtensionCacheState ensureExtensionCache() => $_ensure(11);
 }
 
 class OpenWorker extends $pb.GeneratedMessage {

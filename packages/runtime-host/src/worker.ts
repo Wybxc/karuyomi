@@ -1,6 +1,7 @@
 import { createHello } from './hello.js';
 import { TeaVMDriver, type TeaVMGlobals } from './teavm-driver.js';
 import { VerifiedLoader } from './verified-loader.js';
+import { ExtensionArtifactCache } from './extension-artifact-cache.js';
 import { WorkerRuntime } from './worker-runtime.js';
 import { nativeMaterials } from './materials.js';
 
@@ -17,7 +18,12 @@ if (context && context.origin !== location.origin) {
 const origin = context?.origin ?? location.origin;
 const driver = new TeaVMDriver(
   globalThis as TeaVMGlobals,
-  new VerifiedLoader(origin, undefined, nativeMaterials),
+  new VerifiedLoader(
+    origin,
+    undefined,
+    nativeMaterials,
+    new ExtensionArtifactCache(),
+  ),
   (url) => importScripts(url),
   origin,
 );

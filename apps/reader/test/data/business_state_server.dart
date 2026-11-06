@@ -87,6 +87,17 @@ final class TestBusinessServer implements ApiFetch {
   _Account _account(String subject) =>
       _accounts.putIfAbsent(subject, _Account.new);
 
+  /// Explicit account fixture setup; not a product install or migration path.
+  void seedInstalledExtensions(
+    Iterable<wire.InstalledExtension> values, {
+    String? subject,
+  }) {
+    final settings = _account(subject ?? defaultSubject).globalSettings.values;
+    settings.installedExtensions
+      ..clear()
+      ..addAll(values.map((value) => value.deepCopy()));
+  }
+
   @override
   Future<ApiReply> fetchApi(
     String path, {

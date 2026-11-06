@@ -327,10 +327,22 @@ message FavoriteSource {
   string source_lang = 4;
 }
 
+// Confirmed account intent, separate from each client's disposable code cache.
+// A package has one selected repository/build; replacement is explicit.
+message InstalledExtension {
+  string catalog_url = 1;
+  string repo_id = 2;
+  string package_name = 3;
+  string build_id = 4;
+  string bundle_sha256 = 5;
+  bool enabled = 6;
+}
+
 message GlobalSettingsValues {
   AppTheme theme = 1;
   ReaderSettings reader = 2;
   repeated FavoriteSource favorite_sources = 3;
+  repeated InstalledExtension installed_extensions = 4;
 }
 
 message GlobalSettings {

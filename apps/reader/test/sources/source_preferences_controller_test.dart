@@ -227,6 +227,11 @@ void main() {
       fixture.platform.runtime.containerLost('Identity replacement');
       await Future<void>.delayed(Duration.zero);
       fixture.platform.bootstrapSubject = 'other';
+      fixture.platform.seedInstalledBuilds(
+        wire
+            .decodeProtoJson(wire.ExtensionIndex(), fixture.platform.inventory)
+            .builds,
+      );
       await fixture.catalog.connect();
       await fixture.catalog.openBuild(fixture.catalog.builds.single);
       await fixture.catalog.selectSource(

@@ -1,10 +1,13 @@
 import { SourceRuntimeManager, type WorkerEndpoint } from './manager.js';
 import { installRuntime } from './host-api.js';
 import { RuntimeFailure } from './errors.js';
+import type { Artifact } from '@karuyomi/contracts';
 import { VerifiedLoader } from './verified-loader.js';
+import { ExtensionArtifactCache } from './extension-artifact-cache.js';
 import { isNativeControlPage } from './native-location.js';
 
 declare const __KARUYOMI_MATERIAL_VERSION__: string;
+declare const __KARUYOMI_NATIVE_MATERIALS__: readonly Artifact[];
 declare global {
   interface Window {
     __karuyomiNativeRuntime?: {
@@ -96,7 +99,13 @@ if (!window.karuyomiRuntime) {
     new SourceRuntimeManager(
       workerUrl,
       createWorker,
-      new VerifiedLoader(origin, undefined, () => undefined),
+      new VerifiedLoader(
+        origin,
+        undefined,
+        () => undefined,
+        new ExtensionArtifactCache(),
+        __KARUYOMI_NATIVE_MATERIALS__,
+      ),
       60_000,
       {
         enabled: configuration.imageFiles === true,

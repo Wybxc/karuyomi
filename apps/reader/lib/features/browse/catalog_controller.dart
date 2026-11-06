@@ -84,6 +84,16 @@ final class CatalogBuild {
   final String manifestPath;
   final List<wire.CatalogSource> sources;
 
+  wire.ExtensionBuildDescriptor toProto() => wire.ExtensionBuildDescriptor(
+    buildId: id,
+    packageName: packageName,
+    repoId: repoId,
+    version: version,
+    manifestPath: manifestPath,
+    sourceIds: sources.map((source) => source.id),
+    sources: sources.map((source) => source.deepCopy()),
+  );
+
   factory CatalogBuild.fromProto(wire.ExtensionBuildDescriptor value) {
     final id = value.buildId;
     final path = value.manifestPath;
@@ -200,6 +210,12 @@ final class CatalogController extends ChangeNotifier {
   ProgressRepository? _progress;
   BookmarkRepository? _bookmarks;
   SettingsRepository? _settings;
+  StreamSubscription<SettingsSnapshot>? _installationSubscription;
+  SettingsSnapshot? installationSettings;
+  String? _activeBundleSha256;
+  Future<void>? _retiringExtension;
+  String? extensionCleanupError;
+  final _openedChapters = <OpenedChapter>{};
   SourcePreferencesRepository? _sourcePreferences;
   SourcePreferencesSnapshot? loadedSourcePreferences;
   final _sessionPreferenceValues =
@@ -248,16 +264,28 @@ final class CatalogController extends ChangeNotifier {
           break;
         }
       }
-      _businessClient =
-          retained ??
-          BusinessStateClient(api: api, identity: identity, covers: _covers);
-      _library = LibraryRepository(_businessClient!);
-      _progress = ProgressRepository(_businessClient!);
-      _bookmarks = BookmarkRepository(_businessClient!);
-      _settings = SettingsRepository(_businessClient!);
-      _sourcePreferences = SourcePreferencesRepository(_businessClient!);
+      _bindBusinessClient(
+        retained ??
+            BusinessStateClient(api: api, identity: identity, covers: _covers),
+      );
     }
     return _businessClient;
+  }
+
+  void _bindBusinessClient(BusinessStateClient client) {
+    _businessClient = client;
+    _library = LibraryRepository(client);
+    _progress = ProgressRepository(client);
+    _bookmarks = BookmarkRepository(client);
+    unawaited(_installationSubscription?.cancel());
+    installationSettings = null;
+    final repository = _settings = SettingsRepository(client);
+    _installationSubscription = repository.watchConfirmed().listen((value) {
+      if (!_closed && identical(_settings, repository)) {
+        _acceptInstallations(value);
+      }
+    });
+    _sourcePreferences = SourcePreferencesRepository(client);
   }
 
   ProgressRepository? get readingProgress =>
@@ -271,6 +299,224 @@ final class CatalogController extends ChangeNotifier {
 
   SettingsRepository? get settings =>
       _confirmedBusinessClient == null ? null : _settings;
+
+  String get catalogUrl {
+    final origin =
+        deploymentOrigin ??
+        (api is PlatformRuntime ? (api as PlatformRuntime).origin : null);
+    if (origin == null) throw StateError('服务地址未确认');
+    return '${origin.origin}/extensions/index.json';
+  }
+
+  List<wire.InstalledExtension> get installedExtensions =>
+      installationSettings?.global.installedExtensions ?? const [];
+
+  wire.InstalledExtension? installedExtension(String packageName) {
+    for (final value in installedExtensions) {
+      if (value.packageName == packageName) return value;
+    }
+    return null;
+  }
+
+  bool _allowsBuild(CatalogBuild build, {String? sha256}) {
+    final installed = installedExtension(build.packageName);
+    return installed != null &&
+        installed.enabled &&
+        installed.catalogUrl == catalogUrl &&
+        installed.repoId == build.repoId &&
+        installed.buildId == build.id &&
+        (sha256 == null || installed.bundleSha256 == sha256);
+  }
+
+  String? get extensionUnavailableReason =>
+      activeBuild != null &&
+          !_allowsBuild(activeBuild!, sha256: _activeBundleSha256)
+      ? '当前扩展已停用、卸载或改选构建；请返回扩展管理。'
+      : null;
+
+  void _acceptInstallations(SettingsSnapshot value) {
+    if (installationSettings != null &&
+        value.globalRevision < installationSettings!.globalRevision) {
+      return;
+    }
+    installationSettings = value;
+    if (extensionUnavailableReason != null) {
+      unawaited(retireUnavailableExtension().catchError((Object _) {}));
+    }
+    _notify();
+  }
+
+  Future<SettingsSnapshot> refreshInstallations() async {
+    final repository = settings;
+    if (repository == null) throw StateError('身份未确认');
+    final value = await repository.loadGlobal();
+    if (_closed || !identical(settings, repository)) {
+      throw StateError('身份或服务已改变');
+    }
+    _acceptInstallations(value);
+    return value;
+  }
+
+  Future<CatalogBuild> resolveInstalledBuild(
+    String packageName, {
+    CatalogBuild? requested,
+  }) async {
+    await refreshInstallations();
+    final selected = installedExtension(packageName);
+    if (selected == null) throw const FormatException('扩展尚未安装，请先进入扩展管理。');
+    if (!selected.enabled) throw const FormatException('扩展已停用，请先在扩展管理中启用。');
+    if (selected.catalogUrl != catalogUrl) {
+      throw const FormatException('这个扩展来自尚未接入的仓库，请在扩展管理中处理。');
+    }
+    final matches = builds.where(
+      (build) =>
+          build.packageName == packageName &&
+          build.repoId == selected.repoId &&
+          build.id == selected.buildId,
+    );
+    if (matches.length != 1) {
+      throw const FormatException('所选构建已下架，请在扩展管理中检查并手动更新。');
+    }
+    final build = matches.single;
+    if (requested != null &&
+        (requested.id != build.id || requested.repoId != build.repoId)) {
+      throw const FormatException('请打开账户已选择的构建；更新需在扩展管理中确认。');
+    }
+    return build;
+  }
+
+  Future<void> applyConfirmedInstallations(SettingsSnapshot value) async {
+    _acceptInstallations(value);
+    await retireUnavailableExtension();
+  }
+
+  Future<void> retireUnavailableExtension() {
+    if (session == null || extensionUnavailableReason == null) {
+      return Future.value();
+    }
+    return _retiringExtension ??= _retireUnavailableExtension().whenComplete(
+      () {
+        _retiringExtension = null;
+      },
+    );
+  }
+
+  Future<void> _retireUnavailableExtension() async {
+    final current = session;
+    if (current == null || extensionUnavailableReason == null) return;
+    extensionCleanupError = null;
+    try {
+      await Future.wait(
+        _openedChapters
+            .where((chapter) => chapter.generation == current.generation)
+            .toList()
+            .map((chapter) async {
+              await chapter.provider.close();
+              _openedChapters.remove(chapter);
+            }),
+      );
+      await runtime.closeBuild(
+        buildId: current.buildId,
+        generation: current.generation,
+      );
+      if (session?.generation == current.generation &&
+          session?.buildId == current.buildId) {
+        _dropSession();
+      }
+    } catch (_) {
+      extensionCleanupError = '账户状态已确认，但扩展资源尚未关闭；请重试清理。';
+      rethrow;
+    } finally {
+      _notify();
+    }
+  }
+
+  bool get canRebuildUnavailableExtension =>
+      !busy && session != null && extensionUnavailableReason != null;
+
+  Future<void> rebuildUnavailableExtension() async {
+    final current = session;
+    if (!canRebuildUnavailableExtension || current == null) return;
+    final epoch = _epoch;
+    bool sameUnavailable() =>
+        !_closed &&
+        epoch == _epoch &&
+        session?.generation == current.generation &&
+        session?.buildId == current.buildId &&
+        extensionUnavailableReason != null;
+    busy = true;
+    _notify();
+    try {
+      await _retiringExtension?.catchError((Object _) {});
+      if (!sameUnavailable()) return;
+      for (final chapter
+          in _openedChapters
+              .where((chapter) => chapter.generation == current.generation)
+              .toList()) {
+        await chapter.provider.close();
+        _openedChapters.remove(chapter);
+      }
+      if (!sameUnavailable()) return;
+      _rebuildingRuntime = true;
+      await rebuildRuntime();
+      if (session?.generation == current.generation &&
+          session?.buildId == current.buildId) {
+        _dropSession();
+      }
+      extensionCleanupError = null;
+    } catch (_) {
+      if (sameUnavailable()) extensionCleanupError = '运行时尚未重建，请重试恢复清理。';
+      rethrow;
+    } finally {
+      _rebuildingRuntime = false;
+      if (!_closed && epoch == _epoch) busy = false;
+      _notify();
+    }
+  }
+
+  Future<void> closeManagedBuild(String sha256) async {
+    final current = session;
+    if (current == null || _activeBundleSha256 != sha256) return;
+    _openedChapters.removeWhere((chapter) => chapter.provider.isClosed);
+    if (_openedChapters.any(
+      (chapter) => chapter.generation == current.generation,
+    )) {
+      throw const FormatException('请先退出当前阅读，等待章节资源释放后再清理。');
+    }
+    await runtime.closeBuild(
+      buildId: current.buildId,
+      generation: current.generation,
+    );
+    if (session?.generation == current.generation &&
+        session?.buildId == current.buildId) {
+      _dropSession();
+    }
+    _notify();
+  }
+
+  Future<void> refreshCatalog() async {
+    final epoch = _epoch;
+    final identity = subject;
+    if (_closed || identity == null || status != ServiceStatus.ready) {
+      throw StateError('身份未确认');
+    }
+    final inventory = wire.decodeProtoJson(
+      wire.ExtensionIndex(),
+      await _get('/extensions/index.json'),
+    );
+    final available = inventory.builds.map(CatalogBuild.fromProto).toList();
+    if (inventory.schemaVersion != 1 ||
+        available.length > 5000 ||
+        available.map((build) => build.packageName).toSet().length !=
+            available.length) {
+      throw const FormatException('扩展索引必须每包只包含一个当前版本');
+    }
+    if (_closed || epoch != _epoch || subject != identity) {
+      throw StateError('身份或服务已改变');
+    }
+    builds = List.unmodifiable(available);
+    _notify();
+  }
 
   ReadingProgressController? createReadingProgress(String mangaKey) {
     final repository = readingProgress;
@@ -338,12 +584,7 @@ final class CatalogController extends ChangeNotifier {
       covers: _covers,
     );
     if (!identical(_businessClient, clientState)) {
-      _businessClient = clientState;
-      _library = LibraryRepository(clientState);
-      _progress = ProgressRepository(clientState);
-      _bookmarks = BookmarkRepository(clientState);
-      _settings = SettingsRepository(clientState);
-      _sourcePreferences = SourcePreferencesRepository(clientState);
+      _bindBusinessClient(clientState);
     }
     if (!_readingClients.containsKey(client)) {
       _readingClients[client] = 0;
@@ -474,6 +715,7 @@ final class CatalogController extends ChangeNotifier {
     session = null;
     activeSource = null;
     activeBuild = null;
+    _activeBundleSha256 = null;
     loadedSourcePreferences = null;
     mangas = const [];
     page = 0;
@@ -648,6 +890,15 @@ final class CatalogController extends ChangeNotifier {
     bool Function()? shouldContinue,
   }) async {
     if (shouldContinue?.call() == false) return;
+    final openingEpoch = _epoch;
+    await resolveInstalledBuild(build.packageName, requested: build);
+    if (_closed || openingEpoch != _epoch || shouldContinue?.call() == false) {
+      return;
+    }
+    await _retiringExtension;
+    if (_closed || openingEpoch != _epoch || shouldContinue?.call() == false) {
+      return;
+    }
     lastBuildId = build.id;
     lastSourceId = null;
     final epoch = _epoch;
@@ -660,6 +911,13 @@ final class CatalogController extends ChangeNotifier {
     }
     if (_preferenceRecoveries.keys.any((key) => key.$1 == build.packageName)) {
       await _rebuildForPreferences();
+      if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    }
+    final previous = session;
+    if (previous != null &&
+        (activeBuild?.id != build.id ||
+            activeBuild?.packageName != build.packageName)) {
+      await closeManagedBuild(_activeBundleSha256!);
       if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
     }
     _dropSession();
@@ -695,6 +953,9 @@ final class CatalogController extends ChangeNotifier {
         )) {
       throw const FormatException('扩展资料与当前目录不匹配，请重新连接以刷新目录');
     }
+    if (!_allowsBuild(build, sha256: manifest.bundle.sha256)) {
+      throw const FormatException('构建与账户选择不匹配，请重新读取扩展管理。');
+    }
     final bootstrap = wire.PreferenceBootstrap(packageName: build.packageName);
     // Removed Sources retain their account values without being injected into
     // an extension that no longer constructs that namespace.
@@ -729,8 +990,18 @@ final class CatalogController extends ChangeNotifier {
         preferenceBootstrap: bootstrap,
       ),
     );
-    if (_closed || epoch != _epoch || shouldContinue?.call() == false) return;
+    if (_closed ||
+        epoch != _epoch ||
+        shouldContinue?.call() == false ||
+        !_allowsBuild(build, sha256: manifest.bundle.sha256)) {
+      await runtime.closeBuild(
+        buildId: loaded.buildId,
+        generation: loaded.generation,
+      );
+      return;
+    }
     activeBuild = build;
+    _activeBundleSha256 = manifest.bundle.sha256;
     session = loaded;
     loadedSourcePreferences = confirmedPreferences;
     _preferenceRecoveries.removeWhere((key, _) => key.$1 == build.packageName);
@@ -745,6 +1016,9 @@ final class CatalogController extends ChangeNotifier {
     void Function(String requestId)? onRequest,
     bool allowPreferenceEdit = false,
   }) async {
+    if (extensionUnavailableReason case final reason?) {
+      throw FormatException(reason);
+    }
     if (sourcePreferencesBlocked && !allowPreferenceEdit) {
       throw const FormatException('漫画源设置尚未确认或需要重开，请先处理设置。');
     }
@@ -765,7 +1039,8 @@ final class CatalogController extends ChangeNotifier {
     );
     if (_closed ||
         epoch != _epoch ||
-        session?.generation != current.generation) {
+        session?.generation != current.generation ||
+        extensionUnavailableReason != null) {
       throw const RuntimeException(RuntimeErrorCode.runtimeLost, '漫画源会话已失效');
     }
     return result;
@@ -1027,7 +1302,11 @@ final class CatalogController extends ChangeNotifier {
       _preferenceRecoveries.removeWhere(
         (key, _) => key.$1 == target.build.packageName,
       );
-      await _loadBuild(target.build, shouldContinue: current);
+      final selectedBuild = await resolveInstalledBuild(
+        target.build.packageName,
+      );
+      if (!current()) return false;
+      await _loadBuild(selectedBuild, shouldContinue: current);
       if (!current()) return false;
       final matching = session?.sources.where(
         (source) => source.id == target.source.id,
@@ -1130,6 +1409,7 @@ final class CatalogController extends ChangeNotifier {
   }
 
   bool isCurrentSource(CatalogSourceRef reference) =>
+      extensionUnavailableReason == null &&
       session?.generation == reference.generation &&
       activeBuild?.id == reference.buildId &&
       activeSource?.id == reference.sourceId;
@@ -1378,7 +1658,7 @@ final class CatalogController extends ChangeNotifier {
         chapterKey: chapterKey,
         pageKeys: bindings,
       );
-      return OpenedChapter(
+      final opened = OpenedChapter(
         manifest: ChapterManifest(
           chapterKey: chapterKey,
           version: version,
@@ -1388,6 +1668,8 @@ final class CatalogController extends ChangeNotifier {
         generation: current.generation,
         title: '${manga.title} · ${chapter.name}',
       );
+      _openedChapters.add(opened);
+      return opened;
     } catch (_) {
       await runtime.closePageSession(
         PageSessionRef(
@@ -1402,6 +1684,7 @@ final class CatalogController extends ChangeNotifier {
   Future<void> closeChapter(OpenedChapter chapter) async {
     try {
       await chapter.provider.close();
+      _openedChapters.remove(chapter);
     } catch (_) {
       if (!_closed) {
         error = '章节资源清理失败，请重新连接漫画源';
@@ -1417,6 +1700,7 @@ final class CatalogController extends ChangeNotifier {
     if (requestId != null) unawaited(cancelSourceFilterRequest(requestId));
     ++_epoch;
     unawaited(_subscription.cancel());
+    unawaited(_installationSubscription?.cancel());
     super.dispose();
   }
 }

@@ -3504,16 +3504,138 @@ class FavoriteSource extends $pb.GeneratedMessage {
   void clearSourceLang() => $_clearField(4);
 }
 
+/// Confirmed account intent, separate from each client's disposable code cache.
+/// A package has one selected repository/build; replacement is explicit.
+class InstalledExtension extends $pb.GeneratedMessage {
+  factory InstalledExtension({
+    $core.String? catalogUrl,
+    $core.String? repoId,
+    $core.String? packageName,
+    $core.String? buildId,
+    $core.String? bundleSha256,
+    $core.bool? enabled,
+  }) {
+    final result = InstalledExtension._();
+    if (catalogUrl != null) result.catalogUrl = catalogUrl;
+    if (repoId != null) result.repoId = repoId;
+    if (packageName != null) result.packageName = packageName;
+    if (buildId != null) result.buildId = buildId;
+    if (bundleSha256 != null) result.bundleSha256 = bundleSha256;
+    if (enabled != null) result.enabled = enabled;
+    return result;
+  }
+
+  InstalledExtension._();
+
+  factory InstalledExtension.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      InstalledExtension()..mergeFromBuffer(data, registry);
+  factory InstalledExtension.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      InstalledExtension()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'InstalledExtension',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: InstalledExtension.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'catalogUrl')
+    ..aOS(2, _omitFieldNames ? '' : 'repoId')
+    ..aOS(3, _omitFieldNames ? '' : 'packageName')
+    ..aOS(4, _omitFieldNames ? '' : 'buildId')
+    ..aOS(5, _omitFieldNames ? '' : 'bundleSha256')
+    ..aOB(6, _omitFieldNames ? '' : 'enabled')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InstalledExtension clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InstalledExtension copyWith(void Function(InstalledExtension) updates) =>
+      super.copyWith((message) => updates(message as InstalledExtension))
+          as InstalledExtension;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use InstalledExtension() / InstalledExtension.new instead')
+  static InstalledExtension create() => InstalledExtension._();
+  static $pb.GeneratedMessage $_createMessage() => InstalledExtension._();
+  @$core.override
+  InstalledExtension createEmptyInstance() => InstalledExtension._();
+  @$core.pragma('dart2js:noInline')
+  static InstalledExtension getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<InstalledExtension>(
+          InstalledExtension.$_createMessage);
+  static InstalledExtension? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get catalogUrl => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set catalogUrl($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCatalogUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCatalogUrl() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get repoId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set repoId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRepoId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRepoId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get packageName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set packageName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPackageName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPackageName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get buildId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set buildId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBuildId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBuildId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get bundleSha256 => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set bundleSha256($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasBundleSha256() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearBundleSha256() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get enabled => $_getBF(5);
+  @$pb.TagNumber(6)
+  set enabled($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasEnabled() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEnabled() => $_clearField(6);
+}
+
 class GlobalSettingsValues extends $pb.GeneratedMessage {
   factory GlobalSettingsValues({
     AppTheme? theme,
     ReaderSettings? reader,
     $core.Iterable<FavoriteSource>? favoriteSources,
+    $core.Iterable<InstalledExtension>? installedExtensions,
   }) {
     final result = GlobalSettingsValues._();
     if (theme != null) result.theme = theme;
     if (reader != null) result.reader = reader;
     if (favoriteSources != null) result.favoriteSources.addAll(favoriteSources);
+    if (installedExtensions != null)
+      result.installedExtensions.addAll(installedExtensions);
     return result;
   }
 
@@ -3536,6 +3658,8 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
         subBuilder: ReaderSettings.$_createMessage)
     ..pPM<FavoriteSource>(3, _omitFieldNames ? '' : 'favoriteSources',
         subBuilder: FavoriteSource.$_createMessage)
+    ..pPM<InstalledExtension>(4, _omitFieldNames ? '' : 'installedExtensions',
+        subBuilder: InstalledExtension.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3583,6 +3707,9 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(3)
   $pb.PbList<FavoriteSource> get favoriteSources => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<InstalledExtension> get installedExtensions => $_getList(3);
 }
 
 class GlobalSettings extends $pb.GeneratedMessage {

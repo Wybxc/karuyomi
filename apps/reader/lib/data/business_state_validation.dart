@@ -9,6 +9,7 @@ const _pageLimit = 2048;
 const _libraryPageSize = 8;
 const _bookmarkPageSize = 64;
 const businessFavoriteSourceLimit = 128;
+const businessInstalledExtensionLimit = 128;
 final _mangaKey = RegExp(r'^[a-f0-9]{64}$');
 final _sourceId = RegExp(r'^-?\d{1,19}$');
 final _minSourceId = BigInt.parse('-9223372036854775808');
@@ -493,6 +494,50 @@ void validateBusinessFavoriteSources(Iterable<wire.FavoriteSource> values) {
   }
 }
 
+/// Canonical account identity for the currently supported static catalog.
+void validateBusinessCatalogUrl(String value) {
+  final uri = Uri.tryParse(value);
+  _require(
+    value.length <= 2048 &&
+        uri != null &&
+        uri.hasAuthority &&
+        (uri.scheme == 'https' ||
+            (uri.scheme == 'http' &&
+                {'localhost', '127.0.0.1', '::1'}.contains(uri.host))) &&
+        uri.userInfo.isEmpty &&
+        value == '${uri.origin}/extensions/index.json',
+    'Invalid canonical extension catalog URL',
+  );
+}
+
+void validateBusinessInstalledExtension(wire.InstalledExtension value) {
+  validateBusinessCatalogUrl(value.catalogUrl);
+  _identity(value.repoId);
+  _identity(value.packageName);
+  _require(
+    RegExp(r'^[A-Za-z0-9._-]{1,200}$').hasMatch(value.buildId) &&
+        _mangaKey.hasMatch(value.bundleSha256),
+    'Invalid installed extension build',
+  );
+}
+
+void validateBusinessInstalledExtensions(
+  Iterable<wire.InstalledExtension> values,
+) {
+  _require(
+    values.length <= businessInstalledExtensionLimit,
+    'Installed extensions exceed their count budget',
+  );
+  final packages = <String>{};
+  for (final value in values) {
+    validateBusinessInstalledExtension(value);
+    _require(
+      packages.add(value.packageName),
+      'Duplicate installed extension package',
+    );
+  }
+}
+
 void validateBusinessGlobalSettings(wire.GlobalSettingsValues value) {
   _require(
     value.theme.value >= 1 && value.theme.value <= 3,
@@ -501,6 +546,7 @@ void validateBusinessGlobalSettings(wire.GlobalSettingsValues value) {
   _require(value.hasReader(), 'Missing global reader defaults');
   validateBusinessReaderSettings(value.reader);
   validateBusinessFavoriteSources(value.favoriteSources);
+  validateBusinessInstalledExtensions(value.installedExtensions);
 }
 
 void validateBusinessSettingsMutation(wire.SettingsMutation value) {

@@ -321,6 +321,24 @@ const globalReader: JsonObject = {
 const globalSettingsValues: JsonObject = {
   theme: 'APP_THEME_SYSTEM',
   reader: globalReader,
+  installedExtensions: [
+    {
+      catalogUrl: 'https://read.example.com/extensions/index.json',
+      repoId: 'keiyoushi',
+      packageName,
+      buildId,
+      bundleSha256: sha256,
+      enabled: true,
+    },
+    {
+      catalogUrl: 'http://[::1]:8787/extensions/index.json',
+      repoId: 'other',
+      packageName: `${packageName}.other`,
+      buildId: 'ext-other-selected',
+      bundleSha256: encodedSha256,
+      enabled: false,
+    },
+  ],
   favoriteSources: [
     { packageName, sourceId, sourceName: 'Source 漫画', sourceLang: 'zh-Hant' },
     {
@@ -902,6 +920,11 @@ export const goldenFixtures: GoldenFixture[] = [
         },
       ],
       ['dispose', {}],
+      ['prepareBuild', { preparationId: 'prepare-golden', build: descriptor }],
+      ['cancelPreparation', { preparationId: 'prepare-golden' }],
+      ['extensionCache', {}],
+      ['forgetExtensionArtifact', { sha256 }],
+      ['closeBuild', { buildId, generation }],
     ] satisfies Array<[string, JsonObject]>
   ).map(([command, value]): GoldenFixture => ({
     name: `control-request-${command}`,
@@ -921,6 +944,21 @@ export const goldenFixtures: GoldenFixture[] = [
         },
       ],
       ['session', session],
+      [
+        'preparedBuild',
+        { build: descriptor, bundleSha256: sha256, byteLength: 1024 },
+      ],
+      [
+        'extensionCache',
+        {
+          artifacts: [
+            { sha256, byteLength: 1024, contentType: 'text/javascript' },
+          ],
+          totalBytes: 1024,
+          maxBytes: 268435456,
+          maxArtifacts: 128,
+        },
+      ],
       ['image', imageResource],
       ['released', { released: true }],
       ['closed', { closed: true }],

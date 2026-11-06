@@ -12,6 +12,22 @@ import '../data/business_state_server.dart';
 const sourceId = '9223372036854775806';
 wire.CatalogSource get testCatalogSource =>
     wire.CatalogSource(id: sourceId, name: '测试漫画源', lang: 'zh');
+wire.InstalledExtension testInstalledExtension({
+  String catalogUrl = 'https://reader.example.com/extensions/index.json',
+  String packageName = 'eu.kanade.source.test',
+  String buildId = 'build-1',
+  String repoId = 'keiyoushi',
+  String? sha256,
+  bool enabled = true,
+}) => wire.InstalledExtension(
+  catalogUrl: catalogUrl,
+  repoId: repoId,
+  packageName: packageName,
+  buildId: buildId,
+  bundleSha256: sha256 ?? 'a' * 64,
+  enabled: enabled,
+);
+
 wire.Manga get testManga => wire.Manga(
   url: '/manga/opaque-source-ref',
   title: '真实源 DTO 测试',
@@ -26,8 +42,17 @@ final class TestPlatform extends PlatformRuntime {
     Uri? origin,
     this.bootstrapSubject = 'owner-subject',
     TestBusinessServer? businessServer,
+    bool seedDefaultInstallation = true,
   }) : _origin = origin ?? Uri.parse('https://reader.example.com'),
-       businessServer = businessServer ?? TestBusinessServer();
+       businessServer = businessServer ?? TestBusinessServer() {
+    if (seedDefaultInstallation) {
+      this.businessServer.seedInstalledExtensions([
+        testInstalledExtension(
+          catalogUrl: '${_origin.origin}/extensions/index.json',
+        ),
+      ], subject: bootstrapSubject);
+    }
+  }
   final Uri _origin;
   final TestBusinessServer businessServer;
   CoverTransport? covers;
@@ -78,6 +103,28 @@ final class TestPlatform extends PlatformRuntime {
   Future<wire.SourceResult> Function(wire.SourceCall call)? invokeHandler;
   Future<void> Function(String pageSessionId)? closePageSessionHandler;
   bool closeAcknowledged = true;
+
+  final cachedArtifacts = <String, wire.CachedExtensionArtifact>{};
+  final preparations = <wire.PrepareBuildRequest>[];
+  final buildClosures = <wire.CloseBuildRequest>[];
+  Future<void> Function(wire.PrepareBuildRequest)? beforePrepare;
+  wire.RuntimeError? preparationFailure;
+  final _cancelledPreparations = <String>{};
+  String? _liveBuild;
+
+  void seedInstalledBuilds(Iterable<wire.ExtensionBuildDescriptor> builds) {
+    businessServer.seedInstalledExtensions(
+      builds.map(
+        (build) => testInstalledExtension(
+          catalogUrl: '${origin.origin}/extensions/index.json',
+          packageName: build.packageName,
+          buildId: build.buildId,
+          repoId: build.repoId,
+        ),
+      ),
+      subject: bootstrapSubject,
+    );
+  }
 
   wire.BuildManifest _currentManifest() {
     final index = wire.decodeProtoJson(wire.ExtensionIndex(), inventory);
@@ -169,6 +216,7 @@ final class TestPlatform extends PlatformRuntime {
         preferenceBootstraps.add(request.open.preferenceBootstrap.deepCopy());
         openedBuilds.add(request.open.expectedBuildId);
         _openedBuildId = request.open.expectedBuildId;
+        _liveBuild = _openedBuildId;
         response.session = wire.RuntimeSession(
           protocolVersion: protocolVersion,
           workerInstanceId: 'worker-1',
@@ -186,6 +234,54 @@ final class TestPlatform extends PlatformRuntime {
               ],
           capabilities: ['source-rpc'],
         );
+      case wire.ControlRequest_Command.prepareBuild:
+        final prepare = request.prepareBuild.deepCopy()..freeze();
+        preparations.add(prepare);
+        await beforePrepare?.call(prepare);
+        if (_cancelledPreparations.contains(prepare.preparationId)) {
+          response.error = wire.RuntimeError(
+            code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED,
+            message: 'Preparation cancelled',
+          );
+        } else if (preparationFailure != null) {
+          response.error = preparationFailure!.deepCopy();
+        } else {
+          cachedArtifacts['a' * 64] = wire.CachedExtensionArtifact(
+            sha256: 'a' * 64,
+            byteLength: 256,
+            contentType: 'application/javascript',
+          );
+          response.preparedBuild = wire.PreparedBuild(
+            build: prepare.build.deepCopy(),
+            bundleSha256: 'a' * 64,
+            byteLength: 256,
+          );
+        }
+      case wire.ControlRequest_Command.cancelPreparation:
+        _cancelledPreparations.add(request.cancelPreparation.preparationId);
+        response.completed = wire.Completed(completed: true);
+      case wire.ControlRequest_Command.extensionCache:
+        response.extensionCache = wire.ExtensionCacheState(
+          artifacts: cachedArtifacts.values.map(
+            (artifact) => artifact.deepCopy(),
+          ),
+          totalBytes: cachedArtifacts.values.fold<int>(
+            0,
+            (sum, artifact) => sum + artifact.byteLength,
+          ),
+          maxBytes: 256 * 1024 * 1024,
+          maxArtifacts: 128,
+        );
+      case wire.ControlRequest_Command.forgetExtensionArtifact:
+        cachedArtifacts.remove(request.forgetExtensionArtifact.sha256);
+        response.completed = wire.Completed(completed: true);
+      case wire.ControlRequest_Command.closeBuild:
+        buildClosures.add(request.closeBuild.deepCopy()..freeze());
+        if (_liveBuild == request.closeBuild.buildId &&
+            runtimeGeneration == request.closeBuild.generation) {
+          _liveBuild = null;
+        }
+        response.closed = wire.Closed(closed: closeAcknowledged);
       case wire.ControlRequest_Command.invoke:
         final call = request.invoke;
         invocations.add(call.deepCopy()..freeze());

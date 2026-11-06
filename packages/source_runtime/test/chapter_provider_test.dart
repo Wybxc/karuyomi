@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:test/test.dart';
+
+import 'support/fake_runtime_transport.dart';
 
 final class ImageRuntime implements SourceRuntime {
   final acquisitions = <ImageAcquireRequest>[];
@@ -46,6 +49,25 @@ final class ImageRuntime implements SourceRuntime {
   Future<SourceResult> invoke(SourceRequest request) =>
       throw UnimplementedError();
   @override
+  Future<wire.PreparedBuild> prepareBuild({
+    required String preparationId,
+    required wire.ExtensionBuildDescriptor build,
+  }) => throw UnimplementedError();
+  @override
+  Future<void> cancelPreparation(String preparationId) =>
+      throw UnimplementedError();
+  @override
+  Future<wire.ExtensionCacheState> extensionCache() =>
+      throw UnimplementedError();
+  @override
+  Future<void> forgetExtensionArtifact(String sha256) =>
+      throw UnimplementedError();
+  @override
+  Future<void> closeBuild({
+    required String buildId,
+    required String generation,
+  }) => throw UnimplementedError();
+  @override
   Future<void> dispose() async {}
 }
 
@@ -75,6 +97,73 @@ ImageResource image() => ImageResource(
 );
 
 void main() {
+  test(
+    'failed image release and page-session ACK retry the same owners before build cleanup',
+    () async {
+      final transport = FakeTransport();
+      final runtime = TransportSourceRuntime(transport);
+      await runtime.open(build());
+      final pages = ChapterPageProvider(
+        runtime: runtime,
+        sourceId: sourceId,
+        pageSessionId: 'pages-1',
+        generation: 'generation-1',
+        chapterKey: 'chapter',
+        pageKeys: {'page': 'p-0'},
+      );
+      await pages.acquire(
+        PageRef(
+          requestId: 'image-1',
+          chapterKey: 'chapter',
+          pageKey: 'page',
+          generation: 'generation-1',
+        ),
+      );
+      var releaseAttempts = 0;
+      var closeAttempts = 0;
+      transport.handler = (call) async {
+        if (call.hasReleaseImage() && ++releaseAttempts == 1) {
+          return wire.ControlResponse(
+            requestId: call.requestId,
+            released: wire.Released(released: false),
+          );
+        }
+        if (call.hasClosePageSession() && ++closeAttempts == 1) {
+          return wire.ControlResponse(
+            requestId: call.requestId,
+            closed: wire.Closed(closed: false),
+          );
+        }
+        return transport.respond(call);
+      };
+      await expectLater(
+        pages.close(),
+        throwsA(failure(RuntimeErrorCode.protocolError)),
+      );
+      expect(pages.isClosed, false);
+      expect(closeAttempts, 0);
+      await expectLater(
+        pages.close(),
+        throwsA(failure(RuntimeErrorCode.protocolError)),
+      );
+      expect(pages.isClosed, false);
+      expect(releaseAttempts, 2);
+      await pages.close();
+      expect(pages.isClosed, true);
+      expect(closeAttempts, 2);
+      await pages.close();
+      expect(closeAttempts, 2);
+      final releases = transport.calls
+          .where((call) => call.hasReleaseImage())
+          .toList();
+      expect(releases[0].releaseImage, releases[1].releaseImage);
+      final closes = transport.calls
+          .where((call) => call.hasClosePageSession())
+          .toList();
+      expect(closes[0].closePageSession, closes[1].closePageSession);
+      await runtime.dispose();
+    },
+  );
   test(
     'chapter binding maps logical keys and release/close are idempotent',
     () async {

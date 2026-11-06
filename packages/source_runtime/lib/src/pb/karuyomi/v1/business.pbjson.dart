@@ -1265,6 +1265,26 @@ final $typed_data.Uint8List favoriteSourceDescriptor = $convert.base64Decode(
     'NvdXJjZV9pZBgCIAEoCVIIc291cmNlSWQSHwoLc291cmNlX25hbWUYAyABKAlSCnNvdXJjZU5h'
     'bWUSHwoLc291cmNlX2xhbmcYBCABKAlSCnNvdXJjZUxhbmc=');
 
+@$core.Deprecated('Use installedExtensionDescriptor instead')
+const InstalledExtension$json = {
+  '1': 'InstalledExtension',
+  '2': [
+    {'1': 'catalog_url', '3': 1, '4': 1, '5': 9, '10': 'catalogUrl'},
+    {'1': 'repo_id', '3': 2, '4': 1, '5': 9, '10': 'repoId'},
+    {'1': 'package_name', '3': 3, '4': 1, '5': 9, '10': 'packageName'},
+    {'1': 'build_id', '3': 4, '4': 1, '5': 9, '10': 'buildId'},
+    {'1': 'bundle_sha256', '3': 5, '4': 1, '5': 9, '10': 'bundleSha256'},
+    {'1': 'enabled', '3': 6, '4': 1, '5': 8, '10': 'enabled'},
+  ],
+};
+
+/// Descriptor for `InstalledExtension`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List installedExtensionDescriptor = $convert.base64Decode(
+    'ChJJbnN0YWxsZWRFeHRlbnNpb24SHwoLY2F0YWxvZ191cmwYASABKAlSCmNhdGFsb2dVcmwSFw'
+    'oHcmVwb19pZBgCIAEoCVIGcmVwb0lkEiEKDHBhY2thZ2VfbmFtZRgDIAEoCVILcGFja2FnZU5h'
+    'bWUSGQoIYnVpbGRfaWQYBCABKAlSB2J1aWxkSWQSIwoNYnVuZGxlX3NoYTI1NhgFIAEoCVIMYn'
+    'VuZGxlU2hhMjU2EhgKB2VuYWJsZWQYBiABKAhSB2VuYWJsZWQ=');
+
 @$core.Deprecated('Use globalSettingsValuesDescriptor instead')
 const GlobalSettingsValues$json = {
   '1': 'GlobalSettingsValues',
@@ -1293,6 +1313,14 @@ const GlobalSettingsValues$json = {
       '6': '.karuyomi.v1.FavoriteSource',
       '10': 'favoriteSources'
     },
+    {
+      '1': 'installed_extensions',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.InstalledExtension',
+      '10': 'installedExtensions'
+    },
   ],
 };
 
@@ -1301,7 +1329,8 @@ final $typed_data.Uint8List globalSettingsValuesDescriptor = $convert.base64Deco
     'ChRHbG9iYWxTZXR0aW5nc1ZhbHVlcxIrCgV0aGVtZRgBIAEoDjIVLmthcnV5b21pLnYxLkFwcF'
     'RoZW1lUgV0aGVtZRIzCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5n'
     'c1IGcmVhZGVyEkYKEGZhdm9yaXRlX3NvdXJjZXMYAyADKAsyGy5rYXJ1eW9taS52MS5GYXZvcm'
-    'l0ZVNvdXJjZVIPZmF2b3JpdGVTb3VyY2Vz');
+    'l0ZVNvdXJjZVIPZmF2b3JpdGVTb3VyY2VzElIKFGluc3RhbGxlZF9leHRlbnNpb25zGAQgAygL'
+    'Mh8ua2FydXlvbWkudjEuSW5zdGFsbGVkRXh0ZW5zaW9uUhNpbnN0YWxsZWRFeHRlbnNpb25z');
 
 @$core.Deprecated('Use globalSettingsDescriptor instead')
 const GlobalSettings$json = {

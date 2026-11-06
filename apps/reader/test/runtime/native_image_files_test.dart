@@ -538,6 +538,53 @@ void main() {
     );
   }
 
+  for (final localFailure in [true, false]) {
+    test(
+      'transient ${localFailure ? 'local' : 'host'} release failure retries the same identity and holds capacity until ACK',
+      () async {
+        final first = (await images.acquire(acquire(1))).image;
+        for (var i = 2; i <= 6; i++) {
+          await images.acquire(acquire(i));
+        }
+        final original = handler;
+        files.rejectRelease = localFailure;
+        if (!localFailure) {
+          handler = (request) async => request.hasReleaseImage()
+              ? wire.ControlResponse(
+                  requestId: request.requestId,
+                  error: wire.RuntimeError(
+                    code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT,
+                    message: 'Transient cleanup timeout',
+                  ),
+                )
+              : original(request);
+        }
+        await expectLater(
+          images.release(release(first.resourceId)),
+          throwsA(anything),
+        );
+        expect(images.owns(first.resourceId, 'g', Uri.parse(first.url)), true);
+        await expectLater(
+          images.acquire(acquire(7)),
+          throwsA(code(RuntimeErrorCode.limitExceeded)),
+        );
+        files.rejectRelease = false;
+        handler = original;
+        await images.release(release(first.resourceId));
+        expect(images.owns(first.resourceId, 'g', Uri.parse(first.url)), false);
+        expect(
+          (await images.acquire(acquire(7))).image.resourceId,
+          'r-request-7',
+        );
+        final releases = calls
+            .where((request) => request.hasReleaseImage())
+            .toList();
+        expect(releases, hasLength(2));
+        expect(releases[0].releaseImage, releases[1].releaseImage);
+      },
+    );
+  }
+
   test('concurrent release shares one local deletion and host ACK', () async {
     final resource = (await images.acquire(acquire(1))).image;
     files.permitRelease = Completer<void>();

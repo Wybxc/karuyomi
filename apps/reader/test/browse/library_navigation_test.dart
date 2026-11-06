@@ -60,6 +60,9 @@ void main() {
           ],
         ),
       );
+      platform.seedInstalledBuilds(
+        wire.decodeProtoJson(wire.ExtensionIndex(), platform.inventory).builds,
+      );
       platform.manifestBuildId = 'build-2';
       platform.runtimeGeneration = 'generation-2';
       await catalog.connect();

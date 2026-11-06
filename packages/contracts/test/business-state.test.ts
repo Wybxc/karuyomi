@@ -680,3 +680,147 @@ test('favorite Sources retain exact signed identities and enforce pair uniquenes
   }));
   expect(() => settingsMutationSchema.parse(request(oversized))).toThrow();
 });
+
+test('installed extension intents retain exact canonical catalog/build identity and disabled state at every settings boundary', () => {
+  const extension = {
+    catalogUrl: 'https://read.example.com/extensions/index.json',
+    repoId: 'keiyoushi',
+    packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
+    buildId: 'ext-zh.komiic-0123456789abcdef',
+    bundleSha256: 'a'.repeat(64),
+    enabled: true,
+  };
+  for (const catalogUrl of [
+    extension.catalogUrl,
+    'https://read.example.com:8443/extensions/index.json',
+    'http://localhost:8787/extensions/index.json',
+    'http://127.0.0.1/extensions/index.json',
+    'http://[::1]:8787/extensions/index.json',
+  ]) {
+    const installedExtensions = [
+      { ...extension, catalogUrl },
+      { ...extension, packageName: 'another.package', enabled: false },
+    ];
+    const values = { ...globalSettingsValues, installedExtensions };
+    const parsed = settingsMutationSchema.parse({ ...base, setGlobal: values });
+    if (parsed.operation.case !== 'setGlobal')
+      throw new Error('Missing global settings');
+    expect(parsed.operation.value.installedExtensions).toMatchObject(
+      installedExtensions,
+    );
+    const response = {
+      schemaVersion: 1,
+      accountRevision: 1,
+      global: { revision: 1, values },
+      effectiveReader: values.reader,
+    };
+    expect(
+      settingsResponseSchema.parse(response).global?.values
+        ?.installedExtensions,
+    ).toMatchObject(installedExtensions);
+    expect(
+      settingsMutationResponseSchema.parse({
+        ...response,
+        mutationId: base.mutationId,
+      }).global?.values?.installedExtensions,
+    ).toMatchObject(installedExtensions);
+  }
+  expect(
+    settingsResponseSchema.parse({
+      schemaVersion: 1,
+      global: { values: globalSettingsValues },
+      effectiveReader: globalSettingsValues.reader,
+    }).global?.values?.installedExtensions,
+  ).toEqual([]);
+});
+
+test('installed extension records reject duplicate packages, malformed catalog identities, local state and count/body overflows on requests and replies', () => {
+  const extension = {
+    catalogUrl: 'https://read.example.com/extensions/index.json',
+    repoId: 'keiyoushi',
+    packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
+    buildId: 'ext-zh.komiic-0123456789abcdef',
+    bundleSha256: 'a'.repeat(64),
+    enabled: true,
+  };
+  const request = (installedExtensions: object[]) => ({
+    ...base,
+    setGlobal: { ...globalSettingsValues, installedExtensions },
+  });
+  const response = (installedExtensions: object[]) => ({
+    schemaVersion: 1,
+    accountRevision: 1,
+    global: {
+      revision: 1,
+      values: { ...globalSettingsValues, installedExtensions },
+    },
+    effectiveReader: globalSettingsValues.reader,
+  });
+  const maximum = Array.from({ length: 128 }, (_, index) => ({
+    ...extension,
+    packageName: `package.${index}`,
+  }));
+  expect(() => settingsMutationSchema.parse(request(maximum))).not.toThrow();
+  const invalidUrls = [
+    '',
+    '/extensions/index.json',
+    'http://read.example.com/extensions/index.json',
+    'ftp://read.example.com/extensions/index.json',
+    'https://owner:secret@read.example.com/extensions/index.json',
+    'https://READ.example.com/extensions/index.json',
+    'https://read.example.com:443/extensions/index.json',
+    'https://read.example.com/extensions/../extensions/index.json',
+    'https://read.example.com/extensions/%69ndex.json',
+    'https://read.example.com/extensions/index.json?query=1',
+    'https://read.example.com/extensions/index.json?',
+    'https://read.example.com/extensions/index.json#',
+    'https://read.example.com/extensions/index.json#fragment',
+    'https://read.example.com/extensions/index.json/',
+    'https://read.example.com/prefix/extensions/index.json',
+    'http://localhost.example.com/extensions/index.json',
+    'http://127.1/extensions/index.json',
+    'http://[0:0:0:0:0:0:0:1]/extensions/index.json',
+    `https://${'a'.repeat(2048)}.example.com/extensions/index.json`,
+  ];
+  for (const installedExtensions of [
+    [
+      extension,
+      { ...extension, repoId: 'another-repository', buildId: 'another-build' },
+    ],
+    [...maximum, { ...extension, packageName: 'package.128' }],
+    ...invalidUrls.map((catalogUrl) => [{ ...extension, catalogUrl }]),
+    ...[
+      { ...extension, repoId: '' },
+      { ...extension, repoId: 'r'.repeat(201) },
+      { ...extension, packageName: '' },
+      { ...extension, packageName: 'p'.repeat(201) },
+      { ...extension, buildId: '' },
+      { ...extension, buildId: 'invalid/build' },
+      { ...extension, buildId: 'b'.repeat(201) },
+      { ...extension, bundleSha256: 'A'.repeat(64) },
+      { ...extension, bundleSha256: 'a'.repeat(63) },
+      { ...extension, enabled: 'false' },
+      { ...extension, downloaded: true },
+    ].map((record) => [record]),
+  ]) {
+    expect(() =>
+      settingsMutationSchema.parse(request(installedExtensions)),
+    ).toThrow();
+    expect(() =>
+      settingsResponseSchema.parse(response(installedExtensions)),
+    ).toThrow();
+    expect(() =>
+      settingsMutationResponseSchema.parse({
+        ...response(installedExtensions),
+        mutationId: base.mutationId,
+      }),
+    ).toThrow();
+  }
+  const oversized = maximum.map((record, index) => ({
+    ...record,
+    repoId: '字'.repeat(200),
+    packageName: `${'字'.repeat(196)}${index}`,
+    buildId: 'b'.repeat(200),
+  }));
+  expect(() => settingsMutationSchema.parse(request(oversized))).toThrow();
+});

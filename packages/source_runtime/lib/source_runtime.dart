@@ -9,11 +9,23 @@ import 'src/generated.dart';
 export 'src/generated.dart';
 part 'src/transport_runtime.dart';
 part 'src/chapter_provider.dart';
+part 'src/extension_management.dart';
 
 /// Web uses JS interop; native uses a managed WebView control page.
 abstract interface class SourceRuntime {
   Stream<RuntimeEvent> get events;
   Future<RuntimeSession> open(BuildDescriptor build);
+  Future<wire.PreparedBuild> prepareBuild({
+    required String preparationId,
+    required wire.ExtensionBuildDescriptor build,
+  });
+  Future<void> cancelPreparation(String preparationId);
+  Future<wire.ExtensionCacheState> extensionCache();
+  Future<void> forgetExtensionArtifact(String sha256);
+  Future<void> closeBuild({
+    required String buildId,
+    required String generation,
+  });
   Future<SourceResult> invoke(SourceRequest request);
   Future<void> cancel(String requestId);
   Future<ImageResource> acquireImage(ImageAcquireRequest request);

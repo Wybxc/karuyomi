@@ -7,8 +7,12 @@ import {
   type BundleArtifact,
   type BuildManifest,
   type ExtensionIndex,
+  type ExtensionBuildDescriptor,
 } from '@karuyomi/contracts';
+import { create, equals } from '@bufbuild/protobuf';
+import * as pb from '@karuyomi/protocol';
 import { RuntimeFailure } from './errors.js';
+import { ExtensionArtifactCache } from './extension-artifact-cache.js';
 
 export const sha256 = async (bytes: Uint8Array): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
@@ -26,6 +30,8 @@ export class VerifiedLoader {
     private readonly origin: string,
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
     private readonly materialResolver?: RuntimeMaterialResolver,
+    readonly cache?: ExtensionArtifactCache,
+    private readonly installedMaterials?: readonly Artifact[],
   ) {}
 
   private async response(
@@ -211,6 +217,90 @@ export class VerifiedLoader {
     }
   }
 
+  async prepare(
+    build: ExtensionBuildDescriptor,
+    signal: AbortSignal,
+  ): Promise<{
+    build: ExtensionBuildDescriptor;
+    bundleSha256: string;
+    byteLength: number;
+  }> {
+    if (!this.cache)
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'Managed extension preparation requires an artifact cache',
+      );
+    const index = await this.index(signal);
+    const current = index.builds.find(
+      (value) => value.packageName === build.packageName,
+    );
+    if (
+      !current ||
+      !equals(
+        pb.ExtensionBuildDescriptorSchema,
+        create(pb.ExtensionBuildDescriptorSchema, current),
+        create(pb.ExtensionBuildDescriptorSchema, build),
+      )
+    )
+      throw new RuntimeFailure(
+        'source_error',
+        'The selected extension is no longer current; refresh the catalog',
+      );
+    const manifest = await this.manifest(build.manifestPath, signal);
+    const descriptor: ExtensionBuildDescriptor = {
+      buildId: manifest.buildId,
+      packageName: manifest.packageName,
+      repoId: manifest.repoId,
+      version: manifest.version,
+      sourceIds: manifest.sourceIds,
+      sources: manifest.sources,
+      manifestPath: build.manifestPath,
+    };
+    if (
+      !equals(
+        pb.ExtensionBuildDescriptorSchema,
+        create(pb.ExtensionBuildDescriptorSchema, descriptor),
+        create(pb.ExtensionBuildDescriptorSchema, build),
+      )
+    )
+      throw new RuntimeFailure(
+        'integrity_error',
+        'The build manifest does not match the selected catalog entry',
+      );
+    for (const material of [...manifest.hostScripts, ...manifest.resources]) {
+      if (this.installedMaterials) {
+        const installed = this.installedMaterials.find(
+          (value) => value.sha256 === material.sha256,
+        );
+        if (
+          !installed ||
+          installed.path !== material.path ||
+          installed.size !== material.size ||
+          installed.contentType !== material.contentType ||
+          installed.logicalName !== material.logicalName
+        )
+          throw new RuntimeFailure(
+            'unsupported_capability',
+            'The installed app lacks this runtime material; update the app',
+          );
+      } else {
+        await this.sharedArtifact(
+          material,
+          signal,
+          manifest.hostScripts.includes(material),
+        );
+      }
+      signal.throwIfAborted();
+    }
+    const bytes = await this.artifact(manifest.bundle, signal, true);
+    signal.throwIfAborted();
+    return {
+      build: current,
+      bundleSha256: manifest.bundle.sha256,
+      byteLength: bytes.byteLength,
+    };
+  }
+
   async artifact(
     artifact: BundleArtifact,
     signal: AbortSignal,
@@ -225,72 +315,95 @@ export class VerifiedLoader {
         'Artifact URL must match its registered digest',
       );
     }
-    const response = await this.response(artifact.path, signal, true);
-    const mime = response.headers
-      .get('content-type')
-      ?.split(';')[0]
-      ?.trim()
-      .toLowerCase();
     if (
-      mime !== 'application/gzip' ||
-      response.headers.has('content-encoding') ||
-      (script &&
-        !['application/javascript', 'text/javascript'].includes(
-          artifact.contentType,
-        ))
-    ) {
-      void response.body?.cancel().catch(() => {});
+      script &&
+      !['application/javascript', 'text/javascript'].includes(
+        artifact.contentType,
+      )
+    )
       throw new RuntimeFailure(
         'protocol_error',
-        'Extension transport must be gzip with a JavaScript canonical type',
+        'Extension code requires a JavaScript canonical type',
       );
-    }
-    const encoded = await this.readBounded(
-      response,
-      artifact.encodedSize,
-      signal,
-      true,
-    );
-    if ((await sha256(encoded)) !== artifact.encodedSha256)
-      throw new RuntimeFailure(
-        'integrity_error',
-        'Compressed extension hash does not match its manifest',
-      );
-    signal.throwIfAborted();
-    if (typeof DecompressionStream === 'undefined')
-      throw new RuntimeFailure(
-        'unsupported_capability',
-        'Gzip extension loading requires DecompressionStream',
-      );
-    let bytes: Uint8Array<ArrayBuffer>;
+    const pin = this.cache
+      ? await this.cache.retain(artifact.sha256, signal)
+      : undefined;
     try {
-      const source = new ReadableStream<BufferSource>({
-        start(controller) {
-          controller.enqueue(encoded);
-          controller.close();
-        },
-      });
-      bytes = await this.readStream(
-        source.pipeThrough(new DecompressionStream('gzip')),
-        artifact.size,
+      const cached = await this.cache?.read(artifact, signal);
+      signal.throwIfAborted();
+      if (cached) return cached;
+      const response = await this.response(artifact.path, signal, true);
+      const mime = response.headers
+        .get('content-type')
+        ?.split(';')[0]
+        ?.trim()
+        .toLowerCase();
+      if (
+        mime !== 'application/gzip' ||
+        response.headers.has('content-encoding') ||
+        (script &&
+          !['application/javascript', 'text/javascript'].includes(
+            artifact.contentType,
+          ))
+      ) {
+        void response.body?.cancel().catch(() => {});
+        throw new RuntimeFailure(
+          'protocol_error',
+          'Extension transport must be gzip with a JavaScript canonical type',
+        );
+      }
+      const encoded = await this.readBounded(
+        response,
+        artifact.encodedSize,
         signal,
         true,
       );
-    } catch (error) {
-      if (error instanceof RuntimeFailure || signal.aborted) throw error;
-      throw new RuntimeFailure(
-        'integrity_error',
-        'Extension gzip data is invalid or truncated',
-      );
+      if ((await sha256(encoded)) !== artifact.encodedSha256)
+        throw new RuntimeFailure(
+          'integrity_error',
+          'Compressed extension hash does not match its manifest',
+        );
+      signal.throwIfAborted();
+      if (typeof DecompressionStream === 'undefined')
+        throw new RuntimeFailure(
+          'unsupported_capability',
+          'Gzip extension loading requires DecompressionStream',
+        );
+      let bytes: Uint8Array<ArrayBuffer>;
+      try {
+        const source = new ReadableStream<BufferSource>({
+          start(controller) {
+            controller.enqueue(encoded);
+            controller.close();
+          },
+        });
+        bytes = await this.readStream(
+          source.pipeThrough(new DecompressionStream('gzip')),
+          artifact.size,
+          signal,
+          true,
+        );
+      } catch (error) {
+        if (error instanceof RuntimeFailure || signal.aborted) throw error;
+        throw new RuntimeFailure(
+          'integrity_error',
+          'Extension gzip data is invalid or truncated',
+        );
+      }
+      if ((await sha256(bytes)) !== artifact.sha256) {
+        throw new RuntimeFailure(
+          'integrity_error',
+          'Canonical extension hash does not match the static manifest',
+        );
+      }
+      signal.throwIfAborted();
+      await this.cache?.storeVerified(artifact, bytes, signal);
+      signal.throwIfAborted();
+      return bytes;
+    } finally {
+      pin?.release();
+      await pin?.released;
     }
-    if ((await sha256(bytes)) !== artifact.sha256) {
-      throw new RuntimeFailure(
-        'integrity_error',
-        'Canonical extension hash does not match the static manifest',
-      );
-    }
-    signal.throwIfAborted();
-    return bytes;
   }
 
   /** Shared host code/data comes from static Web assets or the installed app. */

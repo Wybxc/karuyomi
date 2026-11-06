@@ -9,6 +9,8 @@ import {
   ReaderPageLayout,
   SettingsMutationSchema,
   FavoriteSourceSchema,
+  InstalledExtensionSchema,
+  GlobalSettingsValuesSchema,
   type SettingsMutation,
   LibraryMetadataSchema,
   StateMutationSchema,
@@ -1048,6 +1050,7 @@ function globalSettings(
   mode = ReaderMode.WEBTOON,
   pageLayout = ReaderPageLayout.DOUBLE,
   favoriteSources: MessageInitShape<typeof FavoriteSourceSchema>[] = [],
+  installedExtensions: MessageInitShape<typeof InstalledExtensionSchema>[] = [],
 ) {
   return create(SettingsMutationSchema, {
     schemaVersion: businessSchemaVersion,
@@ -1058,6 +1061,7 @@ function globalSettings(
       value: {
         theme,
         favoriteSources,
+        installedExtensions,
         reader: {
           mode,
           pageLayout,
@@ -1964,6 +1968,277 @@ test('invalid favorite Source fields, duplicate pairs, counts and oversized sett
     );
     expect(rejected.status).toBe(status);
     expect(rejected.body.error).toBeDefined();
+  }
+  expect(await owner.settings()).toEqual(before);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+    )
+      .bind(owner.subject)
+      .first('count'),
+  ).toBe(1);
+});
+
+test('installed extensions preserve confirmed settings through cross-client replacement, conflicts, durable retries and removal', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const other = await client();
+  const extension = {
+    catalogUrl: 'https://read.example.com/extensions/index.json',
+    repoId: 'keiyoushi',
+    packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
+    buildId: 'ext-zh.komiic-selected',
+    bundleSha256: 'a'.repeat(64),
+    enabled: true,
+  };
+  const source = {
+    packageName: extension.packageName,
+    sourceId: '9007199254740993',
+    sourceName: 'Komiic',
+    sourceLang: 'zh',
+  };
+  const initial = await first.settings();
+  expect(initial.global?.values?.installedExtensions).toEqual([]);
+  const install = globalSettings(
+    0,
+    AppTheme.DARK,
+    ReaderMode.WEBTOON,
+    ReaderPageLayout.DOUBLE,
+    [source],
+    [extension],
+  );
+  const installed = await first.mutateSettings(install);
+  expect(installed.status).toBe(200);
+  expect(installed.body.global?.values?.installedExtensions).toMatchObject([
+    extension,
+  ]);
+  const confirmed = await second.settings();
+  expect(confirmed.global).toEqual(installed.body.global);
+  const stored = await env.DB.prepare(
+    "SELECT values_json FROM reader_settings WHERE subject = ? AND scope_key = ''",
+  )
+    .bind(first.subject)
+    .first<string>('values_json');
+  expect(JSON.parse(stored!).installedExtensions).toEqual([extension]);
+  const values = confirmed.global?.values;
+  if (!values || !values.reader)
+    throw new Error('Missing confirmed global settings');
+  const edit = create(SettingsMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    expectedRevision: 1,
+    operation: {
+      case: 'setGlobal',
+      value: {
+        ...values,
+        theme: AppTheme.LIGHT,
+        reader: {
+          ...values.reader,
+          fit: ReaderFit.WIDTH,
+          dimPercent: 60,
+          cropBorders: true,
+        },
+      },
+    },
+  });
+  const edited = await second.mutateSettings(edit);
+  expect(edited.status).toBe(200);
+  expect(edited.body.global?.values?.installedExtensions).toEqual(
+    values.installedExtensions,
+  );
+  const replacement = {
+    ...extension,
+    catalogUrl: 'https://other.example.com/extensions/index.json',
+    repoId: 'other',
+    buildId: 'ext-komiic-other',
+    bundleSha256: 'b'.repeat(64),
+    enabled: false,
+  };
+  const replace = globalSettings(
+    1,
+    AppTheme.DARK,
+    ReaderMode.LEFT_TO_RIGHT,
+    ReaderPageLayout.AUTO,
+    [],
+    [replacement],
+  );
+  const conflict = await first.mutateSettings(replace);
+  expect(conflict.status).toBe(409);
+  expect(conflict.body.error?.code).toBe(ErrorCode.REVISION_CONFLICT);
+  expect(conflict.body.global).toEqual(edited.body.global);
+  const current = edited.body.global?.values;
+  if (!current) throw new Error('Missing edited settings');
+  const replaceConfirmed = create(SettingsMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    expectedRevision: 2,
+    operation: {
+      case: 'setGlobal',
+      value: {
+        ...current,
+        installedExtensions: [create(InstalledExtensionSchema, replacement)],
+      },
+    },
+  });
+  const replaced = await first.mutateSettings(replaceConfirmed);
+  expect(replaced.status).toBe(200);
+  expect(replaced.body.global?.values?.installedExtensions).toMatchObject([
+    replacement,
+  ]);
+  expect(replaced.body.global?.values?.reader).toEqual(current.reader);
+  expect(replaced.body.global?.values?.favoriteSources).toEqual(
+    current.favoriteSources,
+  );
+  expect(replaced.body.global?.values?.theme).toBe(AppTheme.LIGHT);
+  const reused = create(SettingsMutationSchema, {
+    ...replaceConfirmed,
+    operation: {
+      case: 'setGlobal',
+      value: {
+        ...current,
+        installedExtensions: [create(InstalledExtensionSchema, extension)],
+      },
+    },
+  });
+  const idConflict = await second.mutateSettings(reused);
+  expect(idConflict.status).toBe(409);
+  expect(idConflict.body.error?.code).toBe(ErrorCode.IDEMPOTENCY_CONFLICT);
+  expect((await first.mutateSettings(install)).body).toEqual(installed.body);
+  expect((await second.settings()).global).toEqual(replaced.body.global);
+  const remove = create(SettingsMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    expectedRevision: 3,
+    operation: {
+      case: 'setGlobal',
+      value: { ...current, installedExtensions: [] },
+    },
+  });
+  const removed = await second.mutateSettings(remove);
+  expect(removed.status).toBe(200);
+  expect((await first.mutateSettings(replaceConfirmed)).body).toEqual(
+    replaced.body,
+  );
+  const final = await first.settings();
+  expect(final.global).toEqual(removed.body.global);
+  expect(final.global?.revision).toBe(4);
+  expect(final.global?.values?.installedExtensions).toEqual([]);
+  expect(final.global?.values?.reader).toEqual(current.reader);
+  expect(final.global?.values?.favoriteSources).toEqual(
+    current.favoriteSources,
+  );
+  expect(final.global?.values?.theme).toBe(AppTheme.LIGHT);
+  expect((await other.settings()).global).toEqual(initial.global);
+  expect(
+    await env.DB.prepare(
+      'SELECT count(*) count FROM state_mutations WHERE subject = ?',
+    )
+      .bind(first.subject)
+      .first('count'),
+  ).toBe(4);
+});
+
+test('invalid or oversized installed extension lists cannot change D1 values, revisions or idempotency records', async () => {
+  const owner = await client();
+  const extension = {
+    catalogUrl: 'https://read.example.com/extensions/index.json',
+    repoId: 'keiyoushi',
+    packageName: 'eu.kanade.test',
+    buildId: 'ext-test-selected',
+    bundleSha256: 'a'.repeat(64),
+    enabled: true,
+  };
+  await owner.mutateSettings(
+    globalSettings(
+      0,
+      AppTheme.DARK,
+      ReaderMode.WEBTOON,
+      ReaderPageLayout.DOUBLE,
+      [],
+      [extension],
+    ),
+  );
+  const before = await owner.settings();
+  const values = before.global?.values;
+  if (!values) throw new Error('Missing saved settings');
+  const maximum = Array.from({ length: 128 }, (_, index) => ({
+    ...extension,
+    packageName: `package.${index}`,
+  }));
+  for (const { installedExtensions, status } of [
+    {
+      installedExtensions: [
+        extension,
+        { ...extension, repoId: 'other', buildId: 'another' },
+      ],
+      status: 400,
+    },
+    {
+      installedExtensions: [
+        ...maximum,
+        { ...extension, packageName: 'package.128' },
+      ],
+      status: 400,
+    },
+    {
+      installedExtensions: [
+        {
+          ...extension,
+          catalogUrl: 'http://read.example.com/extensions/index.json',
+        },
+      ],
+      status: 400,
+    },
+    {
+      installedExtensions: [
+        {
+          ...extension,
+          catalogUrl: 'https://read.example.com/extensions/index.json?',
+        },
+      ],
+      status: 400,
+    },
+    {
+      installedExtensions: [{ ...extension, bundleSha256: 'A'.repeat(64) }],
+      status: 400,
+    },
+    {
+      installedExtensions: [{ ...extension, buildId: 'invalid/build' }],
+      status: 400,
+    },
+    { installedExtensions: [{ ...extension, repoId: '' }], status: 400 },
+    { installedExtensions: [{ ...extension, downloaded: true }], status: 400 },
+    {
+      installedExtensions: maximum.map((record, index) => ({
+        ...record,
+        repoId: '字'.repeat(200),
+        packageName: `${'字'.repeat(196)}${index}`,
+        buildId: 'b'.repeat(200),
+      })),
+      status: 413,
+    },
+  ]) {
+    const rejected = await owner.request('/api/settings/mutations', {
+      method: 'POST',
+      headers: {
+        Origin: origin,
+        'X-App-Request': '1',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        schemaVersion: businessSchemaVersion,
+        mutationId: crypto.randomUUID(),
+        expectedRevision: 1,
+        setGlobal: {
+          ...toJson(GlobalSettingsValuesSchema, values),
+          installedExtensions,
+        },
+      }),
+    });
+    expect(rejected.status).toBe(status);
+    expect(
+      settingsMutationResponseSchema.parse(await rejected.json()).error,
+    ).toBeDefined();
   }
   expect(await owner.settings()).toEqual(before);
   expect(

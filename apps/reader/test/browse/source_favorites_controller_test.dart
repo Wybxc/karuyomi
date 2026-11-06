@@ -57,6 +57,9 @@ void main() {
           builds: [_build('build-2', 'eu.kanade.source.test')],
         ),
       );
+      platform.seedInstalledBuilds([
+        _build('build-2', 'eu.kanade.source.test'),
+      ]);
       platform.manifestBuildId = 'build-2';
       platform.runtimeGeneration = 'generation-2';
       platform.sourceInventory = [
@@ -101,6 +104,9 @@ void main() {
           ],
         ),
       );
+      platform.seedInstalledBuilds([
+        _build('build-current', 'eu.kanade.source.test'),
+      ]);
       platform.manifestBuildId = 'build-current';
       await catalog.connect();
       expect(

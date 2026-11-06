@@ -21,6 +21,7 @@ import '../progress/chapter_read_batch.dart';
 import '../progress/chapter_read_controller.dart';
 import '../progress/chapter_read_dialog.dart';
 import '../sources/favorite_sources.dart';
+import '../extensions/extensions_page.dart';
 import '../sources/source_filters.dart';
 import '../sources/source_preferences.dart';
 
@@ -235,6 +236,19 @@ class _CatalogPageState extends State<CatalogPage> {
                       controller!.email ?? '已连接',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                  ),
+                  TextButton.icon(
+                    key: const ValueKey('extensions-manage'),
+                    onPressed: busy
+                        ? null
+                        : () => Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  ExtensionsPage(catalog: controller),
+                            ),
+                          ),
+                    icon: const Icon(Icons.extension_outlined),
+                    label: const Text('扩展管理'),
                   ),
                   TextButton.icon(
                     onPressed: busy ? null : widget.onConnect,

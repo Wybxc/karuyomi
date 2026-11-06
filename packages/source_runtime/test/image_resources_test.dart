@@ -280,7 +280,7 @@ void main() {
   );
 
   test(
-    'a refused cleanup ACK retains the resource charge and failed cleanup future',
+    'a refused cleanup ACK retains the resource charge while explicit retries reuse its identity',
     () async {
       final transport = FakeTransport();
       final runtime = TransportSourceRuntime(transport);
@@ -305,11 +305,23 @@ void main() {
       );
       expect(
         transport.calls.where((call) => call.hasReleaseImage()),
-        hasLength(1),
+        hasLength(2),
       );
       await expectLater(
         runtime.acquireImage(imageRequest(id: 'seventh')),
         throwsA(failure(RuntimeErrorCode.limitExceeded)),
+      );
+      transport.handler = (call) async {
+        final response = transport.respond(call);
+        if (call.hasAcquireImage()) {
+          response.image.resourceId = call.acquireImage.requestId;
+        }
+        return response;
+      };
+      await runtime.releaseImage(release('resource-0'));
+      expect(
+        (await runtime.acquireImage(imageRequest(id: 'replacement'))).id,
+        'replacement',
       );
       await runtime.dispose();
     },
