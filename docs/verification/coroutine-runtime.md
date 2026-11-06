@@ -1,6 +1,6 @@
 # 官方 kotlinx.coroutines 验证
 
-2026-11-06，官方核心已接入正式源码，自有 Green Job 与四个 kotlinx 覆盖已删除。正式工程检查和固定新 AOT 的 BH3 / Komiic Web 分项通过；早期隔离、平台修复、owner 候选和真实 Source 分层记录，HTTP 子任务取消、Native 与生产仍独立待验。迁移目标和待办见[协程运行时计划](../plan/coroutine-runtime.md)。以下原五轮是接入前的历史证据。
+2026-11-06，官方核心已接入正式源码，自有 Green Job 与四个 kotlinx 覆盖已删除。正式工程检查和固定 `7e8fe769` AOT 的 BH3 / Komiic Web 分项通过。随后 HTTP 适配固定 `48c4526` 的实际 TeaVM / Node 取消子门、clab 两包重建与正式 harness HTTP smoke 通过；该次真实 Source/UI 受内置浏览器环境阻断而未执行，产品取消、Native 与生产仍独立待验。早期隔离、平台修复、owner 候选和真实 Source 保持分层记录。迁移目标和待办见[协程运行时计划](../plan/coroutine-runtime.md)。以下原五轮是接入前的历史证据。
 
 ## 固定输入与隔离范围
 
@@ -151,3 +151,59 @@ seed 的 newCachelessCallWithProgress 仅 newCall，仍需项目图片集成；�
 冻结摘要见候选目录 integration/frozen-sha256.json，实际结果 final-run.log，负向日志在 red/；候选进程已退出。本节仅证明隔离 JVM，尚非本次 HTTP 变更后的 TeaVM AOT、正式 Source、Native 或生产取消验收，前一节 7e8 结果不能自动覆盖新适配。
 
 正式接入后，主仓库完整 `pnpm teavm:check` exit 0，实际执行上述 Java 202、Enqueue 85、seed suspend 保留、两路图片各 8355，以及全部现有 DTO / filters / preferences / HTTP / cache / file / network / platform oracle。`pnpm check` exit 0，418 项 Vitest、跨语言 golden、生成一致性、严格类型、依赖层级和工具回归均通过；全库 `pnpm format` 与完整 `pnpm format:check` 通过。本轮未改 Dart 产品代码，未重复本地 Flutter 全套。详细日志留在 `/private/tmp/karuyomi-http-upstream-*.log`。
+
+## 固定 48c HTTP AOT 与 Node 取消子门
+
+2026-11-06，从 HTTP 适配正式提交 `48c452668ed4d91b9983af1ca4e0679351aec9e1` 的独立 `git archive` 建立 `/private/tmp/karuyomi-http-coroutines-aot-48c4526`，固定 TeaVM gitlink 和锁定 seed；`prepareSources` 核对供体输入/输出摘要，实际 work 中 123 份生产 Java/compat 源码逐字节匹配。`Bridge`、`BrowserCall`、官方核心 owner 适配和 `PatchLibraries` 未改。原始 seed 保留，生产编译器仅处理构建副本，seed await / awaitSuccess 及内部类继续通过精确身份 oracle。
+
+临时 Kotlin fixture 仅提供 main 与检查信号，不提供 Source 实现；使用已有临时 Kotlin 2.4.10 compiler，不新增项目依赖。正式 `prepareSources` / `compileExtension` 与 TeaVM 0.16.0 编译成功，debug JS 为 3,674,816 B，耗时 13.663 秒，摘要 `14a42d9e153424bfc2babcf3296469a7b57fe3f88ce7d11f6d8e659debb55bcf`。这些是机制 fixture 数据，不是扩展包体或性能对照。
+
+Node 24.15.0 实际执行生产 AOT，通过四条受控 HTTP 路径：
+
+1. callback 返回后协程才恢复，正文继续存活；经正式 Bridge 异步读取 13 B 后到 EOF。
+2. 响应已交付但未消费时取消 Job，原 `Call.cancel` 和 Kotlin finally 各执行一次，未读正文的 handle 关闭。
+3. 对真实 localhost fetch 等待响应头时取消 Job，执行原取消/finally，fetch 被 abort，并在成功收尾前观察到服务端连接关闭。
+4. seed `awaitSuccess` 对 HTTP 404 抛出 `HttpException`，关闭未消费正文。
+
+协程 body/finally/callback 的原 owner，以及四条请求的 requestId/generation/token 组合均核对通过。每路径恰好一次 GET、一次 handle 释放，取消及非 2xx 正文均零读取。supplier 有 4 handle / 64KiB metadata 与正文预算，但实际仅单请求顺序执行，不能据此登记 64 响应资源限额或并发压力通过。
+
+**退出限定：** 首轮业务标记与 supplier 断言全部完成，但子进程未自然退出，20 秒外部 watchdog 失败。保留原 `node-first-*`。第二轮只修改临时 runner 收尾：确认 supplier 清理、记录公开 active-resource 诊断和结果、flush 输出后显式退出子进程，对应机制 Worker dispose；未改 AOT 或生产输入。最终外部 runner exit 0、无 watchdog 超时，总用时约 196ms，不能作为自然 event loop idle 或执行性能证据。
+
+最终 supplier 自有 handles/sockets/timers 为零、监听已关闭，但 Node 诊断仍有包括 `Timeout` 的异步资源，其精确归属尚未独立审计。外部 watchdog 仍约束 AOT main 和收尾；临时构建/fixture/supplier 进程均已结束。此门证明生产 Java/seed await/官方 core/TeaVM/Node 的 HTTP 取消与正文所有权子链，不能替代官方 workerd harness、浏览器 UI、真实 Source、Native、旧代竞争或完整阅读取消。
+
+临时材料尚在且工具链已准备时，可在该目录复验；清理后须按上述固定输入重建，不将临时 runner 当正式项目入口：
+
+```sh
+cd /private/tmp/karuyomi-http-coroutines-aot-48c4526
+node run-build-watchdog.ts
+node run-node-watchdog.ts work/public/teavm/httpcoroutineprobe/app.js
+```
+
+详细输入、原失败及最终结果保留在该目录 `RESULTS.md`、`inputs.json`、`production-source-identity.json`、`node-watchdog-result.json` 与日志，不复制入源码仓库。使用仓库锁定 Node，并沿正式工具链设置 `JAVA_HOME`。
+
+## 固定 48c clab 后台重建与正式 harness
+
+同一正式提交在 `fedora@clab` 后台独立目录 `/home/fedora/karuyomi-builds/http-adapter-48c4526-20261106-0718` 完成两包原 Source Gradle → TeaVM → 完整性校验 → `prepare-snapshot`。固定 extensions 上游 `efa93f5a3537856fe830450bbe33f69d21d28167`、suwayomi `6b481e8b62938b9c060eb210b934e0fbfdfa466b`、TeaVM `e87d452e4bd70c77b9e19314a46c3d6971c148b6`；Linux x86_64、Node 24.15.0、pnpm 12.6.0、Temurin JDK 25.0.5+8。官方扩展源码与原 JAR 未改，tracked 输入在完成后仍干净。
+
+| 扩展          | buildId                                          | canonical SHA-256                                                  | gzip / canonical 字节 |
+| ------------- | ------------------------------------------------ | ------------------------------------------------------------------ | --------------------- |
+| BH3 1.6.1     | `ext-zh.bh3-f8487a7957847a8aa607f868ceeb9b74`    | `cab61200d5363fa9ae7765e54c67593d4fa0806b80b53bf5aacca79637e990e9` | 886398 / 4321383      |
+| Komiic 1.6.11 | `ext-zh.komiic-dd3c0806d5ab43cc523334af1602dc12` | `0d9e12bfe655386e00f86373f04fee60543e1c8897f3ac8dc413db9c1b62b831` | 573795 / 1865562      |
+
+hostFingerprint 为 `802fd45ac7d381c1ca58a62a2b66d4a2eb18b03c66db611737f41ba9b6f1ad27`，候选 revision 为 `f1f8608129dc46d7be53ff58cc7c4a81`，2 available / 0 failed / 1446 pending，`bootstrap.complete=false`。两包均保持 `compiled_unverified/runtimeReady=false`，不因编译或下述 HTTP 200 提升。没有部署或写正式 checkpoint；远端 controller、timeout 和构建任务均结束。取回的结果在 `/private/tmp/karuyomi-clab-http-48c4526/remote-results/`，传输归档已校验；详细 summary/日志留在忽略的临时目录。
+
+独立主树 clone `/private/tmp/karuyomi-http-48c4526-harness` 固定相同提交与 submodules，使用本机固定工具链及 frozen 离线依赖，tracked clean。正式 `acceptance:build` 通过，包含 Flutter Web、运行时/Native 材料及官方 Worker/harness；静态装配 60 文件 / 2 当前扩展。**该候选 manifest/index 尚无后续 `sources` 元数据字段，只由固定 48c 产品读取，不补字段冒充当前目录/扩展管理功能产物。**
+
+在该 clone 中复验静态构建与官方 harness（先按项目要求设置 `JAVA_HOME`、`FLUTTER_ROOT` 和固定 Node PATH）：
+
+```sh
+pnpm install --offline --frozen-lockfile
+EXTENSION_ASSETS_DIR=/private/tmp/karuyomi-clab-http-48c4526/remote-results/results/snapshot pnpm acceptance:build
+ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.komiic","allowedHosts":["komiic.com","komiic.cc"]},{"packageName":"eu.kanade.tachiyomi.extension.zh.bh3","allowedHosts":["comic.bh3.com","act-webstatic.mihoyo.com"]}]' pnpm acceptance:serve
+```
+
+官方 `createTestHarness` 应用正式迁移并登记两包显式网络政策，隔离 D1 和 RS256 测试身份 `acceptance-owner` 下，真实 loopback GET `/`、`/api/bootstrap`、`/extensions/index.json` 均 HTTP 200，index 返回精确两包。这不是生产 Access 或 Source 执行证据。
+
+**浏览器未执行：** CUA inventory 无可用 browser，创建 IAB 标签返回 `Browser is not available: iab`，子任务与主任务的 `open_in_codex` 均仅 queued。未操作 Safari/其它浏览器，没有真实页面截图；BH3 详情/阅读、Komiic 设置重开/筛选分页、实际 UI 取消和资源收尾均未执行。这是环境阻断，不登记产品失败，也不沿用前轮 `7e8fe769` 的 Web 通过结果覆盖本次 HTTP 改动。
+
+官方 harness 收到 Enter 后正常 exit 0，finally 关闭服务；本 clone / 原端口无残留进程，SDK 锁释放。详细 `RESULTS.md`、`candidate-summary.json`、`http-smoke.json` 与 build/serve 日志留在临时目录。后续继续实际 Web 产品取消及 Source、Native、生产与真机门；本轮 AOT 和工程 HTTP 子门不缩减这些待办。

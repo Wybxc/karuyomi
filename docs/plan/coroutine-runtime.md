@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-状态：**已接入官方核心；正式工程检查、JVM / AOT 语义与请求归属分项、固定新 AOT 的 BH3 / Komiic Web 分项通过，HTTP 子任务取消及剩余平台门继续推进。** 本计划细化 [P0 宿主](p0-runtime-and-reading.md) 的 Kotlin 执行语义，与 [Source preferences](source-preferences.md) 配合。
+状态：**已接入官方核心；正式工程检查、JVM / AOT 语义与请求归属分项、固定 `7e8fe769` AOT 的 BH3 / Komiic Web 分项通过；HTTP 适配固定 `48c4526` 的 TeaVM / Node 取消子门、clab 两包重建与正式 harness HTTP smoke 通过，产品取消与剩余平台门继续推进。** 本计划细化 [P0 宿主](p0-runtime-and-reading.md) 的 Kotlin 执行语义，与 [Source preferences](source-preferences.md) 配合。
 
 使用锁定的 `kotlinx-coroutines-core-jvm-1.11.0.jar`，由 TeaVM 将其与未修改的 Source JAR 一起 AOT 成 JavaScript。官方 `Job`、`Deferred`、父子关系、取消、builder、Default / IO / Unconfined dispatcher 和计时器保持原实现；项目只适配已有 TeaVM 平台和请求生命周期，不再维护自有 Job 子集。
 
@@ -34,7 +34,9 @@ TeaVM 维护者的 [2024 年讨论](https://groups.google.com/g/teavm/c/ipcePs1m
 - [x] **隔离归属：** delay/HTTP/完成回调不提前释放 lease；过期 LAZY 拒绝且其官方 waiter 完成；generic completion 不借下一请求；配额/调度失败清理；ThreadContext 与其它 element 正确恢复。
 - [x] **正式工程回归：** `pnpm teavm:check` 使用同一生产补丁器处理的官方 core 副本，保留 Enqueue 全部有效场景，验证运行时类来源且旧 Green 不可达；Enqueue 85 项断言、完整格式与 `pnpm check`（含 418 项集成测试）均通过；按本里程碑提交。
 - [x] **HTTP 上游适配与 JVM 分项：** 删除自有阻塞 `OkHttpExtensionsKt`，恢复 seed 的可取消 await / awaitSuccess；只精确适配图片 cacheless / progress 方法。BrowserCall 交付后保留正文，关闭归还独立 64 资源额度，drain 在原总期限内清理后才允许成功确认，超时保留回收信号。隔离真实 seed / 官方 core 的 Java 202、Kotlin 168、原 Enqueue 85 及两路图片各 8355 断言通过；完整 `pnpm teavm:check`、`pnpm check`（418 项集成测试）、全库格式化与完整格式检查均通过。
-- [ ] **HTTP AOT / 产品取消：** 固定新提交重建，实际验证真实 suspend / 单个 Job 到 Call.cancel、响应消费和 Worker 收尾。不能用 JVM、请求级回收或前轮 Source 阅读代替这一门。
+- [x] **HTTP AOT 子门：** 固定 `48c4526` 的正式 Java/seed await/官方 core 经 TeaVM AOT 后，在 Node 实际通过延迟正文消费、交付后 Job 取消、等待真实 localhost fetch 响应头时取消及 404 关闭；四 handle 各释放一次。首轮业务通过但自然退出超时；最终临时 runner 显式退出后通过，仍有 `Timeout` 资源诊断，不声称自然 idle、64 响应压力或产品取消。
+- [x] **HTTP 新包与 harness 工程门：** 固定 `48c4526` 在 clab 后台完成 BH3/Komiic 原 Source 重 AOT、完整性及候选快照；两包保持 `compiled_unverified/runtimeReady=false`。本机同提交的正式构建、60 文件/2 包静态装配、官方 harness 迁移/网络政策和三路径 HTTP 200 通过，无部署或正式 checkpoint 变更。
+- [ ] **HTTP 产品取消与新 Source Web：** 新两包实际 Web Source/UI 受 IAB provider 不可用阻断，尚未执行；继续验证正式产品中单个 Job 到 Call.cancel、响应消费与资源收尾、旧代竞争。不能用 Node、HTTP 200、请求级回收或前轮 `7e8fe769` 阅读代替这一门。当前候选缺少后续 `sources` 元数据，仅配固定 48c 客户端，不补字段接入新目录/管理功能。
 - [x] **代表 Source Web 分项：** 固定 `7e8fe769` 独立重建两包，通过正式 harness / Flutter 主入口完成 BH3 真实 async / await 详情、21 页阅读与服务端进度确认，以及 Komiic 原镜像设置 / Source 重开、动态筛选 / 分页 / 已应用保留。仅登记实际范围，未部署，自动构建记录仍为 `compiled_unverified` / `runtimeReady=false`。
 - [ ] **剩余 Source / 生命周期门：** preference veto / 回调次数 / 丢 ACK、取消迟到竞争与直接资源计数分别验收；继续更多 Source 与平台覆盖，不能由页面正常切换推断所有清理门通过。
 - [ ] **交付边界：** Web 实际验收、Native、生产 Access 和真机分别列证据；不据隔离 fixture 通过升级其它层级。全量 baseline 和 CI 增量仍按原计划独立处理。
