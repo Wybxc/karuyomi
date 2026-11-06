@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-状态：**已接入官方核心；JVM 与 TeaVM AOT 的隔离语义、请求归属分项通过，正式宿主回归与代表 Source 验收继续推进。** 本计划细化 [P0 宿主](p0-runtime-and-reading.md) 的 Kotlin 执行语义，与 [Source preferences](source-preferences.md) 配合。
+状态：**已接入官方核心；正式工程检查、JVM / AOT 语义与请求归属分项、固定新 AOT 的 BH3 / Komiic Web 分项通过，HTTP 子任务取消及剩余平台门继续推进。** 本计划细化 [P0 宿主](p0-runtime-and-reading.md) 的 Kotlin 执行语义，与 [Source preferences](source-preferences.md) 配合。
 
 使用锁定的 `kotlinx-coroutines-core-jvm-1.11.0.jar`，由 TeaVM 将其与未修改的 Source JAR 一起 AOT 成 JavaScript。官方 `Job`、`Deferred`、父子关系、取消、builder、Default / IO / Unconfined dispatcher 和计时器保持原实现；项目只适配已有 TeaVM 平台和请求生命周期，不再维护自有 Job 子集。
 
@@ -34,7 +34,8 @@ TeaVM 维护者的 [2024 年讨论](https://groups.google.com/g/teavm/c/ipcePs1m
 - [x] **隔离归属：** delay/HTTP/完成回调不提前释放 lease；过期 LAZY 拒绝且其官方 waiter 完成；generic completion 不借下一请求；配额/调度失败清理；ThreadContext 与其它 element 正确恢复。
 - [x] **正式工程回归：** `pnpm teavm:check` 使用同一生产补丁器处理的官方 core 副本，保留 Enqueue 全部有效场景，验证运行时类来源且旧 Green 不可达；Enqueue 85 项断言、完整格式与 `pnpm check`（含 418 项集成测试）均通过；按本里程碑提交。
 - [ ] **HTTP 子任务取消：** 当前 `OkHttpExtensionsKt.await/awaitSuccess` 仍调用阻塞 `Call.execute()`；单个 Job 取消尚未接入 Call.cancel。优先评估直接复用官方/上游成熟 coroutine HTTP adapter，保持响应资源释放；不能把请求级回收或普通 HTTP 通过记作这一门通过。
-- [ ] **正式 Source：** 提交后固定独立 checkout 本地重建代表原包，经正式 API/控制入口完成浏览和真实异步业务；继续 filters / preferences / 图片 / 关闭与 Worker 重开门。失败包隔离，未验证包仍为 `compiled_unverified` / `runtimeReady=false`。
+- [x] **代表 Source Web 分项：** 固定 `7e8fe769` 独立重建两包，通过正式 harness / Flutter 主入口完成 BH3 真实 async / await 详情、21 页阅读与服务端进度确认，以及 Komiic 原镜像设置 / Source 重开、动态筛选 / 分页 / 已应用保留。仅登记实际范围，未部署，自动构建记录仍为 `compiled_unverified` / `runtimeReady=false`。
+- [ ] **剩余 Source / 生命周期门：** preference veto / 回调次数 / 丢 ACK、取消迟到竞争与直接资源计数分别验收；继续更多 Source 与平台覆盖，不能由页面正常切换推断所有清理门通过。
 - [ ] **交付边界：** Web 实际验收、Native、生产 Access 和真机分别列证据；不据隔离 fixture 通过升级其它层级。全量 baseline 和 CI 增量仍按原计划独立处理。
 
 不为旧宿主增加兼容路径；不以穷尽上游协程库或可选性能研究延迟本轮功能交付。

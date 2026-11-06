@@ -1,6 +1,6 @@
 # 官方 kotlinx.coroutines 隔离验证
 
-2026-11-06，官方核心已接入正式源码，自有 Green Job 与四个 kotlinx 覆盖已删除。早期隔离、平台修复及后续 owner 候选分别记录；代表 Source、HTTP 子任务取消和 Native 不据此视为通过。迁移目标和待办见[协程运行时计划](../plan/coroutine-runtime.md)。以下原五轮是接入前的历史证据。
+2026-11-06，官方核心已接入正式源码，自有 Green Job 与四个 kotlinx 覆盖已删除。正式工程检查和固定新 AOT 的 BH3 / Komiic Web 分项通过；早期隔离、平台修复、owner 候选和真实 Source 分层记录，HTTP 子任务取消、Native 与生产仍独立待验。迁移目标和待办见[协程运行时计划](../plan/coroutine-runtime.md)。以下原五轮是接入前的历史证据。
 
 ## 固定输入与隔离范围
 
@@ -99,4 +99,34 @@ v2 故意给已关闭请求的旧 LAZY 注册完成回调，官方通过 Complet
 
 正式 `pnpm teavm:check` 已 exit 0：Enqueue 85 项断言通过（原 81 项保留，新增 4 项显式 completion 异常通道断言），8355 项图片/处理后正文合同在 seed 与 owned HttpSource 各通过；DTO、filters、preferences、HTTP body、缓存、文件、网络和两项平台 oracle 同时通过。`pnpm check` 全部 exit 0，包含 418 项 Vitest 集成测试、协议生成一致性、严格类型、依赖层级和工具测试；全库 `pnpm format` 与完整 `pnpm format:check` 通过。没有改动 Dart 产品代码，未将之前的 Flutter 检查重复计成本轮执行。详细日志留在 `/private/tmp/karuyomi-official-core-*.log`。
 
-代表 Source 仍待固定本提交重建后验收；临时 Node supplier 不能代替这一层、Native 或生产。
+提交 `7e8fe769e0761581e065a71957efebd9011b0a32` 的[远端 CI](https://github.com/Wybxc/karuyomi/actions/runs/42167429386)全部通过，包含通用检查、Flutter 回归、完整构建和 D1 迁移。这是该提交的工程证据，真实 Source 见下节。
+
+## 固定官方核心提交的真实 Web 分项
+
+从上述 `7e8fe769` 建立独立目录 `/private/tmp/karuyomi-official-core-7e8fe769`，三份 submodule 与锁定工具链不变，使用正式 Gradle / TeaVM builder 重新构建 Komiic 1.6.11 和 BH3 1.6.1，未复用旧 AOT。原 Source JAR 和官方核心未修改；可变依赖缓存隔离。官方编译、AOT、完整性校验、`prepare-snapshot` 与正式 `acceptance:build` 均通过。首次 sandbox 下 Dart `cpuinfo_macos` SIGABRT 日志保留，同一输入在正常授权环境重跑通过。
+
+| 扩展          | buildId                                          | canonical SHA-256                                                  | gzip / canonical 字节 |
+| ------------- | ------------------------------------------------ | ------------------------------------------------------------------ | --------------------- |
+| Komiic 1.6.11 | `ext-zh.komiic-974d4455d8168db478d2a45de3ce4400` | `e176efb7aab7f444829755f5441c19df15a318a03e130dad9b3d087ba50dec0b` | 566264 / 1828872      |
+| BH3 1.6.1     | `ext-zh.bh3-185eabe825de16f9f651ccb68e46ad54`    | `a14b815ab13e97be669f41f7d8122f5d203403520dd86ca445aebc0d122f1778` | 882337 / 4290269      |
+
+host 输入指纹为 `3d8c568877dd274c1f2e39ab922ce7bf77ab5e49e2cd5e0e9d9892d34d467031`，原包上游为 `efa93f5a3537856fe830450bbe33f69d21d28167`。Komiic 原 JAR SHA-256 为 `123ac3074dc02c3b65253dbbf097653c403a303a9220918e6b651e9425e8cf6d`，BH3 为 `7970b15879757f6e548f45a43c9eaa44f75f5f2ade223056317a64425c16f3f3`；Komiic 与前轮同版本原 JAR 字节不同，因此这里只记录当前体积，不能作 core-only A/B 或包体优化结论。
+
+候选 revision 为 `534881ae689743e08fbbc300249fb6e9`，2 包 available、1446 包 pending，`bootstrap.complete=false`。host ABI 仍为 v6、控制和 HTTP bridge 仍为 2。未部署、未写发布 checkpoint，也未自动提升 `compiled_unverified/runtimeReady=false`。
+
+通过官方 Wrangler `createTestHarness` 启动隔离 D1 / 真实 RS256 测试身份，使用正式 Flutter 主入口和 Codex 内置 Chromium，经正式控制与 HTTP 桥操作。复验入口：
+
+```sh
+cd /private/tmp/karuyomi-official-core-7e8fe769
+ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.komiic","allowedHosts":["komiic.com","komiic.cc"]},{"packageName":"eu.kanade.tachiyomi.extension.zh.bh3","allowedHosts":["comic.bh3.com","act-webstatic.mihoyo.com"]}]' pnpm acceptance:serve
+```
+
+上述图片 host 来自 [BH3 官方页面](https://comic.bh3.com/book) 的实际封面链接。没有修改 Source、注入原图捷径或使用模拟供应器替代在线行为。
+
+1. BH3 初始化、热门及“逃离长空篇”详情成功，返回 7 章。原 `BH3.fetchMangaUpdate` 使用 `coroutineScope`、两个 `async` 和两次 `await`。当前 TeaHost 的 details / chapters 调用传入互斥的 fetch 标志，其中一个分支直接返回；这证明真实 Source 协程业务运行，不表示一次两路 HTTP 并发已验。
+2. 打开“第六话 新的旅程”，正式 Reader 显示真实漫画图像，21 页；翻页后自动双页显示 2 / 3，界面确认“阅读进度已保存到服务端，最远：第 3 页”。详情封面仍为占位图，本轮不登记封面通过。
+3. 退出阅读、返回浏览并切换 Komiic，后续 Source 正常工作。只登记可见交互结果；没有直接量 Java/TS handle 数量，不据此声称完整取消竞争或 handles=0。
+4. Komiic 默认 `.com` 热门仍失败；通过原镜像设置改为 `.cc`，界面确认设置，Source 重开后热门成功。重新打开原设置可见 `komiic.cc`。
+5. 原动态分类树返回，选择“搞笑”并应用后显示“筛选（已应用）”，出现雅尼貓、敗犬女主太多了等新结果；“加载更多”追加被俘者的嘆息等条目。重新打开筛选，“搞笑”仍已选，关闭编辑后原查询保持。这里是可见分页与保留证据，未抓取上游 GraphQL 变量。
+
+本轮限测试身份的 Web 分项，不覆盖 preference veto / 回调次数 / 丢 ACK、单个 Job 到 HTTP 的取消、迟到竞争、Native、生产 Access 或真机。正式验收服务已正常退出，61010 端口拒绝连接，所有本轮构建器已结束。详细固定输入、原 provenance 和构建日志在独立目录 `.local/official-core-harness/summary.json` 及同目录日志；截图为 `/private/tmp/karuyomi-official-core-bh3-reading.jpg`、`/private/tmp/karuyomi-official-core-komiic-filter.jpg`。这些临时产物不提交源码库。

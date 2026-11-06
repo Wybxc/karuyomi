@@ -58,6 +58,10 @@ Komiic 的 Select 描述首轮已能呈现，但其默认 `komiic.com` 在当前
 
 此轮只登记 CuuTruyen 的真实 Web 筛选分项，不覆盖所有八类的实际 Source、Native、生产 Access、完整阅读或设备性能。两包自动化记录仍保持 `compiled_unverified/runtimeReady=false`。验收服务正常关闭，构建进程已结束；截图、完整计划、候选和详细日志保留在忽略的本地目录，不提交产物。
 
+## 官方核心后的 Komiic Web 续验
+
+2026-11-06，固定 `7e8fe769` 新建 v6 AOT，通过正式 preferences 选择原 `.cc` 镜像、Source 重开后热门成功；原动态分类“搞笑”应用、加载更多与重开面板保留已选均通过。固定包身份、正式 harness、原默认镜像失败及 Web 范围见[协程 / Source 记录](coroutine-runtime.md#固定官方核心提交的真实-web-分项)。这补充了上轮 Komiic 待验门，不覆盖其它筛选类型、Native 或生产。
+
 ## 复验与交付限制
 
 ```sh
