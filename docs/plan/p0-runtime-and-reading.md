@@ -64,6 +64,8 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 
 图片解码按[独立子计划](reader-image-decoding.md)推进：Source/host 只交付不透明编码资源，Flutter 以实际 ImageInfo 尺寸更新布局与预算，退休资源计费保留至释放 ACK。当前仍为客户端整图显示，后验账本不证明初次 decoder 临时分配或 GPU 峰值有界，也没有调高整图预算。未采用的自研 codec 候选源码和专属工具已删除，历史评估保留原输入与限定结论。先完成真实 UI 直接解码 baseline，并在相同输入/设备比较首图、跳转、滚动、CPU/RSS/GPU，再决定是否采用成熟区域解码、降采样或分片；Source 不重新感知图片信息。历史编码页/host tile 机制证据保留并标为已替代，原失败不覆盖。真实长图、EXIF/LOD、真机和实际峰值继续待验。
 
+协程执行语义另按[官方核心与平台适配计划](coroutine-runtime.md)收敛：优先复用已锁定的官方 JAR，只保留必要的平台与宿主集成。隔离 AOT 成功不等于已替换产品路径；首次真实挂起与 operation 所有权门通过后再删除当前自有入口。
+
 ## 验收
 
 - P0-A：原输入/工具链/ABI/实际执行身份一致；Source IDs 与清单吻合；文件与 HTTP Cache 在重启、取消和版本切换后语义正确。
