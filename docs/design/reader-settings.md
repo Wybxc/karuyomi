@@ -20,6 +20,8 @@
 
 漫画覆盖使用 `ReaderSettingsOverride` 的 optional 字段。字段缺省表示继承全局；显式 AUTO 表示覆盖为自动布局，不能当成继承。提交完整覆盖文档，未包含的字段恢复继承；空 `overrides` 清空全部覆盖。应用主题没有漫画覆盖。调暗覆盖的显式 0 表示不调暗，与缺省继承不同；D1 计算有效值时以字段 presence 合并，不能按数值真假选择默认值。裁白覆盖的显式 false 表示关闭，与缺省继承不同；D1 有效值保持真正的 JSON bool。全局变化会改变未覆盖字段的有效值，但不会修改漫画覆盖的 revision。
 
+确认值比较遵循 IDL 字段语义：全局设置中的非 optional 标量按生成 getter 的有效值比较，标准 ProtoJSON 省略的 false/0 与显式默认值等价；三个列表仍保留顺序并核对所有字段。漫画 optional 覆盖继续核对 presence，显式 false/0 不能等同继承。相同 revision 的只读重取使用同一语义，实际值变化仍拒绝；mutation ID、CAS、ACK 后当前权威读回与原命令精确重试不变。
+
 章节来源顺序已经随 `MangaResume.reversedOrder` 由进度链路保存，不再建立第二份设置权威。当前缩放/平移矩阵、视口尺寸、工具栏显隐、服务连接地址和平台资源状态不进入同步设置；Source 密码、token、Cookie 也不混入本协议。
 
 ## 阅读内容与输入

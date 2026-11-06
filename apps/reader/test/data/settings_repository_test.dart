@@ -67,6 +67,64 @@ wire.SettingsResponse _snapshot() => wire.SettingsResponse(
   ),
 );
 
+/// Protobuf-ES omits implicit proto3 scalar defaults; optional overrides retain
+/// their presence even when the value is false or zero.
+final class _OmittedSettingsDefaults implements ApiFetch {
+  _OmittedSettingsDefaults(this.api);
+  final ApiFetch api;
+  final replies = <Map<String, Object?>>[];
+  bool omitDefaults = true;
+
+  @override
+  Future<ApiReply> fetchApi(
+    String path, {
+    String method = 'GET',
+    Map<String, String> headers = const {},
+    String? body,
+  }) async {
+    final reply = await api.fetchApi(
+      path,
+      method: method,
+      headers: headers,
+      body: body,
+    );
+    final value = jsonDecode(reply.body);
+    if (value is! Map<String, Object?>) {
+      throw const FormatException('Expected settings JSON object');
+    }
+    final global = value['global'];
+    if (global is Map<String, Object?>) {
+      final values = global['values'];
+      if (values is Map<String, Object?>) {
+        _omitDefaults(values['reader']);
+        final installed = values['installedExtensions'];
+        if (omitDefaults && installed is List<Object?>) {
+          for (final extension in installed) {
+            if (extension is Map<String, Object?> &&
+                extension['enabled'] == false) {
+              extension.remove('enabled');
+            }
+          }
+        }
+      }
+    }
+    _omitDefaults(value['effectiveReader']);
+    replies.add(value);
+    return ApiReply(
+      status: reply.status,
+      headers: reply.headers,
+      body: jsonEncode(value),
+      redirected: reply.redirected,
+    );
+  }
+
+  void _omitDefaults(Object? value) {
+    if (!omitDefaults || value is! Map<String, Object?>) return;
+    if (value['dimPercent'] == 0) value.remove('dimPercent');
+    if (value['cropBorders'] == false) value.remove('cropBorders');
+  }
+}
+
 /// Holds a real supplier ACK after the server has committed the mutation.
 final class _ResponseGate implements ApiFetch {
   _ResponseGate(this.api);
@@ -138,6 +196,188 @@ void main() {
       expect(value.mangaRevision, isNull);
       expect(value.overrides, isNull);
       expect(writes(), isEmpty);
+    },
+  );
+
+  test(
+    'TypeScript ProtoJSON omitted implicit false and zero confirms global settings',
+    () async {
+      final api = _OmittedSettingsDefaults(server);
+      client.rebindApi(api, verifiedIdentity: client.identity);
+      final enabled = _global();
+      enabled.reader
+        ..cropBorders = true
+        ..dimPercent = 35;
+      await repository.setGlobal(values: enabled, basedOnRevision: 0);
+      final disabled = enabled.deepCopy();
+      disabled.reader
+        ..cropBorders = false
+        ..dimPercent = 0;
+
+      final saved = await repository.setGlobal(
+        values: disabled,
+        basedOnRevision: 1,
+      );
+      expect(saved.globalRevision, 2);
+      expect(saved.accountRevision, 2);
+      expect(saved.global.reader.cropBorders, false);
+      expect(saved.global.reader.dimPercent, 0);
+      expect(saved.effectiveReader.cropBorders, false);
+      expect(saved.effectiveReader.dimPercent, 0);
+      expect(repository.pendingGlobal(), isNull);
+      expect(server.appliedMutations, 2);
+      expect(writes(), hasLength(2));
+      final confirmed = await repository.loadGlobal();
+      expect(confirmed.globalRevision, 2);
+      expect(confirmed.global.reader.cropBorders, false);
+      expect(confirmed.global.reader.dimPercent, 0);
+      for (final reply in api.replies.where(
+        (value) => value['accountRevision'] == 2,
+      )) {
+        final global = reply['global']! as Map<String, Object?>;
+        final values = global['values']! as Map<String, Object?>;
+        final reader = values['reader']! as Map<String, Object?>;
+        expect(reader.containsKey('cropBorders'), false);
+        expect(reader.containsKey('dimPercent'), false);
+        final effective = reply['effectiveReader']! as Map<String, Object?>;
+        expect(effective.containsKey('cropBorders'), false);
+        expect(effective.containsKey('dimPercent'), false);
+      }
+    },
+  );
+
+  test(
+    'TypeScript ProtoJSON omitted disabled extension confirms its exact account selection',
+    () async {
+      final api = _OmittedSettingsDefaults(server);
+      client.rebindApi(api, verifiedIdentity: client.identity);
+      final enabled = _global();
+      enabled.installedExtensions.add(
+        wire.InstalledExtension(
+          catalogUrl: 'https://reader.example/extensions/index.json',
+          repoId: 'keiyoushi',
+          packageName: 'eu.kanade.tachiyomi.extension.en.example',
+          buildId: 'ext-example-1',
+          bundleSha256: _otherKey,
+          enabled: true,
+        ),
+      );
+      await repository.setGlobal(values: enabled, basedOnRevision: 0);
+      final disabled = enabled.deepCopy();
+      disabled.installedExtensions.single.enabled = false;
+      final saved = await repository.setGlobal(
+        values: disabled,
+        basedOnRevision: 1,
+      );
+      expect(saved.globalRevision, 2);
+      final extension = saved.global.installedExtensions.single;
+      expect(extension.enabled, false);
+      expect(
+        extension.catalogUrl,
+        disabled.installedExtensions.single.catalogUrl,
+      );
+      expect(extension.repoId, 'keiyoushi');
+      expect(
+        extension.packageName,
+        disabled.installedExtensions.single.packageName,
+      );
+      expect(extension.buildId, 'ext-example-1');
+      expect(extension.bundleSha256, _otherKey);
+      expect(repository.pendingGlobal(), isNull);
+      final global = api.replies.last['global']! as Map<String, Object?>;
+      final values = global['values']! as Map<String, Object?>;
+      final installed = values['installedExtensions']! as List<Object?>;
+      expect(
+        (installed.single! as Map<String, Object?>).containsKey('enabled'),
+        false,
+      );
+      api.omitDefaults = false;
+      final reread = await repository.loadGlobal();
+      expect(reread.globalRevision, 2);
+      expect(reread.global.installedExtensions.single.enabled, false);
+      expect(writes(), hasLength(2));
+      expect(server.appliedMutations, 2);
+    },
+  );
+
+  test(
+    'TypeScript ProtoJSON default scalar presence may change without a new global revision',
+    () async {
+      final api = _OmittedSettingsDefaults(server)..omitDefaults = false;
+      client.rebindApi(api, verifiedIdentity: client.identity);
+      final defaults = _global();
+      defaults.reader
+        ..cropBorders = false
+        ..dimPercent = 0;
+      await repository.setGlobal(values: defaults, basedOnRevision: 0);
+      final explicit = await repository.loadGlobal();
+      expect(explicit.global.reader.hasCropBorders(), true);
+      expect(explicit.global.reader.hasDimPercent(), true);
+      api.omitDefaults = true;
+      final omitted = await repository.loadGlobal();
+      expect(omitted.globalRevision, explicit.globalRevision);
+      expect(omitted.accountRevision, explicit.accountRevision);
+      expect(omitted.global.reader.hasCropBorders(), false);
+      expect(omitted.global.reader.hasDimPercent(), false);
+      expect(
+        omitted.global.reader.cropBorders,
+        explicit.global.reader.cropBorders,
+      );
+      expect(
+        omitted.global.reader.dimPercent,
+        explicit.global.reader.dimPercent,
+      );
+      expect(writes(), hasLength(1));
+      expect(server.appliedMutations, 1);
+    },
+  );
+
+  test(
+    'TypeScript ProtoJSON keeps optional false and zero distinct from inheritance',
+    () async {
+      final api = _OmittedSettingsDefaults(server);
+      client.rebindApi(api, verifiedIdentity: client.identity);
+      final global = _global();
+      global.reader
+        ..cropBorders = true
+        ..dimPercent = 35;
+      await repository.setGlobal(values: global, basedOnRevision: 0);
+      final explicit = await repository.setManga(
+        mangaKey: _key,
+        basedOnRevision: 0,
+        overrides: wire.ReaderSettingsOverride(
+          cropBorders: false,
+          dimPercent: 0,
+        ),
+      );
+      expect(explicit.overrides!.hasCropBorders(), true);
+      expect(explicit.overrides!.cropBorders, false);
+      expect(explicit.overrides!.hasDimPercent(), true);
+      expect(explicit.overrides!.dimPercent, 0);
+      expect(explicit.effectiveReader.cropBorders, false);
+      expect(explicit.effectiveReader.dimPercent, 0);
+      expect(repository.pendingManga(_key), isNull);
+      final reply = api.replies.last;
+      final manga = reply['manga']! as Map<String, Object?>;
+      final overrides = manga['overrides']! as Map<String, Object?>;
+      expect(overrides['cropBorders'], false);
+      expect(overrides['dimPercent'], 0);
+      final effective = reply['effectiveReader']! as Map<String, Object?>;
+      expect(effective.containsKey('cropBorders'), false);
+      expect(effective.containsKey('dimPercent'), false);
+
+      final inherited = await repository.setManga(
+        mangaKey: _key,
+        basedOnRevision: 1,
+        overrides: wire.ReaderSettingsOverride(),
+      );
+      expect(inherited.overrides!.hasCropBorders(), false);
+      expect(inherited.overrides!.hasDimPercent(), false);
+      expect(inherited.effectiveReader.cropBorders, true);
+      expect(inherited.effectiveReader.dimPercent, 35);
+      expect(inherited.mangaRevision, 2);
+      expect(inherited.globalRevision, 1);
+      expect(server.appliedMutations, 3);
     },
   );
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:uuid/uuid.dart';
 
@@ -1231,13 +1232,14 @@ final class BusinessStateClient {
       }
       if (global != null &&
           value.global.revision == global.revision &&
-          value.global != global) {
+          !_globalSettingsMatch(value.global.values, global.values)) {
         throw const FormatException('Global settings changed without revision');
       }
       if (mangaKey != null &&
           previous != null &&
           value.manga.revision == previous.manga.revision &&
-          value.manga != previous.manga) {
+          (value.manga.mangaKey != previous.manga.mangaKey ||
+              value.manga.overrides != previous.manga.overrides)) {
         throw const FormatException('Manga settings changed without revision');
       }
       _ensureOpen();
@@ -1846,8 +1848,61 @@ bool _settingsMatch(
   wire.SettingsMutation command,
   wire.SettingsResponse value,
 ) => command.hasSetGlobal()
-    ? value.global.values == command.setGlobal
+    ? _globalSettingsMatch(value.global.values, command.setGlobal)
     : value.manga.overrides == command.setManga.overrides;
+
+// Proto3 scalars without presence may be omitted by Protobuf-ES even when
+// Dart stores an explicitly assigned default. Compare their generated getters;
+// manga overrides keep protobuf equality because their optional presence matters.
+final _readerSettingsEquality = EqualityBy(
+  (wire.ReaderSettings value) => (
+    value.mode,
+    value.pageLayout,
+    value.background,
+    value.dimPercent,
+    value.tapZones,
+    value.keyboard,
+    value.fit,
+    value.cropBorders,
+  ),
+);
+final _favoriteSourcesEquality = ListEquality(
+  EqualityBy(
+    (wire.FavoriteSource value) =>
+        (value.packageName, value.sourceId, value.sourceName, value.sourceLang),
+  ),
+);
+final _installedExtensionsEquality = ListEquality(
+  EqualityBy(
+    (wire.InstalledExtension value) => (
+      value.catalogUrl,
+      value.repoId,
+      value.packageName,
+      value.buildId,
+      value.bundleSha256,
+      value.enabled,
+    ),
+  ),
+);
+final _repositoriesEquality = ListEquality(
+  EqualityBy(
+    (wire.ExtensionRepository value) =>
+        (value.catalogUrl, value.repoId, value.name),
+  ),
+);
+
+bool _globalSettingsMatch(
+  wire.GlobalSettingsValues a,
+  wire.GlobalSettingsValues b,
+) =>
+    a.theme == b.theme &&
+    _readerSettingsEquality.equals(a.reader, b.reader) &&
+    _favoriteSourcesEquality.equals(a.favoriteSources, b.favoriteSources) &&
+    _installedExtensionsEquality.equals(
+      a.installedExtensions,
+      b.installedExtensions,
+    ) &&
+    _repositoriesEquality.equals(a.repositories, b.repositories);
 
 bool _coverMatches(wire.StateMutation request, wire.MangaState manga) =>
     !request.hasSetCustomCover() ||

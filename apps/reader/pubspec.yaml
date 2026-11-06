@@ -12,6 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   crypto: ^3.0.7
   uuid: 4.6.0
+  collection: 1.19.1
   path_provider: 2.1.6
   flutter_inappwebview: 6.2.0-beta.3
   reader_core:
