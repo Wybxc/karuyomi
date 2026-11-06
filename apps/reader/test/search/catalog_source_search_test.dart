@@ -338,6 +338,121 @@ void main() {
   );
 
   test(
+    'two search packages wait for the foreground close ACK before acquiring slots',
+    () async {
+      final original = await catalog.openSelectedSource(
+        packageName: 'eu.kanade.source.a',
+        sourceId: '11',
+        shouldContinue: () => true,
+      );
+      expect(original, isNotNull, reason: catalog.error);
+      final generation = catalog.session!.generation;
+      final before = slots.events.toList();
+      final closing = Completer<void>();
+      final closeGate = Completer<void>();
+      slots.beforeClose = (request) async {
+        if (request.generation != generation) return;
+        if (!closing.isCompleted) closing.complete();
+        await closeGate.future;
+      };
+      addTearDown(() {
+        if (!closeGate.isCompleted) closeGate.complete();
+      });
+      final first = search.search(target('21'), 'query');
+      final second = search.search(target('31'), 'query');
+      var settled = 0;
+      final results = Future.wait([
+        first.result.whenComplete(() => ++settled),
+        second.result.whenComplete(() => ++settled),
+      ]);
+      unawaited(
+        results.then<void>(
+          (_) {},
+          onError: (Object failure, StackTrace stack) {},
+        ),
+      );
+      try {
+        await _started(first, closing.future);
+        await Future<void>.delayed(Duration.zero);
+        expect(settled, 0);
+        expect(slots.events, [...before, 'close:build-a']);
+        expect(slots.calls, isEmpty);
+        expect(slots.live.values.single.generation, generation);
+      } finally {
+        closeGate.complete();
+      }
+      final pages = await results;
+      expect(pages.map((page) => page.mangas.single.title), ['21', '31']);
+      await search.stop();
+      expect(slots.maxLive, 2);
+      expect(slots.live, isEmpty);
+      for (final build in ['build-b', 'build-c']) {
+        expect(
+          slots.events.indexOf('closed:build-a'),
+          lessThan(slots.events.indexOf('open:$build')),
+        );
+      }
+      expect(slots.calls.map((call) => call.sourceId).toSet(), {'21', '31'});
+      expect(catalog.status, ServiceStatus.ready);
+    },
+  );
+
+  test(
+    'a failed foreground close blocks both search packages until explicit cleanup',
+    () async {
+      await catalog.openSelectedSource(
+        packageName: 'eu.kanade.source.a',
+        sourceId: '11',
+        shouldContinue: () => true,
+      );
+      expect(catalog.session, isNotNull, reason: catalog.error);
+      final generation = catalog.session!.generation;
+      final before = slots.events.toList();
+      final closing = Completer<void>();
+      final closeGate = Completer<void>();
+      slots.beforeClose = (request) async {
+        if (request.generation != generation) return;
+        if (!closing.isCompleted) closing.complete();
+        await closeGate.future;
+        throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Foreground close ACK lost',
+        );
+      };
+      addTearDown(() {
+        if (!closeGate.isCompleted) closeGate.complete();
+      });
+      final first = search.search(target('21'), 'query');
+      final second = search.search(target('31'), 'query');
+      final rejected = Future.wait([
+        expectLater(first.result, throwsA(isA<RuntimeException>())),
+        expectLater(second.result, throwsA(isA<RuntimeException>())),
+      ]);
+      try {
+        await _started(first, closing.future);
+        await Future<void>.delayed(Duration.zero);
+        expect(slots.events, [...before, 'close:build-a']);
+        expect(slots.calls, isEmpty);
+      } finally {
+        closeGate.complete();
+      }
+      await rejected;
+      expect(slots.events, [...before, 'close:build-a']);
+      expect(slots.calls, isEmpty);
+      expect(slots.live.values.single.generation, generation);
+      expect(search.available, false);
+      slots.beforeClose = null;
+      await search.stop();
+      expect(slots.live, isEmpty);
+      expect(
+        slots.events.where((event) => event.startsWith('reset:')),
+        hasLength(1),
+      );
+      expect(search.available, true);
+    },
+  );
+
+  test(
     'Sources in one package share a generation and execute serially',
     () async {
       final firstEntered = Completer<void>();

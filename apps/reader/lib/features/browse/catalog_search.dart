@@ -307,6 +307,8 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
 
   Future<void> _claim() async {
     _check();
+    final claiming = _claiming;
+    if (claiming != null) return claiming;
     if (identical(catalog._searchOwner, this)) return;
     return _claiming ??= _claimSlots().whenComplete(() {
       _claiming = null;
