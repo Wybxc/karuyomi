@@ -59,6 +59,24 @@ pnpm test:protocol
 - 两个独立客户端同身份读回相同账户选择；空缓存客户端准确显示未准备。并发改全局设置、ACK 丢失、旧 CAS 冲突与原请求重试不覆盖其它已确认值。
 - 活动章节、请求与跨实例 namespace/产物占用下，关闭、取消、迟到结果及清理失败恢复；卸载保留全部业务、Source 数据与 HTTP Cache。
 - 下架构建提示与 `build_not_found` 分层，不自动换版，也不把缓存命中当在线能力。
-- 生产 Access 和真机门；当前没有新 AOT、Native App 构建/运行、部署或 checkpoint 变更。
+- 生产 Access 和真机门；该功能提交当时尚无新 AOT 或 Native App 构建/运行、部署、checkpoint 变更；后续固定三包候选另见下节。
 
 额外仓库添加、移除与网络政策接入仍未实现，须依完整 P3 另做真实用例；默认仓库管理入口不计为这项能力通过。
+
+## 固定 ad869d2 三包 AOT 候选
+
+2026-11-07，在 `fedora@clab` 的独立目录 `/home/fedora/karuyomi-builds/extensions-ad869d2-20261107-0020` 固定 `ad869d2759ae9d878a89154f80a1d094bba36564`，三份 submodule 与锁定 gitlink 匹配、tracked 输入干净；Linux x86_64、Node 24.15.0、pnpm 12.6.0、Temurin JDK 25.0.5+8。三包官方 Gradle → TeaVM → 正式完整性 → `prepare-snapshot` 通过，没有修改官方扩展业务或原 JAR。
+
+| 包        | buildId                                          | canonical / gzip 字节 |
+| --------- | ------------------------------------------------ | --------------------- |
+| all.xkcd  | `ext-all.xkcd-38ab36e0fc4a177f69711e53c4a9b60a`  | 4467904 / 929613      |
+| zh.bh3    | `ext-zh.bh3-e29e80275074264edf4c2b1c118ab470`    | 4321388 / 886365      |
+| zh.komiic | `ext-zh.komiic-e537a3bfc1a8490c5586fa0ae3cf0b0f` | 1865559 / 573768      |
+
+xkcd 正式 Gradle metadata 含 en/ru/es/zh/fr 五个 Source，BH3/Komiic 各一个 zh Source；没有给旧清单补字段。hostFingerprint 为 `ea289e6aa7a37950cfefd072a14e2158cc170dedaeb7a7e38caf6d8e1489a4c4`，materialVersion 为 `24275ab6ea0ae12e91869699faabba7024272784b2d6d1d243be69ec67bfb9de`。候选 revision `6ff8677868024a298782c7831c970f33`，3 available / 0 failed / 1445 pending，`bootstrap.complete=false`。
+
+归档取回边界校验一次，通过后复用验证收据。首轮临时选择器误写 `en.xkcd`，在 AOT 前退出；实际 `ps` 确认终态后以官方 `all.xkcd` 在原总期限内恢复，原失败日志保留。最终 controller exit 0，控制器、timeout 和本目录构建进程均已实际确认不存在；无重复发布器。
+
+全部仍为 `compiled_unverified/runtimeReady=false`，没有部署、Release 或正式 checkpoint 写入，baseline 未完成。该固定输入包含当时的目录元数据和扩展管理协议，尚无后续源迁移变更；后续实际验收须核对产品 host/材料身份，不能据此宣称新协议、真实 Source、浏览器或 Native 通过。
+
+候选 snapshot 位于 `/private/tmp/karuyomi-clab-extensions-ad869d2/remote-results/results/snapshot`，正式 materials catalog 位于同一 `results/materials.json`；`RESULTS.md`、saved plan、summary 和原始日志均保留在该临时目录，不提交大产物。复验以同一固定 checkout、锁定环境及 saved plan 调用正式 `tools/extensions/pipeline.ts build` / `prepare-snapshot`；正式发布、checkpoint 和单发布器约束仍以 [EXTENSIONS](../EXTENSIONS.md) 为准。

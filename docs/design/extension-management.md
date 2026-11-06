@@ -52,7 +52,7 @@ shared Web Lock pin 覆盖准备/读取与活动运行槽；删除只能取得�
 
 Static Assets 只保留每包最新可用构建。账户选择的旧 build 可能已无产物或网络登记；即使本机缓存命中，也不能保证它仍可联网。网络登记缺失的 `404 build_not_found` 与 Access 登录/权限错误分开，界面要求用户手动更新，不恢复历史目录或兼容协议。
 
-本轮没有变更静态发布方式、启动新 AOT 或部署。目录元数据已于 `830161c` 接入，但管理功能及协议需要相同固定输入的新构建另行验收；下载、组件和工程构建不提升 `compiled_unverified/runtimeReady=false`，也不代替实际 Source 或三端同步证据。
+静态发布方式保持最新版快照。目录元数据已于 `830161c` 接入；后续固定 `ad869d2` 的三包后台 AOT 与完整性/快照通过，提供包含当时目录与管理协议的候选，实际运行仍待验收，见[记录](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。候选尚未部署或写正式 checkpoint，后续协议变更须重新核对输入；下载、组件和工程构建不提升 `compiled_unverified/runtimeReady=false`，也不代替实际 Source 或三端同步证据。
 
 ## 失败恢复
 
