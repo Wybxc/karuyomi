@@ -97,7 +97,7 @@ flutter test integration_test/bookmarks_sync_test.dart --no-pub \
 
 建议先由 Web 正式 UI 添加目标书签，再运行 Native 新进程 `verify` → Native `remove` → Web 刷新读回；反向可运行 Native `set` → 独立客户端读回。只有 Native 时，可在同一个 HTTPS harness 上顺序运行 iOS `prepare` → iOS `set` → Android `verify` → Android `remove` → iOS `verify`；每个阶段使用新测试进程。每个书签阶段重新取得准确前置；`set` 要求目标原先不存在，`remove` 要求已存在。`verify` 打开书架与详情全程不允许业务 revision 推进；写阶段先确认完整前置集合，再点正式图标，等待 pending 清空、无错误及完整重读，严格要求 manga/account revision 各仅增加 1、只改变目标书签。全局与漫画设置、分类、收藏、资料、封面、resume 和所有已有章节进度必须不变。
 
-驱动按正式 `ChapterSequence` 从唯一 exact URL 算稳定 key；章节名仅用于列表搜索，不承担身份。单操作预算 120 秒、主体总预算 10 分钟，finally 正式 unmount 并等待 Native disposal ACK，成功输出 `BOOKMARKS_SYNC_RESULT` 与 binding reportData。只有实际运行的平台组合可登记通过；驱动分析不证明 Native、跨端、故障恢复、生产 Access 或真机通过。结束后按上文清理 harness、reverse、测试进程及专用设备。
+驱动按正式 `ChapterSequence` 从唯一 exact URL 算稳定 key；移除阶段用正式「仅书签」筛选定位，其他阶段用章节名缩小列表；两种筛选均不承担身份。单操作预算 120 秒、主体总预算 10 分钟，finally 正式 unmount 并等待 Native disposal ACK，成功输出 `BOOKMARKS_SYNC_RESULT` 与 binding reportData。只有实际运行的平台组合可登记通过；驱动分析不证明 Native、跨端、故障恢复、生产 Access 或真机通过。结束后按上文清理 harness、reverse、测试进程及专用设备。
 
 ## Source 阅读与筛选验收
 

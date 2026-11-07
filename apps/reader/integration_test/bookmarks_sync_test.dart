@@ -155,14 +155,28 @@ Future<Map<String, Object?>> _runBookmarkPhase(
   expect(details.manga.url, _mangaUrl);
   final (sequence, chapter) = _exactChapter(details);
   expect(sequence.mangaKey, entry.mangaKey);
-  // The name only narrows the visible list. Identity and the tapped key
-  // always come from the unique exact URL in the real ChapterSequence.
-  final chapterSearch = find.byKey(const ValueKey('chapter-search'));
-  await _reveal(tester, chapterSearch, find.byType(MangaDetailsPage));
-  await tester.enterText(chapterSearch, chapter.name).timeout(_remaining());
-  await tester.pump(const Duration(milliseconds: 300)).timeout(_remaining());
+  final page = find.byType(MangaDetailsPage);
+  final beforeKeys = before.bookmarks.chapterKeys;
+  if (_phase == 'remove') {
+    expect(beforeKeys, contains(chapter.key), reason: '移除前必须已有目标书签');
+    final onlyBookmarks = find.widgetWithText(FilterChip, '仅书签');
+    await _reveal(tester, onlyBookmarks, page);
+    await _waitFor(tester, '正式书签筛选可用', () {
+      return onlyBookmarks.evaluate().length == 1 &&
+          tester.widget<FilterChip>(onlyBookmarks).onSelected != null;
+    });
+    expect(tester.widget<FilterChip>(onlyBookmarks).selected, isFalse);
+    await _tap(tester, onlyBookmarks);
+    expect(tester.widget<FilterChip>(onlyBookmarks).selected, isTrue);
+  } else {
+    // The name only narrows the visible list. The exact URL supplies identity.
+    final chapterSearch = find.byKey(const ValueKey('chapter-search'));
+    await _reveal(tester, chapterSearch, page);
+    await tester.enterText(chapterSearch, chapter.name).timeout(_remaining());
+    await tester.pump(const Duration(milliseconds: 300)).timeout(_remaining());
+  }
   final button = find.byKey(ValueKey('chapter-bookmark-${chapter.key}'));
-  await _reveal(tester, button, find.byType(MangaDetailsPage));
+  await _reveal(tester, button, page);
   await _waitFor(tester, '精确章节的正式书签按钮', () {
     return button.evaluate().length == 1;
   });
@@ -175,7 +189,6 @@ Future<Map<String, Object?>> _runBookmarkPhase(
   expect(identical(editor.repository, repository), isTrue);
   expect(editor.mangaKey, entry.mangaKey);
   await _waitForEditor(tester, editor);
-  final beforeKeys = before.bookmarks.chapterKeys;
   _expectEditor(editor, beforeKeys);
   _expectNoReader(tester, catalog);
 
@@ -189,7 +202,6 @@ Future<Map<String, Object?>> _runBookmarkPhase(
     expect(beforeKeys, isNot(contains(chapter.key)), reason: '不能盲目重跑已添加阶段');
     afterKeys.add(chapter.key);
   } else if (_phase == 'remove') {
-    expect(beforeKeys, contains(chapter.key), reason: '移除前必须已有目标书签');
     afterKeys.remove(chapter.key);
   }
   if (_phase != 'verify') {
