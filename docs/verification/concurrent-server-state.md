@@ -1,6 +1,6 @@
 # 阅读状态一致性验证
 
-本文分别记录历史双 Web 的手动刷新与写冲突、[双 iOS 模拟器](#双-ios-模拟器前台-epoch-冲突)及 [Android 前台恢复与 iOS 重置](#android-前台恢复与-ios-重置同一账户)。各分项均使用正式阅读入口和真实隔离 workerd / D1。
+本文记录历史双 Web 的手动刷新与写冲突、[双 iOS 模拟器前台冲突](#双-ios-模拟器前台-epoch-冲突)、[Android 前台恢复与 iOS 重置](#android-前台恢复与-ios-重置同一账户)及 [Android 已加载阅读断连与显式重试](#android-已加载阅读断连与显式重试)。各分项均使用正式阅读入口和真实隔离 workerd / D1。
 
 > 双 Web 入口状态（2026-11-05）：保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。历史双 Web 结果不算作当前 Source 在线、生产 Access 或 Native 完整门通过。
 
@@ -115,3 +115,21 @@ iOS `prepare`、iOS `reset`、Android `resume` 三次正式测试均通过。A �
 | Android 显式重开并退出           | 10 / 1 / 9                  | epoch 1；当前与最远均为第 1 页 |
 
 复验沿用前一节的 harness、驱动与六路比对，`prepare` 由 B 执行，A 加 `SYNC_TEST_CA_BASE64`，见[集成测试说明](../../apps/reader/integration_test/README.md#阅读中的前台-epoch-冲突)。阶段日志、OS 生命周期、输入摘要与独立 GET 保存在 `/private/tmp/karuyomi-mixed-epoch-a14ee43-LZI43e/results.json` 同目录。本轮两次临时 HTTPS 均已关闭，专用 ADB、AVD 和 iOS 模拟器已清理，无本轮监听或进程残留。该证据覆盖 Android 模拟器前台恢复和 iOS 模拟器顺序重置；未验证 Web 前台、同时写竞争、断网、生产 Access 或真机。独立 GET 证明旧页面没有覆盖 D1，不能据此断言从未发送写请求。
+
+## Android 已加载阅读断连与显式重试
+
+2026-11-08，固定产品提交 `4a7f7c3bb8b55a73c3209f3e86b266bba45ac92d`，Flutter 3.47.5 / Dart 3.13.4。新建 Pixel 9 / Android API 36 ARM64（`emulator-5582`）和 iPhone 17 Pro / iOS 26.4（`F59A3249-6EB3-46CE-90BB-FEB07EB9CE0B`）共用正式 HTTPS harness `https://127.0.0.1:52326/`、受验签测试身份 `acceptance-owner` 与新隔离 D1。Native 使用正式 `app.main()`、WebView、内置运行时材料及原版英文 xkcd Source `1538249443376436084`，作品 `SINGLE`、两页章节 `/3319/`（Elevators）。静态构建为 `ext-all.xkcd-0ba2a6ca758deefaae43a1fe569a0654-969bd86a14e9850b3c4bffe9c827ff7ce52a2eb5e3e4e3437ca70587ddbc6926`；未重新编译 AOT。Android 测试 CA 仅用于本轮 loopback 验收，禁用明文，保持标准证书与 hostname 校验。
+
+| 节点                                      | 账户 / 全局 / 作品 revision | 实际结果                                                                                                                                         |
+| ----------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| iOS 正式安装并收藏                        | 2 / 1 / 1                   | 无书签或进度。                                                                                                                                   |
+| Android 在线解码两页并回到第 1 页         | 5 / 1 / 4                   | epoch 0，当前第 1 页、最远第 2 页。                                                                                                              |
+| 仅阻断 A 到该 HTTPS 端口，真实翻至第 2 页 | 5 / 1 / 4                   | 同 PID `4961`、同阅读页及 Source provider；已加载的第 2 页真实图像仍可显示，UI 明确提示未保存且「重试保存」可用。六路独立 GET 与断连前完整相同。 |
+| 撤规则后点击「重试保存」                  | 8 / 1 / 7                   | 恢复连接时草稿仍在；显式重试后 UI 清除未保存提示。独立 D1 确认当前与最远均为第 2 页，epoch、章与清单身份不变。                                   |
+| iOS 重新打开同一章节并正常回看            | 10 / 1 / 9                  | 正式阅读先恢复第 2 页真实图，再回看第 1 页；最终当前第 1 页、最远第 2 页、epoch 0。                                                              |
+
+断连规则仅作用于专用 Android 模拟器的 `lo → 127.0.0.1:52326`，用 TCP reset 覆盖已有和新建连接，实际命中 5 个 TCP 数据包；ADB 转发始终保持。独立请求按本页同样六路 TLS GET 采样，断连窗口没有业务变更，之后除了该章进度及修订号外其余业务字段不变。仅删除 ADB reverse 的首轮仍可复用既有 HTTPS 连接并保存，因此未通过断连门；使用新 D1 后复验。iOS 首次因旧驱动没有筛选长章节列表而未找到目标；六路无变化，修正精确章节搜索后才通过。
+
+复验见[驱动说明](../../apps/reader/integration_test/README.md#已加载阅读在-android-断连后重试)。Android 实际通过驱动摘要为 `fd81725da5c94f02723c98232d370a09080d84e4f698f650765aff9b7d1d910f`；iOS 重跑的驱动为 `8c60bf6a22795794303e4c7313d1d1350f0276179422d5e0df2ab21a002d9918`，只额外调整明确指定构建的 `navigate` 选择和身份断言。原始证据在 `/private/tmp/karuyomi-android-reader-offline-4a7f7c3-whQNym/results.json` 同目录。两轮服务退出、临时网络规则已撤回、专用 Android AVD、私有 ADB 和 iOS 模拟器已清理，无本轮监听或进程残留。
+
+本分项验证真实服务连接中断时已加载阅读可继续，以及同一会话显式重试、另一设备续读；未覆盖设备全断网、服务已提交后丢 ACK、请求 UUID/单次写入、进程关闭后草稿恢复、生产 Access 或真机。

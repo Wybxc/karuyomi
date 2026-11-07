@@ -160,3 +160,23 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 各节点独立 GET `/api/settings`、`/api/library` 与 `/api/state/manga/:mangaKey?chapterKey=CHAPTER_KEY`；如需比对无关进度和书签，补同作品的完整分页查询。使用上文正式请求头与 TLS 校验。用驱动的作品、章节、清单及构建身份核对 exact 目标，保留 B 重置后、A 旧叶翻页和显式重开后的 D1 证据。旧叶窗口 revision 和锚点不变说明没有覆盖 D1；仅靠 GET 不断言没有发送任何网络请求。报告、独立快照和实际系统前后台证据放在忽略目录。
 
 只有实际成功的测试才能登记平台门。测试驱动的模拟器 UI、生产 Access、物理触控和真机性能分别记录；结束后停止测试服务、关闭并删除本轮可丢弃设备，保留忽略目录中的必要报告。
+
+### 已加载阅读在 Android 断连后重试
+
+使用上述正式 HTTPS harness 和同一套 xkcd 静态资产、设备 CA 与精确 subject。用独立 iOS 的书签驱动 `prepare` 安装英文 xkcd 并收藏，保留空进度。Android 用专用、可抛弃的 API 36 Google APIs 测试模拟器；用 `adb -s "$device_a" reverse "tcp:$port" "tcp:$port"` 接入同一 origin。先确认该模拟器的 debug 包只对 `127.0.0.1` 追加本轮测试 CA、禁用明文，Dart 驱动用 `SYNC_TEST_CA_BASE64`；不改系统全局信任。
+
+1. 在 A 运行 `server_sync_test.dart`，通过 `--dart-define-from-file` 提供 `SYNC_PHASE=offline`、`SYNC_START_PAGE=1`、`SYNC_TARGET_PAGE=2`、`SYNC_EXPECT_EPOCH=0`、实际 `APP_ORIGIN`、`SYNC_SUBJECT`、`SYNC_BUILD_ID` 和 `SYNC_TEST_CA_BASE64`。新 D1 以外须改用独立读回的实际 epoch。驱动先在线解码两页，返回已确认第 1 页；等 `SYNC_OFFLINE_READY`，记录 PID 并用另一个正常 TLS 进程取得六路 GET 基准。
+2. 只在这台专用模拟器阻断该 origin 的精确端口，保留 ADB reverse 与测试控制通道。可在验收协调脚本中使用下列规则；预先设置退出清理，并在脚本正常或异常结束时精确删除同一条规则，不改宿主防火墙，不对普通设备执行。仅删除 ADB reverse 不能排除复用已有 HTTPS 连接。
+
+   ```sh
+   adb -s "$device_a" shell su 0 iptables -I OUTPUT 1 -o lo -d 127.0.0.1/32 \
+     -p tcp --dport "$port" -j REJECT --reject-with tcp-reset
+   # 等待 SYNC_OFFLINE_PENDING，先完成六路独立 GET 对照，再执行删除。
+   adb -s "$device_a" shell su 0 iptables -D OUTPUT -o lo -d 127.0.0.1/32 \
+     -p tcp --dport "$port" -j REJECT --reject-with tcp-reset
+   ```
+
+3. 看到 `SYNC_OFFLINE_PENDING` 时，驱动已在同一阅读页显示真实第 2 页，且待保存提示与「重试保存」有效。恢复前从独立进程确认六路完整响应与基准相同，并核对规则命中和原 PID。撤销规则后，驱动先确认草稿仍未保存，再点正式重试；等待 `SYNC_OFFLINE_RETRY_CONFIRMED`、测试成功退出及独立 D1 读回。当前页应变为第 2 页，epoch 不变，设置、书签及其它业务字段不变。不要把 revision 当作请求计数。
+4. 可另在 iOS 正式重开同一章验证续读。使用 `navigate`、`SYNC_START_PAGE=2`、`SYNC_TARGET_PAGE=1`、同一已知 `SYNC_BUILD_ID` 和原 epoch，不传 Android CA 输入；第 2 页须先出现真实解码帧，第 1 页回看是单独的正常进度写。停止服务并删除本轮设备；详细日志保存在忽略目录。
+
+这项验收只覆盖到该 HTTPS 服务的实际断连和会话内显式保存重试；不模拟已提交后 ACK 丢失，不证明请求 UUID、关闭后草稿恢复或全设备无网。

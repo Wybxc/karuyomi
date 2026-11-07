@@ -8,7 +8,7 @@
 
 Source 重开故障的日期修复已通过正式无插桩 xkcd Web 复验；A 添加书签、B 从书架读回并移除、C 重新读回通过，独立 D1 核对确认重开无附带写入。见[重开记录](../verification/source-reopen.md)。同一隔离 HTTPS / D1 的 iOS ↔ Android 模拟器书签往返也已通过，继续 Web ↔ Native、生产和故障验收，见[书签记录](../verification/bookmarks.md)。
 
-同一隔离 HTTPS / D1 下，双 iOS 模拟器已通过[阅读前台 epoch 冲突](../verification/concurrent-server-state.md#双-ios-模拟器前台-epoch-冲突)：A 在同一进程自动发现 B 的重置，保持当前画面；旧叶翻页不覆盖权威状态，明确重开恢复新位置。同一分项已通过 [Android A 前台恢复、iOS B 重置](../verification/concurrent-server-state.md#android-前台恢复与-ios-重置同一账户)；Web 和其它设备组合继续验收。
+同一隔离 HTTPS / D1 下，双 iOS 模拟器已通过[阅读前台 epoch 冲突](../verification/concurrent-server-state.md#双-ios-模拟器前台-epoch-冲突)：A 在同一进程自动发现 B 的重置，保持当前画面；旧叶翻页不覆盖权威状态，明确重开恢复新位置。同一分项已通过 [Android A 前台恢复、iOS B 重置](../verification/concurrent-server-state.md#android-前台恢复与-ios-重置同一账户)；Web 和其它设备组合继续验收。[Android 阅读断连与显式重试](../verification/concurrent-server-state.md#android-已加载阅读断连与显式重试)已通过：服务连接恢复后保存第 2 页，同账户 iOS 可续读。
 
 ## 优先级与状态
 
@@ -40,7 +40,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 1. **优先功能完整性。** 每个里程碑先实现正式协议、权威读写和用户入口，再集中验证；等待生产 Access 或设备环境时继续可独立完成的功能。[P1 的续读与详情恢复里程碑](p1-library-and-progress.md#下一功能里程碑)已实现，实际平台门另验；[P3 收藏源与快捷打开](p3-extensions-and-migration.md#收藏源里程碑)也已实现，工程与独立运行门见[记录](../verification/source-favorites.md)；[P3 当前包 Source 语言筛选](p3-extensions-and-migration.md#包内语言筛选里程碑)已实现；[静态目录语言筛选](p3-extensions-and-migration.md#静态目录语言筛选里程碑)已接入当前可用索引的 Source 名称/语言，不加载其它扩展，集中工程检查通过、实际 Source/平台待验收，工程及实际运行门维护在[记录](../verification/source-language-filter.md)；[P3 typed Source 筛选](p3-extensions-and-migration.md#typed-source-筛选里程碑)已实现并通过集中工程检查、两包 v5 AOT 及 CuuTruyen Web 动态筛选/分页分项，继续其它 Source/平台验收，后续按[扩展管理](extension-management.md)与[typed Source preferences](source-preferences.md)推进完整功能链路；typed preferences 正式 v6 合同、工程检查、Komiic AOT 与 Web 设置/新文档恢复分项通过，继续其它 Source 控件、Native 和生产验收；默认仓库扩展管理正式合同和入口已接入，已通过[独立集中工程检查](../verification/extension-management.md)、完整 Flutter 回归与构建，实际客户端门继续推进。[源迁移](source-migration.md)已接入正式搜索、章节预览和原子确认，独立集中工程检查、完整 Flutter 回归及构建通过；实际 Source、独立客户端和平台门继续验收。额外仓库已接入，当前三包 AOT、Web 管理及默认 xkcd 安装/阅读分项通过，按[子计划](additional-repositories.md)继续真实外仓与平台验收；[能力提示与有界跨源搜索](cross-source-search.md)已接入，Web 真实 Source 的交接、隔离、分页、停止与详情/阅读分项通过，其余运行门继续验收；不为假设的性能需求增加额外机制。
 2. P1/P2 已实现的分类、章节书签、阅读设置（含外观、输入、适配和裁白）、书架批量操作、范围已读/未读及自定义封面，沿用同一 Worker API + D1 确认路径。各主题的实现、集中工程证据和独立客户端待办以 [P1](p1-library-and-progress.md) / [P2](p2-sync.md) 链接的记录为准，不把已有入口当成完整日用验收。
 3. 功能里程碑完成后运行相关严格分析、数据与正式组件回归、格式和构建，及时提交并推送；不因等待全套人工矩阵而积压已完成的功能。工程检查不能代替真实 Source、独立客户端、生产 Access 或目标设备证据。
-4. 环境可用时集中补齐同一身份 Web/iOS/Android 的实际在线读写、同时写竞争、响应丢失的幂等恢复、前台重取与断网恢复，确认冲突不覆盖另一端状态、最远进度不倒退、旧 epoch 不覆盖重新阅读。既有配对分项及剩余平台门在 [P2](p2-sync.md) 维护；生产 Access 与真机的 [P0](p0-runtime-and-reading.md) 基础验收并行推进。
+4. 环境可用时集中补齐同一身份 Web/iOS/Android 的实际在线读写、同时写竞争、响应丢失的幂等恢复、前台重取与其余断连恢复，确认冲突不覆盖另一端状态、最远进度不倒退、旧 epoch 不覆盖重新阅读。既有配对分项及剩余平台门在 [P2](p2-sync.md) 维护；生产 Access 与真机的 [P0](p0-runtime-and-reading.md) 基础验收并行推进。
 
 ## 维护约定
 

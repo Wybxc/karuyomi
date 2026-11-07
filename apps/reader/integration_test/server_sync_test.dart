@@ -105,7 +105,7 @@ void main() {
         expect(route.initialChapter.name, _chapterLabel);
         expect(_startPage, lessThanOrEqualTo(manifest.pages.length));
         expect(_targetPage, lessThanOrEqualTo(manifest.pages.length));
-        if (_phase != 'navigate') {
+        if (_phase != 'navigate' || _buildId.isNotEmpty) {
           expect(route.source.buildId, _buildId);
           expect(route.initialChapter.snapshot.url, _xkcdChapterUrl);
           expect(manifest.chapterKey, route.initialChapter.key);
@@ -143,6 +143,42 @@ void main() {
           );
           _expectResetState(after);
           epochEvidence = {'beforeReset': _progressReport(before)};
+        } else if (_phase == 'offline') {
+          // Decode both pages online, then return to a confirmed page-one
+          // baseline. The outage must not rely on a Source image fetch.
+          await _turnTo(tester, manifest, _startPage, _targetPage);
+          await _confirmedProgress(
+            tester,
+            repository!,
+            mangaKey,
+            manifest,
+            page: _targetPage,
+            epoch: _expectedEpoch,
+            minimumFurthest: _targetPage,
+          );
+          await _turnTo(tester, manifest, _targetPage, _startPage);
+          await tester.pump(_staleWriteBudget);
+          final before = await _confirmedProgress(
+            tester,
+            repository,
+            mangaKey,
+            manifest,
+            page: _startPage,
+            epoch: _expectedEpoch,
+            minimumFurthest: _targetPage,
+          );
+          after = await _retryAfterOutage(
+            tester,
+            catalog,
+            repository,
+            mangaKey,
+            manifest,
+          );
+          epochEvidence = {
+            'beforeDisconnect': _progressReport(before),
+            'keptMountedReader': true,
+            'explicitRetry': true,
+          };
         } else {
           await _turnTo(tester, manifest, _startPage, _targetPage);
           final before = await _confirmedProgress(
@@ -257,14 +293,22 @@ void _validateConfiguration() {
   if (_chapterLabel.isEmpty || _startPage < 1 || _targetPage < 1) {
     fail('SYNC_CHAPTER_LABEL 不能为空，SYNC_START_PAGE / SYNC_TARGET_PAGE 须大于零');
   }
-  if (!{'navigate', 'reset', 'resume'}.contains(_phase) ||
+  if (!{'navigate', 'reset', 'resume', 'offline'}.contains(_phase) ||
       _expectedEpoch < -1 ||
       _expectedEpoch >= 0xffffffff ||
       (_phase != 'navigate' &&
           (_subject.isEmpty || _buildId.isEmpty || _expectedEpoch < 0)) ||
-      (_phase == 'resume' && (_startPage != 1 || _targetPage != 2)) ||
+      (('resume' == _phase || 'offline' == _phase) &&
+          (_startPage != 1 || _targetPage != 2)) ||
       (_phase == 'reset' && (_startPage != 2 || _targetPage != 1))) {
-    fail('前台和重置阶段须提供同一 subject、构建 ID、原 epoch，以及 resume 1→2 / reset 2→1');
+    fail('前台、断连和重置阶段须提供同一 subject、构建 ID、原 epoch，断连/前台 1→2、重置 2→1');
+  }
+  if (_phase == 'offline' &&
+      (!Platform.isAndroid ||
+          origin.host != '127.0.0.1' ||
+          !origin.hasPort ||
+          _testCaBase64.isEmpty)) {
+    fail('断连验收仅允许专用 Android 模拟器经本地 HTTPS 端口和测试 CA');
   }
 }
 
@@ -343,7 +387,9 @@ Future<Finder> _chapterTile(
   await _waitFor(tester, '正式 Source 返回详情和章节', () {
     return page.evaluate().length == 1;
   });
-  if (_phase == 'navigate') return find.widgetWithText(ListTile, _chapterLabel);
+  if (_phase == 'navigate' && _buildId.isEmpty) {
+    return find.widgetWithText(ListTile, _chapterLabel);
+  }
   final details = tester.widget<MangaDetailsPage>(page);
   expect(details.controller, same(catalog));
   expect(catalog.activeBuild!.packageName, _xkcdPackage);
@@ -563,6 +609,89 @@ _resume(
   _expectResetState(reopened);
   debugPrintSynchronously('SYNC_RESUME_REOPENED pid=$pid');
   return (reopened: reopened, remote: remote, stale: stale);
+}
+
+Future<ProgressSnapshot> _retryAfterOutage(
+  WidgetTester tester,
+  CatalogController catalog,
+  ProgressRepository repository,
+  String mangaKey,
+  ChapterManifest manifest,
+) async {
+  final oldElement = tester.element(find.byType(ReaderScreen));
+  final oldProvider = _reader(tester).provider;
+  final retry = find.widgetWithText(TextButton, '重试保存');
+  final pending = find.textContaining('草稿仅保留在当前会话。');
+  final origin = Uri.parse(_origin);
+
+  void sameReader() {
+    expect(tester.element(find.byType(ReaderScreen)), same(oldElement));
+    expect(_reader(tester).provider, same(oldProvider));
+  }
+
+  debugPrintSynchronously('SYNC_OFFLINE_READY pid=$pid');
+  await _waitForLoopback(tester, origin, connected: false);
+  debugPrintSynchronously('SYNC_OFFLINE_SOCKET_DOWN pid=$pid');
+  await _turnTo(tester, manifest, _startPage, _targetPage);
+  await _waitFor(tester, '真实断连后保留进度草稿和正式重试控件', () {
+    return catalog.hasUnsavedReadingProgress &&
+        pending.evaluate().length == 1 &&
+        retry.evaluate().length == 1 &&
+        tester.widget<TextButton>(retry).onPressed != null;
+  });
+  sameReader();
+  await _waitForPage(tester, manifest, _targetPage);
+  debugPrintSynchronously('SYNC_OFFLINE_PENDING pid=$pid');
+
+  await _waitForLoopback(tester, origin, connected: true);
+  sameReader();
+  expect(catalog.hasUnsavedReadingProgress, isTrue);
+  expect(pending, findsOneWidget);
+  expect(retry, findsOneWidget);
+  debugPrintSynchronously('SYNC_OFFLINE_SOCKET_RESTORED pid=$pid');
+  await _tap(tester, retry);
+  final after = await _confirmedProgress(
+    tester,
+    repository,
+    mangaKey,
+    manifest,
+    page: _targetPage,
+    epoch: _expectedEpoch,
+    minimumFurthest: _targetPage,
+  );
+  sameReader();
+  expect(catalog.hasUnsavedReadingProgress, isFalse);
+  expect(pending, findsNothing);
+  expect(retry, findsNothing);
+  debugPrintSynchronously('SYNC_OFFLINE_RETRY_CONFIRMED pid=$pid');
+  return after;
+}
+
+Future<void> _waitForLoopback(
+  WidgetTester tester,
+  Uri origin, {
+  required bool connected,
+}) async {
+  // Probe only whether the exact loopback route can accept a connection.
+  // Actual app requests still use HTTPS and normal certificate validation.
+  final elapsed = Stopwatch()..start();
+  while (elapsed.elapsed < _operationBudget) {
+    bool reachable;
+    try {
+      final socket = await Socket.connect(
+        origin.host,
+        origin.port,
+        timeout: const Duration(seconds: 2),
+      );
+      socket.destroy();
+      reachable = true;
+    } on SocketException {
+      reachable = false;
+    }
+    if (reachable == connected) return;
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+  fail('专用模拟器未观察到预期的本地连接状态：$connected');
 }
 
 void _expectResetState(ProgressSnapshot state) {

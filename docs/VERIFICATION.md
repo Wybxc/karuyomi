@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-08，正式 Android 模拟器的[阅读断连与显式重试](verification/concurrent-server-state.md#android-已加载阅读断连与显式重试)通过：定向 TCP 中断期间同一阅读页仍可翻到已加载图片，进度保持未确认，独立六路 D1 读回不变；恢复连接后显式重试确认，独立 iOS 正式入口续读到第 2 页并可回看第 1 页，最远进度保持第 2 页。此分项不覆盖全设备断网、服务端已提交后丢响应、生产 Access 或真机。
+
 2026-11-07，两台 iOS 模拟器经同一受信 HTTPS / D1，通过[阅读前台 epoch 冲突](verification/concurrent-server-state.md#双-ios-模拟器前台-epoch-冲突)：B 正式重新阅读后，A 回到原进程和第 2 页，自动提示冲突；旧叶继续翻页未覆盖 D1，明确重开后恢复新 epoch 的第 1 页真实图。独立六路响应比对通过。2026-11-08 [Android A 恢复前台、iOS B 重置](verification/concurrent-server-state.md#android-前台恢复与-ios-重置同一账户)通过同进程和任务恢复、六路权威状态不变及显式重开。Web、其它设备组合、同时写竞争、生产 Access 和真机另验。
 
 2026-11-07，正式 Web 的 xkcd 范围已读/未读通过三独立文档往返；首次发现同一详情收藏后误用旧作品 revision，显式重读可恢复，修复后的独立空库首次确认 3/3 通过。独立 D1 核对负对照、书签、设置及阅读锚点未变，见[章节状态记录](verification/chapter-read-state.md)。Native、真实并发和生产另验。
