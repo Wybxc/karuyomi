@@ -11,6 +11,7 @@ import 'package:karuyomi/features/bookmarks/bookmark_status.dart';
 import 'package:karuyomi/features/bookmarks/chapter_bookmarks_controller.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
@@ -23,6 +24,7 @@ const _origin = String.fromEnvironment('APP_ORIGIN');
 const _subject = String.fromEnvironment('BOOKMARKS_SUBJECT');
 const _packageName = String.fromEnvironment('BOOKMARKS_PACKAGE_NAME');
 const _sourceId = String.fromEnvironment('BOOKMARKS_SOURCE_ID');
+const _buildId = String.fromEnvironment('BOOKMARKS_BUILD_ID');
 const _mangaUrl = String.fromEnvironment('BOOKMARKS_MANGA_URL');
 const _chapterUrl = String.fromEnvironment('BOOKMARKS_CHAPTER_URL');
 const _phase = String.fromEnvironment('BOOKMARKS_PHASE');
@@ -74,135 +76,15 @@ void main() {
       expect(client.identity.subject, _subject);
       expect(client.identity.origin.origin, platform.origin.origin);
       expect(catalog.session, isNull);
-      final shelf = await library.watchView().first.timeout(_remaining());
-      final matches = shelf.entries.where(
-        (entry) =>
-            entry.packageName == _packageName &&
-            entry.sourceId == _sourceId &&
-            entry.url == _mangaUrl,
-      );
-      expect(matches, hasLength(1), reason: '正式书架必须包含唯一精确 Source 作品');
-      final entry = matches.single;
-      expect(entry.mangaKey, expected.state.manga.mangaKey);
-      expect(
-        shelf.entries.every((entry) => entry.customCover == null),
-        isTrue,
-        reason: '本轮只验收书签，不加载任何书架自定义封面图片',
-      );
-      final before = await _readSnapshot(client, repository, entry.mangaKey);
-      _expectConfigured(before, expected);
-      expect(client.hasPendingMetadata(entry.mangaKey), isFalse);
-
-      // Follow the product shelf's real onTap. Opening an unchanged Source
-      // snapshot must remain read-only, including its metadata refresh path.
-      final shelfCard = find.descendant(
-        of: find.byType(LibraryPage),
-        matching: find.byKey(ValueKey(entry.mangaKey)),
-      );
-      final shelfTile = find.descendant(
-        of: shelfCard,
-        matching: find.byType(ListTile),
-      );
-      await _reveal(tester, shelfTile, find.byType(LibraryPage));
-      await _tap(tester, shelfTile);
-      await _waitFor(tester, '真实 Source 详情和章节', () {
-        _checkCatalog(catalog);
-        return find.byType(MangaDetailsPage).evaluate().length == 1;
-      });
-      final details = tester.widget<MangaDetailsPage>(
-        find.byType(MangaDetailsPage),
-      );
-      expect(identical(details.controller, catalog), isTrue);
-      expect(catalog.activeBuild!.packageName, _packageName);
-      expect(details.source.sourceId, _sourceId);
-      expect(details.manga.url, _mangaUrl);
-      final sequence = ChapterSequence(
-        packageName: _packageName,
-        sourceId: _sourceId,
-        mangaUrl: details.manga.url,
-        chapters: details.chapters.map((chapter) => chapter.snapshot),
-      );
-      expect(sequence.mangaKey, entry.mangaKey);
-      final chapters = sequence.entries.where(
-        (chapter) => chapter.snapshot.url == _chapterUrl,
-      );
-      expect(chapters, hasLength(1), reason: '章节必须按唯一 exact Source URL 识别');
-      final chapter = chapters.single;
-      expect(chapter.stable, isTrue);
-      expect(chapter.name, isNotEmpty, reason: '本轮真实xkcd章节须有可搜索的显示名');
-      // The name only narrows the visible list. Identity and the tapped key
-      // always come from the unique exact URL in the real ChapterSequence.
-      final chapterSearch = find.byKey(const ValueKey('chapter-search'));
-      await _reveal(tester, chapterSearch, find.byType(MangaDetailsPage));
-      await tester.enterText(chapterSearch, chapter.name).timeout(_remaining());
-      await tester
-          .pump(const Duration(milliseconds: 300))
-          .timeout(_remaining());
-      final button = find.byKey(ValueKey('chapter-bookmark-${chapter.key}'));
-      await _reveal(tester, button, find.byType(MangaDetailsPage));
-      await _waitFor(tester, '精确章节的正式书签按钮', () {
-        return button.evaluate().length == 1;
-      });
-      final owner = find.ancestor(
-        of: button,
-        matching: find.byType(ChapterBookmarkButton),
-      );
-      expect(owner, findsOneWidget);
-      final editor = tester.widget<ChapterBookmarkButton>(owner).controller;
-      expect(identical(editor.repository, repository), isTrue);
-      expect(editor.mangaKey, entry.mangaKey);
-      await _waitForEditor(tester, editor);
-      final beforeKeys = before.bookmarks.chapterKeys;
-      _expectEditor(editor, beforeKeys);
-      _expectNoReader(tester, catalog);
-
-      // Reject drift before clicking a write. Source metadata that changed
-      // during preparation must be stabilized and snapshotted outside this run.
-      final opened = await _readSnapshot(client, repository, entry.mangaKey);
-      _expectTransition(before, opened, beforeKeys, mutations: 0);
-      expect(client.hasPendingMetadata(entry.mangaKey), isFalse);
-      final afterKeys = {...beforeKeys};
-      if (_phase == 'set') {
-        expect(beforeKeys, isNot(contains(chapter.key)), reason: '不能盲目重跑已添加阶段');
-        afterKeys.add(chapter.key);
-      } else if (_phase == 'remove') {
-        expect(beforeKeys, contains(chapter.key), reason: '移除前必须已有目标书签');
-        afterKeys.remove(chapter.key);
-      }
-      if (_phase != 'verify') {
-        expect(tester.widget<IconButton>(button).onPressed, isNotNull);
-        await _tap(tester, button);
-        await _waitForEditor(tester, editor);
-      }
-      _expectEditor(editor, afterKeys);
-      final after = await _readSnapshot(client, repository, entry.mangaKey);
-      _expectTransition(
-        before,
-        after,
-        afterKeys,
-        mutations: _phase == 'verify' ? 0 : 1,
-      );
-      expect(identical(catalog.library!.client, client), isTrue);
-      expect(identical(catalog.bookmarks, repository), isTrue);
-      expect(client.hasPendingMetadata(entry.mangaKey), isFalse);
-      _expectNoReader(tester, catalog);
-      expect(tester.takeException(), isNull);
-      result = {
-        'phase': _phase,
-        'platform': Platform.operatingSystem,
-        'androidLoopbackTestCa': _testCaBase64.isNotEmpty,
-        'origin': client.identity.origin.origin,
-        'subject': client.identity.subject,
-        'packageName': _packageName,
-        'sourceId': _sourceId,
-        'buildId': catalog.activeBuild!.id,
-        'mangaUrl': _mangaUrl,
-        'mangaKey': entry.mangaKey,
-        'chapterUrl': chapter.snapshot.url,
-        'chapterKey': chapter.key,
-        'before': _report(before),
-        'after': _report(after),
-      };
+      result = expected == null
+          ? await _prepare(tester, catalog, client, repository)
+          : await _runBookmarkPhase(
+              tester,
+              catalog,
+              client,
+              repository,
+              expected,
+            );
     } finally {
       try {
         await tester
@@ -219,6 +101,342 @@ void main() {
     binding.reportData = {'BOOKMARKS_SYNC_RESULT': result};
     debugPrint('BOOKMARKS_SYNC_RESULT ${jsonEncode(result)}');
   }, timeout: const Timeout(Duration(minutes: 15)));
+}
+
+Future<Map<String, Object?>> _runBookmarkPhase(
+  WidgetTester tester,
+  CatalogController catalog,
+  BusinessStateClient client,
+  BookmarkRepository repository,
+  _Expected expected,
+) async {
+  final library = catalog.library!;
+  final shelf = await library.watchView().first.timeout(_remaining());
+  final matches = shelf.entries.where(
+    (entry) =>
+        entry.packageName == _packageName &&
+        entry.sourceId == _sourceId &&
+        entry.url == _mangaUrl,
+  );
+  expect(matches, hasLength(1), reason: '正式书架必须包含唯一精确 Source 作品');
+  final entry = matches.single;
+  expect(entry.mangaKey, expected.state.manga.mangaKey);
+  expect(
+    shelf.entries.every((entry) => entry.customCover == null),
+    isTrue,
+    reason: '本轮只验收书签，不加载任何书架自定义封面图片',
+  );
+  final before = await _readSnapshot(client, repository, entry.mangaKey);
+  _expectConfigured(before, expected);
+  expect(client.hasPendingMetadata(entry.mangaKey), isFalse);
+
+  // Follow the product shelf's real onTap. Opening an unchanged Source
+  // snapshot must remain read-only, including its metadata refresh path.
+  final shelfCard = find.descendant(
+    of: find.byType(LibraryPage),
+    matching: find.byKey(ValueKey(entry.mangaKey)),
+  );
+  final shelfTile = find.descendant(
+    of: shelfCard,
+    matching: find.byType(ListTile),
+  );
+  await _reveal(tester, shelfTile, find.byType(LibraryPage));
+  await _tap(tester, shelfTile);
+  await _waitFor(tester, '真实 Source 详情和章节', () {
+    _checkCatalog(catalog);
+    return find.byType(MangaDetailsPage).evaluate().length == 1;
+  });
+  final details = tester.widget<MangaDetailsPage>(
+    find.byType(MangaDetailsPage),
+  );
+  expect(identical(details.controller, catalog), isTrue);
+  expect(catalog.activeBuild!.packageName, _packageName);
+  expect(details.source.sourceId, _sourceId);
+  expect(details.manga.url, _mangaUrl);
+  final (sequence, chapter) = _exactChapter(details);
+  expect(sequence.mangaKey, entry.mangaKey);
+  // The name only narrows the visible list. Identity and the tapped key
+  // always come from the unique exact URL in the real ChapterSequence.
+  final chapterSearch = find.byKey(const ValueKey('chapter-search'));
+  await _reveal(tester, chapterSearch, find.byType(MangaDetailsPage));
+  await tester.enterText(chapterSearch, chapter.name).timeout(_remaining());
+  await tester.pump(const Duration(milliseconds: 300)).timeout(_remaining());
+  final button = find.byKey(ValueKey('chapter-bookmark-${chapter.key}'));
+  await _reveal(tester, button, find.byType(MangaDetailsPage));
+  await _waitFor(tester, '精确章节的正式书签按钮', () {
+    return button.evaluate().length == 1;
+  });
+  final owner = find.ancestor(
+    of: button,
+    matching: find.byType(ChapterBookmarkButton),
+  );
+  expect(owner, findsOneWidget);
+  final editor = tester.widget<ChapterBookmarkButton>(owner).controller;
+  expect(identical(editor.repository, repository), isTrue);
+  expect(editor.mangaKey, entry.mangaKey);
+  await _waitForEditor(tester, editor);
+  final beforeKeys = before.bookmarks.chapterKeys;
+  _expectEditor(editor, beforeKeys);
+  _expectNoReader(tester, catalog);
+
+  // Reject drift before clicking a write. Source metadata that changed
+  // during preparation must be stabilized and snapshotted outside this run.
+  final opened = await _readSnapshot(client, repository, entry.mangaKey);
+  _expectTransition(before, opened, beforeKeys, mutations: 0);
+  expect(client.hasPendingMetadata(entry.mangaKey), isFalse);
+  final afterKeys = {...beforeKeys};
+  if (_phase == 'set') {
+    expect(beforeKeys, isNot(contains(chapter.key)), reason: '不能盲目重跑已添加阶段');
+    afterKeys.add(chapter.key);
+  } else if (_phase == 'remove') {
+    expect(beforeKeys, contains(chapter.key), reason: '移除前必须已有目标书签');
+    afterKeys.remove(chapter.key);
+  }
+  if (_phase != 'verify') {
+    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+    await _tap(tester, button);
+    await _waitForEditor(tester, editor);
+  }
+  _expectEditor(editor, afterKeys);
+  final after = await _readSnapshot(client, repository, entry.mangaKey);
+  _expectTransition(
+    before,
+    after,
+    afterKeys,
+    mutations: _phase == 'verify' ? 0 : 1,
+  );
+  expect(identical(catalog.library!.client, client), isTrue);
+  expect(identical(catalog.bookmarks, repository), isTrue);
+  expect(client.hasPendingMetadata(entry.mangaKey), isFalse);
+  _expectNoReader(tester, catalog);
+  expect(tester.takeException(), isNull);
+  return {
+    'phase': _phase,
+    'platform': Platform.operatingSystem,
+    'androidLoopbackTestCa': _testCaBase64.isNotEmpty,
+    'origin': client.identity.origin.origin,
+    'subject': client.identity.subject,
+    'packageName': _packageName,
+    'sourceId': _sourceId,
+    'buildId': catalog.activeBuild!.id,
+    'mangaUrl': _mangaUrl,
+    'mangaKey': entry.mangaKey,
+    'chapterUrl': chapter.snapshot.url,
+    'chapterKey': chapter.key,
+    'before': _report(before),
+    'after': _report(after),
+  };
+}
+
+Future<Map<String, Object?>> _prepare(
+  WidgetTester tester,
+  CatalogController catalog,
+  BusinessStateClient client,
+  BookmarkRepository repository,
+) async {
+  final initial = await client.readSettings().timeout(_remaining());
+  final shelf = await catalog.library!.watchView().first.timeout(_remaining());
+  expect(initial.accountRevision, 0, reason: 'prepare 只在新的验收 D1 运行');
+  expect(initial.global.values.installedExtensions, isEmpty);
+  expect(shelf.entries, isEmpty);
+  expect(shelf.categories, isEmpty);
+
+  final candidates = catalog.builds.where(
+    (build) =>
+        build.catalog == catalog.defaultCatalog &&
+        build.packageName == _packageName &&
+        build.id == _buildId,
+  );
+  expect(candidates, hasLength(1), reason: '当前默认静态目录必须包含指定的精确构建');
+  final build = candidates.single;
+  expect(
+    build.sources.where(
+      (source) => source.id == _sourceId && source.lang == 'en',
+    ),
+    hasLength(1),
+  );
+
+  void checkSource() {
+    _checkCatalog(catalog);
+    if (catalog.error case final error?) fail('正式 Source 操作未完成：$error');
+  }
+
+  final libraryPage = find.byType(LibraryPage);
+  final catalogPage = find.byType(CatalogPage);
+  final extensionsPage = find.byType(ExtensionsPage);
+  final goBrowse = find.descendant(of: libraryPage, matching: find.text('去浏览'));
+  await _reveal(tester, goBrowse, libraryPage);
+  await _tap(tester, goBrowse);
+  final manage = find.byKey(const ValueKey('extensions-manage'));
+  await _waitFor(tester, '正式扩展管理入口可点击', () {
+    checkSource();
+    return manage.evaluate().length == 1 &&
+        tester.widget<TextButton>(manage).onPressed != null;
+  });
+  await _tap(tester, manage);
+  await _waitFor(
+    tester,
+    '正式扩展管理页',
+    () => extensionsPage.evaluate().length == 1,
+  );
+  final install = find.byKey(
+    ValueKey(('extension-install', build.catalogUrl, build.packageName)),
+  );
+  await _reveal(tester, install, extensionsPage);
+  await _waitFor(tester, '精确扩展可安装', () {
+    checkSource();
+    return install.evaluate().length == 1 &&
+        tester.widget<FilledButton>(install).onPressed != null;
+  });
+  await _tap(tester, install);
+  final refresh = find.byKey(const ValueKey('extensions-refresh'));
+  await _reveal(tester, refresh, extensionsPage, delta: -300);
+  await _waitFor(tester, '确认精确扩展安装', () {
+    checkSource();
+    final error = find.byKey(const ValueKey('extensions-error'));
+    if (error.evaluate().isNotEmpty) {
+      fail('正式扩展安装未完成：${tester.widget<Text>(error).data}');
+    }
+    final installed = catalog.installedExtension(_packageName);
+    return !catalog.busy &&
+        refresh.evaluate().length == 1 &&
+        tester.widget<TextButton>(refresh).onPressed != null &&
+        installed?.enabled == true &&
+        installed?.buildId == _buildId;
+  });
+  final installedSettings = await client.readSettings().timeout(_remaining());
+  expect(installedSettings.accountRevision, initial.accountRevision + 1);
+  final installed = installedSettings.global.values.installedExtensions.single;
+  expect(installed.packageName, _packageName);
+  expect(installed.buildId, _buildId);
+  expect(installed.catalogUrl, build.catalogUrl);
+  expect(installed.repoId, build.repoId);
+  expect(installed.enabled, isTrue);
+  expect(
+    catalog.isNetworkRegistered(build, sha256: installed.bundleSha256),
+    isTrue,
+  );
+
+  await _tap(
+    tester,
+    find.descendant(of: extensionsPage, matching: find.byType(BackButton)),
+  );
+  await _waitFor(tester, '返回正式浏览页', () => catalogPage.evaluate().length == 1);
+  final buildButton = find.byKey(ValueKey(('catalog-build-open', _buildId)));
+  await _reveal(tester, buildButton, catalogPage);
+  await _tap(tester, buildButton);
+  await _waitFor(tester, '打开精确扩展', () {
+    checkSource();
+    return !catalog.busy &&
+        catalog.activeBuild?.id == _buildId &&
+        catalog.session != null;
+  });
+  final sourceButton = find.byKey(ValueKey(('catalog-source', _sourceId)));
+  await _reveal(tester, sourceButton, catalogPage);
+  await _tap(tester, sourceButton);
+  await _waitFor(tester, '英文 Source 热门返回', () {
+    checkSource();
+    return !catalog.busy &&
+        catalog.activeSource?.id == _sourceId &&
+        catalog.listing == 'popular' &&
+        catalog.page == 1;
+  });
+  expect(catalog.activeSource!.lang, 'en');
+  final matches = catalog.mangas.where((manga) => manga.url == _mangaUrl);
+  expect(matches, hasLength(1), reason: '热门必须包含唯一 exact Source 作品');
+  final manga = matches.single;
+  expect(
+    catalog.mangas.where((entry) => entry.title == manga.title),
+    hasLength(1),
+  );
+  final result = find.ancestor(
+    of: find.descendant(of: catalogPage, matching: find.text(manga.title)),
+    matching: find.byType(ListTile),
+  );
+  await _reveal(tester, result, catalogPage);
+  await _tap(tester, result);
+
+  final detailsPage = find.byType(MangaDetailsPage);
+  await _waitFor(tester, '真实 Source 详情和章节', () {
+    checkSource();
+    return detailsPage.evaluate().length == 1;
+  });
+  final details = tester.widget<MangaDetailsPage>(detailsPage);
+  expect(identical(details.controller, catalog), isTrue);
+  expect(details.source.buildId, _buildId);
+  expect(details.source.sourceId, _sourceId);
+  expect(details.manga.url, _mangaUrl);
+  final (sequence, chapter) = _exactChapter(details);
+  final favorite = find.ancestor(
+    of: find.descendant(of: detailsPage, matching: find.text('加入书架')),
+    matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
+  );
+  await _reveal(tester, favorite, detailsPage);
+  await _waitFor(tester, '正式收藏按钮可点击', () {
+    checkSource();
+    return favorite.evaluate().length == 1 &&
+        tester.widget<OutlinedButton>(favorite).onPressed != null;
+  });
+  await _tap(tester, favorite);
+  await _waitFor(tester, '正式收藏已确认', () {
+    checkSource();
+    return find
+            .descendant(of: detailsPage, matching: find.text('移出书架'))
+            .evaluate()
+            .length ==
+        1;
+  });
+  final after = await _readSnapshot(client, repository, sequence.mangaKey);
+  expect(after.state.accountRevision, installedSettings.accountRevision + 1);
+  expect(
+    wire.encodeProtoJson(after.settings.global),
+    wire.encodeProtoJson(installedSettings.global),
+  );
+  expect(after.state.manga.revision, 1);
+  expect(after.state.manga.favorite, isTrue);
+  expect(after.state.manga.hasCustomCover(), isFalse);
+  expect(after.state.manga.metadata.packageName, _packageName);
+  expect(after.state.manga.metadata.sourceId, _sourceId);
+  expect(after.state.manga.metadata.manga.url, _mangaUrl);
+  expect(after.bookmarks.chapterKeys, isEmpty);
+  expect(after.progress.entries, isEmpty);
+  expect(client.hasPendingMetadata(sequence.mangaKey), isFalse);
+  _expectNoReader(tester, catalog);
+  expect(tester.takeException(), isNull);
+  return {
+    'phase': _phase,
+    'platform': Platform.operatingSystem,
+    'androidLoopbackTestCa': _testCaBase64.isNotEmpty,
+    'origin': client.identity.origin.origin,
+    'subject': client.identity.subject,
+    'packageName': _packageName,
+    'sourceId': _sourceId,
+    'buildId': _buildId,
+    'mangaUrl': _mangaUrl,
+    'mangaKey': sequence.mangaKey,
+    'chapterUrl': chapter.snapshot.url,
+    'chapterKey': chapter.key,
+    'initialAccountRevision': initial.accountRevision,
+    'installedAccountRevision': installedSettings.accountRevision,
+    'after': _report(after),
+  };
+}
+
+(ChapterSequence, SequenceChapter) _exactChapter(MangaDetailsPage details) {
+  final sequence = ChapterSequence(
+    packageName: _packageName,
+    sourceId: _sourceId,
+    mangaUrl: details.manga.url,
+    chapters: details.chapters.map((chapter) => chapter.snapshot),
+  );
+  final chapters = sequence.entries.where(
+    (chapter) => chapter.snapshot.url == _chapterUrl,
+  );
+  expect(chapters, hasLength(1), reason: '章节必须按唯一 exact Source URL 识别');
+  final chapter = chapters.single;
+  expect(chapter.stable, isTrue);
+  expect(chapter.name, isNotEmpty, reason: '本轮真实xkcd章节须有可搜索的显示名');
+  return (sequence, chapter);
 }
 
 final class _Expected {
@@ -402,16 +620,26 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump(const Duration(milliseconds: 300)).timeout(_remaining());
 }
 
-Future<void> _reveal(WidgetTester tester, Finder finder, Finder page) async {
+Future<void> _reveal(
+  WidgetTester tester,
+  Finder finder,
+  Finder page, {
+  double delta = 300,
+}) async {
   final scrollable = find
       .descendant(of: page, matching: find.byType(Scrollable))
       .first;
   await tester
-      .scrollUntilVisible(finder, 300, scrollable: scrollable, maxScrolls: 100)
+      .scrollUntilVisible(
+        finder,
+        delta,
+        scrollable: scrollable,
+        maxScrolls: 100,
+      )
       .timeout(_remaining());
 }
 
-_Expected _validateConfiguration() {
+_Expected? _validateConfiguration() {
   final origin = Uri.tryParse(_origin);
   if (origin == null ||
       origin.scheme != 'https' ||
@@ -436,8 +664,12 @@ _Expected _validateConfiguration() {
       _mangaUrl.isEmpty ||
       _chapterUrl.isEmpty ||
       _chapterUrl.length > 8192 ||
-      !{'verify', 'set', 'remove'}.contains(_phase)) {
-    fail('须提供精确的 BOOKMARKS 身份、Source作品/章节URL及 verify/set/remove 阶段');
+      !{'prepare', 'verify', 'set', 'remove'}.contains(_phase)) {
+    fail('须提供精确的 BOOKMARKS 身份、Source 作品/章节 URL 及阶段');
+  }
+  if (_phase == 'prepare') {
+    if (_buildId.isEmpty) fail('prepare 须提供当前静态目录的精确 BOOKMARKS_BUILD_ID');
+    return null;
   }
   final settings = wire.decodeProtoJson(
     wire.SettingsResponse(),
