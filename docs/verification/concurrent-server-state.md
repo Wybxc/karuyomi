@@ -1,6 +1,6 @@
 # 阅读状态一致性验证
 
-本文分别记录历史双 Web 的手动刷新与写冲突，以及[双 iOS 模拟器的真实前台 epoch 冲突](#双-ios-模拟器前台-epoch-冲突)。两项都使用正式阅读入口和真实隔离 workerd / D1。
+本文分别记录历史双 Web 的手动刷新与写冲突、[双 iOS 模拟器](#双-ios-模拟器前台-epoch-冲突)及 [Android 前台恢复与 iOS 重置](#android-前台恢复与-ios-重置同一账户)。各分项均使用正式阅读入口和真实隔离 workerd / D1。
 
 > 双 Web 入口状态（2026-11-05）：保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。历史双 Web 结果不算作当前 Source 在线、生产 Access 或 Native 完整门通过。
 
@@ -98,4 +98,20 @@ diff -u <(jq -S '{identity, responses}' api-b-reset.json) \
   <(jq -S '{identity, responses}' api-a-stale.json)
 ```
 
-原始阶段配置、输入摘要、两轮日志、`api-*.json` 和旧叶取样时序保留在 `/private/tmp/karuyomi-native-epoch-d2a21aa-KgLChg/`；成功轮使用上述修正后的驱动摘要，`first-attempt/` 保存首轮失败。两轮 harness 已退出，测试端口无监听，两台本轮专用模拟器已关闭和删除。此分项仅覆盖双 iOS 模拟器、顺序写入和真实系统前后台；Web 或 Android 阅读自动前台、混合平台、同时写竞争、断网、生产 Access 和真机仍分别验收。
+原始阶段配置、输入摘要、两轮日志、`api-*.json` 和旧叶取样时序保留在 `/private/tmp/karuyomi-native-epoch-d2a21aa-KgLChg/`；成功轮使用上述修正后的驱动摘要，`first-attempt/` 保存首轮失败。两轮 harness 已退出，测试端口无监听，两台本轮专用模拟器已关闭和删除。此分项仅覆盖双 iOS 模拟器、顺序写入和真实系统前后台；混合模拟器的复验见下节。Web 阅读自动前台、同时写竞争、断网、生产 Access 和真机仍分别验收。
+
+## Android 前台恢复与 iOS 重置（同一账户）
+
+2026-11-08 在固定产品提交 `a14ee43d2ac272fe89ae6c88a9b1291d2c2a5345` 的独立副本，用 Flutter 3.47.5 / Dart 3.13.4 复验。正式 `server_sync_test.dart` 的 SHA-256 为 `ae88f7f6f45298cbdd3fc52f4ec718b5a9349f60c21d3ea8a6e79686af2f78f4`。A 为新建 Pixel 9 / Android API 36 ARM64（`emulator-5586`），B 为新建 iPhone 17 Pro / iOS 26.4（`BC36D11B-3491-47D9-98EB-002BEF22F938`）。两台设备使用同一全新官方 HTTPS harness（`https://127.0.0.1:58319/`、`acceptance-owner`）与 D1；未修改 AOT。确切扩展为 `ext-all.xkcd-0ba2a6ca758deefaae43a1fe569a0654-969bd86a14e9850b3c4bffe9c827ff7ce52a2eb5e3e4e3437ca70587ddbc6926`，英文 Source `1538249443376436084`，作品 `SINGLE`、章节 `/3319/`（Elevators）。Android 以专用 ADB 将相同端口转入模拟器，隔离 debug APK 只对 `127.0.0.1` 追加测试 CA，保留系统根与 hostname 校验，禁用明文；Dart 驱动也用标准 CA 输入。
+
+iOS `prepare`、iOS `reset`、Android `resume` 三次正式测试均通过。A 保存第 2 页后以 `adb shell input keyevent KEYCODE_HOME` 真实暂停；B 恢复第 2 页，点击「重新阅读本章」并确认新 epoch，退出取得资源释放确认。随后 Android 用 launcher intent 热恢复同一 task、同 PID `3385`。A 在测试主动读取或点击之前显示远端重置提示，仍保留旧阅读页、图片与第 2 页，重置与读完按钮不可用。A 在原页面实际翻页 `2 → 1 → 2`，独立六路 GET 与 B 退出后的完整响应逐字段相同；驱动等待 3 秒后再次只读检查，仍未覆盖服务端状态。A 显式点「重新打开本章」后采用已确认的新锚点、显示真实第 1 页，旧资源释放成功。
+
+| 节点                             | 账户 / 全局 / 作品 revision | 目标章                         |
+| -------------------------------- | --------------------------- | ------------------------------ |
+| iOS 安装并收藏                   | 2 / 1 / 1                   | 无进度                         |
+| Android 已进入后台               | 5 / 1 / 4                   | epoch 0；当前与最远均为第 2 页 |
+| iOS 重置并退出                   | 8 / 1 / 7                   | epoch 1；当前第 1 页，无最远锚 |
+| Android 旧页面翻页后、显式重开前 | 8 / 1 / 7                   | 六路响应与上一步完全相同       |
+| Android 显式重开并退出           | 10 / 1 / 9                  | epoch 1；当前与最远均为第 1 页 |
+
+复验沿用前一节的 harness、驱动与六路比对，`prepare` 由 B 执行，A 加 `SYNC_TEST_CA_BASE64`，见[集成测试说明](../../apps/reader/integration_test/README.md#阅读中的前台-epoch-冲突)。阶段日志、OS 生命周期、输入摘要与独立 GET 保存在 `/private/tmp/karuyomi-mixed-epoch-a14ee43-LZI43e/results.json` 同目录。本轮两次临时 HTTPS 均已关闭，专用 ADB、AVD 和 iOS 模拟器已清理，无本轮监听或进程残留。该证据覆盖 Android 模拟器前台恢复和 iOS 模拟器顺序重置；未验证 Web 前台、同时写竞争、断网、生产 Access 或真机。独立 GET 证明旧页面没有覆盖 D1，不能据此断言从未发送写请求。
