@@ -163,6 +163,8 @@ void main() {
       );
       await tap(tester, find.text('保存全局设置'));
       expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
+      expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
+      expect(find.text('重试原设置操作'), findsNothing);
       expect(controller.pending!.retryable, false);
       final rejected = wire.decodeProtoJson(
         wire.SettingsMutation(),
@@ -234,6 +236,47 @@ void main() {
     },
   );
 
+  testWidgets('manga settings conflict requires a read, not an exact retry', (
+    tester,
+  ) async {
+    final controller = editor(manga: true);
+    await tester.runAsync(controller.refresh);
+    await show(tester, controller, manga: true);
+    await select<wire.ReaderPageLayout>(tester, '自动');
+    final remoteClient = BusinessStateClient(
+      api: server,
+      identity: client.identity,
+    );
+    addTearDown(remoteClient.dispose);
+    await tester.runAsync(
+      () => SettingsRepository(remoteClient).setManga(
+        mangaKey: _key,
+        overrides: wire.ReaderSettingsOverride(
+          pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+        ),
+        basedOnRevision: 0,
+      ),
+    );
+    await tap(tester, find.text('保存本漫画设置'));
+    expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
+    expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
+    expect(find.text('重试原设置操作'), findsNothing);
+    expect(controller.pending?.retryable, false);
+    expect(controller.canEdit, false);
+    expect(server.appliedMutations, 1);
+
+    await tap(tester, find.text('重新读取设置'));
+    expect(writes(), hasLength(2));
+    expect(controller.pending, isNull);
+    expect(controller.canEdit, true);
+    expect(
+      controller.snapshot?.overrides?.pageLayout,
+      wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+    );
+    expect(tester.takeException(), isNull);
+    await hide(tester);
+  });
+
   for (final manga in [false, true]) {
     testWidgets(
       'reopening ${manga ? 'manga' : 'global'} pending editor shows the submitted value and only permits exact retry',
@@ -246,9 +289,11 @@ void main() {
         } else {
           await select<wire.AppTheme>(tester, '深色');
         }
-        server.failWrites = true;
+        server.loseNextResponse = true;
         await tap(tester, find.text(manga ? '保存本漫画设置' : '保存全局设置'));
         final original = writes().single.body;
+        expect(server.appliedMutations, 1);
+        expect(controller.pending?.retryable, true);
         expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
         await hide(tester);
         controller.dispose();
@@ -304,7 +349,6 @@ void main() {
         );
         await tap(tester, find.text('重新读取设置'));
         expect(writes(), hasLength(1));
-        server.failWrites = false;
         await tap(tester, find.text('重试原设置操作'));
         expect(writes().map((request) => request.body), [original, original]);
         expect(server.appliedMutations, 1);

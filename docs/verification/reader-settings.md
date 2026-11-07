@@ -201,6 +201,8 @@ ACCEPTANCE_FIXTURE=settings-cas-race pnpm acceptance:serve
 
 两个页面以初始 revision 打开全局设置，在 15 秒内保存相反主题；正常停服时读取 `ACCEPTANCE_SETTINGS_RACE_AUDIT` 中的到达、放行、处理窗、HTTP 状态、revision 与回执摘要。未凑齐两方时夹具不放行业务写入。自动 Workers 测试核对结果和超时行为，实际窗口重叠以本轮采样为准；它不作为 CI 时序断言。原始两轮日志与独立响应留在本地 `/private/tmp/karuyomi-web-settings-race.IcEKkg/`，服务已关闭。这只覆盖 Web 全局设置，其他写入类型、Native、生产 Access 与真机分别验收。
 
+现场还看到明确冲突时附带「设置尚未确认」和禁用的原操作重试。后续设置组件只在回执确实未知且原请求可重试时显示这两项。全局及漫画设置的组件回归覆盖明确冲突后只读重取，以及服务端已写入但丢确认后原样重试。上述浏览器时序仍来自文案修复前的固定产品。
+
 ## 可复验入口
 
 ```sh

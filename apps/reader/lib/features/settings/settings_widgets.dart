@@ -223,7 +223,7 @@ class SettingsStatus extends StatelessWidget {
     children: [
       if (controller.busy) const LinearProgressIndicator(),
       if (controller.error case final error?) Text(error),
-      if (controller.pending != null) const Text('设置尚未确认，本会话保留原操作。'),
+      if (controller.pending?.retryable == true) const Text('设置尚未确认，本会话保留原操作。'),
       Wrap(
         children: [
           TextButton.icon(
@@ -235,7 +235,7 @@ class SettingsStatus extends StatelessWidget {
             icon: const Icon(Icons.sync),
             label: const Text('重新读取设置'),
           ),
-          if (controller.pending != null)
+          if (controller.pending?.retryable == true)
             TextButton(
               onPressed: controller.canRetry
                   ? () => unawaited(() async {

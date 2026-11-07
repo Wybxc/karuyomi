@@ -154,9 +154,12 @@ final class SettingsController extends ChangeNotifier {
       return true;
     } catch (failure) {
       if (available) {
-        _error = failure is BusinessStateException && failure.conflict
-            ? '设置已在其他设备修改，请重新读取后确认。'
-            : '设置修改尚未确认，请明确重试原操作。';
+        _error = switch (failure) {
+          BusinessStateException(conflict: true) => '设置已在其他设备修改，请重新读取后确认。',
+          BusinessStateException(:final error) when !error.retryable =>
+            '设置修改已被服务端拒绝，请重新读取后确认。',
+          _ => '设置修改尚未确认，请明确重试原操作。',
+        };
       }
       return false;
     } finally {
