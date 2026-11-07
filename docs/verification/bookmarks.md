@@ -76,9 +76,25 @@ A 随后关闭，B 是同 origin 的全新 Web 文档。B 从正式书架打开�
 
 固定 `5ba6fff` 的无插桩 xkcd 在正式 Flutter Web / 官方 harness 通过 A 添加 `/3319/` → 新文档 B 从书架重开、读回、筛选并移除 → 新文档 C 重开确认已移除。独立 D1 核对确认两次重开为只读，移除只更新该书签和 account/manga revision。输入、四阶段证据和实际范围见[修复后记录](source-reopen.md#固定-5ba6fff真实-web-重开与书签往返通过)。
 
+## 2026-11-07：iOS ↔ Android 模拟器书签往返
+
+使用正式驱动 `2c4f3b4` / `761972f`、固定 `5ba6fff` 的无插桩 xkcd 构建 `ext-all.xkcd-dd84d305506e2bdc34ac62988aef645f`，在独立的 iPhone 17 Pro / iOS 26.4 与 Pixel 9 / Android API 36 模拟器启动正式 `app.main()`。两端连接同一官方 HTTPS harness `https://127.0.0.1:57539`，使用隔离的 workerd / D1 和同一测试身份 `acceptance-owner`。iOS 只在该模拟器信任验收 CA；Android 临时 debug 副本仅为该 loopback 主机的 WebView 增加同一 CA，Dart 测试进程也通过该 CA 验证；两端保留 TLS 与主机名检查。两端均从正式 Source 详情操作 xkcd 英文 Source 的 `SINGLE`、`/3319/`。
+
+| 阶段         | account / global / manga revision | 正式界面及独立 D1 结果                                                             |
+| ------------ | --------------------------------- | ---------------------------------------------------------------------------------- |
+| iOS 准备     | 2 / 1 / 1                         | 从空账户安装固定构建，通过英文热门打开作品并收藏；无书签、无进度。                 |
+| iOS 添加     | 3 / 1 / 2                         | 正式按钮确认唯一目标书签；仅目标章和相应 revision 变化。                           |
+| Android 读回 | 3 / 1 / 2                         | 新进程从书架打开，真实详情显示目标章已标记；业务快照不变。                         |
+| Android 移除 | 4 / 1 / 3                         | 点击正式「仅书签」筛选与目标按钮并确认移除，书签查询为空；其它已确认业务状态不变。 |
+| iOS 再读回   | 4 / 1 / 3                         | 新进程从书架打开，确认已移除；业务快照不变。                                       |
+
+首次 Android 移除进入了正确详情，读到目标书签且按钮可用，但章节搜索后的按钮未通过中心命中测试，120 秒内未发出点击；独立六路 GET 与上一阶段完全相同。未采集当时的键盘或布局状态，未确定具体成因。驱动 `761972f` 改用正式「仅书签」筛选后复验，仍要求按唯一原章节 URL 计算的 key、真实手势和相同 D1 前置。
+
+各阶段独立读取设置、漫画设置、书架、目标章作品状态、书签和进度；写入只通过正式 Flutter UI。每次正式驱动结束前等待运行时释放。验收入口为 `flutter test integration_test/bookmarks_sync_test.dart --no-pub -d <device> --dart-define-from-file=<phase.json> --reporter expanded`，完整配置见[集成测试说明](../../apps/reader/integration_test/README.md)。临时日志、CA、D1 和采样快照不入库；候选未部署，扩展状态仍为 `compiled_unverified` / `runtimeReady=false`。
+
 ## 尚待验收
 
-- Native 独立客户端往返、浏览器/应用进程重启、自动前台刷新和真实丢响应恢复。
-- Web/iOS/Android 的实际平台组合、Source 在线阅读期间的书签，以及生产 Access、真机与触控。
+- 同一 HTTPS origin 的 Web ↔ Native：此前内置浏览器未信任本地 CA，Web 的 HTTP 独立文档结果和本轮 HTTPS Native 结果分别保留。
+- Source 在线阅读期间的书签、自动前台刷新、真实丢响应恢复、生产 Access、真机与触控。
 
 实现与边界见[章节书签设计](../design/bookmarks.md)，当前交付顺序见 [P2](../plan/p2-sync.md)。
