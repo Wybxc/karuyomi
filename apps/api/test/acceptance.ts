@@ -7,6 +7,8 @@ import { StateMutationSchema } from '@karuyomi/protocol';
 import { exportJWK, exportPKCS8, generateKeyPair } from 'jose';
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
+import { isAbsolute } from 'node:path';
+import { createInterface } from 'node:readline';
 import { getStreamAsBuffer } from 'get-stream';
 import { z } from 'zod';
 import {
@@ -32,6 +34,10 @@ publicKey.kid = 'acceptance';
 const configPath = fileURLToPath(
   new URL('./dist/karuyomi/wrangler.json', import.meta.url),
 );
+const nextConfigPath = process.env.ACCEPTANCE_NEXT_CONFIG;
+if (nextConfigPath !== undefined && !isAbsolute(nextConfigPath)) {
+  throw new Error('ACCEPTANCE_NEXT_CONFIG must be an absolute path');
+}
 const vars = {
   PROBE_ACCESS_JWKS: JSON.stringify({ keys: [publicKey] }),
   ACCESS_TEAM_DOMAIN: 'acceptance.cloudflareaccess.com',
@@ -41,11 +47,20 @@ const vars = {
 };
 const privateKey = await exportPKCS8(keys.privateKey);
 const fixture = process.env.ACCEPTANCE_FIXTURE ?? '';
+if (nextConfigPath && fixture !== '') {
+  throw new Error(
+    'Snapshot switching cannot be combined with another acceptance fixture',
+  );
+}
 const settingsAckLoss = fixture === 'settings-ack-loss';
-const options = (publicOrigin: string): TestHarnessOptions => ({
+const sourcePolicies = process.env.ACCEPTANCE_SOURCE_POLICIES;
+const options = (
+  publicOrigin: string,
+  workerConfig = configPath,
+): TestHarnessOptions => ({
   workers: [
     {
-      configPath,
+      configPath: workerConfig,
       vars: {
         ...vars,
         APP_ORIGIN: publicOrigin,
@@ -66,9 +81,18 @@ const stopped = new Promise<void>((resolve) => {
 });
 process.once('SIGINT', requestStop);
 process.once('SIGTERM', requestStop);
-process.stdin.once('data', requestStop);
 process.stdin.once('end', requestStop);
-process.stdin.resume();
+const commands = nextConfigPath
+  ? createInterface({ input: process.stdin })
+  : undefined;
+if (commands) {
+  commands.on('line', (line) => {
+    if (line === 'stop') requestStop();
+  });
+} else {
+  process.stdin.once('data', requestStop);
+  process.stdin.resume();
+}
 
 let ackAuditDb: D1Database | undefined;
 try {
@@ -96,11 +120,8 @@ try {
     await prepareSettingsAckLoss(db);
     ackAuditDb = db;
   }
-  if (!stopRequested && process.env.ACCEPTANCE_SOURCE_POLICIES) {
-    await initializeSourcePolicies(
-      url.origin,
-      process.env.ACCEPTANCE_SOURCE_POLICIES,
-    );
+  if (!stopRequested && sourcePolicies) {
+    await initializeSourcePolicies(url.origin, sourcePolicies);
   }
   if (!stopRequested && fixture === 'categories') {
     await initializeCategoryFixture(url.origin);
@@ -108,12 +129,52 @@ try {
   if (!stopRequested) {
     console.log(`ACCEPTANCE_URL=${url.href}`);
     console.log(`ACCEPTANCE_SUBJECT=${vars.ACCESS_SUBJECT}`);
-    console.log(
-      'Use independent clients at this URL. Press Enter or Ctrl-C to stop.',
-    );
+    if (commands && nextConfigPath) {
+      const requested = new Promise<void>((resolve) => {
+        commands.on('line', (line) => {
+          if (line === 'switch') resolve();
+        });
+      });
+      console.log('ACCEPTANCE_SWITCH=ready');
+      console.log(
+        'Type switch to activate the next snapshot, or stop to close the server.',
+      );
+      await Promise.race([requested, stopped]);
+      if (!stopRequested) {
+        await server.update(options(url.origin, nextConfigPath));
+        const switched = await server.listen();
+        if (switched.url.origin !== url.origin) {
+          throw new Error(
+            'Acceptance listener changed while switching snapshots',
+          );
+        }
+        const { DB: db } = await server
+          .getWorker<AcceptanceBindings>()
+          .getEnv();
+        const migrated = await db
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'reader_settings'",
+          )
+          .first();
+        if (!migrated) {
+          throw new Error(
+            'Acceptance snapshot switch did not preserve the migrated D1',
+          );
+        }
+        if (!stopRequested && sourcePolicies) {
+          await initializeSourcePolicies(url.origin, sourcePolicies);
+        }
+        if (!stopRequested) console.log('ACCEPTANCE_SWITCH=switched');
+      }
+    } else {
+      console.log(
+        'Use independent clients at this URL. Press Enter or Ctrl-C to stop.',
+      );
+    }
     await stopped;
   }
 } finally {
+  commands?.close();
   process.stdin.pause();
   process.stdin.removeListener('data', requestStop);
   process.stdin.removeListener('end', requestStop);

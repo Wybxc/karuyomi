@@ -10,7 +10,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 匿名 26 路径验收通过，远端网络政策仅含这三个已核对准确 host 的 verified 包，见[生产部署记录](../verification/v4-production.md)。Access 会话已失效，用户答复稍后登录；当前生产正向与 Native 主入口仍未验收。扩展增量工作流继续为 `disabled_manually`，不启动全量或启用定时 CI。下文 v1/v3 记录均为历史冻结批次，其 checkpoint 不修改、不混装，也不得作为覆盖当前生产的恢复输入。
 
-2026-11-07，固定 v6 完成全量发现与 3 包本地串行试编，候选未部署，完整 baseline 仍未启动。试编发现同一输入可能生成不同 canonical JS，旧的仅输入派生 ID 会隐藏实际更新。见[试编与身份对照](../verification/aot-current-pilot.md)。公开 ID 已改为绑定输出摘要，增量调度仍沿用输入指纹；待按新合同重建固定代表包、验收客户端更新并继续本地 baseline。
+2026-11-07，固定 v6 完成全量发现与 3 包本地串行试编，候选未部署，完整 baseline 仍未启动。试编发现同一输入可能生成不同 canonical JS，旧的仅输入派生 ID 会隐藏实际更新。见[试编与身份对照](../verification/aot-current-pilot.md)。绑定摘要的公开 ID 已通过固定三包真编译和静态装配。内置浏览器在同一 D1 验证旧路由下架、xkcd 正式确认更新、本机旧副本清理及原书架首次续读。继续首次本地 baseline、生产发布和增量 CI 验收。
 
 ## 已完成
 
