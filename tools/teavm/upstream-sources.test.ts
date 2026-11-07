@@ -82,13 +82,30 @@ test(
   },
 );
 test(
-  'all pinned donor bytes remain unchanged, including intentional upstream references',
-  { skip: !existsSync(path.join(ROOT, 'vendor/teavm/classlib')) },
+  'stages the locked TeaVM donors and Android JSON without replacing upstream references',
+  {
+    skip:
+      !existsSync(path.join(ROOT, 'vendor/teavm/classlib')) ||
+      !existsSync(path.join(ROOT, 'vendor/suwayomi-server/AndroidCompat')),
+  },
   () => {
     const folder = mkdtempSync(path.join(os.tmpdir(), 'karuyomi-upstream-'));
     try {
       const outputs = prepareSources(folder);
-      assert.equal(outputs.length, PATCHES.length);
+      assert.equal(outputs.length, PATCHES.length + 6);
+      assert.deepEqual(
+        readFileSync(path.join(folder, 'org/json/JSONArray.java')),
+        readFileSync(
+          path.join(
+            ROOT,
+            'vendor/suwayomi-server/AndroidCompat/src/main/java/org/json/JSONArray.java',
+          ),
+        ),
+      );
+      assert.doesNotMatch(
+        readFileSync(path.join(folder, 'org/json/JSONObject.java'), 'utf8'),
+        /androidx\.annotation|@NonNull|@Nullable/,
+      );
       assert.ok(
         outputs.every((file) => !path.relative(folder, file).startsWith('..')),
       );

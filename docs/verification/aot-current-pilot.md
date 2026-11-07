@@ -54,3 +54,9 @@ pnpm acceptance:serve
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。
 
 仅在诊断副本中分开两种索引，并按常量本身类型选取追加方法。小型 Java 夹具的原版 TeaVM 再现同栈；隔离修正后 AOT 成功，Node 执行的四项断言输出与 JVM 逐字节相同，覆盖普通拼接、两个分隔符、静态常量与 String/int 混合。真实 LunarAnime 同一输入越过这个错误，但后续缺 Java EC/签名类和 Android Activity、WebView 方法，Maven 仍失败，无可发布 bundle。没有修改扩展、正式编译器、原始 Maven 缓存或正在运行的全量；该包保留失败。原始对照、补丁和日志在 `/private/tmp/karuyomi-lunaranime-concat.OHFZge/`。
+
+## AsgardScans 的 Android JSON
+
+固定 `952bbab` 全量记录中，AsgardScans 1.6.3 在调用 Android 的 `JSONObject`、`JSONArray` 时缺类；此路径用于从原站详情页的 JSON-LD 取简介、别名与分类。冻结原 JAR SHA-256 为 `c36be974cc8ad903885a1d4cb57466e0e6e90a390bd4ca61ddaf368f4a4025b6`。
+
+在独立副本中，仅加入固定 Suwayomi `6b481e8` 的六份 AndroidCompat 实现，去掉 `JSONObject` 的 AndroidX 空值标注；同一锁定 Maven / TeaVM 0.16.0 离线重编成功，生成 4273929 B JS，SHA-256 `56c2812d2c10cbd05f2cdff76aba249f236c34f56c40c0f54a6039f7134b1815`。原 JAR 摘要未变。正式构建现在在生成目录做同样的准备，`pnpm teavm:check` 的 JVM 回归验证 JSON-LD、缺省、精确 Long 和无效输入；该初次 AOT 是独立诊断，并未发布、更新全量 checkpoint 或确认真实详情/图片。日志留在 `/private/tmp/karuyomi-asgard-json.VpCOGI/`。

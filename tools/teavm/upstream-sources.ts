@@ -143,6 +143,51 @@ export function generateDonorSource(name: string, source: string): string {
   return parts.join('');
 }
 
+/** Stage Android's JSON implementation from the pinned Suwayomi submodule. */
+export function prepareAndroidJsonSources(
+  destination: string,
+  root = ROOT,
+): string[] {
+  const relative = 'org/json',
+    upstream = path.join(
+      root,
+      'vendor/suwayomi-server/AndroidCompat/src/main/java',
+      relative,
+    ),
+    folder = path.join(destination, relative);
+  if (!existsSync(upstream))
+    throw new Error(
+      'AndroidCompat sources missing; run git submodule update --init vendor/suwayomi-server',
+    );
+  mkdirSync(folder, { recursive: true });
+  return [
+    'JSON',
+    'JSONArray',
+    'JSONException',
+    'JSONObject',
+    'JSONStringer',
+    'JSONTokener',
+  ].map((name) => {
+    const file = `${name}.java`;
+    const source = readFileSync(path.join(upstream, file), 'utf8');
+    // The JVM seed has no AndroidX annotations. Strip these compile-time
+    // annotations from the staged source, preserving its Android behavior.
+    const staged =
+      name === 'JSONObject'
+        ? source
+            .replace(
+              /^import androidx\.annotation\.(?:NonNull|Nullable);\r?\n/gm,
+              '',
+            )
+            .replace(/^[ \t]*@(?:NonNull|Nullable)\r?\n/gm, '')
+            .replace(/@(?:NonNull|Nullable) /g, '')
+        : source;
+    const output = path.join(folder, file);
+    writeFileSync(output, staged);
+    return output;
+  });
+}
+
 export function prepareSources(destination: string, root = ROOT): string[] {
   const upstream = path.join(root, 'vendor/teavm/classlib/src/main/java'),
     patches = path.join(root, 'runtime/teavm/patches/teavm');
@@ -172,5 +217,5 @@ export function prepareSources(destination: string, root = ROOT): string[] {
     writeFileSync(output, patched);
     generated.push(output);
   }
-  return generated;
+  return generated.concat(prepareAndroidJsonSources(destination, root));
 }

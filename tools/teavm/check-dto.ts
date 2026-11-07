@@ -15,6 +15,7 @@ import { checkFiles } from './check-files.ts';
 import { checkNetwork } from './check-network.ts';
 import { checkPlatform } from './check-platform.ts';
 import { checkDateFormat } from './check-date-format.ts';
+import { prepareAndroidJsonSources } from './upstream-sources.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -121,6 +122,20 @@ export async function checkDto(root = ROOT): Promise<void> {
       output + path.delimiter + classpath,
       oracleClass,
     ]);
+  const androidJsonOutput = path.join(output, 'android-json');
+  const androidJsonSources = prepareAndroidJsonSources(
+    path.join(androidJsonOutput, 'sources'),
+    root,
+  );
+  await oracle('javac', [
+    '--release',
+    '17',
+    '-d',
+    androidJsonOutput,
+    ...androidJsonSources,
+    path.join(root, 'tools/teavm/AndroidJsonTest.java'),
+  ]);
+  await oracle('java', ['-cp', androidJsonOutput, 'prototype.AndroidJsonTest']);
   // Preference ABI must resolve the real host Context before the Android SDK stubs.
   const preferenceClasspath = [
     ...jars.filter((file) => path.basename(file).startsWith('host-')),
