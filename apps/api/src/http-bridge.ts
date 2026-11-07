@@ -236,7 +236,8 @@ export async function forwardBinary(
         throw new BinaryBridgeError(
           'target_not_allowed',
           'Upstream target is not allowed',
-          403,
+          // A rejected Source URL is not a denial of the signed-in session.
+          422,
         );
       }
       const nominated = connectionHeaders(descriptor.headers);

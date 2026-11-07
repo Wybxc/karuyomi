@@ -68,6 +68,12 @@ The request timeout is a positive integer no greater than 300,000 milliseconds.
 The response message may be empty. A missing Fetch response URL must be replaced
 with the request URL before emitting metadata.
 
+If the Source URL fails the registered build's network policy, the Worker returns
+`422 {"error":"target_not_allowed"}` before making an upstream request. This is a
+Source failure, so the client keeps the account session and the Source settings
+entry. Outer 401 and 403 still indicate Access failures. A response from an
+allowed upstream, including its 4xx status, is carried in the framed META.
+
 Headers are ordered tuples. Preserve their order and repeated fields, especially
 `Set-Cookie`; do not convert them into a map or combine them with commas.
 `hasBody: false` requires `bodyLength: 0`. With `hasBody: true`, zero denotes an

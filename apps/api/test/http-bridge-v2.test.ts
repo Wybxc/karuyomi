@@ -240,7 +240,7 @@ describe('HTTP bridge v2 request validation', () => {
         ['example.org'],
         fetcher,
       );
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(422);
       expect(await response.json()).toEqual({ error: 'target_not_allowed' });
       expect(fetcher).not.toHaveBeenCalled();
     },

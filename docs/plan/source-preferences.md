@@ -81,7 +81,8 @@
 - [x] 按 v6 ABI 在固定提交的独立目录本地重建 Komiic，通过完整性及静态装配门；候选保持 compiled_unverified/runtimeReady=false。
 - [x] Komiic 正式 Web 入口切换原镜像设置、确认到 D1、重开并加载真实热门；第二项保存保留前一值，新 Web 文档从确认状态恢复两项非默认值。实际范围见[记录](../verification/source-preferences.md#komiic-v6-真实-web-分项)。
 - [x] 以未修改的 FoolSlide Customizable 和 MangaDex 原包完成固定提交的隔离 AOT，见[工程与构建证据](../verification/source-preferences.md#文本设置绑定与输入校验)。
-- [ ] 正式设置入口验证 URL/UUID watcher 拒绝、有效值和原回调实际写入；绑定范围见[设计](../design/source-preferences.md#原对象构造顺序与生命周期)。Mango、BookOrbit 和 Komga 尚有独立的 DNS/认证能力缺口。
+- [x] MangaDex 英文 Source 的正式 Web 设置入口验证无效 UUID 拒绝、有效值读回及新文档不继承会话值。
+- [ ] FoolSlide Customizable 的正式设置入口验证无效 URL 拒绝和原回调归一化写入；绑定范围见[设计](../design/source-preferences.md#原对象构造顺序与生命周期)。Mango、BookOrbit 和 Komga 尚有独立的 DNS/认证能力缺口。
 - [ ] 继续通过正式入口验证开关、多选、文本/密码、veto、别名、依赖及刷新；如源站不可用，记录具体失败和未通过门，不用 supplier 结果替代。
 - [ ] 同一身份的 Web 与独立 Native 客户端读取并修改非敏感值后收敛，重开 Source 使用服务端确认值；敏感凭证不随另一端设置同步。Web/iOS/Android 分别记录实际通过范围。
 - [ ] 扩展自定义 Activity/不支持的 bind 行为明确提示，受影响项失败不冒充保存成功，也不破坏其余可用浏览路径。

@@ -514,7 +514,7 @@ test('auth, origin, protocol and D1 build policy failures never fetch upstream',
     'https://user:pass@fixture.example.org/private',
   ]) {
     const response = await dispatch(metadata('/binary', { url: target }));
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(422);
     expect(await response.json()).toEqual({ error: 'target_not_allowed' });
   }
   const unverifiedId = crypto.randomUUID();

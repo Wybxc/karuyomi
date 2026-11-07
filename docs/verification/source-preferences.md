@@ -40,7 +40,16 @@
 | FoolSlide Customizable |              1 |   4371712 | `58cdf281dec32010d7c85cae081c5a41596912966533688342d825555918881e` |
 | MangaDex               |             61 |   4385642 | `23d197c12359f1f3c2feda3ed7e781f122bebc94f415fee07bce8f890f68cb7d` |
 
-原 JAR 摘要、宿主指纹和复验日志在 `/private/tmp/karuyomi-preference-aot-vNGv9d/`，入口为 `freeze.sh` 与 `run.ts`。未执行发布或修改全量 baseline，两包保持 `compiled_unverified/runtimeReady=false`。正式设置界面的无效 URL/UUID 拒绝、有效值及原回调写入仍待验收。
+原 JAR 摘要、宿主指纹和复验日志在 `/private/tmp/karuyomi-preference-aot-vNGv9d/`，入口为 `freeze.sh` 与 `run.ts`。未执行发布或修改全量 baseline，两包保持 `compiled_unverified/runtimeReady=false`。正式设置界面的结果见下节。
+
+### 双包正式 Web 设置
+
+2026-11-08，固定 `f1b0d88` 的正式 Flutter Web / Worker 通过 `pnpm acceptance:build`，装配上述两包（index SHA-256 `a28862c009afd96039d592ea7a38a1fd28638a4318170d9ddcb5c4b0bedf80c5`）。官方隔离 workerd / D1 与 `acceptance-owner`，Codex 内置浏览器从扩展管理确认安装两包。
+
+- **MangaDex 1.6.1**：英文 Source `2499283573021220255` 经正式 HTTP 桥返回真实热门结果。打开原 `Block groups by UUID`：`not-a-uuid` 被拒绝，重开输入仍为空；输入合法测试 UUID 后，Source 自动重开，设置页读回相同值。重新加载为全新 Web 文档、打开同一 Source 后又为空。独立 API GET 确认两包均无 D1 设置行（账户 revision 2 来自两次安装），该输入只在当前客户端会话。
+- **FoolSlide Customizable 1.6.7 首轮未通过**：包初始化后，原 Source 的默认 `https://127.0.0.1` 触发网络政策；旧 Worker 用 403 返回 `target_not_allowed`，客户端误判账号无权并关闭来源设置。独立正式帧复现 403，同时 `/api/bootstrap` 仍返回 200。修正为在上游请求之前返回 422，未改变域名、IP、认证或传输规则。正式 UI 复验另记。
+
+原始 API 快照和候选复验入口在 `/private/tmp/karuyomi-preference-aot-vNGv9d/acceptance/`。本轮不证明原 MangaDex 图片、其它语言、FoolSlide 源站或 Native/生产设置。
 
 ## Komiic v6 真实 Web 分项
 

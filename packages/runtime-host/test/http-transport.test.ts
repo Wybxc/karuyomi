@@ -355,6 +355,18 @@ test.each([401, 403, 302])(
   },
 );
 
+test('a disallowed Source target stays a nonretryable Source error', async () => {
+  const transport = setup(async () =>
+    Response.json({ error: 'target_not_allowed' }, { status: 422 }),
+  );
+  await expect(
+    transport.finish(transport.open(metadata(transport))),
+  ).rejects.toMatchObject({
+    code: 'source_error',
+    retryable: false,
+  });
+});
+
 test('login HTML and a different framed response identity are rejected before DATA', async () => {
   const transport = setup((async (_url, init) => {
     const reader = new HttpFrameReader(
