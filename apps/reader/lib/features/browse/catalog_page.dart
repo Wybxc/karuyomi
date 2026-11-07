@@ -1035,6 +1035,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
 
   Future<void> _editCover() async {
     final repository = _covers;
+    final chapterRead = _chapterRead;
     final sequence = _sequence;
     final catalog = controller;
     final selectedSource = source;
@@ -1059,7 +1060,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     if (!current()) return;
     setState(() => _editingCover = true);
     try {
-      await showCustomCoverEditor(
+      final saved = await showCustomCoverEditor(
         context: context,
         controller: catalog,
         repository: repository,
@@ -1067,6 +1068,9 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         lifecycle: _coverLifecycle,
         isCurrent: current,
       );
+      if (saved == true && current() && identical(_chapterRead, chapterRead)) {
+        await chapterRead?.refreshAfterCurrent();
+      }
     } finally {
       if (mounted) setState(() => _editingCover = false);
     }

@@ -10,14 +10,14 @@ import '../browse/catalog_controller.dart';
 import 'cover_selection.dart';
 import 'custom_cover.dart';
 
-Future<void> showCustomCoverEditor({
+Future<bool?> showCustomCoverEditor({
   required BuildContext context,
   required CatalogController controller,
   required CoverRepository repository,
   required String mangaKey,
   required Listenable lifecycle,
   required bool Function() isCurrent,
-}) => showDialog<void>(
+}) => showDialog<bool>(
   context: context,
   barrierDismissible: false,
   builder: (_) => _CoverEditor(
@@ -52,6 +52,7 @@ class _CoverEditorState extends State<_CoverEditor> {
   bool _clearing = false;
   bool _busy = false;
   bool _attempted = false;
+  bool _saved = false;
   bool _blocked = false;
   bool _expired = false;
   String? _error;
@@ -166,6 +167,7 @@ class _CoverEditorState extends State<_CoverEditor> {
       }
       if (!_current) return;
       setState(() {
+        _saved = true;
         _confirmed = snapshot;
         _selected = null;
         _clearing = false;
@@ -199,7 +201,7 @@ class _CoverEditorState extends State<_CoverEditor> {
     if ((!_expired && _busy) || ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
-    Navigator.pop(context);
+    Navigator.pop(context, _saved);
   }
 
   @override
@@ -213,7 +215,7 @@ class _CoverEditorState extends State<_CoverEditor> {
         pending == null &&
         !_blocked &&
         _confirmed != null;
-    return PopScope<void>(
+    return PopScope<bool>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();

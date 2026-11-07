@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
@@ -12,8 +13,10 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/covers/cover_selection.dart';
 import 'package:karuyomi/features/covers/custom_cover.dart';
+import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/runtime/api_fetch.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
 import '../data/business_state_server.dart';
@@ -214,6 +217,120 @@ void main() {
       await _finish(tester, controller);
     },
   );
+
+  for (final save in [true, false]) {
+    testWidgets(
+      'same-detail cover editor updates range revision only after a save: $save',
+      (tester) async {
+        tester.view.physicalSize = const Size(1100, 1800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final server = TestBusinessServer();
+        final transport = TestCoverTransport(server);
+        final chapters = [
+          wire.Chapter(url: '/one', name: '第一章'),
+          wire.Chapter(url: '/two', name: '第二章'),
+          wire.Chapter(url: '/other', name: '对照章'),
+        ];
+        final sequence = ChapterSequence(
+          packageName: 'eu.kanade.source.test',
+          sourceId: sourceId,
+          mangaUrl: testManga.url,
+          chapters: chapters,
+        );
+        final platform = TestPlatform(businessServer: server)
+          ..covers = transport
+          ..invokeHandler = (call) async => switch (call.whichRequest()) {
+            wire.SourceCall_Request.details => wire.SourceResult(
+              manga: testManga,
+            ),
+            wire.SourceCall_Request.chapters => wire.SourceResult(
+              chapters: wire.ChapterList(chapters: chapters),
+            ),
+            wire.SourceCall_Request.pages => throw StateError(
+              'Chapter marking must not fetch Source pages',
+            ),
+            _ => wire.SourceResult(
+              mangaPage: wire.MangaPage(mangas: [testManga]),
+            ),
+          };
+        final controller = await _details(tester, platform);
+
+        if (!save) {
+          // The editor reads the newer remote revision even if it never saves.
+          final remote = BusinessStateClient(
+            api: server,
+            identity: controller.library!.identity,
+          );
+          addTearDown(remote.dispose);
+          await tester.runAsync(
+            () => LibraryRepository(remote).setFavorite(
+              packageName: 'eu.kanade.source.test',
+              sourceId: sourceId,
+              sourceName: '测试漫画源',
+              sourceLang: 'zh',
+              manga: testManga,
+              favorite: true,
+            ),
+          );
+        }
+        server.requests.clear();
+
+        Finder control(String key) => find.byKey(ValueKey(key));
+        await _tap(tester, control('custom-cover-editor'));
+        picker.files.add(_imageFile());
+        await _tap(tester, control('cover-select-image'));
+        if (save) await _tap(tester, control('cover-save'));
+        await _tap(tester, find.text('关闭'));
+        expect(transport.uploads, hasLength(save ? 1 : 0));
+        if (save) {
+          expect(transport.uploads.single.command.expectedRevision, 0);
+          expect(server.manga(sequence.mangaKey)?.hasCustomCover(), isTrue);
+        }
+
+        await _tap(tester, control('chapter-selection-toggle'));
+        await _tap(tester, control('chapter-range-start'));
+        await _tap(tester, find.text('第一章 · 来源第 1 项').last);
+        await _tap(tester, control('chapter-range-end'));
+        await _tap(tester, find.text('第二章 · 来源第 2 项').last);
+        await _tap(tester, control('chapter-select-range'));
+        await _tap(tester, control('chapter-mark-read'));
+        expect(find.text('确认清单：2 章'), findsOneWidget);
+        await _tap(tester, find.text('确认并开始'));
+
+        final range = server.requests
+            .where(
+              (request) =>
+                  request.method == 'POST' &&
+                  request.uri.path == '/api/state/mutations',
+            )
+            .map(
+              (request) => wire.decodeProtoJson(
+                wire.StateMutation(),
+                jsonDecode(request.body!),
+              ),
+            )
+            .toList();
+        if (save) {
+          expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
+          expect(range.map((command) => command.expectedRevision), [1, 2]);
+          expect(range.map((command) => command.setChapterRead.chapterKey), [
+            for (final chapter in sequence.entries.take(2)) chapter.key,
+          ]);
+        } else {
+          expect(find.textContaining('作品已在其他操作或设备更新'), findsWidgets);
+          expect(range, isEmpty);
+          expect(server.manga(sequence.mangaKey)?.favorite, isTrue);
+        }
+        expect(
+          server.progress(sequence.mangaKey, sequence.entries.last.key),
+          isNull,
+        );
+        await _finish(tester, controller);
+      },
+    );
+  }
 
   testWidgets(
     'lost ACK retries the immutable original while CAS conflict only reloads',
