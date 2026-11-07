@@ -31,7 +31,7 @@ import {
   SHARED_PATHS,
   ROOT,
 } from './catalog.ts';
-import { extensionDescriptorSchema } from './model.ts';
+import { extensionDescriptorSchema, publishedBuildId } from './model.ts';
 import type { ExtensionDescriptor } from './model.ts';
 import { encodeBundle } from './assets.ts';
 
@@ -267,7 +267,6 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       ),
     );
     result.packageName = descriptor.packageName;
-    result.buildId = descriptor.buildId;
     const upstream = path.resolve(
       options.upstream ?? path.join(ROOT, 'vendor/extensions-source'),
     );
@@ -483,7 +482,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       'text/javascript',
     );
     const manifest = buildManifestSchema.parse({
-      buildId: descriptor.buildId,
+      buildId: publishedBuildId(descriptor, bundle.sha256),
       repoId: 'keiyoushi',
       packageName: descriptor.packageName,
       version: metadata.versionName,
@@ -518,6 +517,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       throw new Error('Build manifest exceeds 64 KiB');
     const provenance = {
       schemaVersion: 1,
+      buildId: manifest.buildId,
       descriptor,
       upstream: {
         commit: descriptor.upstreamCommit,
@@ -565,6 +565,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     );
     result.status = 'built';
     result.stage = 'complete';
+    result.buildId = manifest.buildId;
     result.manifestPath = 'manifest.json';
     result.provenancePath = 'provenance.json';
     result.artifacts = [

@@ -39,6 +39,7 @@ import {
   validateState,
 } from './pipeline.ts';
 import {
+  publishedBuildId,
   runtimeIdentitySchema,
   type Catalog,
   type ExtensionDescriptor,
@@ -61,6 +62,8 @@ class Fixture {
   readonly snapshot: string;
   readonly stateFile: string;
   readonly pipeline: ExtensionPipeline;
+  readonly fetched: string[] = [];
+  readonly remoteOverrides = new Map<string, Buffer>();
   constructor(t: TestContext) {
     const environment = {
       CI: process.env.CI,
@@ -100,6 +103,9 @@ class Fixture {
       root: this.root,
       materials: async () => materialIdentity,
       fetchBytes: async (_origin, relative) => {
+        this.fetched.push(relative);
+        const override = this.remoteOverrides.get(relative);
+        if (override) return override;
         const file = path.join(this.snapshot, relative.slice(1));
         if (!existsSync(file)) throw new StaticHttpError(404);
         return readFileSync(file);
@@ -159,6 +165,7 @@ class Fixture {
   output(
     descriptor: ExtensionDescriptor,
     failed = false,
+    suffix = '',
   ): { directory: string; result: PipelineResult } {
     const directory = path.join(this.results, descriptor.inputFingerprint);
     mkdirSync(directory, { recursive: true });
@@ -176,7 +183,10 @@ class Fixture {
     else {
       const { encoded, reference } = encodeBundle(
         Buffer.from(
-          'const packageName = ' + JSON.stringify(descriptor.packageName) + ';',
+          'const packageName = ' +
+            JSON.stringify(descriptor.packageName) +
+            ';' +
+            suffix,
         ),
       );
       mkdirSync(path.join(directory, 'artifacts'), { recursive: true });
@@ -188,7 +198,7 @@ class Fixture {
         path.join(directory, 'manifest.json'),
         JSON.stringify({
           ...materialIdentity,
-          buildId: descriptor.buildId,
+          buildId: publishedBuildId(descriptor, reference.sha256),
           repoId: 'keiyoushi',
           packageName: descriptor.packageName,
           version: descriptor.versionName,
@@ -279,20 +289,21 @@ test('complete gzip-only snapshot commits checkpoint only after remote confirmat
   assert.deepEqual((await f.index()).builds[0]?.sources, [
     { id: '1', name: 'Fixture', lang: 'en' },
   ]);
+  const build = (await f.index()).builds[0];
+  assert.ok(build);
   const current = await parseManifest(
-    readFileSync(
-      path.join(
-        f.snapshot,
-        'extensions/builds',
-        descriptor.buildId,
-        'manifest.json',
-      ),
-    ),
+    readFileSync(path.join(f.snapshot, build.manifestPath.slice(1))),
   );
-  assert.deepEqual(current.sources, (await f.index()).builds[0]?.sources);
+  assert.deepEqual(current.sources, build.sources);
   assert.equal(
-    (await f.index()).builds[0]?.manifestPath,
-    '/extensions/builds/' + descriptor.buildId + '/manifest.json',
+    build.manifestPath,
+    '/extensions/builds/' +
+      publishedBuildId(descriptor, current.bundle.sha256) +
+      '/manifest.json',
+  );
+  assert.equal(
+    candidate.attempts[descriptor.inputFingerprint]?.bundleSha256,
+    current.bundle.sha256,
   );
   assert.ok(
     readdirSync(path.join(f.snapshot, 'extensions/artifacts')).every((name) =>
@@ -369,7 +380,14 @@ test('same-runtime failed update keeps last successful build', async (t) => {
   f.output(update, true);
   const second = await f.prepare(f.plan([update], first), first);
   assert.equal(second.active[update.packageName], previous.inputFingerprint);
-  assert.equal((await f.index()).builds[0]?.buildId, previous.buildId);
+  const digest = first.attempts[previous.inputFingerprint]?.bundleSha256;
+  assert.ok(digest);
+  const buildId = publishedBuildId(previous, digest);
+  assert.equal((await f.index()).builds[0]?.buildId, buildId);
+  assert.deepEqual(f.fetched, [
+    '/extensions/builds/' + buildId + '/manifest.json',
+    '/extensions/artifacts/' + digest + '.gz',
+  ]);
   assert.equal(second.attempts[update.inputFingerprint]?.status, 'failed');
 });
 test('discovery failure retains existing source, instead of retiring it', async (t) => {
@@ -386,7 +404,12 @@ test('discovery failure retains existing source, instead of retiring it', async 
     },
   ];
   const second = await f.prepare(plan, first);
-  assert.equal((await f.index()).builds[0]?.buildId, descriptor.buildId);
+  const digest = first.attempts[descriptor.inputFingerprint]?.bundleSha256;
+  assert.ok(digest);
+  assert.equal(
+    (await f.index()).builds[0]?.buildId,
+    publishedBuildId(descriptor, digest),
+  );
   assert.equal(second.attempts[descriptor.inputFingerprint]?.stale, true);
 });
 test('failed rebuild of unavailable success stays recorded without infinite automatic retry', async (t) => {
@@ -442,14 +465,136 @@ test('success replaces previous build and prunes removed packages and bundles', 
   const second = await f.prepare(f.plan([update], first), first);
   assert.equal(Object.keys(second.active).length, 1);
   assert.deepEqual(Object.keys(second.attempts), [update.inputFingerprint]);
+  const digest = second.attempts[update.inputFingerprint]?.bundleSha256;
+  assert.ok(digest);
   assert.deepEqual(readdirSync(path.join(f.snapshot, 'extensions/builds')), [
-    update.buildId,
+    publishedBuildId(update, digest),
   ]);
   assert.equal(
     readdirSync(path.join(f.snapshot, 'extensions/artifacts')).length,
     1,
   );
 });
+test('a rebuild of the same input with different bundle bytes retires the previous public ID and path', async (t) => {
+  const f = new Fixture(t),
+    descriptor = f.descriptor();
+  const { directory } = f.output(descriptor);
+  const first = await f.prepare(f.plan([descriptor]));
+  const original = (await f.index()).builds[0];
+  const originalSha = first.attempts[descriptor.inputFingerprint]?.bundleSha256;
+  assert.ok(original && originalSha);
+  assert.equal(original.buildId, descriptor.buildId + '-' + originalSha);
+  assert.ok(existsSync(path.join(f.snapshot, original.manifestPath.slice(1))));
+
+  rmSync(directory, { recursive: true });
+  f.output(descriptor, false, '\nconst secondCompilerOutput = true;');
+  const second = await f.prepare(f.plan([descriptor], first), first);
+  const current = (await f.index()).builds[0];
+  const currentSha = second.attempts[descriptor.inputFingerprint]?.bundleSha256;
+  assert.ok(current && currentSha);
+  assert.notEqual(currentSha, originalSha);
+  assert.notEqual(current.buildId, original.buildId);
+  assert.notEqual(current.manifestPath, original.manifestPath);
+  assert.equal(current.buildId, descriptor.buildId + '-' + currentSha);
+  assert.equal(
+    second.active[descriptor.packageName],
+    descriptor.inputFingerprint,
+  );
+  assert.deepEqual(Object.keys(second.attempts), [descriptor.inputFingerprint]);
+  assert.notEqual(second.indexSha256, first.indexSha256);
+  assert.equal(
+    existsSync(path.join(f.snapshot, original.manifestPath.slice(1))),
+    false,
+  );
+  assert.deepEqual(readdirSync(path.join(f.snapshot, 'extensions/artifacts')), [
+    currentSha + '.gz',
+  ]);
+});
+
+test('a legacy success without a digest must rebuild and is never pulled from the work ID path', async (t) => {
+  const f = new Fixture(t),
+    descriptor = f.descriptor();
+  f.output(descriptor);
+  const state = await f.prepare(f.plan([descriptor]));
+  const record = state.attempts[descriptor.inputFingerprint];
+  assert.ok(record);
+  delete record.bundleSha256;
+  const indexed = (await f.index()).builds[0];
+  assert.ok(indexed);
+  const manifest = await parseManifest(
+    readFileSync(path.join(f.snapshot, indexed.manifestPath.slice(1))),
+  );
+  f.remoteOverrides.set(
+    '/extensions/builds/' + descriptor.buildId + '/manifest.json',
+    Buffer.from(JSON.stringify({ ...manifest, buildId: descriptor.buildId })),
+  );
+  assert.deepEqual(
+    makePlan(f.catalog([descriptor]), state, { root: f.root }).selected.map(
+      (build) => build.inputFingerprint,
+    ),
+    [descriptor.inputFingerprint],
+  );
+  state.bootstrap.complete = true;
+  assert.throws(
+    () => makePlan(f.catalog([descriptor]), state, { ci: true, root: f.root }),
+    /bootstrap|baseline|unbound/i,
+  );
+  f.remoteOverrides.set(
+    '/extensions/build-state.json',
+    Buffer.from(JSON.stringify(state)),
+  );
+  await assert.rejects(
+    f.pipeline.pullState('https://example.invalid', f.stateFile),
+    /bootstrap|baseline|unbound/i,
+  );
+  assert.equal(existsSync(f.stateFile), false);
+
+  f.fetched.length = 0;
+  const candidate = await f.prepare(f.plan([descriptor], state, []), state);
+  assert.deepEqual(f.fetched, []);
+  assert.deepEqual((await f.index()).builds, []);
+  assert.equal(candidate.active[descriptor.packageName], undefined);
+  assert.equal(candidate.attempts[descriptor.inputFingerprint], undefined);
+  assert.equal(candidate.bootstrap.complete, false);
+  await f.pipeline.checkBase(f.snapshot, 'https://example.invalid');
+});
+
+test('retaining a build rejects a different digest at its registered path and leaves the deployed snapshot intact', async (t) => {
+  const f = new Fixture(t),
+    descriptor = f.descriptor();
+  f.output(descriptor);
+  const first = await f.prepare(f.plan([descriptor]));
+  const build = (await f.index()).builds[0];
+  const digest = first.attempts[descriptor.inputFingerprint]?.bundleSha256;
+  assert.ok(build && digest);
+  const files = [
+    'extensions/build-state.json',
+    'extensions/index.json',
+    build.manifestPath.slice(1),
+    'extensions/artifacts/' + digest + '.gz',
+  ];
+  const before = files.map((file) => readFileSync(path.join(f.snapshot, file)));
+  const manifest = await parseManifest(
+    readFileSync(path.join(f.snapshot, build.manifestPath.slice(1))),
+  );
+  const changed = encodeBundle(Buffer.from('const substitute = true;'));
+  f.remoteOverrides.set(
+    build.manifestPath,
+    Buffer.from(JSON.stringify({ ...manifest, bundle: changed.reference })),
+  );
+  f.remoteOverrides.set(changed.reference.path, changed.encoded);
+
+  await assert.rejects(
+    f.prepare(f.plan([descriptor], first, []), first),
+    /Static successful build identity mismatch/,
+  );
+  assert.deepEqual(f.fetched, [build.manifestPath]);
+  assert.deepEqual(
+    files.map((file) => readFileSync(path.join(f.snapshot, file))),
+    before,
+  );
+});
+
 test('catalog-only deletion requests a snapshot with zero pending builds', async (t) => {
   const f = new Fixture(t),
     old = f.descriptor(),

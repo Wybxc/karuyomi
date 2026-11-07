@@ -50,6 +50,7 @@ import {
   extensionPlanSchema,
   extensionStateSchema,
   pipelineResultSchema,
+  publishedBuildId,
   runtimeIdentitySchema,
   type BuildRecord,
   type Catalog,
@@ -114,7 +115,9 @@ export function persistStateCheckpoint(
   file: string,
   state: ExtensionState,
 ): void {
-  const serialized = stableStringify(validateState(state));
+  const validated = validateState(state);
+  assertBoundPublications(validated);
+  const serialized = stableStringify(validated);
   if (serialized === undefined) throw new Error('State checkpoint is not JSON');
   if (Buffer.byteLength(serialized + '\n') > MAX_STATE_BYTES)
     throw new Error('Oversized state checkpoint');
@@ -295,6 +298,19 @@ export async function withStateLock<T>(
     if (!compromised) await release();
   }
 }
+function isUnboundPublication(record: BuildRecord | undefined): boolean {
+  return record?.status === 'published' && record.bundleSha256 === undefined;
+}
+
+function hasUnboundPublications(state: ExtensionState): boolean {
+  return Object.values(state.attempts).some(isUnboundPublication);
+}
+
+function assertBoundPublications(state: ExtensionState): void {
+  if (hasUnboundPublications(state))
+    throw new Error('Published build state requires a canonical bundle digest');
+}
+
 function pendingEntries(
   entries: ExtensionDescriptor[],
   state: ExtensionState,
@@ -305,8 +321,9 @@ function pendingEntries(
     return (
       !previous ||
       (previous.status === 'published' &&
-        previous.available === false &&
-        (!previous.rebuildFailure || retryFailed)) ||
+        (isUnboundPublication(previous) ||
+          (previous.available === false &&
+            (!previous.rebuildFailure || retryFailed)))) ||
       (retryFailed && previous.status === 'failed')
     );
   });
@@ -322,7 +339,12 @@ export function makePlan(
   } = {},
 ): ExtensionPlan {
   const { limit = 12, ci = false, retryFailed = false, root = ROOT } = options;
-  if (ci && (!state.bootstrap.complete || state.revision === null))
+  if (
+    ci &&
+    (!state.bootstrap.complete ||
+      state.revision === null ||
+      hasUnboundPublications(state))
+  )
     throw new Error(
       'CI bootstrap guard: deploy the initial local baseline first',
     );
@@ -347,7 +369,9 @@ export function makePlan(
     ci,
     baseRevision: state.revision,
     snapshotNeeded: !!(
-      pending.length || state.catalogFingerprint !== catalog.catalogFingerprint
+      pending.length ||
+      state.catalogFingerprint !== catalog.catalogFingerprint ||
+      hasUnboundPublications(state)
     ),
   };
 }
@@ -382,7 +406,9 @@ export function resumePlan(
     ci: false,
     baseRevision: state.revision,
     snapshotNeeded:
-      !!pending.length || state.catalogFingerprint !== plan.catalogFingerprint,
+      !!pending.length ||
+      state.catalogFingerprint !== plan.catalogFingerprint ||
+      hasUnboundPublications(state),
   };
 }
 export function validateBuildCheckout(
@@ -429,6 +455,20 @@ export function validateBuildCheckout(
 }
 export function runtimeIdentity(manifest: BuildManifest): RuntimeIdentity {
   return runtimeIdentitySchema.parse(manifest);
+}
+
+function matchesPublishedManifest(
+  manifest: BuildManifest,
+  descriptor: ExtensionDescriptor,
+  bundleSha256 = manifest.bundle.sha256,
+): boolean {
+  return (
+    manifest.repoId === 'keiyoushi' &&
+    manifest.packageName === descriptor.packageName &&
+    manifest.version === descriptor.versionName &&
+    manifest.buildId === publishedBuildId(descriptor, bundleSha256) &&
+    manifest.bundle.sha256 === bundleSha256
+  );
 }
 export interface ValidationSummary extends Record<string, unknown> {
   runtimeReady: boolean;
@@ -577,12 +617,7 @@ export class ExtensionPipeline {
         materialCatalog: await this.currentRuntime(checkout),
       },
     );
-    if (
-      descriptor &&
-      (manifest.packageName !== descriptor.packageName ||
-        manifest.buildId !== descriptor.buildId ||
-        manifest.version !== descriptor.versionName)
-    )
+    if (descriptor && !matchesPublishedManifest(manifest, descriptor))
       throw new Error('Build output differs from its pinned descriptor');
     const encoded = readFileSync(
       path.join(directory, 'artifacts', manifest.bundle.sha256 + '.gz'),
@@ -794,9 +829,12 @@ export class ExtensionPipeline {
             verified.validation,
           );
         }
+        if (!matchesPublishedManifest(content.manifest, descriptor))
+          throw new Error('Build output differs from its pinned descriptor');
         record = {
           ...record,
           status: 'published',
+          bundleSha256: content.manifest.bundle.sha256,
           available: true,
           runtimeIdentity: runtimeIdentity(content.manifest),
           runtimeReady: content.validation.runtimeReady,
@@ -806,6 +844,7 @@ export class ExtensionPipeline {
         };
         state.active[descriptor.packageName] = key;
       } catch (error) {
+        content = undefined;
         record.failure = failure(error, 'integrity');
       }
     if (
@@ -813,13 +852,18 @@ export class ExtensionPipeline {
       state.active[descriptor.packageName] === key
     ) {
       const previous = state.attempts[key];
-      if (!previous) throw new Error('Invalid previous successful pointer');
-      record = {
-        ...previous,
-        attempts: record.attempts,
-        available: false,
-        ...(record.failure ? { rebuildFailure: record.failure } : {}),
-      };
+      if (previous?.status !== 'published')
+        throw new Error('Invalid previous successful pointer');
+      if (isUnboundPublication(previous)) {
+        delete state.active[descriptor.packageName];
+      } else {
+        record = {
+          ...previous,
+          attempts: record.attempts,
+          available: false,
+          ...(record.failure ? { rebuildFailure: record.failure } : {}),
+        };
+      }
     }
     state.attempts[key] = record;
     return { record, ...(content ? { content } : {}) };
@@ -848,18 +892,21 @@ export class ExtensionPipeline {
       current = new Map(
         plan.entries.map((entry) => [entry.packageName, entry]),
       );
+    if (hasUnboundPublications(state))
+      candidate.bootstrap = { complete: false };
     const discoveryPaths = new Set(
         plan.discoveryFailures.map((item) => item.sourcePath),
       ),
       retainedDiscovery = new Set<string>();
     for (const [packageName, key] of Object.entries(state.active)) {
-      const descriptor = state.attempts[key]?.descriptor;
+      const record = state.attempts[key];
       if (
-        descriptor &&
+        record?.status === 'published' &&
+        record.bundleSha256 !== undefined &&
         !current.has(packageName) &&
-        discoveryPaths.has(descriptor.sourcePath)
+        discoveryPaths.has(record.descriptor.sourcePath)
       ) {
-        current.set(packageName, descriptor);
+        current.set(packageName, record.descriptor);
         retainedDiscovery.add(packageName);
       }
     }
@@ -897,8 +944,10 @@ export class ExtensionPipeline {
         verified.set(descriptor.packageName, recorded.content);
     }
     candidate.active = Object.fromEntries(
-      Object.entries(candidate.active).filter(([packageName]) =>
-        current.has(packageName),
+      Object.entries(candidate.active).filter(
+        ([packageName, key]) =>
+          current.has(packageName) &&
+          !isUnboundPublication(candidate.attempts[key]),
       ),
     );
     const retained = new Set(
@@ -907,7 +956,9 @@ export class ExtensionPipeline {
         .concat(Object.values(candidate.active)),
     );
     candidate.attempts = Object.fromEntries(
-      Object.entries(candidate.attempts).filter(([key]) => retained.has(key)),
+      Object.entries(candidate.attempts).filter(
+        ([key, record]) => retained.has(key) && !isUnboundPublication(record),
+      ),
     );
     Object.assign(candidate, {
       discoveryFailures: plan.discoveryFailures,
@@ -939,8 +990,10 @@ export class ExtensionPipeline {
         processes.check();
         const record = candidate.attempts[key],
           latest = current.get(packageName);
-        if (!record || !latest) throw new Error('Invalid active build pointer');
-        const descriptor = record.descriptor;
+        if (record?.status !== 'published' || !record.bundleSha256 || !latest)
+          throw new Error('Invalid active build pointer');
+        const { descriptor, bundleSha256 } = record,
+          buildId = publishedBuildId(descriptor, bundleSha256);
         record.stale =
           key !== latest.inputFingerprint || retainedDiscovery.has(packageName);
         if (!equal(record.runtimeIdentity ?? null, identity)) {
@@ -956,28 +1009,28 @@ export class ExtensionPipeline {
         record.availability = retainedDiscovery.has(packageName)
           ? 'discovery_failed'
           : 'available';
-        let manifest: BuildManifest, encoded: Buffer;
+        let manifest: BuildManifest;
         const receipt = verified.get(packageName);
         if (receipt) {
           manifest = receipt.manifest;
-          encoded = receipt.payload();
-          verified.delete(packageName);
         } else {
           const manifestBytes = await this.download(
             options.origin ?? DEFAULT_ORIGIN,
-            '/extensions/builds/' + descriptor.buildId + '/manifest.json',
+            '/extensions/builds/' + buildId + '/manifest.json',
             64 * 1024,
           );
-          const input: unknown = JSON.parse(manifestBytes.toString('utf8'));
-          if (
-            !isRecord(input) ||
-            input.buildId !== descriptor.buildId ||
-            input.packageName !== descriptor.packageName ||
-            input.version !== descriptor.versionName
-          )
-            throw new Error('Static successful build identity mismatch');
           const { parseManifestValue } = await import('./verify-manifest.ts');
-          manifest = await parseManifestValue(input);
+          manifest = await parseManifestValue(
+            JSON.parse(manifestBytes.toString('utf8')),
+          );
+        }
+        if (!matchesPublishedManifest(manifest, descriptor, bundleSha256))
+          throw new Error('Static successful build identity mismatch');
+        let encoded: Buffer;
+        if (receipt) {
+          encoded = receipt.payload();
+          verified.delete(packageName);
+        } else {
           encoded = await this.download(
             options.origin ?? DEFAULT_ORIGIN,
             manifest.bundle.path,
@@ -995,7 +1048,7 @@ export class ExtensionPipeline {
         const manifestFile = path.join(
           extension,
           'builds',
-          descriptor.buildId,
+          buildId,
           'manifest.json',
         );
         mkdirSync(path.dirname(manifestFile), { recursive: true });
@@ -1028,6 +1081,7 @@ export class ExtensionPipeline {
       candidate.indexSha256 = createHash('sha256')
         .update(indexBytes)
         .digest('hex');
+      assertBoundPublications(candidate);
       const serializedState = stableStringify(validateState(candidate));
       if (serializedState === undefined)
         throw new Error('Static state is not JSON');
@@ -1071,7 +1125,11 @@ export class ExtensionPipeline {
       throw new Error(
         'Static index and build state are from different snapshots',
       );
-    if (!state.bootstrap.complete || state.revision === null)
+    if (
+      !state.bootstrap.complete ||
+      state.revision === null ||
+      hasUnboundPublications(state)
+    )
       throw new Error(
         'CI bootstrap guard: deploy initial local baseline first',
       );
@@ -1088,6 +1146,7 @@ export class ExtensionPipeline {
     );
     if (candidate.revision === null)
       throw new Error('Candidate snapshot is missing');
+    assertBoundPublications(candidate);
     if (initialize && (ciEnvironment() || candidate.parentRevision !== null))
       throw new Error(
         'Explicit initialization is local-only and requires no previous baseline',
@@ -1127,6 +1186,7 @@ export class ExtensionPipeline {
       index = readFileSync(path.join(assetsDirectory, 'extensions/index.json'));
     if (candidate.revision === null)
       throw new Error('Candidate snapshot is missing');
+    assertBoundPublications(candidate);
     if (
       createHash('sha256').update(index).digest('hex') !==
         candidate.indexSha256 ||
@@ -1157,11 +1217,7 @@ export function finalizeBaseline(
   const records = catalog.entries.map(
     (entry) => state.attempts[entry.inputFingerprint],
   );
-  if (
-    records.some(
-      (record) => !record || !['published', 'failed'].includes(record.status),
-    )
-  )
+  if (records.some((record) => !record || isUnboundPublication(record)))
     throw new Error('Initial baseline still has unattempted packages');
   state.bootstrap = {
     complete: true,

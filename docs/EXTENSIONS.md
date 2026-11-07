@@ -29,7 +29,9 @@ Bundle 清单记录 canonical `sha256/size/contentType`，以及 `encoding: gzip
 
 上游来源是固定提交的 `vendor/extensions-source`。调度器读取 `src/<lang>/<key>/build.gradle.kts`，按官方 `ExtensionPlugin.kt` 计算 Android versionCode，不依赖已退化为提示页的旧 `index.min.json`。无法静态确认的 Kotlin 表达式记录为 `discovery_failed`。
 
-`inputFingerprint` 覆盖包名、版本、源码依赖闭包及 host 输入，用于 buildId、增量状态和 provenance。共享库、桥、工具链变化即使未修改扩展版本，也会产生新输入；无关上游提交不使所有包重建。`plan` 只选择缺失输入、明确不可用的成功记录，以及本地显式要求重试的失败输入。
+`inputFingerprint` 覆盖包名、版本、源码依赖闭包及 host 输入，用于增量计划、内部工作目录、checkpoint 和 provenance。共享库、桥、工具链变化即使未修改扩展版本，也会产生新输入；无关上游提交不使所有包重建。`plan` 只选择缺失输入、明确不可用的成功记录，以及本地显式要求重试的失败输入。
+
+正式清单和静态目录的公开 `buildId` 在编码后生成：内部工作名 `ext-<包短名>-<输入指纹前 32 位>` 加上 `-<canonicalSHA>`。同一输入即使重编出不同字节，也使用不同清单路径、可被客户端检测为更新。快照状态记录已验证的 canonical SHA 并据此定位保留产物；回拉须与该身份一致。没有绑定摘要的记录不参与产物复用，应重新构建；已确认远端 revision 仍作为部署基线。派生公开 ID 直接复用编码阶段取得的摘要，不重复读取正文。
 
 Source host 的第三方源码输入只包含已初始化、HEAD 与已提交 gitlink 一致且 tracked clean 的 TeaVM / Suwayomi 子模块；扩展上游归 Source 闭包身份。未采用的图片 codec 候选源码、专属工具及其专用上游依赖已删除，不再维护候选构建身份。
 
@@ -70,7 +72,7 @@ runner 检查冻结 checkout 的提交、干净 host 输入、指纹、submodule
 
 `--limit N` 可分批；分批候选部署并确认 checkpoint 后，下一批才会跳过这些输入。全部发现输入都有成功或明确失败记录时才加 `--finalize`。baseline 完成只表示覆盖结束，不表示全部 Source 可运行。`CI=true` 或 `GITHUB_ACTIONS=true` 禁止首次全量、冻结计划恢复和 finalize。
 
-保存有效本地交付结果后，调度器仅清理精确 buildId 的 `extension-work`、`extension-cache` 和 `gradle-launcher`，不跟随 symlink。交付目录、checkpoint、日志和失败诊断保留，共享 Maven/Gradle 缓存保留。SIGINT/SIGTERM 会先终止并等待本次 builder 进程组，再释放 checkpoint 锁；三秒宽限后终止剩余组成员，不搜索或终止其它任务。
+保存有效本地交付结果后，调度器仅清理精确内部工作名的 `extension-work`、`extension-cache` 和 `gradle-launcher`，不跟随 symlink。交付目录、checkpoint、日志和失败诊断保留，共享 Maven/Gradle 缓存保留。SIGINT/SIGTERM 会先终止并等待本次 builder 进程组，再释放 checkpoint 锁；三秒宽限后终止剩余组成员，不搜索或终止其它任务。
 
 ## 候选、部署与 checkpoint
 

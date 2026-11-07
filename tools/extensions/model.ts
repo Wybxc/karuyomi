@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  buildIdSchema,
   hostScriptListSchema,
   resourceListSchema,
 } from '../../packages/contracts/src/index.ts';
@@ -32,6 +33,16 @@ export const extensionDescriptorSchema = z.object({
   hostSubmodules: z.array(submodulePinSchema).optional(),
 });
 export type ExtensionDescriptor = z.infer<typeof extensionDescriptorSchema>;
+/** Public IDs identify the exact output; the descriptor ID only names build work. */
+export function publishedBuildId(
+  descriptor: Pick<ExtensionDescriptor, 'buildId'>,
+  bundleSha256: string,
+): string {
+  return buildIdSchema.parse(
+    descriptor.buildId + '-' + sha256Schema.parse(bundleSha256),
+  );
+}
+
 export const discoveryFailureSchema = z.object({
   sourcePath: z.string(),
   status: z.literal('discovery_failed'),
@@ -85,9 +96,8 @@ export const pipelineResultSchema = z.object({
   failure: buildFailureSchema.optional(),
 });
 export type PipelineResult = z.infer<typeof pipelineResultSchema>;
-export const buildRecordSchema = z.object({
+const buildRecordFields = z.object({
   descriptor: extensionDescriptorSchema,
-  status: z.enum(['published', 'failed']),
   attempts: z.number().int().positive(),
   available: z.boolean().optional(),
   runtimeIdentity: runtimeIdentitySchema.optional(),
@@ -102,6 +112,17 @@ export const buildRecordSchema = z.object({
   failure: buildFailureSchema.optional(),
   rebuildFailure: buildFailureSchema.optional(),
 });
+export const buildRecordSchema = z.discriminatedUnion('status', [
+  buildRecordFields.extend({
+    status: z.literal('published'),
+    // A deployed parent may predate output-bound identities.
+    bundleSha256: sha256Schema.optional(),
+  }),
+  buildRecordFields.extend({
+    status: z.literal('failed'),
+    bundleSha256: z.never().optional(),
+  }),
+]);
 export type BuildRecord = z.infer<typeof buildRecordSchema>;
 export const extensionStateSchema = z
   .object({
