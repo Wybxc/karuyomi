@@ -1,6 +1,6 @@
 # 自定义封面验证
 
-2026-11-06，本地 macOS，固定 Flutter 3.47.5 / Dart 3.13.4。自定义封面已接入 Protobuf、Worker API、D1 当前引用、私有 R2、共享 Dart 数据层及正式详情/书架入口；状态为**已实现，待独立客户端验收**。合同、上传/清除、对象清理与生命周期设计见[设计](../design/custom-covers.md)。
+2026-11-06，本地 macOS，固定 Flutter 3.47.5 / Dart 3.13.4。自定义封面已接入 Protobuf、Worker API、D1 当前引用、私有 R2、共享 Dart 数据层及正式详情/书架入口；当前状态为**已实现，独立 Web 客户端往返通过；Native、故障与生产仍待验**。合同、上传/清除、对象清理与生命周期设计见[设计](../design/custom-covers.md)。
 
 ## 已实测的数据层
 
@@ -48,9 +48,22 @@ iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS �
 
 本轮没有启动 Native App 或模拟器，构建通过不表示真实选择器、Cookie、Access 或 Native UI 已验收。
 
-## 独立客户端与生产门
+## 独立 Web 客户端往返
 
-需要两个独立客户端经同一真实 D1/R2 验证封面替换、另一端刷新、反向替换、清除、并发旧 CAS、响应丢失后的原请求恢复及新进程读回。Web 文件选择与同源凭据、iOS/Android 的真实 Cookie 接线及 Access 恢复分别验收，不能用同一进程多个 repository 或测试 supplier 代替。
+2026-11-07，固定 `d2a21aa` Flutter Web 与官方 Wrangler `createTestHarness`，使用同一 loopback HTTP origin、受验签测试身份 `acceptance-owner`、隔离 D1 和本地 R2 `COVERS`。Flutter `main.dart.js` SHA-256 为 `178c4b43bfe620ef8df51078db0e87a8bb53c8c05d9e555f2ed221d42063794c`。静态索引仅含 xkcd 1.6.1，buildId `ext-all.xkcd-dd84d305506e2bdc34ac62988aef645f`，允许 `xkcd.com` 与 `imgs.xkcd.com`。使用正式浏览、书架与详情和真实英文 xkcd（Source ID `1538249443376436084`，作品 `SINGLE`），未注入图片或业务响应。
+
+| 独立文档     | 正式界面与只读证据                                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A 上传       | 通过真实浏览器文件选择器选择自行生成的 192 × 256 橙色 PNG，预览后保存。详情与编辑器显示已确认橙图，书架 API 返回 account / manga revision `3 / 2` 和 2,423 B 的 JPEG 描述。                                         |
+| B 读回、替换 | 关闭 A 后新文档书架直接显示橙图。B 从书架打开详情、用文件选择器选择同尺寸青色 PNG 并保存。详情与编辑器显示青图，独立书架 GET 为 `4 / 3`；橙图 asset 路径 404，青图 200，实际 2,391 B JPEG 的 SHA-256 与新描述一致。 |
+| C 读回、清除 | 新文档书架显示青图。C 从详情清除并保存，编辑器回到无自定义封面的“选择图片”。独立书架 GET 为 `5 / 4`，作品和书架均无封面引用，两份旧 asset 路径都是 404。                                                            |
+| D 新文档     | 启动后仍显示同一收藏，封面回到 xkcd 默认占位。逐字段对比书架三份快照，除封面引用与 revision 外完全相同；书签和进度仍为空。                                                                                          |
+
+复验使用与当前 host ABI 匹配的真实 xkcd 静态快照，按[官方 Web 验收入口](aot-current-pilot.md#绑定摘要后的正式三包和同站-web-更新)构建并启动服务；本分项不设 `ACCEPTANCE_NEXT_CONFIG`，只提供上述两个精确 Source hosts。通过界面上传两份无敏感数据、易区分的测试图片，独立 GET `/api/library`、`/api/state/manga/:mangaKey` 及 `/api/covers/:assetId` 时使用 `X-App-Request: 1` 和 `X-App-Subject: acceptance-owner`。确认当前正文摘要、旧路径状态和清除前后无关字段。原始图片和 API 样本留在 `/private/tmp/karuyomi-cover-58652.OkXKyy/`；四份文档已关闭，harness 正常退出，原端口无监听。404 仅证明应用拒绝读旧引用，不代表底层旧对象已物理删除。
+
+## 剩余平台、故障与生产门
+
+以上是独立 Web 文档的顺序保存和读回，共用本地浏览器配置与同一服务，尚未覆盖 Native Cookie / 系统选择器、混合平台、并发旧 CAS、响应丢失后原请求恢复、服务端或原生进程重启、生产 Access。继续按同一验收边界补齐，不用数据 supplier 代替。
 
 已通过当前账户的 Wrangler 创建配置匹配的 `karuyomi-covers` bucket，`wrangler r2 bucket dev-url get karuyomi-covers` 确认公开 r2.dev 访问关闭；创建记录在忽略的 `.local/cover-bucket-create.log`，隐私检查在 `.local/cover-bucket-privacy.log`。这只证明资源已准备，尚未部署新 Worker 绑定或应用生产 D1 schema。部署后仍需分别记录已登录上传/读取、匿名拒绝、不同 subject 隔离、旧 asset 撤销和宽限期后显式清理。远端对象不即时删除是当前设计，不能将暂存旧对象误记为当前 API 可公开读取。
 

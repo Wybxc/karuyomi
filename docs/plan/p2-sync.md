@@ -4,7 +4,7 @@
 
 **多端同步是首要设计目标和当前实施主线。** 同一部署、同一身份在 Flutter Web、iOS 和 Android 共享书架、分类、阅读进度、书签和非敏感设置。Worker API 负责业务读写，D1 保存唯一权威状态；功能从数据模型、协议到 UI 都按多端共同使用设计，不先完成一套独立本地产品再补同步。
 
-状态：**收藏与阅读进度的服务端底座已接入，工程检查、正式 Web/API 构建、真实 Web 独立会话及测试身份下三端组合的双向非默认页续读已通过；已部署生产并通过匿名静态/API访问边界检查，生产正向待验收**。Codex 内置浏览器与正式 iOS/Android `app.main()` 经真实隔离 workerd/D1，完成收藏读回、真实图片、双方保存和非默认页恢复，回看最远进度不倒退，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。同 origin Web 独立会话另见[证据](../verification/server-state.md#真实-web-独立会话闭环)。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。双 iOS 模拟器的阅读前台 epoch 冲突已过；其它平台前台重取、同时写竞争、故障恢复、真机及生产 Access 正向继续验收；分类协议、D1 原子读写与 Flutter 数据层已实现并通过组件/真实 D1 检查；分类管理、筛选与多关联 UI 已实现，真实双 Web 分类分项已通过；双 iOS 与 iOS↔Android 分类顺序闭环已过，Web↔Native 分类、Android 初始化可靠性、章节书签、范围已读/未读与同步阅读设置（含裁白）的独立客户端验收继续推进；自定义封面已实现待独立客户端验收，生产私有 bucket 配置与部署待完成。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
+状态：**收藏与阅读进度的服务端底座已接入，工程检查、正式 Web/API 构建、真实 Web 独立会话及测试身份下三端组合的双向非默认页续读已通过；已部署生产并通过匿名静态/API访问边界检查，生产正向待验收**。Codex 内置浏览器与正式 iOS/Android `app.main()` 经真实隔离 workerd/D1，完成收藏读回、真实图片、双方保存和非默认页恢复，回看最远进度不倒退，见[Web/iOS 证据](../verification/native-server-state.md)和[Android 配对证据](../verification/android-server-state.md)。同 origin Web 独立会话另见[证据](../verification/server-state.md#真实-web-独立会话闭环)。`business.proto`、D1 业务表、受信身份 API 与共享 Dart 会话客户端已接入正式产品入口，本地业务 SQLite 和对应 Web 资产已移除。双 iOS 模拟器的阅读前台 epoch 冲突已过；其它平台前台重取、同时写竞争、故障恢复、真机及生产 Access 正向继续验收；分类协议、D1 原子读写与 Flutter 数据层已实现并通过组件/真实 D1 检查；分类管理、筛选与多关联 UI 已实现，真实双 Web 分类分项已通过；双 iOS 与 iOS↔Android 分类顺序闭环已过，Web↔Native 分类、Android 初始化可靠性、章节书签、范围已读/未读与同步阅读设置（含裁白）的独立客户端验收继续推进；自定义封面已通过独立 Web 往返，Native、故障及生产私有 bucket 绑定与部署待验。`P2` 保留主题编号，执行顺序前移，与 [P1](p1-library-and-progress.md) 一起交付；[P0](p0-runtime-and-reading.md) 的会话、Source 和真实阅读验收仍须完成。
 
 ## 权威来源与初版边界
 
@@ -34,7 +34,7 @@
 
 业务 API 的 Access 失效恢复已补齐正式宿主控制错误路径：当前私有请求的 401/403、登录重定向与 HTML 触发既有 Dart 运行时事件和登录/拒绝状态，零 Source 也适用；已发布图片保留释放语义，迟到旧 generation 不暂停新会话。设置认证恢复保留原命令，只读核对后仍须显式精确重试。工程与受控组件证据沿[设置记录](../verification/reader-settings.md)维护，实际生产 Access 续期和设备故障恢复继续单独验收。
 
-自定义封面已实现，待独立客户端验收。私有 R2 保存正文，D1 当前引用经作品 CAS 和幂等确认；multipart 的二进制上传与同一 mutation 一次确认，清除沿现有 JSON mutation，客户端固定原 UUID、CAS、正文和字节进行明确重试。相同业务会话重建仓储保留未确认原操作，旧 ACK 需要当前权威读回，关闭或身份变化后拒绝迟到结果。普通源元数据、收藏、分类和进度修改保留封面；旧对象与失败候选经至少一小时宽限后显式清理，不在修改时即时删除。设计见[自定义封面](../design/custom-covers.md)，工程实际结果与剩余 Cookie/独立客户端/生产 bucket 部署门见[验证记录](../verification/custom-covers.md)。
+自定义封面已实现，独立 Web 文档的上传、替换、清除及顺序读回通过。私有 R2 保存正文，D1 当前引用经作品 CAS 和幂等确认；multipart 的二进制上传与同一 mutation 一次确认，清除沿现有 JSON mutation，客户端固定原 UUID、CAS、正文和字节进行明确重试。相同业务会话重建仓储保留未确认原操作，旧 ACK 需要当前权威读回，关闭或身份变化后拒绝迟到结果。普通源元数据、收藏、分类和进度修改保留封面；旧对象与失败候选经至少一小时宽限后显式清理，不在修改时即时删除。设计见[自定义封面](../design/custom-covers.md)，Web 实际结果与剩余 Native/故障/生产部署门见[验证记录](../verification/custom-covers.md)。
 
 书架批量操作本轮复用单漫画 API，逐本串行确认，不增加跨漫画原子事务。确认清单冻结漫画与目录 revision；分类操作保留其它关联，移出书架不覆写元数据或清除进度。首失败停止，未确认项只能精确重试，剩余项须明确继续；已拒绝项只读刷新后结束旧批次，再重新确认。会话草稿以业务客户端为归属，同客户端 wrapper 重建保留恢复入口；旧窗口失效后不得续发或导航。设计见[批量操作](../design/library-batch.md)，工程与组件范围见[验证记录](../verification/library-batch.md)，真实跨端与故障门仍须另验。
 
