@@ -45,7 +45,15 @@ test('preferences preserve Android int/long/float widths, false, empty text/set 
           toggle: {},
         },
         { key: 'secret', syncScope: scope, text: { secret: true } },
-        { key: 'empty', syncScope: scope, text: { value: '' } },
+        {
+          key: 'empty',
+          syncScope: scope,
+          text: {
+            value: '',
+            hint: 'https://example.org',
+            selectAllOnOpen: true,
+          },
+        },
       ],
     }),
   );
@@ -63,6 +71,8 @@ test('preferences preserve Android int/long/float widths, false, empty text/set 
     throw new Error('Expected text nodes');
   expect(absent.value.value).toBeUndefined();
   expect(empty.value.value).toBe('');
+  expect(empty.value.hint).toBe('https://example.org');
+  expect(empty.value.selectAllOnOpen).toBe(true);
   for (const invalid of [
     { integer: 2147483648 },
     { integer: 1.5 },
@@ -123,6 +133,18 @@ test('preference partitions, secret scope, defaults and recursive descriptions a
       snapshot({ nodes: [{ ...leaf, defaultValue: { text: 'false' } }] }),
     ),
   ).toThrow();
+  for (const invalidText of [
+    { secret: true, hint: 'a secret hint' },
+    { hint: '界'.repeat(171) },
+  ]) {
+    expect(() =>
+      preferenceSnapshotSchema.parse(
+        snapshot({
+          nodes: [{ key: 'text', syncScope: scope, text: invalidText }],
+        }),
+      ),
+    ).toThrow('Preference input hint');
+  }
   expect(() => preferenceEditResultSchema.parse({ accepted: true })).toThrow();
 });
 

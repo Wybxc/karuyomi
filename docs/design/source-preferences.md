@@ -20,9 +20,11 @@ change listener 返回 true 才执行该控件的标准持久化；返回 false 
 
 客户端先 GET 整包已确认设置，再形成 `PreferenceBootstrap(packageName,sources)`。driver 根据应用 origin、确认的 CatalogReference 和已验证 manifest 的 packageName 生成可信同步规则，作为 `PreferenceHostConfiguration` 传给 `hostLoad`。Java 使用 init 创建的原 Application 和原 SharedPreferences.Editor，在 `Generated/createSources` 之前注入 `source_<id>`；不能构造 Source 后才更新设置，因为构造函数、lazy client 和 headers 可能已经读取旧值。
 
-保留原 Preference 实例、具体子类和 listener。必要的 Preference 分组、dependency 和有界 headless 编辑元数据属于项目宿主 ABI 适配；不替换整个 Context，不改扩展源码或原 JAR。原 bind 超出已实现的 headless 方法子集时呈现 unsupported；不伪造 Activity、按钮或 Android UI 成功。密码行不回显原 summary/default。
+保留原 Preference 实例、具体子类和 listener。必要的 Preference 分组、dependency 和有界 headless 编辑元数据属于项目宿主 ABI 适配；不替换整个 Context，不改扩展源码或原 JAR。原 bind 超出已实现的 headless 方法子集时呈现 unsupported；不创建 Activity、原生对话框或任意 Android UI。密码行不回显原 summary、默认值或输入提示。
 
-setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主仍使用有界 operation owner；描述和实际存储最终序列化放在 `owner.drain` 成功之后，避免保存回调尚未写完的值。headless bind 仅在建立描述时执行一次，drain 后不重复触发。
+setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主仍使用有界 operation owner；描述和实际存储最终序列化放在 `owner.drain` 成功之后，避免保存回调尚未写完的值。headless bind 仅在建立描述时执行一次，drain 后不重复触发。设置专用 EditText 支持有界 bind post、全选、非秘密提示及原 TextWatcher；不为普通 Android 控件提供此行为。Flutter 通过 typed 提示和全选字段呈现元数据。
+
+提交文本时，对原存储值到候选值执行一轮 before/on/after，候选通过只读 Editable 提供。设置专用的 `android.R.id.button1` 只表示本次提交是否启用；任一 error、禁用或校验异常均拒绝候选，宿主不调用 change listener、不执行默认写入，原始异常与输入文本不作为错误回显。允许后仍执行原 change listener 一次，并重读实际存储，保留它在返回 false 之前自行写入的值。此边界不模拟逐键输入、IME、span 或其它 Android 对话框。
 
 一次 edit 发送后，即使 veto、异常、取消或响应丢失，该代都不得继续普通 Source/图片请求。TS manager、Worker 和 Dart transport 都执行此门；已有资源的 release、close 与 shutdown 仍可用。必须确认保存或显式放弃并读取 D1 后，通过平台 `rebuildRuntime` 清理旧阅读资源并构造新代；不能用命中缓存的同一 open 或只丢 session 替代。
 
@@ -46,6 +48,8 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 | 设置树                              | 深度 8，节点总数 256                                      |
 | 单组选项 / 字符串集合               | 256，值唯一                                               |
 | key / title、label / summary / text | 200 / 512 / 2048 / 4096 UTF-16 单元                       |
+| 文本输入提示                        | 最多 512 UTF-8 字节，密码控件不发送                       |
+| 每个文本 bind 的 post / watcher     | 各最多 16；仅 bind 阶段登记                               |
 | 每 Source 实际存储（两个分区合计）  | 128 entries、entries 数组 ProtoJSON 32KiB                 |
 | 整包存储 / bootstrap                | 最多 64 Sources，各 entries 数组 ProtoJSON 字节之和 64KiB |
 | bootstrap / 整包业务响应            | 完整 ProtoJSON 128KiB                                     |

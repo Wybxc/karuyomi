@@ -188,6 +188,13 @@ void validatePreferenceSnapshot(PreferenceSnapshot value) {
           expectedDefault = PreferenceValue_Value.text;
           _preferenceKey(node.key);
           if (node.text.hasValue()) _preferenceText(node.text.value);
+          if (node.text.hasHint()) {
+            _preferenceRequire(
+              !node.text.secret &&
+                  utf8.encode(node.text.hint).length <= preferenceLabelLimit,
+              'Preference input hint is secret or exceeds its text budget',
+            );
+          }
           _preferenceRequire(
             !node.text.secret ||
                 node.syncScope ==

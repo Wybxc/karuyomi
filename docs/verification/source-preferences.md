@@ -22,6 +22,20 @@
 
 详细临时日志位于 main 忽略目录 `.local/source-preferences-*.log`；Java oracle 和全源编译的临时日志在 `/private/tmp/karuyomi-source-preferences-*.log`。不提交机器输出或临时工程。
 
+## 文本设置绑定与输入校验
+
+2026-11-08，正式设置链保留 Source 的有界 `EditText` 绑定任务和 `TextWatcher`。提交候选值先执行原 watcher；当 watcher 设置错误、禁用确认或异常时，不调用原 change listener 或执行默认保存。通过时仍由原 change listener 决定是否默认保存；它主动写入的值按实际分区读取。Flutter 支持输入提示和打开时全选，秘密输入不携带提示。
+
+- `pnpm teavm:check` 通过；HostPreferences oracle 共 191 断言，覆盖原回调顺序、拒绝时跳过 change、有效值持久化、别名写入、只读 Editable、绑定上限和秘密提示隔离。
+- `pnpm check` 通过（513 项 Vitest、10 项协议 golden 及工具回归）；TS/Dart 分别校验提示的 UTF-8 预算和秘密边界。
+- `pnpm flutter:check` 通过；reader_core、source_runtime 和正式 reader 均通过严格分析与回归，reader 共 604 项。正式设置组件断言显示提示及输入打开时的实际选择范围。
+
+- `pnpm build` 通过，产出 Vite runtime 和 Native 内置材料、Flutter Web 与 Worker/API。
+
+拒绝阻止默认写入和原 change listener，不能撤销原 watcher 自身的副作用。
+
+待用未修改的 FoolSlide Customizable 和 MangaDex 原 JAR 隔离重建并从正式界面验证 URL/UUID 的无效、有效和回调写入路径。本节是工程证据，不表示这两包已通过 AOT 或真实设置验收，也不改变原 baseline。
+
 ## Komiic v6 真实 Web 分项
 
 固定 `384627e9f58e6f940effe57d6c6a2d06b32eb016` 的独立 clone，锁定的上游和工具链不变，生成完整 1448 包计划后只选 Komiic 1.6.11。未复用 v5 AOT，未改变全量 baseline 或发布 checkpoint。

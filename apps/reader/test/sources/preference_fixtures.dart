@@ -137,7 +137,11 @@ final class PreferenceFixture {
                 enabled: true,
                 visible: true,
                 syncScope: sessionScope,
-                text: wire.PreferenceText(value: values['note']?.value.text),
+                text: wire.PreferenceText(
+                  value: values['note']?.value.text ?? '原备注',
+                  hint: '可填写备注',
+                  selectAllOnOpen: true,
+                ),
               ),
             ],
           ),

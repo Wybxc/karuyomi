@@ -3216,11 +3216,15 @@ class PreferenceText extends $pb.GeneratedMessage {
     $core.String? value,
     $core.bool? secret,
     $core.int? inputType,
+    $core.String? hint,
+    $core.bool? selectAllOnOpen,
   }) {
     final result = PreferenceText._();
     if (value != null) result.value = value;
     if (secret != null) result.secret = secret;
     if (inputType != null) result.inputType = inputType;
+    if (hint != null) result.hint = hint;
+    if (selectAllOnOpen != null) result.selectAllOnOpen = selectAllOnOpen;
     return result;
   }
 
@@ -3240,6 +3244,8 @@ class PreferenceText extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'value')
     ..aOB(2, _omitFieldNames ? '' : 'secret')
     ..aI(3, _omitFieldNames ? '' : 'inputType')
+    ..aOS(4, _omitFieldNames ? '' : 'hint')
+    ..aOB(5, _omitFieldNames ? '' : 'selectAllOnOpen')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3291,6 +3297,25 @@ class PreferenceText extends $pb.GeneratedMessage {
   $core.bool hasInputType() => $_has(2);
   @$pb.TagNumber(3)
   void clearInputType() => $_clearField(3);
+
+  /// Presentation metadata from the original input bind; never include a secret hint.
+  @$pb.TagNumber(4)
+  $core.String get hint => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set hint($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasHint() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearHint() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get selectAllOnOpen => $_getBF(4);
+  @$pb.TagNumber(5)
+  set selectAllOnOpen($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSelectAllOnOpen() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSelectAllOnOpen() => $_clearField(5);
 }
 
 class PreferenceChoice extends $pb.GeneratedMessage {

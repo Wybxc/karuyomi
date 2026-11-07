@@ -181,6 +181,14 @@ export function validatePreferenceSnapshot(value: pb.PreferenceSnapshot): void {
           expectedDefault = 'text';
           key(node.key);
           if (node.kind.value.value !== undefined) text(node.kind.value.value);
+          const hint = node.kind.value.hint;
+          if (hint !== undefined)
+            requireCondition(
+              !node.kind.value.secret &&
+                new TextEncoder().encode(hint).byteLength <=
+                  PREFERENCE_LABEL_LIMIT,
+              'Preference input hint is secret or exceeds its text budget',
+            );
           requireCondition(
             !node.kind.value.secret ||
               node.syncScope === pb.PreferenceSyncScope.CLIENT_SESSION,

@@ -88,7 +88,12 @@ void main() {
       await apply(tester);
       await item(tester, '4.0');
       await item(tester, '4.1');
-      await tester.enterText(find.byType(TextField).last, 'session-note');
+      final noteInput = find.byType(TextField).last;
+      final noteField = tester.widget<TextField>(noteInput);
+      expect(noteField.decoration?.hintText, '可填写备注');
+      final noteController = noteField.controller!;
+      expect(noteController.selection.textInside(noteController.text), '原备注');
+      await tester.enterText(noteInput, 'session-note');
       await apply(tester);
       await item(tester, '5');
       expect(fixture.callbacks, 7);

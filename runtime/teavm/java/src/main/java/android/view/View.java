@@ -20,6 +20,18 @@ public class View {
     return null;
   }
 
+  public View getRootView() {
+    throw new UnsupportedOperationException("Android view hierarchy is unsupported");
+  }
+
+  public final View findViewById(int id) {
+    return findViewTraversal(id);
+  }
+
+  protected View findViewTraversal(int id) {
+    throw new UnsupportedOperationException("Android view lookup is unsupported");
+  }
+
   public void setLayoutParams(ViewGroup.LayoutParams params) {
     layoutParams = java.util.Objects.requireNonNull(params);
   }

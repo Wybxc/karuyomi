@@ -443,9 +443,15 @@ class _PreferenceTextDialogState extends State<_PreferenceTextDialog> {
   @override
   void initState() {
     super.initState();
-    _input = TextEditingController(
-      text: widget.node.text.hasValue() ? widget.node.text.value : '',
-    );
+    final preference = widget.node.text;
+    final text = preference.hasValue() ? preference.value : '';
+    _input = TextEditingController(text: text);
+    if (preference.selectAllOnOpen) {
+      _input.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: text.length,
+      );
+    }
   }
 
   @override
@@ -458,6 +464,7 @@ class _PreferenceTextDialogState extends State<_PreferenceTextDialog> {
       maxLength: 4096,
       decoration: InputDecoration(
         labelText: widget.node.title,
+        hintText: widget.node.text.hasHint() ? widget.node.text.hint : null,
         helperText:
             widget.node.syncScope ==
                 wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_ACCOUNT

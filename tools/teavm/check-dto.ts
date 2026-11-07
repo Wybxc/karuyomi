@@ -131,6 +131,8 @@ export async function checkDto(root = ROOT): Promise<void> {
     'android/view/View.java',
     'android/widget/TextView.java',
     'android/widget/EditText.java',
+    'android/widget/Button.java',
+    'android/text/PreferenceTextValue.java',
     'android/text/method/PasswordTransformationMethod.java',
     'androidx/preference/Preference.java',
     'androidx/preference/PreferenceGroup.java',

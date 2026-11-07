@@ -266,6 +266,9 @@ message PreferenceText {
   optional string value = 1;
   bool secret = 2;
   int32 input_type = 3;
+  // Presentation metadata from the original input bind; never include a secret hint.
+  optional string hint = 4;
+  bool select_all_on_open = 5;
 }
 message PreferenceChoice {
   repeated PreferenceOption options = 1;

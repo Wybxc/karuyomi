@@ -438,6 +438,16 @@ const preferenceSnapshot: JsonObject = {
       syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION',
       unsupported: { reason: 'Activity is unavailable' },
     },
+    {
+      key: 'url',
+      title: '站点地址',
+      syncScope: 'PREFERENCE_SYNC_SCOPE_CLIENT_SESSION',
+      text: {
+        value: 'https://old.example.org',
+        hint: 'https://example.org',
+        selectAllOnOpen: true,
+      },
+    },
   ],
   syncValues: [preferenceEntries[0]!],
   sessionValues: preferenceEntries.slice(1),

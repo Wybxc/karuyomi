@@ -1115,16 +1115,27 @@ const PreferenceText$json = {
     {'1': 'value', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'value', '17': true},
     {'1': 'secret', '3': 2, '4': 1, '5': 8, '10': 'secret'},
     {'1': 'input_type', '3': 3, '4': 1, '5': 5, '10': 'inputType'},
+    {'1': 'hint', '3': 4, '4': 1, '5': 9, '9': 1, '10': 'hint', '17': true},
+    {
+      '1': 'select_all_on_open',
+      '3': 5,
+      '4': 1,
+      '5': 8,
+      '10': 'selectAllOnOpen'
+    },
   ],
   '8': [
     {'1': '_value'},
+    {'1': '_hint'},
   ],
 };
 
 /// Descriptor for `PreferenceText`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List preferenceTextDescriptor = $convert.base64Decode(
     'Cg5QcmVmZXJlbmNlVGV4dBIZCgV2YWx1ZRgBIAEoCUgAUgV2YWx1ZYgBARIWCgZzZWNyZXQYAi'
-    'ABKAhSBnNlY3JldBIdCgppbnB1dF90eXBlGAMgASgFUglpbnB1dFR5cGVCCAoGX3ZhbHVl');
+    'ABKAhSBnNlY3JldBIdCgppbnB1dF90eXBlGAMgASgFUglpbnB1dFR5cGUSFwoEaGludBgEIAEo'
+    'CUgBUgRoaW50iAEBEisKEnNlbGVjdF9hbGxfb25fb3BlbhgFIAEoCFIPc2VsZWN0QWxsT25PcG'
+    'VuQggKBl92YWx1ZUIHCgVfaGludA==');
 
 @$core.Deprecated('Use preferenceChoiceDescriptor instead')
 const PreferenceChoice$json = {

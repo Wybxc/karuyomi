@@ -33,7 +33,11 @@ wire.PreferenceSnapshot _snapshot() => wire.PreferenceSnapshot(
     wire.PreferenceNode(
       key: 'empty',
       syncScope: _sessionScope,
-      text: wire.PreferenceText(value: ''),
+      text: wire.PreferenceText(
+        value: '',
+        hint: 'https://example.org',
+        selectAllOnOpen: true,
+      ),
     ),
     // Android can retain a value no longer listed by the current Source.
     wire.PreferenceNode(
@@ -143,6 +147,23 @@ void main() {
       expect(described.nodes[1].text.hasValue(), false);
       expect(described.nodes[2].text.hasValue(), true);
       expect(described.nodes[2].text.value, '');
+      final decoded = wire.decodeProtoJson(
+        wire.PreferenceSnapshot(),
+        wire.encodeProtoJson(described),
+      );
+      expect(decoded.nodes[2].text.hint, 'https://example.org');
+      expect(decoded.nodes[2].text.selectAllOnOpen, true);
+      decoded.nodes[2].text.hint = '界' * 171;
+      expect(
+        () => wire.validatePreferenceSnapshot(decoded),
+        throwsFormatException,
+      );
+      decoded.nodes[2].text.hint = 'secret hint';
+      decoded.nodes[2].text.secret = true;
+      expect(
+        () => wire.validatePreferenceSnapshot(decoded),
+        throwsFormatException,
+      );
       for (final invalid in [
         wire.PreferenceValue(),
         wire.PreferenceValue(decimal: double.nan),

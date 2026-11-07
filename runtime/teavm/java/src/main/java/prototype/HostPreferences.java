@@ -159,7 +159,7 @@ public final class HostPreferences {
     stored(selected.storage);
     boolean accepted = false, handled = false;
     if (change) {
-      accepted = target.callChangeListener(value);
+      accepted = acceptsTextProposal(node, value) && target.callChangeListener(value);
       if (accepted) {
         assign(target, value);
         if (target.isPersistent() && target.hasKey()) {
@@ -205,6 +205,9 @@ public final class HostPreferences {
       Node node = node(preference, stored, false);
       node.secret = previous.secret;
       node.inputType = previous.inputType;
+      node.hint = previous.hint;
+      node.selectAllOnOpen = previous.selectAllOnOpen;
+      node.textInput = previous.textInput;
       if (previous.kind.equals("unsupported")) {
         node.kind = previous.kind;
         node.reason = previous.reason;
@@ -267,21 +270,29 @@ public final class HostPreferences {
       }
     } else if (preference instanceof EditTextPreference text) {
       node.kind = "text";
+      node.inputType = 1;
       if (current != null) {
         if (!(current instanceof String)) throw invalid("Text value has wrong type");
         text.setText((String) current);
       }
-      if (bind)
+      if (bind && text.getOnBindEditTextListener() != null)
         try {
-          EditText input = new EditText(preference.getContext());
-          if (text.getOnBindEditTextListener() != null)
-            text.getOnBindEditTextListener().onBindEditText(input);
+          EditText input = EditText.hostPreferenceInput(preference.getContext(), text.getText());
+          text.getOnBindEditTextListener().onBindEditText(input);
+          input.hostFinishBinding();
           node.inputType = input.getInputType();
           int type = node.inputType & 0xf, variation = node.inputType & 0xff0;
           node.secret =
               input.getTransformationMethod() instanceof PasswordTransformationMethod
                   || type == 1 && (variation == 0x80 || variation == 0x90 || variation == 0xe0)
                   || type == 2 && variation == 0x10;
+          if (!node.secret && input.getHint() != null) {
+            String hint = input.getHint().toString();
+            if (hint.length() <= MAX_LABEL
+                && hint.getBytes(StandardCharsets.UTF_8).length <= MAX_LABEL) node.hint = hint;
+          }
+          node.selectAllOnOpen = input.hostSelectAllOnOpen();
+          node.textInput = input;
         } catch (UnsupportedOperationException | LinkageError unsupported) {
           node.kind = "unsupported";
           node.secret = true;
@@ -380,6 +391,8 @@ public final class HostPreferences {
             state.addProperty("value", text(((EditTextPreference) preference).getText()));
           state.addProperty("secret", node.secret);
           state.addProperty("inputType", node.inputType);
+          if (node.hint != null) state.addProperty("hint", node.hint);
+          state.addProperty("selectAllOnOpen", node.selectAllOnOpen);
           break;
         case "choice":
           state.add("options", node.options);
@@ -439,6 +452,18 @@ public final class HostPreferences {
       current = group.getPreference(index);
     }
     return current;
+  }
+
+  private static boolean acceptsTextProposal(Node node, Object value) {
+    if (node.textInput == null) return true;
+    if (!(node.preference instanceof EditTextPreference text)
+        || !(value instanceof String proposal)) return false;
+    try {
+      return node.textInput.hostValidateProposal(text.getText(), proposal);
+    } catch (RuntimeException | LinkageError rejected) {
+      // The validator is part of the original input. Do not commit or surface its raw exception.
+      return false;
+    }
   }
 
   private static void validateChange(Node node, Object value) {
@@ -722,8 +747,9 @@ public final class HostPreferences {
 
   private static final class Node {
     final Preference preference;
-    String kind, reason;
-    boolean secret;
+    String kind, reason, hint;
+    boolean secret, selectAllOnOpen;
+    EditText textInput;
     int inputType;
     JsonArray options;
 

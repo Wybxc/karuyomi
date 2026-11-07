@@ -2,7 +2,12 @@ package prototype;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
 import androidx.preference.*;
 import com.google.gson.*;
 import eu.kanade.tachiyomi.source.ConfigurableSource;
@@ -66,7 +71,9 @@ public final class HostPreferencesTest {
     Preference action, unknown;
     PreferenceCategory group;
     int changes, binds, clicks;
-    boolean reject, alias, delayed, emptyOptions;
+    boolean reject, alias, delayed, emptyOptions, watch, excessivePosts;
+    String hint = "Default host";
+    final List<String> inputEvents = new ArrayList<>();
     int nestedGroups;
     String textKey = "text";
 
@@ -109,6 +116,60 @@ public final class HostPreferencesTest {
       text.setOnBindEditTextListener(input -> {
         binds++;
         input.setInputType(1);
+        if (watch) {
+          input.setHint(hint);
+          check(
+              input.post(() -> {
+                check(inputEvents.equals(List.of("bind")), "Post ran before binding finished");
+                inputEvents.add("post");
+                input.selectAll();
+              }),
+              "Projected post was rejected");
+          input.addTextChangedListener(
+              new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+                  check(start == 0 && count == value.length(), "Wrong prior text range");
+                  check(
+                      value.toString().equals(text.getText()),
+                      "Previous stored text changed too soon");
+                  inputEvents.add("before");
+                }
+
+                @Override
+                public void onTextChanged(CharSequence value, int start, int before, int count) {
+                  check(start == 0 && count == value.length(), "Wrong candidate text range");
+                  inputEvents.add("on");
+                }
+
+                @Override
+                public void afterTextChanged(Editable value) {
+                  inputEvents.add("after");
+                  check(
+                      value.toString().equals(input.getText().toString()),
+                      "Watcher did not receive current input");
+                  Button confirm = (Button) input.getRootView().findViewById(android.R.id.button1);
+                  switch (value.toString()) {
+                    case "bad button" -> confirm.setEnabled(false);
+                    case "bad error" -> input.setError(value);
+                    case "throws" -> throw new UnsupportedOperationException(value.toString());
+                    case "mutates" -> value.clear();
+                    default -> {}
+                  }
+                }
+              });
+          inputEvents.add("bind");
+        }
+        if (excessivePosts) {
+          Runnable recurring =
+              new Runnable() {
+                @Override
+                public void run() {
+                  input.post(this);
+                }
+              };
+          input.post(recurring);
+        }
       });
       text.setOnPreferenceChangeListener((original, value) -> {
         changes++;
@@ -145,7 +206,10 @@ public final class HostPreferencesTest {
       password.setKey("password");
       password.setDefaultValue("");
       password.setSummary("must not expose credential summary");
-      password.setOnBindEditTextListener(input -> input.setInputType(0x81));
+      password.setOnBindEditTextListener(input -> {
+        input.setInputType(0x81);
+        input.setHint("Must not expose secret input hint");
+      });
       screen.addPreference(password);
       transformed = new EditTextPreference(context);
       transformed.setKey("transformed");
@@ -689,9 +753,64 @@ public final class HostPreferencesTest {
     rejected(() -> read(host, source), "Depth-nine group accepted");
   }
 
+  private static void projectedTextValidation() {
+    HostPreferences host = new HostPreferences();
+    Fixture source = new Fixture();
+    source.watch = true;
+    source.storage.edit().putString("text", "stored").apply();
+    JsonObject snapshot = read(host, source);
+    JsonObject projected = node(snapshot, 1).getAsJsonObject("text");
+    check(projected.get("hint").getAsString().equals("Default host"), "Bound hint missing");
+    check(projected.get("selectAllOnOpen").getAsBoolean(), "Posted select-all missing");
+    check(source.inputEvents.equals(List.of("bind", "post")), "Reading ran a validation callback");
+    check(!snapshot.toString().contains("Must not expose secret input hint"), "Secret hint leaked");
+    for (String candidate : List.of("bad button", "bad error", "throws", "mutates")) {
+      source.inputEvents.clear();
+      JsonObject result = edit(host, source, snapshot, "[1]", "{\"text\":\"" + candidate + "\"}");
+      check(!result.get("accepted").getAsBoolean(), "Rejected text was accepted");
+      check(!result.toString().contains(candidate), "Rejected raw proposal or error leaked");
+      check(source.inputEvents.equals(List.of("before", "on", "after")), "Watcher phases changed");
+      check(source.changes == 0, "Original change callback ran for invalid text");
+      check(source.storage.getString("text", "").equals("stored"), "Invalid text reached storage");
+    }
+    source.inputEvents.clear();
+    JsonObject changed = edit(host, source, snapshot, "[1]", "{\"text\":\"valid\"}");
+    check(changed.get("accepted").getAsBoolean(), "Validation did not reset after rejection");
+    check(source.changes == 1, "Original callback was not invoked once");
+    check(source.storage.getString("text", "").equals("valid"), "Valid input was not stored");
+    source.alias = true;
+    JsonObject alias = edit(host, source, snapshot, "[1]", "{\"text\":\" normalized \"}");
+    check(!alias.get("accepted").getAsBoolean(), "Original false result was lost");
+    check(source.changes == 2, "Original callback replayed");
+    check(
+        source.storage.getString("ALIAS", "").equals("normalized"),
+        "Original callback write was lost");
+    check(
+        source.storage.getString("text", "").equals("valid"),
+        "Original false default write applied");
+    check(
+        node(alias.getAsJsonObject("snapshot"), 1).getAsJsonObject("text").has("hint"),
+        "Existing metadata was lost during re-read");
+
+    Fixture tooLong = new Fixture();
+    tooLong.watch = true;
+    tooLong.hint = "字".repeat(200);
+    check(
+        !node(read(host, tooLong), 1).getAsJsonObject("text").has("hint"), "Oversize hint leaked");
+    Fixture overflow = new Fixture();
+    overflow.excessivePosts = true;
+    check(node(read(host, overflow), 1).has("unsupported"), "Unbounded posted actions accepted");
+    rejected(
+        () -> new View(source.context).findViewById(android.R.id.button1),
+        "Ordinary View gained a fake dialog");
+    rejected(
+        () -> new EditText(source.context).post(() -> {}), "Ordinary EditText accepted posting");
+  }
+
   public static void main(String[] args) {
     bootstrap();
     descriptionsAndEdits();
+    projectedTextValidation();
     validationAndLifecycle();
     lateWritesAndBudgets();
     bootstrapBudgets();
