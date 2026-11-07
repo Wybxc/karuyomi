@@ -44,9 +44,9 @@ Android 的 WebView 与 Dart HTTP 客户端分别维护证书信任；上面的 
 | ------------------------- | --------------------------------------------------- |
 | `APP_ORIGIN`              | 官方 harness 的实际 HTTPS origin                    |
 | `SETTINGS_SUBJECT`        | 本次服务已确认的 subject                            |
-| `SETTINGS_PHASE`          | `verify` 或 `write`                                 |
+| `SETTINGS_PHASE`          | `verify`、`write` 或 `resume`                       |
 | `SETTINGS_EXPECT_JSON`    | 本阶段完整当前 SettingsResponse 的 JSON 字符串      |
-| `SETTINGS_PRESET`         | 仅写阶段填写，取下述两个预设之一                    |
+| `SETTINGS_PRESET`         | 写入与前台恢复阶段填写，取下述两个预设之一          |
 | `SETTINGS_TEST_CA_BASE64` | 可选，仅 Android loopback 本地 CA 文件字节的 Base64 |
 
 在 `apps/reader` 使用固定 SDK 运行：
@@ -61,6 +61,8 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
 依次运行 A `verify` → B `write`（`dark-rtl-double-width-crop`）→ A 新进程 `verify` → A 新进程 `write`（`light-webtoon-auto-height-no-crop`）→ B 新进程 `verify`。每阶段重新取得当前完整快照作为前置；保存成功后不要盲目重跑旧写阶段。正式表单修改主题、阅读模式、页组、适配和裁白，其它字段与列表保留。驱动验证草稿不提前应用主题、服务端确认后清除 pending，并输出完整 `SETTINGS_SYNC_RESULT`。
 
 这组顺序操作证明实际执行平台间的全局设置读写与新进程恢复；漫画覆盖、同时写竞争、丢响应、自动前台、Web↔Native、生产 Access 和真机分别验收。全局默认 false/0 与 optional 漫画覆盖的 presence 语义不同，驱动按生成 getter 核对非 optional 值。实际结果与剩余门见[设置记录](../../../docs/verification/reader-settings.md)。完成后关闭 harness，移除本轮 reverse、测试安装与专用设备，结束测试进程。
+
+另可用同一初始快照和预设验证自动前台重取：客户端 A 运行 `resume`，等到 `SETTINGS_RESUME_READY` 后用系统 Home 或 App 切换器将其送到后台，不结束进程。等 A 输出 `SETTINGS_RESUME_PAUSED` 后，在同一服务的独立客户端 B 运行 `write`，确认 account/global revision 各只增加 1。然后用系统界面回到 A 的原进程和设置页面，不点重读、不切换应用内导航、不重启。A 在暂停期间不 pump 或发起测试读取，等待实际系统事件至多 5 分钟；输出同 PID 的 `SETTINGS_RESUME_RESUMED` 后，先核对事件时的原快照，再等待正式客户端自动更新同一设置控制器、表单和实际应用主题。驱动在此期间不注入生命周期事件，也不主动重取设置。最后从独立客户端只读确认 revision 没有再次增加；记录实际平台、设备和事件。
 
 ## 章节书签同步
 

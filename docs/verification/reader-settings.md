@@ -159,6 +159,20 @@ ACCEPTANCE_FIXTURE=settings-ack-loss pnpm acceptance:serve
 
 用打印的实际 URL 操作，独立 `GET /api/settings` 和 `GET /api/library` 使用该 origin、`X-App-Subject: acceptance-owner` 与 `X-App-Request: 1`。正常按 Enter 停止，读取 `ACCEPTANCE_SETTINGS_ACK_AUDIT`，要求恰好两条记录及上述不变量。夹具、临时表和故障动作仅存在于隔离的验收入口，默认关闭。
 
+## 2026-11-07：iOS 模拟器回到前台自动读回全局设置
+
+两台独立 iPhone 17 Pro / iOS 26.4 模拟器运行正式 Flutter `app.main()` 和 `NativePlatformRuntime`，连接同一官方 HTTPS 验收入口、隔离 workerd/D1 与测试身份 `acceptance-owner`。仅在两个专用模拟器信任验收 CA，TLS 主机名校验保留；空扩展索引、无 Source 会话和丢响应夹具。应用基线为主分支 `f8f9571` 的全局设置链路，驱动的 SHA-256 为 `b069c87a92dfc4f6290bf08f1c563eb7895d9f679175087a5833d34c8fa54428`。
+
+| 阶段                | 观测与独立读回                                                                                                                                                                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A 已打开设置 → 后台 | 从 SYSTEM 开始；启动模拟器系统设置，真实观察到 A 的 `paused`，A 进程 PID 87903。独立 HTTPS GET 的 settings/library 与初始快照完全相同，account/global revision 均为 0。                                                                              |
+| B 保存              | 同服务另一模拟器通过正式设置页保存 DARK、RTL、DOUBLE、适宽、裁白。ACK 与独立 HTTPS GET 确认 account/global revision 0→1，其余设置与书架内容不变。                                                                                                    |
+| A 恢复前台          | 系统重新打开同一应用，PID 仍为 87903，真实观察到 `resumed`。A 保持原设置页和 controller；不点刷新、不重连、不在后台手动读仓储。应用自动读回已确认值，表单和应用主题均更新。 恢复后独立 settings/library 快照与 B 保存后逐字节一致，revision 保持 1。 |
+
+B 写入与 A 恢复的 Flutter 集成测试各 1/1 通过，均等待正式运行时释放。入口与运行顺序见[集成测试说明](../../apps/reader/integration_test/README.md)。首轮构建与 prek 同时运行，编译读到临时收起修改后的旧测试驱动，未连接或写入；待 hook 恢复文件后重编通过。另有一次内置浏览器双标签尝试：关闭写入标签并返回时，读取标签观测到的文档可见状态始终是 visible，仅手动刷新读回新值；未取得真实 Web 前台事件，不计为通过或产品失败。
+
+本门覆盖 iOS 模拟器全局设置的同进程自动重取。Android 与 Web 前台生命周期、阅读中进度/分类等其它状态、实际断网、生产 Access、真机和触控仍分别验收。
+
 ## 可复验入口
 
 ```sh
@@ -174,7 +188,7 @@ pnpm exec vitest run --project workers apps/api/test/state-workerd.test.ts
 ## 尚待验收与完整范围
 
 - 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；漫画继承/覆盖/清空、其它写入的实际丢响应恢复和同时请求竞争仍待独立客户端验收。
-- Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；Web↔Native、可靠前台恢复、生产 Access、Native 手动触控与真机仍待验收。
+- Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；iOS 模拟器全局设置的自动前台重取已通过；Web↔Native、Android/Web 前台、生产 Access、Native 手动触控与真机仍待验收。
 - 该轮三项设置之后，阅读背景、应用内调暗与点击区/键盘预设已继续接入，结果分别见[后续记录](reader-appearance.md)；适宽/适高与裁白已实现，分别见[图像适配](reader-fit.md)和[同步裁白](reader-crop.md)。
 
 当前交付顺序见 [P1](../plan/p1-library-and-progress.md) 与 [P2](../plan/p2-sync.md)。生产、跨端和真机门未因上述工程与组件测试通过。

@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -21,6 +23,7 @@ const _expectedJson = String.fromEnvironment('SETTINGS_EXPECT_JSON');
 const _preset = String.fromEnvironment('SETTINGS_PRESET');
 const _testCaBase64 = String.fromEnvironment('SETTINGS_TEST_CA_BASE64');
 const _operationBudget = Duration(seconds: 120);
+const _lifecycleBudget = Duration(minutes: 5);
 const _presets = {
   'dark-rtl-double-width-crop',
   'light-webtoon-auto-height-no-crop',
@@ -82,9 +85,11 @@ void main() {
       expect(editor.pending, isNull);
       expect(editor.error, isNull);
 
-      final after = _phase == 'write'
-          ? await _write(tester, editor, repository, before)
-          : await repository.loadGlobal().timeout(_operationBudget);
+      final after = switch (_phase) {
+        'write' => await _write(tester, editor, repository, before),
+        'resume' => await _resume(tester, editor, expected, before),
+        _ => await repository.loadGlobal().timeout(_operationBudget),
+      };
       if (_phase == 'verify') {
         _expectSnapshot(after, expected);
       }
@@ -95,7 +100,12 @@ void main() {
       expect(tester.takeException(), isNull);
       result = {
         'phase': _phase,
-        'preset': _phase == 'write' ? _preset : null,
+        'preset': _phase == 'verify' ? null : _preset,
+        if (_phase == 'resume')
+          'lifecycle': {
+            'pid': pid,
+            'transitions': ['paused', 'resumed'],
+          },
         'platform': Platform.operatingSystem,
         'androidLoopbackTestCa': _testCaBase64.isNotEmpty,
         'origin': repository.identity.origin.origin,
@@ -117,12 +127,7 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 10)));
 }
 
-Future<SettingsSnapshot> _write(
-  WidgetTester tester,
-  SettingsController editor,
-  SettingsRepository repository,
-  SettingsSnapshot before,
-) async {
+wire.GlobalSettingsValues _target(SettingsSnapshot before) {
   // Only these five visible preferences change. The form retains every other
   // confirmed reader field, favorite Source, installation and repository.
   final target = before.global.deepCopy();
@@ -152,8 +157,18 @@ Future<SettingsSnapshot> _write(
       theme: before.global.theme,
       reader: _readerValues(before.global.reader),
     )),
-    reason: '写阶段须提交非默认差异，不能盲目重跑',
+    reason: '写入和前台恢复须从不同于预设的已确认值开始',
   );
+  return target;
+}
+
+Future<SettingsSnapshot> _write(
+  WidgetTester tester,
+  SettingsController editor,
+  SettingsRepository repository,
+  SettingsSnapshot before,
+) async {
+  final target = _target(before);
   await _select<wire.AppTheme>(tester, target.theme);
   await _select<wire.ReaderMode>(tester, target.reader.mode);
   await _select<wire.ReaderPageLayout>(tester, target.reader.pageLayout);
@@ -172,6 +187,84 @@ Future<SettingsSnapshot> _write(
         editor.snapshot?.globalRevision == before.globalRevision + 1;
   });
   final after = await repository.loadGlobal().timeout(_operationBudget);
+  _expectCommittedTarget(after, before, target);
+  _expectGlobal(editor.snapshot!.global, target);
+  expect(editor.error, isNull);
+  await _expectForm(tester, target);
+  _expectTheme(tester, target.theme);
+  return after;
+}
+
+Future<SettingsSnapshot> _resume(
+  WidgetTester tester,
+  SettingsController editor,
+  wire.SettingsResponse expected,
+  SettingsSnapshot before,
+) async {
+  final target = _target(before);
+  expect(tester.binding.lifecycleState, AppLifecycleState.resumed);
+  expect(editor.available, isTrue);
+  expect(editor.busy, isFalse);
+  _expectSnapshot(editor.snapshot!, expected);
+
+  final resumed = Completer<void>();
+  SettingsSnapshot? pausedSnapshot;
+  SettingsSnapshot? resumedSnapshot;
+  final listener = AppLifecycleListener(
+    onPause: () {
+      if (pausedSnapshot != null) return;
+      pausedSnapshot = editor.snapshot;
+      debugPrintSynchronously('SETTINGS_RESUME_PAUSED pid=$pid');
+    },
+    onResume: () {
+      if (pausedSnapshot == null || resumed.isCompleted) return;
+      resumedSnapshot = editor.snapshot;
+      debugPrintSynchronously('SETTINGS_RESUME_RESUMED pid=$pid');
+      resumed.complete();
+    },
+  );
+  try {
+    debugPrintSynchronously('SETTINGS_RESUME_READY pid=$pid');
+    // Paused apps may not service a pump. Await the real system transition
+    // without scheduling frames, reading the repository or touching the UI.
+    await resumed.future.timeout(
+      _lifecycleBudget,
+      onTimeout: () => fail('未在预算内观察到系统暂停后恢复'),
+    );
+  } finally {
+    listener.dispose();
+  }
+
+  _expectSnapshot(pausedSnapshot!, expected);
+  _expectSnapshot(resumedSnapshot!, expected);
+  await _waitFor(tester, '系统恢复触发正式设置重取', () {
+    if (!editor.available || editor.error != null) {
+      fail('恢复前台后原设置会话失效：${editor.error}');
+    }
+    final confirmed = editor.snapshot;
+    return !editor.busy &&
+        confirmed != null &&
+        confirmed.globalRevision > before.globalRevision;
+  });
+  expect(
+    tester
+        .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+        .controller,
+    same(editor),
+  );
+  final after = editor.snapshot!;
+  _expectCommittedTarget(after, before, target);
+  expect(editor.pending, isNull);
+  await _expectForm(tester, target);
+  _expectTheme(tester, target.theme);
+  return after;
+}
+
+void _expectCommittedTarget(
+  SettingsSnapshot after,
+  SettingsSnapshot before,
+  wire.GlobalSettingsValues target,
+) {
   expect(after.globalRevision, before.globalRevision + 1);
   expect(after.accountRevision, before.accountRevision + 1);
   _expectGlobal(after.global, target);
@@ -179,11 +272,6 @@ Future<SettingsSnapshot> _write(
   expect(after.mangaKey, isNull);
   expect(after.mangaRevision, isNull);
   expect(after.overrides, isNull);
-  _expectGlobal(editor.snapshot!.global, target);
-  expect(editor.error, isNull);
-  await _expectForm(tester, target);
-  _expectTheme(tester, target.theme);
-  return after;
 }
 
 void _expectSnapshot(SettingsSnapshot actual, wire.SettingsResponse expected) {
@@ -411,10 +499,9 @@ wire.SettingsResponse _validateConfiguration() {
   if (_subject.isEmpty || _subject.length > 1000) {
     fail('SETTINGS_SUBJECT 须为本次已确认身份');
   }
-  if (!{'verify', 'write'}.contains(_phase) ||
-      (_phase == 'verify' && _preset.isNotEmpty) ||
-      (_phase == 'write' && !_presets.contains(_preset))) {
-    fail('SETTINGS_PHASE 须为 verify/write；只有 write 可指定正式 preset');
+  if (!{'verify', 'write', 'resume'}.contains(_phase) ||
+      (_phase == 'verify' ? _preset.isNotEmpty : !_presets.contains(_preset))) {
+    fail('SETTINGS_PHASE 须为 verify/write/resume；write/resume 使用同一正式 preset');
   }
   final expected = wire.decodeProtoJson(
     wire.SettingsResponse(),
