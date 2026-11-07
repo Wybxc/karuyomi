@@ -48,3 +48,9 @@ pnpm acceptance:serve
 2026-11-07 17:20（UTC+8），从固定 `952bbab` 的隔离 checkout 启动本地全量。正式入口记录 `discovered=1448`、`selected=1448`；以完整计划复用三个输入身份匹配的成功检查点，首个新包 `all.ahottie` 已进入上游 Gradle 构建。这里记录的是启动证据，不能据此认定任何新包完成。
 
 本机忽略目录 `.local/extensions-baseline-952bbab/` 保存冻结计划、独立 checkout、已核对的生产 parent state/index、逐包结果、恢复计划及日志。使用单并发 `bootstrap --plan frozen-plan.json --build-checkout checkout --state state.json --output resume-plan.json --assets-dir candidate --jobs 1 --finalize`（路径按该目录解析）。若中断，先确认原发布器已退出，再按 [恢复约束](../EXTENSIONS.md#首次本地全量与恢复)使用相同冻结输入和检查点。此命令只准备本地候选，不部署，不更新生产 checkpoint，不启用增量 CI。
+
+## LunarAnime 编译器诊断
+
+2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。
+
+仅在诊断副本中分开两种索引，并按常量本身类型选取追加方法。小型 Java 夹具的原版 TeaVM 再现同栈；隔离修正后 AOT 成功，Node 执行的四项断言输出与 JVM 逐字节相同，覆盖普通拼接、两个分隔符、静态常量与 String/int 混合。真实 LunarAnime 同一输入越过这个错误，但后续缺 Java EC/签名类和 Android Activity、WebView 方法，Maven 仍失败，无可发布 bundle。没有修改扩展、正式编译器、原始 Maven 缓存或正在运行的全量；该包保留失败。原始对照、补丁和日志在 `/private/tmp/karuyomi-lunaranime-concat.OHFZge/`。
