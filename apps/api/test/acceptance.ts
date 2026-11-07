@@ -21,6 +21,10 @@ import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { fileURLToPath, URL } from 'node:url';
 import { createTestHarness, type TestHarnessOptions } from 'wrangler';
 import type { AcceptanceBindings } from './acceptance-entry.ts';
+import {
+  prepareSettingsAckLoss,
+  settingsAckAttempts,
+} from './acceptance-settings-ack.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -36,11 +40,17 @@ const vars = {
   OWNER_EMAIL: 'acceptance@example.com',
 };
 const privateKey = await exportPKCS8(keys.privateKey);
+const fixture = process.env.ACCEPTANCE_FIXTURE ?? '';
+const settingsAckLoss = fixture === 'settings-ack-loss';
 const options = (publicOrigin: string): TestHarnessOptions => ({
   workers: [
     {
       configPath,
-      vars: { ...vars, APP_ORIGIN: publicOrigin },
+      vars: {
+        ...vars,
+        APP_ORIGIN: publicOrigin,
+        ...(settingsAckLoss ? { ACCEPTANCE_SETTINGS_ACK_LOSS: '1' } : {}),
+      },
       secrets: { ACCEPTANCE_PRIVATE_KEY: privateKey },
     },
   ],
@@ -60,10 +70,12 @@ process.stdin.once('data', requestStop);
 process.stdin.once('end', requestStop);
 process.stdin.resume();
 
+let ackAuditDb: D1Database | undefined;
 try {
-  const fixture = process.env.ACCEPTANCE_FIXTURE ?? '';
-  if (fixture !== '' && fixture !== 'categories') {
-    throw new Error('ACCEPTANCE_FIXTURE must be categories or empty');
+  if (fixture !== '' && fixture !== 'categories' && !settingsAckLoss) {
+    throw new Error(
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss or empty',
+    );
   }
   const { url } = await server.listen();
   if (
@@ -77,7 +89,13 @@ try {
   if (current.url.origin !== url.origin) {
     throw new Error('Acceptance listener changed while configuring its origin');
   }
-  await server.getWorker<AcceptanceBindings>().applyD1Migrations('DB');
+  const worker = server.getWorker<AcceptanceBindings>();
+  await worker.applyD1Migrations('DB');
+  if (!stopRequested && settingsAckLoss) {
+    const db = (await worker.getEnv()).DB;
+    await prepareSettingsAckLoss(db);
+    ackAuditDb = db;
+  }
   if (!stopRequested && process.env.ACCEPTANCE_SOURCE_POLICIES) {
     await initializeSourcePolicies(
       url.origin,
@@ -101,7 +119,16 @@ try {
   process.stdin.removeListener('end', requestStop);
   process.removeListener('SIGINT', requestStop);
   process.removeListener('SIGTERM', requestStop);
-  await server.close();
+  try {
+    if (ackAuditDb) {
+      console.log(
+        'ACCEPTANCE_SETTINGS_ACK_AUDIT=' +
+          JSON.stringify(await settingsAckAttempts(ackAuditDb)),
+      );
+    }
+  } finally {
+    await server.close();
+  }
 }
 
 async function initializeCategoryFixture(origin: string): Promise<void> {

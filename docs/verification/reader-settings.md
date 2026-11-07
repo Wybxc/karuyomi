@@ -140,6 +140,25 @@ Dart 的正式 `TransportSourceRuntime` 用生成的 `ControlResponse` 和受控
 
 本轮汇总为 `.local/settings-android-ios-20261107/results.json`，保留完整报告、按阶段的驱动 SHA、失败分类、输入身份及清理记录。HTTPS harness 与 Android emulator 均正常 exit 0；端口 52754 已释放，专用 Android AVD 和 iOS 模拟器均已删除，确认 ADB 无设备后关闭本轮 server。独立只读检查未发现可归因本轮的测试、设备或服务进程残留；原有 iOS 设备的元数据差异按实际结果保留在汇总中。
 
+## 2026-11-07：Web 全局设置的真实确认丢失与原样重试
+
+正式 Flutter Web 通过 Codex 内置浏览器连接同一官方 Vite / Wrangler harness（本轮 `http://127.0.0.1:54698`、`acceptance-owner`、独立 D1）。使用正式设置 UI，不加载漫画源，不拦截浏览器 API。夹具仅在显式启用时，在正式 Worker 校验并提交首次成功的全局设置后，确认 D1 中已有匹配回执，再中断 HTTP 200 的响应正文。独立 socket 预验收用普通 Node 24 fetch 收到 200 响应头，正文读取以 `UND_ERR_SOCKET` 失败，确认不是正常读到一份被截短的 JSON。后续同一请求走完整正式回执。
+
+1. A 将默认外观从跟随系统改为深色并保存。UI 提示尚未确认并提供「重试原设置操作」；独立 GET 已读到深色，account / global revision 从 0 / 0 到 1 / 1。
+2. A 点击「重新读取设置」，仍保留待确认操作。新文档 B 打开正式设置，读到已提交的深色，无 A 的待确认操作。
+3. 回到 A 点击「重试原设置操作」，待确认提示和重试按钮消失，仍显示深色。独立读取的设置与书架在丢确认、A 重读、B 读回和 A 重试四阶段完全相同，revision 保持 1 / 1。其它设置和书架内容未变。
+
+关闭时的 D1 夹具审计只有两次成功 POST 观察：首次截断、第二次放行，UUID、原始正文 SHA-256、预期 revision 0、正式 ACK 与持久回执摘要均一致，显式重试原样重发，服务端仅提交一次。未直接调用业务 POST 为浏览器步骤补数据。测试标签和服务已关闭；证据只覆盖此 Web 全局设置写入的响应中断，不替代设备实际断网、阅读进度恢复、Native 或生产 Access。
+
+在准备好正式 Web/API 输出后，以官方本地入口复验：
+
+```sh
+pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts
+ACCEPTANCE_FIXTURE=settings-ack-loss pnpm acceptance:serve
+```
+
+用打印的实际 URL 操作，独立 `GET /api/settings` 和 `GET /api/library` 使用该 origin、`X-App-Subject: acceptance-owner` 与 `X-App-Request: 1`。正常按 Enter 停止，读取 `ACCEPTANCE_SETTINGS_ACK_AUDIT`，要求恰好两条记录及上述不变量。夹具、临时表和故障动作仅存在于隔离的验收入口，默认关闭。
+
 ## 可复验入口
 
 ```sh
@@ -154,7 +173,7 @@ pnpm exec vitest run --project workers apps/api/test/state-workerd.test.ts
 
 ## 尚待验收与完整范围
 
-- 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；漫画继承/覆盖/清空、实际丢响应恢复和同时请求竞争仍待独立客户端验收。
+- 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；漫画继承/覆盖/清空、其它写入的实际丢响应恢复和同时请求竞争仍待独立客户端验收。
 - Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；Web↔Native、可靠前台恢复、生产 Access、Native 手动触控与真机仍待验收。
 - 该轮三项设置之后，阅读背景、应用内调暗与点击区/键盘预设已继续接入，结果分别见[后续记录](reader-appearance.md)；适宽/适高与裁白已实现，分别见[图像适配](reader-fit.md)和[同步裁白](reader-crop.md)。
 
