@@ -42,7 +42,7 @@ export function ackLossLabel(fixture: AckLossFixture): string {
   return fixtures[fixture].label;
 }
 
-async function sha256(value: ArrayBuffer | string): Promise<string> {
+export async function sha256(value: ArrayBuffer | string): Promise<string> {
   const bytes =
     typeof value === 'string' ? new TextEncoder().encode(value) : value;
   const digest = await crypto.subtle.digest('SHA-256', bytes);

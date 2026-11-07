@@ -29,6 +29,10 @@ import {
   isAckLossFixture,
   prepareAckLoss,
 } from './acceptance-ack.ts';
+import {
+  prepareSettingsRace,
+  settingsRaceAttempts,
+} from './acceptance-settings-race.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -55,6 +59,7 @@ if (nextConfigPath && fixture !== '') {
   );
 }
 const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
+const settingsRace = fixture === 'settings-cas-race';
 const sourcePolicies = process.env.ACCEPTANCE_SOURCE_POLICIES;
 const options = (
   publicOrigin: string,
@@ -67,6 +72,7 @@ const options = (
         ...vars,
         APP_ORIGIN: publicOrigin,
         ...(ackLoss ? { ACCEPTANCE_ACK_LOSS: ackLoss } : {}),
+        ...(settingsRace ? { ACCEPTANCE_SETTINGS_CAS_RACE: '1' } : {}),
       },
       secrets: { ACCEPTANCE_PRIVATE_KEY: privateKey },
     },
@@ -96,11 +102,11 @@ if (commands) {
   process.stdin.resume();
 }
 
-let ackAuditDb: D1Database | undefined;
+let fixtureAuditDb: D1Database | undefined;
 try {
-  if (fixture !== '' && fixture !== 'categories' && !ackLoss) {
+  if (fixture !== '' && fixture !== 'categories' && !ackLoss && !settingsRace) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race or empty',
     );
   }
   const { url } = await server.listen();
@@ -117,10 +123,11 @@ try {
   }
   const worker = server.getWorker<AcceptanceBindings>();
   await worker.applyD1Migrations('DB');
-  if (!stopRequested && ackLoss) {
+  if (!stopRequested && (ackLoss || settingsRace)) {
     const db = (await worker.getEnv()).DB;
-    await prepareAckLoss(db);
-    ackAuditDb = db;
+    if (ackLoss) await prepareAckLoss(db);
+    else await prepareSettingsRace(db);
+    fixtureAuditDb = db;
   }
   if (!stopRequested && sourcePolicies) {
     await initializeSourcePolicies(url.origin, sourcePolicies);
@@ -183,11 +190,16 @@ try {
   process.removeListener('SIGINT', requestStop);
   process.removeListener('SIGTERM', requestStop);
   try {
-    if (ackLoss && ackAuditDb) {
+    if (ackLoss && fixtureAuditDb) {
       console.log(
         ackLossLabel(ackLoss) +
           '_AUDIT=' +
-          JSON.stringify(await ackAttempts(ackAuditDb, ackLoss)),
+          JSON.stringify(await ackAttempts(fixtureAuditDb, ackLoss)),
+      );
+    } else if (settingsRace && fixtureAuditDb) {
+      console.log(
+        'ACCEPTANCE_SETTINGS_RACE_AUDIT=' +
+          JSON.stringify(await settingsRaceAttempts(fixtureAuditDb)),
       );
     }
   } finally {

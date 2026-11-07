@@ -183,6 +183,24 @@ B 写入与 A 恢复的 Flutter 集成测试各 1/1 通过，均等待正式运�
 
 两端正式 Flutter 集成测试各 1/1 通过。命令和阶段配置沿用[集成测试说明](../../apps/reader/integration_test/README.md)；Android 的隔离证书、打包核对、系统任务记录与四段采样留在 `/private/tmp/karuyomi-android-resume-457f606-nXu2h6`，不入库。这是 Android 全局设置的同进程前台读回；Web 前台、书架与阅读进度生命周期、生产 Access、真机和触控仍分别验收。
 
+## 双 Web 全局设置同时保存
+
+2026-11-08，固定产品 `72a2f70` 的正式 Flutter Web release。Codex 内置浏览器的两个独立文档连接同一官方 Vite / Wrangler 验收入口（`http://127.0.0.1:63937`）、全新隔离 D1、测试身份 `acceptance-owner`；没有加载扩展或 Source。先分别编辑深色与浅色，独立 settings/library GET 仍是跟随系统、account/global revision 0、空书架。
+
+用 `ACCEPTANCE_FIXTURE=settings-cas-race` 在两个不同 UUID、不同主题、同 revision 0 的 POST 均到齐后共同放行。两次到达相差 7 ms；从调用正式 Worker 到得到其响应的时间窗实测重叠 12 ms。深色返回 HTTP 200，浅色返回 HTTP 409 `REVISION_CONFLICT`；D1 只有胜者的一条匹配回执，account/global revision 都只到 1，GET 返回深色。重叠指两个 Worker 调用在途，不表示 D1 同时执行两条写入。
+
+浅色页提示其它设备已修改，旧保存与原请求重试不可用。该页明确重新读取后采用深色，独立 GET 与竞争结束时相同。它再编辑并保存浅色，另一页重新读取也采用浅色；GET 确认 account/global revision 到 2，其他全局字段和空书架未变。全部写入来自正式 UI，独立采样只发 GET。首轮夹具未统一放行时刻，也取得一成功一冲突，但正式 Worker 的处理窗没有重叠，单独保留该轮日志。
+
+复验时使用空快照和新隔离 D1，先构建正式 Web/API，再构建 acceptance 入口并运行：
+
+```sh
+pnpm build
+pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts
+ACCEPTANCE_FIXTURE=settings-cas-race pnpm acceptance:serve
+```
+
+两个页面以初始 revision 打开全局设置，在 15 秒内保存相反主题；正常停服时读取 `ACCEPTANCE_SETTINGS_RACE_AUDIT` 中的到达、放行、处理窗、HTTP 状态、revision 与回执摘要。未凑齐两方时夹具不放行业务写入。自动 Workers 测试核对结果和超时行为，实际窗口重叠以本轮采样为准；它不作为 CI 时序断言。原始两轮日志与独立响应留在本地 `/private/tmp/karuyomi-web-settings-race.IcEKkg/`，服务已关闭。这只覆盖 Web 全局设置，其他写入类型、Native、生产 Access 与真机分别验收。
+
 ## 可复验入口
 
 ```sh
@@ -197,7 +215,7 @@ pnpm exec vitest run --project workers apps/api/test/state-workerd.test.ts
 
 ## 尚待验收与完整范围
 
-- 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；漫画继承/覆盖/清空、其它写入的实际丢响应恢复和同时请求竞争仍待独立客户端验收。
+- 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；双 Web 全局设置同时保存分项已通过；漫画继承/覆盖/清空、其它写入的实际丢响应恢复和同时请求竞争仍待独立客户端验收。
 - Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；iOS 与 Android 模拟器全局设置的自动前台重取已通过；Web↔Native、Web 前台、生产 Access、Native 手动触控与真机仍待验收。
 - 该轮三项设置之后，阅读背景、应用内调暗与点击区/键盘预设已继续接入，结果分别见[后续记录](reader-appearance.md)；适宽/适高与裁白已实现，分别见[图像适配](reader-fit.md)和[同步裁白](reader-crop.md)。
 
