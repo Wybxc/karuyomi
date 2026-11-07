@@ -94,6 +94,23 @@ export const javaCacheStageSchema = z.enum([
   'cache-response',
   'cache-return',
   'cache-finally',
+  'cache-handshake-check',
+  'cache-handshake-required',
+  'cache-handshake-not-required',
+  'cache-strategy-track-enter',
+  'cache-strategy-network',
+  'cache-strategy-hit',
+  'cache-strategy-unsatisfied',
+  'cache-strategy-tracked',
+  'cache-conditional-hit',
+  'cache-strategy-factory-enter',
+  'cache-strategy-factory-return',
+  'http-date-parse-enter',
+  'http-date-parse-return',
+  'http-date-class-init-enter',
+  'http-date-class-init-return',
+  'http-date-format-init-enter',
+  'http-date-format-init-return',
 ]);
 export const javaCacheDiagnosticSchema = z
   .object({
