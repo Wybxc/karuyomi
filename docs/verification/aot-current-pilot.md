@@ -66,3 +66,13 @@ pnpm acceptance:serve
 隔离 workerd/D1 仅登记 `asgardscans.com`，bootstrap 200，实际提供的索引和清单与候选一致，gzip artifact HEAD 200。Codex 内置浏览器的新文档加载已安装扩展并列出 `AsgardScans · ar`（Source `1271101147092894805`）；选择后热门请求失败，未返回作品。用同一候选在正式 HTTP v2 入口独立重放原热门 URL `https://asgardscans.com/manga?page=1&sort=popular`，外层 200，META 内上游状态 404，513 B HTML 后正常 END/EOF。这不是原浏览器请求的抓包，也不能据此判断为何源站返回 404。没有真实 JSON-LD 详情、章节或图片证据。
 
 复验入口、候选身份、服务和帧记录见 `/private/tmp/karuyomi-asgard-formal.Tqguie/` 下的 `reproduce.md`、`summary.json` 和 `popular-bridge-replay.json`。本轮未更新冻结 checkpoint、未部署，仍为 `compiled_unverified` / `runtimeReady=false`。
+
+## Alpha Manga 的 Canvas 旋转
+
+固定 `952bbab` 的全量记录中，Alpha Manga 1.6.3（英文 Source `370653027333714265`）因缺 `Canvas.rotate(float)` 在 AOT 失败。原 `ImageInterceptor` 对图块执行 save → translate → rotate → 可选 mirror → drawBitmap → restore。宿主按原 Canvas 的局部坐标合成旋转，保留原平移和 save/restore；复用现有 `setTransform` 图形桥，未修改原扩展或图片交付边界。
+
+2026-11-08，固定 `aef05f7` 加本次旋转改动的独立 checkout：Android 35/Robolectric native Skia oracle 3/3 通过；同一像素场景由锁定 TeaVM 编译，经正式 Vite 图形材料与独立 Node Skia 后端运行，正负 90 度、镜像、restore 后七个像素位置精确一致，释放后六项资源计数为零。这不是浏览器或真实 Source 读图证据。
+
+原 JAR SHA-256 `9d8867f5ab9f07827db575083e840a271a7c480c6022fd47455491127fed8556` 不变，正式 `prepareSources`、TeaVM AOT 与 `node --check` 通过；JS 4,410,962 B，SHA-256 `4ab1868a166cc2dc0a22d378a583103ca1859cdd28a19bc4611a62b22568ed17`。独立输入、复验命令和日志见 `/private/tmp/karuyomi-alpha-rotation.TgZ74e/reproduce.md`。当前冻结全量输入与 checkpoint 未改变，候选仍为 `compiled_unverified` / `runtimeReady=false`。线上应以免费章节验证经原拦截器处理的实际图片；仅有封面或元数据不足以证明旋转路径。
+
+同一 JS 已通过单包完整性校验、候选装配及正式 `pnpm acceptance:build`；快照 revision `fbfb089bcd964a85bd431a6fba10891e`，gzip 904,200 B。隔离服务仅登记 `www.alpha-manga.com`，实际 index/manifest 与候选逐字节一致，artifact HEAD 和测试身份 bootstrap 均返回 200。独立 CLI 对公开章节 URL 收到 HTTP 202 与 `x-amzn-waf-action: challenge`，未获得 viewer 正文或图像域名。未放宽网络策略，未做浏览器图片验收或部署；精确身份与命令见同一证据目录下的 `acceptance/summary.json`、`acceptance/smoke.log` 与 `acceptance/acceptance-serve.sh`。

@@ -95,6 +95,7 @@ export async function checkTextLayout(
   for (const name of [
     'TextLayoutScenarios.java',
     'BitmapLifetimeScenarios.java',
+    'CanvasRotationScenarios.java',
   ])
     copyFileSync(path.join(root, 'tools/teavm', name), path.join(source, name));
   const execute = execa({

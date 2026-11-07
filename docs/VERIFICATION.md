@@ -32,6 +32,8 @@
 
 2026-11-06，typed Source preferences 的 v6 控制合同、原 Preference 回调、构造前注入、D1 独立 CAS API、客户端秘密值与 Flutter 设置/重开路径已实现；集中工程检查、固定 Komiic AOT、正式 Web 设置/重开和新文档恢复分项通过；其它控件、Native 及生产门见[设置记录](verification/source-preferences.md)，正式决定见[设计](design/source-preferences.md)。历史 v4/v5 证据不自动覆盖 v6。
 
+2026-11-08，补上 Alpha Manga 原图片拦截器调用的 `Canvas.rotate(float)`；Android 与正式 TeaVM 图形桥同一组旋转/镜像/恢复像素断言通过，原 JAR 正式 AOT 通过。真实免费章节图片、Native 与生产另验，见[旋转记录](verification/aot-current-pilot.md#alpha-manga-的-canvas-旋转)。
+
 2026-11-08，固定 `975c650` 的 AsgardScans 1.6.3 原包通过 Android JSON 的 JVM 回归、正式 AOT、静态装配和内置浏览器初始化；真实热门请求失败，正式 HTTP v2 独立重放收到上游 404。详情 JSON-LD、章节和图片未验，快照未部署，见[验收记录](verification/aot-current-pilot.md#asgardscans-的-android-json)。
 
 2026-11-08，Source 文本设置补上原 `EditText` 输入校验，拒绝无效候选后不会执行原 change listener 或默认保存；Java、跨语言与正式 Flutter 组件的[工程验证](verification/source-preferences.md#文本设置绑定与输入校验)通过；FoolSlide Customizable 与 MangaDex 的原包已隔离重建，MangaDex 的正式 Web UUID 校验与会话隔离通过。FoolSlide Customizable 修正网络政策错误分类后，真实 Web 在默认 URL 被拒绝时仍可打开设置；已通过默认值全选、无效 URL 拒绝、原回调归一化及新文档恢复。两者的会话文本均未写入 D1；FoolSlide 默认源站、Native 与生产未验。

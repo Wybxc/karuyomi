@@ -1,8 +1,8 @@
 package android.graphics;
 
-import prototype.Graphics;
 import com.google.gson.*;
 import java.util.*;
+import prototype.Graphics;
 
 public class Canvas {
   private Bitmap bitmap;
@@ -73,6 +73,18 @@ public class Canvas {
     matrix[1] *= x;
     matrix[2] *= y;
     matrix[3] *= y;
+  }
+
+  public void rotate(float degrees) {
+    if (degrees == 0) return;
+    double radians = Math.toRadians(degrees);
+    float cos = (float) Math.cos(radians), sin = (float) Math.sin(radians);
+    float a = matrix[0], b = matrix[1], c = matrix[2], d = matrix[3];
+    // Compose in local coordinates, keeping the existing translation.
+    matrix[0] = a * cos + c * sin;
+    matrix[1] = b * cos + d * sin;
+    matrix[2] = c * cos - a * sin;
+    matrix[3] = d * cos - b * sin;
   }
 
   public void drawColor(int color) {
