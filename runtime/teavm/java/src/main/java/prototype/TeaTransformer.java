@@ -6,6 +6,29 @@ import org.teavm.model.instructions.*;
 /** Supply absent JCL entry points in TeaVM IR; never rewrites the extension input JAR. */
 public class TeaTransformer implements ClassHolderTransformer {
   public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
+    if (cls.getName().equals("java.text.DateFormatElement$WeekdayText")) {
+      replaceDateParse(
+          cls,
+          context,
+          "org.teavm.classlib.java.text.PatchedDateFormatElement$WeekdayText",
+          new MethodDescriptor(
+              "parse",
+              ValueType.object("java.lang.String"),
+              ValueType.object("java.util.Calendar"),
+              ValueType.object("java.text.ParsePosition"),
+              ValueType.VOID));
+    }
+    if (cls.getName().equals("java.text.SimpleDateFormat")) {
+      replaceDateParse(
+          cls,
+          context,
+          "org.teavm.classlib.java.text.PatchedSimpleDateFormat",
+          new MethodDescriptor(
+              "parse",
+              ValueType.object("java.lang.String"),
+              ValueType.object("java.text.ParsePosition"),
+              ValueType.object("java.util.Date")));
+    }
     if (cls.getName().equals("java.io.File")) {
       String sourceName = "prototype.jcl.FileMethods";
       ClassHolder copy =
@@ -389,6 +412,39 @@ public class TeaTransformer implements ClassHolderTransformer {
                       "prototype.PlatformSupport", "localeForTag", ref.getSignature()));
           }
     }
+  }
+
+  private static void replaceDateParse(
+      ClassHolder cls,
+      ClassHolderTransformerContext context,
+      String sourceName,
+      MethodDescriptor descriptor) {
+    ClassReader source = context.getHierarchy().getClassSource().get(sourceName);
+    MethodHolder target = cls.getMethod(descriptor);
+    if (source == null || target == null)
+      throw new IllegalStateException("Unexpected TeaVM date parser ABI: " + cls.getName());
+    ClassHolder copy =
+        new org.teavm.parsing.ClassRefsRenamer(
+                new ReferenceCache(),
+                name ->
+                    name.equals(sourceName)
+                        ? cls.getName()
+                        : switch (name) {
+                          case "org.teavm.classlib.java.text.TDateFormat" -> "java.text.DateFormat";
+                          case "org.teavm.classlib.java.text.TDateFormatElement",
+                              "org.teavm.classlib.java.text.PatchedDateFormatElement" ->
+                              "java.text.DateFormatElement";
+                          case "org.teavm.classlib.java.text.TParsePosition" ->
+                              "java.text.ParsePosition";
+                          case "org.teavm.classlib.java.util.TCalendar" -> "java.util.Calendar";
+                          case "org.teavm.classlib.java.util.TDate" -> "java.util.Date";
+                          default -> name;
+                        })
+            .rename(org.teavm.model.util.ModelUtils.copyClass(source));
+    MethodHolder replacement = copy.getMethod(descriptor);
+    if (replacement == null || replacement.getProgram() == null)
+      throw new IllegalStateException("Missing TeaVM date parser donor: " + sourceName);
+    target.setProgram(org.teavm.model.util.ModelUtils.copyMethod(replacement).getProgram());
   }
 
   private static String standardType(String name) {

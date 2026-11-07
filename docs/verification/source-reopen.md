@@ -97,3 +97,21 @@ V3 仍固定 `9b98d006`，仅在隔离候选增加 `CacheStrategy.Factory` 构�
 B generation 为 `1b8e66fd-d912-4b2d-91b6-f4c9ea05c798`，超时截图为 `/private/tmp/karuyomi-java-cache-trace-v3-timeout.jpg`。这些实测将调查范围推进到 HTTP 日期转换已进入、formatter 初始化已返回之后；没有取得具体日期输入或异常，不能判定 weekday、特定日期格式或具体底层方法为根因，也不能将缺少正常返回直接等同于某种异常或死循环。V3 没有修复 Source 重开。
 
 独立六路正式 GET 在 B 终态前的 `01:04:27.655Z` 保存添加后基准，超时后于 `01:06:01.812Z` 再读；均为 200，前后完整响应严格相同，account / manga / global revision 保持 3 / 2 / 1，exact `/3319/` 书签为 true，其它已确认业务状态未变。快照为 `/private/tmp/karuyomi-source-reopen-diag-50360-{added,after-timeout}.json`。本节不提升新文档正式详情、跨端书签或生产能力，也不改写原候选与 V1 / V2 的证据范围。
+
+## 无插桩 `f285391`：章节失败立即返回
+
+从固定 `f285391364784227d424322789d22767edfd9365` 独立检出重建，未使用 Java trace 补丁。原 xkcd JAR 摘要仍为 `f1505c9ef0f680d65d03deb61d335179e85de96e6f5b9727eaa4b5db3a4dd1bf`，共享 materials 与固定四包输入逐字节相同。候选为 `ext-all.xkcd-b7f79b0ef5adb5c53d71c624a8e62ca2`，快照为 `/private/tmp/karuyomi-xkcd-aot-f285391-VjZFin/results/snapshot`；`compiled_unverified` / `runtimeReady=false`，未部署或写入正式增量状态。
+
+官方 harness 为 `http://127.0.0.1:49158`，使用隔离 D1 与 `acceptance-owner`。Codex 内置浏览器的正式 Flutter 客户端 A 安装该候选，英文 Source 热门与 3320 章详情成功，收藏 `SINGLE` 并确认 `/3319/` 书签。关闭 A 后，新文档 B 从服务端书架打开：details 正常完成，`chapters / ui-2` 于 `2026-11-07T06:10:08.950Z` 开始，cache-get 于 `.966Z` resolved，章节调用于 `.979Z` settled，约 29 ms。正式页面返回“漫画源请求失败，请重试”；没有发生默认 30 秒超时，也没有打开章节列表。页面及白名单诊断没有暴露 Java 原 cause，不能由这轮推断确切日期输入或宣称日期问题已修复。
+
+独立验收的前后六路业务 GET 均为 200，响应结构逐项相同，account / global / manga revision 仍为 3 / 1 / 2、目标书签仍为 true、无 resume / progress；失败未写入额外业务状态。快照为 `/private/tmp/karuyomi-source-reopen-diag-49158-{added,after}.json`，阶段日志为 `/private/tmp/karuyomi-nonio-terminal-{a,b}.json`。本轮仅通过实际故障及时返回分项，独立文档详情与书签读回未通过；服务与验收标签均已关闭。
+
+## TeaVM 严格 HTTP 日期回归
+
+固定 TeaVM 0.16.0 的 `WeekdayText.parse` 将星期写入 `WEEK_OF_MONTH`，且在已从 1 开始的数组索引上再加 1。周五或周六会写入 7 或 8，严格 Calendar 会拒绝。`SimpleDateFormat.parse(String, ParsePosition)` 也会把严格 Calendar 的非法字段异常直接抛给调用者。OkHttp 缓存策略以严格日期格式解析响应缓存头；这些源码行为与 V3 的 parser 停点一致。
+
+两个精确上游补丁只在生成目录应用，由原始和输出 SHA-256 守门。`TeaTransformer` 只移植对应的两个 `parse` 方法：星期使用正确的 `DAY_OF_WEEK` 和数组索引；解析失败按 `ParsePosition` 合同返回 null、记录错误位置并保留初始索引，成功推进索引，允许 OkHttp 复用已记录错误的 position。未改 TeaVM submodule、原始 Source/JAR、缓存策略或默认时区；原 13 个 regex donor 的输出摘要保持不变。
+
+`node tools/teavm/check-date-format.ts` 通过锁定的 Maven / TeaVM 插件和产品 `TeaTransformer` 生成 JavaScript，同时运行同一 Java fixture 的 JDK oracle；正式入口 `pnpm teavm:check` 包含该回归。未改 parser 的真实生成代码解析周五日期时退出 1，JDK 对照通过；应用补丁后 JDK 和 Node 执行的生成代码均通过 80 项断言，覆盖七个星期的有效日期、准确 UTC 时间、完整消费、非法日期与时分秒、无效文本、非零起始索引和失败后重用。红绿生成产物分别保存在 `/private/tmp/karuyomi-date-format-red` 与 `/private/tmp/karuyomi-date-format-green`。
+
+这证明固定 TeaVM 的日期缺陷与补丁行为。仍需用包含补丁的正式无插桩扩展重复实际 Source A→B 重开，确认章节恢复及书签 A 添加、B 移除、新文档读回闭环。

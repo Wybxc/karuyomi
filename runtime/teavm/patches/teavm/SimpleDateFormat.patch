@@ -1,0 +1,39 @@
+===================================================================
+--- a/PatchedSimpleDateFormat.java
++++ b/PatchedSimpleDateFormat.java
+@@ -75,21 +75,30 @@
+     }
+ 
+     @Override
+     public TDate parse(String string, TParsePosition position) {
++        TParsePosition parsed = new TParsePosition(position.getIndex());
+         TCalendar calendar = (TCalendar) this.calendar.clone();
+         calendar.clear();
+         for (TDateFormatElement element : elements) {
+-            if (position.getIndex() > string.length()) {
+-                position.setErrorIndex(position.getErrorIndex());
++            if (parsed.getIndex() > string.length()) {
++                position.setErrorIndex(parsed.getIndex());
+                 return null;
+             }
+-            element.parse(string, calendar, position);
+-            if (position.getErrorIndex() >= 0) {
++            element.parse(string, calendar, parsed);
++            if (parsed.getErrorIndex() >= 0) {
++                position.setErrorIndex(parsed.getErrorIndex());
+                 return null;
+             }
+         }
+-        return calendar.getTime();
++        try {
++            TDate date = calendar.getTime();
++            position.setIndex(parsed.getIndex());
++            return date;
++        } catch (IllegalArgumentException e) {
++            position.setErrorIndex(parsed.getIndex());
++            return null;
++        }
+     }
+ 
+     @Override
+     public Object clone() {

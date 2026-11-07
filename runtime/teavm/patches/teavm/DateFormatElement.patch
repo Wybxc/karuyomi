@@ -1,0 +1,14 @@
+===================================================================
+--- a/PatchedDateFormatElement.java
++++ b/PatchedDateFormatElement.java
+@@ -132,9 +132,9 @@
+             }
+             if (weekday < 0) {
+                 position.setErrorIndex(position.getIndex());
+             } else {
+-                date.set(TCalendar.WEEK_OF_MONTH, weekday + 1);
++                date.set(TCalendar.DAY_OF_WEEK, weekday);
+             }
+         }
+ 
+         @Override

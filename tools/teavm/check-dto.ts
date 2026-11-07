@@ -14,6 +14,7 @@ import { execa } from 'execa';
 import { checkFiles } from './check-files.ts';
 import { checkNetwork } from './check-network.ts';
 import { checkPlatform } from './check-platform.ts';
+import { checkDateFormat } from './check-date-format.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -312,5 +313,6 @@ export async function checkDto(root = ROOT): Promise<void> {
   await checkFiles(root);
   await checkNetwork(root);
   await checkPlatform(root);
+  await checkDateFormat({ root });
 }
 if (import.meta.main) await checkDto();

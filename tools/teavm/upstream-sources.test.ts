@@ -12,7 +12,6 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
-  PACKAGE,
   PATCHES,
   generateDonorSource,
   prepareSources,
@@ -30,10 +29,10 @@ test(
       path.join(os.tmpdir(), 'karuyomi-upstream-drift-'),
     );
     try {
-      const name = PATCHES[0][0];
+      const [packagePath, name] = PATCHES[0];
       const relative = path.join(
         'vendor/teavm/classlib/src/main/java',
-        PACKAGE,
+        packagePath,
         `T${name}.java`,
       );
       const original = readFileSync(path.join(ROOT, relative), 'utf8');
@@ -74,7 +73,7 @@ test(
         /Patched TeaVM source differs/,
       );
       assert.equal(
-        existsSync(path.join(root, 'out', PACKAGE, `Patched${name}.java`)),
+        existsSync(path.join(root, 'out', packagePath, `Patched${name}.java`)),
         false,
       );
     } finally {
@@ -93,8 +92,14 @@ test(
       assert.ok(
         outputs.every((file) => !path.relative(folder, file).startsWith('..')),
       );
-      const generated = (name: string): string =>
-        readFileSync(path.join(folder, PACKAGE, `Patched${name}.java`), 'utf8');
+      const generated = (name: string): string => {
+        const entry = PATCHES.find(([, patchName]) => patchName === name);
+        assert.ok(entry);
+        return readFileSync(
+          path.join(folder, entry[0], `Patched${name}.java`),
+          'utf8',
+        );
+      };
       assert.ok(generated('Pattern').includes('(TPattern)(Object)this'));
       assert.ok(generated('Lexer').includes('TPattern.quote(pattern)'));
       assert.ok(
