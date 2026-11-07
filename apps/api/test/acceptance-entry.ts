@@ -3,16 +3,17 @@ import { importPKCS8, SignJWT } from 'jose';
 import type { Bindings } from '../src/env.js';
 import verifiedWorker from './workerd-entry.ts';
 import {
-  observeSettingsAck,
-  shouldObserveSettingsAck,
-} from './acceptance-settings-ack.ts';
+  observeAck,
+  shouldObserveAck,
+  type AckLossFixture,
+} from './acceptance-ack.ts';
 
 export { RuntimeSession } from '../src/runtime-session.js';
 
 export interface AcceptanceBindings extends Bindings {
   PROBE_ACCESS_JWKS: string;
   ACCEPTANCE_PRIVATE_KEY: string;
-  ACCEPTANCE_SETTINGS_ACK_LOSS?: string;
+  ACCEPTANCE_ACK_LOSS?: AckLossFixture;
 }
 
 export default {
@@ -23,10 +24,11 @@ export default {
   ) {
     const url = new URL(request.url);
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
-      const observe =
-        env.ACCEPTANCE_SETTINGS_ACK_LOSS === '1' &&
-        shouldObserveSettingsAck(request, env.APP_ORIGIN);
-      const original = observe ? request.clone() : undefined;
+      const fixture = env.ACCEPTANCE_ACK_LOSS;
+      const original =
+        fixture && shouldObserveAck(fixture, request, env.APP_ORIGIN)
+          ? request.clone()
+          : undefined;
       const forwarded = new Request(request);
       const key = await importPKCS8(env.ACCEPTANCE_PRIVATE_KEY, 'RS256');
       const token = await new SignJWT({ email: env.OWNER_EMAIL })
@@ -40,8 +42,8 @@ export default {
       forwarded.headers.set('Cf-Access-Jwt-Assertion', token);
       // URL, Origin, subject and write headers remain the real client's responsibility.
       const response = await verifiedWorker.fetch(forwarded, env, context);
-      return original
-        ? observeSettingsAck(original, response, env.DB, env.ACCESS_SUBJECT)
+      return fixture && original
+        ? observeAck(fixture, original, response, env.DB, env.ACCESS_SUBJECT)
         : response;
     }
     return verifiedWorker.fetch(request, env, context);

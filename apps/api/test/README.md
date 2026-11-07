@@ -34,3 +34,5 @@ node tools/extensions/network-policies.ts --remote
 Wrangler 只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker；已有扩展与共享资源直接由 Static Assets 交付，缺失资源404，应用 shell 路由显式声明。参考 [Static Assets 配置](https://developers.cloudflare.com/workers/static-assets/binding/)与[官方 HTTP mock 集成](https://developers.cloudflare.com/workers/testing/vitest-integration/mock-outbound-requests/)。
 
 通过这些测试不代表真实 Source、生产 Access、完整阅读或真机性能通过；分层证据见[验证总览](../../../docs/VERIFICATION.md)。
+
+本地官方 acceptance harness 默认不注入故障。`ACCEPTANCE_FIXTURE=settings-ack-loss` 与 `progress-ack-loss` 分别在独立 D1 的指定全局设置或 xkcd 末页完成写入已提交后中断首次响应正文；服务正常退出时输出对应的 `ACCEPTANCE_*_ACK_AUDIT`。复验步骤见[阅读进度丢确认记录](../../../docs/verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)。

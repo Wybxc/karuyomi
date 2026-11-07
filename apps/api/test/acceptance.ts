@@ -24,9 +24,11 @@ import { fileURLToPath, URL } from 'node:url';
 import { createTestHarness, type TestHarnessOptions } from 'wrangler';
 import type { AcceptanceBindings } from './acceptance-entry.ts';
 import {
-  prepareSettingsAckLoss,
-  settingsAckAttempts,
-} from './acceptance-settings-ack.ts';
+  ackAttempts,
+  ackLossLabel,
+  isAckLossFixture,
+  prepareAckLoss,
+} from './acceptance-ack.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -52,7 +54,7 @@ if (nextConfigPath && fixture !== '') {
     'Snapshot switching cannot be combined with another acceptance fixture',
   );
 }
-const settingsAckLoss = fixture === 'settings-ack-loss';
+const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const sourcePolicies = process.env.ACCEPTANCE_SOURCE_POLICIES;
 const options = (
   publicOrigin: string,
@@ -64,7 +66,7 @@ const options = (
       vars: {
         ...vars,
         APP_ORIGIN: publicOrigin,
-        ...(settingsAckLoss ? { ACCEPTANCE_SETTINGS_ACK_LOSS: '1' } : {}),
+        ...(ackLoss ? { ACCEPTANCE_ACK_LOSS: ackLoss } : {}),
       },
       secrets: { ACCEPTANCE_PRIVATE_KEY: privateKey },
     },
@@ -96,9 +98,9 @@ if (commands) {
 
 let ackAuditDb: D1Database | undefined;
 try {
-  if (fixture !== '' && fixture !== 'categories' && !settingsAckLoss) {
+  if (fixture !== '' && fixture !== 'categories' && !ackLoss) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss or empty',
     );
   }
   const { url } = await server.listen();
@@ -115,9 +117,9 @@ try {
   }
   const worker = server.getWorker<AcceptanceBindings>();
   await worker.applyD1Migrations('DB');
-  if (!stopRequested && settingsAckLoss) {
+  if (!stopRequested && ackLoss) {
     const db = (await worker.getEnv()).DB;
-    await prepareSettingsAckLoss(db);
+    await prepareAckLoss(db);
     ackAuditDb = db;
   }
   if (!stopRequested && sourcePolicies) {
@@ -181,10 +183,11 @@ try {
   process.removeListener('SIGINT', requestStop);
   process.removeListener('SIGTERM', requestStop);
   try {
-    if (ackAuditDb) {
+    if (ackLoss && ackAuditDb) {
       console.log(
-        'ACCEPTANCE_SETTINGS_ACK_AUDIT=' +
-          JSON.stringify(await settingsAckAttempts(ackAuditDb)),
+        ackLossLabel(ackLoss) +
+          '_AUDIT=' +
+          JSON.stringify(await ackAttempts(ackAuditDb, ackLoss)),
       );
     }
   } finally {

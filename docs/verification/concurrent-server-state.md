@@ -133,3 +133,26 @@ iOS `prepare`、iOS `reset`、Android `resume` 三次正式测试均通过。A �
 复验见[驱动说明](../../apps/reader/integration_test/README.md#已加载阅读在-android-断连后重试)。Android 实际通过驱动摘要为 `fd81725da5c94f02723c98232d370a09080d84e4f698f650765aff9b7d1d910f`；iOS 重跑的驱动为 `8c60bf6a22795794303e4c7313d1d1350f0276179422d5e0df2ab21a002d9918`，只额外调整明确指定构建的 `navigate` 选择和身份断言。原始证据在 `/private/tmp/karuyomi-android-reader-offline-4a7f7c3-whQNym/results.json` 同目录。两轮服务退出、临时网络规则已撤回、专用 Android AVD、私有 ADB 和 iOS 模拟器已清理，无本轮监听或进程残留。
 
 本分项验证真实服务连接中断时已加载阅读可继续，以及同一会话显式重试、另一设备续读；未覆盖设备全断网、服务已提交后丢 ACK、请求 UUID/单次写入、进程关闭后草稿恢复、生产 Access 或真机。
+
+## Web 阅读进度已提交后丢确认
+
+2026-11-08，固定产品 `aef05f7` 的正式 Flutter Web 与官方 Wrangler/Vite harness，Codex 内置浏览器连接 `http://127.0.0.1:59128`、测试身份 `acceptance-owner` 和全新隔离 workerd/D1。使用[同一原版 xkcd 静态构建](#android-已加载阅读断连与显式重试)，仅登记 `xkcd.com` 和 `imgs.xkcd.com`。未替换业务客户端、Source 或图片请求。
+
+| 节点                                       | 账户 / 全局 / 作品 revision | 实际结果                                                                                                    |
+| ------------------------------------------ | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| A 正式安装、收藏、打开 `/3319/` 并翻到末页 | 6 / 1 / 5                   | 已保存；当前与最远均为第 2 页，epoch 0，未读完。                                                            |
+| A 点「读完本章」，成功响应正文中断         | 7 / 1 / 6                   | 同一阅读页保留「重试保存」；独立 GET 已读到 `completed=true`，当前/最远仍为第 2 页，章、清单与 epoch 不变。 |
+| A 点「重试保存」                           | 7 / 1 / 6                   | 变为已保存，重试入口消失；六路只读业务响应与上一阶段完整相同。                                              |
+
+夹具只在显式启用后观察已通过正式鉴权、校验和事务的指定章末页完成请求，先核实匹配的持久 D1 回执，再中断首次 HTTP 200 正文。停服审计只有两条目标记录，`drop_ack=1/0`；两次 UUID、原始正文 SHA-256、预期作品 revision 5、正式 ACK 摘要及持久回执摘要完全一致。D1 只提交了一次；正常翻页不消耗故障。业务 POST 均来自正式浏览器 UI，独立采样只发 GET。实测时底层网络错误文案说「尚未保存到服务器」；根据现场，将这类不确定结果改为「尚未获服务器确认」，不改变写入与重试行为。
+
+使用包含该 xkcd 候选的当前静态快照复验：
+
+```sh
+EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build
+ACCEPTANCE_FIXTURE=progress-ack-loss \
+ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.all.xkcd","allowedHosts":["xkcd.com","imgs.xkcd.com"]}]' \
+  pnpm acceptance:serve
+```
+
+在打印的本地地址通过正式界面准备第 2 页，分阶段从独立进程比较设置、书架、作品、书签、进度与指定章节六路 GET。按 Enter 停止后核对 `ACCEPTANCE_PROGRESS_ACK_AUDIT`，要求恰好两次观察及上述身份相等。原始采样、夹具摘要与服务日志保存在 `/private/tmp/karuyomi-web-progress-ack.jqHHp8/`；服务正常退出且端口已释放。两项官方 Workers 回归另覆盖普通末页观察、其它章、409、默认关闭及既有设置夹具；不把这轮 Web 验收当作 Native、实际断网、同时写、生产或真机验收。

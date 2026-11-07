@@ -7,6 +7,9 @@ import '../../data/business_state_client.dart';
 import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
 
+const _progressUnconfirmed = '进度尚未获服务器确认，可重试；草稿仅保留在当前会话。';
+const _resetUnconfirmed = '重新阅读尚未获服务器确认，请重试；草稿仅保留在当前会话。';
+
 final class _PendingProgress {
   const _PendingProgress(this.manifest, this.progress, this.reversedOrder);
   final ChapterManifest manifest;
@@ -289,12 +292,12 @@ final class ReadingProgressController extends ChangeNotifier {
           _notify();
           return;
         }
-        error = '进度尚未获服务器确认，可重试；草稿仅保留在当前会话。';
+        error = _progressUnconfirmed;
         _notify();
         return;
       } catch (_) {
         if (_closed) return;
-        error = '进度尚未保存到服务器，可重试；草稿仅保留在当前会话。';
+        error = _progressUnconfirmed;
         _notify();
         return; // Keep the exact dirty draft for a later explicit retry.
       }
@@ -324,13 +327,13 @@ final class ReadingProgressController extends ChangeNotifier {
           _conflicted.add(entry.key);
           error = '此作品已在其他设备更新，请重新打开本章后再重新阅读。';
         } else {
-          error = '重新阅读尚未获服务器确认，请重试；草稿仅保留在当前会话。';
+          error = _resetUnconfirmed;
         }
         _notify();
         return;
       } catch (_) {
         if (_closed) return;
-        error = '重新阅读尚未保存到服务器，请重试；草稿仅保留在当前会话。';
+        error = _resetUnconfirmed;
         _notify();
         return;
       }
