@@ -47,7 +47,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 历史冻结批次暴露的宿主缺口可供后续正式回归使用，不从失败包自动重试，也不修改原扩展：bookorbit/lanraragi/mango 缺 `OkHttpClient.Builder.dns`，旧 v1 的 komga 缺 `Builder.authenticator`，dragonballmultiverse/manhuarm 缺 `StaticLayout.Builder` 等文本绘图 ABI（后者还用到字体度量与旋转），mangafire 缺 `Class.getResource` 与协程 cancel ABI。DNS 和认证须实现真实请求语义，不能以 no-op 仅换取编译成功。当时 lunaranime 只有 TeaVM `2/2` 无栈错误。当前冻结批次已在独立副本定位该编译器缺陷；隔离修正后仍缺加密和 Android WebView 能力，见[诊断记录](../verification/aot-current-pilot.md#lunaranime-编译器诊断)。原始逐包日志留在各自冻结 checkout 的 ignored 构建目录，不把旧批次的诊断直接归于新输入。 AsgardScans 的 Android `org.json` 已接入固定上游实现；JVM、原包正式 AOT、候选静态装配与 Web 初始化通过，真实热门请求失败，独立正式帧重放见上游 404，详情和图片仍待验，见[记录](../verification/aot-current-pilot.md#asgardscans-的-android-json)。
 
-Alpha Manga 的单参数 Canvas 旋转缺口已补，Android 与 TeaVM 像素回归、原包隔离 AOT 和候选静态交付通过；独立章节探测遇源站挑战，真实免费章节读图仍待验，见[记录](../verification/aot-current-pilot.md#alpha-manga-的-canvas-旋转)。
+Alpha Manga 的单参数 Canvas 旋转缺口已补，Android 与 TeaVM 像素回归、原包隔离 AOT 和候选静态交付通过；正式 Web 安装和 Source 初始化通过，真实热门未返回作品，独立正式帧重放确认源站挑战，真实免费章节读图仍待验，见[记录](../verification/aot-current-pilot.md#alpha-manga-的-canvas-旋转)。
 
 2026-11-04 重新核对当时 v3 的实际 checkpoint 和日志：komga 的该轮失败处于 `upstream` 阶段，是从 `dl.google.com` 下载 `commons-text:1.11.0` 时 DNS 解析失败，尚未进入 AOT，不能称为该轮认证 ABI 失败。后续包持续成功，未见持续的全局下载故障；该轮未完成，记录仅保留其历史范围，不据此恢复当前生产。相同失败输入仅在明确重试时再尝试，不修改 checkpoint 或启动第二个发布器。两条队列的 baseline 均未完成，继续保持定时扩展 CI 停用。
 
