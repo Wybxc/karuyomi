@@ -173,6 +173,16 @@ B 写入与 A 恢复的 Flutter 集成测试各 1/1 通过，均等待正式运�
 
 本门覆盖 iOS 模拟器全局设置的同进程自动重取。Android 与 Web 前台生命周期、阅读中进度/分类等其它状态、实际断网、生产 Access、真机和触控仍分别验收。
 
+## 2026-11-07：Android 模拟器回到前台读回 iOS 保存
+
+固定 `457f606` 的独立副本运行同一正式 `resume` / `write` 驱动。Android Pixel 9 / API 36（系统 WebView 133）与 iPhone 17 Pro / iOS 26.4 使用同一个官方 HTTPS loopback origin、隔离 workerd/D1 和测试身份 `acceptance-owner`，空扩展索引。Android 验收 APK 的 debug 网络配置只对准确的 127.0.0.1 增加本地 CA，保留系统根、主机名校验、禁明文和 pin 限制；Dart 也通过同一 CA 验证。iOS 仅在专用模拟器信任该 CA。没有关闭 TLS 校验。
+
+1. Android A 从 SYSTEM / account 与 global revision 0 打开正式设置页。系统 Home 后最前台 Activity 从产品切到系统桌面，驱动观察到 `paused`；独立 settings/library GET 与初始快照逐字节一致。
+2. iOS B 通过正式表单保存 DARK、RTL、DOUBLE、适宽和裁白；ACK 与独立 GET 确认 revision 各增加一次，其它设置和书架内容不变。
+3. `adb shell am start -W` 以正常 MAIN/LAUNCHER 恢复同一任务，系统报告 `LaunchState: HOT`。Android A 前后台进程 PID 均为 4066，前后的原 ActivityRecord 和 task 也一致。原设置页和 controller 无手动读回即更新为 B 的值与主题；最终独立 GET 与 B 保存后逐字节一致。
+
+两端正式 Flutter 集成测试各 1/1 通过。命令和阶段配置沿用[集成测试说明](../../apps/reader/integration_test/README.md)；Android 的隔离证书、打包核对、系统任务记录与四段采样留在 `/private/tmp/karuyomi-android-resume-457f606-nXu2h6`，不入库。这是 Android 全局设置的同进程前台读回；Web 前台、书架与阅读进度生命周期、生产 Access、真机和触控仍分别验收。
+
 ## 可复验入口
 
 ```sh
@@ -188,7 +198,7 @@ pnpm exec vitest run --project workers apps/api/test/state-workerd.test.ts
 ## 尚待验收与完整范围
 
 - 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；漫画继承/覆盖/清空、其它写入的实际丢响应恢复和同时请求竞争仍待独立客户端验收。
-- Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；iOS 模拟器全局设置的自动前台重取已通过；Web↔Native、Android/Web 前台、生产 Access、Native 手动触控与真机仍待验收。
+- Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；iOS 与 Android 模拟器全局设置的自动前台重取已通过；Web↔Native、Web 前台、生产 Access、Native 手动触控与真机仍待验收。
 - 该轮三项设置之后，阅读背景、应用内调暗与点击区/键盘预设已继续接入，结果分别见[后续记录](reader-appearance.md)；适宽/适高与裁白已实现，分别见[图像适配](reader-fit.md)和[同步裁白](reader-crop.md)。
 
 当前交付顺序见 [P1](../plan/p1-library-and-progress.md) 与 [P2](../plan/p2-sync.md)。生产、跨端和真机门未因上述工程与组件测试通过。

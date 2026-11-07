@@ -2,7 +2,7 @@
 
 2026-11-07，正式 Web 的 xkcd 范围已读/未读通过三独立文档往返；首次发现同一详情收藏后误用旧作品 revision，显式重读可恢复，修复后的独立空库首次确认 3/3 通过。独立 D1 核对负对照、书签、设置及阅读锚点未变，见[章节状态记录](verification/chapter-read-state.md)。Native、真实并发和生产另验。
 
-2026-11-07，两台 iOS 模拟器经同一 HTTPS/D1 实测全局设置自动前台重取：A 真实进入后台，B 保存，A 同一进程回到前台并自动更新原表单与主题。见[前台设置记录](verification/reader-settings.md#2026-11-07ios-模拟器回到前台自动读回全局设置)；Web、Android、阅读进度和生产仍分别验收。
+2026-11-07，两台 iOS 模拟器经同一 HTTPS/D1 实测全局设置自动前台重取：A 真实进入后台，B 保存，A 同一进程回到前台并自动更新原表单与主题。见[前台设置记录](verification/reader-settings.md#2026-11-07ios-模拟器回到前台自动读回全局设置)；随后 [Android 模拟器从 iOS 保存读回](verification/reader-settings.md#2026-11-07android-模拟器回到前台读回-ios-保存)也通过真实系统前后台、原进程和原任务校验。Web、阅读进度和生产仍分别验收。
 
 2026-11-07，正式 Web 全局设置已通过[真实 HTTP 丢确认与精确重试](verification/reader-settings.md#2026-11-07web-全局设置的真实确认丢失与原样重试)：首次 D1 已保存但响应正文中断，独立文档能读到确认值，原会话显式重试复用 UUID/CAS/原始正文，D1 只提交一次。其它写入、设备实际断网、Native 与生产 Access 分开验收。
 
