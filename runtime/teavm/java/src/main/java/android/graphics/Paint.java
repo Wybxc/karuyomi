@@ -31,7 +31,7 @@ public class Paint {
   }
 
   int color = Color.BLACK, flags;
-  float textSize = 12, textScaleX = 1, strokeWidth = 0;
+  float textSize = 12, textScaleX = 1, strokeWidth = 0, strokeMiter = 4;
   Style style = Style.FILL;
   Join join = Join.MITER;
   Cap cap = Cap.BUTT;
@@ -57,6 +57,7 @@ public class Paint {
     textSize = p.textSize;
     textScaleX = p.textScaleX;
     strokeWidth = p.strokeWidth;
+    strokeMiter = p.strokeMiter;
     style = p.style;
     join = p.join;
     cap = p.cap;
@@ -121,6 +122,14 @@ public class Paint {
 
   public float getStrokeWidth() {
     return strokeWidth;
+  }
+
+  public void setStrokeMiter(float miter) {
+    if (miter >= 0) strokeMiter = miter;
+  }
+
+  public float getStrokeMiter() {
+    return strokeMiter;
   }
 
   public void setStrokeJoin(Join j) {
@@ -247,6 +256,7 @@ public class Paint {
     j.addProperty("size", textSize);
     j.addProperty("scaleX", textScaleX);
     j.addProperty("strokeWidth", strokeWidth);
+    j.addProperty("strokeMiter", strokeMiter);
     j.addProperty("style", style.name());
     j.addProperty("join", join.name());
     j.addProperty("cap", cap.name());

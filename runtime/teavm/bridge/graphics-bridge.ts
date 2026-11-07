@@ -9,6 +9,7 @@ import {
   workerScope,
 } from './bridge-common.js';
 import { imageDimensionsFromData } from 'image-dimensions';
+import { intersection } from 'polygon-clipping';
 import {
   layoutText,
   textDirection,
@@ -18,9 +19,12 @@ import {
 } from './text-layout.js';
 type Rect = [number, number, number, number];
 type Matrix = [number, number, number, number, number, number];
+type Point = [number, number];
+const MAX_CLIP_POINTS = 128;
 interface Paint {
   color: number;
   strokeWidth: number;
+  strokeMiter: number;
   join: CanvasLineJoin;
   cap: CanvasLineCap;
   align: CanvasTextAlign;
@@ -42,6 +46,7 @@ const operations = [
   'raw',
   'putPixels',
   'putRaw',
+  'clipRect',
   'color',
   'erase',
   'drawBitmap',
@@ -61,6 +66,7 @@ interface GraphicsRequest {
   f16: boolean;
   rect: Rect | undefined;
   matrix: Matrix | undefined;
+  clip: Point[] | undefined;
   paint: Paint;
   text: string;
   bytes: string;
@@ -104,6 +110,102 @@ function matrix(value: unknown): Matrix {
     number(value[5]),
   ];
 }
+function clipValue(value: unknown): Point[] {
+  if (!Array.isArray(value) || value.length > MAX_CLIP_POINTS)
+    throw Error('Invalid clip geometry');
+  return value.map((point): Point => {
+    if (!Array.isArray(point) || point.length !== 2)
+      throw Error('Expected two clip coordinates');
+    return [number(point[0]), number(point[1])];
+  });
+}
+
+function intersectClip(
+  clip: Point[] | undefined,
+  m: Matrix,
+  [x0, y0, x1, y1]: Rect,
+  width: number,
+  height: number,
+): Point[] {
+  if (clip?.length === 0 || x0 === x1 || y0 === y1) return [];
+  const [a, b, c, d, e, f] = m;
+  // Skia sorts clip edges and rounds axis-aligned, non-antialiased clips.
+  const left = Math.min(x0, x1),
+    right = Math.max(x0, x1);
+  const top = Math.min(y0, y1),
+    bottom = Math.max(y0, y1);
+  const align = (b === 0 && c === 0) || (a === 0 && d === 0);
+  const coord = (value: number): number =>
+    align ? Math.round(number(value)) : number(value);
+  if (a * d === b * c) return [];
+  const map = (x: number, y: number): Point => [
+    coord(a * x + c * y + e),
+    coord(b * x + d * y + f),
+  ];
+  const bounds: Point[] = [
+    [0, 0],
+    [width, 0],
+    [width, height],
+    [0, height],
+  ];
+  const result = intersection(
+    [clip ?? bounds],
+    [[map(left, top), map(right, top), map(right, bottom), map(left, bottom)]],
+  );
+  if (result.length === 0) return [];
+  const ring = result[0]?.[0];
+  if (!ring || result.length !== 1 || result[0]?.length !== 1)
+    throw Error('Expected a single convex clip');
+  return ring;
+}
+
+// Android's bitmap Canvas clipRect uses a hard pixel edge. Rasterize the
+// convex intersection at pixel centers so Canvas2D cannot antialias its edge.
+function rasterClip(
+  points: readonly Point[],
+  width: number,
+  height: number,
+  rect?: (left: number, top: number, width: number, height: number) => void,
+): boolean {
+  let minY = Infinity,
+    maxY = -Infinity;
+  for (const [, y] of points) {
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  const bottom = Math.min(height, Math.round(maxY));
+  let top = -1,
+    left = -1,
+    right = -1,
+    found = false;
+  for (let row = Math.max(0, Math.round(minY)); row < bottom; row++) {
+    const y = row + 0.5;
+    let minX = Infinity,
+      maxX = -Infinity;
+    for (let i = 1; i < points.length; i++) {
+      const [x0, y0] = points[i - 1]!,
+        [x1, y1] = points[i]!;
+      if (y < Math.min(y0, y1) || y >= Math.max(y0, y1)) continue;
+      const x = x0 + ((y - y0) * (x1 - x0)) / (y1 - y0);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+    }
+    const l = Math.max(0, Math.round(minX)),
+      r = Math.min(width, Math.round(maxX));
+    if (l < r) {
+      if (!rect) return true;
+      found = true;
+      if (top >= 0 && l === left && r === right) continue;
+    }
+    if (top >= 0) rect?.(left, top, right - left, row - top);
+    top = l < r ? row : -1;
+    left = l;
+    right = r;
+  }
+  if (top >= 0) rect?.(left, top, right - left, bottom - top);
+  return found;
+}
+
 function paintValue(value: unknown): Paint {
   const data = value === undefined ? {} : object(value);
   const join = optionalText(data.join) ?? 'MITER',
@@ -125,6 +227,7 @@ function paintValue(value: unknown): Paint {
     direction,
     color: data.color === undefined ? -16777216 : number(data.color),
     strokeWidth: data.strokeWidth === undefined ? 1 : number(data.strokeWidth),
+    strokeMiter: data.strokeMiter === undefined ? 4 : number(data.strokeMiter),
     join: { MITER: 'miter', ROUND: 'round', BEVEL: 'bevel' }[
       join
     ] as CanvasLineJoin,
@@ -163,6 +266,7 @@ export function parseGraphicsRequest(value: unknown): GraphicsRequest {
     f16: data.f16 === undefined ? false : bool(data.f16),
     rect: data.rect === undefined ? undefined : rect(data.rect),
     matrix: data.matrix === undefined ? undefined : matrix(data.matrix),
+    clip: data.clip === undefined ? undefined : clipValue(data.clip),
     paint: paintValue(data.paint),
     text: optionalText(data.text) ?? '',
     bytes: optionalText(data.bytes) ?? '',
@@ -681,7 +785,8 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     ctx.globalAlpha = 1;
     ctx.fillStyle = ctx.strokeStyle = color(p.color ?? -16777216);
     ctx.lineWidth = p.strokeWidth || 1;
-    ctx.lineJoin = p.join;
+    ctx.lineJoin = p.strokeMiter === 0 && p.join === 'miter' ? 'bevel' : p.join;
+    ctx.miterLimit = p.strokeMiter || 4;
     ctx.lineCap = p.cap;
     ctx.textAlign = p.align;
     ctx.textBaseline = 'alphabetic';
@@ -809,6 +914,14 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
       c = s.ctx,
       w = s.canvas.width,
       h = s.canvas.height;
+    if (a.op === 'clipRect') {
+      if (!a.rect || !a.matrix)
+        throw Error('Clip rectangle and matrix required');
+      const clip = intersectClip(a.clip, a.matrix, a.rect, w, h);
+      if (clip.length > MAX_CLIP_POINTS)
+        throw limit('Clip exceeds geometry budget');
+      return { clip: rasterClip(clip, w, h) ? clip : [] };
+    }
     if (a.op === 'pixels' || a.op === 'raw') {
       const r: Rect = a.rect || [0, 0, w, h];
       const size = tileSize(r, a.f16, w, h),
@@ -881,8 +994,20 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
         release();
       }
     }
+    if (a.clip?.length === 0) return {};
     c.save();
     try {
+      if (a.clip !== undefined) {
+        // The clip is defined in bitmap coordinates even when a later draw
+        // uses another transform (or, like drawColor, ignores the transform).
+        c.resetTransform();
+        c.beginPath();
+        rasterClip(a.clip, w, h, (x, y, width, height) =>
+          c.rect(x, y, width, height),
+        );
+        c.clip();
+        c.beginPath();
+      }
       c.setTransform(...(a.matrix || [1, 0, 0, 1, 0, 0]));
       paint(c, a.paint);
       if (a.op === 'color' || a.op === 'erase') {

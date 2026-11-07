@@ -34,6 +34,11 @@ public final class AndroidTextTest {
   }
 
   @Test
+  public void nativeAndroidCanvasClipAndMiter() {
+    CanvasRotationScenarios.runClipAndMiter();
+  }
+
+  @Test
   public void nativeAndroidSharedScenarios() throws Exception {
     assertEquals(35, Build.VERSION.SDK_INT);
     Paint paint = new Paint();

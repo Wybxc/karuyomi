@@ -78,3 +78,15 @@ pnpm acceptance:serve
 同一 JS 已通过单包完整性校验、候选装配及正式 `pnpm acceptance:build`；快照 revision `fbfb089bcd964a85bd431a6fba10891e`，gzip 904,200 B。隔离服务仅登记 `www.alpha-manga.com`，实际 index/manifest 与候选逐字节一致，artifact HEAD 和测试身份 bootstrap 均返回 200。独立 CLI 对公开章节 URL 收到 HTTP 202 与 `x-amzn-waf-action: challenge`，未获得 viewer 正文或图像域名。未放宽网络策略，未做浏览器图片验收或部署；精确身份与命令见同一证据目录下的 `acceptance/summary.json`、`acceptance/smoke.log` 与 `acceptance/acceptance-serve.sh`。
 
 同一候选随后在隔离 `http://127.0.0.1:61630` 经正式 Codex 内置浏览器通过扩展安装、精确构建加载和英文 Source 列表。选择该源后显示「漫画源请求失败，请重试」，没有作品可打开。以同一候选独立通过正式 HTTP v2 桥重放原热门 URL（`/manga/search.json?query=&progress&genre&page=1`）：测试身份 bootstrap 200、外层 bridge 200、上游 META 为 CloudFront 202，带 `x-amzn-waf-action: challenge`，正文 0 B 后正常 END/EOF。该复验仅携明确的 JSON Accept 头，非浏览器原请求抓包；真实列表、章节和图片均未通过。服务正常停止；帧记录在同目录 `acceptance/popular-bridge-replay.json`。
+
+## MangaTek 的气泡图形操作
+
+固定 `952bbab` 的 MangaTek 1.6.13（阿拉伯语 Source `1011491016492324749`）缺少原气泡拦截器使用的绕中心旋转、矩形裁剪和描边斜接限制。原 JAR 的字节码有三个调用；虽然没有使用裁剪返回值，后续画笔仍受裁剪约束。原 Source 和 JAR 未改。
+
+Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透明像素，而 Android Bitmap Canvas 的矩形裁剪是硬边。修正后 Android 35 oracle 4/4，同一 Java fixture 经正式 TeaVM 和 Vite 图形桥、Node Skia 后端，也通过 45 度旋转、按调用时的矩阵裁剪、边缘像素、空/越界交集、保存恢复、描边及资源归零。额外扫描只在裁剪的位图范围内，合并相同跨度；共享图形材料 gzip 从 30,327 B 到 43,766 B，增量 13,439 B，每个 Web 快照只需一份。未测量目标设备的绘制耗时。
+
+固定 `72a2f70` 加图形补丁的独立构建，以未修改的原 JAR（SHA-256 `5728f0c45e3b13e237c08ea8c62ed39dce5dcf444e95b45482b645a92eea3439`）通过 AOT、语法检查、单包静态装配和正式 `pnpm acceptance:build`。host 指纹为 `d9990e66a60fa830c943dcceb07a2fa5558e053d5f40f4b74d48bc3977fa496b`；JS 5,086,621 B，SHA-256 `b11da504d714e76859420c57f4cdd38f736e633878186dd4ea2d6a34af82e530`，gzip 983,806 B。正式隔离服务的静态索引、清单、产物 HEAD 与测试 bootstrap 均返回 200，索引与清单和候选逐字节相同。
+
+2026-11-08，Codex 内置浏览器经 `http://127.0.0.1:49314` 安装并加载精确构建，识别原 MangaTek 阿拉伯语 Source。选择源后热门报错。独立 HTTP v2 重放其热门 URL `https://mangatek.com/manga-list?sort=views&page=1`，外层 200、上游 403 Cloudflare HTML、6050 B 后正常 END/EOF；这不是浏览器请求的抓包。当前只登记已确认的 `mangatek.com`、`api.mangatek.com`，没有访问真实章节或叠字页，仍为 `compiled_unverified` / `runtimeReady=false`。未部署或修改冻结批次，服务已退出。
+
+像素对照入口为 `node tools/teavm/check-text-layout.ts`（需要锁定依赖）；冻结副本的命令、像素和材料记录见 `/private/tmp/karuyomi-mangatek-graphics.QY6mor/reproduce.md`，静态与 HTTP 证据在该目录的 `acceptance/`。

@@ -106,6 +106,8 @@ Bitmap / ImageDecoder 的图像正文改用 Worker 内部 byte handle，`teaGrap
 
 预算属于每个 Source Worker，与外层 manager 的图片窗口预算分别计量。Bitmap、decoder、成功加载的字体和已交付的 Java Frame 属于 Source 持有对象；普通调用结束或取消不得扫描删除它们。Bitmap 通过真实持有的 typed JSO lease 与 surface 关联；bridge 仅弱持 owner，显式 recycle 或 owner 真正被 GC 后同步 retire。普通 End 仅清尚未交付给 Java 的 surface，不删活 owner；预算前仅回收 WeakRef 已清空的对象，编码 pin 在工作终态前继续计费。标准 GC 无固定触发时间，延迟回收仍可能触及预算；独立机制与 Java 证据见 [Bitmap 所有权](verification/bitmap-lifetime-runtime.md)，原 Source 需新材料另验。decoder.close 和 Frame.close 解除各自所有权；Android Typeface 没有 close，已加载字体保留到 Worker 回收，受数量和字节预算约束。
 
+内部 Bitmap Canvas 以裁剪时的矩阵保留设备坐标裁剪，保存/恢复同时还原裁剪和变换。裁剪结果最多保留 128 个坐标点，绘制时只扫描位图内的裁剪范围，合并相同的相邻行以保持 Android 的硬边。已验证像素与已知包的 AOT，真实处理源和设备开销另验，见[MangaTek](verification/aot-current-pilot.md#mangatek-的气泡图形操作)。
+
 取消只标记当前 requestId/generation。不可中断的浏览器 decode、encode 或 font.load 结束后才释放其预留、输入 pin 和临时对象，迟到结果不发布；编码期间显式 recycle 的 surface 延迟到工作完成后销毁。driver 仍等待 Java 回调退出再结束图形上下文和释放串行锁。Java 同步 JSO 和异步 fiber 错误均回传为 Java 异常，确保 finally 路径执行；预算、能力与取消错误在 driver 保留对应错误类别。
 
 此账本约束可见对象和明确工作预留，不等于浏览器进程、GPU、codec 内部或字体 glyph cache 的实际峰值硬上限，也无法限制 Source 自行持有的任意数组或调用方缓存。已有 JVM 流式检查、受控 codec 生命周期测试，以及 Codex 内置浏览器 Chromium 156 的真实 Canvas 二进制 RGBA/PNG、头部 bounds、取消与显式回收检查。同环境的 TeaVM 0.16.0 独立 Java→JSO→Canvas oracle 也通过 131,079 字节分块往返、同步/异步 Java 异常、fiber bounds、Bitmap pixels/raw/PNG、1px region sample 别名和 Java Frame lease 检查，显式释放后账本归零；这不代表真实进程峰值为零。harness 初次遗漏正式构建器的 Android 重复类裁剪，曾触发上游 Stub，校正独立 harness 后复跑通过，未修改 Source 或原始 JAR。新 host 的真实图片解密、重排 Source、超长图和移动设备合计峰值仍须分别验收。Cache/File 等其它内部桥的大正文问题属于后续阶段，不能据此宣称整个 runtime 已无 Base64/JSON 大正文。

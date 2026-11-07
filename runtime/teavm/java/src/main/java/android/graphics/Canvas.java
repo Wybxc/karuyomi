@@ -5,9 +5,13 @@ import java.util.*;
 import prototype.Graphics;
 
 public class Canvas {
+  private static final int MAX_SAVE_DEPTH = 128;
   private Bitmap bitmap;
   private float[] matrix = {1, 0, 0, 1, 0, 0};
-  private final List<float[]> stack = new ArrayList<>();
+  private JsonArray clip;
+  private final List<State> stack = new ArrayList<>();
+
+  private record State(float[] matrix, JsonArray clip) {}
 
   public Canvas() {}
 
@@ -22,6 +26,7 @@ public class Canvas {
     }
     bitmap = b;
     matrix = new float[] {1, 0, 0, 1, 0, 0};
+    clip = null;
     stack.clear();
   }
 
@@ -39,13 +44,15 @@ public class Canvas {
     JsonObject a = Graphics.args();
     a.addProperty("id", bitmap.id());
     a.add("matrix", Graphics.numbers(matrix));
+    if (clip != null) a.add("clip", clip);
     a.add("paint", (p == null ? new Paint() : p).json());
     return a;
   }
 
   public int save() {
+    if (stack.size() >= MAX_SAVE_DEPTH) throw new IllegalStateException("Canvas save limit");
     int n = getSaveCount();
-    stack.add(matrix.clone());
+    stack.add(new State(matrix.clone(), clip));
     return n;
   }
 
@@ -55,7 +62,9 @@ public class Canvas {
 
   public void restore() {
     if (stack.isEmpty()) throw new IllegalStateException("Underflow in restore");
-    matrix = stack.remove(stack.size() - 1);
+    State saved = stack.remove(stack.size() - 1);
+    matrix = saved.matrix();
+    clip = saved.clip();
   }
 
   public void restoreToCount(int n) {
@@ -85,6 +94,21 @@ public class Canvas {
     matrix[1] = b * cos + d * sin;
     matrix[2] = c * cos - a * sin;
     matrix[3] = d * cos - b * sin;
+  }
+
+  public void rotate(float degrees, float px, float py) {
+    if (degrees == 0) return;
+    translate(px, py);
+    rotate(degrees);
+    translate(-px, -py);
+  }
+
+  public boolean clipRect(float left, float top, float right, float bottom) {
+    if (bitmap == null) return false;
+    JsonObject a = args(null);
+    a.add("rect", Graphics.numbers(left, top, right, bottom));
+    clip = Graphics.call("clipRect", a).getAsJsonArray("clip");
+    return !clip.isEmpty();
   }
 
   public void drawColor(int color) {
