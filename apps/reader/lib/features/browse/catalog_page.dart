@@ -775,6 +775,9 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         _bookmarks = ChapterBookmarksController(
           repository: repository,
           mangaKey: _sequence!.mangaKey,
+          onConfirmed: () async {
+            await _chapterRead?.refreshAfterCurrent();
+          },
           isCurrent: () =>
               mounted &&
               !_detailsExpired &&
@@ -1268,6 +1271,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         sequence == null ||
         _markingChapters ||
         _savingFavorite ||
+        _bookmarks?.saving == true ||
         _opening ||
         !progress.available ||
         progress.busy) {
@@ -1371,6 +1375,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         !_opening &&
         !_markingChapters &&
         !_savingFavorite &&
+        _bookmarks?.saving != true &&
         !controller.busy;
     final canSelect = available && progress.loaded && !progress.busy;
     final visibleKeys = visible.map((chapter) => chapter.key).toSet();

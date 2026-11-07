@@ -10,15 +10,18 @@ final class ChapterBookmarksController extends ChangeNotifier {
     required this.repository,
     required this.mangaKey,
     required this.isCurrent,
+    this.onConfirmed,
   });
 
   final BookmarkRepository repository;
   final String mangaKey;
   final bool Function() isCurrent;
+  final Future<void> Function()? onConfirmed;
   Set<String> _chapterKeys = const {};
   int _revision = 0;
   bool _loaded = false;
   bool _busy = false;
+  bool _saving = false;
   bool _retired = false;
   bool _disposed = false;
   String? _error;
@@ -26,6 +29,7 @@ final class ChapterBookmarksController extends ChangeNotifier {
   Set<String> get chapterKeys => _chapterKeys;
   bool get loaded => _loaded;
   bool get busy => _busy;
+  bool get saving => _saving;
   String? get error => _error;
   BookmarkDraft? get pending => repository.pending(mangaKey);
   bool get available => !_disposed && !_retired && isCurrent();
@@ -86,6 +90,7 @@ final class ChapterBookmarksController extends ChangeNotifier {
 
   Future<void> _set(String chapterKey, bool bookmarked, int revision) async {
     _busy = true;
+    _saving = true;
     _error = null;
     notifyListeners();
     var acknowledged = false;
@@ -106,9 +111,10 @@ final class ChapterBookmarksController extends ChangeNotifier {
       }
       _chapterKeys = Set.unmodifiable(keys);
       _revision = value.revision;
+      await onConfirmed?.call();
       // A retried ACK can refer to an older write; read the complete current
       // collection before letting this page edit another chapter.
-      await _read();
+      if (available) await _read();
     } catch (failure) {
       if (!available) return;
       if (acknowledged) {
@@ -123,6 +129,7 @@ final class ChapterBookmarksController extends ChangeNotifier {
     } finally {
       if (!_disposed) {
         _busy = false;
+        _saving = false;
         checkCurrent();
         notifyListeners();
       }

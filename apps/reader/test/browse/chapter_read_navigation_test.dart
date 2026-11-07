@@ -180,6 +180,19 @@ Future<void> _selectAll(WidgetTester tester) async {
   await _tap(tester, _control('chapter-select-visible'));
 }
 
+Future<void> _confirmFirstThree(WidgetTester tester) async {
+  await _tap(tester, _control('chapter-selection-toggle'));
+  await _tap(tester, _control('chapter-range-start'));
+  await _tap(tester, find.text('同名章 · 来源第 1 项').last);
+  await _tap(tester, _control('chapter-range-end'));
+  await _tap(tester, find.text('同名章 · 来源第 3 项').last);
+  await _tap(tester, _control('chapter-select-range'));
+  await _tap(tester, _control('chapter-mark-read'));
+  expect(find.text('确认清单：3 章'), findsOneWidget);
+  await _tap(tester, find.text('确认并开始'));
+  expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
+}
+
 Future<void> _back(WidgetTester tester) async {
   await tester.runAsync(() async {
     await tester.binding.handlePopRoute();
@@ -369,17 +382,7 @@ void main() {
       await _tap(tester, find.text('加入书架'));
       expect(platform.businessServer.manga(_sequence.mangaKey)?.favorite, true);
 
-      await _tap(tester, _control('chapter-selection-toggle'));
-      await _tap(tester, _control('chapter-range-start'));
-      await _tap(tester, find.text('同名章 · 来源第 1 项').last);
-      await _tap(tester, _control('chapter-range-end'));
-      await _tap(tester, find.text('同名章 · 来源第 3 项').last);
-      await _tap(tester, _control('chapter-select-range'));
-      await _tap(tester, _control('chapter-mark-read'));
-      expect(find.text('确认清单：3 章'), findsOneWidget);
-
-      await _tap(tester, find.text('确认并开始'));
-      expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
+      await _confirmFirstThree(tester);
       final commands = _posts(platform).map(_command).toList();
       expect(commands.map((command) => command.expectedRevision), [0, 1, 2, 3]);
       expect(commands.first.setFavorite.favorite, isTrue);
@@ -395,6 +398,71 @@ void main() {
       await _finish(tester, platform, catalog);
     },
   );
+
+  for (final loseAck in [false, true]) {
+    testWidgets(
+      'same-detail bookmark then range uses the confirmed revision (lost ACK: $loseAck)',
+      (tester) async {
+        final platform = _platform();
+        final catalog = await _details(tester, platform);
+        final server = platform.businessServer;
+        final mangaKey = _sequence.mangaKey;
+        final bookmarkKey = _sequence.entries.last.key;
+        server.requests.clear();
+        if (loseAck) {
+          platform.afterBusinessReply = (request, reply) {
+            if (request.method != 'POST') return reply;
+            platform.afterBusinessReply = null;
+            return const ApiReply(
+              status: 503,
+              headers: {'content-type': 'text/plain'},
+              body: 'Bookmark acknowledgement unavailable',
+              redirected: false,
+            );
+          };
+        }
+
+        await _tap(tester, _control('chapter-bookmark-$bookmarkKey'));
+        expect(server.bookmarked(mangaKey, bookmarkKey), isTrue);
+        if (loseAck) {
+          final original = _posts(platform).single.body;
+          expect(
+            server.requests.where(
+              (request) => request.uri.path.endsWith('/progress'),
+            ),
+            isEmpty,
+          );
+          await _tap(tester, find.text('重试原书签操作'));
+          expect(_posts(platform).map((request) => request.body), [
+            original,
+            original,
+          ]);
+        }
+
+        final bookmarkRequests = loseAck ? 2 : 1;
+        await _confirmFirstThree(tester);
+        final commands = _posts(platform).map(_command).toList();
+        expect(commands.map((command) => command.expectedRevision), [
+          0,
+          if (loseAck) 0,
+          1,
+          2,
+          3,
+        ]);
+        expect(commands.first.setBookmark.chapterKey, bookmarkKey);
+        expect(
+          commands
+              .skip(bookmarkRequests)
+              .map((command) => command.setChapterRead.chapterKey),
+          [for (final chapter in _sequence.entries.take(3)) chapter.key],
+        );
+        expect(server.progress(mangaKey, bookmarkKey), isNull);
+        expect(server.bookmarked(mangaKey, bookmarkKey), isTrue);
+        await _back(tester);
+        await _finish(tester, platform, catalog);
+      },
+    );
+  }
 
   testWidgets(
     'read and unread marking keeps resume and system back clears the confirmed selection',
