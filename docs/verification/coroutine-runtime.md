@@ -215,3 +215,5 @@ ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.ko
 正式 `HttpAwaitTest` 新增真实 seed `await` / `awaitSuccess`、直接 enqueue、非 IO 执行错误和 response / failure callback 抛错回归，验证一次终态、原 cause、owner drain 与资源释放。同一 fixture 使用旧 BrowserCall 在 3 秒等待门失败，修复后 HttpAwaitTest 270、EnqueueTest 85、ImageTest 8355 项断言通过；隔离输出在 `/private/tmp/karuyomi-enqueue-failure-XCrmCZ`。正式复验入口仍为 `pnpm teavm:check`。
 
 这些是 JVM 红绿证据；当时真实 TeaVM 候选、Source 重开和独立客户端书签门仍未通过，不能以本修复替代[重开诊断](source-reopen.md)的后续实测。
+
+后续窄回归覆盖拦截器返回的正文在 `source()` 初始化与清理中重复抛出同一个异常对象。旧路径的 `addSuppressed` 自抑制抛出次生异常，覆盖原 cause；修复仅跳过同一对象的抑制。真实 seed await / awaitSuccess 在未修复时失败，修复后 HttpAwaitTest 306、EnqueueTest 85、ImageTest 8355 项断言通过，证据在 `/private/tmp/karuyomi-body-source-failure-4qJHMS`。前一提交 `f285391` 的无 trace xkcd 实际重开也确认 30 秒超时变为立即 Source 失败；两者均不等于书签读回成功，实际流程见[重开记录](source-reopen.md#无插桩-f285391章节失败立即返回)。

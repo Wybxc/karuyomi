@@ -498,6 +498,75 @@ public final class HttpAwaitTest {
     }
   }
 
+  private static void repeatedBodySourceFailure(String endpoint) throws Throwable {
+    for (boolean requireSuccess : new boolean[] {false, true}) {
+      for (Throwable expected :
+          new Throwable[] {
+            new IllegalStateException("repeated body source runtime failure"),
+            new AssertionError("repeated body source error")
+          }) {
+        BrowserCall.Operation owner = begin("repeated-body-source");
+        try {
+          AtomicInteger attempts = new AtomicInteger(), sources = new AtomicInteger();
+          OkHttpClient client =
+              new OkHttpClient.Builder()
+                  .addInterceptor(chain -> {
+                    attempts.incrementAndGet();
+                    return synthetic(
+                        chain.request(),
+                        new ResponseBody() {
+                          public MediaType contentType() {
+                            return null;
+                          }
+
+                          public long contentLength() {
+                            return 0;
+                          }
+
+                          public BufferedSource source() {
+                            sources.incrementAndGet();
+                            if (expected instanceof RuntimeException error) throw error;
+                            throw (Error) expected;
+                          }
+                        });
+                  })
+                  .build();
+          QueuedDispatcher queue = new QueuedDispatcher();
+          GuardCall request = guarded(client, endpoint);
+          Deferred<Response> task = start(queue, request, requireSuccess);
+          queue.step();
+          await(request.returned);
+          queue.drain();
+          try {
+            value(task);
+            throw new AssertionError("Seed await swallowed a body source failure");
+          } catch (Throwable actual) {
+            check(
+                actual instanceof IOException && actual.getCause() == expected,
+                "body source failure survives identical cleanup failure as the await cause");
+          }
+          ownerFailure(owner, expected);
+          check(
+              attempts.get() == 1
+                  && request.enqueues.get() == 1
+                  && request.failures.get() == 1
+                  && request.responses.get() == 0,
+              "body source failure delivers one terminal failure without retry");
+          check(
+              sources.get() == 2,
+              "body wrapping and cleanup both encounter the same source failure");
+          check(
+              expected.getSuppressed().length == 0,
+              "identical cleanup failure is not self-suppressed");
+          check(request.isCanceled(), "body source failure cancels its call");
+        } finally {
+          owner.close();
+          owner.leave();
+        }
+      }
+    }
+  }
+
   private static void nonIoResponseCallbackFailures(String endpoint) throws Throwable {
     for (Throwable expected :
         new Throwable[] {
@@ -928,6 +997,7 @@ public final class HttpAwaitTest {
       cancellationBeforeDelivery(endpoint);
       failureAndNon2xx(endpoint);
       nonIoExecutionFailures(endpoint);
+      repeatedBodySourceFailure(endpoint);
       nonIoResponseCallbackFailures(endpoint);
       replacedBodyAndLimits(endpoint);
       cleanupBeforeAck(endpoint);

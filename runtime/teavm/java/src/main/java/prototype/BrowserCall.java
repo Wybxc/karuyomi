@@ -453,7 +453,7 @@ public final class BrowserCall implements Call {
         if (body != null) body.release();
         else if (response != null) response.close();
       } catch (Throwable cleanup) {
-        error.addSuppressed(cleanup);
+        if (cleanup != error) error.addSuppressed(cleanup);
       } finally {
         closeHandles();
       }
