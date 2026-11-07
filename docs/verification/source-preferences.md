@@ -29,12 +29,18 @@
 - `pnpm teavm:check` 通过；HostPreferences oracle 共 191 断言，覆盖原回调顺序、拒绝时跳过 change、有效值持久化、别名写入、只读 Editable、绑定上限和秘密提示隔离。
 - `pnpm check` 通过（513 项 Vitest、10 项协议 golden 及工具回归）；TS/Dart 分别校验提示的 UTF-8 预算和秘密边界。
 - `pnpm flutter:check` 通过；reader_core、source_runtime 和正式 reader 均通过严格分析与回归，reader 共 604 项。正式设置组件断言显示提示及输入打开时的实际选择范围。
-
 - `pnpm build` 通过，产出 Vite runtime 和 Native 内置材料、Flutter Web 与 Worker/API。
 
 拒绝阻止默认写入和原 change listener，不能撤销原 watcher 自身的副作用。
 
-待用未修改的 FoolSlide Customizable 和 MangaDex 原 JAR 隔离重建并从正式界面验证 URL/UUID 的无效、有效和回调写入路径。本节是工程证据，不表示这两包已通过 AOT 或真实设置验收，也不改变原 baseline。
+固定提交 `f1b0d88` 在独立目录以锁定 TeaVM 0.16.0、上游 `efa93f5` 和未修改的原 JAR 重建 FoolSlide Customizable 与 MangaDex。两包均越过原 `EditText` 缺符号并通过 AOT 及 `node --check`：
+
+| 扩展                   | 声明 Source 数 | JS 字节数 | JS SHA-256                                                         |
+| ---------------------- | -------------: | --------: | ------------------------------------------------------------------ |
+| FoolSlide Customizable |              1 |   4371712 | `58cdf281dec32010d7c85cae081c5a41596912966533688342d825555918881e` |
+| MangaDex               |             61 |   4385642 | `23d197c12359f1f3c2feda3ed7e781f122bebc94f415fee07bce8f890f68cb7d` |
+
+原 JAR 摘要、宿主指纹和复验日志在 `/private/tmp/karuyomi-preference-aot-vNGv9d/`，入口为 `freeze.sh` 与 `run.ts`。未执行发布或修改全量 baseline，两包保持 `compiled_unverified/runtimeReady=false`。正式设置界面的无效 URL/UUID 拒绝、有效值及原回调写入仍待验收。
 
 ## Komiic v6 真实 Web 分项
 
