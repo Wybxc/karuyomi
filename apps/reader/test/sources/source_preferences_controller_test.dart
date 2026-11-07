@@ -178,9 +178,70 @@ void main() {
       expect(current.entries.single.key, 'dependent');
       expect(current.entries.single.value.boolean, true);
       expect(editor.snapshot!.nodes.first.toggle.value, false);
-      expect(editor.message, contains('未接受输入'));
+      expect(editor.message, '漫画源已更新设置；请核对实际值。');
     },
   );
+
+  test(
+    'a listener returning false can store a normalized session value without an API write',
+    () async {
+      final editor = fixture.editor();
+      addTearDown(editor.dispose);
+      await editor.load();
+      fixture.editGate = (_) async {
+        fixture.values['note'] = preferenceEntry(
+          'note',
+          wire.PreferenceValue(text: 'https://example.com'),
+        );
+        return wire.SourceResult(
+          preferenceEdit: wire.PreferenceEditResult(
+            snapshot: fixture.snapshot(),
+          ),
+        );
+      };
+      expect(
+        await editor.change([
+          4,
+          1,
+        ], wire.PreferenceValue(text: 'https://example.com:443/catalog')),
+        true,
+      );
+      expect(fixture.callbacks, 1);
+      expect(fixture.postedBodies, isEmpty);
+      expect(
+        editor.snapshot!.nodes[4].group.nodes[1].text.value,
+        'https://example.com',
+      );
+      expect(editor.message, '漫画源已更新设置；请核对实际值。');
+    },
+  );
+
+  test('a rejection with existing session values reports no change', () async {
+    final editor = fixture.editor();
+    addTearDown(editor.dispose);
+    await editor.load();
+    expect(
+      await editor.change([
+        4,
+        1,
+      ], wire.PreferenceValue(text: 'https://example.com')),
+      true,
+    );
+    fixture.editGate = (_) async => wire.SourceResult(
+      preferenceEdit: wire.PreferenceEditResult(snapshot: fixture.snapshot()),
+    );
+    expect(
+      await editor.change([4, 1], wire.PreferenceValue(text: 'not-a-url')),
+      true,
+    );
+    expect(fixture.callbacks, 2);
+    expect(fixture.postedBodies, isEmpty);
+    expect(
+      editor.snapshot!.nodes[4].group.nodes[1].text.value,
+      'https://example.com',
+    );
+    expect(editor.message, '漫画源未接受输入；设置未更改。');
+  });
 
   test(
     'unknown runtime result never replays its callback; explicit read and reconstruction restore confirmed state',

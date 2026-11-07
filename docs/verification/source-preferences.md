@@ -47,9 +47,12 @@
 2026-11-08，固定 `f1b0d88` 的正式 Flutter Web / Worker 通过 `pnpm acceptance:build`，装配上述两包（index SHA-256 `a28862c009afd96039d592ea7a38a1fd28638a4318170d9ddcb5c4b0bedf80c5`）。官方隔离 workerd / D1 与 `acceptance-owner`，Codex 内置浏览器从扩展管理确认安装两包。
 
 - **MangaDex 1.6.1**：英文 Source `2499283573021220255` 经正式 HTTP 桥返回真实热门结果。打开原 `Block groups by UUID`：`not-a-uuid` 被拒绝，重开输入仍为空；输入合法测试 UUID 后，Source 自动重开，设置页读回相同值。重新加载为全新 Web 文档、打开同一 Source 后又为空。独立 API GET 确认两包均无 D1 设置行（账户 revision 2 来自两次安装），该输入只在当前客户端会话。
-- **FoolSlide Customizable 1.6.7 首轮未通过**：包初始化后，原 Source 的默认 `https://127.0.0.1` 触发网络政策；旧 Worker 用 403 返回 `target_not_allowed`，客户端误判账号无权并关闭来源设置。独立正式帧复现 403，同时 `/api/bootstrap` 仍返回 200。修正为在上游请求之前返回 422，未改变域名、IP、认证或传输规则。正式 UI 复验另记。
+- **FoolSlide Customizable 1.6.7**：首轮默认 `https://127.0.0.1` 被网络政策拦截；旧 Worker 返回 403 `target_not_allowed`，客户端误判账号无权并关闭设置。独立正式帧复现 403，同时 `/api/bootstrap` 返回 200。固定 `f561a16` 用同一索引和扩展产物重建正式 Web 与 Worker；默认地址仍被拦截，独立正式帧返回 422，账户与 Source 设置保持可用。
+- FoolSlide 的正式 Web 复验在 Codex 内置浏览器打开 Source `6351052922295965587` 的原 URL 控件，默认地址打开时实际全选。输入 `not-a-url` 被拒绝，重开仍为默认值；输入 `https://example.com:443/catalog?probe=1` 后，原回调自行保存归一化的 `https://example.com` 并返回 false，重开读回实际值。新 Web 文档恢复默认，安装仍在。独立 API GET 确认没有同步规则或 D1 设置行，账户 revision 1 来自一次安装。
 
-原始 API 快照和候选复验入口在 `/private/tmp/karuyomi-preference-aot-vNGv9d/acceptance/`。本轮不证明原 MangaDex 图片、其它语言、FoolSlide 源站或 Native/生产设置。
+上述 FoolSlide 浏览器版本在回调返回 false 后仍提示“未接受输入”。后续 Flutter 提示改为按实际存储区分：账户或会话值有变化时提示核对实际值；无变化时提示输入被拒绝且设置未更改。Flutter 设置控制器与组件定向回归共 14 项通过，覆盖账户副作用、会话归一化写入及已有会话值下的无变化拒绝；Dart 严格分析通过。新提示未在上述浏览器复验中观察。
+
+原始 API 快照与候选复验入口在 `/private/tmp/karuyomi-preference-aot-vNGv9d/acceptance/`，FoolSlide 二轮步骤和独立 API 证据在 `/private/tmp/karuyomi-preference-policy-6S8TYv5T/`。本轮不证明原 MangaDex 图片、其它语言、FoolSlide 源站或 Native/生产设置。
 
 ## Komiic v6 真实 Web 分项
 

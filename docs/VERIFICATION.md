@@ -32,7 +32,7 @@
 
 2026-11-08，固定 `975c650` 的 AsgardScans 1.6.3 原包通过 Android JSON 的 JVM 回归、正式 AOT、静态装配和内置浏览器初始化；真实热门请求失败，正式 HTTP v2 独立重放收到上游 404。详情 JSON-LD、章节和图片未验，快照未部署，见[验收记录](verification/aot-current-pilot.md#asgardscans-的-android-json)。
 
-2026-11-08，Source 文本设置补上原 `EditText` 输入校验，拒绝无效候选后不会执行原 change listener 或默认保存；Java、跨语言与正式 Flutter 组件的[工程验证](verification/source-preferences.md#文本设置绑定与输入校验)通过；FoolSlide Customizable 与 MangaDex 的原包已隔离重建，MangaDex 的正式 Web UUID 校验与会话隔离通过，FoolSlide 的网络政策错误分类已修正，正式设置复验待完成。
+2026-11-08，Source 文本设置补上原 `EditText` 输入校验，拒绝无效候选后不会执行原 change listener 或默认保存；Java、跨语言与正式 Flutter 组件的[工程验证](verification/source-preferences.md#文本设置绑定与输入校验)通过；FoolSlide Customizable 与 MangaDex 的原包已隔离重建，MangaDex 的正式 Web UUID 校验与会话隔离通过。FoolSlide Customizable 修正网络政策错误分类后，真实 Web 在默认 URL 被拒绝时仍可打开设置；已通过默认值全选、无效 URL 拒绝、原回调归一化及新文档恢复。两者的会话文本均未写入 D1；FoolSlide 默认源站、Native 与生产未验。
 
 2026-11-06，typed Source 筛选的 Protobuf、原 Java Filter 子类保留、Flutter 编辑及空查询搜索/分页链路已接入；本次开发 host ABI 升为 v5。修复后的两包代表 AOT 与 CuuTruyen 真实 Web 动态标签、空 query、分页及重置草稿关闭后继续原查询分项通过。显式快照保留和活动取消的运行代次回收边界见[设计](design/source-filters.md)，工程结果、固定构建身份与其余真实 Source/平台待验门统一见[筛选记录](verification/source-filters.md)。历史 v4 生产与在线结果仍绑定原构建，不自动覆盖新 ABI。
 

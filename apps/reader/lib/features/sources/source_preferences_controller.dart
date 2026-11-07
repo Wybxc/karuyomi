@@ -153,6 +153,7 @@ final class SourcePreferencesController extends ChangeNotifier {
   Future<bool> _edit(wire.PreferenceEditRequest request) {
     if (!canEdit) return Future.value(false);
     final baseline = confirmed!;
+    final before = snapshot!;
     return _perform(() async {
       final result = await catalog.editSourcePreference(
         target,
@@ -186,11 +187,22 @@ final class SourcePreferencesController extends ChangeNotifier {
         );
         if (!available) return false;
       }
-      message = result.accepted
-          ? '设置已确认。'
-          : request.hasClick()
-          ? (result.clickHandled ? '操作已处理。' : '漫画源未处理此操作；实际设置已重新读取。')
-          : '漫画源未接受输入；已保留原回调的实际结果。';
+      if (result.accepted) {
+        message = '设置已确认。';
+      } else if (request.hasClick()) {
+        message = result.clickHandled ? '操作已处理。' : '漫画源未处理此操作；实际设置已重新读取。';
+      } else {
+        final changed =
+            !samePreferenceEntries(
+              before.syncValues,
+              result.snapshot.syncValues,
+            ) ||
+            !samePreferenceEntries(
+              before.sessionValues,
+              result.snapshot.sessionValues,
+            );
+        message = changed ? '漫画源已更新设置；请核对实际值。' : '漫画源未接受输入；设置未更改。';
+      }
       return _reopenAndDescribe();
     });
   }
