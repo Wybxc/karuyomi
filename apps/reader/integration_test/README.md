@@ -122,7 +122,7 @@ Native 使用 `pnpm acceptance:build:native`，并按上文证书和设备要求
 1. 准备与当前宿主 ABI 匹配的真实 xkcd 构建、Native 内置材料与正式 Web 构建，入口见仓库构建说明；只使用与当前 ABI 一致的产物，旧 v4/v5 构建不可混入 v6 验收。
 2. 按上文配置 xkcd 的实际网络政策，启动官方 HTTPS harness。Web 与 Native 使用同一实际 origin、测试身份与隔离 D1。原[Source 测试服务](../../api/test/source-metadata-probe.md)只保留历史说明；本地签名身份不证明生产 Access/Cookie 行为。
 3. Native 必须正常信任 HTTPS 证书。建议创建可丢弃模拟器，只向该设备添加本轮测试 CA；不修改产品 TLS、Mac 全局信任或已有设备信任，不接受证书错误。
-4. 从内置浏览器的正式 UI 收藏英文 xkcd。初次运行测试前保留第 1 页进度或尚无进度；测试从服务端书架进入该作品。
+4. 使用上文书签驱动的 `prepare` 阶段，或在能够正常信任同一 HTTPS origin 的内置浏览器中，经正式 UI 安装并收藏英文 xkcd。初次运行前保留第 1 页进度或尚无进度；测试从服务端书架进入该作品。
 
 在 `apps/reader` 使用固定 Flutter SDK 执行：
 
@@ -139,5 +139,24 @@ flutter test integration_test/server_sync_test.dart \
 测试等待真实图片 frame，使用正式上一页/下一页按钮导航，等待服务端已保存，再读取同一业务 API 核对 current/furthest。它输出 `SYNC_RESULT` 与 integration binding reportData，包含作品、章节、清单和已确认锚点，不输出 Cookie 或凭据。返回详情并等待章节入口恢复后，再关闭运行时，确保资源清理 ACK 已完成。
 
 Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核对恢复位置；反向验收时先从 Web 保存非默认位置（例如第 2 页），再使用全新 Native 安装和 `SYNC_START_PAGE=2` / `SYNC_TARGET_PAGE=1` 运行测试，排除默认首页掩盖恢复错误。回看后最远进度仍须不低于起始页和目标页。普通无设备 `flutter test` 不执行本目录；`flutter analyze` 与仓库格式检查仍覆盖它。
+
+### 阅读中的前台 epoch 冲突
+
+同一 HTTPS / D1 上使用两个独立的 Native 安装。用书签驱动 `prepare` 安装并收藏固定 AOT 快照中的英文 xkcd，保留空进度。验收 `SINGLE` 的 `/3319/`（`3319: Elevators`，实际两页）。两个阶段都用同一实际 origin、subject、精确构建 ID 和原 epoch（新 D1 为 0），并使用手机上的自动单页或事先确认的单页；阶段中不改变阅读设置。
+
+| 参数                                                               | A 持续阅读                           | B 正式重置 |
+| ------------------------------------------------------------------ | ------------------------------------ | ---------- |
+| `SYNC_PHASE`                                                       | `resume`                             | `reset`    |
+| `SYNC_START_PAGE` / `SYNC_TARGET_PAGE`                             | `1` / `2`                            | `2` / `1`  |
+| `APP_ORIGIN`、`SYNC_SUBJECT`、`SYNC_BUILD_ID`、`SYNC_EXPECT_EPOCH` | 由本轮实际服务、账户安装及原进度确定 | 与 A 相同  |
+
+按上面的 `flutter test` 命令，在两个设备上使用各自的 `--dart-define-from-file`。Android 如需本地 CA，另传 `SYNC_TEST_CA_BASE64`：仅允许正式校验过的 Android `https://127.0.0.1` origin，传本轮根 CA 文件原始字节的标准 Base64；与全局设置驱动一样，WebView 仅由隔离 debug 包配置信任，Dart 测试进程追加 CA，保留系统根、证书及 hostname 检查。iOS 不传该参数。
+
+1. A 打开真实第 1 页、翻到第 2 页并确认已保存。等待 `SYNC_RESUME_READY`，通过系统 Home 或切换应用送 A 入后台。记录真实 `SYNC_RESUME_PAUSED` 与原 PID；不关闭或重启 A。
+2. A 暂停期间启动 B。B 从服务端恢复第 2 页，等待正常打开章节的保存确认，再点正式「重新阅读本章」。B 必须显示第 1 页真实图像，并确认 epoch 增加 1。B 退出并等待资源释放后，从独立进程 GET 取得权威快照；这时才恢复 A 的同一进程和阅读路由。
+3. A 不手动刷新。等待 `SYNC_RESUME_RESUMED`、`SYNC_RESUME_CONFLICT` 与 UI 的 epoch 重置提示，检查旧第 2 页仍有解码图像，「重新阅读本章」「读完本章」禁用。驱动在原阅读叶实际翻到第 1 页再回第 2 页；`SYNC_RESUME_STALE_VIEW` 后跨 3 秒保存观察窗，正式只读 inspect 结果必须与远端快照完全一致。需要外部独立快照时，在恢复 A 前启动采样器监听该 marker，及时读取，无需在 UI 中加刷新或等待控件。
+4. 驱动随后点正式「重新打开本章」，核对旧资源的清理 ACK、新阅读叶的真实第 1 页及新 epoch，报告 `SYNC_RESUME_REOPENED`。退出后独立读取最终状态。显式打开或重开可以保存导航，reset 后首图也可能保存已观察位置；不要将全程 revision 固定为只增加 1 或要求最远锚始终为空。
+
+各节点独立 GET `/api/settings`、`/api/library` 与 `/api/state/manga/:mangaKey?chapterKey=CHAPTER_KEY`；如需比对无关进度和书签，补同作品的完整分页查询。使用上文正式请求头与 TLS 校验。用驱动的作品、章节、清单及构建身份核对 exact 目标，保留 B 重置后、A 旧叶翻页和显式重开后的 D1 证据。旧叶窗口 revision 和锚点不变说明没有覆盖 D1；仅靠 GET 不断言没有发送任何网络请求。报告、独立快照和实际系统前后台证据放在忽略目录。
 
 只有实际成功的测试才能登记平台门。测试驱动的模拟器 UI、生产 Access、物理触控和真机性能分别记录；结束后停止测试服务、关闭并删除本轮可丢弃设备，保留忽略目录中的必要报告。

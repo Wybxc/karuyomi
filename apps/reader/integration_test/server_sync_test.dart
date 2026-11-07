@@ -1,19 +1,23 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show max;
 
+import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:karuyomi/data/reading_progress.dart';
+import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
+import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/main.dart' as app;
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 import 'package:reader_core/reader_core.dart';
+import 'package:source_runtime/source_runtime.dart' show ChapterPageProvider;
 
 const _origin = String.fromEnvironment('APP_ORIGIN');
 const _chapterLabel = String.fromEnvironment(
@@ -22,7 +26,22 @@ const _chapterLabel = String.fromEnvironment(
 );
 const _startPage = int.fromEnvironment('SYNC_START_PAGE', defaultValue: 1);
 const _targetPage = int.fromEnvironment('SYNC_TARGET_PAGE', defaultValue: 2);
+const _phase = String.fromEnvironment('SYNC_PHASE', defaultValue: 'navigate');
+const _subject = String.fromEnvironment('SYNC_SUBJECT');
+const _buildId = String.fromEnvironment('SYNC_BUILD_ID');
+const _expectedEpoch = int.fromEnvironment(
+  'SYNC_EXPECT_EPOCH',
+  defaultValue: -1,
+);
+const _testCaBase64 = String.fromEnvironment('SYNC_TEST_CA_BASE64');
 const _operationBudget = Duration(seconds: 120);
+const _lifecycleBudget = Duration(minutes: 5);
+const _staleWriteBudget = Duration(seconds: 3);
+const _xkcdPackage = 'eu.kanade.tachiyomi.extension.all.xkcd';
+const _xkcdSourceId = '1538249443376436084';
+const _xkcdMangaUrl = 'SINGLE';
+const _xkcdChapterUrl = '/3319/';
+const _epochChanged = '本章进度已在其他设备重置，当前阅读位置保持不变。请重新打开本章后继续保存。';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +50,11 @@ void main() {
     'Native reads and confirms shared server progress with real Source images',
     (tester) async {
       _validateConfiguration();
+      if (_testCaBase64.isNotEmpty) {
+        SecurityContext.defaultContext.setTrustedCertificatesBytes(
+          base64Decode(_testCaBase64),
+        );
+      }
       app.main();
       await tester.pump();
 
@@ -55,21 +79,16 @@ void main() {
               mangaTile.evaluate().length == 1 &&
               tester.widget<ListTile>(mangaTile).onTap != null;
         });
-        await tester.ensureVisible(mangaTile);
-        await tester.pump();
-        await tester.tap(mangaTile);
-        await _waitFor(
-          tester,
-          '正式 Source 返回漫画详情和指定章节',
-          () =>
-              find.byType(MangaDetailsPage).evaluate().length == 1 &&
-              find.widgetWithText(ListTile, _chapterLabel).evaluate().length ==
-                  1,
+        if (_subject.isNotEmpty) expect(catalog.subject, _subject);
+        // A ListTile's center may hit its nested Continue Reading icon once
+        // the shelf has a saved resume. Tap the actual title to open details.
+        final mangaTitle = find.descendant(
+          of: mangaTile,
+          matching: find.text('xkcd'),
         );
-        final chapterTile = find.widgetWithText(ListTile, _chapterLabel);
-        await tester.ensureVisible(chapterTile);
-        await tester.pump();
-        await tester.tap(chapterTile);
+        await _tap(tester, mangaTitle);
+        final chapterTile = await _chapterTile(tester, catalog);
+        await _tap(tester, chapterTile);
         await _waitFor(
           tester,
           '正式阅读页完成进度恢复',
@@ -79,82 +98,109 @@ void main() {
         final route = tester.widget<ChapterReaderRoute>(
           find.byType(ChapterReaderRoute),
         );
-        final reader = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+        final reader = _reader(tester);
         final manifest = reader.manifest;
         final mangaKey = route.sequence.mangaKey;
         expect(identical(route.catalog, catalog), isTrue);
         expect(route.initialChapter.name, _chapterLabel);
         expect(_startPage, lessThanOrEqualTo(manifest.pages.length));
         expect(_targetPage, lessThanOrEqualTo(manifest.pages.length));
-
-        // Use the reader's ordinary preference so one button press is one page
-        // on phones and wider native windows alike.
-        final doublePage = find.widgetWithText(FilterChip, '双页');
-        expect(doublePage, findsOneWidget);
-        if (tester.widget<FilterChip>(doublePage).selected) {
-          await tester.tap(doublePage);
-          await tester.pump();
+        if (_phase != 'navigate') {
+          expect(route.source.buildId, _buildId);
+          expect(route.initialChapter.snapshot.url, _xkcdChapterUrl);
+          expect(manifest.chapterKey, route.initialChapter.key);
+          expect(manifest.pages, hasLength(2));
         }
-        await _waitForPage(tester, manifest, _startPage);
-
-        var page = _startPage;
-        while (page != _targetPage) {
-          final direction = page < _targetPage ? 1 : -1;
-          final label = direction > 0 ? '下一页' : '上一页';
-          final button = find.byWidgetPredicate(
-            (widget) => widget is IconButton && widget.tooltip == label,
-          );
-          expect(tester.widget<IconButton>(button).onPressed, isNotNull);
-          await tester.tap(button);
-          page += direction;
-          await _waitForPage(tester, manifest, page);
-        }
-
-        await _waitFor(tester, '当前页和最远进度获得服务端确认', () {
-          final furthest = _displayedFurthestPage(tester);
-          return find.text('阅读进度已保存到服务端').evaluate().length == 1 &&
-              furthest != null &&
-              furthest >= max(_startPage, _targetPage);
-        });
         final repository = catalog.readingProgress;
         expect(repository, isNotNull);
-        final verification = Stopwatch()..start();
-        ChapterProgress? progress;
-        while (true) {
-          final remaining = _operationBudget - verification.elapsed;
-          if (remaining <= Duration.zero) {
-            fail('正式 Worker 读回未在预算内确认目标页及最远进度');
-          }
-          progress = await repository!
-              .loadChapter(mangaKey: mangaKey, chapterKey: manifest.chapterKey)
-              .timeout(remaining);
-          if (progress != null &&
-              progress.current.pageIndexHint == _targetPage - 1 &&
-              (progress.furthest?.pageIndexHint ?? -1) >=
-                  max(_startPage, _targetPage) - 1 &&
-              find.text('阅读进度已保存到服务端').evaluate().length == 1) {
-            break;
-          }
-          // A decoded frame can precede its post-frame viewport notification.
-          // In reverse navigation the old saved/furthest labels alone are not
-          // proof that the new current page has reached the Worker.
-          await tester.pump(const Duration(milliseconds: 100));
-        }
-        expect(progress, isNotNull);
-        _expectConfirmedProgress(progress, manifest);
+        if (_subject.isNotEmpty) expect(repository!.identity.subject, _subject);
 
+        await _singlePage(tester);
+        await _waitForPage(tester, manifest, _startPage);
+        late final ProgressSnapshot after;
+        Map<String, Object?>? epochEvidence;
+        if (_phase == 'reset') {
+          final before = await _confirmedProgress(
+            tester,
+            repository!,
+            mangaKey,
+            manifest,
+            page: _startPage,
+            epoch: _expectedEpoch,
+            minimumFurthest: _startPage,
+          );
+          final reset = find.widgetWithText(TextButton, '重新阅读本章');
+          expect(tester.widget<TextButton>(reset).onPressed, isNotNull);
+          await _tap(tester, reset);
+          await _waitForPage(tester, manifest, _targetPage);
+          after = await _confirmedProgress(
+            tester,
+            repository,
+            mangaKey,
+            manifest,
+            page: _targetPage,
+            epoch: before.epoch + 1,
+          );
+          _expectResetState(after);
+          epochEvidence = {'beforeReset': _progressReport(before)};
+        } else {
+          await _turnTo(tester, manifest, _startPage, _targetPage);
+          final before = await _confirmedProgress(
+            tester,
+            repository!,
+            mangaKey,
+            manifest,
+            page: _targetPage,
+            epoch: _expectedEpoch < 0 ? null : _expectedEpoch,
+            minimumFurthest: max(_startPage, _targetPage),
+          );
+          if (_phase == 'resume') {
+            final evidence = await _resume(
+              tester,
+              repository,
+              mangaKey,
+              manifest,
+              before,
+            );
+            after = evidence.reopened;
+            epochEvidence = {
+              'lifecycle': {
+                'pid': pid,
+                'transitions': ['paused', 'resumed'],
+              },
+              'beforePause': _progressReport(before),
+              'observedRemote': _progressReport(evidence.remote),
+              'afterStalePaging': _progressReport(evidence.stale),
+            };
+          } else {
+            after = before;
+          }
+        }
+        final progress = after.progress!;
+        final activeReader = _reader(tester);
+        final finalPage = _phase == 'resume' ? _startPage : _targetPage;
         result = <String, Object?>{
+          'phase': _phase,
           'platform': Platform.operatingSystem,
           'origin': platform.origin.origin,
+          'subject': catalog.subject,
+          'androidLoopbackTestCa': _testCaBase64.isNotEmpty,
+          'buildId': route.source.buildId,
+          'sourceId': route.source.sourceId,
           'mangaKey': mangaKey,
-          'chapterKey': manifest.chapterKey,
-          'pageKey': manifest.pages[_targetPage - 1].key,
-          'manifestVersion': manifest.version,
+          'chapterKey': activeReader.manifest.chapterKey,
+          'pageKey': activeReader.manifest.pages[finalPage - 1].key,
+          'manifestVersion': activeReader.manifest.version,
           'epoch': progress.epoch,
+          'mangaRevision': after.revision,
           'startPage': _startPage,
           'targetPage': _targetPage,
+          'finalPage': finalPage,
           'current': _anchor(progress.current),
-          'furthest': _anchor(progress.furthest!),
+          'furthest': progress.furthest == null
+              ? null
+              : _anchor(progress.furthest!),
+          ...?epochEvidence,
         };
 
         // The details page enables its chapters only after the actual route
@@ -169,8 +215,9 @@ void main() {
               tester.widget<ListTile>(chapterTile).enabled,
         );
         // close() reuses the provider's real ACK future, including failures.
-        await route.initialOpened.provider.close().timeout(_operationBudget);
+        await _closeProvider(activeReader);
         expect(catalog.hasUnsavedReadingProgress, isFalse);
+        expect(tester.takeException(), isNull);
       } finally {
         try {
           await tester.pumpWidget(const SizedBox.shrink());
@@ -203,8 +250,21 @@ void _validateConfiguration() {
   if (!Platform.isAndroid && !Platform.isIOS) {
     fail('此正式 Native 同步验收仅适用于 Android 或 iOS 设备/模拟器');
   }
+  if (_testCaBase64.isNotEmpty &&
+      (!Platform.isAndroid || origin.host != '127.0.0.1')) {
+    fail('SYNC_TEST_CA_BASE64 仅适用于 Android 的 HTTPS 127.0.0.1 验收');
+  }
   if (_chapterLabel.isEmpty || _startPage < 1 || _targetPage < 1) {
     fail('SYNC_CHAPTER_LABEL 不能为空，SYNC_START_PAGE / SYNC_TARGET_PAGE 须大于零');
+  }
+  if (!{'navigate', 'reset', 'resume'}.contains(_phase) ||
+      _expectedEpoch < -1 ||
+      _expectedEpoch >= 0xffffffff ||
+      (_phase != 'navigate' &&
+          (_subject.isEmpty || _buildId.isEmpty || _expectedEpoch < 0)) ||
+      (_phase == 'resume' && (_startPage != 1 || _targetPage != 2)) ||
+      (_phase == 'reset' && (_startPage != 2 || _targetPage != 1))) {
+    fail('前台和重置阶段须提供同一 subject、构建 ID、原 epoch，以及 resume 1→2 / reset 2→1');
   }
 }
 
@@ -254,25 +314,301 @@ int? _displayedFurthestPage(WidgetTester tester) {
   return null;
 }
 
-void _expectConfirmedProgress(
-  ChapterProgress progress,
+ReaderScreen _reader(WidgetTester tester) =>
+    tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+
+Future<void> _closeProvider(ReaderScreen reader) async {
+  final provider = reader.provider;
+  if (provider is! ChapterPageProvider) fail('阅读须使用正式 Source 页面提供者');
+  await provider.close().timeout(_operationBudget);
+}
+
+Future<void> _tap(WidgetTester tester, Finder target) async {
+  await _waitFor(tester, '正式控件存在：$target', () {
+    return target.evaluate().length == 1;
+  });
+  await tester.ensureVisible(target);
+  await _waitFor(tester, '正式控件可命中：$target', () {
+    return target.hitTestable().evaluate().length == 1;
+  });
+  await tester.tap(target);
+  await tester.pump();
+}
+
+Future<Finder> _chapterTile(
+  WidgetTester tester,
+  CatalogController catalog,
+) async {
+  final page = find.byType(MangaDetailsPage);
+  await _waitFor(tester, '正式 Source 返回详情和章节', () {
+    return page.evaluate().length == 1;
+  });
+  if (_phase == 'navigate') return find.widgetWithText(ListTile, _chapterLabel);
+  final details = tester.widget<MangaDetailsPage>(page);
+  expect(details.controller, same(catalog));
+  expect(catalog.activeBuild!.packageName, _xkcdPackage);
+  expect(details.source.sourceId, _xkcdSourceId);
+  expect(details.manga.url, _xkcdMangaUrl);
+  final sequence = ChapterSequence(
+    packageName: _xkcdPackage,
+    sourceId: _xkcdSourceId,
+    mangaUrl: _xkcdMangaUrl,
+    chapters: details.chapters.map((chapter) => chapter.snapshot),
+  );
+  final chapter = sequence.entries.singleWhere(
+    (chapter) => chapter.snapshot.url == _xkcdChapterUrl,
+  );
+  expect(chapter.stable, isTrue);
+  expect(chapter.name, _chapterLabel);
+  final tile = find.byKey(ValueKey(chapter.key));
+  if (tile.evaluate().isEmpty) {
+    final search = find.byKey(const ValueKey('chapter-search'));
+    await tester.ensureVisible(search);
+    await tester.enterText(search, _chapterLabel);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+  }
+  await _waitFor(tester, '精确章节可打开', () {
+    return tile.evaluate().length == 1 && tester.widget<ListTile>(tile).enabled;
+  });
+  return tile;
+}
+
+Future<void> _singlePage(WidgetTester tester) async {
+  final layout = find.byKey(const ValueKey('reader-page-layout'));
+  await _waitFor(tester, '正式分页控件', () => layout.evaluate().length == 1);
+  final selected = tester.widget<SegmentedButton<bool?>>(layout).selected;
+  final width = tester.getSize(find.byType(ReaderScreen)).width;
+  if (selected.contains(false) || (selected.contains(null) && width < 900)) {
+    return;
+  }
+  if (_phase != 'navigate') fail('前台和重置阶段须预先使用手机自动单页或已确认单页');
+  await _waitFor(tester, '正式单页控件可操作', () {
+    return tester.widget<SegmentedButton<bool?>>(layout).onSelectionChanged !=
+        null;
+  });
+  await _tap(tester, find.descendant(of: layout, matching: find.text('单页')));
+  await _waitFor(tester, '正式单页控件已应用', () {
+    return tester
+        .widget<SegmentedButton<bool?>>(layout)
+        .selected
+        .contains(false);
+  });
+}
+
+Future<void> _turnTo(
+  WidgetTester tester,
   ChapterManifest manifest,
+  int from,
+  int to,
+) async {
+  var page = from;
+  while (page != to) {
+    final direction = page < to ? 1 : -1;
+    final label = direction > 0 ? '下一页' : '上一页';
+    final button = find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == label,
+    );
+    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+    await _tap(tester, button);
+    page += direction;
+    await _waitForPage(tester, manifest, page);
+  }
+}
+
+Future<ProgressSnapshot> _confirmedProgress(
+  WidgetTester tester,
+  ProgressRepository repository,
+  String mangaKey,
+  ChapterManifest manifest, {
+  required int page,
+  int? epoch,
+  int? minimumFurthest,
+}) async {
+  final elapsed = Stopwatch()..start();
+  const saved = '阅读进度已保存到服务端';
+  while (elapsed.elapsed < _operationBudget) {
+    if (find.text(saved).evaluate().length == 1 &&
+        (minimumFurthest == null ||
+            (_displayedFurthestPage(tester) ?? 0) >= minimumFurthest)) {
+      // Inspection does not advance the mounted reader's write CAS baseline.
+      final state = await repository
+          .inspectChapter(mangaKey: mangaKey, chapterKey: manifest.chapterKey)
+          .timeout(_operationBudget - elapsed.elapsed);
+      final progress = state.progress;
+      if (progress != null &&
+          progress.current.pageIndexHint == page - 1 &&
+          (epoch == null || state.epoch == epoch) &&
+          (minimumFurthest == null ||
+              (progress.furthest?.pageIndexHint ?? -1) >=
+                  minimumFurthest - 1) &&
+          find.text(saved).evaluate().length == 1) {
+        _expectProgress(state, manifest, page);
+        return state;
+      }
+    }
+    // A decoded frame can precede the post-frame viewport notification.
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  fail('正式 Worker 读回未在预算内确认第 $page 页及预期 epoch');
+}
+
+Future<
+  ({ProgressSnapshot reopened, ProgressSnapshot remote, ProgressSnapshot stale})
+>
+_resume(
+  WidgetTester tester,
+  ProgressRepository repository,
+  String mangaKey,
+  ChapterManifest manifest,
+  ProgressSnapshot before,
+) async {
+  final oldLeaf = _reader(tester);
+  final oldPositionRequest = oldLeaf.positionRequest?.value;
+  final oldElement = tester.element(find.byType(ReaderScreen));
+  expect(tester.binding.lifecycleState, AppLifecycleState.resumed);
+  var paused = false;
+  final resumed = Completer<void>();
+  final listener = AppLifecycleListener(
+    onPause: () {
+      if (paused) return;
+      paused = true;
+      debugPrintSynchronously('SYNC_RESUME_PAUSED pid=$pid');
+    },
+    onResume: () {
+      if (!paused || resumed.isCompleted) return;
+      debugPrintSynchronously('SYNC_RESUME_RESUMED pid=$pid');
+      resumed.complete();
+    },
+  );
+  try {
+    debugPrintSynchronously('SYNC_RESUME_READY pid=$pid');
+    // No test reads, gestures or frame pumping while the OS is paused.
+    await resumed.future.timeout(
+      _lifecycleBudget,
+      onTimeout: () => fail('未在预算内观察到系统暂停后恢复'),
+    );
+  } finally {
+    listener.dispose();
+  }
+
+  final warning = find.text(_epochChanged);
+  final reopen = find.widgetWithText(TextButton, '重新打开本章');
+  await _waitFor(tester, '正式前台重取报告远端 epoch 重置', () {
+    return warning.evaluate().length == 1 &&
+        reopen.evaluate().length == 1 &&
+        tester.widget<TextButton>(reopen).onPressed != null;
+  });
+  await _waitForPage(tester, manifest, _targetPage);
+  expect(tester.element(find.byType(ReaderScreen)), same(oldElement));
+  expect(_reader(tester).provider, same(oldLeaf.provider));
+  expect(_reader(tester).positionRequest?.value, oldPositionRequest);
+  for (final label in ['重新阅读本章', '读完本章']) {
+    final control = find.widgetWithText(TextButton, label);
+    expect(control, findsOneWidget);
+    expect(tester.widget<TextButton>(control).onPressed, isNull);
+  }
+  final remote = await repository
+      .inspectChapter(mangaKey: mangaKey, chapterKey: manifest.chapterKey)
+      .timeout(_operationBudget);
+  expect(remote.epoch, before.epoch + 1);
+  expect(remote.revision, greaterThan(before.revision));
+  _expectProgress(remote, manifest, _startPage);
+  _expectResetState(remote);
+  debugPrintSynchronously('SYNC_RESUME_CONFLICT pid=$pid');
+
+  await _turnTo(tester, manifest, _targetPage, _startPage);
+  expect(warning, findsOneWidget);
+  await _turnTo(tester, manifest, _startPage, _targetPage);
+  debugPrintSynchronously('SYNC_RESUME_STALE_VIEW pid=$pid');
+  // Observe beyond the product's two-second maximum scheduled save window.
+  final elapsed = Stopwatch()..start();
+  while (elapsed.elapsed < _staleWriteBudget) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(warning, findsOneWidget);
+  expect(tester.element(find.byType(ReaderScreen)), same(oldElement));
+  final stale = await repository
+      .inspectChapter(mangaKey: mangaKey, chapterKey: manifest.chapterKey)
+      .timeout(_operationBudget);
+  expect(_progressReport(stale), _progressReport(remote));
+  debugPrintSynchronously('SYNC_RESUME_STALE_VERIFIED pid=$pid');
+
+  await _tap(tester, reopen);
+  await _waitFor(tester, '显式重开替换原阅读叶并清除冲突', () {
+    final leaves = find.byType(ReaderScreen);
+    return leaves.evaluate().length == 1 &&
+        !identical(_reader(tester).provider, oldLeaf.provider) &&
+        warning.evaluate().isEmpty;
+  });
+  final replacement = _reader(tester);
+  expect(tester.element(find.byType(ReaderScreen)), isNot(same(oldElement)));
+  expect(
+    _anchor(replacement.initialPosition!),
+    _anchor(remote.progress!.current),
+  );
+  expect(replacement.manifest.chapterKey, manifest.chapterKey);
+  expect(replacement.manifest.version, manifest.version);
+  await _closeProvider(oldLeaf);
+  await _waitForPage(tester, replacement.manifest, _startPage);
+  final reopened = await _confirmedProgress(
+    tester,
+    repository,
+    mangaKey,
+    replacement.manifest,
+    page: _startPage,
+    epoch: remote.epoch,
+    minimumFurthest: _startPage,
+  );
+  _expectResetState(reopened);
+  debugPrintSynchronously('SYNC_RESUME_REOPENED pid=$pid');
+  return (reopened: reopened, remote: remote, stale: stale);
+}
+
+void _expectResetState(ProgressSnapshot state) {
+  expect(state.completed, isFalse);
+  final furthest = state.progress!.furthest;
+  if (furthest != null) expect(furthest.pageIndexHint, 0);
+}
+
+void _expectProgress(
+  ProgressSnapshot state,
+  ChapterManifest manifest,
+  int page,
 ) {
+  final progress = state.progress!;
+  expect(progress.epoch, state.epoch);
+  expect(progress.completed, state.completed);
   expect(progress.current.chapterKey, manifest.chapterKey);
   expect(progress.current.manifestVersion, manifest.version);
-  expect(progress.current.pageIndexHint, _targetPage - 1);
-  expect(progress.current.pageKey, manifest.pages[_targetPage - 1].key);
-  expect(progress.furthest, isNotNull);
-  final furthest = progress.furthest!;
-  expect(furthest.chapterKey, manifest.chapterKey);
-  expect(furthest.manifestVersion, manifest.version);
-  expect(
-    furthest.pageIndexHint,
-    greaterThanOrEqualTo(max(_startPage, _targetPage) - 1),
-  );
-  expect(furthest.pageIndexHint, lessThan(manifest.pages.length));
-  expect(furthest.pageKey, manifest.pages[furthest.pageIndexHint].key);
+  expect(progress.current.pageIndexHint, page - 1);
+  expect(progress.current.pageKey, manifest.pages[page - 1].key);
+  if (progress.furthest case final furthest?) {
+    expect(furthest.chapterKey, manifest.chapterKey);
+    expect(furthest.manifestVersion, manifest.version);
+    expect(
+      furthest.pageIndexHint,
+      inInclusiveRange(0, manifest.pages.length - 1),
+    );
+    expect(furthest.pageKey, manifest.pages[furthest.pageIndexHint].key);
+  }
 }
+
+Map<String, Object?> _progressReport(ProgressSnapshot state) => {
+  'mangaRevision': state.revision,
+  'epoch': state.epoch,
+  'completed': state.completed,
+  'current': state.progress == null ? null : _anchor(state.progress!.current),
+  'furthest': state.progress?.furthest == null
+      ? null
+      : _anchor(state.progress!.furthest!),
+  'resume': state.resume == null
+      ? null
+      : {
+          'chapterKey': state.resume!.chapterKey,
+          'reversedOrder': state.resume!.reversedOrder,
+        },
+};
 
 Map<String, Object?> _anchor(ReadingPosition value) => {
   'chapterKey': value.chapterKey,

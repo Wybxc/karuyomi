@@ -1,8 +1,10 @@
 # 实施验证记录
 
+2026-11-07，两台 iOS 模拟器经同一受信 HTTPS / D1，通过[阅读前台 epoch 冲突](verification/concurrent-server-state.md#双-ios-模拟器前台-epoch-冲突)：B 正式重新阅读后，A 回到原进程和第 2 页，自动提示冲突；旧叶继续翻页未覆盖 D1，明确重开后恢复新 epoch 的第 1 页真实图。独立六路响应比对通过；Web、Android、混合平台、同时写竞争、生产 Access 和真机另验。
+
 2026-11-07，正式 Web 的 xkcd 范围已读/未读通过三独立文档往返；首次发现同一详情收藏后误用旧作品 revision，显式重读可恢复，修复后的独立空库首次确认 3/3 通过。独立 D1 核对负对照、书签、设置及阅读锚点未变，见[章节状态记录](verification/chapter-read-state.md)。Native、真实并发和生产另验。
 
-2026-11-07，两台 iOS 模拟器经同一 HTTPS/D1 实测全局设置自动前台重取：A 真实进入后台，B 保存，A 同一进程回到前台并自动更新原表单与主题。见[前台设置记录](verification/reader-settings.md#2026-11-07ios-模拟器回到前台自动读回全局设置)；随后 [Android 模拟器从 iOS 保存读回](verification/reader-settings.md#2026-11-07android-模拟器回到前台读回-ios-保存)也通过真实系统前后台、原进程和原任务校验。Web、阅读进度和生产仍分别验收。
+2026-11-07，两台 iOS 模拟器经同一 HTTPS/D1 实测全局设置自动前台重取：A 真实进入后台，B 保存，A 同一进程回到前台并自动更新原表单与主题。见[前台设置记录](verification/reader-settings.md#2026-11-07ios-模拟器回到前台自动读回全局设置)；随后 [Android 模拟器从 iOS 保存读回](verification/reader-settings.md#2026-11-07android-模拟器回到前台读回-ios-保存)也通过真实系统前后台、原进程和原任务校验。全局设置的 Web 前台与生产另验；阅读进度按上文分项记录。
 
 2026-11-07，正式 Web 全局设置已通过[真实 HTTP 丢确认与精确重试](verification/reader-settings.md#2026-11-07web-全局设置的真实确认丢失与原样重试)：首次 D1 已保存但响应正文中断，独立文档能读到确认值，原会话显式重试复用 UUID/CAS/原始正文，D1 只提交一次。其它写入、设备实际断网、Native 与生产 Access 分开验收。
 

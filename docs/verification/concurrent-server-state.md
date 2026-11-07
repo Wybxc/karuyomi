@@ -1,6 +1,8 @@
-# 双 Web 会话的阅读状态一致性验证
+# 阅读状态一致性验证
 
-> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+本文分别记录历史双 Web 的手动刷新与写冲突，以及[双 iOS 模拟器的真实前台 epoch 冲突](#双-ios-模拟器前台-epoch-冲突)。两项都使用正式阅读入口和真实隔离 workerd / D1。
+
+> 双 Web 入口状态（2026-11-05）：保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。历史双 Web 结果不算作当前 Source 在线、生产 Access 或 Native 完整门通过。
 
 2026-11-05：两个真实 Flutter Web 阅读文档保持打开，在本地真实 workerd/D1 和同一受验签测试身份下，已通过远端位置/epoch 更新时保持旧画面、停止旧视图写入、明确重开采用权威位置，以及未先刷新时正常写路径进入 revision 冲突的分项。业务操作按下表顺序执行，未测试两个写请求同时到达；本记录不代表完整并发、恢复或 P2 验收。
 
@@ -47,4 +49,53 @@ cmp .local/sync-conflicts/a-reopened-reset.json \
 
 两页已关闭，测试服务收到中断后退出；独立进程复核未见该测试代理或 workerd，`8897` 无监听。Miniflare 退出后遗留的本轮临时 D1 与静态快照目录已精确删除，必要 API 状态与网络证据保留在上述忽略目录。
 
-本次记录尚未验收：实际前台自动刷新事件、断网/重连、响应丢失、同时到达的写竞争、Native 生命周期、生产 Access 和真机。分类、书签与同步设置继续按[P2](../plan/p2-sync.md)推进，少量 xkcd 分项不提升其它扩展的运行兼容标记。
+上述历史双 Web 分项尚未验收：实际前台自动刷新事件、断网/重连、响应丢失、同时到达的写竞争、Native 生命周期、生产 Access 和真机。分类、书签与同步设置继续按[P2](../plan/p2-sync.md)推进，少量 xkcd 分项不提升其它扩展的运行兼容标记。
+
+## 双 iOS 模拟器前台 epoch 冲突
+
+2026-11-07，两个独立 iPhone 17 Pro / iOS 26.4 模拟器在同一官方 Wrangler HTTPS harness 和全新隔离 workerd / D1 下通过测试。固定产品提交为 `d2a21aadc2eeb450f717389eac3760e96ed808e1`；阅读驱动 SHA-256 为 `ae88f7f6f45298cbdd3fc52f4ec718b5a9349f60c21d3ea8a6e79686af2f78f4`。正式 `app.main()` 使用本机 WebView、包内 runtime materials、真实 xkcd 图片和受验签测试身份 `acceptance-owner`。两端都以系统信任校验同一 `https://127.0.0.1:58084`，仅登记 `xkcd.com` 和 `imgs.xkcd.com`。使用[三包静态候选](aot-current-pilot.md#绑定摘要后的正式三包和同站-web-更新)中的英文 xkcd（Source ID `1538249443376436084`，canonical 摘要 `969bd86a14e9850b3c4bffe9c827ff7ce52a2eb5e3e4e3437ca70587ddbc6926`），作品 `SINGLE`、章节 `/3319/`（3319: Elevators）。未替换 Source、图片或业务读写。
+
+| 阶段                   | 实际 UI 与独立服务端读回                                                                                                                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A 准备并开始阅读       | 正式安装并收藏后，account / global / manga revision 为 `2 / 1 / 1`，无书签与进度。A 打开真实第 1 页并翻至第 2 页，确认保存；通过系统打开设置进入 `PAUSED`。最后一次正常视口保存后，独立 GET 为 `4 / 1 / 3`、epoch 0，current / furthest 均在第 2 页。                 |
+| B 正式重新阅读         | A 保持后台。B 从书架标题进入详情，续读真实第 2 页后点击“重新阅读本章”，回到真实第 1 页，收到 epoch 1 的确认。退出阅读并等待清理确认后，独立 GET 为 `7 / 1 / 6`、epoch 1，第 1 页，furthest 缺省。                                                                     |
+| A 回前台并继续看旧画面 | 通过系统回到同一 PID `74827` 和原阅读叶，无手动刷新。A 自动提示另一端重置，保留第 2 页真实图与原 provider，禁用“重新阅读本章”和“读完本章”。旧叶实际翻 `2 → 1 → 2`；重开前独立取得的六路响应与 B 退出后完全相同，驱动跨 3 秒保存观察窗再次只读检查也确认权威进度未变。 |
+| A 明确重开并退出       | 点击“重新打开本章”，旧资源取得清理确认，新阅读叶首次在 epoch 1 显示第 1 页真实图；退出后独立 GET 为 `9 / 1 / 8`，current / furthest 均在第 1 页。                                                                                                                     |
+
+六路 GET 为 `/api/settings`、`/api/library`、作品状态、作品书签、作品章节进度列表和带精确 `chapterKey` 的章节状态。对照完整响应与作品/章节身份，忽略采样时间和阶段标签。B 重置后的快照与 A 旧叶翻页后的快照相同，证明旧叶没有覆盖 D1；该证据未记录全部 POST。正常打开、关闭或视口观察可保存导航，因此 revision 不等于重置次数。
+
+首轮使用另一隔离 D1。测试驱动点击书架整行的中心，误命中内嵌的续读图标，B 直接打开真实第 2 页；驱动等不到详情，120 秒后失败。该轮未执行重置，独立 GET 仍是 epoch 0，A 也未恢复前台。只把驱动改为点书架标题，两台专用模拟器卸载该测试应用并使用全新 D1，重走三阶段均 1/1 通过。首轮失败日志与截图保留。
+
+### 复验与证据
+
+按[驱动说明](../../apps/reader/integration_test/README.md#阅读中的前台-epoch-冲突)准备匹配 ABI 的静态候选、Native 内置 runtime、已正常信任本轮 CA 的两台独立 iOS 模拟器。在仓库根目录，以固定工具链运行：
+
+```sh
+EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm --filter @karuyomi/api build
+pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts --mode native-acceptance
+NODE_EXTRA_CA_CERTS=/absolute/path/rootCA.pem \
+WRANGLER_HTTPS_KEY_PATH=/absolute/path/key.pem \
+WRANGLER_HTTPS_CERT_PATH=/absolute/path/cert.pem \
+ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.all.xkcd","allowedHosts":["xkcd.com","imgs.xkcd.com"]}]' \
+  pnpm acceptance:serve
+```
+
+在 `apps/reader` 先对 A 运行 `bookmarks_sync_test.dart` 的 `prepare`，再分别对 A、B 运行 `server_sync_test.dart` 的 `resume` 和 `reset`：
+
+```sh
+flutter test integration_test/bookmarks_sync_test.dart --no-pub \
+  -d "$device_a" --dart-define-from-file="$prepare_defines" --reporter expanded
+flutter test integration_test/server_sync_test.dart --no-pub \
+  -d "$device_a" --dart-define-from-file="$resume_defines" --reporter expanded
+flutter test integration_test/server_sync_test.dart --no-pub \
+  -d "$device_b" --dart-define-from-file="$reset_defines" --reporter expanded
+```
+
+A 的 `resume` 保持运行；在另一终端等 `SYNC_RESUME_READY` 后运行 `xcrun simctl launch "$device_a" com.apple.Preferences`，观察 `SYNC_RESUME_PAUSED` 再执行 B。B 测试结束并独立采样后，运行 `xcrun simctl launch "$device_a" dev.karuyomi.karuyomi`，核对同一 PID。复验时提前监听 `SYNC_RESUME_STALE_VIEW` 采集显式重开前的独立快照。只读请求使用正常 TLS 和 `Origin`、`X-App-Request: 1`、`X-App-Subject: acceptance-owner`。比对归档可运行：
+
+```sh
+diff -u <(jq -S '{identity, responses}' api-b-reset.json) \
+  <(jq -S '{identity, responses}' api-a-stale.json)
+```
+
+原始阶段配置、输入摘要、两轮日志、`api-*.json` 和旧叶取样时序保留在 `/private/tmp/karuyomi-native-epoch-d2a21aa-KgLChg/`；成功轮使用上述修正后的驱动摘要，`first-attempt/` 保存首轮失败。两轮 harness 已退出，测试端口无监听，两台本轮专用模拟器已关闭和删除。此分项仅覆盖双 iOS 模拟器、顺序写入和真实系统前后台；Web 或 Android 阅读自动前台、混合平台、同时写竞争、断网、生产 Access 和真机仍分别验收。
