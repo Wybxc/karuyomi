@@ -1,8 +1,8 @@
 # 实施验证记录
 
-2026-11-07，Source 重开故障已细分为章节 invoke 的 30 秒超时：实际第二文档的 Cache get Promise 已返回，之后未见 Cache 正文/HTTP 阶段，Java 后续位置仍待定位。默认关闭的分阶段诊断、独立 D1 前后核对及官方 Browser 冷 Worker 缓存机制门见[重开记录](verification/source-reopen.md)；书签独立客户端门仍未通过。
+2026-11-07，固定 `5ba6fff` 的日期修复通过 JDK/真实生成 JavaScript 回归，以及无插桩原 xkcd 正式 Web 的两次新文档重开和书签往返。独立四阶段 D1 核对：重开只读，移除仅改变目标书签与相应 revision。历史超时、修复后立即失败及最终通过分别保留在[重开记录](verification/source-reopen.md)。本地候选未部署；Native、混合平台、生产和真机门继续验收。
 
-2026-11-07，修复书架无差异打开仍更新资料、推进共享 CAS 的问题，14 项定向回归及完整 Flutter 检查通过，见[阅读入口](verification/reading-entry.md)。书签实际 Web 添加/筛选与独立 D1 核对通过分项；新文档 Source 重开/调用失败，双客户端往返未通过。正式 Native 书签驱动仅严格分析通过，HTTPS 浏览器信任、实际平台与生产门分别保留，见[书签记录](verification/bookmarks.md)。
+2026-11-07，修复书架无差异打开仍更新资料、推进共享 CAS 的问题，14 项定向回归及完整 Flutter 检查通过，见[阅读入口](verification/reading-entry.md)。正式 Native 书签驱动严格分析通过，实际运行及内置浏览器对本地 HTTPS 的信任门见[书签记录](verification/bookmarks.md)。
 
 2026-11-07，全局设置的真实双 Web 与双 iOS 模拟器顺序往返、新文档/进程恢复分项通过；双 Web 旧 CAS 拒绝与明确重读通过。修复了 Dart 显式 false/0 与标准 ProtoJSON 省略默认值导致的确认误判，完整 Flutter 检查、格式与构建通过。实际范围、修前失败与其余平台/漫画覆盖/故障门见[设置记录](verification/reader-settings.md)，不计为完整 P1/P2 或生产验收。
 
@@ -40,7 +40,7 @@
 
 2026-11-06，正式 `app.main()`、Native runtime、正常受信 HTTPS 与同一隔离 workerd/D1 下，双 iOS 以及 iOS↔Android 分类顺序五阶段已通过：创建关联、另一端改名/关联、新进程读回、删除保留收藏及新进程未分类读回，见[分类多端记录](verification/category-ui-sync.md)。Android 最后阶段曾因 DDS/容器初始化失败，保留失败后仅冷启动 AVD，原只读阶段才通过；初始化可靠性根因仍待修复。内置浏览器未信任此本地 CA，未绕过警告，因此 Web↔Native 分类、生产 Access、真机、并发故障与完整 P1/P2 均保持未验收。
 
-2026-11-06，章节书签的 Protobuf 合同、D1 原子 mutation / 有界查询、共享 Dart 数据层以及正式详情与阅读入口已接入，工程与组件范围见[书签记录](verification/bookmarks.md)。独立客户端、生产和设备书签门仍待验收；按功能完整性优先继续设置，不能把组件 supplier 或构建通过当成实际跨端完成。
+2026-11-06，章节书签的 Protobuf 合同、D1 原子 mutation / 有界查询、共享 Dart 数据层以及正式详情与阅读入口已接入，工程与组件范围见[书签记录](verification/bookmarks.md)。该轮只验收工程与组件；后续实际 Web 独立文档闭环见页首，Native 与生产另验。
 
 2026-11-03，本地 macOS。Flutter 3.47.5 / Dart 3.13.4、pnpm 12.6.0；仓库固定 Node 24.15.0，本轮也使用 Node 26.5.0 执行检查。TeaVM 固定 0.16.0 JS backend，验证 JDK 为 Oracle GraalVM 25.0.4、Maven 3.9.11。下表区分代码/分项测试、独立机制探针与尚未完成的产品验收，不以测试总数作为能力证明。
 

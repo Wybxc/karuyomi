@@ -72,9 +72,13 @@ A 随后关闭，B 是同 origin 的全新 Web 文档。B 从正式书架打开�
 
 输入、构建开关、原始证据、纯缓存桥机制测试与尚未确定的根因见[Source 重开诊断](source-reopen.md)。没有把缓存 Promise 返回当作缓存命中或 Java callback 已恢复，也没有调整超时掩盖问题。
 
+## 2026-11-07：修复后 Web 独立文档闭环
+
+固定 `5ba6fff` 的无插桩 xkcd 在正式 Flutter Web / 官方 harness 通过 A 添加 `/3319/` → 新文档 B 从书架重开、读回、筛选并移除 → 新文档 C 重开确认已移除。独立 D1 核对确认两次重开为只读，移除只更新该书签和 account/manga revision。输入、四阶段证据和实际范围见[修复后记录](source-reopen.md#固定-5ba6fff真实-web-重开与书签往返通过)。
+
 ## 尚待验收
 
-- 两个独立客户端的标记→第二端读回→第二端移除→第一端重新读取，以及重启、自动前台刷新和真实丢响应恢复。
+- Native 独立客户端往返、浏览器/应用进程重启、自动前台刷新和真实丢响应恢复。
 - Web/iOS/Android 的实际平台组合、Source 在线阅读期间的书签，以及生产 Access、真机与触控。
 
 实现与边界见[章节书签设计](../design/bookmarks.md)，当前交付顺序见 [P2](../plan/p2-sync.md)。

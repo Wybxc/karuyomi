@@ -1,6 +1,6 @@
 # 独立 Web 文档 Source 重开诊断
 
-2026-11-07，以主线 `bdc54de` 为基线增加默认关闭的运行时诊断，在正式 Flutter Web 与官方 Vite / Wrangler harness 复现新文档重开失败。当前只确认阻塞阶段，尚未找到根因或通过修复复验；不调整超时，不把缓存桥机制测试当作 TeaVM Source 运行证据。
+2026-11-07，以主线 `bdc54de` 为基线增加默认关闭的运行时诊断，在正式 Flutter Web 与官方 Vite / Wrangler harness 复现新文档重开失败。下文依次保留原始超时、隔离定位、及时失败和修复后的正式复验；默认超时未调整。
 
 ## 输入与可复验入口
 
@@ -115,3 +115,17 @@ B generation 为 `1b8e66fd-d912-4b2d-91b6-f4c9ea05c798`，超时截图为 `/priv
 `node tools/teavm/check-date-format.ts` 通过锁定的 Maven / TeaVM 插件和产品 `TeaTransformer` 生成 JavaScript，同时运行同一 Java fixture 的 JDK oracle；正式入口 `pnpm teavm:check` 包含该回归。未改 parser 的真实生成代码解析周五日期时退出 1，JDK 对照通过；应用补丁后 JDK 和 Node 执行的生成代码均通过 80 项断言，覆盖七个星期的有效日期、准确 UTC 时间、完整消费、非法日期与时分秒、无效文本、非零起始索引和失败后重用。红绿生成产物分别保存在 `/private/tmp/karuyomi-date-format-red` 与 `/private/tmp/karuyomi-date-format-green`。
 
 这证明固定 TeaVM 的日期缺陷与补丁行为。仍需用包含补丁的正式无插桩扩展重复实际 Source A→B 重开，确认章节恢复及书签 A 添加、B 移除、新文档读回闭环。
+
+## 固定 `5ba6fff`：真实 Web 重开与书签往返通过
+
+以固定 `5ba6fffb4c8f3a4f8df393574effe050d69c35f5` 独立构建原 xkcd 1.6.1，候选 `ext-all.xkcd-dd84d305506e2bdc34ac62988aef645f`，快照 `/private/tmp/karuyomi-xkcd-aot-5ba6fff-NrRMY4/results/snapshot`。来源记录含两个日期 donor，原 13 个 regex donor、Source JAR 和共享材料与 `f285391` 对照一致。无临时 Java trace；单包本地快照未部署或写正式 baseline，自动构建状态仍为 `compiled_unverified` / `runtimeReady=false`。
+
+用该快照通过正式 Vite API 与 `vite.acceptance.config.ts` 组装既有 Flutter Web 及宿主；`pnpm acceptance:serve` 输出 `http://127.0.0.1:55162/`，同一隔离 D1、`acceptance-owner` 与显式 xkcd 主机政策。Codex 内置浏览器每次关闭前一个文档再新开下一文档，均走正式 UI：
+
+1. A 安装精确构建，打开英文热门、详情及 3320 章，收藏 `SINGLE`，添加 `/3319/`（Elevators）书签。
+2. B 从正式书架重开同一作品，成功显示 3320 章，已标记 1 章；“仅书签”显示唯一 `/3319/`。随后正式移除该书签，筛选显示 0 章。
+3. C 新文档从书架再次重开 3320 章，目标章显示“标记章节书签”，已标记 0 章。
+
+独立验收四阶段各读取六路正式 GET，全部 200。A-added 与 B-read 的完整响应逐字段相同，account / global / manga revision 为 3 / 1 / 2。移除后为 4 / 1 / 3，仅目标书签由 true 变为 false；安装、收藏、Source 资料、分类、设置及空进度均不变。B-removed 与 C-read 的完整响应也逐字段相同。快照位于 `/private/tmp/karuyomi-source-reopen-diag-55162-{added,b-read,b-removed,c-read}.json`；UI 截图位于 `/private/tmp/karuyomi-http-date-55162-{a,b-read,b-removed,c-read}.jpg`。本轮未采到 B 的分阶段日志，不声称实际 Cache 正文命中、304 或具体时延。服务与三个验收标签均已关闭。
+
+该门证明固定新构建的真实 Web 章节重开和同源同身份书签往返；Native、生产 Access、设备/浏览器进程重启及其它 Source 仍另验。
