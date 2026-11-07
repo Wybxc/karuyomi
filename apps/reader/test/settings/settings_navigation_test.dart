@@ -186,6 +186,81 @@ Future<void> _finish(WidgetTester tester, CatalogController catalog) async {
 }
 
 void main() {
+  testWidgets('returning to the foreground reads a confirmed remote theme', (
+    tester,
+  ) async {
+    final platform = TestPlatform(seedDefaultInstallation: false);
+    final remotePlatform = TestPlatform(
+      businessServer: platform.businessServer,
+      seedDefaultInstallation: false,
+    );
+    final remote = CatalogController(
+      api: remotePlatform,
+      runtime: remotePlatform.runtime,
+      rebuildRuntime: remotePlatform.rebuild,
+      deploymentOrigin: remotePlatform.origin,
+    );
+    addTearDown(() async {
+      remote.dispose();
+      await remote.closeReadingProgress();
+      await remotePlatform.dispose();
+    });
+    await tester.runAsync(remote.connect);
+    await _start(tester, platform);
+    await _tap(tester, _navigation('设置'));
+    final panel = find.byType(GlobalSettingsPanel);
+    final controller = tester.widget<GlobalSettingsPanel>(panel).controller;
+    expect(controller.snapshot!.globalRevision, 0);
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.system,
+    );
+
+    final binding = tester.binding;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.runAsync(() async {
+      final repository = remote.settings!;
+      final current = await repository.loadGlobal();
+      await repository.setGlobal(
+        values: current.global.deepCopy()..theme = wire.AppTheme.APP_THEME_DARK,
+        basedOnRevision: current.globalRevision,
+      );
+    });
+    await tester.pump();
+    expect(controller.snapshot!.globalRevision, 0);
+
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<GlobalSettingsPanel>(panel).controller,
+      same(controller),
+    );
+    expect(controller.snapshot!.globalRevision, 1);
+    expect(
+      find.byKey(
+        const ValueKey(('global-theme', wire.AppTheme.APP_THEME_DARK)),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.dark,
+    );
+    expect(platform.businessServer.appliedMutations, 1);
+    expect(
+      platform.businessServer.requests.where(
+        (request) => request.uri.path == '/api/settings/mutations',
+      ),
+      hasLength(1),
+    );
+    expect(platform.openedBuilds, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   for (final denied in [false, true]) {
     testWidgets(
       'zero-Source settings Access ${denied ? 'denial' : 'expiry'} exposes login recovery and retains the exact pending command',

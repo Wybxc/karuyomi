@@ -23,6 +23,14 @@
 
 `cd apps/reader && flutter test test/runtime/native_platform_runtime_test.dart` 的回归覆盖启动超时、迟到成功/失败、明确重连及关闭，使用受控的插件通道回调。它说明旧等待可被截断，不证明既有 Android 初始化故障由此引起；受信 HTTPS 下真实 Android/iOS 主入口重建、系统生命周期和真机仍须独立验收。
 
+### Android 模拟器复验
+
+2026-11-08，固定正式产品 `24f8b21`，Pixel 9 / API 36、系统 WebView 133.0.6943.137。隔离副本仅增加了集成探针和专用 debug 应用标识、127.0.0.1 的测试 CA 信任；官方 HTTPS harness、workerd/D1 与受验签测试身份未替换，证书和主机名正常验证。空扩展目录，不加载 Source。
+
+同一 App 进程先通过正式 bootstrap 与全局设置读取启动真实 headless WebView。探针显式调用正式平台 `rebuild()`，旧就绪容器的清理返回后，再通过正式 UI「连接服务」启动新容器、恢复同一身份和设置。独立系统日志在同一进程下观察到两个先后的 renderer；卸载 AppShell 后关闭容器，旧控制调用被拒绝。Flutter 集成测试 1/1，独立 HTTPS 设置响应和空索引前后逐字节一致，account/global revision 均为 0。
+
+首轮 `--no-dds` 下自定义 VM stream 不可用，探针导航选择器也有歧义；该轮不计通过。改用默认 DDS、明确的正式 UI 控件后通过。本轮 HTTPS 服务、专用模拟器和私用 ADB 均已停止。复验命令、工具版本与原始日志见 `/private/tmp/karuyomi-native-reconnect-24f8b21-Ml7SWzeP/README.md`。该分项没有注入丢失启动 ACK，没有验证 Source 自动触发的重建、iOS 或真机，不能归因历史 Android 初始化问题。
+
 ## 正式 Web 主入口的 A→B→A
 
 2026-11-04，Codex 内置 Chromium 156 使用正式 Flutter `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 完成身份切换；`main.dart.js` SHA-256 为 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`。原 xkcd AOT 仍为 `b4f72f7` 的 `ext-all.xkcd-b33800f6d02ddab83b60b6d7ac85b49d`，JAR、清单、材料均未改，完整输入身份见[Source 网络 Cache](source-network-cache.md)。

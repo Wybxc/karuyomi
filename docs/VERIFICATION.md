@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-08，MANGA Plus Creators 正式 Web 的[图片 Referer、跨章与新文档续读](verification/aot-current-pilot.md#manga-plus-creators-的图片-referer-和续读)通过限定抽样；两章观察到的 CDN 图请求都保留各自章节 Referer。Android 模拟器[真实容器重建与重连](verification/runtime-reconnect.md#android-模拟器复验)通过空 Source 分项。内置浏览器[未触发真实前台事件](verification/reader-settings.md#web-自动前台读回的观测限制)，Flutter 层自动读回回归通过，真实 Web 前台继续待验。
+
 2026-11-08，正式 Web [全局设置同时保存](verification/reader-settings.md#双-web-全局设置同时保存)通过。两个文档的同 revision 请求在正式 Worker 的处理窗重叠 12 ms；一个成功、一个冲突，D1 只提交一次。冲突页读回后可按新版本重新编辑保存。Native、其它写入、生产 Access 与真机另验。
 
 2026-11-08，正式 Web 的[阅读进度已提交后丢确认与精确重试](verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)通过。内置浏览器在 xkcd 末页点「读完本章」，正式 D1 已提交但 HTTP 200 正文中断；界面保留待确认操作，显式重试复用 UUID、原始正文和 CAS，返回同一回执，六路独立读回不变。此门不覆盖同时写、Native、生产 Access 或真机。

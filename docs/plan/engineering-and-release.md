@@ -55,6 +55,8 @@ Alpha Manga 的单参数 Canvas 旋转缺口已补，Android 与 TeaVM 像素回
 
 MangaTek 的气泡裁剪、中心旋转和描边限制已通过 Android/TeaVM 像素对照；原包 AOT、候选静态交付和 Web 初始化通过，热门上游 403，真实叠字页未验，见[记录](../verification/aot-current-pilot.md#mangatek-的气泡图形操作)。
 
+MANGA Plus Creators 的当前单包候选通过 Web 抽样读图、跨章、新文档续读及原 Source 图片 Referer 的出站核对，见[记录](../verification/aot-current-pilot.md#manga-plus-creators-的图片-referer-和续读)；未发布、未逐页验收。
+
 ## 中断复核与恢复边界
 
 2026-11-04 清理测试进程时，以当时进程列表与工作目录复核，两条历史 AOT 主进程及项目 builder 子进程均不存在。两树跟踪输入仍干净，冻结 state 都保持 revision `22378bbcb89d40f5a0397c5098310072`、`bootstrap.complete=false`；该 revision 已不是当前生产 checkpoint。v3 当时尚无完整候选快照，扩展增量工作流为 `disabled_manually`。日志没有全量完成汇总，因此应记为未完成中断，不能沿用“正在运行”或当作首次 baseline 已完成。

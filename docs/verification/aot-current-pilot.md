@@ -90,3 +90,13 @@ Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透�
 2026-11-08，Codex 内置浏览器经 `http://127.0.0.1:49314` 安装并加载精确构建，识别原 MangaTek 阿拉伯语 Source。选择源后热门报错。独立 HTTP v2 重放其热门 URL `https://mangatek.com/manga-list?sort=views&page=1`，外层 200、上游 403 Cloudflare HTML、6050 B 后正常 END/EOF；这不是浏览器请求的抓包。当前只登记已确认的 `mangatek.com`、`api.mangatek.com`，没有访问真实章节或叠字页，仍为 `compiled_unverified` / `runtimeReady=false`。未部署或修改冻结批次，服务已退出。
 
 像素对照入口为 `node tools/teavm/check-text-layout.ts`（需要锁定依赖）；冻结副本的命令、像素和材料记录见 `/private/tmp/karuyomi-mangatek-graphics.QY6mor/reproduce.md`，静态与 HTTP 证据在该目录的 `acceptance/`。
+
+## MANGA Plus Creators 的图片 Referer 和续读
+
+2026-11-08，固定 `5e403b1` 和未改的 MANGA Plus Creators 1.6.1 原 JAR（SHA-256 `bc385c175172b13ef8d65c2ba598f194a38dbab88aa99d8781c64c9a2424dc2a`），通过正式 TeaVM AOT、单包静态装配和 `pnpm acceptance:build`。英语 Source `4994699950662723787`，快照 revision `83fc244e7d7640c5b930c7c7f9884073`，JS 4,416,711 B、gzip 902,902 B；完整身份在本地候选清单。隔离官方 Vite/Wrangler 验收入口 `http://127.0.0.1:53740`，测试身份与 D1，网络只登记 `mangaplus-creators.jp` 和 `assets.mangaplus-creators.jp`。
+
+正式 Codex 内置浏览器安装精确构建、初始化英语源、在热门列表打开并收藏 Sense Life，读取 18 个章节。反转原章节顺序后进入 `#001`，首图和第 2 页进度通过，按 End 跳至第 72 页并看到末图和保存确认；用「下一章」进入 `#002` 并实际显示首图，翻到第 2 页且确认保存。退出并关闭原文档，从新文档的服务端书架点「继续阅读」首次恢复 `#002` 第 2 页，实际画面可见。独立只读 API 确认两次采样的章节与 pageKey 相同、current/furthest 都为第 2 页、反向顺序保留。重新打开后的 account revision 10 → 11；没有把这次恢复写成无写入读回。
+
+隔离 Node preload 仅在 Wrangler 把正式 workerd 的出站请求交给实际 fetch 时比较两章 CDN 图片请求的 Referer，原请求未修改。两章各有 6 个观测，全部与各自完整章节 URL 精确匹配，图片响应都是 200；日志只存章节别名、比对结果和状态。独立合成 Range 控制可区分缺失与匹配，两者均取得 206，因此这证明原 Source 的请求头被保留，不证明 CDN 强制需要它。
+
+本轮只验收抽样页、跨章及 Web 新文档续读，没有逐页验收 107 页，也未验证其它作品/语言、Native 或生产。构建仍保持 `compiled_unverified` / `runtimeReady=false`，未修改冻结 AOT 或部署。启动步骤和精确构建见 `/private/tmp/karuyomi-mpc-5e403b1.7OHoGs/acceptance/handoff.md`，原始观测和独立 API 样本在同目录，服务及标签已关闭。
