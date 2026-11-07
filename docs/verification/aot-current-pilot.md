@@ -60,3 +60,9 @@ pnpm acceptance:serve
 固定 `952bbab` 全量记录中，AsgardScans 1.6.3 在调用 Android 的 `JSONObject`、`JSONArray` 时缺类；此路径用于从原站详情页的 JSON-LD 取简介、别名与分类。冻结原 JAR SHA-256 为 `c36be974cc8ad903885a1d4cb57466e0e6e90a390bd4ca61ddaf368f4a4025b6`。
 
 在独立副本中，仅加入固定 Suwayomi `6b481e8` 的六份 AndroidCompat 实现，去掉 `JSONObject` 的 AndroidX 空值标注；同一锁定 Maven / TeaVM 0.16.0 离线重编成功，生成 4273929 B JS，SHA-256 `56c2812d2c10cbd05f2cdff76aba249f236c34f56c40c0f54a6039f7134b1815`。原 JAR 摘要未变。正式构建现在在生成目录做同样的准备，`pnpm teavm:check` 的 JVM 回归验证 JSON-LD、缺省、精确 Long 和无效输入；该初次 AOT 是独立诊断，并未发布、更新全量 checkpoint 或确认真实详情/图片。日志留在 `/private/tmp/karuyomi-asgard-json.VpCOGI/`。
+
+随后固定 `975c650` 在独立 checkout 以同一原 JAR 通过正式 `prepareSources`、TeaVM、`node --check`、`verifyOutput`、候选静态装配和 `pnpm acceptance:build`。构建 ID 为 `ext-ar.asgardscans-be73a260e6247a66880ad39ddbf7367e-04bea62075812d18770a79c0690e44e427dcfb57f67529d2113b0a2b1d1f918d`；JS 4,280,375 B，gzip 880,539 B；静态快照 revision 为 `c752d4becbcf43249e06d0086d8e1e0a`。
+
+隔离 workerd/D1 仅登记 `asgardscans.com`，bootstrap 200，实际提供的索引和清单与候选一致，gzip artifact HEAD 200。Codex 内置浏览器的新文档加载已安装扩展并列出 `AsgardScans · ar`（Source `1271101147092894805`）；选择后热门请求失败，未返回作品。用同一候选在正式 HTTP v2 入口独立重放原热门 URL `https://asgardscans.com/manga?page=1&sort=popular`，外层 200，META 内上游状态 404，513 B HTML 后正常 END/EOF。这不是原浏览器请求的抓包，也不能据此判断为何源站返回 404。没有真实 JSON-LD 详情、章节或图片证据。
+
+复验入口、候选身份、服务和帧记录见 `/private/tmp/karuyomi-asgard-formal.Tqguie/` 下的 `reproduce.md`、`summary.json` 和 `popular-bridge-replay.json`。本轮未更新冻结 checkpoint、未部署，仍为 `compiled_unverified` / `runtimeReady=false`。
