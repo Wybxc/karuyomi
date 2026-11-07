@@ -66,6 +66,8 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 
 协程执行语义另按[官方核心与平台适配计划](coroutine-runtime.md)收敛：优先复用已锁定的官方 JAR，只保留必要的平台与宿主集成。隔离 AOT 成功不等于已替换产品路径；首次真实挂起与 operation 所有权门通过后再删除当前自有入口。
 
+Native 启动确认超时或关闭时的旧代退役已修复并通过[定向插件边界回归](../verification/runtime-reconnect.md#native-启动确认超时)；正式 Android/iOS 设备的实际启动与重建仍待验证。
+
 ## 验收
 
 - P0-A：原输入/工具链/ABI/实际执行身份一致；Source IDs 与清单吻合；文件与 HTTP Cache 在重启、取消和版本切换后语义正确。

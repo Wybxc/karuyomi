@@ -15,6 +15,14 @@
 
 上述结果是正式组件/传输与本地 SQLite 回归。随后正式 Web 主入口的 A→B→A 身份切换通过下述独立产品门；Native 身份切换、版本更新和生产 Access 过期恢复仍须另验，不能用模拟 transport 替代。分项产品验收继续按[P0](../plan/p0-runtime-and-reading.md)推进。
 
+## Native 启动确认超时
+
+2026-11-08，正式 Dart 运行容器的旧启动路径虽然设有 20 秒期限，超时后却在清理中继续等待 WebView 插件的 `run()` 确认，可能使启动、显式重建或关闭一直不返回。锁定的 iOS/Android 插件在确认前尚未把 WebView 标记为运行，提前调用 `dispose()` 不会释放该实例。
+
+现在超时或关闭立即摘除旧代并结束前台等待，保留一个清理责任，直到迟到成功后调用一次 `dispose()`，或迟到失败结束等待；旧回调不能复活原代。清理期间显式重连立即报告暂时不能重连；一直未获确认或清理失败时可重启应用。等待期间不会继续创建新的 WebView。
+
+`cd apps/reader && flutter test test/runtime/native_platform_runtime_test.dart` 的回归覆盖启动超时、迟到成功/失败、明确重连及关闭，使用受控的插件通道回调。它说明旧等待可被截断，不证明既有 Android 初始化故障由此引起；受信 HTTPS 下真实 Android/iOS 主入口重建、系统生命周期和真机仍须独立验收。
+
 ## 正式 Web 主入口的 A→B→A
 
 2026-11-04，Codex 内置 Chromium 156 使用正式 Flutter `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 完成身份切换；`main.dart.js` SHA-256 为 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`。原 xkcd AOT 仍为 `b4f72f7` 的 `ext-all.xkcd-b33800f6d02ddab83b60b6d7ac85b49d`，JAR、清单、材料均未改，完整输入身份见[Source 网络 Cache](source-network-cache.md)。

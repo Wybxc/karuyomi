@@ -22,9 +22,27 @@ PlatformRuntime createPlatformRuntime({Uri? origin}) {
   return NativePlatformRuntime(origin);
 }
 
+final class _NativeRun {
+  _NativeRun(HeadlessInAppWebView view) {
+    acknowledgement = Future<void>.microtask(view.run).whenComplete(() {
+      settled = true;
+    });
+  }
+
+  late final Future<void> acknowledgement;
+  bool settled = false;
+}
+
 final class NativePlatformRuntime extends PlatformRuntime
     implements ManagedImageTransport {
-  NativePlatformRuntime(this.origin) {
+  NativePlatformRuntime(Uri origin)
+    : this._(origin, const Duration(seconds: 20));
+
+  @visibleForTesting
+  NativePlatformRuntime.withStartupTimeout(Uri origin, Duration startupTimeout)
+    : this._(origin, startupTimeout);
+
+  NativePlatformRuntime._(this.origin, this._startupTimeout) {
     if (origin.scheme != 'https' ||
         origin.host.isEmpty ||
         origin.userInfo.isNotEmpty ||
@@ -39,6 +57,7 @@ final class NativePlatformRuntime extends PlatformRuntime
 
   @override
   final Uri origin;
+  final Duration _startupTimeout;
   @override
   late final CoverTransport coverTransport = HttpCoverTransport(
     origin: origin,
@@ -56,7 +75,8 @@ final class NativePlatformRuntime extends PlatformRuntime
     },
   );
   HeadlessInAppWebView? _view;
-  Future<void>? _viewRunning;
+  _NativeRun? _viewRunning;
+  Future<void>? _retiringStartup;
   InAppWebViewController? _controller;
   Future<void>? _opening;
   int _generation = 0;
@@ -67,6 +87,9 @@ final class NativePlatformRuntime extends PlatformRuntime
   Completer<void>? _containerEnded;
   Future<void>? _resetting;
   Future<void>? _disposing;
+
+  @override
+  bool get runtimeRestartBlocked => _retiringStartup != null;
 
   @override
   bool ownsImageLocation(String resourceId, String generation, Uri location) =>
@@ -104,6 +127,14 @@ final class NativePlatformRuntime extends PlatformRuntime
         const RuntimeException(
           RuntimeErrorCode.runtimeLost,
           'Native runtime container was disposed',
+        ),
+      );
+    }
+    if (runtimeRestartBlocked) {
+      return Future.error(
+        const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Previous Native runtime startup has not finished retiring',
         ),
       );
     }
@@ -356,18 +387,27 @@ final class NativePlatformRuntime extends PlatformRuntime
     final view = _view!;
     // Listen to load/termination before the platform run ACK: Android can
     // deliver callbacks before run() marks the view as running.
-    final running = Future<void>.microtask(view.run);
+    final running = _NativeRun(view);
     _viewRunning = running;
     try {
       await Future.any<void>([
-        Future.wait<void>([running, loaded.future], eagerError: true),
+        Future.wait<void>([
+          running.acknowledgement,
+          loaded.future,
+        ], eagerError: true),
         ended.future.then<void>(
           (_) => throw const RuntimeException(
             RuntimeErrorCode.runtimeLost,
             'Native runtime container ended during initialization',
           ),
         ),
-      ]).timeout(const Duration(seconds: 20));
+      ]).timeout(
+        _startupTimeout,
+        onTimeout: () => throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Native runtime initialization timed out',
+        ),
+      );
     } catch (error, stack) {
       if (generation == _generation) {
         if (!ended.isCompleted) ended.complete();
@@ -378,7 +418,7 @@ final class NativePlatformRuntime extends PlatformRuntime
         final images = _images;
         _images = null;
         try {
-          await _disposeHost(images, view, running);
+          await _retireHost(images, view, running);
         } catch (cleanupError) {
           debugPrint('Native runtime startup cleanup failed: $cleanupError');
         }
@@ -395,21 +435,53 @@ final class NativePlatformRuntime extends PlatformRuntime
     _hostReady = true;
   }
 
+  Future<void> _retireHost(
+    NativeImageControl? images,
+    HeadlessInAppWebView? view,
+    _NativeRun? running,
+  ) async {
+    final cleanup = _disposeHost(images, view, running);
+    if (running?.settled != false) {
+      await cleanup;
+      return;
+    }
+    // Let startup, rebuild or component close finish without waiting for a
+    // lost ACK. Keep one retiring owner until its plugin cleanup finishes;
+    // a reconnect must not accumulate additional unacknowledged WebViews.
+    _retiringStartup = cleanup;
+    void clear() {
+      if (identical(_retiringStartup, cleanup)) _retiringStartup = null;
+    }
+
+    unawaited(
+      cleanup.then<void>(
+        (_) => clear(),
+        onError: (Object error, StackTrace stack) {
+          debugPrint('Native runtime startup cleanup failed: $error');
+          // Disposal was not confirmed. Require an app restart rather than
+          // allocating another headless instance over an unowned view.
+        },
+      ),
+    );
+  }
+
   Future<void> _disposeHost(
     NativeImageControl? images,
     HeadlessInAppWebView? view,
-    Future<void>? running,
+    _NativeRun? running,
   ) async {
     try {
       await images?.close();
     } finally {
       // The plugin ignores dispose() until run() receives its platform ACK.
+      var started = true;
       try {
-        await running;
+        await running?.acknowledgement;
       } catch (_) {
-        // The startup caller receives the original run failure.
+        // The plugin never marked the view as running. Its dispose is a no-op.
+        started = false;
       }
-      await view?.dispose();
+      if (started) await view?.dispose();
     }
   }
 
@@ -630,7 +702,7 @@ final class NativePlatformRuntime extends PlatformRuntime
     _controller = null;
     _opening = null;
     _hostReady = false;
-    await _disposeHost(images, view, running);
+    await _retireHost(images, view, running);
   }
 
   @override
@@ -665,7 +737,7 @@ final class NativePlatformRuntime extends PlatformRuntime
       _controller = null;
       _opening = null;
       _hostReady = false;
-      await _disposeHost(images, view, running);
+      await _retireHost(images, view, running);
       try {
         await opening;
       } catch (_) {

@@ -27,6 +27,7 @@ abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
     slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
   );
   Uri get origin;
+  bool get runtimeRestartBlocked => false;
   CatalogTransport? _catalogTransport;
   CatalogTransport get catalogTransport =>
       _catalogTransport ??= HttpCatalogTransport();

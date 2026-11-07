@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/runtime/native_runtime_assets.dart';
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -356,7 +357,7 @@ void main() {
   });
 
   test(
-    'rebuild waits for the run acknowledgement before disposing once',
+    'rebuild retires an unacknowledged view and disposes it only after its ACK',
     () async {
       final acknowledgement = Completer<void>();
       platform.nextRunAcknowledgement = acknowledgement;
@@ -366,18 +367,18 @@ void main() {
       final response = ready();
       final rejected = expectLater(response, throwsA(runtimeLost));
       final old = await platform.created.future;
-      var resetCompleted = false;
-      final resetting = runtime.rebuild().then((_) => resetCompleted = true);
-      await flushCallbacks();
+      await runtime.rebuild().timeout(const Duration(seconds: 2));
+      await rejected.timeout(const Duration(seconds: 2));
       expect(old.runCompleted, isFalse);
       expect(old.disposals, 0);
-      expect(resetCompleted, isFalse);
+      expect(runtime.runtimeRestartBlocked, isTrue);
+      await expectLater(ready(), throwsA(runtimeLost));
+      expect(platform.views, hasLength(1));
       acknowledgement.complete();
-      await resetting.timeout(const Duration(seconds: 2));
-      await rejected.timeout(const Duration(seconds: 2));
       await flushCallbacks();
       expect(old.runCompleted, isTrue);
       expect(old.disposals, 1);
+      expect(runtime.runtimeRestartBlocked, isFalse);
 
       final created = platform.nextCreated;
       final nextResponse = ready();
@@ -388,6 +389,105 @@ void main() {
       expect(next.disposals, 0);
     },
   );
+
+  test(
+    'a missing run ACK ends startup and explicit reconnect does not pile up views',
+    () async {
+      await runtime.dispose();
+      runtime = NativePlatformRuntime.withStartupTimeout(
+        Uri.parse('https://reader.example'),
+        const Duration(milliseconds: 100),
+      );
+      final acknowledgement = Completer<void>();
+      platform.nextRunAcknowledgement = acknowledgement;
+      addTearDown(() {
+        if (!acknowledgement.isCompleted) acknowledgement.complete();
+      });
+      final catalog = CatalogController(
+        api: runtime,
+        runtime: runtime.runtime,
+        rebuildRuntime: runtime.rebuild,
+      );
+      try {
+        final connecting = catalog.connect();
+        final old = await platform.created.future;
+        expect(catalog.busy, isTrue);
+        await connecting.timeout(const Duration(seconds: 2));
+        expect(catalog.status, ServiceStatus.failed);
+        expect(catalog.busy, isFalse);
+        expect(catalog.error, contains('重启应用'));
+        expect(old.disposals, 0);
+        expect(runtime.runtimeRestartBlocked, isTrue);
+
+        await catalog.connect().timeout(const Duration(seconds: 2));
+        expect(catalog.status, ServiceStatus.failed);
+        expect(catalog.error, contains('暂时无法重新连接'));
+        expect(platform.views, hasLength(1));
+        old.controller.readiness = true;
+        old.loadStopped();
+        old.params.onRenderProcessGone?.call(
+          InAppWebViewController.fromPlatform(platform: old.controller),
+          RenderProcessGoneDetail(didCrash: false),
+        );
+        await flushCallbacks();
+        expect(old.controller.handshakes, 0);
+        expect(old.disposals, 0);
+
+        acknowledgement.complete();
+        await flushCallbacks();
+        expect(old.disposals, 1);
+        expect(runtime.runtimeRestartBlocked, isFalse);
+        final created = platform.nextCreated;
+        final nextResponse = ready();
+        final next = await created;
+        expect(next, isNot(same(old)));
+        next.controller.readiness = true;
+        next.loadStopped();
+        await nextResponse;
+        expect(old.disposals, 1);
+        expect(next.disposals, 0);
+      } finally {
+        catalog.dispose();
+      }
+    },
+  );
+
+  for (final succeeds in [true, false]) {
+    test(
+      'component close retires startup once when its late run ACK ${succeeds ? 'succeeds' : 'fails'}',
+      () async {
+        final acknowledgement = Completer<void>();
+        platform.nextRunAcknowledgement = acknowledgement;
+        addTearDown(() {
+          if (!acknowledgement.isCompleted) acknowledgement.complete();
+        });
+        final rejected = expectLater(ready(), throwsA(runtimeLost));
+        final old = await platform.created.future;
+        final closing = runtime.dispose();
+        expect(runtime.dispose(), same(closing));
+        await closing.timeout(const Duration(seconds: 2));
+        await rejected.timeout(const Duration(seconds: 2));
+        expect(old.disposals, 0);
+        expect(old.controller.disposeRequests, 0);
+
+        if (succeeds) {
+          acknowledgement.complete();
+        } else {
+          acknowledgement.completeError(StateError('late run failure'));
+        }
+        await flushCallbacks();
+        old.controller.readiness = true;
+        old.loadStopped();
+        await flushCallbacks();
+        expect(old.disposals, succeeds ? 1 : 0);
+        expect(old.controller.handshakes, 0);
+        expect(runtime.runtimeRestartBlocked, isFalse);
+        await expectLater(ready(), throwsA(runtimeLost));
+        expect(platform.views, hasLength(1));
+        expect(old.disposals, succeeds ? 1 : 0);
+      },
+    );
+  }
 
   test('a late failed handshake cannot retire a newer generation', () async {
     final response = ready();

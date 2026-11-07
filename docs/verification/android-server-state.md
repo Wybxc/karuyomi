@@ -46,6 +46,8 @@
 
 ## 复验与待补证据
 
+正式 Native 容器已修复[启动期限后仍等待插件确认](runtime-reconnect.md#native-启动确认超时)，有 Dart 插件边界回归。尚未证明它是既有 Android 初始化故障的根因，需按下述真实入口复验。
+
 准备同一后端的 HTTP/HTTPS 服务见[Source 测试服务](../../apps/api/test/source-metadata-probe.md)，正式入口与断言见[Native 集成测试说明](../../apps/reader/integration_test/README.md)。使用固定源码的独立 debug 副本、锁定依赖与独立 Gradle/Pub 缓存，只加入上述 localhost 专用 CA；不要修改业务源码或正式产品 TLS。Android 仅对本轮设备设置反向端口：
 
 ```sh

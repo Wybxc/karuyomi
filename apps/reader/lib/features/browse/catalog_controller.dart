@@ -921,6 +921,12 @@ final class CatalogController extends ChangeNotifier {
   bool get accessPaused =>
       status == ServiceStatus.loginRequired || status == ServiceStatus.denied;
 
+  String get _runtimeReconnectMessage => switch (api) {
+    PlatformRuntime(runtimeRestartBlocked: true) =>
+      '上次运行容器尚未退出，暂时无法重新连接；若持续出现，请重启应用。',
+    _ => '运行容器已中断，请重新连接',
+  };
+
   void _notify() {
     if (!_closed) notifyListeners();
   }
@@ -954,7 +960,7 @@ final class CatalogController extends ChangeNotifier {
           ? '访问验证已失效，请重新登录'
           : event.code == RuntimeErrorCode.accessDenied
           ? '当前身份没有访问权限'
-          : '运行容器已中断，请重新连接';
+          : _runtimeReconnectMessage;
       status = event.code == RuntimeErrorCode.accessRequired
           ? ServiceStatus.loginRequired
           : event.code == RuntimeErrorCode.accessDenied
@@ -1031,7 +1037,7 @@ final class CatalogController extends ChangeNotifier {
           RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录',
           RuntimeErrorCode.accessDenied => '当前身份没有访问权限',
           RuntimeErrorCode.timeout => '漫画源响应超时，请重新连接后重试',
-          RuntimeErrorCode.runtimeLost => '运行容器已中断，请重新连接',
+          RuntimeErrorCode.runtimeLost => _runtimeReconnectMessage,
           RuntimeErrorCode.unsupportedCapability => '这个漫画源功能暂未支持',
           RuntimeErrorCode.integrityError => '构建校验失败，请重新加载',
           RuntimeErrorCode.sourceError => '漫画源请求失败，请重试',
