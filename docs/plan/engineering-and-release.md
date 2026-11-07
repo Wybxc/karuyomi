@@ -2,15 +2,15 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，v4 三包已部署并通过匿名交付验收，本地 baseline 未完成**。旧 `7f54463` 全量队列已停止。v3 的固定 `b4f72f7` 独立队列与旧 `022d828` v1 队列均曾启动，但 2026-11-04 复核时已无活动进程，首次 baseline 未完成；两套冻结输入与本地产物仅保留历史证据，不得直接覆盖当前生产。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，v4 三包已部署并通过匿名交付验收，首次本地 baseline 已启动、尚未完成**。旧 `7f54463` 全量队列已停止。v3 的固定 `b4f72f7` 独立队列与旧 `022d828` v1 队列均曾启动，但 2026-11-04 复核时已无活动进程，首次 baseline 未完成；两套冻结输入与本地产物仅保留历史证据，不得直接覆盖当前生产。
 
 操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
 2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。Web/Native 材料及扩展必须按 v4 新指纹一起重建；旧 v3 产物在加载前明确拒绝，不提供兼容回退。固定 `1f599cd` 的 xkcd、Arknights、CuuTruyen 已本地重编并通过限定 Web 运行/图片分项，见[v4 运行证据](../verification/v4-source-runtime.md)。固定 `13494a0` 的客户端、Worker 与 v4 三包快照现已部署；Worker 版本为 `9a95d6e6-7578-4781-99aa-3d8bdae6b467`，revision 为 `702cc6bfb2974682bf1c83325458535a`，parent 为 `22378bbcb89d40f5a0397c5098310072`。`commit-snapshot` 后的 `state.json` 已确认新 revision，`bootstrap.complete=false`，状态为 available 3 / unavailable 1 / pending 1445 / failed 0。
 
-匿名 26 路径验收通过，远端网络政策仅含这三个已核对准确 host 的 verified 包，见[生产部署记录](../verification/v4-production.md)。Access 会话已失效，用户答复稍后登录；当前生产正向与 Native 主入口仍未验收。扩展增量工作流继续为 `disabled_manually`，不启动全量或启用定时 CI。下文 v1/v3 记录均为历史冻结批次，其 checkpoint 不修改、不混装，也不得作为覆盖当前生产的恢复输入。
+匿名 26 路径验收通过，远端网络政策仅含这三个已核对准确 host 的 verified 包，见[生产部署记录](../verification/v4-production.md)。Access 会话已失效，用户答复稍后登录；当前生产正向与 Native 主入口仍未验收。扩展增量工作流继续为 `disabled_manually`，不在 CI 运行首次全量，完成并部署 baseline 前不启用定时 CI。下文 v1/v3 记录均为历史冻结批次，其 checkpoint 不修改、不混装，也不得作为覆盖当前生产的恢复输入。
 
-2026-11-07，固定 v6 完成全量发现与 3 包本地串行试编，候选未部署，完整 baseline 仍未启动。试编发现同一输入可能生成不同 canonical JS，旧的仅输入派生 ID 会隐藏实际更新。见[试编与身份对照](../verification/aot-current-pilot.md)。绑定摘要的公开 ID 已通过固定三包真编译和静态装配。内置浏览器在同一 D1 验证旧路由下架、xkcd 正式确认更新、本机旧副本清理及原书架首次续读。继续首次本地 baseline、生产发布和增量 CI 验收。
+2026-11-07，固定 v6 完成全量发现与 3 包本地串行试编，试编候选未部署。试编发现同一输入可能生成不同 canonical JS，旧的仅输入派生 ID 会隐藏实际更新。见[试编与身份对照](../verification/aot-current-pilot.md)。绑定摘要的公开 ID 已通过固定三包真编译和静态装配。内置浏览器在同一 D1 验证旧路由下架、xkcd 正式确认更新、本机旧副本清理及原书架首次续读。同日用固定 `952bbab` 的完整计划启动本地单并发 baseline，复用三个精确匹配的试编检查点，开始处理其余 1,445 包。见[本地启动记录](../verification/aot-current-pilot.md#首次本地全量启动)。待全量结束并验证候选后，才进行生产发布与增量 CI 验收。
 
 ## 已完成
 
@@ -57,7 +57,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 最近的 v3 正式包终态为 `en.aethonwebcomics`（02:45:22 UTC）；其后 `en.akazascans` 仅有部分交付文件，缺少 validation 与 pipeline 终态，不能凭 manifest 或构建输出计为完成。已有正式终态由 runner 在恢复时复验复用，部分输出由正式入口重新构建，不手造成功记录。
 
-该次复核没有重启队列、删除过期锁或改动 state。两套 v1/v3 full-plan、state 和 builds 继续冻结，仅用于历史诊断；不得将旧 checkpoint 或候选直接覆盖当前 v4 生产。后续按 [EXTENSIONS 的恢复约束](../EXTENSIONS.md#首次本地全量与恢复)，以当前协议、固定输入和已确认的生产 checkpoint 另建 baseline 计划，复验后仅复用输入身份匹配的结果；先确认无发布者，过期锁交给 `proper-lockfile` 处理，不修改 parent 绕过前置检查，也不因恢复自动重试相同失败输入。当前不启动新的全量发布器。
+该次复核没有重启队列、删除过期锁或改动 state。两套 v1/v3 full-plan、state 和 builds 继续冻结，仅用于历史诊断；不得将旧 checkpoint 或候选直接覆盖当前 v4 生产。后续按 [EXTENSIONS 的恢复约束](../EXTENSIONS.md#首次本地全量与恢复)，以当前协议、固定输入和已确认的生产 checkpoint 另建 baseline 计划，复验后仅复用输入身份匹配的结果；先确认无发布者，过期锁交给 `proper-lockfile` 处理，不修改 parent 绕过前置检查，也不因恢复自动重试相同失败输入。以上为历史复核；当前固定 `952bbab` 的本地全量独立运行，不复用这些历史队列。
 
 ## 验收
 
