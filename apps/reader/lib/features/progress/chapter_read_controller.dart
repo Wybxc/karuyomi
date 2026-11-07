@@ -16,17 +16,17 @@ final class ChapterReadController extends ChangeNotifier {
   Map<String, bool> _completed = const {};
   int _revision = 0;
   bool _loaded = false;
-  bool _busy = false;
+  Future<void>? _refreshing;
   bool _retired = false;
   bool _disposed = false;
   String? _error;
 
   int get revision => _revision;
   bool get loaded => _loaded;
-  bool get busy => _busy;
+  bool get busy => _refreshing != null;
   String? get error => _error;
   bool get available => !_disposed && !_retired && isCurrent();
-  bool get canRefresh => available && !_busy;
+  bool get canRefresh => available && !busy;
   bool? completed(String chapterKey) =>
       _loaded ? (_completed[chapterKey] ?? false) : null;
 
@@ -37,12 +37,30 @@ final class ChapterReadController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh() {
     checkCurrent();
-    if (!canRefresh) return;
-    _busy = true;
+    if (!available) return Future<void>.value();
+    if (_refreshing case final active?) return active;
     _error = null;
+    final current = _loadSnapshot().whenComplete(() {
+      _refreshing = null;
+      if (!_disposed) {
+        checkCurrent();
+        notifyListeners();
+      }
+    });
+    _refreshing = current;
     notifyListeners();
+    return current;
+  }
+
+  /// A read already in flight may predate a just-confirmed local write.
+  Future<void> refreshAfterCurrent() async {
+    if (_refreshing case final active?) await active;
+    await refresh();
+  }
+
+  Future<void> _loadSnapshot() async {
     try {
       final snapshot = await repository.loadAll(mangaKey);
       acceptSnapshot(snapshot);
@@ -50,12 +68,6 @@ final class ChapterReadController extends ChangeNotifier {
       if (available) {
         _loaded = false;
         _error = '未能读取服务端章节状态，仍可继续阅读；请刷新重试。';
-      }
-    } finally {
-      if (!_disposed) {
-        _busy = false;
-        checkCurrent();
-        notifyListeners();
       }
     }
   }

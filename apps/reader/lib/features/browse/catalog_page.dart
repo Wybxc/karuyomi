@@ -941,6 +941,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
 
   Future<void> _setFavorite(bool favorite) async {
     final repository = _library;
+    final chapterRead = _chapterRead;
     final build = controller.activeBuild;
     final selectedSource = controller.activeSource;
     if (_savingFavorite ||
@@ -965,6 +966,9 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         manga: manga.snapshot,
         favorite: favorite,
       );
+      if (mounted && identical(_chapterRead, chapterRead)) {
+        await chapterRead?.refreshAfterCurrent();
+      }
     } catch (failure) {
       var message = '收藏未能保存，请重试；仍可继续阅读。';
       if (failure is BusinessStateException &&
@@ -1263,6 +1267,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     if (progress == null ||
         sequence == null ||
         _markingChapters ||
+        _savingFavorite ||
         _opening ||
         !progress.available ||
         progress.busy) {
@@ -1365,6 +1370,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         progress.available &&
         !_opening &&
         !_markingChapters &&
+        !_savingFavorite &&
         !controller.busy;
     final canSelect = available && progress.loaded && !progress.busy;
     final visibleKeys = visible.map((chapter) => chapter.key).toSet();

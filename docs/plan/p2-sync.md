@@ -38,7 +38,7 @@
 
 书架批量操作本轮复用单漫画 API，逐本串行确认，不增加跨漫画原子事务。确认清单冻结漫画与目录 revision；分类操作保留其它关联，移出书架不覆写元数据或清除进度。首失败停止，未确认项只能精确重试，剩余项须明确继续；已拒绝项只读刷新后结束旧批次，再重新确认。会话草稿以业务客户端为归属，同客户端 wrapper 重建保留恢复入口；旧窗口失效后不得续发或导航。设计见[批量操作](../design/library-batch.md)，工程与组件范围见[验证记录](../verification/library-batch.md)，真实跨端与故障门仍须另验。
 
-章节范围已读/标未读已复用现有进度表和作品 mutation，允许无真实锚的独立 epoch/已读状态；普通进度跨 manifest 保留章级已读值，标未读或重新阅读才清除。详情筛选、多选及范围确认已接入，串行 CAS 链、原请求重试、显式继续与旧窗口退役见[设计](../design/chapter-read-state.md)。真实 D1 与客户端组件分项见[验证记录](../verification/chapter-read-state.md)，独立客户端及生产门待验。
+章节范围已读/标未读已复用现有进度表和作品 mutation，允许无真实锚的独立 epoch/已读状态；普通进度跨 manifest 保留章级已读值，标未读或重新阅读才清除。详情筛选、多选及范围确认已接入，串行 CAS 链、原请求重试、显式继续与旧窗口退役见[设计](../design/chapter-read-state.md)。真实 Web 独立文档的范围已读与标未读往返通过；同页收藏后的旧版本误冲突已修复并通过新构建复验，见[验证记录](../verification/chapter-read-state.md)。Native、混合平台、部分确认故障和生产待验。
 
 书架直接续读和详情失败恢复沿用现有权威状态与正式 Reader：只按当前章节键定位，恢复时区分已确认视图和当前会话草稿；续读只读重取不 flush，附带资料更新不隐式重放原 pending，资料失败单独显式重试。设计见[阅读入口](../design/reading-entry.md)，功能及验收状态以 [P1](p1-library-and-progress.md#下一功能里程碑) 和[验证记录](../verification/reading-entry.md)为准。
 

@@ -10,6 +10,7 @@ import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/progress/chapter_read_batch.dart';
+import 'package:karuyomi/features/progress/chapter_read_controller.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
@@ -196,6 +197,47 @@ wire.StateMutation _command(TestBusinessRequest request) =>
     wire.decodeProtoJson(wire.StateMutation(), jsonDecode(request.body!));
 
 void main() {
+  for (final retire in [false, true]) {
+    test(
+      'a queued chapter refresh respects an in-flight read and retirement: $retire',
+      () async {
+        final platform = _platform();
+        final repo = ProgressRepository(_remote(platform));
+        var isCurrent = true;
+        final controller = ChapterReadController(
+          repository: repo,
+          mangaKey: _sequence.mangaKey,
+          isCurrent: () => isCurrent,
+        );
+        addTearDown(controller.dispose);
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        var reads = 0;
+        platform.businessServer.beforeRequest = (request) async {
+          if (request.uri.path.endsWith('/progress') && ++reads == 1) {
+            entered.complete();
+            await release.future;
+          }
+          return null;
+        };
+
+        final initial = controller.refresh();
+        await entered.future;
+        final queued = controller.refreshAfterCurrent();
+        expect(reads, 1);
+        if (retire) {
+          isCurrent = false;
+          controller.checkCurrent();
+        }
+        release.complete();
+        await Future.wait([initial, queued]);
+        expect(reads, retire ? 1 : 2);
+        expect(controller.loaded, !retire);
+        expect(controller.busy, isFalse);
+      },
+    );
+  }
+
   testWidgets(
     'complete read state treats missing rows as unread and intersects bookmarks and search',
     (tester) async {
@@ -313,6 +355,43 @@ void main() {
       }
       expect(_posts(platform), isEmpty);
       await _tap(tester, find.text('取消'));
+      await _finish(tester, platform, catalog);
+    },
+  );
+
+  testWidgets(
+    'same-detail favorite then range marking confirms the new exact revision',
+    (tester) async {
+      final platform = _platform();
+      final catalog = await _details(tester, platform);
+      platform.businessServer.requests.clear();
+
+      await _tap(tester, find.text('加入书架'));
+      expect(platform.businessServer.manga(_sequence.mangaKey)?.favorite, true);
+
+      await _tap(tester, _control('chapter-selection-toggle'));
+      await _tap(tester, _control('chapter-range-start'));
+      await _tap(tester, find.text('同名章 · 来源第 1 项').last);
+      await _tap(tester, _control('chapter-range-end'));
+      await _tap(tester, find.text('同名章 · 来源第 3 项').last);
+      await _tap(tester, _control('chapter-select-range'));
+      await _tap(tester, _control('chapter-mark-read'));
+      expect(find.text('确认清单：3 章'), findsOneWidget);
+
+      await _tap(tester, find.text('确认并开始'));
+      expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
+      final commands = _posts(platform).map(_command).toList();
+      expect(commands.map((command) => command.expectedRevision), [0, 1, 2, 3]);
+      expect(commands.first.setFavorite.favorite, isTrue);
+      expect(
+        commands.skip(1).map((command) => command.setChapterRead.chapterKey),
+        [for (final chapter in _sequence.entries.take(3)) chapter.key],
+      );
+      expect(
+        commands.skip(1).every((command) => command.setChapterRead.read),
+        isTrue,
+      );
+      await _back(tester);
       await _finish(tester, platform, catalog);
     },
   );
