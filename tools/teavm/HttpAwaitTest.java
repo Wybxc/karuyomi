@@ -97,6 +97,8 @@ public final class HttpAwaitTest {
     final CountDownLatch returned = new CountDownLatch(1);
     final AtomicInteger enqueues = new AtomicInteger();
     final AtomicInteger cancels = new AtomicInteger();
+    final AtomicInteger responses = new AtomicInteger();
+    final AtomicInteger failures = new AtomicInteger();
 
     GuardCall(Call delegate) {
       this.delegate = delegate;
@@ -111,6 +113,7 @@ public final class HttpAwaitTest {
       delegate.enqueue(
           new Callback() {
             public void onFailure(Call call, IOException error) {
+              failures.incrementAndGet();
               try {
                 callback.onFailure(GuardCall.this, error);
               } finally {
@@ -119,6 +122,7 @@ public final class HttpAwaitTest {
             }
 
             public void onResponse(Call call, Response response) throws IOException {
+              responses.incrementAndGet();
               try {
                 callback.onResponse(GuardCall.this, response);
               } finally {
@@ -378,6 +382,170 @@ public final class HttpAwaitTest {
     } finally {
       owner.close();
       owner.leave();
+    }
+  }
+
+  private static OkHttpClient throwingClient(Throwable failure, AtomicInteger attempts) {
+    return new OkHttpClient.Builder()
+        .addInterceptor(chain -> {
+          attempts.incrementAndGet();
+          if (failure instanceof RuntimeException error) throw error;
+          if (failure instanceof Error error) throw error;
+          throw new AssertionError("Expected a non-IO fixture failure", failure);
+        })
+        .build();
+  }
+
+  private static void ownerFailure(BrowserCall.Operation owner, Throwable expected)
+      throws Throwable {
+    try {
+      owner.drain(1000);
+      throw new AssertionError("Owner swallowed an execution or callback failure");
+    } catch (Throwable actual) {
+      check(actual == expected, "owner drain preserves the original failure");
+    }
+    check(!owner.hasPending(), "failed call and coroutine leave no pending owner work");
+    check(Bridge.openHandles() == 0, "failed execution leaves no HTTP handle");
+  }
+
+  private static void nonIoExecutionFailures(String endpoint) throws Throwable {
+    for (boolean requireSuccess : new boolean[] {false, true}) {
+      for (Throwable expected :
+          new Throwable[] {
+            new IllegalStateException("interceptor runtime failure"),
+            new AssertionError("interceptor error")
+          }) {
+        BrowserCall.Operation owner = begin("non-io-await");
+        try {
+          AtomicInteger attempts = new AtomicInteger();
+          QueuedDispatcher queue = new QueuedDispatcher();
+          GuardCall request = guarded(throwingClient(expected, attempts), endpoint);
+          Deferred<Response> task = start(queue, request, requireSuccess);
+          queue.step();
+          await(request.returned);
+          queue.drain();
+          check(task.isCompleted(), "non-IO failure resumes the actual seed await immediately");
+          try {
+            value(task);
+            throw new AssertionError("Seed await swallowed a non-IO execution failure");
+          } catch (Throwable actual) {
+            check(
+                actual instanceof IOException && actual.getCause() == expected,
+                "await failure retains the interceptor cause");
+          }
+          ownerFailure(owner, expected);
+          check(
+              attempts.get() == 1
+                  && request.enqueues.get() == 1
+                  && request.failures.get() == 1
+                  && request.responses.get() == 0,
+              "await receives exactly one failure without a retry or response");
+          check(request.isCanceled(), "fatal execution cancels its call");
+        } finally {
+          owner.close();
+          owner.leave();
+        }
+      }
+    }
+
+    for (boolean throwFromCallback : new boolean[] {false, true}) {
+      for (Throwable expected :
+          new Throwable[] {
+            new IllegalStateException("direct interceptor runtime failure"),
+            new AssertionError("direct interceptor error")
+          }) {
+        BrowserCall.Operation owner = begin("non-io-enqueue");
+        try {
+          AtomicInteger attempts = new AtomicInteger(), responses = new AtomicInteger();
+          AtomicInteger failures = new AtomicInteger();
+          AtomicReference<IOException> delivered = new AtomicReference<>();
+          CountDownLatch returned = new CountDownLatch(1);
+          AssertionError callbackFailure = new AssertionError("failure callback error");
+          Call request = call(throwingClient(expected, attempts), endpoint);
+          request.enqueue(
+              new Callback() {
+                public void onFailure(Call call, IOException error) {
+                  failures.incrementAndGet();
+                  delivered.set(error);
+                  returned.countDown();
+                  if (throwFromCallback) throw callbackFailure;
+                }
+
+                public void onResponse(Call call, Response response) {
+                  responses.incrementAndGet();
+                  returned.countDown();
+                }
+              });
+          await(returned);
+          ownerFailure(owner, expected);
+          check(
+              delivered.get() != null && delivered.get().getCause() == expected,
+              "direct enqueue retains the original interceptor cause");
+          check(
+              attempts.get() == 1 && failures.get() == 1 && responses.get() == 0,
+              "direct enqueue receives at most one terminal callback");
+          check(request.isCanceled(), "direct execution failure cancels its call");
+          if (throwFromCallback)
+            check(
+                expected.getSuppressed().length == 1
+                    && expected.getSuppressed()[0] == callbackFailure,
+                "callback failure is retained without replacing the execution failure");
+        } finally {
+          owner.close();
+          owner.leave();
+        }
+      }
+    }
+  }
+
+  private static void nonIoResponseCallbackFailures(String endpoint) throws Throwable {
+    for (Throwable expected :
+        new Throwable[] {
+          new IllegalStateException("response callback runtime failure"),
+          new AssertionError("response callback error")
+        }) {
+      BrowserCall.Operation owner = begin("non-io-response-callback");
+      AtomicInteger closes = new AtomicInteger(), responses = new AtomicInteger();
+      AtomicInteger failures = new AtomicInteger();
+      try {
+        OkHttpClient client =
+            new OkHttpClient.Builder()
+                .addInterceptor(chain ->
+                    synthetic(
+                        chain.request(),
+                        ResponseBody.create(
+                            null,
+                            6,
+                            Okio.buffer(
+                                new ForwardingSource(new Buffer().writeUtf8("opaque")) {
+                                  public void close() throws IOException {
+                                    closes.incrementAndGet();
+                                    super.close();
+                                  }
+                                }))))
+                .build();
+        call(client, endpoint)
+            .enqueue(
+                new Callback() {
+                  public void onFailure(Call call, IOException error) {
+                    failures.incrementAndGet();
+                  }
+
+                  public void onResponse(Call call, Response response) {
+                    responses.incrementAndGet();
+                    if (expected instanceof RuntimeException error) throw error;
+                    throw (Error) expected;
+                  }
+                });
+        ownerFailure(owner, expected);
+        check(
+            responses.get() == 1 && failures.get() == 0,
+            "a throwing response callback never receives a second failure callback");
+        check(closes.get() == 1, "a throwing response callback closes its body exactly once");
+      } finally {
+        owner.close();
+        owner.leave();
+      }
     }
   }
 
@@ -759,6 +927,8 @@ public final class HttpAwaitTest {
       cancellationAfterDelivery(endpoint);
       cancellationBeforeDelivery(endpoint);
       failureAndNon2xx(endpoint);
+      nonIoExecutionFailures(endpoint);
+      nonIoResponseCallbackFailures(endpoint);
       replacedBodyAndLimits(endpoint);
       cleanupBeforeAck(endpoint);
       closingConsumerMustFinishBeforeAck(endpoint);

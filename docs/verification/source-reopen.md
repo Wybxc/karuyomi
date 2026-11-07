@@ -81,3 +81,19 @@ V2 保持同一固定 `9b98d006` 基线，临时 `trace-v2.patch` 增加 handsha
 关闭 A 后，新文档 B 从书架重开，generation 为 `f351d640-f53d-4fba-9301-7347df8c9fc4`。`chapters / ui-2` 于 `23:46:07.544Z` 开始，随后完成 V1 的 callback、Gson、entry / metadata / headers / vary、Response 构造和 `cache-return` / `cache-finally`，至 `23:46:07.557Z` 已出现 `cache-callback-after`。B 未出现 handshake / strategy 标记，也没有后续 `cache-read` 或 HTTP 阶段，最终在 `2026-11-06T23:46:37.540Z` 命中默认 30 秒章节调用超时。A 的 strategy 正向记录和 B 的缺失只收窄后续定位范围，尚未证明日期解析是否进入或卡住，不能据此认定根因。
 
 独立正式六路 GET 在 B 终态前的 `23:46:09.212Z` 保存基准，超时后于 `23:47:32.717Z` 再读，全部 200 且逐字段相同；account / manga / global revision 保持 3 / 2 / 1，目标书签仍为 true，无额外已提交业务修改。快照为 `/private/tmp/karuyomi-source-reopen-diag-55538-{added,after-timeout}.json`。本轮 B 正式详情、独立文档读回与跨端书签门仍未通过。
+
+## 隔离 Java trace V3：进入 HTTP 日期转换，未见正常返回
+
+V3 仍固定 `9b98d006`，仅在隔离候选增加 `CacheStrategy.Factory` 构造、HTTP 日期类初始化、`toHttpDateOrNull` 与标准 formatter 初始化的入口 / 正常返回标记。`prepared-v3.json` / `summary-v3.json` 记录临时 `trace-v3.patch` SHA-256 为 `8fa975c1213d5505ad8edbf27ad1b304e4a172b6f124755698eaff02ee2c7c38`，候选为 `ext-all.xkcd-cbfe02922f8108377de5675dc79c9200`，快照为同一隔离目录的 `results/snapshot-v3`；原四包不变，仍未部署或提升 runtimeReady。
+
+独立核对 patch 与 `bytecode-v3-check.log`：四个目标方法各唯一匹配，入口各一处，正常返回分别为 1 / 4 / 1 / 1 处；日期转换保留原有 3 个异常处理器。日志报告去除新增 trace 后原指令与异常处理保持一致。该静态标记核对不等于 TeaVM 编译后行为等价，候选仍改变字节码形状。
+
+官方 HTTP harness `http://127.0.0.1:50360`、subject `acceptance-owner` 的 A 正式安装该候选，热门、3320 章详情、收藏与 `3319: Elevators` 书签成功。独立读取 `/private/tmp/karuyomi-java-cache-trace-v3-{a,b}.json`：A 的 Factory enter / return 各两次，热门正常完成；关闭 A 后，新文档 B 的 `chapters / ui-2` 出现以下同代记录：
+
+- `2026-11-07T01:04:23.723Z`：缓存 Response 返回及 finally 后进入 Factory；HTTP 日期类初始化 enter / return 均已出现，随后进入日期转换及 formatter 初始化。
+- `01:04:23.727Z`：formatter 初始化 return；`01:04:23.728Z`：缓存 callback-after。
+- 后续没有日期转换正常返回、Factory 返回、缓存读取或 HTTP 阶段；`01:04:53.704Z` 仍以默认 30 秒章节调用超时回收 Worker。
+
+B generation 为 `1b8e66fd-d912-4b2d-91b6-f4c9ea05c798`，超时截图为 `/private/tmp/karuyomi-java-cache-trace-v3-timeout.jpg`。这些实测将调查范围推进到 HTTP 日期转换已进入、formatter 初始化已返回之后；没有取得具体日期输入或异常，不能判定 weekday、特定日期格式或具体底层方法为根因，也不能将缺少正常返回直接等同于某种异常或死循环。V3 没有修复 Source 重开。
+
+独立六路正式 GET 在 B 终态前的 `01:04:27.655Z` 保存添加后基准，超时后于 `01:06:01.812Z` 再读；均为 200，前后完整响应严格相同，account / manga / global revision 保持 3 / 2 / 1，exact `/3319/` 书签为 true，其它已确认业务状态未变。快照为 `/private/tmp/karuyomi-source-reopen-diag-50360-{added,after-timeout}.json`。本节不提升新文档正式详情、跨端书签或生产能力，也不改写原候选与 V1 / V2 的证据范围。

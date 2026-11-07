@@ -207,3 +207,11 @@ ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.ko
 **浏览器未执行：** CUA inventory 无可用 browser，创建 IAB 标签返回 `Browser is not available: iab`，子任务与主任务的 `open_in_codex` 均仅 queued。未操作 Safari/其它浏览器，没有真实页面截图；BH3 详情/阅读、Komiic 设置重开/筛选分页、实际 UI 取消和资源收尾均未执行。这是环境阻断，不登记产品失败，也不沿用前轮 `7e8fe769` 的 Web 通过结果覆盖本次 HTTP 改动。
 
 官方 harness 收到 Enter 后正常 exit 0，finally 关闭服务；本 clone / 原端口无残留进程，SDK 锁释放。详细 `RESULTS.md`、`candidate-summary.json`、`http-smoke.json` 与 build/serve 日志留在临时目录。后续继续实际 Web 产品取消及 Source、Native、生产与真机门；本轮 AOT 和工程 HTTP 子门不缩减这些待办。
+
+## 非 IO 执行失败的异步终态修复
+
+2026-11-07，Source 重开诊断期间发现 `BrowserCall.enqueue` 只将 `executeOwned` 的 `IOException` 交给 `onFailure`；拦截器或运行时抛出 `RuntimeException` / `Error` 时，owner 虽记录失败，真实 seed await 的 continuation 仍可能等待。修复按 OkHttp 的异步失败语义取消调用，并在 owner 仍有效时交付一次带原 cause 的 `IOException`；owner 保留原异常，回调和清理的次生异常作为 suppressed 保留。`onResponse` 或 callback 自身抛错不再次触发 `onFailure`，过期 owner 仍拒绝迟到交付。
+
+正式 `HttpAwaitTest` 新增真实 seed `await` / `awaitSuccess`、直接 enqueue、非 IO 执行错误和 response / failure callback 抛错回归，验证一次终态、原 cause、owner drain 与资源释放。同一 fixture 使用旧 BrowserCall 在 3 秒等待门失败，修复后 HttpAwaitTest 270、EnqueueTest 85、ImageTest 8355 项断言通过；隔离输出在 `/private/tmp/karuyomi-enqueue-failure-XCrmCZ`。正式复验入口仍为 `pnpm teavm:check`。
+
+这些是 JVM 红绿证据；当时真实 TeaVM 候选、Source 重开和独立客户端书签门仍未通过，不能以本修复替代[重开诊断](source-reopen.md)的后续实测。

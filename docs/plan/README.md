@@ -6,7 +6,7 @@
 
 2026-11-06：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当前客户端/API `466acdd` 已部署，扩展快照不变，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)；Access 会话已失效，用户稍后登录，生产正向与真机仍待验收，完整 P0 未通过。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；真实 Web 独立会话及测试身份下 Web↔iOS、Web↔Android、iOS↔Android 正式入口的基础书架读回与双向非默认页续读已通过，见[Web/iOS](../verification/native-server-state.md)和[Android 配对](../verification/android-server-state.md)。双 Web 的手动刷新、远端重置与旧写冲突分项随后通过[验收](../verification/concurrent-server-state.md)；分类 UI、真实双 Web 的目录/关联/冲突、双 iOS 与 iOS↔Android 的分类顺序闭环已通过[记录](../verification/category-ui-sync.md)；同时写竞争、自动前台重取、故障恢复、生产正向、Web↔Native 分类、Android 初始化可靠性、已接入章节书签的独立客户端门及非敏感阅读设置（含裁白）的独立客户端门继续按[P1](p1-library-and-progress.md)和[P2](p2-sync.md)推进。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
 
-当前优先修复书签验收发现的 Source 重开故障：已确认是章节 invoke 在缓存 get Promise 返回后超时，Java 后续阻塞点仍待定位；缓存桥单项通过不抬高真实 Source 门，见[重开记录](../verification/source-reopen.md)。独立验收与主线实现并行。
+当前优先修复书签验收发现的 Source 重开故障：已确认是章节 invoke 超时，隔离 trace 已经过 Java 缓存响应构造与 HTTP 日期格式器初始化，日期 parse 未正常返回，具体异常仍待取得；缓存桥单项通过不抬高真实 Source 门，见[重开记录](../verification/source-reopen.md)。独立验收与主线实现并行。
 
 ## 优先级与状态
 

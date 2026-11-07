@@ -335,6 +335,19 @@ public final class BrowserCall implements Call {
                     if (operation != null) operation.checkOpen();
                     c.onFailure(this, error);
                     return;
+                  } catch (RuntimeException | Error error) {
+                    // Like OkHttp's AsyncCall, fail the suspended consumer before propagating
+                    // an interceptor/runtime failure to its owner. Callback failures are outside
+                    // this catch, so a callback can never receive a second terminal event.
+                    failure = error;
+                    try {
+                      cancel();
+                    } catch (Throwable cleanup) {
+                      if (cleanup != error) error.addSuppressed(cleanup);
+                    }
+                    if (operation != null) operation.checkOpen();
+                    c.onFailure(this, new IOException("HTTP execution failed", error));
+                    throw error;
                   }
                   if (operation != null) operation.checkOpen();
                   c.onResponse(this, response);
@@ -342,7 +355,8 @@ public final class BrowserCall implements Call {
                   // dispatcher.
                   delivered = true;
                 } catch (Throwable error) {
-                  failure = error;
+                  if (failure == null) failure = error;
+                  else if (failure != error) failure.addSuppressed(error);
                   if (operation == null) Bridge.trace("HTTP callback failed: " + error);
                 } finally {
                   if (!delivered) {
@@ -351,6 +365,7 @@ public final class BrowserCall implements Call {
                       else closeHandles();
                     } catch (Throwable error) {
                       if (failure == null) failure = error;
+                      else if (failure != error) failure.addSuppressed(error);
                     }
                   }
                   if (operation != null) {
