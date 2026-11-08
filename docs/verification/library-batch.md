@@ -43,6 +43,22 @@ flutter test test/library/library_batch_test.dart test/library/library_batch_pag
 
 使用仓库固定的 Flutter SDK。完整工程入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`；集中检查只证明对应代码、组件与构建层级，不自动提升平台验收。
 
-仍待两个独立客户端在真实 D1 下验证批量读回、部分提交、断网/丢响应恢复和并发冲突；Web/iOS/Android、生产 Access、设备交互与真机门分别记录。服务端单漫画原子性沿用既有 [D1 状态](server-state.md)和[分类数据证据](category-state-data.md)，本轮没有新增跨漫画事务。
+服务端单漫画原子性沿用既有 [D1 状态](server-state.md)和[分类数据证据](category-state-data.md)，没有新增跨漫画事务。
 
 后续核对发现正式 `SetFavorite` 合同无条件要求 metadata，上一里程碑的受控客户端通过没有覆盖无 metadata 移出被拒绝的路径。2026-11-06 已修复合同并补充独立真实 Worker/D1 回归，保留元数据、分类、resume、进度和书签等语义的结果见[章节状态记录](chapter-read-state.md#协议与真实-d1)。
+
+## 双 Web 部分提交与冲突恢复
+
+2026-11-08，固定 `7cf596a`，`pnpm acceptance:build` 构建正式 Flutter Web 与零扩展静态资产。在 Codex 内置浏览器打开两个独立 Web 文档，使用同一官方回环 HTTP Wrangler harness、同一个测试身份和新隔离 D1。通过正式 API 预置三部无分类收藏及两个分类；之后的业务写入均从正式书架 UI 发起。隔离 harness 的临时观察代码只记录正式 Worker 收到的写入、HTTP 结果和匹配的 D1 回执，不修改请求、响应或业务批次。
+
+| 阶段                 | 账户 / 分类目录 revision | 实际结果                                                                                                              |
+| -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| 固定确认清单         | 5 / 2                    | A 选择「批量目标」，清单顺序丙 → 乙 → 甲。顺序以实际确认清单为准；原始 API 页按另一顺序返回。                         |
+| 第二会话修改         | 6 / 2                    | B 只将乙加入「并发保留」，乙作品 revision 从 1 到 2。                                                                 |
+| 提交原批次           | 7 / 2                    | 丙以 revision 1 写入，HTTP 200，有持久回执；乙用原 revision 1 得到 HTTP 409 `REVISION_CONFLICT`，无回执；甲没有请求。 |
+| 只读结束原批次       | 7 / 2                    | A 从「稍后处理」恢复原批次，重新读取后结束；保留乙、甲选择。前后 12 路独立 GET 逐字段一致。                           |
+| 重新确认与第二端读回 | 9 / 2                    | 新批次乙 → 甲分别以 revision 2、1 成功，使用新 UUID；丙未再发送。B 刷新看到三部都有「批量目标」，乙仍有「并发保留」。 |
+
+原批次显示「已确认 1 / 3 部 · 未开始 1 部」，新批次显示「已确认 2 / 2 部 · 未开始 0 部」。停服后核对精确审计序列和五份独立 GET 快照；每次成功与对应 D1 回执相符，第三项直到重新确认才有请求。全局设置、作品元数据、收藏、书签和进度未变；分类目录没有修改。首次临时审计曾在夹具准备阶段因请求流已转交而失败，调整观察顺序后使用新 D1 重跑；正式产品未改。
+
+复验用新隔离 checkout，先运行 `pnpm acceptance:build`。本轮忽略目录 `.local/verification/library-batch-web-7cf596a/` 保存 `REPRODUCE.md`、仅验收使用的 Vite harness 观察补丁、严格 TypeScript 采样与核对入口、停服审计及 `verified.json`；按实际 UI 顺序提供标题，不能以 API 行顺序代替确认清单。此分项覆盖双 Web 的批量添加分类、部分提交和旧 CAS 恢复。批量移除、断网或丢响应、Native/混合平台、生产 Access 和真机仍待独立验收。
