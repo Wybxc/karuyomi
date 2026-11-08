@@ -102,7 +102,7 @@ final class ReadingProgressController extends ChangeNotifier {
     }
     if (_closed || view != _viewSequence) return null;
     final anchor = resolvePosition(manifest, stored?.current).position!;
-    _states[manifest.chapterKey] =
+    final projected =
         (stored ??
                 ChapterProgress(
                   current: anchor,
@@ -110,9 +110,20 @@ final class ReadingProgressController extends ChangeNotifier {
                   completed: loaded?.completed ?? false,
                 ))
             .advance(manifest: manifest, current: anchor);
-    // Opening a chapter records navigation even when its saved anchor has not
-    // changed. Merely preparing its pages() session never calls this method.
-    _navigationPending.add(manifest.chapterKey);
+    _states[manifest.chapterKey] = projected;
+    // A different resume target or a corrected manifest still needs a write
+    // after the viewport arrives. Reopening the confirmed state does not.
+    final resume = loaded?.resume;
+    final switchedChapter =
+        _currentChapter != null && _currentChapter != manifest.chapterKey;
+    if (switchedChapter ||
+        resume?.chapterKey != manifest.chapterKey ||
+        resume?.reversedOrder != reversedOrder ||
+        !_sameNullableProgress(loaded?.progress, projected)) {
+      _navigationPending.add(manifest.chapterKey);
+    } else {
+      _navigationPending.remove(manifest.chapterKey);
+    }
     _notify();
     // Return the original anchor so ReaderScreen can show missing-page notice.
     return stored?.current;

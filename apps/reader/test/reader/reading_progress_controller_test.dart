@@ -47,6 +47,75 @@ void main() {
   });
 
   test(
+    'two readers can resume the same saved chapter before a real navigation writes',
+    () async {
+      final manifest = _manifest;
+      final otherChapter = ChapterManifest(
+        chapterKey: 'other-chapter',
+        version: 'v1',
+        pages: [ReaderPage(key: 'only')],
+      );
+      final otherAnchor = otherChapter.positionAt(0, offset: .7);
+      await repository.save(
+        mangaKey: _key,
+        manifest: otherChapter,
+        progress: ChapterProgress(current: otherAnchor, furthest: otherAnchor),
+        reversedOrder: true,
+      );
+      final anchor = manifest.positionAt(2, offset: .4, viewportY: .2);
+      final furthest = manifest.positionAt(2, offset: 1);
+      final saved = await repository.saveState(
+        mangaKey: _key,
+        manifest: manifest,
+        progress: ChapterProgress(current: anchor, furthest: furthest),
+        reversedOrder: true,
+      );
+
+      final secondClient = BusinessStateClient(
+        api: server,
+        identity: _identity,
+      );
+      final second = ReadingProgressController(
+        repository: ProgressRepository(secondClient),
+        mangaKey: _key,
+      );
+      addTearDown(() async {
+        second.dispose();
+        await secondClient.dispose();
+      });
+      for (final reader in [controller, second]) {
+        final restored = (await reader.restore(manifest))!;
+        expect(reader.awaitingViewport, false);
+        expect(reader.reversedOrder, true);
+        reader.observe(
+          manifest: manifest,
+          current: restored,
+          observed: furthest,
+          reversedOrder: true,
+        );
+        expect(reader.unsaved, false);
+        expect(await reader.flush(), true);
+      }
+      await controller.refreshFromServer(manifest);
+      expect(controller.needsReopen(manifest.chapterKey), false);
+      expect(server.appliedMutations, 2);
+      expect(server.manga(_key)!.revision, saved.revision);
+
+      final restored = (await second.restore(otherChapter))!;
+      expect(second.awaitingViewport, true);
+      second.observe(
+        manifest: otherChapter,
+        current: restored,
+        observed: otherAnchor,
+        reversedOrder: true,
+      );
+      expect(await second.flush(), true);
+      expect(server.appliedMutations, 3);
+      expect(server.manga(_key)!.resume.chapterKey, otherChapter.chapterKey);
+    },
+  );
+
+  test(
     'navigation is saved only after server confirmation; only viewport observation advances furthest',
     () async {
       final manifest = _manifest;
@@ -205,6 +274,7 @@ void main() {
         reversedOrder: false,
       );
       expect(await controller.flush(), true);
+      expect(server.progress(_key, 'chapter')!.current.pageKey, 'new');
       expect(server.progress(_key, 'chapter')!.furthest.pageKey, 'three');
     },
   );
