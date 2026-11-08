@@ -8,8 +8,6 @@ import type { Bindings } from '../src/env.js';
 const config = {
   ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
   ACCESS_AUD: 'test-audience',
-  ACCESS_SUBJECT: 'owner-subject',
-  OWNER_EMAIL: 'owner@example.com',
   APP_ORIGIN: 'https://read.example.com',
 };
 const env = {
@@ -38,9 +36,9 @@ async function token(
     email?: string;
   } = {},
 ) {
-  return new SignJWT({ email: options.email ?? config.OWNER_EMAIL })
+  return new SignJWT({ email: options.email ?? 'owner@example.com' })
     .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
-    .setSubject(options.subject ?? config.ACCESS_SUBJECT)
+    .setSubject(options.subject ?? 'owner-subject')
     .setIssuer(options.issuer ?? `https://${config.ACCESS_TEAM_DOMAIN}`)
     .setAudience(options.audience ?? config.ACCESS_AUD)
     .setIssuedAt()
@@ -100,8 +98,6 @@ test('unconfigured Access is unavailable, with no development bypass', async () 
 });
 
 test.each([
-  { subject: 'another-person' },
-  { email: 'other@example.com' },
   { audience: 'wrong-audience' },
   { issuer: 'https://wrong.cloudflareaccess.com' },
   { expired: true },
@@ -113,7 +109,7 @@ test.each([
     },
     env,
   );
-  expect(response.status).toBe(options.subject || options.email ? 403 : 401);
+  expect(response.status).toBe(401);
 });
 
 test('rejects forged tokens and identity headers', async () => {
@@ -130,19 +126,25 @@ test('rejects forged tokens and identity headers', async () => {
   expect(response.status).toBe(401);
 });
 
-test('verified owner gets typed bootstrap without a token in the body', async () => {
-  const response = await app.request(
-    'https://read.example.com/api/bootstrap',
-    {
-      headers: { 'Cf-Access-Jwt-Assertion': await token() },
-    },
-    env,
-  );
-  expect(response.status).toBe(200);
-  const body = bootstrapSchema.parse(await response.json());
-  expect(body.identity.subject).toBe(config.ACCESS_SUBJECT);
-  expect(body.stage).toBe(BootstrapStage.P0);
-});
+test.each([
+  { subject: 'owner-subject', email: 'owner@example.com' },
+  { subject: 'another-person', email: 'other@example.com' },
+])(
+  'an identity authorized by Access gets its own typed bootstrap: %j',
+  async (claims) => {
+    const response = await app.request(
+      'https://read.example.com/api/bootstrap',
+      {
+        headers: { 'Cf-Access-Jwt-Assertion': await token(claims) },
+      },
+      env,
+    );
+    expect(response.status).toBe(200);
+    const body = bootstrapSchema.parse(await response.json());
+    expect(body.identity.subject).toBe(claims.subject);
+    expect(body.stage).toBe(BootstrapStage.P0);
+  },
+);
 
 test('unknown authenticated API returns JSON 404', async () => {
   const response = await app.request(

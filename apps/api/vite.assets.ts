@@ -12,6 +12,8 @@ import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import {
   runtimeMaterialCatalogSchema,
+  preferenceRulesAssetPath,
+  type BuildManifest,
   type RuntimeMaterialCatalog,
 } from '@karuyomi/contracts';
 import {
@@ -88,6 +90,8 @@ async function prepareStaticAssets(): Promise<void> {
   rules.push(
     '/runtime/materials.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
     '/extensions/index.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
+    preferenceRulesAssetPath +
+      '\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
     '/extensions/build-state.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
     '/extensions/builds/*\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
     '/extensions/artifacts/*\n  Content-Type: application/gzip\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff',
@@ -168,12 +172,17 @@ export async function assembleExtensionAssets(
       JSON.stringify({ schemaVersion: 1, repoId: 'keiyoushi', builds: [] }) +
         '\n',
     );
+    await writeFile(
+      path.join(publicDirectory, preferenceRulesAssetPath.slice(1)),
+      JSON.stringify({ repoId: 'keiyoushi', packages: {} }) + '\n',
+    );
     return 0;
   }
   if (indexBytes.length > 2 * 1024 * 1024)
     throw new Error('Extension index exceeds its byte budget');
   const index = await parseExtensionIndex(indexBytes);
   const written = new Set<string>();
+  const rules = new Map<string, BuildManifest['preferenceSyncRules']>();
   for (const build of index.builds) {
     const manifestFile = path.join(source, build.manifestPath.slice(1));
     if ((await stat(manifestFile)).size > 64 * 1024)
@@ -206,6 +215,8 @@ export async function assembleExtensionAssets(
           );
       }
     }
+    if (manifest.preferenceSyncRules.length)
+      rules.set(manifest.packageName, manifest.preferenceSyncRules);
     const bundle = manifest.bundle;
     if (bundle.encodedSize > 25 * 1024 * 1024)
       throw new Error(
@@ -251,5 +262,12 @@ export async function assembleExtensionAssets(
     throw new Error('Extension build state does not bind the current index');
   await writeFile(path.join(destination, 'build-state.json'), state);
   await writeFile(path.join(destination, 'index.json'), indexBytes);
+  await writeFile(
+    path.join(publicDirectory, preferenceRulesAssetPath.slice(1)),
+    JSON.stringify({
+      repoId: index.repoId,
+      packages: Object.fromEntries(rules),
+    }) + '\n',
+  );
   return index.builds.length;
 }

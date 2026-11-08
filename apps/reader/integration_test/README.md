@@ -36,7 +36,7 @@ flutter test integration_test/category_sync_test.dart --no-pub \
 
 ## 全局设置同步
 
-`settings_sync_test.dart` 复用上面的正式产品构建、官方 HTTPS harness 和设备信任配置；启动服务时不设置 `ACCEPTANCE_FIXTURE` 或 Source policies，使用空 D1 与零扩展索引。两个客户端必须使用同一个实际 HTTPS origin 和服务输出的 subject。Android 的隔离 debug 副本按上面的精确主机 CA 配置，并逐文件核对当前产品 Dart、驱动、锁文件与内置材料；不要复用历史副本的旧业务源码。
+`settings_sync_test.dart` 复用上面的正式产品构建、官方 HTTPS harness 和设备信任配置；普通顺序和前台恢复阶段不设置 `ACCEPTANCE_FIXTURE`，丢确认阶段使用下方专用夹具；全局设置阶段均不设置 Source 策略，使用空 D1 与零扩展索引。两个客户端必须使用同一个实际 HTTPS origin 和服务输出的 subject。Android 的隔离 debug 副本按上面的精确主机 CA 配置，并逐文件核对当前产品 Dart、驱动、锁文件与内置材料；不要复用历史副本的旧业务源码。
 
 Android 的 WebView 与 Dart HTTP 客户端分别维护证书信任；上面的 Network Security Config 只配置 WebView。使用本地 CA 时，在该驱动的阶段配置中额外传入 `SETTINGS_TEST_CA_BASE64` 的标准 Base64 字符串（对本轮 PEM 文件的原始字节编码，不是文件路径）。驱动仅允许 Android 且已校验的 `https://127.0.0.1` origin，在 `app.main()` 前用 Dart 标准库解码后向当前测试进程的默认 `SecurityContext` 追加本轮 CA；保留既有根证书与主机名校验，不使用 `HttpOverrides` 或 `badCertificateCallback`，不改变产品 TLS。iOS 不传该字段，继续由专用模拟器正常信任证书。
 
@@ -46,7 +46,7 @@ Android 的 WebView 与 Dart HTTP 客户端分别维护证书信任；上面的 
 | ------------------------- | --------------------------------------------------- |
 | `APP_ORIGIN`              | 官方 harness 的实际 HTTPS origin                    |
 | `SETTINGS_SUBJECT`        | 本次服务已确认的 subject                            |
-| `SETTINGS_PHASE`          | `verify`、`write` 或 `resume`                       |
+| `SETTINGS_PHASE`          | `verify`、`write`、`resume` 或 `ack-loss`           |
 | `SETTINGS_EXPECT_JSON`    | 本阶段完整当前 SettingsResponse 的 JSON 字符串      |
 | `SETTINGS_PRESET`         | 写入与前台恢复阶段填写，取下述两个预设之一          |
 | `SETTINGS_TEST_CA_BASE64` | 可选，仅 Android loopback 本地 CA 文件字节的 Base64 |
@@ -66,9 +66,15 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
 
 另可用同一初始快照和预设验证自动前台重取：客户端 A 运行 `resume`，等到 `SETTINGS_RESUME_READY` 后用系统 Home 或 App 切换器将其送到后台，不结束进程。等 A 输出 `SETTINGS_RESUME_PAUSED` 后，在同一服务的独立客户端 B 运行 `write`，确认 account/global revision 各只增加 1。然后用系统界面回到 A 的原进程和设置页面，不点重读、不切换应用内导航、不重启。A 在暂停期间不 pump 或发起测试读取，等待实际系统事件至多 5 分钟；输出同 PID 的 `SETTINGS_RESUME_RESUMED` 后，先核对事件时的原快照，再等待正式客户端自动更新同一设置控制器、表单和实际应用主题。驱动在此期间不注入生命周期事件，也不主动重取设置。最后从独立客户端只读确认 revision 没有再次增加；记录实际平台、设备和事件。
 
+### 全局设置已提交后丢确认
+
+为每端分别启动新的官方 HTTPS harness，设置 `ACCEPTANCE_FIXTURE=settings-ack-loss`。从另一个主机进程以正常 TLS 和本节的业务头读取 `/api/settings` 与 `/api/library`，要求空书架、系统主题、账户和全局设置 revision `0/0`。阶段 JSON 使用服务的 `APP_ORIGIN`、`SETTINGS_SUBJECT=acceptance-owner`、完整 `SETTINGS_EXPECT_JSON` 和 `SETTINGS_PHASE=ack-loss`，不传 `SETTINGS_PRESET`。Android 继续使用精确主机 debug CA 配置、`SETTINGS_TEST_CA_BASE64` 与实际端口的 `adb reverse`。
+
+用上方命令运行正式设置驱动。它只将主题改为深色，验证首次丢确认保留原草稿；在同一进程以独立 HTTPS 连接核对已提交的深色 `1/1`；用正式「重新读取设置」应用主题但保留原待确认操作，再点「重试原设置操作」才清除提示，版本仍为 `1/1`。另一个主机进程重取设置与书架，仅允许主题和 revision 改变。按 Enter 停服，核对 `ACCEPTANCE_SETTINGS_ACK_AUDIT` 恰好两条、`sequence=1/2`、`drop_ack=1/0`、预期 revision 均为 0、确认 revision 均为 `1/1`，同一 mutation UUID 及正文、确认和持久回执的 SHA-256 全同。已提交的写阶段须用新 D1 才能重跑。实际结果与边界见 [Native 丢确认记录](../../../docs/verification/native-settings-ack.md)。
+
 ## 章节书签同步
 
-`bookmarks_sync_test.dart` 使用正式 `app.main()` → `NativePlatformRuntime` → 服务端真实 xkcd 书架点击 → `MangaDetailsPage` → `ChapterBookmarkButton`。复用下节的当前 Source 产物、网络政策与官方 HTTPS harness。它只在详情标记章节，不进入 Reader、不请求阅读页或图片；本轮书架不得有自定义封面。iOS 使用正常设备信任，不传测试 CA；Android 如需本地 CA，可按全局设置驱动相同的标准追加方式传 `BOOKMARKS_TEST_CA_BASE64`，仅允许 Android 的 `https://127.0.0.1`，保留系统根证书与 hostname 检查。
+`bookmarks_sync_test.dart` 使用正式 `app.main()` → `NativePlatformRuntime` → 服务端真实 xkcd 书架点击 → `MangaDetailsPage` → `ChapterBookmarkButton`。复用下节的当前 Source 产物与官方 HTTPS harness。它只在详情标记章节，不进入 Reader、不请求阅读页或图片；本轮书架不得有自定义封面。iOS 使用正常设备信任，不传测试 CA；Android 如需本地 CA，可按全局设置驱动相同的标准追加方式传 `BOOKMARKS_TEST_CA_BASE64`，仅允许 Android 的 `https://127.0.0.1`，保留系统根证书与 hostname 检查。
 
 若新 HTTPS D1 没有可用的 Web 客户端，可先从 iOS 或 Android 运行 `prepare`。该阶段要求初始 account revision 为 0、书架与账户安装列表为空；从正式空书架进入浏览，在扩展管理准备并安装指定构建，选择精确英文 Source 并从热门打开目标作品，点击「加入书架」后通过只读 API 核对已确认状态。只进行安装和收藏这两次业务写入；不设置书签、不打开阅读器。准备失败后先检查实际 D1 状态，已提交的安装或收藏不得盲目重跑该阶段。
 
@@ -105,7 +111,7 @@ flutter test integration_test/bookmarks_sync_test.dart --no-pub \
 
 ## 章节范围已读与未读
 
-`chapter_read_sync_test.dart` 复用上文真实 xkcd 静态快照、Source 网络政策、官方 HTTPS harness 和设备证书配置。使用新的空 D1，不设故障夹具；先在 iOS 跑书签驱动的 `prepare`，安装精确 xkcd 构建并收藏英文 Source `1538249443376436084` 的 `SINGLE`。确认 account / manga / global revision 为 2 / 1 / 1，书架只有该作品，进度、书签和续读为空。
+`chapter_read_sync_test.dart` 复用上文真实 xkcd 静态快照、官方 HTTPS harness 和设备证书配置。使用新的空 D1，不设故障夹具；先在 iOS 跑书签驱动的 `prepare`，安装精确 xkcd 构建并收藏英文 Source `1538249443376436084` 的 `SINGLE`。确认 account / manga / global revision 为 2 / 1 / 1，书架只有该作品，进度、书签和续读为空。
 
 用同一实际 HTTPS origin 和 subject 分别运行 iOS `read` → Android `unread` → 新 iOS 进程 `verify`：
 
@@ -121,7 +127,7 @@ flutter test integration_test/chapter_read_sync_test.dart --no-pub \
 
 ## 单作品阅读设置同步
 
-`manga_settings_sync_test.dart` 使用正式 Native Reader 与同一官方 HTTPS harness。用下节方式构建与当前宿主材料匹配的 xkcd v6 快照，仅注册 xkcd 的 `xkcd.com` 和 `imgs.xkcd.com`。使用新隔离 D1、`acceptance-owner` 和实际回环 HTTPS origin，关闭故障夹具。按上文书签驱动的 `prepare` 安装精确构建，收藏英文 Source `1538249443376436084` 的 `SINGLE`；保持默认全局阅读设置。
+`manga_settings_sync_test.dart` 使用正式 Native Reader 与同一官方 HTTPS harness。用下节方式构建与当前宿主材料匹配的 xkcd v6 快照。使用新隔离 D1、`acceptance-owner` 和实际回环 HTTPS origin，关闭故障夹具。按上文书签驱动的 `prepare` 安装精确构建，收藏英文 Source `1538249443376436084` 的 `SINGLE`；保持默认全局阅读设置。
 
 另用正式 `POST /api/state/mutations` 添加一个仅用于独立读回的对照收藏。使用相同业务请求头及 JSON 正文：`schemaVersion` 取当前 `businessSchemaVersion`，`mutationId` 为新 UUID，`expectedRevision: 0`，`setFavorite.favorite: true`，`setFavorite.metadata` 含与 xkcd 不同的 `packageName`、`sourceId`、`sourceName`、`sourceLang`，以及 `manga.url/title`。按正式规则计算 `mangaKey`：`SHA256(UTF8(JSON.stringify([packageName, sourceId, mangaUrl])))`。核对回执中的 key 与收藏状态；对照作品不进入 Reader。书架应只有这两部作品，均无自定义封面。
 
@@ -139,24 +145,21 @@ flutter test integration_test/manga_settings_sync_test.dart --no-pub \
 
 ## Source 阅读与筛选验收
 
-官方 harness 现在可以按显式主机列表注册当前静态快照中的真实 Source。先用固定提交构建与当前 ABI 匹配的候选快照，再运行正式构建：
+先用固定提交构建与当前 ABI 匹配的候选快照，再运行正式构建。中继不需要指定扩展域名：
 
 ```sh
 EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build
-ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.komiic","allowedHosts":["komiic.com"]}]' \
-  pnpm acceptance:serve
+pnpm acceptance:serve
 ```
 
-`ACCEPTANCE_SOURCE_POLICIES` 是本地验收配置，最多 16 包、每包 32 个明确 hostname，总输入不超过 32 KiB；不能填 URL、通配符或省略真实请求主机。入口从本轮官方 Static Assets 读取并验证索引、清单和资源权威关系，经正式 `registrationSql` 生成网络政策，写入隔离 D1。不存在于当前索引的包或无效政策会在输出就绪 URL 前失败；不更改生产 D1、公开资产或发布状态。无需伪造 Source supplier 或关闭正式网络检查。对额外图片域名、重定向域名仍须逐项确认后声明。
-
-Native 使用 `pnpm acceptance:build:native`，并按上文证书和设备要求启动同一官方 HTTPS harness；同时设置 `ACCEPTANCE_SOURCE_POLICIES`。HTTP 模式用于内置浏览器，不作为 Native TLS 或生产 Access 的证据。以下 Source 驱动可复用该服务，但新的正式链路仍须实际执行各平台门，不能把配置就绪当成在线验收通过。旧自有服务已退役，历史记录保留原环境。
+Native 使用 `pnpm acceptance:build:native`，按上文证书和设备要求启动同一官方 HTTPS harness。HTTP 模式用于内置浏览器，不作为 Native TLS 或生产 Access 的证据。以下驱动复用该服务；配置就绪不表示在线验收通过。
 
 `server_sync_test.dart` 通过 Flutter 官方 `integration_test` 启动正式 `app.main()`，使用真正的 Native WebView、内置运行时材料、Source、阅读 UI 和业务 API。它不注入测试 PlatformRuntime、内存业务服务或图片 supplier。
 
 ### 前置条件
 
 1. 准备与当前宿主 ABI 匹配的真实 xkcd 构建、Native 内置材料与正式 Web 构建，入口见仓库构建说明；只使用与当前 ABI 一致的产物，旧 v4/v5 构建不可混入 v6 验收。
-2. 按上文配置 xkcd 的实际网络政策，启动官方 HTTPS harness。Web 与 Native 使用同一实际 origin、测试身份与隔离 D1。原[Source 测试服务](../../api/test/source-metadata-probe.md)只保留历史说明；本地签名身份不证明生产 Access/Cookie 行为。
+2. 启动官方 HTTPS harness。Web 与 Native 使用同一实际 origin、测试身份与隔离 D1。原[Source 测试服务](../../api/test/source-metadata-probe.md)只保留历史说明；本地签名身份不证明生产 Access/Cookie 行为。
 3. Native 必须正常信任 HTTPS 证书。建议创建可丢弃模拟器，只向该设备添加本轮测试 CA；不修改产品 TLS、Mac 全局信任或已有设备信任，不接受证书错误。
 4. 使用上文书签驱动的 `prepare` 阶段，或在能够正常信任同一 HTTPS origin 的内置浏览器中，经正式 UI 安装并收藏英文 xkcd。初次运行前保留第 1 页进度或尚无进度；测试从服务端书架进入该作品。
 
@@ -219,7 +222,7 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 
 ### 阅读进度已提交后丢确认
 
-启动上述正式 HTTPS harness 时指定 `ACCEPTANCE_FIXTURE=progress-ack-loss`，保留当前 xkcd 构建和实际域名政策。使用独立空 D1，先用书签驱动 `prepare` 从正式 UI 安装并收藏英文 xkcd。该夹具只中断 `SINGLE` 的 `/3319/` 末页显式完成的首个成功响应，普通页码保存不消耗故障。
+启动上述正式 HTTPS harness 时指定 `ACCEPTANCE_FIXTURE=progress-ack-loss`，保留当前 xkcd 构建。使用独立空 D1，先用书签驱动 `prepare` 从正式 UI 安装并收藏英文 xkcd。该夹具只中断 `SINGLE` 的 `/3319/` 末页显式完成的首个成功响应，普通页码保存不消耗故障。
 
 用 `server_sync_test.dart` 的 `--dart-define-from-file` 传 `SYNC_PHASE=ack-loss`、`SYNC_SUBJECT=acceptance-owner`、精确 `SYNC_BUILD_ID`、`SYNC_EXPECT_EPOCH=0`、`SYNC_START_PAGE=1`、`SYNC_TARGET_PAGE=2` 以及服务报告的 `APP_ORIGIN=https://127.0.0.1:PORT`。设备按上文正常信任测试 CA；Android 仍需按规定配置 WebView 和 `SYNC_TEST_CA_BASE64`。
 
@@ -227,7 +230,7 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 
 ### 阅读进度同时写
 
-使用当前 xkcd 快照构建正式产品（Web 用 `pnpm acceptance:build`，Native 用 `pnpm acceptance:build:native`）。按上文设置 xkcd Source 政策；在新隔离 D1 上执行 `ACCEPTANCE_FIXTURE=progress-cas-race pnpm acceptance:serve`，两个正式客户端使用服务打印的同一 origin 和测试身份。Native 仍使用前述回环 HTTPS、正常证书信任与实际端口。
+使用当前 xkcd 快照构建正式产品（Web 用 `pnpm acceptance:build`，Native 用 `pnpm acceptance:build:native`）。在新隔离 D1 上执行 `ACCEPTANCE_FIXTURE=progress-cas-race pnpm acceptance:serve`，两个正式客户端使用服务打印的同一 origin 和测试身份。Native 仍使用前述回环 HTTPS、正常证书信任与实际端口。
 
 先从正式界面安装并收藏英文 xkcd，两个独立 Reader 打开 `SINGLE` 的 `/3319/`，保持真实第 2 页已解码且已保存、尚未读完。两端必须确认同一作品 revision、epoch 与清单后才开始；普通进度观察不会占用夹具。一个 Reader 点「读完本章」，另一个点「重新阅读本章」，两条命令须在 15 秒内到达；双方都经过正式 Worker 的写前读取并到达 D1 原子批次后，才提交各自原有的批次。
 

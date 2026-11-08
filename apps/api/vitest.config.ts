@@ -11,11 +11,17 @@ export default defineConfig({
       },
       remoteBindings: false,
       miniflare: {
+        assets: {
+          directory: fileURLToPath(
+            new URL('./test/fixture/public', import.meta.url),
+          ),
+          hasUserWorker: true,
+          notFoundHandling: 'none',
+          runWorkerFirst: ['/api', '/api/*', '/runtime/host.html'],
+        },
         bindings: {
           ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
           ACCESS_AUD: 'state-fixture',
-          ACCESS_SUBJECT: '',
-          OWNER_EMAIL: 'owner@example.com',
           APP_ORIGIN: 'https://read.example.com',
           PROBE_ACCESS_JWKS: '{"keys":[]}',
           TEST_MIGRATIONS: await readD1Migrations(

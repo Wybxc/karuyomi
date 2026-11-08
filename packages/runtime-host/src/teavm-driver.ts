@@ -18,7 +18,6 @@ import {
   closedSchema,
   messageJson,
   validatePreferenceBootstrap,
-  preferenceSyncRulesForCatalog,
   validateSyncedPreferenceEntries,
 } from '@karuyomi/contracts';
 import { RuntimeFailure, runtimeFailure } from './errors.js';
@@ -351,33 +350,41 @@ export class TeaVMDriver implements RuntimeDriver {
       preferences.packageName !== manifest.packageName ||
       preferences.sources.some(
         (source) => !manifest.sourceIds.includes(source.sourceId),
+      ) ||
+      preferences.syncRules.some(
+        (rule) =>
+          rule.sourceId !== undefined &&
+          !manifest.sourceIds.includes(rule.sourceId),
       )
     )
       throw new RuntimeFailure(
         'protocol_error',
         'Preference bootstrap does not belong to this extension',
       );
+    if (
+      preferences.syncRules.length > 0 &&
+      catalog.catalogUrl !== new URL('/extensions/index.json', this.origin).href
+    )
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Account preference rules require the application catalog',
+      );
     this.packageName = manifest.packageName;
-    this.syncRules = preferenceSyncRulesForCatalog(
-      manifest.packageName,
-      catalog,
-      this.origin,
-    );
+    this.syncRules = preferences.syncRules;
     const preferenceConfiguration = JSON.stringify(
       messageJson(
         pb.PreferenceHostConfigurationSchema,
         create(pb.PreferenceHostConfigurationSchema, {
-          bootstrap: preferences,
+          bootstrap: {
+            packageName: preferences.packageName,
+            sources: preferences.sources,
+          },
           syncRules: this.syncRules,
         }),
       ),
     );
     this.binaryTransport?.dispose();
-    this.binaryTransport = new BinaryHttpTransport(this.origin, {
-      buildId: manifest.buildId,
-      catalog,
-      bundleSha256: manifest.bundle.sha256,
-    });
+    this.binaryTransport = new BinaryHttpTransport(this.origin);
     this.scope.karuyomiResources = {};
     for (const resource of manifest.resources) {
       const bytes = await this.loader.sharedArtifact(resource, signal);

@@ -1,6 +1,5 @@
 import { create, toJson } from '@bufbuild/protobuf';
 import {
-  extensionNetworkPoliciesResponseSchema,
   sourcePreferencesMutationResponseSchema,
   sourcePreferencesResponseSchema,
   SOURCE_PREFERENCES_PACKAGE_LIMIT,
@@ -386,80 +385,4 @@ test('catalog namespace isolates the same package and an external keiyoushi name
     pb.BusinessStateErrorCode.IDEMPOTENCY_CONFLICT,
   );
   expect(changedScope.body.catalog).toMatchObject(main);
-});
-
-test('network policy readiness lists only exact catalog bindings and verified build receipts', async () => {
-  const reader = await client();
-  const suffix = crypto.randomUUID();
-  const packageName = 'eu.kanade.fixture.' + suffix;
-  const external = {
-    catalogUrl: 'https://other.example.org/extensions/index.json',
-    repoId: 'other',
-  };
-  const insert = (id: string, repo: string, url: string, status: string) =>
-    env.DB.prepare(
-      'INSERT INTO extension_builds (build_id,package_name,catalog_url,repo_id,bundle_sha256,status,created_at,allowed_hosts_json) VALUES (?,?,?,?,?,?,?,?)',
-    )
-      .bind(id, packageName, url, repo, 'a'.repeat(64), status, 0, '[]')
-      .run();
-  await insert(
-    'default-' + suffix,
-    'keiyoushi',
-    origin + '/extensions/index.json',
-    'verified',
-  );
-  await insert(
-    'external-' + suffix,
-    external.repoId,
-    external.catalogUrl,
-    'verified',
-  );
-  const response = await reader.request(
-    '/api/extensions/network-policies?catalogUrl=' +
-      encodeURIComponent(external.catalogUrl) +
-      '&repoId=' +
-      external.repoId,
-  );
-  expect(response.status).toBe(200);
-  const policy = extensionNetworkPoliciesResponseSchema.parse(
-    await response.json(),
-  );
-  expect(policy.catalog).toMatchObject(external);
-  expect(
-    policy.builds.filter((build) => build.packageName === packageName),
-  ).toMatchObject([
-    {
-      buildId: 'external-' + suffix,
-      packageName,
-      bundleSha256: 'a'.repeat(64),
-    },
-  ]);
-  await env.DB.prepare('UPDATE extension_builds SET status=? WHERE build_id=?')
-    .bind('disabled', 'external-' + suffix)
-    .run();
-  const disabled = await reader.request(
-    '/api/extensions/network-policies?catalogUrl=' +
-      encodeURIComponent(external.catalogUrl) +
-      '&repoId=' +
-      external.repoId,
-  );
-  expect(
-    extensionNetworkPoliciesResponseSchema
-      .parse(await disabled.json())
-      .builds.some((build) => build.packageName === packageName),
-  ).toBe(false);
-  expect(
-    (
-      await reader.request(
-        '/api/extensions/network-policies?catalogUrl=' +
-          encodeURIComponent(external.catalogUrl) +
-          '&repoId=other',
-        { headers: { 'X-App-Subject': 'stale' } },
-      )
-    ).status,
-  ).toBe(403);
-  expect(
-    (await reader.request('/api/extensions/network-policies?repoId=other'))
-      .status,
-  ).toBe(400);
 });

@@ -99,7 +99,7 @@ class _ExtensionsPageState extends State<ExtensionsPage>
         title: const Text('确认添加仓库'),
         content: SingleChildScrollView(
           child: Text(
-            '${preview.repository.name}\n${preview.repository.catalogUrl}\n身份：${preview.repository.repoId}\n当前 ${preview.builds.length} 个扩展。添加仓库不会安装或运行代码，网络登记另行显示。',
+            '${preview.repository.name}\n${preview.repository.catalogUrl}\n身份：${preview.repository.repoId}\n当前 ${preview.builds.length} 个扩展。添加仓库不会安装或运行代码。',
           ),
         ),
         actions: [
@@ -224,14 +224,14 @@ class _ExtensionsPageState extends State<ExtensionsPage>
               catalog.catalogUrl,
               key: const ValueKey('extensions-catalog-url'),
             ),
-            const Text('扩展从已确认仓库的公开静态目录获取。代码准备与漫画源网络登记分别检查。'),
+            const Text('扩展从已确认仓库的公开静态目录获取。打开时核对账户所选构建与产物。'),
             Text('仓库 ${catalog.repositories.length - 1} / 16（另含固定默认仓库）'),
             for (final repository in catalog.repositories)
               Card(
                 child: ListTile(
                   title: Text(repository.name),
                   subtitle: Text(
-                    '${repository.catalogUrl}\n身份：${repository.repoId}\n${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}${catalog.networkPolicyErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}',
+                    '${repository.catalogUrl}\n身份：${repository.repoId}\n${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}',
                   ),
                   trailing: repository.catalogUrl == catalog.catalogUrl
                       ? const Text('默认')
@@ -392,11 +392,6 @@ class _ExtensionsPageState extends State<ExtensionsPage>
                       children: [
                         Text('${build.packageName} · ${build.version}'),
                         Text('${build.catalogUrl} · ${build.repoId}'),
-                        Text(
-                          catalog.isNetworkRegistered(build)
-                              ? '网络已登记，打开时校验精确构建'
-                              : '代码可准备；网络待登记或尚未读取',
-                        ),
                         for (final source in build.sources)
                           Text(
                             '${source.name} · ${source.lang.isEmpty ? '未标注语言' : source.lang}',
@@ -484,15 +479,6 @@ class _ExtensionsPageState extends State<ExtensionsPage>
             Text(extension.packageName),
             Text('账户选择：${extension.buildId}'),
             Text('${extension.catalogUrl} · ${extension.repoId}'),
-            if (latest != null)
-              Text(
-                widget.catalog.isNetworkRegistered(
-                      latest,
-                      sha256: extension.bundleSha256,
-                    )
-                    ? '网络已登记'
-                    : '代码与账户选择保留；网络待登记或尚未读取',
-              ),
             Text(
               cached.contains(extension.bundleSha256) ? '本机产物已准备' : '本机尚未准备',
             ),

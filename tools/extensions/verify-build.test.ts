@@ -22,6 +22,7 @@ import isRecord from 'is-plain-obj';
 import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import {
   repositoryRoot,
+  verifyBuild,
   verifyIntegrity,
   parseExtensionIndex,
 } from './verify-manifest.ts';
@@ -167,12 +168,21 @@ test('same-length artifact corruption fails its SHA-256 gate', async (t) => {
 });
 
 test('canonical corruption and malformed gzip fail after the compressed byte gate', async (t) => {
-  for (const mode of ['canonical', 'truncated', 'bomb'] as const) {
+  for (const mode of [
+    'canonical',
+    'truncated',
+    'trailing',
+    'concatenated',
+    'bomb',
+  ] as const) {
     const value = await fixture(t);
     let encoded = value.bytes;
     if (mode === 'canonical')
       encoded = gzipSync(Buffer.alloc(value.canonical.length, 0));
     if (mode === 'truncated') encoded = encoded.subarray(0, -1);
+    if (mode === 'trailing')
+      encoded = Buffer.concat([encoded, Buffer.from('trailing')]);
+    if (mode === 'concatenated') encoded = Buffer.concat([encoded, encoded]);
     if (mode === 'bomb') value.manifest.bundle.size = 1;
     value.manifest.bundle.encodedSha256 = createHash('sha256')
       .update(encoded)
@@ -190,6 +200,34 @@ test('canonical corruption and malformed gzip fail after the compressed byte gat
       mode === 'canonical' ? 'hash_mismatch' : 'invalid_gzip',
     );
   }
+});
+
+test('release assembly reuses verified bytes but still rejects wrong file sizes and oversized metadata', async (t) => {
+  const { directory, manifest, artifact, bytes } = await fixture(t);
+  const artifacts = path.join(directory, 'artifacts');
+  const materialCatalog = { hostScripts: [], resources: [] };
+  const alreadyVerified = { materialCatalog, verifyHashes: false };
+  await verifyBuild(manifest, artifacts, { materialCatalog });
+  await writeFile(artifact, Buffer.alloc(bytes.length));
+  await verifyBuild(manifest, artifacts, alreadyVerified);
+  await assert.rejects(verifyBuild(manifest, artifacts, { materialCatalog }), {
+    code: 'hash_mismatch',
+  });
+  await assert.rejects(
+    verifyBuild(
+      {
+        ...manifest,
+        bundle: { ...manifest.bundle, encodedSize: 25 * 1024 * 1024 + 1 },
+      },
+      artifacts,
+      alreadyVerified,
+    ),
+    { code: 'invalid_manifest' },
+  );
+  await writeFile(artifact, 'smaller');
+  await assert.rejects(verifyBuild(manifest, artifacts, alreadyVerified), {
+    code: 'size_mismatch',
+  });
 });
 
 test('the browser delivery payload retains gzip bytes, transport MIME and size', async (t) => {

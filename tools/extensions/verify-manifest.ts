@@ -110,6 +110,21 @@ export function verifyMaterialReferences(
   }
 }
 
+/** False is only for bytes verified at a transfer boundary in this process. */
+export async function verifyBuild(
+  input: unknown,
+  artifactDirectory: string,
+  {
+    materialCatalog,
+    verifyHashes = true,
+  }: { materialCatalog: MaterialCatalogRefs; verifyHashes?: boolean },
+): Promise<BuildManifest> {
+  const manifest = await parseManifestValue(input);
+  verifyMaterialReferences(manifest, materialCatalog);
+  await verifyBundleFile(manifest.bundle, artifactDirectory, { verifyHashes });
+  return manifest;
+}
+
 /** One transfer boundary: hash the encoded and canonical byte domains once. */
 export async function decodeBundleBytes(
   bundle: BundleArtifact,

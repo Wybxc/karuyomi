@@ -6,8 +6,9 @@ import {
   parseMessage,
   requireCondition,
   SOURCE_ARGUMENT_LIMIT,
+  validId,
+  validSourceId,
 } from './codec.ts';
-import { validId, validSourceId } from './static-control.ts';
 
 export const PREFERENCE_DEPTH_LIMIT = 8;
 export const PREFERENCE_NODE_LIMIT = 256;
@@ -96,14 +97,95 @@ export function validatePreferenceEntries(
     maximumBytes,
   );
 }
+export function validatePreferencePackageName(packageName: string): void {
+  requireCondition(
+    /^eu\.kanade\.[A-Za-z0-9_.]+$/.test(packageName) &&
+      packageName.length <= 200,
+    'Invalid preference package identity',
+  );
+}
+
+function valueKind(value: pb.PreferenceValue): pb.PreferenceValueKind {
+  switch (value.value.case) {
+    case 'boolean':
+      return pb.PreferenceValueKind.BOOLEAN;
+    case 'text':
+      return pb.PreferenceValueKind.TEXT;
+    case 'integer':
+      return pb.PreferenceValueKind.INTEGER;
+    case 'longInteger':
+      return pb.PreferenceValueKind.LONG_INTEGER;
+    case 'decimal':
+      return pb.PreferenceValueKind.DECIMAL;
+    case 'strings':
+      return pb.PreferenceValueKind.STRINGS;
+    default:
+      throw new Error('A typed preference value is required');
+  }
+}
+
+export function validatePreferenceSyncRules(
+  rules: readonly pb.PreferenceSyncRule[],
+): void {
+  requireCondition(
+    rules.length <= PREFERENCE_ENTRY_LIMIT,
+    'Too many preference sync rules',
+  );
+  const keys = new Set<string>();
+  for (const rule of rules) {
+    key(rule.key);
+    if (rule.sourceId !== undefined) validSourceId(rule.sourceId);
+    const identity = JSON.stringify([rule.key, rule.sourceId ?? null]);
+    requireCondition(
+      !keys.has(identity) &&
+        Number.isInteger(rule.kind) &&
+        rule.kind >= pb.PreferenceValueKind.BOOLEAN &&
+        rule.kind <= pb.PreferenceValueKind.LONG_INTEGER,
+      'Invalid or duplicate preference sync rule',
+    );
+    keys.add(identity);
+  }
+}
+
+export function preferenceEntryMatchesRule(
+  sourceId: string,
+  entry: pb.PreferenceEntry,
+  rules: readonly pb.PreferenceSyncRule[],
+): boolean {
+  const value = entry.value;
+  return (
+    value !== undefined &&
+    rules.some(
+      (rule) =>
+        rule.key === entry.key &&
+        (rule.sourceId === undefined || rule.sourceId === sourceId) &&
+        rule.kind === valueKind(value),
+    )
+  );
+}
+
+export function validateSyncedPreferenceEntries(
+  packageName: string,
+  sourceId: string,
+  entries: readonly pb.PreferenceEntry[],
+  rules: readonly pb.PreferenceSyncRule[],
+): void {
+  validatePreferencePackageName(packageName);
+  validSourceId(sourceId);
+  validatePreferenceEntries(entries);
+  requireCondition(
+    entries.every((entry) =>
+      preferenceEntryMatchesRule(sourceId, entry, rules),
+    ),
+    'Source preference key or type is not approved for account sync',
+  );
+}
+
 export function validatePreferenceBootstrap(
   value: pb.PreferenceBootstrap,
 ): void {
-  requireCondition(
-    /^eu\.kanade\.[A-Za-z0-9_.]+$/.test(value.packageName) &&
-      value.packageName.length <= 200,
-    'Invalid preference package identity',
-  );
+  validatePreferencePackageName(value.packageName);
+  validatePreferenceSyncRules(value.syncRules);
   requireCondition(
     value.sources.length <= 64 &&
       new Set(value.sources.map((source) => source.sourceId)).size ===

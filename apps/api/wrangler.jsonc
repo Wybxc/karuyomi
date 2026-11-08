@@ -19,8 +19,6 @@
   "vars": {
     "ACCESS_TEAM_DOMAIN": "wybxc.cloudflareaccess.com",
     "ACCESS_AUD": "715cfedd3bdf82be23fb21b58c6d3b6d533a1e123f901c17b5697da842d7ce4c",
-    "ACCESS_SUBJECT": "",
-    "OWNER_EMAIL": "wybxc@qq.com",
     "APP_ORIGIN": "https://karuyomi.wybxc.cc",
   },
   "d1_databases": [

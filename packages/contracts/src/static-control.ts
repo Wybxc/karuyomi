@@ -6,11 +6,16 @@ import {
   codec,
   type PlainMessage,
   plainMessage,
+  parseMessage,
   plain,
   messageJson,
   requireCondition,
   requireFields,
+  validId,
+  validSourceId,
 } from './codec.ts';
+import { validatePreferenceSyncRules } from './preferences-control.ts';
+export { validId, validSourceId } from './codec.ts';
 
 type Present<T, K extends keyof T> = T & { [P in K]-?: NonNullable<T[P]> };
 export type Artifact = Present<
@@ -22,12 +27,13 @@ export type BundleArtifact = Required<PlainMessage<pb.BundleArtifact>>;
 export type CatalogSource = Required<PlainMessage<pb.CatalogSource>>;
 export type BuildManifest = Omit<
   Required<PlainMessage<pb.BuildManifest>>,
-  'bundle' | 'hostScripts' | 'resources' | 'sources'
+  'bundle' | 'hostScripts' | 'resources' | 'sources' | 'preferenceSyncRules'
 > & {
   sources: CatalogSource[];
   bundle: BundleArtifact;
   hostScripts: Artifact[];
   resources: ResourceArtifact[];
+  preferenceSyncRules: PlainMessage<pb.PreferenceSyncRule>[];
 };
 export type ExtensionBuildDescriptor = Omit<
   Required<PlainMessage<pb.ExtensionBuildDescriptor>>,
@@ -77,21 +83,26 @@ export const catalogReferenceSchema = codec<CatalogReference>((input) => {
 });
 
 export const buildIdSchema = z.string().regex(/^[a-zA-Z0-9._-]{1,200}$/);
+export const preferenceRulesAssetPath = '/extensions/preference-rules.json';
+export const preferenceRulesAssetSchema = z
+  .object({
+    repoId: buildIdSchema,
+    packages: z.record(
+      z.string(),
+      z.array(z.unknown()).transform((items) => {
+        const rules = items.map((item) =>
+          parseMessage(pb.PreferenceSyncRuleSchema, item),
+        );
+        validatePreferenceSyncRules(rules);
+        return rules;
+      }),
+    ),
+  })
+  .strict();
 export const staticManifestPathSchema = z
   .string()
   .regex(/^\/extensions\/builds\/[a-zA-Z0-9._-]{1,200}\/manifest\.json$/);
 
-export function validId(value: string): void {
-  requireCondition(value.length > 0 && value.length <= 200, 'Invalid identity');
-}
-export function validSourceId(value: string): void {
-  requireCondition(/^-?\d{1,19}$/.test(value), 'Invalid Source identity');
-  const id = BigInt(value);
-  requireCondition(
-    id >= -9223372036854775808n && id <= 9223372036854775807n,
-    'Source identity exceeds signed int64',
-  );
-}
 function boundedText(value: string, max: number): void {
   requireCondition(value.length > 0 && value.length <= max, 'Invalid text');
 }
@@ -227,6 +238,14 @@ export const buildManifestSchema = codec<BuildManifest>((input) => {
   boundedText(value.storageSchema, 100);
   validSources(value.sourceIds);
   const sources = catalogSources(value.sources, value.sourceIds);
+  validatePreferenceSyncRules(value.preferenceSyncRules);
+  requireCondition(
+    value.preferenceSyncRules.every(
+      (rule) =>
+        rule.sourceId === undefined || value.sourceIds.includes(rule.sourceId),
+    ),
+    'Preference sync rules must refer to a Source in this build',
+  );
   const bundle = bundleArtifactSchema.parse(
     messageJson(pb.BundleArtifactSchema, value.bundle),
   );
@@ -244,7 +263,14 @@ export const buildManifestSchema = codec<BuildManifest>((input) => {
       96 * 1024 * 1024,
     'Build exceeds the runtime loading budget',
   );
-  return { ...value, bundle, hostScripts, resources, sources };
+  return {
+    ...value,
+    bundle,
+    hostScripts,
+    resources,
+    sources,
+    preferenceSyncRules: value.preferenceSyncRules.map(plain),
+  };
 });
 
 export const extensionBuildDescriptorSchema = codec<ExtensionBuildDescriptor>(

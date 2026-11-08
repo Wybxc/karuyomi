@@ -60,7 +60,6 @@ final class TestPlatform extends PlatformRuntime {
   late final CatalogTransport catalogTransport = _TestCatalogTransport(this);
   final publicDocuments = <String, Object?>{};
   final publicReads = <Uri>[];
-  final policyDocuments = <String, wire.ExtensionNetworkPoliciesResponse>{};
   CoverTransport? covers;
   @override
   CoverTransport? get coverTransport => covers;
@@ -106,8 +105,6 @@ final class TestPlatform extends PlatformRuntime {
   final invocations = <wire.SourceCall>[];
   final imageControls = <(String, Map<String, Object?>)>[];
   final controlCommands = <wire.ControlRequest_Command>[];
-  final networkPolicyRequests = <wire.ApiFetchRequest>[];
-  wire.ApiFetchResponse? networkPolicyReply;
   Map<String, Object?>? continuation;
   Future<wire.SourceResult> Function(wire.SourceCall call)? invokeHandler;
   Future<void> Function(String pageSessionId)? closePageSessionHandler;
@@ -153,34 +150,6 @@ final class TestPlatform extends PlatformRuntime {
   }
 
   wire.ApiFetchResponse _fetch(String path) {
-    final uri = Uri.parse(path);
-    if (uri.path == '/api/extensions/network-policies') {
-      final url = uri.queryParameters['catalogUrl']!;
-      final repo = uri.queryParameters['repoId']!;
-      final index = wire.decodeProtoJson(wire.ExtensionIndex(), inventory);
-      final value =
-          policyDocuments[url] ??
-          wire.ExtensionNetworkPoliciesResponse(
-            schemaVersion: 1,
-            catalog: wire.CatalogReference(catalogUrl: url, repoId: repo),
-            builds:
-                url == '${origin.origin}/extensions/index.json' &&
-                    repo == index.repoId
-                ? index.builds.map(
-                    (build) => wire.ExtensionNetworkPolicy(
-                      buildId: build.buildId,
-                      packageName: build.packageName,
-                      bundleSha256: 'a' * 64,
-                    ),
-                  )
-                : const <wire.ExtensionNetworkPolicy>[],
-          );
-      return wire.ApiFetchResponse(
-        status: 200,
-        headers: {'content-type': 'application/json'}.entries,
-        body: jsonEncode(wire.encodeProtoJson(value)),
-      );
-    }
     final response = switch (path) {
       '/api/bootstrap' => wire.encodeProtoJson(
         wire.Bootstrap(
@@ -219,18 +188,7 @@ final class TestPlatform extends PlatformRuntime {
     switch (request.whichCommand()) {
       case wire.ControlRequest_Command.fetchApi:
         await beforeApiFetch?.call(request.fetchApi.path);
-        if (Uri.parse(request.fetchApi.path).path ==
-            '/api/extensions/network-policies') {
-          networkPolicyRequests.add(request.fetchApi.deepCopy()..freeze());
-          response.api =
-              request.fetchApi.headers['X-App-Subject'] != bootstrapSubject
-              ? wire.ApiFetchResponse(
-                  status: 403,
-                  headers: {'content-type': 'application/json'}.entries,
-                  body: '{"error":"identity_changed"}',
-                )
-              : networkPolicyReply?.deepCopy() ?? _fetch(request.fetchApi.path);
-        } else if (request.fetchApi.path.startsWith('/api/library') ||
+        if (request.fetchApi.path.startsWith('/api/library') ||
             request.fetchApi.path.startsWith('/api/categories') ||
             request.fetchApi.path.startsWith('/api/settings') ||
             request.fetchApi.path.startsWith('/api/source-preferences/') ||

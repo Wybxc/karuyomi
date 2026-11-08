@@ -43,15 +43,15 @@ Native 分类验收使用 `pnpm acceptance:build:native` 的现有 Vite 配置 m
 
 Vite 插件负责把当前构建的本地输入转换、校验和写入应用资源。扩展静态快照装配已直接内化到现有 `apps/api/vite.assets.ts`，删除独立的 tools 装配模块；不增加只转发一次调用的插件。原有当前索引可达性、材料身份、上传摘要和大小限额断言继续由插件构建测试覆盖。共享清单解析与校验仍供 AOT、注册和流水线复用，保留在所属领域模块。
 
-| 范围                                                       | 职责与当前归属                                                                                | Vite 适用性                                                                                                                    |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/api/` 与 `packages/runtime-host/` 的 Vite 配置和插件 | Flutter/runtime/扩展快照静态装配、五桥与固定 WASM 材料、Native 内嵌及 manifest                | 已接入；产出直接属于应用构建，资源声明和项目规则放在现有配置/插件。                                                            |
-| `tools/extensions/` 的发现、AOT 与流水线                   | catalog 输入闭包和指纹、隔离 builder、增量计划、checkpoint、失败保留、候选快照与部署确认      | 保留显式命令；跨包任务恢复、上游 Gradle/TeaVM 编译和发布状态不属于 Vite 模块图。流水线在启动 builder 前显式调用材料构建 CLI。  |
-| `tools/extensions/` 的网络授权与校验                       | registration、network-policies、assets 传输、有界 gzip、verify-manifest 与 verify-build 报告  | 保留领域函数和独立命令；DB 写入、线上读取、授权和验收有自己的输入与失败边界。资源插件可复用纯校验，默认 build 不触发远端操作。 |
-| `tools/teavm/`                                             | JDK/Maven/Android SDK 与 seed 准备、上游补丁和生成重命名、Java/TeaVM 编译、JVM/Android oracle | 保留领域工具；这些步骤使用独立锁文件、缓存和编译器，产出供 AOT 或验证使用。给 execa 再套 Vite hook 不能替代工具链。            |
-| `tools/protocol/`                                          | Buf 生成和一致性检查、官方 Dart protoc 插件启动                                               | 保留官方生成命令；它同时生成受版本管理的 TS/Dart 源码，并服务于 Flutter、API 和运行时，执行时机独立于 Vite bundle。            |
-| `tools/cloudflare/`                                        | 部署隔离权限探针、检查上传结果并恢复远端基线                                                  | 保留显式验证入口；操作真实 Cloudflare 资源并使用部署凭据，不能附加到普通 build。                                               |
-| `scripts/` 与平台 CLI                                      | Flutter SDK、Web/Native 构建及检查；Drizzle 生成与 Wrangler D1 迁移                           | 保留各自官方命令；Flutter、数据库迁移和平台工具链有独立生命周期。三个 Native 文件的复制直接使用 cpy-cli。                      |
+| 范围                                                       | 职责与当前归属                                                                                | Vite 适用性                                                                                                                   |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/` 与 `packages/runtime-host/` 的 Vite 配置和插件 | Flutter/runtime/扩展快照静态装配、五桥与固定 WASM 材料、Native 内嵌及 manifest                | 已接入；产出直接属于应用构建，资源声明和项目规则放在现有配置/插件。                                                           |
+| `tools/extensions/` 的发现、AOT 与流水线                   | catalog 输入闭包和指纹、隔离 builder、增量计划、checkpoint、失败保留、候选快照与部署确认      | 保留显式命令；跨包任务恢复、上游 Gradle/TeaVM 编译和发布状态不属于 Vite 模块图。流水线在启动 builder 前显式调用材料构建 CLI。 |
+| `tools/extensions/` 的交付与校验                           | assets 传输、有界 gzip、verify-manifest 与 verify-build 报告                                  | 保留领域函数和独立命令；线上读取、产物传输和验收有各自的输入与失败边界。资源插件可复用纯校验，默认 build 不触发远端操作。     |
+| `tools/teavm/`                                             | JDK/Maven/Android SDK 与 seed 准备、上游补丁和生成重命名、Java/TeaVM 编译、JVM/Android oracle | 保留领域工具；这些步骤使用独立锁文件、缓存和编译器，产出供 AOT 或验证使用。给 execa 再套 Vite hook 不能替代工具链。           |
+| `tools/protocol/`                                          | Buf 生成和一致性检查、官方 Dart protoc 插件启动                                               | 保留官方生成命令；它同时生成受版本管理的 TS/Dart 源码，并服务于 Flutter、API 和运行时，执行时机独立于 Vite bundle。           |
+| `tools/cloudflare/`                                        | 部署隔离权限探针、检查上传结果并恢复远端基线                                                  | 保留显式验证入口；操作真实 Cloudflare 资源并使用部署凭据，不能附加到普通 build。                                              |
+| `scripts/` 与平台 CLI                                      | Flutter SDK、Web/Native 构建及检查；Drizzle 生成与 Wrangler D1 迁移                           | 保留各自官方命令；Flutter、数据库迁移和平台工具链有独立生命周期。三个 Native 文件的复制直接使用 cpy-cli。                     |
 
 未采用的自研图片 codec 及其 SDK、归档、构建和验证入口已删除，历史范围见 [codec 记录](verification/long-image-codec.md)。`model`、`types` 等纯模型及测试 fixture/helper 不承担构建编排，无需改成插件。后续新增可由 Vite 表达的 JS/静态资源步骤优先加入已有配置；下载、发布、DB 和网络副作用继续通过明确的命令执行。
 

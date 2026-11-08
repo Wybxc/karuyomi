@@ -2865,10 +2865,12 @@ class PreferenceBootstrap extends $pb.GeneratedMessage {
   factory PreferenceBootstrap({
     $core.String? packageName,
     $core.Iterable<SourcePreferenceValues>? sources,
+    $core.Iterable<PreferenceSyncRule>? syncRules,
   }) {
     final result = PreferenceBootstrap._();
     if (packageName != null) result.packageName = packageName;
     if (sources != null) result.sources.addAll(sources);
+    if (syncRules != null) result.syncRules.addAll(syncRules);
     return result;
   }
 
@@ -2888,6 +2890,8 @@ class PreferenceBootstrap extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'packageName')
     ..pPM<SourcePreferenceValues>(2, _omitFieldNames ? '' : 'sources',
         subBuilder: SourcePreferenceValues.$_createMessage)
+    ..pPM<PreferenceSyncRule>(3, _omitFieldNames ? '' : 'syncRules',
+        subBuilder: PreferenceSyncRule.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2925,6 +2929,9 @@ class PreferenceBootstrap extends $pb.GeneratedMessage {
   /// Only namespaces with values need an entry. Missing keys use Source defaults.
   @$pb.TagNumber(2)
   $pb.PbList<SourcePreferenceValues> get sources => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<PreferenceSyncRule> get syncRules => $_getList(2);
 }
 
 class PreferenceSyncRule extends $pb.GeneratedMessage {
@@ -6241,6 +6248,7 @@ class BuildManifest extends $pb.GeneratedMessage {
     $core.Iterable<Artifact>? hostScripts,
     $core.Iterable<Artifact>? resources,
     $core.Iterable<CatalogSource>? sources,
+    $core.Iterable<PreferenceSyncRule>? preferenceSyncRules,
   }) {
     final result = BuildManifest._();
     if (protocolVersion != null) result.protocolVersion = protocolVersion;
@@ -6257,6 +6265,8 @@ class BuildManifest extends $pb.GeneratedMessage {
     if (hostScripts != null) result.hostScripts.addAll(hostScripts);
     if (resources != null) result.resources.addAll(resources);
     if (sources != null) result.sources.addAll(sources);
+    if (preferenceSyncRules != null)
+      result.preferenceSyncRules.addAll(preferenceSyncRules);
     return result;
   }
 
@@ -6293,6 +6303,8 @@ class BuildManifest extends $pb.GeneratedMessage {
         subBuilder: Artifact.$_createMessage)
     ..pPM<CatalogSource>(14, _omitFieldNames ? '' : 'sources',
         subBuilder: CatalogSource.$_createMessage)
+    ..pPM<PreferenceSyncRule>(15, _omitFieldNames ? '' : 'preferenceSyncRules',
+        subBuilder: PreferenceSyncRule.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6421,6 +6433,9 @@ class BuildManifest extends $pb.GeneratedMessage {
   /// Complete metadata for exactly source_ids, without running the extension.
   @$pb.TagNumber(14)
   $pb.PbList<CatalogSource> get sources => $_getList(13);
+
+  @$pb.TagNumber(15)
+  $pb.PbList<PreferenceSyncRule> get preferenceSyncRules => $_getList(14);
 }
 
 class ExtensionBuildDescriptor extends $pb.GeneratedMessage {

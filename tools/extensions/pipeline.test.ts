@@ -22,6 +22,8 @@ import writeFileAtomic from 'write-file-atomic';
 import { ROOT, git } from './catalog.ts';
 import { addHostTestSubmodules } from './test-submodules.ts';
 import { encodeBundle, StaticHttpError } from './assets.ts';
+import { PreferenceValueKind } from '@karuyomi/protocol';
+import { preferenceSyncRulesForBuild } from './builder.ts';
 import {
   BuilderProcesses,
   BuildCancelled,
@@ -208,6 +210,9 @@ class Fixture {
           version: descriptor.versionName,
           sourceIds: ['1'],
           sources: [{ id: '1', name: 'Fixture', lang: 'en' }],
+          preferenceSyncRules: preferenceSyncRulesForBuild(
+            descriptor.packageName,
+          ),
           storageSchema: '1',
           bundle: reference,
         }) + '\n',
@@ -325,6 +330,56 @@ test('complete gzip-only snapshot commits checkpoint only after remote confirmat
   );
   assert.deepEqual(loadState(f.stateFile), candidate);
 });
+test('AOT preference rules survive fresh and retained snapshot assembly without entering the index', async (t) => {
+  const f = new Fixture(t);
+  const reviewed = f.descriptor(
+    'a',
+    'eu.kanade.tachiyomi.extension.en.mangakatana',
+  );
+  const unrelated = f.descriptor('b', reviewed.packageName + '.other');
+  f.output(reviewed);
+  f.output(unrelated);
+  const descriptors = [reviewed, unrelated];
+  const state = await f.prepare(f.plan(descriptors));
+  const assertSnapshotRules = async () => {
+    const index = await f.index();
+    assert.equal(index.builds.length, 2);
+    for (const build of index.builds) {
+      assert.equal(Object.hasOwn(build, 'preferenceSyncRules'), false);
+      const manifest = await parseManifest(
+        readFileSync(path.join(f.snapshot, build.manifestPath.slice(1))),
+      );
+      const rules = (manifest.preferenceSyncRules ?? []).map(
+        ({ key, kind, sourceId }) => ({ key, kind, sourceId }),
+      );
+      assert.deepEqual(
+        rules,
+        build.packageName === reviewed.packageName
+          ? [
+              {
+                key: 'server_preference',
+                kind: PreferenceValueKind.TEXT,
+                sourceId: undefined,
+              },
+              {
+                key: 'SERVER_PREFERENCE',
+                kind: PreferenceValueKind.TEXT,
+                sourceId: undefined,
+              },
+            ]
+          : [],
+      );
+    }
+  };
+  await assertSnapshotRules();
+  await f.prepare(f.plan(descriptors, state, []), state);
+  assert.equal(
+    f.fetched.filter((entry) => entry.endsWith('/manifest.json')).length,
+    2,
+  );
+  await assertSnapshotRules();
+});
+
 test('CI never bootstraps/retries failures and local retry remains explicit', (t) => {
   const f = new Fixture(t),
     descriptor = f.descriptor(),

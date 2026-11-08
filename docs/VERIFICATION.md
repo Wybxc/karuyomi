@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-08，[通用 Source 中继](verification/generic-source-relay.md)的本地正式构建、接口与内置浏览器 xkcd 中文热门列表均通过；无需扩展或域名登记。生产尚未部署。
+
 2026-11-08，[生产 Web 恢复登录态](verification/server-state-production.md#生产-web-恢复登录态)已确认：用户自行登录后，Codex 内置浏览器中的生产页从 Access 过期提示恢复到正式服务端书架。同一正式会话随后通过 [Arknights Comics 英文热门列表](verification/server-state-production.md#生产-web-真实-source-列表)只读验收。生产详情、完整阅读和原生跨端验收继续。
 
 2026-11-08，[双 Web 书架批量部分提交](verification/library-batch.md#双-web-部分提交与冲突恢复)通过：第一部确认并留下 D1 回执，第二部因另一会话的修改返回 409 且无回执，第三部未发送。只读结束后按最新书架重新确认余项，第二会话读回全部结果，其原分类关联保留。Native、断网或丢响应、生产另验。
@@ -13,6 +15,8 @@
 2026-11-08，同一 MANGA Plus Creators 候选修复前在 iOS 第 3 页超时，独立帧客户端经官方服务读到部分正文后收到远端超时帧，见 [HTTP 对照](verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)。
 
 2026-11-08，HTTP v2 现区分源站读取空闲与整次调用总限，[正式 Workers 与 Host 回归](verification/aot-current-pilot.md#http-读取空闲与总期限回归)通过，六份共享材料与冻结输入逐字节一致。[MANGA Plus Creators iOS 复验](verification/aot-current-pilot.md#manga-plus-creators-的-ios-完整章节与续读)保留首轮第 33 页未解码及后续同页恢复；全新 D1 的第二轮通过首章 72 页、显式完成、下一章及新进程从第 7 页恢复至第 35 页，独立 GET 核对进度。其它作品、真机及生产未验。
+
+2026-11-08，[iOS 和 Android 全局设置提交后丢确认](verification/native-settings-ack.md)在隔离 HTTPS/D1 分别通过；两端同一进程重读和原样重试，D1 各提交一次。
 
 2026-11-08，正式 Web [全局设置同时保存](verification/reader-settings.md#双-web-全局设置同时保存)通过。两个文档的同 revision 请求在正式 Worker 的处理窗重叠 12 ms；一个成功、一个冲突，D1 只提交一次。冲突页读回后可按新版本重新编辑保存。Native、其它写入、生产 Access 与真机另验。
 

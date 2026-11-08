@@ -114,7 +114,7 @@ function fetchAcceptance(subject: string, request: Request, enabled = true) {
       ...env,
       ...credentials,
       APP_ORIGIN: origin,
-      ACCESS_SUBJECT: subject,
+      ACCEPTANCE_SUBJECT: subject,
       ...(enabled ? { ACCEPTANCE_PROGRESS_CAS_RACE: '1' } : {}),
     },
     createExecutionContext(),

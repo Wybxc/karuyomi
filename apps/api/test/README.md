@@ -19,17 +19,9 @@ pnpm --filter @karuyomi/api exec vite build --config vite.test.config.ts
 pnpm exec vitest run apps/api/test/vite-harness.test.ts
 ```
 
-HTTP 测试覆盖 Range、headers、上传、表单、禁止自动重定向、策略、限额、截断、超时和消费者取消。gzip 夹具发送真实压缩字节；Brotli 只检查已解码后的边界与 metadata。MSW 不是真实 TCP origin，测试不宣称网络 Brotli 解压、incoming socket abort 或 TCP reset 证据。旧 `*-probe.ts`、socket adapter 和独立浏览器 runner 已退役，历史记录只说明对应历史输入。
+HTTP 测试覆盖 Range、headers、上传、表单、禁止自动重定向、新域名、限额、截断、超时和消费者取消。gzip 夹具发送真实压缩字节；Brotli 只检查已解码后的边界与 metadata。MSW 不是真实 TCP origin，测试不宣称网络 Brotli 解压、incoming socket abort 或 TCP reset 证据。旧 `*-probe.ts`、socket adapter 和独立浏览器 runner 已退役，历史记录只说明对应历史输入。
 
-扩展唯一公开来源是 Static Assets 的 `/extensions/index.json`、`/extensions/builds/<buildId>/manifest.json` 和 `/extensions/artifacts/<canonicalSHA>.gz`。gzip 为 payload 编码，不使用 HTTP `Content-Encoding`；API 不提供扩展正文或 R2 绑定。`tools/extensions/registration.test.ts` 与 `network-policies.test.ts` 验证传输完整性、metadata-only 注册、按包替换和并发事务回滚。
-
-部署成功后，可信部署任务同步已批准 package 的当前网络策略：
-
-```sh
-node tools/extensions/network-policies.ts --remote
-```
-
-命令先检查部署的静态 index/manifest，再通过 Wrangler D1 JSON 接口事务更新当前 build；不下载 bundle、不自动批准域名。显式本地受控快照使用 `--local --static-root SNAPSHOT --persist-to STATE`。AOT 构建任务不持有部署凭据。
+扩展唯一公开来源是 Static Assets 的 `/extensions/index.json`、`/extensions/builds/<buildId>/manifest.json` 和 `/extensions/artifacts/<canonicalSHA>.gz`。gzip 为 payload 编码，不使用 HTTP `Content-Encoding`；API 不提供扩展正文或 R2 绑定。中继由官方 Workers Vitest 和 MSW 覆盖，已登录请求无需网络登记；业务测试仍在隔离 D1 应用正式迁移。
 
 Wrangler 只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker；已有扩展与共享资源直接由 Static Assets 交付，缺失资源404，应用 shell 路由显式声明。参考 [Static Assets 配置](https://developers.cloudflare.com/workers/static-assets/binding/)与[官方 HTTP mock 集成](https://developers.cloudflare.com/workers/testing/vitest-integration/mock-outbound-requests/)。
 

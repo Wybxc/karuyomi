@@ -387,6 +387,46 @@ void main() {
     },
   );
 
+  test('bootstrap validates typed account rules alongside session values', () {
+    const textKind = wire.PreferenceValueKind.PREFERENCE_VALUE_KIND_TEXT;
+    final rule = wire.PreferenceSyncRule(key: 'appearance', kind: textKind);
+    final scoped = wire.PreferenceSyncRule(
+      key: 'appearance',
+      kind: textKind,
+      sourceId: '-9223372036854775808',
+    );
+    final bootstrap = wire.PreferenceBootstrap(
+      packageName: _package,
+      syncRules: [rule, scoped],
+      sources: [
+        wire.SourcePreferenceValues(
+          sourceId: scoped.sourceId,
+          entries: [_text('session-token', 'local-only')],
+        ),
+      ],
+    );
+    expect(() => wire.validatePreferenceBootstrap(bootstrap), returnsNormally);
+    for (final rules in [
+      [rule, rule.deepCopy()],
+      [wire.PreferenceSyncRule(key: 'appearance')],
+      [wire.PreferenceSyncRule(key: '', kind: textKind)],
+      [scoped.deepCopy()..sourceId = '9223372036854775808'],
+      [scoped.deepCopy()..sourceId = ''],
+      List.generate(
+        129,
+        (i) => wire.PreferenceSyncRule(key: '$i', kind: textKind),
+      ),
+    ]) {
+      bootstrap.syncRules
+        ..clear()
+        ..addAll(rules);
+      expect(
+        () => wire.validatePreferenceBootstrap(bootstrap),
+        throwsFormatException,
+      );
+    }
+  });
+
   test(
     'edit requests preserve click and explicit typed state while rejecting missing commands and invalid paths',
     () {

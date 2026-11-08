@@ -9,7 +9,7 @@
 ## 已接入范围
 
 - [x] 浏览页独立入口，静态候选只读枚举、名称/包搜索、语言筛选、默认不选与手动选择。
-- [x] 精确绑定 catalog URL、repoId、package、build、digest、Source 与原账户 client；每次执行和打开结果重新核验 confirmed 安装、仓库及网络登记。
+- [x] 精确绑定 catalog URL、repoId、package、build、digest、Source 与原账户 client；每次执行和打开结果重新核验 confirmed 安装及仓库。
 - [x] 两个物理运行槽和槽内响应/事件隔离；无阅读资源时搜索独占，完整包 namespace 分组、`pool(2)`、同包串行。
 - [x] 各源独立等待/加载/结果/错误，首轮第一页、手动单源下一页、显式重试与取消；一个普通错误不清其它源结果。
 - [x] query/选择冻结，32 Source、500 UTF-16 搜索词、每源累计 200/总计 1000 项；超限整页拒绝，不截断或自动拆分。

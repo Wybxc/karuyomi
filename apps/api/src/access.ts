@@ -9,8 +9,6 @@ import {
 export interface AccessConfig {
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD: string;
-  ACCESS_SUBJECT: string;
-  OWNER_EMAIL: string;
   APP_ORIGIN: string;
 }
 
@@ -30,9 +28,8 @@ const keySets = new Map<string, JWTVerifyGetKey>();
 
 export class AccessError extends Error {
   constructor(
-    public readonly code:
-      'access_required' | 'access_denied' | 'access_unavailable',
-    public readonly status: 401 | 403 | 503,
+    public readonly code: 'access_required' | 'access_unavailable',
+    public readonly status: 401 | 503,
   ) {
     super(code);
   }
@@ -41,8 +38,7 @@ export class AccessError extends Error {
 export function accessIssuer(config: AccessConfig): string {
   if (
     !/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(config.ACCESS_TEAM_DOMAIN) ||
-    !config.ACCESS_AUD ||
-    !/^[^\s@]+@[^\s@]+$/.test(config.OWNER_EMAIL)
+    !config.ACCESS_AUD
   ) {
     throw new Error('Access is not configured');
   }
@@ -59,10 +55,7 @@ export function accessIssuer(config: AccessConfig): string {
   return `https://${config.ACCESS_TEAM_DOMAIN}`;
 }
 
-export function accessIdentity(
-  payload: JWTPayload,
-  config: AccessConfig,
-): AccessIdentity {
+function accessIdentity(payload: JWTPayload): AccessIdentity {
   if (
     !payload.sub ||
     typeof payload.email !== 'string' ||
@@ -72,11 +65,6 @@ export function accessIdentity(
   ) {
     throw new AccessError('access_required', 401);
   }
-  if (
-    payload.email !== config.OWNER_EMAIL ||
-    (config.ACCESS_SUBJECT && payload.sub !== config.ACCESS_SUBJECT)
-  )
-    throw new AccessError('access_denied', 403);
   return { subject: payload.sub, email: payload.email, expiresAt: payload.exp };
 }
 
@@ -96,7 +84,7 @@ export function createAccessVerifier(getKey?: JWTVerifyGetKey): VerifyAccess {
         algorithms: ['RS256'],
         requiredClaims: ['sub', 'exp', 'iat', 'email'],
       });
-      return accessIdentity(payload, config);
+      return accessIdentity(payload);
     } catch (error) {
       if (error instanceof AccessError) throw error;
       if (

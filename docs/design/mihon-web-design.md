@@ -275,16 +275,16 @@ HTTP 桥按下节 P0-B 改为小元信息与二进制正文。改造必须覆盖
 
 下表为完整范围的目标模型。收藏、阅读进度及幂等结果的协议、D1 约束和原子写入已接入；分类和章节书签模型也已接入，同步设置等其余模型尚待实施。实际表与合同以源码及[P2 计划](../plan/p2-sync.md)为准，不要求保留原型本地模型：
 
-| 表                                                          | 关键字段与约束                                                                                                                                                                                        |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `repositories`, `extensions`, `extension_builds`, `sources` | 仓库/包/版本、原输入哈希、转换版本、TeaVM/宿主/桥 ABI、bundle/资源哈希、storageSchema、能力和允许域名；安装项指向已验证 buildId，Static Assets index/catalog 用于安装定位，归档及构建来源用于问题追溯 |
-| `manga`, `library_entries`                                  | 受信 subject、稳定作品键、package/source/original URL；收藏/元数据分离，包含状态 revision                                                                                                             |
-| `chapters`                                                  | manga_id、原 Source 引用、number_text/number_value、source_order、scanlator；重复引用保留序列发生位置，不按标题或 URL 全局去重                                                                        |
-| `categories`, `entry_categories`                            | 自定义顺序，多对多关系                                                                                                                                                                                |
-| `chapter_progress`, `bookmarks`, `reading_positions`        | 已读、书签、每部作品当前章节/页码、页面内偏移、清单版本、阅读 epoch、客户端 ID、服务端 revision；不保存时间线事件                                                                                     |
-| `reader_settings`, `source_preferences`                     | 全局/漫画覆盖，typed values；敏感项分离                                                                                                                                                               |
-| `sync_mutations`                                            | 受信 subject、幂等 mutation ID、操作内容身份、已确认结果及 revision；重复请求不重复执行，也不允许同 ID 更换内容                                                                                       |
-| `cover_assets`                                              | 自定义封面对象路径、类型、大小、校验和及所属条目                                                                                                                                                      |
+| 表                                                          | 关键字段与约束                                                                                                                                                                              |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `repositories`, `extensions`, `extension_builds`, `sources` | 仓库/包/版本、原输入哈希、转换版本、TeaVM/宿主/桥 ABI、bundle/资源哈希、storageSchema和能力；安装项指向已验证 buildId，Static Assets index/catalog 用于安装定位，归档及构建来源用于问题追溯 |
+| `manga`, `library_entries`                                  | 受信 subject、稳定作品键、package/source/original URL；收藏/元数据分离，包含状态 revision                                                                                                   |
+| `chapters`                                                  | manga_id、原 Source 引用、number_text/number_value、source_order、scanlator；重复引用保留序列发生位置，不按标题或 URL 全局去重                                                              |
+| `categories`, `entry_categories`                            | 自定义顺序，多对多关系                                                                                                                                                                      |
+| `chapter_progress`, `bookmarks`, `reading_positions`        | 已读、书签、每部作品当前章节/页码、页面内偏移、清单版本、阅读 epoch、客户端 ID、服务端 revision；不保存时间线事件                                                                           |
+| `reader_settings`, `source_preferences`                     | 全局/漫画覆盖，typed values；敏感项分离                                                                                                                                                     |
+| `sync_mutations`                                            | 受信 subject、幂等 mutation ID、操作内容身份、已确认结果及 revision；重复请求不重复执行，也不允许同 ID 更换内容                                                                             |
+| `cover_assets`                                              | 自定义封面对象路径、类型、大小、校验和及所属条目                                                                                                                                            |
 
 不建立历史事件、统计、任务租约、下载页、tracker、文件导入或备份表。首版读取 D1 当前状态，暂不要求 `change_log`、cursor 或 DO 通知；确有体量/延迟数据支持后再引入增量机制，其日志也不作为用户历史或备份。源站敏感凭证暂留当前客户端，不做云端凭证同步。
 
@@ -344,7 +344,7 @@ Flutter 收藏与进度已改为 Worker API + D1，Drift/SQLite 业务路径已�
 | `GET /api/runtime/events`                                 | 鉴权后的 WebSocket upgrade，复用会话回调和同步通知通道                                              |
 | `POST /api/bridge/http`、`/api/bridge/callback/*`         | 网络桥使用第 5 节 v2 元信息/二进制帧协议；回调仍按自身协议校验运行会话、代次、实例及方法            |
 | `GET /api/covers/:assetId` / `POST /api/covers/:mangaKey` | 自定义封面读写，multipart 上传与当前身份引用，清除沿 state mutation；见[封面设计](custom-covers.md) |
-| `GET /api/extensions/builds`                              | 如保留控制面，仅返回安装状态或网络策略等小型元数据；扩展定位以 Static Assets index/catalog 为准     |
+| `GET /api/extensions/builds`                              | 扩展定位以 Static Assets index/catalog 为准；账户安装由业务设置返回                                 |
 
 旧 `/bridge/*`、`/extensions/*` 后端路径停止服务，不保留公开别名；新的后端功能必须进入 `/api/*`。未知 API 在鉴权后返回 JSON 404，不能返回 `index.html`。通用宿主/桥、Worker 引导与 WASM 由 Web Static Assets 或 Native 内置材料提供；构建清单与 AOT 在所有客户端均从 Static Assets 获取，只保留每扩展最新 build。删除 `/api/extensions/artifacts/:hash` 的扩展正文交付，不保留 R2 或 Worker 代理回退，也不新增私有下载地址/token 服务。
 
@@ -360,8 +360,8 @@ Flutter 收藏与进度已改为 Worker API + D1，Drift/SQLite 业务路径已�
 
 本项目使用 Workers Static Assets，静态资源 router 不传递 `ctx.access`，因此不能依赖 `ctx.access.getIdentity()`。API 中间件显式校验 `Cf-Access-Jwt-Assertion`，不能只检查头存在或信任邮箱头。[Workers Access 限制](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)。
 
-- 服务端配置：`APP_ORIGIN`、`ACCESS_TEAM_DOMAIN`（完整 HTTPS 团队域名）、`ACCESS_AUD`、`OWNER_EMAIL`；不接受请求传入 issuer 或密钥地址，不将本人邮箱注入公开 bundle。
-- 使用 `jose` 的 `createRemoteJWKSet` / `jwtVerify`，公钥取自固定团队域名的 `/cdn-cgi/access/certs`；复用 JWKS 缓存并支持轮换，限制算法为 RS256，校验签名、issuer、AUD、必需的 exp/sub/email，以及存在时的 nbf。已验证 email 必须匹配本人配置。缺少/无效凭证返回 `401 ACCESS_REQUIRED`，已验证但非本人返回 `403 ACCESS_DENIED`；密钥服务故障拒绝业务访问并返回可重试的 503，不能降级放行。[JWT 校验文档](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)。
+- 服务端配置：`APP_ORIGIN`、`ACCESS_TEAM_DOMAIN`（完整 HTTPS 团队域名）、`ACCESS_AUD`；不接受请求传入 issuer 或密钥地址。
+- 使用 `jose` 的 `createRemoteJWKSet` / `jwtVerify`，公钥取自固定团队域名的 `/cdn-cgi/access/certs`；复用 JWKS 缓存并支持轮换，限制算法为 RS256，校验签名、issuer、AUD、必需的 exp/sub/email，以及存在时的 nbf。准入名单只由 Access 管理；Worker 使用已验证的 subject 隔离账户。缺少或无效凭据返回 401，配置或密钥不可用返回 503。
 - 只有校验通过才能访问 D1、R2、DO 或发起上游 HTTP。DO 从 Worker binding 接收已验证身份、到期时间和会话上下文，不通过公网自行信任前端身份字段。WebSocket 建连同样鉴权并校验 Origin；连接最晚到 JWT exp 时关闭，重连重新鉴权，不把一次成功 upgrade 视为永久授权。
 - UI、TeaVM Worker 保留版本化消息协议、requestId 与参数校验。写操作和网络桥/回调 POST 必须是预期同源 Origin，要求自定义请求头（如 `X-App-Request: 1`）作为 CSRF 防护的一部分；不开放跨源凭证 CORS，不通过 GET 修改业务状态。不增加逐 Source 权限签发或独立身份域。
 
@@ -387,7 +387,7 @@ Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 F
 
 **原型兼容性门槛：** opaque-origin iframe 的 `Origin: null` 不能直接作为同源已登录调用方，现有同步 XHR 回调不能原样搬到受保护 API。目标是能挂起执行的宿主回调与异步消息中转；若 iframe 同步等待阻塞主线程，父页面 `postMessage` 中转也会阻塞，不能声称换用 DO 即可解决。P1 对需要这种脚本路径的源验证宿主适配；完成前标为受限，P0 先验证不依赖该路径的真实阅读源。不为旧回调增加 Access Bypass、`Origin: null` CORS 或前端 service token。
 
-网络桥的域名清单由安装元数据和人工维护的 Source 清单生成，不能让扩展任意扩权。拒绝 localhost、私网/链路本地/IP 字面量、用户信息、任意端口，逐跳校验重定向；不接入可访问内网的 binding。未知新 CDN/镜像产生待检查项。允许确有需求的方法与正文类型，不一概仅限 GET/POST。移除应用的 Cookie、Authorization、Access 头；只转发扩展为该站构造的请求凭证。
+网络中继使用 Cloudflare Access 认证后的应用会话和 Workers 公网 fetch，所有扩展采用相同转发路径。重定向由 Source 自己处理，每跳重新经同一中继；应用 Cookie、Authorization 和 Access 头不复制到上游，只转发 Source 自己为站点构造的请求凭证。
 
 Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Path/Expires/Secure，避免串账号；这些分组不构成对可信扩展的权限隔离。浏览器到同源网络桥按部署会话鉴权；Worker 到漫画站的出站请求只使用扩展请求描述构建，不复制入站应用 Cookie、Authorization 或 Access 头。敏感 cookie/token 仅保留在当前客户端，不增加云端凭证同步模块。
 

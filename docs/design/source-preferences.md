@@ -18,7 +18,7 @@ change listener 返回 true 才执行该控件的标准持久化；返回 false 
 
 ## 原对象、构造顺序与生命周期
 
-客户端先 GET 整包已确认设置，再形成 `PreferenceBootstrap(packageName,sources)`。driver 根据应用 origin、确认的 CatalogReference 和已验证 manifest 的 packageName 生成可信同步规则，作为 `PreferenceHostConfiguration` 传给 `hostLoad`。Java 使用 init 创建的原 Application 和原 SharedPreferences.Editor，在 `Generated/createSources` 之前注入 `source_<id>`；不能构造 Source 后才更新设置，因为构造函数、lazy client 和 headers 可能已经读取旧值。
+客户端先 GET 整包已确认设置，再形成 `PreferenceBootstrap(packageName,sources,syncRules)`。driver 消费账户 API 返回的同步规则，作为 `PreferenceHostConfiguration` 传给 `hostLoad`。Java 使用 init 创建的原 Application 和原 SharedPreferences.Editor，在 `Generated/createSources` 之前注入 `source_<id>`；不能构造 Source 后才更新设置，因为构造函数、lazy client 和 headers 可能已经读取旧值。
 
 保留原 Preference 实例、具体子类和 listener。必要的 Preference 分组、dependency 和有界 headless 编辑元数据属于项目宿主 ABI 适配；不替换整个 Context，不改扩展源码或原 JAR。原 bind 超出已实现的 headless 方法子集时呈现 unsupported；不创建 Activity、原生对话框或任意 Android UI。密码行不回显原 summary、默认值或输入提示。
 
@@ -30,7 +30,7 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 
 ## 同步许可与业务 API
 
-唯一可信许可表为 `packages/contracts/src/source-preference-policy.ts`，同时用于 driver 配置 Java 分区与 Worker API 校验。许可按 package、可选 Source ID、实际存储 key 和值类型配置，不信任插件描述或客户端自行声称 ACCOUNT。仅可信应用默认目录与 `keiyoushi` 获得许可；额外仓库返回空规则，不能因自报相同 package/repoId 获得同步权限。响应和 ACK 回显来源及实际 syncRules，entries 逐项按实际规则校验。初始只批准已核对的 Komiic、MangaFire、AsuraScans 和 MangaKatana 非敏感键；后者保留 UI key 和 listener 别名键。未知文本、未知 key 和秘密值留在 `sessionValues`，绝不整体上传 `getAll()`。
+已审核的键由 AOT 写进当前官方构建的 `preferenceSyncRules`。正式部署装配从同一快照投影设置规则，Worker 只接受应用自己的 Static Assets 提供的规则，并在账户读取和写入时按 Source、原始键与值类型检查。额外仓库与无规则构建的设置留在当前会话，不能用自报相同 package/repoId 获得同步权限。响应和 ACK 回显当前规则，原规则撤下后保留已确认 revision，不再返回对应值。密码、未知文本和未知键留在 `sessionValues`，不会整体上传 `getAll()`。
 
 - GET `/api/source-preferences/packages/:packageName?catalogUrl=...&repoId=...` 返回该身份、该来源的整包 `SourcePreferencesResponse`。
 - POST `/api/source-preferences/mutations` 接收 mutationId、CatalogReference、packageName、sourceId、expectedRevision 和完整 entries，返回确认的 Source 状态与 accountRevision。

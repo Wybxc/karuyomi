@@ -2,6 +2,4 @@
 # Missing configuration fails closed; there is no local authentication bypass.
 ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
 ACCESS_AUD=your-access-application-audience
-ACCESS_SUBJECT=your-own-access-jwt-subject
-OWNER_EMAIL=owner@example.com
 APP_ORIGIN=http://127.0.0.1:8787

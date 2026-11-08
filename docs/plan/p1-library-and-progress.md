@@ -10,7 +10,7 @@
 
 - Flutter 浏览已有构建/Source 选择、热门/最新/搜索分页、详情和章节入口；历史本地书架已验证详情收藏、搜索/排序及经详情继续阅读。完整 Source Manga 快照、稳定作品键、当前静态索引定位和取消收藏保留进度的业务语义可复用，见[本地书架验证](../verification/p1-local-library.md)。本地 SQLite 持久化测试只证明旧实现行为，不替代 D1 或跨端验收。
 - 独立 Dart 阅读核心已有逻辑锚、布局/方向、缩放和有界资源调度；当前/最远位置、显式完成、重新阅读 epoch、保存失败提示和节流机制已有实现。Web 真实 Arknights 关标签页恢复及双端模拟器原 xkcd 进程重启的历史分项见[Web 产品进度](../verification/reader-progress-web.md)和[本地进度记录](../verification/local-progress.md)；这些结果保留原输入和范围。
-- 单 hostname、Access/API、D1 网络策略工程入口与 Protobuf/Buf 控制协议已经存在。收藏、元数据、分章进度、resume 与幂等结果已建立 D1 表、双端生成业务协议和正式 API；工程和真实多端证据仍分别验收。
+- 单 hostname、Access/API、D1 业务工程入口与 Protobuf/Buf 控制协议已经存在。收藏、元数据、分章进度、resume 与幂等结果已建立 D1 表、双端生成业务协议和正式 API；工程和真实多端证据仍分别验收。
 
 ## 待办与实施顺序
 

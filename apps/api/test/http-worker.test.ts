@@ -13,7 +13,6 @@ import {
 } from '@karuyomi/contracts';
 import { setupNetwork } from '@msw/cloudflare';
 import { env, exports } from 'cloudflare:workers';
-import { applyD1Migrations } from 'cloudflare:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { http, HttpResponse } from 'msw';
 import { gzipSync } from 'node:zlib';
@@ -28,14 +27,13 @@ import {
 
 const appOrigin = 'https://read.example.com';
 const upstreamOrigin = 'https://fixture.example.org';
-const buildId = 'http-workers-fixture';
 const network = setupNetwork();
 const payload = Uint8Array.from(
   { length: HTTP_FRAME_LIMIT * 2 + 17 },
   (_, index) => (index * 131 + (index >>> 7)) & 255,
 );
 let signed: string;
-let denied: string;
+let otherAudience: string;
 
 beforeAll(async () => {
   const keys = await generateKeyPair('RS256');
@@ -50,16 +48,14 @@ beforeAll(async () => {
     .setIssuedAt()
     .setExpirationTime('5m')
     .sign(keys.privateKey);
-  denied = await new SignJWT({ email: 'another@example.com' })
+  otherAudience = await new SignJWT({ email: 'another@example.com' })
     .setProtectedHeader({ alg: 'RS256', kid: publicKey.kid })
     .setSubject('denied-owner')
     .setIssuer('https://example.cloudflareaccess.com')
-    .setAudience('state-fixture')
+    .setAudience('different-application')
     .setIssuedAt()
     .setExpirationTime('5m')
     .sign(keys.privateKey);
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
-  await registerBuild(buildId, 'verified', '["fixture.example.org"]');
   network.enable();
 }, 30_000);
 
@@ -68,23 +64,6 @@ beforeEach(() => {
 });
 afterEach(() => network.resetHandlers());
 afterAll(() => network.disable());
-
-async function registerBuild(id: string, status: string, policy: string) {
-  await env.DB.prepare(
-    'INSERT INTO extension_builds (build_id,package_name,bundle_sha256,status,created_at,allowed_hosts_json,catalog_url,repo_id) VALUES (?,?,?,?,?,?,?,?)',
-  )
-    .bind(
-      id,
-      id,
-      'a'.repeat(64),
-      status,
-      0,
-      policy,
-      appOrigin + '/extensions/index.json',
-      'keiyoushi',
-    )
-    .run();
-}
 
 function metadata(
   pathname = '/binary',
@@ -143,10 +122,6 @@ function dispatch(
     headers: {
       'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
       Accept: HTTP_BRIDGE_MEDIA_TYPE,
-      'X-Runtime-Build': buildId,
-      'X-Runtime-Catalog': appOrigin + '/extensions/index.json',
-      'X-Runtime-Repo': 'keiyoushi',
-      'X-Runtime-Bundle': 'a'.repeat(64),
       'X-App-Request': '1',
       Origin: appOrigin,
       'Cf-Access-Jwt-Assertion': signed,
@@ -191,7 +166,7 @@ async function consume(reader: HttpFrameReader): Promise<Uint8Array> {
   return bytes;
 }
 
-test('verified JWT and D1 policy deliver bounded binary frames with control identity', async () => {
+test('verified Access JWT delivers bounded binary frames with control identity without D1', async () => {
   network.use(
     http.get(
       upstreamOrigin + '/binary',
@@ -443,7 +418,7 @@ test('redirect targets are returned for Source handling and never followed by th
   expect(requests).toBe(1);
 });
 
-test('auth, origin, protocol and D1 build policy failures never fetch upstream', async () => {
+test('auth, origin, and protocol failures never fetch upstream', async () => {
   let requests = 0;
   network.use(
     http.all('*', () => {
@@ -457,9 +432,9 @@ test('auth, origin, protocol and D1 build policy failures never fetch upstream',
     error: string;
   }> = [
     {
-      headers: { 'Cf-Access-Jwt-Assertion': denied },
-      status: 403,
-      error: 'access_denied',
+      headers: { 'Cf-Access-Jwt-Assertion': otherAudience },
+      status: 401,
+      error: 'access_required',
     },
     {
       headers: { 'Cf-Access-Jwt-Assertion': '' },
@@ -477,21 +452,6 @@ test('auth, origin, protocol and D1 build policy failures never fetch upstream',
       error: 'invalid_origin',
     },
     {
-      headers: { 'X-Runtime-Build': 'missing' },
-      status: 404,
-      error: 'build_not_found',
-    },
-    ...[
-      {
-        'X-Runtime-Catalog': 'https://other.example.org/extensions/index.json',
-      },
-      { 'X-Runtime-Repo': 'other' },
-      { 'X-Runtime-Bundle': 'b'.repeat(64) },
-      { 'X-Runtime-Catalog': '' },
-      { 'X-Runtime-Repo': '' },
-      { 'X-Runtime-Bundle': '' },
-    ].map((headers) => ({ headers, status: 404, error: 'build_not_found' })),
-    {
       headers: { 'Content-Type': 'application/json' },
       status: 415,
       error: 'unsupported_bridge_protocol',
@@ -507,35 +467,14 @@ test('auth, origin, protocol and D1 build policy failures never fetch upstream',
     expect(response.status).toBe(item.status);
     expect(await response.json()).toEqual({ error: item.error });
   }
-  for (const target of [
-    'http://127.0.0.1/private',
-    'https://other.example.org/denied',
-    'https://fixture.example.org:8443/private',
-    'https://user:pass@fixture.example.org/private',
-  ]) {
-    const response = await dispatch(metadata('/binary', { url: target }));
-    expect(response.status).toBe(422);
-    expect(await response.json()).toEqual({ error: 'target_not_allowed' });
-  }
-  const unverifiedId = crypto.randomUUID();
-  await registerBuild(
-    unverifiedId,
-    'compiled_unverified',
-    '["fixture.example.org"]',
-  );
-  const unverified = await dispatch(metadata(), {
-    headers: { 'X-Runtime-Build': unverifiedId },
-  });
-  expect(unverified.status).toBe(404);
-  expect(await unverified.json()).toEqual({ error: 'build_not_found' });
-  const brokenId = crypto.randomUUID();
-  await registerBuild(brokenId, 'verified', '{"wrong":"shape"}');
-  const broken = await dispatch(metadata(), {
-    headers: { 'X-Runtime-Build': brokenId },
-  });
-  expect(broken.status).toBe(503);
-  expect(await broken.json()).toEqual({ error: 'invalid_network_policy' });
   expect(requests).toBe(0);
+});
+
+test('a previously unknown public hostname works without registration', async () => {
+  const url = 'https://independent-site.example.net/chapter';
+  network.use(http.get(url, () => new HttpResponse('site chapter')));
+  const { reader } = await framed(await dispatch(metadata('/', { url })));
+  expect(new TextDecoder().decode(await consume(reader))).toBe('site chapter');
 });
 
 test('declared request/response limits reject without accepting oversized content', async () => {

@@ -15,8 +15,6 @@ function fixture() {
   const env = {
     ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
     ACCESS_AUD: 'app',
-    ACCESS_SUBJECT: 'owner',
-    OWNER_EMAIL: 'owner@example.com',
     APP_ORIGIN: 'https://read.example.com',
     ASSETS: { fetch: assets },
     DB: { prepare: database },

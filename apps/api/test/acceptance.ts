@@ -9,17 +9,6 @@ import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { createInterface } from 'node:readline';
-import { getStreamAsBuffer } from 'get-stream';
-import { z } from 'zod';
-import {
-  loadStaticIndex,
-  MANIFEST_METADATA_LIMIT,
-  registrationSql,
-  verifyMetadata,
-  verifyStaticAuthority,
-  type MetadataLoader,
-} from '../../../tools/extensions/registration.ts';
-import { parseManifest } from '../../../tools/extensions/verify-manifest.ts';
 import { fileURLToPath, URL } from 'node:url';
 import { createTestHarness, type TestHarnessOptions } from 'wrangler';
 import type { AcceptanceBindings } from './acceptance-entry.ts';
@@ -52,8 +41,7 @@ const vars = {
   PROBE_ACCESS_JWKS: JSON.stringify({ keys: [publicKey] }),
   ACCESS_TEAM_DOMAIN: 'acceptance.cloudflareaccess.com',
   ACCESS_AUD: 'acceptance',
-  ACCESS_SUBJECT: 'acceptance-owner',
-  OWNER_EMAIL: 'acceptance@example.com',
+  ACCEPTANCE_SUBJECT: 'acceptance-owner',
 };
 const privateKey = await exportPKCS8(keys.privateKey);
 const fixture = process.env.ACCEPTANCE_FIXTURE ?? '';
@@ -65,7 +53,6 @@ if (nextConfigPath && fixture !== '') {
 const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const settingsRace = fixture === 'settings-cas-race';
 const progressRace = fixture === 'progress-cas-race';
-const sourcePolicies = process.env.ACCEPTANCE_SOURCE_POLICIES;
 const options = (
   publicOrigin: string,
   workerConfig = configPath,
@@ -142,15 +129,12 @@ try {
     else await prepareProgressRace(db);
     fixtureAuditDb = db;
   }
-  if (!stopRequested && sourcePolicies) {
-    await initializeSourcePolicies(url.origin, sourcePolicies);
-  }
   if (!stopRequested && fixture === 'categories') {
     await initializeCategoryFixture(url.origin);
   }
   if (!stopRequested) {
     console.log(`ACCEPTANCE_URL=${url.href}`);
-    console.log(`ACCEPTANCE_SUBJECT=${vars.ACCESS_SUBJECT}`);
+    console.log(`ACCEPTANCE_SUBJECT=${vars.ACCEPTANCE_SUBJECT}`);
     if (commands && nextConfigPath) {
       const requested = new Promise<void>((resolve) => {
         commands.on('line', (line) => {
@@ -182,9 +166,6 @@ try {
           throw new Error(
             'Acceptance snapshot switch did not preserve the migrated D1',
           );
-        }
-        if (!stopRequested && sourcePolicies) {
-          await initializeSourcePolicies(url.origin, sourcePolicies);
         }
         if (!stopRequested) console.log('ACCEPTANCE_SWITCH=switched');
       }
@@ -258,7 +239,7 @@ async function initializeCategoryFixture(origin: string): Promise<void> {
       method: 'POST',
       headers: {
         Origin: origin,
-        'X-App-Subject': vars.ACCESS_SUBJECT,
+        'X-App-Subject': vars.ACCEPTANCE_SUBJECT,
         'X-App-Request': '1',
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -281,64 +262,4 @@ async function initializeCategoryFixture(origin: string): Promise<void> {
       throw new Error(`Category fixture was not confirmed for ${title}`);
     }
   }
-}
-
-/** Local Source acceptance still uses current static metadata and explicit hosts. */
-async function initializeSourcePolicies(
-  origin: string,
-  input: string,
-): Promise<void> {
-  if (Buffer.byteLength(input, 'utf8') > 32 * 1024)
-    throw new Error('Oversized acceptance Source policies');
-  const policies = z
-    .array(
-      z
-        .object({
-          packageName: z.string().min(1).max(200),
-          allowedHosts: z.array(z.string().min(1).max(253)).min(1).max(32),
-        })
-        .strict(),
-    )
-    .min(1)
-    .max(16)
-    .parse(JSON.parse(input));
-  if (
-    new Set(policies.map((value) => value.packageName)).size !== policies.length
-  ) {
-    throw new Error('Duplicate acceptance Source package policy');
-  }
-  const load: MetadataLoader = async (pathname, maximum) => {
-    const response = await server.fetch(new URL(pathname, origin).href, {
-      redirect: 'manual',
-    });
-    if (response.status !== 200 || !response.body) {
-      throw new Error(`Acceptance static metadata HTTP ${response.status}`);
-    }
-    return getStreamAsBuffer(response.body, { maxBuffer: maximum });
-  };
-  const index = await loadStaticIndex(load);
-  const bindings = await server.getWorker<AcceptanceBindings>().getEnv();
-  for (const policy of policies) {
-    if (stopRequested) return;
-    const entry = index.builds.find(
-      (value) => value.packageName === policy.packageName,
-    );
-    if (!entry)
-      throw new Error(
-        'Acceptance Source is absent from the current static index',
-      );
-    const manifest = await verifyMetadata(
-      await parseManifest(
-        await load(entry.manifestPath, MANIFEST_METADATA_LIMIT),
-      ),
-    );
-    await verifyStaticAuthority(manifest, load);
-    await bindings.DB.exec(
-      registrationSql(manifest, policy.allowedHosts, {
-        catalogUrl: origin + '/extensions/index.json',
-        repoId: manifest.repoId,
-      }),
-    );
-  }
-  console.log(`ACCEPTANCE_SOURCE_POLICY_COUNT=${policies.length}`);
 }

@@ -25,6 +25,7 @@ export { RuntimeSession } from '../src/runtime-session.js';
 export interface AcceptanceBindings extends Bindings {
   PROBE_ACCESS_JWKS: string;
   ACCEPTANCE_PRIVATE_KEY: string;
+  ACCEPTANCE_SUBJECT: string;
   ACCEPTANCE_ACK_LOSS?: AckLossFixture;
   ACCEPTANCE_SETTINGS_CAS_RACE?: '1';
   ACCEPTANCE_PROGRESS_CAS_RACE?: '1';
@@ -49,7 +50,7 @@ export default {
               request,
               env.DB,
               env.APP_ORIGIN,
-              env.ACCESS_SUBJECT,
+              env.ACCEPTANCE_SUBJECT,
               requestJson,
             )
           : undefined;
@@ -60,16 +61,16 @@ export default {
               request,
               env.DB,
               env.APP_ORIGIN,
-              env.ACCESS_SUBJECT,
+              env.ACCEPTANCE_SUBJECT,
               { requestJson, readMangaState },
             )
           : undefined;
       if (progressContender instanceof Response) return progressContender;
       const forwarded = new Request(request);
       const key = await importPKCS8(env.ACCEPTANCE_PRIVATE_KEY, 'RS256');
-      const token = await new SignJWT({ email: env.OWNER_EMAIL })
+      const token = await new SignJWT({ email: 'acceptance@example.com' })
         .setProtectedHeader({ alg: 'RS256', kid: 'acceptance' })
-        .setSubject(env.ACCESS_SUBJECT)
+        .setSubject(env.ACCEPTANCE_SUBJECT)
         .setIssuer(`https://${env.ACCESS_TEAM_DOMAIN}`)
         .setAudience(env.ACCESS_AUD)
         .setIssuedAt()
@@ -92,7 +93,7 @@ export default {
       if (settingsContender) {
         await observeSettingsRace(
           env.DB,
-          env.ACCESS_SUBJECT,
+          env.ACCEPTANCE_SUBJECT,
           settingsContender,
           response,
           dispatchAtMs,
@@ -102,7 +103,7 @@ export default {
       if (progressContender) {
         await observeProgressRace(
           env.DB,
-          env.ACCESS_SUBJECT,
+          env.ACCEPTANCE_SUBJECT,
           progressContender,
           response,
           dispatchAtMs,
@@ -110,7 +111,13 @@ export default {
         );
       }
       return fixture && original
-        ? observeAck(fixture, original, response, env.DB, env.ACCESS_SUBJECT)
+        ? observeAck(
+            fixture,
+            original,
+            response,
+            env.DB,
+            env.ACCEPTANCE_SUBJECT,
+          )
         : response;
     }
     return verifiedWorker.fetch(request, env, context);

@@ -17,7 +17,7 @@ Worker API + D1 保存同一身份的扩展使用意图；Static Assets 提供�
 
 清单最多 128 项，package 唯一；同包跨仓库替换需要明确操作，不并装共享业务身份的两个副本。缺记录就是未安装，不自动将目录迁为已安装。字段在 TS/Dart 边界解析，不能只信生成类型。
 
-`catalogUrl` 最长 2048 字符，使用规范化 origin 加精确 `/extensions/index.json`，无 userinfo、query 或 fragment，包括空的 `?`/`#`。网络仓库要求 HTTPS；开发 HTTP 仅允许 literal localhost、127.0.0.1 或 [::1]。额外仓库的账户登记、同包替换、来源隔离和网络政策以[额外仓库设计](additional-repositories.md)为准，实施与验收状态分别维护。
+`catalogUrl` 最长 2048 字符，使用规范化 origin 加精确 `/extensions/index.json`，无 userinfo、query 或 fragment，包括空的 `?`/`#`。网络仓库要求 HTTPS；开发 HTTP 仅允许 literal localhost、127.0.0.1 或 [::1]。额外仓库的账户登记、同包替换、来源隔离和中继设计以[额外仓库设计](additional-repositories.md)为准，实施与验收状态分别维护。
 
 复用现有身份绑定 `SettingsRepository/SettingsController`、全局 CAS 与 mutation UUID；不新增扩展业务数据库或 outbox。修改复制完整已确认全局值，保留主题、阅读偏好和收藏源。安装/更新在准备开始前固定完整值与 revision，准备完成后按原 CAS 提交；发生并发变更时明确冲突，由用户重新读取并确认。
 
@@ -50,7 +50,7 @@ shared Web Lock pin 覆盖准备/读取与活动运行槽；删除只能取得�
 
 ## 当前构建与可用性
 
-Static Assets 只保留每包最新可用构建。账户选择的旧 build 可能已无产物或网络登记；即使本机缓存命中，也不能保证它仍可联网。网络登记缺失的 `404 build_not_found` 与 Access 登录/权限错误分开，界面要求用户手动更新，不恢复历史目录或兼容协议。
+Static Assets 只保留每包最新可用构建。账户选择的旧 build 可能已不在当前静态目录；界面要求用户手动更新，不恢复历史目录或兼容协议。
 
 静态发布方式保持最新版快照。目录元数据已于 `830161c` 接入；后续固定 `ad869d2` 的三包后台 AOT 与完整性/快照通过，提供包含当时目录与管理协议的候选，实际运行仍待验收，见[记录](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。候选尚未部署或写正式 checkpoint，后续协议变更须重新核对输入；下载、组件和工程构建不提升 `compiled_unverified/runtimeReady=false`，也不代替实际 Source 或三端同步证据。
 

@@ -41,5 +41,6 @@ export async function manifest(): Promise<BuildManifest> {
     bundle: await artifact(),
     hostScripts: [],
     resources: [],
+    preferenceSyncRules: [],
   };
 }

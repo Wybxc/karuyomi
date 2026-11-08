@@ -214,8 +214,6 @@ final class CatalogController extends ChangeNotifier {
   final CatalogTransport publicCatalogs;
   final repositoryErrors = <String, String>{};
   final _catalogBuilds = <String, List<CatalogBuild>>{};
-  final networkPolicies = <String, wire.ExtensionNetworkPoliciesResponse>{};
-  final networkPolicyErrors = <String, String>{};
   CoverTransport? get _covers {
     final transport = api;
     if (transport is PlatformRuntime) return transport.coverTransport;
@@ -382,7 +380,6 @@ final class CatalogController extends ChangeNotifier {
         )
         .toSet();
     _catalogBuilds.removeWhere((key, _) => !allowed.contains(key));
-    networkPolicies.removeWhere((key, _) => !allowed.contains(key));
     builds = List.unmodifiable(
       _catalogBuilds.values.expand((values) => values),
     );
@@ -453,64 +450,6 @@ final class CatalogController extends ChangeNotifier {
     repositoryErrors.remove(key);
     _publishCatalogs();
   }
-
-  Future<void> refreshNetworkPolicies(
-    wire.CatalogReference reference, {
-    bool Function()? shouldContinue,
-  }) async {
-    final client = _confirmedBusinessClient;
-    if (_closed || client == null || shouldContinue?.call() == false) {
-      throw StateError('网络登记查询身份未确认或操作已失效。');
-    }
-    final epoch = _epoch;
-    bool current() =>
-        !_closed &&
-        epoch == _epoch &&
-        identical(_confirmedBusinessClient, client) &&
-        shouldContinue?.call() != false;
-    // A failed refresh must not leave an earlier readiness result usable.
-    networkPolicies.remove(catalogReferenceKey(reference));
-    late final wire.ExtensionNetworkPoliciesResponse value;
-    try {
-      value = await client.readExtensionNetworkPolicies(
-        reference,
-        shouldContinue: current,
-      );
-    } on BusinessStateTransportException catch (failure) {
-      if (!current()) return;
-      if ({200, 401, 403}.contains(failure.status)) {
-        final denied = failure.status == 403;
-        ++_epoch;
-        busy = false;
-        activity = null;
-        error = denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录';
-        status = denied ? ServiceStatus.denied : ServiceStatus.loginRequired;
-        _dropSession();
-        _notify();
-        throw RuntimeException(
-          denied
-              ? RuntimeErrorCode.accessDenied
-              : RuntimeErrorCode.accessRequired,
-          denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录',
-        );
-      }
-      rethrow;
-    }
-    if (!current() || !isRepositoryRegistered(reference)) return;
-    networkPolicies[catalogReferenceKey(reference)] = value.deepCopy()
-      ..freeze();
-    networkPolicyErrors.remove(catalogReferenceKey(reference));
-    _notify();
-  }
-
-  bool isNetworkRegistered(CatalogBuild build, {String? sha256}) =>
-      networkPolicies[catalogReferenceKey(build.catalog)]?.builds.any(
-        (value) =>
-            value.buildId == build.id &&
-            value.packageName == build.packageName &&
-            (sha256 == null || value.bundleSha256 == sha256),
-      ) ??
-      false;
 
   List<wire.InstalledExtension> get installedExtensions =>
       installationSettings?.global.installedExtensions ?? const [];
@@ -749,23 +688,6 @@ final class CatalogController extends ChangeNotifier {
         if (!current()) return;
         repositoryErrors[catalogReferenceKey(reference)] =
             '仓库读取失败；账户选择未改变，可单独重试。';
-      }
-      if (!current()) return;
-      try {
-        await refreshNetworkPolicies(reference, shouldContinue: current);
-      } on RuntimeException catch (failure) {
-        if ({
-          RuntimeErrorCode.accessRequired,
-          RuntimeErrorCode.accessDenied,
-        }.contains(failure.code)) {
-          rethrow;
-        }
-        networkPolicyErrors[catalogReferenceKey(reference)] =
-            '网络登记尚未读取，Source 暂不能打开。';
-      } catch (_) {
-        if (!current()) return;
-        networkPolicyErrors[catalogReferenceKey(reference)] =
-            '网络登记尚未读取，Source 暂不能打开。';
       }
       if (!current()) return;
     }
@@ -1101,7 +1023,6 @@ final class CatalogController extends ChangeNotifier {
       email = null;
       builds = const [];
       _catalogBuilds.clear();
-      networkPolicies.clear();
       _notify();
       // Confirm the cookie's current identity before attempting old drafts.
       // An old subject's rejected POST must not interrupt the new bootstrap.
@@ -1349,14 +1270,10 @@ final class CatalogController extends ChangeNotifier {
     if (!_allowsBuild(build, sha256: manifest.bundle.sha256)) {
       throw const FormatException('构建与账户选择不匹配，请重新读取扩展管理。');
     }
-    await refreshNetworkPolicies(build.catalog, shouldContinue: shouldContinue);
-    if (_closed || epoch != _epoch || shouldContinue?.call() == false) {
-      return null;
-    }
-    if (!isNetworkRegistered(build, sha256: manifest.bundle.sha256)) {
-      throw const FormatException('扩展代码可准备，但此构建尚未登记漫画源网络权限。');
-    }
-    final bootstrap = wire.PreferenceBootstrap(packageName: build.packageName);
+    final bootstrap = wire.PreferenceBootstrap(
+      packageName: build.packageName,
+      syncRules: confirmedPreferences.syncRules,
+    );
     // Removed Sources retain their account values without being injected into
     // an extension that no longer constructs that namespace.
     final sourceIds = manifest.sourceIds.toSet();

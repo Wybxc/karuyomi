@@ -15,6 +15,7 @@ import { afterEach, test, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
 import {
   buildManifestSchema,
+  preferenceRulesAssetSchema,
   runtimeMaterialCatalogSchema,
 } from '@karuyomi/contracts';
 import { assembleExtensionAssets } from '../vite.assets.ts';
@@ -105,6 +106,13 @@ async function fixture() {
       },
       hostScripts: [],
       resources: [],
+      preferenceSyncRules: [
+        {
+          key: 'display_mode',
+          kind: 'PREFERENCE_VALUE_KIND_TEXT',
+          sourceId: '123',
+        },
+      ],
     }),
   );
   await put(bundlePath.slice(1), encoded);
@@ -121,6 +129,16 @@ test('assembly publishes only the current index reachable snapshot', async () =>
     f.encoded,
   );
   await stat(path.join(f.target, f.manifestPath.slice(1)));
+  const rules = preferenceRulesAssetSchema.parse(
+    JSON.parse(
+      await readFile(
+        path.join(f.target, 'extensions/preference-rules.json'),
+        'utf8',
+      ),
+    ),
+  );
+  assert.equal(rules.repoId, 'test');
+  assert.equal(rules.packages['example.source']?.[0]?.key, 'display_mode');
   await assert.rejects(
     stat(path.join(f.target, 'extensions/builds/old-build')),
     { code: 'ENOENT' },

@@ -19,8 +19,6 @@ const server = createTestHarness({
         PROBE_ACCESS_JWKS: JSON.stringify({ keys: [publicKey] }),
         ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
         ACCESS_AUD: 'vite-harness',
-        ACCESS_SUBJECT: 'vite-owner',
-        OWNER_EMAIL: 'owner@example.com',
         APP_ORIGIN: origin,
       },
     },

@@ -1,0 +1,17 @@
+{
+  "repoId": "keiyoushi",
+  "packages": {
+    "eu.kanade.tachiyomi.extension.zh.komiic": [
+      { "key": "preferred_mirror", "kind": 2 },
+      { "key": "CHAPTER_FILTER", "kind": 2 }
+    ],
+    "eu.kanade.tachiyomi.extension.all.mangafire": [
+      { "key": "pref_content_rating", "kind": 5 },
+      { "key": "merge_chapters", "kind": 1 }
+    ],
+    "eu.kanade.tachiyomi.extension.en.mangakatana": [
+      { "key": "server_preference", "kind": 2 },
+      { "key": "SERVER_PREFERENCE", "kind": 2 }
+    ]
+  }
+}

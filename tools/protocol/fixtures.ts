@@ -34,8 +34,7 @@ export type GoldenType =
   | 'SettingsMutationResponse'
   | 'SourcePreferencesMutation'
   | 'SourcePreferencesResponse'
-  | 'SourcePreferencesMutationResponse'
-  | 'ExtensionNetworkPoliciesResponse';
+  | 'SourcePreferencesMutationResponse';
 
 export interface GoldenFixture {
   name: string;
@@ -493,15 +492,7 @@ export const goldenFixtures: GoldenFixture[] = [
       },
     },
   },
-  {
-    name: 'extension-network-policy-readiness',
-    type: 'ExtensionNetworkPoliciesResponse',
-    value: {
-      schemaVersion: 1,
-      catalog,
-      builds: [{ buildId, packageName, bundleSha256: sha256 }],
-    },
-  },
+
   {
     name: 'preferences-open-bootstrap',
     type: 'ControlRequest',

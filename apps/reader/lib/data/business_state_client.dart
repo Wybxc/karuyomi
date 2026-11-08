@@ -1394,55 +1394,6 @@ final class BusinessStateClient {
             pending.request.catalog == catalog,
       );
 
-  Future<wire.ExtensionNetworkPoliciesResponse> readExtensionNetworkPolicies(
-    wire.CatalogReference catalog, {
-    bool Function()? shouldContinue,
-  }) async {
-    _ensureOpen();
-    validateBusinessCatalogReference(catalog);
-    if (shouldContinue?.call() == false) {
-      throw StateError('Network policy read has ended');
-    }
-    final path = Uri(
-      path: '/api/extensions/network-policies',
-      queryParameters: {
-        'catalogUrl': catalog.catalogUrl,
-        'repoId': catalog.repoId,
-      },
-    ).toString();
-    final reply = await api.fetchApi(path, headers: _headers);
-    _ensureOpen();
-    if (shouldContinue?.call() == false) {
-      throw StateError('Network policy read has ended');
-    }
-    if (reply.redirected || reply.status == 401) {
-      throw const BusinessStateTransportException(401);
-    }
-    _budget(reply);
-    _success(reply);
-    final value = wire.decodeProtoJson(
-      wire.ExtensionNetworkPoliciesResponse(),
-      jsonDecode(reply.body),
-      maxBytes: _responseLimit,
-    );
-    _version(value.schemaVersion);
-    if (!value.hasCatalog() ||
-        value.catalog != catalog ||
-        value.builds.length > 5000 ||
-        value.builds.any(
-          (build) =>
-              !RegExp(r'^[A-Za-z0-9._-]{1,200}$').hasMatch(build.buildId) ||
-              build.packageName.isEmpty ||
-              build.packageName.length > 200 ||
-              !RegExp(r'^[a-f0-9]{64}$').hasMatch(build.bundleSha256),
-        ) ||
-        value.builds.map((build) => build.packageName).toSet().length !=
-            value.builds.length) {
-      throw const FormatException('漫画源网络登记回复无效。');
-    }
-    return value.deepCopy()..freeze();
-  }
-
   Future<wire.SourcePreferencesResponse> readSourcePreferences(
     String packageName, {
     required wire.CatalogReference catalog,
@@ -1628,6 +1579,7 @@ final class BusinessStateClient {
       throw const FormatException('Source settings ACK repository mismatch');
     }
     validateBusinessRevision(value.accountRevision);
+    wire.validatePreferenceSyncRules(value.syncRules);
     if (value.mutationId != pending.request.mutationId &&
         (!value.hasError() || value.mutationId.isNotEmpty)) {
       throw const FormatException('Source settings mutation identity mismatch');

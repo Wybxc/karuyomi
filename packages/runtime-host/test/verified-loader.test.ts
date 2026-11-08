@@ -544,15 +544,11 @@ test.each([
         expect.objectContaining({
           credentials: 'same-origin',
           redirect: 'manual',
-          headers: expect.objectContaining({
+          headers: {
             Accept: HTTP_BRIDGE_MEDIA_TYPE,
             'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
             'X-App-Request': '1',
-            'X-Runtime-Build': build.buildId,
-            'X-Runtime-Catalog': catalog.catalogUrl,
-            'X-Runtime-Repo': catalog.repoId,
-            'X-Runtime-Bundle': build.bundle.sha256,
-          }),
+          },
         }),
       );
     } finally {

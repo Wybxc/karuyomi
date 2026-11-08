@@ -13,27 +13,6 @@ export const appMetadata = sqliteTable('app_metadata', {
   value: text('value').notNull(),
 });
 
-export const extensionBuilds = sqliteTable(
-  'extension_builds',
-  {
-    buildId: text('build_id').primaryKey(),
-    packageName: text('package_name').notNull(),
-    catalogUrl: text('catalog_url').notNull(),
-    repoId: text('repo_id').notNull(),
-    bundleSha256: text('bundle_sha256').notNull(),
-    status: text('status', { enum: ['verified', 'disabled'] }).notNull(),
-    createdAt: integer('created_at').notNull(),
-    allowedHostsJson: text('allowed_hosts_json').notNull().default('[]'),
-  },
-  (table) => [
-    uniqueIndex('extension_builds_catalog_package_unique').on(
-      table.catalogUrl,
-      table.repoId,
-      table.packageName,
-    ),
-  ],
-);
-
 export const accountState = sqliteTable('account_state', {
   subject: text('subject').primaryKey(),
   revision: integer('revision').notNull().default(0),

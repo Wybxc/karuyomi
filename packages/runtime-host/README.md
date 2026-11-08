@@ -13,7 +13,7 @@ Web 页面加载 `host.js`，Native 在受控 WebView 中加载内置 host/Worke
 
 扩展索引、清单和 gzip 产物来自同源 `/extensions/` Static Assets，不经私有 API 或 Worker 转发正文，也不携带 Access/GitHub 凭据。加载器拒绝跳转、HTML、协议/ABI 不匹配、超预算与传输摘要错误。缓存与文件系统按已确认身份、仓库、包和 storage schema 隔离；旧 generation 或 workerInstanceId 的结果不得进入当前会话。
 
-Source HTTP 使用 v2 有界二进制协议，向 `/api/bridge/http` 发送小 metadata 与分帧正文，携带同源 cookie、`X-App-Request: 1` 与 `X-Runtime-Build`；图片/HTTP 大正文不进入控制 ProtoJSON。远程脚本能力仍未开放。
+Source HTTP 使用 v2 有界二进制协议，向 `/api/bridge/http` 发送小 metadata 与分帧正文，携带同源 cookie 和 `X-App-Request: 1`；图片/HTTP 大正文不进入控制 ProtoJSON。远程脚本能力仍未开放。
 
 图片内容解释、解码与缓存属于 UI。当前默认使用 Flutter/平台直接解码；未采用且缺少同条件真机性能证据的 `runtime/image-codec` 候选源码与专属工具已删除。先完成真实 UI 基线，再针对实测瓶颈评估成熟方案；长图与设备峰值仍待验收。
 

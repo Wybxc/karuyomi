@@ -4,13 +4,16 @@ import {
   SourcePreferencesResponseSchema,
   CatalogReferenceSchema,
   SourcePreferencesMutationResponseSchema,
+  type CatalogReference,
+  type PreferenceSyncRule,
 } from '@karuyomi/protocol';
 import {
   businessSchemaVersion,
   sourcePreferencesMutationSchema,
   validatePreferencePackageName,
   validateCatalogReference,
-  preferenceSyncRulesForCatalog,
+  preferenceRulesAssetPath,
+  preferenceRulesAssetSchema,
 } from '@karuyomi/contracts';
 import { Hono } from 'hono';
 import type { AppEnv } from './env.js';
@@ -20,6 +23,29 @@ import {
   readSourcePreferences,
 } from './source-preferences-store.js';
 import { StateError } from './state-store.js';
+
+async function currentSyncRules(
+  assets: Fetcher,
+  appOrigin: string,
+  catalog: CatalogReference,
+  packageName: string,
+): Promise<PreferenceSyncRule[]> {
+  if (catalog.catalogUrl !== appOrigin + '/extensions/index.json') return [];
+  const response = await assets.fetch(appOrigin + preferenceRulesAssetPath);
+  if (!response.ok)
+    throw new StateError(
+      ErrorCode.UNAVAILABLE,
+      'Source preference metadata is unavailable',
+      503,
+    );
+  const metadata = preferenceRulesAssetSchema.parse(await response.json());
+  if (
+    metadata.repoId !== catalog.repoId ||
+    !Object.hasOwn(metadata.packages, packageName)
+  )
+    return [];
+  return metadata.packages[packageName] ?? [];
+}
 
 export function createSourcePreferencesRoutes() {
   const app = new Hono<AppEnv>();
@@ -67,6 +93,12 @@ export function createSourcePreferencesRoutes() {
       } catch {
         throw new StateError(ErrorCode.INVALID_INPUT, 'Invalid package name');
       }
+      const rules = await currentSyncRules(
+        c.env.ASSETS,
+        c.env.APP_ORIGIN,
+        catalog,
+        packageName,
+      );
       return c.json(
         toJson(
           SourcePreferencesResponseSchema,
@@ -75,7 +107,7 @@ export function createSourcePreferencesRoutes() {
             c.get('identity').subject,
             packageName,
             catalog,
-            c.env.APP_ORIGIN,
+            rules,
           ),
         ),
       );
@@ -98,7 +130,7 @@ export function createSourcePreferencesRoutes() {
     let catalog: ReturnType<
       typeof sourcePreferencesMutationSchema.parse
     >['catalog'];
-    let syncRules: ReturnType<typeof preferenceSyncRulesForCatalog> = [];
+    let syncRules: PreferenceSyncRule[] = [];
     try {
       let mutation;
       try {
@@ -116,16 +148,17 @@ export function createSourcePreferencesRoutes() {
       catalog = mutation.catalog;
       if (!catalog)
         throw new StateError(ErrorCode.INVALID_INPUT, 'Missing catalog');
-      syncRules = preferenceSyncRulesForCatalog(
-        mutation.packageName,
-        catalog,
+      syncRules = await currentSyncRules(
+        c.env.ASSETS,
         c.env.APP_ORIGIN,
+        catalog,
+        mutation.packageName,
       );
       const result = await applySourcePreferencesMutation(
         c.env.DB,
         c.get('identity').subject,
         mutation,
-        c.env.APP_ORIGIN,
+        syncRules,
       );
       return c.json(
         toJson(SourcePreferencesMutationResponseSchema, result.response),

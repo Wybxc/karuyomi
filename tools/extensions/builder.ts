@@ -18,6 +18,11 @@ import stableStringify from 'json-stable-stringify';
 import writeFileAtomic from 'write-file-atomic';
 import isRecord from 'is-plain-obj';
 import { z } from 'zod';
+import { create, toJson } from '@bufbuild/protobuf';
+import {
+  PreferenceSyncRuleSchema,
+  PreferenceValueKind,
+} from '@karuyomi/protocol';
 import { buildManifestSchema } from '../../packages/contracts/src/index.ts';
 import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import { prepareRuntime, LOCK } from '../teavm/runtime.ts';
@@ -34,6 +39,51 @@ import {
 import { extensionDescriptorSchema, publishedBuildId } from './model.ts';
 import type { ExtensionDescriptor } from './model.ts';
 import { encodeBundle } from './assets.ts';
+
+// Reviewed against the fixed Keiyoushi sources. AOT records these rules in
+// the first-party manifest; a Source cannot opt its own keys into account sync.
+const reviewedPreferenceRules: ReadonlyMap<
+  string,
+  readonly { key: string; kind: PreferenceValueKind }[]
+> = new Map([
+  [
+    'eu.kanade.tachiyomi.extension.zh.komiic',
+    [
+      { key: 'preferred_mirror', kind: PreferenceValueKind.TEXT },
+      { key: 'CHAPTER_FILTER', kind: PreferenceValueKind.TEXT },
+    ],
+  ],
+  [
+    'eu.kanade.tachiyomi.extension.all.mangafire',
+    [
+      { key: 'pref_content_rating', kind: PreferenceValueKind.STRINGS },
+      { key: 'show_as_volumes', kind: PreferenceValueKind.BOOLEAN },
+      { key: 'merge_chapters', kind: PreferenceValueKind.BOOLEAN },
+      { key: 'prefer_official', kind: PreferenceValueKind.BOOLEAN },
+      { key: 'solve_captcha', kind: PreferenceValueKind.BOOLEAN },
+    ],
+  ],
+  [
+    'eu.kanade.tachiyomi.extension.en.asurascans',
+    [{ key: 'pref_hide_premium_chapters', kind: PreferenceValueKind.BOOLEAN }],
+  ],
+  [
+    'eu.kanade.tachiyomi.extension.en.mangakatana',
+    [
+      // The listener and default persistence write distinct storage keys.
+      { key: 'server_preference', kind: PreferenceValueKind.TEXT },
+      { key: 'SERVER_PREFERENCE', kind: PreferenceValueKind.TEXT },
+    ],
+  ],
+]);
+
+export function preferenceSyncRulesForBuild(packageName: string) {
+  return reviewedPreferenceRules
+    .get(packageName)
+    ?.map((rule) =>
+      toJson(PreferenceSyncRuleSchema, create(PreferenceSyncRuleSchema, rule)),
+    );
+}
 
 const sourceSchema = z.object({
   id: z
@@ -490,6 +540,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       sources: [...metadata.sources].sort((a, b) =>
         a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
       ),
+      preferenceSyncRules: preferenceSyncRulesForBuild(descriptor.packageName),
       protocolVersion: materials.protocolVersion,
       hostAbi: materials.hostAbi,
       runtimeBaseline: materials.runtimeBaseline,

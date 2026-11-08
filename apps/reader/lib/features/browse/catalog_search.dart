@@ -285,8 +285,7 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
     for (final build in catalog.builds) {
       final installed = catalog.installedExtension(build.packageName);
       if (installed == null ||
-          !catalog._allowsBuild(build, sha256: installed.bundleSha256) ||
-          !catalog.isNetworkRegistered(build, sha256: installed.bundleSha256)) {
+          !catalog._allowsBuild(build, sha256: installed.bundleSha256)) {
         continue;
       }
       for (final source in build.sources) {
@@ -535,14 +534,6 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
         package.session = session;
       } finally {
         job.opening = false;
-      }
-    } else {
-      await catalog.refreshNetworkPolicies(
-        build.catalog,
-        shouldContinue: () => _current(job),
-      );
-      if (!catalog.isNetworkRegistered(build, sha256: target.bundleSha256)) {
-        throw const FormatException('此构建尚未登记漫画源网络权限。');
       }
     }
     if (!_current(job)) {

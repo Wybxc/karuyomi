@@ -15,8 +15,9 @@ import { validSourceId, validateCatalogReference } from './static-control.ts';
 import {
   validatePreferencePackageName,
   validateSyncedPreferenceEntries,
-  validatePreferenceSyncRuleSubset,
-} from './source-preference-policy.ts';
+  validatePreferenceSyncRules,
+  validatePreferenceEntries,
+} from './preferences-control.ts';
 
 export const SOURCE_PREFERENCES_PACKAGE_LIMIT = 64;
 export const SOURCE_PREFERENCES_PACKAGE_BYTES = 64 * 1024;
@@ -40,7 +41,7 @@ function uint32(value: number): void {
 
 export function validateSourcePreferences(
   value: pb.SourcePreferences,
-  rules?: readonly pb.PreferenceSyncRule[],
+  rules: readonly pb.PreferenceSyncRule[],
 ): void {
   validatePreferencePackageName(value.packageName);
   validSourceId(value.sourceId);
@@ -89,11 +90,9 @@ export const sourcePreferencesMutationSchema =
     validateCatalogReference(value.catalog);
     uuid.parse(value.mutationId);
     uint32(value.expectedRevision);
-    validateSyncedPreferenceEntries(
-      value.packageName,
-      value.sourceId,
-      value.entries,
-    );
+    validatePreferencePackageName(value.packageName);
+    validSourceId(value.sourceId);
+    validatePreferenceEntries(value.entries);
     return value;
   });
 
@@ -107,8 +106,7 @@ export const sourcePreferencesResponseSchema =
     validateEnvelope(value);
     if (!value.error) requireFields(value, ['catalog']);
     if (value.catalog) validateCatalogReference(value.catalog);
-    if (!value.error || value.packageName !== '')
-      validatePreferenceSyncRuleSubset(value.packageName, value.syncRules);
+    validatePreferenceSyncRules(value.syncRules);
     if (!value.error || value.packageName !== '')
       validatePreferencePackageName(value.packageName);
     requireCondition(
@@ -147,11 +145,7 @@ export const sourcePreferencesMutationResponseSchema =
     validateEnvelope(value);
     if (!value.error) requireFields(value, ['catalog']);
     if (value.catalog) validateCatalogReference(value.catalog);
-    if (value.preferences)
-      validatePreferenceSyncRuleSubset(
-        value.preferences.packageName,
-        value.syncRules,
-      );
+    validatePreferenceSyncRules(value.syncRules);
     if (!value.error || value.mutationId !== '') uuid.parse(value.mutationId);
     if (!value.error) requireFields(value, ['preferences']);
     if (value.preferences) {

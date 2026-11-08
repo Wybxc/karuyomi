@@ -71,6 +71,13 @@
       "when": 1793986105990,
       "tag": "0009_cute_master_mold",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794125124635,
+      "tag": "0010_remove-extension-network-registry",
+      "breakpoints": true
     }
   ]
 }

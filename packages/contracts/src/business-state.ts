@@ -795,36 +795,6 @@ export function validateExtensionRepositories(
     ids.add(value.repoId);
   }
 }
-export const extensionNetworkPoliciesResponseSchema =
-  codec<pb.ExtensionNetworkPoliciesResponse>((input) => {
-    const value = parseMessage(
-      pb.ExtensionNetworkPoliciesResponseSchema,
-      input,
-      BUSINESS_RESPONSE_LIMIT,
-    );
-    requireCondition(
-      value.schemaVersion === businessSchemaVersion &&
-        value.builds.length <= 5000,
-      'Invalid extension network policies response',
-    );
-    requireFields(value, ['catalog']);
-    validateCatalogReference(value.catalog);
-    const builds = new Set<string>();
-    const packages = new Set<string>();
-    for (const build of value.builds) {
-      buildIdSchema.parse(build.buildId);
-      validId(build.packageName);
-      mangaKey.parse(build.bundleSha256);
-      requireCondition(
-        !builds.has(build.buildId) && !packages.has(build.packageName),
-        'Duplicate current network build',
-      );
-      builds.add(build.buildId);
-      packages.add(build.packageName);
-    }
-    return value;
-  });
-
 export function validateGlobalSettingsValues(
   value: pb.GlobalSettingsValues,
 ): void {

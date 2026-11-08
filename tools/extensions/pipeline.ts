@@ -44,7 +44,7 @@ import {
   MAX_ENCODED,
   StaticHttpError,
 } from './assets.ts';
-import { verifyBuild } from './registration.ts';
+import { verifyBuild } from './verify-manifest.ts';
 import {
   extensionDescriptorSchema,
   extensionPlanSchema,

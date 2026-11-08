@@ -170,10 +170,7 @@ final class ExtensionsController extends ChangeNotifier {
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
       if (saved) {
-        message =
-            catalog.isNetworkRegistered(build, sha256: prepared.bundleSha256)
-            ? '账户扩展选择已确认，本机产物已准备；打开时将重新校验网络登记。'
-            : '账户扩展选择已确认，代码已准备；网络待登记，暂不能打开漫画源。';
+        message = '账户扩展选择已确认，本机产物已准备。';
         if (previous != null &&
             previous.bundleSha256 != prepared.bundleSha256) {
           await _cleanup(previous.bundleSha256);

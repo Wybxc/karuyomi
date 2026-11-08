@@ -99,12 +99,42 @@ void validatePreferenceEntries(
   );
 }
 
+void _preferenceSourceId(String value) {
+  final number = BigInt.tryParse(value);
+  _preferenceRequire(
+    RegExp(r'^-?\d{1,19}$').hasMatch(value) &&
+        number != null &&
+        number >= BigInt.parse('-9223372036854775808') &&
+        number <= BigInt.parse('9223372036854775807'),
+    'Invalid preference Source identity',
+  );
+}
+
+void validatePreferenceSyncRules(List<PreferenceSyncRule> rules) {
+  _preferenceRequire(
+    rules.length <= preferenceEntryLimit,
+    'Too many preference sync rules',
+  );
+  final identities = <(String, String?)>{};
+  for (final rule in rules) {
+    _preferenceKey(rule.key);
+    final sourceId = rule.hasSourceId() ? rule.sourceId : null;
+    if (sourceId != null) _preferenceSourceId(sourceId);
+    _preferenceRequire(
+      rule.kind != PreferenceValueKind.PREFERENCE_VALUE_KIND_UNSPECIFIED &&
+          identities.add((rule.key, sourceId)),
+      'Invalid or duplicate preference sync rule',
+    );
+  }
+}
+
 void validatePreferenceBootstrap(PreferenceBootstrap value) {
   _preferenceRequire(
     RegExp(r'^eu\.kanade\.[A-Za-z0-9_.]+$').hasMatch(value.packageName) &&
         value.packageName.length <= 200,
     'Invalid preference package identity',
   );
+  validatePreferenceSyncRules(value.syncRules);
   _preferenceRequire(
     value.sources.length <= 64 &&
         value.sources.map((source) => source.sourceId).toSet().length ==
@@ -113,14 +143,7 @@ void validatePreferenceBootstrap(PreferenceBootstrap value) {
   );
   var bytes = 0;
   for (final source in value.sources) {
-    final number = BigInt.tryParse(source.sourceId);
-    _preferenceRequire(
-      RegExp(r'^-?\d{1,19}$').hasMatch(source.sourceId) &&
-          number != null &&
-          number >= BigInt.parse('-9223372036854775808') &&
-          number <= BigInt.parse('9223372036854775807'),
-      'Invalid preference Source identity',
-    );
+    _preferenceSourceId(source.sourceId);
     validatePreferenceEntries(source.entries);
     bytes += utf8
         .encode(

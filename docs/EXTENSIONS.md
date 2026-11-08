@@ -17,7 +17,7 @@ Static Assets 是 Web 与 Native 的扩展权威来源。每个包只部署最�
 
 Source 资料由官方 Gradle `keiyoushi-source-info.json` 的 `metadata.sources` 产生，builder 校验后写 manifest，快照再原样投影到 index。目录只列当前最新可用构建，不包含尚未构建或无可用交付的上游包；名称/语言用于加载前的展示与本地语言筛选，不声明运行时能力或网络可用。不为筛选下载或执行其它扩展，账户安装/卸载也不是目录成员关系。设计见[语言筛选](design/source-language-filter.md)。
 
-装配、登记和客户端打开前核对索引与 manifest 的构建身份及 Source 资料；不一致明确要求刷新，不能静默改用另一资料源。原型不支持缺少 `sources` 的旧格式 fallback；协议/host 输入变化后按固定新输入重建候选，不能将旧清单补标签后当成新 AOT。
+装配和客户端打开前核对索引与 manifest 的构建身份及 Source 资料；不一致明确要求刷新，不能静默改用另一资料源。原型不支持缺少 `sources` 的旧格式 fallback；协议/host 输入变化后按固定新输入重建候选，不能将旧清单补标签后当成新 AOT。
 
 Bundle 清单记录 canonical `sha256/size/contentType`，以及 `encoding: gzip`、`encodedSha256/encodedSize`。canonical 上限 64 MiB，gzip 文件上限 25 MiB；路径绑定 canonical SHA。gzip 使用 level 9、mtime 0、无文件名的固定编码。它是应用显式解压的文件，HTTP 响应不能附加 `Content-Encoding: gzip`。客户端先验证收到的 gzip 长度/摘要，再有界解压并验证 canonical 长度/摘要，最后执行 JavaScript；不读取 raw 资产或私有 API 回退。
 
@@ -85,11 +85,10 @@ node tools/extensions/pipeline.ts prepare-snapshot \
   --results .local/extensions-current/builds \
   --assets-dir .local/extensions-assets
 EXTENSION_ASSETS_DIR="$PWD/.local/extensions-assets" pnpm build
-pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
 node tools/extensions/pipeline.ts check-base \
   --assets-dir .local/extensions-assets
 pnpm --filter @karuyomi/api exec wrangler deploy
-node tools/extensions/network-policies.ts --remote
+pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
 node tools/extensions/pipeline.ts commit-snapshot \
   --state .local/extensions-current/state.json \
   --assets-dir .local/extensions-assets
@@ -101,33 +100,13 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 摘要只在传输边界检查：下载验证编码/canonical 各一次，后续本地阶段复用验证结果；assembler 在上传边界校验实际 gzip 字节，不再次解压计算 canonical 摘要。schema、身份、大小、路径和材料检查仍保留。
 
-## 网络策略
+## Source 网络和设置
 
-静态分发无需 Access。D1 的扩展登记表仅保存按来源绑定的当前 build 网络策略，不保存静态目录或扩展正文；账户安装意图另存于全局业务设置。`/api` 继续校验 Access、Origin 和显式域名白名单。
+静态分发无需 Access。Source HTTP 使用同一应用的 Access 会话和 Worker 公网 fetch；安装、更新或切换漫画站不需要登记包、域名或镜像。额外仓库须与应用 ABI/materials 一致，并为浏览器及 Native WebView 下载提供 CORS；目录、清单与产物验证仍在正式加载边界执行。
 
-部署后的 `network-policies.ts --remote` 仅在指定 catalog URL、由该 index 确定的 repoId 内将已批准 package 的域名策略切换到当前 build，退役该来源中已不在索引的策略；默认 CI 不清理额外仓库；它不自动批准新包、不从请求学习白名单，也不下载 gzip。首次批准一个当前包时，明确指定允许的 hostname：
+具体扩展的适配由 AOT 提供。AOT 可将已审核的非敏感设置键写入当前构建的 `preferenceSyncRules`。正式装配从当前官方清单投影精简的 `/extensions/preference-rules.json`，供 Worker 读取。缺规则的键只在当前客户端会话生效。额外仓库不获得官方清单的设置规则。
 
-```sh
-node tools/extensions/registration.ts PATH_TO_OUTPUT/manifest.json \
-  --allow-host www.mangadraft.com --remote
-```
-
-远程注册先核对部署 origin 的当前 index/manifest；本地测试必须使用 `--local --static-root SNAPSHOT`。注册只解析元数据，不读取本地 gzip、不下载正文，也不重复计算扩展摘要；上传/下载边界负责完整性校验。构建任务不持有 Cloudflare 部署凭据；上游 Gradle/AOT 子进程移除 GitHub 和 Cloudflare 凭据。runtime seed 是独立构建依赖，不属于扩展发布。
-
-额外仓库使用同一工具并显式指定来源：
-
-```sh
-pnpm --filter @karuyomi/runtime-host build
-pnpm exec node tools/extensions/registration.ts MANIFEST \
-  --remote --catalog-url https://repo.example/extensions/index.json \
-  --allow-host source.example
-pnpm exec node tools/extensions/network-policies.ts \
-  --remote --catalog-url https://repo.example/extensions/index.json
-```
-
-`--catalog-url` 只改变 index/manifest 的读取来源；共享材料始终按本项目构建出的 `packages/runtime-host/dist/materials.json` 核对，外仓不重复托管材料，也不能替代受信材料清单。额外仓库须与当前应用 ABI/materials 一致，并为浏览器及 Native 内置 WebView 的运行时下载提供 CORS。代码公开可准备与 Source 网络已登记是两个状态，客户端通过 typed 只读接口区分。
-
-登记、hosts 继承、退役和同步删除均限定来源；跨仓 buildId 冲突拒绝，即使 digest 相同也不覆盖。HTTP 桥同时匹配 buildId、catalog URL、repoId 与 bundle digest，不能只凭 buildId 调用。`0009` 是原型重建：清空无来源的旧网络登记和 Source 设置，并撤销旧设置写入收据。部署前须规划按当前来源重新登记；不要盲目套用迁移后把未登记状态当成可运行。它不删除书架、进度和账户安装意图。本轮功能提交不表示已部署该迁移。
+历史 `0009` 迁移保留。新增 `0010` 只删除退役的网络登记表；应先切换到无需登记的 Worker，再清理旧表，以便旧 Worker 在切换前仍能运行。
 
 ## 增量 CI 与验证层级
 
@@ -135,7 +114,7 @@ pnpm exec node tools/extensions/network-policies.ts \
 
 增量计划读取正式构建生成的共享材料清单，并与已部署索引中的可用扩展逐一比较运行时身份。只要其中一个扩展的协议、ABI、运行基线、HTTP bridge 版本或实际共享材料不匹配，或者缺少已验证的运行时身份，CI 就在输出计划前停止；组装候选前再次检查同一 parent state。先在本地完成并部署当前运行时的全量候选，再恢复增量发布。输入指纹变化但运行时身份相同，继续正常分批构建，未选中的可用构建继续保留。
 
-plan/build/deploy 三个 jobs 只需 GitHub `contents: read`，均安装固定 Node 和锁定 npm 依赖。AOT 在隔离 matrix 中执行；deploy 汇总结果、生成完整快照、构建客户端、检查基线、部署、同步网络策略并确认 checkpoint。即使本轮没有待编译包，catalog 变化（例如删除模块）仍会生成并部署新快照。Cloudflare 凭据仅提供给可信部署步骤，所有增量发布使用同一 concurrency group。
+plan/build/deploy 三个 jobs 只需 GitHub `contents: read`，均安装固定 Node 和锁定 npm 依赖。AOT 在隔离 matrix 中执行；deploy 汇总结果、生成完整快照、构建客户端、检查基线、部署并确认 checkpoint。即使本轮没有待编译包，catalog 变化（例如删除模块）仍会生成并部署新快照。Cloudflare 凭据仅提供给可信部署步骤，所有增量发布使用同一 concurrency group。
 
 增量调度使用以下命令，再以本批结果执行上面的 `prepare-snapshot` 和部署流程；`INPUT_FINGERPRINT` 来自 plan 的 selected 条目：
 
@@ -165,6 +144,6 @@ pnpm test:extension-integrity
 
 ## CI 凭据检查
 
-仓库 Actions secrets 使用 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。Workers Editor 用于更新现有 Worker，D1 Edit 用于迁移和网络策略，`wybxc.cc` 的 Workers Routes Edit 用于域名连接。正常部署不要求创建/删除 Worker 的 Admin 权限。
+仓库 Actions secrets 使用 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。Workers Editor 用于更新现有 Worker，D1 Edit 用于数据库迁移，`wybxc.cc` 的 Workers Routes Edit 用于域名连接。正常部署不要求创建/删除 Worker 的 Admin 权限。
 
 手动工作流 `cloudflare-permissions.yml` 在预先建立、无 `workers.dev`/preview URL 的 `karuyomi-ci-permission-check` 上实际上传 Worker 和静态文件，再恢复空白配置；另创建并删除独立 D1 和唯一测试路由。该 Worker 缺失时应由本地管理员预先创建，检查不会自行申请扩权或新建 Worker。它不修改生产 Worker 或 D1。实际结果见 [验证记录](VERIFICATION.md#ci-凭据权限)。

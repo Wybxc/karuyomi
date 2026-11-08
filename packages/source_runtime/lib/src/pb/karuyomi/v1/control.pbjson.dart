@@ -1009,6 +1009,14 @@ const PreferenceBootstrap$json = {
       '6': '.karuyomi.v1.SourcePreferenceValues',
       '10': 'sources'
     },
+    {
+      '1': 'sync_rules',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceSyncRule',
+      '10': 'syncRules'
+    },
   ],
 };
 
@@ -1016,7 +1024,8 @@ const PreferenceBootstrap$json = {
 final $typed_data.Uint8List preferenceBootstrapDescriptor = $convert.base64Decode(
     'ChNQcmVmZXJlbmNlQm9vdHN0cmFwEiEKDHBhY2thZ2VfbmFtZRgBIAEoCVILcGFja2FnZU5hbW'
     'USPQoHc291cmNlcxgCIAMoCzIjLmthcnV5b21pLnYxLlNvdXJjZVByZWZlcmVuY2VWYWx1ZXNS'
-    'B3NvdXJjZXM=');
+    'B3NvdXJjZXMSPgoKc3luY19ydWxlcxgDIAMoCzIfLmthcnV5b21pLnYxLlByZWZlcmVuY2VTeW'
+    '5jUnVsZVIJc3luY1J1bGVz');
 
 @$core.Deprecated('Use preferenceSyncRuleDescriptor instead')
 const PreferenceSyncRule$json = {
@@ -2101,6 +2110,14 @@ const BuildManifest$json = {
       '6': '.karuyomi.v1.CatalogSource',
       '10': 'sources'
     },
+    {
+      '1': 'preference_sync_rules',
+      '3': 15,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceSyncRule',
+      '10': 'preferenceSyncRules'
+    },
   ],
 };
 
@@ -2116,7 +2133,8 @@ final $typed_data.Uint8List buildManifestDescriptor = $convert.base64Decode(
     'J0aWZhY3RSBmJ1bmRsZRI4Cgxob3N0X3NjcmlwdHMYDCADKAsyFS5rYXJ1eW9taS52MS5BcnRp'
     'ZmFjdFILaG9zdFNjcmlwdHMSMwoJcmVzb3VyY2VzGA0gAygLMhUua2FydXlvbWkudjEuQXJ0aW'
     'ZhY3RSCXJlc291cmNlcxI0Cgdzb3VyY2VzGA4gAygLMhoua2FydXlvbWkudjEuQ2F0YWxvZ1Nv'
-    'dXJjZVIHc291cmNlcw==');
+    'dXJjZVIHc291cmNlcxJTChVwcmVmZXJlbmNlX3N5bmNfcnVsZXMYDyADKAsyHy5rYXJ1eW9taS'
+    '52MS5QcmVmZXJlbmNlU3luY1J1bGVSE3ByZWZlcmVuY2VTeW5jUnVsZXM=');
 
 @$core.Deprecated('Use extensionBuildDescriptorDescriptor instead')
 const ExtensionBuildDescriptor$json = {

@@ -1,10 +1,17 @@
-import { create, fromJsonString, toJsonString } from '@bufbuild/protobuf';
+import {
+  create,
+  fromJsonString,
+  toJson,
+  toJsonString,
+} from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
   SourcePreferencesSchema,
   SourcePreferencesMutationSchema,
   SourcePreferencesMutationResponseSchema,
   type CatalogReference,
+  type PreferenceSyncRule,
+  SourcePreferencesResponseSchema,
   type SourcePreferences,
   type SourcePreferencesMutation,
   type SourcePreferencesMutationResponse,
@@ -18,7 +25,7 @@ import {
   sourcePreferencesResponseSchema,
   sourcePreferencesMutationResponseSchema,
   validateCatalogReference,
-  preferenceSyncRulesForCatalog,
+  preferenceEntryMatchesRule,
   validateSyncedPreferenceEntries,
 } from '@karuyomi/contracts';
 import { hashText, StateError } from './state-store.js';
@@ -34,10 +41,9 @@ export async function readSourcePreferences(
   subject: string,
   packageName: string,
   catalog: CatalogReference,
-  appOrigin: string,
+  rules: PreferenceSyncRule[],
 ): Promise<SourcePreferencesResponse> {
   validateCatalogReference(catalog);
-  const rules = preferenceSyncRulesForCatalog(packageName, catalog, appOrigin);
   const row = await db
     .prepare(
       `SELECT json_object(
@@ -74,7 +80,26 @@ export async function readSourcePreferences(
       'Source preferences are unavailable',
       503,
     );
-  return sourcePreferencesResponseSchema.parse(JSON.parse(row.response_json));
+  const response = fromJsonString(
+    SourcePreferencesResponseSchema,
+    row.response_json,
+  );
+  for (const source of response.sources) projectPreferences(source, rules);
+  return sourcePreferencesResponseSchema.parse(
+    toJson(SourcePreferencesResponseSchema, response),
+  );
+}
+
+// Rules may change with the current static build. Keep the stored revision
+// for CAS, while withholding values the current build no longer synchronizes.
+function projectPreferences(
+  preferences: SourcePreferences,
+  rules: readonly PreferenceSyncRule[],
+): SourcePreferences {
+  preferences.entries = preferences.entries.filter((entry) =>
+    preferenceEntryMatchesRule(preferences.sourceId, entry, rules),
+  );
+  return preferences;
 }
 
 async function currentPreferences(
@@ -126,7 +151,7 @@ export async function applySourcePreferencesMutation(
   db: D1Database,
   subject: string,
   mutation: SourcePreferencesMutation,
-  appOrigin: string,
+  rules: PreferenceSyncRule[],
 ): Promise<{
   status: 200 | 400 | 409 | 413 | 503;
   response: SourcePreferencesMutationResponse;
@@ -135,11 +160,6 @@ export async function applySourcePreferencesMutation(
   if (!catalog)
     throw new StateError(ErrorCode.INVALID_INPUT, 'Source catalog is required');
   validateCatalogReference(catalog);
-  const rules = preferenceSyncRulesForCatalog(
-    mutation.packageName,
-    catalog,
-    appOrigin,
-  );
   const requestHash = await hashText(
     KIND + '\n' + toJsonString(SourcePreferencesMutationSchema, mutation),
   );
@@ -150,12 +170,20 @@ export async function applySourcePreferencesMutation(
       )
       .bind(subject, mutation.mutationId)
       .first<{ kind: string; request_hash: string; response_json: string }>();
-  const replay = (responseJson: string) => ({
-    status: 200 as const,
-    response: sourcePreferencesMutationResponseSchema.parse(
-      JSON.parse(responseJson),
-    ),
-  });
+  const replay = (responseJson: string) => {
+    const response = fromJsonString(
+      SourcePreferencesMutationResponseSchema,
+      responseJson,
+    );
+    if (response.preferences) projectPreferences(response.preferences, rules);
+    response.syncRules = rules;
+    return {
+      status: 200 as const,
+      response: sourcePreferencesMutationResponseSchema.parse(
+        toJson(SourcePreferencesMutationResponseSchema, response),
+      ),
+    };
+  };
   const existing = await findMutation();
   if (existing?.kind === KIND && existing.request_hash === requestHash)
     return replay(existing.response_json);
@@ -172,7 +200,7 @@ export async function applySourcePreferencesMutation(
       schemaVersion: businessSchemaVersion,
       mutationId: mutation.mutationId,
       accountRevision: state.accountRevision,
-      preferences: state.preferences,
+      preferences: projectPreferences(state.preferences, rules),
       catalog,
       syncRules: rules,
       error: {

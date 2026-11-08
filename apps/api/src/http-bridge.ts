@@ -30,31 +30,6 @@ const methods = new Set([
 const HTTP_META_DEADLINE_MS = 30_000;
 const HTTP_HARD_DEADLINE_MS = 300_000;
 
-export function allowedTarget(value: string, hosts: string[]): URL {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error('target_not_allowed');
-  }
-  if (
-    !['https:', 'http:'].includes(url.protocol) ||
-    url.username ||
-    url.password ||
-    url.port ||
-    !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(url.hostname) ||
-    /^\d+(?:\.\d+)*$/.test(url.hostname) ||
-    /(?:^|\.)(?:localhost|local|internal|home|invalid|test)$/.test(
-      url.hostname,
-    ) ||
-    !url.hostname.includes('.') ||
-    !hosts.includes(url.hostname)
-  ) {
-    throw new Error('target_not_allowed');
-  }
-  return url;
-}
-
 class BinaryBridgeError extends Error {
   constructor(
     readonly code: string,
@@ -87,7 +62,6 @@ function connectionHeaders(headers: Iterable<[string, string]>): Set<string> {
  */
 export async function forwardBinary(
   request: Request,
-  hosts: string[],
   fetcher: typeof fetch = (...args) => fetch(...args),
 ): Promise<Response> {
   const started = Date.now();
@@ -280,13 +254,20 @@ export async function forwardBinary(
           400,
         );
       try {
-        url = allowedTarget(descriptor.url, hosts);
+        url = new URL(descriptor.url);
+        if (
+          !['https:', 'http:'].includes(url.protocol) ||
+          url.username ||
+          url.password
+        )
+          throw new Error(
+            'Expected an HTTP(S) URL without embedded credentials',
+          );
       } catch {
         throw new BinaryBridgeError(
-          'target_not_allowed',
-          'Upstream target is not allowed',
-          // A rejected Source URL is not a denial of the signed-in session.
-          422,
+          'invalid_bridge_request',
+          'Invalid upstream HTTP URL',
+          400,
         );
       }
       const nominated = connectionHeaders(descriptor.headers);
@@ -619,30 +600,7 @@ export function createHttpBridge() {
       return c.json({ error: 'unsupported_bridge_protocol' }, 415);
     if (accept !== HTTP_BRIDGE_MEDIA_TYPE)
       return c.json({ error: 'unsupported_bridge_response_protocol' }, 406);
-    const buildId = c.req.header('X-Runtime-Build');
-    if (!buildId || buildId.length > 200)
-      return c.json({ error: 'runtime_build_required' }, 400);
-    const row = await c.env.DB.prepare(
-      'SELECT allowed_hosts_json FROM extension_builds WHERE build_id = ? AND catalog_url = ? AND repo_id = ? AND bundle_sha256 = ? AND status = ?',
-    )
-      .bind(
-        buildId,
-        c.req.header('X-Runtime-Catalog') ?? '',
-        c.req.header('X-Runtime-Repo') ?? '',
-        c.req.header('X-Runtime-Bundle') ?? '',
-        'verified',
-      )
-      .first<{ allowed_hosts_json: string }>();
-    if (!row) return c.json({ error: 'build_not_found' }, 404);
-    let hosts: unknown;
-    try {
-      hosts = JSON.parse(row.allowed_hosts_json);
-    } catch {
-      return c.json({ error: 'invalid_network_policy' }, 503);
-    }
-    if (!Array.isArray(hosts) || !hosts.every((h) => typeof h === 'string'))
-      return c.json({ error: 'invalid_network_policy' }, 503);
-    return forwardBinary(c.req.raw, hosts);
+    return forwardBinary(c.req.raw);
   });
   return app;
 }

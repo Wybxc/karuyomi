@@ -4,7 +4,7 @@
 
 ## 候选与界面
 
-浏览页提供独立“跨源搜索”入口。候选来自当前账户已经确认安装、启用、所属仓库仍登记、静态构建仍匹配且网络政策已登记的 Source；刷新候选只读，不安装、升级、换仓或执行扩展来枚举名称。候选保留 `catalogUrl/repoId/package/buildId/bundleSha256/sourceId`，同名、同 Source ID 或同包跨仓记录不能合并成另一来源。
+浏览页提供独立“跨源搜索”入口。候选来自当前账户已经确认安装、启用、所属仓库仍登记、静态构建仍匹配的 Source；刷新候选只读，不安装、升级、换仓或执行扩展来枚举名称。候选保留 `catalogUrl/repoId/package/buildId/bundleSha256/sourceId`，同名、同 Source ID 或同包跨仓记录不能合并成另一来源。
 
 默认不选择任何 Source。用户按名称或扩展包查找、按语言筛选并明确勾选；候选列表分组显示，不截断未显示的候选。开始时冻结搜索词和本轮选择，各 Source 独立显示等待、执行、结果、错误及停止状态。一个慢源或普通 Source 错误不清除其它源的结果。
 
@@ -22,7 +22,7 @@
 
 ## 打开与调用门禁
 
-每次 Source 执行均重新检查原账户 client、当前 confirmed 安装、enabled、仓库登记、精确 build/hash、manifest、Source ID 和网络政策。Source 设置沿用原来源的已确认 bootstrap，未处理的设置请求阻止执行；搜索不隐式重放设置保存，也不跨仓继承当前会话敏感值。
+每次 Source 执行均重新检查原账户 client、当前 confirmed 安装、enabled、仓库登记、精确 build/hash、manifest、Source ID。Source 设置沿用原来源的已确认 bootstrap，未处理的设置请求阻止执行；搜索不隐式重放设置保存，也不跨仓继承当前会话敏感值。
 
 点击结果先停止本轮任务，等待两槽清理与主线所有权归还，再重新核对该结果的原精确来源。通过主 Catalog 的正式打开入口选择 Source，不额外读取热门，然后调用正式 details/chapters 并进入既有详情页。缺包、停用、下架、换仓或 hash 改变均明确失败，不偷偷打开另一来源的同名作品。
 

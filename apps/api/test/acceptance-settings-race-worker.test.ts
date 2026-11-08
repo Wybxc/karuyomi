@@ -98,7 +98,7 @@ function fetchAcceptance(subject: string, request: Request) {
       ...env,
       ...credentials,
       APP_ORIGIN: origin,
-      ACCESS_SUBJECT: subject,
+      ACCEPTANCE_SUBJECT: subject,
       ACCEPTANCE_SETTINGS_CAS_RACE: '1',
     },
     createExecutionContext(),

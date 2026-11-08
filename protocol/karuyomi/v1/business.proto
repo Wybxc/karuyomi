@@ -369,18 +369,6 @@ message ExtensionRepository {
   string name = 3;
 }
 
-message ExtensionNetworkPolicy {
-  string build_id = 1;
-  string package_name = 2;
-  string bundle_sha256 = 3;
-}
-
-message ExtensionNetworkPoliciesResponse {
-  uint32 schema_version = 1;
-  CatalogReference catalog = 2;
-  repeated ExtensionNetworkPolicy builds = 3;
-}
-
 message GlobalSettingsValues {
   AppTheme theme = 1;
   ReaderSettings reader = 2;

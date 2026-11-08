@@ -324,9 +324,10 @@ Future<Map<String, Object?>> _prepare(
   expect(installed.catalogUrl, build.catalogUrl);
   expect(installed.repoId, build.repoId);
   expect(installed.enabled, isTrue);
+  final cache = await catalog.runtime.extensionCache().timeout(_remaining());
   expect(
-    catalog.isNetworkRegistered(build, sha256: installed.bundleSha256),
-    isTrue,
+    cache.artifacts.map((artifact) => artifact.sha256),
+    contains(installed.bundleSha256),
   );
 
   await _tap(
@@ -343,6 +344,8 @@ Future<Map<String, Object?>> _prepare(
         catalog.activeBuild?.id == _buildId &&
         catalog.session != null;
   });
+  expect(catalog.session!.catalog, build.catalog);
+  expect(catalog.session!.buildId, installed.buildId);
   final sourceButton = find.byKey(ValueKey(('catalog-source', _sourceId)));
   await _reveal(tester, sourceButton, catalogPage);
   await _tap(tester, sourceButton);

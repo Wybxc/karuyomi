@@ -9,5 +9,4 @@ export * from './image-frames.ts';
 export * from './business-state.ts';
 export * from './runtime-materials.ts';
 export * from './preferences-control.ts';
-export * from './source-preference-policy.ts';
 export * from './source-preferences-business.ts';

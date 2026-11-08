@@ -1418,54 +1418,6 @@ final $typed_data.Uint8List extensionRepositoryDescriptor = $convert.base64Decod
     'ChNFeHRlbnNpb25SZXBvc2l0b3J5Eh8KC2NhdGFsb2dfdXJsGAEgASgJUgpjYXRhbG9nVXJsEh'
     'cKB3JlcG9faWQYAiABKAlSBnJlcG9JZBISCgRuYW1lGAMgASgJUgRuYW1l');
 
-@$core.Deprecated('Use extensionNetworkPolicyDescriptor instead')
-const ExtensionNetworkPolicy$json = {
-  '1': 'ExtensionNetworkPolicy',
-  '2': [
-    {'1': 'build_id', '3': 1, '4': 1, '5': 9, '10': 'buildId'},
-    {'1': 'package_name', '3': 2, '4': 1, '5': 9, '10': 'packageName'},
-    {'1': 'bundle_sha256', '3': 3, '4': 1, '5': 9, '10': 'bundleSha256'},
-  ],
-};
-
-/// Descriptor for `ExtensionNetworkPolicy`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List extensionNetworkPolicyDescriptor = $convert.base64Decode(
-    'ChZFeHRlbnNpb25OZXR3b3JrUG9saWN5EhkKCGJ1aWxkX2lkGAEgASgJUgdidWlsZElkEiEKDH'
-    'BhY2thZ2VfbmFtZRgCIAEoCVILcGFja2FnZU5hbWUSIwoNYnVuZGxlX3NoYTI1NhgDIAEoCVIM'
-    'YnVuZGxlU2hhMjU2');
-
-@$core.Deprecated('Use extensionNetworkPoliciesResponseDescriptor instead')
-const ExtensionNetworkPoliciesResponse$json = {
-  '1': 'ExtensionNetworkPoliciesResponse',
-  '2': [
-    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
-    {
-      '1': 'catalog',
-      '3': 2,
-      '4': 1,
-      '5': 11,
-      '6': '.karuyomi.v1.CatalogReference',
-      '10': 'catalog'
-    },
-    {
-      '1': 'builds',
-      '3': 3,
-      '4': 3,
-      '5': 11,
-      '6': '.karuyomi.v1.ExtensionNetworkPolicy',
-      '10': 'builds'
-    },
-  ],
-};
-
-/// Descriptor for `ExtensionNetworkPoliciesResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List extensionNetworkPoliciesResponseDescriptor =
-    $convert.base64Decode(
-        'CiBFeHRlbnNpb25OZXR3b3JrUG9saWNpZXNSZXNwb25zZRIlCg5zY2hlbWFfdmVyc2lvbhgBIA'
-        'EoDVINc2NoZW1hVmVyc2lvbhI3CgdjYXRhbG9nGAIgASgLMh0ua2FydXlvbWkudjEuQ2F0YWxv'
-        'Z1JlZmVyZW5jZVIHY2F0YWxvZxI7CgZidWlsZHMYAyADKAsyIy5rYXJ1eW9taS52MS5FeHRlbn'
-        'Npb25OZXR3b3JrUG9saWN5UgZidWlsZHM=');
-
 @$core.Deprecated('Use globalSettingsValuesDescriptor instead')
 const GlobalSettingsValues$json = {
   '1': 'GlobalSettingsValues',

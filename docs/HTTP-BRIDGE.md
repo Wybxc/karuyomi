@@ -71,17 +71,20 @@ The exported `httpResponseMetaSchema` validates these required fields:
 ```
 
 Both schemas reject unknown fields. URLs must be absolute HTTP(S) URLs; this
-format check does not authorize an upstream host. Authentication, origin/host
-binding, SSRF checks, header policy and redirect policy belong to the bridge.
+format check rejects non-HTTP schemes. Access authentication and the
+application origin contract apply to the outer request.
 The request timeout is a positive integer no greater than 300,000 milliseconds.
 The response message may be empty. A missing Fetch response URL must be replaced
 with the request URL before emitting metadata.
 
-If the Source URL fails the registered build's network policy, the Worker returns
-`422 {"error":"target_not_allowed"}` before making an upstream request. This is a
-Source failure, so the client keeps the account session and the Source settings
-entry. Outer 401 and 403 still indicate Access failures. A response from an
-allowed upstream, including its 4xx status, is carried in the framed META.
+The bridge is available to the authenticated application session. It does not
+look up an extension build or hostname policy. Global fetch uses
+[`global_fetch_strictly_public`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#global-fetch-strictly-public);
+redirects are passed back to the Source and its next HTTP request uses the same
+path. Only Source headers from META form the upstream request. The outer
+Access assertion and application cookies are never copied. An invalid URL
+yields HTTP 400; an upstream 4xx is carried in the framed META, separate from
+an outer application authentication failure.
 
 Headers are ordered tuples. Preserve their order and repeated fields, especially
 `Set-Cookie`; do not convert them into a map or combine them with commas.
@@ -196,7 +199,7 @@ runs Node and official Workers Vitest projects. Frame tests cover byte-level
 splitting, oversized transport chunks, partial-buffer transfer, UTF-8 budgets,
 length validation, terminal forms, exact u64 counts, trailing data, malformed
 input and pending-read cancellation. [Workers HTTP tests](../apps/api/test/http-worker.test.ts)
-exercise the real route, RS256 verifier and D1 policy with controlled outbound
+exercise the real route and RS256 verifier without a D1 network registry with controlled outbound
 responses: status/body rules, cookies, Range, uploads, form data, truncation,
 deadlines and consumer cancellation. Gzip uses actual compressed bytes; the
 Brotli case checks an already decoded response boundary and does not establish

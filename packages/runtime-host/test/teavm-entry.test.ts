@@ -9,6 +9,10 @@ import { VerifiedLoader } from '../src/verified-loader.js';
 import { encodedBytes, manifest } from './fixtures.js';
 import { deferred } from './image-fixtures.js';
 
+const appCatalog = {
+  ...catalog,
+  catalogUrl: 'https://reader.example/extensions/index.json',
+};
 const drivers: TeaVMDriver[] = [];
 afterEach(async () => {
   for (const driver of drivers.splice(0)) await driver.close();
@@ -297,20 +301,24 @@ test('filtered search preserves explicit false, null sorting and nested paths in
   expect(result.value.hasNextPage).toBe(true);
 });
 
-test('hostLoad receives confirmed and session bootstrap before source construction and the owned package sync policy', async () => {
-  const build = {
-    ...(await manifest()),
-    packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
-    repoId: 'keiyoushi',
-  };
+test('hostLoad receives the account rules and session values before Source construction', async () => {
+  const build = await manifest();
   const bootstrap = create(pb.PreferenceBootstrapSchema, {
     packageName: build.packageName,
+    syncRules: [
+      { key: 'appearance', kind: pb.PreferenceValueKind.TEXT },
+      {
+        key: 'view-order',
+        kind: pb.PreferenceValueKind.TEXT,
+        sourceId: build.sourceIds[0],
+      },
+    ],
     sources: [
       {
         sourceId: build.sourceIds[0],
         entries: [
           {
-            key: 'preferred_mirror',
+            key: 'appearance',
             value: { value: { case: 'text', value: '1' } },
           },
           {
@@ -323,7 +331,7 @@ test('hostLoad receives confirmed and session bootstrap before source constructi
       },
     ],
   });
-  const { configurations, entries } = await setup(build, bootstrap);
+  const { configurations, entries } = await setup(build, bootstrap, appCatalog);
   expect(entries.map((entry) => entry.kind)).toEqual(['init', 'load']);
   expect(configurations).toHaveLength(1);
   expect(JSON.parse(configurations[0]!)).toEqual({
@@ -333,7 +341,7 @@ test('hostLoad receives confirmed and session bootstrap before source constructi
         {
           sourceId: build.sourceIds[0],
           entries: [
-            { key: 'preferred_mirror', value: { text: '1' } },
+            { key: 'appearance', value: { text: '1' } },
             {
               key: 'session-long',
               value: { longInteger: '9223372036854775807' },
@@ -343,19 +351,27 @@ test('hostLoad receives confirmed and session bootstrap before source constructi
       ],
     },
     syncRules: [
-      { key: 'preferred_mirror', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
-      { key: 'CHAPTER_FILTER', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+      { key: 'appearance', kind: 'PREFERENCE_VALUE_KIND_TEXT' },
+      {
+        key: 'view-order',
+        kind: 'PREFERENCE_VALUE_KIND_TEXT',
+        sourceId: build.sourceIds[0],
+      },
     ],
   });
 });
 
 test('typed preference edits invoke Java once and reject Source claims that unapproved secrets are synchronized', async () => {
-  const build = {
-    ...(await manifest()),
-    packageName: 'eu.kanade.tachiyomi.extension.en.mangakatana',
-    repoId: 'keiyoushi',
-  };
-  const { driver, scope, context, call } = await setup(build);
+  const build = await manifest();
+  const bootstrap = create(pb.PreferenceBootstrapSchema, {
+    packageName: build.packageName,
+    syncRules: [{ key: 'appearance', kind: pb.PreferenceValueKind.TEXT }],
+  });
+  const { driver, scope, context, call } = await setup(
+    build,
+    bootstrap,
+    appCatalog,
+  );
   const invoked = vi.fn((_source: string, operation: string, args: string) => {
     expect(operation).toBe('editPreference');
     expect(JSON.parse(args)).toEqual({
@@ -369,7 +385,7 @@ test('typed preference edits invoke Java once and reject Source claims that unap
         snapshot: {
           snapshotId: 'prefs-2',
           nodes: [],
-          syncValues: [{ key: 'SERVER_PREFERENCE', value: { text: 'mk' } }],
+          syncValues: [{ key: 'appearance', value: { text: 'compact' } }],
           sessionValues: [{ key: 'token', value: { text: 'secret' } }],
         },
       }),
@@ -397,7 +413,7 @@ test('typed preference edits invoke Java once and reject Source claims that unap
   if (result.case !== 'preferenceEdit' || !result.value.snapshot)
     throw new Error('Expected edit snapshot');
   expect(result.value.accepted).toBe(false);
-  expect(result.value.snapshot.syncValues[0]?.key).toBe('SERVER_PREFERENCE');
+  expect(result.value.snapshot.syncValues[0]?.key).toBe('appearance');
   scope.hostInvoke = vi.fn(() =>
     scope.teaDone!(
       JSON.stringify({
@@ -427,6 +443,12 @@ test('foreign-package and undeclared-source bootstrap fail before importing or r
       packageName: 'eu.kanade.tachiyomi.extension.test',
       sources: [{ sourceId: '1' }],
     }),
+    create(pb.PreferenceBootstrapSchema, {
+      packageName: 'eu.kanade.tachiyomi.extension.test',
+      syncRules: [
+        { key: 'appearance', kind: pb.PreferenceValueKind.TEXT, sourceId: '1' },
+      ],
+    }),
   ]) {
     const importer = vi.fn();
     const driver = new TeaVMDriver(
@@ -450,19 +472,26 @@ test('foreign-package and undeclared-source bootstrap fail before importing or r
   }
 });
 
-test('an external catalog claiming the official package and repo ID cannot approve account preferences', async () => {
-  const build = {
-    ...(await manifest()),
-    repoId: 'keiyoushi',
-    packageName: 'eu.kanade.tachiyomi.extension.zh.komiic',
+test('an external catalog claiming the same package and repo ID cannot approve account preferences', async () => {
+  const build = await manifest();
+  const externalCatalog = {
+    catalogUrl: 'https://foreign.example/extensions/index.json',
+    repoId: appCatalog.repoId,
   };
+  await expect(
+    setup(
+      build,
+      create(pb.PreferenceBootstrapSchema, {
+        packageName: build.packageName,
+        syncRules: [{ key: 'appearance', kind: pb.PreferenceValueKind.TEXT }],
+      }),
+      externalCatalog,
+    ),
+  ).rejects.toThrow('Account preference rules require the application catalog');
   const { driver, scope, context, call, configurations } = await setup(
     build,
     undefined,
-    {
-      catalogUrl: 'https://foreign.example/extensions/index.json',
-      repoId: 'keiyoushi',
-    },
+    externalCatalog,
   );
   expect(JSON.parse(configurations[0]!).syncRules).toBeUndefined();
   scope.hostInvoke = () =>
@@ -470,7 +499,7 @@ test('an external catalog claiming the official package and repo ID cannot appro
       JSON.stringify({
         snapshotId: 'external-preferences',
         nodes: [],
-        syncValues: [{ key: 'preferred_mirror', value: { text: '1' } }],
+        syncValues: [{ key: 'appearance', value: { text: '1' } }],
       }),
     );
   await expect(

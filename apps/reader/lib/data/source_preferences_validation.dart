@@ -45,6 +45,7 @@ void validateSourcePreferencesResponse(
     throw const FormatException('Source preference response identity mismatch');
   }
   validateBusinessRevision(value.accountRevision);
+  wire.validatePreferenceSyncRules(value.syncRules);
   if (value.sources.length > 64 ||
       value.sources.map((source) => source.sourceId).toSet().length !=
           value.sources.length ||

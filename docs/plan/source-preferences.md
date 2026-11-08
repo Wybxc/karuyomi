@@ -73,6 +73,8 @@
 
 这些是源码候选，不是运行可用名单。编译后仍按 `compiled_unverified` / `runtimeReady=false` 管理，直到相应真实链路通过；筛选或默认浏览的既有证据不能覆盖 preferences。
 
+AOT 清单承载已审核键，Worker 与运行时不再按扩展名配置。当前新候选须由新版 AOT 产出相应字段，再复验真实 Source 设置。
+
 ## 验收门
 
 - [x] TS/Dart 合同与 Java oracle：原子类保留、默认值/false/空集合、合法选项、重复/非法路径、整体预算、listener-veto、click、别名写入、依赖与 summary 刷新；SharedPreferences Editor 和监听器语义有实际断言。

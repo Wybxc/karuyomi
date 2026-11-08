@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/source_preferences_repository.dart';
+import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -15,6 +17,36 @@ void main() {
     await fixture.open();
   });
   tearDown(() => fixture.close());
+
+  test(
+    'opening a build forwards only the rules confirmed by the API',
+    () async {
+      final rule = wire.PreferenceSyncRule(
+        key: 'alias',
+        kind: wire.PreferenceValueKind.PREFERENCE_VALUE_KIND_BOOLEAN,
+        sourceId: sourceId,
+      );
+      fixture.platform.afterBusinessReply = (request, reply) {
+        if (request.method != 'GET' ||
+            !request.uri.path.startsWith('/api/source-preferences/packages/')) {
+          return reply;
+        }
+        final response = wire.decodeProtoJson(
+          wire.SourcePreferencesResponse(),
+          jsonDecode(reply.body),
+        )..syncRules.add(rule);
+        return ApiReply(
+          status: reply.status,
+          headers: reply.headers,
+          body: jsonEncode(wire.encodeProtoJson(response)),
+          redirected: reply.redirected,
+        );
+      };
+      expect(fixture.platform.preferenceBootstraps.last.syncRules, isEmpty);
+      await fixture.catalog.openBuild(fixture.catalog.builds.single);
+      expect(fixture.platform.preferenceBootstraps.last.syncRules, [rule]);
+    },
+  );
 
   test(
     'settings for a removed Source stay in D1 without blocking the current extension',

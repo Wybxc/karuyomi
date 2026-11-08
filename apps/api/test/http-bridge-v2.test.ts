@@ -87,7 +87,6 @@ function request(
     headers: {
       'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
       Accept: HTTP_BRIDGE_MEDIA_TYPE,
-      'X-Runtime-Build': 'verified-build',
       'X-App-Request': '1',
       Origin: 'https://read.example.com',
     },
@@ -141,7 +140,6 @@ describe('HTTP bridge v2 request validation', () => {
       responseReader(
         await forwardBinary(
           request(meta, [], { wire }),
-          ['example.org'],
           fetcher as typeof fetch,
         ),
       ),
@@ -157,7 +155,6 @@ describe('HTTP bridge v2 request validation', () => {
         responseReader(
           await forwardBinary(
             request(metadata({ method: 'POST', hasBody })),
-            ['example.org'],
             fetchEmpty as typeof fetch,
           ),
         ),
@@ -201,7 +198,6 @@ describe('HTTP bridge v2 request validation', () => {
           ],
         }),
       ),
-      ['example.org'],
       fetcher as typeof fetch,
     );
     await readAll(responseReader(response));
@@ -219,7 +215,6 @@ describe('HTTP bridge v2 request validation', () => {
     const fetcher = vi.fn();
     const response = await forwardBinary(
       request(metadata(overrides as Partial<HttpRequestMeta>)),
-      ['example.org'],
       fetcher,
     );
     expect(response.status).toBe(400);
@@ -228,23 +223,16 @@ describe('HTTP bridge v2 request validation', () => {
   });
 
   it.each([
-    'http://127.0.0.1/private?secret=password',
+    'not a URL',
     'https://user:password@example.org/',
-    'https://undeclared.org/private',
-  ])(
-    'rejects undeclared or unsafe target without reflecting it: %s',
-    async (url) => {
-      const fetcher = vi.fn();
-      const response = await forwardBinary(
-        request(metadata({ url })),
-        ['example.org'],
-        fetcher,
-      );
-      expect(response.status).toBe(422);
-      expect(await response.json()).toEqual({ error: 'target_not_allowed' });
-      expect(fetcher).not.toHaveBeenCalled();
-    },
-  );
+    'file:///tmp/invalid',
+  ])('rejects an invalid HTTP URL without reflecting it: %s', async (url) => {
+    const fetcher = vi.fn();
+    const response = await forwardBinary(request(metadata({ url })), fetcher);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_bridge_request' });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 
   it.each([
     'truncated',
@@ -263,11 +251,7 @@ describe('HTTP bridge v2 request validation', () => {
     if (kind === 'wrong-magic') wire[0] = new Uint8Array(8);
     if (kind === 'duplicate-meta') wire.splice(2, 0, encodeMetaFrame(meta));
     const fetcher = vi.fn();
-    const response = await forwardBinary(
-      request(meta, [], { wire }),
-      ['example.org'],
-      fetcher,
-    );
+    const response = await forwardBinary(request(meta, [], { wire }), fetcher);
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_bridge_request' });
     expect(fetcher).not.toHaveBeenCalled();
@@ -284,7 +268,6 @@ describe('HTTP bridge v2 request validation', () => {
         request(metadata({ method: 'POST', ...overrides }), [
           new Uint8Array([0]),
         ]),
-        ['example.org'],
         (async (_url, init) => {
           await readUpload(init!);
           return new Response(null);
@@ -318,17 +301,12 @@ describe('HTTP bridge v2 request validation', () => {
     });
     await readAll(
       responseReader(
-        await forwardBinary(
-          request(meta, blocks),
-          ['example.org'],
-          fetcher as typeof fetch,
-        ),
+        await forwardBinary(request(meta, blocks), fetcher as typeof fetch),
       ),
     );
     const cancel = vi.fn();
     const over = await forwardBinary(
       request(meta, [...blocks, new Uint8Array([1])], { cancel }),
-      ['example.org'],
       fetcher as typeof fetch,
     );
     expect(over.status).toBe(413);
@@ -356,7 +334,6 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
         const reader = responseReader(
           await forwardBinary(
             request(meta, [], { wire }),
-            ['example.org'],
             fetcher as typeof fetch,
           ),
         );
@@ -395,7 +372,6 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
       const reader = responseReader(
         await forwardBinary(
           request(meta, [bytes, bytes]),
-          ['example.org'],
           fetcher as typeof fetch,
         ),
       );
@@ -443,11 +419,7 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
       new TextDecoder().decode(
         await readAll(
           responseReader(
-            await forwardBinary(
-              incoming,
-              ['example.org'],
-              fetcher as typeof fetch,
-            ),
+            await forwardBinary(incoming, fetcher as typeof fetch),
           ),
         ),
       ),
@@ -469,7 +441,6 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
     );
     const response = await forwardBinary(
       request(),
-      ['example.org'],
       (async () => new Response(source)) as typeof fetch,
     );
     expect(pulls).toBe(0);
@@ -506,7 +477,7 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
         new Response(new Uint8Array([0, 255]), { status: 302, headers }),
     );
     const reader = responseReader(
-      await forwardBinary(request(), ['example.org'], fetcher as typeof fetch),
+      await forwardBinary(request(), fetcher as typeof fetch),
     );
     const meta = httpResponseMetaSchema.parse(await reader.meta());
     expect(meta.upstreamStatus).toBe(302);
@@ -535,7 +506,6 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
       const reader = responseReader(
         await forwardBinary(
           request(metadata({ method })),
-          ['example.org'],
           (async () =>
             new Response(null, {
               status,
@@ -572,7 +542,6 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
       const reader = responseReader(
         await forwardBinary(
           request(),
-          ['example.org'],
           (async () =>
             new Response(new Uint8Array([0, 255, 128]), {
               status,
@@ -603,7 +572,6 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
       const reader = responseReader(
         await forwardBinary(
           request(),
-          ['example.org'],
           (async () =>
             new Response(new Uint8Array([1, 2]), {
               headers: { 'content-length': String(length) },
@@ -639,10 +607,7 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
       { highWaterMark: 0 },
     );
     const reader = responseReader(
-      await forwardBinary(request(), ['example.org'], (async (
-        _url,
-        init: RequestInit,
-      ) => {
+      await forwardBinary(request(), (async (_url, init: RequestInit) => {
         upstreamSignal = init.signal!;
         return new Response(source);
       }) as typeof fetch),
@@ -674,7 +639,6 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
     );
     const response = await forwardBinary(
       request(),
-      ['example.org'],
       (async () =>
         new Response(source, {
           headers: { 'content-length': String(HTTP_RESPONSE_BODY_LIMIT + 1) },
@@ -687,13 +651,9 @@ describe('HTTP bridge v2 response semantics and backpressure', () => {
   });
 
   it('returns only fixed error text for upstream exceptions containing credentials', async () => {
-    const response = await forwardBinary(
-      request(),
-      ['example.org'],
-      (async () => {
-        throw new Error('https://user:password@example.org/?token=secret');
-      }) as typeof fetch,
-    );
+    const response = await forwardBinary(request(), (async () => {
+      throw new Error('https://user:password@example.org/?token=secret');
+    }) as typeof fetch);
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: 'upstream_network_error' });
   });
@@ -718,7 +678,6 @@ describe('HTTP bridge v2 response boundary failures', () => {
     const reader = responseReader(
       await forwardBinary(
         request(),
-        ['example.org'],
         (async () => new Response(source)) as typeof fetch,
       ),
     );
@@ -747,7 +706,6 @@ describe('HTTP bridge v2 response boundary failures', () => {
     const reader = responseReader(
       await forwardBinary(
         request(),
-        ['example.org'],
         (async () => new Response(source)) as typeof fetch,
       ),
     );
@@ -772,7 +730,6 @@ describe('HTTP bridge v2 response boundary failures', () => {
     );
     const response = await forwardBinary(
       request(),
-      ['example.org'],
       (async () => new Response(source, { headers })) as typeof fetch,
     );
     expect(response.status).toBe(502);
@@ -793,10 +750,7 @@ describe('HTTP bridge v2 response boundary failures', () => {
       { highWaterMark: 0 },
     );
     const reader = responseReader(
-      await forwardBinary(request(), ['example.org'], (async (
-        _url,
-        init: RequestInit,
-      ) => {
+      await forwardBinary(request(), (async (_url, init: RequestInit) => {
         signal = init.signal!;
         return new Response(source);
       }) as typeof fetch),
@@ -829,7 +783,6 @@ describe('HTTP bridge v2 lifecycle', () => {
       );
       const response = await forwardBinary(
         request(metadata({ timeoutMs: 50 })),
-        ['example.org'],
         (async (_url, init: RequestInit) => {
           signal = init.signal!;
           return new Response(source);
@@ -862,7 +815,6 @@ describe('HTTP bridge v2 lifecycle', () => {
     );
     const response = await forwardBinary(
       request(metadata({ timeoutMs: 10 })),
-      ['example.org'],
       (async () => new Response(source)) as typeof fetch,
     );
     await vi.advanceTimersByTimeAsync(299_999);
@@ -896,7 +848,6 @@ describe('HTTP bridge v2 lifecycle', () => {
     const reader = responseReader(
       await forwardBinary(
         request(metadata({ timeoutMs: 100_000 })),
-        ['example.org'],
         (async () => new Response(source)) as typeof fetch,
       ),
     );
@@ -931,7 +882,6 @@ describe('HTTP bridge v2 lifecycle', () => {
       );
       const response = await forwardBinary(
         request(metadata(), [], { signal: abort.signal }),
-        ['example.org'],
         (async (_url, init: RequestInit) => {
           signal = init.signal!;
           return new Response(source);
@@ -973,7 +923,7 @@ describe('HTTP bridge v2 lifecycle', () => {
       duplex: 'half',
     } as RequestInit);
     const fetcher = vi.fn();
-    const forwarding = forwardBinary(incoming, ['example.org'], fetcher);
+    const forwarding = forwardBinary(incoming, fetcher);
     await vi.advanceTimersByTimeAsync(29_999);
     expect(cancel).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -1022,7 +972,7 @@ describe('HTTP bridge v2 lifecycle', () => {
       await readUpload(init);
       return new Response(null);
     });
-    const forwarding = forwardBinary(incoming, ['example.org'], fetcher);
+    const forwarding = forwardBinary(incoming, fetcher);
     await vi.advanceTimersByTimeAsync(299_999);
     expect(fetcher).toHaveBeenCalledOnce();
     expect(cancel).not.toHaveBeenCalled();
@@ -1056,7 +1006,7 @@ describe('HTTP bridge v2 lifecycle', () => {
     } as RequestInit);
     let sent: Uint8Array | undefined;
     let signal: AbortSignal | undefined;
-    const forwarding = forwardBinary(incoming, ['example.org'], (async (
+    const forwarding = forwardBinary(incoming, (async (
       _url,
       init: RequestInit,
     ) => {
@@ -1088,7 +1038,6 @@ describe('HTTP bridge v2 lifecycle', () => {
     const fetcher = vi.fn();
     const response = await forwardBinary(
       request(metadata(), [], { signal: abort.signal, cancel }),
-      ['example.org'],
       fetcher,
     );
     expect(response.status).toBe(502);
@@ -1106,7 +1055,6 @@ describe('HTTP bridge v2 lifecycle', () => {
     const fetcher = vi.fn(() => fetching);
     const forwarding = forwardBinary(
       request(metadata({ timeoutMs: 5 })),
-      ['example.org'],
       fetcher as typeof fetch,
     );
     await vi.advanceTimersByTimeAsync(0);
@@ -1129,10 +1077,7 @@ describe('HTTP bridge v2 lifecycle', () => {
     vi.useFakeTimers();
     let signal: AbortSignal | undefined;
     const reader = responseReader(
-      await forwardBinary(request(), ['example.org'], (async (
-        _url,
-        init: RequestInit,
-      ) => {
+      await forwardBinary(request(), (async (_url, init: RequestInit) => {
         signal = init.signal!;
         return new Response(new Uint8Array([9]));
       }) as typeof fetch),
@@ -1148,15 +1093,7 @@ describe('HTTP bridge v2 route negotiation and existing Access boundary', () => 
   const env = {
     ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
     ACCESS_AUD: 'audience',
-    OWNER_EMAIL: 'owner@example.com',
     APP_ORIGIN: 'https://read.example.com',
-    DB: {
-      prepare: () => ({
-        bind: () => ({
-          first: async () => ({ allowed_hosts_json: '["example.org"]' }),
-        }),
-      }),
-    },
   } as unknown as Bindings;
 
   it.each([
@@ -1198,7 +1135,7 @@ describe('HTTP bridge v2 route negotiation and existing Access boundary', () => 
     },
   );
 
-  it('uses the v2 handler only after the verified build network policy is loaded', async () => {
+  it('uses the v2 handler without build headers or a database binding', async () => {
     const fetcher = vi.fn(async () => new Response(new Uint8Array([0, 255])));
     vi.stubGlobal('fetch', fetcher);
     const incoming = request();

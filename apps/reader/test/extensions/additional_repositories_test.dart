@@ -10,7 +10,6 @@ import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/runtime/catalog_transport.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
-import 'package:source_runtime/source_runtime.dart' as runtime;
 
 import '../browse/fakes.dart';
 import '../data/business_state_server.dart';
@@ -30,7 +29,11 @@ wire.ExtensionBuildDescriptor get extraDescriptor =>
       sources: [testCatalogSource],
       manifestPath: '/extensions/builds/community-1/manifest.json',
     );
-void seedPublic(TestPlatform platform, {String? sourceName}) {
+void seedPublic(
+  TestPlatform platform, {
+  String? sourceName,
+  String? bundleSha256,
+}) {
   final source = testCatalogSource;
   if (sourceName != null) source.name = sourceName;
   final descriptor = extraDescriptor;
@@ -53,23 +56,9 @@ void seedPublic(TestPlatform platform, {String? sourceName}) {
           version: '1.0',
           sourceIds: [sourceId],
           sources: [source],
-          bundle: wire.BundleArtifact(sha256: 'a' * 64),
+          bundle: wire.BundleArtifact(sha256: bundleSha256 ?? 'a' * 64),
         ),
       );
-}
-
-void seedNetwork(TestPlatform platform) {
-  platform.policyDocuments[extraUrl] = wire.ExtensionNetworkPoliciesResponse(
-    schemaVersion: 1,
-    catalog: extraCatalog,
-    builds: [
-      wire.ExtensionNetworkPolicy(
-        buildId: 'community-1',
-        packageName: preferencePackage,
-        bundleSha256: 'a' * 64,
-      ),
-    ],
-  );
 }
 
 void main() {
@@ -113,129 +102,6 @@ void main() {
   }
 
   test(
-    'management network-policy reads carry the confirmed subject for initial and post-add refreshes',
-    () async {
-      await manager.refresh(catalogToo: true);
-      expect(manager.error, isNull);
-      expect(catalog.networkPolicyErrors, isEmpty);
-      expect(platform.networkPolicyRequests, hasLength(1));
-      await addExtra();
-      expect(platform.networkPolicyRequests, hasLength(3));
-      for (final request in platform.networkPolicyRequests) {
-        expect(request.method, 'GET');
-        expect(request.headers['X-App-Subject'], 'owner-subject');
-        expect(request.headers['X-App-Request'], '1');
-        expect(request.headers['Accept'], 'application/json');
-      }
-      expect(
-        Uri.parse(platform.networkPolicyRequests.last.path).queryParameters,
-        {'catalogUrl': extraUrl, 'repoId': 'community'},
-      );
-      expect(catalog.networkPolicyErrors, isEmpty);
-    },
-  );
-
-  for (final status in [401, 403, 302, 200]) {
-    test(
-      'network-policy Access response $status pauses the old session and retires management',
-      () async {
-        await catalog.openSelectedBuild(preferencePackage);
-        expect(catalog.session, isNotNull);
-        expect(catalog.isNetworkRegistered(catalog.builds.single), true);
-        platform.networkPolicyReply = wire.ApiFetchResponse(
-          status: status,
-          redirected: status == 302,
-          headers: {
-            'content-type': status == 200 ? 'text/html' : 'application/json',
-          }.entries,
-          body: status == 200 ? '<html>login</html>' : '{"error":"access"}',
-        );
-        await expectLater(
-          catalog.refreshNetworkPolicies(catalog.defaultCatalog),
-          throwsA(
-            isA<runtime.RuntimeException>().having(
-              (failure) => failure.code,
-              'Access response',
-              status == 403
-                  ? runtime.RuntimeErrorCode.accessDenied
-                  : runtime.RuntimeErrorCode.accessRequired,
-            ),
-          ),
-        );
-        expect(
-          catalog.status,
-          status == 403 ? ServiceStatus.denied : ServiceStatus.loginRequired,
-        );
-        expect(catalog.session, isNull);
-        expect(catalog.isNetworkRegistered(catalog.builds.single), false);
-        expect(manager.available, false);
-        expect(manager.error, contains('身份或服务已改变'));
-        expect(posts(), isEmpty);
-      },
-    );
-  }
-
-  test(
-    'ordinary network-policy failure keeps the account and current Source, clears stale readiness and blocks a later open',
-    () async {
-      await catalog.openSelectedBuild(preferencePackage);
-      final generation = catalog.session!.generation;
-      expect(catalog.isNetworkRegistered(catalog.builds.single), true);
-      platform.networkPolicyReply = wire.ApiFetchResponse(
-        status: 503,
-        headers: {'content-type': 'application/json'}.entries,
-        body: '{"error":"unavailable"}',
-      );
-      await expectLater(
-        catalog.refreshNetworkPolicies(catalog.defaultCatalog),
-        throwsA(
-          isA<BusinessStateTransportException>().having(
-            (failure) => failure.status,
-            'service status',
-            503,
-          ),
-        ),
-      );
-      expect(catalog.status, ServiceStatus.ready);
-      expect(catalog.session!.generation, generation);
-      expect(catalog.isNetworkRegistered(catalog.builds.single), false);
-      expect(manager.available, true);
-      expect(await catalog.openSelectedBuild(preferencePackage), isNull);
-      expect(catalog.error, isNotNull);
-      expect(platform.openedBuilds, ['build-1']);
-      expect(catalog.session, isNull);
-      expect(posts(), isEmpty);
-    },
-  );
-
-  test(
-    'a network-policy reply from the retired subject cannot pause or populate the new account',
-    () async {
-      final entered = Completer<void>();
-      final release = Completer<void>();
-      platform.beforeApiFetch = (path) async {
-        if (!path.startsWith('/api/extensions/network-policies')) return;
-        entered.complete();
-        await release.future;
-      };
-      addTearDown(() {
-        if (!release.isCompleted) release.complete();
-      });
-      final reading = catalog.refreshNetworkPolicies(catalog.defaultCatalog);
-      final failed = expectLater(reading, throwsStateError);
-      await entered.future;
-      platform.bootstrapSubject = 'other-subject';
-      await catalog.connect();
-      expect(catalog.subject, 'other-subject');
-      release.complete();
-      await failed;
-      expect(catalog.status, ServiceStatus.ready);
-      expect(catalog.networkPolicies, isEmpty);
-      expect(posts(), isEmpty);
-    },
-  );
-
-  test(
     'preview is read-only; confirming one global CAS synchronizes the repository without installing',
     () async {
       final before = manager.installed.single.deepCopy();
@@ -262,7 +128,7 @@ void main() {
   );
 
   test(
-    'same package requires explicit replacement; code preparation is separate from exact network readiness',
+    'same package requires explicit replacement and opens the selected repository build',
     () async {
       await catalog.openBuild(catalog.builds.single);
       expect(catalog.session, isNotNull);
@@ -280,14 +146,18 @@ void main() {
       expect(platform.preparations.single.catalog, extraCatalog);
       expect(platform.buildClosures.single.buildId, 'build-1');
       expect(catalog.session, isNull);
-      await catalog.openSelectedBuild(preferencePackage);
-      expect(catalog.error, contains('尚未登记'));
-      expect(platform.openedBuilds, ['build-1']);
-      seedNetwork(platform);
       final opened = await catalog.openSelectedBuild(preferencePackage);
       expect(opened?.catalog, extraCatalog, reason: catalog.error);
       expect(catalog.session!.catalog, extraCatalog);
       expect(platform.openedBuilds, ['build-1', 'community-1']);
+      final preferencesRequest = platform.businessServer.requests.lastWhere(
+        (request) => request.path.startsWith('/api/source-preferences/'),
+      );
+      expect(preferencesRequest.headers['X-App-Subject'], catalog.subject);
+      expect(Uri.parse(preferencesRequest.path).queryParameters, {
+        'catalogUrl': extraUrl,
+        'repoId': 'community',
+      });
       final favorite = wire.FavoriteSource(
         packageName: preferencePackage,
         sourceId: sourceId,
@@ -307,9 +177,24 @@ void main() {
   );
 
   test(
+    'a selected repository build with a changed digest cannot open',
+    () async {
+      final extra = await addExtra();
+      await manager.install(
+        extra,
+        replacing: manager.installed.single.deepCopy()..freeze(),
+      );
+      expect(manager.installed.single.bundleSha256, 'a' * 64);
+      seedPublic(platform, bundleSha256: 'b' * 64);
+      expect(await catalog.openSelectedBuild(preferencePackage), isNull);
+      expect(catalog.error, contains('构建与账户选择不匹配'));
+      expect(platform.openedBuilds, isEmpty);
+    },
+  );
+
+  test(
     'removal keeps installed intent, gates every open and closes only the removed repository slot; re-add restores selection',
     () async {
-      seedNetwork(platform);
       final extra = await addExtra();
       await manager.install(
         extra,
@@ -523,7 +408,6 @@ void main() {
       );
       addTearDown(management.dispose);
       seedPublic(fixture.platform);
-      seedNetwork(fixture.platform);
       await management.refresh();
       await management.addRepository(
         (await management.previewRepository(extraUrl, '社区'))!,

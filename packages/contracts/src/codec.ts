@@ -109,3 +109,15 @@ export function requireCondition(
 ): asserts condition {
   if (!condition) throw new Error(message);
 }
+
+export function validId(value: string): void {
+  requireCondition(value.length > 0 && value.length <= 200, 'Invalid identity');
+}
+export function validSourceId(value: string): void {
+  requireCondition(/^-?\d{1,19}$/.test(value), 'Invalid Source identity');
+  const id = BigInt(value);
+  requireCondition(
+    id >= -9223372036854775808n && id <= 9223372036854775807n,
+    'Source identity exceeds signed int64',
+  );
+}

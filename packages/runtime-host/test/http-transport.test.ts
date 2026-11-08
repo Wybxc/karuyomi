@@ -16,14 +16,6 @@ import {
   HttpOwnerFailure,
 } from '../src/http-transport.js';
 
-const buildIdentity = {
-  buildId: 'test-build',
-  catalog: {
-    catalogUrl: 'https://read.example/extensions/index.json',
-    repoId: 'test-repo',
-  },
-  bundleSha256: 'a'.repeat(64),
-};
 const transports: BinaryHttpTransport[] = [];
 afterEach(() => {
   for (const transport of transports.splice(0)) transport.dispose();
@@ -50,11 +42,7 @@ function metadata(
 }
 
 function setup(fetcher?: typeof fetch) {
-  const transport = new BinaryHttpTransport(
-    'https://read.example',
-    buildIdentity,
-    fetcher,
-  );
+  const transport = new BinaryHttpTransport('https://read.example', fetcher);
   transports.push(transport);
   transport.begin({ requestId: 'operation-1', generation: 'generation-1' });
   return transport;
@@ -114,14 +102,11 @@ test('binary upload retains exact bytes, local identities and Source headers', a
       cache: 'no-store',
     });
     const headers = new Headers(init?.headers);
-    expect(headers.get('x-runtime-build')).toBe('test-build');
-    expect(headers.get('x-runtime-catalog')).toBe(
-      buildIdentity.catalog.catalogUrl,
-    );
-    expect(headers.get('x-runtime-repo')).toBe(buildIdentity.catalog.repoId);
-    expect(headers.get('x-runtime-bundle')).toBe(buildIdentity.bundleSha256);
-    expect(headers.get('accept')).toBe(HTTP_BRIDGE_MEDIA_TYPE);
-    expect(headers.get('cookie')).toBeNull();
+    expect([...headers]).toEqual([
+      ['accept', HTTP_BRIDGE_MEDIA_TYPE],
+      ['content-type', HTTP_BRIDGE_MEDIA_TYPE],
+      ['x-app-request', '1'],
+    ]);
     const reader = new HttpFrameReader(
       (init!.body as Blob).stream(),
       8 * 1024 * 1024,
@@ -194,7 +179,6 @@ test('a real connection drop before response headers carries the controlled retr
       throw Error('Expected TCP server');
     const transport = new BinaryHttpTransport(
       `http://127.0.0.1:${address.port}`,
-      buildIdentity,
     );
     transports.push(transport);
     transport.begin({
@@ -364,9 +348,9 @@ test.each([401, 403, 302])(
   },
 );
 
-test('a disallowed Source target stays a nonretryable Source error', async () => {
+test('a rejected bridge request stays a nonretryable Source error', async () => {
   const transport = setup(async () =>
-    Response.json({ error: 'target_not_allowed' }, { status: 422 }),
+    Response.json({ error: 'invalid_bridge_request' }, { status: 400 }),
   );
   await expect(
     transport.finish(transport.open(metadata(transport))),

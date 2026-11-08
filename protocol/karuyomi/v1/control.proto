@@ -227,6 +227,7 @@ message PreferenceBootstrap {
   string package_name = 1;
   // Only namespaces with values need an entry. Missing keys use Source defaults.
   repeated SourcePreferenceValues sources = 2;
+  repeated PreferenceSyncRule sync_rules = 3;
 }
 enum PreferenceValueKind {
   PREFERENCE_VALUE_KIND_UNSPECIFIED = 0;
@@ -477,6 +478,7 @@ message BuildManifest {
   repeated Artifact resources = 13;
   // Complete metadata for exactly source_ids, without running the extension.
   repeated CatalogSource sources = 14;
+  repeated PreferenceSyncRule preference_sync_rules = 15;
 }
 message ExtensionBuildDescriptor {
   string build_id = 1;
