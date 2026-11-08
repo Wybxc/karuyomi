@@ -16,7 +16,7 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 同日，[iOS ↔ Android 模拟器的章节范围往返](../verification/chapter-read-state.md#ios--android-模拟器范围往返)已通过：iOS 标已读、Android 读回并标未读、iOS 新进程读回。Web ↔ Native 与故障门另验。
 
-同日，[生产 Web 恢复登录态](../verification/server-state-production.md#生产-web-恢复登录态)已确认，真实 Source 请求、完整生产阅读和 Native 继续验收。
+同日，[生产 Web 恢复登录态](../verification/server-state-production.md#生产-web-恢复登录态)已确认，随后 [Arknights Comics 英文热门列表](../verification/server-state-production.md#生产-web-真实-source-列表)通过只读验收。完整生产阅读和 Native 继续验收。
 
 ## 优先级与状态
 

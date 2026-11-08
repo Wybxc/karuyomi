@@ -42,3 +42,9 @@ pnpm --filter @karuyomi/api exec wrangler deploy
 ## 生产 Web 恢复登录态
 
 2026-11-08，获准在 Codex 内置浏览器打开生产域名确认 Access 状态。首次打开显示「访问验证已失效，请重新登录」；用户自行登录后，同一生产页面恢复正式书架，显示「刷新服务端书架」。记录不包含身份、凭据或书架内容。本分项只确认实际生产 Web 从过期状态恢复到登录后的书架入口；未操作登录表单、未打开 Source 或阅读器，也未验证 Cookie 轮转细节、原生回跳、跨端读写或真实 Source 请求。
+
+## 生产 Web 真实 Source 列表
+
+2026-11-08，经用户授权，在同一个已登录的 Codex 内置浏览器生产标签从书架进入「浏览」，打开生产目录已交付的 Arknights Comics 1.6.2，选择英语 Source。界面从加载态进入「热门」列表，显示 `Prelude Suite: The Lone Walker`、`Wandering Records: Gold Of Crowns`、`Sui's Daily Slices: Time for Reunion` 等条目。该 Source 的热门实现请求上游漫画列表。本轮只操作到热门列表，未进入作品详情或阅读器，未执行收藏、进度或设置操作，也未使用测试身份。
+
+该记录确认线上 v4 的生产 Access Web 会话可完成一个真实 Source 列表请求；生产详情、图片阅读、原生会话、同身份跨端保存，以及当前 v6 快照上线后的复验仍待完成。

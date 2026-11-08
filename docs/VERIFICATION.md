@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-08，[生产 Web 恢复登录态](verification/server-state-production.md#生产-web-恢复登录态)已确认：用户自行登录后，Codex 内置浏览器中的生产页从 Access 过期提示恢复到正式服务端书架。生产 Source 请求、完整阅读和原生跨端验收继续。
+2026-11-08，[生产 Web 恢复登录态](verification/server-state-production.md#生产-web-恢复登录态)已确认：用户自行登录后，Codex 内置浏览器中的生产页从 Access 过期提示恢复到正式服务端书架。同一正式会话随后通过 [Arknights Comics 英文热门列表](verification/server-state-production.md#生产-web-真实-source-列表)只读验收。生产详情、完整阅读和原生跨端验收继续。
 
 2026-11-08，当前 v6 ToonLook [Web 长图、完整章节与续读](verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)通过：两章各 10 页均在正式阅读界面显示，第一章完成，第二章在新文档恢复到第 10 页。六个受管 Blob 的独立像素对照覆盖五个非恒等重排和一个恒等控制；续读后页位、锚点和完成状态保持一致，D1 revision 有变化。未验 Native、性能或生产。
 

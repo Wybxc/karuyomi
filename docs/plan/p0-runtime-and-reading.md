@@ -21,7 +21,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 本轮先完成四项功能，再集中运行回归、构建与实际环境验收。提交前格式化、静态类型与依赖检查继续执行。生产 Access、Native 主入口、真机与性能门是独立的待验收项，不通过重复采样代替缺失功能；候选分片、LOD 与性能优化不扩大本轮实现范围。
 
-功能行为、集中工程回归和新 ABI 的交付限制见[功能收尾记录](../verification/p0-feature-completion.md)。随后固定 `1f599cd` 已重编三个 v4 官方扩展，并通过 Web 元数据/原处理图片、xkcd 正式阅读及跨标签占用/释放分项，见[v4 运行记录](../verification/v4-source-runtime.md)；实际 TeaVM 的 owner/嵌套 enqueue/取消分项见[回调记录](../verification/teavm-enqueue.md)。固定 `13494a0` 的正式客户端/API 与这三包已部署，匿名静态交付及远端网络政策核对通过，见[生产记录](../verification/v4-production.md)。生产 Access 会话曾失效，用户自行登录后已[确认 Web 恢复到正式书架](../verification/server-state-production.md#生产-web-恢复登录态)；真实 Source 动态请求、完整阅读与 Native 恢复仍待验收。历史三源证据仍按原提交保留。
+功能行为、集中工程回归和新 ABI 的交付限制见[功能收尾记录](../verification/p0-feature-completion.md)。随后固定 `1f599cd` 已重编三个 v4 官方扩展，并通过 Web 元数据/原处理图片、xkcd 正式阅读及跨标签占用/释放分项，见[v4 运行记录](../verification/v4-source-runtime.md)；实际 TeaVM 的 owner/嵌套 enqueue/取消分项见[回调记录](../verification/teavm-enqueue.md)。固定 `13494a0` 的正式客户端/API 与这三包已部署，匿名静态交付及远端网络政策核对通过，见[生产记录](../verification/v4-production.md)。生产 Access 会话曾失效，用户自行登录后已[确认 Web 恢复到正式书架](../verification/server-state-production.md#生产-web-恢复登录态)；同一生产会话已通过 [Arknights Comics 英文热门列表](../verification/server-state-production.md#生产-web-真实-source-列表)，详情、完整阅读与 Native 恢复仍待验收。历史三源证据仍按原提交保留。
 
 当前 v4 正式 `lib/main.dart` 的 iOS Simulator App 与 Android arm64 调试 APK 已构建并核对实际包内材料、SQLite 映射和导出，见[Native 成品记录](../verification/v4-native-main.md)。该次因 CUA 无法连接 Simulator 而未安装/启动；随后已通过 Flutter 官方 `integration_test` 在独立 iOS/Android 模拟器启动正式 `app.main()`，以真实 xkcd 完成图片、服务端保存及三端组合双向非默认页续读，见[Web/iOS](../verification/native-server-state.md)和[Android 配对](../verification/android-server-state.md)。生产 Access、真机、Native 视觉/触控、后台恢复和性能仍待验收。
 
@@ -40,7 +40,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DTO，Long ID/日期跨语言使用字符串。当时 host ABI v2 的 Arknights Comics 在内置浏览器经真实 workerd/HTTP v2 通过热门、标题搜索、详情、章节与 51 页列表；首、中、末页经原 Source 解码和释放通过，实际 Flutter 已能打开章节阅读。latest 按源声明跳过。该证据使用显式本地政策与测试 JWT，不是生产 Access；详情见 [VERIFICATION](../VERIFICATION.md#web-产品图片通道)。此前 Protobuf 控制升为 host ABI v3 / protocolVersion 2；固定 `6e08ec9` 后已重新构建并通过内置浏览器的同类 Source/图片分项，见 [v3 运行证据](../verification/protocol-v3-runtime.md)，Native 与剩余运行门继续验收。历史 MangaDraft 的文本搜索与挑战失败不因另一源的成功而变为通过。
 
-`karuyomi.wybxc.cc` 历史 protocolVersion 1 部署曾通过公开入口、匿名 Access 拦截与生产登录后的正向 bootstrap。当前已部署 v4 / protocolVersion 2，但现有证据只确认当前匿名静态入口和 Access 拦截；旧登录证据不能替代当前 Source 请求验收。具体部署版本和历史浏览器环境只在验证记录维护。固定 `b6b5f47` Cache2 材料的 Arknights/CuuTruyen 元数据与首中末图片已重新通过；此前 Little Tyrant/Philia 列表为真实 403。三至五源完整覆盖、真实 Source 冷/热 Cache 命中对照仍未齐，见[实际 Source 记录](../verification/graphics-source-runtime.md)。
+`karuyomi.wybxc.cc` 历史 protocolVersion 1 部署曾通过公开入口、匿名 Access 拦截与生产登录后的正向 bootstrap。当前生产 v4 / protocolVersion 2 已通过匿名静态入口、Access 拦截、Web 恢复登录和真实 Source 热门列表；生产图片与完整阅读继续验收。具体部署版本和历史浏览器环境只在验证记录维护。固定 `b6b5f47` Cache2 材料的 Arknights/CuuTruyen 元数据与首中末图片已重新通过；此前 Little Tyrant/Philia 列表为真实 403。三至五源完整覆盖、真实 Source 冷/热 Cache 命中对照仍未齐，见[实际 Source 记录](../verification/graphics-source-runtime.md)。
 
 ## 下一步
 
