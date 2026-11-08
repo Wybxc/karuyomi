@@ -1,6 +1,6 @@
 # 章节已读状态与范围操作验证
 
-2026-11-06，章节标已读/标未读已从 Protobuf 合同、Worker API、现有 D1 进度表接入正式详情 UI。支持读状态筛选、多选及当前显示顺序的闭区间操作；标记不请求 Source `pages()` 或图片。状态与批次语义见[设计](../design/chapter-read-state.md)。以下区分真实 workerd/D1 回归与受控客户端 supplier；没有新增独立浏览器、Native、生产 Access 或真机证据。
+2026-11-06，章节标已读/标未读已从 Protobuf 合同、Worker API、现有 D1 进度表接入正式详情 UI。支持读状态筛选、多选及当前显示顺序的闭区间操作；标记不请求 Source `pages()` 或图片。状态与批次语义见[设计](../design/chapter-read-state.md)。以下分别记录真实 workerd/D1 回归、受控客户端 supplier 和独立客户端实测。
 
 ## 协议与真实 D1
 
@@ -57,7 +57,20 @@
 
 以相同 xkcd 快照重建修复后的正式客户端（Web 入口 SHA-256 `98a25af607b34eb2583baf837553165cc467845541b33af0f8f5d1859496b644`），另开空 D1。从正式 UI 安装、打开详情、收藏，不点手动刷新，第一次确认相同反序范围即 3/3 成功。独立三阶段快照为 0/0/0 → 2/1/1 → 5/4/1，只有目标三章新增 epoch 1 已读，负对照与其它业务字段不变。两个本地 harness 和浏览器标签均已关闭，未部署该候选。
 
-复验使用 `EXTENSION_ASSETS_DIR=<固定快照> pnpm acceptance:build`，按[正式 xkcd 流程](source-reopen.md#固定-5ba6fff真实-web-重开与书签往返通过)用显式 Source 政策启动 `pnpm acceptance:serve`。旧构建的故障与显式恢复、修复后首次提交分开登记。Native、Reader 活动期间的竞争、实际批次部分提交与丢响应、生产和真机仍待验收。
+复验使用 `EXTENSION_ASSETS_DIR=<固定快照> pnpm acceptance:build`，按[正式 xkcd 流程](source-reopen.md#固定-5ba6fff真实-web-重开与书签往返通过)用显式 Source 政策启动 `pnpm acceptance:serve`。旧构建的故障与显式恢复、修复后首次提交分开登记。Native 实测见下节。
+
+## iOS ↔ Android 模拟器范围往返
+
+2026-11-08，使用固定产品 `9ef3ccb`、Flutter 3.47.5 / Dart 3.13.4，iPhone 17 Pro（iOS 26.4 模拟器）和 Android API 36 Google APIs arm64（Pixel 7 配置，WebView 133.0.6943.137）。两端通过同一官方 HTTPS 回环 origin、隔离 workerd/D1 和测试身份 `acceptance-owner`，使用当前 v6 内置材料匹配的真实 xkcd 构建 `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-43d97485f779b768af7861a6a25522db433ab6d229a6d989e70e3f3c88a848a3`。两个模拟器分别正常信任本轮测试 CA；Android 只为回环 HTTPS 的隔离 debug WebView 与测试 Dart 进程追加 CA。未设置故障夹具。
+
+| 阶段                 | account / manga / global revision | 正式界面结果                                                                                                           |
+| -------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| iOS 安装与收藏       | 2 / 1 / 1                         | 正式书签驱动 `prepare` 安装指定构建并收藏英文 xkcd `SINGLE`，无进度或书签。                                            |
+| iOS 标已读           | 5 / 4 / 1                         | 从书架重开真实详情，以来源顺序的反向端点选中 `/3317/`、`/3318/`、`/3319/`，核对清单并获 3/3 确认。三章 epoch 1、已读。 |
+| Android 读回并标未读 | 8 / 7 / 1                         | 从同一书架打开正式已读筛选，读回原三章，再选同一闭区间并获 3/3 确认。三章 epoch 2、未读。                              |
+| iOS 新进程读回       | 8 / 7 / 1                         | 重开详情后已读筛选为 0 章；全部独立快照不变。                                                                          |
+
+各阶段正式集成测试分别 1/1 通过。独立进程使用正常 TLS 和业务请求头，核对全局/作品设置、书架、作品、完整进度、书签及四章逐章状态：两次写入各推进三次 account 与 manga revision；相邻 `/3316/` 始终无进度记录，目标章均无 current/furthest 锚点，没有新增 resume，收藏、分类、资料、设置及书签不变。Android 首轮在进入详情后的前置检查中把独立 ProtoJSON Map 作浅比较，误报失败；尚未开始写入，独立 GET 逐字段与 `5/4/1` 一致。修正驱动为深比较后才执行 Android 写入，无产品修改。复验见[正式驱动](../../apps/reader/integration_test/README.md#章节范围已读与未读)；本轮专用服务与设备已关闭；四次设备日志、独立 GET 快照和 `check-transition.mjs` 留在 `/private/tmp/karuyomi-native-chapter-sync.bztPAx/`。
 
 ## 复验与剩余门槛
 
@@ -80,8 +93,8 @@ flutter test test/browse/chapter_read_navigation_test.dart
 - `pnpm format` 与完整 `pnpm format:check`，覆盖全部项目自有语言与结构化配置。
 - `pnpm check`：生成一致性、portable 格式、严格类型、依赖层级、381 项 Vitest、10 项协议 golden 及全部工具回归。
 - `pnpm flutter:check`：reader_core 21、source_runtime 42、客户端 337 项，三个项目静态分析无问题。
-- `pnpm build`：正式 Web/Native runtime 资源、Flutter Web 与 Worker/Static Assets 构建成功；本轮没有编译或运行新的 iOS/Android App。
+- `pnpm build`：正式 Web/Native runtime 资源、Flutter Web 与 Worker/Static Assets 构建成功；此项仅为工程构建；独立 iOS/Android 实测见上节。
 
 详细临时日志留在忽略的 `.local/chapter-read-*.log`，不提交机器输出。
 
-真实 Web 独立文档的已读/未读往返见上节；仍须补 Native 和混合平台的独立客户端读回、Reader 与详情并发、部分提交及丢响应恢复、实际生命周期、生产 Access 与真机。本轮工程和组件证据不能提升完整 P1/P2 状态。
+Web 独立文档与 iOS ↔ Android 模拟器的顺序闭环已通过。Web ↔ Native 范围同步、Reader 与详情同时写、真实部分提交与丢响应恢复、实际生命周期、生产 Access 和真机仍待验收。

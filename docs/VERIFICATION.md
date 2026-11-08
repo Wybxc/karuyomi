@@ -16,7 +16,7 @@
 
 2026-11-07，两台 iOS 模拟器经同一受信 HTTPS / D1，通过[阅读前台 epoch 冲突](verification/concurrent-server-state.md#双-ios-模拟器前台-epoch-冲突)：B 正式重新阅读后，A 回到原进程和第 2 页，自动提示冲突；旧叶继续翻页未覆盖 D1，明确重开后恢复新 epoch 的第 1 页真实图。独立六路响应比对通过。2026-11-08 [Android A 恢复前台、iOS B 重置](verification/concurrent-server-state.md#android-前台恢复与-ios-重置同一账户)通过同进程和任务恢复、六路权威状态不变及显式重开。Web、其它设备组合、同时写竞争、生产 Access 和真机另验。
 
-2026-11-07，正式 Web 的 xkcd 范围已读/未读通过三独立文档往返；首次发现同一详情收藏后误用旧作品 revision，显式重读可恢复，修复后的独立空库首次确认 3/3 通过。独立 D1 核对负对照、书签、设置及阅读锚点未变，见[章节状态记录](verification/chapter-read-state.md)。Native、真实并发和生产另验。
+2026-11-07，正式 Web 的 xkcd 范围已读/未读通过三独立文档往返；首次发现同一详情收藏后误用旧作品 revision，显式重读可恢复，修复后的独立空库首次确认 3/3 通过。独立 D1 核对负对照、书签、设置及阅读锚点未变。2026-11-08，[iOS ↔ Android 模拟器范围往返](verification/chapter-read-state.md#ios--android-模拟器范围往返)也通过：iOS 标已读、Android 在已读筛选读回后标未读、iOS 新进程只读确认。两次各 3/3，独立 GET 核对只改变目标三章。Web ↔ Native、真实并发、批次故障、生产和真机另验。
 
 2026-11-07，两台 iOS 模拟器经同一 HTTPS/D1 实测全局设置自动前台重取：A 真实进入后台，B 保存，A 同一进程回到前台并自动更新原表单与主题。见[前台设置记录](verification/reader-settings.md#2026-11-07ios-模拟器回到前台自动读回全局设置)；随后 [Android 模拟器从 iOS 保存读回](verification/reader-settings.md#2026-11-07android-模拟器回到前台读回-ios-保存)也通过真实系统前后台、原进程和原任务校验。全局设置的 Web 前台与生产另验；阅读进度按上文分项记录。
 
@@ -58,7 +58,7 @@
 
 2026-11-06，自定义封面已接入生成业务协议、Worker API、D1 当前引用、私有 R2 及正式详情/书架 UI；上传使用独立二进制 multipart 与同一作品 mutation 的 CAS/ACK，清除沿 JSON mutation。共享数据及集中工程检查已通过；2026-11-07，独立 Web 文档的上传、替换、清除和读回已通过，两份旧封面路径撤销。见[自定义封面记录](verification/custom-covers.md)及[对象宽限清理和身份设计](design/custom-covers.md)。Native、故障恢复及生产私有 bucket 绑定与部署尚未验收，不能据此认定完整 P1/P2 通过。
 
-2026-11-06，章节范围已读/标未读已接入正式协议、D1 与详情 UI，包含读状态筛选、保留隐藏选择的多选/反序范围、串行精确确认和恢复。真实 Worker/D1、Dart 数据与正式组件结果及其实际范围见[章节状态记录](verification/chapter-read-state.md)；本轮还修复无 metadata 移出书架被正式合同拒绝的缺口，并通过独立真实 Worker/D1 回归。独立客户端、生产与设备门仍待验收。
+2026-11-06，章节范围已读/标未读已接入正式协议、D1 与详情 UI，包含读状态筛选、保留隐藏选择的多选/反序范围、串行精确确认和恢复。真实 Worker/D1、Dart 数据与正式组件结果及其实际范围见[章节状态记录](verification/chapter-read-state.md)；本轮还修复无 metadata 移出书架被正式合同拒绝的缺口，并通过独立真实 Worker/D1 回归。独立 Web 与 Native 模拟器顺序实测见上文；生产与真机门仍待验收。
 
 2026-11-06，正式书架已接入多选、逐漫画批量添加/移出分类和移出书架；冻结确认清单与 CAS，首失败停止，未确认项精确重试，余项显式继续。工程与组件结果维护在[批量操作记录](verification/library-batch.md)；实际独立客户端、生产和设备门仍待验收。
 

@@ -103,6 +103,22 @@ flutter test integration_test/bookmarks_sync_test.dart --no-pub \
 
 驱动按正式 `ChapterSequence` 从唯一 exact URL 算稳定 key；移除阶段用正式「仅书签」筛选定位，其他阶段用章节名缩小列表；两种筛选均不承担身份。单操作预算 120 秒、主体总预算 10 分钟，finally 正式 unmount 并等待 Native disposal ACK，成功输出 `BOOKMARKS_SYNC_RESULT` 与 binding reportData。只有实际运行的平台组合可登记通过；驱动分析不证明 Native、跨端、故障恢复、生产 Access 或真机通过。结束后按上文清理 harness、reverse、测试进程及专用设备。
 
+## 章节范围已读与未读
+
+`chapter_read_sync_test.dart` 复用上文真实 xkcd 静态快照、Source 网络政策、官方 HTTPS harness 和设备证书配置。使用新的空 D1，不设故障夹具；先在 iOS 跑书签驱动的 `prepare`，安装精确 xkcd 构建并收藏英文 Source `1538249443376436084` 的 `SINGLE`。确认 account / manga / global revision 为 2 / 1 / 1，书架只有该作品，进度、书签和续读为空。
+
+用同一实际 HTTPS origin 和 subject 分别运行 iOS `read` → Android `unread` → 新 iOS 进程 `verify`：
+
+```sh
+flutter test integration_test/chapter_read_sync_test.dart --no-pub \
+  -d DEVICE_ID --dart-define-from-file=/absolute/path/phase.json \
+  --reporter expanded
+```
+
+每份 JSON 提供 `APP_ORIGIN`、`CHAPTER_READ_SUBJECT`、`CHAPTER_READ_BUILD_ID` 和对应的 `CHAPTER_READ_PHASE`。使用本地 CA 的 Android 阶段另传根 CA PEM 原始字节的 Base64（`CHAPTER_READ_TEST_CA_BASE64`）；WebView 仍需隔离 debug 网络配置和同端口 `adb reverse`。iOS 只用设备自身信任，不传 CA 参数。
+
+两次写入都经正式书架与详情，以来源顺序中的相反方向选中精确 URL `/3317/`、`/3318/`、`/3319/` 的闭区间，核对确认清单和 3/3 回执。Android 写入前先在已读筛选中看到这三章；iOS 重启后同一筛选显示 0 章，不写入。每阶段从 API 核对全局与漫画设置、作品快照、书签、完整分章进度和相邻负对照 `/3316/`。可用独立 HTTPS 客户端采集同 revision 的 `GET /api/settings`、`GET /api/settings?mangaKey=KEY`、`GET /api/library?revision=REV`、`GET /api/state/manga/KEY`、其 `/bookmarks?revision=REV`、`/progress?revision=REV` 和四个 `?chapterKey=CHAPTER_KEY` 响应逐字段比对。预期 revision 2/1/1 → 5/4/1 → 8/7/1 → 8/7/1，只改变三章的 epoch 与完成状态，无页码锚或 resume。每个成功阶段输出 `CHAPTER_READ_SYNC_RESULT`；任一失败先核对实际提交状态，勿盲重跑写阶段。结束后关闭 harness、reverse 和专用设备。
+
 ## Source 阅读与筛选验收
 
 官方 harness 现在可以按显式主机列表注册当前静态快照中的真实 Source。先用固定提交构建与当前 ABI 匹配的候选快照，再运行正式构建：
