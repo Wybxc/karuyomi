@@ -14,6 +14,8 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 2026-11-08：同一隔离 D1 的 [Web↔iOS 分类](../verification/category-ui-sync.md#web-与-ios-模拟器双向读写)与[全局设置](../verification/reader-settings.md#web-与-ios-模拟器双向读写)双向写入、新 Web 文档读回通过；[Web↔Android 全局设置](../verification/reader-settings.md#web-与-android-模拟器双向读写)和[分类](../verification/category-ui-sync.md#web-与-android-模拟器双向读写)同样通过，生产和其它门另验。
 
+同日，[生产 Web 恢复登录态](../verification/server-state-production.md#生产-web-恢复登录态)已确认，真实 Source 请求、完整生产阅读和 Native 继续验收。
+
 ## 优先级与状态
 
 | 优先级                  | 计划                                                          | 当前状态与依赖                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |

@@ -38,3 +38,7 @@ pnpm --filter @karuyomi/api exec wrangler deploy
 - `/api/bootstrap`、`/api/library`、`/api/state/mutations` 的匿名请求均重定向到预期 Access 登录页，没有跟随重定向或注入凭据。
 
 原始检查脚本与 JSON 留在忽略的 `.local/server-state-deployment/`，独立于旧生产部署证据。没有把过期的生产浏览器会话、测试 JWT 或本地双会话记录算作真实 Access 登录；生产正向与 iOS/Android 同步继续按 [P2](../plan/p2-sync.md) 验收。
+
+## 生产 Web 恢复登录态
+
+2026-11-08，获准在 Codex 内置浏览器打开生产域名确认 Access 状态。首次打开显示「访问验证已失效，请重新登录」；用户自行登录后，同一生产页面恢复正式书架，显示「刷新服务端书架」。记录不包含身份、凭据或书架内容。本分项只确认实际生产 Web 从过期状态恢复到登录后的书架入口；未操作登录表单、未打开 Source 或阅读器，也未验证 Cookie 轮转细节、原生回跳、跨端读写或真实 Source 请求。
