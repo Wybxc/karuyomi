@@ -927,6 +927,53 @@ void main() {
   );
 
   testWidgets(
+    'chapter controls reflow retains the preferred image anchor through restore',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'page')],
+      );
+      final viewports = <ReaderViewportState>[];
+      Widget configured(double controlsHeight) => screen(
+        provider: provider,
+        manifest: manifest,
+        chapterControls: SizedBox(height: controlsHeight),
+        imageBuilder: decodedImage(width: 400, height: 200),
+        onViewport: viewports.add,
+      );
+      final viewport = find.byType(InteractiveViewer);
+      await tester.pumpWidget(configured(40));
+      await tester.pumpAndSettle();
+      final initial = viewports.last.current;
+      final initialBounds = tester.getRect(viewport);
+      expectRenderedAnchor(tester, initial, viewport);
+      for (final height in [160.0, 40.0, 100.0]) {
+        await tester.pumpWidget(configured(height));
+        await tester.pumpAndSettle();
+        final current = viewports.last.current;
+        expect(current.pageKey, initial.pageKey);
+        expect(current.normalizedX, initial.normalizedX);
+        expect(current.normalizedOffset, initial.normalizedOffset);
+        expect(current.viewportX, initial.viewportX);
+        expect(current.viewportY, initial.viewportY);
+      }
+      expect(tester.getRect(viewport).height, lessThan(initialBounds.height));
+      expect(viewports.last.observed, isNotNull);
+      tester.view.physicalSize = const Size(700, 500);
+      await tester.pumpAndSettle();
+      expectRenderedAnchor(tester, viewports.last.current, viewport);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     '2D request survives unknown dimensions, fit, layout, resize, zoom and reopening',
     (tester) async {
       tester.view.physicalSize = const Size(360, 800);

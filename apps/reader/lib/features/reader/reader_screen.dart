@@ -145,6 +145,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _restoring = false;
   double _viewportWidth = 0;
   double _viewportHeight = 0;
+  Size? _windowSize;
   int _restoreEpoch = 0;
   ReadingPosition? _pendingRestorePosition;
   String _windowSignature = '';
@@ -701,7 +702,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  void _confirmViewportAnchor(ReadingPosition anchor) {
+  void _confirmViewportAnchor(
+    ReadingPosition anchor, {
+    bool preservePlacement = false,
+  }) {
     if (!_hasDecodedGeometry(anchor.pageIndexHint)) return;
     final image = _visibleImages
         .where((image) => image.index == anchor.pageIndexHint)
@@ -721,6 +725,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
       // A user may have panned before the first decoded frame. Only now can
       // that visible point be sampled in genuine original-image coordinates.
       _captureViewportAnchor();
+      return;
+    }
+    if (preservePlacement &&
+        anchor.normalizedX >= crop.left &&
+        anchor.normalizedX <= crop.right &&
+        anchor.normalizedOffset >= crop.top &&
+        anchor.normalizedOffset <= crop.bottom) {
+      // An internal chrome resize can clamp the same original point to a
+      // different screen position. Keep its preferred placement; no one read
+      // a new point or moved the image.
       return;
     }
     _setViewportPosition(
@@ -834,7 +848,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _scheduleViewport();
   }
 
-  void _scheduleRestore() {
+  void _scheduleRestore({bool preservePlacement = false}) {
     _pendingRestorePosition = _reader.position;
     _restoring = true;
     final epoch = ++_restoreEpoch;
@@ -890,7 +904,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _restoring = false;
         // Preserve the original image point, updating only where layout
         // constraints place it in the viewport. Placeholder ratios never save.
-        _confirmViewportAnchor(anchor);
+        _confirmViewportAnchor(anchor, preservePlacement: preservePlacement);
         _syncWindow();
         _scheduleViewport();
       });
@@ -1341,17 +1355,23 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
+                      final window = MediaQuery.sizeOf(context);
+                      final sameWindow = _windowSize == window;
+                      _windowSize = window;
                       if (_viewportWidth != constraints.maxWidth ||
                           _viewportHeight != constraints.maxHeight) {
+                        final chromeOnly =
+                            sameWindow &&
+                            _viewportWidth == constraints.maxWidth;
                         _viewportWidth = constraints.maxWidth;
                         _viewportHeight = constraints.maxHeight;
-                        _scheduleRestore();
+                        _scheduleRestore(preservePlacement: chromeOnly);
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!mounted) return;
                           // A user or parent can change the preference before
                           // this layout callback runs.
                           _applyDoublePagePreference();
-                          _scheduleRestore();
+                          _scheduleRestore(preservePlacement: chromeOnly);
                         });
                       }
                       if (_reader.manifest.pages.isEmpty) {

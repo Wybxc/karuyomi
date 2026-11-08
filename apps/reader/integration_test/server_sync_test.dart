@@ -41,6 +41,7 @@ const _xkcdPackage = 'eu.kanade.tachiyomi.extension.all.xkcd';
 const _xkcdSourceId = '1538249443376436084';
 const _xkcdMangaUrl = 'SINGLE';
 const _xkcdChapterUrl = '/3319/';
+const _ackLossSubject = 'acceptance-owner';
 const _epochChanged = '本章进度已在其他设备重置，当前阅读位置保持不变。请重新打开本章后继续保存。';
 
 void main() {
@@ -118,7 +119,7 @@ void main() {
         await _singlePage(tester);
         await _waitForPage(tester, manifest, _startPage);
         late final ProgressSnapshot after;
-        Map<String, Object?>? epochEvidence;
+        Map<String, Object?>? phaseEvidence;
         if (_phase == 'reset') {
           final before = await _confirmedProgress(
             tester,
@@ -142,7 +143,7 @@ void main() {
             epoch: before.epoch + 1,
           );
           _expectResetState(after);
-          epochEvidence = {'beforeReset': _progressReport(before)};
+          phaseEvidence = {'beforeReset': _progressReport(before)};
         } else if (_phase == 'offline') {
           // Decode both pages online, then return to a confirmed page-one
           // baseline. The outage must not rely on a Source image fetch.
@@ -174,8 +175,25 @@ void main() {
             mangaKey,
             manifest,
           );
-          epochEvidence = {
+          phaseEvidence = {
             'beforeDisconnect': _progressReport(before),
+            'keptMountedReader': true,
+            'explicitRetry': true,
+          };
+        } else if (_phase == 'ack-loss') {
+          await _turnTo(tester, manifest, _startPage, _targetPage);
+          final evidence = await _retryAfterLostAck(
+            tester,
+            catalog,
+            repository!,
+            mangaKey,
+            manifest,
+          );
+          after = evidence.confirmed;
+          phaseEvidence = {
+            'beforeCompletion': _progressReport(evidence.before),
+            'whileUnconfirmed': _progressReport(evidence.committed),
+            'afterRetry': _progressReport(after),
             'keptMountedReader': true,
             'explicitRetry': true,
           };
@@ -199,7 +217,7 @@ void main() {
               before,
             );
             after = evidence.reopened;
-            epochEvidence = {
+            phaseEvidence = {
               'lifecycle': {
                 'pid': pid,
                 'transitions': ['paused', 'resumed'],
@@ -236,7 +254,7 @@ void main() {
           'furthest': progress.furthest == null
               ? null
               : _anchor(progress.furthest!),
-          ...?epochEvidence,
+          ...?phaseEvidence,
         };
 
         // The details page enables its chapters only after the actual route
@@ -293,15 +311,21 @@ void _validateConfiguration() {
   if (_chapterLabel.isEmpty || _startPage < 1 || _targetPage < 1) {
     fail('SYNC_CHAPTER_LABEL 不能为空，SYNC_START_PAGE / SYNC_TARGET_PAGE 须大于零');
   }
-  if (!{'navigate', 'reset', 'resume', 'offline'}.contains(_phase) ||
+  if (!{
+        'navigate',
+        'reset',
+        'resume',
+        'offline',
+        'ack-loss',
+      }.contains(_phase) ||
       _expectedEpoch < -1 ||
       _expectedEpoch >= 0xffffffff ||
       (_phase != 'navigate' &&
           (_subject.isEmpty || _buildId.isEmpty || _expectedEpoch < 0)) ||
-      (('resume' == _phase || 'offline' == _phase) &&
+      ({'resume', 'offline', 'ack-loss'}.contains(_phase) &&
           (_startPage != 1 || _targetPage != 2)) ||
       (_phase == 'reset' && (_startPage != 2 || _targetPage != 1))) {
-    fail('前台、断连和重置阶段须提供同一 subject、构建 ID、原 epoch，断连/前台 1→2、重置 2→1');
+    fail('同步恢复阶段须提供同一 subject、构建 ID、原 epoch；重置 2→1，其余恢复阶段 1→2');
   }
   if (_phase == 'offline' &&
       (!Platform.isAndroid ||
@@ -309,6 +333,12 @@ void _validateConfiguration() {
           !origin.hasPort ||
           _testCaBase64.isEmpty)) {
     fail('断连验收仅允许专用 Android 模拟器经本地 HTTPS 端口和测试 CA');
+  }
+  if (_phase == 'ack-loss' &&
+      (origin.host != '127.0.0.1' ||
+          !origin.hasPort ||
+          _subject != _ackLossSubject)) {
+    fail('丢确认验收仅允许本地 HTTPS 夹具及测试身份 $_ackLossSubject');
   }
 }
 
@@ -470,11 +500,13 @@ Future<ProgressSnapshot> _confirmedProgress(
   required int page,
   int? epoch,
   int? minimumFurthest,
+  bool Function()? ready,
 }) async {
   final elapsed = Stopwatch()..start();
   const saved = '阅读进度已保存到服务端';
   while (elapsed.elapsed < _operationBudget) {
-    if (find.text(saved).evaluate().length == 1 &&
+    if ((ready?.call() ?? true) &&
+        find.text(saved).evaluate().length == 1 &&
         (minimumFurthest == null ||
             (_displayedFurthestPage(tester) ?? 0) >= minimumFurthest)) {
       // Inspection does not advance the mounted reader's write CAS baseline.
@@ -488,7 +520,8 @@ Future<ProgressSnapshot> _confirmedProgress(
           (minimumFurthest == null ||
               (progress.furthest?.pageIndexHint ?? -1) >=
                   minimumFurthest - 1) &&
-          find.text(saved).evaluate().length == 1) {
+          find.text(saved).evaluate().length == 1 &&
+          (ready?.call() ?? true)) {
         _expectProgress(state, manifest, page);
         return state;
       }
@@ -665,6 +698,97 @@ Future<ProgressSnapshot> _retryAfterOutage(
   expect(retry, findsNothing);
   debugPrintSynchronously('SYNC_OFFLINE_RETRY_CONFIRMED pid=$pid');
   return after;
+}
+
+Future<
+  ({
+    ProgressSnapshot before,
+    ProgressSnapshot committed,
+    ProgressSnapshot confirmed,
+  })
+>
+_retryAfterLostAck(
+  WidgetTester tester,
+  CatalogController catalog,
+  ProgressRepository repository,
+  String mangaKey,
+  ChapterManifest manifest,
+) async {
+  final oldElement = tester.element(find.byType(ReaderScreen));
+  final oldProvider = _reader(tester).provider;
+  final complete = find.widgetWithText(TextButton, '读完本章');
+  final retry = find.widgetWithText(TextButton, '重试保存');
+  final pending = find.textContaining('进度尚未获服务器确认');
+
+  // A new viewport observation can be queued before the saved label is
+  // repainted. Wait for the actual draft queue and the last-page UI together.
+  final before = await _confirmedProgress(
+    tester,
+    repository,
+    mangaKey,
+    manifest,
+    page: _targetPage,
+    epoch: _expectedEpoch,
+    minimumFurthest: _targetPage,
+    ready: () =>
+        !catalog.hasUnsavedReadingProgress &&
+        complete.evaluate().length == 1 &&
+        tester.widget<TextButton>(complete).onPressed != null,
+  );
+  expect(before.completed, isFalse, reason: '不能重跑已提交的末页完成');
+  expect(before.progress!.furthest!.pageIndexHint, _targetPage - 1);
+  void sameReader() {
+    expect(tester.element(find.byType(ReaderScreen)), same(oldElement));
+    expect(_reader(tester).provider, same(oldProvider));
+  }
+
+  sameReader();
+  debugPrintSynchronously('SYNC_ACK_LOSS_READY pid=$pid');
+  await _tap(tester, complete);
+  await _waitFor(tester, '提交后丢确认保留草稿和正式重试控件', () {
+    return catalog.hasUnsavedReadingProgress &&
+        pending.evaluate().length == 1 &&
+        retry.evaluate().length == 1 &&
+        tester.widget<TextButton>(retry).onPressed != null;
+  });
+  sameReader();
+  await _waitForPage(tester, manifest, _targetPage);
+
+  // Inspection leaves the mounted writer's CAS and pending command intact.
+  final committed = await repository
+      .inspectChapter(mangaKey: mangaKey, chapterKey: manifest.chapterKey)
+      .timeout(_operationBudget);
+  _expectProgress(committed, manifest, _targetPage);
+  expect(_progressReport(committed), {
+    ..._progressReport(before),
+    'mangaRevision': before.revision + 1,
+    'completed': true,
+  });
+  expect(catalog.hasUnsavedReadingProgress, isTrue);
+  expect(pending, findsOneWidget);
+  expect(retry, findsOneWidget);
+  debugPrintSynchronously('SYNC_ACK_LOSS_COMMITTED_UNCONFIRMED pid=$pid');
+
+  await _tap(tester, retry);
+  final confirmed = await _confirmedProgress(
+    tester,
+    repository,
+    mangaKey,
+    manifest,
+    page: _targetPage,
+    epoch: before.epoch,
+    minimumFurthest: _targetPage,
+    ready: () => !catalog.hasUnsavedReadingProgress,
+  );
+  sameReader();
+  await _waitForPage(tester, manifest, _targetPage);
+  expect(_progressReport(confirmed), _progressReport(committed));
+  expect(catalog.hasUnsavedReadingProgress, isFalse);
+  expect(pending, findsNothing);
+  expect(retry, findsNothing);
+  expect(find.text('最远：第 $_targetPage 页 · 本章已读完'), findsOneWidget);
+  debugPrintSynchronously('SYNC_ACK_LOSS_RETRY_CONFIRMED pid=$pid');
+  return (before: before, committed: committed, confirmed: confirmed);
 }
 
 Future<void> _waitForLoopback(

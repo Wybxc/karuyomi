@@ -182,3 +182,11 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 4. 可另在 iOS 正式重开同一章验证续读。使用 `navigate`、`SYNC_START_PAGE=2`、`SYNC_TARGET_PAGE=1`、同一已知 `SYNC_BUILD_ID` 和原 epoch，不传 Android CA 输入；第 2 页须先出现真实解码帧，第 1 页回看是单独的正常进度写。停止服务并删除本轮设备；详细日志保存在忽略目录。
 
 这项验收只覆盖到该 HTTPS 服务的实际断连和会话内显式保存重试；不模拟已提交后 ACK 丢失，不证明请求 UUID、关闭后草稿恢复或全设备无网。
+
+### 阅读进度已提交后丢确认
+
+启动上述正式 HTTPS harness 时指定 `ACCEPTANCE_FIXTURE=progress-ack-loss`，保留当前 xkcd 构建和实际域名政策。使用独立空 D1，先用书签驱动 `prepare` 从正式 UI 安装并收藏英文 xkcd。该夹具只中断 `SINGLE` 的 `/3319/` 末页显式完成的首个成功响应，普通页码保存不消耗故障。
+
+用 `server_sync_test.dart` 的 `--dart-define-from-file` 传 `SYNC_PHASE=ack-loss`、`SYNC_SUBJECT=acceptance-owner`、精确 `SYNC_BUILD_ID`、`SYNC_EXPECT_EPOCH=0`、`SYNC_START_PAGE=1`、`SYNC_TARGET_PAGE=2` 以及服务报告的 `APP_ORIGIN=https://127.0.0.1:PORT`。设备按上文正常信任测试 CA；Android 仍需按规定配置 WebView 和 `SYNC_TEST_CA_BASE64`。
+
+驱动在真实第 2 页先确认正常进度已保存，然后点击「读完本章」。`SYNC_ACK_LOSS_COMMITTED_UNCONFIRMED` 表示同一阅读页仍保留未确认草稿，但只读检查已看到作品 revision 增加 1，页码和 epoch 不变。驱动点击「重试保存」，要求 `SYNC_ACK_LOSS_RETRY_CONFIRMED` 时待确认提示消失、同一阅读页仍挂载、D1 快照不再变化。按 Enter 停止 harness，核对 `ACCEPTANCE_PROGRESS_ACK_AUDIT` 恰好两条、`drop_ack=1/0`，且 UUID、请求正文、预期 revision、ACK 和持久回执的摘要相同。只读检查和审计共同证明本次重试复用了原请求，不能推广为其它平台、关闭后恢复或生产故障通过。
