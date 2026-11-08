@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:integration_test/integration_test.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:karuyomi/data/business_state_validation.dart';
@@ -24,6 +26,9 @@ const _preset = String.fromEnvironment('SETTINGS_PRESET');
 const _testCaBase64 = String.fromEnvironment('SETTINGS_TEST_CA_BASE64');
 const _operationBudget = Duration(seconds: 120);
 const _lifecycleBudget = Duration(minutes: 5);
+const _ackSubject = 'acceptance-owner';
+const _unconfirmed = '设置尚未确认，本会话保留原操作。';
+const _retry = '重试原设置操作';
 const _presets = {
   'dark-rtl-double-width-crop',
   'light-webtoon-auto-height-no-crop',
@@ -88,6 +93,7 @@ void main() {
       final after = switch (_phase) {
         'write' => await _write(tester, editor, repository, before),
         'resume' => await _resume(tester, editor, expected, before),
+        'ack-loss' => await _ackLoss(tester, editor, repository, before),
         _ => await repository.loadGlobal().timeout(_operationBudget),
       };
       if (_phase == 'verify') {
@@ -100,7 +106,8 @@ void main() {
       expect(tester.takeException(), isNull);
       result = {
         'phase': _phase,
-        'preset': _phase == 'verify' ? null : _preset,
+        'preset': _preset.isEmpty ? null : _preset,
+        if (_phase == 'ack-loss') 'pid': pid,
         if (_phase == 'resume')
           'lifecycle': {
             'pid': pid,
@@ -258,6 +265,154 @@ Future<SettingsSnapshot> _resume(
   await _expectForm(tester, target);
   _expectTheme(tester, target.theme);
   return after;
+}
+
+Future<SettingsSnapshot> _ackLoss(
+  WidgetTester tester,
+  SettingsController editor,
+  SettingsRepository repository,
+  SettingsSnapshot before,
+) async {
+  expect(before.accountRevision, 0, reason: '丢确认验收需要空 D1');
+  expect(before.globalRevision, 0);
+  expect(before.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+  expect(before.global.installedExtensions, isEmpty);
+  final target = before.global.deepCopy()..theme = wire.AppTheme.APP_THEME_DARK;
+  final save = find.widgetWithText(FilledButton, '保存全局设置');
+  final retry = find.widgetWithText(TextButton, _retry);
+  await _select(tester, target.theme);
+  _expectTheme(tester, before.global.theme);
+  await _tap(tester, save);
+  final unconfirmed = find.text(_unconfirmed);
+  await _waitFor(tester, '正式保存保留未确认的设置操作', () {
+    if (!editor.busy &&
+        editor.pending == null &&
+        editor.snapshot!.globalRevision > before.globalRevision) {
+      fail('首次保存直接确认；须启动 settings-ack-loss 夹具');
+    }
+    return editor.canRetry &&
+        unconfirmed.evaluate().length == 1 &&
+        retry.evaluate().length == 1;
+  });
+  expect(find.text('设置修改尚未确认，请明确重试原操作。'), findsOneWidget);
+  _expectPendingAck(tester, editor, before, target);
+  expect(editor.snapshot!.globalRevision, before.globalRevision);
+  _expectTheme(tester, before.global.theme);
+  await _expectSelection(tester, 'global-theme', target.theme);
+
+  // Read through a separate TLS connection so this checkpoint cannot publish a
+  // confirmed value to the current editor or consume its pending operation.
+  final committed = await _readAckSettings();
+  expect(committed.accountRevision, before.accountRevision + 1);
+  expect(committed.global.revision, before.globalRevision + 1);
+  _expectGlobal(committed.global.values, target);
+  expect(
+    _readerValues(committed.effectiveReader),
+    _readerValues(target.reader),
+  );
+  expect(editor.snapshot!.globalRevision, before.globalRevision);
+  _expectTheme(tester, before.global.theme);
+  _expectPendingAck(tester, editor, before, target);
+  debugPrintSynchronously('SETTINGS_ACK_LOSS_COMMITTED_UNCONFIRMED pid=$pid');
+
+  await _tap(tester, find.widgetWithText(TextButton, '重新读取设置'));
+  await _waitFor(
+    tester,
+    '正式重读取到已提交值',
+    () =>
+        !editor.busy &&
+        editor.snapshot!.globalRevision == committed.global.revision,
+  );
+  _expectSnapshot(editor.snapshot!, committed);
+  expect(editor.error, isNull);
+  _expectPendingAck(tester, editor, before, target);
+  await _expectSelection(tester, 'global-theme', target.theme);
+  _expectTheme(tester, target.theme);
+  _expectSnapshot(editor.snapshot!, await _readAckSettings());
+  debugPrintSynchronously('SETTINGS_ACK_LOSS_RELOADED_PENDING pid=$pid');
+
+  await _tap(tester, retry);
+  await _waitFor(tester, '显式重试确认原设置操作', () {
+    if (!editor.busy && editor.error != null) {
+      fail('重试原设置操作失败：${editor.error}');
+    }
+    return editor.canEdit &&
+        editor.pending == null &&
+        unconfirmed.evaluate().isEmpty &&
+        retry.evaluate().isEmpty;
+  });
+  expect(
+    tester
+        .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+        .controller,
+    same(editor),
+  );
+  expect(unconfirmed, findsNothing);
+  expect(retry, findsNothing);
+  _expectSnapshot(editor.snapshot!, committed);
+  await _expectForm(tester, target);
+  _expectTheme(tester, target.theme);
+  final after = await repository.loadGlobal().timeout(_operationBudget);
+  _expectSnapshot(after, committed);
+  _expectSnapshot(after, await _readAckSettings());
+  debugPrintSynchronously('SETTINGS_ACK_LOSS_RETRY_CONFIRMED pid=$pid');
+  return after;
+}
+
+void _expectPendingAck(
+  WidgetTester tester,
+  SettingsController editor,
+  SettingsSnapshot before,
+  wire.GlobalSettingsValues target,
+) {
+  expect(editor.pending?.basedOnRevision, before.globalRevision);
+  expect(editor.pending?.retryable, isTrue);
+  _expectGlobal(editor.pending!.global!, target);
+  expect(find.text(_unconfirmed), findsOneWidget);
+  expect(
+    tester
+        .widget<TextButton>(find.widgetWithText(TextButton, _retry))
+        .onPressed,
+    isNotNull,
+  );
+  expect(
+    tester
+        .widget<FilledButton>(find.widgetWithText(FilledButton, '保存全局设置'))
+        .onPressed,
+    isNull,
+  );
+}
+
+Future<wire.SettingsResponse> _readAckSettings() async {
+  final client = http.Client();
+  Future<wire.SettingsResponse> read() async {
+    final origin = Uri.parse(_origin);
+    final request = http.Request('GET', origin.resolve('/api/settings'))
+      ..followRedirects = false
+      ..headers.addAll({
+        'Origin': origin.origin,
+        'X-App-Request': '1',
+        'X-App-Subject': _subject,
+        'Accept': 'application/json',
+      });
+    final response = await client.send(request);
+    expect(response.statusCode, 200);
+    expect(response.headers['content-type'], startsWith('application/json'));
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in response.stream) {
+      if (chunk.length > wire.controlRequestLimit - bytes.length) {
+        fail('验收设置响应超过读取预算');
+      }
+      bytes.add(chunk);
+    }
+    return _decodeGlobalSettings(utf8.decode(bytes.takeBytes()));
+  }
+
+  try {
+    return await read().timeout(const Duration(seconds: 15));
+  } finally {
+    client.close();
+  }
 }
 
 void _expectCommittedTarget(
@@ -499,19 +654,34 @@ wire.SettingsResponse _validateConfiguration() {
   if (_subject.isEmpty || _subject.length > 1000) {
     fail('SETTINGS_SUBJECT 须为本次已确认身份');
   }
-  if (!{'verify', 'write', 'resume'}.contains(_phase) ||
-      (_phase == 'verify' ? _preset.isNotEmpty : !_presets.contains(_preset))) {
-    fail('SETTINGS_PHASE 须为 verify/write/resume；write/resume 使用同一正式 preset');
+  if (!{'verify', 'write', 'resume', 'ack-loss'}.contains(_phase) ||
+      ({'verify', 'ack-loss'}.contains(_phase)
+          ? _preset.isNotEmpty
+          : !_presets.contains(_preset))) {
+    fail(
+      'SETTINGS_PHASE 须为 verify/write/resume/ack-loss；仅 write/resume 使用 preset',
+    );
   }
-  final expected = wire.decodeProtoJson(
+  if (_phase == 'ack-loss' &&
+      (origin.host != '127.0.0.1' ||
+          !origin.hasPort ||
+          origin.toString() != origin.origin ||
+          _subject != _ackSubject)) {
+    fail('丢确认验收仅允许本地 HTTPS 夹具及测试身份 $_ackSubject');
+  }
+  return _decodeGlobalSettings(_expectedJson);
+}
+
+wire.SettingsResponse _decodeGlobalSettings(String json) {
+  final value = wire.decodeProtoJson(
     wire.SettingsResponse(),
-    jsonDecode(_expectedJson),
+    jsonDecode(json),
     maxBytes: wire.controlRequestLimit,
   );
-  validateBusinessSettingsResponse(expected);
-  expect(expected.hasError(), isFalse);
-  expect(expected.hasManga(), isFalse);
-  return expected;
+  validateBusinessSettingsResponse(value);
+  expect(value.hasError(), isFalse);
+  expect(value.hasManga(), isFalse);
+  return value;
 }
 
 Map<String, Object?> _report(SettingsSnapshot value) => {
