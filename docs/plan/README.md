@@ -12,6 +12,8 @@ Source 重开故障的日期修复已通过正式无插桩 xkcd Web 复验；A �
 
 Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)：客户端显式重试原请求，D1 只提交一次。当前 v6 的 [iOS](../verification/concurrent-server-state.md#ios-模拟器阅读进度已提交后丢确认)和 [Android](../verification/concurrent-server-state.md#android-模拟器阅读进度已提交后丢确认)模拟器也通过同一场景；同时写门另验。
 
+[阅读进度同时写的正式 API 分项](../verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)已通过：同基线的完成与重置到达真实 D1 原子批次，一次提交、一次冲突。双 Reader 的界面保持与显式重开待验。
+
 2026-11-08：同一隔离 D1 的 [Web↔iOS 分类](../verification/category-ui-sync.md#web-与-ios-模拟器双向读写)与[全局设置](../verification/reader-settings.md#web-与-ios-模拟器双向读写)双向写入、新 Web 文档读回通过；[Web↔Android 全局设置](../verification/reader-settings.md#web-与-android-模拟器双向读写)和[分类](../verification/category-ui-sync.md#web-与-android-模拟器双向读写)同样通过，生产和其它门另验。
 
 同日，[iOS ↔ Android 模拟器的章节范围往返](../verification/chapter-read-state.md#ios--android-模拟器范围往返)已通过：iOS 标已读、Android 读回并标未读、iOS 新进程读回。Web ↔ Native 与故障门另验。

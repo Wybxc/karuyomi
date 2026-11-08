@@ -109,6 +109,24 @@ Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透�
 
 本轮只验收抽样页、跨章及 Web 新文档续读，没有逐页验收 107 页，也未验证其它作品/语言、Native 或生产。构建仍保持 `compiled_unverified` / `runtimeReady=false`，未修改冻结 AOT 或部署。启动步骤和精确构建见 `/private/tmp/karuyomi-mpc-5e403b1.7OHoGs/acceptance/handoff.md`，原始观测和独立 API 样本在同目录，服务及标签已关闭。
 
+## MANGA Plus Creators 的 iOS 图片超时对照
+
+2026-11-08，在固定产品 `9ef3ccb` 的独立副本使用 Flutter 官方 `integration_test`、iPhone 17 Pro / iOS 26.4 模拟器及官方回环 HTTPS Wrangler 服务。使用上一节同一 v6 候选，核对 Native host、worker 和材料清单逐字节相同；隔离 D1 只登记原 Source 两个域名。正式 `prepare` 安装英语 Source 并收藏 Sense Life，独立读回账户／作品 revision `2/1` 且无进度。
+
+首轮从书架打开时，扩展 gzip 与 JS 已加载，详情或章节阶段的同源请求约 10 秒后取消；D1 快照不变。第二轮通过同一正式书架入口打开 `#001`，实际显示第 1、2 页的解码帧；第 3 页显示「图片未能加载」。独立读回只证明已保存到所选第 3 页，没有已观察的最远锚。独立诊断副本从该页重开，原界面和显式「重试」都再次报告 `RuntimeException(timeout)`，错误来自 HTTP transport；没有到达完整章或跨章验收。诊断只记录错误类型，未改图片处理和超时。
+
+第 3 页的独立对照使用同一当前图片 URL 与精确章节 Referer，尝试读取完整响应至 EOF：
+
+| 路径                                         | 实测结果                                                                                                                                                                    |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 从宿主直接请求 CDN                           | `200`，205,238 B，约 0.49 秒读完。                                                                                                                                          |
+| 独立 Node 经同一官方 HTTPS 服务，10 秒帧预算 | 多次见到上游 `200` 后超时；一次在约 0.215 秒收到 META、读到 187,954 B / 46 块后，于约 10.009 秒收到远端 `timeout` ERROR 帧。同轮第 2、4 页读完；另一轮第 3 页也曾完整读完。 |
+| 同一桥，独立帧请求使用 30 秒诊断预算         | `200`，205,238 B / 51 块，约 9.77 秒读完；正式 Source 的预算未调整。                                                                                                        |
+
+另起同配置官方 harness，仅用 Node `diagnostics_channel` 观测入站正文，不读取或替换流，也不改 10 秒预算。同一第 3 页三次帧重放，两次约 1.66／8.68 秒完整结束，一次约 10.01 秒收到远端超时；失败时 Node 从 CDN 收到的 122,418 B / 30 块均已交付帧客户端，对应累计字节的到达差最大约 2 毫秒。绕过 Worker 的直接 Node 请求也有一次 9.93 秒完整结束、一次 10 秒只收到 167,474 B。4 KiB 块已出现在 Node 入站；本组慢样本主要等待上游正文，未发现 Worker 帧转发额外拖慢，也未到 WebKit 文件交付或 Flutter 解码。现有对照不足以区分 CDN、连接与本地网络的成因。
+
+失败帧之后，本地 Wrangler 的 Node fetch 到约 17.89 秒才收完正文；这次本地 harness 未把取消及时传到出站连接，生产取消需独立验收。后续应核对 Source 的读取超时与宿主整体预算语义，再复验真实 Native 阅读；本轮未调整产品超时。模拟器、回环服务均已清理，未更新冻结 AOT 或部署。原始 UI 日志、GET 对照和驱动在 `/private/tmp/karuyomi-ios-mpc-9ef3ccb.FrFKke/`，逐块对照见 `/private/tmp/karuyomi-mpc-frame-diag.idt5I9/summary.json`。
+
 ## ToonLook 的长图重排、完整章节与续读
 
 2026-11-08，固定产品 `b64fc90` 与当前 v6 宿主材料，使用未修改的 ToonLook 1.6.2、英文 Source `8320348786843379620`。单包候选 revision `5f2dbba16f6947d284bd93f85311ff2f`；六份共享材料与当前构建逐字节相同。正式 API、runtime 和验收配置从固定提交构建；Web release 复用 `8705ee4` 的现有字节，先核对正式 Flutter 输入、锁和工具链完全相同。官方 HTTP harness 的测试身份连接独立 workerd/D1，仅登记 `toonlook.com`、`img.toonlook.com`。

@@ -8,7 +8,11 @@
 
 2026-11-08，MANGA Plus Creators 正式 Web 的[图片 Referer、跨章与新文档续读](verification/aot-current-pilot.md#manga-plus-creators-的图片-referer-和续读)通过限定抽样；两章观察到的 CDN 图请求都保留各自章节 Referer。Android 模拟器[真实容器重建与重连](verification/runtime-reconnect.md#android-模拟器复验)通过空 Source 分项。内置浏览器[未触发真实前台事件](verification/reader-settings.md#web-自动前台读回的观测限制)，Flutter 层自动读回回归通过，真实 Web 前台继续待验。
 
+2026-11-08，同一 MANGA Plus Creators 候选在 iOS 模拟器通过真实首两页，第三页正式重试仍超时；独立 Node 经同一官方服务在上游 `200` 后读到部分正文，收到远端超时帧。见 [HTTP 对照](verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)；完整 Native 章与续读未通过。
+
 2026-11-08，正式 Web [全局设置同时保存](verification/reader-settings.md#双-web-全局设置同时保存)通过。两个文档的同 revision 请求在正式 Worker 的处理窗重叠 12 ms；一个成功、一个冲突，D1 只提交一次。冲突页读回后可按新版本重新编辑保存。Native、其它写入、生产 Access 与真机另验。
+
+2026-11-08，[阅读进度同时写的正式 API 分项](verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)通过：两个独立进程的完成／重置请求以同一 revision 到达正式 D1 原子批次，一个 `200`、一个 `409`，只提交一次。全库 `pnpm check` 通过（Vitest 522 项）；双 Reader 的冲突画面、旧视图和显式重开待验。
 
 2026-11-08，正式 Web 的[阅读进度已提交后丢确认与精确重试](verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)通过。内置浏览器在 xkcd 末页点「读完本章」，正式 D1 已提交但 HTTP 200 正文中断；界面保留待确认操作，显式重试复用 UUID、原始正文和 CAS，返回同一回执，六路独立读回不变。[iOS 模拟器同一丢确认场景](verification/concurrent-server-state.md#ios-模拟器阅读进度已提交后丢确认)也已通过，修正了内部控件重排导致的额外进度写入。[Android 模拟器](verification/concurrent-server-state.md#android-模拟器阅读进度已提交后丢确认)使用相同的当前 v6 xkcd 通过复验。双端模拟器在显式重试前后的独立六路响应均不变，各自审计只有两次原请求且 D1 只提交一次。阅读进度同时写、生产 Access 和真机另验。
 
