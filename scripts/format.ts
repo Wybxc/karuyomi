@@ -116,7 +116,7 @@ if (!(major >= 21))
 console.log('[format] Java');
 const gjf = jar(
   'google-java-format-2.0.0-all-deps.jar',
-  'https://github.com/google/google-java-format/releases/download/v2.0.0/google-java-format-2.0.0-all-deps.jar',
+  'https://repo.maven.apache.org/maven2/com/google/googlejavaformat/google-java-format/2.0.0/google-java-format-2.0.0-all-deps.jar',
   'c78feb48c549fa7114b7ea11db3b456808f7b371ffe84e6643a44dd2f9588639',
 );
 const javaFlags = [
