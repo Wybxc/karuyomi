@@ -45,6 +45,15 @@ The exported `httpRequestMetaSchema` validates these required fields:
 }
 ```
 
+`timeoutMs` carries the Source's upstream read idle limit. The API uses it
+while waiting for response headers after forwarding the request, and while
+waiting for the next nonempty body chunk or EOF on demand. It does not count
+time while the consumer is not pulling. Separately, the API limits the initial
+request META to 30 seconds, and both the API and the local HTTP handle limit
+the entire call to 300 seconds. The enclosing Source operation can still
+cancel earlier. A bridge timeout is non-retryable whether reported before
+META as HTTP 504 or after META as an ERROR frame.
+
 The exported `httpResponseMetaSchema` validates these required fields:
 
 ```ts

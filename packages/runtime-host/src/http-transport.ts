@@ -53,6 +53,7 @@ interface HttpSession {
 
 const HTTP_HANDLE_LIMIT = 4;
 const HTTP_TERMINAL_LIMIT = 16;
+const HTTP_HARD_DEADLINE_MS = 300_000;
 
 export interface HttpBuildIdentity {
   buildId: string;
@@ -152,9 +153,11 @@ export class BinaryHttpTransport {
     encodeMetaFrame(parsed.data);
     const handle = crypto.randomUUID();
     const controller = new AbortController();
+    // META timeoutMs is the Source's upstream read idle budget, enforced by
+    // the API. Independently bound the local handle through upload and EOF.
     const timer = setTimeout(
       () => this.close(handle, cancelledFailure(true)),
-      parsed.data.timeoutMs,
+      HTTP_HARD_DEADLINE_MS,
     );
     this.sessions.set(handle, {
       owner: this.context,
@@ -218,9 +221,8 @@ export class BinaryHttpTransport {
     try {
       let response: Response;
       try {
-        response = await this.fetcher(
-          new URL('/api/bridge/http', this.origin),
-          {
+        response = await responseUntilAbort(
+          this.fetcher(new URL('/api/bridge/http', this.origin), {
             method: 'POST',
             headers: {
               'Content-Type': HTTP_BRIDGE_MEDIA_TYPE,
@@ -236,7 +238,8 @@ export class BinaryHttpTransport {
             redirect: 'manual',
             cache: 'no-store',
             signal: session.controller.signal,
-          },
+          }),
+          session.controller.signal,
         );
         this.diagnose(handle, session, 'response');
       } catch (error) {
@@ -252,7 +255,7 @@ export class BinaryHttpTransport {
         throw error;
       }
       if (session.failure) {
-        await response.body?.cancel().catch(() => {});
+        void response.body?.cancel().catch(() => {});
         throw session.failure;
       }
       this.get(handle);
@@ -268,7 +271,7 @@ export class BinaryHttpTransport {
           );
         assertBridgeResponse(response);
       } catch (error) {
-        await response.body?.cancel().catch(() => {});
+        void response.body?.cancel().catch(() => {});
         throw error;
       }
       if (
@@ -278,7 +281,7 @@ export class BinaryHttpTransport {
           ?.trim()
           .toLowerCase() !== HTTP_BRIDGE_MEDIA_TYPE
       ) {
-        await response.body?.cancel().catch(() => {});
+        void response.body?.cancel().catch(() => {});
         throw new RuntimeFailure(
           'protocol_error',
           'Invalid HTTP frame media type',
@@ -418,6 +421,29 @@ export class BinaryHttpTransport {
   }
 }
 
+/** Settle the handle on abort even if fetch resolves late with an unused body. */
+function responseUntilAbort(
+  fetching: Promise<Response>,
+  signal: AbortSignal,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+    void fetching.then(
+      (response) => {
+        signal.removeEventListener('abort', onAbort);
+        if (signal.aborted) void response.body?.cancel().catch(() => {});
+        else resolve(response);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 /** Only the API's small, fixed pre-header error can authorize a connection retry. */
 async function preResponseNetworkFailure(
   response: Response,
@@ -512,6 +538,7 @@ export function assertBridgeResponse(response: Response): void {
       'access_required',
       'Access returned a login page to the Source bridge',
     );
+  if (response.status === 504) throw cancelledFailure(true);
   if (!response.ok)
     throw new RuntimeFailure(
       'source_error',

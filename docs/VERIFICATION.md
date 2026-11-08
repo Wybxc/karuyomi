@@ -10,6 +10,8 @@
 
 2026-11-08，同一 MANGA Plus Creators 候选在 iOS 模拟器通过真实首两页，第三页正式重试仍超时；独立 Node 经同一官方服务在上游 `200` 后读到部分正文，收到远端超时帧。见 [HTTP 对照](verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)；完整 Native 章与续读未通过。
 
+2026-11-08，HTTP v2 现区分源站读取空闲与整次调用总限。[真实 Workers 与 Host 回归](verification/aot-current-pilot.md#http-读取空闲与总期限回归)验证持续有正文时可超过空闲间隔，真正停读与整体预算仍会中止；六份共享材料与冻结输入逐字节一致。真实 Native 章节复验进行中。
+
 2026-11-08，正式 Web [全局设置同时保存](verification/reader-settings.md#双-web-全局设置同时保存)通过。两个文档的同 revision 请求在正式 Worker 的处理窗重叠 12 ms；一个成功、一个冲突，D1 只提交一次。冲突页读回后可按新版本重新编辑保存。Native、其它写入、生产 Access 与真机另验。
 
 2026-11-08，[阅读进度同时写的正式 API 分项](verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)通过：两个独立进程的完成／重置请求以同一 revision 到达正式 D1 原子批次，一个 `200`、一个 `409`，只提交一次。全库 `pnpm check` 通过（Vitest 522 项）；双 Reader 的冲突画面、旧视图和显式重开待验。

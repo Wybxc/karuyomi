@@ -812,41 +812,52 @@ describe('HTTP bridge v2 response boundary failures', () => {
 });
 
 describe('HTTP bridge v2 lifecycle', () => {
-  it('keeps the deadline active after returning a Response and cancels pending reads', async () => {
-    vi.useFakeTimers();
-    const cancel = vi.fn();
-    let signal: AbortSignal | undefined;
-    const source = new ReadableStream<Uint8Array>(
-      { cancel },
-      { highWaterMark: 0 },
-    );
-    const response = await forwardBinary(
-      request(metadata({ timeoutMs: 50 })),
-      ['example.org'],
-      (async (_url, init: RequestInit) => {
-        signal = init.signal!;
-        return new Response(source);
-      }) as typeof fetch,
-    );
-    const reader = responseReader(response);
-    await reader.meta();
-    const reading = reader.read(1);
-    const rejection = expect(reading).rejects.toMatchObject({
-      code: 'timeout',
-      remote: true,
-    });
-    await vi.advanceTimersByTimeAsync(50);
-    await rejection;
-    expect(cancel).toHaveBeenCalledOnce();
-    expect(signal?.aborted).toBe(true);
-    expect(vi.getTimerCount()).toBe(0);
-  });
+  it.each([false, true])(
+    'times out a pending upstream read, including empty chunks (%s)',
+    async (emptyChunks) => {
+      vi.useFakeTimers();
+      const cancel = vi.fn(() => new Promise<void>(() => {}));
+      let signal: AbortSignal | undefined;
+      const source = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            if (emptyChunks) controller.enqueue(new Uint8Array());
+          },
+          cancel,
+        },
+        { highWaterMark: 0 },
+      );
+      const response = await forwardBinary(
+        request(metadata({ timeoutMs: 50 })),
+        ['example.org'],
+        (async (_url, init: RequestInit) => {
+          signal = init.signal!;
+          return new Response(source);
+        }) as typeof fetch,
+      );
+      const reader = responseReader(response);
+      await reader.meta();
+      const reading = reader.read(1);
+      const rejection = expect(reading).rejects.toMatchObject({
+        code: 'timeout',
+        message: 'Upstream HTTP read timed out',
+        remote: true,
+      });
+      await vi.advanceTimersByTimeAsync(50);
+      await rejection;
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(source.locked).toBe(false);
+      expect(signal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
 
-  it('cancels upstream even if the response is never consumed', async () => {
+  it('bounds unconsumed responses without treating downstream backpressure as upstream idle', async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();
+    const pull = vi.fn();
     const source = new ReadableStream<Uint8Array>(
-      { cancel },
+      { pull, cancel },
       { highWaterMark: 0 },
     );
     const response = await forwardBinary(
@@ -854,14 +865,56 @@ describe('HTTP bridge v2 lifecycle', () => {
       ['example.org'],
       (async () => new Response(source)) as typeof fetch,
     );
-    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(pull).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     expect(cancel).toHaveBeenCalledOnce();
     const reader = responseReader(response);
     await reader.meta();
     await expect(reader.read(1)).rejects.toMatchObject({
       code: 'timeout',
+      message: 'HTTP bridge deadline exceeded',
       remote: true,
     });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('enforces the absolute deadline even while receiving nonempty DATA within each idle budget', async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    let upstream!: ReadableStreamDefaultController<Uint8Array>;
+    const source = new ReadableStream<Uint8Array>(
+      {
+        start: (controller) => {
+          upstream = controller;
+        },
+        cancel,
+      },
+      { highWaterMark: 0 },
+    );
+    const reader = responseReader(
+      await forwardBinary(
+        request(metadata({ timeoutMs: 100_000 })),
+        ['example.org'],
+        (async () => new Response(source)) as typeof fetch,
+      ),
+    );
+    await reader.meta();
+    for (let index = 1; index <= 4; index++) {
+      const read = reader.read(1);
+      await vi.advanceTimersByTimeAsync(74_000);
+      upstream.enqueue(new Uint8Array([index]));
+      expect(await read).toEqual(new Uint8Array([index]));
+    }
+    const pending = expect(reader.read(1)).rejects.toMatchObject({
+      code: 'timeout',
+      message: 'HTTP bridge deadline exceeded',
+      remote: true,
+    });
+    await vi.advanceTimersByTimeAsync(4_000);
+    await pending;
+    expect(cancel).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -907,18 +960,11 @@ describe('HTTP bridge v2 lifecycle', () => {
     },
   );
 
-  it('includes metadata upload time in the declared timeout', async () => {
+  it('keeps a separate short metadata intake deadline', async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();
-    const meta = metadata({ timeoutMs: 10 });
-    let controller!: ReadableStreamDefaultController<Uint8Array>;
     const body = new ReadableStream<Uint8Array>(
-      {
-        start(value) {
-          controller = value;
-        },
-        cancel,
-      },
+      { cancel },
       { highWaterMark: 0 },
     );
     const incoming = new Request('https://read.example.com/api/bridge/http', {
@@ -928,13 +974,15 @@ describe('HTTP bridge v2 lifecycle', () => {
     } as RequestInit);
     const fetcher = vi.fn();
     const forwarding = forwardBinary(incoming, ['example.org'], fetcher);
-    await vi.advanceTimersByTimeAsync(20);
-    controller.enqueue(concat(frames(meta)));
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(cancel).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     const response = await forwarding;
     expect(response.status).toBe(504);
     expect(await response.json()).toEqual({ error: 'timeout' });
     expect(cancel).toHaveBeenCalledOnce();
     expect(fetcher).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('cancels a stalled upload after META and aborts its in-flight upstream fetch', async () => {
@@ -975,12 +1023,61 @@ describe('HTTP bridge v2 lifecycle', () => {
       return new Response(null);
     });
     const forwarding = forwardBinary(incoming, ['example.org'], fetcher);
-    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(cancel).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     const response = await forwarding;
     expect(response.status).toBe(504);
     expect(await response.json()).toEqual({ error: 'timeout' });
     expect(cancel).toHaveBeenCalledOnce();
     expect(fetcher).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('starts waiting for POST response headers after the upload reaches EOF', async () => {
+    vi.useFakeTimers();
+    const bytes = new Uint8Array([123]);
+    const [preamble, meta, data, end] = frames(
+      metadata({ method: 'POST', hasBody: true, bodyLength: 1, timeoutMs: 50 }),
+      [bytes],
+    );
+    let upload!: ReadableStreamDefaultController<Uint8Array>;
+    const incoming = new Request('https://read.example.com/api/bridge/http', {
+      method: 'POST',
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          upload = controller;
+          upload.enqueue(preamble!);
+          upload.enqueue(meta!);
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit);
+    let sent: Uint8Array | undefined;
+    let signal: AbortSignal | undefined;
+    const forwarding = forwardBinary(incoming, ['example.org'], (async (
+      _url,
+      init: RequestInit,
+    ) => {
+      signal = init.signal!;
+      sent = await readUpload(init);
+      return new Promise<Response>(() => {});
+    }) as typeof fetch);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(signal?.aborted).toBe(false);
+    expect(sent).toBeUndefined();
+    upload.enqueue(data!);
+    upload.enqueue(end!);
+    upload.close();
+    await vi.advanceTimersByTimeAsync(49);
+    expect(sent).toEqual(bytes);
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    const response = await forwarding;
+    expect(response.status).toBe(504);
+    expect(await response.json()).toEqual({ error: 'timeout' });
+    expect(signal?.aborted).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
 

@@ -625,7 +625,7 @@ test('an upstream network failure becomes a bounded JSON failure', async () => {
   expect(await response.json()).toEqual({ error: 'upstream_network_error' });
 });
 
-test('the request deadline aborts a mocked pending upstream request', async () => {
+test('read idle aborts a mocked upstream request with no response headers', async () => {
   let aborted = false;
   network.use(
     http.get(upstreamOrigin + '/delayed', async ({ request }) => {
@@ -644,6 +644,33 @@ test('the request deadline aborts a mocked pending upstream request', async () =
   expect(response.status).toBe(504);
   expect(await response.json()).toEqual({ error: 'timeout' });
   await expect.poll(() => aborted).toBe(true);
+});
+
+test('the Workers bridge streams a response longer than the Source read idle budget', async () => {
+  network.use(
+    http.get(upstreamOrigin + '/steady', () => {
+      let next = 1;
+      return new HttpResponse(
+        new ReadableStream<Uint8Array>(
+          {
+            async pull(controller) {
+              if (next > 4) {
+                controller.close();
+                return;
+              }
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              controller.enqueue(new Uint8Array([next++]));
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+      );
+    }),
+  );
+  const { reader } = await framed(
+    await dispatch(metadata('/steady', { timeoutMs: 300 })),
+  );
+  expect(await consume(reader)).toEqual(new Uint8Array([1, 2, 3, 4]));
 });
 
 test('cancelling the response reader cancels the mocked upstream body', async () => {

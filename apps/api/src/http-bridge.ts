@@ -13,6 +13,7 @@ import {
   encodeErrorFrame,
   httpRequestMetaSchema,
   httpResponseMetaSchema,
+  type HttpRequestMeta,
 } from '@karuyomi/contracts';
 
 const blockedHeaders =
@@ -26,6 +27,8 @@ const methods = new Set([
   'DELETE',
   'OPTIONS',
 ]);
+const HTTP_META_DEADLINE_MS = 30_000;
+const HTTP_HARD_DEADLINE_MS = 300_000;
 
 export function allowedTarget(value: string, hosts: string[]): URL {
   let url: URL;
@@ -79,7 +82,8 @@ function connectionHeaders(headers: Iterable<[string, string]>): Set<string> {
 
 /**
  * The request is bounded binary input; the response only reads upstream when its
- * consumer pulls. Its deadline and abort linkage live until END, ERROR or cancel.
+ * consumer pulls. META timeoutMs limits waiting on upstream reads; an independent
+ * deadline and abort linkage live until END, ERROR or cancel.
  */
 export async function forwardBinary(
   request: Request,
@@ -89,18 +93,17 @@ export async function forwardBinary(
   const started = Date.now();
   const abort = new AbortController();
   let input: HttpFrameReader | undefined;
+  let unclaimedUpstream: ReadableStream<Uint8Array> | null | undefined;
   let upstreamReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   let remaining: Uint8Array | undefined;
   let failure: BinaryBridgeError | undefined;
   let finished = false;
   let cancelled = false;
-  let timer: ReturnType<typeof setTimeout>;
-  let resolveInterruption!: (error: BinaryBridgeError) => void;
-  const interruption = new Promise<BinaryBridgeError>((resolve) => {
-    resolveInterruption = resolve;
-  });
+  let deadlineTimer: ReturnType<typeof setTimeout>;
+  let readIdleTimer: ReturnType<typeof setTimeout> | null = null;
   const cleanup = () => {
-    clearTimeout(timer);
+    clearTimeout(deadlineTimer);
+    if (readIdleTimer !== null) clearTimeout(readIdleTimer);
     request.signal.removeEventListener('abort', onAbort);
   };
   const stop = (error: BinaryBridgeError) => {
@@ -108,26 +111,26 @@ export async function forwardBinary(
     failure = error;
     remaining = undefined;
     cleanup();
-    abort.abort();
-    resolveInterruption(error);
+    abort.abort(error);
     // A broken upstream cancel implementation must not hold up cancellation of
     // the response. Fetch is also aborted independently of its reader.
     void input?.cancel(error).catch(() => {});
     if (upstreamReader) {
       const reader = upstreamReader;
-      void reader
-        .cancel(error)
-        .catch(() => {})
-        .finally(() => reader.releaseLock());
+      upstreamReader = undefined;
+      void reader.cancel(error).catch(() => {});
+      reader.releaseLock();
     }
+    void unclaimedUpstream?.cancel(error).catch(() => {});
+    unclaimedUpstream = undefined;
   };
   const onAbort = () =>
     stop(
       new BinaryBridgeError('cancelled', 'HTTP bridge request was cancelled'),
     );
   const deadline = (milliseconds: number) => {
-    clearTimeout(timer);
-    timer = setTimeout(
+    clearTimeout(deadlineTimer);
+    deadlineTimer = setTimeout(
       () =>
         stop(
           new BinaryBridgeError(
@@ -139,18 +142,63 @@ export async function forwardBinary(
       milliseconds,
     );
   };
+  const startReadIdle = (milliseconds: number) => {
+    if (failure || readIdleTimer !== null) return;
+    readIdleTimer = setTimeout(
+      () =>
+        stop(
+          new BinaryBridgeError('timeout', 'Upstream HTTP read timed out', 504),
+        ),
+      milliseconds,
+    );
+  };
+  const stopReadIdle = () => {
+    if (readIdleTimer !== null) clearTimeout(readIdleTimer);
+    readIdleTimer = null;
+  };
   async function active<T>(operation: Promise<T>): Promise<T> {
     if (failure) {
       void operation.catch(() => {});
       throw failure;
     }
-    const result = await Promise.race([
-      operation.then((value) => ({ value })),
-      interruption.then((error) => ({ error })),
-    ]);
-    if ('error' in result) throw result.error;
-    if (failure) throw failure;
-    return result.value;
+    // Keep a listener only while this I/O is pending. A shared abort Promise
+    // raced against every read would retain one reaction per DATA chunk.
+    let interrupt!: () => void;
+    try {
+      const result = await new Promise<T>((resolve, reject) => {
+        interrupt = () => reject(abort.signal.reason);
+        abort.signal.addEventListener('abort', interrupt, { once: true });
+        void operation.then(resolve, reject);
+      });
+      if (failure) throw failure;
+      return result;
+    } finally {
+      abort.signal.removeEventListener('abort', interrupt);
+    }
+  }
+  async function readUpstream(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    readIdleMs: number,
+  ): Promise<Uint8Array | undefined> {
+    startReadIdle(readIdleMs);
+    let emptyReadYield: ReturnType<typeof setTimeout> | null = null;
+    try {
+      for (;;) {
+        const result = await active(reader.read());
+        if (result.done) return undefined;
+        if (result.value.byteLength) return result.value;
+        // Empty reads aren't progress. Let either timer fire even if a peer
+        // can supply empty chunks without ever waiting for network I/O.
+        await active(
+          new Promise<void>((resolve) => {
+            emptyReadYield = setTimeout(resolve, 0);
+          }),
+        );
+      }
+    } finally {
+      if (emptyReadYield !== null) clearTimeout(emptyReadYield);
+      stopReadIdle();
+    }
   }
   const safeFailure = (error: unknown, body = false): BinaryBridgeError => {
     if (failure) return failure;
@@ -183,7 +231,7 @@ export async function forwardBinary(
     );
   };
   request.signal.addEventListener('abort', onAbort, { once: true });
-  deadline(30_000);
+  deadline(HTTP_META_DEADLINE_MS);
   if (request.signal.aborted) onAbort();
   try {
     if (failure) {
@@ -197,8 +245,9 @@ export async function forwardBinary(
         400,
       );
     input = new HttpFrameReader(request.body, HTTP_REQUEST_BODY_LIMIT);
-    let descriptor;
+    let descriptor: HttpRequestMeta;
     let upload: ReadableStream<Uint8Array> | undefined;
+    let awaitingHeaders = true;
     let validateUpload = async () => {};
     let url: URL;
     const headers = new Headers();
@@ -213,7 +262,7 @@ export async function forwardBinary(
           400,
         );
       descriptor = parsed.data;
-      const timeLeft = descriptor.timeoutMs - (Date.now() - started);
+      const timeLeft = HTTP_HARD_DEADLINE_MS - (Date.now() - started);
       if (timeLeft <= 0)
         throw new BinaryBridgeError(
           'timeout',
@@ -306,8 +355,11 @@ export async function forwardBinary(
                 try {
                   const chunk = await next();
                   if (stopped) return;
-                  if (chunk === null) controller.close();
-                  else controller.enqueue(chunk);
+                  if (chunk === null) {
+                    controller.close();
+                    // The upstream request can now wait for response headers.
+                    if (awaitingHeaders) startReadIdle(descriptor.timeoutMs);
+                  } else controller.enqueue(chunk);
                 } catch (error) {
                   const safe = requestFailure(error);
                   stop(safe);
@@ -318,6 +370,7 @@ export async function forwardBinary(
             },
             cancel() {
               stopped = true;
+              if (awaitingHeaders) startReadIdle(descriptor.timeoutMs);
             },
           },
           { highWaterMark: 0 },
@@ -340,16 +393,25 @@ export async function forwardBinary(
       signal: abort.signal,
     };
     if (upload !== undefined) init.body = upload;
-    const fetching = fetcher(url, init).then((response) => {
-      // A fetch implementation may resolve after it was aborted. Such a body
-      // must never escape into this or a later runtime generation.
-      if (failure) {
-        void response.body?.cancel().catch(() => {});
-        throw failure;
-      }
-      return response;
-    });
-    const upstream = await active(fetching);
+    else startReadIdle(descriptor.timeoutMs);
+    let upstream: Response;
+    try {
+      const fetching = fetcher(url, init).then((response) => {
+        // A fetch implementation may resolve after it was aborted. Such a body
+        // must never escape into this or a later runtime generation.
+        if (failure) {
+          void response.body?.cancel().catch(() => {});
+          throw failure;
+        }
+        unclaimedUpstream = response.body;
+        return response;
+      });
+      upstream = await active(fetching);
+    } finally {
+      awaitingHeaders = false;
+      stopReadIdle();
+    }
+    if (failure) throw failure;
     const requestValidated = validateUpload().catch((error: unknown) => {
       stop(requestFailure(error));
     });
@@ -370,6 +432,7 @@ export async function forwardBinary(
         : null;
     if (hasBody) upstreamReader = upstream.body!.getReader();
     else void upstream.body?.cancel().catch(() => {});
+    unclaimedUpstream = undefined;
     if (
       bodyLength !== null &&
       (!Number.isSafeInteger(bodyLength) ||
@@ -451,28 +514,33 @@ export async function forwardBinary(
               return;
             }
             if (failure) throw failure;
-            while (!remaining && upstreamReader) {
-              const result = await active(upstreamReader.read());
+            if (!remaining && upstreamReader) {
+              const chunk = await readUpstream(
+                upstreamReader,
+                descriptor.timeoutMs,
+              );
               if (cancelled) return;
-              if (result.done) break;
-              if (!result.value.byteLength) continue;
-              if (total + result.value.byteLength > HTTP_RESPONSE_BODY_LIMIT)
+              if (failure) throw failure;
+              if (chunk && total + chunk.byteLength > HTTP_RESPONSE_BODY_LIMIT)
                 throw new BinaryBridgeError(
                   'limit_exceeded',
                   'Upstream body exceeds the byte budget',
                 );
               if (
+                chunk &&
                 bodyLength !== null &&
-                total + result.value.byteLength > bodyLength
+                total + chunk.byteLength > bodyLength
               )
                 throw new BinaryBridgeError(
                   'upstream_body_error',
                   'Upstream body length does not match metadata',
                 );
-              remaining = result.value;
+              remaining = chunk;
             }
             if (!remaining) {
               await active(requestValidated);
+              if (cancelled) return;
+              if (failure) throw failure;
               if (bodyLength !== null && total !== bodyLength)
                 throw new BinaryBridgeError(
                   'upstream_body_error',

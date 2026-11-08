@@ -265,6 +265,15 @@ test('error text alone cannot authorize a retry', async () => {
   ).rejects.toMatchObject({ retryable: false });
 });
 
+test('an API timeout before response META stays a non-retryable timeout', async () => {
+  const transport = setup(async () =>
+    Response.json({ error: 'timeout' }, { status: 504 }),
+  );
+  await expect(
+    transport.finish(transport.open(metadata(transport))),
+  ).rejects.toMatchObject({ code: 'timeout', retryable: false });
+});
+
 test('a stalled API error body remains bounded by the timeout and is never retryable', async () => {
   vi.useFakeTimers();
   const cancelled = vi.fn();
@@ -286,7 +295,7 @@ test('a stalled API error body remains bounded by the timeout and is never retry
     code: 'timeout',
     retryable: false,
   });
-  await vi.advanceTimersByTimeAsync(51);
+  await vi.advanceTimersByTimeAsync(300_000);
   await pending;
   expect(cancelled).toHaveBeenCalledOnce();
   expect(vi.getTimerCount()).toBe(0);
@@ -437,13 +446,14 @@ test('timeout retains its cause and cancels a late response', async () => {
     name: 'TimeoutError',
     retryable: false,
   });
-  await vi.advanceTimersByTimeAsync(51);
-  resolve(new Response(new ReadableStream({ cancel: cancelled })));
+  await vi.advanceTimersByTimeAsync(300_000);
   await failure;
+  resolve(new Response(new ReadableStream({ cancel: cancelled })));
+  await vi.advanceTimersByTimeAsync(0);
   expect(cancelled).toHaveBeenCalledOnce();
 });
 
-test('timeout between body reads retains its cause while releasing the stream and timer', async () => {
+test('the handle uses its absolute cap, not the upstream idle budget, between body reads', async () => {
   vi.useFakeTimers();
   const cancelled = vi.fn();
   let signal: AbortSignal | undefined;
@@ -451,9 +461,11 @@ test('timeout between body reads retains its cause while releasing the stream an
     signal = init?.signal ?? undefined;
     if (!(init?.body instanceof Blob)) throw Error('Expected framed upload');
     const reader = new HttpFrameReader(init.body.stream(), 8 * 1024 * 1024);
+    const request = httpRequestMetaSchema.parse(await reader.meta());
+    expect(request.timeoutMs).toBe(50);
     return framedResponse(
-      httpRequestMetaSchema.parse(await reader.meta()),
-      [new Uint8Array([1]), new Uint8Array([2])],
+      request,
+      [new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3])],
       {},
       cancelled,
     );
@@ -462,6 +474,9 @@ test('timeout between body reads retains its cause while releasing the stream an
   await transport.finish(handle);
   expect(await transport.read(handle, 1)).toEqual(new Uint8Array([1]));
   await vi.advanceTimersByTimeAsync(51);
+  expect(signal?.aborted).toBe(false);
+  expect(await transport.read(handle, 1)).toEqual(new Uint8Array([2]));
+  await vi.advanceTimersByTimeAsync(300_000 - 51);
   expect(signal?.aborted).toBe(true);
   expect(cancelled).toHaveBeenCalledOnce();
   expect(vi.getTimerCount()).toBe(0);
@@ -531,7 +546,7 @@ test('timeout during a pending body read cancels it with timeout rather than rea
     name: 'TimeoutError',
   });
   await stalled;
-  await vi.advanceTimersByTimeAsync(51);
+  await vi.advanceTimersByTimeAsync(300_000);
   await failed;
   expect(cancelled).toHaveBeenCalledOnce();
   expect(vi.getTimerCount()).toBe(0);
@@ -554,7 +569,7 @@ test('terminal failure history is bounded, releases handle slots, and ends with 
       ),
     );
     transport.write(expired[index]!, new Uint8Array([index]));
-    await vi.advanceTimersByTimeAsync(2);
+    await vi.advanceTimersByTimeAsync(300_000);
   }
   expect(vi.getTimerCount()).toBe(0);
   await expect(transport.finish(expired[0]!)).rejects.toMatchObject({

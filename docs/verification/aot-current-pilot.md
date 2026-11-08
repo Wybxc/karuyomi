@@ -127,6 +127,12 @@ Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透�
 
 失败帧之后，本地 Wrangler 的 Node fetch 到约 17.89 秒才收完正文；这次本地 harness 未把取消及时传到出站连接，生产取消需独立验收。后续应核对 Source 的读取超时与宿主整体预算语义，再复验真实 Native 阅读；本轮未调整产品超时。模拟器、回环服务均已清理，未更新冻结 AOT 或部署。原始 UI 日志、GET 对照和驱动在 `/private/tmp/karuyomi-ios-mpc-9ef3ccb.FrFKke/`，逐块对照见 `/private/tmp/karuyomi-mpc-frame-diag.idt5I9/summary.json`。
 
+## HTTP 读取空闲与总期限回归
+
+2026-11-08，MANGA Plus Creators 的部分正文超时样本中，超过 10 秒的是整次调用，最大 DATA 间隔约 2.65 秒。修正 v2 桥：原 `timeoutMs` 用于源站响应头与按需正文的读取空闲，API 与本地 handle 各自保留独立 300 秒总限，现有上层 Source 操作预算仍可提前取消。没有修改 Java、扩展 JAR 或 wire 格式。
+
+官方 Workers 测试用每隔约 100 毫秒返回的四个 DATA 验证 300 毫秒空闲预算，旧代码超时，修复后通过 END 与 EOF。Host 测试也复现旧绝对计时中断。定向回归另覆盖真正读空闲、空块不续期、慢消费、总限、上传后等响应头、取消与迟到响应。生成的 `materials.json` 与六份共享材料逐一核对 SHA-256，和冻结 `c04d436` 构建完全相同；正式 AOT 计算的 host fingerprint `d9990e66…` 也未变。Native worker 随宿主代码重建。正式 Native 完整章节、续读和生产验证仍需实测。
+
 ## ToonLook 的长图重排、完整章节与续读
 
 2026-11-08，固定产品 `b64fc90` 与当前 v6 宿主材料，使用未修改的 ToonLook 1.6.2、英文 Source `8320348786843379620`。单包候选 revision `5f2dbba16f6947d284bd93f85311ff2f`；六份共享材料与当前构建逐字节相同。正式 API、runtime 和验收配置从固定提交构建；Web release 复用 `8705ee4` 的现有字节，先核对正式 Flutter 输入、锁和工具链完全相同。官方 HTTP harness 的测试身份连接独立 workerd/D1，仅登记 `toonlook.com`、`img.toonlook.com`。
