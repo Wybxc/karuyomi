@@ -70,7 +70,7 @@
 | Android 读回并标未读 | 8 / 7 / 1                         | 从同一书架打开正式已读筛选，读回原三章，再选同一闭区间并获 3/3 确认。三章 epoch 2、未读。                              |
 | iOS 新进程读回       | 8 / 7 / 1                         | 重开详情后已读筛选为 0 章；全部独立快照不变。                                                                          |
 
-各阶段正式集成测试分别 1/1 通过。独立进程使用正常 TLS 和业务请求头，核对全局/作品设置、书架、作品、完整进度、书签及四章逐章状态：两次写入各推进三次 account 与 manga revision；相邻 `/3316/` 始终无进度记录，目标章均无 current/furthest 锚点，没有新增 resume，收藏、分类、资料、设置及书签不变。Android 首轮在进入详情后的前置检查中把独立 ProtoJSON Map 作浅比较，误报失败；尚未开始写入，独立 GET 逐字段与 `5/4/1` 一致。修正驱动为深比较后才执行 Android 写入，无产品修改。复验见[正式驱动](../../apps/reader/integration_test/README.md#章节范围已读与未读)；本轮专用服务与设备已关闭；四次设备日志、独立 GET 快照和 `check-transition.mjs` 留在 `/private/tmp/karuyomi-native-chapter-sync.bztPAx/`。
+各阶段正式集成测试分别 1/1 通过。独立进程使用正常 TLS 和业务请求头，核对全局设置、书架、作品、完整进度、书签及四章逐章状态：两次写入各推进三次 account 与 manga revision；相邻 `/3316/` 始终无进度记录，目标章均无 current/furthest 锚点，没有新增 resume，收藏、分类、资料、全局设置及书签不变。作品设置由正式驱动通过作品作用域 API 核对不变；当时独立采样中标作作品设置的请求实际重复了全局路径。Android 首轮在进入详情后的前置检查中把独立 ProtoJSON Map 作浅比较，误报失败；尚未开始写入，独立 GET 逐字段与 `5/4/1` 一致。修正驱动为深比较后才执行 Android 写入，无产品修改。复验见[正式驱动](../../apps/reader/integration_test/README.md#章节范围已读与未读)；本轮专用服务与设备已关闭；四次设备日志、独立 GET 快照和 `check-transition.mjs` 留在 `/private/tmp/karuyomi-native-chapter-sync.bztPAx/`。
 
 ## 复验与剩余门槛
 

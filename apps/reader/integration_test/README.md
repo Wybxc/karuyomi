@@ -117,7 +117,7 @@ flutter test integration_test/chapter_read_sync_test.dart --no-pub \
 
 每份 JSON 提供 `APP_ORIGIN`、`CHAPTER_READ_SUBJECT`、`CHAPTER_READ_BUILD_ID` 和对应的 `CHAPTER_READ_PHASE`。使用本地 CA 的 Android 阶段另传根 CA PEM 原始字节的 Base64（`CHAPTER_READ_TEST_CA_BASE64`）；WebView 仍需隔离 debug 网络配置和同端口 `adb reverse`。iOS 只用设备自身信任，不传 CA 参数。
 
-两次写入都经正式书架与详情，以来源顺序中的相反方向选中精确 URL `/3317/`、`/3318/`、`/3319/` 的闭区间，核对确认清单和 3/3 回执。Android 写入前先在已读筛选中看到这三章；iOS 重启后同一筛选显示 0 章，不写入。每阶段从 API 核对全局与漫画设置、作品快照、书签、完整分章进度和相邻负对照 `/3316/`。可用独立 HTTPS 客户端采集同 revision 的 `GET /api/settings`、`GET /api/settings?mangaKey=KEY`、`GET /api/library?revision=REV`、`GET /api/state/manga/KEY`、其 `/bookmarks?revision=REV`、`/progress?revision=REV` 和四个 `?chapterKey=CHAPTER_KEY` 响应逐字段比对。预期 revision 2/1/1 → 5/4/1 → 8/7/1 → 8/7/1，只改变三章的 epoch 与完成状态，无页码锚或 resume。每个成功阶段输出 `CHAPTER_READ_SYNC_RESULT`；任一失败先核对实际提交状态，勿盲重跑写阶段。结束后关闭 harness、reverse 和专用设备。
+两次写入都经正式书架与详情，以来源顺序中的相反方向选中精确 URL `/3317/`、`/3318/`、`/3319/` 的闭区间，核对确认清单和 3/3 回执。Android 写入前先在已读筛选中看到这三章；iOS 重启后同一筛选显示 0 章，不写入。每阶段从 API 核对全局与漫画设置、作品快照、书签、完整分章进度和相邻负对照 `/3316/`。可用独立 HTTPS 客户端采集同 revision 的 `GET /api/settings`、`GET /api/settings/manga/KEY`、`GET /api/library?revision=REV`、`GET /api/state/manga/KEY`、其 `/bookmarks?revision=REV`、`/progress?revision=REV` 和四个 `?chapterKey=CHAPTER_KEY` 响应逐字段比对。预期 revision 2/1/1 → 5/4/1 → 8/7/1 → 8/7/1，只改变三章的 epoch 与完成状态，无页码锚或 resume。每个成功阶段输出 `CHAPTER_READ_SYNC_RESULT`；任一失败先核对实际提交状态，勿盲重跑写阶段。结束后关闭 harness、reverse 和专用设备。
 
 ## Source 阅读与筛选验收
 
