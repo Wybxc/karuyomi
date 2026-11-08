@@ -44,6 +44,8 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 ## 下一步
 
+当前 v6 材料已在正式 Web 读完 ToonLook 英文源 Doomed 的第一章、进入第二章并逐页显示，两章各 10 页，新文档首次续读恢复到第二章第 10 页；五个实图样本的条带重排与独立参考相符。[验收记录](../verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)只覆盖这一作品的 Web 分项。继续补相同材料的代表源、Native 实图和真机性能。
+
 阅读连续性三个实现里程碑已接通：保留 Source 原序/反序与重复章节，用包含漫画/Source 作用域的章节键在同一 route 切章；新叶等旧调度、图片 pin、provider 清理确认后才安装。路由退出时，迟到 pages 与尚未挂载的新 provider 均有明确关闭者。有界下一章在真实末页 frame、窗口与 Source 空闲后自动准备，邻章不取图片；清理失败保留 owner 并阻止继续占用会话。历史目录/详情/Reader 曾使用受信身份与 Drift 进度，SQLite 文件关闭重开回归通过；当前业务读写已改为 Worker API + D1，历史本地数据库证据不代表跨端恢复。真实 Arknights 连续切章及关标签页重开的章节/页码/顺序恢复已通过，见[Web 产品进度](../verification/reader-progress-web.md)；iOS/Android 模拟器原 xkcd 的正式 ReaderScreen 已分别通过受控入口下真实进程重启恢复章节、末页和完成状态；浏览器进程退出、真机与完整日用流程仍待验收；随后固定 `19b65f5` 的 Cache v3 原 Source 双端重启也已通过[分项复验](../verification/reader-frame-native.md)，另见[阅读记录](../verification/reader-continuity.md)与[进度记录](../verification/local-progress.md)。
 
 固定 `31555e8` 的 Cache v3 新材料已通过 Web 三源元数据与首中末图片分项，xkcd 正式 Flutter 两章阅读和显式完成也通过。但关标签页后虽恢复原章末页与完成状态，文字图首次显示为空黑，翻页后才正常；首次恢复视觉门仍失败，见[当前材料记录](../verification/cache-v3-sources.md)。该旧失败保持原状；随后固定 `19b65f5`（加入 `5267181`）的正式 Web release 已通过同类两章及关标签页首次恢复文字图，见[修复后 Web 记录](../verification/reader-frame-web.md)，不推广到其他 Source 或浏览器进程恢复。

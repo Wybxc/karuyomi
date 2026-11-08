@@ -108,3 +108,13 @@ Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透�
 隔离 Node preload 仅在 Wrangler 把正式 workerd 的出站请求交给实际 fetch 时比较两章 CDN 图片请求的 Referer，原请求未修改。两章各有 6 个观测，全部与各自完整章节 URL 精确匹配，图片响应都是 200；日志只存章节别名、比对结果和状态。独立合成 Range 控制可区分缺失与匹配，两者均取得 206，因此这证明原 Source 的请求头被保留，不证明 CDN 强制需要它。
 
 本轮只验收抽样页、跨章及 Web 新文档续读，没有逐页验收 107 页，也未验证其它作品/语言、Native 或生产。构建仍保持 `compiled_unverified` / `runtimeReady=false`，未修改冻结 AOT 或部署。启动步骤和精确构建见 `/private/tmp/karuyomi-mpc-5e403b1.7OHoGs/acceptance/handoff.md`，原始观测和独立 API 样本在同目录，服务及标签已关闭。
+
+## ToonLook 的长图重排、完整章节与续读
+
+2026-11-08，固定产品 `b64fc90` 与当前 v6 宿主材料，使用未修改的 ToonLook 1.6.2、英文 Source `8320348786843379620`。单包候选 revision `5f2dbba16f6947d284bd93f85311ff2f`；六份共享材料与当前构建逐字节相同。正式 API、runtime 和验收配置从固定提交构建；Web release 复用 `8705ee4` 的现有字节，先核对正式 Flutter 输入、锁和工具链完全相同。官方 HTTP harness 的测试身份连接独立 workerd/D1，仅登记 `toonlook.com`、`img.toonlook.com`。
+
+Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 Doomed，反转章节顺序，从 `131-chapter-1?lang=en` 逐页显示全部 10 页。第 10 页服务端确认后显式点「读完本章」，独立 GET 核对当前与最远均为 10、`completed=true`。用正式「下一章」进入 `131-chapter-2?lang=en` 并显示全部 10 页；退出旧文档，从新文档的服务端书架继续阅读，首次打开第 2 章第 10 页。独立 GET 的两章进度、当前与最远锚、章序、书架资料逐字段相同；重开前后账户／作品 revision `34/32 → 37/35`，不将这次续读记为无写入，GET 也不能单独判定每次写入的操作类型。
+
+临时验收 HTML 的观察器只读取正式 `acquireImage` 交付的 Blob；原 Source、正式 Flutter JS 与宿主未改。对两章各第 1、6、10 页比对独立参考：五个非恒等样本全部符合按原 Source 规则重排后的 500 px 条带顺序，原图直通负对照均失败；第 1 章第 10 页预期为恒等顺序，只核对几何与尾段。四个样本高度 5,000 px；观察器可能见到预取资源，其结果只作像素证据，逐页显示单独由正式阅读界面确认。额外解码使本轮不能作为性能测量。
+
+复验用独立快照执行 `EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build`，通过 `ACCEPTANCE_SOURCE_POLICIES` 为 `eu.kanade.tachiyomi.extension.all.toonlook` 指定上述域名后运行 `pnpm acceptance:serve`。本轮运行参数、隔离候选与独立 D1 样本位于 `/private/tmp/karuyomi-toonlook-p0-b64fc90.41hfTc/`，独立参考及正负对照在 `/private/tmp/karuyomi-toonlook-8705ee4.AZ7u6I/acceptance/observe/`。此门只覆盖该作品两章的 Web 阅读；Native、物理设备、长图性能和生产另验。未部署或修改全量构建输入，仍为 `compiled_unverified` / `runtimeReady=false`。

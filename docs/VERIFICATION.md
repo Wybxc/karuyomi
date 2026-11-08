@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-08，当前 v6 ToonLook [Web 长图、完整章节与续读](verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)通过：两章各 10 页均在正式阅读界面显示，第一章完成，第二章在新文档恢复到第 10 页。六个受管 Blob 的独立像素对照覆盖五个非恒等重排和一个恒等控制；续读后页位、锚点和完成状态保持一致，D1 revision 有变化。未验 Native、性能或生产。
+
 2026-11-08，正式 [Web↔iOS 模拟器分类双向写入](verification/category-ui-sync.md#web-与-ios-模拟器双向读写)通过：Web 创建并关联甲，iOS 读回、改名并关联乙，独立 Web 文档显示两部关联并可筛选。不同回环入口共享同一隔离 D1，最终独立读回不改变业务状态。同一服务亦通过 [Web↔iOS 全局设置](verification/reader-settings.md#web-与-ios-模拟器双向读写)：Web 保存浅色，iOS 读回并保存五项预设，独立新 Web 文档全部读回。[Web↔Android 全局设置](verification/reader-settings.md#web-与-android-模拟器双向读写)也通过同一流程，两次读回都不写入。同一日，[Web↔Android 模拟器分类双向写入](verification/category-ui-sync.md#web-与-android-模拟器双向读写)也通过：Android 改名并关联第二部，新 Web 文档读回并筛选，双入口独立 GET 核对无附带写入。生产、真机和其它门另验。
 
 2026-11-08，MANGA Plus Creators 正式 Web 的[图片 Referer、跨章与新文档续读](verification/aot-current-pilot.md#manga-plus-creators-的图片-referer-和续读)通过限定抽样；两章观察到的 CDN 图请求都保留各自章节 Referer。Android 模拟器[真实容器重建与重连](verification/runtime-reconnect.md#android-模拟器复验)通过空 Source 分项。内置浏览器[未触发真实前台事件](verification/reader-settings.md#web-自动前台读回的观测限制)，Flutter 层自动读回回归通过，真实 Web 前台继续待验。
