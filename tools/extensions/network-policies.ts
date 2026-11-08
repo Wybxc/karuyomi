@@ -22,6 +22,7 @@ import {
   networkHosts,
   policyDestination,
   quote,
+  retireNoncurrentBuildsSql,
   verifyMetadata,
   writePolicyTransaction,
   type D1Executor,
@@ -135,12 +136,11 @@ export function synchronizationSql(
       `UPDATE extension_builds SET bundle_sha256=CASE WHEN build_id=${quote(policy.buildId)} AND bundle_sha256=${quote(policy.bundleSha256)} AND status='verified' AND json(allowed_hosts_json)=json(${quote(policy.allowedHostsJson)}) THEN ${quote(manifest.bundle.sha256)} ELSE NULL END,build_id=${quote(manifest.buildId)} WHERE ${scope} AND package_name=${quote(policy.packageName)};`,
     );
   }
-  const ids = [...current.values()].map((value) => value.buildId).sort();
   statements.push(
-    'DELETE FROM extension_builds WHERE ' +
-      scope +
-      (ids.length ? ` AND build_id NOT IN (${ids.map(quote).join(',')})` : '') +
-      ';',
+    ...retireNoncurrentBuildsSql(
+      catalog,
+      Array.from(current.values(), ({ buildId }) => buildId),
+    ),
   );
   return statements.join('\n') + '\n';
 }

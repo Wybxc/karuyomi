@@ -7,6 +7,7 @@ import { URL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  buildIdSchema,
   runtimeMaterialCatalogSchema,
   catalogReferenceSchema,
   validateExtensionCatalogUrl,
@@ -105,6 +106,37 @@ export function networkHosts(input: readonly string[]): string[] {
 export const quote = (value: string): string =>
   "'" + value.replaceAll("'", "''") + "'";
 
+export function retireNoncurrentBuildsSql(
+  catalog: CatalogReference,
+  currentBuildIds: Iterable<string>,
+): string[] {
+  catalogReferenceSchema.parse(catalog);
+  const scope = `catalog_url=${quote(catalog.catalogUrl)} AND repo_id=${quote(catalog.repoId)}`;
+  const prefix = `DELETE FROM extension_builds WHERE ${scope}`;
+  const ids = [...new Set(currentBuildIds)]
+    .map((id) => buildIdSchema.parse(id))
+    .sort();
+  if (ids.length === 0) return [prefix + ';'];
+
+  // D1 caps each statement at 100,000 bytes. At most 400 ASCII IDs of
+  // 200 bytes, plus their quotes, scope and range bounds, fit in a statement.
+  // Use disjoint lexical ranges so an ID in one group cannot be retired by
+  // another group's NOT IN. The build_id column uses SQLite's BINARY order.
+  const groupSize = 400;
+  const statements: string[] = [];
+  let lower = '';
+  for (let start = 0; start < ids.length; start += groupSize) {
+    const group = ids.slice(start, start + groupSize);
+    const next = ids[start + groupSize];
+    const upper = next ? ` AND build_id<${quote(next)}` : '';
+    statements.push(
+      `${prefix}${lower}${upper} AND build_id NOT IN (${group.map(quote).join(',')});`,
+    );
+    if (next) lower = ` AND build_id>=${quote(next)}`;
+  }
+  return statements;
+}
+
 export function registrationSql(
   manifest: BuildManifest,
   hosts: readonly string[],
@@ -120,12 +152,7 @@ export function registrationSql(
   const digest = quote(manifest.bundle.sha256);
   const scope = `catalog_url=${quote(catalog.catalogUrl)} AND repo_id=${quote(catalog.repoId)}`;
   const retire = currentBuildIds
-    ? 'DELETE FROM extension_builds WHERE ' +
-      scope +
-      (currentBuildIds.size
-        ? ` AND build_id NOT IN (${[...currentBuildIds].sort().map(quote).join(',')})`
-        : '') +
-      ';\n'
+    ? retireNoncurrentBuildsSql(catalog, currentBuildIds).join('\n') + '\n'
     : '';
   // The single Wrangler SQL file is transactional. A NOT NULL guard rejects
   // identity/policy conflicts and rolls back preceding retirement statements.

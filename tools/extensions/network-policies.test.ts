@@ -15,7 +15,7 @@ import {
   snapshot,
   transaction,
 } from './registration-fixtures.ts';
-import { snapshotLoader } from './registration.ts';
+import { registrationSql, snapshotLoader } from './registration.ts';
 import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
 import type { BuildManifest } from '../../packages/contracts/src/index.ts';
 
@@ -151,6 +151,78 @@ test('an empty current index retires all approvals', async (t) => {
   insert(db, 'example.source', 'old', ['example.org']);
   synchronize(db, new Map());
   assert.deepEqual(db.prepare('SELECT * FROM extension_builds').all(), []);
+});
+test('full catalogs can synchronize and register under the D1 statement limit', async (t) => {
+  const f = await fixture(t);
+  const catalog = {
+    catalogUrl: 'https://read.example.com/extensions/index.json',
+    repoId: f.manifest.repoId,
+  };
+  const manifests = Array.from({ length: 1448 }, (_, index) => {
+    const number = String(index).padStart(4, '0');
+    return {
+      ...f.manifest,
+      packageName: `package-${number}`,
+      buildId: `build-${number}-${'x'.repeat(189)}`,
+    };
+  });
+  const first = manifests[0];
+  assert(first);
+  const current = new Map(
+    manifests
+      .map((manifest) => [manifest.packageName, manifest] as const)
+      .reverse(),
+  );
+  const ids = new Set(manifests.map(({ buildId }) => buildId));
+  for (const register of [false, true]) {
+    const db = await database(t);
+    for (const manifest of manifests.slice(1))
+      insert(db, manifest.packageName, manifest.buildId, [], 'disabled');
+    insert(db, first.packageName, 'retired-first', ['example.org']);
+    insert(db, 'below', 'A-below', []);
+    insert(db, 'above', 'z-above', [], 'disabled');
+    // Add retired IDs between live IDs throughout the catalog.
+    for (const { packageName, buildId } of manifests.filter(
+      (_, index) => index % 199 === 0,
+    ))
+      insert(db, `retired-${packageName}`, buildId.slice(0, -1) + 'z', []);
+    insert(db, 'other-catalog', 'other-catalog-build', ['other.example.org']);
+    db.exec(
+      "UPDATE extension_builds SET catalog_url='https://other.example.org/extensions/index.json' WHERE build_id='other-catalog-build'",
+    );
+    insert(db, 'other-repo', 'other-repo-build', ['other.example.org']);
+    db.exec(
+      "UPDATE extension_builds SET repo_id='external' WHERE build_id='other-repo-build'",
+    );
+    const sql: string = register
+      ? registrationSql(first, ['example.org'], catalog, ids)
+      : synchronizationSql(current, approved(db), catalog);
+    for (const statement of sql.trimEnd().split('\n'))
+      assert(
+        Buffer.byteLength(statement) <= 100_000,
+        'D1 limits each SQL statement to 100,000 bytes',
+      );
+    transaction(db, sql);
+    const rows = db
+      .prepare(
+        'SELECT build_id,status,allowed_hosts_json FROM extension_builds ORDER BY build_id',
+      )
+      .all();
+    assert.deepEqual(
+      rows.map((row) => row.build_id),
+      [...ids, 'other-catalog-build', 'other-repo-build'].sort(),
+    );
+    assert.deepEqual(
+      rows.map((row) => row.status),
+      [
+        'verified',
+        ...Array(manifests.length - 1).fill('disabled'),
+        'verified',
+        'verified',
+      ],
+    );
+    assert.equal(rows[0]?.allowed_hosts_json, '["example.org"]');
+  }
 });
 test('metadata-only synchronization does not need bundle bytes', async (t) => {
   const f = await fixture(t);
