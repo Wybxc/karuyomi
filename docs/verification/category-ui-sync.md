@@ -93,11 +93,19 @@ Android 最后 verify-deleted 首次在测试体加载前 DDS 启动失败；详
 
 Web 正式界面创建「跨端分类」并关联甲。iOS 正式 `app.main()` 的 `category_sync_test.dart` 以 `CATEGORY_PHASE=update` 启动，读回该状态后改名为「共享分类」并关联乙，实际设备驱动 1/1 通过。新的 Web 文档显示同一分类及甲、乙的关联，选择该分类仍显示两部收藏。独立 HTTP/HTTPS 读取的目录、书架、设置和两部作品状态一致；账户／目录／甲／乙 revision 从 Web 保存后的 4/1/2/1 变为 6/2/2/2，分类 ID 不变，最终 Web 读回与筛选不产生额外写入。
 
-前两次 iOS 驱动已读到正确服务端数据，但在点击前因旧断言未适配书架副标题的多行布局而超时，权威快照没有变。驱动改为在各漫画卡内查找实际分类文本后通过。临时代理、原始日志与独立快照留在本地 `/private/tmp/karuyomi-mixed-categories-5e403b1-3x6MOp/`。本分项只覆盖双向顺序写入、读回和筛选；同一 HTTPS origin、Web↔Android、删除、重排、同时写和故障恢复另验。
+前两次 iOS 驱动已读到正确服务端数据，但在点击前因旧断言未适配书架副标题的多行布局而超时，权威快照没有变。驱动改为在各漫画卡内查找实际分类文本后通过。临时代理、原始日志与独立快照留在本地 `/private/tmp/karuyomi-mixed-categories-5e403b1-3x6MOp/`。本分项只覆盖双向顺序写入、读回和筛选；同一 HTTPS origin、删除、重排、同时写和故障恢复另验。
+
+## Web 与 Android 模拟器双向读写
+
+2026-11-08，Codex 内置浏览器通过 HTTP 回环别名访问官方验收服务，专用 Pixel 9 模拟器（Android 16 / API 36 / arm64，系统 WebView 133.0.6943.137）通过同一服务的 HTTPS 回环入口与 ADB reverse 连接。两端使用同一隔离 workerd/D1 和测试身份 `acceptance-owner`，未加载 Source。Web 与 Worker 使用固定 `5e403b1` 的现有构建，Android 隔离 debug 副本固定 `c04d436`，写入阶段的分类驱动固定 `5e6a526`；已核对各自执行的产品和业务输入与 `5e6a526` 相同。
+
+Web 创建「跨端分类」并关联甲，账户／目录／甲／乙 revision 从 `2/0/1/1` 变为 `4/1/2/1`。Android 在正式 `app.main()` 中读回，改名「共享分类」并关联乙，驱动通过 1/1；revision 变为 `6/2/2/2`，分类 ID 不变。新开的 Web 文档显示两部都关联「共享分类」，选中该筛选仍显示两部。两个入口各六路独立 GET 核对了身份、设置、书架、目录和两部作品状态；Android 保存后到 Web 筛选后，业务响应逐字段相同。
+
+首次 Android 启动在连接等待阶段失败，未执行分类写入，双入口读回与 Web 写后快照相同。隔离 debug 副本配置了 WebView 对回环测试 CA 的信任；写入复验用临时测试入口将同一 CA 追加给 Dart 测试进程，再运行原分类驱动，保留系统 CA 与主机名检查。未捕获首次握手错误，不能据此判定初始化问题的根因。随后按[正式驱动说明](../../apps/reader/integration_test/README.md#分类同步)传 `CATEGORY_TEST_CA_BASE64` 执行只读 `verify`；首次 Flutter CLI 未附加到已启动的 Dart VM，冷启动模拟器后通过 1/1，权威快照仍相同。原始日志和快照留在本地 `/private/tmp/karuyomi-mixed-categories-android-5e6a526.NZngrS/`。此分项只覆盖不同回环入口的顺序写入与新 Web 文档读回；同一 HTTPS origin、生产、真机、删除、重排、并发与故障恢复另验。
 
 ## 尚待验收
 
-- Web↔Android 分类、混合平台剩余操作和物理设备读回；双 Web、双 iOS、iOS↔Android 的顺序分项及上述 Web↔iOS 双向写入读回已分别通过。
+- 混合平台的删除、重排、同一 HTTPS origin 及物理设备读回；双 Web、双 iOS、iOS↔Android 的顺序分项及上述 Web 分别与双端模拟器的双向写入读回已分别通过。
 - Android DDS/Native 容器初始化的间歇失败复现与根因修复；当前冷启动读回通过不覆盖此门。
 - 实际网络丢响应、同时到达的写竞争及自动前台/断网恢复；当前组件故障注入与顺序旧视图冲突分别计证据。
 - 生产 Access 正向会话及生产分类部署；本地临时 RS256 身份不代表此门通过。

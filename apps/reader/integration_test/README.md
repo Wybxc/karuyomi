@@ -16,6 +16,8 @@ ACCEPTANCE_FIXTURE=categories pnpm acceptance:serve
 
 证书必须包含 harness 实际 loopback hostname（当前为 `127.0.0.1`），由本轮可丢弃设备正常信任。iOS 可使用 `xcrun simctl keychain UUID add-root-cert /absolute/path/rootCA.pem`。Android 使用隔离 debug 副本的精确主机 Network Security Config，仅加入本轮 CA，并保留系统 CA、证书/hostname 检查与明文禁用；release 不加入测试 CA。不要修改系统全局信任或接受证书错误。Android 通过 `adb -s SERIAL reverse tcp:PORT tcp:PORT` 访问官方实际端口，不制造不同 APP_ORIGIN 别名。
 
+Android 的 Dart HTTP 客户端与 WebView 分别维护证书信任。使用本地 CA 时，在 Android 分类阶段的 `--dart-define-from-file` 配置中加入 `CATEGORY_TEST_CA_BASE64`（本轮根 CA PEM 原始字节的标准 Base64）。驱动只在 Android 的 `https://127.0.0.1` 验收进程向默认 `SecurityContext` 追加该 CA，保留既有根和主机名检查；iOS 不传此项。系统 WebView 仍需前述隔离 debug 配置。
+
 官方 `createTestHarness()` 应用正式 D1 迁移，以临时 RS256 测试身份运行正式 API；可选 `ACCEPTANCE_FIXTURE=categories` 在就绪前经同一 API 创建“分类同步·甲”“分类同步·乙”两部受控收藏，初始无分类。它们只用于业务元数据测试，不可进入 Source 阅读；默认未设置 fixture 时仍为空 D1。测试不注入假 PlatformRuntime、业务服务或 Source supplier。
 
 在 `apps/reader` 执行以下模板，`APP_ORIGIN` 使用服务实际输出，依次运行 A `create` → B `update` → A `verify` → B `delete` → A `verify-deleted`；A/B 是独立客户端安装，每个命令启动新进程。阶段严格核对前置状态，不要在已提交后盲目重跑写阶段。

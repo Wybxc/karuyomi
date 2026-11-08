@@ -12,6 +12,7 @@ import 'package:karuyomi/runtime/platform_runtime_native.dart';
 
 const _origin = String.fromEnvironment('APP_ORIGIN');
 const _phase = String.fromEnvironment('CATEGORY_PHASE');
+const _testCaBase64 = String.fromEnvironment('CATEGORY_TEST_CA_BASE64');
 const _first = '分类同步·甲';
 const _second = '分类同步·乙';
 const _createdName = '跨端分类';
@@ -23,6 +24,11 @@ void main() {
 
   testWidgets('Native category sync: $_phase', (tester) async {
     _validateConfiguration();
+    if (_testCaBase64.isNotEmpty) {
+      SecurityContext.defaultContext.setTrustedCertificatesBytes(
+        base64Decode(_testCaBase64),
+      );
+    }
     app.main();
     await tester.pump();
     final catalog = tester
@@ -57,6 +63,7 @@ void main() {
         'phase': _phase,
         'platform': Platform.operatingSystem,
         'origin': platform.origin.origin,
+        'androidLoopbackTestCa': _testCaBase64.isNotEmpty,
         'subject': repository.identity.subject,
         'categoryRevision': after.categoryRevision,
         'categoryId': category?.id,
@@ -339,6 +346,10 @@ void _validateConfiguration() {
   }
   if (!Platform.isAndroid && !Platform.isIOS) {
     fail('此正式分类同步验收仅适用于 Android 或 iOS 设备/模拟器');
+  }
+  if (_testCaBase64.isNotEmpty &&
+      (!Platform.isAndroid || origin.host != '127.0.0.1')) {
+    fail('CATEGORY_TEST_CA_BASE64 仅适用于 Android 的 HTTPS 127.0.0.1 验收');
   }
   if (!{
     'create',
