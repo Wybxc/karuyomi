@@ -76,6 +76,8 @@
 
 2026-11-06，书架直接续读、详情失败显式重试、续读位置只读重取及书架资料原请求重试已接入正式 Flutter 入口。稳定章节/位置/顺序恢复、未确认写隔离和迟到结果边界的受控组件记录见[续读与恢复](verification/reading-entry.md)，设计见[阅读入口](design/reading-entry.md)。实际 Source、独立客户端、生产 Access 和目标设备分别验收，不将本轮组件结果提升为完整 P1/P2 通过。
 
+2026-11-08，[正式 Web 书架直接续读](verification/reading-entry.md#正式-web-书架直接续读)在隔离 D1 上通过：Codex 内置浏览器独立文档顺序交接真实 xkcd，直接恢复第 2 页；回看第 1 页后再开，最远仍为第 2 页。两次直接恢复均不改 D1。详情失败重试、混合客户端、生产与真机另验。
+
 2026-11-06，自定义封面已接入生成业务协议、Worker API、D1 当前引用、私有 R2 及正式详情/书架 UI；上传使用独立二进制 multipart 与同一作品 mutation 的 CAS/ACK，清除沿 JSON mutation。共享数据及集中工程检查已通过；2026-11-07，独立 Web 文档的上传、替换、清除和读回已通过，两份旧封面路径撤销。见[自定义封面记录](verification/custom-covers.md)及[对象宽限清理和身份设计](design/custom-covers.md)。Native、故障恢复及生产私有 bucket 绑定与部署尚未验收，不能据此认定完整 P1/P2 通过。
 
 2026-11-06，章节范围已读/标未读已接入正式协议、D1 与详情 UI，包含读状态筛选、保留隐藏选择的多选/反序范围、串行精确确认和恢复。真实 Worker/D1、Dart 数据与正式组件结果及其实际范围见[章节状态记录](verification/chapter-read-state.md)；本轮还修复无 metadata 移出书架被正式合同拒绝的缺口，并通过独立真实 Worker/D1 回归。独立 Web 与 Native 模拟器顺序实测见上文；生产与真机门仍待验收。

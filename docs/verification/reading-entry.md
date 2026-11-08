@@ -42,8 +42,18 @@ flutter test test/library/ test/browse/details_recovery_test.dart test/browse/ch
 
 真实 Web 书签准备发现新文档 Source 重开/调用失败，尚未取得实际平台上无差异打开零 revision 的证据；不能以受控回归代替该运行门。实际观察、D1 核对及 HTTPS 信任限制见[书签记录](bookmarks.md)。
 
-## 独立运行门
+## 正式 Web 书架直接续读
 
-新增入口仍需在 Codex 内置浏览器、Web/Native 独立客户端、生产 Access 及目标设备分别验收。现有三端经详情续读的历史证据不能自动扩展为新书架按钮验收。实际 Source 的章节变化、临时故障、身份恢复、屏幕与输入交互须保留真实环境证据。
+2026-11-08，本地 macOS 的 Codex 内置浏览器，使用 `2cde709` 的 `pnpm acceptance:build` 正式 Flutter Web / Worker 构建、固定 `c04d436` 的 xkcd v6 1.6.1 单包快照及 `pnpm acceptance:serve` 隔离 D1（迁移至 0010，测试身份 `acceptance-owner`）。起始书架与已安装目录为空；未操作生产。
+
+1. 文档 A 从正式扩展管理安装 xkcd，从英文 Source（`SINGLE`）收藏作品并经详情打开 `3319: Elevators`。显示第 1 页原漫画图，翻到第 2 页后显示 Source 处理的文字图；未点「读完本章」。独立读取 `/api/state/manga/:mangaKey?chapterKey=…` 确认当前位置和最远位置均为第 2 页，账户/作品 revision 为 `5/4`。
+2. 同一浏览器 profile 的文档 B 已能读到书架；当 A 仍持同源 Source 运行锁时，B 明确提示需要关闭其它标签后重连。关闭 A 并重连后，B 点书架「继续阅读」直接进入该章第 2 页，显示文字图与已保存状态。重开前后的独立 API 响应逐字节一致（含 revision、位置、页清单和视口锚）。
+3. B 回看第 1 页，独立读取确认账户/作品 revision 恰好各加一（`6/5`），当前位置为第 1 页、最远仍为第 2 页。关闭 B 后新建文档 C，点书架续读直接显示第 1 页原漫画、最远第 2 页及已保存状态；重开前后独立响应再次逐字节一致。
+
+结果覆盖同 profile 的独立文档顺序交接和已有进度的无差异打开；共享 Source 锁和浏览器缓存，未验同开、冷缓存或独立设备。原始读回、截图与服务日志保留在忽略的 `.local/reading-entry-current-*`。
+
+## 剩余运行门
+
+详情开章故障和显式重试，以及新书架续读入口在 Web↔Native 独立客户端、生产 Access 及目标设备上的表现仍待验收。现有三端经详情续读的历史证据不能自动扩展为新书架按钮验收。实际 Source 的章节变化、临时故障、身份恢复、屏幕与输入交互须保留真实环境证据。
 
 本轮没有新增业务存储、协议或远端部署；Worker API + D1 继续作为业务权威。完整 P0/P1/P2 及真机门仍未通过，继续按 [P1](../plan/p1-library-and-progress.md) 和 [P2](../plan/p2-sync.md) 推进。
