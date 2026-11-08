@@ -5,10 +5,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import 'business_state_validation.dart';
 
 void validateSourcePreferencesIdentity(String packageName, [String? sourceId]) {
-  if (!RegExp(r'^eu\.kanade\.[A-Za-z0-9_.]+$').hasMatch(packageName) ||
-      packageName.length > 200) {
-    throw const FormatException('Invalid Source preference package');
-  }
+  wire.validatePreferencePackageName(packageName);
   if (sourceId != null) {
     final value = BigInt.tryParse(sourceId);
     if (!RegExp(r'^-?\d{1,19}$').hasMatch(sourceId) ||

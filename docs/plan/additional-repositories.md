@@ -25,4 +25,6 @@
 - [ ] 仓库及安装选择的并发冲突、未知 ACK 原请求重试，以及独立设备刷新收敛。
 - [ ] 通用中继与迁移 `0010` 的部署验收，生产 Access 和真机分别记录。
 
+Source 设置校验已和安装使用同一通用包标识，工程回归覆盖非 Keiyoushi 命名空间；[实际外仓 Source](../verification/generic-source-relay.md#第三方包名) 仍待独立运行验收。
+
 功能实现与工程通过不替代实际 Source、独立客户端、Native 或生产验收。当前候选 AOT 与首次 baseline 状态继续按[扩展管理记录](../verification/extension-management.md)维护。

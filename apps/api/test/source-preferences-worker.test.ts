@@ -248,12 +248,14 @@ test('ordinary API rejects sensitive, unknown, malformed and oversized values be
       })
     ).status,
   ).toBe(413);
+  for (const packageName of ['', 'a'.repeat(201)])
+    expect((await reader.raw({ ...base, packageName })).status).toBe(400);
   expect(
-    (await reader.raw({ ...base, packageName: 'unapproved' })).status,
-  ).toBe(400);
-  expect(
-    (await reader.request('/api/source-preferences/packages/unapproved'))
-      .status,
+    (
+      await reader.request(
+        '/api/source-preferences/packages/' + 'a'.repeat(201),
+      )
+    ).status,
   ).toBe(400);
   expect(
     (await reader.raw(base, { 'X-App-Subject': 'old-subject' })).status,
@@ -283,6 +285,28 @@ test('ordinary API rejects sensitive, unknown, malformed and oversized values be
       .bind(reader.subject)
       .first('count'),
   ).toBe(0);
+});
+
+test('a valid community package can read preferences without gaining sync rules', async () => {
+  const reader = await client();
+  const packageName = 'org.example.extension';
+  const catalog = {
+    catalogUrl: 'https://community.example/extensions/index.json',
+    repoId: 'community',
+  };
+  const initial = await reader.read(packageName, catalog);
+  expect(initial).toMatchObject({
+    packageName,
+    accountRevision: 0,
+    syncRules: [],
+    sources: [],
+  });
+  const write = await reader.mutate({
+    ...command([text('preferred_mirror', '1')], 0, packageName),
+    catalog: create(pb.CatalogReferenceSchema, catalog),
+  });
+  expect(write.status).toBe(400);
+  expect((await reader.read(packageName, catalog)).accountRevision).toBe(0);
 });
 
 test('package scope count is bounded transactionally, including simultaneous last-slot writes, and clearing retains CAS', async () => {

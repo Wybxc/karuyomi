@@ -62,6 +62,12 @@ test('metadata rules check exact key, type, and optional Source scope', () => {
 });
 
 test('business mutation parses only bounded typed entries and leaves policy to the current metadata', () => {
+  expect(
+    sourcePreferencesMutationSchema.parse({
+      ...base,
+      packageName: 'org.example.extension',
+    }).packageName,
+  ).toBe('org.example.extension');
   for (const entries of [
     [
       { key: 'CHAPTER_FILTER', value: { text: 'all' } },
@@ -75,9 +81,8 @@ test('business mutation parses only bounded typed entries and leaves policy to t
     ).toThrow();
   for (const change of [
     { packageName: '' },
-    { packageName: 'unknown' },
-    { packageName: 'eu.kanade.' },
-    { packageName: 'eu.kanade.' + 'x'.repeat(191) },
+    { packageName: 42 },
+    { packageName: 'x'.repeat(201) },
     { sourceId: '9223372036854775808' },
     { expectedRevision: -1 },
     { expectedRevision: 0.5 },

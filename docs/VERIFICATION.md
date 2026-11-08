@@ -84,6 +84,8 @@
 
 2026-11-08，[旧网络登记到通用中继的切换演练](verification/d1-relay-cutover.md)在隔离 workerd/D1 通过：确认旧版与 `0004–0008` 兼容，`0009` 同时停止旧中继并满足新版 Source 设置 schema，切换新版后应用 `0010` 保留书架、位置和作品写入回执。生产迁移与发布未执行。
 
+同日，[Source 设置采用通用包名](verification/generic-source-relay.md#第三方包名)。安装、正式启动校验和设置 API 的工程回归覆盖非 `eu.kanade.` 标识，完整检查与正式构建通过；实际外仓 Source 与生产另验。
+
 2026-11-06，自定义封面已接入生成业务协议、Worker API、D1 当前引用、私有 R2 及正式详情/书架 UI；上传使用独立二进制 multipart 与同一作品 mutation 的 CAS/ACK，清除沿 JSON mutation。共享数据及集中工程检查已通过；2026-11-07，独立 Web 文档的上传、替换、清除和读回已通过，两份旧封面路径撤销。见[自定义封面记录](verification/custom-covers.md)及[对象宽限清理和身份设计](design/custom-covers.md)。Native、故障恢复及生产私有 bucket 绑定与部署尚未验收，不能据此认定完整 P1/P2 通过。
 
 2026-11-06，章节范围已读/标未读已接入正式协议、D1 与详情 UI，包含读状态筛选、保留隐藏选择的多选/反序范围、串行精确确认和恢复。真实 Worker/D1、Dart 数据与正式组件结果及其实际范围见[章节状态记录](verification/chapter-read-state.md)；本轮还修复无 metadata 移出书架被正式合同拒绝的缺口，并通过独立真实 Worker/D1 回归。独立 Web 与 Native 模拟器顺序实测见上文；生产与真机门仍待验收。

@@ -10,10 +10,10 @@ import {
   parseMessage,
   requireCondition,
   requireFields,
+  validId,
 } from './codec.ts';
 import { validSourceId, validateCatalogReference } from './static-control.ts';
 import {
-  validatePreferencePackageName,
   validateSyncedPreferenceEntries,
   validatePreferenceSyncRules,
   validatePreferenceEntries,
@@ -43,7 +43,7 @@ export function validateSourcePreferences(
   value: pb.SourcePreferences,
   rules: readonly pb.PreferenceSyncRule[],
 ): void {
-  validatePreferencePackageName(value.packageName);
+  validId(value.packageName);
   validSourceId(value.sourceId);
   uint32(value.revision);
   validateSyncedPreferenceEntries(
@@ -90,7 +90,7 @@ export const sourcePreferencesMutationSchema =
     validateCatalogReference(value.catalog);
     uuid.parse(value.mutationId);
     uint32(value.expectedRevision);
-    validatePreferencePackageName(value.packageName);
+    validId(value.packageName);
     validSourceId(value.sourceId);
     validatePreferenceEntries(value.entries);
     return value;
@@ -107,8 +107,7 @@ export const sourcePreferencesResponseSchema =
     if (!value.error) requireFields(value, ['catalog']);
     if (value.catalog) validateCatalogReference(value.catalog);
     validatePreferenceSyncRules(value.syncRules);
-    if (!value.error || value.packageName !== '')
-      validatePreferencePackageName(value.packageName);
+    if (!value.error || value.packageName !== '') validId(value.packageName);
     requireCondition(
       value.sources.length <= SOURCE_PREFERENCES_PACKAGE_LIMIT,
       'Too many Source preferences in one package',

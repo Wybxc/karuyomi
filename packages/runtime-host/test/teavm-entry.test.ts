@@ -473,7 +473,7 @@ test('foreign-package and undeclared-source bootstrap fail before importing or r
 });
 
 test('an external catalog claiming the same package and repo ID cannot approve account preferences', async () => {
-  const build = await manifest();
+  const build = { ...(await manifest()), packageName: 'org.example.extension' };
   const externalCatalog = {
     catalogUrl: 'https://foreign.example/extensions/index.json',
     repoId: appCatalog.repoId,
@@ -493,7 +493,9 @@ test('an external catalog claiming the same package and repo ID cannot approve a
     undefined,
     externalCatalog,
   );
-  expect(JSON.parse(configurations[0]!).syncRules).toBeUndefined();
+  expect(JSON.parse(configurations[0]!)).toEqual({
+    bootstrap: { packageName: build.packageName },
+  });
   scope.hostInvoke = () =>
     scope.teaDone!(
       JSON.stringify({

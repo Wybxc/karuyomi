@@ -31,12 +31,13 @@ wire.ExtensionBuildDescriptor get extraDescriptor =>
     );
 void seedPublic(
   TestPlatform platform, {
+  String packageName = preferencePackage,
   String? sourceName,
   String? bundleSha256,
 }) {
   final source = testCatalogSource;
   if (sourceName != null) source.name = sourceName;
-  final descriptor = extraDescriptor;
+  final descriptor = extraDescriptor..packageName = packageName;
   descriptor.sources
     ..clear()
     ..add(source);
@@ -51,7 +52,7 @@ void seedPublic(
       wire.encodeProtoJson(
         wire.BuildManifest(
           buildId: 'community-1',
-          packageName: preferencePackage,
+          packageName: packageName,
           repoId: 'community',
           version: '1.0',
           sourceIds: [sourceId],
@@ -124,6 +125,25 @@ void main() {
       final count = posts().length;
       await manager.refresh(catalogToo: true);
       expect(posts(), hasLength(count));
+    },
+  );
+
+  test(
+    'a community package opens with its own empty preference scope',
+    () async {
+      const packageName = 'org.example.extension';
+      seedPublic(platform, packageName: packageName);
+      final extra = await addExtra();
+      expect(extra.packageName, packageName);
+      await manager.install(extra);
+      expect(manager.error, isNull);
+      final opened = await catalog.openSelectedBuild(packageName);
+      expect(opened?.catalog, extraCatalog, reason: catalog.error);
+      expect(catalog.session?.catalog, extraCatalog);
+      final bootstrap = platform.preferenceBootstraps.last;
+      expect(bootstrap.packageName, packageName);
+      expect(bootstrap.sources, isEmpty);
+      expect(bootstrap.syncRules, isEmpty);
     },
   );
 

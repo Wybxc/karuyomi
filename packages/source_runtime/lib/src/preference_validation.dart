@@ -128,12 +128,15 @@ void validatePreferenceSyncRules(List<PreferenceSyncRule> rules) {
   }
 }
 
-void validatePreferenceBootstrap(PreferenceBootstrap value) {
+void validatePreferencePackageName(String packageName) {
   _preferenceRequire(
-    RegExp(r'^eu\.kanade\.[A-Za-z0-9_.]+$').hasMatch(value.packageName) &&
-        value.packageName.length <= 200,
+    packageName.isNotEmpty && packageName.length <= 200,
     'Invalid preference package identity',
   );
+}
+
+void validatePreferenceBootstrap(PreferenceBootstrap value) {
+  validatePreferencePackageName(value.packageName);
   validatePreferenceSyncRules(value.syncRules);
   _preferenceRequire(
     value.sources.length <= 64 &&

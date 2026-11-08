@@ -11,3 +11,9 @@
 以上覆盖本地 Worker 与中文热门列表；生产 Access、生产部署和 Native 的这次中继变更仍待验收。四个已审核包的设置规则现在只由新版 AOT 写入清单，未用旧冻结清单冒充重编或把设置回归算成新版真实 Source 设置实测。产物状态仍为 `compiled_unverified` / `runtimeReady=false`。本轮本地记录位于忽略目录 `.local/network-registry-*.log`。
 
 从旧登记部署切换的迁移依赖已单独做[隔离 D1 演练](d1-relay-cutover.md)；操作顺序见[发布文档](../EXTENSIONS.md#旧网络登记部署切换)。
+
+## 第三方包名
+
+后续复查发现：静态目录和安装接受通用包标识，而 Source 设置 bootstrap 与 API 曾限制 `eu.kanade.` 前缀，导致其它命名空间的兼容扩展安装后打不开。现已与静态目录和安装对齐，校验同一非空、最长 200 UTF-16 单元的包标识，并保留来源范围、Source ID 和设置规则校验。
+
+在工程回归中，`org.example.extension` 通过 Flutter 的安装/打开、Dart bootstrap 及正式 TeaVMDriver 的受控 Java 接口；真实 Workers/D1 允许读回该包的独立空设置，仍拒绝未经审核的同步写入。空值、错误类型和超长标识继续被拒绝。`pnpm check`（Vitest 518 项）、`pnpm flutter:check`（22 + 87 + 610 项）与固定 xkcd 单包快照的 `pnpm build` 通过。正式 Web/Native runtime-host 构建的共享材料与冻结批次逐字节一致；真实外仓 Source、生产及真机另验。原始检查见忽略目录 `.local/generic-package-identity-*`。

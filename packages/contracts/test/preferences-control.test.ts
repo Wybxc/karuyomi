@@ -200,7 +200,8 @@ test('bootstrap supports more than 512 small entries while enforcing per-source,
   );
   expect(() => validatePreferenceBootstrap(value)).toThrow();
   for (const invalid of [
-    create(pb.PreferenceBootstrapSchema, { packageName: 'invalid' }),
+    create(pb.PreferenceBootstrapSchema, { packageName: '' }),
+    create(pb.PreferenceBootstrapSchema, { packageName: 'a'.repeat(201) }),
     create(pb.PreferenceBootstrapSchema, {
       packageName,
       sources: [{ sourceId: '1' }, { sourceId: '1' }],

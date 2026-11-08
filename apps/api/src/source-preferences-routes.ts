@@ -10,7 +10,7 @@ import {
 import {
   businessSchemaVersion,
   sourcePreferencesMutationSchema,
-  validatePreferencePackageName,
+  validId,
   validateCatalogReference,
   preferenceRulesAssetPath,
   preferenceRulesAssetSchema,
@@ -88,7 +88,7 @@ export function createSourcePreferencesRoutes() {
         repoId: c.req.query('repoId') ?? '',
       });
       try {
-        validatePreferencePackageName(packageName);
+        validId(packageName);
         validateCatalogReference(catalog);
       } catch {
         throw new StateError(ErrorCode.INVALID_INPUT, 'Invalid package name');

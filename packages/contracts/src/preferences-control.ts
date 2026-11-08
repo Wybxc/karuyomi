@@ -97,14 +97,6 @@ export function validatePreferenceEntries(
     maximumBytes,
   );
 }
-export function validatePreferencePackageName(packageName: string): void {
-  requireCondition(
-    /^eu\.kanade\.[A-Za-z0-9_.]+$/.test(packageName) &&
-      packageName.length <= 200,
-    'Invalid preference package identity',
-  );
-}
-
 function valueKind(value: pb.PreferenceValue): pb.PreferenceValueKind {
   switch (value.value.case) {
     case 'boolean':
@@ -170,7 +162,7 @@ export function validateSyncedPreferenceEntries(
   entries: readonly pb.PreferenceEntry[],
   rules: readonly pb.PreferenceSyncRule[],
 ): void {
-  validatePreferencePackageName(packageName);
+  validId(packageName);
   validSourceId(sourceId);
   validatePreferenceEntries(entries);
   requireCondition(
@@ -184,7 +176,7 @@ export function validateSyncedPreferenceEntries(
 export function validatePreferenceBootstrap(
   value: pb.PreferenceBootstrap,
 ): void {
-  validatePreferencePackageName(value.packageName);
+  validId(value.packageName);
   validatePreferenceSyncRules(value.syncRules);
   requireCondition(
     value.sources.length <= 64 &&

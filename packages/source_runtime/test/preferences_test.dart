@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 
 import 'support/fake_runtime_transport.dart';
 
-const _package = 'eu.kanade.test';
+const _package = 'org.example.extension';
 const _sessionScope =
     wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_CLIENT_SESSION;
 const _accountScope = wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_ACCOUNT;
@@ -357,7 +357,8 @@ void main() {
         );
       }
       for (final invalid in [
-        wire.PreferenceBootstrap(packageName: 'invalid'),
+        wire.PreferenceBootstrap(packageName: ''),
+        wire.PreferenceBootstrap(packageName: 'a' * 201),
         wire.PreferenceBootstrap(
           packageName: _package,
           sources: [
