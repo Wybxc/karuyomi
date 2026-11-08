@@ -457,6 +457,40 @@ export function runtimeIdentity(manifest: BuildManifest): RuntimeIdentity {
   return runtimeIdentitySchema.parse(manifest);
 }
 
+function readRuntimeIdentity(checkout: string): RuntimeIdentity {
+  const catalog: unknown = JSON.parse(
+    readFileSync(
+      path.join(checkout, 'packages/runtime-host/dist/materials.json'),
+      'utf8',
+    ),
+  );
+  if (!isRecord(catalog)) throw new Error('Invalid runtime material catalog');
+  return runtimeIdentitySchema.parse({ ...catalog, bridgeVersion: 2 });
+}
+
+export async function assertCiRuntimeCompatible(
+  state: ExtensionState,
+  readIdentity: () => RuntimeIdentity | Promise<RuntimeIdentity>,
+): Promise<void> {
+  const published = Object.values(state.active)
+    .map((key) => state.attempts[key])
+    .filter(
+      (record): record is BuildRecord =>
+        record?.status === 'published' && record.available !== false,
+    );
+  if (published.length === 0) return;
+  const identity = await readIdentity();
+  const incompatible = published.find(
+    (record) => !equal(record.runtimeIdentity, identity),
+  );
+  if (incompatible)
+    throw new Error(
+      'CI runtime guard: deployed build for ' +
+        incompatible.descriptor.packageName +
+        ' uses a different or unknown runtime identity; build and deploy a complete local baseline for the current runtime first',
+    );
+}
+
 function matchesPublishedManifest(
   manifest: BuildManifest,
   descriptor: ExtensionDescriptor,
@@ -571,21 +605,7 @@ export class ExtensionPipeline {
                 maxBuffer: 2 * 1024 * 1024,
               },
             );
-            const catalog: unknown = JSON.parse(
-              readFileSync(
-                path.join(
-                  checkout,
-                  'packages/runtime-host/dist/materials.json',
-                ),
-                'utf8',
-              ),
-            );
-            if (!isRecord(catalog))
-              throw new Error('Invalid runtime material catalog');
-            return runtimeIdentitySchema.parse({
-              ...catalog,
-              bridgeVersion: 2,
-            });
+            return readRuntimeIdentity(checkout);
           });
       this.catalogs.set(checkout, value);
     }
@@ -888,6 +908,11 @@ export class ExtensionPipeline {
     processes.check();
     if (plan.baseRevision !== state.revision)
       throw new Error('Plan was based on a different deployed snapshot');
+    if (plan.ci || ciEnvironment())
+      await assertCiRuntimeCompatible(state, () =>
+        this.currentRuntime(options.checkout),
+      );
+    processes.check();
     const candidate = structuredClone(state),
       current = new Map(
         plan.entries.map((entry) => [entry.packageName, entry]),
@@ -1454,6 +1479,8 @@ async function runPipeline(
           },
         );
       }
+      if (plan.ci)
+        await assertCiRuntimeCompatible(state, () => readRuntimeIdentity(ROOT));
       const output = path.resolve(required('output'));
       const serializedPlan = stableStringify(plan);
       if (serializedPlan === undefined)

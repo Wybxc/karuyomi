@@ -133,12 +133,15 @@ pnpm exec node tools/extensions/network-policies.ts \
 
 `.github/workflows/extensions.yml` 每六小时或手动运行。`pull-state --state PATH` 只接受远端已完成且 index/state 一致的 baseline，缺失、HTML、部分 bootstrap 均拒绝，不能退化为首次全量。CI 跟随上游 main，默认每批 12 包、手动最高 24，并发最多 2；相同失败输入不自动重试。
 
+增量计划读取正式构建生成的共享材料清单，并与已部署索引中的可用扩展逐一比较运行时身份。只要其中一个扩展的协议、ABI、运行基线、HTTP bridge 版本或实际共享材料不匹配，或者缺少已验证的运行时身份，CI 就在输出计划前停止；组装候选前再次检查同一 parent state。先在本地完成并部署当前运行时的全量候选，再恢复增量发布。输入指纹变化但运行时身份相同，继续正常分批构建，未选中的可用构建继续保留。
+
 plan/build/deploy 三个 jobs 只需 GitHub `contents: read`，均安装固定 Node 和锁定 npm 依赖。AOT 在隔离 matrix 中执行；deploy 汇总结果、生成完整快照、构建客户端、检查基线、部署、同步网络策略并确认 checkpoint。即使本轮没有待编译包，catalog 变化（例如删除模块）仍会生成并部署新快照。Cloudflare 凭据仅提供给可信部署步骤，所有增量发布使用同一 concurrency group。
 
 增量调度使用以下命令，再以本批结果执行上面的 `prepare-snapshot` 和部署流程；`INPUT_FINGERPRINT` 来自 plan 的 selected 条目：
 
 ```sh
 node tools/extensions/pipeline.ts pull-state --state .local/extensions/state.json
+pnpm --filter @karuyomi/runtime-host build:materials
 node tools/extensions/pipeline.ts plan --ci \
   --state .local/extensions/state.json --output .local/extensions/plan.json --limit 12
 node tools/extensions/pipeline.ts build \

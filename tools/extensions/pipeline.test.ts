@@ -27,6 +27,7 @@ import {
   BuildCancelled,
   ExtensionPipeline,
   VerifiedBuild,
+  assertCiRuntimeCompatible,
   cleanupBuiltWork,
   emptyState,
   finalizeBaseline,
@@ -46,6 +47,7 @@ import {
   type ExtensionPlan,
   type ExtensionState,
   type PipelineResult,
+  type RuntimeIdentity,
 } from './model.ts';
 import { parseExtensionIndex, parseManifest } from './verify-manifest.ts';
 const materialIdentity = runtimeIdentitySchema.parse({
@@ -64,7 +66,9 @@ class Fixture {
   readonly pipeline: ExtensionPipeline;
   readonly fetched: string[] = [];
   readonly remoteOverrides = new Map<string, Buffer>();
-  constructor(t: TestContext) {
+  private readonly identity: RuntimeIdentity;
+  constructor(t: TestContext, identity = materialIdentity) {
+    this.identity = identity;
     const environment = {
       CI: process.env.CI,
       GITHUB_ACTIONS: process.env.GITHUB_ACTIONS,
@@ -101,7 +105,7 @@ class Fixture {
     addHostTestSubmodules(this.root);
     this.pipeline = new ExtensionPipeline({
       root: this.root,
-      materials: async () => materialIdentity,
+      materials: async () => this.identity,
       fetchBytes: async (_origin, relative) => {
         this.fetched.push(relative);
         const override = this.remoteOverrides.get(relative);
@@ -197,7 +201,7 @@ class Fixture {
       writeFileAtomic.sync(
         path.join(directory, 'manifest.json'),
         JSON.stringify({
-          ...materialIdentity,
+          ...this.identity,
           buildId: publishedBuildId(descriptor, reference.sha256),
           repoId: 'keiyoushi',
           packageName: descriptor.packageName,
@@ -452,6 +456,107 @@ test('old ABI remains state-only and requires a rebuild before restoration', asy
     makePlan(f.catalog([previous]), second, { root: f.root }).selected.length,
     1,
   );
+});
+test('CI rejects a runtime switch before replacing any deployed artifacts', async (t) => {
+  const graphics = (byte: string) => {
+    const sha256 = byte.repeat(64);
+    return {
+      path: '/runtime/materials/' + sha256,
+      sha256,
+      size: 100,
+      contentType: 'text/javascript',
+      logicalName: 'graphics-bridge.js',
+    };
+  };
+  const identity = { ...materialIdentity, hostScripts: [graphics('a')] };
+  const f = new Fixture(t, identity);
+  const previous = f.descriptor();
+  const unselected = f.descriptor('c', 'example.other');
+  for (const descriptor of [previous, unselected]) f.output(descriptor);
+  const deployed = await f.prepare(
+    f.plan([previous, unselected]),
+    emptyState(),
+    { finalize: true },
+  );
+  const update = f.descriptor('b');
+  const plan = makePlan(f.catalog([update, unselected]), deployed, {
+    ci: true,
+    limit: 1,
+    root: f.root,
+  });
+  const selected = plan.selected[0];
+  assert.ok(selected);
+  f.output(selected);
+  const files = ['extensions/index.json', 'extensions/build-state.json'];
+  for (const { descriptor, bundleSha256 } of Object.values(deployed.attempts)) {
+    assert.ok(bundleSha256);
+    const buildId = publishedBuildId(descriptor, bundleSha256);
+    files.push(
+      `extensions/builds/${buildId}/manifest.json`,
+      `extensions/artifacts/${bundleSha256}.gz`,
+    );
+  }
+  const snapshot = () =>
+    files.map((file) => readFileSync(path.join(f.snapshot, file)));
+  const before = snapshot();
+  for (const old of [
+    { ...identity, hostAbi: 'old-abi' },
+    { ...identity, protocolVersion: identity.protocolVersion + 1 },
+    { ...identity, hostScripts: [graphics('b')] },
+    undefined,
+  ] satisfies (RuntimeIdentity | undefined)[]) {
+    const parent = structuredClone(deployed);
+    const active = parent.attempts[previous.inputFingerprint];
+    assert.ok(active);
+    if (old) active.runtimeIdentity = old;
+    else delete active.runtimeIdentity;
+    const unchanged = structuredClone(parent);
+    const message = /CI runtime guard:.*complete local baseline/;
+    await assert.rejects(
+      assertCiRuntimeCompatible(parent, () => identity),
+      message,
+    );
+    // Even if the one incompatible package is rebuilt in the batch, the
+    // guard runs against the deployed snapshot before merging any results.
+    await assert.rejects(f.prepare(plan, parent), message);
+    assert.deepEqual(parent, unchanged);
+    assert.deepEqual(snapshot(), before);
+    assert.deepEqual(f.fetched, []);
+  }
+  for (const active of Object.values(deployed.attempts))
+    active.available = false;
+  await assertCiRuntimeCompatible(deployed, () => {
+    assert.fail('No deployed builds require a runtime comparison');
+  });
+});
+test('CI keeps unselected builds when host inputs change without changing the runtime', async (t) => {
+  const f = new Fixture(t);
+  const previous = [f.descriptor(), f.descriptor('b', 'example.other')];
+  for (const descriptor of previous) f.output(descriptor);
+  const deployed = await f.prepare(f.plan(previous), emptyState(), {
+    finalize: true,
+  });
+  const updatedHost = 'f'.repeat(64);
+  const updated = [
+    { ...f.descriptor('c'), hostFingerprint: updatedHost },
+    { ...f.descriptor('e', 'example.other'), hostFingerprint: updatedHost },
+  ];
+  const plan = makePlan(
+    { ...f.catalog(updated), hostFingerprint: updatedHost },
+    deployed,
+    { ci: true, limit: 1, root: f.root },
+  );
+  assert.equal(plan.pendingCount, 2);
+  assert.equal(plan.remainingCount, 1);
+  const [selected] = plan.selected;
+  assert.ok(selected);
+  f.output(selected);
+  await assertCiRuntimeCompatible(deployed, () => materialIdentity);
+  const next = await f.prepare(plan, deployed);
+  assert.equal(next.hostFingerprint, updatedHost);
+  assert.equal(next.active[selected.packageName], selected.inputFingerprint);
+  assert.equal(next.active['example.other'], deployed.active['example.other']);
+  assert.equal((await f.index()).builds.length, 2);
 });
 test('success replaces previous build and prunes removed packages and bundles', async (t) => {
   const f = new Fixture(t),

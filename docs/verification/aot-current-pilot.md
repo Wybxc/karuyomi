@@ -49,6 +49,14 @@ pnpm acceptance:serve
 
 本机忽略目录 `.local/extensions-baseline-952bbab/` 保存冻结计划、独立 checkout、已核对的生产 parent state/index、逐包结果、恢复计划及日志。使用单并发 `bootstrap --plan frozen-plan.json --build-checkout checkout --state state.json --output resume-plan.json --assets-dir candidate --jobs 1 --finalize`（路径按该目录解析）。若中断，先确认原发布器已退出，再按 [恢复约束](../EXTENSIONS.md#首次本地全量与恢复)使用相同冻结输入和检查点。此命令只准备本地候选，不部署，不更新生产 checkpoint，不启用增量 CI。
 
+## 当前宿主全量启动
+
+2026-11-08，原 `952bbab` 批次的图形桥摘要与当前宿主不同，正式装配不能混用。旧 runner 按正式取消路径收到 SIGTERM，退出码 143，锁释放；保留 867 个成功、76 个失败检查点作为该提交的证据，另有 505 包未尝试。未生成、部署旧全量快照。
+
+新的独立 checkout 固定为 `c04d436`；上游扩展提交仍为 `efa93f5a`，宿主指纹为 `d9990e66a60fa830c943dcceb07a2fa5558e053d5f40f4b74d48bc3977fa496b`。通过匿名读取生产 index/state 核对真实父 revision `702cc6bfb2974682bf1c83325458535a`、三包和 index SHA。固定 Node 24.15.0、pnpm 12.6.0、三子模块及工具链锁，以正式 `prepare-runtime.ts --android --seed` 校验准备工具链和 seed。
+
+本地忽略目录 `.local/extensions-prototype-v6.n7bHUj/` 保存原样父状态、固定计划、构建结果和日志。按[首次全量与恢复](../EXTENSIONS.md#首次本地全量与恢复)生成 `frozen-plan.json` 后，单并发 `bootstrap --plan … --build-checkout … --jobs 1 --finalize` 发现并选择 1,448 包，首包 `all.ahottie` 已写入正式 built 检查点。此次不使用旧宿主结果，仍只准备本地候选。后续需要用匹配的产品材料装配，验证静态及 Source 分项、生产 Access 和网络政策；候选未部署，增量发布继续停用。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

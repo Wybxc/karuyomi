@@ -47,6 +47,8 @@ jobs:
         run: |
           git -C vendor/extensions-source fetch --depth=1 origin main
           git -C vendor/extensions-source checkout --detach FETCH_HEAD
+      - name: Generate current shared runtime materials for the compatibility check
+        run: pnpm --filter @karuyomi/runtime-host build:materials
       - name: Plan bounded changed inputs
         id: plan
         env:
