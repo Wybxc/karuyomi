@@ -1,6 +1,6 @@
 # 阅读状态一致性验证
 
-本文记录历史双 Web 的手动刷新与写冲突、[双 iOS 模拟器前台冲突](#双-ios-模拟器前台-epoch-冲突)、[Android 前台恢复与 iOS 重置](#android-前台恢复与-ios-重置同一账户)及 [Android 已加载阅读断连与显式重试](#android-已加载阅读断连与显式重试)。各分项均使用正式阅读入口和真实隔离 workerd / D1。
+本文记录历史双 Web 的手动刷新与写冲突、[双 iOS 模拟器前台冲突](#双-ios-模拟器前台-epoch-冲突)、[Android 前台恢复与 iOS 重置](#android-前台恢复与-ios-重置同一账户)、[Android 已加载阅读断连与显式重试](#android-已加载阅读断连与显式重试)，以及阅读进度已提交后丢确认的 [Web](#web-阅读进度已提交后丢确认)、[iOS](#ios-模拟器阅读进度已提交后丢确认)和 [Android](#android-模拟器阅读进度已提交后丢确认)复验。各分项均使用正式阅读入口和真实隔离 workerd / D1。
 
 > 双 Web 入口状态（2026-11-05）：保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。历史双 Web 结果不算作当前 Source 在线、生产 Access 或 Native 完整门通过。
 
@@ -171,4 +171,35 @@ ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.all.x
 | 点「读完本章」，成功响应中断  | `5/4`               | 独立进程已读到完成，原 Reader 与图像仍在，客户端显示待确认与重试。                           |
 | 点「重试保存」                | `5/4`               | 原 Reader 清除待确认，页码、清单、epoch 与锚点保持；独立六路完整业务响应与上一阶段完全相同。 |
 
-正式驱动通过 1/1。停服审计恰好两条，`drop_ack=1/0`，UUID、请求原始字节摘要、预期作品 revision 3、ACK 与持久回执摘要全部相同。原始设备报告、对照快照、审计和失败复现保存在 `/private/tmp/karuyomi-ios-ack-current.uX8fbo/`；AOT 快照和材料证据见 `/private/tmp/karuyomi-xkcd-v6-c04d436.S0u88B/`。本轮仅证明实际 iOS 模拟器及此进度请求；Android 丢确认、同时写、生产 Access 和真机另验。
+正式驱动通过 1/1。停服审计恰好两条，`drop_ack=1/0`，UUID、请求原始字节摘要、预期作品 revision 3、ACK 与持久回执摘要全部相同。原始设备报告、对照快照、审计和失败复现保存在 `/private/tmp/karuyomi-ios-ack-current.uX8fbo/`；AOT 快照和材料证据见 `/private/tmp/karuyomi-xkcd-v6-c04d436.S0u88B/`。本轮证明实际 iOS 模拟器及此进度请求；Android 另见下节，同时写、生产 Access 和真机另验。
+
+## Android 模拟器阅读进度已提交后丢确认
+
+2026-11-08，固定产品提交 `9ef3ccbf0add36577a447536219752aa1b85270e`，Flutter 3.47.5 / Dart 3.13.4，专用 Pixel 9 / Android API 36 ARM64 模拟器（`emulator-5596`，系统 WebView `133.0.6943.137`）。官方 Wrangler HTTPS harness 为 `https://127.0.0.1:63457`，使用 `acceptance-owner` 和独立空 D1；通过私有 ADB 将同一实际端口转给模拟器。隔离 debug APK 仅对 `127.0.0.1` 添加本轮测试根 CA，保留系统根、标准证书和 hostname 校验，并禁用明文；Dart 驱动用标准 CA 输入。实际 APK 的 CA、Native host、worker 和材料清单均核对过原始字节；材料与上一节当前 v6 xkcd 候选一致。
+
+正式 xkcd 英文 Source 为 `1538249443376436084`，作品 `SINGLE`，构建为 `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-43d97485f779b768af7861a6a25522db433ab6d229a6d989e70e3f3c88a848a3`。本轮执行的 `server_sync_test.dart` SHA-256 为 `2934cf908298317644e83db3ee5fe7d4ecb3777cbe15e5e416af7ec28f4e0aea`。
+
+| 节点                          | 账户／全局／作品 revision | 实际结果                                                                                     |
+| ----------------------------- | ------------------------- | -------------------------------------------------------------------------------------------- |
+| 安装当前英文 xkcd 并收藏      | `2/1/1`                   | 正式 `prepare` 从账户 revision 0 起跑；独立读回无阅读进度。                                  |
+| 打开原 `/3319/` 并确认第 2 页 | `4/1/3`                   | 真实图片已解码，当前与最远均为第 2 页，epoch 0，未完成。                                     |
+| 点「读完本章」，成功响应中断  | `5/1/4`                   | 独立 GET 已读到 `completed=true`；同一 Reader 保留待确认草稿和「重试保存」。                 |
+| 点「重试保存」                | `5/1/4`                   | 同一进程（PID `4501`）和 Reader 清除待确认；当前、最远、清单、epoch 和原图／视口锚保持不变。 |
+
+`prepare` 和 ACK-loss 驱动各通过 1/1。独立进程在驱动仅输出 `SYNC_ACK_LOSS_READY` 时已取得提交后快照；重试后设置、书架、作品、书签、进度和指定章六路完整 GET 响应逐字段相同。停服审计恰好两条（`drop_ack=1/0`），同一 UUID `a8cef6b7-cab4-4ec9-992d-50ebf08a4bbd`、预期作品 revision 3、原始请求正文、ACK 与持久回执摘要逐项一致，D1 只提交一次。
+
+复验使用[正式驱动及阶段参数](../../apps/reader/integration_test/README.md#阅读进度已提交后丢确认)。从独立产品副本构建，生成包含 `127.0.0.1` IP SAN 的回环证书，并按该说明为隔离 debug APK 配置 WebView 信任：
+
+```sh
+EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build:native
+NODE_EXTRA_CA_CERTS=/absolute/path/rootCA.pem \
+WRANGLER_HTTPS_KEY_PATH=/absolute/path/key.pem \
+WRANGLER_HTTPS_CERT_PATH=/absolute/path/cert.pem \
+ACCEPTANCE_FIXTURE=progress-ack-loss \
+ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.all.xkcd","allowedHosts":["xkcd.com","imgs.xkcd.com"]}]' \
+  pnpm acceptance:serve
+```
+
+从实际输出取得端口并执行 `adb -s "$device" reverse "tcp:$port" "tcp:$port"`；在 `apps/reader` 依次用 `flutter test -d "$device" --dart-define-from-file=...` 运行 `integration_test/bookmarks_sync_test.dart`（`prepare`）和 `integration_test/server_sync_test.dart`（`ack-loss`）。两份阶段参数分别用 `BOOKMARKS_TEST_CA_BASE64`、`SYNC_TEST_CA_BASE64` 追加同一测试根。核对独立 GET，按 Enter 停服取得 `ACCEPTANCE_PROGRESS_ACK_AUDIT`。
+
+阶段输入、APK 校验、设备日志、快照及汇总见 `/private/tmp/karuyomi-android-ack-9ef3ccb.9Uq8k8/verified.json` 同目录。已撤下 reverse，停止官方 harness、私有 ADB，删除专用 AVD 并核对相关端口释放。该分项只证明此 Android 模拟器与同一进程中的指定完成请求；同时写竞争、关闭后的草稿、生产 Access 与真机不在此分项。
