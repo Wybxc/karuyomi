@@ -235,9 +235,15 @@ Future<void> _expectShelf(
   ]) {
     final tile = _tile(title);
     if (tile.evaluate().length != 1) return false;
-    final subtitle = tester.widget<ListTile>(tile).subtitle;
     final expected = assigned ? categoryName : '未分类';
-    if (subtitle is! Text || subtitle.data?.endsWith('分类：$expected') != true) {
+    final classification = find.descendant(
+      of: tile,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Text && widget.data?.split('\n').last == '分类：$expected',
+      ),
+    );
+    if (classification.evaluate().length != 1) {
       return false;
     }
   }

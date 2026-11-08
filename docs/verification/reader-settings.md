@@ -211,6 +211,14 @@ ACCEPTANCE_FIXTURE=settings-cas-race pnpm acceptance:serve
 
 另有正式 AppShell 的 Flutter 组件回归：通过框架测试绑定模拟 hidden → resumed，远端独立客户端已确认的主题自动应用到原设置表单和页面主题，未产生额外写入。它验证生命周期交到 Flutter 后的业务路径；真实 Web 文档的焦点/可见性、生产和真机仍分别验收。被动探针和只读响应在 `/private/tmp/karuyomi-web-resume.V6ku0A/`；两个测试服务已关闭。
 
+## Web 与 iOS 模拟器双向读写
+
+2026-11-08，在[分类往返](category-ui-sync.md#web-与-ios-模拟器双向读写)的同一隔离 D1 继续验证全局设置。Codex 内置浏览器由 HTTP 回环别名接入，iOS 26.4 专用模拟器由正常信任 CA 的 HTTPS 回环入口接入。两端使用同一签名测试身份和正式产品 UI，未加载 Source。
+
+Web 将外观由跟随系统改成浅色，两个入口的独立读取确认只有 theme 和账户／全局 revision 变化（6/0 → 7/1）。iOS 使用 `settings_sync_test.dart` 的 `write` 阶段，以独立 HTTPS 的完整快照作为前置，读到浅色后通过正式 UI 保存深色、从右到左、双页、适宽和裁白开启。驱动 1/1 通过，账户／全局 revision 变为 8/2。新的 Web 文档直接显示五项确认值，未点重新读取。两个入口独立核对设置、目录、书架和两部作品，读回未引入写入，目录和作品业务内容不变。
+
+原始阶段配置、集成日志与独立快照留在 `/private/tmp/karuyomi-mixed-categories-5e403b1-3x6MOp/`。本分项覆盖全局设置顺序写入和新文档读回；同一 HTTPS origin、Web↔Android、逐漫画覆盖、实际裁白阅读及生产另验。
+
 ## 可复验入口
 
 ```sh
