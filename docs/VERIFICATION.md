@@ -18,6 +18,8 @@
 
 2026-11-08，修正恢复相同阅读状态时的额外写入。Flutter 回归使用两个独立客户端加载同一已保存的章节与顺序，观察已确认的位置后作品 revision 不变；实际切到另一章则更新继续阅读目标。清单已变化的回归确认会保存修正后的当前锚点、保留已找不到的旧最远锚点。这是客户端控制器证据；正式双 Reader 同时写待验。
 
+2026-11-08，[双 iOS 首轮准备](verification/concurrent-server-state.md#双-ios-阅读器的开章基线)实测确认另一路写入：新进程首帧解码时只有 `viewportY` 改变，作品 revision 从 3 增到 4，未放行并发操作。已补齐首帧布局回归，双 Reader 重新验收中。
+
 2026-11-08，正式 Web 的[阅读进度已提交后丢确认与精确重试](verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)通过。内置浏览器在 xkcd 末页点「读完本章」，正式 D1 已提交但 HTTP 200 正文中断；界面保留待确认操作，显式重试复用 UUID、原始正文和 CAS，返回同一回执，六路独立读回不变。[iOS 模拟器同一丢确认场景](verification/concurrent-server-state.md#ios-模拟器阅读进度已提交后丢确认)也已通过，修正了内部控件重排导致的额外进度写入。[Android 模拟器](verification/concurrent-server-state.md#android-模拟器阅读进度已提交后丢确认)使用相同的当前 v6 xkcd 通过复验。双端模拟器在显式重试前后的独立六路响应均不变，各自审计只有两次原请求且 D1 只提交一次。阅读进度同时写、生产 Access 和真机另验。
 
 2026-11-08，正式 Android 模拟器的[阅读断连与显式重试](verification/concurrent-server-state.md#android-已加载阅读断连与显式重试)通过：定向 TCP 中断期间同一阅读页仍可翻到已加载图片，进度保持未确认，独立六路 D1 读回不变；恢复连接后显式重试确认，独立 iOS 正式入口续读到第 2 页并可回看第 1 页，最远进度保持第 2 页。此分项不覆盖全设备断网、服务端已提交后丢响应、生产 Access 或真机。

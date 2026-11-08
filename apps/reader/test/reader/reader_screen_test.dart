@@ -88,6 +88,7 @@ Widget screen({
   required FixturePageProvider provider,
   required ChapterManifest manifest,
   ReadingPosition? position,
+  bool preserveInitialPlacement = false,
   ReadingMode mode = ReadingMode.leftToRight,
   ValueChanged<ReadingPosition>? onPosition,
   ValueChanged<ReaderViewportState>? onViewport,
@@ -111,6 +112,7 @@ Widget screen({
     provider: provider,
     generation: generation,
     initialPosition: position,
+    preserveInitialPlacement: preserveInitialPlacement,
     initialMode: mode,
     doublePage: doublePage,
     chapterControls: chapterControls,
@@ -968,6 +970,75 @@ void main() {
       tester.view.physicalSize = const Size(700, 500);
       await tester.pumpAndSettle();
       expectRenderedAnchor(tester, viewports.last.current, viewport);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'late decode keeps a saved placement but an explicit jump measures the new viewport',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [ReaderPage(key: 'page')],
+      );
+      final saved = manifest.positionAt(
+        0,
+        offset: .1,
+        normalizedX: .5,
+        viewportX: .5,
+        viewportY: .2,
+      );
+      final requests = ValueNotifier<ReadingPosition?>(null);
+      addTearDown(requests.dispose);
+      final viewports = <ReaderViewportState>[];
+      Widget restored(ResourceImageBuilder builder) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: saved,
+        preserveInitialPlacement: true,
+        positionRequest: requests,
+        onViewport: viewports.add,
+        imageBuilder: builder,
+      );
+
+      await tester.pumpWidget(restored(fixtureImage));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed, isNull);
+      await tester.pumpWidget(restored(decodedImage(width: 400, height: 200)));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.normalizedOffset, 1);
+      expect(viewports.last.current.normalizedOffset, saved.normalizedOffset);
+      expect(viewports.last.current.viewportY, saved.viewportY);
+
+      final viewport = find.byType(InteractiveViewer);
+      final bounds = tester.getRect(viewport);
+      final image = tester.getRect(
+        find.byKey(const ValueKey('image-rect-page')),
+      );
+      final renderedY =
+          (image.top + image.height * saved.normalizedOffset - bounds.top) /
+          bounds.height;
+      expect(renderedY, inExclusiveRange(0, 1));
+      expect((renderedY - saved.viewportY).abs(), greaterThan(.01));
+
+      requests.value = manifest.positionAt(
+        0,
+        offset: .8,
+        normalizedX: .5,
+        viewportX: .5,
+        viewportY: .2,
+      );
+      await tester.pumpAndSettle();
+      final moved = viewports.last.current;
+      expect(moved.normalizedOffset, closeTo(.8, .001));
+      expectRenderedAnchor(tester, moved, viewport);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },

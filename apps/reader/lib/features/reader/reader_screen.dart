@@ -46,6 +46,7 @@ class ReaderScreen extends StatefulWidget {
     required this.generation,
     this.title = '阅读',
     this.initialPosition,
+    this.preserveInitialPlacement = false,
     this.initialMode = ReadingMode.leftToRight,
     this.doublePage,
     this.fit = ReaderFit.contain,
@@ -74,6 +75,10 @@ class ReaderScreen extends StatefulWidget {
   final String generation;
   final String title;
   final ReadingPosition? initialPosition;
+
+  /// A confirmed resume can render at a clamped placement without replacing
+  /// the saved preference merely because its images just finished laying out.
+  final bool preserveInitialPlacement;
   final ReadingMode initialMode;
 
   /// Defaults to automatic width-based layout. An in-reader selection lasts for
@@ -143,6 +148,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Offset? _dragStart;
   bool _toolbar = true;
   bool _restoring = false;
+  late bool _preservingInitialPlacement = widget.preserveInitialPlacement;
   double _viewportWidth = 0;
   double _viewportHeight = 0;
   Size? _windowSize;
@@ -203,6 +209,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (requested.chapterKey != _reader.manifest.chapterKey) return;
     final resolved = resolvePosition(_reader.manifest, requested).position;
     if (resolved == null) return;
+    _preservingInitialPlacement = false;
     _navigation('position_request', {
       'targetPageKey': resolved.pageKey,
       'targetIndex': resolved.pageIndexHint,
@@ -689,6 +696,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _setViewportPosition(ReadingPosition position) {
     final previous = _reader.position;
     if (previous != null && _sameAnchor(previous, position)) return;
+    _preservingInitialPlacement = false;
     _reader.updateViewportAnchor(
       position.pageIndexHint,
       offset: position.normalizedOffset,
@@ -727,14 +735,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _captureViewportAnchor();
       return;
     }
-    if (preservePlacement &&
+    final initial = widget.initialPosition;
+    final preserveResume =
+        _preservingInitialPlacement &&
+        initial != null &&
+        _sameAnchor(anchor, initial);
+    if ((preservePlacement || preserveResume) &&
         anchor.normalizedX >= crop.left &&
         anchor.normalizedX <= crop.right &&
         anchor.normalizedOffset >= crop.top &&
         anchor.normalizedOffset <= crop.bottom) {
-      // An internal chrome resize can clamp the same original point to a
-      // different screen position. Keep its preferred placement; no one read
-      // a new point or moved the image.
+      // Startup geometry and internal chrome can clamp the same original
+      // point. Keep its preferred placement unless the view actually moved.
       return;
     }
     _setViewportPosition(
@@ -915,6 +927,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectMode(ReadingMode mode) {
     if (_reader.mode == mode) return;
+    _preservingInitialPlacement = false;
     _navigation('layout', {'mode': mode.name});
     _applyMode(mode);
     widget.onModeChanged?.call(mode);
@@ -930,6 +943,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectDoublePage(bool? value) {
     if (_doublePagePreference == value) return;
+    _preservingInitialPlacement = false;
     _navigation('layout', {'doublePage': value});
     setState(() => _doublePagePreference = value);
     _restoring = true;
@@ -949,6 +963,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _goTo(int index) {
     if (_reader.manifest.pages.isEmpty) return;
+    _preservingInitialPlacement = false;
     _restoring = true;
     _transform.value = Matrix4.identity();
     _navigation('jump', {'targetIndex': index});
@@ -958,6 +973,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _advance() {
     if (!_reader.canAdvance) return;
+    _preservingInitialPlacement = false;
     _navigation('advance', {
       'targetPageKey': _reader.spreads[_reader.spreadIndex + 1].pages.first.key,
     });
@@ -974,6 +990,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _back() {
     if (!_reader.canGoBack) return;
+    _preservingInitialPlacement = false;
     _navigation('back', {
       'targetPageKey': _reader.spreads[_reader.spreadIndex - 1].pages.first.key,
     });
@@ -996,6 +1013,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _zoom(double factor) {
+    _preservingInitialPlacement = false;
     final scale = _transform.value.getMaxScaleOnAxis();
     final next = (scale * factor).clamp(1.0, 5.0);
     final center = Offset(_viewportWidth / 2, _viewportHeight / 2);
@@ -1357,6 +1375,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     builder: (context, constraints) {
                       final window = MediaQuery.sizeOf(context);
                       final sameWindow = _windowSize == window;
+                      if (_windowSize != null && !sameWindow) {
+                        _preservingInitialPlacement = false;
+                      }
                       _windowSize = window;
                       if (_viewportWidth != constraints.maxWidth ||
                           _viewportHeight != constraints.maxHeight) {
@@ -1446,6 +1467,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   IconButton(
                     tooltip: '重置缩放',
                     onPressed: () {
+                      _preservingInitialPlacement = false;
                       _restoring = true;
                       _transform.value = Matrix4.identity();
                       _scheduleRestore();

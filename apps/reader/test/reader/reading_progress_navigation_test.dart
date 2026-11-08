@@ -444,6 +444,7 @@ void main() {
       await tester.pumpAndSettle();
       leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       expect(leaf.manifest.chapterKey, secondManifest.chapterKey);
+      expect(leaf.preserveInitialPlacement, true);
       expect(leaf.initialPosition!.pageKey, secondManifest.pages[1].key);
       expect(leaf.initialPosition!.normalizedOffset, .35);
       expect(leaf.initialPosition!.normalizedX, .65);

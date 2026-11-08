@@ -84,6 +84,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   String? _preparationAttempt;
   ReadingProgressController? _progress;
   ReadingPosition? _initialPosition;
+  bool _preserveInitialPlacement = false;
   final _positionRequest = ValueNotifier<ReadingPosition?>(null);
   bool _allowPop = false;
   bool _exitPending = false;
@@ -227,6 +228,10 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     if (_closing || !mounted) return;
     setState(() {
       _initialPosition = widget.initialPosition ?? position;
+      _preserveInitialPlacement =
+          widget.initialPosition == null &&
+          position != null &&
+          !_progress!.awaitingViewport;
       _order =
           widget.initialOrder ??
           (_progress!.reversedOrder
@@ -357,6 +362,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         _chapter = next.chapter;
         _opened = next.opened;
         _initialPosition = next.position;
+        _preserveInitialPlacement = false;
         _viewport = null;
         _positionRequest.value = null;
         _viewClosed = Completer<void>();
@@ -659,6 +665,10 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         _viewAttached = false;
         _viewport = null;
         _initialPosition = position;
+        _preserveInitialPlacement =
+            adoptingServerState &&
+            position != null &&
+            _progress?.awaitingViewport == false;
         if (adoptingServerState &&
             _progress?.needsReopen(target.key) == false) {
           _order = _progress!.reversedOrder
@@ -911,6 +921,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       generation: opened.generation,
       title: opened.title,
       initialPosition: _initialPosition,
+      preserveInitialPlacement: _preserveInitialPlacement,
       initialMode: _mode,
       doublePage: _doublePage,
       fit: _fit,
