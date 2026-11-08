@@ -188,6 +188,12 @@ flutter test integration_test/server_sync_test.dart \
 
 Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核对恢复位置；反向验收时先从 Web 保存非默认位置（例如第 2 页），再使用全新 Native 安装和 `SYNC_START_PAGE=2` / `SYNC_TARGET_PAGE=1` 运行测试，排除默认首页掩盖恢复错误。回看后最远进度仍须不低于起始页和目标页。普通无设备 `flutter test` 不执行本目录；`flutter analyze` 与仓库格式检查仍覆盖它。
 
+### 书架直接续读
+
+用同一隔离 HTTPS / D1 和固定英文 xkcd `3319: Elevators`。先按上文准备，并在 iOS 用默认详情入口保存第 2 页。Android 新进程在相同配置下增加 `SYNC_ENTRY=shelf`、`SYNC_SUBJECT`、精确 `SYNC_BUILD_ID` 和原 `SYNC_EXPECT_EPOCH`，以 `SYNC_START_PAGE=2` / `SYNC_TARGET_PAGE=1` 运行 `server_sync_test.dart`。随后新 iOS 进程用同一书架模式设为 `1` / `1`。设备使用自动单页或已确认单页，Android 使用上文测试 CA 方式。
+
+每个阶段从独立进程读 `/api/state/manga/:mangaKey?chapterKey=CHAPTER_KEY`。Android 打开后不写入，回看只推进账户/作品 revision 各一次，最远仍第 2 页；iOS 打开、退出不改权威状态。两次正式书架入口均须解码真实图像并等待章节资源释放。已有详情、前台与故障驱动仍使用原入口。
+
 ### 阅读中的前台 epoch 冲突
 
 同一 HTTPS / D1 上使用两个独立的 Native 安装。用书签驱动 `prepare` 安装并收藏固定 AOT 快照中的英文 xkcd，保留空进度。验收 `SINGLE` 的 `/3319/`（`3319: Elevators`，实际两页）。两个阶段都用同一实际 origin、subject、精确构建 ID 和原 epoch（新 D1 为 0），并使用手机上的自动单页或事先确认的单页；阶段中不改变阅读设置。

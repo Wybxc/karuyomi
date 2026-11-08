@@ -148,7 +148,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Offset? _dragStart;
   bool _toolbar = true;
   bool _restoring = false;
-  late bool _preservingInitialPlacement = widget.preserveInitialPlacement;
+  late ReadingPosition? _preferredPlacement = widget.preserveInitialPlacement
+      ? widget.initialPosition
+      : null;
   double _viewportWidth = 0;
   double _viewportHeight = 0;
   Size? _windowSize;
@@ -209,7 +211,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (requested.chapterKey != _reader.manifest.chapterKey) return;
     final resolved = resolvePosition(_reader.manifest, requested).position;
     if (resolved == null) return;
-    _preservingInitialPlacement = false;
+    _preferredPlacement = null;
     _navigation('position_request', {
       'targetPageKey': resolved.pageKey,
       'targetIndex': resolved.pageIndexHint,
@@ -696,7 +698,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _setViewportPosition(ReadingPosition position) {
     final previous = _reader.position;
     if (previous != null && _sameAnchor(previous, position)) return;
-    _preservingInitialPlacement = false;
+    _preferredPlacement = null;
     _reader.updateViewportAnchor(
       position.pageIndexHint,
       offset: position.normalizedOffset,
@@ -735,18 +737,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _captureViewportAnchor();
       return;
     }
-    final initial = widget.initialPosition;
-    final preserveResume =
-        _preservingInitialPlacement &&
-        initial != null &&
-        _sameAnchor(anchor, initial);
-    if ((preservePlacement || preserveResume) &&
+    final preferred = _preferredPlacement;
+    final keepPreferred = preferred != null && _sameAnchor(anchor, preferred);
+    if ((preservePlacement || keepPreferred) &&
         anchor.normalizedX >= crop.left &&
         anchor.normalizedX <= crop.right &&
         anchor.normalizedOffset >= crop.top &&
         anchor.normalizedOffset <= crop.bottom) {
-      // Startup geometry and internal chrome can clamp the same original
-      // point. Keep its preferred placement unless the view actually moved.
+      // Layout can clamp the same original point while resuming, turning
+      // a page, or changing internal controls. Keep the chosen placement;
+      // a gesture or explicit 2D jump will publish a new point.
       return;
     }
     _setViewportPosition(
@@ -927,7 +927,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectMode(ReadingMode mode) {
     if (_reader.mode == mode) return;
-    _preservingInitialPlacement = false;
+    _preferredPlacement = null;
     _navigation('layout', {'mode': mode.name});
     _applyMode(mode);
     widget.onModeChanged?.call(mode);
@@ -943,7 +943,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectDoublePage(bool? value) {
     if (_doublePagePreference == value) return;
-    _preservingInitialPlacement = false;
+    _preferredPlacement = null;
     _navigation('layout', {'doublePage': value});
     setState(() => _doublePagePreference = value);
     _restoring = true;
@@ -963,26 +963,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _goTo(int index) {
     if (_reader.manifest.pages.isEmpty) return;
-    _preservingInitialPlacement = false;
     _restoring = true;
     _transform.value = Matrix4.identity();
     _navigation('jump', {'targetIndex': index});
-    _reader.goToPage(index, normalizedX: _leadingX, viewportX: _leadingX);
+    _selectPage(index);
     _scheduleRestore();
   }
 
   void _advance() {
     if (!_reader.canAdvance) return;
-    _preservingInitialPlacement = false;
     _navigation('advance', {
       'targetPageKey': _reader.spreads[_reader.spreadIndex + 1].pages.first.key,
     });
     _restoring = true;
     final page = _reader.spreads[_reader.spreadIndex + 1].pages.first;
-    _reader.goToPage(
+    _selectPage(
       _reader.manifest.pages.indexWhere((item) => item.key == page.key),
-      normalizedX: _leadingX,
-      viewportX: _leadingX,
     );
     _transform.value = Matrix4.identity();
     _scheduleRestore();
@@ -990,19 +986,23 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _back() {
     if (!_reader.canGoBack) return;
-    _preservingInitialPlacement = false;
     _navigation('back', {
       'targetPageKey': _reader.spreads[_reader.spreadIndex - 1].pages.first.key,
     });
     _restoring = true;
     final page = _reader.spreads[_reader.spreadIndex - 1].pages.first;
-    _reader.goToPage(
+    _selectPage(
       _reader.manifest.pages.indexWhere((item) => item.key == page.key),
-      normalizedX: _leadingX,
-      viewportX: _leadingX,
     );
     _transform.value = Matrix4.identity();
     _scheduleRestore();
+  }
+
+  void _selectPage(int index) {
+    _reader.goToPage(index, normalizedX: _leadingX, viewportX: _leadingX);
+    // The page identity is already valid before its image arrives. Late
+    // dimensions can change rendering without changing the saved placement.
+    _preferredPlacement = _reader.position;
   }
 
   void _onTransform() {
@@ -1013,7 +1013,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _zoom(double factor) {
-    _preservingInitialPlacement = false;
+    _preferredPlacement = null;
     final scale = _transform.value.getMaxScaleOnAxis();
     final next = (scale * factor).clamp(1.0, 5.0);
     final center = Offset(_viewportWidth / 2, _viewportHeight / 2);
@@ -1376,7 +1376,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       final window = MediaQuery.sizeOf(context);
                       final sameWindow = _windowSize == window;
                       if (_windowSize != null && !sameWindow) {
-                        _preservingInitialPlacement = false;
+                        _preferredPlacement = null;
                       }
                       _windowSize = window;
                       if (_viewportWidth != constraints.maxWidth ||
@@ -1467,7 +1467,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   IconButton(
                     tooltip: '重置缩放',
                     onPressed: () {
-                      _preservingInitialPlacement = false;
+                      _preferredPlacement = null;
                       _restoring = true;
                       _transform.value = Matrix4.identity();
                       _scheduleRestore();

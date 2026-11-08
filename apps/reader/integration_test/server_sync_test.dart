@@ -17,6 +17,7 @@ import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/main.dart' as app;
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 import 'package:reader_core/reader_core.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart' show ChapterPageProvider;
 
 const _origin = String.fromEnvironment('APP_ORIGIN');
@@ -27,6 +28,8 @@ const _chapterLabel = String.fromEnvironment(
 const _startPage = int.fromEnvironment('SYNC_START_PAGE', defaultValue: 1);
 const _targetPage = int.fromEnvironment('SYNC_TARGET_PAGE', defaultValue: 2);
 const _phase = String.fromEnvironment('SYNC_PHASE', defaultValue: 'navigate');
+const _entry = String.fromEnvironment('SYNC_ENTRY', defaultValue: 'details');
+const _shelfEntry = _entry == 'shelf';
 const _subject = String.fromEnvironment('SYNC_SUBJECT');
 const _buildId = String.fromEnvironment('SYNC_BUILD_ID');
 const _expectedEpoch = int.fromEnvironment(
@@ -81,15 +84,60 @@ void main() {
               tester.widget<ListTile>(mangaTile).onTap != null;
         });
         if (_subject.isNotEmpty) expect(catalog.subject, _subject);
-        // A ListTile's center may hit its nested Continue Reading icon once
-        // the shelf has a saved resume. Tap the actual title to open details.
-        final mangaTitle = find.descendant(
-          of: mangaTile,
-          matching: find.text('xkcd'),
-        );
-        await _tap(tester, mangaTitle);
-        final chapterTile = await _chapterTile(tester, catalog);
-        await _tap(tester, chapterTile);
+        final shelfSequence = _shelfEntry
+            ? ChapterSequence(
+                packageName: _xkcdPackage,
+                sourceId: _xkcdSourceId,
+                mangaUrl: _xkcdMangaUrl,
+                chapters: [wire.Chapter(url: _xkcdChapterUrl)],
+              )
+            : null;
+        final shelfChapterKey = shelfSequence?.entries.single.key;
+        final shelfClient = _shelfEntry
+            ? catalog.readingProgress!.client
+            : null;
+        Future<wire.MangaStateResponse> inspectShelfState() => shelfClient!
+            .inspectManga(shelfSequence!.mangaKey, chapterKey: shelfChapterKey!)
+            .timeout(_operationBudget);
+
+        final shelfBefore = _shelfEntry ? await inspectShelfState() : null;
+        late final Finder returnTarget;
+        late final bool Function() returnEnabled;
+        if (_shelfEntry) {
+          final shelfButton = find.byKey(
+            ValueKey(('library-continue', shelfSequence!.mangaKey)),
+          );
+          final resume = shelfBefore!.manga.resume;
+          expect(resume.chapterKey, shelfChapterKey);
+          expect(shelfBefore.progress.current.pageIndexHint, _startPage - 1);
+          expect(shelfBefore.progress.furthest.pageIndexHint, 1);
+          expect(shelfBefore.progress.epoch, _expectedEpoch);
+          expect(shelfBefore.progress.completed, isFalse);
+          returnTarget = shelfButton;
+          returnEnabled = () =>
+              tester.widget<IconButton>(shelfButton).onPressed != null;
+          await _waitFor(
+            tester,
+            '已确认的书架续读按钮',
+            () =>
+                shelfButton.evaluate().length == 1 &&
+                returnEnabled() &&
+                tester.widget<IconButton>(shelfButton).tooltip == '继续阅读：xkcd',
+          );
+          await _tap(tester, shelfButton);
+        } else {
+          // A ListTile's center may hit its nested Continue Reading icon once
+          // the shelf has a saved resume. Tap the actual title to open details.
+          final mangaTitle = find.descendant(
+            of: mangaTile,
+            matching: find.text('xkcd'),
+          );
+          await _tap(tester, mangaTitle);
+          final chapterTile = await _chapterTile(tester, catalog);
+          returnTarget = chapterTile;
+          returnEnabled = () => tester.widget<ListTile>(chapterTile).enabled;
+          await _tap(tester, chapterTile);
+        }
         await _waitFor(
           tester,
           '正式阅读页完成进度恢复',
@@ -104,6 +152,15 @@ void main() {
         final mangaKey = route.sequence.mangaKey;
         expect(identical(route.catalog, catalog), isTrue);
         expect(route.initialChapter.name, _chapterLabel);
+        if (_shelfEntry) {
+          expect(
+            find.byType(MangaDetailsPage, skipOffstage: false),
+            findsNothing,
+          );
+          expect(mangaKey, shelfSequence!.mangaKey);
+          expect(manifest.chapterKey, shelfChapterKey);
+          expect(route.source.sourceId, _xkcdSourceId);
+        }
         expect(_startPage, lessThanOrEqualTo(manifest.pages.length));
         expect(_targetPage, lessThanOrEqualTo(manifest.pages.length));
         if (_phase != 'navigate' || _buildId.isNotEmpty) {
@@ -118,6 +175,19 @@ void main() {
 
         await _singlePage(tester);
         await _waitForPage(tester, manifest, _startPage);
+        if (_shelfEntry) {
+          await _confirmedProgress(
+            tester,
+            repository!,
+            mangaKey,
+            manifest,
+            page: _startPage,
+            epoch: _expectedEpoch,
+            minimumFurthest: 2,
+          );
+          await tester.pump(_staleWriteBudget);
+          expect(await inspectShelfState(), shelfBefore);
+        }
         late final ProgressSnapshot after;
         Map<String, Object?>? phaseEvidence;
         if (_phase == 'reset') {
@@ -206,7 +276,7 @@ void main() {
             manifest,
             page: _targetPage,
             epoch: _expectedEpoch < 0 ? null : _expectedEpoch,
-            minimumFurthest: max(_startPage, _targetPage),
+            minimumFurthest: _shelfEntry ? 2 : max(_startPage, _targetPage),
           );
           if (_phase == 'resume') {
             final evidence = await _resume(
@@ -235,6 +305,7 @@ void main() {
         final finalPage = _phase == 'resume' ? _startPage : _targetPage;
         result = <String, Object?>{
           'phase': _phase,
+          if (_shelfEntry) 'entry': _entry,
           'platform': Platform.operatingSystem,
           'origin': platform.origin.origin,
           'subject': catalog.subject,
@@ -257,19 +328,45 @@ void main() {
           ...?phaseEvidence,
         };
 
-        // The details page enables its chapters only after the actual route
-        // completion and closeChapter ACK. Do not dispose the runtime first.
+        // Wait for the originating UI after route completion and closeChapter
+        // ACK before disposing the runtime.
         await tester.tap(find.byType(BackButton));
         await _waitFor(
           tester,
-          '返回详情并完成章节资源 ACK',
+          _shelfEntry ? '返回书架并完成章节资源 ACK' : '返回详情并完成章节资源 ACK',
           () =>
               find.byType(ReaderScreen).evaluate().isEmpty &&
-              chapterTile.evaluate().length == 1 &&
-              tester.widget<ListTile>(chapterTile).enabled,
+              returnTarget.evaluate().length == 1 &&
+              returnEnabled(),
         );
         // close() reuses the provider's real ACK future, including failures.
         await _closeProvider(activeReader);
+        if (_shelfEntry) {
+          final finalShelfState = await inspectShelfState();
+          if (_startPage == _targetPage) {
+            expect(finalShelfState, shelfBefore);
+          } else {
+            expect(
+              finalShelfState.accountRevision,
+              shelfBefore!.accountRevision + 1,
+            );
+            expect(
+              finalShelfState.manga.revision,
+              shelfBefore.manga.revision + 1,
+            );
+            expect(finalShelfState.manga.resume, shelfBefore.manga.resume);
+            expect(
+              finalShelfState.progress.furthest,
+              shelfBefore.progress.furthest,
+            );
+            expect(finalShelfState.progress.epoch, shelfBefore.progress.epoch);
+            expect(finalShelfState.progress.completed, isFalse);
+            expect(
+              finalShelfState.progress.current.pageIndexHint,
+              _targetPage - 1,
+            );
+          }
+        }
         expect(catalog.hasUnsavedReadingProgress, isFalse);
         expect(tester.takeException(), isNull);
       } finally {
@@ -310,6 +407,16 @@ void _validateConfiguration() {
   }
   if (_chapterLabel.isEmpty || _startPage < 1 || _targetPage < 1) {
     fail('SYNC_CHAPTER_LABEL 不能为空，SYNC_START_PAGE / SYNC_TARGET_PAGE 须大于零');
+  }
+  if (!{'details', 'shelf'}.contains(_entry) ||
+      (_shelfEntry &&
+          (_phase != 'navigate' ||
+              _subject.isEmpty ||
+              _buildId.isEmpty ||
+              _expectedEpoch < 0 ||
+              _startPage > 2 ||
+              _targetPage > _startPage))) {
+    fail('书架续读阶段须为 navigate，提供同一 subject、构建 ID、原 epoch，仅恢复或回看');
   }
   if (!{
         'navigate',
@@ -458,7 +565,9 @@ Future<void> _singlePage(WidgetTester tester) async {
   if (selected.contains(false) || (selected.contains(null) && width < 900)) {
     return;
   }
-  if (_phase != 'navigate') fail('前台和重置阶段须预先使用手机自动单页或已确认单页');
+  if (_phase != 'navigate' || _shelfEntry) {
+    fail('书架续读、前台和重置阶段须预先使用手机自动单页或已确认单页');
+  }
   await _waitFor(tester, '正式单页控件可操作', () {
     return tester.widget<SegmentedButton<bool?>>(layout).onSelectionChanged !=
         null;

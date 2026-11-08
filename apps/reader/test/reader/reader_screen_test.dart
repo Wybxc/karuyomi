@@ -1045,6 +1045,66 @@ void main() {
   );
 
   testWidgets(
+    'a backward page turn keeps its placement while the destination decodes',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = ChapterManifest(
+        chapterKey: 'chapter',
+        version: '1',
+        pages: [
+          ReaderPage(key: 'portrait'),
+          ReaderPage(key: 'landscape'),
+        ],
+      );
+      final viewports = <ReaderViewportState>[];
+      Widget configured({required bool decodeDestination}) => screen(
+        provider: provider,
+        manifest: manifest,
+        position: manifest.positionAt(1),
+        preserveInitialPlacement: true,
+        onViewport: viewports.add,
+        imageBuilder: (context, resource, fit) {
+          if (resource.id.endsWith('landscape')) {
+            return decodedImage(width: 1600, height: 600)(
+              context,
+              resource,
+              fit,
+            );
+          }
+          return decodeDestination
+              ? decodedImage(width: 600, height: 1800)(context, resource, fit)
+              : fixtureImage(context, resource, fit);
+        },
+      );
+      await tester.pumpWidget(configured(decodeDestination: false));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'landscape');
+      await tester.tap(find.byTooltip('上一页'));
+      await tester.pumpAndSettle();
+      final navigation = viewports.last.current;
+      expect(navigation.pageKey, 'portrait');
+      expect(viewports.last.observed, isNull);
+
+      await tester.pumpWidget(configured(decodeDestination: true));
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'portrait');
+      expect(viewports.last.current.normalizedX, navigation.normalizedX);
+      expect(
+        viewports.last.current.normalizedOffset,
+        navigation.normalizedOffset,
+      );
+      expect(viewports.last.current.viewportX, navigation.viewportX);
+      expect(viewports.last.current.viewportY, navigation.viewportY);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     '2D request survives unknown dimensions, fit, layout, resize, zoom and reopening',
     (tester) async {
       tester.view.physicalSize = const Size(360, 800);

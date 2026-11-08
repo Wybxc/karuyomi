@@ -80,6 +80,8 @@
 
 2026-11-08，[正式 Web 书架直接续读](verification/reading-entry.md#正式-web-书架直接续读)在隔离 D1 上通过：Codex 内置浏览器独立文档顺序交接真实 xkcd，直接恢复第 2 页；回看第 1 页后再开，最远仍为第 2 页。两次直接恢复均不改 D1。混合客户端、生产与真机另验。
 
+同日，[iOS↔Android 模拟器书架续读](verification/reading-entry.md#ios-与-android-模拟器书架续读)通过：修复迟到解码尺寸引起的同点视口放置更新后，Android 直接恢复第 2 页不写入，回看第 1 页只提交一次，新 iOS 进程直接恢复第 1 页且最远仍第 2 页。Web↔Native、生产与真机另验。
+
 同日，[正式 Web 详情开章重试](verification/reading-entry.md#详情开章故障验收入口)通过：指定 xkcd 章节只注入一次 502，失败前后 D1 状态一致，详情内显式重试显示两页并确认保存。续读读取错误、Native、生产和真机另验。
 
 2026-11-08，[旧网络登记到通用中继的切换演练](verification/d1-relay-cutover.md)在隔离 workerd/D1 通过：确认旧版与 `0004–0008` 兼容，`0009` 同时停止旧中继并满足新版 Source 设置 schema，切换新版后应用 `0010` 保留书架、位置和作品写入回执。生产迁移与发布未执行。

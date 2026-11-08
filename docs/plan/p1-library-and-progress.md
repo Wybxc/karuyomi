@@ -27,7 +27,7 @@
 
 自定义封面已通过独立 Web 文档的顺序往返；其它平台与故障门另验。以下日用入口已实现，实际运行按分项验收：
 
-- **书架直接续读（已实现，Web 独立文档顺序交接通过）**：把服务端已确认的 `MangaState.resume` 投影到书架，在保留详情入口的同时提供明确续读操作；取得当前 Source 和章节清单后按稳定 chapterKey 解析，复用正式 Reader 路由，章节缺失时明确回到详情，不另建本地进度权威。[正式 Web 验收](../verification/reading-entry.md#正式-web-书架直接续读)已确认真实 xkcd 直接恢复第 2 页、回看第 1 页后最远仍为第 2 页，且打开不附带写入；混合平台与生产另验。
+- **书架直接续读（Web 独立文档及 iOS↔Android 模拟器通过）**：把服务端已确认的 `MangaState.resume` 投影到书架，在保留详情入口的同时提供明确续读操作；取得当前 Source 和章节清单后按稳定 chapterKey 解析，复用正式 Reader 路由，章节缺失时明确回到详情，不另建本地进度权威。[正式 Web 验收](../verification/reading-entry.md#正式-web-书架直接续读)已确认真实 xkcd 直接恢复第 2 页、回看第 1 页后最远仍为第 2 页，且打开不附带写入；[原生顺序交接](../verification/reading-entry.md#ios-与-android-模拟器书架续读)另确认 Android 回看只写一次、新 iOS 进程直接恢复。Web↔Native、生产与真机另验。
 - **详情失败恢复（已实现，正式 Web 开章重试通过）**：开章遇普通 Source 错误时保留本次选择，在当前详情给出专用提示并允许显式重试。真实 xkcd [单次错误验收](../verification/reading-entry.md#详情开章故障验收入口)确认失败不写进度、同章重试能打开两页并保存。续读位置读取失败提供只读重取入口，不自动重放 Source 副作用或未确认进度写入。续读状态读取失败、Access 暂停/认证恢复、Native 和生产继续验收。
 - **无差异书架打开（已实现，工程检查通过）**：Source 名称、语言和完整 Manga 快照不变时不再附带写资料，避免干扰另一端的共享 CAS；真正变化、旧快照与未确认原命令分别保留正确更新和显式恢复语义。集中证据见[阅读入口](../verification/reading-entry.md)。固定新构建的 Web 书签复验中，两次新文档重开均无附带写入，见[书签记录](../verification/bookmarks.md)。
 
