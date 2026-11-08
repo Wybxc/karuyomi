@@ -52,6 +52,20 @@ flutter test test/library/ test/browse/details_recovery_test.dart test/browse/ch
 
 结果覆盖同 profile 的独立文档顺序交接和已有进度的无差异打开；共享 Source 锁和浏览器缓存，未验同开、冷缓存或独立设备。原始读回、截图与服务日志保留在忽略的 `.local/reading-entry-current-*`。
 
+## 详情开章故障验收入口
+
+在固定 xkcd 快照上构建正式客户端与验收 Worker 后，以空的临时 D1 启动：
+
+```sh
+ACCEPTANCE_FIXTURE=bridge-once-error \
+  ACCEPTANCE_BRIDGE_ERROR_URL=https://xkcd.com/3319/ \
+  pnpm acceptance:serve
+```
+
+该夹具默认关闭，只在本地验收入口观察指定 HTTPS URL 的 GET。正式 Worker 验签和转发后，夹具只把第一次成功响应替换为不可自动重试的 502；其它目标、真实上游失败和后续重试原样返回。官方 Workers 回归覆盖关闭、Origin 拒绝、目标匹配、注入一次及后续响应正文。停止时输出审计，仅记录请求标识、代次、状态和是否注入。完整 `pnpm check` 通过（Vitest 517 项），同一正式单包静态树的验收 Worker 已构建。
+
+实测条件：进入英文 xkcd 详情并搜索 3319，首次点章节应出现失败反馈，短提示消失后仍保留同章重试。用独立 D1 API 读回核对失败前后进度与 revision 不变，再点同章重试，确认两页真实内容及进度保存。审计应有一次注入和一次通过；夹具回归不算浏览器验收。
+
 ## 剩余运行门
 
 详情开章故障和显式重试，以及新书架续读入口在 Web↔Native 独立客户端、生产 Access 及目标设备上的表现仍待验收。现有三端经详情续读的历史证据不能自动扩展为新书架按钮验收。实际 Source 的章节变化、临时故障、身份恢复、屏幕与输入交互须保留真实环境证据。

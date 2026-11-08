@@ -19,6 +19,11 @@ import {
   observeProgressRace,
   progressRaceDatabase,
 } from './acceptance-progress-race.ts';
+import {
+  bridgeErrorRequest,
+  observeBridgeError,
+  shouldObserveBridgeError,
+} from './acceptance-bridge-error.ts';
 
 export { RuntimeSession } from '../src/runtime-session.js';
 
@@ -29,6 +34,7 @@ export interface AcceptanceBindings extends Bindings {
   ACCEPTANCE_ACK_LOSS?: AckLossFixture;
   ACCEPTANCE_SETTINGS_CAS_RACE?: '1';
   ACCEPTANCE_PROGRESS_CAS_RACE?: '1';
+  ACCEPTANCE_BRIDGE_ERROR_URL?: string;
 }
 
 export default {
@@ -43,6 +49,14 @@ export default {
       const original =
         fixture && shouldObserveAck(fixture, request, env.APP_ORIGIN)
           ? request.clone()
+          : undefined;
+      const bridgeError =
+        env.ACCEPTANCE_BRIDGE_ERROR_URL &&
+        shouldObserveBridgeError(request, env.APP_ORIGIN)
+          ? await bridgeErrorRequest(
+              env.ACCEPTANCE_BRIDGE_ERROR_URL,
+              request.clone(),
+            )
           : undefined;
       const settingsContender =
         env.ACCEPTANCE_SETTINGS_CAS_RACE === '1'
@@ -110,6 +124,7 @@ export default {
           responseAtMs,
         );
       }
+      if (bridgeError) return observeBridgeError(bridgeError, response, env.DB);
       return fixture && original
         ? observeAck(
             fixture,

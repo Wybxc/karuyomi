@@ -26,6 +26,11 @@ import {
   prepareProgressRace,
   progressRaceAttempts,
 } from './acceptance-progress-race.ts';
+import {
+  bridgeErrorAttempts,
+  bridgeErrorTarget,
+  prepareBridgeError,
+} from './acceptance-bridge-error.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -53,6 +58,10 @@ if (nextConfigPath && fixture !== '') {
 const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const settingsRace = fixture === 'settings-cas-race';
 const progressRace = fixture === 'progress-cas-race';
+const bridgeError =
+  fixture === 'bridge-once-error'
+    ? bridgeErrorTarget(process.env.ACCEPTANCE_BRIDGE_ERROR_URL)
+    : undefined;
 const options = (
   publicOrigin: string,
   workerConfig = configPath,
@@ -66,6 +75,7 @@ const options = (
         ...(ackLoss ? { ACCEPTANCE_ACK_LOSS: ackLoss } : {}),
         ...(settingsRace ? { ACCEPTANCE_SETTINGS_CAS_RACE: '1' } : {}),
         ...(progressRace ? { ACCEPTANCE_PROGRESS_CAS_RACE: '1' } : {}),
+        ...(bridgeError ? { ACCEPTANCE_BRIDGE_ERROR_URL: bridgeError } : {}),
       },
       secrets: { ACCEPTANCE_PRIVATE_KEY: privateKey },
     },
@@ -102,10 +112,11 @@ try {
     fixture !== 'categories' &&
     !ackLoss &&
     !settingsRace &&
-    !progressRace
+    !progressRace &&
+    !bridgeError
   ) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race, progress-cas-race or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race, progress-cas-race, bridge-once-error or empty',
     );
   }
   const { url } = await server.listen();
@@ -122,11 +133,15 @@ try {
   }
   const worker = server.getWorker<AcceptanceBindings>();
   await worker.applyD1Migrations('DB');
-  if (!stopRequested && (ackLoss || settingsRace || progressRace)) {
+  if (
+    !stopRequested &&
+    (ackLoss || settingsRace || progressRace || bridgeError)
+  ) {
     const db = (await worker.getEnv()).DB;
     if (ackLoss) await prepareAckLoss(db);
     else if (settingsRace) await prepareSettingsRace(db);
-    else await prepareProgressRace(db);
+    else if (progressRace) await prepareProgressRace(db);
+    else await prepareBridgeError(db);
     fixtureAuditDb = db;
   }
   if (!stopRequested && fixture === 'categories') {
@@ -199,6 +214,11 @@ try {
       console.log(
         'ACCEPTANCE_PROGRESS_RACE_AUDIT=' +
           JSON.stringify(await progressRaceAttempts(fixtureAuditDb)),
+      );
+    } else if (bridgeError && fixtureAuditDb) {
+      console.log(
+        'ACCEPTANCE_BRIDGE_ERROR_AUDIT=' +
+          JSON.stringify(await bridgeErrorAttempts(fixtureAuditDb)),
       );
     }
   } finally {
