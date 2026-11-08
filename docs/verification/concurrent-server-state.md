@@ -203,3 +203,11 @@ ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.all.x
 从实际输出取得端口并执行 `adb -s "$device" reverse "tcp:$port" "tcp:$port"`；在 `apps/reader` 依次用 `flutter test -d "$device" --dart-define-from-file=...` 运行 `integration_test/bookmarks_sync_test.dart`（`prepare`）和 `integration_test/server_sync_test.dart`（`ack-loss`）。两份阶段参数分别用 `BOOKMARKS_TEST_CA_BASE64`、`SYNC_TEST_CA_BASE64` 追加同一测试根。核对独立 GET，按 Enter 停服取得 `ACCEPTANCE_PROGRESS_ACK_AUDIT`。
 
 阶段输入、APK 校验、设备日志、快照及汇总见 `/private/tmp/karuyomi-android-ack-9ef3ccb.9Uq8k8/verified.json` 同目录。已撤下 reverse，停止官方 harness、私有 ADB，删除专用 AVD 并核对相关端口释放。该分项只证明此 Android 模拟器与同一进程中的指定完成请求；同时写竞争、关闭后的草稿、生产 Access 与真机不在此分项。
+
+## 阅读进度同时写：正式 API 与 D1 夹具
+
+2026-11-08，独立空 D1 上的官方 Wrangler 回环 HTTPS harness（`https://127.0.0.1:54760`，`acceptance-owner`）验证了 `ACCEPTANCE_FIXTURE=progress-cas-race`。两个独立 Node 进程（PID `61015`、`61016`）使用相同作品 revision 1、相同两页清单、epoch 0 和不同 UUID，分别提交完成第 2 页与重置请求。用正式 API 先保存未完成的第 2 页，使用真实 xkcd 作品与章节键及合成页键；此次未启动 Reader、Source 或图片加载。
+
+停服审计恰好两条，两条请求都通过正式 Worker 的鉴权、请求校验和写前读取，到达 D1 原子批次入口后才提交原有批次；两条 Worker 处理窗实测重叠 3 ms。完成写入返回 HTTP 200 并有唯一持久回执，重置返回 HTTP 409 / `REVISION_CONFLICT`、无回执，两条响应的权威进度与作品相同。第三个独立进程（PID `60878`）只读同一章，读到与两条响应相同的状态：账户和作品 revision 各从 1 增至 2，当前及最远均为第 2 页、已完成、epoch 仍为 0。
+
+官方 Workers 全套 8 文件 86 项通过；新增回归覆盖两种到达顺序、普通观察和其它章节不占槽、单请求超时，以及两条虽均准入但只有一条到达 D1 批次时不写入。夹具和复验步骤见[正式驱动说明](../../apps/reader/integration_test/README.md#阅读进度同时写)，原始请求、响应、审计及汇总见 `/private/tmp/karuyomi-progress-cas.qWCrho/verified.json` 同目录，服务已停止。此项仅证明 API 层事务竞争；两个正式 Reader 的冲突提示、画面保持、显式重开和权威状态收敛仍待验。

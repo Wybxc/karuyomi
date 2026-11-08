@@ -33,6 +33,10 @@ import {
   prepareSettingsRace,
   settingsRaceAttempts,
 } from './acceptance-settings-race.ts';
+import {
+  prepareProgressRace,
+  progressRaceAttempts,
+} from './acceptance-progress-race.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -60,6 +64,7 @@ if (nextConfigPath && fixture !== '') {
 }
 const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const settingsRace = fixture === 'settings-cas-race';
+const progressRace = fixture === 'progress-cas-race';
 const sourcePolicies = process.env.ACCEPTANCE_SOURCE_POLICIES;
 const options = (
   publicOrigin: string,
@@ -73,6 +78,7 @@ const options = (
         APP_ORIGIN: publicOrigin,
         ...(ackLoss ? { ACCEPTANCE_ACK_LOSS: ackLoss } : {}),
         ...(settingsRace ? { ACCEPTANCE_SETTINGS_CAS_RACE: '1' } : {}),
+        ...(progressRace ? { ACCEPTANCE_PROGRESS_CAS_RACE: '1' } : {}),
       },
       secrets: { ACCEPTANCE_PRIVATE_KEY: privateKey },
     },
@@ -104,9 +110,15 @@ if (commands) {
 
 let fixtureAuditDb: D1Database | undefined;
 try {
-  if (fixture !== '' && fixture !== 'categories' && !ackLoss && !settingsRace) {
+  if (
+    fixture !== '' &&
+    fixture !== 'categories' &&
+    !ackLoss &&
+    !settingsRace &&
+    !progressRace
+  ) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race, progress-cas-race or empty',
     );
   }
   const { url } = await server.listen();
@@ -123,10 +135,11 @@ try {
   }
   const worker = server.getWorker<AcceptanceBindings>();
   await worker.applyD1Migrations('DB');
-  if (!stopRequested && (ackLoss || settingsRace)) {
+  if (!stopRequested && (ackLoss || settingsRace || progressRace)) {
     const db = (await worker.getEnv()).DB;
     if (ackLoss) await prepareAckLoss(db);
-    else await prepareSettingsRace(db);
+    else if (settingsRace) await prepareSettingsRace(db);
+    else await prepareProgressRace(db);
     fixtureAuditDb = db;
   }
   if (!stopRequested && sourcePolicies) {
@@ -200,6 +213,11 @@ try {
       console.log(
         'ACCEPTANCE_SETTINGS_RACE_AUDIT=' +
           JSON.stringify(await settingsRaceAttempts(fixtureAuditDb)),
+      );
+    } else if (progressRace && fixtureAuditDb) {
+      console.log(
+        'ACCEPTANCE_PROGRESS_RACE_AUDIT=' +
+          JSON.stringify(await progressRaceAttempts(fixtureAuditDb)),
       );
     }
   } finally {

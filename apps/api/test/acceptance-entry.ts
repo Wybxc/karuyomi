@@ -2,6 +2,7 @@
 import { importPKCS8, SignJWT } from 'jose';
 import { requestJson } from '../src/business-request.js';
 import type { Bindings } from '../src/env.js';
+import { readMangaState } from '../src/state-store.js';
 import verifiedWorker from './workerd-entry.ts';
 import {
   observeAck,
@@ -13,6 +14,11 @@ import {
   holdSettingsRace,
   observeSettingsRace,
 } from './acceptance-settings-race.ts';
+import {
+  holdProgressRace,
+  observeProgressRace,
+  progressRaceDatabase,
+} from './acceptance-progress-race.ts';
 
 export { RuntimeSession } from '../src/runtime-session.js';
 
@@ -21,6 +27,7 @@ export interface AcceptanceBindings extends Bindings {
   ACCEPTANCE_PRIVATE_KEY: string;
   ACCEPTANCE_ACK_LOSS?: AckLossFixture;
   ACCEPTANCE_SETTINGS_CAS_RACE?: '1';
+  ACCEPTANCE_PROGRESS_CAS_RACE?: '1';
 }
 
 export default {
@@ -36,7 +43,7 @@ export default {
         fixture && shouldObserveAck(fixture, request, env.APP_ORIGIN)
           ? request.clone()
           : undefined;
-      const contender =
+      const settingsContender =
         env.ACCEPTANCE_SETTINGS_CAS_RACE === '1'
           ? await holdSettingsRace(
               request,
@@ -46,7 +53,18 @@ export default {
               requestJson,
             )
           : undefined;
-      if (contender instanceof Response) return contender;
+      if (settingsContender instanceof Response) return settingsContender;
+      const progressContender =
+        env.ACCEPTANCE_PROGRESS_CAS_RACE === '1'
+          ? await holdProgressRace(
+              request,
+              env.DB,
+              env.APP_ORIGIN,
+              env.ACCESS_SUBJECT,
+              { requestJson, readMangaState },
+            )
+          : undefined;
+      if (progressContender instanceof Response) return progressContender;
       const forwarded = new Request(request);
       const key = await importPKCS8(env.ACCEPTANCE_PRIVATE_KEY, 'RS256');
       const token = await new SignJWT({ email: env.OWNER_EMAIL })
@@ -59,17 +77,36 @@ export default {
         .sign(key);
       forwarded.headers.set('Cf-Access-Jwt-Assertion', token);
       // URL, Origin, subject and write headers remain the real client's responsibility.
-      if (contender) await waitForSettingsRaceRelease(contender);
-      const dispatchAtMs = contender ? Date.now() : 0;
-      const response = await verifiedWorker.fetch(forwarded, env, context);
-      if (contender) {
+      if (settingsContender)
+        await waitForSettingsRaceRelease(settingsContender);
+      const dispatchAtMs = Date.now();
+      const workerEnv = progressContender
+        ? { ...env, DB: progressRaceDatabase(env.DB, progressContender) }
+        : env;
+      const response = await verifiedWorker.fetch(
+        forwarded,
+        workerEnv,
+        context,
+      );
+      const responseAtMs = Date.now();
+      if (settingsContender) {
         await observeSettingsRace(
           env.DB,
           env.ACCESS_SUBJECT,
-          contender,
+          settingsContender,
           response,
           dispatchAtMs,
-          Date.now(),
+          responseAtMs,
+        );
+      }
+      if (progressContender) {
+        await observeProgressRace(
+          env.DB,
+          env.ACCESS_SUBJECT,
+          progressContender,
+          response,
+          dispatchAtMs,
+          responseAtMs,
         );
       }
       return fixture && original

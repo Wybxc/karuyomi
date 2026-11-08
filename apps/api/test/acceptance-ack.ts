@@ -12,6 +12,10 @@ import {
   StateMutationResponseSchema,
   StateMutationSchema,
 } from '@karuyomi/protocol';
+import {
+  xkcdChapterKey as progressChapterKey,
+  xkcdMangaKey as progressMangaKey,
+} from './acceptance-xkcd.ts';
 
 const maxAttempts = 16;
 const fixtures = {
@@ -26,13 +30,6 @@ const fixtures = {
 } as const;
 
 export type AckLossFixture = keyof typeof fixtures;
-
-// English xkcd, SINGLE, /3319/. Require the explicit completion save at the
-// last page so automatic observations during preparation never use the fault.
-const progressMangaKey =
-  '62c3d5a079471dde67f80c71005112fde078e4fa3111e6faedc9757350392a6f';
-const progressChapterKey =
-  '3ebd1a075e8cc6fad4cae9daa7595caac80545bdf9499496417bb3d3b6b1142c';
 
 export function isAckLossFixture(value: string): value is AckLossFixture {
   return Object.hasOwn(fixtures, value);

@@ -206,3 +206,11 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 用 `server_sync_test.dart` 的 `--dart-define-from-file` 传 `SYNC_PHASE=ack-loss`、`SYNC_SUBJECT=acceptance-owner`、精确 `SYNC_BUILD_ID`、`SYNC_EXPECT_EPOCH=0`、`SYNC_START_PAGE=1`、`SYNC_TARGET_PAGE=2` 以及服务报告的 `APP_ORIGIN=https://127.0.0.1:PORT`。设备按上文正常信任测试 CA；Android 仍需按规定配置 WebView 和 `SYNC_TEST_CA_BASE64`。
 
 驱动在真实第 2 页先确认正常进度已保存，然后点击「读完本章」。`SYNC_ACK_LOSS_COMMITTED_UNCONFIRMED` 表示同一阅读页仍保留未确认草稿，但只读检查已看到作品 revision 增加 1，页码和 epoch 不变。驱动点击「重试保存」，要求 `SYNC_ACK_LOSS_RETRY_CONFIRMED` 时待确认提示消失、同一阅读页仍挂载、D1 快照不再变化。按 Enter 停止 harness，核对 `ACCEPTANCE_PROGRESS_ACK_AUDIT` 恰好两条、`drop_ack=1/0`，且 UUID、请求正文、预期 revision、ACK 和持久回执的摘要相同。只读检查和审计共同证明本次重试复用了原请求，不能推广为其它平台、关闭后恢复或生产故障通过。
+
+### 阅读进度同时写
+
+使用当前 xkcd 快照构建正式产品（Web 用 `pnpm acceptance:build`，Native 用 `pnpm acceptance:build:native`）。按上文设置 xkcd Source 政策；在新隔离 D1 上执行 `ACCEPTANCE_FIXTURE=progress-cas-race pnpm acceptance:serve`，两个正式客户端使用服务打印的同一 origin 和测试身份。Native 仍使用前述回环 HTTPS、正常证书信任与实际端口。
+
+先从正式界面安装并收藏英文 xkcd，两个独立 Reader 打开 `SINGLE` 的 `/3319/`，保持真实第 2 页已解码且已保存、尚未读完。两端必须确认同一作品 revision、epoch 与清单后才开始；普通进度观察不会占用夹具。一个 Reader 点「读完本章」，另一个点「重新阅读本章」，两条命令须在 15 秒内到达；双方都经过正式 Worker 的写前读取并到达 D1 原子批次后，才提交各自原有的批次。
+
+分别记录成功端和冲突端。冲突端应保持已加载画面并提示明确重开，重开后采用赢家的位置与完成状态；另从独立进程比较设置、书架、作品、书签、进度和指定章。区分竞争当时的单次修订与之后由真实重新导航或显式操作触发的普通保存。停服核对 `ACCEPTANCE_PROGRESS_RACE_AUDIT` 恰好两条、不同 UUID 与同基线、处理时段重叠、两个 `batch_ready_at_ms` 都不晚于首个响应，一个 HTTP 200 有持久回执，一个 HTTP 409 无回执，两条权威状态摘要相同。现有 [API 层证据](../../../docs/verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)不视为正式双 Reader 验收。
