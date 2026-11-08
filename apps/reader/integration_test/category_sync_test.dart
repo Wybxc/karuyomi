@@ -17,6 +17,8 @@ const _first = '分类同步·甲';
 const _second = '分类同步·乙';
 const _createdName = '跨端分类';
 const _sharedName = '共享分类';
+const _weekday = '工作日';
+const _weekend = '周末';
 const _operationBudget = Duration(seconds: 120);
 
 void main() {
@@ -68,6 +70,10 @@ void main() {
         'categoryRevision': after.categoryRevision,
         'categoryId': category?.id,
         'categoryName': category?.name,
+        'categories': [
+          for (final category in after.categories)
+            {'id': category.id, 'name': category.name},
+        ],
         'entries': [
           for (final title in [_first, _second])
             {
@@ -188,9 +194,116 @@ Future<LibraryView> _runPhase(
         isTrue,
       );
       return before;
+    case 'reorder':
+      _expectOrderedState(before, [_weekday, _weekend]);
+      await _expectOrderedShelf(tester, [_weekday, _weekend]);
+      await _tap(tester, find.text('管理分类'));
+      await _tap(tester, find.byTooltip('上移分类 $_weekend'));
+      await _waitForManager(tester, _weekday);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is IconButton &&
+              widget.tooltip == '上移分类 $_weekend' &&
+              widget.onPressed == null,
+        ),
+        findsOneWidget,
+      );
+      await _closeManager(tester);
+      final after = await _readConfirmed(repository);
+      _expectOrderedState(after, [_weekend, _weekday]);
+      expect(after.categoryRevision, before.categoryRevision + 1);
+      expect(
+        after.categories.map((category) => category.id),
+        before.categories.reversed.map((category) => category.id),
+      );
+      for (final title in [_first, _second]) {
+        expect(_entry(after, title).revision, _entry(before, title).revision);
+      }
+      await _expectOrderedShelf(tester, [_weekend, _weekday]);
+      return after;
+    case 'delete-reordered':
+      _expectOrderedState(before, [_weekend, _weekday]);
+      await _expectOrderedShelf(tester, [_weekend, _weekday]);
+      await _tap(tester, find.text('管理分类'));
+      await _tap(tester, find.byTooltip('删除分类 $_weekend'));
+      await _tap(tester, find.text('删除'));
+      await _waitForManager(tester, _weekday);
+      expect(find.byTooltip('删除分类 $_weekend'), findsNothing);
+      await _closeManager(tester);
+      final after = await _readConfirmed(repository);
+      _expectOrderedState(after, [_weekday]);
+      expect(after.categoryRevision, before.categoryRevision + 1);
+      expect(after.categories.single.id, before.categories.last.id);
+      expect(_entry(after, _first).revision, _entry(before, _first).revision);
+      expect(
+        _entry(after, _second).revision,
+        _entry(before, _second).revision + 1,
+      );
+      await _expectOrderedShelf(tester, [_weekday]);
+      return after;
+    case 'verify-reordered-deleted':
+      _expectOrderedState(before, [_weekday]);
+      await _expectOrderedShelf(tester, [_weekday]);
+      return before;
     default:
       throw StateError('Unknown CATEGORY_PHASE: $_phase');
   }
+}
+
+void _expectOrderedState(LibraryView view, List<String> names) {
+  expect(view.categories.map((category) => category.name), names);
+  expect(
+    view.entries.map((entry) => entry.title),
+    unorderedEquals([_first, _second]),
+  );
+  for (final (title, name) in [(_first, _weekday), (_second, _weekend)]) {
+    expect(
+      _entry(view, title).categoryIds,
+      view.categories
+          .where((category) => category.name == name)
+          .map((category) => category.id),
+    );
+  }
+}
+
+Future<void> _expectOrderedShelf(
+  WidgetTester tester,
+  List<String> names,
+) async {
+  final secondName = names.contains(_weekend) ? _weekend : '未分类';
+  final labels = ['全部', '未分类', ...names];
+  Finder chip(String name) => find.widgetWithText(ChoiceChip, name);
+  await _waitFor(tester, '书架显示目录顺序和两部收藏的分类', () {
+    final actualLabels = tester
+        .widgetList<Text>(
+          find.descendant(
+            of: find.byType(ChoiceChip),
+            matching: find.byType(Text),
+          ),
+        )
+        .map((label) => label.data)
+        .toList();
+    if (actualLabels.join('/') != labels.join('/')) {
+      return false;
+    }
+    for (final (title, name) in [(_first, _weekday), (_second, secondName)]) {
+      if (!_tileShowsCategory(title, name)) return false;
+    }
+    return true;
+  });
+  for (final (name, visible, hidden) in [
+    (_weekday, _first, _second),
+    (secondName, _second, _first),
+  ]) {
+    await _tap(tester, chip(name));
+    expect(tester.widget<ChoiceChip>(chip(name)).selected, isTrue);
+    expect(_tile(visible), findsOneWidget);
+    expect(_tile(hidden), findsNothing);
+  }
+  await _tap(tester, chip('全部'));
+  expect(_tile(_first), findsOneWidget);
+  expect(_tile(_second), findsOneWidget);
 }
 
 // watchView performs the repository's normal API refresh; no test state is injected.
@@ -229,6 +342,23 @@ LibraryEntry _entry(LibraryView view, String title) =>
 
 Finder _tile(String title) => find.widgetWithText(ListTile, title);
 
+bool _tileShowsCategory(String title, String? categoryName) {
+  final tile = _tile(title);
+  if (tile.evaluate().length != 1) return false;
+  return find
+          .descendant(
+            of: tile,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  widget.data?.split('\n').last == '分类：$categoryName',
+            ),
+          )
+          .evaluate()
+          .length ==
+      1;
+}
+
 Future<void> _expectShelf(
   WidgetTester tester, {
   String? categoryName,
@@ -240,19 +370,8 @@ Future<void> _expectShelf(
     (_first, firstAssigned),
     (_second, secondAssigned),
   ]) {
-    final tile = _tile(title);
-    if (tile.evaluate().length != 1) return false;
     final expected = assigned ? categoryName : '未分类';
-    final classification = find.descendant(
-      of: tile,
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is Text && widget.data?.split('\n').last == '分类：$expected',
-      ),
-    );
-    if (classification.evaluate().length != 1) {
-      return false;
-    }
+    if (!_tileShowsCategory(title, expected)) return false;
   }
   return categoryName == null
       ? find.byType(ChoiceChip).evaluate().length == 2
@@ -357,7 +476,13 @@ void _validateConfiguration() {
     'verify',
     'delete',
     'verify-deleted',
+    'reorder',
+    'delete-reordered',
+    'verify-reordered-deleted',
   }.contains(_phase)) {
-    fail('CATEGORY_PHASE 须为 create/update/verify/delete/verify-deleted');
+    fail(
+      'CATEGORY_PHASE 须为 create/update/verify/delete/verify-deleted/'
+      'reorder/delete-reordered/verify-reordered-deleted',
+    );
   }
 }

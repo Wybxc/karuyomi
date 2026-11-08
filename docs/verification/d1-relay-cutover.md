@@ -1,0 +1,23 @@
+# 通用中继的 D1 生产切换演练
+
+2026-11-08，在本地隔离 workerd / D1，用最后一次确认的生产部署 `466acdd` 和当前通用中继 `2cde709` 演练从迁移 `0003` 切换到 `0010`。使用 Wrangler 4.156.1 官方 harness、同一隔离 D1、临时 RS256 测试身份和独立模拟 R2。旧 Worker 使用该提交的 Worker 源码；新版来自 `pnpm acceptance:build`，静态树含固定 `c04d436` 的 xkcd v6 1.6.1 单包验收产物。旧 Worker 也挂载这棵测试静态树，仅用于验证 API 与 schema 顺序。桥请求故意提交空帧；400 代表通过前置分支到达协议解析。
+
+| D1 迁移阶段 | 旧 Worker                                          | 当前 Worker                                       |
+| ----------- | -------------------------------------------------- | ------------------------------------------------- |
+| 至 `0003`   | 正式 API 收藏成功；中继到达协议解析                | 未运行                                            |
+| 至 `0008`   | 正式 API 继续保存进度，书架/作品读回，中继仍可解析 | 书架可读；Source 设置返回 503                     |
+| 至 `0009`   | 中继返回 `404 build_not_found`                     | Source 设置返回 200；中继无需登记即可到达协议解析 |
+| 至 `0010`   | 中继返回 500（故意重启旧版以验证单独回退的边界）   | Source 设置、书架/作品和 Static Assets 均可读     |
+
+`0009` 删除了测试预置的旧 Source 设置与对应写入回执；收藏、当前页、最远页、视口锚和两条作品写入回执在最终状态保持。另用官方 Wrangler CLI 对同一临时持久化目录依次应用原 SQL 前缀至 `0008`、`0009`、`0010`，迁移记录按文件名顺序追加，最终无待应用迁移。无生产写入、无真实 Access 登录、无真实上游 Source 请求。
+
+可复验的本地脚本与原始结果保存在忽略目录 `.local/d1-cutover-rehearsal.t4nTkx/`；目录内有两次 harness 输出及 `cli-prefix.l9hYIl/results.log`。在本仓库根运行：
+
+```sh
+export XDG_CONFIG_HOME="$PWD/.local/d1-cutover-rehearsal.t4nTkx/config"
+export WRANGLER_LOG_PATH="$PWD/.local/d1-cutover-rehearsal.t4nTkx/wrangler.log"
+export WRANGLER_SEND_METRICS=false
+.local/node24/bin/node .local/d1-cutover-rehearsal.t4nTkx/rehearse.ts
+```
+
+该结果确认旧、新 Worker 的切换顺序与隔离 D1 状态保留。尝试只读查询生产迁移列表时，Wrangler 因当前无管理 API 认证退出；生产迁移账本和私有封面桶仍须发布前核对。现网 v4 三包须由完整、匹配当前运行时的候选接替。操作顺序见[发布文档](../EXTENSIONS.md#旧网络登记部署切换)；新版真实中继和中文列表见[本地验收](generic-source-relay.md)。

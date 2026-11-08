@@ -34,6 +34,15 @@ flutter test integration_test/category_sync_test.dart --no-pub \
 
 本入口只证明实际执行的平台组合和操作，不代表 Source、生产 Access、同时写竞争、网络故障、物理触控或真机性能。当前证据见[分类同步记录](../../../docs/verification/category-ui-sync.md)。完成后按 Enter 关闭 harness，停止测试进程并删除本轮专用设备。
 
+### 跨端重排后删除
+
+新建同一 HTTPS fixture。通过正常 TLS 与 `Origin`、`X-App-Subject`、`X-App-Request: 1` 读取 `/api/library`，初始有两部收藏、空目录。使用 [ProtoJSON 业务协议](../../../protocol/karuyomi/v1/business.proto)按以下顺序预置数据；每个 POST 都使用不同的 mutation UUID，核对 200 与返回 revision：
+
+1. 向 `/api/categories/mutations` 提交两个 `createCategory`，各用新的分类 UUID，依次创建「工作日」「周末」，目录预期 revision 分别为 0 和 1。
+2. 向 `/api/state/mutations` 各提交一个 `setCategories`，以书架返回的 `mangaKey` 关联甲至「工作日」、乙至「周末」。两部作品预期 revision 均为 1，`expectedCatalogRevision` 均为 2。
+
+按上面的设备命令运行 Android `reorder` → iOS `delete-reordered` → Android 新进程 `verify-reordered-deleted`。三阶段分别上移「周末」、按新顺序读回后删除「周末」、只读验证「工作日」及未分类筛选；测试仍操作正式 UI。预置后及每阶段分别独立 GET `/api/categories`、`/api/library` 和两部 `/api/state/manga/{mangaKey}`。账户／目录／甲／乙 revision 应依次为 `6/2/2/2`、`7/3/2/2`、`8/4/2/3`、`8/4/2/3`。重排只改变目录顺序；删除仅移除乙的关联，两部收藏保留。若写后驱动失败，先检查权威状态；已提交的写阶段只在新 D1 重跑。
+
 ## 全局设置同步
 
 `settings_sync_test.dart` 复用上面的正式产品构建、官方 HTTPS harness 和设备信任配置；普通顺序和前台恢复阶段不设置 `ACCEPTANCE_FIXTURE`，丢确认阶段使用下方专用夹具；全局设置阶段均不设置 Source 策略，使用空 D1 与零扩展索引。两个客户端必须使用同一个实际 HTTPS origin 和服务输出的 subject。Android 的隔离 debug 副本按上面的精确主机 CA 配置，并逐文件核对当前产品 Dart、驱动、锁文件与内置材料；不要复用历史副本的旧业务源码。

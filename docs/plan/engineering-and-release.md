@@ -14,7 +14,7 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 2026-11-08，实测冻结 `952bbab` 和当前主分支虽然同为 ABI v6 / protocol 2，`graphics-bridge.js` 摘要及宿主指纹已经不同。所有冻结清单都引用旧材料；正式静态组装拒绝混用，Native 同样须配套材料。旧队列已通过正式取消退出，结果保留为该提交的构建证据；固定 `c04d436` 与已确认的生产 parent 已另行启动本地全量，见[当前宿主全量启动](../verification/aot-current-pilot.md#当前宿主全量启动)。待全量结束并验证候选后，才进行生产发布与增量 CI 验收。
 
-扩展网络登记已从当前实现移除；[正式本地接口与 xkcd 中文热门列表通过](../verification/generic-source-relay.md)。D1 `0010` 只清理退役表；先切换新版 Worker 再应用迁移。[`0009` 预演](../verification/network-policies-0009.md)与 v4 部署审批是历史记录。冻结在 clab 运行的 v6 批次保持原输入；新输入的正式快照和生产 Source 仍需验收。
+扩展网络登记已从当前实现移除；[正式本地接口与 xkcd 中文热门列表通过](../verification/generic-source-relay.md)。[隔离 D1 切换演练](../verification/d1-relay-cutover.md)确认：`0009` 是新版 Source 设置前置条件，也会停止旧中继；需要短维护窗口先应用 `0009`、再切换 Worker/Static Assets，最后应用 `0010`。冻结在 clab 运行的 v6 批次保持原输入；完整候选和生产 Source 仍需验收。
 
 增量计划和候选组装都检查已部署可用扩展的运行时身份。协议、ABI 或材料字节有变化时，CI 要求先发布匹配的本地全量候选；输入指纹变化而材料与合同不变时，仍允许有界增量。定向回归覆盖宿主切换拒绝及旧快照不变，也验证同运行时的有界批次保留未选中的可用扩展。线上工作流仍待匹配的 baseline 部署后验收。
 

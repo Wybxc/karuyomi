@@ -103,9 +103,26 @@ Web 创建「跨端分类」并关联甲，账户／目录／甲／乙 revision 
 
 首次 Android 启动在连接等待阶段失败，未执行分类写入，双入口读回与 Web 写后快照相同。隔离 debug 副本配置了 WebView 对回环测试 CA 的信任；写入复验用临时测试入口将同一 CA 追加给 Dart 测试进程，再运行原分类驱动，保留系统 CA 与主机名检查。未捕获首次握手错误，不能据此判定初始化问题的根因。随后按[正式驱动说明](../../apps/reader/integration_test/README.md#分类同步)传 `CATEGORY_TEST_CA_BASE64` 执行只读 `verify`；首次 Flutter CLI 未附加到已启动的 Dart VM，冷启动模拟器后通过 1/1，权威快照仍相同。原始日志和快照留在本地 `/private/tmp/karuyomi-mixed-categories-android-5e6a526.NZngrS/`。此分项只覆盖不同回环入口的顺序写入与新 Web 文档读回；同一 HTTPS origin、生产、真机、删除、重排、并发与故障恢复另验。
 
+## Android 与 iOS 重排后删除
+
+2026-11-08，固定产品 `2cde709` 的独立源码快照，使用 Node 24.15.0、pnpm 12.6.0、Flutter 3.47.5 / Dart 3.13.4，完整运行 `pnpm acceptance:build:native`。专用 Pixel 7 模拟器（Android 16 / API 36 / arm64，WebView 133.0.6943.137）和 iPhone 17 Pro 模拟器（iOS 26.4）通过同一官方 `https://127.0.0.1:54363` 入口、同一隔离 workerd/D1 和测试身份 `acceptance-owner`。仅 Android 隔离 debug APK 和本轮 iOS 模拟器追加临时 CA，正常校验证书及主机名；Android 通过 ADB reverse 使用实际端口。零扩展索引，未启动 Source。
+
+经正式 API 预置两部收藏与分类：甲属「工作日」，乙属「周末」，初始目录顺序为「工作日 / 周末」。三个独立进程均通过正式 `app.main()`、Native runtime 和分类界面，每阶段 1/1 通过。另一个进程经正常 TLS 独立 GET 身份、书架、目录和两部作品状态：
+
+| 阶段               | 实际结果                                                                                | 账户 / 目录 / 甲 / 乙 revision |
+| ------------------ | --------------------------------------------------------------------------------------- | ------------------------------ |
+| API 预置           | 两个分类分别关联甲、乙                                                                  | `6/2/2/2`                      |
+| Android 重排       | 上移「周末」，两类 ID 和两作品关联保留，作品 revision 不变                              | `7/3/2/2`                      |
+| iOS 读回并删除     | 先显示「周末 / 工作日」，再删除「周末」。甲保留关联，乙变为未分类，两部均仍收藏         | `8/4/2/3`                      |
+| Android 新进程读回 | 「工作日」只显示甲，「未分类」只显示乙，全部筛选仍有两部；独立 GET 与删除后业务状态相同 | `8/4/2/3`                      |
+
+首轮 Android 已提交重排，驱动随后把 RawTooltip 错当 IconButton，写后断言失败；独立读回确认只改变目录顺序。修正断言后重建隔离 D1，没有重复旧 D1 的写入。新 D1 上首次 Android CLI 在安装后未建立 VM 转发，测试未执行，独立快照与预置完全相同；新建专用 AVD 冷启动后跑通上述三阶段。成功日志显示 DDS 仍参与测试连接，不能据此确认 Flutter 附加问题或旧 WebView 初始化失败的根因已修复。
+
+驱动、构建、原始阶段日志、独立快照及失败诊断保留在 `/private/tmp/karuyomi-native-category-2cde709.jwuz5t/`，复验步骤见[集成测试说明](../../apps/reader/integration_test/README.md#跨端重排后删除)。两个 HTTPS harness 均 exit=0，监听释放；ADB reverse 和专用 ADB 停止，Android AVD 与 iOS 模拟器均删除。Android 单独卸载命令返回错误，随后整个专用 AVD 已删除。本分项仅证明两种模拟器的顺序操作、筛选和新进程读回。
+
 ## 尚待验收
 
-- 混合平台的删除、重排、同一 HTTPS origin 及物理设备读回；双 Web、双 iOS、iOS↔Android 的顺序分项及上述 Web 分别与双端模拟器的双向写入读回已分别通过。
+- Web↔Native 的删除、重排和同一 HTTPS origin，以及物理设备读回；双 Web、双 iOS、iOS↔Android 的顺序分项及上述 Web 分别与双端模拟器的双向写入读回已分别通过。
 - Android DDS/Native 容器初始化的间歇失败复现与根因修复；当前冷启动读回通过不覆盖此门。
 - 实际网络丢响应、同时到达的写竞争及自动前台/断网恢复；当前组件故障注入与顺序旧视图冲突分别计证据。
 - 生产 Access 正向会话及生产分类部署；本地临时 RS256 身份不代表此门通过。

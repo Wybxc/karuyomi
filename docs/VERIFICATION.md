@@ -76,7 +76,11 @@
 
 2026-11-06，书架直接续读、详情失败显式重试、续读位置只读重取及书架资料原请求重试已接入正式 Flutter 入口。稳定章节/位置/顺序恢复、未确认写隔离和迟到结果边界的受控组件记录见[续读与恢复](verification/reading-entry.md)，设计见[阅读入口](design/reading-entry.md)。实际 Source、独立客户端、生产 Access 和目标设备分别验收，不将本轮组件结果提升为完整 P1/P2 通过。
 
+2026-11-08，[Android → iOS → Android 分类重排后删除](verification/category-ui-sync.md#android-与-ios-重排后删除)在同一隔离 HTTPS / D1 上通过，三个正式入口阶段各 1/1。重排保留两个关联，删除只更新受影响作品，最后新进程读回无附带写入。Android 间歇性初始化问题仍待定位，Web↔Native 对应操作、生产与真机另验。
+
 2026-11-08，[正式 Web 书架直接续读](verification/reading-entry.md#正式-web-书架直接续读)在隔离 D1 上通过：Codex 内置浏览器独立文档顺序交接真实 xkcd，直接恢复第 2 页；回看第 1 页后再开，最远仍为第 2 页。两次直接恢复均不改 D1。详情失败重试、混合客户端、生产与真机另验。
+
+2026-11-08，[旧网络登记到通用中继的切换演练](verification/d1-relay-cutover.md)在隔离 workerd/D1 通过：确认旧版与 `0004–0008` 兼容，`0009` 同时停止旧中继并满足新版 Source 设置 schema，切换新版后应用 `0010` 保留书架、位置和作品写入回执。生产迁移与发布未执行。
 
 2026-11-06，自定义封面已接入生成业务协议、Worker API、D1 当前引用、私有 R2 及正式详情/书架 UI；上传使用独立二进制 multipart 与同一作品 mutation 的 CAS/ACK，清除沿 JSON mutation。共享数据及集中工程检查已通过；2026-11-07，独立 Web 文档的上传、替换、清除和读回已通过，两份旧封面路径撤销。见[自定义封面记录](verification/custom-covers.md)及[对象宽限清理和身份设计](design/custom-covers.md)。Native、故障恢复及生产私有 bucket 绑定与部署尚未验收，不能据此认定完整 P1/P2 通过。
 

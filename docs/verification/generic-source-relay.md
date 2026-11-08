@@ -9,3 +9,5 @@
 - Codex 内置浏览器打开正式 Web，从空书架进入扩展管理，准备并安装 xkcd 1.6.1，再在运行时的五个 Source 中选 `xkcd · zh`。热门列表正常显示作品 xkcd（兰德尔·门罗），未出现权限提示。独立 GET 读回账户/全局 revision 为 1/1，仅已安装一项，书架仍空。未打开详情或 Reader，未写收藏或进度。
 
 以上覆盖本地 Worker 与中文热门列表；生产 Access、生产部署和 Native 的这次中继变更仍待验收。四个已审核包的设置规则现在只由新版 AOT 写入清单，未用旧冻结清单冒充重编或把设置回归算成新版真实 Source 设置实测。产物状态仍为 `compiled_unverified` / `runtimeReady=false`。本轮本地记录位于忽略目录 `.local/network-registry-*.log`。
+
+从旧登记部署切换的迁移依赖已单独做[隔离 D1 演练](d1-relay-cutover.md)；操作顺序见[发布文档](../EXTENSIONS.md#旧网络登记部署切换)。

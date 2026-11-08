@@ -100,13 +100,22 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 摘要只在传输边界检查：下载验证编码/canonical 各一次，后续本地阶段复用验证结果；assembler 在上传边界校验实际 gzip 字节，不再次解压计算 canonical 摘要。schema、身份、大小、路径和材料检查仍保留。
 
+### 旧网络登记部署切换
+
+从仍读取旧网络登记的部署切换到通用中继时，使用以下顺序。原因与本地复验见[切换演练](verification/d1-relay-cutover.md)。上面的常规部署顺序不适用于这次切换。
+
+1. 备齐完整候选并固定 Worker、客户端、共享材料和快照。保留现网仍可用的包，使用当前 ABI/材料的实际构建；不要部署验收用的 xkcd 单包快照。完成 `pnpm build` 和 Wrangler `deploy --dry-run`，读回生产 Worker 版本和 D1 待应用列表，核对私有 `COVERS` 绑定及当前 Access 配置。
+2. 暂停其它发布器，安排 Source 短维护窗口。如果待应用列表仍包含 `0004–0008`，可先在旧 Worker 运行时应用这段新增表和列的迁移。Wrangler 没有指定截止版本的参数；分段时用只含原始 SQL 前缀的独立目录和临时 Wrangler 配置，绑定同一个生产 `DB` 并保留同一迁移账本。目录内不得改写文件内容、名称或顺序。先检查该配置列出的确切待应用文件，再执行对应的迁移。
+3. 紧邻切换运行 `check-base`，应用截至 `0009` 的前缀，立即一次性切换新版 Worker 和完整 Static Assets。不要把旧、新 Worker 按流量比例混用。自 `0009` 清空网络登记和旧 Source 设置起，旧中继停止工作，单独回退 Worker 不会恢复它；该次迁移不清空书架和阅读进度。
+4. 在重新打开的正式客户端检查 Access、书架及实际 Source 后，用正式配置执行 `wrangler d1 migrations apply DB --remote` 收尾 `0010`。再次检查待应用列表为空和中继可用，远端 index/state 与候选一致后才执行 `commit-snapshot`。生产阅读和 Native 同步仍按原验收计划分别记录。
+
 ## Source 网络和设置
 
 静态分发无需 Access。Source HTTP 使用同一应用的 Access 会话和 Worker 公网 fetch；安装、更新或切换漫画站不需要登记包、域名或镜像。额外仓库须与应用 ABI/materials 一致，并为浏览器及 Native WebView 下载提供 CORS；目录、清单与产物验证仍在正式加载边界执行。
 
 具体扩展的适配由 AOT 提供。AOT 可将已审核的非敏感设置键写入当前构建的 `preferenceSyncRules`。正式装配从当前官方清单投影精简的 `/extensions/preference-rules.json`，供 Worker 读取。缺规则的键只在当前客户端会话生效。额外仓库不获得官方清单的设置规则。
 
-历史 `0009` 迁移保留。新增 `0010` 只删除退役的网络登记表；应先切换到无需登记的 Worker，再清理旧表，以便旧 Worker 在切换前仍能运行。
+历史 `0009` 迁移保留，当前 Source 设置表依赖其来源主键。新增 `0010` 只删除退役的网络登记表。切换时按上一节安排两者与 Worker 的顺序。
 
 ## 增量 CI 与验证层级
 
