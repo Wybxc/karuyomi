@@ -225,6 +225,25 @@ Web 将外观由跟随系统改成浅色，两个入口的独立读取确认只�
 
 Android 正式设置驱动读回 Web 的跟随系统、从右到左、双页、适宽和裁白开启，随后在 UI 保存浅色、条漫、自动页组、适高和裁白关闭。驱动 1/1 通过，账户／全局 revision 变为 10/4。全新 Web 文档直接读到五项确认值；HTTP/HTTPS 独立比对没有新增写入，书架、分类与两部作品业务内容未变。专用模拟器、端口映射和私用 ADB 已清理；原始日志与快照留在 `/private/tmp/karuyomi-mixed-settings-android-c04d436.PrCqFW/` 和前一分项的服务目录。本分项不覆盖真机、同一 HTTPS origin、逐漫画覆盖、Web 自动前台和生产。
 
+## iOS 与 Android 模拟器单作品设置覆盖
+
+2026-11-08，两个正式 Native 安装共用同一官方 Vite/Wrangler HTTPS origin、隔离 workerd/D1 和测试身份 `acceptance-owner`。iOS 为 iPhone 17 Pro / iOS 26.4（Xcode 27.2），Android 为 Pixel 7 配置 / API 36 Google APIs arm64 / WebView 133.0.6943.137，Flutter 3.47.5 / Dart 3.13.4。iOS 使用设备信任；Android 经私用 ADB reverse 连接，在隔离 debug WebView 与测试 Dart 进程中分别追加同一回环 CA，保留系统根与主机名校验。
+
+当前 v6 xkcd 构建为 `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-43d97485f779b768af7861a6a25522db433ab6d229a6d989e70e3f3c88a848a3`。从正式书架、详情打开英文 Source `1538249443376436084` 的 `SINGLE`、精确章节 `/3319/`，实际解码两页。只有对照作品的初始收藏由正式 API 准备；实际设置均在正式 Reader 面板修改。先翻至第 2 页建立已确认最远进度，再回到第 1 页保存当前进度，避免把首次观察最远点混入设置阶段。
+
+| 独立阶段            | 账户 / 全局 / 目标作品设置 revision | 实际结果                                                                                                          |
+| ------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| iOS `prime`         | 6 / 1 / 0                           | 当前第 1 页、最远第 2 页均已确认；目标无覆盖。                                                                    |
+| iOS `set`           | 7 / 1 / 1                           | 正式面板保存从右到左、单页和显式关闭裁白；Reader 采用该模式和页组，ProtoJSON 保留 optional `cropBorders: false`。 |
+| Android `clear`     | 8 / 1 / 2                           | 先读回确认值，再逐项选跟随全局；覆盖为空、保留设置 revision，Reader 恢复从左到右与自动页组。                      |
+| iOS 新进程 `verify` | 8 / 1 / 2                           | 打开真实章节和设置面板后仍为空覆盖，Reader 采用全局值；独立 GET 与 Android 保存后完全一致。                       |
+
+每阶段正式驱动 1/1。独立 HTTPS GET 核对：全局设置 revision 1 与全部内容、目标作品业务 revision 4、对照作品业务 revision 1 / 设置 revision 0、书架、分类、书签、资料、当前及最远原图与视口锚、epoch 和续读目标均不变。两次设置各只推进账户及目标设置 revision 一次。
+
+首轮固定 `4e5ca90` 未通过严格验收。iOS 写入时设置重排触发了同页首次最远观察，账户 / 作品业务 / 作品设置 revision 由 5 / 3 / 0 到 7 / 4 / 1。Android 能读回该覆盖；清除前的草稿校验发现重开只改写了 `current.viewportX`（0.11407696156091057 → 0.08224988037968135），原图点、页、章、epoch、最远及设置不变，revision 到 8 / 5 / 1，未点保存。严格复验改用新 D1，产品为 `4e5ca90` 加首帧确认位置保留补丁；实测的 `reader_screen.dart`、`chapter_reader_route.dart`、`reading_progress_controller.dart` 与后续正式提交 `f3419d0` 逐文件一致。
+
+复验入口见[正式驱动](../../apps/reader/integration_test/README.md#单作品阅读设置同步)。阶段日志、独立快照、精确源码和材料摘要保留在 `/private/tmp/karuyomi-native-manga-settings.lJC4G1/`（严格复验见 `strict/`）；专用环境已关闭。裁白仅验证显式 false 与缺失继承的区别，未测实际裁剪像素。Web↔Native 漫画设置、其余覆盖字段、同时写竞争、实际故障、生产 Access、真机触控与性能分别验收。
+
 ## 可复验入口
 
 ```sh
@@ -239,8 +258,8 @@ pnpm exec vitest run --project workers apps/api/test/state-workerd.test.ts
 
 ## 尚待验收与完整范围
 
-- 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；双 Web 全局设置同时保存分项已通过；漫画继承/覆盖/清空、其它写入的实际丢响应恢复和同时请求竞争仍待独立客户端验收。
-- Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；iOS 与 Android 模拟器全局设置的自动前台重取已通过；Web↔Native、Web 前台、生产 Access、Native 手动触控与真机仍待验收。
+- 已取得的全局设置 Web 双文档双向读回、旧 CAS 拒绝、新文档恢复和双 iOS 模拟器新进程恢复见上节；双 Web 全局设置同时保存分项已通过；iOS→Android→iOS 单作品模式、页组与裁白覆盖和清空已通过；Web↔Native 漫画设置、其余覆盖字段、其它写入的实际丢响应恢复和同时请求竞争继续验收。
+- Android↔iOS 同服务全局设置在线读写和新进程恢复已取得上节模拟器证据；iOS 与 Android 模拟器全局设置的自动前台重取及 Web 分别与双端模拟器的全局设置顺序读写已通过；Web 自动前台、生产 Access、Native 手动触控与真机仍待验收。
 - 该轮三项设置之后，阅读背景、应用内调暗与点击区/键盘预设已继续接入，结果分别见[后续记录](reader-appearance.md)；适宽/适高与裁白已实现，分别见[图像适配](reader-fit.md)和[同步裁白](reader-crop.md)。
 
 当前交付顺序见 [P1](../plan/p1-library-and-progress.md) 与 [P2](../plan/p2-sync.md)。生产、跨端和真机门未因上述工程与组件测试通过。

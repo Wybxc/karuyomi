@@ -27,7 +27,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 真实 TeaVM 的后续组合门已通过 64/65 pending callback 上限、约 30.05 秒 fatal drain、正式 manager 回收/排队拒绝/连接关闭及同 namespace 新 Worker 恢复，详见[回调组合记录](../verification/teavm-enqueue.md#实际-callback-上限fatal-drain-与-manager-回收)。产品常量未缩短，不能将受控 Source 成功推广为生产 Access 或 Native 通过。
 
-当前 v6 MANGA Plus Creators 的 iOS 模拟器已打开真实章节并解码首两页；第 3 页从 HTTP transport 超时，独立帧客户端经官方 HTTPS harness 也复现了正文中途超时。[逐块对照](../verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)表明样本主要等待上游正文，未发现桥帧转发放大。桥已将源站读取空闲与整体预算分开并通过 [Workers 和 Host 回归](../verification/aot-current-pilot.md#http-读取空闲与总期限回归)；继续复验完整章、跨章与新进程恢复。
+当前 v6 MANGA Plus Creators 修复前的 iOS 第 3 页中途超时有[独立逐块对照](../verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)。源站读取空闲与整体预算已分开，[Workers 与 Host 回归](../verification/aot-current-pilot.md#http-读取空闲与总期限回归)通过。[iOS 实测](../verification/aot-current-pilot.md#manga-plus-creators-的-ios-完整章节与续读)保留修复后首轮第 33 页未解码及后续同页恢复；独立第二轮通过 Sense Life 完整首章、正式下一章与新进程从第 7 页恢复后读至第二章末页。继续其它代表 Source、真机和生产 Access 验收；完整 P0 未通过。
 
 ## 已完成与边界
 

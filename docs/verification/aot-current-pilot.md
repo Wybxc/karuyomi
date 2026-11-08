@@ -57,6 +57,8 @@ pnpm acceptance:serve
 
 本地忽略目录 `.local/extensions-prototype-v6.n7bHUj/` 保存原样父状态、固定计划、构建结果和日志。按[首次全量与恢复](../EXTENSIONS.md#首次本地全量与恢复)生成 `frozen-plan.json` 后，单并发 `bootstrap --plan … --build-checkout … --jobs 1 --finalize` 发现并选择 1,448 包，首包 `all.ahottie` 已写入正式 built 检查点。此次不使用旧宿主结果，仍只准备本地候选。后续需要用匹配的产品材料装配，验证静态及 Source 分项、生产 Access 和网络政策；候选未部署，增量发布继续停用。
 
+同日，为释放 Mac 的 CPU，将该冻结批次迁至独立 Fedora x86_64 构建机。先用固定提交和锁定工具链在 Linux 重建材料，`materials.json` SHA-256 与 Mac 完全一致；在独立输出目录重新编译 xkcd，编译与产物完整性通过。Mac 调度器收到 SIGTERM 后等待 builder 退出并释放状态锁。停机后将父状态、计划和逐包结果同步至 Fedora；传输前后 295 个成功、16 个失败检查点的记录逐项摘要一致，剩余 1,137 个输入。Fedora 用同一冻结计划单并发恢复，保留原失败结果，并为首个待处理输入 `d68d5c0f…` 写入新 `built` 检查点。Mac 目录保留为交接备份，恢复只生成待验收候选，未部署。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。
@@ -131,7 +133,19 @@ Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透�
 
 2026-11-08，MANGA Plus Creators 的部分正文超时样本中，超过 10 秒的是整次调用，最大 DATA 间隔约 2.65 秒。修正 v2 桥：原 `timeoutMs` 用于源站响应头与按需正文的读取空闲，API 与本地 handle 各自保留独立 300 秒总限，现有上层 Source 操作预算仍可提前取消。没有修改 Java、扩展 JAR 或 wire 格式。
 
-官方 Workers 测试用每隔约 100 毫秒返回的四个 DATA 验证 300 毫秒空闲预算，旧代码超时，修复后通过 END 与 EOF。Host 测试也复现旧绝对计时中断。定向回归另覆盖真正读空闲、空块不续期、慢消费、总限、上传后等响应头、取消与迟到响应。生成的 `materials.json` 与六份共享材料逐一核对 SHA-256，和冻结 `c04d436` 构建完全相同；正式 AOT 计算的 host fingerprint `d9990e66…` 也未变。Native worker 随宿主代码重建。正式 Native 完整章节、续读和生产验证仍需实测。
+官方 Workers 测试用每隔约 100 毫秒返回的四个 DATA 验证 300 毫秒空闲预算，旧代码超时，修复后通过 END 与 EOF。Host 测试也复现旧绝对计时中断。定向回归另覆盖真正读空闲、空块不续期、慢消费、总限、上传后等响应头、取消与迟到响应。生成的 `materials.json` 与六份共享材料逐一核对 SHA-256，和冻结 `c04d436` 构建完全相同；正式 AOT 计算的 host fingerprint `d9990e66…` 也未变。Native worker 随宿主代码重建。正式 iOS 复验见下一节，生产仍待验证。
+
+## MANGA Plus Creators 的 iOS 完整章节与续读
+
+2026-11-08，以 `4e5ca90` 的产品副本加入与 `8ed8436` 相同的两份 HTTP 产品源码，用上一节相同的 v6 MANGA Plus Creators 1.6.1 英语 Source 和静态快照 `83fc244e7d7640c5b930c7c7f9884073`。Flutter 官方 `integration_test` 在 iPhone 17 Pro / iOS 26.4 模拟器运行正式主入口，连接官方回环 HTTPS Wrangler 服务，专用模拟器正常信任本轮 CA。索引、扩展清单和 gzip 与候选一致，两轮实际 App 包内 host、worker 和清单一致，六份共享材料与冻结构建 SHA-256 相同。
+
+修复后首次从空 D1 准备正式书架，Sense Life `#001` 第 1–32 页逐页显示，包含此前失败的第 3 页；第 33 页 120 秒内未满足解码帧和当前页码的断言，本轮未完成首章。独立 GET 仅确认所选第 33 页、无最远锚、未完成、无第二章记录，账户／作品 revision 为 `17/16`。34 次出站 Referer 均精确匹配，33 次收到上游 `200` 响应头，一次 fetch 失败；日志未关联页码，不能据此归因。
+
+失败后的独立帧重放仍使用原 10 秒读取空闲预算：第 3 页 1.542 秒读完；第 33 页三次都读到 EOF（221,752 B，0.104–0.106 秒）。这是后续请求，不能说明先前的 UI 失败原因。另一次诊断用新 iOS 进程从失败 D1 的服务端书架恢复 `#001` 第 33 页，点击「继续阅读」约 6.77 秒看到解码帧，无需点击「重试」；独立 GET 仍为同章同页，revision `17/16 → 18/17`。
+
+第二轮用新 HTTPS 入口和全新 D1，恢复未经修改的验收驱动。进程 `81224` 逐页解码 `#001` 全部 72 页，显式确认完成，经「下一章」进入 `#002` 并逐页读到第 7 页；新进程 `86388` 从服务端书架首次显示 `#002` 第 7 页，章节键、页键与清单版本一致，再逐页读至第 35 页。独立 GET 核对反向章序、首章完成及其当前／最远第 72 页在两次读回间不变；次章当前／最远第 7 → 35 页，未显式完成。账户／作品 revision `2/1 → 18/17 → 23/22`，收藏、设置和书签业务字段保持。读与续读的测试体分别约 39 秒和 18 秒。两章分别观测到 72 和 37 次精确 Referer、上游响应头均为 `200`；次数含预取及重开，不作吞吐或延迟基准。
+
+复验用原单包快照执行 `EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build:native`，按 [Native 官方 HTTPS 配置](../../apps/reader/integration_test/README.md#分类同步)仅登记原两域名并启动空 D1；依次执行 Flutter 驱动的 `prepare`、`manga-plus-read`、`manga-plus-resume`，两次阅读使用独立进程。命令、驱动副本、两轮日志与独立 GET 在 `/private/tmp/karuyomi-http-idle-8fd995e.021mnf/`，成功轮核验在 `attempt2/verified.json`。此门覆盖这部作品两章的 iOS 模拟器流程；未实测其它作品、Android、真机或生产 Access，未部署，包仍为 `compiled_unverified` / `runtimeReady=false`。两轮服务和专用设备均已清理。
 
 ## ToonLook 的长图重排、完整章节与续读
 

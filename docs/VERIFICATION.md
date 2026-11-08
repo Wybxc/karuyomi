@@ -8,23 +8,27 @@
 
 2026-11-08，MANGA Plus Creators 正式 Web 的[图片 Referer、跨章与新文档续读](verification/aot-current-pilot.md#manga-plus-creators-的图片-referer-和续读)通过限定抽样；两章观察到的 CDN 图请求都保留各自章节 Referer。Android 模拟器[真实容器重建与重连](verification/runtime-reconnect.md#android-模拟器复验)通过空 Source 分项。内置浏览器[未触发真实前台事件](verification/reader-settings.md#web-自动前台读回的观测限制)，Flutter 层自动读回回归通过，真实 Web 前台继续待验。
 
-2026-11-08，同一 MANGA Plus Creators 候选在 iOS 模拟器通过真实首两页，第三页正式重试仍超时；独立 Node 经同一官方服务在上游 `200` 后读到部分正文，收到远端超时帧。见 [HTTP 对照](verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)；完整 Native 章与续读未通过。
+2026-11-08，同一 MANGA Plus Creators 候选修复前在 iOS 第 3 页超时，独立帧客户端经官方服务读到部分正文后收到远端超时帧，见 [HTTP 对照](verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)。
 
-2026-11-08，HTTP v2 现区分源站读取空闲与整次调用总限。[真实 Workers 与 Host 回归](verification/aot-current-pilot.md#http-读取空闲与总期限回归)验证持续有正文时可超过空闲间隔，真正停读与整体预算仍会中止；六份共享材料与冻结输入逐字节一致。真实 Native 章节复验进行中。
+2026-11-08，HTTP v2 现区分源站读取空闲与整次调用总限，[正式 Workers 与 Host 回归](verification/aot-current-pilot.md#http-读取空闲与总期限回归)通过，六份共享材料与冻结输入逐字节一致。[MANGA Plus Creators iOS 复验](verification/aot-current-pilot.md#manga-plus-creators-的-ios-完整章节与续读)保留首轮第 33 页未解码及后续同页恢复；全新 D1 的第二轮通过首章 72 页、显式完成、下一章及新进程从第 7 页恢复至第 35 页，独立 GET 核对进度。其它作品、真机及生产未验。
 
 2026-11-08，正式 Web [全局设置同时保存](verification/reader-settings.md#双-web-全局设置同时保存)通过。两个文档的同 revision 请求在正式 Worker 的处理窗重叠 12 ms；一个成功、一个冲突，D1 只提交一次。冲突页读回后可按新版本重新编辑保存。Native、其它写入、生产 Access 与真机另验。
 
-2026-11-08，[阅读进度同时写的正式 API 分项](verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)通过：两个独立进程的完成／重置请求以同一 revision 到达正式 D1 原子批次，一个 `200`、一个 `409`，只提交一次。全库 `pnpm check` 通过（Vitest 522 项）；双 Reader 的冲突画面、旧视图和显式重开待验。
+2026-11-08，[阅读进度同时写的正式 API 分项](verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)通过：两个独立进程的完成／重置请求以同一 revision 到达正式 D1 原子批次，一个 `200`、一个 `409`，只提交一次。全库 `pnpm check` 通过（Vitest 522 项）。
 
-2026-11-08，修正恢复相同阅读状态时的额外写入。Flutter 回归使用两个独立客户端加载同一已保存的章节与顺序，观察已确认的位置后作品 revision 不变；实际切到另一章则更新继续阅读目标。清单已变化的回归确认会保存修正后的当前锚点、保留已找不到的旧最远锚点。这是客户端控制器证据；正式双 Reader 同时写待验。
+2026-11-08，修正恢复相同阅读状态时的额外写入。Flutter 回归使用两个独立客户端加载同一已保存的章节与顺序，观察已确认的位置后作品 revision 不变；实际切到另一章则更新继续阅读目标。清单已变化的回归确认会保存修正后的当前锚点、保留已找不到的旧最远锚点。这是客户端控制器证据。
 
-2026-11-08，[双 iOS 首轮准备](verification/concurrent-server-state.md#双-ios-阅读器的开章基线)实测确认另一路写入：新进程首帧解码时只有 `viewportY` 改变，作品 revision 从 3 增到 4，未放行并发操作。已补齐首帧布局回归，双 Reader 重新验收中。
+2026-11-08，[双 iOS 首轮准备](verification/concurrent-server-state.md#双-ios-阅读器的开章基线)实测确认另一路写入：新进程首帧解码时只有 `viewportY` 改变，作品 revision 从 3 增到 4，未放行并发操作。修复后，确认续读的首帧布局保留已保存的放置偏好。
 
-2026-11-08，正式 Web 的[阅读进度已提交后丢确认与精确重试](verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)通过。内置浏览器在 xkcd 末页点「读完本章」，正式 D1 已提交但 HTTP 200 正文中断；界面保留待确认操作，显式重试复用 UUID、原始正文和 CAS，返回同一回执，六路独立读回不变。[iOS 模拟器同一丢确认场景](verification/concurrent-server-state.md#ios-模拟器阅读进度已提交后丢确认)也已通过，修正了内部控件重排导致的额外进度写入。[Android 模拟器](verification/concurrent-server-state.md#android-模拟器阅读进度已提交后丢确认)使用相同的当前 v6 xkcd 通过复验。双端模拟器在显式重试前后的独立六路响应均不变，各自审计只有两次原请求且 D1 只提交一次。阅读进度同时写、生产 Access 和真机另验。
+2026-11-08，固定 `f3419d0` 的[双 iOS 模拟器阅读进度同时写](verification/concurrent-server-state.md#双-ios-模拟器阅读进度同时写)通过。两个正式 Reader 打开同一真实第 2 页未推进 revision；重置返回 HTTP 200 并留下唯一回执，读完返回 409。冲突端保持原画面，翻页未改变 D1，显式重开后显示新 epoch 的第 1 页。其它平台配对、正式 Reader 的完成获胜分支、生产 Access 与真机另验。
+
+2026-11-08，[iOS→Android→新 iOS 进程的单作品阅读设置](verification/reader-settings.md#ios-与-android-模拟器单作品设置覆盖)通过：iOS 保存真实 xkcd 作品的方向、页组及显式关闭裁白，Android 读回并清空覆盖，新 iOS 进程恢复继承。两次只推进账户与目标设置 revision；另一作品、全局和完整阅读进度不变。实际裁白效果、Web↔Native 漫画设置、故障、生产及真机另验。
+
+2026-11-08，正式 Web 的[阅读进度已提交后丢确认与精确重试](verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)通过。内置浏览器在 xkcd 末页点「读完本章」，正式 D1 已提交但 HTTP 200 正文中断；界面保留待确认操作，显式重试复用 UUID、原始正文和 CAS，返回同一回执，六路独立读回不变。[iOS 模拟器同一丢确认场景](verification/concurrent-server-state.md#ios-模拟器阅读进度已提交后丢确认)也已通过，修正了内部控件重排导致的额外进度写入。[Android 模拟器](verification/concurrent-server-state.md#android-模拟器阅读进度已提交后丢确认)使用相同的当前 v6 xkcd 通过复验。双端模拟器在显式重试前后的独立六路响应均不变，各自审计只有两次原请求且 D1 只提交一次。此分项只覆盖丢确认与原样重试；生产 Access 和真机另验。
 
 2026-11-08，正式 Android 模拟器的[阅读断连与显式重试](verification/concurrent-server-state.md#android-已加载阅读断连与显式重试)通过：定向 TCP 中断期间同一阅读页仍可翻到已加载图片，进度保持未确认，独立六路 D1 读回不变；恢复连接后显式重试确认，独立 iOS 正式入口续读到第 2 页并可回看第 1 页，最远进度保持第 2 页。此分项不覆盖全设备断网、服务端已提交后丢响应、生产 Access 或真机。
 
-2026-11-07，两台 iOS 模拟器经同一受信 HTTPS / D1，通过[阅读前台 epoch 冲突](verification/concurrent-server-state.md#双-ios-模拟器前台-epoch-冲突)：B 正式重新阅读后，A 回到原进程和第 2 页，自动提示冲突；旧叶继续翻页未覆盖 D1，明确重开后恢复新 epoch 的第 1 页真实图。独立六路响应比对通过。2026-11-08 [Android A 恢复前台、iOS B 重置](verification/concurrent-server-state.md#android-前台恢复与-ios-重置同一账户)通过同进程和任务恢复、六路权威状态不变及显式重开。Web、其它设备组合、同时写竞争、生产 Access 和真机另验。
+2026-11-07，两台 iOS 模拟器经同一受信 HTTPS / D1，通过[阅读前台 epoch 冲突](verification/concurrent-server-state.md#双-ios-模拟器前台-epoch-冲突)：B 正式重新阅读后，A 回到原进程和第 2 页，自动提示冲突；旧叶继续翻页未覆盖 D1，明确重开后恢复新 epoch 的第 1 页真实图。独立六路响应比对通过。2026-11-08 [Android A 恢复前台、iOS B 重置](verification/concurrent-server-state.md#android-前台恢复与-ios-重置同一账户)通过同进程和任务恢复、六路权威状态不变及显式重开。阅读自动前台重取在 Web 和其它设备组合仍待验收；生产 Access 和真机另验。
 
 2026-11-07，正式 Web 的 xkcd 范围已读/未读通过三独立文档往返；首次发现同一详情收藏后误用旧作品 revision，显式重读可恢复，修复后的独立空库首次确认 3/3 通过。独立 D1 核对负对照、书签、设置及阅读锚点未变。2026-11-08，[iOS ↔ Android 模拟器范围往返](verification/chapter-read-state.md#ios--android-模拟器范围往返)也通过：iOS 标已读、Android 在已读筛选读回后标未读、iOS 新进程只读确认。两次各 3/3，独立 GET 核对只改变目标三章。Web ↔ Native、真实并发、批次故障、生产和真机另验。
 
@@ -74,7 +78,7 @@
 
 2026-11-06，详情章节搜索、来源原序/反序和书签组合筛选已接入，保留重复条目、原始 Source DTO 及章节索引；4 项正式组件导航回归通过，含未返回详情状态时恢复服务端阅读顺序。集中检查与实际平台范围见[章节浏览记录](verification/chapter-browsing.md)。
 
-2026-11-05，收藏与阅读进度已接入生成业务协议、Worker API 和 D1 权威状态，本地业务 SQLite 与对应 Web 资产已移除。真实 workerd/D1 的并发、幂等、身份、分页及原子失败测试见[服务端状态记录](verification/server-state.md)；本轮全格式、通用检查与 Flutter 三项目静态分析/测试通过（21/42/208 项）。Codex 内置浏览器已通过真实 xkcd 的独立会话收藏→阅读保存→重启续读，见[实际 Web 记录](verification/server-state.md#真实-web-独立会话闭环)；随后正式 iOS `app.main()` 与 Web 通过测试身份下的双向非默认页续读、真实图片及回看最远进度保持，三次官方集成测试通过，见[Web↔iOS 记录](verification/native-server-state.md)。随后正式 Android 入口补齐 Web↔Android、iOS↔Android 双向非默认页续读，六次 Native 官方集成测试各 1/1 通过，新 Web 实际显示 Android 已确认的第 2 页真实文字图，见[Android 配对记录](verification/android-server-state.md)。双 Web 正式入口随后通过远端位置/epoch 更新保持旧画面、停止旧视图写入、未先刷新时正常写路径冲突及明确重开恢复，见[双会话记录](verification/concurrent-server-state.md)。客户端与业务 API 已[部署生产并通过匿名检查](verification/server-state-production.md)；同时写竞争、实际自动前台重取、故障恢复、生产 Access 正向与真机仍待完成，历史本地数据库恢复不代表当前同步完成。
+2026-11-05，收藏与阅读进度已接入生成业务协议、Worker API 和 D1 权威状态，本地业务 SQLite 与对应 Web 资产已移除。真实 workerd/D1 的并发、幂等、身份、分页及原子失败测试见[服务端状态记录](verification/server-state.md)；本轮全格式、通用检查与 Flutter 三项目静态分析/测试通过（21/42/208 项）。Codex 内置浏览器已通过真实 xkcd 的独立会话收藏→阅读保存→重启续读，见[实际 Web 记录](verification/server-state.md#真实-web-独立会话闭环)；随后正式 iOS `app.main()` 与 Web 通过测试身份下的双向非默认页续读、真实图片及回看最远进度保持，三次官方集成测试通过，见[Web↔iOS 记录](verification/native-server-state.md)。随后正式 Android 入口补齐 Web↔Android、iOS↔Android 双向非默认页续读，六次 Native 官方集成测试各 1/1 通过，新 Web 实际显示 Android 已确认的第 2 页真实文字图，见[Android 配对记录](verification/android-server-state.md)。双 Web 正式入口随后通过远端位置/epoch 更新保持旧画面、停止旧视图写入、未先刷新时正常写路径冲突及明确重开恢复，见[双会话记录](verification/concurrent-server-state.md)。客户端与业务 API 已[部署生产并通过匿名检查](verification/server-state-production.md)；当时尚未验证同时写竞争、实际自动前台重取、故障恢复、生产 Access 正向与真机，后续分项见上文。历史本地数据库恢复不代表当前同步完成。
 
 2026-11-05，分类协议、D1 API 与 Flutter 数据层通过[数据层验证](verification/category-state-data.md)，管理/排序/筛选/多关联 UI 已接入，真实双 Web 的目录、关联、旧编辑冲突与重载恢复分项通过，见[分类 UI 记录](verification/category-ui-sync.md)；Native 分类后续分项见下段，生产正向继续验收。未采用的 `runtime/image-codec` 候选与专属构建工具已删除，默认只维护 UI 直接解码。项目自有 JS 构建已进一步收敛为声明式 Vite 配置与官方 CLI，旧 builder、独立资产组装和不适合官方集成的探针已删除。Workers HTTP/状态、生成配置 harness 与内置浏览器新版 Browser 测试通过；完整构建、格式、Flutter 与通用集中检查通过，范围及限制见[Vite 记录](verification/vite-build-and-testing.md)。
 

@@ -62,7 +62,7 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
 
 依次运行 A `verify` → B `write`（`dark-rtl-double-width-crop`）→ A 新进程 `verify` → A 新进程 `write`（`light-webtoon-auto-height-no-crop`）→ B 新进程 `verify`。每阶段重新取得当前完整快照作为前置；保存成功后不要盲目重跑旧写阶段。正式表单修改主题、阅读模式、页组、适配和裁白，其它字段与列表保留。驱动验证草稿不提前应用主题、服务端确认后清除 pending，并输出完整 `SETTINGS_SYNC_RESULT`。
 
-这组顺序操作证明实际执行平台间的全局设置读写与新进程恢复；漫画覆盖、同时写竞争、丢响应、自动前台、Web↔Native、生产 Access 和真机分别验收。全局默认 false/0 与 optional 漫画覆盖的 presence 语义不同，驱动按生成 getter 核对非 optional 值。实际结果与剩余门见[设置记录](../../../docs/verification/reader-settings.md)。完成后关闭 harness，移除本轮 reverse、测试安装与专用设备，结束测试进程。
+这组顺序操作证明实际执行平台间的全局设置读写与新进程恢复；单作品覆盖见[独立驱动](#单作品阅读设置同步)，同时写竞争、丢响应、自动前台、Web↔Native、生产 Access 和真机分别验收。全局默认 false/0 与 optional 漫画覆盖的 presence 语义不同，驱动按生成 getter 核对非 optional 值。实际结果与剩余门见[设置记录](../../../docs/verification/reader-settings.md)。完成后关闭 harness，移除本轮 reverse、测试安装与专用设备，结束测试进程。
 
 另可用同一初始快照和预设验证自动前台重取：客户端 A 运行 `resume`，等到 `SETTINGS_RESUME_READY` 后用系统 Home 或 App 切换器将其送到后台，不结束进程。等 A 输出 `SETTINGS_RESUME_PAUSED` 后，在同一服务的独立客户端 B 运行 `write`，确认 account/global revision 各只增加 1。然后用系统界面回到 A 的原进程和设置页面，不点重读、不切换应用内导航、不重启。A 在暂停期间不 pump 或发起测试读取，等待实际系统事件至多 5 分钟；输出同 PID 的 `SETTINGS_RESUME_RESUMED` 后，先核对事件时的原快照，再等待正式客户端自动更新同一设置控制器、表单和实际应用主题。驱动在此期间不注入生命周期事件，也不主动重取设置。最后从独立客户端只读确认 revision 没有再次增加；记录实际平台、设备和事件。
 
@@ -118,6 +118,24 @@ flutter test integration_test/chapter_read_sync_test.dart --no-pub \
 每份 JSON 提供 `APP_ORIGIN`、`CHAPTER_READ_SUBJECT`、`CHAPTER_READ_BUILD_ID` 和对应的 `CHAPTER_READ_PHASE`。使用本地 CA 的 Android 阶段另传根 CA PEM 原始字节的 Base64（`CHAPTER_READ_TEST_CA_BASE64`）；WebView 仍需隔离 debug 网络配置和同端口 `adb reverse`。iOS 只用设备自身信任，不传 CA 参数。
 
 两次写入都经正式书架与详情，以来源顺序中的相反方向选中精确 URL `/3317/`、`/3318/`、`/3319/` 的闭区间，核对确认清单和 3/3 回执。Android 写入前先在已读筛选中看到这三章；iOS 重启后同一筛选显示 0 章，不写入。每阶段从 API 核对全局与漫画设置、作品快照、书签、完整分章进度和相邻负对照 `/3316/`。可用独立 HTTPS 客户端采集同 revision 的 `GET /api/settings`、`GET /api/settings/manga/KEY`、`GET /api/library?revision=REV`、`GET /api/state/manga/KEY`、其 `/bookmarks?revision=REV`、`/progress?revision=REV` 和四个 `?chapterKey=CHAPTER_KEY` 响应逐字段比对。预期 revision 2/1/1 → 5/4/1 → 8/7/1 → 8/7/1，只改变三章的 epoch 与完成状态，无页码锚或 resume。每个成功阶段输出 `CHAPTER_READ_SYNC_RESULT`；任一失败先核对实际提交状态，勿盲重跑写阶段。结束后关闭 harness、reverse 和专用设备。
+
+## 单作品阅读设置同步
+
+`manga_settings_sync_test.dart` 使用正式 Native Reader 与同一官方 HTTPS harness。用下节方式构建与当前宿主材料匹配的 xkcd v6 快照，仅注册 xkcd 的 `xkcd.com` 和 `imgs.xkcd.com`。使用新隔离 D1、`acceptance-owner` 和实际回环 HTTPS origin，关闭故障夹具。按上文书签驱动的 `prepare` 安装精确构建，收藏英文 Source `1538249443376436084` 的 `SINGLE`；保持默认全局阅读设置。
+
+另用正式 `POST /api/state/mutations` 添加一个仅用于独立读回的对照收藏。使用相同业务请求头及 JSON 正文：`schemaVersion` 取当前 `businessSchemaVersion`，`mutationId` 为新 UUID，`expectedRevision: 0`，`setFavorite.favorite: true`，`setFavorite.metadata` 含与 xkcd 不同的 `packageName`、`sourceId`、`sourceName`、`sourceLang`，以及 `manga.url/title`。按正式规则计算 `mangaKey`：`SHA256(UTF8(JSON.stringify([packageName, sourceId, mangaUrl])))`。核对回执中的 key 与收藏状态；对照作品不进入 Reader。书架应只有这两部作品，均无自定义封面。
+
+在 `apps/reader` 用固定 SDK 运行，各阶段启动独立进程：
+
+```sh
+flutter test integration_test/manga_settings_sync_test.dart --no-pub \
+  -d DEVICE_ID --dart-define-from-file=/absolute/path/phase.json \
+  --reporter expanded
+```
+
+阶段 JSON 提供 `APP_ORIGIN`、`MANGA_SETTINGS_PHASE`、`MANGA_SETTINGS_BUILD_ID`、`MANGA_SETTINGS_CONTROL_KEY`（对照作品 key）。先运行 iOS `prime`：打开 `/3319/` 并确认真实图片解码，到第 2 页并确认最远进度，再回第 1 页并确认保存。用独立 HTTPS GET `/api/settings` 的实际账户 revision 作为其余三阶段共同的 `MANGA_SETTINGS_BASE_ACCOUNT`。Android 使用本地 CA 时传 `MANGA_SETTINGS_TEST_CA_BASE64`，并按上文配置隔离 debug WebView 信任和 `adb reverse`；iOS 只用设备信任。
+
+依次运行 iOS `set` → Android `clear` → iOS 新进程 `verify`。iOS 在正式 Reader 表单保存从右到左、单页、裁白显式关闭；Android 先核对已确认的覆盖及 Reader 配置，再逐项选择跟随全局；iOS 新进程确认三项均继承、Reader 恢复从左到右与自动页组。每阶段输出 `MANGA_SETTINGS_SYNC_RESULT`。独立 HTTPS 客户端对照 `/api/settings`、`/api/library?revision=REV`、两部作品的 `/api/settings/manga/KEY`、`/api/state/manga/KEY` 及其 `/progress?revision=REV`、`/bookmarks?revision=REV`，另查目标章 `/api/state/manga/KEY?chapterKey=CHAPTER_KEY`。两次保存各只推进一个账户与目标作品设置 revision，开章、退出和新进程读回不推进 revision；全局、作品业务状态及已确认进度须保持一致。失败后先核对 D1，勿盲重跑保存。结束后按上文清理。实际通过范围见[单作品设置记录](../../../docs/verification/reader-settings.md#ios-与-android-模拟器单作品设置覆盖)。
 
 ## Source 阅读与筛选验收
 
@@ -213,4 +231,4 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 
 先从正式界面安装并收藏英文 xkcd，两个独立 Reader 打开 `SINGLE` 的 `/3319/`，保持真实第 2 页已解码且已保存、尚未读完。两端必须确认同一作品 revision、epoch 与清单后才开始；普通进度观察不会占用夹具。一个 Reader 点「读完本章」，另一个点「重新阅读本章」，两条命令须在 15 秒内到达；双方都经过正式 Worker 的写前读取并到达 D1 原子批次后，才提交各自原有的批次。
 
-分别记录成功端和冲突端。冲突端应保持已加载画面并提示明确重开，重开后采用赢家的位置与完成状态；另从独立进程比较设置、书架、作品、书签、进度和指定章。区分竞争当时的单次修订与之后由真实重新导航或显式操作触发的普通保存。停服核对 `ACCEPTANCE_PROGRESS_RACE_AUDIT` 恰好两条、不同 UUID 与同基线、处理时段重叠、两个 `batch_ready_at_ms` 都不晚于首个响应，一个 HTTP 200 有持久回执，一个 HTTP 409 无回执，两条权威状态摘要相同。现有 [API 层证据](../../../docs/verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)不视为正式双 Reader 验收。
+分别记录成功端和冲突端。先等成功端显示真实页面并确认当前与最远位置，使其保持挂载；再验证冲突端仍可翻动已加载画面、旧视图无法改变服务端，且显式重开后采用赢家的位置与完成状态。独立进程比较打开前、两端打开后、冲突端重开前后及退出后的设置、书架、作品、书签、进度和指定章。区分竞争当时的单次修订与重置后因真实图片显示产生的普通进度保存。停服核对 `ACCEPTANCE_PROGRESS_RACE_AUDIT` 恰好两条、不同 UUID 与同基线、处理时段重叠、两个 `batch_ready_at_ms` 都不晚于首个响应，一个 HTTP 200 有持久回执，一个 HTTP 409 无回执，两条权威状态摘要相同。已取得[双 iOS 模拟器正式 Reader 证据](../../../docs/verification/concurrent-server-state.md#双-ios-模拟器阅读进度同时写)，与[仅调用 API 的对照](../../../docs/verification/concurrent-server-state.md#阅读进度同时写正式-api-与-d1-夹具)分开记录。
