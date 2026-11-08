@@ -217,7 +217,13 @@ ACCEPTANCE_FIXTURE=settings-cas-race pnpm acceptance:serve
 
 Web 将外观由跟随系统改成浅色，两个入口的独立读取确认只有 theme 和账户／全局 revision 变化（6/0 → 7/1）。iOS 使用 `settings_sync_test.dart` 的 `write` 阶段，以独立 HTTPS 的完整快照作为前置，读到浅色后通过正式 UI 保存深色、从右到左、双页、适宽和裁白开启。驱动 1/1 通过，账户／全局 revision 变为 8/2。新的 Web 文档直接显示五项确认值，未点重新读取。两个入口独立核对设置、目录、书架和两部作品，读回未引入写入，目录和作品业务内容不变。
 
-原始阶段配置、集成日志与独立快照留在 `/private/tmp/karuyomi-mixed-categories-5e403b1-3x6MOp/`。本分项覆盖全局设置顺序写入和新文档读回；同一 HTTPS origin、Web↔Android、逐漫画覆盖、实际裁白阅读及生产另验。
+原始阶段配置、集成日志与独立快照留在 `/private/tmp/karuyomi-mixed-categories-5e403b1-3x6MOp/`。本分项覆盖全局设置顺序写入和新文档读回；同一 HTTPS origin、逐漫画覆盖、实际裁白阅读及生产另验；Android 组合见下节。
+
+## Web 与 Android 模拟器双向读写
+
+2026-11-08，在同一隔离 D1 继续验收。Codex 内置浏览器通过正式设置界面将深色改为跟随系统，两入口的独立读取确认仅外观和账户／全局 revision 改变（8/2 → 9/3）。固定 `c04d436` 的 Pixel 9 / API 36 专用模拟器（系统 WebView 133.0.6943.137）经私用 ADB reverse 连接正式 HTTPS 入口。隔离 debug 构建只为 127.0.0.1 加入本轮 CA，保留系统 CA、HTTPS 与主机名校验；三份内置材料与原构建逐字节一致。Dart 进程按正式驱动说明信任同一 CA。
+
+Android 正式设置驱动读回 Web 的跟随系统、从右到左、双页、适宽和裁白开启，随后在 UI 保存浅色、条漫、自动页组、适高和裁白关闭。驱动 1/1 通过，账户／全局 revision 变为 10/4。全新 Web 文档直接读到五项确认值；HTTP/HTTPS 独立比对没有新增写入，书架、分类与两部作品业务内容未变。专用模拟器、端口映射和私用 ADB 已清理；原始日志与快照留在 `/private/tmp/karuyomi-mixed-settings-android-c04d436.PrCqFW/` 和前一分项的服务目录。本分项不覆盖真机、同一 HTTPS origin、逐漫画覆盖、Web 自动前台和生产。
 
 ## 可复验入口
 
