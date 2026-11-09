@@ -31,6 +31,10 @@ import {
   bridgeErrorTarget,
   prepareBridgeError,
 } from './acceptance-bridge-error.ts';
+import {
+  prepareProgressD1Error,
+  progressD1ErrorAttempts,
+} from './acceptance-progress-d1-error.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -58,6 +62,7 @@ if (nextConfigPath && fixture !== '') {
 const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const settingsRace = fixture === 'settings-cas-race';
 const progressRace = fixture === 'progress-cas-race';
+const progressD1Error = fixture === 'progress-d1-error';
 const bridgeError =
   fixture === 'bridge-once-error'
     ? bridgeErrorTarget(process.env.ACCEPTANCE_BRIDGE_ERROR_URL)
@@ -75,6 +80,7 @@ const options = (
         ...(ackLoss ? { ACCEPTANCE_ACK_LOSS: ackLoss } : {}),
         ...(settingsRace ? { ACCEPTANCE_SETTINGS_CAS_RACE: '1' } : {}),
         ...(progressRace ? { ACCEPTANCE_PROGRESS_CAS_RACE: '1' } : {}),
+        ...(progressD1Error ? { ACCEPTANCE_PROGRESS_D1_ERROR: '1' } : {}),
         ...(bridgeError ? { ACCEPTANCE_BRIDGE_ERROR_URL: bridgeError } : {}),
       },
       secrets: { ACCEPTANCE_PRIVATE_KEY: privateKey },
@@ -113,10 +119,11 @@ try {
     !ackLoss &&
     !settingsRace &&
     !progressRace &&
+    !progressD1Error &&
     !bridgeError
   ) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race, progress-cas-race, bridge-once-error or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race, progress-cas-race, progress-d1-error, bridge-once-error or empty',
     );
   }
   const { url } = await server.listen();
@@ -135,12 +142,13 @@ try {
   await worker.applyD1Migrations('DB');
   if (
     !stopRequested &&
-    (ackLoss || settingsRace || progressRace || bridgeError)
+    (ackLoss || settingsRace || progressRace || progressD1Error || bridgeError)
   ) {
     const db = (await worker.getEnv()).DB;
     if (ackLoss) await prepareAckLoss(db);
     else if (settingsRace) await prepareSettingsRace(db);
     else if (progressRace) await prepareProgressRace(db);
+    else if (progressD1Error) await prepareProgressD1Error(db);
     else await prepareBridgeError(db);
     fixtureAuditDb = db;
   }
@@ -214,6 +222,11 @@ try {
       console.log(
         'ACCEPTANCE_PROGRESS_RACE_AUDIT=' +
           JSON.stringify(await progressRaceAttempts(fixtureAuditDb)),
+      );
+    } else if (progressD1Error && fixtureAuditDb) {
+      console.log(
+        'ACCEPTANCE_PROGRESS_D1_ERROR_AUDIT=' +
+          JSON.stringify(await progressD1ErrorAttempts(fixtureAuditDb)),
       );
     } else if (bridgeError && fixtureAuditDb) {
       console.log(

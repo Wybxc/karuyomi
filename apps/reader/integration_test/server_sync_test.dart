@@ -250,19 +250,20 @@ void main() {
             'keptMountedReader': true,
             'explicitRetry': true,
           };
-        } else if (_phase == 'ack-loss') {
+        } else if (_phase == 'ack-loss' || _phase == 'd1-error') {
           await _turnTo(tester, manifest, _startPage, _targetPage);
-          final evidence = await _retryAfterLostAck(
+          final evidence = await _retryAfterCompletionFailure(
             tester,
             catalog,
             repository!,
             mangaKey,
             manifest,
+            expectRollback: _phase == 'd1-error',
           );
           after = evidence.confirmed;
           phaseEvidence = {
             'beforeCompletion': _progressReport(evidence.before),
-            'whileUnconfirmed': _progressReport(evidence.committed),
+            'whileUnconfirmed': _progressReport(evidence.unconfirmed),
             'afterRetry': _progressReport(after),
             'keptMountedReader': true,
             'explicitRetry': true,
@@ -424,12 +425,13 @@ void _validateConfiguration() {
         'resume',
         'offline',
         'ack-loss',
+        'd1-error',
       }.contains(_phase) ||
       _expectedEpoch < -1 ||
       _expectedEpoch >= 0xffffffff ||
       (_phase != 'navigate' &&
           (_subject.isEmpty || _buildId.isEmpty || _expectedEpoch < 0)) ||
-      ({'resume', 'offline', 'ack-loss'}.contains(_phase) &&
+      ({'resume', 'offline', 'ack-loss', 'd1-error'}.contains(_phase) &&
           (_startPage != 1 || _targetPage != 2)) ||
       (_phase == 'reset' && (_startPage != 2 || _targetPage != 1))) {
     fail('同步恢复阶段须提供同一 subject、构建 ID、原 epoch；重置 2→1，其余恢复阶段 1→2');
@@ -441,11 +443,11 @@ void _validateConfiguration() {
           _testCaBase64.isEmpty)) {
     fail('断连验收仅允许专用 Android 模拟器经本地 HTTPS 端口和测试 CA');
   }
-  if (_phase == 'ack-loss' &&
+  if ((_phase == 'ack-loss' || _phase == 'd1-error') &&
       (origin.host != '127.0.0.1' ||
           !origin.hasPort ||
           _subject != _ackLossSubject)) {
-    fail('丢确认验收仅允许本地 HTTPS 夹具及测试身份 $_ackLossSubject');
+    fail('完成写入故障验收仅允许本地 HTTPS 夹具及测试身份 $_ackLossSubject');
   }
 }
 
@@ -812,17 +814,18 @@ Future<ProgressSnapshot> _retryAfterOutage(
 Future<
   ({
     ProgressSnapshot before,
-    ProgressSnapshot committed,
+    ProgressSnapshot unconfirmed,
     ProgressSnapshot confirmed,
   })
 >
-_retryAfterLostAck(
+_retryAfterCompletionFailure(
   WidgetTester tester,
   CatalogController catalog,
   ProgressRepository repository,
   String mangaKey,
-  ChapterManifest manifest,
-) async {
+  ChapterManifest manifest, {
+  required bool expectRollback,
+}) async {
   final oldElement = tester.element(find.byType(ReaderScreen));
   final oldProvider = _reader(tester).provider;
   final complete = find.widgetWithText(TextButton, '读完本章');
@@ -852,9 +855,10 @@ _retryAfterLostAck(
   }
 
   sameReader();
-  debugPrintSynchronously('SYNC_ACK_LOSS_READY pid=$pid');
+  final label = expectRollback ? 'SYNC_D1_ERROR' : 'SYNC_ACK_LOSS';
+  debugPrintSynchronously('${label}_READY pid=$pid');
   await _tap(tester, complete);
-  await _waitFor(tester, '提交后丢确认保留草稿和正式重试控件', () {
+  await _waitFor(tester, '完成写入未确认后保留草稿和正式重试控件', () {
     return catalog.hasUnsavedReadingProgress &&
         pending.evaluate().length == 1 &&
         retry.evaluate().length == 1 &&
@@ -864,19 +868,25 @@ _retryAfterLostAck(
   await _waitForPage(tester, manifest, _targetPage);
 
   // Inspection leaves the mounted writer's CAS and pending command intact.
-  final committed = await repository
+  if (expectRollback) await tester.pump(_staleWriteBudget);
+  final unconfirmed = await repository
       .inspectChapter(mangaKey: mangaKey, chapterKey: manifest.chapterKey)
       .timeout(_operationBudget);
-  _expectProgress(committed, manifest, _targetPage);
-  expect(_progressReport(committed), {
+  _expectProgress(unconfirmed, manifest, _targetPage);
+  final completed = {
     ..._progressReport(before),
     'mangaRevision': before.revision + 1,
     'completed': true,
-  });
+  };
+  expect(
+    _progressReport(unconfirmed),
+    expectRollback ? _progressReport(before) : completed,
+  );
   expect(catalog.hasUnsavedReadingProgress, isTrue);
   expect(pending, findsOneWidget);
   expect(retry, findsOneWidget);
-  debugPrintSynchronously('SYNC_ACK_LOSS_COMMITTED_UNCONFIRMED pid=$pid');
+  final outcome = expectRollback ? 'ROLLED_BACK' : 'COMMITTED';
+  debugPrintSynchronously('${label}_${outcome}_UNCONFIRMED pid=$pid');
 
   await _tap(tester, retry);
   final confirmed = await _confirmedProgress(
@@ -891,13 +901,13 @@ _retryAfterLostAck(
   );
   sameReader();
   await _waitForPage(tester, manifest, _targetPage);
-  expect(_progressReport(confirmed), _progressReport(committed));
+  expect(_progressReport(confirmed), completed);
   expect(catalog.hasUnsavedReadingProgress, isFalse);
   expect(pending, findsNothing);
   expect(retry, findsNothing);
   expect(find.text('最远：第 $_targetPage 页 · 本章已读完'), findsOneWidget);
-  debugPrintSynchronously('SYNC_ACK_LOSS_RETRY_CONFIRMED pid=$pid');
-  return (before: before, committed: committed, confirmed: confirmed);
+  debugPrintSynchronously('${label}_RETRY_CONFIRMED pid=$pid');
+  return (before: before, unconfirmed: unconfirmed, confirmed: confirmed);
 }
 
 Future<void> _waitForLoopback(

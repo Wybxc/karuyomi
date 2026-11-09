@@ -261,3 +261,12 @@ pnpm exec vitest run --project node apps/api/test/vite-harness.test.ts
 ```
 
 Wrangler harness 3/3、API 严格类型与依赖检查通过。本分项验证 Worker 更新后权威状态和幂等回执独立于 Worker 实例，未模拟生产 Access 登录流程、D1 服务故障或设备 UI 恢复。
+
+## iOS 模拟器阅读进度写入被 D1 拒绝
+
+2026-11-10，使用正式 Flutter iOS 入口（iPhone 17 Pro / iOS 26.4）、正常验证证书的隔离 HTTPS、官方 Wrangler harness 和实际 workerd/D1。正式客户端安装英文 xkcd v6 1.6.1，收藏 `SINGLE`，打开 `/3319/`，显示真实第 2 页并收到普通页位的保存确认。
+
+- 点「读完本章」后，夹具的 SQLite trigger 在正式 D1 原子批次最后一次回执更新时拒绝写入。正式 API 返回 503 `UNAVAILABLE`；账户/作品 revision 保持 `4/3`，没有该 mutation 的持久回执，读回仍是第 2 页、未完成。界面保留同一阅读器和图片，显示「进度尚未获服务器确认」及「重试保存」。
+- 点击「重试保存」后，审计确认请求 UUID、正文 SHA-256 和预期作品 revision 均一致。正式 API 返回 200 并留下唯一持久回执；账户/作品 revision 各增加一次至 `5/4`。未确认提示消失，同一画面显示本章读完。退出测试客户端后，由另一个进程经正常 HTTPS 读回，确认当前位置和最远仍为第 2 页，`completed=true`。
+
+复验使用[正式 Native 驱动](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)的 `ACCEPTANCE_FIXTURE=progress-d1-error` / `SYNC_PHASE=d1-error`。正式安装/收藏和阅读驱动分别通过，Workers 定向测试 3/3。原始日志、正常停服后的 `ACCEPTANCE_PROGRESS_D1_ERROR_AUDIT` 和独立读回保留在忽略目录 `.local/progress-d1-error.LSvAOc/`。该分项覆盖真实本地 D1 批次回滚与 iOS 显式重试；丢确认是独立场景，Web、Android、生产与真机的 D1 错误门另验。

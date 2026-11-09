@@ -50,6 +50,8 @@
 
 2026-11-07，固定 `5ba6fff` 的日期修复通过实际无插桩 xkcd 重开，Web 同源同身份的书签添加、读回、移除及第三文档读回通过；重开不推进共享 revision。同一隔离 HTTPS / D1 的正式 iOS ↔ Android 模拟器也已完成相同往返，两次跨端读回业务快照不变。同一 HTTPS origin 的内置浏览器证书信任仍阻断 Web ↔ Native 门，生产与真机另验，见[书签记录](../verification/bookmarks.md)。
 
+[iOS 模拟器的 D1 写入错误与显式恢复](../verification/concurrent-server-state.md#ios-模拟器阅读进度写入被-d1-拒绝)已通过：末页完成事务返回 503 后，客户端保留当前画面和未确认草稿，D1 无回执、状态不变；显式重试原 UUID、正文与 CAS 后只提交一次。Web、Android、生产和真机的同类门继续验收。
+
 ## 实施顺序
 
 1. **先固定跨端合同与 D1 模型。** 定义漫画/收藏、章节引用、分类、多分类关联、书签、设置、当前继续阅读位置及最远进度；保留原 Source URL、字符串 ID、稳定作品/章节键和完整 Manga 快照。定义有界查询、mutation ID、服务端 revision、预期 revision、写入结果和冲突响应。D1 使用受支持的 batch、条件 SQL 和唯一约束保证业务修改、幂等结果及 revision 原子提交，Worker 不能以内存持有权威状态。

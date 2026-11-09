@@ -5,9 +5,12 @@ import {
   businessSchemaVersion,
   mangaStateResponseSchema,
   settingsMutationResponseSchema,
+  stateMutationResponseSchema,
+  stateMutationSchema,
 } from '@karuyomi/contracts';
 import {
   AppTheme,
+  BusinessStateErrorCode as ErrorCode,
   ReaderBackground,
   ReaderFit,
   ReaderInputPreset,
@@ -25,16 +28,19 @@ import {
   prepareAckLoss,
   type AckLossFixture,
 } from './acceptance-ack.ts';
+import {
+  prepareProgressD1Error,
+  progressD1ErrorAttempts,
+} from './acceptance-progress-d1-error.ts';
+import {
+  xkcdChapterKey as targetChapter,
+  xkcdMangaKey as mangaKey,
+} from './acceptance-xkcd.ts';
 
 const origin = 'http://127.0.0.1:44123';
 const subject = 'acceptance-owner';
 const statePath = '/api/state/mutations';
 const settingsPath = '/api/settings/mutations';
-// Exact stable English xkcd SINGLE /3319/ identities from the reader.
-const mangaKey =
-  '62c3d5a079471dde67f80c71005112fde078e4fa3111e6faedc9757350392a6f';
-const targetChapter =
-  '3ebd1a075e8cc6fad4cae9daa7595caac80545bdf9499496417bb3d3b6b1142c';
 const secondPage = 'manifest:1';
 
 let credentials: {
@@ -54,7 +60,7 @@ beforeAll(async () => {
 }, 30_000);
 
 function request(
-  fixture: AckLossFixture | undefined,
+  fixture: AckLossFixture | 'progress-d1-error' | undefined,
   path: string,
   body?: string,
   identity = subject,
@@ -75,7 +81,11 @@ function request(
       ...credentials,
       APP_ORIGIN: origin,
       ACCEPTANCE_SUBJECT: identity,
-      ...(fixture ? { ACCEPTANCE_ACK_LOSS: fixture } : {}),
+      ...(fixture === 'progress-d1-error'
+        ? { ACCEPTANCE_PROGRESS_D1_ERROR: '1' as const }
+        : fixture
+          ? { ACCEPTANCE_ACK_LOSS: fixture }
+          : {}),
     },
     createExecutionContext(),
   );
@@ -119,10 +129,12 @@ function save(
   );
 }
 
-async function targetState() {
+async function targetState(identity = subject) {
   const response = await request(
     undefined,
     `/api/state/manga/${mangaKey}?chapterKey=${targetChapter}`,
+    undefined,
+    identity,
   );
   expect(response.status).toBe(200);
   return mangaStateResponseSchema.parse(await response.json());
@@ -130,6 +142,11 @@ async function targetState() {
 
 afterEach(async () => {
   await env.DB.exec('DROP TABLE IF EXISTS acceptance_ack_attempts');
+  await env.DB.batch([
+    env.DB.prepare('DROP TRIGGER IF EXISTS acceptance_progress_d1_abort'),
+    env.DB.prepare('DROP TABLE IF EXISTS acceptance_progress_d1_target'),
+    env.DB.prepare('DROP TABLE IF EXISTS acceptance_progress_d1_attempts'),
+  ]);
 });
 
 test('the opt-in progress fault drops the completed target ACK after D1 commits and releases the exact replay', async () => {
@@ -260,4 +277,119 @@ test('default acceptance does not intercept and the existing settings fixture pr
   const [drop, retry] = attempts;
   expect(drop).toMatchObject({ expected_revision: 0, global_revision: 1 });
   expect(retry).toEqual({ ...drop, sequence: 2, drop_ack: 0 });
+});
+
+test('the opt-in D1 fault rejects the real final receipt update, rolls back and accepts the original request once', async () => {
+  const fixture = 'progress-d1-error';
+  const owner = 'd1-error-acceptance-owner';
+  const mutate = (body: string) => request(fixture, statePath, body, owner);
+  const trigger = () =>
+    env.DB.prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'acceptance_progress_d1_abort'",
+    ).first<string>('sql');
+  const rows = () =>
+    env.DB.prepare(
+      `SELECT a.revision account_revision, m.revision manga_revision,
+      m.state_json manga_json, p.state_json progress_json
+      FROM account_state a JOIN manga_state m USING (subject)
+      JOIN chapter_progress p USING (subject, manga_key)
+      WHERE a.subject = ? AND m.manga_key = ? AND p.chapter_key = ?`,
+    )
+      .bind(owner, mangaKey, targetChapter)
+      .first();
+  const digest = (text: string) =>
+    createHash('sha256').update(text).digest('hex');
+
+  await prepareProgressD1Error(env.DB);
+  expect(await trigger()).toMatch(
+    /BEFORE UPDATE OF response_json ON state_mutations/,
+  );
+  expect((await mutate(save(0, false))).status).toBe(200);
+  expect((await mutate(save(1, true, 'other-chapter'))).status).toBe(200);
+  expect((await mutate(save(0, true))).status).toBe(409);
+  expect(await progressD1ErrorAttempts(env.DB)).toEqual([]);
+  expect(await trigger()).not.toBeNull();
+
+  const canonical = await targetState(owner);
+  const before = await rows();
+  expect(before).toMatchObject({ account_revision: 2, manga_revision: 2 });
+  expect(canonical.progress?.completed).toBe(false);
+  const body = save(2, true);
+  const { mutationId } = stateMutationSchema.parse(JSON.parse(body));
+  const receipt = () =>
+    env.DB.prepare(
+      'SELECT response_json FROM state_mutations WHERE subject = ? AND mutation_id = ?',
+    )
+      .bind(owner, mutationId)
+      .first<string>('response_json');
+
+  const rejected = await mutate(body);
+  expect(rejected.status).toBe(503);
+  const rejectedText = await rejected.text();
+  const error = stateMutationResponseSchema.parse(JSON.parse(rejectedText));
+  expect(error).toMatchObject({
+    mutationId,
+    error: { code: ErrorCode.UNAVAILABLE, retryable: true },
+  });
+  expect(error.manga).toBeUndefined();
+  expect(error.progress).toBeUndefined();
+  expect(await receipt()).toBeNull();
+  expect(await rows()).toEqual(before);
+  expect(await targetState(owner)).toEqual(canonical);
+  expect(await trigger()).toBeNull();
+  const rejectedAttempt = {
+    sequence: 1,
+    http_status: 503,
+    error_code: 'UNAVAILABLE',
+    mutation_id: mutationId,
+    expected_revision: 2,
+    account_revision: 2,
+    manga_revision: 2,
+    body_sha256: digest(body),
+    response_sha256: digest(rejectedText),
+    receipt_sha256: null,
+    manga_key: mangaKey,
+    chapter_key: targetChapter,
+  };
+  expect(await progressD1ErrorAttempts(env.DB)).toEqual([rejectedAttempt]);
+
+  const retried = await mutate(body);
+  expect(retried.status).toBe(200);
+  const ack = await retried.text();
+  expect(stateMutationResponseSchema.parse(JSON.parse(ack))).toMatchObject({
+    mutationId,
+    accountRevision: 3,
+    manga: { revision: 3 },
+    progress: { completed: true },
+  });
+  const persisted = await receipt();
+  expect(persisted).not.toBeNull();
+  if (!persisted) throw new Error('Missing persisted receipt');
+  expect(stateMutationResponseSchema.parse(JSON.parse(persisted))).toEqual(
+    stateMutationResponseSchema.parse(JSON.parse(ack)),
+  );
+  const committed = await targetState(owner);
+  expect(committed).toMatchObject({
+    accountRevision: 3,
+    manga: { revision: 3 },
+    progress: { completed: true },
+  });
+  const duplicate = await mutate(body);
+  expect(duplicate.status).toBe(200);
+  expect(await duplicate.text()).toBe(ack);
+  expect(await receipt()).toBe(persisted);
+  expect(await targetState(owner)).toEqual(committed);
+  expect(await progressD1ErrorAttempts(env.DB)).toEqual([
+    rejectedAttempt,
+    {
+      ...rejectedAttempt,
+      sequence: 2,
+      http_status: 200,
+      error_code: null,
+      account_revision: 3,
+      manga_revision: 3,
+      response_sha256: digest(ack),
+      receipt_sha256: digest(persisted),
+    },
+  ]);
 });

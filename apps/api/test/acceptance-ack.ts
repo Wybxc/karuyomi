@@ -14,6 +14,7 @@ import {
 } from '@karuyomi/protocol';
 import {
   xkcdChapterKey as progressChapterKey,
+  xkcdLastPageCompletion,
   xkcdMangaKey as progressMangaKey,
 } from './acceptance-xkcd.ts';
 
@@ -161,19 +162,9 @@ async function acceptedAck(
   }
 
   const mutation = stateMutationSchema.parse(input);
-  if (
-    mutation.operation.case !== 'saveProgress' ||
-    mutation.mangaKey !== progressMangaKey
-  )
-    return;
-  const { snapshot, progress } = mutation.operation.value;
-  if (
-    snapshot?.chapterKey !== progressChapterKey ||
-    !progress?.completed ||
-    !progress.current ||
-    progress.current.pageKey !== snapshot.pageKeys.at(-1)
-  )
-    return;
+  const completion = xkcdLastPageCompletion(mutation);
+  if (!completion) return;
+  const { snapshot, progress, current } = completion;
   const ackText = await response.clone().text();
   const ack = stateMutationResponseSchema.parse(JSON.parse(ackText));
   if (ack.error) return;
@@ -184,7 +175,7 @@ async function acceptedAck(
     ack.progress?.chapterKey !== progressChapterKey ||
     !ack.progress.completed ||
     ack.progress.epoch !== progress.epoch ||
-    ack.progress.current?.pageKey !== progress.current.pageKey ||
+    ack.progress.current?.pageKey !== current.pageKey ||
     ack.progress.current.manifestVersion !== snapshot.manifestVersion
   ) {
     throw new Error('Unexpected successful chapter completion ACK');

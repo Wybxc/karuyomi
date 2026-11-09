@@ -24,6 +24,10 @@ import {
   observeBridgeError,
   shouldObserveBridgeError,
 } from './acceptance-bridge-error.ts';
+import {
+  shouldObserveProgressD1Error,
+  withProgressD1Error,
+} from './acceptance-progress-d1-error.ts';
 
 export { RuntimeSession } from '../src/runtime-session.js';
 
@@ -34,6 +38,7 @@ export interface AcceptanceBindings extends Bindings {
   ACCEPTANCE_ACK_LOSS?: AckLossFixture;
   ACCEPTANCE_SETTINGS_CAS_RACE?: '1';
   ACCEPTANCE_PROGRESS_CAS_RACE?: '1';
+  ACCEPTANCE_PROGRESS_D1_ERROR?: '1';
   ACCEPTANCE_BRIDGE_ERROR_URL?: string;
 }
 
@@ -48,6 +53,15 @@ export default {
       const fixture = env.ACCEPTANCE_ACK_LOSS;
       const original =
         fixture && shouldObserveAck(fixture, request, env.APP_ORIGIN)
+          ? request.clone()
+          : undefined;
+      const progressD1Error =
+        env.ACCEPTANCE_PROGRESS_D1_ERROR === '1' &&
+        shouldObserveProgressD1Error(
+          request,
+          env.APP_ORIGIN,
+          env.ACCEPTANCE_SUBJECT,
+        )
           ? request.clone()
           : undefined;
       const bridgeError =
@@ -98,11 +112,17 @@ export default {
       const workerEnv = progressContender
         ? { ...env, DB: progressRaceDatabase(env.DB, progressContender) }
         : env;
-      const response = await verifiedWorker.fetch(
-        forwarded,
-        workerEnv,
-        context,
-      );
+      const dispatch = () =>
+        verifiedWorker.fetch(forwarded, workerEnv, context);
+      const response = progressD1Error
+        ? await withProgressD1Error(
+            progressD1Error,
+            env.DB,
+            env.ACCEPTANCE_SUBJECT,
+            { requestJson, readMangaState },
+            dispatch,
+          )
+        : await dispatch();
       const responseAtMs = Date.now();
       if (settingsContender) {
         await observeSettingsRace(

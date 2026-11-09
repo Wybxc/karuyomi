@@ -243,6 +243,14 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 
 驱动在真实第 2 页先确认正常进度已保存，然后点击「读完本章」。`SYNC_ACK_LOSS_COMMITTED_UNCONFIRMED` 表示同一阅读页仍保留未确认草稿，但只读检查已看到作品 revision 增加 1，页码和 epoch 不变。驱动点击「重试保存」，要求 `SYNC_ACK_LOSS_RETRY_CONFIRMED` 时待确认提示消失、同一阅读页仍挂载、D1 快照不再变化。按 Enter 停止 harness，核对 `ACCEPTANCE_PROGRESS_ACK_AUDIT` 恰好两条、`drop_ack=1/0`，且 UUID、请求正文、预期 revision、ACK 和持久回执的摘要相同。只读检查和审计共同证明本次重试复用了原请求，不能推广为其它平台、关闭后恢复或生产故障通过。
 
+### D1 拒绝阅读进度写入
+
+沿用上一节的正式 HTTPS、空 D1、测试身份和精确 xkcd 构建。启动服务时改用 `ACCEPTANCE_FIXTURE=progress-d1-error`。从正式界面安装并收藏英文 xkcd，再以 `SYNC_PHASE=d1-error` 运行相同的第 1 → 2 页驱动。
+
+真实第 2 页先正常确认。点击「读完本章」后，验收库的 SQLite trigger 在该次 D1 原子批次的最后一个回执更新处拒绝提交，Worker 返回业务 HTTP 503。`SYNC_D1_ERROR_ROLLED_BACK_UNCONFIRMED` 要求真实页仍挂载、界面保留草稿和「重试保存」，只读进度与提交前一致。故障解除后仍需点击该按钮；`SYNC_D1_ERROR_RETRY_CONFIRMED` 才表示同一阅读视图显示已完成和保存确认。
+
+停服核对 `ACCEPTANCE_PROGRESS_D1_ERROR_AUDIT`：恰好两条，503 `UNAVAILABLE` 无回执、两个 revision 不变；200 有持久回执、两个 revision 各增加 1；UUID、原始正文摘要和预期 revision 相同。可用独立 GET 确认最终当前与最远都仍是第 2 页且 epoch 不变。这一门与提交后丢确认分开，不代表生产 D1 故障验收。
+
 ### 阅读进度同时写
 
 使用当前 xkcd 快照构建正式产品（Web 用 `pnpm acceptance:build`，Native 用 `pnpm acceptance:build:native`）。在新隔离 D1 上执行 `ACCEPTANCE_FIXTURE=progress-cas-race pnpm acceptance:serve`，两个正式客户端使用服务打印的同一 origin 和测试身份。Native 仍使用前述回环 HTTPS、正常证书信任与实际端口。
