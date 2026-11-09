@@ -60,7 +60,7 @@
 
 2026-11-06，官方 `kotlinx-coroutines-core-jvm` 已接入正式源码，自有 Green Job 与四个同名覆盖已删除。正式工程及远端 CI、JVM/AOT 的真实挂起与取消/父子/启动语义、owner/lease 分项通过；固定新 AOT 经正式 Web 主入口完成 BH3 协程详情及 21 页阅读、Komiic 镜像设置/重开与筛选分页，见[协程验证](verification/coroutine-runtime.md)。HTTP await 已恢复 seed 上游可取消实现，响应所有权及 ACK 前清理的正式 JVM 202 项与完整工程检查通过；随后固定 `48c4526` 的正式 TeaVM / Node HTTP 取消子门通过，clab 后台重建两包及本机正式 harness 构建/静态装配/三路径 HTTP 200 通过；Node 最终 runner 使用显式退出，尚非自然 idle，IAB provider 不可用导致该次实际 Source/UI 未执行。两包保持 `compiled_unverified/runtimeReady=false`，无部署或正式 checkpoint 变更；产品取消、Native / 生产等剩余门继续按[计划](plan/coroutine-runtime.md)验收。
 
-2026-11-07，默认仓库扩展管理的账户确认清单、准备/取消、有界缓存、手动更新、启停/卸载与精确关闭/显式重建已接入，独立集中检查、445 项 Vitest、22 + 63 + 470 项 Flutter/Dart 测试与完整构建通过，见[扩展管理验证](verification/extension-management.md)。初次构建为 0 扩展，彼时 IAB provider 不可用；随后当前候选的 Web 分项见下文，Native 和生产门继续按[计划](plan/extension-management.md)验收。
+2026-11-07，默认仓库扩展管理的账户确认清单、准备/取消、有界缓存、手动更新、启停/卸载与精确关闭/显式重建已接入，独立集中检查、445 项 Vitest、22 + 63 + 470 项 Flutter/Dart 测试与完整构建通过，见[扩展管理验证](verification/extension-management.md)。初次构建为 0 扩展，彼时 IAB provider 不可用；随后通过默认仓库的 Web 安装和 [iOS 模拟器同版本构建替换](verification/extension-version-native.md)分项，完整生命周期与各平台剩余门继续按[计划](plan/extension-management.md)验收。
 
 2026-11-07，额外仓库的账户登记、只读预览与刷新、同包明确换仓、完整来源回显、存储/设置隔离及按来源网络政策已接入，独立集中工程检查、465 项 Vitest、22 + 68 + 527 项 Dart/Flutter 与完整构建通过。随后真实 IAB 发现并修复网络登记 GET 缺身份头，完整 Flutter 回归重跑至 22 + 68 + 534 项全部通过；固定当前三包 AOT 已取回，官方 Vite 装配 64 个 Static Assets / 3 扩展。空外仓管理、max-age 再验证、双 Web 顺序收敛及默认 xkcd 安装/两页真实阅读分项通过，独立 D1 确认收藏与第 2 页进度。精确范围与限制见[额外仓库验证](verification/additional-repositories.md)；真实外仓代码、Native 与生产待验收，`0009` 尚未部署。
 
@@ -358,11 +358,13 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 固定 `19b65f5`（`31555e8` 加 `5267181`）的正式 Flutter Web release 已在 Codex 内置 Chromium 156 经主入口完成原 xkcd 两章、显式读完与关标签页重开；首次恢复 3318 末页即显示原文字图，未翻页或诊断补帧。原黑屏失败不覆盖，详见[Web 修复后证据](verification/reader-frame-web.md)。同输入 Android / iOS 模拟器也通过正式 Reader 及真实进程重启，原文字图、已保存 / 已读完与最终清理均已核对，见[Native 修复后证据](verification/reader-frame-native.md)。iOS 早期黑截图仍作为视觉失败保留；终态截图等待实际路由过渡完成，并以 OS / Flutter 两种原图核对。以上不声明生产 Access、Source Cache、真机或浏览器进程恢复。
 
-## 正式扩展版本更新与 Native 主入口准备
+## 正式扩展更新与 Native 主入口准备
 
 2026-11-04，固定 `be5c3ed` 的正式 Flutter Web 通过官方 Arknights 1.6.1 → 1.6.2 更新：旧版保存 DREAM 第 3 页，新版重新连接后首次继续阅读即显示同一原图和已保存页位；两版 PageList 均为 51 页且摘要一致，同 principal/namespace、不同 Worker/generation，章节会话与最终 Worker 清理确认。当前静态快照旧清单/正文返回 404；独立审查和完整 90/90 检查点见[版本记录](verification/extension-version-web.md)。新版四次 Cache entry 后仍以真实 200 重新写入正文，不能认定正文复用、304、零网络或本地旧 bundle 缓存清理。
 
-同期正式 Native main 成品、62 份 Dart 和内置材料核对一致，正常 TLS、Secure/HttpOnly Cookie 与真实 RS256 Worker 的九项预验通过；当前 CUA 无法连接 Simulator，App 未安装/启动，UI 保持 `not_run` / `passed=false`。测试服务、模拟器和工具启动的 Xcode 已清理，见[Native 主入口记录](verification/native-main-entry.md)。
+同期正式 Native main 成品、62 份 Dart 和内置材料核对一致，正常 TLS、Secure/HttpOnly Cookie 与真实 RS256 Worker 的九项预验通过；当时 CUA 无法连接 Simulator，App 未安装/启动，UI 保持 `not_run` / `passed=false`。测试服务、模拟器和工具启动的 Xcode 已清理，见[Native 主入口记录](verification/native-main-entry.md)。
+
+2026-11-10，固定 `426536d` 的正式 iOS 模拟器通过 [xkcd 1.6.1 同版本 AOT 构建替换](verification/extension-version-native.md)：同一 HTTPS/D1 切换静态目录并经 UI 明确确认后，运行时扩展代码缓存只留新构建，新进程首次书架续读即显示真实第 2 页。独立四阶段 API 快照显示只确认了账户安装项，无附带业务状态变化。Native 上游版本升级、Android 换版、真机、生产 Access 和换版后 Source HTTP Cache 正文复用另验。
 
 ## UI 图片职责与分片选型
 
@@ -376,8 +378,8 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 ## 尚未通过的门槛
 
-- Cloudflare 签发的真实 Access JWT 正向 Source 动态请求、登录回跳/cookie 失效与原生恢复。
-- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 Cache 正文复用与普通文件、Native 版本/身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但浏览器/App 进程重启未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述版本更新续读分别保留其实际范围。
+- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。
+- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换、Android 同版本构建替换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - 自定义封面的 Native/混合平台读回、Cookie/Access、并发和丢响应恢复、进程重启、生产私有 bucket/部署与远端清理；独立 Web 顺序往返已通过。
