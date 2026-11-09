@@ -185,4 +185,14 @@ Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 
 
 2026-11-10，固定正式产品 `68e5e08` 与冻结 `c04d436` 的 ToonLook 1.6.2（英语 Source `8320348786843379620`，单包快照 `f978898a11704b4bbb2adb3b7f0e2a4f`）。iPhone 17 Pro / iOS 26.4 模拟器通过 Flutter 官方 `integration_test`、受信回环 HTTPS 与隔离 D1 启动。正式入口安装、搜索及收藏 Doomed，并打开 `131-chapter-1?lang=en`。阅读器获得 10 页清单并显示 `1 / 10`，第 1 页提示「当前平台尚未支持图片阅读」，120 秒内未显示解码帧。独立 D1 读回只确认第 1 页已选中；无最远进度，未完成。后续诊断驱动未通过重新开章，无法据此归因具体图形操作。
 
-复验沿用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。构建输入、准备与阅读日志和界面截图见 `.local/ios-toonlook-v6-68e5e0.t6QMCa/evidence/`。这是 iOS 首图失败证据，不影响之前 Web 分项的结论；AOT 产物仍为 `compiled_unverified`。
+同日诊断复验使用同一快照、同一 iOS 模拟器和全新 HTTPS/D1。仅在独立产品副本的 Worker driver 和测试 UI 增加观察，六份共享材料及 AOT 未变。同一次首图请求中，`ImageDecoder` 缺失导致 `openDecoder` 抛错，但 Source 捕获后通过 `createImageBitmap` 静态解码，创建并绘制重排后的 Bitmap。`OffscreenCanvas.convertToBlob({type: 'image/webp'})` 对 720 × 5,000 surface 返回 `image/png`，桥按约定拒绝格式不匹配，原 Source 抛出 `java.io.IOException`（`Could not encode descrambled image`），尚未打开图片交付通道。driver 优先呈现了之前已回退的解码能力错误，因此界面提示不指向真正的失败步骤。独立 D1 再次确认只记录首图选中、无最远锚或完成状态（账户／作品 `3/2`）。
+
+复验沿用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。构建输入、诊断补丁、准备与阅读日志、独立读回和界面截图见 `.local/ios-toonlook-v6-68e5e0.t6QMCa/evidence/`。此门确认该 iOS WebView 缺少 Canvas WebP 编码路径，未验证其它 WebKit 版本、修复或真机；AOT 产物仍为 `compiled_unverified`。
+
+## ToonLook 的 iOS WebP 编码探针
+
+用官方 libwebp 1.6.0 和 Zig 0.17.0 构建独立单线程 encoder-only WASM。质量 90 的探针为 168,745 B（gzip 83,415 B），限制 3,600,000 像素、4 MiB 输出和 96 MiB 线性内存；一个 720 × 5,000 的合成 RGBA 输入编码为 1,000,214 B，WASM 线性内存容量高点 68.875 MiB，官方 `dwebp` 成功解码。超像素、输出空间不足、非法质量及越过内存上限有负对照。该内存只指 WASM 线性内存；Node 的单次编码结果不代表 Canvas、WebKit 或设备峰值。上游、命令、ABI、摘要和负对照见 `.local/libwebp-wasm-1.6.0.8SnXZg/REPRODUCE.md`。
+
+在上节同一 iOS 模拟器、同一 ToonLook v6 AOT 和新的隔离 HTTPS/D1 中，仅在独立副本的 Worker 用该探针替换 Canvas 的错误格式输出：从已经由 Source 绘制完的 surface 读 RGBA，以原质量参数编码，校验 RIFF/WebP 签名，再经原图形桥和原图片交付。共享材料 catalog SHA-256 仍为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。真实《Doomed》首章 10 页逐页显示并显式确认完成，经「下一章」保存第二章第 7 页（720 × 5,000）；新进程从书架首次显示第 7 页并读到第 10 页。独立 HTTPS 读回确认首章保持完成，当前和最远均为第 10 页；第二章当前和最远从第 7 页到第 10 页，仍未完成，反向章序保留。账户／作品 revision `2/1 → 9/8 → 11/10`。诊断对照、探针补丁、复验参数、帧日志和机器核验见 `.local/ios-toonlook-v6-68e5e0.t6QMCa/evidence/`。
+
+此门证明通用编码可恢复这一真实 Source 的阅读，不代表生产已经修复。探针的临时 Canvas 包装及内联 WASM 不进入产品；正式共享材料装配、图形账本、取消与释放、其它平台及真机仍待验收。未修改冻结输入或部署，产物仍为 `compiled_unverified`。

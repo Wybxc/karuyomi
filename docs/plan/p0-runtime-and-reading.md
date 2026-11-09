@@ -29,7 +29,7 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 当前 v6 MANGA Plus Creators 修复前的 iOS 第 3 页中途超时有[独立逐块对照](../verification/aot-current-pilot.md#manga-plus-creators-的-ios-图片超时对照)。源站读取空闲与整体预算已分开，[Workers 与 Host 回归](../verification/aot-current-pilot.md#http-读取空闲与总期限回归)通过。[iOS 实测](../verification/aot-current-pilot.md#manga-plus-creators-的-ios-完整章节与续读)保留修复后首轮第 33 页未解码及后续同页恢复；独立第二轮通过 Sense Life 完整首章、正式下一章与新进程从第 7 页恢复后读至第 35 页。[Android 模拟器](../verification/aot-current-pilot.md#manga-plus-creators-的-android-完整章节与续读)用同版本的冻结 AOT 构建复验，同样逐页读完首章 72 页，切至次章并从新进程续读。继续其它代表 Source、真机和生产 Access 验收；完整 P0 未通过。
 
-ToonLook 的长图重排已通过 [Web 完整章节分项](../verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)。[iOS 模拟器](../verification/aot-current-pilot.md#toonlook-的-ios-首图失败)可搜索、进入章节并获得 10 页清单，但首图报平台能力不支持，原因待定位；暂未通过 iOS 阅读门。
+ToonLook 的长图重排已通过 [Web 完整章节分项](../verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)。[iOS 模拟器首图诊断](../verification/aot-current-pilot.md#toonlook-的-ios-首图失败)确认静态解码和重排成功，Canvas 请求 WebP 时回 PNG，原 Source 因而在图片交付前失败。[隔离编码探针](../verification/aot-current-pilot.md#toonlook-的-ios-webp-编码探针)用 libwebp 1.6.0 输出真正的 WebP，真实首章、切章和新进程续读通过。下一步在共享图形桥正式接入固定工具链和有界编码，核对图形账本、取消和释放；使用匹配的新材料与独立 AOT 候选验收，不修改正在运行的冻结全量。iOS 正式阅读门仍未通过。
 
 ## 已完成与边界
 
