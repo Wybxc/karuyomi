@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-10，[iOS 模拟器自定义封面](verification/custom-covers.md#ios-模拟器系统选择器与新进程读回)通过。两次实际系统 Files 选择、上传、替换和清除后，新进程读回默认封面；独立读回确认三次写推进 revision，清除后的两份旧路径均撤销。混合平台、故障、生产与真机另验。
+
 2026-11-10，固定 `2c012db` 的 [iOS arm64 发布构建](verification/native-main-entry.md#v6-ios-arm64-发布构建)通过。实际 Runner 与 Dart AOT 均为 iOS arm64，包内运行时与冻结 v6 六份材料匹配。未签名、未安装，真机与生产 Access 另验。
 
 2026-11-10，[Android 模拟器正式源迁移](verification/source-migration.md#android-模拟器正式源迁移与新进程读回)通过。独立隔离 D1 中，真实 xkcd 英文到中文的搜索、热门和手动映射在确认前未改变七份 API 响应；确认后复制一章已读和一枚书签，保留原作，不复制页位。新进程读回通过；混合平台、故障、真机与生产另验。
@@ -394,7 +396,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 - 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换、Android 同版本构建替换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
-- 自定义封面的 Native/混合平台读回、Cookie/Access、并发和丢响应恢复、进程重启、生产私有 bucket/部署与远端清理；独立 Web 顺序往返已通过。
+- 自定义封面的混合平台读回、生产 Cookie/Access、并发和丢响应恢复、服务端重启、生产私有 bucket/部署与远端清理；独立 Web 与 iOS、Android 模拟器的顺序往返和新进程读回已通过。
 - P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。
 
 CI 已配置统一检查，远端运行结果需由对应提交确认。以上工程与探针证据不表示 P0 或后续阶段通过。

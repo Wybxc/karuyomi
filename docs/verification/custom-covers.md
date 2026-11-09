@@ -69,9 +69,17 @@ iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS �
 
 独立 HTTPS 与只读 D1/R2 审计核对：账户／作品 revision `3/1 → 4/2 → 5/3 → 6/4 → 6/4`，三个写阶段各有一条唯一回执。两份实际返回的 JPEG 均为 192 × 256，正文大小和 SHA-256 与当前 D1 引用及 R2 内容一致。替换后橙图路径 404，清除后两份旧路径均 404；旧对象仍按宽限期留在 R2。对照收藏、作品资料、设置、书签和阅读进度保持不变。复验步骤、系统选择器证据及独立摘要位于本机忽略目录 `.local/native-android-cover-426536d/` 的 `REPRODUCE.md` 和 `evidence/verified.json`。
 
+## iOS 模拟器系统选择器与新进程读回
+
+2026-11-10，固定同一正式产品 `426536d`、冻结 `c04d436` 的真实 xkcd v6 1.6.1。iPhone 17 Pro / iOS 26.4 专用模拟器通过正常 TLS 访问独立官方 Wrangler HTTPS / workerd / D1、隔离私有 `COVERS` 和测试身份。正式 Flutter 主入口与原文件选择插件不修改；独立 XCUITest 操作实际 iOS Files 选择器，从仅含两份合成 PNG 的测试文件夹依次选择橙色和青色文件，并确认选择器关闭。
+
+上传、替换、清除和重启读回四个 Flutter 进程各 1/1。正式详情预览、确认后的封面与书架显示预期颜色；替换与清除分别从新进程读到上一份已确认封面。第四次启动仍保留同一收藏，恢复原占位。独立 D1/R2 核对三条新成功回执，账户／作品 revision 为 `3/1 → 4/2 → 5/3 → 6/4 → 6/4`；两份 192 × 256 JPEG 的 HTTP 大小与摘要均匹配当时的 D1 引用和 R2 对象。替换后旧橙图路径 404，清除后两份旧路径均 404，两个对象仍在宽限期。对照收藏、设置、进度和书签不变。
+
+首轮选择器定位及 Flutter 等待超时保留；测试驱动改为预编译后及时启动并点实际文件单元格的缩略图，正式产品未改。原始 Flutter 日志、XCUITest 结果与各阶段快照保存在本机忽略目录 `.local/native-ios-cover-426536d/`。
+
 ## 剩余平台、故障与生产门
 
-Web 与 Android 模拟器分别通过独立文档／进程的顺序保存和读回。iOS 系统选择器与 Cookie、混合平台、并发旧 CAS、响应丢失后原请求恢复、服务端重启、生产 Access 与真机仍须验收。
+Web 与 iOS、Android 模拟器分别通过独立文档／进程的顺序保存和读回。混合平台同库、并发旧 CAS、响应丢失后原请求恢复、服务端重启、生产 Cookie／Access 与真机仍须验收。
 
 已通过当前账户的 Wrangler 创建配置匹配的 `karuyomi-covers` bucket，`wrangler r2 bucket dev-url get karuyomi-covers` 确认公开 r2.dev 访问关闭；创建记录在忽略的 `.local/cover-bucket-create.log`，隐私检查在 `.local/cover-bucket-privacy.log`。这只证明资源已准备，尚未部署新 Worker 绑定或应用生产 D1 schema。部署后仍需分别记录已登录上传/读取、匿名拒绝、不同 subject 隔离、旧 asset 撤销和宽限期后显式清理。远端对象不即时删除是当前设计，不能将暂存旧对象误记为当前 API 可公开读取。
 
