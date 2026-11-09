@@ -77,6 +77,14 @@ pnpm acceptance:serve
 
 2026-11-10，在 clab 用固定 `2a07fc2` 补编 checkout、真实 `c04d436` 冻结结果目录、同一生产父快照及上述三个精确包名执行正式 `prepare-baseline`。两个 checkout 与六份共享材料一致，线上 state/index 校验通过；入口到达冻结终态检查，报告 `tr.eskimangalar` 尚无结果，未生成快照。原始结果在 clab 的补编目录 `candidate-preflight.4IUnji/prepare.log`。冻结 supervisor 持续运行；未启动补编、未改生产。该结果验证的是实际输入预检和缺结果时停止，完整候选仍待生成。
 
+## 首发六材料产品归档
+
+2026-11-10，另建固定 `2c012db` 产品 checkout，回摘本机服务地址保存 `98d78aa` 和 Native 登录修复 `016a5d0` 的生产源码路径。正式 `hostFingerprint()` 完整结果应用前后逐字节一致（`1ba88f82…18dc`）；保留冻结与补编扩展各自原始宿主指纹。空索引 `pnpm build` 成功，六份共享材料、Web host/worker 及 Native host/worker/manifest 与原 `2c012db` 成品逐字节一致，材料版本仍为 `5d1260e5…92e4`。
+
+该归档的正式 Wrangler harness 核对登录 303 携带同一 UUID、回跳 GET/HEAD 无脚本且 no-store、随后 bootstrap 200。旧 Native 回跳参数返回 400，首发必须使用新版配套安装包。服务地址正式 AppShell 回归 1/1 通过；`wrangler versions upload --dry-run` 通过且未上传。复验命令、补丁和原始比对保存在本机忽略目录 `.local/six-material-product-2c012db.3549L2/`。
+
+本轮空索引不能发布。等待冻结结果和三个补编结果后，用同一产品归档装配正式扩展快照并重跑构建、dry-run、双端 Native 安装与实际 Source 门；未改冻结运行目录、候选 state 或生产。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

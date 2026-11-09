@@ -78,6 +78,6 @@ Android 修复前可复现：IdP 签发 Cookie，Worker 收到有效 Cookie 后�
 
 iPhone 17 Pro／iOS 26.4 用未插桩的正式 Flutter App 和外部 XCTest 操作可见登录：首次登录及同进程会话失效后从设置点「连接服务」再登录均各 1/1 通过，PID 同为 `60501`。设置页两次都显示测试账号；服务端每轮观察到匿名 bootstrap 401、挑战、IdP 文档、签 Cookie、带有效 Cookie 的正式登录 303 和回跳文档，随后仅一个有效 bootstrap 并读回设置。终止并启动原安装（PID `46548`）后，设置页不经可见登录再次显示同账号，审计只增加带有效 Cookie 的 bootstrap 和设置读取。D1 业务账号和变更回执始终为 0。
 
-Android 用正式 Flutter 构建的调试 APK 启动正式 App，由系统 UIAutomator 点击可见 IdP 按钮。首次登录、新进程直接沿用 Cookie、失效后新进程明确需要登录、再点击并恢复同一账号四项均通过（PID 依次为 `3239`、`3632`、`3781`、`3936`）。两次可见登录各只触发一次带有效 Cookie 的 Native bootstrap，Cookie 有效的重启不挑战，失效的重启未显示旧身份。独立 D1 查询确认业务表无新增行或回执。测试 CA 只用于独立的回环 WebView 与 Dart 网络信任，未关闭证书校验。
+Android 用正式 Flutter 构建的调试 APK 启动正式 App，由系统 UIAutomator 点击可见 IdP 按钮。首次登录、新进程直接沿用 Cookie、失效后新进程明确需要登录、再点击并恢复同一账号四项均通过（PID 依次为 `3239`、`3632`、`3781`、`3936`）。阶段间覆盖安装保留同一 App 数据。两次可见登录各只触发一次带有效 Cookie 的 Native bootstrap，Cookie 有效时新进程不挑战，失效时不显示旧身份。独立 D1 查询确认业务表无新增行或回执。测试 CA 只用于独立的回环 WebView 与 Dart 网络信任，未关闭证书校验。
 
 iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evidence/`，包括三轮 `xcresult` 和独立 audit JSON；Android 的验收及源文件比对在 `.local/native-android-access-afcbd11/evidence/`。iOS 首轮用 Flutter 测试驱动时外部点击未提交，改用未插桩 App；一次修复候选的本地材料装配错误也保留在原始记录，正式复验使用逐字节匹配的内置材料。本节只覆盖隔离设置页登录和身份确认；生产 Access、阅读中断后恢复、跨身份与真机门独立验收。
