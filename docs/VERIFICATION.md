@@ -1,5 +1,11 @@
 # 实施验证记录
 
+2026-11-10，[iOS 模拟器详情续读位置读取失败与显式重试](verification/reading-entry.md#ios-模拟器详情续读位置读取失败与显式重试)通过。真实 xkcd 第 2 页已保存后，详情状态读取返回 503，仍保留章节列表；同一 Source 会话显式读回续读目标，六份 D1 响应不变，未重发 Source 中继或业务写入。
+
+2026-11-10，[Android 模拟器自定义封面](verification/custom-covers.md#android-模拟器系统选择器与新进程读回)通过。两次实际系统文件选择、上传与替换、清除和独立新进程读回均通过。独立 D1/R2 核对三个回执、当前引用和正文；旧路径撤销但对象保留至宽限期。iOS、混合平台、故障、真机与生产另验。
+
+2026-11-10，[iOS 模拟器正式源迁移](verification/source-migration.md#ios-模拟器正式源迁移与新进程读回)通过。真实 xkcd 英文到中文的手动映射在确认前未改变七份业务响应；确认复制一章已读和一枚书签，保留原作，未复制页位。新进程从书架与详情读回，独立快照不变。Android、混合平台、故障、真机与生产另验。
+
 2026-11-10，[iOS 重置获胜与 Android 旧完成冲突](verification/concurrent-server-state.md#ios-重置获胜与-android-旧完成冲突)通过。两条请求到达 D1 批次入口，隔离夹具安排 iOS 重置先提交；只有重置留下回执。Android 仍可翻动旧页，显式重开显示真实第 1 页；旧页、重开及退出均不覆盖权威状态。Web 配对、真机与生产另验。
 
 2026-11-09，[iOS 与 Android 模拟器阅读进度同时写](verification/concurrent-server-state.md#ios-与-android-模拟器阅读进度同时写)通过。同一隔离 HTTPS/D1、同一真实第 2 页上，iOS 显式完成提交一次，Android 重置被拒；Android 旧页仍可翻动，显式重开读回完成状态。两端打开不写，冲突后的旧页、重开及退出也不改权威状态。真机与生产另验。

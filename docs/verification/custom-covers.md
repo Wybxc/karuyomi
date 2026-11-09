@@ -61,9 +61,17 @@ iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS �
 
 复验使用与当前 host ABI 匹配的真实 xkcd 静态快照，按[官方 Web 验收入口](aot-current-pilot.md#绑定摘要后的正式三包和同站-web-更新)构建并启动服务；本分项不设 `ACCEPTANCE_NEXT_CONFIG`，只提供上述两个精确 Source hosts。通过界面上传两份无敏感数据、易区分的测试图片，独立 GET `/api/library`、`/api/state/manga/:mangaKey` 及 `/api/covers/:assetId` 时使用 `X-App-Request: 1` 和 `X-App-Subject: acceptance-owner`。确认当前正文摘要、旧路径状态和清除前后无关字段。原始图片和 API 样本留在 `/private/tmp/karuyomi-cover-58652.OkXKyy/`；四份文档已关闭，harness 正常退出，原端口无监听。404 仅证明应用拒绝读旧引用，不代表底层旧对象已物理删除。
 
+## Android 模拟器系统选择器与新进程读回
+
+2026-11-10，固定产品 `426536d`、冻结 `c04d436` 的真实 xkcd v6 1.6.1、Android API 36 专用模拟器。同一官方 Wrangler HTTPS / workerd / D1、隔离私有 `COVERS` 和测试身份，系统 WebView 与 Flutter HTTP 客户端正常校验证书。正式详情和书架使用真实英文 xkcd，另有一部由正式 API 创建的对照收藏。
+
+四个独立 Flutter 进程均 1/1 通过。第一次上传橙色 PNG，第二次新进程读回橙图并替换为青色 PNG；两次均从 Android 系统 DocumentsUI 的 `ACTION_OPEN_DOCUMENT` 列表实际选择文件。正式预览、确认后封面、详情和书架解码为预期颜色。第三次新进程读回青图并清除，第四次启动仍无封面引用，显示原占位，未附带写入。
+
+独立 HTTPS 与只读 D1/R2 审计核对：账户／作品 revision `3/1 → 4/2 → 5/3 → 6/4 → 6/4`，三个写阶段各有一条唯一回执。两份实际返回的 JPEG 均为 192 × 256，正文大小和 SHA-256 与当前 D1 引用及 R2 内容一致。替换后橙图路径 404，清除后两份旧路径均 404；旧对象仍按宽限期留在 R2。对照收藏、作品资料、设置、书签和阅读进度保持不变。复验步骤、系统选择器证据及独立摘要位于本机忽略目录 `.local/native-android-cover-426536d/` 的 `REPRODUCE.md` 和 `evidence/verified.json`。
+
 ## 剩余平台、故障与生产门
 
-以上是独立 Web 文档的顺序保存和读回，共用本地浏览器配置与同一服务，尚未覆盖 Native Cookie / 系统选择器、混合平台、并发旧 CAS、响应丢失后原请求恢复、服务端或原生进程重启、生产 Access。继续按同一验收边界补齐，不用数据 supplier 代替。
+Web 与 Android 模拟器分别通过独立文档／进程的顺序保存和读回。iOS 系统选择器与 Cookie、混合平台、并发旧 CAS、响应丢失后原请求恢复、服务端重启、生产 Access 与真机仍须验收。
 
 已通过当前账户的 Wrangler 创建配置匹配的 `karuyomi-covers` bucket，`wrangler r2 bucket dev-url get karuyomi-covers` 确认公开 r2.dev 访问关闭；创建记录在忽略的 `.local/cover-bucket-create.log`，隐私检查在 `.local/cover-bucket-privacy.log`。这只证明资源已准备，尚未部署新 Worker 绑定或应用生产 D1 schema。部署后仍需分别记录已登录上传/读取、匿名拒绝、不同 subject 隔离、旧 asset 撤销和宽限期后显式清理。远端对象不即时删除是当前设计，不能将暂存旧对象误记为当前 API 可公开读取。
 

@@ -22,6 +22,8 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 冻结与当前 AOT 的[材料和定向补编预检](../verification/aot-current-pilot.md#冻结全量与当前-aot-的定向补编预检)通过。先等待 clab 全量终态，再单独补编需要新设置规则的三个包；使用[本地候选组装](../EXTENSIONS.md#首次全量候选的定向补编)保留两版各自实际输入身份和原生产父快照。真实补编、全量候选及上线仍未验收。
 
+2026-11-10，固定 `2c012db` 的正式产品构建确认使用与 `c04d436` 冻结批次、`2a07fc2` 补编计划相同的六份材料。验收该冻结候选时，App/API 使用这套匹配构建，仍须保留现网三包并通过完整候选的构建、dry-run 与实际 Source 检查。该候选不包含 ToonLook 的 iOS WebP 修复。自 `a1dd0cd` 起材料身份已变为七份，[新版 ToonLook 单包](../verification/aot-current-pilot.md#正式-webp-编码材料与图形桥)只用于独立验收；用这套材料发布或启用主分支增量工作流，须先有已部署的同材料完整 baseline。两个候选均不得混用，生产切换继续按[切换顺序](../EXTENSIONS.md#旧网络登记部署切换)另行验收。
+
 ## 已完成
 
 - Keiyoushi、TeaVM、Suwayomi 通过固定提交的 submodule 引入；研究交付中的项目代码已内化，真正上游用正式补丁追踪。依赖/JAR/seed/大产物留在忽略目录。
