@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-**状态：正式功能与工程检查通过，真实 Web、iOS 和 Android 模拟器独立迁移，以及 Android → iOS → Android 同库读回通过。** 正式迁移协议、Worker API + D1 原子写、Flutter 数据层、书架/详情入口与向导已接入。真实 Web 发现无搜索结果的 Source 无法选作品，补齐目标源热门与分页后，xkcd 英文到中文的显式映射、确认和新文档读回通过；[iOS 模拟器](../verification/source-migration.md#ios-模拟器正式源迁移与新进程读回)和 [Android 模拟器](../verification/source-migration.md#android-模拟器正式源迁移与新进程读回)同样通过真实向导和新进程读回。[同库分项](../verification/source-migration.md#android-与-ios-同库迁移)以隔离测试身份在 Android 标记英文原作，由 iOS 确认迁移，Android 新进程读回中文标记。故障、生产和真机门继续推进。上级范围见 [P3](p3-extensions-and-migration.md)，合同见[设计](../design/source-migration.md)，实际结果统一见[验证](../verification/source-migration.md)。
+**状态：正式功能与工程检查通过，真实 Web、iOS 和 Android 模拟器独立迁移、Android → iOS → Android 同库读回，以及 Android 已提交后丢确认恢复通过。** 正式迁移协议、Worker API + D1 原子写、Flutter 数据层、书架/详情入口与向导已接入。真实 Web 发现无搜索结果的 Source 无法选作品，补齐目标源热门与分页后，xkcd 英文到中文的显式映射、确认和新文档读回通过；[iOS 模拟器](../verification/source-migration.md#ios-模拟器正式源迁移与新进程读回)和 [Android 模拟器](../verification/source-migration.md#android-模拟器正式源迁移与新进程读回)同样通过真实向导和新进程读回。[同库分项](../verification/source-migration.md#android-与-ios-同库迁移)以隔离测试身份在 Android 标记英文原作，由 iOS 确认迁移，Android 新进程读回中文标记。[丢确认分项](../verification/source-migration.md#android-源迁移已提交后丢确认)在 Android 通过同一 UUID、原正文和三项 CAS 补领原回执；独立 D1 查询确认只有一条迁移回执。其它故障场景、生产和真机门继续推进。上级范围见 [P3](p3-extensions-and-migration.md)，合同见[设计](../design/source-migration.md)，实际结果统一见[验证](../verification/source-migration.md)。
 
 完成“选择已安装的目标 Source → 搜索或热门列表/分页 → 确认目标作品 → 只读预览一对一章节映射 → 独立确认 → 原子补充目标收藏、分类、已读/书签”流程。原条目始终保留，跨源不复制页面位置、resume、自定义封面、阅读顺序或原 epoch；目标已有业务与章节状态保留。
 
@@ -24,7 +24,8 @@
 - [x] iOS 模拟器的正式书架向导、真实章节映射、显式确认和新进程读回。
 - [x] Android 模拟器的正式书架向导、真实章节映射、显式确认和新进程读回。
 - [x] 隔离同库同身份验证 Android 写原作标记 → iOS 正式迁移 → Android 新进程读回；迁移确认前与独立读回前后，七路业务响应分别逐字节不变。
-- [ ] 更多 Source、非空分类、同时修改源/目标/分类、断网和丢 ACK、旧 epoch 草稿及恢复后重新确认。不补造旧清单/协议字段，不由受控 supplier 代替在线 Source。
+- [x] 隔离 Android 正式向导验证 D1 提交后丢确认、显式重试原请求并独立读回；真实 D1 只新增一条迁移回执。
+- [ ] 更多 Source、非空分类、同时修改源/目标/分类、提交前断网、Web/iOS 丢确认、旧 epoch 草稿及恢复后重新确认。不补造旧清单/协议字段，不由受控 supplier 代替在线 Source。
 - [ ] 生产 Access 与目标设备分别验收；完整 P1/P2/P3 和 AOT baseline 保留各自剩余门。
 
 ## 验收条件

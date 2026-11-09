@@ -1,5 +1,11 @@
 # 实施验证记录
 
+2026-11-10，[iOS Arknights 阅读性能基线](verification/reader-baseline-ios.md)取得一轮正式 iOS debug 模拟器原始数据：Flutter 首次图像帧、连续翻页、固定滚动、跨章帧与 App 自身 RSS 均有样本。没有把 Flutter 图像帧当作物理屏幕呈现；真机、WebContent/GPU 与分布门仍待验。
+
+2026-11-10，[Android 源迁移已提交后丢确认](verification/source-migration.md#android-源迁移已提交后丢确认)通过。隔离 D1 已完成英文到中文 xkcd 迁移后截断首个成功响应，正式向导保留原请求；显式重试恢复确认。真实 D1 核对两次请求相同、只持久化一条迁移回执，新进程读回无附带写。
+
+2026-11-10，[Native 本机服务地址恢复](verification/native-main-entry.md#native-本机服务地址恢复)已通过组件回归、完整 Flutter 检查和正式 Web/Worker 构建。iOS 模拟器两个正式进程均未传默认地址，第二次从实际本机偏好恢复并连接同一测试身份，独立 D1 未见业务写。
+
 2026-11-10，[Android arm64 发布构建与冷启动](verification/native-main-entry.md#v6-android-arm64-发布构建与离线模拟器冷启动)通过。固定 `2c012db` 的 arm64-v8a release APK 包内运行时与冻结 v6 六份材料匹配；用本地调试签名侧载专用 Android 模拟器，冷启动显示正式书架。该次未连接服务，发行签名、真机和生产另验。
 
 2026-11-10，[Android 同版本扩展构建替换](verification/extension-version-native.md#操作与独立核对)通过。真实 xkcd 经显式确认切换构建、清理旧缓存，新进程从书架首次解码第 2 页。独立 API 和 D1 证据只新增一条设置回执，进度与书签不变；真机、生产和上游版本升级另验。

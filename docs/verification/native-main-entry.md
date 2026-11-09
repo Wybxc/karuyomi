@@ -59,3 +59,11 @@ flutter build apk --release --no-pub --target-platform=android-arm64 \
 - 专用 Pixel 7 / Android 16 API 36 ARM64 模拟器在飞行模式下通过 `adb install` 安装；设备上 `base.apk` 的 SHA-256 与本机 APK 相同。`adb shell am start -W -n dev.karuyomi.karuyomi/.MainActivity` 报告冷启动成功，正式 Activity 位于前台（PID `4184`），UI 树和截图显示空书架及书架、浏览、设置三个标签。
 
 APK 保留在本机忽略目录 `.local/android-arm64-release-2c012db/artifacts/karuyomi-2c012db-arm64-v8a-release-local.apk`。`evidence/split/` 保留签名、ELF、实际安装摘要、启动日志及截图；可用 `node verify-apk.ts` 重核。专用模拟器和私有 ADB 已清理。本次只验证该 release 包能启动；未连接隔离或生产服务，未验证此 APK 的 Source 初始化、真实 xkcd 续读、生产 Access 或真机。
+
+## Native 本机服务地址恢复
+
+2026-11-10，修复通用 Native 安装中手动选择的服务地址只留在当前进程的问题。正式设置使用 Flutter `shared_preferences` 2.5.6 记录本机选定的 HTTPS origin；启动先读取该偏好，没有可用值时使用构建的 `APP_ORIGIN`，Web 继续使用文档 origin。此偏好不保存业务状态或 Access 凭据。
+
+正式 AppShell 组件回归从空配置进入设置、确认带端口的 HTTPS 地址、尝试无效 HTTP 地址，然后销毁并启动新的 AppShell。新实例选回之前的 HTTPS 地址，两个实例均未写业务 API。完整 `pnpm flutter:check` 通过（三项目 22、87、612 项），正式 Web/Worker 的 `pnpm build` 通过。
+
+在固定 `2c012db` 的副本应用相同 Flutter 变更，用专用 iPhone 17 Pro / iOS 26.4 模拟器和空扩展目录的官方 Wrangler HTTPS / workerd / D1 验收实际系统偏好。两次 Flutter 集成验收均不传 `APP_ORIGIN`：PID 41163 在正式设置手动连接，写入本机 UserDefaults；PID 42525 启动自动连回同一测试身份，无手动连接。第二次 Flutter 启动覆盖安装并保留偏好。独立 HTTPS 书架、设置读回不变，三次独立 D1 核对均为账户 revision 0、无业务写或回执。原始日志在 `.local/native-ios-origin-2c012db/evidence/`。Android 真实系统偏好、签名真机及生产 Access 另验。

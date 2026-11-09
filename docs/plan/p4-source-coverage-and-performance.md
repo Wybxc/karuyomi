@@ -9,6 +9,7 @@
 - 少量当前上游包已真实 AOT、完整性校验和浏览器初始化；MangaDraft 有真实网络元数据结果及源站挑战失败记录。
 - 历史 release9 研究覆盖、固定输入语义和性能结果保留为历史证据；不能外推为当前全部上游包、真实阅读或手机表现。
 - [AOT 包体方案](../AOT-SIZE.md)已采用共享材料与 gzip；本地全量发布默认 `compiled_unverified`，不据发布数量累加运行覆盖。
+- [iOS 模拟器真实阅读采集](../verification/reader-baseline-ios.md)已保留固定 v6 Arknights 的首图、翻页、竖向滚动、切章、引擎帧和 App 进程 RSS 原始记录。单轮 debug 样本用于复验采集方法；同条件冷热分布、真机、长图、CPU 与 WebContent/GPU 合计峰值仍待测量。
 
 ## 待办
 
