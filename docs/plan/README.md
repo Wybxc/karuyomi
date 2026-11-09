@@ -22,7 +22,7 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 同日，[生产 Web 恢复登录态](../verification/server-state-production.md#生产-web-恢复登录态)已确认，随后 [Arknights Comics 英文热门列表](../verification/server-state-production.md#生产-web-真实-source-列表)通过只读验收。完整生产阅读和 Native 继续验收。
 
-2026-11-10：[MANGA Plus Creators 的 Android 模拟器](../verification/aot-current-pilot.md#manga-plus-creators-的-android-完整章节与续读)通过完整首章、跨章和新进程续读。[ToonLook 的 iOS 首图](../verification/aot-current-pilot.md#toonlook-的-ios-首图失败)失败定位为 WebP 编码缺失；[隔离 libwebp 探针](../verification/aot-current-pilot.md#toonlook-的-ios-webp-编码探针)通过完整首章、跨章和新进程续读，正式共享图形桥接入与验收待完成。P0 保持进行中。
+2026-11-10：[MANGA Plus Creators 的 Android 模拟器](../verification/aot-current-pilot.md#manga-plus-creators-的-android-完整章节与续读)通过完整首章、跨章和新进程续读。[ToonLook 的 iOS 首图](../verification/aot-current-pilot.md#toonlook-的-ios-首图失败)失败定位为 WebP 编码缺失；[隔离 libwebp 探针](../verification/aot-current-pilot.md#toonlook-的-ios-webp-编码探针)通过完整首章、跨章和新进程续读。[正式共享图形桥和材料](../verification/aot-current-pilot.md#正式-webp-编码材料与图形桥)已接入，新 AOT 候选与正式 iOS 复验待完成。P0 保持进行中。
 
 ## 优先级与状态
 

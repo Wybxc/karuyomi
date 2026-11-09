@@ -129,6 +129,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Initialize pinned libwebp sources for runtime materials
+        run: git submodule update --init --depth 1 vendor/libwebp
       - uses: actions/setup-node@v4
         with:
           node-version: 24.15.0

@@ -108,7 +108,9 @@ Bitmap / ImageDecoder 的图像正文改用 Worker 内部 byte handle，`teaGrap
 
 内部 Bitmap Canvas 以裁剪时的矩阵保留设备坐标裁剪，保存/恢复同时还原裁剪和变换。裁剪结果最多保留 128 个坐标点，绘制时只扫描位图内的裁剪范围，合并相同的相邻行以保持 Android 的硬边。已验证像素与已知包的 AOT，真实处理源和设备开销另验，见[MangaTek](verification/aot-current-pilot.md#mangatek-的气泡图形操作)。
 
-取消只标记当前 requestId/generation。不可中断的浏览器 decode、encode 或 font.load 结束后才释放其预留、输入 pin 和临时对象，迟到结果不发布；编码期间显式 recycle 的 surface 延迟到工作完成后销毁。driver 仍等待 Java 回调退出再结束图形上下文和释放串行锁。Java 同步 JSO 和异步 fiber 错误均回传为 Java 异常，确保 finally 路径执行；预算、能力与取消错误在 driver 保留对应错误类别。
+`Bitmap.compress(WEBP, quality)` 优先使用 Canvas 编码。每个图形桥先用 1 × 1 画布探测有损 WebP；不支持或实际返回 MIME 不符时，才从原 Source 已绘制的 surface 读取 sRGB RGBA，并用已校验的 `webp-encoder.wasm` 按原质量参数输出真正的 WebP。启用 libwebp 的低内存选项；编码实例使用独立、最高 96 MiB 的导入内存。在分配前将整个堆额度和 RGBA 读回计入现有图形账本，输出复制前另行预留 byte handle。输出按原 64 MiB 上限和本次工作容量限制，失败不将部分字节或 PNG 当作 WebP 发布。JPEG、PNG 和原来不支持的无损 WebP 行为保持。该路径不预解码直接交给 UI 的图片，不根据 Source 身份分支。材料交付见[共享运行时材料](RUNTIME-MATERIALS.md)。
+
+取消只标记当前 requestId/generation。不可中断的浏览器 decode、encode 或 font.load 结束后才释放其预留、输入 pin 和临时对象，迟到结果不发布；编码期间显式 recycle 的 surface 延迟到工作完成后销毁。同步 WASM 编码不能在 Worker 内抢占；独立 manager 会先取消图片收集、丢弃迟到结果，等待关闭确认超时后终止 Worker。driver 仍等待 Java 回调退出再结束图形上下文和释放串行锁。Java 同步 JSO 和异步 fiber 错误均回传为 Java 异常，确保 finally 路径执行；预算、能力与取消错误在 driver 保留对应错误类别。
 
 此账本约束可见对象和明确工作预留，不等于浏览器进程、GPU、codec 内部或字体 glyph cache 的实际峰值硬上限，也无法限制 Source 自行持有的任意数组或调用方缓存。已有 JVM 流式检查、受控 codec 生命周期测试，以及 Codex 内置浏览器 Chromium 156 的真实 Canvas 二进制 RGBA/PNG、头部 bounds、取消与显式回收检查。同环境的 TeaVM 0.16.0 独立 Java→JSO→Canvas oracle 也通过 131,079 字节分块往返、同步/异步 Java 异常、fiber bounds、Bitmap pixels/raw/PNG、1px region sample 别名和 Java Frame lease 检查，显式释放后账本归零；这不代表真实进程峰值为零。harness 初次遗漏正式构建器的 Android 重复类裁剪，曾触发上游 Stub，校正独立 harness 后复跑通过，未修改 Source 或原始 JAR。新 host 的真实图片解密、重排 Source、超长图和移动设备合计峰值仍须分别验收。Cache/File 等其它内部桥的大正文问题属于后续阶段，不能据此宣称整个 runtime 已无 Base64/JSON 大正文。
 

@@ -33,7 +33,7 @@ Bundle 清单记录 canonical `sha256/size/contentType`，以及 `encoding: gzip
 
 正式清单和静态目录的公开 `buildId` 在编码后生成：内部工作名 `ext-<包短名>-<输入指纹前 32 位>` 加上 `-<canonicalSHA>`。同一输入即使重编出不同字节，也使用不同清单路径、可被客户端检测为更新。快照状态记录已验证的 canonical SHA 并据此定位保留产物；回拉须与该身份一致。没有绑定摘要的记录不参与产物复用，应重新构建；已确认远端 revision 仍作为部署基线。派生公开 ID 直接复用编码阶段取得的摘要，不重复读取正文。
 
-Source host 的第三方源码输入只包含已初始化、HEAD 与已提交 gitlink 一致且 tracked clean 的 TeaVM / Suwayomi 子模块；扩展上游归 Source 闭包身份。未采用的图片 codec 候选源码、专属工具及其专用上游依赖已删除，不再维护候选构建身份。
+Source host 的第三方源码输入包含已初始化、HEAD 与已提交 gitlink 一致且 tracked clean 的 TeaVM、Suwayomi 和 libwebp 子模块；扩展上游归 Source 闭包身份。libwebp 只用于共享图形桥的编码，准备工具和编译配方都进入 host 输入。
 
 构建失败保留同运行时的上次成功构建，同一失败输入不会自动反复重试。发现失败时，仍存在的 `sourcePath` 也保留上次成功；真正从上游删除的模块才退役。成功更新替换旧 build，快照仅保留当前可用版本。协议、ABI 或材料不匹配的旧成功只保留状态，标为 unavailable，不进入索引，也不复制旧 bundle；原型不维护兼容集合。
 
@@ -44,7 +44,7 @@ Source host 的第三方源码输入只包含已初始化、HEAD 与已提交 gi
 先提交稳定的当前 host，使用固定提交、干净的独立 clone。下列命令在该 clone 内执行；长批次必须同时固定 supervisor、verifier、builder 和 submodules，不能只固定 builder 却让其它阶段读取持续变化的开发目录。state、plan、builds 和 snapshot 可以使用绝对路径放在统一的忽略目录。
 
 ```sh
-git submodule update --init vendor/extensions-source vendor/suwayomi-server vendor/teavm
+git submodule update --init vendor/extensions-source vendor/suwayomi-server vendor/teavm vendor/libwebp
 pnpm install --frozen-lockfile
 node scripts/prepare-runtime.ts --android
 node tools/extensions/pipeline.ts bootstrap \
@@ -55,6 +55,8 @@ node tools/extensions/pipeline.ts bootstrap \
 ```
 
 `bootstrap` 默认处理所有未尝试输入，本地上限 10,000，并发默认 1、最高 4。它先保存每包 built/failed 结果，完成本批后生成完整候选快照，尚不写入已部署 checkpoint。中断后重跑会重新验证并复用已有成功交付；`--retry-failed` 才明确重试相同失败输入。
+
+在 libwebp 接入前冻结的批次仍使用接入前的 supervisor 与补编 checkout 完成原候选。当前工具会按新增的固定输入重新计算指纹，不能用于重扫旧冻结树。包含编码器的新材料须另建候选，不能用旧清单混装。
 
 需要显式恢复完整冻结计划时，在同一固定 clone 执行：
 

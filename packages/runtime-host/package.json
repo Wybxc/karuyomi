@@ -6,7 +6,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "build": "pnpm build:materials && vite build --config vite.config.ts",
-    "build:materials": "vite build --config vite.materials.config.ts"
+    "build:materials": "pnpm -w webp:prepare && vite build --config vite.materials.config.ts"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.16.0",

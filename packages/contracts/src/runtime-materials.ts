@@ -33,6 +33,13 @@ export const runtimeMaterialCatalogSchema = z.object({
       sha256: sha256Schema,
       size: z.number().int().positive(),
     }),
+    webpEncoder: z.object({
+      version: z.string().min(1),
+      upstreamCommit: z.string().regex(/^[0-9a-f]{40}$/),
+      compilerVersion: z.string().min(1),
+      sha256: sha256Schema,
+      size: z.number().int().positive(),
+    }),
   }),
 });
 

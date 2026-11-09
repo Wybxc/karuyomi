@@ -31,8 +31,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm flutter:setup
       - run: pnpm protocol:setup
-      - name: Initialize pinned TeaVM sources for exact patch regression
-        run: git submodule update --init --depth 1 vendor/teavm
+      - name: Initialize pinned TeaVM and libwebp sources
+        run: git submodule update --init --depth 1 vendor/teavm vendor/libwebp
       - run: pnpm exec prek validate-config .pre-commit-config.yaml
       - run: pnpm check
       - run: pnpm flutter:check

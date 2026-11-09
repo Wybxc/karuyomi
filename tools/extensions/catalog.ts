@@ -26,6 +26,8 @@ export const HOST_PATHS = [
   'tools/teavm/runtime.ts',
   'tools/teavm/build.ts',
   'tools/teavm/upstream-sources.ts',
+  'tools/teavm/webp.ts',
+  'scripts/prepare-webp-encoder.ts',
   'tools/teavm/PatchLibraries.java',
   'protocol',
   'buf.yaml',
@@ -116,8 +118,8 @@ export function treeHash(
     throw new Error('Fingerprint records are not JSON');
   return createHash('sha256').update(encoded).digest('hex');
 }
-// Candidate image codecs have their own build identity and are not Source inputs.
 export const HOST_SUBMODULE_PATHS = [
+  'vendor/libwebp',
   'vendor/suwayomi-server',
   'vendor/teavm',
 ] as const;

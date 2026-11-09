@@ -8,6 +8,7 @@
 - Keiyoushi 扩展源码由 `vendor/extensions-source` submodule 固定，Apache-2.0。正式构建使用其 Gradle/KSP 生成的 JAR 与 Source 元数据，不修改扩展业务字节。许可证见 `licenses/Keiyoushi-Apache-2.0.txt`。
 - ICU4J 79.1 的 Unicode 许可见 `licenses/ICU4J-Unicode.txt`。`AotServiceFactory` 只分派到原 ICU 构造器；原 ICU 实现和资源保持依赖材料身份。`java.text.Collator` / `Normalizer` 是浏览器 Intl / normalize 适配。
 - Zstandard 的 BSD 许可见 `licenses/Zstd-BSD.txt`；`@bokuweb/zstd-wasm` 0.0.27 来源为 [bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm)，包声明 MIT，由精确版本与 pnpm tarball integrity 固定。生成的 JS glue 和 WASM 均来自此 npm 依赖，项目只维护类型化的桥接与有界帧校验。WASM 在 Web 作为静态资源交付，在 Native 随应用打包，构建与加载均校验其摘要；客户端构建不从私有 JVM seed 提取 WASM。
+- libwebp 1.6.0 由 `vendor/libwebp` submodule 固定。WebP 编码 WASM 随 Web 和 Native 交付，原 `COPYING` 和 `PATENTS` 从该提交输出为 `libwebp.txt`。项目仅维护有界编码接口，Flutter 的阅读图片解码不使用此 WASM。
 - Gson、Jsoup、OkHttp、Okio、Kotlin、Android ABI 及其他 JVM 依赖的版本和文件摘要在 `toolchain-lock.json` 的 runtime seed 中固定，各库原许可见其 JAR 的 `META-INF`。同名 Java 文件是项目为 TeaVM 提供的适配；例如 Gson `Streams` 提供递归 JSON 读写，未复制完整原库源码。
 
 正式构建中的 `PatchLibraries.java` 仅适配宿主和依赖 JAR，不改写扩展输入 JAR。发布 provenance 记录实际上游提交、材料摘要、工具链和构建输出；编译或初始化通过不代表在线网站语义与图片功能通过。

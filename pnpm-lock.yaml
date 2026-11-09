@@ -292,6 +292,9 @@ importers:
       write-file-atomic:
         specifier: 8.0.0
         version: 8.0.0
+      xz-decompress:
+        specifier: 0.2.3
+        version: 0.2.3
       yauzl:
         specifier: 3.4.0
         version: 3.4.0
@@ -2814,6 +2817,10 @@ packages:
       utf-8-validate:
         optional: true
 
+  xz-decompress@0.2.3:
+    resolution: {integrity: sha512-O8v6HG8T0PrKBcpyWA13GkSYWFvncwzuzcLx5A7++l3HsE3atmoetXjIxrZ/JV/nbvSZ7WS4+3XvREZuVn+rEA==}
+    engines: {node: '>=16'}
+
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
@@ -4806,6 +4813,8 @@ snapshots:
   ws@8.21.0: {}
 
   ws@8.22.0: {}
+
+  xz-decompress@0.2.3: {}
 
   y18n@5.0.8: {}
 

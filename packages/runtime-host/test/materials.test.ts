@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 
 describe('Vite runtime material output', () => {
-  it('contains five classic bridges and the exact npm WASM', () => {
+  it('contains the five classic bridges and both pinned WASM materials', () => {
     expect(catalog.hostScripts.map((item) => item.logicalName)).toEqual([
       'crypto-bridge.js',
       'zstd-bridge.js',
@@ -50,6 +50,12 @@ describe('Vite runtime material output', () => {
           '80260eee5795ee8072bb5821e203730c74dca3909938f5ac1128da67f96223df',
         contentType: 'application/wasm',
       }),
+      expect.objectContaining({
+        logicalName: 'webp-encoder.wasm',
+        sha256: catalog.sources.webpEncoder.sha256,
+        size: catalog.sources.webpEncoder.size,
+        contentType: 'application/wasm',
+      }),
     ]);
     expect(catalog.sources.zstd).toEqual({
       packageName: '@bokuweb/zstd-wasm',
@@ -59,10 +65,15 @@ describe('Vite runtime material output', () => {
         '80260eee5795ee8072bb5821e203730c74dca3909938f5ac1128da67f96223df',
       size: 251806,
     });
-    expect(data.size).toBe(6);
+    expect(catalog.sources.webpEncoder).toMatchObject({
+      version: '1.6.0',
+      upstreamCommit: '4fa21912338357f89e4fd51cf2368325b59e9bd9',
+      compilerVersion: '0.17.0',
+    });
+    expect(data.size).toBe(7);
   });
 
-  it('emits exactly six hash-addressed files whose bytes match the catalog', async () => {
+  it('emits exactly the hash-addressed files whose bytes match the catalog', async () => {
     expect(
       (await readdir(new URL('../dist/materials', import.meta.url))).sort(),
     ).toEqual([...data.keys()].sort());
@@ -84,7 +95,7 @@ describe('Vite runtime material output', () => {
     }
   });
 
-  it('embeds the same six materials into the Native Worker and binds both scripts in its manifest', async () => {
+  it('embeds the same materials into the Native Worker and binds both scripts in its manifest', async () => {
     const nativeManifest: unknown = JSON.parse(
       await readFile(
         new URL('../dist/native/manifest.json', import.meta.url),
@@ -185,7 +196,7 @@ describe('Vite runtime material output', () => {
         artifact.sha256,
       );
     }
-    expect(requests).toHaveLength(6);
+    expect(requests).toHaveLength(data.size);
     expect(requests.every((url) => url.startsWith('/runtime/materials/'))).toBe(
       true,
     );
@@ -198,7 +209,7 @@ describe('Vite runtime material output', () => {
         true,
       ),
     ).rejects.toMatchObject({ code: 'integrity_error' });
-    expect(requests).toHaveLength(6);
+    expect(requests).toHaveLength(data.size);
   });
 });
 

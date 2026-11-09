@@ -290,7 +290,10 @@ test('shared materials use verified host bytes without per-build copies', async 
   const { report, payloads } = await verifyIntegrity(directory);
   assert.equal(report.stages.artifactIntegrity, 'passed');
   assert.equal(report.bundleArtifactCount, 1);
-  assert.equal(report.sharedMaterialCount, 6);
+  assert.equal(
+    report.sharedMaterialCount,
+    catalog.hostScripts.length + catalog.resources.length,
+  );
   for (const material of [...catalog.hostScripts, ...catalog.resources]) {
     assert.deepEqual(
       payloads?.get(material.path)?.bytes,

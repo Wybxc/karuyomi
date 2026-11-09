@@ -17,6 +17,12 @@ import {
   TEXT_WORK_BYTES,
   type TextAlignment,
 } from './text-layout.js';
+import {
+  compileWebpEncoder,
+  encodeWebp,
+  WEBP_HEAP_BYTES,
+  WEBP_MAX_DIMENSION,
+} from './webp-encoder.js';
 type Rect = [number, number, number, number];
 type Matrix = [number, number, number, number, number, number];
 type Point = [number, number];
@@ -426,6 +432,8 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
   let pending = 0;
   let loadingFonts = 0,
     openingDecoders = 0;
+  let canvasWebp: Promise<boolean> | undefined;
+  let webpEncoder: Promise<WebAssembly.Module> | undefined;
   function limit(message: string): Error {
     return Object.assign(Error(message), { code: 'limit_exceeded' });
   }
@@ -630,15 +638,22 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     data: Uint8Array<ArrayBuffer>,
     persistent = false,
   ): { bytes: string; length: number } {
-    const id = teaGraphicsBytesOpen(Math.max(1, data.length)),
+    return outputBytesFrom(data.length, () => data, persistent);
+  }
+  function outputBytesFrom(
+    length: number,
+    data: () => Uint8Array<ArrayBuffer>,
+    persistent = false,
+  ): { bytes: string; length: number } {
+    const id = teaGraphicsBytesOpen(Math.max(1, length)),
       entry = byteHandle(id);
     try {
-      entry.releases.push(reserve(data.length));
-      if (persistent) entry.javaRelease = reserve(data.length, data.length);
-      entry.data = data;
-      entry.length = data.length;
+      entry.releases.push(reserve(length));
+      if (persistent) entry.javaRelease = reserve(length, length);
+      entry.data = data();
+      entry.length = length;
       entry.persistent = persistent;
-      return { bytes: id, length: data.length };
+      return { bytes: id, length };
     } catch (error) {
       closeBytes(id);
       throw error;
@@ -1071,6 +1086,32 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
       release();
     }
   }
+  function canvasEncodesWebp(): Promise<boolean> {
+    if (canvasWebp) return canvasWebp;
+    // A small probe avoids encoding an entire image as PNG on browsers that
+    // silently substitute PNG when asked to encode WebP.
+    const release = reserve(CHUNK + 4, 4);
+    canvasWebp = (async () => {
+      let canvas: OffscreenCanvas | undefined;
+      try {
+        canvas = new OffscreenCanvas(1, 1);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return false;
+        ctx.fillRect(0, 0, 1, 1);
+        const blob = await canvas.convertToBlob({
+          type: 'image/webp',
+          quality: 0.8,
+        });
+        return blob.type === 'image/webp';
+      } catch {
+        return false;
+      } finally {
+        if (canvas) canvas.width = canvas.height = 0;
+        release();
+      }
+    })();
+    return canvasWebp;
+  }
   async function asynchronous(
     a: GraphicsRequest,
     owner: GraphicsContext,
@@ -1123,30 +1164,73 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
             : a.format === 'PNG'
               ? 'image/png'
               : 'image/webp';
-      // convertToBlob has no cancellation API. Hold its source and reservation
-      // until it settles, even when the owning Source operation is cancelled.
-      const release = reserve(BODY);
+      // Browser encoding cannot be cancelled. Keep the source pinned through
+      // the capability check, the encode, and any WebAssembly compilation.
       s.pins++;
       try {
-        const blob = await s.canvas.convertToBlob({
-          type,
-          quality: a.quality / 100,
-        });
-        check(owner);
-        if (blob.type !== type) return { ok: false };
-        if (blob.size > BODY) throw limit('Encoded bitmap exceeds byte budget');
-        const copyRelease = reserve(blob.size);
-        try {
-          const data = new Uint8Array(await blob.arrayBuffer());
+        if (type !== 'image/webp' || (await canvasEncodesWebp())) {
           check(owner);
-          return { ok: true, mime: type, ...outputBytes(data) };
+          const release = reserve(BODY);
+          try {
+            const blob = await s.canvas.convertToBlob({
+              type,
+              quality: a.quality / 100,
+            });
+            check(owner);
+            if (blob.type === type) {
+              if (blob.size > BODY)
+                throw limit('Encoded bitmap exceeds byte budget');
+              const copyRelease = reserve(blob.size);
+              try {
+                const data = new Uint8Array(await blob.arrayBuffer());
+                check(owner);
+                return { ok: true, mime: type, ...outputBytes(data) };
+              } finally {
+                copyRelease();
+              }
+            }
+            if (type !== 'image/webp') return { ok: false };
+          } finally {
+            release();
+          }
+        }
+        check(owner);
+        const { width, height } = s.canvas;
+        if (width > WEBP_MAX_DIMENSION || height > WEBP_MAX_DIMENSION)
+          throw limit('Bitmap dimensions exceed WebP encoder limits');
+        let module: WebAssembly.Module;
+        try {
+          module = await (webpEncoder ??= compileWebpEncoder());
         } finally {
-          copyRelease();
+          check(owner);
+        }
+        // The imported heap includes all codec scratch, WASM input and output.
+        // Account for the Canvas RGBA readback separately before allocating it.
+        const workingBytes = WEBP_HEAP_BYTES + width * height * 4;
+        const release = reserve(workingBytes, workingBytes);
+        try {
+          const { data } = s.ctx.getImageData(0, 0, width, height, {
+            colorSpace: 'srgb',
+          });
+          const encoded = encodeWebp(
+            module,
+            data,
+            width,
+            height,
+            Math.min(100, Math.max(0, a.quality)),
+            BODY,
+            (bytes) => {
+              check(owner);
+              return outputBytesFrom(bytes.length, () => bytes.slice());
+            },
+          );
+          return encoded ? { ok: true, mime: type, ...encoded } : { ok: false };
+        } finally {
+          release();
         }
       } finally {
         s.pins--;
         releaseSurface(s);
-        release();
       }
     }
     if (a.op === 'openDecoder') {

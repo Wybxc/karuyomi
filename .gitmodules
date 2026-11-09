@@ -8,3 +8,6 @@
 [submodule "vendor/teavm"]
 	path = vendor/teavm
 	url = https://github.com/konsoletyper/teavm.git
+[submodule "vendor/libwebp"]
+	path = vendor/libwebp
+	url = https://github.com/webmproject/libwebp.git

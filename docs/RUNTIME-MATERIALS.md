@@ -6,14 +6,17 @@
 
 `runtime/teavm/bridge/` 的 crypto、zstd、graphics、cache、file 五个桥使用严格 TypeScript。产品构建由 Vite CLI 读取声明式多环境配置，按两阶段执行：
 
-1. `packages/runtime-host/vite.materials.config.ts` 声明五个独立 classic IIFE。`vite.runtime-plugin.ts` 的构建 hook 根据最终字节生成内容寻址材料和 catalog，并加入固定 Zstd WASM。
-2. `packages/runtime-host/vite.config.ts` 声明 Web host ESM、Web Worker classic IIFE，以及独立的 Native host/Worker classic IIFE。同一 `vite.runtime-plugin.ts` 读取已生成材料，生成 Native 材料虚拟模块与运行时 manifest；六份 Source 材料只内嵌到 Native Worker。
+1. `build:materials` 先准备固定 WebP 编码器，再由 `packages/runtime-host/vite.materials.config.ts` 声明五个独立 classic IIFE。`vite.runtime-plugin.ts` 的构建 hook 根据最终字节生成内容寻址材料和 catalog，并加入固定 Zstd 和 WebP WASM。
+2. `packages/runtime-host/vite.config.ts` 声明 Web host ESM、Web Worker classic IIFE，以及独立的 Native host/Worker classic IIFE。同一 `vite.runtime-plugin.ts` 读取已生成材料，生成 Native 材料虚拟模块与运行时 manifest；七份 Source 材料只内嵌到 Native Worker。
 
 资源生成和 Native 内嵌集中在现有 Vite 插件中；独立的 `materials.ts` 已删除。`@karuyomi/contracts` 仅提供纯 `runtimeMaterialCatalogSchema` 模型及其类型。工具与测试在调用点直接使用 `readFile` 读取 `dist/materials.json`，再用 `runtimeMaterialCatalogSchema.parse(JSON.parse(...))` 校验；按 catalog 路径读取需要的字节。材料读取不启动编译，缺少产物时先运行对应 CLI。
 
 Zstd 上游 JS glue 与 WASM 来自 pnpm 精确锁定的 `@bokuweb/zstd-wasm@0.0.27`。项目只维护有界 codec 与桥封装，不复制上游生成代码。WASM 固定为 251,806 bytes，SHA-256 `80260eee5795ee8072bb5821e203730c74dca3909938f5ac1128da67f96223df`；来源和许可见 [NOTICE](../runtime/teavm/NOTICE.md)，tarball 完整性由 `pnpm-lock.yaml` 固定。
 
+`webp-encoder.wasm` 由 `vendor/libwebp` 的官方固定提交构建，Zig 版本、下载摘要和构建输入由 `runtime/teavm/toolchain/webp/` 固定。`pnpm webp:prepare` 可单独准备，不使用 PATH 上的编译器或私有 JVM seed。AOT 构建与宿主复用同一个已准备产物，Vite 不启动编译器。只在 Source 的 Canvas 无法生成要求的 WebP 时使用这个编码器，正常 Flutter 图片解码不受影响。上游许可随 Web 和 Native 交付，见 [NOTICE](../runtime/teavm/NOTICE.md)。
+
 ```sh
+git submodule update --init --depth 1 vendor/libwebp
 pnpm install --frozen-lockfile
 pnpm typecheck
 # 只生成共享材料，供 AOT 构建与材料读取使用
@@ -24,17 +27,17 @@ pnpm --filter @karuyomi/runtime-host build
 pnpm build:native-assets
 ```
 
-普通客户端构建不需要私有 JVM seed 或 SDK 编译。catalog 只包含五桥与 Zstd WASM 六份正式材料，已删除闲置的 codec 字段。未被默认产品采用、缺少性能依据的图片 codec 候选源码、专属工具与构建配置已删除；图片由 Flutter/UI 直接解码。历史机制与限定结果保留在 [codec 记录](verification/long-image-codec.md)，不构成当前资源交付或性能验收。
+普通客户端构建不需要私有 JVM seed 或 Android SDK 编译。catalog 只包含五桥和两份 WASM。此前为 Flutter 阅读解码评估的 codec 候选已删除；其[历史记录](verification/long-image-codec.md)与 Source 图形桥的编码能力是不同的边界。
 
 | 生成输出                                                              | 用途                                          |
 | --------------------------------------------------------------------- | --------------------------------------------- |
-| `packages/runtime-host/dist/materials.json`                           | 当前六份产品材料、来源及 materialVersion      |
-| `packages/runtime-host/dist/materials/<sha256>`                       | 五桥与 Zstd WASM 的 Web 静态字节              |
+| `packages/runtime-host/dist/materials.json`                           | 当前七份产品材料、来源及 materialVersion      |
+| `packages/runtime-host/dist/materials/<sha256>`                       | 五桥与 Zstd、WebP WASM 的 Web 静态字节        |
 | `packages/runtime-host/dist/{host.js,worker.js}`                      | Web host ESM 与独立 classic Worker            |
-| `packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}` | Native 运行时；六份 Source 材料在 Worker 内嵌 |
+| `packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}` | Native 运行时；七份 Source 材料在 Worker 内嵌 |
 | `apps/reader/assets/runtime/{host.js,worker.js,manifest.json}`        | cpy-cli 复制的 Flutter 应用资源，不入库       |
 
-`materialVersion` 覆盖协议、ABI、材料顺序、路径、摘要、长度和 MIME。同一源码与锁定依赖须生成一致 catalog。当前 host ABI 为 `karuyomi-source-host-v4`、protocolVersion 为 2；Web/Native 材料与扩展须按同一身份重建。扩展 AOT 另有输入指纹与 bundle 摘要，Vite 配置及依赖锁属于构建输入。
+`materialVersion` 覆盖协议、ABI、材料顺序、路径、摘要、长度和 MIME。同一源码与锁定依赖须生成一致 catalog。当前 host ABI 为 `karuyomi-source-host-v6`、protocolVersion 为 2；Web/Native 材料与扩展须按同一身份重建。扩展 AOT 另有输入指纹与 bundle 摘要，Vite 配置及依赖锁属于构建输入。
 
 ## Web 与 Native
 

@@ -39,7 +39,8 @@
     "test:cloudflare-probe": "node --test tools/cloudflare/*.test.ts",
     "test:build": "pnpm --filter @karuyomi/runtime-host build && pnpm --filter @karuyomi/api exec vite build --config vite.test.config.ts",
     "test:browser": "vitest --config packages/runtime-host/vitest.browser.config.ts",
-    "build:native-assets": "cpy \"packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}\" apps/reader/assets/runtime --flat",
+    "build:native-assets": "cpy \"packages/runtime-host/dist/native/{host.js,worker.js,manifest.json}\" packages/runtime-host/dist/notices/libwebp.txt apps/reader/assets/runtime --flat",
+    "webp:prepare": "node scripts/prepare-webp-encoder.ts",
     "acceptance:build": "pnpm build && pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts",
     "acceptance:serve": "pnpm --filter @karuyomi/api exec node test/acceptance.ts",
     "acceptance:build:native": "pnpm build && pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts --mode native-acceptance",
@@ -87,6 +88,7 @@
     "vitest": "4.1.12",
     "wrangler": "4.156.1",
     "write-file-atomic": "8.0.0",
+    "xz-decompress": "0.2.3",
     "yauzl": "3.4.0",
     "zod": "4.6.7"
   }

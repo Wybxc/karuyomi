@@ -196,3 +196,11 @@ Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 
 在上节同一 iOS 模拟器、同一 ToonLook v6 AOT 和新的隔离 HTTPS/D1 中，仅在独立副本的 Worker 用该探针替换 Canvas 的错误格式输出：从已经由 Source 绘制完的 surface 读 RGBA，以原质量参数编码，校验 RIFF/WebP 签名，再经原图形桥和原图片交付。共享材料 catalog SHA-256 仍为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。真实《Doomed》首章 10 页逐页显示并显式确认完成，经「下一章」保存第二章第 7 页（720 × 5,000）；新进程从书架首次显示第 7 页并读到第 10 页。独立 HTTPS 读回确认首章保持完成，当前和最远均为第 10 页；第二章当前和最远从第 7 页到第 10 页，仍未完成，反向章序保留。账户／作品 revision `2/1 → 9/8 → 11/10`。诊断对照、探针补丁、复验参数、帧日志和机器核验见 `.local/ios-toonlook-v6-68e5e0.t6QMCa/evidence/`。
 
 此门证明通用编码可恢复这一真实 Source 的阅读，不代表生产已经修复。探针的临时 Canvas 包装及内联 WASM 不进入产品；正式共享材料装配、图形账本、取消与释放、其它平台及真机仍待验收。未修改冻结输入或部署，产物仍为 `compiled_unverified`。
+
+## 正式 WebP 编码材料与图形桥
+
+2026-11-10，从固定 libwebp 1.6.0 提交 `4fa21912338357f89e4fd51cf2368325b59e9bd9` 和校验过的官方 Zig 0.17.0 在 macOS arm64 与 clab Linux x64 独立准备。相同的低内存编码配方和导入内存 ABI 生成 176,717 B，SHA-256 同为 `29e4972e12f6239d00e7832ed406108fc4d964d0d55ffeb2d1c2946836a57738`，摘要和长度已进入工具链锁。Linux 在冻结批次之外使用隔离目录、低优先级，未修改或重启在途 AOT。
+
+同一正式 WASM 在 Node 24.15.0 用两种确定性 720 × 5,000 RGBA 输入、质量 90 运行：结构图输出 786,652 B，线性内存容量高点 45.875 MiB；高噪声图输出 3,017,796 B，线性内存容量高点 57.875 MiB。两份字节均通过 RIFF/WebP 签名校验；高噪声输出另经官方 `dwebp` 解码。容量测量不含 Canvas、JS、进程 RSS 或 GPU。图形桥分项用正式材料验证 Canvas 优先、能力探针、长图编码、输出租约和取消；Vite 材料测试检查 Web 静态路径、实际字节与 Native 内置集合一致。
+
+复验先 `git submodule update --init --depth 1 vendor/libwebp`，运行 `pnpm webp:prepare`，再 `pnpm --filter @karuyomi/runtime-host build` 和 `pnpm exec vitest run packages/runtime-host/test/graphics-bridge.test.ts packages/runtime-host/test/materials.test.ts`。本轮是正式材料与桥的工程验收；原 Source 仍须用新材料身份重编后，在正式 iOS 包复验，不以早前隔离探针代替。新材料未部署。

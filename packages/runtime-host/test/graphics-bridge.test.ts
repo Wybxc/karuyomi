@@ -1,8 +1,17 @@
 /** Controlled codec timing tests; real Canvas semantics run in browser/bridges.browser.test.ts. */
+import { readFile } from 'node:fs/promises';
+import { runtimeMaterialCatalogSchema } from '@karuyomi/contracts';
+import { imageDimensionsFromData } from 'image-dimensions';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createGraphicsBridge } from '../../../runtime/teavm/bridge/graphics-bridge.js';
+import { WEBP_HEAP_BYTES } from '../../../runtime/teavm/bridge/webp-encoder.js';
 import { deferred, pngHeader } from './image-fixtures.js';
 
+const readPixels = vi.fn(
+  (_x: number, _y: number, width: number, height: number) => ({
+    data: new Uint8ClampedArray(width * height * 4),
+  }),
+);
 class Canvas {
   width: number;
   height: number;
@@ -13,22 +22,22 @@ class Canvas {
   getContext() {
     return {
       drawImage() {},
-      getImageData: (
-        _x: number,
-        _y: number,
-        width: number,
-        height: number,
-      ) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+      fillRect() {},
+      getImageData: readPixels,
     };
   }
-  convertToBlob() {
+  convertToBlob(_options?: ImageEncodeOptions) {
     return Promise.resolve(
       new Blob([pngHeader(this.width, this.height)], { type: 'image/png' }),
     );
   }
 }
 beforeEach(() => vi.stubGlobal('OffscreenCanvas', Canvas));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  readPixels.mockReset();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 const identity = { requestId: 'graphics', generation: 'generation' };
 function opened(options: Parameters<typeof createGraphicsBridge>[0] = {}) {
   const bridge = createGraphicsBridge(options);
@@ -186,6 +195,274 @@ test('encoding pins recycled source until pending browser work finishes, cancell
   expect(b.teaGraphicsSnapshot().rasterBytes).toBe(24);
   gate.resolve(new Blob([pngHeader()], { type: 'image/png' }));
   await rejected;
+  expect(b.teaGraphicsSnapshot().totalBytes).toBe(0);
+});
+test('Canvas keeps its native encode path and probes lossy WebP once', async () => {
+  const native = vi
+      .spyOn(Canvas.prototype, 'convertToBlob')
+      .mockImplementation(async (options) => new Blob(['test'], options)),
+    compile = vi.spyOn(WebAssembly, 'compile');
+  const b = opened(),
+    image = b.teaGraphicsSync({ op: 'create', width: 2, height: 3 });
+  for (const [format, mime] of [
+    ['JPEG', 'image/jpeg'],
+    ['PNG', 'image/png'],
+    ['WEBP', 'image/webp'],
+    ['WEBP_LOSSY', 'image/webp'],
+  ]) {
+    const encoded = await b.teaGraphicsAsync({
+      op: 'encode',
+      id: image.id,
+      format,
+      quality: 45,
+    });
+    expect(encoded).toMatchObject({ ok: true, mime });
+    b.teaGraphicsBytesClose(handle(encoded));
+  }
+  expect(
+    await b.teaGraphicsAsync({ op: 'encode', format: 'WEBP_LOSSLESS' }),
+  ).toEqual({ ok: false });
+  expect(native.mock.calls.map(([options]) => options)).toEqual([
+    { type: 'image/jpeg', quality: 0.45 },
+    { type: 'image/png', quality: 0.45 },
+    { type: 'image/webp', quality: 0.8 },
+    { type: 'image/webp', quality: 0.45 },
+    { type: 'image/webp', quality: 0.45 },
+  ]);
+  expect(compile).not.toHaveBeenCalled();
+  expect(readPixels).not.toHaveBeenCalled();
+  b.teaGraphicsEnd(identity.requestId, identity.generation);
+  expect(b.teaGraphicsSnapshot().totalBytes).toBe(0);
+});
+
+async function webpMaterial(): Promise<string> {
+  const catalog = runtimeMaterialCatalogSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL('../dist/materials.json', import.meta.url),
+        'utf8',
+      ),
+    ),
+  );
+  const artifact = catalog.resources.find(
+    (entry) => entry.logicalName === 'webp-encoder.wasm',
+  );
+  if (!artifact) throw Error('Missing generated WebP encoder');
+  const wasm = await readFile(
+    new URL('../dist/materials/' + artifact.sha256, import.meta.url),
+  );
+  const url = URL.createObjectURL(
+    new Blob([wasm], { type: artifact.contentType }),
+  );
+  vi.stubGlobal('karuyomiResources', { 'webp-encoder.wasm': url });
+  return url;
+}
+test.each([false, true])(
+  'encodes real pixels with the bundled codec when Canvas reports WebP=%s but returns PNG',
+  async (reportsWebp) => {
+    const url = await webpMaterial();
+    try {
+      const native = vi
+          .spyOn(Canvas.prototype, 'convertToBlob')
+          .mockImplementation(function (this: Canvas) {
+            const type =
+              reportsWebp && this.width === 1 ? 'image/webp' : 'image/png';
+            return Promise.resolve(new Blob(['test'], { type }));
+          }),
+        compile = vi.spyOn(WebAssembly, 'compile');
+      const b = opened(),
+        width = 64,
+        height = 49,
+        image = b.teaGraphicsSync({ op: 'create', width, height });
+      const baseline = b.teaGraphicsSnapshot().totalBytes;
+      const pixels = Uint8ClampedArray.from(
+        { length: width * height * 4 },
+        (_, i) =>
+          i % 4 === 3 ? 255 : (i * 31 + Math.floor(i / 37) * 53) % 256,
+      );
+      readPixels.mockImplementation(() => {
+        expect(b.teaGraphicsSnapshot().rasterBytes).toBe(
+          WEBP_HEAP_BYTES + 2 * pixels.length,
+        );
+        return { data: pixels };
+      });
+      const outputs: Uint8Array[] = [];
+      for (const quality of [10, 90]) {
+        const encoded = await b.teaGraphicsAsync({
+          op: 'encode',
+          id: image.id,
+          format: 'WEBP_LOSSY',
+          quality,
+        });
+        expect(encoded).toMatchObject({ ok: true, mime: 'image/webp' });
+        const id = handle(encoded),
+          bytes = b.teaGraphicsBytesRead(id, 65536);
+        if (!bytes) throw Error('Missing WebP output');
+        expect(bytes.length).toBe(encoded.length);
+        expect(imageDimensionsFromData(bytes)).toMatchObject({
+          width,
+          height,
+          type: 'webp',
+        });
+        expect(b.teaGraphicsBytesRead(id, 65536)).toBeNull();
+        expect(b.teaGraphicsSnapshot().totalBytes).toBe(
+          baseline + bytes.length,
+        );
+        outputs.push(bytes);
+        b.teaGraphicsBytesClose(id);
+        expect(b.teaGraphicsSnapshot().totalBytes).toBe(baseline);
+      }
+      expect(outputs[0]).not.toEqual(outputs[1]);
+      expect(native).toHaveBeenCalledTimes(reportsWebp ? 3 : 1);
+      expect(compile).toHaveBeenCalledOnce();
+      expect(readPixels).toHaveBeenCalledTimes(2);
+      b.teaGraphicsEnd(identity.requestId, identity.generation);
+      expect(b.teaGraphicsSnapshot().totalBytes).toBe(0);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  },
+);
+
+test('the bundled codec cannot publish output when the byte handle has no remaining budget', async () => {
+  const url = await webpMaterial();
+  try {
+    const rasterBytes = 2 * 3 * 4,
+      b = opened({ totalBytes: 2 * 65536 + WEBP_HEAP_BYTES + 2 * rasterBytes }),
+      image = b.teaGraphicsSync({ op: 'create', width: 2, height: 3 });
+    const baseline = b.teaGraphicsSnapshot();
+    await expect(
+      b.teaGraphicsAsync({ op: 'encode', id: image.id, format: 'WEBP' }),
+    ).rejects.toMatchObject({ code: 'limit_exceeded' });
+    expect(readPixels).toHaveBeenCalledOnce();
+    expect(b.teaGraphicsSnapshot()).toEqual(baseline);
+    b.teaGraphicsEnd(identity.requestId, identity.generation);
+    expect(b.teaGraphicsSnapshot().totalBytes).toBe(0);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+});
+
+test('the bundled codec encodes and transfers a tall 720 × 5000 raster within the default budgets', async () => {
+  const url = await webpMaterial();
+  try {
+    const b = opened(),
+      width = 720,
+      height = 5000,
+      image = b.teaGraphicsSync({ op: 'create', width, height });
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    let noise = 1;
+    for (let i = 0; i < pixels.length; i += 4) {
+      noise ^= noise << 13;
+      noise ^= noise >>> 17;
+      noise ^= noise << 5;
+      // Banded tones with independent texture in each color channel.
+      const tone = Math.floor(i / 4 / width) % 256;
+      pixels[i] = (tone + (noise & 15)) & 255;
+      pixels[i + 1] = (tone + ((noise >>> 8) & 15)) & 255;
+      pixels[i + 2] = (tone + ((noise >>> 16) & 15)) & 255;
+      pixels[i + 3] = 255;
+    }
+    readPixels.mockReturnValue({ data: pixels });
+    const baseline = b.teaGraphicsSnapshot().totalBytes;
+    const result = await b.teaGraphicsAsync({
+      op: 'encode',
+      id: image.id,
+      format: 'WEBP_LOSSY',
+      quality: 90,
+    });
+    expect(result).toMatchObject({ ok: true, mime: 'image/webp' });
+    const id = handle(result),
+      first = b.teaGraphicsBytesRead(id, 65536);
+    if (!first) throw Error('Missing WebP output');
+    expect(imageDimensionsFromData(first)).toMatchObject({
+      width,
+      height,
+      type: 'webp',
+    });
+    let transferred = first.length;
+    for (
+      let chunk = b.teaGraphicsBytesRead(id, 65536);
+      chunk;
+      chunk = b.teaGraphicsBytesRead(id, 65536)
+    )
+      transferred += chunk.length;
+    expect(transferred).toBe(result.length);
+    expect(b.teaGraphicsSnapshot().totalBytes).toBe(baseline + transferred);
+    b.teaGraphicsBytesClose(id);
+    b.teaGraphicsEnd(identity.requestId, identity.generation);
+    expect(b.teaGraphicsSnapshot()).toMatchObject({
+      totalBytes: 0,
+      handles: 0,
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+});
+
+test('a missing verified WebP resource never triggers a network fetch or publishes bytes', async () => {
+  vi.stubGlobal('karuyomiResources', {
+    'webp-encoder.wasm': 'https://example.invalid/webp-encoder.wasm',
+  });
+  const fetch = vi.spyOn(globalThis, 'fetch');
+  const b = opened(),
+    image = b.teaGraphicsSync({ op: 'create', width: 2, height: 3 });
+  await expect(
+    b.teaGraphicsAsync({ op: 'encode', id: image.id, format: 'WEBP' }),
+  ).rejects.toMatchObject({ code: 'unsupported_capability' });
+  expect(fetch).not.toHaveBeenCalled();
+  expect(readPixels).not.toHaveBeenCalled();
+  b.teaGraphicsEnd(identity.requestId, identity.generation);
+  expect(b.teaGraphicsSnapshot()).toMatchObject({ totalBytes: 0, handles: 0 });
+});
+
+test('WebP cancellation holds the recycled source during compilation and discards the late result', async () => {
+  const compiling = deferred<void>(),
+    compiled = deferred<WebAssembly.Module>();
+  vi.stubGlobal('karuyomiResources', { 'webp-encoder.wasm': 'blob:verified' });
+  vi.stubGlobal('fetch', () => Promise.resolve(new Response()));
+  vi.spyOn(WebAssembly, 'compile').mockImplementation(() => {
+    compiling.resolve();
+    return compiled.promise;
+  });
+  const b = opened(),
+    image = b.teaGraphicsSync({ op: 'create', width: 2, height: 3 }),
+    operation = b.teaGraphicsAsync({
+      op: 'encode',
+      id: image.id,
+      format: 'WEBP',
+    }),
+    rejected = expect(operation).rejects.toMatchObject({ code: 'cancelled' });
+  await compiling.promise;
+  b.teaGraphicsSync({ op: 'recycle', id: image.id });
+  b.teaGraphicsCancel(identity.requestId, identity.generation);
+  b.teaGraphicsEnd(identity.requestId, identity.generation);
+  expect(b.teaGraphicsSnapshot().rasterBytes).toBe(24);
+  compiled.resolve(
+    new WebAssembly.Module(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])),
+  );
+  await rejected;
+  expect(readPixels).not.toHaveBeenCalled();
+  expect(b.teaGraphicsSnapshot()).toMatchObject({ totalBytes: 0, handles: 0 });
+});
+
+test('WebP reserves the imported heap and Canvas readback before touching pixels', async () => {
+  vi.stubGlobal('karuyomiResources', { 'webp-encoder.wasm': 'blob:verified' });
+  vi.stubGlobal('fetch', () => Promise.resolve(new Response()));
+  vi.spyOn(WebAssembly, 'compile').mockResolvedValue(
+    new WebAssembly.Module(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])),
+  );
+  const b = opened({ rasterBytes: WEBP_HEAP_BYTES + 2 * 24 - 1 }),
+    image = b.teaGraphicsSync({ op: 'create', width: 2, height: 3 });
+  await expect(
+    b.teaGraphicsAsync({ op: 'encode', id: image.id, format: 'WEBP' }),
+  ).rejects.toMatchObject({ code: 'limit_exceeded' });
+  expect(readPixels).not.toHaveBeenCalled();
+  expect(b.teaGraphicsSnapshot()).toMatchObject({
+    rasterBytes: 24,
+    handles: 0,
+  });
+  b.teaGraphicsEnd(identity.requestId, identity.generation);
   expect(b.teaGraphicsSnapshot().totalBytes).toBe(0);
 });
 test('decoder and detached Java frame have independent persistent leases', async () => {

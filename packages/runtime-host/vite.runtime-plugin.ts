@@ -11,6 +11,10 @@ import {
   type RuntimeMaterialArtifact,
   type RuntimeMaterialCatalog,
 } from '@karuyomi/contracts';
+import {
+  readPreparedWebpEncoder,
+  readWebpEncoderSource,
+} from '../../tools/teavm/webp.ts';
 import { z } from 'zod';
 import { transformWithOxc, type Plugin, type Rolldown } from 'vite';
 
@@ -28,6 +32,9 @@ const zstdSource = Object.freeze({
 const digest = (bytes: Uint8Array): string =>
   createHash('sha256').update(bytes).digest('hex');
 const bridgeEntry = 'virtual:karuyomi-runtime-bridge/';
+const wasmMime = 'application/wasm';
+const zstdName = 'zstd.wasm';
+const webpName = 'webp-encoder.wasm';
 
 function singleScript(bundle: Rolldown.OutputBundle): Rolldown.OutputChunk {
   const outputs = Object.values(bundle);
@@ -58,6 +65,19 @@ function materialArtifact(
   };
 }
 
+function wasmArtifact(
+  logicalName: string,
+  { sha256, size }: { sha256: string; size: number },
+): RuntimeMaterialArtifact {
+  return {
+    logicalName,
+    path: '/runtime/materials/' + sha256,
+    sha256,
+    size,
+    contentType: wasmMime,
+  };
+}
+
 async function packageBuiltMaterials(scripts: ReadonlyMap<string, Buffer>) {
   const data = new Map<string, { bytes: Buffer; contentType: string }>();
   const hostScripts = scriptNames.map((name) => {
@@ -84,15 +104,13 @@ async function packageBuiltMaterials(scripts: ReadonlyMap<string, Buffer>) {
   const wasm = await readFile(path.join(packageDirectory, zstdSource.file));
   if (digest(wasm) !== zstdSource.sha256 || wasm.length !== zstdSource.size)
     throw new Error('Pinned zstd WASM digest/size mismatch');
-  const resource: RuntimeMaterialArtifact = {
-    logicalName: 'zstd.wasm',
-    path: '/runtime/materials/' + zstdSource.sha256,
-    sha256: zstdSource.sha256,
-    size: zstdSource.size,
-    contentType: 'application/wasm',
-  };
-  data.set(resource.sha256, { bytes: wasm, contentType: resource.contentType });
-  const resources = [resource];
+  const webp = readPreparedWebpEncoder();
+  const resources = [
+    wasmArtifact(zstdName, zstdSource),
+    wasmArtifact(webpName, webp.source),
+  ];
+  data.set(zstdSource.sha256, { bytes: wasm, contentType: wasmMime });
+  data.set(webp.source.sha256, { bytes: webp.bytes, contentType: wasmMime });
   const identity = {
     protocolVersion,
     hostAbi,
@@ -108,7 +126,7 @@ async function packageBuiltMaterials(scripts: ReadonlyMap<string, Buffer>) {
     materialVersion: digest(Buffer.from(JSON.stringify(identity))),
     hostScripts,
     resources,
-    sources: { zstd: zstdSource },
+    sources: { zstd: zstdSource, webpEncoder: webp.source },
   });
   return { catalog, data };
 }
@@ -160,11 +178,21 @@ export function runtimeMaterialAssets(): Plugin {
         fileName: 'materials.json',
         source: JSON.stringify(catalog, null, 2) + '\n',
       });
+      const [license, patents] = await Promise.all(
+        ['COPYING', 'PATENTS'].map((name) =>
+          readFile(path.join(root, 'vendor/libwebp', name), 'utf8'),
+        ),
+      );
+      this.emitFile({
+        type: 'asset',
+        fileName: 'notices/libwebp.txt',
+        source: `${license}\n${patents}`,
+      });
     },
   };
 }
 
-/** Native is the same six Web materials embedded as independently owned bytes. */
+/** Native embeds the same Web materials as independently owned bytes. */
 export async function nativeRuntimeAssets(): Promise<Plugin> {
   let catalog: RuntimeMaterialCatalog;
   try {
@@ -180,19 +208,39 @@ export async function nativeRuntimeAssets(): Promise<Plugin> {
     );
   }
   const source = catalog.sources.zstd;
+  const webp = readWebpEncoderSource();
+  const webpSource = catalog.sources.webpEncoder;
+  const expectedResources = [
+    wasmArtifact(zstdName, zstdSource),
+    wasmArtifact(webpName, webp),
+  ];
   if (
     catalog.protocolVersion !== protocolVersion ||
     catalog.hostAbi !== hostAbi ||
     catalog.runtimeBaseline !== runtimeBaseline ||
     catalog.hostScripts.map((entry) => entry.logicalName).join('\n') !==
       scriptNames.map((name) => name + '-bridge.js').join('\n') ||
-    catalog.resources.length !== 1 ||
-    catalog.resources[0]?.sha256 !== zstdSource.sha256 ||
+    catalog.resources.length !== expectedResources.length ||
+    expectedResources.some((expected, index) => {
+      const actual = catalog.resources[index];
+      return (
+        actual?.logicalName !== expected.logicalName ||
+        actual.path !== expected.path ||
+        actual.sha256 !== expected.sha256 ||
+        actual.size !== expected.size ||
+        actual.contentType !== expected.contentType
+      );
+    }) ||
     source.packageName !== zstdSource.packageName ||
     source.version !== zstdSource.version ||
     source.file !== zstdSource.file ||
     source.sha256 !== zstdSource.sha256 ||
-    source.size !== zstdSource.size
+    source.size !== zstdSource.size ||
+    webpSource.version !== webp.version ||
+    webpSource.upstreamCommit !== webp.upstreamCommit ||
+    webpSource.compilerVersion !== webp.compilerVersion ||
+    webpSource.sha256 !== webp.sha256 ||
+    webpSource.size !== webp.size
   )
     throw new Error(
       'Generated product material catalog contains unexpected assets',
