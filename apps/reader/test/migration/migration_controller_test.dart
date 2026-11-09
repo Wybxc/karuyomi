@@ -143,7 +143,7 @@ void main() {
       expect(controller.sources.single.source.id, _targetId);
       await controller.chooseSource(controller.sources.single);
       await controller.search('原作品');
-      await controller.search('ignored', more: true);
+      await controller.loadMore();
       final searches = platform.invocations
           .where((call) => call.hasSearch())
           .toList();
@@ -630,8 +630,28 @@ void main() {
   }
 
   testWidgets(
-    'wizard makes the target and mapping visible before explicit migration confirmation',
+    'wizard browses a target without search results and filters marks before confirmation',
     (tester) async {
+      final normal = platform.invokeHandler!;
+      platform.invokeHandler = (call) async {
+        if (call.hasSearch()) {
+          return wire.SourceResult(mangaPage: wire.MangaPage());
+        }
+        if (call.hasPopular()) {
+          return wire.SourceResult(
+            mangaPage: wire.MangaPage(
+              mangas: [
+                if (call.popular.page == 1)
+                  _target
+                else
+                  wire.Manga(url: '/another', title: '第二页作品'),
+              ],
+              hasNextPage: call.popular.page == 1,
+            ),
+          );
+        }
+        return normal(call);
+      };
       await tester.binding.setSurfaceSize(const Size(700, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
@@ -651,11 +671,44 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('migration-search-submit')));
       await tester.pumpAndSettle();
+      expect(find.text('没有搜索结果，可尝试浏览目标源热门作品。'), findsOneWidget);
+      expect(platform.invocations.where((call) => call.hasPopular()), isEmpty);
+      await tester.tap(find.byKey(const ValueKey('migration-popular')));
+      await tester.pumpAndSettle();
+      expect(find.text('目标作品'), findsOneWidget);
+      final more = find.byKey(const ValueKey('migration-search-more'));
+      await tester.ensureVisible(more);
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      expect(find.text('第二页作品'), findsOneWidget);
+      final popular = platform.invocations.where((call) => call.hasPopular());
+      expect(popular.map((call) => call.popular.page), [1, 2]);
+      expect(popular.every((call) => call.sourceId == _targetId), true);
+      expect(find.text('没有搜索结果，可尝试浏览目标源热门作品。'), findsNothing);
       await tester.ensureVisible(
         find.byKey(const ValueKey(('migration-result', 0))),
       );
       await tester.tap(find.byKey(const ValueKey(('migration-result', 0))));
       await tester.pumpAndSettle();
+      final filter = find.byKey(const ValueKey('migration-only-marked'));
+      final scroller = find.byType(Scrollable).first;
+      final marked = find.byKey(
+        ValueKey(('migration-map-selected', sequence.entries[0].key)),
+      );
+      final unmarked = find.byKey(
+        ValueKey(('migration-map-selected', sequence.entries[1].key)),
+      );
+      await tester.scrollUntilVisible(unmarked, 300, scrollable: scroller);
+      expect(unmarked, findsOneWidget);
+      await tester.ensureVisible(filter);
+      await tester.tap(filter);
+      await tester.pumpAndSettle();
+      expect(unmarked, findsNothing);
+      expect(tester.widget<CheckboxListTile>(marked).value, true);
+      await tester.tap(filter);
+      await tester.pumpAndSettle();
+      expect(unmarked, findsOneWidget);
+      expect(tester.widget<CheckboxListTile>(marked).value, true);
       final confirm = find.byKey(const ValueKey('migration-confirm'));
       await tester.scrollUntilVisible(
         confirm,
@@ -677,6 +730,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('迁移已由服务端确认'), findsOneWidget);
       expect(posts(), hasLength(before + 1));
+      final operation = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(posts().last),
+      );
+      expect(operation.migrateFrom.chapters.single.copyRead, true);
+      expect(operation.migrateFrom.chapters.single.copyBookmark, true);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },

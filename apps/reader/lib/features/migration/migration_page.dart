@@ -27,6 +27,7 @@ class _MigrationPageState extends State<MigrationPage> {
   late final MigrationController controller;
   late final TextEditingController _search;
   int _mappingPage = 0;
+  bool _showMarkedOnly = false;
 
   @override
   void initState() {
@@ -197,8 +198,16 @@ class _MigrationPageState extends State<MigrationPage> {
 
   Widget _preview() {
     final preview = controller.preview!;
-    final mappings = controller.matches;
-    final start = (_mappingPage * 50).clamp(0, mappings.length);
+    final mappings = _showMarkedOnly
+        ? controller.matches.where((match) {
+            final key = match.source.key;
+            return preview.sourceProgress[key]?.completed == true ||
+                preview.sourceBookmarks.contains(key);
+          }).toList()
+        : controller.matches;
+    final lastPage = mappings.isEmpty ? 0 : (mappings.length - 1) ~/ 50;
+    final page = _mappingPage.clamp(0, lastPage);
+    final start = page * 50;
     final end = (start + 50).clamp(0, mappings.length);
     final selected = controller.selectedChapters.length;
     return Column(
@@ -263,22 +272,31 @@ class _MigrationPageState extends State<MigrationPage> {
             onPressed: controller.canChange ? controller.clearSelection : null,
             child: const Text('取消全部章节选择'),
           ),
+          CheckboxListTile(
+            key: const ValueKey('migration-only-marked'),
+            title: const Text('只显示原作已读或有书签的章节'),
+            value: _showMarkedOnly,
+            onChanged: (value) => setState(() {
+              _showMarkedOnly = value ?? false;
+              _mappingPage = 0;
+            }),
+          ),
+          if (_showMarkedOnly && mappings.isEmpty)
+            const Text('原作品没有已读或有书签的章节。'),
           for (final match in mappings.sublist(start, end)) _mappingRow(match),
           if (mappings.isNotEmpty)
             Row(
               children: [
                 TextButton(
-                  onPressed: _mappingPage > 0
-                      ? () => setState(() => _mappingPage--)
+                  onPressed: page > 0
+                      ? () => setState(() => _mappingPage = page - 1)
                       : null,
                   child: const Text('上一页映射'),
                 ),
-                Text(
-                  '${mappings.isEmpty ? 0 : start + 1}–$end / ${mappings.length}',
-                ),
+                Text('${start + 1}–$end / ${mappings.length}'),
                 TextButton(
                   onPressed: end < mappings.length
-                      ? () => setState(() => _mappingPage++)
+                      ? () => setState(() => _mappingPage = page + 1)
                       : null,
                   child: const Text('下一页映射'),
                 ),
@@ -388,7 +406,7 @@ class _MigrationPageState extends State<MigrationPage> {
               if (controller.categoriesOnly) const Text('已选择仅迁移收藏和分类，章节标记不复制。'),
               const SizedBox(height: 16),
               Text(
-                '2. 选择目标漫画源并搜索',
+                '2. 选择目标漫画源并查找作品',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               if (controller.sources.isEmpty)
@@ -441,14 +459,33 @@ class _MigrationPageState extends State<MigrationPage> {
                 decoration: const InputDecoration(labelText: '搜索目标作品'),
                 onSubmitted: (value) => unawaited(controller.search(value)),
               ),
-              TextButton(
-                key: const ValueKey('migration-search-submit'),
-                onPressed:
-                    controller.canChange && controller.selectedSource != null
-                    ? () => unawaited(controller.search(_search.text))
-                    : null,
-                child: const Text('搜索'),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                children: [
+                  TextButton(
+                    key: const ValueKey('migration-search-submit'),
+                    onPressed:
+                        controller.canChange &&
+                            controller.selectedSource != null
+                        ? () => unawaited(controller.search(_search.text))
+                        : null,
+                    child: const Text('搜索'),
+                  ),
+                  TextButton(
+                    key: const ValueKey('migration-popular'),
+                    onPressed:
+                        controller.canChange &&
+                            controller.selectedSource != null
+                        ? () => unawaited(controller.browsePopular())
+                        : null,
+                    child: const Text('浏览目标源热门作品'),
+                  ),
+                ],
               ),
+              if (controller.emptyResultsMessage case final message?
+                  when !controller.busy)
+                Text(message),
               for (var index = 0; index < controller.results.length; index++)
                 ListTile(
                   key: ValueKey(('migration-result', index)),
@@ -468,9 +505,7 @@ class _MigrationPageState extends State<MigrationPage> {
                 TextButton(
                   key: const ValueKey('migration-search-more'),
                   onPressed: controller.canChange
-                      ? () => unawaited(
-                          controller.search(controller.query, more: true),
-                        )
+                      ? () => unawaited(controller.loadMore())
                       : null,
                   child: const Text('加载更多目标结果'),
                 ),

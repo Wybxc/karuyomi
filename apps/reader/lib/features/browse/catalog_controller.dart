@@ -1345,7 +1345,7 @@ final class CatalogController extends ChangeNotifier {
     return result;
   }
 
-  /// Migration searches use the ordinary installed Source runtime without
+  /// Migration listings use the ordinary installed Source runtime without
   /// mutating the browse page's query, pagination or manga results.
   Future<CatalogSourceRef?> openMigrationSource({
     required CatalogBuild build,
@@ -1400,23 +1400,26 @@ final class CatalogController extends ChangeNotifier {
     return sourceReference;
   });
 
-  Future<({List<MangaEntry> mangas, bool hasNextPage})?>
-  searchMigrationTargets({
+  Future<({List<MangaEntry> mangas, bool hasNextPage})?> listMigrationTargets({
     required CatalogSourceRef source,
-    required String query,
+    required String? search,
     required int page,
     required bool Function() shouldContinue,
   }) => _perform<({List<MangaEntry> mangas, bool hasNextPage})?>(
-    '正在搜索迁移目标',
+    search == null ? '正在读取目标源热门作品' : '正在搜索迁移目标',
     () async {
       if (!shouldContinue() || !isCurrentSource(source)) return null;
-      if (query.trim().isEmpty || query.length > 500 || page < 1) {
+      if (page < 1) throw const FormatException('目标列表页码无效。');
+      final query = search?.trim();
+      if (query != null && (query.isEmpty || query.length > 500)) {
         throw const FormatException('请输入不超过500字的搜索词。');
       }
       final result = (await _invoke(
-        wire.SourceCall(
-          search: wire.SearchRequest(query: query.trim(), page: page),
-        ),
+        query == null
+            ? wire.SourceCall(popular: wire.PageRequest(page: page))
+            : wire.SourceCall(
+                search: wire.SearchRequest(query: query, page: page),
+              ),
       )).mangaPage;
       if (!shouldContinue() || !isCurrentSource(source)) return null;
       return (

@@ -1,5 +1,9 @@
 # 实施验证记录
 
+2026-11-09，[正式 Web 真实源迁移](verification/source-migration.md#正式-web-的真实源搜索与热门列表)通过。修正无搜索结果的源无法选择目标后，使用真实 xkcd 英文/中文完成手动映射第 2978 章；确认前七份 D1 API 响应无差异，确认后新增一章已读和一枚书签。新文档读回中英作品及目标标记。故障、Native 和生产另验。
+
+2026-11-09，[Worker 更新后的 D1 读回与原样重试](verification/concurrent-server-state.md#worker-更新保留-d1-状态与原回执)通过官方本地 Wrangler harness：更新 Worker 验签密钥后，相同 subject 读到原书架和进度；旧请求返回原回执，不覆盖更新后的页位，也不增加 D1 写入。生产 Access 和设备 UI 恢复另验。
+
 2026-11-08，[通用 Source 中继](verification/generic-source-relay.md)的本地正式构建、接口与内置浏览器 xkcd 中文热门列表均通过；无需扩展或域名登记。生产尚未部署。
 
 2026-11-08，[生产 Web 恢复登录态](verification/server-state-production.md#生产-web-恢复登录态)已确认：用户自行登录后，Codex 内置浏览器中的生产页从 Access 过期提示恢复到正式服务端书架。同一正式会话随后通过 [Arknights Comics 英文热门列表](verification/server-state-production.md#生产-web-真实-source-列表)只读验收。生产详情、完整阅读和原生跨端验收继续。

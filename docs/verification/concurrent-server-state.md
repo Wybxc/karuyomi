@@ -236,3 +236,14 @@ A / B 的 Flutter 集成测试各 1/1 通过，分别为进程 `93889` 和 `9555
 复验沿用[正式 HTTPS harness 与双 Reader 步骤](../../apps/reader/integration_test/README.md#阅读进度同时写)。先让两端都确认同一真实第 2 页且打开不写入，再放行两个按钮；等胜端确认真实页的当前和最远位置并保持 Reader 挂载，才测败端的旧页翻动和显式重开。原始审计、阶段快照、测试驱动补丁及汇总保留在 `/private/tmp/karuyomi-ios-progress-cas.l682bk/`，入口说明为 `REPRODUCE.md`，汇总为 `verified.json`。服务和协调器已退出，两台专用设备已删除。
 
 此分项覆盖双 iOS 模拟器的正式 Reader，以及重置获胜后的旧视图隔离和恢复。完成获胜仅有上节 API 证据；其它平台配对、真实触控、真机、生产 Access 与完整 P2 仍另验。
+
+## Worker 更新保留 D1 状态与原回执
+
+2026-11-09，官方 Wrangler `createTestHarness` 使用 Vite 生成的 Worker 配置、正式业务路由和临时 D1。测试先写入收藏和第 2 页进度，再以 `update()` 更新 Worker 的测试验签密钥，保持同一监听和 D1。旧 JWT 返回 401，新 JWT 以相同 subject 读到完全一致的作品状态、收藏与续读目标。新请求保存第 3 页后，原第 2 页请求以相同 UUID 和正文重试，返回原回执；D1 仍只有三条回执（一次收藏、两次进度），作品与账户 revision 保持 `3/3`，当前位置与最远仍是第 3 页。
+
+```sh
+pnpm --filter @karuyomi/api exec vite build --config vite.test.config.ts
+pnpm exec vitest run --project node apps/api/test/vite-harness.test.ts
+```
+
+Wrangler harness 3/3、API 严格类型与依赖检查通过。本分项验证 Worker 更新后权威状态和幂等回执独立于 Worker 实例，未模拟生产 Access 登录流程、D1 服务故障或设备 UI 恢复。

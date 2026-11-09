@@ -21,6 +21,8 @@
 
 ## 当前实现与剩余主线
 
+[本地 Worker 更新分项](../verification/concurrent-server-state.md#worker-更新保留-d1-状态与原回执)已验证同一 D1 上的收藏、进度与幂等回执保留。真实 Access 恢复、设备 UI 和服务故障继续分别验收。
+
 - 已接入 `GET /api/library`、`GET /api/state/manga/:mangaKey`、`GET /api/state/manga/:mangaKey/progress` 和 `POST /api/state/mutations`。书架每页 8 部作品，章节进度每页最多 64 项并固定 account revision；请求上限 128 KiB、响应上限 2 MiB；清单最多 2048 个稳定 pageKey，完整 Source memo 保持不透明文本。
 - D1 按 Access subject 隔离 account/manga revision、分章进度与 mutation 结果；条件 SQL、唯一键和 nonce gate 在同一 batch 内提交。客户端固定首次请求的 mutation ID/正文，丢响应时复用，CAS/epoch 冲突明确停止旧视图写入。
 - 正式 Flutter 入口共用 `BusinessStateClient`，收藏与进度仅保存服务端确认状态；未确认进度只留当前会话，同一服务和身份恢复后重绑 API 再重试。书架进入、前台恢复、重连和手动刷新重取；本地搜索/排序只处理已确认视图。

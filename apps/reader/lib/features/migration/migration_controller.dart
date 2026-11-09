@@ -84,9 +84,14 @@ final class MigrationController extends ChangeNotifier {
   MigrationSourceChoice? selectedSource;
   CatalogSourceRef? _targetReference;
   List<MangaEntry> results = const [];
-  String query = '';
-  int page = 0;
+  String? _listingQuery;
+  int _listingPage = 0;
   bool hasNextPage = false;
+  String? get emptyResultsMessage => _listingPage == 0 || results.isNotEmpty
+      ? null
+      : _listingQuery == null
+      ? '目标源的热门列表没有作品。'
+      : '没有搜索结果，可尝试浏览目标源热门作品。';
   wire.LibraryMetadata? targetMetadata;
   ChapterSequence? targetSequence;
   String? error;
@@ -198,7 +203,8 @@ final class MigrationController extends ChangeNotifier {
       selectedSource = choice;
       _targetReference = ref;
       results = const [];
-      page = 0;
+      _listingQuery = null;
+      _listingPage = 0;
       hasNextPage = false;
       targetMetadata = null;
       targetSequence = null;
@@ -209,22 +215,30 @@ final class MigrationController extends ChangeNotifier {
     });
   }
 
-  Future<void> search(String value, {bool more = false}) async {
+  Future<void> search(String value) => _listTargets(value.trim());
+
+  Future<void> browsePopular() => _listTargets(null);
+
+  Future<void> loadMore() async {
+    if (_listingPage == 0 || !hasNextPage) return;
+    await _listTargets(_listingQuery, more: true);
+  }
+
+  Future<void> _listTargets(String? search, {bool more = false}) async {
     final ref = _targetReference;
     if (!canChange || ref == null) return;
     await _run((epoch) async {
-      final text = more ? query : value.trim();
-      final next = more ? page + 1 : 1;
-      final found = await catalog.searchMigrationTargets(
+      final next = more ? _listingPage + 1 : 1;
+      final found = await catalog.listMigrationTargets(
         source: ref,
-        query: text,
+        search: search,
         page: next,
         shouldContinue: () => _current(epoch),
       );
       if (!_current(epoch)) return;
-      if (found == null) throw FormatException(catalog.error ?? '目标搜索未完成。');
-      query = text;
-      page = next;
+      if (found == null) throw FormatException(catalog.error ?? '目标列表未能读取。');
+      _listingQuery = search;
+      _listingPage = next;
       hasNextPage = found.hasNextPage;
       results = List.unmodifiable(
         more ? [...results, ...found.mangas] : found.mangas,
