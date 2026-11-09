@@ -22,6 +22,8 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 同日，[生产 Web 恢复登录态](../verification/server-state-production.md#生产-web-恢复登录态)已确认，随后 [Arknights Comics 英文热门列表](../verification/server-state-production.md#生产-web-真实-source-列表)通过只读验收。完整生产阅读和 Native 继续验收。
 
+2026-11-10：[MANGA Plus Creators 的 Android 模拟器](../verification/aot-current-pilot.md#manga-plus-creators-的-android-完整章节与续读)通过完整首章、跨章和新进程续读；[ToonLook 的 iOS 模拟器](../verification/aot-current-pilot.md#toonlook-的-ios-首图失败)可取得真实章节清单，首图仍失败。P0 保持进行中。
+
 ## 优先级与状态
 
 | 优先级                  | 计划                                                          | 当前状态与依赖                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |

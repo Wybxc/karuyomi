@@ -27,6 +27,13 @@ const _sourceId = String.fromEnvironment('BOOKMARKS_SOURCE_ID');
 const _buildId = String.fromEnvironment('BOOKMARKS_BUILD_ID');
 const _mangaUrl = String.fromEnvironment('BOOKMARKS_MANGA_URL');
 const _chapterUrl = String.fromEnvironment('BOOKMARKS_CHAPTER_URL');
+const _prepareSearch = String.fromEnvironment('BOOKMARKS_PREPARE_SEARCH');
+const _prepareMangaTitle = String.fromEnvironment(
+  'BOOKMARKS_PREPARE_MANGA_TITLE',
+);
+const _prepareChapterTitle = String.fromEnvironment(
+  'BOOKMARKS_PREPARE_CHAPTER_TITLE',
+);
 const _phase = String.fromEnvironment('BOOKMARKS_PHASE');
 const _settingsJson = String.fromEnvironment('BOOKMARKS_EXPECT_SETTINGS_JSON');
 const _stateJson = String.fromEnvironment('BOOKMARKS_EXPECT_STATE_JSON');
@@ -357,8 +364,28 @@ Future<Map<String, Object?>> _prepare(
         catalog.page == 1;
   });
   expect(catalog.activeSource!.lang, 'en');
-  final matches = catalog.mangas.where((manga) => manga.url == _mangaUrl);
-  expect(matches, hasLength(1), reason: '热门必须包含唯一 exact Source 作品');
+  if (_prepareSearch.isNotEmpty) {
+    final search = find.descendant(
+      of: catalogPage,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == '搜索漫画',
+      ),
+    );
+    await _reveal(tester, search, catalogPage);
+    await tester.enterText(search, _prepareSearch).timeout(_remaining());
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await _waitFor(tester, '实际 Source 搜索结果', () {
+      checkSource();
+      return !catalog.busy && catalog.listing == 'search' && catalog.page == 1;
+    });
+  }
+  final matches = catalog.mangas.where(
+    (manga) => _mangaUrl.isNotEmpty
+        ? manga.url == _mangaUrl
+        : manga.title == _prepareMangaTitle,
+  );
+  expect(matches, hasLength(1), reason: '列表必须包含唯一 exact Source 作品');
   final manga = matches.single;
   expect(
     catalog.mangas.where((entry) => entry.title == manga.title),
@@ -380,7 +407,7 @@ Future<Map<String, Object?>> _prepare(
   expect(identical(details.controller, catalog), isTrue);
   expect(details.source.buildId, _buildId);
   expect(details.source.sourceId, _sourceId);
-  expect(details.manga.url, _mangaUrl);
+  expect(details.manga.url, manga.url);
   final (sequence, chapter) = _exactChapter(details);
   final favorite = find.ancestor(
     of: find.descendant(of: detailsPage, matching: find.text('加入书架')),
@@ -412,7 +439,7 @@ Future<Map<String, Object?>> _prepare(
   expect(after.state.manga.hasCustomCover(), isFalse);
   expect(after.state.manga.metadata.packageName, _packageName);
   expect(after.state.manga.metadata.sourceId, _sourceId);
-  expect(after.state.manga.metadata.manga.url, _mangaUrl);
+  expect(after.state.manga.metadata.manga.url, manga.url);
   expect(after.bookmarks.chapterKeys, isEmpty);
   expect(after.progress.entries, isEmpty);
   expect(client.hasPendingMetadata(sequence.mangaKey), isFalse);
@@ -427,10 +454,20 @@ Future<Map<String, Object?>> _prepare(
     'packageName': _packageName,
     'sourceId': _sourceId,
     'buildId': _buildId,
-    'mangaUrl': _mangaUrl,
+    'mangaUrl': manga.url,
     'mangaKey': sequence.mangaKey,
     'chapterUrl': chapter.snapshot.url,
     'chapterKey': chapter.key,
+    'adjacentChapters': [
+      for (final delta in [-1, 1])
+        if (sequence.adjacent(chapter.sourceIndex, ChapterOrder.source, delta)
+            case final adjacent?)
+          {
+            'sourceDelta': delta,
+            'name': adjacent.name,
+            'url': adjacent.snapshot.url,
+          },
+    ],
     'initialAccountRevision': initial.accountRevision,
     'installedAccountRevision': installedSettings.accountRevision,
     'after': _report(after),
@@ -445,9 +482,11 @@ Future<Map<String, Object?>> _prepare(
     chapters: details.chapters.map((chapter) => chapter.snapshot),
   );
   final chapters = sequence.entries.where(
-    (chapter) => chapter.snapshot.url == _chapterUrl,
+    (chapter) => _chapterUrl.isNotEmpty
+        ? chapter.snapshot.url == _chapterUrl
+        : chapter.name == _prepareChapterTitle,
   );
-  expect(chapters, hasLength(1), reason: '章节必须按唯一 exact Source URL 识别');
+  expect(chapters, hasLength(1), reason: 'Source 必须有唯一符合条件的章节');
   final chapter = chapters.single;
   expect(chapter.stable, isTrue);
   expect(chapter.name, isNotEmpty, reason: '本轮真实xkcd章节须有可搜索的显示名');
@@ -676,8 +715,10 @@ _Expected? _validateConfiguration() {
       _subject.length > 1000 ||
       _packageName.isEmpty ||
       _sourceId.isEmpty ||
-      _mangaUrl.isEmpty ||
-      _chapterUrl.isEmpty ||
+      (_mangaUrl.isEmpty &&
+          (_phase != 'prepare' || _prepareMangaTitle.isEmpty)) ||
+      (_chapterUrl.isEmpty &&
+          (_phase != 'prepare' || _prepareChapterTitle.isEmpty)) ||
       _chapterUrl.length > 8192 ||
       !{'prepare', 'verify', 'set', 'remove'}.contains(_phase)) {
     fail('须提供精确的 BOOKMARKS 身份、Source 作品/章节 URL 及阶段');

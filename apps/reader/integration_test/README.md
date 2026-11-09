@@ -243,6 +243,14 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 
 驱动在真实第 2 页先确认正常进度已保存，然后点击「读完本章」。`SYNC_ACK_LOSS_COMMITTED_UNCONFIRMED` 表示同一阅读页仍保留未确认草稿，但只读检查已看到作品 revision 增加 1，页码和 epoch 不变。驱动点击「重试保存」，要求 `SYNC_ACK_LOSS_RETRY_CONFIRMED` 时待确认提示消失、同一阅读页仍挂载、D1 快照不再变化。按 Enter 停止 harness，核对 `ACCEPTANCE_PROGRESS_ACK_AUDIT` 恰好两条、`drop_ack=1/0`，且 UUID、请求正文、预期 revision、ACK 和持久回执的摘要相同。只读检查和审计共同证明本次重试复用了原请求，不能推广为其它平台、关闭后恢复或生产故障通过。
 
+### 真实 Source 完整章、跨章和新进程续读
+
+在隔离回环 HTTPS 入口装配与当前运行材料匹配的真实 AOT，使用新 D1 和 `acceptance-owner`。先用 `bookmarks_sync_test.dart` 的 `prepare` 从正式界面安装、打开英语源、收藏作品。热门无目标作品时可用 `BOOKMARKS_PREPARE_SEARCH` 走正式 Source 搜索；如尚未知 URL，可用 `BOOKMARKS_PREPARE_MANGA_TITLE`、`BOOKMARKS_PREPARE_CHAPTER_TITLE` 唯一定位，已知的 URL 优先。输出 `BOOKMARKS_SYNC_RESULT` 含精确作品、章节及相邻章节的来源顺序偏移与 URL。
+
+用 `flutter test integration_test/source_chapter_test.dart --no-pub -d DEVICE --dart-define-from-file=PARAMS` 启动正式 `app.main()`。参数 `APP_ORIGIN` 不带末尾斜杠；`SOURCE_CHAPTER_PACKAGE`、`SOURCE_CHAPTER_SOURCE`、`SOURCE_CHAPTER_BUILD`、`SOURCE_CHAPTER_MANGA`、`SOURCE_CHAPTER_FIRST`、`SOURCE_CHAPTER_NEXT` 填精确包、Source ID、构建 ID、作品 URL、首章及下一章 URL。`SOURCE_CHAPTER_REVERSED` 按两章的实际相邻顺序设置。设置 `SOURCE_CHAPTER_FIRST_PAGES`、`SOURCE_CHAPTER_SAVED_PAGE`；已知下一章完整页数时可设 `SOURCE_CHAPTER_NEXT_PAGES`，否则按实际清单校验目标页界限。Android 同前使用专用 debug APK 的精确回环信任配置，另传 `SOURCE_CHAPTER_TEST_CA_BASE64`。
+
+`SOURCE_CHAPTER_PHASE=read` 从书架进入详情，逐页核对首章的当前页码与实际解码帧，显式读完，再通过「下一章」读到指定保存页。退出后用独立进程从相同 HTTPS/D1 执行 `SOURCE_CHAPTER_PHASE=resume` 和 `SOURCE_CHAPTER_RESUME_THROUGH`，通过书架续读首次恢复同一清单的已保存页，按需再读至目标页。两阶段以 `SOURCE_CHAPTER_FRAME` 记录页码和实际解码尺寸，以 `SOURCE_CHAPTER_RESULT` 记录进程、已确认的章节锚和完成状态。另从主机以正常 TLS 独立读取 D1，核对首章已完成且锚点未被后续阅读改变。本驱动是功能验收，不用帧记录推断真机性能。
+
 ### D1 拒绝阅读进度写入
 
 沿用上一节的正式 HTTPS、空 D1、测试身份和精确 xkcd 构建。启动服务时改用 `ACCEPTANCE_FIXTURE=progress-d1-error`。从正式界面安装并收藏英文 xkcd，再以 `SYNC_PHASE=d1-error` 运行相同的第 1 → 2 页驱动。

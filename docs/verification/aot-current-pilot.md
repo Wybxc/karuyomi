@@ -163,6 +163,14 @@ Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透�
 
 复验用原单包快照执行 `EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build:native`，按 [Native 官方 HTTPS 配置](../../apps/reader/integration_test/README.md#分类同步)仅登记原两域名并启动空 D1；依次执行 Flutter 驱动的 `prepare`、`manga-plus-read`、`manga-plus-resume`，两次阅读使用独立进程。命令、驱动副本、两轮日志与独立 GET 在 `/private/tmp/karuyomi-http-idle-8fd995e.021mnf/`，成功轮核验在 `attempt2/verified.json`。此门覆盖这部作品两章的 iOS 模拟器流程；未实测其它作品、Android、真机或生产 Access，未部署，包仍为 `compiled_unverified` / `runtimeReady=false`。两轮服务和专用设备均已清理。
 
+## MANGA Plus Creators 的 Android 完整章节与续读
+
+2026-11-10，固定正式产品 `68e5e08`，Pixel 7 / Android 16（API 36，WebView `133.0.6943.137`）模拟器，经官方 Wrangler `https://127.0.0.1:60562`、专用回环 CA、私有 ADB 和全新隔离 D1。采用同一 v6 运行材料及冻结 `c04d436` 的 MANGA Plus Creators 1.6.1 英语 Source `4994699950662723787`，单包快照 `f64ea58e2c9f4ab5b1db47c874a04f6e`。和 iOS 历史记录是同版本的不同 AOT 字节；未使用旧 Source 域名登记或绕过图片处理。
+
+正式入口安装并收藏《Sense Life》，进程 `5170` 逐页显示 `#001` 的全部 72 页，显式确认读完，并通过「下一章」在 `#002` 确认保存第 7 页。进程 `5443` 从书架首次显示同一清单的第 7 页（实际解码 812 × 1275），再逐页读到第 35 页。独立正常 HTTPS 读回确认首章当前／最远第 72 页且完成，次章当前／最远第 7 → 35 页、未完成，反向章序保留，设置、收藏和书签的业务字段保持。账户／作品 revision `2/1 → 10/9 → 23/22`。
+
+用 [通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)复验。固定输入、两个进程的逐帧结果、独立读回和机器核对保存在 `.local/manga-plus-android-68e5e08/`；首轮只解码第 1 页，因驱动误选 Tooltip 在翻页前停止，新 D1 复验时已修正。此门只覆盖该作品的 Android 模拟器功能，未测真机、性能、生产或其它 Source；AOT 产物仍为 `compiled_unverified`。
+
 ## ToonLook 的长图重排、完整章节与续读
 
 2026-11-08，固定产品 `b64fc90` 与当前 v6 宿主材料，使用未修改的 ToonLook 1.6.2、英文 Source `8320348786843379620`。单包候选 revision `5f2dbba16f6947d284bd93f85311ff2f`；六份共享材料与当前构建逐字节相同。正式 API、runtime 和验收配置从固定提交构建；Web release 复用 `8705ee4` 的现有字节，先核对正式 Flutter 输入、锁和工具链完全相同。官方 HTTP harness 的测试身份连接独立 workerd/D1，仅登记 `toonlook.com`、`img.toonlook.com`。
@@ -172,3 +180,9 @@ Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 
 临时验收 HTML 的观察器只读取正式 `acquireImage` 交付的 Blob；原 Source、正式 Flutter JS 与宿主未改。对两章各第 1、6、10 页比对独立参考：五个非恒等样本全部符合按原 Source 规则重排后的 500 px 条带顺序，原图直通负对照均失败；第 1 章第 10 页预期为恒等顺序，只核对几何与尾段。四个样本高度 5,000 px；观察器可能见到预取资源，其结果只作像素证据，逐页显示单独由正式阅读界面确认。额外解码使本轮不能作为性能测量。
 
 复验用独立快照执行 `EXTENSION_ASSETS_DIR=/absolute/path/snapshot pnpm acceptance:build`，通过 `ACCEPTANCE_SOURCE_POLICIES` 为 `eu.kanade.tachiyomi.extension.all.toonlook` 指定上述域名后运行 `pnpm acceptance:serve`。本轮运行参数、隔离候选与独立 D1 样本位于 `/private/tmp/karuyomi-toonlook-p0-b64fc90.41hfTc/`，独立参考及正负对照在 `/private/tmp/karuyomi-toonlook-8705ee4.AZ7u6I/acceptance/observe/`。此门只覆盖该作品两章的 Web 阅读；Native、物理设备、长图性能和生产另验。未部署或修改全量构建输入，仍为 `compiled_unverified` / `runtimeReady=false`。
+
+## ToonLook 的 iOS 首图失败
+
+2026-11-10，固定正式产品 `68e5e08` 与冻结 `c04d436` 的 ToonLook 1.6.2（英语 Source `8320348786843379620`，单包快照 `f978898a11704b4bbb2adb3b7f0e2a4f`）。iPhone 17 Pro / iOS 26.4 模拟器通过 Flutter 官方 `integration_test`、受信回环 HTTPS 与隔离 D1 启动。正式入口安装、搜索及收藏 Doomed，并打开 `131-chapter-1?lang=en`。阅读器获得 10 页清单并显示 `1 / 10`，第 1 页提示「当前平台尚未支持图片阅读」，120 秒内未显示解码帧。独立 D1 读回只确认第 1 页已选中；无最远进度，未完成。后续诊断驱动未通过重新开章，无法据此归因具体图形操作。
+
+复验沿用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。构建输入、准备与阅读日志和界面截图见 `.local/ios-toonlook-v6-68e5e0.t6QMCa/evidence/`。这是 iOS 首图失败证据，不影响之前 Web 分项的结论；AOT 产物仍为 `compiled_unverified`。
