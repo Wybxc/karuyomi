@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-**状态：默认 Static Assets 仓库的账户合同、准备与缓存、关闭协议及正式管理入口已实现，独立集中工程检查、完整 Flutter 回归与构建通过；Web 准备/安装、双标签精确选择与 xkcd 两页阅读，以及 iOS 模拟器 xkcd 同版本构建替换、旧代码缓存清理和新进程续读分项通过。完整生命周期及各平台剩余门待验收。** 设计见[账户扩展与本机准备](../design/extension-management.md)，实际通过层级见[验证记录](../verification/extension-management.md)和 [iOS 换构建记录](../verification/extension-version-native.md)。额外仓库的正式来源链与管理入口也已接入，独立工程和实际平台门按[额外仓库子计划](additional-repositories.md)验收；不以工程通过代替完整 P3。上级计划见 [P3](p3-extensions-and-migration.md)。
+**状态：默认 Static Assets 仓库的账户合同、准备与缓存、关闭协议及正式管理入口已实现，独立集中工程检查、完整 Flutter 回归与构建通过；Web 准备/安装、双标签精确选择与 xkcd 两页阅读，以及 iOS、Android 模拟器 xkcd 同版本构建替换、旧代码缓存清理和新进程续读分项通过。完整生命周期及各平台剩余门待验收。** 设计见[账户扩展与本机准备](../design/extension-management.md)，实际通过层级见[验证记录](../verification/extension-management.md)和 [Native 换构建记录](../verification/extension-version-native.md)。额外仓库的正式来源链与管理入口也已接入，独立工程和实际平台门按[额外仓库子计划](additional-repositories.md)验收；不以工程通过代替完整 P3。上级计划见 [P3](p3-extensions-and-migration.md)。
 
 目标是让同一身份在 Web、iOS、Android 使用同一份账户扩展清单，区分账户已确认的使用意图、本机准备情况和正在运行的精确构建。安装准备不执行扩展，更新由用户明确发起，切换前关闭原运行槽，卸载后清理不再使用的本机扩展副本。
 
@@ -29,8 +29,8 @@
 - [x] Dart 管理 UI、transport、四打开路径与正式夹具已接入，保持缺记录不自动安装。
 - [x] 独立审查原 CAS、未知 ACK、取消与迟到结果、关闭失败恢复、跨实例缓存引用和已确认停用门禁，已修复发现的问题并补回归。
 - [x] 生成一致性、严格分析、依赖检查、正式测试、完整格式及客户端/API 构建通过；实际结果统一见验证记录，后续代码变更另验。
-- [x] iOS 模拟器从默认仓库安装 xkcd 1.6.1，确认切换到同版本的另一构建，清理旧代码缓存并在新进程读回已确认进度；独立 D1 快照核对了账户选择和阅读状态。
-- 继续用当前真实 AOT 验收 Web 和 Native 剩余生命周期，含 Android 安装/换构建、Native 上游版本升级、各端停用与卸载；生产 Access 与真机分别记录。
+- [x] iOS、Android 模拟器各自从默认仓库安装 xkcd 1.6.1，明确确认切换到同版本的另一构建，清理旧代码缓存并在新进程续读第 2 页。两端的独立 API 核对只见安装项改变；Android 直接核对 D1，唯一新增回执是该设置提交。
+- 继续用当前真实 AOT 验收 Web 和 Native 剩余生命周期，含 Native 上游版本升级、各端停用与卸载；生产 Access 与真机分别记录。
 - 两个独立客户端以同一身份读回相同账户意图，分别检查本机空缓存、关闭收尾、CAS 冲突与丢响应的原请求恢复。
 
 ### 额外仓库与完整 P3

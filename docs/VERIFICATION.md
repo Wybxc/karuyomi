@@ -1,5 +1,13 @@
 # 实施验证记录
 
+2026-11-10，[Android arm64 发布构建与冷启动](verification/native-main-entry.md#v6-android-arm64-发布构建与离线模拟器冷启动)通过。固定 `2c012db` 的 arm64-v8a release APK 包内运行时与冻结 v6 六份材料匹配；用本地调试签名侧载专用 Android 模拟器，冷启动显示正式书架。该次未连接服务，发行签名、真机和生产另验。
+
+2026-11-10，[Android 同版本扩展构建替换](verification/extension-version-native.md#操作与独立核对)通过。真实 xkcd 经显式确认切换构建、清理旧缓存，新进程从书架首次解码第 2 页。独立 API 和 D1 证据只新增一条设置回执，进度与书签不变；真机、生产和上游版本升级另验。
+
+2026-11-10，[iOS 同服务重连与书架续读](verification/runtime-reconnect.md#ios-同服务重连与真实续读)通过。同一正式进程重建运行时，更换 Source generation 和图片目录，书架两次打开真实 xkcd 第 2 页；六路独立 HTTPS 响应逐字节不变。生产 Access 与真机另验。
+
+2026-11-10，[Android 与 iOS 同库源迁移](verification/source-migration.md#android-与-ios-同库迁移)通过。Android 为英文 xkcd 第 2978 章保存已读和书签，iOS 用正式向导映射到中文并确认，Android 新进程读回。确认前七路响应字节不变；确认后账户／英文／中文 revision 从 `4/3/0` 到 `5/3/1`，读回无附带写入。Web↔Native、故障、生产与真机另验。
+
 2026-11-10，[Arknights Comics Android 完整章节与续读](verification/aot-current-pilot.md#arknights-comics-的-android-完整章节与续读)通过：真实《DREAM》逐页显示 51 页，显式完成后进入《HEARTBEAT》，新进程从书架首次显示已确认的第 3 页。[同库 Android↔iOS 接力](verification/aot-current-pilot.md#arknights-comics-的-android-与-ios-模拟器接力)中，iOS 从第 3 页翻到第 4 页，Android 新进程首次显示第 4 页。只读 D1 回执区分导航与实图观察；两端打开没有附带写入。生产与真机另验。
 
 2026-11-10，[iOS→Android→iOS 同库封面交接](verification/custom-covers.md#ios-与-android-模拟器同库封面交接)通过。iOS 从实际 Files 上传，Android 解码同图后清除，iOS 新进程显示默认占位。D1/R2 独立确认恰好两次提交，重启只读，旧路径 404。Web↔Native、故障、生产与真机另验。
@@ -397,7 +405,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 ## 尚未通过的门槛
 
 - 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。
-- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换、Android 同版本构建替换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
+- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - 自定义封面的 Web↔Native 读回、生产 Cookie/Access、并发和丢响应恢复、服务端重启、生产私有 bucket/部署与远端清理；独立 Web 与 iOS、Android 模拟器的顺序往返和新进程读回已通过。

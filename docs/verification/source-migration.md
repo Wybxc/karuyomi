@@ -45,7 +45,7 @@ Dart 数据层与章节匹配覆盖只读完整分页、混合 revision 拒绝�
 
 首轮集中 check 在补路由修复后、再次格式化前停于格式检查；重新全库格式化并由 Dart 官方修复器补齐新代码花括号 lint 后，完整三步均重跑通过。未缩小格式范围、跳过 hook、降低类型检查或把失败夹具当成功。失败与最终日志分别保留 `/private/tmp/karuyomi-source-migration-acceptance-check.log` 和 `karuyomi-source-migration-acceptance-{check,flutter,build}-final.log`，完整格式日志为 `karuyomi-source-migration-format{,-check}-final.log`。
 
-## 尚未登记通过
+## 2026-11-07 工程轮次未覆盖的门
 
 - 本轮 Codex 内置浏览器 inventory 无可用 browser；没有迁移页面截图或实际 Source 搜索/章节映射运行证据，也未改用其它桌面浏览器。
 - Web/Native 独立客户端、真实 Source、实际跨端冲突/丢 ACK、生产 Access 与真机均未执行；模拟 supplier 不覆盖这些门。
@@ -83,3 +83,16 @@ Dart 数据层与章节匹配覆盖只读完整分页、混合 revision 拒绝�
 中文搜索无结果后，经热门列表选中文 `SINGLE`，手动映射 `2978: Stranded` → `2978: 困住`。搜索后及独立确认框打开时，书架、两部作品状态、进度与书签共七份 API 响应与迁移前逐字节一致。显式确认返回新增已读 1 章、书签 1 个；账户／英文作品／中文作品 revision 由 `4/3/0` 变为 `5/3/1`。英文保留收藏和标记，中文没有页锚、最远位置或续读目标。
 
 第四个进程从书架打开中文详情，读到相同两项标记，七份响应在这次读回前后不变。宿主独立 HTTPS GET 再核对七份摘要；未独立统计请求次数。四阶段日志、原始响应和复验步骤在忽略目录 `.local/native-source-migration-a1dd0cd/android/`。本轮已停止服务并清理专用模拟器、ADB 转发和 TLS 私钥；混合平台同库、故障、真机与生产另验。
+
+## Android 与 iOS 同库迁移
+
+2026-11-10，Pixel 7 / Android 16 API 36 与 iPhone 17 Pro / iOS 26.4 共用一个新建的官方 Wrangler HTTPS / workerd / D1 和隔离测试身份 `acceptance-owner`。使用固定产品 `2c012db` 与冻结 `c04d436` 的真实 xkcd v6 1.6.1，清单引用的六份共享材料与产品完全匹配，Native host/worker 通过本地完整性校验。任何业务写入前，确认故障夹具未启用、服务提供的索引与清单和候选逐字节相同，账户书架为空且 revision 为 0。
+
+1. Android 经正式入口安装并收藏英文 `SINGLE`，账户 revision `0 → 1 → 2`。第二个进程从英文详情给第 2978 章 `Stranded` 标记已读并加入书签，账户／英文作品／中文作品 revision 为 `4/3/0`。
+2. iOS 从同一账户的书架进入正式向导。中文源搜索无结果，经热门列表选择中文 `SINGLE`，手动映射 `2978: Stranded` → `2978: 困住`。迁移前、搜索后、独立确认框打开时，书架、两部作品的状态、进度和书签共七份 API 响应，均与 Android 标记完成后的响应逐字节一致。
+3. iOS 显式确认后，界面显示新增已读 1 章、书签 1 个；revision 为 `5/3/1`。英文保留收藏和原标记；中文首次入架，有 epoch 1 的已读和书签，没有页位、最远位置或续读目标。
+4. Android 新进程从书架打开中文详情，读回第 2978 章的两项标记；打开前后七份响应均与 iOS 提交后逐字节一致，revision 保持 `5/3/1`。宿主在 Android 标记后和最终读回后各独立 GET 七路，原始响应分别 7/7 匹配。
+
+四阶段各 1/1 通过。私有 ADB 记录三个 Android 应用进程 PID `3853`、`4296`、`4672`；iOS 驱动记录 PID `18762`。日志、原始响应、复验步骤和核对脚本保留在本机忽略目录 `.local/native-source-migration-mixed-2c012db/`，汇总为 `evidence/mixed-p3-evidence.json`。服务、专用模拟器、反代和临时 TLS 私钥均已清理。
+
+本次确认相同快照下的业务状态，未独立统计请求次数。更多 Source、非空分类、迁移并发、断网或丢确认、生产 Access、真机和后续七材料 WebP 构建仍未由本次通过覆盖。

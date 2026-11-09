@@ -1,6 +1,6 @@
 # Native 正式主入口准备与阻断
 
-2026-11-10，匹配冻结 v6 发布候选的 [iOS 真机目标构建](#v6-ios-arm64-发布构建)已单独通过。以下 v4 以前的记录保留历史输入。
+2026-11-10，匹配冻结 v6 发布候选的 [iOS 真机目标构建](#v6-ios-arm64-发布构建)通过；[Android arm64 发布构建与离线模拟器冷启动](#v6-android-arm64-发布构建与离线模拟器冷启动)也通过。以下 v4 以前的记录保留历史输入。
 
 > 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
 
@@ -43,3 +43,19 @@ flutter build ios --release --no-codesign --no-pub --target=lib/main.dart \
 官方构建 exit 0。实际 `build/ios/iphoneos/Runner.app` 的 Runner 和 Dart AOT framework 均为 arm64、Mach-O 平台 iOS；应用 ID 为 `dev.karuyomi.karuyomi`，编译的 Dart AOT 包含指定 origin。成品中的 `host.js`、`worker.js`、`manifest.json` 与正式 Vite Native 输出逐字节一致；六份共享材料目录与冻结 v6 xkcd 验收输入相同，目录文件 SHA-256 为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。未混入后续七材料的 WebP 改动。原始日志、成品和核对输出保存在本机忽略目录 `.local/ios-device-release-2c012db.xwGgAa/`。
 
 成品确认为未签名，检查时本机无有效签名身份。未安装、启动或访问生产；当前生产仍是 v4。真机验收需要有效签名、可达的匹配 v6 部署与用户 Access 登录，之后再记录真实阅读、跨端恢复及移动性能。
+
+## v6 Android arm64 发布构建与离线模拟器冷启动
+
+2026-11-10，复用隔离的固定 `2c012db` Git 归档和冻结 `c04d436` 的 v6 xkcd 六份匹配材料。使用 Flutter 3.47.5 / Dart 3.13.4、JDK 25.0.5+8 和正式 `lib/main.dart`，未设置 `APP_ORIGIN`。在固定源码树按锁文件准备依赖并用 `pnpm --filter @karuyomi/runtime-host build`、`pnpm build:native-assets` 生成 Native 资源后，在 `apps/reader` 执行：
+
+```sh
+flutter build apk --release --no-pub --target-platform=android-arm64 \
+  --split-per-abi --target=lib/main.dart
+```
+
+- 官方产物 `app-arm64-v8a-release.apk` 为 23,210,038 字节，SHA-256 为 `19293db1112468b48276dc3558050546f032ed65916ea6ae05522b2ffc2a797e`。包名 `dev.karuyomi.karuyomi`、版本 `0.1.0`（versionCode `2001`）；APK 与系统安装记录均为 `arm64-v8a`，`libapp.so` 为 ELF64/AArch64，应用不可调试。
+- `apksigner` 验证 APK Signature Scheme v2 通过，唯一证书为 `CN=Android Debug`，证书 SHA-256 为 `8cd31446c6584ffeb49a7dd7fccdfe2beac96a44c7559e6028abbe9f22b8187e`。这是 Gradle 当前配置生成的本机侧载候选，尚无发行签名。
+- APK 内 `host.js`、`worker.js`、`manifest.json` 与固定 Native 构建逐字节一致；内置清单的材料版本为 `5d1260e5d20b2f2f05fd378a6e8b697338e5fdfd4feca2c5a8c361e756bb92e4`，引用的六份冻结材料均按实际文件核对。APK 没有 `libsqlite3.so`，`NativeAssetsManifest.json` 的映射为空；固定产品无 Drift/SQLite 业务依赖，业务状态由 Worker API + D1 确认。历史 APK 的 SQLite 证据属于旧实现。
+- 专用 Pixel 7 / Android 16 API 36 ARM64 模拟器在飞行模式下通过 `adb install` 安装；设备上 `base.apk` 的 SHA-256 与本机 APK 相同。`adb shell am start -W -n dev.karuyomi.karuyomi/.MainActivity` 报告冷启动成功，正式 Activity 位于前台（PID `4184`），UI 树和截图显示空书架及书架、浏览、设置三个标签。
+
+APK 保留在本机忽略目录 `.local/android-arm64-release-2c012db/artifacts/karuyomi-2c012db-arm64-v8a-release-local.apk`。`evidence/split/` 保留签名、ELF、实际安装摘要、启动日志及截图；可用 `node verify-apk.ts` 重核。专用模拟器和私有 ADB 已清理。本次只验证该 release 包能启动；未连接隔离或生产服务，未验证此 APK 的 Source 初始化、真实 xkcd 续读、生产 Access 或真机。

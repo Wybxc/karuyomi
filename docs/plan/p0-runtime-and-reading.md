@@ -37,6 +37,8 @@ ToonLook 的长图重排已通过 [Web 完整章节分项](../verification/aot-c
 
 固定 `2c012db` 已通过与冻结 v6 候选匹配的 [iOS arm64 发布构建及包内材料核对](../verification/native-main-entry.md#v6-ios-arm64-发布构建)。成品未签名；匹配部署、实际安装与真机阅读另验。
 
+同一固定产品的 [Android arm64 发布构建与冷启动](../verification/native-main-entry.md#v6-android-arm64-发布构建与离线模拟器冷启动)通过。使用本地调试签名在专用模拟器侧载了实际 release APK；此次离线启动不覆盖连服务、实际阅读或真机。
+
 | 分项           | 已有实现或证据                                                                                                                                                                    | 尚不能据此认定的能力                                                                                                 |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | P0-A 宿主      | release9 项目实现已内化；真正上游由 submodule/补丁追踪；按包 AOT、完整 DTO、显式漫画/章节引用、命名空间和静态交付已实现                                                           | 多源在线等价、文件/HTTP Cache 重启/取消/切换及完整 Access 动态请求                                                   |
@@ -78,7 +80,7 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 
 协程执行语义另按[官方核心与平台适配计划](coroutine-runtime.md)收敛：优先复用已锁定的官方 JAR，只保留必要的平台与宿主集成。隔离 AOT 成功不等于已替换产品路径；首次真实挂起与 operation 所有权门通过后再删除当前自有入口。
 
-Native 启动确认超时或关闭时的旧代退役已修复并通过[定向插件边界回归](../verification/runtime-reconnect.md#native-启动确认超时)；随后 Android 模拟器的[真实启动、显式平台重建、UI 重连与关闭](../verification/runtime-reconnect.md#android-模拟器复验)通过；实际丢启动确认、Source 触发重建、iOS 和真机另验。
+Native 启动确认超时或关闭时的旧代退役已修复并通过[定向插件边界回归](../verification/runtime-reconnect.md#native-启动确认超时)。Android 模拟器的[真实启动、显式平台重建、UI 重连与关闭](../verification/runtime-reconnect.md#android-模拟器复验)通过。固定 `2c012db` 的 [iOS 模拟器同服务重连](../verification/runtime-reconnect.md#ios-同服务重连与真实续读)也通过：同一 App 进程经正式设置重连，新 Source generation 和图片绑定重新解码 xkcd 第 2 页，独立 HTTPS 六路业务响应逐字节不变。实际丢启动确认、Source 自动触发重建、生产 Access 和物理设备另验。
 
 ## 验收
 

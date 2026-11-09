@@ -75,6 +75,8 @@ pnpm acceptance:serve
 
 新增的[本地候选组装入口](../EXTENSIONS.md#首次全量候选的定向补编)用这两份固定计划、同一生产父快照和两个空结果目录预检，确认缺少首个冻结结果时退出且不生成快照。定向回归另覆盖成功合入及保留冻结失败、父索引不符、材料不符、缺失与损坏结果，以及上游输入不一致。真实两份计划和原始预检日志保存在 `.local/baseline-supplement-a382be1/`。当前 clab 队列与生产均未改动。
 
+2026-11-10，在 clab 用固定 `2a07fc2` 补编 checkout、真实 `c04d436` 冻结结果目录、同一生产父快照及上述三个精确包名执行正式 `prepare-baseline`。两个 checkout 与六份共享材料一致，线上 state/index 校验通过；入口到达冻结终态检查，报告 `tr.eskimangalar` 尚无结果，未生成快照。原始结果在 clab 的补编目录 `candidate-preflight.4IUnji/prepare.log`。冻结 supervisor 持续运行；未启动补编、未改生产。该结果验证的是实际输入预检和缺结果时停止，完整候选仍待生成。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

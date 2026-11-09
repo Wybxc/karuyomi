@@ -2,20 +2,20 @@
 
 ## 目标与状态
 
-将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开、包内语言筛选已实现待独立运行验收；静态目录语言筛选已实现、集中工程检查通过，实际 Source/平台待验收；typed Source 筛选已实现，两包 v5 AOT 与 CuuTruyen Web 分项通过；typed preferences v6 正式链、Komiic AOT 与 Web 设置/新文档恢复分项通过，其它 Source/平台待验收；默认仓库扩展管理的工程检查、Web 安装和 iOS 模拟器同版本构建替换分项已过，完整生命周期待验；源迁移已通过真实 Web 与 iOS、Android 模拟器的热门选目标、章节映射、确认和独立读回，混合平台、故障及生产待验；额外仓库正式链、当前三包 AOT、Web 管理及默认 xkcd 安装/阅读分项已通过，剩余实际外仓与平台门见[子计划](additional-repositories.md)**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
+将正式 AOT 工具链提供的当前构建变成可用的仓库/扩展管理、Source 设置与用户确认的源迁移流程。状态：**收藏源与快捷打开、包内语言筛选已实现待独立运行验收；静态目录语言筛选已实现、集中工程检查通过，实际 Source/平台待验收；typed Source 筛选已实现，两包 v5 AOT 与 CuuTruyen Web 分项通过；typed preferences v6 正式链、Komiic AOT 与 Web 设置/新文档恢复分项通过，其它 Source/平台待验收；默认仓库扩展管理的工程检查、Web 安装和 iOS、Android 模拟器同版本构建替换分项已过，完整生命周期待验；源迁移已通过真实 Web 与 iOS、Android 模拟器的独立验收，以及 Android → iOS → Android 的隔离同库验收；故障、生产与真机待验；额外仓库正式链、当前三包 AOT、Web 管理及默认 xkcd 安装/阅读分项已通过，剩余实际外仓与平台门见[子计划](additional-repositories.md)**。构建注册和浏览中的包/Source 选择属于工程基础。依赖 [P0](p0-runtime-and-reading.md) 运行边界和 [P1](p1-library-and-progress.md) 书架状态；发布流水线由[工程计划](engineering-and-release.md)维护。
 
 ## 已有基础
 
 - 官方上游 submodule、按包 builder、manifest/provenance、失败隔离与最新版 Static Assets 工程入口已有实现。
 - manifest 记录包/版本、Source IDs、完整 `CatalogSource` 名称/语言、ABI、storage schema 与资源身份；静态索引投影相同资料，运行时按构建/代次隔离并检查实际 Source IDs。
-- 默认仓库的账户安装、启用、精确构建选择、手动更新和卸载链路已接入，功能与独立集中工程检查通过，实际平台待验收；静态索引仅提供构建，D1 确认清单决定使用意图。额外仓库正式链已接入，验收见[子计划](additional-repositories.md)；[源迁移](source-migration.md)的正式合同、原子 API、数据层与向导已接入；真实 Web 与 iOS、Android 模拟器的 xkcd 英文到中文迁移及独立读回通过，混合平台、故障与生产待验。
+- 默认仓库的账户安装、启用、精确构建选择、手动更新和卸载链路已接入，功能与独立集中工程检查通过，Web 安装与两端 Native 模拟器同版本构建替换已实测；静态索引仅提供构建，D1 确认清单决定使用意图。额外仓库正式链已接入，验收见[子计划](additional-repositories.md)；[源迁移](source-migration.md)的正式合同、原子 API、数据层与向导已接入；真实 xkcd 英文到中文迁移已通过 Web、iOS、Android 的独立读回，以及 [Android → iOS → Android 同库读回](../verification/source-migration.md#android-与-ios-同库迁移)。
 - 收藏源复用生成全局设置、D1、CAS 与原请求幂等，正式浏览中可收藏/取消并快捷打开；设计见[收藏源](../design/source-favorites.md)，工程与独立客户端门见[验证记录](../verification/source-favorites.md)。
 
 ## 待办
 
-1. 按[扩展管理子计划](extension-management.md)推进默认仓库里程碑的实际客户端验收。D1 的 `InstalledExtension` 确认意图、不执行扩展的准备、单层有界缓存、手动更新/启停/卸载与精确选择已实现，独立集中工程检查、完整 Flutter 回归与构建通过；默认仓库的 Web 安装与 [iOS 同版本构建替换](../verification/extension-version-native.md)已实测，继续剩余平台和完整生命周期。额外仓库的账户登记、预览、刷新/移除、身份冲突、完整来源隔离及通用 Source 中继已按[子计划](additional-repositories.md)接入；实际平台验收另行推进。无 AOT 产物时明确待构建/不支持，不从网页启动远程编译。
+1. 按[扩展管理子计划](extension-management.md)推进默认仓库里程碑的实际客户端验收。D1 的 `InstalledExtension` 确认意图、不执行扩展的准备、单层有界缓存、手动更新/启停/卸载与精确选择已实现，独立集中工程检查、完整 Flutter 回归与构建通过；默认仓库的 Web 安装与 [iOS、Android 模拟器同版本构建替换](../verification/extension-version-native.md)已实测，继续 Native 上游版本升级和完整生命周期。额外仓库的账户登记、预览、刷新/移除、身份冲突、完整来源隔离及通用 Source 中继已按[子计划](additional-repositories.md)接入；实际平台验收另行推进。无 AOT 产物时明确待构建/不支持，不从网页启动远程编译。
 2. 验收已接入的精确 `closeBuild(buildId,generation)`：调用方先处理请求、阅读资源和存储写锁，manager 等待 shutdown ACK 与 namespace/产物引用释放；旧代不影响新槽，失败显示并显式恢复。定向受控测试不是实际 Source 关闭证据。
-3. 服务器仅保留每包最新可用构建。客户端检查索引、明确切换构建并通过受管缓存清理旧副本；iOS 模拟器已验证同版本替换时的旧代码缓存清理，跨进程缓存持久性和其它平台的清理继续验收。下架构建的 `404 build_not_found` 与 Access 登录/权限错误分开；不承诺远端历史版本回滚，不维护旧协议或旧材料兼容层。卸载保留书架、分类、进度、书签、收藏源及 Source 数据。
+3. 服务器仅保留每包最新可用构建。客户端检查索引、明确切换构建并通过受管缓存清理旧副本；iOS、Android 模拟器已验证同版本替换时的旧代码缓存清理；跨进程缓存持久性和 Web 的清理继续验收。下架构建的 `404 build_not_found` 与 Access 登录/权限错误分开；不承诺远端历史版本回滚，不维护旧协议或旧材料兼容层。卸载保留书架、分类、进度、书签、收藏源及 Source 数据。
 4. Source 自定义筛选已接入 typed 链路，两包 v5 AOT 与 CuuTruyen Web 分项已过，继续其余真实 Source/平台验收；typed Source preferences 已按[子计划](source-preferences.md)接入 v6 正式合同、开关、文本/密码、单/多选、分组、依赖项与刷新，并通过 Komiic Web 设置/新文档恢复分项，继续其它控件与跨端验收。保留原 Preference 对象、监听器及实际存储变化；D1 确认可同步非敏感值，敏感值留当前客户端，不整体同步 SharedPreferences。不把 Android 自定义 Activity 设置页当成已支持。
 5. 收藏源与快捷打开已实现，补实际独立客户端及索引更新验收；包内与当前可用静态目录语言筛选已实现，新增目录集中工程检查通过，实际 Source/平台待验收；[能力提示与有界跨源搜索](cross-source-search.md)已接入双槽、逐源结果和正式 UI，独立工程与 Web 真实 Source 的交接、隔离、分页、停止和详情/阅读分项通过，其余平台门继续验收。仅声明实际验证的登录/验证码/脚本能力。
 6. 按[源迁移子计划](source-migration.md)完成“搜索或浏览目标源热门作品 → 用户确认作品 → 预览一对一章节映射 → 原子补充目标收藏/分类/已读/书签”。正式协议与 D1 三 CAS 原子写、Flutter 数据层、书架/详情入口和向导已实现，独立集中工程检查与构建通过。模糊项须手动确认，原条目与目标已有状态保留，不跨源复制页面位置，不把工程检查当作实际 Source/多端完成。
@@ -48,17 +48,17 @@ typed preferences 已接入正式设置入口并通过 Komiic v6 AOT、Web 设�
 
 ## 扩展管理里程碑
 
-**默认仓库的集中工程检查、Web 安装和 iOS 模拟器同版本构建替换分项已过；额外仓库正式来源链已接入，工程与实际平台分别验收。** [子计划](extension-management.md)维护完整范围，[设计](../design/extension-management.md)确定 `InstalledExtension`、全局 CAS/pending、准备/取消、代码缓存与关闭合同，[验证记录](../verification/extension-management.md)区分已过集中工程与实际平台门。
+**默认仓库的集中工程检查、Web 安装和 iOS、Android 模拟器同版本构建替换分项已过；额外仓库正式来源链已接入，工程与实际平台分别验收。** [子计划](extension-management.md)维护完整范围，[设计](../design/extension-management.md)确定 `InstalledExtension`、全局 CAS/pending、准备/取消、代码缓存与关闭合同，[验证记录](../verification/extension-management.md)区分已过集中工程与实际平台门。
 
 D1 保存账户清单、enabled 和精确 build/hash，缺记录不自动安装；本机准备只下载/验证代码，不执行 Source。缓存直接使用 idb，128 项/256MiB，shared pin 保护使用中产物；运行槽精确关闭并等待 ACK/释放。安装和更新先准备后按原 CAS 确认，检查更新不自动换版；四打开路径、实际调用和图片 provider 共用确认门禁。停用/卸载以账户确认驱动，关闭/清理失败单独展示，保留业务、Source 数据与 HTTP Cache。
 
-[iOS 实测](../verification/extension-version-native.md)通过手动替换 xkcd 1.6.1 构建、清除旧代码缓存及新进程续读；Native 上游版本升级、Android 换版、真机、生产和完整生命周期继续验收。历史固定 `ad869d2` 三包 AOT 候选通过，仅 `compiled_unverified`，未部署或写正式 checkpoint，见[候选证据](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。额外仓库的添加、验证、刷新/移除、身份冲突和通用 Source 中继已按[子计划](additional-repositories.md)接入，实际外仓、Source/平台与独立客户端继续验收；[能力提示与有界跨源搜索](cross-source-search.md)已接入，独立服务回归已过，实际运行门待验收，不将本里程碑当作完整 P3 完成。
+[Native 实测](../verification/extension-version-native.md)在 iOS、Android 模拟器通过手动替换 xkcd 1.6.1 构建、清除旧代码缓存及新进程续读。Android 的 D1 审计只新增一条安装设置回执。Native 上游版本升级、真机、生产和完整生命周期继续验收。历史固定 `ad869d2` 三包 AOT 候选通过，仅 `compiled_unverified`，未部署或写正式 checkpoint，见[候选证据](../verification/extension-management.md#固定-ad869d2-三包-aot-候选)。额外仓库的添加、验证、刷新/移除、身份冲突和通用 Source 中继已按[子计划](additional-repositories.md)接入，实际外仓、Source/平台与独立客户端继续验收；[能力提示与有界跨源搜索](cross-source-search.md)已接入，独立服务回归已过，实际运行门待验收，不将本里程碑当作完整 P3 完成。
 
 ## 源迁移里程碑
 
-**已实现，工程与真实 Web、iOS 和 Android 模拟器的顺序迁移和独立读回已通过。** [子计划](source-migration.md)维护目标与待办，[设计](../design/source-migration.md)确定三 CAS、保留源/目标状态、一对一章节身份及显式原请求恢复，[验证记录](../verification/source-migration.md)区分定向合同/D1、跨语言、受控客户端与真实平台门。
+**已实现，工程与真实 Web、iOS 和 Android 模拟器的独立验收已通过，Android → iOS → Android 同库验收已通过。** [子计划](source-migration.md)维护目标与待办，[设计](../design/source-migration.md)确定三 CAS、保留源/目标状态、一对一章节身份及显式原请求恢复，[验证记录](../verification/source-migration.md)区分定向合同/D1、跨语言、受控客户端与真实平台门。
 
-预览按源、目标及分类目录 revision 冻结，只在用户独立确认后原子写入目标收藏、分类并集和缺失正向已读/书签；原作品不改，目标已有 progress、封面与续读保留，原页位不跨源复制。未知 ACK 只显式重试原 UUID/body/CAS，最多 256 组映射且不隐式截断/拆批。正式 Web 与 iOS、Android 模拟器均使用 xkcd 英文和中文源，验证热门列表选目标、手动映射、确认前状态不变及独立读回；更多 Source、故障、混合平台和生产继续验收。
+预览按源、目标及分类目录 revision 冻结，只在用户独立确认后原子写入目标收藏、分类并集和缺失正向已读/书签；原作品不改，目标已有 progress、封面与续读保留，原页位不跨源复制。未知 ACK 只显式重试原 UUID/body/CAS，最多 256 组映射且不隐式截断/拆批。正式 Web 与 iOS、Android 模拟器均使用 xkcd 英文和中文源，验证热门列表选目标、手动映射、确认前状态不变及独立读回。隔离同库验收由 Android 标记英文原作、iOS 确认迁移、Android 新进程读回；账户／英文作品／中文作品 revision 从 `4/3/0` 变为 `5/3/1`，读回时保持不变。更多 Source、故障、生产与真机继续验收。
 
 ## typed Source preferences 里程碑
 

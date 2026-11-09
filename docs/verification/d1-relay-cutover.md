@@ -25,3 +25,5 @@ export WRANGLER_SEND_METRICS=false
 2026-11-10，基于 `51c7b1b` 的正式配置和 SQL，准备了截至 `0008`、`0009` 的原样前缀。使用不同数据库 ID 和独立本地持久目录的对应配置，以 Wrangler CLI 顺序应用 `0003 → 0008 → 0009 → 0010`，每步以 `SELECT name FROM d1_migrations ORDER BY id` 读取账本，逐文件核对四个结果与原前缀一致。配置、SQL 摘要和读回留在 `.local/cutover-preflight-51c7b1b.u4E4Vi/`。当前 `wrangler whoami` 报本机管理会话已过期；未执行生产命令。完整候选、生产账本、Access 和封面桶的当前状态仍需在发布前核对。
 
 同一提交的正式 Vite Worker 配置通过 `pnpm --filter @karuyomi/api exec wrangler deploy --dry-run --config dist/karuyomi/wrangler.json`，识别到 `DB`、`COVERS`、`ASSETS` 与 Access 变量。此次使用 xkcd 单包验收快照，只证明本地配置与构建可被 Wrangler 接受，未向生产上传，也不代替完整候选的 dry-run。
+
+2026-11-10，为缩短 `0009` 后的中继中断，用正式 `2c012db` / 六材料 xkcd 验收构建执行 Wrangler 4.156.1 `versions upload --dry-run`。生成 Worker 与 `DB`、`COVERS`、`ASSETS`、`RUNTIME_SESSIONS` 及 Access 变量均被识别；本地源码确认真实上传会同步 Static Assets，dry-run 不上传。与已部署 `466acdd` 的配置比对，Worker 自定义域名和 Durable Object `v1` 声明无变更。正式切换拟先上传完整版本，再执行 `0009` 和 100% 版本切换；生产 Worker 版本、路由和待应用迁移需在当次发布前核实。本轮未上传或切流，也未应用远端迁移。原始日志位于 `.local/versions-upload-cutover-2c012db.xteibk/dry-run.log`。

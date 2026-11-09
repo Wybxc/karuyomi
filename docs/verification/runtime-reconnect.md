@@ -31,6 +31,14 @@
 
 首轮 `--no-dds` 下自定义 VM stream 不可用，探针导航选择器也有歧义；该轮不计通过。改用默认 DDS、明确的正式 UI 控件后通过。本轮 HTTPS 服务、专用模拟器和私用 ADB 均已停止。复验命令、工具版本与原始日志见 `/private/tmp/karuyomi-native-reconnect-24f8b21-Ml7SWzeP/README.md`。该分项没有注入丢失启动 ACK，没有验证 Source 自动触发的重建、iOS 或真机，不能归因历史 Android 初始化问题。
 
+### iOS 同服务重连与真实续读
+
+2026-11-10，在专用 iPhone 17 Pro / iOS 26.4 模拟器上，用固定 `2c012db` 的正式 `app.main()`、受信回环 HTTPS 和独立 workerd/D1，验收同一身份主动重连同一服务。Static Assets 提供冻结 `c04d436` 的 xkcd 1.6.1 v6 工件，build ID 为 `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-43d97485f779b768af7861a6a25522db433ab6d229a6d989e70e3f3c88a848a3`。准备阶段经正式界面保存英文 Source `1538249443376436084`、`3319: Elevators`（`/3319/`）第 2 页，epoch 0；后续重连探针没有重复写入基线。
+
+新 App 进程（PID 21527）从正式书架直接续读，第 2 页显示真实 `RawImage`，随后返回书架并确认章节资源关闭。只通过「设置 → 连接服务」重连原地址，Catalog 状态实测为 `ready → failed → connecting → ready`，收到两条正式的 `Native runtime container was rebuilt` 事件；事件条数不代表启动了两个新 WebView。该进程回到书架直接续读同章第 2 页，无需翻页。两轮页键和 manifest 一致，均实际解码 1000×213 的图片（36,912 B），Source generation 从 `2186a808…` 变为 `6030ca36…`，Native 图片绑定目录从 `01E43D2E…` 变为 `C1AAE5DC…`；两轮均确认关闭章节，Flutter 集成测试 1/1 通过。
+
+独立 HTTPS 对照的书架、设置、作品、带精确章键的章节状态、章节进度列表和书签六路响应均逐字节一致，账户/作品/全局设置 revision 保持 `4/3/1`。这证明该流程未产生可见业务写入。复验使用正式验收 harness、同一静态候选和测试身份；用正式 `server_sync_test.dart` 准备页码后，运行忽略目录 `.local/ios-xkcd-reconnect-2c012db.qSHavJ/` 中的 `run-reconnect.sh`（固定 Flutter 3.47.5、指定专用模拟器和隔离源站），前后分别用 `snapshot.sh` 采样。更换验收端口时需同步修改驱动与采样脚本的回环地址限制。原始日志、快照、包内 runtime 摘要与清理记录在同目录；服务和专用模拟器已清理，临时 TLS 私钥已删除。该分项未覆盖 Source 自动触发的恢复、丢失启动确认、换身份、生产 Access 或物理设备。
+
 ## 正式 Web 主入口的 A→B→A
 
 2026-11-04，Codex 内置 Chromium 156 使用正式 Flutter `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 完成身份切换；`main.dart.js` SHA-256 为 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`。原 xkcd AOT 仍为 `b4f72f7` 的 `ext-all.xkcd-b33800f6d02ddab83b60b6d7ac85b49d`，JAR、清单、材料均未改，完整输入身份见[Source 网络 Cache](source-network-cache.md)。
