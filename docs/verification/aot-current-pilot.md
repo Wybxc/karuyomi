@@ -59,6 +59,14 @@ pnpm acceptance:serve
 
 同日，为释放 Mac 的 CPU，将该冻结批次迁至独立 Fedora x86_64 构建机。先用固定提交和锁定工具链在 Linux 重建材料，`materials.json` SHA-256 与 Mac 完全一致；在独立输出目录重新编译 xkcd，编译与产物完整性通过。Mac 调度器收到 SIGTERM 后等待 builder 退出并释放状态锁。停机后将父状态、计划和逐包结果同步至 Fedora；传输前后 295 个成功、16 个失败检查点的记录逐项摘要一致，剩余 1,137 个输入。Fedora 用同一冻结计划单并发恢复，保留原失败结果，并为首个待处理输入 `d68d5c0f…` 写入新 `built` 检查点。Mac 目录保留为交接备份，恢复只生成待验收候选，未部署。
 
+## clab 在途失败抽样
+
+2026-11-09 23:08（UTC+8），在固定 `c04d436` 的 clab 批次仍运行时，只读核对当时已完成的 1,088 个逐包 `pipeline-result.json`：1,036 成功、52 失败（16 条由 Mac 迁入、36 条在 clab 生成）。1,036 个成功均为 `compiled_unverified`。同次公开读取确认生产仍是三个包，`build-state.json` 的 revision 仍等于该批次的生产 parent，`bootstrap.complete=false`。这些是固定时点的观察，不是最终候选或部署结果。
+
+52 条结果均为 AOT 阶段的 `ExecaError`，对应的上游 Gradle 均已成功。逐包 `logs/aot.log` 显示其中 50 条为 TeaVM 缺类或方法，另有 `en.manhwaread` 的编译 JVM `Java heap space`，以及 `all.lunaranime` 的无栈 `Unexpected error occurred: 2/2`；后一条不能单凭文本套用下节旧批次的定位。逐包摘要和只读复验方法保存在本机忽略目录 `.local/aot-clab-triage/`，重采样结果与原摘要逐字节一致。
+
+链接缺口包括 Android API（21 包，其中 10 包涉及 WebView）、JCA 加解密（10 包）和 OkHttp 接口（8 包），同一包可有多项。11 包缺 `Class.getResource(String)`，其中 5 包当次只报这一项。核对原始 JAR 和调用点，Webnex、CapibaraTraductor、MangaFire 用它读取打包在 `assets/` 内的文本。全量结束后可先在隔离 AOT 实现并验证此资源读取模式，保留缺失资源、字符集和流关闭的语义；仍需对代表包验证实际读取，不能据一次编译认定兼容。没有修改冻结输入、重试同指纹失败包或启动第二个发布器。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。
