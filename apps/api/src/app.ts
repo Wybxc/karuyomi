@@ -35,9 +35,16 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
     const api = path === '/api' || path.startsWith('/api/');
     if (!api) {
       if (path.startsWith('/cdn-cgi/')) return c.notFound();
+      if (['GET', 'HEAD'].includes(c.req.method) && path === '/auth/complete') {
+        // The opener or Native WebView observes this location, then bootstraps
+        // the session. The callback does not need to start another client.
+        return c.text('请返回 Karuyomi。', 200, {
+          'Cache-Control': 'no-store',
+        });
+      }
       if (
         ['GET', 'HEAD'].includes(c.req.method) &&
-        ['/', '/auth/complete', '/browse', '/settings'].includes(path)
+        ['/', '/browse', '/settings'].includes(path)
       ) {
         return c.env.ASSETS.fetch(
           new Request(new URL('/', c.req.url), c.req.raw),
@@ -82,15 +89,7 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
     const attempt = c.req.query('attempt');
     // Keep the login continuation on one of the public application routes.
     // In particular, never redirect back into Access or an arbitrary origin.
-    if (
-      ![
-        '/',
-        '/auth/complete',
-        '/browse',
-        '/settings',
-        '/runtime/host.html',
-      ].includes(returnTo)
-    ) {
+    if (!['/', '/auth/complete', '/browse', '/settings'].includes(returnTo)) {
       return c.json({ error: 'invalid_return_to' }, 400);
     }
     if (attempt !== undefined) {

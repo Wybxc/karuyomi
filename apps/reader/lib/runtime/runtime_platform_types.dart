@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:uuid/uuid.dart';
 
 import 'api_fetch.dart';
 import 'cover_transport.dart';
@@ -34,7 +35,8 @@ abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
 
   CoverTransport? get coverTransport => null;
 
-  /// Web leaves this page; native returns after bootstrap confirms the cookie.
+  /// Waits for the first-party Access return. The caller then bootstraps to
+  /// confirm the session and its identity before continuing.
   Future<bool> authenticate(
     BuildContext context, {
     String returnTo = '/',
@@ -71,7 +73,10 @@ abstract class PlatformRuntime implements RuntimeTransport, ApiFetch {
   Future<void> dispose();
 }
 
-String authenticationPath(String returnTo) {
+({String id, Uri login, Uri callback}) authenticationAttempt(
+  Uri origin,
+  String returnTo,
+) {
   final uri = Uri.tryParse(returnTo);
   if (uri == null ||
       uri.hasScheme ||
@@ -81,8 +86,15 @@ String authenticationPath(String returnTo) {
       returnTo.contains('\\')) {
     throw ArgumentError('Authentication return path must be same-origin');
   }
-  return Uri(
-    path: '/api/auth/login',
-    queryParameters: {'returnTo': returnTo},
-  ).toString();
+  const callbackPath = '/auth/complete';
+  final id = const Uuid().v4();
+  return (
+    id: id,
+    login: origin
+        .resolve('/api/auth/login')
+        .replace(queryParameters: {'returnTo': callbackPath, 'attempt': id}),
+    callback: origin
+        .resolve(callbackPath)
+        .replace(queryParameters: {'attempt': id}),
+  );
 }

@@ -158,13 +158,7 @@ test('unknown authenticated API returns JSON 404', async () => {
   expect(await response.json()).toEqual({ error: 'not_found' });
 });
 
-test.each([
-  '/',
-  '/auth/complete',
-  '/browse',
-  '/settings',
-  '/runtime/host.html',
-])(
+test.each(['/', '/auth/complete', '/browse', '/settings'])(
   'login permits only a public application continuation: %s',
   async (returnTo) => {
     const response = await app.request(
@@ -217,6 +211,7 @@ test.each([
   'https://attacker.example',
   '//attacker.example',
   '/api/bootstrap',
+  '/runtime/host.html',
   '/cdn-cgi/access/login',
   '/browse?redirect=https://attacker.example',
 ])('login rejects arbitrary continuations: %s', async (returnTo) => {

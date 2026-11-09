@@ -42,7 +42,7 @@
 
 2026-11-08，[生产 Web 恢复登录态](verification/server-state-production.md#生产-web-恢复登录态)已确认：用户自行登录后，Codex 内置浏览器中的生产页从 Access 过期提示恢复到正式服务端书架。同一正式会话随后通过 [Arknights Comics 英文热门列表](verification/server-state-production.md#生产-web-真实-source-列表)只读验收。生产详情、完整阅读和原生跨端验收继续。
 
-2026-11-08，[双 Web 书架批量部分提交](verification/library-batch.md#双-web-部分提交与冲突恢复)通过：第一部确认并留下 D1 回执，第二部因另一会话的修改返回 409 且无回执，第三部未发送。只读结束后按最新书架重新确认余项，第二会话读回全部结果，其原分类关联保留。Native、断网或丢响应、生产另验。
+2026-11-08，[双 Web 书架批量部分提交](verification/library-batch.md#双-web-部分提交与冲突恢复)通过：第一部确认并留下 D1 回执，第二部因另一会话的修改返回 409 且无回执，第三部未发送。只读结束后按最新书架重新确认余项，第二会话读回全部结果，其原分类关联保留。11-10，[Android 批量移出分类及书架，iOS 新进程读回](verification/library-batch.md#android-批量移出与-ios-读回)通过；隔离 D1 只新增四条预期回执，未选作品、保留分类和阅读标记未改变。Native 其余操作、断网或丢响应、生产另验。
 
 2026-11-08，当前 v6 ToonLook [Web 长图、完整章节与续读](verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)通过：两章各 10 页均在正式阅读界面显示，第一章完成，第二章在新文档恢复到第 10 页。六个受管 Blob 的独立像素对照覆盖五个非恒等重排和一个恒等控制；续读后页位、锚点和完成状态保持一致，D1 revision 有变化。未验 Native、性能或生产。
 
@@ -410,7 +410,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 ## 尚未通过的门槛
 
-- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。
+- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。[隔离 Native 可见登录](verification/native-main-entry.md#native-可见-access-回跳)已通过双端首次登录、失效重登和 Cookie 进程恢复；使用本地身份提供方，不代表生产 Access。
 - 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。

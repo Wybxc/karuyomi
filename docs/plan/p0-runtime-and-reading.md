@@ -41,6 +41,8 @@ ToonLook 的长图重排已通过 [Web 完整章节分项](../verification/aot-c
 
 Native 通用安装包已接入[本机服务地址恢复](../verification/native-main-entry.md#native-本机服务地址恢复)。用户手动选择有效的 HTTPS 地址后，下次启动以该地址连接；没有本机偏好时用构建默认值。业务状态仍以对应服务为准。
 
+[Native 可见登录回跳](../verification/native-main-entry.md#native-可见-access-回跳)已改为消费精确的本次回跳地址，并由正式运行时重新确认身份。iOS 和 Android 模拟器的首次登录、会话失效后重登及保留 Cookie 的进程重启已通过真实操作和独立 D1 审计；生产 Access、阅读恢复和真机仍须另验。
+
 [iOS Arknights 阅读性能基线](../verification/reader-baseline-ios.md)取得 debug 模拟器真实首图、翻页、滚动和跨章帧及 App RSS。此轮验证了采集方法，不替代物理设备的首图分布、合计峰值与触控验收。
 
 | 分项           | 已有实现或证据                                                                                                                                                                    | 尚不能据此认定的能力                                                                                                 |

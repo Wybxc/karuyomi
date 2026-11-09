@@ -3,7 +3,6 @@ import 'dart:js_interop_unsafe';
 import 'package:flutter/widgets.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
-import 'package:uuid/uuid.dart';
 import 'package:web/web.dart' as web;
 import 'package:http/browser_client.dart';
 import 'cover_transport.dart';
@@ -42,19 +41,14 @@ final class WebPlatformRuntime extends PlatformRuntime {
   }) async {
     if (_disposed) throw StateError('服务已关闭，请重新连接。');
     if (_authentication != null) throw StateError('登录窗口已打开，请先完成或关闭。');
-    authenticationPath(returnTo);
+    final attempt = authenticationAttempt(origin, returnTo);
     final continuation = {'returnTo': returnTo, 'pending': pending};
     wire.checkJsonBudget(continuation, maxBytes: wire.controlRequestLimit);
-    final attempt = const Uuid().v4();
-    final path = Uri(
-      path: '/api/auth/login',
-      queryParameters: {'returnTo': '/auth/complete', 'attempt': attempt},
-    ).toString();
     // Open synchronously before the first await, while the click still grants
     // popup activation. The current app and its unconfirmed drafts stay alive.
     final popup = web.window.open(
-      path,
-      'karuyomi-auth-$attempt',
+      attempt.login.toString(),
+      'karuyomi-auth-${attempt.id}',
       'popup,width=520,height=720',
     );
     if (popup == null) throw StateError('浏览器阻止了登录窗口，请允许弹出窗口后重试。');
@@ -63,8 +57,7 @@ final class WebPlatformRuntime extends PlatformRuntime {
     _pendingAuthentication = continuation;
     try {
       return await authentication.wait(
-        origin: origin,
-        attempt: attempt,
+        callback: attempt.callback,
         readLocation: () {
           try {
             return Uri.tryParse(popup.location.href);

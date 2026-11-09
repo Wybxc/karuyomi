@@ -319,7 +319,8 @@ Flutter 收藏与进度已改为 Worker API + D1，Drift/SQLite 业务路径已�
 
 | 路径                                                                          | 访问要求                            | 内容                                                                             |
 | ----------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
-| `/`、`/library`、`/browse`、`/reader/*`、`/settings`、`/auth/complete`        | 公开                                | SPA 页面外壳；个人内容由鉴权 API 或当前设备镜像提供                              |
+| `/`、`/library`、`/browse`、`/reader/*`、`/settings`                          | 公开                                | SPA 页面外壳；个人内容由鉴权 API 提供                                            |
+| `/auth/complete`                                                              | 公开                                | 仅提示返回应用，不加载应用脚本或读取业务数据                                     |
 | `/assets/*`、`/runtime/*`、`/source-worker.js`、manifest、Service Worker 脚本 | 公开                                | 公开 UI、通用桥与 Worker 引导；不包含扩展 AOT bundle、用户配置或已安装扩展清单   |
 | `/api`、`/api/*`                                                              | Cloudflare Access + Worker JWT 校验 | 私有业务数据/安装状态、Source 网络桥、回调、通知连接、自定义封面；不承载扩展正文 |
 | Static Assets 扩展目录                                                        | 公开、全客户端共用                  | index/catalog、清单与每扩展最新 AOT；客户端下载、更新与缓存须实测                |
@@ -350,7 +351,7 @@ Flutter 收藏与进度已改为 Worker API + D1，Drift/SQLite 业务路径已�
 
 1. 前端用 `fetch('/api/bootstrap', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' })` 探测状态。成功且响应结构正确才进入已连接状态；Access 可能先于 Worker 返回登录重定向或拒绝页，不能假定未授权总是 JSON 401。
 2. `opaqueredirect` 或明确的鉴权失败显示“登录后连接”；无法识别的 HTML/403 显示“连接被拒绝，可重新验证”，不能当作业务 JSON。断网、超时、5xx 单独显示连接错误，不触发自动登录循环。
-3. 用户点击登录时先保存当前阅读位置，在 `sessionStorage` 保存经过校验的站内相对路由，再顶层导航到 `/api/auth/login`。Access 完成登录、设置 Cookie，Worker 校验后固定跳转到公开 `/auth/complete`。该页面重新读取 bootstrap，成功后恢复路由；没有记录则回书架。登录端点不接受任意外部 `returnTo`，整个流程不在 URL 或前端存储中传递 JWT。
+3. 用户点击登录时，Web 打开独立窗口，Native 打开共享 Cookie 的可见 WebView。两端保留原页面与本次会话草稿，并携带一次性 UUID 导航到 `/api/auth/login`。Access 设置 Cookie，Worker 校验后将 UUID 随 303 返回到公开 `/auth/complete`。客户端只接受当前登录窗口或主框架中与本次 URL 完全一致的回跳，再由原应用正式 bootstrap 核对服务和身份后恢复。回跳页不启动第二个客户端，不在 URL 或前端存储中传递 JWT。
 4. 普通 UI 请求和同源 TeaVM WebWorker 请求都由浏览器自动携带 Access Cookie。浏览器不能通过 fetch 在后台完成交互登录；运行时收到 Access 失效信号后通知 UI，按第 7 节暂停和恢复。
 5. 网络桥将漫画站状态放在带来源标识的 `upstreamStatus` / 结构化错误中；上游 401、403、重定向不冒充后端 Access 响应。已过期会话下的写请求不得盲目重放，只在重新验证后按 mutation ID 幂等重试。
 

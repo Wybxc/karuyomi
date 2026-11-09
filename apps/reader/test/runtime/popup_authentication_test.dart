@@ -13,8 +13,7 @@ void main() {
     final authentication = PopupAuthentication();
     var closes = 0;
     final result = authentication.wait(
-      origin: origin,
-      attempt: attempt,
+      callback: callback(),
       readLocation: callback,
       isClosed: () => false,
       close: () => closes++,
@@ -33,8 +32,7 @@ void main() {
     Uri? location;
     var completed = false;
     final result = authentication.wait(
-      origin: origin,
-      attempt: attempt,
+      callback: callback(),
       readLocation: () => location,
       isClosed: () => false,
       close: () {},
@@ -44,6 +42,8 @@ void main() {
       Uri.parse('https://foreign.example/auth/complete?attempt=$attempt'),
       callback('previous-attempt'),
       origin.resolve('/settings?attempt=$attempt'),
+      origin.resolve('/auth/complete?attempt=$attempt&attempt=$attempt'),
+      origin.resolve('/auth/complete?attempt=$attempt#different'),
     ]) {
       location = invalid;
       await tester.pump(const Duration(milliseconds: 200));
@@ -62,8 +62,7 @@ void main() {
       var reads = 0;
       var closes = 0;
       final result = authentication.wait(
-        origin: origin,
-        attempt: attempt,
+        callback: callback(),
         readLocation: () {
           reads++;
           return null;
@@ -88,8 +87,7 @@ void main() {
     );
     var closes = 0;
     final result = authentication.wait(
-      origin: origin,
-      attempt: attempt,
+      callback: callback(),
       readLocation: () => null,
       isClosed: () => false,
       close: () => closes++,
@@ -106,8 +104,7 @@ void main() {
     final authentication = PopupAuthentication();
     var closes = 0;
     final result = authentication.wait(
-      origin: origin,
-      attempt: attempt,
+      callback: callback(),
       readLocation: () => null,
       isClosed: () => false,
       close: () => closes++,
