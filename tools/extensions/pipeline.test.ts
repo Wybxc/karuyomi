@@ -1175,6 +1175,43 @@ test('baseline plans reject duplicate replacements and a changed upstream source
     /source|upstream/i,
   );
 });
+
+test('initial baseline refuses to drop a deployed package still in the catalog', async (t) => {
+  const { f, options, failed, parent } = await baselineFixture(t);
+  const previous = f.descriptor('d', failed.packageName);
+  const index = Buffer.from(
+    JSON.stringify({
+      schemaVersion: 1,
+      builds: [
+        { packageName: previous.packageName, buildId: previous.buildId },
+      ],
+    }),
+  );
+  const deployed: ExtensionState = {
+    ...parent,
+    active: { [previous.packageName]: previous.inputFingerprint },
+    attempts: {
+      [previous.inputFingerprint]: {
+        descriptor: previous,
+        status: 'published',
+        attempts: 1,
+        available: true,
+      },
+    },
+    indexSha256: createHash('sha256').update(index).digest('hex'),
+  };
+  f.remoteOverrides.set(
+    '/extensions/build-state.json',
+    Buffer.from(JSON.stringify(deployed)),
+  );
+  f.remoteOverrides.set('/extensions/index.json', index);
+
+  await assert.rejects(
+    f.pipeline.prepareBaseline({ ...options, parentState: deployed }),
+    /would drop a deployed package/,
+  );
+  assert.equal(existsSync(f.snapshot), false);
+});
 test('state parser rejects inconsistent successful pointers and descriptor identities', (t) => {
   const f = new Fixture(t),
     descriptor = f.descriptor(),

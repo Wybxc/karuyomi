@@ -1186,6 +1186,7 @@ export class ExtensionPipeline {
       processes,
       finalize: true,
       strictResults: true,
+      preserveAvailable: true,
       ...(supplementCheckout ? { checkout: supplementCheckout } : {}),
     });
   }
@@ -1198,6 +1199,7 @@ export class ExtensionPipeline {
       origin?: string;
       finalize?: boolean;
       strictResults?: boolean;
+      preserveAvailable?: boolean;
       checkout?: string;
       processes?: BuilderProcesses;
       verifiedResults?: Map<string, ResultReceipt>;
@@ -1374,6 +1376,21 @@ export class ExtensionPipeline {
           materialCatalog: identity,
         });
         manifests.push(manifest);
+      }
+      if (options.preserveAvailable) {
+        const included = new Set(
+          manifests.map((manifest) => manifest.packageName),
+        );
+        for (const [packageName, key] of Object.entries(state.active)) {
+          if (
+            current.has(packageName) &&
+            state.attempts[key]?.available === true &&
+            !included.has(packageName)
+          )
+            throw new Error(
+              'Baseline would drop a deployed package: ' + packageName,
+            );
+        }
       }
       candidate.summary = {
         available: manifests.length,
