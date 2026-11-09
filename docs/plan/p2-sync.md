@@ -50,7 +50,7 @@
 
 2026-11-07，固定 `5ba6fff` 的日期修复通过实际无插桩 xkcd 重开，Web 同源同身份的书签添加、读回、移除及第三文档读回通过；重开不推进共享 revision。同一隔离 HTTPS / D1 的正式 iOS ↔ Android 模拟器也已完成相同往返，两次跨端读回业务快照不变。同一 HTTPS origin 的内置浏览器证书信任仍阻断 Web ↔ Native 门，生产与真机另验，见[书签记录](../verification/bookmarks.md)。
 
-[iOS 模拟器的 D1 写入错误与显式恢复](../verification/concurrent-server-state.md#ios-模拟器阅读进度写入被-d1-拒绝)已通过：末页完成事务返回 503 后，客户端保留当前画面和未确认草稿，D1 无回执、状态不变；显式重试原 UUID、正文与 CAS 后只提交一次。Web、Android、生产和真机的同类门继续验收。
+[iOS](../verification/concurrent-server-state.md#ios-模拟器阅读进度写入被-d1-拒绝)与 [Android](../verification/concurrent-server-state.md#android-模拟器阅读进度写入被-d1-拒绝) 模拟器的 D1 写入错误与显式恢复已通过：末页完成事务返回 503 后，客户端保留当前画面和未确认草稿，D1 无回执、状态不变；显式重试原 UUID、正文与 CAS 后只提交一次。Android 新进程从书架首次打开恢复已完成的第 2 页，未改变业务状态。Web、生产和真机的同类门继续验收。
 
 ## 实施顺序
 

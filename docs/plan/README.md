@@ -12,6 +12,8 @@ Source 重开故障的日期修复已通过正式无插桩 xkcd Web 复验；A �
 
 Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)：客户端显式重试原请求，D1 只提交一次。当前 v6 的 [iOS](../verification/concurrent-server-state.md#ios-模拟器阅读进度已提交后丢确认)和 [Android](../verification/concurrent-server-state.md#android-模拟器阅读进度已提交后丢确认)模拟器也通过同一场景；丢确认与同时写分开验收。
 
+[iOS 和 Android 模拟器](../verification/concurrent-server-state.md#ios-模拟器阅读进度写入被-d1-拒绝)已通过阅读进度写入被 D1 拒绝后的保留画面、显式重试与持久确认；Android 新进程从书架续读已完成的末页。Web、生产和真机的同类门继续按 [P2](p2-sync.md) 验收。
+
 [双 iOS 模拟器阅读进度同时写](../verification/concurrent-server-state.md#双-ios-模拟器阅读进度同时写)的重置获胜与 [iOS ↔ Android 模拟器](../verification/concurrent-server-state.md#ios-与-android-模拟器阅读进度同时写)的完成获胜已通过。打开不推进共享 revision，竞争只产生一条持久回执；冲突端保持原画面，旧页翻动不覆盖 D1，显式重开后读回胜出状态。其余配对及完整 P2 仍待验。
 
 2026-11-08：同一隔离 D1 的 [Web↔iOS 分类](../verification/category-ui-sync.md#web-与-ios-模拟器双向读写)与[全局设置](../verification/reader-settings.md#web-与-ios-模拟器双向读写)双向写入、新 Web 文档读回通过；[Web↔Android 全局设置](../verification/reader-settings.md#web-与-android-模拟器双向读写)和[分类](../verification/category-ui-sync.md#web-与-android-模拟器双向读写)同样通过，生产和其它门另验。

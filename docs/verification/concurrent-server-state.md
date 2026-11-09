@@ -269,4 +269,13 @@ Wrangler harness 3/3、API 严格类型与依赖检查通过。本分项验证 W
 - 点「读完本章」后，夹具的 SQLite trigger 在正式 D1 原子批次最后一次回执更新时拒绝写入。正式 API 返回 503 `UNAVAILABLE`；账户/作品 revision 保持 `4/3`，没有该 mutation 的持久回执，读回仍是第 2 页、未完成。界面保留同一阅读器和图片，显示「进度尚未获服务器确认」及「重试保存」。
 - 点击「重试保存」后，审计确认请求 UUID、正文 SHA-256 和预期作品 revision 均一致。正式 API 返回 200 并留下唯一持久回执；账户/作品 revision 各增加一次至 `5/4`。未确认提示消失，同一画面显示本章读完。退出测试客户端后，由另一个进程经正常 HTTPS 读回，确认当前位置和最远仍为第 2 页，`completed=true`。
 
-复验使用[正式 Native 驱动](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)的 `ACCEPTANCE_FIXTURE=progress-d1-error` / `SYNC_PHASE=d1-error`。正式安装/收藏和阅读驱动分别通过，Workers 定向测试 3/3。原始日志、正常停服后的 `ACCEPTANCE_PROGRESS_D1_ERROR_AUDIT` 和独立读回保留在忽略目录 `.local/progress-d1-error.LSvAOc/`。该分项覆盖真实本地 D1 批次回滚与 iOS 显式重试；丢确认是独立场景，Web、Android、生产与真机的 D1 错误门另验。
+复验使用[正式 Native 驱动](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)的 `ACCEPTANCE_FIXTURE=progress-d1-error` / `SYNC_PHASE=d1-error`。正式安装/收藏和阅读驱动分别通过，Workers 定向测试 3/3。原始日志、正常停服后的 `ACCEPTANCE_PROGRESS_D1_ERROR_AUDIT` 和独立读回保留在忽略目录 `.local/progress-d1-error.LSvAOc/`。该分项覆盖真实本地 D1 批次回滚与 iOS 显式重试；丢确认和其它平台分别验收。
+
+## Android 模拟器阅读进度写入被 D1 拒绝
+
+2026-11-10，固定 `cc5f4d2` 的正式 Flutter Android 入口、Pixel 7 / Android 16（API 36，WebView `133.0.6943.137`）。应用通过私有 ADB 转发连接官方 Wrangler harness `https://127.0.0.1:55523`；隔离 debug APK 只为回环测试 CA 增加信任，继续验证 TLS 与主机名。使用同一夹具、实际 v6 xkcd、`acceptance-owner` 和全新隔离 D1。
+
+- 正式界面安装、收藏并显示真实第 2 页。点「读完本章」后，原阅读器和图片继续显示，进度提示未确认，作品和账户状态保持，章未完成。显式重试后未确认提示消失，显示已读完。停服审计证明 503 `UNAVAILABLE` 无持久回执，200 有唯一回执；两次 UUID、原始正文摘要、预期作品 revision 3 一致，账户/作品 revision 从 `4/3` 只增加一次至 `5/4`。
+- 退出后从独立进程经正式书架入口继续阅读；首个真实解码画面为第 2 页，显示已读完。六路业务 GET 在续读前后逐字节一致。续读单独使用隔离驱动差异以期待已完成状态，未修改产品；第一次使用原驱动时在点击前因预期未完成而停止，独立状态未变化。
+
+复验沿用上节与[正式 Android HTTPS 说明](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)。日志、六路独立读回、隔离续读驱动差异和精确参数保存在 `.local/progress-d1-error-android-cc5f4d2/`。此分项仅覆盖 Android 模拟器和隔离 D1 的写入拒绝与重试，生产、真机和 Web 单独验收。
