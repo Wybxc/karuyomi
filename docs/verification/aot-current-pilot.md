@@ -206,3 +206,17 @@ Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 
 复验先 `git submodule update --init --depth 1 vendor/libwebp`，运行 `pnpm webp:prepare`，再 `pnpm --filter @karuyomi/runtime-host build` 和 `pnpm exec vitest run packages/runtime-host/test/graphics-bridge.test.ts packages/runtime-host/test/materials.test.ts`。本轮是正式材料与桥的工程验收；原 Source 仍须用新材料身份重编后，在正式 iOS 包复验，不以早前隔离探针代替。新材料未部署。
 
 固定 `a1dd0cd` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42688888405) 已通过。clab 的独立 checkout 已准备锁定工具链与 ToonLook 单包计划；正式材料清单与 macOS 构建逐字节一致，七份资源均通过摘要和大小校验。macOS 独立验收目录已重建 Native 内置文件，host、worker 与清单均与该提交的正式构建字节相同。旧冻结 ToonLook 清单与新材料不匹配。clab 的冻结全量仍在运行；独立单包计划尚未执行，不能加入旧候选或用来声称正式 iOS 已通过。
+
+## Arknights Comics 的 Android 完整章节与续读
+
+2026-11-10，固定正式产品 `2c012db`、冻结 `c04d436` 的 Arknights Comics 1.6.2（英语 Source `5973713386239249589`，独立静态快照 `b1ab2d45307a4a2cbc51ccfcb38860d7`）。从冻结检查点正式组装，未重编原扩展。实际静态索引、清单、gzip 和 App 内置材料均经核对，与六份材料身份匹配。Pixel 7 / Android 16 API 36 模拟器使用正式 Flutter 入口、官方 Wrangler HTTPS / workerd / D1 及测试身份；回环 CA 仅用于隔离调试构建，保留证书与主机名检查。
+
+从空书架经正式界面安装并收藏《Prelude Suite: The Lone Walker》。章节清单确认来源原序中《DREAM》的下一章是《HEARTBEAT》。阅读进程逐页显示《DREAM》51 页（实解码尺寸 1200 × 1691），显式标记完成后用「下一章」进入《HEARTBEAT》，显示并保存第 3 页。独立 Android 新进程从书架直接续读，首次显示《HEARTBEAT》第 3 页，无需经过详情。
+
+独立 HTTPS 读回确认账户／作品 revision 为 `2/1 → 58/57 → 58/57`，重开前后的完整响应相同。《DREAM》的当前与最远页均为 51 且已完成，《HEARTBEAT》的当前与最远页均为 3、未完成，保留来源章序。复验使用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)，逐页日志和读回摘要见本机忽略目录 `.local/arknights-android-2c012db/evidence/`。本分项未部署产物，不改变静态快照的 `compiled_unverified` 状态；生产和真机另验。
+
+## Arknights Comics 的 Android 与 iOS 模拟器接力
+
+沿用上节同一隔离 HTTPS / D1、静态快照、产品与测试身份。iPhone 17 Pro / iOS 26.4 专用模拟器信任本轮证书，从正式书架首次续读到 Android 已确认的《HEARTBEAT》第 3 页，显示真实解码帧，再操作一次「下一页」，确认第 4 页。实际 iOS App 的 host、worker、清单与正式构建字节一致。随后独立 Android 进程从书架首次显示第 4 页，不再翻页。
+
+独立 HTTPS 读回确认账户／作品 revision 为 `58/57 → 60/59 → 60/59`。《DREAM》第 51 页的完成状态和两份锚点全程相同；《HEARTBEAT》保留原清单和章序，当前与最远均为第 4 页、未完成。只读检查实际 D1 的三条回执：`58/57` 当前／最远为 `3/3`，`59/58` 为 `4/3`，`60/59` 为 `4/4`，且后两条的当前锚完全相同。两次提交分别确认用户导航和第 4 页真实解码后推进的最远位置；iOS 打开第 3 页没有附带提交。Android 回读前后各路原始响应正文逐字节一致。复验日志、快照与回执见 `.local/arknights-ios-handoff-2c012db.Gp8GbB/` 和上节 Android 证据目录。此分项覆盖同一作品的真实跨端续读，生产 Access、真机和其它 Source 另验。

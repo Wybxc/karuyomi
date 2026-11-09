@@ -25,7 +25,7 @@
 
 ## 下一功能里程碑
 
-自定义封面已通过独立 Web 文档和 iOS、Android 模拟器的顺序往返；混合平台、故障与生产另验。以下日用入口已实现，实际运行按分项验收：
+自定义封面已通过独立 Web 文档和 iOS、Android 模拟器的顺序往返，以及 iOS→Android→iOS 的同库上传、清除和新进程读回；Web↔Native、故障与生产另验。以下日用入口已实现，实际运行按分项验收：
 
 - **书架直接续读（Web 独立文档及 iOS↔Android 模拟器通过）**：把服务端已确认的 `MangaState.resume` 投影到书架，在保留详情入口的同时提供明确续读操作；取得当前 Source 和章节清单后按稳定 chapterKey 解析，复用正式 Reader 路由，章节缺失时明确回到详情，不另建本地进度权威。[正式 Web 验收](../verification/reading-entry.md#正式-web-书架直接续读)已确认真实 xkcd 直接恢复第 2 页、回看第 1 页后最远仍为第 2 页，且打开不附带写入；[原生顺序交接](../verification/reading-entry.md#ios-与-android-模拟器书架续读)另确认 Android 回看只写一次、新 iOS 进程直接恢复。Web↔Native、生产与真机另验。
 - **详情失败恢复（已实现，Web 开章及 iOS 模拟器续读位置重试通过）**：开章遇普通 Source 错误时保留本次选择，在当前详情给出专用提示并允许显式重试。真实 xkcd [Web 单次错误验收](../verification/reading-entry.md#详情开章故障验收入口)确认失败不写进度、同章重试能打开两页并保存。[iOS 详情续读位置读取失败](../verification/reading-entry.md#ios-模拟器详情续读位置读取失败与显式重试)已验证重读后恢复原按钮、无新增 Source 中继或业务写入。其它平台的对应错误、书架读取、Access 暂停/认证恢复与生产继续验收。

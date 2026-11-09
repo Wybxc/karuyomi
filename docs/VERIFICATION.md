@@ -1,5 +1,9 @@
 # 实施验证记录
 
+2026-11-10，[Arknights Comics Android 完整章节与续读](verification/aot-current-pilot.md#arknights-comics-的-android-完整章节与续读)通过：真实《DREAM》逐页显示 51 页，显式完成后进入《HEARTBEAT》，新进程从书架首次显示已确认的第 3 页。[同库 Android↔iOS 接力](verification/aot-current-pilot.md#arknights-comics-的-android-与-ios-模拟器接力)中，iOS 从第 3 页翻到第 4 页，Android 新进程首次显示第 4 页。只读 D1 回执区分导航与实图观察；两端打开没有附带写入。生产与真机另验。
+
+2026-11-10，[iOS→Android→iOS 同库封面交接](verification/custom-covers.md#ios-与-android-模拟器同库封面交接)通过。iOS 从实际 Files 上传，Android 解码同图后清除，iOS 新进程显示默认占位。D1/R2 独立确认恰好两次提交，重启只读，旧路径 404。Web↔Native、故障、生产与真机另验。
+
 2026-11-10，[iOS 模拟器自定义封面](verification/custom-covers.md#ios-模拟器系统选择器与新进程读回)通过。两次实际系统 Files 选择、上传、替换和清除后，新进程读回默认封面；独立读回确认三次写推进 revision，清除后的两份旧路径均撤销。混合平台、故障、生产与真机另验。
 
 2026-11-10，固定 `2c012db` 的 [iOS arm64 发布构建](verification/native-main-entry.md#v6-ios-arm64-发布构建)通过。实际 Runner 与 Dart AOT 均为 iOS arm64，包内运行时与冻结 v6 六份材料匹配。未签名、未安装，真机与生产 Access 另验。
@@ -396,7 +400,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 - 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换、Android 同版本构建替换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
-- 自定义封面的混合平台读回、生产 Cookie/Access、并发和丢响应恢复、服务端重启、生产私有 bucket/部署与远端清理；独立 Web 与 iOS、Android 模拟器的顺序往返和新进程读回已通过。
+- 自定义封面的 Web↔Native 读回、生产 Cookie/Access、并发和丢响应恢复、服务端重启、生产私有 bucket/部署与远端清理；独立 Web 与 iOS、Android 模拟器的顺序往返和新进程读回已通过。
 - P1 完整书架/分类/设置和日用流程、P2 同步、P3 用户扩展/迁移、P4 覆盖与优化；已有本地进度分项不能替代完整 P1。
 
 CI 已配置统一检查，远端运行结果需由对应提交确认。以上工程与探针证据不表示 P0 或后续阶段通过。

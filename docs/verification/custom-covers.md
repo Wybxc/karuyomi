@@ -77,9 +77,19 @@ iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS �
 
 首轮选择器定位及 Flutter 等待超时保留；测试驱动改为预编译后及时启动并点实际文件单元格的缩略图，正式产品未改。原始 Flutter 日志、XCUITest 结果与各阶段快照保存在本机忽略目录 `.local/native-ios-cover-426536d/`。
 
+## iOS 与 Android 模拟器同库封面交接
+
+2026-11-10，固定 `426536d` 与冻结 xkcd v6 1.6.1，iPhone 17 Pro / iOS 26.4 和 Pixel 7 / Android API 36 使用同一新建隔离 Wrangler HTTPS / workerd / D1、私有 R2 与测试身份。三个独立进程使用正式 Flutter 主入口：
+
+1. iOS 用系统 Files 选择橙色 PNG，保存并在书架解码已确认封面。
+2. 全新 Android 进程读取同一作品的相同封面 ID，书架解码像素与 iOS 一致；进入正式编辑器清除并等待确认。
+3. 保留原安装数据的 iOS 新进程读回同一收藏，显示默认占位；没有再次写入。
+
+独立 HTTPS 与 D1/R2 核对账户／作品 revision `3/1 → 4/2 → 5/3 → 5/3`；两次确认恰好各留一条新回执，重启读回无变更。清除后当前引用为空、旧路径 404，原 R2 对象仍保留至宽限期。对照收藏、设置、进度及书签不变。原始日志与 `verified.json` 在本机忽略目录 `.local/native-mixed-cover-426536d/evidence/`。Web↔Native 同库、故障、生产和真机另验。
+
 ## 剩余平台、故障与生产门
 
-Web 与 iOS、Android 模拟器分别通过独立文档／进程的顺序保存和读回。混合平台同库、并发旧 CAS、响应丢失后原请求恢复、服务端重启、生产 Cookie／Access 与真机仍须验收。
+Web 与 iOS、Android 模拟器分别通过独立文档／进程的顺序保存和读回，iOS→Android→iOS 同库上传、清除和读回已过。Web↔Native 同库、并发旧 CAS、响应丢失后原请求恢复、服务端重启、生产 Cookie／Access 与真机仍须验收。
 
 已通过当前账户的 Wrangler 创建配置匹配的 `karuyomi-covers` bucket，`wrangler r2 bucket dev-url get karuyomi-covers` 确认公开 r2.dev 访问关闭；创建记录在忽略的 `.local/cover-bucket-create.log`，隐私检查在 `.local/cover-bucket-privacy.log`。这只证明资源已准备，尚未部署新 Worker 绑定或应用生产 D1 schema。部署后仍需分别记录已登录上传/读取、匿名拒绝、不同 subject 隔离、旧 asset 撤销和宽限期后显式清理。远端对象不即时删除是当前设计，不能将暂存旧对象误记为当前 API 可公开读取。
 

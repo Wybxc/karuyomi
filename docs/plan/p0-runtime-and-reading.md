@@ -31,6 +31,8 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 ToonLook 的长图重排已通过 [Web 完整章节分项](../verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)。[iOS 模拟器首图诊断](../verification/aot-current-pilot.md#toonlook-的-ios-首图失败)确认静态解码和重排成功，Canvas 请求 WebP 时回 PNG，原 Source 因而在图片交付前失败。[隔离编码探针](../verification/aot-current-pilot.md#toonlook-的-ios-webp-编码探针)用 libwebp 1.6.0 输出真正的 WebP，真实首章、切章和新进程续读通过。[正式共享图形桥与材料](../verification/aot-current-pilot.md#正式-webp-编码材料与图形桥)已接入固定工具链、有界堆、输出账本和既有取消机制。下一步用匹配的新材料与独立 AOT 候选复验 iOS 正式阅读及其它平台，不修改正在运行的冻结全量。iOS 正式阅读门仍未通过。
 
+冻结 v6 [Arknights Comics Android 分项](../verification/aot-current-pilot.md#arknights-comics-的-android-完整章节与续读)已实际显示《DREAM》完整 51 页、完成、跨章及新进程非首页续读；[同库 Android↔iOS](../verification/aot-current-pilot.md#arknights-comics-的-android-与-ios-模拟器接力)的续读接力已通过。真机、生产 Access 与其余 P0 门另验。
+
 ## 已完成与边界
 
 固定 `2c012db` 已通过与冻结 v6 候选匹配的 [iOS arm64 发布构建及包内材料核对](../verification/native-main-entry.md#v6-ios-arm64-发布构建)。成品未签名；匹配部署、实际安装与真机阅读另验。
