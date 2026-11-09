@@ -60,8 +60,13 @@ final class ProgressRepository {
   Future<ProgressSnapshot> loadChapterState({
     required String mangaKey,
     required String chapterKey,
+    bool discardPendingProgress = false,
   }) async {
-    final result = await client.readManga(mangaKey, chapterKey: chapterKey);
+    final result = await client.readManga(
+      mangaKey,
+      chapterKey: chapterKey,
+      discardPendingProgress: discardPendingProgress,
+    );
     return _state(result.manga, result.hasProgress() ? result.progress : null);
   }
 
@@ -136,6 +141,8 @@ final class ProgressRepository {
     required ChapterProgress progress,
     required bool reversedOrder,
     int? basedOnRevision,
+    bool Function(bool explicitRetry)? canSend,
+    bool explicitRetry = false,
   }) async {
     _validate(mangaKey, manifest, progress);
     final result = await client.mutate(
@@ -148,6 +155,8 @@ final class ProgressRepository {
         ),
       ),
       basedOnRevision: basedOnRevision,
+      canSendProgress: canSend,
+      explicitProgressRetry: explicitRetry,
     );
     return _confirmedState(result, manifest.chapterKey);
   }
@@ -167,6 +176,8 @@ final class ProgressRepository {
     required ChapterManifest manifest,
     required bool reversedOrder,
     int? basedOnRevision,
+    bool Function(bool explicitRetry)? canSend,
+    bool explicitRetry = false,
   }) async {
     if (mangaKey.isEmpty || manifest.pages.isEmpty) {
       throw ArgumentError(
@@ -182,6 +193,8 @@ final class ProgressRepository {
         ),
       ),
       basedOnRevision: basedOnRevision,
+      canSendProgress: canSend,
+      explicitProgressRetry: explicitRetry,
     );
     return _confirmedState(result, manifest.chapterKey);
   }

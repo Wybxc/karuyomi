@@ -352,7 +352,9 @@ class _CatalogPageState extends State<CatalogPage> {
                   icon: Icons.warning_amber,
                 ),
                 TextButton(
-                  onPressed: () => unawaited(controller.flushReadingProgress()),
+                  onPressed: () => unawaited(
+                    controller.flushReadingProgress(explicitRetry: true),
+                  ),
                   child: const Text('重试保存进度'),
                 ),
               ],
@@ -938,7 +940,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   }
 
   Future<void> _retryProgress() async {
-    await controller.flushReadingProgress();
+    await controller.flushReadingProgress(explicitRetry: true);
     await _refreshResume();
   }
 

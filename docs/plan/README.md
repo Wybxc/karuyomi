@@ -55,6 +55,8 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
 
+首发六材料归档已通过 [Native arm64 发布构建与包内材料核对](../verification/aot-current-pilot.md#六材料-native-发布构建)；该次成品早于阅读进度修复。隔离模拟器的[阅读中登录恢复](../verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)已有双端分项，最终构建、生产和真机门仍待验收。
+
 ## 当前交付顺序
 
 1. **优先功能完整性。** 每个里程碑先实现正式协议、权威读写和用户入口，再集中验证；等待生产 Access 或设备环境时继续可独立完成的功能。[P1 的续读与详情恢复里程碑](p1-library-and-progress.md#下一功能里程碑)已实现，书架直接续读已过 [Web 独立文档顺序交接](../verification/reading-entry.md#正式-web-书架直接续读)；[P3 收藏源与快捷打开](p3-extensions-and-migration.md#收藏源里程碑)也已实现，工程与独立运行门见[记录](../verification/source-favorites.md)；[P3 当前包 Source 语言筛选](p3-extensions-and-migration.md#包内语言筛选里程碑)已实现；[静态目录语言筛选](p3-extensions-and-migration.md#静态目录语言筛选里程碑)已接入当前可用索引的 Source 名称/语言，不加载其它扩展，集中工程检查通过、实际 Source/平台待验收，工程及实际运行门维护在[记录](../verification/source-language-filter.md)；[P3 typed Source 筛选](p3-extensions-and-migration.md#typed-source-筛选里程碑)已实现并通过集中工程检查、两包 v5 AOT 及 CuuTruyen Web 动态筛选/分页分项，继续其它 Source/平台验收，后续按[扩展管理](extension-management.md)与[typed Source preferences](source-preferences.md)推进完整功能链路；typed preferences 正式 v6 合同、工程检查、Komiic AOT 与 Web 设置/新文档恢复分项通过，继续其它 Source 控件、Native 和生产验收；默认仓库扩展管理的[独立集中工程检查](../verification/extension-management.md)、Web 安装及 [iOS/Android 模拟器同版本构建替换与续读](../verification/extension-version-native.md)已过，继续验收剩余平台和完整生命周期。[源迁移](source-migration.md)已通过真实 Web、iOS/Android 模拟器独立读回及 Android→iOS→Android 同库 xkcd 英文到中文迁移；Web↔Native、故障与生产继续验收。额外仓库已接入，当前三包 AOT、Web 管理及默认 xkcd 安装/阅读分项通过，按[子计划](additional-repositories.md)继续真实外仓与平台验收；[能力提示与有界跨源搜索](cross-source-search.md)已接入，Web 真实 Source 的交接、隔离、分页、停止与详情/阅读分项通过，其余运行门继续验收；不为假设的性能需求增加额外机制。

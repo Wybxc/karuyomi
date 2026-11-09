@@ -254,9 +254,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       setState(() => _error = reason);
     }
     if (widget.catalog.accessPaused && !_accessPaused) {
-      _recordViewport();
       setState(() => _accessPaused = true);
-      unawaited(_progress?.flush());
       // The displayed leaf keeps its resources. Only the extra page session is
       // discarded; an active Source call settles before its owner is closed.
       unawaited(
@@ -304,7 +302,6 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     });
     RecoveredReader? recovered;
     try {
-      _recordViewport();
       if (!await authenticate(continuation) || _closing || !mounted) return;
       _mode = continuation.mode;
       _doublePage = continuation.doublePage;
@@ -426,7 +423,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         unawaited(_bookmarks?.refresh());
         unawaited(_settings?.refresh());
       }
-    } else {
+    } else if (!_accessPaused && !_recovering) {
       unawaited(_progress?.flush());
     }
   }
@@ -873,7 +870,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
                 TextButton(
                   onPressed: disabled
                       ? null
-                      : () => unawaited(progress.flush()),
+                      : () => unawaited(progress.retry()),
                   child: const Text('重试保存'),
                 ),
             ],

@@ -85,6 +85,15 @@ pnpm acceptance:serve
 
 本轮空索引不能发布。等待冻结结果和三个补编结果后，用同一产品归档装配正式扩展快照并重跑构建、dry-run、双端 Native 安装与实际 Source 门；未改冻结运行目录、候选 state 或生产。
 
+### 六材料 Native 发布构建
+
+2026-11-10，用上述固定归档与 Flutter 3.47.5 / Dart 3.13.4 分别从正式 `lib/main.dart` 构建 Android arm64 release APK 与 iOS arm64 iPhoneOS `--no-codesign` 应用。两个 Dart AOT 二进制均包含正式默认服务地址、本机服务地址保存键和新登录回跳路径。此归档只回摘了服务地址与 Access 修复，尚未包含后续的阅读进度恢复修复。
+
+- Android APK 为 23,480,920 B，SHA-256 `ed057058cd4a6d1f4424ab5d93514af0f336d8fe28dd85f3542fb47ea19e02e5`，仅 `arm64-v8a`，不可调试。项目当前 Gradle 配置生成的本机 Android Debug 证书通过 APK v2 校验；没有发行签名，也不能以该证书覆盖旧的不同证书侧载包。
+- iOS Runner 和 `App.framework/App` 均为 iPhoneOS Mach-O arm64，应用 ID `dev.karuyomi.karuyomi`。成品无签名和 provisioning profile，尚不能安装到真机。
+
+从两份实际成品分别取出 `host.js`、`worker.js`、`manifest.json`，均与归档 Vite Native 输出逐字节一致；从 Worker 核对实际嵌入的五个桥脚本和 zstd WASM 全部匹配六材料 `5d1260e5…92e4`。构建未改变 Dart 依赖锁或平台跟踪文件。命令、产物和核对日志见本机忽略目录 `.local/six-material-product-2c012db.3549L2/NATIVE_RELEASE.md`。两包未安装或运行；最终扩展快照、发行签名、真机和生产 Access 另验。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

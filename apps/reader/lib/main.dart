@@ -495,7 +495,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _retryProgress() async {
     if (_retryingProgress) return;
     setState(() => _retryingProgress = true);
-    await _catalog?.flushReadingProgress();
+    await _catalog?.flushReadingProgress(explicitRetry: true);
     for (final client in _retiredProgress.toList()) {
       if (!await client.flush()) continue;
       if (_retiredProgress.remove(client)) client.dispose();

@@ -410,7 +410,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 ## 尚未通过的门槛
 
-- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。[隔离 Native 可见登录](verification/native-main-entry.md#native-可见-access-回跳)已通过双端首次登录、失效重登和 Cookie 进程恢复；使用本地身份提供方，不代表生产 Access。
+- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。[隔离 Native 可见登录及阅读恢复](verification/native-main-entry.md#native-可见-access-回跳)已有双端分项；使用本地身份提供方，不代表生产 Access。iOS 显式重试后的附加同页视口写继续定位。
 - 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。

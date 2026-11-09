@@ -63,14 +63,16 @@ final class _PendingMutation {
     this.body,
     this.accountRevision,
     this.requireExactRevision,
-    this.coverBytes,
-  );
+    this.coverBytes, {
+    this.canSendProgress,
+  });
   final String fingerprint;
   final wire.StateMutation request;
   final String body;
   final int accountRevision;
   final bool requireExactRevision;
   final Uint8List? coverBytes;
+  final bool Function(bool explicitRetry)? canSendProgress;
   bool rejected = false;
   bool sent = false;
   BusinessStateException? failure;
@@ -507,6 +509,7 @@ final class BusinessStateClient {
     String? chapterKey,
     bool Function()? shouldContinue,
     bool updateSession = true,
+    bool discardPendingProgress = false,
   }) => _serial(
     key,
     () => _readManga(
@@ -514,6 +517,7 @@ final class BusinessStateClient {
       chapterKey: chapterKey,
       shouldContinue: shouldContinue,
       accept: updateSession,
+      discardPendingProgress: discardPendingProgress,
     ),
   );
 
@@ -533,6 +537,7 @@ final class BusinessStateClient {
     bool accept = true,
     bool Function()? shouldContinue,
     int? knownLocalRevision,
+    bool discardPendingProgress = false,
   }) async {
     _checkContinue(shouldContinue);
     if (chapterKey != null) validateBusinessChapterKey(chapterKey);
@@ -603,6 +608,14 @@ final class BusinessStateClient {
         _pending.remove(key);
       }
     }
+    final pending = _pending[key]?.request;
+    if (discardPendingProgress &&
+        chapterKey != null &&
+        pending != null &&
+        (pending.hasSaveProgress() || pending.hasResetProgress()) &&
+        _mutationChapter(pending) == chapterKey) {
+      _pending.remove(key);
+    }
     _changes.add(null);
     return value;
   }
@@ -671,6 +684,8 @@ final class BusinessStateClient {
     bool requireExactRevision = false,
     bool allowPendingReplay = true,
     Uint8List? coverBytes,
+    bool Function(bool explicitRetry)? canSendProgress,
+    bool explicitProgressRetry = false,
   }) {
     final command = operation.deepCopy();
     if (command.hasMigrateFrom()) {
@@ -725,6 +740,11 @@ final class BusinessStateClient {
         : Uint8List.fromList(coverBytes).asUnmodifiableView();
     final fingerprint = jsonEncode(wire.encodeProtoJson(command));
     return _serial(command.mangaKey, () async {
+      _checkProgressWrite(
+        command.mangaKey,
+        canSendProgress,
+        explicitProgressRetry,
+      );
       _assertNoMigration(command.mangaKey);
       final previous = _pending[command.mangaKey];
       if (previous != null) {
@@ -753,14 +773,25 @@ final class BusinessStateClient {
                 : '请先处理书架中的未确认分类修改。',
           );
         }
-        final result = await _send(previous);
+        final result = await _send(
+          previous,
+          explicitProgressRetry:
+              explicitProgressRetry && canSendProgress != null,
+        );
         if (previous.fingerprint == fingerprint) return result;
       }
       if (!_manga.containsKey(command.mangaKey)) {
         await _readManga(command.mangaKey);
       }
+      _checkProgressWrite(
+        command.mangaKey,
+        canSendProgress,
+        explicitProgressRetry,
+      );
       if (basedOnRevision != null &&
-          (requireExactRevision || command.hasSetCategories()
+          (requireExactRevision ||
+                  explicitProgressRetry ||
+                  command.hasSetCategories()
               ? basedOnRevision != _manga[command.mangaKey]!.revision
               : command.hasSetBookmark()
               ? !hasOnlyLocalChangesSince(
@@ -790,14 +821,33 @@ final class BusinessStateClient {
         _accountRevision,
         requireExactRevision,
         upload,
+        canSendProgress: canSendProgress,
       );
       _pending[command.mangaKey] = pending;
-      return _send(pending);
+      return _send(pending, explicitProgressRetry: explicitProgressRetry);
     });
   }
 
-  Future<wire.StateMutationResponse> _send(_PendingMutation pending) async {
+  void _checkProgressWrite(
+    String mangaKey,
+    bool Function(bool explicitRetry)? canSend,
+    bool explicitRetry,
+  ) {
+    if (canSend?.call(explicitRetry) == false) {
+      throw BusinessPendingMutationException(mangaKey, '请确认身份后显式重试阅读进度。');
+    }
+  }
+
+  Future<wire.StateMutationResponse> _send(
+    _PendingMutation pending, {
+    bool explicitProgressRetry = false,
+  }) async {
     _ensureOpen();
+    _checkProgressWrite(
+      pending.request.mangaKey,
+      pending.canSendProgress,
+      explicitProgressRetry,
+    );
     if (pending.rejected && pending.failure != null) throw pending.failure!;
     if (!pending.request.hasMigrateFrom()) {
       _assertNoMigration(pending.request.mangaKey);

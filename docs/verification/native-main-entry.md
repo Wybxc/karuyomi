@@ -81,3 +81,23 @@ iPhone 17 Pro／iOS 26.4 用未插桩的正式 Flutter App 和外部 XCTest 操�
 Android 用正式 Flutter 构建的调试 APK 启动正式 App，由系统 UIAutomator 点击可见 IdP 按钮。首次登录、新进程直接沿用 Cookie、失效后新进程明确需要登录、再点击并恢复同一账号四项均通过（PID 依次为 `3239`、`3632`、`3781`、`3936`）。阶段间覆盖安装保留同一 App 数据。两次可见登录各只触发一次带有效 Cookie 的 Native bootstrap，Cookie 有效时新进程不挑战，失效时不显示旧身份。独立 D1 查询确认业务表无新增行或回执。测试 CA 只用于独立的回环 WebView 与 Dart 网络信任，未关闭证书校验。
 
 iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evidence/`，包括三轮 `xcresult` 和独立 audit JSON；Android 的验收及源文件比对在 `.local/native-android-access-afcbd11/evidence/`。iOS 首轮用 Flutter 测试驱动时外部点击未提交，改用未插桩 App；一次修复候选的本地材料装配错误也保留在原始记录，正式复验使用逐字节匹配的内置材料。本节只覆盖隔离设置页登录和身份确认；生产 Access、阅读中断后恢复、跨身份与真机门独立验收。
+
+### Android 阅读中 Access 失效与原位恢复
+
+2026-11-10，专用 Pixel 7 / Android 16 API 36 ARM64 模拟器通过同身份真实阅读恢复。使用 Flutter 3.47.5 / Dart 3.13.4 调试验收 APK，入口调用正式 `app.main`。固定 `2c012db` 六材料归档，应用 `98d78aa` 与 `016a5d0`，逐字节核对登录、服务地址和正式 Worker 源码。官方 Vite/Wrangler HTTPS harness 绑定隔离 D1；WebView 与 Dart 信任本轮回环证书。Static Assets 使用冻结 `c04d436` 的 v6 xkcd，材料版本 `5d1260e5d20b2f2f05fd378a6e8b697338e5fdfd4feca2c5a8c361e756bb92e4`。测试 IdP 发真实 Secure、HttpOnly Cookie，正式 Worker 校验测试签发的 Access JWT；图片通过正式 Source 链路请求和解码。
+
+先从设置可见登录，安装 xkcd、收藏英文源作品并保存 `/3319/`（`3319: Elevators`）第 2/2 页。新进程从书架直接续读，后续都在 PID `5134` 的同一个 Reader 路由完成。让夹具 Cookie 失效后，Android 系统输入点击「刷新进度」，实际读请求收到 401。Reader 暂停新图片与章节请求，失效提示和可见登录覆盖期间，原来的页面会话、资源和已解码的 1000 × 209 画面都保留。Android 系统输入依次点击「重新登录并恢复本章」和 IdP 按钮。审计记录一次有效 Cookie 的正式 bootstrap，随后重新读取设置、作品和 Source；应用确认同一 `acceptance-owner`，释放原会话与资源，在同一路由用新会话解码同章、同清单、同页。
+
+独立 D1 查询确认已保存、失效前、暂停、可见登录和恢复五个阶段的业务状态及回执完全相同（账户 revision 5、作品 revision 4、5 笔回执）。Android 系统返回退出时释放恢复后的会话，观察到恰好一笔进度写：仍是同章、同页和同一最远进度，仅 `current.viewportY` 从默认 0 变为约 0.394，账户 revision 6、作品 revision 5。驱动让阅读控件滚动至可点击范围，本轮不能单独归因这笔视口变化；无写入结论仅覆盖退出前的恢复阶段。
+
+本机忽略目录 `.local/native-android-reader-access-2c012db/` 保留 `REPRODUCE.md`、Android 系统控件树和截图、分阶段审计与 D1 快照。可用仓库固定 Node 执行 `node .local/native-android-reader-access-2c012db/verify.ts` 独立重核。专用模拟器、ADB、隔离服务及临时私钥已清理。本项覆盖隔离 Android 模拟器中的同身份恢复；生产 Cloudflare Access、其他身份、未确认草稿和真机需分别验收。
+
+### iOS 阅读中 Access 失效与待确认进度
+
+2026-11-10，使用 iPhone 17 Pro / iOS 26.4 专用模拟器、未插桩 Flutter App 与外部 XCTest，独立验证首发六材料归档（`2c012db` + 服务地址与 Access 回跳修复）。官方 Vite/Wrangler HTTPS、临时 D1、回环测试 IdP 和冻结 v6 xkcd 与 Android 分项使用同一验证方式。正式界面登录、安装和收藏 xkcd 英文作品，打开 `3319: Elevators`、显示并保存第 2/2 页。驱动从外部使 Cookie 失效，App 留在前台，点击「读完本章」的真实 POST 收到 401；原图仍可见，账户/作品 revision 保持 5/4，D1 无新回执。
+
+修复前，在同一 PID 点「重新登录并恢复本章」及可见 IdP 按钮后，App 恢复同章同页，但在重新读取作品前自动提交了 401 请求的原 UUID 和正文。用户没有点「重试保存」，D1 已将本章标记为读完。恢复期间另有一笔进度请求，最终 revision 7/6；这不是无写入恢复通过。
+
+同一归档加入进度修复后，用新隔离 D1 复验。一次真实 401、可见重登和原位恢复都在 PID `72755`：失效期间保留第 2 页，回跳只触发一次有效 bootstrap，重新打开同章并显示第 2 页。重登后的作品读回没有业务 POST；基线、401 后和恢复后的账户、作品、章节与回执快照完全相同（revision 5/4，五笔回执，未读完）。点击「重试保存」后先读取作品，再用原 UUID、正文 SHA-256 和 CAS 4 发送一次，D1 收到对应回执，本章变为已读完。随后另有一笔新 UUID、CAS 5 的同页视口写，最终 revision 7/6，页码、清单、epoch、最远页未改变。该笔写与重试后的界面变化同轮发生，仍需单独定位。
+
+回归测试另覆盖更换身份时不发送旧草稿、远端已重置时不重放旧写。实测仅覆盖同一身份和本地 IdP；生产 Access、签名真机及跨身份实测仍未验收。本机忽略目录 `.local/ios-reader-access-v6.7gSLAq/` 保留固定补丁、XCTest、原始 `xcresult`、分阶段审计和独立核对脚本。

@@ -707,10 +707,27 @@ final class CatalogController extends ChangeNotifier {
     final client = ReadingProgressController(
       repository: repository,
       mangaKey: mangaKey,
-    );
+    )..bindWritePermission(() => _canWriteProgress(repository.identity));
+    if (accessPaused) client.pauseForAccess();
     _readingClients[client] = 1;
     client.addListener(_notify);
     return client;
+  }
+
+  bool _canWriteProgress(ProgressIdentity identity) {
+    final transport = api;
+    final origin =
+        deploymentOrigin ??
+        (transport is PlatformRuntime ? transport.origin : null);
+    return status == ServiceStatus.ready &&
+        subject == identity.subject &&
+        origin?.origin == identity.origin.origin;
+  }
+
+  void _pauseReadingProgress() {
+    for (final client in _readingClients.keys) {
+      client.pauseForAccess();
+    }
   }
 
   Future<void> releaseReadingProgress(ReadingProgressController client) async {
@@ -754,6 +771,7 @@ final class CatalogController extends ChangeNotifier {
         client.repository.identity.key == readingProgress?.identity.key;
     if (_progressClosing != null || !sameIdentity) return false;
     final clientState = client.repository.client;
+    client.bindWritePermission(() => _canWriteProgress(clientState.identity));
     clientState.rebindApi(
       api,
       verifiedIdentity: readingProgress!.identity,
@@ -769,13 +787,13 @@ final class CatalogController extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> flushReadingProgress() async {
+  Future<bool> flushReadingProgress({bool explicitRetry = false}) async {
     final identity = readingProgress?.identity.key;
     final results = await Future.wait(
       _readingClients.keys
           .where((client) => client.repository.identity.key == identity)
           .toList()
-          .map((client) => client.flush()),
+          .map((client) => explicitRetry ? client.retry() : client.flush()),
     );
     _retireSavedProgress();
     _notify();
@@ -888,6 +906,7 @@ final class CatalogController extends ChangeNotifier {
           : event.code == RuntimeErrorCode.accessDenied
           ? ServiceStatus.denied
           : ServiceStatus.failed;
+      if (accessPaused) _pauseReadingProgress();
     }
     _notify();
   }
@@ -970,9 +989,11 @@ final class CatalogController extends ChangeNotifier {
         if (failure.code == RuntimeErrorCode.accessRequired) {
           status = ServiceStatus.loginRequired;
           _dropSession();
+          _pauseReadingProgress();
         } else if (failure.code == RuntimeErrorCode.accessDenied) {
           status = ServiceStatus.denied;
           _dropSession();
+          _pauseReadingProgress();
         } else if ({
           RuntimeErrorCode.runtimeLost,
           RuntimeErrorCode.timeout,
