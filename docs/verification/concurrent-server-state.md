@@ -249,7 +249,17 @@ A / B 的 Flutter 集成测试各 1/1 通过，分别为进程 `93889` 和 `9555
 
 iOS（进程 `76166`）与 Android（进程 `4334`）的 Flutter 集成测试各 1/1 通过。两条实际业务 POST 使用不同 UUID、相同预期作品 revision 3；请求到达相差 21 ms，Worker 处理窗重叠 3 ms，双方都进入原 D1 批次入口 2 ms 后才有首个响应。回环协调器只同步正式按钮和只读取样；验证同时到达事务入口、单次提交及冲突恢复，不表示 D1 并行执行写入。
 
-复验沿用[双 Reader HTTPS 驱动](../../apps/reader/integration_test/README.md#阅读进度同时写)与 `ACCEPTANCE_FIXTURE=progress-cas-race`。本机忽略目录 `.local/native-mixed-cas-426536d/` 保存驱动补丁、阶段快照、两端日志及 D1 审计。此轮覆盖 iOS 完成获胜、Android 拒绝重置的分支；混合平台重置获胜、Web 配对、真机与生产另验。
+复验沿用[双 Reader HTTPS 驱动](../../apps/reader/integration_test/README.md#阅读进度同时写)与 `ACCEPTANCE_FIXTURE=progress-cas-race`。本机忽略目录 `.local/native-mixed-cas-426536d/` 保存驱动补丁、阶段快照、两端日志及 D1 审计。此轮覆盖 iOS 完成获胜、Android 拒绝重置的分支；相反分支见下节。
+
+### iOS 重置获胜与 Android 旧完成冲突
+
+2026-11-10，使用相同产品提交、xkcd 构建和章节，在新的官方 Wrangler HTTPS / workerd / D1 中复验。iPhone 17 Pro / iOS 26.4 与 Pixel 7 / Android API 36 模拟器使用同一测试身份，均正常校验回环证书。两端正式 Flutter 集成测试各 1/1 通过。
+
+两端打开已解码的第 2 页，六路独立 GET 与打开前一致，账户／作品 revision 为 `4/3`、epoch 0。两个正式按钮发出不同 UUID、相同预期作品 revision 的请求，到达相差 17 ms、Worker 处理窗重叠 4 ms；两条请求均到达原 D1 批次入口后 3 ms 才出现首个响应。隔离夹具安排重置先提交，再放行原完成批次，以确定覆盖重置获胜分支；业务处理和 D1 写入逻辑未替换。
+
+iOS「重新阅读本章」返回 200 并留下唯一回执；Android「读完本章」返回 409 / `REVISION_CONFLICT`，无回执。两条响应指向同一权威状态：revision `5/4`、epoch 1、未完成、当前第 1 页、无最远位置。iOS 解码第 1 页后的正常观察另行保存，revision 变为 `6/5`，当前及最远均为第 1 页。Android 保持原阅读页并往返 `2 → 1 → 2`，显式重开后显示真实第 1 页。从胜端观察保存后，到 Android 翻页、显式重开及双端退出，六路 GET 逐字节一致。
+
+复验步骤、驱动和夹具补丁、独立 D1 审计及阶段快照见本机忽略目录 `.local/native-mixed-reset-426536d/REPRODUCE.md` 与 `evidence/verified.json`。这是隔离模拟器的指定竞争顺序；Web 配对、真机与生产另验。
 
 ## Worker 更新保留 D1 状态与原回执
 

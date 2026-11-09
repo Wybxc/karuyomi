@@ -204,3 +204,5 @@ Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 
 同一正式 WASM 在 Node 24.15.0 用两种确定性 720 × 5,000 RGBA 输入、质量 90 运行：结构图输出 786,652 B，线性内存容量高点 45.875 MiB；高噪声图输出 3,017,796 B，线性内存容量高点 57.875 MiB。两份字节均通过 RIFF/WebP 签名校验；高噪声输出另经官方 `dwebp` 解码。容量测量不含 Canvas、JS、进程 RSS 或 GPU。图形桥分项用正式材料验证 Canvas 优先、能力探针、长图编码、输出租约和取消；Vite 材料测试检查 Web 静态路径、实际字节与 Native 内置集合一致。
 
 复验先 `git submodule update --init --depth 1 vendor/libwebp`，运行 `pnpm webp:prepare`，再 `pnpm --filter @karuyomi/runtime-host build` 和 `pnpm exec vitest run packages/runtime-host/test/graphics-bridge.test.ts packages/runtime-host/test/materials.test.ts`。本轮是正式材料与桥的工程验收；原 Source 仍须用新材料身份重编后，在正式 iOS 包复验，不以早前隔离探针代替。新材料未部署。
+
+固定 `a1dd0cd` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42688888405) 已通过。clab 的独立 checkout 已准备锁定工具链与 ToonLook 单包计划；正式材料清单与 macOS 构建逐字节一致，七份资源均通过摘要和大小校验。macOS 独立验收目录已重建 Native 内置文件，host、worker 与清单均与该提交的正式构建字节相同。旧冻结 ToonLook 清单与新材料不匹配。clab 的冻结全量仍在运行；独立单包计划尚未执行，不能加入旧候选或用来声称正式 iOS 已通过。

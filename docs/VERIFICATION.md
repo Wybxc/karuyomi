@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-10，[iOS 重置获胜与 Android 旧完成冲突](verification/concurrent-server-state.md#ios-重置获胜与-android-旧完成冲突)通过。两条请求到达 D1 批次入口，隔离夹具安排 iOS 重置先提交；只有重置留下回执。Android 仍可翻动旧页，显式重开显示真实第 1 页；旧页、重开及退出均不覆盖权威状态。Web 配对、真机与生产另验。
+
 2026-11-09，[iOS 与 Android 模拟器阅读进度同时写](verification/concurrent-server-state.md#ios-与-android-模拟器阅读进度同时写)通过。同一隔离 HTTPS/D1、同一真实第 2 页上，iOS 显式完成提交一次，Android 重置被拒；Android 旧页仍可翻动，显式重开读回完成状态。两端打开不写，冲突后的旧页、重开及退出也不改权威状态。真机与生产另验。
 
 2026-11-09，[正式 Web 真实源迁移](verification/source-migration.md#正式-web-的真实源搜索与热门列表)通过。修正无搜索结果的源无法选择目标后，使用真实 xkcd 英文/中文完成手动映射第 2978 章；确认前七份 D1 API 响应无差异，确认后新增一章已读和一枚书签。新文档读回中英作品及目标标记。故障、Native 和生产另验。
