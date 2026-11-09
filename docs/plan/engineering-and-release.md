@@ -20,6 +20,8 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 [clab 在途失败抽样](../verification/aot-current-pilot.md#clab-在途失败抽样)显示主要是 TeaVM 宿主链接缺口。先完成并验收冻结批次；`Class.getResource` 的打包资源读取可作为下一轮隔离 AOT 验证的优先项。
 
+冻结与当前 AOT 的[材料和定向补编预检](../verification/aot-current-pilot.md#冻结全量与当前-aot-的定向补编预检)通过。先等待 clab 全量终态，再单独补编需要新设置规则的三个包；使用[本地候选组装](../EXTENSIONS.md#首次全量候选的定向补编)保留两版各自实际输入身份和原生产父快照。真实补编、全量候选及上线仍未验收。
+
 ## 已完成
 
 - Keiyoushi、TeaVM、Suwayomi 通过固定提交的 submodule 引入；研究交付中的项目代码已内化，真正上游用正式补丁追踪。依赖/JAR/seed/大产物留在忽略目录。

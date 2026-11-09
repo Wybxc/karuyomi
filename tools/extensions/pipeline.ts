@@ -411,6 +411,136 @@ export function resumePlan(
       hasUnboundPublications(state),
   };
 }
+function catalogDigest(
+  entries: readonly ExtensionDescriptor[],
+  failures: Catalog['discoveryFailures'],
+): string {
+  const serialized = stableStringify({
+    entries: entries.map((entry) => entry.inputFingerprint),
+    failures,
+  });
+  if (serialized === undefined) throw new Error('Catalog is not JSON');
+  return createHash('sha256').update(serialized).digest('hex');
+}
+
+function baselineInventory(
+  plan: ExtensionPlan,
+): Map<string, ExtensionDescriptor> {
+  if (plan.ci || !plan.entries.length)
+    throw new Error('Baseline requires a complete local catalog');
+  const byPackage = new Map<string, ExtensionDescriptor>();
+  const inputs = new Set<string>();
+  const paths = new Set<string>();
+  const first = plan.entries[0];
+  if (!first) throw new Error('Baseline requires a complete local catalog');
+  for (const entry of plan.entries) {
+    if (
+      entry.hostRepositoryCommit !== plan.repositoryCommit ||
+      entry.hostFingerprint !== plan.hostFingerprint ||
+      entry.upstreamCommit !== plan.upstreamCommit ||
+      !equal(entry.hostInputs, first.hostInputs) ||
+      !equal(entry.hostSubmodules, first.hostSubmodules)
+    )
+      throw new Error('Baseline plan mixes host or upstream identities');
+    if (
+      byPackage.has(entry.packageName) ||
+      inputs.has(entry.inputFingerprint) ||
+      paths.has(entry.sourcePath)
+    )
+      throw new Error('Baseline plan has duplicate catalog entries');
+    byPackage.set(entry.packageName, entry);
+    inputs.add(entry.inputFingerprint);
+    paths.add(entry.sourcePath);
+  }
+  if (
+    plan.catalogFingerprint !==
+    catalogDigest(plan.entries, plan.discoveryFailures)
+  )
+    throw new Error('Baseline plan catalog fingerprint mismatch');
+  const selected = new Set<string>();
+  for (const entry of plan.selected) {
+    if (
+      selected.has(entry.packageName) ||
+      !equal(entry, byPackage.get(entry.packageName))
+    )
+      throw new Error('Baseline plan selection differs from its catalog');
+    selected.add(entry.packageName);
+  }
+  return byPackage;
+}
+
+/** The frozen catalog supplies coverage; only selected successful supplements replace its inputs. */
+export function makeBaselinePlan(
+  frozen: ExtensionPlan,
+  supplement: ExtensionPlan,
+  packages: readonly string[],
+): ExtensionPlan {
+  if (
+    frozen.baseRevision === null ||
+    frozen.baseRevision !== supplement.baseRevision
+  )
+    throw new Error('Baseline plans must use the same deployed parent');
+  if (
+    frozen.upstreamCommit !== supplement.upstreamCommit ||
+    !equal(frozen.discoveryFailures, supplement.discoveryFailures)
+  )
+    throw new Error('Baseline plans must use the same upstream catalog');
+  const original = baselineInventory(frozen);
+  const updated = baselineInventory(supplement);
+  if (original.size !== updated.size)
+    throw new Error('Baseline plans must cover the same source packages');
+  for (const [name, entry] of original) {
+    const replacement = updated.get(name);
+    if (
+      !replacement ||
+      !(
+        [
+          'sourcePath',
+          'versionName',
+          'versionCode',
+          'declaredVersionCode',
+          'effectiveVersionCode',
+          'sourceFingerprint',
+          'sourceInputs',
+          'sharedInputs',
+        ] as const
+      ).every((key) => equal(entry[key], replacement[key]))
+    )
+      throw new Error('Baseline plans differ in source identity for ' + name);
+  }
+  const chosen = new Set(packages);
+  const selected = new Set(
+    supplement.selected.map((entry) => entry.packageName),
+  );
+  if (!chosen.size || chosen.size !== packages.length)
+    throw new Error('Baseline requires unique supplement packages');
+  const entries = frozen.entries.map((entry) => {
+    if (!chosen.delete(entry.packageName)) return entry;
+    const replacement = updated.get(entry.packageName);
+    if (!replacement || !selected.has(entry.packageName))
+      throw new Error(
+        'Supplement package is not selected in its plan: ' + entry.packageName,
+      );
+    if (entry.inputFingerprint === replacement.inputFingerprint)
+      throw new Error(
+        'Supplement package must replace a different build input: ' +
+          entry.packageName,
+      );
+    return replacement;
+  });
+  if (chosen.size)
+    throw new Error('Supplement package is missing from frozen catalog');
+  return {
+    ...frozen,
+    catalogFingerprint: catalogDigest(entries, frozen.discoveryFailures),
+    entries,
+    selected: entries,
+    pendingCount: entries.length,
+    remainingCount: 0,
+    snapshotNeeded: true,
+  };
+}
+
 export function validateBuildCheckout(
   checkout: string,
   descriptor: ExtensionDescriptor,
@@ -453,6 +583,35 @@ export function validateBuildCheckout(
     throw new Error('Frozen source checkout changed');
   return checkout;
 }
+function validateBaselineCheckout(
+  checkout: string,
+  plan: ExtensionPlan,
+): string {
+  const descriptor = plan.entries[0];
+  if (!descriptor)
+    throw new Error('Baseline requires a complete local catalog');
+  checkout = validateBuildCheckout(checkout, descriptor);
+  const host = hostFingerprint(checkout);
+  if (host.fingerprint !== plan.hostFingerprint)
+    throw new Error('Baseline checkout differs from its pinned host');
+  const discovered = makePlan(
+    scan(
+      path.join(checkout, 'vendor/extensions-source'),
+      host.fingerprint,
+      host.inputs,
+    ),
+    emptyState(),
+    { root: checkout, limit: 10000 },
+  );
+  if (
+    discovered.catalogFingerprint !== plan.catalogFingerprint ||
+    !equal(discovered.entries, plan.entries) ||
+    !equal(discovered.discoveryFailures, plan.discoveryFailures)
+  )
+    throw new Error('Baseline plan does not cover the pinned checkout catalog');
+  return checkout;
+}
+
 export function runtimeIdentity(manifest: BuildManifest): RuntimeIdentity {
   return runtimeIdentitySchema.parse(manifest);
 }
@@ -571,6 +730,84 @@ function filesIn(directory: string): string[] {
     else if (info.isFile()) files.push(file);
   }
   return files;
+}
+type ResultReceipt = { directory: string; outcome: BuildOutcome };
+function readBuildResults(results: string): Map<string, ResultReceipt> {
+  const byKey = new Map<string, ResultReceipt>();
+  for (const file of filesIn(results).filter(
+    (file) => path.basename(file) === 'pipeline-result.json',
+  )) {
+    const result = loadPipelineResult(file);
+    const key = result.descriptor.inputFingerprint;
+    if (byKey.has(key)) throw new Error('Ambiguous duplicate build results');
+    byKey.set(key, { directory: path.dirname(file), outcome: result });
+  }
+  return byKey;
+}
+
+function baselineResult(
+  results: ReadonlyMap<string, ResultReceipt>,
+  descriptor: ExtensionDescriptor,
+  kind: 'frozen' | 'supplement',
+): ResultReceipt {
+  const receipt = results.get(descriptor.inputFingerprint);
+  if (!receipt)
+    throw new Error(
+      'Missing ' + kind + ' baseline result: ' + descriptor.packageName,
+    );
+  const result = resultOf(receipt.outcome);
+  if (!equal(result.descriptor, descriptor))
+    throw new Error('Baseline result differs from its pinned descriptor');
+  if (kind === 'supplement' && result.status !== 'built')
+    throw new Error('Supplement baseline result must be built');
+  if (result.status === 'failed' && !result.failure)
+    throw new Error('Baseline failed result has no explicit failure');
+  if (result.status === 'built' && result.failure)
+    throw new Error('Baseline built result contains a failure');
+  return receipt;
+}
+
+function canonicalPath(file: string): string {
+  const absolute = path.resolve(file);
+  return existsSync(absolute)
+    ? realpathSync(absolute)
+    : path.join(canonicalPath(path.dirname(absolute)), path.basename(absolute));
+}
+
+function pathContains(parent: string, file: string): boolean {
+  const relative = path.relative(parent, file);
+  return (
+    !path.isAbsolute(relative) &&
+    relative !== '..' &&
+    !relative.startsWith('..' + path.sep)
+  );
+}
+
+function requireSeparateOutput(
+  output: string,
+  inputs: readonly string[],
+): string {
+  output = canonicalPath(output);
+  for (const input of inputs) {
+    const source = canonicalPath(input);
+    if (pathContains(output, source) || pathContains(source, output))
+      throw new Error('Baseline output overlaps a build input');
+  }
+  return output;
+}
+
+interface BaselineOptions {
+  frozenPlan: ExtensionPlan;
+  frozenResults: string;
+  frozenRuntime: RuntimeIdentity;
+  supplementPlan: ExtensionPlan;
+  supplementResults: string;
+  supplementPackages: readonly string[];
+  supplementCheckout?: string;
+  parentState: ExtensionState;
+  assetsDirectory: string;
+  origin?: string;
+  processes?: BuilderProcesses;
 }
 export interface PipelineOptions {
   root?: string;
@@ -818,6 +1055,7 @@ export class ExtensionPipeline {
     outcome: BuildOutcome,
     directory: string,
     checkout = this.root,
+    strict = false,
   ): Promise<{ record: BuildRecord; content?: VerifiedBuild }> {
     const key = descriptor.inputFingerprint,
       result = resultOf(outcome);
@@ -851,12 +1089,15 @@ export class ExtensionPipeline {
         }
         if (!matchesPublishedManifest(content.manifest, descriptor))
           throw new Error('Build output differs from its pinned descriptor');
+        const identity = runtimeIdentity(content.manifest);
+        if (strict && !equal(identity, await this.currentRuntime(checkout)))
+          throw new Error('Baseline build runtime materials differ');
         record = {
           ...record,
           status: 'published',
           bundleSha256: content.manifest.bundle.sha256,
           available: true,
-          runtimeIdentity: runtimeIdentity(content.manifest),
+          runtimeIdentity: identity,
           runtimeReady: content.validation.runtimeReady,
           validationStatus: content.validation.runtimeReady
             ? 'browser_verified'
@@ -864,6 +1105,7 @@ export class ExtensionPipeline {
         };
         state.active[descriptor.packageName] = key;
       } catch (error) {
+        if (strict) throw error;
         content = undefined;
         record.failure = failure(error, 'integrity');
       }
@@ -888,20 +1130,77 @@ export class ExtensionPipeline {
     state.attempts[key] = record;
     return { record, ...(content ? { content } : {}) };
   }
+  async prepareBaseline(options: BaselineOptions): Promise<ExtensionState> {
+    if (ciEnvironment())
+      throw new Error('CI cannot assemble an initial baseline');
+    const {
+      frozenResults,
+      supplementResults,
+      supplementPackages,
+      supplementCheckout,
+      origin = DEFAULT_ORIGIN,
+      processes = new BuilderProcesses(),
+    } = options;
+    const assets = requireSeparateOutput(options.assetsDirectory, [
+      frozenResults,
+      supplementResults,
+    ]);
+    const frozen = extensionPlanSchema.parse(options.frozenPlan),
+      supplement = extensionPlanSchema.parse(options.supplementPlan),
+      plan = makeBaselinePlan(frozen, supplement, supplementPackages),
+      parent = validateState(options.parentState);
+    if (plan.baseRevision !== parent.revision)
+      throw new Error('Baseline production parent changed');
+    processes.check();
+    const remote = await this.remoteState(origin);
+    if (!equal(remote, parent))
+      throw new Error('Baseline production parent changed');
+    const index = await this.download(origin, INDEX_PATH, 2 * 1024 * 1024);
+    if (createHash('sha256').update(index).digest('hex') !== remote.indexSha256)
+      throw new Error('Baseline production parent index does not match state');
+    if (
+      !equal(
+        runtimeIdentitySchema.parse(options.frozenRuntime),
+        await this.currentRuntime(supplementCheckout),
+      )
+    )
+      throw new Error('Baseline runtime materials differ');
+    processes.check();
+    const base = readBuildResults(frozenResults),
+      overlays = readBuildResults(supplementResults),
+      effective = new Map<string, ResultReceipt>();
+    for (const entry of frozen.entries) {
+      const receipt = baselineResult(base, entry, 'frozen');
+      effective.set(entry.inputFingerprint, receipt);
+    }
+    const packages = new Set(supplementPackages);
+    for (const entry of plan.entries) {
+      if (packages.has(entry.packageName))
+        effective.set(
+          entry.inputFingerprint,
+          baselineResult(overlays, entry, 'supplement'),
+        );
+    }
+    return this.prepareSnapshot(plan, remote, effective, assets, {
+      origin,
+      processes,
+      finalize: true,
+      strictResults: true,
+      ...(supplementCheckout ? { checkout: supplementCheckout } : {}),
+    });
+  }
   async prepareSnapshot(
     plan: ExtensionPlan,
     state: ExtensionState,
-    results: string,
+    results: string | ReadonlyMap<string, ResultReceipt>,
     assetsDirectory = DEFAULT_ASSETS,
     options: {
       origin?: string;
       finalize?: boolean;
+      strictResults?: boolean;
       checkout?: string;
       processes?: BuilderProcesses;
-      verifiedResults?: Map<
-        string,
-        { directory: string; outcome: BuildOutcome }
-      >;
+      verifiedResults?: Map<string, ResultReceipt>;
     } = {},
   ): Promise<ExtensionState> {
     const processes = options.processes ?? new BuilderProcesses();
@@ -935,19 +1234,10 @@ export class ExtensionPipeline {
         retainedDiscovery.add(packageName);
       }
     }
-    const resultByKey = new Map<
-      string,
-      { directory: string; outcome: BuildOutcome }
-    >();
-    for (const file of filesIn(results).filter(
-      (file) => path.basename(file) === 'pipeline-result.json',
-    )) {
-      const result = loadPipelineResult(file),
-        key = result.descriptor.inputFingerprint;
-      if (resultByKey.has(key))
-        throw new Error('Ambiguous duplicate build results');
-      resultByKey.set(key, { directory: path.dirname(file), outcome: result });
-    }
+    const resultByKey =
+      typeof results === 'string'
+        ? readBuildResults(results)
+        : new Map(results);
     for (const [key, value] of options.verifiedResults ?? [])
       resultByKey.set(key, value);
     const verified = new Map<string, VerifiedBuild>();
@@ -964,6 +1254,7 @@ export class ExtensionPipeline {
         result.outcome,
         result.directory,
         options.checkout,
+        options.strictResults,
       );
       if (recorded.content)
         verified.set(descriptor.packageName, recorded.content);
@@ -1366,7 +1657,7 @@ async function runPipeline(
   const [command, ...arguments_] = argv;
   if (!command || command === '--help') {
     console.log(
-      'Usage: node tools/extensions/pipeline.ts <plan|bootstrap|build|prepare-snapshot|pull-state|check-base|commit-snapshot> [options]',
+      'Usage: node tools/extensions/pipeline.ts <plan|bootstrap|build|prepare-snapshot|prepare-baseline|pull-state|check-base|commit-snapshot> [options]',
     );
     return;
   }
@@ -1384,6 +1675,10 @@ async function runPipeline(
       finalize: { type: 'boolean', default: false },
       plan: { type: 'string' },
       'build-checkout': { type: 'string' },
+      'supplement-checkout': { type: 'string' },
+      'supplement-plan': { type: 'string' },
+      'supplement-results': { type: 'string' },
+      'supplement-package': { type: 'string', multiple: true },
       'assets-dir': { type: 'string' },
       origin: { type: 'string' },
       key: { type: 'string' },
@@ -1393,7 +1688,15 @@ async function runPipeline(
     },
   });
   const required = (
-    name: 'state' | 'output' | 'plan' | 'results' | 'key',
+    name:
+      | 'state'
+      | 'output'
+      | 'plan'
+      | 'results'
+      | 'key'
+      | 'build-checkout'
+      | 'supplement-plan'
+      | 'supplement-results',
   ): string => {
     const value = values[name];
     if (!value) throw new Error('--' + name + ' is required');
@@ -1417,7 +1720,58 @@ async function runPipeline(
         assetsDirectory,
         { origin, processes },
       );
-    else if (command === 'build') {
+    else if (command === 'prepare-baseline') {
+      if (values.ci || ciEnvironment())
+        throw new Error('CI cannot assemble an initial baseline');
+      const frozenFile = required('plan'),
+        supplementFile = required('supplement-plan'),
+        stateFile = required('state'),
+        frozenResults = required('results'),
+        supplementResults = required('supplement-results'),
+        frozenCheckout = required('build-checkout'),
+        supplementCheckout = values['supplement-checkout'] ?? ROOT,
+        supplementPackages = values['supplement-package'] ?? [],
+        assets = requireSeparateOutput(assetsDirectory, [
+          frozenFile,
+          supplementFile,
+          stateFile,
+          frozenCheckout,
+          frozenResults,
+          supplementResults,
+        ]);
+      for (const checkout of [ROOT, supplementCheckout].map(canonicalPath)) {
+        const local = path.join(checkout, '.local');
+        if (
+          pathContains(assets, checkout) ||
+          (pathContains(checkout, assets) &&
+            (!pathContains(local, assets) || assets === local))
+        )
+          throw new Error('Baseline output must be outside checkout inputs');
+      }
+      const frozen = loadPlan(frozenFile),
+        supplement = loadPlan(supplementFile),
+        parentState = loadState(stateFile);
+      makeBaselinePlan(frozen, supplement, supplementPackages);
+      // Git status must not refresh the on-disk index of either input checkout.
+      process.env.GIT_OPTIONAL_LOCKS = '0';
+      const original = validateBaselineCheckout(frozenCheckout, frozen),
+        updated = validateBaselineCheckout(supplementCheckout, supplement);
+      await new ExtensionPipeline({
+        materials: async (checkout) => readRuntimeIdentity(checkout),
+      }).prepareBaseline({
+        frozenPlan: frozen,
+        frozenResults,
+        frozenRuntime: readRuntimeIdentity(original),
+        supplementPlan: supplement,
+        supplementResults,
+        supplementPackages,
+        supplementCheckout: updated,
+        parentState,
+        assetsDirectory: assets,
+        origin,
+        processes,
+      });
+    } else if (command === 'build') {
       const plan = loadPlan(required('plan')),
         key = required('key');
       const descriptor = plan.selected.find(

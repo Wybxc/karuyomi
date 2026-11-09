@@ -96,6 +96,25 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 `bootstrap` 已生成候选时可跳过上面的 `prepare-snapshot`。`check-base` 应紧邻部署，确认远端 revision 仍为计划基线；首次替换已知旧 SPA 时可在本地显式增加 `--initialize`，它不接受任意错误响应，也不能在 CI 使用。网络命令默认 origin 为 `https://karuyomi.wybxc.cc`，可用 `--origin` 明确指定。
 
+### 首次全量候选的定向补编
+
+冻结全量期间如有少量包需要用新版 AOT 重编，先确认新旧 checkout 的上游源码和共享运行材料相同。等冻结批次退出并留下所有包的终态；在独立目录保留其原计划和逐包结果。新版固定 checkout 以同一份已核对的生产父状态运行 `plan --limit 10000`，按新计划中的精确 `inputFingerprint` 对指定包运行 `build --key`，每个包使用独立输出目录。两份 checkout 先各自执行 `pnpm --filter @karuyomi/runtime-host build:materials`。
+
+执行本地候选组装。`--supplement-checkout` 指向补编计划固定的 checkout，省略时使用当前 checkout；`--supplement-package` 为完整包名，每包重复一次：
+
+```sh
+node tools/extensions/pipeline.ts prepare-baseline \
+  --state "$parent_state" --plan "$frozen_plan" \
+  --results "$frozen_results" --build-checkout "$frozen_checkout" \
+  --supplement-plan "$new_plan" --supplement-results "$new_results" \
+  --supplement-checkout "$new_checkout" \
+  --supplement-package "$package_name" --assets-dir "$candidate"
+```
+
+入口核对线上 state/index 仍为同一真实父快照，验证完整冻结计划、补编的包身份及实际结果。只用补编成功产物替换指定包；保留其余冻结终态及各自输入指纹。缺检查点、材料不符或传输损坏会中止，不把它们记为编译失败。组装只生成本地候选；仍需正式构建、验收和 `check-base` 后才可部署。增量 CI 继续以真实已部署且完成的 baseline 为前提。
+
+### 部署确认
+
 `commit-snapshot` 只有在远端 state 与候选完全一致、远端 index 与本地字节一致后才原子保存本地 checkpoint。部署失败或未确认时，旧 checkpoint 保持不变。所有 publisher 必须串行；本地文件锁和 CI concurrency group 不能替代跨工作区的发布协调。
 
 摘要只在传输边界检查：下载验证编码/canonical 各一次，后续本地阶段复用验证结果；assembler 在上传边界校验实际 gzip 字节，不再次解压计算 canonical 摘要。schema、身份、大小、路径和材料检查仍保留。

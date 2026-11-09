@@ -67,6 +67,14 @@ pnpm acceptance:serve
 
 链接缺口包括 Android API（21 包，其中 10 包涉及 WebView）、JCA 加解密（10 包）和 OkHttp 接口（8 包），同一包可有多项。11 包缺 `Class.getResource(String)`，其中 5 包当次只报这一项。核对原始 JAR 和调用点，Webnex、CapibaraTraductor、MangaFire 用它读取打包在 `assets/` 内的文本。全量结束后可先在隔离 AOT 实现并验证此资源读取模式，保留缺失资源、字符集和流关闭的语义；仍需对代表包验证实际读取，不能据一次编译认定兼容。没有修改冻结输入、重试同指纹失败包或启动第二个发布器。
 
+## 冻结全量与当前 AOT 的定向补编预检
+
+2026-11-10，重新从公开静态路径读取生产 state/index，核对二者摘要匹配。固定 `c04d436` 的冻结计划与 `a382be1` 的补编计划使用同一生产父 revision `702cc6bfb2974682bf1c83325458535a`、同一上游 `efa93f5a`、同样的 1,448 包与源码输入。两版生成的 ABI、协议、HTTP 桥及共享材料字节一致；AOT 宿主指纹不同，逐包编译记录仍需保留各自实际输入身份。
+
+冻结 AOT 的清单未生成当前的 Source 设置同步规则。首发前补编 Komiic、Asura Scans 和 MangaKatana，再核对成品清单与正式设置读写。冻结 MangaFire 是已记录的编译失败，仍保留原结果。三包补编及真实候选尚未生成。
+
+新增的[本地候选组装入口](../EXTENSIONS.md#首次全量候选的定向补编)用这两份固定计划、同一生产父快照和两个空结果目录预检，确认缺少首个冻结结果时退出且不生成快照。定向回归另覆盖成功合入及保留冻结失败、父索引不符、材料不符、缺失与损坏结果，以及上游输入不一致。真实两份计划和原始预检日志保存在 `.local/baseline-supplement-a382be1/`。当前 clab 队列与生产均未改动。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

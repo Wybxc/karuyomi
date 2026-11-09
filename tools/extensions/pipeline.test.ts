@@ -35,6 +35,7 @@ import {
   finalizeBaseline,
   loadState,
   MAX_STATE_BYTES,
+  makeBaselinePlan,
   makePlan,
   persistStateCheckpoint,
   removeBuildWork,
@@ -172,8 +173,9 @@ class Fixture {
     descriptor: ExtensionDescriptor,
     failed = false,
     suffix = '',
+    resultsDirectory = this.results,
   ): { directory: string; result: PipelineResult } {
-    const directory = path.join(this.results, descriptor.inputFingerprint);
+    const directory = path.join(resultsDirectory, descriptor.inputFingerprint);
     mkdirSync(directory, { recursive: true });
     const result: PipelineResult = {
       schemaVersion: 1,
@@ -965,6 +967,213 @@ test('finalization requires every input and is forbidden in CI', (t) => {
     /unattempted/,
   );
   assert.throws(() => finalizeBaseline(emptyState(), source, true, true), /CI/);
+});
+
+async function baselineFixture(t: TestContext) {
+  const f = new Fixture(t);
+  const retained = f.descriptor('a', 'example.keep');
+  const replaced = f.descriptor('b', 'eu.kanade.tachiyomi.extension.zh.komiic');
+  const failed = f.descriptor('c', 'example.failed');
+  const frozen = [retained, replaced, failed];
+  const newer = frozen.map((descriptor, i) => ({
+    ...descriptor,
+    hostFingerprint: 'f'.repeat(64),
+    inputFingerprint: ['1', '2', '3'][i]!.repeat(64),
+    buildId: `${descriptor.buildId}-current`,
+  }));
+  const selected = newer[1]!;
+  const parent: ExtensionState = { ...emptyState(), revision: '9'.repeat(32) };
+  const index = Buffer.from(
+    '{"schemaVersion":1,"repoId":"keiyoushi","builds":[]}',
+  );
+  parent.indexSha256 = createHash('sha256').update(index).digest('hex');
+  f.remoteOverrides.set(
+    '/extensions/build-state.json',
+    Buffer.from(JSON.stringify(parent)),
+  );
+  f.remoteOverrides.set('/extensions/index.json', index);
+
+  function pinnedPlan(entries: ExtensionDescriptor[], revision: string) {
+    const pins = [
+      {
+        path: 'vendor/teavm',
+        gitlink: 'a'.repeat(40),
+        checkout: 'a'.repeat(40),
+      },
+    ];
+    const pinned = entries.map((entry) => ({
+      ...entry,
+      hostRepositoryCommit: revision,
+      hostSubmodules: pins,
+    }));
+    return {
+      ...f.plan(pinned, parent),
+      hostFingerprint: pinned[0]!.hostFingerprint,
+      repositoryCommit: revision,
+      catalogFingerprint: createHash('sha256')
+        .update(
+          JSON.stringify({
+            entries: pinned.map((entry) => entry.inputFingerprint),
+            failures: [],
+          }),
+        )
+        .digest('hex'),
+    };
+  }
+
+  const frozenPlan = pinnedPlan(frozen, 'a'.repeat(40));
+  const supplementPlan = pinnedPlan(newer, 'b'.repeat(40));
+  const supplementResults = path.join(f.root, 'supplement-results');
+  mkdirSync(supplementResults);
+  const { directory: retainedDirectory } = f.output(frozenPlan.entries[0]!);
+  const { directory: replacedDirectory } = f.output(frozenPlan.entries[1]!);
+  f.output(frozenPlan.entries[2]!, true);
+  const oldManifest = path.join(replacedDirectory, 'manifest.json');
+  const old = await parseManifest(readFileSync(oldManifest));
+  writeFileSync(
+    oldManifest,
+    JSON.stringify({ ...old, preferenceSyncRules: [] }),
+  );
+  const { directory: supplementDirectory } = f.output(
+    supplementPlan.entries[1]!,
+    false,
+    '/* current host build */',
+    supplementResults,
+  );
+
+  return {
+    f,
+    retained,
+    selected,
+    replaced,
+    failed,
+    parent,
+    index,
+    retainedDirectory,
+    replacedDirectory,
+    supplementDirectory,
+    options: {
+      frozenPlan,
+      frozenResults: f.results,
+      frozenRuntime: materialIdentity,
+      supplementPlan,
+      supplementResults,
+      supplementPackages: [selected.packageName],
+      parentState: parent,
+      assetsDirectory: f.snapshot,
+    },
+  };
+}
+
+test('supplemented baseline replaces only requested inputs and finalizes against the deployed parent', async (t) => {
+  const { f, options, retained, selected, replaced, failed, parent } =
+    await baselineFixture(t);
+  const next = await f.pipeline.prepareBaseline(options);
+  assert.equal(next.parentRevision, parent.revision);
+  assert.equal(next.bootstrap.complete, true);
+  assert.equal(next.summary?.pending, 0);
+  assert.equal(next.active[retained.packageName], retained.inputFingerprint);
+  assert.equal(next.active[selected.packageName], selected.inputFingerprint);
+  assert.equal(next.attempts[replaced.inputFingerprint], undefined);
+  assert.equal(next.attempts[failed.inputFingerprint]?.status, 'failed');
+  assert.equal(
+    next.attempts[failed.inputFingerprint]?.failure?.code,
+    'source_failed',
+  );
+  assert.deepEqual(
+    Object.keys(next.attempts).sort(),
+    [
+      retained.inputFingerprint,
+      selected.inputFingerprint,
+      failed.inputFingerprint,
+    ].sort(),
+  );
+  const index = await f.index();
+  const build = index.builds.find(
+    (entry) => entry.packageName === selected.packageName,
+  );
+  assert.ok(build);
+  const manifest = await parseManifest(
+    readFileSync(path.join(f.snapshot, build.manifestPath.slice(1))),
+  );
+  assert.deepEqual(manifest.preferenceSyncRules, [
+    { key: 'preferred_mirror', kind: PreferenceValueKind.TEXT },
+    { key: 'CHAPTER_FILTER', kind: PreferenceValueKind.TEXT },
+  ]);
+  assert.equal(existsSync(f.stateFile), false);
+  assert.deepEqual(f.fetched.sort(), [
+    '/extensions/build-state.json',
+    '/extensions/index.json',
+  ]);
+});
+
+test('supplemented baseline aborts on a mismatched live index or damaged artifacts without replacing a prior candidate', async (t) => {
+  const {
+    f,
+    options,
+    index,
+    retainedDirectory,
+    replacedDirectory,
+    supplementDirectory,
+  } = await baselineFixture(t);
+  const previous = path.join(f.snapshot, 'previous-candidate');
+  mkdirSync(f.snapshot);
+  writeFileSync(previous, 'keep');
+  f.remoteOverrides.set('/extensions/index.json', Buffer.from('{}'));
+  await assert.rejects(f.pipeline.prepareBaseline(options), /index|snapshot/i);
+  f.remoteOverrides.set('/extensions/index.json', index);
+  await assert.rejects(
+    f.pipeline.prepareBaseline({
+      ...options,
+      frozenRuntime: { ...materialIdentity, hostAbi: 'different-runtime' },
+    }),
+    /runtime materials/i,
+  );
+
+  const replacedResult = path.join(replacedDirectory, 'pipeline-result.json');
+  const frozenOriginal = readFileSync(replacedResult);
+  rmSync(replacedResult);
+  await assert.rejects(f.pipeline.prepareBaseline(options), /missing frozen/i);
+  writeFileSync(replacedResult, frozenOriginal);
+
+  const replacementResult = path.join(
+    supplementDirectory,
+    'pipeline-result.json',
+  );
+  const original = readFileSync(replacementResult);
+  rmSync(replacementResult);
+  await assert.rejects(f.pipeline.prepareBaseline(options), /result|missing/i);
+  writeFileSync(replacementResult, original);
+
+  const artifactDirectory = path.join(retainedDirectory, 'artifacts');
+  const [artifact] = readdirSync(artifactDirectory);
+  assert.ok(artifact);
+  writeFileSync(path.join(artifactDirectory, artifact), 'corrupt');
+  await assert.rejects(
+    f.pipeline.prepareBaseline(options),
+    /artifact|bundle|integrity|build/i,
+  );
+  assert.deepEqual(readdirSync(f.snapshot), ['previous-candidate']);
+  assert.equal(readFileSync(previous, 'utf8'), 'keep');
+});
+
+test('baseline plans reject duplicate replacements and a changed upstream source closure', async (t) => {
+  const { options, selected } = await baselineFixture(t);
+  assert.throws(
+    () =>
+      makeBaselinePlan(options.frozenPlan, options.supplementPlan, [
+        selected.packageName,
+        selected.packageName,
+      ]),
+    /duplicate|unique/i,
+  );
+  const changed = structuredClone(options.supplementPlan);
+  changed.entries[1]!.sourceFingerprint = '8'.repeat(64);
+  changed.selected[1]!.sourceFingerprint = '8'.repeat(64);
+  assert.throws(
+    () => makeBaselinePlan(options.frozenPlan, changed, [selected.packageName]),
+    /source|upstream/i,
+  );
 });
 test('state parser rejects inconsistent successful pointers and descriptor identities', (t) => {
   const f = new Fixture(t),
