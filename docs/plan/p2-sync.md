@@ -8,7 +8,7 @@
 
 ## 权威来源与初版边界
 
-[双 iOS 模拟器阅读进度同时写](../verification/concurrent-server-state.md#双-ios-模拟器阅读进度同时写)已通过。两端以相同 revision 打开真实第 2 页；完成与重置在同一 D1 基线上得到一次确认和一次冲突。冲突端可翻动原画面而不覆盖服务端，显式重开后恢复到新 epoch 的第 1 页。其它平台配对和正式 Reader 的完成获胜分支继续验收。
+[双 iOS 模拟器阅读进度同时写](../verification/concurrent-server-state.md#双-ios-模拟器阅读进度同时写)的重置获胜分支已通过：冲突端可翻动原画面，显式重开后恢复到新 epoch 的第 1 页。[iOS ↔ Android 模拟器](../verification/concurrent-server-state.md#ios-与-android-模拟器阅读进度同时写)的完成获胜分支也已通过：iOS 完成第 2 页，Android 重置冲突，旧页不覆盖权威状态，显式重开读回已完成的第 2 页。混合平台的重置获胜、Web 配对、真机与生产继续验收。
 
 双 Reader 验收准备时发现，恢复已确认的同一章节会发送内容未变的保存；修正后 iOS 首帧重排仍可能只改变视口放置并触发保存。已补齐控制器去重和确认续读的首帧保留策略：原图点仍可见时保留已确认的放置偏好；实际导航、原图点修正和新观察仍可提交。[回归与首轮实际结果](../verification/concurrent-server-state.md#双-ios-阅读器的开章基线)已记录，修复后的两端开章都未推进共享 revision。
 

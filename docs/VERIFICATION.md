@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-09，[iOS 与 Android 模拟器阅读进度同时写](verification/concurrent-server-state.md#ios-与-android-模拟器阅读进度同时写)通过。同一隔离 HTTPS/D1、同一真实第 2 页上，iOS 显式完成提交一次，Android 重置被拒；Android 旧页仍可翻动，显式重开读回完成状态。两端打开不写，冲突后的旧页、重开及退出也不改权威状态。真机与生产另验。
+
 2026-11-09，[正式 Web 真实源迁移](verification/source-migration.md#正式-web-的真实源搜索与热门列表)通过。修正无搜索结果的源无法选择目标后，使用真实 xkcd 英文/中文完成手动映射第 2978 章；确认前七份 D1 API 响应无差异，确认后新增一章已读和一枚书签。新文档读回中英作品及目标标记。故障、Native 和生产另验。
 
 2026-11-09，[Worker 更新后的 D1 读回与原样重试](verification/concurrent-server-state.md#worker-更新保留-d1-状态与原回执)通过官方本地 Wrangler harness：更新 Worker 验签密钥后，相同 subject 读到原书架和进度；旧请求返回原回执，不覆盖更新后的页位，也不增加 D1 写入。生产 Access 和设备 UI 恢复另验。
