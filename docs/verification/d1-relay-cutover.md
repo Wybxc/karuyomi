@@ -21,3 +21,7 @@ export WRANGLER_SEND_METRICS=false
 ```
 
 该结果确认旧、新 Worker 的切换顺序与隔离 D1 状态保留。尝试只读查询生产迁移列表时，Wrangler 因当前无管理 API 认证退出；生产迁移账本和私有封面桶仍须发布前核对。现网 v4 三包须由完整、匹配当前运行时的候选接替。操作顺序见[发布文档](../EXTENSIONS.md#旧网络登记部署切换)；新版真实中继和中文列表见[本地验收](generic-source-relay.md)。
+
+2026-11-10，基于 `51c7b1b` 的正式配置和 SQL，准备了截至 `0008`、`0009` 的原样前缀。使用不同数据库 ID 和独立本地持久目录的对应配置，以 Wrangler CLI 顺序应用 `0003 → 0008 → 0009 → 0010`，每步以 `SELECT name FROM d1_migrations ORDER BY id` 读取账本，逐文件核对四个结果与原前缀一致。配置、SQL 摘要和读回留在 `.local/cutover-preflight-51c7b1b.u4E4Vi/`。当前 `wrangler whoami` 报本机管理会话已过期；未执行生产命令。完整候选、生产账本、Access 和封面桶的当前状态仍需在发布前核对。
+
+同一提交的正式 Vite Worker 配置通过 `pnpm --filter @karuyomi/api exec wrangler deploy --dry-run --config dist/karuyomi/wrangler.json`，识别到 `DB`、`COVERS`、`ASSETS` 与 Access 变量。此次使用 xkcd 单包验收快照，只证明本地配置与构建可被 Wrangler 接受，未向生产上传，也不代替完整候选的 dry-run。

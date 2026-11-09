@@ -128,6 +128,18 @@ node tools/extensions/pipeline.ts prepare-baseline \
 3. 紧邻切换运行 `check-base`，应用截至 `0009` 的前缀，立即一次性切换新版 Worker 和完整 Static Assets。不要把旧、新 Worker 按流量比例混用。自 `0009` 清空网络登记和旧 Source 设置起，旧中继停止工作，单独回退 Worker 不会恢复它；该次迁移不清空书架和阅读进度。
 4. 在重新打开的正式客户端检查 Access、书架及实际 Source 后，用正式配置执行 `wrangler d1 migrations apply DB --remote` 收尾 `0010`。再次检查待应用列表为空和中继可用，远端 index/state 与候选一致后才执行 `commit-snapshot`。生产阅读和 Native 同步仍按原验收计划分别记录。
 
+生产预检用以下只读命令。将 SQL 结果的迁移名称按顺序与 `apps/api/migrations/` 下已固定的文件比对，确认已应用的恰好是连续前缀。锁定版本的 `d1 migrations list` 会先执行 `CREATE TABLE IF NOT EXISTS`，严格只读阶段直接查询迁移账本。找不到账本、顺序异常或出现候选未知的迁移时停止切换。
+
+```sh
+pnpm --filter @karuyomi/api exec wrangler deployments list --json
+pnpm --filter @karuyomi/api exec wrangler d1 execute DB --remote \
+  --command 'SELECT name FROM d1_migrations ORDER BY id' --json
+pnpm --filter @karuyomi/api exec wrangler r2 bucket dev-url get karuyomi-covers
+pnpm --filter @karuyomi/api exec wrangler r2 bucket domain list karuyomi-covers
+```
+
+核对 `COVERS` 的 r2.dev 访问关闭、无公开自定义域名，生产 Access 保护 `/api` 和 `/api/*` 且应用 Audience 与候选 Worker 配置一致。命令成功只证明管理面可读；生产客户端登录、详情和图片仍须用正式入口验收。
+
 ## Source 网络和设置
 
 静态分发无需 Access。Source HTTP 使用同一应用的 Access 会话和 Worker 公网 fetch；安装、更新或切换漫画站不需要登记包、域名或镜像。额外仓库须与应用 ABI/materials 一致，并为浏览器及 Native WebView 下载提供 CORS；目录、清单与产物验证仍在正式加载边界执行。
