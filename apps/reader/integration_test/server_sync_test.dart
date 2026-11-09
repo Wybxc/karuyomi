@@ -10,15 +10,15 @@ import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
-import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
-import 'package:karuyomi/main.dart' as app;
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart' show ChapterPageProvider;
+
+import 'native_app.dart';
 
 const _origin = String.fromEnvironment('APP_ORIGIN');
 const _chapterLabel = String.fromEnvironment(
@@ -59,14 +59,8 @@ void main() {
           base64Decode(_testCaBase64),
         );
       }
-      app.main();
-      await tester.pump();
-
-      final catalog = tester
-          .widget<LibraryPage>(find.byType(LibraryPage))
-          .controller;
-      expect(catalog, isNotNull, reason: '正式 App 必须创建 CatalogController');
-      final platform = catalog!.api;
+      final catalog = await startNativeApp(tester);
+      final platform = catalog.api;
       if (platform is! NativePlatformRuntime) {
         fail('此验收必须使用正式 NativePlatformRuntime');
       }

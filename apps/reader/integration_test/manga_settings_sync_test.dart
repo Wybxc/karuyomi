@@ -7,15 +7,16 @@ import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
-import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
-import 'package:karuyomi/main.dart' as app;
+import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+
+import 'native_app.dart';
 
 const _origin = String.fromEnvironment('APP_ORIGIN');
 const _phase = String.fromEnvironment('MANGA_SETTINGS_PHASE');
@@ -60,11 +61,8 @@ void main() {
         base64Decode(_testCa),
       );
     }
-    app.main();
-    await tester.pump();
+    final catalog = await startNativeApp(tester);
     final shelf = find.byType(LibraryPage);
-    final catalog = tester.widget<LibraryPage>(shelf).controller;
-    if (catalog == null) fail('必须使用正式书架');
     final platform = catalog.api;
     if (platform is! NativePlatformRuntime) fail('必须使用正式 Native 运行时');
     expect(platform.origin.origin, origin.origin);
