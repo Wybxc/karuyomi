@@ -51,7 +51,7 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 [iOS→Android→新 iOS 进程的单作品阅读设置](../verification/reader-settings.md#ios-与-android-模拟器单作品设置覆盖)已通过模式、页组与裁白覆盖/继承；Web↔Native 漫画覆盖、其余字段和实际裁白效果仍待验。
 
-[双 Web 书架批量添加分类](../verification/library-batch.md#双-web-部分提交与冲突恢复)已通过真实 D1 部分提交、旧 CAS 拒绝和明确重新确认；其它批量操作、平台与故障门继续验收。
+[双 Web 书架批量添加分类](../verification/library-batch.md#双-web-部分提交与冲突恢复)已通过真实 D1 部分提交、旧 CAS 拒绝和明确重新确认；[Android 批量移出分类及书架，iOS 新进程读回](../verification/library-batch.md#android-批量移出与-ios-读回)通过，Native 反向写入及其它故障继续验收。
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
 

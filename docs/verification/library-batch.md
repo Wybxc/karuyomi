@@ -61,4 +61,19 @@ flutter test test/library/library_batch_test.dart test/library/library_batch_pag
 
 原批次显示「已确认 1 / 3 部 · 未开始 1 部」，新批次显示「已确认 2 / 2 部 · 未开始 0 部」。停服后核对精确审计序列和五份独立 GET 快照；每次成功与对应 D1 回执相符，第三项直到重新确认才有请求。全局设置、作品元数据、收藏、书签和进度未变；分类目录没有修改。首次临时审计曾在夹具准备阶段因请求流已转交而失败，调整观察顺序后使用新 D1 重跑；正式产品未改。
 
-复验用新隔离 checkout，先运行 `pnpm acceptance:build`。本轮忽略目录 `.local/verification/library-batch-web-7cf596a/` 保存 `REPRODUCE.md`、仅验收使用的 Vite harness 观察补丁、严格 TypeScript 采样与核对入口、停服审计及 `verified.json`；按实际 UI 顺序提供标题，不能以 API 行顺序代替确认清单。此分项覆盖双 Web 的批量添加分类、部分提交和旧 CAS 恢复。批量移除、断网或丢响应、Native/混合平台、生产 Access 和真机仍待独立验收。
+复验用新隔离 checkout，先运行 `pnpm acceptance:build`。本轮忽略目录 `.local/verification/library-batch-web-7cf596a/` 保存 `REPRODUCE.md`、仅验收使用的 Vite harness 观察补丁、严格 TypeScript 采样与核对入口、停服审计及 `verified.json`；按实际 UI 顺序提供标题，不能以 API 行顺序代替确认清单。此分项覆盖双 Web 的批量添加分类、部分提交和旧 CAS 恢复；未覆盖批量移出、断网或丢响应、Native、生产 Access 和真机。
+
+## Android 批量移出与 iOS 读回
+
+2026-11-10，固定正式产品 `2c012db` 与冻结 `c04d436` v6 六份共享材料，使用专用 Pixel 7 / Android 16 API 36 和 iPhone 17 Pro / iOS 26.4。同一个新建的官方 Wrangler HTTPS / workerd / D1 提供隔离身份 `acceptance-owner`。标准 `categories` 夹具和正式 API 只用于预置三部受控收藏及两个分类：甲同时在「批量目标」「原有保留」且有一条已读和书签，乙和对照项丙只在「批量目标」。预置结束后写入只来自正式 Android UI；未执行受控作品的 Source。
+
+| 正式客户端与动作           | 账户／目录／甲／乙／丙 revision | 观察结果                                                                       |
+| -------------------------- | ------------------------------- | ------------------------------------------------------------------------------ |
+| Android 操作前             | `10/2/4/2/2`                    | 三部均收藏，丙不选。                                                           |
+| Android 批量移出分类       | `12/2/5/3/2`                    | 清单仅甲乙；只移出「批量目标」。甲保留「原有保留」，乙未分类，丙仍在目标分类。 |
+| Android 新进程批量移出书架 | `14/2/6/4/2`                    | 清单仅甲乙；确认后只剩丙。甲的分类、已读和书签保留。                           |
+| iOS 新进程只读             | `14/2/6/4/2`                    | 书架和目标分类筛选均只显示丙，「原有保留」及未分类筛选为空。                   |
+
+两个 Android 批次均显示「已确认 2 / 2 部 · 未开始 0 部」。独立只读查询实际 D1 SQLite 文件，回执数为 `10 → 12 → 14 → 14`；四条新增回执分别为乙、甲的 `setCategories` 和乙、甲的 `setFavorite`。以原 UUID 和作品／目录 CAS 重算每条规范化请求摘要，与 D1 匹配；丙的完整作品状态、分类目录、设置和原有章节标记保持。两个确认框打开时，书架、分类目录、设置以及三部作品的状态、进度和书签共十二路 API 原始响应，与本批次写前逐字节一致；iOS 读回前后均与 Android 完成后逐字节一致。宿主独立 HTTPS 采样每个检查点均 12/12 匹配。
+
+三个阶段各 1/1 通过，应用 PID 依次为 `4488`、`4810`、`53373`。复验步骤、原始响应和 `evidence/verified.json` 保留于本机忽略目录 `.local/library-batch-native-2c012db/`。服务、反代、私有 ADB、专用设备和临时 TLS 私钥已清理。本次覆盖 Android 正常批量移出和 iOS 新进程只读；未覆盖 iOS 写批次、Native 批量添加、跨端写冲突、断网或丢确认、真实 Source 阅读、生产 Access 和真机。
