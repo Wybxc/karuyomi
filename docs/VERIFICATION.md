@@ -1,5 +1,9 @@
 # 实施验证记录
 
+2026-11-10，固定 `2c012db` 的 [iOS arm64 发布构建](verification/native-main-entry.md#v6-ios-arm64-发布构建)通过。实际 Runner 与 Dart AOT 均为 iOS arm64，包内运行时与冻结 v6 六份材料匹配。未签名、未安装，真机与生产 Access 另验。
+
+2026-11-10，[Android 模拟器正式源迁移](verification/source-migration.md#android-模拟器正式源迁移与新进程读回)通过。独立隔离 D1 中，真实 xkcd 英文到中文的搜索、热门和手动映射在确认前未改变七份 API 响应；确认后复制一章已读和一枚书签，保留原作，不复制页位。新进程读回通过；混合平台、故障、真机与生产另验。
+
 2026-11-10，[iOS 模拟器详情续读位置读取失败与显式重试](verification/reading-entry.md#ios-模拟器详情续读位置读取失败与显式重试)通过。真实 xkcd 第 2 页已保存后，详情状态读取返回 503，仍保留章节列表；同一 Source 会话显式读回续读目标，六份 D1 响应不变，未重发 Source 中继或业务写入。
 
 2026-11-10，[Android 模拟器自定义封面](verification/custom-covers.md#android-模拟器系统选择器与新进程读回)通过。两次实际系统文件选择、上传与替换、清除和独立新进程读回均通过。独立 D1/R2 核对三个回执、当前引用和正文；旧路径撤销但对象保留至宽限期。iOS、混合平台、故障、真机与生产另验。

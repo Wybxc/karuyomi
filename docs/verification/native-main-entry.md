@@ -1,5 +1,7 @@
 # Native 正式主入口准备与阻断
 
+2026-11-10，匹配冻结 v6 发布候选的 [iOS 真机目标构建](#v6-ios-arm64-发布构建)已单独通过。以下 v4 以前的记录保留历史输入。
+
 > 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
 
 2026-11-04，对固定 `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 的 Native 成品和本地 HTTPS 服务做独立预验。**正式 App UI 未运行，验收未通过**；本记录不替代既有受控 ReaderScreen 或 Source Cache 分项，也不代表生产 Access。
@@ -27,3 +29,17 @@ CUA 分别通过 Simulator 名称、完整应用路径和 bundle ID 连接，均
 | `service-input.json` | `7d7647bd59d5492fb6b4cc728eb0ac257d4a1305f6227d099beaada8610dec20` |
 
 本轮服务、esbuild/workerd 子进程、单个 iOS 模拟器和工具尝试启动的 Xcode 均已正常停止；正式 AOT 队列未受影响。详细日志和临时工程不入源码库。
+
+## v6 iOS arm64 发布构建
+
+2026-11-10，从固定 `2c012db` 的独立 Git 归档构建正式 Flutter 主入口。锁定 Node 24.15.0、pnpm 12.6.0、Flutter 3.47.5 / Dart 3.13.4 和 Xcode 27.2。根目录先执行 `pnpm install --frozen-lockfile --offline`、`pnpm --filter @karuyomi/runtime-host build` 和 `pnpm build:native-assets`，在 `apps/reader` 执行：
+
+```sh
+flutter pub get --offline --enforce-lockfile
+flutter build ios --release --no-codesign --no-pub --target=lib/main.dart \
+  --dart-define=APP_ORIGIN=https://karuyomi.wybxc.cc
+```
+
+官方构建 exit 0。实际 `build/ios/iphoneos/Runner.app` 的 Runner 和 Dart AOT framework 均为 arm64、Mach-O 平台 iOS；应用 ID 为 `dev.karuyomi.karuyomi`，编译的 Dart AOT 包含指定 origin。成品中的 `host.js`、`worker.js`、`manifest.json` 与正式 Vite Native 输出逐字节一致；六份共享材料目录与冻结 v6 xkcd 验收输入相同，目录文件 SHA-256 为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。未混入后续七材料的 WebP 改动。原始日志、成品和核对输出保存在本机忽略目录 `.local/ios-device-release-2c012db.xwGgAa/`。
+
+成品确认为未签名，检查时本机无有效签名身份。未安装、启动或访问生产；当前生产仍是 v4。真机验收需要有效签名、可达的匹配 v6 部署与用户 Access 登录，之后再记录真实阅读、跨端恢复及移动性能。
