@@ -483,7 +483,7 @@ class _CatalogPageState extends State<CatalogPage> {
               ],
               if (controller.builds.isNotEmpty) ...[
                 if (controller.session != null) const SizedBox(height: 24),
-                _catalogChoices(controller),
+                ..._catalogChoices(controller),
               ],
             ],
           ],
@@ -492,7 +492,7 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  Widget _catalogChoices(CatalogController controller) {
+  List<Widget> _catalogChoices(CatalogController controller) {
     final sources = controller.builds.expand((build) => build.sources).toList();
     final languages = sources.map((source) => source.lang).toSet().toList()
       ..sort();
@@ -516,69 +516,74 @@ class _CatalogPageState extends State<CatalogPage> {
     final active = controller.activeBuild;
     final activeHidden =
         active != null && !visible.any((build) => build.id == active.id);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('扩展目录', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: '目录语言',
-                  border: OutlineInputBorder(),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    key: const ValueKey('catalog-language-filter'),
-                    value: _catalogLanguage,
-                    isExpanded: true,
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('全部语言'),
+    // Give each build its own scroll row so reordering the directory also
+    // updates the viewport's accessibility children when returning to it.
+    return [
+      Text('扩展目录', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: '目录语言',
+                border: OutlineInputBorder(),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: const ValueKey('catalog-language-filter'),
+                  value: _catalogLanguage,
+                  isExpanded: true,
+                  isDense: true,
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('全部语言'),
+                    ),
+                    for (final language in languages)
+                      DropdownMenuItem<String>(
+                        value: language,
+                        child: Text(language.isEmpty ? '未标注语言' : language),
                       ),
-                      for (final language in languages)
-                        DropdownMenuItem<String>(
-                          value: language,
-                          child: Text(language.isEmpty ? '未标注语言' : language),
-                        ),
-                    ],
-                    onChanged: controller.busy
-                        ? null
-                        : (language) =>
-                              setState(() => _catalogLanguage = language),
-                  ),
+                  ],
+                  onChanged: controller.busy
+                      ? null
+                      : (language) =>
+                            setState(() => _catalogLanguage = language),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            TextButton(
-              key: const ValueKey('catalog-language-clear'),
-              onPressed: controller.busy || _catalogLanguage == null
-                  ? null
-                  : () => setState(() => _catalogLanguage = null),
-              child: const Text('清除筛选'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '匹配 ${visible.length} / ${controller.builds.length} 个扩展 · '
-          '$matchingSources / ${sources.length} 个漫画源',
-          key: const ValueKey('catalog-language-count'),
-        ),
-        if (activeHidden)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text('当前使用扩展：${active.packageName}（不在当前目录筛选中）'),
           ),
-        const SizedBox(height: 8),
-        if (visible.isEmpty) const Text('当前目录没有匹配语言的可用构建，请清除筛选。'),
-        for (final build in ordered)
-          Card(
+          const SizedBox(width: 8),
+          TextButton(
+            key: const ValueKey('catalog-language-clear'),
+            onPressed: controller.busy || _catalogLanguage == null
+                ? null
+                : () => setState(() => _catalogLanguage = null),
+            child: const Text('清除筛选'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Text(
+        '匹配 ${visible.length} / ${controller.builds.length} 个扩展 · '
+        '$matchingSources / ${sources.length} 个漫画源',
+        key: const ValueKey('catalog-language-count'),
+      ),
+      if (activeHidden)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text('当前使用扩展：${active.packageName}（不在当前目录筛选中）'),
+        ),
+      const SizedBox(height: 8),
+      if (visible.isEmpty) const Text('当前目录没有匹配语言的可用构建，请清除筛选。'),
+      for (final (index, build) in ordered.indexed)
+        Align(
+          // A moved row needs a fresh accessibility node on Web, including
+          // when the directory reorders behind the management route.
+          key: ValueKey(('catalog-row', index, build.id)),
+          alignment: Alignment.centerLeft,
+          child: Card(
             key: ValueKey(('catalog-build', build.id)),
             margin: const EdgeInsets.only(bottom: 8),
             child: Padding(
@@ -611,8 +616,8 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
             ),
           ),
-      ],
-    );
+        ),
+    ];
   }
 
   Widget _sourceChoices(CatalogController controller) {
