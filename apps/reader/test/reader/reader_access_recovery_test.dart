@@ -11,12 +11,14 @@ import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_recovery.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/features/reader/reading_progress_controller.dart';
 import 'package:karuyomi/main.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
+import '../data/business_state_server.dart';
 
 const _memo = '{"id":9223372036854775806,"nested":{"huge":1e1000}}';
 
@@ -70,6 +72,57 @@ final class _Fixture {
   int _sessions = 0;
   Completer<void>? detailsGate;
   Completer<void>? pagesGate;
+
+  String get mangaKey => ChapterSequence(
+    packageName: 'eu.kanade.source.test',
+    sourceId: sourceId,
+    mangaUrl: testManga.url,
+    chapters: const [],
+  ).mangaKey;
+
+  List<TestBusinessRequest> get progressPosts => platform
+      .businessServer
+      .requests
+      .where(
+        (request) =>
+            request.method == 'POST' &&
+            request.path == '/api/state/mutations' &&
+            (jsonDecode(request.body!) as Map<String, Object?>).containsKey(
+              'saveProgress',
+            ),
+      )
+      .toList();
+
+  Future<ReadingProgressController> failProgressForAccess(
+    WidgetTester tester,
+    ChapterManifest manifest, {
+    int page = 2,
+  }) async {
+    final writer = catalog.createReadingProgress(mangaKey)!;
+    // The Reader keeps its original reference; do not add an extra route owner.
+    await catalog.releaseReadingProgress(writer);
+    final server = platform.businessServer;
+    server.beforeRequest = (request) {
+      if (request.path == '/api/state/mutations' && request.method == 'POST') {
+        throw const RuntimeException(
+          RuntimeErrorCode.accessRequired,
+          'Access expired',
+        );
+      }
+      return null;
+    };
+    writer.observe(
+      manifest: manifest,
+      current: manifest.positionAt(page),
+      observed: manifest.positionAt(page),
+      reversedOrder: false,
+    );
+    expect(await writer.flush(), false);
+    await tester.pumpAndSettle();
+    expect(catalog.status, ServiceStatus.loginRequired);
+    expect(writer.unsaved, true);
+    return writer;
+  }
 
   Future<void> open(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1100, 1000);
@@ -132,6 +185,82 @@ final class _Fixture {
 
 void main() {
   testWidgets(
+    'same identity checks progress read-only and only explicit retry sends the original draft',
+    (tester) async {
+      final fixture = _Fixture();
+      await fixture.open(tester);
+      final original = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+      expect(await fixture.catalog.flushReadingProgress(), true);
+      final baselinePosts = fixture.progressPosts.length;
+      final appliedBefore = fixture.platform.businessServer.appliedMutations;
+      final writer = await fixture.failProgressForAccess(
+        tester,
+        original.manifest,
+      );
+      expect(fixture.progressPosts, hasLength(baselinePosts + 1));
+      final originalBody = fixture.progressPosts.last.body;
+      expect(
+        tester.widget<ReaderScreen>(find.byType(ReaderScreen)).key,
+        original.key,
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(seconds: 3));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(await fixture.catalog.flushReadingProgress(), false);
+      expect(fixture.progressPosts, hasLength(baselinePosts + 1));
+
+      final recoveryCalls = <String>[];
+      fixture.platform.beforeApiFetch = (path) async => recoveryCalls.add(path);
+      fixture.platform.businessServer.beforeRequest = null;
+      await tester.tap(find.text('重新登录并恢复本章'));
+      await tester.pumpAndSettle();
+      final chapterPath =
+          '/api/state/manga/${fixture.mangaKey}?chapterKey=${original.manifest.chapterKey}';
+      expect(
+        recoveryCalls,
+        containsAllInOrder(['/api/bootstrap', chapterPath]),
+      );
+      expect(fixture.progressPosts, hasLength(baselinePosts + 1));
+      expect(fixture.platform.businessServer.appliedMutations, appliedBefore);
+      expect(writer.unsaved, true);
+      expect(
+        tester.widget<ReaderScreen>(find.byType(ReaderScreen)).paused,
+        false,
+      );
+
+      // A shared manga mutation must not replay this paused writer's pending POST.
+      await expectLater(
+        fixture.catalog.readingProgress!.client.mutate(
+          wire.StateMutation(
+            mangaKey: fixture.mangaKey,
+            setFavorite: wire.SetFavorite(favorite: false),
+          ),
+        ),
+        throwsA(isA<BusinessPendingMutationException>()),
+      );
+      expect(fixture.progressPosts, hasLength(baselinePosts + 1));
+
+      recoveryCalls.clear();
+      await tester.tap(find.text('重试保存'));
+      await tester.pumpAndSettle();
+      expect(
+        recoveryCalls,
+        containsAllInOrder([chapterPath, '/api/state/mutations']),
+      );
+      expect(fixture.progressPosts, hasLength(baselinePosts + 2));
+      expect(fixture.progressPosts.last.body, originalBody);
+      expect(
+        fixture.platform.businessServer.appliedMutations,
+        appliedBefore + 1,
+      );
+      expect(writer.unsaved, false);
+      await fixture.close(tester);
+    },
+  );
+
+  testWidgets(
     'remote reset during login fences the preserved view until explicit reopen',
     (tester) async {
       final fixture = _Fixture();
@@ -153,9 +282,10 @@ void main() {
         identity: fixture.catalog.readingProgress!.identity,
       );
       final repository = ProgressRepository(remote);
-      await fixture.pause(tester);
-      fixture.expire = false;
+      await fixture.failProgressForAccess(tester, manifest, page: 3);
+      final postsAtPause = fixture.progressPosts.length;
       fixture.platform.authenticateHandler = () async {
+        fixture.platform.businessServer.beforeRequest = null;
         await repository.reset(
           mangaKey: mangaKey,
           manifest: manifest,
@@ -171,6 +301,7 @@ void main() {
       expect(resumed.initialPosition!.normalizedOffset, .6);
       expect(find.text('重新打开本章'), findsOneWidget);
       expect(await fixture.catalog.flushReadingProgress(), false);
+      expect(fixture.progressPosts, hasLength(postsAtPause));
       var stored = fixture.platform.businessServer.progress(
         mangaKey,
         manifest.chapterKey,
@@ -189,6 +320,21 @@ void main() {
       )!;
       expect(stored.epoch, 1);
       expect(stored.current.pageIndexHint, 0);
+      (reopened.positionRequest! as ValueNotifier<ReadingPosition?>).value =
+          reopened.manifest.positionAt(1);
+      await tester.pumpAndSettle();
+      expect(await fixture.catalog.flushReadingProgress(), true);
+      expect(fixture.progressPosts, hasLength(postsAtPause + 1));
+      expect(
+        fixture.progressPosts.last.body,
+        isNot(fixture.progressPosts[postsAtPause - 1].body),
+      );
+      expect(
+        fixture.platform.businessServer
+            .progress(mangaKey, manifest.chapterKey)!
+            .epoch,
+        1,
+      );
       await fixture.close(tester);
       await remote.dispose();
     },
@@ -327,6 +473,7 @@ void main() {
           anchor.manifestVersion,
         );
         expect(resumed.initialPosition!.normalizedOffset, .4);
+        expect(resumed.preserveInitialPlacement, !changedPages);
         expect(resumed.initialMode, ReadingMode.rightToLeft);
         expect(resumed.doublePage, true);
         expect(
@@ -411,15 +558,18 @@ void main() {
         chapters: const [],
       ).mangaKey;
       await fixture.catalog.flushReadingProgress();
-      await fixture.pause(tester);
+      await fixture.failProgressForAccess(tester, original.manifest);
+      final postsAtPause = fixture.progressPosts.length;
+      final writesAtPause = fixture.platform.businessServer.appliedMutations;
       final callsAtPause = fixture.platform.invocations.length;
-      fixture.expire = false;
+      fixture.platform.businessServer.beforeRequest = null;
       fixture.platform.bootstrapSubject = 'different-owner';
       await tester.tap(find.text('重新登录并恢复本章'));
       await tester.pumpAndSettle();
       expect(find.byType(ReaderScreen), findsNothing);
       expect(find.byType(MangaDetailsPage), findsNothing);
       expect(fixture.catalog.subject, 'different-owner');
+      expect(fixture.catalog.status, ServiceStatus.ready);
       expect(fixture.platform.openedIdentities, ['owner-subject']);
       expect(fixture.platform.invocations, hasLength(callsAtPause));
       expect(
@@ -443,6 +593,8 @@ void main() {
         isNotNull,
       );
       await fixture.close(tester);
+      expect(fixture.progressPosts, hasLength(postsAtPause));
+      expect(fixture.platform.businessServer.appliedMutations, writesAtPause);
     },
   );
 

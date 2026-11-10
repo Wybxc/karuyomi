@@ -47,6 +47,10 @@ final class ReadingProgressController extends ChangeNotifier {
   Timer? _delay;
   Timer? _deadline;
   Future<void>? _flushing;
+  bool Function()? _canWrite;
+  bool _awaitingAccessRetry = false;
+  bool _retryingAccess = false;
+  bool _accessRetryAuthorized = false;
   bool _closed = false;
   bool _orderLoaded = false;
   int _viewSequence = 0;
@@ -64,6 +68,24 @@ final class ReadingProgressController extends ChangeNotifier {
       ? null
       : MangaResume(chapterKey: _currentChapter!, reversedOrder: reversedOrder);
 
+  void bindWritePermission(bool Function() canWrite) => _canWrite = canWrite;
+
+  bool get _writeIdentityCurrent => !_closed && _canWrite?.call() != false;
+
+  bool _maySend(bool explicitRetry) =>
+      _writeIdentityCurrent &&
+      (!_awaitingAccessRetry || (explicitRetry && _accessRetryAuthorized));
+
+  /// Keep the original draft and cancel automatic sends, including after a
+  /// fresh bootstrap until the user has explicitly chosen to retry it.
+  void pauseForAccess() {
+    _awaitingAccessRetry = true;
+    _accessRetryAuthorized = false;
+    ++_refreshSequence;
+    _cancelTimers();
+    if (unsaved && _conflicted.isEmpty) error ??= _progressUnconfirmed;
+  }
+
   Future<ReadingPosition?> restore(ChapterManifest manifest) async {
     if (manifest.pages.isEmpty || _closed) return null;
     final view = ++_viewSequence;
@@ -79,6 +101,7 @@ final class ReadingProgressController extends ChangeNotifier {
         final state = await repository.loadChapterState(
           mangaKey: mangaKey,
           chapterKey: manifest.chapterKey,
+          discardPendingProgress: reopening && _awaitingAccessRetry,
         );
         if (_closed || view != _viewSequence) return null;
         _remember(manifest.chapterKey, state);
@@ -92,8 +115,9 @@ final class ReadingProgressController extends ChangeNotifier {
       if (reopening) {
         _pending.remove(manifest.chapterKey);
         _pendingResets.remove(manifest.chapterKey);
+        if (!unsaved) _awaitingAccessRetry = false;
       }
-      error = null;
+      error = _awaitingAccessRetry && unsaved ? _progressUnconfirmed : null;
       _conflicted.remove(manifest.chapterKey);
     } catch (_) {
       if (_closed || view != _viewSequence) return null;
@@ -135,25 +159,53 @@ final class ReadingProgressController extends ChangeNotifier {
     if (_closed ||
         manifest.pages.isEmpty ||
         needsReopen(manifest.chapterKey) ||
-        _resetting.isNotEmpty) {
+        _resetting.isNotEmpty ||
+        _canWrite?.call() == false) {
       return;
     }
+    final afterAccess = _awaitingAccessRetry;
     final refresh = ++_refreshSequence;
     final view = _viewSequence;
-    bool current() =>
-        !_closed && refresh == _refreshSequence && view == _viewSequence;
     _cancelTimers();
-    if (unsaved || _flushing != null) {
-      if (!await flush() || !current()) return;
+    if (!afterAccess && (unsaved || _flushing != null)) {
+      if (!await flush() ||
+          refresh != _refreshSequence ||
+          view != _viewSequence) {
+        return;
+      }
     }
-    if (!current()) return;
-    final before = _confirmed[manifest.chapterKey];
+    if (await _inspectChapter(
+          manifest.chapterKey,
+          afterAccess: afterAccess,
+          refresh: refresh,
+        ) &&
+        afterAccess &&
+        refresh == _refreshSequence &&
+        !unsaved) {
+      _awaitingAccessRetry = false;
+    }
+  }
+
+  Future<bool> _inspectChapter(
+    String chapterKey, {
+    required bool afterAccess,
+    required int refresh,
+  }) async {
+    if (!_writeIdentityCurrent || needsReopen(chapterKey)) {
+      return false;
+    }
+    final view = _viewSequence;
+    bool current() =>
+        _writeIdentityCurrent &&
+        refresh == _refreshSequence &&
+        view == _viewSequence;
+    final before = _confirmed[chapterKey];
     try {
       final latest = await repository.inspectChapter(
         mangaKey: mangaKey,
-        chapterKey: manifest.chapterKey,
+        chapterKey: chapterKey,
       );
-      if (!current()) return;
+      if (!current()) return false;
       final progressChanged =
           before == null ||
           before.epoch != latest.epoch ||
@@ -163,27 +215,30 @@ final class ReadingProgressController extends ChangeNotifier {
       final remoteRevisionChanged =
           before != null &&
           latest.revision != before.revision &&
-          !repository.client.hasOnlyLocalChangesSince(
-            mangaKey,
-            basedOnRevision: before.revision,
-            revision: latest.revision,
-          );
+          (afterAccess ||
+              !repository.client.hasOnlyLocalChangesSince(
+                mangaKey,
+                basedOnRevision: before.revision,
+                revision: latest.revision,
+              ));
       if (progressChanged || remoteRevisionChanged) {
-        _conflicted.add(manifest.chapterKey);
+        _conflicted.add(chapterKey);
         error = before?.epoch != latest.epoch
             ? '本章进度已在其他设备重置，当前阅读位置保持不变。请重新打开本章后继续保存。'
             : progressChanged
             ? '阅读进度已在其他设备更新，当前阅读位置保持不变。请重新打开本章后继续保存。'
             : '此作品已在其他设备更新，当前阅读位置保持不变。请重新打开本章后继续保存。';
       } else if (_conflicted.isEmpty) {
-        _remember(manifest.chapterKey, latest);
-        error = null;
+        if (!afterAccess || !unsaved) _remember(chapterKey, latest);
+        error = afterAccess && unsaved ? _progressUnconfirmed : null;
       }
       _notify();
+      return !needsReopen(chapterKey);
     } catch (_) {
-      if (!current()) return;
+      if (!current()) return false;
       error = '未能刷新服务器进度，当前阅读位置保持不变，可重试。';
       _notify();
+      return false;
     }
   }
 
@@ -200,7 +255,7 @@ final class ReadingProgressController extends ChangeNotifier {
     required bool reversedOrder,
     bool complete = false,
   }) {
-    if (_closed ||
+    if (!_maySend(false) ||
         _conflicted.contains(manifest.chapterKey) ||
         _resetting.contains(manifest.chapterKey) ||
         _pendingResets.containsKey(manifest.chapterKey) ||
@@ -239,17 +294,45 @@ final class ReadingProgressController extends ChangeNotifier {
     if (!wasUnsaved || before.completed != after.completed) _notify();
   }
 
-  Future<bool> flush() async {
-    if (_closed) return !unsaved && _conflicted.isEmpty;
+  Future<bool> flush() => _flush();
+
+  Future<bool> retry() async {
+    if (!_awaitingAccessRetry) return flush();
+    if (!_writeIdentityCurrent || _retryingAccess || !unsaved) {
+      return !unsaved && _conflicted.isEmpty;
+    }
+    _retryingAccess = true;
+    try {
+      // Other chapters may have retained drafts as well. Inspect every one
+      // before permitting the shared client to send the first original POST.
+      final refresh = ++_refreshSequence;
+      for (final key in {..._pending.keys, ..._pendingResets.keys}) {
+        if (!await _inspectChapter(key, afterAccess: true, refresh: refresh) ||
+            refresh != _refreshSequence) {
+          return false;
+        }
+      }
+      _accessRetryAuthorized = true;
+      final saved = await _flush(explicitRetry: true);
+      if (saved) _awaitingAccessRetry = false;
+      return saved;
+    } finally {
+      _accessRetryAuthorized = false;
+      _retryingAccess = false;
+    }
+  }
+
+  Future<bool> _flush({bool explicitRetry = false}) async {
+    if (!_maySend(explicitRetry)) return !unsaved && _conflicted.isEmpty;
     _cancelTimers();
     if (!unsaved && _flushing == null) return _conflicted.isEmpty;
     if (_flushing != null) {
       await _flushing;
       // A new viewport can arrive in the completion microtask of the previous
       // drain, after this caller has cancelled its timer. Do not strand it.
-      if (unsaved && error == null) return flush();
+      if (unsaved && error == null) return _flush(explicitRetry: explicitRetry);
     } else {
-      final pending = _drain();
+      final pending = _drain(explicitRetry: explicitRetry);
       _flushing = pending;
       try {
         await pending;
@@ -261,8 +344,8 @@ final class ReadingProgressController extends ChangeNotifier {
     return !unsaved && _conflicted.isEmpty;
   }
 
-  Future<void> _drain() async {
-    while (_pending.isNotEmpty && !_closed) {
+  Future<void> _drain({required bool explicitRetry}) async {
+    while (_pending.isNotEmpty && _maySend(explicitRetry)) {
       final entry = _pending.entries.first;
       final draft = entry.value;
       try {
@@ -273,6 +356,8 @@ final class ReadingProgressController extends ChangeNotifier {
           progress: draft.progress,
           reversedOrder: draft.reversedOrder,
           basedOnRevision: _confirmed[entry.key]?.revision,
+          canSend: _maySend,
+          explicitRetry: explicitRetry,
         );
         if (_closed) return;
         final saved = confirmed.progress!;
@@ -313,7 +398,7 @@ final class ReadingProgressController extends ChangeNotifier {
         return; // Keep the exact dirty draft for a later explicit retry.
       }
     }
-    while (_pendingResets.isNotEmpty && !_closed) {
+    while (_pendingResets.isNotEmpty && _maySend(explicitRetry)) {
       final entry = _pendingResets.entries.first;
       try {
         final confirmed = await repository.resetState(
@@ -321,6 +406,8 @@ final class ReadingProgressController extends ChangeNotifier {
           manifest: entry.value.manifest,
           reversedOrder: entry.value.reversedOrder,
           basedOnRevision: _confirmed[entry.key]?.revision,
+          canSend: _maySend,
+          explicitRetry: explicitRetry,
         );
         if (_closed) return;
         final saved = confirmed.progress!;
@@ -353,7 +440,7 @@ final class ReadingProgressController extends ChangeNotifier {
   }
 
   Future<ChapterProgress?> reset(ChapterManifest manifest) async {
-    if (_closed ||
+    if (!_maySend(false) ||
         manifest.pages.isEmpty ||
         _resetting.contains(manifest.chapterKey)) {
       return null;

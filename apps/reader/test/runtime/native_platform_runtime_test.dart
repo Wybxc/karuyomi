@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -119,12 +120,60 @@ final class TestHeadless extends PlatformHeadlessInAppWebView {
   }
 }
 
+final class TestAuthenticationWebView extends PlatformInAppWebViewWidget {
+  TestAuthenticationWebView(super.params) : super.implementation();
+
+  late final _controller = controllerFromPlatform<InAppWebViewController>(
+    TestController(),
+  );
+
+  Uri get login => Uri.parse(params.initialUrlRequest!.url.toString());
+
+  Future<NavigationActionPolicy?> decideNavigation(
+    Uri target, {
+    required bool isForMainFrame,
+  }) async => params.shouldOverrideUrlLoading!(
+    _controller,
+    NavigationAction(
+      request: URLRequest(url: WebUri(target.toString())),
+      isForMainFrame: isForMainFrame,
+    ),
+  );
+
+  void commitVisible(Uri target) =>
+      params.onPageCommitVisible!(_controller, WebUri(target.toString()));
+
+  void loadStopped(Uri target) =>
+      params.onLoadStop!(_controller, WebUri(target.toString()));
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.expand();
+
+  @override
+  T controllerFromPlatform<T>(PlatformInAppWebViewController controller) =>
+      params.controllerFromPlatform!(controller) as T;
+
+  @override
+  void dispose() {}
+}
+
 final class TestWebViewPlatform extends InAppWebViewPlatform {
   final created = Completer<TestHeadless>();
   final views = <TestHeadless>[];
+  final authenticationViews = <TestAuthenticationWebView>[];
   Completer<void>? nextRunAcknowledgement;
   var _nextCreated = Completer<TestHeadless>();
   Future<TestHeadless> get nextCreated => _nextCreated.future;
+
+  @override
+  PlatformInAppWebViewWidget createPlatformInAppWebViewWidget(
+    PlatformInAppWebViewWidgetCreationParams params,
+  ) {
+    final view = TestAuthenticationWebView(params);
+    authenticationViews.add(view);
+    return view;
+  }
+
   @override
   PlatformHeadlessInAppWebView createPlatformHeadlessInAppWebView(
     PlatformHeadlessInAppWebViewCreationParams params,
@@ -140,6 +189,59 @@ final class TestWebViewPlatform extends InAppWebViewPlatform {
     _nextCreated = Completer<TestHeadless>();
     return view;
   }
+}
+
+const _readerRoute = ValueKey('test-reader-route');
+
+final class TestAuthenticationNavigatorObserver extends NavigatorObserver {
+  int pops = 0;
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pops++;
+  }
+}
+
+Future<TestAuthenticationNavigatorObserver> _openReader(
+  WidgetTester tester,
+) async {
+  final navigator = GlobalKey<NavigatorState>();
+  final observer = TestAuthenticationNavigatorObserver();
+  await tester.pumpWidget(
+    MaterialApp(
+      navigatorKey: navigator,
+      navigatorObservers: [observer],
+      home: const Scaffold(body: Text('书架')),
+    ),
+  );
+  unawaited(
+    navigator.currentState!.push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(key: _readerRoute, body: Text('阅读')),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return observer;
+}
+
+Uri _callbackFor(TestAuthenticationWebView view) {
+  final attempt = view.login.queryParameters['attempt'];
+  expect(
+    attempt,
+    matches(
+      RegExp(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+      ),
+    ),
+  );
+  expect(view.login.origin, 'https://reader.example');
+  expect(view.login.path, '/api/auth/login');
+  expect(view.login.queryParameters, {
+    'returnTo': '/auth/complete',
+    'attempt': attempt,
+  });
+  return Uri.https('reader.example', '/auth/complete', {'attempt': attempt});
 }
 
 void main() {
@@ -207,6 +309,116 @@ void main() {
     ),
   );
   Future<void> flushCallbacks() => Future<void>.delayed(Duration.zero);
+
+  testWidgets(
+    'only the current authentication callback can pop the login route',
+    (tester) async {
+      final observer = await _openReader(tester);
+      final context = tester.element(find.byKey(_readerRoute));
+      final results = <bool>[];
+
+      unawaited(
+        runtime.authenticate(context, pending: {'tab': 0}).then(results.add),
+      );
+      await tester.pumpAndSettle();
+      final first = platform.authenticationViews.single;
+      final previousCallback = _callbackFor(first);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(results, [false]);
+      expect(runtime.takePendingAuthentication(), isNull);
+      expect(find.byKey(_readerRoute), findsOneWidget);
+      expect(observer.pops, 1);
+
+      const returnTo = '/reader?resume=1';
+      const pending = {
+        'tab': 1,
+        'reader': {'chapter': 'test-chapter'},
+      };
+      unawaited(
+        runtime
+            .authenticate(context, returnTo: returnTo, pending: pending)
+            .then(results.add),
+      );
+      await tester.pumpAndSettle();
+      expect(platform.authenticationViews, hasLength(2));
+      final current = platform.authenticationViews.last;
+      final callback = _callbackFor(current);
+      expect(callback, isNot(previousCallback));
+
+      // The exact URL in a navigation decision is not yet a committed document.
+      for (final isForMainFrame in [false, true]) {
+        expect(
+          await current.decideNavigation(
+            callback,
+            isForMainFrame: isForMainFrame,
+          ),
+          NavigationActionPolicy.ALLOW,
+        );
+      }
+      first.loadStopped(previousCallback);
+      for (final unrelated in [
+        current.login,
+        callback.replace(host: 'idp.example'),
+        previousCallback,
+        Uri.https('reader.example', '/auth/complete'),
+        callback.replace(
+          queryParameters: {...callback.queryParameters, 'extra': '1'},
+        ),
+      ]) {
+        current.commitVisible(unrelated);
+        current.loadStopped(unrelated);
+        await tester.pump();
+        expect(results, [false], reason: unrelated.toString());
+        expect(find.text('登录'), findsOneWidget);
+        expect(observer.pops, 1);
+      }
+      expect(runtime.takePendingAuthentication(), isNull);
+
+      current.commitVisible(callback);
+      current.loadStopped(callback);
+      await tester.pumpAndSettle();
+      expect(results, [false, true]);
+      expect(find.text('登录'), findsNothing);
+      expect(find.byKey(_readerRoute), findsOneWidget);
+      expect(observer.pops, 2);
+      expect(runtime.takePendingAuthentication(), {
+        'returnTo': returnTo,
+        'pending': pending,
+      });
+      expect(runtime.takePendingAuthentication(), isNull);
+
+      current.loadStopped(callback);
+      current.commitVisible(callback);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_readerRoute), findsOneWidget);
+      expect(observer.pops, 2);
+      expect(runtime.takePendingAuthentication(), isNull);
+      expect(platform.views, isEmpty);
+    },
+  );
+
+  testWidgets('the current load stop also completes authentication', (
+    tester,
+  ) async {
+    final observer = await _openReader(tester);
+    final context = tester.element(find.byKey(_readerRoute));
+    final results = <bool>[];
+    unawaited(runtime.authenticate(context).then(results.add));
+    await tester.pumpAndSettle();
+
+    final view = platform.authenticationViews.single;
+    view.loadStopped(_callbackFor(view));
+    await tester.pumpAndSettle();
+    expect(results, [true]);
+    expect(observer.pops, 1);
+    expect(find.byKey(_readerRoute), findsOneWidget);
+    expect(runtime.takePendingAuthentication(), {
+      'returnTo': '/',
+      'pending': {},
+    });
+    expect(runtime.takePendingAuthentication(), isNull);
+  });
 
   test(
     'unready load does not suppress the subsequent ready document',

@@ -2,6 +2,8 @@
 
 `category_sync_test.dart` 和 `settings_sync_test.dart` 使用正式 `app.main()`、`NativePlatformRuntime` 和业务 repository 验证分类与全局设置；独立于 Source 阅读。`server_sync_test.dart` 保留原阅读驱动，其旧配套服务状态单独见下节。普通无设备 `flutter test` 不执行本目录；`flutter analyze` 与仓库格式检查仍覆盖它。
 
+Native 启动先异步读取本机连接地址偏好；驱动等待正式书架获得 controller，再检查实际 origin。首次运行或更换验收 origin 时用干净的专用模拟器或应用安装，避免上轮手动选择的服务覆盖本轮 `APP_ORIGIN` 默认值。
+
 ## 分类同步
 
 在仓库根目录构建正式产品与官方 HTTPS harness：

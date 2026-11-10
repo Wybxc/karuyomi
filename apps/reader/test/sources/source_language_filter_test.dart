@@ -122,6 +122,11 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
+    if (target.evaluate().isEmpty) {
+      final position = tester.state<ScrollableState>(scrollable).position;
+      position.jumpTo(position.minScrollExtent);
+      await tester.pumpAndSettle();
+    }
     await tester.scrollUntilVisible(target, 220, scrollable: scrollable);
     await tester.ensureVisible(target);
     await tester.pumpAndSettle();
@@ -288,6 +293,7 @@ void main() {
       await loading;
       await tester.pumpAndSettle();
       expect(catalog.busy, false);
+      await reveal(tester, languageFilter());
       expect(
         tester.widget<DropdownButton<String>>(languageFilter()).value,
         'zh',

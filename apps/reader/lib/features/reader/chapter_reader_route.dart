@@ -254,9 +254,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       setState(() => _error = reason);
     }
     if (widget.catalog.accessPaused && !_accessPaused) {
-      _recordViewport();
       setState(() => _accessPaused = true);
-      unawaited(_progress?.flush());
       // The displayed leaf keeps its resources. Only the extra page session is
       // discarded; an active Source call settles before its owner is closed.
       unawaited(
@@ -304,7 +302,6 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     });
     RecoveredReader? recovered;
     try {
-      _recordViewport();
       if (!await authenticate(continuation) || _closing || !mounted) return;
       _mode = continuation.mode;
       _doublePage = continuation.doublePage;
@@ -355,14 +352,23 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
           !widget.catalog.isCurrentSource(next.source)) {
         throw StateError(widget.catalog.error ?? '恢复时漫画源会话已改变，请重新连接');
       }
+      final anchor = next.position;
+      final manifest = next.opened.manifest;
       setState(() {
         _manga = next.manga;
         _sequence = next.sequence;
         _source = next.source;
         _chapter = next.chapter;
         _opened = next.opened;
-        _initialPosition = next.position;
-        _preserveInitialPlacement = false;
+        _initialPosition = anchor;
+        // A fresh leaf can center the same decoded point differently. Keep
+        // the original placement so removing recovery controls does not save
+        // a synthetic move. Missing pages still use the normal fallback.
+        _preserveInitialPlacement =
+            anchor != null &&
+            anchor.chapterKey == manifest.chapterKey &&
+            anchor.manifestVersion == manifest.version &&
+            manifest.pages.any((page) => page.key == anchor.pageKey);
         _viewport = null;
         _positionRequest.value = null;
         _viewClosed = Completer<void>();
@@ -426,7 +432,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         unawaited(_bookmarks?.refresh());
         unawaited(_settings?.refresh());
       }
-    } else {
+    } else if (!_accessPaused && !_recovering) {
       unawaited(_progress?.flush());
     }
   }
@@ -873,7 +879,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
                 TextButton(
                   onPressed: disabled
                       ? null
-                      : () => unawaited(progress.flush()),
+                      : () => unawaited(progress.retry()),
                   child: const Text('重试保存'),
                 ),
             ],

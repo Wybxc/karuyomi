@@ -16,8 +16,7 @@ final class PopupAuthentication {
   void Function()? _close;
 
   Future<bool> wait({
-    required Uri origin,
-    required String attempt,
+    required Uri callback,
     required Uri? Function() readLocation,
     required bool Function() isClosed,
     required void Function() close,
@@ -31,11 +30,7 @@ final class PopupAuthentication {
       // Access pages can be cross-origin until the first-party redirect. Only
       // the adapter's same-origin location read can complete authentication.
       final location = readLocation();
-      if (location != null &&
-          location.hasAuthority &&
-          location.origin == origin.origin &&
-          location.path == '/auth/complete' &&
-          location.queryParameters['attempt'] == attempt) {
+      if (location == callback) {
         _finish();
       } else if (isClosed()) {
         _finish(StateError('登录窗口已关闭或被浏览器隔离，请重新登录。'));

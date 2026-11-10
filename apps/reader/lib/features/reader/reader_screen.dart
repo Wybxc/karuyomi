@@ -1415,9 +1415,29 @@ class _ReaderScreenState extends State<ReaderScreen> {
     ),
   );
 
-  Widget _controls() => Material(
-    child: SafeArea(
-      top: false,
+  Widget _controls() {
+    final available = math.max(
+      0.0,
+      MediaQuery.sizeOf(context).height -
+          MediaQuery.paddingOf(context).vertical -
+          kToolbarHeight,
+    );
+    // Keep space for the page even when the full set of controls cannot fit.
+    final readingHeight = math.min(3 * kMinInteractiveDimension, available / 2);
+    return Material(
+      child: SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: available - readingHeight),
+          child: _scrollableControls(),
+        ),
+      ),
+    );
+  }
+
+  Widget _scrollableControls() {
+    return SingleChildScrollView(
+      primary: false,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Column(
@@ -1529,8 +1549,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   void dispose() {

@@ -88,6 +88,18 @@ test('declared Vite assets bypass the Worker and retain their headers', async ()
   expect(host.headers.get('X-Karuyomi-Probe-Worker')).toBe('1');
 });
 
+test('the public Access callback serves only a no-store return notice', async () => {
+  const callback = await server.fetch(
+    `${origin}/auth/complete?attempt=${crypto.randomUUID()}`,
+    { redirect: 'manual' },
+  );
+  expect(callback.status).toBe(200);
+  expect(callback.headers.get('X-Karuyomi-Probe-Worker')).toBe('1');
+  expect(callback.headers.get('Cache-Control')).toBe('no-store');
+  expect(callback.headers.get('Content-Type')).toMatch(/^text\/plain\b/);
+  expect(await callback.text()).toBe('请返回 Karuyomi。');
+});
+
 test('generated Worker config applies D1 migrations, binds private R2 and verifies the test JWT', async () => {
   expect((await worker.fetch(`${origin}/api/categories`)).status).toBe(401);
   const response = await worker.fetch(`${origin}/api/categories`, {

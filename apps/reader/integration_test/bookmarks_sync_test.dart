@@ -16,9 +16,10 @@ import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
-import 'package:karuyomi/main.dart' as app;
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+
+import 'native_app.dart';
 
 const _origin = String.fromEnvironment('APP_ORIGIN');
 const _subject = String.fromEnvironment('BOOKMARKS_SUBJECT');
@@ -56,12 +57,7 @@ void main() {
         base64Decode(_testCaBase64),
       );
     }
-    app.main();
-    await tester.pump();
-    final catalog = tester
-        .widget<LibraryPage>(find.byType(LibraryPage))
-        .controller;
-    if (catalog == null) fail('正式 App 必须创建 CatalogController');
+    final catalog = await startNativeApp(tester);
     final platform = catalog.api;
     if (platform is! NativePlatformRuntime) {
       fail('此验收必须使用正式 NativePlatformRuntime');

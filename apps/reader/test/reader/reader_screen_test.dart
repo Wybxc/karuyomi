@@ -976,7 +976,7 @@ void main() {
   );
 
   testWidgets(
-    'late decode keeps a saved placement but an explicit jump measures the new viewport',
+    'late decode and removing controls preserve placement until an explicit jump',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -998,15 +998,17 @@ void main() {
       final requests = ValueNotifier<ReadingPosition?>(null);
       addTearDown(requests.dispose);
       final viewports = <ReaderViewportState>[];
-      Widget restored(ResourceImageBuilder builder) => screen(
-        provider: provider,
-        manifest: manifest,
-        position: saved,
-        preserveInitialPlacement: true,
-        positionRequest: requests,
-        onViewport: viewports.add,
-        imageBuilder: builder,
-      );
+      Widget restored(ResourceImageBuilder builder, {double controls = 48}) =>
+          screen(
+            provider: provider,
+            manifest: manifest,
+            position: saved,
+            preserveInitialPlacement: true,
+            positionRequest: requests,
+            onViewport: viewports.add,
+            imageBuilder: builder,
+            chapterControls: SizedBox(height: controls),
+          );
 
       await tester.pumpWidget(restored(fixtureImage));
       await tester.pumpAndSettle();
@@ -1027,6 +1029,14 @@ void main() {
           bounds.height;
       expect(renderedY, inExclusiveRange(0, 1));
       expect((renderedY - saved.viewportY).abs(), greaterThan(.01));
+
+      await tester.pumpWidget(
+        restored(decodedImage(width: 400, height: 200), controls: 0),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(viewport).height, greaterThan(bounds.height));
+      expect(viewports.last.current.normalizedOffset, saved.normalizedOffset);
+      expect(viewports.last.current.viewportY, saved.viewportY);
 
       requests.value = manifest.positionAt(
         0,
@@ -2200,6 +2210,67 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
     expect(provider.released, isNotEmpty);
+  });
+
+  testWidgets('landscape keeps the image visible with tall chapter controls', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(411, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final manifest = fixtureChapter();
+    final viewports = <ReaderViewportState>[];
+    var nextChapter = false;
+    await tester.pumpWidget(
+      screen(
+        provider: FixturePageProvider(),
+        manifest: manifest,
+        position: manifest.positionAt(1, offset: .28),
+        mode: ReadingMode.continuous,
+        imageBuilder: decodedImage(),
+        onViewport: viewports.add,
+        chapterControls: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final label in [
+              '阅读设置',
+              '刷新进度',
+              '重新阅读本章',
+              '读完本章',
+              '标记书签',
+              '刷新书签',
+            ])
+              TextButton(onPressed: () {}, child: Text(label)),
+            TextButton(
+              onPressed: () => nextChapter = true,
+              child: const Text('下一章'),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final before = viewports.last.current;
+    expect(before.pageKey, manifest.pages[1].key);
+
+    tester.view.physicalSize = const Size(915, 411);
+    await tester.pumpAndSettle();
+    final imageViewport = find.byKey(const ValueKey('continuous-reader'));
+    expect(imageViewport.hitTestable(), findsOneWidget);
+    expect(viewports.last.observed, isNotNull);
+    final rotated = viewports.last.current;
+    expect(rotated.pageKey, before.pageKey);
+    expect(rotated.normalizedOffset, before.normalizedOffset);
+
+    final next = find.text('下一章');
+    expect(next.hitTestable(), findsNothing);
+    await tester.ensureVisible(next);
+    await tester.pumpAndSettle();
+    await tester.tap(next);
+    expect(nextChapter, isTrue);
+    expect(imageViewport.hitTestable(), findsOneWidget);
+    expect(viewports.last.current, rotated);
   });
 
   testWidgets('continuous position survives resize and Webtoon layout switch', (

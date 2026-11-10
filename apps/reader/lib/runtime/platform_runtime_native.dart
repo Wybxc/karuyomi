@@ -94,6 +94,7 @@ final class NativePlatformRuntime extends PlatformRuntime
   @override
   bool ownsImageLocation(String resourceId, String generation, Uri location) =>
       _images?.owns(resourceId, generation, location) ?? false;
+  bool _authenticating = false;
   Map<String, Object?>? _authenticationContinuation;
 
   @override
@@ -102,16 +103,30 @@ final class NativePlatformRuntime extends PlatformRuntime
     String returnTo = '/',
     Map<String, Object?> pending = const {},
   }) async {
-    authenticationPath(returnTo);
-    _authenticationContinuation = {'returnTo': returnTo, 'pending': pending};
-    final authenticated = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => _AuthenticationPage(origin: origin),
-      ),
-    );
-    // The caller retires its old Reader and awaits resource ACKs before it
-    // reconnects. Rebuilding here would delete files behind the visible page.
-    return authenticated == true;
+    if (_disposed || _closing) throw StateError('服务已关闭，请重新连接。');
+    if (_authenticating) throw StateError('登录页已打开，请先完成或关闭。');
+    final attempt = authenticationAttempt(origin, returnTo);
+    final continuation = {'returnTo': returnTo, 'pending': pending};
+    wire.checkJsonBudget(continuation, maxBytes: wire.controlRequestLimit);
+    _authenticating = true;
+    _authenticationContinuation = null;
+    try {
+      final authenticated = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => _AuthenticationPage(
+            login: attempt.login,
+            callback: attempt.callback,
+          ),
+        ),
+      );
+      if (authenticated != true || _closing || _disposed) return false;
+      // The caller retires the old Reader before reconnecting and verifying the
+      // identity. Rebuilding here would delete files behind the visible page.
+      _authenticationContinuation = continuation;
+      return true;
+    } finally {
+      _authenticating = false;
+    }
   }
 
   @override
@@ -749,8 +764,9 @@ final class NativePlatformRuntime extends PlatformRuntime
 
 /// Access and the IdP stay inside the app, sharing the runtime's cookie store.
 final class _AuthenticationPage extends StatefulWidget {
-  const _AuthenticationPage({required this.origin});
-  final Uri origin;
+  const _AuthenticationPage({required this.login, required this.callback});
+  final Uri login;
+  final Uri callback;
 
   @override
   State<_AuthenticationPage> createState() => _AuthenticationPageState();
@@ -758,37 +774,21 @@ final class _AuthenticationPage extends StatefulWidget {
 
 final class _AuthenticationPageState extends State<_AuthenticationPage> {
   String? _error;
-  bool _checking = false;
   bool _completed = false;
   InAppWebViewController? _controller;
 
-  Future<void> _check(InAppWebViewController controller, WebUri? url) async {
-    if (_checking || _completed || url == null || !mounted) return;
-    if (Uri.parse(url.toString()).origin != widget.origin.origin) return;
-    _checking = true;
-    try {
-      final result = await controller.callAsyncJavaScript(
-        functionBody: '''
-          const response = await fetch('/api/bootstrap', {
-            credentials:'same-origin', redirect:'manual', cache:'no-store',
-            headers:{Accept:'application/json'}
-          });
-          if (response.status !== 200 || !(response.headers.get('content-type') ?? '').includes('application/json')) return false;
-          const bootstrap = await response.json();
-          return typeof bootstrap.identity?.subject === 'string' && typeof bootstrap.identity?.email === 'string';
-        ''',
-      );
-      if (mounted && result?.value == true) {
-        _completed = true;
-        Navigator.of(context).pop(true);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _error = '登录后未能确认身份，请重试。');
-      }
-    } finally {
-      _checking = false;
+  void _complete(InAppWebViewController controller, WebUri? url) {
+    // WebView can report intermediate redirects out of order. Only the
+    // matching main-frame return signals that this navigation has finished.
+    if (_completed ||
+        !mounted ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        url == null ||
+        Uri.tryParse(url.toString()) != widget.callback) {
+      return;
     }
+    _completed = true;
+    Navigator.of(context).pop(true);
   }
 
   @override
@@ -801,20 +801,23 @@ final class _AuthenticationPageState extends State<_AuthenticationPage> {
             content: Text(_error!),
             actions: [
               TextButton(
-                onPressed: () => _controller?.reload(),
+                onPressed: () {
+                  setState(() => _error = null);
+                  unawaited(
+                    _controller?.loadUrl(
+                      urlRequest: URLRequest(
+                        url: WebUri(widget.login.toString()),
+                      ),
+                    ),
+                  );
+                },
                 child: const Text('重试'),
               ),
             ],
           ),
         Expanded(
           child: InAppWebView(
-            initialUrlRequest: URLRequest(
-              url: WebUri(
-                widget.origin
-                    .resolve(authenticationPath('/runtime/host.html'))
-                    .toString(),
-              ),
-            ),
+            initialUrlRequest: URLRequest(url: WebUri(widget.login.toString())),
             initialSettings: InAppWebViewSettings(
               javaScriptEnabled: true,
               sharedCookiesEnabled: true,
@@ -827,7 +830,8 @@ final class _AuthenticationPageState extends State<_AuthenticationPage> {
                   ? NavigationActionPolicy.ALLOW
                   : NavigationActionPolicy.CANCEL;
             },
-            onLoadStop: _check,
+            onPageCommitVisible: _complete,
+            onLoadStop: _complete,
             onReceivedError: (controller, request, error) {
               if (request.isForMainFrame == true && mounted) {
                 setState(() => _error = error.description);

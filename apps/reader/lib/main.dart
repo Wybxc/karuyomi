@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'diagnostics/reader_baseline.dart';
 import 'diagnostics/reader_baseline_host.dart';
 import 'features/reader/reading_progress_controller.dart';
@@ -14,12 +15,25 @@ import 'features/settings/settings_controller.dart';
 import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
 
-void main() => runApp(const KaruyomiApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    KaruyomiApp(
+      connectionPreferences: kIsWeb ? null : SharedPreferencesAsync(),
+    ),
+  );
+}
 
 class KaruyomiApp extends StatefulWidget {
-  const KaruyomiApp({super.key, this.platform, this.platformFactory});
+  const KaruyomiApp({
+    super.key,
+    this.platform,
+    this.platformFactory,
+    this.connectionPreferences,
+  });
   final PlatformRuntime? platform;
   final PlatformRuntime Function(Uri? origin)? platformFactory;
+  final SharedPreferencesAsync? connectionPreferences;
 
   @override
   State<KaruyomiApp> createState() => _KaruyomiAppState();
@@ -55,6 +69,7 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
       onThemeChanged: (value) => setState(() => _themeMode = value),
       platform: widget.platform,
       platformFactory: widget.platformFactory,
+      connectionPreferences: widget.connectionPreferences,
     ),
   );
 }
@@ -66,12 +81,14 @@ class AppShell extends StatefulWidget {
     required this.onThemeChanged,
     this.platform,
     this.platformFactory,
+    this.connectionPreferences,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeChanged;
   final PlatformRuntime? platform;
   final PlatformRuntime Function(Uri? origin)? platformFactory;
+  final SharedPreferencesAsync? connectionPreferences;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -88,9 +105,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final _retiredProgress = <ReadingProgressController>{};
   bool _retryingProgress = false;
   bool _changingService = false;
-  final _originField = TextEditingController(
-    text: const String.fromEnvironment('APP_ORIGIN'),
-  );
+  bool _restoringOrigin = false;
+  String? _originPersistenceError;
+  static const _defaultOrigin = String.fromEnvironment('APP_ORIGIN');
+  static const _originKey = 'native_service_origin';
+  final _originField = TextEditingController(text: _defaultOrigin);
   static const _labels = ['书架', '浏览', '设置'];
   static const _icons = [
     Icons.collections_bookmark_outlined,
@@ -165,7 +184,47 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _configure(widget.platform);
+    final preferences = widget.connectionPreferences;
+    if (kIsWeb || widget.platform != null || preferences == null) {
+      _configure(widget.platform);
+    } else {
+      _restoringOrigin = true;
+      unawaited(_restoreOrigin(preferences));
+    }
+  }
+
+  Future<void> _restoreOrigin(SharedPreferencesAsync preferences) async {
+    String? stored;
+    try {
+      stored = await preferences
+          .getString(_originKey)
+          .timeout(const Duration(seconds: 3));
+    } on Exception {
+      // A missing platform preference must not prevent connecting manually.
+    }
+    if (!mounted) return;
+    setState(() {
+      _restoringOrigin = false;
+      if (stored != null && stored.trim().isNotEmpty) {
+        _originField.text = stored;
+        _configure();
+        if (_catalog != null) return;
+        _originField.text = _defaultOrigin;
+      }
+      _configure();
+    });
+  }
+
+  Future<void> _rememberOrigin(Uri origin) async {
+    final preferences = widget.connectionPreferences;
+    if (kIsWeb || preferences == null) return;
+    try {
+      await preferences.setString(_originKey, origin.origin);
+    } on Exception {
+      if (mounted) {
+        setState(() => _originPersistenceError = '未能在本机记住服务地址，下次打开可能需要重新填写。');
+      }
+    }
   }
 
   PlatformRuntime _createPlatform() {
@@ -365,8 +424,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _changeService() async {
-    if (_changingService) return;
-    setState(() => _changingService = true);
+    if (_changingService || _restoringOrigin) return;
+    setState(() {
+      _changingService = true;
+      _originPersistenceError = null;
+    });
     try {
       final platform = _platform;
       final requested = Uri.tryParse(_originField.text.trim());
@@ -383,6 +445,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             _configurationError = null;
             _originField.text = platform.origin.toString();
           });
+          await _rememberOrigin(platform.origin);
+          if (!mounted) return;
           await _connect();
         }
         return;
@@ -419,6 +483,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           adopted = true;
           _configure(candidate);
         });
+        if (_catalog != null) await _rememberOrigin(candidate.origin);
       } finally {
         if (!adopted) await candidate.dispose();
       }
@@ -430,7 +495,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _retryProgress() async {
     if (_retryingProgress) return;
     setState(() => _retryingProgress = true);
-    await _catalog?.flushReadingProgress();
+    await _catalog?.flushReadingProgress(explicitRetry: true);
     for (final client in _retiredProgress.toList()) {
       if (!await client.flush()) continue;
       if (_retiredProgress.remove(client)) client.dispose();
@@ -491,7 +556,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         const SizedBox(height: 16),
         TextField(
           controller: _originField,
-          readOnly: kIsWeb,
+          readOnly: kIsWeb || _restoringOrigin,
           keyboardType: TextInputType.url,
           autocorrect: false,
           decoration: const InputDecoration(
@@ -502,6 +567,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 12),
         if (_configurationError != null) Text(_configurationError!),
+        if (_originPersistenceError != null) Text(_originPersistenceError!),
         if (controller?.email != null) Text('账号：${controller!.email}'),
         if (controller?.error != null) Text(controller!.error!),
         if (_retiredProgress.isNotEmpty ||
@@ -519,7 +585,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           runSpacing: 8,
           children: [
             OutlinedButton.icon(
-              onPressed: controller?.busy == true || _changingService
+              onPressed:
+                  controller?.busy == true ||
+                      _changingService ||
+                      _restoringOrigin
                   ? null
                   : _changeService,
               icon: const Icon(Icons.link),

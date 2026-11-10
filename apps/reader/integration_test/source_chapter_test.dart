@@ -8,14 +8,14 @@ import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
-import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
-import 'package:karuyomi/main.dart' as app;
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+
+import 'native_app.dart';
 
 const _origin = String.fromEnvironment('APP_ORIGIN');
 const _testCa = String.fromEnvironment('SOURCE_CHAPTER_TEST_CA_BASE64');
@@ -82,11 +82,7 @@ void main() {
     final mangaKey = identity.mangaKey;
     final firstKey = identity.entries.first.key;
     final nextKey = identity.entries.last.key;
-    app.main();
-    await tester.pump();
-    final catalog = tester
-        .widget<LibraryPage>(find.byType(LibraryPage))
-        .controller!;
+    final catalog = await startNativeApp(tester);
     final platform = catalog.api;
     expect(platform, isA<NativePlatformRuntime>());
     expect((platform as NativePlatformRuntime).origin.origin, _origin);

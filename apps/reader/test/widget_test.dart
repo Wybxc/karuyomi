@@ -204,7 +204,12 @@ void main() {
       await tester.tap(find.text('登录').first);
       await tester.pumpAndSettle();
       expect(platform.authCalls, 1);
-      expect(find.text('eu.kanade.source.test · 1.0'), findsOneWidget);
+      final catalog = tester.widget<CatalogPage>(find.byType(CatalogPage));
+      expect(
+        catalog.controller?.activeBuild?.packageName,
+        'eu.kanade.source.test',
+      );
+      expect(catalog.controller?.activeSource?.id, sourceId);
       expect(find.text('owner@example.com'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('真实源 DTO 测试'),
