@@ -394,6 +394,8 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 同一 Cache 桥及官方 39 组 Worker/suite 字节在 iOS/Android 模拟器均通过 IndexedDB/Web Locks/Worker 机制和最终 dispose，见[移动引擎记录](verification/cache-v3-native.md)。这不替代 Native Java/Source、生产 Access 或真机门。
 
+2026-11-10，首发六材料的正式 iOS App 已通过[原 xkcd 章节 HTML 跨进程复用](verification/source-cache-native.md#2026-11-10ios-正式-app-进程退出后复用章节正文)：真实退出再启动，在新 generation 显示两页，原图仍请求中继，章节 HTML 没有重请求；WebKit 持久缓存的 7,151 B 与首次真实响应摘要相同。Android、浏览器、生产和真机另验。
+
 ## Reader 帧调度修复后的复验
 
 固定 `19b65f5`（`31555e8` 加 `5267181`）的正式 Flutter Web release 已在 Codex 内置 Chromium 156 经主入口完成原 xkcd 两章、显式读完与关标签页重开；首次恢复 3318 末页即显示原文字图，未翻页或诊断补帧。原黑屏失败不覆盖，详见[Web 修复后证据](verification/reader-frame-web.md)。同输入 Android / iOS 模拟器也通过正式 Reader 及真实进程重启，原文字图、已保存 / 已读完与最终清理均已核对，见[Native 修复后证据](verification/reader-frame-native.md)。iOS 早期黑截图仍作为视觉失败保留；终态截图等待实际路由过渡完成，并以 OS / Flutter 两种原图核对。以上不声明生产 Access、Source Cache、真机或浏览器进程恢复。
@@ -419,7 +421,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 ## 尚未通过的门槛
 
 - 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。[隔离 Native 可见登录及阅读恢复](verification/native-main-entry.md#native-可见-access-回跳)已有双端分项；使用本地身份提供方，不代表生产 Access。
-- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及带实际 Source 缓存负载的往返换身份；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、双端模拟器阅读中 A→B、304 后正文复用与上述扩展更新续读分别保留其实际范围。
+- 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及带实际 Source 缓存负载的往返换身份；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，iOS 已另验原 xkcd 章节 HTML 跨 App 进程复用，Android 与浏览器进程重启仍待验。Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、双端模拟器阅读中 A→B、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
 - 自定义封面的 Web↔Native 读回、生产 Cookie/Access、并发和丢响应恢复、服务端重启、生产私有 bucket/部署与远端清理；独立 Web 与 iOS、Android 模拟器的顺序往返和新进程读回已通过。

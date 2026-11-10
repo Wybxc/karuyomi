@@ -75,3 +75,16 @@ App 自动执行并将结果写入正式 Application Support 目录；iOS 用 `s
 首轮 iOS 报告 `ios-report-first.json` 保留 `passed=false`：fixture 将初始 archive 操作与重建阶段都标为 `metadata`，错误累计了早先网络流水。其 cold/warm 及重建后真实 store 读取均已完成；修复仅发生在 ignored fixture，改为网络 before/after 增量，并以新 App ID 重跑，未修改产品。Android 首次构建因公开 Maven/Google 依赖的 DNS/TLS 下载失败；之后设置 `GRADLE_USER_HOME` 为既有 `/Users/wybxc/karuyomi/runtime/teavm/.local/gradle`，复用相同官方依赖缓存后构建成功，未修改依赖或 TLS。
 
 本项没有发生 304；store 事件不等于 Java CacheInterceptor 精确计数。只证明原 xkcd 元数据在双端模拟器正式 Native runtime 中的 fresh 正文复用和容器重建保留，没有重启 App/系统进程，没有验收图片 Cache、完整阅读 UI、跨版本/身份切换、真机、生产 Access 或性能。其它 Source 的 Native Cache 仍待独立验收。
+
+## 2026-11-10：iOS 正式 App 进程退出后复用章节正文
+
+首发六材料产品归档的正式 `lib/main.dart`，在 iPhone 17 Pro / iOS 26.4 模拟器的普通受信回环 HTTPS 下通过。Flutter 3.47.5 / Xcode 27.2；包内 `host.js`、`worker.js`、`manifest.json` 与[首发归档](aot-current-pilot.md#六材料-native-发布构建)逐字节相同。使用 protocol 2、host ABI v6、materialVersion `5d1260e5d20b2f2f05fd378a6e8b697338e5fdfd4feca2c5a8c361e756bb92e4`，静态测试目录仅发布原版 xkcd 的构建 `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-43d97485f779b768af7861a6a25522db433ab6d229a6d989e70e3f3c88a848a3`。本地 Wrangler acceptance harness 使用独立 D1 和 RS256 测试身份；观察器只读取正式中继的请求和响应副本，不改响应字节、缓存头或 App/Source/Worker 材料。
+
+| 阶段       | 实际产品行为                                                                                                                                                           | 中继与磁盘证据                                                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 首次阅读   | 从原版英文 xkcd 详情打开 `3319: Elevators`，显示原图和 Source 文字图，保存到第 2 页                                                                                    | `/3319/` 一次真实 200，`Cache-Control: max-age=300`，完整 HTML 7,151 B；原图另走中继                                                                                                                                  |
+| 进程退出后 | `simctl terminate` 后确认旧 App 不再运行；`simctl launch` 得到不同 PID。在书架点击「继续阅读」即显示第 2 页的 Source 文字图，再翻回第 1 页显示原图，两页均核对实际截图 | 新 generation 再请求一次原图并收到 200；目标章节 HTML 新增请求为 **0**。再次结束 App 后，只读检查 WebKit 的 `teavm-http-cache-v3`，目标 entry 的两个正文块（4,096 + 3,055 B）顺序拼接，SHA-256 与首次上游响应完全一致 |
+
+正文 SHA-256 为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。D1 提供续读页位；实际章节仍由原 Source 解析，图像请求显示新的运行 generation。独立 `verify-cache.ts` 核对两次不同 PID、退出后无 App 进程、完整中继增量、缓存条目与正文块长度及摘要。两次通过的 XCTest、Worker/夹具类型检查和只读对照脚本的类型检查均通过。早先两次 XCTest 未打开目标章（收藏按钮尚未就绪时滚动、滚动未稳定时点章卡），保留失败日志，未计为 Cache 结果。
+
+复验见 ignored `.local/prototype-native-source-cache-restart.OieLuQ/REPRODUCE.md`。原始中继样本、进程记录与截图在同目录 `evidence/`；`cache-disk-check.json` 的 SHA-256 为 `440fc27164b5d28d3327c8ab7da677bb172c1936f1acf610c91953d99bb634f0`。此项只验收首发六材料的原 xkcd HTML fresh 复用；Android 与浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 和真机另验。原图保持 cacheless。
