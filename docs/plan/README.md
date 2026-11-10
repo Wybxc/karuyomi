@@ -4,7 +4,7 @@
 
 **首要设计目标是多端同步。** [P2](p2-sync.md) 提升为当前主线，与 [P1](p1-library-and-progress.md) 的数据模型、API 和客户端读写一起推进；阶段编号保留，不代表同步必须等完整本地书架之后才开始。Worker API + D1 为唯一业务权威，先打通同身份跨 Web/iOS/Android 的在线保存与恢复，再扩展外围功能。
 
-2026-11-10：[Web 0.1.0、API 和首份六材料扩展基线已上线](../verification/first-web-release.md)。生产 Web 的 Access、收藏、xkcd 阅读和续读已通过；正式签名、真机和同账号三端读写继续按 [P0](p0-runtime-and-reading.md) 与 [P2](p2-sync.md)验收。
+2026-11-10：[Web 0.1.0、API 和首份六材料扩展基线已上线](../verification/first-web-release.md)。生产 Web 的 Access、收藏、xkcd 阅读和续读已通过；11 日又通过 [Arknights Comics 与 CuuTruyen 的生产整章、跨章与续读](../verification/first-web-release.md#生产代表源整章与续读)。正式签名、真机和同账号三端读写继续按 [P0](p0-runtime-and-reading.md) 与 [P2](p2-sync.md)验收。
 
 2026-11-06：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当时客户端/API `466acdd` 部署并保留 v4 快照，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；真实 Web 独立会话及测试身份下 Web↔iOS、Web↔Android、iOS↔Android 正式入口的基础书架读回与双向非默认页续读已通过，见[Web/iOS](../verification/native-server-state.md)和[Android 配对](../verification/android-server-state.md)。双 Web 的手动刷新、远端重置与旧写冲突分项随后通过[验收](../verification/concurrent-server-state.md)；分类 UI、真实双 Web 的目录/关联/冲突、双 iOS 与 iOS↔Android 的分类顺序闭环已通过[记录](../verification/category-ui-sync.md)；同时写竞争、自动前台重取、故障恢复、生产正向、Web↔Android 分类、混合平台剩余操作、Android 初始化可靠性、章节书签的混合平台门及非敏感阅读设置（含裁白）的独立客户端门继续按[P1](p1-library-and-progress.md)和[P2](p2-sync.md)推进。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
 

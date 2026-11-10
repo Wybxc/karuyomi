@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-11，[生产代表源整章与续读](verification/first-web-release.md#生产代表源整章与续读)通过。真实 Access 测试账号用同一首版分别完成 Arknights Comics 51 页及 CuuTruyen 23 页，逐页获服务端确认，标记读完后跨章；两者均从独立新标签页恢复下一章第 3 页实图。生产 Web 现有三个代表源的阅读证据，Native 生产及签名真机仍待验。
+
 2026-11-10，[0.1.0 Web 与 API 已上线](verification/first-web-release.md)。生产 D1 账本连续至 `0010`，首份六材料扩展基线已确认。真实 Access 测试账号已通过 xkcd 读图、收藏、服务端保存与新标签续读；清理后新开章节也显示首图并保存。正式签名、真机和生产同账号三端读写仍待验。
 
 2026-11-10，[六材料首发修复合并预检](verification/aot-current-pilot.md#六材料首发修复合并预检)通过：首发归档合入 Android 签名配置和横屏修复，Arknights 单包的正式 Web/Worker 构建和 Wrangler 部署预演、43 项定向阅读回归、双端 arm64 未签名构建及包内六材料核对均通过。完整快照、生产和签名真机另验。

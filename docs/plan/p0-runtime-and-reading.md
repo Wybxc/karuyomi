@@ -10,6 +10,8 @@ P0-F、P0-R、P0-A 可并行，P0-B 收齐二进制网络门后在 P0-C 汇合�
 
 2026-11-10，[Web 0.1.0 与 API 已上线](../verification/first-web-release.md)。真实 Access 测试账号完成 xkcd 收藏、两页实图、服务端保存和新标签页续读；D1 清理后重新载入并打开未读章节也通过。以首发源码和完整目录复验的 [MANGA Plus Creators iOS 模拟器](../verification/aot-current-pilot.md#完整目录的代表源复验)通过 72 页完整首章、跨章和新进程续读。继续签名真机、同账号三端及其余代表源和性能门。
 
+2026-11-11，[生产 Web 的 Arknights Comics 与 CuuTruyen 完整章](../verification/first-web-release.md#生产代表源整章与续读)已通过逐页确认、正常跨章和新标签非首页续读。连同 xkcd，生产 Web 已有三个代表源的实际阅读证据；继续 Native 生产 Access、签名真机、多端操作与设备性能验收。
+
 2026-11-05，项目将多端同步提升为首要设计目标。当前业务开发按 [P2](p2-sync.md)优先建立 Worker API + D1 权威状态与跨端确认语义，P1 的书架、进度和设置随该合同推进；P0 的真实阅读、生产 Access、Native 主入口和真机门继续保留，不作为推迟同步设计与实现的理由。收藏与进度现已切换到 D1；下述 Drift/SQLite 恢复结果仅记录历史实现，不能作为当前业务权威或跨端恢复的验收替代。
 
 ## 当前功能收尾（先实现，后集中验收）
