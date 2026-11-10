@@ -106,6 +106,24 @@ pnpm acceptance:serve
 
 此预检只覆盖单包装配、工程回归和未签名构建。完整快照到位后复用同一归档重跑构建及部署预演，执行真实 Source 验收，并使用正式签名在真机验证；本轮未安装这两个包或切换生产。
 
+### 六材料完整候选
+
+2026-11-10，clab 固定 `c04d436` 的 1,448 个输入全部取得终态：1,371 成功、77 失败。使用固定 `2a07fc2` 和同一上游提交、生产父快照与六份材料，定向补编 Komiic、Asura Scans、MangaKatana；三包均为 `built`。首次 Gradle 下载很慢，在进入编译前有序取消，确认未写入失败结果。之后复用冻结批次中相同版本的 Gradle 和依赖缓存，在独立输出目录构建；其余冻结失败保持原结果。
+
+按[定向补编流程](../EXTENSIONS.md#首次全量候选的定向补编)执行 `prepare-baseline`，生成本地 revision `3c24b0d7c0a745a58de4bd6b5ffb7654`，父 revision 为 `702cc6bfb2974682bf1c83325458535a`。索引 SHA-256 为 `b819024786b18fa87be8f9f16b350cf4e70564268e592d28946866d24ccf11eb`。与冻结索引相比只有三个补编包的 buildId 变化，实际清单包含预期类型的五项 Source 设置规则；保留现网 xkcd、Arknights Comics、CuuTruyen。候选目录含 1,371 个可分发包，77 个失败只留在构建状态，所有可分发记录仍为 `compiled_unverified`、`runtimeReady=false`。
+
+拉取候选到六材料归档的独立副本，以 `EXTENSION_ASSETS_DIR=<完整候选>` 运行正式 `pnpm build`，Vite 检查引用产物和传输摘要。输出的索引和构建状态与候选逐字节一致，Web 共享材料和 Native 内置运行时文件与合并预检归档逐字节一致。以实际生成配置运行 Wrangler `deploy --dry-run` 通过，读取 4,194 个静态文件；`check-base` 确认公开生产父状态仍匹配。原始日志和复验命令保存在本机忽略目录 `.local/prototype-full-six-material.tLNTHI/`。
+
+#### 完整目录的 Android 阅读验收
+
+用完整快照启动官方 Wrangler HTTPS、隔离 D1 和 Android 16 模拟器。首轮驱动未能在完整目录滚到 xkcd；改为用扩展管理的搜索后，D1 确认精确构建已安装、未收藏作品，但浏览页的 Source 控件排在 1,371 个目录条目之后。修复将当前 Source 和漫画结果放在目录之前，目录优先显示本账户已启用的扩展；用户打开扩展成功后回到浏览页顶部。目录语言筛选及包内语言筛选仍独立。
+
+以修复后的正式 App 入口和全新 D1 复验：从完整索引搜索并安装原版 xkcd 1.6.1，打开英文 Source、读到真实热门与详情并收藏。独立进程进入 `3319: Elevators` 显示两张真实图片，保存第 2 页；再次启动从书架直接恢复第 2 页。主机独立读取书架和作品状态，续读前后原始响应逐字节一致（账户 revision 4），没有附带写入。本分项只覆盖隔离 Android 模拟器、该 Source 与该章节。故障、生产 Access、更多代表源和签名真机另验。
+
+将浏览页修复并入六材料归档后，重新通过完整候选的 Web/Worker 构建和 Wrangler dry-run。Android arm64 APK 与 iOS arm64 `Runner.app` 均完成未签名构建，核对了生产地址和包内运行时文件。维护树的完整格式、Flutter 分析和测试通过。未签名包仅作构建验收，未用于真机安装。
+
+未上传或切换生产。本机 Wrangler 管理登录仍不可用，未读到生产 D1 迁移账本。正式签名、物理设备、生产 Access 和完整代表源门继续按 P0 验收。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

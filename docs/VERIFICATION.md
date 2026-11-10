@@ -276,6 +276,8 @@ Access 本人策略覆盖 `/api` 和 `/api/*`。匿名 `/api`、`/api/bootstrap`
 
 ## 静态分发分项
 
+首发 v6 的[六材料完整候选](verification/aot-current-pilot.md#六材料完整候选)已完成三包补编、正式构建和 Wrangler dry-run，公开生产父状态仍匹配；候选尚未上传，生产 Access 和真机未验收。
+
 当前 v4 三包生产快照及匿名交付见[生产记录](verification/v4-production.md)。以下 `022d828` 两包部署和政策保留其历史状态，不是当前生产目录。
 
 固定 `022d828` 的两包代表快照已部署到 `https://karuyomi.wybxc.cc`，Worker version 为 `1d434d1b-7e30-4668-b458-350e486f3b3d`，快照 revision 为 `22378bbcb89d40f5a0397c5098310072`。生产 D1 `0002` 迁移已成功；公开 index/state 字节与本地候选一致，两个 gzip 的 MIME、无 HTTP Content-Encoding、immutable 缓存与编码/原文双 SHA 均通过实际匿名下载验证。前一 `1bfc97f` 的两个清单和 gzip 地址均已实际返回 404，确认当前快照只保留最新版本。六份共享材料的长度/摘要通过，未知扩展和 Native 内置资源路径返回 404，匿名 `/api/bootstrap` 仍跳转到原 Access 团队。bootstrap 尚不完整，不能启用初次全量 CI；当时只有匿名拦截证据，后续生产登录分项见上文。

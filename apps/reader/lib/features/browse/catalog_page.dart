@@ -71,10 +71,26 @@ class _CatalogFavoritesState extends State<_CatalogFavorites>
 
 class _CatalogPageState extends State<CatalogPage> {
   final _search = TextEditingController();
+  final _scroll = ScrollController();
   String? _sourceLanguage;
   Object? _sourceLanguageSession;
   String? _catalogLanguage;
   Object? _catalogLanguageIdentity;
+
+  Future<void> _openBuild(
+    CatalogController controller,
+    CatalogBuild build,
+  ) async {
+    await controller.openBuild(build);
+    if (mounted &&
+        identical(widget.controller, controller) &&
+        controller.activeBuild?.id == build.id &&
+        controller.activeBuild?.catalog == build.catalog &&
+        controller.session != null &&
+        _scroll.hasClients) {
+      _scroll.jumpTo(0);
+    }
+  }
 
   Future<void> _details(MangaEntry entry) async {
     final controller = widget.controller!;
@@ -234,6 +250,7 @@ class _CatalogPageState extends State<CatalogPage> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
         child: ListView(
+          controller: _scroll,
           padding: const EdgeInsets.all(24),
           children: [
             if (busy) ...[
@@ -363,7 +380,6 @@ class _CatalogPageState extends State<CatalogPage> {
                   text: '当前目录没有可用构建，请稍后重新连接以刷新目录。',
                   icon: Icons.extension_outlined,
                 ),
-              if (controller.builds.isNotEmpty) _catalogChoices(controller),
               if (controller.session != null) ...[
                 const SizedBox(height: 16),
                 _sourceChoices(controller),
@@ -465,6 +481,10 @@ class _CatalogPageState extends State<CatalogPage> {
                     ),
                   ),
               ],
+              if (controller.builds.isNotEmpty) ...[
+                if (controller.session != null) const SizedBox(height: 24),
+                _catalogChoices(controller),
+              ],
             ],
           ],
         ),
@@ -481,6 +501,17 @@ class _CatalogPageState extends State<CatalogPage> {
     final visible = controller.builds
         .where((build) => build.sources.any(matches))
         .toList();
+    final enabled = {
+      for (final extension in controller.installedExtensions)
+        if (extension.enabled)
+          (extension.catalogUrl, extension.repoId, extension.packageName),
+    };
+    bool isEnabled(CatalogBuild build) =>
+        enabled.contains((build.catalogUrl, build.repoId, build.packageName));
+    final ordered = [
+      ...visible.where(isEnabled),
+      ...visible.where((build) => !isEnabled(build)),
+    ];
     final matchingSources = sources.where(matches).length;
     final active = controller.activeBuild;
     final activeHidden =
@@ -546,7 +577,7 @@ class _CatalogPageState extends State<CatalogPage> {
           ),
         const SizedBox(height: 8),
         if (visible.isEmpty) const Text('当前目录没有匹配语言的可用构建，请清除筛选。'),
-        for (final build in visible)
+        for (final build in ordered)
           Card(
             key: ValueKey(('catalog-build', build.id)),
             margin: const EdgeInsets.only(bottom: 8),
@@ -561,7 +592,7 @@ class _CatalogPageState extends State<CatalogPage> {
                     selected: active?.id == build.id,
                     onSelected: controller.busy
                         ? null
-                        : (_) => controller.openBuild(build),
+                        : (_) => _openBuild(controller, build),
                   ),
                   for (final source in build.sources.where(matches))
                     Padding(
@@ -680,6 +711,7 @@ class _CatalogPageState extends State<CatalogPage> {
   @override
   void dispose() {
     _search.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 }

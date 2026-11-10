@@ -20,15 +20,15 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 [clab 在途失败抽样](../verification/aot-current-pilot.md#clab-在途失败抽样)显示主要是 TeaVM 宿主链接缺口。先完成并验收冻结批次；`Class.getResource` 的打包资源读取可作为下一轮隔离 AOT 验证的优先项。
 
-冻结与当前 AOT 的[材料和定向补编预检](../verification/aot-current-pilot.md#冻结全量与当前-aot-的定向补编预检)通过。先等待 clab 全量终态，再单独补编需要新设置规则的三个包；使用[本地候选组装](../EXTENSIONS.md#首次全量候选的定向补编)保留两版各自实际输入身份和原生产父快照。真实补编、全量候选及上线仍未验收。
+clab 冻结全量与三个定向补编已结束；[六材料完整候选](../verification/aot-current-pilot.md#六材料完整候选)已组装，保留两版各自实际输入身份、原生产父快照和现网三个包。完整快照的正式构建、部署 dry-run 和公开生产父状态复核通过。[完整目录 Android xkcd 阅读与续读](../verification/aot-current-pilot.md#完整目录的-android-阅读验收)已通过。继续以该候选补齐代表源，并在备齐生产管理登录和正式签名后进行生产预检及真机验收。
 
 2026-11-10，固定 `2c012db` 的正式产品构建确认使用与 `c04d436` 冻结批次、`2a07fc2` 补编计划相同的六份材料。验收该冻结候选时，App/API 使用这套匹配构建，仍须保留现网三包并通过完整候选的构建、dry-run 与实际 Source 检查。该候选不包含 ToonLook 的 iOS WebP 修复。自 `a1dd0cd` 起材料身份已变为七份，[新版 ToonLook 单包](../verification/aot-current-pilot.md#正式-webp-编码材料与图形桥)只用于独立验收；用这套材料发布或启用主分支增量工作流，须先有已部署的同材料完整 baseline。两个候选均不得混用，生产切换继续按[切换顺序](../EXTENSIONS.md#旧网络登记部署切换)另行验收。
 
-[首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。空索引构建、隔离 HTTP 回跳和上传 dry-run 通过；完整快照、最终签名安装包及生产仍未验收。
+[首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。隔离 HTTP 回跳通过；最终签名安装包及生产仍未验收。
 
 [Android 发行签名配置](../verification/native-main-entry.md#android-发行签名配置)已用同一归档验证：未配置时产出未签名 APK，配置临时证书后可验证签名和包内材料。正式证书与真机仍待验收。
 
-[六材料首发修复合并预检](../verification/aot-current-pilot.md#六材料首发修复合并预检)已带入 Android 发行签名配置和[短窗口阅读修复](../verification/reader-fit.md#2026-11-10android-横屏控件与原图位置)。合并后的归档以 Arknights 单包通过正式 Web/Worker 构建、部署 dry-run、定向阅读回归和双端 arm64 未签名构建，材料字节与原归档一致。待完整快照生成后，用该归档重建并完成真实 Source、生产与正式签名真机验收。
+[六材料首发修复合并预检](../verification/aot-current-pilot.md#六材料首发修复合并预检)已带入 Android 发行签名配置和[短窗口阅读修复](../verification/reader-fit.md#2026-11-10android-横屏控件与原图位置)。归档的 Arknights 单包预检通过定向阅读回归和双端 arm64 未签名构建，随后用同一输入构建了完整候选的 Web/Worker。真机需使用正式签名包。
 
 ## 已完成
 

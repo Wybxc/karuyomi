@@ -294,6 +294,13 @@ Future<Map<String, Object?>> _prepare(
     '正式扩展管理页',
     () => extensionsPage.evaluate().length == 1,
   );
+  final extensionSearch = find.byKey(const ValueKey('extensions-search'));
+  await _reveal(tester, extensionSearch, extensionsPage);
+  await tester
+      .enterText(extensionSearch, build.packageName)
+      .timeout(_remaining());
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
   final install = find.byKey(
     ValueKey(('extension-install', build.catalogUrl, build.packageName)),
   );
