@@ -29,6 +29,8 @@ Wrangler 只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker�
 
 本地官方 acceptance harness 默认不注入故障。`ACCEPTANCE_FIXTURE=settings-ack-loss` 与 `progress-ack-loss` 分别在独立 D1 的指定全局设置或 xkcd 末页完成写入已提交后中断首次响应正文；服务正常退出时输出对应的 `ACCEPTANCE_*_ACK_AUDIT`。复验步骤见[阅读进度丢确认记录](../../../docs/verification/concurrent-server-state.md#web-阅读进度已提交后丢确认)。
 
+`ACCEPTANCE_FIXTURE=bookmark-ack-loss` 对英文 xkcd 的 `SINGLE`、`/3319/` 首次添加书签执行同样的已提交后中断。它核对正式响应和 D1 回执后截断响应正文，普通进度、其它章节、移除书签和未成功的请求不占用故障名额。正常停服输出 `ACCEPTANCE_BOOKMARK_ACK_AUDIT`，可核对是否原样重试并复用同一回执。
+
 `ACCEPTANCE_FIXTURE=progress-d1-error` 对同一末页完成请求在真实 D1 批次最后一次回执更新时触发 SQLite 拒绝，检查正式 503、状态不变及无回执后移除 trigger。它保留原业务响应；普通翻页和其它章节不触发故障。正常停服输出 `ACCEPTANCE_PROGRESS_D1_ERROR_AUDIT`，用于核对同 UUID、正文摘要和 CAS 的 503→200 重试。[Native 驱动](../../reader/integration_test/README.md#d1-拒绝阅读进度写入)另验证未确认界面和显式重试。
 
 `ACCEPTANCE_FIXTURE=settings-cas-race` 只在隔离验收入口同时放行两个 revision 0、UUID 和主题均不同的全局设置 POST；只有正式业务写入成功才有 D1 回执。正常停服输出 `ACCEPTANCE_SETTINGS_RACE_AUDIT`，见[双 Web 设置复验](../../../docs/verification/reader-settings.md#双-web-全局设置同时保存)。

@@ -51,6 +51,8 @@
 
 2026-11-07，固定 `5ba6fff` 的日期修复通过实际无插桩 xkcd 重开，Web 同源同身份的书签添加、读回、移除及第三文档读回通过；重开不推进共享 revision。同一隔离 HTTPS / D1 的正式 iOS ↔ Android 模拟器也已完成相同往返，两次跨端读回业务快照不变。11 月 10 日的首发材料复验中，Web 经 HTTP 别名可读回 iOS 书架，但不同默认仓库 URL 阻止打开详情。Web ↔ Native 书签仍需共同受信的同一 HTTPS origin，生产与真机另验，见[书签记录](../verification/bookmarks.md)。
 
+首发六材料的 [Android Reader 书签丢确认与 iOS 冷启动读回](../verification/bookmarks.md#2026-11-10native-在线阅读书签丢确认与跨端读回)通过。iOS 在 Android 重试前读到已提交书签；Android 刷新后仍保留原待确认请求，显式重试只复用同一回执。D1 阅读位置和其它业务状态保持不变；Web ↔ Native、其它写入端和自动前台刷新继续验收。
+
 [iOS](../verification/concurrent-server-state.md#ios-模拟器阅读进度写入被-d1-拒绝)、[Android](../verification/concurrent-server-state.md#android-模拟器阅读进度写入被-d1-拒绝) 模拟器和 [Web](../verification/concurrent-server-state.md#web-阅读进度写入被-d1-拒绝) 的 D1 写入错误与显式恢复已通过。拒绝后保留当前画面和未确认草稿，权威状态不变，重试只推进一次。Native 审计核对了同 UUID、正文与 CAS 及唯一成功回执；Android 新进程和 Web 新文档均从书架恢复已完成的第 2 页，未改变业务状态。生产和真机另验。
 
 ## 实施顺序

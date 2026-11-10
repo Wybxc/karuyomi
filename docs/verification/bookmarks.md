@@ -100,9 +100,19 @@ Codex 内置浏览器经 HTTP Vite 别名 `http://127.0.0.1:55217` 成功读回�
 
 两项本地服务、专用模拟器和 ADB 已清理。构建输入、准备日志与前后快照保存在本机忽略目录 `.local/prototype-web-native-bookmarks.YSZYX1/evidence/`。
 
+## 2026-11-10：Native 在线阅读书签丢确认与跨端读回
+
+使用首发六材料产品归档和冻结 v6 xkcd。专用 Pixel 7 / Android 16 API 36 arm64 与 iPhone 17 Pro / iOS 26.4 模拟器连接同一官方 Wrangler 回环 HTTPS、新隔离 D1 和 `acceptance-owner`。两端包内 `host.js`、`worker.js` 和 `manifest.json` 均与归档一致，保留 TLS 和主机名校验。Android 调试入口只补测试 CA 后运行正式 App，由 UIAutomator 操作；iOS 使用正式 `lib/main.dart` 和外部 XCTest。
+
+1. Android 从书架打开真实 `3319: Elevators`，显示并保存第 2/2 页。在 Reader 点「标记章节书签」后，`ACCEPTANCE_FIXTURE=bookmark-ack-loss` 等正式 Worker 提交 D1、核对成功响应与持久回执，再中断首个 HTTP 200 响应正文。Android 保持原图，仍显示未标记、修改尚未确认及可重试。此时独立 GET 已读到唯一目标章书签，账户/作品 revision 从 5/4 到 6/5；收藏、设置、章节位置与最远页不变。
+2. 在 Android 尚未重试时，重新安装的 iOS App 从新进程经正式书架进入详情，用「仅书签」筛选读回该章并显示移除按钮。六路独立 API 响应与刚提交后逐字节相同，未产生额外业务变更。
+3. 回到原 Android 进程点「刷新书签」，已确认的视图读到该标记，原操作仍显示未确认且可重试。再点「重试原书签操作」，待确认提示消失，原图和第 2 页保留。两次操作后六路读回仍相同；停服审计恰有两次匹配的书签请求，UUID、正文、CAS、成功响应与持久回执摘要均相同，只有首个响应中断，D1 只提交一次。
+
+iOS 首轮已完成安装和收藏，但外部驱动未可靠收起键盘及打开章节，未提交进度或书签；成功链路使用 Android 阅读写入和 iOS 冷启动读回。复验步骤、控件树、截图、`xcresult` 和独立核对保留在 `.local/prototype-reader-bookmark-ack.D2qnuv/REPRODUCE.md`，用固定 Node 执行同目录 `verify.ts` 重核。官方 Workers 的四项确认及 D1 故障回归通过。此分项未覆盖 Web、其它阅读模式、自动前台刷新、生产 Access 或物理设备。
+
 ## 尚待验收
 
 - Web ↔ Native 书签需要内置浏览器和原生客户端共同信任的同一 HTTPS origin；HTTP 别名的书架读回不计入书签往返。
-- Source 在线阅读期间的书签、自动前台刷新、真实丢响应恢复、生产 Access、真机与触控。
+- 其它客户端的阅读中书签和丢响应恢复、书签自动前台刷新、生产 Access、真机与触控。
 
 实现与边界见[章节书签设计](../design/bookmarks.md)，当前交付顺序见 [P2](../plan/p2-sync.md)。

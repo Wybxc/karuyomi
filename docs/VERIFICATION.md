@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-10，[Android 阅读中书签丢确认与 iOS 冷启动读回](verification/bookmarks.md#2026-11-10native-在线阅读书签丢确认与跨端读回)通过。Android 保留原图和待确认操作，iOS 在重试前读回已提交的书签；Android 刷新不重发，显式重试同一请求。六路独立 API 响应及 D1 审计确认只提交一次，进度不变。Web、生产和真机另验。
+
 2026-11-10，首发六材料的 [iOS](verification/native-main-entry.md#ios-阅读中切换身份)和 [Android](verification/native-main-entry.md#android-阅读中切换身份)模拟器换身份通过。A 的完成请求收到 401，切到 B 时退出旧 Reader 且不重发；仅 B 的显式扩展安装新增一条设置回执，B 冷启动只读，A 的 D1 记录不变。生产 Access 与签名真机另验。
 
 2026-11-10，[CuuTruyen 六材料 Native 完整章和接力](verification/aot-current-pilot.md#cuutruyen-的-native-完整章节与跨端续读)通过。Android 模拟器逐页显示并完成第 142 章 23 页，进入第 141 章保存第 3 页；iOS 同库续到第 4 页，Android 新进程读回。D1 仅为 iOS 翻页新增一条回执，最终读回无写入。生产、真机和完整快照另验。

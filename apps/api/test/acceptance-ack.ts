@@ -13,9 +13,9 @@ import {
   StateMutationSchema,
 } from '@karuyomi/protocol';
 import {
-  xkcdChapterKey as progressChapterKey,
+  xkcdChapterKey,
   xkcdLastPageCompletion,
-  xkcdMangaKey as progressMangaKey,
+  xkcdMangaKey,
 } from './acceptance-xkcd.ts';
 
 const maxAttempts = 16;
@@ -27,6 +27,10 @@ const fixtures = {
   'progress-ack-loss': {
     path: '/api/state/mutations',
     label: 'ACCEPTANCE_PROGRESS_ACK',
+  },
+  'bookmark-ack-loss': {
+    path: '/api/state/mutations',
+    label: 'ACCEPTANCE_BOOKMARK_ACK',
   },
 } as const;
 
@@ -68,8 +72,8 @@ function auditAttempt(fixture: AckLossFixture, row: AttemptRow) {
     : {
         ...attempt,
         manga_revision: scope_revision,
-        manga_key: progressMangaKey,
-        chapter_key: progressChapterKey,
+        manga_key: xkcdMangaKey,
+        chapter_key: xkcdChapterKey,
       };
 }
 
@@ -162,9 +166,17 @@ async function acceptedAck(
   }
 
   const mutation = stateMutationSchema.parse(input);
-  const completion = xkcdLastPageCompletion(mutation);
-  if (!completion) return;
-  const { snapshot, progress, current } = completion;
+  const completion =
+    fixture === 'progress-ack-loss'
+      ? xkcdLastPageCompletion(mutation)
+      : undefined;
+  const addsTargetBookmark =
+    fixture === 'bookmark-ack-loss' &&
+    mutation.mangaKey === xkcdMangaKey &&
+    mutation.operation.case === 'setBookmark' &&
+    mutation.operation.value.chapterKey === xkcdChapterKey &&
+    mutation.operation.value.bookmarked;
+  if (!completion && !addsTargetBookmark) return;
   const ackText = await response.clone().text();
   const ack = stateMutationResponseSchema.parse(JSON.parse(ackText));
   if (ack.error) return;
@@ -172,13 +184,17 @@ async function acceptedAck(
     ack.mutationId !== mutation.mutationId ||
     ack.manga?.mangaKey !== mutation.mangaKey ||
     ack.manga.revision !== mutation.expectedRevision + 1 ||
-    ack.progress?.chapterKey !== progressChapterKey ||
-    !ack.progress.completed ||
-    ack.progress.epoch !== progress.epoch ||
-    ack.progress.current?.pageKey !== current.pageKey ||
-    ack.progress.current.manifestVersion !== snapshot.manifestVersion
+    (completion &&
+      (ack.progress?.chapterKey !== xkcdChapterKey ||
+        !ack.progress.completed ||
+        ack.progress.epoch !== completion.progress.epoch ||
+        ack.progress.current?.pageKey !== completion.current.pageKey ||
+        ack.progress.current.manifestVersion !==
+          completion.snapshot.manifestVersion)) ||
+    (addsTargetBookmark &&
+      (ack.bookmark?.chapterKey !== xkcdChapterKey || !ack.bookmark.bookmarked))
   ) {
-    throw new Error('Unexpected successful chapter completion ACK');
+    throw new Error(`Unexpected successful ACK for ${fixture}`);
   }
   return {
     kind: 'manga',

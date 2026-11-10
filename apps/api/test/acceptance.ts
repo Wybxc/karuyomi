@@ -123,7 +123,7 @@ try {
     !bridgeError
   ) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, settings-cas-race, progress-cas-race, progress-d1-error, bridge-once-error or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, bookmark-ack-loss, settings-cas-race, progress-cas-race, progress-d1-error, bridge-once-error or empty',
     );
   }
   const { url } = await server.listen();

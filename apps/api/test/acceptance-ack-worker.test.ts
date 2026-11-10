@@ -129,6 +129,19 @@ function save(
   );
 }
 
+function bookmark(revision: number, chapterKey: string, bookmarked: boolean) {
+  return toJsonString(
+    StateMutationSchema,
+    create(StateMutationSchema, {
+      schemaVersion: businessSchemaVersion,
+      mutationId: crypto.randomUUID(),
+      mangaKey,
+      expectedRevision: revision,
+      operation: { case: 'setBookmark', value: { chapterKey, bookmarked } },
+    }),
+  );
+}
+
 async function targetState(identity = subject) {
   const response = await request(
     undefined,
@@ -212,6 +225,68 @@ test('the opt-in progress fault drops the completed target ACK after D1 commits 
   });
   expect(retry).toEqual({ ...drop, sequence: 2, drop_ack: 0 });
   expect(await ackAttempts(env.DB, fixture)).toHaveLength(2);
+});
+
+test('the bookmark fault interrupts only the target add after commit and preserves the receipt on replay', async () => {
+  const fixture = 'bookmark-ack-loss';
+  const owner = 'bookmark-acceptance-owner';
+  const mutate = (body: string) => request(fixture, statePath, body, owner);
+  await prepareAckLoss(env.DB);
+
+  // Progress, a different chapter, and a target removal must leave the fault unused.
+  const progress = await mutate(save(0, false));
+  expect(progress.status).toBe(200);
+  await expect(progress.json()).resolves.toMatchObject({
+    manga: { revision: 1 },
+  });
+  const unrelated = await mutate(bookmark(1, 'other-chapter', true));
+  expect(unrelated.status).toBe(200);
+  await expect(unrelated.json()).resolves.toMatchObject({
+    manga: { revision: 2 },
+  });
+  const removal = await mutate(bookmark(2, targetChapter, false));
+  expect(removal.status).toBe(200);
+  expect(stateMutationResponseSchema.parse(await removal.json())).toMatchObject(
+    {
+      bookmark: { bookmarked: false },
+    },
+  );
+  const before = await targetState(owner);
+  const revision = before.manga!.revision;
+  expect(await ackAttempts(env.DB, fixture)).toEqual([]);
+
+  const body = bookmark(revision, targetChapter, true);
+  const dropped = await mutate(body);
+  expect(dropped.status).toBe(200);
+  await expect(dropped.text()).rejects.toThrow();
+  const committed = await targetState(owner);
+  expect(committed).toMatchObject({
+    accountRevision: before.accountRevision + 1,
+    manga: { revision: revision + 1 },
+    bookmark: { chapterKey: targetChapter, bookmarked: true },
+  });
+  expect(committed.progress).toEqual(before.progress);
+
+  const replay = await mutate(body);
+  expect(replay.status).toBe(200);
+  await expect(replay.json()).resolves.toMatchObject({
+    manga: { revision: revision + 1 },
+    bookmark: { chapterKey: targetChapter, bookmarked: true },
+  });
+  expect(await targetState(owner)).toEqual(committed);
+
+  const attempts = await ackAttempts(env.DB, fixture);
+  expect(attempts).toHaveLength(2);
+  const [drop, retry] = attempts;
+  expect(drop).toMatchObject({
+    sequence: 1,
+    drop_ack: 1,
+    expected_revision: revision,
+    manga_revision: revision + 1,
+    body_sha256: createHash('sha256').update(body).digest('hex'),
+    mutation_id: stateMutationSchema.parse(JSON.parse(body)).mutationId,
+  });
+  expect(retry).toEqual({ ...drop, sequence: 2, drop_ack: 0 });
 });
 
 test('default acceptance does not intercept and the existing settings fixture preserves its exact replay audit', async () => {
