@@ -92,9 +92,17 @@ A 随后关闭，B 是同 origin 的全新 Web 文档。B 从正式书架打开�
 
 各阶段独立读取设置、漫画设置、书架、目标章作品状态、书签和进度；写入只通过正式 Flutter UI。每次正式驱动结束前等待运行时释放。验收入口为 `flutter test integration_test/bookmarks_sync_test.dart --no-pub -d <device> --dart-define-from-file=<phase.json> --reporter expanded`，完整配置见[集成测试说明](../../apps/reader/integration_test/README.md)。临时日志、CA、D1 和采样快照不入库；候选未部署，扩展状态仍为 `compiled_unverified` / `runtimeReady=false`。
 
+## 2026-11-10：首发材料的 Web 与 iOS 混合验收受限
+
+使用带登录与阅读恢复修复的首发六材料产品归档、冻结 v6 xkcd 和同一隔离 D1。iOS 模拟器从正式入口运行 `bookmarks_sync_test.dart` 的 `prepare` 阶段，连接受信任的 Wrangler HTTPS harness `https://127.0.0.1:60472`，安装扩展并收藏 xkcd；账户/作品 revision 为 2/1，章节 `/3319/` 未标记书签，无阅读进度。
+
+Codex 内置浏览器经 HTTP Vite 别名 `http://127.0.0.1:55217` 成功读回同一书架。打开 xkcd 时提示「这个扩展的仓库已移除」：安装记录中的默认仓库索引是 HTTPS harness 的目录 URL，Web 当前默认仓库是 HTTP 别名的目录 URL，两者即使提供相同静态字节也不是同一仓库。打开前后八路独立 API 响应逐字节一致。Web 未进入详情、未操作书签；Android 未启动。本轮只验证了跨端书架读回。
+
+两项本地服务、专用模拟器和 ADB 已清理。构建输入、准备日志与前后快照保存在本机忽略目录 `.local/prototype-web-native-bookmarks.YSZYX1/evidence/`。
+
 ## 尚待验收
 
-- 同一 HTTPS origin 的 Web ↔ Native：此前内置浏览器未信任本地 CA，Web 的 HTTP 独立文档结果和本轮 HTTPS Native 结果分别保留。
+- Web ↔ Native 书签需要内置浏览器和原生客户端共同信任的同一 HTTPS origin；HTTP 别名的书架读回不计入书签往返。
 - Source 在线阅读期间的书签、自动前台刷新、真实丢响应恢复、生产 Access、真机与触控。
 
 实现与边界见[章节书签设计](../design/bookmarks.md)，当前交付顺序见 [P2](../plan/p2-sync.md)。
