@@ -117,7 +117,7 @@ node tools/extensions/pipeline.ts prepare-baseline \
 
 ### 部署确认
 
-`commit-snapshot` 只有在远端 state 与候选完全一致、远端 index 与本地字节一致后才原子保存本地 checkpoint。部署失败或未确认时，旧 checkpoint 保持不变。所有 publisher 必须串行；本地文件锁和 CI concurrency group 不能替代跨工作区的发布协调。
+`commit-snapshot` 只有在远端 state 与候选完全一致、远端 index 与本地字节一致后才原子保存本地 checkpoint。`--state` 应指向持有已确认父状态的文件；若使用新路径，在切流前保存当时的生产 state 并核对 index 摘要。部署失败或未确认时，旧 checkpoint 保持不变。所有 publisher 必须串行；本地文件锁和 CI concurrency group 不能替代跨工作区的发布协调。
 
 摘要只在传输边界检查：下载验证编码/canonical 各一次，后续本地阶段复用验证结果；assembler 在上传边界校验实际 gzip 字节，不再次解压计算 canonical 摘要。schema、身份、大小、路径和材料检查仍保留。
 
@@ -127,7 +127,7 @@ node tools/extensions/pipeline.ts prepare-baseline \
 
 1. 备齐完整候选并固定 Worker、客户端、共享材料和快照。保留现网仍可用的包，使用当前 ABI/材料的实际构建；不要部署验收用的 xkcd 单包快照。完成 `pnpm build` 和 Wrangler `deploy --dry-run`，读回生产 Worker 版本和 D1 待应用列表，核对私有 `COVERS` 绑定及当前 Access 配置。
 2. 暂停其它发布器。确认路由保持不变、没有待应用的 Durable Object 迁移后，在获准发布时用生成配置执行 `wrangler versions upload --config dist/karuyomi/wrangler.json`，记录新 version ID，并确认生产仍由原版本服务。Worker 和完整 Static Assets 在这一步上传，[版本上传不会切换流量](https://developers.cloudflare.com/workers/wrangler/commands/workers/#versions-upload)。上传失败或不能核实旧版仍在服务时，停止在 `0009` 之前。
-3. 安排 Source 短维护窗口。如果待应用列表仍包含 `0004–0008`，可先在旧 Worker 运行时应用这段新增表和列的迁移。Wrangler 没有指定截止版本的参数；分段时用只含原始 SQL 前缀的独立目录和临时 Wrangler 配置，绑定同一个生产 `DB` 并保留同一迁移账本。目录内不得改写文件内容、名称或顺序。先检查该配置列出的确切待应用文件，再执行对应的迁移。紧邻切换运行 `check-base` 并确认生产 Worker 仍是预检版本，然后应用截至 `0009` 的前缀，立即执行 `wrangler versions deploy "$version_id@100%" --config dist/karuyomi/wrangler.json --yes`。自 `0009` 清空网络登记和旧 Source 设置起，旧中继停止工作，单独回退 Worker 不会恢复它；该次迁移不清空书架和阅读进度。
+3. 安排 Source 短维护窗口。如果待应用列表仍包含 `0004–0008`，可先在旧 Worker 运行时应用这段新增表和列的迁移。Wrangler 没有指定截止版本的参数；分段时用只含原始 SQL 前缀的独立目录和临时 Wrangler 配置，绑定同一个生产 `DB` 并保留同一迁移账本。目录内不得改写文件内容、名称或顺序。先检查该配置列出的确切待应用文件，再执行对应的迁移。紧邻切换运行 `check-base` 并确认生产 Worker 仍是预检版本，使用 `wrangler d1 time-travel info DB --json` 留存恢复点。然后应用截至 `0009` 的前缀，立即执行 `wrangler versions deploy "$version_id@100%" --config dist/karuyomi/wrangler.json --yes`。自 `0009` 清空网络登记和旧 Source 设置起，旧中继停止工作，单独回退 Worker 不会恢复它；该次迁移不清空书架和阅读进度。[D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) 恢复会撤回恢复点之后的业务写入，不自动执行。
 4. 在重新打开的正式客户端检查 Access、书架及实际 Source 后，用正式配置执行 `wrangler d1 migrations apply DB --remote` 收尾 `0010`。再次检查待应用列表为空和中继可用，远端 index/state 与候选一致后才执行 `commit-snapshot`。生产阅读和 Native 同步仍按原验收计划分别记录。
 
 生产预检用以下只读命令。将 SQL 结果的迁移名称按顺序与 `apps/api/migrations/` 下已固定的文件比对，确认已应用的恰好是连续前缀。锁定版本的 `d1 migrations list` 会先执行 `CREATE TABLE IF NOT EXISTS`，严格只读阶段直接查询迁移账本。找不到账本、顺序异常或出现候选未知的迁移时停止切换。

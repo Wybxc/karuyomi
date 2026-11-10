@@ -2,29 +2,27 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**已实现待完整验收，v4 三包已部署并通过匿名交付验收，首次本地 baseline 已启动、尚未完成**。旧 `7f54463` 全量队列已停止。v3 的固定 `b4f72f7` 独立队列与旧 `022d828` v1 队列均曾启动，但 2026-11-04 复核时已无活动进程，首次 baseline 未完成；两套冻结输入与本地产物仅保留历史证据，不得直接覆盖当前生产。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**Web 0.1.0、API 与首份六材料基线已上线；原生正式发布及增量部署待验收**。切换、迁移、静态交付与生产 Web 实测见[首发记录](../verification/first-web-release.md)。
 
 操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
-2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。Web/Native 材料及扩展必须按 v4 新指纹一起重建；旧 v3 产物在加载前明确拒绝，不提供兼容回退。固定 `1f599cd` 的 xkcd、Arknights、CuuTruyen 已本地重编并通过限定 Web 运行/图片分项，见[v4 运行证据](../verification/v4-source-runtime.md)。固定 `13494a0` 的客户端、Worker 与 v4 三包快照现已部署；Worker 版本为 `9a95d6e6-7578-4781-99aa-3d8bdae6b467`，revision 为 `702cc6bfb2974682bf1c83325458535a`，parent 为 `22378bbcb89d40f5a0397c5098310072`。`commit-snapshot` 后的 `state.json` 已确认新 revision，`bootstrap.complete=false`，状态为 available 3 / unavailable 1 / pending 1445 / failed 0。
-
-匿名 26 路径验收通过，远端网络政策仅含这三个已核对准确 host 的 verified 包，见[生产部署记录](../verification/v4-production.md)。Access 会话已失效，用户答复稍后登录；当前生产正向与 Native 主入口仍未验收。扩展增量工作流继续为 `disabled_manually`，不在 CI 运行首次全量，完成并部署 baseline 前不启用定时 CI。下文 v1/v3 记录均为历史冻结批次，其 checkpoint 不修改、不混装，也不得作为覆盖当前生产的恢复输入。
+2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。固定 `1f599cd` 的 xkcd、Arknights、CuuTruyen 已本地重编并通过限定 Web 运行/图片分项，见[v4 运行证据](../verification/v4-source-runtime.md)。随后部署的 [v4 三包快照](../verification/v4-production.md)通过匿名 26 路径及旧网络政策核对；它是 0.1.0 的父快照。下文 v1/v3 记录是历史冻结批次，保留原检查点和输入身份。
 
 2026-11-07，固定 v6 完成全量发现与 3 包本地串行试编，试编候选未部署。试编发现同一输入可能生成不同 canonical JS，旧的仅输入派生 ID 会隐藏实际更新。见[试编与身份对照](../verification/aot-current-pilot.md)。绑定摘要的公开 ID 已通过固定三包真编译和静态装配。内置浏览器在同一 D1 验证旧路由下架、xkcd 正式确认更新、本机旧副本清理及原书架首次续读。同日用固定 `952bbab` 的完整计划启动本地单并发 baseline，复用三个精确匹配的试编检查点，开始处理其余 1,445 包。见[本地启动记录](../verification/aot-current-pilot.md#首次本地全量启动)。
 
 2026-11-08，实测冻结 `952bbab` 和当前主分支虽然同为 ABI v6 / protocol 2，`graphics-bridge.js` 摘要及宿主指纹已经不同。所有冻结清单都引用旧材料；正式静态组装拒绝混用，Native 同样须配套材料。旧队列已通过正式取消退出，结果保留为该提交的构建证据；固定 `c04d436` 与已确认的生产 parent 已另行启动本地全量，见[当前宿主全量启动](../verification/aot-current-pilot.md#当前宿主全量启动)。待全量结束并验证候选后，才进行生产发布与增量 CI 验收。
 
-扩展网络登记已从当前实现移除；[正式本地接口与 xkcd 中文热门列表通过](../verification/generic-source-relay.md)。[隔离 D1 切换演练](../verification/d1-relay-cutover.md)确认：`0009` 是新版 Source 设置前置条件，也会停止旧中继；需要短维护窗口先应用 `0009`、再切换 Worker/Static Assets，最后应用 `0010`。冻结在 clab 运行的 v6 批次保持原输入；完整候选和生产 Source 仍需验收。
+扩展网络登记已移除。[隔离 D1 切换演练](../verification/d1-relay-cutover.md)确认：`0009` 是新版 Source 设置前置条件，也会停止旧中继；需要短维护窗口先应用 `0009`、再切换 Worker/Static Assets，最后应用 `0010`。生产已按该顺序切换，`0010` 后的 xkcd 读图与保存通过。
 
 增量计划和候选组装都检查已部署可用扩展的运行时身份。协议、ABI 或材料字节有变化时，CI 要求先发布匹配的本地全量候选；输入指纹变化而材料与合同不变时，仍允许有界增量。定向回归覆盖宿主切换拒绝及旧快照不变，也验证同运行时的有界批次保留未选中的可用扩展。线上工作流仍待匹配的 baseline 部署后验收。
 
 [clab 在途失败抽样](../verification/aot-current-pilot.md#clab-在途失败抽样)显示主要是 TeaVM 宿主链接缺口。先完成并验收冻结批次；`Class.getResource` 的打包资源读取可作为下一轮隔离 AOT 验证的优先项。
 
-clab 冻结全量与三个定向补编已结束；[六材料完整候选](../verification/aot-current-pilot.md#六材料完整候选)已组装，保留两版各自实际输入身份、原生产父快照和现网三个包。完整快照的正式构建、部署 dry-run 和公开生产父状态复核通过。[完整目录 Android xkcd 阅读与续读](../verification/aot-current-pilot.md#完整目录的-android-阅读验收)及 [CuuTruyen 整章、切章与双端接力](../verification/aot-current-pilot.md#完整目录的代表源复验)已通过；MANGA Plus Creators 的 iOS 整章仍待通过。继续以该候选补齐代表源，并在备齐生产管理登录和正式签名后进行生产预检及真机验收。
+clab 冻结全量与三个定向补编已结束；[六材料完整候选](../verification/aot-current-pilot.md#六材料完整候选)保留各自实际输入身份、原生产父快照和现网三个包，现已作为首版发布。[完整目录 Android xkcd 阅读与续读](../verification/aot-current-pilot.md#完整目录的-android-阅读验收)、[CuuTruyen 整章与双端接力、MANGA Plus Creators iOS 整章与续读](../verification/aot-current-pilot.md#完整目录的代表源复验)已通过隔离模拟器验收。
 
-2026-11-10，固定 `2c012db` 的正式产品构建确认使用与 `c04d436` 冻结批次、`2a07fc2` 补编计划相同的六份材料。验收该冻结候选时，App/API 使用这套匹配构建，仍须保留现网三包并通过完整候选的构建、dry-run 与实际 Source 检查。该候选不包含 ToonLook 的 iOS WebP 修复。自 `a1dd0cd` 起材料身份已变为七份，[新版 ToonLook 单包](../verification/aot-current-pilot.md#正式-webp-编码材料与图形桥)只用于独立验收；用这套材料发布或启用主分支增量工作流，须先有已部署的同材料完整 baseline。两个候选均不得混用，生产切换继续按[切换顺序](../EXTENSIONS.md#旧网络登记部署切换)另行验收。
+2026-11-10，首发源码 `0f43779` 使用与 `c04d436` 冻结批次、`2a07fc2` 补编计划匹配的六份材料。该发布不包含 ToonLook 的 iOS WebP 修复。自 `a1dd0cd` 起 `main` 的材料身份已变为七份，[新版 ToonLook 单包](../verification/aot-current-pilot.md#正式-webp-编码材料与图形桥)只用于独立验收。主分支增量工作流保持 `disabled_manually`；先发布匹配七份材料的完整基线，再验收有界增量和客户端更新。
 
-[首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。隔离 HTTP 回跳通过；最终签名安装包及生产仍未验收。
+[首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。隔离 HTTP 回跳通过；原生正式签名和生产 Access 另验。
 
 [Android 发行签名配置](../verification/native-main-entry.md#android-发行签名配置)已用同一归档验证：未配置时产出未签名 APK，配置临时证书后可验证签名和包内材料。正式证书与真机仍待验收。
 
@@ -36,7 +34,7 @@ clab 冻结全量与三个定向补编已结束；[六材料完整候选](../ver
 - generalized builder 能发现扩展、准备固定工具链、构建原版 JAR 并按包 AOT；源码依赖闭包与 host 输入参与内部指纹，失败按包隔离。
 - 包体方案已有真实 A/B：保留 `ADVANCED` 和服务，桥/WASM 共享交付，每包确定性 gzip。额外字典与低收益裁剪不阻塞发布。
 - 自有代码统一格式化并由 prek 检查；项目自有自动化与运行时桥统一使用严格 TypeScript；依赖分层由 dependency-cruiser 纳入 CI，细节见 [TOOLING](../TOOLING.md)。通用 CI 仅响应分支 push/PR，tag 不触发。
-- HTTP 生产链、构建清单只维护 v2；受控 workerd、真实 TeaVM 编译的模拟 supplier 及 v4 三源 Web 运行/图片分项通过，生产 Access 与当前 Native 运行门仍待验收。
+- HTTP 生产链、构建清单只维护 v2；受控 workerd、真实 TeaVM 编译的模拟 supplier、v4 三源 Web 运行/图片及 0.1.0 的生产 Web xkcd 分项通过，Native 生产运行门仍待验收。
 - GitHub 已确认公开，但 IAB 实测 Release/CDN 正文不能跨域读取。用户据此选定最终 Static Assets 方案；不建设私有下载凭据服务。
 
 ## 实施与剩余验收
@@ -49,9 +47,7 @@ clab 冻结全量与三个定向补编已结束；[六材料完整候选](../ver
 6. **移除旧分发。** 删除扩展 R2 正文路由、上传和关联表；D1 不再保存扩展分发或网络授权元数据，书架与阅读进度等业务状态仍以 D1 为唯一权威。已停用旧工作流并删除 90 个扩展 AOT/索引 Release 及其 tag；运行时 seed 是独立锁定构建依赖，保留。清理旧发布器与 Release 专属 CI，源码不保留无用兼容分支。
 7. **实际验收后全量。** 用当前代表包验证静态发布、客户端下载、更新替换、旧包清理、失败保留和断点恢复，再建立新完整 plan 与首次本地 baseline。旧 `7f54463` 队列和材料不能继续作为当前产品结果。
 
-当前实现已移除 R2 正文路由和关联表、迁移 Dart/TS 静态索引、加入 gzip 有界验证。历史固定提交 `022d828` 的两包真实 AOT / 内置浏览器初始化、线上匿名 gzip 下载和旧版本远端清理均通过，D1 仅继承已有域名授权。该提交的本地单并发全量曾启动，原队列包含剩余 1,446 包，后续中断且未完成 baseline；该历史计数不表示当前生产状态。首次全量最终部署、有界 CI 部署及客户端真实更新/旧缓存清理仍需收齐证据；CI 在完整 baseline 部署前继续停用。Actions secrets、全 TS 自动化、依赖规则与固定 Node 24 检查已验证，详细证据见 [VERIFICATION](../VERIFICATION.md)。
-
-当前 Protobuf 控制合同使用 host ABI `karuyomi-source-host-v4`、protocolVersion 2，HTTP bridgeVersion 保持 2；原型不兼容旧控制协议或 Page DTO。历史 `022d828` 全量仍是独立冻结的 v1 输入，不能修改其源码，也不能用当前客户端/材料装配或部署其候选。它的编译覆盖仅证明 v1 批次；当前 v4 包须按新指纹重新构建和验收。三包部署和匿名交付通过不等于生产正向、完整发布或 baseline 验收，完成并部署新 baseline 前不能启用定时 CI。当前图片合同和预算见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
+首版已完成 Dart/TS 静态索引、gzip 有界验证、首次生产基线与旧网络登记清理。剩余发布门是签名真机、生产同账号读写，以及主分支的同材料基线和有界增量部署。实际 Source 兼容性、更新和缓存清理继续按 [P0](p0-runtime-and-reading.md) 与[扩展管理](extension-management.md)验收。工程和环境证据见 [VERIFICATION](../VERIFICATION.md)，图片合同见 [IMAGE-RESOURCES](../IMAGE-RESOURCES.md)。
 
 ## 历史冻结批次
 

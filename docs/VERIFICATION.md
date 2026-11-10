@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-10，[0.1.0 Web 与 API 已上线](verification/first-web-release.md)。生产 D1 账本连续至 `0010`，首份六材料扩展基线已确认。真实 Access 测试账号已通过 xkcd 读图、收藏、服务端保存与新标签续读；清理后新开章节也显示首图并保存。正式签名、真机和生产同账号三端读写仍待验。
+
 2026-11-10，[六材料首发修复合并预检](verification/aot-current-pilot.md#六材料首发修复合并预检)通过：首发归档合入 Android 签名配置和横屏修复，Arknights 单包的正式 Web/Worker 构建和 Wrangler 部署预演、43 项定向阅读回归、双端 arm64 未签名构建及包内六材料核对均通过。完整快照、生产和签名真机另验。
 
 2026-11-10，首发六材料的 [Android xkcd 同版本换构建后章节缓存](verification/source-cache-native.md#2026-11-10android-同版本换构建后复用章节正文)通过。切换静态目录和检查更新均未更改账户选择；明确确认后，新进程从书架恢复到第 2 页，重新请求原图但没有请求章节 HTML。清除本地 App 数据、保留同一 D1 后，章节恢复一次完整请求，正文摘要与首次相同。
@@ -191,7 +193,7 @@ GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c
 
 随后固定 `1f599cd` 的三包 v4 原 Source 已重新 AOT，在内置 Chromium 156 通过元数据、原图片处理、2/3/3 张图片解码与释放；正式 Flutter xkcd 阅读完成、同 namespace 第二标签占用失败及关闭持有标签后重开也通过，见[v4 分项](verification/v4-source-runtime.md)。另以真实 TeaHost/BrowserCall AOT 和受控 Source/HTTP-v2 端点通过嵌套 enqueue、异常、取消及旧 owner 隔离，见[回调分项](verification/teavm-enqueue.md)。该次本地验证未部署，不提升流水线兼容标记，不替代生产 Access、Native 或真机验收。
 
-随后固定 `13494a0` 的正式客户端/API 与这三包已部署，Worker version 为 `9a95d6e6-7578-4781-99aa-3d8bdae6b467`，snapshot revision 为 `702cc6bfb2974682bf1c83325458535a`。26 个匿名路径、三包完整性和旧资产 404 均通过，远端三包显式网络政策已核对，正式 checkpoint 已确认。完整身份与范围见[v4 生产记录](verification/v4-production.md)。当前 Access 会话失效，用户选择稍后登录；正向生产 bootstrap、Source 请求及阅读恢复待验收。`bootstrap.complete=false`，定时增量 CI 继续停用。
+随后固定 `13494a0` 的正式客户端/API 与这三包曾部署，Worker version 为 `9a95d6e6-7578-4781-99aa-3d8bdae6b467`，snapshot revision 为 `702cc6bfb2974682bf1c83325458535a`。26 个匿名路径、三包完整性和旧资产 404 均通过，远端三包显式网络政策已核对，正式 checkpoint 已确认。完整身份与当时的 Access 限制见[v4 生产记录](verification/v4-production.md)。该快照的 `bootstrap.complete=false`，后由 0.1.0 六材料基线替换。
 
 当前 v4 的正式 `lib/main.dart` 已重新构建为 iOS Simulator App 和 Android arm64 调试 APK，双端实际包内 manifest/host/worker 与当前材料逐字节一致，SQLite 映射和导出通过，见[Native 构建记录](verification/v4-native-main.md)。iOS 首次官方库下载失败保留，使用经固定摘要校验的标准缓存后成功；未修改第三方 hook。CUA 仍无法连接 Simulator，App 未安装/启动，不能认定当前 Native UI、Source、Access 或真机通过。
 
@@ -276,9 +278,9 @@ Access 本人策略覆盖 `/api` 和 `/api/*`。匿名 `/api`、`/api/bootstrap`
 
 ## 静态分发分项
 
-首发 v6 的[六材料完整候选](verification/aot-current-pilot.md#六材料完整候选)已完成三包补编、正式构建和 Wrangler dry-run，公开生产父状态仍匹配；候选尚未上传，生产 Access 和真机未验收。
+首发 v6 的[六材料完整候选](verification/aot-current-pilot.md#六材料完整候选)已作为 0.1.0 部署。线上 index/state 与候选一致，`bootstrap.complete=true`；37 条匿名路径与四包完整性验证见[首发记录](verification/first-web-release.md)。扩展增量 CI 继续停用，直到有与工作流运行时匹配的生产基线。
 
-当前 v4 三包生产快照及匿名交付见[生产记录](verification/v4-production.md)。以下 `022d828` 两包部署和政策保留其历史状态，不是当前生产目录。
+历史 v4 三包生产快照及匿名交付见[v4 记录](verification/v4-production.md)。以下 `022d828` 两包部署和政策也保留其历史状态。
 
 固定 `022d828` 的两包代表快照已部署到 `https://karuyomi.wybxc.cc`，Worker version 为 `1d434d1b-7e30-4668-b458-350e486f3b3d`，快照 revision 为 `22378bbcb89d40f5a0397c5098310072`。生产 D1 `0002` 迁移已成功；公开 index/state 字节与本地候选一致，两个 gzip 的 MIME、无 HTTP Content-Encoding、immutable 缓存与编码/原文双 SHA 均通过实际匿名下载验证。前一 `1bfc97f` 的两个清单和 gzip 地址均已实际返回 404，确认当前快照只保留最新版本。六份共享材料的长度/摘要通过，未知扩展和 Native 内置资源路径返回 404，匿名 `/api/bootstrap` 仍跳转到原 Access 团队。bootstrap 尚不完整，不能启用初次全量 CI；当时只有匿名拦截证据，后续生产登录分项见上文。
 
@@ -428,7 +430,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 ## 尚未通过的门槛
 
-- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。[隔离 Native 可见登录及阅读恢复](verification/native-main-entry.md#native-可见-access-回跳)已有双端分项；使用本地身份提供方，不代表生产 Access。
+- 更多代表源的生产读图、阅读中 Access 失效后的恢复，以及 Native 在生产 Access 下的登录、读写和续读。[首发 Web xkcd](verification/first-web-release.md#实际-web-验收)已通过真实 Access、收藏、读图和续读；[隔离 Native 可见登录及阅读恢复](verification/native-main-entry.md#native-可见-access-回跳)使用本地身份提供方。
 - 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、其它平台及上游版本变化后的 HTTP Cache 正文复用、普通文件、Native 上游版本升级及带实际 Source 缓存负载的往返换身份；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，iOS 和 Android 已另验原 xkcd 章节 HTML 跨 App 进程复用，浏览器进程重启仍待验。Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、双端模拟器阅读中 A→B、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。
