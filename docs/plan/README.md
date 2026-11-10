@@ -57,7 +57,7 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；P0-B 先完成真实二进制链路，再在 P0-C 汇合成完整在线阅读。工程发布可以并行推进，不能用编译或发布成功替代 P0、Source 在线语义或移动验收。
 
-首发[六材料完整候选](../verification/aot-current-pilot.md#六材料完整候选)已完成定向补编、正式构建与部署 dry-run；生产、正式签名真机和完整代表源门仍待验收。首发归档的 [Native arm64 构建与包内材料](../verification/aot-current-pilot.md#六材料-native-发布构建)已核对。[Android 模拟器复验](../verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)确认重登恢复原位、直接退出无业务写；[iOS 模拟器复验](../verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)确认原请求只写一次、布局变化不附带写。双端模拟器的阅读中换身份按 [P2](p2-sync.md#当前实现与剩余主线)记录。
+首发[六材料完整候选](../verification/aot-current-pilot.md#六材料完整候选)已完成定向补编、正式构建与部署 dry-run；[CuuTruyen 整章与双端接力](../verification/aot-current-pilot.md#完整目录的代表源复验)通过。生产、正式签名真机和完整代表源门仍待验收。首发归档的 [Native arm64 构建与包内材料](../verification/aot-current-pilot.md#六材料-native-发布构建)已核对。[Android 模拟器复验](../verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)确认重登恢复原位、直接退出无业务写；[iOS 模拟器复验](../verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)确认原请求只写一次、布局变化不附带写。双端模拟器的阅读中换身份按 [P2](p2-sync.md#当前实现与剩余主线)记录。
 
 ## 当前交付顺序
 

@@ -94,7 +94,9 @@ void main() {
         if (catalog.accessPaused || catalog.error != null) {
           fail('正式 Native 书架连接失败：${catalog.error}');
         }
-        return catalog.status == ServiceStatus.ready && catalog.library != null;
+        return catalog.status == ServiceStatus.ready &&
+            !catalog.busy &&
+            catalog.library != null;
       });
       expect(catalog.subject, _subject);
       final client = catalog.library!.client;
@@ -113,11 +115,10 @@ void main() {
           find.descendant(of: card, matching: find.text(entry.title)),
         );
         final detailsFinder = find.byType(MangaDetailsPage);
-        await _wait(
-          tester,
-          '真实 Source 详情',
-          () => detailsFinder.evaluate().length == 1,
-        );
+        await _wait(tester, '真实 Source 详情', () {
+          if (catalog.error case final error?) fail('正式 Source 详情失败：$error');
+          return detailsFinder.evaluate().length == 1;
+        });
         final details = tester.widget<MangaDetailsPage>(detailsFinder);
         expect(details.source.buildId, _buildId);
         expect(details.source.sourceId, _sourceId);

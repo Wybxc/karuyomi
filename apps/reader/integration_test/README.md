@@ -247,7 +247,7 @@ Native 成功保存后，在内置浏览器刷新并从书架继续阅读，核�
 
 ### 真实 Source 完整章、跨章和新进程续读
 
-在隔离回环 HTTPS 入口装配与当前运行材料匹配的真实 AOT，使用新 D1 和 `acceptance-owner`。先用 `bookmarks_sync_test.dart` 的 `prepare` 从正式界面安装、打开英语源、收藏作品。热门无目标作品时可用 `BOOKMARKS_PREPARE_SEARCH` 走正式 Source 搜索；如尚未知 URL，可用 `BOOKMARKS_PREPARE_MANGA_TITLE`、`BOOKMARKS_PREPARE_CHAPTER_TITLE` 唯一定位，已知的 URL 优先。输出 `BOOKMARKS_SYNC_RESULT` 含精确作品、章节及相邻章节的来源顺序偏移与 URL。
+在隔离回环 HTTPS 入口装配与当前运行材料匹配的真实 AOT，使用新 D1 和 `acceptance-owner`。先用 `bookmarks_sync_test.dart` 的 `prepare` 从正式界面安装扩展、打开源并收藏作品。`BOOKMARKS_PREPARE_SOURCE_LANGUAGE` 指定 Source 语言（默认 `en`）。热门无目标作品时可用 `BOOKMARKS_PREPARE_SEARCH` 走正式 Source 搜索；如尚未知 URL，可用 `BOOKMARKS_PREPARE_MANGA_TITLE`、`BOOKMARKS_PREPARE_CHAPTER_TITLE` 唯一定位，已知的 URL 优先。输出 `BOOKMARKS_SYNC_RESULT` 含精确作品、章节及相邻章节的来源顺序偏移与 URL。
 
 用 `flutter test integration_test/source_chapter_test.dart --no-pub -d DEVICE --dart-define-from-file=PARAMS` 启动正式 `app.main()`。参数 `APP_ORIGIN` 不带末尾斜杠；`SOURCE_CHAPTER_PACKAGE`、`SOURCE_CHAPTER_SOURCE`、`SOURCE_CHAPTER_BUILD`、`SOURCE_CHAPTER_MANGA`、`SOURCE_CHAPTER_FIRST`、`SOURCE_CHAPTER_NEXT` 填精确包、Source ID、构建 ID、作品 URL、首章及下一章 URL。`SOURCE_CHAPTER_REVERSED` 按两章的实际相邻顺序设置。设置 `SOURCE_CHAPTER_FIRST_PAGES`、`SOURCE_CHAPTER_SAVED_PAGE`；已知下一章完整页数时可设 `SOURCE_CHAPTER_NEXT_PAGES`，否则按实际清单校验目标页界限。Android 同前使用专用 debug APK 的精确回环信任配置，另传 `SOURCE_CHAPTER_TEST_CA_BASE64`。
 

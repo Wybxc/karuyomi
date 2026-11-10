@@ -29,6 +29,10 @@ const _buildId = String.fromEnvironment('BOOKMARKS_BUILD_ID');
 const _mangaUrl = String.fromEnvironment('BOOKMARKS_MANGA_URL');
 const _chapterUrl = String.fromEnvironment('BOOKMARKS_CHAPTER_URL');
 const _prepareSearch = String.fromEnvironment('BOOKMARKS_PREPARE_SEARCH');
+const _prepareSourceLanguage = String.fromEnvironment(
+  'BOOKMARKS_PREPARE_SOURCE_LANGUAGE',
+  defaultValue: 'en',
+);
 const _prepareMangaTitle = String.fromEnvironment(
   'BOOKMARKS_PREPARE_MANGA_TITLE',
 );
@@ -266,9 +270,11 @@ Future<Map<String, Object?>> _prepare(
   final build = candidates.single;
   expect(
     build.sources.where(
-      (source) => source.id == _sourceId && source.lang == 'en',
+      (source) =>
+          source.id == _sourceId && source.lang == _prepareSourceLanguage,
     ),
     hasLength(1),
+    reason: '静态目录必须包含指定 Source ID 和语言',
   );
 
   void checkSource() {
@@ -359,14 +365,14 @@ Future<Map<String, Object?>> _prepare(
   final sourceButton = find.byKey(ValueKey(('catalog-source', _sourceId)));
   await _reveal(tester, sourceButton, catalogPage);
   await _tap(tester, sourceButton);
-  await _waitFor(tester, '英文 Source 热门返回', () {
+  await _waitFor(tester, '指定 Source 热门返回', () {
     checkSource();
     return !catalog.busy &&
         catalog.activeSource?.id == _sourceId &&
         catalog.listing == 'popular' &&
         catalog.page == 1;
   });
-  expect(catalog.activeSource!.lang, 'en');
+  expect(catalog.activeSource!.lang, _prepareSourceLanguage);
   if (_prepareSearch.isNotEmpty) {
     final search = find.descendant(
       of: catalogPage,
