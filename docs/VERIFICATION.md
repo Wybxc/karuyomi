@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-10，[iOS 阅读中重登与显式重试](verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)在六材料归档和隔离 D1 通过：401 与恢复原位不提交，显式重试按原请求只写一次，收起恢复控件不写，主动翻页再保存。生产 Access、Android 退出时的视口写归因及签名真机另验。
+2026-11-10，[iOS 阅读中重登与显式重试](verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)在六材料归档和隔离 D1 通过：401 与恢复原位不提交，显式重试按原请求只写一次，收起恢复控件不写，主动翻页再保存。[Android 复验](verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)中，401 后重登、原位恢复及直接退出的 D1 业务状态与基线完全相同。生产 Access 与签名真机另验。
 
 2026-11-10，[iOS Arknights 阅读性能基线](verification/reader-baseline-ios.md)取得一轮正式 iOS debug 模拟器原始数据：Flutter 首次图像帧、连续翻页、固定滚动、跨章帧与 App 自身 RSS 均有样本。没有把 Flutter 图像帧当作物理屏幕呈现；真机、WebContent/GPU 与分布门仍待验。
 
@@ -412,7 +412,7 @@ iOS 临时独立工程与原始本地输出已归档到被忽略的研究目录�
 
 ## 尚未通过的门槛
 
-- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。[隔离 Native 可见登录及阅读恢复](verification/native-main-entry.md#native-可见-access-回跳)已有双端分项；使用本地身份提供方，不代表生产 Access。Android 恢复后退出时的同页视口写尚未独立归因。
+- 当前 v6 在生产 Access 下的真实 Source 请求，以及生产作品详情、图片阅读、登录回跳/Cookie 失效与原生恢复；历史 v4 已通过 [Arknights Comics 真实热门列表](verification/server-state-production.md#生产-web-真实-source-列表)。[隔离 Native 可见登录及阅读恢复](verification/native-main-entry.md#native-可见-access-回跳)已有双端分项；使用本地身份提供方，不代表生产 Access。
 - 更广 Source 的 Web/Native 冷热 Cache、真实 Source 截断 / 取消、版本更新后的 HTTP Cache 正文复用与普通文件、Native 上游版本升级及身份切换；xkcd Web 与双端 Native 元数据 fresh Cache 及实际容器重建后的复用已单独通过，但 HTTP Cache 正文在浏览器/App 进程重启后的复用未验；Cache 跨目录 namespace 39 组及受控 ABI 组合存储/manager 切换不能替代这些剩余产品门。Web 正式原 Source 的身份 A→B→A、304 后正文复用与上述扩展更新续读分别保留其实际范围。
 - 正式 Native 主入口人工操作、后台恢复与更多原 Source 的 Native 验收；原处理源重复/取消及更多真实解密源覆盖。
 - 3–5 个未修改原版源完整章/下一章、物理设备触控、超长图、移动首图与合计峰值。

@@ -96,6 +96,8 @@ pnpm acceptance:serve
 
 从两份实际成品分别取出 `host.js`、`worker.js`、`manifest.json`，均与归档 Vite Native 输出逐字节一致；从 Worker 核对实际嵌入的五个桥脚本和 zstd WASM 全部匹配六材料 `5d1260e5…92e4`。构建未改变 Dart 依赖锁或平台跟踪文件。命令、产物和核对日志见本机忽略目录 `.local/six-material-product-2c012db.3549L2/NATIVE_RELEASE.md`。两包未安装或运行；最终扩展快照、发行签名、真机和生产 Access 另验。
 
+同日，从加入两次阅读恢复修复的六材料归档重建 Android arm64-v8a release APK 和未签名 iPhoneOS arm64 App。两份实际包内的三项 Native 资源逐字节匹配，清单 SHA-256 仍为 `c0839e9a5af816ccb0681a8187558cc80f7cc16b641daa20bde744b4418c31f5`，Worker 确认内嵌同一六份材料；Dart 锁文件未变。Android APK CRC 和本地测试签名验证通过，在无默认网络的专用模拟器侧载并冷启动显示书架。iOS 未签名。本轮复验命令与成品记录见 `.local/prototype-reader-recovery.mw5OJU/REPRODUCE.md`；在线阅读使用独立调试验收包，发行签名、生产和真机另验。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

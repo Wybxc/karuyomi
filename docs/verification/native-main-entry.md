@@ -92,6 +92,8 @@ iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evid
 
 本机忽略目录 `.local/native-android-reader-access-2c012db/` 保留 `REPRODUCE.md`、Android 系统控件树和截图、分阶段审计与 D1 快照。可用仓库固定 Node 执行 `node .local/native-android-reader-access-2c012db/verify.ts` 独立重核。专用模拟器、ADB、隔离服务及临时私钥已清理。本项覆盖隔离 Android 模拟器中的同身份恢复；生产 Cloudflare Access、其他身份、未确认草稿和真机需分别验收。
 
+2026-11-10，用带 `676f424` 和 `63c2cab` 阅读恢复修复的首发六材料源码，在另一台专用 Pixel 7 / Android 16 API 36 模拟器上重跑同一系统操作。正式入口和冻结 xkcd 的静态索引已逐字节核对。刷新进度收到 401 后保留原图，系统点击完成可见重登，读回同章第 2 页并重新解码；系统返回释放恢复后的资源。独立读取临时 D1 确认保存基线、401 前、暂停、登录、原位恢复、退出的业务数据完全相同（账户/作品 revision 4/3，四笔回执）；退出没有附带请求。保留旧轮次的同页写证据；本轮结论覆盖同一测试身份的读请求失效与退出。原始记录与独立核对脚本见 `.local/prototype-reader-recovery.mw5OJU/android-recovery/`。
+
 ### iOS 阅读中 Access 失效与待确认进度
 
 2026-11-10，使用 iPhone 17 Pro / iOS 26.4 专用模拟器、未插桩 Flutter App 与外部 XCTest，独立验证首发六材料归档（`2c012db` + 服务地址与 Access 回跳修复）。官方 Vite/Wrangler HTTPS、临时 D1、回环测试 IdP 和冻结 v6 xkcd 与 Android 分项使用同一验证方式。正式界面登录、安装和收藏 xkcd 英文作品，打开 `3319: Elevators`、显示并保存第 2/2 页。驱动从外部使 Cookie 失效，App 留在前台，点击「读完本章」的真实 POST 收到 401；原图仍可见，账户/作品 revision 保持 5/4，D1 无新回执。
