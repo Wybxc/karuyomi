@@ -238,6 +238,70 @@ void main() {
     );
 
     testWidgets(
+      'after first install the new row leads accessibility traversal without reopening Browse',
+      (tester) async {
+        final builds = [
+          for (var index = 0; index < 48; index++)
+            _build('extension-$index', [
+              wire.CatalogSource(
+                id: '$index',
+                name: 'Source $index',
+                lang: 'en',
+              ),
+            ]),
+        ];
+        final first = builds.first, target = builds.last;
+        String label(wire.ExtensionBuildDescriptor build) =>
+            '${build.packageName} · ${build.version}';
+        final rowLabels = {label(first), label(target)};
+        Iterable<String> matchingRows() => tester.semantics
+            .simulatedAccessibilityTraversal()
+            .map((node) => node.label)
+            .where(rowLabels.contains);
+
+        platform.inventory = _index(builds);
+        platform.seedInstalledBuilds(const []);
+        await catalog.connect();
+        await show(tester);
+        expect(matchingRows(), [label(first)]);
+        await tester.tap(find.byKey(const ValueKey('extensions-manage')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('extensions-search')),
+          target.packageName,
+        );
+        await tester.pumpAndSettle();
+        final install = find.byKey(
+          ValueKey((
+            'extension-install',
+            catalog.catalogUrl,
+            target.packageName,
+          )),
+        );
+        await tester.scrollUntilVisible(
+          install,
+          180,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(install);
+        await tester.pumpAndSettle();
+        expect(catalog.installedExtensions.single.buildId, target.buildId);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(matchingRows(), [label(target), label(first)]);
+        expect(
+          find
+              .byKey(ValueKey(('catalog-build-open', target.buildId)))
+              .hitTestable(),
+          findsOneWidget,
+        );
+        expect(platform.openedBuilds, isEmpty);
+        await hide(tester);
+      },
+    );
+
+    testWidgets(
       'static names and language projection work before executing any extension',
       (tester) async {
         await show(tester);
