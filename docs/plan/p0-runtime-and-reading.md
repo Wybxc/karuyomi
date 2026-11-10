@@ -33,6 +33,8 @@ ToonLook 的长图重排已通过 [Web 完整章节分项](../verification/aot-c
 
 冻结 v6 [Arknights Comics Android 分项](../verification/aot-current-pilot.md#arknights-comics-的-android-完整章节与续读)已实际显示《DREAM》完整 51 页、完成、跨章及新进程非首页续读；[同库 Android↔iOS](../verification/aot-current-pilot.md#arknights-comics-的-android-与-ios-模拟器接力)的续读接力已通过。真机、生产 Access 与其余 P0 门另验。
 
+同一冻结批次的 [CuuTruyen Native 分项](../verification/aot-current-pilot.md#cuutruyen-的-native-完整章节与跨端续读)已验证原 Source 处理后的第 142 章全部 23 页、显式完成、正常下一章，以及 Android → iOS → 新 Android 进程的同库续读。完整候选、生产 Access 和真机另验。
+
 ## 已完成与边界
 
 固定 `2c012db` 已通过与冻结 v6 候选匹配的 [iOS arm64 发布构建及包内材料核对](../verification/native-main-entry.md#v6-ios-arm64-发布构建)。成品未签名；匹配部署、实际安装与真机阅读另验。

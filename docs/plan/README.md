@@ -26,6 +26,8 @@ Web 已通过[阅读进度提交后丢确认](../verification/concurrent-server-
 
 2026-11-10：[Arknights Comics Android 完整章和新进程续读](../verification/aot-current-pilot.md#arknights-comics-的-android-完整章节与续读)、[iOS↔Android 同库接力](../verification/aot-current-pilot.md#arknights-comics-的-android-与-ios-模拟器接力)及[iOS→Android→iOS 封面交接](../verification/custom-covers.md#ios-与-android-模拟器同库封面交接)通过，生产与真机另验。
 
+同日，[CuuTruyen Native 完整章节和同库接力](../verification/aot-current-pilot.md#cuutruyen-的-native-完整章节与跨端续读)通过，覆盖六材料归档的真源图片处理、Android 完整章与跨章、iOS 续读推进及 Android 新进程无写入读回。
+
 ## 优先级与状态
 
 | 优先级                  | 计划                                                          | 当前状态与依赖                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |

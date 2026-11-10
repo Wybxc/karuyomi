@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-10，[CuuTruyen 六材料 Native 完整章和接力](verification/aot-current-pilot.md#cuutruyen-的-native-完整章节与跨端续读)通过。Android 模拟器逐页显示并完成第 142 章 23 页，进入第 141 章保存第 3 页；iOS 同库续到第 4 页，Android 新进程读回。D1 仅为 iOS 翻页新增一条回执，最终读回无写入。生产、真机和完整快照另验。
+
 2026-11-10，[iOS 阅读中重登与显式重试](verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)在六材料归档和隔离 D1 通过：401 与恢复原位不提交，显式重试按原请求只写一次，收起恢复控件不写，主动翻页再保存。[Android 复验](verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)中，401 后重登、原位恢复及直接退出的 D1 业务状态与基线完全相同。生产 Access 与签名真机另验。
 
 2026-11-10，[iOS Arknights 阅读性能基线](verification/reader-baseline-ios.md)取得一轮正式 iOS debug 模拟器原始数据：Flutter 首次图像帧、连续翻页、固定滚动、跨章帧与 App 自身 RSS 均有样本。没有把 Flutter 图像帧当作物理屏幕呈现；真机、WebContent/GPU 与分布门仍待验。
