@@ -54,11 +54,26 @@ flutter build apk --release --no-pub --target-platform=android-arm64 \
 ```
 
 - 官方产物 `app-arm64-v8a-release.apk` 为 23,210,038 字节，SHA-256 为 `19293db1112468b48276dc3558050546f032ed65916ea6ae05522b2ffc2a797e`。包名 `dev.karuyomi.karuyomi`、版本 `0.1.0`（versionCode `2001`）；APK 与系统安装记录均为 `arm64-v8a`，`libapp.so` 为 ELF64/AArch64，应用不可调试。
-- `apksigner` 验证 APK Signature Scheme v2 通过，唯一证书为 `CN=Android Debug`，证书 SHA-256 为 `8cd31446c6584ffeb49a7dd7fccdfe2beac96a44c7559e6028abbe9f22b8187e`。这是 Gradle 当前配置生成的本机侧载候选，尚无发行签名。
+- `apksigner` 验证 APK Signature Scheme v2 通过，唯一证书为 `CN=Android Debug`，证书 SHA-256 为 `8cd31446c6584ffeb49a7dd7fccdfe2beac96a44c7559e6028abbe9f22b8187e`。这是当时 Gradle 配置生成的本机侧载候选，尚无发行签名。
 - APK 内 `host.js`、`worker.js`、`manifest.json` 与固定 Native 构建逐字节一致；内置清单的材料版本为 `5d1260e5d20b2f2f05fd378a6e8b697338e5fdfd4feca2c5a8c361e756bb92e4`，引用的六份冻结材料均按实际文件核对。APK 没有 `libsqlite3.so`，`NativeAssetsManifest.json` 的映射为空；固定产品无 Drift/SQLite 业务依赖，业务状态由 Worker API + D1 确认。历史 APK 的 SQLite 证据属于旧实现。
 - 专用 Pixel 7 / Android 16 API 36 ARM64 模拟器在飞行模式下通过 `adb install` 安装；设备上 `base.apk` 的 SHA-256 与本机 APK 相同。`adb shell am start -W -n dev.karuyomi.karuyomi/.MainActivity` 报告冷启动成功，正式 Activity 位于前台（PID `4184`），UI 树和截图显示空书架及书架、浏览、设置三个标签。
 
 APK 保留在本机忽略目录 `.local/android-arm64-release-2c012db/artifacts/karuyomi-2c012db-arm64-v8a-release-local.apk`。`evidence/split/` 保留签名、ELF、实际安装摘要、启动日志及截图；可用 `node verify-apk.ts` 重核。专用模拟器和私有 ADB 已清理。本次只验证该 release 包能启动；未连接隔离或生产服务，未验证此 APK 的 Source 初始化、真实 xkcd 续读、生产 Access 或真机。
+
+## Android 发行签名配置
+
+2026-11-10，在包含 Native 登录及阅读恢复修复的[首发六材料归档](aot-current-pilot.md#首发六材料产品归档)副本中，只替换 Android app 的 Gradle 配置。使用固定 Flutter 3.47.5 / Dart 3.13.4、JDK 25.0.5+8 和 Android Build Tools 37.0.0，从 `apps/reader` 运行：
+
+```sh
+flutter build apk --release --target-platform=android-arm64 \
+  --split-per-abi --target=lib/main.dart \
+  --dart-define=APP_ORIGIN=https://karuyomi.wybxc.cc
+```
+
+- 无 `android/key.properties` 时，构建成功，`apksigner verify` 拒绝未签名 APK。提供本轮临时 PKCS#12 密钥库及发行配置后重建，`apksigner verify --verbose --print-certs` 确认 v2 签名通过，唯一签名证书的 SHA-256 与构建前从密钥库导出的证书一致。
+- 两个 APK 内的 `host.js`、`worker.js` 和 `manifest.json` 均与首发归档逐字节一致，`pubspec.lock` 不变。首轮 `--no-pub` 复用了过时的集成测试插件注册表，未通过 Java 编译；上面的正常构建刷新注册表后，两次均成功。
+
+日志、证书摘要和成品保存在本机忽略目录 `.local/prototype-android-signing.vZ5Qg7/`，临时密钥和签名配置已清理。两份 APK 均未安装；正式发行证书、签名真机和生产登录仍待验收。
 
 ## Native 本机服务地址恢复
 

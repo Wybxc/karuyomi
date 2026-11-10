@@ -26,6 +26,8 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 [首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。空索引构建、隔离 HTTP 回跳和上传 dry-run 通过；完整快照、最终签名安装包及生产仍未验收。
 
+[Android 发行签名配置](../verification/native-main-entry.md#android-发行签名配置)已用同一归档验证：未配置时产出未签名 APK，配置临时证书后可验证签名和包内材料。组装最终六材料候选时一并回摘这项 Gradle 变更，再用正式证书构建并在真机验收。
+
 ## 已完成
 
 - Keiyoushi、TeaVM、Suwayomi 通过固定提交的 submodule 引入；研究交付中的项目代码已内化，真正上游用正式补丁追踪。依赖/JAR/seed/大产物留在忽略目录。
