@@ -28,6 +28,8 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 [Android 发行签名配置](../verification/native-main-entry.md#android-发行签名配置)已用同一归档验证：未配置时产出未签名 APK，配置临时证书后可验证签名和包内材料。组装最终六材料候选时一并回摘这项 Gradle 变更，再用正式证书构建并在真机验收。
 
+最终六材料客户端还需带入[短窗口阅读器修复](../verification/reader-fit.md#2026-11-10android-横屏控件与原图位置)。该 Dart 变更已在首发归档副本用真实 Arknights 复验，APK 内置运行时与原归档字节一致。
+
 ## 已完成
 
 - Keiyoushi、TeaVM、Suwayomi 通过固定提交的 submodule 引入；研究交付中的项目代码已内化，真正上游用正式补丁追踪。依赖/JAR/seed/大产物留在忽略目录。

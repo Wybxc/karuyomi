@@ -64,6 +64,8 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 [六材料 Native 阅读中 Access 恢复](../verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)已通过 Android 只读失效后同章同页恢复并直接退出，D1 不变；[iOS 有待确认进度时的复验](../verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)确认重登只读，显式重试只提交原请求一次，控件收起不写入，主动翻页仍保存。[iOS](../verification/native-main-entry.md#ios-阅读中切换身份)和 [Android](../verification/native-main-entry.md#android-阅读中切换身份)模拟器都已验证切换测试身份时退出原阅读、旧草稿不重发、新身份独立保存和冷启动读回。生产 Access、真机和最终签名安装包另验。
 
+首发六材料的 [Android 模拟器短窗口复验](../verification/reader-fit.md#2026-11-10android-横屏控件与原图位置)修复了横屏控件挤掉图片的问题。真实 Arknights 连续阅读中，旋转和同进程前后台切换保持当前页与原图点，短窗口控件可独立滚动；其它平台、真机和完整 P0 仍待验收。
+
 当前 v6 材料已在正式 Web 读完 ToonLook 英文源 Doomed 的第一章、进入第二章并逐页显示，两章各 10 页，新文档首次续读恢复到第二章第 10 页；五个实图样本的条带重排与独立参考相符。[验收记录](../verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)只覆盖这一作品的 Web 分项。继续补相同材料的代表源、Native 实图和真机性能。
 
 阅读连续性三个实现里程碑已接通：保留 Source 原序/反序与重复章节，用包含漫画/Source 作用域的章节键在同一 route 切章；新叶等旧调度、图片 pin、provider 清理确认后才安装。路由退出时，迟到 pages 与尚未挂载的新 provider 均有明确关闭者。有界下一章在真实末页 frame、窗口与 Source 空闲后自动准备，邻章不取图片；清理失败保留 owner 并阻止继续占用会话。历史目录/详情/Reader 曾使用受信身份与 Drift 进度，SQLite 文件关闭重开回归通过；当前业务读写已改为 Worker API + D1，历史本地数据库证据不代表跨端恢复。真实 Arknights 连续切章及关标签页重开的章节/页码/顺序恢复已通过，见[Web 产品进度](../verification/reader-progress-web.md)；iOS/Android 模拟器原 xkcd 的正式 ReaderScreen 已分别通过受控入口下真实进程重启恢复章节、末页和完成状态；浏览器进程退出、真机与完整日用流程仍待验收；随后固定 `19b65f5` 的 Cache v3 原 Source 双端重启也已通过[分项复验](../verification/reader-frame-native.md)，另见[阅读记录](../verification/reader-continuity.md)与[进度记录](../verification/local-progress.md)。

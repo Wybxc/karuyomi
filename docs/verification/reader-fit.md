@@ -43,3 +43,13 @@ flutter test test/settings/ test/reader/reading_progress_navigation_test.dart te
 全库入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。临时日志保留在忽略的 `.local/fit-*.log` 与 `.local/reader-fit-screen.log`。
 
 后续全局适配偏好的双 Web 与双 iOS 顺序读回、新文档/进程恢复分项见[设置记录](reader-settings.md)；实际阅读二维位置、生产 Access、其余平台和真机手势仍须分别验收。本轮不部署生产；裁白和自定义封面已继续接入，分别见[裁白](reader-crop.md)与[自定义封面](custom-covers.md)，不把工程通过当作完整 P1/P2 验收。
+
+## 2026-11-10：Android 横屏控件与原图位置
+
+在独立 Pixel 7 / Android 16 API 36 模拟器上，用首发六材料正式客户端、冻结 Arknights Comics 1.6.2、受信回环 Wrangler HTTPS 和隔离 D1，通过正式界面收藏《Prelude Suite: The Lone Walker》，以竖向连续模式打开 DREAM。调试入口只加入测试 CA；APK 内三项运行时资源与首发归档逐字节一致。
+
+- 修复前，滚到第 2/51 页的原图 y=0.28714 后由系统旋转至 2400×1080。界面仍报第 2 页、D1 锚不变，但打开的底部控件占满窗口，实际没有任何漫画图可见；转回竖屏后恢复。
+- 修复后，从同一书架在新进程读回该页内点。打开控件旋转后仍显示真实第 2 页，滑动控件区可访问「下一章」，图片和七路业务读回不变。系统桌面返回原进程时恢复为竖屏，仍显示相同原图点。两次窗口变化各保存一次实际视口横向位置；页键、原图坐标、最远进度及完成状态保持不变。
+- 主动翻页后保存第 3 页。另一次竖屏前后台往返保持同一进程，恢复真实第 3 页，七路 API 响应正文与切换前逐字节相同。
+
+短窗口回归先在旧版复现图片区消失，再通过修复版的旋转、独立控件滚动与章操作。全量 `pnpm flutter:check` 和 `pnpm build` 通过。测试操作、截图、进程与 D1 对照见忽略目录 `.local/prototype-android-reader-rotation.04loWR/REPRODUCE.md`。此项只覆盖 Android 模拟器的正式阅读分项，浏览器、iOS、发行签名真机、生产 Access 和性能另验。

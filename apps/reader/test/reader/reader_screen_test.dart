@@ -2212,6 +2212,67 @@ void main() {
     expect(provider.released, isNotEmpty);
   });
 
+  testWidgets('landscape keeps the image visible with tall chapter controls', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(411, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final manifest = fixtureChapter();
+    final viewports = <ReaderViewportState>[];
+    var nextChapter = false;
+    await tester.pumpWidget(
+      screen(
+        provider: FixturePageProvider(),
+        manifest: manifest,
+        position: manifest.positionAt(1, offset: .28),
+        mode: ReadingMode.continuous,
+        imageBuilder: decodedImage(),
+        onViewport: viewports.add,
+        chapterControls: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final label in [
+              '阅读设置',
+              '刷新进度',
+              '重新阅读本章',
+              '读完本章',
+              '标记书签',
+              '刷新书签',
+            ])
+              TextButton(onPressed: () {}, child: Text(label)),
+            TextButton(
+              onPressed: () => nextChapter = true,
+              child: const Text('下一章'),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final before = viewports.last.current;
+    expect(before.pageKey, manifest.pages[1].key);
+
+    tester.view.physicalSize = const Size(915, 411);
+    await tester.pumpAndSettle();
+    final imageViewport = find.byKey(const ValueKey('continuous-reader'));
+    expect(imageViewport.hitTestable(), findsOneWidget);
+    expect(viewports.last.observed, isNotNull);
+    final rotated = viewports.last.current;
+    expect(rotated.pageKey, before.pageKey);
+    expect(rotated.normalizedOffset, before.normalizedOffset);
+
+    final next = find.text('下一章');
+    expect(next.hitTestable(), findsNothing);
+    await tester.ensureVisible(next);
+    await tester.pumpAndSettle();
+    await tester.tap(next);
+    expect(nextChapter, isTrue);
+    expect(imageViewport.hitTestable(), findsOneWidget);
+    expect(viewports.last.current, rotated);
+  });
+
   testWidgets('continuous position survives resize and Webtoon layout switch', (
     tester,
   ) async {
