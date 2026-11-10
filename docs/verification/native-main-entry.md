@@ -119,4 +119,14 @@ iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evid
 
 最终修复在同章、同清单且原页仍存在时保留原视口锚点，避免图片重新解码或收起恢复控件被当作用户移动；清单改变仍走常规位置解析。用加入两次修复的同一六材料源码、专用 iOS 模拟器及新隔离 D1 复验：401 和原位恢复不改变业务状态；显式重试用原 UUID、正文及 CAS 只提交一次，账户/作品 revision 从 5/4 到 6/5，页位与最远进度均不变；控件收起后无新增 POST。主动翻到第 1 页才新增一条回执（7/6），第 2 页仍为最远进度，已读完成标记保留。42 项阅读器定向回归通过，包含恢复时清单变化、迟到解码和控件收起后再主动定位。复核可用固定 Node 执行 `node .local/ios-reader-access-v6.7gSLAq/placement.G2ta1m/verify.ts`，同目录保留实际补丁、`xcresult` 与分阶段审计。
 
-回归测试另覆盖更换身份时不发送旧草稿、远端已重置时不重放旧写。实测仅覆盖同一身份和本地 IdP；生产 Access、签名真机及跨身份实测仍未验收。本机忽略目录 `.local/ios-reader-access-v6.7gSLAq/` 保留固定补丁、XCTest、原始 `xcresult`、分阶段审计和独立核对脚本。
+回归测试另覆盖更换身份时不发送旧草稿、远端已重置时不重放旧写。本段实测使用同一身份和本地 IdP；生产 Access 和签名真机仍未验收。不同身份的隔离实测见下节。本机忽略目录 `.local/ios-reader-access-v6.7gSLAq/` 保留固定补丁、XCTest、原始 `xcresult`、分阶段审计和独立核对脚本。
+
+### iOS 阅读中切换身份
+
+2026-11-10，用带两次阅读恢复修复的首发六材料源码，在专用 iPhone 17 Pro / iOS 26.4 模拟器运行未插桩的正式 App。App、Reader Core、Source Runtime、正式 Worker 与归档一致，实际包内三项运行时资源也逐字节一致。复用冻结 v6 xkcd、隔离 D1、官方 Wrangler HTTPS 和外部 XCTest。回环测试 IdP 用同一测试邮件签发两个不同的 RS256 `sub`，正式 Worker 仍按签名身份鉴权。
+
+1. A 登录、安装并收藏 xkcd，打开 `3319: Elevators`，显示并保存第 2/2 页。使 Cookie 失效后点击「读完本章」：实际 POST 收到 401，原图仍可见；账户/作品 revision 保持 5/4，本章未读完，D1 仍是 5 笔回执。
+2. 保持同一 App 进程，通过 Reader 的可见登录切到 B。原 Reader 退出，B 看到空书架，无旧「重试保存」入口。独立审计确认 B 的 bootstrap 和书架读回，未出现原作品查询或 Source 中继请求，未重发 A 的章节 mutation，D1 业务快照与切换前完全一致。
+3. B 从正式扩展管理明确安装 xkcd。D1 只新增 B 自己的一条全局设置回执，B 账户/设置 revision 均为 1，A 的账号、作品、进度、设置和回执逐项不变。终止并重启 App 后，B 仍能读回自己的扩展安装，书架保持空白，业务快照无变化。
+
+首次 XCTest 已完成 B 登录，但等待空书架的静态标题超时；该标题未出现在当轮控件树中。驱动改用空状态专属的「去浏览」按钮，在原进程只读复验。设置接口审计未区分请求方法，唯一设置提交以 D1 revision 和回执为准。原始 `xcresult`、前后快照、进程核对及复验命令见本机忽略目录 `.local/prototype-ios-identity.vBZnAl/REPRODUCE.md`，可用固定 Node 执行同目录 `verify.ts`。测试服务、专用模拟器与 TLS 私钥已清理。本项仅覆盖 iOS 模拟器的本地签名身份切换；Android 换身份、生产 Access 和签名真机另验。
