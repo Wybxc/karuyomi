@@ -352,14 +352,23 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
           !widget.catalog.isCurrentSource(next.source)) {
         throw StateError(widget.catalog.error ?? '恢复时漫画源会话已改变，请重新连接');
       }
+      final anchor = next.position;
+      final manifest = next.opened.manifest;
       setState(() {
         _manga = next.manga;
         _sequence = next.sequence;
         _source = next.source;
         _chapter = next.chapter;
         _opened = next.opened;
-        _initialPosition = next.position;
-        _preserveInitialPlacement = false;
+        _initialPosition = anchor;
+        // A fresh leaf can center the same decoded point differently. Keep
+        // the original placement so removing recovery controls does not save
+        // a synthetic move. Missing pages still use the normal fallback.
+        _preserveInitialPlacement =
+            anchor != null &&
+            anchor.chapterKey == manifest.chapterKey &&
+            anchor.manifestVersion == manifest.version &&
+            manifest.pages.any((page) => page.key == anchor.pageKey);
         _viewport = null;
         _positionRequest.value = null;
         _viewClosed = Completer<void>();

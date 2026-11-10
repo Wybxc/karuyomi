@@ -473,6 +473,7 @@ void main() {
           anchor.manifestVersion,
         );
         expect(resumed.initialPosition!.normalizedOffset, .4);
+        expect(resumed.preserveInitialPlacement, !changedPages);
         expect(resumed.initialMode, ReadingMode.rightToLeft);
         expect(resumed.doublePage, true);
         expect(

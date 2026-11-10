@@ -85,6 +85,8 @@ pnpm acceptance:serve
 
 本轮空索引不能发布。等待冻结结果和三个补编结果后，用同一产品归档装配正式扩展快照并重跑构建、dry-run、双端 Native 安装与实际 Source 门；未改冻结运行目录、候选 state 或生产。
 
+2026-11-10，从上述归档独立复制源码，再回摘阅读中 Access 恢复的显式重试和视口保留两项修复。回摘的七个产品源码文件与通过隔离 iOS 复验的文件逐字节一致。完整 `hostFingerprint()` JSON、Web 材料清单与 host/worker、Native host/worker/manifest 与旧归档逐字节相同，仍使用冻结 v6 的六份材料。空索引的正式 Web/Worker 构建和 Wrangler 上传 dry-run 通过；使用完整快照的最终构建、发行签名与生产验收另做。本机忽略目录 `.local/prototype-reader-recovery.mw5OJU/` 保留补丁、构建和核对日志。
+
 ### 六材料 Native 发布构建
 
 2026-11-10，用上述固定归档与 Flutter 3.47.5 / Dart 3.13.4 分别从正式 `lib/main.dart` 构建 Android arm64 release APK 与 iOS arm64 iPhoneOS `--no-codesign` 应用。两个 Dart AOT 二进制均包含正式默认服务地址、本机服务地址保存键和新登录回跳路径。此归档只回摘了服务地址与 Access 修复，尚未包含后续的阅读进度恢复修复。
