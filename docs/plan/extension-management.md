@@ -14,6 +14,7 @@
 - D1 保存账户已确认意图，沿用全局设置 CAS、原 mutation UUID/body 和确认后重取。准备开始时复制完整全局值并固定 revision；准备结束不重读一个新 CAS 覆盖并发修改。任意未知 ACK 的全局 pending 阻止新编辑，只能显式重试整份原请求；只读刷新不重放写入。
 - 管理页搜索同时匹配包名和当前同来源目录的漫画源名称。已安装项按 `catalogUrl/repoId/packageName` 获取元数据，目录缺失仍可按包名找到；不同仓库的同包名称不互相借用，搜索不写账户或启动扩展。
 - 默认仓库使用当前部署 origin 的 `/extensions/index.json`。已确认清单和当前目录分别呈现；检查更新只重读目录，不自动切换。安装、更新先 `prepareBuild`，再确认账户选择；本机缺副本可独立准备，不写账户选择。
+- 首次安装经服务端确认后，返回浏览页即按账户安装状态排序；完整目录的辅助功能顺序已通过[隔离 Web 复验和生产冒烟](../verification/first-web-release.md#首装后的目录顺序)。
 - 准备重新核对当前索引与 manifest，沿正式有界下载、解压和完整性路径取得代码，不创建 Source Worker 或调用 Source。manager 仅允许一个准备任务，关联 preparation ID，设置 60 秒取消信号，取消完成前等待下载与缓存操作收尾。
 - 扩展代码直接使用 `idb@8.0.4` 的单层可丢弃 IndexedDB 缓存；metadata 与 canonical JS bytes 原子写入，最多 128 项 / 256MiB。下载验证收据在本地复用，不再次 hash；占用可以查询，单副本可以删除。Web Locks 的 shared pin 保护准备与活动构建，删除须取得排他锁；不全清 IndexedDB 或 WebView 数据。
 - `closeBuild(buildId,generation)` 要求调用方先收尾活动请求、队列和图片资源。关闭期间拒绝新 open/调用，等待 Worker shutdown ACK（5 秒期限）以及 namespace 与产物引用释放；失败回收运行槽并报告失败，不能将 terminate 当成成功 ACK。旧代关闭不能影响新代。关闭失败后保留原错误；显式“重建运行时并恢复清理”是独立 reset，先成功收尾 provider，再等待重建确认与引用释放，不将强制回收伪报为 shutdown ACK。
