@@ -62,7 +62,7 @@ Java 的 `popular/latest/search/details/chapters/pages` 边界已返回完整 DT
 
 ## 下一步
 
-[六材料 Native 阅读中 Access 恢复](../verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)已通过 Android 只读失效后同章同页恢复并直接退出，D1 不变；[iOS 有待确认进度时的复验](../verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)确认重登只读，显式重试只提交原请求一次，控件收起不写入，主动翻页仍保存。[iOS 切换测试身份](../verification/native-main-entry.md#ios-阅读中切换身份)已验证退出原阅读、旧草稿不重发和新身份独立保存。Android 切换身份、生产 Access、真机和最终签名安装包另验。
+[六材料 Native 阅读中 Access 恢复](../verification/native-main-entry.md#android-阅读中-access-失效与原位恢复)已通过 Android 只读失效后同章同页恢复并直接退出，D1 不变；[iOS 有待确认进度时的复验](../verification/native-main-entry.md#ios-阅读中-access-失效与待确认进度)确认重登只读，显式重试只提交原请求一次，控件收起不写入，主动翻页仍保存。[iOS](../verification/native-main-entry.md#ios-阅读中切换身份)和 [Android](../verification/native-main-entry.md#android-阅读中切换身份)模拟器都已验证切换测试身份时退出原阅读、旧草稿不重发、新身份独立保存和冷启动读回。生产 Access、真机和最终签名安装包另验。
 
 当前 v6 材料已在正式 Web 读完 ToonLook 英文源 Doomed 的第一章、进入第二章并逐页显示，两章各 10 页，新文档首次续读恢复到第二章第 10 页；五个实图样本的条带重排与独立参考相符。[验收记录](../verification/aot-current-pilot.md#toonlook-的长图重排完整章节与续读)只覆盖这一作品的 Web 分项。继续补相同材料的代表源、Native 实图和真机性能。
 

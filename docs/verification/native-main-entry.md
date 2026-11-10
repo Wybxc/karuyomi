@@ -129,4 +129,14 @@ iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evid
 2. 保持同一 App 进程，通过 Reader 的可见登录切到 B。原 Reader 退出，B 看到空书架，无旧「重试保存」入口。独立审计确认 B 的 bootstrap 和书架读回，未出现原作品查询或 Source 中继请求，未重发 A 的章节 mutation，D1 业务快照与切换前完全一致。
 3. B 从正式扩展管理明确安装 xkcd。D1 只新增 B 自己的一条全局设置回执，B 账户/设置 revision 均为 1，A 的账号、作品、进度、设置和回执逐项不变。终止并重启 App 后，B 仍能读回自己的扩展安装，书架保持空白，业务快照无变化。
 
-首次 XCTest 已完成 B 登录，但等待空书架的静态标题超时；该标题未出现在当轮控件树中。驱动改用空状态专属的「去浏览」按钮，在原进程只读复验。设置接口审计未区分请求方法，唯一设置提交以 D1 revision 和回执为准。原始 `xcresult`、前后快照、进程核对及复验命令见本机忽略目录 `.local/prototype-ios-identity.vBZnAl/REPRODUCE.md`，可用固定 Node 执行同目录 `verify.ts`。测试服务、专用模拟器与 TLS 私钥已清理。本项仅覆盖 iOS 模拟器的本地签名身份切换；Android 换身份、生产 Access 和签名真机另验。
+首次 XCTest 已完成 B 登录，但等待空书架的静态标题超时；该标题未出现在当轮控件树中。驱动改用空状态专属的「去浏览」按钮，在原进程只读复验。设置接口审计未区分请求方法，唯一设置提交以 D1 revision 和回执为准。原始 `xcresult`、前后快照、进程核对及复验命令见本机忽略目录 `.local/prototype-ios-identity.vBZnAl/REPRODUCE.md`，可用固定 Node 执行同目录 `verify.ts`。测试服务、专用模拟器与 TLS 私钥已清理。本项仅覆盖 iOS 模拟器的本地签名身份切换，Android 对照见下节。
+
+### Android 阅读中切换身份
+
+2026-11-10，在专用 Pixel 7 / Android 16 API 36 arm64 模拟器，用与 iOS 对照一致的首发六材料源码、冻结 v6 xkcd、官方 Wrangler 回环 HTTPS 和新隔离 D1 复验。调试入口只为 Dart 加入测试 CA，再调用正式 `app.main()`；WebView 仅在回环域信任该 CA，两条网络路径都保留证书和主机名校验。APK 内的 `host.js`、`worker.js` 和 `manifest.json` 与首发归档逐字节一致。所有业务操作通过正式界面，由 Android 系统 UIAutomator 定位和点击；测试 IdP 签发不同 `sub` 的令牌，正式 Worker 验签。
+
+1. A 安装并收藏真实 xkcd，打开 `3319: Elevators`，显示并保存第 2/2 页。Cookie 失效后点「读完本章」，唯一一次章节 POST 收到 401；截图确认第 2 页原图仍在，完成只显示为未确认草稿。独立 D1 快照确认本章未读完，账户/作品 revision 仍为 5/4，回执仍为五条。
+2. 在同一 App PID `3856` 通过可见登录切到 B，原 Reader 退出，B 的空书架无旧「重试保存」入口。有效 Cookie 的 B bootstrap 后读回自己的书架；期间无业务 POST、原作品 GET 或 Source 中继请求，D1 业务快照不变。
+3. B 的扩展列表显示零个安装，手动安装 xkcd 后只有一条由 B 发起的 `POST /api/settings/mutations`，请求 ID 与新 D1 回执一致。B 账户/设置 revision 为 1，A 的所有行不变，401 请求从未持久化。终止 App 后以 PID `5691` 冷启动，B 的 Cookie、空书架和安装记录可读回，全程无业务 POST，D1 快照不变。
+
+控件树、截图、APK 资源核对、独立审计和复验步骤保留在本机忽略目录 `.local/prototype-android-identity.pEmIby/REPRODUCE.md`；用固定 Node 执行同目录 `verify.ts` 重核五阶段快照。专用服务、模拟器、私用 ADB 和临时 TLS 私钥已清理。本分项覆盖隔离模拟器的单向身份切换；生产 Access、更多 Source 下往返换身份和签名真机另验。
