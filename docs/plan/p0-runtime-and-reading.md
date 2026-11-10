@@ -84,7 +84,7 @@ Android 当前材料首轮显示后未推进 observed，已定位为 post-frame 
 
 历史 `be5c3ed` Web 主入口通过官方 Arknights 1.6.1 → 1.6.2 的静态快照更新、重新连接与 DREAM 第 3 页首次续读；两版章节会话均关闭、两 Worker 最终终止，见[版本更新证据](../verification/extension-version-web.md)。新版以真实上游 200 重新写入正文，未验证换版后 HTTP Cache 正文复用。同期 Native 主入口因工具无法操作 Simulator 未安装或启动，见[当时的准备与阻断](../verification/native-main-entry.md)。
 
-随后固定 `426536d` 的正式 iOS 模拟器通过 [xkcd 1.6.1 同版本构建替换](../verification/extension-version-native.md)：明确确认新构建，清理旧扩展代码缓存，新进程从书架首次续读恢复同一真实第 2 页，D1 阅读状态与确认前一致。Native 上游版本升级、Android 换版、真机和生产 Access 仍待验收；P0 完整门槛不变。
+随后固定 `426536d` 的正式 iOS、Android 模拟器通过 [xkcd 1.6.1 同版本构建替换](../verification/extension-version-native.md)：明确确认新构建，清理旧扩展代码缓存，新进程从书架首次续读恢复同一真实第 2 页，D1 阅读状态与确认前一致。首发六材料 Android 又通过[换构建后章节 HTML 复用与清除数据对照](../verification/source-cache-native.md#2026-11-10android-同版本换构建后复用章节正文)。其它平台与上游版本变化的正文复用、Native 上游版本升级、真机和生产 Access 仍待验收；P0 完整门槛不变。
 
 图片解码按[独立子计划](reader-image-decoding.md)推进：Source/host 只交付不透明编码资源，Flutter 以实际 ImageInfo 尺寸更新布局与预算，退休资源计费保留至释放 ACK。当前仍为客户端整图显示，后验账本不证明初次 decoder 临时分配或 GPU 峰值有界，也没有调高整图预算。未采用的自研 codec 候选源码和专属工具已删除，历史评估保留原输入与限定结论。先完成真实 UI 直接解码 baseline，并在相同输入/设备比较首图、跳转、滚动、CPU/RSS/GPU，再决定是否采用成熟区域解码、降采样或分片；Source 不重新感知图片信息。历史编码页/host tile 机制证据保留并标为已替代，原失败不覆盖。真实长图、EXIF/LOD、真机和实际峰值继续待验。
 

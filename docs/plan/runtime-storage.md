@@ -60,7 +60,7 @@
 
 真实 xkcd 冷热观测曾全部为零，已核实锁定 seed 的 `NetworkHelper` 没有配置 Cache。现已内化最小 owned 适配，保留既有 ABI、Cookie、UA 与拦截器，显式启用稳定目录下的 5 MiB Cache；图片原有 cacheless 调用保持有效。原 seed 与 owned JVM 配置门及实际 TeaVM 浏览器 Worker 配置门已通过，详见[Source 网络配置证据](../verification/source-network-cache.md)。随后固定 `b4f72f7` 的新指纹 / 原 JAR AOT 已实际证明 xkcd 3318 元数据 cold commit 7187 B、warm 从 store 读完 7187 B 且上游零请求；Page 会话关闭及页列表摘要一致。图片保持原 cacheless，两轮各走真实网络。随后独立新 origin 的原 Source 通过 12 项 manager/Worker 重建门：旧 manager dispose 实际终止 Worker，新 manager/Worker 以相同四维 namespace 读完持久 store 的 7187 B、EOF 与 reader-close，上游零请求、PageList 摘要一致，最终两 Worker 均终止。这是同一浏览器文档内重建，未发生 304。另有[原 Source Native Cache 门](../verification/source-cache-native.md)：同一新 AOT 在 iOS / Android 模拟器通过正式 Native runtime 的 cold commit、warm 正文读取及容器重建后复用，三阶段 Page 会话关闭和最终 dispose 均确认。这组历史门未包含进程重启。固定 `be5c3ed` 的正式 Flutter Web 主入口随后通过原 xkcd A→B→A：独立 namespace 的 B 冷取，返回 A 恢复自身进度并在真实 304 后读完原 7187 B 正文，详见[产品重连记录](../verification/runtime-reconnect.md)；不将其记成零网络，也不推广到 Native 身份或生产会话。
 
-正式 Flutter Web 的官方 Arknights 1.6.1 → 1.6.2 更新与第 3 页续读已按[版本证据](../verification/extension-version-web.md)通过：同 namespace 的新版可见旧 Cache 条目、旧新 Worker 均正常终止；但本轮全部上游 200、新版正文读取计数为 0，只证明重新获取并写入。版本更新后 Cache 正文复用、普通文件、Native 及进程重启仍须分别验收，不用产品页位恢复替代存储语义门。
+正式 Flutter Web 的官方 Arknights 1.6.1 → 1.6.2 更新与第 3 页续读已按[版本证据](../verification/extension-version-web.md)通过：同 namespace 的新版可见旧 Cache 条目、旧新 Worker 均正常终止；但本轮全部上游 200、新版正文读取计数为 0，只证明重新获取并写入。首发六材料 Android 的[原版 xkcd 同版本换构建后正文复用](../verification/source-cache-native.md#2026-11-10android-同版本换构建后复用章节正文)已通过：显式换构建后新进程不请求章节 HTML；清除本地数据、保留同一 D1 后恢复一次完整请求。其它平台和上游版本变化的正文复用、普通文件及浏览器进程重启仍待验，不用页位恢复替代存储语义门。
 
 ## 阶段四：原 JVM 同版对照与产品门
 

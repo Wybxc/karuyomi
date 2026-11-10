@@ -102,3 +102,18 @@ Pixel 7 / Android API 36 arm64 模拟器（WebView `133.0.6943.137`）使用同�
 两次 HTML 响应的 SHA-256 均为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。三次 App PID 与 Source generation 各不相同；冷启动两页有实际截图。清除数据的对照表明 D1 仍可提供页位，但不能代替 Source 重新获取章节正文。Android 未直接解码 LevelDB 正文块；证据来自真实中继增量、独立同库对照和正式 App 冷启动。
 
 复验见 ignored `.local/prototype-android-source-cache-restart.H2hyLM/REPRODUCE.md`。正式 APK 构建、验收 Worker 类型检查、独立断言脚本的严格类型检查和三阶段断言均通过；`evidence/cache-restart-check.json` SHA-256 为 `66c73bdd51fb48e35d6f4a22e48aaf9e6557ba2ab6d950c9aa63146edfede2e1`。本项仍不覆盖浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 或真机。
+
+## 2026-11-10：Android 同版本换构建后复用章节正文
+
+在独立 Pixel 7 / Android API 36 arm64 模拟器（WebView `133.0.6943.137`）运行首发六材料的正式 App。仅 debug 验收入口增加本轮回环 CA，APK 内 `host.js`、`worker.js`、`manifest.json` 与首发归档逐字节相同。沿用[两份原版 xkcd 1.6.1 工件](extension-version-native.md#固定输入)：旧 bundle 摘要以 `43d974` 开头，新 bundle 以 `792d491` 开头；仓库、包、Source ID、`storageSchema=release9-v1` 和六份共享材料相同。官方 Wrangler harness 在同一受信 HTTPS origin、测试身份和隔离 D1 中切换静态目录。中继观察器只读请求及响应副本。
+
+| 阶段                 | 正式界面与 D1                                                                                                                                  | 中继与静态交付证据                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 旧构建首次阅读       | 安装并收藏 xkcd，打开 `3319: Elevators`，确认第 2 页已保存                                                                                     | 章节一次 200，`max-age=300`，完整 HTML 7,151 B；原图一次 200                        |
+| 切换目录并检查更新   | 账户仍选择旧构建，六路独立 API 与切换前逐字节相同                                                                                              | 新索引、清单及 gzip 摘要通过，旧清单和 gzip 返回 404                                |
+| 明确更新后冷启动续读 | 点「准备并确认更新」只修改安装项的构建、摘要及设置相关版本。新进程首次进入即显示第 2 页文字图，六路状态与确认后相同；主动返回第 1 页后显示原图 | 新 generation 的原图请求一次 200，距旧构建读取章节约 133 秒；目标章节 HTML **零次** |
+| 清除本地数据后的对照 | 仅清除专用模拟器的 App 数据，第三个进程以同一账号读回同章第 1 页；前后六路状态逐字节相同                                                       | 恢复一次无条件 HTML 200，无 `If-None-Match` / `If-Modified-Since`；原图一次 200     |
+
+清除前首次读取与清除后的完整正文均为 7,151 B，SHA-256 同为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。三次 App PID 和 Source generation 均不同。独立脚本断言静态快照身份、界面页位、六路业务读回和真实中继增量；复验命令、两页截图与审计保留在 ignored `.local/prototype-android-cache-build-update.5NnnxA/REPRODUCE.md` 同目录。报告 `evidence/cache-update-check.json` SHA-256 为 `947f8126f28a5c1437488b30abcf4b3ecffe8f454546c2faa6d706d60145ee6c`，采样与校验脚本通过严格 TypeScript 检查。
+
+本项只证明 Android 模拟器同上游版本、同 storage schema 换构建后复用未过期的原 xkcd 章节 HTML，原图继续请求网络。未覆盖上游版本或 schema 变化、普通文件、过期重验证、Web / iOS 换版、生产 Access 和真机。
