@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-10，[六材料首发修复合并预检](verification/aot-current-pilot.md#六材料首发修复合并预检)通过：首发归档合入 Android 签名配置和横屏修复，Arknights 单包的正式 Web/Worker 构建和 Wrangler 部署预演、43 项定向阅读回归、双端 arm64 未签名构建及包内六材料核对均通过。完整快照、生产和签名真机另验。
+
 2026-11-10，首发六材料的 [Android xkcd 同版本换构建后章节缓存](verification/source-cache-native.md#2026-11-10android-同版本换构建后复用章节正文)通过。切换静态目录和检查更新均未更改账户选择；明确确认后，新进程从书架恢复到第 2 页，重新请求原图但没有请求章节 HTML。清除本地 App 数据、保留同一 D1 后，章节恢复一次完整请求，正文摘要与首次相同。
 
 2026-11-10，[Android 阅读中书签丢确认与 iOS 冷启动读回](verification/bookmarks.md#2026-11-10native-在线阅读书签丢确认与跨端读回)通过。Android 保留原图和待确认操作，iOS 在重试前读回已提交的书签；Android 刷新不重发，显式重试同一请求。六路独立 API 响应及 D1 审计确认只提交一次，进度不变。Web、生产和真机另验。

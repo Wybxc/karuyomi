@@ -98,6 +98,14 @@ pnpm acceptance:serve
 
 同日，从加入两次阅读恢复修复的六材料归档重建 Android arm64-v8a release APK 和未签名 iPhoneOS arm64 App。两份实际包内的三项 Native 资源逐字节匹配，清单 SHA-256 仍为 `c0839e9a5af816ccb0681a8187558cc80f7cc16b641daa20bde744b4418c31f5`，Worker 确认内嵌同一六份材料；Dart 锁文件未变。Android APK CRC 和本地测试签名验证通过，在无默认网络的专用模拟器侧载并冷启动显示书架。iOS 未签名。本轮复验命令与成品记录见 `.local/prototype-reader-recovery.mw5OJU/REPRODUCE.md`；在线阅读使用独立调试验收包，发行签名、生产和真机另验。
 
+### 六材料首发修复合并预检
+
+2026-11-10，在带本机服务地址、登录回跳及阅读恢复修复的 `2c012db` 归档副本中，回摘 `a430647` 的 Android 发行签名配置和 `ab46c3b` 的短窗口阅读修复。以冻结 `c04d436` 的 Arknights Comics 1.6.2 单包静态快照运行 `EXTENSION_ASSETS_DIR=<单包快照> pnpm build`，部署输出的扩展索引与输入相同，六份 Web 材料和三个 Native 运行时文件均与原归档逐字节一致。使用实际生成的 Wrangler 配置执行 `deploy --dry-run` 通过；阅读恢复与 ReaderScreen 的 43 项定向回归通过。
+
+从正式 `lib/main.dart` 和生产默认服务地址构建 Android arm64-v8a release APK 和 iPhoneOS arm64 App。两包均未签名，包内运行时文件与 Vite 输出逐字节一致，Worker 内嵌六份材料，Native 清单摘要与原归档相同。构建未更改 Dart 依赖锁。Android 在测试后用正常 release 命令重新生成插件注册；iOS 首次受 SwiftPM 缓存写权限阻断，允许 Xcode 写构建缓存后通过。复现步骤、失败记录、产物及核对结果见本机忽略目录 `.local/prototype-six-material-rc.XbbXZW/REPRODUCE.md`。
+
+此预检只覆盖单包装配、工程回归和未签名构建。完整快照到位后复用同一归档重跑构建及部署预演，执行真实 Source 验收，并使用正式签名在真机验证；本轮未安装这两个包或切换生产。
+
 ## LunarAnime 编译器诊断
 
 2026-11-08，从固定 `952bbab` 全量的只读检查点复制 LunarAnime 1.6.6 工作目录和 Maven 本地仓库，独立运行同一 TeaVM 0.16.0 Maven 目标（`-o -e`）。上游 Gradle、原 JAR 和转换产物已有成功结果；AOT 首次失败的堆栈确认 `IndexOutOfBoundsException: 2/2` 来自 `StringConcatFactorySubstitutor.appendArgumentWithRecipe`。原版 Kotlin 代码使用 U+0001、U+0002 作分隔符，转换 JAR 中有两个动态实参夹一个静态常量的拼接配方。TeaVM 错把静态常量也算进动态实参索引，读取不存在的第三个参数。

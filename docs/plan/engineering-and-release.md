@@ -26,9 +26,9 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 [首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。空索引构建、隔离 HTTP 回跳和上传 dry-run 通过；完整快照、最终签名安装包及生产仍未验收。
 
-[Android 发行签名配置](../verification/native-main-entry.md#android-发行签名配置)已用同一归档验证：未配置时产出未签名 APK，配置临时证书后可验证签名和包内材料。组装最终六材料候选时一并回摘这项 Gradle 变更，再用正式证书构建并在真机验收。
+[Android 发行签名配置](../verification/native-main-entry.md#android-发行签名配置)已用同一归档验证：未配置时产出未签名 APK，配置临时证书后可验证签名和包内材料。正式证书与真机仍待验收。
 
-最终六材料客户端还需带入[短窗口阅读器修复](../verification/reader-fit.md#2026-11-10android-横屏控件与原图位置)。该 Dart 变更已在首发归档副本用真实 Arknights 复验，APK 内置运行时与原归档字节一致。
+[六材料首发修复合并预检](../verification/aot-current-pilot.md#六材料首发修复合并预检)已带入 Android 发行签名配置和[短窗口阅读修复](../verification/reader-fit.md#2026-11-10android-横屏控件与原图位置)。合并后的归档以 Arknights 单包通过正式 Web/Worker 构建、部署 dry-run、定向阅读回归和双端 arm64 未签名构建，材料字节与原归档一致。待完整快照生成后，用该归档重建并完成真实 Source、生产与正式签名真机验收。
 
 ## 已完成
 
