@@ -4,7 +4,7 @@
 
 ## 目标与状态
 
-为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。iOS/Android 模拟器的 Cache 桥 39 组机制及最终容器销毁也已通过；真实 manager 的 namespace 切换与同键 Cache/files 256 MiB allocated 组合门已通过受控 ABI 分项；原 xkcd 的 Web 元数据 fresh Cache、实际 manager/Worker 重建，以及双端模拟器正式 Native runtime 的原 Java Source 冷热 / 容器重建复用已通过新 AOT 分项；首发六材料也已通过 [iOS 正式 App 进程重启后复用 xkcd 章节正文](../verification/source-cache-native.md#2026-11-10ios-正式-app-进程退出后复用章节正文)。Android / 浏览器进程重启、更广 Source 与产品切换仍待验收。
+为未修改的 Source 提供持久文件与原 OkHttp 缓存语义，在 Worker 取消、异常终止、重建和扩展版本切换后保持完整条目、句柄所有权与有界资源。状态：**进行中**。Cache 正文、namespace 总预算与普通文件核心已通过分层机制门；原 JVM/TeaVM 的共享 CacheInterceptor 场景已通过。iOS/Android 模拟器的 Cache 桥 39 组机制及最终容器销毁也已通过；真实 manager 的 namespace 切换与同键 Cache/files 256 MiB allocated 组合门已通过受控 ABI 分项；原 xkcd 的 Web 元数据 fresh Cache、实际 manager/Worker 重建，以及双端模拟器正式 Native runtime 的原 Java Source 冷热 / 容器重建复用已通过新 AOT 分项；首发六材料也已通过 [iOS](../verification/source-cache-native.md#2026-11-10ios-正式-app-进程退出后复用章节正文) 与 [Android](../verification/source-cache-native.md#2026-11-10android-正式-app-强制停止后复用章节正文) 正式 App 进程重启后复用 xkcd 章节正文。浏览器进程重启、更广 Source 与产品切换仍待验收。
 
 已有浏览器桥机制门覆盖正常持久化、namespace 隔离、Cache editor 竞争/CAS 和文件 rename/unlink；图片 JVM oracle 明确使用 cacheless 链，不是 HTTP Cache 语义验收。证据参见 [Worker 桥](../verification/worker-bridges.md)，P0 总目标参见 [运行时计划](p0-runtime-and-reading.md)。
 
@@ -68,7 +68,7 @@
 
 1. 已补充 `CacheFailureScenarios.java`：两端四场景、50 项检查通过，精确读 8192 B 后截断/取消，Cache.close 后同目录重开验证半成品不可见、旧条目保留及恢复；不是进程重启。真实本地 HTTP/1 中继 RST 与原点关闭单独确认，生产 HTTP/2、HTTP/3、Access/Native 仍待验，见[独立故障记录](../verification/cache-http-failures.md)。历史冷热、Vary/Cookie、304、no-cache/no-store 和 POST invalidation 对照保留。
 2. 对照正文摘要、状态及关键响应头、网络请求次数、cache/network 标记和异常类型；不能只比较测试数量或编译结果。
-3. 正式 manager namespace 的版本/重建保留和 identity、repo、package、storageSchema 四维隔离单元门已通过；buildId 不参与派生。新增[真实 manager/存储门](../verification/runtime-storage-namespace.md)通过 11 组：由产品加载器和 Worker/driver 驱动受控 TS ABI，实际 IDB 数据跨构建/manager 保留、四维隔离，以及同键两分区合计 256 MiB allocated 和不借贷。该组合门不运行 Java/官方 Source。另有原 xkcd 的实际 manager/Worker 重建及双端模拟器 Native 容器重建后复用通过上述独立门；正式扩展/Flutter 的版本更新、Native 身份切换、Android / 浏览器进程重启、生产 Access 及其它 Source Native Cache 仍须验收；Web 原 Source 身份分项按上述产品记录单独通过。
+3. 正式 manager namespace 的版本/重建保留和 identity、repo、package、storageSchema 四维隔离单元门已通过；buildId 不参与派生。新增[真实 manager/存储门](../verification/runtime-storage-namespace.md)通过 11 组：由产品加载器和 Worker/driver 驱动受控 TS ABI，实际 IDB 数据跨构建/manager 保留、四维隔离，以及同键两分区合计 256 MiB allocated 和不借贷。该组合门不运行 Java/官方 Source。另有原 xkcd 的实际 manager/Worker 重建及双端模拟器 Native 容器重建后复用通过上述独立门；正式扩展/Flutter 的版本更新、Native 身份切换、浏览器进程重启、生产 Access 及其它 Source Native Cache 仍须验收；Web 原 Source 身份分项按上述产品记录单独通过。
 4. 原版 Source、HTTPS handshake 适配、生产 Access 和 Web/Native 实际环境分别验收。受控 HTTP 或存储机制门不能替代这些结果。
 
 原 Arknights cacheless 图片的正式 Web 获取中退出与恢复随后通过[限定 Source 门](../verification/source-cancellation-web.md)：暂停的真实未完成 HTTPS 响应在 UI 取消后及时关闭，Java/章节终态、恢复显示及最终 Worker/遥测/服务清理均确认。该门不是 Cache editor 取消、生产 Access、Native、全部阶段或更多 Source 的验证；前两轮上游等到 Source 期限的失败保留。

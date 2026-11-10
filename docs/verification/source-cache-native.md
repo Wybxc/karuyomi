@@ -87,4 +87,18 @@ App 自动执行并将结果写入正式 Application Support 目录；iOS 用 `s
 
 正文 SHA-256 为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。D1 提供续读页位；实际章节仍由原 Source 解析，图像请求显示新的运行 generation。独立 `verify-cache.ts` 核对两次不同 PID、退出后无 App 进程、完整中继增量、缓存条目与正文块长度及摘要。两次通过的 XCTest、Worker/夹具类型检查和只读对照脚本的类型检查均通过。早先两次 XCTest 未打开目标章（收藏按钮尚未就绪时滚动、滚动未稳定时点章卡），保留失败日志，未计为 Cache 结果。
 
-复验见 ignored `.local/prototype-native-source-cache-restart.OieLuQ/REPRODUCE.md`。原始中继样本、进程记录与截图在同目录 `evidence/`；`cache-disk-check.json` 的 SHA-256 为 `440fc27164b5d28d3327c8ab7da677bb172c1936f1acf610c91953d99bb634f0`。此项只验收首发六材料的原 xkcd HTML fresh 复用；Android 与浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 和真机另验。原图保持 cacheless。
+复验见 ignored `.local/prototype-native-source-cache-restart.OieLuQ/REPRODUCE.md`。原始中继样本、进程记录与截图在同目录 `evidence/`；`cache-disk-check.json` 的 SHA-256 为 `440fc27164b5d28d3327c8ab7da677bb172c1936f1acf610c91953d99bb634f0`。此项只验收首发六材料的原 xkcd HTML fresh 复用；Android 的独立验收见下节。浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 和真机另验。原图保持 cacheless。
+
+## 2026-11-10：Android 正式 App 强制停止后复用章节正文
+
+Pixel 7 / Android API 36 arm64 模拟器（WebView `133.0.6943.137`）使用同一首发六材料归档、同一原版英文 xkcd AOT 和新的受信回环 HTTPS / Wrangler / 隔离 D1。Android debug 入口只增加本轮回环 CA，然后调用正式 `app.main()`；WebView 仅在精确测试域信任该 CA。正式 Dart 源码与归档一致，APK 内 `host.js`、`worker.js`、`manifest.json` 逐字节核对通过。观察器沿用 iOS 轮的正式中继请求与响应副本记录。
+
+| 阶段                      | 正式阅读界面                                                                                                       | 目标章节与图片中继                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| 首次读取                  | 打开 `3319: Elevators`，显示两页并确认第 2 页保存到服务端                                                          | `/3319/` 一次 200，`max-age=300`，完整 HTML 7,151 B；原图一次 200                                                          |
+| 强制停止并重新启动        | `am force-stop` 后确认无 App PID，原安装启动新进程；书架直接续读第 2 页的 Source 文字图，翻回第 1 页看到原图       | 新 generation 的目标 HTML 请求 **0 次**，原图一次 200。退出后仍有该 origin 的 WebView IndexedDB 文件                       |
+| 清除本地 App 数据后的对照 | 只在专用模拟器执行 `pm clear`。同一测试账号的独立 D1 书架读回前后逐字节一致；新进程仍从书架打开同一章并显示第 1 页 | 目标 HTML 恢复一次无条件 200，无 `If-None-Match` / `If-Modified-Since`；完整 7,151 B 与首次响应 SHA-256 一致，原图一次 200 |
+
+两次 HTML 响应的 SHA-256 均为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。三次 App PID 与 Source generation 各不相同；冷启动两页有实际截图。清除数据的对照表明 D1 仍可提供页位，但不能代替 Source 重新获取章节正文。Android 未直接解码 LevelDB 正文块；证据来自真实中继增量、独立同库对照和正式 App 冷启动。
+
+复验见 ignored `.local/prototype-android-source-cache-restart.H2hyLM/REPRODUCE.md`。正式 APK 构建、验收 Worker 类型检查、独立断言脚本的严格类型检查和三阶段断言均通过；`evidence/cache-restart-check.json` SHA-256 为 `66c73bdd51fb48e35d6f4a22e48aaf9e6557ba2ab6d950c9aa63146edfede2e1`。本项仍不覆盖浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 或真机。
