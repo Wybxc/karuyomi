@@ -58,3 +58,16 @@
 目录修复后，以六材料发布分支 [`2f5a8eca655638d8f3e88fdeee6b93dd257088f2`](https://github.com/Wybxc/karuyomi/commit/2f5a8eca655638d8f3e88fdeee6b93dd257088f2) 重建 Android arm64 release APK 和 iPhoneOS arm64 App，均未签名。包名、生产地址、架构和包内六份材料均核对通过，Dart 锁文件未变。新版成品与核对记录在本机忽略目录 `.local/first-run-catalog.HIprOz/` 的 `artifacts/` 与 `native-*-verified.json`。未执行真机安装或生产 Native 登录。
 
 续办时用修复后的六材料源码构建，默认 `APP_ORIGIN=https://karuyomi.wybxc.cc`。Android 按[发行签名配置](native-main-entry.md#android-发行签名配置)使用正式密钥；iOS 使用对应 `dev.karuyomi.karuyomi` 的 Apple Team、签名身份和 provisioning。真机分别通过生产 Access 登录同一测试账号，先跑 Web → iOS → Android → Web 的非默认页保存/续读，再按 [P0](../plan/p0-runtime-and-reading.md#验收)和 [P2](../plan/p2-sync.md#验收)补齐代表源、真实设备操作和一致性门。
+
+### 原生模拟器生产登录预检
+
+2026-11-11，以同一六材料发布源码和正式 `lib/main.dart` 连接生产地址，双端模拟器均从匿名书架进入真实 Cloudflare Access 表单，实际显示 `Log in to Karuyomi`、GitHub 入口、Email 输入框和 `Send login code`。本分项只确认生产挑战与表单能打开；尚未取得原生端登录成功、账户读回或生产三端接力的证据。
+
+| 客户端  | 实际输入与验证                                                                                                                                                                                                                                                                                                            |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Android | Pixel 7 / API 36 arm64 模拟器安装首发 release APK 的临时 v2 签名副本；唯一证书为 `CN=Karuyomi Local Emulator Only`。签名前后 Dart AOT 和三份内置运行时文件逐字节一致；设备上的 APK 摘要等于本机副本。正式 Activity 冷启动后经可见「登录」按钮打开生产表单，并在带窗口模式重新确认。该密钥只用于本机模拟器，不是发行身份。 |
+| iOS     | iPhone 17 Pro / iOS 26.4 模拟器运行正式入口的 debug 构建，包名为 `dev.karuyomi.karuyomi`。内置 `host.js`、`worker.js`、`manifest.json` 与首发 iPhoneOS 成品逐字节一致，Dart kernel 包含生产地址。独立 XCTest 点击正式登录按钮，以 Access 独有标题和提交按钮确认表单，1 项通过；真实截图也核对通过。                       |
+
+iOS 早期两轮测试误选了同一 App 的后台运行时 WebView，断言未找到表单；当时的截图和层级记录实际包含 Access。修正外部测试的定位后通过，产品未改动。运行产物、签名/安装摘要、三轮 XCTest 结果及截图保存在本机忽略目录 `.local/native-production-preflight.itpO4s/`。这版 Xcode 的模拟器窗口由 [Device Hub](https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub) 提供，已打开本次专用设备供用户登录。测试未注入身份、复制浏览器 Cookie 或修改生产 TLS 信任。
+
+用户已明确目前没有可用的正式签名或真机；两端仍需用户在 App 内登录同一 Access 测试账号。模拟器的表单预检不代替正式签名、真机安装、生产登录回跳、实际阅读和同账号三端确认。

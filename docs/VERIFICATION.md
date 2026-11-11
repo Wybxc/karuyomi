@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-11，[原生模拟器生产登录预检](verification/first-web-release.md#原生模拟器生产登录预检)通过：首发六材料的 Android release 临时签名副本与 iOS 正式入口 debug 构建均打开真实 Access 表单，包内材料核对一致；iOS 外部 XCTest 1 项通过。原生账号登录、生产三端接力、正式签名和真机仍待验。
+
 2026-11-11，[生产代表源整章与续读](verification/first-web-release.md#生产代表源整章与续读)通过。真实 Access 测试账号用同一首版分别完成 Arknights Comics 51 页及 CuuTruyen 23 页，逐页获服务端确认，标记读完后跨章；两者均从独立新标签页恢复下一章第 3 页实图。生产 Web 现有三个代表源的阅读证据，Native 生产及签名真机仍待验。
 
 2026-11-10，[0.1.0 Web 与 API 已上线](verification/first-web-release.md)。生产 D1 账本连续至 `0010`，首份六材料扩展基线已确认。真实 Access 测试账号已通过 xkcd 读图、收藏、服务端保存与新标签续读；清理后新开章节也显示首图并保存。正式签名、真机和生产同账号三端读写仍待验。
