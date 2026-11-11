@@ -98,6 +98,10 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 `bootstrap` 已生成候选时可跳过上面的 `prepare-snapshot`。`check-base` 应紧邻部署，确认远端 revision 仍为计划基线；首次替换已知旧 SPA 时可在本地显式增加 `--initialize`，它不接受任意错误响应，也不能在 CI 使用。网络命令默认 origin 为 `https://karuyomi.wybxc.cc`，可用 `--origin` 明确指定。
 
+用户指定优先包时，可以先发布本地分批候选。保留原完整冻结计划及其 `entries`、目录指纹、输入身份和父 revision；按原 descriptor 调用 `build --key`，只调整构建顺序。组装时派生一份 `selected` 仅含已有正式终态的计划，未尝试输入仍保留在完整目录中并计入 pending。使用普通 `prepare-snapshot`，不使用 `--finalize`；原计划和生产父状态不手工修改。
+
+运行时身份变化的分批候选会清除旧材料的 baseline 完成标记。只有匹配当前材料的构建进入索引，其余旧构建仅保留状态；首批可按正式部署与 checkpoint 流程上线，但不能据此启用增量 CI。后续在本地补齐完整目录并正式 finalize、部署和确认后，再运行有界增量。运行时相同的普通有界更新保留既有 baseline 完成状态。
+
 ### 首次全量候选的定向补编
 
 冻结全量期间如有少量包需要用新版 AOT 重编，先确认新旧 checkout 的上游源码和共享运行材料相同。等冻结批次退出并留下所有包的终态；在独立目录保留其原计划和逐包结果。新版固定 checkout 以同一份已核对的生产父状态运行 `plan --limit 10000`，按新计划中的精确 `inputFingerprint` 对指定包运行 `build --key`，每个包使用独立输出目录。两份 checkout 先各自执行 `pnpm --filter @karuyomi/runtime-host build:materials`。

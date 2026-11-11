@@ -1302,6 +1302,18 @@ export class ExtensionPipeline {
       mkdirSync(artifacts, { recursive: true });
       const manifests: BuildManifest[] = [],
         identity = await this.currentRuntime(options.checkout);
+      if (
+        !options.finalize &&
+        Object.values(state.active).some((key) => {
+          const previous = state.attempts[key];
+          return (
+            previous?.status === 'published' &&
+            previous.available !== false &&
+            !equal(previous.runtimeIdentity, identity)
+          );
+        })
+      )
+        candidate.bootstrap = { complete: false };
       for (const [packageName, key] of Object.entries(candidate.active).sort(
         ([a], [b]) => (a < b ? -1 : 1),
       )) {

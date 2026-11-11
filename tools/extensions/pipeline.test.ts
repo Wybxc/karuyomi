@@ -586,6 +586,74 @@ test('CI rejects a runtime switch before replacing any deployed artifacts', asyn
     assert.fail('No deployed builds require a runtime comparison');
   });
 });
+test('a partial runtime replacement clears the old baseline until all current inputs are finalized', async (t) => {
+  const environment = {
+    CI: process.env.CI,
+    GITHUB_ACTIONS: process.env.GITHUB_ACTIONS,
+  };
+  const sha256 = 'a'.repeat(64);
+  const old = new Fixture(t, {
+    ...materialIdentity,
+    hostScripts: [
+      {
+        path: '/runtime/materials/' + sha256,
+        sha256,
+        size: 100,
+        contentType: 'text/javascript',
+        logicalName: 'graphics-bridge.js',
+      },
+    ],
+  });
+  const previous = [old.descriptor(), old.descriptor('b', 'example.other')];
+  for (const descriptor of previous) old.output(descriptor);
+  const deployed = await old.prepare(old.plan(previous), emptyState(), {
+    finalize: true,
+  });
+  assert.equal(deployed.bootstrap.published, 2);
+  const f = new Fixture(t);
+  t.after(() => {
+    for (const [key, value] of Object.entries(environment)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  const updated = [
+    f.descriptor('c'),
+    f.descriptor('d', 'example.other'),
+    f.descriptor('e', 'example.pending'),
+  ];
+  const selected = updated.slice(0, 2);
+  for (const descriptor of selected) f.output(descriptor);
+  const parentBefore = structuredClone(deployed);
+  const partial = await f.prepare(
+    f.plan(updated, deployed, selected),
+    deployed,
+  );
+  assert.deepEqual(deployed, parentBefore);
+  assert.equal(partial.summary?.pending, 1);
+  assert.deepEqual(partial.bootstrap, { complete: false });
+  assert.equal((await f.index()).builds.length, 2);
+  assert.throws(
+    () => makePlan(f.catalog(updated), partial, { ci: true, root: f.root }),
+    /CI bootstrap guard/,
+  );
+  await assert.rejects(
+    f.pipeline.pullState('https://example.invalid', f.stateFile),
+    /bootstrap/,
+  );
+  assert.equal(existsSync(f.stateFile), false);
+  const pending = updated[2];
+  assert.ok(pending);
+  f.output(pending);
+  const complete = await f.prepare(
+    f.plan(updated, partial, [pending]),
+    partial,
+    { finalize: true },
+  );
+  assert.equal(complete.bootstrap.complete, true);
+  assert.equal(complete.summary?.pending, 0);
+  assert.equal((await f.index()).builds.length, 3);
+});
 test('CI keeps unselected builds when host inputs change without changing the runtime', async (t) => {
   const f = new Fixture(t);
   const previous = [f.descriptor(), f.descriptor('b', 'example.other')];
@@ -610,6 +678,7 @@ test('CI keeps unselected builds when host inputs change without changing the ru
   f.output(selected);
   await assertCiRuntimeCompatible(deployed, () => materialIdentity);
   const next = await f.prepare(plan, deployed);
+  assert.equal(next.bootstrap.complete, true);
   assert.equal(next.hostFingerprint, updatedHost);
   assert.equal(next.active[selected.packageName], selected.inputFingerprint);
   assert.equal(next.active['example.other'], deployed.active['example.other']);
