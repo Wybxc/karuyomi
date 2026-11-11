@@ -71,3 +71,5 @@
 iOS 早期两轮测试误选了同一 App 的后台运行时 WebView，断言未找到表单；当时的截图和层级记录实际包含 Access。修正外部测试的定位后通过，产品未改动。运行产物、签名/安装摘要、三轮 XCTest 结果及截图保存在本机忽略目录 `.local/native-production-preflight.itpO4s/`。这版 Xcode 的模拟器窗口由 [Device Hub](https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub) 提供，已打开本次专用设备供用户登录。测试未注入身份、复制浏览器 Cookie 或修改生产 TLS 信任。
 
 用户已明确目前没有可用的正式签名或真机；两端仍需用户在 App 内登录同一 Access 测试账号。模拟器的表单预检不代替正式签名、真机安装、生产登录回跳、实际阅读和同账号三端确认。
+
+2026-11-11，用户要求停止原生验证。本轮专用 iOS 模拟器已确认 `Shutdown`，独立 AVD `karuyomi-prod-preflight` 已通过专用 ADB 退出；两端登录请求终止，已有产物和证据保留，未通过项不提升为已验收。同轮只读复核确认 Web shell 返回 200，现网索引摘要和构建条目数与首发一致；GitHub 扩展增量工作流仍为 `disabled_manually`。非原生剩余工作按[工程发布](../plan/engineering-and-release.md)与 [P1/P2](../plan/p1-library-and-progress.md)继续安排。

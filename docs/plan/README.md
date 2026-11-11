@@ -8,6 +8,8 @@
 
 11 日，[双端模拟器已打开真实生产 Access 表单](../verification/first-web-release.md#原生模拟器生产登录预检)，包内材料与首发一致；原生登录成功及三端读写仍待验。用户目前无可用正式签名或真机，模拟器结果单独记录。
 
+2026-11-11，按用户要求停止原生验证，关闭本轮专用模拟器，原生未验项保持待验，本轮登录请求终止。除原生外，可用的 Web 初版已上线；剩余收尾集中在 [Web 日用功能与同步的生产验收](p1-library-and-progress.md)和[主分支匹配的扩展完整基线、有界增量发布与更新验收](engineering-and-release.md)。更广的 Source 运行覆盖按 [P4](p4-source-coverage-and-performance.md)持续推进，不将可下载包数当作实际兼容数量。
+
 2026-11-06：P0 已补齐本轮确认的四项功能缺口并通过集中工程回归；v4 三源 Web 元数据/图片、xkcd 正式阅读、跨标签写入门及实际 TeaVM enqueue 分项已通过。v4 三包初次部署与三包网络政策见[记录](../verification/v4-production.md)；当时客户端/API `466acdd` 部署并保留 v4 快照，匿名检查通过，见[同步生产部署](../verification/server-state-production.md)。收藏与进度已接入业务协议和 D1 权威 API，已移除本地业务数据库；真实 Web 独立会话及测试身份下 Web↔iOS、Web↔Android、iOS↔Android 正式入口的基础书架读回与双向非默认页续读已通过，见[Web/iOS](../verification/native-server-state.md)和[Android 配对](../verification/android-server-state.md)。双 Web 的手动刷新、远端重置与旧写冲突分项随后通过[验收](../verification/concurrent-server-state.md)；分类 UI、真实双 Web 的目录/关联/冲突、双 iOS 与 iOS↔Android 的分类顺序闭环已通过[记录](../verification/category-ui-sync.md)；同时写竞争、自动前台重取、故障恢复、生产正向、Web↔Android 分类、混合平台剩余操作、Android 初始化可靠性、章节书签的混合平台门及非敏感阅读设置（含裁白）的独立客户端门继续按[P1](p1-library-and-progress.md)和[P2](p2-sync.md)推进。原型阶段直接维护当前协议和材料，不建设旧版本兼容层。
 
 Source 重开故障的日期修复已通过正式无插桩 xkcd Web 复验；A 添加书签、B 从书架读回并移除、C 重新读回通过，独立 D1 核对确认重开无附带写入。见[重开记录](../verification/source-reopen.md)。同一隔离 HTTPS / D1 的 iOS ↔ Android 模拟器书签往返也已通过，继续 Web ↔ Native、生产和故障验收，见[书签记录](../verification/bookmarks.md)。
