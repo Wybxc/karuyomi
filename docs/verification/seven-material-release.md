@@ -15,6 +15,8 @@ clab 独立目录为 `/home/fedora/.local/karuyomi-seven-2fa8a33.NxbBAV`，冻�
 
 正式 `bootstrap --jobs 1 --finalize` 已启动，并通过实际 PID、首包日志及结果确认执行。clab 为 4 CPU、3.8 GiB 内存，Maven 和 Gradle heap 均限制为 1 GiB，JVM 活跃处理器为 3。进程使用 nohup，与本机 SSH 会话分离；逐包结果保存在 `builds/`，汇总日志为 `bootstrap.log`。恢复须先确认原进程及其子进程已退出，再按 [EXTENSIONS](../EXTENSIONS.md#首次本地全量与恢复)使用原计划；不能并行启动两个发布器。
 
+为节约本机电池，通用 CI 在 `main` push 的全部检查通过后保留 `web-build-<commit>` artifact，包含实际 Flutter Web 和 runtime-host 构建输出，保留七天。它不包含扩展基线，也不自动部署。组装生产候选时须核对 artifact 的运行与源码身份、材料目录和字节；如使用较后的仅文档或 CI 提交，先证明 Web、API、运行时、依赖锁等产品输入与冻结源码相同。再在远端用正式 API Vite CLI 和完整候选重新装配 Static Assets、执行部署预演及验收，不能直接发布 CI 的空索引。
+
 ## 首个实际交付
 
 `eu.kanade.tachiyomi.extension.all.ahottie` 1.6.5 的原版 Gradle 构建与正式 AOT 成功，builder 总耗时 218.79 秒。canonical 为 4,251,027 B，SHA-256 `cac399991fc0fa79d6b51fad144181e9cda43ce042f313e8f6da44965b7a39bd`；gzip 为 873,970 B，SHA-256 `206979ac09d7216e2ed0f3b4442c63efad07525bf6bd32ba79df3ee81a734d49`。
