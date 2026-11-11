@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**Web 0.1.0、API 与首份六材料基线已上线；原生正式发布及增量部署待验收**。切换、迁移、静态交付与生产 Web 实测见[首发记录](../verification/first-web-release.md)。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**Web 0.1.0、API 与中文/全语言七材料首批已上线；其余语言基线及增量部署待验收，原生验证停止**。首次切换见[首发记录](../verification/first-web-release.md)，当前生产身份见[七材料发布](../verification/seven-material-release.md#首批生产发布与验收)。
 
 操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
@@ -25,6 +25,8 @@ clab 冻结全量与三个定向补编已结束；[六材料完整候选](../ver
 2026-11-11，按用户要求停止原生验证并节约本机电池；固定 `2fa8a33` 的[七材料生产基线](../verification/seven-material-release.md)在 clab 独立目录执行，已按正式恢复入口改为双并发，原冻结计划和生产父状态不变。同输入 xkcd 已在 CI Web、clab 官方 harness 和内置浏览器完成真实读图、服务端保存及新标签第 2 页续读；本机没有编译 Flutter。完整计划覆盖 1,448 包，尚未部署新基线，增量工作流仍停用。后续完成同材料候选、生产发布确认及一次真实有界增量，不恢复原生验收，不使用 pku-dasys。
 
 同日用户指定中文和全语言优先，完成这两类后即上线。原全量队列及其子进程已安全退出；全语言 138 包已有终态，中文 59 包使用相同冻结输入、正式逐包入口和状态锁在 clab 双并发构建。按[分批首发记录](../verification/seven-material-release.md#中文与全语言优先首发)先部署已有新材料结果，其余语言随后补齐；首批不能沿用六材料的完整基线标记，完整目录仍待本地完成并确认后再恢复增量 CI。
+
+2026-11-11 19:25（UTC+8），[中文与全语言首批](../verification/seven-material-release.md#首批生产发布与验收)已完成 197 包终态和生产发布；加入已完成的 7 个阿拉伯语包后，190 包进入七材料目录，14 个编译失败。新 Worker 全部流量、26 条匿名路径、D1 账本、真实 Access 下 xkcd 更新/两页保存/新标签续读与正式 checkpoint 均确认。候选保持 `bootstrap.complete=false`；其余 1,244 包已从新检查点在 clab 通过正式入口恢复，完整基线和真实有界增量仍待完成。
 
 [首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。隔离 HTTP 回跳通过；原生正式签名和生产 Access 另验。
 
