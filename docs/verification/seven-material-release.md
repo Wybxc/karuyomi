@@ -15,6 +15,8 @@ clab 独立目录为 `/home/fedora/.local/karuyomi-seven-2fa8a33.NxbBAV`，冻�
 
 正式 `bootstrap --jobs 1 --finalize` 已启动，并通过实际 PID、首包日志及结果确认执行。clab 为 4 CPU、3.8 GiB 内存，Maven 和 Gradle heap 均限制为 1 GiB，JVM 活跃处理器为 3。进程使用 nohup，与本机 SSH 会话分离；逐包结果保存在 `builds/`，汇总日志为 `bootstrap.log`。恢复须先确认原进程及其子进程已退出，再按 [EXTENSIONS](../EXTENSIONS.md#首次本地全量与恢复)使用原计划；不能并行启动两个发布器。
 
+完成下述 Web 隔离验收后，原 supervisor 及全部构建子进程已通过正式 SIGTERM 退出，并逐 PID 核实。随后使用原 `plan.json`、同一冻结 checkout 和生产父状态，通过 `bootstrap --plan ... --build-checkout ... --jobs 2 --finalize` 恢复；每个 JVM 限两颗活跃处理器，heap 限额不变。恢复计划和日志单独保存为 `resume-2jobs-plan.json`、`resume-2jobs.log`，原计划和父状态摘要不变，已有正式成功和失败终态由入口复验复用。此后仅该双并发队列写同一 state。用户明确禁止使用 pku-dasys；该机器仅做过只读资源检查，没有启动任务或转移文件，后续只使用 clab 与 CI。
+
 为节约本机电池，通用 CI 在 `main` push 的全部检查通过后保留 `web-build-<commit>` artifact，包含实际 Flutter Web 和 runtime-host 构建输出，保留七天。它不包含扩展基线，也不自动部署。组装生产候选时须核对 artifact 的运行与源码身份、材料目录和字节；如使用较后的仅文档或 CI 提交，先证明 Web、API、运行时、依赖锁等产品输入与冻结源码相同。再在远端用正式 API Vite CLI 和完整候选重新装配 Static Assets、执行部署预演及验收，不能直接发布 CI 的空索引。
 
 ## 首个实际交付
@@ -22,6 +24,24 @@ clab 独立目录为 `/home/fedora/.local/karuyomi-seven-2fa8a33.NxbBAV`，冻�
 `eu.kanade.tachiyomi.extension.all.ahottie` 1.6.5 的原版 Gradle 构建与正式 AOT 成功，builder 总耗时 218.79 秒。canonical 为 4,251,027 B，SHA-256 `cac399991fc0fa79d6b51fad144181e9cda43ce042f313e8f6da44965b7a39bd`；gzip 为 873,970 B，SHA-256 `206979ac09d7216e2ed0f3b4442c63efad07525bf6bd32ba79df3ee81a734d49`。
 
 公开 buildId 为 `ext-all.ahottie-6284b6146ba79eb4353a1db065cce03b-cac399991fc0fa79d6b51fad144181e9cda43ce042f313e8f6da44965b7a39bd`。清单包含五桥和两份 WASM；正式 runner 的 `artifactIntegrity=passed`，`workerInit/browserLoad=not_run`，状态保持 `compiled_unverified/runtimeReady=false`。首包成功不表示完整候选或 Source 在线行为通过。
+
+## 七材料 Web 隔离验收
+
+同一冻结输入的 `eu.kanade.tachiyomi.extension.all.xkcd` 1.6.1 已经正式 `build --key` 构建并通过完整性校验。canonical 为 4,486,032 B，SHA-256 `d4c7fd8c83a3c5cdd43cb9de2a2a1ebcbbbb793e711794b4dfc13fbb21a60536`；gzip 为 932,252 B，SHA-256 `6c2cef34d915f79b9281212a72b2d793c22c0bf9d30c1b15ff26c1fa24b3ca79`。该逐包结果与原全量计划 descriptor 一致，留在正式 `builds/` 目录供队列复验复用，未修改原计划或生产父状态。
+
+Web 来自[通过全部检查的 CI](https://github.com/Wybxc/karuyomi/actions/runs/42956939491) artifact `web-build-dcb1eab71979036d76484b8a6317617d9f3c1060`。排除文档及该 CI artifact 步骤后，产物源码与 `2fa8a33` 的全部产品输入相同。下载 ZIP 16,183,637 B，SHA-256 `2a4851beaa92c8d6c0d3799baf241fafbfcf2668064871eaad3d2ed75992fefb`，本机及 clab 的传输边界校验均通过；`main.dart.js` SHA-256 为 `19b7b3873ef626af787323eeb784d98071da833213aee7305e825d98565b722b`。本机没有运行 Flutter 编译。
+
+独立发布 clone 使用正式 `prepare-snapshot` 生成仅含 xkcd 的局部快照，revision `1c3c1155c23e4fffb92d344f81f88514`、`bootstrap.complete=false`，不用于生产或启用 CI。clab 的正式 API Vite 装配、验收 Worker 构建及官方 Wrangler `createTestHarness` 均通过；临时 D1 身份为 `acceptance-owner`。内置浏览器通过本机 SSH loopback 转发，实际验证：
+
+1. 空书架下安装七材料 xkcd，账户选择由服务端确认。
+2. 英文 Source 返回真实热门、详情及章节；收藏 xkcd 后，API 独立读回 `favorite=true`。
+3. 实际显示 `3319: Elevators` 两页，翻至第 2 页并显示“阅读进度已保存到服务端”。
+4. 关闭原标签，在新标签的服务端书架直接继续阅读，恢复到第 2 页并显示真实图片及保存确认。
+5. 独立 GET 进度读回 `current.pageIndexHint=1`、`furthest.pageIndexHint=1`，与 UI 一致。书架和进度原始响应及两张截图保存在 ignored 发布目录。
+
+本次是 **Linux clab workerd + CI Flutter Web + Codex 内置浏览器的隔离验收**，没有经过生产 Access，也没有执行原生 App。清单仍为 `compiled_unverified/runtimeReady=false`；不能据此提升整个目录的兼容性。验收标签、SSH 隧道与临时 harness 已关闭，原全量构建未受验收清理影响。
+
+装配顺序也已实测：`build:materials` 会清理 runtime dist；之后在装配 API 前须执行完整的 `pnpm --filter @karuyomi/runtime-host build`，生成正式 host/worker 和静态材料。该远端构建不执行 Flutter 或原生 App。
 
 ## 剩余验收
 

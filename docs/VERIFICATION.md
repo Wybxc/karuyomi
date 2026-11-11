@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-11，[七材料生产基线](verification/seven-material-release.md)在固定 `2fa8a33` 的 clab 独立目录启动，1,448 包完整计划、生产父状态和七材料身份已固定。首包正式 Gradle/AOT 与完整性校验通过，仍为 `compiled_unverified/runtimeReady=false`；完整基线、生产发布与有界增量尚未完成。本机 AOT 已停止以节约电池，原生验证继续停止。
+2026-11-11，[七材料生产基线](verification/seven-material-release.md)在固定 `2fa8a33` 的 clab 独立目录启动，1,448 包完整计划、生产父状态和七材料身份已固定。首包正式 Gradle/AOT 与完整性校验通过；同输入 xkcd 已在 CI Web、clab 官方 harness 和内置浏览器完成真实读图、服务端保存及关闭标签后的第 2 页续读。该验收没有经过生产 Access；清单仍为 `compiled_unverified/runtimeReady=false`。完整基线、生产发布与有界增量尚未完成。本机 AOT 已停止以节约电池，原生验证继续停止。
 
 2026-11-11，[原生模拟器生产登录预检](verification/first-web-release.md#原生模拟器生产登录预检)通过：首发六材料的 Android release 临时签名副本与 iOS 正式入口 debug 构建均打开真实 Access 表单，包内材料核对一致；iOS 外部 XCTest 1 项通过。原生账号登录、生产三端接力、正式签名和真机仍待验。
 
