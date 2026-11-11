@@ -22,6 +22,8 @@ clab 冻结全量与三个定向补编已结束；[六材料完整候选](../ver
 
 2026-11-10，首发源码 `0f43779` 使用与 `c04d436` 冻结批次、`2a07fc2` 补编计划匹配的六份材料。该发布不包含 ToonLook 的 iOS WebP 修复。自 `a1dd0cd` 起 `main` 的材料身份已变为七份，[新版 ToonLook 单包](../verification/aot-current-pilot.md#正式-webp-编码材料与图形桥)只用于独立验收。主分支增量工作流保持 `disabled_manually`；先发布匹配七份材料的完整基线，再验收有界增量和客户端更新。
 
+2026-11-11，按用户要求停止原生验证并节约本机电池；固定 `2fa8a33` 的[七材料生产基线](../verification/seven-material-release.md)已转至 clab 独立目录单并发执行。完整计划覆盖 1,448 包，首包的实际编译和完整性校验通过；尚未部署新基线，增量工作流仍停用。后续完成同材料候选、生产发布确认及一次真实有界增量，不恢复原生验收。
+
 [首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。隔离 HTTP 回跳通过；原生正式签名和生产 Access 另验。
 
 [Android 发行签名配置](../verification/native-main-entry.md#android-发行签名配置)已用同一归档验证：未配置时产出未签名 APK，配置临时证书后可验证签名和包内材料。正式证书与真机仍待验收。

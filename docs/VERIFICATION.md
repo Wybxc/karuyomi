@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-11，[七材料生产基线](verification/seven-material-release.md)在固定 `2fa8a33` 的 clab 独立目录启动，1,448 包完整计划、生产父状态和七材料身份已固定。首包正式 Gradle/AOT 与完整性校验通过，仍为 `compiled_unverified/runtimeReady=false`；完整基线、生产发布与有界增量尚未完成。本机 AOT 已停止以节约电池，原生验证继续停止。
+
 2026-11-11，[原生模拟器生产登录预检](verification/first-web-release.md#原生模拟器生产登录预检)通过：首发六材料的 Android release 临时签名副本与 iOS 正式入口 debug 构建均打开真实 Access 表单，包内材料核对一致；iOS 外部 XCTest 1 项通过。原生账号登录、生产三端接力、正式签名和真机仍待验。
 
 2026-11-11，[生产代表源整章与续读](verification/first-web-release.md#生产代表源整章与续读)通过。真实 Access 测试账号用同一首版分别完成 Arknights Comics 51 页及 CuuTruyen 23 页，逐页获服务端确认，标记读完后跨章；两者均从独立新标签页恢复下一章第 3 页实图。生产 Web 现有三个代表源的阅读证据，Native 生产及签名真机仍待验。
