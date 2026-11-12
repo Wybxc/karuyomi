@@ -1395,6 +1395,8 @@ final class CatalogController extends ChangeNotifier {
     CatalogBuild? requested,
     required String sourceId,
     required bool Function() shouldContinue,
+    String? preparationId,
+    VoidCallback? onPrepared,
   }) => _perform<CatalogSourceRef?>('正在打开账户选择的漫画源', () async {
     if (accessPaused || subject == null || !shouldContinue()) return null;
     if (status == ServiceStatus.failed && _runtimeNeedsRebuild) {
@@ -1407,6 +1409,18 @@ final class CatalogController extends ChangeNotifier {
       shouldContinue: shouldContinue,
     );
     if (!shouldContinue()) return null;
+    if (preparationId != null) {
+      final prepared = await runtime.prepareBuild(
+        preparationId: preparationId,
+        catalog: build.catalog,
+        build: build.toProto(),
+      );
+      if (!shouldContinue()) return null;
+      if (!_allowsBuild(build, sha256: prepared.bundleSha256)) {
+        throw const FormatException('产物与账户所选构建不匹配，请返回检查更新。');
+      }
+      onPrepared?.call();
+    }
     await _loadResolvedBuild(build, shouldContinue: shouldContinue);
     if (!shouldContinue() ||
         activeBuild?.catalog != build.catalog ||
@@ -1481,10 +1495,16 @@ final class CatalogController extends ChangeNotifier {
     String? search,
     String? operation,
     bool more = false,
+    bool Function()? shouldContinue,
   }) async {
     await _perform(
       '正在加载漫画',
-      () => _loadListing(search: search, operation: operation, more: more),
+      () => _loadListing(
+        search: search,
+        operation: operation,
+        more: more,
+        shouldContinue: shouldContinue,
+      ),
     );
   }
 

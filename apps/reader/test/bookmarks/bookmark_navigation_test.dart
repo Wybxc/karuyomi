@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/main.dart';
@@ -56,8 +56,16 @@ void main() {
       await tester.pumpWidget(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       await _tap(tester, find.text('去浏览'));
-      await _tap(tester, find.text('eu.kanade.source.test · 1.0'));
-      await _tap(tester, find.byKey(ValueKey(('catalog-source', sourceId))));
+      await _tap(
+        tester,
+        find.byKey(
+          const ValueKey((
+            'source-directory-row',
+            'eu.kanade.source.test',
+            sourceId,
+          )),
+        ),
+      );
       await _tap(tester, find.text('真实源 DTO 测试'));
       final catalog = tester
           .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))

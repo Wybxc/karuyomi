@@ -9,7 +9,7 @@ import '../../data/business_state_client.dart';
 import '../../data/cover_repository.dart';
 import '../covers/custom_cover.dart';
 import '../browse/catalog_controller.dart';
-import '../browse/catalog_page.dart';
+import '../browse/manga_details_page.dart';
 import '../reader/reader_recovery.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';

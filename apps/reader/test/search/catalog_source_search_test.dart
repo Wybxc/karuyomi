@@ -42,6 +42,7 @@ final class _Slots implements RuntimeTransport {
   Future<void> Function(wire.OpenRequest request)? beforeOpen;
   Future<wire.SourceResult> Function(wire.SourceCall call)? invoke;
   Future<void> Function(wire.CloseBuildRequest request)? beforeClose;
+  Future<void> Function()? beforePageClose;
   Future<void> Function()? beforeReset;
 
   void _retire(wire.RuntimeSlot slot) {
@@ -172,6 +173,7 @@ final class _Slots implements RuntimeTransport {
           events.add('reset:$slot');
           response.completed = wire.Completed(completed: true);
         case wire.ControlRequest_Command.closePageSession:
+          await beforePageClose?.call();
           events.add('page-closed');
           response.closed = wire.Closed(closed: true);
         case wire.ControlRequest_Command.dispose:
@@ -678,6 +680,45 @@ void main() {
       expect(chapter!.provider.isClosed, false);
       expect(catalog.session!.generation, chapter.generation);
       await catalog.closeChapter(chapter);
+    },
+  );
+
+  test(
+    'a prepared chapter blocks search until its direct provider close is confirmed',
+    () async {
+      await catalog.openSelectedSource(
+        packageName: 'eu.kanade.source.a',
+        sourceId: '11',
+        shouldContinue: () => true,
+      );
+      final details = await catalog.details(MangaEntry(testManga));
+      final chapter = (await catalog.openChapter(
+        details!.manga,
+        details.chapters.single,
+        reference: details.source,
+      ))!;
+      final entered = Completer<void>(), release = Completer<void>();
+      addTearDown(() {
+        if (!release.isCompleted) release.complete();
+      });
+      slots.beforePageClose = () async {
+        entered.complete();
+        await release.future;
+      };
+      final closing = chapter.provider.close();
+      await entered.future;
+      expect(chapter.provider.isClosed, isFalse);
+      final before = slots.events.toList();
+      final blocked = search.search(target('21'), 'query');
+      await expectLater(blocked.result, throwsA(isA<StateError>()));
+      expect(slots.events, before);
+      release.complete();
+      await closing;
+      expect(chapter.provider.isClosed, isTrue);
+      final page = await search.search(target('21'), 'query').result;
+      expect(page.mangas.single.title, '21');
+      await search.stop();
+      expect(slots.live, isEmpty);
     },
   );
 

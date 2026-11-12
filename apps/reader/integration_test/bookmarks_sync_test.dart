@@ -11,6 +11,8 @@ import 'package:karuyomi/features/bookmarks/bookmark_status.dart';
 import 'package:karuyomi/features/bookmarks/chapter_bookmarks_controller.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/source_browse_page.dart';
+import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
@@ -292,7 +294,7 @@ Future<Map<String, Object?>> _prepare(
   await _waitFor(tester, '正式扩展管理入口可点击', () {
     checkSource();
     return manage.evaluate().length == 1 &&
-        tester.widget<TextButton>(manage).onPressed != null;
+        manage.hitTestable().evaluate().isNotEmpty;
   });
   await _tap(tester, manage);
   await _waitFor(
@@ -314,10 +316,10 @@ Future<Map<String, Object?>> _prepare(
   await _waitFor(tester, '精确扩展可安装', () {
     checkSource();
     return install.evaluate().length == 1 &&
-        tester.widget<FilledButton>(install).onPressed != null;
+        tester.widget<TextButton>(install).onPressed != null;
   });
   await _tap(tester, install);
-  final refresh = find.byKey(const ValueKey('extensions-refresh'));
+  final refresh = find.byKey(const ValueKey('extensions-check-updates'));
   await _reveal(tester, refresh, extensionsPage, delta: -300);
   await _waitFor(tester, '确认精确扩展安装', () {
     checkSource();
@@ -346,25 +348,14 @@ Future<Map<String, Object?>> _prepare(
     contains(installed.bundleSha256),
   );
 
-  await _tap(
-    tester,
-    find.descendant(of: extensionsPage, matching: find.byType(BackButton)),
-  );
+  await _tap(tester, find.text('漫画源').first);
   await _waitFor(tester, '返回正式浏览页', () => catalogPage.evaluate().length == 1);
-  final buildButton = find.byKey(ValueKey(('catalog-build-open', _buildId)));
-  await _reveal(tester, buildButton, catalogPage);
-  await _tap(tester, buildButton);
-  await _waitFor(tester, '打开精确扩展', () {
-    checkSource();
-    return !catalog.busy &&
-        catalog.activeBuild?.id == _buildId &&
-        catalog.session != null;
-  });
-  expect(catalog.session!.catalog, build.catalog);
-  expect(catalog.session!.buildId, installed.buildId);
-  final sourceButton = find.byKey(ValueKey(('catalog-source', _sourceId)));
+  final sourceButton = find.byKey(
+    ValueKey(('source-directory-row', _packageName, _sourceId)),
+  );
   await _reveal(tester, sourceButton, catalogPage);
   await _tap(tester, sourceButton);
+  final sourcePage = find.byType(SourceBrowsePage);
   await _waitFor(tester, '指定 Source 热门返回', () {
     checkSource();
     return !catalog.busy &&
@@ -372,16 +363,19 @@ Future<Map<String, Object?>> _prepare(
         catalog.listing == 'popular' &&
         catalog.page == 1;
   });
+  expect(catalog.session!.catalog, build.catalog);
+  expect(catalog.session!.buildId, installed.buildId);
   expect(catalog.activeSource!.lang, _prepareSourceLanguage);
   if (_prepareSearch.isNotEmpty) {
     final search = find.descendant(
-      of: catalogPage,
+      of: sourcePage,
       matching: find.byWidgetPredicate(
         (widget) =>
-            widget is TextField && widget.decoration?.labelText == '搜索漫画',
+            widget is TextField &&
+            widget.key == const ValueKey('source-manga-search'),
       ),
     );
-    await _reveal(tester, search, catalogPage);
+    await _reveal(tester, search, sourcePage);
     await tester.enterText(search, _prepareSearch).timeout(_remaining());
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await _waitFor(tester, '实际 Source 搜索结果', () {
@@ -401,10 +395,10 @@ Future<Map<String, Object?>> _prepare(
     hasLength(1),
   );
   final result = find.ancestor(
-    of: find.descendant(of: catalogPage, matching: find.text(manga.title)),
+    of: find.descendant(of: sourcePage, matching: find.text(manga.title)),
     matching: find.byType(ListTile),
   );
-  await _reveal(tester, result, catalogPage);
+  await _reveal(tester, result, sourcePage);
   await _tap(tester, result);
 
   final detailsPage = find.byType(MangaDetailsPage);

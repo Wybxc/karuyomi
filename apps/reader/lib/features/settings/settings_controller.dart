@@ -8,6 +8,8 @@ import '../../data/settings_repository.dart';
 
 /// A single global or manga editor; pending commands belong to the shared
 /// identity-bound repository, independently of this widget's lifetime.
+enum SettingsFailure { conflict, rejected, unknown }
+
 final class SettingsController extends ChangeNotifier {
   SettingsController({
     required this.repository,
@@ -26,6 +28,7 @@ final class SettingsController extends ChangeNotifier {
   bool _retired = false;
   bool _disposed = false;
   String? _error;
+  SettingsFailure? failure;
   int _wantedGlobalRevision = -1;
 
   SettingsSnapshot? get snapshot => _snapshot;
@@ -82,6 +85,7 @@ final class SettingsController extends ChangeNotifier {
     if (!canRefresh) return false;
     _busy = true;
     _error = null;
+    failure = null;
     notifyListeners();
     try {
       final value = mangaKey == null
@@ -146,6 +150,7 @@ final class SettingsController extends ChangeNotifier {
     if (!(retrying ? canRetry : canEdit)) return false;
     _busy = true;
     _error = null;
+    failure = null;
     notifyListeners();
     try {
       final value = await send();
@@ -154,6 +159,12 @@ final class SettingsController extends ChangeNotifier {
       return true;
     } catch (failure) {
       if (available) {
+        this.failure = switch (failure) {
+          BusinessStateException(conflict: true) => SettingsFailure.conflict,
+          BusinessStateException(:final error) when !error.retryable =>
+            SettingsFailure.rejected,
+          _ => SettingsFailure.unknown,
+        };
         _error = switch (failure) {
           BusinessStateException(conflict: true) => '设置已在其他设备修改，请重新读取后确认。',
           BusinessStateException(:final error) when !error.retryable =>

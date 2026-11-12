@@ -1,6 +1,6 @@
 # 扩展管理与浏览：UI 状态流程提案
 
-2026-11-12。本文整理页面职责、用户操作、可见状态及每个状态的最小必要信息，供后续 UI 调整评审；不表示客户端已经按此实现。
+2026-11-12。本文整理页面职责、用户操作、可见状态及每个状态的最小必要信息。用户已采纳并要求实施；当前进度与验收维护在[实施计划](../plan/browse-ui-flow.md)，不能将本设计文档视为客户端已经实现或通过验收的证据。
 
 参考 Mihon v0.21.3 的[浏览入口](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/tachiyomi/ui/browse/BrowseTab.kt)、[扩展列表](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/presentation/browse/ExtensionsScreen.kt)、[漫画源列表](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/presentation/browse/SourcesScreen.kt)与[作品列表](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/presentation/browse/BrowseSourceScreen.kt)：源和扩展分区；扩展按状态分组；源直接进入作品；首次加载、空结果、已有结果的后续加载分别处理。使用路径也见[官方入门指南](https://mihon.app/docs/guides/getting-started/)。
 
@@ -237,4 +237,4 @@ flowchart TD
 
 ## 9. 评审与后续实现边界
 
-本次交付为 UI 流程与信息层级提案。当前实现仍见 `apps/reader/lib/features/extensions/extensions_page.dart`、`apps/reader/lib/features/browse/catalog_page.dart`；不会把新布局写成已完成或已验收能力。采用本提案后，再在对应实施计划中拆分导航、状态投影、结果分页与异常恢复任务，保留现有账户确认和精确构建选择合同。
+用户已要求按本流程实施。当前入口见 `apps/reader/lib/features/extensions/extensions_page.dart`、`apps/reader/lib/features/browse/catalog_page.dart`；导航、状态投影、结果分页与异常恢复按[实施计划](../plan/browse-ui-flow.md)推进，保留现有账户确认和精确构建选择合同。仅对应实现及实际验证成立后，才更新完成状态。

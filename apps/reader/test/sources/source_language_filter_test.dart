@@ -88,7 +88,8 @@ void main() {
     await platform.dispose();
   });
 
-  Finder source(String id) => find.byKey(ValueKey(('catalog-source', id)));
+  Finder source(String id, [String package = 'eu.kanade.source.test']) =>
+      find.byKey(ValueKey(('source-directory-row', package, id)));
   Finder languageFilter() =>
       find.byKey(const ValueKey('source-language-filter'));
   Finder clearFilter() => find.byKey(const ValueKey('source-language-clear'));
@@ -118,7 +119,7 @@ void main() {
   Future<void> reveal(WidgetTester tester, Finder target) async {
     final scrollable = find
         .descendant(
-          of: find.byType(CatalogPage),
+          of: find.byType(ListView).first,
           matching: find.byType(Scrollable),
         )
         .first;
@@ -145,162 +146,96 @@ void main() {
   }
 
   testWidgets(
-    'loaded language projection preserves active source and requests, with distinct all and long source IDs',
+    'language projection uses installed static metadata before opening and preserves the active Source',
     (tester) async {
       await catalog.selectSource(catalog.session!.sources.first);
       await show(tester);
-      await reveal(tester, languageFilter());
-      expect(find.text('匹配 5 / 5 个漫画源'), findsOneWidget);
-      final controlsBefore = platform.controlCommands.length;
-      final businessBefore = platform.businessServer.requests.length;
-      final callsBefore = platform.invocations.length;
-
+      final active = catalog.activeSource;
+      final manga = catalog.mangas.single;
+      final controls = platform.controlCommands.length;
+      final calls = platform.invocations.length;
+      final business = platform.businessServer.requests.length;
       await chooseLanguage(tester, 'en');
       expect(source('42'), findsOneWidget);
       expect(source(sourceId), findsNothing);
-      expect(find.text('匹配 1 / 5 个漫画源'), findsOneWidget);
-      expect(find.text('当前使用：中文甲 · zh（不在当前筛选中）'), findsOneWidget);
-      expect(catalog.activeSource!.id, sourceId);
-      expect(catalog.mangas.single.title, testManga.title);
-
       await chooseLanguage(tester, 'all');
       expect(source('44'), findsOneWidget);
       expect(source('42'), findsNothing);
-      expect(find.text('匹配 1 / 5 个漫画源'), findsOneWidget);
       await tap(tester, clearFilter());
-      expect(find.text('匹配 5 / 5 个漫画源'), findsOneWidget);
-      expect(tester.widget<FilterChip>(source(sourceId)).selected, true);
-      await chooseLanguage(tester, '全部语言');
-      expect(find.text('匹配 5 / 5 个漫画源'), findsOneWidget);
       await chooseLanguage(tester, 'zh');
-      expect(find.text('匹配 2 / 5 个漫画源'), findsOneWidget);
-      expect(platform.controlCommands, hasLength(controlsBefore));
-      expect(platform.businessServer.requests, hasLength(businessBefore));
-      expect(platform.invocations, hasLength(callsBefore));
-      expect(catalog.activeSource!.id, sourceId);
-
+      expect(source(sourceId), findsOneWidget);
+      expect(source(_secondSourceId), findsOneWidget);
+      expect(catalog.activeSource, same(active));
+      expect(catalog.mangas.single, same(manga));
+      expect(platform.controlCommands, hasLength(controls));
+      expect(platform.invocations, hasLength(calls));
+      expect(platform.businessServer.requests, hasLength(business));
       await tap(tester, source(_secondSourceId));
       expect(catalog.activeSource!.id, _secondSourceId);
-      expect(platform.invocations, hasLength(callsBefore + 1));
       expect(platform.invocations.last.sourceId, _secondSourceId);
-      expect(tester.widget<FilterChip>(source(_secondSourceId)).selected, true);
-      expect(tester.takeException(), isNull);
-      await hide(tester);
-    },
-  );
-
-  testWidgets(
-    'switching package and generation clears only the session filter',
-    (tester) async {
-      await show(tester);
-      await chooseLanguage(tester, 'zh');
-      expect(find.text('匹配 2 / 5 个漫画源'), findsOneWidget);
-      platform.manifestBuildId = 'build-2';
-      await tap(tester, find.text('eu.kanade.source.other · 2.0'));
-      await reveal(tester, languageFilter());
-      expect(catalog.activeBuild!.packageName, 'eu.kanade.source.other');
-      expect(
-        tester.widget<DropdownButton<String>>(languageFilter()).value,
-        isNull,
-      );
-      expect(find.text('匹配 5 / 5 个漫画源'), findsOneWidget);
-      expect(catalog.activeSource, isNull);
-
-      await chooseLanguage(tester, 'en');
-      expect(find.text('匹配 1 / 5 个漫画源'), findsOneWidget);
-      platform.runtimeGeneration = 'generation-2';
-      await catalog.connect();
+      await tester.pageBack();
       await tester.pumpAndSettle();
-      await tap(tester, find.text('eu.kanade.source.other · 2.0'));
-      await reveal(tester, languageFilter());
-      expect(catalog.session!.generation, 'generation-2');
       expect(
         tester.widget<DropdownButton<String>>(languageFilter()).value,
-        isNull,
+        'zh',
       );
-      expect(find.text('匹配 5 / 5 个漫画源'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
   );
 
   testWidgets(
-    'no loaded session hides language controls until a confirmed extension opens',
+    'no runtime session is required to search, filter or favorite Source names',
     (tester) async {
       await catalog.connect();
       await show(tester);
       expect(catalog.session, isNull);
-      expect(languageFilter(), findsNothing);
-      expect(clearFilter(), findsNothing);
-      expect(find.byKey(const ValueKey('source-language-count')), findsNothing);
+      expect(languageFilter(), findsOneWidget);
+      await chooseLanguage(tester, 'en');
+      expect(source('42'), findsOneWidget);
       expect(platform.invocations, isEmpty);
-      await tap(tester, find.text('eu.kanade.source.test · 1.0'));
-      await reveal(tester, languageFilter());
-      expect(find.text('匹配 5 / 5 个漫画源'), findsOneWidget);
-      expect(
-        tester.widget<DropdownButton<String>>(languageFilter()).onChanged,
-        isNotNull,
+      await tester.enterText(
+        find.byKey(const ValueKey('source-directory-search')),
+        '不存在的名称',
       );
-      expect(tester.widget<TextButton>(clearFilter()).onPressed, isNull);
+      await tester.pumpAndSettle();
+      expect(find.text('没有匹配的漫画源'), findsOneWidget);
+      expect(find.text('尚无漫画源'), findsNothing);
       expect(platform.invocations, isEmpty);
-      expect(catalog.activeSource, isNull);
-      expect(tester.takeException(), isNull);
       await hide(tester);
     },
   );
 
   testWidgets(
-    'busy loading prevents source changes and resumes the same filter',
+    'busy loading disables opening other Sources without losing the directory filter',
     (tester) async {
       await catalog.selectSource(catalog.session!.sources.first);
       await show(tester);
       await chooseLanguage(tester, 'zh');
-      await reveal(tester, source(_secondSourceId));
       final pending = Completer<void>();
       addTearDown(() {
         if (!pending.isCompleted) pending.complete();
       });
-      platform.invokeHandler = (call) async {
-        if (call.whichRequest() == wire.SourceCall_Request.latest) {
-          await pending.future;
-        }
+      platform.invokeHandler = (_) async {
+        await pending.future;
         return wire.SourceResult(
           mangaPage: wire.MangaPage(mangas: [testManga]),
         );
       };
       final loading = catalog.loadMangas(operation: 'latest');
       await tester.pump();
-      expect(catalog.busy, true);
-      await tester.ensureVisible(source(_secondSourceId));
-      await tester.pump();
-      expect(
-        tester.widget<FilterChip>(source(_secondSourceId)).onSelected,
-        isNull,
-      );
-      expect(
-        tester.widget<DropdownButton<String>>(languageFilter()).onChanged,
-        isNull,
-      );
-      expect(tester.widget<TextButton>(clearFilter()).onPressed, isNull);
-      final callsBefore = platform.invocations.length;
+      expect(tester.widget<ListTile>(source(_secondSourceId)).onTap, isNull);
+      final before = platform.invocations.length;
       await tester.tap(source(_secondSourceId));
       await tester.pump();
-      expect(catalog.activeSource!.id, sourceId);
-      expect(platform.invocations, hasLength(callsBefore));
-      expect(find.text('匹配 2 / 5 个漫画源'), findsOneWidget);
-
+      expect(platform.invocations, hasLength(before));
       pending.complete();
       await loading;
       await tester.pumpAndSettle();
-      expect(catalog.busy, false);
-      await reveal(tester, languageFilter());
       expect(
         tester.widget<DropdownButton<String>>(languageFilter()).value,
         'zh',
       );
-      await tap(tester, source(_secondSourceId));
-      expect(catalog.activeSource!.id, _secondSourceId);
-      expect(platform.invocations.last.sourceId, _secondSourceId);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

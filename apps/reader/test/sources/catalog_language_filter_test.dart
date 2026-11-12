@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
@@ -148,10 +146,8 @@ void main() {
     });
 
     Finder languageFilter() =>
-        find.byKey(const ValueKey('catalog-language-filter'));
-    Finder clearFilter() =>
-        find.byKey(const ValueKey('catalog-language-clear'));
-    Finder build(String id) => find.byKey(ValueKey(('catalog-build', id)));
+        find.byKey(const ValueKey('source-language-filter'));
+    Finder clearFilter() => find.byKey(const ValueKey('source-language-clear'));
 
     Future<void> show(WidgetTester tester) async {
       await tester.binding.setSurfaceSize(const Size(480, 800));
@@ -173,7 +169,7 @@ void main() {
     Future<void> reveal(WidgetTester tester, Finder target) async {
       final scrollable = find
           .descendant(
-            of: find.byType(CatalogPage),
+            of: find.byType(ListView).first,
             matching: find.byType(Scrollable),
           )
           .first;
@@ -238,37 +234,116 @@ void main() {
     );
 
     testWidgets(
-      'after first install the new row leads accessibility traversal without reopening Browse',
+      'static Source names and languages filter without executing extensions',
       (tester) async {
-        final builds = [
-          for (var index = 0; index < 48; index++)
-            _build('extension-$index', [
-              wire.CatalogSource(
-                id: '$index',
-                name: 'Source $index',
-                lang: 'en',
-              ),
-            ]),
-        ];
-        final first = builds.first, target = builds.last;
-        String label(wire.ExtensionBuildDescriptor build) =>
-            '${build.packageName} · ${build.version}';
-        final rowLabels = {label(first), label(target)};
-        Iterable<String> matchingRows() => tester.semantics
-            .simulatedAccessibilityTraversal()
-            .map((node) => node.label)
-            .where(rowLabels.contains);
+        await show(tester);
+        expect(find.text('中文目录源'), findsOneWidget);
+        final controls = platform.controlCommands.length;
+        final requests = platform.businessServer.requests.length;
+        await choose(tester, languageFilter(), 'all');
+        expect(find.text('多语言目录源'), findsOneWidget);
+        expect(find.text('中文目录源'), findsNothing);
+        await choose(tester, languageFilter(), '未标注语言');
+        expect(
+          tester.widget<DropdownButton<String>>(languageFilter()).value,
+          '',
+        );
+        expect(find.text('未标注目录源'), findsOneWidget);
+        await tester.tap(clearFilter());
+        await tester.pumpAndSettle();
+        expect(find.text('中文目录源'), findsOneWidget);
+        expect(platform.controlCommands, hasLength(controls));
+        expect(platform.businessServer.requests, hasLength(requests));
+        expect(platform.openedBuilds, isEmpty);
+        expect(platform.invocations, isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
 
-        platform.inventory = _index(builds);
+    testWidgets(
+      'filtering preserves existing reading context and reconciles removed languages',
+      (tester) async {
+        platform.sourceInventory = [
+          wire.SourceInfo(id: sourceId, name: '中文目录源', lang: 'zh'),
+        ];
+        await catalog.openBuild(catalog.builds.first);
+        await catalog.selectSource(catalog.session!.sources.first);
+        final active = catalog.activeSource;
+        final manga = catalog.mangas.single;
+        await show(tester);
+        final commands = platform.controlCommands.length;
+        await choose(tester, languageFilter(), 'ja');
+        expect(catalog.activeSource, same(active));
+        expect(catalog.mangas.single, same(manga));
+        expect(platform.controlCommands, hasLength(commands));
+        platform.inventory = _index([_builds()[0]]);
+        await catalog.connect();
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<DropdownButton<String>>(languageFilter()).value,
+          isNull,
+        );
+        await choose(tester, languageFilter(), 'en');
+        platform.bootstrapSubject = 'another-subject';
+        await catalog.connect();
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<DropdownButton<String>>(languageFilter()).value,
+          isNull,
+        );
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+
+    testWidgets(
+      'missing installed version is a blocked extension row rather than new Source metadata',
+      (tester) async {
+        final changed = _build('replacement', [
+          wire.CatalogSource(id: '99', name: '新版本独有漫画源', lang: 'en'),
+        ])..packageName = _builds().first.packageName;
+        platform.inventory = _index([changed]);
+        await catalog.connect();
+        await show(tester);
+        expect(
+          find.byKey(
+            ValueKey(('source-extension-blocked', changed.packageName)),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(
+            ValueKey(('source-directory-row', changed.packageName, '99')),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.byKey(
+            ValueKey(('source-favorite-toggle', changed.packageName, '99')),
+          ),
+          findsNothing,
+        );
+        expect(find.textContaining('尚无漫画源'), findsNothing);
+        expect(platform.openedBuilds, isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+
+    testWidgets(
+      'no account installations leads to extension installation and refreshes the Source tab',
+      (tester) async {
         platform.seedInstalledBuilds(const []);
         await catalog.connect();
         await show(tester);
-        expect(matchingRows(), [label(first)]);
-        await tester.tap(find.byKey(const ValueKey('extensions-manage')));
+        expect(find.text('尚无漫画源'), findsOneWidget);
+        await tester.tap(find.text('前往扩展'));
         await tester.pumpAndSettle();
+        final target = _builds().first;
         await tester.enterText(
           find.byKey(const ValueKey('extensions-search')),
-          target.packageName,
+          '中文目录源',
         );
         await tester.pumpAndSettle();
         final install = find.byKey(
@@ -278,205 +353,17 @@ void main() {
             target.packageName,
           )),
         );
-        await tester.scrollUntilVisible(
-          install,
-          180,
-          scrollable: find.byType(Scrollable).first,
-        );
+        await tester.ensureVisible(install);
         await tester.tap(install);
         await tester.pumpAndSettle();
-        expect(catalog.installedExtensions.single.buildId, target.buildId);
-        await tester.pageBack();
+        await tester.tap(find.text('漫画源').first);
         await tester.pumpAndSettle();
-
-        expect(matchingRows(), [label(target), label(first)]);
+        expect(find.text('中文目录源'), findsOneWidget);
         expect(
-          find
-              .byKey(ValueKey(('catalog-build-open', target.buildId)))
-              .hitTestable(),
-          findsOneWidget,
+          catalog.installedExtensions.single.packageName,
+          target.packageName,
         );
         expect(platform.openedBuilds, isEmpty);
-        await hide(tester);
-      },
-    );
-
-    testWidgets(
-      'static names and language projection work before executing any extension',
-      (tester) async {
-        await show(tester);
-        await reveal(tester, languageFilter());
-        expect(find.text('匹配 4 / 4 个扩展 · 5 / 5 个漫画源'), findsOneWidget);
-        expect(find.text('中文目录源 · zh'), findsOneWidget);
-        expect(find.text('English source · en'), findsOneWidget);
-        final commands = platform.controlCommands.length;
-        final business = platform.businessServer.requests.length;
-
-        await choose(tester, languageFilter(), 'all');
-        expect(build('build-3'), findsOneWidget);
-        expect(build('build-1'), findsNothing);
-        expect(find.text('多语言目录源 · all'), findsOneWidget);
-        expect(find.text('匹配 1 / 4 个扩展 · 1 / 5 个漫画源'), findsOneWidget);
-        await choose(tester, languageFilter(), '未标注语言');
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          '',
-        );
-        expect(build('build-4'), findsOneWidget);
-        expect(find.text('未标注目录源 · 未标注语言'), findsOneWidget);
-        await reveal(tester, clearFilter());
-        await tester.tap(clearFilter());
-        await tester.pumpAndSettle();
-        expect(find.text('匹配 4 / 4 个扩展 · 5 / 5 个漫画源'), findsOneWidget);
-        expect(platform.controlCommands, hasLength(commands));
-        expect(platform.businessServer.requests, hasLength(business));
-        expect(platform.openedBuilds, isEmpty);
-        expect(platform.invocations, isEmpty);
-        expect(catalog.session, isNull);
-        expect(tester.takeException(), isNull);
-        await hide(tester);
-      },
-    );
-
-    testWidgets(
-      'directory filtering preserves current manga context and is independent of loaded languages',
-      (tester) async {
-        await catalog.openBuild(catalog.builds.first);
-        await catalog.selectSource(catalog.session!.sources.first);
-        final activeBuild = catalog.activeBuild;
-        final activeSource = catalog.activeSource;
-        final manga = catalog.mangas.single;
-        await show(tester);
-        final commands = platform.controlCommands.length;
-        final business = platform.businessServer.requests.length;
-        await choose(tester, languageFilter(), 'ja');
-        expect(build('build-1'), findsNothing);
-        expect(
-          find.text('当前使用扩展：${activeBuild!.packageName}（不在当前目录筛选中）'),
-          findsOneWidget,
-        );
-        final loadedFilter = find.byKey(
-          const ValueKey('source-language-filter'),
-        );
-        await choose(tester, loadedFilter, 'zh');
-        expect(catalog.activeBuild, same(activeBuild));
-        expect(catalog.activeSource, same(activeSource));
-        expect(catalog.mangas.single, same(manga));
-        expect(platform.controlCommands, hasLength(commands));
-        expect(platform.businessServer.requests, hasLength(business));
-        await reveal(tester, languageFilter());
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          'ja',
-        );
-        platform.runtimeGeneration = 'generation-2';
-        platform.manifestBuildId = 'build-2';
-        final nextBuild = find.byKey(
-          const ValueKey(('catalog-build-open', 'build-2')),
-        );
-        await reveal(tester, nextBuild);
-        await tester.tap(nextBuild);
-        await tester.pumpAndSettle();
-        await reveal(tester, loadedFilter);
-        expect(catalog.session!.generation, 'generation-2');
-        expect(
-          tester.widget<DropdownButton<String>>(loadedFilter).value,
-          isNull,
-        );
-        await reveal(tester, languageFilter());
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          'ja',
-        );
-        expect(tester.takeException(), isNull);
-        await hide(tester);
-      },
-    );
-
-    testWidgets(
-      'refresh reconciles removed languages and changed identities without stale dropdown values',
-      (tester) async {
-        await show(tester);
-        await choose(tester, languageFilter(), 'en');
-        await catalog.connect();
-        await tester.pumpAndSettle();
-        await reveal(tester, languageFilter());
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          'en',
-        );
-        platform.inventory = _index([_builds()[1]]);
-        await catalog.connect();
-        await tester.pumpAndSettle();
-        await reveal(tester, languageFilter());
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          isNull,
-        );
-        expect(find.text('匹配 1 / 1 个扩展 · 1 / 1 个漫画源'), findsOneWidget);
-        await choose(tester, languageFilter(), 'ja');
-        platform.bootstrapSubject = 'another-subject';
-        await catalog.connect();
-        await tester.pumpAndSettle();
-        await reveal(tester, languageFilter());
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          isNull,
-        );
-        expect(platform.invocations, isEmpty);
-        expect(tester.takeException(), isNull);
-        await hide(tester);
-      },
-    );
-
-    testWidgets(
-      'an empty directory has no installed claim and busy loading disables directory actions',
-      (tester) async {
-        platform.inventory = _index([]);
-        await catalog.connect();
-        await show(tester);
-        expect(find.text('当前目录没有可用构建，请稍后重新连接以刷新目录。'), findsOneWidget);
-        expect(languageFilter(), findsNothing);
-        expect(find.textContaining('已安装'), findsNothing);
-        platform.inventory = _index(_builds());
-        await catalog.connect();
-        await tester.pumpAndSettle();
-        await choose(tester, languageFilter(), 'en');
-        final entered = Completer<void>(), release = Completer<void>();
-        addTearDown(() {
-          if (!release.isCompleted) release.complete();
-        });
-        platform.beforeApiFetch = (path) async {
-          if (!path.endsWith('/manifest.json')) return;
-          entered.complete();
-          await release.future;
-        };
-        final loading = catalog.openBuild(catalog.builds.first);
-        for (var pump = 0; pump < 20 && !entered.isCompleted; pump++) {
-          await tester.pump(const Duration(milliseconds: 20));
-        }
-        expect(entered.isCompleted, true);
-        await tester.pump();
-        await tester.ensureVisible(languageFilter());
-        await tester.pump();
-        expect(catalog.busy, true);
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).onChanged,
-          isNull,
-        );
-        expect(tester.widget<TextButton>(clearFilter()).onPressed, isNull);
-        expect(platform.openedBuilds, isEmpty);
-        release.complete();
-        await loading;
-        await tester.pumpAndSettle();
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          'en',
-        );
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).onChanged,
-          isNotNull,
-        );
         expect(tester.takeException(), isNull);
         await hide(tester);
       },

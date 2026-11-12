@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
-import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/migration/migration_controller.dart';
 import 'package:karuyomi/features/migration/migration_page.dart';

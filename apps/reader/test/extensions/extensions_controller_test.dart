@@ -416,12 +416,7 @@ void main() {
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
-    final scrollable = find
-        .descendant(
-          of: find.byType(ExtensionsPage),
-          matching: find.byType(Scrollable),
-        )
-        .first;
+    final scrollable = find.byType(Scrollable).first;
     if (finder.evaluate().isEmpty) {
       await tester.drag(scrollable, const Offset(0, 4000));
       await tester.pumpAndSettle();
@@ -453,7 +448,13 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('本机产物已准备'), findsOneWidget);
+      await tap(
+        tester,
+        find.byKey(
+          const ValueKey(('extension-installed', 'eu.kanade.source.test')),
+        ),
+      );
+      expect(find.textContaining('本机就绪'), findsOneWidget);
       await tester.runAsync(() => catalog.openBuild(catalog.builds.single));
       await tester.pumpAndSettle();
       platform.closeAcknowledged = false;
@@ -476,6 +477,9 @@ void main() {
           const ValueKey(('extension-uninstall', 'eu.kanade.source.test')),
         ),
       );
+      expect(find.text('账户已卸载此扩展，请返回扩展列表。'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(find.text('账户尚未安装扩展。'), findsOneWidget);
       expect(platform.cachedArtifacts, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -499,6 +503,12 @@ void main() {
           const ValueKey(('extension-installed', 'eu.kanade.source.test')),
         ),
         findsOneWidget,
+      );
+      await tap(
+        tester,
+        find.byKey(
+          const ValueKey(('extension-installed', 'eu.kanade.source.test')),
+        ),
       );
       expect(
         find.byKey(
@@ -540,6 +550,12 @@ void main() {
         'eu.kanade.source.test',
       );
       await tester.pumpAndSettle();
+      await tap(
+        tester,
+        find.byKey(
+          const ValueKey(('extension-installed', 'eu.kanade.source.test')),
+        ),
+      );
       expect(
         find.byKey(
           const ValueKey(('extension-uninstall', 'eu.kanade.source.test')),
@@ -566,13 +582,21 @@ void main() {
           .where((request) => request.method == 'POST')
           .length;
       await show(tester);
-      expect(find.text('全局设置尚未确认；请处理原操作后再修改扩展。'), findsOneWidget);
+      expect(find.textContaining('结果待确认'), findsOneWidget);
+      await tap(
+        tester,
+        find.byKey(
+          const ValueKey(('extension-installed', 'eu.kanade.source.test')),
+        ),
+      );
       final enabled = find.byKey(
         const ValueKey(('extension-enabled', 'eu.kanade.source.test')),
       );
       await tester.ensureVisible(enabled);
       expect(tester.widget<SwitchListTile>(enabled).onChanged, isNull);
       await tap(tester, find.byKey(const ValueKey('extensions-refresh')));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await tap(tester, find.byKey(const ValueKey('extensions-check-updates')));
       expect(
         platform.businessServer.requests

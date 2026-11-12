@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../data/business_state_validation.dart';
@@ -11,6 +12,8 @@ import '../settings/settings_controller.dart';
 
 /// Account intent reuses the identity-bound global settings queue. Artifacts
 /// remain disposable local copies; preparation never opens a Source.
+enum ExtensionActivity { reading, preparing, saving, cleaning }
+
 final class ExtensionsController extends ChangeNotifier {
   ExtensionsController({
     required this.catalog,
@@ -37,6 +40,10 @@ final class ExtensionsController extends ChangeNotifier {
   String? error;
   String? message;
   String? _preparationId;
+  ExtensionActivity? activity;
+  RuntimeErrorCode? operationFailure;
+  String? cleanupSha256;
+  String? cleanupError;
   bool _busy = false;
   bool _disposed = false;
   bool _retired = false;
@@ -134,6 +141,7 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       final id = const Uuid().v4();
       _preparationId = id;
+      activity = ExtensionActivity.preparing;
       _changed();
       wire.PreparedBuild prepared;
       try {
@@ -164,6 +172,8 @@ final class ExtensionsController extends ChangeNotifier {
           enabled: previous?.enabled ?? true,
         ),
       );
+      activity = ExtensionActivity.saving;
+      _changed();
       final saved = await settings.saveGlobal(values, revision);
       if (!available) return;
       if (saved) await catalog.applyConfirmedInstallations(settings.snapshot!);
@@ -233,6 +243,8 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       _validateNewRepository(preview.repository, values.repositories);
       values.repositories.add(preview.repository.deepCopy());
+      activity = ExtensionActivity.saving;
+      _changed();
       final saved = await settings.saveGlobal(
         values,
         preview.baseline.globalRevision,
@@ -263,6 +275,8 @@ final class ExtensionsController extends ChangeNotifier {
           value.repoId == repository.repoId,
     );
     await _run(() async {
+      activity = ExtensionActivity.saving;
+      _changed();
       final saved = await settings.saveGlobal(values, initial.globalRevision);
       if (!saved || !available) return;
       message = '仓库已移除；安装选择、书架和来源数据保留，对应运行槽将关闭。';
@@ -283,6 +297,8 @@ final class ExtensionsController extends ChangeNotifier {
     if (match == null) return;
     match.enabled = enabled;
     await _run(() async {
+      activity = ExtensionActivity.saving;
+      _changed();
       if (await settings.saveGlobal(values, initial.globalRevision) &&
           available) {
         await catalog.applyConfirmedInstallations(settings.snapshot!);
@@ -303,6 +319,8 @@ final class ExtensionsController extends ChangeNotifier {
       (value) => value.packageName == extension.packageName,
     );
     await _run(() async {
+      activity = ExtensionActivity.saving;
+      _changed();
       if (!await settings.saveGlobal(values, initial.globalRevision) ||
           !available) {
         return;
@@ -332,6 +350,7 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       final id = const Uuid().v4();
       _preparationId = id;
+      activity = ExtensionActivity.preparing;
       _changed();
       wire.PreparedBuild prepared;
       try {
@@ -374,20 +393,35 @@ final class ExtensionsController extends ChangeNotifier {
   }
 
   Future<void> _cleanup(String sha256) async {
-    await catalog.retireUnavailableExtension();
-    if (!available) return;
-    await catalog.closeManagedBuild(sha256);
-    if (!available) return;
-    await catalog.runtime.forgetExtensionArtifact(sha256);
-    if (!available) return;
-    cache = await catalog.runtime.extensionCache();
+    activity = ExtensionActivity.cleaning;
+    cleanupSha256 = sha256;
+    cleanupError = null;
+    _changed();
+    try {
+      await catalog.retireUnavailableExtension();
+      if (!available) return;
+      await catalog.closeManagedBuild(sha256);
+      if (!available) return;
+      await catalog.runtime.forgetExtensionArtifact(sha256);
+      if (!available) return;
+      cache = await catalog.runtime.extensionCache();
+      cleanupSha256 = null;
+    } catch (_) {
+      cleanupError = '账户已确认；本机副本清理未完成，请重试清理。';
+      rethrow;
+    }
   }
 
   Future<void> retryCleanup() async {
     if (!available || busy || catalog.busy) return;
     await _run(() async {
-      await catalog.retireUnavailableExtension();
-      if (available) cache = await catalog.runtime.extensionCache();
+      final sha256 = cleanupSha256;
+      if (sha256 != null) {
+        await _cleanup(sha256);
+      } else {
+        await catalog.retireUnavailableExtension();
+        if (available) cache = await catalog.runtime.extensionCache();
+      }
     });
   }
 
@@ -414,6 +448,8 @@ final class ExtensionsController extends ChangeNotifier {
 
   Future<void> _run(Future<void> Function() operation) async {
     _busy = true;
+    activity = ExtensionActivity.reading;
+    operationFailure = null;
     error = null;
     message = null;
     _changed();
@@ -421,14 +457,26 @@ final class ExtensionsController extends ChangeNotifier {
       await operation();
     } catch (failure) {
       if (available) {
-        error = failure is FormatException
-            ? failure.message
-            : '操作未完成；账户确认和本机清理状态请分别检查。${catalog.extensionCleanupError ?? ''}';
+        operationFailure = failure is RuntimeException ? failure.code : null;
+        error = switch (failure) {
+          RuntimeException(code: RuntimeErrorCode.limitExceeded) =>
+            '本机存储达到限额，请释放空间后重试。',
+          RuntimeException(code: RuntimeErrorCode.storageBusy) =>
+            '扩展仍在使用，请关闭相关阅读后重试。',
+          RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
+            '当前应用不支持此扩展材料，请更新应用。',
+          RuntimeException(code: RuntimeErrorCode.integrityError) =>
+            '扩展下载校验失败，请检查更新后重试。',
+          FormatException(:final message) => message,
+          StateError(:final message) => message.toString(),
+          _ => '操作未完成，请重试。',
+        };
       }
     } finally {
       _preparationId = null;
       if (!_disposed) {
         _busy = false;
+        activity = null;
         _changed();
       }
     }
