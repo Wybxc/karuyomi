@@ -44,7 +44,7 @@
 ## 同轮：Wasm 对照与采用门槛
 
 - [ ] 自有 Web 桥已使用现代 `dart:js_interop`；通过 `--no-deprecated-js-interop` 检查完整依赖链，修复真实依赖问题，不以自有源码没有旧导入代替构建证据。
-- [ ] 在 CI 用相同提交、Source 材料与发布配置生成 JavaScript 和 `--wasm` 候选，复用现有构建链与扩展产物。使用[官方 loader 的双目标与自动 JavaScript 回退](https://docs.flutter.dev/platform-integration/web/wasm)，不自建回退层，TeaVM Source 继续使用已确定的 JavaScript backend。
+- [ ] 在 CI 用相同提交、Source 材料与发布配置生成 JavaScript 和 `--wasm` 候选，复用现有构建链与扩展产物。独立候选开启既有 `READER_BASELINE` 采集面板并记录提交号，生产默认产物保持正常配置。使用[官方 loader 的双目标与自动 JavaScript 回退](https://docs.flutter.dev/platform-integration/web/wasm)，不自建回退层，TeaVM Source 继续使用已确定的 JavaScript backend。
 - [ ] 核对 Wasm MIME、自托管渲染资源和必要响应头；如调整跨源隔离，连同 Access 登录窗口与运行时资源一起验收。Safari / Firefox 的 `wasmAllowList` 采用须有对应浏览器证据，无法测试的平台保持待验。
 - [ ] 对照记录冷启动与复访到可操作时间、章节首图、连续滚动帧耗时及可取得的内存指标，注明浏览器、设备、缓存条件、网络、素材与重复次数。确认实际执行 Wasm，并完成真实阅读、保存、取消、关闭与新文档续读回归。
 - [ ] 根据同条件测量与正确性回归决定默认配置，记录采用结论及未覆盖环境。官方重组件基准的两倍帧率不能作为 Karuyomi 收益；未证明收益前不增加应用专有的浏览器分支或性能机制。
