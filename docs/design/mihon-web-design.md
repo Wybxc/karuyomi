@@ -1,6 +1,6 @@
 # 个人漫画阅读 App 设计
 
-设计日期：2026-11-01；最近修订：2026-11-05。本文是可持续修改的现行设计，不再冻结。当前工程已建立并有分项实现和验证，P0 尚未完整验收；执行状态见[计划目录](../plan/README.md)与[验证记录](../VERIFICATION.md)。TeaVM 0.16.0 JavaScript backend / release9 是项目宿主的研究起点，不是要求产品源码保持原样的快照。
+设计日期：2026-11-01；最近修订：2026-11-13。本文是可持续修改的现行设计，不再冻结。当前工程已建立并有分项实现和验证，P0 尚未完整验收；执行状态见[计划目录](../plan/README.md)与[验证记录](../VERIFICATION.md)。TeaVM 0.16.0 JavaScript backend / release9 是项目宿主的研究起点，不是要求产品源码保持原样的快照。
 
 **选型已确定：Flutter + TeaVM，采用浏览器宿主路线。首版功能为浏览漫画源、管理书架、在线阅读。** 移动端原生优先、桌面端浏览器优先，并尽量共享代码；允许以一定桌面性能换取移动性能。Flutter Web 通过 JS interop 连接 TeaVM Worker，iOS/Android 通过系统 WebView 内的 Worker 复用同版 TeaVM JS 宿主；统一 Dart 接口，原生图片通道与鉴权仍待验证。具体方式见[Flutter + TeaVM 接入设计](./flutter-teavm-integration.md)。RN、SwiftUI 与纯 React PWA 不再是选型候选。后端采用 Cloudflare Workers API + D1 + Durable Objects，R2 仅用于需要的私有个人对象（如自定义封面），无需常驻 JVM、容器或自有服务器。扩展仅在应用打开时按需执行，关闭后停止；不承诺后台任务续跑。完整 Mihon 功能仅作为长期参考，首版范围以下表为准。
 
@@ -63,6 +63,8 @@
 不会宣称完整 Android 兼容：WebView 登录、验证码、原生 JNI/图像库、特殊图片格式必须有独立能力检测和失败提示。付费、账号和地区条件由原站决定。
 
 ## 3. 页面设计
+
+2026-11-13 确定 Web / iOS / Android 全端使用官方 `cupertino_ui`，维护一套 Cupertino 界面。Mihon 继续提供信息架构与操作逻辑参考；具体组件、主题、导航和反馈方式按[Cupertino 设计](cupertino-ui.md)集中迁移，实施与验收见[计划](../plan/cupertino-ui.md)。
 
 工作名「页间」，移动端以底部导航为主，桌面端使用左侧导航。主要入口：**书架 / 浏览 / 设置**。
 
