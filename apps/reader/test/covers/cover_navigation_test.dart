@@ -10,7 +10,7 @@ import 'package:image/image.dart' as img;
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
-import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/covers/cover_selection.dart';
 import 'package:karuyomi/features/covers/custom_cover.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';

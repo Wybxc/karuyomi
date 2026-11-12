@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
-import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -70,10 +70,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: CatalogPage(
-            controller: catalog,
-            onConnect: () {},
-            onAuthenticate: () {},
+          body: SourceBrowsePage(
+            catalog: catalog,
+            build: catalog.activeBuild!,
+            source: catalog.activeBuild!.sources.single,
           ),
         ),
       ),
@@ -90,7 +90,7 @@ void main() {
     final form = find.byKey(const ValueKey('source-filter-form'));
     final scrollable = find
         .descendant(
-          of: form.evaluate().isEmpty ? find.byType(CatalogPage) : form,
+          of: form.evaluate().isEmpty ? find.byType(SourceBrowsePage) : form,
           matching: find.byType(Scrollable),
         )
         .first;

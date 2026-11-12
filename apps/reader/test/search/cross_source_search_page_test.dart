@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/search/cross_source_search_page.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -223,13 +224,23 @@ void main() {
       find.byKey(const ValueKey('cross-source-search-open')),
       findsOneWidget,
     );
-    final hint = find.byKey(const ValueKey('source-latest-unsupported'));
+    await tester.tap(
+      find.byKey(
+        const ValueKey((
+          'source-directory-row',
+          'eu.kanade.source.test',
+          sourceId,
+        )),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final hint = find.byKey(const ValueKey('source-query-context'));
     await tester.scrollUntilVisible(
       hint,
       200,
       scrollable: find
           .descendant(
-            of: find.byType(CatalogPage),
+            of: find.byType(SourceBrowsePage),
             matching: find.byType(Scrollable),
           )
           .first,

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../browse/catalog_controller.dart';
+import '../browse/manga_list_tile.dart';
+import '../extensions/extension_listing.dart';
 import 'cross_source_search_controller.dart';
 
 typedef OpenSourceSearchDetails =
@@ -151,8 +153,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
                 value: controller.selected.contains(target.key),
                 title: Text(target.source.name),
                 subtitle: Text(
-                  '${target.source.lang} · ${target.build.repoId}\n'
-                  '${target.build.packageName}',
+                  '${sourceLanguage(target.source.lang)} · ${extensionName(target.build.packageName, target.build.sources)}',
                 ),
                 onChanged: controller.canSelect
                     ? (selected) => controller.select(target, selected == true)
@@ -209,7 +210,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text(
-              '${group.target.source.lang} · ${group.target.build.repoId}'
+              '${sourceLanguage(group.target.source.lang)}'
               ' · $status · $count 项',
               key: ValueKey(('cross-search-status', group.target.key)),
             ),
@@ -227,14 +228,9 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
             if (group.limitReason != null && group.limitReason != group.error)
               Text(group.limitReason!),
             for (var index = 0; index < group.mangas.length; index++)
-              ListTile(
+              MangaListTile(
                 key: ValueKey(('cross-search-result', group.target.key, index)),
-                leading: const Icon(Icons.menu_book_outlined),
-                title: Text(group.mangas[index].title),
-                subtitle: group.mangas[index].author == null
-                    ? null
-                    : Text(group.mangas[index].author!),
-                trailing: const Icon(Icons.chevron_right),
+                manga: group.mangas[index],
                 onTap: controller.canChange && controller.cleanupError == null
                     ? () => unawaited(_open(group, group.mangas[index]))
                     : null,
@@ -399,7 +395,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
                 if (controller.groups.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text(
-                    '“${controller.query}” · ${controller.resultCount} 项',
+                    '“${controller.query}” · ${controller.groups.where((group) => !group.active).length} / ${controller.groups.length} 源完成 · ${controller.resultCount} 项',
                     key: const ValueKey('cross-search-results-heading'),
                   ),
                   const Text('结果按漫画源分别显示；下一页和重试均需手动操作。'),

@@ -579,9 +579,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('repositories-add')),
-      );
+      await tester.tap(find.byKey(const ValueKey('extensions-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('仓库管理'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('repositories-add')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -652,6 +653,10 @@ void main() {
       await tester.enterText(search, testCatalogSource.name);
       await tester.pumpAndSettle();
       expect(installed, findsOneWidget);
+      expect(enabled, findsNothing);
+      expect(uninstall, findsNothing);
+      await tester.tap(installed);
+      await tester.pumpAndSettle();
       expect(enabled, findsOneWidget);
       expect(uninstall, findsOneWidget);
       expect(available, findsNothing);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
 
 import 'preference_fixtures.dart';
@@ -24,10 +24,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: CatalogPage(
-            controller: fixture.catalog,
-            onConnect: () {},
-            onAuthenticate: () {},
+          body: SourceBrowsePage(
+            catalog: fixture.catalog,
+            build: fixture.catalog.activeBuild!,
+            source: fixture.catalog.activeBuild!.sources.single,
           ),
         ),
       ),
@@ -36,7 +36,7 @@ void main() {
     final button = find.byKey(const ValueKey('source-preferences-open'));
     final scrollable = find
         .descendant(
-          of: find.byType(CatalogPage),
+          of: find.byType(SourceBrowsePage),
           matching: find.byType(Scrollable),
         )
         .first;
@@ -155,7 +155,7 @@ void main() {
       final recovery = find.text('处理设置');
       final scrollable = find
           .descendant(
-            of: find.byType(CatalogPage),
+            of: find.byType(SourceBrowsePage),
             matching: find.byType(Scrollable),
           )
           .first;

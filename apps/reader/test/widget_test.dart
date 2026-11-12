@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/diagnostics/reader_baseline_host.dart';
+import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'browse/fakes.dart';
@@ -13,21 +15,18 @@ import 'browse/fakes.dart';
 Future<void> _browseDetails(WidgetTester tester) async {
   await tester.tap(find.text('去浏览'));
   await tester.pumpAndSettle();
-  final catalog = find.byType(CatalogPage);
-  final scrollable = find
-      .descendant(of: catalog, matching: find.byType(Scrollable))
-      .first;
-  for (final finder in [
-    find.text('eu.kanade.source.test · 1.0'),
-    find.byKey(ValueKey(('catalog-source', sourceId))),
-    find.text('真实源 DTO 测试'),
-  ]) {
-    final target = find.descendant(of: catalog, matching: finder);
-    await tester.scrollUntilVisible(target, 180, scrollable: scrollable);
-    await tester.pumpAndSettle();
-    await tester.tap(target);
-    await tester.pumpAndSettle();
-  }
+  await tester.tap(
+    find.byKey(
+      const ValueKey((
+        'source-directory-row',
+        'eu.kanade.source.test',
+        sourceId,
+      )),
+    ),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('真实源 DTO 测试'));
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -210,17 +209,17 @@ void main() {
         'eu.kanade.source.test',
       );
       expect(catalog.controller?.activeSource?.id, sourceId);
-      expect(find.text('owner@example.com'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('真实源 DTO 测试'),
-        180,
-        scrollable: find
-            .descendant(
-              of: find.byType(CatalogPage),
-              matching: find.byType(Scrollable),
-            )
-            .first,
+      await tester.tap(
+        find.byKey(
+          const ValueKey((
+            'source-directory-row',
+            'eu.kanade.source.test',
+            sourceId,
+          )),
+        ),
       );
+      await tester.pumpAndSettle();
+      expect(find.byType(SourceBrowsePage), findsOneWidget);
       await tester.pumpAndSettle();
       expect(find.text('真实源 DTO 测试'), findsOneWidget);
       expect(tester.takeException(), isNull);

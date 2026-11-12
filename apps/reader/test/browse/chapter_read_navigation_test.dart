@@ -8,7 +8,7 @@ import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
-import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/progress/chapter_read_batch.dart';
 import 'package:karuyomi/features/progress/chapter_read_controller.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
