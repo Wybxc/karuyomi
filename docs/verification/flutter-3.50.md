@@ -38,4 +38,10 @@ Android 静态核对仍为 AGP 9.1.0、模板 `builtInKotlin=false` / `newDsl=fa
 
 ## CI、浏览器与发布
 
-待执行。JavaScript 默认构建与同提交 Wasm 候选交给 CI，完整 Flutter Web 不在本机编译。Wasm 的收益和默认采用结论须有实际运行及同条件测量；未验证前维持 JavaScript 默认。原生直接互操作与 WebParagraph 属于后续候选，不阻塞首批交付。
+[完整分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/43262649795)在 `0fbafda` 通过，包含正式 JavaScript 与 Wasm 编译；[同提交采集候选 CI](https://github.com/Wybxc/karuyomi/actions/runs/43264080190)在 `5b33c24` 通过。[PR #3](https://github.com/Wybxc/karuyomi/pull/3)已合入主线 `63723e9`。主线检查通过并部署 Worker `5c7a070f-d2cd-41ba-8a71-814ed91769e4`，D1 无待应用迁移，但[发布后校验](https://github.com/Wybxc/karuyomi/actions/runs/43266282323)收到插件哈希 HTML 的 307 而失败。Cloudflare 的[默认 HTML 规范化](https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/)会移除 `.html`；校验器调整为跟随公开资源重定向后继续检查大小、完整哈希和缓存头，API Access 检查仍手动观察跳转。补充真实插件 HTML 形状后，15 项发布回归和 11 项 Vite/harness 回归通过；修复发布与最终生产验收仍待完成。
+
+本机仅下载 CI 正常 JavaScript 产物、执行轻量 Vite 装配，没有完整编译 Flutter Web。`main.dart.1b20c295.js` 为 5,003,866 字节；官方原清单 40 条，排除 4 条 Native 专用 payload 后公开 36 条。逐条核对实际大小与短哈希、本地正式 Wrangler harness 的 36 条缓存头，以及 6 份 renderer Wasm 的 `application/wasm` 均通过。ignored 输入记录为 `.local/flutter-350-build-inputs.json`，实际响应为 `.local/flutter-350-harness-assets.json`。
+
+隔离 D1 / Wrangler harness 的正式 CI 产物已在 Codex 内置浏览器完成扩展查询输入、Tab 焦点、xkcd 安装/初始化/热门/详情、章节筛选与全选替换，并显示真实 Dragonfly 第一页；阅读进度获服务端确认。浅色设置获确认后由隔离 API 独立读回，账户与 global revision 均为 1。生产旧 3.47 文档在部署后仍显示实图并能翻页、获服务端保存确认；新文档续读及最终生产 D1 核对继续验收。
+
+JavaScript 默认构建与同提交 Wasm 候选均由 CI 编译。Wasm 的收益和默认采用结论仍缺实际运行及同条件测量，维持 JavaScript 默认。原生直接互操作与 WebParagraph 属于后续候选，不阻塞首批交付。
