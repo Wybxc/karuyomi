@@ -240,10 +240,12 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
   Future<void> _details(MangaEntry entry) async {
     if (!_current || !_sourceCurrent || catalog.busy || _openingDetails) return;
     setState(() => _openingDetails = true);
-    final details = await catalog.details(
+    final request = catalog.details(
       entry,
       shouldContinue: () => _current && _sourceCurrent,
     );
+    _work = request.then<void>((_) {});
+    final details = await request;
     if (!mounted) return;
     setState(() => _openingDetails = false);
     if (details == null || !_current || !_sourceCurrent) {
@@ -541,7 +543,7 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
                                     covers: _covers,
                                     onTap: busy || !canBrowse
                                         ? null
-                                        : () => _work = _details(manga),
+                                        : () => unawaited(_details(manga)),
                                   ),
                               if (_loading == null &&
                                   _error == null &&

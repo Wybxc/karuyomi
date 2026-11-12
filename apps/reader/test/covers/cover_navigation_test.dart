@@ -182,8 +182,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(BackButton));
-      await tester.pumpAndSettle();
+      await _tap(tester, find.byType(BackButton));
       await _tap(tester, find.text('书架').last);
       expect(
         tester.widget<CustomCover>(find.byType(CustomCover)).cover!.assetId,

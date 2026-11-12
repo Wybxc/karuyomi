@@ -289,7 +289,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(BackButton));
+      await tester.runAsync(() async {
+        await tester.tap(find.byType(BackButton));
+        await Future<void>.delayed(Duration.zero);
+      });
       await tester.pumpAndSettle();
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();

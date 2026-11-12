@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-12，[扩展管理与浏览 UI 重整](verification/browse-ui-flow.md)通过本轮分项验收：完整格式检查、三个 Flutter/Dart 项目的严格分析与测试（客户端 621 项）及正式 Web/Worker 构建成功。内置浏览器确认安装、停用恢复、本机清理与自动补齐精确构建、收藏及语言筛选、真实 xkcd 阅读/保存、退出阅读后跨源搜索和关闭旧标签后的新文档第 2 页续读；独立 API 确认保存位置。普通 Source 缩略图资源通道尚未接入；新 UI 未部署生产，原生验证继续停止。详细记录区分浏览器所用提交和后续导航等待范围修正的工程证据。
+
 2026-11-11，[七材料中文与全语言首批](verification/seven-material-release.md#首批生产发布与验收)已上线：197 包终态，加上此前完成的 7 个阿拉伯语包，共 190 包可分发、14 包失败。Worker `a6cd3ee6-bb09-414f-81bd-1a77b9c953f1` 承接全部流量；26 条匿名交付检查、D1 连续至 `0010`、真实生产 Access 下 xkcd 更新/两页保存/关闭后新标签第 2 页续读，以及正式 `commit-snapshot` 均通过。分批切换不继承旧完成标记的 31 项回归和完整 CI 通过；`bootstrap.complete=false`，其余 1,244 包已在 clab 从新检查点恢复，完整基线和有界增量仍待完成。清单保持 `compiled_unverified/runtimeReady=false`。本机没有编译 AOT 或 Flutter，原生验证继续停止，不使用 pku-dasys。
 
 2026-11-11，[原生模拟器生产登录预检](verification/first-web-release.md#原生模拟器生产登录预检)通过：首发六材料的 Android release 临时签名副本与 iOS 正式入口 debug 构建均打开真实 Access 表单，包内材料核对一致；iOS 外部 XCTest 1 项通过。原生账号登录、生产三端接力、正式签名和真机仍待验。
