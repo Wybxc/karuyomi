@@ -314,7 +314,8 @@ export async function verifyWebRelease(
       limit(async () => {
         const response = await request(new URL(asset.path, record.origin), {
           credentials: 'omit',
-          redirect: 'manual',
+          // Static Assets canonicalizes .html URLs; verify the delivered bytes.
+          redirect: 'follow',
           signal: AbortSignal.timeout(45000),
           headers: {
             'Cache-Control': 'no-cache',

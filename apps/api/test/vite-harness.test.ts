@@ -95,6 +95,16 @@ test('declared Vite assets bypass the Worker and retain their headers', async ()
 
 test('Flutter generated cache policy is enforced by the official Static Assets harness', async () => {
   for (const entry of flutterFixtureManifest.entries) {
+    if (entry.url.endsWith('.html')) {
+      const redirect = await server.fetch(`${origin}/${entry.url}`, {
+        redirect: 'manual',
+      });
+      expect(redirect.status).toBe(307);
+      expect(redirect.headers.get('location')).toBe(
+        '/' + entry.url.slice(0, -'.html'.length),
+      );
+      await redirect.body?.cancel();
+    }
     const response = await server.fetch(`${origin}/${entry.url}`);
     expect(response.status).toBe(200);
     expect(response.headers.has('X-Karuyomi-Probe-Worker')).toBe(false);

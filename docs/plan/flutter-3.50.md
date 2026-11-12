@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-状态：进行中（实现与工程验证）。2026-11-13 已将工作分支固定为 Flutter 3.50.0 / Dart 3.14.0，完成语言迁移、Material 独立包导入、主构造函数精简、内容哈希发布合同及 UI 调整；CI 构建、浏览器与生产验收待执行。保持严格分析、生成一致性和主线自动上线。[状态管理重构的历史验收产物](../verification/flutter-state-management.md)使用原固定工具链，新 SDK 的证据单独记录。
+状态：进行中（生产发布收尾）。2026-11-13 已将主线固定为 Flutter 3.50.0 / Dart 3.14.0，完成语言迁移、Material 独立包导入、主构造函数精简、内容哈希发布合同及 UI 调整；完整 CI、JavaScript 与 Wasm 编译通过，主线已部署。发布校验发现公开 HTML 的正常规范化重定向被误判，修复与生产交互验收正在推进。保持严格分析、生成一致性和主线自动上线。[状态管理重构的历史验收产物](../verification/flutter-state-management.md)使用原固定工具链，新 SDK 的证据单独记录。
 
 已核对[官方 Flutter 3.50 发布说明](https://flutter.dev/blog/whats-new-in-flutter-3-50)与 [Dart 3.14 changelog](https://dart.dev/changelog#3-14)：两者已于 2026-11-11 发布。实施时从[官方 SDK archive](https://docs.flutter.dev/install/archive)确认同一 Flutter bundle 的精确版本、Dart 版本和校验值，再固定到仓库，不独立替换 Flutter 内置 Dart。
 
@@ -31,7 +31,7 @@
 - [x] 在 `scripts/flutter.ts` 的正式 Web 构建入口启用 `--web-content-hash`，保留现有资源自托管要求。已核对无 deferred imports，本轮不新增延迟加载方案。
 - [x] 将 `tools/cloudflare/web-release.ts` 中写死的 `main.dart.js` 改为读取官方 `precache_manifest.json`，校验清单格式并纳入实际生成的 JS/Wasm 模块、资源及 bootstrap。保留 runtime、materials 和扩展各自的发布验证合同，不把 Flutter 清单当成全部发布内容。
 - [x] 在 `apps/api/vite.assets.ts` 按官方清单中的哈希标记生成缓存规则：带内容哈希的 Flutter 文件长期 `immutable` 缓存，HTML、bootstrap 与其它未哈希入口重新验证；自托管 `canvaskit/**` 仍按未哈希资源处理。扩展索引与共享材料继续遵循现有独立规则。
-- [ ] 为清单接入和缓存头增加必要的发布回归，使用官方构建与 Wrangler harness 验证实际产物，覆盖入口引用、完整性校验、资源可达及缓存策略。
+- [x] 为清单接入和缓存头增加必要的发布回归，使用官方构建与 Wrangler harness 验证实际产物，覆盖入口引用、完整性校验、资源可达及缓存策略。真实 CI 产物的 36 条公开清单大小/哈希与本地 harness 缓存头通过，Native 公开条目为零；15 项发布回归和 11 项 Vite/harness 回归通过，覆盖插件 HTML 的规范化重定向。
 - [ ] 用 Codex 内置浏览器验收首次访问、复访、发布切换、持续打开的阅读标签与新文档。明确旧标签遇到资源失效时的更新提示和刷新路径，保持未确认草稿提示；不建立历史发布目录或旧版本兼容层，不能只加构建参数就标为完成。
 
 ## 首批：UI 改善
@@ -43,8 +43,8 @@
 
 ## 同轮：Wasm 对照与采用门槛
 
-- [ ] 自有 Web 桥已使用现代 `dart:js_interop`；通过 `--no-deprecated-js-interop` 检查完整依赖链，修复真实依赖问题，不以自有源码没有旧导入代替构建证据。
-- [ ] 在 CI 用相同提交、Source 材料与发布配置生成 JavaScript 和 `--wasm` 候选，复用现有构建链与扩展产物。独立候选开启既有 `READER_BASELINE` 采集面板并记录提交号，生产默认产物保持正常配置。使用[官方 loader 的双目标与自动 JavaScript 回退](https://docs.flutter.dev/platform-integration/web/wasm)，不自建回退层，TeaVM Source 继续使用已确定的 JavaScript backend。
+- [x] 自有 Web 桥已使用现代 `dart:js_interop`；完整 CI 的 JavaScript 与 Wasm 正式编译均通过 `--no-deprecated-js-interop`，没有绕过依赖链检查。
+- [x] 在 CI 用相同提交、Source 材料与发布配置生成 JavaScript 和 `--wasm` 候选，复用现有构建链与扩展产物。独立候选开启既有 `READER_BASELINE` 采集面板并记录提交号，生产默认产物保持正常配置。使用[官方 loader 的双目标与自动 JavaScript 回退](https://docs.flutter.dev/platform-integration/web/wasm)，不自建回退层，TeaVM Source 继续使用已确定的 JavaScript backend。
 - [ ] 核对 Wasm MIME、自托管渲染资源和必要响应头；如调整跨源隔离，连同 Access 登录窗口与运行时资源一起验收。Safari / Firefox 的 `wasmAllowList` 采用须有对应浏览器证据，无法测试的平台保持待验。
 - [ ] 对照记录冷启动与复访到可操作时间、章节首图、连续滚动帧耗时及可取得的内存指标，注明浏览器、设备、缓存条件、网络、素材与重复次数。确认实际执行 Wasm，并完成真实阅读、保存、取消、关闭与新文档续读回归。
 - [ ] 根据同条件测量与正确性回归决定默认配置，记录采用结论及未覆盖环境。官方重组件基准的两倍帧率不能作为 Karuyomi 收益；未证明收益前不增加应用专有的浏览器分支或性能机制。

@@ -192,6 +192,12 @@ async function fixture(t: TestContext) {
         Buffer.from('notice'),
       ],
       ['/canvaskit/canvaskit.wasm', Buffer.from('renderer')],
+      [
+        '/assets/packages/webview/page.' +
+          hash(Buffer.from('<html>plugin</html>')).slice(0, 8) +
+          '.html',
+        Buffer.from('<html>plugin</html>'),
+      ],
     ]);
     if (wasm) {
       for (const extension of ['wasm', 'mjs']) {
@@ -246,13 +252,15 @@ async function fixture(t: TestContext) {
     await recordWebRelease(root, directory, 'a'.repeat(40));
     const request: typeof fetch = async (input, init) => {
       assert.equal(init?.credentials, 'omit');
-      assert.equal(init.redirect, 'manual');
       const relative = new URL(String(input)).pathname;
-      if (relative === '/api/session')
+      if (relative === '/api/session') {
+        assert.equal(init.redirect, 'manual');
         return new Response(null, {
           status: 302,
           headers: { location: 'https://fixture.cloudflareaccess.com/login' },
         });
+      }
+      assert.equal(init.redirect, 'follow');
       const bytes = publicFiles.get(relative);
       assert(bytes, relative);
       return new Response(new Uint8Array(bytes), {
@@ -394,7 +402,7 @@ test('Delivery smoke verifies canonical root HTML, client bytes and the Access r
   const f = await fixture(t);
   const { request } = await f.client();
   const result = await verifyWebRelease(f.directory, request);
-  assert.equal(result.publicAssetsVerified, 10);
+  assert.equal(result.publicAssetsVerified, 11);
   assert.equal(result.extensionCount, 1);
   assert.equal(result.accessStatus, 302);
   assert(
@@ -418,7 +426,7 @@ test('Wasm publication verifies both generated targets, bootstrap, assets and re
   const f = await fixture(t);
   const { request } = await f.client(true);
   const result = await verifyWebRelease(f.directory, request);
-  assert.equal(result.publicAssetsVerified, 12);
+  assert.equal(result.publicAssetsVerified, 13);
   for (const suffix of ['js', 'wasm', 'mjs'])
     assert(
       result.assets.some((asset) =>
