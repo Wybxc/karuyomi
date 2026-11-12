@@ -2,6 +2,8 @@
 
 Worker API + D1 保存同一身份的扩展使用意图；Static Assets 提供每包最新可用构建；每台客户端独立准备可丢弃代码副本。正式管理入口将这三种状态分开，不用目录可见或缓存命中冒充账户已安装。实施与实际通过范围分别见[计划](../plan/extension-management.md)和[验证](../verification/extension-management.md)。
 
+面向用户的页面划分、操作状态及每个状态的最小信息见 [UI 状态流程提案](extension-browse-ui-flow.md)；该提案不改变下述账户与运行时合同，也不表示新 UI 已实现。
+
 ## 账户合同
 
 `business.proto` 的 `GlobalSettingsValues.installedExtensions` 使用 `InstalledExtension`：
