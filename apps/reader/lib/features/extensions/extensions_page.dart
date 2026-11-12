@@ -153,155 +153,151 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
         unawaited(_controller.refresh());
       }
     });
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final all = extensionListings(widget.catalog, _controller.installed);
-        final languages = all.expand((item) => item.languages).toSet().toList()
-          ..sort();
-        if (_language != null && !languages.contains(_language)) {
-          _language = null;
-        }
-        final query = _search.text.trim().toLowerCase();
-        final visible = all
-            .where((item) => item.matches(query, _language))
-            .toList();
-        final nameCounts = <String, int>{};
-        for (final item in all) {
-          nameCounts.update(item.name, (count) => count + 1, ifAbsent: () => 1);
-        }
-        final groups = <(String, List<ExtensionListing>)>[
-          ('需要处理', visible.where((item) => item.needsAttention).toList()),
-          (
-            '已安装',
-            visible
-                .where((item) => item.installed != null && !item.needsAttention)
-                .toList(),
-          ),
-          ('可安装', visible.where((item) => item.installed == null).toList()),
-        ];
-        final content = ListView(
-          key: const PageStorageKey('extensions-scroll'),
-          padding: const EdgeInsets.all(16),
+    useListenable(_controller);
+    final all = extensionListings(widget.catalog, _controller.installed);
+    final languages = all.expand((item) => item.languages).toSet().toList()
+      ..sort();
+    if (_language != null && !languages.contains(_language)) {
+      _language = null;
+    }
+    final query = _search.text.trim().toLowerCase();
+    final visible = all
+        .where((item) => item.matches(query, _language))
+        .toList();
+    final nameCounts = <String, int>{};
+    for (final item in all) {
+      nameCounts.update(item.name, (count) => count + 1, ifAbsent: () => 1);
+    }
+    final groups = <(String, List<ExtensionListing>)>[
+      ('需要处理', visible.where((item) => item.needsAttention).toList()),
+      (
+        '已安装',
+        visible
+            .where((item) => item.installed != null && !item.needsAttention)
+            .toList(),
+      ),
+      ('可安装', visible.where((item) => item.installed == null).toList()),
+    ];
+    final content = ListView(
+      key: const PageStorageKey('extensions-scroll'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: const ValueKey('extensions-search'),
-                    controller: _search,
-                    decoration: const InputDecoration(
-                      hintText: '查找扩展或漫画源名称',
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  key: const ValueKey('extensions-more'),
-                  tooltip: '扩展选项',
-                  onSelected: (value) {
-                    if (value == 'repositories') {
-                      _repositories();
-                    } else {
-                      _storage();
-                    }
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'repositories', child: Text('仓库管理')),
-                    PopupMenuItem(value: 'storage', child: Text('本机存储')),
-                  ],
-                ),
-              ],
-            ),
-            Wrap(
-              spacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                DropdownButton<String>(
-                  key: const ValueKey('extensions-language'),
-                  value: _language,
-                  hint: const Text('全部语言'),
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: null,
-                      child: Text('全部语言'),
-                    ),
-                    for (final language in languages)
-                      DropdownMenuItem(
-                        value: language,
-                        child: Text(sourceLanguage(language)),
-                      ),
-                  ],
-                  onChanged: (value) => setState(() => _language = value),
-                ),
-                TextButton.icon(
-                  key: const ValueKey('extensions-check-updates'),
-                  onPressed:
-                      !_controller.available ||
-                          _controller.busy ||
-                          widget.catalog.busy
-                      ? null
-                      : () => unawaited(_controller.refresh(catalogToo: true)),
-                  icon: const Icon(Icons.sync),
-                  label: const Text('检查更新'),
-                ),
-                if (query.isNotEmpty || _language != null)
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _search.clear();
-                      _language = null;
-                    }),
-                    child: const Text('清除筛选'),
-                  ),
-              ],
-            ),
-            ExtensionOperationStatus(controller: _controller),
-            if (_controller.settings.snapshot == null && !_controller.busy)
-              const Text('尚未读取账户扩展，请重试。'),
-            if (_controller.settings.snapshot != null &&
-                _controller.installed.isEmpty)
-              const Text('账户尚未安装扩展。'),
-            if (widget.catalog.repositoryErrors.isNotEmpty)
-              ListTile(
-                title: const Text('部分仓库未能读取'),
-                subtitle: const Text('已有目录仍可查看'),
-                trailing: TextButton(
-                  onPressed: _repositories,
-                  child: const Text('管理仓库'),
+            Expanded(
+              child: TextField(
+                key: const ValueKey('extensions-search'),
+                controller: _search,
+                decoration: const InputDecoration(
+                  hintText: '查找扩展或漫画源名称',
+                  prefixIcon: Icon(Icons.search),
                 ),
               ),
-            for (final group in groups)
-              if (group.$2.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    '${group.$1} (${group.$2.length})',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                for (final item in group.$2)
-                  _row(item, (nameCounts[item.name] ?? 0) > 1),
+            ),
+            PopupMenuButton<String>(
+              key: const ValueKey('extensions-more'),
+              tooltip: '扩展选项',
+              onSelected: (value) {
+                if (value == 'repositories') {
+                  _repositories();
+                } else {
+                  _storage();
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'repositories', child: Text('仓库管理')),
+                PopupMenuItem(value: 'storage', child: Text('本机存储')),
               ],
-            if (visible.isEmpty && !_controller.busy)
-              Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  query.isNotEmpty || _language != null
-                      ? '没有匹配的扩展，请清除筛选。'
-                      : '当前目录没有扩展，请检查更新或管理仓库。',
-                  textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        Wrap(
+          spacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            DropdownButton<String>(
+              key: const ValueKey('extensions-language'),
+              value: _language,
+              hint: const Text('全部语言'),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('全部语言'),
                 ),
+                for (final language in languages)
+                  DropdownMenuItem(
+                    value: language,
+                    child: Text(sourceLanguage(language)),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _language = value),
+            ),
+            TextButton.icon(
+              key: const ValueKey('extensions-check-updates'),
+              onPressed:
+                  !_controller.available ||
+                      _controller.busy ||
+                      widget.catalog.busy
+                  ? null
+                  : () => unawaited(_controller.refresh(catalogToo: true)),
+              icon: const Icon(Icons.sync),
+              label: const Text('检查更新'),
+            ),
+            if (query.isNotEmpty || _language != null)
+              TextButton(
+                onPressed: () => setState(() {
+                  _search.clear();
+                  _language = null;
+                }),
+                child: const Text('清除筛选'),
               ),
           ],
-        );
-        return widget.embedded
-            ? content
-            : Scaffold(
-                appBar: AppBar(title: const Text('扩展')),
-                body: content,
-              );
-      },
+        ),
+        ExtensionOperationStatus(controller: _controller),
+        if (_controller.settings.snapshot == null && !_controller.busy)
+          const Text('尚未读取账户扩展，请重试。'),
+        if (_controller.settings.snapshot != null &&
+            _controller.installed.isEmpty)
+          const Text('账户尚未安装扩展。'),
+        if (widget.catalog.repositoryErrors.isNotEmpty)
+          ListTile(
+            title: const Text('部分仓库未能读取'),
+            subtitle: const Text('已有目录仍可查看'),
+            trailing: TextButton(
+              onPressed: _repositories,
+              child: const Text('管理仓库'),
+            ),
+          ),
+        for (final group in groups)
+          if (group.$2.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                '${group.$1} (${group.$2.length})',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            for (final item in group.$2)
+              _row(item, (nameCounts[item.name] ?? 0) > 1),
+          ],
+        if (visible.isEmpty && !_controller.busy)
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text(
+              query.isNotEmpty || _language != null
+                  ? '没有匹配的扩展，请清除筛选。'
+                  : '当前目录没有扩展，请检查更新或管理仓库。',
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
     );
+    return widget.embedded
+        ? content
+        : Scaffold(
+            appBar: AppBar(title: const Text('扩展')),
+            body: content,
+          );
   }
 
   @override
@@ -641,7 +637,7 @@ class ExtensionDetailsPage extends StatelessWidget {
   );
 }
 
-class ExtensionRepositoriesPage extends StatefulWidget {
+class ExtensionRepositoriesPage extends StatefulHookWidget {
   const ExtensionRepositoriesPage({super.key, required this.controller});
   final ExtensionsController controller;
   @override
@@ -747,69 +743,66 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, _) {
-      final catalog = _controller.catalog;
-      return Scaffold(
-        appBar: AppBar(title: const Text('仓库管理')),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            ExtensionOperationStatus(controller: _controller),
-            for (final repository in catalog.repositories)
-              ListTile(
-                title: Text(repository.name),
-                subtitle: Text(
-                  '${Uri.parse(repository.catalogUrl).host} · ${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] == null ? '可用' : '读取失败'}',
-                ),
-                trailing: repository.catalogUrl == catalog.catalogUrl
-                    ? const Text('默认')
-                    : IconButton(
-                        key: ValueKey((
-                          'repository-remove',
-                          repository.catalogUrl,
-                        )),
-                        tooltip: '移除仓库',
-                        onPressed: _controller.canEdit
-                            ? () => unawaited(_removeRepository(repository))
-                            : null,
-                        icon: const Icon(Icons.delete_outline),
-                      ),
+  Widget build(BuildContext context) {
+    useListenable(_controller);
+    final catalog = _controller.catalog;
+    return Scaffold(
+      appBar: AppBar(title: const Text('仓库管理')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ExtensionOperationStatus(controller: _controller),
+          for (final repository in catalog.repositories)
+            ListTile(
+              title: Text(repository.name),
+              subtitle: Text(
+                '${Uri.parse(repository.catalogUrl).host} · ${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] == null ? '可用' : '读取失败'}',
               ),
-            TextButton.icon(
-              key: const ValueKey('repositories-add'),
-              onPressed:
-                  _controller.canEdit && catalog.repositories.length <= 16
-                  ? () => unawaited(_addRepository())
-                  : null,
-              icon: const Icon(Icons.add),
-              label: const Text('添加仓库'),
-            ),
-            TextButton.icon(
-              onPressed: !_controller.available || _controller.busy
-                  ? null
-                  : () => unawaited(_controller.refresh(catalogToo: true)),
-              icon: const Icon(Icons.refresh),
-              label: const Text('重试读取仓库'),
-            ),
-            ExpansionTile(
-              title: const Text('诊断信息'),
-              children: [
-                for (final repository in catalog.repositories)
-                  ListTile(
-                    title: SelectableText(repository.catalogUrl),
-                    subtitle: Text(
-                      '${repository.repoId}\n${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}',
+              trailing: repository.catalogUrl == catalog.catalogUrl
+                  ? const Text('默认')
+                  : IconButton(
+                      key: ValueKey((
+                        'repository-remove',
+                        repository.catalogUrl,
+                      )),
+                      tooltip: '移除仓库',
+                      onPressed: _controller.canEdit
+                          ? () => unawaited(_removeRepository(repository))
+                          : null,
+                      icon: const Icon(Icons.delete_outline),
                     ),
-                  ),
-              ],
             ),
-          ],
-        ),
-      );
-    },
-  );
+          TextButton.icon(
+            key: const ValueKey('repositories-add'),
+            onPressed: _controller.canEdit && catalog.repositories.length <= 16
+                ? () => unawaited(_addRepository())
+                : null,
+            icon: const Icon(Icons.add),
+            label: const Text('添加仓库'),
+          ),
+          TextButton.icon(
+            onPressed: !_controller.available || _controller.busy
+                ? null
+                : () => unawaited(_controller.refresh(catalogToo: true)),
+            icon: const Icon(Icons.refresh),
+            label: const Text('重试读取仓库'),
+          ),
+          ExpansionTile(
+            title: const Text('诊断信息'),
+            children: [
+              for (final repository in catalog.repositories)
+                ListTile(
+                  title: SelectableText(repository.catalogUrl),
+                  subtitle: Text(
+                    '${repository.repoId}\n${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}',
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _bytes(int value) => '${(value / (1024 * 1024)).toStringAsFixed(1)} MiB';

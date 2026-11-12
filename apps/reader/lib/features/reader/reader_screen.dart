@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -38,7 +39,7 @@ final class ReaderViewportState {
 
 /// An online chapter view. Images are exclusively acquired through the Source's
 /// PageProvider; this screen never downloads raw Source image URLs itself.
-class ReaderScreen extends StatefulWidget {
+class ReaderScreen extends StatefulHookWidget {
   const ReaderScreen({
     super.key,
     required this.manifest,
@@ -133,16 +134,14 @@ typedef _ReaderAppearance = ({
 });
 
 class _ReaderScreenState extends State<ReaderScreen> {
-  late final ValueNotifier<_ReaderAppearance> _appearance;
+  late ValueNotifier<_ReaderAppearance> _appearance;
   ReaderBaselineRecorder? _baseline;
   int _navigationEpoch = 0;
   late final ReaderController _reader;
   late ImageScheduler _scheduler;
   late ReaderResourcePool _resourcePool;
-  StreamSubscription<void>? _readerSubscription;
-  StreamSubscription<ImageSchedulerSnapshot>? _imagesSubscription;
-  final _scroll = ScrollController();
-  final _transform = TransformationController();
+  late ScrollController _scroll;
+  late TransformationController _transform;
   final _horizontal = <String, ScrollController>{};
   final _pointers = <int>{};
   Offset? _dragStart;
@@ -166,16 +165,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   final _crops = <String, _ImageCrop>{};
   bool _resetCropGeometry = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _appearance = ValueNotifier((
-      background: widget.background,
-      dimPercent: widget.dimPercent,
-      fit: widget.fit,
-      cropBorders: widget.cropBorders,
-      crops: const {},
-    ));
+  void _initialize() {
     _baseline = ReaderBaselineScope.read(context);
     _baseline?.event('reader_attached', {
       'chapterKey': widget.manifest.chapterKey,
@@ -192,17 +182,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (widget.initialPosition == null && _reader.position != null) {
       _reader.goToPage(0, normalizedX: _leadingX, viewportX: _leadingX);
     }
-    _readerSubscription = _reader.changes.listen((_) {
-      _syncWindow();
-      if (mounted) setState(() {});
-      final position = _reader.position;
-      if (position != null) widget.onPositionChanged?.call(position);
-      _scheduleViewport();
-    });
     _attachScheduler();
-    _scroll.addListener(_onScroll);
-    _transform.addListener(_onTransform);
-    widget.positionRequest?.addListener(_applyPositionRequest);
+  }
+
+  void _readerChanged() {
+    _syncWindow();
+    if (mounted) setState(() {});
+    final position = _reader.position;
+    if (position != null) widget.onPositionChanged?.call(position);
+    _scheduleViewport();
   }
 
   void _applyPositionRequest() {
@@ -241,25 +229,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
     _scheduler = ImageScheduler(provider: _resourcePool);
     _scheduler.setPaused(widget.paused);
-    _imagesSubscription = _scheduler.changes.listen((snapshot) {
-      final residentIds = snapshot.resources.values
-          .map((image) => image.id)
-          .toSet();
-      _decodedResources.removeWhere((id) => !residentIds.contains(id));
-      final cropCount = _crops.length;
-      _crops.removeWhere(
-        (id, crop) =>
-            !residentIds.contains(id) ||
-            snapshot.dimensions[id]?.width != crop.width ||
-            snapshot.dimensions[id]?.height != crop.height,
-      );
-      if (cropCount != _crops.length) _publishAppearance();
-      _scheduleDimensions();
-      _scheduleViewport();
-      if (mounted) setState(() {});
-    });
     _syncWindow();
     _publishAppearance();
+  }
+
+  void _imagesChanged(ImageSchedulerSnapshot snapshot) {
+    final residentIds = snapshot.resources.values
+        .map((image) => image.id)
+        .toSet();
+    _decodedResources.removeWhere((id) => !residentIds.contains(id));
+    final cropCount = _crops.length;
+    _crops.removeWhere(
+      (id, crop) =>
+          !residentIds.contains(id) ||
+          snapshot.dimensions[id]?.width != crop.width ||
+          snapshot.dimensions[id]?.height != crop.height,
+    );
+    if (cropCount != _crops.length) _publishAppearance();
+    _scheduleDimensions();
+    _scheduleViewport();
+    if (mounted) setState(() {});
   }
 
   void _scheduleViewport() {
@@ -470,12 +459,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _scheduleRestore();
     }
     _scheduler.setPaused(widget.paused);
-    if (oldWidget.positionRequest != widget.positionRequest) {
-      oldWidget.positionRequest?.removeListener(_applyPositionRequest);
-      widget.positionRequest?.addListener(_applyPositionRequest);
-    }
     if (oldWidget.provider != widget.provider) {
-      unawaited(_imagesSubscription?.cancel());
       final oldScheduler = _scheduler;
       unawaited(() async {
         await oldScheduler.dispose();
@@ -1337,83 +1321,105 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-          _keyboardTurn(_reader.mode != ReadingMode.rightToLeft),
-      const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-          _keyboardTurn(_reader.mode == ReadingMode.rightToLeft),
-      const SingleActivator(LogicalKeyboardKey.pageDown): () =>
-          _keyboardTurn(true),
-      const SingleActivator(LogicalKeyboardKey.space): () =>
-          _keyboardTurn(true),
-      const SingleActivator(LogicalKeyboardKey.pageUp): () =>
-          _keyboardTurn(false),
-      const SingleActivator(LogicalKeyboardKey.home): () => _keyboardGoTo(0),
-      const SingleActivator(LogicalKeyboardKey.end): () =>
-          _keyboardGoTo(_reader.manifest.pages.length - 1),
-    },
-    child: Focus(
-      autofocus: true,
-      child: Scaffold(
-        backgroundColor: _readerBackgroundColor(context, widget.background),
-        appBar: _toolbar ? AppBar(title: Text(widget.title)) : null,
-        body: DefaultTextStyle.merge(
-          style: TextStyle(
-            color: _readerForegroundColor(context, widget.background),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                if (_reader.requiresPositionNotice)
-                  const MaterialBanner(
-                    content: Text('页面清单发生变化，已定位到最接近的页码。'),
-                    actions: [SizedBox.shrink()],
-                  ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final window = MediaQuery.sizeOf(context);
-                      final sameWindow = _windowSize == window;
-                      if (_windowSize != null && !sameWindow) {
-                        _preferredPlacement = null;
-                      }
-                      _windowSize = window;
-                      if (_viewportWidth != constraints.maxWidth ||
-                          _viewportHeight != constraints.maxHeight) {
-                        final chromeOnly =
-                            sameWindow &&
-                            _viewportWidth == constraints.maxWidth;
-                        _viewportWidth = constraints.maxWidth;
-                        _viewportHeight = constraints.maxHeight;
-                        _scheduleRestore(preservePlacement: chromeOnly);
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          // A user or parent can change the preference before
-                          // this layout callback runs.
-                          _applyDoublePagePreference();
+  Widget build(BuildContext context) {
+    _scroll = useScrollController();
+    _transform = useTransformationController();
+    _appearance = useValueNotifier<_ReaderAppearance>((
+      background: widget.background,
+      dimPercent: widget.dimPercent,
+      fit: widget.fit,
+      cropBorders: widget.cropBorders,
+      crops: const {},
+    ));
+    useEffect(() {
+      _initialize();
+      return null;
+    }, const []);
+    useOnStreamChange(_reader.changes, onData: (_) => _readerChanged());
+    useOnStreamChange(_scheduler.changes, onData: _imagesChanged);
+    useOnListenableChange(_scroll, _onScroll);
+    useOnListenableChange(_transform, _onTransform);
+    useOnListenableChange(widget.positionRequest, _applyPositionRequest);
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _keyboardTurn(_reader.mode != ReadingMode.rightToLeft),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _keyboardTurn(_reader.mode == ReadingMode.rightToLeft),
+        const SingleActivator(LogicalKeyboardKey.pageDown): () =>
+            _keyboardTurn(true),
+        const SingleActivator(LogicalKeyboardKey.space): () =>
+            _keyboardTurn(true),
+        const SingleActivator(LogicalKeyboardKey.pageUp): () =>
+            _keyboardTurn(false),
+        const SingleActivator(LogicalKeyboardKey.home): () => _keyboardGoTo(0),
+        const SingleActivator(LogicalKeyboardKey.end): () =>
+            _keyboardGoTo(_reader.manifest.pages.length - 1),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: _readerBackgroundColor(context, widget.background),
+          appBar: _toolbar ? AppBar(title: Text(widget.title)) : null,
+          body: DefaultTextStyle.merge(
+            style: TextStyle(
+              color: _readerForegroundColor(context, widget.background),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  if (_reader.requiresPositionNotice)
+                    const MaterialBanner(
+                      content: Text('页面清单发生变化，已定位到最接近的页码。'),
+                      actions: [SizedBox.shrink()],
+                    ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final window = MediaQuery.sizeOf(context);
+                        final sameWindow = _windowSize == window;
+                        if (_windowSize != null && !sameWindow) {
+                          _preferredPlacement = null;
+                        }
+                        _windowSize = window;
+                        if (_viewportWidth != constraints.maxWidth ||
+                            _viewportHeight != constraints.maxHeight) {
+                          final chromeOnly =
+                              sameWindow &&
+                              _viewportWidth == constraints.maxWidth;
+                          _viewportWidth = constraints.maxWidth;
+                          _viewportHeight = constraints.maxHeight;
                           _scheduleRestore(preservePlacement: chromeOnly);
-                        });
-                      }
-                      if (_reader.manifest.pages.isEmpty) {
-                        return const Center(child: Text('这一章没有页面'));
-                      }
-                      return _ReaderContent(
-                        background: widget.background,
-                        dimPercent: widget.dimPercent,
-                        child: _reader.isContinuous ? _continuous() : _paged(),
-                      );
-                    },
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            // A user or parent can change the preference before
+                            // this layout callback runs.
+                            _applyDoublePagePreference();
+                            _scheduleRestore(preservePlacement: chromeOnly);
+                          });
+                        }
+                        if (_reader.manifest.pages.isEmpty) {
+                          return const Center(child: Text('这一章没有页面'));
+                        }
+                        return _ReaderContent(
+                          background: widget.background,
+                          dimPercent: widget.dimPercent,
+                          child: _reader.isContinuous
+                              ? _continuous()
+                              : _paged(),
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          bottomNavigationBar: _toolbar ? _controls() : null,
         ),
-        bottomNavigationBar: _toolbar ? _controls() : null,
       ),
-    ),
-  );
+    );
+  }
 
   Widget _controls() {
     final available = math.max(
@@ -1554,11 +1560,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   void dispose() {
-    widget.positionRequest?.removeListener(_applyPositionRequest);
     final position = _reader.position;
     if (position != null) widget.onPositionChanged?.call(position);
-    unawaited(_readerSubscription?.cancel());
-    unawaited(_imagesSubscription?.cancel());
     final scheduler = _scheduler;
     final onClosed = widget.onClosed;
     final baseline = _baseline;
@@ -1589,16 +1592,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
     widget.onClosing?.call(cleanup);
     unawaited(cleanup);
     unawaited(_reader.dispose());
-    _scroll.dispose();
-    _transform.dispose();
-    _appearance.dispose();
     super.dispose();
   }
 }
 
 /// Each lazily built page owns its horizontal position and disposes it when
 /// leaving the list; the Reader only borrows live controllers for restoration.
-class _ContinuousImage extends StatefulWidget {
+class _ContinuousImage extends HookWidget {
   const _ContinuousImage({
     super.key,
     required this.pageKey,
@@ -1619,45 +1619,33 @@ class _ContinuousImage extends StatefulWidget {
   final VoidCallback onDoubleTap;
   final Widget child;
   @override
-  State<_ContinuousImage> createState() => _ContinuousImageState();
-}
-
-class _ContinuousImageState extends State<_ContinuousImage> {
-  final _controller = ScrollController();
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(_moved);
-    widget.onAttached(_controller);
-  }
-
-  void _moved() => widget.onMoved();
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    key: ValueKey('horizontal-${widget.pageKey}'),
-    controller: _controller,
-    scrollDirection: Axis.horizontal,
-    child: GestureDetector(
-      onDoubleTap: widget.onDoubleTap,
-      child: SizedBox(
-        width: math.max(widget.viewportWidth, widget.imageSize.width),
-        height: widget.imageSize.height,
-        child: Center(
-          child: SizedBox(
-            key: ValueKey('image-rect-${widget.pageKey}'),
-            width: widget.imageSize.width,
-            height: widget.imageSize.height,
-            child: widget.child,
+  Widget build(BuildContext context) {
+    final controller = useScrollController();
+    useOnListenableChange(controller, onMoved);
+    useEffect(() {
+      onAttached(controller);
+      return () => onDetached(controller);
+    }, [controller]);
+    return SingleChildScrollView(
+      key: ValueKey('horizontal-$pageKey'),
+      controller: controller,
+      scrollDirection: Axis.horizontal,
+      child: GestureDetector(
+        onDoubleTap: onDoubleTap,
+        child: SizedBox(
+          width: math.max(viewportWidth, imageSize.width),
+          height: imageSize.height,
+          child: Center(
+            child: SizedBox(
+              key: ValueKey('image-rect-$pageKey'),
+              width: imageSize.width,
+              height: imageSize.height,
+              child: child,
+            ),
           ),
         ),
       ),
-    ),
-  );
-  @override
-  void dispose() {
-    widget.onDetached(_controller);
-    _controller.dispose();
-    super.dispose();
+    );
   }
 }
 
@@ -1841,7 +1829,7 @@ class _ReaderContent extends StatelessWidget {
   );
 }
 
-class _ZoomImageDialog extends StatefulWidget {
+class _ZoomImageDialog extends StatefulHookWidget {
   const _ZoomImageDialog({
     required this.resource,
     required this.pool,
@@ -1860,7 +1848,7 @@ class _ZoomImageDialog extends StatefulWidget {
 }
 
 class _ZoomImageDialogState extends State<_ZoomImageDialog> {
-  final _transform = TransformationController();
+  late TransformationController _transform;
   Size? _viewport;
   _ReaderScene? _scene;
   ReaderFit? _fit;
@@ -2012,50 +2000,41 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      ValueListenableBuilder<_ReaderAppearance>(
-        valueListenable: widget.appearance,
-        builder: (context, appearance, _) => Dialog.fullscreen(
-          child: Scaffold(
-            backgroundColor: _readerBackgroundColor(
-              context,
-              appearance.background,
+  Widget build(BuildContext context) {
+    _transform = useTransformationController();
+    final appearance = useValueListenable(widget.appearance);
+    return Dialog.fullscreen(
+      child: Scaffold(
+        backgroundColor: _readerBackgroundColor(context, appearance.background),
+        appBar: AppBar(
+          title: const Text('查看图片'),
+          actions: [
+            IconButton(
+              tooltip: '缩小',
+              onPressed: () => _zoom(0.5),
+              icon: const Icon(Icons.zoom_out),
             ),
-            appBar: AppBar(
-              title: const Text('查看图片'),
-              actions: [
-                IconButton(
-                  tooltip: '缩小',
-                  onPressed: () => _zoom(0.5),
-                  icon: const Icon(Icons.zoom_out),
-                ),
-                IconButton(
-                  tooltip: '放大',
-                  onPressed: () => _zoom(2),
-                  icon: const Icon(Icons.zoom_in),
-                ),
-                IconButton(
-                  tooltip: '重置缩放',
-                  onPressed: () => _zoom(0.2),
-                  icon: const Icon(Icons.fit_screen),
-                ),
-              ],
+            IconButton(
+              tooltip: '放大',
+              onPressed: () => _zoom(2),
+              icon: const Icon(Icons.zoom_in),
             ),
-            body: _ReaderContent(
-              background: appearance.background,
-              dimPercent: appearance.dimPercent,
-              child: LayoutBuilder(
-                builder: (context, constraints) =>
-                    _content(appearance, constraints),
-              ),
+            IconButton(
+              tooltip: '重置缩放',
+              onPressed: () => _zoom(0.2),
+              icon: const Icon(Icons.fit_screen),
             ),
+          ],
+        ),
+        body: _ReaderContent(
+          background: appearance.background,
+          dimPercent: appearance.dimPercent,
+          child: LayoutBuilder(
+            builder: (context, constraints) =>
+                _content(appearance, constraints),
           ),
         ),
-      );
-
-  @override
-  void dispose() {
-    _transform.dispose();
-    super.dispose();
+      ),
+    );
   }
 }

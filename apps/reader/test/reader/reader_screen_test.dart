@@ -976,6 +976,48 @@ void main() {
   );
 
   testWidgets(
+    'replacing position commands detaches the old input without resetting the chapter',
+    (tester) async {
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final oldCommands = ValueNotifier<ReadingPosition?>(null);
+      final commands = ValueNotifier<ReadingPosition?>(null);
+      addTearDown(oldCommands.dispose);
+      addTearDown(commands.dispose);
+      final positions = <ReadingPosition>[];
+      Widget configured(ValueListenable<ReadingPosition?> input) => screen(
+        provider: provider,
+        manifest: manifest,
+        positionRequest: input,
+        onPosition: positions.add,
+        doublePage: false,
+      );
+
+      await tester.pumpWidget(configured(oldCommands));
+      await tester.pumpAndSettle();
+      oldCommands.value = manifest.positionAt(3);
+      await tester.pumpAndSettle();
+      expect(positions.last.pageKey, 'page-3');
+
+      await tester.pumpWidget(configured(commands));
+      await tester.pumpAndSettle();
+      expect(positions.last.pageKey, 'page-3');
+      oldCommands.value = manifest.positionAt(8);
+      await tester.pumpAndSettle();
+      expect(positions.last.pageKey, 'page-3');
+      commands.value = manifest.positionAt(5);
+      await tester.pumpAndSettle();
+      expect(positions.last.pageKey, 'page-5');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      commands.value = manifest.positionAt(9);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'late decode and removing controls preserve placement until an explicit jump',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);

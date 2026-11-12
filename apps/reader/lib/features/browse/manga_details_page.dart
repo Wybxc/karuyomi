@@ -47,8 +47,7 @@ class MangaDetailsPage extends StatefulHookConsumerWidget {
 
 enum _ChapterReadFilter { all, read, unread }
 
-class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
-    with WidgetsBindingObserver {
+class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   CatalogController get controller => widget.controller;
   MangaEntry get manga => widget.manga;
   List<ChapterEntry> get chapters => widget.chapters;
@@ -64,7 +63,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
   bool _opening = false;
   LibraryRepository? _library;
   CoverRepository? _covers;
-  final _coverLifecycle = ValueNotifier(0);
+  late ValueNotifier<int> _coverLifecycle;
   bool _editingCover = false;
   bool _savingFavorite = false;
   bool _migrating = false;
@@ -86,10 +85,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
   final _chapterNameCounts = <String, int>{};
   final _chapterUrlCounts = <String, int>{};
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
+  void _initialize() {
     final build = controller.activeBuild;
     if (build != null) {
       _sequence = ChapterSequence(
@@ -126,7 +122,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
               controller.status == ServiceStatus.ready &&
               controller.isCurrentSource(source) &&
               identical(controller.bookmarks, repository),
-        )..addListener(_bookmarksChanged);
+        );
         unawaited(_bookmarks!.refresh());
       }
       final progress = controller.readingProgress;
@@ -140,21 +136,16 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
               controller.status == ServiceStatus.ready &&
               controller.isCurrentSource(source) &&
               identical(controller.readingProgress, progress),
-        )..addListener(_detailsChanged);
+        );
         unawaited(_chapterRead!.refresh());
       }
       unawaited(_refreshResume());
     }
-    controller.addListener(_catalogChanged);
   }
 
   @override
   void didUpdateWidget(MangaDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.controller, widget.controller)) {
-      oldWidget.controller.removeListener(_catalogChanged);
-      controller.addListener(_catalogChanged);
-    }
     if (!identical(oldWidget.controller, widget.controller) ||
         !identical(oldWidget.source, widget.source) ||
         !identical(oldWidget.manga, widget.manga) ||
@@ -167,8 +158,6 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
       _detailsChanged();
     }
   }
-
-  void _bookmarksChanged() => _detailsChanged();
 
   void _detailsChanged() {
     if (!mounted) return;
@@ -201,8 +190,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
     progress?.checkCurrent();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void _lifecycleChanged(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshResume());
       unawaited(_bookmarks?.refresh());
@@ -220,12 +208,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
   @override
   void dispose() {
     _coverLifecycle.value++;
-    _coverLifecycle.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-    controller.removeListener(_catalogChanged);
-    _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
-    _chapterRead?.removeListener(_detailsChanged);
     _chapterRead?.dispose();
     super.dispose();
   }
@@ -1110,7 +1093,17 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
 
   @override
   Widget build(BuildContext context) {
+    _coverLifecycle = useValueNotifier(0);
     _chapterSearch = useTextEditingController();
+    useEffect(() {
+      _initialize();
+      return null;
+    }, const []);
+    useListenable(controller);
+    useOnListenableChange(controller, _catalogChanged);
+    useOnListenableChange(_bookmarks, _detailsChanged);
+    useOnListenableChange(_chapterRead, _detailsChanged);
+    useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
     return Scaffold(
       appBar: AppBar(
         title: Text(manga.title),
@@ -1136,117 +1129,110 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage>
           ),
         ],
       ),
-      body: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) =>
-            _detailsExpired || !controller.isCurrentSource(source)
-            ? Center(
-                child: Padding(
+      body: _detailsExpired || !controller.isCurrentSource(source)
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(controller.error ?? '漫画源会话已变化，请返回浏览重新打开详情。'),
+              ),
+            )
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: ListView(
                   padding: const EdgeInsets.all(24),
-                  child: Text(controller.error ?? '漫画源会话已变化，请返回浏览重新打开详情。'),
-                ),
-              )
-            : Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900),
-                  child: ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      if (_library != null) ...[
-                        _favoriteControl(),
-                        const SizedBox(height: 16),
-                      ],
-                      Text(
-                        manga.title,
-                        style: Theme.of(context).textTheme.headlineMedium,
+                  children: [
+                    if (_library != null) ...[
+                      _favoriteControl(),
+                      const SizedBox(height: 16),
+                    ],
+                    Text(
+                      manga.title,
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    if (manga.author?.isNotEmpty ?? false) ...[
+                      const SizedBox(height: 12),
+                      Text('作者：${manga.author}'),
+                    ],
+                    if (manga.artist?.isNotEmpty ?? false)
+                      Text('画师：${manga.artist}'),
+                    if (manga.genres.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final genre in manga.genres)
+                            Chip(label: Text(genre)),
+                        ],
                       ),
-                      if (manga.author?.isNotEmpty ?? false) ...[
-                        const SizedBox(height: 12),
-                        Text('作者：${manga.author}'),
-                      ],
-                      if (manga.artist?.isNotEmpty ?? false)
-                        Text('画师：${manga.artist}'),
-                      if (manga.genres.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            for (final genre in manga.genres)
-                              Chip(label: Text(genre)),
-                          ],
-                        ),
-                      ],
-                      if (manga.description?.isNotEmpty ?? false) ...[
-                        const SizedBox(height: 16),
-                        SelectableText(manga.description!),
-                      ],
-                      const SizedBox(height: 32),
-                      if (_failedChapter case final chapter?) ...[
-                        _Notice(
-                          text: '未能打开「${chapter.name}」：$_chapterOpenError',
-                          icon: Icons.error_outline,
-                        ),
-                        TextButton.icon(
-                          key: const ValueKey('retry-open-chapter'),
+                    ],
+                    if (manga.description?.isNotEmpty ?? false) ...[
+                      const SizedBox(height: 16),
+                      SelectableText(manga.description!),
+                    ],
+                    const SizedBox(height: 32),
+                    if (_failedChapter case final chapter?) ...[
+                      _Notice(
+                        text: '未能打开「${chapter.name}」：$_chapterOpenError',
+                        icon: Icons.error_outline,
+                      ),
+                      TextButton.icon(
+                        key: const ValueKey('retry-open-chapter'),
+                        onPressed:
+                            _opening || controller.busy || _selectingChapters
+                            ? null
+                            : () => _openChapter(context, chapter.sourceIndex),
+                        icon: const Icon(Icons.refresh),
+                        label: Text('重试打开「${chapter.name}」'),
+                      ),
+                    ],
+                    if (_resume case final resume?)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('继续阅读'),
                           onPressed:
                               _opening || controller.busy || _selectingChapters
                               ? null
-                              : () =>
-                                    _openChapter(context, chapter.sourceIndex),
-                          icon: const Icon(Icons.refresh),
-                          label: Text('重试打开「${chapter.name}」'),
-                        ),
-                      ],
-                      if (_resume case final resume?)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: FilledButton.icon(
-                            icon: const Icon(Icons.play_arrow),
-                            label: const Text('继续阅读'),
-                            onPressed:
-                                _opening ||
-                                    controller.busy ||
-                                    _selectingChapters
-                                ? null
-                                : () => _openChapter(
-                                    context,
-                                    _sequence!.entries.indexWhere(
-                                      (entry) => entry.key == resume.chapterKey,
-                                    ),
+                              : () => _openChapter(
+                                  context,
+                                  _sequence!.entries.indexWhere(
+                                    (entry) => entry.key == resume.chapterKey,
                                   ),
-                          ),
+                                ),
                         ),
-                      if (_resumeError != null)
-                        _Notice(text: _resumeError!, icon: Icons.info_outline),
-                      if (_resumeReadFailed)
-                        TextButton.icon(
-                          key: const ValueKey('retry-read-resume'),
-                          onPressed:
-                              _loadingResume ||
-                                  _opening ||
-                                  controller.busy ||
-                                  _selectingChapters
-                              ? null
-                              : () => unawaited(_refreshResume()),
-                          icon: const Icon(Icons.refresh),
-                          label: Text(_loadingResume ? '正在读取阅读位置' : '重新读取阅读位置'),
-                        ),
-                      if (controller.hasUnsavedReadingProgress) ...[
-                        const _Notice(
-                          text: '部分阅读进度尚未保存，当前会话仍保留记录。',
-                          icon: Icons.warning_amber,
-                        ),
-                        TextButton(
-                          onPressed: () => unawaited(_retryProgress()),
-                          child: const Text('重试保存进度'),
-                        ),
-                      ],
-                      ..._chapterList(),
+                      ),
+                    if (_resumeError != null)
+                      _Notice(text: _resumeError!, icon: Icons.info_outline),
+                    if (_resumeReadFailed)
+                      TextButton.icon(
+                        key: const ValueKey('retry-read-resume'),
+                        onPressed:
+                            _loadingResume ||
+                                _opening ||
+                                controller.busy ||
+                                _selectingChapters
+                            ? null
+                            : () => unawaited(_refreshResume()),
+                        icon: const Icon(Icons.refresh),
+                        label: Text(_loadingResume ? '正在读取阅读位置' : '重新读取阅读位置'),
+                      ),
+                    if (controller.hasUnsavedReadingProgress) ...[
+                      const _Notice(
+                        text: '部分阅读进度尚未保存，当前会话仍保留记录。',
+                        icon: Icons.warning_amber,
+                      ),
+                      TextButton(
+                        onPressed: () => unawaited(_retryProgress()),
+                        child: const Text('重试保存进度'),
+                      ),
                     ],
-                  ),
+                    ..._chapterList(),
+                  ],
                 ),
               ),
-      ),
+            ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../browse/catalog_controller.dart';
 import '../browse/manga_list_tile.dart';
@@ -13,7 +14,7 @@ typedef OpenSourceSearchDetails =
       details,
     );
 
-class CrossSourceSearchPage extends StatefulWidget {
+class CrossSourceSearchPage extends StatefulHookWidget {
   const CrossSourceSearchPage({
     super.key,
     required this.service,
@@ -26,11 +27,10 @@ class CrossSourceSearchPage extends StatefulWidget {
   State<CrossSourceSearchPage> createState() => _CrossSourceSearchPageState();
 }
 
-class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
-    with WidgetsBindingObserver {
+class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   late final CrossSourceSearchController controller;
-  final _query = TextEditingController();
-  final _sourceFilter = TextEditingController();
+  late TextEditingController _query;
+  late TextEditingController _sourceFilter;
   int _sourcePage = 0;
   bool _allowPop = false;
   bool _leaving = false;
@@ -39,7 +39,6 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     controller = CrossSourceSearchController(
       service: widget.service,
       isCurrent: () =>
@@ -50,8 +49,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
     });
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void _lifecycleChanged(AppLifecycleState state) {
     final foreground = state == AppLifecycleState.resumed;
     final leftForeground = _foreground && !foreground;
     _foreground = foreground;
@@ -285,9 +283,12 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) => PopScope<void>(
+  Widget build(BuildContext context) {
+    _query = useTextEditingController();
+    _sourceFilter = useTextEditingController();
+    useListenable(controller);
+    useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
+    return PopScope<void>(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_leave());
@@ -406,15 +407,12 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage>
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     controller.dispose();
-    _query.dispose();
-    _sourceFilter.dispose();
     super.dispose();
   }
 }

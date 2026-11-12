@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../data/library_repository.dart';
@@ -38,7 +39,7 @@ Future<Set<String>?> showLibraryBatchDialog({
   );
 }
 
-class _LibraryBatchDialog extends StatefulWidget {
+class _LibraryBatchDialog extends StatefulHookWidget {
   const _LibraryBatchDialog({
     required this.controller,
     required this.repository,
@@ -73,10 +74,6 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
         ),
   );
   late LibraryBatchDraft? _draft = widget.pending;
-  late final _lifecycle = Listenable.merge([
-    widget.controller,
-    widget.lifecycle,
-  ]);
   bool _expired = false;
   String? _error;
 
@@ -96,8 +93,6 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
   void initState() {
     super.initState();
     _expired = !widget.isCurrent();
-    _lifecycle.addListener(_checkSession);
-    _draft?.addListener(_draftChanged);
   }
 
   void _checkSession() {
@@ -142,7 +137,6 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
         _draft = draft;
         _error = null;
       });
-      draft.addListener(_draftChanged);
       await draft.start(isCurrent: () => _current);
       if (!mounted) return;
       _checkSession();
@@ -231,6 +225,12 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final lifecycle = useMemoized(
+      () => Listenable.merge([widget.controller, widget.lifecycle]),
+      [widget.controller, widget.lifecycle],
+    );
+    useOnListenableChange(lifecycle, _checkSession);
+    useOnListenableChange(_draft, _draftChanged);
     final draft = _draft;
     final locked = _expired || draft != null;
     return PopScope<Set<String>>(
@@ -347,12 +347,5 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _draft?.removeListener(_draftChanged);
-    _lifecycle.removeListener(_checkSession);
-    super.dispose();
   }
 }

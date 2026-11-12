@@ -17,9 +17,13 @@ Access 暂停后，旧作用域保留原账户的未确认操作供检查，禁�
 
 ## 组件与资源生命周期
 
-Hooks 持有可丢弃的输入框、滚动、标签、筛选和本地表单草稿。全局与作品设置共用一套字段控件；未编辑的表单跟随新确认值，已编辑的表单保留打开时的 revision，遇到冲突必须明确重读。表单重建不是保存。
+所有带有输入框、焦点、滚动、缩放、动画/标签控制器或普通监听订阅的 Stateful Widget 都采用 Hooks。`useTextEditingController`、`useScrollController`、`useTransformationController`、`useValueNotifier` 管理本地控制器；`useListenable`、`useOnListenableChange`、`useOnStreamChange` 和 `useOnAppLifecycleStateChange` 管理普通订阅及前后台回调，随输入对象替换而退订旧对象。标签控制器按 flutter_hooks 当前 API 用 ticker、memoized 和 effect 管理。
 
-Catalog、Worker、Source、图片页会话和阅读进度仍由原有持有者管理。provider 退订仅取消它创建的读取订阅，不关闭 runtime，不丢弃业务客户端草稿，不替代异步资源关闭确认。Reader 的视口、手势、预取和逐帧状态保留在路由/组件；设置更新不能重置阅读进度。
+纯 UI 组件使用 HookWidget，混合业务资源和逐帧状态的组件使用 StatefulHookWidget / StatefulHookConsumerWidget，Hooks 仍在 build 中无条件按固定顺序调用。输入控制器先创建，再运行需要访问它们的首次装配；不能在 initState 中读取尚未创建的 Hook 值。原有身份失效检查和跨路由通知的帧后延迟继续保留。
+
+Hooks 持有可丢弃的筛选和本地表单草稿。全局与作品设置共用一套字段控件；未编辑的表单跟随新确认值，已编辑的表单保留打开时的 revision，遇到冲突必须明确重读。表单重建不是保存。
+
+Catalog、Worker、Source、图片页会话和阅读进度仍由原有持有者管理。provider 退订仅取消它创建的读取订阅，不关闭 runtime，不丢弃业务客户端草稿，不替代异步资源关闭确认。Reader 的视口、手势、预取和逐帧状态保留在路由/组件；设置更新不能重置阅读进度。`ResourceImage` 的 ImageStream、ImageInfo/图像句柄与暂停动画策略，以及 `PinnedReaderImage` 的资源 pin 都有特殊的资源所有权，继续显式管理；它们不属于普通 Listenable/Stream 订阅。原生 WebView 控制器由平台组件持有，不能由通用 effect 擅自关闭。
 
 扩展命令控制器继续负责下载准备、取消和清理等资源操作；它订阅共享设置 provider 并调用其 Notifier，不再创建和释放另一份设置控制器。
 

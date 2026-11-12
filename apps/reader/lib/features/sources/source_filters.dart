@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/catalog_controller.dart';
 
 /// Source filter edits are session drafts. Only applying a successful search
 /// changes the catalog; closing this sheet discards its unsubmitted edits.
-class SourceFiltersSheet extends StatefulWidget {
+class SourceFiltersSheet extends StatefulHookWidget {
   const SourceFiltersSheet({
     super.key,
     required this.catalog,
@@ -350,103 +351,98 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.catalog,
-    builder: (context, _) {
-      final current = _current;
-      final enabled = current && !_working && !widget.catalog.busy;
-      final draft = _draft;
-      return Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          children: [
-            ListTile(
-              title: const Text('筛选漫画'),
-              subtitle: Text(
-                widget.query.isEmpty ? '应用后按筛选条件搜索' : '搜索词：${widget.query}',
-              ),
-              trailing: IconButton(
-                tooltip: _working ? '取消请求并关闭筛选' : '取消筛选编辑',
-                onPressed: _close,
-                icon: const Icon(Icons.close),
-              ),
+  Widget build(BuildContext context) {
+    useListenable(widget.catalog);
+    final current = _current;
+    final enabled = current && !_working && !widget.catalog.busy;
+    final draft = _draft;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(
+        children: [
+          ListTile(
+            title: const Text('筛选漫画'),
+            subtitle: Text(
+              widget.query.isEmpty ? '应用后按筛选条件搜索' : '搜索词：${widget.query}',
             ),
-            if (_working) ...[
-              const LinearProgressIndicator(),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Text('关闭将取消请求，可能需要重新连接漫画源。'),
-              ),
-            ],
-            Expanded(
-              child: ListView(
-                key: const ValueKey('source-filter-form'),
-                padding: const EdgeInsets.all(24),
-                children: [
-                  if (!current)
-                    const Text('漫画源会话已变化，请关闭后重新打开筛选。')
-                  else ...[
-                    if (_error != null) ...[
-                      Text(_error!),
-                      const SizedBox(height: 12),
-                    ],
-                    if (draft == null && !_working)
-                      OutlinedButton.icon(
-                        onPressed: enabled ? () => _load() : null,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('重试加载筛选'),
-                      ),
-                    if (draft != null)
-                      KeyedSubtree(
-                        key: ValueKey(draft.snapshotId),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (draft.nodes.isEmpty)
-                              const Text('这个漫画源没有额外筛选条件。'),
-                            for (
-                              var index = 0;
-                              index < draft.nodes.length;
-                              index++
-                            )
-                              _node(draft.nodes[index], [index], enabled),
-                          ],
-                        ),
-                      ),
-                  ],
-                ],
-              ),
+            trailing: IconButton(
+              tooltip: _working ? '取消请求并关闭筛选' : '取消筛选编辑',
+              onPressed: _close,
+              icon: const Icon(Icons.close),
             ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('source-filter-reset'),
-                      onPressed: enabled ? () => _load(reset: true) : null,
-                      child: const Text('重置筛选'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      key: const ValueKey('source-filter-apply'),
-                      onPressed: enabled && draft != null ? _apply : null,
-                      child: const Text('应用筛选'),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          if (_working) ...[
+            const LinearProgressIndicator(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Text('关闭将取消请求，可能需要重新连接漫画源。'),
             ),
           ],
-        ),
-      );
-    },
-  );
+          Expanded(
+            child: ListView(
+              key: const ValueKey('source-filter-form'),
+              padding: const EdgeInsets.all(24),
+              children: [
+                if (!current)
+                  const Text('漫画源会话已变化，请关闭后重新打开筛选。')
+                else ...[
+                  if (_error != null) ...[
+                    Text(_error!),
+                    const SizedBox(height: 12),
+                  ],
+                  if (draft == null && !_working)
+                    OutlinedButton.icon(
+                      onPressed: enabled ? () => _load() : null,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('重试加载筛选'),
+                    ),
+                  if (draft != null)
+                    KeyedSubtree(
+                      key: ValueKey(draft.snapshotId),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (draft.nodes.isEmpty) const Text('这个漫画源没有额外筛选条件。'),
+                          for (
+                            var index = 0;
+                            index < draft.nodes.length;
+                            index++
+                          )
+                            _node(draft.nodes[index], [index], enabled),
+                        ],
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const ValueKey('source-filter-reset'),
+                    onPressed: enabled ? () => _load(reset: true) : null,
+                    child: const Text('重置筛选'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    key: const ValueKey('source-filter-apply'),
+                    onPressed: enabled && draft != null ? _apply : null,
+                    child: const Text('应用筛选'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {

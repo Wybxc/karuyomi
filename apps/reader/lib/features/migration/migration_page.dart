@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../../data/business_state_client.dart';
 import '../../data/source_migration_matching.dart';
@@ -9,7 +10,7 @@ import '../browse/catalog_controller.dart';
 import '../reader/chapter_sequence.dart';
 import 'migration_controller.dart';
 
-class MigrationPage extends StatefulWidget {
+class MigrationPage extends StatefulHookWidget {
   const MigrationPage({
     super.key,
     required this.catalog,
@@ -25,14 +26,13 @@ class MigrationPage extends StatefulWidget {
 
 class _MigrationPageState extends State<MigrationPage> {
   late final MigrationController controller;
-  late final TextEditingController _search;
+  late TextEditingController _search;
   int _mappingPage = 0;
   bool _showMarkedOnly = false;
 
   @override
   void initState() {
     super.initState();
-    _search = TextEditingController(text: widget.seed.metadata.manga.title);
     controller = MigrationController(
       catalog: widget.catalog,
       client: widget.client,
@@ -323,204 +323,196 @@ class _MigrationPageState extends State<MigrationPage> {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) {
-      final pending = controller.pending;
-      final selectedKey = controller.selectedSource?.key;
-      return Scaffold(
-        appBar: AppBar(title: const Text('迁移到其他漫画源')),
-        body: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
+  Widget build(BuildContext context) {
+    _search = useTextEditingController(text: widget.seed.metadata.manga.title);
+    useListenable(controller);
+    final pending = controller.pending;
+    final selectedKey = controller.selectedSource?.key;
+    return Scaffold(
+      appBar: AppBar(title: const Text('迁移到其他漫画源')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Text(
+            '原作品：${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName}',
+          ),
+          if (controller.busy) const LinearProgressIndicator(),
+          if (controller.error case final value?)
+            Text(value, key: const ValueKey('migration-error')),
+          if (controller.notice case final value?)
+            Text(value, key: const ValueKey('migration-notice')),
+          if (pending != null) ...[
+            const Text('原迁移操作尚未确认。新目标和新映射均不可提交；仅可明确重试原操作。'),
             Text(
-              '原作品：${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName}',
+              '原操作：${pending.request.mutationId} · 目标 ${pending.request.mangaKey}',
             ),
-            if (controller.busy) const LinearProgressIndicator(),
-            if (controller.error case final value?)
-              Text(value, key: const ValueKey('migration-error')),
-            if (controller.notice case final value?)
-              Text(value, key: const ValueKey('migration-notice')),
-            if (pending != null) ...[
-              const Text('原迁移操作尚未确认。新目标和新映射均不可提交；仅可明确重试原操作。'),
-              Text(
-                '原操作：${pending.request.mutationId} · 目标 ${pending.request.mangaKey}',
-              ),
-              Text(
-                '原版本：源 ${pending.request.migrateFrom.expectedSourceRevision}，目标 ${pending.request.expectedRevision}，分类 ${pending.request.migrateFrom.expectedCatalogRevision}',
-              ),
-              if (pending.retryable)
-                FilledButton(
-                  key: const ValueKey('migration-retry-original'),
-                  onPressed: controller.available && !controller.busy
-                      ? () => unawaited(controller.retry())
-                      : null,
-                  child: const Text('重试原迁移操作'),
-                )
-              else
-                TextButton(
-                  key: const ValueKey('migration-discard-rejected'),
-                  onPressed: controller.available && !controller.busy
-                      ? () => unawaited(controller.discardRejected())
-                      : null,
-                  child: const Text('重新读取并结束已拒绝的原操作'),
-                ),
-            ],
-            if (controller.completed)
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('返回'),
-              )
-            else ...[
-              const SizedBox(height: 16),
-              Text('1. 原作品章节', style: Theme.of(context).textTheme.titleMedium),
-              if (controller.sourceSequence != null)
-                Text(
-                  '已捕获 ${controller.sourceSequence!.entries.length} 章；切换目标源后仍保留本次章节快照。',
-                )
-              else
-                const Text('先读取原源章节，或明确选择仅迁移收藏和分类。'),
-              Wrap(
-                spacing: 8,
-                children: [
-                  TextButton(
-                    key: const ValueKey('migration-load-source'),
-                    onPressed:
-                        controller.canChange &&
-                            controller.selectedSource == null
-                        ? () => unawaited(controller.readOriginalChapters())
-                        : null,
-                    child: const Text('读取原漫画源章节'),
-                  ),
-                  TextButton(
-                    key: const ValueKey('migration-categories-only'),
-                    onPressed:
-                        controller.canChange &&
-                            controller.selectedSource == null
-                        ? controller.chooseCategoriesOnly
-                        : null,
-                    child: const Text('仅迁移收藏和分类'),
-                  ),
-                ],
-              ),
-              if (controller.categoriesOnly) const Text('已选择仅迁移收藏和分类，章节标记不复制。'),
-              const SizedBox(height: 16),
-              Text(
-                '2. 选择目标漫画源并查找作品',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              if (controller.sources.isEmpty)
-                const Text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'),
-              TextButton(
-                key: const ValueKey('migration-refresh-sources'),
+            Text(
+              '原版本：源 ${pending.request.migrateFrom.expectedSourceRevision}，目标 ${pending.request.expectedRevision}，分类 ${pending.request.migrateFrom.expectedCatalogRevision}',
+            ),
+            if (pending.retryable)
+              FilledButton(
+                key: const ValueKey('migration-retry-original'),
                 onPressed: controller.available && !controller.busy
-                    ? () => unawaited(controller.refreshSources())
+                    ? () => unawaited(controller.retry())
                     : null,
-                child: const Text('重新读取可用漫画源（只读）'),
+                child: const Text('重试原迁移操作'),
+              )
+            else
+              TextButton(
+                key: const ValueKey('migration-discard-rejected'),
+                onPressed: controller.available && !controller.busy
+                    ? () => unawaited(controller.discardRejected())
+                    : null,
+                child: const Text('重新读取并结束已拒绝的原操作'),
               ),
-              DropdownButton<String>(
-                key: const ValueKey('migration-source'),
-                isExpanded: true,
-                hint: const Text('选择已安装的目标漫画源'),
-                value:
-                    controller.sources.any(
-                      (choice) => choice.key == selectedKey,
-                    )
-                    ? selectedKey
-                    : null,
-                items: [
-                  for (final choice in controller.sources)
-                    DropdownMenuItem(
-                      value: choice.key,
-                      child: Text(
-                        '${choice.source.name} · ${choice.source.lang} · ${choice.build.packageName}',
-                      ),
+          ],
+          if (controller.completed)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('返回'),
+            )
+          else ...[
+            const SizedBox(height: 16),
+            Text('1. 原作品章节', style: Theme.of(context).textTheme.titleMedium),
+            if (controller.sourceSequence != null)
+              Text(
+                '已捕获 ${controller.sourceSequence!.entries.length} 章；切换目标源后仍保留本次章节快照。',
+              )
+            else
+              const Text('先读取原源章节，或明确选择仅迁移收藏和分类。'),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton(
+                  key: const ValueKey('migration-load-source'),
+                  onPressed:
+                      controller.canChange && controller.selectedSource == null
+                      ? () => unawaited(controller.readOriginalChapters())
+                      : null,
+                  child: const Text('读取原漫画源章节'),
+                ),
+                TextButton(
+                  key: const ValueKey('migration-categories-only'),
+                  onPressed:
+                      controller.canChange && controller.selectedSource == null
+                      ? controller.chooseCategoriesOnly
+                      : null,
+                  child: const Text('仅迁移收藏和分类'),
+                ),
+              ],
+            ),
+            if (controller.categoriesOnly) const Text('已选择仅迁移收藏和分类，章节标记不复制。'),
+            const SizedBox(height: 16),
+            Text(
+              '2. 选择目标漫画源并查找作品',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            if (controller.sources.isEmpty)
+              const Text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'),
+            TextButton(
+              key: const ValueKey('migration-refresh-sources'),
+              onPressed: controller.available && !controller.busy
+                  ? () => unawaited(controller.refreshSources())
+                  : null,
+              child: const Text('重新读取可用漫画源（只读）'),
+            ),
+            DropdownButton<String>(
+              key: const ValueKey('migration-source'),
+              isExpanded: true,
+              hint: const Text('选择已安装的目标漫画源'),
+              value:
+                  controller.sources.any((choice) => choice.key == selectedKey)
+                  ? selectedKey
+                  : null,
+              items: [
+                for (final choice in controller.sources)
+                  DropdownMenuItem(
+                    value: choice.key,
+                    child: Text(
+                      '${choice.source.name} · ${choice.source.lang} · ${choice.build.packageName}',
                     ),
-                ],
-                onChanged: controller.canChange && controller.sourceDecided
-                    ? (key) {
-                        if (key != null) {
-                          unawaited(
-                            controller.chooseSource(
-                              controller.sources.singleWhere(
-                                (choice) => choice.key == key,
-                              ),
+                  ),
+              ],
+              onChanged: controller.canChange && controller.sourceDecided
+                  ? (key) {
+                      if (key != null) {
+                        unawaited(
+                          controller.chooseSource(
+                            controller.sources.singleWhere(
+                              (choice) => choice.key == key,
                             ),
-                          );
-                        }
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+            ),
+            TextField(
+              key: const ValueKey('migration-search'),
+              controller: _search,
+              enabled:
+                  controller.canChange && controller.selectedSource != null,
+              decoration: const InputDecoration(labelText: '搜索目标作品'),
+              onSubmitted: (value) => unawaited(controller.search(value)),
+            ),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: [
+                TextButton(
+                  key: const ValueKey('migration-search-submit'),
+                  onPressed:
+                      controller.canChange && controller.selectedSource != null
+                      ? () => unawaited(controller.search(_search.text))
+                      : null,
+                  child: const Text('搜索'),
+                ),
+                TextButton(
+                  key: const ValueKey('migration-popular'),
+                  onPressed:
+                      controller.canChange && controller.selectedSource != null
+                      ? () => unawaited(controller.browsePopular())
+                      : null,
+                  child: const Text('浏览目标源热门作品'),
+                ),
+              ],
+            ),
+            if (controller.emptyResultsMessage case final message?
+                when !controller.busy)
+              Text(message),
+            for (var index = 0; index < controller.results.length; index++)
+              ListTile(
+                key: ValueKey(('migration-result', index)),
+                title: Text(controller.results[index].title),
+                subtitle: Text(controller.results[index].url),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: controller.canChange
+                    ? () {
+                        _mappingPage = 0;
+                        unawaited(
+                          controller.chooseManga(controller.results[index]),
+                        );
                       }
                     : null,
               ),
-              TextField(
-                key: const ValueKey('migration-search'),
-                controller: _search,
-                enabled:
-                    controller.canChange && controller.selectedSource != null,
-                decoration: const InputDecoration(labelText: '搜索目标作品'),
-                onSubmitted: (value) => unawaited(controller.search(value)),
+            if (controller.hasNextPage)
+              TextButton(
+                key: const ValueKey('migration-search-more'),
+                onPressed: controller.canChange
+                    ? () => unawaited(controller.loadMore())
+                    : null,
+                child: const Text('加载更多目标结果'),
               ),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                children: [
-                  TextButton(
-                    key: const ValueKey('migration-search-submit'),
-                    onPressed:
-                        controller.canChange &&
-                            controller.selectedSource != null
-                        ? () => unawaited(controller.search(_search.text))
-                        : null,
-                    child: const Text('搜索'),
-                  ),
-                  TextButton(
-                    key: const ValueKey('migration-popular'),
-                    onPressed:
-                        controller.canChange &&
-                            controller.selectedSource != null
-                        ? () => unawaited(controller.browsePopular())
-                        : null,
-                    child: const Text('浏览目标源热门作品'),
-                  ),
-                ],
-              ),
-              if (controller.emptyResultsMessage case final message?
-                  when !controller.busy)
-                Text(message),
-              for (var index = 0; index < controller.results.length; index++)
-                ListTile(
-                  key: ValueKey(('migration-result', index)),
-                  title: Text(controller.results[index].title),
-                  subtitle: Text(controller.results[index].url),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: controller.canChange
-                      ? () {
-                          _mappingPage = 0;
-                          unawaited(
-                            controller.chooseManga(controller.results[index]),
-                          );
-                        }
-                      : null,
-                ),
-              if (controller.hasNextPage)
-                TextButton(
-                  key: const ValueKey('migration-search-more'),
-                  onPressed: controller.canChange
-                      ? () => unawaited(controller.loadMore())
-                      : null,
-                  child: const Text('加载更多目标结果'),
-                ),
-              if (controller.preview != null) _preview(),
-            ],
+            if (controller.preview != null) _preview(),
           ],
-        ),
-      );
-    },
-  );
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
     controller.dispose();
-    _search.dispose();
     super.dispose();
   }
 }

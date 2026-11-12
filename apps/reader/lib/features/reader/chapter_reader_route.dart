@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -21,7 +22,7 @@ import 'reader_recovery.dart';
 
 /// One navigation route owns the whole reading session, not one route per page
 /// list. A new leaf can only acquire images after the previous leaf's ACKs.
-class ChapterReaderRoute extends ConsumerStatefulWidget {
+class ChapterReaderRoute extends StatefulHookConsumerWidget {
   const ChapterReaderRoute({
     super.key,
     required this.catalog,
@@ -53,8 +54,7 @@ class ChapterReaderRoute extends ConsumerStatefulWidget {
   ConsumerState<ChapterReaderRoute> createState() => _ChapterReaderRouteState();
 }
 
-class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
-    with WidgetsBindingObserver {
+class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   late OpenedChapter _opened = widget.initialOpened;
   late SequenceChapter _chapter = widget.initialChapter;
   late MangaEntry _manga = widget.manga;
@@ -86,7 +86,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
   ReadingProgressController? _progress;
   ReadingPosition? _initialPosition;
   bool _preserveInitialPlacement = false;
-  final _positionRequest = ValueNotifier<ReadingPosition?>(null);
+  late ValueNotifier<ReadingPosition?> _positionRequest;
   bool _allowPop = false;
   bool _exitPending = false;
   bool _accessPaused = false;
@@ -119,10 +119,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
     _order = widget.initialOrder ?? ChapterOrder.source;
     _initialPosition = widget.initialPosition;
     _accessPaused = widget.catalog.accessPaused;
-    widget.catalog.addListener(_catalogChanged);
-    WidgetsBinding.instance.addObserver(this);
     _progress = widget.catalog.createReadingProgress(_sequence.mangaKey);
-    _progress?.addListener(_progressChanged);
     _installBookmarks();
     if (_progress != null && _opened.manifest.pages.isNotEmpty) {
       _visible = false;
@@ -132,7 +129,6 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
   }
 
   void _installBookmarks() {
-    _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
     _bookmarks = null;
     final repository = widget.catalog.bookmarks;
@@ -145,12 +141,8 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
           !_closing &&
           widget.catalog.subject == _subject &&
           widget.catalog.deploymentOrigin?.origin == _origin,
-    )..addListener(_bookmarksChanged);
+    );
     unawaited(_bookmarks!.refresh());
-  }
-
-  void _bookmarksChanged() {
-    if (!_closing && mounted) setState(() {});
   }
 
   void _applySettings(SettingsState settings) {
@@ -413,8 +405,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
     ],
   );
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void _lifecycleChanged(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshProgress());
       if (!_accessPaused && !_recovering) {
@@ -883,6 +874,11 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
 
   @override
   Widget build(BuildContext context) {
+    _positionRequest = useValueNotifier<ReadingPosition?>(null);
+    useOnListenableChange(widget.catalog, _catalogChanged);
+    useOnListenableChange(_progress, _progressChanged);
+    useOnListenableChange(_bookmarks, _progressChanged);
+    useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
     if (_settingsCurrent) _applySettings(ref.watch(_settingsProvider));
     return PopScope<void>(
       canPop: _progress == null || _allowPop,
@@ -959,16 +955,11 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute>
   @override
   void dispose() {
     _closing = true;
-    WidgetsBinding.instance.removeObserver(this);
-    _positionRequest.dispose();
     final progress = _progress;
-    progress?.removeListener(_progressChanged);
     if (progress != null) {
       final released = widget.catalog.releaseReadingProgress(progress);
       unawaited(released);
     }
-    widget.catalog.removeListener(_catalogChanged);
-    _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
     final preparationClosed = _preparation.close();
     if (!_viewAttached && !_viewClosed.isCompleted) {

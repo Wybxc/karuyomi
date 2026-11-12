@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -78,7 +79,7 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
   );
 }
 
-class AppShell extends ConsumerStatefulWidget {
+class AppShell extends StatefulHookConsumerWidget {
   const AppShell({
     super.key,
     required this.themeMode,
@@ -98,8 +99,7 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell>
-    with WidgetsBindingObserver {
+class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
   PlatformRuntime? _platform;
   CatalogController? _catalog;
@@ -118,7 +118,7 @@ class _AppShellState extends ConsumerState<AppShell>
   String? _originPersistenceError;
   static const _defaultOrigin = String.fromEnvironment('APP_ORIGIN');
   static const _originKey = 'native_service_origin';
-  final _originField = TextEditingController(text: _defaultOrigin);
+  late TextEditingController _originField;
   static const _labels = ['书架', '浏览', '设置'];
   static const _icons = [
     Icons.collections_bookmark_outlined,
@@ -137,15 +137,7 @@ class _AppShellState extends ConsumerState<AppShell>
     widget.onThemeChanged(value);
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_settings?.refresh());
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
+  void _initialize() {
     final preferences = widget.connectionPreferences;
     if (kIsWeb || widget.platform != null || preferences == null) {
       _configure(widget.platform);
@@ -562,17 +554,20 @@ class _AppShellState extends ConsumerState<AppShell>
         ),
       ],
     );
-    return controller == null
-        ? content()
-        : AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) => content(),
-          );
+    return content();
   }
 
   @override
   Widget build(BuildContext context) {
-    final catalog = _catalog;
+    _originField = useTextEditingController(text: _defaultOrigin);
+    useEffect(() {
+      _initialize();
+      return null;
+    }, const []);
+    useOnAppLifecycleStateChange((_, state) {
+      if (state == AppLifecycleState.resumed) unawaited(_settings?.refresh());
+    });
+    final catalog = useListenable(_catalog);
     if (catalog != null) {
       final theme = ref.watch(
         settingsControllerProvider(catalog, catalog.settings).select(
@@ -636,7 +631,6 @@ class _AppShellState extends ConsumerState<AppShell>
     final catalog = _catalog;
     final platform = _platform;
     final retired = _retiredProgress.toList();
-    WidgetsBinding.instance.removeObserver(this);
     catalog?.dispose();
     unawaited(() async {
       await catalog?.closeReadingProgress();
@@ -646,7 +640,6 @@ class _AppShellState extends ConsumerState<AppShell>
       }
       await platform?.dispose();
     }());
-    _originField.dispose();
     super.dispose();
   }
 }

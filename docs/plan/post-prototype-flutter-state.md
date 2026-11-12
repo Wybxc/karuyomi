@@ -12,16 +12,16 @@ Riverpod 负责跨页面共享的读取、派生状态与依赖装配；flutter_
 
 1. 固定现有书架、设置、阅读恢复和导航回归基线；补齐身份切换、共享订阅、重复挂载与前台刷新的请求计数。复用 repository / `BusinessStateClient`，不建立第二份业务存储。
 2. 一并迁移书架列表、浏览列表的收藏标记、详情收藏状态、全局和作品设置的共享订阅。按已验证的服务地址与身份隔离 provider，移走 `AppShell` 的手工设置订阅装配，共用同一身份和作用域的设置命令控制器。保留显式刷新和写入命令；provider 的构建、失效与重试不得提交业务写。
-3. 搜索、语言筛选、浏览标签和设置编辑组件采用 hooks；Reader 的逐帧视口、手势、图片调度继续由局部状态持有。Worker、Source、章节图片和阅读进度仍由既有持有者显式关闭并等待释放确认。
+3. 所有包含输入框、焦点、滚动、缩放、动画/标签控制器以及普通监听订阅的 Stateful Widget 采用 hooks，覆盖阅读器、章节详情、源迁移、跨源搜索、扩展管理、源设置/筛选、分类/批量编辑和诊断面板。纯 UI 组件使用 HookWidget；需要保留业务资源与逐帧状态的组件使用 StatefulHookWidget / StatefulHookConsumerWidget。Worker、Source、章节图片和阅读进度仍由既有持有者显式关闭并等待释放确认。
 4. 固定 generator、annotation、hooks 和 lint 版本；生成物提交并接入一致性检查。`riverpod_lint` 随严格分析运行。生成器按需运行，不启动常驻 watch。
 5. 集中执行静态分析、provider/组件/既有业务回归、完整格式检查和 Web 构建，并通过内置浏览器验收 Web 主流程。按可审阅里程碑提交、推送；原生现场验证和真机证据单独列为未执行，不将其伪称通过。
 
 ## 当前进度
 
 - 已通过改动前的书架、设置、续读和导航组件基线，原始日志在 `.local/flutter-state-refactor/baseline.log`。
-- 已完成 generator、analyzer 版 riverpod_lint、共享读状态、账户作用域的设置 Notifier 和 hooks 迁移；旧的设置控制器装配已删除。
-- 正式 `flutter:check --concurrency=1 --reporter=expanded` 已通过三个项目的严格分析、生成一致性、22 + 87 + 624 项回归及 Dart 格式检查；lint 另以临时违规样例确认实际执行。
-- 生产手写 Dart 已净减少 330 行，生成代码另计 423 行。工程证据见[记录](../verification/flutter-state-management.md)；Web 构建与内置浏览器主流程待验，原生现场保持停止。
+- 已完成 generator、analyzer 版 riverpod_lint、共享读状态、账户作用域的设置 Notifier；旧的设置控制器装配已删除。按最新范围完成全库 Widget 审计，控制器和普通监听已交给 hooks，图片解码及资源 pin 等特殊所有权继续显式管理。
+- 正式 `flutter:check --concurrency=1 --reporter=expanded` 已通过三个项目的严格分析、生成一致性、22 + 87 + 625 项回归及 Dart 格式检查；lint 另以临时违规样例确认实际执行。
+- 生产手写 Dart 累计净减少 463 行，其中扩大 Hooks 范围进一步净减 133 行；生成代码另计 423 行。工程证据见[记录](../verification/flutter-state-management.md)；Web 构建与内置浏览器主流程待验，原生现场保持停止。
 
 ## 验收
 

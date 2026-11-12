@@ -48,7 +48,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   late TextEditingController _search;
   LibraryRepository? _repository;
   CoverRepository? _covers;
-  final _editLifecycle = ValueNotifier(0);
+  late ValueNotifier<int> _editLifecycle;
   String? _categoryFilter;
   bool _editing = false;
   bool _disposing = false;
@@ -63,19 +63,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   bool _selecting = false;
 
   @override
-  void initState() {
-    super.initState();
-    widget.controller?.addListener(_catalogChanged);
-    _bindRepository();
-  }
-
-  @override
   void didUpdateWidget(LibraryPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller?.removeListener(_catalogChanged);
-      widget.controller?.addListener(_catalogChanged);
-    }
     _bindRepository();
   }
 
@@ -507,6 +496,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   @override
   Widget build(BuildContext context) {
+    _editLifecycle = useValueNotifier(0);
+    useEffect(() {
+      _bindRepository();
+      return null;
+    }, const []);
+    useOnListenableChange(widget.controller, _catalogChanged);
     _search = useTextEditingController(keys: [_repository]);
     useListenable(_search);
     useOnAppLifecycleStateChange((previous, state) {
@@ -1038,8 +1033,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   void dispose() {
     _disposing = true;
     _editLifecycle.value++;
-    _editLifecycle.dispose();
-    widget.controller?.removeListener(_catalogChanged);
     super.dispose();
   }
 }
