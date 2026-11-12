@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 class PendingGlobalSettings extends StatelessWidget {
-  const PendingGlobalSettings({required this.values, required this.revision});
+  const PendingGlobalSettings({
+    super.key,
+    required this.values,
+    required this.revision,
+  });
   final wire.GlobalSettingsValues values;
   final int revision;
 

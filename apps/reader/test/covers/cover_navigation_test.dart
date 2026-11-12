@@ -67,18 +67,22 @@ Future<CatalogController> _details(
   await tester.pumpWidget(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
   await _tap(tester, find.text('去浏览'));
-  final catalog = find.byType(CatalogPage);
-  final scrollable = find
-      .descendant(of: catalog, matching: find.byType(Scrollable))
-      .first;
-  for (final finder in [
-    find.text('eu.kanade.source.test · 1.0'),
-    find.byKey(ValueKey(('catalog-source', sourceId))),
+  for (final target in [
+    find.byKey(
+      const ValueKey((
+        'source-directory-row',
+        'eu.kanade.source.test',
+        sourceId,
+      )),
+    ),
     find.text('真实源 DTO 测试'),
   ]) {
-    final target = find.descendant(of: catalog, matching: finder);
-    await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
-    await _tap(tester, target);
+    await tester.ensureVisible(target);
+    await tester.runAsync(() async {
+      await tester.tap(target);
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
   }
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
@@ -177,6 +181,8 @@ void main() {
         await tester.binding.handlePopRoute();
         await Future<void>.delayed(Duration.zero);
       });
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
       await _tap(tester, find.text('书架').last);
       expect(

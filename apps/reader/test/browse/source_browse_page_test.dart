@@ -211,4 +211,38 @@ void main() {
       await hide(tester);
     },
   );
+
+  testWidgets(
+    'leaving while details load waits and prevents late chapter requests or navigation',
+    (tester) async {
+      await show(tester);
+      final entered = Completer<void>(), release = Completer<void>();
+      addTearDown(() {
+        if (!release.isCompleted) release.complete();
+      });
+      final callsBefore = platform.invocations.length;
+      platform.invokeHandler = (call) async {
+        expect(call.hasDetails(), isTrue);
+        entered.complete();
+        await release.future;
+        return wire.SourceResult(manga: call.details.manga);
+      };
+      await tester.tap(find.text(testManga.title));
+      await tester.pump();
+      await tester.runAsync(
+        () => entered.future.timeout(const Duration(seconds: 5)),
+      );
+      await tester.tap(find.byType(BackButton));
+      await tester.pump();
+      expect(find.text('正在停止并收尾'), findsOneWidget);
+      release.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('打开源'), findsOneWidget);
+      expect(find.byType(SourceBrowsePage), findsNothing);
+      expect(platform.invocations, hasLength(callsBefore + 1));
+      expect(catalog.busy, isFalse);
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
 }

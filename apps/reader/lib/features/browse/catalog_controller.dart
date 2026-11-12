@@ -1416,8 +1416,9 @@ final class CatalogController extends ChangeNotifier {
         build: build.toProto(),
       );
       if (!shouldContinue()) return null;
-      if (!_allowsBuild(build, sha256: prepared.bundleSha256))
+      if (!_allowsBuild(build, sha256: prepared.bundleSha256)) {
         throw const FormatException('产物与账户所选构建不匹配，请返回检查更新。');
+      }
       onPrepared?.call();
     }
     await _loadResolvedBuild(build, shouldContinue: shouldContinue);

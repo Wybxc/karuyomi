@@ -58,8 +58,9 @@ class _ExtensionsPageState extends State<ExtensionsPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
-        ModalRoute.of(context)?.isCurrent == true)
+        ModalRoute.of(context)?.isCurrent == true) {
       unawaited(_controller.refresh());
+    }
   }
 
   Future<void> _details(ExtensionListing item) =>
@@ -159,8 +160,9 @@ class _ExtensionsPageState extends State<ExtensionsPage>
         final all = extensionListings(widget.catalog, _controller.installed);
         final languages = all.expand((item) => item.languages).toSet().toList()
           ..sort();
-        if (_language != null && !languages.contains(_language))
+        if (_language != null && !languages.contains(_language)) {
           _language = null;
+        }
         final query = _search.text.trim().toLowerCase();
         final visible = all
             .where((item) => item.matches(query, _language))
@@ -200,10 +202,11 @@ class _ExtensionsPageState extends State<ExtensionsPage>
                   key: const ValueKey('extensions-more'),
                   tooltip: '扩展选项',
                   onSelected: (value) {
-                    if (value == 'repositories')
+                    if (value == 'repositories') {
                       _repositories();
-                    else
+                    } else {
                       _storage();
+                    }
                   },
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'repositories', child: Text('仓库管理')),
@@ -490,7 +493,7 @@ class ExtensionDetailsPage extends StatelessWidget {
         installed: installed,
         candidate: candidate,
       );
-      if (installed == null && candidate == null)
+      if (installed == null && candidate == null) {
         return Scaffold(
           appBar: AppBar(title: const Text('扩展')),
           body: ListView(
@@ -501,6 +504,7 @@ class ExtensionDetailsPage extends StatelessWidget {
             ],
           ),
         );
+      }
       final exact = item.exact;
       return Scaffold(
         appBar: AppBar(title: Text(item.name)),
@@ -603,9 +607,9 @@ class ExtensionDetailsPage extends StatelessWidget {
                       ? null
                       : () {
                           final open = onOpenSource;
-                          if (open != null)
+                          if (open != null) {
                             unawaited(open(item, source));
-                          else
+                          } else {
                             unawaited(
                               Navigator.of(context).push<void>(
                                 MaterialPageRoute(
@@ -617,6 +621,7 @@ class ExtensionDetailsPage extends StatelessWidget {
                                 ),
                               ),
                             );
+                          }
                         },
                 ),
             const SizedBox(height: 24),

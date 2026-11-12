@@ -152,10 +152,10 @@ void main() {
       expect(find.text('未确认的原保存请求 · 基于版本 0'), findsOneWidget);
       await tester.tap(find.byTooltip('关闭设置'));
       await tester.pumpAndSettle();
-      final recovery = find.text('处理设置');
+      final recovery = find.text('处理漫画源设置');
       final scrollable = find
           .descendant(
-            of: find.byType(SourceBrowsePage),
+            of: find.byType(ListView).first,
             matching: find.byType(Scrollable),
           )
           .first;

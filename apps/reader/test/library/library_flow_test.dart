@@ -16,20 +16,21 @@ import '../data/business_state_server.dart';
 Future<CatalogController> _browseDetails(WidgetTester tester) async {
   await tester.tap(find.text('去浏览'));
   await tester.pumpAndSettle();
-  final catalog = find.byType(CatalogPage);
-  final scrollable = find
-      .descendant(of: catalog, matching: find.byType(Scrollable))
-      .first;
-  for (final finder in [
-    find.text('eu.kanade.source.test · 1.0'),
-    find.byKey(ValueKey(('catalog-source', sourceId))),
+  for (final target in [
+    find.byKey(
+      const ValueKey((
+        'source-directory-row',
+        'eu.kanade.source.test',
+        sourceId,
+      )),
+    ),
     find.text('真实源 DTO 测试'),
   ]) {
-    final target = find.descendant(of: catalog, matching: finder);
-    await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
     await tester.ensureVisible(target);
-    await tester.pumpAndSettle();
-    await tester.tap(target);
+    await tester.runAsync(() async {
+      await tester.tap(target);
+      await Future<void>.delayed(Duration.zero);
+    });
     await tester.pumpAndSettle();
   }
   return tester

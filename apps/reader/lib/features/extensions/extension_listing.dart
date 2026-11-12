@@ -89,8 +89,9 @@ final class ExtensionListing {
           (target) =>
               target.build.packageName == packageName &&
               target.build.catalog == reference,
-        )))
+        ))) {
       return '漫画源设置待确认';
+    }
     return null;
   }
 

@@ -64,6 +64,21 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
   bool _leaving = false;
   bool _allowPop = false;
   bool _openingDetails = false;
+  bool _loadingLibrary = false;
+  String? _libraryError;
+  Future<void> _refreshLibrary() async {
+    if (!_current || _library == null || _loadingLibrary) return;
+    _loadingLibrary = true;
+    try {
+      await _library.refresh();
+      if (_current) setState(() => _libraryError = null);
+    } catch (_) {
+      if (_current) setState(() => _libraryError = '未能读取书架状态，可重试。');
+    } finally {
+      _loadingLibrary = false;
+    }
+  }
+
   CatalogController get catalog => widget.catalog;
   bool get _current =>
       mounted &&
@@ -80,11 +95,14 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
     _identity = catalog.library?.client;
     _library = catalog.library;
     if (_library != null) {
-      _entries = _library!.watchEntries();
-      _covers = CoverRepository(_library!.client);
+      _entries = _library.watchEntries();
+      _covers = CoverRepository(_library.client);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _work = _open();
+      if (mounted) {
+        _work = _open();
+        unawaited(_refreshLibrary());
+      }
     });
   }
 
@@ -133,15 +151,17 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
         if (_error == null) _adoptResults();
       }
     } catch (error) {
-      if (_current)
+      if (_current) {
         _error = error is FormatException ? error.message : '漫画源未能打开，请重试。';
+      }
     } finally {
       _preparation = null;
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = null;
           if (_error != null) _failed = _ListingWork.initial;
         });
+      }
     }
   }
 
@@ -150,8 +170,9 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
     String? query,
     String? listing,
   }) async {
-    if (!_current || !_sourceCurrent || catalog.busy || _loading != null)
+    if (!_current || !_sourceCurrent || catalog.busy || _loading != null) {
       return;
+    }
     setState(() {
       _loading = kind;
       _failed = null;
@@ -174,8 +195,9 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
       if (_error == null &&
           kind != _ListingWork.more &&
           kind != _ListingWork.refresh &&
-          _scroll.hasClients)
+          _scroll.hasClients) {
         _scroll.jumpTo(0);
+      }
     });
   }
 
@@ -202,11 +224,12 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
       if (id != null) await catalog.runtime.cancelPreparation(id);
       await _work;
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _leaving = false;
           _error = '停止未完成，请重试返回。';
         });
+      }
       return;
     }
     if (!mounted) return;
@@ -251,16 +274,17 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
         child: SourceFiltersSheet(catalog: catalog, query: _search.text),
       ),
     );
-    if (mounted && applied == true)
+    if (mounted && applied == true) {
       setState(() {
         _error = null;
         _failed = null;
         _adoptResults();
       });
+    }
   }
 
-  Future<void> _preferences() async {
-    final target = catalog.currentPreferencesTarget,
+  Future<void> _preferences([SourcePreferencesTarget? recovery]) async {
+    final target = recovery ?? catalog.currentPreferencesTarget,
         repository = catalog.sourcePreferences;
     if (target == null || repository == null) return;
     await showModalBottomSheet<void>(
@@ -282,6 +306,7 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
       setState(() {
         _reference = catalog.sourceReference;
         _error = catalog.error;
+        if (_sourceCurrent && catalog.page > 0) _adoptResults();
       });
     }
   }
@@ -295,6 +320,17 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(_error ?? catalog.error ?? '请返回后重新选择漫画源。'),
+          for (final recovery in catalog.sourcePreferenceRecoveries.where(
+            (target) =>
+                target.build.packageName == widget.build.packageName &&
+                target.build.catalog == widget.build.catalog,
+          ))
+            TextButton(
+              onPressed: _loading != null || _leaving
+                  ? null
+                  : () => unawaited(_preferences(recovery)),
+              child: const Text('处理漫画源设置'),
+            ),
           TextButton(
             onPressed: _loading != null || _leaving
                 ? null
@@ -467,6 +503,15 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.all(16),
                             children: [
+                              if (_libraryError != null)
+                                ListTile(
+                                  title: Text(_libraryError!),
+                                  trailing: TextButton(
+                                    onPressed: () =>
+                                        unawaited(_refreshLibrary()),
+                                    child: const Text('重试读取书架'),
+                                  ),
+                                ),
                               if (_loading != _ListingWork.initial &&
                                   !canBrowse)
                                 _failure(
@@ -496,7 +541,7 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
                                     covers: _covers,
                                     onTap: busy || !canBrowse
                                         ? null
-                                        : () => unawaited(_details(manga)),
+                                        : () => _work = _details(manga),
                                   ),
                               if (_loading == null &&
                                   _error == null &&
@@ -581,10 +626,11 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
   void dispose() {
     final id = _preparation;
     _preparation = null;
-    if (id != null)
+    if (id != null) {
       unawaited(
         catalog.runtime.cancelPreparation(id).catchError((Object _) {}),
       );
+    }
     _search.dispose();
     _scroll.dispose();
     super.dispose();

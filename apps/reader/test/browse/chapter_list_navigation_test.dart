@@ -86,8 +86,16 @@ Future<CatalogController> _details(
   await tester.pumpWidget(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
   await _tap(tester, find.text('去浏览'));
-  await _tap(tester, find.text('eu.kanade.source.test · 1.0'));
-  await _tap(tester, find.byKey(ValueKey(('catalog-source', sourceId))));
+  await _tap(
+    tester,
+    find.byKey(
+      const ValueKey((
+        'source-directory-row',
+        'eu.kanade.source.test',
+        sourceId,
+      )),
+    ),
+  );
   if (settleDetails) {
     await _tap(tester, find.text('真实源 DTO 测试'));
   } else {

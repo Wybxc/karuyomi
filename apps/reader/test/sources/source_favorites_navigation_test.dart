@@ -116,7 +116,7 @@ void main() {
         )
         .first;
     if (finder.evaluate().isEmpty) {
-      await tester.drag(scrollable, const Offset(0, 2500));
+      tester.state<ScrollableState>(scrollable).position.jumpTo(0);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(finder, 220, scrollable: scrollable);
     }
@@ -215,6 +215,8 @@ void main() {
       await tester.tap(toggle());
       await tester.pumpAndSettle();
       expect(posts(), hasLength(before));
+      expect(platform.openedBuilds, isEmpty);
+      expect(find.byType(CatalogPage), findsOneWidget);
       final unavailable = remove('saved.extension.0');
       await tap(tester, unavailable);
       expect(

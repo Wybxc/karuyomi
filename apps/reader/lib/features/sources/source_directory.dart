@@ -108,8 +108,9 @@ class _SourceDirectoryState extends State<SourceDirectory>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
-        ModalRoute.of(context)?.isCurrent == true)
+        ModalRoute.of(context)?.isCurrent == true) {
       unawaited(_settings?.refresh());
+    }
   }
 
   bool _same(
@@ -120,8 +121,9 @@ class _SourceDirectoryState extends State<SourceDirectory>
   Future<void> _toggle(String packageName, wire.CatalogSource source) async {
     final settings = _settings;
     final confirmed = settings?.snapshot;
-    if (confirmed == null || settings?.canEdit != true || widget.catalog.busy)
+    if (confirmed == null || settings?.canEdit != true || widget.catalog.busy) {
       return;
+    }
     final values = confirmed.global.deepCopy();
     final exists = values.favoriteSources.any(
       (item) => _same(item, packageName, source.id),
@@ -183,8 +185,9 @@ class _SourceDirectoryState extends State<SourceDirectory>
       }
     }
     for (final favorite in favorites) {
-      if (rows.any((row) => _same(favorite, row.packageName, row.source.id)))
+      if (rows.any((row) => _same(favorite, row.packageName, row.source.id))) {
         continue;
+      }
       final extension = extensions
           .where((item) => item.packageName == favorite.packageName)
           .firstOrNull;
@@ -375,39 +378,46 @@ class _SourceDirectoryState extends State<SourceDirectory>
                 : row.blocked != null || row.extension == null
                 ? widget.onManage
                 : () => unawaited(widget.onOpen(row.extension!, row.source)),
-            trailing: _saving == (row.packageName, row.source.id)
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : IconButton(
-                    key: ValueKey((
-                      'source-favorite-toggle',
-                      row.packageName,
-                      row.source.id,
-                    )),
-                    tooltip: saved(row.packageName, row.source.id)
-                        ? '取消收藏源：${row.source.name}'
-                        : '收藏源：${row.source.name}',
-                    onPressed:
-                        canEdit &&
-                            (saved(row.packageName, row.source.id) ||
-                                favorites.length < businessFavoriteSourceLimit)
-                        ? () => unawaited(_toggle(row.packageName, row.source))
-                        : null,
-                    icon: Icon(
-                      saved(row.packageName, row.source.id)
-                          ? Icons.star
-                          : Icons.star_border,
+            trailing: GestureDetector(
+              excludeFromSemantics: true,
+              behavior: HitTestBehavior.opaque,
+              onTap: () {},
+              child: _saving == (row.packageName, row.source.id)
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : IconButton(
+                      key: ValueKey((
+                        'source-favorite-toggle',
+                        row.packageName,
+                        row.source.id,
+                      )),
+                      tooltip: saved(row.packageName, row.source.id)
+                          ? '取消收藏源：${row.source.name}'
+                          : '收藏源：${row.source.name}',
+                      onPressed:
+                          canEdit &&
+                              (saved(row.packageName, row.source.id) ||
+                                  favorites.length <
+                                      businessFavoriteSourceLimit)
+                          ? () =>
+                                unawaited(_toggle(row.packageName, row.source))
+                          : null,
+                      icon: Icon(
+                        saved(row.packageName, row.source.id)
+                            ? Icons.star
+                            : Icons.star_border,
+                      ),
                     ),
-                  ),
+            ),
           ),
         for (final extension in pendingExtensions)
           ListTile(
             key: ValueKey(('source-extension-blocked', extension.packageName)),
             leading: const Icon(Icons.extension_off_outlined),
-            title: Text(extension.name),
+            title: Text('${extension.name}（扩展待处理）'),
             subtitle: Text(extension.blockedReason ?? '所选构建的漫画源资料不可用'),
             trailing: TextButton(
               onPressed: widget.onManage,

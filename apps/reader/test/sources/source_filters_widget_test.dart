@@ -90,7 +90,7 @@ void main() {
     final form = find.byKey(const ValueKey('source-filter-form'));
     final scrollable = find
         .descendant(
-          of: form.evaluate().isEmpty ? find.byType(SourceBrowsePage) : form,
+          of: form.evaluate().isEmpty ? find.byType(ListView).first : form,
           matching: find.byType(Scrollable),
         )
         .first;
@@ -221,7 +221,7 @@ void main() {
       expect(catalog.query, '关键词');
       await tester.tap(find.byTooltip('取消筛选编辑'));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('加载更多'));
+      await tap(tester, find.byKey(const ValueKey('source-load-more')));
       expect(platform.invocations.last.search.page, 2);
       expect(platform.invocations.last.search.filters, applied);
       expect(platform.invocations.last.search.query, '关键词');

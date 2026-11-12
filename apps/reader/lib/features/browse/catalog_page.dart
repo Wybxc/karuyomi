@@ -140,7 +140,7 @@ class _CatalogPageState extends State<CatalogPage>
     final ready =
         catalog?.settings != null &&
         {ServiceStatus.ready, ServiceStatus.failed}.contains(status);
-    if (!ready)
+    if (!ready) {
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -192,6 +192,7 @@ class _CatalogPageState extends State<CatalogPage>
           ),
         ),
       );
+    }
     final current = catalog!;
     final updates = extensionListings(
       current,

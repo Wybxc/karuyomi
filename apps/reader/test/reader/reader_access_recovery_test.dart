@@ -133,9 +133,16 @@ final class _Fixture {
     await tester.pumpAndSettle();
     await tester.tap(find.text('去浏览'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('eu.kanade.source.test · 1.0'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(ValueKey(('catalog-source', sourceId))));
+    await tester.tap(
+      find.byKey(
+        const ValueKey((
+          'source-directory-row',
+          'eu.kanade.source.test',
+          sourceId,
+        )),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('真实源 DTO 测试'));
     await tester.pumpAndSettle();
@@ -204,8 +211,12 @@ void main() {
         original.key,
       );
 
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump(const Duration(seconds: 3));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(await fixture.catalog.flushReadingProgress(), false);

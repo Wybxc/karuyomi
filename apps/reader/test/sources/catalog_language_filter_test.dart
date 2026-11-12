@@ -312,7 +312,18 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(find.text('新版本独有漫画源'), findsNothing);
+        expect(
+          find.byKey(
+            ValueKey(('source-directory-row', changed.packageName, '99')),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.byKey(
+            ValueKey(('source-favorite-toggle', changed.packageName, '99')),
+          ),
+          findsNothing,
+        );
         expect(find.textContaining('尚无漫画源'), findsNothing);
         expect(platform.openedBuilds, isEmpty);
         expect(tester.takeException(), isNull);
