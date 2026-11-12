@@ -14,6 +14,33 @@ void main() {
   ) async {
     final platform = TestPlatform();
     final phases = <String, Map<String, int>>{};
+    final builds = <String, int>{};
+    final rebuilds = <String, int>{};
+    final buildPhases = <String, Map<String, int>>{};
+    final rebuildPhases = <String, Map<String, int>>{};
+    final builtElements = Expando<bool>();
+    final previous = debugOnRebuildDirtyWidget;
+    debugOnRebuildDirtyWidget = (element, builtOnce) {
+      previous?.call(element, builtOnce);
+      final name = element.widget.runtimeType.toString();
+      if (!const {
+        'KaruyomiApp',
+        'AppShell',
+        'LibraryPage',
+        'CatalogPage',
+        'SourceDirectory',
+        'ExtensionsPage',
+        'GlobalSettingsPanel',
+      }.contains(name)) {
+        return;
+      }
+      builds.update(name, (count) => count + 1, ifAbsent: () => 1);
+      if (builtElements[element] == true) {
+        rebuilds.update(name, (count) => count + 1, ifAbsent: () => 1);
+      }
+      builtElements[element] = true;
+    };
+    addTearDown(() => debugOnRebuildDirtyWidget = previous);
     void record(String phase) {
       final counts = <String, int>{};
       for (final request in platform.businessServer.requests) {
@@ -21,6 +48,8 @@ void main() {
         counts.update(key, (value) => value + 1, ifAbsent: () => 1);
       }
       phases[phase] = counts;
+      buildPhases[phase] = Map.of(builds);
+      rebuildPhases[phase] = Map.of(rebuilds);
     }
 
     await tester.pumpApp(KaruyomiApp(platform: platform));
@@ -65,6 +94,9 @@ void main() {
     expect(platform.invocations, isEmpty);
     expect(tester.takeException(), isNull);
     debugPrint('STATE_REQUEST_BUDGET ${jsonEncode(phases)}');
+    debugPrint(
+      'STATE_BUILD_COUNTS ${jsonEncode({'builds': buildPhases, 'rebuilds': rebuildPhases})}',
+    );
     await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
     expect(platform.disposalCount, 1);

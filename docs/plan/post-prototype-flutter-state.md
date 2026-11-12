@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-状态：进行中。初版 Web 已交付；2026-11-12 按用户要求将逐页试点改为集中迁移，采用 Riverpod + riverpod_generator + flutter_hooks，并启用 riverpod_lint。不要在每批迁移之间重复等待整套人工平台矩阵。原生现场验证仍按用户要求停止，保留其待验状态。
+状态：已验收（状态管理实现、工程检查与 Web 主流程）。初版 Web 已交付；2026-11-12 按用户要求将逐页试点改为集中迁移，采用 Riverpod + riverpod_generator + flutter_hooks，并启用 riverpod_lint。通过 PR #2 及主线 CI 自动发布交付。原生现场验证仍按用户要求停止，保留其待验状态。
 
 Riverpod 负责跨页面共享的读取、派生状态与依赖装配；flutter_hooks 负责组件内重复的输入、焦点、动画与订阅生命周期。所有项目 provider 使用 `@riverpod` 生成声明，不同时维护手写等价 provider。两者都不改变业务权威和资源所有权。
 
@@ -21,7 +21,9 @@ Riverpod 负责跨页面共享的读取、派生状态与依赖装配；flutter_
 - 已通过改动前的书架、设置、续读和导航组件基线，原始日志在 `.local/flutter-state-refactor/baseline.log`。
 - 已完成 generator、analyzer 版 riverpod_lint、共享读状态、账户作用域的设置 Notifier；旧的设置控制器装配已删除。按最新范围完成全库 Widget 审计，控制器和普通监听已交给 hooks，图片解码及资源 pin 等特殊所有权继续显式管理。
 - 正式 `flutter:check --concurrency=1 --reporter=expanded` 已通过三个项目的严格分析、生成一致性、22 + 87 + 625 项回归及 Dart 格式检查；lint 另以临时违规样例确认实际执行。
-- 生产手写 Dart 累计净减少 463 行，其中扩大 Hooks 范围进一步净减 133 行；生成代码另计 423 行。工程证据见[记录](../verification/flutter-state-management.md)；Web 构建与内置浏览器主流程待验，原生现场保持停止。
+- 生产手写 Dart 累计净减少 463 行，其中扩大 Hooks 范围进一步净减 133 行；生成代码另计 423 行。
+- 请求、订阅和重建计数已记录；完整分支 CI 和 Web 构建通过，内置浏览器完成安装/收藏源、全局与作品设置、真实 xkcd 图片、页位保存、跨源搜索及新文档第 2 页续读，独立 API 核对权威状态。工程与运行证据见[记录](../verification/flutter-state-management.md)。生产发布采用主线自动流程，原生现场保持停止。
+- 后续按用户要求准备 [Flutter 3.50 / Dart 3.14 更新](flutter-3.50.md)，与本轮已验收的生产输入分别记录。
 
 ## 验收
 
