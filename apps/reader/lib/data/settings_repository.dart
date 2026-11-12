@@ -5,47 +5,33 @@ import 'reading_progress.dart';
 
 /// A confirmed online snapshot. Missing override fields mean inheritance;
 /// an explicit AUTO layout remains present in [overrides].
-final class SettingsSnapshot {
-  SettingsSnapshot._(wire.SettingsResponse value)
-    : accountRevision = value.accountRevision,
-      globalRevision = value.global.revision,
-      global = value.global.values.deepCopy()..freeze(),
-      mangaKey = value.hasManga() ? value.manga.mangaKey : null,
-      mangaRevision = value.hasManga() ? value.manga.revision : null,
-      overrides = value.hasManga()
-          ? (value.manga.overrides.deepCopy()..freeze())
-          : null,
-      effectiveReader = value.effectiveReader.deepCopy()..freeze();
-  final int accountRevision;
-  final int globalRevision;
-  final wire.GlobalSettingsValues global;
-  final String? mangaKey;
-  final int? mangaRevision;
-  final wire.ReaderSettingsOverride? overrides;
-  final wire.ReaderSettings effectiveReader;
+final class SettingsSnapshot._(wire.SettingsResponse value) {
+  final int accountRevision = value.accountRevision;
+  final int globalRevision = value.global.revision;
+  final wire.GlobalSettingsValues global = value.global.values.deepCopy()
+    ..freeze();
+  final String? mangaKey = value.hasManga() ? value.manga.mangaKey : null;
+  final int? mangaRevision = value.hasManga() ? value.manga.revision : null;
+  final wire.ReaderSettingsOverride? overrides = value.hasManga()
+      ? (value.manga.overrides.deepCopy()..freeze())
+      : null;
+  final wire.ReaderSettings effectiveReader = value.effectiveReader.deepCopy()
+    ..freeze();
 }
 
 /// Frozen submitted values. Retrying this exact draft retains its UUID/CAS.
-final class SettingsDraft {
-  SettingsDraft._(wire.SettingsMutation value, this.retryable)
-    : mangaKey = value.hasSetManga() ? value.setManga.mangaKey : null,
-      global = value.hasSetGlobal()
-          ? (value.setGlobal.deepCopy()..freeze())
-          : null,
-      overrides = value.hasSetManga()
-          ? (value.setManga.overrides.deepCopy()..freeze())
-          : null,
-      basedOnRevision = value.expectedRevision;
-  final String? mangaKey;
-  final wire.GlobalSettingsValues? global;
-  final wire.ReaderSettingsOverride? overrides;
-  final int basedOnRevision;
-  final bool retryable;
+final class SettingsDraft._(wire.SettingsMutation value, final bool retryable) {
+  final String? mangaKey = value.hasSetManga() ? value.setManga.mangaKey : null;
+  final wire.GlobalSettingsValues? global = value.hasSetGlobal()
+      ? (value.setGlobal.deepCopy()..freeze())
+      : null;
+  final wire.ReaderSettingsOverride? overrides = value.hasSetManga()
+      ? (value.setManga.overrides.deepCopy()..freeze())
+      : null;
+  final int basedOnRevision = value.expectedRevision;
 }
 
-final class SettingsRepository {
-  SettingsRepository(this.client);
-  final BusinessStateClient client;
+final class SettingsRepository(final BusinessStateClient client) {
   ProgressIdentity get identity => client.identity;
 
   Stream<SettingsSnapshot> watchConfirmed() =>

@@ -1,11 +1,12 @@
 import '../test_app.dart';
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:karuyomi/data/business_state_client.dart';
@@ -109,41 +110,38 @@ void main() {
     FileSelectorPlatform.instance = previous;
   });
 
-  test(
-    'cover normalization bakes orientation, bounds output and rejects huge headers before decode',
-    () {
-      final oriented = img.Image(width: 20, height: 40);
-      oriented.exif.imageIfd.orientation = 6;
-      final normalized = normalizeCoverImage(img.encodeJpg(oriented));
-      final decoded = img.decodeJpg(normalized)!;
-      expect((decoded.width, decoded.height), (40, 20));
-      expect(decoded.exif.imageIfd.hasOrientation, false);
-      final large = normalizeCoverImage(
-        img.encodePng(img.Image(width: 2048, height: 1024)),
-      );
-      final output = img.decodeJpg(large)!;
-      expect((output.width, output.height), (1024, 512));
-      expect(large.length, lessThanOrEqualTo(1024 * 1024));
-      final header = img.encodeBmp(img.Image(width: 1, height: 1));
-      final dimensions = ByteData.sublistView(header);
-      dimensions.setInt32(18, 100000, Endian.little);
-      dimensions.setInt32(22, 100000, Endian.little);
-      expect(
-        () => normalizeCoverImage(header),
-        throwsA(
-          isA<FormatException>().having(
-            (error) => error.message,
-            'budget',
-            contains('3200'),
-          ),
+  test('cover normalization bakes orientation, bounds output and rejects huge headers before decode', () {
+    final oriented = img.Image(width: 20, height: 40);
+    oriented.exif.imageIfd.orientation = 6;
+    final normalized = normalizeCoverImage(img.encodeJpg(oriented));
+    final decoded = img.decodeJpg(normalized)!;
+    expect((decoded.width, decoded.height), (40, 20));
+    expect(decoded.exif.imageIfd.hasOrientation, false);
+    final large = normalizeCoverImage(
+      img.encodePng(img.Image(width: 2048, height: 1024)),
+    );
+    final output = img.decodeJpg(large)!;
+    expect((output.width, output.height), (1024, 512));
+    expect(large.length, lessThanOrEqualTo(1024 * 1024));
+    final header = img.encodeBmp(img.Image(width: 1, height: 1));
+    final dimensions = ByteData.sublistView(header);
+    dimensions.setInt32(18, 100000, Endian.little);
+    dimensions.setInt32(22, 100000, Endian.little);
+    expect(
+      () => normalizeCoverImage(header),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'budget',
+          contains('3200'),
         ),
-      );
-      expect(
-        () => normalizeCoverImage(Uint8List(16 * 1024 * 1024 + 1)),
-        throwsFormatException,
-      );
-    },
-  );
+      ),
+    );
+    expect(
+      () => normalizeCoverImage(Uint8List(16 * 1024 * 1024 + 1)),
+      throwsFormatException,
+    );
+  });
 
   testWidgets(
     'selected, replaced and cleared covers update details and shelf without Source thumbnails',

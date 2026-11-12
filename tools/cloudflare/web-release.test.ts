@@ -31,6 +31,11 @@ import {
   recordWebRelease,
   verifyWebRelease,
 } from './web-release.ts';
+import {
+  flutterCacheRules,
+  flutterWebManifestSchema,
+  immutableCache,
+} from '../flutter/web-assets.ts';
 
 const hash = (bytes: Uint8Array) =>
   createHash('sha256').update(bytes).digest('hex');
@@ -174,16 +179,46 @@ async function fixture(t: TestContext) {
   };
   const prepare = () =>
     prepareWebSnapshot({ origin, destination, catalog, download });
-  async function client() {
+  async function client(wasm = false) {
     await prepare();
+    const main = Buffer.from('new client');
+    const mainPath = '/main.dart.' + hash(main).slice(0, 8) + '.js';
     const publicFiles = new Map<string, Buffer>([
       ['/', Buffer.from('<html>fixture</html>')],
-      ['/main.dart.js', Buffer.from('new client')],
+      [mainPath, main],
+      ['/flutter_bootstrap.js', Buffer.from('bootstrap')],
+      [
+        '/assets/NOTICES.' + hash(Buffer.from('notice')).slice(0, 8),
+        Buffer.from('notice'),
+      ],
+      ['/canvaskit/canvaskit.wasm', Buffer.from('renderer')],
+    ]);
+    if (wasm) {
+      for (const extension of ['wasm', 'mjs']) {
+        const bytes = Buffer.from(extension);
+        publicFiles.set(
+          '/main.dart.' + hash(bytes).slice(0, 8) + '.' + extension,
+          bytes,
+        );
+      }
+    }
+    const manifest = {
+      version: 1,
+      entries: [...publicFiles].map(([relative, bytes]) => ({
+        url: relative === '/' ? 'index.html' : relative.slice(1),
+        hash: hash(bytes).slice(0, 8),
+        size: bytes.length,
+        urlHashed: relative.includes(hash(bytes).slice(0, 8)),
+      })),
+    };
+    publicFiles.set('/precache_manifest.json', json(manifest));
+    for (const [relative, bytes] of new Map<string, Buffer>([
       ['/runtime/host.js', Buffer.from('host')],
       ['/runtime/worker.js', Buffer.from('worker')],
       ['/runtime/materials.json', json(catalog)],
       [material.path, materialBytes],
-    ]);
+    ]))
+      publicFiles.set(relative, bytes);
     const clientDirectory = path.join(root, 'apps/api/dist/client');
     for (const [relative, bytes] of publicFiles) {
       const file = path.join(
@@ -220,9 +255,17 @@ async function fixture(t: TestContext) {
         });
       const bytes = publicFiles.get(relative);
       assert(bytes, relative);
-      return new Response(new Uint8Array(bytes));
+      return new Response(new Uint8Array(bytes), {
+        headers: {
+          'Cache-Control': manifest.entries.find(
+            (entry) => '/' + entry.url === relative,
+          )?.urlHashed
+            ? immutableCache
+            : 'no-cache',
+        },
+      });
     };
-    return { request, publicFiles };
+    return { request, publicFiles, mainPath, manifest, clientDirectory };
   }
   return {
     root,
@@ -351,7 +394,7 @@ test('Delivery smoke verifies canonical root HTML, client bytes and the Access r
   const f = await fixture(t);
   const { request } = await f.client();
   const result = await verifyWebRelease(f.directory, request);
-  assert.equal(result.publicAssetsVerified, 6);
+  assert.equal(result.publicAssetsVerified, 10);
   assert.equal(result.extensionCount, 1);
   assert.equal(result.accessStatus, 302);
   assert(
@@ -363,11 +406,88 @@ test('Delivery smoke verifies canonical root HTML, client bytes and the Access r
 
 test('Delivery smoke rejects an old client even when HTTP succeeds', async (t) => {
   const f = await fixture(t);
-  const { request, publicFiles } = await f.client();
-  publicFiles.set('/main.dart.js', Buffer.from('old client'));
+  const { request, publicFiles, mainPath } = await f.client();
+  publicFiles.set(mainPath, Buffer.from('old client'));
   await assert.rejects(
     verifyWebRelease(f.directory, request),
-    /main\.dart\.js/,
+    /main\.dart\.[a-f0-9]{8}\.js/,
+  );
+});
+
+test('Wasm publication verifies both generated targets, bootstrap, assets and renderer', async (t) => {
+  const f = await fixture(t);
+  const { request } = await f.client(true);
+  const result = await verifyWebRelease(f.directory, request);
+  assert.equal(result.publicAssetsVerified, 12);
+  for (const suffix of ['js', 'wasm', 'mjs'])
+    assert(
+      result.assets.some((asset) =>
+        asset.path.match(
+          new RegExp('^/main\\.dart\\.[a-f0-9]{8}\\.' + suffix + '$'),
+        ),
+      ),
+    );
+  assert(result.assets.some((asset) => asset.path === '/flutter_bootstrap.js'));
+  assert(
+    result.assets.some((asset) => asset.path === '/canvaskit/canvaskit.wasm'),
+  );
+});
+
+test('Delivery rejects immutable bootstrap or uncached hashed assets', async (t) => {
+  const f = await fixture(t);
+  const { request, mainPath } = await f.client();
+  for (const asset of ['/flutter_bootstrap.js', mainPath]) {
+    await assert.rejects(
+      verifyWebRelease(f.directory, async (input, init) => {
+        const response = await request(input, init);
+        if (new URL(String(input)).pathname === asset)
+          response.headers.set(
+            'Cache-Control',
+            asset === mainPath ? 'no-cache' : immutableCache,
+          );
+        return response;
+      }),
+      /Cache|flutter_bootstrap|main\.dart/,
+    );
+  }
+});
+
+test('Release recording checks generated manifest bytes before publishing', async (t) => {
+  const f = await fixture(t);
+  const { clientDirectory, mainPath } = await f.client();
+  await writeFile(
+    path.join(clientDirectory, mainPath.slice(1)),
+    'tampered client',
+  );
+  await assert.rejects(
+    recordWebRelease(f.root, f.directory, 'a'.repeat(40)),
+    /main\.dart/,
+  );
+});
+
+test('Flutter cache groups stay disjoint and keep unhashed renderer files revalidating', async (t) => {
+  const f = await fixture(t);
+  const { manifest } = await f.client();
+  const parsed = flutterWebManifestSchema.parse(manifest);
+  const rules = flutterCacheRules(parsed);
+  assert(rules.includes('/assets/*\n  Cache-Control: ' + immutableCache));
+  assert(rules.includes('/canvaskit/*\n  Cache-Control: no-cache'));
+  assert(rules.includes('/flutter_bootstrap.js\n  Cache-Control: no-cache'));
+  assert(!rules.some((rule) => rule.startsWith('/*\n')));
+  assert(
+    !flutterWebManifestSchema.safeParse({
+      ...manifest,
+      entries: [...manifest.entries, manifest.entries[0]],
+    }).success,
+  );
+  assert(
+    !flutterWebManifestSchema.safeParse({
+      ...manifest,
+      entries: [
+        ...manifest.entries,
+        { ...manifest.entries[0], url: '../outside' },
+      ],
+    }).success,
   );
 });
 

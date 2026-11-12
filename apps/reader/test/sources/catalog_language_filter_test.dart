@@ -1,5 +1,6 @@
 import '../test_app.dart';
-import 'package:flutter/material.dart';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
@@ -87,42 +88,39 @@ void main() {
     },
   );
 
-  test(
-    'catalog metadata rejects missing, duplicate, malformed and oversized values',
-    () {
-      final invalid = <String, wire.ExtensionBuildDescriptor>{
-        'missing metadata': _builds().first..sources.clear(),
-        'duplicate declared ID': _builds().first..sourceIds[1] = sourceId,
-        'duplicate metadata ID': _builds().first..sources[1].id = sourceId,
-        'mismatched ID set': _builds().first..sources[1].id = '123',
-        'signed range': _builds().first
-          ..sourceIds[0] = '9223372036854775808'
-          ..sources[0].id = '9223372036854775808',
-        'nondecimal ID': _builds().first
-          ..sourceIds[0] = 'source-one'
-          ..sources[0].id = 'source-one',
-        'blank name': _builds().first..sources.first.name = ' \t ',
-        'long name': _builds().first..sources.first.name = 'x' * 501,
-        'long language': _builds().first..sources.first.lang = 'x' * 65,
-        'empty repository': _builds().first..repoId = '',
-        'empty source list': _build('empty', []),
-        'source count': _build('many', [
-          for (var id = 0; id < 501; id++)
-            wire.CatalogSource(id: '$id', name: 'Source $id', lang: 'en'),
-        ]),
-      };
-      for (final entry in invalid.entries) {
-        expect(
-          () => CatalogBuild.fromProto(
-            entry.value,
-            catalogUrl: 'https://reader.example/extensions/index.json',
-          ),
-          throwsFormatException,
-          reason: entry.key,
-        );
-      }
-    },
-  );
+  test('catalog metadata rejects missing, duplicate, malformed and oversized values', () {
+    final invalid = <String, wire.ExtensionBuildDescriptor>{
+      'missing metadata': _builds().first..sources.clear(),
+      'duplicate declared ID': _builds().first..sourceIds[1] = sourceId,
+      'duplicate metadata ID': _builds().first..sources[1].id = sourceId,
+      'mismatched ID set': _builds().first..sources[1].id = '123',
+      'signed range': _builds().first
+        ..sourceIds[0] = '9223372036854775808'
+        ..sources[0].id = '9223372036854775808',
+      'nondecimal ID': _builds().first
+        ..sourceIds[0] = 'source-one'
+        ..sources[0].id = 'source-one',
+      'blank name': _builds().first..sources.first.name = ' \t ',
+      'long name': _builds().first..sources.first.name = 'x' * 501,
+      'long language': _builds().first..sources.first.lang = 'x' * 65,
+      'empty repository': _builds().first..repoId = '',
+      'empty source list': _build('empty', []),
+      'source count': _build('many', [
+        for (var id = 0; id < 501; id++)
+          wire.CatalogSource(id: '$id', name: 'Source $id', lang: 'en'),
+      ]),
+    };
+    for (final entry in invalid.entries) {
+      expect(
+        () => CatalogBuild.fromProto(
+          entry.value,
+          catalogUrl: 'https://reader.example/extensions/index.json',
+        ),
+        throwsFormatException,
+        reason: entry.key,
+      );
+    }
+  });
 
   group('formal catalog navigation', () {
     late TestPlatform platform;
@@ -196,43 +194,40 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    test(
-      'manifest identity and metadata mismatch never opens a runtime or injects preferences',
-      () async {
-        final current = _builds().first;
-        wire.BuildManifest manifest() => wire.BuildManifest(
-          buildId: current.buildId,
-          packageName: current.packageName,
-          repoId: current.repoId,
-          version: current.version,
-          sourceIds: current.sourceIds,
-          sources: current.sources.map((source) => source.deepCopy()),
-          bundle: wire.BundleArtifact(sha256: 'a' * 64),
-        );
-        final mismatches = [
-          manifest()..packageName = 'eu.kanade.source.another',
-          manifest()..repoId = 'another-repository',
-          manifest()..sources.first.name = 'different name',
-          manifest()..sources.last.lang = 'ja',
-          manifest()..sourceIds.removeLast(),
-        ];
-        for (final value in mismatches) {
-          platform.manifestOverride = value;
-          await catalog.openBuild(catalog.builds.first);
-          expect(catalog.error, contains('重新连接以刷新目录'));
-          expect(catalog.activeBuild, isNull);
-          expect(platform.openedBuilds, isEmpty);
-          expect(platform.preferenceBootstraps, isEmpty);
-          expect(platform.invocations, isEmpty);
-        }
-        expect(
-          platform.businessServer.requests.where(
-            (request) => request.method == 'POST',
-          ),
-          isEmpty,
-        );
-      },
-    );
+    test('manifest identity and metadata mismatch never opens a runtime or injects preferences', () async {
+      final current = _builds().first;
+      wire.BuildManifest manifest() => wire.BuildManifest(
+        buildId: current.buildId,
+        packageName: current.packageName,
+        repoId: current.repoId,
+        version: current.version,
+        sourceIds: current.sourceIds,
+        sources: current.sources.map((source) => source.deepCopy()),
+        bundle: wire.BundleArtifact(sha256: 'a' * 64),
+      );
+      final mismatches = [
+        manifest()..packageName = 'eu.kanade.source.another',
+        manifest()..repoId = 'another-repository',
+        manifest()..sources.first.name = 'different name',
+        manifest()..sources.last.lang = 'ja',
+        manifest()..sourceIds.removeLast(),
+      ];
+      for (final value in mismatches) {
+        platform.manifestOverride = value;
+        await catalog.openBuild(catalog.builds.first);
+        expect(catalog.error, contains('重新连接以刷新目录'));
+        expect(catalog.activeBuild, isNull);
+        expect(platform.openedBuilds, isEmpty);
+        expect(platform.preferenceBootstraps, isEmpty);
+        expect(platform.invocations, isEmpty);
+      }
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.method == 'POST',
+        ),
+        isEmpty,
+      );
+    });
 
     testWidgets(
       'static Source names and languages filter without executing extensions',

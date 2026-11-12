@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/runtime/native_image_files.dart';
@@ -263,111 +264,99 @@ void main() {
     );
   }
 
-  test(
-    'only a completed managed file is owned; stale release and late cancel preserve it',
-    () async {
-      final response = await images.acquire(acquire(1));
-      final image = response.image;
-      final location = Uri.parse(image.url);
-      expect(location.scheme, 'file');
-      expect(await File.fromUri(location).length(), 1234);
-      expect(images.owns(image.resourceId, 'g', location), true);
-      expect(images.owns(image.resourceId, 'other', location), false);
-      await images.release(release(image.resourceId, generation: 'other'));
-      await images.cancel(cancel(1));
-      expect(await File.fromUri(location).exists(), true);
-      await images.release(release(image.resourceId));
-      await images.release(release(image.resourceId));
-      expect(await File.fromUri(location).exists(), false);
-      expect(images.owns(image.resourceId, 'g', location), false);
-    },
-  );
+  test('only a completed managed file is owned; stale release and late cancel preserve it', () async {
+    final response = await images.acquire(acquire(1));
+    final image = response.image;
+    final location = Uri.parse(image.url);
+    expect(location.scheme, 'file');
+    expect(await File.fromUri(location).length(), 1234);
+    expect(images.owns(image.resourceId, 'g', location), true);
+    expect(images.owns(image.resourceId, 'other', location), false);
+    await images.release(release(image.resourceId, generation: 'other'));
+    await images.cancel(cancel(1));
+    expect(await File.fromUri(location).exists(), true);
+    await images.release(release(image.resourceId));
+    await images.release(release(image.resourceId));
+    expect(await File.fromUri(location).exists(), false);
+    expect(images.owns(image.resourceId, 'g', location), false);
+  });
 
-  test(
-    'cancel waits for real file cancellation and discards a late copy before acknowledging',
-    () async {
-      files.permitCopy = Completer<void>();
-      files.permitCancel = Completer<void>();
-      final pending = images.acquire(acquire(1));
-      final failure = expectLater(
-        pending,
-        throwsA(code(RuntimeErrorCode.cancelled)),
-      );
-      await files.copied.future;
-      var acknowledged = false;
-      final cancellation = images.cancel(cancel(1)).then((value) {
-        acknowledged = value.released.released;
-      });
-      await Future<void>.delayed(Duration.zero);
-      expect(acknowledged, false);
-      files.permitCancel!.complete();
-      await cancellation;
-      await failure;
-      expect(files.cancelled, 1);
-      expect(acknowledged, true);
-      expect(files.files, isEmpty);
-      expect(calls.any((request) => request.hasReleaseImage()), true);
-    },
-  );
+  test('cancel waits for real file cancellation and discards a late copy before acknowledging', () async {
+    files.permitCopy = Completer<void>();
+    files.permitCancel = Completer<void>();
+    final pending = images.acquire(acquire(1));
+    final failure = expectLater(
+      pending,
+      throwsA(code(RuntimeErrorCode.cancelled)),
+    );
+    await files.copied.future;
+    var acknowledged = false;
+    final cancellation = images.cancel(cancel(1)).then((value) {
+      acknowledged = value.released.released;
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(acknowledged, false);
+    files.permitCancel!.complete();
+    await cancellation;
+    await failure;
+    expect(files.cancelled, 1);
+    expect(acknowledged, true);
+    expect(files.files, isEmpty);
+    expect(calls.any((request) => request.hasReleaseImage()), true);
+  });
 
-  test(
-    'local deadline remains timeout when Source cancellation returns a cancelled envelope',
-    () async {
-      final source = Completer<wire.ControlResponse>();
-      handler = (request) async {
-        if (request.hasAcquireImage()) return source.future;
-        source.complete(
-          wire.ControlResponse(
-            slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
-            requestId: 'control-1',
-            error: wire.RuntimeError(
-              code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED,
-              message: 'cancelled',
-            ),
+  test('local deadline remains timeout when Source cancellation returns a cancelled envelope', () async {
+    final source = Completer<wire.ControlResponse>();
+    handler = (request) async {
+      if (request.hasAcquireImage()) return source.future;
+      source.complete(
+        wire.ControlResponse(
+          slotId: wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+          requestId: 'control-1',
+          error: wire.RuntimeError(
+            code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED,
+            message: 'cancelled',
           ),
-        );
-        return wire.ControlResponse(
-          slotId: request.slotId,
-          requestId: request.requestId,
-          released: wire.Released(released: true),
-        );
-      };
-      await expectLater(
-        images.acquire(acquire(1, timeout: 10)),
-        throwsA(code(RuntimeErrorCode.timeout)),
+        ),
       );
-      expect(files.files, isEmpty);
-    },
-  );
+      return wire.ControlResponse(
+        slotId: request.slotId,
+        requestId: request.requestId,
+        released: wire.Released(released: true),
+      );
+    };
+    await expectLater(
+      images.acquire(acquire(1, timeout: 10)),
+      throwsA(code(RuntimeErrorCode.timeout)),
+    );
+    expect(files.files, isEmpty);
+  });
 
-  test(
-    'retained encoded files count against resource and byte budgets until release',
-    () async {
-      final retained = <wire.ImageResource>[];
-      for (var index = 0; index < 6; index++) {
-        retained.add((await images.acquire(acquire(index))).image);
-      }
-      final before = calls.length;
-      await expectLater(
-        images.acquire(acquire(7)),
-        throwsA(code(RuntimeErrorCode.limitExceeded)),
-      );
-      expect(calls.length, before);
-      for (final image in retained) {
-        await images.release(release(image.resourceId));
-      }
-      byteLength = 32 * 1024 * 1024;
-      final one = (await images.acquire(acquire(8))).image;
-      final two = (await images.acquire(acquire(9))).image;
-      await expectLater(
-        images.acquire(acquire(10)),
-        throwsA(code(RuntimeErrorCode.limitExceeded)),
-      );
-      expect(files.files.length, 2);
-      await images.release(release(one.resourceId));
-      await images.release(release(two.resourceId));
-    },
-  );
+  test('retained encoded files count against resource and byte budgets until release', () async {
+    final retained = <wire.ImageResource>[];
+    for (var index = 0; index < 6; index++) {
+      retained.add((await images.acquire(acquire(index))).image);
+    }
+    final before = calls.length;
+    await expectLater(
+      images.acquire(acquire(7)),
+      throwsA(code(RuntimeErrorCode.limitExceeded)),
+    );
+    expect(calls.length, before);
+    for (final image in retained) {
+      await images.release(release(image.resourceId));
+    }
+    byteLength = 32 * 1024 * 1024;
+    final one = (await images.acquire(acquire(8))).image;
+    final two = (await images.acquire(acquire(9))).image;
+    await expectLater(
+      images.acquire(acquire(10)),
+      throwsA(code(RuntimeErrorCode.limitExceeded)),
+    );
+    expect(files.files.length, 2);
+    await images.release(release(one.resourceId));
+    await images.release(release(two.resourceId));
+  });
 
   test(
     'release cannot claim acknowledgement when the Blob owner rejects cleanup',
@@ -388,22 +377,19 @@ void main() {
     },
   );
 
-  test(
-    'failed cancellation invalidates the operation instead of acknowledging cleanup',
-    () async {
-      files.permitCopy = Completer<void>();
-      files.rejectCancel = true;
-      final pending = images.acquire(acquire(1));
-      final rejected = expectLater(
-        pending,
-        throwsA(code(RuntimeErrorCode.runtimeLost)),
-      );
-      await files.copied.future;
-      await expectLater(images.cancel(cancel(1)), throwsA(anything));
-      files.permitCopy!.complete();
-      await rejected;
-    },
-  );
+  test('failed cancellation invalidates the operation instead of acknowledging cleanup', () async {
+    files.permitCopy = Completer<void>();
+    files.rejectCancel = true;
+    final pending = images.acquire(acquire(1));
+    final rejected = expectLater(
+      pending,
+      throwsA(code(RuntimeErrorCode.runtimeLost)),
+    );
+    await files.copied.future;
+    await expectLater(images.cancel(cancel(1)), throwsA(anything));
+    files.permitCopy!.complete();
+    await rejected;
+  });
 
   test(
     'close interrupts an outstanding Source call and waits for local cleanup',
@@ -499,10 +485,8 @@ void main() {
               ),
             ),
           );
-          await Future.wait([
-            acquisition,
-            cancellation,
-          ]).timeout(const Duration(seconds: 2));
+          await Future.wait([acquisition, cancellation])
+              .timeout(const Duration(seconds: 2));
           final releases = calls
               .where((request) => request.hasReleaseImage())
               .toList();
@@ -546,10 +530,8 @@ void main() {
       await cancelled.future;
       await Future<void>.delayed(Duration.zero);
       await images.close().timeout(const Duration(seconds: 2));
-      await Future.wait([
-        acquisition,
-        cancellation,
-      ]).timeout(const Duration(seconds: 2));
+      await Future.wait([acquisition, cancellation])
+          .timeout(const Duration(seconds: 2));
       expect(await directory.exists(), false);
       expect(source.isCompleted, false);
     },
@@ -592,11 +574,8 @@ void main() {
       expect(ended, false);
       expect(await directory.exists(), true);
       files.permitClear!.complete();
-      await Future.wait([
-        closing,
-        acquisition,
-        cancellation,
-      ]).timeout(const Duration(seconds: 2));
+      await Future.wait([closing, acquisition, cancellation])
+          .timeout(const Duration(seconds: 2));
       expect(reply.isCompleted, false);
       expect(await directory.exists(), false);
     },
@@ -638,10 +617,8 @@ void main() {
       expect(ended, false);
       expect(await File.fromUri(location).exists(), true);
       files.permitClear!.complete();
-      await Future.wait([
-        closing,
-        releasing,
-      ]).timeout(const Duration(seconds: 2));
+      await Future.wait([closing, releasing])
+          .timeout(const Duration(seconds: 2));
       expect(await File.fromUri(location).exists(), false);
       expect(reply.isCompleted, false);
       files.permitRelease!.complete();
@@ -673,10 +650,8 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         expect(ended, false);
         files.permitClear!.complete();
-        await Future.wait([
-          closing,
-          rejected,
-        ]).timeout(const Duration(seconds: 2));
+        await Future.wait([closing, rejected])
+            .timeout(const Duration(seconds: 2));
         expect(reply.isCompleted, false);
       },
     );
@@ -795,9 +770,8 @@ void main() {
                 'directoryUrl': directory.uri.toString(),
               },
               'acquire' => {
-                'url': File(
-                  '${directory.parent.path}/outside.image',
-                ).uri.toString(),
+                'url': File('${directory.parent.path}/outside.image').uri
+                    .toString(),
               },
               'release' || 'cancel' => {'released': true},
               'clear' => {'cleared': true},

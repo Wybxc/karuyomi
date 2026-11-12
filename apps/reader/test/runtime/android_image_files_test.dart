@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/runtime/android_image_files.dart';
 import 'package:source_runtime/source_runtime.dart';
@@ -41,13 +42,11 @@ void main() {
     },
   );
 
-  test(
-    'persistent platform port requires matching ACK and safely starts the next transfer',
-    () async {
-      final process = await Process.start('node', ['--input-type=module']);
-      final stdout = process.stdout.transform(utf8.decoder).join();
-      final stderr = process.stderr.transform(utf8.decoder).join();
-      process.stdin.write('''
+  test('persistent platform port requires matching ACK and safely starts the next transfer', () async {
+    final process = await Process.start('node', ['--input-type=module']);
+    final stdout = process.stdout.transform(utf8.decoder).join();
+    final stderr = process.stderr.transform(utf8.decoder).join();
+    process.stdin.write('''
 import assert from 'node:assert/strict';
 import {MessageChannel} from 'node:worker_threads';
 const listeners=new Set();
@@ -80,13 +79,12 @@ channel.port1.postMessage('cancel:2');await wait(()=>received.length===2);assert
 URL.revokeObjectURL(url);channel.port1.close();channel.port2.close();
 console.log('persistent slot, matching ACK, stale messages, cancellation passed');
 ''');
-      await process.stdin.close();
-      expect(
-        await process.exitCode.timeout(const Duration(seconds: 10)),
-        0,
-        reason: await stderr,
-      );
-      expect(await stdout, contains('cancellation passed'));
-    },
-  );
+    await process.stdin.close();
+    expect(
+      await process.exitCode.timeout(const Duration(seconds: 10)),
+      0,
+      reason: await stderr,
+    );
+    expect(await stdout, contains('cancellation passed'));
+  });
 }

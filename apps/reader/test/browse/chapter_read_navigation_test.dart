@@ -1,8 +1,9 @@
 import '../test_app.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -520,9 +521,9 @@ void main() {
         expect(state.hasCurrent(), false);
       }
       expect(
-        _posts(
-          platform,
-        ).map(_command).every((value) => value.hasSetChapterRead()),
+        _posts(platform)
+            .map(_command)
+            .every((value) => value.hasSetChapterRead()),
         true,
       );
       await _finish(tester, platform, catalog);
@@ -632,18 +633,17 @@ void main() {
       );
       await tester.runAsync(() async {
         unawaited(
-          Navigator.of(
-            tester.element(find.byType(MangaDetailsPage)),
-          ).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => MangaDetailsPage(
-                controller: catalog,
-                manga: detail.manga,
-                chapters: changedChapters.map(ChapterEntry.new).toList(),
-                source: detail.source,
+          Navigator.of(tester.element(find.byType(MangaDetailsPage)))
+              .push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => MangaDetailsPage(
+                    controller: catalog,
+                    manga: detail.manga,
+                    chapters: changedChapters.map(ChapterEntry.new).toList(),
+                    source: detail.source,
+                  ),
+                ),
               ),
-            ),
-          ),
         );
         await Future<void>.delayed(Duration.zero);
       });
@@ -715,9 +715,9 @@ void main() {
       expect(find.text('继续剩余原清单'), findsNothing);
       expect(_posts(platform).length, lessThanOrEqualTo(1));
       expect(
-        _posts(
-          platform,
-        ).map(_command).every((value) => value.expectedRevision == 0),
+        _posts(platform)
+            .map(_command)
+            .every((value) => value.expectedRevision == 0),
         true,
       );
       final posts = _posts(platform).length;

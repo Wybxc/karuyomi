@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:reader_core/reader_core.dart';
@@ -255,6 +255,7 @@ class _SettingsEditor extends HookConsumerWidget {
             ? ValueKey(('$scope-$id', value))
             : ValueKey(('$scope-$id', value)),
         initialValue: value,
+        enabled: state.canEdit,
         hint: const Text('跟随全局'),
         decoration: InputDecoration(
           labelText: label,

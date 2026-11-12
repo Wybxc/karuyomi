@@ -12,21 +12,14 @@ part 'settings_controller.g.dart';
 
 enum SettingsFailure { conflict, rejected, unknown }
 
-final class SettingsState {
-  const SettingsState({
-    this.snapshot,
-    this.pending,
-    this.available = false,
-    this.busy = false,
-    this.error,
-    this.failure,
-  });
-  final SettingsSnapshot? snapshot;
-  final SettingsDraft? pending;
-  final bool available;
-  final bool busy;
-  final String? error;
-  final SettingsFailure? failure;
+final class const SettingsState({
+  final SettingsSnapshot? snapshot,
+  final SettingsDraft? pending,
+  final bool available = false,
+  final bool busy = false,
+  final String? error,
+  final SettingsFailure? failure,
+}) {
   bool get canEdit => available && !busy && snapshot != null && pending == null;
   bool get canRefresh => available && !busy;
   bool get canRetry => available && !busy && pending?.retryable == true;

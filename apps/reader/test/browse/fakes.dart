@@ -170,9 +170,8 @@ final class TestPlatform extends PlatformRuntime {
     };
     return wire.ApiFetchResponse(
       status: path == '/api/bootstrap' ? bootstrapStatus : 200,
-      headers: {
-        'content-type': loginHtml ? 'text/html' : 'application/json',
-      }.entries,
+      headers: {'content-type': loginHtml ? 'text/html' : 'application/json'}
+          .entries,
       body: loginHtml ? '<html>login</html>' : jsonEncode(response),
     );
   }
@@ -433,9 +432,8 @@ final class _TestCatalogTransport implements CatalogTransport {
     }
     final value = platform._fetch(uri.path);
     if (value.status != 200 ||
-        !Map.fromEntries(
-          value.headers.entries,
-        ).values.contains('application/json')) {
+        !Map.fromEntries(value.headers.entries).values
+            .contains('application/json')) {
       throw const FormatException('Public repository is unavailable');
     }
     return jsonDecode(value.body);

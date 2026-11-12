@@ -246,30 +246,27 @@ void main() {
     },
   );
 
-  test(
-    'failed reconnect rebuild retains no verified subject and can retry cleanup',
-    () async {
-      await open();
-      final before = platform.controlCommands.length;
-      platform.beforeRebuild = () async =>
-          throw StateError('Controlled rebuild cleanup failure');
-      await controller.connect();
-      expect(platform.rebuildCount, 1);
-      expect(platform.controlCommands.length, before);
-      expect(controller.subject, isNull);
-      expect(controller.email, isNull);
-      expect(controller.session, isNull);
-      expect(controller.builds, isEmpty);
-      expect(controller.status, ServiceStatus.failed);
-      expect(controller.busy, false);
-      expect(controller.error, isNotNull);
-      platform.beforeRebuild = null;
-      await controller.connect();
-      expect(platform.rebuildCount, 2);
-      expect(controller.status, ServiceStatus.ready);
-      expect(controller.subject, 'owner-subject');
-    },
-  );
+  test('failed reconnect rebuild retains no verified subject and can retry cleanup', () async {
+    await open();
+    final before = platform.controlCommands.length;
+    platform.beforeRebuild = () async =>
+        throw StateError('Controlled rebuild cleanup failure');
+    await controller.connect();
+    expect(platform.rebuildCount, 1);
+    expect(platform.controlCommands.length, before);
+    expect(controller.subject, isNull);
+    expect(controller.email, isNull);
+    expect(controller.session, isNull);
+    expect(controller.builds, isEmpty);
+    expect(controller.status, ServiceStatus.failed);
+    expect(controller.busy, false);
+    expect(controller.error, isNotNull);
+    platform.beforeRebuild = null;
+    await controller.connect();
+    expect(platform.rebuildCount, 2);
+    expect(controller.status, ServiceStatus.ready);
+    expect(controller.subject, 'owner-subject');
+  });
 
   test('catalog-only refresh does not rebuild an unopened runtime', () async {
     await controller.connect();
@@ -299,50 +296,47 @@ void main() {
     expect(controller.status, ServiceStatus.failed);
   });
 
-  test(
-    'empty page URLs use content version so same-length reorders cannot claim a stable page',
-    () async {
-      await open();
-      final manga = controller.mangas.single;
-      final chapter = ChapterEntry(
-        wire.Chapter(url: '/chapter/ref', name: 'chapter'),
-      );
-      var images = ['first', 'second'];
-      platform.invokeHandler = (payload) async => wire.SourceResult(
-        pageList: wire.PageList(
-          pageSessionId: 'pages-empty',
-          pages: [
-            for (var i = 0; i < images.length; i++)
-              wire.Page(
-                pageKey: 'p-$i',
-                index: i,
-                sourceIndex: i,
-                url: '',
-                imageUrl: 'https://source.invalid/${images[i]}.png',
-              ),
-          ],
-        ),
-      );
-      final first = await controller.openChapter(
-        manga,
-        chapter,
-        reference: controller.sourceReference,
-      );
-      final position = first!.manifest.positionAt(0, offset: 0.3);
-      await controller.closeChapter(first);
-      images = images.reversed.toList();
-      final second = await controller.openChapter(
-        manga,
-        chapter,
-        reference: controller.sourceReference,
-      );
-      expect(second!.manifest.version, isNot(first.manifest.version));
-      final resolved = resolvePosition(second.manifest, position);
-      expect(resolved.kind, PositionResolutionKind.missingPage);
-      expect(resolved.position!.pageIndexHint, 0);
-      await controller.closeChapter(second);
-    },
-  );
+  test('empty page URLs use content version so same-length reorders cannot claim a stable page', () async {
+    await open();
+    final manga = controller.mangas.single;
+    final chapter = ChapterEntry(
+      wire.Chapter(url: '/chapter/ref', name: 'chapter'),
+    );
+    var images = ['first', 'second'];
+    platform.invokeHandler = (payload) async => wire.SourceResult(
+      pageList: wire.PageList(
+        pageSessionId: 'pages-empty',
+        pages: [
+          for (var i = 0; i < images.length; i++)
+            wire.Page(
+              pageKey: 'p-$i',
+              index: i,
+              sourceIndex: i,
+              url: '',
+              imageUrl: 'https://source.invalid/${images[i]}.png',
+            ),
+        ],
+      ),
+    );
+    final first = await controller.openChapter(
+      manga,
+      chapter,
+      reference: controller.sourceReference,
+    );
+    final position = first!.manifest.positionAt(0, offset: 0.3);
+    await controller.closeChapter(first);
+    images = images.reversed.toList();
+    final second = await controller.openChapter(
+      manga,
+      chapter,
+      reference: controller.sourceReference,
+    );
+    expect(second!.manifest.version, isNot(first.manifest.version));
+    final resolved = resolvePosition(second.manifest, position);
+    expect(resolved.kind, PositionResolutionKind.missingPage);
+    expect(resolved.position!.pageIndexHint, 0);
+    await controller.closeChapter(second);
+  });
 
   test('static index rejects duplicate package versions', () async {
     final entry = {

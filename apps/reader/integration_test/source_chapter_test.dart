@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -100,9 +100,9 @@ void main() {
       });
       expect(catalog.subject, _subject);
       final client = catalog.library!.client;
-      final entry = (await catalog.library!.watchView().first.timeout(
-        _budget,
-      )).entries.singleWhere((entry) => entry.mangaKey == mangaKey);
+      final entry = (await catalog.library!.watchView().first.timeout(_budget))
+          .entries
+          .singleWhere((entry) => entry.mangaKey == mangaKey);
       expect(entry.url, _mangaUrl);
       final firstBefore = await _inspect(client, mangaKey, firstKey);
       final nextBefore = await _inspect(client, mangaKey, nextKey);

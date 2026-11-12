@@ -167,8 +167,8 @@ const dart = process.env.FLUTTER_ROOT
     ? path.join(root, '.fvm/flutter_sdk/bin/dart')
     : 'dart';
 const dartVersion = capture(dart, ['--version']);
-if (!(dartVersion.stdout + dartVersion.stderr).includes('3.13.4'))
-  throw Error('Use Dart 3.13.4 from Flutter 3.47.5 for stable formatting');
+if (!(dartVersion.stdout + dartVersion.stderr).includes('3.14.0'))
+  throw Error('Use Dart 3.14.0 from Flutter 3.50.0 for stable formatting');
 run(dart, [
   'format',
   ...(write ? [] : ['--output=none', '--set-exit-if-changed']),

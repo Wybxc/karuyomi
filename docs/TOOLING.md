@@ -33,6 +33,8 @@ Wrangler 4.156.1 的 D1 `--file --json` 会由另一套 logger 输出上传进�
 
 JS/TS 产品构建使用声明式 Vite 配置和官方 CLI；API 使用 Cloudflare 官方 Vite 插件。`pnpm build` 依次构建 runtime-host、用 cpy-cli 复制 Native 资源、构建 Flutter Web，最后运行 API Vite。`apps/api/vite.assets.ts` 在 Vite config hook 中装配 Flutter/runtime/当前扩展快照，产生 `dist/public` 并检查 MIME、缓存、限额和 Native 资源排除；Cloudflare 插件生成最终客户端产物与 Wrangler 部署配置重定向。资源规则属于项目集成逻辑，不另设手写构建器。[原型自动发布](DEPLOYMENT.md)使用同轮 CI 的 Web/runtime artifact，仅重新运行正式 API Vite 装配；线上扩展快照和交付验证由 `scripts/release-web.ts` 进入 `tools/cloudflare/web-release.ts`，不触发 AOT。
 
+Flutter 3.50 正式构建开启 `--web-content-hash` 与 `--no-deprecated-js-interop`。项目按官方 `precache_manifest.json` 校验实际文件、尺寸与哈希，移除 Native 专用 pubspec payload；清单中的哈希 URL 长期 immutable，bootstrap/HTML/未哈希渲染资源重新验证。`tools/flutter/web-assets.ts` 提供该发布合同和缓存规则，Vite 与交付验证直接消费，不维护第二套 Flutter 文件列表。CI 独立 Wasm 候选与默认 JavaScript 构建使用同一提交和 runtime，默认采用须有产品实测依据。
+
 `pnpm test` 先经 Vite CLI 构建 runtime 与 API 测试 fixture，再运行 Node/官方 Workers Vitest。官方 Test Harness 使用独立 fixture 与输出，不改写生产构建定位。浏览器桥回归使用官方 Vitest Browser Preview：运行 `BROWSER=none pnpm test:browser`，再用 Codex 内置浏览器打开其 URL；Preview 会请求打开默认浏览器，单设 `server.open: false` 不足。旧手写 socket/HTTP、Source 在线与浏览器 runner 已移除，新 fixture 测试不自动继承原 Source、Native、网络 TCP reset 或生产 Access 的验收范围。当前覆盖和剩余门见 [Vite 计划](plan/vite-build-and-testing.md)及[验证记录](verification/vite-build-and-testing.md)。
 
 正式 Flutter Web 的交互验收使用 `pnpm acceptance:build` 构建当前产品及独立 Vite 测试产物，再运行 `pnpm acceptance:serve`。入口直接使用 Cloudflare 官方 `createTestHarness()`，监听随机 loopback URL、应用真实 D1 迁移；同一个 URL 可在 Codex 内置浏览器打开两个独立标签页。测试入口为 loopback 请求签发临时 RS256 身份，随后仍经过正式 JWT、Origin 和业务请求头校验；它不替客户端补写 `X-App-Subject` 或 `X-App-Request`。该入口不进入生产构建，测试身份不能代替生产 Access 正向验收。按 Enter 或发送 SIGINT/SIGTERM 后关闭官方 harness，隔离 D1 状态随进程销毁。

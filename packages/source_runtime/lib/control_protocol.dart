@@ -2,7 +2,9 @@
 library;
 
 import 'dart:convert';
+
 import 'package:protobuf/protobuf.dart';
+
 import 'src/pb/karuyomi/v1/control.pb.dart';
 
 export 'src/pb/karuyomi/v1/control.pb.dart';

@@ -2,7 +2,9 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:reader_core/reader_core.dart';
+
 import 'control_protocol.dart' as wire;
 import 'src/generated.dart';
 
@@ -39,78 +41,52 @@ abstract interface class SourceRuntime {
 }
 
 /// Image controls stay small; bytes remain in the platform resource channel.
-final class ImageAcquireRequest {
-  const ImageAcquireRequest({
-    required this.requestId,
-    required this.sourceId,
-    required this.pageSessionId,
-    required this.pageKey,
-    required this.generation,
-    this.timeout = const Duration(seconds: 30),
-  });
-  final String requestId;
-  final String sourceId;
-  final String pageSessionId;
-  final String pageKey;
-  final String generation;
-  final Duration timeout;
-}
+final class const ImageAcquireRequest({
+  required final String requestId,
+  required final String sourceId,
+  required final String pageSessionId,
+  required final String pageKey,
+  required final String generation,
+  final Duration timeout = const Duration(seconds: 30),
+});
 
-final class ImageCancelRequest {
-  const ImageCancelRequest({required this.requestId, required this.generation});
-  final String requestId;
-  final String generation;
-}
+final class const ImageCancelRequest({
+  required final String requestId,
+  required final String generation,
+});
 
-final class ImageReleaseRequest {
-  const ImageReleaseRequest({
-    required this.resourceId,
-    required this.generation,
-  });
-  final String resourceId;
-  final String generation;
-}
+final class const ImageReleaseRequest({
+  required final String resourceId,
+  required final String generation,
+});
 
-final class PageSessionRef {
-  const PageSessionRef({required this.pageSessionId, required this.generation});
-  final String pageSessionId;
-  final String generation;
-}
+final class const PageSessionRef({
+  required final String pageSessionId,
+  required final String generation,
+});
 
-final class BuildDescriptor {
-  const BuildDescriptor({
-    required this.buildId,
-    required this.catalog,
-    required this.manifestUri,
-    required this.sha256,
-    this.identity = '',
-    this.packageId,
-    this.preferenceBootstrap,
-  });
-
-  final String buildId;
-  final wire.CatalogReference catalog;
-  final Uri manifestUri;
-  final String sha256;
+final class const BuildDescriptor({
+  required final String buildId,
+  required final wire.CatalogReference catalog,
+  required final Uri manifestUri,
+  required final String sha256,
 
   /// Confirmed Access subject. Never a JWT or service token.
-  final String identity;
-  final String? packageId;
+  final String identity = '',
+  final String? packageId,
 
   /// Confirmed account values plus current client session values, injected before Source construction.
-  final wire.PreferenceBootstrap? preferenceBootstrap;
-}
+  final wire.PreferenceBootstrap? preferenceBootstrap,
+});
 
 typedef RuntimeSession = wire.RuntimeSession;
 typedef SourceInfo = wire.SourceInfo;
 typedef SourceResult = wire.SourceResult;
 
-final class SourceRequest {
-  const SourceRequest({required this.packageId, required this.call});
-
-  final String packageId;
-  final wire.SourceCall call;
-}
+final class const SourceRequest({
+  required final String packageId,
+  required final wire.SourceCall call,
+});
 
 enum RuntimeErrorCode {
   storageBusy,
@@ -126,18 +102,12 @@ enum RuntimeErrorCode {
   limitExceeded,
 }
 
-final class RuntimeEvent {
-  const RuntimeEvent({
-    required this.generation,
-    required this.code,
-    this.message,
-    this.containerWide = false,
-  });
-  final bool containerWide;
-  final String generation;
-  final RuntimeErrorCode code;
-  final String? message;
-}
+final class const RuntimeEvent({
+  required final String generation,
+  required final RuntimeErrorCode code,
+  final String? message,
+  final bool containerWide = false,
+});
 
 /// Shared version check; readiness also requires package, files and Source init.
 bool isCompatibleHost(wire.RuntimeHello hello) =>

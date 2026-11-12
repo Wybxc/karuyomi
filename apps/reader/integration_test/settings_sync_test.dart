@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrintSynchronously;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:integration_test/integration_test.dart';
@@ -12,7 +12,9 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:karuyomi/data/business_state_validation.dart';
 import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+
 import '../test/settings/settings_probe.dart';
+
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 

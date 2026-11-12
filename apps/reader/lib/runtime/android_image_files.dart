@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+
 import 'native_image_files.dart';
 
 /// The private platform sink prefixes each binary block with its slot-local,
@@ -362,9 +364,8 @@ if (listeners?.[token]) {
   Future<void> _receive(WebMessage? message) async {
     final data = message?.data;
     if (data is String) {
-      final identity = RegExp(
-        r'^(?:cancelled|failed|end):(\d+)(?::|$)',
-      ).firstMatch(data);
+      final identity = RegExp(r'^(?:cancelled|failed|end):(\d+)(?::|$)')
+          .firstMatch(data);
       if (identity != null && identity.group(1) != '$transfer') return;
     }
     if (data == 'cancelled:$transfer') {

@@ -18,17 +18,14 @@ void main() {
     viewportY: viewportY,
   );
 
-  test(
-    'anchor keeps original page identity and accepts source and viewport boundaries',
-    () {
-      expect(position().pageKey, 'page-4');
-      final edge = position(offset: 1, x: 1, viewportX: 1, viewportY: 1);
-      expect(edge.normalizedOffset, 1);
-      expect(edge.normalizedX, 1);
-      expect(edge.viewportX, 1);
-      expect(edge.viewportY, 1);
-    },
-  );
+  test('anchor keeps original page identity and accepts source and viewport boundaries', () {
+    expect(position().pageKey, 'page-4');
+    final edge = position(offset: 1, x: 1, viewportX: 1, viewportY: 1);
+    expect(edge.normalizedOffset, 1);
+    expect(edge.normalizedX, 1);
+    expect(edge.viewportX, 1);
+    expect(edge.viewportY, 1);
+  });
 
   test(
     'invalid and non-finite coordinates cannot enter persistent progress',

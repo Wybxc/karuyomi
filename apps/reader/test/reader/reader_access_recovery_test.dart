@@ -1,8 +1,9 @@
 import '../test_app.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -352,61 +353,57 @@ void main() {
     },
   );
 
-  test(
-    'stored login context retains opaque DTO, logical anchor and layout, and rejects oversized state',
-    () {
-      final original = ReaderRecoveryContext(
-        origin: 'https://reader.example.com',
-        subject: 'owner',
-        packageName: 'eu.kanade.source.test',
-        sourceId: sourceId,
-        manga: testManga..memoJson = _memo,
+  test('stored login context retains opaque DTO, logical anchor and layout, and rejects oversized state', () {
+    final original = ReaderRecoveryContext(
+      origin: 'https://reader.example.com',
+      subject: 'owner',
+      packageName: 'eu.kanade.source.test',
+      sourceId: sourceId,
+      manga: testManga..memoJson = _memo,
+      chapterKey: 'chapter',
+      position: ReadingPosition(
         chapterKey: 'chapter',
-        position: ReadingPosition(
-          chapterKey: 'chapter',
-          pageKey: 'missing-page',
-          manifestVersion: 'old',
-          pageIndexHint: 2,
-          normalizedOffset: .4,
-          normalizedX: .7,
-          viewportX: .6,
-          viewportY: .2,
-        ),
-        order: ChapterOrder.reversed,
-        mode: ReadingMode.webtoon,
-        doublePage: false,
-      );
-      final restored = ReaderRecoveryContext.fromJson(
-        jsonDecode(jsonEncode(original.toJson())),
-      );
-      expect(restored.manga.memoJson, _memo);
-      expect(restored.sourceId, sourceId);
-      expect(restored.position!.pageKey, 'missing-page');
-      expect(restored.position!.normalizedOffset, .4);
-      expect(restored.position!.normalizedX, .7);
-      expect(restored.position!.viewportX, .6);
-      expect(restored.position!.viewportY, .2);
-      final missingCoordinate = original.toJson();
-      if (missingCoordinate['position']
-          case final Map<String, Object?> anchor) {
-        anchor.remove('viewportY');
-      }
-      expect(
-        () => ReaderRecoveryContext.fromJson(missingCoordinate),
-        throwsFormatException,
-      );
-      expect(restored.order, ChapterOrder.reversed);
-      expect(restored.mode, ReadingMode.webtoon);
-      expect(restored.doublePage, false);
-      expect(
-        () => ReaderRecoveryContext.fromJson({
-          ...original.toJson(),
-          'origin': 'x' * wire.controlRequestLimit,
-        }),
-        throwsFormatException,
-      );
-    },
-  );
+        pageKey: 'missing-page',
+        manifestVersion: 'old',
+        pageIndexHint: 2,
+        normalizedOffset: .4,
+        normalizedX: .7,
+        viewportX: .6,
+        viewportY: .2,
+      ),
+      order: ChapterOrder.reversed,
+      mode: ReadingMode.webtoon,
+      doublePage: false,
+    );
+    final restored = ReaderRecoveryContext.fromJson(
+      jsonDecode(jsonEncode(original.toJson())),
+    );
+    expect(restored.manga.memoJson, _memo);
+    expect(restored.sourceId, sourceId);
+    expect(restored.position!.pageKey, 'missing-page');
+    expect(restored.position!.normalizedOffset, .4);
+    expect(restored.position!.normalizedX, .7);
+    expect(restored.position!.viewportX, .6);
+    expect(restored.position!.viewportY, .2);
+    final missingCoordinate = original.toJson();
+    if (missingCoordinate['position'] case final Map<String, Object?> anchor) {
+      anchor.remove('viewportY');
+    }
+    expect(
+      () => ReaderRecoveryContext.fromJson(missingCoordinate),
+      throwsFormatException,
+    );
+    expect(restored.order, ChapterOrder.reversed);
+    expect(restored.mode, ReadingMode.webtoon);
+    expect(restored.doublePage, false);
+    expect(
+      () => ReaderRecoveryContext.fromJson({
+        ...original.toJson(),
+        'origin': 'x' * wire.controlRequestLimit,
+      }),
+      throwsFormatException,
+    );
+  });
 
   for (final changedPages in [false, true]) {
     testWidgets(

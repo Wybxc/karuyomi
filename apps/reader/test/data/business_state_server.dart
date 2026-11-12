@@ -78,9 +78,9 @@ final class TestBusinessServer implements ApiFetch {
     String key,
     String chapterKey, {
     String? subject,
-  }) => _account(
-    subject ?? defaultSubject,
-  ).progress[(key, chapterKey)]?.deepCopy();
+  }) =>
+      _account(subject ?? defaultSubject).progress[(key, chapterKey)]
+          ?.deepCopy();
 
   bool bookmarked(String key, String chapterKey, {String? subject}) =>
       _account(subject ?? defaultSubject).bookmarks.contains((key, chapterKey));

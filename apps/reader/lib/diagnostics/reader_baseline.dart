@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
@@ -236,15 +237,11 @@ final class ReaderBaselineRecorder extends ChangeNotifier {
           : 'debug',
       'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
       'eventClock': 'Stopwatch elapsed microseconds since start',
-      'frameClock':
-          'Engine FrameTiming epoch; rasterFinishWallTime has its own wall-clock epoch; join events by frameNumber only',
+      'frameClock': 'Engine FrameTiming epoch; rasterFinishWallTime has its own wall-clock epoch; join events by frameNumber only',
       'interpretation': {
-        'image_info':
-            'Decoded ImageInfo arrival, possibly synchronous cache reuse; not decode CPU time',
-        'image_frame':
-            'Image.frameBuilder in a framework frame; not physical presentation',
-        'viewport':
-            'Logical content intersection and current resource identity after layout; not occlusion or physical visibility',
+        'image_info': 'Decoded ImageInfo arrival, possibly synchronous cache reuse; not decode CPU time',
+        'image_frame': 'Image.frameBuilder in a framework frame; not physical presentation',
+        'viewport': 'Logical content intersection and current resource identity after layout; not occlusion or physical visibility',
         'reportedAtUs':
             'Timing callback receipt only; never the end of rendering',
         'rasterDurationUs':
@@ -268,8 +265,7 @@ final class ReaderBaselineRecorder extends ChangeNotifier {
         'session': _session,
         'stopReason': _stopReason,
         'stopAtUs': _stopUs,
-        'frameBoundaryPolicy':
-            'Inclusive start/stop frame IDs; boundary frames may overlap capture boundaries',
+        'frameBoundaryPolicy': 'Inclusive start/stop frame IDs; boundary frames may overlap capture boundaries',
         'firstFrameNumber': _firstFrame,
         'lastFrameNumber': _lastFrame,
         'truncated': _truncated,

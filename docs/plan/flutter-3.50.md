@@ -2,11 +2,11 @@
 
 ## 目标与状态
 
-状态：进行中（升级与优化准备）。2026-11-12 按用户要求准备从 Flutter 3.47.5 / Dart 3.13.4 更新到 Flutter 3.50 系列及其内置 Dart 3.14，并将官方更新对应的 Web 发布、代码精简和 UI 改善纳入本轮。保持固定补丁版本、严格分析、生成一致性和主线自动上线。当前 `.fvmrc` 和 CI 尚未切换；[状态管理重构的已验收产物](../verification/flutter-state-management.md)仍使用原固定工具链。
+状态：进行中（实现与工程验证）。2026-11-13 已将工作分支固定为 Flutter 3.50.0 / Dart 3.14.0，完成语言迁移、Material 独立包导入、主构造函数精简、内容哈希发布合同及 UI 调整；CI 构建、浏览器与生产验收待执行。保持严格分析、生成一致性和主线自动上线。[状态管理重构的历史验收产物](../verification/flutter-state-management.md)使用原固定工具链，新 SDK 的证据单独记录。
 
 已核对[官方 Flutter 3.50 发布说明](https://flutter.dev/blog/whats-new-in-flutter-3-50)与 [Dart 3.14 changelog](https://dart.dev/changelog#3-14)：两者已于 2026-11-11 发布。实施时从[官方 SDK archive](https://docs.flutter.dev/install/archive)确认同一 Flutter bundle 的精确版本、Dart 版本和校验值，再固定到仓库，不独立替换 Flutter 内置 Dart。
 
-目标是改善频繁上线后的资源一致性和复访加载，实质减少手写 Dart 代码，并取得 Karuyomi 自身的 Wasm 对照数据。当前只完成官方变更核对、仓库入口清点和计划整理，以下实现与验收均待执行；官方基准和引擎改进不作为产品性能证据。
+目标是改善频繁上线后的资源一致性和复访加载，实质减少手写 Dart 代码，并取得 Karuyomi 自身的 Wasm 对照数据。以下逐项记录实现和验收，官方基准和引擎改进不作为产品性能证据。官方归档入口本次返回 404，本机采用官方 Git 标签 `3.50.0`（`ab2912035e160d9cad6306df307576da6128ebdb`）及其配套 engine/Dart 完成正式 bootstrap；没有单独替换 Dart。工程结果见[更新验证记录](../verification/flutter-3.50.md)。
 
 ## 交付顺序
 
@@ -16,29 +16,29 @@
 
 ## 首批：工具链、设计包与代码精简
 
-- [ ] 一次更新 `.fvmrc`、`.github/workflows/{project-ci,extensions}.yml`、`scripts/format.ts` 的 Dart 版本校验及 `AGENTS.md` 工具链要求。三个业务 Dart 项目与 `tools/protocol/generator` 的 pubspec SDK 下限统一调整；用正式 pub 命令刷新各自 lock。用户已有的 `pnpm-lock.yaml` 改动另行保留，不混入升级。
-- [ ] 当前业务包语言下限仍为 `^3.12.0`。按 [Dart 3.14 的迁移流程](https://dart.dev/blog/announcing-dart-3-14)，先运行 `dart migrate --dry-run --target-sdk=3.14.0` 审阅，再应用准备、版本更新与清理；不能仅替换 SDK 后仍按旧语言版本维护代码。
-- [ ] 使用[主构造函数](https://dart.dev/language/primary-constructors)精简 `SettingsState`、`SettingsSnapshot`、`SettingsDraft`、`ReadingPosition`、`PageRef`、`ImageResource` 等适合的值对象。该特性自 Dart 3.13 起可用，并非 3.14 新增；保留构造校验、不可变状态与复制语义，生成模型继续由正式生成器维护。
-- [ ] 以本轮实施前提交为基线，分别记录生产手写 Dart 的新增、删除、净变化及生成代码变化。验收要求实质净减少手写代码，不以移动文件、压缩可读性或删除必要校验计作收益；具体行数由实施后的 diff 给出。
-- [ ] 自有 UI 仍导入 SDK `material.dart`；按[官方迁移指引](https://docs.flutter.dev/release/breaking-changes/material-ui-and-cupertino-ui)运行 `dart fix --apply --code=migrate_design_widgets`，精确固定 `material_ui`，统一生产、测试和 integration_test 导入及本地化 delegates。按实际使用引入 Cupertino，删除不再使用的旧依赖，不增加项目自有兼容桥。核对第三方库公开 API 的设计类型，遇到类型冲突通过依赖或调用修复。独立设计包的收益是维护与独立更新，包体变化另行测量。
-- [ ] 在新 Dart 上解析固定的 generator / annotation / hooks / analyzer plugin 依赖，先运行生成一致性和严格分析，必要时精确更新冲突依赖；不关闭 riverpod_lint、不抑制类型或废弃警告。核对 [Dart 3.14 的 flow-analysis 与 SDK 变更](https://dart.dev/changelog#3-14)，根据实际诊断改代码。
-- [ ] Android 当前使用 AGP 9.1.0；核对插件的 Built-in Kotlin 要求。iOS 核对当前 Swift Package Manager 配置和 WebView 插件构建要求。这里只做工程准备；原生现场验收继续停止，不能将工程检查标成原生运行已验证。
+- [x] 一次更新 `.fvmrc`、`.github/workflows/{project-ci,extensions}.yml`、`scripts/format.ts` 的 Dart 版本校验及 `AGENTS.md` 工具链要求。三个业务 Dart 项目与 `tools/protocol/generator` 的 pubspec SDK 下限统一调整；用正式 pub 命令刷新各自 lock。用户已有的 `pnpm-lock.yaml` 改动另行保留，不混入升级。
+- [x] 将四个 Dart 项目的语言下限由 `^3.12.0` 更新为 `^3.14.0`。按 [Dart 3.14 的迁移流程](https://dart.dev/blog/announcing-dart-3-14)审阅 dry-run，再应用完整准备、版本更新与清理，随后正式 pub get 刷新语言配置。
+- [x] 使用[主构造函数](https://dart.dev/language/primary-constructors)精简 `SettingsState`、`SettingsSnapshot`、`SettingsDraft`、`ReadingPosition`、`PageRef`、`ImageResource` 等适合的值对象。该特性自 Dart 3.13 起可用，并非 3.14 新增；保留构造校验、不可变状态与复制语义，生成模型继续由正式生成器维护。
+- [x] 以本轮实施前 `b248648` 为基线，生产手写 Dart 新增 340 行、删除 400 行、净减 60 行（30,414 → 30,354）；生成代码新增/删除为零，测试另计。结果包含新增转场策略与正式 formatter 的格式变化，未靠移动文件或删除校验减少代码。
+- [x] 按[官方迁移指引](https://docs.flutter.dev/release/breaking-changes/material-ui-and-cupertino-ui)运行 `dart fix --apply --code=migrate_design_widgets`，更新 64 个文件并精确固定 `material_ui: 1.11.0`；生产、测试、integration_test 与本地化 delegates 已统一。移除旧 `flutter_localizations` 直接依赖，不增加兼容桥。第三方公开 API 的设计类型通过严格分析；独立设计包的收益是维护与独立更新，包体变化另行测量。
+- [x] 新 Dart 正式解析固定的 generator / annotation / hooks / analyzer plugin；Riverpod 与 Protobuf 生成一致性通过，三个项目严格分析无问题，736 项回归通过。riverpod_lint 保持开启，未抑制类型或废弃警告。
+- [x] 完成原生配置静态核对：Android 仍使用 AGP 9.1.0 和模板的 `builtInKotlin=false` / `newDsl=false`，WebView 插件仍含旧 DSL 配置，本轮不在缺少构建证据时强行切换。iOS 已配置 SwiftPM 的本地 package 与 prepare pre-action，当前 WebView 插件带正式 `Package.swift`；保留现有 CocoaPods 集成。原生现场验收继续停止，以上不代表新 SDK 原生构建或运行已验证。
 
 ## 首批：Web 内容哈希与发布校验
 
 依据[官方 Web 发布文档](https://docs.flutter.dev/deployment/web#web-content-hashing---web-content-hash)，由 Flutter 生成内容哈希和资源清单，项目仅维护 Static Assets 集成与发布合同。
 
-- [ ] 在 `scripts/flutter.ts` 的正式 Web 构建入口启用 `--web-content-hash`，保留现有资源自托管要求。启用前核对 deferred imports；当前内容哈希与 deferred loading 不同时启用，本轮不新增延迟加载方案。
-- [ ] 将 `tools/cloudflare/web-release.ts` 中写死的 `main.dart.js` 改为读取官方 `precache_manifest.json`，校验清单格式并纳入实际生成的 JS/Wasm 模块、资源及 bootstrap。保留 runtime、materials 和扩展各自的发布验证合同，不把 Flutter 清单当成全部发布内容。
-- [ ] 在 `apps/api/vite.assets.ts` 按官方清单中的哈希标记生成缓存规则：带内容哈希的 Flutter 文件长期 `immutable` 缓存，HTML、bootstrap 与其它未哈希入口重新验证；自托管 `canvaskit/**` 仍按未哈希资源处理。扩展索引与共享材料继续遵循现有独立规则。
+- [x] 在 `scripts/flutter.ts` 的正式 Web 构建入口启用 `--web-content-hash`，保留现有资源自托管要求。已核对无 deferred imports，本轮不新增延迟加载方案。
+- [x] 将 `tools/cloudflare/web-release.ts` 中写死的 `main.dart.js` 改为读取官方 `precache_manifest.json`，校验清单格式并纳入实际生成的 JS/Wasm 模块、资源及 bootstrap。保留 runtime、materials 和扩展各自的发布验证合同，不把 Flutter 清单当成全部发布内容。
+- [x] 在 `apps/api/vite.assets.ts` 按官方清单中的哈希标记生成缓存规则：带内容哈希的 Flutter 文件长期 `immutable` 缓存，HTML、bootstrap 与其它未哈希入口重新验证；自托管 `canvaskit/**` 仍按未哈希资源处理。扩展索引与共享材料继续遵循现有独立规则。
 - [ ] 为清单接入和缓存头增加必要的发布回归，使用官方构建与 Wrangler harness 验证实际产物，覆盖入口引用、完整性校验、资源可达及缓存策略。
 - [ ] 用 Codex 内置浏览器验收首次访问、复访、发布切换、持续打开的阅读标签与新文档。明确旧标签遇到资源失效时的更新提示和刷新路径，保持未确认草稿提示；不建立历史发布目录或旧版本兼容层，不能只加构建参数就标为完成。
 
 ## 首批：UI 改善
 
-- [ ] 封面评估采用 `Image.useLogicalCacheSize` / `ResizeImage.useLogicalSize`，简化 `custom_cover.dart` 的 DPR 换算，核对尺寸单位并保留现有解码上限。当前已有限制解码尺寸，只报告实际代码和测量收益；正文缩放、裁白、缓存键与资源释放语义不能因该 API 变化而简化。
+- [x] 完成封面逻辑尺寸 API 评估：保留当前物理像素换算。`custom_cover.dart` 已将解码高度限制在 1–1024 物理像素；新 API 接收整数逻辑尺寸，维持原预算还需额外 DPR 换算，没有代码精简收益。正文缩放、裁白、缓存键与资源释放语义不变，不宣称内存下降。
 - [ ] 在 `apps/reader/web/index.html` 补齐适合移动浏览器的 viewport 配置，并按[官方 SafeArea 说明](https://docs.flutter.dev/deployment/web#mobile-browser-viewport-and-safearea)验收安全区、页面缩放和阅读控件可达性。
-- [ ] 核对新增 `MediaQueryData.reduceMotion` 与现有 `disableAnimations` 的使用，适配系统减少动态效果设置下的非必要位移和转场；动图播放策略单独保持明确语义，不把两者无条件等同。
+- [x] 核对新增 `MediaQueryData.reduceMotion` 与现有 `disableAnimations`：路由在前者下改用淡化，在后者下直接显示；两项转场组件回归通过。正文动图仍遵循原有独立播放策略，不把两个系统标志等同。
 - [ ] 设置、书架、源筛选、源偏好和跨源搜索使用 `DropdownButtonFormField`，迁移后逐处保持忙碌/停用语义；参考[显式 enabled 变更](https://docs.flutter.dev/release/breaking-changes/dropdownbuttonformfield-enabled-parameter)。验收文本选择、键盘焦点、缩放与输入，不只通过导入替换判断完成。
 
 ## 同轮：Wasm 对照与采用门槛

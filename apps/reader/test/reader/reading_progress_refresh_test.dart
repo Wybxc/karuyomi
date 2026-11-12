@@ -87,41 +87,37 @@ void main() {
     },
   );
 
-  test(
-    'remote navigation and furthest change require reopening without moving the viewport',
-    () async {
-      await writer.restore(pages);
-      await saveLocal(0);
-      await saveRemote(2);
-      await writer.refreshFromServer(pages);
-      expect(writer.needsReopen('chapter'), true);
-      expect(writer.error, contains('其他设备更新'));
-      expect(writer.chapter('chapter')!.current.pageKey, 'one');
-      expect(writer.chapter('chapter')!.furthest!.pageKey, 'one');
-      writer.observe(
-        manifest: pages,
-        current: pages.positionAt(1),
-        reversedOrder: false,
-      );
-      expect(writer.unsaved, false);
-      expect(await writer.flush(), false);
-      expect(server.progress(_key, 'chapter')!.current.pageKey, 'three');
-      expect((await writer.restore(pages))!.pageKey, 'three');
-      expect(writer.reversedOrder, true);
-      expect(writer.needsReopen('chapter'), false);
-      await saveLocal(1);
-      expect(server.progress(_key, 'chapter')!.furthest.pageKey, 'three');
-    },
-  );
+  test('remote navigation and furthest change require reopening without moving the viewport', () async {
+    await writer.restore(pages);
+    await saveLocal(0);
+    await saveRemote(2);
+    await writer.refreshFromServer(pages);
+    expect(writer.needsReopen('chapter'), true);
+    expect(writer.error, contains('其他设备更新'));
+    expect(writer.chapter('chapter')!.current.pageKey, 'one');
+    expect(writer.chapter('chapter')!.furthest!.pageKey, 'one');
+    writer.observe(
+      manifest: pages,
+      current: pages.positionAt(1),
+      reversedOrder: false,
+    );
+    expect(writer.unsaved, false);
+    expect(await writer.flush(), false);
+    expect(server.progress(_key, 'chapter')!.current.pageKey, 'three');
+    expect((await writer.restore(pages))!.pageKey, 'three');
+    expect(writer.reversedOrder, true);
+    expect(writer.needsReopen('chapter'), false);
+    await saveLocal(1);
+    expect(server.progress(_key, 'chapter')!.furthest.pageKey, 'three');
+  });
 
   test(
     'remote epoch reset is announced while the current anchor stays intact',
     () async {
       await writer.restore(pages);
       await saveLocal(2);
-      await ProgressRepository(
-        remote,
-      ).reset(mangaKey: _key, manifest: pages, reversedOrder: true);
+      await ProgressRepository(remote)
+          .reset(mangaKey: _key, manifest: pages, reversedOrder: true);
       await writer.refreshFromServer(pages);
       expect(writer.error, contains('其他设备重置'));
       expect(writer.needsReopen('chapter'), true);
@@ -148,32 +144,29 @@ void main() {
     },
   );
 
-  test(
-    'a background shared-client read cannot lend its new revision to an unsent old draft',
-    () async {
-      await writer.restore(pages);
-      writer.observe(
-        manifest: pages,
-        current: pages.positionAt(0),
-        reversedOrder: false,
-      );
-      await saveRemote(2);
-      // A details or shelf observer can read the same shared client before the
-      // reader's debounce fires. That read must not rebase the reader's draft.
-      await ProgressRepository(client).loadResume(_key);
-      final writes = server.requests
-          .where((request) => request.method == 'POST')
-          .length;
-      await writer.refreshFromServer(pages);
-      expect(writer.needsReopen('chapter'), true);
-      expect(writer.chapter('chapter')!.current.pageKey, 'one');
-      expect(
-        server.requests.where((request) => request.method == 'POST').length,
-        writes,
-      );
-      expect(server.progress(_key, 'chapter')!.current.pageKey, 'three');
-    },
-  );
+  test('a background shared-client read cannot lend its new revision to an unsent old draft', () async {
+    await writer.restore(pages);
+    writer.observe(
+      manifest: pages,
+      current: pages.positionAt(0),
+      reversedOrder: false,
+    );
+    await saveRemote(2);
+    // A details or shelf observer can read the same shared client before the
+    // reader's debounce fires. That read must not rebase the reader's draft.
+    await ProgressRepository(client).loadResume(_key);
+    final writes = server.requests
+        .where((request) => request.method == 'POST')
+        .length;
+    await writer.refreshFromServer(pages);
+    expect(writer.needsReopen('chapter'), true);
+    expect(writer.chapter('chapter')!.current.pageKey, 'one');
+    expect(
+      server.requests.where((request) => request.method == 'POST').length,
+      writes,
+    );
+    expect(server.progress(_key, 'chapter')!.current.pageKey, 'three');
+  });
 
   test(
     'same-client favorite changes still share revisions with a dirty reader',
@@ -238,15 +231,14 @@ void main() {
           reversedOrder: false,
         );
         expect(await writer.flush(), true);
-        await LibraryRepository(
-          fromOtherClient ? remote : client,
-        ).refreshMetadata(
-          packageName: 'test.extension',
-          sourceId: '123',
-          sourceName: 'Test',
-          sourceLang: 'en',
-          manga: wire.Manga(url: original.url, title: 'Updated'),
-        );
+        await LibraryRepository(fromOtherClient ? remote : client)
+            .refreshMetadata(
+              packageName: 'test.extension',
+              sourceId: '123',
+              sourceName: 'Test',
+              sourceLang: 'en',
+              manga: wire.Manga(url: original.url, title: 'Updated'),
+            );
         await writer.refreshFromServer(pages);
         expect(writer.chapter('chapter')!.current.pageKey, 'two');
         expect(writer.needsReopen('chapter'), fromOtherClient);
@@ -265,55 +257,49 @@ void main() {
     );
   }
 
-  test(
-    'a failed draft keeps its exact request and is retried before foreground inspection',
-    () async {
-      await writer.restore(pages);
-      writer.observe(
-        manifest: pages,
-        current: pages.positionAt(1),
-        reversedOrder: false,
-      );
-      server.failWrites = true;
-      await writer.refreshFromServer(pages);
-      expect(writer.unsaved, true);
-      expect(writer.needsReopen('chapter'), false);
-      expect(writer.error, contains('当前会话'));
-      final original = server.requests
-          .where((request) => request.method == 'POST')
-          .single
-          .body;
-      final reads = server.requests
-          .where((request) => request.method == 'GET')
-          .length;
-      expect(reads, 1);
-      server.failWrites = false;
-      await writer.refreshFromServer(pages);
-      expect(writer.unsaved, false);
-      expect(writer.error, isNull);
-      expect(
-        server.requests.where((request) => request.method == 'POST').last.body,
-        original,
-      );
-      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
-    },
-  );
+  test('a failed draft keeps its exact request and is retried before foreground inspection', () async {
+    await writer.restore(pages);
+    writer.observe(
+      manifest: pages,
+      current: pages.positionAt(1),
+      reversedOrder: false,
+    );
+    server.failWrites = true;
+    await writer.refreshFromServer(pages);
+    expect(writer.unsaved, true);
+    expect(writer.needsReopen('chapter'), false);
+    expect(writer.error, contains('当前会话'));
+    final original = server.requests
+        .where((request) => request.method == 'POST')
+        .single
+        .body;
+    final reads = server.requests
+        .where((request) => request.method == 'GET')
+        .length;
+    expect(reads, 1);
+    server.failWrites = false;
+    await writer.refreshFromServer(pages);
+    expect(writer.unsaved, false);
+    expect(writer.error, isNull);
+    expect(
+      server.requests.where((request) => request.method == 'POST').last.body,
+      original,
+    );
+    expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+  });
 
-  test(
-    'a failed foreground read can be retried without blocking or moving reading',
-    () async {
-      await writer.restore(pages);
-      await saveLocal(1);
-      server.failNextRequest = true;
-      await writer.refreshFromServer(pages);
-      expect(writer.error, contains('可重试'));
-      expect(writer.needsReopen('chapter'), false);
-      expect(writer.chapter('chapter')!.current.pageKey, 'two');
-      await writer.refreshFromServer(pages);
-      expect(writer.error, isNull);
-      expect(writer.needsReopen('chapter'), false);
-    },
-  );
+  test('a failed foreground read can be retried without blocking or moving reading', () async {
+    await writer.restore(pages);
+    await saveLocal(1);
+    server.failNextRequest = true;
+    await writer.refreshFromServer(pages);
+    expect(writer.error, contains('可重试'));
+    expect(writer.needsReopen('chapter'), false);
+    expect(writer.chapter('chapter')!.current.pageKey, 'two');
+    await writer.refreshFromServer(pages);
+    expect(writer.error, isNull);
+    expect(writer.needsReopen('chapter'), false);
+  });
 
   test(
     'inspection does not release a sticky conflict owned by another chapter',

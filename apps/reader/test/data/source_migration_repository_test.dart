@@ -97,31 +97,28 @@ void main() {
   });
   tearDown(() => client.dispose());
 
-  test(
-    'preview is read-only and frozen; explicit confirmation copies marks without source anchors',
-    () async {
-      final original = server.manga(sourceKey)!.deepCopy();
-      final value = await preview();
-      expect(posts(), isEmpty);
-      expect(value.sourceProgress['opaque-original']!.completed, true);
-      expect(value.sourceBookmarks, {'opaque-original'});
-      expect(() => value.source.favorite = false, throwsUnsupportedError);
-      expect(() => value.sourceProgress.clear(), throwsUnsupportedError);
-      final result = await repository.commit(value, chapters: selection());
-      expect(posts(), hasLength(1));
-      expect(result.migration.copiedReadChapters, 1);
-      expect(result.migration.copiedBookmarks, 1);
-      expect(server.manga(sourceKey), original);
-      expect(server.manga(targetKey)!.favorite, true);
-      final progress = server.progress(targetKey, 'opaque-target')!;
-      expect(progress.completed, true);
-      expect(progress.epoch, 1);
-      expect(progress.hasCurrent(), false);
-      expect(progress.hasFurthest(), false);
-      expect(server.manga(targetKey)!.hasResume(), false);
-      expect(repository.pending(sourceKey), isNull);
-    },
-  );
+  test('preview is read-only and frozen; explicit confirmation copies marks without source anchors', () async {
+    final original = server.manga(sourceKey)!.deepCopy();
+    final value = await preview();
+    expect(posts(), isEmpty);
+    expect(value.sourceProgress['opaque-original']!.completed, true);
+    expect(value.sourceBookmarks, {'opaque-original'});
+    expect(() => value.source.favorite = false, throwsUnsupportedError);
+    expect(() => value.sourceProgress.clear(), throwsUnsupportedError);
+    final result = await repository.commit(value, chapters: selection());
+    expect(posts(), hasLength(1));
+    expect(result.migration.copiedReadChapters, 1);
+    expect(result.migration.copiedBookmarks, 1);
+    expect(server.manga(sourceKey), original);
+    expect(server.manga(targetKey)!.favorite, true);
+    final progress = server.progress(targetKey, 'opaque-target')!;
+    expect(progress.completed, true);
+    expect(progress.epoch, 1);
+    expect(progress.hasCurrent(), false);
+    expect(progress.hasFurthest(), false);
+    expect(server.manga(targetKey)!.hasResume(), false);
+    expect(repository.pending(sourceKey), isNull);
+  });
 
   test(
     'a changed catalog preview stays read-only without hidden shelf refresh',
@@ -169,26 +166,23 @@ void main() {
     },
   );
 
-  test(
-    'an already issued write accepts its ACK after page invalidation without issuing another mutation',
-    () async {
-      final value = await preview();
-      var alive = true;
-      server.beforeRequest = (request) {
-        if (request.method == 'POST') alive = false;
-        return null;
-      };
-      final result = await repository.commit(
-        value,
-        chapters: selection(),
-        shouldContinue: () => alive,
-      );
-      expect(alive, false);
-      expect(result.migration.copiedReadChapters, 1);
-      expect(repository.pending(sourceKey), isNull);
-      expect(posts(), hasLength(1));
-    },
-  );
+  test('an already issued write accepts its ACK after page invalidation without issuing another mutation', () async {
+    final value = await preview();
+    var alive = true;
+    server.beforeRequest = (request) {
+      if (request.method == 'POST') alive = false;
+      return null;
+    };
+    final result = await repository.commit(
+      value,
+      chapters: selection(),
+      shouldContinue: () => alive,
+    );
+    expect(alive, false);
+    expect(result.migration.copiedReadChapters, 1);
+    expect(repository.pending(sourceKey), isNull);
+    expect(posts(), hasLength(1));
+  });
 
   test(
     'a failed progress page never becomes an assumed unread preview',
@@ -285,57 +279,54 @@ void main() {
     );
   }
 
-  test(
-    'unknown migration survives wrappers and reads, blocks both works and catalog, and retries exact body',
-    () async {
-      final value = await preview();
-      server.loseNextResponse = true;
-      await expectLater(
-        repository.commit(value, chapters: selection()),
-        throwsStateError,
-      );
-      final original = posts().single.body;
-      final other = MigrationRepository(client);
-      expect(other.pending(sourceKey)!.retryable, true);
-      expect(() => other.discardRejected(sourceKey), throwsStateError);
-      await client.refreshLibrary();
-      await client.readManga(sourceKey);
-      await client.readManga(targetKey);
-      await client.readBookmarks(sourceKey);
-      for (final key in [sourceKey, targetKey]) {
-        expect(
-          () => client.mutate(
-            wire.StateMutation(
-              mangaKey: key,
-              setFavorite: wire.SetFavorite(favorite: false),
-            ),
-          ),
-          throwsA(isA<BusinessPendingMutationException>()),
-        );
-      }
+  test('unknown migration survives wrappers and reads, blocks both works and catalog, and retries exact body', () async {
+    final value = await preview();
+    server.loseNextResponse = true;
+    await expectLater(
+      repository.commit(value, chapters: selection()),
+      throwsStateError,
+    );
+    final original = posts().single.body;
+    final other = MigrationRepository(client);
+    expect(other.pending(sourceKey)!.retryable, true);
+    expect(() => other.discardRejected(sourceKey), throwsStateError);
+    await client.refreshLibrary();
+    await client.readManga(sourceKey);
+    await client.readManga(targetKey);
+    await client.readBookmarks(sourceKey);
+    for (final key in [sourceKey, targetKey]) {
       expect(
-        () => client.mutateCategories(
-          wire.CategoryMutation(
-            expectedRevision: value.categories.revision,
-            createCategory: wire.CreateCategory(
-              category: wire.Category(
-                id: '33333333-3333-4333-8333-333333333333',
-                name: '新分类',
-              ),
+        () => client.mutate(
+          wire.StateMutation(
+            mangaKey: key,
+            setFavorite: wire.SetFavorite(favorite: false),
+          ),
+        ),
+        throwsA(isA<BusinessPendingMutationException>()),
+      );
+    }
+    expect(
+      () => client.mutateCategories(
+        wire.CategoryMutation(
+          expectedRevision: value.categories.revision,
+          createCategory: wire.CreateCategory(
+            category: wire.Category(
+              id: '33333333-3333-4333-8333-333333333333',
+              name: '新分类',
             ),
           ),
         ),
-        throwsStateError,
-      );
-      expect(posts(), hasLength(1));
-      final result = await other.retry(sourceKey);
-      expect(posts(), hasLength(2));
-      expect(posts().last.body, original);
-      expect(result.migration.copiedReadChapters, 1);
-      expect(server.appliedMutations, 4);
-      expect(other.pending(sourceKey), isNull);
-    },
-  );
+      ),
+      throwsStateError,
+    );
+    expect(posts(), hasLength(1));
+    final result = await other.retry(sourceKey);
+    expect(posts(), hasLength(2));
+    expect(posts().last.body, original);
+    expect(result.migration.copiedReadChapters, 1);
+    expect(server.appliedMutations, 4);
+    expect(other.pending(sourceKey), isNull);
+  });
 
   test(
     'rejected source CAS remains explicit through refresh until discarded',
@@ -370,36 +361,33 @@ void main() {
     },
   );
 
-  test(
-    'a stale idempotent success cannot replace a newer target or clear the rejected draft',
-    () async {
-      final value = await preview();
-      server.loseNextResponse = true;
-      await expectLater(
-        repository.commit(value, chapters: selection()),
-        throwsStateError,
-      );
-      final originalBody = posts().single.body;
-      final remote = BusinessStateClient(api: server, identity: identity);
-      addTearDown(remote.dispose);
-      await favorite(remote, target, false);
-      final latest = server.manga(targetKey)!;
-      await expectLater(
-        repository.retry(sourceKey),
-        throwsA(
-          isA<BusinessStateException>().having(
-            (error) => error.conflict,
-            'new target is authoritative',
-            true,
-          ),
+  test('a stale idempotent success cannot replace a newer target or clear the rejected draft', () async {
+    final value = await preview();
+    server.loseNextResponse = true;
+    await expectLater(
+      repository.commit(value, chapters: selection()),
+      throwsStateError,
+    );
+    final originalBody = posts().single.body;
+    final remote = BusinessStateClient(api: server, identity: identity);
+    addTearDown(remote.dispose);
+    await favorite(remote, target, false);
+    final latest = server.manga(targetKey)!;
+    await expectLater(
+      repository.retry(sourceKey),
+      throwsA(
+        isA<BusinessStateException>().having(
+          (error) => error.conflict,
+          'new target is authoritative',
+          true,
         ),
-      );
-      expect(posts().last.body, originalBody);
-      expect(server.manga(targetKey), latest);
-      expect((await client.readManga(targetKey)).manga, latest);
-      expect(repository.pending(sourceKey)!.retryable, false);
-    },
-  );
+      ),
+    );
+    expect(posts().last.body, originalBody);
+    expect(server.manga(targetKey), latest);
+    expect((await client.readManga(targetKey)).manga, latest);
+    expect(repository.pending(sourceKey)!.retryable, false);
+  });
 
   for (final retry in [false, true]) {
     test(
@@ -447,23 +435,20 @@ void main() {
     );
   }
 
-  test(
-    'existing target progress and selected false facts are rejected before transmission',
-    () async {
-      await ProgressRepository(client).setChapterRead(
-        mangaKey: targetKey,
-        chapterKey: 'opaque-target',
-        read: false,
-        basedOnRevision: 0,
-      );
-      final value = await preview();
-      final count = posts().length;
-      expect(
-        () => repository.commit(value, chapters: selection()),
-        throwsA(isA<FormatException>()),
-      );
-      expect(posts(), hasLength(count));
-      expect(server.progress(targetKey, 'opaque-target')!.completed, false);
-    },
-  );
+  test('existing target progress and selected false facts are rejected before transmission', () async {
+    await ProgressRepository(client).setChapterRead(
+      mangaKey: targetKey,
+      chapterKey: 'opaque-target',
+      read: false,
+      basedOnRevision: 0,
+    );
+    final value = await preview();
+    final count = posts().length;
+    expect(
+      () => repository.commit(value, chapters: selection()),
+      throwsA(isA<FormatException>()),
+    );
+    expect(posts(), hasLength(count));
+    expect(server.progress(targetKey, 'opaque-target')!.completed, false);
+  });
 }
