@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-状态：进行中（生产发布收尾）。2026-11-13 已将主线固定为 Flutter 3.50.0 / Dart 3.14.0，完成语言迁移、Material 独立包导入、主构造函数精简、内容哈希发布合同及 UI 调整；完整 CI、JavaScript 与 Wasm 编译通过，主线已部署。发布校验发现公开 HTML 的正常规范化重定向被误判，修复与生产交互验收正在推进。保持严格分析、生成一致性和主线自动上线。[状态管理重构的历史验收产物](../verification/flutter-state-management.md)使用原固定工具链，新 SDK 的证据单独记录。
+状态：首批已上线并通过生产验收；Wasm 性能对照与后续候选待验。2026-11-13 主线固定为 Flutter 3.50.0 / Dart 3.14.0，完成语言迁移、Material 独立包导入、主构造函数精简、内容哈希发布合同及 UI 调整；完整 CI、JavaScript 与 Wasm 编译通过。生产真实读图、旧标签跨发布保存和独立新文档续读通过，修正 HTML 规范化处理后，47 项匿名资源与 Access 门禁完整复验通过。保持严格分析、生成一致性和主线自动上线。[状态管理重构的历史验收产物](../verification/flutter-state-management.md)使用原固定工具链，新 SDK 的证据单独记录。
 
 已核对[官方 Flutter 3.50 发布说明](https://flutter.dev/blog/whats-new-in-flutter-3-50)与 [Dart 3.14 changelog](https://dart.dev/changelog#3-14)：两者已于 2026-11-11 发布。实施时从[官方 SDK archive](https://docs.flutter.dev/install/archive)确认同一 Flutter bundle 的精确版本、Dart 版本和校验值，再固定到仓库，不独立替换 Flutter 内置 Dart。
 
@@ -32,14 +32,14 @@
 - [x] 将 `tools/cloudflare/web-release.ts` 中写死的 `main.dart.js` 改为读取官方 `precache_manifest.json`，校验清单格式并纳入实际生成的 JS/Wasm 模块、资源及 bootstrap。保留 runtime、materials 和扩展各自的发布验证合同，不把 Flutter 清单当成全部发布内容。
 - [x] 在 `apps/api/vite.assets.ts` 按官方清单中的哈希标记生成缓存规则：带内容哈希的 Flutter 文件长期 `immutable` 缓存，HTML、bootstrap 与其它未哈希入口重新验证；自托管 `canvaskit/**` 仍按未哈希资源处理。扩展索引与共享材料继续遵循现有独立规则。
 - [x] 为清单接入和缓存头增加必要的发布回归，使用官方构建与 Wrangler harness 验证实际产物，覆盖入口引用、完整性校验、资源可达及缓存策略。真实 CI 产物的 36 条公开清单大小/哈希与本地 harness 缓存头通过，Native 公开条目为零；15 项发布回归和 11 项 Vite/harness 回归通过，覆盖插件 HTML 的规范化重定向。
-- [ ] 用 Codex 内置浏览器验收首次访问、复访、发布切换、持续打开的阅读标签与新文档。明确旧标签遇到资源失效时的更新提示和刷新路径，保持未确认草稿提示；不建立历史发布目录或旧版本兼容层，不能只加构建参数就标为完成。
+- [x] 用 Codex 内置浏览器验收首次访问、复访、发布切换、持续打开的阅读标签与新文档。旧 3.47 文档在部署后继续读图并保存，第 1 页获独立 D1 确认；新哈希入口恢复第 1 页、保存第 2 页，关闭后独立新文档续到第 2 页，D1 revision 仍为 24。沿用既有更新/重新加载入口与未确认草稿提示，不建立历史发布目录或旧版本兼容层。本轮复用了相同 runtime/扩展，没有注入“已加载页面的哈希资源被移除”故障，该场景的提示验收保留为后续回归。
 
 ## 首批：UI 改善
 
 - [x] 完成封面逻辑尺寸 API 评估：保留当前物理像素换算。`custom_cover.dart` 已将解码高度限制在 1–1024 物理像素；新 API 接收整数逻辑尺寸，维持原预算还需额外 DPR 换算，没有代码精简收益。正文缩放、裁白、缓存键与资源释放语义不变，不宣称内存下降。
-- [ ] 在 `apps/reader/web/index.html` 补齐适合移动浏览器的 viewport 配置，并按[官方 SafeArea 说明](https://docs.flutter.dev/deployment/web#mobile-browser-viewport-and-safearea)验收安全区、页面缩放和阅读控件可达性。
+- [x] 在 `apps/reader/web/index.html` 补齐适合移动浏览器的 viewport 配置。生产 DOM 确认为设备宽度、初始比例和 `viewport-fit=cover`；1280×720 与 390×844 下真实读图、正文放大/重置、控件可达及保存通过。参照[官方 SafeArea 说明](https://docs.flutter.dev/deployment/web#mobile-browser-viewport-and-safearea)核对配置，真实刘海/安全区设备继续随原生与目标浏览器验收，不把桌面浏览器尺寸模拟当作真机证据。
 - [x] 核对新增 `MediaQueryData.reduceMotion` 与现有 `disableAnimations`：路由在前者下改用淡化，在后者下直接显示；两项转场组件回归通过。正文动图仍遵循原有独立播放策略，不把两个系统标志等同。
-- [ ] 设置、书架、源筛选、源偏好和跨源搜索使用 `DropdownButtonFormField`，迁移后逐处保持忙碌/停用语义；参考[显式 enabled 变更](https://docs.flutter.dev/release/breaking-changes/dropdownbuttonformfield-enabled-parameter)。验收文本选择、键盘焦点、缩放与输入，不只通过导入替换判断完成。
+- [x] 设置、书架、源筛选、源偏好和跨源搜索使用 `DropdownButtonFormField`，迁移后逐处保持忙碌/停用语义；参考[显式 enabled 变更](https://docs.flutter.dev/release/breaking-changes/dropdownbuttonformfield-enabled-parameter)。严格分析与组件回归通过，隔离浏览器完成查询输入、Tab 焦点、全选替换、漫画背景覆盖保存与恢复全局继承，独立 API 确认实际生效值；生产缩放和翻页通过。
 
 ## 同轮：Wasm 对照与采用门槛
 
@@ -51,6 +51,7 @@
 
 ## 后续性能候选
 
+- **发布切换故障回归**：本轮已验证旧文档持续阅读、保存和新文档续读；补充移除旧哈希资源后的显式错误、重新加载入口与未确认草稿保留。该故障分项保持待验，不能据本轮正常路径宣称已通过。
 - **原生直接互操作**：FFIgen / JNIgen 已稳定，但当前 iOS 图片正文走文件通道，MethodChannel 主要传小控制消息。先测自有文件服务的调用开销，再判断是否迁移；即使改用直接互操作，跨 TeaVM 边界的正式协议、generation、限额、取消与释放 ACK 仍须保留。当前不恢复原生现场验收。
 - **WebParagraph**：仍是实验预览，阅读主体为图片，潜在收益主要在中文 UI、文本布局与冷启动。取得相关瓶颈后再做对照，不纳入首批完成条件。
 - **引擎内建改善**：iOS 触控调度等随 SDK 更新取得实现变化，不据此重写现有手势或宣称目标设备性能已通过。

@@ -1,6 +1,6 @@
 # Flutter 3.50 / Dart 3.14 更新验证
 
-2026-11-13，进行中。范围见[更新计划](../plan/flutter-3.50.md)。本记录区分本机工程、CI 构建、Web 交互、生产与原生证据。
+2026-11-13，首批上线与生产验收通过；Wasm 性能对照及后续候选待验。范围见[更新计划](../plan/flutter-3.50.md)。本记录区分本机工程、CI 构建、Web 交互、生产与原生证据。
 
 ## 工具链与工程
 
@@ -38,10 +38,16 @@ Android 静态核对仍为 AGP 9.1.0、模板 `builtInKotlin=false` / `newDsl=fa
 
 ## CI、浏览器与发布
 
-[完整分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/43262649795)在 `0fbafda` 通过，包含正式 JavaScript 与 Wasm 编译；[同提交采集候选 CI](https://github.com/Wybxc/karuyomi/actions/runs/43264080190)在 `5b33c24` 通过。[PR #3](https://github.com/Wybxc/karuyomi/pull/3)已合入主线 `63723e9`。主线检查通过并部署 Worker `5c7a070f-d2cd-41ba-8a71-814ed91769e4`，D1 无待应用迁移，但[发布后校验](https://github.com/Wybxc/karuyomi/actions/runs/43266282323)收到插件哈希 HTML 的 307 而失败。Cloudflare 的[默认 HTML 规范化](https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/)会移除 `.html`；校验器调整为跟随公开资源重定向后继续检查大小、完整哈希和缓存头，API Access 检查仍手动观察跳转。补充真实插件 HTML 形状后，15 项发布回归和 11 项 Vite/harness 回归通过；修复发布与最终生产验收仍待完成。
+[完整分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/43262649795)在 `0fbafda` 通过，包含正式 JavaScript 与 Wasm 编译；[同提交采集候选 CI](https://github.com/Wybxc/karuyomi/actions/runs/43264080190)在 `5b33c24` 通过。[PR #3](https://github.com/Wybxc/karuyomi/pull/3)已合入主线 `63723e9`。主线检查通过并部署 Worker `5c7a070f-d2cd-41ba-8a71-814ed91769e4`，D1 无待应用迁移，但[首次发布后校验](https://github.com/Wybxc/karuyomi/actions/runs/43266282323)收到插件哈希 HTML 的 307 而失败。Cloudflare 的[默认 HTML 规范化](https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/)会移除 `.html`；校验器调整为跟随公开资源重定向后继续检查大小、完整哈希和缓存头，API Access 检查仍手动观察跳转。补充真实插件 HTML 形状后，15 项发布回归和 11 项 Vite/harness 回归通过；修复的[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/43270207582)与 [PR 检查](https://github.com/Wybxc/karuyomi/actions/runs/43270312482)均通过，[PR #4](https://github.com/Wybxc/karuyomi/pull/4)已合入主线 `02bd115`。
+
+使用首次生产 CI 保存的正式 `web-release-63723e9…` 记录与修正后的正式校验入口，对仍在服务的同版生产执行完整匿名复验：2026-11-13 01:43（UTC+8），**47 项公开资源**的实际字节数、完整 SHA-256 和声明的缓存策略全部通过；复用 190 包，匿名 `/api/session` 为 302 且目标为配置的 Access team。没有放宽内容校验或跳过 HTML。ignored 证据为 `.local/flutter-350-published-verification/{release,verification}.json` 与 `.local/flutter-350-public-verification.log`。主线后续提交继续由正式 CI 自动构建、部署并复验。
 
 本机仅下载 CI 正常 JavaScript 产物、执行轻量 Vite 装配，没有完整编译 Flutter Web。`main.dart.1b20c295.js` 为 5,003,866 字节；官方原清单 40 条，排除 4 条 Native 专用 payload 后公开 36 条。逐条核对实际大小与短哈希、本地正式 Wrangler harness 的 36 条缓存头，以及 6 份 renderer Wasm 的 `application/wasm` 均通过。ignored 输入记录为 `.local/flutter-350-build-inputs.json`，实际响应为 `.local/flutter-350-harness-assets.json`。
 
-隔离 D1 / Wrangler harness 的正式 CI 产物已在 Codex 内置浏览器完成扩展查询输入、Tab 焦点、xkcd 安装/初始化/热门/详情、章节筛选与全选替换，并显示真实 Dragonfly 第一页；阅读进度获服务端确认。浅色设置获确认后由隔离 API 独立读回，账户与 global revision 均为 1。生产旧 3.47 文档在部署后仍显示实图并能翻页、获服务端保存确认；新文档续读及最终生产 D1 核对继续验收。
+隔离 D1 / Wrangler harness 的正式 CI 产物已在 Codex 内置浏览器完成扩展查询输入、Tab 焦点、xkcd 安装/初始化/热门/详情、章节筛选与全选替换，并显示真实 Dragonfly 第一页；阅读进度获服务端确认。浅色设置获确认后由隔离 API 独立读回，账户与 global revision 均为 1。安装扩展后，漫画背景覆盖保存为白色，独立 API 读回 manga revision 1、有效背景白色；恢复“跟随全局”并保存后，manga revision 2、overrides 为空、有效背景恢复全局黑色。对应 ignored 记录为 `.local/flutter-350-manga-settings-{override,inherited}.json`。本轮专用 harness 与临时标签已关闭。
+
+生产使用既有真实 Access 测试账号。旧 3.47 文档在部署后仍显示 Dragonfly 实图，从第 2 页翻到第 1 页并获服务端确认；限定该账号与作品的 D1 只读核对显示 revision 19 → 20、当前锚点变为第 1 页。新文档 DOM 明确加载 `main.dart.1b20c295.js`，从书架恢复同一第 1 页；1280×720 和 390×844 下控件可达，正文放大/重置与翻页均正常，第 2 页保存后 D1 revision 为 24。退出阅读、关闭文档后，独立新文档从书架恢复到第 2 页实图，D1 仍为 revision 24、收藏不变，最终只读查询 rows_written 为 0。原始核对在 ignored `.local/flutter-350-progress-{before,after-old-tab,after-new-save,after-resume}.json`，截图为 `.local/flutter-350-production-{reading-mobile,resume}.png`。
+
+本轮验证了正常发布切换与恢复，复用了相同 runtime/扩展，没有主动移除旧页面引用的哈希资源，因而不宣称该故障分项通过。390×844 是内置桌面浏览器尺寸模拟，不能代替 iOS Safari、刘海安全区或真机性能。
 
 JavaScript 默认构建与同提交 Wasm 候选均由 CI 编译。Wasm 的收益和默认采用结论仍缺实际运行及同条件测量，维持 JavaScript 默认。原生直接互操作与 WebParagraph 属于后续候选，不阻塞首批交付。
