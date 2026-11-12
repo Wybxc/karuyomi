@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -59,7 +60,7 @@ void main() {
     (tester) async {
       final server = TestBusinessServer();
       final platform = TestPlatform(businessServer: server);
-      await tester.pumpWidget(KaruyomiApp(platform: platform));
+      await tester.pumpApp(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       final catalog = await _browseDetails(tester);
       expect(find.text('加入书架'), findsOneWidget);
@@ -120,7 +121,7 @@ void main() {
         expect(server.appliedMutations, appliedBefore + 1);
         expect(await remoteLibrary.contains(rejected.mangaKey), false);
         expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpApp(const SizedBox.shrink());
         await tester.pumpAndSettle();
         await catalog.closeReadingProgress();
       } finally {
@@ -134,7 +135,7 @@ void main() {
   ) async {
     final server = TestBusinessServer();
     var platform = TestPlatform(businessServer: server);
-    await tester.pumpWidget(KaruyomiApp(platform: platform));
+    await tester.pumpApp(KaruyomiApp(platform: platform));
     await tester.pumpAndSettle();
     var catalog = await _browseDetails(tester);
     await _revealDetails(tester, find.text('加入书架'));
@@ -163,13 +164,13 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.text('继续阅读'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await catalog.closeReadingProgress();
 
     platform = TestPlatform(businessServer: server)
       ..runtimeGeneration = 'second-client-generation';
-    await tester.pumpWidget(KaruyomiApp(platform: platform));
+    await tester.pumpApp(KaruyomiApp(platform: platform));
     await tester.pumpAndSettle();
     expect(find.text('真实源 DTO 测试'), findsOneWidget);
     expect(platform.invocations, isEmpty);
@@ -204,7 +205,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('书架还是空的'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await catalog.closeReadingProgress();
   });
@@ -213,7 +214,7 @@ void main() {
     'failed favorite write stays retryable and does not block chapter reading',
     (tester) async {
       final platform = TestPlatform();
-      await tester.pumpWidget(KaruyomiApp(platform: platform));
+      await tester.pumpApp(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       final catalog = await _browseDetails(tester);
       platform.businessServer.failWrites = true;
@@ -242,7 +243,7 @@ void main() {
       expect(find.text('移出书架'), findsOneWidget);
       expect(find.text('收藏未能保存，请重试；仍可继续阅读。'), findsNothing);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
     },

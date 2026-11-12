@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:uuid/uuid.dart';
 
@@ -216,18 +217,24 @@ final class _CategoryDraft extends ChangeNotifier {
 
 /// Once a service or identity is lost, an open editor never becomes writable
 /// again. Explicit reopening can resume the same frozen, unconfirmed command.
-abstract class _CategorySession<W extends StatefulWidget> extends State<W> {
+abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
   CatalogController get controller;
   Listenable get lifecycle;
   bool Function() get isCurrent;
   bool expired = false;
-  late final _changes = Listenable.merge([controller, lifecycle]);
 
   @override
   void initState() {
     super.initState();
     expired = !isCurrent();
-    _changes.addListener(_checkSession);
+  }
+
+  void useSession() {
+    final changes = useMemoized(
+      () => Listenable.merge([controller, lifecycle]),
+      [controller, lifecycle],
+    );
+    useOnListenableChange(changes, _checkSession);
   }
 
   void _checkSession() {
@@ -279,15 +286,9 @@ abstract class _CategorySession<W extends StatefulWidget> extends State<W> {
         ),
     ],
   );
-
-  @override
-  void dispose() {
-    _changes.removeListener(_checkSession);
-    super.dispose();
-  }
 }
 
-class _CategoryManager extends StatefulWidget {
+class _CategoryManager extends StatefulHookWidget {
   const _CategoryManager({
     required this.controller,
     required this.repository,
@@ -307,7 +308,7 @@ class _CategoryManager extends StatefulWidget {
 
 class _CategoryManagerState extends _CategorySession<_CategoryManager> {
   late LibraryView _view = widget.view;
-  _CategoryDraft? _draft;
+  late _CategoryDraft? _draft = _pendingEdits[widget.repository.client];
   bool _childOpen = false;
   @override
   CatalogController get controller => widget.controller;
@@ -316,18 +317,6 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
   @override
   bool Function() get isCurrent => widget.isCurrent;
   bool get editable => !expired && !_childOpen && _draft == null;
-
-  @override
-  void initState() {
-    super.initState();
-    _follow(_pendingEdits[widget.repository.client]);
-  }
-
-  void _follow(_CategoryDraft? draft) {
-    _draft?.removeListener(_draftChanged);
-    _draft = draft;
-    _draft?.addListener(_draftChanged);
-  }
 
   void _draftChanged() {
     if (!mounted) return;
@@ -341,7 +330,7 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
           draft?.completed == true &&
           !draft!.reloaded) {
         _view = draft.confirmedView ?? _view;
-        _follow(null);
+        _draft = null;
       }
     });
   }
@@ -349,7 +338,7 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
   Future<void> _execute(_CategoryDraft draft) async {
     if (!current || _childOpen || draft.busy) return;
     setState(() {
-      _follow(draft);
+      _draft = draft;
       _childOpen = !draft.reorder;
     });
     if (draft.reorder) {
@@ -367,9 +356,9 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
     setState(() {
       if (draft.completed) {
         _view = draft.confirmedView ?? _view;
-        _follow(null);
+        _draft = null;
       } else if (!draft.attempted) {
-        _follow(null);
+        _draft = null;
       }
     });
   }
@@ -445,60 +434,64 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: expired || _draft?.busy != true,
-    child: AlertDialog(
-      title: const Text('管理分类'),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              status(_draft),
-              if (_view.categories.isEmpty) const Text('还没有分类。'),
-              for (var index = 0; index < _view.categories.length; index++)
-                _categoryRow(_view.categories[index], index),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: editable && _view.categories.length < 64
-                    ? _command
-                    : null,
-                icon: const Icon(Icons.add),
-                label: const Text('新建分类'),
-              ),
-              if (_view.categories.length == 64) const Text('最多可创建 64 个分类。'),
-              if (_draft case final draft? when !expired) ...[
-                if (draft.blocked && !draft.completed)
-                  FilledButton(
-                    onPressed: draft.busy ? null : _reload,
-                    child: const Text('重新读取并关闭'),
-                  )
-                else if (draft.attempted && !draft.completed)
-                  FilledButton(
-                    onPressed: draft.busy ? null : () => _execute(draft),
-                    child: Text(draft.reorder ? draft.retryLabel : '继续未确认修改'),
-                  ),
+  Widget build(BuildContext context) {
+    useSession();
+    useOnListenableChange(_draft, _draftChanged);
+    return PopScope(
+      canPop: expired || _draft?.busy != true,
+      child: AlertDialog(
+        title: const Text('管理分类'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                status(_draft),
+                if (_view.categories.isEmpty) const Text('还没有分类。'),
+                for (var index = 0; index < _view.categories.length; index++)
+                  _categoryRow(_view.categories[index], index),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: editable && _view.categories.length < 64
+                      ? _command
+                      : null,
+                  icon: const Icon(Icons.add),
+                  label: const Text('新建分类'),
+                ),
+                if (_view.categories.length == 64) const Text('最多可创建 64 个分类。'),
+                if (_draft case final draft? when !expired) ...[
+                  if (draft.blocked && !draft.completed)
+                    FilledButton(
+                      onPressed: draft.busy ? null : _reload,
+                      child: const Text('重新读取并关闭'),
+                    )
+                  else if (draft.attempted && !draft.completed)
+                    FilledButton(
+                      onPressed: draft.busy ? null : () => _execute(draft),
+                      child: Text(draft.reorder ? draft.retryLabel : '继续未确认修改'),
+                    ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: !expired && _draft?.busy == true
+                ? null
+                : () => Navigator.pop(context),
+            child: Text(
+              _draft?.attempted == true && _draft?.completed != true
+                  ? '稍后处理'
+                  : '完成',
+            ),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: !expired && _draft?.busy == true
-              ? null
-              : () => Navigator.pop(context),
-          child: Text(
-            _draft?.attempted == true && _draft?.completed != true
-                ? '稍后处理'
-                : '完成',
-          ),
-        ),
-      ],
-    ),
-  );
+    );
+  }
 
   Widget _categoryRow(LibraryCategory category, int index) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
@@ -537,15 +530,9 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
       ],
     ),
   );
-
-  @override
-  void dispose() {
-    _draft?.removeListener(_draftChanged);
-    super.dispose();
-  }
 }
 
-class _CategoryCommand extends StatefulWidget {
+class _CategoryCommand extends StatefulHookWidget {
   const _CategoryCommand({
     required this.controller,
     required this.lifecycle,
@@ -561,7 +548,7 @@ class _CategoryCommand extends StatefulWidget {
 }
 
 class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
-  late final _name = TextEditingController(text: widget.draft.name ?? '');
+  late TextEditingController _name;
   late final _selection = {...widget.draft.selection};
   final _form = GlobalKey<FormState>();
   _CategoryDraft get draft => widget.draft;
@@ -572,16 +559,6 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
   @override
   bool Function() get isCurrent => widget.isCurrent;
   bool get editable => !expired && !draft.attempted;
-
-  @override
-  void initState() {
-    super.initState();
-    draft.addListener(_draftChanged);
-  }
-
-  void _draftChanged() {
-    if (mounted) setState(() {});
-  }
 
   Future<void> _save() async {
     if (!current || draft.busy || draft.blocked) return;
@@ -603,95 +580,97 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: expired || !draft.busy,
-    child: AlertDialog(
-      title: Text(draft.title),
-      content: SizedBox(
-        width: 440,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (draft.description case final description?)
-                  Text(description),
-                if (draft.name != null)
-                  TextFormField(
-                    controller: _name,
-                    enabled: editable,
-                    autofocus: true,
-                    decoration: const InputDecoration(labelText: '分类名称'),
-                    validator: (text) {
-                      try {
-                        validateBusinessCategoryName((text ?? '').trim());
-                        return null;
-                      } on FormatException {
-                        return '名称不能为空，且最多 100 字、256 字节。';
-                      }
-                    },
-                  ),
-                if (draft.categories case final categories?) ...[
-                  if (categories.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Text('还没有分类，请先在书架中管理分类。'),
+  Widget build(BuildContext context) {
+    useSession();
+    _name = useTextEditingController(text: draft.name ?? '');
+    useListenable(draft);
+    return PopScope(
+      canPop: expired || !draft.busy,
+      child: AlertDialog(
+        title: Text(draft.title),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (draft.description case final description?)
+                    Text(description),
+                  if (draft.name != null)
+                    TextFormField(
+                      controller: _name,
+                      enabled: editable,
+                      autofocus: true,
+                      decoration: const InputDecoration(labelText: '分类名称'),
+                      validator: (text) {
+                        try {
+                          validateBusinessCategoryName((text ?? '').trim());
+                          return null;
+                        } on FormatException {
+                          return '名称不能为空，且最多 100 字、256 字节。';
+                        }
+                      },
                     ),
-                  for (final category in categories)
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(category.name),
-                      value: _selection.contains(category.id),
-                      onChanged: editable
-                          ? (selected) => setState(() {
-                              if (selected == true) {
-                                _selection.add(category.id);
-                              } else {
-                                _selection.remove(category.id);
-                              }
-                            })
-                          : null,
-                    ),
+                  if (draft.categories case final categories?) ...[
+                    if (categories.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Text('还没有分类，请先在书架中管理分类。'),
+                      ),
+                    for (final category in categories)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(category.name),
+                        value: _selection.contains(category.id),
+                        onChanged: editable
+                            ? (selected) => setState(() {
+                                if (selected == true) {
+                                  _selection.add(category.id);
+                                } else {
+                                  _selection.remove(category.id);
+                                }
+                              })
+                            : null,
+                      ),
+                  ],
+                  status(draft),
                 ],
-                status(draft),
-              ],
+              ),
             ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: !expired && draft.busy
+                ? null
+                : () => Navigator.pop(context),
+            child: Text(
+              draft.completed
+                  ? '完成'
+                  : draft.attempted
+                  ? '稍后处理'
+                  : '取消',
+            ),
+          ),
+          if (draft.blocked)
+            FilledButton(
+              onPressed: expired || draft.busy ? null : _reload,
+              child: const Text('重新读取并关闭'),
+            )
+          else
+            FilledButton(
+              onPressed: expired || draft.busy || draft.completed
+                  ? null
+                  : _save,
+              child: Text(
+                draft.attempted ? draft.retryLabel : draft.submitLabel,
+              ),
+            ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: !expired && draft.busy
-              ? null
-              : () => Navigator.pop(context),
-          child: Text(
-            draft.completed
-                ? '完成'
-                : draft.attempted
-                ? '稍后处理'
-                : '取消',
-          ),
-        ),
-        if (draft.blocked)
-          FilledButton(
-            onPressed: expired || draft.busy ? null : _reload,
-            child: const Text('重新读取并关闭'),
-          )
-        else
-          FilledButton(
-            onPressed: expired || draft.busy || draft.completed ? null : _save,
-            child: Text(draft.attempted ? draft.retryLabel : draft.submitLabel),
-          ),
-      ],
-    ),
-  );
-
-  @override
-  void dispose() {
-    draft.removeListener(_draftChanged);
-    _name.dispose();
-    super.dispose();
+    );
   }
 }

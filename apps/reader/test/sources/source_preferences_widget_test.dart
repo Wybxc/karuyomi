@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
@@ -21,7 +22,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Scaffold(
           body: SourceBrowsePage(

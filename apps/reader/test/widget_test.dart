@@ -1,3 +1,4 @@
+import 'test_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -37,7 +38,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(const KaruyomiApp());
+      await tester.pumpApp(const KaruyomiApp());
       await tester.pumpAndSettle();
       expect(find.text('书架还是空的'), findsOneWidget);
       expect(
@@ -63,7 +64,7 @@ void main() {
     'chapter navigation preserves Source reference and Native reports its image gate',
     (tester) async {
       final platform = TestPlatform();
-      await tester.pumpWidget(KaruyomiApp(platform: platform));
+      await tester.pumpApp(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       await _browseDetails(tester);
       expect(find.text('漫画源返回的完整简介'), findsOneWidget);
@@ -112,7 +113,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(platform.imageControls.last.$1, 'closePageSession');
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
@@ -121,7 +122,7 @@ void main() {
     'chapter completion during details exit closes its session without opening Reader',
     (tester) async {
       final platform = TestPlatform();
-      await tester.pumpWidget(KaruyomiApp(platform: platform));
+      await tester.pumpApp(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       await _browseDetails(tester);
       await tester.scrollUntilVisible(
@@ -180,7 +181,7 @@ void main() {
         'generation': 'generation-1',
       });
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
@@ -197,7 +198,7 @@ void main() {
           'sourceId': sourceId,
         },
       };
-      await tester.pumpWidget(KaruyomiApp(platform: platform));
+      await tester.pumpApp(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       expect(find.text('登录后继续浏览'), findsOneWidget);
       await tester.tap(find.text('登录').first);
@@ -223,7 +224,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('真实源 DTO 测试'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );

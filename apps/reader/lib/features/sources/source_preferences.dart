@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/source_preferences_repository.dart';
 import '../browse/catalog_controller.dart';
 import 'source_preferences_controller.dart';
 
-class SourcePreferencesSheet extends StatefulWidget {
+class SourcePreferencesSheet extends StatefulHookWidget {
   const SourcePreferencesSheet({
     super.key,
     required this.catalog,
@@ -305,123 +306,115 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, _) {
-      final snapshot = _controller.snapshot;
-      final pending = _controller.pending;
-      return Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          children: [
-            ListTile(
-              title: const Text('漫画源设置'),
-              subtitle: Text(widget.target.source.name),
-              trailing: IconButton(
-                tooltip: '关闭设置',
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  _closing = true;
-                  _controller.cancelActiveRequest();
-                  Navigator.of(context).pop();
-                },
-              ),
+  Widget build(BuildContext context) {
+    useListenable(_controller);
+    final snapshot = _controller.snapshot;
+    final pending = _controller.pending;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(
+        children: [
+          ListTile(
+            title: const Text('漫画源设置'),
+            subtitle: Text(widget.target.source.name),
+            trailing: IconButton(
+              tooltip: '关闭设置',
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                _closing = true;
+                _controller.cancelActiveRequest();
+                Navigator.of(context).pop();
+              },
             ),
-            if (_controller.busy) ...[
-              const LinearProgressIndicator(),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Text('正在处理。关闭会取消运行中的请求，可能需要重新连接。'),
-              ),
-            ],
-            Expanded(
-              child: ListView(
-                key: const ValueKey('source-preferences-form'),
-                padding: const EdgeInsets.all(24),
-                children: [
-                  if (!_current) const Text('身份或服务已变化，请关闭后重新打开设置。'),
-                  if (_controller.error != null) Text(_controller.error!),
-                  if (_controller.message != null) Text(_controller.message!),
-                  if (pending != null) ...[
-                    Text(
-                      '未确认的原保存请求 · 基于版本 ${pending.request.expectedRevision}',
-                    ),
-                    Text(
-                      '包含 ${pending.request.entries.length} 项可同步设置；密码和会话值不在请求中。',
-                    ),
-                    FilledButton(
-                      key: const ValueKey('source-preferences-retry'),
-                      onPressed:
-                          _controller.available &&
-                              !_controller.busy &&
-                              pending.retryable
-                          ? () => unawaited(_controller.retry())
-                          : null,
-                      child: const Text('重试原保存请求'),
-                    ),
-                  ],
-                  if (_controller.needsRecovery || pending != null)
-                    OutlinedButton(
-                      key: const ValueKey('source-preferences-recover'),
-                      onPressed: _controller.available && !_controller.busy
-                          ? () => unawaited(_controller.recover())
-                          : null,
-                      child: const Text('读取服务端状态并重新打开'),
-                    ),
-                  if (snapshot == null &&
-                      !_controller.busy &&
-                      !_controller.needsRecovery &&
-                      pending == null)
-                    OutlinedButton(
-                      onPressed: _controller.available
-                          ? () => unawaited(_controller.load())
-                          : null,
-                      child: const Text('重试读取设置'),
-                    ),
-                  if (snapshot != null) ...[
-                    const Text('每次修改只执行一次漫画源操作。非敏感设置收到服务器确认后生效；密码及会话设置不会同步。'),
-                    const SizedBox(height: 12),
-                    if (snapshot.nodes.isEmpty) const Text('这个漫画源没有额外设置。'),
-                    KeyedSubtree(
-                      key: ValueKey(snapshot.snapshotId),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (
-                            var index = 0;
-                            index < snapshot.nodes.length;
-                            index++
-                          )
-                            _node(snapshot.nodes[index], [index], true),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: OutlinedButton.icon(
-                key: const ValueKey('source-preferences-refresh'),
-                onPressed:
-                    _controller.available &&
-                        !_controller.busy &&
-                        pending == null
-                    ? () => unawaited(_controller.load(reopen: true))
-                    : null,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重新读取并刷新漫画源'),
-              ),
+          ),
+          if (_controller.busy) ...[
+            const LinearProgressIndicator(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Text('正在处理。关闭会取消运行中的请求，可能需要重新连接。'),
             ),
           ],
-        ),
-      );
-    },
-  );
+          Expanded(
+            child: ListView(
+              key: const ValueKey('source-preferences-form'),
+              padding: const EdgeInsets.all(24),
+              children: [
+                if (!_current) const Text('身份或服务已变化，请关闭后重新打开设置。'),
+                if (_controller.error != null) Text(_controller.error!),
+                if (_controller.message != null) Text(_controller.message!),
+                if (pending != null) ...[
+                  Text('未确认的原保存请求 · 基于版本 ${pending.request.expectedRevision}'),
+                  Text(
+                    '包含 ${pending.request.entries.length} 项可同步设置；密码和会话值不在请求中。',
+                  ),
+                  FilledButton(
+                    key: const ValueKey('source-preferences-retry'),
+                    onPressed:
+                        _controller.available &&
+                            !_controller.busy &&
+                            pending.retryable
+                        ? () => unawaited(_controller.retry())
+                        : null,
+                    child: const Text('重试原保存请求'),
+                  ),
+                ],
+                if (_controller.needsRecovery || pending != null)
+                  OutlinedButton(
+                    key: const ValueKey('source-preferences-recover'),
+                    onPressed: _controller.available && !_controller.busy
+                        ? () => unawaited(_controller.recover())
+                        : null,
+                    child: const Text('读取服务端状态并重新打开'),
+                  ),
+                if (snapshot == null &&
+                    !_controller.busy &&
+                    !_controller.needsRecovery &&
+                    pending == null)
+                  OutlinedButton(
+                    onPressed: _controller.available
+                        ? () => unawaited(_controller.load())
+                        : null,
+                    child: const Text('重试读取设置'),
+                  ),
+                if (snapshot != null) ...[
+                  const Text('每次修改只执行一次漫画源操作。非敏感设置收到服务器确认后生效；密码及会话设置不会同步。'),
+                  const SizedBox(height: 12),
+                  if (snapshot.nodes.isEmpty) const Text('这个漫画源没有额外设置。'),
+                  KeyedSubtree(
+                    key: ValueKey(snapshot.snapshotId),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (
+                          var index = 0;
+                          index < snapshot.nodes.length;
+                          index++
+                        )
+                          _node(snapshot.nodes[index], [index], true),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: OutlinedButton.icon(
+              key: const ValueKey('source-preferences-refresh'),
+              onPressed:
+                  _controller.available && !_controller.busy && pending == null
+                  ? () => unawaited(_controller.load(reopen: true))
+                  : null,
+              icon: const Icon(Icons.refresh),
+              label: const Text('重新读取并刷新漫画源'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -431,61 +424,51 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
   }
 }
 
-class _PreferenceTextDialog extends StatefulWidget {
+class _PreferenceTextDialog extends HookWidget {
   const _PreferenceTextDialog({required this.node});
   final wire.PreferenceNode node;
-  @override
-  State<_PreferenceTextDialog> createState() => _PreferenceTextDialogState();
-}
 
-class _PreferenceTextDialogState extends State<_PreferenceTextDialog> {
-  late final TextEditingController _input;
   @override
-  void initState() {
-    super.initState();
-    final preference = widget.node.text;
+  Widget build(BuildContext context) {
+    final preference = node.text;
     final text = preference.hasValue() ? preference.value : '';
-    _input = TextEditingController(text: text);
-    if (preference.selectAllOnOpen) {
-      _input.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: text.length,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.node.title),
-    content: TextField(
-      controller: _input,
-      autofocus: true,
-      obscureText: widget.node.text.secret,
-      maxLength: 4096,
-      decoration: InputDecoration(
-        labelText: widget.node.title,
-        hintText: widget.node.text.hasHint() ? widget.node.text.hint : null,
-        helperText:
-            widget.node.syncScope ==
-                wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_ACCOUNT
-            ? '确认后同步到其他设备'
-            : '仅保留在当前客户端会话',
+    final input = useTextEditingController(text: text);
+    useEffect(() {
+      if (preference.selectAllOnOpen) {
+        input.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: text.length,
+        );
+      }
+      return null;
+    }, const []);
+    return AlertDialog(
+      title: Text(node.title),
+      content: TextField(
+        controller: input,
+        autofocus: true,
+        obscureText: preference.secret,
+        maxLength: 4096,
+        decoration: InputDecoration(
+          labelText: node.title,
+          hintText: preference.hasHint() ? preference.hint : null,
+          helperText:
+              node.syncScope ==
+                  wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_ACCOUNT
+              ? '确认后同步到其他设备'
+              : '仅保留在当前客户端会话',
+        ),
       ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('取消'),
-      ),
-      FilledButton(
-        onPressed: () => Navigator.pop(context, _input.text),
-        child: const Text('应用此设置'),
-      ),
-    ],
-  );
-  @override
-  void dispose() {
-    _input.dispose();
-    super.dispose();
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, input.text),
+          child: const Text('应用此设置'),
+        ),
+      ],
+    );
   }
 }

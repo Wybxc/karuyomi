@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/services.dart';
 import 'reader_baseline.dart';
 import 'reader_baseline_file_cleanup_stub.dart'
@@ -27,7 +28,7 @@ class ReaderBaselineHost extends StatelessWidget {
   );
 }
 
-class _ReaderBaselineContents extends StatefulWidget {
+class _ReaderBaselineContents extends StatefulHookWidget {
   const _ReaderBaselineContents({
     required this.child,
     this.saveReportForTesting,
@@ -53,45 +54,43 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
   @override
   void initState() {
     super.initState();
-    _recorder.addListener(_changed);
     // Let the app finish its first layout before adding focusable diagnostics.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _controlsReady = true);
     });
   }
 
-  void _changed() {
-    if (mounted) setState(() {});
-  }
-
   @override
-  Widget build(BuildContext context) => ReaderBaselineScope(
-    recorder: _recorder,
-    child: Stack(
-      children: [
-        widget.child,
-        if (_controlsReady)
-          Positioned(
-            right: 8,
-            top: MediaQuery.paddingOf(context).top + 8,
-            child: _open
-                ? _panel()
-                : Material(
-                    elevation: 4,
-                    borderRadius: BorderRadius.circular(20),
-                    child: TextButton.icon(
-                      onPressed: () {
-                        _recorder.event('capture_panel_opened');
-                        setState(() => _open = true);
-                      },
-                      icon: const Icon(Icons.speed),
-                      label: const Text('性能采集'),
+  Widget build(BuildContext context) {
+    useListenable(_recorder);
+    return ReaderBaselineScope(
+      recorder: _recorder,
+      child: Stack(
+        children: [
+          widget.child,
+          if (_controlsReady)
+            Positioned(
+              right: 8,
+              top: MediaQuery.paddingOf(context).top + 8,
+              child: _open
+                  ? _panel()
+                  : Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(20),
+                      child: TextButton.icon(
+                        onPressed: () {
+                          _recorder.event('capture_panel_opened');
+                          setState(() => _open = true);
+                        },
+                        icon: const Icon(Icons.speed),
+                        label: const Text('性能采集'),
+                      ),
                     ),
-                  ),
-          ),
-      ],
-    ),
-  );
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _panel() => SizedBox(
     width: (MediaQuery.sizeOf(context).width - 16).clamp(0, 560),
@@ -272,7 +271,6 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
   @override
   void dispose() {
     _resetReport();
-    _recorder.removeListener(_changed);
     _recorder.dispose();
     super.dispose();
   }

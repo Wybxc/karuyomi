@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -18,10 +20,11 @@ import '../migration/migration_page.dart';
 import 'category_dialogs.dart';
 import 'library_batch.dart';
 import 'library_batch_dialogs.dart';
+import 'library_providers.dart';
 
 enum _LibrarySort { added, title }
 
-class LibraryPage extends StatefulWidget {
+class LibraryPage extends StatefulHookConsumerWidget {
   const LibraryPage({
     super.key,
     required this.controller,
@@ -38,21 +41,18 @@ class LibraryPage extends StatefulWidget {
   final ReaderAuthentication? onAuthenticateReader;
 
   @override
-  State<LibraryPage> createState() => _LibraryPageState();
+  ConsumerState<LibraryPage> createState() => _LibraryPageState();
 }
 
-class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
-  final _search = TextEditingController();
+class _LibraryPageState extends ConsumerState<LibraryPage> {
+  late TextEditingController _search;
   LibraryRepository? _repository;
   CoverRepository? _covers;
-  Stream<LibraryView>? _views;
-  final _editLifecycle = ValueNotifier(0);
+  late ValueNotifier<int> _editLifecycle;
   String? _categoryFilter;
   bool _editing = false;
   bool _disposing = false;
   _LibrarySort _sort = _LibrarySort.added;
-  int _retry = 0;
-  ServiceStatus? _lastStatus;
   bool _opening = false;
   bool _catalogChangeScheduled = false;
   String? _refreshError;
@@ -63,20 +63,8 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   bool _selecting = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    widget.controller?.addListener(_catalogChanged);
-    _bindRepository();
-  }
-
-  @override
   void didUpdateWidget(LibraryPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller?.removeListener(_catalogChanged);
-      widget.controller?.addListener(_catalogChanged);
-    }
     _bindRepository();
   }
 
@@ -93,11 +81,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
       }
       return;
     }
-    final status = widget.controller?.status;
-    final reconnected = status == ServiceStatus.ready && _lastStatus != status;
-    _lastStatus = status;
     setState(_bindRepository);
-    if (reconnected) unawaited(_refresh());
   }
 
   void _bindRepository() {
@@ -118,14 +102,7 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     _openError = null;
     _retryingMetadata = null;
     _metadataAttempt = null;
-    _views = next?.watchView();
     _categoryFilter = null;
-    _search.clear();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_refresh());
   }
 
   Future<void> _refresh() async {
@@ -143,10 +120,11 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
     }
   }
 
-  void _retryStorage() => setState(() {
-    _retry++;
-    _views = _repository?.watchView();
-  });
+  void _retryStorage() {
+    if (_repository case final repository?) {
+      ref.invalidate(libraryViewProvider(repository));
+    }
+  }
 
   Future<void> _open(LibraryEntry entry, {bool continueReading = false}) async {
     final controller = widget.controller;
@@ -517,75 +495,86 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   }
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1100),
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          if (_opening || widget.controller?.busy == true) ...[
-            const LinearProgressIndicator(),
-            const SizedBox(height: 12),
-          ],
-          if (widget.controller?.error case final error?) _notice(error),
-          if (_refreshError case final error?) _notice(error),
-          if (_openError case final error?) _notice(error),
-          if (widget.controller case final controller?)
-            if (controller.status != ServiceStatus.ready)
-              _connection(controller),
-          if (_repository != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => unawaited(_refresh()),
-                icon: const Icon(Icons.sync),
-                label: const Text('刷新服务端书架'),
+  Widget build(BuildContext context) {
+    _editLifecycle = useValueNotifier(0);
+    useEffect(() {
+      _bindRepository();
+      return null;
+    }, const []);
+    useOnListenableChange(widget.controller, _catalogChanged);
+    _search = useTextEditingController(keys: [_repository]);
+    useListenable(_search);
+    useOnAppLifecycleStateChange((previous, state) {
+      if (state == AppLifecycleState.resumed) unawaited(_refresh());
+    });
+    final AsyncValue<LibraryView?> snapshot = _repository == null
+        ? const AsyncData(null)
+        : ref.watch(libraryViewProvider(_repository!));
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            if (_opening || widget.controller?.busy == true) ...[
+              const LinearProgressIndicator(),
+              const SizedBox(height: 12),
+            ],
+            if (widget.controller?.error case final error?) _notice(error),
+            if (_refreshError case final error?) _notice(error),
+            if (_openError case final error?) _notice(error),
+            if (widget.controller case final controller?)
+              if (controller.status != ServiceStatus.ready)
+                _connection(controller),
+            if (_repository != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => unawaited(_refresh()),
+                  icon: const Icon(Icons.sync),
+                  label: const Text('刷新服务端书架'),
+                ),
               ),
-            ),
-          StreamBuilder<LibraryView>(
-            key: ValueKey((_repository, _repository?.identity.key, _retry)),
-            stream: _views,
-            builder: (context, snapshot) {
-              if (snapshot.hasError && !snapshot.hasData) {
-                return Column(
-                  children: [
-                    _notice('未能读取服务端书架，请重试。'),
-                    TextButton(
-                      onPressed: _retryStorage,
-                      child: const Text('重试读取书架'),
-                    ),
-                  ],
-                );
-              }
-              if (_views != null && !snapshot.hasData) {
-                return const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: Text('正在读取书架')),
-                );
-              }
-              final view = snapshot.data;
-              if (view == null) {
-                return _repository == null && widget.controller != null
-                    ? const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('连接并确认身份后显示服务端书架。'),
-                      )
-                    : _empty();
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (snapshot.hasError) _notice('未能读取服务端书架，当前显示上次确认的结果。'),
-                  _categoryControls(view),
-                  if (view.entries.isEmpty) _empty() else _library(view),
-                ],
-              );
-            },
-          ),
-        ],
+            _libraryContents(snapshot),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _libraryContents(AsyncValue<LibraryView?> snapshot) {
+    if (snapshot.hasError && !snapshot.hasValue) {
+      return Column(
+        children: [
+          _notice('未能读取服务端书架，请重试。'),
+          TextButton(onPressed: _retryStorage, child: const Text('重试读取书架')),
+        ],
+      );
+    }
+    if (_repository != null && !snapshot.hasValue) {
+      return const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: Text('正在读取书架')),
+      );
+    }
+    final view = snapshot.value;
+    if (view == null) {
+      return _repository == null && widget.controller != null
+          ? const Padding(
+              padding: EdgeInsets.all(32),
+              child: Text('连接并确认身份后显示服务端书架。'),
+            )
+          : _empty();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (snapshot.hasError) _notice('未能读取服务端书架，当前显示上次确认的结果。'),
+        _categoryControls(view),
+        if (view.entries.isEmpty) _empty() else _library(view),
+      ],
+    );
+  }
 
   Widget _connection(CatalogController controller) {
     final needsLogin = controller.accessPaused;
@@ -788,7 +777,6 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
       children: [
         TextField(
           controller: _search,
-          onChanged: (_) => setState(() {}),
           decoration: const InputDecoration(
             labelText: '搜索书架',
             hintText: '漫画、作者或漫画源',
@@ -1045,10 +1033,6 @@ class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver {
   void dispose() {
     _disposing = true;
     _editLifecycle.value++;
-    _editLifecycle.dispose();
-    widget.controller?.removeListener(_catalogChanged);
-    WidgetsBinding.instance.removeObserver(this);
-    _search.dispose();
     super.dispose();
   }
 }

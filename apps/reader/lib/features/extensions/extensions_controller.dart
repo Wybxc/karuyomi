@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 import 'package:uuid/uuid.dart';
@@ -19,15 +20,15 @@ final class ExtensionsController extends ChangeNotifier {
     required this.catalog,
     required this.repository,
     required this.isCurrent,
+    required this.container,
   }) {
     if (!identical(catalog.settings, repository) || catalog.accessPaused) {
       _retire();
     }
-    settings = SettingsController(
-      repository: repository,
-      isCurrent: () => available,
+    _settingsSubscription = container.listen(
+      settingsControllerProvider(catalog, repository),
+      (_, _) => _changed(),
     );
-    settings.addListener(_changed);
     catalog.addListener(_changed);
   }
 
@@ -35,7 +36,12 @@ final class ExtensionsController extends ChangeNotifier {
   final CatalogController catalog;
   final SettingsRepository repository;
   final bool Function() isCurrent;
-  late final SettingsController settings;
+  final ProviderContainer container;
+  late final ProviderSubscription<SettingsState> _settingsSubscription;
+  SettingsState get settings =>
+      container.read(settingsControllerProvider(catalog, repository));
+  SettingsController get _settingsCommands =>
+      container.read(settingsControllerProvider(catalog, repository).notifier);
   wire.ExtensionCacheState? cache;
   String? error;
   String? message;
@@ -76,7 +82,7 @@ final class ExtensionsController extends ChangeNotifier {
   Future<void> refresh({bool catalogToo = false}) async {
     if (!available || busy) return;
     await _run(() async {
-      final refreshed = await settings.refresh();
+      final refreshed = await _settingsCommands.refresh();
       if (!available) return;
       if (refreshed) {
         await catalog.applyConfirmedInstallations(settings.snapshot!);
@@ -174,7 +180,7 @@ final class ExtensionsController extends ChangeNotifier {
       );
       activity = ExtensionActivity.saving;
       _changed();
-      final saved = await settings.saveGlobal(values, revision);
+      final saved = await _settingsCommands.saveGlobal(values, revision);
       if (!available) return;
       if (saved) await catalog.applyConfirmedInstallations(settings.snapshot!);
       if (!available) return;
@@ -245,7 +251,7 @@ final class ExtensionsController extends ChangeNotifier {
       values.repositories.add(preview.repository.deepCopy());
       activity = ExtensionActivity.saving;
       _changed();
-      final saved = await settings.saveGlobal(
+      final saved = await _settingsCommands.saveGlobal(
         values,
         preview.baseline.globalRevision,
       );
@@ -277,7 +283,10 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       activity = ExtensionActivity.saving;
       _changed();
-      final saved = await settings.saveGlobal(values, initial.globalRevision);
+      final saved = await _settingsCommands.saveGlobal(
+        values,
+        initial.globalRevision,
+      );
       if (!saved || !available) return;
       message = '仓库已移除；安装选择、书架和来源数据保留，对应运行槽将关闭。';
       await catalog.applyConfirmedInstallations(settings.snapshot!);
@@ -299,7 +308,7 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       activity = ExtensionActivity.saving;
       _changed();
-      if (await settings.saveGlobal(values, initial.globalRevision) &&
+      if (await _settingsCommands.saveGlobal(values, initial.globalRevision) &&
           available) {
         await catalog.applyConfirmedInstallations(settings.snapshot!);
         message = enabled ? '账户已确认启用。' : '账户已确认停用。';
@@ -321,7 +330,7 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       activity = ExtensionActivity.saving;
       _changed();
-      if (!await settings.saveGlobal(values, initial.globalRevision) ||
+      if (!await _settingsCommands.saveGlobal(values, initial.globalRevision) ||
           !available) {
         return;
       }
@@ -438,7 +447,7 @@ final class ExtensionsController extends ChangeNotifier {
   Future<void> retry() async {
     if (!available || busy) return;
     await _run(() async {
-      if (await settings.retry() && available) {
+      if (await _settingsCommands.retry() && available) {
         await catalog.applyConfirmedInstallations(settings.snapshot!);
         cache = await catalog.runtime.extensionCache();
         message = '原设置操作已由服务端确认；请检查本机缓存状态。';
@@ -493,8 +502,7 @@ final class ExtensionsController extends ChangeNotifier {
         catalog.runtime.cancelPreparation(id).catchError((Object _) {}),
       );
     }
-    settings.removeListener(_changed);
-    settings.dispose();
+    _settingsSubscription.close();
     catalog.removeListener(_changed);
     super.dispose();
   }

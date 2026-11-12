@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -41,7 +42,7 @@ void main() {
       platform.beforeApiFetch = (path) async {
         if (path.startsWith('/api/state/manga/')) await progressGate.future;
       };
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: ChapterReaderRoute(
             catalog: catalog,
@@ -55,7 +56,7 @@ void main() {
       );
       await tester.pump();
       expect(find.byType(ReaderScreen), findsNothing);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pump();
       expect(platform.imageControls.map((entry) => entry.$1), [
         'closePageSession',
@@ -116,7 +117,7 @@ void main() {
           reference: catalog.sourceReference,
           logicalChapterKey: sequence.entries.first.key,
         );
-        await tester.pumpWidget(
+        await tester.pumpApp(
           MaterialApp(
             home: ChapterReaderRoute(
               catalog: catalog,
@@ -170,7 +171,7 @@ void main() {
         if (exitBeforeMount) {
           // Complete the old close and transfer ownership in microtasks, without
           // allowing the next frame to mount the new Reader leaf.
-          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpApp(const SizedBox.shrink());
           await tester.pumpAndSettle();
           expect(find.byType(ReaderScreen), findsNothing);
           expect(
@@ -207,7 +208,7 @@ void main() {
           ),
           hasLength(1),
         );
-        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpApp(const SizedBox.shrink());
         await tester.pumpAndSettle();
         expect(platform.imageControls.last.$1, 'closePageSession');
         expect(tester.takeException(), isNull);
@@ -247,7 +248,7 @@ void main() {
       );
       final delayed = Completer<wire.SourceResult>();
       platform.invokeHandler = (_) => delayed.future;
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: ChapterReaderRoute(
             catalog: catalog,
@@ -262,7 +263,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('下一章'));
       await tester.pump();
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       delayed.complete(
         wire.SourceResult(

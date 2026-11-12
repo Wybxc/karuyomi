@@ -1,15 +1,16 @@
+import '../test_app.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
-import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../data/business_state_server.dart';
+import 'settings_fixture.dart';
 
 const _key = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 wire.GlobalSettingsValues _global({
@@ -31,35 +32,20 @@ void main() {
   late TestBusinessServer server;
   late BusinessStateClient client;
   late SettingsRepository repository;
-  final editors = <SettingsController>[];
+  late SettingsFixture fixture;
 
-  setUp(() {
-    server = TestBusinessServer();
-    client = BusinessStateClient(
-      api: server,
-      identity: ProgressIdentity(
-        origin: Uri.parse('https://reader.example'),
-        subject: 'owner-subject',
-      ),
-    );
-    repository = SettingsRepository(client);
-    editors.clear();
+  setUp(() async {
+    fixture = SettingsFixture();
+    await fixture.connect();
+    server = fixture.platform.businessServer;
+    repository = fixture.catalog.settings!;
+    client = repository.client;
   });
-  tearDown(() async {
-    for (final editor in editors) {
-      editor.dispose();
-    }
-    await client.dispose();
-  });
-  SettingsController editor({bool manga = false}) {
-    final value = SettingsController(
-      repository: repository,
-      mangaKey: manga ? _key : null,
-      isCurrent: () => true,
-    );
-    editors.add(value);
-    return value;
-  }
+  tearDown(() => fixture.dispose());
+  SettingsController editor({bool manga = false}) =>
+      fixture.editor(mangaKey: manga ? _key : null);
+  SettingsState state({bool manga = false}) =>
+      fixture.state(mangaKey: manga ? _key : null);
 
   Future<void> show(
     WidgetTester tester,
@@ -70,23 +56,24 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: manga
-                ? MangaSettingsEditor(controller: controller)
-                : GlobalSettingsPanel(controller: controller),
+                ? MangaSettingsEditor(catalog: fixture.catalog, mangaKey: _key)
+                : GlobalSettingsPanel(catalog: fixture.catalog),
           ),
         ),
       ),
+      container: fixture.container,
     );
     await tester.pumpAndSettle();
   }
 
   Future<void> hide(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
   }
 
@@ -129,7 +116,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(controller.snapshot!.globalRevision, 1);
+    expect(state().snapshot!.globalRevision, 1);
     expect(tester.takeException(), isNull);
     await hide(tester);
   });
@@ -154,7 +141,7 @@ void main() {
         await repository.loadGlobal();
       });
       await tester.pumpAndSettle();
-      expect(controller.snapshot!.globalRevision, 1);
+      expect(state().snapshot!.globalRevision, 1);
       expect(
         find.byKey(
           const ValueKey(('global-theme', wire.AppTheme.APP_THEME_DARK)),
@@ -165,14 +152,14 @@ void main() {
       expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
       expect(find.text('重试原设置操作'), findsNothing);
-      expect(controller.pending!.retryable, false);
+      expect(state().pending!.retryable, false);
       final rejected = wire.decodeProtoJson(
         wire.SettingsMutation(),
         jsonDecode(writes().last.body!),
       );
       expect(rejected.expectedRevision, 0);
       await tap(tester, find.text('重新读取设置'));
-      expect(controller.pending, isNull);
+      expect(state().pending, isNull);
       expect(
         find.byKey(
           const ValueKey(('global-theme', wire.AppTheme.APP_THEME_LIGHT)),
@@ -189,7 +176,7 @@ void main() {
             .expectedRevision,
         1,
       );
-      expect(controller.snapshot!.globalRevision, 2);
+      expect(state().snapshot!.globalRevision, 2);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -219,16 +206,16 @@ void main() {
       );
       await select<wire.ReaderPageLayout>(tester, '自动');
       await tap(tester, find.text('保存本漫画设置'));
-      expect(controller.snapshot!.overrides!.hasPageLayout(), true);
+      expect(state(manga: true).snapshot!.overrides!.hasPageLayout(), true);
       expect(
-        controller.snapshot!.effectiveReader.pageLayout,
+        state(manga: true).snapshot!.effectiveReader.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
       );
       await select<wire.ReaderPageLayout>(tester, '跟随全局');
       await tap(tester, find.text('保存本漫画设置'));
-      expect(controller.snapshot!.overrides!.hasPageLayout(), false);
+      expect(state(manga: true).snapshot!.overrides!.hasPageLayout(), false);
       expect(
-        controller.snapshot!.effectiveReader.pageLayout,
+        state(manga: true).snapshot!.effectiveReader.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
       );
       expect(tester.takeException(), isNull);
@@ -261,16 +248,16 @@ void main() {
     expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
     expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
     expect(find.text('重试原设置操作'), findsNothing);
-    expect(controller.pending?.retryable, false);
-    expect(controller.canEdit, false);
+    expect(state(manga: true).pending?.retryable, false);
+    expect(state(manga: true).canEdit, false);
     expect(server.appliedMutations, 1);
 
     await tap(tester, find.text('重新读取设置'));
     expect(writes(), hasLength(2));
-    expect(controller.pending, isNull);
-    expect(controller.canEdit, true);
+    expect(state(manga: true).pending, isNull);
+    expect(state(manga: true).canEdit, true);
     expect(
-      controller.snapshot?.overrides?.pageLayout,
+      state(manga: true).snapshot?.overrides?.pageLayout,
       wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
     );
     expect(tester.takeException(), isNull);
@@ -293,11 +280,10 @@ void main() {
         await tap(tester, find.text(manga ? '保存本漫画设置' : '保存全局设置'));
         final original = writes().single.body;
         expect(server.appliedMutations, 1);
-        expect(controller.pending?.retryable, true);
+        expect(state(manga: manga).pending?.retryable, true);
         expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
         await hide(tester);
-        controller.dispose();
-        editors.remove(controller);
+        fixture.invalidate(mangaKey: manga ? _key : null);
         controller = editor(manga: manga);
         await tester.runAsync(controller.refresh);
         await show(tester, controller, manga: manga);
@@ -352,8 +338,8 @@ void main() {
         await tap(tester, find.text('重试原设置操作'));
         expect(writes().map((request) => request.body), [original, original]);
         expect(server.appliedMutations, 1);
-        expect(controller.pending, isNull);
-        expect(controller.canEdit, true);
+        expect(state(manga: manga).pending, isNull);
+        expect(state(manga: manga).canEdit, true);
         expect(tester.takeException(), isNull);
         await hide(tester);
       },

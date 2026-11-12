@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,7 @@ void main() {
     await platform.dispose();
   });
   Future<void> show(WidgetTester tester) async {
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Builder(
           builder: (context) => Scaffold(
@@ -53,7 +54,7 @@ void main() {
   }
 
   Future<void> hide(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox());
+    await tester.pumpApp(const SizedBox());
     await tester.pumpAndSettle();
   }
 

@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
+import '../library/library_providers.dart';
 import '../../data/cover_repository.dart';
 import '../covers/custom_cover.dart';
 import '../covers/custom_cover_editor.dart';
@@ -23,7 +26,7 @@ import '../progress/chapter_read_dialog.dart';
 import '../migration/migration_controller.dart';
 import '../migration/migration_page.dart';
 
-class MangaDetailsPage extends StatefulWidget {
+class MangaDetailsPage extends StatefulHookConsumerWidget {
   const MangaDetailsPage({
     super.key,
     required this.controller,
@@ -39,13 +42,12 @@ class MangaDetailsPage extends StatefulWidget {
   final ReaderAuthentication? onAuthenticateReader;
 
   @override
-  State<MangaDetailsPage> createState() => _MangaDetailsPageState();
+  ConsumerState<MangaDetailsPage> createState() => _MangaDetailsPageState();
 }
 
 enum _ChapterReadFilter { all, read, unread }
 
-class _MangaDetailsPageState extends State<MangaDetailsPage>
-    with WidgetsBindingObserver {
+class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   CatalogController get controller => widget.controller;
   MangaEntry get manga => widget.manga;
   List<ChapterEntry> get chapters => widget.chapters;
@@ -60,9 +62,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   String? _chapterOpenError;
   bool _opening = false;
   LibraryRepository? _library;
-  Stream<wire.MangaState?>? _mangaStream;
   CoverRepository? _covers;
-  final _coverLifecycle = ValueNotifier(0);
+  late ValueNotifier<int> _coverLifecycle;
   bool _editingCover = false;
   bool _savingFavorite = false;
   bool _migrating = false;
@@ -78,16 +79,13 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   int _unmatchedChapterSelectionCount = 0;
   String? _rangeStart;
   String? _rangeEnd;
-  final _chapterSearch = TextEditingController();
+  late TextEditingController _chapterSearch;
   ChapterOrder _chapterOrder = ChapterOrder.source;
   bool _chapterOrderChosen = false;
   final _chapterNameCounts = <String, int>{};
   final _chapterUrlCounts = <String, int>{};
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
+  void _initialize() {
     final build = controller.activeBuild;
     if (build != null) {
       _sequence = ChapterSequence(
@@ -109,7 +107,6 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
         );
       }
       _library = controller.library;
-      _mangaStream = _library?.client.watchManga(_sequence!.mangaKey);
       if (_library != null) _covers = CoverRepository(_library!.client);
       final repository = controller.bookmarks;
       if (repository != null) {
@@ -125,7 +122,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
               controller.status == ServiceStatus.ready &&
               controller.isCurrentSource(source) &&
               identical(controller.bookmarks, repository),
-        )..addListener(_bookmarksChanged);
+        );
         unawaited(_bookmarks!.refresh());
       }
       final progress = controller.readingProgress;
@@ -139,21 +136,16 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
               controller.status == ServiceStatus.ready &&
               controller.isCurrentSource(source) &&
               identical(controller.readingProgress, progress),
-        )..addListener(_detailsChanged);
+        );
         unawaited(_chapterRead!.refresh());
       }
       unawaited(_refreshResume());
     }
-    controller.addListener(_catalogChanged);
   }
 
   @override
   void didUpdateWidget(MangaDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.controller, widget.controller)) {
-      oldWidget.controller.removeListener(_catalogChanged);
-      controller.addListener(_catalogChanged);
-    }
     if (!identical(oldWidget.controller, widget.controller) ||
         !identical(oldWidget.source, widget.source) ||
         !identical(oldWidget.manga, widget.manga) ||
@@ -166,8 +158,6 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
       _detailsChanged();
     }
   }
-
-  void _bookmarksChanged() => _detailsChanged();
 
   void _detailsChanged() {
     if (!mounted) return;
@@ -200,8 +190,7 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     progress?.checkCurrent();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void _lifecycleChanged(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshResume());
       unawaited(_bookmarks?.refresh());
@@ -219,14 +208,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   @override
   void dispose() {
     _coverLifecycle.value++;
-    _coverLifecycle.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-    controller.removeListener(_catalogChanged);
-    _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
-    _chapterRead?.removeListener(_detailsChanged);
     _chapterRead?.dispose();
-    _chapterSearch.dispose();
     super.dispose();
   }
 
@@ -417,76 +400,78 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
     }
   }
 
-  Widget _favoriteControl() => StreamBuilder<wire.MangaState?>(
-    key: ValueKey((_library?.client, _sequence?.mangaKey)),
-    stream: _mangaStream,
-    builder: (context, snapshot) {
-      final state = snapshot.data;
-      final favorite = state?.favorite ?? false;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              CustomCover(
-                repository: _covers!,
-                cover: state?.hasCustomCover() == true
-                    ? state!.customCover
-                    : null,
-                width: 96,
-                height: 128,
-              ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed:
-                        !snapshot.hasData ||
-                            _savingFavorite ||
-                            _opening ||
-                            _editingCover
-                        ? null
-                        : () => unawaited(_setFavorite(!favorite)),
-                    icon: Icon(
-                      favorite ? Icons.bookmark : Icons.bookmark_add_outlined,
-                    ),
-                    label: Text(
-                      _savingFavorite
-                          ? '正在保存'
-                          : favorite
-                          ? '移出书架'
-                          : '加入书架',
-                    ),
-                  ),
-                  TextButton.icon(
-                    key: const ValueKey('custom-cover-editor'),
-                    onPressed:
-                        !snapshot.hasData ||
-                            _savingFavorite ||
-                            _opening ||
-                            _editingCover
-                        ? null
-                        : () => unawaited(_editCover()),
-                    icon: const Icon(Icons.image_outlined),
-                    label: const Text('自定义封面'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          if (_favoriteError != null || snapshot.hasError)
-            _Notice(
-              text: _favoriteError ?? '未能读取作品状态，请返回书架重试；仍可继续阅读。',
-              icon: Icons.warning_amber,
+  Widget _favoriteControl() {
+    final snapshot =
+        _library == null ||
+            _sequence == null ||
+            !identical(controller.library, _library)
+        ? const AsyncData<wire.MangaState?>(null)
+        : ref.watch(mangaStateProvider(_library!.client, _sequence!.mangaKey));
+    final state = snapshot.value;
+    final favorite = state?.favorite ?? false;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 16,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            CustomCover(
+              repository: _covers!,
+              cover: state?.hasCustomCover() == true
+                  ? state!.customCover
+                  : null,
+              width: 96,
+              height: 128,
             ),
-        ],
-      );
-    },
-  );
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                OutlinedButton.icon(
+                  onPressed:
+                      state == null ||
+                          _savingFavorite ||
+                          _opening ||
+                          _editingCover
+                      ? null
+                      : () => unawaited(_setFavorite(!favorite)),
+                  icon: Icon(
+                    favorite ? Icons.bookmark : Icons.bookmark_add_outlined,
+                  ),
+                  label: Text(
+                    _savingFavorite
+                        ? '正在保存'
+                        : favorite
+                        ? '移出书架'
+                        : '加入书架',
+                  ),
+                ),
+                TextButton.icon(
+                  key: const ValueKey('custom-cover-editor'),
+                  onPressed:
+                      state == null ||
+                          _savingFavorite ||
+                          _opening ||
+                          _editingCover
+                      ? null
+                      : () => unawaited(_editCover()),
+                  icon: const Icon(Icons.image_outlined),
+                  label: const Text('自定义封面'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        if (_favoriteError != null || snapshot.hasError)
+          _Notice(
+            text: _favoriteError ?? '未能读取作品状态，请返回书架重试；仍可继续阅读。',
+            icon: Icons.warning_amber,
+          ),
+      ],
+    );
+  }
 
   Future<void> _openChapter(BuildContext context, int index) async {
     if (!mounted ||
@@ -1107,35 +1092,44 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(manga.title),
-      actions: [
-        PopupMenuButton<String>(
-          key: const ValueKey('details-more'),
-          enabled:
-              !_migrating &&
-              !_detailsExpired &&
-              !_opening &&
-              !_savingFavorite &&
-              !_editingCover &&
-              _library != null &&
-              _sequence != null &&
-              controller.status == ServiceStatus.ready &&
-              !controller.busy,
-          onSelected: (value) {
-            if (value == 'migrate') unawaited(_migrate());
-          },
-          itemBuilder: (_) => [
-            const PopupMenuItem(value: 'migrate', child: Text('迁移到其他漫画源')),
-          ],
-        ),
-      ],
-    ),
-    body: AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) =>
-          _detailsExpired || !controller.isCurrentSource(source)
+  Widget build(BuildContext context) {
+    _coverLifecycle = useValueNotifier(0);
+    _chapterSearch = useTextEditingController();
+    useEffect(() {
+      _initialize();
+      return null;
+    }, const []);
+    useListenable(controller);
+    useOnListenableChange(controller, _catalogChanged);
+    useOnListenableChange(_bookmarks, _detailsChanged);
+    useOnListenableChange(_chapterRead, _detailsChanged);
+    useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(manga.title),
+        actions: [
+          PopupMenuButton<String>(
+            key: const ValueKey('details-more'),
+            enabled:
+                !_migrating &&
+                !_detailsExpired &&
+                !_opening &&
+                !_savingFavorite &&
+                !_editingCover &&
+                _library != null &&
+                _sequence != null &&
+                controller.status == ServiceStatus.ready &&
+                !controller.busy,
+            onSelected: (value) {
+              if (value == 'migrate') unawaited(_migrate());
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'migrate', child: Text('迁移到其他漫画源')),
+            ],
+          ),
+        ],
+      ),
+      body: _detailsExpired || !controller.isCurrentSource(source)
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -1239,8 +1233,8 @@ class _MangaDetailsPageState extends State<MangaDetailsPage>
                 ),
               ),
             ),
-    ),
-  );
+    );
+  }
 }
 
 class _Notice extends StatelessWidget {

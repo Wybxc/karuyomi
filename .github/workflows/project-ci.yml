@@ -42,8 +42,8 @@ jobs:
       - run: pnpm db:migrate:local
         env:
           CLOUDFLARE_SEND_METRICS: 'false'
-      - name: Preserve the trusted Web build for production assembly
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Preserve the verified Web build for acceptance and production assembly
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: web-build-${{ github.sha }}

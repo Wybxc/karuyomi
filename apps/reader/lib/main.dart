@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'diagnostics/reader_baseline.dart';
@@ -14,12 +16,15 @@ import 'features/library/library_page.dart';
 import 'features/settings/settings_controller.dart';
 import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
+import 'state/account_providers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    KaruyomiApp(
-      connectionPreferences: kIsWeb ? null : SharedPreferencesAsync(),
+    ProviderScope(
+      child: KaruyomiApp(
+        connectionPreferences: kIsWeb ? null : SharedPreferencesAsync(),
+      ),
     ),
   );
 }
@@ -74,7 +79,7 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
   );
 }
 
-class AppShell extends StatefulWidget {
+class AppShell extends StatefulHookConsumerWidget {
   const AppShell({
     super.key,
     required this.themeMode,
@@ -91,14 +96,18 @@ class AppShell extends StatefulWidget {
   final SharedPreferencesAsync? connectionPreferences;
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
   PlatformRuntime? _platform;
   CatalogController? _catalog;
-  SettingsController? _settings;
+  SettingsController? get _settings => _catalog == null
+      ? null
+      : ref.read(
+          settingsControllerProvider(_catalog!, _catalog!.settings).notifier,
+        );
   ThemeMode _confirmedTheme = ThemeMode.system;
   String? _configurationError;
   Map<String, Object?>? _pendingContinuation;
@@ -109,7 +118,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   String? _originPersistenceError;
   static const _defaultOrigin = String.fromEnvironment('APP_ORIGIN');
   static const _originKey = 'native_service_origin';
-  final _originField = TextEditingController(text: _defaultOrigin);
+  late TextEditingController _originField;
   static const _labels = ['书架', '浏览', '设置'];
   static const _icons = [
     Icons.collections_bookmark_outlined,
@@ -122,68 +131,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (index == 2) unawaited(_settings?.refresh());
   }
 
-  void _clearSettings() {
-    _settings?.removeListener(_settingsChanged);
-    _settings?.dispose();
-    _settings = null;
-  }
-
-  void _settingsChanged() {
-    if (!mounted) return;
-    final settings = _settings;
-    final snapshot = settings?.snapshot;
-    if (settings?.available == true && snapshot != null) {
-      _applyTheme(appTheme(snapshot.global.theme));
-    }
-    setState(() {});
-  }
-
   void _applyTheme(ThemeMode value) {
     if (_confirmedTheme == value) return;
     _confirmedTheme = value;
     widget.onThemeChanged(value);
   }
 
-  void _catalogChanged() {
-    if (!mounted) return;
-    final catalog = _catalog;
-    _settings?.checkCurrent();
-    if (catalog == null || catalog.status != ServiceStatus.ready) return;
-    final repository = catalog.settings;
-    if (repository == null ||
-        (identical(repository, _settings?.repository) &&
-            _settings!.available)) {
-      return;
-    }
-    if (_settings?.repository.identity.key != repository.identity.key) {
-      _applyTheme(ThemeMode.system);
-    }
-    _clearSettings();
-    final subject = catalog.subject;
-    final origin = catalog.deploymentOrigin?.origin;
-    _settings = SettingsController(
-      repository: repository,
-      isCurrent: () =>
-          mounted &&
-          identical(catalog, _catalog) &&
-          !catalog.accessPaused &&
-          catalog.subject == subject &&
-          catalog.deploymentOrigin?.origin == origin &&
-          identical(catalog.settings, repository),
-    )..addListener(_settingsChanged);
-    unawaited(_settings!.refresh());
-    setState(() {});
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_settings?.refresh());
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
+  void _initialize() {
     final preferences = widget.connectionPreferences;
     if (kIsWeb || widget.platform != null || preferences == null) {
       _configure(widget.platform);
@@ -251,7 +205,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         runtime: _platform!.runtime,
         rebuildRuntime: _platform!.rebuild,
         deploymentOrigin: _platform!.origin,
-      )..addListener(_catalogChanged);
+      );
       _configurationError = null;
       final continuation = _platform!.takePendingAuthentication();
       if (continuation?['pending'] case final Map pending) {
@@ -282,7 +236,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         if (!controller.adoptReadingProgress(client)) continue;
         _retiredProgress.remove(client);
       }
-      _catalogChanged();
       setState(() {});
     }
     if (!mounted ||
@@ -463,10 +416,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       try {
         final old = _platform;
         final oldCatalog = _catalog;
-        _clearSettings();
         _applyTheme(ThemeMode.system);
         if (oldCatalog != null) {
-          oldCatalog.removeListener(_catalogChanged);
           await oldCatalog.flushReadingProgress();
           if (!mounted) return;
           _retiredProgress.addAll(oldCatalog.takeUnsavedReadingProgress());
@@ -527,11 +478,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           children: [
             _connectionSettings(),
             const SizedBox(height: 24),
-            if (_settings case final settings?)
-              GlobalSettingsPanel(
-                key: ObjectKey(settings),
-                controller: settings,
-              )
+            if (_catalog case final catalog?
+                when ref.watch(confirmedAccountProvider(catalog)) != null)
+              GlobalSettingsPanel(catalog: catalog)
             else
               const Text('连接并确认身份后可读取和保存同步设置。'),
             const SizedBox(height: 24),
@@ -605,67 +554,83 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         ),
       ],
     );
-    return controller == null
-        ? content()
-        : AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) => content(),
-          );
+    return content();
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final wide = constraints.maxWidth >= 840;
-      return Scaffold(
-        appBar: AppBar(title: Text(_labels[_index])),
-        body: SafeArea(
-          child: Row(
-            children: [
-              if (wide) ...[
-                NavigationRail(
+  Widget build(BuildContext context) {
+    _originField = useTextEditingController(text: _defaultOrigin);
+    useEffect(() {
+      _initialize();
+      return null;
+    }, const []);
+    useOnAppLifecycleStateChange((_, state) {
+      if (state == AppLifecycleState.resumed) unawaited(_settings?.refresh());
+    });
+    final catalog = useListenable(_catalog);
+    if (catalog != null) {
+      final theme = ref.watch(
+        settingsControllerProvider(catalog, catalog.settings).select(
+          (state) => state.available ? state.snapshot?.global.theme : null,
+        ),
+      );
+      final desired = theme == null ? ThemeMode.system : appTheme(theme);
+      if (_confirmedTheme != desired) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && identical(catalog, _catalog)) _applyTheme(desired);
+        });
+      }
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 840;
+        return Scaffold(
+          appBar: AppBar(title: Text(_labels[_index])),
+          body: SafeArea(
+            child: Row(
+              children: [
+                if (wide) ...[
+                  NavigationRail(
+                    selectedIndex: _index,
+                    onDestinationSelected: _select,
+                    labelType: NavigationRailLabelType.all,
+                    destinations: [
+                      for (var i = 0; i < _labels.length; i++)
+                        NavigationRailDestination(
+                          icon: Icon(_icons[i]),
+                          label: Text(_labels[i]),
+                        ),
+                    ],
+                  ),
+                  const VerticalDivider(width: 1),
+                ],
+                Expanded(child: _page()),
+              ],
+            ),
+          ),
+          bottomNavigationBar: wide
+              ? null
+              : NavigationBar(
                   selectedIndex: _index,
                   onDestinationSelected: _select,
-                  labelType: NavigationRailLabelType.all,
                   destinations: [
                     for (var i = 0; i < _labels.length; i++)
-                      NavigationRailDestination(
+                      NavigationDestination(
                         icon: Icon(_icons[i]),
-                        label: Text(_labels[i]),
+                        label: _labels[i],
                       ),
                   ],
                 ),
-                const VerticalDivider(width: 1),
-              ],
-              Expanded(child: _page()),
-            ],
-          ),
-        ),
-        bottomNavigationBar: wide
-            ? null
-            : NavigationBar(
-                selectedIndex: _index,
-                onDestinationSelected: _select,
-                destinations: [
-                  for (var i = 0; i < _labels.length; i++)
-                    NavigationDestination(
-                      icon: Icon(_icons[i]),
-                      label: _labels[i],
-                    ),
-                ],
-              ),
-      );
-    },
-  );
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
     final catalog = _catalog;
     final platform = _platform;
     final retired = _retiredProgress.toList();
-    WidgetsBinding.instance.removeObserver(this);
-    _clearSettings();
-    catalog?.removeListener(_catalogChanged);
     catalog?.dispose();
     unawaited(() async {
       await catalog?.closeReadingProgress();
@@ -675,7 +640,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
       await platform?.dispose();
     }());
-    _originField.dispose();
     super.dispose();
   }
 }

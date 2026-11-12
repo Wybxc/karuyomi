@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -54,7 +55,7 @@ void main() {
   }
 
   Future<void> show(WidgetTester tester) async {
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Scaffold(
           body: LibraryPage(
@@ -70,7 +71,7 @@ void main() {
   }
 
   Future<void> hide(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
   }
 
@@ -253,13 +254,9 @@ void main() {
         final readsBefore = platform.businessServer.requests
             .where((request) => request.uri.path == '/api/library')
             .length;
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.inactive,
-        );
-        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.resumed,
-        );
+        setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
+        setAppLifecycleState(tester.binding, AppLifecycleState.paused);
+        setAppLifecycleState(tester.binding, AppLifecycleState.resumed);
         await tester.pumpAndSettle();
         expect(find.text(testManga.title), findsOneWidget);
         expect(find.text('书架还是空的'), findsNothing);

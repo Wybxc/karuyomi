@@ -1,18 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/business_state_validation.dart';
-import '../../data/settings_repository.dart';
+import '../../state/account_providers.dart';
 import '../browse/catalog_controller.dart';
 import '../extensions/extension_listing.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_widgets.dart';
 import '../settings/pending_global_settings.dart';
 
-class SourceDirectory extends StatefulWidget {
+class SourceDirectory extends HookConsumerWidget {
   const SourceDirectory({
     super.key,
     required this.catalog,
@@ -31,130 +32,71 @@ class SourceDirectory extends StatefulWidget {
   final VoidCallback onSearch;
   final ValueChanged<SourcePreferencesTarget> onPreferences;
 
-  @override
-  State<SourceDirectory> createState() => _SourceDirectoryState();
-}
-
-class _SourceDirectoryState extends State<SourceDirectory>
-    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
-  SettingsController? _settings;
-  SettingsRepository? _repository;
-  final _search = TextEditingController();
-  String? _language;
-  bool _scheduled = false;
-  bool _disposing = false;
-  (String, String)? _saving;
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    widget.catalog.addListener(_changed);
-    _bind();
-  }
-
-  void _bind() {
-    final repository = widget.catalog.settings;
-    if (identical(repository, _repository)) return;
-    _settings?.removeListener(_changed);
-    _settings?.dispose();
-    _repository = repository;
-    _settings = null;
-    _language = null;
-    _search.clear();
-    if (repository == null) return;
-    final settings = SettingsController(
-      repository: repository,
-      isCurrent: () =>
-          mounted &&
-          !_disposing &&
-          identical(widget.catalog.settings, repository) &&
-          !widget.catalog.accessPaused,
-    );
-    _settings = settings;
-    settings.addListener(_changed);
-    unawaited(settings.refresh());
-  }
-
-  void _changed() {
-    if (!mounted || _disposing) return;
-    _bind();
-    _settings?.checkCurrent();
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      if (_scheduled) return;
-      _scheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scheduled = false;
-        if (mounted && !_disposing) setState(() {});
-      });
-    } else {
-      setState(() {});
-    }
-  }
-
-  @override
-  void didUpdateWidget(SourceDirectory oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.catalog, widget.catalog)) {
-      oldWidget.catalog.removeListener(_changed);
-      widget.catalog.addListener(_changed);
-    }
-    _bind();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        ModalRoute.of(context)?.isCurrent == true) {
-      unawaited(_settings?.refresh());
-    }
-  }
-
   bool _same(
     wire.FavoriteSource favorite,
     String packageName,
     String sourceId,
   ) => favorite.packageName == packageName && favorite.sourceId == sourceId;
-  Future<void> _toggle(String packageName, wire.CatalogSource source) async {
-    final settings = _settings;
-    final confirmed = settings?.snapshot;
-    if (confirmed == null || settings?.canEdit != true || widget.catalog.busy) {
-      return;
-    }
-    final values = confirmed.global.deepCopy();
-    final exists = values.favoriteSources.any(
-      (item) => _same(item, packageName, source.id),
-    );
-    if (exists) {
-      values.favoriteSources.removeWhere(
-        (item) => _same(item, packageName, source.id),
-      );
-    } else {
-      if (values.favoriteSources.length >= businessFavoriteSourceLimit) return;
-      values.favoriteSources.add(
-        wire.FavoriteSource(
-          packageName: packageName,
-          sourceId: source.id,
-          sourceName: source.name,
-          sourceLang: source.lang,
-        ),
-      );
-    }
-    setState(() => _saving = (packageName, source.id));
-    await settings!.saveGlobal(values, confirmed.globalRevision);
-    if (mounted) setState(() => _saving = null);
-  }
 
   @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final catalog = widget.catalog;
-    final settings = _settings;
+  Widget build(BuildContext context, WidgetRef ref) {
+    useAutomaticKeepAlive();
+    useListenable(catalog);
+    final account = ref.watch(confirmedAccountProvider(catalog));
+    final search = useTextEditingController(keys: [account?.settings]);
+    useListenable(search);
+    final language = useState<String?>(null);
+    final saving = useState<(String, String)?>(null);
+    final provider = settingsControllerProvider(catalog, catalog.settings);
+    final settings = ref.watch(provider);
+    final commands = ref.read(provider.notifier);
+    useOnAppLifecycleStateChange((previous, state) {
+      if (state == AppLifecycleState.resumed &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        unawaited(commands.refresh());
+      }
+    });
+    useEffect(() {
+      scheduleMicrotask(() {
+        if (context.mounted) unawaited(commands.refresh());
+      });
+      return null;
+    }, [commands]);
+    useEffect(() {
+      language.value = null;
+      return null;
+    }, [account?.settings]);
+    Future<void> toggle(String packageName, wire.CatalogSource source) async {
+      final confirmed = settings.snapshot;
+      if (confirmed == null || !settings.canEdit || catalog.busy) return;
+      final values = confirmed.global.deepCopy();
+      final exists = values.favoriteSources.any(
+        (item) => _same(item, packageName, source.id),
+      );
+      if (exists) {
+        values.favoriteSources.removeWhere(
+          (item) => _same(item, packageName, source.id),
+        );
+      } else {
+        if (values.favoriteSources.length >= businessFavoriteSourceLimit) {
+          return;
+        }
+        values.favoriteSources.add(
+          wire.FavoriteSource(
+            packageName: packageName,
+            sourceId: source.id,
+            sourceName: source.name,
+            sourceLang: source.lang,
+          ),
+        );
+      }
+      saving.value = (packageName, source.id);
+      await commands.saveGlobal(values, confirmed.globalRevision);
+      if (context.mounted) saving.value = null;
+    }
+
     final favorites =
-        settings?.snapshot?.global.favoriteSources ?? <wire.FavoriteSource>[];
+        settings.snapshot?.global.favoriteSources ?? <wire.FavoriteSource>[];
     final extensions = extensionListings(
       catalog,
       catalog.installedExtensions,
@@ -223,20 +165,22 @@ class _SourceDirectoryState extends State<SourceDirectory>
     });
     final languages = rows.map((row) => row.source.lang).toSet().toList()
       ..sort();
-    if (_language != null && !languages.contains(_language)) _language = null;
-    final query = _search.text.trim().toLowerCase();
+    if (language.value != null && !languages.contains(language.value)) {
+      language.value = null;
+    }
+    final query = search.text.trim().toLowerCase();
     final visible = rows
         .where(
           (row) =>
-              (_language == null || row.source.lang == _language) &&
+              (language.value == null || row.source.lang == language.value) &&
               (query.isEmpty || row.source.name.toLowerCase().contains(query)),
         )
         .toList();
     final pendingExtensions = unresolved
-        .where((item) => item.matches(query, _language))
+        .where((item) => item.matches(query, language.value))
         .toList();
-    final hasFilter = query.isNotEmpty || _language != null;
-    final canEdit = settings?.canEdit == true && !catalog.busy;
+    final hasFilter = query.isNotEmpty || language.value != null;
+    final canEdit = settings.canEdit == true && !catalog.busy;
     return ListView(
       key: const PageStorageKey('source-directory-scroll'),
       padding: const EdgeInsets.all(16),
@@ -246,12 +190,11 @@ class _SourceDirectoryState extends State<SourceDirectory>
             Expanded(
               child: TextField(
                 key: const ValueKey('source-directory-search'),
-                controller: _search,
+                controller: search,
                 decoration: const InputDecoration(
                   hintText: '查找漫画源名称',
                   prefixIcon: Icon(Icons.search),
                 ),
-                onChanged: (_) => setState(() {}),
               ),
             ),
             IconButton(
@@ -259,7 +202,7 @@ class _SourceDirectoryState extends State<SourceDirectory>
               tooltip: '跨源搜索',
               onPressed: catalog.busy || catalog.library == null
                   ? null
-                  : widget.onSearch,
+                  : onSearch,
               icon: const Icon(Icons.manage_search),
             ),
           ],
@@ -270,7 +213,7 @@ class _SourceDirectoryState extends State<SourceDirectory>
             const Text('语言：'),
             DropdownButton<String>(
               key: const ValueKey('source-language-filter'),
-              value: _language,
+              value: language.value,
               hint: const Text('全部语言'),
               items: [
                 const DropdownMenuItem<String>(
@@ -283,24 +226,23 @@ class _SourceDirectoryState extends State<SourceDirectory>
                     child: Text(sourceLanguage(language)),
                   ),
               ],
-              onChanged: (value) => setState(() => _language = value),
+              onChanged: (value) => language.value = value,
             ),
             if (hasFilter)
               TextButton(
                 key: const ValueKey('source-language-clear'),
-                onPressed: () => setState(() {
-                  _language = null;
-                  _search.clear();
-                }),
+                onPressed: () {
+                  language.value = null;
+                  search.clear();
+                },
                 child: const Text('清除筛选'),
               ),
           ],
         ),
-        if (settings != null &&
-            (settings.snapshot == null ||
-                settings.error != null ||
-                settings.pending != null)) ...[
-          SettingsStatus(controller: settings),
+        if ((settings.snapshot == null ||
+            settings.error != null ||
+            settings.pending != null)) ...[
+          SettingsStatus(controller: commands, state: settings),
           if (settings.pending?.global case final values?)
             PendingGlobalSettings(
               values: values,
@@ -312,9 +254,7 @@ class _SourceDirectoryState extends State<SourceDirectory>
             title: Text('${target.source.name}的设置需要处理'),
             subtitle: const Text('原保存请求尚未确认'),
             trailing: TextButton(
-              onPressed: catalog.busy
-                  ? null
-                  : () => widget.onPreferences(target),
+              onPressed: catalog.busy ? null : () => onPreferences(target),
               child: const Text('处理设置'),
             ),
           ),
@@ -346,11 +286,11 @@ class _SourceDirectoryState extends State<SourceDirectory>
                 Text(hasFilter ? '请修改名称或语言条件。' : '安装扩展后即可选择其中的漫画源。'),
                 TextButton(
                   onPressed: hasFilter
-                      ? () => setState(() {
-                          _language = null;
-                          _search.clear();
-                        })
-                      : widget.onManage,
+                      ? () {
+                          language.value = null;
+                          search.clear();
+                        }
+                      : onManage,
                   child: Text(hasFilter ? '清除筛选' : '前往扩展'),
                 ),
               ],
@@ -376,13 +316,13 @@ class _SourceDirectoryState extends State<SourceDirectory>
             onTap: catalog.busy
                 ? null
                 : row.blocked != null || row.extension == null
-                ? widget.onManage
-                : () => unawaited(widget.onOpen(row.extension!, row.source)),
+                ? onManage
+                : () => unawaited(onOpen(row.extension!, row.source)),
             trailing: GestureDetector(
               excludeFromSemantics: true,
               behavior: HitTestBehavior.opaque,
               onTap: () {},
-              child: _saving == (row.packageName, row.source.id)
+              child: saving.value == (row.packageName, row.source.id)
                   ? const SizedBox(
                       width: 24,
                       height: 24,
@@ -402,8 +342,7 @@ class _SourceDirectoryState extends State<SourceDirectory>
                               (saved(row.packageName, row.source.id) ||
                                   favorites.length <
                                       businessFavoriteSourceLimit)
-                          ? () =>
-                                unawaited(_toggle(row.packageName, row.source))
+                          ? () => unawaited(toggle(row.packageName, row.source))
                           : null,
                       icon: Icon(
                         saved(row.packageName, row.source.id)
@@ -420,7 +359,7 @@ class _SourceDirectoryState extends State<SourceDirectory>
             title: Text('${extension.name}（扩展待处理）'),
             subtitle: Text(extension.blockedReason ?? '所选构建的漫画源资料不可用'),
             trailing: TextButton(
-              onPressed: widget.onManage,
+              onPressed: onManage,
               child: const Text('管理扩展'),
             ),
           ),
@@ -431,16 +370,5 @@ class _SourceDirectoryState extends State<SourceDirectory>
           ),
       ],
     );
-  }
-
-  @override
-  void dispose() {
-    _disposing = true;
-    WidgetsBinding.instance.removeObserver(this);
-    widget.catalog.removeListener(_changed);
-    _settings?.removeListener(_changed);
-    _settings?.dispose();
-    _search.dispose();
-    super.dispose();
   }
 }

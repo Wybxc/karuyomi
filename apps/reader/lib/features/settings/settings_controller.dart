@@ -1,122 +1,157 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/business_state_client.dart';
 import '../../data/settings_repository.dart';
+import '../../state/account_providers.dart';
+import '../browse/catalog_controller.dart';
 
-/// A single global or manga editor; pending commands belong to the shared
-/// identity-bound repository, independently of this widget's lifetime.
+part 'settings_controller.g.dart';
+
 enum SettingsFailure { conflict, rejected, unknown }
 
-final class SettingsController extends ChangeNotifier {
-  SettingsController({
-    required this.repository,
-    required this.isCurrent,
-    this.mangaKey,
-  }) {
-    _subscription = repository.watchConfirmed().listen(_confirmed);
-  }
+final class SettingsState {
+  const SettingsState({
+    this.snapshot,
+    this.pending,
+    this.available = false,
+    this.busy = false,
+    this.error,
+    this.failure,
+  });
+  final SettingsSnapshot? snapshot;
+  final SettingsDraft? pending;
+  final bool available;
+  final bool busy;
+  final String? error;
+  final SettingsFailure? failure;
+  bool get canEdit => available && !busy && snapshot != null && pending == null;
+  bool get canRefresh => available && !busy;
+  bool get canRetry => available && !busy && pending?.retryable == true;
+}
 
-  final SettingsRepository repository;
-  final bool Function() isCurrent;
-  final String? mangaKey;
-  late final StreamSubscription<SettingsSnapshot> _subscription;
-  SettingsSnapshot? _snapshot;
-  bool _busy = false;
-  bool _retired = false;
-  bool _disposed = false;
-  String? _error;
-  SettingsFailure? failure;
+/// One editor per verified catalog identity and global/manga scope. Submitted
+/// UUID/CAS drafts remain in BusinessStateClient when this provider is disposed.
+@riverpod
+class SettingsController extends _$SettingsController {
+  Object _generation = Object();
   int _wantedGlobalRevision = -1;
 
-  SettingsSnapshot? get snapshot => _snapshot;
-  bool get busy => _busy;
-  String? get error => _error;
-  SettingsDraft? get pending => mangaKey == null
-      ? repository.pendingGlobal()
-      : repository.pendingManga(mangaKey!);
-  bool get available => !_disposed && !_retired && isCurrent();
-  bool get canEdit =>
-      available && !_busy && _snapshot != null && pending == null;
-  bool get canRefresh => available && !_busy;
-  bool get canRetry => available && !_busy && pending?.retryable == true;
-
-  void checkCurrent() {
-    if (_disposed || _retired || isCurrent()) return;
-    _retired = true;
-    _error = '身份或服务已改变，请重新打开设置。';
-    notifyListeners();
-  }
-
-  void _confirmed(SettingsSnapshot value) {
-    if (!available) return;
-    if (value.globalRevision > _wantedGlobalRevision) {
-      _wantedGlobalRevision = value.globalRevision;
+  @override
+  SettingsState build(
+    CatalogController catalog,
+    SettingsRepository? repository, {
+    String? mangaKey,
+  }) {
+    final account = ref.watch(confirmedAccountProvider(catalog));
+    final generation = _generation = Object();
+    final initial = mangaKey == null ? catalog.installationSettings : null;
+    _wantedGlobalRevision = initial?.globalRevision ?? -1;
+    if (repository == null || !identical(account?.settings, repository)) {
+      return SettingsState(pending: _pending());
     }
-    if (mangaKey == null) {
-      if (_snapshot != null &&
-          value.globalRevision <= _snapshot!.globalRevision) {
+    final subscription = repository.watchConfirmed().listen((value) {
+      if (!_current(generation)) return;
+      _wantedGlobalRevision = value.globalRevision > _wantedGlobalRevision
+          ? value.globalRevision
+          : _wantedGlobalRevision;
+      if (mangaKey == null) {
+        if (value.globalRevision <= (state.snapshot?.globalRevision ?? -1)) {
+          return;
+        }
+      } else if (value.mangaKey != mangaKey) {
+        _refreshInheritance();
         return;
       }
-      _snapshot = value;
-      notifyListeners();
-    } else if (value.mangaKey == mangaKey) {
-      _snapshot = value;
-      notifyListeners();
-    } else {
-      _refreshInheritance();
+      state = _next(
+        snapshot: value,
+        busy: state.busy,
+        error: state.error,
+        failure: state.failure,
+      );
+    });
+    ref.onDispose(() => unawaited(subscription.cancel()));
+    if (initial == null) {
+      scheduleMicrotask(() {
+        if (_current(generation)) unawaited(refresh());
+      });
     }
+    return SettingsState(
+      snapshot: initial,
+      pending: _pending(),
+      available: true,
+    );
   }
+
+  bool _current(Object generation) =>
+      ref.mounted &&
+      !catalog.closed &&
+      {ServiceStatus.ready, ServiceStatus.failed}.contains(catalog.status) &&
+      identical(generation, _generation) &&
+      repository != null &&
+      !catalog.accessPaused &&
+      catalog.subject == repository!.identity.subject &&
+      identical(catalog.settings, repository);
+
+  SettingsDraft? _pending() => mangaKey == null
+      ? repository?.pendingGlobal()
+      : repository?.pendingManga(mangaKey!);
+
+  SettingsState _next({
+    SettingsSnapshot? snapshot,
+    bool busy = false,
+    String? error,
+    SettingsFailure? failure,
+  }) => SettingsState(
+    snapshot: snapshot ?? state.snapshot,
+    pending: _pending(),
+    available: _current(_generation),
+    busy: busy,
+    error: error,
+    failure: failure,
+  );
 
   void _refreshInheritance() {
     if (mangaKey != null &&
-        canRefresh &&
-        pending == null &&
-        _error == null &&
-        _wantedGlobalRevision > (_snapshot?.globalRevision ?? -1)) {
+        state.canRefresh &&
+        state.pending == null &&
+        state.error == null &&
+        _wantedGlobalRevision > (state.snapshot?.globalRevision ?? -1)) {
       unawaited(refresh());
     }
   }
 
   Future<bool> refresh() async {
-    checkCurrent();
-    if (!canRefresh) return false;
-    _busy = true;
-    _error = null;
-    failure = null;
-    notifyListeners();
+    if (!_current(_generation) || !state.canRefresh) return false;
+    state = _next(busy: true);
+    final generation = _generation;
     try {
-      final value = mangaKey == null
-          ? await repository.loadGlobal()
-          : await repository.loadManga(mangaKey!);
-      if (!available) return false;
-      _snapshot = value;
+      final snapshot = mangaKey == null
+          ? await repository!.loadGlobal()
+          : await repository!.loadManga(mangaKey!);
+      if (!_current(generation)) return false;
+      state = _next(snapshot: snapshot);
       return true;
     } catch (_) {
-      if (available) _error = '未能读取服务端设置；当前阅读仍可继续。';
+      if (_current(generation)) state = _next(error: '未能读取服务端设置；当前阅读仍可继续。');
       return false;
     } finally {
-      if (!_disposed) {
-        _busy = false;
-        checkCurrent();
-        notifyListeners();
-        _refreshInheritance();
-      }
+      if (_current(generation)) _refreshInheritance();
     }
   }
 
   Future<bool> saveGlobal(wire.GlobalSettingsValues values, int revision) =>
       _save(
-        () => repository.setGlobal(values: values, basedOnRevision: revision),
+        () => repository!.setGlobal(values: values, basedOnRevision: revision),
       );
 
   Future<bool> saveOverrides(
     wire.ReaderSettingsOverride values,
     int revision,
   ) => _save(
-    () => repository.setManga(
+    () => repository!.setManga(
       mangaKey: mangaKey!,
       overrides: values,
       basedOnRevision: revision,
@@ -124,19 +159,19 @@ final class SettingsController extends ChangeNotifier {
   );
 
   Future<bool> retry() async {
-    checkCurrent();
-    final draft = pending;
-    if (!canRetry || draft == null) return false;
+    if (!_current(_generation)) return false;
+    final pending = state.pending;
+    if (!state.canRetry || pending == null) return false;
     return _save(
       () => mangaKey == null
-          ? repository.setGlobal(
-              values: draft.global!,
-              basedOnRevision: draft.basedOnRevision,
+          ? repository!.setGlobal(
+              values: pending.global!,
+              basedOnRevision: pending.basedOnRevision,
             )
-          : repository.setManga(
+          : repository!.setManga(
               mangaKey: mangaKey!,
-              overrides: draft.overrides!,
-              basedOnRevision: draft.basedOnRevision,
+              overrides: pending.overrides!,
+              basedOnRevision: pending.basedOnRevision,
             ),
       retrying: true,
     );
@@ -146,47 +181,37 @@ final class SettingsController extends ChangeNotifier {
     Future<SettingsSnapshot> Function() send, {
     bool retrying = false,
   }) async {
-    checkCurrent();
-    if (!(retrying ? canRetry : canEdit)) return false;
-    _busy = true;
-    _error = null;
-    failure = null;
-    notifyListeners();
+    if (!_current(_generation) ||
+        !(retrying ? state.canRetry : state.canEdit)) {
+      return false;
+    }
+    final generation = _generation;
+    state = _next(busy: true);
     try {
-      final value = await send();
-      if (!available) return false;
-      _snapshot = value;
+      final snapshot = await send();
+      if (!_current(generation)) return false;
+      state = _next(snapshot: snapshot);
       return true;
-    } catch (failure) {
-      if (available) {
-        this.failure = switch (failure) {
+    } catch (error) {
+      if (_current(generation)) {
+        final failure = switch (error) {
           BusinessStateException(conflict: true) => SettingsFailure.conflict,
           BusinessStateException(:final error) when !error.retryable =>
             SettingsFailure.rejected,
           _ => SettingsFailure.unknown,
         };
-        _error = switch (failure) {
-          BusinessStateException(conflict: true) => '设置已在其他设备修改，请重新读取后确认。',
-          BusinessStateException(:final error) when !error.retryable =>
-            '设置修改已被服务端拒绝，请重新读取后确认。',
-          _ => '设置修改尚未确认，请明确重试原操作。',
-        };
+        state = _next(
+          failure: failure,
+          error: switch (failure) {
+            SettingsFailure.conflict => '设置已在其他设备修改，请重新读取后确认。',
+            SettingsFailure.rejected => '设置修改已被服务端拒绝，请重新读取后确认。',
+            SettingsFailure.unknown => '设置修改尚未确认，请明确重试原操作。',
+          },
+        );
       }
       return false;
     } finally {
-      if (!_disposed) {
-        _busy = false;
-        checkCurrent();
-        notifyListeners();
-        _refreshInheritance();
-      }
+      if (_current(generation)) _refreshInheritance();
     }
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    unawaited(_subscription.cancel());
-    super.dispose();
   }
 }

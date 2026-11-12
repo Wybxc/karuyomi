@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../data/business_state_client.dart';
@@ -29,7 +30,7 @@ Future<bool?> showCustomCoverEditor({
   ),
 );
 
-class _CoverEditor extends StatefulWidget {
+class _CoverEditor extends StatefulHookWidget {
   const _CoverEditor({
     required this.controller,
     required this.repository,
@@ -57,7 +58,6 @@ class _CoverEditorState extends State<_CoverEditor> {
   bool _expired = false;
   String? _error;
   CoverDraft? get _pending => widget.repository.pending(widget.mangaKey);
-  late final _changes = Listenable.merge([widget.controller, widget.lifecycle]);
   bool get _current {
     _checkCurrent();
     return mounted && !_expired;
@@ -67,7 +67,6 @@ class _CoverEditorState extends State<_CoverEditor> {
   void initState() {
     super.initState();
     _expired = !widget.isCurrent();
-    _changes.addListener(_checkCurrent);
     if (!_expired) unawaited(_load());
   }
 
@@ -206,6 +205,11 @@ class _CoverEditorState extends State<_CoverEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final changes = useMemoized(
+      () => Listenable.merge([widget.controller, widget.lifecycle]),
+      [widget.controller, widget.lifecycle],
+    );
+    useOnListenableChange(changes, _checkCurrent);
     final pending = _pending;
     final preview = pending?.bytes ?? _selected;
     final clearing = pending != null ? pending.cover == null : _clearing;
@@ -320,11 +324,5 @@ class _CoverEditorState extends State<_CoverEditor> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _changes.removeListener(_checkCurrent);
-    super.dispose();
   }
 }

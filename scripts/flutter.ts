@@ -1,5 +1,6 @@
 import { execa, ExecaError } from 'execa';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -25,6 +26,27 @@ const run = execa({
   preferLocal: false,
   verbose: 'none',
 });
+async function generate(check = false): Promise<void> {
+  const cwd = path.join(root, 'apps/reader');
+  const snapshot = () => {
+    const source = path.join(cwd, 'lib');
+    return readdirSync(source, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.g.dart'))
+      .map((entry) => {
+        const file = path.join(entry.parentPath, entry.name);
+        return `${path.relative(source, file)}:${createHash('sha256').update(readFileSync(file)).digest('hex')}`;
+      })
+      .sort()
+      .join('\n');
+  };
+  const before = check ? snapshot() : '';
+  await run(dart, ['run', 'build_runner', 'build', '--force-jit'], { cwd });
+  if (check && snapshot() !== before) {
+    throw new Error(
+      'Riverpod generated files differ; run pnpm flutter:generate and commit the outputs',
+    );
+  }
+}
 async function main(): Promise<void> {
   const projects = [
     'packages/reader_core',
@@ -32,6 +54,9 @@ async function main(): Promise<void> {
     'apps/reader',
   ];
   switch (process.argv[2]) {
+    case 'generate':
+      await generate(process.argv.includes('--check'));
+      break;
     case 'setup':
       for (const project of projects) {
         await run(project === 'apps/reader' ? flutter : dart, ['pub', 'get'], {
@@ -40,14 +65,15 @@ async function main(): Promise<void> {
       }
       break;
     case 'check': {
+      await generate(true);
       for (const project of projects) {
         const cwd = path.join(root, project);
         if (project === 'apps/reader') {
           await run(flutter, ['analyze', '--fatal-infos'], { cwd });
-          await run(flutter, ['test'], { cwd });
+          await run(flutter, ['test', ...process.argv.slice(3)], { cwd });
         } else {
           await run(dart, ['analyze', '--fatal-infos'], { cwd });
-          await run(dart, ['test'], { cwd });
+          await run(dart, ['test', ...process.argv.slice(3)], { cwd });
         }
       }
       // Dart comes from the same pinned SDK as Flutter.
@@ -97,7 +123,7 @@ async function main(): Promise<void> {
       });
       break;
     default:
-      throw new Error('Use setup, check, build or run');
+      throw new Error('Use setup, generate, check, build or run');
   }
 }
 await main().catch((error: unknown) => {

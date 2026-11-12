@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -467,7 +468,7 @@ void main() {
   testWidgets(
     'Library menu opens migration without loading the original Source',
     (tester) async {
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: Scaffold(
             body: LibraryPage(
@@ -493,7 +494,7 @@ void main() {
       expect(find.text('读取原漫画源章节'), findsOneWidget);
       expect(platform.invocations, isEmpty);
       expect(posts(), hasLength(before));
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
@@ -507,7 +508,7 @@ void main() {
         shouldContinue: () => true,
       );
       expect(source, isNotNull);
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: MangaDetailsPage(
             controller: catalog,
@@ -530,7 +531,7 @@ void main() {
         sequence.entries.map((chapter) => chapter.key),
       );
       expect(posts(), hasLength(before));
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
@@ -547,7 +548,7 @@ void main() {
               sourceId: sourceId,
               shouldContinue: () => true,
             );
-            await tester.pumpWidget(
+            await tester.pumpApp(
               MaterialApp(
                 home: MangaDetailsPage(
                   controller: catalog,
@@ -558,7 +559,7 @@ void main() {
               ),
             );
           } else {
-            await tester.pumpWidget(
+            await tester.pumpApp(
               MaterialApp(
                 home: Scaffold(
                   body: LibraryPage(
@@ -622,7 +623,7 @@ void main() {
             expect(platform.invocations, hasLength(calls));
             expect(platform.openedBuilds, hasLength(opened));
           }
-          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpApp(const SizedBox.shrink());
           await tester.pumpAndSettle();
         },
       );
@@ -654,7 +655,7 @@ void main() {
       };
       await tester.binding.setSurfaceSize(const Size(700, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: MigrationPage(
             catalog: catalog,
@@ -736,7 +737,7 @@ void main() {
       );
       expect(operation.migrateFrom.chapters.single.copyRead, true);
       expect(operation.migrateFrom.chapters.single.copyBookmark, true);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );

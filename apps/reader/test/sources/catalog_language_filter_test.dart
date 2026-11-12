@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
@@ -152,7 +153,7 @@ void main() {
     Future<void> show(WidgetTester tester) async {
       await tester.binding.setSurfaceSize(const Size(480, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: Scaffold(
             body: CatalogPage(
@@ -191,7 +192,7 @@ void main() {
     }
 
     Future<void> hide(WidgetTester tester) async {
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     }
 

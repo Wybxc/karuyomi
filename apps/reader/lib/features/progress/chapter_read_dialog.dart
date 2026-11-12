@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../browse/catalog_controller.dart';
@@ -25,7 +26,7 @@ Future<Set<String>?> showChapterReadDialog({
   );
 }
 
-class _ChapterReadDialog extends StatefulWidget {
+class _ChapterReadDialog extends StatefulHookWidget {
   const _ChapterReadDialog({
     required this.catalog,
     required this.progress,
@@ -51,9 +52,6 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
   void initState() {
     super.initState();
     _expired = !widget.isCurrent();
-    widget.catalog.addListener(_checkSession);
-    widget.progress.addListener(_checkSession);
-    draft.addListener(_changed);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _changed();
     });
@@ -136,111 +134,108 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => PopScope<Set<String>>(
-    canPop: false,
-    onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) _close();
-    },
-    child: AlertDialog(
-      title: Text(draft.read ? '标记为已读' : '标记为未读'),
-      content: SizedBox(
-        width: 560,
-        height: MediaQuery.sizeOf(context).height * .55,
-        child: ListView(
-          children: [
-            Text('确认清单：${draft.items.length} 章'),
-            const Text('逐章保存，首项失败后暂停；不会加载页面或改变继续阅读的位置。'),
-            if (_expired) const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。'),
-            if (draft.attempted) ...[
-              Text(
-                '已确认 ${draft.confirmedCount} / ${draft.items.length} 章 · 未开始 ${draft.notStartedCount} 章',
-              ),
-              if (draft.busy) const LinearProgressIndicator(),
-              if (draft.busy && draft.pauseRequested)
-                const Text('已请求暂停，等待当前操作结束后可关闭。'),
-              if (!_expired && draft.completed) const Text('全部标记已由服务端确认。'),
-              if (!_expired && draft.finished && !draft.completed)
-                const Text('原批次已结束，剩余章节未再发送。请按最新状态重新确认。'),
-              if (!draft.finished) const Text('当前会话保留原清单和未确认操作；关闭不会撤回已发请求。'),
-            ],
-            if (draft.error case final error?) Text(error),
-            for (final item in draft.items)
-              ListTile(
-                key: ValueKey(('chapter-read-item', item.chapter.key)),
-                contentPadding: EdgeInsets.zero,
-                title: Text(item.chapter.name),
-                subtitle: Text(
-                  [
-                    '来源第 ${item.chapter.sourceIndex + 1} 项',
-                    if (draft.attempted)
-                      switch (item.status) {
-                        ChapterReadItemStatus.notStarted => '未开始',
-                        ChapterReadItemStatus.sending => '正在等待服务端确认',
-                        ChapterReadItemStatus.confirmed => '已由服务端确认',
-                        ChapterReadItemStatus.uncertain => '尚未确认，需重试原操作',
-                        ChapterReadItemStatus.blocked => '未保存，需重新读取',
-                      },
-                    ?item.error,
-                  ].join('\n'),
+  Widget build(BuildContext context) {
+    useOnListenableChange(widget.catalog, _checkSession);
+    useOnListenableChange(widget.progress, _checkSession);
+    useOnListenableChange(draft, _changed);
+    return PopScope<Set<String>>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
+      },
+      child: AlertDialog(
+        title: Text(draft.read ? '标记为已读' : '标记为未读'),
+        content: SizedBox(
+          width: 560,
+          height: MediaQuery.sizeOf(context).height * .55,
+          child: ListView(
+            children: [
+              Text('确认清单：${draft.items.length} 章'),
+              const Text('逐章保存，首项失败后暂停；不会加载页面或改变继续阅读的位置。'),
+              if (_expired) const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。'),
+              if (draft.attempted) ...[
+                Text(
+                  '已确认 ${draft.confirmedCount} / ${draft.items.length} 章 · 未开始 ${draft.notStartedCount} 章',
                 ),
-              ),
+                if (draft.busy) const LinearProgressIndicator(),
+                if (draft.busy && draft.pauseRequested)
+                  const Text('已请求暂停，等待当前操作结束后可关闭。'),
+                if (!_expired && draft.completed) const Text('全部标记已由服务端确认。'),
+                if (!_expired && draft.finished && !draft.completed)
+                  const Text('原批次已结束，剩余章节未再发送。请按最新状态重新确认。'),
+                if (!draft.finished) const Text('当前会话保留原清单和未确认操作；关闭不会撤回已发请求。'),
+              ],
+              if (draft.error case final error?) Text(error),
+              for (final item in draft.items)
+                ListTile(
+                  key: ValueKey(('chapter-read-item', item.chapter.key)),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(item.chapter.name),
+                  subtitle: Text(
+                    [
+                      '来源第 ${item.chapter.sourceIndex + 1} 项',
+                      if (draft.attempted)
+                        switch (item.status) {
+                          ChapterReadItemStatus.notStarted => '未开始',
+                          ChapterReadItemStatus.sending => '正在等待服务端确认',
+                          ChapterReadItemStatus.confirmed => '已由服务端确认',
+                          ChapterReadItemStatus.uncertain => '尚未确认，需重试原操作',
+                          ChapterReadItemStatus.blocked => '未保存，需重新读取',
+                        },
+                      ?item.error,
+                    ].join('\n'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          if (!_expired && draft.busy)
+            TextButton(
+              onPressed: draft.pauseRequested ? null : draft.pause,
+              child: const Text('暂停剩余操作'),
+            ),
+          TextButton(
+            onPressed: !_expired && draft.busy ? null : _close,
+            child: Text(
+              !draft.attempted
+                  ? '取消'
+                  : draft.finished
+                  ? '完成'
+                  : '稍后处理',
+            ),
+          ),
+          if (!draft.attempted)
+            FilledButton(
+              onPressed: _expired ? null : _start,
+              child: const Text('确认并开始'),
+            ),
+          if (draft.canRetry)
+            FilledButton(
+              onPressed: _expired ? null : _retry,
+              child: const Text('重试原未确认操作'),
+            ),
+          if (draft.canContinue) ...[
+            FilledButton(
+              onPressed: _expired ? null : _continue,
+              child: const Text('继续剩余原清单'),
+            ),
+            TextButton(
+              onPressed: _expired
+                  ? null
+                  : () {
+                      if (_current) draft.finishRemaining();
+                    },
+              child: const Text('结束剩余操作'),
+            ),
           ],
-        ),
-      ),
-      actions: [
-        if (!_expired && draft.busy)
-          TextButton(
-            onPressed: draft.pauseRequested ? null : draft.pause,
-            child: const Text('暂停剩余操作'),
-          ),
-        TextButton(
-          onPressed: !_expired && draft.busy ? null : _close,
-          child: Text(
-            !draft.attempted
-                ? '取消'
-                : draft.finished
-                ? '完成'
-                : '稍后处理',
-          ),
-        ),
-        if (!draft.attempted)
-          FilledButton(
-            onPressed: _expired ? null : _start,
-            child: const Text('确认并开始'),
-          ),
-        if (draft.canRetry)
-          FilledButton(
-            onPressed: _expired ? null : _retry,
-            child: const Text('重试原未确认操作'),
-          ),
-        if (draft.canContinue) ...[
-          FilledButton(
-            onPressed: _expired ? null : _continue,
-            child: const Text('继续剩余原清单'),
-          ),
-          TextButton(
-            onPressed: _expired
-                ? null
-                : () {
-                    if (_current) draft.finishRemaining();
-                  },
-            child: const Text('结束剩余操作'),
-          ),
+          if (draft.canReloadAndFinish)
+            FilledButton(
+              onPressed: _expired ? null : _reload,
+              child: const Text('重新读取并结束原批次'),
+            ),
         ],
-        if (draft.canReloadAndFinish)
-          FilledButton(
-            onPressed: _expired ? null : _reload,
-            child: const Text('重新读取并结束原批次'),
-          ),
-      ],
-    ),
-  );
-
-  @override
-  void dispose() {
-    widget.catalog.removeListener(_checkSession);
-    widget.progress.removeListener(_checkSession);
-    draft.removeListener(_changed);
-    super.dispose();
+      ),
+    );
   }
 }

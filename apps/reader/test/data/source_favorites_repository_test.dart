@@ -1,3 +1,5 @@
+import '../test_app.dart';
+import '../settings/settings_fixture.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -6,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/reading_progress.dart';
 import 'package:karuyomi/data/settings_repository.dart';
-import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -83,6 +84,7 @@ void main() {
   late TestBusinessServer server;
   late BusinessStateClient client;
   late SettingsRepository repository;
+  late SettingsFixture fixture;
 
   setUp(() {
     server = TestBusinessServer();
@@ -90,6 +92,14 @@ void main() {
     repository = SettingsRepository(client);
   });
   tearDown(() => client.dispose());
+  Future<void> attachFixture() async {
+    await client.dispose();
+    fixture = SettingsFixture(server: server);
+    await fixture.connect();
+    repository = fixture.catalog.settings!;
+    client = repository.client;
+    addTearDown(fixture.dispose);
+  }
 
   test(
     'source favorites round-trip across clients, isolate subjects and distinguish packages with the same source ID',
@@ -132,10 +142,8 @@ void main() {
   test(
     'lost favorite ACK survives repository and controller recreation with the original UUID body and CAS',
     () async {
-      var controller = SettingsController(
-        repository: repository,
-        isCurrent: () => true,
-      );
+      await attachFixture();
+      var controller = fixture.editor();
       expect(await controller.refresh(), true);
       final favorite = _values(favorites: [_source('source.a')]);
       server.loseNextResponse = true;
@@ -154,20 +162,16 @@ void main() {
         ),
       );
       expect(sent.expectedRevision, 0);
-      expect(controller.pending!.global, favorite);
-      controller.dispose();
+      expect(fixture.state().pending!.global, favorite);
+      fixture.invalidate();
       final recreated = SettingsRepository(client);
-      controller = SettingsController(
-        repository: recreated,
-        isCurrent: () => true,
-      );
-      addTearDown(controller.dispose);
+      controller = fixture.editor();
       expect(await controller.refresh(), true);
       expect(_writes(server), hasLength(1));
-      expect(controller.pending!.global, favorite);
-      expect(controller.pending!.basedOnRevision, 0);
-      expect(controller.canEdit, false);
-      expect(controller.canRetry, true);
+      expect(fixture.state().pending!.global, favorite);
+      expect(fixture.state().pending!.basedOnRevision, 0);
+      expect(fixture.state().canEdit, false);
+      expect(fixture.state().canRetry, true);
       final changed = favorite.deepCopy()..favoriteSources.clear();
       await expectLater(
         recreated.setGlobal(values: changed, basedOnRevision: 1),
@@ -179,9 +183,9 @@ void main() {
         original,
         original,
       ]);
-      expect(controller.snapshot!.global, favorite);
-      expect(controller.snapshot!.globalRevision, 1);
-      expect(controller.pending, isNull);
+      expect(fixture.state().snapshot!.global, favorite);
+      expect(fixture.state().snapshot!.globalRevision, 1);
+      expect(fixture.state().pending, isNull);
       expect(server.appliedMutations, 1);
     },
   );
@@ -332,6 +336,7 @@ void main() {
   testWidgets(
     'editing the global theme preserves source favorites and reader preferences',
     (tester) async {
+      await attachFixture();
       tester.view.physicalSize = const Size(480, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -342,21 +347,18 @@ void main() {
       await tester.runAsync(
         () => repository.setGlobal(values: original, basedOnRevision: 0),
       );
-      final controller = SettingsController(
-        repository: repository,
-        isCurrent: () => true,
-      );
-      addTearDown(controller.dispose);
+      final controller = fixture.editor();
       await tester.runAsync(controller.refresh);
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: Scaffold(
             body: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: GlobalSettingsPanel(controller: controller),
+              child: GlobalSettingsPanel(catalog: fixture.catalog),
             ),
           ),
         ),
+        container: fixture.container,
       );
       await tester.pumpAndSettle();
       Future<void> tap(Finder finder) async {
@@ -381,7 +383,7 @@ void main() {
       );
       expect(sent.setGlobal.favoriteSources, original.favoriteSources);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );

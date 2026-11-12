@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -129,7 +130,7 @@ final class _Fixture {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(KaruyomiApp(platform: platform));
+    await tester.pumpApp(KaruyomiApp(platform: platform));
     await tester.pumpAndSettle();
     await tester.tap(find.text('去浏览'));
     await tester.pumpAndSettle();
@@ -183,7 +184,7 @@ final class _Fixture {
   }
 
   Future<void> close(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await catalog.closeReadingProgress();
     expect(tester.takeException(), isNull);
@@ -211,13 +212,13 @@ void main() {
         original.key,
       );
 
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
+      setAppLifecycleState(tester.binding, AppLifecycleState.hidden);
+      setAppLifecycleState(tester.binding, AppLifecycleState.paused);
       await tester.pump(const Duration(seconds: 3));
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      setAppLifecycleState(tester.binding, AppLifecycleState.hidden);
+      setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
+      setAppLifecycleState(tester.binding, AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(await fixture.catalog.flushReadingProgress(), false);
       expect(fixture.progressPosts, hasLength(baselinePosts + 1));

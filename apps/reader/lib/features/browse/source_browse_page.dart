@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:uuid/uuid.dart';
 
 import '../../data/cover_repository.dart';
 import '../../data/library_repository.dart';
+import '../library/library_providers.dart';
 import '../reader/reader_recovery.dart';
 import '../sources/source_filters.dart';
 import '../sources/source_preferences.dart';
@@ -15,7 +18,7 @@ import 'manga_list_tile.dart';
 
 enum _ListingWork { initial, query, refresh, more }
 
-class SourceBrowsePage extends StatefulWidget {
+class SourceBrowsePage extends StatefulHookConsumerWidget {
   const SourceBrowsePage({
     super.key,
     required this.catalog,
@@ -30,15 +33,14 @@ class SourceBrowsePage extends StatefulWidget {
   final ReaderAuthentication? onAuthenticateReader;
   final VoidCallback? onAuthenticate;
   @override
-  State<SourceBrowsePage> createState() => _SourceBrowsePageState();
+  ConsumerState<SourceBrowsePage> createState() => _SourceBrowsePageState();
 }
 
-class _SourceBrowsePageState extends State<SourceBrowsePage> {
-  final _search = TextEditingController();
-  final _scroll = ScrollController();
+class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
+  late TextEditingController _search;
+  late ScrollController _scroll;
   late final Object? _identity;
   late final LibraryRepository? _library;
-  Stream<List<LibraryEntry>>? _entries;
   CoverRepository? _covers;
   CatalogSourceRef? _reference;
   Future<void>? _work;
@@ -95,7 +97,6 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
     _identity = catalog.library?.client;
     _library = catalog.library;
     if (_library != null) {
-      _entries = _library.watchEntries();
       _covers = CoverRepository(_library.client);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -346,284 +347,272 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
     ),
   );
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: catalog,
-    builder: (context, _) {
-      final busy =
-          catalog.busy || _loading != null || _leaving || _openingDetails;
-      final showOld = _loading != _ListingWork.query;
-      final canBrowse =
-          _sourceCurrent &&
-          catalog.extensionUnavailableReason == null &&
-          !catalog.sourcePreferencesBlocked &&
-          !catalog.accessPaused;
-      final mode = switch (_displayListing) {
-        'search' => '搜索',
-        'latest' => '最新',
-        _ => '热门',
-      };
-      return PopScope<void>(
-        canPop: _allowPop,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) unawaited(_leave());
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            leading: BackButton(onPressed: () => unawaited(_leave())),
-            title: Text(widget.source.name),
-            actions: [
-              IconButton(
-                key: const ValueKey('source-preferences-open'),
-                tooltip: '漫画源设置',
-                onPressed: busy || !canBrowse
-                    ? null
-                    : () => unawaited(_preferences()),
-                icon: const Icon(Icons.tune),
-              ),
-            ],
-          ),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: TextField(
-                      key: const ValueKey('source-manga-search'),
-                      controller: _search,
-                      enabled: !busy && canBrowse,
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: '搜索此源的作品',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: IconButton(
-                          tooltip: '搜索',
-                          onPressed: busy || !canBrowse
-                              ? null
-                              : () => _start(
-                                  _ListingWork.query,
-                                  query: _search.text,
-                                ),
-                          icon: const Icon(Icons.arrow_forward),
-                        ),
+  Widget build(BuildContext context) {
+    _search = useTextEditingController();
+    _scroll = useScrollController();
+    useListenable(catalog);
+    final view =
+        _library != null &&
+            identical(catalog.library?.client, _identity) &&
+            !catalog.accessPaused
+        ? ref.watch(libraryViewProvider(_library)).value
+        : null;
+    final saved = {
+      for (final entry in view?.entries ?? <LibraryEntry>[])
+        if (entry.packageName == widget.build.packageName &&
+            entry.sourceId == widget.source.id)
+          entry.url: entry,
+    };
+    final busy =
+        catalog.busy || _loading != null || _leaving || _openingDetails;
+    final showOld = _loading != _ListingWork.query;
+    final canBrowse =
+        _sourceCurrent &&
+        catalog.extensionUnavailableReason == null &&
+        !catalog.sourcePreferencesBlocked &&
+        !catalog.accessPaused;
+    final mode = switch (_displayListing) {
+      'search' => '搜索',
+      'latest' => '最新',
+      _ => '热门',
+    };
+    return PopScope<void>(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_leave());
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: () => unawaited(_leave())),
+          title: Text(widget.source.name),
+          actions: [
+            IconButton(
+              key: const ValueKey('source-preferences-open'),
+              tooltip: '漫画源设置',
+              onPressed: busy || !canBrowse
+                  ? null
+                  : () => unawaited(_preferences()),
+              icon: const Icon(Icons.tune),
+            ),
+          ],
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: TextField(
+                    key: const ValueKey('source-manga-search'),
+                    controller: _search,
+                    enabled: !busy && canBrowse,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: '搜索此源的作品',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        tooltip: '搜索',
+                        onPressed: busy || !canBrowse
+                            ? null
+                            : () => _start(
+                                _ListingWork.query,
+                                query: _search.text,
+                              ),
+                        icon: const Icon(Icons.arrow_forward),
                       ),
-                      onSubmitted: (query) =>
-                          _start(_ListingWork.query, query: query),
                     ),
+                    onSubmitted: (query) =>
+                        _start(_ListingWork.query, query: query),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        for (final item in [
-                          ('popular', '热门'),
-                          if (catalog.activeSource?.hasSupportsLatest() ==
-                                  true &&
-                              catalog.activeSource!.supportsLatest)
-                            ('latest', '最新'),
-                        ])
-                          ChoiceChip(
-                            label: Text(item.$2),
-                            selected: catalog.listing == item.$1,
-                            onSelected: busy || !canBrowse
-                                ? null
-                                : (_) {
-                                    _search.clear();
-                                    _start(
-                                      _ListingWork.query,
-                                      query: '',
-                                      listing: item.$1,
-                                    );
-                                  },
-                          ),
-                        OutlinedButton.icon(
-                          key: const ValueKey('source-filters-open'),
-                          onPressed: busy || !canBrowse
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Wrap(
+                    spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final item in [
+                        ('popular', '热门'),
+                        if (catalog.activeSource?.hasSupportsLatest() == true &&
+                            catalog.activeSource!.supportsLatest)
+                          ('latest', '最新'),
+                      ])
+                        ChoiceChip(
+                          label: Text(item.$2),
+                          selected: catalog.listing == item.$1,
+                          onSelected: busy || !canBrowse
                               ? null
-                              : () => unawaited(_filters()),
-                          icon: const Icon(Icons.filter_list),
-                          label: Text(
-                            catalog.appliedSourceFilters == null
-                                ? '筛选'
-                                : '筛选（已应用）',
-                          ),
+                              : (_) {
+                                  _search.clear();
+                                  _start(
+                                    _ListingWork.query,
+                                    query: '',
+                                    listing: item.$1,
+                                  );
+                                },
                         ),
-                        IconButton(
-                          key: const ValueKey('source-refresh'),
-                          tooltip: '刷新当前列表',
-                          onPressed: busy || !canBrowse
-                              ? null
-                              : () => _start(_ListingWork.refresh),
-                          icon: const Icon(Icons.refresh),
+                      OutlinedButton.icon(
+                        key: const ValueKey('source-filters-open'),
+                        onPressed: busy || !canBrowse
+                            ? null
+                            : () => unawaited(_filters()),
+                        icon: const Icon(Icons.filter_list),
+                        label: Text(
+                          catalog.appliedSourceFilters == null
+                              ? '筛选'
+                              : '筛选（已应用）',
                         ),
-                      ],
-                    ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('source-refresh'),
+                        tooltip: '刷新当前列表',
+                        onPressed: busy || !canBrowse
+                            ? null
+                            : () => _start(_ListingWork.refresh),
+                        icon: const Icon(Icons.refresh),
+                      ),
+                    ],
                   ),
-                  if (_leaving || _loading != null || _openingDetails) ...[
-                    const LinearProgressIndicator(),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        _leaving
-                            ? '正在停止并收尾'
-                            : _openingDetails
-                            ? '正在打开作品详情'
-                            : _preparation != null
-                            ? '正在下载账户所选构建'
-                            : switch (_loading) {
-                                _ListingWork.initial => '正在打开漫画源',
-                                _ListingWork.query => '正在加载新查询',
-                                _ListingWork.refresh => '正在刷新，原作品仍可查看',
-                                _ => '正在加载下一页',
-                              },
-                      ),
-                    ),
-                  ],
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: () async {
-                        _work = _load(_ListingWork.refresh);
-                        await _work;
-                      },
-                      child: StreamBuilder<List<LibraryEntry>>(
-                        stream: _entries,
-                        builder: (context, snapshot) {
-                          final saved = {
-                            for (final entry
-                                in snapshot.data ?? <LibraryEntry>[])
-                              if (entry.packageName ==
-                                      widget.build.packageName &&
-                                  entry.sourceId == widget.source.id)
-                                entry.url: entry,
-                          };
-                          return ListView(
-                            controller: _scroll,
-                            key: const PageStorageKey('source-manga-scroll'),
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.all(16),
-                            children: [
-                              if (_libraryError != null)
-                                ListTile(
-                                  title: Text(_libraryError!),
-                                  trailing: TextButton(
-                                    onPressed: () =>
-                                        unawaited(_refreshLibrary()),
-                                    child: const Text('重试读取书架'),
-                                  ),
-                                ),
-                              if (_loading != _ListingWork.initial &&
-                                  !canBrowse)
-                                _failure(
-                                  catalog.accessPaused ? '登录后继续' : '漫画源需要处理',
-                                )
-                              else if (_error != null &&
-                                  _failed != _ListingWork.more)
-                                _failure(
-                                  _failed == _ListingWork.refresh
-                                      ? '刷新失败，原作品仍可查看'
-                                      : _failed == _ListingWork.query
-                                      ? '新查询失败，仍显示原列表'
-                                      : '加载失败',
-                                ),
-                              if (showOld &&
-                                  (_results.isNotEmpty || catalog.page > 0))
-                                Text(
-                                  '$mode${_displayQuery.isEmpty ? '' : ' · $_displayQuery'}${_displayFiltered ? ' · 筛选已应用' : ''}',
-                                  key: const ValueKey('source-query-context'),
-                                ),
-                              if (showOld)
-                                for (final manga in _results)
-                                  MangaListTile(
-                                    key: ValueKey(('source-manga', manga.url)),
-                                    manga: manga,
-                                    libraryEntry: saved[manga.url],
-                                    covers: _covers,
-                                    onTap: busy || !canBrowse
-                                        ? null
-                                        : () => unawaited(_details(manga)),
-                                  ),
-                              if (_loading == null &&
-                                  _error == null &&
-                                  canBrowse &&
-                                  _results.isEmpty &&
-                                  catalog.page > 0)
-                                Padding(
-                                  padding: const EdgeInsets.all(32),
-                                  child: Column(
-                                    children: [
-                                      const Text('没有结果'),
-                                      Text(
-                                        catalog.query.isNotEmpty ||
-                                                catalog.appliedSourceFilters !=
-                                                    null
-                                            ? '请修改关键词或筛选条件。'
-                                            : '当前列表暂时没有作品。',
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            _start(_ListingWork.refresh),
-                                        child: const Text('刷新'),
-                                      ),
-                                      if (catalog.query.isNotEmpty ||
-                                          catalog.appliedSourceFilters != null)
-                                        TextButton(
-                                          onPressed: () {
-                                            _search.clear();
-                                            _start(
-                                              _ListingWork.query,
-                                              query: '',
-                                              listing: 'popular',
-                                            );
-                                          },
-                                          child: const Text('清除查询'),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              if (_failed == _ListingWork.more)
-                                _failure('下一页加载失败'),
-                              if (showOld &&
-                                  canBrowse &&
-                                  _results.isNotEmpty &&
-                                  _hasNextPage)
-                                Center(
-                                  child: TextButton(
-                                    key: const ValueKey('source-load-more'),
-                                    onPressed: busy
-                                        ? null
-                                        : () => _start(_ListingWork.more),
-                                    child: const Text('加载下一页'),
-                                  ),
-                                )
-                              else if (showOld &&
-                                  canBrowse &&
-                                  _results.isNotEmpty &&
-                                  !_hasNextPage &&
-                                  _loading == null)
-                                const Padding(
-                                  padding: EdgeInsets.all(24),
-                                  child: Text(
-                                    '全部加载完成',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
+                ),
+                if (_leaving || _loading != null || _openingDetails) ...[
+                  const LinearProgressIndicator(),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      _leaving
+                          ? '正在停止并收尾'
+                          : _openingDetails
+                          ? '正在打开作品详情'
+                          : _preparation != null
+                          ? '正在下载账户所选构建'
+                          : switch (_loading) {
+                              _ListingWork.initial => '正在打开漫画源',
+                              _ListingWork.query => '正在加载新查询',
+                              _ListingWork.refresh => '正在刷新，原作品仍可查看',
+                              _ => '正在加载下一页',
+                            },
                     ),
                   ),
                 ],
-              ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      _work = _load(_ListingWork.refresh);
+                      await _work;
+                    },
+                    child: ListView(
+                      controller: _scroll,
+                      key: const PageStorageKey('source-manga-scroll'),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        if (_libraryError != null)
+                          ListTile(
+                            title: Text(_libraryError!),
+                            trailing: TextButton(
+                              onPressed: () => unawaited(_refreshLibrary()),
+                              child: const Text('重试读取书架'),
+                            ),
+                          ),
+                        if (_loading != _ListingWork.initial && !canBrowse)
+                          _failure(catalog.accessPaused ? '登录后继续' : '漫画源需要处理')
+                        else if (_error != null && _failed != _ListingWork.more)
+                          _failure(
+                            _failed == _ListingWork.refresh
+                                ? '刷新失败，原作品仍可查看'
+                                : _failed == _ListingWork.query
+                                ? '新查询失败，仍显示原列表'
+                                : '加载失败',
+                          ),
+                        if (showOld &&
+                            (_results.isNotEmpty || catalog.page > 0))
+                          Text(
+                            '$mode${_displayQuery.isEmpty ? '' : ' · $_displayQuery'}${_displayFiltered ? ' · 筛选已应用' : ''}',
+                            key: const ValueKey('source-query-context'),
+                          ),
+                        if (showOld)
+                          for (final manga in _results)
+                            MangaListTile(
+                              key: ValueKey(('source-manga', manga.url)),
+                              manga: manga,
+                              libraryEntry: saved[manga.url],
+                              covers: _covers,
+                              onTap: busy || !canBrowse
+                                  ? null
+                                  : () => unawaited(_details(manga)),
+                            ),
+                        if (_loading == null &&
+                            _error == null &&
+                            canBrowse &&
+                            _results.isEmpty &&
+                            catalog.page > 0)
+                          Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              children: [
+                                const Text('没有结果'),
+                                Text(
+                                  catalog.query.isNotEmpty ||
+                                          catalog.appliedSourceFilters != null
+                                      ? '请修改关键词或筛选条件。'
+                                      : '当前列表暂时没有作品。',
+                                ),
+                                TextButton(
+                                  onPressed: () => _start(_ListingWork.refresh),
+                                  child: const Text('刷新'),
+                                ),
+                                if (catalog.query.isNotEmpty ||
+                                    catalog.appliedSourceFilters != null)
+                                  TextButton(
+                                    onPressed: () {
+                                      _search.clear();
+                                      _start(
+                                        _ListingWork.query,
+                                        query: '',
+                                        listing: 'popular',
+                                      );
+                                    },
+                                    child: const Text('清除查询'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        if (_failed == _ListingWork.more) _failure('下一页加载失败'),
+                        if (showOld &&
+                            canBrowse &&
+                            _results.isNotEmpty &&
+                            _hasNextPage)
+                          Center(
+                            child: TextButton(
+                              key: const ValueKey('source-load-more'),
+                              onPressed: busy
+                                  ? null
+                                  : () => _start(_ListingWork.more),
+                              child: const Text('加载下一页'),
+                            ),
+                          )
+                        else if (showOld &&
+                            canBrowse &&
+                            _results.isNotEmpty &&
+                            !_hasNextPage &&
+                            _loading == null)
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text('全部加载完成', textAlign: TextAlign.center),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
+
   @override
   void dispose() {
     final id = _preparation;
@@ -633,8 +622,6 @@ class _SourceBrowsePageState extends State<SourceBrowsePage> {
         catalog.runtime.cancelPreparation(id).catchError((Object _) {}),
       );
     }
-    _search.dispose();
-    _scroll.dispose();
     super.dispose();
   }
 }

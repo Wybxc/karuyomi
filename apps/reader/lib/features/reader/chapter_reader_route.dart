@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -20,7 +22,7 @@ import 'reader_recovery.dart';
 
 /// One navigation route owns the whole reading session, not one route per page
 /// list. A new leaf can only acquire images after the previous leaf's ACKs.
-class ChapterReaderRoute extends StatefulWidget {
+class ChapterReaderRoute extends StatefulHookConsumerWidget {
   const ChapterReaderRoute({
     super.key,
     required this.catalog,
@@ -49,11 +51,10 @@ class ChapterReaderRoute extends StatefulWidget {
   final bool? initialDoublePage;
 
   @override
-  State<ChapterReaderRoute> createState() => _ChapterReaderRouteState();
+  ConsumerState<ChapterReaderRoute> createState() => _ChapterReaderRouteState();
 }
 
-class _ChapterReaderRouteState extends State<ChapterReaderRoute>
-    with WidgetsBindingObserver {
+class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   late OpenedChapter _opened = widget.initialOpened;
   late SequenceChapter _chapter = widget.initialChapter;
   late MangaEntry _manga = widget.manga;
@@ -85,7 +86,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   ReadingProgressController? _progress;
   ReadingPosition? _initialPosition;
   bool _preserveInitialPlacement = false;
-  final _positionRequest = ValueNotifier<ReadingPosition?>(null);
+  late ValueNotifier<ReadingPosition?> _positionRequest;
   bool _allowPop = false;
   bool _exitPending = false;
   bool _accessPaused = false;
@@ -93,7 +94,19 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   bool _initializing = false;
   bool _refreshingProgress = false;
   ChapterBookmarksController? _bookmarks;
-  SettingsController? _settings;
+  SettingsControllerProvider get _settingsProvider =>
+      settingsControllerProvider(
+        widget.catalog,
+        widget.catalog.settings,
+        mangaKey: _sequence.mangaKey,
+      );
+  bool get _settingsCurrent =>
+      widget.catalog.subject == _subject &&
+      widget.catalog.deploymentOrigin?.origin == _origin;
+  SettingsState get _settingsState =>
+      _settingsCurrent ? ref.read(_settingsProvider) : const SettingsState();
+  SettingsController? get _settings =>
+      _settingsCurrent ? ref.read(_settingsProvider.notifier) : null;
   Object? _appliedSettings;
 
   @override
@@ -106,12 +119,8 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     _order = widget.initialOrder ?? ChapterOrder.source;
     _initialPosition = widget.initialPosition;
     _accessPaused = widget.catalog.accessPaused;
-    widget.catalog.addListener(_catalogChanged);
-    WidgetsBinding.instance.addObserver(this);
     _progress = widget.catalog.createReadingProgress(_sequence.mangaKey);
-    _progress?.addListener(_progressChanged);
     _installBookmarks();
-    _installSettings();
     if (_progress != null && _opened.manifest.pages.isNotEmpty) {
       _visible = false;
       _initializing = true;
@@ -120,7 +129,6 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   }
 
   void _installBookmarks() {
-    _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
     _bookmarks = null;
     final repository = widget.catalog.bookmarks;
@@ -133,40 +141,13 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
           !_closing &&
           widget.catalog.subject == _subject &&
           widget.catalog.deploymentOrigin?.origin == _origin,
-    )..addListener(_bookmarksChanged);
+    );
     unawaited(_bookmarks!.refresh());
   }
 
-  void _bookmarksChanged() {
-    if (!_closing && mounted) setState(() {});
-  }
-
-  void _installSettings() {
-    _settings?.removeListener(_settingsChanged);
-    _settings?.dispose();
-    _settings = null;
-    _appliedSettings = null;
-    final repository = widget.catalog.settings;
-    if (repository == null) return;
-    _settings = SettingsController(
-      repository: repository,
-      mangaKey: _sequence.mangaKey,
-      isCurrent: () =>
-          mounted &&
-          !_closing &&
-          !widget.catalog.accessPaused &&
-          widget.catalog.subject == _subject &&
-          widget.catalog.deploymentOrigin?.origin == _origin &&
-          identical(widget.catalog.settings, repository),
-    )..addListener(_settingsChanged);
-    unawaited(_settings!.refresh());
-  }
-
-  void _settingsChanged() {
-    if (_closing || !mounted) return;
-    final controller = _settings;
-    final value = controller?.snapshot;
-    if (controller?.available == true &&
+  void _applySettings(SettingsState settings) {
+    final value = settings.snapshot;
+    if (settings.available &&
         value != null &&
         !identical(value, _appliedSettings)) {
       _appliedSettings = value;
@@ -181,7 +162,6 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       _tapZones = settings_ui.readerInputPreset(value.effectiveReader.tapZones);
       _keyboard = settings_ui.readerInputPreset(value.effectiveReader.keyboard);
     }
-    setState(() {});
   }
 
   bool get _canEditSettings =>
@@ -189,11 +169,11 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
       !_accessPaused &&
       !_recovering &&
       !_initializing &&
-      _settings?.canEdit == true;
+      _settingsState.canEdit;
 
   void _changeMode(ReadingMode value) {
     final controller = _settings;
-    final snapshot = controller?.snapshot;
+    final snapshot = _settingsState.snapshot;
     if (!_canEditSettings || controller == null || snapshot == null) return;
     setState(() => _mode = value);
     final draft = wire.ReaderSettingsOverride()
@@ -204,7 +184,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
 
   void _changePageLayout(bool? value) {
     final controller = _settings;
-    final snapshot = controller?.snapshot;
+    final snapshot = _settingsState.snapshot;
     if (!_canEditSettings || controller == null || snapshot == null) return;
     setState(() => _doublePage = value);
     final draft = wire.ReaderSettingsOverride()
@@ -219,7 +199,10 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => settings_ui.MangaSettingsEditor(controller: controller),
+      builder: (_) => settings_ui.MangaSettingsEditor(
+        catalog: widget.catalog,
+        mangaKey: _sequence.mangaKey,
+      ),
     );
   }
 
@@ -249,7 +232,6 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   void _catalogChanged() {
     if (_closing || !mounted) return;
     _bookmarks?.checkCurrent();
-    _settings?.checkCurrent();
     if (widget.catalog.extensionUnavailableReason case final reason?) {
       setState(() => _error = reason);
     }
@@ -378,7 +360,6 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
         _visible = true;
       });
       _installBookmarks();
-      _installSettings();
       recovered = null;
     } catch (error) {
       if (!_closing && mounted) {
@@ -424,8 +405,7 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
     ],
   );
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void _lifecycleChanged(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshProgress());
       if (!_accessPaused && !_recovering) {
@@ -723,8 +703,11 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
             icon: const Icon(Icons.tune),
             label: const Text('阅读设置'),
           ),
-          if (settings.error != null || settings.pending != null)
-            settings_ui.SettingsStatus(controller: settings),
+          if (_settingsState.error != null || _settingsState.pending != null)
+            settings_ui.SettingsStatus(
+              controller: settings,
+              state: _settingsState,
+            ),
         ],
         if (_progress case final progress?) _progressControls(progress),
         if (_bookmarks case final bookmarks?) ...[
@@ -891,6 +874,12 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
 
   @override
   Widget build(BuildContext context) {
+    _positionRequest = useValueNotifier<ReadingPosition?>(null);
+    useOnListenableChange(widget.catalog, _catalogChanged);
+    useOnListenableChange(_progress, _progressChanged);
+    useOnListenableChange(_bookmarks, _progressChanged);
+    useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
+    if (_settingsCurrent) _applySettings(ref.watch(_settingsProvider));
     return PopScope<void>(
       canPop: _progress == null || _allowPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -966,19 +955,12 @@ class _ChapterReaderRouteState extends State<ChapterReaderRoute>
   @override
   void dispose() {
     _closing = true;
-    WidgetsBinding.instance.removeObserver(this);
-    _positionRequest.dispose();
     final progress = _progress;
-    progress?.removeListener(_progressChanged);
     if (progress != null) {
       final released = widget.catalog.releaseReadingProgress(progress);
       unawaited(released);
     }
-    widget.catalog.removeListener(_catalogChanged);
-    _bookmarks?.removeListener(_bookmarksChanged);
     _bookmarks?.dispose();
-    _settings?.removeListener(_settingsChanged);
-    _settings?.dispose();
     final preparationClosed = _preparation.close();
     if (!_viewAttached && !_viewClosed.isCompleted) {
       // setState may install a provider just before a pop removes this route,

@@ -1,3 +1,5 @@
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../test_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -66,7 +68,9 @@ void main() {
   late TestPlatform platform;
   late CatalogController catalog;
   late ExtensionsController manager;
+  late ProviderContainer container;
   setUp(() async {
+    container = ProviderContainer();
     platform = TestPlatform();
     seedPublic(platform);
     catalog = CatalogController(
@@ -77,6 +81,7 @@ void main() {
     );
     await catalog.connect();
     manager = ExtensionsController(
+      container: container,
       catalog: catalog,
       repository: catalog.settings!,
       isCurrent: () => true,
@@ -85,6 +90,7 @@ void main() {
   });
   tearDown(() async {
     manager.dispose();
+    container.dispose();
     catalog.dispose();
     await catalog.closeReadingProgress();
     await platform.dispose();
@@ -422,6 +428,7 @@ void main() {
       );
       final owner = fixture.catalog;
       final management = ExtensionsController(
+        container: container,
         catalog: owner,
         repository: owner.settings!,
         isCurrent: () => true,
@@ -508,6 +515,7 @@ void main() {
         await owner.connect();
         addTearDown(owner.dispose);
         final management = ExtensionsController(
+          container: container,
           catalog: owner,
           repository: owner.settings!,
           isCurrent: () => true,
@@ -573,7 +581,7 @@ void main() {
   testWidgets(
     'repository dialog previews before an explicit second confirmation writes the account',
     (tester) async {
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
         ),
@@ -608,7 +616,7 @@ void main() {
         true,
       );
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpApp(const SizedBox());
     },
   );
 
@@ -623,7 +631,7 @@ void main() {
       final before = posts().length;
       await tester.binding.setSurfaceSize(const Size(900, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
+      await tester.pumpApp(
         MaterialApp(
           home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
         ),
@@ -664,7 +672,7 @@ void main() {
       expect(platform.preparations, isEmpty);
       expect(platform.openedBuilds, isEmpty);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpApp(const SizedBox());
     },
   );
 
@@ -680,7 +688,7 @@ void main() {
         }
         await catalog.connect();
         final before = platform.businessServer.requests.length;
-        await tester.pumpWidget(
+        await tester.pumpApp(
           MaterialApp(
             home: ExtensionsPage(catalog: catalog, repository: clicked),
           ),
@@ -697,7 +705,7 @@ void main() {
         expect(platform.businessServer.requests, hasLength(resumed));
         expect(platform.preparations, isEmpty);
         expect(posts(), isEmpty);
-        await tester.pumpWidget(const SizedBox());
+        await tester.pumpApp(const SizedBox());
       },
     );
   }

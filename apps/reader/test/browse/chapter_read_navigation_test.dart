@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -115,7 +116,7 @@ Future<CatalogController> _details(
   WidgetTester tester,
   TestPlatform platform,
 ) async {
-  await tester.pumpWidget(KaruyomiApp(platform: platform));
+  await tester.pumpApp(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
   await _tap(tester, find.text('去浏览'));
   for (final target in [
@@ -152,7 +153,7 @@ Future<void> _finish(
     isEmpty,
   );
   expect(tester.takeException(), isNull);
-  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpApp(const SizedBox.shrink());
   await tester.pumpAndSettle();
   await tester.runAsync(catalog.closeReadingProgress);
 }
@@ -861,7 +862,7 @@ void main() {
           source: source,
         ),
       );
-      await tester.pumpWidget(detail(MangaEntry(testManga)));
+      await tester.pumpApp(detail(MangaEntry(testManga)));
       await tester.pumpAndSettle();
       final previousState = tester.state(find.byKey(key));
       await _reveal(tester, _row(0));
@@ -876,7 +877,7 @@ void main() {
       final replacement = MangaEntry(
         wire.Manga(url: '/new-manga', title: '新作品'),
       );
-      await tester.pumpWidget(detail(replacement));
+      await tester.pumpApp(detail(replacement));
       await tester.pump(const Duration(milliseconds: 32));
       expect(tester.state(find.byKey(key)), same(previousState));
       expect(
@@ -899,7 +900,7 @@ void main() {
       expect(find.textContaining('漫画源会话已变化'), findsOneWidget);
       expect(_posts(platform), isEmpty);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
