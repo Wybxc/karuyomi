@@ -61,19 +61,16 @@ void main() {
     return NativeRuntimeAssets.load(bundle: bundle);
   }
 
-  test(
-    'verified installed files load from offset asset views without material downloads',
-    () async {
-      final assets = await load();
-      expect(assets.workerSource, contains('中文'));
-      expect(assets.materialVersion, 'a' * 64);
-      expect(bundle.requests, [
-        '${directory}manifest.json',
-        '${directory}host.js',
-        '${directory}worker.js',
-      ]);
-    },
-  );
+  test('verified installed files load from offset asset views without material downloads', () async {
+    final assets = await load();
+    expect(assets.workerSource, contains('中文'));
+    expect(assets.materialVersion, 'a' * 64);
+    expect(bundle.requests, [
+      '${directory}manifest.json',
+      '${directory}host.js',
+      '${directory}worker.js',
+    ]);
+  });
 
   test('same-length corruption fails before any script can execute', () async {
     final bytes = List<int>.from(bundle.files['${directory}worker.js']!);
@@ -113,35 +110,32 @@ void main() {
     },
   );
 
-  test(
-    'protocol, ABI, baseline and material identity drift require a compatible app',
-    () async {
-      for (final entry in {
-        'protocolVersion': 999,
-        'hostAbi': 'unknown-host',
-        'runtimeBaseline': 'unknown-baseline',
-        'materialVersion': '../invalid-materials',
-      }.entries) {
-        final original = manifest[entry.key];
-        manifest[entry.key] = entry.value;
-        await expectLater(
-          load(),
-          throwsA(
-            isA<RuntimeException>().having(
-              (error) => error.code,
-              'code',
-              RuntimeErrorCode.unsupportedCapability,
-            ),
+  test('protocol, ABI, baseline and material identity drift require a compatible app', () async {
+    for (final entry in {
+      'protocolVersion': 999,
+      'hostAbi': 'unknown-host',
+      'runtimeBaseline': 'unknown-baseline',
+      'materialVersion': '../invalid-materials',
+    }.entries) {
+      final original = manifest[entry.key];
+      manifest[entry.key] = entry.value;
+      await expectLater(
+        load(),
+        throwsA(
+          isA<RuntimeException>().having(
+            (error) => error.code,
+            'code',
+            RuntimeErrorCode.unsupportedCapability,
           ),
-        );
-        manifest[entry.key] = original;
-      }
-      expect(
-        bundle.requests.every((path) => path.endsWith('manifest.json')),
-        isTrue,
+        ),
       );
-    },
-  );
+      manifest[entry.key] = original;
+    }
+    expect(
+      bundle.requests.every((path) => path.endsWith('manifest.json')),
+      isTrue,
+    );
+  });
 
   test(
     'manifest cannot choose an arbitrary app asset or oversized script',
@@ -159,46 +153,40 @@ void main() {
     },
   );
 
-  test(
-    'injection cannot be configured for a file origin or credential-bearing URL',
-    () async {
-      final assets = await load();
-      for (final value in [
-        'file:///runtime/host.html',
-        'http://example.com',
-        'https://user:password@example.com',
-        'https://example.com/other',
-        'https://example.com/?query=1',
-        'https://example.com/#fragment',
-      ]) {
-        expect(
-          () => assets.documentStartScript(Uri.parse(value)),
-          throwsArgumentError,
-        );
-      }
-    },
-  );
-
-  test(
-    'managed file capability and binding token are explicitly opted in together',
-    () async {
-      final assets = await load();
-      final ordinary = assets.documentStartScript(
-        Uri.parse('https://reader.example'),
-      );
-      expect(ordinary, contains('imageFiles: false'));
-      expect(ordinary, isNot(contains('__karuyomiNativeImageToken')));
-      final managed = assets.documentStartScript(
-        Uri.parse('https://reader.example'),
-        imageFileToken: 'native-token',
-      );
-      expect(managed, contains('imageFiles: true'));
+  test('injection cannot be configured for a file origin or credential-bearing URL', () async {
+    final assets = await load();
+    for (final value in [
+      'file:///runtime/host.html',
+      'http://example.com',
+      'https://user:password@example.com',
+      'https://example.com/other',
+      'https://example.com/?query=1',
+      'https://example.com/#fragment',
+    ]) {
       expect(
-        managed,
-        contains("Object.defineProperty(window, '__karuyomiNativeImageToken'"),
+        () => assets.documentStartScript(Uri.parse(value)),
+        throwsArgumentError,
       );
-      expect(managed, contains('location.origin !== "https://reader.example"'));
-      expect(managed, contains("['/runtime/host.html', '/runtime/host']"));
-    },
-  );
+    }
+  });
+
+  test('managed file capability and binding token are explicitly opted in together', () async {
+    final assets = await load();
+    final ordinary = assets.documentStartScript(
+      Uri.parse('https://reader.example'),
+    );
+    expect(ordinary, contains('imageFiles: false'));
+    expect(ordinary, isNot(contains('__karuyomiNativeImageToken')));
+    final managed = assets.documentStartScript(
+      Uri.parse('https://reader.example'),
+      imageFileToken: 'native-token',
+    );
+    expect(managed, contains('imageFiles: true'));
+    expect(
+      managed,
+      contains("Object.defineProperty(window, '__karuyomiNativeImageToken'"),
+    );
+    expect(managed, contains('location.origin !== "https://reader.example"'));
+    expect(managed, contains("['/runtime/host.html', '/runtime/host']"));
+  });
 }

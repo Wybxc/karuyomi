@@ -214,9 +214,8 @@ void main() {
       addTearDown(remote.dispose);
       final repository = LibraryRepository(client);
       await expectLater(_create(repository), throwsStateError);
-      await LibraryRepository(
-        remote,
-      ).deleteCategory(categoryId: _first, expectedRevision: 1);
+      await LibraryRepository(remote)
+          .deleteCategory(categoryId: _first, expectedRevision: 1);
       await expectLater(
         _create(repository),
         throwsA(
@@ -234,61 +233,56 @@ void main() {
     },
   );
 
-  test(
-    'deleting a category removes associations and preserves reading state on another device',
-    () async {
-      final server = TestBusinessServer();
-      final client = _client(server);
-      final remote = _client(server);
-      addTearDown(client.dispose);
-      addTearDown(remote.dispose);
-      final repository = LibraryRepository(client);
-      await _create(repository);
-      await _favorite(repository);
-      final entry = (await repository.watchEntries().first).single;
-      await repository.setCategories(
+  test('deleting a category removes associations and preserves reading state on another device', () async {
+    final server = TestBusinessServer();
+    final client = _client(server);
+    final remote = _client(server);
+    addTearDown(client.dispose);
+    addTearDown(remote.dispose);
+    final repository = LibraryRepository(client);
+    await _create(repository);
+    await _favorite(repository);
+    final entry = (await repository.watchEntries().first).single;
+    await repository.setCategories(
+      mangaKey: entry.mangaKey,
+      categoryIds: [_first],
+      expectedCatalogRevision: 1,
+      expectedMangaRevision: entry.revision,
+    );
+    final pages = ChapterManifest(
+      chapterKey: 'chapter',
+      version: 'v1',
+      pages: [ReaderPage(key: 'page')],
+    );
+    await ProgressRepository(client).save(
+      mangaKey: entry.mangaKey,
+      manifest: pages,
+      progress: ChapterProgress(current: pages.positionAt(0, offset: .6)),
+      reversedOrder: true,
+    );
+    final before = server.manga(entry.mangaKey)!;
+    await LibraryRepository(remote)
+        .deleteCategory(categoryId: _first, expectedRevision: 1);
+    final view = await repository.watchView().first;
+    expect(view.categories, isEmpty);
+    expect(view.entries.single.categoryIds, isEmpty);
+    expect(view.entries.single.revision, before.revision + 1);
+    expect(view.entries.single.addedAt, entry.addedAt);
+    expect(
+      (await ProgressRepository(client).loadChapter(
         mangaKey: entry.mangaKey,
-        categoryIds: [_first],
-        expectedCatalogRevision: 1,
-        expectedMangaRevision: entry.revision,
-      );
-      final pages = ChapterManifest(
         chapterKey: 'chapter',
-        version: 'v1',
-        pages: [ReaderPage(key: 'page')],
-      );
-      await ProgressRepository(client).save(
-        mangaKey: entry.mangaKey,
-        manifest: pages,
-        progress: ChapterProgress(current: pages.positionAt(0, offset: .6)),
-        reversedOrder: true,
-      );
-      final before = server.manga(entry.mangaKey)!;
-      await LibraryRepository(
-        remote,
-      ).deleteCategory(categoryId: _first, expectedRevision: 1);
-      final view = await repository.watchView().first;
-      expect(view.categories, isEmpty);
-      expect(view.entries.single.categoryIds, isEmpty);
-      expect(view.entries.single.revision, before.revision + 1);
-      expect(view.entries.single.addedAt, entry.addedAt);
-      expect(
-        (await ProgressRepository(client).loadChapter(
-          mangaKey: entry.mangaKey,
-          chapterKey: 'chapter',
-        ))!.current.normalizedOffset,
-        .6,
-      );
-      expect(
-        (await ProgressRepository(
-          client,
-        ).loadResume(entry.mangaKey))!.reversedOrder,
-        true,
-      );
-      expect(server.progress(entry.mangaKey, 'chapter')!.epoch, 0);
-      expect(server.manga(entry.mangaKey)!.favorite, true);
-    },
-  );
+      ))!.current.normalizedOffset,
+      .6,
+    );
+    expect(
+      (await ProgressRepository(client).loadResume(entry.mangaKey))!
+          .reversedOrder,
+      true,
+    );
+    expect(server.progress(entry.mangaKey, 'chapter')!.epoch, 0);
+    expect(server.manga(entry.mangaKey)!.favorite, true);
+  });
 
   test(
     'catalog commands progress independently while a manga ACK is delayed',
@@ -357,9 +351,8 @@ void main() {
         ),
       );
       await gate.received!.future;
-      await LibraryRepository(
-        remote,
-      ).deleteCategory(categoryId: _first, expectedRevision: 1);
+      await LibraryRepository(remote)
+          .deleteCategory(categoryId: _first, expectedRevision: 1);
       await repository.refresh();
       gate.release!.complete();
       await failed;
@@ -381,9 +374,8 @@ void main() {
       await _create(repository);
       await _favorite(repository);
       final entry = (await repository.watchEntries().first).single;
-      await LibraryRepository(
-        remote,
-      ).renameCategory(categoryId: _first, name: 'New', expectedRevision: 1);
+      await LibraryRepository(remote)
+          .renameCategory(categoryId: _first, name: 'New', expectedRevision: 1);
       await repository.refresh();
       await expectLater(
         repository.setCategories(
@@ -444,57 +436,54 @@ void main() {
     },
   );
 
-  test(
-    'watchView publishes entries and catalog together through a deletion refresh',
-    () async {
-      final server = TestBusinessServer();
-      final gate = _ResponseGate(server);
-      final client = _client(gate);
-      addTearDown(client.dispose);
-      final repository = LibraryRepository(client);
-      await _create(repository);
-      await _favorite(repository);
-      final entry = (await repository.watchEntries().first).single;
-      await repository.setCategories(
-        mangaKey: entry.mangaKey,
-        categoryIds: [_first],
-        expectedCatalogRevision: 1,
-        expectedMangaRevision: entry.revision,
-      );
-      final views = <LibraryView>[];
-      final updated = Completer<void>();
-      final subscription = repository.watchView().listen((view) {
-        views.add(view);
-        if (view.categoryRevision == 2 && !updated.isCompleted) {
-          updated.complete();
-        }
-      });
-      addTearDown(subscription.cancel);
-      await repository.refresh();
-      gate.hold('/api/library');
-      final deleting = repository.deleteCategory(
-        categoryId: _first,
-        expectedRevision: 1,
-      );
-      await gate.received!.future;
-      expect(views.last.categoryRevision, 1);
-      expect(views.last.entries.single.categoryIds, [_first]);
-      gate.release!.complete();
-      await deleting;
-      await updated.future;
-      expect(views.last.categoryRevision, 2);
-      for (final view in views) {
-        expect(
-          view.entries.single.categoryIds,
-          view.categories.map((category) => category.id).toList(),
-        );
+  test('watchView publishes entries and catalog together through a deletion refresh', () async {
+    final server = TestBusinessServer();
+    final gate = _ResponseGate(server);
+    final client = _client(gate);
+    addTearDown(client.dispose);
+    final repository = LibraryRepository(client);
+    await _create(repository);
+    await _favorite(repository);
+    final entry = (await repository.watchEntries().first).single;
+    await repository.setCategories(
+      mangaKey: entry.mangaKey,
+      categoryIds: [_first],
+      expectedCatalogRevision: 1,
+      expectedMangaRevision: entry.revision,
+    );
+    final views = <LibraryView>[];
+    final updated = Completer<void>();
+    final subscription = repository.watchView().listen((view) {
+      views.add(view);
+      if (view.categoryRevision == 2 && !updated.isCompleted) {
+        updated.complete();
       }
+    });
+    addTearDown(subscription.cancel);
+    await repository.refresh();
+    gate.hold('/api/library');
+    final deleting = repository.deleteCategory(
+      categoryId: _first,
+      expectedRevision: 1,
+    );
+    await gate.received!.future;
+    expect(views.last.categoryRevision, 1);
+    expect(views.last.entries.single.categoryIds, [_first]);
+    gate.release!.complete();
+    await deleting;
+    await updated.future;
+    expect(views.last.categoryRevision, 2);
+    for (final view in views) {
       expect(
-        () => views.first.entries.single.categoryIds.clear(),
-        throwsUnsupportedError,
+        view.entries.single.categoryIds,
+        view.categories.map((category) => category.id).toList(),
       );
-    },
-  );
+    }
+    expect(
+      () => views.first.entries.single.categoryIds.clear(),
+      throwsUnsupportedError,
+    );
+  });
 
   test(
     'reorder is authoritative and names may repeat across devices',
@@ -530,29 +519,26 @@ void main() {
     },
   );
 
-  test(
-    'closing a subject drops a late category ACK and leaves the next identity isolated',
-    () async {
-      final server = TestBusinessServer();
-      final gate = _ResponseGate(server)
-        ..hold('/api/categories/mutations', verb: 'POST');
-      final client = _client(gate);
-      final write = _create(LibraryRepository(client));
-      final failed = expectLater(write, throwsStateError);
-      await gate.received!.future;
-      await client.dispose();
-      final next = _client(server.forSubject('other'), subject: 'other');
-      addTearDown(next.dispose);
-      expect(
-        (await LibraryRepository(next).watchView().first).categories,
-        isEmpty,
-      );
-      gate.release!.complete();
-      await failed;
-      expect(server.catalog().categories.single.id, _first);
-      expect(server.catalog(subject: 'other').categories, isEmpty);
-    },
-  );
+  test('closing a subject drops a late category ACK and leaves the next identity isolated', () async {
+    final server = TestBusinessServer();
+    final gate = _ResponseGate(server)
+      ..hold('/api/categories/mutations', verb: 'POST');
+    final client = _client(gate);
+    final write = _create(LibraryRepository(client));
+    final failed = expectLater(write, throwsStateError);
+    await gate.received!.future;
+    await client.dispose();
+    final next = _client(server.forSubject('other'), subject: 'other');
+    addTearDown(next.dispose);
+    expect(
+      (await LibraryRepository(next).watchView().first).categories,
+      isEmpty,
+    );
+    gate.release!.complete();
+    await failed;
+    expect(server.catalog().categories.single.id, _first);
+    expect(server.catalog(subject: 'other').categories, isEmpty);
+  });
 
   test(
     'category responses reject invalid IDs, catalogs and oversized bodies',
@@ -584,8 +570,7 @@ void main() {
           ? const ApiReply(
               status: 200,
               headers: {'content-type': 'application/json'},
-              body:
-                  '{"schemaVersion":1,"categoryCatalog":{"categories":[{"id":"invalid","name":"Name"}]}}',
+              body: '{"schemaVersion":1,"categoryCatalog":{"categories":[{"id":"invalid","name":"Name"}]}}',
               redirected: false,
             )
           : null;

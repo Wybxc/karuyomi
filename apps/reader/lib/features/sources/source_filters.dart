@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -231,6 +231,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
         return input(
           DropdownButtonFormField<int>(
             key: key('tri'),
+            enabled: enabled,
             initialValue: node.triState.state,
             isExpanded: true,
             decoration: InputDecoration(
@@ -250,6 +251,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
         return input(
           DropdownButtonFormField<int>(
             key: key('select'),
+            enabled: enabled,
             initialValue: node.select.state,
             isExpanded: true,
             decoration: InputDecoration(

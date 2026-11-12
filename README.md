@@ -38,7 +38,7 @@ docs/verification/       验证结论与复验入口
 
 ## 本地开发
 
-需要 Node 24.15.0（`.node-version`）、pnpm 12.6.0、Flutter 3.47.5（`.fvmrc`）。支持 `FLUTTER_ROOT=/path/to/flutter`；原生构建另需 Xcode / Android SDK。JVM 工具链和依赖由[锁文件与运行时说明](runtime/teavm/README.md)固定。
+需要 Node 24.15.0（`.node-version`）、pnpm 12.6.0、Flutter 3.50.0 / Dart 3.14.0（`.fvmrc`）。支持 `FLUTTER_ROOT=/path/to/flutter`；原生构建另需 Xcode / Android SDK。JVM 工具链和依赖由[锁文件与运行时说明](runtime/teavm/README.md)固定。
 
 ```sh
 pnpm install --frozen-lockfile

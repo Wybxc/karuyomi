@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/cover_repository.dart';

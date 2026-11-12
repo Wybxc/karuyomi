@@ -66,66 +66,60 @@ void main() {
     },
   );
 
-  test(
-    'cancel ACK cannot publish a late image and its cleanup preserves the Source',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      final entered = Completer<void>();
-      final ready = Completer<void>();
-      transport.handler = (call) async {
-        final response = transport.respond(call);
-        if (call.hasAcquireImage()) {
-          entered.complete();
-          await ready.future;
-        }
-        return response;
-      };
-      final assertion = expectLater(
-        runtime.acquireImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.cancelled)),
-      );
-      await entered.future;
-      await runtime.cancelImage(
-        const ImageCancelRequest(
-          requestId: 'image-1',
-          generation: 'generation-1',
-        ),
-      );
-      ready.complete();
-      await assertion;
-      expect(transport.calls.last.releaseImage.resourceId, 'resource-1');
-      expect(transport.calls.last.releaseImage.generation, 'generation-1');
-      expect(transport.calls.where((call) => call.hasCancel()), isEmpty);
-      expect((await runtime.invoke(request())).generation, 'generation-1');
-      await runtime.dispose();
-    },
-  );
+  test('cancel ACK cannot publish a late image and its cleanup preserves the Source', () async {
+    final transport = FakeTransport();
+    final runtime = TransportSourceRuntime(transport);
+    await runtime.open(build());
+    final entered = Completer<void>();
+    final ready = Completer<void>();
+    transport.handler = (call) async {
+      final response = transport.respond(call);
+      if (call.hasAcquireImage()) {
+        entered.complete();
+        await ready.future;
+      }
+      return response;
+    };
+    final assertion = expectLater(
+      runtime.acquireImage(imageRequest()),
+      throwsA(failure(RuntimeErrorCode.cancelled)),
+    );
+    await entered.future;
+    await runtime.cancelImage(
+      const ImageCancelRequest(
+        requestId: 'image-1',
+        generation: 'generation-1',
+      ),
+    );
+    ready.complete();
+    await assertion;
+    expect(transport.calls.last.releaseImage.resourceId, 'resource-1');
+    expect(transport.calls.last.releaseImage.generation, 'generation-1');
+    expect(transport.calls.where((call) => call.hasCancel()), isEmpty);
+    expect((await runtime.invoke(request())).generation, 'generation-1');
+    await runtime.dispose();
+  });
 
-  test(
-    'a rejected envelope releases only the new resource under the request generation',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      transport.handler = (call) async {
-        final response = transport.respond(call);
-        if (call.hasAcquireImage()) {
-          response.requestId = 'foreign';
-          response.image.generation = 'foreign';
-        }
-        return response;
-      };
-      await expectLater(
-        runtime.acquireImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
-      );
-      expect(transport.calls.last.releaseImage.resourceId, 'resource-1');
-      expect(transport.calls.last.releaseImage.generation, 'generation-1');
-      await runtime.dispose();
-    },
-  );
+  test('a rejected envelope releases only the new resource under the request generation', () async {
+    final transport = FakeTransport();
+    final runtime = TransportSourceRuntime(transport);
+    await runtime.open(build());
+    transport.handler = (call) async {
+      final response = transport.respond(call);
+      if (call.hasAcquireImage()) {
+        response.requestId = 'foreign';
+        response.image.generation = 'foreign';
+      }
+      return response;
+    };
+    await expectLater(
+      runtime.acquireImage(imageRequest()),
+      throwsA(failure(RuntimeErrorCode.protocolError)),
+    );
+    expect(transport.calls.last.releaseImage.resourceId, 'resource-1');
+    expect(transport.calls.last.releaseImage.generation, 'generation-1');
+    await runtime.dispose();
+  });
 
   test(
     'a reused resource identity cannot revoke an accepted UI owner',
@@ -279,52 +273,49 @@ void main() {
     },
   );
 
-  test(
-    'a refused cleanup ACK retains the resource charge while explicit retries reuse its identity',
-    () async {
-      final transport = FakeTransport();
-      final runtime = TransportSourceRuntime(transport);
-      await runtime.open(build());
-      uniqueResource(transport);
-      for (var i = 0; i < wire.imageResourceLimit; i++) {
-        await runtime.acquireImage(imageRequest(id: 'resource-$i'));
+  test('a refused cleanup ACK retains the resource charge while explicit retries reuse its identity', () async {
+    final transport = FakeTransport();
+    final runtime = TransportSourceRuntime(transport);
+    await runtime.open(build());
+    uniqueResource(transport);
+    for (var i = 0; i < wire.imageResourceLimit; i++) {
+      await runtime.acquireImage(imageRequest(id: 'resource-$i'));
+    }
+    transport.handler = (call) async => call.hasReleaseImage()
+        ? wire.ControlResponse(
+            slotId: call.slotId,
+            requestId: call.requestId,
+            released: wire.Released(),
+          )
+        : transport.respond(call);
+    await expectLater(
+      runtime.releaseImage(release('resource-0')),
+      throwsA(failure(RuntimeErrorCode.protocolError)),
+    );
+    await expectLater(
+      runtime.releaseImage(release('resource-0')),
+      throwsA(failure(RuntimeErrorCode.protocolError)),
+    );
+    expect(
+      transport.calls.where((call) => call.hasReleaseImage()),
+      hasLength(2),
+    );
+    await expectLater(
+      runtime.acquireImage(imageRequest(id: 'seventh')),
+      throwsA(failure(RuntimeErrorCode.limitExceeded)),
+    );
+    transport.handler = (call) async {
+      final response = transport.respond(call);
+      if (call.hasAcquireImage()) {
+        response.image.resourceId = call.acquireImage.requestId;
       }
-      transport.handler = (call) async => call.hasReleaseImage()
-          ? wire.ControlResponse(
-              slotId: call.slotId,
-              requestId: call.requestId,
-              released: wire.Released(),
-            )
-          : transport.respond(call);
-      await expectLater(
-        runtime.releaseImage(release('resource-0')),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
-      );
-      await expectLater(
-        runtime.releaseImage(release('resource-0')),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
-      );
-      expect(
-        transport.calls.where((call) => call.hasReleaseImage()),
-        hasLength(2),
-      );
-      await expectLater(
-        runtime.acquireImage(imageRequest(id: 'seventh')),
-        throwsA(failure(RuntimeErrorCode.limitExceeded)),
-      );
-      transport.handler = (call) async {
-        final response = transport.respond(call);
-        if (call.hasAcquireImage()) {
-          response.image.resourceId = call.acquireImage.requestId;
-        }
-        return response;
-      };
-      await runtime.releaseImage(release('resource-0'));
-      expect(
-        (await runtime.acquireImage(imageRequest(id: 'replacement'))).id,
-        'replacement',
-      );
-      await runtime.dispose();
-    },
-  );
+      return response;
+    };
+    await runtime.releaseImage(release('resource-0'));
+    expect(
+      (await runtime.acquireImage(imageRequest(id: 'replacement'))).id,
+      'replacement',
+    );
+    await runtime.dispose();
+  });
 }

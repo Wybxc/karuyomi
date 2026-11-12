@@ -2,6 +2,6 @@ name: karuyomi_protocol_generator
 description: Locked official Dart Protobuf code generator.
 publish_to: none
 environment:
-  sdk: ^3.13.4
+  sdk: ^3.14.0
 dev_dependencies:
   protoc_plugin: 25.1.0

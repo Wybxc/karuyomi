@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../browse/catalog_controller.dart';
@@ -8,11 +8,10 @@ import '../browse/manga_list_tile.dart';
 import '../extensions/extension_listing.dart';
 import 'cross_source_search_controller.dart';
 
-typedef OpenSourceSearchDetails =
-    Future<void> Function(
-      ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})
-      details,
-    );
+typedef OpenSourceSearchDetails = Future<void> Function(
+  ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})
+  details,
+);
 
 class CrossSourceSearchPage extends StatefulHookWidget {
   const CrossSourceSearchPage({
@@ -106,6 +105,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               key: ValueKey(('cross-search-language', controller.language)),
+              enabled: controller.canChange,
               initialValue: controller.language,
               decoration: const InputDecoration(labelText: '语言'),
               items: [

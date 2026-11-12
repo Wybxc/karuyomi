@@ -7,36 +7,33 @@ ChapterManifest chapter(List<ReaderPage> pages, {String version = '1'}) =>
     ChapterManifest(chapterKey: 'chapter', version: version, pages: pages);
 
 void main() {
-  test(
-    'learned content geometry controls spreads while original decode budgets remain intact',
-    () {
-      final cropped = ReaderPage(
-        key: 'cropped',
-        width: 1200,
-        height: 600,
-        contentAspectRatio: .8,
-      );
-      final manifest = chapter([portrait('cover'), cropped, portrait('next')]);
+  test('learned content geometry controls spreads while original decode budgets remain intact', () {
+    final cropped = ReaderPage(
+      key: 'cropped',
+      width: 1200,
+      height: 600,
+      contentAspectRatio: .8,
+    );
+    final manifest = chapter([portrait('cover'), cropped, portrait('next')]);
+    expect(
+      groupPages(
+        manifest,
+        doublePage: true,
+      ).map((spread) => spread.pages.map((page) => page.key).toList()),
+      [
+        ['cover'],
+        ['cropped', 'next'],
+      ],
+    );
+    expect(cropped.originalAspectRatio, 2);
+    expect(cropped.estimatedDecodedBytes, 1200 * 600 * 4);
+    for (final ratio in [0.0, -1.0, double.infinity, double.nan]) {
       expect(
-        groupPages(
-          manifest,
-          doublePage: true,
-        ).map((spread) => spread.pages.map((page) => page.key).toList()),
-        [
-          ['cover'],
-          ['cropped', 'next'],
-        ],
+        () => ReaderPage(key: 'invalid', contentAspectRatio: ratio),
+        throwsArgumentError,
       );
-      expect(cropped.originalAspectRatio, 2);
-      expect(cropped.estimatedDecodedBytes, 1200 * 600 * 4);
-      for (final ratio in [0.0, -1.0, double.infinity, double.nan]) {
-        expect(
-          () => ReaderPage(key: 'invalid', contentAspectRatio: ratio),
-          throwsArgumentError,
-        );
-      }
-    },
-  );
+    }
+  });
 
   test(
     'cover and landscape are alone; portrait spreads preserve source order',
@@ -131,40 +128,37 @@ void main() {
     },
   );
 
-  test(
-    'manifest revision reorders by identity and explicitly reports missing pages',
-    () {
-      final old = chapter([portrait('a'), portrait('b'), portrait('c')]);
-      final reordered = chapter([
-        portrait('c'),
-        portrait('a'),
-        portrait('b'),
-      ], version: '2');
-      final exact = resolvePosition(
-        reordered,
-        old.positionAt(
-          1,
-          offset: 0.4,
-          normalizedX: .8,
-          viewportX: .6,
-          viewportY: .2,
-        ),
-      );
-      expect(exact.kind, PositionResolutionKind.exactPage);
-      expect(exact.position!.pageIndexHint, 2);
-      expect(exact.position!.normalizedOffset, 0.4);
-      expect(exact.position!.normalizedX, .8);
-      expect(exact.position!.viewportX, .6);
-      expect(exact.position!.viewportY, .2);
-      expect(exact.position!.manifestVersion, '2');
-      final removed = resolvePosition(
-        chapter([portrait('a')]),
-        old.positionAt(2),
-      );
-      expect(removed.requiresNotice, isTrue);
-      expect(removed.position!.pageKey, 'a');
-    },
-  );
+  test('manifest revision reorders by identity and explicitly reports missing pages', () {
+    final old = chapter([portrait('a'), portrait('b'), portrait('c')]);
+    final reordered = chapter([
+      portrait('c'),
+      portrait('a'),
+      portrait('b'),
+    ], version: '2');
+    final exact = resolvePosition(
+      reordered,
+      old.positionAt(
+        1,
+        offset: 0.4,
+        normalizedX: .8,
+        viewportX: .6,
+        viewportY: .2,
+      ),
+    );
+    expect(exact.kind, PositionResolutionKind.exactPage);
+    expect(exact.position!.pageIndexHint, 2);
+    expect(exact.position!.normalizedOffset, 0.4);
+    expect(exact.position!.normalizedX, .8);
+    expect(exact.position!.viewportX, .6);
+    expect(exact.position!.viewportY, .2);
+    expect(exact.position!.manifestVersion, '2');
+    final removed = resolvePosition(
+      chapter([portrait('a')]),
+      old.positionAt(2),
+    );
+    expect(removed.requiresNotice, isTrue);
+    expect(removed.position!.pageKey, 'a');
+  });
 
   test(
     'empty chapter has no position and duplicate page keys are rejected',

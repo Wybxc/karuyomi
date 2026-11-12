@@ -28,6 +28,10 @@ import {
   parseManifest,
   verifyMaterialReferences,
 } from '../extensions/verify-manifest.ts';
+import {
+  immutableCache,
+  readFlutterWebManifest,
+} from '../flutter/web-assets.ts';
 
 const indexPath = '/extensions/index.json';
 const statePath = '/extensions/build-state.json';
@@ -205,8 +209,9 @@ const releaseSchema = z.object({
     .array(
       z.object({
         path: z.string().regex(/^\/(?!\/)(?!.*\.\.).*$/),
-        size: z.number().int().positive(),
+        size: z.number().int().nonnegative(),
         sha256: sha256Schema,
+        cacheControl: z.enum([immutableCache, 'no-cache']).optional(),
       }),
     )
     .min(1),
@@ -244,19 +249,38 @@ export async function recordWebRelease(
       await readFile(path.join(client, 'runtime/materials.json'), 'utf8'),
     ),
   );
+  const flutterManifest = await readFlutterWebManifest(client);
+  const flutterAssets = new Map(
+    flutterManifest.entries.map((entry) => [entry.url, entry]),
+  );
   const assets = await Promise.all(
     [
-      'index.html',
-      'main.dart.js',
-      'runtime/host.js',
-      'runtime/worker.js',
-      'runtime/materials.json',
+      ...new Set([
+        'index.html',
+        'precache_manifest.json',
+        ...flutterAssets.keys(),
+        'runtime/host.js',
+        'runtime/worker.js',
+        'runtime/materials.json',
+      ]),
     ].map(async (relative) => {
       const bytes = await readFile(path.join(client, relative));
+      const sha256 = hash(bytes);
+      const flutter = flutterAssets.get(relative);
+      if (flutter) {
+        assert.equal(bytes.length, flutter.size, relative);
+        assert(
+          sha256.startsWith(flutter.hash),
+          `Flutter manifest hash mismatch: ${relative}`,
+        );
+      }
       return {
         path: relative === 'index.html' ? '/' : '/' + relative,
         size: bytes.length,
-        sha256: hash(bytes),
+        sha256,
+        ...((flutter || relative === 'precache_manifest.json') && {
+          cacheControl: flutter?.urlHashed ? immutableCache : 'no-cache',
+        }),
       };
     }),
   );
@@ -308,6 +332,12 @@ export async function verifyWebRelease(
         });
         assert.equal(bytes.length, asset.size, asset.path);
         assert.equal(hash(bytes), asset.sha256, asset.path);
+        if (asset.cacheControl)
+          assert.equal(
+            response.headers.get('Cache-Control'),
+            asset.cacheControl,
+            asset.path,
+          );
       }),
     ),
   );

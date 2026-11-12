@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -602,67 +602,64 @@ void main() {
     },
   );
 
-  test(
-    'a missing run ACK ends startup and explicit reconnect does not pile up views',
-    () async {
-      await runtime.dispose();
-      runtime = NativePlatformRuntime.withStartupTimeout(
-        Uri.parse('https://reader.example'),
-        const Duration(milliseconds: 100),
-      );
-      final acknowledgement = Completer<void>();
-      platform.nextRunAcknowledgement = acknowledgement;
-      addTearDown(() {
-        if (!acknowledgement.isCompleted) acknowledgement.complete();
-      });
-      final catalog = CatalogController(
-        api: runtime,
-        runtime: runtime.runtime,
-        rebuildRuntime: runtime.rebuild,
-      );
-      try {
-        final connecting = catalog.connect();
-        final old = await platform.created.future;
-        expect(catalog.busy, isTrue);
-        await connecting.timeout(const Duration(seconds: 2));
-        expect(catalog.status, ServiceStatus.failed);
-        expect(catalog.busy, isFalse);
-        expect(catalog.error, contains('重启应用'));
-        expect(old.disposals, 0);
-        expect(runtime.runtimeRestartBlocked, isTrue);
+  test('a missing run ACK ends startup and explicit reconnect does not pile up views', () async {
+    await runtime.dispose();
+    runtime = NativePlatformRuntime.withStartupTimeout(
+      Uri.parse('https://reader.example'),
+      const Duration(milliseconds: 100),
+    );
+    final acknowledgement = Completer<void>();
+    platform.nextRunAcknowledgement = acknowledgement;
+    addTearDown(() {
+      if (!acknowledgement.isCompleted) acknowledgement.complete();
+    });
+    final catalog = CatalogController(
+      api: runtime,
+      runtime: runtime.runtime,
+      rebuildRuntime: runtime.rebuild,
+    );
+    try {
+      final connecting = catalog.connect();
+      final old = await platform.created.future;
+      expect(catalog.busy, isTrue);
+      await connecting.timeout(const Duration(seconds: 2));
+      expect(catalog.status, ServiceStatus.failed);
+      expect(catalog.busy, isFalse);
+      expect(catalog.error, contains('重启应用'));
+      expect(old.disposals, 0);
+      expect(runtime.runtimeRestartBlocked, isTrue);
 
-        await catalog.connect().timeout(const Duration(seconds: 2));
-        expect(catalog.status, ServiceStatus.failed);
-        expect(catalog.error, contains('暂时无法重新连接'));
-        expect(platform.views, hasLength(1));
-        old.controller.readiness = true;
-        old.loadStopped();
-        old.params.onRenderProcessGone?.call(
-          InAppWebViewController.fromPlatform(platform: old.controller),
-          RenderProcessGoneDetail(didCrash: false),
-        );
-        await flushCallbacks();
-        expect(old.controller.handshakes, 0);
-        expect(old.disposals, 0);
+      await catalog.connect().timeout(const Duration(seconds: 2));
+      expect(catalog.status, ServiceStatus.failed);
+      expect(catalog.error, contains('暂时无法重新连接'));
+      expect(platform.views, hasLength(1));
+      old.controller.readiness = true;
+      old.loadStopped();
+      old.params.onRenderProcessGone?.call(
+        InAppWebViewController.fromPlatform(platform: old.controller),
+        RenderProcessGoneDetail(didCrash: false),
+      );
+      await flushCallbacks();
+      expect(old.controller.handshakes, 0);
+      expect(old.disposals, 0);
 
-        acknowledgement.complete();
-        await flushCallbacks();
-        expect(old.disposals, 1);
-        expect(runtime.runtimeRestartBlocked, isFalse);
-        final created = platform.nextCreated;
-        final nextResponse = ready();
-        final next = await created;
-        expect(next, isNot(same(old)));
-        next.controller.readiness = true;
-        next.loadStopped();
-        await nextResponse;
-        expect(old.disposals, 1);
-        expect(next.disposals, 0);
-      } finally {
-        catalog.dispose();
-      }
-    },
-  );
+      acknowledgement.complete();
+      await flushCallbacks();
+      expect(old.disposals, 1);
+      expect(runtime.runtimeRestartBlocked, isFalse);
+      final created = platform.nextCreated;
+      final nextResponse = ready();
+      final next = await created;
+      expect(next, isNot(same(old)));
+      next.controller.readiness = true;
+      next.loadStopped();
+      await nextResponse;
+      expect(old.disposals, 1);
+      expect(next.disposals, 0);
+    } finally {
+      catalog.dispose();
+    }
+  });
 
   for (final succeeds in [true, false]) {
     test(
@@ -806,53 +803,50 @@ void main() {
     expect(view.disposals, 1);
   });
 
-  test(
-    'a search slot runtime error response does not replace the foreground WebView',
-    () async {
-      final first = ready();
-      final view = await platform.created.future;
-      view.controller.readiness = true;
-      view.loadStopped();
-      await first;
-      view.controller.controlResult = CallAsyncJavaScriptResult(
-        value: jsonEncode(
-          wire.encodeProtoJson(
-            wire.ControlResponse(
-              requestId: 'search-ready',
-              slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
-              error: wire.RuntimeError(
-                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
-                message: 'Search worker ended',
-              ),
+  test('a search slot runtime error response does not replace the foreground WebView', () async {
+    final first = ready();
+    final view = await platform.created.future;
+    view.controller.readiness = true;
+    view.loadStopped();
+    await first;
+    view.controller.controlResult = CallAsyncJavaScriptResult(
+      value: jsonEncode(
+        wire.encodeProtoJson(
+          wire.ControlResponse(
+            requestId: 'search-ready',
+            slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+            error: wire.RuntimeError(
+              code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+              message: 'Search worker ended',
             ),
           ),
         ),
-      );
-      final response = wire.decodeProtoJson(
-        wire.ControlResponse(),
-        await runtime.control(
-          wire.encodeProtoJson(
-            wire.ControlRequest(
-              requestId: 'search-ready',
-              slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
-              ready: wire.Empty(),
-            ),
+      ),
+    );
+    final response = wire.decodeProtoJson(
+      wire.ControlResponse(),
+      await runtime.control(
+        wire.encodeProtoJson(
+          wire.ControlRequest(
+            requestId: 'search-ready',
+            slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+            ready: wire.Empty(),
           ),
         ),
-      );
-      expect(response.slotId, wire.RuntimeSlot.RUNTIME_SLOT_SEARCH);
-      expect(
-        response.error.code,
-        wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
-      );
-      await flushCallbacks();
-      expect(view.disposals, 0);
-      view.controller.controlResult = null;
-      await ready();
-      expect(platform.views, hasLength(1));
-      expect(view.disposals, 0);
-    },
-  );
+      ),
+    );
+    expect(response.slotId, wire.RuntimeSlot.RUNTIME_SLOT_SEARCH);
+    expect(
+      response.error.code,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+    );
+    await flushCallbacks();
+    expect(view.disposals, 0);
+    view.controller.controlResult = null;
+    await ready();
+    expect(platform.views, hasLength(1));
+    expect(view.disposals, 0);
+  });
 
   test(
     'dispose ends unfinished initialization without reviving late callbacks',

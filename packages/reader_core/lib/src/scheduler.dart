@@ -1,43 +1,32 @@
 import 'dart:async';
+
 import 'layout.dart';
 import 'resources.dart';
 
-final class ImageBudgetExceeded implements Exception {
-  const ImageBudgetExceeded(this.message);
-  final String message;
+final class const ImageBudgetExceeded(final String message)
+    implements Exception {
   @override
   String toString() => message;
 }
 
-final class ImageSchedulerSnapshot {
-  ImageSchedulerSnapshot({
-    required Map<String, ImageResource> resources,
-    required Map<String, Object> errors,
-    required Map<String, ImageDimensions> dimensions,
-    required Iterable<String> loading,
-    required this.residentBytes,
-    required this.estimatedDecodedBytes,
-    required this.cleanupError,
-  }) : resources = Map.unmodifiable(resources),
-       errors = Map.unmodifiable(errors),
-       dimensions = Map.unmodifiable(dimensions),
-       loading = Set.unmodifiable(loading);
-
-  final Map<String, ImageResource> resources;
-  final Map<String, Object> errors;
+final class ImageSchedulerSnapshot({
+  required Map<String, ImageResource> resources,
+  required Map<String, Object> errors,
+  required Map<String, ImageDimensions> dimensions,
+  required Iterable<String> loading,
+  required final int residentBytes,
+  required final int estimatedDecodedBytes,
+  required final Object? cleanupError,
+}) {
+  final Map<String, ImageResource> resources = Map.unmodifiable(resources);
+  final Map<String, Object> errors = Map.unmodifiable(errors);
 
   /// Actual client-decoded dimensions, keyed by resource ID (including retiring).
-  final Map<String, ImageDimensions> dimensions;
-  final Set<String> loading;
-  final int residentBytes;
-  final int estimatedDecodedBytes;
-  final Object? cleanupError;
+  final Map<String, ImageDimensions> dimensions = Map.unmodifiable(dimensions);
+  final Set<String> loading = Set.unmodifiable(loading);
 }
 
-final class _Acquisition {
-  _Acquisition(this.ref, this.epoch);
-  final PageRef ref;
-  final int epoch;
+final class _Acquisition(final PageRef ref, final int epoch) {
   bool cancelled = false;
 }
 

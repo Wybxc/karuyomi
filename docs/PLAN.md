@@ -11,7 +11,7 @@
 - Static Assets 是所有客户端的扩展分发权威源，每包只部署最新可用构建，由客户端或 Service Worker 管理更新与缓存。扩展不再发布到 GitHub Release，Worker/R2 不代理正文。共享桥/WASM 在 Web 作为 Static Assets、Native 随应用打包；Java/Maven、原 JAR 与 seed 只用于构建。
 - [能力提示与有界跨源搜索](plan/cross-source-search.md)复用已确认安装和最多两个独立槽；Source 结果逐组返回，搜索与活动阅读互斥，取消/关闭确认后才交还主线。功能已接线，独立服务与 UI 回归、完整工程和构建通过，实际平台验收继续推进。
 - 首版保留浏览、书架、在线阅读、基本进度、同步和源管理；暂缓模块及各阶段完整范围见[计划索引](plan/README.md)。原型阶段不维护旧协议、旧材料或旧发布格式兼容。
-- 初版 Web 交付后，[Riverpod + generator + flutter_hooks 状态管理重构](plan/post-prototype-flutter-state.md)已通过工程与 Web 验收，并启用 riverpod_lint；后续准备 [Flutter 3.50 / Dart 3.14 更新](plan/flutter-3.50.md)。
+- 初版 Web 交付后，[Riverpod + generator + flutter_hooks 状态管理重构](plan/post-prototype-flutter-state.md)已通过工程与 Web 验收，并启用 riverpod_lint；当前推进 [Flutter 3.50 / Dart 3.14 更新](plan/flutter-3.50.md)，实现与本机工程检查已通过，CI 构建及新版本 Web 验收待执行。
 
 收藏、进度与分类已接入 Worker API + D1、双端生成协议与幂等确认路径，本地业务 SQLite 已移除；工程和实际跨平台验收分别推进，历史本地恢复证据不能作为多端同步完成的证据。初版通过幂等写入、服务端 revision/冲突语义及前台重新读取收敛，不要求持久 outbox、离线冲突合并、增量日志或实时通知先行。P0 的真实阅读、生产 Access 和设备验收继续推进，不能因同步优先而跳过。
 

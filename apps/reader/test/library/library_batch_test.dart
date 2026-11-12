@@ -142,115 +142,105 @@ void main() {
     return running;
   }
 
-  test(
-    'pause waits for the in-flight ACK and only explicit continuation sends the remainder',
-    () async {
-      final view = await _seed(repository);
-      final draft = batch(view);
-      final before = _posts(server).length;
-      final running = startHeld(draft, () => true);
-      await gate.received!.future;
-      expect(draft.items.first.status, LibraryBatchItemStatus.sending);
-      expect(server.manga(view.entries.first.mangaKey)!.favorite, false);
-      draft.pause();
-      expect(draft.pauseRequested, true);
-      draft.finishRemaining();
-      expect(draft.finished, false);
-      expect(pendingLibraryBatch(repository), same(draft));
-      gate.release();
-      await running;
-      expect(draft.items.map((item) => item.status), [
-        LibraryBatchItemStatus.confirmed,
-        LibraryBatchItemStatus.notStarted,
-        LibraryBatchItemStatus.notStarted,
-      ]);
-      expect(_posts(server), hasLength(before + 1));
-      expect(draft.confirmedCount, 1);
-      expect(draft.canContinue, true);
-      final wrapper = LibraryRepository(client);
-      expect(pendingLibraryBatch(wrapper), same(draft));
-      await pendingLibraryBatch(
-        wrapper,
-      )!.continueRemaining(isCurrent: () => true);
-      expect(draft.completed, true);
-      expect(draft.finished, true);
-      expect(draft.confirmedCount, 3);
-      expect(_posts(server), hasLength(before + 3));
-      expect(pendingLibraryBatch(wrapper), isNull);
-      expect(await wrapper.watchEntries().first, isEmpty);
-    },
-  );
+  test('pause waits for the in-flight ACK and only explicit continuation sends the remainder', () async {
+    final view = await _seed(repository);
+    final draft = batch(view);
+    final before = _posts(server).length;
+    final running = startHeld(draft, () => true);
+    await gate.received!.future;
+    expect(draft.items.first.status, LibraryBatchItemStatus.sending);
+    expect(server.manga(view.entries.first.mangaKey)!.favorite, false);
+    draft.pause();
+    expect(draft.pauseRequested, true);
+    draft.finishRemaining();
+    expect(draft.finished, false);
+    expect(pendingLibraryBatch(repository), same(draft));
+    gate.release();
+    await running;
+    expect(draft.items.map((item) => item.status), [
+      LibraryBatchItemStatus.confirmed,
+      LibraryBatchItemStatus.notStarted,
+      LibraryBatchItemStatus.notStarted,
+    ]);
+    expect(_posts(server), hasLength(before + 1));
+    expect(draft.confirmedCount, 1);
+    expect(draft.canContinue, true);
+    final wrapper = LibraryRepository(client);
+    expect(pendingLibraryBatch(wrapper), same(draft));
+    await pendingLibraryBatch(wrapper)!
+        .continueRemaining(isCurrent: () => true);
+    expect(draft.completed, true);
+    expect(draft.finished, true);
+    expect(draft.confirmedCount, 3);
+    expect(_posts(server), hasLength(before + 3));
+    expect(pendingLibraryBatch(wrapper), isNull);
+    expect(await wrapper.watchEntries().first, isEmpty);
+  });
 
-  test(
-    'ending the remainder requires all attempted writes to be confirmed and sends nothing else',
-    () async {
-      final view = await _seed(repository);
-      final draft = batch(view);
-      server.loseNextResponse = true;
-      await draft.start(isCurrent: () => true);
-      expect(draft.items.first.status, LibraryBatchItemStatus.uncertain);
-      final original = _posts(server).last.body;
-      final beforeRetry = _posts(server).length;
-      draft.finishRemaining();
-      expect(draft.finished, false);
-      expect(pendingLibraryBatch(repository), same(draft));
-      expect(_posts(server), hasLength(beforeRetry));
-      await draft.retry(isCurrent: () => true);
-      expect(_posts(server).last.body, original);
-      expect(draft.confirmedCount, 1);
-      expect(draft.canContinue, true);
-      final remaining = {view.entries[1].mangaKey, view.entries[2].mangaKey};
-      final afterRetry = _posts(server).length;
-      draft.finishRemaining();
-      expect(draft.finished, true);
-      expect(draft.completed, false);
-      expect(draft.remainingKeys, remaining);
-      expect(pendingLibraryBatch(repository), isNull);
-      await draft.continueRemaining(isCurrent: () => true);
-      expect(_posts(server), hasLength(afterRetry));
-      for (final key in remaining) {
-        expect(server.manga(key)!.favorite, true);
-      }
-    },
-  );
+  test('ending the remainder requires all attempted writes to be confirmed and sends nothing else', () async {
+    final view = await _seed(repository);
+    final draft = batch(view);
+    server.loseNextResponse = true;
+    await draft.start(isCurrent: () => true);
+    expect(draft.items.first.status, LibraryBatchItemStatus.uncertain);
+    final original = _posts(server).last.body;
+    final beforeRetry = _posts(server).length;
+    draft.finishRemaining();
+    expect(draft.finished, false);
+    expect(pendingLibraryBatch(repository), same(draft));
+    expect(_posts(server), hasLength(beforeRetry));
+    await draft.retry(isCurrent: () => true);
+    expect(_posts(server).last.body, original);
+    expect(draft.confirmedCount, 1);
+    expect(draft.canContinue, true);
+    final remaining = {view.entries[1].mangaKey, view.entries[2].mangaKey};
+    final afterRetry = _posts(server).length;
+    draft.finishRemaining();
+    expect(draft.finished, true);
+    expect(draft.completed, false);
+    expect(draft.remainingKeys, remaining);
+    expect(pendingLibraryBatch(repository), isNull);
+    await draft.continueRemaining(isCurrent: () => true);
+    expect(_posts(server), hasLength(afterRetry));
+    for (final key in remaining) {
+      expect(server.manga(key)!.favorite, true);
+    }
+  });
 
-  test(
-    'a late ACK settles only its retired caller and another draft cannot replace the session batch',
-    () async {
-      final view = await _seed(repository);
-      final draft = batch(view);
-      var current = true;
-      final before = _posts(server).length;
-      final running = startHeld(draft, () => current);
-      await gate.received!.future;
-      current = false;
-      gate.release();
-      await running;
-      expect(draft.confirmedCount, 1);
-      expect(draft.notStartedCount, 2);
-      expect(draft.pauseRequested, true);
-      expect(draft.busy, false);
-      await draft.continueRemaining(isCurrent: () => current);
-      expect(_posts(server), hasLength(before + 1));
-      final wrapper = LibraryRepository(client);
-      expect(pendingLibraryBatch(wrapper), same(draft));
-      final replacement = LibraryBatchDraft(
-        repository: wrapper,
-        view: view,
-        mangaKeys: view.entries.map((entry) => entry.mangaKey).toSet(),
-        action: LibraryBatchAction.removeFavorites,
-      );
-      addTearDown(replacement.dispose);
-      await replacement.start(isCurrent: () => true);
-      expect(replacement.attempted, false);
-      expect(replacement.error, isNotNull);
-      expect(pendingLibraryBatch(repository), same(draft));
-      expect(_posts(server), hasLength(before + 1));
-      final nextClient = _client(server);
-      addTearDown(nextClient.dispose);
-      expect(pendingLibraryBatch(LibraryRepository(nextClient)), isNull);
-    },
-  );
+  test('a late ACK settles only its retired caller and another draft cannot replace the session batch', () async {
+    final view = await _seed(repository);
+    final draft = batch(view);
+    var current = true;
+    final before = _posts(server).length;
+    final running = startHeld(draft, () => current);
+    await gate.received!.future;
+    current = false;
+    gate.release();
+    await running;
+    expect(draft.confirmedCount, 1);
+    expect(draft.notStartedCount, 2);
+    expect(draft.pauseRequested, true);
+    expect(draft.busy, false);
+    await draft.continueRemaining(isCurrent: () => current);
+    expect(_posts(server), hasLength(before + 1));
+    final wrapper = LibraryRepository(client);
+    expect(pendingLibraryBatch(wrapper), same(draft));
+    final replacement = LibraryBatchDraft(
+      repository: wrapper,
+      view: view,
+      mangaKeys: view.entries.map((entry) => entry.mangaKey).toSet(),
+      action: LibraryBatchAction.removeFavorites,
+    );
+    addTearDown(replacement.dispose);
+    await replacement.start(isCurrent: () => true);
+    expect(replacement.attempted, false);
+    expect(replacement.error, isNotNull);
+    expect(pendingLibraryBatch(repository), same(draft));
+    expect(_posts(server), hasLength(before + 1));
+    final nextClient = _client(server);
+    addTearDown(nextClient.dispose);
+    expect(pendingLibraryBatch(LibraryRepository(nextClient)), isNull);
+  });
 
   for (final change in ['catalog', 'manga']) {
     test(
@@ -296,9 +286,10 @@ void main() {
         expect(draft.canRetry, false);
         expect(draft.canContinue, false);
         expect(draft.canReloadAndFinish, true);
-        final commands = _posts(
-          server,
-        ).map(_command).where((command) => command.hasSetCategories()).toList();
+        final commands = _posts(server)
+            .map(_command)
+            .where((command) => command.hasSetCategories())
+            .toList();
         expect(commands, hasLength(2));
         expect(commands.last.mangaKey, view.entries[1].mangaKey);
         expect(commands.last.expectedRevision, view.entries[1].revision);
@@ -322,64 +313,59 @@ void main() {
     );
   }
 
-  test(
-    'category union and difference preserve other memberships and still ACK no-op targets',
-    () async {
-      var view = await _seed(repository);
-      for (final entry in view.entries) {
-        final ids = switch (entry.title) {
-          '甲' => [_firstCategory, _secondCategory],
-          '乙' => [_secondCategory],
-          _ => <String>[],
-        };
-        if (ids.isEmpty) continue;
-        await repository.setCategories(
-          mangaKey: entry.mangaKey,
-          categoryIds: ids,
-          expectedCatalogRevision: view.categoryRevision,
-          expectedMangaRevision: entry.revision,
-        );
-      }
-      view = await repository.watchView().first;
-      final addition = batch(
-        view,
-        action: LibraryBatchAction.addCategories,
-        categoryIds: {_firstCategory},
+  test('category union and difference preserve other memberships and still ACK no-op targets', () async {
+    var view = await _seed(repository);
+    for (final entry in view.entries) {
+      final ids = switch (entry.title) {
+        '甲' => [_firstCategory, _secondCategory],
+        '乙' => [_secondCategory],
+        _ => <String>[],
+      };
+      if (ids.isEmpty) continue;
+      await repository.setCategories(
+        mangaKey: entry.mangaKey,
+        categoryIds: ids,
+        expectedCatalogRevision: view.categoryRevision,
+        expectedMangaRevision: entry.revision,
       );
-      final beforeAdd = _posts(server).length;
-      await addition.start(isCurrent: () => true);
-      expect(addition.confirmedCount, 3);
-      expect(addition.finished, true);
-      expect(_posts(server), hasLength(beforeAdd + 3));
-      for (final item in addition.items) {
-        final expected = item.entry.title == '丙'
-            ? [_firstCategory]
-            : [_firstCategory, _secondCategory];
-        expect(server.manga(item.entry.mangaKey)!.categoryIds, expected);
-        expect(
-          server.manga(item.entry.mangaKey)!.revision,
-          item.entry.revision + 1,
-        );
-      }
-      final removal = batch(
-        await repository.watchView().first,
-        action: LibraryBatchAction.removeCategories,
-        categoryIds: {_secondCategory},
+    }
+    view = await repository.watchView().first;
+    final addition = batch(
+      view,
+      action: LibraryBatchAction.addCategories,
+      categoryIds: {_firstCategory},
+    );
+    final beforeAdd = _posts(server).length;
+    await addition.start(isCurrent: () => true);
+    expect(addition.confirmedCount, 3);
+    expect(addition.finished, true);
+    expect(_posts(server), hasLength(beforeAdd + 3));
+    for (final item in addition.items) {
+      final expected = item.entry.title == '丙'
+          ? [_firstCategory]
+          : [_firstCategory, _secondCategory];
+      expect(server.manga(item.entry.mangaKey)!.categoryIds, expected);
+      expect(
+        server.manga(item.entry.mangaKey)!.revision,
+        item.entry.revision + 1,
       );
-      final beforeRemove = _posts(server).length;
-      await removal.start(isCurrent: () => true);
-      expect(removal.confirmedCount, 3);
-      expect(removal.finished, true);
-      expect(_posts(server), hasLength(beforeRemove + 3));
-      for (final item in removal.items) {
-        expect(server.manga(item.entry.mangaKey)!.categoryIds, [
-          _firstCategory,
-        ]);
-        expect(
-          server.manga(item.entry.mangaKey)!.revision,
-          item.entry.revision + 1,
-        );
-      }
-    },
-  );
+    }
+    final removal = batch(
+      await repository.watchView().first,
+      action: LibraryBatchAction.removeCategories,
+      categoryIds: {_secondCategory},
+    );
+    final beforeRemove = _posts(server).length;
+    await removal.start(isCurrent: () => true);
+    expect(removal.confirmedCount, 3);
+    expect(removal.finished, true);
+    expect(_posts(server), hasLength(beforeRemove + 3));
+    for (final item in removal.items) {
+      expect(server.manga(item.entry.mangaKey)!.categoryIds, [_firstCategory]);
+      expect(
+        server.manga(item.entry.mangaKey)!.revision,
+        item.entry.revision + 1,
+      );
+    }
+  });
 }

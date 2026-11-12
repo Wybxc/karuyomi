@@ -1,10 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'diagnostics/reader_baseline.dart';
 import 'diagnostics/reader_baseline_host.dart';
 import 'features/reader/reading_progress_controller.dart';
@@ -48,35 +49,67 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
   ThemeMode _themeMode = ThemeMode.system;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'Karuyomi',
-    builder: readerBaselineEnabled
-        ? (context, child) => ReaderBaselineHost(child: child!)
-        : null,
-    debugShowCheckedModeBanner: false,
-    locale: const Locale('zh'),
-    supportedLocales: const [Locale('zh'), Locale('en')],
-    localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    themeMode: _themeMode,
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff476b5d)),
-      useMaterial3: true,
-    ),
-    darkTheme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xff476b5d),
-        brightness: Brightness.dark,
-      ),
-      useMaterial3: true,
-    ),
-    home: AppShell(
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.reduceMotionOf(context) ||
+        MediaQuery.disableAnimationsOf(context);
+    final transitions = reduceMotion
+        ? PageTransitionsTheme(
+            builders: {
+              for (final platform in TargetPlatform.values)
+                platform: const _ReducedMotionTransitions(),
+            },
+          )
+        : const PageTransitionsTheme();
+    return MaterialApp(
+      title: 'Karuyomi',
+      builder: readerBaselineEnabled
+          ? (context, child) => ReaderBaselineHost(child: child!)
+          : null,
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('zh'),
+      supportedLocales: const [Locale('zh'), Locale('en')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       themeMode: _themeMode,
-      onThemeChanged: (value) => setState(() => _themeMode = value),
-      platform: widget.platform,
-      platformFactory: widget.platformFactory,
-      connectionPreferences: widget.connectionPreferences,
-    ),
-  );
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff476b5d)),
+        useMaterial3: true,
+        pageTransitionsTheme: transitions,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xff476b5d),
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+        pageTransitionsTheme: transitions,
+      ),
+      home: AppShell(
+        themeMode: _themeMode,
+        onThemeChanged: (value) => setState(() => _themeMode = value),
+        platform: widget.platform,
+        platformFactory: widget.platformFactory,
+        connectionPreferences: widget.connectionPreferences,
+      ),
+    );
+  }
+}
+
+/// Keep route changes legible without spatial motion; animated manga retain
+/// their separate playback setting and disableAnimations policy.
+class _ReducedMotionTransitions extends PageTransitionsBuilder {
+  const _ReducedMotionTransitions();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => MediaQuery.disableAnimationsOf(context)
+      ? child
+      : FadeTransition(opacity: animation, child: child);
 }
 
 class AppShell extends StatefulHookConsumerWidget {

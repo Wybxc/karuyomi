@@ -105,57 +105,53 @@ void main() {
     );
   });
 
-  test(
-    'search close and rebuild are addressed to its slot and preserve foreground ownership',
-    () async {
-      final transport = SlotTransport();
-      final foreground = TransportSourceRuntime(transport);
-      final search = TransportSourceRuntime(
-        transport,
-        slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
-      );
-      addTearDown(foreground.dispose);
-      addTearDown(search.dispose);
-      final events = <RuntimeEvent>[];
-      final subscription = foreground.events.listen(events.add);
-      addTearDown(subscription.cancel);
-      final reading = await foreground.open(build());
-      final initial = await search.open(searchBuild());
-      expect(initial.generation, isNot(reading.generation));
-      expect(
-        (await search.invoke(searchRequest(initial.generation))).generation,
-        initial.generation,
-      );
-      await search.cancel('search-request');
-      await search.closeBuild(
-        buildId: initial.buildId,
-        generation: initial.generation,
-      );
-      final replacement = await search.open(searchBuild());
-      expect(replacement.generation, isNot(initial.generation));
-      await search.rebuildHost();
-      expect(
-        (await foreground.invoke(
-          request(generation: reading.generation),
-        )).generation,
-        reading.generation,
-      );
-      expect(events, isEmpty);
-      expect(
-        transport.calls
-            .where(
-              (value) =>
-                  value.hasCancel() ||
-                  value.hasCloseBuild() ||
-                  value.hasRebuild(),
-            )
-            .every(
-              (value) => value.slotId == wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
-            ),
-        true,
-      );
-    },
-  );
+  test('search close and rebuild are addressed to its slot and preserve foreground ownership', () async {
+    final transport = SlotTransport();
+    final foreground = TransportSourceRuntime(transport);
+    final search = TransportSourceRuntime(
+      transport,
+      slotId: wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+    );
+    addTearDown(foreground.dispose);
+    addTearDown(search.dispose);
+    final events = <RuntimeEvent>[];
+    final subscription = foreground.events.listen(events.add);
+    addTearDown(subscription.cancel);
+    final reading = await foreground.open(build());
+    final initial = await search.open(searchBuild());
+    expect(initial.generation, isNot(reading.generation));
+    expect(
+      (await search.invoke(searchRequest(initial.generation))).generation,
+      initial.generation,
+    );
+    await search.cancel('search-request');
+    await search.closeBuild(
+      buildId: initial.buildId,
+      generation: initial.generation,
+    );
+    final replacement = await search.open(searchBuild());
+    expect(replacement.generation, isNot(initial.generation));
+    await search.rebuildHost();
+    expect(
+      (await foreground.invoke(request(generation: reading.generation)))
+          .generation,
+      reading.generation,
+    );
+    expect(events, isEmpty);
+    expect(
+      transport.calls
+          .where(
+            (value) =>
+                value.hasCancel() ||
+                value.hasCloseBuild() ||
+                value.hasRebuild(),
+          )
+          .every(
+            (value) => value.slotId == wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+          ),
+      true,
+    );
+  });
 
   for (final replacement in [
     null,

@@ -374,63 +374,60 @@ void main() {
     },
   );
 
-  test(
-    'lost removal retries its UUID without replacing metadata or deleting reading state',
-    () async {
-      await _favorite(library);
-      await _createCategory(library);
-      var entry = await _entry(library);
-      await library.setCategories(
-        mangaKey: _mangaKey,
-        categoryIds: [_categoryId],
-        expectedCatalogRevision: 1,
-        expectedMangaRevision: entry.revision,
-      );
-      await _saveProgress(client);
-      final bookmarks = BookmarkRepository(client);
-      final bookmark = await bookmarks.loadChapter(
-        mangaKey: _mangaKey,
-        chapterKey: 'chapter',
-      );
-      await bookmarks.set(
-        mangaKey: _mangaKey,
-        chapterKey: 'chapter',
-        bookmarked: true,
-        basedOnRevision: bookmark.revision,
-      );
-      entry = await _entry(library);
-      final before = server.manga(_mangaKey)!;
-      final progress = server.progress(_mangaKey, 'chapter')!;
-      Future<void> remove() => library.removeFavorite(
-        mangaKey: _mangaKey,
-        expectedMangaRevision: entry.revision,
-      );
-      server.loseNextResponse = true;
-      await expectLater(remove(), throwsStateError);
-      final original = _posts(server).last.body;
-      final command = wire.decodeProtoJson(
-        wire.StateMutation(),
-        jsonDecode(original!),
-      );
-      expect(command.setFavorite.hasMetadata(), false);
-      expect(command.setFavorite.favorite, false);
-      expect(server.manga(_mangaKey)!.favorite, false);
-      // A shelf refresh may evict the removed favorite from the session cache;
-      // the pending original command must still retain its transport identity.
-      await library.refresh();
-      final applied = server.appliedMutations;
-      await remove();
-      expect(_posts(server).last.body, original);
-      expect(server.appliedMutations, applied);
-      final after = server.manga(_mangaKey)!;
-      expect(after.metadata, before.metadata);
-      expect(after.categoryIds, before.categoryIds);
-      expect(after.resume, before.resume);
-      expect(server.progress(_mangaKey, 'chapter'), progress);
-      expect(server.bookmarked(_mangaKey, 'chapter'), true);
-      expect(await library.watchEntries().first, isEmpty);
-    },
-  );
+  test('lost removal retries its UUID without replacing metadata or deleting reading state', () async {
+    await _favorite(library);
+    await _createCategory(library);
+    var entry = await _entry(library);
+    await library.setCategories(
+      mangaKey: _mangaKey,
+      categoryIds: [_categoryId],
+      expectedCatalogRevision: 1,
+      expectedMangaRevision: entry.revision,
+    );
+    await _saveProgress(client);
+    final bookmarks = BookmarkRepository(client);
+    final bookmark = await bookmarks.loadChapter(
+      mangaKey: _mangaKey,
+      chapterKey: 'chapter',
+    );
+    await bookmarks.set(
+      mangaKey: _mangaKey,
+      chapterKey: 'chapter',
+      bookmarked: true,
+      basedOnRevision: bookmark.revision,
+    );
+    entry = await _entry(library);
+    final before = server.manga(_mangaKey)!;
+    final progress = server.progress(_mangaKey, 'chapter')!;
+    Future<void> remove() => library.removeFavorite(
+      mangaKey: _mangaKey,
+      expectedMangaRevision: entry.revision,
+    );
+    server.loseNextResponse = true;
+    await expectLater(remove(), throwsStateError);
+    final original = _posts(server).last.body;
+    final command = wire.decodeProtoJson(
+      wire.StateMutation(),
+      jsonDecode(original!),
+    );
+    expect(command.setFavorite.hasMetadata(), false);
+    expect(command.setFavorite.favorite, false);
+    expect(server.manga(_mangaKey)!.favorite, false);
+    // A shelf refresh may evict the removed favorite from the session cache;
+    // the pending original command must still retain its transport identity.
+    await library.refresh();
+    final applied = server.appliedMutations;
+    await remove();
+    expect(_posts(server).last.body, original);
+    expect(server.appliedMutations, applied);
+    final after = server.manga(_mangaKey)!;
+    expect(after.metadata, before.metadata);
+    expect(after.categoryIds, before.categoryIds);
+    expect(after.resume, before.resume);
+    expect(server.progress(_mangaKey, 'chapter'), progress);
+    expect(server.bookmarked(_mangaKey, 'chapter'), true);
+    expect(await library.watchEntries().first, isEmpty);
+  });
 
   test(
     'an ACK followed by a failed catalog shelf read retains the original UUID',

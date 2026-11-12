@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+
 import 'package:flutter/widgets.dart';
 import 'package:image/image.dart' as img;
+
 import '../../diagnostics/reader_baseline.dart';
+
 import 'package:reader_core/reader_core.dart';
+
 import 'resource_image_web.dart'
     if (dart.library.io) 'resource_image_native.dart'
     as platform;

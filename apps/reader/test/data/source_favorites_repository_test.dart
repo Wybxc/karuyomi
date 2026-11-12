@@ -1,9 +1,10 @@
 import '../test_app.dart';
 import '../settings/settings_fixture.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/reading_progress.dart';
@@ -101,143 +102,133 @@ void main() {
     addTearDown(fixture.dispose);
   }
 
-  test(
-    'source favorites round-trip across clients, isolate subjects and distinguish packages with the same source ID',
-    () async {
-      final a = _source('source.a');
-      final b = _source('source.b');
-      final original = _values(favorites: [a, b]);
-      await repository.setGlobal(values: original, basedOnRevision: 0);
-      final remoteClient = _client(server);
-      addTearDown(remoteClient.dispose);
-      final remote = SettingsRepository(remoteClient);
-      final loaded = await remote.loadGlobal();
-      expect(loaded.global, original);
-      expect(loaded.global.favoriteSources, [a, b]);
-      final removed = loaded.global.deepCopy();
-      removed.favoriteSources.removeWhere(
-        (source) =>
-            source.packageName == a.packageName &&
-            source.sourceId == a.sourceId,
-      );
-      await remote.setGlobal(
-        values: removed,
-        basedOnRevision: loaded.globalRevision,
-      );
-      final current = await repository.loadGlobal();
-      expect(current.global.favoriteSources, [b]);
-      expect(current.global.theme, original.theme);
-      expect(current.global.reader, original.reader);
-      expect(current.globalRevision, 2);
-      final otherClient = _client(server.forSubject('other'), subject: 'other');
-      addTearDown(otherClient.dispose);
-      final other = await SettingsRepository(otherClient).loadGlobal();
-      expect(other.global.favoriteSources, isEmpty);
-      expect(other.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
-      expect(other.globalRevision, 0);
-      expect(server.appliedMutations, 2);
-    },
-  );
+  test('source favorites round-trip across clients, isolate subjects and distinguish packages with the same source ID', () async {
+    final a = _source('source.a');
+    final b = _source('source.b');
+    final original = _values(favorites: [a, b]);
+    await repository.setGlobal(values: original, basedOnRevision: 0);
+    final remoteClient = _client(server);
+    addTearDown(remoteClient.dispose);
+    final remote = SettingsRepository(remoteClient);
+    final loaded = await remote.loadGlobal();
+    expect(loaded.global, original);
+    expect(loaded.global.favoriteSources, [a, b]);
+    final removed = loaded.global.deepCopy();
+    removed.favoriteSources.removeWhere(
+      (source) =>
+          source.packageName == a.packageName && source.sourceId == a.sourceId,
+    );
+    await remote.setGlobal(
+      values: removed,
+      basedOnRevision: loaded.globalRevision,
+    );
+    final current = await repository.loadGlobal();
+    expect(current.global.favoriteSources, [b]);
+    expect(current.global.theme, original.theme);
+    expect(current.global.reader, original.reader);
+    expect(current.globalRevision, 2);
+    final otherClient = _client(server.forSubject('other'), subject: 'other');
+    addTearDown(otherClient.dispose);
+    final other = await SettingsRepository(otherClient).loadGlobal();
+    expect(other.global.favoriteSources, isEmpty);
+    expect(other.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+    expect(other.globalRevision, 0);
+    expect(server.appliedMutations, 2);
+  });
 
-  test(
-    'lost favorite ACK survives repository and controller recreation with the original UUID body and CAS',
-    () async {
-      await attachFixture();
-      var controller = fixture.editor();
-      expect(await controller.refresh(), true);
-      final favorite = _values(favorites: [_source('source.a')]);
-      server.loseNextResponse = true;
-      expect(await controller.saveGlobal(favorite, 0), false);
-      final original = _writes(server).single.body!;
-      final sent = wire.decodeProtoJson(
-        wire.SettingsMutation(),
-        jsonDecode(original),
-      );
-      expect(
-        sent.mutationId,
-        matches(
-          RegExp(
-            r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
-          ),
+  test('lost favorite ACK survives repository and controller recreation with the original UUID body and CAS', () async {
+    await attachFixture();
+    var controller = fixture.editor();
+    expect(await controller.refresh(), true);
+    final favorite = _values(favorites: [_source('source.a')]);
+    server.loseNextResponse = true;
+    expect(await controller.saveGlobal(favorite, 0), false);
+    final original = _writes(server).single.body!;
+    final sent = wire.decodeProtoJson(
+      wire.SettingsMutation(),
+      jsonDecode(original),
+    );
+    expect(
+      sent.mutationId,
+      matches(
+        RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
         ),
-      );
-      expect(sent.expectedRevision, 0);
-      expect(fixture.state().pending!.global, favorite);
-      fixture.invalidate();
-      final recreated = SettingsRepository(client);
-      controller = fixture.editor();
-      expect(await controller.refresh(), true);
-      expect(_writes(server), hasLength(1));
-      expect(fixture.state().pending!.global, favorite);
-      expect(fixture.state().pending!.basedOnRevision, 0);
-      expect(fixture.state().canEdit, false);
-      expect(fixture.state().canRetry, true);
-      final changed = favorite.deepCopy()..favoriteSources.clear();
-      await expectLater(
-        recreated.setGlobal(values: changed, basedOnRevision: 1),
-        throwsStateError,
-      );
-      expect(_writes(server), hasLength(1));
-      expect(await controller.retry(), true);
-      expect(_writes(server).map((request) => request.body), [
-        original,
-        original,
-      ]);
-      expect(fixture.state().snapshot!.global, favorite);
-      expect(fixture.state().snapshot!.globalRevision, 1);
-      expect(fixture.state().pending, isNull);
-      expect(server.appliedMutations, 1);
-    },
-  );
+      ),
+    );
+    expect(sent.expectedRevision, 0);
+    expect(fixture.state().pending!.global, favorite);
+    fixture.invalidate();
+    final recreated = SettingsRepository(client);
+    controller = fixture.editor();
+    expect(await controller.refresh(), true);
+    expect(_writes(server), hasLength(1));
+    expect(fixture.state().pending!.global, favorite);
+    expect(fixture.state().pending!.basedOnRevision, 0);
+    expect(fixture.state().canEdit, false);
+    expect(fixture.state().canRetry, true);
+    final changed = favorite.deepCopy()..favoriteSources.clear();
+    await expectLater(
+      recreated.setGlobal(values: changed, basedOnRevision: 1),
+      throwsStateError,
+    );
+    expect(_writes(server), hasLength(1));
+    expect(await controller.retry(), true);
+    expect(_writes(server).map((request) => request.body), [
+      original,
+      original,
+    ]);
+    expect(fixture.state().snapshot!.global, favorite);
+    expect(fixture.state().snapshot!.globalRevision, 1);
+    expect(fixture.state().pending, isNull);
+    expect(server.appliedMutations, 1);
+  });
 
-  test(
-    'a stale favorite edit cannot overwrite another client global preferences or canceled favorites',
-    () async {
-      final initial = await repository.setGlobal(
-        values: _values(favorites: [_source('source.a')]),
-        basedOnRevision: 0,
-      );
-      final remoteClient = _client(server);
-      addTearDown(remoteClient.dispose);
-      final remote = SettingsRepository(remoteClient);
-      final remotelyChanged = initial.global.deepCopy()
-        ..theme = wire.AppTheme.APP_THEME_LIGHT
-        ..favoriteSources.clear();
-      remotelyChanged.reader.mode = wire.ReaderMode.READER_MODE_CONTINUOUS;
-      await remote.setGlobal(values: remotelyChanged, basedOnRevision: 1);
-      final stale = initial.global.deepCopy()
-        ..favoriteSources.add(_source('source.b'));
-      await expectLater(
-        repository.setGlobal(
-          values: stale,
-          basedOnRevision: initial.globalRevision,
+  test('a stale favorite edit cannot overwrite another client global preferences or canceled favorites', () async {
+    final initial = await repository.setGlobal(
+      values: _values(favorites: [_source('source.a')]),
+      basedOnRevision: 0,
+    );
+    final remoteClient = _client(server);
+    addTearDown(remoteClient.dispose);
+    final remote = SettingsRepository(remoteClient);
+    final remotelyChanged = initial.global.deepCopy()
+      ..theme = wire.AppTheme.APP_THEME_LIGHT
+      ..favoriteSources.clear();
+    remotelyChanged.reader.mode = wire.ReaderMode.READER_MODE_CONTINUOUS;
+    await remote.setGlobal(values: remotelyChanged, basedOnRevision: 1);
+    final stale = initial.global.deepCopy()
+      ..favoriteSources.add(_source('source.b'));
+    await expectLater(
+      repository.setGlobal(
+        values: stale,
+        basedOnRevision: initial.globalRevision,
+      ),
+      throwsA(
+        isA<BusinessStateException>().having(
+          (error) => error.conflict,
+          'conflict',
+          true,
         ),
-        throwsA(
-          isA<BusinessStateException>().having(
-            (error) => error.conflict,
-            'conflict',
-            true,
-          ),
-        ),
-      );
-      expect(repository.pendingGlobal()!.retryable, false);
-      final count = _writes(server).length;
-      await expectLater(
-        repository.setGlobal(
-          values: stale,
-          basedOnRevision: initial.globalRevision,
-        ),
-        throwsA(isA<BusinessStateException>()),
-      );
-      expect(_writes(server), hasLength(count));
-      final current = await repository.loadGlobal();
-      expect(current.global, remotelyChanged);
-      expect(current.global.favoriteSources, isEmpty);
-      expect(current.globalRevision, 2);
-      expect(repository.pendingGlobal(), isNull);
-      expect(server.appliedMutations, 2);
-    },
-  );
+      ),
+    );
+    expect(repository.pendingGlobal()!.retryable, false);
+    final count = _writes(server).length;
+    await expectLater(
+      repository.setGlobal(
+        values: stale,
+        basedOnRevision: initial.globalRevision,
+      ),
+      throwsA(isA<BusinessStateException>()),
+    );
+    expect(_writes(server), hasLength(count));
+    final current = await repository.loadGlobal();
+    expect(current.global, remotelyChanged);
+    expect(current.global.favoriteSources, isEmpty);
+    expect(current.globalRevision, 2);
+    expect(repository.pendingGlobal(), isNull);
+    expect(server.appliedMutations, 2);
+  });
 
   test(
     'an old favorite ACK cannot resurrect a source canceled by another client',
@@ -294,44 +285,41 @@ void main() {
     },
   );
 
-  test(
-    'closing the identity rejects late favorite ACKs and leaves another subject empty',
-    () async {
-      final gate = _ResponseGate(server);
-      addTearDown(() {
-        if (!gate.release.isCompleted) gate.release.complete();
-      });
-      client.rebindApi(gate, verifiedIdentity: client.identity);
-      final events = <SettingsSnapshot>[];
-      final subscription = repository.watchConfirmed().listen(events.add);
-      addTearDown(subscription.cancel);
-      final write = repository.setGlobal(
-        values: _values(favorites: [_source('source.a')]),
-        basedOnRevision: 0,
-      );
-      final rejected = expectLater(write, throwsStateError);
-      await gate.received.future;
-      expect(repository.pendingGlobal(), isNotNull);
-      await client.dispose();
-      expect(repository.pendingGlobal(), isNull);
-      final otherClient = _client(server.forSubject('other'), subject: 'other');
-      addTearDown(otherClient.dispose);
-      final other = await SettingsRepository(otherClient).loadGlobal();
-      expect(other.global.favoriteSources, isEmpty);
-      expect(other.globalRevision, 0);
-      gate.release.complete();
-      await rejected;
-      expect(events, isEmpty);
-      final sameIdentity = _client(server);
-      addTearDown(sameIdentity.dispose);
-      expect(
-        (await SettingsRepository(
-          sameIdentity,
-        ).loadGlobal()).global.favoriteSources,
-        [_source('source.a')],
-      );
-    },
-  );
+  test('closing the identity rejects late favorite ACKs and leaves another subject empty', () async {
+    final gate = _ResponseGate(server);
+    addTearDown(() {
+      if (!gate.release.isCompleted) gate.release.complete();
+    });
+    client.rebindApi(gate, verifiedIdentity: client.identity);
+    final events = <SettingsSnapshot>[];
+    final subscription = repository.watchConfirmed().listen(events.add);
+    addTearDown(subscription.cancel);
+    final write = repository.setGlobal(
+      values: _values(favorites: [_source('source.a')]),
+      basedOnRevision: 0,
+    );
+    final rejected = expectLater(write, throwsStateError);
+    await gate.received.future;
+    expect(repository.pendingGlobal(), isNotNull);
+    await client.dispose();
+    expect(repository.pendingGlobal(), isNull);
+    final otherClient = _client(server.forSubject('other'), subject: 'other');
+    addTearDown(otherClient.dispose);
+    final other = await SettingsRepository(otherClient).loadGlobal();
+    expect(other.global.favoriteSources, isEmpty);
+    expect(other.globalRevision, 0);
+    gate.release.complete();
+    await rejected;
+    expect(events, isEmpty);
+    final sameIdentity = _client(server);
+    addTearDown(sameIdentity.dispose);
+    expect(
+      (await SettingsRepository(
+        sameIdentity,
+      ).loadGlobal()).global.favoriteSources,
+      [_source('source.a')],
+    );
+  });
 
   testWidgets(
     'editing the global theme preserves source favorites and reader preferences',

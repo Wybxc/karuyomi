@@ -88,7 +88,6 @@ bool samePreferenceEntries(
   final left = canonicalPreferenceEntries(a);
   final right = canonicalPreferenceEntries(b);
   return left.length == right.length &&
-      Iterable<int>.generate(
-        left.length,
-      ).every((index) => left[index] == right[index]);
+      Iterable<int>.generate(left.length)
+          .every((index) => left[index] == right[index]);
 }

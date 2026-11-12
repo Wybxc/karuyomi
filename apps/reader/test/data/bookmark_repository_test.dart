@@ -95,97 +95,90 @@ void main() {
     },
   );
 
-  test(
-    'local confirmed progress may advance CAS; reset and unfavorite preserve bookmarks',
-    () async {
-      final library = LibraryRepository(client);
-      final manga = wire.Manga(url: '/manga/bookmarks', title: 'Bookmarks');
-      Future<void> favorite(bool value) => library.setFavorite(
-        packageName: 'eu.kanade.source.test',
-        sourceId: '123',
-        sourceName: 'Test',
-        sourceLang: 'en',
-        manga: manga,
-        favorite: value,
-      );
-      await favorite(true);
-      final key = (await library.watchEntries().first).single.mangaKey;
-      final view = await repository.loadAll(key);
-      await _saveProgress(client, key);
-      final saved = await repository.set(
-        mangaKey: key,
-        chapterKey: 'chapter',
-        bookmarked: true,
-        basedOnRevision: view.revision,
-      );
-      final request = wire.decodeProtoJson(
-        wire.StateMutation(),
-        jsonDecode(server.requests.lastWhere((r) => r.method == 'POST').body!),
-      );
-      expect(request.expectedRevision, view.revision + 1);
-      expect(saved.revision, view.revision + 2);
-      await ProgressRepository(
-        client,
-      ).resetState(mangaKey: key, manifest: _manifest, reversedOrder: false);
-      await favorite(false);
-      expect((await repository.loadAll(key)).chapterKeys, {'chapter'});
-      expect(server.progress(key, 'chapter')!.current.pageKey, 'first');
-      expect(server.manga(key)!.favorite, isFalse);
-    },
-  );
+  test('local confirmed progress may advance CAS; reset and unfavorite preserve bookmarks', () async {
+    final library = LibraryRepository(client);
+    final manga = wire.Manga(url: '/manga/bookmarks', title: 'Bookmarks');
+    Future<void> favorite(bool value) => library.setFavorite(
+      packageName: 'eu.kanade.source.test',
+      sourceId: '123',
+      sourceName: 'Test',
+      sourceLang: 'en',
+      manga: manga,
+      favorite: value,
+    );
+    await favorite(true);
+    final key = (await library.watchEntries().first).single.mangaKey;
+    final view = await repository.loadAll(key);
+    await _saveProgress(client, key);
+    final saved = await repository.set(
+      mangaKey: key,
+      chapterKey: 'chapter',
+      bookmarked: true,
+      basedOnRevision: view.revision,
+    );
+    final request = wire.decodeProtoJson(
+      wire.StateMutation(),
+      jsonDecode(server.requests.lastWhere((r) => r.method == 'POST').body!),
+    );
+    expect(request.expectedRevision, view.revision + 1);
+    expect(saved.revision, view.revision + 2);
+    await ProgressRepository(client)
+        .resetState(mangaKey: key, manifest: _manifest, reversedOrder: false);
+    await favorite(false);
+    expect((await repository.loadAll(key)).chapterKeys, {'chapter'});
+    expect(server.progress(key, 'chapter')!.current.pageKey, 'first');
+    expect(server.manga(key)!.favorite, isFalse);
+  });
 
-  test(
-    'observed remote writes reject an old view and reload clears only rejected bookmark commands',
-    () async {
-      final initial = await repository.loadAll(_key);
-      final other = _client(server);
-      addTearDown(other.dispose);
-      await _saveProgress(other, _key);
-      await expectLater(
-        repository.set(
-          mangaKey: _key,
-          chapterKey: 'chapter',
-          bookmarked: true,
-          basedOnRevision: initial.revision,
-        ),
-        throwsA(
-          isA<BusinessStateException>().having(
-            (e) => e.conflict,
-            'conflict',
-            true,
-          ),
-        ),
-      );
-      expect(repository.pending(_key)!.retryable, isFalse);
-      final before = server.appliedMutations;
-      final fresh = await repository.loadAll(_key);
-      expect(server.appliedMutations, before);
-      expect(repository.pending(_key), isNull);
-      final writes = server.requests.where((r) => r.method == 'POST').length;
-      await expectLater(
-        repository.set(
-          mangaKey: _key,
-          chapterKey: 'chapter',
-          bookmarked: true,
-          basedOnRevision: initial.revision,
-        ),
-        throwsA(
-          isA<BusinessStateException>().having(
-            (e) => e.conflict,
-            'observed remote revision',
-            true,
-          ),
-        ),
-      );
-      expect(server.requests.where((r) => r.method == 'POST').length, writes);
-      await repository.set(
+  test('observed remote writes reject an old view and reload clears only rejected bookmark commands', () async {
+    final initial = await repository.loadAll(_key);
+    final other = _client(server);
+    addTearDown(other.dispose);
+    await _saveProgress(other, _key);
+    await expectLater(
+      repository.set(
         mangaKey: _key,
         chapterKey: 'chapter',
         bookmarked: true,
-        basedOnRevision: fresh.revision,
-      );
-    },
-  );
+        basedOnRevision: initial.revision,
+      ),
+      throwsA(
+        isA<BusinessStateException>().having(
+          (e) => e.conflict,
+          'conflict',
+          true,
+        ),
+      ),
+    );
+    expect(repository.pending(_key)!.retryable, isFalse);
+    final before = server.appliedMutations;
+    final fresh = await repository.loadAll(_key);
+    expect(server.appliedMutations, before);
+    expect(repository.pending(_key), isNull);
+    final writes = server.requests.where((r) => r.method == 'POST').length;
+    await expectLater(
+      repository.set(
+        mangaKey: _key,
+        chapterKey: 'chapter',
+        bookmarked: true,
+        basedOnRevision: initial.revision,
+      ),
+      throwsA(
+        isA<BusinessStateException>().having(
+          (e) => e.conflict,
+          'observed remote revision',
+          true,
+        ),
+      ),
+    );
+    expect(server.requests.where((r) => r.method == 'POST').length, writes);
+    await repository.set(
+      mangaKey: _key,
+      chapterKey: 'chapter',
+      bookmarked: true,
+      basedOnRevision: fresh.revision,
+    );
+  });
 
   for (final loseReply in [false, true]) {
     test(
@@ -305,27 +298,24 @@ void main() {
     },
   );
 
-  test(
-    'a historical ACK with unchanged bookmark returns the current manga revision',
-    () async {
-      await repository.loadAll(_key);
-      server.loseNextResponse = true;
-      Future<BookmarkSnapshot> save() => repository.set(
-        mangaKey: _key,
-        chapterKey: 'chapter',
-        bookmarked: true,
-        basedOnRevision: 0,
-      );
-      await expectLater(save(), throwsStateError);
-      final other = _client(server);
-      addTearDown(other.dispose);
-      await _saveProgress(other, _key);
-      final result = await save();
-      expect(result.bookmarked, isTrue);
-      expect(result.revision, 2);
-      expect(repository.pending(_key), isNull);
-    },
-  );
+  test('a historical ACK with unchanged bookmark returns the current manga revision', () async {
+    await repository.loadAll(_key);
+    server.loseNextResponse = true;
+    Future<BookmarkSnapshot> save() => repository.set(
+      mangaKey: _key,
+      chapterKey: 'chapter',
+      bookmarked: true,
+      basedOnRevision: 0,
+    );
+    await expectLater(save(), throwsStateError);
+    final other = _client(server);
+    addTearDown(other.dispose);
+    await _saveProgress(other, _key);
+    final result = await save();
+    expect(result.bookmarked, isTrue);
+    expect(result.revision, 2);
+    expect(repository.pending(_key), isNull);
+  });
 
   test(
     'pagination restarts its entire snapshot on account revision changes',
@@ -379,132 +369,120 @@ void main() {
     },
   );
 
-  test(
-    'bookmark pages enforce identity, saved flags, budgets and UTF-8 cursor order',
-    () {
-      wire.BookmarkPageResponse page(Iterable<String> keys) =>
-          wire.BookmarkPageResponse(
-            schemaVersion: 1,
-            mangaKey: _key,
-            entries: keys.map(
-              (key) => wire.ChapterBookmark(chapterKey: key, bookmarked: true),
-            ),
-          );
-      final ordered = page(['\uE000', '😀']);
-      expect(
-        () => validateBusinessBookmarkPage(ordered, mangaKey: _key),
-        returnsNormally,
-      );
-      for (final value in [
-        page(['chapter'])..mangaKey = 'b' * 64,
-        page(['chapter'])..entries.first.bookmarked = false,
-        page(['chapter', 'chapter']),
-        page(['b', 'a']),
-        page(['😀', '\uE000']),
-        page(['chapter'])..nextKey = 'different',
-        page(List.generate(65, (i) => 'chapter-$i')),
-      ]) {
-        expect(
-          () => validateBusinessBookmarkPage(value, mangaKey: _key),
-          throwsFormatException,
-        );
-      }
-      expect(
-        () => validateBusinessBookmarkPage(
-          page(['a']),
+  test('bookmark pages enforce identity, saved flags, budgets and UTF-8 cursor order', () {
+    wire.BookmarkPageResponse page(Iterable<String> keys) =>
+        wire.BookmarkPageResponse(
+          schemaVersion: 1,
           mangaKey: _key,
-          afterKey: 'a',
-        ),
-        throwsFormatException,
-      );
-    },
-  );
-
-  test(
-    'wrong or missing bookmark ACK stays unconfirmed; requested GET requires explicit bookmark',
-    () async {
-      await repository.loadAll(_key);
-      server.beforeRequest = (request) {
-        if (request.method != 'POST') return null;
-        final mutation = wire.decodeProtoJson(
-          wire.StateMutation(),
-          jsonDecode(request.body!),
-        );
-        return _reply(
-          wire.StateMutationResponse(
-            schemaVersion: 1,
-            mutationId: mutation.mutationId,
-            accountRevision: 1,
-            manga: wire.MangaState(mangaKey: _key, revision: 1),
-            categoryCatalog: wire.CategoryCatalog(),
-            bookmark: wire.ChapterBookmark(
-              chapterKey: 'wrong',
-              bookmarked: true,
-            ),
+          entries: keys.map(
+            (key) => wire.ChapterBookmark(chapterKey: key, bookmarked: true),
           ),
         );
-      };
-      await expectLater(
-        repository.set(
-          mangaKey: _key,
-          chapterKey: 'chapter',
-          bookmarked: true,
-          basedOnRevision: 0,
-        ),
+    final ordered = page(['\uE000', '😀']);
+    expect(
+      () => validateBusinessBookmarkPage(ordered, mangaKey: _key),
+      returnsNormally,
+    );
+    for (final value in [
+      page(['chapter'])..mangaKey = 'b' * 64,
+      page(['chapter'])..entries.first.bookmarked = false,
+      page(['chapter', 'chapter']),
+      page(['b', 'a']),
+      page(['😀', '\uE000']),
+      page(['chapter'])..nextKey = 'different',
+      page(List.generate(65, (i) => 'chapter-$i')),
+    ]) {
+      expect(
+        () => validateBusinessBookmarkPage(value, mangaKey: _key),
         throwsFormatException,
       );
-      expect(repository.pending(_key)!.retryable, isTrue);
-      server.beforeRequest = (request) => _reply(
-        wire.MangaStateResponse(
-          schemaVersion: 1,
-          manga: wire.MangaState(mangaKey: _key),
-          categoryCatalog: wire.CategoryCatalog(),
-        ),
-      );
-      await expectLater(
-        repository.loadChapter(mangaKey: _key, chapterKey: 'chapter'),
-        throwsFormatException,
-      );
-    },
-  );
+    }
+    expect(
+      () => validateBusinessBookmarkPage(
+        page(['a']),
+        mangaKey: _key,
+        afterKey: 'a',
+      ),
+      throwsFormatException,
+    );
+  });
 
-  test(
-    'subjects stay isolated and a closed session drops its late ACK and pending draft',
-    () async {
-      await repository.loadAll(_key);
-      final started = Completer<void>();
-      final release = Completer<void>();
-      server.beforeRequest = (request) async {
-        if (request.method == 'POST') {
-          started.complete();
-          await release.future;
-        }
-        return null;
-      };
-      final saving = repository.set(
+  test('wrong or missing bookmark ACK stays unconfirmed; requested GET requires explicit bookmark', () async {
+    await repository.loadAll(_key);
+    server.beforeRequest = (request) {
+      if (request.method != 'POST') return null;
+      final mutation = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(request.body!),
+      );
+      return _reply(
+        wire.StateMutationResponse(
+          schemaVersion: 1,
+          mutationId: mutation.mutationId,
+          accountRevision: 1,
+          manga: wire.MangaState(mangaKey: _key, revision: 1),
+          categoryCatalog: wire.CategoryCatalog(),
+          bookmark: wire.ChapterBookmark(chapterKey: 'wrong', bookmarked: true),
+        ),
+      );
+    };
+    await expectLater(
+      repository.set(
         mangaKey: _key,
         chapterKey: 'chapter',
         bookmarked: true,
         basedOnRevision: 0,
-      );
-      final rejected = expectLater(saving, throwsStateError);
-      await started.future;
-      await client.dispose();
-      expect(repository.pending(_key), isNull);
-      release.complete();
-      await rejected;
-      server.beforeRequest = null;
-      final other = _client(server.forSubject('other'), subject: 'other');
-      addTearDown(other.dispose);
-      expect(
-        (await BookmarkRepository(other).loadAll(_key)).chapterKeys,
-        isEmpty,
-      );
-      expect(server.bookmarked(_key, 'chapter'), isTrue);
-      expect(
-        () => other.rebindApi(server, verifiedIdentity: _identity()),
-        throwsArgumentError,
-      );
-    },
-  );
+      ),
+      throwsFormatException,
+    );
+    expect(repository.pending(_key)!.retryable, isTrue);
+    server.beforeRequest = (request) => _reply(
+      wire.MangaStateResponse(
+        schemaVersion: 1,
+        manga: wire.MangaState(mangaKey: _key),
+        categoryCatalog: wire.CategoryCatalog(),
+      ),
+    );
+    await expectLater(
+      repository.loadChapter(mangaKey: _key, chapterKey: 'chapter'),
+      throwsFormatException,
+    );
+  });
+
+  test('subjects stay isolated and a closed session drops its late ACK and pending draft', () async {
+    await repository.loadAll(_key);
+    final started = Completer<void>();
+    final release = Completer<void>();
+    server.beforeRequest = (request) async {
+      if (request.method == 'POST') {
+        started.complete();
+        await release.future;
+      }
+      return null;
+    };
+    final saving = repository.set(
+      mangaKey: _key,
+      chapterKey: 'chapter',
+      bookmarked: true,
+      basedOnRevision: 0,
+    );
+    final rejected = expectLater(saving, throwsStateError);
+    await started.future;
+    await client.dispose();
+    expect(repository.pending(_key), isNull);
+    release.complete();
+    await rejected;
+    server.beforeRequest = null;
+    final other = _client(server.forSubject('other'), subject: 'other');
+    addTearDown(other.dispose);
+    expect(
+      (await BookmarkRepository(other).loadAll(_key)).chapterKeys,
+      isEmpty,
+    );
+    expect(server.bookmarked(_key, 'chapter'), isTrue);
+    expect(
+      () => other.rebindApi(server, verifiedIdentity: _identity()),
+      throwsArgumentError,
+    );
+  });
 }

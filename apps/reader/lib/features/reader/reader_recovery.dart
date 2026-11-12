@@ -6,31 +6,18 @@ import 'chapter_sequence.dart';
 
 /// Local, one-shot navigation state for an explicitly requested Access login.
 /// Original DTO snapshots are retained; URLs are never used to bypass Source.
-final class ReaderRecoveryContext {
-  const ReaderRecoveryContext({
-    required this.origin,
-    required this.subject,
-    required this.packageName,
-    required this.sourceId,
-    required this.manga,
-    required this.chapterKey,
-    required this.position,
-    required this.order,
-    required this.mode,
-    this.doublePage,
-  });
-
-  final String origin;
-  final String subject;
-  final String packageName;
-  final String sourceId;
-  final wire.Manga manga;
-  final String chapterKey;
-  final ReadingPosition? position;
-  final ChapterOrder order;
-  final ReadingMode mode;
-  final bool? doublePage;
-
+final class const ReaderRecoveryContext({
+  required final String origin,
+  required final String subject,
+  required final String packageName,
+  required final String sourceId,
+  required final wire.Manga manga,
+  required final String chapterKey,
+  required final ReadingPosition? position,
+  required final ChapterOrder order,
+  required final ReadingMode mode,
+  final bool? doublePage,
+}) {
   Map<String, Object?> toJson() => {
     'origin': origin,
     'subject': subject,
@@ -80,16 +67,18 @@ final class ReaderRecoveryContext {
       }
       ReadingPosition? position;
       if (value['position'] case final Object anchor) {
-        if (anchor case {
-          'chapterKey': final String anchorChapter,
-          'pageKey': final String pageKey,
-          'manifestVersion': final String version,
-          'pageIndexHint': final int index,
-          'normalizedOffset': final num offset,
-          'normalizedX': final num normalizedX,
-          'viewportX': final num viewportX,
-          'viewportY': final num viewportY,
-        } when anchorChapter == chapterKey) {
+        if (anchor
+            case {
+              'chapterKey': final String anchorChapter,
+              'pageKey': final String pageKey,
+              'manifestVersion': final String version,
+              'pageIndexHint': final int index,
+              'normalizedOffset': final num offset,
+              'normalizedX': final num normalizedX,
+              'viewportX': final num viewportX,
+              'viewportY': final num viewportY,
+            }
+            when anchorChapter == chapterKey) {
           position = ReadingPosition(
             chapterKey: anchorChapter,
             pageKey: pageKey,
@@ -123,23 +112,14 @@ final class ReaderRecoveryContext {
 
 typedef ReaderAuthentication = Future<bool> Function(ReaderRecoveryContext);
 
-final class RecoveredReader {
-  const RecoveredReader({
-    required this.manga,
-    required this.sequence,
-    required this.chapter,
-    required this.source,
-    required this.opened,
-    required this.position,
-  });
-
-  final MangaEntry manga;
-  final ChapterSequence sequence;
-  final SequenceChapter chapter;
-  final CatalogSourceRef source;
-  final OpenedChapter opened;
-  final ReadingPosition? position;
-}
+final class const RecoveredReader({
+  required final MangaEntry manga,
+  required final ChapterSequence sequence,
+  required final SequenceChapter chapter,
+  required final CatalogSourceRef source,
+  required final OpenedChapter opened,
+  required final ReadingPosition? position,
+});
 
 /// Runs only after an explicit user action and a fresh bootstrap. It starts new
 /// Source operations for this chapter, never replays failed calls or old POSTs.

@@ -46,110 +46,101 @@ void main() {
     await shared.dispose();
   });
 
-  test(
-    'two readers can resume the same saved chapter before a real navigation writes',
-    () async {
-      final manifest = _manifest;
-      final otherChapter = ChapterManifest(
-        chapterKey: 'other-chapter',
-        version: 'v1',
-        pages: [ReaderPage(key: 'only')],
-      );
-      final otherAnchor = otherChapter.positionAt(0, offset: .7);
-      await repository.save(
-        mangaKey: _key,
-        manifest: otherChapter,
-        progress: ChapterProgress(current: otherAnchor, furthest: otherAnchor),
-        reversedOrder: true,
-      );
-      final anchor = manifest.positionAt(2, offset: .4, viewportY: .2);
-      final furthest = manifest.positionAt(2, offset: 1);
-      final saved = await repository.saveState(
-        mangaKey: _key,
+  test('two readers can resume the same saved chapter before a real navigation writes', () async {
+    final manifest = _manifest;
+    final otherChapter = ChapterManifest(
+      chapterKey: 'other-chapter',
+      version: 'v1',
+      pages: [ReaderPage(key: 'only')],
+    );
+    final otherAnchor = otherChapter.positionAt(0, offset: .7);
+    await repository.save(
+      mangaKey: _key,
+      manifest: otherChapter,
+      progress: ChapterProgress(current: otherAnchor, furthest: otherAnchor),
+      reversedOrder: true,
+    );
+    final anchor = manifest.positionAt(2, offset: .4, viewportY: .2);
+    final furthest = manifest.positionAt(2, offset: 1);
+    final saved = await repository.saveState(
+      mangaKey: _key,
+      manifest: manifest,
+      progress: ChapterProgress(current: anchor, furthest: furthest),
+      reversedOrder: true,
+    );
+
+    final secondClient = BusinessStateClient(api: server, identity: _identity);
+    final second = ReadingProgressController(
+      repository: ProgressRepository(secondClient),
+      mangaKey: _key,
+    );
+    addTearDown(() async {
+      second.dispose();
+      await secondClient.dispose();
+    });
+    for (final reader in [controller, second]) {
+      final restored = (await reader.restore(manifest))!;
+      expect(reader.awaitingViewport, false);
+      expect(reader.reversedOrder, true);
+      reader.observe(
         manifest: manifest,
-        progress: ChapterProgress(current: anchor, furthest: furthest),
-        reversedOrder: true,
-      );
-
-      final secondClient = BusinessStateClient(
-        api: server,
-        identity: _identity,
-      );
-      final second = ReadingProgressController(
-        repository: ProgressRepository(secondClient),
-        mangaKey: _key,
-      );
-      addTearDown(() async {
-        second.dispose();
-        await secondClient.dispose();
-      });
-      for (final reader in [controller, second]) {
-        final restored = (await reader.restore(manifest))!;
-        expect(reader.awaitingViewport, false);
-        expect(reader.reversedOrder, true);
-        reader.observe(
-          manifest: manifest,
-          current: restored,
-          observed: furthest,
-          reversedOrder: true,
-        );
-        expect(reader.unsaved, false);
-        expect(await reader.flush(), true);
-      }
-      await controller.refreshFromServer(manifest);
-      expect(controller.needsReopen(manifest.chapterKey), false);
-      expect(server.appliedMutations, 2);
-      expect(server.manga(_key)!.revision, saved.revision);
-
-      final restored = (await second.restore(otherChapter))!;
-      expect(second.awaitingViewport, true);
-      second.observe(
-        manifest: otherChapter,
         current: restored,
-        observed: otherAnchor,
+        observed: furthest,
         reversedOrder: true,
       );
-      expect(await second.flush(), true);
-      expect(server.appliedMutations, 3);
-      expect(server.manga(_key)!.resume.chapterKey, otherChapter.chapterKey);
-    },
-  );
+      expect(reader.unsaved, false);
+      expect(await reader.flush(), true);
+    }
+    await controller.refreshFromServer(manifest);
+    expect(controller.needsReopen(manifest.chapterKey), false);
+    expect(server.appliedMutations, 2);
+    expect(server.manga(_key)!.revision, saved.revision);
 
-  test(
-    'navigation is saved only after server confirmation; only viewport observation advances furthest',
-    () async {
-      final manifest = _manifest;
-      expect(await controller.restore(manifest), isNull);
-      controller.observe(
-        manifest: manifest,
-        current: manifest.positionAt(0),
-        reversedOrder: false,
-      );
-      expect(controller.unsaved, true);
-      expect(await controller.flush(), true);
-      expect(controller.storageMode, ProgressStorageMode.serverConfirmed);
-      expect(server.progress(_key, 'chapter')!.hasFurthest(), false);
-      controller.observe(
-        manifest: manifest,
-        current: manifest.positionAt(2),
-        observed: manifest.positionAt(2, offset: .9),
-        reversedOrder: true,
-      );
-      controller.observe(
-        manifest: manifest,
-        current: manifest.positionAt(0, offset: .2),
-        reversedOrder: true,
-      );
-      expect(await controller.flush(), true);
-      final saved = server.progress(_key, 'chapter')!;
-      expect(saved.current.pageIndexHint, 0);
-      expect(saved.current.normalizedOffset, .2);
-      expect(saved.furthest.pageIndexHint, 2);
-      expect(saved.furthest.normalizedOffset, .9);
-      expect(saved.completed, false);
-      expect(server.manga(_key)!.resume.reversedOrder, true);
-    },
-  );
+    final restored = (await second.restore(otherChapter))!;
+    expect(second.awaitingViewport, true);
+    second.observe(
+      manifest: otherChapter,
+      current: restored,
+      observed: otherAnchor,
+      reversedOrder: true,
+    );
+    expect(await second.flush(), true);
+    expect(server.appliedMutations, 3);
+    expect(server.manga(_key)!.resume.chapterKey, otherChapter.chapterKey);
+  });
+
+  test('navigation is saved only after server confirmation; only viewport observation advances furthest', () async {
+    final manifest = _manifest;
+    expect(await controller.restore(manifest), isNull);
+    controller.observe(
+      manifest: manifest,
+      current: manifest.positionAt(0),
+      reversedOrder: false,
+    );
+    expect(controller.unsaved, true);
+    expect(await controller.flush(), true);
+    expect(controller.storageMode, ProgressStorageMode.serverConfirmed);
+    expect(server.progress(_key, 'chapter')!.hasFurthest(), false);
+    controller.observe(
+      manifest: manifest,
+      current: manifest.positionAt(2),
+      observed: manifest.positionAt(2, offset: .9),
+      reversedOrder: true,
+    );
+    controller.observe(
+      manifest: manifest,
+      current: manifest.positionAt(0, offset: .2),
+      reversedOrder: true,
+    );
+    expect(await controller.flush(), true);
+    final saved = server.progress(_key, 'chapter')!;
+    expect(saved.current.pageIndexHint, 0);
+    expect(saved.current.normalizedOffset, .2);
+    expect(saved.furthest.pageIndexHint, 2);
+    expect(saved.furthest.normalizedOffset, .9);
+    expect(saved.completed, false);
+    expect(server.manga(_key)!.resume.reversedOrder, true);
+  });
 
   testWidgets(
     'horizontal-only viewport changes debounce to a new confirmed current anchor',
@@ -194,39 +185,36 @@ void main() {
     },
   );
 
-  test(
-    'read failure does not block reading and write failure retains session draft for retry',
-    () async {
-      final manifest = _manifest;
-      server.failNextRequest = true;
-      expect(await controller.restore(manifest), isNull);
-      expect(controller.error, contains('阅读仍可继续'));
-      server.failWrites = true;
-      controller.observe(
-        manifest: manifest,
-        current: manifest.positionAt(1),
-        observed: manifest.positionAt(1, offset: .7),
-        reversedOrder: false,
-      );
-      expect(await controller.flush(), false);
-      expect(controller.unsaved, true);
-      expect(controller.error, contains('当前会话'));
-      expect(server.progress(_key, 'chapter'), isNull);
-      final firstBody = server.requests
-          .where((request) => request.method == 'POST')
-          .single
-          .body;
-      server.failWrites = false;
-      expect(await controller.flush(), true);
-      expect(controller.unsaved, false);
-      expect(controller.error, isNull);
-      expect(
-        server.requests.where((request) => request.method == 'POST').last.body,
-        firstBody,
-      );
-      expect(server.progress(_key, 'chapter')!.furthest.normalizedOffset, .7);
-    },
-  );
+  test('read failure does not block reading and write failure retains session draft for retry', () async {
+    final manifest = _manifest;
+    server.failNextRequest = true;
+    expect(await controller.restore(manifest), isNull);
+    expect(controller.error, contains('阅读仍可继续'));
+    server.failWrites = true;
+    controller.observe(
+      manifest: manifest,
+      current: manifest.positionAt(1),
+      observed: manifest.positionAt(1, offset: .7),
+      reversedOrder: false,
+    );
+    expect(await controller.flush(), false);
+    expect(controller.unsaved, true);
+    expect(controller.error, contains('当前会话'));
+    expect(server.progress(_key, 'chapter'), isNull);
+    final firstBody = server.requests
+        .where((request) => request.method == 'POST')
+        .single
+        .body;
+    server.failWrites = false;
+    expect(await controller.flush(), true);
+    expect(controller.unsaved, false);
+    expect(controller.error, isNull);
+    expect(
+      server.requests.where((request) => request.method == 'POST').last.body,
+      firstBody,
+    );
+    expect(server.progress(_key, 'chapter')!.furthest.normalizedOffset, .7);
+  });
 
   test(
     'lost save response keeps same mutation and only confirmation marks saved',
@@ -437,184 +425,175 @@ void main() {
     expect(controller.unsaved, false);
   });
 
-  test(
-    'Catalog retains failed detached writer, reuses it and retires after confirmation',
-    () async {
-      final platform = TestPlatform(businessServer: server);
-      final catalog = CatalogController(
-        api: platform,
-        runtime: platform.runtime,
-        rebuildRuntime: platform.rebuild,
-        deploymentOrigin: platform.origin,
-      );
-      addTearDown(() async {
-        catalog.dispose();
-        await catalog.closeReadingProgress();
-        await platform.dispose();
-      });
-      expect(catalog.readingProgress, isNull);
-      await catalog.connect();
-      final writer = catalog.createReadingProgress(_key)!;
-      await writer.restore(_manifest);
-      server.failWrites = true;
-      writer.observe(
-        manifest: _manifest,
-        current: _manifest.positionAt(2),
-        reversedOrder: true,
-      );
-      await catalog.releaseReadingProgress(writer);
-      expect(catalog.hasUnsavedReadingProgress, true);
-      expect(catalog.readingDraftResume(_key)!.chapterKey, 'chapter');
-      final reused = catalog.createReadingProgress(_key)!;
-      expect(reused, same(writer));
-      server.failWrites = false;
-      expect(await catalog.flushReadingProgress(), true);
-      await catalog.releaseReadingProgress(reused);
-      expect(catalog.hasUnsavedReadingProgress, false);
-      expect(
-        (await catalog.readingProgress!.loadResume(_key))!.reversedOrder,
-        true,
-      );
-    },
-  );
+  test('Catalog retains failed detached writer, reuses it and retires after confirmation', () async {
+    final platform = TestPlatform(businessServer: server);
+    final catalog = CatalogController(
+      api: platform,
+      runtime: platform.runtime,
+      rebuildRuntime: platform.rebuild,
+      deploymentOrigin: platform.origin,
+    );
+    addTearDown(() async {
+      catalog.dispose();
+      await catalog.closeReadingProgress();
+      await platform.dispose();
+    });
+    expect(catalog.readingProgress, isNull);
+    await catalog.connect();
+    final writer = catalog.createReadingProgress(_key)!;
+    await writer.restore(_manifest);
+    server.failWrites = true;
+    writer.observe(
+      manifest: _manifest,
+      current: _manifest.positionAt(2),
+      reversedOrder: true,
+    );
+    await catalog.releaseReadingProgress(writer);
+    expect(catalog.hasUnsavedReadingProgress, true);
+    expect(catalog.readingDraftResume(_key)!.chapterKey, 'chapter');
+    final reused = catalog.createReadingProgress(_key)!;
+    expect(reused, same(writer));
+    server.failWrites = false;
+    expect(await catalog.flushReadingProgress(), true);
+    await catalog.releaseReadingProgress(reused);
+    expect(catalog.hasUnsavedReadingProgress, false);
+    expect(
+      (await catalog.readingProgress!.loadResume(_key))!.reversedOrder,
+      true,
+    );
+  });
 
-  test(
-    'new service adopts only matching identity and rebinds the retained request',
-    () async {
-      final original = TestPlatform(businessServer: server);
-      final first = CatalogController(
-        api: original,
-        runtime: original.runtime,
-        rebuildRuntime: original.rebuild,
-        deploymentOrigin: original.origin,
-      );
-      await first.connect();
-      final draft = first.createReadingProgress(_key)!;
-      await draft.restore(_manifest);
-      server.failWrites = true;
-      draft.observe(
-        manifest: _manifest,
-        current: _manifest.positionAt(1),
-        reversedOrder: true,
-      );
-      await draft.flush();
-      final initialBody = server.requests
-          .where((request) => request.method == 'POST')
-          .last
-          .body;
-      expect(first.takeUnsavedReadingProgress().single, same(draft));
-      first.dispose();
-      await first.closeReadingProgress();
-      await original.dispose();
-      final wrongPlatform = TestPlatform(
-        businessServer: server,
-        bootstrapSubject: 'other',
-      );
-      final wrong = CatalogController(
-        api: wrongPlatform,
-        runtime: wrongPlatform.runtime,
-        rebuildRuntime: wrongPlatform.rebuild,
-        deploymentOrigin: wrongPlatform.origin,
-      );
-      await wrong.connect();
-      expect(wrong.adoptReadingProgress(draft), false);
-      wrong.dispose();
-      await wrong.closeReadingProgress();
-      await wrongPlatform.dispose();
-      final nextPlatform = TestPlatform(businessServer: server);
-      final next = CatalogController(
-        api: nextPlatform,
-        runtime: nextPlatform.runtime,
-        rebuildRuntime: nextPlatform.rebuild,
-        deploymentOrigin: nextPlatform.origin,
-      );
-      addTearDown(() async {
-        next.dispose();
-        await next.closeReadingProgress();
-        await nextPlatform.dispose();
-      });
-      await next.connect();
-      expect(next.adoptReadingProgress(draft), true);
-      expect(next.createReadingProgress(_key), same(draft));
-      server.failWrites = false;
-      expect(await next.flushReadingProgress(), true);
-      expect(
-        server.requests.where((request) => request.method == 'POST').last.body,
-        initialBody,
-      );
-      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
-    },
-  );
+  test('new service adopts only matching identity and rebinds the retained request', () async {
+    final original = TestPlatform(businessServer: server);
+    final first = CatalogController(
+      api: original,
+      runtime: original.runtime,
+      rebuildRuntime: original.rebuild,
+      deploymentOrigin: original.origin,
+    );
+    await first.connect();
+    final draft = first.createReadingProgress(_key)!;
+    await draft.restore(_manifest);
+    server.failWrites = true;
+    draft.observe(
+      manifest: _manifest,
+      current: _manifest.positionAt(1),
+      reversedOrder: true,
+    );
+    await draft.flush();
+    final initialBody = server.requests
+        .where((request) => request.method == 'POST')
+        .last
+        .body;
+    expect(first.takeUnsavedReadingProgress().single, same(draft));
+    first.dispose();
+    await first.closeReadingProgress();
+    await original.dispose();
+    final wrongPlatform = TestPlatform(
+      businessServer: server,
+      bootstrapSubject: 'other',
+    );
+    final wrong = CatalogController(
+      api: wrongPlatform,
+      runtime: wrongPlatform.runtime,
+      rebuildRuntime: wrongPlatform.rebuild,
+      deploymentOrigin: wrongPlatform.origin,
+    );
+    await wrong.connect();
+    expect(wrong.adoptReadingProgress(draft), false);
+    wrong.dispose();
+    await wrong.closeReadingProgress();
+    await wrongPlatform.dispose();
+    final nextPlatform = TestPlatform(businessServer: server);
+    final next = CatalogController(
+      api: nextPlatform,
+      runtime: nextPlatform.runtime,
+      rebuildRuntime: nextPlatform.rebuild,
+      deploymentOrigin: nextPlatform.origin,
+    );
+    addTearDown(() async {
+      next.dispose();
+      await next.closeReadingProgress();
+      await nextPlatform.dispose();
+    });
+    await next.connect();
+    expect(next.adoptReadingProgress(draft), true);
+    expect(next.createReadingProgress(_key), same(draft));
+    server.failWrites = false;
+    expect(await next.flushReadingProgress(), true);
+    expect(
+      server.requests.where((request) => request.method == 'POST').last.body,
+      initialBody,
+    );
+    expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+  });
 
-  test(
-    'identity bootstrap and current-session flush never submit an old identity draft',
-    () async {
-      final platform = TestPlatform(businessServer: server);
-      final catalog = CatalogController(
-        api: platform,
-        runtime: platform.runtime,
-        rebuildRuntime: platform.rebuild,
-        deploymentOrigin: platform.origin,
-      );
-      addTearDown(() async {
-        catalog.dispose();
-        await catalog.closeReadingProgress();
-        await platform.dispose();
-      });
-      await catalog.connect();
-      final original = catalog.createReadingProgress(_key)!;
-      await original.restore(_manifest);
-      server.failWrites = true;
-      original.observe(
-        manifest: _manifest,
-        current: _manifest.positionAt(1),
-        reversedOrder: true,
-      );
-      expect(await original.flush(), false);
-      final originalBody = server.requests
-          .where((request) => request.method == 'POST')
-          .single
-          .body;
-      server.failWrites = false;
-      var rejectedWrites = 0;
-      platform.bootstrapSubject = 'other';
-      platform.beforeApiFetch = (path) async {
-        if (path == '/api/state/mutations') {
-          rejectedWrites++;
-          // The real host emits this failure as an Access event, invalidating
-          // Catalog's epoch. Merely catching the write error cannot save the
-          // bootstrap that a pre-confirmation flush would interrupt.
-          throw const RuntimeException(
-            RuntimeErrorCode.accessDenied,
-            'The active cookie belongs to another identity',
-          );
-        }
-      };
-      await catalog.connect();
-      expect(catalog.status, ServiceStatus.ready);
-      expect(catalog.readingProgress!.identity.subject, 'other');
-      expect(rejectedWrites, 0);
-      expect(original.unsaved, true);
-      expect(await catalog.flushReadingProgress(), false);
-      expect(rejectedWrites, 0);
-      expect(catalog.status, ServiceStatus.ready);
-      expect(server.appliedMutations, 0);
-      platform.beforeApiFetch = null;
-      platform.bootstrapSubject = 'owner-subject';
-      await catalog.connect();
-      expect(catalog.status, ServiceStatus.ready);
-      expect(catalog.createReadingProgress(_key), same(original));
-      expect(await catalog.flushReadingProgress(), true);
-      expect(original.unsaved, false);
-      expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
-      expect(server.progress(_key, 'chapter', subject: 'other'), isNull);
-      expect(
-        server.requests.where((request) => request.method == 'POST').last.body,
-        originalBody,
-      );
-      expect(server.appliedMutations, 1);
-    },
-  );
+  test('identity bootstrap and current-session flush never submit an old identity draft', () async {
+    final platform = TestPlatform(businessServer: server);
+    final catalog = CatalogController(
+      api: platform,
+      runtime: platform.runtime,
+      rebuildRuntime: platform.rebuild,
+      deploymentOrigin: platform.origin,
+    );
+    addTearDown(() async {
+      catalog.dispose();
+      await catalog.closeReadingProgress();
+      await platform.dispose();
+    });
+    await catalog.connect();
+    final original = catalog.createReadingProgress(_key)!;
+    await original.restore(_manifest);
+    server.failWrites = true;
+    original.observe(
+      manifest: _manifest,
+      current: _manifest.positionAt(1),
+      reversedOrder: true,
+    );
+    expect(await original.flush(), false);
+    final originalBody = server.requests
+        .where((request) => request.method == 'POST')
+        .single
+        .body;
+    server.failWrites = false;
+    var rejectedWrites = 0;
+    platform.bootstrapSubject = 'other';
+    platform.beforeApiFetch = (path) async {
+      if (path == '/api/state/mutations') {
+        rejectedWrites++;
+        // The real host emits this failure as an Access event, invalidating
+        // Catalog's epoch. Merely catching the write error cannot save the
+        // bootstrap that a pre-confirmation flush would interrupt.
+        throw const RuntimeException(
+          RuntimeErrorCode.accessDenied,
+          'The active cookie belongs to another identity',
+        );
+      }
+    };
+    await catalog.connect();
+    expect(catalog.status, ServiceStatus.ready);
+    expect(catalog.readingProgress!.identity.subject, 'other');
+    expect(rejectedWrites, 0);
+    expect(original.unsaved, true);
+    expect(await catalog.flushReadingProgress(), false);
+    expect(rejectedWrites, 0);
+    expect(catalog.status, ServiceStatus.ready);
+    expect(server.appliedMutations, 0);
+    platform.beforeApiFetch = null;
+    platform.bootstrapSubject = 'owner-subject';
+    await catalog.connect();
+    expect(catalog.status, ServiceStatus.ready);
+    expect(catalog.createReadingProgress(_key), same(original));
+    expect(await catalog.flushReadingProgress(), true);
+    expect(original.unsaved, false);
+    expect(server.progress(_key, 'chapter')!.current.pageKey, 'two');
+    expect(server.progress(_key, 'chapter', subject: 'other'), isNull);
+    expect(
+      server.requests.where((request) => request.method == 'POST').last.body,
+      originalBody,
+    );
+    expect(server.appliedMutations, 1);
+  });
 
   test(
     'same Catalog subject switch never sends old drafts as the next identity',

@@ -20,6 +20,10 @@ import {
   parseExtensionIndex,
   parseManifest,
 } from '../../tools/extensions/verify-manifest.ts';
+import {
+  flutterCacheRules,
+  readFlutterWebManifest,
+} from '../../tools/flutter/web-assets.ts';
 
 import type { Plugin } from 'vite';
 
@@ -52,6 +56,14 @@ async function prepareStaticAssets(): Promise<void> {
         nativeFlutterPath,
       ),
   });
+  const flutterManifest = await readFlutterWebManifest(
+    fileURLToPath(flutterWeb),
+  );
+  // The deployed manifest describes only public files, including hashed names.
+  await writeFile(
+    new URL('precache_manifest.json', publicDir),
+    JSON.stringify(flutterManifest, null, 2) + '\n',
+  );
   await cp(runtime, new URL('runtime/', publicDir), {
     recursive: true,
     filter: (source) => {
@@ -87,6 +99,7 @@ async function prepareStaticAssets(): Promise<void> {
     (artifact: { path: string; contentType: string }) =>
       `${artifact.path}\n  Content-Type: ${artifact.contentType}\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff`,
   );
+  rules.push(...flutterCacheRules(flutterManifest));
   rules.push(
     '/runtime/materials.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
     '/extensions/index.json\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
@@ -96,10 +109,17 @@ async function prepareStaticAssets(): Promise<void> {
     '/extensions/builds/*\n  Content-Type: application/json; charset=utf-8\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff',
     '/extensions/artifacts/*\n  Content-Type: application/gzip\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff',
   );
-  await writeFile(
-    headerFile,
-    headers.trimEnd() + '\n\n' + rules.join('\n\n') + '\n',
-  );
+  headers = headers.trimEnd() + '\n\n' + rules.join('\n\n') + '\n';
+  const headerLines = headers.split('\n');
+  if (
+    headerLines.filter((line) => /^[^\s#]/.test(line)).length > 100 ||
+    headerLines.some((line) => line.length > 2000)
+  ) {
+    throw new Error(
+      'Static Assets headers exceed Cloudflare rule or line limits',
+    );
+  }
+  await writeFile(headerFile, headers);
 
   // Check the actual output tree, including ignored/hidden files. Matching native
   // payloads must not become public under an unexpected name or asset directory.

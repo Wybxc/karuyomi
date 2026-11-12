@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-13，[Flutter 3.50 / Dart 3.14 更新](verification/flutter-3.50.md)通过本机固定 SDK 的严格分析、736 项单并发 Dart 回归、生成一致性和完整格式检查。工作分支完成 Material 独立包、主构造函数、内容哈希发布合同及 UI 调整，生产手写 Dart 净减 60 行；受控 Static Assets 与发布合同回归通过。CI 完整构建、实际 Web/生产与 Wasm 对照待执行，原生现场验收继续停止。
+
 2026-11-12，[Flutter 状态管理重构](verification/flutter-state-management.md)通过集中工程检查、完整分支 CI / Web 构建及内置浏览器实际主流程：采用 Riverpod generator、hooks 和实际启用的 riverpod_lint，三个 Dart/Flutter 项目严格分析、22 + 87 + 625 项测试、生成一致性及 Dart 格式检查通过。生产手写 Dart 净减 463 行，生成 423 行单独统计；并发写入、身份隔离、未确认草稿和资源关闭语义继续由实际回归约束。隔离身份完成安装/收藏源、设置覆盖/继承、真实 xkcd 阅读、跨源搜索与新文档第 2 页续读，独立 API 核对；原生现场验证保持停止，生产发布沿用主线 CI 自动流程。
 
 2026-11-12，[扩展管理与浏览 UI 重整](verification/browse-ui-flow.md)通过本轮分项验收：完整格式检查、三个 Flutter/Dart 项目的严格分析与测试（客户端 621 项）及正式 Web/Worker 构建成功。内置浏览器确认安装、停用恢复、本机清理与自动补齐精确构建、收藏及语言筛选、真实 xkcd 阅读/保存、退出阅读后跨源搜索和关闭旧标签后的新文档第 2 页续读；独立 API 确认保存位置。[新 UI 已生产上线](verification/browse-ui-flow.md#生产发布)，主线 CI、静态交付、真实 Access 登录、Komiic 热门列表及扩展管理最小检查通过。普通 Source 缩略图资源通道尚未接入，原生验证继续停止。详细记录区分隔离浏览器、最终工程和生产分项证据。

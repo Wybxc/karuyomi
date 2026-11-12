@@ -1,7 +1,8 @@
 import 'test_app.dart';
+
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
@@ -11,6 +12,7 @@ import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+
 import 'browse/fakes.dart';
 
 Future<void> _browseDetails(WidgetTester tester) async {
@@ -31,6 +33,58 @@ Future<void> _browseDetails(WidgetTester tester) async {
 }
 
 void main() {
+  for (final disableAnimations in [false, true]) {
+    testWidgets(
+      'reduced motion keeps pages stationary (disabled: $disableAnimations)',
+      (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(
+              reduceMotion: true,
+              disableAnimations: disableAnimations,
+            );
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+        final context = tester.element(find.byType(AppShell));
+        expect(MediaQuery.reduceMotionOf(context), true);
+        expect(MediaQuery.disableAnimationsOf(context), disableAnimations);
+        const pageKey = ValueKey('motion-test-page');
+        final navigator = Navigator.of(context);
+        unawaited(
+          navigator.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const SizedBox.expand(key: pageKey),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 60));
+        final page = find.byKey(pageKey);
+        expect(tester.getTopLeft(page), Offset.zero);
+        final fades = tester.widgetList<FadeTransition>(
+          find.ancestor(of: page, matching: find.byType(FadeTransition)),
+        );
+        if (disableAnimations) {
+          expect(fades, isEmpty);
+        } else {
+          expect(
+            fades.any(
+              (fade) => fade.opacity.value > 0 && fade.opacity.value < 1,
+            ),
+            true,
+          );
+        }
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(page), Offset.zero);
+        navigator.pop();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final size in [const Size(360, 800), const Size(1280, 900)]) {
     testWidgets('empty shell navigation at ${size.width}px', (tester) async {
       tester.view.physicalSize = size;

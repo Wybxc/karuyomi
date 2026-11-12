@@ -1,8 +1,9 @@
 import '../test_app.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
@@ -297,9 +298,9 @@ void main() {
       expect(mutations(), hasLength(2));
       final uncertain = mutations().last;
       final firstConfirmed = command(mutations().first).mangaKey;
-      final third = (await tester.runAsync(
-        () => remote.watchView().first,
-      ))!.entries.single;
+      final third = (await tester.runAsync(() => remote.watchView().first))!
+          .entries
+          .single;
       await tap(tester, find.text('稍后处理'));
       expect(
         find.byKey(const ValueKey('library-resume-batch')),

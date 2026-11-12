@@ -17,6 +17,11 @@ import { fileURLToPath, URL } from 'node:url';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { createTestHarness, type TestHarnessOptions } from 'wrangler';
 import type { Bindings } from '../src/env.js';
+import {
+  flutterFixtureFiles,
+  flutterFixtureManifest,
+} from './fixture/flutter-assets.ts';
+import { immutableCache } from '../../../tools/flutter/web-assets.ts';
 
 const origin = 'https://read.example.com';
 const accessTeamDomain = 'example.cloudflareaccess.com';
@@ -86,6 +91,18 @@ test('declared Vite assets bypass the Worker and retain their headers', async ()
     '/runtime/host',
   );
   expect(host.headers.get('X-Karuyomi-Probe-Worker')).toBe('1');
+});
+
+test('Flutter generated cache policy is enforced by the official Static Assets harness', async () => {
+  for (const entry of flutterFixtureManifest.entries) {
+    const response = await server.fetch(`${origin}/${entry.url}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.has('X-Karuyomi-Probe-Worker')).toBe(false);
+    expect(response.headers.get('Cache-Control')).toBe(
+      entry.urlHashed ? immutableCache : 'no-cache',
+    );
+    expect(await response.text()).toBe(flutterFixtureFiles.get(entry.url));
+  }
 });
 
 test('the public Access callback serves only a no-store return notice', async () => {

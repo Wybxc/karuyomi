@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter/scheduler.dart';
@@ -162,9 +162,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       Future<void> showDetails({String? notice}) async {
         if (!isCurrent() || !controller.isCurrentSource(details.source)) return;
         if (notice != null) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(notice)));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(notice)));
         }
         await Navigator.of(context).push<void>(
           MaterialPageRoute<void>(

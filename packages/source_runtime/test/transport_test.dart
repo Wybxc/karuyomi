@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:test/test.dart';
@@ -617,40 +618,37 @@ void main() {
     await runtime.dispose();
   });
 
-  test(
-    'file images require the Native transport ownership table, including identity and generation',
-    () async {
-      final delegate = FakeTransport();
-      final managed = ManagedTransport(delegate);
-      final location = Uri.parse('file:///private/tmp/managed/image');
-      delegate.handler = (request) async {
-        final response = delegate.respond(request);
-        if (request.hasAcquireImage()) response.image.url = location.toString();
-        return response;
-      };
-      final runtime = TransportSourceRuntime(managed);
-      await runtime.open(build());
-      await expectLater(
-        runtime.acquireImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
-      );
-      managed.owned = location;
-      final resource = await runtime.acquireImage(imageRequest());
-      expect(resource.location, location);
-      await runtime.releaseImage(
-        const ImageReleaseRequest(
-          resourceId: 'resource-1',
-          generation: 'generation-1',
-        ),
-      );
-      managed.owned = Uri.parse('file:///private/tmp/managed/other');
-      await expectLater(
-        runtime.acquireImage(imageRequest()),
-        throwsA(failure(RuntimeErrorCode.protocolError)),
-      );
-      await runtime.dispose();
-    },
-  );
+  test('file images require the Native transport ownership table, including identity and generation', () async {
+    final delegate = FakeTransport();
+    final managed = ManagedTransport(delegate);
+    final location = Uri.parse('file:///private/tmp/managed/image');
+    delegate.handler = (request) async {
+      final response = delegate.respond(request);
+      if (request.hasAcquireImage()) response.image.url = location.toString();
+      return response;
+    };
+    final runtime = TransportSourceRuntime(managed);
+    await runtime.open(build());
+    await expectLater(
+      runtime.acquireImage(imageRequest()),
+      throwsA(failure(RuntimeErrorCode.protocolError)),
+    );
+    managed.owned = location;
+    final resource = await runtime.acquireImage(imageRequest());
+    expect(resource.location, location);
+    await runtime.releaseImage(
+      const ImageReleaseRequest(
+        resourceId: 'resource-1',
+        generation: 'generation-1',
+      ),
+    );
+    managed.owned = Uri.parse('file:///private/tmp/managed/other');
+    await expectLater(
+      runtime.acquireImage(imageRequest()),
+      throwsA(failure(RuntimeErrorCode.protocolError)),
+    );
+    await runtime.dispose();
+  });
 
   test(
     'invalid managed locations and byte counts release rejected resource',

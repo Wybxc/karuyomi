@@ -19,28 +19,25 @@ void main() {
   Uri location(String path) =>
       Uri.parse('http://127.0.0.1:${server.port}$path');
 
-  test(
-    'public reads send only anonymous JSON requests and accept case-insensitive exact JSON MIME',
-    () async {
-      final received = Completer<HttpRequest>();
-      server.listen((request) async {
-        received.complete(request);
-        request.response.headers.set(
-          'content-type',
-          'Application/JSON; charset=utf-8',
-        );
-        request.response.write('{"repo":"community"}');
-        await request.response.close();
-      });
-      expect(await transport.read(location('/extensions/index.json')), {
-        'repo': 'community',
-      });
-      final request = await received.future;
-      expect(request.headers.value('cookie'), isNull);
-      expect(request.headers.value('authorization'), isNull);
-      expect(request.headers.value('accept'), 'application/json');
-    },
-  );
+  test('public reads send only anonymous JSON requests and accept case-insensitive exact JSON MIME', () async {
+    final received = Completer<HttpRequest>();
+    server.listen((request) async {
+      received.complete(request);
+      request.response.headers.set(
+        'content-type',
+        'Application/JSON; charset=utf-8',
+      );
+      request.response.write('{"repo":"community"}');
+      await request.response.close();
+    });
+    expect(await transport.read(location('/extensions/index.json')), {
+      'repo': 'community',
+    });
+    final request = await received.future;
+    expect(request.headers.value('cookie'), isNull);
+    expect(request.headers.value('authorization'), isNull);
+    expect(request.headers.value('accept'), 'application/json');
+  });
 
   test(
     'redirects are rejected without requesting the redirected destination',

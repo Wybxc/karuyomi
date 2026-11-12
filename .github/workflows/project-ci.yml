@@ -25,7 +25,7 @@ jobs:
           version: 12.6.0
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.5
+          flutter-version: 3.50.0
           channel: stable
           cache: true
       - run: pnpm install --frozen-lockfile
@@ -47,6 +47,51 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: web-build-${{ github.sha }}
+          path: |
+            apps/reader/build/web
+            packages/runtime-host/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  wasm:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm flutter:setup
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-build-${{ github.sha }}
+          path: .
+      - run: pnpm build:native-assets
+      - name: Build a JavaScript measurement candidate with the existing reader recorder
+        run: node scripts/flutter.ts build --dart-define=READER_BASELINE=true --dart-define=BASELINE_REVISION=${{ github.sha }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-js-baseline-${{ github.sha }}
+          path: |
+            apps/reader/build/web
+            packages/runtime-host/dist
+          if-no-files-found: error
+          retention-days: 7
+      - name: Build a Wasm candidate from the same verified runtime and extension inputs
+        run: node scripts/flutter.ts build --wasm --dart-define=READER_BASELINE=true --dart-define=BASELINE_REVISION=${{ github.sha }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-wasm-${{ github.sha }}
           path: |
             apps/reader/build/web
             packages/runtime-host/dist

@@ -1,8 +1,9 @@
 import '../test_app.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -136,75 +137,69 @@ void main() {
     await controller.chooseManga(controller.results.first);
   }
 
-  test(
-    'installed Source search pagination, details, mapping and confirmation retain the source without copying anchors',
-    () async {
-      final before = posts().length;
-      await controller.refreshSources();
-      expect(controller.sources.single.source.id, _targetId);
-      await controller.chooseSource(controller.sources.single);
-      await controller.search('原作品');
-      await controller.loadMore();
-      final searches = platform.invocations
-          .where((call) => call.hasSearch())
-          .toList();
-      expect(searches.map((call) => call.search.page), [1, 2]);
-      expect(searches.every((call) => call.sourceId == _targetId), true);
-      expect(searches.every((call) => call.search.query == '原作品'), true);
-      await controller.chooseManga(controller.results.first);
-      expect(controller.preview, isNotNull);
-      expect(controller.selectedChapters, {sequence.entries.first.key});
-      expect(posts(), hasLength(before));
-      await controller.confirm();
-      expect(controller.completed, true, reason: controller.error);
-      expect(posts(), hasLength(before + 1));
-      final operation = wire.decodeProtoJson(
-        wire.StateMutation(),
-        jsonDecode(posts().last),
-      );
-      expect(operation.migrateFrom.chapters.single.copyRead, true);
-      expect(operation.migrateFrom.chapters.single.copyBookmark, true);
-      final targetKey = controller.preview!.targetKey;
-      expect(platform.businessServer.manga(sequence.mangaKey)!.favorite, true);
-      expect(platform.businessServer.manga(targetKey)!.favorite, true);
-      final copied = platform.businessServer.progress(
-        targetKey,
-        operation.migrateFrom.chapters.single.targetChapterKey,
-      )!;
-      expect(copied.completed, true);
-      expect(copied.epoch, 1);
-      expect(copied.hasCurrent(), false);
-      expect(copied.hasFurthest(), false);
-    },
-  );
+  test('installed Source search pagination, details, mapping and confirmation retain the source without copying anchors', () async {
+    final before = posts().length;
+    await controller.refreshSources();
+    expect(controller.sources.single.source.id, _targetId);
+    await controller.chooseSource(controller.sources.single);
+    await controller.search('原作品');
+    await controller.loadMore();
+    final searches = platform.invocations
+        .where((call) => call.hasSearch())
+        .toList();
+    expect(searches.map((call) => call.search.page), [1, 2]);
+    expect(searches.every((call) => call.sourceId == _targetId), true);
+    expect(searches.every((call) => call.search.query == '原作品'), true);
+    await controller.chooseManga(controller.results.first);
+    expect(controller.preview, isNotNull);
+    expect(controller.selectedChapters, {sequence.entries.first.key});
+    expect(posts(), hasLength(before));
+    await controller.confirm();
+    expect(controller.completed, true, reason: controller.error);
+    expect(posts(), hasLength(before + 1));
+    final operation = wire.decodeProtoJson(
+      wire.StateMutation(),
+      jsonDecode(posts().last),
+    );
+    expect(operation.migrateFrom.chapters.single.copyRead, true);
+    expect(operation.migrateFrom.chapters.single.copyBookmark, true);
+    final targetKey = controller.preview!.targetKey;
+    expect(platform.businessServer.manga(sequence.mangaKey)!.favorite, true);
+    expect(platform.businessServer.manga(targetKey)!.favorite, true);
+    final copied = platform.businessServer.progress(
+      targetKey,
+      operation.migrateFrom.chapters.single.targetChapterKey,
+    )!;
+    expect(copied.completed, true);
+    expect(copied.epoch, 1);
+    expect(copied.hasCurrent(), false);
+    expect(copied.hasFurthest(), false);
+  });
 
-  test(
-    'lost ACK survives closing the wizard and only explicit retry resends its original body',
-    () async {
-      await targetPreview();
-      platform.businessServer.loseNextResponse = true;
-      await controller.confirm();
-      expect(controller.completed, false);
-      expect(controller.pending?.retryable, true);
-      final original = posts().last;
-      final count = posts().length;
-      controller.dispose();
-      controller = MigrationController(
-        catalog: catalog,
-        client: catalog.library!.client,
-        seed: seed,
-        isCurrent: () => current,
-      );
-      await controller.refreshSources();
-      await controller.refreshPreview();
-      expect(posts(), hasLength(count));
-      expect(controller.canChange, false);
-      await controller.retry();
-      expect(controller.completed, true, reason: controller.error);
-      expect(posts().last, original);
-      expect(posts(), hasLength(count + 1));
-    },
-  );
+  test('lost ACK survives closing the wizard and only explicit retry resends its original body', () async {
+    await targetPreview();
+    platform.businessServer.loseNextResponse = true;
+    await controller.confirm();
+    expect(controller.completed, false);
+    expect(controller.pending?.retryable, true);
+    final original = posts().last;
+    final count = posts().length;
+    controller.dispose();
+    controller = MigrationController(
+      catalog: catalog,
+      client: catalog.library!.client,
+      seed: seed,
+      isCurrent: () => current,
+    );
+    await controller.refreshSources();
+    await controller.refreshPreview();
+    expect(posts(), hasLength(count));
+    expect(controller.canChange, false);
+    await controller.retry();
+    expect(controller.completed, true, reason: controller.error);
+    expect(posts().last, original);
+    expect(posts(), hasLength(count + 1));
+  });
 
   test(
     'unavailable original chapters require an explicit categories-only choice',
@@ -288,182 +283,170 @@ void main() {
     );
   }
 
-  test(
-    'changing an already selected mapping to a fully populated target removes its disabled selection',
-    () async {
-      final secondSource = sequence.entries[1];
-      final source = await catalog.library!.client.readManga(sequence.mangaKey);
-      await catalog.readingProgress!.setChapterRead(
-        mangaKey: sequence.mangaKey,
-        chapterKey: secondSource.key,
-        read: true,
-        basedOnRevision: source.manga.revision,
-      );
-      final targetSequence = ChapterSequence(
-        packageName: _package,
-        sourceId: _targetId,
-        mangaUrl: _target.url,
-        chapters: _chapters('new'),
-      );
-      await catalog.library!.setFavorite(
-        packageName: _package,
-        sourceId: _targetId,
-        sourceName: '目标源',
-        sourceLang: 'zh',
-        manga: _target,
-        favorite: true,
-      );
-      final target = await catalog.library!.client.readManga(
-        targetSequence.mangaKey,
-      );
-      await catalog.readingProgress!.setChapterRead(
-        mangaKey: targetSequence.mangaKey,
-        chapterKey: targetSequence.entries.first.key,
-        read: false,
-        basedOnRevision: target.manga.revision,
-      );
-      final targetUnread = await catalog.library!.client.readManga(
-        targetSequence.mangaKey,
-      );
-      await catalog.bookmarks!.set(
-        mangaKey: targetSequence.mangaKey,
-        chapterKey: targetSequence.entries.first.key,
-        bookmarked: true,
-        basedOnRevision: targetUnread.manga.revision,
-      );
-      await targetPreview();
-      expect(controller.selectedChapters, {secondSource.key});
-      controller.mapChapter(sequence.entries.first.key, null);
-      controller.mapChapter(secondSource.key, targetSequence.entries.first.key);
-      expect(controller.hasCopyableMarks(secondSource.key), false);
-      expect(controller.selectedChapters, isEmpty);
-      await controller.confirm();
-      expect(controller.completed, true, reason: controller.error);
-      final operation = wire.decodeProtoJson(
-        wire.StateMutation(),
-        jsonDecode(posts().last),
-      );
-      expect(operation.migrateFrom.chapters, isEmpty);
-      expect(
-        platform.businessServer
-            .progress(
-              targetSequence.mangaKey,
-              targetSequence.entries.first.key,
-            )!
-            .completed,
-        false,
-      );
-    },
-  );
+  test('changing an already selected mapping to a fully populated target removes its disabled selection', () async {
+    final secondSource = sequence.entries[1];
+    final source = await catalog.library!.client.readManga(sequence.mangaKey);
+    await catalog.readingProgress!.setChapterRead(
+      mangaKey: sequence.mangaKey,
+      chapterKey: secondSource.key,
+      read: true,
+      basedOnRevision: source.manga.revision,
+    );
+    final targetSequence = ChapterSequence(
+      packageName: _package,
+      sourceId: _targetId,
+      mangaUrl: _target.url,
+      chapters: _chapters('new'),
+    );
+    await catalog.library!.setFavorite(
+      packageName: _package,
+      sourceId: _targetId,
+      sourceName: '目标源',
+      sourceLang: 'zh',
+      manga: _target,
+      favorite: true,
+    );
+    final target = await catalog.library!.client.readManga(
+      targetSequence.mangaKey,
+    );
+    await catalog.readingProgress!.setChapterRead(
+      mangaKey: targetSequence.mangaKey,
+      chapterKey: targetSequence.entries.first.key,
+      read: false,
+      basedOnRevision: target.manga.revision,
+    );
+    final targetUnread = await catalog.library!.client.readManga(
+      targetSequence.mangaKey,
+    );
+    await catalog.bookmarks!.set(
+      mangaKey: targetSequence.mangaKey,
+      chapterKey: targetSequence.entries.first.key,
+      bookmarked: true,
+      basedOnRevision: targetUnread.manga.revision,
+    );
+    await targetPreview();
+    expect(controller.selectedChapters, {secondSource.key});
+    controller.mapChapter(sequence.entries.first.key, null);
+    controller.mapChapter(secondSource.key, targetSequence.entries.first.key);
+    expect(controller.hasCopyableMarks(secondSource.key), false);
+    expect(controller.selectedChapters, isEmpty);
+    await controller.confirm();
+    expect(controller.completed, true, reason: controller.error);
+    final operation = wire.decodeProtoJson(
+      wire.StateMutation(),
+      jsonDecode(posts().last),
+    );
+    expect(operation.migrateFrom.chapters, isEmpty);
+    expect(
+      platform.businessServer
+          .progress(targetSequence.mangaKey, targetSequence.entries.first.key)!
+          .completed,
+      false,
+    );
+  });
 
-  test(
-    'more than 256 selected chapters require an explicit smaller selection before any migration POST',
-    () async {
-      final oldChapters = [
-        for (var number = 1; number <= 257; number++)
-          wire.Chapter(
-            url: '/old/$number',
-            name: '第$number章',
-            chapterNumber: number.toDouble(),
-          ),
-      ];
-      sequence = ChapterSequence(
-        packageName: _package,
-        sourceId: sourceId,
-        mangaUrl: testManga.url,
-        chapters: oldChapters,
+  test('more than 256 selected chapters require an explicit smaller selection before any migration POST', () async {
+    final oldChapters = [
+      for (var number = 1; number <= 257; number++)
+        wire.Chapter(
+          url: '/old/$number',
+          name: '第$number章',
+          chapterNumber: number.toDouble(),
+        ),
+    ];
+    sequence = ChapterSequence(
+      packageName: _package,
+      sourceId: sourceId,
+      mangaUrl: testManga.url,
+      chapters: oldChapters,
+    );
+    final progress = catalog.readingProgress!;
+    for (final chapter in sequence.entries) {
+      await progress.setChapterRead(
+        mangaKey: sequence.mangaKey,
+        chapterKey: chapter.key,
+        read: true,
+        basedOnRevision: platform.businessServer
+            .manga(sequence.mangaKey)!
+            .revision,
       );
-      final progress = catalog.readingProgress!;
-      for (final chapter in sequence.entries) {
-        await progress.setChapterRead(
-          mangaKey: sequence.mangaKey,
-          chapterKey: chapter.key,
-          read: true,
-          basedOnRevision: platform.businessServer
-              .manga(sequence.mangaKey)!
-              .revision,
+    }
+    controller.dispose();
+    controller = MigrationController(
+      catalog: catalog,
+      client: catalog.library!.client,
+      seed: MigrationSeed(metadata: seed.metadata, sequence: sequence),
+      isCurrent: () => current,
+    );
+    final normal = platform.invokeHandler!;
+    platform.invokeHandler = (call) async {
+      if (call.sourceId == _targetId && call.hasChapters()) {
+        return wire.SourceResult(
+          chapters: wire.ChapterList(
+            chapters: [
+              for (var number = 1; number <= 257; number++)
+                wire.Chapter(
+                  url: '/new/$number',
+                  name: '第$number章',
+                  chapterNumber: number.toDouble(),
+                ),
+            ],
+          ),
         );
       }
-      controller.dispose();
-      controller = MigrationController(
-        catalog: catalog,
-        client: catalog.library!.client,
-        seed: MigrationSeed(metadata: seed.metadata, sequence: sequence),
-        isCurrent: () => current,
-      );
-      final normal = platform.invokeHandler!;
-      platform.invokeHandler = (call) async {
-        if (call.sourceId == _targetId && call.hasChapters()) {
-          return wire.SourceResult(
-            chapters: wire.ChapterList(
-              chapters: [
-                for (var number = 1; number <= 257; number++)
-                  wire.Chapter(
-                    url: '/new/$number',
-                    name: '第$number章',
-                    chapterNumber: number.toDouble(),
-                  ),
-              ],
-            ),
-          );
-        }
-        return normal(call);
-      };
-      await targetPreview();
-      expect(controller.selectedChapters, hasLength(257));
-      expect(controller.tooMany, true);
-      final before = posts().length;
-      await controller.confirm();
-      expect(controller.completed, false);
-      expect(posts(), hasLength(before));
-      controller.clearSelection();
-      controller.selectChapter(sequence.entries.first.key, true);
-      await controller.confirm();
-      expect(controller.completed, true, reason: controller.error);
-      expect(posts(), hasLength(before + 1));
-      final operation = wire.decodeProtoJson(
-        wire.StateMutation(),
-        jsonDecode(posts().last),
-      );
-      expect(operation.migrateFrom.chapters, hasLength(1));
-      expect(
-        operation.migrateFrom.chapters.single.sourceChapterKey,
-        sequence.entries.first.key,
-      );
-    },
-  );
+      return normal(call);
+    };
+    await targetPreview();
+    expect(controller.selectedChapters, hasLength(257));
+    expect(controller.tooMany, true);
+    final before = posts().length;
+    await controller.confirm();
+    expect(controller.completed, false);
+    expect(posts(), hasLength(before));
+    controller.clearSelection();
+    controller.selectChapter(sequence.entries.first.key, true);
+    await controller.confirm();
+    expect(controller.completed, true, reason: controller.error);
+    expect(posts(), hasLength(before + 1));
+    final operation = wire.decodeProtoJson(
+      wire.StateMutation(),
+      jsonDecode(posts().last),
+    );
+    expect(operation.migrateFrom.chapters, hasLength(1));
+    expect(
+      operation.migrateFrom.chapters.single.sourceChapterKey,
+      sequence.entries.first.key,
+    );
+  });
 
-  test(
-    'closing during a read-only preview stops subsequent reads and never submits migration',
-    () async {
-      await controller.refreshSources();
-      await controller.chooseSource(controller.sources.single);
-      await controller.search('作品');
-      final entered = Completer<void>();
-      final release = Completer<void>();
-      addTearDown(() {
-        if (!release.isCompleted) release.complete();
-      });
-      platform.businessServer.beforeRequest = (request) async {
-        if (request.uri.path ==
-            '/api/state/manga/${sequence.mangaKey}/progress') {
-          entered.complete();
-          await release.future;
-        }
-        return null;
-      };
-      final count = posts().length;
-      final loading = controller.chooseManga(controller.results.first);
-      await entered.future.timeout(const Duration(seconds: 5));
-      final requests = platform.businessServer.requests.length;
-      current = false;
-      release.complete();
-      await loading;
-      expect(platform.businessServer.requests, hasLength(requests));
-      expect(controller.preview, isNull);
-      expect(posts(), hasLength(count));
-    },
-  );
+  test('closing during a read-only preview stops subsequent reads and never submits migration', () async {
+    await controller.refreshSources();
+    await controller.chooseSource(controller.sources.single);
+    await controller.search('作品');
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    addTearDown(() {
+      if (!release.isCompleted) release.complete();
+    });
+    platform.businessServer.beforeRequest = (request) async {
+      if (request.uri.path ==
+          '/api/state/manga/${sequence.mangaKey}/progress') {
+        entered.complete();
+        await release.future;
+      }
+      return null;
+    };
+    final count = posts().length;
+    final loading = controller.chooseManga(controller.results.first);
+    await entered.future.timeout(const Duration(seconds: 5));
+    final requests = platform.businessServer.requests.length;
+    current = false;
+    release.complete();
+    await loading;
+    expect(platform.businessServer.requests, hasLength(requests));
+    expect(controller.preview, isNull);
+    expect(posts(), hasLength(count));
+  });
 
   testWidgets(
     'Library menu opens migration without loading the original Source',

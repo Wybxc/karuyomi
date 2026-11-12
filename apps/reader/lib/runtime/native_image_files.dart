@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:source_runtime/source_runtime.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -110,8 +111,9 @@ final class IosImageFileStore implements NativeImageFileStore {
   Future<void> clear() => _ack('clear', {}, 'cleared');
 }
 
-typedef NativeControlCall =
-    Future<wire.ControlResponse> Function(wire.ControlRequest);
+typedef NativeControlCall = Future<wire.ControlResponse> Function(
+  wire.ControlRequest,
+);
 
 /// Keeps Source cancellation and file-copy cancellation in one ownership scope.
 /// The Blob remains charged to the JS resource pool until the local file leaves

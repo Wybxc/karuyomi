@@ -199,358 +199,328 @@ void main() {
     },
   );
 
-  test(
-    'TypeScript ProtoJSON omitted implicit false and zero confirms global settings',
-    () async {
-      final api = _OmittedSettingsDefaults(server);
-      client.rebindApi(api, verifiedIdentity: client.identity);
-      final enabled = _global();
-      enabled.reader
-        ..cropBorders = true
-        ..dimPercent = 35;
-      await repository.setGlobal(values: enabled, basedOnRevision: 0);
-      final disabled = enabled.deepCopy();
-      disabled.reader
-        ..cropBorders = false
-        ..dimPercent = 0;
+  test('TypeScript ProtoJSON omitted implicit false and zero confirms global settings', () async {
+    final api = _OmittedSettingsDefaults(server);
+    client.rebindApi(api, verifiedIdentity: client.identity);
+    final enabled = _global();
+    enabled.reader
+      ..cropBorders = true
+      ..dimPercent = 35;
+    await repository.setGlobal(values: enabled, basedOnRevision: 0);
+    final disabled = enabled.deepCopy();
+    disabled.reader
+      ..cropBorders = false
+      ..dimPercent = 0;
 
-      final saved = await repository.setGlobal(
-        values: disabled,
-        basedOnRevision: 1,
-      );
-      expect(saved.globalRevision, 2);
-      expect(saved.accountRevision, 2);
-      expect(saved.global.reader.cropBorders, false);
-      expect(saved.global.reader.dimPercent, 0);
-      expect(saved.effectiveReader.cropBorders, false);
-      expect(saved.effectiveReader.dimPercent, 0);
-      expect(repository.pendingGlobal(), isNull);
-      expect(server.appliedMutations, 2);
-      expect(writes(), hasLength(2));
-      final confirmed = await repository.loadGlobal();
-      expect(confirmed.globalRevision, 2);
-      expect(confirmed.global.reader.cropBorders, false);
-      expect(confirmed.global.reader.dimPercent, 0);
-      for (final reply in api.replies.where(
-        (value) => value['accountRevision'] == 2,
-      )) {
-        final global = reply['global']! as Map<String, Object?>;
-        final values = global['values']! as Map<String, Object?>;
-        final reader = values['reader']! as Map<String, Object?>;
-        expect(reader.containsKey('cropBorders'), false);
-        expect(reader.containsKey('dimPercent'), false);
-        final effective = reply['effectiveReader']! as Map<String, Object?>;
-        expect(effective.containsKey('cropBorders'), false);
-        expect(effective.containsKey('dimPercent'), false);
-      }
-    },
-  );
-
-  test(
-    'TypeScript ProtoJSON omitted disabled extension confirms its exact account selection',
-    () async {
-      final api = _OmittedSettingsDefaults(server);
-      client.rebindApi(api, verifiedIdentity: client.identity);
-      final enabled = _global();
-      enabled.installedExtensions.add(
-        wire.InstalledExtension(
-          catalogUrl: 'https://reader.example/extensions/index.json',
-          repoId: 'keiyoushi',
-          packageName: 'eu.kanade.tachiyomi.extension.en.example',
-          buildId: 'ext-example-1',
-          bundleSha256: _otherKey,
-          enabled: true,
-        ),
-      );
-      await repository.setGlobal(values: enabled, basedOnRevision: 0);
-      final disabled = enabled.deepCopy();
-      disabled.installedExtensions.single.enabled = false;
-      final saved = await repository.setGlobal(
-        values: disabled,
-        basedOnRevision: 1,
-      );
-      expect(saved.globalRevision, 2);
-      final extension = saved.global.installedExtensions.single;
-      expect(extension.enabled, false);
-      expect(
-        extension.catalogUrl,
-        disabled.installedExtensions.single.catalogUrl,
-      );
-      expect(extension.repoId, 'keiyoushi');
-      expect(
-        extension.packageName,
-        disabled.installedExtensions.single.packageName,
-      );
-      expect(extension.buildId, 'ext-example-1');
-      expect(extension.bundleSha256, _otherKey);
-      expect(repository.pendingGlobal(), isNull);
-      final global = api.replies.last['global']! as Map<String, Object?>;
+    final saved = await repository.setGlobal(
+      values: disabled,
+      basedOnRevision: 1,
+    );
+    expect(saved.globalRevision, 2);
+    expect(saved.accountRevision, 2);
+    expect(saved.global.reader.cropBorders, false);
+    expect(saved.global.reader.dimPercent, 0);
+    expect(saved.effectiveReader.cropBorders, false);
+    expect(saved.effectiveReader.dimPercent, 0);
+    expect(repository.pendingGlobal(), isNull);
+    expect(server.appliedMutations, 2);
+    expect(writes(), hasLength(2));
+    final confirmed = await repository.loadGlobal();
+    expect(confirmed.globalRevision, 2);
+    expect(confirmed.global.reader.cropBorders, false);
+    expect(confirmed.global.reader.dimPercent, 0);
+    for (final reply in api.replies.where(
+      (value) => value['accountRevision'] == 2,
+    )) {
+      final global = reply['global']! as Map<String, Object?>;
       final values = global['values']! as Map<String, Object?>;
-      final installed = values['installedExtensions']! as List<Object?>;
-      expect(
-        (installed.single! as Map<String, Object?>).containsKey('enabled'),
-        false,
-      );
-      api.omitDefaults = false;
-      final reread = await repository.loadGlobal();
-      expect(reread.globalRevision, 2);
-      expect(reread.global.installedExtensions.single.enabled, false);
-      expect(writes(), hasLength(2));
-      expect(server.appliedMutations, 2);
-    },
-  );
-
-  test(
-    'TypeScript ProtoJSON default scalar presence may change without a new global revision',
-    () async {
-      final api = _OmittedSettingsDefaults(server)..omitDefaults = false;
-      client.rebindApi(api, verifiedIdentity: client.identity);
-      final defaults = _global();
-      defaults.reader
-        ..cropBorders = false
-        ..dimPercent = 0;
-      await repository.setGlobal(values: defaults, basedOnRevision: 0);
-      final explicit = await repository.loadGlobal();
-      expect(explicit.global.reader.hasCropBorders(), true);
-      expect(explicit.global.reader.hasDimPercent(), true);
-      api.omitDefaults = true;
-      final omitted = await repository.loadGlobal();
-      expect(omitted.globalRevision, explicit.globalRevision);
-      expect(omitted.accountRevision, explicit.accountRevision);
-      expect(omitted.global.reader.hasCropBorders(), false);
-      expect(omitted.global.reader.hasDimPercent(), false);
-      expect(
-        omitted.global.reader.cropBorders,
-        explicit.global.reader.cropBorders,
-      );
-      expect(
-        omitted.global.reader.dimPercent,
-        explicit.global.reader.dimPercent,
-      );
-      expect(writes(), hasLength(1));
-      expect(server.appliedMutations, 1);
-    },
-  );
-
-  test(
-    'TypeScript ProtoJSON keeps optional false and zero distinct from inheritance',
-    () async {
-      final api = _OmittedSettingsDefaults(server);
-      client.rebindApi(api, verifiedIdentity: client.identity);
-      final global = _global();
-      global.reader
-        ..cropBorders = true
-        ..dimPercent = 35;
-      await repository.setGlobal(values: global, basedOnRevision: 0);
-      final explicit = await repository.setManga(
-        mangaKey: _key,
-        basedOnRevision: 0,
-        overrides: wire.ReaderSettingsOverride(
-          cropBorders: false,
-          dimPercent: 0,
-        ),
-      );
-      expect(explicit.overrides!.hasCropBorders(), true);
-      expect(explicit.overrides!.cropBorders, false);
-      expect(explicit.overrides!.hasDimPercent(), true);
-      expect(explicit.overrides!.dimPercent, 0);
-      expect(explicit.effectiveReader.cropBorders, false);
-      expect(explicit.effectiveReader.dimPercent, 0);
-      expect(repository.pendingManga(_key), isNull);
-      final reply = api.replies.last;
-      final manga = reply['manga']! as Map<String, Object?>;
-      final overrides = manga['overrides']! as Map<String, Object?>;
-      expect(overrides['cropBorders'], false);
-      expect(overrides['dimPercent'], 0);
+      final reader = values['reader']! as Map<String, Object?>;
+      expect(reader.containsKey('cropBorders'), false);
+      expect(reader.containsKey('dimPercent'), false);
       final effective = reply['effectiveReader']! as Map<String, Object?>;
       expect(effective.containsKey('cropBorders'), false);
       expect(effective.containsKey('dimPercent'), false);
+    }
+  });
 
-      final inherited = await repository.setManga(
-        mangaKey: _key,
-        basedOnRevision: 1,
-        overrides: wire.ReaderSettingsOverride(),
-      );
-      expect(inherited.overrides!.hasCropBorders(), false);
-      expect(inherited.overrides!.hasDimPercent(), false);
-      expect(inherited.effectiveReader.cropBorders, true);
-      expect(inherited.effectiveReader.dimPercent, 35);
-      expect(inherited.mangaRevision, 2);
-      expect(inherited.globalRevision, 1);
-      expect(server.appliedMutations, 3);
-    },
-  );
+  test('TypeScript ProtoJSON omitted disabled extension confirms its exact account selection', () async {
+    final api = _OmittedSettingsDefaults(server);
+    client.rebindApi(api, verifiedIdentity: client.identity);
+    final enabled = _global();
+    enabled.installedExtensions.add(
+      wire.InstalledExtension(
+        catalogUrl: 'https://reader.example/extensions/index.json',
+        repoId: 'keiyoushi',
+        packageName: 'eu.kanade.tachiyomi.extension.en.example',
+        buildId: 'ext-example-1',
+        bundleSha256: _otherKey,
+        enabled: true,
+      ),
+    );
+    await repository.setGlobal(values: enabled, basedOnRevision: 0);
+    final disabled = enabled.deepCopy();
+    disabled.installedExtensions.single.enabled = false;
+    final saved = await repository.setGlobal(
+      values: disabled,
+      basedOnRevision: 1,
+    );
+    expect(saved.globalRevision, 2);
+    final extension = saved.global.installedExtensions.single;
+    expect(extension.enabled, false);
+    expect(
+      extension.catalogUrl,
+      disabled.installedExtensions.single.catalogUrl,
+    );
+    expect(extension.repoId, 'keiyoushi');
+    expect(
+      extension.packageName,
+      disabled.installedExtensions.single.packageName,
+    );
+    expect(extension.buildId, 'ext-example-1');
+    expect(extension.bundleSha256, _otherKey);
+    expect(repository.pendingGlobal(), isNull);
+    final global = api.replies.last['global']! as Map<String, Object?>;
+    final values = global['values']! as Map<String, Object?>;
+    final installed = values['installedExtensions']! as List<Object?>;
+    expect(
+      (installed.single! as Map<String, Object?>).containsKey('enabled'),
+      false,
+    );
+    api.omitDefaults = false;
+    final reread = await repository.loadGlobal();
+    expect(reread.globalRevision, 2);
+    expect(reread.global.installedExtensions.single.enabled, false);
+    expect(writes(), hasLength(2));
+    expect(server.appliedMutations, 2);
+  });
 
-  test(
-    'adding a mutation UUID rejects an oversized final body without sending or retaining a draft',
-    () async {
-      final values = _global()
-        ..favoriteSources.addAll(
-          List.generate(
-            businessFavoriteSourceLimit,
-            (index) => wire.FavoriteSource(
-              packageName: 'p' * 200,
-              sourceId: '$index',
-              sourceName: 'a' * 256,
-              sourceLang: 'a' * 64,
-            ),
+  test('TypeScript ProtoJSON default scalar presence may change without a new global revision', () async {
+    final api = _OmittedSettingsDefaults(server)..omitDefaults = false;
+    client.rebindApi(api, verifiedIdentity: client.identity);
+    final defaults = _global();
+    defaults.reader
+      ..cropBorders = false
+      ..dimPercent = 0;
+    await repository.setGlobal(values: defaults, basedOnRevision: 0);
+    final explicit = await repository.loadGlobal();
+    expect(explicit.global.reader.hasCropBorders(), true);
+    expect(explicit.global.reader.hasDimPercent(), true);
+    api.omitDefaults = true;
+    final omitted = await repository.loadGlobal();
+    expect(omitted.globalRevision, explicit.globalRevision);
+    expect(omitted.accountRevision, explicit.accountRevision);
+    expect(omitted.global.reader.hasCropBorders(), false);
+    expect(omitted.global.reader.hasDimPercent(), false);
+    expect(
+      omitted.global.reader.cropBorders,
+      explicit.global.reader.cropBorders,
+    );
+    expect(omitted.global.reader.dimPercent, explicit.global.reader.dimPercent);
+    expect(writes(), hasLength(1));
+    expect(server.appliedMutations, 1);
+  });
+
+  test('TypeScript ProtoJSON keeps optional false and zero distinct from inheritance', () async {
+    final api = _OmittedSettingsDefaults(server);
+    client.rebindApi(api, verifiedIdentity: client.identity);
+    final global = _global();
+    global.reader
+      ..cropBorders = true
+      ..dimPercent = 35;
+    await repository.setGlobal(values: global, basedOnRevision: 0);
+    final explicit = await repository.setManga(
+      mangaKey: _key,
+      basedOnRevision: 0,
+      overrides: wire.ReaderSettingsOverride(cropBorders: false, dimPercent: 0),
+    );
+    expect(explicit.overrides!.hasCropBorders(), true);
+    expect(explicit.overrides!.cropBorders, false);
+    expect(explicit.overrides!.hasDimPercent(), true);
+    expect(explicit.overrides!.dimPercent, 0);
+    expect(explicit.effectiveReader.cropBorders, false);
+    expect(explicit.effectiveReader.dimPercent, 0);
+    expect(repository.pendingManga(_key), isNull);
+    final reply = api.replies.last;
+    final manga = reply['manga']! as Map<String, Object?>;
+    final overrides = manga['overrides']! as Map<String, Object?>;
+    expect(overrides['cropBorders'], false);
+    expect(overrides['dimPercent'], 0);
+    final effective = reply['effectiveReader']! as Map<String, Object?>;
+    expect(effective.containsKey('cropBorders'), false);
+    expect(effective.containsKey('dimPercent'), false);
+
+    final inherited = await repository.setManga(
+      mangaKey: _key,
+      basedOnRevision: 1,
+      overrides: wire.ReaderSettingsOverride(),
+    );
+    expect(inherited.overrides!.hasCropBorders(), false);
+    expect(inherited.overrides!.hasDimPercent(), false);
+    expect(inherited.effectiveReader.cropBorders, true);
+    expect(inherited.effectiveReader.dimPercent, 35);
+    expect(inherited.mangaRevision, 2);
+    expect(inherited.globalRevision, 1);
+    expect(server.appliedMutations, 3);
+  });
+
+  test('adding a mutation UUID rejects an oversized final body without sending or retaining a draft', () async {
+    final values = _global()
+      ..favoriteSources.addAll(
+        List.generate(
+          businessFavoriteSourceLimit,
+          (index) => wire.FavoriteSource(
+            packageName: 'p' * 200,
+            sourceId: '$index',
+            sourceName: 'a' * 256,
+            sourceLang: 'a' * 64,
           ),
-        );
-      final draft = wire.SettingsMutation(schemaVersion: 1, setGlobal: values);
-      int bodyBytes(wire.SettingsMutation value) => utf8
-          .encode(
-            jsonEncode(
-              wire.encodeProtoJson(value, maxBytes: wire.controlJsonLimit),
-            ),
-          )
-          .length;
-      var remaining = wire.controlRequestLimit - bodyBytes(draft);
-      expect(remaining, inInclusiveRange(1, businessFavoriteSourceLimit * 512));
-      for (final source in values.favoriteSources) {
-        final wide = remaining > 512 ? 256 : remaining ~/ 2;
-        remaining -= wide * 2;
-        final doubleByte = remaining == 1 && wide < 256 ? 1 : 0;
-        remaining -= doubleByte;
-        source.sourceName =
-            '${'界' * wide}${'é' * doubleByte}${'a' * (256 - wide - doubleByte)}';
-        if (remaining == 0) break;
-      }
-      expect(remaining, 0);
-      expect(bodyBytes(draft), wire.controlRequestLimit);
-      expect(() => validateBusinessSettingsMutation(draft), returnsNormally);
-      expect(
-        bodyBytes(
-          draft.deepCopy()..mutationId = '12345678-1234-4234-8234-123456789abc',
-        ),
-        greaterThan(wire.controlRequestLimit),
-      );
-
-      await expectLater(
-        repository.setGlobal(values: values, basedOnRevision: 0),
-        throwsFormatException,
-      );
-      expect(server.requests, isEmpty);
-      expect(repository.pendingGlobal(), isNull);
-      expect(server.appliedMutations, 0);
-
-      final saved = await repository.setGlobal(
-        values: _global(),
-        basedOnRevision: 0,
-      );
-      expect(saved.globalRevision, 1);
-      expect(writes(), hasLength(1));
-      expect(repository.pendingGlobal(), isNull);
-      expect(server.appliedMutations, 1);
-    },
-  );
-
-  test(
-    'manga presence distinguishes inheritance from AUTO and revisions do not alter business state',
-    () async {
-      await BookmarkRepository(client).set(
-        mangaKey: _key,
-        chapterKey: 'chapter',
-        bookmarked: true,
-        basedOnRevision: 0,
-      );
-      final business = server.manga(_key)!;
-      final defaults = _global(
-        mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
-        layout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
-      )..reader.fit = wire.ReaderFit.READER_FIT_WIDTH;
-      await repository.setGlobal(values: defaults, basedOnRevision: 0);
-      final inherited = await repository.loadManga(_key);
-      expect(inherited.mangaRevision, 0);
-      expect(inherited.overrides!.hasMode(), false);
-      expect(inherited.overrides!.hasPageLayout(), false);
-      expect(inherited.overrides!.hasFit(), false);
-      expect(inherited.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
-      expect(
-        inherited.effectiveReader.mode,
-        wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
-      );
-      expect(
-        inherited.effectiveReader.pageLayout,
-        wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
-      );
-      final explicit = await repository.setManga(
-        mangaKey: _key,
-        overrides: wire.ReaderSettingsOverride(
-          pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
-          fit: wire.ReaderFit.READER_FIT_CONTAIN,
-        ),
-        basedOnRevision: 0,
-      );
-      expect(explicit.mangaRevision, 1);
-      expect(explicit.globalRevision, 1);
-      expect(explicit.overrides!.hasMode(), false);
-      expect(explicit.overrides!.hasPageLayout(), true);
-      expect(explicit.overrides!.hasFit(), true);
-      expect(explicit.effectiveReader.fit, wire.ReaderFit.READER_FIT_CONTAIN);
-      expect(
-        explicit.effectiveReader.mode,
-        wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
-      );
-      expect(
-        explicit.effectiveReader.pageLayout,
-        wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
-      );
-      final cleared = await repository.setManga(
-        mangaKey: _key,
-        overrides: wire.ReaderSettingsOverride(),
-        basedOnRevision: 1,
-      );
-      expect(cleared.mangaRevision, 2);
-      expect(cleared.globalRevision, 1);
-      expect(cleared.overrides!.hasPageLayout(), false);
-      expect(cleared.overrides!.hasFit(), false);
-      expect(cleared.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
-      expect(
-        cleared.effectiveReader.pageLayout,
-        wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
-      );
-      expect(server.manga(_key), business);
-      expect(server.bookmarked(_key, 'chapter'), true);
-    },
-  );
-
-  test(
-    'reader overrides distinguish explicit zero and false from inheritance and preserve unrelated defaults',
-    () async {
-      final global = _global();
-      global.reader
-        ..cropBorders = true
-        ..background = wire.ReaderBackground.READER_BACKGROUND_THEME
-        ..dimPercent = 80
-        ..tapZones = wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED
-        ..keyboard = wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED;
-      await repository.setGlobal(values: global, basedOnRevision: 0);
-      final explicit = await repository.setManga(
-        mangaKey: _key,
-        basedOnRevision: 0,
-        overrides: wire.ReaderSettingsOverride(
-          dimPercent: 0,
-          cropBorders: false,
         ),
       );
-      expect(explicit.overrides!.hasDimPercent(), true);
-      expect(explicit.overrides!.hasCropBorders(), true);
-      expect(explicit.effectiveReader.cropBorders, false);
-      expect(explicit.effectiveReader.dimPercent, 0);
-      expect(explicit.effectiveReader.background, global.reader.background);
-      expect(explicit.effectiveReader.tapZones, global.reader.tapZones);
-      expect(explicit.effectiveReader.keyboard, global.reader.keyboard);
-      final cleared = await repository.setManga(
-        mangaKey: _key,
-        basedOnRevision: 1,
-        overrides: wire.ReaderSettingsOverride(),
-      );
-      expect(cleared.overrides!.hasDimPercent(), false);
-      expect(cleared.overrides!.hasCropBorders(), false);
-      expect(cleared.effectiveReader.cropBorders, true);
-      expect(cleared.effectiveReader, global.reader);
-    },
-  );
+    final draft = wire.SettingsMutation(schemaVersion: 1, setGlobal: values);
+    int bodyBytes(wire.SettingsMutation value) => utf8
+        .encode(
+          jsonEncode(
+            wire.encodeProtoJson(value, maxBytes: wire.controlJsonLimit),
+          ),
+        )
+        .length;
+    var remaining = wire.controlRequestLimit - bodyBytes(draft);
+    expect(remaining, inInclusiveRange(1, businessFavoriteSourceLimit * 512));
+    for (final source in values.favoriteSources) {
+      final wide = remaining > 512 ? 256 : remaining ~/ 2;
+      remaining -= wide * 2;
+      final doubleByte = remaining == 1 && wide < 256 ? 1 : 0;
+      remaining -= doubleByte;
+      source.sourceName =
+          '${'界' * wide}${'é' * doubleByte}${'a' * (256 - wide - doubleByte)}';
+      if (remaining == 0) break;
+    }
+    expect(remaining, 0);
+    expect(bodyBytes(draft), wire.controlRequestLimit);
+    expect(() => validateBusinessSettingsMutation(draft), returnsNormally);
+    expect(
+      bodyBytes(
+        draft.deepCopy()..mutationId = '12345678-1234-4234-8234-123456789abc',
+      ),
+      greaterThan(wire.controlRequestLimit),
+    );
+
+    await expectLater(
+      repository.setGlobal(values: values, basedOnRevision: 0),
+      throwsFormatException,
+    );
+    expect(server.requests, isEmpty);
+    expect(repository.pendingGlobal(), isNull);
+    expect(server.appliedMutations, 0);
+
+    final saved = await repository.setGlobal(
+      values: _global(),
+      basedOnRevision: 0,
+    );
+    expect(saved.globalRevision, 1);
+    expect(writes(), hasLength(1));
+    expect(repository.pendingGlobal(), isNull);
+    expect(server.appliedMutations, 1);
+  });
+
+  test('manga presence distinguishes inheritance from AUTO and revisions do not alter business state', () async {
+    await BookmarkRepository(client).set(
+      mangaKey: _key,
+      chapterKey: 'chapter',
+      bookmarked: true,
+      basedOnRevision: 0,
+    );
+    final business = server.manga(_key)!;
+    final defaults = _global(
+      mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+      layout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+    )..reader.fit = wire.ReaderFit.READER_FIT_WIDTH;
+    await repository.setGlobal(values: defaults, basedOnRevision: 0);
+    final inherited = await repository.loadManga(_key);
+    expect(inherited.mangaRevision, 0);
+    expect(inherited.overrides!.hasMode(), false);
+    expect(inherited.overrides!.hasPageLayout(), false);
+    expect(inherited.overrides!.hasFit(), false);
+    expect(inherited.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
+    expect(
+      inherited.effectiveReader.mode,
+      wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+    );
+    expect(
+      inherited.effectiveReader.pageLayout,
+      wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+    );
+    final explicit = await repository.setManga(
+      mangaKey: _key,
+      overrides: wire.ReaderSettingsOverride(
+        pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
+        fit: wire.ReaderFit.READER_FIT_CONTAIN,
+      ),
+      basedOnRevision: 0,
+    );
+    expect(explicit.mangaRevision, 1);
+    expect(explicit.globalRevision, 1);
+    expect(explicit.overrides!.hasMode(), false);
+    expect(explicit.overrides!.hasPageLayout(), true);
+    expect(explicit.overrides!.hasFit(), true);
+    expect(explicit.effectiveReader.fit, wire.ReaderFit.READER_FIT_CONTAIN);
+    expect(
+      explicit.effectiveReader.mode,
+      wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+    );
+    expect(
+      explicit.effectiveReader.pageLayout,
+      wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
+    );
+    final cleared = await repository.setManga(
+      mangaKey: _key,
+      overrides: wire.ReaderSettingsOverride(),
+      basedOnRevision: 1,
+    );
+    expect(cleared.mangaRevision, 2);
+    expect(cleared.globalRevision, 1);
+    expect(cleared.overrides!.hasPageLayout(), false);
+    expect(cleared.overrides!.hasFit(), false);
+    expect(cleared.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
+    expect(
+      cleared.effectiveReader.pageLayout,
+      wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+    );
+    expect(server.manga(_key), business);
+    expect(server.bookmarked(_key, 'chapter'), true);
+  });
+
+  test('reader overrides distinguish explicit zero and false from inheritance and preserve unrelated defaults', () async {
+    final global = _global();
+    global.reader
+      ..cropBorders = true
+      ..background = wire.ReaderBackground.READER_BACKGROUND_THEME
+      ..dimPercent = 80
+      ..tapZones = wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED
+      ..keyboard = wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED;
+    await repository.setGlobal(values: global, basedOnRevision: 0);
+    final explicit = await repository.setManga(
+      mangaKey: _key,
+      basedOnRevision: 0,
+      overrides: wire.ReaderSettingsOverride(dimPercent: 0, cropBorders: false),
+    );
+    expect(explicit.overrides!.hasDimPercent(), true);
+    expect(explicit.overrides!.hasCropBorders(), true);
+    expect(explicit.effectiveReader.cropBorders, false);
+    expect(explicit.effectiveReader.dimPercent, 0);
+    expect(explicit.effectiveReader.background, global.reader.background);
+    expect(explicit.effectiveReader.tapZones, global.reader.tapZones);
+    expect(explicit.effectiveReader.keyboard, global.reader.keyboard);
+    final cleared = await repository.setManga(
+      mangaKey: _key,
+      basedOnRevision: 1,
+      overrides: wire.ReaderSettingsOverride(),
+    );
+    expect(cleared.overrides!.hasDimPercent(), false);
+    expect(cleared.overrides!.hasCropBorders(), false);
+    expect(cleared.effectiveReader.cropBorders, true);
+    expect(cleared.effectiveReader, global.reader);
+  });
 
   test(
     'different settings scopes never implicitly resend each other',
@@ -684,49 +654,46 @@ void main() {
     );
   }
 
-  test(
-    'an old ACK cannot acknowledge remotely changed values; refresh clears only the rejected draft',
-    () async {
-      server.loseNextResponse = true;
-      await expectLater(
-        repository.setGlobal(values: _global(), basedOnRevision: 0),
-        throwsStateError,
-      );
-      final remoteClient = _client(server);
-      addTearDown(remoteClient.dispose);
-      final remote = SettingsRepository(remoteClient);
-      await remote.setGlobal(
-        values: _global(theme: wire.AppTheme.APP_THEME_LIGHT),
-        basedOnRevision: 1,
-      );
-      await expectLater(
-        repository.setGlobal(values: _global(), basedOnRevision: 0),
-        throwsA(
-          isA<BusinessStateException>().having(
-            (error) => error.conflict,
-            'conflict',
-            true,
-          ),
+  test('an old ACK cannot acknowledge remotely changed values; refresh clears only the rejected draft', () async {
+    server.loseNextResponse = true;
+    await expectLater(
+      repository.setGlobal(values: _global(), basedOnRevision: 0),
+      throwsStateError,
+    );
+    final remoteClient = _client(server);
+    addTearDown(remoteClient.dispose);
+    final remote = SettingsRepository(remoteClient);
+    await remote.setGlobal(
+      values: _global(theme: wire.AppTheme.APP_THEME_LIGHT),
+      basedOnRevision: 1,
+    );
+    await expectLater(
+      repository.setGlobal(values: _global(), basedOnRevision: 0),
+      throwsA(
+        isA<BusinessStateException>().having(
+          (error) => error.conflict,
+          'conflict',
+          true,
         ),
-      );
-      expect(repository.pendingGlobal()!.retryable, false);
-      final count = writes().length;
-      await expectLater(
-        repository.setGlobal(values: _global(), basedOnRevision: 0),
-        throwsA(isA<BusinessStateException>()),
-      );
-      expect(writes(), hasLength(count));
-      final current = await repository.loadGlobal();
-      expect(current.globalRevision, 2);
-      expect(current.global.theme, wire.AppTheme.APP_THEME_LIGHT);
-      expect(repository.pendingGlobal(), isNull);
-      final saved = await repository.setGlobal(
-        values: _global(),
-        basedOnRevision: 2,
-      );
-      expect(saved.globalRevision, 3);
-    },
-  );
+      ),
+    );
+    expect(repository.pendingGlobal()!.retryable, false);
+    final count = writes().length;
+    await expectLater(
+      repository.setGlobal(values: _global(), basedOnRevision: 0),
+      throwsA(isA<BusinessStateException>()),
+    );
+    expect(writes(), hasLength(count));
+    final current = await repository.loadGlobal();
+    expect(current.globalRevision, 2);
+    expect(current.global.theme, wire.AppTheme.APP_THEME_LIGHT);
+    expect(repository.pendingGlobal(), isNull);
+    final saved = await repository.setGlobal(
+      values: _global(),
+      basedOnRevision: 2,
+    );
+    expect(saved.globalRevision, 3);
+  });
 
   test(
     'an old ACK with unchanged values confirms the current manga revision',
@@ -745,9 +712,8 @@ void main() {
       );
       final remoteClient = _client(server);
       addTearDown(remoteClient.dispose);
-      await SettingsRepository(
-        remoteClient,
-      ).setManga(mangaKey: _key, overrides: overrides, basedOnRevision: 1);
+      await SettingsRepository(remoteClient)
+          .setManga(mangaKey: _key, overrides: overrides, basedOnRevision: 1);
       final confirmed = await repository.setManga(
         mangaKey: _key,
         overrides: overrides,
@@ -765,117 +731,110 @@ void main() {
     },
   );
 
-  test(
-    'settings boundaries reject malformed identity, enums, effective values and missing overrides',
-    () async {
-      final invalid = <wire.SettingsResponse>[
-        _snapshot()..schemaVersion = 2,
-        _snapshot()..effectiveReader.cropBorders = true,
-        _snapshot()..manga.mangaKey = _otherKey,
-        _snapshot()..global.values.theme = wire.AppTheme.APP_THEME_UNSPECIFIED,
-        _snapshot()
-          ..global.values.reader.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
-        _snapshot()
-          ..manga.overrides.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
-        _snapshot()..effectiveReader.fit = wire.ReaderFit.READER_FIT_HEIGHT,
-        _snapshot()
-          ..manga.overrides.mode = wire.ReaderMode.READER_MODE_UNSPECIFIED,
-        _snapshot()
-          ..manga.overrides.pageLayout =
-              wire.ReaderPageLayout.READER_PAGE_LAYOUT_UNSPECIFIED,
-        _snapshot()
-          ..effectiveReader.mode = wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
-        _snapshot()..manga.clearOverrides(),
-        _snapshot()
-          ..global.values.reader.background =
-              wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
-        _snapshot()
-          ..manga.overrides.background =
-              wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
-        _snapshot()..manga.overrides.dimPercent = 81,
-        _snapshot()
-          ..manga.overrides.tapZones =
-              wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
-        _snapshot()
-          ..manga.overrides.keyboard =
-              wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
-        _snapshot()
-          ..effectiveReader.background =
-              wire.ReaderBackground.READER_BACKGROUND_THEME,
-        _snapshot()..effectiveReader.dimPercent = 1,
-        _snapshot()
-          ..effectiveReader.tapZones =
-              wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
-        _snapshot()
-          ..effectiveReader.keyboard =
-              wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
-      ];
-      for (final value in invalid) {
-        server.beforeRequest = (_) => _reply(value);
-        await expectLater(repository.loadManga(_key), throwsFormatException);
-      }
-      server.beforeRequest = null;
-      expect((await repository.loadManga(_key)).mangaRevision, 0);
-      final count = server.requests.length;
-      await expectLater(
-        repository.setGlobal(
-          values: wire.GlobalSettingsValues(),
-          basedOnRevision: 0,
+  test('settings boundaries reject malformed identity, enums, effective values and missing overrides', () async {
+    final invalid = <wire.SettingsResponse>[
+      _snapshot()..schemaVersion = 2,
+      _snapshot()..effectiveReader.cropBorders = true,
+      _snapshot()..manga.mangaKey = _otherKey,
+      _snapshot()..global.values.theme = wire.AppTheme.APP_THEME_UNSPECIFIED,
+      _snapshot()
+        ..global.values.reader.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
+      _snapshot()..manga.overrides.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
+      _snapshot()..effectiveReader.fit = wire.ReaderFit.READER_FIT_HEIGHT,
+      _snapshot()
+        ..manga.overrides.mode = wire.ReaderMode.READER_MODE_UNSPECIFIED,
+      _snapshot()
+        ..manga.overrides.pageLayout =
+            wire.ReaderPageLayout.READER_PAGE_LAYOUT_UNSPECIFIED,
+      _snapshot()
+        ..effectiveReader.mode = wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+      _snapshot()..manga.clearOverrides(),
+      _snapshot()
+        ..global.values.reader.background =
+            wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
+      _snapshot()
+        ..manga.overrides.background =
+            wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
+      _snapshot()..manga.overrides.dimPercent = 81,
+      _snapshot()
+        ..manga.overrides.tapZones =
+            wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
+      _snapshot()
+        ..manga.overrides.keyboard =
+            wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
+      _snapshot()
+        ..effectiveReader.background =
+            wire.ReaderBackground.READER_BACKGROUND_THEME,
+      _snapshot()..effectiveReader.dimPercent = 1,
+      _snapshot()
+        ..effectiveReader.tapZones =
+            wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
+      _snapshot()
+        ..effectiveReader.keyboard =
+            wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
+    ];
+    for (final value in invalid) {
+      server.beforeRequest = (_) => _reply(value);
+      await expectLater(repository.loadManga(_key), throwsFormatException);
+    }
+    server.beforeRequest = null;
+    expect((await repository.loadManga(_key)).mangaRevision, 0);
+    final count = server.requests.length;
+    await expectLater(
+      repository.setGlobal(
+        values: wire.GlobalSettingsValues(),
+        basedOnRevision: 0,
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      repository.setManga(
+        mangaKey: _key,
+        overrides: wire.ReaderSettingsOverride(
+          mode: wire.ReaderMode.READER_MODE_UNSPECIFIED,
         ),
-        throwsFormatException,
-      );
-      await expectLater(
-        repository.setManga(
-          mangaKey: _key,
-          overrides: wire.ReaderSettingsOverride(
-            mode: wire.ReaderMode.READER_MODE_UNSPECIFIED,
-          ),
-          basedOnRevision: 0,
-        ),
-        throwsFormatException,
-      );
-      await expectLater(
-        repository.setManga(
-          mangaKey: 'invalid',
-          overrides: wire.ReaderSettingsOverride(),
-          basedOnRevision: 0,
-        ),
-        throwsFormatException,
-      );
-      expect(server.requests, hasLength(count));
-      expect(repository.pendingGlobal(), isNull);
-      expect(repository.pendingManga(_key), isNull);
-    },
-  );
+        basedOnRevision: 0,
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      repository.setManga(
+        mangaKey: 'invalid',
+        overrides: wire.ReaderSettingsOverride(),
+        basedOnRevision: 0,
+      ),
+      throwsFormatException,
+    );
+    expect(server.requests, hasLength(count));
+    expect(repository.pendingGlobal(), isNull);
+    expect(repository.pendingManga(_key), isNull);
+  });
 
-  test(
-    'watchConfirmed publishes reads and acknowledged state, never a submitted draft',
-    () async {
-      final gate = _ResponseGate(server);
-      client.rebindApi(gate, verifiedIdentity: client.identity);
-      final events = <SettingsSnapshot>[];
-      final subscription = repository.watchConfirmed().listen(events.add);
-      addTearDown(subscription.cancel);
-      await repository.loadGlobal();
-      await Future<void>.delayed(Duration.zero);
-      expect(events.map((value) => value.global.theme), [
-        wire.AppTheme.APP_THEME_SYSTEM,
-      ]);
-      final write = repository.setGlobal(values: _global(), basedOnRevision: 0);
-      await gate.received.future;
-      await Future<void>.delayed(Duration.zero);
-      expect(repository.pendingGlobal(), isNotNull);
-      expect(events, hasLength(1));
-      gate.release.complete();
-      final confirmed = await write;
-      await Future<void>.delayed(Duration.zero);
-      expect(confirmed.globalRevision, 1);
-      expect(events.map((value) => value.global.theme), [
-        wire.AppTheme.APP_THEME_SYSTEM,
-        wire.AppTheme.APP_THEME_DARK,
-      ]);
-    },
-  );
+  test('watchConfirmed publishes reads and acknowledged state, never a submitted draft', () async {
+    final gate = _ResponseGate(server);
+    client.rebindApi(gate, verifiedIdentity: client.identity);
+    final events = <SettingsSnapshot>[];
+    final subscription = repository.watchConfirmed().listen(events.add);
+    addTearDown(subscription.cancel);
+    await repository.loadGlobal();
+    await Future<void>.delayed(Duration.zero);
+    expect(events.map((value) => value.global.theme), [
+      wire.AppTheme.APP_THEME_SYSTEM,
+    ]);
+    final write = repository.setGlobal(values: _global(), basedOnRevision: 0);
+    await gate.received.future;
+    await Future<void>.delayed(Duration.zero);
+    expect(repository.pendingGlobal(), isNotNull);
+    expect(events, hasLength(1));
+    gate.release.complete();
+    final confirmed = await write;
+    await Future<void>.delayed(Duration.zero);
+    expect(confirmed.globalRevision, 1);
+    expect(events.map((value) => value.global.theme), [
+      wire.AppTheme.APP_THEME_SYSTEM,
+      wire.AppTheme.APP_THEME_DARK,
+    ]);
+  });
 
   test(
     'closing a session drops late settings ACKs and isolates the next identity',

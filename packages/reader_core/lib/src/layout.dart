@@ -1,12 +1,15 @@
 import 'resources.dart';
 
-final class ReaderPage {
-  ReaderPage({
-    required this.key,
-    this.width,
-    this.height,
-    this.contentAspectRatio,
-  }) {
+final class ReaderPage({
+  required final String key,
+  final double? width,
+  final double? height,
+
+  /// Learned display geometry only; source dimensions and decode budgets remain
+  /// those of the complete original image.
+  final double? contentAspectRatio,
+}) {
+  this {
     if (key.isEmpty) throw ArgumentError('Page key cannot be empty');
     if ((width == null) != (height == null) ||
         (width != null && (!width!.isFinite || width! <= 0)) ||
@@ -19,13 +22,6 @@ final class ReaderPage {
     }
   }
 
-  final String key;
-  final double? width;
-  final double? height;
-
-  /// Learned display geometry only; source dimensions and decode budgets remain
-  /// those of the complete original image.
-  final double? contentAspectRatio;
   double get originalAspectRatio => width == null ? 2 / 3 : width! / height!;
   double get aspectRatio => contentAspectRatio ?? originalAspectRatio;
   bool get isLandscape => aspectRatio > 1;
@@ -35,12 +31,13 @@ final class ReaderPage {
       width == null ? null : (width! * height! * 4).ceil();
 }
 
-final class ChapterManifest {
-  ChapterManifest({
-    required this.chapterKey,
-    required this.version,
-    required Iterable<ReaderPage> pages,
-  }) : pages = List.unmodifiable(pages) {
+final class ChapterManifest({
+  required final String chapterKey,
+  required final String version,
+  required Iterable<ReaderPage> pages,
+}) {
+  final List<ReaderPage> pages = List.unmodifiable(pages);
+  this {
     if (chapterKey.isEmpty || version.isEmpty) {
       throw ArgumentError('Chapter and manifest version must be explicit');
     }
@@ -49,10 +46,6 @@ final class ChapterManifest {
       throw ArgumentError('Page keys must be unique within a chapter');
     }
   }
-
-  final String chapterKey;
-  final String version;
-  final List<ReaderPage> pages;
 
   ReadingPosition positionAt(
     int index, {
@@ -72,9 +65,8 @@ final class ChapterManifest {
   );
 }
 
-final class PageSpread {
-  PageSpread(Iterable<ReaderPage> pages) : pages = List.unmodifiable(pages);
-  final List<ReaderPage> pages;
+final class PageSpread(Iterable<ReaderPage> pages) {
+  final List<ReaderPage> pages = List.unmodifiable(pages);
 
   /// RTL changes the spread's presentation order, never the source page order.
   List<ReaderPage> displayPages(ReadingMode mode) =>
@@ -108,10 +100,10 @@ List<PageSpread> groupPages(
 
 enum PositionResolutionKind { exactPage, missingPage, differentChapter, empty }
 
-final class PositionResolution {
-  const PositionResolution(this.position, this.kind);
-  final ReadingPosition? position;
-  final PositionResolutionKind kind;
+final class const PositionResolution(
+  final ReadingPosition? position,
+  final PositionResolutionKind kind,
+) {
   bool get requiresNotice =>
       kind == PositionResolutionKind.missingPage ||
       kind == PositionResolutionKind.differentChapter;

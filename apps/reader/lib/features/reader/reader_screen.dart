@@ -2,21 +2,25 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
+
 import '../../diagnostics/reader_baseline.dart';
 import 'reader_preferences.dart';
 import 'resource_image.dart';
 import 'resource_pool.dart';
 
-typedef ResourceImageBuilder =
-    Widget Function(BuildContext context, ImageResource resource, BoxFit fit);
+typedef ResourceImageBuilder = Widget Function(
+  BuildContext context,
+  ImageResource resource,
+  BoxFit fit,
+);
 
 /// Logical viewport state. An observed anchor requires an actually decoded,
 /// visible Flutter image; scheduler residency alone never advances reading.

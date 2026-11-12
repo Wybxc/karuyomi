@@ -111,6 +111,8 @@ async function main(): Promise<void> {
           'web',
           '--release',
           '--no-web-resources-cdn',
+          '--web-content-hash',
+          '--no-deprecated-js-interop',
           ...process.argv.slice(3),
         ],
         { cwd: path.join(root, 'apps/reader') },

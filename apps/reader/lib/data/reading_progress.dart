@@ -6,9 +6,12 @@ import 'package:reader_core/reader_core.dart';
 enum ProgressStorageMode { serverConfirmed }
 
 /// Constructed only after bootstrap has confirmed the user's identity.
-final class ProgressIdentity {
-  ProgressIdentity({required Uri origin, required this.subject})
-    : origin = _origin(origin) {
+final class ProgressIdentity({
+  required Uri origin,
+  required final String subject,
+}) {
+  final Uri origin = _origin(origin);
+  this {
     if (subject.isEmpty) {
       throw ArgumentError('Progress subject cannot be empty');
     }
@@ -23,38 +26,30 @@ final class ProgressIdentity {
     return Uri.parse(value.origin);
   }
 
-  final Uri origin;
-  final String subject;
   String get key => sha256
       .convert(utf8.encode(jsonEncode([origin.origin, subject])))
       .toString();
 }
 
-final class MangaResume {
-  const MangaResume({required this.chapterKey, required this.reversedOrder});
-  final String chapterKey;
-  final bool reversedOrder;
-}
+final class const MangaResume({
+  required final String chapterKey,
+  required final bool reversedOrder,
+});
 
 /// Current navigation and observed reading progress have different lifetimes.
 /// Preloading or restoring a position never counts as observing a page.
-final class ChapterProgress {
-  ChapterProgress({
-    required this.current,
-    this.furthest,
-    this.epoch = 0,
-    this.completed = false,
-  }) {
+final class ChapterProgress({
+  required final ReadingPosition current,
+  final ReadingPosition? furthest,
+  final int epoch = 0,
+  final bool completed = false,
+}) {
+  this {
     if (epoch < 0 ||
         (furthest != null && furthest!.chapterKey != current.chapterKey)) {
       throw ArgumentError('Invalid progress epoch or chapter identity');
     }
   }
-
-  final ReadingPosition current;
-  final ReadingPosition? furthest;
-  final int epoch;
-  final bool completed;
 
   bool furthestUnresolved(ChapterManifest manifest) =>
       furthest != null && _project(manifest, furthest!) == null;

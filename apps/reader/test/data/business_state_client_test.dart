@@ -85,73 +85,70 @@ void main() {
     },
   );
 
-  test(
-    'favorite retries and shelf refresh cannot clear a reader-owned CAS conflict',
-    () async {
-      final library = LibraryRepository(client);
-      final manga = wire.Manga(url: '/manga/shared-conflict', title: 'Shared');
-      Future<void> favorite(bool enabled) => library.setFavorite(
-        packageName: 'test.extension',
-        sourceId: '123',
-        sourceName: 'Test',
-        sourceLang: 'en',
-        manga: manga,
-        favorite: enabled,
-      );
-      await favorite(true);
-      final key = (await library.watchEntries().first).single.mangaKey;
-      final writer = ReadingProgressController(
-        repository: ProgressRepository(client),
-        mangaKey: key,
-      );
-      addTearDown(writer.dispose);
-      await writer.restore(_pages);
-      server.failWrites = true;
-      writer.observe(
-        manifest: _pages,
-        current: _pages.positionAt(0),
-        reversedOrder: false,
-      );
-      expect(await writer.flush(), false);
-      expect(writer.unsaved, true);
-      server.failWrites = false;
-      final remote = BusinessStateClient(api: server, identity: _identity);
-      addTearDown(remote.dispose);
-      await ProgressRepository(remote).save(
-        mangaKey: key,
-        manifest: _pages,
-        progress: ChapterProgress(current: _pages.positionAt(1)),
-        reversedOrder: true,
-      );
-      final progressConflict = throwsA(
-        isA<BusinessStateException>()
-            .having((failure) => failure.conflict, 'conflict', true)
-            .having(
-              (failure) => failure.conflictedChapterKey,
-              'original chapter',
-              'chapter',
-            ),
-      );
-      await expectLater(favorite(false), progressConflict);
-      // These are the exact reads performed by the favorite conflict handler
-      // and foreground shelf refresh; neither owns the pending reader draft.
-      await library.contains(key);
-      await library.refresh();
-      final requests = server.requests.length;
-      expect(await writer.flush(), false);
-      expect(server.requests.length, requests);
-      expect(writer.error, contains('其他设备更新'));
-      expect(writer.unsaved, false);
-      expect(server.progress(key, 'chapter')!.current.pageKey, 'two');
-      expect(server.appliedMutations, 2);
-      await expectLater(favorite(false), progressConflict);
-      await writer.restore(_pages);
-      await favorite(false);
-      expect(server.manga(key)!.favorite, false);
-      expect(server.progress(key, 'chapter')!.current.pageKey, 'two');
-      expect(server.appliedMutations, 3);
-    },
-  );
+  test('favorite retries and shelf refresh cannot clear a reader-owned CAS conflict', () async {
+    final library = LibraryRepository(client);
+    final manga = wire.Manga(url: '/manga/shared-conflict', title: 'Shared');
+    Future<void> favorite(bool enabled) => library.setFavorite(
+      packageName: 'test.extension',
+      sourceId: '123',
+      sourceName: 'Test',
+      sourceLang: 'en',
+      manga: manga,
+      favorite: enabled,
+    );
+    await favorite(true);
+    final key = (await library.watchEntries().first).single.mangaKey;
+    final writer = ReadingProgressController(
+      repository: ProgressRepository(client),
+      mangaKey: key,
+    );
+    addTearDown(writer.dispose);
+    await writer.restore(_pages);
+    server.failWrites = true;
+    writer.observe(
+      manifest: _pages,
+      current: _pages.positionAt(0),
+      reversedOrder: false,
+    );
+    expect(await writer.flush(), false);
+    expect(writer.unsaved, true);
+    server.failWrites = false;
+    final remote = BusinessStateClient(api: server, identity: _identity);
+    addTearDown(remote.dispose);
+    await ProgressRepository(remote).save(
+      mangaKey: key,
+      manifest: _pages,
+      progress: ChapterProgress(current: _pages.positionAt(1)),
+      reversedOrder: true,
+    );
+    final progressConflict = throwsA(
+      isA<BusinessStateException>()
+          .having((failure) => failure.conflict, 'conflict', true)
+          .having(
+            (failure) => failure.conflictedChapterKey,
+            'original chapter',
+            'chapter',
+          ),
+    );
+    await expectLater(favorite(false), progressConflict);
+    // These are the exact reads performed by the favorite conflict handler
+    // and foreground shelf refresh; neither owns the pending reader draft.
+    await library.contains(key);
+    await library.refresh();
+    final requests = server.requests.length;
+    expect(await writer.flush(), false);
+    expect(server.requests.length, requests);
+    expect(writer.error, contains('其他设备更新'));
+    expect(writer.unsaved, false);
+    expect(server.progress(key, 'chapter')!.current.pageKey, 'two');
+    expect(server.appliedMutations, 2);
+    await expectLater(favorite(false), progressConflict);
+    await writer.restore(_pages);
+    await favorite(false);
+    expect(server.manga(key)!.favorite, false);
+    expect(server.progress(key, 'chapter')!.current.pageKey, 'two');
+    expect(server.appliedMutations, 3);
+  });
 
   for (final refreshShelf in [true, false]) {
     test(
@@ -187,9 +184,8 @@ void main() {
         final remote = BusinessStateClient(api: server, identity: _identity);
         addTearDown(remote.dispose);
         await favorite(LibraryRepository(remote), false);
-        await ProgressRepository(
-          remote,
-        ).reset(mangaKey: key, manifest: _pages, reversedOrder: false);
+        await ProgressRepository(remote)
+            .reset(mangaKey: key, manifest: _pages, reversedOrder: false);
         if (refreshShelf) {
           await library.refresh();
         }
@@ -204,43 +200,40 @@ void main() {
     );
   }
 
-  test(
-    'an unrelated account change does not block confirmation of a retried write',
-    () async {
-      final repository = ProgressRepository(client);
-      final draft = ChapterProgress(current: _pages.positionAt(1));
-      server.loseNextResponse = true;
-      await expectLater(
-        repository.save(
-          mangaKey: _key,
-          manifest: _pages,
-          progress: draft,
-          reversedOrder: true,
-        ),
-        throwsStateError,
-      );
-      final remote = BusinessStateClient(api: server, identity: _identity);
-      addTearDown(remote.dispose);
-      await LibraryRepository(remote).setFavorite(
-        packageName: 'test.extension',
-        sourceId: '123',
-        sourceName: 'Test',
-        sourceLang: 'en',
-        manga: wire.Manga(url: '/other', title: 'Other'),
-        favorite: true,
-      );
-      await client.refreshLibrary();
-      final confirmed = await repository.save(
+  test('an unrelated account change does not block confirmation of a retried write', () async {
+    final repository = ProgressRepository(client);
+    final draft = ChapterProgress(current: _pages.positionAt(1));
+    server.loseNextResponse = true;
+    await expectLater(
+      repository.save(
         mangaKey: _key,
         manifest: _pages,
         progress: draft,
         reversedOrder: true,
-      );
-      expect(confirmed.current.pageKey, 'two');
-      expect(confirmed.epoch, 0);
-      expect(server.appliedMutations, 2);
-    },
-  );
+      ),
+      throwsStateError,
+    );
+    final remote = BusinessStateClient(api: server, identity: _identity);
+    addTearDown(remote.dispose);
+    await LibraryRepository(remote).setFavorite(
+      packageName: 'test.extension',
+      sourceId: '123',
+      sourceName: 'Test',
+      sourceLang: 'en',
+      manga: wire.Manga(url: '/other', title: 'Other'),
+      favorite: true,
+    );
+    await client.refreshLibrary();
+    final confirmed = await repository.save(
+      mangaKey: _key,
+      manifest: _pages,
+      progress: draft,
+      reversedOrder: true,
+    );
+    expect(confirmed.current.pageKey, 'two');
+    expect(confirmed.epoch, 0);
+    expect(server.appliedMutations, 2);
+  });
 
   test(
     'unsupported schema and redirected responses never populate the cache',
@@ -393,50 +386,46 @@ void main() {
     },
   );
 
-  test(
-    'an old idempotent success cannot acknowledge a view after a known remote reset',
-    () async {
-      final repository = ProgressRepository(client);
-      final draft = ChapterProgress(current: _pages.positionAt(1));
-      server.loseNextResponse = true;
-      await expectLater(
-        repository.save(
-          mangaKey: _key,
-          manifest: _pages,
-          progress: draft,
-          reversedOrder: true,
+  test('an old idempotent success cannot acknowledge a view after a known remote reset', () async {
+    final repository = ProgressRepository(client);
+    final draft = ChapterProgress(current: _pages.positionAt(1));
+    server.loseNextResponse = true;
+    await expectLater(
+      repository.save(
+        mangaKey: _key,
+        manifest: _pages,
+        progress: draft,
+        reversedOrder: true,
+      ),
+      throwsStateError,
+    );
+    final remote = BusinessStateClient(api: server, identity: _identity);
+    addTearDown(remote.dispose);
+    await ProgressRepository(remote)
+        .reset(mangaKey: _key, manifest: _pages, reversedOrder: false);
+    expect(
+      (await repository.loadChapter(
+        mangaKey: _key,
+        chapterKey: 'chapter',
+      ))!.epoch,
+      1,
+    );
+    await expectLater(
+      repository.save(
+        mangaKey: _key,
+        manifest: _pages,
+        progress: draft,
+        reversedOrder: true,
+      ),
+      throwsA(
+        isA<BusinessStateException>().having(
+          (error) => error.conflict,
+          'stale confirmation',
+          true,
         ),
-        throwsStateError,
-      );
-      final remote = BusinessStateClient(api: server, identity: _identity);
-      addTearDown(remote.dispose);
-      await ProgressRepository(
-        remote,
-      ).reset(mangaKey: _key, manifest: _pages, reversedOrder: false);
-      expect(
-        (await repository.loadChapter(
-          mangaKey: _key,
-          chapterKey: 'chapter',
-        ))!.epoch,
-        1,
-      );
-      await expectLater(
-        repository.save(
-          mangaKey: _key,
-          manifest: _pages,
-          progress: draft,
-          reversedOrder: true,
-        ),
-        throwsA(
-          isA<BusinessStateException>().having(
-            (error) => error.conflict,
-            'stale confirmation',
-            true,
-          ),
-        ),
-      );
-      expect(server.progress(_key, 'chapter')!.epoch, 1);
-      expect(server.appliedMutations, 2);
-    },
-  );
+      ),
+    );
+    expect(server.progress(_key, 'chapter')!.epoch, 1);
+    expect(server.appliedMutations, 2);
+  });
 }
