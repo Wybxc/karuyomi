@@ -316,6 +316,7 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
 
   Future<void> _claimSlots() async {
     _check();
+    catalog._openedChapters.removeWhere((chapter) => chapter.provider.isClosed);
     if (catalog._searchOwner != null ||
         catalog.busy ||
         catalog._openedChapters.isNotEmpty ||
