@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -14,7 +16,7 @@ import '../settings/pending_global_settings.dart';
 import 'extension_listing.dart';
 import 'extensions_controller.dart';
 
-class ExtensionsPage extends StatefulWidget {
+class ExtensionsPage extends StatefulHookConsumerWidget {
   const ExtensionsPage({
     super.key,
     required this.catalog,
@@ -31,36 +33,25 @@ class ExtensionsPage extends StatefulWidget {
   )?
   onOpenSource;
   @override
-  State<ExtensionsPage> createState() => _ExtensionsPageState();
+  ConsumerState<ExtensionsPage> createState() => _ExtensionsPageState();
 }
 
-class _ExtensionsPageState extends State<ExtensionsPage>
-    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
   late final ExtensionsController _controller;
-  final _search = TextEditingController();
+  late TextEditingController _search;
   String? _language;
-  @override
-  bool get wantKeepAlive => true;
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _controller = ExtensionsController(
       catalog: widget.catalog,
+      container: ProviderScope.containerOf(context, listen: false),
       repository: widget.repository,
       isCurrent: () => mounted && ModalRoute.of(context)?.isActive == true,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_controller.refresh(catalogToo: true));
     });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        ModalRoute.of(context)?.isCurrent == true) {
-      unawaited(_controller.refresh());
-    }
   }
 
   Future<void> _details(ExtensionListing item) =>
@@ -153,7 +144,15 @@ class _ExtensionsPageState extends State<ExtensionsPage>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    useAutomaticKeepAlive();
+    _search = useTextEditingController();
+    useListenable(_search);
+    useOnAppLifecycleStateChange((_, state) {
+      if (state == AppLifecycleState.resumed &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        unawaited(_controller.refresh());
+      }
+    });
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -195,7 +194,6 @@ class _ExtensionsPageState extends State<ExtensionsPage>
                       hintText: '查找扩展或漫画源名称',
                       prefixIcon: Icon(Icons.search),
                     ),
-                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 PopupMenuButton<String>(
@@ -308,9 +306,7 @@ class _ExtensionsPageState extends State<ExtensionsPage>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
-    _search.dispose();
     super.dispose();
   }
 }
@@ -423,7 +419,7 @@ class ExtensionOperationStatus extends StatelessWidget {
                   values: values,
                   revision: pending.basedOnRevision,
                 ),
-              GlobalSettingsPanel(controller: controller.settings),
+              GlobalSettingsPanel(catalog: controller.catalog),
             ],
           ),
         ],

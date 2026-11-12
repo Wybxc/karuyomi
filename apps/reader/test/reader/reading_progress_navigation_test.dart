@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -60,7 +61,7 @@ Future<CatalogController> _details(
   TestPlatform platform, {
   TestPlatform Function(Uri? origin)? factory,
 }) async {
-  await tester.pumpWidget(
+  await tester.pumpApp(
     KaruyomiApp(platform: platform, platformFactory: factory),
   );
   await tester.pumpAndSettle();
@@ -154,9 +155,9 @@ void main() {
         reversedOrder: true,
       );
       final remoteRevision = server.accountRevision;
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
       await tester.pumpAndSettle();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      setAppLifecycleState(tester.binding, AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(find.text('重新打开本章'), findsOneWidget);
       final unchanged = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
@@ -198,7 +199,7 @@ void main() {
         ChapterOrder.reversed,
       );
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
       await remote.dispose();
@@ -231,9 +232,9 @@ void main() {
         }
         return null;
       };
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
       await tester.pumpAndSettle();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      setAppLifecycleState(tester.binding, AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(find.text('未能刷新服务器进度，当前阅读位置保持不变，可重试。'), findsOneWidget);
       expect(
@@ -244,7 +245,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('未能刷新服务器进度，当前阅读位置保持不变，可重试。'), findsNothing);
       expect(find.text('阅读进度已保存到服务端'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
     },
@@ -357,7 +358,7 @@ void main() {
       );
       expect(original.controlCommands.length, oldControls);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await nextCatalog.closeReadingProgress();
     },
@@ -439,7 +440,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('继续阅读'), findsOneWidget);
       expect(find.byType(ReaderScreen), findsNothing);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
       platform = _platform(server: server);
@@ -493,7 +494,7 @@ void main() {
       expect(stored.furthest, isNull);
       expect(stored.completed, false);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
     },
@@ -533,7 +534,7 @@ void main() {
       expect(catalog.hasUnsavedReadingProgress, false);
       expect(find.text('阅读进度已保存到服务端'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
     },

@@ -1,3 +1,5 @@
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -45,10 +47,12 @@ wire.GlobalSettingsValues _values({
 void main() {
   late TestPlatform platform;
   late CatalogController catalog;
+  late ProviderContainer container;
   late BusinessStateClient remote;
   late SettingsRepository remoteSettings;
 
   setUp(() async {
+    container = ProviderContainer();
     platform = TestPlatform();
     catalog = CatalogController(
       api: platform,
@@ -64,6 +68,7 @@ void main() {
     remoteSettings = SettingsRepository(remote);
   });
   tearDown(() async {
+    container.dispose();
     catalog.dispose();
     await catalog.closeReadingProgress();
     await remote.dispose();
@@ -89,7 +94,7 @@ void main() {
   Future<void> show(WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Scaffold(
           body: CatalogPage(
@@ -104,7 +109,7 @@ void main() {
   }
 
   Future<void> hide(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
   }
 
@@ -273,10 +278,9 @@ void main() {
         favorites: [_favorite(package: 'another.extension')],
       );
       final repository = SettingsRepository(catalog.settings!.client);
-      final editor = SettingsController(
-        repository: repository,
-        isCurrent: () => true,
-      );
+      final provider = settingsControllerProvider(catalog, catalog.settings);
+      final subscription = container.listen(provider, (_, _) {});
+      final editor = container.read(provider.notifier);
       await editor.refresh();
       var loseAck = true;
       platform.afterBusinessReply = (request, reply) {
@@ -295,11 +299,14 @@ void main() {
       };
       final applied = platform.businessServer.appliedMutations;
       expect(
-        await editor.saveGlobal(values, editor.snapshot!.globalRevision),
+        await editor.saveGlobal(
+          values,
+          container.read(provider).snapshot!.globalRevision,
+        ),
         false,
       );
       final originalBody = posts().single.body;
-      editor.dispose();
+      subscription.close();
       await show(tester);
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
       expect(find.textContaining('应用主题：深色'), findsOneWidget);

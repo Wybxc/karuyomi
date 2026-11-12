@@ -67,4 +67,4 @@ Vite 插件负责把当前构建的本地输入转换、校验和写入应用资
 
 收藏与阅读进度通过 `protocol/karuyomi/v1/business.proto` 生成 TypeScript/Dart 模型，`pnpm generate:check` 检查一致性；D1 表由 `apps/api/src/db/schema.ts` 定义，使用固定 Drizzle Kit 生成迁移。API 集成测试通过 Cloudflare 官方 Workers Vitest 在真实 workerd/D1 中执行受信 JWT、条件写入和原子失败验证；出站请求使用官方推荐的 MSW 集成。
 
-本地业务 Drift/SQLite、build_runner 和数据库 Web WASM/Worker 资产已移除。`pnpm flutter:check` 继续执行三个 Dart/Flutter 项目的静态分析、测试和格式检查；客户端仅保留会话状态，不再生成本地数据库代码。Source 自身文件/HTTP Cache 与业务数据分离，仍保留原有存储生命周期。
+本地业务 Drift/SQLite、数据库生成链路和数据库 Web WASM/Worker 资产已移除。build_runner 仅用于 Riverpod provider 生成，入口为 `pnpm flutter:generate` / `pnpm flutter:generate:check`；按需使用官方 JIT builder，生成文件提交且独立统计代码量。`pnpm flutter:check` 先验证生成一致性，再执行三个 Dart/Flutter 项目的严格静态分析（含 riverpod_lint）、测试和格式检查；本机可传 `--concurrency=1` 限制测试并发。客户端仅保留会话状态，不生成本地数据库代码。Source 自身文件/HTTP Cache 与业务数据分离，仍保留原有存储生命周期。

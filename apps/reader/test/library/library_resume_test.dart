@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -137,7 +138,7 @@ void main() {
   Future<void> show(WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Scaffold(
           body: LibraryPage(
@@ -155,7 +156,7 @@ void main() {
   }
 
   Future<void> hide(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
   }
 

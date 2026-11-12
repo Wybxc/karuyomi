@@ -784,6 +784,7 @@ final class CatalogController extends ChangeNotifier {
       _readingClients[client] = 0;
       client.addListener(_notify);
     }
+    _notify();
     return true;
   }
 
@@ -855,6 +856,7 @@ final class CatalogController extends ChangeNotifier {
   int _requestSequence = 0;
   int _epoch = 0;
   bool _closed = false;
+  bool get closed => _closed;
   bool _runtimeNeedsRebuild = false;
   bool _rebuildingRuntime = false;
 

@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
@@ -15,7 +16,7 @@ void main() {
     FakeSourceSearch service, {
     OpenSourceSearchDetails? onOpen,
   }) async {
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Builder(
           builder: (context) => Scaffold(
@@ -107,7 +108,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(opened, 1);
       expect(service.openedTarget, same(service.targets.first));
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpApp(const SizedBox());
       await tester.pump();
     },
   );
@@ -159,7 +160,7 @@ void main() {
         isNull,
       );
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpApp(const SizedBox());
       await tester.pump();
     },
   );
@@ -171,18 +172,18 @@ void main() {
       await openPage(tester, service);
       await chooseAndSearch(tester, service);
       final before = service.stops;
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
+      setAppLifecycleState(tester.binding, AppLifecycleState.hidden);
+      setAppLifecycleState(tester.binding, AppLifecycleState.paused);
       await tester.pumpAndSettle();
       expect(service.stops, before + 1);
       expect(service.tasks.single.cancelCalls, 1);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      setAppLifecycleState(tester.binding, AppLifecycleState.hidden);
+      setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
+      setAppLifecycleState(tester.binding, AppLifecycleState.resumed);
       await tester.pump();
       expect(service.tasks, hasLength(1));
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpApp(const SizedBox());
       await tester.pump();
     },
   );
@@ -208,7 +209,7 @@ void main() {
     await catalog.connect();
     await catalog.openBuild(catalog.builds.single);
     await catalog.selectSource(catalog.session!.sources.single);
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: Scaffold(
           body: CatalogPage(
@@ -247,7 +248,7 @@ void main() {
     );
     expect(hint, findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '最新'), findsNothing);
-    await tester.pumpWidget(const SizedBox());
+    await tester.pumpApp(const SizedBox());
     catalog.dispose();
     await catalog.closeReadingProgress();
     await platform.dispose();

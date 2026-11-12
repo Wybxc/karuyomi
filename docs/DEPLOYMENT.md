@@ -12,6 +12,8 @@
 
 CI 成功只表示该次发布与自动交付检查通过。涉及交互改动时做一次针对性的内置浏览器检查；登录、整章阅读、跨端同步和真机矩阵仍分别记录，不要求每次重复全部人工验收。本轮 UI 的实际生产证据见[记录](verification/browse-ui-flow.md#生产发布)。
 
+分支 push 的成功检查同样保留 Web/runtime artifact，可直接用于隔离交互验收，避免本机重复编译；生产 deploy 仍只消费同轮 `main` 提交的 artifact。
+
 ## 扩展与发布协调
 
 Web 发布原样保留生产 index、build-state、manifest 和 gzip，不生成新扩展 revision，不修改 `bootstrap.complete` 或运行兼容声明。因此可复用已经上线的分批快照，UI 发布无需等待全语言 baseline。协议、ABI 或所需材料不匹配时停止，不把旧 AOT 重新贴标签；配套 AOT 仍在 clab 按 [EXTENSIONS](EXTENSIONS.md)推进。

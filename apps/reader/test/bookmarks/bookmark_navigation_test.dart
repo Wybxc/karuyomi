@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
@@ -53,7 +54,7 @@ void main() {
             mangaPage: wire.MangaPage(mangas: [testManga]),
           ),
         };
-      await tester.pumpWidget(KaruyomiApp(platform: platform));
+      await tester.pumpApp(KaruyomiApp(platform: platform));
       await tester.pumpAndSettle();
       await _tap(tester, find.text('去浏览'));
       await _tap(
@@ -130,7 +131,7 @@ void main() {
       expect(find.text('第二章'), findsNothing);
       expect(platform.businessServer.manga(sequence.mangaKey)!.favorite, false);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await tester.runAsync(catalog.closeReadingProgress);
     },

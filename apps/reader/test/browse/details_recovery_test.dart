@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -93,7 +94,7 @@ Future<CatalogController> _details(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(KaruyomiApp(platform: platform));
+  await tester.pumpApp(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
   await _tap(tester, find.text('去浏览'));
   for (final target in [
@@ -120,7 +121,7 @@ Future<CatalogController> _details(
 
 Future<void> _finish(WidgetTester tester, CatalogController catalog) async {
   expect(tester.takeException(), isNull);
-  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpApp(const SizedBox.shrink());
   await tester.pumpAndSettle();
   await tester.runAsync(catalog.closeReadingProgress);
 }

@@ -1,3 +1,5 @@
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -12,6 +14,7 @@ import 'package:reader_core/reader_core.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
+import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -20,8 +23,10 @@ void main() {
   late TestPlatform platform;
   late CatalogController catalog;
   late ExtensionsController manager;
+  late ProviderContainer container;
   bool current = true;
   setUp(() async {
+    container = ProviderContainer();
     current = true;
     platform = TestPlatform(seedDefaultInstallation: false);
     catalog = CatalogController(
@@ -32,6 +37,7 @@ void main() {
     );
     await catalog.connect();
     manager = ExtensionsController(
+      container: container,
       catalog: catalog,
       repository: catalog.settings!,
       isCurrent: () => current,
@@ -40,6 +46,7 @@ void main() {
   });
   tearDown(() async {
     manager.dispose();
+    container.dispose();
     catalog.dispose();
     await catalog.closeReadingProgress();
     await platform.dispose();
@@ -95,6 +102,7 @@ void main() {
         (request) => request.method == 'POST',
       );
       final second = ExtensionsController(
+        container: container,
         catalog: catalog,
         repository: catalog.settings!,
         isCurrent: () => true,
@@ -196,6 +204,7 @@ void main() {
       expect(catalog.adoptReadingProgress(progress), true);
       manager.dispose();
       manager = ExtensionsController(
+        container: container,
         catalog: catalog,
         repository: catalog.settings!,
         isCurrent: () => current,
@@ -341,10 +350,14 @@ void main() {
             values.installedExtensions.add(
               testInstalledExtension(enabled: enabled),
             );
-            await manager.settings.saveGlobal(
-              values,
-              manager.settings.snapshot!.globalRevision,
-            );
+            await container
+                .read(
+                  settingsControllerProvider(
+                    catalog,
+                    catalog.settings,
+                  ).notifier,
+                )
+                .saveGlobal(values, manager.settings.snapshot!.globalRevision);
           }
           final build = catalog.builds.single;
           switch (path) {
@@ -407,7 +420,7 @@ void main() {
   Future<void> show(WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(600, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
+    await tester.pumpApp(
       MaterialApp(
         home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
       ),
@@ -482,7 +495,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('账户尚未安装扩展。'), findsOneWidget);
       expect(platform.cachedArtifacts, isEmpty);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
@@ -528,7 +541,7 @@ void main() {
             .length,
         posts,
       );
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
@@ -568,7 +581,7 @@ void main() {
             .length,
         posts,
       );
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );
@@ -605,7 +618,7 @@ void main() {
         posts,
       );
       expect(platform.preparations, hasLength(1));
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },
   );

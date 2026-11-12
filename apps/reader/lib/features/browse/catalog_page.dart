@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../extensions/extension_listing.dart';
@@ -13,7 +14,7 @@ import 'catalog_controller.dart';
 import 'manga_details_page.dart';
 import 'source_browse_page.dart';
 
-class CatalogPage extends StatefulWidget {
+class CatalogPage extends HookWidget {
   const CatalogPage({
     super.key,
     required this.controller,
@@ -27,20 +28,13 @@ class CatalogPage extends StatefulWidget {
   final VoidCallback onAuthenticate;
   final String? configurationError;
   final ReaderAuthentication? onAuthenticateReader;
-  @override
-  State<CatalogPage> createState() => _CatalogPageState();
-}
-
-class _CatalogPageState extends State<CatalogPage>
-    with SingleTickerProviderStateMixin {
-  late final _tabs = TabController(length: 2, vsync: this);
-
   Future<void> _open(
+    BuildContext context,
     ExtensionListing extension,
     wire.CatalogSource source,
   ) async {
     final build = extension.exact;
-    final catalog = widget.controller;
+    final catalog = controller;
     if (build == null || catalog == null || catalog.busy) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -48,15 +42,18 @@ class _CatalogPageState extends State<CatalogPage>
           catalog: catalog,
           build: build,
           source: source,
-          onAuthenticateReader: widget.onAuthenticateReader,
-          onAuthenticate: widget.onAuthenticate,
+          onAuthenticateReader: onAuthenticateReader,
+          onAuthenticate: onAuthenticate,
         ),
       ),
     );
   }
 
-  Future<void> _preferences(SourcePreferencesTarget target) async {
-    final catalog = widget.controller;
+  Future<void> _preferences(
+    BuildContext context,
+    SourcePreferencesTarget target,
+  ) async {
+    final catalog = controller;
     final repository = catalog?.sourcePreferences;
     if (catalog == null || repository == null || catalog.busy) return;
     await showModalBottomSheet<void>(
@@ -74,8 +71,8 @@ class _CatalogPageState extends State<CatalogPage>
     );
   }
 
-  Future<void> _search() async {
-    final catalog = widget.controller;
+  Future<void> _search(BuildContext context) async {
+    final catalog = controller;
     final client = catalog?.library?.client;
     if (catalog == null || client == null || catalog.busy) return;
     final CatalogSourceSearch service;
@@ -97,7 +94,7 @@ class _CatalogPageState extends State<CatalogPage>
           service: service,
           onOpen: (details) async {
             bool current() =>
-                mounted &&
+                context.mounted &&
                 !catalog.accessPaused &&
                 identical(catalog.library?.client, client) &&
                 catalog.isCurrentSource(details.source);
@@ -110,7 +107,7 @@ class _CatalogPageState extends State<CatalogPage>
                         manga: details.manga,
                         chapters: details.chapters,
                         source: details.source,
-                        onAuthenticateReader: widget.onAuthenticateReader,
+                        onAuthenticateReader: onAuthenticateReader,
                       )
                     : Scaffold(
                         appBar: AppBar(title: const Text('作品已失效')),
@@ -126,16 +123,18 @@ class _CatalogPageState extends State<CatalogPage>
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    return controller == null
-        ? _content(null)
-        : AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) => _content(controller),
-          );
+    final ticker = useSingleTickerProvider();
+    final tabs = useMemoized(() => TabController(length: 2, vsync: ticker));
+    useEffect(() => tabs.dispose, [tabs]);
+    useListenable(controller);
+    return _content(context, controller, tabs);
   }
 
-  Widget _content(CatalogController? catalog) {
+  Widget _content(
+    BuildContext context,
+    CatalogController? catalog,
+    TabController tabs,
+  ) {
     final status = catalog?.status ?? ServiceStatus.disconnected;
     final ready =
         catalog?.settings != null &&
@@ -163,9 +162,7 @@ class _CatalogPageState extends State<CatalogPage>
               ),
               const SizedBox(height: 12),
               Text(
-                widget.configurationError ??
-                    catalog?.error ??
-                    '连接服务后，安装扩展并选择漫画源。',
+                configurationError ?? catalog?.error ?? '连接服务后，安装扩展并选择漫画源。',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -177,8 +174,8 @@ class _CatalogPageState extends State<CatalogPage>
                     onPressed:
                         status == ServiceStatus.loginRequired ||
                             status == ServiceStatus.denied
-                        ? widget.onAuthenticate
-                        : widget.onConnect,
+                        ? onAuthenticate
+                        : onConnect,
                     icon: const Icon(Icons.refresh),
                     label: Text(
                       status == ServiceStatus.loginRequired ||
@@ -204,7 +201,7 @@ class _CatalogPageState extends State<CatalogPage>
         child: Column(
           children: [
             TabBar(
-              controller: _tabs,
+              controller: tabs,
               tabs: [
                 const Tab(text: '漫画源'),
                 Tab(
@@ -215,21 +212,24 @@ class _CatalogPageState extends State<CatalogPage>
             ),
             Expanded(
               child: TabBarView(
-                controller: _tabs,
+                controller: tabs,
                 children: [
                   SourceDirectory(
                     catalog: current,
-                    onManage: () => _tabs.animateTo(1),
-                    onOpen: _open,
-                    onSearch: () => unawaited(_search()),
-                    onPreferences: (target) => unawaited(_preferences(target)),
+                    onManage: () => tabs.animateTo(1),
+                    onOpen: (extension, source) =>
+                        _open(context, extension, source),
+                    onSearch: () => unawaited(_search(context)),
+                    onPreferences: (target) =>
+                        unawaited(_preferences(context, target)),
                   ),
                   ExtensionsPage(
                     key: ValueKey(current.settings),
                     catalog: current,
                     repository: current.settings!,
                     embedded: true,
-                    onOpenSource: _open,
+                    onOpenSource: (extension, source) =>
+                        _open(context, extension, source),
                   ),
                 ],
               ),
@@ -238,11 +238,5 @@ class _CatalogPageState extends State<CatalogPage>
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
   }
 }

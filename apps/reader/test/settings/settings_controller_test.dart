@@ -1,14 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:karuyomi/data/business_state_client.dart';
-import 'package:karuyomi/data/reading_progress.dart';
-import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
-import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../data/business_state_server.dart';
+import 'settings_fixture.dart';
 
 const _key = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 wire.GlobalSettingsValues _global({
@@ -27,64 +24,35 @@ wire.GlobalSettingsValues _global({
   ),
 );
 
-final class _ResponseGate implements ApiFetch {
-  _ResponseGate(this.api);
-  final ApiFetch api;
-  final received = Completer<void>();
-  final release = Completer<void>();
+void main() {
+  late SettingsFixture fixture;
+  late TestBusinessServer server;
+  late SettingsController controller;
+  SettingsState state() => fixture.state();
+  late Completer<void> received;
+  late Completer<void> release;
   bool holdNextWrite = false;
 
-  @override
-  Future<ApiReply> fetchApi(
-    String path, {
-    String method = 'GET',
-    Map<String, String> headers = const {},
-    String? body,
-  }) async {
-    final hold = holdNextWrite && method == 'POST';
-    if (hold) holdNextWrite = false;
-    final reply = await api.fetchApi(
-      path,
-      method: method,
-      headers: headers,
-      body: body,
-    );
-    if (hold) {
-      received.complete();
-      await release.future;
-    }
-    return reply;
-  }
-}
-
-void main() {
-  late TestBusinessServer server;
-  late _ResponseGate gate;
-  late BusinessStateClient client;
-  late SettingsRepository repository;
-  late SettingsController controller;
-  late bool current;
-
-  setUp(() {
-    server = TestBusinessServer();
-    gate = _ResponseGate(server);
-    client = BusinessStateClient(
-      api: gate,
-      identity: ProgressIdentity(
-        origin: Uri.parse('https://reader.example'),
-        subject: 'owner-subject',
-      ),
-    );
-    repository = SettingsRepository(client);
-    current = true;
-    controller = SettingsController(
-      repository: repository,
-      isCurrent: () => current,
-    );
+  setUp(() async {
+    fixture = SettingsFixture();
+    await fixture.connect();
+    server = fixture.platform.businessServer;
+    controller = fixture.editor();
+    received = Completer<void>();
+    release = Completer<void>();
+    holdNextWrite = false;
+    fixture.platform.afterBusinessReply = (request, reply) async {
+      if (holdNextWrite && request.method == 'POST') {
+        holdNextWrite = false;
+        received.complete();
+        await release.future;
+      }
+      return reply;
+    };
   });
   tearDown(() async {
-    controller.dispose();
-    await client.dispose();
+    if (!release.isCompleted) release.complete();
+    await fixture.dispose();
   });
 
   List<TestBusinessRequest> writes() =>
@@ -94,17 +62,17 @@ void main() {
     'only ACKs confirm settings and an uncertain command requires exact explicit retry',
     () async {
       expect(await controller.refresh(), true);
-      gate.holdNextWrite = true;
+      holdNextWrite = true;
       final write = controller.saveGlobal(_global(), 0);
-      await gate.received.future;
-      expect(controller.busy, true);
-      expect(controller.canEdit, false);
-      expect(controller.snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
-      expect(controller.snapshot!.globalRevision, 0);
-      gate.release.complete();
+      await received.future;
+      expect(state().busy, true);
+      expect(state().canEdit, false);
+      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+      expect(state().snapshot!.globalRevision, 0);
+      release.complete();
       expect(await write, true);
-      expect(controller.snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
-      expect(controller.snapshot!.globalRevision, 1);
+      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+      expect(state().snapshot!.globalRevision, 1);
       server.loseNextResponse = true;
       expect(
         await controller.saveGlobal(
@@ -113,74 +81,60 @@ void main() {
         ),
         false,
       );
-      expect(controller.error, contains('尚未确认'));
-      expect(controller.pending!.retryable, true);
-      expect(controller.snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+      expect(state().error, contains('尚未确认'));
+      expect(state().pending!.retryable, true);
+      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
       final original = writes().last.body;
       expect(await controller.saveGlobal(_global(), 1), false);
       expect(writes(), hasLength(2));
       expect(await controller.refresh(), true);
       expect(writes(), hasLength(2));
-      expect(controller.pending, isNotNull);
-      expect(controller.canEdit, false);
+      expect(state().pending, isNotNull);
+      expect(state().canEdit, false);
       expect(await controller.retry(), true);
       expect(writes().last.body, original);
       expect(server.appliedMutations, 2);
-      expect(controller.pending, isNull);
-      expect(controller.canEdit, true);
-      expect(controller.snapshot!.global.theme, wire.AppTheme.APP_THEME_LIGHT);
-      expect(controller.snapshot!.globalRevision, 2);
+      expect(state().pending, isNull);
+      expect(state().canEdit, true);
+      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_LIGHT);
+      expect(state().snapshot!.globalRevision, 2);
     },
   );
 
   test(
-    'identity changes permanently retire an editor before its late ACK',
+    'identity changes discard old views before a late settings ACK',
     () async {
       await controller.refresh();
-      gate.holdNextWrite = true;
+      holdNextWrite = true;
       final write = controller.saveGlobal(_global(), 0);
-      await gate.received.future;
-      current = false;
-      controller.checkCurrent();
-      expect(controller.error, contains('身份或服务已改变'));
-      expect(controller.available, false);
-      gate.release.complete();
+      await received.future;
+      fixture.platform.bootstrapSubject = 'another-owner';
+      await fixture.catalog.connect();
+      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+      expect(state().pending, isNull);
+      release.complete();
       expect(await write, false);
-      expect(controller.snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
-      current = true;
-      final count = server.requests.length;
-      expect(await controller.refresh(), false);
-      expect(await controller.saveGlobal(_global(), 0), false);
-      expect(controller.available, false);
-      expect(server.requests, hasLength(count));
+      expect(state().snapshot!.globalRevision, 0);
+      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
     },
   );
 
   test(
     'global confirmation refreshes inherited manga values while explicit overrides remain',
     () async {
-      final manga = SettingsController(
-        repository: repository,
-        mangaKey: _key,
-        isCurrent: () => true,
-      );
-      addTearDown(manga.dispose);
+      final manga = fixture.editor(mangaKey: _key);
+      SettingsState mangaState() => fixture.state(mangaKey: _key);
       await manga.refresh();
       await controller.refresh();
-      Future<void> untilRevision(int revision) {
-        final done = Completer<void>();
-        void changed() {
-          if (!manga.busy &&
-              manga.snapshot?.globalRevision == revision &&
-              !done.isCompleted) {
-            manga.removeListener(changed);
-            done.complete();
+      Future<void> untilRevision(int revision) async {
+        for (var turn = 0; turn < 100; turn++) {
+          if (!mangaState().busy &&
+              mangaState().snapshot?.globalRevision == revision) {
+            return;
           }
+          await Future<void>.delayed(Duration.zero);
         }
-
-        manga.addListener(changed);
-        changed();
-        return done.future;
+        fail('Inherited settings did not reach revision $revision');
       }
 
       final inherited = untilRevision(1);
@@ -195,13 +149,13 @@ void main() {
         true,
       );
       await inherited;
-      expect(manga.snapshot!.overrides!.hasMode(), false);
+      expect(mangaState().snapshot!.overrides!.hasMode(), false);
       expect(
-        manga.snapshot!.effectiveReader.mode,
+        mangaState().snapshot!.effectiveReader.mode,
         wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
       );
       expect(
-        manga.snapshot!.effectiveReader.pageLayout,
+        mangaState().snapshot!.effectiveReader.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
       );
       expect(
@@ -223,14 +177,14 @@ void main() {
         true,
       );
       await explicit;
-      expect(manga.snapshot!.globalRevision, 2);
-      expect(manga.snapshot!.mangaRevision, 1);
+      expect(mangaState().snapshot!.globalRevision, 2);
+      expect(mangaState().snapshot!.mangaRevision, 1);
       expect(
-        manga.snapshot!.effectiveReader.mode,
+        mangaState().snapshot!.effectiveReader.mode,
         wire.ReaderMode.READER_MODE_WEBTOON,
       );
       expect(
-        manga.snapshot!.effectiveReader.pageLayout,
+        mangaState().snapshot!.effectiveReader.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
       );
     },

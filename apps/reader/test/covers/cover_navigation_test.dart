@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
@@ -64,7 +65,7 @@ Future<CatalogController> _details(
   WidgetTester tester,
   TestPlatform platform,
 ) async {
-  await tester.pumpWidget(KaruyomiApp(platform: platform));
+  await tester.pumpApp(KaruyomiApp(platform: platform));
   await tester.pumpAndSettle();
   await _tap(tester, find.text('去浏览'));
   for (final target in [
@@ -91,7 +92,7 @@ Future<CatalogController> _details(
 
 Future<void> _finish(WidgetTester tester, CatalogController controller) async {
   expect(tester.takeException(), isNull);
-  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpApp(const SizedBox.shrink());
   await tester.pumpAndSettle();
   await tester.runAsync(controller.closeReadingProgress);
 }

@@ -1,0 +1,10 @@
+targets:
+  $default:
+    sources:
+      - lib/**
+      - pubspec.yaml
+      - $package$
+    builders:
+      riverpod_generator:
+        generate_for:
+          - lib/**.dart

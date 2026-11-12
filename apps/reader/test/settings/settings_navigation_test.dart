@@ -1,3 +1,7 @@
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:karuyomi/features/settings/settings_controller.dart';
+import 'settings_probe.dart';
+import '../test_app.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -116,7 +120,7 @@ Future<void> _start(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(
+  await tester.pumpApp(
     KaruyomiApp(platform: platform, platformFactory: factory),
   );
   await tester.pumpAndSettle();
@@ -189,7 +193,7 @@ Future<void> _leaveReader(
 
 Future<void> _finish(WidgetTester tester, CatalogController catalog) async {
   expect(tester.takeException(), isNull);
-  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpApp(const SizedBox.shrink());
   await tester.pumpAndSettle();
   await tester.runAsync(catalog.closeReadingProgress);
 }
@@ -218,16 +222,22 @@ void main() {
     await _start(tester, platform);
     await _tap(tester, _navigation('设置'));
     final panel = find.byType(GlobalSettingsPanel);
-    final controller = tester.widget<GlobalSettingsPanel>(panel).controller;
-    expect(controller.snapshot!.globalRevision, 0);
+    final catalog = tester.widget<GlobalSettingsPanel>(panel).catalog;
+    final container = ProviderScope.containerOf(
+      tester.element(panel),
+      listen: false,
+    );
+    final provider = settingsControllerProvider(catalog, catalog.settings);
+    final controller = container.read(provider.notifier);
+    expect(container.read(provider).snapshot!.globalRevision, 0);
     expect(
       tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
       ThemeMode.system,
     );
 
     final binding = tester.binding;
-    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    setAppLifecycleState(binding, AppLifecycleState.inactive);
+    setAppLifecycleState(binding, AppLifecycleState.hidden);
     await tester.runAsync(() async {
       final repository = remote.settings!;
       final current = await repository.loadGlobal();
@@ -237,16 +247,18 @@ void main() {
       );
     });
     await tester.pump();
-    expect(controller.snapshot!.globalRevision, 0);
+    expect(container.read(provider).snapshot!.globalRevision, 0);
 
-    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    setAppLifecycleState(binding, AppLifecycleState.inactive);
+    setAppLifecycleState(binding, AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     expect(
-      tester.widget<GlobalSettingsPanel>(panel).controller,
+      container.read(
+        settingsControllerProvider(catalog, catalog.settings).notifier,
+      ),
       same(controller),
     );
-    expect(controller.snapshot!.globalRevision, 1);
+    expect(container.read(provider).snapshot!.globalRevision, 1);
     expect(
       find.byKey(
         const ValueKey(('global-theme', wire.AppTheme.APP_THEME_DARK)),
@@ -266,7 +278,7 @@ void main() {
     );
     expect(platform.openedBuilds, isEmpty);
     expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
   });
 
@@ -277,9 +289,7 @@ void main() {
         final platform = TestPlatform(seedDefaultInstallation: false);
         await _start(tester, platform);
         await _tap(tester, _navigation('设置'));
-        final initial = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
+        final initial = globalSettings(tester);
         await _choose<wire.AppTheme>(tester, '深色');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
@@ -302,9 +312,9 @@ void main() {
         final originalRequest = platform.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
             .single;
-        expect(initial.pending, isNotNull);
-        expect(initial.available, false);
-        expect(initial.canRetry, false);
+        expect(initial.state.pending, isNotNull);
+        expect(initial.state.available, false);
+        expect(initial.state.canRetry, false);
         expect(
           find.text(denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录'),
           findsOneWidget,
@@ -312,13 +322,11 @@ void main() {
         expect(platform.businessServer.appliedMutations, 1);
         expect(platform.openedBuilds, isEmpty);
         await _tap(tester, find.text('登录'));
-        final recovered = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
+        final recovered = globalSettings(tester);
         expect(platform.authCalls, 1);
         expect(recovered.repository.client, same(initial.repository.client));
-        expect(recovered.pending, isNotNull);
-        expect(recovered.canRetry, true);
+        expect(recovered.state.pending, isNotNull);
+        expect(recovered.state.canRetry, true);
         expect(
           platform.businessServer.requests.where(
             (request) => request.uri.path == '/api/settings/mutations',
@@ -333,11 +341,14 @@ void main() {
           [originalRequest.body, originalRequest.body],
         );
         expect(platform.businessServer.appliedMutations, 1);
-        expect(recovered.pending, isNull);
-        expect(recovered.snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+        expect(recovered.state.pending, isNull);
+        expect(
+          recovered.state.snapshot!.global.theme,
+          wire.AppTheme.APP_THEME_DARK,
+        );
         expect(platform.openedBuilds, isEmpty);
         expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpApp(const SizedBox.shrink());
         await tester.pumpAndSettle();
       },
     );
@@ -362,10 +373,8 @@ void main() {
           },
         );
         await _tap(tester, _navigation('设置'));
-        final initial = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
-        final originalRevision = initial.snapshot!.globalRevision;
+        final initial = globalSettings(tester);
+        final originalRevision = initial.state.snapshot!.globalRevision;
         await _choose<wire.AppTheme>(tester, '深色');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
@@ -391,7 +400,7 @@ void main() {
         expect(originalMutation.mutationId, isNotEmpty);
         expect(originalMutation.expectedRevision, originalRevision);
         expect(originalMutation.setGlobal.theme, wire.AppTheme.APP_THEME_DARK);
-        expect(initial.pending, isNotNull);
+        expect(initial.state.pending, isNotNull);
         expect(platform.businessServer.appliedMutations, 1);
         expect(platform.openedBuilds, isEmpty);
         await tester.enterText(
@@ -399,13 +408,11 @@ void main() {
           '${platform.origin.origin}${trailingSlash ? '/' : ''}',
         );
         await _tap(tester, find.text('连接服务'));
-        final reconnected = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
-        expect(reconnected.pending, isNotNull);
-        expect(reconnected.pending!.basedOnRevision, originalRevision);
+        final reconnected = globalSettings(tester);
+        expect(reconnected.state.pending, isNotNull);
+        expect(reconnected.state.pending!.basedOnRevision, originalRevision);
         expect(
-          reconnected.pending!.global!.theme,
+          reconnected.state.pending!.global!.theme,
           wire.AppTheme.APP_THEME_DARK,
         );
         expect(reconnected.repository.client, same(initial.repository.client));
@@ -434,14 +441,14 @@ void main() {
         expect(retriedMutation.mutationId, originalMutation.mutationId);
         expect(retriedMutation.expectedRevision, originalRevision);
         expect(platform.businessServer.appliedMutations, 1);
-        expect(reconnected.pending, isNull);
+        expect(reconnected.state.pending, isNull);
         expect(find.text('重试原设置操作'), findsNothing);
         expect(
           tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
           ThemeMode.dark,
         );
         expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpApp(const SizedBox.shrink());
         await tester.pumpAndSettle();
       },
     );
@@ -466,9 +473,7 @@ void main() {
           },
         );
         await _tap(tester, _navigation('设置'));
-        final initial = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
+        final initial = globalSettings(tester);
         await _choose<wire.AppTheme>(tester, '深色');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
@@ -487,20 +492,21 @@ void main() {
         final originalRequest = platform.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
             .single;
-        final pending = initial.pending;
+        final pending = initial.state.pending;
         expect(pending, isNotNull);
         await tester.enterText(find.byType(TextField), invalidOrigin);
         await _tap(tester, find.text('连接服务'));
         expect(find.byType(GlobalSettingsPanel), findsOneWidget);
-        final rejected = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
-        expect(rejected, same(initial));
-        expect(rejected.pending, isNotNull);
-        expect(rejected.pending!.basedOnRevision, pending!.basedOnRevision);
-        expect(rejected.pending!.global, pending.global);
-        expect(rejected.pending!.retryable, pending.retryable);
-        expect(rejected.available, true);
+        final rejected = globalSettings(tester);
+        expect(rejected.commands, same(initial.commands));
+        expect(rejected.state.pending, isNotNull);
+        expect(
+          rejected.state.pending!.basedOnRevision,
+          pending!.basedOnRevision,
+        );
+        expect(rejected.state.pending!.global, pending.global);
+        expect(rejected.state.pending!.retryable, pending.retryable);
+        expect(rejected.state.available, true);
         expect(platform.disposalCount, 0);
         expect(platform.rebuildCount, 0);
         expect(platform.businessServer.appliedMutations, 1);
@@ -522,10 +528,8 @@ void main() {
           platform.origin.toString(),
         );
         await _tap(tester, find.text('连接服务'));
-        final reconnected = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
-        expect(reconnected.pending, isNotNull);
+        final reconnected = globalSettings(tester);
+        expect(reconnected.state.pending, isNotNull);
         expect(reconnected.repository.client, same(initial.repository.client));
         expect(find.textContaining('请先在设置中填写服务的 HTTPS 地址'), findsNothing);
         await _tap(tester, find.text('重试原设置操作'));
@@ -536,10 +540,10 @@ void main() {
           [originalRequest.body, originalRequest.body],
         );
         expect(platform.businessServer.appliedMutations, 1);
-        expect(reconnected.pending, isNull);
+        expect(reconnected.state.pending, isNull);
         expect(platform.openedBuilds, isEmpty);
         expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpApp(const SizedBox.shrink());
         await tester.pumpAndSettle();
       },
     );
@@ -568,9 +572,7 @@ void main() {
           },
         );
         await _tap(tester, _navigation('设置'));
-        final previous = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
+        final previous = globalSettings(tester);
         await _choose<wire.AppTheme>(tester, '深色');
         original.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
@@ -593,7 +595,7 @@ void main() {
           wire.SettingsMutation(),
           jsonDecode(oldRequest.body!),
         );
-        expect(previous.pending, isNotNull);
+        expect(previous.state.pending, isNotNull);
         if (!changeOrigin) {
           original.bootstrapSubject = replacement.bootstrapSubject;
         }
@@ -602,19 +604,20 @@ void main() {
           replacement.origin.toString(),
         );
         await _tap(tester, find.text('连接服务'));
-        final current = tester
-            .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-            .controller;
+        final current = globalSettings(tester);
         expect(current.repository.identity.origin, replacement.origin);
         expect(
           current.repository.identity.subject,
           replacement.bootstrapSubject,
         );
-        expect(current.pending, isNull);
-        expect(current.snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
-        expect(previous.available, false);
-        expect(previous.canRetry, false);
-        expect(await tester.runAsync(previous.retry), false);
+        expect(current.state.pending, isNull);
+        expect(
+          current.state.snapshot!.global.theme,
+          wire.AppTheme.APP_THEME_SYSTEM,
+        );
+        expect(previous.state.available, false);
+        expect(previous.state.canRetry, false);
+        expect(await tester.runAsync(previous.commands.retry), false);
         expect(find.text('重试原设置操作'), findsNothing);
         expect(
           original.businessServer.requests.where(
@@ -652,8 +655,11 @@ void main() {
           newRequest.headers['X-App-Subject'],
           replacement.bootstrapSubject,
         );
-        expect(current.pending, isNull);
-        expect(current.snapshot!.global.theme, wire.AppTheme.APP_THEME_LIGHT);
+        expect(current.state.pending, isNull);
+        expect(
+          current.state.snapshot!.global.theme,
+          wire.AppTheme.APP_THEME_LIGHT,
+        );
         expect(original.businessServer.appliedMutations, changeOrigin ? 1 : 2);
         if (changeOrigin) {
           expect(replacement.businessServer.appliedMutations, 1);
@@ -661,7 +667,7 @@ void main() {
         expect(original.openedBuilds, isEmpty);
         expect(replacement.openedBuilds, isEmpty);
         expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpApp(const SizedBox.shrink());
         await tester.pumpAndSettle();
       },
     );

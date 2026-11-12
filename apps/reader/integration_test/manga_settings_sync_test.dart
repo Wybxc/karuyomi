@@ -1,3 +1,5 @@
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../test/settings/settings_probe.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -166,15 +168,23 @@ void main() {
         final panel = find.byType(MangaSettingsEditor);
         await _wait(tester, '漫画设置面板取得权威值', () {
           if (panel.evaluate().length != 1) return false;
-          final editor = tester.widget<MangaSettingsEditor>(panel).controller;
-          if (editor.error != null) fail('设置面板错误：${editor.error}');
-          return editor.canEdit && editor.snapshot != null;
+          final editor = SettingsProbe(
+            ProviderScope.containerOf(tester.element(panel), listen: false),
+            tester.widget<MangaSettingsEditor>(panel).catalog,
+            mangaKey: target.mangaKey,
+          );
+          if (editor.state.error != null) fail('设置面板错误：${editor.state.error}');
+          return editor.state.canEdit && editor.state.snapshot != null;
         });
-        final editor = tester.widget<MangaSettingsEditor>(panel).controller;
+        final editor = SettingsProbe(
+          ProviderScope.containerOf(tester.element(panel), listen: false),
+          tester.widget<MangaSettingsEditor>(panel).catalog,
+          mangaKey: target.mangaKey,
+        );
         expect(editor.mangaKey, target.mangaKey);
         expect(editor.repository, same(catalog.settings));
-        expect(editor.snapshot!.mangaRevision, prior);
-        expect(editor.pending, isNull);
+        expect(editor.state.snapshot!.mangaRevision, prior);
+        expect(editor.state.pending, isNull);
         _expectForm(prior == 1);
 
         if (_phase == 'set' || _phase == 'clear') {
@@ -201,7 +211,7 @@ void main() {
             set ? '关闭' : '跟随全局',
           );
           _expectForm(set);
-          expect(editor.snapshot!.mangaRevision, prior);
+          expect(editor.state.snapshot!.mangaRevision, prior);
           final draft = await _snapshot(client, target.mangaKey, _controlKey);
           _expectTransition(before, draft, writes: 0);
           await _tap(
@@ -211,10 +221,12 @@ void main() {
           );
           expectedRevision++;
           await _wait(tester, '本漫画设置获得服务端确认', () {
-            if (editor.error != null) fail('漫画设置保存失败：${editor.error}');
-            return !editor.busy &&
-                editor.pending == null &&
-                editor.snapshot?.mangaRevision == expectedRevision;
+            if (editor.state.error != null) {
+              fail('漫画设置保存失败：${editor.state.error}');
+            }
+            return !editor.state.busy &&
+                editor.state.pending == null &&
+                editor.state.snapshot?.mangaRevision == expectedRevision;
           });
           _expectForm(set);
         }

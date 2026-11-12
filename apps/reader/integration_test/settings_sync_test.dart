@@ -12,7 +12,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:karuyomi/data/business_state_validation.dart';
 import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
-import 'package:karuyomi/features/settings/settings_controller.dart';
+import '../test/settings/settings_probe.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
 
@@ -71,19 +71,19 @@ void main() {
         if (panels.evaluate().length != 1) {
           return false;
         }
-        final editor = tester.widget<GlobalSettingsPanel>(panels).controller;
-        return editor.available && !editor.busy && editor.snapshot != null;
+        final editor = globalSettings(tester);
+        return editor.state.available &&
+            !editor.state.busy &&
+            editor.state.snapshot != null;
       });
-      final editor = tester
-          .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-          .controller;
+      final editor = globalSettings(tester);
       expect(identical(editor.repository, repository), isTrue);
       final before = await repository.loadGlobal().timeout(_operationBudget);
       _expectSnapshot(before, expected);
       await _expectForm(tester, before.global);
       _expectTheme(tester, before.global.theme);
-      expect(editor.pending, isNull);
-      expect(editor.error, isNull);
+      expect(editor.state.pending, isNull);
+      expect(editor.state.error, isNull);
 
       final after = switch (_phase) {
         'write' => await _write(tester, editor, repository, before),
@@ -166,7 +166,7 @@ wire.GlobalSettingsValues _target(SettingsSnapshot before) {
 
 Future<SettingsSnapshot> _write(
   WidgetTester tester,
-  SettingsController editor,
+  SettingsProbe editor,
   SettingsRepository repository,
   SettingsSnapshot before,
 ) async {
@@ -179,19 +179,19 @@ Future<SettingsSnapshot> _write(
   await _expectForm(tester, target);
   // A draft cannot apply the theme or become confirmed before the save ACK.
   _expectTheme(tester, before.global.theme);
-  _expectGlobal(editor.snapshot!.global, before.global);
-  expect(editor.pending, isNull);
+  _expectGlobal(editor.state.snapshot!.global, before.global);
+  expect(editor.state.pending, isNull);
   await _tap(tester, find.widgetWithText(FilledButton, '保存全局设置'));
   await _waitFor(tester, '全局设置获得服务端确认', () {
-    if (editor.error != null) fail('全局设置写入失败：${editor.error}');
-    return !editor.busy &&
-        editor.pending == null &&
-        editor.snapshot?.globalRevision == before.globalRevision + 1;
+    if (editor.state.error != null) fail('全局设置写入失败：${editor.state.error}');
+    return !editor.state.busy &&
+        editor.state.pending == null &&
+        editor.state.snapshot?.globalRevision == before.globalRevision + 1;
   });
   final after = await repository.loadGlobal().timeout(_operationBudget);
   _expectCommittedTarget(after, before, target);
-  _expectGlobal(editor.snapshot!.global, target);
-  expect(editor.error, isNull);
+  _expectGlobal(editor.state.snapshot!.global, target);
+  expect(editor.state.error, isNull);
   await _expectForm(tester, target);
   _expectTheme(tester, target.theme);
   return after;
@@ -199,15 +199,15 @@ Future<SettingsSnapshot> _write(
 
 Future<SettingsSnapshot> _resume(
   WidgetTester tester,
-  SettingsController editor,
+  SettingsProbe editor,
   wire.SettingsResponse expected,
   SettingsSnapshot before,
 ) async {
   final target = _target(before);
   expect(tester.binding.lifecycleState, AppLifecycleState.resumed);
-  expect(editor.available, isTrue);
-  expect(editor.busy, isFalse);
-  _expectSnapshot(editor.snapshot!, expected);
+  expect(editor.state.available, isTrue);
+  expect(editor.state.busy, isFalse);
+  _expectSnapshot(editor.state.snapshot!, expected);
 
   final resumed = Completer<void>();
   SettingsSnapshot? pausedSnapshot;
@@ -215,12 +215,12 @@ Future<SettingsSnapshot> _resume(
   final listener = AppLifecycleListener(
     onPause: () {
       if (pausedSnapshot != null) return;
-      pausedSnapshot = editor.snapshot;
+      pausedSnapshot = editor.state.snapshot;
       debugPrintSynchronously('SETTINGS_RESUME_PAUSED pid=$pid');
     },
     onResume: () {
       if (pausedSnapshot == null || resumed.isCompleted) return;
-      resumedSnapshot = editor.snapshot;
+      resumedSnapshot = editor.state.snapshot;
       debugPrintSynchronously('SETTINGS_RESUME_RESUMED pid=$pid');
       resumed.complete();
     },
@@ -240,23 +240,18 @@ Future<SettingsSnapshot> _resume(
   _expectSnapshot(pausedSnapshot!, expected);
   _expectSnapshot(resumedSnapshot!, expected);
   await _waitFor(tester, '系统恢复触发正式设置重取', () {
-    if (!editor.available || editor.error != null) {
-      fail('恢复前台后原设置会话失效：${editor.error}');
+    if (!editor.state.available || editor.state.error != null) {
+      fail('恢复前台后原设置会话失效：${editor.state.error}');
     }
-    final confirmed = editor.snapshot;
-    return !editor.busy &&
+    final confirmed = editor.state.snapshot;
+    return !editor.state.busy &&
         confirmed != null &&
         confirmed.globalRevision > before.globalRevision;
   });
-  expect(
-    tester
-        .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-        .controller,
-    same(editor),
-  );
-  final after = editor.snapshot!;
+  expect(globalSettings(tester).commands, same(editor.commands));
+  final after = editor.state.snapshot!;
   _expectCommittedTarget(after, before, target);
-  expect(editor.pending, isNull);
+  expect(editor.state.pending, isNull);
   await _expectForm(tester, target);
   _expectTheme(tester, target.theme);
   return after;
@@ -264,7 +259,7 @@ Future<SettingsSnapshot> _resume(
 
 Future<SettingsSnapshot> _ackLoss(
   WidgetTester tester,
-  SettingsController editor,
+  SettingsProbe editor,
   SettingsRepository repository,
   SettingsSnapshot before,
 ) async {
@@ -280,18 +275,18 @@ Future<SettingsSnapshot> _ackLoss(
   await _tap(tester, save);
   final unconfirmed = find.text(_unconfirmed);
   await _waitFor(tester, '正式保存保留未确认的设置操作', () {
-    if (!editor.busy &&
-        editor.pending == null &&
-        editor.snapshot!.globalRevision > before.globalRevision) {
+    if (!editor.state.busy &&
+        editor.state.pending == null &&
+        editor.state.snapshot!.globalRevision > before.globalRevision) {
       fail('首次保存直接确认；须启动 settings-ack-loss 夹具');
     }
-    return editor.canRetry &&
+    return editor.state.canRetry &&
         unconfirmed.evaluate().length == 1 &&
         retry.evaluate().length == 1;
   });
   expect(find.text('设置修改尚未确认，请明确重试原操作。'), findsOneWidget);
   _expectPendingAck(tester, editor, before, target);
-  expect(editor.snapshot!.globalRevision, before.globalRevision);
+  expect(editor.state.snapshot!.globalRevision, before.globalRevision);
   _expectTheme(tester, before.global.theme);
   await _expectSelection(tester, 'global-theme', target.theme);
 
@@ -305,7 +300,7 @@ Future<SettingsSnapshot> _ackLoss(
     _readerValues(committed.effectiveReader),
     _readerValues(target.reader),
   );
-  expect(editor.snapshot!.globalRevision, before.globalRevision);
+  expect(editor.state.snapshot!.globalRevision, before.globalRevision);
   _expectTheme(tester, before.global.theme);
   _expectPendingAck(tester, editor, before, target);
   debugPrintSynchronously('SETTINGS_ACK_LOSS_COMMITTED_UNCONFIRMED pid=$pid');
@@ -315,36 +310,31 @@ Future<SettingsSnapshot> _ackLoss(
     tester,
     '正式重读取到已提交值',
     () =>
-        !editor.busy &&
-        editor.snapshot!.globalRevision == committed.global.revision,
+        !editor.state.busy &&
+        editor.state.snapshot!.globalRevision == committed.global.revision,
   );
-  _expectSnapshot(editor.snapshot!, committed);
-  expect(editor.error, isNull);
+  _expectSnapshot(editor.state.snapshot!, committed);
+  expect(editor.state.error, isNull);
   _expectPendingAck(tester, editor, before, target);
   await _expectSelection(tester, 'global-theme', target.theme);
   _expectTheme(tester, target.theme);
-  _expectSnapshot(editor.snapshot!, await _readAckSettings());
+  _expectSnapshot(editor.state.snapshot!, await _readAckSettings());
   debugPrintSynchronously('SETTINGS_ACK_LOSS_RELOADED_PENDING pid=$pid');
 
   await _tap(tester, retry);
   await _waitFor(tester, '显式重试确认原设置操作', () {
-    if (!editor.busy && editor.error != null) {
-      fail('重试原设置操作失败：${editor.error}');
+    if (!editor.state.busy && editor.state.error != null) {
+      fail('重试原设置操作失败：${editor.state.error}');
     }
-    return editor.canEdit &&
-        editor.pending == null &&
+    return editor.state.canEdit &&
+        editor.state.pending == null &&
         unconfirmed.evaluate().isEmpty &&
         retry.evaluate().isEmpty;
   });
-  expect(
-    tester
-        .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-        .controller,
-    same(editor),
-  );
+  expect(globalSettings(tester).commands, same(editor.commands));
   expect(unconfirmed, findsNothing);
   expect(retry, findsNothing);
-  _expectSnapshot(editor.snapshot!, committed);
+  _expectSnapshot(editor.state.snapshot!, committed);
   await _expectForm(tester, target);
   _expectTheme(tester, target.theme);
   final after = await repository.loadGlobal().timeout(_operationBudget);
@@ -356,13 +346,13 @@ Future<SettingsSnapshot> _ackLoss(
 
 void _expectPendingAck(
   WidgetTester tester,
-  SettingsController editor,
+  SettingsProbe editor,
   SettingsSnapshot before,
   wire.GlobalSettingsValues target,
 ) {
-  expect(editor.pending?.basedOnRevision, before.globalRevision);
-  expect(editor.pending?.retryable, isTrue);
-  _expectGlobal(editor.pending!.global!, target);
+  expect(editor.state.pending?.basedOnRevision, before.globalRevision);
+  expect(editor.state.pending?.retryable, isTrue);
+  _expectGlobal(editor.state.pending!.global!, target);
   expect(find.text(_unconfirmed), findsOneWidget);
   expect(
     tester

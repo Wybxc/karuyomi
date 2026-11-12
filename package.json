@@ -25,6 +25,8 @@
     "test:extension-integrity": "node --test tools/extensions/verify-build.test.ts",
     "test:teavm-patches": "node --test tools/teavm/upstream-sources.test.ts",
     "flutter:setup": "node scripts/flutter.ts setup",
+    "flutter:generate": "node scripts/flutter.ts generate",
+    "flutter:generate:check": "node scripts/flutter.ts generate --check",
     "flutter:check": "node scripts/flutter.ts check",
     "build": "pnpm --filter @karuyomi/runtime-host build && pnpm build:native-assets && node scripts/flutter.ts build && pnpm --filter @karuyomi/api build",
     "db:generate": "pnpm --filter @karuyomi/api db:generate",

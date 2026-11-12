@@ -1,3 +1,4 @@
+import '../test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
@@ -44,7 +45,7 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    await tester.pumpWidget(app());
+    await tester.pumpApp(app());
     await tester.pumpAndSettle();
     await openSettings();
 
@@ -62,9 +63,9 @@ void main() {
     expect(connected, hasLength(1));
     expect(connected.single.disposalCount, 0);
 
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
-    await tester.pumpWidget(app());
+    await tester.pumpApp(app());
     await tester.pumpAndSettle();
     expect(connected, hasLength(2));
     expect(connected.last.origin.origin, 'https://reader.example.net:9443');
