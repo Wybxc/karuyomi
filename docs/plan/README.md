@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-2026-11-12：[扩展与浏览 UI 流程实施](browse-ui-flow.md)已完成本轮客户端改动、完整 Flutter 回归及 Web 分项验收，证据见[验证记录](../verification/browse-ui-flow.md)。已覆盖源目录、扩展维护、真实 xkcd 阅读、退出阅读后跨源搜索及新标签续读。账户权威与精确构建门禁沿用现有合同，普通 Source 缩略图仍为占位，新 UI 尚未部署生产，原生验证保持停止。
+2026-11-12：[扩展与浏览 UI 流程实施](browse-ui-flow.md)已完成本轮客户端改动、完整 Flutter 回归、Web 分项验收和[生产上线](../verification/browse-ui-flow.md#生产发布)。已覆盖源目录、扩展维护、真实 xkcd 阅读、退出阅读后跨源搜索及新标签续读；生产另通过登录、Komiic 目录及扩展页最小检查。用户选择[主线 CI 通过后自动上线](../DEPLOYMENT.md)，复用构建和现网扩展，不让 UI 等待 AOT 全量。账户权威与精确构建门禁沿用现有合同，普通 Source 缩略图仍为占位，原生验证保持停止。
 
 **初版完成后**：[Flutter 状态管理重构](post-prototype-flutter-state.md)尚未开始。初版交付与验收完成后，采用 Riverpod + flutter_hooks 分阶段重构；初版不引入这两项依赖。
 

@@ -125,6 +125,9 @@ jobs:
     needs: [plan, build]
     if: always() && !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.snapshot_needed == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: karuyomi-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -159,6 +162,8 @@ jobs:
         run: EXTENSION_ASSETS_DIR="$PWD/.local/extensions-assets" pnpm build
       - name: Refuse a stale publisher before deploying
         run: node tools/extensions/pipeline.ts check-base --assets-dir .local/extensions-assets
+      - name: Refuse an obsolete Web client
+        run: node scripts/release-web.ts latest --require-latest
       - name: Deploy Static Assets with the app and apply database migrations
         run: |
           pnpm --filter @karuyomi/api exec wrangler deploy

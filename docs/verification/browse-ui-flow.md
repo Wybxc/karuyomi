@@ -51,4 +51,21 @@ pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts
 pnpm acceptance:serve
 ```
 
-内置浏览器访问最后一条命令返回的 `ACCEPTANCE_URL`。验收结束后已停止本轮 harness。新 UI 未部署生产；原生、真机、生产 Access 及全目录兼容均不包含在本轮完成声明中。
+内置浏览器访问最后一条命令返回的 `ACCEPTANCE_URL`。验收结束后已停止本轮 harness。上述隔离验收不覆盖原生、真机、生产 Access 或全目录兼容；随后的生产分项如下。
+
+## 生产发布
+
+2026-11-12 16:27:42（UTC+8），[PR #1](https://github.com/Wybxc/karuyomi/pull/1) 已合入 `main@13138c1632e319c546f13957c3954b68863895e4`，[该提交的完整 CI](https://github.com/Wybxc/karuyomi/actions/runs/43181546134)通过。产品输入与 `f735e52` 逐项比较无差异，复用该输入的最终正式本机构建，没有重复 Flutter 或 AOT 编译。Wrangler dry-run 通过，先上传再切换到全部流量；上传阶段核对旧版本仍在服务。
+
+| 身份                         | 已确认结果                                                                  |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| Worker version               | `d6281303-d106-4bdf-8bbd-8f505342a5f4`，100%                                |
+| Deployment                   | `baeb3cd2-ed9a-4f6e-809b-80a040b0aba0`                                      |
+| Flutter main.dart.js SHA-256 | `528ba9b437b8653420cace8660d91c864d47b377bca24561b1d60827b6647b03`          |
+| 扩展 revision                | 保持 `6bf6597462c449d58b73a48512c9aca2`，190 包，`bootstrap.complete=false` |
+
+切流前后扩展 index/state 与候选逐字节相同，七材料不变；没有提交新的扩展 checkpoint。D1 账本只读核对连续至 `0010`，与源码文件一致，本次未执行数据库迁移。生产 HTML 使用 `/` 作为规范入口；线上 Flutter、host/worker 与七份材料的字节/摘要匹配候选，四个匿名 API 路径仍跳转 Access。
+
+Codex 内置浏览器在真实生产 Access 会话中读回原书架，显示新“漫画源 / 扩展”分栏，从目录直接打开已安装 Komiic，自动准备账户所选构建并返回真实热门作品；返回时完成关闭收尾，扩展列表显示“已安装 / 可安装”和本机就绪。此次采用针对新入口的最小生产检查，没有重复此前完整的阅读/保存/新标签矩阵，没有更改书架或阅读进度。
+
+原始上线证据保存在 `.local/ui-flow-production-13138c1/`，含上传/切流日志、前后部署身份、`pre.json`、`post.json` 和 `production-source.png`。原生验证继续停止，普通 Source 缩略图及全目录运行兼容仍按原限制记录。随后用户选择[主线 CI 后自动发布](../DEPLOYMENT.md)，后续自动发布以相同 SHA 的 CI job 日志及 `web-release-<sha>` artifact 为执行证据。

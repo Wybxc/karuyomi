@@ -52,3 +52,65 @@ jobs:
             packages/runtime-host/dist
           if-no-files-found: error
           retention-days: 7
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: karuyomi-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+      - run: pnpm install --frozen-lockfile
+      - name: Skip an obsolete main commit
+        id: latest
+        run: node scripts/release-web.ts latest
+      - uses: actions/download-artifact@v4
+        if: steps.latest.outputs.current == 'true'
+        with:
+          name: web-build-${{ github.sha }}
+          path: .
+      - name: Reuse the deployed extensions without waiting for AOT
+        if: steps.latest.outputs.current == 'true'
+        run: node scripts/release-web.ts prepare
+      - name: Assemble the verified Web and runtime with the current extension snapshot
+        if: steps.latest.outputs.current == 'true'
+        run: EXTENSION_ASSETS_DIR="$PWD/.local/web-release/assets" pnpm --filter @karuyomi/api build
+        env:
+          CLOUDFLARE_SEND_METRICS: 'false'
+      - name: Check the production snapshot and main commit immediately before publishing
+        id: publish
+        if: steps.latest.outputs.current == 'true'
+        run: node scripts/release-web.ts check
+      - name: Publish production and apply pending database migrations
+        if: steps.publish.outputs.current == 'true'
+        run: |
+          pnpm --filter @karuyomi/api exec wrangler deploy --config dist/karuyomi/wrangler.json
+          pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_SEND_METRICS: 'false'
+      - name: Verify public bytes and the anonymous Access gate
+        if: steps.publish.outputs.current == 'true'
+        run: node scripts/release-web.ts verify
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.publish.outputs.current == 'true'
+        with:
+          name: web-release-${{ github.sha }}
+          path: |
+            .local/web-release/release.json
+            .local/web-release/verification.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30

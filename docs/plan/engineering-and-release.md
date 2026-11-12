@@ -4,7 +4,7 @@
 
 Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**Web 0.1.0、API 与中文/全语言七材料首批已上线；其余语言基线及增量部署待验收，原生验证停止**。首次切换见[首发记录](../verification/first-web-release.md)，当前生产身份见[七材料发布](../verification/seven-material-release.md#首批生产发布与验收)。
 
-操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
+Web/API 按[原型自动上线流程](../DEPLOYMENT.md)在主线 CI 成功后发布，复用同轮构建与现网扩展快照；[浏览 UI 已上线](../verification/browse-ui-flow.md#生产发布)。扩展操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
 2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。固定 `1f599cd` 的 xkcd、Arknights、CuuTruyen 已本地重编并通过限定 Web 运行/图片分项，见[v4 运行证据](../verification/v4-source-runtime.md)。随后部署的 [v4 三包快照](../verification/v4-production.md)通过匿名 26 路径及旧网络政策核对；它是 0.1.0 的父快照。下文 v1/v3 记录是历史冻结批次，保留原检查点和输入身份。
 

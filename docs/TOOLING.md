@@ -31,7 +31,7 @@ flowchart TD
 
 Wrangler 4.156.1 的 D1 `--file --json` 会由另一套 logger 输出上传进度，而错误日志级别又会抑制最终 JSON。仓库使用标准 pnpm patch，只修正 D1 `--json` 成功结果为独立 JSON 输出；执行器设置 `WRANGLER_LOG=error`，仍严格解析结果并拒绝非零退出及失败项。补丁由 `pnpm-workspace.yaml` 和锁文件固定，不维护本地复制的 CLI，也不通过截取输出寻找 JSON。
 
-JS/TS 产品构建使用声明式 Vite 配置和官方 CLI；API 使用 Cloudflare 官方 Vite 插件。`pnpm build` 依次构建 runtime-host、用 cpy-cli 复制 Native 资源、构建 Flutter Web，最后运行 API Vite。`apps/api/vite.assets.ts` 在 Vite config hook 中装配 Flutter/runtime/当前扩展快照，产生 `dist/public` 并检查 MIME、缓存、限额和 Native 资源排除；Cloudflare 插件生成最终客户端产物与 Wrangler 部署配置重定向。资源规则属于项目集成逻辑，不另设手写构建器。
+JS/TS 产品构建使用声明式 Vite 配置和官方 CLI；API 使用 Cloudflare 官方 Vite 插件。`pnpm build` 依次构建 runtime-host、用 cpy-cli 复制 Native 资源、构建 Flutter Web，最后运行 API Vite。`apps/api/vite.assets.ts` 在 Vite config hook 中装配 Flutter/runtime/当前扩展快照，产生 `dist/public` 并检查 MIME、缓存、限额和 Native 资源排除；Cloudflare 插件生成最终客户端产物与 Wrangler 部署配置重定向。资源规则属于项目集成逻辑，不另设手写构建器。[原型自动发布](DEPLOYMENT.md)使用同轮 CI 的 Web/runtime artifact，仅重新运行正式 API Vite 装配；线上扩展快照和交付验证由 `scripts/release-web.ts` 进入 `tools/cloudflare/web-release.ts`，不触发 AOT。
 
 `pnpm test` 先经 Vite CLI 构建 runtime 与 API 测试 fixture，再运行 Node/官方 Workers Vitest。官方 Test Harness 使用独立 fixture 与输出，不改写生产构建定位。浏览器桥回归使用官方 Vitest Browser Preview：运行 `BROWSER=none pnpm test:browser`，再用 Codex 内置浏览器打开其 URL；Preview 会请求打开默认浏览器，单设 `server.open: false` 不足。旧手写 socket/HTTP、Source 在线与浏览器 runner 已移除，新 fixture 测试不自动继承原 Source、Native、网络 TCP reset 或生产 Access 的验收范围。当前覆盖和剩余门见 [Vite 计划](plan/vite-build-and-testing.md)及[验证记录](verification/vite-build-and-testing.md)。
 
