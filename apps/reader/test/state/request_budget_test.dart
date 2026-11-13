@@ -1,5 +1,3 @@
-import '../../test_support/cupertino.dart';
-
 import '../test_app.dart';
 
 import 'dart:convert';
@@ -72,13 +70,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(testManga.title), findsOneWidget);
 
-    await tester.tap(appNavigation('浏览'));
+    await tester.tap(find.text('浏览').last);
     await tester.pumpAndSettle();
     record('browse');
-    await tester.tap(appNavigation('设置'));
+    await tester.tap(find.text('设置').last);
     await tester.pumpAndSettle();
     record('settings');
-    await tester.tap(appNavigation('书架'));
+    await tester.tap(find.text('书架').last);
     await tester.pumpAndSettle();
     expect(find.text(testManga.title), findsOneWidget);
     record('remount');

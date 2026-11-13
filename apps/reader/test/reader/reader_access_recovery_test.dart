@@ -1,5 +1,3 @@
-import '../../test_support/cupertino.dart';
-
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
@@ -260,7 +258,6 @@ void main() {
       expect(fixture.progressPosts, hasLength(baselinePosts + 1));
 
       recoveryCalls.clear();
-      await tester.ensureVisible(find.text('重试保存'));
       await tester.tap(find.text('重试保存'));
       await tester.pumpAndSettle();
       expect(
@@ -326,7 +323,6 @@ void main() {
       )!;
       expect(stored.epoch, 1);
       expect(stored.current.pageIndexHint, 0);
-      await tester.ensureVisible(find.text('重新打开本章'));
       await tester.tap(find.text('重新打开本章'));
       await tester.pumpAndSettle();
       final reopened = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
@@ -417,10 +413,8 @@ void main() {
       (tester) async {
         final fixture = _Fixture();
         await fixture.open(tester);
-        await openReaderTools(tester);
         await tester.tap(find.text('重新阅读本章'));
         await tester.pumpAndSettle();
-        await openReaderTools(tester);
         tester
             .widget<ChoiceField<ReadingMode>>(
               find.byType(ChoiceField<ReadingMode>),
@@ -637,7 +631,7 @@ void main() {
           await tester.pump(const Duration(milliseconds: 50));
         }
         expect(find.text('正在恢复阅读'), findsOneWidget);
-        await tester.tap(appBackButton);
+        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
         for (
           var index = 0;
           index < 40 && find.byType(ChapterReaderRoute).evaluate().isNotEmpty;
@@ -681,8 +675,6 @@ void main() {
       final oldKey = tester.widget<ReaderScreen>(find.byType(ReaderScreen)).key;
       final gate = Completer<void>();
       fixture.pagesGate = gate;
-      await openReaderTools(tester);
-      await tester.ensureVisible(find.text('下一章'));
       await tester.tap(find.text('下一章'));
       await tester.pump();
       fixture.expire = true;

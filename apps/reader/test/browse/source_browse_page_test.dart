@@ -1,5 +1,3 @@
-import '../../test_support/cupertino.dart';
-
 import 'package:karuyomi/widgets/app_page_route.dart';
 
 import '../test_app.dart';
@@ -206,7 +204,7 @@ void main() {
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
-      await tester.tap(appBackButton);
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pump();
       expect(find.text('正在停止并收尾'), findsOneWidget);
       release.complete();
@@ -238,7 +236,7 @@ void main() {
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
-      await tester.tap(appBackButton);
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pump();
       expect(find.text('正在停止并收尾'), findsOneWidget);
       release.complete();

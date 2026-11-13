@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-**当前 UI 实施**：[Liquid Glass 界面重构](liquid-glass.md)进行中；[当日库评估](../design/liquid-glass-evaluation.md)已覆盖搜索结果并核对主要候选发布源码。首选验证 `liquid_glass_widgets`，集中重整三入口导航、全局操作浮层和阅读控制区，内容层保持清晰的 Cupertino；Web 默认轻量玻璃与原生完整折射的效果差异明确记录。计划以一轮完整交付推进，验收真实阅读、无空闲捕获与资源释放；用户已将[代码削减另立重构](ui-code-consolidation.md)，本轮如实记录净增；已固定依赖并接入主题、全页导航、阅读控制与常驻状态；工程回归、真实浏览器与发布尚在推进。进展与限制见[实施证据](../verification/liquid-glass.md)，原生现场验证继续停止。
+**当前 UI 实施**：[Liquid Glass](liquid-glass.md)曾随 PR #6 上线，用户现已终止该方案，要求[恢复统一 Cupertino](cupertino-ui.md#恢复-cupertino)。玻璃库、专用材质设置及资源一并移除，复用此前已验收的正式界面；恢复版本继续通过主线 CI 自动发布，并重新核对生产阅读、保存和续读。[当日评估](../design/liquid-glass-evaluation.md)和[执行证据](../verification/liquid-glass.md)保留历史与未完成性能门，不把用户取舍称作已测得能耗结论。[代码削减](ui-code-consolidation.md)仍独立规划，原生现场验证继续停止。
 
 2026-11-12：[扩展与浏览 UI 流程实施](browse-ui-flow.md)已完成本轮客户端改动、完整 Flutter 回归、Web 分项验收和[生产上线](../verification/browse-ui-flow.md#生产发布)。已覆盖源目录、扩展维护、真实 xkcd 阅读、退出阅读后跨源搜索及新标签续读；生产另通过登录、Komiic 目录及扩展页最小检查。用户选择[主线 CI 通过后自动上线](../DEPLOYMENT.md)，复用构建和现网扩展，不让 UI 等待 AOT 全量。账户权威与精确构建门禁沿用现有合同，普通 Source 缩略图仍为占位，原生验证保持停止。
 

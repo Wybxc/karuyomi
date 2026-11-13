@@ -1,15 +1,12 @@
 import 'widgets/app_page_route.dart';
-import 'widgets/app_appearance.dart';
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:flutter_localizations/flutter_localizations.dart' as sdk;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'diagnostics/reader_baseline.dart';
 import 'diagnostics/reader_baseline_host.dart';
@@ -24,9 +21,8 @@ import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
 import 'state/account_providers.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
   runApp(
     ProviderScope(
       child: KaruyomiApp(
@@ -48,37 +44,24 @@ class const KaruyomiApp({
 
 class _KaruyomiAppState extends State<KaruyomiApp> {
   Brightness? _brightness;
-  bool _reduceTransparency = false;
 
   @override
   Widget build(BuildContext context) => CupertinoApp(
     title: 'Karuyomi',
-    builder: (context, child) => AppAppearance(
-      reduceTransparency: _reduceTransparency,
-      child: readerBaselineEnabled ? ReaderBaselineHost(child: child!) : child!,
-    ),
+    builder: readerBaselineEnabled
+        ? (context, child) => ReaderBaselineHost(child: child!)
+        : null,
     debugShowCheckedModeBanner: false,
     locale: const Locale('zh'),
     supportedLocales: const [Locale('zh'), Locale('en')],
-    localizationsDelegates: const [
-      ...GlobalCupertinoLocalizations.delegates,
-      // The glass library still requests the SDK Cupertino localization type.
-      // ignore: deprecated_member_use
-      sdk.GlobalCupertinoLocalizations.delegate,
-    ],
+    localizationsDelegates: GlobalCupertinoLocalizations.delegates,
     theme: CupertinoThemeData(
       brightness: _brightness,
       primaryColor: CupertinoColors.activeGreen,
-      scaffoldBackgroundColor: const CupertinoDynamicColor.withBrightness(
-        color: Color(0xFFF6F7FA),
-        darkColor: Color(0xFF17191E),
-      ),
     ),
     home: AppShell(
-      onAppearanceChanged: (theme, solid) => setState(() {
-        _brightness = theme;
-        _reduceTransparency = solid;
-      }),
+      brightness: _brightness,
+      onThemeChanged: (value) => setState(() => _brightness = value),
       platform: widget.platform,
       platformFactory: widget.platformFactory,
       connectionPreferences: widget.connectionPreferences,
@@ -88,7 +71,8 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
 
 class const AppShell({
   super.key,
-  required final void Function(Brightness?, bool) onAppearanceChanged,
+  required final Brightness? brightness,
+  required final ValueChanged<Brightness?> onThemeChanged,
   final PlatformRuntime? platform,
   final PlatformRuntime Function(Uri? origin)? platformFactory,
   final SharedPreferencesAsync? connectionPreferences,
@@ -107,7 +91,6 @@ class _AppShellState extends ConsumerState<AppShell> {
           settingsControllerProvider(_catalog!, _catalog!.settings).notifier,
         );
   Brightness? _confirmedTheme;
-  bool _confirmedReduceTransparency = false;
   String? _configurationError;
   String? _notice;
   Map<String, Object?>? _pendingContinuation;
@@ -131,13 +114,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     if (index == 2) unawaited(_settings?.refresh());
   }
 
-  void _applyAppearance(Brightness? theme, bool solid) {
-    if (_confirmedTheme == theme && _confirmedReduceTransparency == solid) {
-      return;
-    }
-    _confirmedTheme = theme;
-    _confirmedReduceTransparency = solid;
-    widget.onAppearanceChanged(theme, solid);
+  void _applyTheme(Brightness? value) {
+    if (_confirmedTheme == value) return;
+    _confirmedTheme = value;
+    widget.onThemeChanged(value);
   }
 
   void _initialize() {
@@ -413,7 +393,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       try {
         final old = _platform;
         final oldCatalog = _catalog;
-        _applyAppearance(null, false);
+        _applyTheme(null);
         if (oldCatalog != null) {
           await oldCatalog.flushReadingProgress();
           if (!mounted) return;
@@ -562,68 +542,86 @@ class _AppShellState extends ConsumerState<AppShell> {
     });
     final catalog = useListenable(_catalog);
     if (catalog != null) {
-      final appearance = ref.watch(
+      final theme = ref.watch(
         settingsControllerProvider(catalog, catalog.settings).select(
-          (state) => state.available && state.snapshot != null
-              ? (
-                  theme: appBrightness(state.snapshot!.global.theme),
-                  solid: state.snapshot!.global.reduceTransparency,
-                )
-              : null,
+          (state) => state.available ? state.snapshot?.global.theme : null,
         ),
       );
-      final theme = appearance?.theme;
-      final solid = appearance?.solid ?? false;
-      if (_confirmedTheme != theme || _confirmedReduceTransparency != solid) {
+      final desired = theme == null ? null : appBrightness(theme);
+      if (_confirmedTheme != desired) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && identical(catalog, _catalog)) {
-            _applyAppearance(theme, solid);
-          }
+          if (mounted && identical(catalog, _catalog)) _applyTheme(desired);
         });
       }
     }
-    return GlassScaffold(
-      enableBackgroundSampling: false,
-      extendBody: false,
-      appBar: GlassAppBar(
-        title: Text(_labels[_index]),
-        backgroundColor: AppAppearance.chromeColor(context),
-      ),
-      bottomBar: GlassTabBar.bottom(
-        key: const ValueKey('app-navigation'),
-        horizontalPadding:
-            20 +
-            (MediaQuery.sizeOf(context).width - 640).clamp(0, double.infinity) /
-                2,
-        selectedIndex: _index,
-        onTabSelected: _select,
-        enableBlend: false,
-        selectedIconColor: CupertinoTheme.of(context).primaryColor,
-        selectedLabelColor: CupertinoTheme.of(context).primaryColor,
-        tabs: [
-          for (var i = 0; i < _labels.length; i++)
-            GlassTab(icon: Icon(_icons[i]), label: _labels[i]),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            if (_notice case final notice?)
-              CupertinoListTile(
-                title: Text(notice, maxLines: 4),
-                trailing: CupertinoButton(
-                  onPressed: () => setState(() => _notice = null),
-                  child: const Icon(
-                    CupertinoIcons.xmark,
-                    semanticLabel: '关闭提示',
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 840;
+        return CupertinoPageScaffold(
+          navigationBar: CupertinoNavigationBar(middle: Text(_labels[_index])),
+          child: SafeArea(
+            child: Column(
+              children: [
+                if (_notice case final notice?)
+                  CupertinoListTile(
+                    title: Text(notice, maxLines: 4),
+                    trailing: CupertinoButton(
+                      onPressed: () => setState(() => _notice = null),
+                      child: const Icon(
+                        CupertinoIcons.xmark,
+                        semanticLabel: '关闭提示',
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      if (wide)
+                        SizedBox(
+                          width: 148,
+                          child: Column(
+                            key: const ValueKey('app-navigation'),
+                            children: [
+                              for (var i = 0; i < _labels.length; i++)
+                                CupertinoButton(
+                                  onPressed: () => _select(i),
+                                  color: _index == i
+                                      ? CupertinoColors.tertiarySystemFill
+                                            .resolveFrom(context)
+                                      : null,
+                                  child: Row(
+                                    children: [
+                                      Icon(_icons[i]),
+                                      const SizedBox(width: 8),
+                                      Text(_labels[i]),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      Expanded(child: _page()),
+                    ],
                   ),
                 ),
-              ),
-            Expanded(child: _page()),
-          ],
-        ),
-      ),
+                if (!wide)
+                  CupertinoTabBar(
+                    key: const ValueKey('app-navigation'),
+                    currentIndex: _index,
+                    onTap: _select,
+                    items: [
+                      for (var i = 0; i < _labels.length; i++)
+                        BottomNavigationBarItem(
+                          icon: Icon(_icons[i]),
+                          label: _labels[i],
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

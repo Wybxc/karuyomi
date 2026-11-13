@@ -97,7 +97,6 @@ void main() {
       expect(find.text('第二章'), findsNothing);
       await _tap(tester, find.text('第一章'));
       expect(find.byType(ReaderScreen), findsOneWidget);
-      await openReaderTools(tester);
       expect(find.text('本章已标记书签'), findsOneWidget);
       await _tap(tester, iconLabel('移除章节书签 第一章'));
       expect(find.text('本章未标记书签'), findsOneWidget);

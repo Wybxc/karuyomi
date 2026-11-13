@@ -1,7 +1,3 @@
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-
-import '../../widgets/app_appearance.dart';
-
 import '../../widgets/app_page_route.dart';
 import '../../widgets/choice_field.dart';
 
@@ -290,15 +286,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
     );
     return widget.embedded
         ? content
-        : GlassScaffold(
-            enableBackgroundSampling: false,
-            extendBody: false,
-            backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
-            appBar: GlassAppBar.pinned(
-              backgroundColor: AppAppearance.chromeColor(context),
-              title: const Text('扩展'),
-            ),
-            body: SafeArea(top: false, child: content),
+        : CupertinoPageScaffold(
+            navigationBar: CupertinoNavigationBar(middle: const Text('扩展')),
+            child: SafeArea(child: content),
           );
   }
 
@@ -482,16 +472,9 @@ class const ExtensionDetailsPage({
       candidate: candidate,
     );
     if (installed == null && candidate == null) {
-      return GlassScaffold(
-        enableBackgroundSampling: false,
-        extendBody: false,
-        backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
-        appBar: GlassAppBar.pinned(
-          backgroundColor: AppAppearance.chromeColor(context),
-          title: const Text('扩展'),
-        ),
-        body: SafeArea(
-          top: false,
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: const Text('扩展')),
+        child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -503,16 +486,9 @@ class const ExtensionDetailsPage({
       );
     }
     final exact = item.exact;
-    return GlassScaffold(
-      enableBackgroundSampling: false,
-      extendBody: false,
-      backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
-      appBar: GlassAppBar.pinned(
-        backgroundColor: AppAppearance.chromeColor(context),
-        title: Text(item.name),
-      ),
-      body: SafeArea(
-        top: false,
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: Text(item.name)),
+      child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -784,16 +760,9 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
   Widget build(BuildContext context) {
     useListenable(_controller);
     final catalog = _controller.catalog;
-    return GlassScaffold(
-      enableBackgroundSampling: false,
-      extendBody: false,
-      backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
-      appBar: GlassAppBar.pinned(
-        backgroundColor: AppAppearance.chromeColor(context),
-        title: const Text('仓库管理'),
-      ),
-      body: SafeArea(
-        top: false,
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: const Text('仓库管理')),
+      child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -881,16 +850,9 @@ class const ExtensionStoragePage({
   Widget build(BuildContext context) {
     useListenable(controller);
     final cache = controller.cache;
-    return GlassScaffold(
-      enableBackgroundSampling: false,
-      extendBody: false,
-      backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
-      appBar: GlassAppBar.pinned(
-        backgroundColor: AppAppearance.chromeColor(context),
-        title: const Text('本机存储'),
-      ),
-      body: SafeArea(
-        top: false,
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: const Text('本机存储')),
+      child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [

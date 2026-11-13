@@ -1,5 +1,3 @@
-import '../../test_support/cupertino.dart';
-
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../test_app.dart';
@@ -260,7 +258,7 @@ void main() {
       expect(catalog.mangas.single.title, testManga.title);
       expect(platform.openedBuilds, ['build-1']);
       expect(posts(), hasLength(before));
-      await tester.tap(appBackButton);
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(schemaVersion: 1, repoId: 'keiyoushi'),

@@ -1,7 +1,4 @@
 import '../../widgets/choice_field.dart';
-import '../../widgets/app_appearance.dart';
-
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -89,7 +86,6 @@ class const ReaderScreen({
   /// Publishes the complete cleanup future as soon as this leaf unmounts.
   final ValueChanged<Future<void>>? onClosing,
   final Widget? chapterControls,
-  final Widget? persistentStatus,
   final VoidCallback? onAttached,
   final VoidCallback? onExit,
   final ValueChanged<ReaderViewportState>? onViewportChanged,
@@ -128,8 +124,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
   final _pointers = <int>{};
   Offset? _dragStart;
   bool _toolbar = true;
-  bool _tools = false;
-  late FocusNode _toolsFocus;
   bool _restoring = false;
   late ReadingPosition? _preferredPlacement = widget.preserveInitialPlacement
       ? widget.initialPosition
@@ -1250,7 +1244,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         onTapUp: (details) {
           final fraction = details.localPosition.dx / _viewportWidth;
           if (fraction > 1 / 3 && fraction < 2 / 3) {
-            _toggleToolbar();
+            setState(() => _toolbar = !_toolbar);
           } else if (!_zoomed &&
               widget.tapZones != ReaderInputPreset.disabled) {
             final forward = _reader.mode == ReadingMode.rightToLeft
@@ -1305,7 +1299,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _toolsFocus = useFocusNode();
     _scroll = useScrollController();
     _transform = useTransformationController();
     _appearance = useValueNotifier<_ReaderAppearance>((
@@ -1326,14 +1319,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     useOnListenableChange(widget.positionRequest, _applyPositionRequest);
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (_tools) {
-            setState(() => _tools = false);
-            _toolsFocus.requestFocus();
-          } else {
-            _toggleToolbar();
-          }
-        },
         const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
             _keyboardTurn(_reader.mode != ReadingMode.rightToLeft),
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
@@ -1350,94 +1335,82 @@ class _ReaderScreenState extends State<ReaderScreen> {
       },
       child: Focus(
         autofocus: true,
-        child: GlassScaffold(
-          enableBackgroundSampling: false,
-          extendBody: false,
+        child: CupertinoPageScaffold(
           backgroundColor: _readerBackgroundColor(context, widget.background),
-          appBar: _toolbar
-              ? GlassAppBar.pinned(
-                  title: Text(
-                    widget.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onBack: widget.onExit,
-                  backgroundColor: CupertinoTheme.of(context)
-                      .scaffoldBackgroundColor,
+          navigationBar: _toolbar
+              ? CupertinoNavigationBar(
+                  automaticBackgroundVisibility: false,
+                  leading: widget.onExit == null
+                      ? null
+                      : CupertinoNavigationBarBackButton(
+                          onPressed: widget.onExit,
+                        ),
+                  middle: Text(widget.title),
                 )
               : null,
-          body: SafeArea(
-            top: !_toolbar,
+          child: SafeArea(
             child: Column(
               children: [
                 Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        top: widget.persistentStatus == null
-                            ? 0
-                            : 32 * MediaQuery.textScalerOf(context).scale(1),
-                        child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            color: _readerForegroundColor(
-                              context,
-                              widget.background,
+                  child: DefaultTextStyle.merge(
+                    style: TextStyle(
+                      color: _readerForegroundColor(context, widget.background),
+                    ),
+                    child: SafeArea(
+                      child: Column(
+                        children: [
+                          if (_reader.requiresPositionNotice)
+                            const Text('页面清单发生变化，已定位到最接近的页码。'),
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final window = MediaQuery.sizeOf(context);
+                                final sameWindow = _windowSize == window;
+                                if (_windowSize != null && !sameWindow) {
+                                  _preferredPlacement = null;
+                                }
+                                _windowSize = window;
+                                if (_viewportWidth != constraints.maxWidth ||
+                                    _viewportHeight != constraints.maxHeight) {
+                                  final chromeOnly =
+                                      sameWindow &&
+                                      _viewportWidth == constraints.maxWidth;
+                                  _viewportWidth = constraints.maxWidth;
+                                  _viewportHeight = constraints.maxHeight;
+                                  _scheduleRestore(
+                                    preservePlacement: chromeOnly,
+                                  );
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (!mounted) return;
+                                    // A user or parent can change the preference before
+                                    // this layout callback runs.
+                                    _applyDoublePagePreference();
+                                    _scheduleRestore(
+                                      preservePlacement: chromeOnly,
+                                    );
+                                  });
+                                }
+                                if (_reader.manifest.pages.isEmpty) {
+                                  return const Center(child: Text('这一章没有页面'));
+                                }
+                                return _ReaderContent(
+                                  background: widget.background,
+                                  dimPercent: widget.dimPercent,
+                                  child: _reader.isContinuous
+                                      ? _continuous()
+                                      : _paged(),
+                                );
+                              },
                             ),
                           ),
-                          child: Column(
-                            children: [
-                              if (_reader.requiresPositionNotice)
-                                const Text('页面清单发生变化，已定位到最接近的页码。'),
-                              Expanded(child: _canvas()),
-                            ],
-                          ),
-                        ),
+                        ],
                       ),
-                      if (widget.persistentStatus case final status?)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          top: 0,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxHeight:
-                                  MediaQuery.sizeOf(context).height * .25,
-                            ),
-                            child: ColoredBox(
-                              color: CupertinoTheme.of(context)
-                                  .scaffoldBackgroundColor,
-                              child: SingleChildScrollView(
-                                primary: false,
-                                child: status,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (_toolbar)
-                        Positioned(
-                          left: 12,
-                          right: 12,
-                          bottom: 8,
-                          child: _controls(),
-                        ),
-                      if (!_toolbar)
-                        Positioned(
-                          right: 12,
-                          top: widget.persistentStatus == null
-                              ? 8
-                              : 40 * MediaQuery.textScalerOf(context).scale(1),
-                          child: GlassIconButton(
-                            icon: const Icon(
-                              CupertinoIcons.slider_horizontal_3,
-                              semanticLabel: '显示阅读工具',
-                            ),
-                            onPressed: _toggleToolbar,
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
                 ),
-                if (_tools) _toolsPanel(),
+                ?(_toolbar ? _controls() : null),
               ],
             ),
           ),
@@ -1446,94 +1419,48 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  Widget _canvas() => LayoutBuilder(
-    builder: (context, constraints) {
-      final window = MediaQuery.sizeOf(context);
-      final sameWindow = _windowSize == window;
-      if (_windowSize != null && !sameWindow) {
-        _preferredPlacement = null;
-      }
-      _windowSize = window;
-      if (_viewportWidth != constraints.maxWidth ||
-          _viewportHeight != constraints.maxHeight) {
-        final chromeOnly = sameWindow && _viewportWidth == constraints.maxWidth;
-        _viewportWidth = constraints.maxWidth;
-        _viewportHeight = constraints.maxHeight;
-        _scheduleRestore(preservePlacement: chromeOnly);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          // A user or parent can change the preference before
-          // this layout callback runs.
-          _applyDoublePagePreference();
-          _scheduleRestore(preservePlacement: chromeOnly);
-        });
-      }
-      if (_reader.manifest.pages.isEmpty) {
-        return const Center(child: Text('这一章没有页面'));
-      }
-      return _ReaderContent(
-        background: widget.background,
-        dimPercent: widget.dimPercent,
-        child: _reader.isContinuous ? _continuous() : _paged(),
-      );
-    },
-  );
-
-  void _toggleToolbar() => setState(() {
-    _toolbar = !_toolbar;
-    if (!_toolbar) _tools = false;
-  });
-
-  Widget _toolsPanel() => ConstrainedBox(
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * .45,
-    ),
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
+  Widget _controls() {
+    final available = math.max(
+      0.0,
+      MediaQuery.sizeOf(context).height -
+          MediaQuery.paddingOf(context).vertical -
+          kMinInteractiveDimensionCupertino,
+    );
+    // Keep space for the page even when the full set of controls cannot fit.
+    final readingHeight = math.min(
+      3 * kMinInteractiveDimensionCupertino,
+      available / 2,
+    );
+    return ColoredBox(
+      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: available - readingHeight),
+          child: _scrollableControls(),
+        ),
       ),
-      child: SingleChildScrollView(
-        key: const ValueKey('reader-tools-panel'),
-        primary: false,
-        padding: const EdgeInsets.all(12),
-        child: _secondaryControls(),
-      ),
-    ),
-  );
+    );
+  }
 
-  Widget _controls() => Center(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 640),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 8),
-          GlassContainer.card(
-            shape: const LiquidRoundedSuperellipse(borderRadius: 28),
-            surfaceStyle: AppAppearance.solidOf(context)
-                ? GlassSurfaceStyle.solid
-                : GlassSurfaceStyle.glass,
-            child: Row(
+  Widget _scrollableControls() {
+    return SingleChildScrollView(
+      primary: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               children: [
-                for (final (label, icon, action)
-                    in <(String, IconData, VoidCallback?)>[
-                      (
-                        '上一页',
-                        CupertinoIcons.backward_end,
-                        _reader.canGoBack ? _back : null,
-                      ),
-                      (
-                        '下一页',
-                        CupertinoIcons.forward_end,
-                        _reader.canAdvance ? _advance : null,
-                      ),
-                    ])
-                  CupertinoButton(
-                    padding: const EdgeInsets.all(8),
-                    onPressed: action,
-                    child: Icon(icon, semanticLabel: label),
+                CupertinoButton(
+                  onPressed: _reader.canGoBack ? _back : null,
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    CupertinoIcons.backward_end,
+                    semanticLabel: '上一页',
                   ),
+                ),
                 Expanded(
                   child: Text(
                     _reader.position == null
@@ -1543,105 +1470,101 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                 ),
                 CupertinoButton(
-                  key: const ValueKey('reader-tools-toggle'),
-                  focusNode: _toolsFocus,
-                  onPressed: () => setState(() => _tools = !_tools),
-                  child: Icon(
-                    CupertinoIcons.slider_horizontal_3,
-                    semanticLabel: _tools ? '收起阅读工具' : '章节与阅读工具',
-                  ),
-                ),
-                CupertinoButton(
-                  onPressed: _toggleToolbar,
+                  onPressed: _reader.canAdvance ? _advance : null,
+                  padding: const EdgeInsets.all(8),
                   child: const Icon(
-                    CupertinoIcons.chevron_down,
-                    semanticLabel: '隐藏阅读工具',
+                    CupertinoIcons.forward_end,
+                    semanticLabel: '下一页',
                   ),
                 ),
+                if (_reader.isContinuous)
+                  CupertinoButton(
+                    onPressed: _reader.position == null
+                        ? null
+                        : () => _openZoom(
+                            _reader.manifest.pages[_reader.pageIndex],
+                          ),
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      CupertinoIcons.zoom_in,
+                      semanticLabel: '放大当前图片',
+                    ),
+                  ),
+                if (!_reader.isContinuous) ...[
+                  for (final (factor, icon, label) in [
+                    (0.5, CupertinoIcons.zoom_out, '缩小'),
+                    (2.0, CupertinoIcons.zoom_in, '放大'),
+                  ])
+                    CupertinoButton(
+                      onPressed: () => _zoom(factor),
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(icon, semanticLabel: label),
+                    ),
+                  CupertinoButton(
+                    onPressed: () {
+                      _preferredPlacement = null;
+                      _restoring = true;
+                      _transform.value = Matrix4.identity();
+                      _scheduleRestore();
+                    },
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      CupertinoIcons.arrow_up_left_arrow_down_right,
+                      semanticLabel: '重置缩放',
+                    ),
+                  ),
+                ],
               ],
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget _secondaryControls() => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Wrap(
-        alignment: WrapAlignment.center,
-        children: [
-          if (_reader.isContinuous)
-            CupertinoButton(
-              onPressed: _reader.position == null
-                  ? null
-                  : () => _openZoom(_reader.manifest.pages[_reader.pageIndex]),
-              child: const Icon(
-                CupertinoIcons.zoom_in,
-                semanticLabel: '放大当前图片',
-              ),
-            )
-          else ...[
-            for (final (factor, icon, label) in [
-              (0.5, CupertinoIcons.zoom_out, '缩小'),
-              (2.0, CupertinoIcons.zoom_in, '放大'),
-            ])
-              CupertinoButton(
-                onPressed: () => _zoom(factor),
-                child: Icon(icon, semanticLabel: label),
-              ),
-            CupertinoButton(
-              onPressed: () {
-                _preferredPlacement = null;
-                _restoring = true;
-                _transform.value = Matrix4.identity();
-                _scheduleRestore();
-              },
-              child: const Icon(
-                CupertinoIcons.arrow_up_left_arrow_down_right,
-                semanticLabel: '重置缩放',
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: ChoiceField<ReadingMode>(
+                    label: '阅读模式',
+                    value: _reader.mode,
+                    options: {
+                      ReadingMode.leftToRight: '从左到右',
+                      ReadingMode.rightToLeft: '从右到左',
+                      ReadingMode.continuous: '竖向连续',
+                      ReadingMode.webtoon: '条漫',
+                    },
+                    onChanged: widget.layoutSettingsEnabled
+                        ? (mode) {
+                            if (mode != null) _selectMode(mode);
+                          }
+                        : null,
+                  ),
+                ),
+                if (!_reader.isContinuous)
+                  CupertinoSlidingSegmentedControl<int>(
+                    key: const ValueKey('reader-page-layout'),
+                    groupValue: _doublePagePreference == null
+                        ? 0
+                        : _doublePagePreference!
+                        ? 2
+                        : 1,
+                    children: const {
+                      0: Text('自动'),
+                      1: Text('单页'),
+                      2: Text('双页'),
+                    },
+                    disabledChildren: widget.layoutSettingsEnabled
+                        ? const {}
+                        : const {0, 1, 2},
+                    onValueChanged: (value) {
+                      if (widget.layoutSettingsEnabled && value != null) {
+                        _selectDoublePage(value == 0 ? null : value == 2);
+                      }
+                    },
+                  ),
+              ],
             ),
+            if (widget.chapterControls case final Widget controls) controls,
           ],
-        ],
-      ),
-      ChoiceField<ReadingMode>(
-        label: '阅读模式',
-        value: _reader.mode,
-        options: const {
-          ReadingMode.leftToRight: '从左到右',
-          ReadingMode.rightToLeft: '从右到左',
-          ReadingMode.continuous: '竖向连续',
-          ReadingMode.webtoon: '条漫',
-        },
-        onChanged: widget.layoutSettingsEnabled
-            ? (mode) {
-                if (mode != null) _selectMode(mode);
-              }
-            : null,
-      ),
-      if (!_reader.isContinuous)
-        CupertinoSlidingSegmentedControl<int>(
-          key: const ValueKey('reader-page-layout'),
-          groupValue: _doublePagePreference == null
-              ? 0
-              : _doublePagePreference!
-              ? 2
-              : 1,
-          children: const {0: Text('自动'), 1: Text('单页'), 2: Text('双页')},
-          disabledChildren: widget.layoutSettingsEnabled
-              ? const {}
-              : const {0, 1, 2},
-          onValueChanged: (value) {
-            if (widget.layoutSettingsEnabled && value != null) {
-              _selectDoublePage(value == 0 ? null : value == 2);
-            }
-          },
         ),
-      ?widget.chapterControls,
-    ],
-  );
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -2069,37 +1992,42 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   Widget build(BuildContext context) {
     _transform = useTransformationController();
     final appearance = useValueListenable(widget.appearance);
-    return GlassScaffold(
+    return CupertinoPageScaffold(
       key: const ValueKey('reader-image-viewer'),
-      enableBackgroundSampling: false,
-      extendBody: false,
       backgroundColor: _readerBackgroundColor(context, appearance.background),
-      appBar: GlassAppBar.pinned(
-        backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
-        backButton: false,
-        leading: [
-          GlassBarItem.icon(
-            icon: const Icon(CupertinoIcons.xmark, semanticLabel: '关闭图片'),
-            label: '关闭图片',
-            onTap: () => Navigator.pop(context),
-          ),
-        ],
-        title: const Text('查看图片'),
-        actions: [
-          for (final (factor, icon, label) in [
-            (0.5, CupertinoIcons.zoom_out, '缩小'),
-            (2.0, CupertinoIcons.zoom_in, '放大'),
-            (0.2, CupertinoIcons.arrow_up_left_arrow_down_right, '重置缩放'),
-          ])
-            GlassBarItem.icon(
-              icon: Icon(icon, semanticLabel: label),
-              label: label,
-              onTap: () => _zoom(factor),
+      navigationBar: CupertinoNavigationBar(
+        automaticBackgroundVisibility: false,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.pop(context),
+          child: const Icon(CupertinoIcons.xmark, semanticLabel: '关闭图片'),
+        ),
+        middle: const Text('查看图片'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
+              onPressed: () => _zoom(0.5),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(CupertinoIcons.zoom_out, semanticLabel: '缩小'),
             ),
-        ],
+            CupertinoButton(
+              onPressed: () => _zoom(2),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(CupertinoIcons.zoom_in, semanticLabel: '放大'),
+            ),
+            CupertinoButton(
+              onPressed: () => _zoom(0.2),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(
+                CupertinoIcons.arrow_up_left_arrow_down_right,
+                semanticLabel: '重置缩放',
+              ),
+            ),
+          ],
+        ),
       ),
-      body: SafeArea(
-        top: false,
+      child: SafeArea(
         child: _ReaderContent(
           background: appearance.background,
           dimPercent: appearance.dimPercent,
