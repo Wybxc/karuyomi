@@ -419,9 +419,20 @@ void main() {
       expect(iconLabel('重命名分类 $name'), findsOneWidget);
       expect(iconLabel('删除分类 $name'), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tap(tester, iconLabel('重命名分类 $name'));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(CupertinoTextField).last, '长篇·待读');
+      expect(find.text('保存').hitTestable(), findsOneWidget);
+      expect(tester.getRect(find.text('保存')).bottom, lessThanOrEqualTo(440));
+      await tap(tester, find.text('保存'));
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(server.catalog().categories.first.name, '长篇·待读');
       await tap(tester, find.text('完成'));
       await tap(tester, iconLabel('设置分类：Alpha'));
-      expect(checkboxLabel(name), findsOneWidget);
+      expect(checkboxLabel('长篇·待读'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
