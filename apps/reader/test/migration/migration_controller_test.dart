@@ -485,7 +485,7 @@ void main() {
   );
 
   testWidgets(
-    'opened Details menu passes its original chapter snapshot into migration',
+    'Details action passes its original chapter snapshot into migration',
     (tester) async {
       final source = await catalog.openMigrationSource(
         build: catalog.builds.single,
@@ -505,9 +505,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final before = posts().length;
-      await tester.tap(find.bySemanticsLabel('更多操作'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('迁移到其他漫画源'));
+      await tester.tap(find.bySemanticsLabel('迁移到其他漫画源'));
       await tester.pumpAndSettle();
       final page = tester.widget<MigrationPage>(find.byType(MigrationPage));
       expect(page.seed.sequence!.mangaKey, sequence.mangaKey);
@@ -561,8 +559,8 @@ void main() {
           final VoidCallback migrate;
           if (fromDetails) {
             final bar = tester.widget<GlassAppBar>(find.byType(GlassAppBar));
-            final item = bar.pinnedActions!.single as GlassBarMenuItem;
-            migrate = (item.menuItems.single as GlassMenuItem).onTap;
+            final item = bar.pinnedActions!.single as GlassBarIconItem;
+            migrate = item.onTap;
           } else {
             final menu = tester.widget<CupertinoMenuAnchor>(
               find.byKey(ValueKey(('library-more', sequence.mangaKey))),

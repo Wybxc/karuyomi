@@ -1055,27 +1055,21 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         backgroundColor: AppAppearance.chromeColor(context),
         title: Text(manga.title),
         actions: [
-          GlassBarItem.menu(
-            id: 'details-more',
-            label: '更多操作',
-            icon: const Icon(CupertinoIcons.ellipsis),
-            menuWidth: 260,
-            menuItems: [
-              GlassMenuItem(
-                title: '迁移到其他漫画源',
-                enabled:
-                    !_migrating &&
-                    !_detailsExpired &&
-                    !_opening &&
-                    !_savingFavorite &&
-                    !_editingCover &&
-                    _library != null &&
-                    _sequence != null &&
-                    controller.status == ServiceStatus.ready &&
-                    !controller.busy,
-                onTap: () => unawaited(_migrate()),
-              ),
-            ],
+          GlassBarItem.icon(
+            id: 'details-migrate',
+            label: '迁移到其他漫画源',
+            icon: const Icon(CupertinoIcons.arrow_right_arrow_left),
+            enabled:
+                !_migrating &&
+                !_detailsExpired &&
+                !_opening &&
+                !_savingFavorite &&
+                !_editingCover &&
+                _library != null &&
+                _sequence != null &&
+                controller.status == ServiceStatus.ready &&
+                !controller.busy,
+            onTap: () => unawaited(_migrate()),
           ),
         ],
       ),
