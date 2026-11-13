@@ -1,3 +1,5 @@
+import '../../test_support/cupertino.dart';
+
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
@@ -181,6 +183,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(await catalog.flushReadingProgress(), false);
       expect(server.accountRevision, remoteRevision);
+      await tester.ensureVisible(find.text('重新打开本章'));
       await tester.tap(find.text('重新打开本章'));
       await tester.pumpAndSettle();
       final reopened = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
@@ -193,6 +196,7 @@ void main() {
       expect(reopened.initialMode, ReadingMode.webtoon);
       expect(reopened.doublePage, true);
       expect(find.text('重新打开本章'), findsNothing);
+      await openReaderTools(tester);
       expect(
         tester
             .widget<ChoiceField<ChapterOrder>>(
@@ -244,6 +248,8 @@ void main() {
         tester.widget<ReaderScreen>(find.byType(ReaderScreen)).key,
         before.key,
       );
+      await openReaderTools(tester);
+      await tester.ensureVisible(find.text('刷新进度'));
       await tester.tap(find.text('刷新进度'));
       await tester.pumpAndSettle();
       expect(find.text('未能刷新服务器进度，当前阅读位置保持不变，可重试。'), findsNothing);
@@ -289,16 +295,16 @@ void main() {
           manifest.positionAt(1, offset: .4);
       await tester.pumpAndSettle();
       expect(await catalog.flushReadingProgress(), false);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       await tester.runAsync(() async {
-        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+        await tester.tap(appBackButton);
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pumpAndSettle();
-      await tester.tap(find.text('设置').last);
+      await tester.tap(appNavigation('设置'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(CupertinoTextField),
@@ -309,7 +315,7 @@ void main() {
       expect(original.disposalCount, 1);
       expect(find.text('重试保存所有进度'), findsOneWidget);
       final oldControls = original.controlCommands.length;
-      await tester.tap(find.text('浏览').last);
+      await tester.tap(appNavigation('浏览'));
       await tester.pumpAndSettle();
       final nextCatalog = tester
           .widget<CatalogPage>(find.byType(CatalogPage))
@@ -337,7 +343,7 @@ void main() {
         0,
       );
       server.failWrites = false;
-      await tester.tap(find.text('设置').last);
+      await tester.tap(appNavigation('设置'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(CupertinoTextField),
@@ -388,6 +394,8 @@ void main() {
       (leaf.positionRequest! as ValueNotifier<ReadingPosition?>).value =
           firstManifest.positionAt(2);
       await tester.pumpAndSettle();
+      await openReaderTools(tester);
+      await tester.ensureVisible(find.text('下一章'));
       // These callbacks exercise product navigation/persistence. Actual decode
       // visibility and zoom gates are separately tested in ReaderScreen tests.
       leaf.onViewportChanged!(
@@ -410,6 +418,7 @@ void main() {
       );
       leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final secondManifest = leaf.manifest;
+      await openReaderTools(tester);
       tester
           .widget<ChoiceField<ChapterOrder>>(
             find.byType(ChoiceField<ChapterOrder>),
@@ -439,7 +448,7 @@ void main() {
           windowReady: false,
         ),
       );
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(find.text('继续阅读'), findsOneWidget);
       expect(find.byType(ReaderScreen), findsNothing);
@@ -461,6 +470,7 @@ void main() {
       expect(leaf.initialPosition!.normalizedX, .65);
       expect(leaf.initialPosition!.viewportX, .25);
       expect(leaf.initialPosition!.viewportY, .15);
+      await openReaderTools(tester);
       expect(
         tester
             .widget<ChoiceField<ChapterOrder>>(
@@ -479,6 +489,7 @@ void main() {
       final pagesBeforeReset = platform.invocations
           .where((call) => call.whichRequest() == wire.SourceCall_Request.pages)
           .length;
+      await openReaderTools(tester);
       await tester.tap(find.text('重新阅读本章'));
       await tester.pumpAndSettle();
       expect(find.text('1 / 3'), findsOneWidget);
@@ -532,6 +543,7 @@ void main() {
       expect(find.text('重试保存'), findsOneWidget);
       expect(find.text('阅读进度已保存到服务端'), findsNothing);
       platform.businessServer.failWrites = false;
+      await tester.ensureVisible(find.text('重试保存'));
       await tester.tap(find.text('重试保存'));
       await tester.pumpAndSettle();
       expect(catalog.hasUnsavedReadingProgress, false);

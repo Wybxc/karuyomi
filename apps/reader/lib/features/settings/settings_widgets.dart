@@ -300,7 +300,7 @@ class const _SettingsEditor({
         Text(manga ? '选择“跟随全局”时，之后的全局修改会应用到此漫画。' : '漫画可以单独覆盖各项阅读偏好；服务端确认后才保存。'),
         const SizedBox(height: 16),
         if (draft != null && r != null) ...[
-          if (draft.global case final global?)
+          if (draft.global case final global?) ...[
             choice(
               'theme',
               '外观',
@@ -314,6 +314,16 @@ class const _SettingsEditor({
               () {},
               inherit: false,
             ),
+            choice(
+              'transparency',
+              '界面材质',
+              global.reduceTransparency,
+              const {false: '液态玻璃', true: '实色（减少透明度）'},
+              (value) => global.reduceTransparency = value,
+              () {},
+              inherit: false,
+            ),
+          ],
           choice(
             'mode',
             '阅读模式',

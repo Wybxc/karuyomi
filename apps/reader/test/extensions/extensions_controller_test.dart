@@ -1,3 +1,5 @@
+import '../../test_support/cupertino.dart';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../test_app.dart';
@@ -472,7 +474,7 @@ void main() {
         ),
       );
       expect(find.text('账户已卸载此扩展，请返回扩展列表。'), findsOneWidget);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(find.text('账户尚未安装扩展。'), findsOneWidget);
       expect(platform.cachedArtifacts, isEmpty);
@@ -589,7 +591,7 @@ void main() {
       await tester.ensureVisible(enabled);
       expect(tester.widget<CupertinoSwitch>(enabled).onChanged, isNull);
       await tap(tester, find.byKey(const ValueKey('extensions-refresh')));
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       await tap(tester, find.byKey(const ValueKey('extensions-check-updates')));
       expect(

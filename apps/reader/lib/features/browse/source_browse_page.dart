@@ -1,3 +1,7 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
+import '../../widgets/app_appearance.dart';
+
 import '../../widgets/app_page_route.dart';
 
 import 'dart:async';
@@ -367,25 +371,33 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_leave());
       },
-      child: CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(
-          leading: CupertinoNavigationBarBackButton(
-            onPressed: () => unawaited(_leave()),
-          ),
-          middle: Text(widget.source.name),
-          trailing: CupertinoButton(
-            key: const ValueKey('source-preferences-open'),
-            onPressed: busy || !canBrowse
-                ? null
-                : () => unawaited(_preferences()),
-            padding: const EdgeInsets.all(8),
-            child: const Icon(
-              CupertinoIcons.slider_horizontal_3,
-              semanticLabel: '漫画源设置',
+      child: GlassScaffold(
+        enableBackgroundSampling: false,
+        extendBody: false,
+        backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
+        appBar: GlassAppBar.pinned(
+          backgroundColor: AppAppearance.chromeColor(context),
+          onBack: () => unawaited(_leave()),
+          title: Text(widget.source.name),
+          actions: [
+            GlassBarItem.custom(
+              child: CupertinoButton(
+                key: const ValueKey('source-preferences-open'),
+                onPressed: busy || !canBrowse
+                    ? null
+                    : () => unawaited(_preferences()),
+                padding: const EdgeInsets.all(8),
+                child: const Icon(
+                  CupertinoIcons.slider_horizontal_3,
+                  semanticLabel: '漫画源设置',
+                ),
+              ),
+              background: GlassBarItemBackground.none,
             ),
-          ),
+          ],
         ),
-        child: SafeArea(
+        body: SafeArea(
+          top: false,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1000),

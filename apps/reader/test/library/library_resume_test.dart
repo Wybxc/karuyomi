@@ -179,7 +179,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(MangaDetailsPage), findsOneWidget);
       expect(platform.invocations.where((call) => call.hasPages()), isEmpty);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       await tester.ensureVisible(getContinue());
       final target = manifests['/two']!;
@@ -257,6 +257,7 @@ void main() {
             .initialOrder,
         isNull,
       );
+      await openReaderTools(tester);
       expect(
         tester
             .widget<ChoiceField<ChapterOrder>>(
@@ -265,7 +266,7 @@ void main() {
             .value,
         ChapterOrder.source,
       );
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(find.byType(LibraryPage), findsOneWidget);
       expect(find.byType(MangaDetailsPage), findsNothing);
@@ -437,7 +438,7 @@ void main() {
       expect(find.byType(MangaDetailsPage), findsOneWidget);
       expect(platform.businessServer.appliedMutations, appliedBefore + 1);
       expect(catalog.library!.client.hasPendingMetadata(entry.mangaKey), true);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       final retry = find.byKey(
         ValueKey(('library-retry-metadata', entry.mangaKey)),

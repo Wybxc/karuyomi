@@ -1,3 +1,7 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
+import 'app_appearance.dart';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
@@ -96,9 +100,16 @@ class const ChoicePage<T>({
     final visible = options.entries
         .where((item) => item.value.toLowerCase().contains(search))
         .toList();
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: Text(label)),
-      child: SafeArea(
+    return GlassScaffold(
+      enableBackgroundSampling: false,
+      extendBody: false,
+      backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      appBar: GlassAppBar.pinned(
+        backgroundColor: AppAppearance.chromeColor(context),
+        title: Text(label),
+      ),
+      body: SafeArea(
+        top: false,
         child: Column(
           children: [
             Padding(

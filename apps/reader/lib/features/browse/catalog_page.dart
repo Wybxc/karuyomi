@@ -1,3 +1,7 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
+import '../../widgets/app_appearance.dart';
+
 import '../../widgets/app_page_route.dart';
 
 import 'dart:async';
@@ -109,11 +113,17 @@ class const CatalogPage({
                         source: details.source,
                         onAuthenticateReader: onAuthenticateReader,
                       )
-                    : CupertinoPageScaffold(
-                        navigationBar: CupertinoNavigationBar(
-                          middle: const Text('作品已失效'),
+                    : GlassScaffold(
+                        enableBackgroundSampling: false,
+                        extendBody: false,
+                        backgroundColor: CupertinoTheme.of(context)
+                            .scaffoldBackgroundColor,
+                        appBar: GlassAppBar.pinned(
+                          backgroundColor: AppAppearance.chromeColor(context),
+                          title: const Text('作品已失效'),
                         ),
-                        child: SafeArea(
+                        body: SafeArea(
+                          top: false,
                           child: const Center(
                             child: Text('身份或漫画源已改变，请返回后重新搜索。'),
                           ),
