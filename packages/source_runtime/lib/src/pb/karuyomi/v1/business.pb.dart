@@ -4032,6 +4032,7 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
     $core.Iterable<FavoriteSource>? favoriteSources,
     $core.Iterable<InstalledExtension>? installedExtensions,
     $core.Iterable<ExtensionRepository>? repositories,
+    $core.bool? reduceTransparency,
   }) {
     final result = GlobalSettingsValues._();
     if (theme != null) result.theme = theme;
@@ -4040,6 +4041,8 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
     if (installedExtensions != null)
       result.installedExtensions.addAll(installedExtensions);
     if (repositories != null) result.repositories.addAll(repositories);
+    if (reduceTransparency != null)
+      result.reduceTransparency = reduceTransparency;
     return result;
   }
 
@@ -4066,6 +4069,7 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
         subBuilder: InstalledExtension.$_createMessage)
     ..pPM<ExtensionRepository>(5, _omitFieldNames ? '' : 'repositories',
         subBuilder: ExtensionRepository.$_createMessage)
+    ..aOB(6, _omitFieldNames ? '' : 'reduceTransparency')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4119,6 +4123,15 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(5)
   $pb.PbList<ExtensionRepository> get repositories => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $core.bool get reduceTransparency => $_getBF(5);
+  @$pb.TagNumber(6)
+  set reduceTransparency($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasReduceTransparency() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearReduceTransparency() => $_clearField(6);
 }
 
 class GlobalSettings extends $pb.GeneratedMessage {

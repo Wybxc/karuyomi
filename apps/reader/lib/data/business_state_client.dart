@@ -1898,6 +1898,7 @@ bool _globalSettingsMatch(
   wire.GlobalSettingsValues b,
 ) =>
     a.theme == b.theme &&
+    a.reduceTransparency == b.reduceTransparency &&
     _readerSettingsEquality.equals(a.reader, b.reader) &&
     _favoriteSourcesEquality.equals(a.favoriteSources, b.favoriteSources) &&
     _installedExtensionsEquality.equals(

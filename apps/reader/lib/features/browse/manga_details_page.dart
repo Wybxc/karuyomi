@@ -1,3 +1,7 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
+import '../../widgets/app_appearance.dart';
+
 import '../../widgets/app_page_route.dart';
 import '../../widgets/choice_field.dart';
 
@@ -1043,52 +1047,40 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
     useOnListenableChange(_bookmarks, _detailsChanged);
     useOnListenableChange(_chapterRead, _detailsChanged);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(manga.title),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoMenuAnchor(
-              key: const ValueKey('details-more'),
-              menuChildren: [
-                CupertinoMenuItem(
-                  onPressed:
-                      !_migrating &&
-                          !_detailsExpired &&
-                          !_opening &&
-                          !_savingFavorite &&
-                          !_editingCover &&
-                          _library != null &&
-                          _sequence != null &&
-                          controller.status == ServiceStatus.ready &&
-                          !controller.busy
-                      ? () => unawaited(_migrate())
-                      : null,
-                  child: Text('迁移到其他漫画源'),
-                ),
-              ],
-              builder: (context, menu, child) => CupertinoButton(
-                onPressed:
+    return GlassScaffold(
+      enableBackgroundSampling: false,
+      extendBody: false,
+      backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      appBar: GlassAppBar.pinned(
+        backgroundColor: AppAppearance.chromeColor(context),
+        title: Text(manga.title),
+        actions: [
+          GlassBarItem.menu(
+            id: 'details-more',
+            label: '更多操作',
+            icon: const Icon(CupertinoIcons.ellipsis),
+            menuWidth: 260,
+            menuItems: [
+              GlassMenuItem(
+                title: '迁移到其他漫画源',
+                enabled:
                     !_migrating &&
-                        !_detailsExpired &&
-                        !_opening &&
-                        !_savingFavorite &&
-                        !_editingCover &&
-                        _library != null &&
-                        _sequence != null &&
-                        controller.status == ServiceStatus.ready &&
-                        !controller.busy
-                    ? () => menu.isOpen ? menu.close() : menu.open()
-                    : null,
-                padding: const EdgeInsets.all(8),
-                child: Icon(CupertinoIcons.ellipsis, semanticLabel: '更多操作'),
+                    !_detailsExpired &&
+                    !_opening &&
+                    !_savingFavorite &&
+                    !_editingCover &&
+                    _library != null &&
+                    _sequence != null &&
+                    controller.status == ServiceStatus.ready &&
+                    !controller.busy,
+                onTap: () => unawaited(_migrate()),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
-      child: SafeArea(
+      body: SafeArea(
+        top: false,
         child: _detailsExpired || !controller.isCurrentSource(source)
             ? Center(
                 child: Padding(

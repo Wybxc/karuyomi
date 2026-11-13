@@ -1,3 +1,7 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
+import '../../widgets/app_appearance.dart';
+
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -272,12 +276,17 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_leave());
       },
-      child: CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(
-          leading: CupertinoNavigationBarBackButton(onPressed: _leave),
-          middle: const Text('跨源搜索'),
+      child: GlassScaffold(
+        enableBackgroundSampling: false,
+        extendBody: false,
+        backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
+        appBar: GlassAppBar.pinned(
+          backgroundColor: AppAppearance.chromeColor(context),
+          onBack: _leave,
+          title: const Text('跨源搜索'),
         ),
-        child: SafeArea(
+        body: SafeArea(
+          top: false,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1000),

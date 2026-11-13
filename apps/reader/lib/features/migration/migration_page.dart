@@ -1,3 +1,7 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
+import '../../widgets/app_appearance.dart';
+
 import '../../widgets/choice_field.dart';
 import '../../widgets/app_page_route.dart';
 
@@ -313,9 +317,16 @@ class _MigrationPageState extends State<MigrationPage> {
     useListenable(controller);
     final pending = controller.pending;
     final selectedKey = controller.selectedSource?.key;
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: const Text('迁移到其他漫画源')),
-      child: SafeArea(
+    return GlassScaffold(
+      enableBackgroundSampling: false,
+      extendBody: false,
+      backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      appBar: GlassAppBar.pinned(
+        backgroundColor: AppAppearance.chromeColor(context),
+        title: const Text('迁移到其他漫画源'),
+      ),
+      body: SafeArea(
+        top: false,
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [

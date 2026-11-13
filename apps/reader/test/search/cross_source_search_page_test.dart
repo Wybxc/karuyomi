@@ -1,3 +1,5 @@
+import '../../test_support/cupertino.dart';
+
 import 'package:karuyomi/widgets/app_page_route.dart';
 
 import '../test_app.dart';
@@ -125,7 +127,7 @@ void main() {
         if (++attempts == 1) throw const FormatException('关闭未确认');
       };
       await openPage(tester, service);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(find.byType(CrossSourceSearchPage), findsOneWidget);
       expect(
@@ -133,7 +135,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('关闭未确认'), findsOneWidget);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(find.byType(CrossSourceSearchPage), findsNothing);
       expect(find.text('开始'), findsOneWidget);

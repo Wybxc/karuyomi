@@ -1,3 +1,5 @@
+import '../../test_support/cupertino.dart';
+
 import 'package:karuyomi/widgets/app_page_route.dart';
 
 import 'dart:async';
@@ -326,7 +328,7 @@ void main() {
       await tester.pumpAndSettle();
       final first = platform.authenticationViews.single;
       final previousCallback = _callbackFor(first);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(results, [false]);
       expect(runtime.takePendingAuthentication(), isNull);

@@ -1,3 +1,7 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
+import 'app_appearance.dart';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 
 /// Shared layout for server-backed edits: scrolling content and visible actions
@@ -9,12 +13,17 @@ class const EditSheet({
   required final List<Widget> actions,
 }) extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => CupertinoPageScaffold(
-    navigationBar: CupertinoNavigationBar(
-      automaticallyImplyLeading: false,
-      middle: title,
+  Widget build(BuildContext context) => GlassScaffold(
+    enableBackgroundSampling: false,
+    extendBody: false,
+    backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
+    appBar: GlassAppBar.pinned(
+      backgroundColor: AppAppearance.chromeColor(context),
+      backButton: false,
+      title: title,
     ),
-    child: SafeArea(
+    body: SafeArea(
+      top: false,
       child: Column(
         children: [
           Expanded(

@@ -1,3 +1,5 @@
+import '../../test_support/cupertino.dart';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -138,7 +140,7 @@ void main() {
       await show(tester, options: long, onChanged: changed.add);
       await tester.tap(find.byKey(field));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(changed, isEmpty);
       await tester.tap(find.byKey(field));

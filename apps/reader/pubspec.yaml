@@ -7,6 +7,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: 1.0.9
   cupertino_ui: 1.1.6
   crypto: ^3.0.7
@@ -29,6 +31,7 @@ dependencies:
   hooks_riverpod: 3.5.0
   flutter_hooks: 0.21.4
   riverpod_annotation: 4.0.8
+  liquid_glass_widgets: 1.17.2
 dev_dependencies:
   build_runner: 2.17.1
   riverpod_generator: 4.0.10

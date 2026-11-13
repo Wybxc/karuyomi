@@ -1,5 +1,7 @@
 import '../test_app.dart';
 
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -503,7 +505,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final before = posts().length;
-      await tester.tap(find.byKey(const ValueKey('details-more')));
+      await tester.tap(find.bySemanticsLabel('更多操作'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('迁移到其他漫画源'));
       await tester.pumpAndSettle();
@@ -556,20 +558,25 @@ void main() {
             );
           }
           await tester.pumpAndSettle();
-          final menu = tester.widget<CupertinoMenuAnchor>(
-            find.byKey(
-              fromDetails
-                  ? const ValueKey('details-more')
-                  : ValueKey(('library-more', sequence.mangaKey)),
-            ),
-          );
+          final VoidCallback migrate;
+          if (fromDetails) {
+            final bar = tester.widget<GlassAppBar>(find.byType(GlassAppBar));
+            final item = bar.pinnedActions!.single as GlassBarMenuItem;
+            migrate = (item.menuItems.single as GlassMenuItem).onTap;
+          } else {
+            final menu = tester.widget<CupertinoMenuAnchor>(
+              find.byKey(ValueKey(('library-more', sequence.mangaKey))),
+            );
+            migrate =
+                (menu.menuChildren.single as CupertinoMenuItem).onPressed!;
+          }
           final before = posts().length;
           final reads = platform.businessServer.requests.length;
           final calls = platform.invocations.length;
           final opened = platform.openedBuilds.length;
           // Run the real entry handler, then invalidate before the pushed
           // route's lazy builder receives its first frame.
-          (menu.menuChildren.single as CupertinoMenuItem).onPressed!();
+          migrate();
           expect(find.byType(MigrationPage), findsNothing);
           catalog.subject = replaceIdentity ? 'other-subject' : null;
           catalog.status = replaceIdentity

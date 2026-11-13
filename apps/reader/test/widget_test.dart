@@ -108,7 +108,7 @@ void main() {
       await tester.tap(find.text('去浏览'));
       await tester.pumpAndSettle();
       expect(find.text('连接漫画服务'), findsOneWidget);
-      await tester.tap(find.text('设置').last);
+      await tester.tap(appNavigation('设置'));
       await tester.pumpAndSettle();
       expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
       expect(find.byType(ChoiceField<wire.AppTheme>), findsNothing);
@@ -168,7 +168,7 @@ void main() {
       expect(find.text('当前平台尚未支持图片阅读'), findsOneWidget);
       expect(platform.imageControls.single.$1, 'acquireImage');
       expect(platform.imageControls.single.$2['pageKey'], 'p-0');
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pumpAndSettle();
       expect(platform.imageControls.last.$1, 'closePageSession');
       expect(tester.takeException(), isNull);
@@ -207,7 +207,7 @@ void main() {
       final detailsRoute = ModalRoute.of(detailsContext)!;
       await tester.tap(find.text('第 1 章'));
       await tester.pump();
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.tap(appBackButton);
       await tester.pump(const Duration(milliseconds: 50));
       expect(detailsContext.mounted, true);
       expect(detailsRoute.isCurrent, false);
