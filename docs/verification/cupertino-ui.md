@@ -1,6 +1,6 @@
 # Cupertino UI 迁移验证
 
-2026-11-13，应用壳、全部业务界面、阅读器、诊断与原生 Access 页面已完成 Cupertino 代码迁移。完整 CI / Web 构建与隔离浏览器验收通过，生产发布及验收待完成。范围和未验门槛见[迁移计划](../plan/cupertino-ui.md)。原生现场验证继续按用户要求停止。
+2026-11-13，应用壳、全部业务界面、阅读器、诊断与原生 Access 页面已完成 Cupertino 代码迁移。完整 CI / Web 构建、隔离浏览器和生产验收通过，已由主线自动发布。范围和未验门槛见[迁移计划](../plan/cupertino-ui.md)。原生现场验证继续按用户要求停止。
 
 ## 工程与交互回归
 
@@ -63,4 +63,19 @@ Codex 内置浏览器已完成扩展安装的等待/账户确认/本机就绪、
 
 ### 生产发布
 
-生产按既有主线 CI 自动发布，复用当前 runtime 与扩展快照，不重做 AOT；真实 Access 与独立 API/D1 核对另行记录。原生共享代码和 integration_test 的迁移不能代替 iOS/Android 实际运行证据。
+[PR #5](https://github.com/Wybxc/karuyomi/pull/5) 已合并，主线提交 `f4643e0cb235ccc911795936bbc5691219d52a0a` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/43370279052) 全部成功，包括 `check`、`wasm` 和 `deploy`。按既有流程自动发布至 [karuyomi.wybxc.cc](https://karuyomi.wybxc.cc)，复用当前 runtime 与 190 包扩展快照，revision 为 `6bf6597462c449d58b73a48512c9aca2`，没有重做 AOT。扩展清单的 `compiled_unverified/runtimeReady=false` 语义未改变，不将可分发数量当作本轮实际运行覆盖。
+
+同一提交的正式 `web-release` artifact 记录 46 条公开资源的字节、SHA-256 和缓存头核对通过；匿名 API 返回 302 到 Access。验证时间为 `2026-11-13T05:21:40.995Z`。入口实际加载 `main.dart.aced948e.js`，Cupertino 字体哈希为 `67c44fe9183b002e79dde7f6977e2988661c9a3e4a3c5fce968787efdbed823c`。这些自动门与已登录业务验收分别记录。
+
+Codex 内置浏览器使用既有生产 Access 测试账号会话，明确重新加载发布后的页面，完成：
+
+- 宽屏书架的三个入口与 Cupertino 页面，返回箭头及阅读标题均正常显示。
+- 从现有书架续读 Dragonfly 第 2 页真实图片，翻到第 1 页再回第 2 页，每次分别等待服务端确认。
+- 本漫画阅读背景从“跟随全局”改为白色，先显示未保存，再显式保存并收到确认；退出编辑后白色在真实阅读中生效。随后恢复“跟随全局”并确认保存。
+- 显式退出阅读并关闭旧文档后，独立新文档在 360px × 800px 视口直接恢复第 2 页真实图片，读回继承的黑色背景及已保存状态；恢复正常宽屏后标题、图片和控件仍正常。没有重用旧文档内存作为续读证据。
+
+通过 Wrangler 正式只读查询独立核对生产 D1，身份由正式 `/api/bootstrap` 与现有测试账号确认，不提取浏览器 token。上线前 xkcd revision 为 25；两次翻页确认后为 27，最终验收结束为 28，当前/最远位置均为 `pageIndexHint=1`、同一 Dragonfly manifest，当前横向视口锚点为 `viewportX=0.13669143356643354`。全局设置保持 revision 10、`APP_THEME_SYSTEM` 与黑色背景；作品设置 revision 1 为白色，恢复继承后 revision 2、背景覆盖为空，最终独立读回一致。
+
+生产两份文档的浏览器 warn/error 日志均为空，临时视口已恢复，最终显式退出并释放阅读会话。release/verification、D1 查询结果和成功截图保存在 ignored `.local/cupertino-migration/`；详细临时输出不提交。后续仅提交本次证据与状态文档，产品源码及协议不再变化。
+
+本轮 Web 交付通过；没有测量新的包体或性能收益。原生共享代码和 integration_test 的迁移不能代替 iOS/Android 实际运行证据；原生现场、物理触屏、真实软键盘、安全区及系统手势仍待验，按用户要求继续停止，不阻塞本次 Web 上线。
