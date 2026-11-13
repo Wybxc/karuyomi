@@ -792,6 +792,16 @@ void main() {
       await _tap(tester, find.text('第一章'));
       final leafBeforeFit = _reader(tester).key;
       await _tap(tester, find.text('阅读设置'));
+      await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
+      expect(find.text('修改尚未保存。'), findsOneWidget);
+      await _tap(tester, find.text('关闭设置'));
+      expect(find.byType(MangaSettingsEditor), findsNothing);
+      final untouched = await tester.runAsync(
+        () => catalog.settings!.loadManga(_mangaKey),
+      );
+      expect(untouched!.overrides!.hasFit(), false);
+      expect(_reader(tester).key, leafBeforeFit);
+      await _tap(tester, find.text('阅读设置'));
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '适高');
       await _chooseField<bool>(tester, '裁白', '关闭');
       await _tap(tester, find.text('保存本漫画设置'));

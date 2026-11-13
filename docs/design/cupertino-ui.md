@@ -40,6 +40,8 @@ Cupertino 缺少某种组件时，先检查原交互是否仍有必要。可以�
 
 所有阅读退出入口汇入现有 `_exit()` 流程：先尝试确认阅读进度，再退出阅读路由；页面销毁启动图片释放，持有该路由的上层等待 `route.completed` 并执行 `catalog.closeChapter`，在必要关闭/释放 ACK 完成前不打开新的互斥 Source 活动。保留 `PopScope` 和重复退出防护；未确认进度保留当前会话草稿，失败显示状态与允许的恢复操作。
 
+阅读与图片查看页的导航栏关闭自动背景融合，使用应用主题的导航栏颜色，避免浅色主题标题与黑色阅读背景混为一色。本漫画设置使用已有 `EditSheet`，正文滚动、保存/关闭常驻底部；保存中禁止关闭，未提交修改与服务端已确认值分别提示。
+
 官方 [PopScope 说明](https://api.flutter.dev/flutter/widgets/PopScope-class.html)明确：iOS 的 Cupertino 路由在 `canPop=false` 时不检测边缘返回手势，也不会触发 `onPopInvokedWithResult`。因此阅读页提供显式返回按钮并直接调用既有退出流程，不能只依赖该回调；仅在允许安全退出的状态启用边缘返回。Android 系统返回、Web 页面内返回、取消和显式返回分别回归。浏览器关闭文档不具备可靠等待异步 ACK 的保证，继续遵守未确认草稿的既有限制。
 
 弹层关闭与切 tab 也遵守既有所有权，不因路由动画或隐藏页面保活重复创建运行时。身份/服务地址变化后清除旧视图和旧草稿，迟到结果继续按 requestId / generation 丢弃。
@@ -55,5 +57,7 @@ Cupertino 缺少某种组件时，先检查原交互是否仍有必要。可以�
 2026-11-13 核对的官方 [`cupertino_ui` 1.1.6](https://pub.dev/packages/cupertino_ui/versions/1.1.6)支持当前固定 SDK，其最低要求是 Dart `^3.13.0` / Flutter `>=3.47.0`。应用直接精确固定该包和已有 `cupertino_icons` 版本，通过正式 pub 命令维护 lock；删除应用直接 Material 依赖与自有 Material 控件、图标字体配置。
 
 `hooks_riverpod` 当前导入 `material_ui`，`flutter_hooks` 和 `flutter_inappwebview` 仍有旧 Material 导入。导入本身不证明运行时需要 Material 主题：实施时检查实际调用与本地化/类型依赖，严格分析与正式组件回归验证。保留 generator 与 Hooks；不复制第三方实现、不为清空传递依赖破坏类型或更换状态架构。需要处理实际耦合时，优先更新正式依赖或修改集成调用，不默认添加兼容桥。若仍有 Material 传递依赖，交付记录其来源；包体与性能变化依据实际构建和测量报告。
+
+当前固定 `cupertino_ui` 的返回箭头通过 `Text.rich` 绘制 `CupertinoIcons.back`，release 图标扫描没有保留实际字形。正式 Web 构建使用官方 `--no-tree-shake-icons`；原生 release 同样须保留字体，未来构建入口见[客户端说明](../../apps/reader/README.md)。不修改 SDK、不放置不可见图标来影响裁剪；实际构建与字形证据见验证记录。
 
 官方[设计包迁移指引](https://docs.flutter.dev/release/breaking-changes/material-ui-and-cupertino-ui)与[组件目录](https://docs.flutter.dev/ui/widgets/cupertino)用于核对 API。`migrate_design_widgets` 处理旧 SDK 导入到独立包的迁移；本次 Material 控件与交互转换按上述设计逐处实施。

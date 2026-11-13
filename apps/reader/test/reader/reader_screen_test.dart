@@ -1454,6 +1454,33 @@ void main() {
       final manifest = fixtureChapter();
       final viewports = <ReaderViewportState>[];
       Color? textColor;
+      void expectTitleContrast() {
+        final bar = find.byType(CupertinoNavigationBar);
+        final decoration =
+            tester
+                    .widget<DecoratedBox>(
+                      find
+                          .descendant(
+                            of: bar,
+                            matching: find.byType(DecoratedBox),
+                          )
+                          .first,
+                    )
+                    .decoration
+                as BoxDecoration;
+        final title = DefaultTextStyle.of(tester.element(find.text('阅读')))
+            .style
+            .color!;
+        final luminances = [
+          decoration.color!.computeLuminance(),
+          title.computeLuminance(),
+        ]..sort();
+        expect(
+          (luminances.last + .05) / (luminances.first + .05),
+          greaterThan(4.5),
+        );
+      }
+
       Widget configured(ReaderBackground background, int dimPercent) => screen(
         provider: provider,
         manifest: manifest,
@@ -1476,6 +1503,7 @@ void main() {
         CupertinoColors.black,
       );
       expect(textColor, CupertinoColors.white);
+      expectTitleContrast();
       final acquired = provider.acquired.map((page) => page.pageKey).toList();
       final released = provider.released.toList();
       final anchor = viewports.last.current;
@@ -1489,6 +1517,7 @@ void main() {
         CupertinoColors.white,
       );
       expect(textColor, CupertinoColors.black);
+      expectTitleContrast();
       final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
       expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
       expect(

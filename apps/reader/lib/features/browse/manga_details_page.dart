@@ -906,19 +906,8 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         onChanged: (_) => setState(_resetRange),
         placeholder: '章节名、扫描组或章节号',
         prefix: const Icon(CupertinoIcons.search),
-        suffix: _chapterSearch.text.isEmpty
-            ? null
-            : CupertinoButton(
-                onPressed: () => setState(() {
-                  _chapterSearch.clear();
-                  _resetRange();
-                }),
-                padding: const EdgeInsets.all(8),
-                child: const Icon(
-                  CupertinoIcons.clear,
-                  semanticLabel: '清空章节搜索',
-                ),
-              ),
+        clearButtonMode: OverlayVisibilityMode.editing,
+        clearButtonSemanticLabel: '清空章节搜索',
       ),
       const SizedBox(height: 12),
       Row(

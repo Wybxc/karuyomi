@@ -61,14 +61,14 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpApp(
       CupertinoApp(
-        home: CupertinoPageScaffold(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: manga
-                ? MangaSettingsEditor(catalog: fixture.catalog, mangaKey: _key)
-                : GlobalSettingsPanel(catalog: fixture.catalog),
-          ),
-        ),
+        home: manga
+            ? MangaSettingsEditor(catalog: fixture.catalog, mangaKey: _key)
+            : CupertinoPageScaffold(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: GlobalSettingsPanel(catalog: fixture.catalog),
+                ),
+              ),
       ),
       container: fixture.container,
     );

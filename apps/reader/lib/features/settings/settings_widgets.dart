@@ -1,4 +1,5 @@
 import '../../widgets/choice_field.dart';
+import '../../widgets/edit_sheet.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -268,14 +269,34 @@ class const _SettingsEditor({
     final r = draft?.reader;
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
+    final save = draft == null || r == null
+        ? null
+        : CupertinoButton.filled(
+            onPressed: state.canEdit
+                ? () async {
+                    final saved = manga
+                        ? await controller.saveOverrides(
+                            r.deepCopy(),
+                            draft.revision,
+                          )
+                        : await controller.saveGlobal(
+                            draft.globalValues(),
+                            draft.revision,
+                          );
+                    if (saved) reset();
+                  }
+                : null,
+            child: Text(manga ? '保存本漫画设置' : '保存全局设置'),
+          );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          manga ? '本漫画阅读设置' : '全局设置',
-          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-        ),
+        if (!manga)
+          Text(
+            '全局设置',
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+          ),
         Text(manga ? '选择“跟随全局”时，之后的全局修改会应用到此漫画。' : '漫画可以单独覆盖各项阅读偏好；服务端确认后才保存。'),
         const SizedBox(height: 16),
         if (draft != null && r != null) ...[
@@ -386,32 +407,34 @@ class const _SettingsEditor({
           ),
           const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
           const SizedBox(height: 12),
-          CupertinoButton.filled(
-            onPressed: state.canEdit
-                ? () async {
-                    final saved = manga
-                        ? await controller.saveOverrides(
-                            r.deepCopy(),
-                            draft.revision,
-                          )
-                        : await controller.saveGlobal(
-                            draft.globalValues(),
-                            draft.revision,
-                          );
-                    if (saved) reset();
-                  }
-                : null,
-            child: Text(manga ? '保存本漫画设置' : '保存全局设置'),
-          ),
         ],
+        if (draft?.dirty == true && state.pending == null)
+          const Text('修改尚未保存。')
+        else if (state.snapshot != null &&
+            !state.busy &&
+            state.error == null &&
+            state.pending == null)
+          const Text('当前设置已获服务端确认。'),
+        if (!manga && save != null) save,
         SettingsStatus(controller: controller, state: state, onReloaded: reset),
       ],
     );
     return manga
-        ? SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: content,
+        ? PopScope(
+            canPop: !state.busy,
+            child: EditSheet(
+              title: const Text('本漫画阅读设置'),
+              content: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: content,
+              ),
+              actions: [
+                CupertinoButton(
+                  onPressed: state.busy ? null : () => Navigator.pop(context),
+                  child: const Text('关闭设置'),
+                ),
+                ?save,
+              ],
             ),
           )
         : content;

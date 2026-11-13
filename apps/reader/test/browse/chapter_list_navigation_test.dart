@@ -241,8 +241,8 @@ void main() {
       await _search(tester, '完全没有的章节');
       expect(_tiles, findsNothing);
       expect(find.text('没有匹配的章节'), findsOneWidget);
-      expect(iconLabel('清空章节搜索'), findsOneWidget);
-      await _tap(tester, iconLabel('清空章节搜索'));
+      expect(find.bySemanticsLabel('清空章节搜索'), findsOneWidget);
+      await _tap(tester, find.bySemanticsLabel('清空章节搜索'));
       expect(_visibleKeys(tester), _keys([0, 1, 2, 3]));
       expect(find.text('没有匹配的章节'), findsNothing);
       expect(

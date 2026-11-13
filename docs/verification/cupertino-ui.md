@@ -28,10 +28,18 @@ pnpm check:dependencies
 
 ## 代码量
 
-基线 `5352d8f7624a62258e74643e193963e335b8b875`，范围固定为 `apps/reader/lib`、`packages/reader_core/lib`、`packages/source_runtime/lib` 的生产 Dart，排除 `.g.dart` 与 `/src/pb/`，计入所有新增生产组件。正式格式化后由 **30,354 行降至 30,282 行，净减 72 行**。这是本次 UI 迁移的净变化；不将此前重构的削减重复计入，也不宣称已取得包体或性能收益。
+基线 `5352d8f7624a62258e74643e193963e335b8b875`，范围固定为 `apps/reader/lib`、`packages/reader_core/lib`、`packages/source_runtime/lib` 的生产 Dart，排除 `.g.dart` 与 `/src/pb/`，计入所有新增生产组件。正式格式化后由 **30,354 行降至 30,296 行，净减 58 行**。这是本次 UI 迁移的净变化；不将此前重构的削减重复计入，也不宣称已取得包体或性能收益。
 
 删除来源包括重复选择确认层、卡片布局、编辑布局、普通监听装配，以及 43 个 Widget 的字段/构造参数重复声明。新增 `ChoiceField` / `ChoicePage`、`EditSheet` 与无障碍路由策略已计入；业务校验和生命周期约束保留。生成代码、测试与文档单独统计。
 
 ## CI、浏览器与生产
 
-待同一提交的完整 CI / Web 构建，以及 Codex 内置浏览器的导航、扩展、详情/收藏、设置、真实图片阅读、退出和独立新文档续读验收。生产按既有主线 CI 自动发布，复用当前 runtime 与扩展快照，不重做 AOT；真实 Access 与独立 API/D1 核对另行记录。原生共享代码和 integration_test 的迁移不能代替 iOS/Android 实际运行证据。
+`d6c7bdb` 的[分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/43353599558)与 [PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43353650403)通过，包含完整工程检查、Flutter 回归与 Web 构建。分支保留的正式 Web/runtime artifact 经官方 Vite 装配，复用 xkcd、Komiic 两份现有扩展，用 Wrangler 官方 harness 的隔离 D1 与 `acceptance-owner` 验收。没有在本机编译 Flutter Web。
+
+Codex 内置浏览器已完成扩展安装的等待/账户确认/本机就绪、停用与重新启用、xkcd 热门列表、详情收藏、Dragonfly 两页真实图片和服务端进度确认。实际验收还发现三处集成问题：release 返回箭头缺字、章节搜索动态清空按钮使输入失焦，以及阅读标题与背景对比度/设置弹层背景及关闭入口遗漏。修复后的同一构建须重新验收，不能沿用旧构建通过的结论。
+
+返回箭头的证据：`cupertino_ui` 1.1.6 的 `_BackChevron` 使用 `Text.rich` 绘制 U+F3CF；Flutter 3.50 默认为该字体保留的是旧 U+F3D2。官方 SDK `font-subset` 对 CI 裁剪字体提取 62415 返回 `Codepoint 62415 not found in font`，对固定 `cupertino_icons` 原字体提取成功。因此采用官方 `--no-tree-shake-icons`，后续须核对新 artifact 和浏览器可见字形。
+
+章节搜索改用官方内置清空按钮；阅读/图片查看导航栏使用独立主题背景；设置复用已有 `EditSheet`，补充常驻保存/关闭及未保存/已确认状态。定向回归覆盖搜索及范围操作、标题对比度、页位与资源驻留、设置草稿取消及保存；最终 CI 和真实浏览器结果继续补充。
+
+生产按既有主线 CI 自动发布，复用当前 runtime 与扩展快照，不重做 AOT；真实 Access 与独立 API/D1 核对另行记录。原生共享代码和 integration_test 的迁移不能代替 iOS/Android 实际运行证据。

@@ -1339,6 +1339,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           backgroundColor: _readerBackgroundColor(context, widget.background),
           navigationBar: _toolbar
               ? CupertinoNavigationBar(
+                  automaticBackgroundVisibility: false,
                   leading: widget.onExit == null
                       ? null
                       : CupertinoNavigationBarBackButton(
@@ -1995,6 +1996,7 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
       key: const ValueKey('reader-image-viewer'),
       backgroundColor: _readerBackgroundColor(context, appearance.background),
       navigationBar: CupertinoNavigationBar(
+        automaticBackgroundVisibility: false,
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.pop(context),
