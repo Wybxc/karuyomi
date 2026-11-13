@@ -1,5 +1,3 @@
-import '../../test_support/cupertino.dart';
-
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
@@ -179,7 +177,7 @@ void main() {
       await tap(tester, source(_secondSourceId));
       expect(catalog.activeSource!.id, _secondSourceId);
       expect(platform.invocations.last.sourceId, _secondSourceId);
-      await tester.tap(appBackButton);
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(tester.widget<ChoiceField<String>>(languageFilter()).value, 'zh');
       expect(tester.takeException(), isNull);

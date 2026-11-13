@@ -1462,13 +1462,6 @@ const GlobalSettingsValues$json = {
       '6': '.karuyomi.v1.ExtensionRepository',
       '10': 'repositories'
     },
-    {
-      '1': 'reduce_transparency',
-      '3': 6,
-      '4': 1,
-      '5': 8,
-      '10': 'reduceTransparency'
-    },
   ],
 };
 
@@ -1480,8 +1473,7 @@ final $typed_data.Uint8List globalSettingsValuesDescriptor = $convert.base64Deco
     'l0ZVNvdXJjZVIPZmF2b3JpdGVTb3VyY2VzElIKFGluc3RhbGxlZF9leHRlbnNpb25zGAQgAygL'
     'Mh8ua2FydXlvbWkudjEuSW5zdGFsbGVkRXh0ZW5zaW9uUhNpbnN0YWxsZWRFeHRlbnNpb25zEk'
     'QKDHJlcG9zaXRvcmllcxgFIAMoCzIgLmthcnV5b21pLnYxLkV4dGVuc2lvblJlcG9zaXRvcnlS'
-    'DHJlcG9zaXRvcmllcxIvChNyZWR1Y2VfdHJhbnNwYXJlbmN5GAYgASgIUhJyZWR1Y2VUcmFuc3'
-    'BhcmVuY3k=');
+    'DHJlcG9zaXRvcmllcw==');
 
 @$core.Deprecated('Use globalSettingsDescriptor instead')
 const GlobalSettings$json = {

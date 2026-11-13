@@ -1,5 +1,3 @@
-import '../../test_support/cupertino.dart';
-
 import '../test_app.dart';
 
 import 'dart:async';
@@ -183,8 +181,8 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pumpAndSettle();
-      await _tap(tester, appBackButton);
-      await _tap(tester, appNavigation('书架'));
+      await _tap(tester, find.byType(CupertinoNavigationBarBackButton));
+      await _tap(tester, find.text('书架').last);
       expect(
         tester.widget<CustomCover>(find.byType(CustomCover)).cover!.assetId,
         first,

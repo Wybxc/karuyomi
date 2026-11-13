@@ -1193,33 +1193,6 @@ test('settings reads do not write, defaults inherit per field, and clearing over
   ).toBe(3);
 });
 
-test('solid appearance is authoritative across sessions, replay and CAS conflicts', async () => {
-  const first = await client();
-  const second = await client(first.subject);
-  expect((await first.settings()).global?.values?.reduceTransparency).toBe(
-    false,
-  );
-  const command = globalSettings();
-  if (command.operation.case !== 'setGlobal')
-    throw new Error('Missing global values');
-  command.operation.value.reduceTransparency = true;
-  const saved = await first.mutateSettings(command);
-  expect(saved.status).toBe(200);
-  expect(saved.body.global?.values?.reduceTransparency).toBe(true);
-  expect((await second.settings()).global?.values?.reduceTransparency).toBe(
-    true,
-  );
-  expect((await second.mutateSettings(command)).body).toEqual(saved.body);
-  expect((await second.mutateSettings(globalSettings())).status).toBe(409);
-  expect((await first.settings()).global?.values?.reduceTransparency).toBe(
-    true,
-  );
-  expect((await second.mutateSettings(globalSettings(1))).status).toBe(200);
-  const current = await first.settings();
-  expect(current.global?.revision).toBe(2);
-  expect(current.global?.values?.reduceTransparency).toBe(false);
-});
-
 test('reader preferences preserve explicit zero and false, inherit all fields and reject invalid writes without touching reading state', async () => {
   const reader = await client();
   const command = favorite();

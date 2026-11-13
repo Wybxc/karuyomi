@@ -199,57 +199,6 @@ void main() {
     },
   );
 
-  test(
-    'solid appearance requires its exact ACK and an independent confirmed read',
-    () async {
-      final desired = _global()..reduceTransparency = true;
-      server.beforeRequest = (request) {
-        if (request.method != 'POST') return null;
-        final command = wire.decodeProtoJson(
-          wire.SettingsMutation(),
-          jsonDecode(request.body!),
-        );
-        return _reply(
-          wire.SettingsMutationResponse(
-            schemaVersion: 1,
-            mutationId: command.mutationId,
-            accountRevision: 1,
-            global: wire.GlobalSettings(
-              revision: 1,
-              values: desired.deepCopy()..reduceTransparency = false,
-            ),
-            effectiveReader: desired.reader.deepCopy(),
-          ),
-        );
-      };
-      await expectLater(
-        repository.setGlobal(values: desired, basedOnRevision: 0),
-        throwsFormatException,
-      );
-      expect(repository.pendingGlobal()!.global!.reduceTransparency, true);
-      expect((await repository.loadGlobal()).global.reduceTransparency, false);
-      final original = writes().single.body;
-      server.beforeRequest = null;
-      final confirmed = await repository.setGlobal(
-        values: desired,
-        basedOnRevision: 0,
-      );
-      expect(confirmed.global.reduceTransparency, true);
-      expect(writes().last.body, original);
-      expect(repository.pendingGlobal(), isNull);
-      final other = _client(server);
-      addTearDown(other.dispose);
-      final independent = SettingsRepository(other);
-      expect((await independent.loadGlobal()).global.reduceTransparency, true);
-      await independent.setGlobal(
-        values: desired.deepCopy()..reduceTransparency = false,
-        basedOnRevision: 1,
-      );
-      expect((await repository.loadGlobal()).global.reduceTransparency, false);
-      expect(server.appliedMutations, 2);
-    },
-  );
-
   test('TypeScript ProtoJSON omitted implicit false and zero confirms global settings', () async {
     final api = _OmittedSettingsDefaults(server);
     client.rebindApi(api, verifiedIdentity: client.identity);

@@ -1,7 +1,5 @@
 import '../widgets/app_page_route.dart';
 
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
@@ -800,19 +798,9 @@ final class _AuthenticationPageState extends State<_AuthenticationPage> {
   }
 
   @override
-  Widget build(BuildContext context) => GlassScaffold(
-    enableBackgroundSampling: false,
-    extendBody: false,
-    appBar: GlassAppBar(
-      backgroundColor: CupertinoTheme.of(context).scaffoldBackgroundColor,
-      title: const Text('登录'),
-      leading: CupertinoButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Icon(CupertinoIcons.chevron_back, semanticLabel: '返回'),
-      ),
-    ),
-    body: SafeArea(
-      top: false,
+  Widget build(BuildContext context) => CupertinoPageScaffold(
+    navigationBar: CupertinoNavigationBar(middle: const Text('登录')),
+    child: SafeArea(
       child: Column(
         children: [
           if (_error != null)

@@ -379,7 +379,6 @@ void main() {
       gate.complete();
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
       await tester.pumpAndSettle();
-      await openReaderTools(tester);
       expect(
         tester
             .widget<ChoiceField<ChapterOrder>>(

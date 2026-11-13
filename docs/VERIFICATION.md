@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-13，[Liquid Glass 界面重构](verification/liquid-glass.md)的应用壳、导航浮层、阅读工具及服务端确认后的实色设置已实现；748 项 Dart/Flutter 回归与严格分析、46 项 Worker/D1 状态回归通过。当前等待 CI、真实浏览器验收和发布，不能将工程检查当成已上线。按用户决定，代码削减转为独立重构；原生现场验证保持停止。
+2026-11-13，[Liquid Glass](verification/liquid-glass.md)曾通过 CI 并发布，用户随后决定终止并[恢复统一 Cupertino](plan/cupertino-ui.md#恢复-cupertino)。恢复代码已移除玻璃库及专用设置，新的工程和生产证据在 [Cupertino 记录](verification/cupertino-ui.md)更新。原玻璃性能对照未完成，不宣称能耗结论；代码削减另立重构，原生现场验证保持停止。
 
 2026-11-13，[Cupertino UI 迁移](verification/cupertino-ui.md)完成应用壳、业务页面、阅读器、诊断与原生 Access 页的代码切换，并由主线 CI 自动上线；三项目严格分析、742 项单并发 Dart 回归及完整 CI / Web 构建通过。移除应用直接 Material 依赖，生产手写 Dart 计入新增组件后净减 58 行；缺失组件通过重整选择、筛选、编辑与反馈流程解决。隔离内置浏览器与独立 API 已验证扩展维护、章节输入、真实两页阅读/缩放、设置草稿取消及确认保存、360px 分类/主题和独立新文档续读；发现的字体、焦点和弹层问题复验通过。[生产 Access 下](verification/cupertino-ui.md#生产发布)的真实阅读、翻页确认、设置覆盖/继承与独立新文档第 2 页续读均通过，独立 D1 核对一致；46 条公开资源与匿名 Access 门禁通过。原生现场验证仍停止。
 

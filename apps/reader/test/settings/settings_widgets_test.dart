@@ -97,27 +97,6 @@ void main() {
   List<TestBusinessRequest> writes() =>
       server.requests.where((request) => request.method == 'POST').toList();
 
-  testWidgets('material choice stays a draft until the server confirms it', (
-    tester,
-  ) async {
-    final controller = editor();
-    await tester.runAsync(controller.refresh);
-    await show(tester, controller);
-    await tap(tester, find.byKey(const ValueKey('global-transparency')));
-    await tap(tester, find.widgetWithText(CupertinoMenuItem, '实色（减少透明度）'));
-    expect(state().snapshot!.global.reduceTransparency, false);
-    expect(writes(), isEmpty);
-    expect(find.text('修改尚未保存。'), findsOneWidget);
-    await tap(tester, find.text('保存全局设置'));
-    expect(state().snapshot!.global.reduceTransparency, true);
-    expect(
-      (await tester.runAsync(repository.loadGlobal))!.global.reduceTransparency,
-      true,
-    );
-    expect(state().pending, isNull);
-    await hide(tester);
-  });
-
   testWidgets('an untouched global panel follows newly confirmed snapshots', (
     tester,
   ) async {

@@ -375,7 +375,6 @@ message GlobalSettingsValues {
   repeated FavoriteSource favorite_sources = 3;
   repeated InstalledExtension installed_extensions = 4;
   repeated ExtensionRepository repositories = 5;
-  bool reduce_transparency = 6;
 }
 
 message GlobalSettings {

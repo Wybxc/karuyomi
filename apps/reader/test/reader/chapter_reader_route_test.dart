@@ -1,5 +1,3 @@
-import '../../test_support/cupertino.dart';
-
 import '../test_app.dart';
 
 import 'dart:async';
@@ -157,8 +155,6 @@ void main() {
         }
         final closeGate = Completer<void>();
         platform.closePageSessionHandler = (_) => closeGate.future;
-        await openReaderTools(tester);
-        await tester.ensureVisible(find.text('下一章'));
         await tester.tap(find.text('下一章'));
         await tester.pump();
         await tester.pump();
@@ -266,8 +262,6 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await openReaderTools(tester);
-      await tester.ensureVisible(find.text('下一章'));
       await tester.tap(find.text('下一章'));
       await tester.pump();
       await tester.pumpApp(const SizedBox.shrink());
