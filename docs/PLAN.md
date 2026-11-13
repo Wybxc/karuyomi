@@ -7,7 +7,7 @@
 - **多端同步是首要设计目标。** 同一部署、同一 Access 身份在 Web、iOS、Android 共享书架、分类、进度、书签和非敏感设置；Worker API + D1 是唯一业务权威。客户端只维护当前会话状态、未确认草稿及可丢弃缓存，保存以服务端确认结果为准。先完成跨端在线闭环，再扩展完整书架和阅读设置；同步计划沿用 [P2](plan/p2-sync.md) 文件名，但已提升为当前主线，不再等待 P1 全部完成。
 - Flutter / Dart 负责 UI 和独立阅读核心；iOS、Android 原生优先，桌面使用 Flutter Web。
 - Web / iOS / Android [全端统一 Cupertino UI](plan/cupertino-ui.md)，采用官方 `cupertino_ui`，应用壳、业务页面、阅读器、诊断与原生 Access 页已完成代码迁移，并经主线 CI 自动上线。完整工程、隔离浏览器及生产阅读、设置保存和独立新文档续读通过；原生现场验证继续停止。Mihon 保留信息架构与业务流程参考，缺失组件通过调整操作流程或成熟第三方库解决。
-- [Liquid Glass 界面重构](plan/liquid-glass.md)曾上线，现按用户决定终止并[恢复统一 Cupertino](plan/cupertino-ui.md#恢复-cupertino)；移除玻璃依赖与专用外观设置，保持一套正式界面。代码削减另立[UI 代码收敛](plan/ui-code-consolidation.md)，基线在恢复后重新固定。
+- [Liquid Glass 界面重构](plan/liquid-glass.md)已按用户决定终止，[统一 Cupertino 已恢复并上线](plan/cupertino-ui.md#恢复-cupertino)；玻璃依赖、专用外观设置及资源已移除，主线 CI 与生产阅读、保存和新文档续读复验通过。代码削减另立[UI 代码收敛](plan/ui-code-consolidation.md)，基线在恢复后重新固定。
 - TeaVM 0.16.0 JavaScript backend / release9 是运行基线。Web 通过 JS interop 连接 Worker；原生通过系统 WebView 控制同版 Worker。不重选框架或执行引擎。
 - 单 hostname、单 Cloudflare Worker：公开 Flutter shell 和 `/runtime/`，后端与个人数据放在 Access 保护的 `/api`、`/api/*`，Worker 再校验 JWT。
 - Static Assets 是所有客户端的扩展分发权威源，每包只部署最新可用构建，由客户端或 Service Worker 管理更新与缓存。扩展不再发布到 GitHub Release，Worker/R2 不代理正文。共享桥/WASM 在 Web 作为 Static Assets、Native 随应用打包；Java/Maven、原 JAR 与 seed 只用于构建。

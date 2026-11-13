@@ -1,6 +1,6 @@
 # Cupertino UI 迁移验证
 
-2026-11-13，应用壳、全部业务界面、阅读器、诊断与原生 Access 页面已完成 Cupertino 代码迁移。完整 CI / Web 构建、隔离浏览器和生产验收通过，已由主线自动发布。范围和未验门槛见[迁移计划](../plan/cupertino-ui.md)。原生现场验证继续按用户要求停止。
+2026-11-13，应用壳、全部业务界面、阅读器、诊断与原生 Access 页面已完成 Cupertino 代码迁移。完整 CI / Web 构建、隔离浏览器和生产验收通过，已由主线自动发布。随后试用的 Liquid Glass 已按用户决定撤下，统一 Cupertino 已重新发布，并完成下述[生产复验](#恢复-cupertino-后的生产复验)。范围和未验门槛见[迁移计划](../plan/cupertino-ui.md)。原生现场验证继续按用户要求停止。
 
 ## 工程与交互回归
 
@@ -79,3 +79,31 @@ Codex 内置浏览器使用既有生产 Access 测试账号会话，明确重新
 生产两份文档的浏览器 warn/error 日志均为空，临时视口已恢复，最终显式退出并释放阅读会话。release/verification、D1 查询结果和成功截图保存在 ignored `.local/cupertino-migration/`；详细临时输出不提交。后续仅提交本次证据与状态文档，产品源码及协议不再变化。
 
 本轮 Web 交付通过；没有测量新的包体或性能收益。原生共享代码和 integration_test 的迁移不能代替 iOS/Android 实际运行证据；原生现场、物理触屏、真实软键盘、安全区及系统手势仍待验，按用户要求继续停止，不阻塞本次 Web 上线。
+
+## 恢复 Cupertino 后的生产复验
+
+2026-11-13，用户决定撤下 Liquid Glass，恢复统一 Cupertino。[PR #7](https://github.com/Wybxc/karuyomi/pull/7) 已合入主线，生产提交为 `33dfb2ec51d8e0ad787a90f1146da59cdafecfc4`。恢复提交 `849e1cccb10e8339455e05f917330880e9152747` 的 `apps/`、`packages/`、`protocol/` 与此前已验收的 `d7416f0ab5981b405dd5d8998158d3868b53971c` 完全相同；直接移除玻璃库、初始化、专用设置及生成模型，没有新增兼容层或双外观分支。Riverpod generator、Hooks、CAS、服务端确认和关闭 ACK 继续沿用。
+
+本机通过正式 `pnpm generate`、Flutter `pub get --offline --directory apps/reader`、`pnpm generate:check`、全范围 `pnpm format` → `pnpm format:check` 及 `pnpm check:dependencies`。完整检查和编译交由[主线 CI](https://github.com/Wybxc/karuyomi/actions/runs/43402637392)，`check`、`wasm`、`deploy` 均成功；三个项目严格分析无问题，reader_core 22、source_runtime 87、reader 633 项 Dart 测试通过，共 **742 项**。本机没有进行完整 Flutter 编译、AOT、模拟器或原生现场验证。
+
+同一提交的正式 release/verification artifact 在 `2026-11-13T09:45:51.533Z` 确认 **46 条公开资源**的字节、SHA-256 和缓存头通过，匿名 API 返回 **302** 到 Access。资源清单已无 `liquid_glass`、`progressive_blur` 或 `interactive_indicator` 资源；入口为 `/main.dart.aced948e.js`，4,290,232 字节，SHA-256 为 `aced948e906aae23eff147123d0761e257c554f44fe822dc5e7d40f9c42975ce`。复用原 190 包扩展，revision 仍为 `6bf6597462c449d58b73a48512c9aca2`，没有重做 AOT，也没有扩大实际运行覆盖的声明。
+
+恢复前，Wrangler 对生产 D1 的只读查询确认全局设置没有遗留材质字段，结果为 **0**：
+
+```sql
+SELECT COUNT(*) AS obsolete_material_settings
+FROM reader_settings
+WHERE scope_key = ''
+  AND json_type(values_json, '$.reduceTransparency') IS NOT NULL;
+```
+
+恢复发布后，Codex 内置浏览器使用已授权的生产 Access 测试账号，在 1280px × 720px 视口完成：
+
+- 新文档读回书架、已保存的深色主题和正式 Cupertino 侧栏；书架、浏览、扩展管理与设置入口均可达，专用材质选项已移除。
+- 从书架打开 xkcd `3322: Dragonfly` 第 1 页，翻至第 2 页真实图片，先出现待确认，再显示“阅读进度已保存到服务端”；显式退出后正常返回书架。
+- 全局主题从深色改为浅色，草稿显示未保存，显式保存后才应用；随后恢复深色并再次获得服务端确认。
+- 关闭该文档后，在独立新文档从书架直接续读第 2 页真实图片，读回已确认状态及原有深色主题；最后显式退出并关闭验收文档。
+
+独立 Wrangler 只读核对生产 D1：翻页前漫画 revision 为 30，确认后为 **31**，当前和最远位置均为 `pageIndexHint=1`，页键后缀为 `:1`，manifest 为 `01223f77d9c8d1aaebdfde75cc19184ca84847451b619dbc9295c4a875ef3874`。全局主题两次保存后 revision 从 13 增至 **15**，最终为 `APP_THEME_DARK`。独立新文档续读前后的漫画、全部该漫画章节进度和该账号设置查询结果逐字节一致；漫画与设置 revision 均未增加，续读未附带业务写入。查询没有提取浏览器凭据或修改服务端数据。
+
+两份验收文档的浏览器 warn/error 日志均为空。临时视口已恢复，验收标签已关闭，用户原有标签保留。CI 日志、release/verification、D1 对照与截图保存在 ignored `.local/liquid-glass-evaluation/` 的 `cupertino-restore-*`、`cupertino-restored-*` 和 `production-*-cupertino*` 文件中。未继续玻璃性能采集，不把恢复决定或资源移除描述为已经测得能耗改善；原生现场验证仍停止。
