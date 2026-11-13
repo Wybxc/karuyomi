@@ -1,4 +1,6 @@
-import 'package:material_ui/material_ui.dart';
+import '../../widgets/edit_sheet.dart';
+
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -14,10 +16,10 @@ Future<Set<String>?> showChapterReadDialog({
   required bool Function() isCurrent,
 }) {
   FocusManager.instance.primaryFocus?.unfocus();
-  return showDialog<Set<String>>(
+  return showCupertinoSheet<Set<String>>(
     context: context,
-    barrierDismissible: false,
-    builder: (_) => _ChapterReadDialog(
+    enableDrag: false,
+    scrollableBuilder: (context, _) => _ChapterReadDialog(
       catalog: catalog,
       progress: progress,
       draft: draft,
@@ -26,18 +28,12 @@ Future<Set<String>?> showChapterReadDialog({
   );
 }
 
-class _ChapterReadDialog extends StatefulHookWidget {
-  const _ChapterReadDialog({
-    required this.catalog,
-    required this.progress,
-    required this.draft,
-    required this.isCurrent,
-  });
-  final CatalogController catalog;
-  final ChapterReadController progress;
-  final ChapterReadBatchDraft draft;
-  final bool Function() isCurrent;
-
+class const _ChapterReadDialog({
+  required final CatalogController catalog,
+  required final ChapterReadController progress,
+  required final ChapterReadBatchDraft draft,
+  required final bool Function() isCurrent,
+}) extends StatefulHookWidget {
   @override
   State<_ChapterReadDialog> createState() => _ChapterReadDialogState();
 }
@@ -143,59 +139,57 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();
       },
-      child: AlertDialog(
+      child: EditSheet(
+        key: const ValueKey('chapter-read-review'),
         title: Text(draft.read ? '标记为已读' : '标记为未读'),
-        content: SizedBox(
-          width: 560,
-          height: MediaQuery.sizeOf(context).height * .55,
-          child: ListView(
-            children: [
-              Text('确认清单：${draft.items.length} 章'),
-              const Text('逐章保存，首项失败后暂停；不会加载页面或改变继续阅读的位置。'),
-              if (_expired) const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。'),
-              if (draft.attempted) ...[
-                Text(
-                  '已确认 ${draft.confirmedCount} / ${draft.items.length} 章 · 未开始 ${draft.notStartedCount} 章',
-                ),
-                if (draft.busy) const LinearProgressIndicator(),
-                if (draft.busy && draft.pauseRequested)
-                  const Text('已请求暂停，等待当前操作结束后可关闭。'),
-                if (!_expired && draft.completed) const Text('全部标记已由服务端确认。'),
-                if (!_expired && draft.finished && !draft.completed)
-                  const Text('原批次已结束，剩余章节未再发送。请按最新状态重新确认。'),
-                if (!draft.finished) const Text('当前会话保留原清单和未确认操作；关闭不会撤回已发请求。'),
-              ],
-              if (draft.error case final error?) Text(error),
-              for (final item in draft.items)
-                ListTile(
-                  key: ValueKey(('chapter-read-item', item.chapter.key)),
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item.chapter.name),
-                  subtitle: Text(
-                    [
-                      '来源第 ${item.chapter.sourceIndex + 1} 项',
-                      if (draft.attempted)
-                        switch (item.status) {
-                          ChapterReadItemStatus.notStarted => '未开始',
-                          ChapterReadItemStatus.sending => '正在等待服务端确认',
-                          ChapterReadItemStatus.confirmed => '已由服务端确认',
-                          ChapterReadItemStatus.uncertain => '尚未确认，需重试原操作',
-                          ChapterReadItemStatus.blocked => '未保存，需重新读取',
-                        },
-                      ?item.error,
-                    ].join('\n'),
-                  ),
-                ),
+        content: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('确认清单：${draft.items.length} 章'),
+            const Text('逐章保存，首项失败后暂停；不会加载页面或改变继续阅读的位置。'),
+            if (_expired) const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。'),
+            if (draft.attempted) ...[
+              Text(
+                '已确认 ${draft.confirmedCount} / ${draft.items.length} 章 · 未开始 ${draft.notStartedCount} 章',
+              ),
+              if (draft.busy) const CupertinoActivityIndicator(),
+              if (draft.busy && draft.pauseRequested)
+                const Text('已请求暂停，等待当前操作结束后可关闭。'),
+              if (!_expired && draft.completed) const Text('全部标记已由服务端确认。'),
+              if (!_expired && draft.finished && !draft.completed)
+                const Text('原批次已结束，剩余章节未再发送。请按最新状态重新确认。'),
+              if (!draft.finished) const Text('当前会话保留原清单和未确认操作；关闭不会撤回已发请求。'),
             ],
-          ),
+            if (draft.error case final error?) Text(error),
+            for (final item in draft.items)
+              CupertinoListTile(
+                key: ValueKey(('chapter-read-item', item.chapter.key)),
+                title: Text(item.chapter.name),
+                subtitle: Text(
+                  [
+                    '来源第 ${item.chapter.sourceIndex + 1} 项',
+                    if (draft.attempted)
+                      switch (item.status) {
+                        ChapterReadItemStatus.notStarted => '未开始',
+                        ChapterReadItemStatus.sending => '正在等待服务端确认',
+                        ChapterReadItemStatus.confirmed => '已由服务端确认',
+                        ChapterReadItemStatus.uncertain => '尚未确认，需重试原操作',
+                        ChapterReadItemStatus.blocked => '未保存，需重新读取',
+                      },
+                    ?item.error,
+                  ].join('\n'),
+                ),
+                padding: EdgeInsets.zero,
+              ),
+          ],
         ),
         actions: [
           if (!_expired && draft.busy)
-            TextButton(
+            CupertinoButton(
               onPressed: draft.pauseRequested ? null : draft.pause,
               child: const Text('暂停剩余操作'),
             ),
-          TextButton(
+          CupertinoButton(
             onPressed: !_expired && draft.busy ? null : _close,
             child: Text(
               !draft.attempted
@@ -206,21 +200,21 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
             ),
           ),
           if (!draft.attempted)
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: _expired ? null : _start,
               child: const Text('确认并开始'),
             ),
           if (draft.canRetry)
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: _expired ? null : _retry,
               child: const Text('重试原未确认操作'),
             ),
           if (draft.canContinue) ...[
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: _expired ? null : _continue,
               child: const Text('继续剩余原清单'),
             ),
-            TextButton(
+            CupertinoButton(
               onPressed: _expired
                   ? null
                   : () {
@@ -230,7 +224,7 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
             ),
           ],
           if (draft.canReloadAndFinish)
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: _expired ? null : _reload,
               child: const Text('重新读取并结束原批次'),
             ),

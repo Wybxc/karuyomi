@@ -5,7 +5,7 @@ import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
@@ -402,7 +402,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(600, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
-      MaterialApp(
+      CupertinoApp(
         home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
       ),
     );
@@ -472,7 +472,7 @@ void main() {
         ),
       );
       expect(find.text('账户已卸载此扩展，请返回扩展列表。'), findsOneWidget);
-      await tester.pageBack();
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(find.text('账户尚未安装扩展。'), findsOneWidget);
       expect(platform.cachedArtifacts, isEmpty);
@@ -587,9 +587,9 @@ void main() {
         const ValueKey(('extension-enabled', 'eu.kanade.source.test')),
       );
       await tester.ensureVisible(enabled);
-      expect(tester.widget<SwitchListTile>(enabled).onChanged, isNull);
+      expect(tester.widget<CupertinoSwitch>(enabled).onChanged, isNull);
       await tap(tester, find.byKey(const ValueKey('extensions-refresh')));
-      await tester.pageBack();
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       await tap(tester, find.byKey(const ValueKey('extensions-check-updates')));
       expect(

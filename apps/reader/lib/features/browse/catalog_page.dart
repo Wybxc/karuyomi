@@ -1,6 +1,8 @@
+import '../../widgets/app_page_route.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -14,20 +16,14 @@ import 'catalog_controller.dart';
 import 'manga_details_page.dart';
 import 'source_browse_page.dart';
 
-class CatalogPage extends HookWidget {
-  const CatalogPage({
-    super.key,
-    required this.controller,
-    required this.onConnect,
-    required this.onAuthenticate,
-    this.configurationError,
-    this.onAuthenticateReader,
-  });
-  final CatalogController? controller;
-  final VoidCallback onConnect;
-  final VoidCallback onAuthenticate;
-  final String? configurationError;
-  final ReaderAuthentication? onAuthenticateReader;
+class const CatalogPage({
+  super.key,
+  required final CatalogController? controller,
+  required final VoidCallback onConnect,
+  required final VoidCallback onAuthenticate,
+  final String? configurationError,
+  final ReaderAuthentication? onAuthenticateReader,
+}) extends HookWidget {
   Future<void> _open(
     BuildContext context,
     ExtensionListing extension,
@@ -37,7 +33,7 @@ class CatalogPage extends HookWidget {
     final catalog = controller;
     if (build == null || catalog == null || catalog.busy) return;
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) => SourceBrowsePage(
           catalog: catalog,
           build: build,
@@ -56,17 +52,13 @@ class CatalogPage extends HookWidget {
     final catalog = controller;
     final repository = catalog?.sourcePreferences;
     if (catalog == null || repository == null || catalog.busy) return;
-    await showModalBottomSheet<void>(
+    await showCupertinoSheet<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: .9,
-        child: SourcePreferencesSheet(
-          catalog: catalog,
-          target: target,
-          repository: repository,
-        ),
+      enableDrag: false,
+      scrollableBuilder: (context, _) => SourcePreferencesSheet(
+        catalog: catalog,
+        target: target,
+        repository: repository,
       ),
     );
   }
@@ -79,17 +71,25 @@ class CatalogPage extends HookWidget {
     try {
       service = catalog.createSourceSearch();
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('无法搜索'),
           content: Text(
             error is StateError ? error.message.toString() : error.toString(),
           ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('关闭'),
+            ),
+          ],
         ),
       );
       return;
     }
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) => CrossSourceSearchPage(
           service: service,
           onOpen: (details) async {
@@ -100,7 +100,7 @@ class CatalogPage extends HookWidget {
                 catalog.isCurrentSource(details.source);
             if (!current()) return;
             await Navigator.of(context).push<void>(
-              MaterialPageRoute(
+              AppPageRoute(
                 builder: (_) => current()
                     ? MangaDetailsPage(
                         controller: catalog,
@@ -109,9 +109,15 @@ class CatalogPage extends HookWidget {
                         source: details.source,
                         onAuthenticateReader: onAuthenticateReader,
                       )
-                    : Scaffold(
-                        appBar: AppBar(title: const Text('作品已失效')),
-                        body: const Center(child: Text('身份或漫画源已改变，请返回后重新搜索。')),
+                    : CupertinoPageScaffold(
+                        navigationBar: CupertinoNavigationBar(
+                          middle: const Text('作品已失效'),
+                        ),
+                        child: SafeArea(
+                          child: const Center(
+                            child: Text('身份或漫画源已改变，请返回后重新搜索。'),
+                          ),
+                        ),
                       ),
               ),
             );
@@ -123,9 +129,7 @@ class CatalogPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ticker = useSingleTickerProvider();
-    final tabs = useMemoized(() => TabController(length: 2, vsync: ticker));
-    useEffect(() => tabs.dispose, [tabs]);
+    final tabs = useState(0);
     useListenable(controller);
     return _content(context, controller, tabs);
   }
@@ -133,7 +137,7 @@ class CatalogPage extends HookWidget {
   Widget _content(
     BuildContext context,
     CatalogController? catalog,
-    TabController tabs,
+    ValueNotifier<int> tabs,
   ) {
     final status = catalog?.status ?? ServiceStatus.disconnected;
     final ready =
@@ -147,7 +151,7 @@ class CatalogPage extends HookWidget {
             shrinkWrap: true,
             padding: const EdgeInsets.all(24),
             children: [
-              const Icon(Icons.travel_explore_outlined, size: 56),
+              const Icon(CupertinoIcons.globe, size: 56),
               const SizedBox(height: 20),
               Text(
                 switch (status) {
@@ -157,7 +161,9 @@ class CatalogPage extends HookWidget {
                   ServiceStatus.failed => '服务连接未完成',
                   _ => '连接漫画服务',
                 },
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: CupertinoTheme.of(context)
+                    .textTheme
+                    .navLargeTitleTextStyle,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
@@ -167,17 +173,16 @@ class CatalogPage extends HookWidget {
               ),
               const SizedBox(height: 24),
               if (catalog?.busy == true)
-                const LinearProgressIndicator()
+                const CupertinoActivityIndicator()
               else
                 Center(
-                  child: FilledButton.icon(
+                  child: CupertinoButton.filled(
                     onPressed:
                         status == ServiceStatus.loginRequired ||
                             status == ServiceStatus.denied
                         ? onAuthenticate
                         : onConnect,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(
+                    child: Text(
                       status == ServiceStatus.loginRequired ||
                               status == ServiceStatus.denied
                           ? '登录'
@@ -200,39 +205,41 @@ class CatalogPage extends HookWidget {
         constraints: const BoxConstraints(maxWidth: 1100),
         child: Column(
           children: [
-            TabBar(
-              controller: tabs,
-              tabs: [
-                const Tab(text: '漫画源'),
-                Tab(
-                  key: const ValueKey('extensions-manage'),
-                  text: updates == 0 ? '扩展' : '扩展 ($updates)',
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: CupertinoSlidingSegmentedControl<int>(
+                groupValue: tabs.value,
+                children: {
+                  0: const Text('漫画源'),
+                  1: Text(
+                    updates == 0 ? '扩展' : '扩展 ($updates)',
+                    key: const ValueKey('extensions-manage'),
+                  ),
+                },
+                onValueChanged: (value) {
+                  if (value != null) tabs.value = value;
+                },
+              ),
             ),
             Expanded(
-              child: TabBarView(
-                controller: tabs,
-                children: [
-                  SourceDirectory(
-                    catalog: current,
-                    onManage: () => tabs.animateTo(1),
-                    onOpen: (extension, source) =>
-                        _open(context, extension, source),
-                    onSearch: () => unawaited(_search(context)),
-                    onPreferences: (target) =>
-                        unawaited(_preferences(context, target)),
-                  ),
-                  ExtensionsPage(
-                    key: ValueKey(current.settings),
-                    catalog: current,
-                    repository: current.settings!,
-                    embedded: true,
-                    onOpenSource: (extension, source) =>
-                        _open(context, extension, source),
-                  ),
-                ],
-              ),
+              child: tabs.value == 0
+                  ? SourceDirectory(
+                      catalog: current,
+                      onManage: () => tabs.value = 1,
+                      onOpen: (extension, source) =>
+                          _open(context, extension, source),
+                      onSearch: () => unawaited(_search(context)),
+                      onPreferences: (target) =>
+                          unawaited(_preferences(context, target)),
+                    )
+                  : ExtensionsPage(
+                      key: ValueKey(current.settings),
+                      catalog: current,
+                      repository: current.settings!,
+                      embedded: true,
+                      onOpenSource: (extension, source) =>
+                          _open(context, extension, source),
+                    ),
             ),
           ],
         ),

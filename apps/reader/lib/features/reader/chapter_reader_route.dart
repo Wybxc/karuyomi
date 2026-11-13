@@ -1,6 +1,8 @@
+import '../../widgets/choice_field.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:reader_core/reader_core.dart';
@@ -22,34 +24,20 @@ import 'reader_recovery.dart';
 
 /// One navigation route owns the whole reading session, not one route per page
 /// list. A new leaf can only acquire images after the previous leaf's ACKs.
-class ChapterReaderRoute extends StatefulHookConsumerWidget {
-  const ChapterReaderRoute({
-    super.key,
-    required this.catalog,
-    required this.manga,
-    required this.source,
-    required this.sequence,
-    required this.initialChapter,
-    required this.initialOpened,
-    this.onAuthenticate,
-    this.initialPosition,
-    this.initialOrder,
-    this.initialMode = ReadingMode.leftToRight,
-    this.initialDoublePage,
-  });
-
-  final CatalogController catalog;
-  final MangaEntry manga;
-  final CatalogSourceRef source;
-  final ChapterSequence sequence;
-  final SequenceChapter initialChapter;
-  final OpenedChapter initialOpened;
-  final ReaderAuthentication? onAuthenticate;
-  final ReadingPosition? initialPosition;
-  final ChapterOrder? initialOrder;
-  final ReadingMode initialMode;
-  final bool? initialDoublePage;
-
+class const ChapterReaderRoute({
+  super.key,
+  required final CatalogController catalog,
+  required final MangaEntry manga,
+  required final CatalogSourceRef source,
+  required final ChapterSequence sequence,
+  required final SequenceChapter initialChapter,
+  required final OpenedChapter initialOpened,
+  final ReaderAuthentication? onAuthenticate,
+  final ReadingPosition? initialPosition,
+  final ChapterOrder? initialOrder,
+  final ReadingMode initialMode = ReadingMode.leftToRight,
+  final bool? initialDoublePage,
+}) extends StatefulHookConsumerWidget {
   @override
   ConsumerState<ChapterReaderRoute> createState() => _ChapterReaderRouteState();
 }
@@ -196,10 +184,10 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   Future<void> _editSettings() async {
     final controller = _settings;
     if (controller == null || _accessPaused || _recovering || _closing) return;
-    await showModalBottomSheet<void>(
+    await showCupertinoSheet<void>(
       context: context,
-      isScrollControlled: true,
-      builder: (_) => settings_ui.MangaSettingsEditor(
+      enableDrag: false,
+      scrollableBuilder: (context, _) => settings_ui.MangaSettingsEditor(
         catalog: widget.catalog,
         mangaKey: _sequence.mangaKey,
       ),
@@ -394,13 +382,12 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         ),
       ),
       if (widget.onAuthenticate != null)
-        FilledButton.icon(
+        CupertinoButton.filled(
           onPressed:
               _recovering || _busy || _initializing || _refreshingProgress
               ? null
               : () => unawaited(_recoverReading()),
-          icon: const Icon(Icons.login),
-          label: Text(_recovering ? '正在恢复阅读' : '重新登录并恢复本章'),
+          child: Text(_recovering ? '正在恢复阅读' : '重新登录并恢复本章'),
         ),
     ],
   );
@@ -690,18 +677,17 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (_busy) const LinearProgressIndicator(),
+        if (_busy) const CupertinoActivityIndicator(),
         if (_accessPaused) _accessNotice(),
-        if (_preparation.busy && !_busy) const LinearProgressIndicator(),
+        if (_preparation.busy && !_busy) const CupertinoActivityIndicator(),
         if (_error != null)
           Padding(padding: const EdgeInsets.all(8), child: Text(_error!)),
         if (_settings case final settings?) ...[
-          TextButton.icon(
+          CupertinoButton(
             onPressed: _busy || _accessPaused || _recovering
                 ? null
                 : _editSettings,
-            icon: const Icon(Icons.tune),
-            label: const Text('阅读设置'),
+            child: const Text('阅读设置'),
           ),
           if (_settingsState.error != null || _settingsState.pending != null)
             settings_ui.SettingsStatus(
@@ -743,7 +729,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         ],
         Row(
           children: [
-            TextButton.icon(
+            CupertinoButton(
               onPressed:
                   _busy ||
                       _accessPaused ||
@@ -752,23 +738,16 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                       previous == null
                   ? null
                   : () => unawaited(_move(previous)),
-              icon: const Icon(Icons.navigate_before),
-              label: const Text('上一章'),
+              child: const Text('上一章'),
             ),
             Expanded(
-              child: DropdownButton<ChapterOrder>(
+              child: ChoiceField<ChapterOrder>(
+                label: '章节排序',
                 value: _order,
-                isExpanded: true,
-                items: const [
-                  DropdownMenuItem(
-                    value: ChapterOrder.source,
-                    child: Text('来源顺序'),
-                  ),
-                  DropdownMenuItem(
-                    value: ChapterOrder.reversed,
-                    child: Text('反向来源顺序'),
-                  ),
-                ],
+                options: {
+                  ChapterOrder.source: '来源顺序',
+                  ChapterOrder.reversed: '反向来源顺序',
+                },
                 onChanged: _busy || _recovering || _refreshingProgress
                     ? null
                     : (order) {
@@ -776,7 +755,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                       },
               ),
             ),
-            TextButton.icon(
+            CupertinoButton(
               onPressed:
                   _busy ||
                       _accessPaused ||
@@ -785,8 +764,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                       next == null
                   ? null
                   : () => unawaited(_move(next)),
-              icon: const Icon(Icons.navigate_next),
-              label: const Text('下一章'),
+              child: const Text('下一章'),
             ),
           ],
         ),
@@ -825,14 +803,13 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
           Wrap(
             alignment: WrapAlignment.center,
             children: [
-              TextButton.icon(
+              CupertinoButton(
                 onPressed: disabled
                     ? null
                     : needsReopen
                     ? () => unawaited(_move(_chapter, reopen: true))
                     : () => unawaited(_refreshProgress()),
-                icon: const Icon(Icons.sync),
-                label: Text(
+                child: Text(
                   _refreshingProgress
                       ? '正在刷新进度'
                       : needsReopen
@@ -840,14 +817,14 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                       : '刷新进度',
                 ),
               ),
-              TextButton(
+              CupertinoButton(
                 onPressed:
                     disabled || needsReopen || _opened.manifest.pages.isEmpty
                     ? null
                     : () => unawaited(_resetChapter()),
                 child: const Text('重新阅读本章'),
               ),
-              TextButton(
+              CupertinoButton(
                 onPressed:
                     disabled ||
                         needsReopen ||
@@ -859,7 +836,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                 child: const Text('读完本章'),
               ),
               if (progress.error != null && progress.unsaved && !needsReopen)
-                TextButton(
+                CupertinoButton(
                   onPressed: disabled
                       ? null
                       : () => unawaited(progress.retry()),
@@ -891,19 +868,26 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
 
   Widget _reader() {
     if (!_visible) {
-      return Scaffold(
-        appBar: AppBar(title: Text(_manga.title)),
-        body: Column(
-          children: [
-            if (_accessPaused && !_allowPop) _accessNotice(),
-            Expanded(
-              child: Center(
-                child: _error == null
-                    ? const CircularProgressIndicator()
-                    : Text(_error!),
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          leading: CupertinoNavigationBarBackButton(
+            onPressed: () => unawaited(_exit()),
+          ),
+          middle: Text(_manga.title),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              if (_accessPaused && !_allowPop) _accessNotice(),
+              Expanded(
+                child: Center(
+                  child: _error == null
+                      ? const CupertinoActivityIndicator()
+                      : Text(_error!),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -915,6 +899,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       provider: opened.provider,
       generation: opened.generation,
       title: opened.title,
+      onExit: () => unawaited(_exit()),
       initialPosition: _initialPosition,
       preserveInitialPlacement: _preserveInitialPlacement,
       initialMode: _mode,

@@ -1,6 +1,8 @@
+import 'package:karuyomi/widgets/app_page_route.dart';
+
 import '../test_app.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
@@ -18,12 +20,12 @@ void main() {
     OpenSourceSearchDetails? onOpen,
   }) async {
     await tester.pumpApp(
-      MaterialApp(
+      CupertinoApp(
         home: Builder(
-          builder: (context) => Scaffold(
-            body: TextButton(
+          builder: (context) => CupertinoPageScaffold(
+            child: CupertinoButton(
               onPressed: () => Navigator.of(context).push<void>(
-                MaterialPageRoute<void>(
+                AppPageRoute<void>(
                   builder: (_) => CrossSourceSearchPage(
                     service: service,
                     onOpen: onOpen ?? (_) async {},
@@ -123,7 +125,7 @@ void main() {
         if (++attempts == 1) throw const FormatException('关闭未确认');
       };
       await openPage(tester, service);
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(find.byType(CrossSourceSearchPage), findsOneWidget);
       expect(
@@ -131,7 +133,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('关闭未确认'), findsOneWidget);
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(find.byType(CrossSourceSearchPage), findsNothing);
       expect(find.text('开始'), findsOneWidget);
@@ -154,7 +156,7 @@ void main() {
       await tester.pump();
       expect(
         tester
-            .widget<FilledButton>(
+            .widget<CupertinoButton>(
               find.byKey(const ValueKey('cross-search-submit')),
             )
             .onPressed,
@@ -211,9 +213,9 @@ void main() {
     await catalog.openBuild(catalog.builds.single);
     await catalog.selectSource(catalog.session!.sources.single);
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: CatalogPage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: CatalogPage(
             controller: catalog,
             onConnect: () {},
             onAuthenticate: () {},
@@ -248,7 +250,7 @@ void main() {
           .first,
     );
     expect(hint, findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '最新'), findsNothing);
+    expect(find.widgetWithText(CupertinoButton, '最新'), findsNothing);
     await tester.pumpApp(const SizedBox());
     catalog.dispose();
     await catalog.closeReadingProgress();

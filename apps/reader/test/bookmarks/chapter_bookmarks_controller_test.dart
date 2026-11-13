@@ -1,6 +1,8 @@
+import '../../test_support/cupertino.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -265,9 +267,9 @@ void main() {
   );
 
   Future<void> show(WidgetTester tester) => tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: Column(
+    CupertinoApp(
+      home: CupertinoPageScaffold(
+        child: Column(
           children: [
             BookmarkStatus(controller: controller),
             ChapterBookmarkButton(
@@ -295,19 +297,19 @@ void main() {
     await show(tester);
     expect(
       tester
-          .widget<IconButton>(
+          .widget<CupertinoButton>(
             find.byKey(const ValueKey('chapter-bookmark-$_chapter')),
           )
           .onPressed,
       isNull,
     );
     await tap(tester, find.text('刷新书签'));
-    await tap(tester, find.byTooltip('标记章节书签 第一章'));
+    await tap(tester, iconLabel('标记章节书签 第一章'));
     expect(server.bookmarked(_mangaKey, _chapter), true);
-    expect(find.byTooltip('移除章节书签 第一章'), findsOneWidget);
-    await tap(tester, find.byTooltip('移除章节书签 第一章'));
+    expect(iconLabel('移除章节书签 第一章'), findsOneWidget);
+    await tap(tester, iconLabel('移除章节书签 第一章'));
     expect(server.bookmarked(_mangaKey, _chapter), false);
-    expect(find.byTooltip('标记章节书签 第一章'), findsOneWidget);
+    expect(iconLabel('标记章节书签 第一章'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -318,12 +320,12 @@ void main() {
       await show(tester);
       await tap(tester, find.text('刷新书签'));
       server.failWrites = true;
-      await tap(tester, find.byTooltip('标记章节书签 第一章'));
+      await tap(tester, iconLabel('标记章节书签 第一章'));
       expect(find.text('本会话有尚未确认的书签操作；刷新不会自动重发。'), findsOneWidget);
       expect(find.text('重试原书签操作'), findsOneWidget);
       expect(
         tester
-            .widget<IconButton>(
+            .widget<CupertinoButton>(
               find.byKey(const ValueKey('chapter-bookmark-$_chapter')),
             )
             .onPressed,
@@ -336,7 +338,7 @@ void main() {
       expect(getWrites(), hasLength(2));
       expect(server.appliedMutations, 1);
       expect(find.text('重试原书签操作'), findsNothing);
-      expect(find.byTooltip('移除章节书签 第一章'), findsOneWidget);
+      expect(iconLabel('移除章节书签 第一章'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },

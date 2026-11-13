@@ -1,8 +1,10 @@
+import 'package:karuyomi/widgets/app_page_route.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
@@ -31,12 +33,12 @@ void main() {
   });
   Future<void> show(WidgetTester tester) async {
     await tester.pumpApp(
-      MaterialApp(
+      CupertinoApp(
         home: Builder(
-          builder: (context) => Scaffold(
-            body: TextButton(
+          builder: (context) => CupertinoPageScaffold(
+            child: CupertinoButton(
               onPressed: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
+                AppPageRoute(
                   builder: (_) => SourceBrowsePage(
                     catalog: catalog,
                     build: catalog.builds.single,
@@ -87,7 +89,7 @@ void main() {
       expect(platform.preparations, hasLength(1));
       expect(platform.openedBuilds, ['build-1']);
       expect(find.text(testManga.title), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, '最新'), findsNothing);
+      expect(find.widgetWithText(CupertinoButton, '最新'), findsNothing);
       expect(
         platform.businessServer.requests.where(
           (request) => request.method == 'POST',
@@ -202,7 +204,7 @@ void main() {
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pump();
       expect(find.text('正在停止并收尾'), findsOneWidget);
       release.complete();
@@ -234,7 +236,7 @@ void main() {
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pump();
       expect(find.text('正在停止并收尾'), findsOneWidget);
       release.complete();

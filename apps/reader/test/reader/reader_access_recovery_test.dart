@@ -1,9 +1,11 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -414,16 +416,16 @@ void main() {
         await tester.tap(find.text('重新阅读本章'));
         await tester.pumpAndSettle();
         tester
-            .widget<DropdownButton<ReadingMode>>(
-              find.byType(DropdownButton<ReadingMode>),
+            .widget<ChoiceField<ReadingMode>>(
+              find.byType(ChoiceField<ReadingMode>),
             )
             .onChanged!(ReadingMode.rightToLeft);
         await tester.pumpAndSettle();
         tester
-            .widget<SegmentedButton<bool?>>(
+            .widget<CupertinoSlidingSegmentedControl<int>>(
               find.byKey(const ValueKey('reader-page-layout')),
             )
-            .onSelectionChanged!({true});
+            .onValueChanged(2);
         await tester.pumpAndSettle();
         final original = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
         final anchor = original.manifest.positionAt(1, offset: .4);
@@ -629,7 +631,7 @@ void main() {
           await tester.pump(const Duration(milliseconds: 50));
         }
         expect(find.text('正在恢复阅读'), findsOneWidget);
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
         for (
           var index = 0;
           index < 40 && find.byType(ChapterReaderRoute).evaluate().isNotEmpty;
@@ -694,8 +696,8 @@ void main() {
       await tester.pump();
       expect(
         tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, '重新登录并恢复本章'),
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '重新登录并恢复本章'),
             )
             .onPressed,
         isNull,
@@ -713,8 +715,8 @@ void main() {
       );
       expect(
         tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, '重新登录并恢复本章'),
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '重新登录并恢复本章'),
             )
             .onPressed,
         isNotNull,

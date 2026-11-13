@@ -1,7 +1,9 @@
+import '../test_support/cupertino.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/library_repository.dart';
@@ -126,7 +128,7 @@ Future<LibraryView> _runPhase(
         firstAssigned: true,
       );
       await _tap(tester, find.text('管理分类'));
-      await _tap(tester, find.byTooltip('重命名分类 $_createdName'));
+      await _tap(tester, iconLabel('重命名分类 $_createdName'));
       await _nameAndSave(tester, _sharedName);
       await _waitForManager(tester, _sharedName);
       await _closeManager(tester);
@@ -165,7 +167,7 @@ Future<LibraryView> _runPhase(
       );
       if (_phase == 'verify') return before;
       await _tap(tester, find.text('管理分类'));
-      await _tap(tester, find.byTooltip('删除分类 $_sharedName'));
+      await _tap(tester, iconLabel('删除分类 $_sharedName'));
       await _tap(tester, find.text('删除'));
       await _waitFor(
         tester,
@@ -180,12 +182,10 @@ Future<LibraryView> _runPhase(
     case 'verify-deleted':
       _expectState(before);
       await _expectShelf(tester);
-      await _tap(tester, find.widgetWithText(ChoiceChip, '未分类'));
+      await _tap(tester, find.widgetWithText(CupertinoButton, '未分类'));
       await _expectShelf(tester);
       expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '未分类'))
-            .selected,
+        selectedState(tester, find.widgetWithText(CupertinoButton, '未分类')),
         isTrue,
       );
       return before;
@@ -193,16 +193,12 @@ Future<LibraryView> _runPhase(
       _expectOrderedState(before, [_weekday, _weekend]);
       await _expectOrderedShelf(tester, [_weekday, _weekend]);
       await _tap(tester, find.text('管理分类'));
-      await _tap(tester, find.byTooltip('上移分类 $_weekend'));
+      await _tap(tester, iconLabel('上移分类 $_weekend'));
       await _waitForManager(tester, _weekday);
+      expect(iconButton('上移分类 $_weekend'), findsOneWidget);
       expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is IconButton &&
-              widget.tooltip == '上移分类 $_weekend' &&
-              widget.onPressed == null,
-        ),
-        findsOneWidget,
+        tester.widget<CupertinoButton>(iconButton('上移分类 $_weekend')).onPressed,
+        isNull,
       );
       await _closeManager(tester);
       final after = await _readConfirmed(repository);
@@ -221,10 +217,10 @@ Future<LibraryView> _runPhase(
       _expectOrderedState(before, [_weekend, _weekday]);
       await _expectOrderedShelf(tester, [_weekend, _weekday]);
       await _tap(tester, find.text('管理分类'));
-      await _tap(tester, find.byTooltip('删除分类 $_weekend'));
+      await _tap(tester, iconLabel('删除分类 $_weekend'));
       await _tap(tester, find.text('删除'));
       await _waitForManager(tester, _weekday);
-      expect(find.byTooltip('删除分类 $_weekend'), findsNothing);
+      expect(iconLabel('删除分类 $_weekend'), findsNothing);
       await _closeManager(tester);
       final after = await _readConfirmed(repository);
       _expectOrderedState(after, [_weekday]);
@@ -268,14 +264,11 @@ Future<void> _expectOrderedShelf(
 ) async {
   final secondName = names.contains(_weekend) ? _weekend : '未分类';
   final labels = ['全部', '未分类', ...names];
-  Finder chip(String name) => find.widgetWithText(ChoiceChip, name);
+  Finder chip(String name) => find.widgetWithText(CupertinoButton, name);
   await _waitFor(tester, '书架显示目录顺序和两部收藏的分类', () {
     final actualLabels = tester
         .widgetList<Text>(
-          find.descendant(
-            of: find.byType(ChoiceChip),
-            matching: find.byType(Text),
-          ),
+          find.descendant(of: selectionControls, matching: find.byType(Text)),
         )
         .map((label) => label.data)
         .toList();
@@ -292,7 +285,7 @@ Future<void> _expectOrderedShelf(
     (secondName, _second, _first),
   ]) {
     await _tap(tester, chip(name));
-    expect(tester.widget<ChoiceChip>(chip(name)).selected, isTrue);
+    expect(selectedState(tester, chip(name)), isTrue);
     expect(_tile(visible), findsOneWidget);
     expect(_tile(hidden), findsNothing);
   }
@@ -335,7 +328,7 @@ void _expectState(
 LibraryEntry _entry(LibraryView view, String title) =>
     view.entries.singleWhere((entry) => entry.title == title);
 
-Finder _tile(String title) => find.widgetWithText(ListTile, title);
+Finder _tile(String title) => find.widgetWithText(CupertinoListTile, title);
 
 bool _tileShowsCategory(String title, String? categoryName) {
   final tile = _tile(title);
@@ -360,7 +353,7 @@ Future<void> _expectShelf(
   bool firstAssigned = false,
   bool secondAssigned = false,
 }) => _waitFor(tester, '书架显示服务端确认的分类与收藏', () {
-  if (find.byType(AlertDialog).evaluate().isNotEmpty) return false;
+  if (find.byType(CupertinoAlertDialog).evaluate().isNotEmpty) return false;
   for (final (title, assigned) in [
     (_first, firstAssigned),
     (_second, secondAssigned),
@@ -369,12 +362,13 @@ Future<void> _expectShelf(
     if (!_tileShowsCategory(title, expected)) return false;
   }
   return categoryName == null
-      ? find.byType(ChoiceChip).evaluate().length == 2
-      : find.widgetWithText(ChoiceChip, categoryName).evaluate().length == 1;
+      ? selectionControls.evaluate().length == 2
+      : find.widgetWithText(CupertinoButton, categoryName).evaluate().length ==
+            1;
 });
 
 Future<void> _nameAndSave(WidgetTester tester, String name) async {
-  final field = find.byType(TextFormField);
+  final field = find.byType(CupertinoTextFormFieldRow);
   await _waitFor(tester, '分类名称编辑框', () => field.evaluate().length == 1);
   await tester.enterText(field, name);
   await _tap(tester, find.text('保存'));
@@ -382,14 +376,11 @@ Future<void> _nameAndSave(WidgetTester tester, String name) async {
 
 Future<void> _waitForManager(WidgetTester tester, String name) =>
     _waitFor(tester, '分类修改获得确认并返回管理窗口', () {
-      final rename = find.byWidgetPredicate(
-        (widget) =>
-            widget is IconButton &&
-            widget.tooltip == '重命名分类 $name' &&
-            widget.onPressed != null,
-      );
-      return find.byType(AlertDialog).evaluate().length == 1 &&
-          rename.evaluate().length == 1;
+      final rename = iconButton('重命名分类 $name');
+      return find.byKey(const ValueKey('category-manager')).evaluate().length ==
+              1 &&
+          rename.evaluate().length == 1 &&
+          tester.widget<CupertinoButton>(rename).onPressed != null;
     });
 
 Future<void> _closeManager(WidgetTester tester) async {
@@ -397,7 +388,7 @@ Future<void> _closeManager(WidgetTester tester) async {
   await _waitFor(
     tester,
     '关闭分类管理窗口',
-    () => find.byType(AlertDialog).evaluate().isEmpty,
+    () => find.byType(CupertinoAlertDialog).evaluate().isEmpty,
   );
 }
 
@@ -406,17 +397,17 @@ Future<void> _assign(
   String title,
   String categoryName,
 ) async {
-  await _tap(tester, find.byTooltip('设置分类：$title'));
-  final checkbox = find.widgetWithText(CheckboxListTile, categoryName);
+  await _tap(tester, iconLabel('设置分类：$title'));
+  final checkbox = checkboxLabel(categoryName);
   await _waitFor(tester, '漫画分类选择框', () => checkbox.evaluate().length == 1);
-  expect(tester.widget<CheckboxListTile>(checkbox).value, isFalse);
+  expect(tester.widget<CupertinoCheckbox>(checkbox).value, isFalse);
   await _tap(tester, checkbox);
-  expect(tester.widget<CheckboxListTile>(checkbox).value, isTrue);
+  expect(tester.widget<CupertinoCheckbox>(checkbox).value, isTrue);
   await _tap(tester, find.text('保存'));
   await _waitFor(
     tester,
     '漫画关联获得服务端确认',
-    () => find.byType(AlertDialog).evaluate().isEmpty,
+    () => find.byType(CupertinoAlertDialog).evaluate().isEmpty,
   );
 }
 

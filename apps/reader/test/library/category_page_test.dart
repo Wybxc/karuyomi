@@ -1,9 +1,13 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+import 'package:karuyomi/widgets/edit_sheet.dart';
+
+import '../../test_support/cupertino.dart';
 import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
@@ -54,9 +58,9 @@ void main() {
   Future<void> show(WidgetTester tester, {CatalogController? service}) async {
     final current = service ?? controller;
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: LibraryPage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: LibraryPage(
             controller: current,
             onBrowse: () {},
             onConnect: () => unawaited(current.connect()),
@@ -81,6 +85,17 @@ void main() {
     });
     await tester.pumpAndSettle();
   }
+
+  final categoryFilter = find.byKey(const ValueKey('library-category-filter'));
+  Future<void> filter(WidgetTester tester, String name) async {
+    await tap(tester, categoryFilter);
+    await tap(tester, find.widgetWithText(CupertinoMenuItem, name));
+  }
+
+  bool hasCategory(WidgetTester tester, String name) => tester
+      .widget<ChoiceField<String>>(categoryFilter)
+      .options
+      .containsValue(name);
 
   Future<void> create(
     WidgetTester tester, {
@@ -117,7 +132,7 @@ void main() {
   }
 
   Future<void> nameAndSave(WidgetTester tester, String name) async {
-    await tester.enterText(find.byType(TextField).last, name);
+    await tester.enterText(find.byType(CupertinoTextField).last, name);
     await tap(tester, find.text('保存'));
   }
 
@@ -141,24 +156,24 @@ void main() {
         '想读',
         '科幻',
       ]);
-      await tap(tester, find.byTooltip('上移分类 科幻'));
+      await tap(tester, iconLabel('上移分类 科幻'));
       expect(server.catalog().categories.map((value) => value.name), [
         '科幻',
         '想读',
       ]);
-      await tap(tester, find.byTooltip('下移分类 科幻'));
+      await tap(tester, iconLabel('下移分类 科幻'));
       expect(server.catalog().categories.map((value) => value.name), [
         '想读',
         '科幻',
       ]);
-      await tap(tester, find.byTooltip('重命名分类 想读'));
+      await tap(tester, iconLabel('重命名分类 想读'));
       await nameAndSave(tester, '待读');
       expect(server.catalog().categories.first.name, '待读');
-      await tap(tester, find.byTooltip('删除分类 科幻'));
+      await tap(tester, iconLabel('删除分类 科幻'));
       await tap(tester, find.text('删除'));
       expect(server.catalog().categories.map((value) => value.name), ['待读']);
       await tap(tester, find.text('完成'));
-      expect(find.widgetWithText(ChoiceChip, '待读'), findsOneWidget);
+      expect(hasCategory(tester, '待读'), true);
       expect(platform.invocations, isEmpty);
       expect(tester.takeException(), isNull);
       await hide(tester);
@@ -173,26 +188,26 @@ void main() {
       final alpha = await favorite(tester, 'Alpha');
       await favorite(tester, 'Beta');
       await show(tester);
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '想读'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '科幻'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, checkboxLabel('想读'));
+      await tap(tester, checkboxLabel('科幻'));
       await tap(tester, find.text('保存'));
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first, _second]);
-      await tap(tester, find.widgetWithText(ChoiceChip, '想读'));
+      await filter(tester, '想读');
       expect(find.text('Alpha'), findsOneWidget);
       expect(find.text('Beta'), findsNothing);
-      await tap(tester, find.widgetWithText(ChoiceChip, '未分类'));
+      await filter(tester, '未分类');
       expect(find.text('Alpha'), findsNothing);
       expect(find.text('Beta'), findsOneWidget);
-      await tap(tester, find.widgetWithText(ChoiceChip, '全部'));
+      await filter(tester, '全部');
       expect(find.text('Alpha'), findsOneWidget);
       expect(find.text('Beta'), findsOneWidget);
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '想读'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '科幻'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, checkboxLabel('想读'));
+      await tap(tester, checkboxLabel('科幻'));
       await tap(tester, find.text('保存'));
       expect(server.manga(alpha.mangaKey)!.categoryIds, isEmpty);
-      await tap(tester, find.widgetWithText(ChoiceChip, '未分类'));
+      await filter(tester, '未分类');
       expect(find.text('Alpha'), findsOneWidget);
       expect(find.text('Beta'), findsOneWidget);
       expect(platform.invocations, isEmpty);
@@ -207,8 +222,8 @@ void main() {
       await create(tester);
       await show(tester);
       await tap(tester, find.text('管理分类'));
-      await tap(tester, find.byTooltip('重命名分类 想读'));
-      await tester.enterText(find.byType(TextField).last, '本端草稿');
+      await tap(tester, iconLabel('重命名分类 想读'));
+      await tester.enterText(find.byType(CupertinoTextField).last, '本端草稿');
       await tester.runAsync(
         () => remote.renameCategory(
           categoryId: _first,
@@ -243,8 +258,8 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '科幻'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, checkboxLabel('科幻'));
       await tester.runAsync(
         () => remote.setCategories(
           mangaKey: alpha.mangaKey,
@@ -294,14 +309,18 @@ void main() {
       final initial = posts('/api/categories/mutations').single.body;
       expect(server.appliedMutations, 1);
       expect(
-        tester.widget<TextField>(find.byType(TextField).last).enabled,
+        tester
+            .widget<CupertinoTextField>(find.byType(CupertinoTextField).last)
+            .enabled,
         false,
       );
-      expect(find.widgetWithText(ChoiceChip, '想读'), findsNothing);
+      expect(hasCategory(tester, '想读'), false);
       await tap(tester, find.text('稍后处理').last);
       expect(
         tester
-            .widget<TextButton>(find.widgetWithText(TextButton, '新建分类'))
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '新建分类'),
+            )
             .onPressed,
         isNull,
       );
@@ -311,7 +330,9 @@ void main() {
       await tap(tester, find.text('继续未确认修改'));
       expect(posts('/api/categories/mutations'), hasLength(1));
       expect(
-        tester.widget<TextField>(find.byType(TextField).last).enabled,
+        tester
+            .widget<CupertinoTextField>(find.byType(CupertinoTextField).last)
+            .enabled,
         false,
       );
       await tap(tester, find.text('重试保存'));
@@ -321,7 +342,7 @@ void main() {
       ]);
       expect(server.appliedMutations, 1);
       await tap(tester, find.text('完成'));
-      expect(find.widgetWithText(ChoiceChip, '想读'), findsOneWidget);
+      expect(hasCategory(tester, '想读'), true);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -333,18 +354,14 @@ void main() {
       await create(tester);
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '想读'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, checkboxLabel('想读'));
       server.failWrites = true;
       await tap(tester, find.text('保存'));
       expect(find.textContaining('尚未确认保存'), findsWidgets);
       expect(server.manga(alpha.mangaKey)!.categoryIds, isEmpty);
       expect(
-        tester
-            .widget<CheckboxListTile>(
-              find.widgetWithText(CheckboxListTile, '想读'),
-            )
-            .onChanged,
+        tester.widget<CupertinoCheckbox>(checkboxLabel('想读')).onChanged,
         isNull,
       );
       final first = posts('/api/state/mutations').last.body;
@@ -365,7 +382,7 @@ void main() {
       await show(tester);
       await tap(tester, find.text('管理分类'));
       await tap(tester, find.text('新建分类'));
-      await tester.enterText(find.byType(TextField).last, '旧身份草稿');
+      await tester.enterText(find.byType(CupertinoTextField).last, '旧身份草稿');
       final postCount = posts('/api/categories/mutations').length;
       platform.bootstrapSubject = 'other-subject';
       await tester.runAsync(controller.connect);
@@ -373,7 +390,7 @@ void main() {
       expect(find.text(_expired), findsWidgets);
       expect(
         tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, '保存'))
+            .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, '保存'))
             .onPressed,
         isNull,
       );
@@ -399,12 +416,12 @@ void main() {
       await show(tester);
       expect(tester.takeException(), isNull);
       await tap(tester, find.text('管理分类'));
-      expect(find.byTooltip('重命名分类 $name'), findsOneWidget);
-      expect(find.byTooltip('删除分类 $name'), findsOneWidget);
+      expect(iconLabel('重命名分类 $name'), findsOneWidget);
+      expect(iconLabel('删除分类 $name'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tap(tester, find.text('完成'));
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      expect(find.widgetWithText(CheckboxListTile, name), findsOneWidget);
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      expect(checkboxLabel(name), findsOneWidget);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -417,8 +434,8 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '想读'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, checkboxLabel('想读'));
       await tester.runAsync(
         () => remote.renameCategory(
           categoryId: _second,
@@ -441,9 +458,9 @@ void main() {
       expect(find.text('重试保存'), findsNothing);
       await tap(tester, find.text('重新读取并关闭'));
       expect(posts('/api/state/mutations').length, attempts);
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      expect(find.widgetWithText(CheckboxListTile, '新名字'), findsOneWidget);
-      await tap(tester, find.widgetWithText(CheckboxListTile, '想读'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      expect(checkboxLabel('新名字'), findsOneWidget);
+      await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));
       final accepted = wire.decodeProtoJson(
         wire.StateMutation(),
@@ -463,17 +480,19 @@ void main() {
     await show(tester);
     await tap(tester, find.text('管理分类'));
     await tap(tester, find.text('新建分类'));
-    await tester.enterText(find.byType(TextField).last, '旧会话草稿');
+    await tester.enterText(find.byType(CupertinoTextField).last, '旧会话草稿');
     await tester.runAsync(controller.connect);
     await tester.pumpAndSettle();
     expect(find.text(_expired), findsWidgets);
     expect(
-      tester.widget<TextField>(find.byType(TextField).last).enabled,
+      tester
+          .widget<CupertinoTextField>(find.byType(CupertinoTextField).last)
+          .enabled,
       false,
     );
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, '保存'))
+          .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, '保存'))
           .onPressed,
       isNull,
     );
@@ -496,7 +515,7 @@ void main() {
       await show(tester);
       await tap(tester, find.text('管理分类'));
       await tap(tester, find.text('新建分类'));
-      await tester.enterText(find.byType(TextField).last, '旧服务草稿');
+      await tester.enterText(find.byType(CupertinoTextField).last, '旧服务草稿');
       final nextPlatform = TestPlatform();
       final nextController = CatalogController(
         api: nextPlatform,
@@ -513,12 +532,14 @@ void main() {
       await show(tester, service: nextController);
       expect(find.text(_expired), findsWidgets);
       expect(
-        tester.widget<TextField>(find.byType(TextField).last).enabled,
+        tester
+            .widget<CupertinoTextField>(find.byType(CupertinoTextField).last)
+            .enabled,
         false,
       );
       expect(
         tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, '保存'))
+            .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, '保存'))
             .onPressed,
         isNull,
       );
@@ -535,7 +556,7 @@ void main() {
       await show(tester);
       await tap(tester, find.text('管理分类'));
       await tap(tester, find.text('新建分类'));
-      await tester.enterText(find.byType(TextField).last, '旧请求');
+      await tester.enterText(find.byType(CupertinoTextField).last, '旧请求');
       final received = Completer<void>();
       final release = Completer<void>();
       addTearDown(() {
@@ -563,10 +584,12 @@ void main() {
       expect(find.text(_expired), findsWidgets);
       release.complete();
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsNWidgets(2));
+      expect(find.byType(EditSheet), findsNWidgets(2));
       expect(find.text(_expired), findsWidgets);
       expect(
-        tester.widget<FilledButton>(find.byType(FilledButton).last).onPressed,
+        tester
+            .widget<CupertinoButton>(find.byType(CupertinoButton).last)
+            .onPressed,
         isNull,
       );
       expect(server.catalog(subject: 'other-subject').categories, isEmpty);
@@ -620,13 +643,14 @@ void main() {
           await Future<void>.delayed(Duration.zero);
         });
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pump(const Duration(milliseconds: 600));
+        await tester.pump();
       }
 
       await show(tester);
       await tap(tester, find.text('管理分类'));
       await tap(tester, find.text('新建分类'));
-      await tester.enterText(find.byType(TextField).last, '迟到确认');
+      await tester.enterText(find.byType(CupertinoTextField).last, '迟到确认');
       holdReply('/api/categories/mutations');
       await startSaving();
       final createdId = server.catalog().categories.single.id;
@@ -634,26 +658,48 @@ void main() {
       await tester.pump(const Duration(milliseconds: 32));
       expect(find.text(_expired), findsWidgets);
       // An expired busy modal can close, while the original command stays held.
-      await tapBusy(find.text('稍后处理').last);
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tap(tester, find.text('稍后处理'));
-      expect(find.byType(AlertDialog), findsNothing);
+      await tapBusy(
+        find.descendant(
+          of: find.byKey(const ValueKey('category-command')),
+          matching: find.text('稍后处理'),
+        ),
+      );
+      // Sheets retain a departing route for their delegated transition. Count
+      // active editors while a spinner prevents using pumpAndSettle.
+      final activeSheets = find.byElementPredicate(
+        (element) =>
+            element.widget is EditSheet &&
+            ModalRoute.of(element)?.isActive == true,
+      );
+      expect(activeSheets, findsOneWidget);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('category-manager')),
+          matching: find.text('稍后处理'),
+        ),
+      );
+      expect(activeSheets, findsNothing);
       await tapBusy(find.text('处理未确认修改'));
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(activeSheets, findsOneWidget);
       expect(find.text('管理分类'), findsWidgets);
       expect(find.text(_expired), findsNothing);
       expect(
         tester
-            .widget<TextButton>(find.widgetWithText(TextButton, '新建分类'))
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '新建分类'),
+            )
             .onPressed,
         isNull,
       );
       await acknowledge();
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.byTooltip('重命名分类 迟到确认'), findsOneWidget);
+      expect(find.byType(EditSheet), findsOneWidget);
+      expect(iconLabel('重命名分类 迟到确认'), findsOneWidget);
       expect(
         tester
-            .widget<TextButton>(find.widgetWithText(TextButton, '新建分类'))
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '新建分类'),
+            )
             .onPressed,
         isNotNull,
       );
@@ -662,8 +708,8 @@ void main() {
 
       final alpha = await favorite(tester, 'Alpha');
       await tester.pumpAndSettle();
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '迟到确认'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, checkboxLabel('迟到确认'));
       received = Completer<void>();
       release = Completer<void>();
       holdReply('/api/state/mutations');
@@ -673,25 +719,21 @@ void main() {
       await tester.pump(const Duration(milliseconds: 32));
       expect(find.text(_expired), findsWidgets);
       await tap(tester, find.text('稍后处理'));
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(EditSheet), findsNothing);
       await tapBusy(find.text('处理未确认修改'));
       expect(find.text('设置分类'), findsOneWidget);
       expect(find.text(_expired), findsNothing);
       await acknowledge();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(EditSheet), findsOneWidget);
       expect(find.text('分类修改已由服务端确认。'), findsOneWidget);
       expect(
-        tester
-            .widget<CheckboxListTile>(
-              find.widgetWithText(CheckboxListTile, '迟到确认'),
-            )
-            .onChanged,
+        tester.widget<CupertinoCheckbox>(checkboxLabel('迟到确认')).onChanged,
         isNull,
       );
       expect(posts('/api/state/mutations').length, sent);
       expect(server.manga(alpha.mangaKey)!.categoryIds, [createdId]);
       await tap(tester, find.text('完成'));
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(EditSheet), findsNothing);
       expect(find.text('处理未确认修改'), findsNothing);
       expect(tester.takeException(), isNull);
       await hide(tester);
@@ -733,14 +775,14 @@ void main() {
       );
       final original = posts('/api/state/mutations').last.body;
       final sent = posts('/api/state/mutations').length;
-      await tap(tester, find.byTooltip('设置分类：Alpha'));
-      await tap(tester, find.widgetWithText(CheckboxListTile, '想读'));
+      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));
       expect(find.textContaining('先处理原操作'), findsOneWidget);
       expect(find.text('重新读取并关闭'), findsOneWidget);
       expect(posts('/api/state/mutations'), hasLength(sent));
       await tap(tester, find.text('重新读取并关闭'));
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(EditSheet), findsNothing);
       expect(find.text('处理未确认修改'), findsNothing);
       expect(find.text('书架还是空的'), findsOneWidget);
       expect(posts('/api/state/mutations'), hasLength(sent));
@@ -770,17 +812,15 @@ void main() {
         ),
       );
       await show(tester);
-      await tap(tester, find.widgetWithText(ChoiceChip, '想读'));
+      await filter(tester, '想读');
       expect(find.text('Beta'), findsNothing);
       await tap(tester, find.text('管理分类'));
-      await tap(tester, find.byTooltip('删除分类 想读'));
+      await tap(tester, iconLabel('删除分类 想读'));
       await tap(tester, find.text('删除'));
       await tap(tester, find.text('完成'));
-      expect(find.widgetWithText(ChoiceChip, '想读'), findsNothing);
+      expect(hasCategory(tester, '想读'), false);
       expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '全部'))
-            .selected,
+        tester.widget<ChoiceField<String>>(categoryFilter).value == null,
         true,
       );
       expect(find.text('Alpha'), findsOneWidget);

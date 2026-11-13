@@ -1,7 +1,11 @@
+import '../../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import 'dart:async';
 import 'dart:io';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
@@ -52,7 +56,7 @@ ChapterManifest fixtureChapter() => ChapterManifest(
 Widget fixtureImage(BuildContext context, ImageResource resource, BoxFit fit) =>
     ColoredBox(
       key: ValueKey(resource.id),
-      color: Colors.indigo,
+      color: CupertinoColors.systemIndigo,
       child: Center(child: Text(resource.id)),
     );
 
@@ -107,7 +111,7 @@ Widget screen({
   int dimPercent = 0,
   ReaderInputPreset tapZones = ReaderInputPreset.standard,
   ReaderInputPreset keyboard = ReaderInputPreset.standard,
-}) => MaterialApp(
+}) => CupertinoApp(
   home: ReaderScreen(
     manifest: manifest,
     provider: provider,
@@ -154,12 +158,15 @@ void expectOriginalImageAnchor(
   );
 }
 
-bool? pageLayoutPreference(WidgetTester tester) => tester
-    .widget<SegmentedButton<bool?>>(
+bool? pageLayoutPreference(WidgetTester tester) => switch (tester
+    .widget<CupertinoSlidingSegmentedControl<int>>(
       find.byKey(const ValueKey('reader-page-layout')),
     )
-    .selected
-    .single;
+    .groupValue) {
+  1 => false,
+  2 => true,
+  _ => null,
+};
 
 void main() {
   testWidgets(
@@ -381,9 +388,9 @@ void main() {
       );
       await tester.pumpWidget(configured(true));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('下一页'));
+      await tester.tap(iconLabel('下一页'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('下一页'));
+      await tester.tap(iconLabel('下一页'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('spread-page-1')), findsOneWidget);
       expect(find.byKey(const ValueKey('image-rect-page-1')), findsOneWidget);
@@ -490,9 +497,9 @@ void main() {
       expect(viewports.last.current.normalizedX, closeTo(.7, .001));
       expect(viewports.last.current.normalizedOffset, closeTo(.6, .001));
       expectOriginalImageAnchor(tester, viewports.last.current, list);
-      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.tap(iconLabel('放大当前图片'));
       await tester.pumpAndSettle();
-      final dialog = find.byType(Dialog);
+      final dialog = find.byKey(const ValueKey('reader-image-viewer'));
       final original = find.descendant(
         of: dialog,
         matching: find.byKey(const ValueKey('runtime-1-page-0')),
@@ -509,14 +516,14 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.getRect(original).width, closeTo(croppedWidth, 1));
-      await tester.pageBack();
+      await tester.tap(iconLabel('关闭图片'));
       await tester.pumpAndSettle();
       expect(viewports.last.current.normalizedX, closeTo(.7, .001));
       expect(viewports.last.current.normalizedOffset, closeTo(.6, .001));
       expectOriginalImageAnchor(tester, viewports.last.current, list);
       expect(provider.acquired.length, acquired);
       expect(provider.released, isEmpty);
-      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.tap(iconLabel('放大当前图片'));
       await tester.pumpAndSettle();
       final oldImageContext = tester.element(original);
       final replacement = FixturePageProvider();
@@ -539,7 +546,7 @@ void main() {
         tester.getSize(find.byKey(const ValueKey('image-rect-page-0'))),
         contentSize,
       );
-      await tester.pageBack();
+      await tester.tap(iconLabel('关闭图片'));
       await tester.pumpAndSettle();
       expect(provider.released, ['runtime-1-page-0']);
       expect(replacement.acquired.length, 1);
@@ -776,7 +783,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('下一页'));
+      await tester.tap(iconLabel('下一页'));
       await tester.pumpAndSettle();
       expect(viewports.last.current.pageKey, 'page-1');
       expect(viewports.last.current.normalizedX, 1);
@@ -796,7 +803,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(viewports.last.atEnd, true);
       expect(viewports.last.observed!.pageKey, 'page-2');
-      await tester.tap(find.byTooltip('上一页'));
+      await tester.tap(iconLabel('上一页'));
       await tester.pumpAndSettle();
       expect(find.text('1 / 3'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -1136,7 +1143,7 @@ void main() {
       await tester.pumpWidget(configured(decodeDestination: false));
       await tester.pumpAndSettle();
       expect(viewports.last.observed?.pageKey, 'landscape');
-      await tester.tap(find.byTooltip('上一页'));
+      await tester.tap(iconLabel('上一页'));
       await tester.pumpAndSettle();
       final navigation = viewports.last.current;
       expect(navigation.pageKey, 'portrait');
@@ -1234,13 +1241,13 @@ void main() {
       await tester.pumpAndSettle();
       expectOriginalPoint(list);
       final saved = viewports.last.current;
-      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.tap(iconLabel('放大当前图片'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(
         configured(ReadingMode.continuous, ReaderFit.width),
       );
       await tester.pumpAndSettle();
-      final dialog = find.byType(Dialog);
+      final dialog = find.byKey(const ValueKey('reader-image-viewer'));
       final dialogViewport = find.descendant(
         of: dialog,
         matching: find.byType(InteractiveViewer),
@@ -1261,7 +1268,7 @@ void main() {
         tester.getRect(dialogImage).height,
         closeTo(tester.getRect(dialogViewport).height, 1),
       );
-      await tester.pageBack();
+      await tester.tap(iconLabel('关闭图片'));
       await tester.pumpAndSettle();
       expect(viewports.last.observed, isNotNull);
       final count = positions.length;
@@ -1352,13 +1359,13 @@ void main() {
       await tapFraction(.9);
       expect(find.text('6 / 20'), findsOneWidget);
       await tapFraction(.5);
-      expect(find.byType(AppBar), findsNothing);
+      expect(find.byType(CupertinoNavigationBar), findsNothing);
       await tapFraction(.5);
-      expect(find.byType(AppBar), findsOneWidget);
+      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
       await tester.drag(find.byType(InteractiveViewer), const Offset(120, 0));
       await tester.pumpAndSettle();
       expect(find.text('7 / 20'), findsOneWidget);
-      await tester.tap(find.byTooltip('上一页'));
+      await tester.tap(iconLabel('上一页'));
       await tester.pumpAndSettle();
       expect(find.text('6 / 20'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -1431,7 +1438,7 @@ void main() {
         await press(key);
       }
       expect(find.text('20 / 20'), findsOneWidget);
-      await tester.tap(find.byTooltip('上一页'));
+      await tester.tap(iconLabel('上一页'));
       await tester.pumpAndSettle();
       expect(find.text('19 / 20'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -1463,10 +1470,12 @@ void main() {
       await tester.pumpWidget(configured(ReaderBackground.black, 0));
       await tester.pumpAndSettle();
       expect(
-        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
-        Colors.black,
+        tester
+            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+            .backgroundColor,
+        CupertinoColors.black,
       );
-      expect(textColor, Colors.white);
+      expect(textColor, CupertinoColors.white);
       final acquired = provider.acquired.map((page) => page.pageKey).toList();
       final released = provider.released.toList();
       final anchor = viewports.last.current;
@@ -1474,10 +1483,12 @@ void main() {
       await tester.pumpWidget(configured(ReaderBackground.white, 80));
       await tester.pumpAndSettle();
       expect(
-        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
-        Colors.white,
+        tester
+            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+            .backgroundColor,
+        CupertinoColors.white,
       );
-      expect(textColor, Colors.black);
+      expect(textColor, CupertinoColors.black);
       final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
       expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
       expect(
@@ -1485,7 +1496,7 @@ void main() {
         tester.getRect(find.byType(InteractiveViewer)),
       );
       expect(
-        tester.getRect(dimmer).overlaps(tester.getRect(find.byTooltip('下一页'))),
+        tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('下一页'))),
         false,
       );
       expect(viewports.last.current.pageKey, anchor.pageKey);
@@ -1501,10 +1512,12 @@ void main() {
       await tester.pumpAndSettle();
       final readerContext = tester.element(find.byType(ReaderScreen));
       expect(
-        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
-        Theme.of(readerContext).scaffoldBackgroundColor,
+        tester
+            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+            .backgroundColor,
+        CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
       );
-      expect(textColor, Theme.of(readerContext).colorScheme.onSurface);
+      expect(textColor, CupertinoColors.label.resolveFrom(readerContext));
       expect(dimmer, findsNothing);
       expect(provider.acquired.map((page) => page.pageKey), acquired);
       expect(tester.takeException(), isNull);
@@ -1544,21 +1557,17 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.home);
       await tester.pumpAndSettle();
       expect(scrollable.position.pixels, scrollOffset);
-      await tester.tap(find.byTooltip('放大当前图片'));
+      await tester.tap(iconLabel('放大当前图片'));
       await tester.pumpAndSettle();
       expect(find.text('查看图片'), findsOneWidget);
       final acquired = provider.acquired.map((page) => page.pageKey).toList();
       final released = provider.released.toList();
       await tester.pumpWidget(configured(ReaderBackground.white, 80));
       await tester.pumpAndSettle();
-      final dialog = find.byType(Dialog);
+      final dialog = find.byKey(const ValueKey('reader-image-viewer'));
       expect(
-        tester
-            .widget<Scaffold>(
-              find.descendant(of: dialog, matching: find.byType(Scaffold)),
-            )
-            .backgroundColor,
-        Colors.white,
+        tester.widget<CupertinoPageScaffold>(dialog).backgroundColor,
+        CupertinoColors.white,
       );
       final dimmer = find.descendant(
         of: dialog,
@@ -1566,10 +1575,10 @@ void main() {
       );
       expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
       expect(
-        tester.getRect(dimmer).overlaps(tester.getRect(find.byTooltip('放大'))),
+        tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('放大'))),
         false,
       );
-      await tester.tap(find.byTooltip('放大'));
+      await tester.tap(iconLabel('放大'));
       await tester.pumpAndSettle();
       final zoom = tester.widget<InteractiveViewer>(
         find.descendant(of: dialog, matching: find.byType(InteractiveViewer)),
@@ -1577,7 +1586,7 @@ void main() {
       expect(zoom.transformationController!.value.getMaxScaleOnAxis(), 2);
       expect(provider.acquired.map((page) => page.pageKey), acquired);
       expect(provider.released, released);
-      await tester.pageBack();
+      await tester.tap(iconLabel('关闭图片'));
       await tester.pumpAndSettle();
       expect(positions.last.pageKey, anchor.pageKey);
       expect(
@@ -1611,7 +1620,7 @@ void main() {
       await tester.pumpWidget(
         ReaderBaselineScope(
           recorder: baseline,
-          child: MaterialApp(
+          child: CupertinoApp(
             home: ReaderScreen(
               manifest: fixtureChapter(),
               provider: provider,
@@ -1630,7 +1639,7 @@ void main() {
         provider.acquired.map((e) => e.pageKey),
         containsAll(['page-0', 'page-1']),
       );
-      await tester.tap(find.byTooltip('下一页'));
+      await tester.tap(iconLabel('下一页'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
@@ -1934,7 +1943,7 @@ void main() {
       expect(viewports.last.doublePage, isNull);
       expect(modes, isEmpty);
       expect(pagePolicies, isEmpty);
-      await tester.tap(find.byType(DropdownButton<ReadingMode>));
+      await tester.tap(find.byType(ChoiceField<ReadingMode>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('从右到左').last);
       await tester.pumpAndSettle();
@@ -1947,8 +1956,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<DropdownButton<ReadingMode>>(
-              find.byType(DropdownButton<ReadingMode>),
+            .widget<ChoiceField<ReadingMode>>(
+              find.byType(ChoiceField<ReadingMode>),
             )
             .value,
         ReadingMode.rightToLeft,
@@ -1990,21 +1999,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<DropdownButton<ReadingMode>>(
-              find.byType(DropdownButton<ReadingMode>),
+            .widget<ChoiceField<ReadingMode>>(
+              find.byType(ChoiceField<ReadingMode>),
             )
             .onChanged,
         isNull,
       );
       expect(
         tester
-            .widget<SegmentedButton<bool?>>(
+            .widget<CupertinoSlidingSegmentedControl<int>>(
               find.byKey(const ValueKey('reader-page-layout')),
             )
-            .onSelectionChanged,
-        isNull,
+            .disabledChildren,
+        {0, 1, 2},
       );
-      await tester.tap(find.byTooltip('下一页'));
+      await tester.tap(iconLabel('下一页'));
       await tester.pumpAndSettle();
       expect(find.text('2 / 20'), findsOneWidget);
       await tester.pumpWidget(
@@ -2142,7 +2151,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('放大'));
+      await tester.tap(iconLabel('放大'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(
         screen(
@@ -2165,7 +2174,7 @@ void main() {
       expect(viewports.last.observed, isNotNull);
       expect(viewports.last.atEnd, false);
       expect(viewports.last.windowReady, true);
-      await tester.tap(find.byTooltip('重置缩放'));
+      await tester.tap(iconLabel('重置缩放'));
       await tester.pumpAndSettle();
       expect(viewports.last.observed!.pageKey, 'page-20');
       expect(viewports.last.atEnd, true);
@@ -2232,10 +2241,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1 / 20'), findsOneWidget);
     expect(provider.acquired.length, lessThanOrEqualTo(3));
-    await tester.tap(find.byTooltip('下一页'));
+    await tester.tap(iconLabel('下一页'));
     await tester.pumpAndSettle();
     expect(find.text('2 / 20'), findsOneWidget);
-    await tester.tap(find.byTooltip('放大'));
+    await tester.tap(iconLabel('放大'));
     await tester.pumpAndSettle();
     final viewer = tester.widget<InteractiveViewer>(
       find.byType(InteractiveViewer),
@@ -2244,7 +2253,7 @@ void main() {
     await tester.drag(find.byType(InteractiveViewer), const Offset(-120, 0));
     await tester.pumpAndSettle();
     expect(find.text('2 / 20'), findsOneWidget);
-    await tester.tap(find.byTooltip('重置缩放'));
+    await tester.tap(iconLabel('重置缩放'));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(InteractiveViewer), const Offset(-120, 0));
     await tester.pumpAndSettle();
@@ -2284,8 +2293,8 @@ void main() {
               '标记书签',
               '刷新书签',
             ])
-              TextButton(onPressed: () {}, child: Text(label)),
-            TextButton(
+              CupertinoButton(onPressed: () {}, child: Text(label)),
+            CupertinoButton(
               onPressed: () => nextChapter = true,
               child: const Text('下一章'),
             ),
@@ -2345,17 +2354,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     final before = positions.last;
-    await tester.tap(find.byTooltip('放大当前图片'));
+    await tester.tap(iconLabel('放大当前图片'));
     await tester.pumpAndSettle();
     expect(find.text('查看图片'), findsOneWidget);
-    await tester.tap(find.byTooltip('放大'));
+    await tester.tap(iconLabel('放大'));
     await tester.pumpAndSettle();
-    await tester.pageBack();
+    await tester.tap(iconLabel('关闭图片'));
     await tester.pumpAndSettle();
     expect(find.text('查看图片'), findsNothing);
     tester.view.physicalSize = const Size(700, 500);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButton<ReadingMode>));
+    await tester.tap(find.byType(ChoiceField<ReadingMode>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('条漫').last);
     await tester.pumpAndSettle();

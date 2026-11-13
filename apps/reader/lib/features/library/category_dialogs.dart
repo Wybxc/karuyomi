@@ -1,6 +1,8 @@
+import '../../widgets/edit_sheet.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:uuid/uuid.dart';
@@ -34,10 +36,10 @@ Future<void> showLibraryCategoryManager({
   if (pending?.entry != null) {
     return _showCommand(context, controller, lifecycle, isCurrent, pending!);
   }
-  return showDialog<void>(
+  return showCupertinoSheet<void>(
     context: context,
-    barrierDismissible: false,
-    builder: (_) => _CategoryManager(
+    enableDrag: false,
+    scrollableBuilder: (context, _) => _CategoryManager(
       controller: controller,
       repository: repository,
       view: pending?.view ?? view,
@@ -94,10 +96,10 @@ Future<void> _showCommand(
   Listenable lifecycle,
   bool Function() isCurrent,
   _CategoryDraft draft,
-) => showDialog<void>(
+) => showCupertinoSheet<void>(
   context: context,
-  barrierDismissible: false,
-  builder: (_) => _CategoryCommand(
+  enableDrag: false,
+  scrollableBuilder: (context, _) => _CategoryCommand(
     controller: controller,
     lifecycle: lifecycle,
     isCurrent: isCurrent,
@@ -265,13 +267,15 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (draft?.busy == true) const LinearProgressIndicator(),
+      if (draft?.busy == true) const CupertinoActivityIndicator(),
       if (expired || draft?.error != null)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text(
             expired ? _expired : draft!.error!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+            style: TextStyle(
+              color: CupertinoColors.systemRed.resolveFrom(context),
+            ),
           ),
         ),
       if (!expired && draft?.completed == true)
@@ -288,20 +292,13 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
   );
 }
 
-class _CategoryManager extends StatefulHookWidget {
-  const _CategoryManager({
-    required this.controller,
-    required this.repository,
-    required this.view,
-    required this.lifecycle,
-    required this.isCurrent,
-  });
-  final CatalogController controller;
-  final LibraryRepository repository;
-  final LibraryView view;
-  final Listenable lifecycle;
-  final bool Function() isCurrent;
-
+class const _CategoryManager({
+  required final CatalogController controller,
+  required final LibraryRepository repository,
+  required final LibraryView view,
+  required final Listenable lifecycle,
+  required final bool Function() isCurrent,
+}) extends StatefulHookWidget {
   @override
   State<_CategoryManager> createState() => _CategoryManagerState();
 }
@@ -439,46 +436,44 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
     useOnListenableChange(_draft, _draftChanged);
     return PopScope(
       canPop: expired || _draft?.busy != true,
-      child: AlertDialog(
+      child: EditSheet(
+        key: const ValueKey('category-manager'),
         title: const Text('管理分类'),
-        content: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                status(_draft),
-                if (_view.categories.isEmpty) const Text('还没有分类。'),
-                for (var index = 0; index < _view.categories.length; index++)
-                  _categoryRow(_view.categories[index], index),
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: editable && _view.categories.length < 64
-                      ? _command
-                      : null,
-                  icon: const Icon(Icons.add),
-                  label: const Text('新建分类'),
-                ),
-                if (_view.categories.length == 64) const Text('最多可创建 64 个分类。'),
-                if (_draft case final draft? when !expired) ...[
-                  if (draft.blocked && !draft.completed)
-                    FilledButton(
-                      onPressed: draft.busy ? null : _reload,
-                      child: const Text('重新读取并关闭'),
-                    )
-                  else if (draft.attempted && !draft.completed)
-                    FilledButton(
-                      onPressed: draft.busy ? null : () => _execute(draft),
-                      child: Text(draft.reorder ? draft.retryLabel : '继续未确认修改'),
-                    ),
-                ],
+        content: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              status(_draft),
+              if (_view.categories.isEmpty) const Text('还没有分类。'),
+              for (var index = 0; index < _view.categories.length; index++)
+                _categoryRow(_view.categories[index], index),
+              const SizedBox(height: 12),
+              CupertinoButton(
+                onPressed: editable && _view.categories.length < 64
+                    ? _command
+                    : null,
+                child: const Text('新建分类'),
+              ),
+              if (_view.categories.length == 64) const Text('最多可创建 64 个分类。'),
+              if (_draft case final draft? when !expired) ...[
+                if (draft.blocked && !draft.completed)
+                  CupertinoButton.filled(
+                    onPressed: draft.busy ? null : _reload,
+                    child: const Text('重新读取并关闭'),
+                  )
+                else if (draft.attempted && !draft.completed)
+                  CupertinoButton.filled(
+                    onPressed: draft.busy ? null : () => _execute(draft),
+                    child: Text(draft.reorder ? draft.retryLabel : '继续未确认修改'),
+                  ),
               ],
-            ),
+            ],
           ),
         ),
         actions: [
-          TextButton(
+          CupertinoButton(
             onPressed: !expired && _draft?.busy == true
                 ? null
                 : () => Navigator.pop(context),
@@ -498,33 +493,44 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(category.name, style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          category.name,
+          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+        ),
         Wrap(
           children: [
-            IconButton(
-              tooltip: '上移分类 ${category.name}',
-              onPressed: editable && index > 0 ? () => _move(index, -1) : null,
-              icon: const Icon(Icons.arrow_upward),
-            ),
-            IconButton(
-              tooltip: '下移分类 ${category.name}',
-              onPressed: editable && index + 1 < _view.categories.length
-                  ? () => _move(index, 1)
-                  : null,
-              icon: const Icon(Icons.arrow_downward),
-            ),
-            IconButton(
-              tooltip: '重命名分类 ${category.name}',
-              onPressed: editable ? () => _command(category: category) : null,
-              icon: const Icon(Icons.edit_outlined),
-            ),
-            IconButton(
-              tooltip: '删除分类 ${category.name}',
-              onPressed: editable
-                  ? () => _command(category: category, delete: true)
-                  : null,
-              icon: const Icon(Icons.delete_outline),
-            ),
+            for (final (icon, label, action)
+                in <(IconData, String, VoidCallback?)>[
+                  (
+                    CupertinoIcons.arrow_up,
+                    '上移分类',
+                    editable && index > 0 ? () => _move(index, -1) : null,
+                  ),
+                  (
+                    CupertinoIcons.arrow_down,
+                    '下移分类',
+                    editable && index + 1 < _view.categories.length
+                        ? () => _move(index, 1)
+                        : null,
+                  ),
+                  (
+                    CupertinoIcons.pencil,
+                    '重命名分类',
+                    editable ? () => _command(category: category) : null,
+                  ),
+                  (
+                    CupertinoIcons.trash,
+                    '删除分类',
+                    editable
+                        ? () => _command(category: category, delete: true)
+                        : null,
+                  ),
+                ])
+              CupertinoButton(
+                onPressed: action,
+                padding: const EdgeInsets.all(8),
+                child: Icon(icon, semanticLabel: '$label ${category.name}'),
+              ),
           ],
         ),
       ],
@@ -532,17 +538,12 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
   );
 }
 
-class _CategoryCommand extends StatefulHookWidget {
-  const _CategoryCommand({
-    required this.controller,
-    required this.lifecycle,
-    required this.isCurrent,
-    required this.draft,
-  });
-  final CatalogController controller;
-  final Listenable lifecycle;
-  final bool Function() isCurrent;
-  final _CategoryDraft draft;
+class const _CategoryCommand({
+  required final CatalogController controller,
+  required final Listenable lifecycle,
+  required final bool Function() isCurrent,
+  required final _CategoryDraft draft,
+}) extends StatefulHookWidget {
   @override
   State<_CategoryCommand> createState() => _CategoryCommandState();
 }
@@ -586,64 +587,67 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
     useListenable(draft);
     return PopScope(
       canPop: expired || !draft.busy,
-      child: AlertDialog(
+      child: EditSheet(
+        key: const ValueKey('category-command'),
         title: Text(draft.title),
-        content: SizedBox(
-          width: 440,
-          child: SingleChildScrollView(
-            child: Form(
-              key: _form,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (draft.description case final description?)
-                    Text(description),
-                  if (draft.name != null)
-                    TextFormField(
-                      controller: _name,
-                      enabled: editable,
-                      autofocus: true,
-                      decoration: const InputDecoration(labelText: '分类名称'),
-                      validator: (text) {
-                        try {
-                          validateBusinessCategoryName((text ?? '').trim());
-                          return null;
-                        } on FormatException {
-                          return '名称不能为空，且最多 100 字、256 字节。';
-                        }
-                      },
+        content: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (draft.description case final description?)
+                  Text(description),
+                if (draft.name != null)
+                  CupertinoTextFormFieldRow(
+                    controller: _name,
+                    enabled: editable,
+                    autofocus: true,
+                    validator: (text) {
+                      try {
+                        validateBusinessCategoryName((text ?? '').trim());
+                        return null;
+                      } on FormatException {
+                        return '名称不能为空，且最多 100 字、256 字节。';
+                      }
+                    },
+                    prefix: Text('分类名称'),
+                  ),
+                if (draft.categories case final categories?) ...[
+                  if (categories.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('还没有分类，请先在书架中管理分类。'),
                     ),
-                  if (draft.categories case final categories?) ...[
-                    if (categories.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Text('还没有分类，请先在书架中管理分类。'),
+                  for (final category in categories)
+                    MergeSemantics(
+                      child: CupertinoFormRow(
+                        prefix: Expanded(flex: 3, child: Text(category.name)),
+                        padding: EdgeInsets.zero,
+                        child: CupertinoCheckbox(
+                          value: _selection.contains(category.id),
+                          onChanged: editable
+                              ? (selected) => setState(() {
+                                  if (selected == true) {
+                                    _selection.add(category.id);
+                                  } else {
+                                    _selection.remove(category.id);
+                                  }
+                                })
+                              : null,
+                        ),
                       ),
-                    for (final category in categories)
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(category.name),
-                        value: _selection.contains(category.id),
-                        onChanged: editable
-                            ? (selected) => setState(() {
-                                if (selected == true) {
-                                  _selection.add(category.id);
-                                } else {
-                                  _selection.remove(category.id);
-                                }
-                              })
-                            : null,
-                      ),
-                  ],
-                  status(draft),
+                    ),
                 ],
-              ),
+                status(draft),
+              ],
             ),
           ),
         ),
         actions: [
-          TextButton(
+          CupertinoButton(
             onPressed: !expired && draft.busy
                 ? null
                 : () => Navigator.pop(context),
@@ -656,12 +660,12 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
             ),
           ),
           if (draft.blocked)
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: expired || draft.busy ? null : _reload,
               child: const Text('重新读取并关闭'),
             )
           else
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: expired || draft.busy || draft.completed
                   ? null
                   : _save,

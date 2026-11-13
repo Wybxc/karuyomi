@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/services.dart';
 
@@ -13,16 +13,12 @@ import 'reader_baseline_file_cleanup_stub.dart'
 
 /// Mounted only in an explicitly enabled build. The normal app has no recorder,
 /// timings listener, performance overlay, or global JavaScript export hook.
-class ReaderBaselineHost extends StatelessWidget {
-  const ReaderBaselineHost({
-    super.key,
-    required this.child,
-    this.saveReportForTesting,
-  });
-  final Widget child;
+class const ReaderBaselineHost({
+  super.key,
+  required final Widget child,
+  final Future<void> Function(XFile file)? saveReportForTesting,
+}) extends StatelessWidget {
   @visibleForTesting
-  final Future<void> Function(XFile file)? saveReportForTesting;
-
   @override
   Widget build(BuildContext context) => _ReaderBaselineContents(
     saveReportForTesting: saveReportForTesting,
@@ -30,13 +26,10 @@ class ReaderBaselineHost extends StatelessWidget {
   );
 }
 
-class _ReaderBaselineContents extends StatefulHookWidget {
-  const _ReaderBaselineContents({
-    required this.child,
-    this.saveReportForTesting,
-  });
-  final Widget child;
-  final Future<void> Function(XFile file)? saveReportForTesting;
+class const _ReaderBaselineContents({
+  required final Widget child,
+  final Future<void> Function(XFile file)? saveReportForTesting,
+}) extends StatefulHookWidget {
   @override
   State<_ReaderBaselineContents> createState() =>
       _ReaderBaselineContentsState();
@@ -76,16 +69,14 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
               top: MediaQuery.paddingOf(context).top + 8,
               child: _open
                   ? _panel()
-                  : Material(
-                      elevation: 4,
-                      borderRadius: BorderRadius.circular(20),
-                      child: TextButton.icon(
+                  : ColoredBox(
+                      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+                      child: CupertinoButton(
                         onPressed: () {
                           _recorder.event('capture_panel_opened');
                           setState(() => _open = true);
                         },
-                        icon: const Icon(Icons.speed),
-                        label: const Text('性能采集'),
+                        child: const Text('性能采集'),
                       ),
                     ),
             ),
@@ -97,10 +88,8 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
   Widget _panel() => SizedBox(
     width: (MediaQuery.sizeOf(context).width - 16).clamp(0, 560),
     height: (MediaQuery.sizeOf(context).height - 32).clamp(0, 640),
-    child: Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
+    child: ColoredBox(
+      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
@@ -110,7 +99,7 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
               Row(
                 children: [
                   const Expanded(child: Text('性能采集')),
-                  TextButton(
+                  CupertinoButton(
                     onPressed: () {
                       _recorder.event('capture_panel_closed');
                       setState(() => _open = false);
@@ -134,7 +123,7 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
               Wrap(
                 spacing: 8,
                 children: [
-                  FilledButton(
+                  CupertinoButton.filled(
                     onPressed:
                         _downloadPending ||
                             _recorder.recording ||
@@ -157,7 +146,7 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
                           },
                     child: const Text('开始采集'),
                   ),
-                  OutlinedButton(
+                  CupertinoButton(
                     onPressed: _recorder.recording
                         ? () {
                             _recorder.stop();
@@ -165,14 +154,14 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
                         : null,
                     child: const Text('停止采集'),
                   ),
-                  OutlinedButton(
+                  CupertinoButton(
                     onPressed: _recorder.state == ReaderBaselineState.stopped
                         ? _showSummary
                         : null,
                     child: const Text('查看摘要'),
                   ),
                   if (kIsWeb || widget.saveReportForTesting != null)
-                    OutlinedButton(
+                    CupertinoButton(
                       onPressed:
                           _recorder.state == ReaderBaselineState.stopped &&
                               !_downloadPending
@@ -180,7 +169,7 @@ class _ReaderBaselineContentsState extends State<_ReaderBaselineContents> {
                           : null,
                       child: const Text('下载 JSON'),
                     ),
-                  OutlinedButton(
+                  CupertinoButton(
                     onPressed: _recorder.state == ReaderBaselineState.stopped
                         ? _copy
                         : null,

@@ -1,9 +1,14 @@
+import '../../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
@@ -140,9 +145,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: LibraryPage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: LibraryPage(
             controller: catalog,
             onBrowse: () {},
             onConnect: () {},
@@ -169,12 +174,12 @@ void main() {
     'shelf keeps details navigation and directly resumes fresh server chapter and anchor once',
     (tester) async {
       await show(tester);
-      expect(find.byTooltip('继续阅读：${entry.title}'), findsOneWidget);
+      expect(iconLabel('继续阅读：${entry.title}'), findsOneWidget);
       await tester.tap(find.text(entry.title));
       await tester.pumpAndSettle();
       expect(find.byType(MangaDetailsPage), findsOneWidget);
       expect(platform.invocations.where((call) => call.hasPages()), isEmpty);
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       await tester.ensureVisible(getContinue());
       final target = manifests['/two']!;
@@ -211,7 +216,7 @@ void main() {
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
-      expect(tester.widget<IconButton>(getContinue()).onPressed, isNull);
+      expect(tester.widget<CupertinoButton>(getContinue()).onPressed, isNull);
       expect(
         platform.invocations.where(
           (call) => call.hasPages() && call.pages.chapter.url == '/two',
@@ -254,13 +259,13 @@ void main() {
       );
       expect(
         tester
-            .widget<DropdownButton<ChapterOrder>>(
-              find.byType(DropdownButton<ChapterOrder>),
+            .widget<ChoiceField<ChapterOrder>>(
+              find.byType(ChoiceField<ChapterOrder>),
             )
             .value,
         ChapterOrder.source,
       );
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(find.byType(LibraryPage), findsOneWidget);
       expect(find.byType(MangaDetailsPage), findsNothing);
@@ -322,8 +327,8 @@ void main() {
     );
     unawaited(
       Navigator.of(tester.element(find.byType(LibraryPage))).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => const Scaffold(body: Text('另一个页面')),
+        AppPageRoute<void>(
+          builder: (_) => const CupertinoPageScaffold(child: Text('另一个页面')),
         ),
       ),
     );
@@ -432,7 +437,7 @@ void main() {
       expect(find.byType(MangaDetailsPage), findsOneWidget);
       expect(platform.businessServer.appliedMutations, appliedBefore + 1);
       expect(catalog.library!.client.hasPendingMetadata(entry.mangaKey), true);
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       final retry = find.byKey(
         ValueKey(('library-retry-metadata', entry.mangaKey)),
@@ -440,7 +445,7 @@ void main() {
       await tester.ensureVisible(retry);
       await tester.pumpAndSettle();
       expect(find.text('重试保存书架资料'), findsOneWidget);
-      expect(tester.widget<TextButton>(retry).onPressed, isNotNull);
+      expect(tester.widget<CupertinoButton>(retry).onPressed, isNotNull);
       expect(bodies, hasLength(1));
       await tester.tap(retry);
       await tester.tap(retry);
@@ -448,7 +453,7 @@ void main() {
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
-      expect(tester.widget<TextButton>(retry).onPressed, isNull);
+      expect(tester.widget<CupertinoButton>(retry).onPressed, isNull);
       expect(bodies, hasLength(2));
       expect(bodies.last, bodies.first);
       expect(platform.businessServer.appliedMutations, appliedBefore + 1);
@@ -501,7 +506,7 @@ void main() {
         await release.future;
       };
       await show(tester);
-      expect(find.byTooltip('继续阅读（未保存）：${entry.title}'), findsOneWidget);
+      expect(iconLabel('继续阅读（未保存）：${entry.title}'), findsOneWidget);
       await tester.tap(getContinue());
       await tester.pump();
       await tester.runAsync(

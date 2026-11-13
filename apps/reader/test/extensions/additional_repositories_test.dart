@@ -4,7 +4,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
@@ -561,7 +561,7 @@ void main() {
     'repository dialog previews before an explicit second confirmation writes the account',
     (tester) async {
       await tester.pumpApp(
-        MaterialApp(
+        CupertinoApp(
           home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
         ),
       );
@@ -611,7 +611,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(900, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpApp(
-        MaterialApp(
+        CupertinoApp(
           home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
         ),
       );
@@ -668,7 +668,7 @@ void main() {
         await catalog.connect();
         final before = platform.businessServer.requests.length;
         await tester.pumpApp(
-          MaterialApp(
+          CupertinoApp(
             home: ExtensionsPage(catalog: catalog, repository: clicked),
           ),
         );

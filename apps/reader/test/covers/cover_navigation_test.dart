@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:karuyomi/data/business_state_client.dart';
@@ -181,7 +181,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pumpAndSettle();
-      await _tap(tester, find.byType(BackButton));
+      await _tap(tester, find.byType(CupertinoNavigationBarBackButton));
       await _tap(tester, find.text('书架').last);
       expect(
         tester.widget<CustomCover>(find.byType(CustomCover)).cover!.assetId,
@@ -375,7 +375,7 @@ void main() {
       expect(find.text('未能读取服务端封面，请重试。'), findsOneWidget);
       expect(
         tester
-            .widget<OutlinedButton>(
+            .widget<CupertinoButton>(
               find.byKey(const ValueKey('cover-select-image')),
             )
             .onPressed,

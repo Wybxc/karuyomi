@@ -1,6 +1,7 @@
+import '../../test_support/cupertino.dart';
 import '../test_app.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
@@ -79,7 +80,7 @@ void main() {
         chapters: _chapters,
       );
       expect(find.text('已标记 0 章'), findsOneWidget);
-      await _tap(tester, find.byTooltip('标记章节书签 第一章'));
+      await _tap(tester, iconLabel('标记章节书签 第一章'));
       expect(
         platform.businessServer.bookmarked(
           sequence.mangaKey,
@@ -88,13 +89,16 @@ void main() {
         true,
       );
       expect(find.text('已标记 1 章'), findsOneWidget);
-      await _tap(tester, find.widgetWithText(FilterChip, '仅书签'));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('chapters-bookmarked-only')),
+      );
       expect(find.text('第一章'), findsOneWidget);
       expect(find.text('第二章'), findsNothing);
       await _tap(tester, find.text('第一章'));
       expect(find.byType(ReaderScreen), findsOneWidget);
       expect(find.text('本章已标记书签'), findsOneWidget);
-      await _tap(tester, find.byTooltip('移除章节书签 第一章'));
+      await _tap(tester, iconLabel('移除章节书签 第一章'));
       expect(find.text('本章未标记书签'), findsOneWidget);
       expect(
         platform.businessServer.bookmarked(

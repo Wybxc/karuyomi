@@ -1,6 +1,10 @@
+import '../../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
@@ -24,9 +28,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: SourceBrowsePage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: SourceBrowsePage(
             catalog: fixture.catalog,
             build: fixture.catalog.activeBuild!,
             source: fixture.catalog.activeBuild!.sources.single,
@@ -72,27 +76,24 @@ void main() {
       expect(fixture.postedBodies, hasLength(1));
       await item(tester, '1');
       await tester.enterText(
-        find.byType(TextField).last,
+        find.byType(CupertinoTextField).last,
         'secret-on-this-client',
       );
       await apply(tester);
       expect(fixture.postedBodies, hasLength(1));
       expect(find.text('secret-on-this-client'), findsNothing);
       await item(tester, '2');
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.widgetWithText(CupertinoMenuItem, '服务器乙'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('服务器乙').last);
-      await tester.pumpAndSettle();
-      await apply(tester);
       await item(tester, '3');
       await tester.tap(find.text('中文').last);
       await tester.pumpAndSettle();
       await apply(tester);
       await item(tester, '4.0');
       await item(tester, '4.1');
-      final noteInput = find.byType(TextField).last;
-      final noteField = tester.widget<TextField>(noteInput);
-      expect(noteField.decoration?.hintText, '可填写备注');
+      final noteInput = find.byType(CupertinoTextField).last;
+      final noteField = tester.widget<CupertinoTextField>(noteInput);
+      expect(noteField.placeholder, '可填写备注');
       final noteController = noteField.controller!;
       expect(noteController.selection.textInside(noteController.text), '原备注');
       await tester.enterText(noteInput, 'session-note');
@@ -110,7 +111,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(unsupported, findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byTooltip('关闭设置'));
+      await tester.tap(iconLabel('关闭设置'));
       await tester.pumpAndSettle();
     },
   );
@@ -122,11 +123,8 @@ void main() {
       await open(tester);
       expect(find.textContaining('当前值已不在可选列表中'), findsOneWidget);
       await item(tester, '2');
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.widgetWithText(CupertinoMenuItem, '服务器乙'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('服务器乙').last);
-      await tester.pumpAndSettle();
-      await apply(tester);
       expect(fixture.postedBodies.single, contains('"text":"b"'));
       fixture.emptyOptions = true;
       await tester.tap(
@@ -137,9 +135,9 @@ void main() {
       await tester.ensureVisible(choice);
       await tester.pumpAndSettle();
       expect(find.textContaining('目前没有可选项'), findsOneWidget);
-      expect(tester.widget<ListTile>(choice).onTap, isNull);
+      expect(tester.widget<ChoiceField<String>>(choice).onChanged, isNull);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byTooltip('关闭设置'));
+      await tester.tap(iconLabel('关闭设置'));
       await tester.pumpAndSettle();
     },
   );
@@ -152,12 +150,12 @@ void main() {
       await item(tester, '0');
       final original = fixture.postedBodies.single;
       expect(find.text('未确认的原保存请求 · 基于版本 0'), findsOneWidget);
-      await tester.tap(find.byTooltip('关闭设置'));
+      await tester.tap(iconLabel('关闭设置'));
       await tester.pumpAndSettle();
       final recovery = find.text('处理漫画源设置');
       final scrollable = find
           .descendant(
-            of: find.byType(ListView).first,
+            of: find.byType(SourceBrowsePage),
             matching: find.byType(Scrollable),
           )
           .first;
@@ -174,7 +172,7 @@ void main() {
       expect(fixture.callbacks, 1);
       expect(fixture.platform.businessServer.appliedMutations, 1);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byTooltip('关闭设置'));
+      await tester.tap(iconLabel('关闭设置'));
       await tester.pumpAndSettle();
     },
   );
@@ -257,7 +255,7 @@ void main() {
         expect(fixture.platform.openedBuilds, hasLength(opened));
         expect(fixture.postedBodies, isEmpty);
         expect(tester.takeException(), isNull);
-        await tester.tap(find.byTooltip('关闭设置'));
+        await tester.tap(iconLabel('关闭设置'));
         await tester.pumpAndSettle();
       },
     );

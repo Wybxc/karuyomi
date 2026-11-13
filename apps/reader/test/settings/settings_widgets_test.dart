@@ -1,8 +1,10 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/settings_repository.dart';
@@ -58,9 +60,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: manga
                 ? MangaSettingsEditor(catalog: fixture.catalog, mangaKey: _key)
@@ -88,8 +90,8 @@ void main() {
   }
 
   Future<void> select<T>(WidgetTester tester, String label) async {
-    await tap(tester, find.byType(DropdownButtonFormField<T>));
-    await tap(tester, find.text(label).last);
+    await tap(tester, find.byType(ChoiceField<T>));
+    await tap(tester, find.widgetWithText(CupertinoMenuItem, label));
   }
 
   List<TestBusinessRequest> writes() =>
@@ -102,20 +104,24 @@ void main() {
     await tester.runAsync(controller.refresh);
     await show(tester, controller);
     expect(
-      find.byKey(
-        const ValueKey(('global-theme', wire.AppTheme.APP_THEME_SYSTEM)),
-      ),
-      findsOneWidget,
+      tester
+          .widget<ChoiceField<wire.AppTheme>>(
+            find.byKey(const ValueKey('global-theme')),
+          )
+          .value,
+      wire.AppTheme.APP_THEME_SYSTEM,
     );
     await tester.runAsync(
       () => repository.setGlobal(values: _global(), basedOnRevision: 0),
     );
     await tester.pumpAndSettle();
     expect(
-      find.byKey(
-        const ValueKey(('global-theme', wire.AppTheme.APP_THEME_DARK)),
-      ),
-      findsOneWidget,
+      tester
+          .widget<ChoiceField<wire.AppTheme>>(
+            find.byKey(const ValueKey('global-theme')),
+          )
+          .value,
+      wire.AppTheme.APP_THEME_DARK,
     );
     expect(state().snapshot!.globalRevision, 1);
     expect(tester.takeException(), isNull);
@@ -144,10 +150,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(state().snapshot!.globalRevision, 1);
       expect(
-        find.byKey(
-          const ValueKey(('global-theme', wire.AppTheme.APP_THEME_DARK)),
-        ),
-        findsOneWidget,
+        tester
+            .widget<ChoiceField<wire.AppTheme>>(
+              find.byKey(const ValueKey('global-theme')),
+            )
+            .value,
+        wire.AppTheme.APP_THEME_DARK,
       );
       await tap(tester, find.text('保存全局设置'));
       expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
@@ -162,10 +170,12 @@ void main() {
       await tap(tester, find.text('重新读取设置'));
       expect(state().pending, isNull);
       expect(
-        find.byKey(
-          const ValueKey(('global-theme', wire.AppTheme.APP_THEME_LIGHT)),
-        ),
-        findsOneWidget,
+        tester
+            .widget<ChoiceField<wire.AppTheme>>(
+              find.byKey(const ValueKey('global-theme')),
+            )
+            .value,
+        wire.AppTheme.APP_THEME_LIGHT,
       );
       await tap(tester, find.text('保存全局设置'));
       expect(
@@ -199,10 +209,10 @@ void main() {
       await show(tester, controller, manga: true);
       expect(
         tester
-            .widget<DropdownButtonFormField<wire.ReaderPageLayout>>(
-              find.byType(DropdownButtonFormField<wire.ReaderPageLayout>),
+            .widget<ChoiceField<wire.ReaderPageLayout>>(
+              find.byType(ChoiceField<wire.ReaderPageLayout>),
             )
-            .initialValue,
+            .value,
         isNull,
       );
       await select<wire.ReaderPageLayout>(tester, '自动');
@@ -213,6 +223,14 @@ void main() {
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
       );
       await select<wire.ReaderPageLayout>(tester, '跟随全局');
+      expect(
+        tester
+            .widget<ChoiceField<wire.ReaderPageLayout>>(
+              find.byType(ChoiceField<wire.ReaderPageLayout>),
+            )
+            .value,
+        isNull,
+      );
       await tap(tester, find.text('保存本漫画设置'));
       expect(state(manga: true).snapshot!.overrides!.hasPageLayout(), false);
       expect(
@@ -291,27 +309,27 @@ void main() {
         if (manga) {
           expect(
             tester
-                .widget<DropdownButtonFormField<wire.ReaderPageLayout>>(
-                  find.byType(DropdownButtonFormField<wire.ReaderPageLayout>),
+                .widget<ChoiceField<wire.ReaderPageLayout>>(
+                  find.byType(ChoiceField<wire.ReaderPageLayout>),
                 )
-                .initialValue,
+                .value,
             wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
           );
         } else {
           expect(
             tester
-                .widget<DropdownButtonFormField<wire.AppTheme>>(
-                  find.byType(DropdownButtonFormField<wire.AppTheme>),
+                .widget<ChoiceField<wire.AppTheme>>(
+                  find.byType(ChoiceField<wire.AppTheme>),
                 )
-                .initialValue,
+                .value,
             wire.AppTheme.APP_THEME_DARK,
           );
         }
         if (manga) {
           expect(
             tester
-                .widget<DropdownButtonFormField<wire.ReaderPageLayout>>(
-                  find.byType(DropdownButtonFormField<wire.ReaderPageLayout>),
+                .widget<ChoiceField<wire.ReaderPageLayout>>(
+                  find.byType(ChoiceField<wire.ReaderPageLayout>),
                 )
                 .onChanged,
             isNull,
@@ -319,8 +337,8 @@ void main() {
         } else {
           expect(
             tester
-                .widget<DropdownButtonFormField<wire.AppTheme>>(
-                  find.byType(DropdownButtonFormField<wire.AppTheme>),
+                .widget<ChoiceField<wire.AppTheme>>(
+                  find.byType(ChoiceField<wire.AppTheme>),
                 )
                 .onChanged,
             isNull,
@@ -328,8 +346,11 @@ void main() {
         }
         expect(
           tester
-              .widget<FilledButton>(
-                find.widgetWithText(FilledButton, manga ? '保存本漫画设置' : '保存全局设置'),
+              .widget<CupertinoButton>(
+                find.widgetWithText(
+                  CupertinoButton,
+                  manga ? '保存本漫画设置' : '保存全局设置',
+                ),
               )
               .onPressed,
           isNull,

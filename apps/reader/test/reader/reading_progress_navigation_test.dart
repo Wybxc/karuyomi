@@ -1,6 +1,8 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -193,8 +195,8 @@ void main() {
       expect(find.text('重新打开本章'), findsNothing);
       expect(
         tester
-            .widget<DropdownButton<ChapterOrder>>(
-              find.byType(DropdownButton<ChapterOrder>),
+            .widget<ChoiceField<ChapterOrder>>(
+              find.byType(ChoiceField<ChapterOrder>),
             )
             .value,
         ChapterOrder.reversed,
@@ -287,19 +289,19 @@ void main() {
           manifest.positionAt(1, offset: .4);
       await tester.pumpAndSettle();
       expect(await catalog.flushReadingProgress(), false);
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       await tester.runAsync(() async {
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pumpAndSettle();
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.byType(TextField),
+        find.byType(CupertinoTextField),
         replacement.origin.toString(),
       );
       await tester.tap(find.text('连接服务'));
@@ -338,7 +340,7 @@ void main() {
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.byType(TextField),
+        find.byType(CupertinoTextField),
         original.origin.toString(),
       );
       await tester.tap(find.text('连接服务'));
@@ -409,8 +411,8 @@ void main() {
       leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final secondManifest = leaf.manifest;
       tester
-          .widget<DropdownButton<ChapterOrder>>(
-            find.byType(DropdownButton<ChapterOrder>),
+          .widget<ChoiceField<ChapterOrder>>(
+            find.byType(ChoiceField<ChapterOrder>),
           )
           .onChanged!(ChapterOrder.reversed);
       await tester.pumpAndSettle();
@@ -437,7 +439,7 @@ void main() {
           windowReady: false,
         ),
       );
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(find.text('继续阅读'), findsOneWidget);
       expect(find.byType(ReaderScreen), findsNothing);
@@ -461,8 +463,8 @@ void main() {
       expect(leaf.initialPosition!.viewportY, .15);
       expect(
         tester
-            .widget<DropdownButton<ChapterOrder>>(
-              find.byType(DropdownButton<ChapterOrder>),
+            .widget<ChoiceField<ChapterOrder>>(
+              find.byType(ChoiceField<ChapterOrder>),
             )
             .value,
         ChapterOrder.reversed,

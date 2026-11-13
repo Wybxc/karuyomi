@@ -1,9 +1,11 @@
+import 'package:karuyomi/widgets/app_page_route.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -300,7 +302,10 @@ void main() {
       );
       await _tap(tester, _readFilter('unread'));
       await _shown(tester, [1, 2, 3]);
-      await _tap(tester, find.widgetWithText(FilterChip, '仅书签'));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('chapters-bookmarked-only')),
+      );
       await _search(tester, '同名');
       await _shown(tester, [2]);
       await _tap(tester, _readFilter('read'));
@@ -342,17 +347,17 @@ void main() {
           ValueKey(('chapter-select', _sequence.entries[index].key)),
         );
         await _reveal(tester, checkbox);
-        expect(tester.widget<Checkbox>(checkbox).value, index != 3);
+        expect(tester.widget<CupertinoCheckbox>(checkbox).value, index != 3);
       }
       await _search(tester, '同名');
       await _tap(tester, _control('chapter-mark-read'));
       expect(find.text('确认清单：3 章'), findsOneWidget);
       expect(
         tester
-            .widgetList<ListTile>(
+            .widgetList<CupertinoListTile>(
               find.descendant(
-                of: find.byType(AlertDialog),
-                matching: find.byType(ListTile),
+                of: find.byKey(const ValueKey('chapter-read-review')),
+                matching: find.byType(CupertinoListTile),
               ),
             )
             .map((tile) => tile.key),
@@ -362,8 +367,8 @@ void main() {
         ],
       );
       for (final index in [2, 1, 0]) {
-        final item = tester.widget<ListTile>(_preview(index));
-        expect((item.title! as Text).data, _chapters[index].name);
+        final item = tester.widget<CupertinoListTile>(_preview(index));
+        expect((item.title as Text).data, _chapters[index].name);
         expect((item.subtitle! as Text).data, '来源第 ${index + 1} 项');
       }
       expect(_posts(platform), isEmpty);
@@ -635,7 +640,7 @@ void main() {
         unawaited(
           Navigator.of(tester.element(find.byType(MangaDetailsPage)))
               .push<void>(
-                MaterialPageRoute<void>(
+                AppPageRoute<void>(
                   builder: (_) => MangaDetailsPage(
                     controller: catalog,
                     manga: detail.manga,
@@ -796,7 +801,7 @@ void main() {
         );
       }
       await _back(tester);
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
       expect(find.byType(MangaDetailsPage), findsOneWidget);
       expect(find.textContaining('漫画源会话已变化'), findsOneWidget);
       await _finish(tester, platform, catalog);
@@ -853,7 +858,7 @@ void main() {
       final key = GlobalKey();
       final chapters = _chapters.map(ChapterEntry.new).toList();
       final source = catalog.sourceReference;
-      Widget detail(MangaEntry manga) => MaterialApp(
+      Widget detail(MangaEntry manga) => CupertinoApp(
         home: MangaDetailsPage(
           key: key,
           controller: catalog,

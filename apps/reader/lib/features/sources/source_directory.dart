@@ -1,6 +1,8 @@
+import '../../widgets/choice_field.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -13,25 +15,18 @@ import '../settings/settings_controller.dart';
 import '../settings/settings_widgets.dart';
 import '../settings/pending_global_settings.dart';
 
-class SourceDirectory extends HookConsumerWidget {
-  const SourceDirectory({
-    super.key,
-    required this.catalog,
-    required this.onManage,
-    required this.onOpen,
-    required this.onSearch,
-    required this.onPreferences,
-  });
-  final CatalogController catalog;
-  final VoidCallback onManage;
-  final Future<void> Function(
+class const SourceDirectory({
+  super.key,
+  required final CatalogController catalog,
+  required final VoidCallback onManage,
+  required final Future<void> Function(
     ExtensionListing extension,
     wire.CatalogSource source,
   )
-  onOpen;
-  final VoidCallback onSearch;
-  final ValueChanged<SourcePreferencesTarget> onPreferences;
-
+  onOpen,
+  required final VoidCallback onSearch,
+  required final ValueChanged<SourcePreferencesTarget> onPreferences,
+}) extends HookConsumerWidget {
   bool _same(
     wire.FavoriteSource favorite,
     String packageName,
@@ -188,48 +183,44 @@ class SourceDirectory extends HookConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: TextField(
+              child: CupertinoTextField(
                 key: const ValueKey('source-directory-search'),
                 controller: search,
-                decoration: const InputDecoration(
-                  hintText: '查找漫画源名称',
-                  prefixIcon: Icon(Icons.search),
-                ),
+                placeholder: '查找漫画源名称',
+                prefix: Icon(CupertinoIcons.search),
               ),
             ),
-            IconButton(
+            CupertinoButton(
               key: const ValueKey('cross-source-search-open'),
-              tooltip: '跨源搜索',
               onPressed: catalog.busy || catalog.library == null
                   ? null
                   : onSearch,
-              icon: const Icon(Icons.manage_search),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(
+                CupertinoIcons.doc_text_search,
+                semanticLabel: '跨源搜索',
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            const Text('语言：'),
-            DropdownButton<String>(
-              key: const ValueKey('source-language-filter'),
-              value: language.value,
-              hint: const Text('全部语言'),
-              items: [
-                const DropdownMenuItem<String>(
-                  value: null,
-                  child: Text('全部语言'),
-                ),
-                for (final language in languages)
-                  DropdownMenuItem(
-                    value: language,
-                    child: Text(sourceLanguage(language)),
-                  ),
-              ],
-              onChanged: (value) => language.value = value,
+            Expanded(
+              child: ChoiceField<String>(
+                key: const ValueKey('source-language-filter'),
+                label: '语言',
+                value: language.value,
+                options: {
+                  null: '全部语言',
+                  for (final language in languages)
+                    language: sourceLanguage(language),
+                },
+                onChanged: (value) => language.value = value,
+              ),
             ),
             if (hasFilter)
-              TextButton(
+              CupertinoButton(
                 key: const ValueKey('source-language-clear'),
                 onPressed: () {
                   language.value = null;
@@ -250,18 +241,18 @@ class SourceDirectory extends HookConsumerWidget {
             ),
         ],
         for (final target in catalog.sourcePreferenceRecoveries)
-          ListTile(
+          CupertinoListTile(
             title: Text('${target.source.name}的设置需要处理'),
             subtitle: const Text('原保存请求尚未确认'),
-            trailing: TextButton(
+            trailing: CupertinoButton(
               onPressed: catalog.busy ? null : () => onPreferences(target),
               child: const Text('处理设置'),
             ),
           ),
         if (catalog.hasUnsavedReadingProgress)
-          ListTile(
+          CupertinoListTile(
             title: const Text('部分阅读进度尚未保存'),
-            trailing: TextButton(
+            trailing: CupertinoButton(
               onPressed: () =>
                   unawaited(catalog.flushReadingProgress(explicitRetry: true)),
               child: const Text('重试保存'),
@@ -276,15 +267,15 @@ class SourceDirectory extends HookConsumerWidget {
             padding: const EdgeInsets.all(32),
             child: Column(
               children: [
-                const Icon(Icons.travel_explore, size: 48),
+                const Icon(CupertinoIcons.globe, size: 48),
                 const SizedBox(height: 16),
                 Text(
                   hasFilter ? '没有匹配的漫画源' : '尚无漫画源',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
                 ),
                 const SizedBox(height: 8),
                 Text(hasFilter ? '请修改名称或语言条件。' : '安装扩展后即可选择其中的漫画源。'),
-                TextButton(
+                CupertinoButton(
                   onPressed: hasFilter
                       ? () {
                           language.value = null;
@@ -297,68 +288,73 @@ class SourceDirectory extends HookConsumerWidget {
             ),
           ),
         for (final row in visible)
-          ListTile(
-            key: ValueKey((
-              'source-directory-row',
-              row.packageName,
-              row.source.id,
-            )),
-            leading: const Icon(Icons.language),
-            title: Text(row.source.name),
-            subtitle: Text(
-              [
-                sourceLanguage(row.source.lang),
-                if (row.blocked != null) row.blocked!,
-                if ((nameCounts[row.source.name] ?? 0) > 1)
-                  row.extension?.name ?? row.packageName.split('.').last,
-              ].join(' · '),
-            ),
-            onTap: catalog.busy
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: catalog.busy
                 ? null
                 : row.blocked != null || row.extension == null
                 ? onManage
                 : () => unawaited(onOpen(row.extension!, row.source)),
-            trailing: GestureDetector(
-              excludeFromSemantics: true,
-              behavior: HitTestBehavior.opaque,
-              onTap: () {},
-              child: saving.value == (row.packageName, row.source.id)
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : IconButton(
-                      key: ValueKey((
-                        'source-favorite-toggle',
-                        row.packageName,
-                        row.source.id,
-                      )),
-                      tooltip: saved(row.packageName, row.source.id)
-                          ? '取消收藏源：${row.source.name}'
-                          : '收藏源：${row.source.name}',
-                      onPressed:
-                          canEdit &&
-                              (saved(row.packageName, row.source.id) ||
-                                  favorites.length <
-                                      businessFavoriteSourceLimit)
-                          ? () => unawaited(toggle(row.packageName, row.source))
-                          : null,
-                      icon: Icon(
-                        saved(row.packageName, row.source.id)
-                            ? Icons.star
-                            : Icons.star_border,
+            child: CupertinoListTile(
+              key: ValueKey((
+                'source-directory-row',
+                row.packageName,
+                row.source.id,
+              )),
+              leading: const Icon(CupertinoIcons.globe),
+              title: Text(row.source.name),
+              subtitle: Text(
+                [
+                  sourceLanguage(row.source.lang),
+                  if (row.blocked != null) row.blocked!,
+                  if ((nameCounts[row.source.name] ?? 0) > 1)
+                    row.extension?.name ?? row.packageName.split('.').last,
+                ].join(' · '),
+              ),
+              trailing: GestureDetector(
+                excludeFromSemantics: true,
+                behavior: HitTestBehavior.opaque,
+                onTap: () {},
+                child: saving.value == (row.packageName, row.source.id)
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CupertinoActivityIndicator(),
+                      )
+                    : CupertinoButton(
+                        key: ValueKey((
+                          'source-favorite-toggle',
+                          row.packageName,
+                          row.source.id,
+                        )),
+                        onPressed:
+                            canEdit &&
+                                (saved(row.packageName, row.source.id) ||
+                                    favorites.length <
+                                        businessFavoriteSourceLimit)
+                            ? () =>
+                                  unawaited(toggle(row.packageName, row.source))
+                            : null,
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          saved(row.packageName, row.source.id)
+                              ? CupertinoIcons.star_fill
+                              : CupertinoIcons.star,
+                          semanticLabel: saved(row.packageName, row.source.id)
+                              ? '取消收藏源：${row.source.name}'
+                              : '收藏源：${row.source.name}',
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
         for (final extension in pendingExtensions)
-          ListTile(
+          CupertinoListTile(
             key: ValueKey(('source-extension-blocked', extension.packageName)),
-            leading: const Icon(Icons.extension_off_outlined),
+            leading: const Icon(CupertinoIcons.cube),
             title: Text('${extension.name}（扩展待处理）'),
             subtitle: Text(extension.blockedReason ?? '所选构建的漫画源资料不可用'),
-            trailing: TextButton(
+            trailing: CupertinoButton(
               onPressed: onManage,
               child: const Text('管理扩展'),
             ),

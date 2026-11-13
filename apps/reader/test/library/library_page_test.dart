@@ -1,9 +1,11 @@
+import 'package:karuyomi/widgets/app_page_route.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
@@ -57,9 +59,9 @@ void main() {
 
   Future<void> show(WidgetTester tester) async {
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: LibraryPage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: LibraryPage(
             controller: controller,
             onBrowse: () {},
             onConnect: () => unawaited(controller.connect()),
@@ -103,15 +105,15 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Zulu')).dy),
     );
 
-    await tester.enterText(find.byType(TextField), '新作者');
+    await tester.enterText(find.byType(CupertinoTextField), '新作者');
     await tester.pumpAndSettle();
     expect(find.text('Zulu'), findsOneWidget);
     expect(find.text('Alpha'), findsNothing);
-    await tester.enterText(find.byType(TextField), '测试漫画源');
+    await tester.enterText(find.byType(CupertinoTextField), '测试漫画源');
     await tester.pumpAndSettle();
     expect(find.text('Alpha'), findsOneWidget);
     expect(find.text('Zulu'), findsNothing);
-    await tester.enterText(find.byType(TextField), '不存在');
+    await tester.enterText(find.byType(CupertinoTextField), '不存在');
     await tester.pumpAndSettle();
     expect(find.text('没有找到收藏'), findsOneWidget);
     expect(platform.invocations, isEmpty);
@@ -209,8 +211,8 @@ void main() {
       await tester.runAsync(() => entered.future);
       unawaited(
         Navigator.of(tester.element(find.byType(LibraryPage))).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => const Scaffold(body: Text('另一页面')),
+          AppPageRoute<void>(
+            builder: (_) => const CupertinoPageScaffold(child: Text('另一页面')),
           ),
         ),
       );

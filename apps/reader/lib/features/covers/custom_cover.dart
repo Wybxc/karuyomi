@@ -1,22 +1,17 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/cover_repository.dart';
 
 /// Private cover bytes are read through the verified business identity. No
 /// Source thumbnail URL or unauthenticated image URL enters this widget.
-class CustomCover extends StatefulWidget {
-  const CustomCover({
-    super.key,
-    required this.repository,
-    required this.cover,
-    this.width = 48,
-    this.height = 64,
-  });
-  final CoverRepository repository;
-  final wire.CustomCover? cover;
-  final double width;
-  final double height;
+class const CustomCover({
+  super.key,
+  required final CoverRepository repository,
+  required final wire.CustomCover? cover,
+  final double width = 48,
+  final double height = 64,
+}) extends StatefulWidget {
   @override
   State<CustomCover> createState() => _CustomCoverState();
 }
@@ -45,17 +40,17 @@ class _CustomCoverState extends State<CustomCover> {
   }
 
   Widget _placeholder({bool failed = false}) => ColoredBox(
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
     child: failed
-        ? IconButton(
-            tooltip: '重试读取封面',
+        ? CupertinoButton(
             onPressed: () => setState(() {
               _retry++;
               _bytes = widget.repository.read(widget.cover!);
             }),
-            icon: const Icon(Icons.refresh),
+            padding: const EdgeInsets.all(8),
+            child: const Icon(CupertinoIcons.refresh, semanticLabel: '重试读取封面'),
           )
-        : const Center(child: Icon(Icons.menu_book_outlined)),
+        : const Center(child: Icon(CupertinoIcons.book)),
   );
   @override
   Widget build(BuildContext context) => SizedBox(

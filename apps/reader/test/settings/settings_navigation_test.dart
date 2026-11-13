@@ -1,3 +1,5 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 
@@ -6,7 +8,7 @@ import '../test_app.dart';
 
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
@@ -72,14 +74,12 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> _choose<T>(WidgetTester tester, String label) async {
-  await _tap(tester, find.byType(DropdownButtonFormField<T>));
-  await _tap(tester, find.text(label).last);
+  await _tap(tester, find.byType(ChoiceField<T>));
+  await _tap(tester, find.widgetWithText(CupertinoMenuItem, label));
 }
 
 Finder _field<T>(String label) => find.byWidgetPredicate(
-  (widget) =>
-      widget is DropdownButtonFormField<T> &&
-      widget.decoration.labelText == label,
+  (widget) => widget is ChoiceField<T> && widget.label == label,
 );
 Future<void> _chooseField<T>(
   WidgetTester tester,
@@ -87,13 +87,11 @@ Future<void> _chooseField<T>(
   String value,
 ) async {
   await _tap(tester, _field<T>(field));
-  await _tap(tester, find.text(value).last);
+  await _tap(tester, find.widgetWithText(CupertinoMenuItem, value));
 }
 
 Finder _navigation(String label) => find.descendant(
-  of: find.byWidgetPredicate(
-    (widget) => widget is NavigationRail || widget is NavigationBar,
-  ),
+  of: find.byKey(const ValueKey('app-navigation')),
   matching: find.text(label),
 );
 Future<void> _dim(
@@ -104,11 +102,21 @@ Future<void> _dim(
   final slider = find.byKey(ValueKey('$scope-dim'));
   await tester.ensureVisible(slider);
   await tester.pumpAndSettle();
-  if (zero) {
-    await tester.drag(slider, const Offset(-500, 0));
-  } else {
-    await tester.tap(slider);
-  }
+  final control = tester.widget<CupertinoSlider>(slider);
+  final bounds = tester.getRect(slider);
+  final inset = bounds.height / 2;
+  final track = bounds.width - inset * 2;
+  final fraction = (control.value - control.min) / (control.max - control.min);
+  final thumb = Offset(
+    bounds.left + inset + track * fraction,
+    bounds.center.dy,
+  );
+  final delta = track * ((zero ? 0 : .5) - fraction);
+  // Cupertino starts measuring after the gesture recognizer accepts the drag.
+  await tester.dragFrom(
+    thumb,
+    Offset(delta + kDragSlopDefault * delta.sign, 0),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -233,8 +241,8 @@ void main() {
     final controller = container.read(provider.notifier);
     expect(container.read(provider).snapshot!.globalRevision, 0);
     expect(
-      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
-      ThemeMode.system,
+      tester.widget<CupertinoApp>(find.byType(CupertinoApp)).theme?.brightness,
+      null,
     );
 
     final binding = tester.binding;
@@ -262,14 +270,16 @@ void main() {
     );
     expect(container.read(provider).snapshot!.globalRevision, 1);
     expect(
-      find.byKey(
-        const ValueKey(('global-theme', wire.AppTheme.APP_THEME_DARK)),
-      ),
-      findsOneWidget,
+      tester
+          .widget<ChoiceField<wire.AppTheme>>(
+            find.byKey(const ValueKey('global-theme')),
+          )
+          .value,
+      wire.AppTheme.APP_THEME_DARK,
     );
     expect(
-      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
-      ThemeMode.dark,
+      tester.widget<CupertinoApp>(find.byType(CupertinoApp)).theme?.brightness,
+      Brightness.dark,
     );
     expect(platform.businessServer.appliedMutations, 1);
     expect(
@@ -406,7 +416,7 @@ void main() {
         expect(platform.businessServer.appliedMutations, 1);
         expect(platform.openedBuilds, isEmpty);
         await tester.enterText(
-          find.byType(TextField),
+          find.byType(CupertinoTextField),
           '${platform.origin.origin}${trailingSlash ? '/' : ''}',
         );
         await _tap(tester, find.text('连接服务'));
@@ -446,8 +456,11 @@ void main() {
         expect(reconnected.state.pending, isNull);
         expect(find.text('重试原设置操作'), findsNothing);
         expect(
-          tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
-          ThemeMode.dark,
+          tester
+              .widget<CupertinoApp>(find.byType(CupertinoApp))
+              .theme
+              ?.brightness,
+          Brightness.dark,
         );
         expect(tester.takeException(), isNull);
         await tester.pumpApp(const SizedBox.shrink());
@@ -496,7 +509,7 @@ void main() {
             .single;
         final pending = initial.state.pending;
         expect(pending, isNotNull);
-        await tester.enterText(find.byType(TextField), invalidOrigin);
+        await tester.enterText(find.byType(CupertinoTextField), invalidOrigin);
         await _tap(tester, find.text('连接服务'));
         expect(find.byType(GlobalSettingsPanel), findsOneWidget);
         final rejected = globalSettings(tester);
@@ -526,7 +539,7 @@ void main() {
               : [Uri.parse(invalidOrigin)],
         );
         await tester.enterText(
-          find.byType(TextField),
+          find.byType(CupertinoTextField),
           platform.origin.toString(),
         );
         await _tap(tester, find.text('连接服务'));
@@ -602,7 +615,7 @@ void main() {
           original.bootstrapSubject = replacement.bootstrapSubject;
         }
         await tester.enterText(
-          find.byType(TextField),
+          find.byType(CupertinoTextField),
           replacement.origin.toString(),
         );
         await _tap(tester, find.text('连接服务'));
@@ -682,8 +695,11 @@ void main() {
       await _start(tester, platform);
       await _globalDefaults(tester, dark: true);
       expect(
-        tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
-        ThemeMode.system,
+        tester
+            .widget<CupertinoApp>(find.byType(CupertinoApp))
+            .theme
+            ?.brightness,
+        null,
       );
       expect(
         platform.businessServer.requests.where(
@@ -693,8 +709,11 @@ void main() {
       );
       await _tap(tester, find.text('保存全局设置'));
       expect(
-        tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
-        ThemeMode.dark,
+        tester
+            .widget<CupertinoApp>(find.byType(CupertinoApp))
+            .theme
+            ?.brightness,
+        Brightness.dark,
       );
       final catalog = await _details(tester);
       final inherited = await tester.runAsync(
@@ -743,17 +762,19 @@ void main() {
       expect(_reader(tester).keyboard, ReaderInputPreset.disabled);
       expect(
         tester
-            .widget<DropdownButton<ReadingMode>>(
-              find.byType(DropdownButton<ReadingMode>),
+            .widget<ChoiceField<ReadingMode>>(
+              find.byType(ChoiceField<ReadingMode>),
             )
             .value,
         ReadingMode.rightToLeft,
       );
       expect(
         tester
-            .widget<SegmentedButton<bool?>>(find.byType(SegmentedButton<bool?>))
-            .selected,
-        {true},
+            .widget<CupertinoSlidingSegmentedControl<int>>(
+              find.byType(CupertinoSlidingSegmentedControl<int>),
+            )
+            .groupValue,
+        2,
       );
       await _leaveReader(tester, catalog);
       await _finish(tester, catalog);
@@ -785,12 +806,12 @@ void main() {
       expect(reset.viewportX, 1);
       expect(reset.viewportY, 0);
       expect(_reader(tester).key, leafBeforeFit);
-      await _tap(tester, find.byType(DropdownButton<ReadingMode>));
+      await _tap(tester, find.byType(ChoiceField<ReadingMode>));
       await _tap(tester, find.text('从左到右').last);
       await _tap(
         tester,
         find.descendant(
-          of: find.byType(SegmentedButton<bool?>),
+          of: find.byType(CupertinoSlidingSegmentedControl<int>),
           matching: find.text('单页'),
         ),
       );
@@ -868,7 +889,7 @@ void main() {
       await _tap(
         tester,
         find.descendant(
-          of: find.byType(SegmentedButton<bool?>),
+          of: find.byType(CupertinoSlidingSegmentedControl<int>),
           matching: find.text('自动'),
         ),
       );
@@ -901,9 +922,11 @@ void main() {
       expect(_reader(tester).doublePage, isNull);
       expect(
         tester
-            .widget<SegmentedButton<bool?>>(find.byType(SegmentedButton<bool?>))
-            .selected,
-        {null},
+            .widget<CupertinoSlidingSegmentedControl<int>>(
+              find.byType(CupertinoSlidingSegmentedControl<int>),
+            )
+            .groupValue,
+        0,
       );
       final writes = platform.businessServer.requests
           .where((request) => request.uri.path == '/api/settings/mutations')
@@ -930,9 +953,11 @@ void main() {
       expect(_reader(tester).doublePage, isNull);
       expect(
         tester
-            .widget<SegmentedButton<bool?>>(find.byType(SegmentedButton<bool?>))
-            .selected,
-        {null},
+            .widget<CupertinoSlidingSegmentedControl<int>>(
+              find.byType(CupertinoSlidingSegmentedControl<int>),
+            )
+            .groupValue,
+        0,
       );
       await _leaveReader(tester, catalog);
       await _tap(tester, find.text('第一章'));
@@ -941,9 +966,11 @@ void main() {
       expect(_reader(tester).doublePage, isNull);
       expect(
         tester
-            .widget<SegmentedButton<bool?>>(find.byType(SegmentedButton<bool?>))
-            .selected,
-        {null},
+            .widget<CupertinoSlidingSegmentedControl<int>>(
+              find.byType(CupertinoSlidingSegmentedControl<int>),
+            )
+            .groupValue,
+        0,
       );
       expect(
         platform.businessServer.requests.where(
@@ -1013,57 +1040,50 @@ void main() {
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
       await _tap(tester, _navigation('浏览'));
       await _tap(tester, _navigation('设置'));
+      expect(tester.widget<ChoiceField<bool>>(_field<bool>('裁白')).value, true);
       expect(
-        tester
-            .widget<DropdownButtonFormField<bool>>(_field<bool>('裁白'))
-            .initialValue,
-        true,
-      );
-      expect(
-        tester
-            .widget<DropdownButtonFormField<bool>>(_field<bool>('裁白'))
-            .onChanged,
+        tester.widget<ChoiceField<bool>>(_field<bool>('裁白')).onChanged,
         isNull,
       );
       expect(
         tester
-            .widget<DropdownButtonFormField<wire.ReaderFit>>(
-              _field<wire.ReaderFit>('图像适配'),
-            )
-            .initialValue,
+            .widget<ChoiceField<wire.ReaderFit>>(_field<wire.ReaderFit>('图像适配'))
+            .value,
         wire.ReaderFit.READER_FIT_WIDTH,
       );
       expect(
         tester
-            .widget<DropdownButtonFormField<wire.ReaderBackground>>(
+            .widget<ChoiceField<wire.ReaderBackground>>(
               _field<wire.ReaderBackground>('阅读背景'),
             )
-            .initialValue,
+            .value,
         wire.ReaderBackground.READER_BACKGROUND_WHITE,
       );
       expect(
-        tester.widget<Slider>(find.byKey(const ValueKey('global-dim'))).value,
+        tester
+            .widget<CupertinoSlider>(find.byKey(const ValueKey('global-dim')))
+            .value,
         40,
       );
       expect(
         tester
-            .widget<DropdownButtonFormField<wire.ReaderInputPreset>>(
+            .widget<ChoiceField<wire.ReaderInputPreset>>(
               _field<wire.ReaderInputPreset>('分页点击区'),
             )
-            .initialValue,
+            .value,
         wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
       );
       expect(
         tester
-            .widget<DropdownButtonFormField<wire.ReaderInputPreset>>(
+            .widget<ChoiceField<wire.ReaderInputPreset>>(
               _field<wire.ReaderInputPreset>('阅读快捷键'),
             )
-            .initialValue,
+            .value,
         wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
       );
       expect(
         tester
-            .widget<Slider>(find.byKey(const ValueKey('global-dim')))
+            .widget<CupertinoSlider>(find.byKey(const ValueKey('global-dim')))
             .onChanged,
         isNull,
       );

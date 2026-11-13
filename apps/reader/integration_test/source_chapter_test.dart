@@ -1,8 +1,12 @@
+import '../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -149,19 +153,19 @@ void main() {
           _firstPages,
         );
         await _read(tester, firstManifest, 1, _firstPages);
-        final orderButton = find.byType(DropdownButton<ChapterOrder>);
-        if (tester.widget<DropdownButton<ChapterOrder>>(orderButton).value !=
+        final orderButton = find.byType(ChoiceField<ChapterOrder>);
+        if (tester.widget<ChoiceField<ChapterOrder>>(orderButton).value !=
             order) {
           await _tap(tester, orderButton);
           await _tap(tester, find.text(_reversed ? '反向来源顺序' : '来源顺序').last);
         }
-        final complete = find.widgetWithText(TextButton, '读完本章');
+        final complete = find.widgetWithText(CupertinoButton, '读完本章');
         await _wait(
           tester,
           '末页可以显式确认读完',
           () =>
               complete.evaluate().length == 1 &&
-              tester.widget<TextButton>(complete).onPressed != null,
+              tester.widget<CupertinoButton>(complete).onPressed != null,
         );
         await _tap(tester, complete);
         firstSaved = await _confirmed(
@@ -174,14 +178,16 @@ void main() {
         );
         final next = find.ancestor(
           of: find.text('下一章'),
-          matching: find.byWidgetPredicate((widget) => widget is TextButton),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is CupertinoButton,
+          ),
         );
         await _wait(
           tester,
           '正式下一章入口可用',
           () =>
               next.evaluate().length == 1 &&
-              tester.widget<TextButton>(next).onPressed != null,
+              tester.widget<CupertinoButton>(next).onPressed != null,
         );
         await _tap(tester, next);
       } else {
@@ -307,12 +313,12 @@ Future<ChapterManifest> _open(
   expect(route.sequence.mangaKey, mangaKey);
   final manifest = tester.widget<ReaderScreen>(reader).manifest;
   if (pages != 0) expect(manifest.pages, hasLength(pages));
-  final layout = tester.widget<SegmentedButton<bool?>>(
+  final layout = tester.widget<CupertinoSlidingSegmentedControl<int>>(
     find.byKey(const ValueKey('reader-page-layout')),
   );
   expect(
-    layout.selected.contains(false) ||
-        (layout.selected.contains(null) && tester.getSize(reader).width < 900),
+    layout.groupValue == 1 ||
+        (layout.groupValue == 0 && tester.getSize(reader).width < 900),
     isTrue,
     reason: '使用手机自动单页或预先确认的单页设置',
   );
@@ -329,15 +335,13 @@ Future<void> _read(
   expect(to, lessThanOrEqualTo(manifest.pages.length));
   for (var page = from; page <= to; page++) {
     if (page != from) {
-      final next = find.byWidgetPredicate(
-        (widget) => widget is IconButton && widget.tooltip == '下一页',
-      );
+      final next = iconButton('下一页');
       await _wait(
         tester,
         '正式下一页控件可用',
         () =>
             next.evaluate().length == 1 &&
-            tester.widget<IconButton>(next).onPressed != null,
+            tester.widget<CupertinoButton>(next).onPressed != null,
       );
       await _tap(tester, next);
     }

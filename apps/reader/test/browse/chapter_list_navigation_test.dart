@@ -1,8 +1,12 @@
+import '../../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -125,14 +129,16 @@ Future<CatalogController> _details(
 
 Finder get _tiles => find.descendant(
   of: find.byType(MangaDetailsPage),
-  matching: find.byType(ListTile),
+  matching: find.byType(CupertinoListTile),
 );
 
 Finder _row(int sourceIndex) =>
     find.byKey(ValueKey(_sequence.entries[sourceIndex].key));
 
-List<Key?> _visibleKeys(WidgetTester tester) =>
-    tester.widgetList<ListTile>(_tiles).map((tile) => tile.key).toList();
+List<Key?> _visibleKeys(WidgetTester tester) => tester
+    .widgetList<CupertinoListTile>(_tiles)
+    .map((tile) => tile.key)
+    .toList();
 
 List<Key> _keys(Iterable<int> sourceIndices) => [
   for (final index in sourceIndices) ValueKey(_sequence.entries[index].key),
@@ -235,13 +241,15 @@ void main() {
       await _search(tester, '完全没有的章节');
       expect(_tiles, findsNothing);
       expect(find.text('没有匹配的章节'), findsOneWidget);
-      expect(find.byTooltip('清空章节搜索'), findsOneWidget);
-      await _tap(tester, find.byTooltip('清空章节搜索'));
+      expect(iconLabel('清空章节搜索'), findsOneWidget);
+      await _tap(tester, iconLabel('清空章节搜索'));
       expect(_visibleKeys(tester), _keys([0, 1, 2, 3]));
       expect(find.text('没有匹配的章节'), findsNothing);
       expect(
         tester
-            .widget<TextField>(find.byKey(const ValueKey('chapter-search')))
+            .widget<CupertinoTextField>(
+              find.byKey(const ValueKey('chapter-search')),
+            )
             .controller!
             .text,
         isEmpty,
@@ -261,7 +269,7 @@ void main() {
       final calls = platform.invocations.length;
       await _tap(
         tester,
-        find.descendant(of: _row(2), matching: find.byTooltip('标记章节书签 同名章')),
+        find.descendant(of: _row(2), matching: iconLabel('标记章节书签 同名章')),
       );
       expect(
         platform.businessServer.bookmarked(
@@ -280,7 +288,10 @@ void main() {
       await _search(tester, '同名章');
       await _reverse(tester);
       expect(_visibleKeys(tester), _keys([2, 0]));
-      await _tap(tester, find.widgetWithText(FilterChip, '仅书签'));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('chapters-bookmarked-only')),
+      );
       expect(_visibleKeys(tester), _keys([2]));
       expect(platform.invocations, hasLength(calls));
       await _tap(tester, _row(2));
@@ -370,8 +381,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<DropdownButton<ChapterOrder>>(
-              find.byType(DropdownButton<ChapterOrder>),
+            .widget<ChoiceField<ChapterOrder>>(
+              find.byType(ChoiceField<ChapterOrder>),
             )
             .value,
         ChapterOrder.reversed,
