@@ -16,7 +16,7 @@ import '../sources/source_filters.dart';
 import '../sources/source_preferences.dart';
 import 'catalog_controller.dart';
 import 'manga_details_page.dart';
-import 'manga_list_tile.dart';
+import 'manga_cover_tile.dart';
 
 enum _ListingWork { initial, query, refresh, more }
 
@@ -548,17 +548,47 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                   '$mode${_displayQuery.isEmpty ? '' : ' · $_displayQuery'}${_displayFiltered ? ' · 筛选已应用' : ''}',
                                   key: const ValueKey('source-query-context'),
                                 ),
-                              if (showOld)
-                                for (final manga in _results)
-                                  MangaListTile(
-                                    key: ValueKey(('source-manga', manga.url)),
-                                    manga: manga,
-                                    libraryEntry: saved[manga.url],
-                                    covers: _covers,
-                                    onTap: busy || !canBrowse
-                                        ? null
-                                        : () => unawaited(_details(manga)),
+                            ],
+                          ),
+                        ),
+                        if (showOld)
+                          SliverPadding(
+                            padding: const EdgeInsets.all(8),
+                            sliver: SliverGrid.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                                    maxCrossAxisExtent: 180,
+                                    mainAxisSpacing: 4,
+                                    crossAxisSpacing: 4,
+                                    childAspectRatio: 2 / 3,
                                   ),
+                              itemCount: _results.length,
+                              itemBuilder: (context, index) {
+                                final manga = _results[index];
+                                return MangaCoverTile(
+                                  key: ValueKey(('source-manga', manga.url)),
+                                  title: manga.title,
+                                  entry: saved[manga.url],
+                                  covers: _covers,
+                                  badge: saved[manga.url] == null
+                                      ? null
+                                      : Icon(
+                                          CupertinoIcons.book_fill,
+                                          color: CupertinoTheme.of(context)
+                                              .primaryColor,
+                                          semanticLabel: '已在书架',
+                                        ),
+                                  onPressed: busy || !canBrowse
+                                      ? null
+                                      : () => unawaited(_details(manga)),
+                                );
+                              },
+                            ),
+                          ),
+                        SliverPadding(
+                          padding: const EdgeInsets.all(16),
+                          sliver: SliverList.list(
+                            children: [
                               if (_loading == null &&
                                   _error == null &&
                                   canBrowse &&

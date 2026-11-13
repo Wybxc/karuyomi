@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/cover_repository.dart';
+import '../../theme/app_theme.dart';
 
 /// Private cover bytes are read through the verified business identity. No
 /// Source thumbnail URL or unauthenticated image URL enters this widget.
@@ -40,7 +41,7 @@ class _CustomCoverState extends State<CustomCover> {
   }
 
   Widget _placeholder({bool failed = false}) => ColoredBox(
-    color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+    color: AppColors.groupedSurface.resolveFrom(context),
     child: failed
         ? CupertinoButton(
             onPressed: () => setState(() {

@@ -4,7 +4,7 @@
 
 2026-11-13，Liquid Glass 曾发布到 Web；用户随后决定撤下该视觉方案，恢复本文的统一 Cupertino 风格。移除玻璃依赖、初始化、专用主题、着色器资源和实色选项，不保留两套外观实现。[库评估](liquid-glass-evaluation.md)与[终止记录](../plan/liquid-glass.md)作为历史依据；恢复交付见[迁移计划](../plan/cupertino-ui.md#恢复-cupertino)。这项决定基于用户对效果成本的取舍，不能描述为已完成严格能耗对照。
 
-Mihon 继续作为书架、源、扩展和阅读操作的信息架构参考；组件、主题、路由和反馈遵循本文。业务状态及最小必要信息沿用[扩展与浏览状态流程](extension-browse-ui-flow.md)，视觉调整不增加新的业务状态或第二套同步机制。
+2026-11-13，用户进一步要求对照 Mihon 全部界面的布局与配色，先取得像素对照，再按 Cupertino 自然度量自适应；范围覆盖全部已有功能，缺失功能留作后续。[逐页对照设计](mihon-cupertino-fidelity.md)固定参考版本、30 组页面和色彩角色，实施状态见[计划](../plan/mihon-cupertino-fidelity.md)。本文继续约束正式交付的组件、路由和反馈。业务状态及最小必要信息沿用[扩展与浏览状态流程](extension-browse-ui-flow.md)，视觉调整不增加新的业务状态或第二套同步机制。
 
 ## 应用、主题与导航
 

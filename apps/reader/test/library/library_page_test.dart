@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/features/browse/manga_cover_tile.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
@@ -93,16 +94,20 @@ void main() {
     await show(tester);
 
     expect(
-      tester.getTopLeft(find.text('Zulu')).dy,
-      lessThan(tester.getTopLeft(find.text('Alpha')).dy),
+      tester
+          .widgetList<MangaCoverTile>(find.byType(MangaCoverTile))
+          .map((tile) => tile.title),
+      ['Zulu', 'Alpha'],
     );
     await tester.tap(find.text('最近收藏'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('标题').last);
     await tester.pumpAndSettle();
     expect(
-      tester.getTopLeft(find.text('Alpha')).dy,
-      lessThan(tester.getTopLeft(find.text('Zulu')).dy),
+      tester
+          .widgetList<MangaCoverTile>(find.byType(MangaCoverTile))
+          .map((tile) => tile.title),
+      ['Alpha', 'Zulu'],
     );
 
     await tester.enterText(find.byType(CupertinoTextField), '新作者');

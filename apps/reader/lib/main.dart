@@ -20,6 +20,7 @@ import 'features/settings/settings_controller.dart';
 import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
 import 'state/account_providers.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,10 +56,7 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
     locale: const Locale('zh'),
     supportedLocales: const [Locale('zh'), Locale('en')],
     localizationsDelegates: GlobalCupertinoLocalizations.delegates,
-    theme: CupertinoThemeData(
-      brightness: _brightness,
-      primaryColor: CupertinoColors.activeGreen,
-    ),
+    theme: readerAppTheme(_brightness),
     home: AppShell(
       brightness: _brightness,
       onThemeChanged: (value) => setState(() => _brightness = value),
@@ -586,14 +584,30 @@ class _AppShellState extends ConsumerState<AppShell> {
                                 CupertinoButton(
                                   onPressed: () => _select(i),
                                   color: _index == i
-                                      ? CupertinoColors.tertiarySystemFill
-                                            .resolveFrom(context)
+                                      ? AppColors.selection.resolveFrom(context)
                                       : null,
                                   child: Row(
                                     children: [
-                                      Icon(_icons[i]),
+                                      Icon(
+                                        _icons[i],
+                                        color:
+                                            (_index == i
+                                                    ? AppColors.onSelection
+                                                    : AppColors.secondaryLabel)
+                                                .resolveFrom(context),
+                                      ),
                                       const SizedBox(width: 8),
-                                      Text(_labels[i]),
+                                      Text(
+                                        _labels[i],
+                                        style: TextStyle(
+                                          color:
+                                              (_index == i
+                                                      ? AppColors.onSelection
+                                                      : AppColors
+                                                            .secondaryLabel)
+                                                  .resolveFrom(context),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -607,6 +621,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                 if (!wide)
                   CupertinoTabBar(
                     key: const ValueKey('app-navigation'),
+                    backgroundColor: AppColors.toolbar.resolveFrom(context),
+                    inactiveColor: AppColors.secondaryLabel.resolveFrom(
+                      context,
+                    ),
                     currentIndex: _index,
                     onTap: _select,
                     items: [

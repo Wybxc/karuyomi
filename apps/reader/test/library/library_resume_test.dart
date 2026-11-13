@@ -382,7 +382,7 @@ void main() {
     expect(find.byType(ChapterReaderRoute), findsNothing);
     expect(find.byType(MangaDetailsPage), findsNothing);
     expect(platform.invocations.where((call) => call.hasPages()), isEmpty);
-    await tester.drag(find.byType(ListView), const Offset(0, 1000));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 1000));
     await tester.pumpAndSettle();
     expect(
       find.text('书架还是空的'),
