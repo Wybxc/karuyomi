@@ -1,3 +1,5 @@
+import '../widgets/app_page_route.dart';
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
@@ -8,7 +10,7 @@ import 'package:http/io_client.dart';
 
 import 'cover_transport.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:source_runtime/source_runtime.dart';
@@ -116,7 +118,7 @@ final class NativePlatformRuntime extends PlatformRuntime
     _authenticationContinuation = null;
     try {
       final authenticated = await Navigator.of(context).push<bool>(
-        MaterialPageRoute<bool>(
+        AppPageRoute<bool>(
           builder: (_) => _AuthenticationPage(
             login: attempt.login,
             callback: attempt.callback,
@@ -796,54 +798,63 @@ final class _AuthenticationPageState extends State<_AuthenticationPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('登录')),
-    body: Column(
-      children: [
-        if (_error != null)
-          MaterialBanner(
-            content: Text(_error!),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  setState(() => _error = null);
-                  unawaited(
-                    _controller?.loadUrl(
-                      urlRequest: URLRequest(
-                        url: WebUri(widget.login.toString()),
-                      ),
+  Widget build(BuildContext context) => CupertinoPageScaffold(
+    navigationBar: CupertinoNavigationBar(middle: const Text('登录')),
+    child: SafeArea(
+      child: Column(
+        children: [
+          if (_error != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_error!),
+                Wrap(
+                  children: [
+                    CupertinoButton(
+                      onPressed: () {
+                        setState(() => _error = null);
+                        unawaited(
+                          _controller?.loadUrl(
+                            urlRequest: URLRequest(
+                              url: WebUri(widget.login.toString()),
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('重试'),
                     ),
-                  );
-                },
-                child: const Text('重试'),
-              ),
-            ],
-          ),
-        Expanded(
-          child: InAppWebView(
-            initialUrlRequest: URLRequest(url: WebUri(widget.login.toString())),
-            initialSettings: InAppWebViewSettings(
-              javaScriptEnabled: true,
-              sharedCookiesEnabled: true,
-              useShouldOverrideUrlLoading: true,
+                  ],
+                ),
+              ],
             ),
-            onWebViewCreated: (controller) => _controller = controller,
-            shouldOverrideUrlLoading: (controller, action) async {
-              final target = action.request.url;
-              return target == null || target.scheme == 'https'
-                  ? NavigationActionPolicy.ALLOW
-                  : NavigationActionPolicy.CANCEL;
-            },
-            onPageCommitVisible: _complete,
-            onLoadStop: _complete,
-            onReceivedError: (controller, request, error) {
-              if (request.isForMainFrame == true && mounted) {
-                setState(() => _error = error.description);
-              }
-            },
+          Expanded(
+            child: InAppWebView(
+              initialUrlRequest: URLRequest(
+                url: WebUri(widget.login.toString()),
+              ),
+              initialSettings: InAppWebViewSettings(
+                javaScriptEnabled: true,
+                sharedCookiesEnabled: true,
+                useShouldOverrideUrlLoading: true,
+              ),
+              onWebViewCreated: (controller) => _controller = controller,
+              shouldOverrideUrlLoading: (controller, action) async {
+                final target = action.request.url;
+                return target == null || target.scheme == 'https'
+                    ? NavigationActionPolicy.ALLOW
+                    : NavigationActionPolicy.CANCEL;
+              },
+              onPageCommitVisible: _complete,
+              onLoadStop: _complete,
+              onReceivedError: (controller, request, error) {
+                if (request.isForMainFrame == true && mounted) {
+                  setState(() => _error = error.description);
+                }
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

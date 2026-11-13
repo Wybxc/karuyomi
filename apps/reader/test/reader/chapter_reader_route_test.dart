@@ -2,7 +2,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
@@ -44,7 +44,7 @@ void main() {
         if (path.startsWith('/api/state/manga/')) await progressGate.future;
       };
       await tester.pumpApp(
-        MaterialApp(
+        CupertinoApp(
           home: ChapterReaderRoute(
             catalog: catalog,
             manga: manga,
@@ -119,7 +119,7 @@ void main() {
           logicalChapterKey: sequence.entries.first.key,
         );
         await tester.pumpApp(
-          MaterialApp(
+          CupertinoApp(
             home: ChapterReaderRoute(
               catalog: catalog,
               manga: manga,
@@ -250,7 +250,7 @@ void main() {
       final delayed = Completer<wire.SourceResult>();
       platform.invokeHandler = (_) => delayed.future;
       await tester.pumpApp(
-        MaterialApp(
+        CupertinoApp(
           home: ChapterReaderRoute(
             catalog: catalog,
             manga: manga,

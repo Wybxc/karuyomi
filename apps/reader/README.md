@@ -4,6 +4,8 @@
 
 从仓库根目录执行 `pnpm flutter:setup`、`pnpm flutter:check`、`pnpm build`；详见[开发说明](../../README.md)。Flutter 版本固定在根目录 `.fvmrc`。
 
+当前 `cupertino_ui` 的返回箭头以文本字形绘制，Flutter 的图标裁剪不能发现它。Web 正式构建入口已使用 `--no-tree-shake-icons`；手动构建原生 release 时也须加入此官方选项，直至依赖修复并通过实际 release 字形验收。该选项不改变图片、运行时或扩展资源合同。
+
 `reader_core` 与 `source_runtime` 是纯 Dart 包。Web 使用 JS interop + Worker；Native 使用固定的 `flutter_inappwebview` 6.1.5 管理 HTTPS 控制页，和可见的 Access 登录页共享 Cookie。Native 不使用 `file://` 页面，也不在客户端保存 GitHub 下载令牌。
 
 构建 Native 前，先在仓库根目录执行 `pnpm --filter @karuyomi/runtime-host build`，生成并复制 `host.js`、`worker.js`、`manifest.json` 到忽略的 `assets/runtime/`。这三个文件由 Flutter 作为 app assets 打包；每次启动容器均核验 SHA256、长度、协议/ABI 与材料版本，再在部署域 `/runtime/host.html` 或规范化的 `/runtime/host` 主框架文档开始时注入。Worker 及通用 JS/WASM 由 app 内置。缺少或不匹配的内置材料会报错；Android WebView 缺少 `DOCUMENT_START_SCRIPT` 时拒绝启动。

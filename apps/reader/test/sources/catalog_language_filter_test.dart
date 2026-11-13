@@ -1,6 +1,8 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
@@ -152,9 +154,9 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(480, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpApp(
-        MaterialApp(
-          home: Scaffold(
-            body: CatalogPage(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: CatalogPage(
               controller: catalog,
               onConnect: () {},
               onAuthenticate: () {},
@@ -168,7 +170,7 @@ void main() {
     Future<void> reveal(WidgetTester tester, Finder target) async {
       final scrollable = find
           .descendant(
-            of: find.byType(ListView).first,
+            of: find.byKey(const PageStorageKey('source-directory-scroll')),
             matching: find.byType(Scrollable),
           )
           .first;
@@ -185,7 +187,7 @@ void main() {
       await reveal(tester, filter);
       await tester.tap(filter);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(value).last);
+      await tester.tap(find.widgetWithText(CupertinoMenuItem, value));
       await tester.pumpAndSettle();
     }
 
@@ -240,10 +242,7 @@ void main() {
         expect(find.text('多语言目录源'), findsOneWidget);
         expect(find.text('中文目录源'), findsNothing);
         await choose(tester, languageFilter(), '未标注语言');
-        expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
-          '',
-        );
+        expect(tester.widget<ChoiceField<String>>(languageFilter()).value, '');
         expect(find.text('未标注目录源'), findsOneWidget);
         await tester.tap(clearFilter());
         await tester.pumpAndSettle();
@@ -268,6 +267,7 @@ void main() {
         final active = catalog.activeSource;
         final manga = catalog.mangas.single;
         await show(tester);
+        expect(catalog.activeSource, same(active), reason: '挂载目录保留已打开的 Source');
         final commands = platform.controlCommands.length;
         await choose(tester, languageFilter(), 'ja');
         expect(catalog.activeSource, same(active));
@@ -277,7 +277,7 @@ void main() {
         await catalog.connect();
         await tester.pumpAndSettle();
         expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
+          tester.widget<ChoiceField<String>>(languageFilter()).value,
           isNull,
         );
         await choose(tester, languageFilter(), 'en');
@@ -285,7 +285,7 @@ void main() {
         await catalog.connect();
         await tester.pumpAndSettle();
         expect(
-          tester.widget<DropdownButton<String>>(languageFilter()).value,
+          tester.widget<ChoiceField<String>>(languageFilter()).value,
           isNull,
         );
         expect(tester.takeException(), isNull);

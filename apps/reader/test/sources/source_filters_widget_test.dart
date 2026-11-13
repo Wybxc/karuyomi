@@ -1,8 +1,9 @@
+import '../../test_support/cupertino.dart';
 import '../test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
@@ -70,9 +71,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: SourceBrowsePage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: SourceBrowsePage(
             catalog: catalog,
             build: catalog.activeBuild!,
             source: catalog.activeBuild!.sources.single,
@@ -92,7 +93,7 @@ void main() {
     final form = find.byKey(const ValueKey('source-filter-form'));
     final scrollable = find
         .descendant(
-          of: form.evaluate().isEmpty ? find.byType(ListView).first : form,
+          of: form.evaluate().isEmpty ? find.byType(SourceBrowsePage) : form,
           matching: find.byType(Scrollable),
         )
         .first;
@@ -119,7 +120,15 @@ void main() {
       await show(tester);
       await tap(tester, open());
       expect(find.text('作品条件'), findsOneWidget);
-      expect(find.byType(Divider), findsWidgets);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is ColoredBox &&
+              widget.color ==
+                  CupertinoColors.separator.resolveFrom(tester.element(open())),
+        ),
+        findsWidgets,
+      );
       final callsBefore = platform.invocations.length;
       final writesBefore = platform.businessServer.requests
           .where((request) => request.method == 'POST')
@@ -166,13 +175,15 @@ void main() {
       );
       await reveal(tester, control('text', '1'));
       expect(
-        tester.widget<TextFormField>(control('text', '1')).initialValue,
+        tester
+            .widget<CupertinoTextFormFieldRow>(control('text', '1'))
+            .initialValue,
         '输入的作者',
       );
       await tester.enterText(control('text', '1'), '取消的作者');
       tester.testTextInput.hide();
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('取消筛选编辑'));
+      await tester.tap(iconLabel('取消筛选编辑'));
       await tester.pumpAndSettle();
       expect(catalog.appliedSourceFilters!.updates.first.text, '输入的作者');
       expect(platform.invocations, hasLength(callsBefore + 1));
@@ -216,12 +227,14 @@ void main() {
       );
       await reveal(tester, control('text', '1'));
       expect(
-        tester.widget<TextFormField>(control('text', '1')).initialValue,
+        tester
+            .widget<CupertinoTextFormFieldRow>(control('text', '1'))
+            .initialValue,
         '',
       );
       expect(catalog.appliedSourceFilters, applied);
       expect(catalog.query, '关键词');
-      await tester.tap(find.byTooltip('取消筛选编辑'));
+      await tester.tap(iconLabel('取消筛选编辑'));
       await tester.pumpAndSettle();
       await tap(tester, find.byKey(const ValueKey('source-load-more')));
       expect(platform.invocations.last.search.page, 2);
@@ -254,8 +267,8 @@ void main() {
       await tester.tap(reset());
       await tester.pump();
       expect(find.text('关闭将取消请求，可能需要重新连接漫画源。'), findsOneWidget);
-      expect(tester.widget<FilledButton>(apply()).onPressed, isNull);
-      await tester.tap(find.byTooltip('取消请求并关闭筛选'));
+      expect(tester.widget<CupertinoButton>(apply()).onPressed, isNull);
+      await tester.tap(iconLabel('取消请求并关闭筛选'));
       await tester.pump();
       expect(
         platform.controlCommands,

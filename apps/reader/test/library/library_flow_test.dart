@@ -2,7 +2,7 @@ import '../test_app.dart';
 
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
@@ -162,7 +162,7 @@ void main() {
       ),
     );
     await catalog.flushReadingProgress();
-    await tester.tap(find.byType(BackButton));
+    await tester.tap(find.byType(CupertinoNavigationBarBackButton));
     await tester.pumpAndSettle();
     expect(find.text('继续阅读'), findsOneWidget);
     await tester.pumpApp(const SizedBox.shrink());
@@ -194,7 +194,7 @@ void main() {
     expect(resumed.initialPosition!.chapterKey, manifest.chapterKey);
     expect(resumed.initialPosition!.pageKey, manifest.pages.single.key);
     expect(resumed.initialPosition!.normalizedOffset, .35);
-    await tester.tap(find.byType(BackButton));
+    await tester.tap(find.byType(CupertinoNavigationBarBackButton));
     await tester.pumpAndSettle();
     await _revealDetails(tester, find.text('移出书架'));
     await tester.pumpAndSettle();
@@ -202,7 +202,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('加入书架'), findsOneWidget);
     expect(find.text('继续阅读'), findsOneWidget);
-    await tester.tap(find.byType(BackButton));
+    await tester.tap(find.byType(CupertinoNavigationBarBackButton));
     await tester.pumpAndSettle();
     expect(find.text('书架还是空的'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -234,7 +234,7 @@ void main() {
       await tester.tap(find.text('第 1 章'));
       await tester.pumpAndSettle();
       expect(find.byType(ReaderScreen), findsOneWidget);
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       platform.businessServer.failWrites = false;
       await _revealDetails(tester, find.text('加入书架'));

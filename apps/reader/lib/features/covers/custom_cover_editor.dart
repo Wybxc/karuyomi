@@ -1,7 +1,9 @@
+import '../../widgets/edit_sheet.dart';
+
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -18,10 +20,10 @@ Future<bool?> showCustomCoverEditor({
   required String mangaKey,
   required Listenable lifecycle,
   required bool Function() isCurrent,
-}) => showDialog<bool>(
+}) => showCupertinoSheet<bool>(
   context: context,
-  barrierDismissible: false,
-  builder: (_) => _CoverEditor(
+  enableDrag: false,
+  scrollableBuilder: (context, _) => _CoverEditor(
     controller: controller,
     repository: repository,
     mangaKey: mangaKey,
@@ -30,19 +32,13 @@ Future<bool?> showCustomCoverEditor({
   ),
 );
 
-class _CoverEditor extends StatefulHookWidget {
-  const _CoverEditor({
-    required this.controller,
-    required this.repository,
-    required this.mangaKey,
-    required this.lifecycle,
-    required this.isCurrent,
-  });
-  final CatalogController controller;
-  final CoverRepository repository;
-  final String mangaKey;
-  final Listenable lifecycle;
-  final bool Function() isCurrent;
+class const _CoverEditor({
+  required final CatalogController controller,
+  required final CoverRepository repository,
+  required final String mangaKey,
+  required final Listenable lifecycle,
+  required final bool Function() isCurrent,
+}) extends StatefulHookWidget {
   @override
   State<_CoverEditor> createState() => _CoverEditorState();
 }
@@ -224,90 +220,85 @@ class _CoverEditorState extends State<_CoverEditor> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();
       },
-      child: AlertDialog(
+      child: EditSheet(
+        key: const ValueKey('cover-editor'),
         title: const Text('自定义封面'),
-        content: SizedBox(
-          width: 480,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_expired)
-                  const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。')
-                else ...[
-                  const Text('服务端已确认'),
-                  const SizedBox(height: 8),
-                  if (_confirmed case final confirmed?)
-                    CustomCover(
-                      repository: widget.repository,
-                      cover: confirmed.cover,
+        content: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_expired)
+                const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。')
+              else ...[
+                const Text('服务端已确认'),
+                const SizedBox(height: 8),
+                if (_confirmed case final confirmed?)
+                  CustomCover(
+                    repository: widget.repository,
+                    cover: confirmed.cover,
+                    width: 120,
+                    height: 160,
+                  )
+                else
+                  const Text('正在读取封面'),
+                if (preview != null || clearing) ...[
+                  const SizedBox(height: 16),
+                  Text(_attempted || pending != null ? '尚未确认的修改' : '待保存的修改'),
+                  if (clearing)
+                    const Text('清除自定义封面')
+                  else
+                    Image.memory(
+                      preview!,
                       width: 120,
                       height: 160,
-                    )
-                  else
-                    const Text('正在读取封面'),
-                  if (preview != null || clearing) ...[
-                    const SizedBox(height: 16),
-                    Text(_attempted || pending != null ? '尚未确认的修改' : '待保存的修改'),
-                    if (clearing)
-                      const Text('清除自定义封面')
-                    else
-                      Image.memory(
-                        preview!,
-                        width: 120,
-                        height: 160,
-                        fit: BoxFit.cover,
+                      fit: BoxFit.cover,
+                    ),
+                ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    CupertinoButton(
+                      key: const ValueKey('cover-select-image'),
+                      onPressed: editable ? _select : null,
+                      child: Text(_confirmed?.cover == null ? '选择图片' : '替换图片'),
+                    ),
+                    if (_confirmed?.cover != null)
+                      CupertinoButton(
+                        key: const ValueKey('cover-clear'),
+                        onPressed: editable
+                            ? () => setState(() {
+                                _selected = null;
+                                _clearing = true;
+                                _attempted = false;
+                              })
+                            : null,
+                        child: const Text('清除封面'),
                       ),
                   ],
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        key: const ValueKey('cover-select-image'),
-                        onPressed: editable ? _select : null,
-                        icon: const Icon(Icons.photo_library_outlined),
-                        label: Text(
-                          _confirmed?.cover == null ? '选择图片' : '替换图片',
-                        ),
-                      ),
-                      if (_confirmed?.cover != null)
-                        TextButton(
-                          key: const ValueKey('cover-clear'),
-                          onPressed: editable
-                              ? () => setState(() {
-                                  _selected = null;
-                                  _clearing = true;
-                                  _attempted = false;
-                                })
-                              : null,
-                          child: const Text('清除封面'),
-                        ),
-                    ],
-                  ),
-                  if (_busy) const LinearProgressIndicator(),
-                  if (pending != null)
-                    const Text('当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'),
-                  if (_error case final error?) Text(error),
-                ],
+                ),
+                if (_busy) const CupertinoActivityIndicator(),
+                if (pending != null) const Text('当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'),
+                if (_error case final error?) Text(error),
               ],
-            ),
+            ],
           ),
         ),
         actions: [
-          TextButton(
+          CupertinoButton(
             onPressed: !_expired && _busy ? null : _close,
             child: Text(pending != null ? '稍后处理' : '关闭'),
           ),
           if (!_expired &&
               (_blocked || pending?.retryable == false || _confirmed == null))
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: _busy ? null : _load,
               child: const Text('重新读取'),
             ),
           if (!_expired && !_blocked && pending?.retryable == true)
-            FilledButton(
+            CupertinoButton.filled(
               key: const ValueKey('cover-retry'),
               onPressed: _busy ? null : () => _save(retry: true),
               child: const Text('重试原修改'),
@@ -316,7 +307,7 @@ class _CoverEditorState extends State<_CoverEditor> {
               pending == null &&
               !_blocked &&
               (_selected != null || _clearing))
-            FilledButton(
+            CupertinoButton.filled(
               key: const ValueKey('cover-save'),
               onPressed: _busy || _confirmed == null ? null : _save,
               child: const Text('保存封面'),

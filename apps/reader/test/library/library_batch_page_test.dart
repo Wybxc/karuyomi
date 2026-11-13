@@ -3,7 +3,7 @@ import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
@@ -83,9 +83,9 @@ void main() {
 
   Future<void> show(WidgetTester tester) async {
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: LibraryPage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: LibraryPage(
             controller: controller,
             onBrowse: () {},
             onConnect: () => unawaited(controller.connect()),
@@ -118,7 +118,10 @@ void main() {
   }
 
   Future<void> search(WidgetTester tester, String query) async {
-    final finder = find.widgetWithText(TextField, '搜索书架');
+    final finder = find.byWidgetPredicate(
+      (widget) =>
+          widget is CupertinoTextField && widget.placeholder == '漫画、作者或漫画源',
+    );
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
     await tester.enterText(finder, query);
@@ -417,7 +420,10 @@ void main() {
       );
       await tester.binding.handlePopRoute();
       await tester.pump(const Duration(milliseconds: 32));
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('library-batch-review')),
+        findsOneWidget,
+      );
       expect(find.text('全部修改已由服务端确认。'), findsNothing);
       expect(mutations(), hasLength(1));
       await tester.runAsync(() async {
@@ -434,7 +440,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byKey(const ValueKey('library-batch-review')), findsNothing);
       final toggle = find.byKey(const ValueKey('library-selection-toggle'));
       await tester.scrollUntilVisible(
         toggle,

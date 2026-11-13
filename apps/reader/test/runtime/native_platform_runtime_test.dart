@@ -1,8 +1,10 @@
+import 'package:karuyomi/widgets/app_page_route.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -208,16 +210,17 @@ Future<TestAuthenticationNavigatorObserver> _openReader(
   final navigator = GlobalKey<NavigatorState>();
   final observer = TestAuthenticationNavigatorObserver();
   await tester.pumpWidget(
-    MaterialApp(
+    CupertinoApp(
       navigatorKey: navigator,
       navigatorObservers: [observer],
-      home: const Scaffold(body: Text('书架')),
+      home: const CupertinoPageScaffold(child: Text('书架')),
     ),
   );
   unawaited(
     navigator.currentState!.push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => const Scaffold(key: _readerRoute, body: Text('阅读')),
+      AppPageRoute<void>(
+        builder: (_) =>
+            const CupertinoPageScaffold(key: _readerRoute, child: Text('阅读')),
       ),
     ),
   );
@@ -323,7 +326,7 @@ void main() {
       await tester.pumpAndSettle();
       final first = platform.authenticationViews.single;
       final previousCallback = _callbackFor(first);
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(results, [false]);
       expect(runtime.takePendingAuthentication(), isNull);

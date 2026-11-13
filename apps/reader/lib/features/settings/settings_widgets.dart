@@ -1,4 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import '../../widgets/choice_field.dart';
+import '../../widgets/edit_sheet.dart';
+
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:reader_core/reader_core.dart';
@@ -56,10 +59,10 @@ ReaderInputPreset readerInputPreset(wire.ReaderInputPreset value) =>
         ReaderInputPreset.disabled,
       _ => throw const FormatException('Unsupported reader input preset'),
     };
-ThemeMode appTheme(wire.AppTheme theme) => switch (theme) {
-  wire.AppTheme.APP_THEME_SYSTEM => ThemeMode.system,
-  wire.AppTheme.APP_THEME_LIGHT => ThemeMode.light,
-  wire.AppTheme.APP_THEME_DARK => ThemeMode.dark,
+Brightness? appBrightness(wire.AppTheme theme) => switch (theme) {
+  wire.AppTheme.APP_THEME_SYSTEM => null,
+  wire.AppTheme.APP_THEME_LIGHT => Brightness.light,
+  wire.AppTheme.APP_THEME_DARK => Brightness.dark,
   _ => throw const FormatException('Unsupported application theme'),
 };
 
@@ -92,38 +95,32 @@ const _inputPresets = <wire.ReaderInputPreset, String>{
   wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED: '关闭',
 };
 
-class SettingsStatus extends StatelessWidget {
-  const SettingsStatus({
-    super.key,
-    required this.controller,
-    required this.state,
-    this.onReloaded,
-  });
-  final SettingsController controller;
-  final SettingsState state;
-  final VoidCallback? onReloaded;
-
+class const SettingsStatus({
+  super.key,
+  required final SettingsController controller,
+  required final SettingsState state,
+  final VoidCallback? onReloaded,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      if (state.busy) const LinearProgressIndicator(),
+      if (state.busy) const CupertinoActivityIndicator(),
       if (state.error case final error?) Text(error),
       if (state.pending?.retryable == true) const Text('设置尚未确认，本会话保留原操作。'),
       Wrap(
         children: [
-          TextButton.icon(
+          CupertinoButton(
             onPressed: state.canRefresh
                 ? () async {
                     if (await controller.refresh()) onReloaded?.call();
                   }
                 : null,
-            icon: const Icon(Icons.sync),
-            label: const Text('重新读取设置'),
+            child: const Text('重新读取设置'),
           ),
           if (state.pending?.retryable == true)
-            TextButton(
+            CupertinoButton(
               onPressed: state.canRetry
                   ? () async {
                       if (await controller.retry()) onReloaded?.call();
@@ -137,9 +134,8 @@ class SettingsStatus extends StatelessWidget {
   );
 }
 
-class GlobalSettingsPanel extends _SettingsEditor {
-  const GlobalSettingsPanel({super.key, required super.catalog});
-}
+class const GlobalSettingsPanel({super.key, required super.catalog})
+    extends _SettingsEditor {}
 
 class MangaSettingsEditor extends _SettingsEditor {
   const MangaSettingsEditor({
@@ -198,11 +194,11 @@ final class _FormDraft {
         );
 }
 
-class _SettingsEditor extends HookConsumerWidget {
-  const _SettingsEditor({super.key, required this.catalog, this.mangaKey});
-  final CatalogController catalog;
-  final String? mangaKey;
-
+class const _SettingsEditor({
+  super.key,
+  required final CatalogController catalog,
+  final String? mangaKey,
+}) extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = settingsControllerProvider(
@@ -250,23 +246,14 @@ class _SettingsEditor extends HookConsumerWidget {
       bool inherit = true,
     }) => Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: DropdownButtonFormField<T>(
-        key: value == null
-            ? ValueKey(('$scope-$id', value))
-            : ValueKey(('$scope-$id', value)),
-        initialValue: value,
-        enabled: state.canEdit,
-        hint: const Text('跟随全局'),
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-        items: [
-          if (manga && inherit)
-            DropdownMenuItem<T>(value: null, child: const Text('跟随全局')),
-          for (final item in values.entries)
-            DropdownMenuItem(value: item.key, child: Text(item.value)),
-        ],
+      child: ChoiceField<T>(
+        key: ValueKey('$scope-$id'),
+        label: label,
+        value: value,
+        options: {
+          if (manga && inherit) null: '跟随全局',
+          for (final item in values.entries) item.key: item.value,
+        },
         onChanged: state.canEdit
             ? (value) => change(() {
                 if (value == null) {
@@ -282,14 +269,34 @@ class _SettingsEditor extends HookConsumerWidget {
     final r = draft?.reader;
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
+    final save = draft == null || r == null
+        ? null
+        : CupertinoButton.filled(
+            onPressed: state.canEdit
+                ? () async {
+                    final saved = manga
+                        ? await controller.saveOverrides(
+                            r.deepCopy(),
+                            draft.revision,
+                          )
+                        : await controller.saveGlobal(
+                            draft.globalValues(),
+                            draft.revision,
+                          );
+                    if (saved) reset();
+                  }
+                : null,
+            child: Text(manga ? '保存本漫画设置' : '保存全局设置'),
+          );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          manga ? '本漫画阅读设置' : '全局设置',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        if (!manga)
+          Text(
+            '全局设置',
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+          ),
         Text(manga ? '选择“跟随全局”时，之后的全局修改会应用到此漫画。' : '漫画可以单独覆盖各项阅读偏好；服务端确认后才保存。'),
         const SizedBox(height: 16),
         if (draft != null && r != null) ...[
@@ -348,29 +355,32 @@ class _SettingsEditor extends HookConsumerWidget {
             r.clearBackground,
           ),
           if (manga)
-            SwitchListTile(
-              key: ValueKey('$scope-dim-inherit'),
-              contentPadding: EdgeInsets.zero,
-              title: const Text('调暗跟随全局'),
-              value: dim == null,
-              onChanged: state.canEdit
-                  ? (inherit) => change(() {
-                      if (inherit) {
-                        r.clearDimPercent();
-                      } else {
-                        r.dimPercent = inheritedDim;
-                      }
-                    })
-                  : null,
+            MergeSemantics(
+              child: CupertinoFormRow(
+                prefix: Expanded(flex: 3, child: const Text('调暗跟随全局')),
+                padding: EdgeInsets.zero,
+                child: CupertinoSwitch(
+                  key: ValueKey('$scope-dim-inherit'),
+                  value: dim == null,
+                  onChanged: state.canEdit
+                      ? (inherit) => change(() {
+                          if (inherit) {
+                            r.clearDimPercent();
+                          } else {
+                            r.dimPercent = inheritedDim;
+                          }
+                        })
+                      : null,
+                ),
+              ),
             ),
           Text(dim == null ? '应用内调暗：跟随全局（$inheritedDim%）' : '应用内调暗：$dim%'),
-          Slider(
+          CupertinoSlider(
             key: ValueKey('$scope-dim'),
             value: (dim ?? inheritedDim).toDouble(),
             min: 0,
             max: 80,
             divisions: 80,
-            label: '${dim ?? inheritedDim}%',
             onChanged: state.canEdit && dim != null
                 ? (value) => change(() => r.dimPercent = value.round())
                 : null,
@@ -397,32 +407,34 @@ class _SettingsEditor extends HookConsumerWidget {
           ),
           const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
           const SizedBox(height: 12),
-          FilledButton(
-            onPressed: state.canEdit
-                ? () async {
-                    final saved = manga
-                        ? await controller.saveOverrides(
-                            r.deepCopy(),
-                            draft.revision,
-                          )
-                        : await controller.saveGlobal(
-                            draft.globalValues(),
-                            draft.revision,
-                          );
-                    if (saved) reset();
-                  }
-                : null,
-            child: Text(manga ? '保存本漫画设置' : '保存全局设置'),
-          ),
         ],
+        if (draft?.dirty == true && state.pending == null)
+          const Text('修改尚未保存。')
+        else if (state.snapshot != null &&
+            !state.busy &&
+            state.error == null &&
+            state.pending == null)
+          const Text('当前设置已获服务端确认。'),
+        if (!manga && save != null) save,
         SettingsStatus(controller: controller, state: state, onReloaded: reset),
       ],
     );
     return manga
-        ? SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: content,
+        ? PopScope(
+            canPop: !state.busy,
+            child: EditSheet(
+              title: const Text('本漫画阅读设置'),
+              content: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: content,
+              ),
+              actions: [
+                CupertinoButton(
+                  onPressed: state.busy ? null : () => Navigator.pop(context),
+                  child: const Text('关闭设置'),
+                ),
+                ?save,
+              ],
             ),
           )
         : content;

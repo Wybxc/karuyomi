@@ -1,8 +1,13 @@
+import '../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import 'test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
@@ -54,7 +59,7 @@ void main() {
         final navigator = Navigator.of(context);
         unawaited(
           navigator.push<void>(
-            MaterialPageRoute<void>(
+            AppPageRoute<void>(
               builder: (_) => const SizedBox.expand(key: pageKey),
             ),
           ),
@@ -99,17 +104,14 @@ void main() {
         find.byType(ReaderBaselineHost),
         readerBaselineEnabled ? findsOneWidget : findsNothing,
       );
-      expect(
-        find.byType(size.width >= 840 ? NavigationRail : NavigationBar),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('app-navigation')), findsOneWidget);
       await tester.tap(find.text('去浏览'));
       await tester.pumpAndSettle();
       expect(find.text('连接漫画服务'), findsOneWidget);
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();
       expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
-      expect(find.byType(DropdownButtonFormField<wire.AppTheme>), findsNothing);
+      expect(find.byType(ChoiceField<wire.AppTheme>), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -139,13 +141,16 @@ void main() {
       expect(find.byType(Image), findsNothing);
       expect(
         tester
-            .widget<ListTile>(
-              find.ancestor(
-                of: find.text('第 1 章'),
-                matching: find.byType(ListTile),
-              ),
-            )
-            .enabled,
+                .widget<CupertinoButton>(
+                  buttonAbove(
+                    find.ancestor(
+                      of: find.text('第 1 章'),
+                      matching: find.byType(CupertinoListTile),
+                    ),
+                  ),
+                )
+                .onPressed !=
+            null,
         true,
       );
       await tester.tap(find.text('第 1 章'));
@@ -163,7 +168,7 @@ void main() {
       expect(find.text('当前平台尚未支持图片阅读'), findsOneWidget);
       expect(platform.imageControls.single.$1, 'acquireImage');
       expect(platform.imageControls.single.$2['pageKey'], 'p-0');
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(platform.imageControls.last.$1, 'closePageSession');
       expect(tester.takeException(), isNull);
@@ -202,7 +207,7 @@ void main() {
       final detailsRoute = ModalRoute.of(detailsContext)!;
       await tester.tap(find.text('第 1 章'));
       await tester.pump();
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pump(const Duration(milliseconds: 50));
       expect(detailsContext.mounted, true);
       expect(detailsRoute.isCurrent, false);

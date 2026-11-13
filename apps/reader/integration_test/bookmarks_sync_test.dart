@@ -1,7 +1,9 @@
+import '../test_support/cupertino.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
@@ -147,7 +149,7 @@ Future<Map<String, Object?>> _runBookmarkPhase(
   );
   final shelfTile = find.descendant(
     of: shelfCard,
-    matching: find.byType(ListTile),
+    matching: find.byType(CupertinoListTile),
   );
   await _reveal(tester, shelfTile, find.byType(LibraryPage));
   await _tap(tester, shelfTile);
@@ -168,15 +170,15 @@ Future<Map<String, Object?>> _runBookmarkPhase(
   final beforeKeys = before.bookmarks.chapterKeys;
   if (_phase == 'remove') {
     expect(beforeKeys, contains(chapter.key), reason: '移除前必须已有目标书签');
-    final onlyBookmarks = find.widgetWithText(FilterChip, '仅书签');
+    final onlyBookmarks = find.widgetWithText(CupertinoButton, '仅书签');
     await _reveal(tester, onlyBookmarks, page);
     await _waitFor(tester, '正式书签筛选可用', () {
       return onlyBookmarks.evaluate().length == 1 &&
-          tester.widget<FilterChip>(onlyBookmarks).onSelected != null;
+          tester.widget<CupertinoButton>(onlyBookmarks).onPressed != null;
     });
-    expect(tester.widget<FilterChip>(onlyBookmarks).selected, isFalse);
+    expect(selectedState(tester, onlyBookmarks), isFalse);
     await _tap(tester, onlyBookmarks);
-    expect(tester.widget<FilterChip>(onlyBookmarks).selected, isTrue);
+    expect(selectedState(tester, onlyBookmarks), isTrue);
   } else {
     // The name only narrows the visible list. The exact URL supplies identity.
     final chapterSearch = find.byKey(const ValueKey('chapter-search'));
@@ -214,7 +216,7 @@ Future<Map<String, Object?>> _runBookmarkPhase(
     afterKeys.remove(chapter.key);
   }
   if (_phase != 'verify') {
-    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+    expect(tester.widget<CupertinoButton>(button).onPressed, isNotNull);
     await _tap(tester, button);
     await _waitForEditor(tester, editor);
   }
@@ -316,7 +318,7 @@ Future<Map<String, Object?>> _prepare(
   await _waitFor(tester, '精确扩展可安装', () {
     checkSource();
     return install.evaluate().length == 1 &&
-        tester.widget<TextButton>(install).onPressed != null;
+        tester.widget<CupertinoButton>(install).onPressed != null;
   });
   await _tap(tester, install);
   final refresh = find.byKey(const ValueKey('extensions-check-updates'));
@@ -330,7 +332,7 @@ Future<Map<String, Object?>> _prepare(
     final installed = catalog.installedExtension(_packageName);
     return !catalog.busy &&
         refresh.evaluate().length == 1 &&
-        tester.widget<TextButton>(refresh).onPressed != null &&
+        tester.widget<CupertinoButton>(refresh).onPressed != null &&
         installed?.enabled == true &&
         installed?.buildId == _buildId;
   });
@@ -371,7 +373,7 @@ Future<Map<String, Object?>> _prepare(
       of: sourcePage,
       matching: find.byWidgetPredicate(
         (widget) =>
-            widget is TextField &&
+            widget is CupertinoTextField &&
             widget.key == const ValueKey('source-manga-search'),
       ),
     );
@@ -396,7 +398,7 @@ Future<Map<String, Object?>> _prepare(
   );
   final result = find.ancestor(
     of: find.descendant(of: sourcePage, matching: find.text(manga.title)),
-    matching: find.byType(ListTile),
+    matching: find.byType(CupertinoListTile),
   );
   await _reveal(tester, result, sourcePage);
   await _tap(tester, result);
@@ -414,13 +416,13 @@ Future<Map<String, Object?>> _prepare(
   final (sequence, chapter) = _exactChapter(details);
   final favorite = find.ancestor(
     of: find.descendant(of: detailsPage, matching: find.text('加入书架')),
-    matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
+    matching: find.byWidgetPredicate((widget) => widget is CupertinoButton),
   );
   await _reveal(tester, favorite, detailsPage);
   await _waitFor(tester, '正式收藏按钮可点击', () {
     checkSource();
     return favorite.evaluate().length == 1 &&
-        tester.widget<OutlinedButton>(favorite).onPressed != null;
+        tester.widget<CupertinoButton>(favorite).onPressed != null;
   });
   await _tap(tester, favorite);
   await _waitFor(tester, '正式收藏已确认', () {

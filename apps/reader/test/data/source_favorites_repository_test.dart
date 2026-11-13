@@ -1,10 +1,12 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 import '../settings/settings_fixture.dart';
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/reading_progress.dart';
@@ -338,9 +340,9 @@ void main() {
       final controller = fixture.editor();
       await tester.runAsync(controller.refresh);
       await tester.pumpApp(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: GlobalSettingsPanel(catalog: fixture.catalog),
             ),
@@ -358,7 +360,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      await tap(find.byType(DropdownButtonFormField<wire.AppTheme>));
+      await tap(find.byType(ChoiceField<wire.AppTheme>));
       await tap(find.text('浅色').last);
       await tap(find.text('保存全局设置'));
       final current = await tester.runAsync(repository.loadGlobal);

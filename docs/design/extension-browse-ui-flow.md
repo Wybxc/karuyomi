@@ -2,6 +2,8 @@
 
 2026-11-12。本文整理页面职责、用户操作、可见状态及每个状态的最小必要信息。用户已采纳并要求实施；当前进度与验收维护在[实施计划](../plan/browse-ui-flow.md)，不能将本设计文档视为客户端已经实现或通过验收的证据。
 
+2026-11-13 决定[全端统一 Cupertino UI](cupertino-ui.md)。本文的页面职责、业务状态和最小必要信息继续保留；Mihon 作为信息架构参考，具体视觉控件按[迁移计划](../plan/cupertino-ui.md)调整。
+
 参考 Mihon v0.21.3 的[浏览入口](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/tachiyomi/ui/browse/BrowseTab.kt)、[扩展列表](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/presentation/browse/ExtensionsScreen.kt)、[漫画源列表](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/presentation/browse/SourcesScreen.kt)与[作品列表](https://github.com/mihonapp/mihon/blob/v0.21.3/app/src/main/java/eu/kanade/presentation/browse/BrowseSourceScreen.kt)：源和扩展分区；扩展按状态分组；源直接进入作品；首次加载、空结果、已有结果的后续加载分别处理。使用路径也见[官方入门指南](https://mihon.app/docs/guides/getting-started/)。
 
 Karuyomi 的账户选择、本机副本与目录可用性仍遵守[账户扩展设计](extension-management.md)。本提案复用[语言筛选](source-language-filter.md)、[跨源搜索](cross-source-search.md)及[额外仓库](additional-repositories.md)的业务边界。

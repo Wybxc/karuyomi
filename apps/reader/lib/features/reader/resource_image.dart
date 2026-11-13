@@ -85,20 +85,13 @@ Widget buildResourceImage(
 
 /// Observes the same cached provider/completer used by Image. The extra listener
 /// owns only an ImageInfo handle; it never creates a codec or decodes bytes.
-class ResourceImage extends StatefulWidget {
-  const ResourceImage({
-    super.key,
-    required this.resource,
-    required this.fit,
-    this.imageProvider,
-    this.cropBorders = false,
-  });
-
-  final ImageResource resource;
-  final BoxFit fit;
-  final ImageProvider<Object>? imageProvider;
-  final bool cropBorders;
-
+class const ResourceImage({
+  super.key,
+  required final ImageResource resource,
+  required final BoxFit fit,
+  final ImageProvider<Object>? imageProvider,
+  final bool cropBorders = false,
+}) extends StatefulWidget {
   @override
   State<ResourceImage> createState() => _ResourceImageState();
 }

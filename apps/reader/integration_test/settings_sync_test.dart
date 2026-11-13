@@ -1,10 +1,12 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrintSynchronously;
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:integration_test/integration_test.dart';
@@ -67,7 +69,7 @@ void main() {
       expect(repository.identity.origin.origin, platform.origin.origin);
       expect(catalog.session, isNull, reason: '设置验收不能启动 Source');
 
-      await _tap(tester, find.byIcon(Icons.tune_outlined));
+      await _tap(tester, find.byIcon(CupertinoIcons.slider_horizontal_3));
       await _waitFor(tester, '正式全局设置面板', () {
         final panels = find.byType(GlobalSettingsPanel);
         if (panels.evaluate().length != 1) {
@@ -183,7 +185,7 @@ Future<SettingsSnapshot> _write(
   _expectTheme(tester, before.global.theme);
   _expectGlobal(editor.state.snapshot!.global, before.global);
   expect(editor.state.pending, isNull);
-  await _tap(tester, find.widgetWithText(FilledButton, '保存全局设置'));
+  await _tap(tester, find.widgetWithText(CupertinoButton, '保存全局设置'));
   await _waitFor(tester, '全局设置获得服务端确认', () {
     if (editor.state.error != null) fail('全局设置写入失败：${editor.state.error}');
     return !editor.state.busy &&
@@ -270,8 +272,8 @@ Future<SettingsSnapshot> _ackLoss(
   expect(before.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
   expect(before.global.installedExtensions, isEmpty);
   final target = before.global.deepCopy()..theme = wire.AppTheme.APP_THEME_DARK;
-  final save = find.widgetWithText(FilledButton, '保存全局设置');
-  final retry = find.widgetWithText(TextButton, _retry);
+  final save = find.widgetWithText(CupertinoButton, '保存全局设置');
+  final retry = find.widgetWithText(CupertinoButton, _retry);
   await _select(tester, target.theme);
   _expectTheme(tester, before.global.theme);
   await _tap(tester, save);
@@ -307,7 +309,7 @@ Future<SettingsSnapshot> _ackLoss(
   _expectPendingAck(tester, editor, before, target);
   debugPrintSynchronously('SETTINGS_ACK_LOSS_COMMITTED_UNCONFIRMED pid=$pid');
 
-  await _tap(tester, find.widgetWithText(TextButton, '重新读取设置'));
+  await _tap(tester, find.widgetWithText(CupertinoButton, '重新读取设置'));
   await _waitFor(
     tester,
     '正式重读取到已提交值',
@@ -358,13 +360,13 @@ void _expectPendingAck(
   expect(find.text(_unconfirmed), findsOneWidget);
   expect(
     tester
-        .widget<TextButton>(find.widgetWithText(TextButton, _retry))
+        .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, _retry))
         .onPressed,
     isNotNull,
   );
   expect(
     tester
-        .widget<FilledButton>(find.widgetWithText(FilledButton, '保存全局设置'))
+        .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, '保存全局设置'))
         .onPressed,
     isNull,
   );
@@ -548,48 +550,42 @@ Future<void> _expectSelection<T>(
   await tester.ensureVisible(finder);
   await tester.pump(const Duration(milliseconds: 300));
   expect(finder.hitTestable(), findsOneWidget);
-  expect(tester.widget<DropdownButtonFormField<T>>(finder).initialValue, value);
+  expect(tester.widget<ChoiceField<T>>(finder).value, value);
 }
 
 void _expectTheme(WidgetTester tester, wire.AppTheme theme) {
   final expected = switch (theme) {
-    wire.AppTheme.APP_THEME_SYSTEM => ThemeMode.system,
-    wire.AppTheme.APP_THEME_LIGHT => ThemeMode.light,
-    wire.AppTheme.APP_THEME_DARK => ThemeMode.dark,
+    wire.AppTheme.APP_THEME_SYSTEM => null,
+    wire.AppTheme.APP_THEME_LIGHT => Brightness.light,
+    wire.AppTheme.APP_THEME_DARK => Brightness.dark,
     _ => throw const FormatException('Unsupported expected application theme'),
   };
   expect(
-    tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+    tester.widget<CupertinoApp>(find.byType(CupertinoApp)).theme?.brightness,
     expected,
   );
 }
 
 Future<void> _select<T>(WidgetTester tester, T value) async {
-  final field = find.byType(DropdownButtonFormField<T>);
+  final field = find.byType(ChoiceField<T>);
   await _waitFor(tester, '设置选择框 $T', () => field.evaluate().length == 1);
-  final input = tester.widget<DropdownButtonFormField<T>>(field);
-  if (input.initialValue == value) {
+  final input = tester.widget<ChoiceField<T>>(field);
+  if (input.value == value) {
     return;
   }
   expect(input.onChanged, isNotNull);
   final dropdown = find.descendant(
     of: field,
-    matching: find.byType(DropdownButton<T>),
+    matching: find.byType(ChoiceField<T>),
   );
   expect(dropdown, findsOneWidget);
-  final items = tester.widget<DropdownButton<T>>(dropdown).items!;
-  final child = items.singleWhere((item) => item.value == value).child;
-  if (child is! Text || child.data == null) {
-    fail('正式设置菜单应提供可见文本');
-  }
-  final label = child.data!;
+  final label = tester.widget<ChoiceField<T>>(dropdown).options[value]!;
   await _tap(tester, field);
   await _tap(tester, find.text(label).last);
   await _waitFor(
     tester,
     '设置选择已进入表单草稿',
-    () =>
-        tester.widget<DropdownButtonFormField<T>>(field).initialValue == value,
+    () => tester.widget<ChoiceField<T>>(field).value == value,
   );
 }
 

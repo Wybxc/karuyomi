@@ -1,7 +1,9 @@
+import 'widgets/app_page_route.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,104 +32,51 @@ void main() {
   );
 }
 
-class KaruyomiApp extends StatefulWidget {
-  const KaruyomiApp({
-    super.key,
-    this.platform,
-    this.platformFactory,
-    this.connectionPreferences,
-  });
-  final PlatformRuntime? platform;
-  final PlatformRuntime Function(Uri? origin)? platformFactory;
-  final SharedPreferencesAsync? connectionPreferences;
-
+class const KaruyomiApp({
+  super.key,
+  final PlatformRuntime? platform,
+  final PlatformRuntime Function(Uri? origin)? platformFactory,
+  final SharedPreferencesAsync? connectionPreferences,
+}) extends StatefulWidget {
   @override
   State<KaruyomiApp> createState() => _KaruyomiAppState();
 }
 
 class _KaruyomiAppState extends State<KaruyomiApp> {
-  ThemeMode _themeMode = ThemeMode.system;
+  Brightness? _brightness;
 
   @override
-  Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.reduceMotionOf(context) ||
-        MediaQuery.disableAnimationsOf(context);
-    final transitions = reduceMotion
-        ? PageTransitionsTheme(
-            builders: {
-              for (final platform in TargetPlatform.values)
-                platform: const _ReducedMotionTransitions(),
-            },
-          )
-        : const PageTransitionsTheme();
-    return MaterialApp(
-      title: 'Karuyomi',
-      builder: readerBaselineEnabled
-          ? (context, child) => ReaderBaselineHost(child: child!)
-          : null,
-      debugShowCheckedModeBanner: false,
-      locale: const Locale('zh'),
-      supportedLocales: const [Locale('zh'), Locale('en')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      themeMode: _themeMode,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff476b5d)),
-        useMaterial3: true,
-        pageTransitionsTheme: transitions,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff476b5d),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        pageTransitionsTheme: transitions,
-      ),
-      home: AppShell(
-        themeMode: _themeMode,
-        onThemeChanged: (value) => setState(() => _themeMode = value),
-        platform: widget.platform,
-        platformFactory: widget.platformFactory,
-        connectionPreferences: widget.connectionPreferences,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => CupertinoApp(
+    title: 'Karuyomi',
+    builder: readerBaselineEnabled
+        ? (context, child) => ReaderBaselineHost(child: child!)
+        : null,
+    debugShowCheckedModeBanner: false,
+    locale: const Locale('zh'),
+    supportedLocales: const [Locale('zh'), Locale('en')],
+    localizationsDelegates: GlobalCupertinoLocalizations.delegates,
+    theme: CupertinoThemeData(
+      brightness: _brightness,
+      primaryColor: CupertinoColors.activeGreen,
+    ),
+    home: AppShell(
+      brightness: _brightness,
+      onThemeChanged: (value) => setState(() => _brightness = value),
+      platform: widget.platform,
+      platformFactory: widget.platformFactory,
+      connectionPreferences: widget.connectionPreferences,
+    ),
+  );
 }
 
-/// Keep route changes legible without spatial motion; animated manga retain
-/// their separate playback setting and disableAnimations policy.
-class _ReducedMotionTransitions extends PageTransitionsBuilder {
-  const _ReducedMotionTransitions();
-
-  @override
-  Widget buildTransitions<T>(
-    PageRoute<T> route,
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) => MediaQuery.disableAnimationsOf(context)
-      ? child
-      : FadeTransition(opacity: animation, child: child);
-}
-
-class AppShell extends StatefulHookConsumerWidget {
-  const AppShell({
-    super.key,
-    required this.themeMode,
-    required this.onThemeChanged,
-    this.platform,
-    this.platformFactory,
-    this.connectionPreferences,
-  });
-
-  final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeChanged;
-  final PlatformRuntime? platform;
-  final PlatformRuntime Function(Uri? origin)? platformFactory;
-  final SharedPreferencesAsync? connectionPreferences;
-
+class const AppShell({
+  super.key,
+  required final Brightness? brightness,
+  required final ValueChanged<Brightness?> onThemeChanged,
+  final PlatformRuntime? platform,
+  final PlatformRuntime Function(Uri? origin)? platformFactory,
+  final SharedPreferencesAsync? connectionPreferences,
+}) extends StatefulHookConsumerWidget {
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
 }
@@ -141,8 +90,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       : ref.read(
           settingsControllerProvider(_catalog!, _catalog!.settings).notifier,
         );
-  ThemeMode _confirmedTheme = ThemeMode.system;
+  Brightness? _confirmedTheme;
   String? _configurationError;
+  String? _notice;
   Map<String, Object?>? _pendingContinuation;
   final _retiredProgress = <ReadingProgressController>{};
   bool _retryingProgress = false;
@@ -154,9 +104,9 @@ class _AppShellState extends ConsumerState<AppShell> {
   late TextEditingController _originField;
   static const _labels = ['书架', '浏览', '设置'];
   static const _icons = [
-    Icons.collections_bookmark_outlined,
-    Icons.explore_outlined,
-    Icons.tune_outlined,
+    CupertinoIcons.book,
+    CupertinoIcons.compass,
+    CupertinoIcons.slider_horizontal_3,
   ];
 
   void _select(int index) {
@@ -164,7 +114,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     if (index == 2) unawaited(_settings?.refresh());
   }
 
-  void _applyTheme(ThemeMode value) {
+  void _applyTheme(Brightness? value) {
     if (_confirmedTheme == value) return;
     _confirmedTheme = value;
     widget.onThemeChanged(value);
@@ -295,36 +245,32 @@ class _AppShellState extends ConsumerState<AppShell> {
           return;
         }
         try {
-          await Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => ChapterReaderRoute(
-                catalog: controller,
-                manga: recovered.manga,
-                source: recovered.source,
-                sequence: recovered.sequence,
-                initialChapter: recovered.chapter,
-                initialOpened: recovered.opened,
-                initialPosition: recovered.position,
-                initialOrder: recovery.order,
-                initialMode: recovery.mode,
-                initialDoublePage: recovery.doublePage,
-                onAuthenticate: _authenticateReader,
-              ),
+          final readerRoute = AppPageRoute<void>(
+            builder: (_) => ChapterReaderRoute(
+              catalog: controller,
+              manga: recovered.manga,
+              source: recovered.source,
+              sequence: recovered.sequence,
+              initialChapter: recovered.chapter,
+              initialOpened: recovered.opened,
+              initialPosition: recovered.position,
+              initialOrder: recovery.order,
+              initialMode: recovery.mode,
+              initialDoublePage: recovery.doublePage,
+              onAuthenticate: _authenticateReader,
             ),
           );
+          await Navigator.of(context).push<void>(readerRoute);
+          await readerRoute.completed;
         } finally {
           await controller.closeChapter(recovered.opened);
         }
       } catch (error) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                error is StateError
-                    ? error.message.toString()
-                    : '阅读恢复状态无效，请重新选择章节',
-              ),
-            ),
+          setState(
+            () => _notice = error is StateError
+                ? error.message.toString()
+                : '阅读恢复状态无效，请重新选择章节',
           );
         }
       }
@@ -383,12 +329,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error is StateError ? error.message.toString() : '登录未完成，请重试。',
-            ),
-          ),
+        setState(
+          () => _notice = error is StateError
+              ? error.message.toString()
+              : '登录未完成，请重试。',
         );
       }
     }
@@ -449,7 +393,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       try {
         final old = _platform;
         final oldCatalog = _catalog;
-        _applyTheme(ThemeMode.system);
+        _applyTheme(null);
         if (oldCatalog != null) {
           await oldCatalog.flushReadingProgress();
           if (!mounted) return;
@@ -517,11 +461,11 @@ class _AppShellState extends ConsumerState<AppShell> {
             else
               const Text('连接并确认身份后可读取和保存同步设置。'),
             const SizedBox(height: 24),
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
+            const CupertinoListTile(
               title: Text('Karuyomi'),
               subtitle: Text('轻松翻开下一页'),
               trailing: Text('0.1.0'),
+              padding: EdgeInsets.zero,
             ),
           ],
         ),
@@ -531,21 +475,20 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   Widget _connectionSettings() {
     final controller = _catalog;
-    Widget content() => Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('服务连接', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          '服务连接',
+          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+        ),
         const SizedBox(height: 16),
-        TextField(
+        CupertinoTextField(
           controller: _originField,
           readOnly: kIsWeb || _restoringOrigin,
           keyboardType: TextInputType.url,
           autocorrect: false,
-          decoration: const InputDecoration(
-            labelText: '服务地址',
-            hintText: 'https://你的服务域名',
-            border: OutlineInputBorder(),
-          ),
+          placeholder: 'https://你的服务域名',
         ),
         const SizedBox(height: 12),
         if (_configurationError != null) Text(_configurationError!),
@@ -556,7 +499,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             controller?.hasUnsavedReadingProgress == true) ...[
           const SizedBox(height: 12),
           const Text('部分阅读进度尚未保存；原服务和身份的记录仍保留，可继续连接服务。'),
-          TextButton(
+          CupertinoButton(
             onPressed: _retryingProgress ? null : _retryProgress,
             child: const Text('重试保存所有进度'),
           ),
@@ -566,28 +509,25 @@ class _AppShellState extends ConsumerState<AppShell> {
           spacing: 12,
           runSpacing: 8,
           children: [
-            OutlinedButton.icon(
+            CupertinoButton(
               onPressed:
                   controller?.busy == true ||
                       _changingService ||
                       _restoringOrigin
                   ? null
                   : _changeService,
-              icon: const Icon(Icons.link),
-              label: const Text('连接服务'),
+              child: const Text('连接服务'),
             ),
-            FilledButton.icon(
+            CupertinoButton.filled(
               onPressed: _platform == null || controller?.busy == true
                   ? null
                   : _authenticate,
-              icon: const Icon(Icons.login),
-              label: const Text('登录'),
+              child: const Text('登录'),
             ),
           ],
         ),
       ],
     );
-    return content();
   }
 
   @override
@@ -607,7 +547,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           (state) => state.available ? state.snapshot?.global.theme : null,
         ),
       );
-      final desired = theme == null ? ThemeMode.system : appTheme(theme);
+      final desired = theme == null ? null : appBrightness(theme);
       if (_confirmedTheme != desired) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && identical(catalog, _catalog)) _applyTheme(desired);
@@ -617,43 +557,69 @@ class _AppShellState extends ConsumerState<AppShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 840;
-        return Scaffold(
-          appBar: AppBar(title: Text(_labels[_index])),
-          body: SafeArea(
-            child: Row(
+        return CupertinoPageScaffold(
+          navigationBar: CupertinoNavigationBar(middle: Text(_labels[_index])),
+          child: SafeArea(
+            child: Column(
               children: [
-                if (wide) ...[
-                  NavigationRail(
-                    selectedIndex: _index,
-                    onDestinationSelected: _select,
-                    labelType: NavigationRailLabelType.all,
-                    destinations: [
+                if (_notice case final notice?)
+                  CupertinoListTile(
+                    title: Text(notice, maxLines: 4),
+                    trailing: CupertinoButton(
+                      onPressed: () => setState(() => _notice = null),
+                      child: const Icon(
+                        CupertinoIcons.xmark,
+                        semanticLabel: '关闭提示',
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      if (wide)
+                        SizedBox(
+                          width: 148,
+                          child: Column(
+                            key: const ValueKey('app-navigation'),
+                            children: [
+                              for (var i = 0; i < _labels.length; i++)
+                                CupertinoButton(
+                                  onPressed: () => _select(i),
+                                  color: _index == i
+                                      ? CupertinoColors.tertiarySystemFill
+                                            .resolveFrom(context)
+                                      : null,
+                                  child: Row(
+                                    children: [
+                                      Icon(_icons[i]),
+                                      const SizedBox(width: 8),
+                                      Text(_labels[i]),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      Expanded(child: _page()),
+                    ],
+                  ),
+                ),
+                if (!wide)
+                  CupertinoTabBar(
+                    key: const ValueKey('app-navigation'),
+                    currentIndex: _index,
+                    onTap: _select,
+                    items: [
                       for (var i = 0; i < _labels.length; i++)
-                        NavigationRailDestination(
+                        BottomNavigationBarItem(
                           icon: Icon(_icons[i]),
-                          label: Text(_labels[i]),
+                          label: _labels[i],
                         ),
                     ],
                   ),
-                  const VerticalDivider(width: 1),
-                ],
-                Expanded(child: _page()),
               ],
             ),
           ),
-          bottomNavigationBar: wide
-              ? null
-              : NavigationBar(
-                  selectedIndex: _index,
-                  onDestinationSelected: _select,
-                  destinations: [
-                    for (var i = 0; i < _labels.length; i++)
-                      NavigationDestination(
-                        icon: Icon(_icons[i]),
-                        label: _labels[i],
-                      ),
-                  ],
-                ),
         );
       },
     );

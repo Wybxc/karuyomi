@@ -163,16 +163,12 @@ final class ReaderImagePin {
 }
 
 /// Also wraps injected test renderers so display ownership has one policy.
-class PinnedReaderImage extends StatefulWidget {
-  const PinnedReaderImage({
-    super.key,
-    required this.pool,
-    required this.image,
-    required this.builder,
-  });
-  final ReaderResourcePool pool;
-  final ImageResource image;
-  final WidgetBuilder builder;
+class const PinnedReaderImage({
+  super.key,
+  required final ReaderResourcePool pool,
+  required final ImageResource image,
+  required final WidgetBuilder builder,
+}) extends StatefulWidget {
   @override
   State<PinnedReaderImage> createState() => _PinnedReaderImageState();
 }

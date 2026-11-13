@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:cross_file/cross_file.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
@@ -206,7 +206,7 @@ void main() {
       final files = <XFile>[];
       final downloads = <List<int>>[];
       await tester.pumpWidget(
-        MaterialApp(
+        CupertinoApp(
           builder: (context, child) => ReaderBaselineHost(
             saveReportForTesting: (file) async {
               files.add(file);
@@ -214,8 +214,8 @@ void main() {
             },
             child: child!,
           ),
-          home: Scaffold(
-            body: Builder(
+          home: CupertinoPageScaffold(
+            child: Builder(
               builder: (context) {
                 recorder = ReaderBaselineScope.read(context)!;
                 return const Text('正式 UI');
@@ -295,10 +295,10 @@ void main() {
         ),
       );
       await tester.pumpWidget(
-        MaterialApp(
+        CupertinoApp(
           builder: (context, child) => ReaderBaselineHost(child: child!),
-          home: Scaffold(
-            body: Builder(
+          home: CupertinoPageScaffold(
+            child: Builder(
               builder: (context) {
                 recorder = ReaderBaselineScope.read(context)!;
                 return const Text('正式 UI');

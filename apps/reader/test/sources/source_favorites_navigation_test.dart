@@ -5,7 +5,7 @@ import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
@@ -97,9 +97,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: CatalogPage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: CatalogPage(
             controller: catalog,
             onConnect: () {},
             onAuthenticate: () {},
@@ -180,7 +180,7 @@ void main() {
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
       expect(catalog.installationSettings!.global.favoriteSources, isEmpty);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
       final command = wire.decodeProtoJson(
         wire.SettingsMutation(),
         jsonDecode(posts().last.body!),
@@ -190,8 +190,12 @@ void main() {
       release.complete();
       await tester.pumpAndSettle();
       expect(
-        tester.widget<IconButton>(toggle()).icon,
-        isA<Icon>().having((icon) => icon.icon, 'saved star', Icons.star),
+        tester.widget<CupertinoButton>(toggle()).child,
+        isA<Icon>().having(
+          (icon) => icon.icon,
+          'saved star',
+          CupertinoIcons.star_fill,
+        ),
       );
       expect(platform.openedBuilds, isEmpty);
       await tap(tester, toggle());
@@ -217,7 +221,7 @@ void main() {
       );
       await show(tester);
       await reveal(tester, toggle());
-      expect(tester.widget<IconButton>(toggle()).onPressed, isNull);
+      expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNull);
       final before = posts().length;
       await tester.tap(toggle());
       await tester.pumpAndSettle();
@@ -231,7 +235,7 @@ void main() {
         hasLength(businessFavoriteSourceLimit - 1),
       );
       await reveal(tester, toggle());
-      expect(tester.widget<IconButton>(toggle()).onPressed, isNotNull);
+      expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNotNull);
       await tap(tester, toggle());
       expect(
         (await remoteSettings.loadGlobal()).global.favoriteSources,
@@ -254,7 +258,7 @@ void main() {
       expect(catalog.mangas.single.title, testManga.title);
       expect(platform.openedBuilds, ['build-1']);
       expect(posts(), hasLength(before));
-      await tester.pageBack();
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       platform.inventory = wire.encodeProtoJson(
         wire.ExtensionIndex(schemaVersion: 1, repoId: 'keiyoushi'),
@@ -312,7 +316,7 @@ void main() {
       await show(tester);
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
       expect(find.textContaining('应用主题：深色'), findsOneWidget);
-      expect(tester.widget<IconButton>(toggle()).onPressed, isNull);
+      expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNull);
       await tap(tester, find.text('重新读取设置'));
       expect(posts(), hasLength(1));
       expect(repository.pendingGlobal(), isNotNull);
@@ -336,7 +340,7 @@ void main() {
       await seed(_values(favorites: [_favorite(package: 'remote.extension')]));
       await tap(tester, toggle());
       expect(catalog.settings!.pendingGlobal()!.retryable, false);
-      expect(tester.widget<IconButton>(toggle()).onPressed, isNull);
+      expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNull);
       expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
       await tap(tester, find.text('重新读取设置'));
       expect(catalog.settings!.pendingGlobal(), isNull);

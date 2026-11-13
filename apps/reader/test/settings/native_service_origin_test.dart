@@ -1,6 +1,6 @@
 import '../test_app.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,7 +39,7 @@ void main() {
     Future<void> openSettings() async {
       await tester.tap(
         find.descendant(
-          of: find.byType(NavigationBar),
+          of: find.byKey(const ValueKey('app-navigation')),
           matching: find.text('设置'),
         ),
       );
@@ -50,7 +50,7 @@ void main() {
     await tester.pumpAndSettle();
     await openSettings();
 
-    final field = find.byType(TextField);
+    final field = find.byType(CupertinoTextField);
     final connect = find.text('连接服务');
     await tester.enterText(field, 'https://reader.example.net:9443/');
     await tester.tap(connect);
@@ -73,7 +73,7 @@ void main() {
     expect(connected.last.businessServer.appliedMutations, 0);
     await openSettings();
     expect(
-      tester.widget<TextField>(field).controller!.text,
+      tester.widget<CupertinoTextField>(field).controller!.text,
       'https://reader.example.net:9443',
     );
   });

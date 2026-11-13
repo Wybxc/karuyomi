@@ -1,6 +1,9 @@
+import '../../widgets/app_page_route.dart';
+import '../../widgets/choice_field.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter/scheduler.dart';
@@ -24,22 +27,14 @@ import 'library_providers.dart';
 
 enum _LibrarySort { added, title }
 
-class LibraryPage extends StatefulHookConsumerWidget {
-  const LibraryPage({
-    super.key,
-    required this.controller,
-    required this.onBrowse,
-    required this.onConnect,
-    required this.onAuthenticate,
-    this.onAuthenticateReader,
-  });
-
-  final CatalogController? controller;
-  final VoidCallback onBrowse;
-  final VoidCallback onConnect;
-  final VoidCallback onAuthenticate;
-  final ReaderAuthentication? onAuthenticateReader;
-
+class const LibraryPage({
+  super.key,
+  required final CatalogController? controller,
+  required final VoidCallback onBrowse,
+  required final VoidCallback onConnect,
+  required final VoidCallback onAuthenticate,
+  final ReaderAuthentication? onAuthenticateReader,
+}) extends StatefulHookConsumerWidget {
   @override
   ConsumerState<LibraryPage> createState() => _LibraryPageState();
 }
@@ -161,17 +156,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       if (details == null || !isCurrent()) return;
       Future<void> showDetails({String? notice}) async {
         if (!isCurrent() || !controller.isCurrentSource(details.source)) return;
-        if (notice != null) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(notice)));
-        }
         await Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
+          AppPageRoute<void>(
             builder: (_) => MangaDetailsPage(
               controller: controller,
               manga: details.manga,
               chapters: details.chapters,
               source: details.source,
+              notice: notice,
               onAuthenticateReader: widget.onAuthenticateReader,
             ),
           ),
@@ -227,7 +219,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       }
       try {
         if (!mounted || !sourceCurrent()) return;
-        final readerRoute = MaterialPageRoute<void>(
+        final readerRoute = AppPageRoute<void>(
           builder: (_) => ChapterReaderRoute(
             catalog: controller,
             manga: details.manga,
@@ -277,7 +269,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     setState(() => _opening = true);
     try {
       await Navigator.of(context).push<void>(
-        MaterialPageRoute(
+        AppPageRoute(
           builder: (_) => MigrationPage(
             catalog: catalog,
             client: client,
@@ -516,22 +508,21 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           padding: const EdgeInsets.all(24),
           children: [
             if (_opening || widget.controller?.busy == true) ...[
-              const LinearProgressIndicator(),
+              const CupertinoActivityIndicator(),
               const SizedBox(height: 12),
             ],
-            if (widget.controller?.error case final error?) _notice(error),
-            if (_refreshError case final error?) _notice(error),
-            if (_openError case final error?) _notice(error),
+            if (widget.controller?.error case final error?) Text(error),
+            if (_refreshError case final error?) Text(error),
+            if (_openError case final error?) Text(error),
             if (widget.controller case final controller?)
               if (controller.status != ServiceStatus.ready)
                 _connection(controller),
             if (_repository != null)
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+                child: CupertinoButton(
                   onPressed: () => unawaited(_refresh()),
-                  icon: const Icon(Icons.sync),
-                  label: const Text('刷新服务端书架'),
+                  child: const Text('刷新服务端书架'),
                 ),
               ),
             _libraryContents(snapshot),
@@ -545,8 +536,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     if (snapshot.hasError && !snapshot.hasValue) {
       return Column(
         children: [
-          _notice('未能读取服务端书架，请重试。'),
-          TextButton(onPressed: _retryStorage, child: const Text('重试读取书架')),
+          Text('未能读取服务端书架，请重试。'),
+          CupertinoButton(
+            onPressed: _retryStorage,
+            child: const Text('重试读取书架'),
+          ),
         ],
       );
     }
@@ -568,7 +562,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (snapshot.hasError) _notice('未能读取服务端书架，当前显示上次确认的结果。'),
+        if (snapshot.hasError) Text('未能读取服务端书架，当前显示上次确认的结果。'),
         _categoryControls(view),
         if (view.entries.isEmpty) _empty() else _library(view),
       ],
@@ -588,14 +582,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             ServiceStatus.denied => '当前账号无法访问',
             _ => '连接服务后打开书架漫画',
           }),
-          TextButton.icon(
+          CupertinoButton(
             onPressed: controller.busy
                 ? null
                 : needsLogin
                 ? widget.onAuthenticate
                 : widget.onConnect,
-            icon: Icon(needsLogin ? Icons.login : Icons.refresh),
-            label: Text(needsLogin ? '登录' : '连接服务'),
+            child: Text(needsLogin ? '登录' : '连接服务'),
           ),
         ],
       ),
@@ -607,19 +600,21 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     child: Column(
       children: [
         Icon(
-          Icons.auto_stories_outlined,
+          CupertinoIcons.book,
           size: 64,
-          color: Theme.of(context).colorScheme.primary,
+          color: CupertinoTheme.of(context).primaryColor,
         ),
         const SizedBox(height: 24),
-        Text('书架还是空的', style: Theme.of(context).textTheme.headlineSmall),
+        Text(
+          '书架还是空的',
+          style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle,
+        ),
         const SizedBox(height: 12),
         const Text('从浏览打开漫画详情，收藏喜欢的漫画。'),
         const SizedBox(height: 24),
-        FilledButton.icon(
+        CupertinoButton.filled(
           onPressed: widget.onBrowse,
-          icon: const Icon(Icons.explore_outlined),
-          label: const Text('去浏览'),
+          child: const Text('去浏览'),
         ),
       ],
     ),
@@ -646,71 +641,53 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         _retryingMetadata == null &&
         widget.controller?.status == ServiceStatus.ready &&
         widget.controller?.busy == false;
-    final selected = _filterFor(view);
-    Widget chip(String? value, String label) => Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Tooltip(
-        message: label,
-        child: ChoiceChip(
-          label: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 200),
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-          selected: selected == value,
-          onSelected: (_) => setState(() => _categoryFilter = value),
-        ),
-      ),
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (pending) ...[
-          _notice('有一项分类修改尚未处理。请继续原修改，当前列表仅显示服务端已确认的结果。'),
+          Text('有一项分类修改尚未处理。请继续原修改，当前列表仅显示服务端已确认的结果。'),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
+            child: CupertinoButton.tinted(
               onPressed: available
                   ? () => unawaited(_editCategories(view))
                   : null,
-              icon: const Icon(Icons.pending_actions),
-              label: const Text('处理未确认修改'),
+              child: const Text('处理未确认修改'),
             ),
           ),
           const SizedBox(height: 8),
         ],
         if (batch != null) ...[
-          _notice('有未完成的批量操作，当前列表仅显示服务端已确认的结果。'),
+          Text('有未完成的批量操作，当前列表仅显示服务端已确认的结果。'),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
+            child: CupertinoButton.tinted(
               key: const ValueKey('library-resume-batch'),
               onPressed: available ? () => unawaited(_batch(view)) : null,
-              icon: const Icon(Icons.pending_actions),
-              label: const Text('继续处理批量操作'),
+              child: const Text('继续处理批量操作'),
             ),
           ),
           const SizedBox(height: 8),
         ],
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
+          child: CupertinoButton(
             onPressed: available && !pending && batch == null && !_selecting
                 ? () => unawaited(_editCategories(view))
                 : null,
-            icon: const Icon(Icons.folder_outlined),
-            label: const Text('管理分类'),
+            child: const Text('管理分类'),
           ),
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              chip(null, '全部'),
-              chip('', '未分类'),
-              for (final category in view.categories)
-                chip(category.id, category.name),
-            ],
-          ),
+        ChoiceField<String>(
+          key: const ValueKey('library-category-filter'),
+          label: '分类',
+          value: _filterFor(view),
+          options: {
+            null: '全部',
+            '': '未分类',
+            for (final category in view.categories) category.id: category.name,
+          },
+          onChanged: (value) => setState(() => _categoryFilter = value),
         ),
         const SizedBox(height: 16),
       ],
@@ -774,26 +751,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
+        CupertinoTextField(
           controller: _search,
-          decoration: const InputDecoration(
-            labelText: '搜索书架',
-            hintText: '漫画、作者或漫画源',
-            prefixIcon: Icon(Icons.search),
-            border: OutlineInputBorder(),
-          ),
+          placeholder: '漫画、作者或漫画源',
+          prefix: Icon(CupertinoIcons.search),
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<_LibrarySort>(
-          initialValue: _sort,
-          decoration: const InputDecoration(
-            labelText: '排序',
-            border: OutlineInputBorder(),
-          ),
-          items: const [
-            DropdownMenuItem(value: _LibrarySort.added, child: Text('最近收藏')),
-            DropdownMenuItem(value: _LibrarySort.title, child: Text('标题')),
-          ],
+        ChoiceField<_LibrarySort>(
+          label: '排序',
+          value: _sort,
+          options: {_LibrarySort.added: '最近收藏', _LibrarySort.title: '标题'},
           onChanged: (value) {
             if (value != null) setState(() => _sort = value);
           },
@@ -802,7 +769,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         Text('收藏 ${entries.length} 部 · 当前显示 ${visible.length} 部'),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
+          child: CupertinoButton(
             key: const ValueKey('library-selection-toggle'),
             onPressed: canSelect && (_selecting || !hasPending)
                 ? () => setState(() {
@@ -810,8 +777,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     if (!_selecting) _selection.clear();
                   })
                 : null,
-            icon: Icon(_selecting ? Icons.close : Icons.checklist),
-            label: Text(_selecting ? '退出选择' : '选择漫画'),
+            child: Text(_selecting ? '退出选择' : '选择漫画'),
           ),
         ),
         if (_selecting) ...[
@@ -820,14 +786,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           Wrap(
             spacing: 8,
             children: [
-              TextButton(
+              CupertinoButton(
                 key: const ValueKey('library-select-visible'),
                 onPressed: canSelect && visible.isNotEmpty
                     ? () => setState(() => _selection.addAll(visibleKeys))
                     : null,
                 child: const Text('全选当前显示'),
               ),
-              TextButton(
+              CupertinoButton(
                 key: const ValueKey('library-deselect-visible'),
                 onPressed:
                     canSelect && selected.intersection(visibleKeys).isNotEmpty
@@ -835,7 +801,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     : null,
                 child: const Text('取消当前显示选择'),
               ),
-              TextButton(
+              CupertinoButton(
                 key: const ValueKey('library-clear-selection'),
                 onPressed: canSelect && selected.isNotEmpty
                     ? () => setState(_selection.clear)
@@ -848,50 +814,31 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              OutlinedButton.icon(
-                key: const ValueKey('library-batch-add-categories'),
-                onPressed:
-                    canSelect &&
-                        !hasPending &&
-                        selected.isNotEmpty &&
-                        view.categories.isNotEmpty
-                    ? () => unawaited(
-                        _batch(view, action: LibraryBatchAction.addCategories),
-                      )
-                    : null,
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('批量添加分类'),
-              ),
-              OutlinedButton.icon(
-                key: const ValueKey('library-batch-remove-categories'),
-                onPressed:
-                    canSelect &&
-                        !hasPending &&
-                        selected.isNotEmpty &&
-                        view.categories.isNotEmpty
-                    ? () => unawaited(
-                        _batch(
-                          view,
-                          action: LibraryBatchAction.removeCategories,
-                        ),
-                      )
-                    : null,
-                icon: const Icon(Icons.folder_off_outlined),
-                label: const Text('批量移出分类'),
-              ),
-              FilledButton.tonalIcon(
-                key: const ValueKey('library-batch-remove-favorites'),
-                onPressed: canSelect && !hasPending && selected.isNotEmpty
-                    ? () => unawaited(
-                        _batch(
-                          view,
-                          action: LibraryBatchAction.removeFavorites,
-                        ),
-                      )
-                    : null,
-                icon: const Icon(Icons.bookmark_remove_outlined),
-                label: const Text('批量移出书架'),
-              ),
+              for (final (action, id, label) in const [
+                (LibraryBatchAction.addCategories, 'add-categories', '批量添加分类'),
+                (
+                  LibraryBatchAction.removeCategories,
+                  'remove-categories',
+                  '批量移出分类',
+                ),
+                (
+                  LibraryBatchAction.removeFavorites,
+                  'remove-favorites',
+                  '批量移出书架',
+                ),
+              ])
+                CupertinoButton(
+                  key: ValueKey('library-batch-$id'),
+                  onPressed:
+                      canSelect &&
+                          !hasPending &&
+                          selected.isNotEmpty &&
+                          (action == LibraryBatchAction.removeFavorites ||
+                              view.categories.isNotEmpty)
+                      ? () => unawaited(_batch(view, action: action))
+                      : null,
+                  child: Text(label),
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -903,130 +850,149 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             child: Text('没有找到收藏', textAlign: TextAlign.center),
           ),
         for (final entry in visible)
-          Card(
-            key: ValueKey(entry.mangaKey),
-            child: ListTile(
-              leading: _selecting
-                  ? Checkbox(
-                      key: ValueKey(('library-select', entry.mangaKey)),
-                      value: selected.contains(entry.mangaKey),
-                      onChanged: canSelect
-                          ? (_) => _toggleSelection(entry.mangaKey)
-                          : null,
-                    )
-                  : CustomCover(repository: _covers!, cover: entry.customCover),
-              title: Text(entry.title),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    [
-                      if (entry.snapshot.author.isNotEmpty)
-                        entry.snapshot.author,
-                      '${entry.sourceName} · ${entry.sourceLang}',
-                      '分类：${entry.categoryIds.isEmpty ? '未分类' : view.categories.where((category) => entry.categoryIds.contains(category.id)).map((category) => category.name).join('、')}',
-                    ].join('\n'),
-                  ),
-                  if (repository?.client.hasPendingMetadata(entry.mangaKey) ==
-                      true)
-                    TextButton(
-                      key: ValueKey(('library-retry-metadata', entry.mangaKey)),
-                      onPressed: canOpen && !_editing
-                          ? () => unawaited(_retryMetadata(entry))
-                          : null,
-                      child: Text(
-                        _retryingMetadata == entry.mangaKey
-                            ? '正在重试保存书架资料'
-                            : '重试保存书架资料',
-                      ),
-                    ),
-                ],
-              ),
-              trailing: _selecting
-                  ? null
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (entry.resume != null ||
-                            controller?.readingDraftResume(entry.mangaKey) !=
-                                null)
-                          IconButton(
-                            key: ValueKey(('library-continue', entry.mangaKey)),
-                            tooltip:
-                                controller?.readingDraftResume(
-                                      entry.mangaKey,
-                                    ) !=
-                                    null
-                                ? '继续阅读（未保存）：${entry.title}'
-                                : '继续阅读：${entry.title}',
-                            onPressed: canOpen
-                                ? () => unawaited(
-                                    _open(entry, continueReading: true),
-                                  )
+          CupertinoListSection.insetGrouped(
+            children: [
+              GestureDetector(
+                onLongPress: canSelect && !_selecting && !hasPending
+                    ? () => setState(() {
+                        _selecting = true;
+                        _selection.add(entry.mangaKey);
+                      })
+                    : null,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _selecting
+                      ? canSelect
+                            ? () => _toggleSelection(entry.mangaKey)
+                            : null
+                      : canOpen
+                      ? () => unawaited(_open(entry))
+                      : null,
+                  child: CupertinoListTile(
+                    key: ValueKey(entry.mangaKey),
+                    leading: _selecting
+                        ? CupertinoCheckbox(
+                            key: ValueKey(('library-select', entry.mangaKey)),
+                            value: selected.contains(entry.mangaKey),
+                            onChanged: canSelect
+                                ? (_) => _toggleSelection(entry.mangaKey)
                                 : null,
-                            icon: const Icon(Icons.play_arrow),
+                          )
+                        : CustomCover(
+                            repository: _covers!,
+                            cover: entry.customCover,
                           ),
-                        IconButton(
-                          tooltip: '设置分类：${entry.title}',
-                          onPressed: canCategorize
-                              ? () => unawaited(
-                                  _editCategories(view, entry: entry),
-                                )
-                              : null,
-                          icon: const Icon(Icons.folder_outlined),
+                    title: Text(entry.title),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          [
+                            if (entry.snapshot.author.isNotEmpty)
+                              entry.snapshot.author,
+                            '${entry.sourceName} · ${entry.sourceLang}',
+                            '分类：${entry.categoryIds.isEmpty ? '未分类' : view.categories.where((category) => entry.categoryIds.contains(category.id)).map((category) => category.name).join('、')}',
+                          ].join('\n'),
                         ),
-                        PopupMenuButton<String>(
-                          key: ValueKey(('library-more', entry.mangaKey)),
-                          tooltip: '更多操作：${entry.title}',
-                          enabled: canOpen && !_editing,
-                          onSelected: (value) {
-                            if (value == 'migrate') unawaited(_migrate(entry));
-                          },
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: 'migrate',
-                              child: Text('迁移到其他漫画源'),
+                        if (repository?.client.hasPendingMetadata(
+                              entry.mangaKey,
+                            ) ==
+                            true)
+                          CupertinoButton(
+                            key: ValueKey((
+                              'library-retry-metadata',
+                              entry.mangaKey,
+                            )),
+                            onPressed: canOpen && !_editing
+                                ? () => unawaited(_retryMetadata(entry))
+                                : null,
+                            child: Text(
+                              _retryingMetadata == entry.mangaKey
+                                  ? '正在重试保存书架资料'
+                                  : '重试保存书架资料',
                             ),
-                          ],
-                        ),
-                        const Icon(Icons.chevron_right),
+                          ),
                       ],
                     ),
-              onTap: _selecting
-                  ? canSelect
-                        ? () => _toggleSelection(entry.mangaKey)
-                        : null
-                  : canOpen
-                  ? () => unawaited(_open(entry))
-                  : null,
-              onLongPress: canSelect && !_selecting && !hasPending
-                  ? () => setState(() {
-                      _selecting = true;
-                      _selection.add(entry.mangaKey);
-                    })
-                  : null,
-            ),
+                    trailing: _selecting
+                        ? null
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (entry.resume != null ||
+                                  controller?.readingDraftResume(
+                                        entry.mangaKey,
+                                      ) !=
+                                      null)
+                                CupertinoButton(
+                                  key: ValueKey((
+                                    'library-continue',
+                                    entry.mangaKey,
+                                  )),
+                                  onPressed: canOpen
+                                      ? () => unawaited(
+                                          _open(entry, continueReading: true),
+                                        )
+                                      : null,
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(
+                                    CupertinoIcons.play,
+                                    semanticLabel:
+                                        controller?.readingDraftResume(
+                                              entry.mangaKey,
+                                            ) !=
+                                            null
+                                        ? '继续阅读（未保存）：${entry.title}'
+                                        : '继续阅读：${entry.title}',
+                                  ),
+                                ),
+                              CupertinoButton(
+                                onPressed: canCategorize
+                                    ? () => unawaited(
+                                        _editCategories(view, entry: entry),
+                                      )
+                                    : null,
+                                padding: const EdgeInsets.all(8),
+                                child: Icon(
+                                  CupertinoIcons.folder,
+                                  semanticLabel: '设置分类：${entry.title}',
+                                ),
+                              ),
+                              CupertinoMenuAnchor(
+                                key: ValueKey(('library-more', entry.mangaKey)),
+                                menuChildren: [
+                                  CupertinoMenuItem(
+                                    onPressed: canOpen && !_editing
+                                        ? () => unawaited(_migrate(entry))
+                                        : null,
+                                    child: Text('迁移到其他漫画源'),
+                                  ),
+                                ],
+                                builder: (context, menu, child) =>
+                                    CupertinoButton(
+                                      onPressed: canOpen && !_editing
+                                          ? () => menu.isOpen
+                                                ? menu.close()
+                                                : menu.open()
+                                          : null,
+                                      padding: const EdgeInsets.all(8),
+                                      child: Icon(
+                                        CupertinoIcons.ellipsis,
+                                        semanticLabel: '更多操作：${entry.title}',
+                                      ),
+                                    ),
+                              ),
+                              const Icon(CupertinoIcons.chevron_right),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
           ),
       ],
     );
   }
-
-  Widget _notice(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Card.outlined(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.info_outline),
-            const SizedBox(width: 12),
-            Expanded(child: Text(text)),
-          ],
-        ),
-      ),
-    ),
-  );
 
   @override
   void dispose() {

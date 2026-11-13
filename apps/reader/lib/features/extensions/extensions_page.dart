@@ -1,6 +1,9 @@
+import '../../widgets/app_page_route.dart';
+import '../../widgets/choice_field.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -16,22 +19,17 @@ import '../settings/pending_global_settings.dart';
 import 'extension_listing.dart';
 import 'extensions_controller.dart';
 
-class ExtensionsPage extends StatefulHookConsumerWidget {
-  const ExtensionsPage({
-    super.key,
-    required this.catalog,
-    required this.repository,
-    this.embedded = false,
-    this.onOpenSource,
-  });
-  final CatalogController catalog;
-  final SettingsRepository repository;
-  final bool embedded;
+class const ExtensionsPage({
+  super.key,
+  required final CatalogController catalog,
+  required final SettingsRepository repository,
+  final bool embedded = false,
   final Future<void> Function(
     ExtensionListing extension,
     wire.CatalogSource source,
   )?
-  onOpenSource;
+  onOpenSource,
+}) extends StatefulHookConsumerWidget {
   @override
   ConsumerState<ExtensionsPage> createState() => _ExtensionsPageState();
 }
@@ -56,7 +54,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
 
   Future<void> _details(ExtensionListing item) =>
       Navigator.of(context).push<void>(
-        MaterialPageRoute(
+        AppPageRoute(
           builder: (_) => ExtensionDetailsPage(
             controller: _controller,
             packageName: item.packageName,
@@ -67,14 +65,14 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       );
   void _repositories() => unawaited(
     Navigator.of(context).push<void>(
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) => ExtensionRepositoriesPage(controller: _controller),
       ),
     ),
   );
   void _storage() => unawaited(
     Navigator.of(context).push<void>(
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) => ExtensionStoragePage(controller: _controller),
       ),
     ),
@@ -114,30 +112,33 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       label = '管理';
       action = () => unawaited(_details(item));
     }
-    return ListTile(
-      key: installed != null
-          ? ValueKey(('extension-installed', item.packageName))
-          : ValueKey((
-              'extension-available',
-              item.reference.catalogUrl,
-              item.packageName,
-            )),
-      leading: const Icon(Icons.extension_outlined),
-      title: Text(item.name),
-      subtitle: Text(
-        '${item.languageLabel} · ${item.status(_controller.cache)}${sameName ? ' · ${item.repositoryName}' : ''}',
-      ),
-      onTap: () => unawaited(_details(item)),
-      trailing: TextButton(
-        key: installed == null
-            ? ValueKey((
-                'extension-install',
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: () => unawaited(_details(item)),
+      child: CupertinoListTile(
+        key: installed != null
+            ? ValueKey(('extension-installed', item.packageName))
+            : ValueKey((
+                'extension-available',
                 item.reference.catalogUrl,
                 item.packageName,
-              ))
-            : ValueKey(('extension-primary', item.packageName)),
-        onPressed: action,
-        child: Text(label),
+              )),
+        leading: const Icon(CupertinoIcons.cube_box),
+        title: Text(item.name),
+        subtitle: Text(
+          '${item.languageLabel} · ${item.status(_controller.cache)}${sameName ? ' · ${item.repositoryName}' : ''}',
+        ),
+        trailing: CupertinoButton(
+          key: installed == null
+              ? ValueKey((
+                  'extension-install',
+                  item.reference.catalogUrl,
+                  item.packageName,
+                ))
+              : ValueKey(('extension-primary', item.packageName)),
+          onPressed: action,
+          child: Text(label),
+        ),
       ),
     );
   }
@@ -185,29 +186,27 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
         Row(
           children: [
             Expanded(
-              child: TextField(
+              child: CupertinoTextField(
                 key: const ValueKey('extensions-search'),
                 controller: _search,
-                decoration: const InputDecoration(
-                  hintText: '查找扩展或漫画源名称',
-                  prefixIcon: Icon(Icons.search),
-                ),
+                placeholder: '查找扩展或漫画源名称',
+                prefix: Icon(CupertinoIcons.search),
               ),
             ),
-            PopupMenuButton<String>(
+            CupertinoMenuAnchor(
               key: const ValueKey('extensions-more'),
-              tooltip: '扩展选项',
-              onSelected: (value) {
-                if (value == 'repositories') {
-                  _repositories();
-                } else {
-                  _storage();
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'repositories', child: Text('仓库管理')),
-                PopupMenuItem(value: 'storage', child: Text('本机存储')),
+              menuChildren: [
+                CupertinoMenuItem(
+                  onPressed: _repositories,
+                  child: Text('仓库管理'),
+                ),
+                CupertinoMenuItem(onPressed: _storage, child: Text('本机存储')),
               ],
+              builder: (context, menu, child) => CupertinoButton(
+                onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+                padding: const EdgeInsets.all(8),
+                child: Icon(CupertinoIcons.ellipsis, semanticLabel: '扩展选项'),
+              ),
             ),
           ],
         ),
@@ -215,24 +214,18 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           spacing: 12,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            DropdownButton<String>(
+            ChoiceField<String>(
               key: const ValueKey('extensions-language'),
+              label: '语言',
               value: _language,
-              hint: const Text('全部语言'),
-              items: [
-                const DropdownMenuItem<String>(
-                  value: null,
-                  child: Text('全部语言'),
-                ),
+              options: {
+                null: '全部语言',
                 for (final language in languages)
-                  DropdownMenuItem(
-                    value: language,
-                    child: Text(sourceLanguage(language)),
-                  ),
-              ],
+                  language: sourceLanguage(language),
+              },
               onChanged: (value) => setState(() => _language = value),
             ),
-            TextButton.icon(
+            CupertinoButton(
               key: const ValueKey('extensions-check-updates'),
               onPressed:
                   !_controller.available ||
@@ -240,11 +233,10 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                       widget.catalog.busy
                   ? null
                   : () => unawaited(_controller.refresh(catalogToo: true)),
-              icon: const Icon(Icons.sync),
-              label: const Text('检查更新'),
+              child: const Text('检查更新'),
             ),
             if (query.isNotEmpty || _language != null)
-              TextButton(
+              CupertinoButton(
                 onPressed: () => setState(() {
                   _search.clear();
                   _language = null;
@@ -260,10 +252,10 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
             _controller.installed.isEmpty)
           const Text('账户尚未安装扩展。'),
         if (widget.catalog.repositoryErrors.isNotEmpty)
-          ListTile(
+          CupertinoListTile(
             title: const Text('部分仓库未能读取'),
             subtitle: const Text('已有目录仍可查看'),
-            trailing: TextButton(
+            trailing: CupertinoButton(
               onPressed: _repositories,
               child: const Text('管理仓库'),
             ),
@@ -274,7 +266,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 '${group.$1} (${group.$2.length})',
-                style: Theme.of(context).textTheme.titleMedium,
+                style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
               ),
             ),
             for (final item in group.$2)
@@ -294,9 +286,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
     );
     return widget.embedded
         ? content
-        : Scaffold(
-            appBar: AppBar(title: const Text('扩展')),
-            body: content,
+        : CupertinoPageScaffold(
+            navigationBar: CupertinoNavigationBar(middle: const Text('扩展')),
+            child: SafeArea(child: content),
           );
   }
 
@@ -320,21 +312,22 @@ Future<void> installExtension(
       (previous.catalogUrl != build.catalogUrl ||
           previous.repoId != build.repoId);
   if (replacing) {
-    final accepted = await showDialog<bool>(
+    final accepted = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('确认替换扩展来源'),
         content: Text(
           '原仓库：${Uri.parse(previous.catalogUrl).host}\n新仓库：${Uri.parse(build.catalogUrl).host}\n书架、收藏源和阅读记录保留；源设置、Cookie 和登录不会继承到新仓库。',
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          CupertinoDialogAction(
             key: const ValueKey('extension-replace-confirm'),
             onPressed: () => Navigator.pop(context, true),
+            isDefaultAction: true,
             child: const Text('确认替换'),
           ),
         ],
@@ -348,14 +341,11 @@ Future<void> installExtension(
   );
 }
 
-class ExtensionOperationStatus extends StatelessWidget {
-  const ExtensionOperationStatus({
-    super.key,
-    required this.controller,
-    this.showStorageAction = true,
-  });
-  final ExtensionsController controller;
-  final bool showStorageAction;
+class const ExtensionOperationStatus({
+  super.key,
+  required final ExtensionsController controller,
+  final bool showStorageAction = true,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pending = controller.settings.pending;
@@ -364,7 +354,7 @@ class ExtensionOperationStatus extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (controller.busy) ...[
-          const LinearProgressIndicator(),
+          const CupertinoActivityIndicator(),
           Text(switch (controller.activity) {
             ExtensionActivity.preparing => '正在准备扩展',
             ExtensionActivity.saving => '正在保存账户选择，等待确认',
@@ -373,7 +363,7 @@ class ExtensionOperationStatus extends StatelessWidget {
           }),
         ],
         if (controller.preparing)
-          TextButton(
+          CupertinoButton(
             key: const ValueKey('extensions-cancel-prepare'),
             onPressed: () => unawaited(controller.cancelPreparation()),
             child: const Text('取消准备'),
@@ -385,9 +375,9 @@ class ExtensionOperationStatus extends StatelessWidget {
         if (controller.settings.error case final error?) Text(error),
         if (showStorageAction &&
             controller.operationFailure == RuntimeErrorCode.limitExceeded)
-          TextButton(
+          CupertinoButton(
             onPressed: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
+              AppPageRoute(
                 builder: (_) => ExtensionStoragePage(controller: controller),
               ),
             ),
@@ -399,24 +389,27 @@ class ExtensionOperationStatus extends StatelessWidget {
             SettingsFailure.rejected => '操作未保存，请读取最新状态后处理。',
             _ => pending.retryable ? '结果待确认：请确认或重试原操作。' : '原操作尚未确认，请读取最新状态。',
           }),
-          TextButton(
+          CupertinoButton(
             key: const ValueKey('extensions-retry-settings'),
             onPressed: controller.busy || !controller.settings.canRetry
                 ? null
                 : () => unawaited(controller.retry()),
             child: const Text('重试原设置操作'),
           ),
-          ExpansionTile(
+          CupertinoExpansionTile(
             key: const ValueKey('extensions-pending-values'),
             title: const Text('查看未确认的原操作'),
-            children: [
-              if (pending.global case final values?)
-                PendingGlobalSettings(
-                  values: values,
-                  revision: pending.basedOnRevision,
-                ),
-              GlobalSettingsPanel(catalog: controller.catalog),
-            ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (pending.global case final values?)
+                  PendingGlobalSettings(
+                    values: values,
+                    revision: pending.basedOnRevision,
+                  ),
+                GlobalSettingsPanel(catalog: controller.catalog),
+              ],
+            ),
           ),
         ],
         if (controller.cleanupError != null ||
@@ -425,14 +418,14 @@ class ExtensionOperationStatus extends StatelessWidget {
             controller.cleanupError ??
                 controller.catalog.extensionCleanupError!,
           ),
-          TextButton(
+          CupertinoButton(
             onPressed: controller.busy
                 ? null
                 : () => unawaited(controller.retryCleanup()),
             child: const Text('重试资源清理'),
           ),
           if (controller.catalog.canRebuildUnavailableExtension)
-            TextButton(
+            CupertinoButton(
               key: const ValueKey('extensions-rebuild-cleanup'),
               onPressed: controller.busy
                   ? null
@@ -444,63 +437,59 @@ class ExtensionOperationStatus extends StatelessWidget {
             failure != null ||
             controller.settings.snapshot == null ||
             controller.error != null)
-          TextButton.icon(
+          CupertinoButton(
             key: const ValueKey('extensions-refresh'),
             onPressed: !controller.available || controller.busy
                 ? null
                 : () => unawaited(controller.refresh()),
-            icon: const Icon(Icons.refresh),
-            label: const Text('重新读取账户和缓存'),
+            child: const Text('重新读取账户和缓存'),
           ),
       ],
     );
   }
 }
 
-class ExtensionDetailsPage extends StatelessWidget {
-  const ExtensionDetailsPage({
-    super.key,
-    required this.controller,
-    required this.packageName,
-    this.candidate,
-    this.onOpenSource,
-  });
-  final ExtensionsController controller;
-  final String packageName;
-  final CatalogBuild? candidate;
+class const ExtensionDetailsPage({
+  super.key,
+  required final ExtensionsController controller,
+  required final String packageName,
+  final CatalogBuild? candidate,
   final Future<void> Function(
     ExtensionListing extension,
     wire.CatalogSource source,
   )?
-  onOpenSource;
+  onOpenSource,
+}) extends HookWidget {
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) {
-      final installed = controller.installed
-          .where((value) => value.packageName == packageName)
-          .firstOrNull;
-      final item = ExtensionListing(
-        catalog: controller.catalog,
-        installed: installed,
-        candidate: candidate,
-      );
-      if (installed == null && candidate == null) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('扩展')),
-          body: ListView(
+  Widget build(BuildContext context) {
+    useListenable(controller);
+    final installed = controller.installed
+        .where((value) => value.packageName == packageName)
+        .firstOrNull;
+    final item = ExtensionListing(
+      catalog: controller.catalog,
+      installed: installed,
+      candidate: candidate,
+    );
+    if (installed == null && candidate == null) {
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: const Text('扩展')),
+        child: SafeArea(
+          child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
               ExtensionOperationStatus(controller: controller),
               const Text('账户已卸载此扩展，请返回扩展列表。'),
             ],
           ),
-        );
-      }
-      final exact = item.exact;
-      return Scaffold(
-        appBar: AppBar(title: Text(item.name)),
-        body: ListView(
+        ),
+      );
+    }
+    final exact = item.exact;
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: Text(item.name)),
+      child: SafeArea(
+        child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             ExtensionOperationStatus(controller: controller),
@@ -513,7 +502,7 @@ class ExtensionDetailsPage extends StatelessWidget {
               Text(
                 '另一个来源：${extensionName(candidate!.packageName, candidate!.sources)} · ${Uri.parse(candidate!.catalogUrl).host}',
               ),
-              FilledButton.tonal(
+              CupertinoButton.filled(
                 onPressed: controller.canEdit
                     ? () => unawaited(
                         installExtension(context, controller, candidate!),
@@ -523,21 +512,26 @@ class ExtensionDetailsPage extends StatelessWidget {
               ),
             ],
             if (installed != null) ...[
-              SwitchListTile(
-                key: ValueKey(('extension-enabled', packageName)),
-                title: const Text('启用'),
-                value: installed.enabled,
-                onChanged: controller.canEdit
-                    ? (value) =>
-                          unawaited(controller.setEnabled(installed, value))
-                    : null,
+              MergeSemantics(
+                child: CupertinoFormRow(
+                  prefix: Expanded(flex: 3, child: const Text('启用')),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: CupertinoSwitch(
+                    key: ValueKey(('extension-enabled', packageName)),
+                    value: installed.enabled,
+                    onChanged: controller.canEdit
+                        ? (value) =>
+                              unawaited(controller.setEnabled(installed, value))
+                        : null,
+                  ),
+                ),
               ),
               if (exact != null &&
                   controller.cache != null &&
                   !controller.cache!.artifacts.any(
                     (artifact) => artifact.sha256 == installed.bundleSha256,
                   ))
-                TextButton(
+                CupertinoButton(
                   key: ValueKey(('extension-prepare', packageName)),
                   onPressed: !controller.available || controller.busy
                       ? null
@@ -545,7 +539,7 @@ class ExtensionDetailsPage extends StatelessWidget {
                   child: const Text('下载本机副本'),
                 ),
               if (item.needsUpdate)
-                FilledButton.tonal(
+                CupertinoButton.filled(
                   key: ValueKey(('extension-update', packageName)),
                   onPressed: controller.canEdit
                       ? () => unawaited(
@@ -555,16 +549,16 @@ class ExtensionDetailsPage extends StatelessWidget {
                   child: const Text('更新'),
                 ),
               if (!item.registered)
-                TextButton(
+                CupertinoButton(
                   onPressed: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
+                    AppPageRoute(
                       builder: (_) =>
                           ExtensionRepositoriesPage(controller: controller),
                     ),
                   ),
                   child: const Text('管理仓库'),
                 ),
-              TextButton(
+              CupertinoButton(
                 key: ValueKey(('extension-uninstall', packageName)),
                 onPressed: controller.canEdit
                     ? () => unawaited(controller.uninstall(installed))
@@ -573,7 +567,7 @@ class ExtensionDetailsPage extends StatelessWidget {
               ),
               const Text('卸载保留书架、阅读进度、收藏源及漫画源数据。'),
             ] else if (candidate != null)
-              FilledButton(
+              CupertinoButton.filled(
                 onPressed: controller.canEdit
                     ? () => unawaited(
                         installExtension(context, controller, candidate!),
@@ -582,17 +576,18 @@ class ExtensionDetailsPage extends StatelessWidget {
                 child: const Text('安装'),
               ),
             const SizedBox(height: 24),
-            Text('包含的漫画源', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '包含的漫画源',
+              style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+            ),
             if (installed != null && exact == null)
               const Text('所选构建的源资料不可用，请先处理扩展。')
             else
               for (final source
                   in (exact ?? candidate)?.sources ?? <wire.CatalogSource>[])
-                ListTile(
-                  title: Text(source.name),
-                  subtitle: Text(sourceLanguage(source.lang)),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap:
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed:
                       installed == null ||
                           item.blockedReason != null ||
                           controller.busy
@@ -604,7 +599,7 @@ class ExtensionDetailsPage extends StatelessWidget {
                           } else {
                             unawaited(
                               Navigator.of(context).push<void>(
-                                MaterialPageRoute(
+                                AppPageRoute(
                                   builder: (_) => SourceBrowsePage(
                                     catalog: controller.catalog,
                                     build: exact!,
@@ -615,31 +610,49 @@ class ExtensionDetailsPage extends StatelessWidget {
                             );
                           }
                         },
+                  child: CupertinoListTile(
+                    title: Text(source.name),
+                    subtitle: Text(sourceLanguage(source.lang)),
+                    trailing: const Icon(CupertinoIcons.chevron_right),
+                  ),
                 ),
             const SizedBox(height: 24),
-            ExpansionTile(
+            CupertinoExpansionTile(
               title: const Text('诊断信息'),
-              children: [
-                SelectableText(
-                  '包名：$packageName\n仓库：${item.reference.catalogUrl}\n身份：${item.reference.repoId}\n账户构建：${installed?.buildId ?? '未安装'}\n目录版本：${item.latest?.version ?? '不可用'}\n目录构建：${item.latest?.id ?? '不可用'}\n摘要：${installed?.bundleSha256 ?? '未下载'}',
-                ),
-                if (controller.catalog.activeBuild?.packageName == packageName)
-                  Text(
-                    '当前运行：${controller.catalog.activeBuild!.id}',
-                    key: const ValueKey('extensions-running'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SelectableRegion(
+                    selectionControls: cupertinoTextSelectionControls,
+                    contextMenuBuilder: (context, state) =>
+                        CupertinoAdaptiveTextSelectionToolbar.buttonItems(
+                          buttonItems: state.contextMenuButtonItems,
+                          anchors: state.contextMenuAnchors,
+                        ),
+                    child: Text(
+                      '包名：$packageName\n仓库：${item.reference.catalogUrl}\n身份：${item.reference.repoId}\n账户构建：${installed?.buildId ?? '未安装'}\n目录版本：${item.latest?.version ?? '不可用'}\n目录构建：${item.latest?.id ?? '不可用'}\n摘要：${installed?.bundleSha256 ?? '未下载'}',
+                    ),
                   ),
-              ],
+                  if (controller.catalog.activeBuild?.packageName ==
+                      packageName)
+                    Text(
+                      '当前运行：${controller.catalog.activeBuild!.id}',
+                      key: const ValueKey('extensions-running'),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
 }
 
-class ExtensionRepositoriesPage extends StatefulHookWidget {
-  const ExtensionRepositoriesPage({super.key, required this.controller});
-  final ExtensionsController controller;
+class const ExtensionRepositoriesPage({
+  super.key,
+  required final ExtensionsController controller,
+}) extends StatefulHookWidget {
   @override
   State<ExtensionRepositoriesPage> createState() =>
       _ExtensionRepositoriesPageState();
@@ -650,39 +663,38 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
   Future<void> _addRepository() async {
     var address = '';
     var label = '';
-    final accepted = await showDialog<bool>(
+    final accepted = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('预览额外仓库'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('仓库必须公开提供 HTTPS 静态目录及 CORS，应用凭据不会发送给仓库。'),
-              TextField(
+              CupertinoTextField(
                 key: const ValueKey('repository-url'),
                 onChanged: (value) => address = value,
-                decoration: const InputDecoration(
-                  labelText: '仓库地址或 /extensions/index.json URL',
-                ),
+                placeholder: '仓库地址或 /extensions/index.json URL',
               ),
-              TextField(
+              CupertinoTextField(
                 key: const ValueKey('repository-name'),
                 onChanged: (value) => label = value,
                 maxLength: 100,
-                decoration: const InputDecoration(labelText: '名称（可选）'),
+                placeholder: '名称（可选）',
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          CupertinoDialogAction(
             key: const ValueKey('repository-preview-submit'),
             onPressed: () => Navigator.pop(context, true),
+            isDefaultAction: true,
             child: const Text('只读预览'),
           ),
         ],
@@ -691,9 +703,9 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
     if (accepted != true || !mounted || !_controller.canEdit) return;
     final preview = await _controller.previewRepository(address, label);
     if (!mounted || !_controller.available || preview == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('确认添加仓库'),
         content: SingleChildScrollView(
           child: Text(
@@ -701,13 +713,14 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
           ),
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          CupertinoDialogAction(
             key: const ValueKey('repository-add-confirm'),
             onPressed: () => Navigator.pop(context, true),
+            isDefaultAction: true,
             child: const Text('确认添加'),
           ),
         ],
@@ -717,21 +730,22 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
   }
 
   Future<void> _removeRepository(wire.ExtensionRepository repository) async {
-    final accepted = await showDialog<bool>(
+    final accepted = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('移除仓库'),
         content: Text(
           '移除“${repository.name}”后，对应扩展暂时不可用；安装选择、书架和阅读记录保留。\n受影响扩展：${_controller.installed.where((item) => item.catalogUrl == repository.catalogUrl && item.repoId == repository.repoId).map((item) => ExtensionListing(catalog: _controller.catalog, installed: item).name).join('、')}',
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          CupertinoDialogAction(
             key: const ValueKey('repository-remove-confirm'),
             onPressed: () => Navigator.pop(context, true),
+            isDefaultAction: true,
             child: const Text('确认移除'),
           ),
         ],
@@ -746,60 +760,69 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
   Widget build(BuildContext context) {
     useListenable(_controller);
     final catalog = _controller.catalog;
-    return Scaffold(
-      appBar: AppBar(title: const Text('仓库管理')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          ExtensionOperationStatus(controller: _controller),
-          for (final repository in catalog.repositories)
-            ListTile(
-              title: Text(repository.name),
-              subtitle: Text(
-                '${Uri.parse(repository.catalogUrl).host} · ${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] == null ? '可用' : '读取失败'}',
-              ),
-              trailing: repository.catalogUrl == catalog.catalogUrl
-                  ? const Text('默认')
-                  : IconButton(
-                      key: ValueKey((
-                        'repository-remove',
-                        repository.catalogUrl,
-                      )),
-                      tooltip: '移除仓库',
-                      onPressed: _controller.canEdit
-                          ? () => unawaited(_removeRepository(repository))
-                          : null,
-                      icon: const Icon(Icons.delete_outline),
-                    ),
-            ),
-          TextButton.icon(
-            key: const ValueKey('repositories-add'),
-            onPressed: _controller.canEdit && catalog.repositories.length <= 16
-                ? () => unawaited(_addRepository())
-                : null,
-            icon: const Icon(Icons.add),
-            label: const Text('添加仓库'),
-          ),
-          TextButton.icon(
-            onPressed: !_controller.available || _controller.busy
-                ? null
-                : () => unawaited(_controller.refresh(catalogToo: true)),
-            icon: const Icon(Icons.refresh),
-            label: const Text('重试读取仓库'),
-          ),
-          ExpansionTile(
-            title: const Text('诊断信息'),
-            children: [
-              for (final repository in catalog.repositories)
-                ListTile(
-                  title: SelectableText(repository.catalogUrl),
-                  subtitle: Text(
-                    '${repository.repoId}\n${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}',
-                  ),
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: const Text('仓库管理')),
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            ExtensionOperationStatus(controller: _controller),
+            for (final repository in catalog.repositories)
+              CupertinoListTile(
+                title: Text(repository.name),
+                subtitle: Text(
+                  '${Uri.parse(repository.catalogUrl).host} · ${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] == null ? '可用' : '读取失败'}',
                 ),
-            ],
-          ),
-        ],
+                trailing: repository.catalogUrl == catalog.catalogUrl
+                    ? const Text('默认')
+                    : CupertinoButton(
+                        key: ValueKey((
+                          'repository-remove',
+                          repository.catalogUrl,
+                        )),
+                        onPressed: _controller.canEdit
+                            ? () => unawaited(_removeRepository(repository))
+                            : null,
+                        padding: const EdgeInsets.all(8),
+                        child: const Icon(
+                          CupertinoIcons.trash,
+                          semanticLabel: '移除仓库',
+                        ),
+                      ),
+              ),
+            CupertinoButton(
+              key: const ValueKey('repositories-add'),
+              onPressed:
+                  _controller.canEdit && catalog.repositories.length <= 16
+                  ? () => unawaited(_addRepository())
+                  : null,
+              child: const Text('添加仓库'),
+            ),
+            CupertinoButton(
+              onPressed: !_controller.available || _controller.busy
+                  ? null
+                  : () => unawaited(_controller.refresh(catalogToo: true)),
+              child: const Text('重试读取仓库'),
+            ),
+            CupertinoExpansionTile(
+              title: const Text('诊断信息'),
+              child: SelectableRegion(
+                selectionControls: cupertinoTextSelectionControls,
+                contextMenuBuilder: (context, state) =>
+                    CupertinoAdaptiveTextSelectionToolbar.buttonItems(
+                      buttonItems: state.contextMenuButtonItems,
+                      anchors: state.contextMenuAnchors,
+                    ),
+                child: Text(
+                  [
+                    for (final repository in catalog.repositories)
+                      '${repository.catalogUrl}\n${repository.repoId}\n${catalog.repositoryErrors[catalogReferenceKey(wire.CatalogReference(catalogUrl: repository.catalogUrl, repoId: repository.repoId))] ?? ''}',
+                  ].join('\n\n'),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -807,9 +830,10 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
 
 String _bytes(int value) => '${(value / (1024 * 1024)).toStringAsFixed(1)} MiB';
 
-class ExtensionStoragePage extends StatelessWidget {
-  const ExtensionStoragePage({super.key, required this.controller});
-  final ExtensionsController controller;
+class const ExtensionStoragePage({
+  super.key,
+  required final ExtensionsController controller,
+}) extends HookWidget {
   String _name(String sha256) {
     final installed = controller.installed
         .where((item) => item.bundleSha256 == sha256)
@@ -823,13 +847,13 @@ class ExtensionStoragePage extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) {
-      final cache = controller.cache;
-      return Scaffold(
-        appBar: AppBar(title: const Text('本机存储')),
-        body: ListView(
+  Widget build(BuildContext context) {
+    useListenable(controller);
+    final cache = controller.cache;
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: const Text('本机存储')),
+      child: SafeArea(
+        child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             ExtensionOperationStatus(
@@ -851,10 +875,10 @@ class ExtensionStoragePage extends StatelessWidget {
                   child: Text('本机没有扩展副本'),
                 ),
               for (final artifact in cache.artifacts)
-                ListTile(
+                CupertinoListTile(
                   title: Text(_name(artifact.sha256)),
                   subtitle: Text(_bytes(artifact.byteLength)),
-                  trailing: TextButton(
+                  trailing: CupertinoButton(
                     key: ValueKey(('extension-forget', artifact.sha256)),
                     onPressed:
                         !controller.available ||
@@ -865,29 +889,34 @@ class ExtensionStoragePage extends StatelessWidget {
                     child: const Text('清理副本'),
                   ),
                 ),
-              ExpansionTile(
+              CupertinoExpansionTile(
                 title: const Text('诊断信息'),
-                children: [
-                  Text(
-                    '${cache.artifacts.length} / ${cache.maxArtifacts} 个产物 · ${_bytes(cache.totalBytes)} / ${_bytes(cache.maxBytes)}',
+                child: SelectableRegion(
+                  selectionControls: cupertinoTextSelectionControls,
+                  contextMenuBuilder: (context, state) =>
+                      CupertinoAdaptiveTextSelectionToolbar.buttonItems(
+                        buttonItems: state.contextMenuButtonItems,
+                        anchors: state.contextMenuAnchors,
+                      ),
+                  child: Text(
+                    [
+                      '${cache.artifacts.length} / ${cache.maxArtifacts} 个产物 · ${_bytes(cache.totalBytes)} / ${_bytes(cache.maxBytes)}',
+                      for (final artifact in cache.artifacts)
+                        '${_name(artifact.sha256)} · ${artifact.sha256}',
+                    ].join('\n'),
                   ),
-                  for (final artifact in cache.artifacts)
-                    SelectableText(
-                      '${_name(artifact.sha256)} · ${artifact.sha256}',
-                    ),
-                ],
+                ),
               ),
             ],
-            TextButton.icon(
+            CupertinoButton(
               onPressed: !controller.available || controller.busy
                   ? null
                   : () => unawaited(controller.refresh()),
-              icon: const Icon(Icons.refresh),
-              label: const Text('重新读取本机副本'),
+              child: const Text('重新读取本机副本'),
             ),
           ],
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
 }

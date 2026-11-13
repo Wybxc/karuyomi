@@ -112,6 +112,8 @@ async function main(): Promise<void> {
           '--release',
           '--no-web-resources-cdn',
           '--web-content-hash',
+          // Cupertino's back chevron is rendered as Text, outside Icon discovery.
+          '--no-tree-shake-icons',
           '--no-deprecated-js-interop',
           ...process.argv.slice(3),
         ],

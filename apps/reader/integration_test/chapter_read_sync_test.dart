@@ -1,7 +1,11 @@
+import '../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -88,7 +92,7 @@ void main() {
         tester,
         find.descendant(
           of: find.byKey(ValueKey(entry.mangaKey)),
-          matching: find.byType(ListTile),
+          matching: find.byType(CupertinoListTile),
         ),
         page: shelf,
       );
@@ -120,13 +124,13 @@ void main() {
 
       final order = _control('chapter-list-order');
       await _show(tester, order, detailPage);
-      if (tester.widget<DropdownButton<ChapterOrder>>(order).value !=
+      if (tester.widget<ChoiceField<ChapterOrder>>(order).value !=
           ChapterOrder.source) {
         await _tap(tester, order);
         await _tap(tester, find.text('来源顺序').last);
       }
       expect(
-        tester.widget<DropdownButton<ChapterOrder>>(order).value,
+        tester.widget<ChoiceField<ChapterOrder>>(order).value,
         ChapterOrder.source,
       );
       final filter = find.byKey(
@@ -135,7 +139,7 @@ void main() {
       await _show(tester, filter, detailPage);
       await _waitFor(tester, '正式已读筛选就绪', () {
         _checkConnection(catalog);
-        return tester.widget<ChoiceChip>(filter).onSelected != null;
+        return tester.widget<CupertinoButton>(filter).onPressed != null;
       });
       final opened = await _snapshot(client, entry.mangaKey);
       _expectSameBusiness(before, opened, mutations: 0);
@@ -143,7 +147,7 @@ void main() {
 
       if (_phase != 'read') {
         await _tap(tester, filter);
-        expect(tester.widget<ChoiceChip>(filter).selected, isTrue);
+        expect(selectedState(tester, filter), isTrue);
         final count = beforeEpoch == 1 ? _urls.length : 0;
         final shown = find.text('显示 $count / ${details.chapters.length} 章');
         await _show(tester, shown, detailPage);
@@ -153,7 +157,7 @@ void main() {
             final row = find.byKey(ValueKey(target.key));
             await _show(tester, row, detailPage);
             expect(
-              tester.widget<ListTile>(row).subtitle,
+              tester.widget<CupertinoListTile>(row).subtitle,
               isA<Text>().having(
                 (text) => text.data,
                 'subtitle',
@@ -172,7 +176,7 @@ void main() {
           delta: _phase == 'unread' ? -280 : 280,
         );
         await _waitFor(tester, '章节选择可用', () {
-          return tester.widget<TextButton>(selection).onPressed != null;
+          return tester.widget<CupertinoButton>(selection).onPressed != null;
         });
         await _tap(tester, selection);
         for (final (control, chapter) in [
@@ -187,7 +191,7 @@ void main() {
         }
         await _tap(tester, _control('chapter-select-range'), page: detailPage);
         await _tap(tester, _control('chapter-mark-$_phase'), page: detailPage);
-        final dialog = find.byType(AlertDialog);
+        final dialog = find.byType(CupertinoAlertDialog);
         final preview = find.text('确认清单：3 章');
         await _show(tester, preview, dialog);
         expect(preview, findsOneWidget);
@@ -198,14 +202,14 @@ void main() {
             dialog,
           );
         }
-        await _tap(tester, find.widgetWithText(FilledButton, '确认并开始'));
+        await _tap(tester, find.widgetWithText(CupertinoButton, '确认并开始'));
         final confirmed = find.text('全部标记已由服务端确认。');
         await _waitFor(tester, '三章均获服务端确认', () {
           _checkConnection(catalog);
           return confirmed.evaluate().isNotEmpty;
         });
         await _show(tester, find.text('已确认 3 / 3 章 · 未开始 0 章'), dialog);
-        await _tap(tester, find.widgetWithText(TextButton, '完成'));
+        await _tap(tester, find.widgetWithText(CupertinoButton, '完成'));
       }
       final after = await _snapshot(client, entry.mangaKey);
       final mutations = _phase == 'verify' ? 0 : keys.length;

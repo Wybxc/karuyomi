@@ -3,7 +3,7 @@ import '../test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -452,9 +452,9 @@ void main() {
     'Library menu opens migration without loading the original Source',
     (tester) async {
       await tester.pumpApp(
-        MaterialApp(
-          home: Scaffold(
-            body: LibraryPage(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: LibraryPage(
               controller: catalog,
               onBrowse: () {},
               onConnect: () {},
@@ -492,7 +492,7 @@ void main() {
       );
       expect(source, isNotNull);
       await tester.pumpApp(
-        MaterialApp(
+        CupertinoApp(
           home: MangaDetailsPage(
             controller: catalog,
             manga: MangaEntry(testManga),
@@ -532,7 +532,7 @@ void main() {
               shouldContinue: () => true,
             );
             await tester.pumpApp(
-              MaterialApp(
+              CupertinoApp(
                 home: MangaDetailsPage(
                   controller: catalog,
                   manga: MangaEntry(testManga),
@@ -543,9 +543,9 @@ void main() {
             );
           } else {
             await tester.pumpApp(
-              MaterialApp(
-                home: Scaffold(
-                  body: LibraryPage(
+              CupertinoApp(
+                home: CupertinoPageScaffold(
+                  child: LibraryPage(
                     controller: catalog,
                     onBrowse: () {},
                     onConnect: () {},
@@ -556,7 +556,7 @@ void main() {
             );
           }
           await tester.pumpAndSettle();
-          final menu = tester.widget<PopupMenuButton<String>>(
+          final menu = tester.widget<CupertinoMenuAnchor>(
             find.byKey(
               fromDetails
                   ? const ValueKey('details-more')
@@ -569,7 +569,7 @@ void main() {
           final opened = platform.openedBuilds.length;
           // Run the real entry handler, then invalidate before the pushed
           // route's lazy builder receives its first frame.
-          menu.onSelected!('migrate');
+          (menu.menuChildren.single as CupertinoMenuItem).onPressed!();
           expect(find.byType(MigrationPage), findsNothing);
           catalog.subject = replaceIdentity ? 'other-subject' : null;
           catalog.status = replaceIdentity
@@ -596,7 +596,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(
               tester
-                  .widget<TextButton>(
+                  .widget<CupertinoButton>(
                     find.byKey(const ValueKey('migration-refresh-sources')),
                   )
                   .onPressed,
@@ -639,7 +639,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(700, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpApp(
-        MaterialApp(
+        CupertinoApp(
           home: MigrationPage(
             catalog: catalog,
             client: catalog.library!.client,
@@ -688,11 +688,11 @@ void main() {
       await tester.tap(filter);
       await tester.pumpAndSettle();
       expect(unmarked, findsNothing);
-      expect(tester.widget<CheckboxListTile>(marked).value, true);
+      expect(tester.widget<CupertinoCheckbox>(marked).value, true);
       await tester.tap(filter);
       await tester.pumpAndSettle();
       expect(unmarked, findsOneWidget);
-      expect(tester.widget<CheckboxListTile>(marked).value, true);
+      expect(tester.widget<CupertinoCheckbox>(marked).value, true);
       final confirm = find.byKey(const ValueKey('migration-confirm'));
       await tester.scrollUntilVisible(
         confirm,
@@ -708,7 +708,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(confirm);
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(posts(), hasLength(before));
       await tester.tap(find.byKey(const ValueKey('migration-confirm-send')));
       await tester.pumpAndSettle();

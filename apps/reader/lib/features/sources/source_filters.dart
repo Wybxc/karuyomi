@@ -1,6 +1,9 @@
+import '../../widgets/edit_sheet.dart';
+import '../../widgets/choice_field.dart';
+
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -8,16 +11,11 @@ import '../browse/catalog_controller.dart';
 
 /// Source filter edits are session drafts. Only applying a successful search
 /// changes the catalog; closing this sheet discards its unsubmitted edits.
-class SourceFiltersSheet extends StatefulHookWidget {
-  const SourceFiltersSheet({
-    super.key,
-    required this.catalog,
-    required this.query,
-  });
-
-  final CatalogController catalog;
-  final String query;
-
+class const SourceFiltersSheet({
+  super.key,
+  required final CatalogController catalog,
+  required final String query,
+}) extends StatefulHookWidget {
   @override
   State<SourceFiltersSheet> createState() => _SourceFiltersSheetState();
 }
@@ -196,52 +194,53 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             node.name,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
           ),
         );
       case wire.FilterNode_Kind.separator:
-        return const Divider(height: 24);
+        return SizedBox(
+          height: 24,
+          child: ColoredBox(
+            color: CupertinoColors.separator.resolveFrom(context),
+          ),
+        );
       case wire.FilterNode_Kind.text:
         return input(
-          TextFormField(
+          CupertinoTextFormFieldRow(
             key: key('text'),
             initialValue: node.text.state,
             enabled: enabled,
             maxLength: 4096,
-            decoration: InputDecoration(
-              labelText: node.name,
-              border: const OutlineInputBorder(),
-            ),
             onChanged: (value) => node.text.state = value,
+            prefix: Text(node.name),
           ),
         );
       case wire.FilterNode_Kind.checkBox:
         return input(
-          CheckboxListTile(
-            key: key('check'),
-            title: Text(node.name),
-            value: node.checkBox.state,
-            contentPadding: EdgeInsets.zero,
-            onChanged: enabled
-                ? (value) => setState(() => node.checkBox.state = value!)
-                : null,
+          MergeSemantics(
+            child: CupertinoFormRow(
+              prefix: Expanded(flex: 3, child: Text(node.name)),
+              padding: EdgeInsets.zero,
+              child: CupertinoCheckbox(
+                key: key('check'),
+                value: node.checkBox.state,
+                onChanged: enabled
+                    ? (value) => setState(() => node.checkBox.state = value!)
+                    : null,
+              ),
+            ),
           ),
         );
       case wire.FilterNode_Kind.triState:
         return input(
-          DropdownButtonFormField<int>(
+          ChoiceField<int>(
             key: key('tri'),
-            enabled: enabled,
-            initialValue: node.triState.state,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: node.name,
-              border: const OutlineInputBorder(),
-            ),
-            items: [
+            label: node.name,
+            value: node.triState.state,
+            options: {
               for (final item in [(0, '忽略'), (1, '包含'), (2, '排除')])
-                DropdownMenuItem(value: item.$1, child: Text(item.$2)),
-            ],
+                item.$1: item.$2,
+            },
             onChanged: enabled
                 ? (value) => setState(() => node.triState.state = value!)
                 : null,
@@ -249,22 +248,14 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
         );
       case wire.FilterNode_Kind.select:
         return input(
-          DropdownButtonFormField<int>(
+          ChoiceField<int>(
             key: key('select'),
-            enabled: enabled,
-            initialValue: node.select.state,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: node.name,
-              border: const OutlineInputBorder(),
-            ),
-            items: [
+            label: node.name,
+            value: node.select.state,
+            options: {
               for (var index = 0; index < node.select.options.length; index++)
-                DropdownMenuItem(
-                  value: index,
-                  child: Text(node.select.options[index]),
-                ),
-            ],
+                index: node.select.options[index],
+            },
             onChanged: enabled
                 ? (value) => setState(() => node.select.state = value!)
                 : null,
@@ -277,71 +268,50 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
           Row(
             children: [
               Expanded(
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: node.name,
-                    border: const OutlineInputBorder(),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      key: key('sort'),
-                      value: selection?.index,
-                      isExpanded: true,
-                      isDense: true,
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: null,
-                          child: Text('默认排序'),
-                        ),
-                        for (
-                          var index = 0;
-                          index < node.sort.options.length;
-                          index++
-                        )
-                          DropdownMenuItem(
-                            value: index,
-                            child: Text(node.sort.options[index]),
-                          ),
-                      ],
-                      onChanged: enabled
-                          ? (index) => setState(() {
-                              node.sort.state = wire.FilterSortState(
-                                selection: index == null
-                                    ? null
-                                    : wire.FilterSortSelection(
-                                        index: index,
-                                        ascending: selection?.ascending ?? true,
-                                      ),
-                              );
-                            })
-                          : null,
-                    ),
-                  ),
+                child: ChoiceField<int>(
+                  key: key('sort'),
+                  label: node.name,
+                  value: selection?.index,
+                  options: {
+                    null: '默认排序',
+                    for (
+                      var index = 0;
+                      index < node.sort.options.length;
+                      index++
+                    )
+                      index: node.sort.options[index],
+                  },
+                  onChanged: enabled
+                      ? (index) => setState(() {
+                          node.sort.state = wire.FilterSortState(
+                            selection: index == null
+                                ? null
+                                : wire.FilterSortSelection(
+                                    index: index,
+                                    ascending: selection?.ascending ?? true,
+                                  ),
+                          );
+                        })
+                      : null,
                 ),
               ),
-              const SizedBox(width: 8),
-              TextButton.icon(
+              SizedBox(width: 8),
+              CupertinoButton(
                 key: key('ascending'),
                 onPressed: enabled && selection != null
                     ? () => setState(
                         () => selection.ascending = !selection.ascending,
                       )
                     : null,
-                icon: Icon(
-                  selection?.ascending == false ? Icons.south : Icons.north,
-                ),
-                label: Text(selection?.ascending == false ? '降序' : '升序'),
+                child: Text(selection?.ascending == false ? '降序' : '升序'),
               ),
             ],
           ),
         );
       case wire.FilterNode_Kind.group:
-        return ExpansionTile(
+        return CupertinoListSection(
           key: key('group'),
-          initiallyExpanded: true,
-          tilePadding: EdgeInsets.zero,
-          childrenPadding: const EdgeInsets.only(left: 12),
-          title: Text(node.name),
+          header: Text(node.name),
           children: [
             for (var index = 0; index < node.group.nodes.length; index++)
               _node(node.group.nodes[index], [...path, index], enabled),
@@ -358,91 +328,64 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
     final current = _current;
     final enabled = current && !_working && !widget.catalog.busy;
     final draft = _draft;
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Column(
+    return EditSheet(
+      title: const Text('筛选漫画'),
+      content: ListView(
+        key: const ValueKey('source-filter-form'),
+        padding: const EdgeInsets.all(24),
         children: [
-          ListTile(
-            title: const Text('筛选漫画'),
-            subtitle: Text(
-              widget.query.isEmpty ? '应用后按筛选条件搜索' : '搜索词：${widget.query}',
-            ),
-            trailing: IconButton(
-              tooltip: _working ? '取消请求并关闭筛选' : '取消筛选编辑',
-              onPressed: _close,
-              icon: const Icon(Icons.close),
-            ),
-          ),
+          Text(widget.query.isEmpty ? '应用后按筛选条件搜索' : '搜索词：${widget.query}'),
           if (_working) ...[
-            const LinearProgressIndicator(),
+            const CupertinoActivityIndicator(),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               child: Text('关闭将取消请求，可能需要重新连接漫画源。'),
             ),
           ],
-          Expanded(
-            child: ListView(
-              key: const ValueKey('source-filter-form'),
-              padding: const EdgeInsets.all(24),
-              children: [
-                if (!current)
-                  const Text('漫画源会话已变化，请关闭后重新打开筛选。')
-                else ...[
-                  if (_error != null) ...[
-                    Text(_error!),
-                    const SizedBox(height: 12),
+          if (!current)
+            const Text('漫画源会话已变化，请关闭后重新打开筛选。')
+          else ...[
+            if (_error != null) ...[Text(_error!), const SizedBox(height: 12)],
+            if (draft == null && !_working)
+              CupertinoButton(
+                onPressed: enabled ? () => _load() : null,
+                child: const Text('重试加载筛选'),
+              ),
+            if (draft != null)
+              KeyedSubtree(
+                key: ValueKey(draft.snapshotId),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (draft.nodes.isEmpty) const Text('这个漫画源没有额外筛选条件。'),
+                    for (var index = 0; index < draft.nodes.length; index++)
+                      _node(draft.nodes[index], [index], enabled),
                   ],
-                  if (draft == null && !_working)
-                    OutlinedButton.icon(
-                      onPressed: enabled ? () => _load() : null,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('重试加载筛选'),
-                    ),
-                  if (draft != null)
-                    KeyedSubtree(
-                      key: ValueKey(draft.snapshotId),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (draft.nodes.isEmpty) const Text('这个漫画源没有额外筛选条件。'),
-                          for (
-                            var index = 0;
-                            index < draft.nodes.length;
-                            index++
-                          )
-                            _node(draft.nodes[index], [index], enabled),
-                        ],
-                      ),
-                    ),
-                ],
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    key: const ValueKey('source-filter-reset'),
-                    onPressed: enabled ? () => _load(reset: true) : null,
-                    child: const Text('重置筛选'),
-                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    key: const ValueKey('source-filter-apply'),
-                    onPressed: enabled && draft != null ? _apply : null,
-                    child: const Text('应用筛选'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+          ],
         ],
       ),
+      actions: [
+        CupertinoButton(
+          onPressed: _close,
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            CupertinoIcons.xmark,
+            semanticLabel: _working ? '取消请求并关闭筛选' : '取消筛选编辑',
+          ),
+        ),
+        CupertinoButton(
+          key: const ValueKey('source-filter-reset'),
+          onPressed: enabled ? () => _load(reset: true) : null,
+          child: const Text('重置筛选'),
+        ),
+        CupertinoButton.filled(
+          key: const ValueKey('source-filter-apply'),
+          onPressed: enabled && draft != null ? _apply : null,
+          child: const Text('应用筛选'),
+        ),
+      ],
     );
   }
 

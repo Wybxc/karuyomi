@@ -1,24 +1,18 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
-class PendingGlobalSettings extends StatelessWidget {
-  const PendingGlobalSettings({
-    super.key,
-    required this.values,
-    required this.revision,
-  });
-  final wire.GlobalSettingsValues values;
-  final int revision;
-
+class const PendingGlobalSettings({
+  super.key,
+  required final wire.GlobalSettingsValues values,
+  required final int revision,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reader = values.reader;
-    return ExpansionTile(
+    return CupertinoListSection(
       key: const ValueKey('favorite-source-pending-global'),
-      initiallyExpanded: true,
-      tilePadding: EdgeInsets.zero,
-      title: const Text('未确认的原全局设置内容'),
-      subtitle: Text('原操作基于版本 $revision；重试会保留全部原内容。'),
+      header: const Text('未确认的原全局设置内容'),
+      footer: Text('原操作基于版本 $revision；重试会保留全部原内容。'),
       children: [
         Align(
           alignment: Alignment.centerLeft,

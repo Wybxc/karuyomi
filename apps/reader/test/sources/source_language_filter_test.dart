@@ -1,8 +1,10 @@
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
@@ -100,9 +102,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
-      MaterialApp(
-        home: Scaffold(
-          body: CatalogPage(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: CatalogPage(
             controller: catalog,
             onConnect: () {},
             onAuthenticate: () {},
@@ -175,12 +177,9 @@ void main() {
       await tap(tester, source(_secondSourceId));
       expect(catalog.activeSource!.id, _secondSourceId);
       expect(platform.invocations.last.sourceId, _secondSourceId);
-      await tester.pageBack();
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<DropdownButton<String>>(languageFilter()).value,
-        'zh',
-      );
+      expect(tester.widget<ChoiceField<String>>(languageFilter()).value, 'zh');
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -226,7 +225,10 @@ void main() {
       };
       final loading = catalog.loadMangas(operation: 'latest');
       await tester.pump();
-      expect(tester.widget<ListTile>(source(_secondSourceId)).onTap, isNull);
+      expect(
+        tester.widget<CupertinoListTile>(source(_secondSourceId)).onTap,
+        isNull,
+      );
       final before = platform.invocations.length;
       await tester.tap(source(_secondSourceId));
       await tester.pump();
@@ -234,10 +236,7 @@ void main() {
       pending.complete();
       await loading;
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<DropdownButton<String>>(languageFilter()).value,
-        'zh',
-      );
+      expect(tester.widget<ChoiceField<String>>(languageFilter()).value, 'zh');
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

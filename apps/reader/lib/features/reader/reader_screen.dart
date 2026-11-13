@@ -1,10 +1,12 @@
+import '../../widgets/choice_field.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -43,87 +45,59 @@ final class ReaderViewportState {
 
 /// An online chapter view. Images are exclusively acquired through the Source's
 /// PageProvider; this screen never downloads raw Source image URLs itself.
-class ReaderScreen extends StatefulHookWidget {
-  const ReaderScreen({
-    super.key,
-    required this.manifest,
-    required this.provider,
-    required this.generation,
-    this.title = '阅读',
-    this.initialPosition,
-    this.preserveInitialPlacement = false,
-    this.initialMode = ReadingMode.leftToRight,
-    this.doublePage,
-    this.fit = ReaderFit.contain,
-    this.cropBorders = false,
-    this.background = ReaderBackground.black,
-    this.dimPercent = 0,
-    this.tapZones = ReaderInputPreset.standard,
-    this.keyboard = ReaderInputPreset.standard,
-    this.onModeChanged,
-    this.onDoublePageChanged,
-    this.layoutSettingsEnabled = true,
-    this.onPositionChanged,
-    this.imageBuilder = buildResourceImage,
-    this.imageEvictor,
-    this.onClosed,
-    this.onClosing,
-    this.chapterControls,
-    this.onAttached,
-    this.onViewportChanged,
-    this.positionRequest,
-    this.paused = false,
-  }) : assert(dimPercent >= 0 && dimPercent <= 80);
-
-  final ChapterManifest manifest;
-  final PageProvider provider;
-  final String generation;
-  final String title;
-  final ReadingPosition? initialPosition;
+class const ReaderScreen({
+  super.key,
+  required final ChapterManifest manifest,
+  required final PageProvider provider,
+  required final String generation,
+  final String title = '阅读',
+  final ReadingPosition? initialPosition,
 
   /// A confirmed resume can render at a clamped placement without replacing
   /// the saved preference merely because its images just finished laying out.
-  final bool preserveInitialPlacement;
-  final ReadingMode initialMode;
+  final bool preserveInitialPlacement = false,
+  final ReadingMode initialMode = ReadingMode.leftToRight,
 
   /// Defaults to automatic width-based layout. An in-reader selection lasts for
   /// this chapter unless this input changes; changing to null resumes automatic.
-  final bool? doublePage;
-
-  final ReaderFit fit;
-  final bool cropBorders;
-  final ReaderBackground background;
+  final bool? doublePage,
+  final ReaderFit fit = ReaderFit.contain,
+  final bool cropBorders = false,
+  final ReaderBackground background = ReaderBackground.black,
 
   /// Application content dimming only; never changes system screen brightness.
-  final int dimPercent;
-  final ReaderInputPreset tapZones;
-  final ReaderInputPreset keyboard;
+  final int dimPercent = 0,
+  final ReaderInputPreset tapZones = ReaderInputPreset.standard,
+  final ReaderInputPreset keyboard = ReaderInputPreset.standard,
 
   /// User selections only; applying parent settings and resizing do not save.
-  final ValueChanged<ReadingMode>? onModeChanged;
-  final ValueChanged<bool?>? onDoublePageChanged;
+  final ValueChanged<ReadingMode>? onModeChanged,
+  final ValueChanged<bool?>? onDoublePageChanged,
 
   /// Only disables settings edits; chapter navigation and zoom remain usable.
-  final bool layoutSettingsEnabled;
-  final ValueChanged<ReadingPosition>? onPositionChanged;
-  final ResourceImageBuilder imageBuilder;
-  final Future<void> Function(ImageResource)? imageEvictor;
+  final bool layoutSettingsEnabled = true,
+  final ValueChanged<ReadingPosition>? onPositionChanged,
+  final ResourceImageBuilder imageBuilder = buildResourceImage,
+  final Future<void> Function(ImageResource)? imageEvictor,
 
   /// Runs after scheduler cancellation, widget pins and cache eviction finish.
-  final Future<void> Function()? onClosed;
+  final Future<void> Function()? onClosed,
 
   /// Publishes the complete cleanup future as soon as this leaf unmounts.
-  final ValueChanged<Future<void>>? onClosing;
-  final Widget? chapterControls;
-  final VoidCallback? onAttached;
-  final ValueChanged<ReaderViewportState>? onViewportChanged;
+  final ValueChanged<Future<void>>? onClosing,
+  final Widget? chapterControls,
+  final VoidCallback? onAttached,
+  final VoidCallback? onExit,
+  final ValueChanged<ReaderViewportState>? onViewportChanged,
 
   /// Explicit navigation such as a persisted reading-epoch reset. It changes
   /// the logical viewport without replacing or reusing a closed provider.
-  final ValueListenable<ReadingPosition?>? positionRequest;
+  final ValueListenable<ReadingPosition?>? positionRequest,
 
   /// Access loss freezes production while retaining the displayed resources.
-  final bool paused;
+  final bool paused = false,
+}) extends StatefulHookWidget {
+  this : assert(dimPercent >= 0 && dimPercent <= 80);
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -1126,7 +1100,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               _ => '图片未能加载',
             }),
             const SizedBox(height: 8),
-            FilledButton.tonal(
+            CupertinoButton.filled(
               onPressed: widget.paused
                   ? null
                   : () => _scheduler.retry(page.key),
@@ -1137,7 +1111,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       );
     }
     return snapshot.loading.contains(page.key)
-        ? const Center(child: CircularProgressIndicator())
+        ? const Center(child: CupertinoActivityIndicator())
         : const SizedBox.shrink();
   }
 
@@ -1149,9 +1123,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final scheduler = _scheduler;
     final pin = pool.pin(resource.id);
     unawaited(
-      showDialog<void>(
+      showCupertinoDialog<void>(
         context: context,
-        useSafeArea: true,
         builder: (dialogContext) => NotificationListener<ReaderImageDecoded>(
           onNotification: (notification) {
             if (notification.resourceId == resource.id) {
@@ -1362,64 +1335,85 @@ class _ReaderScreenState extends State<ReaderScreen> {
       },
       child: Focus(
         autofocus: true,
-        child: Scaffold(
+        child: CupertinoPageScaffold(
           backgroundColor: _readerBackgroundColor(context, widget.background),
-          appBar: _toolbar ? AppBar(title: Text(widget.title)) : null,
-          body: DefaultTextStyle.merge(
-            style: TextStyle(
-              color: _readerForegroundColor(context, widget.background),
-            ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  if (_reader.requiresPositionNotice)
-                    const MaterialBanner(
-                      content: Text('页面清单发生变化，已定位到最接近的页码。'),
-                      actions: [SizedBox.shrink()],
+          navigationBar: _toolbar
+              ? CupertinoNavigationBar(
+                  automaticBackgroundVisibility: false,
+                  leading: widget.onExit == null
+                      ? null
+                      : CupertinoNavigationBarBackButton(
+                          onPressed: widget.onExit,
+                        ),
+                  middle: Text(widget.title),
+                )
+              : null,
+          child: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: DefaultTextStyle.merge(
+                    style: TextStyle(
+                      color: _readerForegroundColor(context, widget.background),
                     ),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final window = MediaQuery.sizeOf(context);
-                        final sameWindow = _windowSize == window;
-                        if (_windowSize != null && !sameWindow) {
-                          _preferredPlacement = null;
-                        }
-                        _windowSize = window;
-                        if (_viewportWidth != constraints.maxWidth ||
-                            _viewportHeight != constraints.maxHeight) {
-                          final chromeOnly =
-                              sameWindow &&
-                              _viewportWidth == constraints.maxWidth;
-                          _viewportWidth = constraints.maxWidth;
-                          _viewportHeight = constraints.maxHeight;
-                          _scheduleRestore(preservePlacement: chromeOnly);
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (!mounted) return;
-                            // A user or parent can change the preference before
-                            // this layout callback runs.
-                            _applyDoublePagePreference();
-                            _scheduleRestore(preservePlacement: chromeOnly);
-                          });
-                        }
-                        if (_reader.manifest.pages.isEmpty) {
-                          return const Center(child: Text('这一章没有页面'));
-                        }
-                        return _ReaderContent(
-                          background: widget.background,
-                          dimPercent: widget.dimPercent,
-                          child: _reader.isContinuous
-                              ? _continuous()
-                              : _paged(),
-                        );
-                      },
+                    child: SafeArea(
+                      child: Column(
+                        children: [
+                          if (_reader.requiresPositionNotice)
+                            const Text('页面清单发生变化，已定位到最接近的页码。'),
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final window = MediaQuery.sizeOf(context);
+                                final sameWindow = _windowSize == window;
+                                if (_windowSize != null && !sameWindow) {
+                                  _preferredPlacement = null;
+                                }
+                                _windowSize = window;
+                                if (_viewportWidth != constraints.maxWidth ||
+                                    _viewportHeight != constraints.maxHeight) {
+                                  final chromeOnly =
+                                      sameWindow &&
+                                      _viewportWidth == constraints.maxWidth;
+                                  _viewportWidth = constraints.maxWidth;
+                                  _viewportHeight = constraints.maxHeight;
+                                  _scheduleRestore(
+                                    preservePlacement: chromeOnly,
+                                  );
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (!mounted) return;
+                                    // A user or parent can change the preference before
+                                    // this layout callback runs.
+                                    _applyDoublePagePreference();
+                                    _scheduleRestore(
+                                      preservePlacement: chromeOnly,
+                                    );
+                                  });
+                                }
+                                if (_reader.manifest.pages.isEmpty) {
+                                  return const Center(child: Text('这一章没有页面'));
+                                }
+                                return _ReaderContent(
+                                  background: widget.background,
+                                  dimPercent: widget.dimPercent,
+                                  child: _reader.isContinuous
+                                      ? _continuous()
+                                      : _paged(),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+                ?(_toolbar ? _controls() : null),
+              ],
             ),
           ),
-          bottomNavigationBar: _toolbar ? _controls() : null,
         ),
       ),
     );
@@ -1430,11 +1424,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
       0.0,
       MediaQuery.sizeOf(context).height -
           MediaQuery.paddingOf(context).vertical -
-          kToolbarHeight,
+          kMinInteractiveDimensionCupertino,
     );
     // Keep space for the page even when the full set of controls cannot fit.
-    final readingHeight = math.min(3 * kMinInteractiveDimension, available / 2);
-    return Material(
+    final readingHeight = math.min(
+      3 * kMinInteractiveDimensionCupertino,
+      available / 2,
+    );
+    return ColoredBox(
+      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
         top: false,
         child: ConstrainedBox(
@@ -1455,10 +1453,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
           children: [
             Row(
               children: [
-                IconButton(
-                  tooltip: '上一页',
+                CupertinoButton(
                   onPressed: _reader.canGoBack ? _back : null,
-                  icon: const Icon(Icons.skip_previous),
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    CupertinoIcons.backward_end,
+                    semanticLabel: '上一页',
+                  ),
                 ),
                 Expanded(
                   child: Text(
@@ -1468,41 +1469,49 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                IconButton(
-                  tooltip: '下一页',
+                CupertinoButton(
                   onPressed: _reader.canAdvance ? _advance : null,
-                  icon: const Icon(Icons.skip_next),
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    CupertinoIcons.forward_end,
+                    semanticLabel: '下一页',
+                  ),
                 ),
                 if (_reader.isContinuous)
-                  IconButton(
-                    tooltip: '放大当前图片',
+                  CupertinoButton(
                     onPressed: _reader.position == null
                         ? null
                         : () => _openZoom(
                             _reader.manifest.pages[_reader.pageIndex],
                           ),
-                    icon: const Icon(Icons.zoom_in),
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      CupertinoIcons.zoom_in,
+                      semanticLabel: '放大当前图片',
+                    ),
                   ),
                 if (!_reader.isContinuous) ...[
-                  IconButton(
-                    tooltip: '缩小',
-                    onPressed: () => _zoom(0.5),
-                    icon: const Icon(Icons.zoom_out),
-                  ),
-                  IconButton(
-                    tooltip: '放大',
-                    onPressed: () => _zoom(2),
-                    icon: const Icon(Icons.zoom_in),
-                  ),
-                  IconButton(
-                    tooltip: '重置缩放',
+                  for (final (factor, icon, label) in [
+                    (0.5, CupertinoIcons.zoom_out, '缩小'),
+                    (2.0, CupertinoIcons.zoom_in, '放大'),
+                  ])
+                    CupertinoButton(
+                      onPressed: () => _zoom(factor),
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(icon, semanticLabel: label),
+                    ),
+                  CupertinoButton(
                     onPressed: () {
                       _preferredPlacement = null;
                       _restoring = true;
                       _transform.value = Matrix4.identity();
                       _scheduleRestore();
                     },
-                    icon: const Icon(Icons.fit_screen),
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      CupertinoIcons.arrow_up_left_arrow_down_right,
+                      semanticLabel: '重置缩放',
+                    ),
                   ),
                 ],
               ],
@@ -1510,28 +1519,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
             Row(
               children: [
                 Expanded(
-                  child: DropdownButton<ReadingMode>(
+                  child: ChoiceField<ReadingMode>(
+                    label: '阅读模式',
                     value: _reader.mode,
-                    isExpanded: true,
-                    underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(
-                        value: ReadingMode.leftToRight,
-                        child: Text('从左到右'),
-                      ),
-                      DropdownMenuItem(
-                        value: ReadingMode.rightToLeft,
-                        child: Text('从右到左'),
-                      ),
-                      DropdownMenuItem(
-                        value: ReadingMode.continuous,
-                        child: Text('竖向连续'),
-                      ),
-                      DropdownMenuItem(
-                        value: ReadingMode.webtoon,
-                        child: Text('条漫'),
-                      ),
-                    ],
+                    options: {
+                      ReadingMode.leftToRight: '从左到右',
+                      ReadingMode.rightToLeft: '从右到左',
+                      ReadingMode.continuous: '竖向连续',
+                      ReadingMode.webtoon: '条漫',
+                    },
                     onChanged: widget.layoutSettingsEnabled
                         ? (mode) {
                             if (mode != null) _selectMode(mode);
@@ -1540,18 +1536,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                 ),
                 if (!_reader.isContinuous)
-                  SegmentedButton<bool?>(
+                  CupertinoSlidingSegmentedControl<int>(
                     key: const ValueKey('reader-page-layout'),
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: null, label: Text('自动')),
-                      ButtonSegment(value: false, label: Text('单页')),
-                      ButtonSegment(value: true, label: Text('双页')),
-                    ],
-                    selected: {_doublePagePreference},
-                    onSelectionChanged: widget.layoutSettingsEnabled
-                        ? (values) => _selectDoublePage(values.single)
-                        : null,
+                    groupValue: _doublePagePreference == null
+                        ? 0
+                        : _doublePagePreference!
+                        ? 2
+                        : 1,
+                    children: const {
+                      0: Text('自动'),
+                      1: Text('单页'),
+                      2: Text('双页'),
+                    },
+                    disabledChildren: widget.layoutSettingsEnabled
+                        ? const {}
+                        : const {0, 1, 2},
+                    onValueChanged: (value) {
+                      if (widget.layoutSettingsEnabled && value != null) {
+                        _selectDoublePage(value == 0 ? null : value == 2);
+                      }
+                    },
                   ),
               ],
             ),
@@ -1602,26 +1606,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
 /// Each lazily built page owns its horizontal position and disposes it when
 /// leaving the list; the Reader only borrows live controllers for restoration.
-class _ContinuousImage extends HookWidget {
-  const _ContinuousImage({
-    super.key,
-    required this.pageKey,
-    required this.viewportWidth,
-    required this.imageSize,
-    required this.onAttached,
-    required this.onDetached,
-    required this.onMoved,
-    required this.onDoubleTap,
-    required this.child,
-  });
-  final String pageKey;
-  final double viewportWidth;
-  final Size imageSize;
-  final ValueChanged<ScrollController> onAttached;
-  final ValueChanged<ScrollController> onDetached;
-  final VoidCallback onMoved;
-  final VoidCallback onDoubleTap;
-  final Widget child;
+class const _ContinuousImage({
+  super.key,
+  required final String pageKey,
+  required final double viewportWidth,
+  required final Size imageSize,
+  required final ValueChanged<ScrollController> onAttached,
+  required final ValueChanged<ScrollController> onDetached,
+  required final VoidCallback onMoved,
+  required final VoidCallback onDoubleTap,
+  required final Widget child,
+}) extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final controller = useScrollController();
@@ -1674,10 +1669,10 @@ bool _validCrop(Rect bounds) =>
 
 /// Repositions the same complete image under a clip. Its provider, encoded
 /// bytes, decoded frame and resource ownership are unchanged by trimming.
-class _CroppedImage extends StatelessWidget {
-  const _CroppedImage({required this.bounds, required this.child});
-  final Rect bounds;
-  final Widget child;
+class const _CroppedImage({
+  required final Rect bounds,
+  required final Widget child,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) => ClipRect(
@@ -1786,31 +1781,26 @@ Color _readerBackgroundColor(
   BuildContext context,
   ReaderBackground background,
 ) => switch (background) {
-  ReaderBackground.black => Colors.black,
-  ReaderBackground.white => Colors.white,
-  ReaderBackground.theme => Theme.of(context).scaffoldBackgroundColor,
+  ReaderBackground.black => CupertinoColors.black,
+  ReaderBackground.white => CupertinoColors.white,
+  ReaderBackground.theme => CupertinoTheme.of(context).scaffoldBackgroundColor,
 };
 
 Color _readerForegroundColor(
   BuildContext context,
   ReaderBackground background,
 ) => switch (background) {
-  ReaderBackground.black => Colors.white,
-  ReaderBackground.white => Colors.black,
-  ReaderBackground.theme => Theme.of(context).colorScheme.onSurface,
+  ReaderBackground.black => CupertinoColors.white,
+  ReaderBackground.white => CupertinoColors.black,
+  ReaderBackground.theme => CupertinoColors.label.resolveFrom(context),
 };
 
 /// Applies appearance only to reading content, preserving input and controls.
-class _ReaderContent extends StatelessWidget {
-  const _ReaderContent({
-    required this.background,
-    required this.dimPercent,
-    required this.child,
-  });
-  final ReaderBackground background;
-  final int dimPercent;
-  final Widget child;
-
+class const _ReaderContent({
+  required final ReaderBackground background,
+  required final int dimPercent,
+  required final Widget child,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ColoredBox(
     color: _readerBackgroundColor(context, background),
@@ -1824,7 +1814,9 @@ class _ReaderContent extends StatelessWidget {
             IgnorePointer(
               child: ColoredBox(
                 key: const ValueKey('reader-content-dimming'),
-                color: Colors.black.withValues(alpha: dimPercent / 100),
+                color: CupertinoColors.black.withValues(
+                  alpha: dimPercent / 100,
+                ),
               ),
             ),
         ],
@@ -1833,20 +1825,13 @@ class _ReaderContent extends StatelessWidget {
   );
 }
 
-class _ZoomImageDialog extends StatefulHookWidget {
-  const _ZoomImageDialog({
-    required this.resource,
-    required this.pool,
-    required this.imageBuilder,
-    required this.appearance,
-    required this.aspectRatio,
-  });
-  final ValueListenable<_ReaderAppearance> appearance;
-  final ImageResource resource;
-  final ReaderResourcePool pool;
-  final ResourceImageBuilder imageBuilder;
-  final double aspectRatio;
-
+class const _ZoomImageDialog({
+  required final ImageResource resource,
+  required final ReaderResourcePool pool,
+  required final ResourceImageBuilder imageBuilder,
+  required final ValueListenable<_ReaderAppearance> appearance,
+  required final double aspectRatio,
+}) extends StatefulHookWidget {
   @override
   State<_ZoomImageDialog> createState() => _ZoomImageDialogState();
 }
@@ -2007,30 +1992,43 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   Widget build(BuildContext context) {
     _transform = useTransformationController();
     final appearance = useValueListenable(widget.appearance);
-    return Dialog.fullscreen(
-      child: Scaffold(
-        backgroundColor: _readerBackgroundColor(context, appearance.background),
-        appBar: AppBar(
-          title: const Text('查看图片'),
-          actions: [
-            IconButton(
-              tooltip: '缩小',
+    return CupertinoPageScaffold(
+      key: const ValueKey('reader-image-viewer'),
+      backgroundColor: _readerBackgroundColor(context, appearance.background),
+      navigationBar: CupertinoNavigationBar(
+        automaticBackgroundVisibility: false,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.pop(context),
+          child: const Icon(CupertinoIcons.xmark, semanticLabel: '关闭图片'),
+        ),
+        middle: const Text('查看图片'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
               onPressed: () => _zoom(0.5),
-              icon: const Icon(Icons.zoom_out),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(CupertinoIcons.zoom_out, semanticLabel: '缩小'),
             ),
-            IconButton(
-              tooltip: '放大',
+            CupertinoButton(
               onPressed: () => _zoom(2),
-              icon: const Icon(Icons.zoom_in),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(CupertinoIcons.zoom_in, semanticLabel: '放大'),
             ),
-            IconButton(
-              tooltip: '重置缩放',
+            CupertinoButton(
               onPressed: () => _zoom(0.2),
-              icon: const Icon(Icons.fit_screen),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(
+                CupertinoIcons.arrow_up_left_arrow_down_right,
+                semanticLabel: '重置缩放',
+              ),
             ),
           ],
         ),
-        body: _ReaderContent(
+      ),
+      child: SafeArea(
+        child: _ReaderContent(
           background: appearance.background,
           dimPercent: appearance.dimPercent,
           child: LayoutBuilder(

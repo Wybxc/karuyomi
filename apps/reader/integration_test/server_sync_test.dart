@@ -1,10 +1,12 @@
+import '../test_support/cupertino.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show max;
 
 import 'package:flutter/foundation.dart' show debugPrintSynchronously;
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -68,14 +70,17 @@ void main() {
       late final Map<String, Object?> result;
 
       try {
-        final mangaTile = find.widgetWithText(ListTile, 'xkcd');
+        final mangaTile = find.widgetWithText(CupertinoListTile, 'xkcd');
         await _waitFor(tester, '已登录 Native 的服务端 xkcd 书架', () {
           if (catalog.accessPaused) {
             fail('请先在此 Native 安装中完成正式 Access 登录，再运行同步验收');
           }
           return catalog.status == ServiceStatus.ready &&
               mangaTile.evaluate().length == 1 &&
-              tester.widget<ListTile>(mangaTile).onTap != null;
+              tester
+                      .widget<CupertinoButton>(buttonAbove(mangaTile))
+                      .onPressed !=
+                  null;
         });
         if (_subject.isNotEmpty) expect(catalog.subject, _subject);
         final shelfSequence = _shelfEntry
@@ -109,18 +114,25 @@ void main() {
           expect(shelfBefore.progress.completed, isFalse);
           returnTarget = shelfButton;
           returnEnabled = () =>
-              tester.widget<IconButton>(shelfButton).onPressed != null;
+              tester.widget<CupertinoButton>(shelfButton).onPressed != null;
           await _waitFor(
             tester,
             '已确认的书架续读按钮',
             () =>
                 shelfButton.evaluate().length == 1 &&
                 returnEnabled() &&
-                tester.widget<IconButton>(shelfButton).tooltip == '继续阅读：xkcd',
+                find
+                        .descendant(
+                          of: shelfButton,
+                          matching: iconLabel('继续阅读：xkcd'),
+                        )
+                        .evaluate()
+                        .length ==
+                    1,
           );
           await _tap(tester, shelfButton);
         } else {
-          // A ListTile's center may hit its nested Continue Reading icon once
+          // A CupertinoListTile's center may hit its nested Continue Reading icon once
           // the shelf has a saved resume. Tap the actual title to open details.
           final mangaTitle = find.descendant(
             of: mangaTile,
@@ -129,7 +141,11 @@ void main() {
           await _tap(tester, mangaTitle);
           final chapterTile = await _chapterTile(tester, catalog);
           returnTarget = chapterTile;
-          returnEnabled = () => tester.widget<ListTile>(chapterTile).enabled;
+          returnEnabled = () =>
+              tester
+                  .widget<CupertinoButton>(buttonAbove(chapterTile))
+                  .onPressed !=
+              null;
           await _tap(tester, chapterTile);
         }
         await _waitFor(
@@ -194,8 +210,8 @@ void main() {
             epoch: _expectedEpoch,
             minimumFurthest: _startPage,
           );
-          final reset = find.widgetWithText(TextButton, '重新阅读本章');
-          expect(tester.widget<TextButton>(reset).onPressed, isNotNull);
+          final reset = find.widgetWithText(CupertinoButton, '重新阅读本章');
+          expect(tester.widget<CupertinoButton>(reset).onPressed, isNotNull);
           await _tap(tester, reset);
           await _waitForPage(tester, manifest, _targetPage);
           after = await _confirmedProgress(
@@ -325,7 +341,7 @@ void main() {
 
         // Wait for the originating UI after route completion and closeChapter
         // ACK before disposing the runtime.
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
         await _waitFor(
           tester,
           _shelfEntry ? '返回书架并完成章节资源 ACK' : '返回详情并完成章节资源 ACK',
@@ -521,7 +537,7 @@ Future<Finder> _chapterTile(
     return page.evaluate().length == 1;
   });
   if (_phase == 'navigate' && _buildId.isEmpty) {
-    return find.widgetWithText(ListTile, _chapterLabel);
+    return find.widgetWithText(CupertinoListTile, _chapterLabel);
   }
   final details = tester.widget<MangaDetailsPage>(page);
   expect(details.controller, same(catalog));
@@ -548,7 +564,8 @@ Future<Finder> _chapterTile(
     await tester.pump();
   }
   await _waitFor(tester, '精确章节可打开', () {
-    return tile.evaluate().length == 1 && tester.widget<ListTile>(tile).enabled;
+    return tile.evaluate().length == 1 &&
+        tester.widget<CupertinoButton>(buttonAbove(tile)).onPressed != null;
   });
   return tile;
 }
@@ -556,24 +573,28 @@ Future<Finder> _chapterTile(
 Future<void> _singlePage(WidgetTester tester) async {
   final layout = find.byKey(const ValueKey('reader-page-layout'));
   await _waitFor(tester, '正式分页控件', () => layout.evaluate().length == 1);
-  final selected = tester.widget<SegmentedButton<bool?>>(layout).selected;
+  final selected = tester
+      .widget<CupertinoSlidingSegmentedControl<int>>(layout)
+      .groupValue;
   final width = tester.getSize(find.byType(ReaderScreen)).width;
-  if (selected.contains(false) || (selected.contains(null) && width < 900)) {
+  if (selected == 1 || (selected == 0 && width < 900)) {
     return;
   }
   if (_phase != 'navigate' || _shelfEntry) {
     fail('书架续读、前台和重置阶段须预先使用手机自动单页或已确认单页');
   }
   await _waitFor(tester, '正式单页控件可操作', () {
-    return tester.widget<SegmentedButton<bool?>>(layout).onSelectionChanged !=
-        null;
+    return !tester
+        .widget<CupertinoSlidingSegmentedControl<int>>(layout)
+        .disabledChildren
+        .contains(1);
   });
   await _tap(tester, find.descendant(of: layout, matching: find.text('单页')));
   await _waitFor(tester, '正式单页控件已应用', () {
     return tester
-        .widget<SegmentedButton<bool?>>(layout)
-        .selected
-        .contains(false);
+            .widget<CupertinoSlidingSegmentedControl<int>>(layout)
+            .groupValue ==
+        1;
   });
 }
 
@@ -587,10 +608,8 @@ Future<void> _turnTo(
   while (page != to) {
     final direction = page < to ? 1 : -1;
     final label = direction > 0 ? '下一页' : '上一页';
-    final button = find.byWidgetPredicate(
-      (widget) => widget is IconButton && widget.tooltip == label,
-    );
-    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+    final button = iconButton(label);
+    expect(tester.widget<CupertinoButton>(button).onPressed, isNotNull);
     await _tap(tester, button);
     page += direction;
     await _waitForPage(tester, manifest, page);
@@ -677,20 +696,20 @@ _resume(
   }
 
   final warning = find.text(_epochChanged);
-  final reopen = find.widgetWithText(TextButton, '重新打开本章');
+  final reopen = find.widgetWithText(CupertinoButton, '重新打开本章');
   await _waitFor(tester, '正式前台重取报告远端 epoch 重置', () {
     return warning.evaluate().length == 1 &&
         reopen.evaluate().length == 1 &&
-        tester.widget<TextButton>(reopen).onPressed != null;
+        tester.widget<CupertinoButton>(reopen).onPressed != null;
   });
   await _waitForPage(tester, manifest, _targetPage);
   expect(tester.element(find.byType(ReaderScreen)), same(oldElement));
   expect(_reader(tester).provider, same(oldLeaf.provider));
   expect(_reader(tester).positionRequest?.value, oldPositionRequest);
   for (final label in ['重新阅读本章', '读完本章']) {
-    final control = find.widgetWithText(TextButton, label);
+    final control = find.widgetWithText(CupertinoButton, label);
     expect(control, findsOneWidget);
-    expect(tester.widget<TextButton>(control).onPressed, isNull);
+    expect(tester.widget<CupertinoButton>(control).onPressed, isNull);
   }
   final remote = await repository
       .inspectChapter(mangaKey: mangaKey, chapterKey: manifest.chapterKey)
@@ -758,7 +777,7 @@ Future<ProgressSnapshot> _retryAfterOutage(
 ) async {
   final oldElement = tester.element(find.byType(ReaderScreen));
   final oldProvider = _reader(tester).provider;
-  final retry = find.widgetWithText(TextButton, '重试保存');
+  final retry = find.widgetWithText(CupertinoButton, '重试保存');
   final pending = find.textContaining('草稿仅保留在当前会话。');
   final origin = Uri.parse(_origin);
 
@@ -775,7 +794,7 @@ Future<ProgressSnapshot> _retryAfterOutage(
     return catalog.hasUnsavedReadingProgress &&
         pending.evaluate().length == 1 &&
         retry.evaluate().length == 1 &&
-        tester.widget<TextButton>(retry).onPressed != null;
+        tester.widget<CupertinoButton>(retry).onPressed != null;
   });
   sameReader();
   await _waitForPage(tester, manifest, _targetPage);
@@ -822,8 +841,8 @@ _retryAfterCompletionFailure(
 }) async {
   final oldElement = tester.element(find.byType(ReaderScreen));
   final oldProvider = _reader(tester).provider;
-  final complete = find.widgetWithText(TextButton, '读完本章');
-  final retry = find.widgetWithText(TextButton, '重试保存');
+  final complete = find.widgetWithText(CupertinoButton, '读完本章');
+  final retry = find.widgetWithText(CupertinoButton, '重试保存');
   final pending = find.textContaining('进度尚未获服务器确认');
 
   // A new viewport observation can be queued before the saved label is
@@ -839,7 +858,7 @@ _retryAfterCompletionFailure(
     ready: () =>
         !catalog.hasUnsavedReadingProgress &&
         complete.evaluate().length == 1 &&
-        tester.widget<TextButton>(complete).onPressed != null,
+        tester.widget<CupertinoButton>(complete).onPressed != null,
   );
   expect(before.completed, isFalse, reason: '不能重跑已提交的末页完成');
   expect(before.progress!.furthest!.pageIndexHint, _targetPage - 1);
@@ -856,7 +875,7 @@ _retryAfterCompletionFailure(
     return catalog.hasUnsavedReadingProgress &&
         pending.evaluate().length == 1 &&
         retry.evaluate().length == 1 &&
-        tester.widget<TextButton>(retry).onPressed != null;
+        tester.widget<CupertinoButton>(retry).onPressed != null;
   });
   sameReader();
   await _waitForPage(tester, manifest, _targetPage);

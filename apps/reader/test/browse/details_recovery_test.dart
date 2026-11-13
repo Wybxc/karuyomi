@@ -1,8 +1,12 @@
+import '../../test_support/cupertino.dart';
+
+import 'package:karuyomi/widgets/choice_field.dart';
+
 import '../test_app.dart';
 
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -179,17 +183,11 @@ void main() {
       final catalog = await _details(tester, platform);
       await _tap(tester, find.byKey(ValueKey(_sequence.entries[1].key)));
       expect(find.byType(ChapterReaderRoute), findsNothing);
-      expect(find.byType(SnackBar), findsOneWidget);
       expect(
         find.byKey(const ValueKey('chapter-open-failure')),
         findsOneWidget,
       );
-      expect(
-        tester
-            .widget<Text>(find.byKey(const ValueKey('chapter-open-failure')))
-            .data,
-        '未能打开「第二版」：漫画源请求失败，请重试',
-      );
+      expect(find.text('未能打开「第二版」：漫画源请求失败，请重试'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
       expect(pageCalls, 1);
       await _reveal(tester, find.byKey(const ValueKey('chapter-search')));
@@ -246,8 +244,8 @@ void main() {
       expect(find.byKey(const ValueKey('retry-read-resume')), findsNothing);
       expect(
         tester
-            .widget<DropdownButton<ChapterOrder>>(
-              find.byType(DropdownButton<ChapterOrder>),
+            .widget<ChoiceField<ChapterOrder>>(
+              find.byType(ChoiceField<ChapterOrder>),
             )
             .value,
         ChapterOrder.reversed,
@@ -268,15 +266,20 @@ void main() {
       expect(platform.businessServer.requests.skip(start), hasLength(1));
       expect(
         tester
-            .widget<TextButton>(find.byKey(const ValueKey('retry-read-resume')))
+            .widget<CupertinoButton>(
+              find.byKey(const ValueKey('retry-read-resume')),
+            )
             .onPressed,
         isNotNull,
       );
       await _reveal(tester, find.byKey(ValueKey(_sequence.entries[1].key)));
       expect(
         tester
-            .widget<ListTile>(find.byKey(ValueKey(_sequence.entries[1].key)))
-            .enabled,
+                .widget<CupertinoButton>(
+                  buttonAbove(find.byKey(ValueKey(_sequence.entries[1].key))),
+                )
+                .onPressed !=
+            null,
         true,
       );
       await tester.pump(const Duration(seconds: 3));
@@ -313,11 +316,11 @@ void main() {
       final start = platform.businessServer.requests.length;
       await _tap(tester, find.byKey(const ValueKey('retry-read-resume')));
       expect(catalog.hasUnsavedReadingProgress, true);
-      await _reveal(tester, find.byType(DropdownButton<ChapterOrder>));
+      await _reveal(tester, find.byType(ChoiceField<ChapterOrder>));
       expect(
         tester
-            .widget<DropdownButton<ChapterOrder>>(
-              find.byType(DropdownButton<ChapterOrder>),
+            .widget<ChoiceField<ChapterOrder>>(
+              find.byType(ChoiceField<ChapterOrder>),
             )
             .value,
         ChapterOrder.reversed,
@@ -371,7 +374,7 @@ void main() {
       });
       await tester.pump();
       expect(delaying, true);
-      expect(tester.widget<TextButton>(retry).onPressed, isNull);
+      expect(tester.widget<CupertinoButton>(retry).onPressed, isNull);
       platform.bootstrapSubject = 'different-subject';
       await tester.runAsync(catalog.connect);
       await tester.pump();

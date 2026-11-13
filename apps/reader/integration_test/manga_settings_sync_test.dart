@@ -1,3 +1,5 @@
+import '../test_support/cupertino.dart';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../test/settings/settings_probe.dart';
@@ -5,7 +7,7 @@ import '../test/settings/settings_probe.dart';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -107,7 +109,7 @@ void main() {
       final shelfCard = find.byKey(ValueKey(target.mangaKey));
       final tile = find.descendant(
         of: shelfCard,
-        matching: find.byType(ListTile),
+        matching: find.byType(CupertinoListTile),
       );
       final title = find.descendant(
         of: tile,
@@ -218,7 +220,7 @@ void main() {
           _expectTransition(before, draft, writes: 0);
           await _tap(
             tester,
-            find.widgetWithText(FilledButton, '保存本漫画设置'),
+            find.widgetWithText(CupertinoButton, '保存本漫画设置'),
             scrollWithin: panel,
           );
           expectedRevision++;
@@ -242,14 +244,17 @@ void main() {
       }
 
       await tester.pump(const Duration(seconds: 1));
-      await _tap(tester, find.byType(BackButton));
+      await _tap(tester, find.byType(CupertinoNavigationBarBackButton));
       await _wait(
         tester,
         '返回详情并释放章节资源',
         () =>
             reader.evaluate().isEmpty &&
             chapterTile.evaluate().length == 1 &&
-            tester.widget<ListTile>(chapterTile).enabled,
+            tester
+                    .widget<CupertinoButton>(buttonAbove(chapterTile))
+                    .onPressed !=
+                null,
       );
       expect(catalog.hasUnsavedReadingProgress, isFalse);
       expect(tester.takeException(), isNull);
@@ -515,12 +520,7 @@ Future<void> _turnPage(
   required String tooltip,
   required int page,
 }) async {
-  await _tap(
-    tester,
-    find.byWidgetPredicate(
-      (widget) => widget is IconButton && widget.tooltip == tooltip,
-    ),
-  );
+  await _tap(tester, iconButton(tooltip));
   await _waitForPage(tester, catalog, reader, page);
 }
 
