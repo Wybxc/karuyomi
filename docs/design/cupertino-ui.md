@@ -2,6 +2,8 @@
 
 2026-11-13，用户确定 Web、iOS、Android 使用一套 Cupertino 界面。采用 Flutter 官方独立包 `cupertino_ui`，沿用已固定的 Flutter 3.50 / Dart 3.14、Riverpod generator、flutter_hooks 与 riverpod_lint。实施状态、范围与验收维护在[迁移计划](../plan/cupertino-ui.md)。
 
+当前已上线界面遵循本文；后续 [Liquid Glass 库评估](liquid-glass-evaluation.md)与[界面重构计划](../plan/liquid-glass.md)拟在同一 Cupertino 基础上重整导航和操作浮层，实施尚未开始。玻璃效果不改变下述业务状态、导航所有权和生命周期要求。
+
 Mihon 继续作为书架、源、扩展和阅读操作的信息架构参考；组件、主题、路由和反馈遵循本文。业务状态及最小必要信息沿用[扩展与浏览状态流程](extension-browse-ui-flow.md)，视觉调整不增加新的业务状态或第二套同步机制。
 
 ## 应用、主题与导航
