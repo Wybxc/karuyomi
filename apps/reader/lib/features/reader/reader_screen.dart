@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -1792,7 +1793,7 @@ Color _readerForegroundColor(
 ) => switch (background) {
   ReaderBackground.black => CupertinoColors.white,
   ReaderBackground.white => CupertinoColors.black,
-  ReaderBackground.theme => CupertinoColors.label.resolveFrom(context),
+  ReaderBackground.theme => AppColors.label.resolveFrom(context),
 };
 
 /// Applies appearance only to reading content, preserving input and controls.

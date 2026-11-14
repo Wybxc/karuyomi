@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 
 import 'dart:async';
@@ -304,6 +305,12 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   }
 
   Widget _failure(String title) => CupertinoListSection.insetGrouped(
+    backgroundColor: AppColors.background.resolveFrom(context),
+    separatorColor: AppColors.separator.resolveFrom(context),
+    decoration: BoxDecoration(
+      color: AppColors.groupedSurface.resolveFrom(context),
+      borderRadius: BorderRadius.circular(10),
+    ),
     children: [
       Text(
         title,
@@ -554,35 +561,47 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                         if (showOld)
                           SliverPadding(
                             padding: const EdgeInsets.all(8),
-                            sliver: SliverGrid.builder(
-                              gridDelegate:
-                                  const SliverGridDelegateWithMaxCrossAxisExtent(
-                                    maxCrossAxisExtent: 180,
-                                    mainAxisSpacing: 4,
-                                    crossAxisSpacing: 4,
-                                    childAspectRatio: 2 / 3,
-                                  ),
-                              itemCount: _results.length,
-                              itemBuilder: (context, index) {
-                                final manga = _results[index];
-                                return MangaCoverTile(
-                                  key: ValueKey(('source-manga', manga.url)),
-                                  title: manga.title,
-                                  entry: saved[manga.url],
-                                  covers: _covers,
-                                  badge: saved[manga.url] == null
-                                      ? null
-                                      : Icon(
-                                          CupertinoIcons.book_fill,
-                                          color: CupertinoTheme.of(context)
-                                              .primaryColor,
-                                          semanticLabel: '已在书架',
+                            sliver: SliverLayoutBuilder(
+                              builder: (context, constraints) =>
+                                  SliverGrid.builder(
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount:
+                                              ((constraints.crossAxisExtent +
+                                                          4) /
+                                                      132)
+                                                  .floor()
+                                                  .clamp(1, 100),
+                                          mainAxisSpacing: 4,
+                                          crossAxisSpacing: 4,
+                                          childAspectRatio: 2 / 3,
                                         ),
-                                  onPressed: busy || !canBrowse
-                                      ? null
-                                      : () => unawaited(_details(manga)),
-                                );
-                              },
+                                    itemCount: _results.length,
+                                    itemBuilder: (context, index) {
+                                      final manga = _results[index];
+                                      return MangaCoverTile(
+                                        key: ValueKey((
+                                          'source-manga',
+                                          manga.url,
+                                        )),
+                                        title: manga.title,
+                                        entry: saved[manga.url],
+                                        covers: _covers,
+                                        badge: saved[manga.url] == null
+                                            ? null
+                                            : Icon(
+                                                CupertinoIcons.book_fill,
+                                                color: CupertinoTheme.of(
+                                                  context,
+                                                ).primaryColor,
+                                                semanticLabel: '已在书架',
+                                              ),
+                                        onPressed: busy || !canBrowse
+                                            ? null
+                                            : () => unawaited(_details(manga)),
+                                      );
+                                    },
+                                  ),
                             ),
                           ),
                         SliverPadding(

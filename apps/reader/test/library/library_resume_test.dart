@@ -444,7 +444,11 @@ void main() {
       );
       await tester.ensureVisible(retry);
       await tester.pumpAndSettle();
-      expect(find.text('重试保存书架资料'), findsOneWidget);
+      expect(find.text('书架资料尚未由服务端确认'), findsOneWidget);
+      final retryRow = tester.widget<CupertinoListTile>(
+        find.ancestor(of: retry, matching: find.byType(CupertinoListTile)),
+      );
+      expect((retryRow.title as Text).data, isNotEmpty);
       expect(tester.widget<CupertinoButton>(retry).onPressed, isNotNull);
       expect(bodies, hasLength(1));
       await tester.tap(retry);

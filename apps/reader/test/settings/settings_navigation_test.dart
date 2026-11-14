@@ -94,6 +94,21 @@ Finder _navigation(String label) => find.descendant(
   of: find.byKey(const ValueKey('app-navigation')),
   matching: find.text(label),
 );
+Future<void> _openSettings(WidgetTester tester) async {
+  await _tap(tester, _navigation('设置'));
+  for (final id in ['appearance', 'reading', 'input']) {
+    final group = find.byKey(ValueKey('settings-group-$id'));
+    if (group.evaluate().isNotEmpty) {
+      await _tap(
+        tester,
+        find
+            .descendant(of: group, matching: find.byType(CupertinoListTile))
+            .first,
+      );
+    }
+  }
+}
+
 Future<void> _dim(
   WidgetTester tester,
   String scope, {
@@ -137,7 +152,7 @@ Future<void> _start(
 }
 
 Future<void> _globalDefaults(WidgetTester tester, {bool dark = false}) async {
-  await _tap(tester, _navigation('设置'));
+  await _openSettings(tester);
   if (dark) await _choose<wire.AppTheme>(tester, '深色');
   await _choose<wire.ReaderMode>(tester, '从右到左');
   await _choose<wire.ReaderPageLayout>(tester, '双页');
@@ -230,7 +245,7 @@ void main() {
     });
     await tester.runAsync(remote.connect);
     await _start(tester, platform);
-    await _tap(tester, _navigation('设置'));
+    await _openSettings(tester);
     final panel = find.byType(GlobalSettingsPanel);
     final catalog = tester.widget<GlobalSettingsPanel>(panel).catalog;
     final container = ProviderScope.containerOf(
@@ -300,7 +315,7 @@ void main() {
       (tester) async {
         final platform = TestPlatform(seedDefaultInstallation: false);
         await _start(tester, platform);
-        await _tap(tester, _navigation('设置'));
+        await _openSettings(tester);
         final initial = globalSettings(tester);
         await _choose<wire.AppTheme>(tester, '深色');
         platform.afterBusinessReply = (request, reply) {
@@ -384,7 +399,7 @@ void main() {
             return replacement;
           },
         );
-        await _tap(tester, _navigation('设置'));
+        await _openSettings(tester);
         final initial = globalSettings(tester);
         final originalRevision = initial.state.snapshot!.globalRevision;
         await _choose<wire.AppTheme>(tester, '深色');
@@ -487,7 +502,7 @@ void main() {
             return native.createPlatformRuntime(origin: origin);
           },
         );
-        await _tap(tester, _navigation('设置'));
+        await _openSettings(tester);
         final initial = globalSettings(tester);
         await _choose<wire.AppTheme>(tester, '深色');
         platform.afterBusinessReply = (request, reply) {
@@ -586,7 +601,7 @@ void main() {
             return replacement;
           },
         );
-        await _tap(tester, _navigation('设置'));
+        await _openSettings(tester);
         final previous = globalSettings(tester);
         await _choose<wire.AppTheme>(tester, '深色');
         original.afterBusinessReply = (request, reply) {
@@ -653,6 +668,15 @@ void main() {
           expect(factoryOrigins, isEmpty);
           expect(original.rebuildCount, 1);
           expect(original.disposalCount, 0);
+        }
+        if (find.byType(ChoiceField<wire.AppTheme>).evaluate().isEmpty) {
+          final group = find.byKey(const ValueKey('settings-group-appearance'));
+          await _tap(
+            tester,
+            find
+                .descendant(of: group, matching: find.byType(CupertinoListTile))
+                .first,
+          );
         }
         await _choose<wire.AppTheme>(tester, '浅色');
         await _tap(tester, find.text('保存全局设置'));
@@ -1049,7 +1073,7 @@ void main() {
       final original = writes.single.body;
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
       await _tap(tester, _navigation('浏览'));
-      await _tap(tester, _navigation('设置'));
+      await _openSettings(tester);
       expect(tester.widget<ChoiceField<bool>>(_field<bool>('裁白')).value, true);
       expect(
         tester.widget<ChoiceField<bool>>(_field<bool>('裁白')).onChanged,

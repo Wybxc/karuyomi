@@ -70,6 +70,7 @@ void main() {
         ),
       );
       await _tap(tester, find.text('真实源 DTO 测试'));
+      await _tap(tester, find.byKey(const ValueKey('chapter-options')));
       final catalog = tester
           .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
           .controller;

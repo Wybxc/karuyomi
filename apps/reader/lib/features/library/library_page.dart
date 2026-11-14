@@ -505,53 +505,53 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
-        child: CustomScrollView(
-          slivers: [
-            CupertinoSliverRefreshControl(onRefresh: _refresh),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverList.list(
-                children: [
-                  if (_opening || widget.controller?.busy == true) ...[
-                    const CupertinoActivityIndicator(),
-                    const SizedBox(height: 12),
-                  ],
-                  if (widget.controller?.error case final error?)
-                    Text(
-                      error,
-                      style: TextStyle(
-                        color: AppColors.error.resolveFrom(context),
-                      ),
+        child: Column(
+          children: [
+            Expanded(
+              child: CustomScrollView(
+                slivers: [
+                  CupertinoSliverRefreshControl(onRefresh: _refresh),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList.list(
+                      children: [
+                        if (_opening || widget.controller?.busy == true) ...[
+                          const CupertinoActivityIndicator(),
+                          const SizedBox(height: 12),
+                        ],
+                        if (widget.controller?.error case final error?)
+                          Text(
+                            error,
+                            style: TextStyle(
+                              color: AppColors.error.resolveFrom(context),
+                            ),
+                          ),
+                        if (_refreshError case final error?)
+                          Text(
+                            error,
+                            style: TextStyle(
+                              color: AppColors.error.resolveFrom(context),
+                            ),
+                          ),
+                        if (_openError case final error?)
+                          Text(
+                            error,
+                            style: TextStyle(
+                              color: AppColors.error.resolveFrom(context),
+                            ),
+                          ),
+                        if (widget.controller case final controller?)
+                          if (controller.status != ServiceStatus.ready)
+                            _connection(controller),
+                      ],
                     ),
-                  if (_refreshError case final error?)
-                    Text(
-                      error,
-                      style: TextStyle(
-                        color: AppColors.error.resolveFrom(context),
-                      ),
-                    ),
-                  if (_openError case final error?)
-                    Text(
-                      error,
-                      style: TextStyle(
-                        color: AppColors.error.resolveFrom(context),
-                      ),
-                    ),
-                  if (widget.controller case final controller?)
-                    if (controller.status != ServiceStatus.ready)
-                      _connection(controller),
-                  if (_repository != null)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: CupertinoButton(
-                        onPressed: () => unawaited(_refresh()),
-                        child: const Text('刷新服务端书架'),
-                      ),
-                    ),
+                  ),
+                  _libraryContents(snapshot),
                 ],
               ),
             ),
-            _libraryContents(snapshot),
+            if (snapshot.value case final view? when _selecting)
+              _batchActions(view),
           ],
         ),
       ),
@@ -710,28 +710,113 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ),
           const SizedBox(height: 8),
         ],
-        Align(
-          alignment: Alignment.centerLeft,
-          child: CupertinoButton(
-            onPressed: available && !pending && batch == null && !_selecting
-                ? () => unawaited(_editCategories(view))
-                : null,
-            child: const Text('管理分类'),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: ChoiceField<String>(
+                key: const ValueKey('library-category-filter'),
+                label: '分类',
+                value: _filterFor(view),
+                options: {
+                  null: '全部',
+                  '': '未分类',
+                  for (final category in view.categories)
+                    category.id: category.name,
+                },
+                onChanged: (value) => setState(() => _categoryFilter = value),
+              ),
+            ),
+            CupertinoMenuAnchor(
+              key: const ValueKey('library-more'),
+              menuChildren: [
+                CupertinoMenuItem(
+                  onPressed:
+                      available && !pending && batch == null && !_selecting
+                      ? () => unawaited(_editCategories(view))
+                      : null,
+                  child: const Text('管理分类'),
+                ),
+                CupertinoMenuItem(
+                  onPressed: () => unawaited(_refresh()),
+                  child: const Text('刷新服务端书架'),
+                ),
+              ],
+              builder: (context, menu, _) => CupertinoButton(
+                padding: const EdgeInsets.all(8),
+                onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+                child: const Icon(
+                  CupertinoIcons.ellipsis,
+                  semanticLabel: '书架选项',
+                ),
+              ),
+            ),
+          ],
         ),
-        ChoiceField<String>(
-          key: const ValueKey('library-category-filter'),
-          label: '分类',
-          value: _filterFor(view),
-          options: {
-            null: '全部',
-            '': '未分类',
-            for (final category in view.categories) category.id: category.name,
-          },
-          onChanged: (value) => setState(() => _categoryFilter = value),
-        ),
-        const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _batchActions(LibraryView view) {
+    final repository = _repository;
+    final canSelect =
+        !_opening &&
+        !_editing &&
+        _retryingMetadata == null &&
+        widget.controller?.busy == false &&
+        widget.controller?.status == ServiceStatus.ready;
+    final pending =
+        repository != null &&
+        (hasPendingLibraryCategoryEdit(repository) ||
+            pendingLibraryBatch(repository) != null);
+    final selected = _selectedKeys(view);
+    return ColoredBox(
+      color: AppColors.toolbar.resolveFrom(context),
+      child: Row(
+        children: [
+          for (final (action, id, label, icon) in const [
+            (
+              LibraryBatchAction.addCategories,
+              'add-categories',
+              '添加分类',
+              CupertinoIcons.folder_badge_plus,
+            ),
+            (
+              LibraryBatchAction.removeCategories,
+              'remove-categories',
+              '移出分类',
+              CupertinoIcons.folder,
+            ),
+            (
+              LibraryBatchAction.removeFavorites,
+              'remove-favorites',
+              '移出书架',
+              CupertinoIcons.trash,
+            ),
+          ])
+            Expanded(
+              child: CupertinoButton(
+                key: ValueKey('library-batch-$id'),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                onPressed:
+                    canSelect &&
+                        !pending &&
+                        selected.isNotEmpty &&
+                        (action == LibraryBatchAction.removeFavorites ||
+                            view.categories.isNotEmpty)
+                    ? () => unawaited(_batch(view, action: action))
+                    : null,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon),
+                    const SizedBox(height: 4),
+                    Text(label, textAlign: TextAlign.center),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -795,102 +880,111 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverList.list(
             children: [
-              CupertinoSearchTextField(
-                controller: _search,
-                placeholder: '漫画、作者或漫画源',
-              ),
               Row(
                 children: [
                   Expanded(
-                    child: ChoiceField<_LibrarySort>(
-                      label: '排序',
-                      value: _sort,
-                      options: {
-                        _LibrarySort.added: '最近收藏',
-                        _LibrarySort.title: '标题',
-                      },
-                      onChanged: (value) {
-                        if (value != null) setState(() => _sort = value);
-                      },
+                    child: CupertinoTextField(
+                      controller: _search,
+                      placeholder: '漫画、作者或漫画源',
+                      prefix: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          CupertinoIcons.search,
+                          size: 20,
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                        ),
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.groupedSurface.resolveFrom(context),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      clearButtonMode: OverlayVisibilityMode.editing,
+                    ),
+                  ),
+                  CupertinoMenuAnchor(
+                    key: const ValueKey('library-sort'),
+                    menuChildren: [
+                      for (final (sort, label) in const [
+                        (_LibrarySort.added, '最近收藏'),
+                        (_LibrarySort.title, '标题'),
+                      ])
+                        CupertinoMenuItem(
+                          onPressed: () => setState(() => _sort = sort),
+                          trailing: _sort == sort
+                              ? const Icon(CupertinoIcons.check_mark)
+                              : null,
+                          child: Text(label),
+                        ),
+                    ],
+                    builder: (context, menu, _) => CupertinoButton(
+                      padding: const EdgeInsets.all(8),
+                      onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+                      child: const Icon(
+                        CupertinoIcons.sort_down,
+                        semanticLabel: '书架排序',
+                      ),
                     ),
                   ),
                   CupertinoButton(
                     key: const ValueKey('library-selection-toggle'),
+                    padding: const EdgeInsets.all(8),
                     onPressed: canSelect && (_selecting || !hasPending)
                         ? () => setState(() {
                             _selecting = !_selecting;
                             if (!_selecting) _selection.clear();
                           })
                         : null,
-                    child: Text(_selecting ? '退出选择' : '选择漫画'),
+                    child: Icon(
+                      _selecting
+                          ? CupertinoIcons.xmark
+                          : CupertinoIcons.check_mark_circled,
+                      semanticLabel: _selecting ? '退出选择' : '选择漫画',
+                    ),
                   ),
                 ],
               ),
-              Text('收藏 ${entries.length} 部 · 当前显示 ${visible.length} 部'),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  _selecting
+                      ? '已选 ${selected.length} 部 · 当前隐藏 $hiddenCount 部'
+                      : '收藏 ${entries.length} 部 · 当前显示 ${visible.length} 部',
+                  style: CupertinoTheme.of(context).textTheme.textStyle
+                      .copyWith(
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                        fontSize: 13,
+                      ),
+                ),
+              ),
               if (_selecting) ...[
-                Text('已选 ${selected.length} 部 · 当前隐藏 $hiddenCount 部'),
                 if (hiddenCount > 0) const Text('批量操作包含隐藏选中的漫画，请在确认清单中核对。'),
                 Wrap(
-                  spacing: 8,
                   children: [
-                    CupertinoButton(
-                      key: const ValueKey('library-select-visible'),
-                      onPressed: canSelect && visible.isNotEmpty
-                          ? () => setState(() => _selection.addAll(visibleKeys))
-                          : null,
-                      child: const Text('全选当前显示'),
-                    ),
-                    CupertinoButton(
-                      key: const ValueKey('library-deselect-visible'),
-                      onPressed:
-                          canSelect &&
-                              selected.intersection(visibleKeys).isNotEmpty
-                          ? () => setState(
-                              () => _selection.removeAll(visibleKeys),
-                            )
-                          : null,
-                      child: const Text('取消当前显示选择'),
-                    ),
-                    CupertinoButton(
-                      key: const ValueKey('library-clear-selection'),
-                      onPressed: canSelect && selected.isNotEmpty
-                          ? () => setState(_selection.clear)
-                          : null,
-                      child: const Text('清空选择'),
-                    ),
-                  ],
-                ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final (action, id, label) in const [
+                    for (final (id, label, enabled, action) in [
                       (
-                        LibraryBatchAction.addCategories,
-                        'add-categories',
-                        '批量添加分类',
+                        'select-visible',
+                        '全选当前显示',
+                        canSelect && visible.isNotEmpty,
+                        () => _selection.addAll(visibleKeys),
                       ),
                       (
-                        LibraryBatchAction.removeCategories,
-                        'remove-categories',
-                        '批量移出分类',
+                        'deselect-visible',
+                        '取消当前显示选择',
+                        canSelect &&
+                            selected.intersection(visibleKeys).isNotEmpty,
+                        () => _selection.removeAll(visibleKeys),
                       ),
                       (
-                        LibraryBatchAction.removeFavorites,
-                        'remove-favorites',
-                        '批量移出书架',
+                        'clear-selection',
+                        '清空选择',
+                        canSelect && selected.isNotEmpty,
+                        _selection.clear,
                       ),
                     ])
                       CupertinoButton(
-                        key: ValueKey('library-batch-$id'),
-                        onPressed:
-                            canSelect &&
-                                !hasPending &&
-                                selected.isNotEmpty &&
-                                (action == LibraryBatchAction.removeFavorites ||
-                                    view.categories.isNotEmpty)
-                            ? () => unawaited(_batch(view, action: action))
-                            : null,
+                        key: ValueKey('library-$id'),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: enabled ? () => setState(action) : null,
                         child: Text(label),
                       ),
                   ],
@@ -899,15 +993,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               for (final entry in visible)
                 if (repository?.client.hasPendingMetadata(entry.mangaKey) ==
                     true)
-                  CupertinoButton(
-                    key: ValueKey(('library-retry-metadata', entry.mangaKey)),
-                    onPressed: canOpen && !_editing
-                        ? () => unawaited(_retryMetadata(entry))
-                        : null,
-                    child: Text(
-                      _retryingMetadata == entry.mangaKey
-                          ? '正在重试保存书架资料'
-                          : '重试保存书架资料',
+                  CupertinoListTile(
+                    title: Text(entry.title),
+                    subtitle: const Text('书架资料尚未由服务端确认'),
+                    trailing: CupertinoButton(
+                      key: ValueKey(('library-retry-metadata', entry.mangaKey)),
+                      onPressed: canOpen && !_editing
+                          ? () => unawaited(_retryMetadata(entry))
+                          : null,
+                      child: Text(
+                        _retryingMetadata == entry.mangaKey ? '正在保存' : '重试保存',
+                      ),
                     ),
                   ),
               if (visible.isEmpty)
@@ -920,94 +1016,100 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         ),
         SliverPadding(
           padding: const EdgeInsets.all(8),
-          sliver: SliverGrid.builder(
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 180,
-              mainAxisSpacing: 4,
-              crossAxisSpacing: 4,
-              childAspectRatio: 2 / 3,
-            ),
-            itemCount: visible.length,
-            itemBuilder: (context, index) {
-              final entry = visible[index];
-              final draft =
-                  controller?.readingDraftResume(entry.mangaKey) != null;
-              return MangaCoverTile(
-                key: ValueKey(entry.mangaKey),
-                title: entry.title,
-                entry: entry,
-                covers: _covers,
-                selected: _selecting ? selected.contains(entry.mangaKey) : null,
-                onLongPress: canSelect && !_selecting && !hasPending
-                    ? () => setState(() {
-                        _selecting = true;
-                        _selection.add(entry.mangaKey);
-                      })
-                    : null,
-                onPressed: _selecting
-                    ? canSelect
-                          ? () => _toggleSelection(entry.mangaKey)
-                          : null
-                    : canOpen
-                    ? () => unawaited(_open(entry))
-                    : null,
-                badge: _selecting
-                    ? CupertinoCheckbox(
-                        key: ValueKey(('library-select', entry.mangaKey)),
-                        value: selected.contains(entry.mangaKey),
-                        onChanged: canSelect
-                            ? (_) => _toggleSelection(entry.mangaKey)
-                            : null,
-                      )
-                    : null,
-                continueKey: ValueKey(('library-continue', entry.mangaKey)),
-                continueLabel: !_selecting && (entry.resume != null || draft)
-                    ? draft
-                          ? '继续阅读（未保存）：${entry.title}'
-                          : '继续阅读：${entry.title}'
-                    : null,
-                onContinue: canOpen
-                    ? () => unawaited(_open(entry, continueReading: true))
-                    : null,
-                menu: _selecting
-                    ? null
-                    : CupertinoMenuAnchor(
-                        key: ValueKey(('library-more', entry.mangaKey)),
-                        menuChildren: [
-                          CupertinoMenuItem(
-                            onPressed: canCategorize
-                                ? () => unawaited(
-                                    _editCategories(view, entry: entry),
-                                  )
-                                : null,
-                            leading: Icon(
-                              CupertinoIcons.folder,
-                              semanticLabel: '设置分类：${entry.title}',
-                            ),
-                            child: const Text('设置分类'),
-                          ),
-                          CupertinoMenuItem(
-                            onPressed: canOpen && !_editing
-                                ? () => unawaited(_migrate(entry))
-                                : null,
-                            child: const Text('迁移到其他漫画源'),
-                          ),
-                        ],
-                        builder: (context, menu, child) => CupertinoButton(
-                          onPressed: canOpen && !_editing
-                              ? () => menu.isOpen ? menu.close() : menu.open()
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) => SliverGrid.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: ((constraints.crossAxisExtent + 4) / 132)
+                    .floor()
+                    .clamp(1, 100),
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                childAspectRatio: 2 / 3,
+              ),
+              itemCount: visible.length,
+              itemBuilder: (context, index) {
+                final entry = visible[index];
+                final draft =
+                    controller?.readingDraftResume(entry.mangaKey) != null;
+                return MangaCoverTile(
+                  key: ValueKey(entry.mangaKey),
+                  title: entry.title,
+                  entry: entry,
+                  covers: _covers,
+                  selected: _selecting
+                      ? selected.contains(entry.mangaKey)
+                      : null,
+                  onLongPress: canSelect && !_selecting && !hasPending
+                      ? () => setState(() {
+                          _selecting = true;
+                          _selection.add(entry.mangaKey);
+                        })
+                      : null,
+                  onPressed: _selecting
+                      ? canSelect
+                            ? () => _toggleSelection(entry.mangaKey)
+                            : null
+                      : canOpen
+                      ? () => unawaited(_open(entry))
+                      : null,
+                  badge: _selecting
+                      ? CupertinoCheckbox(
+                          key: ValueKey(('library-select', entry.mangaKey)),
+                          value: selected.contains(entry.mangaKey),
+                          onChanged: canSelect
+                              ? (_) => _toggleSelection(entry.mangaKey)
                               : null,
-                          padding: const EdgeInsets.all(8),
-                          child: Icon(
-                            CupertinoIcons.ellipsis,
-                            color: const Color(0xFFFFFFFF),
-                            shadows: const [Shadow(blurRadius: 4)],
-                            semanticLabel: '更多操作：${entry.title}',
+                        )
+                      : null,
+                  continueKey: ValueKey(('library-continue', entry.mangaKey)),
+                  continueLabel: !_selecting && (entry.resume != null || draft)
+                      ? draft
+                            ? '继续阅读（未保存）：${entry.title}'
+                            : '继续阅读：${entry.title}'
+                      : null,
+                  onContinue: canOpen
+                      ? () => unawaited(_open(entry, continueReading: true))
+                      : null,
+                  menu: _selecting
+                      ? null
+                      : CupertinoMenuAnchor(
+                          key: ValueKey(('library-more', entry.mangaKey)),
+                          menuChildren: [
+                            CupertinoMenuItem(
+                              onPressed: canCategorize
+                                  ? () => unawaited(
+                                      _editCategories(view, entry: entry),
+                                    )
+                                  : null,
+                              leading: Icon(
+                                CupertinoIcons.folder,
+                                semanticLabel: '设置分类：${entry.title}',
+                              ),
+                              child: const Text('设置分类'),
+                            ),
+                            CupertinoMenuItem(
+                              onPressed: canOpen && !_editing
+                                  ? () => unawaited(_migrate(entry))
+                                  : null,
+                              child: const Text('迁移到其他漫画源'),
+                            ),
+                          ],
+                          builder: (context, menu, child) => CupertinoButton(
+                            onPressed: canOpen && !_editing
+                                ? () => menu.isOpen ? menu.close() : menu.open()
+                                : null,
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(
+                              CupertinoIcons.ellipsis,
+                              color: const Color(0xFFFFFFFF),
+                              shadows: const [Shadow(blurRadius: 4)],
+                              semanticLabel: '更多操作：${entry.title}',
+                            ),
                           ),
                         ),
-                      ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ],

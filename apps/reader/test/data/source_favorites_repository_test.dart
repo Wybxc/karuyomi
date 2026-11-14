@@ -360,6 +360,17 @@ void main() {
         await tester.pumpAndSettle();
       }
 
+      final appearance = find.byKey(
+        const ValueKey('settings-group-appearance'),
+      );
+      await tap(
+        find
+            .descendant(
+              of: appearance,
+              matching: find.byType(CupertinoListTile),
+            )
+            .first,
+      );
       await tap(find.byType(ChoiceField<wire.AppTheme>));
       await tap(find.text('浅色').last);
       await tap(find.text('保存全局设置'));

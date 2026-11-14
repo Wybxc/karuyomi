@@ -122,6 +122,8 @@ Future<CatalogController> _details(
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(MangaDetailsPage), findsOneWidget);
   }
+  if (settleDetails)
+    await _tap(tester, find.byKey(const ValueKey('chapter-options')));
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
       .controller;

@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -89,6 +90,12 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     final start = page * 50;
     final end = (start + 50).clamp(0, visible.length);
     return CupertinoListSection.insetGrouped(
+      backgroundColor: AppColors.background.resolveFrom(context),
+      separatorColor: AppColors.separator.resolveFrom(context),
+      decoration: BoxDecoration(
+        color: AppColors.groupedSurface.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
       children: [
         Text(
           '选择漫画源（已选 ${controller.selected.length} / 32）',
@@ -187,6 +194,12 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     };
     final count = group.mangas.length;
     return CupertinoListSection.insetGrouped(
+      backgroundColor: AppColors.background.resolveFrom(context),
+      separatorColor: AppColors.separator.resolveFrom(context),
+      decoration: BoxDecoration(
+        color: AppColors.groupedSurface.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
       children: [
         Text(
           group.target.source.name,
@@ -302,6 +315,14 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                     ),
                   if (controller.cleanupError != null)
                     CupertinoListSection.insetGrouped(
+                      backgroundColor: AppColors.background.resolveFrom(
+                        context,
+                      ),
+                      separatorColor: AppColors.separator.resolveFrom(context),
+                      decoration: BoxDecoration(
+                        color: AppColors.groupedSurface.resolveFrom(context),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       children: [
                         Text(
                           controller.cleanupError!,

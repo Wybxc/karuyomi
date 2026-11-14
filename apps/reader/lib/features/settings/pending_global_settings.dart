@@ -1,3 +1,5 @@
+import '../../theme/app_theme.dart';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -10,6 +12,11 @@ class const PendingGlobalSettings({
   Widget build(BuildContext context) {
     final reader = values.reader;
     return CupertinoListSection(
+      backgroundColor: AppColors.background.resolveFrom(context),
+      separatorColor: AppColors.separator.resolveFrom(context),
+      decoration: BoxDecoration(
+        color: AppColors.groupedSurface.resolveFrom(context),
+      ),
       key: const ValueKey('favorite-source-pending-global'),
       header: const Text('未确认的原全局设置内容'),
       footer: Text('原操作基于版本 $revision；重试会保留全部原内容。'),

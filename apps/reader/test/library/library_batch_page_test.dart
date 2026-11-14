@@ -1,4 +1,5 @@
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -453,7 +454,7 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('选择漫画'), findsOneWidget);
+      expect(iconLabel('选择漫画'), findsOneWidget);
       expect(find.text('退出选择'), findsNothing);
       expect(find.textContaining('已选 '), findsNothing);
       expect(find.byKey(ValueKey(alpha.mangaKey)), findsOneWidget);

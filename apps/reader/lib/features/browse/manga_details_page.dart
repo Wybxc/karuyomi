@@ -1,5 +1,6 @@
 import '../../widgets/app_page_route.dart';
 import '../../widgets/choice_field.dart';
+import '../../theme/app_theme.dart';
 
 import 'dart:async';
 
@@ -79,6 +80,8 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   late TextEditingController _chapterSearch;
   ChapterOrder _chapterOrder = ChapterOrder.source;
   bool _chapterOrderChosen = false;
+  bool _chapterOptions = false;
+  bool _descriptionExpanded = false;
   final _chapterNameCounts = <String, int>{};
   final _chapterUrlCounts = <String, int>{};
 
@@ -409,51 +412,32 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _mangaInformation(state),
         Wrap(
           spacing: 16,
           runSpacing: 12,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            CustomCover(
-              repository: _covers!,
-              cover: state?.hasCustomCover() == true
-                  ? state!.customCover
-                  : null,
-              width: 96,
-              height: 128,
+            CupertinoButton(
+              onPressed:
+                  state == null || _savingFavorite || _opening || _editingCover
+                  ? null
+                  : () => unawaited(_setFavorite(!favorite)),
+              child: Text(
+                _savingFavorite
+                    ? '正在保存'
+                    : favorite
+                    ? '移出书架'
+                    : '加入书架',
+              ),
             ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CupertinoButton(
-                  onPressed:
-                      state == null ||
-                          _savingFavorite ||
-                          _opening ||
-                          _editingCover
-                      ? null
-                      : () => unawaited(_setFavorite(!favorite)),
-                  child: Text(
-                    _savingFavorite
-                        ? '正在保存'
-                        : favorite
-                        ? '移出书架'
-                        : '加入书架',
-                  ),
-                ),
-                CupertinoButton(
-                  key: const ValueKey('custom-cover-editor'),
-                  onPressed:
-                      state == null ||
-                          _savingFavorite ||
-                          _opening ||
-                          _editingCover
-                      ? null
-                      : () => unawaited(_editCover()),
-                  child: const Text('自定义封面'),
-                ),
-              ],
+            CupertinoButton(
+              key: const ValueKey('custom-cover-editor'),
+              onPressed:
+                  state == null || _savingFavorite || _opening || _editingCover
+                  ? null
+                  : () => unawaited(_editCover()),
+              child: const Text('自定义封面'),
             ),
           ],
         ),
@@ -462,6 +446,57 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
       ],
     );
   }
+
+  Widget _mangaInformation(wire.MangaState? state) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (_covers case final covers?)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: CustomCover(
+            repository: covers,
+            cover: state?.hasCustomCover() == true ? state!.customCover : null,
+            width: 100,
+            height: 150,
+          ),
+        ),
+      const SizedBox(width: 16),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              manga.title,
+              style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle
+                  .copyWith(fontSize: 28),
+            ),
+            const SizedBox(height: 8),
+            if (manga.author?.isNotEmpty == true)
+              Text(
+                '作者：${manga.author}',
+                style: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            if (manga.artist?.isNotEmpty == true &&
+                manga.artist != manga.author)
+              Text(
+                '画师：${manga.artist}',
+                style: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            Text(
+              controller.activeSource?.name ?? '漫画源',
+              style: TextStyle(
+                color: AppColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
 
   Future<void> _openChapter(BuildContext context, int index) async {
     if (!mounted ||
@@ -894,9 +929,24 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         })
         .toList();
     return [
-      Text(
-        '章节（${chapters.length}）',
-        style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              '章节（${chapters.length}）',
+              style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+            ),
+          ),
+          CupertinoButton(
+            key: const ValueKey('chapter-options'),
+            padding: const EdgeInsets.all(8),
+            onPressed: () => setState(() => _chapterOptions = !_chapterOptions),
+            child: Icon(
+              CupertinoIcons.line_horizontal_3_decrease,
+              semanticLabel: _chapterOptions ? '收起章节选项' : '章节选项',
+            ),
+          ),
+        ],
       ),
       const SizedBox(height: 12),
       CupertinoTextField(
@@ -905,69 +955,93 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         enabled: !_opening,
         onChanged: (_) => setState(_resetRange),
         placeholder: '章节名、扫描组或章节号',
-        prefix: const Icon(CupertinoIcons.search),
+        prefix: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Icon(
+            CupertinoIcons.search,
+            size: 20,
+            color: AppColors.secondaryLabel.resolveFrom(context),
+          ),
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.groupedSurface.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+        ),
         clearButtonMode: OverlayVisibilityMode.editing,
         clearButtonSemanticLabel: '清空章节搜索',
       ),
       const SizedBox(height: 12),
-      Row(
-        children: [
-          const Text('章节排序'),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ChoiceField<ChapterOrder>(
-              key: const ValueKey('chapter-list-order'),
-              label: '章节排序',
-              value: _chapterOrder,
-              options: {
-                ChapterOrder.source: '来源顺序',
-                ChapterOrder.reversed: '反向来源顺序',
-              },
-              onChanged: _opening
-                  ? null
-                  : (order) {
-                      if (order != null) {
-                        setState(() {
-                          _chapterOrder = order;
-                          _chapterOrderChosen = true;
-                          _resetRange();
-                        });
-                      }
-                    },
+      if (_chapterOptions ||
+          _selectingChapters ||
+          _unmatchedChapterSelectionCount > 0 ||
+          _chapterRead?.error != null ||
+          _bookmarks?.error != null ||
+          _bookmarks?.pending != null ||
+          (_chapterRead != null &&
+              pendingChapterReadBatch(
+                    _chapterRead!.repository,
+                    _chapterRead!.mangaKey,
+                  ) !=
+                  null)) ...[
+        Row(
+          children: [
+            const Text('章节排序'),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ChoiceField<ChapterOrder>(
+                key: const ValueKey('chapter-list-order'),
+                label: '章节排序',
+                value: _chapterOrder,
+                options: {
+                  ChapterOrder.source: '来源顺序',
+                  ChapterOrder.reversed: '反向来源顺序',
+                },
+                onChanged: _opening
+                    ? null
+                    : (order) {
+                        if (order != null) {
+                          setState(() {
+                            _chapterOrder = order;
+                            _chapterOrderChosen = true;
+                            _resetRange();
+                          });
+                        }
+                      },
+              ),
             ),
-          ),
-        ],
-      ),
-      if (_bookmarks case final bookmarks?) ...[
-        MergeSemantics(
-          child: CupertinoFormRow(
-            prefix: const Expanded(flex: 3, child: Text('仅书签')),
-            helper: Text(
-              bookmarks.loaded
-                  ? '已标记 ${bookmarks.chapterKeys.length} 章'
-                  : '书签尚未确认',
-            ),
-            child: CupertinoSwitch(
-              key: const ValueKey('chapters-bookmarked-only'),
-              value: _onlyBookmarks,
-              onChanged: bookmarks.loaded
-                  ? (value) => setState(() {
-                      _onlyBookmarks = value;
-                      _resetRange();
-                    })
-                  : null,
-            ),
-          ),
+          ],
         ),
-        BookmarkStatus(controller: bookmarks),
-        if (bookmarks.chapterKeys.any(
-          (key) =>
-              !(sequence?.entries.any((chapter) => chapter.key == key) ??
-                  false),
-        ))
-          const Text('部分书签的章节未在当前列表中找到，原记录仍保留。'),
+        if (_bookmarks case final bookmarks?) ...[
+          MergeSemantics(
+            child: CupertinoFormRow(
+              prefix: const Expanded(flex: 3, child: Text('仅书签')),
+              helper: Text(
+                bookmarks.loaded
+                    ? '已标记 ${bookmarks.chapterKeys.length} 章'
+                    : '书签尚未确认',
+              ),
+              child: CupertinoSwitch(
+                key: const ValueKey('chapters-bookmarked-only'),
+                value: _onlyBookmarks,
+                onChanged: bookmarks.loaded
+                    ? (value) => setState(() {
+                        _onlyBookmarks = value;
+                        _resetRange();
+                      })
+                    : null,
+              ),
+            ),
+          ),
+          BookmarkStatus(controller: bookmarks),
+          if (bookmarks.chapterKeys.any(
+            (key) =>
+                !(sequence?.entries.any((chapter) => chapter.key == key) ??
+                    false),
+          ))
+            const Text('部分书签的章节未在当前列表中找到，原记录仍保留。'),
+        ],
+        ..._chapterReadControls(visible),
       ],
-      ..._chapterReadControls(visible),
       Text('显示 ${visible.length} / ${chapters.length} 章'),
       if (controller.busy) const CupertinoActivityIndicator(),
       if (controller.error != null && _chapterOpenError == null)
@@ -1100,34 +1174,42 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 900),
                   child: ListView(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(16),
                     children: [
                       if (widget.notice case final notice?) Text(notice),
                       if (_library != null) ...[
                         _favoriteControl(),
                         const SizedBox(height: 16),
-                      ],
-                      Text(
-                        manga.title,
-                        style: CupertinoTheme.of(context)
-                            .textTheme
-                            .navLargeTitleTextStyle,
-                      ),
-                      if (manga.author?.isNotEmpty ?? false) ...[
-                        const SizedBox(height: 12),
-                        Text('作者：${manga.author}'),
-                      ],
-                      if (manga.artist?.isNotEmpty ?? false)
-                        Text('画师：${manga.artist}'),
+                      ] else
+                        _mangaInformation(null),
                       if (manga.genres.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         Wrap(
                           spacing: 8,
                           children: [
                             for (final genre in manga.genres)
-                              Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Text(genre),
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: AppColors.selection.resolveFrom(
+                                    context,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    genre,
+                                    style: TextStyle(
+                                      color: AppColors.onSelection.resolveFrom(
+                                        context,
+                                      ),
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
                               ),
                           ],
                         ),
@@ -1141,7 +1223,25 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                                 buttonItems: state.contextMenuButtonItems,
                                 anchors: state.contextMenuAnchors,
                               ),
-                          child: Text(manga.description!),
+                          child: Text(
+                            manga.description!,
+                            maxLines: _descriptionExpanded ? null : 3,
+                            overflow: _descriptionExpanded
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.secondaryLabel.resolveFrom(
+                                context,
+                              ),
+                            ),
+                          ),
+                        ),
+                        CupertinoButton(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          onPressed: () => setState(
+                            () => _descriptionExpanded = !_descriptionExpanded,
+                          ),
+                          child: Text(_descriptionExpanded ? '收起简介' : '展开简介'),
                         ),
                       ],
                       const SizedBox(height: 32),

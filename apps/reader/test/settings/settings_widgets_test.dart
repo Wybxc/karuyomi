@@ -73,6 +73,20 @@ void main() {
       container: fixture.container,
     );
     await tester.pumpAndSettle();
+    if (!manga) {
+      for (final id in ['appearance', 'reading', 'input']) {
+        await tester.ensureVisible(find.byKey(ValueKey('settings-group-$id')));
+        await tester.tap(
+          find
+              .descendant(
+                of: find.byKey(ValueKey('settings-group-$id')),
+                matching: find.byType(CupertinoListTile),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+      }
+    }
   }
 
   Future<void> hide(WidgetTester tester) async {

@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/edit_sheet.dart';
 import '../../widgets/choice_field.dart';
 
@@ -177,6 +178,7 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ChoiceField<String>(
+              inline: false,
               key: key,
               label: node.title,
               value: node.choice.hasValue() ? node.choice.value : null,
@@ -241,6 +243,11 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
         );
       case wire.PreferenceNode_Kind.group:
         return CupertinoListSection(
+          backgroundColor: AppColors.background.resolveFrom(context),
+          separatorColor: AppColors.separator.resolveFrom(context),
+          decoration: BoxDecoration(
+            color: AppColors.groupedSurface.resolveFrom(context),
+          ),
           key: key,
           header: Text(node.title),
           footer: !account || node.summary.isEmpty ? null : Text(node.summary),

@@ -78,6 +78,10 @@ void main() {
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
+    if (finder.evaluate().isEmpty) {
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
+    }
     await tester.ensureVisible(finder);
     await tester.runAsync(() async {
       await tester.tap(finder);
@@ -700,7 +704,7 @@ void main() {
       expect(activeSheets, findsNothing);
       await tapBusy(find.text('处理未确认修改'));
       expect(activeSheets, findsOneWidget);
-      expect(find.text('管理分类'), findsWidgets);
+      expect(iconLabel('书架选项'), findsOneWidget);
       expect(find.text(_expired), findsNothing);
       expect(
         tester

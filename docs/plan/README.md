@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中。固定 v0.21.3 参考，覆盖[全部现有页面和独立操作面](../design/mihon-cupertino-fidelity.md)；先逐像素核对布局及配色，再调整为自然 Cupertino 度量和自适应布局。缺失功能按用户决定列入后续，不增加空入口；源码、参考截图和最终运行证据分别记录。
+**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中。固定 v0.21.3 参考，覆盖[全部现有页面和独立操作面](../design/mihon-cupertino-fidelity.md)；已接入颜色角色、封面网格、紧凑书架工具、详情信息区与设置分组，首批 CI 通过。继续逐像素核对布局及配色，再调整为自然 Cupertino 度量和自适应布局。缺失功能按用户决定列入后续，不增加空入口；源码、参考截图和最终运行证据分别记录。
 
 **当前 UI 交付**：[统一 Cupertino 已恢复并生产上线](cupertino-ui.md#恢复-cupertino)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源和 Access 门禁通过；内置浏览器重新确认导航、真实图片、设置保存和独立新文档续读，独立 D1 核对状态一致，见[恢复验证](../verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。Web / iOS / Android 保持一套 Cupertino 共享实现，沿用 generator、Hooks 与现有权威读写/生命周期。[Liquid Glass](liquid-glass.md)已终止，玻璃库、专用材质设置及资源已移除；[评估](../design/liquid-glass-evaluation.md)与[执行证据](../verification/liquid-glass.md)保留历史及未完成性能门，不宣称能耗结论。[代码削减](ui-code-consolidation.md)仍独立规划，原生现场验证继续停止。
 

@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/choice_field.dart';
 import '../../widgets/app_page_route.dart';
 
@@ -111,6 +112,12 @@ class _MigrationPageState extends State<MigrationPage> {
     final read = state.sourceProgress[key]?.completed == true;
     final bookmark = state.sourceBookmarks.contains(key);
     return CupertinoListSection.insetGrouped(
+      backgroundColor: AppColors.background.resolveFrom(context),
+      separatorColor: AppColors.separator.resolveFrom(context),
+      decoration: BoxDecoration(
+        color: AppColors.groupedSurface.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
       children: [
         MergeSemantics(
           child: CupertinoFormRow(
@@ -172,9 +179,7 @@ class _MigrationPageState extends State<MigrationPage> {
       children: [
         SizedBox(
           height: 1,
-          child: ColoredBox(
-            color: CupertinoColors.separator.resolveFrom(context),
-          ),
+          child: ColoredBox(color: AppColors.separator.resolveFrom(context)),
         ),
         Text(
           '迁移预览',
