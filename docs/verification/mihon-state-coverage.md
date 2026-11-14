@@ -289,6 +289,7 @@ stateDiagram-v2
     state "15.03 分源成功" as G2
     state "15.04 分源空结果" as G3
     state "15.05 分源失败" as G4
+    state "15.06 仅显示有结果" as G5
     B0 --> B1: 成功
     B0 --> B6: 失败
     B6 --> B0: 重试
@@ -339,12 +340,14 @@ stateDiagram-v2
     G1 --> G2: 源成功
     G1 --> G3: 源无结果
     G1 --> G4: 源失败
-    G4 --> G1: 重试
+    G4 --> G0: 修改查询或范围
     G2 --> G0: 修改查询或范围
+    G2 --> G5: 开启有结果筛选
+    G5 --> G2: 关闭有结果筛选
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
     class B0,F0 partial
-    class B1,B2,B3,B4,B5,B6,B8,F1,F2,F3,F4,F5,F6,P0,P1,P2,P3,P4,P5,P6 paired
+    class B1,B2,B3,B4,B5,B6,B8,F1,F2,F3,F4,F5,F6,P0,P1,P2,P3,P4,P5,P6,G0,G1,G2,G3,G4,G5 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                               | 浅色                                                                                                                           | 深色                                                                                                                             |
@@ -372,11 +375,12 @@ stateDiagram-v2
 | 14.05   | Japanese 已选草稿、确认/取消；取消重开未选，确认重开已选                            | `s1405-source-multiple-draft-light`、`s1405-source-multiple-cancel-reopen-light`、`s1405-source-multiple-applied-reopen-light` | `s1405-source-multiple-draft-dark`、`s1405-source-multiple-cancel-reopen-dark`、`s1405-source-multiple-applied-reopen-dark`      |
 | 14.06   | 文本 `123`，非法 UUID 错误说明、确定禁用、可修正/取消                               | `s1406-source-text-invalid-light`                                                                                              | `s1406-source-text-invalid-dark`                                                                                                 |
 | 14.07   | 有效测试 UUID，错误消失、确定可用；确认后重开仍保留                                 | `s1407-source-text-valid-light`、`s1407-source-text-applied-reopen-light`                                                      | `s1407-source-text-valid-dark`、`s1407-source-text-applied-reopen-dark`                                                          |
-| 15.01   | 查询、源范围、提交/返回                                                             | 待                                                                                                                             | 待                                                                                                                               |
-| 15.02   | 每源名称与加载反馈，其他已完成源仍可见                                              | 待                                                                                                                             | 待                                                                                                                               |
-| 15.03   | 每源名称与横向作品、点击作品入口                                                    | 待                                                                                                                             | 待                                                                                                                               |
-| 15.04   | 对应源名及无结果说明                                                                | 待                                                                                                                             | 待                                                                                                                               |
-| 15.05   | 对应源名、错误和重试；混合成功/失败同屏另留图                                       | 待                                                                                                                             | 待                                                                                                                               |
+| 15.01   | 空输入/查询、已置顶/全部范围、有结果筛选、返回与键盘                                | `s1501-global-empty-light`、`s1501-global-query-light`                                                                         | `s1501-global-empty-dark`、`s1501-global-query-dark`                                                                             |
+| 15.02   | 每源名称与实际旋转指示、总进度；瞬态 PNG 先于 XML，不用后来的 XML 推导该帧位置      | `s1502-global-naruto-loading-light`                                                                                            | `s1502-global-loading-dark`                                                                                                      |
+| 15.03   | 源名/语言与横向封面、封面下三行标题、进入源箭头；打开作品转换仍待                   | `s1503-global-top-light`                                                                                                       | `s1503-global-top-dark`                                                                                                          |
+| 15.04   | Local source 无结果；与 MangaDex 成功同屏                                           | `s1503-global-top-light`                                                                                                       | `s1503-global-top-dark`                                                                                                          |
+| 15.05   | 源名/语言、错误图标与说明；无独立重试按钮；混合成功/失败同屏另待                    | `s1505-global-error-light`                                                                                                     | `s1505-global-error-dark`                                                                                                        |
+| 15.06   | 有结果筛选选中，只保留 MangaDex 两组；关闭恢复空结果源                              | `s1503-global-only-results-light`                                                                                              | `s1503-global-only-results-dark`                                                                                                 |
 
 实际转换补充（两种主题均已操作并核对 PNG）：
 
@@ -384,6 +388,7 @@ stateDiagram-v2
 - 点击筛选后截到实际加载指示，随后得到 Domino Kick 等真实结果，见 `s1302-source-filter-applying-{light,dark}` 与 `s1302-source-filter-applied-{light,dark}`。浅色瞬态同时截到面板淡出，不能当稳定面板像素基准；两侧等待与结果状态已取得。搜索 `one piece` 的匹配作品在加载完封面、收起键盘后另拍 12.05，不使用早期空封面帧作成对主图。
 - 偏好多选的取消/确认后分别重开，检查未选/已选，最后恢复未选。文本编辑用 `00000000-0000-4000-8000-000000000001` 验证，通过确认及重开后清空恢复。完整动作图见同前缀的 `cancel`、`applied`、`reset` 及 `reset-draft` 文件。空值合法且确定可用；错误节点仅由实际非法 UUID 触发。
 - 12.07/12.09 仅关闭专用模拟器 Wi-Fi/移动数据触发，真实错误是连接参考代理 `10.0.2.2:7890` 失败。首次失败使用整页错误与三个动作；追加失败保留列表并显示持久错误条，恢复网络重试后继续得到作品。两者均有双主题实际 PNG。错误页表情随机，封面缓存和追加后的滚动位置不同，排除同数据像素叠图；追加加载帧未明确出现旋转指示，12.08 仍待。曾尝试模拟器 2000ms/128kbit/s 网络配置，未据此推断其生效或性能；已恢复 delay none、speed full、Wi-Fi/移动数据启用并暂停模拟器。
+- 跨源搜索两主题实际选择“全部”并查询 `one piece`，MangaDex 多语言/English 成功，Local source/xkcd 无结果；有结果筛选开启/关闭已操作。首次进入默认“已置顶”且无可搜源时是空内容区，不误记为加载。浅色真实旋转帧另用 `Naruto` 新查询捕获；`s1502-global-loading-light` 实际无目标、`s1502-global-all-loading-light` 实际为成功布局动画，均排除加载证据。断网后换查询才触发错误，重复提交相同查询没有重发；Mihon 跨源错误没有独立重试按钮，Karuyomi 继续保留单源重试。成功/失败混合同屏、打开作品/进入源及恢复后再次成功仍是转换缺口。网络已恢复、模拟器已暂停。
 - 旧 Android Preference/View 偏好弹层的浅色容器偏蓝，区别于 Mihon Compose 弹层；系统键盘仍按 Android 系统浅色，作为系统变体保留。筛选列表的滚动位置和打开/收起动画存在差异，当前只确认状态覆盖，未计为同位置叠图通过。最新目录两次请求间数据有变化，同样不能用于同数据像素叠图。
 
 ## 16–21：作品、章节、封面与迁移

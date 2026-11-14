@@ -8,6 +8,7 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/search/cross_source_search_page.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -18,9 +19,16 @@ void main() {
     WidgetTester tester,
     FakeSourceSearch service, {
     OpenSourceSearchDetails? onOpen,
+    Brightness? brightness,
+    TextScaler textScaler = TextScaler.noScaling,
   }) async {
     await tester.pumpApp(
       CupertinoApp(
+        theme: readerAppTheme(brightness),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
         home: Builder(
           builder: (context) => CupertinoPageScaffold(
             child: CupertinoButton(
@@ -46,16 +54,104 @@ void main() {
     WidgetTester tester,
     FakeSourceSearch service,
   ) async {
-    await tester.tap(
-      find.byKey(ValueKey(('cross-search-source', service.targets.first.key))),
+    final source = find.byKey(
+      ValueKey(('cross-search-source', service.targets.first.key)),
     );
+    await tester.ensureVisible(source);
+    await tester.tap(source);
     final query = find.byKey(const ValueKey('cross-search-query'));
     await tester.ensureVisible(query);
     await tester.enterText(query, '测试作品');
+    await tester.pumpAndSettle();
     final submit = find.byKey(const ValueKey('cross-search-submit'));
     await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
     await tester.tap(submit);
     await tester.pump();
+  }
+
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('mixed source states fit narrow $brightness at ${scale}x', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final service = FakeSourceSearch(
+          targets: [searchTarget(1), searchTarget(2), searchTarget(3)],
+        );
+        await openPage(
+          tester,
+          service,
+          brightness: brightness,
+          textScaler: TextScaler.linear(scale),
+        );
+        for (final target in service.targets.skip(1)) {
+          final source = find.byKey(
+            ValueKey(('cross-search-source', target.key)),
+          );
+          await tester.ensureVisible(source);
+          await tester.tap(source);
+          await tester.pump();
+        }
+        await chooseAndSearch(tester, service);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(service.tasks, hasLength(3));
+        expect(tester.takeException(), isNull);
+        const title = '这是一个很长的漫画作品名称，显示在封面下方';
+        service.tasks[0].complete([searchManga(title)], more: true);
+        service.tasks[1].complete([]);
+        service.tasks[2].fail('这个漫画源暂时不可用');
+        await tester.pumpAndSettle();
+        final result = find.byKey(
+          ValueKey(('cross-search-result', service.targets[0].key, 0)),
+        );
+        await tester.ensureVisible(result);
+        await tester.pumpAndSettle();
+        final cover = find.descendant(
+          of: result,
+          matching: find.byType(AspectRatio),
+        );
+        expect(tester.getSize(result).width, 96);
+        expect(tester.getSize(cover), const Size(88, 132));
+        expect(
+          tester.getTopLeft(find.text(title)).dy,
+          greaterThan(tester.getBottomLeft(cover).dy),
+        );
+        final context = tester.element(result);
+        expect(
+          tester.widget<Text>(find.text(title)).style!.color,
+          AppColors.label.resolveFrom(context),
+        );
+        await tester.tap(result);
+        await tester.pumpAndSettle();
+        expect(service.openedManga?.title, title);
+        final empty = find.text('此漫画源没有找到漫画。');
+        await tester.ensureVisible(empty);
+        await tester.pumpAndSettle();
+        expect(empty, findsOneWidget);
+        final failure = find.byKey(
+          ValueKey(('cross-search-error', service.targets[2].key)),
+        );
+        await tester.ensureVisible(failure);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Text>(failure).style!.color,
+          AppColors.error.resolveFrom(tester.element(failure)),
+        );
+        final retry = find.byKey(
+          ValueKey(('cross-search-more', service.targets[2].key)),
+        );
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        expect(tester.widget<CupertinoButton>(retry).onPressed, isNotNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox());
+        await tester.pump();
+      });
+    }
   }
 
   testWidgets(
