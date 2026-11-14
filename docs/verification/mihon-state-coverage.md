@@ -17,7 +17,10 @@
 
 ```mermaid
 stateDiagram-v2
-    [*] --> L0
+    [*] --> N0
+    state "01.01 手机底部导航" as N0
+    state "01.02 手机横屏底部导航" as N1
+    state "01.03 平板侧栏导航" as N2
     state "02.01 书架为空" as L0
     state "02.02 有作品" as L1
     state "02.03 当前分类为空" as L2
@@ -46,6 +49,12 @@ stateDiagram-v2
     state "05.08 删除确认" as C7
     state "05.09 重命名空输入" as C8
     state "05.10 重命名重名错误" as C9
+    N0 --> N1: 手机旋转横屏
+    N1 --> N0: 恢复竖屏
+    N0 --> N2: 平板尺寸且自动平板界面
+    N2 --> N0: 恢复手机尺寸
+    N0 --> L0: 空书架
+    N0 --> L1: 有作品书架
     L0 --> L1: 收藏作品
     L1 --> L2: 切到空分类
     L2 --> L1: 切回
@@ -97,42 +106,46 @@ stateDiagram-v2
     C1 --> C0: 删除最后一项
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class L17 partial
-    class L0,L1,L2,L3,L4,L5,L6,L7,L8,L9,L10,L11,L12,L13,L14,L15,L16,C0,C1,C2,C3,C4,C5,C6,C7,C8,C9 paired
+    class N0,N1,N2,L0,L1,L2,L3,L4,L5,L6,L7,L8,L9,L10,L11,L12,L13,L14,L15,L16,L17,C0,C1,C2,C3,C4,C5,C6,C7,C8,C9 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                                                | 浅色                                                                                                                     | 深色                                                                          |
-| ------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| 01.01   | 三入口对应的 Mihon 底部导航：活动入口、图标、标题及正文边界；复用 02.02/07.02/26.01  | 待                                                                                                                       | `library-populated-default-dark`（书架分项）                                  |
-| 01.02   | 宽屏/横屏导航及内容区域；旋转同一参考设备                                            | 待                                                                                                                       | 待                                                                            |
-| 02.01   | 空书架标题、原因、入门指南；移出最后一部测试作品                                     | `s0201-library-empty-light`                                                                                              | `s0201-library-empty-dark`                                                    |
-| 02.02   | 封面、标题、未读标记、续读位置及网格边界                                             | `s0202-library-content-light`                                                                                            | `s0202-library-content-dark`                                                  |
-| 02.03   | 空分类名、空态及切回入口；切到新建分类                                               | `s0203-library-category-empty-light`                                                                                     | `s0203-library-category-empty-dark`                                           |
-| 03.01   | 已打开的搜索框、查询、清空/退出；点搜索                                              | `s0301-library-search-light`                                                                                             | `s0301-library-search-dark`                                                   |
-| 03.02   | 查询与匹配作品；输入 `xkcd`                                                          | `s0302-library-match-light`                                                                                              | `s0302-library-match-dark`                                                    |
-| 03.03   | 查询、无结果说明、清空/退出；输入不会匹配的文本                                      | `s0303-library-no-results-light`                                                                                         | `s0303-library-no-results-dark`                                               |
-| 03.04   | 筛选页签、选项及三态当前值；打开筛选                                                 | `s0304-library-filter-light`                                                                                             | `s0304-library-filter-dark`                                                   |
-| 03.05   | 排序页签、当前排序和方向                                                             | `s0305-library-sort-light`                                                                                               | `s0305-library-sort-dark`                                                     |
-| 03.06   | 显示页签、当前网格/列表设置                                                          | `s0306-library-display-light`                                                                                            | `s0306-library-display-dark`                                                  |
-| 03.07   | 可用菜单项及正文锚点；点更多                                                         | `s0307-library-more-light`                                                                                               | `s0307-library-more-dark`                                                     |
-| 04.01   | 选中数量、选中封面、退出/全选和底部批量操作                                          | `s0401-library-selection-light`                                                                                          | `s0401-library-selection-dark`                                                |
-| 04.02   | 移出确认初态：影响范围选项均未选、确认禁用、取消                                     | `s0402-library-remove-confirm-light`                                                                                     | `s0402-library-remove-confirm-dark`                                           |
-| 04.03   | 多选中的迁移/删除菜单、当前选择上下文及关闭                                          | `s0403-library-selection-more-light`                                                                                     | `s0403-library-selection-more-dark`                                           |
-| 04.04   | 仅选移出书架、确认可用；浅色确认后为空书架；深色取消后返回迁移/删除菜单              | `s0404-library-remove-enabled-light`                                                                                     | `s0404-library-remove-enabled-dark`、`s0404-library-remove-cancel-dark`       |
-| 05.01   | 无分类说明及添加入口                                                                 | `s0501-category-empty-light`                                                                                             | `category-manager-default-dark`                                               |
-| 05.02   | 名称、拖动顺序、编辑和删除入口                                                       | `s0502-categories-two-light`                                                                                             | `s0502-categories-two-dark`                                                   |
-| 05.03   | 标题、空名称、必填、禁用提交、取消及键盘                                             | `s0503-category-create-keyboard-light`                                                                                   | `s0503-category-create-empty-dark`                                            |
-| 05.04   | 名称、可用提交、取消及键盘                                                           | `s0504-category-create-keyboard-light`                                                                                   | `s0504-category-create-keyboard-dark`                                         |
-| 05.05   | 创建时重复名称、错误说明、禁用添加及键盘                                             | `s0505-category-create-duplicate-light`                                                                                  | `s0505-category-create-duplicate-dark`                                        |
-| 05.06   | 原名称、禁用确认、取消及键盘                                                         | `s0506-category-rename-second-light`                                                                                     | `s0506-category-rename-second-dark`                                           |
-| 05.07   | 修改后名称、可用确认、取消及键盘                                                     | `s0507-category-rename-valid-light`                                                                                      | `s0507-category-rename-valid-dark`                                            |
-| 05.08   | 待删分类名、影响、取消和确认                                                         | `s0508-category-delete-second-light`                                                                                     | `s0508-category-delete-second-dark`                                           |
-| 05.09   | 重命名清空名称、必填、禁用确认和键盘                                                 | `s0509-category-rename-empty-light`                                                                                      | `s0509-category-rename-empty-dark`                                            |
-| 05.10   | 重命名为另一现有分类、重名错误、禁用确认和键盘                                       | `s0505-category-rename-duplicate-light`                                                                                  | `s0505-category-rename-duplicate-dark`                                        |
-| 06.01   | 无分类说明及编辑分类入口                                                             | `s0601-no-category-dialog-light`                                                                                         | `library-categories-default-dark`                                             |
-| 06.02   | 分类名、已选项、取消和确认                                                           | `s0602-library-category-choice-light`                                                                                    | `s0602-library-category-choice-dark`                                          |
-| 06.03   | 两部作品跨分类选中，a 部分选中、b 未选；取消后保持多选，浅色重开仍混合，确认转换待补 | `s0603-library-categories-mixed-light`、`s0603-library-categories-cancel-light`、`s0603-library-categories-reopen-light` | `s0603-library-categories-mixed-dark`、`s0603-library-categories-cancel-dark` |
-| 06.04   | 点击混合 a 后变为未选，取消重开恢复混合；未确认该草稿                                | `s0604-library-categories-none-draft-light`                                                                              | 待                                                                            |
+| 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                              | 深色                                                                                                                         |
+| ------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 01.01   | 三入口对应的 Mihon 底部导航：书架/浏览/更多的活动入口、图标、标题及正文边界                    | `s0202-library-content-light`、`s0702-source-list-light`、`s0101-more-light`                                                      | `s0202-library-content-dark`、`s0702-source-list-dark`、`s0101-more-dark`                                                    |
+| 01.02   | 手机横屏仍为底部导航，书架/浏览/更多分别采集；800×360dp                                        | `s0102-{library,browse,more}-landscape-light`                                                                                     | `s0102-{library,browse,more}-landscape-dark`                                                                                 |
+| 01.03   | 自动平板界面的侧栏、当前入口与正文边界；768×1024dp                                             | `s0103-{library,browse,more}-tablet-light`                                                                                        | `s0103-{library,browse,more}-tablet-dark`                                                                                    |
+| 02.01   | 空书架标题、原因、入门指南；移出最后一部测试作品                                               | `s0201-library-empty-light`                                                                                                       | `s0201-library-empty-dark`                                                                                                   |
+| 02.02   | 封面、标题、未读标记、续读位置及网格边界                                                       | `s0202-library-content-light`                                                                                                     | `s0202-library-content-dark`                                                                                                 |
+| 02.03   | 空分类名、空态及切回入口；切到新建分类                                                         | `s0203-library-category-empty-light`                                                                                              | `s0203-library-category-empty-dark`                                                                                          |
+| 03.01   | 已打开的搜索框、查询、清空/退出；点搜索                                                        | `s0301-library-search-light`                                                                                                      | `s0301-library-search-dark`                                                                                                  |
+| 03.02   | 查询与匹配作品；输入 `xkcd`                                                                    | `s0302-library-match-light`                                                                                                       | `s0302-library-match-dark`                                                                                                   |
+| 03.03   | 查询、无结果说明、清空/退出；输入不会匹配的文本                                                | `s0303-library-no-results-light`                                                                                                  | `s0303-library-no-results-dark`                                                                                              |
+| 03.04   | 筛选页签、选项及三态当前值；打开筛选                                                           | `s0304-library-filter-light`                                                                                                      | `s0304-library-filter-dark`                                                                                                  |
+| 03.05   | 排序页签、当前排序和方向                                                                       | `s0305-library-sort-light`                                                                                                        | `s0305-library-sort-dark`                                                                                                    |
+| 03.06   | 显示页签、当前网格/列表设置                                                                    | `s0306-library-display-light`                                                                                                     | `s0306-library-display-dark`                                                                                                 |
+| 03.07   | 可用菜单项及正文锚点；点更多                                                                   | `s0307-library-more-light`                                                                                                        | `s0307-library-more-dark`                                                                                                    |
+| 04.01   | 选中数量、选中封面、退出/全选和底部批量操作                                                    | `s0401-library-selection-light`                                                                                                   | `s0401-library-selection-dark`                                                                                               |
+| 04.02   | 移出确认初态：影响范围选项均未选、确认禁用、取消                                               | `s0402-library-remove-confirm-light`                                                                                              | `s0402-library-remove-confirm-dark`                                                                                          |
+| 04.03   | 多选中的迁移/删除菜单、当前选择上下文及关闭                                                    | `s0403-library-selection-more-light`                                                                                              | `s0403-library-selection-more-dark`                                                                                          |
+| 04.04   | 仅选移出书架、确认可用；浅色确认后为空书架；深色取消后返回迁移/删除菜单                        | `s0404-library-remove-enabled-light`                                                                                              | `s0404-library-remove-enabled-dark`、`s0404-library-remove-cancel-dark`                                                      |
+| 05.01   | 无分类说明及添加入口                                                                           | `s0501-category-empty-light`                                                                                                      | `category-manager-default-dark`                                                                                              |
+| 05.02   | 名称、拖动顺序、编辑和删除入口                                                                 | `s0502-categories-two-light`                                                                                                      | `s0502-categories-two-dark`                                                                                                  |
+| 05.03   | 标题、空名称、必填、禁用提交、取消及键盘                                                       | `s0503-category-create-keyboard-light`                                                                                            | `s0503-category-create-empty-dark`                                                                                           |
+| 05.04   | 名称、可用提交、取消及键盘                                                                     | `s0504-category-create-keyboard-light`                                                                                            | `s0504-category-create-keyboard-dark`                                                                                        |
+| 05.05   | 创建时重复名称、错误说明、禁用添加及键盘                                                       | `s0505-category-create-duplicate-light`                                                                                           | `s0505-category-create-duplicate-dark`                                                                                       |
+| 05.06   | 原名称、禁用确认、取消及键盘                                                                   | `s0506-category-rename-second-light`                                                                                              | `s0506-category-rename-second-dark`                                                                                          |
+| 05.07   | 修改后名称、可用确认、取消及键盘                                                               | `s0507-category-rename-valid-light`                                                                                               | `s0507-category-rename-valid-dark`                                                                                           |
+| 05.08   | 待删分类名、影响、取消和确认                                                                   | `s0508-category-delete-second-light`                                                                                              | `s0508-category-delete-second-dark`                                                                                          |
+| 05.09   | 重命名清空名称、必填、禁用确认和键盘                                                           | `s0509-category-rename-empty-light`                                                                                               | `s0509-category-rename-empty-dark`                                                                                           |
+| 05.10   | 重命名为另一现有分类、重名错误、禁用确认和键盘                                                 | `s0505-category-rename-duplicate-light`                                                                                           | `s0505-category-rename-duplicate-dark`                                                                                       |
+| 06.01   | 无分类说明及编辑分类入口                                                                       | `s0601-no-category-dialog-light`                                                                                                  | `library-categories-default-dark`                                                                                            |
+| 06.02   | 分类名、已选项、取消和确认                                                                     | `s0602-library-category-choice-light`                                                                                             | `s0602-library-category-choice-dark`                                                                                         |
+| 06.03   | 两部作品跨分类选中，a 部分选中、b 未选；取消后保持多选，重开仍混合；未修改混合项的直接确认仍待 | `s0603-library-categories-current-light`、`s0603-library-categories-cancel-light`、`s0603-library-categories-reopen-light`        | `s0603-library-categories-reopen-dark`、`s0603-library-categories-cancel-dark`                                               |
+| 06.04   | 点击混合 a 后变为未选；双主题确认后 a 为空、默认分类含两部作品，随后分别恢复原分类             | `s0604-library-categories-none-current-light`、`s0604-library-categories-applied-light`、`s0604-library-categories-default-light` | `s0604-library-categories-none-draft-dark`、`s0604-library-categories-applied-dark`、`s0604-library-categories-default-dark` |
+
+01 已实看 `navigation-more-pairs.jpg`、`navigation-landscape-pairs.jpg` 与 `navigation-tablet-pairs.jpg`。手机横屏仍是底部导航，不将可用宽度 800dp 当作自动平板条件；宽屏参考另在同一模拟器设为 1536×2048/320dpi，得到 768×1024dp 的侧栏。平板的三入口布局锚点一致，手机横屏浏览页的列表滚动位置不同，只用于导航分项，排除正文同位置叠图。两种尺寸的“更多”首屏不能展示所有行，完整设置目录仍独立采集。尺寸和旋转已恢复为 720×1600/320dpi 与原 `free`，加速度旋转仍为 1。
+
+06 新图及确认后落点已实看 `categories-transition-pairs-0.jpg` 至 `categories-transition-pairs-2.jpg`。移出草稿确认后退出多选，a 显示真实空态，默认分类包含 One Piece/xkcd；再只选择 One Piece 设回 a，核对默认仅 xkcd、a 仅 One Piece，b 保持空。新的双主题弹层边界一致；早期浅色图的系统底栏边界不同，弹层纵坐标相差 8 物理像素，因此用同轮 `current-light` 与深色主图比较。浅深空态的随机表情不同，不作为字形叠图锚点。先前的取消丢弃草稿证据继续保留，未修改混合值直接确认仍是转换缺口。
 
 ## 07–11：漫画源、扩展、仓库与存储
 
@@ -529,18 +542,25 @@ stateDiagram-v2
 
 ## 22–25：阅读器与图片
 
-依据：`presentation/reader/appbars/ReaderAppBars.kt`、`ReadingModeSelectDialog.kt`、`settings/ReaderSettingsDialog.kt` 的阅读模式/常规/滤镜页签、`ReaderPageActionsDialog.kt`、`ui/reader/viewer/pager/PagerPageHolder.kt` 及 webtoon holder。错误、空章节、首末页和章节间过渡均须实拍。
+依据：`presentation/reader/appbars/ReaderAppBars.kt`、`ReadingModeSelectDialog.kt`、`settings/ReaderSettingsDialog.kt` 的阅读模式/常规/滤镜页签、`ReaderPageActionsDialog.kt`、`ui/reader/ReaderActivity.kt`、`loader/ChapterLoader.kt`、`viewer/pager/{PagerPageHolder,PagerTransitionHolder}.kt` 及 webtoon holder。错误、空章节、首末页和章节间过渡均须实拍；首次章节失败的返回反馈与画布内图片失败不能合并。
 
 ```mermaid
 stateDiagram-v2
-    [*] --> A0
-    state "22.01 图片加载" as A0
+    [*] --> A19
+    state "22.01 已知页位的图片加载" as A0
     state "22.02 工具隐藏" as A1
     state "22.03 工具显示" as A2
     state "22.04 图片失败" as A3
-    state "22.05 无页面" as A4
+    state "22.05 空页面反馈并返回" as A4
     state "22.06 页码跳转" as A5
-    state "22.07 首末页及章节过渡" as A6
+    state "22.07 有相邻章的过渡" as A6
+    state "22.08 首次章失败并返回作品" as A20
+    state "22.09 首次阅读载入" as A19
+    state "22.10 章节过渡加载" as A21
+    state "22.11 章节过渡失败" as A22
+    state "22.12 无上一章" as A23
+    state "22.13 无下一章" as A24
+    state "22.14 工具切章等待弹层" as A25
     state "23.01 阅读模式选择" as A7
     state "23.02 更多操作" as A8
     state "23.03 书签结果" as A9
@@ -553,16 +573,29 @@ stateDiagram-v2
     state "25.01 图片操作面板" as A14
     state "25.02 设置封面确认" as A15
     state "25.03 图片缩放或查看" as A16
+    A19 --> A1: 首张图片可见
+    A19 --> A20: 初始化章节失败并退出阅读器
+    A19 --> A4: 页列表为空并退出阅读器
+    A20 --> A19: 返回原作品重新点同章
+    A4 --> A19: 返回原作品重开章节
     A0 --> A1: 图片可见
     A0 --> A3: 失败
-    A0 --> A4: 无页面
     A3 --> A0: 重试
     A1 --> A2: 中央点击
     A2 --> A1: 中央点击
     A2 --> A5: 拖动页码
     A5 --> A1: 跳转完成
-    A1 --> A6: 首末页或切章
+    A1 --> A6: 读至相邻章过渡
     A6 --> A0: 下一章
+    A6 --> A21: 相邻章页列表加载
+    A21 --> A0: 加载完成
+    A21 --> A22: 加载失败
+    A22 --> A21: 重试
+    A1 --> A23: 已到全书开头
+    A1 --> A24: 已到全书末尾
+    A2 --> A25: 工具栏切换章节
+    A25 --> A1: 载入完成
+    A25 --> A2: 失败后回原章（待实测）
     A2 --> A7: 阅读模式
     A2 --> A8: 更多
     A2 --> A9: 书签
@@ -584,18 +617,25 @@ stateDiagram-v2
     A16 --> A1: 复位或关闭
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class A1,A2,A7,A8,A9,A10,A11,A12,A14,A15,A17,A18 paired
+    class A1,A2,A5,A7,A8,A9,A10,A11,A12,A14,A15,A16,A17,A18,A19,A20 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                          | 浅色                                                                                                     | 深色                                                                                                  |
 | ------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 22.01   | 作品/章节上下文、页位和图片加载指示                                            | 待                                                                                                       | 待（`reader-loading-default-dark` 实际为 Android 首次全屏提示）                                       |
+| 22.01   | 已知页位时的图片加载指示与章节/页位上下文；不将首次章载入或无图片的空黑帧替代  | 待                                                                                                       | 待（`reader-loading-default-dark` 实际为 Android 首次全屏提示）                                       |
 | 22.02   | 实际图片与页码，工具隐藏                                                       | `s2202-reader-canvas-light`                                                                              | `s2202-reader-canvas-dark`                                                                            |
 | 22.03   | 返回、作品/章节、书签/更多、页码与底部工具                                     | `s2203-reader-tools-light`                                                                               | `s2203-reader-tools-dark`                                                                             |
 | 22.04   | 失败页、错误和重试；不要把外层全屏提示当图片失败                               | 待                                                                                                       | 待                                                                                                    |
-| 22.05   | 无页面说明和退出/恢复                                                          | 待                                                                                                       | 待                                                                                                    |
-| 22.06   | 当前/目标页码、滑杆拖动反馈及落点                                              | 待                                                                                                       | 待                                                                                                    |
-| 22.07   | 首/末页边界、上一/下一章及无相邻章；分别采集                                   | 待                                                                                                       | 待                                                                                                    |
+| 22.05   | 初始空页列表错误 toast 并返回作品；不是独立空画布，消息须真实触发              | 待                                                                                                       | 待                                                                                                    |
+| 22.06   | 3322 Dragonfly 的当前/总页数、滑杆落点；1→2 的实际第二页图片及返回 1           | `s2206-reader-jump-{before,result,restored}-light`                                                       | `s2206-reader-jump-{before,result,restored}-dark`                                                     |
+| 22.07   | 当前章/相邻章、方向和可继续过渡；不含加载/失败及无相邻章分支                   | 待                                                                                                       | 待                                                                                                    |
+| 22.08   | 初始章节请求失败，退出阅读器回原作品并显示真实错误；恢复网络后重开同章成功     | `s2208-reader-initial-failure-light-5`、`s2209-reader-retry-light-settled`                               | `s2208-reader-initial-failure-dark-5`、`s2209-reader-retry-dark-settled`                              |
+| 22.09   | 首次进入的黑色阅读画布、实际旋转指示；尚无页位工具，读取阶段不由瞬态图推断     | `s2209-reader-retry-light-5`                                                                             | `s2209-reader-retry-dark-5`                                                                           |
+| 22.10   | 相邻章过渡保留原/目标章，显示页列表加载指示与说明                              | 待                                                                                                       | 待                                                                                                    |
+| 22.11   | 相邻章过渡的实际错误、原/目标章和重试                                          | 待                                                                                                       | 待                                                                                                    |
+| 22.12   | 无上一章的边界说明与当前章；不能用普通首页代替                                 | 待                                                                                                       | 待                                                                                                    |
+| 22.13   | 无下一章的边界说明与当前章；不能用普通末页代替                                 | 待                                                                                                       | 待                                                                                                    |
+| 22.14   | 工具栏切章的不可取消等待弹层、加载指示与说明，和画布内过渡加载区分             | 待                                                                                                       | 待                                                                                                    |
 | 23.01   | 当前模式、可选模式、应用及关闭                                                 | `s2301-reader-mode-light`                                                                                | `s2301-reader-mode-dark`                                                                              |
 | 23.02   | 当前章节可用操作与关闭                                                         | `s2302-reader-more-light`                                                                                | `s2302-reader-more-dark`                                                                              |
 | 23.03   | 已加与已移除两种书签状态、可用反向动作                                         | `s2303-reader-bookmarked-light`、`s2303-reader-unbookmarked-light`                                       | `s2303-reader-bookmarked-dark`、`s2303-reader-unbookmarked-dark`                                      |
@@ -607,7 +647,11 @@ stateDiagram-v2
 | 24.06   | 色彩开关、RGBA当前值、混合模式、灰度/反色；参考附加分支，RGB等未实现功能列后续 | `s2406-reader-color-filter-enabled-light`、`s2406-reader-color-filter-lower-light`                       | `s2406-reader-color-filter-enabled-dark`、`s2406-reader-color-filter-lower-dark`                      |
 | 25.01   | 当前图片上下文、设置封面/保存等真实动作                                        | `s2501-reader-image-actions-light`                                                                       | `s2501-reader-image-actions-dark`                                                                     |
 | 25.02   | 设置封面影响、确认/取消；取消返回图片操作面板，确认落点待验                    | `s2502-reader-cover-confirm-light`；取消图 `s2502-reader-cover-cancel-light`                             | `s2502-reader-cover-confirm-dark`                                                                     |
-| 25.03   | 放大后的实际图片、复位/退出；Karuyomi 独立图片页另验                           | 待                                                                                                       | 待                                                                                                    |
+| 25.03   | 双击放大的实际 Dragonfly 图片及再次双击复位；Karuyomi 独立图片页另验           | `s2503-reader-zoom-confirmed-light`、`s2503-reader-zoom-reset-light`                                     | `s2503-reader-zoom-confirmed-dark`、`s2503-reader-zoom-reset-dark`                                    |
+
+阅读新图已实看 `reader-initial-burst-{light,dark}.jpg`、`reader-retry-burst-{light,dark}.jpg`、`reader-jump-pairs.jpg` 和四张 `s2503-reader-zoom-{confirmed,reset}-{light,dark}.png`。同一 xkcd 3322 在专用模拟器断网时实际返回 `Failed to connect to /10.0.2.2:7890`，退出阅读器并由系统显示 toast；恢复网络后重开同章得到真实图片。进入时的旋转指示与阅读模式 toast 同屏，不能把模式提示当作错误。采样帧为先截图的短时连续 PNG，时间记录在同前缀 `.timing.json`，没有同帧 XML；随后 `settled.xml` 只代表稍后的页面。首次章与图片加载复用指示组件，仅凭黑底旋转帧不能证明内部所处阶段，已知页位的 22.01 继续待采。
+
+页码滑杆从 1 拖至 2 后菜单自动隐藏，重开工具后显示页码 2 及真实第二页，再拖回 1；操作前后的稳定主图成对，拖动中的浮动反馈帧仍待。第二页是 Source 提供的文字图片，按原比例显示可能横向裁切，不当作缩放证据。早期无明确双击间隔的 `doubletap` / `zoomed-picture` 图仅切换了工具，均排除；正式 25.03 使用两次触点间 100ms，取得约两倍放大的实际第一张图片及复位。深色主图有完整页码，浅色放大图的页码未显示，工具/计时变体继续单列。两主题沿用黑色阅读背景，图片本身未染色；已读标记因实际阅读改变，失败前的读状态不同不作同数据叠图。未触发空页、单张图片失败或章节过渡分支。Wi-Fi/移动数据已恢复为原启用值，模拟器暂停。
 
 ## 26–30：设置、选择与通用弹层
 
@@ -619,6 +663,7 @@ stateDiagram-v2
     state "26.01 设置目录" as U0
     state "26.02 外观设置" as U1
     state "26.03 全局阅读设置" as U2
+    state "26.04 平板设置双栏" as U14
     state "28.01 高级与诊断入口" as U3
     state "28.02 应用与设备诊断" as U4
     state "28.03 Android后台任务诊断" as U12
@@ -631,6 +676,9 @@ stateDiagram-v2
     state "30.03 编辑校验错误" as U10
     state "30.04 确认与取消" as U11
     U0 --> U1: 外观
+    U0 --> U14: 平板宽度
+    U14 --> U0: 恢复手机宽度
+    U14 --> U14: 左侧切换设置分类
     U0 --> U2: 阅读
     U0 --> U3: 高级
     U3 --> U4: 诊断明细
@@ -657,7 +705,7 @@ stateDiagram-v2
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
     class U13 partial
-    class U0,U1,U2,U3,U4,U5,U12 paired
+    class U0,U1,U2,U3,U4,U5,U12,U14 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                             | 浅色                                                               | 深色                                                                 |
@@ -665,6 +713,7 @@ stateDiagram-v2
 | 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”           | `s2601-settings-light`                                             | `s2601-settings-dark`                                                |
 | 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                                      | `s2602-appearance-light`                                           | `s2602-appearance-dark`                                              |
 | 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                           | `s2603-reader-preferences-*-light`                                 | `s2603-reader-preferences-*-dark`                                    |
+| 26.04   | 平板设置目录/当前分类与外观同屏、当前主题、分栏边界；768×1024dp                   | `nav-settings-tablet-light`                                        | `s2604-settings-tablet-dark`                                         |
 | 28.01   | 高级设置首屏、数据/网络、书架和阅读/扩展末段；中段有滚动偏差，未操作维护/网络选项 | `s2801-advanced-{top,network,library,extensions}-light`            | `s2801-advanced-{top,network,library,extensions}-dark`               |
 | 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段               | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`      | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`          |
 | 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体          | `s2803-worker-info-light`、`s2804-worker-horizontal-light`         | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`             |
@@ -678,6 +727,8 @@ stateDiagram-v2
 | 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02        | 待                                                                 | 待                                                                   |
 
 26.03 的 `*` 依次为 `top`、`display`、`paged`、`webtoon`、`navigation`、`actions`，已实看 `settings-reference-pairs-0.jpg` 至 `settings-reference-pairs-2.jpg`。首屏与末段两主题的应用 XML 边界一致；中间四段有约 3–15 物理像素的滚动差，部分首尾文字受裁切，只计状态覆盖，不能用于同位置叠图。六段覆盖默认模式/提示、显示/E-Ink、章节跳过、单页/条漫、输入和操作菜单；未实现的 Android 专属设置及 E-Ink 只作参考，不增加无效产品入口。
+
+26.04 已实看 `settings-tablet-pairs.jpg`：两栏各 384dp，左侧保留完整目录、当前“外观”高亮，右侧展示外观字段。深色多出“纯黑深色模式”一行，后续字段自然下移；不能把整张图强行套成相同纵坐标。恢复手机尺寸后返回独立页面。其它设置分类在双栏中的切换、输入与返回仍待，不能用外观主图代替。
 
 28 和 29 已实看 `settings-reference-pairs-3.jpg` 至 `settings-reference-pairs-5.jpg`，并单独核对 Worker info 横向滚动及深色复制图。28.03 是 Mihon 的 Android WorkManager 诊断，与 Cloudflare Worker 无关；当时仅有一项 Enqueued，Finished/Running 为 `-`，其它运行状态仍待。横向滚动会移动整块正文，标题栏保持位置。28.04 属于独立 Android 系统反馈，不将系统容器配色纳入 Mihon 应用角色；未验证完整复制内容。29.01 本轮只取消，没有改动默认阅读模式；选中其他模式并返回仍待。
 

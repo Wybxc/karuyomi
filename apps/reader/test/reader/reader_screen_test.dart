@@ -1448,113 +1448,143 @@ void main() {
     },
   );
 
-  testWidgets(
-    'content appearance updates preserve anchor and resource residency without fabricating observation',
-    (tester) async {
-      final provider = FixturePageProvider();
-      final manifest = fixtureChapter();
-      final viewports = <ReaderViewportState>[];
-      Color? textColor;
-      void expectTitleContrast() {
-        final bar = find.byType(CupertinoNavigationBar);
-        final decoration =
-            tester
-                    .widget<DecoratedBox>(
-                      find
-                          .descendant(
-                            of: bar,
-                            matching: find.byType(DecoratedBox),
-                          )
-                          .first,
-                    )
-                    .decoration
-                as BoxDecoration;
-        final title = DefaultTextStyle.of(tester.element(find.text('阅读')))
-            .style
-            .color!;
-        final luminances = [
-          decoration.color!.computeLuminance(),
-          title.computeLuminance(),
-        ]..sort();
-        expect(
-          (luminances.last + .05) / (luminances.first + .05),
-          greaterThan(4.5),
-        );
-      }
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'content appearance updates preserve anchor and resource residency in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final provider = FixturePageProvider();
+        final manifest = fixtureChapter();
+        final viewports = <ReaderViewportState>[];
+        Color? textColor;
+        void expectTitleContrast(ReaderBackground background) {
+          final bar = find.byType(CupertinoNavigationBar);
+          final decoration =
+              tester
+                      .widget<DecoratedBox>(
+                        find
+                            .descendant(
+                              of: bar,
+                              matching: find.byType(DecoratedBox),
+                            )
+                            .first,
+                      )
+                      .decoration
+                  as BoxDecoration;
+          final title = DefaultTextStyle.of(tester.element(find.text('阅读')))
+              .style
+              .color!;
+          if (background == ReaderBackground.black) {
+            expect(
+              decoration.color!.toARGB32(),
+              brightness == Brightness.light ? 0xFFDDE2EE : 0xFF23252C,
+              reason:
+                  'opaque reader bars match the sampled black-canvas reference',
+            );
+          } else if (background == ReaderBackground.white) {
+            expect(
+              decoration.color!.toARGB32(),
+              brightness == Brightness.light ? 0xFFEAEFFB : 0xFF3D3E46,
+              reason:
+                  'the confirmed white canvas participates in the bar blend',
+            );
+          }
+          final controls = find
+              .ancestor(of: iconLabel('下一页'), matching: find.byType(ColoredBox))
+              .first;
+          expect(tester.widget<ColoredBox>(controls).color, decoration.color);
+          expect(
+            decoration.color!.a,
+            1,
+            reason: 'bars do not require a blur pass',
+          );
+          final luminances = [
+            decoration.color!.computeLuminance(),
+            title.computeLuminance(),
+          ]..sort();
+          expect(
+            (luminances.last + .05) / (luminances.first + .05),
+            greaterThan(4.5),
+          );
+        }
 
-      Widget configured(ReaderBackground background, int dimPercent) => screen(
-        provider: provider,
-        manifest: manifest,
-        position: manifest.positionAt(5, offset: .35),
-        doublePage: false,
-        background: background,
-        dimPercent: dimPercent,
-        onViewport: viewports.add,
-        imageBuilder: (context, resource, fit) {
-          textColor = DefaultTextStyle.of(context).style.color;
-          return fixtureImage(context, resource, fit);
-        },
-      );
-      await tester.pumpWidget(configured(ReaderBackground.black, 0));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
-            .backgroundColor,
-        CupertinoColors.black,
-      );
-      expect(textColor, CupertinoColors.white);
-      expectTitleContrast();
-      final acquired = provider.acquired.map((page) => page.pageKey).toList();
-      final released = provider.released.toList();
-      final anchor = viewports.last.current;
-      expect(viewports.last.observed, isNull);
-      await tester.pumpWidget(configured(ReaderBackground.white, 80));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
-            .backgroundColor,
-        CupertinoColors.white,
-      );
-      expect(textColor, CupertinoColors.black);
-      expectTitleContrast();
-      final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
-      expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
-      expect(
-        tester.getRect(dimmer),
-        tester.getRect(find.byType(InteractiveViewer)),
-      );
-      expect(
-        tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('下一页'))),
-        false,
-      );
-      expect(viewports.last.current.pageKey, anchor.pageKey);
-      expect(
-        viewports.last.current.normalizedOffset,
-        closeTo(anchor.normalizedOffset, .001),
-      );
-      expect(viewports.last.observed, isNull);
-      expect(viewports.last.atEnd, false);
-      expect(provider.acquired.map((page) => page.pageKey), acquired);
-      expect(provider.released, released);
-      await tester.pumpWidget(configured(ReaderBackground.theme, 0));
-      await tester.pumpAndSettle();
-      final readerContext = tester.element(find.byType(ReaderScreen));
-      expect(
-        tester
-            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
-            .backgroundColor,
-        CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
-      );
-      expect(textColor, AppColors.label.resolveFrom(readerContext));
-      expect(dimmer, findsNothing);
-      expect(provider.acquired.map((page) => page.pageKey), acquired);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-    },
-  );
+        Widget configured(ReaderBackground background, int dimPercent) =>
+            screen(
+              provider: provider,
+              manifest: manifest,
+              position: manifest.positionAt(5, offset: .35),
+              doublePage: false,
+              background: background,
+              dimPercent: dimPercent,
+              onViewport: viewports.add,
+              imageBuilder: (context, resource, fit) {
+                textColor = DefaultTextStyle.of(context).style.color;
+                return fixtureImage(context, resource, fit);
+              },
+            );
+        await tester.pumpWidget(configured(ReaderBackground.black, 0));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+              .backgroundColor,
+          CupertinoColors.black,
+        );
+        expect(textColor, CupertinoColors.white);
+        expectTitleContrast(ReaderBackground.black);
+        final acquired = provider.acquired.map((page) => page.pageKey).toList();
+        final released = provider.released.toList();
+        final anchor = viewports.last.current;
+        expect(viewports.last.observed, isNull);
+        await tester.pumpWidget(configured(ReaderBackground.white, 80));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+              .backgroundColor,
+          CupertinoColors.white,
+        );
+        expect(textColor, CupertinoColors.black);
+        expectTitleContrast(ReaderBackground.white);
+        final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
+        expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
+        expect(
+          tester.getRect(dimmer),
+          tester.getRect(find.byType(InteractiveViewer)),
+        );
+        expect(
+          tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('下一页'))),
+          false,
+        );
+        expect(viewports.last.current.pageKey, anchor.pageKey);
+        expect(
+          viewports.last.current.normalizedOffset,
+          closeTo(anchor.normalizedOffset, .001),
+        );
+        expect(viewports.last.observed, isNull);
+        expect(viewports.last.atEnd, false);
+        expect(provider.acquired.map((page) => page.pageKey), acquired);
+        expect(provider.released, released);
+        await tester.pumpWidget(configured(ReaderBackground.theme, 0));
+        await tester.pumpAndSettle();
+        final readerContext = tester.element(find.byType(ReaderScreen));
+        expect(
+          tester
+              .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+              .backgroundColor,
+          CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
+        );
+        expect(textColor, AppColors.label.resolveFrom(readerContext));
+        expectTitleContrast(ReaderBackground.theme);
+        expect(dimmer, findsNothing);
+        expect(provider.acquired.map((page) => page.pageKey), acquired);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 
   testWidgets(
     'continuous zoom follows live content appearance while controls and scrolling remain usable',

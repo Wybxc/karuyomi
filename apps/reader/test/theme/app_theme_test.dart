@@ -36,6 +36,8 @@ void main() {
         (AppColors.secondaryLabel, AppColors.background),
         (AppColors.secondaryLabel, AppColors.groupedSurface),
         (AppColors.secondaryLabel, AppColors.toolbar),
+        (AppColors.secondaryLabel, AppColors.sidebar),
+        (AppColors.accent, AppColors.sidebar),
         (AppColors.accent, AppColors.background),
         (AppColors.onAccent, AppColors.accent),
         (AppColors.onSelection, AppColors.selection),

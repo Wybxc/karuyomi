@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/diagnostics/reader_baseline_host.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
@@ -90,30 +91,65 @@ void main() {
     );
   }
 
-  for (final size in [const Size(360, 800), const Size(1280, 900)]) {
-    testWidgets('empty shell navigation at ${size.width}px', (tester) async {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  for (final brightness in Brightness.values) {
+    for (final (size, usesSidebar) in [
+      (const Size(360, 800), false),
+      (const Size(800, 360), false),
+      (const Size(768, 1024), true),
+      (const Size(1024, 768), true),
+      (const Size(1280, 900), true),
+    ]) {
+      testWidgets('empty shell navigation at $size in $brightness', (
+        tester,
+      ) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpApp(const KaruyomiApp());
-      await tester.pumpAndSettle();
-      expect(find.text('书架还是空的'), findsOneWidget);
-      expect(
-        find.byType(ReaderBaselineHost),
-        readerBaselineEnabled ? findsOneWidget : findsNothing,
-      );
-      expect(find.byKey(const ValueKey('app-navigation')), findsOneWidget);
-      await tester.tap(find.text('去浏览'));
-      await tester.pumpAndSettle();
-      expect(find.text('连接漫画服务'), findsOneWidget);
-      await tester.tap(find.text('设置').last);
-      await tester.pumpAndSettle();
-      expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
-      expect(find.byType(ChoiceField<wire.AppTheme>), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+        expect(find.text('书架还是空的'), findsOneWidget);
+        expect(
+          find.byType(ReaderBaselineHost),
+          readerBaselineEnabled ? findsOneWidget : findsNothing,
+        );
+        final navigation = find.byKey(const ValueKey('app-navigation'));
+        expect(navigation, findsOneWidget);
+        expect(
+          find.byType(CupertinoTabBar),
+          usesSidebar ? findsNothing : findsOneWidget,
+        );
+        if (usesSidebar) {
+          final sidebar = find.byKey(const ValueKey('app-sidebar'));
+          expect(
+            tester.widget<ColoredBox>(sidebar).color,
+            AppColors.sidebar.resolveFrom(tester.element(sidebar)),
+          );
+        }
+        await tester.tap(find.text('去浏览'));
+        await tester.pumpAndSettle();
+        expect(find.text('连接漫画服务'), findsOneWidget);
+        await tester.tap(find.text('设置').last);
+        await tester.pumpAndSettle();
+        expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+        expect(find.byType(ChoiceField<wire.AppTheme>), findsNothing);
+
+        tester.view.physicalSize = usesSidebar
+            ? const Size(800, 360)
+            : const Size(768, 1024);
+        await tester.pumpAndSettle();
+        expect(navigation, findsOneWidget);
+        expect(
+          find.byType(CupertinoTabBar),
+          usesSidebar ? findsOneWidget : findsNothing,
+        );
+        expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   testWidgets(

@@ -623,7 +623,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 840;
+        // A landscape phone remains compact even when its width is tablet-sized.
+        final wide = constraints.maxWidth > constraints.maxHeight
+            ? constraints.maxHeight >= 600
+            : constraints.maxWidth >= 700;
         return CupertinoPageScaffold(
           navigationBar: CupertinoNavigationBar(middle: Text(_labels[_index])),
           child: SafeArea(
@@ -644,31 +647,26 @@ class _AppShellState extends ConsumerState<AppShell> {
                   child: Row(
                     children: [
                       if (wide)
-                        SizedBox(
-                          width: 148,
-                          child: Column(
-                            key: const ValueKey('app-navigation'),
-                            children: [
-                              for (var i = 0; i < _labels.length; i++)
-                                CupertinoButton(
-                                  onPressed: () => _select(i),
-                                  color: _index == i
-                                      ? AppColors.selection.resolveFrom(context)
-                                      : null,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        _icons[i],
-                                        color:
-                                            (_index == i
-                                                    ? AppColors.onSelection
-                                                    : AppColors.secondaryLabel)
-                                                .resolveFrom(context),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _labels[i],
-                                        style: TextStyle(
+                        ColoredBox(
+                          key: const ValueKey('app-sidebar'),
+                          color: AppColors.sidebar.resolveFrom(context),
+                          child: SizedBox(
+                            width: 148,
+                            child: Column(
+                              key: const ValueKey('app-navigation'),
+                              children: [
+                                for (var i = 0; i < _labels.length; i++)
+                                  CupertinoButton(
+                                    onPressed: () => _select(i),
+                                    color: _index == i
+                                        ? AppColors.selection.resolveFrom(
+                                            context,
+                                          )
+                                        : null,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _icons[i],
                                           color:
                                               (_index == i
                                                       ? AppColors.onSelection
@@ -676,11 +674,23 @@ class _AppShellState extends ConsumerState<AppShell> {
                                                             .secondaryLabel)
                                                   .resolveFrom(context),
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _labels[i],
+                                          style: TextStyle(
+                                            color:
+                                                (_index == i
+                                                        ? AppColors.onSelection
+                                                        : AppColors
+                                                              .secondaryLabel)
+                                                    .resolveFrom(context),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       Expanded(child: _page()),

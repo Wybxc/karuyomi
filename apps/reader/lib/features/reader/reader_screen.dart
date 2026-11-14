@@ -1341,6 +1341,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
           navigationBar: _toolbar
               ? CupertinoNavigationBar(
                   automaticBackgroundVisibility: false,
+                  backgroundColor: _readerToolbarColor(
+                    context,
+                    widget.background,
+                  ),
                   leading: widget.onExit == null
                       ? null
                       : CupertinoNavigationBarBackButton(
@@ -1433,7 +1437,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       available / 2,
     );
     return ColoredBox(
-      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      color: _readerToolbarColor(context, widget.background),
       child: SafeArea(
         top: false,
         child: ConstrainedBox(
@@ -1800,6 +1804,20 @@ Color _readerForegroundColor(
   ReaderBackground.white => CupertinoColors.black,
   ReaderBackground.theme => AppColors.label.resolveFrom(context),
 };
+
+// Resolve Mihon's translucent bars against the confirmed canvas in advance;
+// Cupertino receives an opaque color and does not need a backdrop filter.
+Color _readerToolbarColor(BuildContext context, ReaderBackground background) =>
+    Color.alphaBlend(
+      AppColors.sidebar
+          .resolveFrom(context)
+          .withValues(
+            alpha: CupertinoTheme.brightnessOf(context) == Brightness.dark
+                ? .9
+                : .95,
+          ),
+      _readerBackgroundColor(context, background),
+    );
 
 /// Applies appearance only to reading content, preserving input and controls.
 class const _ReaderContent({

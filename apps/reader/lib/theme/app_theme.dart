@@ -39,6 +39,12 @@ abstract final class AppColors {
     color: Color(0xFFF3EDF7),
     darkColor: Color(0xFF211F26),
   );
+  // Mihon's navigation rail uses surfaceColorAtElevation(3.dp), while its
+  // bottom navigation uses surfaceContainer. Both were sampled separately.
+  static const sidebar = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFE9EEFB),
+    darkColor: Color(0xFF272931),
+  );
   static const separator = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFC5C6D0),
     darkColor: Color(0xFF44464F),
