@@ -57,6 +57,7 @@ CupertinoThemeData readerAppTheme(Brightness? brightness) {
   const typography = CupertinoTextThemeData();
   return CupertinoThemeData(
     brightness: brightness,
+    applyThemeToAll: true,
     primaryColor: AppColors.accent,
     primaryContrastingColor: AppColors.onAccent,
     scaffoldBackgroundColor: AppColors.background,

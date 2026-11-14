@@ -416,6 +416,9 @@ class const _SettingsEditor({
                   padding: EdgeInsets.zero,
                   child: CupertinoSwitch(
                     key: ValueKey('$scope-dim-inherit'),
+                    thumbColor: AppColors.onAccent.resolveFrom(context),
+                    inactiveThumbColor: CupertinoColors.white,
+                    onLabelColor: AppColors.onAccent.resolveFrom(context),
                     value: dim == null,
                     onChanged: state.canEdit
                         ? (inherit) => change(() {

@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-14，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，未通过全范围视觉或生产验收。`a894832`、配色修复 `a55bc5f` 的 push/PR CI 完整通过；隔离内置浏览器已核对浅深色书架、设置、扩展搜索与服务端确认切换，新产物的输入占位和展开箭头配色已复验。后续紧凑阅读工具及窄屏大字号调整通过 78 项相关定向用例，尚待新版 Web 产物验收。[状态机清单](verification/mihon-state-coverage.md)分别记录两种主题的主状态截图、转换与变体缺口。
+2026-11-14，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，未通过全范围视觉或生产验收。`a894832`、配色修复 `a55bc5f` 和紧凑阅读工具 `4474318` 的 push/PR CI 完整通过；隔离内置浏览器已核对浅深色书架、设置、扩展搜索和真实 xkcd 图片/阅读菜单，执行服务端确认、翻页、完成及独立文档恢复。设置开关实看发现系统绿遗漏，修复后 42 项相关定向用例通过，新产物配色复验待 CI。[状态机清单](verification/mihon-state-coverage.md)分别记录两种主题的主状态截图、转换与变体缺口。
 
 2026-11-13，[Liquid Glass](verification/liquid-glass.md)已按用户决定终止，[统一 Cupertino 已恢复并生产上线](verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源与匿名 Access 门禁通过；内置浏览器确认导航、真实图片、翻页保存、主题保存及独立新文档第 2 页续读，独立 D1 核对续读前后状态一致。玻璃库、专用设置及资源已移除。原玻璃性能对照未完成，不宣称能耗结论；代码削减另立重构，原生现场验证保持停止。
 

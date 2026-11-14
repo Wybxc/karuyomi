@@ -139,6 +139,9 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
             padding: EdgeInsets.zero,
             child: CupertinoSwitch(
               key: key,
+              thumbColor: AppColors.onAccent.resolveFrom(context),
+              inactiveThumbColor: CupertinoColors.white,
+              onLabelColor: AppColors.onAccent.resolveFrom(context),
               value: node.toggle.value,
               onChanged: enabled
                   ? (value) => unawaited(
