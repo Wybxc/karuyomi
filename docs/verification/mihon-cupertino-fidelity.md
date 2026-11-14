@@ -82,7 +82,19 @@
 
 三入口联系表`karuyomi-a9538f1-navigation-{tablet,landscape}-pairs.jpg`均已实看，原图为JPEG，只作有损画面证据，不计无损色值或一像素叠图。设置两侧的已确认主题字段值不同，限定对照导航区域；设置分栏及其它页面几何仍待。本轮没有安装或执行Source，也未重放生产Access/新文档续读；视口恢复，harness已关闭。
 
-复验另发现：离开已编辑的源目录后，可访问树仍包含零尺寸的旧搜索框及“提交”，重开目录出现重复搜索标签。固定Flutter 3.50的Web引擎会为默认启用自动填充的文本框保存dormant form，`autofillHints:null`的输入则不创建该表单。当前修复在九个检索字段直接禁用自动填充；长选项查询改用可明确传入该参数的官方CupertinoTextField，并保留清空/搜索操作和主题表面。25项导航/选择定向回归与十个改动Dart文件严格分析通过，验证平台输入配置不含autofill及离页释放连接。该修复的完整CI与新Web可访问树复验仍待，不因旧画面正常而记作已修复验收。
+复验另发现：离开已编辑的源目录后，可访问树仍包含零尺寸的旧搜索框及“提交”，重开目录出现重复搜索标签。固定Flutter 3.50的Web引擎会为默认启用自动填充的文本框保存dormant form，`autofillHints:null`的输入则不创建该表单。修复在九个检索字段直接禁用自动填充；长选项查询改用可明确传入该参数的官方CupertinoTextField，并保留清空/搜索操作和主题表面。25项导航/选择定向回归与十个改动Dart文件严格分析通过，验证平台输入配置不含autofill及离页释放连接。
+
+`ebcba1b`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43607632739)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43607635941)完整通过。39个Flutter清单条目经长度/哈希校验，Vite组装仍为64个公开文件、两个当前扩展；官方harness、临时D1、acceptance-owner、无fixture。内置浏览器360×800下分别确认浅色与深色，再各执行输入“草稿”→书架→重开源目录→输入“再次”→书架。两主题每次离页后DOM输入数均为0，实际AX树也没有旧搜索或提交；重开时精确标签的搜索框均只有1个。原始画面`karuyomi-ebcba1b-search-{editing,left}-{light,dark}.jpg`与`karuyomi-ebcba1b-search-cleanup.json`保留在忽略目录，控制台无warn/error，视口恢复且harness正常关闭。这是源目录离页/重进的实际Web证据，不外推为九个调用点、长选项、配置字段或移动IME全部验收通过。
+
+### 设置目录与平板分栏
+
+已把全局设置的内联展开改为五项目录和独立详情，平板同时保留目录与当前栏目；漫画覆盖仍使用原编辑面板。中间实现的低优先级、单并发48项回归通过，包含双主题的栏目/尺寸切换、草稿与连接输入元素/光标/焦点保留、主题确认后应用、CAS冲突、响应丢失后的原操作重试、身份切换，以及原阅读设置继承/覆盖与Source收藏保留。首轮发现Access原因被隐藏，已在当前栏目补回恢复入口并复验；宽屏不重复展示重试操作。随后按用户要求改用最终Cupertino语义颜色、标签栏、官方设置列表和正式详情路由；中间48项不代表这批新代码已完成验收，完整CI及正式Web仍待，不能用旧设置截图填表。
+
+### 最终 Cupertino 配色、导航与设置路由
+
+2026-11-14，最终代码删除Mihon固定palette、80dp窄侧栏/选中胶囊及阅读工具的Material elevation混色，改为官方Cupertino动态语义颜色、三入口标签栏、不透明系统工具表面与标准绿色开关。设置目录直接使用官方分组列表，窄屏使用同一减少动态策略的Cupertino页面路由，宽屏保留目录/详情。声明式页面更新读取当前Page，避免保留路由时显示旧栏目；详情身份跨尺寸保持。
+
+低优先级、单并发运行`test/settings/settings_widgets_test.dart`、`settings_navigation_test.dart`、`test/data/source_favorites_repository_test.dart`、`test/widget_test.dart`、`test/theme/app_theme_test.dart`、`test/reader/reader_screen_test.dart`，**90项通过**。覆盖双主题、高对比度语义色、显式主题优先、各窗口标签栏选中语义、跨尺寸输入元素/文字/光标/焦点、草稿与原revision、导航/系统返回、减少动态淡化/禁用动画、CAS/精确重试/身份隔离，以及黑/白/主题阅读画布的页位、对比与资源驻留。15个改动Dart文件严格分析零问题。此处为组件/类型结果，完整CI、正式Web与全页视觉仍待。
 
 ### 实拍布局与颜色锚点
 

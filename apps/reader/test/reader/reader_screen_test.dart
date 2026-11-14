@@ -1458,7 +1458,7 @@ void main() {
         final manifest = fixtureChapter();
         final viewports = <ReaderViewportState>[];
         Color? textColor;
-        void expectTitleContrast(ReaderBackground background) {
+        void expectTitleContrast() {
           final bar = find.byType(CupertinoNavigationBar);
           final decoration =
               tester
@@ -1475,21 +1475,11 @@ void main() {
           final title = DefaultTextStyle.of(tester.element(find.text('阅读')))
               .style
               .color!;
-          if (background == ReaderBackground.black) {
-            expect(
-              decoration.color!.toARGB32(),
-              brightness == Brightness.light ? 0xFFDDE2EE : 0xFF23252C,
-              reason:
-                  'opaque reader bars match the sampled black-canvas reference',
-            );
-          } else if (background == ReaderBackground.white) {
-            expect(
-              decoration.color!.toARGB32(),
-              brightness == Brightness.light ? 0xFFEAEFFB : 0xFF3D3E46,
-              reason:
-                  'the confirmed white canvas participates in the bar blend',
-            );
-          }
+          expect(
+            decoration.color,
+            CupertinoColors.systemBackground.resolveFrom(tester.element(bar)),
+            reason: 'all confirmed canvases use the same opaque Cupertino toolbar surface',
+          );
           final controls = find
               .ancestor(of: iconLabel('下一页'), matching: find.byType(ColoredBox))
               .first;
@@ -1532,7 +1522,7 @@ void main() {
           CupertinoColors.black,
         );
         expect(textColor, CupertinoColors.white);
-        expectTitleContrast(ReaderBackground.black);
+        expectTitleContrast();
         final acquired = provider.acquired.map((page) => page.pageKey).toList();
         final released = provider.released.toList();
         final anchor = viewports.last.current;
@@ -1546,7 +1536,7 @@ void main() {
           CupertinoColors.white,
         );
         expect(textColor, CupertinoColors.black);
-        expectTitleContrast(ReaderBackground.white);
+        expectTitleContrast();
         final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
         expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
         expect(
@@ -1576,7 +1566,7 @@ void main() {
           CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
         );
         expect(textColor, AppColors.label.resolveFrom(readerContext));
-        expectTitleContrast(ReaderBackground.theme);
+        expectTitleContrast();
         expect(dimmer, findsNothing);
         expect(provider.acquired.map((page) => page.pageKey), acquired);
         expect(tester.takeException(), isNull);

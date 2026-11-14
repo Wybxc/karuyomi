@@ -15,6 +15,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../data/business_state_server.dart';
 import 'settings_fixture.dart';
+import 'settings_probe.dart';
 
 const _key = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 wire.GlobalSettingsValues _global({
@@ -57,6 +58,8 @@ void main() {
     bool manga = false,
     Brightness? appearance,
     bool reduceMotion = false,
+    bool disableAnimations = false,
+    bool openAppearance = true,
   }) async {
     tester.view.physicalSize = const Size(480, 1000);
     tester.view.devicePixelRatio = 1;
@@ -66,34 +69,21 @@ void main() {
       CupertinoApp(
         theme: appearance == null ? null : readerAppTheme(appearance),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(reduceMotion: reduceMotion),
+          data: MediaQuery.of(context).copyWith(
+            reduceMotion: reduceMotion,
+            disableAnimations: disableAnimations,
+          ),
           child: child!,
         ),
         home: manga
             ? MangaSettingsEditor(catalog: fixture.catalog, mangaKey: _key)
-            : CupertinoPageScaffold(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: GlobalSettingsPanel(catalog: fixture.catalog),
-                ),
-              ),
+            : GlobalSettingsPanel(catalog: fixture.catalog),
       ),
       container: fixture.container,
     );
     await tester.pumpAndSettle();
-    if (!manga) {
-      for (final id in ['appearance', 'reading', 'input']) {
-        await tester.ensureVisible(find.byKey(ValueKey('settings-group-$id')));
-        await tester.tap(
-          find
-              .descendant(
-                of: find.byKey(ValueKey('settings-group-$id')),
-                matching: find.byType(CupertinoListTile),
-              )
-              .first,
-        );
-        await tester.pumpAndSettle();
-      }
+    if (!manga && openAppearance) {
+      await openSettingsSection(tester, 'appearance');
     }
   }
 
@@ -119,9 +109,56 @@ void main() {
   List<TestBusinessRequest> writes() =>
       server.requests.where((request) => request.method == 'POST').toList();
 
+  for (final disabled in [false, true]) {
+    testWidgets(
+      'settings detail respects reduced motion and system back (disabled: $disabled)',
+      (tester) async {
+        final controller = editor();
+        await tester.runAsync(controller.refresh);
+        await show(
+          tester,
+          controller,
+          reduceMotion: true,
+          disableAnimations: disabled,
+          openAppearance: false,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-reading')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 60));
+        final detail = find
+            .ancestor(
+              of: find.byKey(const ValueKey('global-mode')),
+              matching: find.byType(CupertinoPageScaffold),
+            )
+            .first;
+        expect(tester.getTopLeft(detail), Offset.zero);
+        final fades = tester.widgetList<FadeTransition>(
+          find.ancestor(of: detail, matching: find.byType(FadeTransition)),
+        );
+        expect(
+          fades.any((fade) => fade.opacity.value > 0 && fade.opacity.value < 1),
+          !disabled,
+        );
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('global-mode')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('settings-section-reading')),
+          findsOneWidget,
+        );
+        expect(writes(), isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+  }
+
   for (final appearance in Brightness.values) {
     testWidgets(
-      'settings disclosure preserves its draft in $appearance with reduced motion',
+      'settings directory preserves its draft through categories and resize in $appearance',
       (tester) async {
         tester.platformDispatcher.platformBrightnessTestValue =
             appearance == Brightness.light ? Brightness.dark : Brightness.light;
@@ -135,22 +172,31 @@ void main() {
           reduceMotion: true,
         );
         await select<wire.AppTheme>(tester, '深色');
-        final group = find.byKey(const ValueKey('settings-group-appearance'));
-        final header = find
-            .descendant(of: group, matching: find.byType(CupertinoListTile))
-            .first;
-        final context = tester.element(header);
-        final icon = tester.widget<Icon>(
-          find.descendant(of: header, matching: find.byType(Icon)),
-        );
-        expect(icon.color, AppColors.accent.resolveFrom(context));
-        final expansion = tester.widget<Expansible>(
-          find.descendant(of: group, matching: find.byType(Expansible)).first,
-        );
-        expect(expansion.animationStyle, AnimationStyle.noAnimation);
-        await tap(tester, header);
+        await openSettingsSection(tester, 'reading');
         expect(find.byKey(const ValueKey('global-theme')), findsNothing);
-        await tap(tester, header);
+        tester.view.physicalSize = const Size(768, 1024);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('settings-directory')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('global-mode')), findsOneWidget);
+        await openSettingsSection(tester, 'appearance');
+        final row = find.byKey(const ValueKey('settings-section-appearance'));
+        expect(
+          tester.widget<CupertinoListTile>(row).backgroundColor,
+          AppColors.selection.resolveFrom(tester.element(row)),
+        );
+        final subtitle = tester.element(
+          find.descendant(of: row, matching: find.text('跟随系统、浅色与深色')),
+        );
+        expect(
+          DefaultTextStyle.of(subtitle).style.color,
+          CupertinoColors.secondaryLabel.resolveFrom(subtitle),
+        );
+        tester.view.physicalSize = const Size(360, 800);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('settings-directory')), findsNothing);
         expect(
           tester
               .widget<ChoiceField<wire.AppTheme>>(
@@ -159,6 +205,22 @@ void main() {
               .value,
           wire.AppTheme.APP_THEME_DARK,
         );
+        await tap(tester, find.byType(CupertinoNavigationBarBackButton));
+        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        expect(find.text('修改尚未保存。'), findsOneWidget);
+        await openSettingsSection(tester, 'appearance');
+        expect(
+          tester
+              .widget<ChoiceField<wire.AppTheme>>(
+                find.byKey(const ValueKey('global-theme')),
+              )
+              .value,
+          wire.AppTheme.APP_THEME_DARK,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        expect(find.text('修改尚未保存。'), findsOneWidget);
         expect(writes(), isEmpty);
         expect(tester.takeException(), isNull);
         await hide(tester);

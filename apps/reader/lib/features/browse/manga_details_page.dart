@@ -1026,9 +1026,6 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
               ),
               child: CupertinoSwitch(
                 key: const ValueKey('chapters-bookmarked-only'),
-                thumbColor: AppColors.onAccent.resolveFrom(context),
-                inactiveThumbColor: CupertinoColors.white,
-                onLabelColor: AppColors.onAccent.resolveFrom(context),
                 value: _onlyBookmarks,
                 onChanged: bookmarks.loaded
                     ? (value) => setState(() {

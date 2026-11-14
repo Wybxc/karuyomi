@@ -10,7 +10,39 @@ double _contrast(Color foreground, Color background) {
 
 void main() {
   for (final brightness in Brightness.values) {
-    testWidgets('Mihon color roles remain readable in $brightness', (
+    testWidgets(
+      'Cupertino semantic colors honor increased contrast in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(highContrast: true);
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.pumpWidget(
+          CupertinoApp(
+            theme: readerAppTheme(null),
+            home: const CupertinoPageScaffold(child: Text('高对比度')),
+          ),
+        );
+        final context = tester.element(find.text('高对比度'));
+        expect(
+          CupertinoTheme.of(context).primaryColor.toARGB32(),
+          brightness == Brightness.light ? 0xFF0040DD : 0xFF409CFF,
+        );
+        expect(
+          AppColors.groupedSurface.resolveFrom(context),
+          CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+        );
+        expect(
+          AppColors.secondaryLabel.resolveFrom(context).a,
+          greaterThan(.6),
+        );
+      },
+    );
+
+    testWidgets('Cupertino surfaces and controls follow $brightness', (
       tester,
     ) async {
       tester.platformDispatcher.platformBrightnessTestValue = brightness;
@@ -30,42 +62,39 @@ void main() {
         ),
       );
       final context = tester.element(find.text('保存'));
-      Color resolve(CupertinoDynamicColor color) => color.resolveFrom(context);
-      for (final (foreground, background) in [
-        (AppColors.label, AppColors.background),
-        (AppColors.secondaryLabel, AppColors.background),
-        (AppColors.secondaryLabel, AppColors.groupedSurface),
-        (AppColors.secondaryLabel, AppColors.toolbar),
-        (AppColors.secondaryLabel, AppColors.sidebar),
-        (AppColors.accent, AppColors.sidebar),
-        (AppColors.accent, AppColors.background),
-        (AppColors.onAccent, AppColors.accent),
-        (AppColors.onSelection, AppColors.selection),
-        (AppColors.error, AppColors.background),
-        (AppColors.success, AppColors.background),
-      ]) {
-        expect(
-          _contrast(resolve(foreground), resolve(background)),
-          greaterThanOrEqualTo(4.5),
-          reason: 'text and its actual surface must remain readable',
-        );
-      }
       final theme = CupertinoTheme.of(context);
       expect(
-        _contrast(
-          theme.textTheme.textStyle.color!,
-          theme.scaffoldBackgroundColor,
-        ),
-        greaterThanOrEqualTo(4.5),
+        theme.primaryColor,
+        CupertinoColors.systemBlue.resolveFrom(context),
       );
       expect(
-        _contrast(
-          DefaultTextStyle.of(context).style.color!,
-          theme.primaryColor,
-        ),
-        greaterThanOrEqualTo(4.5),
-        reason: 'filled buttons need the matching on-primary color',
+        theme.scaffoldBackgroundColor,
+        CupertinoColors.systemGroupedBackground.resolveFrom(context),
       );
+      expect(
+        theme.barBackgroundColor,
+        CupertinoColors.systemBackground.resolveFrom(context),
+      );
+      expect(
+        theme.textTheme.textStyle.color,
+        CupertinoColors.label.resolveFrom(context),
+      );
+      expect(
+        theme.applyThemeToAll,
+        false,
+        reason: 'switches retain their standard Cupertino colors',
+      );
+      expect(DefaultTextStyle.of(context).style.color, CupertinoColors.white);
+      for (final surface in [
+        theme.scaffoldBackgroundColor,
+        theme.barBackgroundColor,
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+      ]) {
+        expect(
+          _contrast(theme.textTheme.textStyle.color!, surface),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
       final title = tester.element(find.text('书架'));
       expect(
         _contrast(
@@ -90,10 +119,9 @@ void main() {
       ),
     );
     final theme = CupertinoTheme.of(tester.element(find.text('已确认的主题')));
-    // Fixed reference: Mihon v0.21.3 TachiyomiColorScheme.darkScheme.
-    expect(theme.scaffoldBackgroundColor.toARGB32(), 0xFF1B1B1F);
-    expect(theme.primaryColor.toARGB32(), 0xFFB0C6FF);
-    expect(theme.barBackgroundColor.toARGB32(), 0xFF211F26);
-    expect(theme.textTheme.textStyle.color!.toARGB32(), 0xFFE3E2E6);
+    expect(theme.scaffoldBackgroundColor.toARGB32(), 0xFF000000);
+    expect(theme.primaryColor.toARGB32(), 0xFF0A84FF);
+    expect(theme.barBackgroundColor.toARGB32(), 0xFF000000);
+    expect(theme.textTheme.textStyle.color!.toARGB32(), 0xFFFFFFFF);
   });
 }

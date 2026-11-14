@@ -74,6 +74,10 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> _choose<T>(WidgetTester tester, String label) async {
+  await openSettingsSection(
+    tester,
+    T == wire.AppTheme ? 'appearance' : 'reading',
+  );
   await _tap(tester, find.byType(ChoiceField<T>));
   await _tap(tester, find.widgetWithText(CupertinoMenuItem, label));
 }
@@ -86,6 +90,10 @@ Future<void> _chooseField<T>(
   String field,
   String value,
 ) async {
+  await openSettingsSection(
+    tester,
+    T == wire.ReaderInputPreset ? 'input' : 'reading',
+  );
   await _tap(tester, _field<T>(field));
   await _tap(tester, find.widgetWithText(CupertinoMenuItem, value));
 }
@@ -96,26 +104,7 @@ Finder _navigation(String label) => find.descendant(
 );
 Future<void> _openSettings(WidgetTester tester) async {
   await _tap(tester, _navigation('设置'));
-  final connection = find.byKey(const ValueKey('service-connection'));
-  if (connection.evaluate().isNotEmpty) {
-    await _tap(
-      tester,
-      find
-          .descendant(of: connection, matching: find.byType(CupertinoListTile))
-          .first,
-    );
-  }
-  for (final id in ['appearance', 'reading', 'input']) {
-    final group = find.byKey(ValueKey('settings-group-$id'));
-    if (group.evaluate().isNotEmpty) {
-      await _tap(
-        tester,
-        find
-            .descendant(of: group, matching: find.byType(CupertinoListTile))
-            .first,
-      );
-    }
-  }
+  await openSettingsSection(tester, 'appearance');
 }
 
 Future<void> _dim(
@@ -123,6 +112,7 @@ Future<void> _dim(
   String scope, {
   required bool zero,
 }) async {
+  if (scope == 'global') await openSettingsSection(tester, 'reading');
   final slider = find.byKey(ValueKey('$scope-dim'));
   await tester.ensureVisible(slider);
   await tester.pumpAndSettle();
@@ -135,12 +125,16 @@ Future<void> _dim(
     bounds.left + inset + track * fraction,
     bounds.center.dy,
   );
-  final delta = track * ((zero ? 0 : .5) - fraction);
-  // Cupertino starts measuring after the gesture recognizer accepts the drag.
-  await tester.dragFrom(
-    thumb,
-    Offset(delta + kDragSlopDefault * delta.sign, 0),
-  );
+  final target = zero ? 0.0 : .5;
+  if (target == fraction) return;
+  final gesture = await tester.startGesture(thumb);
+  await gesture.moveBy(Offset(kDragSlopDefault * (target - fraction).sign, 0));
+  await tester.pump();
+  // Account for movement consumed while the drag recognizer accepts the gesture.
+  final started = tester.widget<CupertinoSlider>(slider);
+  final current = (started.value - started.min) / (started.max - started.min);
+  await gesture.moveBy(Offset(track * (target - current), 0));
+  await gesture.up();
   await tester.pumpAndSettle();
 }
 
@@ -357,6 +351,7 @@ void main() {
         );
         expect(platform.businessServer.appliedMutations, 1);
         expect(platform.openedBuilds, isEmpty);
+        await openSettingsSection(tester, 'connection');
         await _tap(tester, find.text('登录'));
         final recovered = globalSettings(tester);
         expect(platform.authCalls, 1);
@@ -439,6 +434,7 @@ void main() {
         expect(initial.state.pending, isNotNull);
         expect(platform.businessServer.appliedMutations, 1);
         expect(platform.openedBuilds, isEmpty);
+        await openSettingsSection(tester, 'connection');
         await tester.enterText(
           find.byType(CupertinoTextField),
           '${platform.origin.origin}${trailingSlash ? '/' : ''}',
@@ -533,6 +529,7 @@ void main() {
             .single;
         final pending = initial.state.pending;
         expect(pending, isNotNull);
+        await openSettingsSection(tester, 'connection');
         await tester.enterText(find.byType(CupertinoTextField), invalidOrigin);
         await _tap(tester, find.text('连接服务'));
         expect(find.byType(GlobalSettingsPanel), findsOneWidget);
@@ -562,6 +559,7 @@ void main() {
               ? isEmpty
               : [Uri.parse(invalidOrigin)],
         );
+        await openSettingsSection(tester, 'connection');
         await tester.enterText(
           find.byType(CupertinoTextField),
           platform.origin.toString(),
@@ -638,6 +636,7 @@ void main() {
         if (!changeOrigin) {
           original.bootstrapSubject = replacement.bootstrapSubject;
         }
+        await openSettingsSection(tester, 'connection');
         await tester.enterText(
           find.byType(CupertinoTextField),
           replacement.origin.toString(),
@@ -677,15 +676,6 @@ void main() {
           expect(factoryOrigins, isEmpty);
           expect(original.rebuildCount, 1);
           expect(original.disposalCount, 0);
-        }
-        if (find.byType(ChoiceField<wire.AppTheme>).evaluate().isEmpty) {
-          final group = find.byKey(const ValueKey('settings-group-appearance'));
-          await _tap(
-            tester,
-            find
-                .descendant(of: group, matching: find.byType(CupertinoListTile))
-                .first,
-          );
         }
         await _choose<wire.AppTheme>(tester, '浅色');
         await _tap(tester, find.text('保存全局设置'));
@@ -1084,6 +1074,7 @@ void main() {
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
       await _tap(tester, _navigation('浏览'));
       await _openSettings(tester);
+      await openSettingsSection(tester, 'reading');
       expect(tester.widget<ChoiceField<bool>>(_field<bool>('裁白')).value, true);
       expect(
         tester.widget<ChoiceField<bool>>(_field<bool>('裁白')).onChanged,
@@ -1111,6 +1102,13 @@ void main() {
       );
       expect(
         tester
+            .widget<CupertinoSlider>(find.byKey(const ValueKey('global-dim')))
+            .onChanged,
+        isNull,
+      );
+      await openSettingsSection(tester, 'input');
+      expect(
+        tester
             .widget<ChoiceField<wire.ReaderInputPreset>>(
               _field<wire.ReaderInputPreset>('分页点击区'),
             )
@@ -1124,12 +1122,6 @@ void main() {
             )
             .value,
         wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
-      );
-      expect(
-        tester
-            .widget<CupertinoSlider>(find.byKey(const ValueKey('global-dim')))
-            .onChanged,
-        isNull,
       );
       await _tap(tester, find.text('重新读取设置'));
       expect(

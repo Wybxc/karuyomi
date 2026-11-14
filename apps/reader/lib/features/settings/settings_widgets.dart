@@ -1,5 +1,6 @@
 import '../../widgets/choice_field.dart';
 import '../../widgets/edit_sheet.dart';
+import '../../widgets/app_page_route.dart';
 import '../../theme/app_theme.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -108,7 +109,11 @@ class const SettingsStatus({
     mainAxisSize: MainAxisSize.min,
     children: [
       if (state.busy) const CupertinoActivityIndicator(),
-      if (state.error case final error?) Text(error),
+      if (state.error case final error?)
+        Text(
+          error,
+          style: TextStyle(color: AppColors.error.resolveFrom(context)),
+        ),
       if (state.pending?.retryable == true) const Text('设置尚未确认，本会话保留原操作。'),
       Wrap(
         children: [
@@ -135,8 +140,25 @@ class const SettingsStatus({
   );
 }
 
-class const GlobalSettingsPanel({super.key, required super.catalog})
-    extends _SettingsEditor {}
+class const GlobalSettingsPanel({
+  super.key,
+  required super.catalog,
+  super.connection,
+}) extends _SettingsEditor {}
+
+enum _SettingsSection {
+  appearance('appearance', '外观与主题', '跟随系统、浅色与深色', CupertinoIcons.paintbrush),
+  reading('reading', '阅读显示', '阅读模式、图像与背景', CupertinoIcons.book),
+  input('input', '翻页与快捷键', '点击区与键盘操作', CupertinoIcons.keyboard),
+  connection('connection', '服务连接', '服务地址与登录', CupertinoIcons.cloud),
+  about('about', '关于', 'Karuyomi', CupertinoIcons.info);
+
+  const _SettingsSection(this.id, this.title, this.subtitle, this.icon);
+  final String id;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+}
 
 class MangaSettingsEditor extends _SettingsEditor {
   const MangaSettingsEditor({
@@ -199,6 +221,7 @@ class const _SettingsEditor({
   super.key,
   required final CatalogController catalog,
   final String? mangaKey,
+  final Widget? connection,
 }) extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -212,6 +235,9 @@ class const _SettingsEditor({
     final owner = ref.watch(confirmedAccountProvider(catalog))?.settings;
     final edit = useRef<_FormDraft?>(null);
     final revision = useState(0);
+    final selected = useState<_SettingsSection?>(null);
+    final detailScroll = useScrollController();
+    final navigator = useMemoized(GlobalKey<NavigatorState>.new);
     final manga = mangaKey != null;
     final scope = manga ? 'manga' : 'global';
     final confirmedRevision = manga
@@ -233,6 +259,7 @@ class const _SettingsEditor({
 
     void change(VoidCallback apply) {
       apply();
+      if (!manga) selected.value ??= _SettingsSection.appearance;
       edit.value!.dirty = true;
       revision.value++;
     }
@@ -271,55 +298,19 @@ class const _SettingsEditor({
     final r = draft?.reader;
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
-    Widget group(String id, String title, List<Widget> fields) {
-      final section = CupertinoListSection.insetGrouped(
-        backgroundColor: AppColors.background.resolveFrom(context),
-        separatorColor: AppColors.separator.resolveFrom(context),
-        decoration: BoxDecoration(
-          color: AppColors.groupedSurface.resolveFrom(context),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        header: manga ? Text(title) : null,
-        hasLeading: false,
-        children: fields,
-      );
-      return manga
-          ? section
-          : HookBuilder(
-              key: ValueKey('settings-group-$id'),
-              builder: (context) {
-                final expansion = useMemoized(ExpansibleController.new);
-                useEffect(() => expansion.dispose, [expansion]);
-                return Expansible(
-                  controller: expansion,
-                  animationStyle:
-                      MediaQuery.reduceMotionOf(context) ||
-                          MediaQuery.disableAnimationsOf(context)
-                      ? AnimationStyle.noAnimation
-                      : null,
-                  headerBuilder: (context, animation) => Semantics(
-                    expanded: expansion.isExpanded,
-                    child: CupertinoListTile(
-                      title: Text(title),
-                      onTap: () => expansion.isExpanded
-                          ? expansion.collapse()
-                          : expansion.expand(),
-                      trailing: RotationTransition(
-                        turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
-                        child: Icon(
-                          CupertinoIcons.chevron_right,
-                          size: 16,
-                          color: AppColors.accent.resolveFrom(context),
-                        ),
-                      ),
-                    ),
-                  ),
-                  bodyBuilder: (context, animation) => section,
-                );
-              },
-            );
-    }
+    Widget group(String title, List<Widget> fields) =>
+        CupertinoListSection.insetGrouped(
+          backgroundColor: AppColors.background.resolveFrom(context),
+          separatorColor: AppColors.separator.resolveFrom(context),
+          decoration: BoxDecoration(
+            color: AppColors.groupedSurface.resolveFrom(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          header: manga ? Text(title) : null,
+          hasLeading: false,
+          children: fields,
+        );
 
     final save = draft == null || r == null
         ? null
@@ -340,20 +331,39 @@ class const _SettingsEditor({
                 : null,
             child: Text(manga ? '保存本漫画设置' : '保存全局设置'),
           );
-    final content = Column(
+    Widget content(_SettingsSection? section) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!manga)
-          Text(
-            '全局设置',
-            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+        if (manga) const Text('选择“跟随全局”时，之后的全局修改会应用到此漫画。'),
+        if (connection != null &&
+            section != _SettingsSection.connection &&
+            catalog.status != ServiceStatus.ready) ...[
+          if (catalog.error case final error?)
+            Text(
+              error,
+              style: TextStyle(color: AppColors.error.resolveFrom(context)),
+            ),
+          CupertinoButton(
+            onPressed: () => selected.value = _SettingsSection.connection,
+            child: const Text('服务连接与登录'),
           ),
-        Text(manga ? '选择“跟随全局”时，之后的全局修改会应用到此漫画。' : '漫画可以单独覆盖各项阅读偏好；服务端确认后才保存。'),
-        const SizedBox(height: 16),
+        ],
+        if (section == _SettingsSection.connection) ?connection,
+        if (section == _SettingsSection.about)
+          const CupertinoListTile(
+            title: Text('Karuyomi'),
+            subtitle: Text('轻松翻开下一页'),
+            trailing: Text('0.1.0'),
+          ),
+        if (draft == null &&
+            section != _SettingsSection.about &&
+            section != _SettingsSection.connection)
+          const Text('连接并确认身份后可读取和保存同步设置。'),
         if (draft != null && r != null) ...[
-          if (draft.global case final global?)
-            group('appearance', '外观与主题', [
+          if (draft.global case final global?
+              when section == _SettingsSection.appearance)
+            group('外观与主题', [
               choice(
                 'theme',
                 '外观',
@@ -368,114 +378,127 @@ class const _SettingsEditor({
                 inherit: false,
               ),
             ]),
-          group('reading', '阅读显示', [
-            choice(
-              'mode',
-              '阅读模式',
-              r.hasMode() ? r.mode : null,
-              _modes,
-              (value) => r.mode = value,
-              r.clearMode,
-            ),
-            choice(
-              'layout',
-              '页组',
-              r.hasPageLayout() ? r.pageLayout : null,
-              _layouts,
-              (value) => r.pageLayout = value,
-              r.clearPageLayout,
-            ),
-            choice(
-              'fit',
-              '图像适配',
-              r.hasFit() ? r.fit : null,
-              _fits,
-              (value) => r.fit = value,
-              r.clearFit,
-            ),
-            choice(
-              'crop-borders',
-              '裁白',
-              r.hasCropBorders() ? r.cropBorders : null,
-              const {false: '关闭', true: '开启'},
-              (value) => r.cropBorders = value,
-              r.clearCropBorders,
-            ),
-            choice(
-              'background',
-              '阅读背景',
-              r.hasBackground() ? r.background : null,
-              _backgrounds,
-              (value) => r.background = value,
-              r.clearBackground,
-            ),
-            if (manga)
-              MergeSemantics(
-                child: CupertinoFormRow(
-                  prefix: Expanded(flex: 3, child: const Text('调暗跟随全局')),
-                  padding: EdgeInsets.zero,
-                  child: CupertinoSwitch(
-                    key: ValueKey('$scope-dim-inherit'),
-                    thumbColor: AppColors.onAccent.resolveFrom(context),
-                    inactiveThumbColor: CupertinoColors.white,
-                    onLabelColor: AppColors.onAccent.resolveFrom(context),
-                    value: dim == null,
-                    onChanged: state.canEdit
-                        ? (inherit) => change(() {
-                            if (inherit) {
-                              r.clearDimPercent();
-                            } else {
-                              r.dimPercent = inheritedDim;
-                            }
-                          })
-                        : null,
+          if (manga || section == _SettingsSection.reading)
+            group('阅读显示', [
+              choice(
+                'mode',
+                '阅读模式',
+                r.hasMode() ? r.mode : null,
+                _modes,
+                (value) => r.mode = value,
+                r.clearMode,
+              ),
+              choice(
+                'layout',
+                '页组',
+                r.hasPageLayout() ? r.pageLayout : null,
+                _layouts,
+                (value) => r.pageLayout = value,
+                r.clearPageLayout,
+              ),
+              choice(
+                'fit',
+                '图像适配',
+                r.hasFit() ? r.fit : null,
+                _fits,
+                (value) => r.fit = value,
+                r.clearFit,
+              ),
+              choice(
+                'crop-borders',
+                '裁白',
+                r.hasCropBorders() ? r.cropBorders : null,
+                const {false: '关闭', true: '开启'},
+                (value) => r.cropBorders = value,
+                r.clearCropBorders,
+              ),
+              choice(
+                'background',
+                '阅读背景',
+                r.hasBackground() ? r.background : null,
+                _backgrounds,
+                (value) => r.background = value,
+                r.clearBackground,
+              ),
+              if (manga)
+                MergeSemantics(
+                  child: CupertinoFormRow(
+                    prefix: Expanded(flex: 3, child: const Text('调暗跟随全局')),
+                    padding: EdgeInsets.zero,
+                    child: CupertinoSwitch(
+                      key: ValueKey('$scope-dim-inherit'),
+                      value: dim == null,
+                      onChanged: state.canEdit
+                          ? (inherit) => change(() {
+                              if (inherit) {
+                                r.clearDimPercent();
+                              } else {
+                                r.dimPercent = inheritedDim;
+                              }
+                            })
+                          : null,
+                    ),
                   ),
                 ),
+              Text(dim == null ? '应用内调暗：跟随全局（$inheritedDim%）' : '应用内调暗：$dim%'),
+              CupertinoSlider(
+                key: ValueKey('$scope-dim'),
+                value: (dim ?? inheritedDim).toDouble(),
+                min: 0,
+                max: 80,
+                divisions: 80,
+                onChanged: state.canEdit && dim != null
+                    ? (value) => change(() => r.dimPercent = value.round())
+                    : null,
               ),
-            Text(dim == null ? '应用内调暗：跟随全局（$inheritedDim%）' : '应用内调暗：$dim%'),
-            CupertinoSlider(
-              key: ValueKey('$scope-dim'),
-              value: (dim ?? inheritedDim).toDouble(),
-              min: 0,
-              max: 80,
-              divisions: 80,
-              onChanged: state.canEdit && dim != null
-                  ? (value) => change(() => r.dimPercent = value.round())
-                  : null,
-            ),
-            const Text('仅调暗阅读内容，不改变系统亮度。'),
-          ]),
-          group('input', '翻页与快捷键', [
-            choice(
-              'tap-zones',
-              '分页点击区',
-              r.hasTapZones() ? r.tapZones : null,
-              _inputPresets,
-              (value) => r.tapZones = value,
-              r.clearTapZones,
-            ),
-            const Text('反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
-            const SizedBox(height: 16),
-            choice(
-              'keyboard',
-              '阅读快捷键',
-              r.hasKeyboard() ? r.keyboard : null,
-              _inputPresets,
-              (value) => r.keyboard = value,
-              r.clearKeyboard,
-            ),
-            const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
-          ]),
+              const Text('仅调暗阅读内容，不改变系统亮度。'),
+            ]),
+          if (manga || section == _SettingsSection.input)
+            group('翻页与快捷键', [
+              choice(
+                'tap-zones',
+                '分页点击区',
+                r.hasTapZones() ? r.tapZones : null,
+                _inputPresets,
+                (value) => r.tapZones = value,
+                r.clearTapZones,
+              ),
+              const Text('反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
+              const SizedBox(height: 16),
+              choice(
+                'keyboard',
+                '阅读快捷键',
+                r.hasKeyboard() ? r.keyboard : null,
+                _inputPresets,
+                (value) => r.keyboard = value,
+                r.clearKeyboard,
+              ),
+              const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
+            ]),
         ],
-        if (draft?.dirty == true && state.pending == null)
-          const Text('修改尚未保存。')
-        else if (state.snapshot != null &&
-            !state.busy &&
-            state.error == null &&
-            state.pending == null)
-          const Text('当前设置已获服务端确认。'),
-        if (!manga && save != null) save,
-        SettingsStatus(controller: controller, state: state, onReloaded: reset),
+        if (manga ||
+            {
+              _SettingsSection.appearance,
+              _SettingsSection.reading,
+              _SettingsSection.input,
+            }.contains(section) ||
+            draft?.dirty == true ||
+            state.pending != null ||
+            state.error != null) ...[
+          if (draft?.dirty == true && state.pending == null)
+            const Text('修改尚未保存。')
+          else if (state.snapshot != null &&
+              !state.busy &&
+              state.error == null &&
+              state.pending == null)
+            const Text('当前设置已获服务端确认。'),
+          if (!manga && save != null) save,
+          SettingsStatus(
+            controller: controller,
+            state: state,
+            onReloaded: reset,
+          ),
+        ],
       ],
     );
     return manga
@@ -484,8 +507,9 @@ class const _SettingsEditor({
             child: EditSheet(
               title: const Text('本漫画阅读设置'),
               content: SingleChildScrollView(
+                controller: detailScroll,
                 padding: const EdgeInsets.all(24),
-                child: content,
+                child: content(null),
               ),
               actions: [
                 CupertinoButton(
@@ -496,6 +520,146 @@ class const _SettingsEditor({
               ],
             ),
           )
-        : content;
+        : LayoutBuilder(
+            builder: (context, constraints) {
+              final wide =
+                  constraints.maxWidth >= 600 &&
+                  MediaQuery.sizeOf(context).shortestSide >= 600;
+              final section = selected.value ?? _SettingsSection.appearance;
+              final showDetail = wide || selected.value != null;
+              void select(_SettingsSection value) {
+                FocusScope.of(context).unfocus();
+                selected.value = value;
+                if (detailScroll.hasClients) detailScroll.jumpTo(0);
+              }
+
+              final directory = CupertinoPageScaffold(
+                navigationBar: const CupertinoNavigationBar(middle: Text('设置')),
+                child: SafeArea(
+                  child: ListView(
+                    primary: false,
+                    children: [
+                      if (owner == null && !showDetail)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('连接并确认身份后可读取和保存同步设置。'),
+                        ),
+                      CupertinoListSection.insetGrouped(
+                        children: [
+                          for (final item in _SettingsSection.values)
+                            if (item != _SettingsSection.connection ||
+                                connection != null)
+                              Semantics(
+                                selected: wide ? section == item : null,
+                                child: CupertinoListTile(
+                                  key: ValueKey('settings-section-${item.id}'),
+                                  backgroundColor: wide && section == item
+                                      ? AppColors.selection.resolveFrom(context)
+                                      : null,
+                                  leading: Icon(
+                                    item.icon,
+                                    size: 24,
+                                    color: AppColors.accent.resolveFrom(
+                                      context,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    item.title,
+                                    maxLines: 2,
+                                    softWrap: true,
+                                  ),
+                                  subtitle: Text(
+                                    item.subtitle,
+                                    maxLines: 3,
+                                    softWrap: true,
+                                  ),
+                                  trailing: wide
+                                      ? null
+                                      : const CupertinoListTileChevron(),
+                                  onTap: () => select(item),
+                                ),
+                              ),
+                        ],
+                      ),
+                      if (!showDetail && draft?.dirty == true)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('修改尚未保存。'),
+                        ),
+                      if (!showDetail &&
+                          (state.pending != null || state.error != null))
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: SettingsStatus(
+                            controller: controller,
+                            state: state,
+                            onReloaded: reset,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+              final detail = CupertinoPageScaffold(
+                navigationBar: CupertinoNavigationBar(
+                  automaticallyImplyLeading: !wide,
+                  middle: Text(section.title),
+                ),
+                child: SafeArea(
+                  child: SingleChildScrollView(
+                    key: ValueKey(('settings-content', section)),
+                    controller: detailScroll,
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: content(section),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              return Row(
+                children: [
+                  if (wide)
+                    SizedBox(
+                      key: const ValueKey('settings-directory'),
+                      width: (constraints.maxWidth / 2).clamp(240, 384),
+                      child: directory,
+                    ),
+                  Expanded(
+                    key: const ValueKey('settings-detail'),
+                    child: NavigatorPopHandler<void>(
+                      enabled: !wide,
+                      onPopWithResult: (_) => navigator.currentState!.pop(),
+                      child: Navigator(
+                        key: navigator,
+                        pages: [
+                          if (!wide)
+                            AppPage<void>(
+                              key: const ValueKey('settings-directory-page'),
+                              title: '设置',
+                              child: directory,
+                            ),
+                          if (showDetail)
+                            AppPage<void>(
+                              key: const ValueKey('settings-detail-page'),
+                              title: section.title,
+                              child: detail,
+                            ),
+                        ],
+                        onDidRemovePage: (page) {
+                          if (page.key ==
+                              const ValueKey('settings-detail-page')) {
+                            selected.value = null;
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
   }
 }

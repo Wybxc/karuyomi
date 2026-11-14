@@ -4,15 +4,16 @@
 
 2026-11-13，Liquid Glass 曾发布到 Web；用户随后决定撤下该视觉方案，恢复本文的统一 Cupertino 风格。移除玻璃依赖、初始化、专用主题、着色器资源和实色选项，不保留两套外观实现。[库评估](liquid-glass-evaluation.md)与[终止记录](../plan/liquid-glass.md)作为历史依据；恢复交付见[迁移计划](../plan/cupertino-ui.md#恢复-cupertino)。这项决定基于用户对效果成本的取舍，不能描述为已完成严格能耗对照。
 
-2026-11-13，用户进一步要求对照 Mihon 全部界面的布局与配色，先取得像素对照，再按 Cupertino 自然度量自适应；范围覆盖全部已有功能，缺失功能留作后续。[逐页对照设计](mihon-cupertino-fidelity.md)固定参考版本、30 组页面和色彩角色，实施状态见[计划](../plan/mihon-cupertino-fidelity.md)。本文继续约束正式交付的组件、路由和反馈。业务状态及最小必要信息沿用[扩展与浏览状态流程](extension-browse-ui-flow.md)，视觉调整不增加新的业务状态或第二套同步机制。
+2026-11-13，用户进一步要求对照 Mihon 全部界面的布局与配色，先取得像素对照，再按 Cupertino 自然度量自适应。2026-11-14 明确最终配色也采用 Cupertino，导航、控件及转场同样自然化，两阶段继续保留；范围覆盖全部已有功能，缺失功能留作后续。[逐页对照设计](mihon-cupertino-fidelity.md)固定参考版本、30 组页面和最终语义颜色，实施状态见[计划](../plan/mihon-cupertino-fidelity.md)。本文继续约束正式交付的组件、路由和反馈。业务状态及最小必要信息沿用[扩展与浏览状态流程](extension-browse-ui-flow.md)，视觉调整不增加新的业务状态或第二套同步机制。
 
 ## 应用、主题与导航
 
 - 应用根改为 `CupertinoApp`，中文及英文 delegates 使用 `GlobalCupertinoLocalizations.delegates`。主题使用 `CupertinoThemeData`、`CupertinoColors` 和在当前上下文解析的 `CupertinoDynamicColor`，统一替换 Material 的 `ThemeData` / `ColorScheme`。
 - 服务端 `AppTheme` 继续表达跟随系统、浅色、深色；客户端分别映射到未指定 `brightness`、`Brightness.light`、`Brightness.dark`。主题切换仍由已确认设置驱动，未确认草稿单独展示，不引入平台分支或更改协议枚举。
-- 保留书架、浏览、设置三个入口、一个根 Navigator，以及按当前入口挂载业务页的策略。窄屏使用 `CupertinoTabBar`；宽度达到 840 时，用 Flutter 布局和 `CupertinoButton` 组成带文字标签的侧栏，直接放在现有应用壳中。
+- 最终主题采用官方系统蓝、label/secondaryLabel、分组背景/表面、separator、系统红/绿，颜色随亮暗、提高对比度和界面层级解析。保留官方文字和绿色开关默认值；导航/阅读工具使用不透明系统背景，保持已决定的无玻璃方案。Mihon 的固定 Material 色值只作第一阶段测量证据。
+- 保留书架、浏览、设置三个入口、一个根业务 Navigator，以及按当前入口挂载业务页的策略。各窗口统一使用官方 `CupertinoTabBar`；宽屏由设置等页面内部采用目录/详情分栏，不保留第一阶段的 Material 式80dp侧栏和选中胶囊。
 - 不引入每个 tab 的嵌套 Navigator 或隐藏业务树。`CupertinoTabScaffold` / `CupertinoTabView` 会保留已访问的 tab；直接套用会改变当前退订与 Source 生命周期，不能只为导航外观采用。
-- 普通页面使用 `CupertinoPageRoute`；`AppPageRoute` 仅集中实现系统减少动态效果时淡化、禁用动画时直接切换的既有无障碍策略。弹层直接使用官方 Cupertino 路由与返回值，不扩展为自建路由或设计系统。
+- 普通页面使用 `CupertinoPageRoute`；`AppPageRoute` 仅集中实现系统减少动态效果时淡化、禁用动画时直接切换的既有无障碍策略。设置目录/详情的内层 Navigator 使用同策略的声明式 `AppPage`，尺寸切换保持详情身份，系统返回回到目录；它只管理设置的UI层级，不增加 Source 业务树。弹层直接使用官方 Cupertino 路由与返回值，不扩展为自建路由或设计系统。
 
 ## 控件与信息呈现
 
@@ -50,7 +51,7 @@ Cupertino 缺少某种组件时，先检查原交互是否仍有必要。可以�
 
 ## 多端输入与可访问性
 
-统一 Cupertino 外观，同时保留触屏、鼠标和键盘操作。核心操作不依赖长按或滑动发现；Tab、Enter、Escape、滚动、中文输入与文本选择可用，菜单/弹层关闭后焦点回到触发位置。窄屏从 360px 起验证，宽屏保留侧栏与合理内容宽度；控件有语义名称、足够触控区域，状态不只靠颜色表达。
+统一 Cupertino 外观，同时保留触屏、鼠标和键盘操作。核心操作不依赖长按或滑动发现；Tab、Enter、Escape、滚动、中文输入与文本选择可用，菜单/弹层关闭后焦点回到触发位置。窄屏从 360px 起验证，宽屏用页面内分栏和合理内容宽度；控件有语义名称、足够触控区域，状态不只靠颜色表达。
 
 浅色、深色、跟随系统、文字缩放和减少动态效果纳入组件回归。桌面视口模拟只能作为 Web 布局证据，实际设备安全区、原生 Access 和三端读写继续单独验收。
 

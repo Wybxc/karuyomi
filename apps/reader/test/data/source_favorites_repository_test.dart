@@ -340,14 +340,7 @@ void main() {
       final controller = fixture.editor();
       await tester.runAsync(controller.refresh);
       await tester.pumpApp(
-        CupertinoApp(
-          home: CupertinoPageScaffold(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: GlobalSettingsPanel(catalog: fixture.catalog),
-            ),
-          ),
-        ),
+        CupertinoApp(home: GlobalSettingsPanel(catalog: fixture.catalog)),
         container: fixture.container,
       );
       await tester.pumpAndSettle();
@@ -361,16 +354,9 @@ void main() {
       }
 
       final appearance = find.byKey(
-        const ValueKey('settings-group-appearance'),
+        const ValueKey('settings-section-appearance'),
       );
-      await tap(
-        find
-            .descendant(
-              of: appearance,
-              matching: find.byType(CupertinoListTile),
-            )
-            .first,
-      );
+      await tap(appearance);
       await tap(find.byType(ChoiceField<wire.AppTheme>));
       await tap(find.text('浅色').last);
       await tap(find.text('保存全局设置'));

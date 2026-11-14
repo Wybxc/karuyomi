@@ -560,9 +560,6 @@ class const ExtensionDetailsPage({
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: CupertinoSwitch(
                     key: ValueKey(('extension-enabled', packageName)),
-                    thumbColor: AppColors.onAccent.resolveFrom(context),
-                    inactiveThumbColor: CupertinoColors.white,
-                    onLabelColor: AppColors.onAccent.resolveFrom(context),
                     value: installed.enabled,
                     onChanged: controller.canEdit
                         ? (value) =>

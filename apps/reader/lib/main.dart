@@ -19,7 +19,6 @@ import 'features/library/library_page.dart';
 import 'features/settings/settings_controller.dart';
 import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
-import 'state/account_providers.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -444,36 +443,27 @@ class _AppShellState extends ConsumerState<AppShell> {
       onAuthenticateReader: _authenticateReader,
       configurationError: _configurationError,
     ),
-    _ => Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
+    _ => switch (_catalog) {
+      final catalog? => GlobalSettingsPanel(
+        catalog: catalog,
+        connection: _connectionSettings(),
+      ),
+      null => CupertinoPageScaffold(
+        navigationBar: const CupertinoNavigationBar(middle: Text('服务连接')),
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (_catalog case final catalog?
-                when ref.watch(confirmedAccountProvider(catalog)) != null)
-              GlobalSettingsPanel(catalog: catalog)
-            else
-              const Text('连接并确认身份后可读取和保存同步设置。'),
-            const SizedBox(height: 24),
+            const Text('连接并确认身份后可读取和保存同步设置。'),
+            const SizedBox(height: 16),
             _connectionSettings(),
-            const SizedBox(height: 24),
-            const CupertinoListTile(
-              title: Text('Karuyomi'),
-              subtitle: Text('轻松翻开下一页'),
-              trailing: Text('0.1.0'),
-              padding: EdgeInsets.zero,
-            ),
           ],
         ),
       ),
-    ),
+    },
   };
 
   Widget _connectionSettings() {
     final controller = _catalog;
-    final connected = controller?.status == ServiceStatus.ready;
     final form = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -520,48 +510,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (connected)
-          HookBuilder(
-            key: const ValueKey('service-connection'),
-            builder: (context) {
-              final expansion = useMemoized(ExpansibleController.new);
-              useEffect(() => expansion.dispose, [expansion]);
-              return Expansible(
-                controller: expansion,
-                animationStyle:
-                    MediaQuery.reduceMotionOf(context) ||
-                        MediaQuery.disableAnimationsOf(context)
-                    ? AnimationStyle.noAnimation
-                    : null,
-                headerBuilder: (context, animation) => Semantics(
-                  expanded: expansion.isExpanded,
-                  child: CupertinoListTile(
-                    title: const Text('服务连接'),
-                    onTap: () => expansion.isExpanded
-                        ? expansion.collapse()
-                        : expansion.expand(),
-                    trailing: RotationTransition(
-                      turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
-                      child: Icon(
-                        CupertinoIcons.chevron_right,
-                        size: 16,
-                        color: AppColors.accent.resolveFrom(context),
-                      ),
-                    ),
-                  ),
-                ),
-                bodyBuilder: (context, animation) => form,
-              );
-            },
-          )
-        else ...[
-          Text(
-            '服务连接',
-            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-          ),
-          const SizedBox(height: 16),
-          form,
-        ],
+        form,
         if (controller?.email != null)
           Text(
             '账号：${controller!.email}',
@@ -621,152 +570,45 @@ class _AppShellState extends ConsumerState<AppShell> {
         });
       }
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // A landscape phone remains compact even when its width is tablet-sized.
-        final wide = constraints.maxWidth > constraints.maxHeight
-            ? constraints.maxHeight >= 600
-            : constraints.maxWidth >= 700;
-        return Row(
+    return CupertinoPageScaffold(
+      navigationBar: _index == 2
+          ? null
+          : CupertinoNavigationBar(middle: Text(_labels[_index])),
+      child: SafeArea(
+        child: Column(
           children: [
-            if (wide)
-              ColoredBox(
-                key: const ValueKey('app-sidebar'),
-                color: AppColors.sidebar.resolveFrom(context),
-                child: SizedBox(
-                  width: 80,
-                  child: SafeArea(
-                    right: false,
-                    child: CustomScrollView(
-                      key: const ValueKey('app-navigation'),
-                      primary: false,
-                      slivers: [
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                for (var i = 0; i < _labels.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 4),
-                                  Semantics(
-                                    key: ValueKey(('app-destination', i)),
-                                    selected: _index == i,
-                                    child: CupertinoButton(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      minimumSize: const Size(80, 60),
-                                      onPressed: () => _select(i),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 56,
-                                            height: 32,
-                                            alignment: Alignment.center,
-                                            decoration: BoxDecoration(
-                                              color: _index == i
-                                                  ? AppColors.selection
-                                                        .resolveFrom(context)
-                                                  : null,
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                            ),
-                                            child: Icon(
-                                              _icons[i],
-                                              size: 24,
-                                              color:
-                                                  (_index == i
-                                                          ? AppColors
-                                                                .onSelection
-                                                          : AppColors
-                                                                .secondaryLabel)
-                                                      .resolveFrom(context),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _labels[i],
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              height: 20 / 14,
-                                              fontWeight: _index == i
-                                                  ? FontWeight.w600
-                                                  : FontWeight.w500,
-                                              color:
-                                                  (_index == i
-                                                          ? AppColors.accent
-                                                          : AppColors
-                                                                .secondaryLabel)
-                                                      .resolveFrom(context),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+            if (_notice case final notice?)
+              CupertinoListTile(
+                title: Text(notice, maxLines: 4),
+                trailing: CupertinoButton(
+                  onPressed: () => setState(() => _notice = null),
+                  child: const Icon(
+                    CupertinoIcons.xmark,
+                    semanticLabel: '关闭提示',
+                  ),
+                ),
+              ),
+            Expanded(key: const ValueKey('app-content'), child: _page()),
+            CupertinoTabBar(
+              key: const ValueKey('app-navigation'),
+              backgroundColor: AppColors.toolbar.resolveFrom(context),
+              inactiveColor: AppColors.secondaryLabel.resolveFrom(context),
+              currentIndex: _index,
+              onTap: _select,
+              items: [
+                for (var i = 0; i < _labels.length; i++)
+                  BottomNavigationBarItem(
+                    icon: Icon(
+                      _icons[i],
+                      key: ValueKey(('app-destination', i)),
                     ),
+                    label: _labels[i],
                   ),
-                ),
-              ),
-            Expanded(
-              key: const ValueKey('app-content'),
-              child: CupertinoPageScaffold(
-                navigationBar: CupertinoNavigationBar(
-                  middle: Text(_labels[_index]),
-                ),
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      if (_notice case final notice?)
-                        CupertinoListTile(
-                          title: Text(notice, maxLines: 4),
-                          trailing: CupertinoButton(
-                            onPressed: () => setState(() => _notice = null),
-                            child: const Icon(
-                              CupertinoIcons.xmark,
-                              semanticLabel: '关闭提示',
-                            ),
-                          ),
-                        ),
-                      Expanded(child: _page()),
-                      if (!wide)
-                        CupertinoTabBar(
-                          key: const ValueKey('app-navigation'),
-                          backgroundColor: AppColors.toolbar.resolveFrom(
-                            context,
-                          ),
-                          inactiveColor: AppColors.secondaryLabel.resolveFrom(
-                            context,
-                          ),
-                          currentIndex: _index,
-                          onTap: _select,
-                          items: [
-                            for (var i = 0; i < _labels.length; i++)
-                              BottomNavigationBarItem(
-                                icon: Icon(_icons[i]),
-                                label: _labels[i],
-                              ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+              ],
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 
