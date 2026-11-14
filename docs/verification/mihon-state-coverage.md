@@ -93,40 +93,40 @@ stateDiagram-v2
     C1 --> C0: 删除最后一项
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class L1,L2,L3,L4,L5,L6,L7,L8,L9,L10,L11,L12,L13,L15,C0,C1,C2,C3,C4,C5,C6,C7,C8,C9 paired
+    class L0,L1,L2,L3,L4,L5,L6,L7,L8,L9,L10,L11,L12,L13,L15,L16,C0,C1,C2,C3,C4,C5,C6,C7,C8,C9 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                                               | 浅色                                    | 深色                                         |
-| ------- | ----------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------------------- |
-| 01.01   | 三入口对应的 Mihon 底部导航：活动入口、图标、标题及正文边界；复用 02.02/07.02/26.01 | 待                                      | `library-populated-default-dark`（书架分项） |
-| 01.02   | 宽屏/横屏导航及内容区域；旋转同一参考设备                                           | 待                                      | 待                                           |
-| 02.01   | 空书架标题、原因、可执行入口；移出最后一部作品                                      | 待                                      | 待（早期 `library-empty-dark` 为 Monet）     |
-| 02.02   | 封面、标题、未读标记、续读位置及网格边界                                            | `s0202-library-content-light`           | `s0202-library-content-dark`                 |
-| 02.03   | 空分类名、空态及切回入口；切到新建分类                                              | `s0203-library-category-empty-light`    | `s0203-library-category-empty-dark`          |
-| 03.01   | 已打开的搜索框、查询、清空/退出；点搜索                                             | `s0301-library-search-light`            | `s0301-library-search-dark`                  |
-| 03.02   | 查询与匹配作品；输入 `xkcd`                                                         | `s0302-library-match-light`             | `s0302-library-match-dark`                   |
-| 03.03   | 查询、无结果说明、清空/退出；输入不会匹配的文本                                     | `s0303-library-no-results-light`        | `s0303-library-no-results-dark`              |
-| 03.04   | 筛选页签、选项及三态当前值；打开筛选                                                | `s0304-library-filter-light`            | `s0304-library-filter-dark`                  |
-| 03.05   | 排序页签、当前排序和方向                                                            | `s0305-library-sort-light`              | `s0305-library-sort-dark`                    |
-| 03.06   | 显示页签、当前网格/列表设置                                                         | `s0306-library-display-light`           | `s0306-library-display-dark`                 |
-| 03.07   | 可用菜单项及正文锚点；点更多                                                        | `s0307-library-more-light`              | `s0307-library-more-dark`                    |
-| 04.01   | 选中数量、选中封面、退出/全选和底部批量操作                                         | `s0401-library-selection-light`         | `s0401-library-selection-dark`               |
-| 04.02   | 移出确认初态：影响范围选项均未选、确认禁用、取消                                    | `s0402-library-remove-confirm-light`    | `s0402-library-remove-confirm-dark`          |
-| 04.03   | 多选中的迁移/删除菜单、当前选择上下文及关闭                                         | `s0403-library-selection-more-light`    | `s0403-library-selection-more-dark`          |
-| 04.04   | 选择移出书架/删除下载范围、确认可用；确认后的实际落点                               | 待                                      | 待                                           |
-| 05.01   | 无分类说明及添加入口                                                                | `s0501-category-empty-light`            | `category-manager-default-dark`              |
-| 05.02   | 名称、拖动顺序、编辑和删除入口                                                      | `s0502-categories-two-light`            | `s0502-categories-two-dark`                  |
-| 05.03   | 标题、空名称、必填、禁用提交、取消及键盘                                            | `s0503-category-create-keyboard-light`  | `s0503-category-create-empty-dark`           |
-| 05.04   | 名称、可用提交、取消及键盘                                                          | `s0504-category-create-keyboard-light`  | `s0504-category-create-keyboard-dark`        |
-| 05.05   | 创建时重复名称、错误说明、禁用添加及键盘                                            | `s0505-category-create-duplicate-light` | `s0505-category-create-duplicate-dark`       |
-| 05.06   | 原名称、禁用确认、取消及键盘                                                        | `s0506-category-rename-second-light`    | `s0506-category-rename-second-dark`          |
-| 05.07   | 修改后名称、可用确认、取消及键盘                                                    | `s0507-category-rename-valid-light`     | `s0507-category-rename-valid-dark`           |
-| 05.08   | 待删分类名、影响、取消和确认                                                        | `s0508-category-delete-second-light`    | `s0508-category-delete-second-dark`          |
-| 05.09   | 重命名清空名称、必填、禁用确认和键盘                                                | `s0509-category-rename-empty-light`     | `s0509-category-rename-empty-dark`           |
-| 05.10   | 重命名为另一现有分类、重名错误、禁用确认和键盘                                      | `s0505-category-rename-duplicate-light` | `s0505-category-rename-duplicate-dark`       |
-| 06.01   | 无分类说明及编辑分类入口                                                            | `s0601-no-category-dialog-light`        | `library-categories-default-dark`            |
-| 06.02   | 分类名、已选项、取消和确认                                                          | `s0602-library-category-choice-light`   | `s0602-library-category-choice-dark`         |
-| 06.03   | 多作品混合选中态、最终选择及确认                                                    | 待                                      | 待（需要两部测试作品）                       |
+| 状态 ID | 最小必要信息/采集触发                                                               | 浅色                                    | 深色                                                                    |
+| ------- | ----------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
+| 01.01   | 三入口对应的 Mihon 底部导航：活动入口、图标、标题及正文边界；复用 02.02/07.02/26.01 | 待                                      | `library-populated-default-dark`（书架分项）                            |
+| 01.02   | 宽屏/横屏导航及内容区域；旋转同一参考设备                                           | 待                                      | 待                                                                      |
+| 02.01   | 空书架标题、原因、入门指南；移出最后一部测试作品                                    | `s0201-library-empty-light`             | `s0201-library-empty-dark`                                              |
+| 02.02   | 封面、标题、未读标记、续读位置及网格边界                                            | `s0202-library-content-light`           | `s0202-library-content-dark`                                            |
+| 02.03   | 空分类名、空态及切回入口；切到新建分类                                              | `s0203-library-category-empty-light`    | `s0203-library-category-empty-dark`                                     |
+| 03.01   | 已打开的搜索框、查询、清空/退出；点搜索                                             | `s0301-library-search-light`            | `s0301-library-search-dark`                                             |
+| 03.02   | 查询与匹配作品；输入 `xkcd`                                                         | `s0302-library-match-light`             | `s0302-library-match-dark`                                              |
+| 03.03   | 查询、无结果说明、清空/退出；输入不会匹配的文本                                     | `s0303-library-no-results-light`        | `s0303-library-no-results-dark`                                         |
+| 03.04   | 筛选页签、选项及三态当前值；打开筛选                                                | `s0304-library-filter-light`            | `s0304-library-filter-dark`                                             |
+| 03.05   | 排序页签、当前排序和方向                                                            | `s0305-library-sort-light`              | `s0305-library-sort-dark`                                               |
+| 03.06   | 显示页签、当前网格/列表设置                                                         | `s0306-library-display-light`           | `s0306-library-display-dark`                                            |
+| 03.07   | 可用菜单项及正文锚点；点更多                                                        | `s0307-library-more-light`              | `s0307-library-more-dark`                                               |
+| 04.01   | 选中数量、选中封面、退出/全选和底部批量操作                                         | `s0401-library-selection-light`         | `s0401-library-selection-dark`                                          |
+| 04.02   | 移出确认初态：影响范围选项均未选、确认禁用、取消                                    | `s0402-library-remove-confirm-light`    | `s0402-library-remove-confirm-dark`                                     |
+| 04.03   | 多选中的迁移/删除菜单、当前选择上下文及关闭                                         | `s0403-library-selection-more-light`    | `s0403-library-selection-more-dark`                                     |
+| 04.04   | 仅选移出书架、确认可用；浅色确认后为空书架；深色取消后返回迁移/删除菜单             | `s0404-library-remove-enabled-light`    | `s0404-library-remove-enabled-dark`、`s0404-library-remove-cancel-dark` |
+| 05.01   | 无分类说明及添加入口                                                                | `s0501-category-empty-light`            | `category-manager-default-dark`                                         |
+| 05.02   | 名称、拖动顺序、编辑和删除入口                                                      | `s0502-categories-two-light`            | `s0502-categories-two-dark`                                             |
+| 05.03   | 标题、空名称、必填、禁用提交、取消及键盘                                            | `s0503-category-create-keyboard-light`  | `s0503-category-create-empty-dark`                                      |
+| 05.04   | 名称、可用提交、取消及键盘                                                          | `s0504-category-create-keyboard-light`  | `s0504-category-create-keyboard-dark`                                   |
+| 05.05   | 创建时重复名称、错误说明、禁用添加及键盘                                            | `s0505-category-create-duplicate-light` | `s0505-category-create-duplicate-dark`                                  |
+| 05.06   | 原名称、禁用确认、取消及键盘                                                        | `s0506-category-rename-second-light`    | `s0506-category-rename-second-dark`                                     |
+| 05.07   | 修改后名称、可用确认、取消及键盘                                                    | `s0507-category-rename-valid-light`     | `s0507-category-rename-valid-dark`                                      |
+| 05.08   | 待删分类名、影响、取消和确认                                                        | `s0508-category-delete-second-light`    | `s0508-category-delete-second-dark`                                     |
+| 05.09   | 重命名清空名称、必填、禁用确认和键盘                                                | `s0509-category-rename-empty-light`     | `s0509-category-rename-empty-dark`                                      |
+| 05.10   | 重命名为另一现有分类、重名错误、禁用确认和键盘                                      | `s0505-category-rename-duplicate-light` | `s0505-category-rename-duplicate-dark`                                  |
+| 06.01   | 无分类说明及编辑分类入口                                                            | `s0601-no-category-dialog-light`        | `library-categories-default-dark`                                       |
+| 06.02   | 分类名、已选项、取消和确认                                                          | `s0602-library-category-choice-light`   | `s0602-library-category-choice-dark`                                    |
+| 06.03   | 多作品混合选中态、最终选择及确认                                                    | 待                                      | 待（需要两部测试作品）                                                  |
 
 ## 07–11：漫画源、扩展、仓库与存储
 
@@ -684,6 +684,7 @@ stateDiagram-v2
 2026-11-14 已实看 `category-theme-pairs.jpg`、`library-theme-pairs-0.jpg` 与 `library-theme-pairs-1.jpg` 的 PNG 联系表，并与同名 XML 对照。首批覆盖书架有内容/空分类/搜索、选项三页签、多选/更多/移出初态、分类列表/输入/校验/删除及设置目录/外观。排序重新统一为“检查更新时间”降序，深色面板从普通书架打开，不沿用搜索条仍开着的旧图。
 
 - 创建和重命名的重名错误为独立节点；移出确认的初始禁用态与选择范围后可提交态也分别记录。实际取消删除确认返回底层“迁移/删除”菜单，不能画作直接回书架。
+- 固定 DEFAULT 的空书架与移出确认可提交态新增成对联系表 `library-empty-removal-pairs.jpg`。浅色确认移出唯一测试 xkcd 后显示空书架，切深色保留空态；随后从同一真实源详情重新添加 xkcd。深色取消可提交确认返回底层菜单，作品仍保留，确认成功转换仍待深色重放。未删除下载或进度；模拟器已暂停在 xkcd 多选态。空态颜文字不同，排除该字形的同内容叠图。
 - 参考应用的空态颜文字每次随机变化，属于同一空态；保留实际生成结果，不为叠图修改上游。
 - Gboard 是独立系统界面：本次应用切深色时键盘仍跟随 Android 系统浅色，需单独核对键盘占位及操作可达，不将键盘颜色作为 Mihon 配色角色。
 - 外观深色新增“纯黑深色模式”一行，导致下方显示组位移；该开关本次关闭。列表、弹层和背景分别取色，不用单一黑白反转代替深色。

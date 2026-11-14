@@ -280,7 +280,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
           ),
         if (group.mangas.isNotEmpty)
           SizedBox(
-            height: 148 + MediaQuery.textScalerOf(context).scale(54),
+            height: 148 + MediaQuery.textScalerOf(context).scale(12) * 4.5,
             child: ListView.separated(
               key: ValueKey(('cross-search-results', group.target.key)),
               scrollDirection: Axis.horizontal,

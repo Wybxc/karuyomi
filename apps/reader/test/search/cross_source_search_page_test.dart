@@ -14,6 +14,16 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import '../browse/fakes.dart';
 import 'fakes.dart';
 
+final class _NonlinearTextScaler extends TextScaler {
+  const _NonlinearTextScaler();
+
+  @override
+  double scale(double fontSize) => fontSize * (fontSize <= 14 ? 2 : 1.5);
+
+  @override
+  double get textScaleFactor => 2;
+}
+
 void main() {
   Future<void> openPage(
     WidgetTester tester,
@@ -71,8 +81,12 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
-    for (final scale in [1.0, 2.0]) {
-      testWidgets('mixed source states fit narrow $brightness at ${scale}x', (
+    for (final (label, scaler) in [
+      ('1x', TextScaler.noScaling),
+      ('2x', TextScaler.linear(2)),
+      ('nonlinear', const _NonlinearTextScaler()),
+    ]) {
+      testWidgets('mixed source states fit narrow $brightness at $label', (
         tester,
       ) async {
         tester.view.physicalSize = const Size(360, 800);
@@ -86,7 +100,7 @@ void main() {
           tester,
           service,
           brightness: brightness,
-          textScaler: TextScaler.linear(scale),
+          textScaler: scaler,
         );
         for (final target in service.targets.skip(1)) {
           final source = find.byKey(
