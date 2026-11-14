@@ -152,7 +152,10 @@ stateDiagram-v2
     state "08.03 扩展分组列表" as E2
     state "08.04 搜索无结果" as E3
     state "08.05 扩展语言筛选" as E4
-    state "08.06 未加载及信任确认" as E5
+    state "08.06 未信任提示" as E5
+    state "08.13 其他未加载原因" as E12
+    state "08.14 加载失败诊断" as E13
+    state "08.15 安装权限缺失横幅" as E14
     state "08.07 下载等待" as E6
     state "08.08 下载中" as E7
     state "08.09 安装中" as E8
@@ -162,6 +165,7 @@ stateDiagram-v2
     state "09.01 扩展详情与源开关" as D0
     state "09.02 内容警告" as D1
     state "09.03 卸载确认" as D2
+    state "09.04 来源关闭并排至末尾" as D3
     state "10.01 仓库空态" as R0
     state "10.02 地址输入" as R1
     state "10.03 地址错误" as R2
@@ -170,8 +174,8 @@ stateDiagram-v2
     state "10.06 移除确认" as R5
     state "10.07 仓库操作错误" as R6
     state "11.01 存储摘要" as T0
-    state "11.02 清理确认" as T1
-    state "11.03 清理进行及结果" as T2
+    state "11.03 清理结果反馈" as T2
+    state "11.04 清理失败提示" as T3
     S0 --> S1: 已加载
     S0 --> S2: 无可用源
     S1 --> S3: 置顶或取消置顶
@@ -188,8 +192,17 @@ stateDiagram-v2
     E4 --> E2: 修改或返回
     E10 --> E11: 无仓库目录时筛选
     E11 --> E2: 返回
-    E2 --> E5: 点未加载项目
-    E5 --> E2: 信任或取消
+    E2 --> E5: 点未信任项目
+    E5 --> E2: 信任或返回取消
+    E5 --> D2: 卸载
+    E2 --> E12: 点其他未加载项目
+    E2 --> E13: 点加载失败项目
+    E12 --> E2: 关闭
+    E13 --> E2: 关闭
+    E12 --> D2: 卸载
+    E13 --> D2: 卸载
+    E2 --> E14: 缺少系统安装权限
+    E14 --> E2: 授权后返回（待验）
     E2 --> E6: 安装或更新
     E6 --> E7: 开始下载
     E7 --> E8: 下载完成
@@ -201,9 +214,12 @@ stateDiagram-v2
     E2 --> D0: 点已安装项目
     D0 --> D1: 警告说明
     D1 --> D0: 关闭
+    D0 --> D3: 关闭来源并重新排序
+    D3 --> D0: 重新启用后回启用分组
     D0 --> D2: 卸载
     D2 --> E2: 确认
     D2 --> D0: 取消
+    D2 --> E2: 从未加载提示打开后取消
     E10 --> R0: 无仓库
     R0 --> R1: 添加
     R4 --> R1: 添加
@@ -216,49 +232,61 @@ stateDiagram-v2
     R4 --> R5: 移除
     R5 --> R4: 确认或取消
     R5 --> R0: 移除最后一个
-    T0 --> T1: 清理
-    T1 --> T2: 确认
-    T1 --> T0: 取消
-    T2 --> T0: 完成
+    T0 --> T2: 直接清理成功
+    T0 --> T3: 直接清理失败
+    T2 --> T0: 反馈结束
+    T3 --> T0: 反馈结束后可重试
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class E2,E5,D0 partial
-    class S1,S3,S4,S5,E3,E10,E11,D1,R0,R1,R2,R3,R4,R5 paired
+    class E2 partial
+    class S1,S3,S4,S5,E3,E5,E10,E11,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,T0,T2 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                          | 浅色                                                                                                       | 深色                                                                                                                                                    |
-| ------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 07.01   | 漫画源标题及加载指示；冷启动进入源页                           | 待                                                                                                         | 待                                                                                                                                                      |
-| 07.02   | 源名、语言、最近使用、可执行尾部操作                           | `s0702-source-list-light`                                                                                  | `s0702-source-list-dark`                                                                                                                                |
-| 07.03   | 无可用源说明与扩展入口；关闭已安装源                           | 待                                                                                                         | 待（Local source 项与真正空态分开）                                                                                                                     |
-| 07.04   | Mihon 置顶分组与普通分组、取消置顶入口；对照 Karuyomi 收藏分组 | `s0704-source-pinned-light`                                                                                | `s0704-source-pinned-dark`                                                                                                                              |
-| 07.05   | 语言列表及当前启用项；两侧只启用多语言/English                 | `s0705-source-language-light`（上段）；下段待补                                                            | `s0705-source-language-dark`（上段）；下段待补                                                                                                          |
-| 07.06   | 当前源及置顶/隐藏等可用动作                                    | `s0706-source-actions-light`                                                                               | `s0706-source-actions-dark`                                                                                                                             |
-| 08.01   | 标题、加载状态及禁用刷新；重新读取目录                         | 待                                                                                                         | 待                                                                                                                                                      |
-| 08.02   | 无扩展原因与仓库入口                                           | 待                                                                                                         | 待                                                                                                                                                      |
-| 08.03   | 未加载/已安装/可安装/更新分组、名称、语言、版本、主操作        | `s0803-extensions-installed-light`（已安装）、`s0803-extension-catalog-light`（可安装）；未加载/更新待补   | `s0803-extensions-installed-dark`（已安装）、`s0803-extension-catalog-dark`（可安装）、`extensions-mangadex-untrusted-default-dark`（未加载）；更新待补 |
-| 08.04   | 查询、无匹配说明、清空/返回；清空后恢复列表                    | `s0804-extension-empty-light`；恢复 `s0804-extension-clear-light`                                          | `s0804-extension-empty-dark`；恢复 `s0804-extension-clear-dark`                                                                                         |
-| 08.05   | 语言和内容筛选当前值                                           | `s0805-extension-filter-light`；启用语言与深色不同，待对齐重拍                                             | `s0805-extension-filter-dark`；待同条件重拍                                                                                                             |
-| 08.06   | 未加载原因、插件名、信任/卸载；其他未加载原因分别补图          | 待                                                                                                         | `mangadex-trust-confirmation`（未信任分项）                                                                                                             |
-| 08.07   | 对象、等待标记、取消                                           | 待                                                                                                         | 待                                                                                                                                                      |
-| 08.08   | 对象、下载标记、进度/取消                                      | 待                                                                                                         | 待                                                                                                                                                      |
-| 08.09   | 对象、安装中及系统权限/确认（若出现）                          | 待                                                                                                         | 待                                                                                                                                                      |
-| 08.10   | 对象、失败与重试                                               | 待                                                                                                         | 待                                                                                                                                                      |
-| 08.11   | 筛选和仓库入口                                                 | `s0811-extension-menu-light`                                                                               | `s0811-extension-menu-dark`                                                                                                                             |
-| 08.12   | 筛选页没有仓库语言目录时的独立空态、标题和返回                 | `s0812-extension-filter-empty-light`                                                                       | `s0812-extension-filter-empty-dark`                                                                                                                     |
-| 09.01   | 图标、名称、包名、版本/语言/警告、卸载、源列表/启停/偏好       | `s0901-mangadex-details-light`（启用）；禁用待补                                                           | `s0901-mangadex-details-dark`（启用）；禁用待补                                                                                                         |
-| 09.02   | 内容警告原因和关闭动作                                         | `s0902-extension-warning-light`                                                                            | `s0902-extension-warning-dark`                                                                                                                          |
-| 09.03   | 卸载对象、系统确认/取消                                        | 待                                                                                                         | 待                                                                                                                                                      |
-| 10.01   | 无仓库说明、返回、刷新和添加                                   | `s1001-repository-empty-light`                                                                             | `s1001-repository-empty-dark`                                                                                                                           |
-| 10.02   | 地址、必填、提交可用性、取消、键盘                             | `s1002-repository-add-empty-light`、`s1002-repository-add-filled-light`                                    | `s1002-repository-add-empty-dark`、`s1002-repository-add-filled-dark`                                                                                   |
-| 10.03   | 提交数字 `987654321` 后的实际 scheme 错误、修正/取消           | `s1003-repository-invalid-result-light`                                                                    | `s1003-repository-invalid-result-dark`                                                                                                                  |
-| 10.04   | 提交正式公开仓库地址后实际可见的“处理中…”                      | `s1004-repository-add-processing-light`                                                                    | `s1004-repository-add-processing-dark`                                                                                                                  |
-| 10.05   | 仓库名、地址、移除/刷新；使用正式公开仓库                      | `s1005-repository-list-light`                                                                              | `s1005-repository-list-dark`                                                                                                                            |
-| 10.06   | 待移除仓库、确认/取消；取消保留列表，确认移除最后一项回空态    | `s1006-repository-remove-confirm-light`、`s1006-repository-cancel-light`、`s1006-repository-removed-light` | `s1006-repository-remove-confirm-dark`、`s1006-repository-cancel-dark`、`s1006-repository-removed-dark`                                                 |
-| 10.07   | 失败原因和可用恢复入口；连接失败分支                           | 待                                                                                                         | 待                                                                                                                                                      |
-| 11.01   | 占用、存储范围及清理入口；仅对照同类存储布局                   | 待                                                                                                         | 待                                                                                                                                                      |
-| 11.02   | 清理对象、影响、确认/取消                                      | 待                                                                                                         | 待                                                                                                                                                      |
-| 11.03   | 清理进行/完成/失败的实际反馈，三个分项分别保留                 | 待                                                                                                         | 待                                                                                                                                                      |
+| 状态 ID | 最小必要信息/采集触发                                                                            | 浅色                                                                                                       | 深色                                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 07.01   | 漫画源标题及加载指示；冷启动进入源页                                                             | 待                                                                                                         | 待                                                                                                      |
+| 07.02   | 源名、语言、最近使用、可执行尾部操作                                                             | `s0702-source-list-light`                                                                                  | `s0702-source-list-dark`                                                                                |
+| 07.03   | 无可用源说明与扩展入口；关闭已安装源                                                             | 待                                                                                                         | 待（Local source 项与真正空态分开）                                                                     |
+| 07.04   | Mihon 置顶分组与普通分组、取消置顶入口；对照 Karuyomi 收藏分组                                   | `s0704-source-pinned-light`                                                                                | `s0704-source-pinned-dark`                                                                              |
+| 07.05   | 语言列表及当前启用项；两侧只启用多语言/English                                                   | `s0705-source-language-light`（上段）；下段待补                                                            | `s0705-source-language-dark`（上段）；下段待补                                                          |
+| 07.06   | 当前源及置顶/隐藏等可用动作                                                                      | `s0706-source-actions-light`                                                                               | `s0706-source-actions-dark`                                                                             |
+| 08.01   | 标题、加载状态及禁用刷新；重新读取目录                                                           | 待                                                                                                         | 待                                                                                                      |
+| 08.02   | 无扩展原因与仓库入口                                                                             | 待                                                                                                         | 待                                                                                                      |
+| 08.03   | 未加载/已安装/可安装/更新分组、名称、语言、版本、主操作；更新仍待                                | `s0803-extensions-installed-light`、`s0803-extension-catalog-light`、`s0803-extensions-untrusted-light`    | `s0803-extensions-installed-dark`、`s0803-extension-catalog-dark`、`s0803-extensions-untrusted-dark`    |
+| 08.04   | 查询、无匹配说明、清空/返回；清空后恢复列表                                                      | `s0804-extension-empty-light`；恢复 `s0804-extension-clear-light`                                          | `s0804-extension-empty-dark`；恢复 `s0804-extension-clear-dark`                                         |
+| 08.05   | 语言和内容筛选当前值                                                                             | `s0805-extension-filter-light`；启用语言与深色不同，待对齐重拍                                             | `s0805-extension-filter-dark`；待同条件重拍                                                             |
+| 08.06   | 未信任风险、信任/卸载与返回取消；取消仍未加载，浅色已确认恢复原信任，深色确认转换待              | `s0806-extension-trust-light`、`s0806-extension-trust-cancel-light`、`s0806-extension-trusted-light`       | `s0806-extension-trust-dark`、`s0806-extension-trust-cancel-dark`                                       |
+| 08.07   | 对象、等待标记、取消                                                                             | 待                                                                                                         | 待                                                                                                      |
+| 08.08   | 对象、下载标记、进度/取消                                                                        | 待                                                                                                         | 待                                                                                                      |
+| 08.09   | 对象、安装中及系统权限/确认（若出现）                                                            | 待                                                                                                         | 待                                                                                                      |
+| 08.10   | 对象、失败与重试                                                                                 | 待                                                                                                         | 待                                                                                                      |
+| 08.11   | 筛选和仓库入口                                                                                   | `s0811-extension-menu-light`                                                                               | `s0811-extension-menu-dark`                                                                             |
+| 08.12   | 筛选页没有仓库语言目录时的独立空态、标题和返回                                                   | `s0812-extension-filter-empty-light`                                                                       | `s0812-extension-filter-empty-dark`                                                                     |
+| 08.13   | Filtered / Unsigned / UnsupportedLibVersion / Malformed 的具体原因、关闭与卸载；每种原因分别待采 | 待                                                                                                         | 待                                                                                                      |
+| 08.14   | Failed 的具体错误、等宽简要诊断、复制完整堆栈、关闭与卸载                                        | 待                                                                                                         | 待                                                                                                      |
+| 08.15   | Android 安装权限缺失横幅及系统授权入口；本轮未改变安装权限                                       | `s0803-extensions-untrusted-light`                                                                         | `s0803-extensions-untrusted-dark`                                                                       |
+| 09.01   | 图标、名称、包名、版本/语言/警告、卸载、来源启用/偏好；恢复后 Afrikaans 回首行                   | `s0901-mangadex-details-light`、`s0901-mangadex-restored-light`                                            | `s0901-mangadex-details-dark`、`s0901-mangadex-restored-dark`                                           |
+| 09.02   | 内容警告原因和关闭动作                                                                           | `s0902-extension-warning-light`                                                                            | `s0902-extension-warning-dark`                                                                          |
+| 09.03   | 同一 MangaDex 的系统卸载确认和取消；浅色从未信任列表发起，深色从详情发起，确认卸载待             | `s0903-extension-uninstall-light`、`s0903-extension-uninstall-cancel-light`                                | `s0903-extension-uninstall-dark`、`s0903-extension-uninstall-return-dark`                               |
+| 09.04   | Afrikaans 关闭后移到末尾、关闭开关与独立偏好入口；重新启用恢复首行                               | `s0901-mangadex-disabled-light`                                                                            | `s0901-mangadex-disabled-dark`                                                                          |
+| 10.01   | 无仓库说明、返回、刷新和添加                                                                     | `s1001-repository-empty-light`                                                                             | `s1001-repository-empty-dark`                                                                           |
+| 10.02   | 地址、必填、提交可用性、取消、键盘                                                               | `s1002-repository-add-empty-light`、`s1002-repository-add-filled-light`                                    | `s1002-repository-add-empty-dark`、`s1002-repository-add-filled-dark`                                   |
+| 10.03   | 提交数字 `987654321` 后的实际 scheme 错误、修正/取消                                             | `s1003-repository-invalid-result-light`                                                                    | `s1003-repository-invalid-result-dark`                                                                  |
+| 10.04   | 提交正式公开仓库地址后实际可见的“处理中…”                                                        | `s1004-repository-add-processing-light`                                                                    | `s1004-repository-add-processing-dark`                                                                  |
+| 10.05   | 仓库名、地址、移除/刷新；使用正式公开仓库                                                        | `s1005-repository-list-light`                                                                              | `s1005-repository-list-dark`                                                                            |
+| 10.06   | 待移除仓库、确认/取消；取消保留列表，确认移除最后一项回空态                                      | `s1006-repository-remove-confirm-light`、`s1006-repository-cancel-light`、`s1006-repository-removed-light` | `s1006-repository-remove-confirm-dark`、`s1006-repository-cancel-dark`、`s1006-repository-removed-dark` |
+| 10.07   | 失败原因和可用恢复入口；连接失败分支                                                             | 待                                                                                                         | 待                                                                                                      |
+| 11.01   | 占用、存储范围及清理入口；两主题清理前均 165 kB，主图上下两段                                    | `s1101-storage-top-light`、`s1101-storage-usage-light`                                                     | `s1101-storage-top-dark`、`s1101-storage-usage-dark`                                                    |
+| 11.03   | 清理后占用与实际反馈；两主题稳定状态均 1.37 kB；浅色删除3文件，深色再次清理删除0文件             | `s1103-storage-cleared-light`、`s1103-storage-clear-feedback-light`                                        | `s1103-storage-cleared-dark`、`s1103-storage-clear-feedback-dark`                                       |
+| 11.04   | 清理失败 toast 与保留占用，随后可再次点击清理；不能用成功反馈代替                                | 待                                                                                                         | 待                                                                                                      |
+
+原 11.02“清理确认”是未经调用点核对的假设，现已移除。Mihon 的 `SettingsDataScreen.getDataGroup()` 直接调用 `chapterCache.clear()`，只在完成/失败时显示 toast，没有独立确认框或可见忙碌分支；Karuyomi 的 `ExtensionStoragePage` 同样直接调用 `controller.forget(sha256)`。Karuyomi 的取消 ACK、资源清理失败和身份约束仍须另验，不因此省略。
+
+08.06 仅表示 `Reason.Untrusted` 的风险提示。`Filtered`、`Unsigned`、`UnsupportedLibVersion`、`Malformed` 共用另一种关闭/卸载弹层，`Failed` 还增加等宽错误及复制堆栈，故拆为 08.13/08.14，未采集的原因仍待，不能用信任提示代替。08.15 是 Android 安装权限横幅；本轮未更改该权限，也未完成下载、安装或更新状态。
+
+09.04 的开关关闭后，`ExtensionDetailsViewModel.subscribeToSources()` 按 `!enabled` 排序，将 Afrikaans 移到末尾；两主题都已拍到真正关闭的行，再重新启用回到首行。`s0901-mangadex-disabled-sorted-top-*` 只记录原位置移走，不作为关闭开关主图。09.03 的系统弹层两次均为 Android English 浅色，应用主题不控制其颜色；浅色从未信任列表发起，取消返回列表，深色从详情发起，取消返回详情，底层不同不计同状态像素叠图。`s0903-extension-uninstall-cancel-stale-dark` 的 XML 已返回详情，但 PNG 与确认图完全相同，已排除；另拍并实看稳定 `s0903-extension-uninstall-return-dark`。
+
+11.01 清理前两主题均为 165 kB；浅色清理删除 3 个文件，稳定占用为 1.37 kB，深色再次清理删除 0 个文件，占用保持 1.37 kB。上游明确保留 cache journal，非零值不表示清理失败。反馈图截到 toast 淡入，只用于确认内容，不能作稳定合成色/字形基准；失败反馈仍待。备份/导出等未实现功能只作为本页背景，不扩大本轮产品范围。
 
 ## 12–15：源内浏览、筛选、偏好与跨源搜索
 
@@ -632,26 +660,28 @@ stateDiagram-v2
     class U0,U1,U2,U3,U4,U5,U12 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                                      | 浅色                                                               | 深色                                                                 |
-| ------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”    | `s2601-settings-light`                                             | `s2601-settings-dark`                                                |
-| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                               | `s2602-appearance-light`                                           | `s2602-appearance-dark`                                              |
-| 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                    | `s2603-reader-preferences-*-light`                                 | `s2603-reader-preferences-*-dark`                                    |
-| 28.01   | 高级分组及诊断入口；仅当前首屏，全部滚动内容仍待补                         | `s2801-advanced-top-light`                                         | `s2801-advanced-top-dark`                                            |
-| 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段        | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`      | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`          |
-| 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体   | `s2803-worker-info-light`、`s2804-worker-horizontal-light`         | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`             |
-| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验           | 待（`s2803-worker-copy-light` 只有空容器，排除）                   | `s2803-worker-copy-dark`（含测试任务ID开头的系统预览；完整内容待验） |
-| 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变               | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light` | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`     |
-| 29.02   | 当前项、可搜索的长选项、搜索/取消和键盘                                    | 待                                                                 | 待（先核对 Mihon 是否采用同样搜索结构）                              |
-| 29.03   | 查询、无匹配、清空/取消                                                    | 待                                                                 | 待（若 Mihon 无此界面，记为 Karuyomi 独有并保留源码依据）            |
-| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                     | 待                                                                 | `category-create-default-dark`（分类分项）                           |
-| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                            | 待                                                                 | `category-ime-default-dark`（分类分项）                              |
-| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                           | 待                                                                 | 待                                                                   |
-| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02 | 待                                                                 | 待                                                                   |
+| 状态 ID | 最小必要信息/采集触发                                                             | 浅色                                                               | 深色                                                                 |
+| ------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”           | `s2601-settings-light`                                             | `s2601-settings-dark`                                                |
+| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                                      | `s2602-appearance-light`                                           | `s2602-appearance-dark`                                              |
+| 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                           | `s2603-reader-preferences-*-light`                                 | `s2603-reader-preferences-*-dark`                                    |
+| 28.01   | 高级设置首屏、数据/网络、书架和阅读/扩展末段；中段有滚动偏差，未操作维护/网络选项 | `s2801-advanced-{top,network,library,extensions}-light`            | `s2801-advanced-{top,network,library,extensions}-dark`               |
+| 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段               | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`      | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`          |
+| 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体          | `s2803-worker-info-light`、`s2804-worker-horizontal-light`         | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`             |
+| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                  | 待（`s2803-worker-copy-light` 只有空容器，排除）                   | `s2803-worker-copy-dark`（含测试任务ID开头的系统预览；完整内容待验） |
+| 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变                      | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light` | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`     |
+| 29.02   | 当前项、可搜索的长选项、搜索/取消和键盘                                           | 待                                                                 | 待（先核对 Mihon 是否采用同样搜索结构）                              |
+| 29.03   | 查询、无匹配、清空/取消                                                           | 待                                                                 | 待（若 Mihon 无此界面，记为 Karuyomi 独有并保留源码依据）            |
+| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | 待                                                                 | `category-create-default-dark`（分类分项）                           |
+| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | 待                                                                 | `category-ime-default-dark`（分类分项）                              |
+| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                  | 待                                                                 | 待                                                                   |
+| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02        | 待                                                                 | 待                                                                   |
 
 26.03 的 `*` 依次为 `top`、`display`、`paged`、`webtoon`、`navigation`、`actions`，已实看 `settings-reference-pairs-0.jpg` 至 `settings-reference-pairs-2.jpg`。首屏与末段两主题的应用 XML 边界一致；中间四段有约 3–15 物理像素的滚动差，部分首尾文字受裁切，只计状态覆盖，不能用于同位置叠图。六段覆盖默认模式/提示、显示/E-Ink、章节跳过、单页/条漫、输入和操作菜单；未实现的 Android 专属设置及 E-Ink 只作参考，不增加无效产品入口。
 
 28 和 29 已实看 `settings-reference-pairs-3.jpg` 至 `settings-reference-pairs-5.jpg`，并单独核对 Worker info 横向滚动及深色复制图。28.03 是 Mihon 的 Android WorkManager 诊断，与 Cloudflare Worker 无关；当时仅有一项 Enqueued，Finished/Running 为 `-`，其它运行状态仍待。横向滚动会移动整块正文，标题栏保持位置。28.04 属于独立 Android 系统反馈，不将系统容器配色纳入 Mihon 应用角色；未验证完整复制内容。29.01 本轮只取消，没有改动默认阅读模式；选中其他模式并返回仍待。
+
+28.01 后续补齐 `network`、`library`、`extensions` 三段，已实看 `extension-storage-pairs-5.jpg` / `extension-storage-pairs-6.jpg`。网络/书架中段约有 14 物理像素滚动差，上边缘个别文字受裁切；末段布局一致。未修改 DoH、User Agent、日志保护、数据库清理或文件名设置。仅通过正式“撤销已信任的未知插件”触发参考扩展未加载，完成两主题提示与取消后，已恢复原 MangaDex / xkcd 信任及 Afrikaans 启用。模拟器暂停在深色 MangaDex 详情。
 
 ## Karuyomi 独有状态与转换
 
@@ -785,6 +815,7 @@ stateDiagram-v2
 - `source-pairs-reviewed-0.jpg` 至 `source-pairs-reviewed-3.jpg` 已实看源列表/置顶/语言上段/源操作、xkcd 热门/搜索无结果、已安装扩展/目录/搜索清空、更多菜单及筛选独立空态的成对主图。源列表的语言条件统一为多语言/English。08.03 的未加载和更新、07.05 的下段、12.06 的无键盘及恢复仍待补；08.05 两侧启用语言不同，不能按同条件完成。Mihon 的“置顶”用于分组布局对照，不将其解释为 Karuyomi 的账户服务端收藏能力。
 - `repository-pairs-reviewed-0.jpg` 至 `repository-pairs-reviewed-2.jpg` 已实看仓库空态、输入空/有效值、实际校验错误、处理中、成功列表和移除确认/取消/完成。仓库地址为 `https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json`；处理中浅色采用先截图后 XML，PNG 确实包含加载文字。深色空输入/错误图使用拼音键盘、有效地址和处理中已切 English；键盘作为独立系统变体保留，仍需同键盘条件对照。未将提交前的 `s1003-repository-invalid-dark` 误记为错误结果。
 - 新节点 08.12 对应 `ExtensionFilterScreen.kt` 的 `state.isEmpty` 分支：无仓库语言目录时筛选页自身为空，区别于有值的语言筛选 08.05。xkcd 不支持最新，搜索实现返回空；搜索成功、最新与分页必须另用真实支持的 Source 采集，不以空结果覆盖。
+- 后续 `extension-storage-pairs-0.jpg` 至 `extension-storage-pairs-6.jpg` 已实看；第 2 张取消深色图曾为旧帧，已替换为重新采集并实看的稳定返回图。未加载/信任/取消、来源关闭/恢复、存储首屏/占用/清理后、系统卸载确认及高级完整滚动段均新增双主题主图；未加载其它原因、更新/下载/安装、确认卸载与清理失败仍待。系统弹层和中段滚动限制见对应表，不将新增主图计为整组完成。
 
 ## 当前采集顺序与变体门槛
 
