@@ -106,6 +106,10 @@
 
 该次Web实看发现两项缺口：平板目录可见但未进入无障碍树；聚焦Web只读服务地址后，离开栏目仍残留旧地址/“提交”的自动填充表单。现已分别为内层Navigator建立独立语义容器、在服务地址字段禁用自动填充。新增回归从根语义树验证五个目录动作与详情在平板/窄屏切换后可达，并验证离页释放输入连接、重开保留原生地址草稿；修复前实际失败日志保留。阅读调暗合并为一项内容，点击区/快捷键说明移至官方分组页脚。低优先级单并发运行`widget_test.dart`与三个设置测试文件，49项通过；这批后续修改的严格分析、完整CI及稳定双主题Web复验另记。浏览器无warn/error，视口已恢复，harness已停止。
 
+`d9fad79`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43617551512)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43617554296)完整通过，含787项Dart、531项Vitest及Web/候选Wasm构建；三个改动Dart文件严格分析、完整格式/依赖检查和标准prek通过。复用正式Web artifact并校验39个Flutter清单条目，在同一官方隔离流程中复验：浅/深平板五个栏目动作各有唯一可访问节点，目录与连接详情同时进入AX树；聚焦只读地址再离开后，两主题的DOM输入数与“提交”数均为0。保留`karuyomi-d9fad79-browser-checks.json`与两主题AX快照，独立API确认两次主题保存后revision均为2、主题DARK。未执行Source或生产Access；控制台无warn/error，视口恢复且harness退出0。
+
+设置目录/五个详情及平板连接已采双主题JPEG并实看联系表；部分详情截图仍有返回/标签栏未稳定绘制的帧，不作为整页最终画面。实看还发现`CupertinoListSection.insetGrouped`的footer沿用17px正文样式；官方固定版本的`CupertinoFormSection`自带13px/secondaryLabel辅助样式。现已直接采用后者，同时删除重复背景、圆角和分隔配置，未自行复制其样式值。相同49项回归再次通过；后续完整CI与稳定辅助文字画面另验。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。

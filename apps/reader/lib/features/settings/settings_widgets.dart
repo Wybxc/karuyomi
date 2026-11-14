@@ -299,17 +299,10 @@ class const _SettingsEditor({
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
     Widget group(String title, List<Widget> fields, {String? footer}) =>
-        CupertinoListSection.insetGrouped(
-          backgroundColor: AppColors.background.resolveFrom(context),
-          separatorColor: AppColors.separator.resolveFrom(context),
-          decoration: BoxDecoration(
-            color: AppColors.groupedSurface.resolveFrom(context),
-            borderRadius: BorderRadius.circular(10),
-          ),
+        CupertinoFormSection.insetGrouped(
           margin: const EdgeInsets.symmetric(vertical: 8),
           header: manga ? Text(title) : null,
           footer: footer == null ? null : Text(footer),
-          hasLeading: false,
           children: fields,
         );
 
