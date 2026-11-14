@@ -15,7 +15,6 @@ import '../../data/business_state_validation.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/source_browse_page.dart';
 import '../settings/settings_controller.dart';
-import '../settings/settings_widgets.dart';
 import '../settings/pending_global_settings.dart';
 import 'extension_listing.dart';
 import 'extensions_controller.dart';
@@ -439,17 +438,13 @@ class const ExtensionOperationStatus({
                 ),
               ),
             ),
-            bodyBuilder: (context, animation) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (pending.global case final values?)
-                  PendingGlobalSettings(
-                    values: values,
-                    revision: pending.basedOnRevision,
-                  ),
-                GlobalSettingsPanel(catalog: controller.catalog),
-              ],
-            ),
+            bodyBuilder: (context, animation) => switch (pending.global) {
+              final values? => PendingGlobalSettings(
+                values: values,
+                revision: pending.basedOnRevision,
+              ),
+              null => const SizedBox.shrink(),
+            },
           ),
         ],
         if (controller.cleanupError != null ||

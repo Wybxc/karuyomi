@@ -616,6 +616,10 @@ void main() {
           .length;
       await show(tester);
       expect(find.textContaining('结果待确认'), findsOneWidget);
+      await tap(tester, find.text('查看未确认的原操作'));
+      expect(find.text('未确认的原全局设置内容'), findsOneWidget);
+      expect(find.text('重试原设置操作'), findsOneWidget);
+      expect(tester.takeException(), isNull);
       await tap(
         tester,
         find.byKey(
