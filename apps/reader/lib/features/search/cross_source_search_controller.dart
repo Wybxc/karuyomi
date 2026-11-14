@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:source_runtime/source_runtime.dart';
 
 import '../browse/catalog_controller.dart';
 
@@ -28,6 +29,7 @@ final class SourceSearchGroup {
   bool hasNextPage = false;
   SourceSearchStatus status = SourceSearchStatus.queued;
   String? error;
+  String? errorDetails;
   String? limitReason;
   SourceSearchTask? _task;
   int _request = 0;
@@ -176,6 +178,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
     final request = ++group._request;
     group.status = SourceSearchStatus.queued;
     group.error = null;
+    group.errorDetails = null;
     try {
       final task = service.search(
         group.target,
@@ -193,6 +196,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       if (!_current(epoch) || request != group._request) return;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
+      group.errorDetails = failure.toString();
     }
   }
 
@@ -228,6 +232,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       group._task = null;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
+      group.errorDetails = failure.toString();
     } finally {
       if (!_disposed) notifyListeners();
     }
@@ -261,6 +266,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
     final epoch = _epoch;
     group.status = SourceSearchStatus.cancelling;
     group.error = null;
+    group.errorDetails = null;
     notifyListeners();
     try {
       await task.cancel();
@@ -271,6 +277,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       if (_disposed || epoch != _epoch || request != group._request) return;
       group.status = SourceSearchStatus.cancellationFailed;
       group.error = '停止尚未确认：${_message(failure)}';
+      group.errorDetails = failure.toString();
     } finally {
       if (!_disposed) notifyListeners();
     }
@@ -288,7 +295,11 @@ final class CrossSourceSearchController extends ChangeNotifier {
       for (final group in groups) {
         ++group._request;
         group._task = null;
-        if (group.active) group.status = SourceSearchStatus.cancelled;
+        if (group.active) {
+          group.status = SourceSearchStatus.cancelled;
+          group.error = null;
+          group.errorDetails = null;
+        }
       }
       cleanupError = null;
       return true;
@@ -365,8 +376,23 @@ final class CrossSourceSearchController extends ChangeNotifier {
     }
   }
 
-  static String _message(Object error) =>
-      error is FormatException ? error.message.toString() : error.toString();
+  static String _message(Object error) => switch (error) {
+    FormatException() => error.message.toString(),
+    RuntimeException() => switch (error.code) {
+      RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录。',
+      RuntimeErrorCode.accessDenied => '当前身份没有访问权限。',
+      RuntimeErrorCode.timeout => '漫画源响应超时，请重试。',
+      RuntimeErrorCode.runtimeLost => '漫画源连接已失效，请重试。',
+      RuntimeErrorCode.unsupportedCapability => '漫画源暂不支持这个操作。',
+      RuntimeErrorCode.integrityError => '扩展文件校验失败，请重新加载。',
+      RuntimeErrorCode.sourceError => '漫画源请求失败，请重试。',
+      RuntimeErrorCode.storageBusy => '漫画源正在其他标签页或窗口运行，请关闭后重试。',
+      RuntimeErrorCode.protocolError => '漫画源返回的数据无法读取，请重新加载。',
+      RuntimeErrorCode.limitExceeded => '漫画源返回内容超出限额，请缩小搜索范围。',
+      RuntimeErrorCode.cancelled => '请求已取消，可重新搜索。',
+    },
+    _ => error.toString(),
+  };
 
   Future<void> _disposeService() async {
     try {

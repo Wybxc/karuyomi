@@ -10,6 +10,7 @@ import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/search/cross_source_search_page.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart';
 
 import '../browse/fakes.dart';
 import 'fakes.dart';
@@ -81,6 +82,58 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    testWidgets('long source failure keeps retry reachable in $brightness', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final service = FakeSourceSearch();
+      await openPage(tester, service, brightness: brightness);
+      final second = service.targets.last;
+      await tester.tap(
+        find.byKey(ValueKey(('cross-search-source', second.key))),
+      );
+      await chooseAndSearch(tester, service);
+      service.tasks.first.complete([]);
+      final diagnostic =
+          'HTTP error 500\n${List.generate(100, (i) => 'at source frame $i').join('\n')}';
+      final failure = RuntimeException(
+        RuntimeErrorCode.sourceError,
+        diagnostic,
+      );
+      service.tasks.last.completion.completeError(failure);
+      await tester.pumpAndSettle();
+      final retry = find.byKey(ValueKey(('cross-search-more', second.key)));
+      expect(find.text('漫画源请求失败，请重试。'), findsOneWidget);
+      expect(find.text(failure.toString()), findsNothing);
+      expect(tester.getBottomRight(retry).dy, lessThanOrEqualTo(800));
+      expect(tester.getSemantics(retry).getSemanticsData().label, '重试此源');
+      final details = find.byKey(
+        ValueKey(('cross-search-error-details', second.key)),
+      );
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      expect(find.text(failure.toString()), findsOneWidget);
+      await tester.tap(find.text('关闭'));
+      await tester.pumpAndSettle();
+      expect(service.tasks, hasLength(2));
+      await tester.tap(retry);
+      await tester.pump();
+      expect(service.tasks, hasLength(3));
+      expect(service.tasks.last.target.key, second.key);
+      expect(service.tasks.last.query, '测试作品');
+      expect(service.tasks.last.page, 1);
+      expect(find.text('错误详情'), findsNothing);
+      expect(find.text('此漫画源没有找到漫画。'), findsOneWidget);
+      service.tasks.last.complete([]);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.pumpApp(const SizedBox());
+      await tester.pump();
+    });
+
     for (final (label, scaler) in [
       ('1x', TextScaler.noScaling),
       ('2x', TextScaler.linear(2)),
