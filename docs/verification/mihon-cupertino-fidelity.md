@@ -96,6 +96,8 @@
 
 低优先级、单并发运行`test/settings/settings_widgets_test.dart`、`settings_navigation_test.dart`、`test/data/source_favorites_repository_test.dart`、`test/widget_test.dart`、`test/theme/app_theme_test.dart`、`test/reader/reader_screen_test.dart`，**90项通过**。覆盖双主题、高对比度语义色、显式主题优先、各窗口标签栏选中语义、跨尺寸输入元素/文字/光标/焦点、草稿与原revision、导航/系统返回、减少动态淡化/禁用动画、CAS/精确重试/身份隔离，以及黑/白/主题阅读画布的页位、对比与资源驻留。15个改动Dart文件严格分析零问题。此处为组件/类型结果，完整CI、正式Web与全页视觉仍待。
 
+2026-11-15 复查其它调用点，服务地址冷启动恢复测试仍使用旧的连接展开入口，已改为通过设置目录打开连接详情；该测试单项通过。它使用`TestPlatform`，没有启动原生应用，不计原生现场验收。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。

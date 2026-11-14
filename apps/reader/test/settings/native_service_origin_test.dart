@@ -6,6 +6,7 @@ import 'package:karuyomi/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../browse/fakes.dart';
+import 'settings_probe.dart';
 
 final class _Preferences extends Fake implements SharedPreferencesAsync {
   final values = <String, String>{};
@@ -45,12 +46,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       if (find
-          .byKey(const ValueKey('service-connection'))
+          .byKey(const ValueKey('settings-section-connection'))
           .evaluate()
           .isNotEmpty) {
-        await tester.ensureVisible(find.text('服务连接'));
-        await tester.tap(find.text('服务连接'));
-        await tester.pumpAndSettle();
+        await openSettingsSection(tester, 'connection');
       }
     }
 
@@ -66,9 +65,7 @@ void main() {
     expect(connected.single.origin.origin, 'https://reader.example.net:9443');
     expect(connected.single.businessServer.appliedMutations, 0);
 
-    await tester.ensureVisible(find.text('服务连接'));
-    await tester.tap(find.text('服务连接'));
-    await tester.pumpAndSettle();
+    await openSettingsSection(tester, 'connection');
     await tester.enterText(field, 'http://invalid.example.net');
     await tester.tap(connect);
     await tester.pumpAndSettle();
