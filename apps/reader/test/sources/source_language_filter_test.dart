@@ -145,7 +145,7 @@ void main() {
 
   Future<void> chooseLanguage(WidgetTester tester, String language) async {
     await tap(tester, languageFilter());
-    await tester.tap(find.text(language).last);
+    await tester.tap(find.widgetWithText(CupertinoMenuItem, language));
     await tester.pumpAndSettle();
   }
 

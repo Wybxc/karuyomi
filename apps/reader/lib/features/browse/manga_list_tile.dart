@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 
 import '../../data/cover_repository.dart';
 import '../../data/library_repository.dart';
+import '../../theme/app_theme.dart';
 import '../covers/custom_cover.dart';
 import 'catalog_controller.dart';
 
@@ -25,7 +26,7 @@ class const MangaListTile({
               width: 48,
               height: 64,
               child: ColoredBox(
-                color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+                color: AppColors.groupedSurface.resolveFrom(context),
                 child: const Icon(CupertinoIcons.book),
               ),
             ),

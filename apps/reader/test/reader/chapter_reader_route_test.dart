@@ -8,11 +8,97 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
 
 void main() {
+  for (final appearance in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'reader preserves its canvas and reachable actions in $appearance at ${scale}x text',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final platform = TestPlatform();
+          final catalog = CatalogController(
+            api: platform,
+            runtime: platform.runtime,
+            rebuildRuntime: platform.rebuild,
+            deploymentOrigin: platform.origin,
+          );
+          addTearDown(() async {
+            await tester.pumpApp(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+            await catalog.closeReadingProgress();
+            catalog.dispose();
+            await platform.dispose();
+          });
+          await catalog.connect();
+          await catalog.openBuild(catalog.builds.single);
+          await catalog.selectSource(catalog.session!.sources.single);
+          final manga = catalog.mangas.single;
+          final sequence = ChapterSequence(
+            packageName: 'eu.kanade.source.test',
+            sourceId: sourceId,
+            mangaUrl: manga.url,
+            chapters: [wire.Chapter(url: '/one', name: '用于核对较长中文标题的第一章')],
+          );
+          final opened = (await catalog.openChapter(
+            manga,
+            ChapterEntry(sequence.entries.first.snapshot),
+            reference: catalog.sourceReference,
+            logicalChapterKey: sequence.entries.first.key,
+          ))!;
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: ChapterReaderRoute(
+                catalog: catalog,
+                manga: manga,
+                source: catalog.sourceReference,
+                sequence: sequence,
+                initialChapter: sequence.entries.first,
+                initialOpened: opened,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.getSize(find.byType(InteractiveViewer).first).height,
+            greaterThan(scale == 1 ? 400 : 240),
+          );
+          expect(find.text('重新阅读本章'), findsNothing);
+          expect(find.text('刷新书签'), findsNothing);
+          final options = find.byKey(const ValueKey('reader-chapter-options'));
+          expect(options.hitTestable(), findsOneWidget);
+          await catalog.flushReadingProgress();
+          await tester.pumpAndSettle();
+          final writes = platform.businessServer.requests
+              .where((r) => r.method == 'POST')
+              .length;
+          await tester.tap(options);
+          await tester.pumpAndSettle();
+          expect(find.text('重新阅读本章').hitTestable(), findsOneWidget);
+          expect(find.text('刷新进度').hitTestable(), findsOneWidget);
+          expect(
+            platform.businessServer.requests.where((r) => r.method == 'POST'),
+            hasLength(writes),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets(
     'exit during delayed progress restore closes unmounted provider and ignores late result',
     (tester) async {

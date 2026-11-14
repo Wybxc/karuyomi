@@ -270,6 +270,22 @@ void main() {
         fixture.platform.businessServer.appliedMutations,
         appliedBefore + 1,
       );
+      // The original request is acknowledged above. A subsequent viewport
+      // observation after the recovery row collapses is a separate mutation.
+      await tester.pump(writer.debounce);
+      await tester.pumpAndSettle();
+      final originalMutation = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(originalBody!),
+      );
+      for (final request in fixture.progressPosts.skip(baselinePosts + 2)) {
+        expect(
+          wire
+              .decodeProtoJson(wire.StateMutation(), jsonDecode(request.body!))
+              .mutationId,
+          isNot(originalMutation.mutationId),
+        );
+      }
       expect(writer.unsaved, false);
       await fixture.close(tester);
     },
@@ -413,6 +429,8 @@ void main() {
       (tester) async {
         final fixture = _Fixture();
         await fixture.open(tester);
+        await tester.tap(find.byKey(const ValueKey('reader-chapter-options')));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('重新阅读本章'));
         await tester.pumpAndSettle();
         tester

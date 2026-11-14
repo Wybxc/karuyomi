@@ -1,7 +1,6 @@
 import '../../test_support/cupertino.dart';
 
 import 'package:karuyomi/widgets/app_page_route.dart';
-import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
 
@@ -257,14 +256,20 @@ void main() {
             .initialOrder,
         isNull,
       );
-      expect(
-        tester
-            .widget<ChoiceField<ChapterOrder>>(
-              find.byType(ChoiceField<ChapterOrder>),
-            )
-            .value,
-        ChapterOrder.source,
-      );
+      final options = find.byKey(const ValueKey('reader-chapter-options'));
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      for (final order in ChapterOrder.values) {
+        final item = tester.widget<CupertinoMenuItem>(
+          find.byKey(ValueKey(('reader-chapter-order', order))),
+        );
+        expect(
+          item.trailing,
+          order == ChapterOrder.source ? isA<Icon>() : isNull,
+        );
+      }
+      await tester.tap(options);
+      await tester.pumpAndSettle();
       await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(find.byType(LibraryPage), findsOneWidget);
@@ -382,7 +387,7 @@ void main() {
     expect(find.byType(ChapterReaderRoute), findsNothing);
     expect(find.byType(MangaDetailsPage), findsNothing);
     expect(platform.invocations.where((call) => call.hasPages()), isEmpty);
-    await tester.drag(find.byType(ListView), const Offset(0, 1000));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 1000));
     await tester.pumpAndSettle();
     expect(
       find.text('书架还是空的'),
@@ -444,7 +449,11 @@ void main() {
       );
       await tester.ensureVisible(retry);
       await tester.pumpAndSettle();
-      expect(find.text('重试保存书架资料'), findsOneWidget);
+      expect(find.text('书架资料尚未由服务端确认'), findsOneWidget);
+      final retryRow = tester.widget<CupertinoListTile>(
+        find.ancestor(of: retry, matching: find.byType(CupertinoListTile)),
+      );
+      expect((retryRow.title as Text).data, isNotEmpty);
       expect(tester.widget<CupertinoButton>(retry).onPressed, isNotNull);
       expect(bodies, hasLength(1));
       await tester.tap(retry);

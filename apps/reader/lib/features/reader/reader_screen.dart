@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -1340,6 +1341,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
           navigationBar: _toolbar
               ? CupertinoNavigationBar(
                   automaticBackgroundVisibility: false,
+                  backgroundColor: _readerToolbarColor(
+                    context,
+                    widget.background,
+                  ),
                   leading: widget.onExit == null
                       ? null
                       : CupertinoNavigationBarBackButton(
@@ -1432,7 +1437,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       available / 2,
     );
     return ColoredBox(
-      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      color: _readerToolbarColor(context, widget.background),
       child: SafeArea(
         top: false,
         child: ConstrainedBox(
@@ -1516,48 +1521,53 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ],
               ],
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: ChoiceField<ReadingMode>(
-                    label: '阅读模式',
-                    value: _reader.mode,
-                    options: {
-                      ReadingMode.leftToRight: '从左到右',
-                      ReadingMode.rightToLeft: '从右到左',
-                      ReadingMode.continuous: '竖向连续',
-                      ReadingMode.webtoon: '条漫',
-                    },
-                    onChanged: widget.layoutSettingsEnabled
-                        ? (mode) {
-                            if (mode != null) _selectMode(mode);
-                          }
-                        : null,
+            LayoutBuilder(
+              builder: (context, constraints) => Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                    child: ChoiceField<ReadingMode>(
+                      label: '阅读模式',
+                      value: _reader.mode,
+                      options: {
+                        ReadingMode.leftToRight: '从左到右',
+                        ReadingMode.rightToLeft: '从右到左',
+                        ReadingMode.continuous: '竖向连续',
+                        ReadingMode.webtoon: '条漫',
+                      },
+                      onChanged: widget.layoutSettingsEnabled
+                          ? (mode) {
+                              if (mode != null) _selectMode(mode);
+                            }
+                          : null,
+                    ),
                   ),
-                ),
-                if (!_reader.isContinuous)
-                  CupertinoSlidingSegmentedControl<int>(
-                    key: const ValueKey('reader-page-layout'),
-                    groupValue: _doublePagePreference == null
-                        ? 0
-                        : _doublePagePreference!
-                        ? 2
-                        : 1,
-                    children: const {
-                      0: Text('自动'),
-                      1: Text('单页'),
-                      2: Text('双页'),
-                    },
-                    disabledChildren: widget.layoutSettingsEnabled
-                        ? const {}
-                        : const {0, 1, 2},
-                    onValueChanged: (value) {
-                      if (widget.layoutSettingsEnabled && value != null) {
-                        _selectDoublePage(value == 0 ? null : value == 2);
-                      }
-                    },
-                  ),
-              ],
+                  if (!_reader.isContinuous)
+                    CupertinoSlidingSegmentedControl<int>(
+                      key: const ValueKey('reader-page-layout'),
+                      groupValue: _doublePagePreference == null
+                          ? 0
+                          : _doublePagePreference!
+                          ? 2
+                          : 1,
+                      children: const {
+                        0: Text('自动'),
+                        1: Text('单页'),
+                        2: Text('双页'),
+                      },
+                      disabledChildren: widget.layoutSettingsEnabled
+                          ? const {}
+                          : const {0, 1, 2},
+                      onValueChanged: (value) {
+                        if (widget.layoutSettingsEnabled && value != null) {
+                          _selectDoublePage(value == 0 ? null : value == 2);
+                        }
+                      },
+                    ),
+                ],
+              ),
             ),
             if (widget.chapterControls case final Widget controls) controls,
           ],
@@ -1792,8 +1802,22 @@ Color _readerForegroundColor(
 ) => switch (background) {
   ReaderBackground.black => CupertinoColors.white,
   ReaderBackground.white => CupertinoColors.black,
-  ReaderBackground.theme => CupertinoColors.label.resolveFrom(context),
+  ReaderBackground.theme => AppColors.label.resolveFrom(context),
 };
+
+// Resolve Mihon's translucent bars against the confirmed canvas in advance;
+// Cupertino receives an opaque color and does not need a backdrop filter.
+Color _readerToolbarColor(BuildContext context, ReaderBackground background) =>
+    Color.alphaBlend(
+      AppColors.sidebar
+          .resolveFrom(context)
+          .withValues(
+            alpha: CupertinoTheme.brightnessOf(context) == Brightness.dark
+                ? .9
+                : .95,
+          ),
+      _readerBackgroundColor(context, background),
+    );
 
 /// Applies appearance only to reading content, preserving input and controls.
 class const _ReaderContent({

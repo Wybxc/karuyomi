@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import 'app_page_route.dart';
+import '../theme/app_theme.dart';
 
 /// Small sets use a menu; Source and language catalogs need searchable choices.
 class const ChoiceField<T>({
@@ -11,6 +12,7 @@ class const ChoiceField<T>({
   required final Map<T?, String> options,
   required final ValueChanged<T?>? onChanged,
   final Set<T?> disabledValues = const {},
+  final bool inline = true,
 }) extends HookWidget {
   @override
   Widget build(BuildContext context) {
@@ -26,22 +28,40 @@ class const ChoiceField<T>({
 
     Widget button(VoidCallback open) => CupertinoButton(
       focusNode: focus,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: inline
+          ? const EdgeInsets.symmetric(horizontal: 8)
+          : EdgeInsets.zero,
       onPressed: onChanged == null || options.isEmpty ? null : open,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('$label：'),
-          Flexible(
-            child: Text(
-              options[value] ?? '选择',
-              overflow: TextOverflow.ellipsis,
+      child: inline
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$label：'),
+                Flexible(
+                  child: Text(
+                    options[value] ?? '选择',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(CupertinoIcons.chevron_down, size: 14),
+              ],
+            )
+          : CupertinoListTile(
+              title: Text(
+                label,
+                maxLines: 2,
+                style: TextStyle(color: AppColors.label.resolveFrom(context)),
+              ),
+              subtitle: Text(
+                options[value] ?? '选择',
+                maxLines: 3,
+                style: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+              trailing: const CupertinoListTileChevron(),
             ),
-          ),
-          const SizedBox(width: 6),
-          const Icon(CupertinoIcons.chevron_down, size: 14),
-        ],
-      ),
     );
 
     return options.length <= 8
@@ -103,9 +123,26 @@ class const ChoicePage<T>({
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: CupertinoSearchTextField(
+              child: CupertinoTextField(
+                autofillHints: null,
                 controller: query,
                 placeholder: '查找$label',
+                placeholderStyle: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                textInputAction: TextInputAction.search,
+                prefix: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    CupertinoIcons.search,
+                    color: AppColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+                clearButtonMode: OverlayVisibilityMode.editing,
+                decoration: BoxDecoration(
+                  color: AppColors.groupedSurface.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             Expanded(

@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -6,7 +7,6 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../browse/catalog_controller.dart';
-import '../browse/manga_list_tile.dart';
 import '../extensions/extension_listing.dart';
 import 'cross_source_search_controller.dart';
 
@@ -28,6 +28,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   late final CrossSourceSearchController controller;
   late TextEditingController _query;
   late TextEditingController _sourceFilter;
+  late ExpansibleController _scope;
   int _sourcePage = 0;
   bool _allowPop = false;
   bool _leaving = false;
@@ -74,6 +75,14 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     await widget.onOpen(details);
   }
 
+  Future<void> _start(String query) async {
+    await controller.start(query);
+    if (mounted && controller.error == null && controller.groups.isNotEmpty) {
+      FocusScope.of(context).unfocus();
+      _scope.collapse();
+    }
+  }
+
   Widget _sourceChoices() {
     final filter = _sourceFilter.text.trim().toLowerCase();
     final visible = controller.visibleTargets
@@ -89,6 +98,13 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     final start = page * 50;
     final end = (start + 50).clamp(0, visible.length);
     return CupertinoListSection.insetGrouped(
+      margin: const EdgeInsets.only(bottom: 8),
+      backgroundColor: AppColors.background.resolveFrom(context),
+      separatorColor: AppColors.separator.resolveFrom(context),
+      decoration: BoxDecoration(
+        color: AppColors.groupedSurface.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
       children: [
         Text(
           '选择漫画源（已选 ${controller.selected.length} / 32）',
@@ -115,10 +131,19 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
         ),
         const SizedBox(height: 12),
         CupertinoTextField(
+          autofillHints: null,
           key: const ValueKey('cross-search-source-filter'),
           controller: _sourceFilter,
           onChanged: (_) => setState(() => _sourcePage = 0),
           placeholder: '查找漫画源名称或扩展包',
+          placeholderStyle: TextStyle(
+            color: AppColors.secondaryLabel.resolveFrom(context),
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.background.resolveFrom(context),
+            border: Border.all(color: AppColors.separator.resolveFrom(context)),
+            borderRadius: BorderRadius.circular(6),
+          ),
         ),
         if (controller.loadingTargets)
           const CupertinoActivityIndicator()
@@ -186,78 +211,238 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
       SourceSearchStatus.cancellationFailed => '停止尚未确认',
     };
     final count = group.mangas.length;
-    return CupertinoListSection.insetGrouped(
-      children: [
-        Text(
-          group.target.source.name,
-          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-        ),
-        Text(
-          '${sourceLanguage(group.target.source.lang)}'
-          ' · $status · $count 项',
-          key: ValueKey(('cross-search-status', group.target.key)),
-        ),
-        if (group.status == SourceSearchStatus.loading ||
-            group.status == SourceSearchStatus.cancelling)
-          const CupertinoActivityIndicator(),
-        if (group.error != null)
+    final loading =
+        group.status == SourceSearchStatus.loading ||
+        group.status == SourceSearchStatus.cancelling;
+    final hasAction =
+        group.active ||
+        group.hasNextPage ||
+        group.status == SourceSearchStatus.error ||
+        group.status == SourceSearchStatus.cancelled;
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              group.error!,
-              key: ValueKey(('cross-search-error', group.target.key)),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        group.target.source.name,
+                        style: CupertinoTheme.of(context).textTheme.textStyle
+                            .copyWith(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${sourceLanguage(group.target.source.lang)}'
+                        ' · $status · $count 项',
+                        key: ValueKey((
+                          'cross-search-status',
+                          group.target.key,
+                        )),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (loading) ...[
+                  const SizedBox(width: 12),
+                  const CupertinoActivityIndicator(),
+                ],
+              ],
             ),
           ),
-        if (group.limitReason != null && group.limitReason != group.error)
-          Text(group.limitReason!),
-        for (var index = 0; index < group.mangas.length; index++)
-          MangaListTile(
-            key: ValueKey(('cross-search-result', group.target.key, index)),
-            manga: group.mangas[index],
-            onTap: controller.canChange && controller.cleanupError == null
-                ? () => unawaited(_open(group, group.mangas[index]))
-                : null,
-          ),
-        if (group.status == SourceSearchStatus.complete && group.mangas.isEmpty)
-          const Text('此漫画源没有找到漫画。'),
-        Wrap(
-          spacing: 8,
-          children: [
-            if (group.status == SourceSearchStatus.queued ||
-                group.status == SourceSearchStatus.loading)
-              CupertinoButton(
-                key: ValueKey(('cross-search-cancel', group.target.key)),
-                onPressed: controller.canChange
-                    ? () => unawaited(controller.cancel(group))
-                    : null,
-                child: const Text('停止此源'),
+          if (group.error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                children: [
+                  Icon(
+                    CupertinoIcons.exclamationmark_circle_fill,
+                    color: AppColors.error.resolveFrom(context),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    group.error!,
+                    key: ValueKey(('cross-search-error', group.target.key)),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.error.resolveFrom(context),
+                    ),
+                  ),
+                  if (group.errorDetails case final details?)
+                    MergeSemantics(
+                      child: CupertinoButton(
+                        key: ValueKey((
+                          'cross-search-error-details',
+                          group.target.key,
+                        )),
+                        onPressed: () => showCupertinoDialog<void>(
+                          context: context,
+                          builder: (context) => CupertinoAlertDialog(
+                            title: Text('${group.target.source.name} · 错误详情'),
+                            content: Text(details),
+                            actions: [
+                              CupertinoDialogAction(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('关闭'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        child: const Text('错误详情'),
+                      ),
+                    ),
+                ],
               ),
-            if (group.status == SourceSearchStatus.cancellationFailed)
-              CupertinoButton(
-                key: ValueKey(('cross-search-cancel-retry', group.target.key)),
-                onPressed: controller.canChange
-                    ? () => unawaited(controller.cancel(group))
-                    : null,
-                child: const Text('重试停止'),
-              ),
-            if (group.hasNextPage ||
-                group.status == SourceSearchStatus.error ||
-                group.status == SourceSearchStatus.cancelled)
-              CupertinoButton(
-                key: ValueKey(('cross-search-more', group.target.key)),
-                onPressed: controller.canContinue(group)
-                    ? () => controller.next(group)
-                    : null,
-                child: Text(
-                  group.status == SourceSearchStatus.error ||
-                          group.status == SourceSearchStatus.cancelled
-                      ? '重试此源'
-                      : '此源下一页',
+            ),
+          if (group.limitReason != null && group.limitReason != group.error)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(group.limitReason!),
+            ),
+          if (group.mangas.isNotEmpty)
+            SizedBox(
+              height: 148 + MediaQuery.textScalerOf(context).scale(12) * 4.5,
+              child: ListView.separated(
+                key: ValueKey(('cross-search-results', group.target.key)),
+                scrollDirection: Axis.horizontal,
+                itemCount: group.mangas.length,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 4),
+                itemBuilder: (context, index) => SizedBox(
+                  width: 96,
+                  child: MergeSemantics(
+                    child: CupertinoButton(
+                      key: ValueKey((
+                        'cross-search-result',
+                        group.target.key,
+                        index,
+                      )),
+                      padding: const EdgeInsets.all(4),
+                      alignment: Alignment.topLeft,
+                      onPressed:
+                          controller.canChange &&
+                              controller.cleanupError == null
+                          ? () => unawaited(_open(group, group.mangas[index]))
+                          : null,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 2 / 3,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: AppColors.groupedSurface.resolveFrom(
+                                  context,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Icon(
+                                CupertinoIcons.book,
+                                color: AppColors.secondaryLabel.resolveFrom(
+                                  context,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            group.mangas[index].title,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.5,
+                              color: AppColors.label.resolveFrom(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-          ],
-        ),
-      ],
+            ),
+          if (group.status == SourceSearchStatus.complete &&
+              group.mangas.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                '此漫画源没有找到漫画。',
+                style: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            ),
+          if (hasAction)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  if (group.status == SourceSearchStatus.queued ||
+                      group.status == SourceSearchStatus.loading)
+                    MergeSemantics(
+                      child: CupertinoButton(
+                        key: ValueKey((
+                          'cross-search-cancel',
+                          group.target.key,
+                        )),
+                        onPressed: controller.canChange
+                            ? () => unawaited(controller.cancel(group))
+                            : null,
+                        child: const Text('停止此源'),
+                      ),
+                    ),
+                  if (group.status == SourceSearchStatus.cancellationFailed)
+                    MergeSemantics(
+                      child: CupertinoButton(
+                        key: ValueKey((
+                          'cross-search-cancel-retry',
+                          group.target.key,
+                        )),
+                        onPressed: controller.canChange
+                            ? () => unawaited(controller.cancel(group))
+                            : null,
+                        child: const Text('重试停止'),
+                      ),
+                    ),
+                  if (group.hasNextPage ||
+                      group.status == SourceSearchStatus.error ||
+                      group.status == SourceSearchStatus.cancelled)
+                    MergeSemantics(
+                      child: CupertinoButton(
+                        key: ValueKey(('cross-search-more', group.target.key)),
+                        onPressed: controller.canContinue(group)
+                            ? () => controller.next(group)
+                            : null,
+                        child: Text(
+                          group.status == SourceSearchStatus.error ||
+                                  group.status == SourceSearchStatus.cancelled
+                              ? '重试此源'
+                              : '此源下一页',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 
@@ -265,6 +450,11 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   Widget build(BuildContext context) {
     _query = useTextEditingController();
     _sourceFilter = useTextEditingController();
+    _scope = useMemoized(ExpansibleController.new);
+    useEffect(() {
+      _scope.expand();
+      return _scope.dispose;
+    }, [_scope]);
     useListenable(controller);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
     return PopScope<void>(
@@ -282,94 +472,171 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1000),
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 children: [
-                  if (!controller.available)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        controller.unavailableReason!,
-                        key: const ValueKey('cross-search-unavailable'),
-                      ),
-                    ),
-                  if (controller.error != null)
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        controller.error!,
-                        key: const ValueKey('cross-search-error'),
-                      ),
-                    ),
-                  if (controller.cleanupError != null)
-                    CupertinoListSection.insetGrouped(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          controller.cleanupError!,
-                          key: const ValueKey('cross-search-cleanup-error'),
+                        if (!controller.available)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              controller.unavailableReason!,
+                              key: const ValueKey('cross-search-unavailable'),
+                            ),
+                          ),
+                        if (controller.error != null)
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              controller.error!,
+                              key: const ValueKey('cross-search-error'),
+                            ),
+                          ),
+                        if (controller.cleanupError != null)
+                          CupertinoListSection.insetGrouped(
+                            backgroundColor: AppColors.background.resolveFrom(
+                              context,
+                            ),
+                            separatorColor: AppColors.separator.resolveFrom(
+                              context,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.groupedSurface.resolveFrom(
+                                context,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            children: [
+                              Text(
+                                controller.cleanupError!,
+                                key: const ValueKey(
+                                  'cross-search-cleanup-error',
+                                ),
+                              ),
+                              CupertinoButton(
+                                key: const ValueKey(
+                                  'cross-search-cleanup-retry',
+                                ),
+                                onPressed: controller.transitioning
+                                    ? null
+                                    : () => unawaited(controller.stop()),
+                                child: const Text('重试释放搜索资源'),
+                              ),
+                            ],
+                          ),
+                        CupertinoTextField(
+                          autofillHints: null,
+                          key: const ValueKey('cross-search-query'),
+                          controller: _query,
+                          enabled: controller.available && !controller.opening,
+                          maxLength: crossSourceQueryLimit,
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: (value) => unawaited(_start(value)),
+                          placeholder: '搜索漫画',
+                          placeholderStyle: TextStyle(
+                            color: AppColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
+                          ),
+                          prefix: Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Icon(
+                              CupertinoIcons.search,
+                              color: AppColors.secondaryLabel.resolveFrom(
+                                context,
+                              ),
+                            ),
+                          ),
+                          clearButtonMode: OverlayVisibilityMode.editing,
+                          decoration: BoxDecoration(
+                            color: AppColors.groupedSurface.resolveFrom(
+                              context,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        CupertinoButton(
-                          key: const ValueKey('cross-search-cleanup-retry'),
-                          onPressed: controller.transitioning
-                              ? null
-                              : () => unawaited(controller.stop()),
-                          child: const Text('重试释放搜索资源'),
+                        Expansible(
+                          key: const ValueKey('cross-search-scope'),
+                          controller: _scope,
+                          animationStyle:
+                              MediaQuery.reduceMotionOf(context) ||
+                                  MediaQuery.disableAnimationsOf(context)
+                              ? AnimationStyle.noAnimation
+                              : null,
+                          headerBuilder: (context, animation) => Semantics(
+                            expanded: _scope.isExpanded,
+                            child: CupertinoListTile(
+                              title: Text(
+                                '搜索范围 · 已选 ${controller.selected.length} 个漫画源',
+                              ),
+                              onTap: () => _scope.isExpanded
+                                  ? _scope.collapse()
+                                  : _scope.expand(),
+                              trailing: RotationTransition(
+                                turns: animation.drive(
+                                  Tween(begin: 0.0, end: 0.25),
+                                ),
+                                child: Icon(
+                                  CupertinoIcons.chevron_right,
+                                  size: 16,
+                                  color: AppColors.accent.resolveFrom(context),
+                                ),
+                              ),
+                            ),
+                          ),
+                          bodyBuilder: (context, animation) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _sourceChoices(),
+                              CupertinoButton(
+                                key: const ValueKey('cross-search-refresh'),
+                                onPressed: controller.canSelect
+                                    ? () => unawaited(controller.loadTargets())
+                                    : null,
+                                child: const Text('刷新可选漫画源'),
+                              ),
+                            ],
+                          ),
                         ),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            CupertinoButton.filled(
+                              key: const ValueKey('cross-search-submit'),
+                              onPressed: controller.canChange
+                                  ? () => unawaited(_start(_query.text))
+                                  : null,
+                              child: const Text('搜索所选漫画源'),
+                            ),
+                            if (controller.hasActive)
+                              CupertinoButton(
+                                key: const ValueKey('cross-search-stop'),
+                                onPressed: controller.transitioning
+                                    ? null
+                                    : () => unawaited(controller.stop()),
+                                child: const Text('停止全部'),
+                              ),
+                          ],
+                        ),
+                        if (controller.transitioning || controller.opening) ...[
+                          const SizedBox(height: 12),
+                          const CupertinoActivityIndicator(),
+                          Text(controller.opening ? '正在打开作品详情' : '正在释放搜索资源'),
+                        ],
+                        if (controller.groups.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            '“${controller.query}” · ${controller.groups.where((group) => !group.active).length} / ${controller.groups.length} 源完成 · ${controller.resultCount} 项',
+                            key: const ValueKey('cross-search-results-heading'),
+                          ),
+                          const Text('结果按漫画源分别显示；下一页和重试均需手动操作。'),
+                        ],
                       ],
                     ),
-                  _sourceChoices(),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: CupertinoButton(
-                      key: const ValueKey('cross-search-refresh'),
-                      onPressed: controller.canSelect
-                          ? () => unawaited(controller.loadTargets())
-                          : null,
-                      child: const Text('刷新可选漫画源'),
-                    ),
                   ),
-                  const SizedBox(height: 12),
-                  CupertinoTextField(
-                    key: const ValueKey('cross-search-query'),
-                    controller: _query,
-                    enabled: controller.available && !controller.opening,
-                    maxLength: crossSourceQueryLimit,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (value) => unawaited(controller.start(value)),
-                    placeholder: '搜索漫画',
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      CupertinoButton.filled(
-                        key: const ValueKey('cross-search-submit'),
-                        onPressed: controller.canChange
-                            ? () => unawaited(controller.start(_query.text))
-                            : null,
-                        child: const Text('搜索所选漫画源'),
-                      ),
-                      if (controller.hasActive)
-                        CupertinoButton(
-                          key: const ValueKey('cross-search-stop'),
-                          onPressed: controller.transitioning
-                              ? null
-                              : () => unawaited(controller.stop()),
-                          child: const Text('停止全部'),
-                        ),
-                    ],
-                  ),
-                  if (controller.transitioning || controller.opening) ...[
-                    const SizedBox(height: 12),
-                    const CupertinoActivityIndicator(),
-                    Text(controller.opening ? '正在打开作品详情' : '正在释放搜索资源'),
-                  ],
-                  if (controller.groups.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      '“${controller.query}” · ${controller.groups.where((group) => !group.active).length} / ${controller.groups.length} 源完成 · ${controller.resultCount} 项',
-                      key: const ValueKey('cross-search-results-heading'),
-                    ),
-                    const Text('结果按漫画源分别显示；下一页和重试均需手动操作。'),
-                  ],
                   for (final group in controller.groups) _results(group),
                 ],
               ),

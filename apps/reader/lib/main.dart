@@ -20,6 +20,7 @@ import 'features/settings/settings_controller.dart';
 import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
 import 'state/account_providers.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,10 +56,7 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
     locale: const Locale('zh'),
     supportedLocales: const [Locale('zh'), Locale('en')],
     localizationsDelegates: GlobalCupertinoLocalizations.delegates,
-    theme: CupertinoThemeData(
-      brightness: _brightness,
-      primaryColor: CupertinoColors.activeGreen,
-    ),
+    theme: readerAppTheme(_brightness),
     home: AppShell(
       brightness: _brightness,
       onThemeChanged: (value) => setState(() => _brightness = value),
@@ -451,15 +449,15 @@ class _AppShellState extends ConsumerState<AppShell> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           children: [
-            _connectionSettings(),
-            const SizedBox(height: 24),
             if (_catalog case final catalog?
                 when ref.watch(confirmedAccountProvider(catalog)) != null)
               GlobalSettingsPanel(catalog: catalog)
             else
               const Text('连接并确认身份后可读取和保存同步设置。'),
+            const SizedBox(height: 24),
+            _connectionSettings(),
             const SizedBox(height: 24),
             const CupertinoListTile(
               title: Text('Karuyomi'),
@@ -475,35 +473,26 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   Widget _connectionSettings() {
     final controller = _catalog;
-    return Column(
+    final connected = controller?.status == ServiceStatus.ready;
+    final form = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '服务连接',
-          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-        ),
-        const SizedBox(height: 16),
         CupertinoTextField(
+          key: const ValueKey('service-origin'),
           controller: _originField,
           readOnly: kIsWeb || _restoringOrigin,
           keyboardType: TextInputType.url,
           autocorrect: false,
           placeholder: 'https://你的服务域名',
-        ),
-        const SizedBox(height: 12),
-        if (_configurationError != null) Text(_configurationError!),
-        if (_originPersistenceError != null) Text(_originPersistenceError!),
-        if (controller?.email != null) Text('账号：${controller!.email}'),
-        if (controller?.error != null) Text(controller!.error!),
-        if (_retiredProgress.isNotEmpty ||
-            controller?.hasUnsavedReadingProgress == true) ...[
-          const SizedBox(height: 12),
-          const Text('部分阅读进度尚未保存；原服务和身份的记录仍保留，可继续连接服务。'),
-          CupertinoButton(
-            onPressed: _retryingProgress ? null : _retryProgress,
-            child: const Text('重试保存所有进度'),
+          placeholderStyle: TextStyle(
+            color: AppColors.secondaryLabel.resolveFrom(context),
           ),
-        ],
+          decoration: BoxDecoration(
+            color: AppColors.groupedSurface.resolveFrom(context),
+            border: Border.all(color: AppColors.separator.resolveFrom(context)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -526,6 +515,84 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
           ],
         ),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (connected)
+          HookBuilder(
+            key: const ValueKey('service-connection'),
+            builder: (context) {
+              final expansion = useMemoized(ExpansibleController.new);
+              useEffect(() => expansion.dispose, [expansion]);
+              return Expansible(
+                controller: expansion,
+                animationStyle:
+                    MediaQuery.reduceMotionOf(context) ||
+                        MediaQuery.disableAnimationsOf(context)
+                    ? AnimationStyle.noAnimation
+                    : null,
+                headerBuilder: (context, animation) => Semantics(
+                  expanded: expansion.isExpanded,
+                  child: CupertinoListTile(
+                    title: const Text('服务连接'),
+                    onTap: () => expansion.isExpanded
+                        ? expansion.collapse()
+                        : expansion.expand(),
+                    trailing: RotationTransition(
+                      turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                      child: Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: AppColors.accent.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ),
+                bodyBuilder: (context, animation) => form,
+              );
+            },
+          )
+        else ...[
+          Text(
+            '服务连接',
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+          ),
+          const SizedBox(height: 16),
+          form,
+        ],
+        if (controller?.email != null)
+          Text(
+            '账号：${controller!.email}',
+            style: TextStyle(
+              color: AppColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        if (_configurationError != null)
+          Text(
+            _configurationError!,
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+          ),
+        if (_originPersistenceError != null)
+          Text(
+            _originPersistenceError!,
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+          ),
+        if (controller?.error != null)
+          Text(
+            controller!.error!,
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+          ),
+        if (_retiredProgress.isNotEmpty ||
+            controller?.hasUnsavedReadingProgress == true) ...[
+          const SizedBox(height: 12),
+          const Text('部分阅读进度尚未保存；原服务和身份的记录仍保留，可继续连接服务。'),
+          CupertinoButton(
+            onPressed: _retryingProgress ? null : _retryProgress,
+            child: const Text('重试保存所有进度'),
+          ),
+        ],
       ],
     );
   }
@@ -556,70 +623,148 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 840;
-        return CupertinoPageScaffold(
-          navigationBar: CupertinoNavigationBar(middle: Text(_labels[_index])),
-          child: SafeArea(
-            child: Column(
-              children: [
-                if (_notice case final notice?)
-                  CupertinoListTile(
-                    title: Text(notice, maxLines: 4),
-                    trailing: CupertinoButton(
-                      onPressed: () => setState(() => _notice = null),
-                      child: const Icon(
-                        CupertinoIcons.xmark,
-                        semanticLabel: '关闭提示',
-                      ),
+        // A landscape phone remains compact even when its width is tablet-sized.
+        final wide = constraints.maxWidth > constraints.maxHeight
+            ? constraints.maxHeight >= 600
+            : constraints.maxWidth >= 700;
+        return Row(
+          children: [
+            if (wide)
+              ColoredBox(
+                key: const ValueKey('app-sidebar'),
+                color: AppColors.sidebar.resolveFrom(context),
+                child: SizedBox(
+                  width: 80,
+                  child: SafeArea(
+                    right: false,
+                    child: CustomScrollView(
+                      key: const ValueKey('app-navigation'),
+                      primary: false,
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (var i = 0; i < _labels.length; i++) ...[
+                                  if (i > 0) const SizedBox(height: 4),
+                                  Semantics(
+                                    key: ValueKey(('app-destination', i)),
+                                    selected: _index == i,
+                                    child: CupertinoButton(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      minimumSize: const Size(80, 60),
+                                      onPressed: () => _select(i),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 56,
+                                            height: 32,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: _index == i
+                                                  ? AppColors.selection
+                                                        .resolveFrom(context)
+                                                  : null,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            child: Icon(
+                                              _icons[i],
+                                              size: 24,
+                                              color:
+                                                  (_index == i
+                                                          ? AppColors
+                                                                .onSelection
+                                                          : AppColors
+                                                                .secondaryLabel)
+                                                      .resolveFrom(context),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _labels[i],
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              height: 20 / 14,
+                                              fontWeight: _index == i
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                              color:
+                                                  (_index == i
+                                                          ? AppColors.accent
+                                                          : AppColors
+                                                                .secondaryLabel)
+                                                      .resolveFrom(context),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                Expanded(
-                  child: Row(
+                ),
+              ),
+            Expanded(
+              key: const ValueKey('app-content'),
+              child: CupertinoPageScaffold(
+                navigationBar: CupertinoNavigationBar(
+                  middle: Text(_labels[_index]),
+                ),
+                child: SafeArea(
+                  child: Column(
                     children: [
-                      if (wide)
-                        SizedBox(
-                          width: 148,
-                          child: Column(
-                            key: const ValueKey('app-navigation'),
-                            children: [
-                              for (var i = 0; i < _labels.length; i++)
-                                CupertinoButton(
-                                  onPressed: () => _select(i),
-                                  color: _index == i
-                                      ? CupertinoColors.tertiarySystemFill
-                                            .resolveFrom(context)
-                                      : null,
-                                  child: Row(
-                                    children: [
-                                      Icon(_icons[i]),
-                                      const SizedBox(width: 8),
-                                      Text(_labels[i]),
-                                    ],
-                                  ),
-                                ),
-                            ],
+                      if (_notice case final notice?)
+                        CupertinoListTile(
+                          title: Text(notice, maxLines: 4),
+                          trailing: CupertinoButton(
+                            onPressed: () => setState(() => _notice = null),
+                            child: const Icon(
+                              CupertinoIcons.xmark,
+                              semanticLabel: '关闭提示',
+                            ),
                           ),
                         ),
                       Expanded(child: _page()),
-                    ],
-                  ),
-                ),
-                if (!wide)
-                  CupertinoTabBar(
-                    key: const ValueKey('app-navigation'),
-                    currentIndex: _index,
-                    onTap: _select,
-                    items: [
-                      for (var i = 0; i < _labels.length; i++)
-                        BottomNavigationBarItem(
-                          icon: Icon(_icons[i]),
-                          label: _labels[i],
+                      if (!wide)
+                        CupertinoTabBar(
+                          key: const ValueKey('app-navigation'),
+                          backgroundColor: AppColors.toolbar.resolveFrom(
+                            context,
+                          ),
+                          inactiveColor: AppColors.secondaryLabel.resolveFrom(
+                            context,
+                          ),
+                          currentIndex: _index,
+                          onTap: _select,
+                          items: [
+                            for (var i = 0; i < _labels.length; i++)
+                              BottomNavigationBarItem(
+                                icon: Icon(_icons[i]),
+                                label: _labels[i],
+                              ),
+                          ],
                         ),
                     ],
                   ),
-              ],
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
     );

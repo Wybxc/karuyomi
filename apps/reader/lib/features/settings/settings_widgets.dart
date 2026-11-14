@@ -1,5 +1,6 @@
 import '../../widgets/choice_field.dart';
 import '../../widgets/edit_sheet.dart';
+import '../../theme/app_theme.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -245,8 +246,9 @@ class const _SettingsEditor({
       VoidCallback clear, {
       bool inherit = true,
     }) => Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.zero,
       child: ChoiceField<T>(
+        inline: false,
         key: ValueKey('$scope-$id'),
         label: label,
         value: value,
@@ -269,6 +271,56 @@ class const _SettingsEditor({
     final r = draft?.reader;
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
+    Widget group(String id, String title, List<Widget> fields) {
+      final section = CupertinoListSection.insetGrouped(
+        backgroundColor: AppColors.background.resolveFrom(context),
+        separatorColor: AppColors.separator.resolveFrom(context),
+        decoration: BoxDecoration(
+          color: AppColors.groupedSurface.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        header: manga ? Text(title) : null,
+        hasLeading: false,
+        children: fields,
+      );
+      return manga
+          ? section
+          : HookBuilder(
+              key: ValueKey('settings-group-$id'),
+              builder: (context) {
+                final expansion = useMemoized(ExpansibleController.new);
+                useEffect(() => expansion.dispose, [expansion]);
+                return Expansible(
+                  controller: expansion,
+                  animationStyle:
+                      MediaQuery.reduceMotionOf(context) ||
+                          MediaQuery.disableAnimationsOf(context)
+                      ? AnimationStyle.noAnimation
+                      : null,
+                  headerBuilder: (context, animation) => Semantics(
+                    expanded: expansion.isExpanded,
+                    child: CupertinoListTile(
+                      title: Text(title),
+                      onTap: () => expansion.isExpanded
+                          ? expansion.collapse()
+                          : expansion.expand(),
+                      trailing: RotationTransition(
+                        turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                        child: Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 16,
+                          color: AppColors.accent.resolveFrom(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  bodyBuilder: (context, animation) => section,
+                );
+              },
+            );
+    }
+
     final save = draft == null || r == null
         ? null
         : CupertinoButton.filled(
@@ -301,112 +353,119 @@ class const _SettingsEditor({
         const SizedBox(height: 16),
         if (draft != null && r != null) ...[
           if (draft.global case final global?)
+            group('appearance', '外观与主题', [
+              choice(
+                'theme',
+                '外观',
+                global.theme,
+                const {
+                  wire.AppTheme.APP_THEME_SYSTEM: '跟随系统',
+                  wire.AppTheme.APP_THEME_LIGHT: '浅色',
+                  wire.AppTheme.APP_THEME_DARK: '深色',
+                },
+                (value) => global.theme = value,
+                () {},
+                inherit: false,
+              ),
+            ]),
+          group('reading', '阅读显示', [
             choice(
-              'theme',
-              '外观',
-              global.theme,
-              const {
-                wire.AppTheme.APP_THEME_SYSTEM: '跟随系统',
-                wire.AppTheme.APP_THEME_LIGHT: '浅色',
-                wire.AppTheme.APP_THEME_DARK: '深色',
-              },
-              (value) => global.theme = value,
-              () {},
-              inherit: false,
+              'mode',
+              '阅读模式',
+              r.hasMode() ? r.mode : null,
+              _modes,
+              (value) => r.mode = value,
+              r.clearMode,
             ),
-          choice(
-            'mode',
-            '阅读模式',
-            r.hasMode() ? r.mode : null,
-            _modes,
-            (value) => r.mode = value,
-            r.clearMode,
-          ),
-          choice(
-            'layout',
-            '页组',
-            r.hasPageLayout() ? r.pageLayout : null,
-            _layouts,
-            (value) => r.pageLayout = value,
-            r.clearPageLayout,
-          ),
-          choice(
-            'fit',
-            '图像适配',
-            r.hasFit() ? r.fit : null,
-            _fits,
-            (value) => r.fit = value,
-            r.clearFit,
-          ),
-          choice(
-            'crop-borders',
-            '裁白',
-            r.hasCropBorders() ? r.cropBorders : null,
-            const {false: '关闭', true: '开启'},
-            (value) => r.cropBorders = value,
-            r.clearCropBorders,
-          ),
-          choice(
-            'background',
-            '阅读背景',
-            r.hasBackground() ? r.background : null,
-            _backgrounds,
-            (value) => r.background = value,
-            r.clearBackground,
-          ),
-          if (manga)
-            MergeSemantics(
-              child: CupertinoFormRow(
-                prefix: Expanded(flex: 3, child: const Text('调暗跟随全局')),
-                padding: EdgeInsets.zero,
-                child: CupertinoSwitch(
-                  key: ValueKey('$scope-dim-inherit'),
-                  value: dim == null,
-                  onChanged: state.canEdit
-                      ? (inherit) => change(() {
-                          if (inherit) {
-                            r.clearDimPercent();
-                          } else {
-                            r.dimPercent = inheritedDim;
-                          }
-                        })
-                      : null,
+            choice(
+              'layout',
+              '页组',
+              r.hasPageLayout() ? r.pageLayout : null,
+              _layouts,
+              (value) => r.pageLayout = value,
+              r.clearPageLayout,
+            ),
+            choice(
+              'fit',
+              '图像适配',
+              r.hasFit() ? r.fit : null,
+              _fits,
+              (value) => r.fit = value,
+              r.clearFit,
+            ),
+            choice(
+              'crop-borders',
+              '裁白',
+              r.hasCropBorders() ? r.cropBorders : null,
+              const {false: '关闭', true: '开启'},
+              (value) => r.cropBorders = value,
+              r.clearCropBorders,
+            ),
+            choice(
+              'background',
+              '阅读背景',
+              r.hasBackground() ? r.background : null,
+              _backgrounds,
+              (value) => r.background = value,
+              r.clearBackground,
+            ),
+            if (manga)
+              MergeSemantics(
+                child: CupertinoFormRow(
+                  prefix: Expanded(flex: 3, child: const Text('调暗跟随全局')),
+                  padding: EdgeInsets.zero,
+                  child: CupertinoSwitch(
+                    key: ValueKey('$scope-dim-inherit'),
+                    thumbColor: AppColors.onAccent.resolveFrom(context),
+                    inactiveThumbColor: CupertinoColors.white,
+                    onLabelColor: AppColors.onAccent.resolveFrom(context),
+                    value: dim == null,
+                    onChanged: state.canEdit
+                        ? (inherit) => change(() {
+                            if (inherit) {
+                              r.clearDimPercent();
+                            } else {
+                              r.dimPercent = inheritedDim;
+                            }
+                          })
+                        : null,
+                  ),
                 ),
               ),
+            Text(dim == null ? '应用内调暗：跟随全局（$inheritedDim%）' : '应用内调暗：$dim%'),
+            CupertinoSlider(
+              key: ValueKey('$scope-dim'),
+              value: (dim ?? inheritedDim).toDouble(),
+              min: 0,
+              max: 80,
+              divisions: 80,
+              onChanged: state.canEdit && dim != null
+                  ? (value) => change(() => r.dimPercent = value.round())
+                  : null,
             ),
-          Text(dim == null ? '应用内调暗：跟随全局（$inheritedDim%）' : '应用内调暗：$dim%'),
-          CupertinoSlider(
-            key: ValueKey('$scope-dim'),
-            value: (dim ?? inheritedDim).toDouble(),
-            min: 0,
-            max: 80,
-            divisions: 80,
-            onChanged: state.canEdit && dim != null
-                ? (value) => change(() => r.dimPercent = value.round())
-                : null,
-          ),
-          const Text('仅调暗阅读内容，不改变系统亮度。'),
-          const SizedBox(height: 16),
-          choice(
-            'tap-zones',
-            '分页点击区',
-            r.hasTapZones() ? r.tapZones : null,
-            _inputPresets,
-            (value) => r.tapZones = value,
-            r.clearTapZones,
-          ),
-          const Text('反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
-          const SizedBox(height: 16),
-          choice(
-            'keyboard',
-            '阅读快捷键',
-            r.hasKeyboard() ? r.keyboard : null,
-            _inputPresets,
-            (value) => r.keyboard = value,
-            r.clearKeyboard,
-          ),
-          const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
-          const SizedBox(height: 12),
+            const Text('仅调暗阅读内容，不改变系统亮度。'),
+          ]),
+          group('input', '翻页与快捷键', [
+            choice(
+              'tap-zones',
+              '分页点击区',
+              r.hasTapZones() ? r.tapZones : null,
+              _inputPresets,
+              (value) => r.tapZones = value,
+              r.clearTapZones,
+            ),
+            const Text('反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
+            const SizedBox(height: 16),
+            choice(
+              'keyboard',
+              '阅读快捷键',
+              r.hasKeyboard() ? r.keyboard : null,
+              _inputPresets,
+              (value) => r.keyboard = value,
+              r.clearKeyboard,
+            ),
+            const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
+          ]),
         ],
         if (draft?.dirty == true && state.pending == null)
           const Text('修改尚未保存。')

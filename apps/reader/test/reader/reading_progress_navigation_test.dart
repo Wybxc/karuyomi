@@ -1,5 +1,3 @@
-import 'package:karuyomi/widgets/choice_field.dart';
-
 import '../test_app.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -19,6 +17,28 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
 import '../data/business_state_server.dart';
+
+Future<void> _readerOptions(WidgetTester tester) async {
+  final button = find.byKey(const ValueKey('reader-chapter-options'));
+  await tester.ensureVisible(button);
+  await tester.tap(button);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _expectReversedOrder(WidgetTester tester) async {
+  await _readerOptions(tester);
+  expect(
+    tester
+        .widget<CupertinoMenuItem>(
+          find.byKey(
+            const ValueKey(('reader-chapter-order', ChapterOrder.reversed)),
+          ),
+        )
+        .trailing,
+    isA<Icon>(),
+  );
+  await _readerOptions(tester);
+}
 
 TestPlatform _platform({
   Uri? origin,
@@ -193,14 +213,7 @@ void main() {
       expect(reopened.initialMode, ReadingMode.webtoon);
       expect(reopened.doublePage, true);
       expect(find.text('重新打开本章'), findsNothing);
-      expect(
-        tester
-            .widget<ChoiceField<ChapterOrder>>(
-              find.byType(ChoiceField<ChapterOrder>),
-            )
-            .value,
-        ChapterOrder.reversed,
-      );
+      await _expectReversedOrder(tester);
       expect(tester.takeException(), isNull);
       await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
@@ -300,6 +313,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('服务连接'));
+      await tester.tap(find.text('服务连接'));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(CupertinoTextField),
         replacement.origin.toString(),
@@ -338,6 +354,9 @@ void main() {
       );
       server.failWrites = false;
       await tester.tap(find.text('设置').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('服务连接'));
+      await tester.tap(find.text('服务连接'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(CupertinoTextField),
@@ -410,11 +429,12 @@ void main() {
       );
       leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final secondManifest = leaf.manifest;
-      tester
-          .widget<ChoiceField<ChapterOrder>>(
-            find.byType(ChoiceField<ChapterOrder>),
-          )
-          .onChanged!(ChapterOrder.reversed);
+      await _readerOptions(tester);
+      await tester.tap(
+        find.byKey(
+          const ValueKey(('reader-chapter-order', ChapterOrder.reversed)),
+        ),
+      );
       await tester.pumpAndSettle();
       (leaf.positionRequest! as ValueNotifier<ReadingPosition?>).value =
           secondManifest.positionAt(
@@ -461,14 +481,7 @@ void main() {
       expect(leaf.initialPosition!.normalizedX, .65);
       expect(leaf.initialPosition!.viewportX, .25);
       expect(leaf.initialPosition!.viewportY, .15);
-      expect(
-        tester
-            .widget<ChoiceField<ChapterOrder>>(
-              find.byType(ChoiceField<ChapterOrder>),
-            )
-            .value,
-        ChapterOrder.reversed,
-      );
+      await _expectReversedOrder(tester);
       var stored = (await catalog.readingProgress!.loadChapter(
         mangaKey: mangaKey,
         chapterKey: secondManifest.chapterKey,
@@ -479,6 +492,7 @@ void main() {
       final pagesBeforeReset = platform.invocations
           .where((call) => call.whichRequest() == wire.SourceCall_Request.pages)
           .length;
+      await _readerOptions(tester);
       await tester.tap(find.text('重新阅读本章'));
       await tester.pumpAndSettle();
       expect(find.text('1 / 3'), findsOneWidget);
@@ -533,6 +547,10 @@ void main() {
       expect(find.text('阅读进度已保存到服务端'), findsNothing);
       platform.businessServer.failWrites = false;
       await tester.tap(find.text('重试保存'));
+      await tester.pumpAndSettle();
+      // Collapsing the recovery actions changes the actual viewport. Its new
+      // observation follows the normal debounce after the original retry ACK.
+      await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(catalog.hasUnsavedReadingProgress, false);
       expect(find.text('阅读进度已保存到服务端'), findsOneWidget);

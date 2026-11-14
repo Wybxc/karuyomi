@@ -1,6 +1,7 @@
 import 'package:karuyomi/widgets/app_page_route.dart';
 
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -8,6 +9,7 @@ import 'dart:convert';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/features/browse/manga_cover_tile.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
@@ -93,16 +95,20 @@ void main() {
     await show(tester);
 
     expect(
-      tester.getTopLeft(find.text('Zulu')).dy,
-      lessThan(tester.getTopLeft(find.text('Alpha')).dy),
+      tester
+          .widgetList<MangaCoverTile>(find.byType(MangaCoverTile))
+          .map((tile) => tile.title),
+      ['Zulu', 'Alpha'],
     );
-    await tester.tap(find.text('最近收藏'));
+    await tester.tap(iconLabel('书架排序'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('标题').last);
     await tester.pumpAndSettle();
     expect(
-      tester.getTopLeft(find.text('Alpha')).dy,
-      lessThan(tester.getTopLeft(find.text('Zulu')).dy),
+      tester
+          .widgetList<MangaCoverTile>(find.byType(MangaCoverTile))
+          .map((tile) => tile.title),
+      ['Alpha', 'Zulu'],
     );
 
     await tester.enterText(find.byType(CupertinoTextField), '新作者');
@@ -310,6 +316,8 @@ void main() {
           redirected: false,
         );
       };
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('刷新服务端书架'));
       await tester.pumpAndSettle();
       expect(find.text(testManga.title), findsOneWidget);
@@ -317,6 +325,8 @@ void main() {
       expect(find.text('书架还是空的'), findsNothing);
       expect(controller.status, ServiceStatus.ready);
       platform.businessServer.beforeRequest = null;
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('刷新服务端书架'));
       await tester.pumpAndSettle();
       expect(find.text(testManga.title), findsOneWidget);
@@ -330,6 +340,8 @@ void main() {
     'the shelf offers an explicit server refresh without local persistence',
     (tester) async {
       await show(tester);
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
       expect(find.text('刷新服务端书架'), findsOneWidget);
       expect(find.text('书架仅保存在此设备。'), findsNothing);
       expect(tester.takeException(), isNull);

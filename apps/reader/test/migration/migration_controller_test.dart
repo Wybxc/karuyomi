@@ -569,7 +569,14 @@ void main() {
           final opened = platform.openedBuilds.length;
           // Run the real entry handler, then invalidate before the pushed
           // route's lazy builder receives its first frame.
-          (menu.menuChildren.single as CupertinoMenuItem).onPressed!();
+          menu.menuChildren
+              .whereType<CupertinoMenuItem>()
+              .singleWhere(
+                (item) =>
+                    item.child is Text &&
+                    (item.child as Text).data == '迁移到其他漫画源',
+              )
+              .onPressed!();
           expect(find.byType(MigrationPage), findsNothing);
           catalog.subject = replaceIdentity ? 'other-subject' : null;
           catalog.status = replaceIdentity

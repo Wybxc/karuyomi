@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/edit_sheet.dart';
 
 import 'dart:async';
@@ -273,9 +274,7 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text(
             expired ? _expired : draft!.error!,
-            style: TextStyle(
-              color: CupertinoColors.systemRed.resolveFrom(context),
-            ),
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
           ),
         ),
       if (!expired && draft?.completed == true)

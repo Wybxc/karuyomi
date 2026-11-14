@@ -44,6 +44,14 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      if (find
+          .byKey(const ValueKey('service-connection'))
+          .evaluate()
+          .isNotEmpty) {
+        await tester.ensureVisible(find.text('服务连接'));
+        await tester.tap(find.text('服务连接'));
+        await tester.pumpAndSettle();
+      }
     }
 
     await tester.pumpApp(app());
@@ -58,6 +66,9 @@ void main() {
     expect(connected.single.origin.origin, 'https://reader.example.net:9443');
     expect(connected.single.businessServer.appliedMutations, 0);
 
+    await tester.ensureVisible(find.text('服务连接'));
+    await tester.tap(find.text('服务连接'));
+    await tester.pumpAndSettle();
     await tester.enterText(field, 'http://invalid.example.net');
     await tester.tap(connect);
     await tester.pumpAndSettle();

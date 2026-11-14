@@ -1,7 +1,5 @@
 import '../../test_support/cupertino.dart';
 
-import 'package:karuyomi/widgets/choice_field.dart';
-
 import '../test_app.dart';
 
 import 'dart:async';
@@ -121,6 +119,9 @@ Future<CatalogController> _details(
     }
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(MangaDetailsPage), findsOneWidget);
+  }
+  if (settleDetails) {
+    await _tap(tester, find.byKey(const ValueKey('chapter-options')));
   }
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
@@ -379,14 +380,20 @@ void main() {
       gate.complete();
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<ChoiceField<ChapterOrder>>(
-              find.byType(ChoiceField<ChapterOrder>),
-            )
-            .value,
-        ChapterOrder.reversed,
-      );
+      final options = find.byKey(const ValueKey('reader-chapter-options'));
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      for (final order in ChapterOrder.values) {
+        final item = tester.widget<CupertinoMenuItem>(
+          find.byKey(ValueKey(('reader-chapter-order', order))),
+        );
+        expect(
+          item.trailing,
+          order == ChapterOrder.reversed ? isA<Icon>() : isNull,
+        );
+      }
+      await tester.tap(options);
+      await tester.pumpAndSettle();
       await _leaveReader(tester, catalog);
       expect(_visibleKeys(tester), _keys([3, 2, 1, 0]));
       await _finish(tester, catalog);

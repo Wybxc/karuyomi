@@ -70,6 +70,7 @@ void main() {
         ),
       );
       await _tap(tester, find.text('真实源 DTO 测试'));
+      await _tap(tester, find.byKey(const ValueKey('chapter-options')));
       final catalog = tester
           .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
           .controller;
@@ -97,9 +98,9 @@ void main() {
       expect(find.text('第二章'), findsNothing);
       await _tap(tester, find.text('第一章'));
       expect(find.byType(ReaderScreen), findsOneWidget);
-      expect(find.text('本章已标记书签'), findsOneWidget);
+      expect(iconLabel('移除章节书签 第一章'), findsOneWidget);
       await _tap(tester, iconLabel('移除章节书签 第一章'));
-      expect(find.text('本章未标记书签'), findsOneWidget);
+      expect(iconLabel('标记章节书签 第一章'), findsOneWidget);
       expect(
         platform.businessServer.bookmarked(
           sequence.mangaKey,

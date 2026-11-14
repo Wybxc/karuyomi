@@ -78,6 +78,10 @@ void main() {
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
+    if (finder.evaluate().isEmpty) {
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
+    }
     await tester.ensureVisible(finder);
     await tester.runAsync(() async {
       await tester.tap(finder);
@@ -188,6 +192,7 @@ void main() {
       final alpha = await favorite(tester, 'Alpha');
       await favorite(tester, 'Beta');
       await show(tester);
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, checkboxLabel('科幻'));
@@ -202,6 +207,7 @@ void main() {
       await filter(tester, '全部');
       expect(find.text('Alpha'), findsOneWidget);
       expect(find.text('Beta'), findsOneWidget);
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, checkboxLabel('科幻'));
@@ -258,6 +264,7 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       await tap(tester, checkboxLabel('科幻'));
       await tester.runAsync(
@@ -354,6 +361,7 @@ void main() {
       await create(tester);
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       await tap(tester, checkboxLabel('想读'));
       server.failWrites = true;
@@ -431,6 +439,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(server.catalog().categories.first.name, '长篇·待读');
       await tap(tester, find.text('完成'));
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       expect(checkboxLabel('长篇·待读'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -445,6 +454,7 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       await tap(tester, checkboxLabel('想读'));
       await tester.runAsync(
@@ -469,6 +479,7 @@ void main() {
       expect(find.text('重试保存'), findsNothing);
       await tap(tester, find.text('重新读取并关闭'));
       expect(posts('/api/state/mutations').length, attempts);
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       expect(checkboxLabel('新名字'), findsOneWidget);
       await tap(tester, checkboxLabel('想读'));
@@ -693,7 +704,7 @@ void main() {
       expect(activeSheets, findsNothing);
       await tapBusy(find.text('处理未确认修改'));
       expect(activeSheets, findsOneWidget);
-      expect(find.text('管理分类'), findsWidgets);
+      expect(iconLabel('书架选项'), findsOneWidget);
       expect(find.text(_expired), findsNothing);
       expect(
         tester
@@ -719,6 +730,7 @@ void main() {
 
       final alpha = await favorite(tester, 'Alpha');
       await tester.pumpAndSettle();
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       await tap(tester, checkboxLabel('迟到确认'));
       received = Completer<void>();
@@ -786,6 +798,7 @@ void main() {
       );
       final original = posts('/api/state/mutations').last.body;
       final sent = posts('/api/state/mutations').length;
+      await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));

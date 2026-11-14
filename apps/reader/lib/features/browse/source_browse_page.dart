@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 
 import 'dart:async';
@@ -16,7 +17,7 @@ import '../sources/source_filters.dart';
 import '../sources/source_preferences.dart';
 import 'catalog_controller.dart';
 import 'manga_details_page.dart';
-import 'manga_list_tile.dart';
+import 'manga_cover_tile.dart';
 
 enum _ListingWork { initial, query, refresh, more }
 
@@ -304,6 +305,12 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   }
 
   Widget _failure(String title) => CupertinoListSection.insetGrouped(
+    backgroundColor: AppColors.background.resolveFrom(context),
+    separatorColor: AppColors.separator.resolveFrom(context),
+    decoration: BoxDecoration(
+      color: AppColors.groupedSurface.resolveFrom(context),
+      borderRadius: BorderRadius.circular(10),
+    ),
     children: [
       Text(
         title,
@@ -394,6 +401,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: CupertinoTextField(
+                      autofillHints: null,
                       key: const ValueKey('source-manga-search'),
                       controller: _search,
                       enabled: !busy && canBrowse,
@@ -401,7 +409,20 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                       onSubmitted: (query) =>
                           _start(_ListingWork.query, query: query),
                       placeholder: '搜索此源的作品',
-                      prefix: const Icon(CupertinoIcons.search),
+                      placeholderStyle: TextStyle(
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.groupedSurface.resolveFrom(context),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      prefix: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          CupertinoIcons.search,
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                        ),
+                      ),
                       suffix: CupertinoButton(
                         onPressed: busy || !canBrowse
                             ? null
@@ -548,17 +569,59 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                   '$mode${_displayQuery.isEmpty ? '' : ' · $_displayQuery'}${_displayFiltered ? ' · 筛选已应用' : ''}',
                                   key: const ValueKey('source-query-context'),
                                 ),
-                              if (showOld)
-                                for (final manga in _results)
-                                  MangaListTile(
-                                    key: ValueKey(('source-manga', manga.url)),
-                                    manga: manga,
-                                    libraryEntry: saved[manga.url],
-                                    covers: _covers,
-                                    onTap: busy || !canBrowse
-                                        ? null
-                                        : () => unawaited(_details(manga)),
+                            ],
+                          ),
+                        ),
+                        if (showOld)
+                          SliverPadding(
+                            padding: const EdgeInsets.all(8),
+                            sliver: SliverLayoutBuilder(
+                              builder: (context, constraints) =>
+                                  SliverGrid.builder(
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount:
+                                              ((constraints.crossAxisExtent +
+                                                          4) /
+                                                      132)
+                                                  .floor()
+                                                  .clamp(1, 100),
+                                          mainAxisSpacing: 4,
+                                          crossAxisSpacing: 4,
+                                          childAspectRatio: 2 / 3,
+                                        ),
+                                    itemCount: _results.length,
+                                    itemBuilder: (context, index) {
+                                      final manga = _results[index];
+                                      return MangaCoverTile(
+                                        key: ValueKey((
+                                          'source-manga',
+                                          manga.url,
+                                        )),
+                                        title: manga.title,
+                                        entry: saved[manga.url],
+                                        covers: _covers,
+                                        badge: saved[manga.url] == null
+                                            ? null
+                                            : Icon(
+                                                CupertinoIcons.book_fill,
+                                                color: CupertinoTheme.of(
+                                                  context,
+                                                ).primaryColor,
+                                                semanticLabel: '已在书架',
+                                              ),
+                                        onPressed: busy || !canBrowse
+                                            ? null
+                                            : () => unawaited(_details(manga)),
+                                      );
+                                    },
                                   ),
+                            ),
+                          ),
+                        SliverPadding(
+                          padding: const EdgeInsets.all(16),
+                          sliver: SliverList.list(
+                            children: [
                               if (_loading == null &&
                                   _error == null &&
                                   canBrowse &&

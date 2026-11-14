@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/edit_sheet.dart';
 import '../../widgets/choice_field.dart';
 
@@ -138,6 +139,9 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
             padding: EdgeInsets.zero,
             child: CupertinoSwitch(
               key: key,
+              thumbColor: AppColors.onAccent.resolveFrom(context),
+              inactiveThumbColor: CupertinoColors.white,
+              onLabelColor: AppColors.onAccent.resolveFrom(context),
               value: node.toggle.value,
               onChanged: enabled
                   ? (value) => unawaited(
@@ -177,6 +181,7 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ChoiceField<String>(
+              inline: false,
               key: key,
               label: node.title,
               value: node.choice.hasValue() ? node.choice.value : null,
@@ -241,6 +246,11 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
         );
       case wire.PreferenceNode_Kind.group:
         return CupertinoListSection(
+          backgroundColor: AppColors.background.resolveFrom(context),
+          separatorColor: AppColors.separator.resolveFrom(context),
+          decoration: BoxDecoration(
+            color: AppColors.groupedSurface.resolveFrom(context),
+          ),
           key: key,
           header: Text(node.title),
           footer: !account || node.summary.isEmpty ? null : Text(node.summary),
@@ -402,6 +412,14 @@ class const _PreferenceTextDialog({required final wire.PreferenceNode node})
         obscureText: preference.secret,
         maxLength: 4096,
         placeholder: preference.hasHint() ? preference.hint : null,
+        placeholderStyle: TextStyle(
+          color: AppColors.secondaryLabel.resolveFrom(context),
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.groupedSurface.resolveFrom(context),
+          border: Border.all(color: AppColors.separator.resolveFrom(context)),
+          borderRadius: BorderRadius.circular(6),
+        ),
       ),
       actions: [
         CupertinoDialogAction(

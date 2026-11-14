@@ -139,6 +139,7 @@ Future<CatalogController> _details(
     });
     await tester.pumpAndSettle();
   }
+  await _tap(tester, find.byKey(const ValueKey('chapter-options')));
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
       .controller;

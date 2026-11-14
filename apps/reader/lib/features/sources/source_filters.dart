@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../widgets/edit_sheet.dart';
 import '../../widgets/choice_field.dart';
 
@@ -200,9 +201,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
       case wire.FilterNode_Kind.separator:
         return SizedBox(
           height: 24,
-          child: ColoredBox(
-            color: CupertinoColors.separator.resolveFrom(context),
-          ),
+          child: ColoredBox(color: AppColors.separator.resolveFrom(context)),
         );
       case wire.FilterNode_Kind.text:
         return input(
@@ -310,6 +309,11 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
         );
       case wire.FilterNode_Kind.group:
         return CupertinoListSection(
+          backgroundColor: AppColors.background.resolveFrom(context),
+          separatorColor: AppColors.separator.resolveFrom(context),
+          decoration: BoxDecoration(
+            color: AppColors.groupedSurface.resolveFrom(context),
+          ),
           key: key('group'),
           header: Text(node.name),
           children: [
