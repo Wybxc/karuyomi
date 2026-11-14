@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，覆盖全部现有页面。已接入颜色角色、封面网格、紧凑工具、详情与设置分组；`27476c0` 的导航/阅读配色完整CI和隔离双主题正式Web分项通过，保留一次容器中断/重试恢复与JPEG证据限制。作品/迁移主状态亦已补双主题参考。按[逐状态流程图](../verification/mihon-state-coverage.md)继续补齐转换与变体，再完成逐页像素和自然Cupertino阶段；全范围、Source toggle、超长诊断滚动及生产验收仍待。缺失功能按用户决定列入后续。
+**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，覆盖全部现有页面。`a9538f1` 的80dp侧栏、正文标题与内容保留完整CI/双主题正式Web分项通过；跟随系统/显式主题优先已补双主题参考。复验发现旧检索自动填充节点残留，九字段修复的定向检查通过，新CI/Web待验。按[逐状态流程图](../verification/mihon-state-coverage.md)继续补齐转换、变体及逐页像素/自然Cupertino阶段；Source toggle、超长诊断滚动、迁移执行和生产验收仍待。已有失败及JPEG限制保留，缺失功能列入后续。
 
 参考采集按[状态机与双主题截图清单](../verification/mihon-state-coverage.md)推进；加载、空态、失败、选择、编辑与弹层逐状态记录，只有单主题或只有根页截图均不算完成。
 

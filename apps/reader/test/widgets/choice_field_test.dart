@@ -120,7 +120,7 @@ void main() {
       await tester.tap(find.byKey(field));
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.byType(CupertinoSearchTextField),
+        find.widgetWithText(CupertinoTextField, '查找选择'),
         '中文漫画源分区 7',
       );
       await tester.pumpAndSettle();
@@ -143,7 +143,12 @@ void main() {
       expect(changed, isEmpty);
       await tester.tap(find.byKey(field));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(CupertinoSearchTextField), '语言 7');
+      await tester.enterText(
+        find.widgetWithText(CupertinoTextField, '查找选择'),
+        '语言 7',
+      );
+      expect(tester.testTextInput.setClientArgs, isNotNull);
+      expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
       await tester.pumpAndSettle();
       expect(find.text('语言 6'), findsNothing);
       await tester.tap(find.widgetWithText(CupertinoListTile, '语言 7'));

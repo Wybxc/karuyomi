@@ -131,6 +131,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
         ),
         const SizedBox(height: 12),
         CupertinoTextField(
+          autofillHints: null,
           key: const ValueKey('cross-search-source-filter'),
           controller: _sourceFilter,
           onChanged: (_) => setState(() => _sourcePage = 0),
@@ -527,6 +528,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                             ],
                           ),
                         CupertinoTextField(
+                          autofillHints: null,
                           key: const ValueKey('cross-search-query'),
                           controller: _query,
                           enabled: controller.available && !controller.opening,

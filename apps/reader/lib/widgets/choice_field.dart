@@ -123,14 +123,26 @@ class const ChoicePage<T>({
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: CupertinoSearchTextField(
+              child: CupertinoTextField(
+                autofillHints: null,
                 controller: query,
                 placeholder: '查找$label',
                 placeholderStyle: TextStyle(
                   color: AppColors.secondaryLabel.resolveFrom(context),
                 ),
-                itemColor: AppColors.secondaryLabel.resolveFrom(context),
-                backgroundColor: AppColors.groupedSurface.resolveFrom(context),
+                textInputAction: TextInputAction.search,
+                prefix: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    CupertinoIcons.search,
+                    color: AppColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+                clearButtonMode: OverlayVisibilityMode.editing,
+                decoration: BoxDecoration(
+                  color: AppColors.groupedSurface.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             Expanded(

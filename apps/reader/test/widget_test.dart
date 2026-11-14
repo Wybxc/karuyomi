@@ -241,6 +241,47 @@ void main() {
     );
   }
 
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'search does not retain autofill clients after $brightness navigation',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await tester.pumpApp(KaruyomiApp(platform: platform));
+        await tester.pumpAndSettle();
+        final navigation = find.byKey(const ValueKey('app-navigation'));
+        await tester.tap(
+          find.descendant(of: navigation, matching: find.text('浏览')),
+        );
+        await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('source-directory-search'));
+        await tester.enterText(search, '草稿');
+        expect(tester.testTextInput.hasAnyClients, true);
+        expect(tester.testTextInput.setClientArgs, isNotNull);
+        expect(
+          tester.testTextInput.setClientArgs!['autofill'],
+          isNull,
+          reason: 'search must not create a dormant browser autofill form',
+        );
+        await tester.tap(
+          find.descendant(of: navigation, matching: find.text('设置')),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.testTextInput.hasAnyClients, false);
+        await tester.tap(
+          find.descendant(of: navigation, matching: find.text('浏览')),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(search, '另一个查询');
+        expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets(
     'chapter navigation preserves Source reference and Native reports its image gate',
     (tester) async {

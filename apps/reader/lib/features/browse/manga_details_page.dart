@@ -950,6 +950,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
       ),
       const SizedBox(height: 12),
       CupertinoTextField(
+        autofillHints: null,
         key: const ValueKey('chapter-search'),
         controller: _chapterSearch,
         enabled: !_opening,

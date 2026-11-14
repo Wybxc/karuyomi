@@ -189,6 +189,7 @@ class const SourceDirectory({
           children: [
             Expanded(
               child: CupertinoTextField(
+                autofillHints: null,
                 key: const ValueKey('source-directory-search'),
                 controller: search,
                 placeholder: '查找漫画源名称',

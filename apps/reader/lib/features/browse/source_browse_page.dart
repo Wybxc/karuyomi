@@ -401,6 +401,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: CupertinoTextField(
+                      autofillHints: null,
                       key: const ValueKey('source-manga-search'),
                       controller: _search,
                       enabled: !busy && canBrowse,

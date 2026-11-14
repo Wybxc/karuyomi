@@ -188,6 +188,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           children: [
             Expanded(
               child: CupertinoTextField(
+                autofillHints: null,
                 key: const ValueKey('extensions-search'),
                 controller: _search,
                 placeholder: '查找扩展或漫画源名称',

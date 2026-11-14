@@ -441,6 +441,7 @@ class _MigrationPageState extends State<MigrationPage> {
                     : null,
               ),
               CupertinoTextField(
+                autofillHints: null,
                 key: const ValueKey('migration-search'),
                 controller: _search,
                 enabled:

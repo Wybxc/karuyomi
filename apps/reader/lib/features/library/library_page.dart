@@ -884,6 +884,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 children: [
                   Expanded(
                     child: CupertinoTextField(
+                      autofillHints: null,
                       controller: _search,
                       placeholder: '漫画、作者或漫画源',
                       placeholderStyle: TextStyle(

@@ -723,6 +723,8 @@ stateDiagram-v2
     state "26.02 外观设置" as U1
     state "26.03 全局阅读设置" as U2
     state "26.04 平板设置双栏" as U14
+    state "26.05 跟随系统亮度" as U15
+    state "26.06 显式主题优先" as U16
     state "28.01 高级与诊断入口" as U3
     state "28.02 应用与设备诊断" as U4
     state "28.03 Android后台任务诊断" as U12
@@ -748,6 +750,11 @@ stateDiagram-v2
     U12 --> U4: 返回
     U4 --> U3: 返回
     U1 --> U5: 选择
+    U1 --> U15: 选择跟随系统
+    U15 --> U15: 系统浅色变深色
+    U15 --> U16: 明确选择浅色或深色
+    U16 --> U16: 系统改变但应用保持显式主题
+    U16 --> U15: 再选跟随系统（待验）
     U2 --> U5: 选择
     U0 --> U6: 长选项
     U6 --> U7: 搜索无匹配
@@ -764,30 +771,34 @@ stateDiagram-v2
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
     class U13 partial
-    class U0,U1,U2,U3,U4,U5,U12,U14 paired
+    class U0,U1,U2,U3,U4,U5,U12,U14,U15,U16 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                                             | 浅色                                                               | 深色                                                                 |
-| ------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”           | `s2601-settings-light`                                             | `s2601-settings-dark`                                                |
-| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                                      | `s2602-appearance-light`                                           | `s2602-appearance-dark`                                              |
-| 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                           | `s2603-reader-preferences-*-light`                                 | `s2603-reader-preferences-*-dark`                                    |
-| 26.04   | 平板设置目录/当前分类与外观同屏、当前主题、分栏边界；768×1024dp                   | `nav-settings-tablet-light`                                        | `s2604-settings-tablet-dark`                                         |
-| 28.01   | 高级设置首屏、数据/网络、书架和阅读/扩展末段；中段有滚动偏差，未操作维护/网络选项 | `s2801-advanced-{top,network,library,extensions}-light`            | `s2801-advanced-{top,network,library,extensions}-dark`               |
-| 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段               | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`      | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`          |
-| 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体          | `s2803-worker-info-light`、`s2804-worker-horizontal-light`         | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`             |
-| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                  | 待（`s2803-worker-copy-light` 只有空容器，排除）                   | `s2803-worker-copy-dark`（含测试任务ID开头的系统预览；完整内容待验） |
-| 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变                      | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light` | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`     |
-| 29.02   | 当前项、可搜索的长选项、搜索/取消和键盘                                           | 待                                                                 | 待（先核对 Mihon 是否采用同样搜索结构）                              |
-| 29.03   | 查询、无匹配、清空/取消                                                           | 待                                                                 | 待（若 Mihon 无此界面，记为 Karuyomi 独有并保留源码依据）            |
-| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | 待                                                                 | `category-create-default-dark`（分类分项）                           |
-| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | 待                                                                 | `category-ime-default-dark`（分类分项）                              |
-| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                  | 待                                                                 | 待                                                                   |
-| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02        | 待                                                                 | 待                                                                   |
+| 状态 ID | 最小必要信息/采集触发                                                             | 浅色                                                                    | 深色                                                                  |
+| ------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”           | `s2601-settings-light`                                                  | `s2601-settings-dark`                                                 |
+| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                                      | `s2602-appearance-light`                                                | `s2602-appearance-dark`                                               |
+| 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                           | `s2603-reader-preferences-*-light`                                      | `s2603-reader-preferences-*-dark`                                     |
+| 26.04   | 平板设置目录/当前分类与外观同屏、当前主题、分栏边界；768×1024dp                   | `nav-settings-tablet-light`                                             | `s2604-settings-tablet-dark`                                          |
+| 26.05   | 跟随系统选中、DEFAULT卡及实际应用表面；系统浅→深后仍停在原外观页                  | `s2605-appearance-system-light`                                         | `s2605-appearance-system-dark`                                        |
+| 26.06   | 显式浅/深选中、与系统相反时仍使用应用主题，系统变化后保持该选择                   | `s2606-appearance-explicit-light`、`s2606-explicit-system-change-light` | `s2606-appearance-explicit-dark`、`s2606-explicit-system-change-dark` |
+| 28.01   | 高级设置首屏、数据/网络、书架和阅读/扩展末段；中段有滚动偏差，未操作维护/网络选项 | `s2801-advanced-{top,network,library,extensions}-light`                 | `s2801-advanced-{top,network,library,extensions}-dark`                |
+| 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段               | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`           | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`           |
+| 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体          | `s2803-worker-info-light`、`s2804-worker-horizontal-light`              | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`              |
+| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                  | 待（`s2803-worker-copy-light` 只有空容器，排除）                        | `s2803-worker-copy-dark`（含测试任务ID开头的系统预览；完整内容待验）  |
+| 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变                      | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light`      | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`      |
+| 29.02   | 当前项、可搜索的长选项、搜索/取消和键盘                                           | 待                                                                      | 待（先核对 Mihon 是否采用同样搜索结构）                               |
+| 29.03   | 查询、无匹配、清空/取消                                                           | 待                                                                      | 待（若 Mihon 无此界面，记为 Karuyomi 独有并保留源码依据）             |
+| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | 待                                                                      | `category-create-default-dark`（分类分项）                            |
+| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | 待                                                                      | `category-ime-default-dark`（分类分项）                               |
+| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                  | 待                                                                      | 待                                                                    |
+| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02        | 待                                                                      | 待                                                                    |
 
 26.03 的 `*` 依次为 `top`、`display`、`paged`、`webtoon`、`navigation`、`actions`，已实看 `settings-reference-pairs-0.jpg` 至 `settings-reference-pairs-2.jpg`。首屏与末段两主题的应用 XML 边界一致；中间四段有约 3–15 物理像素的滚动差，部分首尾文字受裁切，只计状态覆盖，不能用于同位置叠图。六段覆盖默认模式/提示、显示/E-Ink、章节跳过、单页/条漫、输入和操作菜单；未实现的 Android 专属设置及 E-Ink 只作参考，不增加无效产品入口。
 
 26.04 已实看 `settings-tablet-pairs.jpg`：两栏各 384dp，左侧保留完整目录、当前“外观”高亮，右侧展示外观字段。深色多出“纯黑深色模式”一行，后续字段自然下移；不能把整张图强行套成相同纵坐标。恢复手机尺寸后返回独立页面。其它设置分类在双栏中的切换、输入与返回仍待，不能用外观主图代替。
+
+26.05/26.06 已实看 `theme-system-reference-pairs.jpg`、`theme-explicit-reference-pairs.jpg` 与 `theme-explicit-transition-pairs.jpg`。先选择跟随系统，参考模拟器系统由浅变深时应用随之变化；再选显式浅色/深色，分别核对与系统相反的主图，以及系统变化后页面和选中值保持。跟随系统处于浅色时仍显示纯黑模式行，而显式浅色隐藏该行，不能用两种设置下的浅色图直接叠图。最后恢复原系统浅色、应用显式深色并暂停模拟器，未改网络、分类或阅读设置。以上是Mihon本地偏好的参考；Karuyomi主题仍须取得服务端确认才应用，两种保存语义分开验收。
 
 28 和 29 已实看 `settings-reference-pairs-3.jpg` 至 `settings-reference-pairs-5.jpg`，并单独核对 Worker info 横向滚动及深色复制图。28.03 是 Mihon 的 Android WorkManager 诊断，与 Cloudflare Worker 无关；当时仅有一项 Enqueued，Finished/Running 为 `-`，其它运行状态仍待。横向滚动会移动整块正文，标题栏保持位置。28.04 属于独立 Android 系统反馈，不将系统容器配色纳入 Mihon 应用角色；未验证完整复制内容。29.01 本轮只取消，没有改动默认阅读模式；选中其他模式并返回仍待。
 
