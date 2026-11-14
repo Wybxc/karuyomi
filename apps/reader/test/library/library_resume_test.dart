@@ -1,7 +1,6 @@
 import '../../test_support/cupertino.dart';
 
 import 'package:karuyomi/widgets/app_page_route.dart';
-import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
 
@@ -257,14 +256,20 @@ void main() {
             .initialOrder,
         isNull,
       );
-      expect(
-        tester
-            .widget<ChoiceField<ChapterOrder>>(
-              find.byType(ChoiceField<ChapterOrder>),
-            )
-            .value,
-        ChapterOrder.source,
-      );
+      final options = find.byKey(const ValueKey('reader-chapter-options'));
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      for (final order in ChapterOrder.values) {
+        final item = tester.widget<CupertinoMenuItem>(
+          find.byKey(ValueKey(('reader-chapter-order', order))),
+        );
+        expect(
+          item.trailing,
+          order == ChapterOrder.source ? isA<Icon>() : isNull,
+        );
+      }
+      await tester.tap(options);
+      await tester.pumpAndSettle();
       await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
       expect(find.byType(LibraryPage), findsOneWidget);
