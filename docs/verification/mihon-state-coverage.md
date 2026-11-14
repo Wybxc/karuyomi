@@ -876,7 +876,7 @@ stateDiagram-v2
 
 ### 26：Karuyomi 最终 Cupertino 设置导航
 
-以下沿用26组参考结构，同时保留Karuyomi的服务端确认语义；这是最终目标画面清单，不能用第一阶段旧配色截图填入。代码/组件验证与正式Web实拍分别记录。
+以下沿用26组参考结构，同时保留Karuyomi的服务端确认语义；这是最终目标画面清单，不能用第一阶段旧配色截图填入。代码/组件验证与正式Web实拍分别记录。蓝色仅代表`729cbe3`的双主题主图已核对，全部变体与转换仍待。
 
 ```mermaid
 stateDiagram-v2
@@ -903,17 +903,21 @@ stateDiagram-v2
     Panes --> Panes: 切换栏目不隐式提交
     Panes --> Connection: 窄屏且当前为连接
     Panes --> Appearance: 窄屏且当前为外观
+    classDef captured fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    class Directory,Appearance,Reading,Input,Connection,About,Panes captured
 ```
 
-| 目标画面/必要信息                                                    | 浅色正式Web | 深色正式Web |
-| -------------------------------------------------------------------- | ----------- | ----------- |
-| 窄屏目录：五个已有栏目、图标/标题/短说明、chevron、未保存/待确认反馈 | 待          | 待          |
-| 外观：当前值、保存/重取、草稿不提前换主题、确认后应用                | 待          | 待          |
-| 阅读显示：阅读/页组/适配/裁白/背景/调暗、说明与确认状态              | 待          | 待          |
-| 输入：点击区与快捷键当前值、说明和确认状态                           | 待          | 待          |
-| 服务连接：地址、连接与登录、当前身份/错误/恢复、输入可编辑           | 待          | 待          |
-| 关于：名称、版本与简述、返回                                         | 待          | 待          |
-| 平板双栏：当前项、完整目录及对应详情，跨尺寸保持草稿/光标/焦点       | 待          | 待          |
+| 目标主画面/必要信息                                         | 浅色正式Web                                             | 深色正式Web                                            |
+| ----------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------ |
+| 窄屏目录：五个栏目、图标/标题/短说明、chevron               | `karuyomi-729cbe3-settings-directory-light.jpg`         | `karuyomi-729cbe3-settings-directory-dark.jpg`         |
+| 外观：当前已确认值、保存/重新读取                           | `karuyomi-729cbe3-settings-appearance-light.jpg`        | `karuyomi-729cbe3-settings-appearance-dark.jpg`        |
+| 阅读显示：模式/页组/适配/裁白/背景/调暗、辅助说明与确认状态 | `karuyomi-729cbe3-settings-reading-light.jpg`           | `karuyomi-729cbe3-settings-reading-dark.jpg`           |
+| 输入：点击区与快捷键当前值、辅助说明与确认状态              | `karuyomi-729cbe3-settings-input-light.jpg`             | `karuyomi-729cbe3-settings-input-dark.jpg`             |
+| 服务连接：地址、连接/登录与当前身份；Web同源只读            | `karuyomi-729cbe3-settings-connection-light.jpg`        | `karuyomi-729cbe3-settings-connection-dark.jpg`        |
+| 关于：名称、版本与简述、返回                                | `karuyomi-729cbe3-settings-about-light.jpg`             | `karuyomi-729cbe3-settings-about-dark.jpg`             |
+| 平板双栏：当前项、完整目录和对应连接详情                    | `karuyomi-729cbe3-settings-connection-tablet-light.jpg` | `karuyomi-729cbe3-settings-connection-tablet-dark.jpg` |
+
+同一正式CI产物、官方隔离harness和临时D1，无fixture/Source。上述JPEG及联系表已实看，缺文字/底栏的早期帧已排除，原因未定，不能把重拍当作全部转场验收。两主题平板五项各有唯一可访问节点；聚焦只读地址后离页的DOM输入/提交均为0，独立API确认两次主题保存后revision为2、主题DARK。未保存/待确认、保存失败/精确重试、身份/Access恢复、字号/减少动态和全部导航转换的最终Web画面仍待；跨尺寸草稿/光标/焦点以及原生可编辑服务地址保留组件证据，不计为本次浏览器通过。证据范围见[验证记录](mihon-cupertino-fidelity.md#最终-cupertino-配色导航与设置路由)。
 
 ### 15：Karuyomi 跨源搜索的目标状态
 

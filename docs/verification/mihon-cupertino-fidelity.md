@@ -1,6 +1,6 @@
 # Mihon 布局与配色对照验证
 
-2026-11-14，进行中。范围见[30 组页面矩阵](../design/mihon-cupertino-fidelity.md)，待办见[实施计划](../plan/mihon-cupertino-fidelity.md)。本轮尚未通过逐页像素、最终 Cupertino 或生产验收。
+2026-11-15，进行中。范围见[30 组页面矩阵](../design/mihon-cupertino-fidelity.md)，待办见[实施计划](../plan/mihon-cupertino-fidelity.md)。本轮尚未通过逐页像素、最终 Cupertino 或生产验收。
 
 [逐状态截图状态机](mihon-state-coverage.md)现为参考采集进度入口，分别记录每个状态的浅/深图和缺口；本记录继续汇总实际工程与运行证据。`f0f648b` 的测试辅助代码大括号提示及 `44fa79d` 的两项旧色值断言已修复；`a894832` 的 [push CI](https://github.com/Wybxc/karuyomi/actions/runs/43541437961)与 [PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43541443714)均完整通过，分支未部署。这项工程结果不替代逐页视觉验收。
 
@@ -108,7 +108,13 @@
 
 `d9fad79`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43617551512)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43617554296)完整通过，含787项Dart、531项Vitest及Web/候选Wasm构建；三个改动Dart文件严格分析、完整格式/依赖检查和标准prek通过。复用正式Web artifact并校验39个Flutter清单条目，在同一官方隔离流程中复验：浅/深平板五个栏目动作各有唯一可访问节点，目录与连接详情同时进入AX树；聚焦只读地址再离开后，两主题的DOM输入数与“提交”数均为0。保留`karuyomi-d9fad79-browser-checks.json`与两主题AX快照，独立API确认两次主题保存后revision均为2、主题DARK。未执行Source或生产Access；控制台无warn/error，视口恢复且harness退出0。
 
-设置目录/五个详情及平板连接已采双主题JPEG并实看联系表；部分详情截图仍有返回/标签栏未稳定绘制的帧，不作为整页最终画面。实看还发现`CupertinoListSection.insetGrouped`的footer沿用17px正文样式；官方固定版本的`CupertinoFormSection`自带13px/secondaryLabel辅助样式。现已直接采用后者，同时删除重复背景、圆角和分隔配置，未自行复制其样式值。相同49项回归再次通过；后续完整CI与稳定辅助文字画面另验。
+设置目录/五个详情及平板连接已采双主题JPEG并实看联系表；部分详情截图仍有返回/标签栏未稳定绘制的帧，不作为整页最终画面。实看还发现`CupertinoListSection.insetGrouped`的footer沿用17px正文样式；官方固定版本的`CupertinoFormSection`自带13px/secondaryLabel辅助样式。现已直接采用后者，同时删除重复背景、圆角和分隔配置，未自行复制其样式值。相同49项回归再次通过。
+
+表单收敛提交`729cbe3`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43620115529)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43620120739)完整通过，含787项Dart（22 + 87 + 678）、531项Vitest及正式Web/候选Wasm构建，部署跳过。唯一改动Dart文件严格分析零问题，完整格式及标准prek通过。
+
+校验该提交正式Web artifact的39个Flutter清单条目后，复用官方Wrangler隔离harness、临时D1、acceptance-owner、无fixture，在内置浏览器实看360×800目录与五个详情，以及768×1024连接双栏的浅/深主图。阅读调暗与点击区/快捷键说明使用官方13px次级文字；分组背景、正文/辅助文字、系统蓝操作和标签栏随主题解析。两张联系表`karuyomi-729cbe3-settings-{pages,nav}-pairs.jpg`已实看。此前曾取得缺副标题、返回文字或底栏的帧；独立重载后重新导航、逐页观察并重拍，当前保存主图完整。原因尚未确定，不能把缺项帧直接归因于动画或截图工具，也不以重拍代替全部转场验收。
+
+保留`karuyomi-729cbe3-browser-checks.json`：浅/深平板五项目录按钮各有一个可访问节点；聚焦Web同源只读地址后离页，DOM输入与“提交”数均为0。Web地址不可编辑，原生地址草稿/焦点只有组件证据。独立`GET /api/settings`确认两次主题保存后的`global.revision=2`、`accountRevision=2`与主题DARK。控制台无warn/error，视口与浏览器可见性已恢复，临时标签关闭，harness退出0。未安装或执行Source，未做生产Access/续读或原生现场验收；该批主图不覆盖草稿、失败、减少动态、大字号与全页面变体。
 
 ### 实拍布局与颜色锚点
 
