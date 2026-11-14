@@ -7,6 +7,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -125,7 +126,7 @@ void main() {
           (widget) =>
               widget is ColoredBox &&
               widget.color ==
-                  CupertinoColors.separator.resolveFrom(tester.element(open())),
+                  AppColors.separator.resolveFrom(tester.element(open())),
         ),
         findsWidgets,
       );

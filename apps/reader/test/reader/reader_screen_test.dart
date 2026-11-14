@@ -15,6 +15,7 @@ import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/features/reader/resource_image.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:reader_core/reader_core.dart';
 
 final class FixturePageProvider implements PageProvider {
@@ -1546,7 +1547,7 @@ void main() {
             .backgroundColor,
         CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
       );
-      expect(textColor, CupertinoColors.label.resolveFrom(readerContext));
+      expect(textColor, AppColors.label.resolveFrom(readerContext));
       expect(dimmer, findsNothing);
       expect(provider.acquired.map((page) => page.pageKey), acquired);
       expect(tester.takeException(), isNull);
