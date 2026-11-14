@@ -970,25 +970,72 @@ stateDiagram-v2
     Enabled --> Candidate: 从候选页安装后再卸载
 ```
 
-| 状态 ID | 最小必要信息                                           | 浅色正式Web                                                                               | 深色正式Web |
-| ------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ----------- |
-| 08.K1   | 分组、名称、当前候选版本/语言、状态、独立安装与行详情  | `karuyomi-5d8bd71-extensions-available-light.jpg`（布局主图；键盘入口失败，排除最终验收） | 待          |
-| 08.K2   | 已确认安装、精确版本/语言、本机准备状态、管理入口      | 待                                                                                        | 待          |
-| 08.K3   | 当前查询、无匹配原因、清空或清除筛选                   | 待                                                                                        | 待          |
-| 08.K4   | 当前语言、可选语言、全部语言与取消                     | 待                                                                                        | 待          |
-| 08.K5   | 仓库管理、本机存储和关闭                               | 待                                                                                        | 待          |
-| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装           | 待                                                                                        | 待          |
-| 08.K7   | 等待账户确认、停用重复写入、保留原操作                 | 待                                                                                        | 待          |
-| 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取             | 待                                                                                        | 待          |
-| 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源       | 待                                                                                        | 待          |
-| 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口  | 待                                                                                        | 待          |
-| 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开           | 待                                                                                        | 待          |
-| 09.K4   | 原仓库/包/构建身份、完整可选取正文、当前展开状态与收起 | 待                                                                                        | 待          |
-| 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留           | 待                                                                                        | 待          |
+| 状态 ID | 最小必要信息                                           | 浅色正式Web                                            | 深色正式Web                                                    |
+| ------- | ------------------------------------------------------ | ------------------------------------------------------ | -------------------------------------------------------------- |
+| 08.K1   | 分组、名称、当前候选版本/语言、状态、独立安装与行详情  | `karuyomi-9a09331-extensions-installed-light.jpg`      | `karuyomi-9a09331-extensions-available-system-dark.jpg`        |
+| 08.K2   | 已确认安装、精确版本/语言、本机准备状态、管理入口      | `karuyomi-9a09331-extensions-installed-light.jpg`      | `karuyomi-9a09331-extensions-install-observed-system-dark.jpg` |
+| 08.K3   | 当前查询、无匹配原因、清空或清除筛选                   | `karuyomi-9a09331-extensions-empty-light.jpg`          | `karuyomi-9a09331-extensions-empty-system-dark.jpg`            |
+| 08.K4   | 当前语言、可选语言、全部语言与取消                     | `karuyomi-9a09331-extensions-language-light.jpg`       | `karuyomi-9a09331-extensions-language-system-dark.jpg`         |
+| 08.K5   | 仓库管理、本机存储和关闭                               | `karuyomi-9a09331-extensions-menu-light.jpg`           | `karuyomi-9a09331-extensions-menu-system-dark.jpg`             |
+| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装           | 待                                                     | 待                                                             |
+| 08.K7   | 等待账户确认、停用重复写入、保留原操作                 | 待                                                     | 待                                                             |
+| 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取             | 待                                                     | 待                                                             |
+| 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源       | `karuyomi-9a09331-extension-candidate-enter-light.jpg` | `karuyomi-9a09331-extension-candidate-enter-system-dark.jpg`   |
+| 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口  | `karuyomi-9a09331-extension-installed-light.jpg`       | `karuyomi-9a09331-extension-installed-system-dark.jpg`         |
+| 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开           | `karuyomi-9a09331-extension-disabled-light.jpg`        | `karuyomi-9a09331-extension-disabled-system-dark.jpg`          |
+| 09.K4   | 原仓库/包/构建身份、完整可选取正文、当前展开状态与收起 | 待                                                     | 待                                                             |
+| 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留           | 待                                                     | 待                                                             |
 
 这里只跟踪当前目标画面；主图、变体及每条转换分别验收。08.K8的冲突/拒绝/结果未知、资源清理失败、已移除仓库/已下架构建、长文本与减少动态效果仍须分项补充，不用正常启停主图代替。
 
-`5ed6dd6`浅色列表与候选详情已实看，Tab/空格可达，Enter仍失败，61语言还截断版本/状态，因此继续排除08.K1/09.K1最终通过。已安装MangaDex的绿色开关、系统红卸载及页脚已有浅色布局图，同样因摘要缺口不计09.K2完成。后续修复的模拟Web Enter/小键盘Enter及61语言双主题回归通过；正式双主题画面待CI产物。MangaDex英文Source初次和一次重试均容器中断，不能填入Source toggle的通过项。
+`5ed6dd6`浅色列表与候选详情已实看，Tab/空格可达，Enter仍失败，61语言还截断版本/状态，因此继续排除08.K1/09.K1最终通过。已安装MangaDex的绿色开关、系统红卸载及页脚已有浅色布局图，同样因摘要缺口不计09.K2完成。`9a09331`完整CI和上述双主题正式Web已确认版本/状态可见，候选Enter可用；历史失败继续保留。浅色列表有一个已安装项，深色可安装图尚未安装，不能作为同数据像素叠图。Source及诊断入口仍无键盘焦点，09.K2/09.K3仅为画面和启停证据；后续修复的正式Web待验。准备/等待确认未截到主图，诊断展开中标题缺失帧也排除。MangaDex英文Source初次和一次重试均容器中断，不能填入Source toggle的通过项。
+
+### 14：Karuyomi Source 会话偏好的目标状态
+
+此图补充真实Source的会话开关验证；文本、单选、多选、依赖、取消与账户恢复仍按14组参考和独有状态逐项补齐。以下历史`5ed6dd6`主图尚未采用新表单分组，不能填作最终Cupertino已完成。
+
+```mermaid
+stateDiagram-v2
+    [*] --> LoadingPreferences
+    state "14.K1 正在读取设置" as LoadingPreferences
+    state "14.K2 会话开关关闭" as ToggleOff
+    state "14.K3 会话开关开启" as ToggleOn
+    state "14.K4 修改进行中" as ChangingPreference
+    state "14.K5 原请求待确认" as PreferencePending
+    state "14.K6 失败与恢复" as PreferenceFailed
+    state "14.K7 不支持的设置" as UnsupportedPreference
+    state "14.K8 同会话重开保持" as SessionReopened
+    state "14.K9 新文档默认值" as NewDocument
+    LoadingPreferences --> ToggleOff: 读取成功
+    LoadingPreferences --> PreferenceFailed: 读取失败
+    ToggleOff --> ChangingPreference: 打开
+    ToggleOn --> ChangingPreference: 关闭
+    ChangingPreference --> ToggleOn: 会话修改完成
+    ChangingPreference --> ToggleOff: 会话修改完成
+    ChangingPreference --> PreferencePending: 账户请求结果未知
+    ChangingPreference --> PreferenceFailed: 修改失败
+    PreferencePending --> ToggleOn: 原操作确认且值为开启
+    PreferenceFailed --> LoadingPreferences: 显式恢复
+    ToggleOn --> SessionReopened: 关闭后同会话重开
+    SessionReopened --> ToggleOn: 保持开启
+    ToggleOn --> NewDocument: 新文档重新打开
+    NewDocument --> ToggleOff: 会话设置恢复默认
+    LoadingPreferences --> UnsupportedPreference: 节点不受支持
+```
+
+| 状态 ID | 最小必要信息                            | 浅色正式Web                                                       | 深色正式Web                                                             |
+| ------- | --------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 14.K1   | 源身份、正在读取、关闭可取消            | 待                                                                | 待                                                                      |
+| 14.K2   | 设置名、关闭值、会话范围                | `karuyomi-5ed6dd6-dm5-preferences-off-light.jpg`（历史布局）      | `karuyomi-5ed6dd6-dm5-preferences-off-system-dark.jpg`（历史布局）      |
+| 14.K3   | 设置名、开启值、会话范围                | `karuyomi-5ed6dd6-dm5-preferences-on-light.jpg`（历史布局）       | `karuyomi-5ed6dd6-dm5-preferences-on-system-dark.jpg`（历史布局）       |
+| 14.K4   | 请求进行中、重复操作禁用、关闭的影响    | 待                                                                | 待                                                                      |
+| 14.K5   | 原请求身份/值、未知结果、精确重试与恢复 | 待                                                                | 待                                                                      |
+| 14.K6   | 失败原因、现值、明确恢复入口            | 待                                                                | 待                                                                      |
+| 14.K7   | 设置名、不支持原因、不可误操作          | `karuyomi-5ed6dd6-dm5-preferences-off-light.jpg`（历史布局）      | `karuyomi-5ed6dd6-dm5-preferences-off-system-dark.jpg`（历史布局）      |
+| 14.K8   | 同一会话、已改值、范围说明              | `karuyomi-5ed6dd6-dm5-preferences-reopened-light.jpg`（历史布局） | `karuyomi-5ed6dd6-dm5-preferences-reopened-system-dark.jpg`（历史布局） |
+| 14.K9   | 独立新文档、默认值、会话范围            | 待（已有关闭图，转换检查未确认）                                  | 待                                                                      |
+
+动漫屋1.6.3的“章末吐槽页”已在两主题完成0→1和同会话重开仍1；独立API确认账户revision未因会话开关变化，账户Source entries为空。未执行unsupported Cookie动作或动漫屋图片阅读。Source行键盘、分组说明与无关语义合并缺口已经进入后续修改，66项定向回归及严格分析通过；正式CI/Web另验。不得将本图或历史主图称作全Source偏好组通过。
 
 ### 15：Karuyomi 跨源搜索的目标状态
 

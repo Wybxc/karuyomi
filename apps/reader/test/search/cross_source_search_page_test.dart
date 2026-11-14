@@ -3,6 +3,7 @@ import 'package:karuyomi/widgets/app_page_route.dart';
 import '../test_app.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
@@ -82,6 +83,36 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    testWidgets('search scope opens and closes by keyboard in $brightness', (
+      tester,
+    ) async {
+      final service = FakeSourceSearch();
+      await openPage(tester, service, brightness: brightness);
+      final option = find.byKey(
+        ValueKey(('cross-search-source', service.targets.first.key)),
+      );
+      expect(option.hitTestable(), findsOneWidget);
+      const key = ValueKey('cross-search-scope-toggle');
+      Key? focusedButton() => FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<CupertinoButton>()
+          ?.key;
+      for (var attempt = 0; attempt < 12 && focusedButton() != key; attempt++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+      expect(focusedButton(), key);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(option.hitTestable(), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(option.hitTestable(), findsOneWidget);
+      expect(service.tasks, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpApp(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('long source failure keeps retry reachable in $brightness', (
       tester,
     ) async {

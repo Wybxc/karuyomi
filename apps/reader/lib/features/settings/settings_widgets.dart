@@ -561,33 +561,45 @@ class const _SettingsEditor({
                             if (item != _SettingsSection.connection ||
                                 connection != null)
                               Semantics(
+                                container: true,
                                 selected: wide ? section == item : null,
-                                child: CupertinoListTile(
-                                  key: ValueKey('settings-section-${item.id}'),
-                                  backgroundColor: wide && section == item
-                                      ? AppColors.selection.resolveFrom(context)
-                                      : null,
-                                  leading: Icon(
-                                    item.icon,
-                                    size: 24,
-                                    color: AppColors.accent.resolveFrom(
-                                      context,
+                                child: CupertinoButton(
+                                  key: ValueKey((
+                                    'settings-navigation',
+                                    item.id,
+                                  )),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => select(item),
+                                  child: CupertinoListTile(
+                                    key: ValueKey(
+                                      'settings-section-${item.id}',
                                     ),
+                                    backgroundColor: wide && section == item
+                                        ? AppColors.selection.resolveFrom(
+                                            context,
+                                          )
+                                        : null,
+                                    leading: Icon(
+                                      item.icon,
+                                      size: 24,
+                                      color: AppColors.accent.resolveFrom(
+                                        context,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      item.title,
+                                      maxLines: 2,
+                                      softWrap: true,
+                                    ),
+                                    subtitle: Text(
+                                      item.subtitle,
+                                      maxLines: 3,
+                                      softWrap: true,
+                                    ),
+                                    trailing: wide
+                                        ? null
+                                        : const CupertinoListTileChevron(),
                                   ),
-                                  title: Text(
-                                    item.title,
-                                    maxLines: 2,
-                                    softWrap: true,
-                                  ),
-                                  subtitle: Text(
-                                    item.subtitle,
-                                    maxLines: 3,
-                                    softWrap: true,
-                                  ),
-                                  trailing: wide
-                                      ? null
-                                      : const CupertinoListTileChevron(),
-                                  onTap: () => select(item),
                                 ),
                               ),
                         ],

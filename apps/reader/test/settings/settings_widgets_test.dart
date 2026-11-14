@@ -5,6 +5,7 @@ import '../test_app.dart';
 import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/settings_repository.dart';
@@ -157,6 +158,39 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'settings directory opens a detail by keyboard in $appearance',
+      (tester) async {
+        final controller = editor();
+        await tester.runAsync(controller.refresh);
+        await show(
+          tester,
+          controller,
+          appearance: appearance,
+          openAppearance: false,
+        );
+        const key = ValueKey(('settings-navigation', 'appearance'));
+        Key? focusedButton() => FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<CupertinoButton>()
+            ?.key;
+        for (
+          var attempt = 0;
+          attempt < 10 && focusedButton() != key;
+          attempt++
+        ) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+        }
+        expect(focusedButton(), key);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('global-theme')), findsOneWidget);
+        expect(writes(), isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+
     testWidgets(
       'settings directory preserves its draft through categories and resize in $appearance',
       (tester) async {

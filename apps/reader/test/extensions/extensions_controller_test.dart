@@ -418,6 +418,90 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
+      'installed source and diagnostic actions have independent keyboard access in $appearance',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          await manager.install(catalog.builds.single);
+          final writes = platform.businessServer.requests
+              .where((request) => request.method == 'POST')
+              .length;
+          final opened = <wire.CatalogSource>[];
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ExtensionDetailsPage(
+                controller: manager,
+                packageName: 'eu.kanade.source.test',
+                onOpenSource: (extension, source) async {
+                  expect(
+                    extension.installed!.packageName,
+                    'eu.kanade.source.test',
+                  );
+                  opened.add(source);
+                },
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.getSemantics(find.text('卸载扩展')).label, '卸载扩展');
+          final sourceKey = ValueKey((
+            'extension-source',
+            testCatalogSource.id,
+          ));
+          Key? focusedButton() => FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<CupertinoButton>()
+              ?.key;
+          for (
+            var attempt = 0;
+            attempt < 12 && focusedButton() != sourceKey;
+            attempt++
+          ) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pump();
+          }
+          expect(focusedButton(), sourceKey);
+          expect(
+            tester.getSemantics(find.byKey(sourceKey)).label,
+            isNot(contains('包含的漫画源')),
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+          expect(opened.single.id, testCatalogSource.id);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          expect(
+            FocusManager.instance.primaryFocus?.context
+                ?.findAncestorWidgetOfExactType<CupertinoButton>(),
+            tester.widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '诊断信息'),
+            ),
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+          expect(
+            find.textContaining('包名：eu.kanade.source.test'),
+            findsOneWidget,
+          );
+          expect(platform.invocations, isEmpty);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            hasLength(writes),
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
       'extension search stays readable and clearable in $appearance',
       (tester) async {
         tester.platformDispatcher.platformBrightnessTestValue =

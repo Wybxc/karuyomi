@@ -128,13 +128,25 @@
 
 后续修复把行内容导航与尾部操作改为并列的官方按钮，内容按钮内的列表行不再有第二个操作；源清单的单一导航仍直接使用官方onTap。新增浅/深真实Tab遍历及Enter打开详情且零账户写入的回归，同批44项扩展测试与严格分析通过；后续完整CI及正式Web双主题复验另记。上述浏览器控制环境已恢复，harness退出0，未执行Source或生产Access。
 
-Source偏好toggle仍无真实浏览器证据。已只读核对现网190包索引和MangaDex 1.6.1清单：907135B编码包、61个Source、宿主ABI与共享材料身份与当前两包快照相同，官方源码提供多个SwitchPreferenceCompat；可通过隔离账户的额外仓库登记尝试真实验证，不需重新AOT。材料匹配不是初始化或偏好运行通过，尚未执行该包。
+此前Source偏好toggle尚无真实浏览器证据。已只读核对现网190包索引和MangaDex 1.6.1清单：907135B编码包、61个Source、宿主ABI与共享材料身份与当前两包快照相同，官方源码提供多个SwitchPreferenceCompat；可通过隔离账户的额外仓库登记尝试真实验证，不需重新AOT。材料匹配不是初始化或偏好运行通过，尚未执行该包。
 
 `5ed6dd6`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43626496683)完整成功，含793项Dart（22 + 87 + 684）、531项Vitest及Web/候选Wasm构建。其正式Web产物在隔离harness中确认行已是`role=button, tabindex=0`，实际Tab可在详情和安装之间移动；Enter仍未激活，空格才进入候选详情。独立`GET /api/settings`确认导航前后`global.revision=1`、`accountRevision=1`，未写安装选择。`karuyomi-5ed6dd6-extensions-available-light.jpg`与`extension-candidate-space-light`仅为当前布局及空格激活证据，不能标为Enter验收通过。
 
 真实MangaDex的61语言摘要在列表/详情中占满三行，版本和状态被截断；原始画面保留为`mangadex-enabled-light-before-summary-fix`。后续修复缩短语言摘要并优先显示精确版本，同时在应用入口修正Web Enter intent；新增模拟Web默认映射的Enter/小键盘Enter、输入不误激活及Tab跳过禁用操作回归，61语言的列表/详情双主题回归也已加入。该批57项定向测试通过，完整CI与后续正式Web证据另记。
 
 `5d8bd71`的额外仓库预览实际失败，未登记或执行Source；现网公开索引响应未提供跨源CORS，且其`keiyoushi`身份与默认仓库重复。随后仅为隔离验收，从现有公开发布中提取MangaDex清单和编码包，传输时验证编码/原文长度及哈希，确认共享材料身份一致，与原两包组成三包临时静态输入；其派生build-state绑定该子集，不是发布baseline，不重新AOT或修改上游业务。`5ed6dd6`已通过正式UI安装MangaDex并取得账户确认；首次打开英文Source和一次正式重试均出现“运行容器已中断”，偏好入口不可用，未取得toggle证据。保存`karuyomi-5ed6dd6-browser-findings.json`及失败主图；控制台无warn/error，视口已恢复、临时标签已关闭、harness退出0。初始化、偏好开关与在线阅读仍须分别验收，不能由安装成功推断兼容。
+
+### 最新正式 Web 与 Source 会话偏好
+
+`9a09331`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43629513501)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43629652977)完整成功，含797项Dart（22 + 87 + 688）、531项Vitest及Web/候选Wasm构建，未部署。正式Web artifact的39个Flutter清单条目已验证长度与哈希，仅本机低优先级Vite组装，无Flutter/AOT编译。
+
+在官方Wrangler隔离harness、临时D1、acceptance-owner、无fixture、四个现有已发布包中，以360×800内置浏览器核对系统深色和服务端已确认浅色：扩展列表、候选详情、无匹配、语言页、选项菜单，以及动漫屋已安装/停用详情均已实看。版本、语言数量、状态完整可见；Enter打开候选详情，两主题均成功；实际Tab从MangaDex详情按钮移至独立安装按钮。用尾部Enter安装动漫屋后仍留在列表，并显示账户已确认；两主题启停均有确认文字，开关保持标准绿/灰，卸载危险文字为系统红。
+
+`karuyomi-9a09331-browser-findings.json`及同前缀JPEG/AX保留实际范围。独立GET在深色候选导航前后完全相同，缺省revision为0、未安装；安装/停用/启用和浅色主题确认后revision为4，浅色两次启停后为6，与六次明确写入相符。语言、菜单、检索和详情不额外写账户。深色诊断截图截到展开中的标题缺失帧，排除稳定目标主图；准备和等待确认仅观察到AX瞬态，没有主截图。Source行和诊断入口的tabindex仍为null、详情状态组还合并无关操作，因此不计整组最终交互通过。控制台无warn/error，视口恢复、临时标签关闭、harness退出0。未执行该版本Source阅读、卸载、生产Access或原生现场验收。
+
+此前`5ed6dd6`中，现有公开动漫屋1.6.3包经传输验证后纳入隔离静态子集（Source 293789630396851172）；其真实热门目录有海贼王、青之芦苇等结果。真实“章末吐槽页”在系统深色和已确认浅色均完成关闭→开启→同会话关闭/重开仍开启，深色随后恢复关闭。该包无账户偏好同步规则；独立GET确认开关修改前后账户/全局revision分别保持1和2，Source账户entries为空。`karuyomi-5ed6dd6-dm5-{preferences-*,toggle-checks.json}`保留画面与检查。另留新文档浅色关闭图，但旧检查文件未确认该转换，继续待最新版本重放；不将会话内保存解释为跨文档同步。原“清除Cookie”缺少storage key，仍显示unsupported且未执行。MangaDex初次/重试中断和额外仓库预览失败保持原记录，不能被动漫屋成功覆盖。
+
+后续实现修正Source/设置目录/展开入口的键盘焦点，拆分独立操作语义，并将Source偏好改为官方表单分组、次级说明与系统红错误。66项定向回归和8文件严格分析通过，覆盖双主题键盘、独立操作、偏好会话/账户及既有恢复流程；新增测试首轮因语义句柄释放时机失败，修正测试生命周期后通过，原日志保留。完整格式/标准hook、CI和新正式Web仍分别待验，不以本地回归外推最终画面。
 
 ### 实拍布局与颜色锚点
 

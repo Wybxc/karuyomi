@@ -567,22 +567,29 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                               ? AnimationStyle.noAnimation
                               : null,
                           headerBuilder: (context, animation) => Semantics(
+                            container: true,
                             expanded: _scope.isExpanded,
-                            child: CupertinoListTile(
-                              title: Text(
-                                '搜索范围 · 已选 ${controller.selected.length} 个漫画源',
-                              ),
-                              onTap: () => _scope.isExpanded
+                            child: CupertinoButton(
+                              key: const ValueKey('cross-search-scope-toggle'),
+                              padding: EdgeInsets.zero,
+                              onPressed: () => _scope.isExpanded
                                   ? _scope.collapse()
                                   : _scope.expand(),
-                              trailing: RotationTransition(
-                                turns: animation.drive(
-                                  Tween(begin: 0.0, end: 0.25),
+                              child: CupertinoListTile(
+                                title: Text(
+                                  '搜索范围 · 已选 ${controller.selected.length} 个漫画源',
                                 ),
-                                child: Icon(
-                                  CupertinoIcons.chevron_right,
-                                  size: 16,
-                                  color: AppColors.accent.resolveFrom(context),
+                                trailing: RotationTransition(
+                                  turns: animation.drive(
+                                    Tween(begin: 0.0, end: 0.25),
+                                  ),
+                                  child: Icon(
+                                    CupertinoIcons.chevron_right,
+                                    size: 16,
+                                    color: AppColors.accent.resolveFrom(
+                                      context,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),

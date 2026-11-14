@@ -8,6 +8,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 
 import 'preference_fixtures.dart';
 
@@ -22,6 +23,7 @@ void main() {
   Future<void> open(
     WidgetTester tester, {
     Future<void> Function()? beforeFirstFrame,
+    Brightness? appearance,
   }) async {
     tester.view.physicalSize = const Size(480, 800);
     tester.view.devicePixelRatio = 1;
@@ -29,6 +31,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpApp(
       CupertinoApp(
+        theme: readerAppTheme(appearance),
         home: CupertinoPageScaffold(
           child: SourceBrowsePage(
             catalog: fixture.catalog,
@@ -65,6 +68,44 @@ void main() {
   Future<void> apply(WidgetTester tester) async {
     await tester.tap(find.text('应用此设置'));
     await tester.pumpAndSettle();
+  }
+
+  for (final appearance in Brightness.values) {
+    testWidgets(
+      'source preference controls and help keep separate semantic roles in $appearance',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          await open(tester, appearance: appearance);
+          final toggle = find.byKey(const ValueKey(('source-preference', '0')));
+          final label = tester.getSemantics(toggle).label;
+          expect(label, contains('隐藏付费章节'));
+          expect(label, isNot(contains('登录密码')));
+          expect(label, isNot(contains('服务器')));
+          final help = tester.element(find.text('显示全部章节\n服务端确认后同步'));
+          expect(
+            tester.widget<Text>(find.text('显示全部章节\n服务端确认后同步')).style!.fontSize,
+            13,
+          );
+          expect(
+            tester.widget<Text>(find.text('显示全部章节\n服务端确认后同步')).style!.color,
+            CupertinoColors.secondaryLabel.resolveFrom(help),
+          );
+          final footer = tester.element(find.textContaining('每次修改只执行一次漫画源操作。'));
+          expect(DefaultTextStyle.of(footer).style.fontSize, 13);
+          expect(
+            DefaultTextStyle.of(footer).style.color,
+            CupertinoColors.secondaryLabel.resolveFrom(footer),
+          );
+          expect(fixture.postedBodies, isEmpty);
+          expect(tester.takeException(), isNull);
+          await tester.tap(iconLabel('关闭设置'));
+          await tester.pumpAndSettle();
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
   }
 
   testWidgets(

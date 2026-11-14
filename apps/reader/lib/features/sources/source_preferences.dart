@@ -129,14 +129,17 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
       if (node.whichKind() != wire.PreferenceNode_Kind.group)
         account ? '服务端确认后同步' : '仅当前客户端会话',
     ];
+    final captionStyle = TextStyle(
+      fontSize: 13,
+      color: AppColors.secondaryLabel.resolveFrom(context),
+    );
     final key = ValueKey(('source-preference', path.join('.')));
     switch (node.whichKind()) {
       case wire.PreferenceNode_Kind.toggle:
         return MergeSemantics(
           child: CupertinoFormRow(
             prefix: Expanded(flex: 3, child: Text(node.title)),
-            helper: Text(caption.join('\n')),
-            padding: EdgeInsets.zero,
+            helper: Text(caption.join('\n'), style: captionStyle),
             child: CupertinoSwitch(
               key: key,
               value: node.toggle.value,
@@ -168,9 +171,9 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                   '未保存，使用漫画源默认值',
                 ...caption,
               ].join('\n'),
+              maxLines: 4,
             ),
             trailing: const Icon(CupertinoIcons.pencil),
-            padding: EdgeInsets.zero,
           ),
         );
       case wire.PreferenceNode_Kind.choice:
@@ -210,7 +213,10 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                   : null,
             ),
             if (node.choice.options.isEmpty) const Text('目前没有可选项'),
-            Text(caption.join('\n')),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(caption.join('\n'), style: captionStyle),
+            ),
           ],
         );
       case wire.PreferenceNode_Kind.multiChoice:
@@ -236,28 +242,24 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                 if (node.multiChoice.options.isEmpty) '目前没有可选项',
                 ...caption,
               ].join('\n'),
+              maxLines: 4,
             ),
             trailing: const Icon(CupertinoIcons.list_bullet),
-            padding: EdgeInsets.zero,
           ),
         );
       case wire.PreferenceNode_Kind.group:
-        return CupertinoListSection(
-          backgroundColor: AppColors.background.resolveFrom(context),
-          separatorColor: AppColors.separator.resolveFrom(context),
-          decoration: BoxDecoration(
-            color: AppColors.groupedSurface.resolveFrom(context),
-          ),
+        return Column(
           key: key,
-          header: Text(node.title),
-          footer: !account || node.summary.isEmpty ? null : Text(node.summary),
-          children: [
-            for (var index = 0; index < node.group.nodes.length; index++)
-              _node(node.group.nodes[index], [
-                ...path,
-                index,
-              ], parentEnabled && node.enabled),
-          ],
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _sections(
+            node.group.nodes,
+            path,
+            parentEnabled && node.enabled,
+            header: Text(node.title),
+            footer: !account || node.summary.isEmpty
+                ? null
+                : Text(node.summary),
+          ),
         );
       case wire.PreferenceNode_Kind.action:
         return CupertinoButton(
@@ -266,22 +268,64 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
           child: CupertinoListTile(
             key: key,
             title: Text(node.title),
-            subtitle: caption.isEmpty ? null : Text(caption.join('\n')),
+            subtitle: caption.isEmpty
+                ? null
+                : Text(caption.join('\n'), maxLines: 4),
             trailing: const Icon(CupertinoIcons.play),
-            padding: EdgeInsets.zero,
           ),
         );
       case wire.PreferenceNode_Kind.unsupported:
         return CupertinoListTile(
           key: key,
           title: Text(node.title),
-          subtitle: Text(node.unsupported.reason),
+          subtitle: Text(node.unsupported.reason, maxLines: 6),
           leading: const Icon(CupertinoIcons.info_circle),
-          padding: EdgeInsets.zero,
         );
       case wire.PreferenceNode_Kind.notSet:
         throw const FormatException('漫画源设置缺少类型');
     }
+  }
+
+  List<Widget> _sections(
+    List<wire.PreferenceNode> nodes,
+    List<int> parentPath,
+    bool parentEnabled, {
+    Widget? header,
+    Widget? footer,
+  }) {
+    final sections = <Widget>[];
+    var rows = <Widget>[];
+    void flush() {
+      if (rows.isEmpty && header == null) return;
+      sections.add(
+        Semantics(
+          container: true,
+          explicitChildNodes: true,
+          child: CupertinoFormSection.insetGrouped(
+            header: header,
+            footer: footer,
+            children: rows,
+          ),
+        ),
+      );
+      rows = [];
+      header = null;
+      footer = null;
+    }
+
+    for (var index = 0; index < nodes.length; index++) {
+      final node = nodes[index];
+      if (!node.visible) continue;
+      final path = [...parentPath, index];
+      if (node.whichKind() == wire.PreferenceNode_Kind.group) {
+        flush();
+        sections.add(_node(node, path, parentEnabled));
+      } else {
+        rows.add(_node(node, path, parentEnabled));
+      }
+    }
+    flush();
+    return sections;
   }
 
   @override
@@ -293,63 +337,83 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
       title: const Text('漫画源设置'),
       content: ListView(
         key: const ValueKey('source-preferences-form'),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         children: [
-          Text(widget.target.source.name),
-          if (_controller.busy) ...[
-            const CupertinoActivityIndicator(),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Text('正在处理。关闭会取消运行中的请求，可能需要重新连接。'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (snapshot == null) Text(widget.target.source.name),
+                if (_controller.busy) ...[
+                  const CupertinoActivityIndicator(),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Text('正在处理。关闭会取消运行中的请求，可能需要重新连接。'),
+                  ),
+                ],
+                if (!_current) const Text('身份或服务已变化，请关闭后重新打开设置。'),
+                if (_controller.error case final error?)
+                  Text(
+                    error,
+                    style: TextStyle(
+                      color: AppColors.error.resolveFrom(context),
+                    ),
+                  ),
+                if (_controller.message != null) Text(_controller.message!),
+                if (pending != null) ...[
+                  Text('未确认的原保存请求 · 基于版本 ${pending.request.expectedRevision}'),
+                  Text(
+                    '包含 ${pending.request.entries.length} 项可同步设置；密码和会话值不在请求中。',
+                  ),
+                  CupertinoButton.filled(
+                    key: const ValueKey('source-preferences-retry'),
+                    onPressed:
+                        _controller.available &&
+                            !_controller.busy &&
+                            pending.retryable
+                        ? () => unawaited(_controller.retry())
+                        : null,
+                    child: const Text('重试原保存请求'),
+                  ),
+                ],
+                if (_controller.needsRecovery || pending != null)
+                  CupertinoButton(
+                    key: const ValueKey('source-preferences-recover'),
+                    onPressed: _controller.available && !_controller.busy
+                        ? () => unawaited(_controller.recover())
+                        : null,
+                    child: const Text('读取服务端状态并重新打开'),
+                  ),
+                if (snapshot == null &&
+                    !_controller.busy &&
+                    !_controller.needsRecovery &&
+                    pending == null)
+                  CupertinoButton(
+                    onPressed: _controller.available
+                        ? () => unawaited(_controller.load())
+                        : null,
+                    child: const Text('重试读取设置'),
+                  ),
+              ],
             ),
-          ],
-          if (!_current) const Text('身份或服务已变化，请关闭后重新打开设置。'),
-          if (_controller.error != null) Text(_controller.error!),
-          if (_controller.message != null) Text(_controller.message!),
-          if (pending != null) ...[
-            Text('未确认的原保存请求 · 基于版本 ${pending.request.expectedRevision}'),
-            Text('包含 ${pending.request.entries.length} 项可同步设置；密码和会话值不在请求中。'),
-            CupertinoButton.filled(
-              key: const ValueKey('source-preferences-retry'),
-              onPressed:
-                  _controller.available &&
-                      !_controller.busy &&
-                      pending.retryable
-                  ? () => unawaited(_controller.retry())
-                  : null,
-              child: const Text('重试原保存请求'),
-            ),
-          ],
-          if (_controller.needsRecovery || pending != null)
-            CupertinoButton(
-              key: const ValueKey('source-preferences-recover'),
-              onPressed: _controller.available && !_controller.busy
-                  ? () => unawaited(_controller.recover())
-                  : null,
-              child: const Text('读取服务端状态并重新打开'),
-            ),
-          if (snapshot == null &&
-              !_controller.busy &&
-              !_controller.needsRecovery &&
-              pending == null)
-            CupertinoButton(
-              onPressed: _controller.available
-                  ? () => unawaited(_controller.load())
-                  : null,
-              child: const Text('重试读取设置'),
-            ),
+          ),
           if (snapshot != null) ...[
-            const Text('每次修改只执行一次漫画源操作。非敏感设置收到服务器确认后生效；密码及会话设置不会同步。'),
-            SizedBox(height: 12),
-            if (snapshot.nodes.isEmpty) const Text('这个漫画源没有额外设置。'),
             KeyedSubtree(
               key: ValueKey(snapshot.snapshotId),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var index = 0; index < snapshot.nodes.length; index++)
-                    _node(snapshot.nodes[index], [index], true),
-                ],
+                children: _sections(
+                  snapshot.nodes,
+                  [],
+                  true,
+                  header: Text(widget.target.source.name),
+                  footer: Text(
+                    snapshot.nodes.isEmpty
+                        ? '这个漫画源没有额外设置。'
+                        : '每次修改只执行一次漫画源操作。非敏感设置收到服务器确认后生效；密码及会话设置不会同步。',
+                  ),
+                ),
               ),
             ),
           ],
