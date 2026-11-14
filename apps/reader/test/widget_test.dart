@@ -6,6 +6,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 import 'test_app.dart';
 
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -124,10 +125,42 @@ void main() {
         );
         if (usesSidebar) {
           final sidebar = find.byKey(const ValueKey('app-sidebar'));
+          expect(tester.getRect(sidebar), Rect.fromLTWH(0, 0, 80, size.height));
+          expect(
+            tester.getTopLeft(find.byType(CupertinoNavigationBar)).dx,
+            80,
+            reason: 'the content header starts after the rail',
+          );
           expect(
             tester.widget<ColoredBox>(sidebar).color,
             AppColors.sidebar.resolveFrom(tester.element(sidebar)),
           );
+          for (var i = 0; i < 3; i++) {
+            final destination = find.byKey(ValueKey(('app-destination', i)));
+            expect(tester.getSize(destination), const Size(80, 60));
+            final icon = find.descendant(
+              of: destination,
+              matching: find.byType(Icon),
+            );
+            final label = find.descendant(
+              of: destination,
+              matching: find.byType(Text),
+            );
+            expect(tester.getCenter(icon).dx, 40);
+            expect(tester.getCenter(label).dx, 40);
+            expect(
+              tester.getTopLeft(label).dy,
+              greaterThan(tester.getBottomRight(icon).dy),
+            );
+            expect(
+              tester
+                  .getSemantics(destination)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isSelected,
+              i == 0 ? Tristate.isTrue : Tristate.isFalse,
+            );
+          }
         }
         await tester.tap(find.text('去浏览'));
         await tester.pumpAndSettle();
@@ -150,6 +183,62 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+
+    testWidgets(
+      'large rail keeps focus and drafts across $brightness changes',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+        final settings = find.byKey(const ValueKey(('app-destination', 2)));
+        await tester.tap(settings);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .getSemantics(settings)
+              .getSemanticsData()
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue,
+        );
+        final origin = find.byKey(const ValueKey('service-origin'));
+        await tester.ensureVisible(origin);
+        await tester.enterText(origin, 'https://draft.example');
+        expect(
+          PrimaryScrollController.of(tester.element(find.byType(AppShell)))
+              .positions,
+          hasLength(1),
+          reason: 'keyboard scrolling has one content target, not the rail',
+        );
+        final field = tester.element(origin);
+        final editing = tester.widget<EditableText>(
+          find.descendant(of: origin, matching: find.byType(EditableText)),
+        );
+        expect(editing.focusNode.hasFocus, true);
+        final selection = editing.controller.selection;
+        for (final size in [const Size(800, 360), const Size(768, 1024)]) {
+          tester.platformDispatcher.platformBrightnessTestValue =
+              brightness == Brightness.light
+              ? Brightness.dark
+              : Brightness.light;
+          tester.view.physicalSize = size;
+          await tester.pumpAndSettle();
+          expect(tester.element(origin), same(field));
+          expect(editing.controller.text, 'https://draft.example');
+          expect(editing.controller.selection, selection);
+          expect(editing.focusNode.hasFocus, true);
+          expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
   }
 
   testWidgets(

@@ -627,96 +627,144 @@ class _AppShellState extends ConsumerState<AppShell> {
         final wide = constraints.maxWidth > constraints.maxHeight
             ? constraints.maxHeight >= 600
             : constraints.maxWidth >= 700;
-        return CupertinoPageScaffold(
-          navigationBar: CupertinoNavigationBar(middle: Text(_labels[_index])),
-          child: SafeArea(
-            child: Column(
-              children: [
-                if (_notice case final notice?)
-                  CupertinoListTile(
-                    title: Text(notice, maxLines: 4),
-                    trailing: CupertinoButton(
-                      onPressed: () => setState(() => _notice = null),
-                      child: const Icon(
-                        CupertinoIcons.xmark,
-                        semanticLabel: '关闭提示',
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      if (wide)
-                        ColoredBox(
-                          key: const ValueKey('app-sidebar'),
-                          color: AppColors.sidebar.resolveFrom(context),
-                          child: SizedBox(
-                            width: 148,
+        return Row(
+          children: [
+            if (wide)
+              ColoredBox(
+                key: const ValueKey('app-sidebar'),
+                color: AppColors.sidebar.resolveFrom(context),
+                child: SizedBox(
+                  width: 80,
+                  child: SafeArea(
+                    right: false,
+                    child: CustomScrollView(
+                      key: const ValueKey('app-navigation'),
+                      primary: false,
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Column(
-                              key: const ValueKey('app-navigation'),
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                for (var i = 0; i < _labels.length; i++)
-                                  CupertinoButton(
-                                    onPressed: () => _select(i),
-                                    color: _index == i
-                                        ? AppColors.selection.resolveFrom(
-                                            context,
-                                          )
-                                        : null,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          _icons[i],
-                                          color:
-                                              (_index == i
-                                                      ? AppColors.onSelection
-                                                      : AppColors
-                                                            .secondaryLabel)
-                                                  .resolveFrom(context),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _labels[i],
-                                          style: TextStyle(
-                                            color:
-                                                (_index == i
-                                                        ? AppColors.onSelection
-                                                        : AppColors
-                                                              .secondaryLabel)
-                                                    .resolveFrom(context),
+                                for (var i = 0; i < _labels.length; i++) ...[
+                                  if (i > 0) const SizedBox(height: 4),
+                                  Semantics(
+                                    key: ValueKey(('app-destination', i)),
+                                    selected: _index == i,
+                                    child: CupertinoButton(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      minimumSize: const Size(80, 60),
+                                      onPressed: () => _select(i),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 56,
+                                            height: 32,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: _index == i
+                                                  ? AppColors.selection
+                                                        .resolveFrom(context)
+                                                  : null,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            child: Icon(
+                                              _icons[i],
+                                              size: 24,
+                                              color:
+                                                  (_index == i
+                                                          ? AppColors
+                                                                .onSelection
+                                                          : AppColors
+                                                                .secondaryLabel)
+                                                      .resolveFrom(context),
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _labels[i],
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              height: 20 / 14,
+                                              fontWeight: _index == i
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                              color:
+                                                  (_index == i
+                                                          ? AppColors.accent
+                                                          : AppColors
+                                                                .secondaryLabel)
+                                                      .resolveFrom(context),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
+                                ],
                               ],
                             ),
                           ),
                         ),
-                      Expanded(child: _page()),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-                if (!wide)
-                  CupertinoTabBar(
-                    key: const ValueKey('app-navigation'),
-                    backgroundColor: AppColors.toolbar.resolveFrom(context),
-                    inactiveColor: AppColors.secondaryLabel.resolveFrom(
-                      context,
-                    ),
-                    currentIndex: _index,
-                    onTap: _select,
-                    items: [
-                      for (var i = 0; i < _labels.length; i++)
-                        BottomNavigationBarItem(
-                          icon: Icon(_icons[i]),
-                          label: _labels[i],
+              ),
+            Expanded(
+              key: const ValueKey('app-content'),
+              child: CupertinoPageScaffold(
+                navigationBar: CupertinoNavigationBar(
+                  middle: Text(_labels[_index]),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      if (_notice case final notice?)
+                        CupertinoListTile(
+                          title: Text(notice, maxLines: 4),
+                          trailing: CupertinoButton(
+                            onPressed: () => setState(() => _notice = null),
+                            child: const Icon(
+                              CupertinoIcons.xmark,
+                              semanticLabel: '关闭提示',
+                            ),
+                          ),
+                        ),
+                      Expanded(child: _page()),
+                      if (!wide)
+                        CupertinoTabBar(
+                          key: const ValueKey('app-navigation'),
+                          backgroundColor: AppColors.toolbar.resolveFrom(
+                            context,
+                          ),
+                          inactiveColor: AppColors.secondaryLabel.resolveFrom(
+                            context,
+                          ),
+                          currentIndex: _index,
+                          onTap: _select,
+                          items: [
+                            for (var i = 0; i < _labels.length; i++)
+                              BottomNavigationBarItem(
+                                icon: Icon(_icons[i]),
+                                label: _labels[i],
+                              ),
+                          ],
                         ),
                     ],
                   ),
-              ],
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
     );
