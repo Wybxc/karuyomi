@@ -399,8 +399,12 @@ void main() {
     }
   }
 
-  Future<void> show(WidgetTester tester, {Brightness? appearance}) async {
-    await tester.binding.setSurfaceSize(const Size(600, 1100));
+  Future<void> show(
+    WidgetTester tester, {
+    Brightness? appearance,
+    Size size = const Size(600, 1100),
+  }) async {
+    await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
@@ -458,6 +462,58 @@ void main() {
     await tester.ensureVisible(finder);
     await tester.tap(finder);
     await tester.pumpAndSettle();
+  }
+
+  for (final appearance in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'compact extension accessories install without opening details at $appearance / $scale',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+          );
+          await tap(
+            tester,
+            find.byKey(
+              ValueKey((
+                'extension-install',
+                catalog.catalogUrl,
+                'eu.kanade.source.test',
+              )),
+            ),
+          );
+          expect(
+            catalog.installedExtensions.single.packageName,
+            'eu.kanade.source.test',
+          );
+          expect(find.byType(ExtensionDetailsPage), findsNothing);
+          final writes = platform.businessServer.requests
+              .where((request) => request.method == 'POST')
+              .length;
+          expect(writes, 1);
+          await tap(
+            tester,
+            find.byKey(
+              const ValueKey(('extension-installed', 'eu.kanade.source.test')),
+            ),
+          );
+          expect(find.byType(ExtensionDetailsPage), findsOneWidget);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            hasLength(writes),
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
   }
 
   testWidgets(
