@@ -286,10 +286,38 @@ class const _SettingsEditor({
       );
       return manga
           ? section
-          : CupertinoExpansionTile(
+          : HookBuilder(
               key: ValueKey('settings-group-$id'),
-              title: Text(title),
-              child: section,
+              builder: (context) {
+                final expansion = useMemoized(ExpansibleController.new);
+                useEffect(() => expansion.dispose, [expansion]);
+                return Expansible(
+                  controller: expansion,
+                  animationStyle:
+                      MediaQuery.reduceMotionOf(context) ||
+                          MediaQuery.disableAnimationsOf(context)
+                      ? AnimationStyle.noAnimation
+                      : null,
+                  headerBuilder: (context, animation) => Semantics(
+                    expanded: expansion.isExpanded,
+                    child: CupertinoListTile(
+                      title: Text(title),
+                      onTap: () => expansion.isExpanded
+                          ? expansion.collapse()
+                          : expansion.expand(),
+                      trailing: RotationTransition(
+                        turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                        child: Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 16,
+                          color: AppColors.accent.resolveFrom(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  bodyBuilder: (context, animation) => section,
+                );
+              },
             );
     }
 

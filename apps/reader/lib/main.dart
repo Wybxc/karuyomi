@@ -484,6 +484,14 @@ class _AppShellState extends ConsumerState<AppShell> {
           keyboardType: TextInputType.url,
           autocorrect: false,
           placeholder: 'https://你的服务域名',
+          placeholderStyle: TextStyle(
+            color: AppColors.secondaryLabel.resolveFrom(context),
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.groupedSurface.resolveFrom(context),
+            border: Border.all(color: AppColors.separator.resolveFrom(context)),
+            borderRadius: BorderRadius.circular(6),
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -513,10 +521,38 @@ class _AppShellState extends ConsumerState<AppShell> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (connected)
-          CupertinoExpansionTile(
+          HookBuilder(
             key: const ValueKey('service-connection'),
-            title: const Text('服务连接'),
-            child: form,
+            builder: (context) {
+              final expansion = useMemoized(ExpansibleController.new);
+              useEffect(() => expansion.dispose, [expansion]);
+              return Expansible(
+                controller: expansion,
+                animationStyle:
+                    MediaQuery.reduceMotionOf(context) ||
+                        MediaQuery.disableAnimationsOf(context)
+                    ? AnimationStyle.noAnimation
+                    : null,
+                headerBuilder: (context, animation) => Semantics(
+                  expanded: expansion.isExpanded,
+                  child: CupertinoListTile(
+                    title: const Text('服务连接'),
+                    onTap: () => expansion.isExpanded
+                        ? expansion.collapse()
+                        : expansion.expand(),
+                    trailing: RotationTransition(
+                      turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                      child: Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: AppColors.accent.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ),
+                bodyBuilder: (context, animation) => form,
+              );
+            },
           )
         else ...[
           Text(

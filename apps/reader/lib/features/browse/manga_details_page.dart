@@ -955,6 +955,9 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         enabled: !_opening,
         onChanged: (_) => setState(_resetRange),
         placeholder: '章节名、扫描组或章节号',
+        placeholderStyle: TextStyle(
+          color: AppColors.secondaryLabel.resolveFrom(context),
+        ),
         prefix: Padding(
           padding: const EdgeInsets.only(left: 8),
           child: Icon(

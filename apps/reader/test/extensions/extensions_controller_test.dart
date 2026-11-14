@@ -17,6 +17,7 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -398,15 +399,53 @@ void main() {
     }
   }
 
-  Future<void> show(WidgetTester tester) async {
+  Future<void> show(WidgetTester tester, {Brightness? appearance}) async {
     await tester.binding.setSurfaceSize(const Size(600, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
+        theme: appearance == null ? null : readerAppTheme(appearance),
         home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  for (final appearance in Brightness.values) {
+    testWidgets(
+      'extension search stays readable and clearable in $appearance',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue =
+            appearance == Brightness.light ? Brightness.dark : Brightness.light;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        await show(tester, appearance: appearance);
+        final search = find.byKey(const ValueKey('extensions-search'));
+        final context = tester.element(search);
+        final placeholder = tester.widget<Text>(find.text('查找扩展或漫画源名称'));
+        final field = tester.widget<CupertinoTextField>(search);
+        final foreground = placeholder.style!.color!;
+        final background = field.decoration!.color!;
+        expect(foreground, AppColors.secondaryLabel.resolveFrom(context));
+        final a = foreground.computeLuminance();
+        final b = background.computeLuminance();
+        expect(
+          a > b ? (a + 0.05) / (b + 0.05) : (b + 0.05) / (a + 0.05),
+          greaterThanOrEqualTo(4.5),
+        );
+        await tester.enterText(search, '__missing__');
+        await tester.pumpAndSettle();
+        expect(find.text('没有匹配的扩展，请清除筛选。'), findsOneWidget);
+        await tester.tap(find.byIcon(CupertinoIcons.clear_thick_circled));
+        await tester.pumpAndSettle();
+        expect(find.text('查找扩展或漫画源名称'), findsOneWidget);
+        expect(find.text('没有匹配的扩展，请清除筛选。'), findsNothing);
+        expect(
+          platform.businessServer.requests.where((r) => r.method == 'POST'),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {

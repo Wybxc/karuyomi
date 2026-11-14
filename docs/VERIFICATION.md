@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-14，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，未通过全范围视觉或生产验收。`a894832` 的 push/PR CI 完整通过，隔离内置浏览器已核对浅深色书架、设置与服务端确认切换；据此修正输入占位和展开控件配色，49 项定向回归通过，新产物待复验。[状态机清单](verification/mihon-state-coverage.md)分别记录两种主题的主状态截图、转换与变体缺口。
+
 2026-11-13，[Liquid Glass](verification/liquid-glass.md)已按用户决定终止，[统一 Cupertino 已恢复并生产上线](verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源与匿名 Access 门禁通过；内置浏览器确认导航、真实图片、翻页保存、主题保存及独立新文档第 2 页续读，独立 D1 核对续读前后状态一致。玻璃库、专用设置及资源已移除。原玻璃性能对照未完成，不宣称能耗结论；代码削减另立重构，原生现场验证保持停止。
 
 2026-11-13，[Cupertino UI 迁移](verification/cupertino-ui.md)完成应用壳、业务页面、阅读器、诊断与原生 Access 页的代码切换，并由主线 CI 自动上线；三项目严格分析、742 项单并发 Dart 回归及完整 CI / Web 构建通过。移除应用直接 Material 依赖，生产手写 Dart 计入新增组件后净减 58 行；缺失组件通过重整选择、筛选、编辑与反馈流程解决。隔离内置浏览器与独立 API 已验证扩展维护、章节输入、真实两页阅读/缩放、设置草稿取消及确认保存、360px 分类/主题和独立新文档续读；发现的字体、焦点和弹层问题复验通过。[生产 Access 下](verification/cupertino-ui.md#生产发布)的真实阅读、翻页确认、设置覆盖/继承与独立新文档第 2 页续读均通过，独立 D1 核对一致；46 条公开资源与匿名 Access 门禁通过。原生现场验证仍停止。

@@ -192,6 +192,9 @@ class const SourceDirectory({
                 key: const ValueKey('source-directory-search'),
                 controller: search,
                 placeholder: '查找漫画源名称',
+                placeholderStyle: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
                 prefix: Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: Icon(

@@ -447,6 +447,13 @@ class _MigrationPageState extends State<MigrationPage> {
                     controller.canChange && controller.selectedSource != null,
                 onSubmitted: (value) => unawaited(controller.search(value)),
                 placeholder: '搜索目标作品',
+                placeholderStyle: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.groupedSurface.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               Wrap(
                 alignment: WrapAlignment.center,

@@ -408,7 +408,20 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                       onSubmitted: (query) =>
                           _start(_ListingWork.query, query: query),
                       placeholder: '搜索此源的作品',
-                      prefix: const Icon(CupertinoIcons.search),
+                      placeholderStyle: TextStyle(
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.groupedSurface.resolveFrom(context),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      prefix: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          CupertinoIcons.search,
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                        ),
+                      ),
                       suffix: CupertinoButton(
                         onPressed: busy || !canBrowse
                             ? null

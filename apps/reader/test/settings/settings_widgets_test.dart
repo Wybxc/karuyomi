@@ -10,6 +10,7 @@ import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../data/business_state_server.dart';
@@ -54,6 +55,8 @@ void main() {
     WidgetTester tester,
     SettingsController controller, {
     bool manga = false,
+    Brightness? appearance,
+    bool reduceMotion = false,
   }) async {
     tester.view.physicalSize = const Size(480, 1000);
     tester.view.devicePixelRatio = 1;
@@ -61,6 +64,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpApp(
       CupertinoApp(
+        theme: appearance == null ? null : readerAppTheme(appearance),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(reduceMotion: reduceMotion),
+          child: child!,
+        ),
         home: manga
             ? MangaSettingsEditor(catalog: fixture.catalog, mangaKey: _key)
             : CupertinoPageScaffold(
@@ -110,6 +118,53 @@ void main() {
 
   List<TestBusinessRequest> writes() =>
       server.requests.where((request) => request.method == 'POST').toList();
+
+  for (final appearance in Brightness.values) {
+    testWidgets(
+      'settings disclosure preserves its draft in $appearance with reduced motion',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue =
+            appearance == Brightness.light ? Brightness.dark : Brightness.light;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final controller = editor();
+        await tester.runAsync(controller.refresh);
+        await show(
+          tester,
+          controller,
+          appearance: appearance,
+          reduceMotion: true,
+        );
+        await select<wire.AppTheme>(tester, '深色');
+        final group = find.byKey(const ValueKey('settings-group-appearance'));
+        final header = find
+            .descendant(of: group, matching: find.byType(CupertinoListTile))
+            .first;
+        final context = tester.element(header);
+        final icon = tester.widget<Icon>(
+          find.descendant(of: header, matching: find.byType(Icon)),
+        );
+        expect(icon.color, AppColors.accent.resolveFrom(context));
+        final expansion = tester.widget<Expansible>(
+          find.descendant(of: group, matching: find.byType(Expansible)).first,
+        );
+        expect(expansion.animationStyle, AnimationStyle.noAnimation);
+        await tap(tester, header);
+        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        await tap(tester, header);
+        expect(
+          tester
+              .widget<ChoiceField<wire.AppTheme>>(
+                find.byKey(const ValueKey('global-theme')),
+              )
+              .value,
+          wire.AppTheme.APP_THEME_DARK,
+        );
+        expect(writes(), isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+  }
 
   testWidgets('an untouched global panel follows newly confirmed snapshots', (
     tester,

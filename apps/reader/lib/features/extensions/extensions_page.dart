@@ -1,5 +1,6 @@
 import '../../widgets/app_page_route.dart';
 import '../../widgets/choice_field.dart';
+import '../../theme/app_theme.dart';
 
 import 'dart:async';
 
@@ -190,7 +191,21 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                 key: const ValueKey('extensions-search'),
                 controller: _search,
                 placeholder: '查找扩展或漫画源名称',
-                prefix: Icon(CupertinoIcons.search),
+                placeholderStyle: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                prefix: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    CupertinoIcons.search,
+                    color: AppColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+                clearButtonMode: OverlayVisibilityMode.editing,
+                decoration: BoxDecoration(
+                  color: AppColors.groupedSurface.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             CupertinoMenuAnchor(
@@ -345,9 +360,11 @@ class const ExtensionOperationStatus({
   super.key,
   required final ExtensionsController controller,
   final bool showStorageAction = true,
-}) extends StatelessWidget {
+}) extends HookWidget {
   @override
   Widget build(BuildContext context) {
+    final expansion = useMemoized(ExpansibleController.new);
+    useEffect(() => expansion.dispose, [expansion]);
     final pending = controller.settings.pending;
     final failure = controller.settings.failure;
     return Column(
@@ -396,10 +413,32 @@ class const ExtensionOperationStatus({
                 : () => unawaited(controller.retry()),
             child: const Text('重试原设置操作'),
           ),
-          CupertinoExpansionTile(
+          Expansible(
             key: const ValueKey('extensions-pending-values'),
-            title: const Text('查看未确认的原操作'),
-            child: Column(
+            controller: expansion,
+            animationStyle:
+                MediaQuery.reduceMotionOf(context) ||
+                    MediaQuery.disableAnimationsOf(context)
+                ? AnimationStyle.noAnimation
+                : null,
+            headerBuilder: (context, animation) => Semantics(
+              expanded: expansion.isExpanded,
+              child: CupertinoListTile(
+                title: const Text('查看未确认的原操作'),
+                onTap: () => expansion.isExpanded
+                    ? expansion.collapse()
+                    : expansion.expand(),
+                trailing: RotationTransition(
+                  turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                  child: Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 16,
+                    color: AppColors.accent.resolveFrom(context),
+                  ),
+                ),
+              ),
+            ),
+            bodyBuilder: (context, animation) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (pending.global case final values?)
@@ -463,6 +502,8 @@ class const ExtensionDetailsPage({
   @override
   Widget build(BuildContext context) {
     useListenable(controller);
+    final diagnostics = useMemoized(ExpansibleController.new);
+    useEffect(() => diagnostics.dispose, [diagnostics]);
     final installed = controller.installed
         .where((value) => value.packageName == packageName)
         .firstOrNull;
@@ -617,9 +658,31 @@ class const ExtensionDetailsPage({
                   ),
                 ),
             const SizedBox(height: 24),
-            CupertinoExpansionTile(
-              title: const Text('诊断信息'),
-              child: Column(
+            Expansible(
+              controller: diagnostics,
+              animationStyle:
+                  MediaQuery.reduceMotionOf(context) ||
+                      MediaQuery.disableAnimationsOf(context)
+                  ? AnimationStyle.noAnimation
+                  : null,
+              headerBuilder: (context, animation) => Semantics(
+                expanded: diagnostics.isExpanded,
+                child: CupertinoListTile(
+                  title: const Text('诊断信息'),
+                  onTap: () => diagnostics.isExpanded
+                      ? diagnostics.collapse()
+                      : diagnostics.expand(),
+                  trailing: RotationTransition(
+                    turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                    child: Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 16,
+                      color: AppColors.accent.resolveFrom(context),
+                    ),
+                  ),
+                ),
+              ),
+              bodyBuilder: (context, animation) => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SelectableRegion(
@@ -676,12 +739,32 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
                 key: const ValueKey('repository-url'),
                 onChanged: (value) => address = value,
                 placeholder: '仓库地址或 /extensions/index.json URL',
+                placeholderStyle: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.groupedSurface.resolveFrom(context),
+                  border: Border.all(
+                    color: AppColors.separator.resolveFrom(context),
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
               CupertinoTextField(
                 key: const ValueKey('repository-name'),
                 onChanged: (value) => label = value,
                 maxLength: 100,
                 placeholder: '名称（可选）',
+                placeholderStyle: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.groupedSurface.resolveFrom(context),
+                  border: Border.all(
+                    color: AppColors.separator.resolveFrom(context),
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
             ],
           ),
@@ -759,6 +842,8 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
   @override
   Widget build(BuildContext context) {
     useListenable(_controller);
+    final diagnostics = useMemoized(ExpansibleController.new);
+    useEffect(() => diagnostics.dispose, [diagnostics]);
     final catalog = _controller.catalog;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: const Text('仓库管理')),
@@ -804,9 +889,31 @@ class _ExtensionRepositoriesPageState extends State<ExtensionRepositoriesPage> {
                   : () => unawaited(_controller.refresh(catalogToo: true)),
               child: const Text('重试读取仓库'),
             ),
-            CupertinoExpansionTile(
-              title: const Text('诊断信息'),
-              child: SelectableRegion(
+            Expansible(
+              controller: diagnostics,
+              animationStyle:
+                  MediaQuery.reduceMotionOf(context) ||
+                      MediaQuery.disableAnimationsOf(context)
+                  ? AnimationStyle.noAnimation
+                  : null,
+              headerBuilder: (context, animation) => Semantics(
+                expanded: diagnostics.isExpanded,
+                child: CupertinoListTile(
+                  title: const Text('诊断信息'),
+                  onTap: () => diagnostics.isExpanded
+                      ? diagnostics.collapse()
+                      : diagnostics.expand(),
+                  trailing: RotationTransition(
+                    turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                    child: Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 16,
+                      color: AppColors.accent.resolveFrom(context),
+                    ),
+                  ),
+                ),
+              ),
+              bodyBuilder: (context, animation) => SelectableRegion(
                 selectionControls: cupertinoTextSelectionControls,
                 contextMenuBuilder: (context, state) =>
                     CupertinoAdaptiveTextSelectionToolbar.buttonItems(
@@ -849,6 +956,8 @@ class const ExtensionStoragePage({
   @override
   Widget build(BuildContext context) {
     useListenable(controller);
+    final diagnostics = useMemoized(ExpansibleController.new);
+    useEffect(() => diagnostics.dispose, [diagnostics]);
     final cache = controller.cache;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: const Text('本机存储')),
@@ -889,9 +998,31 @@ class const ExtensionStoragePage({
                     child: const Text('清理副本'),
                   ),
                 ),
-              CupertinoExpansionTile(
-                title: const Text('诊断信息'),
-                child: SelectableRegion(
+              Expansible(
+                controller: diagnostics,
+                animationStyle:
+                    MediaQuery.reduceMotionOf(context) ||
+                        MediaQuery.disableAnimationsOf(context)
+                    ? AnimationStyle.noAnimation
+                    : null,
+                headerBuilder: (context, animation) => Semantics(
+                  expanded: diagnostics.isExpanded,
+                  child: CupertinoListTile(
+                    title: const Text('诊断信息'),
+                    onTap: () => diagnostics.isExpanded
+                        ? diagnostics.collapse()
+                        : diagnostics.expand(),
+                    trailing: RotationTransition(
+                      turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                      child: Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: AppColors.accent.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ),
+                bodyBuilder: (context, animation) => SelectableRegion(
                   selectionControls: cupertinoTextSelectionControls,
                   contextMenuBuilder: (context, state) =>
                       CupertinoAdaptiveTextSelectionToolbar.buttonItems(

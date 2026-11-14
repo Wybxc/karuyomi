@@ -134,6 +134,14 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
           controller: _sourceFilter,
           onChanged: (_) => setState(() => _sourcePage = 0),
           placeholder: '查找漫画源名称或扩展包',
+          placeholderStyle: TextStyle(
+            color: AppColors.secondaryLabel.resolveFrom(context),
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.background.resolveFrom(context),
+            border: Border.all(color: AppColors.separator.resolveFrom(context)),
+            borderRadius: BorderRadius.circular(6),
+          ),
         ),
         if (controller.loadingTargets)
           const CupertinoActivityIndicator()
@@ -298,11 +306,11 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   Widget build(BuildContext context) {
     _query = useTextEditingController();
     _sourceFilter = useTextEditingController();
-    _scope = useExpansibleController();
+    _scope = useMemoized(ExpansibleController.new);
     useEffect(() {
       _scope.expand();
-      return null;
-    }, const []);
+      return _scope.dispose;
+    }, [_scope]);
     useListenable(controller);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
     return PopScope<void>(
@@ -370,9 +378,15 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                     textInputAction: TextInputAction.search,
                     onSubmitted: (value) => unawaited(_start(value)),
                     placeholder: '搜索漫画',
-                    prefix: const Padding(
-                      padding: EdgeInsets.only(left: 8),
-                      child: Icon(CupertinoIcons.search),
+                    placeholderStyle: TextStyle(
+                      color: AppColors.secondaryLabel.resolveFrom(context),
+                    ),
+                    prefix: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Icon(
+                        CupertinoIcons.search,
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                      ),
                     ),
                     clearButtonMode: OverlayVisibilityMode.editing,
                     decoration: BoxDecoration(
@@ -380,11 +394,34 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  CupertinoExpansionTile(
+                  Expansible(
                     key: const ValueKey('cross-search-scope'),
                     controller: _scope,
-                    title: Text('搜索范围 · 已选 ${controller.selected.length} 个漫画源'),
-                    child: Column(
+                    animationStyle:
+                        MediaQuery.reduceMotionOf(context) ||
+                            MediaQuery.disableAnimationsOf(context)
+                        ? AnimationStyle.noAnimation
+                        : null,
+                    headerBuilder: (context, animation) => Semantics(
+                      expanded: _scope.isExpanded,
+                      child: CupertinoListTile(
+                        title: Text(
+                          '搜索范围 · 已选 ${controller.selected.length} 个漫画源',
+                        ),
+                        onTap: () => _scope.isExpanded
+                            ? _scope.collapse()
+                            : _scope.expand(),
+                        trailing: RotationTransition(
+                          turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                          child: Icon(
+                            CupertinoIcons.chevron_right,
+                            size: 16,
+                            color: AppColors.accent.resolveFrom(context),
+                          ),
+                        ),
+                      ),
+                    ),
+                    bodyBuilder: (context, animation) => Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _sourceChoices(),

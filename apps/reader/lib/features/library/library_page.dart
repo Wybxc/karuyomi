@@ -886,6 +886,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     child: CupertinoTextField(
                       controller: _search,
                       placeholder: '漫画、作者或漫画源',
+                      placeholderStyle: TextStyle(
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                      ),
                       prefix: Padding(
                         padding: const EdgeInsets.only(left: 8),
                         child: Icon(

@@ -409,6 +409,14 @@ class const _PreferenceTextDialog({required final wire.PreferenceNode node})
         obscureText: preference.secret,
         maxLength: 4096,
         placeholder: preference.hasHint() ? preference.hint : null,
+        placeholderStyle: TextStyle(
+          color: AppColors.secondaryLabel.resolveFrom(context),
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.groupedSurface.resolveFrom(context),
+          border: Border.all(color: AppColors.separator.resolveFrom(context)),
+          borderRadius: BorderRadius.circular(6),
+        ),
       ),
       actions: [
         CupertinoDialogAction(
