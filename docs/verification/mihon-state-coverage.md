@@ -217,7 +217,7 @@ stateDiagram-v2
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
     class E2,E5,D0 partial
-    class S1,S3,S4,S5,E3,E10,E11,R0,R1,R2,R3,R4,R5 paired
+    class S1,S3,S4,S5,E3,E10,E11,D1,R0,R1,R2,R3,R4,R5 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                          | 浅色                                                                                                       | 深色                                                                                                                                                    |
@@ -240,8 +240,8 @@ stateDiagram-v2
 | 08.10   | 对象、失败与重试                                               | 待                                                                                                         | 待                                                                                                                                                      |
 | 08.11   | 筛选和仓库入口                                                 | `s0811-extension-menu-light`                                                                               | `s0811-extension-menu-dark`                                                                                                                             |
 | 08.12   | 筛选页没有仓库语言目录时的独立空态、标题和返回                 | `s0812-extension-filter-empty-light`                                                                       | `s0812-extension-filter-empty-dark`                                                                                                                     |
-| 09.01   | 图标、名称、包名、版本/语言/警告、卸载、源列表/启停/偏好       | 待                                                                                                         | `mangadex-details-default-dark`（启用）；禁用分项待补                                                                                                   |
-| 09.02   | 内容警告原因和关闭动作                                         | 待                                                                                                         | 待                                                                                                                                                      |
+| 09.01   | 图标、名称、包名、版本/语言/警告、卸载、源列表/启停/偏好       | `s0901-mangadex-details-light`（启用）；禁用待补                                                           | `s0901-mangadex-details-dark`（启用）；禁用待补                                                                                                         |
+| 09.02   | 内容警告原因和关闭动作                                         | `s0902-extension-warning-light`                                                                            | `s0902-extension-warning-dark`                                                                                                                          |
 | 09.03   | 卸载对象、系统确认/取消                                        | 待                                                                                                         | 待                                                                                                                                                      |
 | 10.01   | 无仓库说明、返回、刷新和添加                                   | `s1001-repository-empty-light`                                                                             | `s1001-repository-empty-dark`                                                                                                                           |
 | 10.02   | 地址、必填、提交可用性、取消、键盘                             | `s1002-repository-add-empty-light`、`s1002-repository-add-filled-light`                                    | `s1002-repository-add-empty-dark`、`s1002-repository-add-filled-dark`                                                                                   |
@@ -272,10 +272,18 @@ stateDiagram-v2
     state "12.09 追加失败" as B8
     state "13.01 筛选字段" as F0
     state "13.02 已修改草稿" as F1
+    state "13.03 排序展开及方向" as F2
+    state "13.04 下拉选择展开" as F3
+    state "13.05 三态不限制" as F4
+    state "13.06 三态包含" as F5
+    state "13.07 三态排除" as F6
     state "14.01 偏好列表" as P0
     state "14.02 单项选择" as P1
     state "14.03 多项选择" as P2
     state "14.04 文本编辑" as P3
+    state "14.05 多选已修改草稿" as P4
+    state "14.06 文本非法" as P5
+    state "14.07 文本有效" as P6
     state "15.01 查询及范围" as G0
     state "15.02 各源加载" as G1
     state "15.03 分源成功" as G2
@@ -299,13 +307,34 @@ stateDiagram-v2
     F0 --> F1: 修改字段
     F1 --> F0: 重置
     F1 --> B0: 应用
-    F1 --> B1: 取消
+    F1 --> B1: 收起不查询并保留草稿
+    B1 --> F1: 重开保留的草稿
+    F0 --> F2: 展开排序
+    F2 --> F2: 同项切换升降序
+    F2 --> F1: 选择排序后收起
+    F0 --> F3: 打开选择项
+    F3 --> F1: 选择新值
+    F3 --> F0: 返回不修改
+    F0 --> F4: 展开三态组
+    F4 --> F5: 包含
+    F5 --> F6: 排除
+    F6 --> F4: 不限制
+    F4 --> F0: 收起组
+    F5 --> F1: 收起组
+    F6 --> F1: 收起组
     P0 --> P1: 单选
     P0 --> P2: 多选
     P0 --> P3: 编辑文本
     P1 --> P0: 选择或取消
-    P2 --> P0: 确认或取消
-    P3 --> P0: 确认或取消
+    P2 --> P4: 修改集合
+    P2 --> P0: 取消或确认
+    P4 --> P0: 确认保存或取消丢弃
+    P3 --> P5: 输入非法UUID
+    P5 --> P6: 修正
+    P6 --> P5: 再次输入非法值
+    P6 --> P3: 清空非必填值
+    P3 --> P0: 确认空值或取消
+    P6 --> P0: 确认保存或取消
     G0 --> G1: 提交查询
     G1 --> G2: 源成功
     G1 --> G3: 源无结果
@@ -314,32 +343,47 @@ stateDiagram-v2
     G2 --> G0: 修改查询或范围
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class P0,P1 partial
-    class B1,B3,B5 paired
+    class B0,F0 partial
+    class B1,B2,B3,B4,B5,F1,F2,F3,F4,F5,F6,P0,P1,P2,P3,P4,P5,P6 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                                             | 浅色                                                                  | 深色                                                                |
-| ------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 12.01   | 源名、当前模式、加载指示                                                          | 待                                                                    | 待（`xkcd-browse-default-dark` 须再核对是否截到指示）               |
-| 12.02   | 源名、热门模式、封面与标题网格                                                    | `s1202-xkcd-popular-light`                                            | `s1202-xkcd-popular-dark`                                           |
-| 12.03   | 源名、最新模式、作品；使用支持最新的源                                            | 待                                                                    | 待                                                                  |
-| 12.04   | 空输入和精确查询 `987654321`、键盘、清空和提交                                    | `s1204-source-search-input-light`、`s1204-source-search-filled-light` | `s1204-source-search-input-dark`、`s1204-source-search-filled-dark` |
-| 12.05   | 查询与匹配作品                                                                    | 待                                                                    | 待                                                                  |
-| 12.06   | 当前查询 `987654321`、无结果说明和恢复动作；主图含键盘                            | `s1206-source-empty-light`；无键盘/恢复待补                           | `s1206-source-empty-dark`；无键盘/恢复待补                          |
-| 12.07   | 错误正文、重试、返回；仅在参考模拟器制造网络不可用                                | 待                                                                    | 待                                                                  |
-| 12.08   | 已有作品、追加指示、滚动位置                                                      | 待                                                                    | 待                                                                  |
-| 12.09   | 已有作品、追加失败提示和重试                                                      | 待                                                                    | 待                                                                  |
-| 13.01   | text/check/select/tri-state/sort/group 当前值、重置/应用/取消；各字段类型分项采集 | 待                                                                    | 待                                                                  |
-| 13.02   | 修改后的值及应用/重置/取消后的结果                                                | 待                                                                    | 待                                                                  |
-| 14.01   | 源名、偏好标题、当前值、说明及开关                                                | 待                                                                    | `source-preferences-default-dark`（MangaDex）                       |
-| 14.02   | 字段名、选项、当前选中、取消                                                      | 待                                                                    | `source-preference-choice-default-dark`                             |
-| 14.03   | 字段名、多选项、当前集合、确认/取消                                               | 待                                                                    | 待（选择实际提供多选偏好的源）                                      |
-| 14.04   | 字段名、当前文本、输入约束、确认/取消和键盘                                       | 待                                                                    | 待（选择实际提供文本偏好的源）                                      |
-| 15.01   | 查询、源范围、提交/返回                                                           | 待                                                                    | 待                                                                  |
-| 15.02   | 每源名称与加载反馈，其他已完成源仍可见                                            | 待                                                                    | 待                                                                  |
-| 15.03   | 每源名称与横向作品、点击作品入口                                                  | 待                                                                    | 待                                                                  |
-| 15.04   | 对应源名及无结果说明                                                              | 待                                                                    | 待                                                                  |
-| 15.05   | 对应源名、错误和重试；混合成功/失败同屏另留图                                     | 待                                                                    | 待                                                                  |
+| 状态 ID | 最小必要信息/采集触发                                                            | 浅色                                                                                                                           | 深色                                                                                                                        |
+| ------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| 12.01   | 源名、当前模式、加载指示；冷启动及切模式分别记录                                 | `s1203-source-latest-loading-light`（切最新）；冷启动图截到路由动画，待补                                                      | `s1201-mangadex-loading-dark`（冷启动）、`s1203-source-latest-loading-dark`（切最新）                                       |
+| 12.02   | 源名、热门模式、封面与标题网格                                                   | `s1202-xkcd-popular-light`、`s1202-mangadex-popular-light`                                                                     | `s1202-xkcd-popular-dark`、`s1202-mangadex-popular-dark`                                                                    |
+| 12.03   | 源名、最新模式、作品；真实动态目录内容会变化，不用于同数据叠图                   | `s1203-source-latest-light`                                                                                                    | `s1203-source-latest-dark`                                                                                                  |
+| 12.04   | 空输入和精确查询 `987654321`、键盘、清空和提交                                   | `s1204-source-search-input-light`、`s1204-source-search-filled-light`                                                          | `s1204-source-search-input-dark`、`s1204-source-search-filled-dark`                                                         |
+| 12.05   | 精确查询 `one piece`、匹配作品、清空与返回；键盘已收起                           | `s1205-mangadex-search-loaded-light`                                                                                           | `s1205-mangadex-search-loaded-dark`                                                                                         |
+| 12.06   | 当前查询 `987654321`、无结果说明和恢复动作；主图含键盘                           | `s1206-source-empty-light`；无键盘/恢复待补                                                                                    | `s1206-source-empty-dark`；无键盘/恢复待补                                                                                  |
+| 12.07   | 错误正文、重试、返回；仅在参考模拟器制造网络不可用                               | 待                                                                                                                             | 待                                                                                                                          |
+| 12.08   | 已有作品、追加指示、滚动位置                                                     | 待                                                                                                                             | 待                                                                                                                          |
+| 12.09   | 已有作品、追加失败提示和重试                                                     | 待                                                                                                                             | 待                                                                                                                          |
+| 13.01   | text/check/select/tri-state/sort/group 当前值、重置/应用；文本筛选仍需其他真实源 | `s1301-source-filters-light`、`s1301-source-filter-group-light`；text 待                                                       | `s1301-source-filters-dark`、`s1301-source-filter-group-dark`；text 待                                                      |
+| 13.02   | group/check/select 草稿，重置、收起重开和实际应用；下述转换另列文件              | `s1302-source-filter-draft-light`、`s1302-source-filter-reset-light`、`s1304-source-filter-select-draft-light`                 | `s1302-source-filter-draft-dark`、`s1302-source-filter-reset-dark`、`s1304-source-filter-select-draft-dark`                 |
+| 13.03   | Sort 展开、默认 Relevance 降序、点同项升序；上下滚动内容                         | `s1301-source-filter-sort-light`、`s1301-source-filter-sort-lower-light`、`s1303-source-filter-sort-ascending-light`           | `s1301-source-filter-sort-dark`、`s1301-source-filter-sort-lower-dark`、`s1303-source-filter-sort-ascending-dark`           |
+| 13.04   | Created within last 下拉展开，Any/Day/Week/Month/Year 和原值                     | `s1304-source-filter-select-light`                                                                                             | `s1304-source-filter-select-dark`                                                                                           |
+| 13.05   | Genre 的 Action 不限制，空框；点击后进入包含                                     | `s1305-source-filter-tristate-neutral-light`                                                                                   | `s1305-source-filter-tristate-neutral-dark`                                                                                 |
+| 13.06   | Action 包含，勾选图形与强调色；点击后进入排除                                    | `s1305-source-filter-tristate-include-light`                                                                                   | `s1305-source-filter-tristate-include-dark`                                                                                 |
+| 13.07   | Action 排除，叉号与强调色；点击后回不限制                                        | `s1305-source-filter-tristate-exclude-light`、`s1305-source-filter-tristate-reset-light`                                       | `s1305-source-filter-tristate-exclude-dark`、`s1305-source-filter-tristate-reset-dark`                                      |
+| 14.01   | MangaDex EN 偏好标题、当前值、说明及开关，上下段均采集                           | `s1401-source-preferences-light`、`s1401-source-preferences-lower-light`                                                       | `s1401-source-preferences-dark`、`s1401-source-preferences-lower-dark`                                                      |
+| 14.02   | Cover quality 字段、Original 当前选中、其他选项、取消；取消后值不变              | `s1402-source-choice-light`、`s1402-source-choice-cancel-light`                                                                | `s1402-source-choice-dark`、`s1402-source-choice-cancel-dark`                                                               |
+| 14.03   | Filter original languages 多选初态，选项未选、确认/取消                          | `s1403-source-multiple-light`                                                                                                  | `s1403-source-multiple-dark`                                                                                                |
+| 14.04   | Block groups by UUID 空输入、非必填、确定可用、取消与键盘                        | `s1404-source-text-empty-light`                                                                                                | `s1404-source-text-empty-dark`                                                                                              |
+| 14.05   | Japanese 已选草稿、确认/取消；取消重开未选，确认重开已选                         | `s1405-source-multiple-draft-light`、`s1405-source-multiple-cancel-reopen-light`、`s1405-source-multiple-applied-reopen-light` | `s1405-source-multiple-draft-dark`、`s1405-source-multiple-cancel-reopen-dark`、`s1405-source-multiple-applied-reopen-dark` |
+| 14.06   | 文本 `123`，非法 UUID 错误说明、确定禁用、可修正/取消                            | `s1406-source-text-invalid-light`                                                                                              | `s1406-source-text-invalid-dark`                                                                                            |
+| 14.07   | 有效测试 UUID，错误消失、确定可用；确认后重开仍保留                              | `s1407-source-text-valid-light`、`s1407-source-text-applied-reopen-light`                                                      | `s1407-source-text-valid-dark`、`s1407-source-text-applied-reopen-dark`                                                     |
+| 15.01   | 查询、源范围、提交/返回                                                          | 待                                                                                                                             | 待                                                                                                                          |
+| 15.02   | 每源名称与加载反馈，其他已完成源仍可见                                           | 待                                                                                                                             | 待                                                                                                                          |
+| 15.03   | 每源名称与横向作品、点击作品入口                                                 | 待                                                                                                                             | 待                                                                                                                          |
+| 15.04   | 对应源名及无结果说明                                                             | 待                                                                                                                             | 待                                                                                                                          |
+| 15.05   | 对应源名、错误和重试；混合成功/失败同屏另留图                                    | 待                                                                                                                             | 待                                                                                                                          |
+
+实际转换补充（两种主题均已操作并核对 PNG）：
+
+- MangaDex 筛选勾选 `Has available chapters`，返回收起后热门结果不变，重开仍勾选。证据为 `s1302-source-filter-checkbox-draft-{light,dark}`、`s1302-source-filter-dismissed-{light,dark}`、`s1302-source-filter-dismissed-reopen-{light,dark}`。这是保留未应用草稿，不能写成“取消丢弃”。Karuyomi 的显式取消继续丢弃草稿，作为已确认业务合同的交互差异记录。
+- 点击筛选后截到实际加载指示，随后得到 Domino Kick 等真实结果，见 `s1302-source-filter-applying-{light,dark}` 与 `s1302-source-filter-applied-{light,dark}`。浅色瞬态同时截到面板淡出，不能当稳定面板像素基准；两侧等待与结果状态已取得。搜索 `one piece` 的匹配作品在加载完封面、收起键盘后另拍 12.05，不使用早期空封面帧作成对主图。
+- 偏好多选的取消/确认后分别重开，检查未选/已选，最后恢复未选。文本编辑用 `00000000-0000-4000-8000-000000000001` 验证，通过确认及重开后清空恢复。完整动作图见同前缀的 `cancel`、`applied`、`reset` 及 `reset-draft` 文件。空值合法且确定可用；错误节点仅由实际非法 UUID 触发。
+- 旧 Android Preference/View 偏好弹层的浅色容器偏蓝，区别于 Mihon Compose 弹层；系统键盘仍按 Android 系统浅色，作为系统变体保留。筛选列表的滚动位置和打开/收起动画存在差异，当前只确认状态覆盖，未计为同位置叠图通过。最新目录两次请求间数据有变化，同样不能用于同数据像素叠图。
 
 ## 16–21：作品、章节、封面与迁移
 
