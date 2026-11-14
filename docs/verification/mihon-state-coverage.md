@@ -592,7 +592,9 @@ stateDiagram-v2
     state "26.02 外观设置" as U1
     state "26.03 全局阅读设置" as U2
     state "28.01 高级与诊断入口" as U3
-    state "28.02 诊断明细" as U4
+    state "28.02 应用与设备诊断" as U4
+    state "28.03 Android后台任务诊断" as U12
+    state "28.04 系统复制反馈" as U13
     state "29.01 少量单选" as U5
     state "29.02 长列表或搜索选择" as U6
     state "29.03 无匹配选项" as U7
@@ -604,12 +606,19 @@ stateDiagram-v2
     U0 --> U2: 阅读
     U0 --> U3: 高级
     U3 --> U4: 诊断明细
+    U4 --> U12: Worker info
+    U12 --> U12: 横向滚动正文
+    U12 --> U13: 复制
+    U13 --> U12: 系统反馈收起
+    U12 --> U4: 返回
+    U4 --> U3: 返回
     U1 --> U5: 选择
     U2 --> U5: 选择
     U0 --> U6: 长选项
     U6 --> U7: 搜索无匹配
     U7 --> U6: 清空
-    U5 --> U0: 选择或取消返回原页
+    U5 --> U2: 取消默认阅读模式且保留原值
+    U5 --> U1: 外观调用点返回（待验）
     U6 --> U0: 选择或取消返回原页
     U0 --> U8: 编辑
     U8 --> U9: 有效输入
@@ -619,23 +628,30 @@ stateDiagram-v2
     U11 --> U0: 确认或取消
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class U0,U1 paired
+    class U13 partial
+    class U0,U1,U2,U3,U4,U5,U12 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                                      | 浅色                     | 深色                                                      |
-| ------- | -------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------- |
-| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”    | `s2601-settings-light`   | `s2601-settings-dark`                                     |
-| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                               | `s2602-appearance-light` | `s2602-appearance-dark`                                   |
-| 26.03   | 阅读显示/输入分组、当前值和说明；完整滚动段分别留图                        | 待                       | 待                                                        |
-| 28.01   | 高级分组及诊断入口；主路径中的次级位置                                     | 待                       | 待                                                        |
-| 28.02   | 诊断标题、字段值、复制/返回；DebugInfo 与 WorkerInfo 分别采集              | 待                       | 待                                                        |
-| 29.01   | 选项标题、当前选中、选项、取消；可复用14.02但逐调用点核对                  | 待                       | `source-preference-choice-default-dark`（源偏好分项）     |
-| 29.02   | 当前项、可搜索的长选项、搜索/取消和键盘                                    | 待                       | 待（先核对 Mihon 是否采用同样搜索结构）                   |
-| 29.03   | 查询、无匹配、清空/取消                                                    | 待                       | 待（若 Mihon 无此界面，记为 Karuyomi 独有并保留源码依据） |
-| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                     | 待                       | `category-create-default-dark`（分类分项）                |
-| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                            | 待                       | `category-ime-default-dark`（分类分项）                   |
-| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                           | 待                       | 待                                                        |
-| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02 | 待                       | 待                                                        |
+| 状态 ID | 最小必要信息/采集触发                                                      | 浅色                                                               | 深色                                                                 |
+| ------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”    | `s2601-settings-light`                                             | `s2601-settings-dark`                                                |
+| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                               | `s2602-appearance-light`                                           | `s2602-appearance-dark`                                              |
+| 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                    | `s2603-reader-preferences-*-light`                                 | `s2603-reader-preferences-*-dark`                                    |
+| 28.01   | 高级分组及诊断入口；仅当前首屏，全部滚动内容仍待补                         | `s2801-advanced-top-light`                                         | `s2801-advanced-top-dark`                                            |
+| 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段        | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`      | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`          |
+| 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体   | `s2803-worker-info-light`、`s2804-worker-horizontal-light`         | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`             |
+| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验           | 待（`s2803-worker-copy-light` 只有空容器，排除）                   | `s2803-worker-copy-dark`（含测试任务ID开头的系统预览；完整内容待验） |
+| 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变               | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light` | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`     |
+| 29.02   | 当前项、可搜索的长选项、搜索/取消和键盘                                    | 待                                                                 | 待（先核对 Mihon 是否采用同样搜索结构）                              |
+| 29.03   | 查询、无匹配、清空/取消                                                    | 待                                                                 | 待（若 Mihon 无此界面，记为 Karuyomi 独有并保留源码依据）            |
+| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                     | 待                                                                 | `category-create-default-dark`（分类分项）                           |
+| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                            | 待                                                                 | `category-ime-default-dark`（分类分项）                              |
+| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                           | 待                                                                 | 待                                                                   |
+| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02 | 待                                                                 | 待                                                                   |
+
+26.03 的 `*` 依次为 `top`、`display`、`paged`、`webtoon`、`navigation`、`actions`，已实看 `settings-reference-pairs-0.jpg` 至 `settings-reference-pairs-2.jpg`。首屏与末段两主题的应用 XML 边界一致；中间四段有约 3–15 物理像素的滚动差，部分首尾文字受裁切，只计状态覆盖，不能用于同位置叠图。六段覆盖默认模式/提示、显示/E-Ink、章节跳过、单页/条漫、输入和操作菜单；未实现的 Android 专属设置及 E-Ink 只作参考，不增加无效产品入口。
+
+28 和 29 已实看 `settings-reference-pairs-3.jpg` 至 `settings-reference-pairs-5.jpg`，并单独核对 Worker info 横向滚动及深色复制图。28.03 是 Mihon 的 Android WorkManager 诊断，与 Cloudflare Worker 无关；当时仅有一项 Enqueued，Finished/Running 为 `-`，其它运行状态仍待。横向滚动会移动整块正文，标题栏保持位置。28.04 属于独立 Android 系统反馈，不将系统容器配色纳入 Mihon 应用角色；未验证完整复制内容。29.01 本轮只取消，没有改动默认阅读模式；选中其他模式并返回仍待。
 
 ## Karuyomi 独有状态与转换
 
@@ -687,7 +703,7 @@ stateDiagram-v2
 
 ### 15：Karuyomi 跨源搜索的目标状态
 
-这张图跟踪产品自身的明确选源、独立重试与停止确认，不填入 Mihon 的参考画面。下表记录真实 CI Web 产物 `b826249` 的隔离内置浏览器证据；已有截图不代表全部变体或最终配色验收完成。浏览器截图实际编码为 JPEG，不用于精确颜色采样。
+这张图跟踪产品自身的明确选源、独立重试与停止确认，不填入 Mihon 的参考画面。下表记录真实 CI Web 产物 `b826249` 与错误修复 `07342fb` 的隔离内置浏览器证据；已有截图不代表全部变体或最终配色验收完成。浏览器截图实际编码为 JPEG，不用于精确颜色采样。
 
 ```mermaid
 stateDiagram-v2
@@ -731,25 +747,29 @@ stateDiagram-v2
     Q14 --> Q5: 返回原查询与结果
     Q0 --> Q12: 退出时清理失败
     Q12 --> Q0: 重试清理确认后返回
+    classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
+    class Q0,Q4,Q5,Q6,Q7,Q8,Q10,Q14 paired
 ```
 
-| 状态 ID | 最小必要信息与实际边界                                                   | 浅色                                                                                           | 深色                                                                             |
-| ------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| 15.K1   | 查询、源数/上限、语言及明确选择、刷新和开始；主图为未选源                | `karuyomi-b826249-cross-scope-light.jpg`                                                       | `karuyomi-b826249-cross-scope-dark.jpg`                                          |
-| 15.K2   | 无可选源原因及安装/刷新入口                                              | 待                                                                                             | 待                                                                               |
-| 15.K3   | 原输入与校验原因、可修正入口，不创建搜索任务                             | 待                                                                                             | 待                                                                               |
-| 15.K4   | 源身份、等待执行及停止入口；同包排队要真实截到                           | 待                                                                                             | 待                                                                               |
-| 15.K5   | 源名、语言、真实旋转指示、停止此源/全部和总进度                          | `karuyomi-b826249-cross-start-light.jpg`                                                       | `karuyomi-b826249-cross-start-dark.jpg`                                          |
-| 15.K6   | Komiic 备用镜像的三项真实结果；标题在封面下，普通封面仍占位              | `karuyomi-b826249-cross-results-light.jpg`                                                     | `karuyomi-b826249-cross-results-dark.jpg`                                        |
-| 15.K7   | xkcd 返回零项、源状态及空结果说明；与成功源同屏                          | `karuyomi-b826249-cross-results-light.jpg`                                                     | `karuyomi-b826249-cross-results-dark.jpg`                                        |
-| 15.K8   | 默认镜像 HTTP 500 与独立重试；旧产物长堆栈挤占问题已发现，修复产物待复验 | `karuyomi-b826249-cross-mixed-error-light.jpg`、`karuyomi-b826249-cross-error-retry-light.jpg` | `karuyomi-b826249-cross-mixed-error-dark.jpg`                                    |
-| 15.K9   | 源名、完整原始诊断、滚动和关闭；查看本身不请求                           | 待                                                                                             | 待                                                                               |
-| 15.K10  | 正在停止、当前源及禁止重复开始；不能用加载图代替                         | 待                                                                                             | 待                                                                               |
-| 15.K11  | 停止已确认、原查询与已有结果、显式重试；取消失败提示清除                 | 待                                                                                             | 待                                                                               |
-| 15.K12  | 未确认的停止、同一停止重试、继续搜索受阻                                 | 待                                                                                             | 待                                                                               |
-| 15.K13  | 页面资源尚未释放、精确清理重试、退出受阻                                 | 待                                                                                             | 待                                                                               |
-| 15.K14  | 正在打开、原分源结果与冻结操作；实际过渡图仍待                           | 待                                                                                             | 待                                                                               |
-| 15.K15  | 《ONE PIECE航海王》、尾田榮一郎、238 章；返回保留原查询与三项结果        | `karuyomi-b826249-cross-open-light.jpg`、`karuyomi-b826249-cross-return-light.jpg`             | `karuyomi-b826249-cross-open-dark.jpg`、`karuyomi-b826249-cross-return-dark.jpg` |
+| 状态 ID | 最小必要信息与实际边界                                                    | 浅色                                                                               | 深色                                                                             |
+| ------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 15.K1   | 查询、源数/上限、语言及明确选择、刷新和开始；主图为未选源                 | `karuyomi-b826249-cross-scope-light.jpg`                                           | `karuyomi-b826249-cross-scope-dark.jpg`                                          |
+| 15.K2   | 无可选源原因及安装/刷新入口                                               | 待                                                                                 | 待                                                                               |
+| 15.K3   | 原输入与校验原因、可修正入口，不创建搜索任务                              | 待                                                                                 | 待                                                                               |
+| 15.K4   | 源身份、等待执行及停止入口；同包排队要真实截到                            | 待                                                                                 | 待                                                                               |
+| 15.K5   | 源名、语言、真实旋转指示、停止此源/全部和总进度；独立重试保留 xkcd 空结果 | `karuyomi-07342fb-cross-start-light.jpg`、`karuyomi-07342fb-cross-retry-light.jpg` | `karuyomi-07342fb-cross-start-dark.jpg`、`karuyomi-07342fb-cross-retry-dark.jpg` |
+| 15.K6   | Komiic 备用镜像的三项真实结果；标题在封面下，普通封面仍占位               | `karuyomi-b826249-cross-results-light.jpg`                                         | `karuyomi-b826249-cross-results-dark.jpg`                                        |
+| 15.K7   | xkcd 返回零项、源状态及空结果说明；与成功源同屏                           | `karuyomi-b826249-cross-results-light.jpg`                                         | `karuyomi-b826249-cross-results-dark.jpg`                                        |
+| 15.K8   | 默认镜像真实 HTTP 500；短说明、错误详情与重试独立命名，重试在首屏         | `karuyomi-07342fb-cross-error-light.jpg`                                           | `karuyomi-07342fb-cross-error-dark.jpg`                                          |
+| 15.K9   | 源名、完整原始诊断和关闭；关闭后仍停在原失败，超长滚动浏览器变体待补      | `karuyomi-07342fb-cross-diagnostic-light.jpg`                                      | `karuyomi-07342fb-cross-diagnostic-dark.jpg`                                     |
+| 15.K10  | 正在停止、当前源及禁止重复开始；不能用加载图代替                          | 待                                                                                 | 待                                                                               |
+| 15.K11  | 两源均已停止、原查询与显式重试；本轮为零结果，非空保留/旧停止失败恢复待补 | `karuyomi-07342fb-cross-stopped-light.jpg`                                         | `karuyomi-07342fb-cross-stopped-dark.jpg`                                        |
+| 15.K12  | 未确认的停止、同一停止重试、继续搜索受阻                                  | 待                                                                                 | 待                                                                               |
+| 15.K13  | 页面资源尚未释放、精确清理重试、退出受阻                                  | 待                                                                                 | 待                                                                               |
+| 15.K14  | 正在打开、原分源结果与冻结操作；实际过渡图仍待                            | 待                                                                                 | 待                                                                               |
+| 15.K15  | 《ONE PIECE航海王》、尾田榮一郎、238 章；返回保留原查询与三项结果         | `karuyomi-b826249-cross-open-light.jpg`、`karuyomi-b826249-cross-return-light.jpg` | `karuyomi-b826249-cross-open-dark.jpg`、`karuyomi-b826249-cross-return-dark.jpg` |
+
+`07342fb` 的三张 `cross-{start,errors,operations}-pairs.jpg` 联系表已实看，浅深均为 360×800、同样的 xkcd en / Komiic 和查询 `航海王`。两主题重试按钮 DOM 均为 `x=8,y=588,width=106.359375,height=57`，名称仅为“重试此源”。独立重试帧的 Komiic 旋转指示和 xkcd 已返回空态同时存在；深色 DOM 在截图后已回到失败，不用后续 DOM 冒充截图瞬间。错误详情为完整 HTTP 500 和原始 JS/Java 堆栈，关闭后仍为原失败。超长诊断的实际滚动、无请求的独立网络审计及取消 ACK 失败等仍待浏览器分项；100 行诊断/关闭不请求/取消失败恢复另有 29 项组件与控制器回归，不能互相替代。验收采用临时 D1、`acceptance-owner`、无 fixture；视口已恢复且 harness 已停止。
 
 ## 已核对的成对参考与差异
 
