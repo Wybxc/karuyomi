@@ -2,6 +2,8 @@
 
 2026-11-14，进行中。范围见[30 组页面矩阵](../design/mihon-cupertino-fidelity.md)，待办见[实施计划](../plan/mihon-cupertino-fidelity.md)。本轮尚未通过逐页像素、最终 Cupertino 或生产验收。
 
+[逐状态截图状态机](mihon-state-coverage.md)现为参考采集进度入口，分别记录每个状态的浅/深图和缺口；本记录继续汇总实际工程与运行证据。`f0f648b` CI 发现一个测试辅助代码的 `curly_braces_in_flow_control_structures` 提示，已补大括号，待下一次 CI 复验；不能沿用 `b138967` 的成功结果代表此提交通过。
+
 ## 已取得的依据
 
 - Karuyomi 从 `33dfb2ec51d8e0ad787a90f1146da59cdafecfc4` 起步；已有恢复发布证据不重复计为本轮视觉对齐通过。

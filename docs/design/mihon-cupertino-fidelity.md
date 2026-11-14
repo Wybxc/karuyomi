@@ -4,6 +4,8 @@
 
 实施及验收分别维护在[计划](../plan/mihon-cupertino-fidelity.md)与[验证记录](../verification/mihon-cupertino-fidelity.md)。本文件记录对照依据和设计，不将源码推导或计划当作实际渲染通过。
 
+页面矩阵进一步展开为[逐状态截图流程图](../verification/mihon-state-coverage.md)。每个状态分别跟踪浅色与深色，所有状态及取消/重试/确认转换都纳入；Karuyomi 独有的服务端状态单列验收。两种主题不共用一个“已截图”标记。
+
 ## 固定参考
 
 Mihon 采用官方稳定版 **v0.21.3 / `feadad5e1e2bf638be6e2ca317d11657b09d4596`**，通过只读参考 submodule [vendor/mihon](../../vendor/mihon) 固定。所有下述 Kotlin 文件均以该提交为准；不编译或修改上游业务实现。官方[发布页](https://github.com/mihonapp/mihon/releases/tag/v0.21.3)与[使用指南](https://mihon.app/docs/guides/getting-started)作为入口依据。

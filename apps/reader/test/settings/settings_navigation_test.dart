@@ -96,6 +96,15 @@ Finder _navigation(String label) => find.descendant(
 );
 Future<void> _openSettings(WidgetTester tester) async {
   await _tap(tester, _navigation('设置'));
+  final connection = find.byKey(const ValueKey('service-connection'));
+  if (connection.evaluate().isNotEmpty) {
+    await _tap(
+      tester,
+      find
+          .descendant(of: connection, matching: find.byType(CupertinoListTile))
+          .first,
+    );
+  }
   for (final id in ['appearance', 'reading', 'input']) {
     final group = find.byKey(ValueKey('settings-group-$id'));
     if (group.evaluate().isNotEmpty) {

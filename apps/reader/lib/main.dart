@@ -449,15 +449,15 @@ class _AppShellState extends ConsumerState<AppShell> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           children: [
-            _connectionSettings(),
-            const SizedBox(height: 24),
             if (_catalog case final catalog?
                 when ref.watch(confirmedAccountProvider(catalog)) != null)
               GlobalSettingsPanel(catalog: catalog)
             else
               const Text('连接并确认身份后可读取和保存同步设置。'),
+            const SizedBox(height: 24),
+            _connectionSettings(),
             const SizedBox(height: 24),
             const CupertinoListTile(
               title: Text('Karuyomi'),
@@ -473,35 +473,18 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   Widget _connectionSettings() {
     final controller = _catalog;
-    return Column(
+    final connected = controller?.status == ServiceStatus.ready;
+    final form = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '服务连接',
-          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-        ),
-        const SizedBox(height: 16),
         CupertinoTextField(
+          key: const ValueKey('service-origin'),
           controller: _originField,
           readOnly: kIsWeb || _restoringOrigin,
           keyboardType: TextInputType.url,
           autocorrect: false,
           placeholder: 'https://你的服务域名',
         ),
-        const SizedBox(height: 12),
-        if (_configurationError != null) Text(_configurationError!),
-        if (_originPersistenceError != null) Text(_originPersistenceError!),
-        if (controller?.email != null) Text('账号：${controller!.email}'),
-        if (controller?.error != null) Text(controller!.error!),
-        if (_retiredProgress.isNotEmpty ||
-            controller?.hasUnsavedReadingProgress == true) ...[
-          const SizedBox(height: 12),
-          const Text('部分阅读进度尚未保存；原服务和身份的记录仍保留，可继续连接服务。'),
-          CupertinoButton(
-            onPressed: _retryingProgress ? null : _retryProgress,
-            child: const Text('重试保存所有进度'),
-          ),
-        ],
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -524,6 +507,56 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
           ],
         ),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (connected)
+          CupertinoExpansionTile(
+            key: const ValueKey('service-connection'),
+            title: const Text('服务连接'),
+            child: form,
+          )
+        else ...[
+          Text(
+            '服务连接',
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+          ),
+          const SizedBox(height: 16),
+          form,
+        ],
+        if (controller?.email != null)
+          Text(
+            '账号：${controller!.email}',
+            style: TextStyle(
+              color: AppColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        if (_configurationError != null)
+          Text(
+            _configurationError!,
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+          ),
+        if (_originPersistenceError != null)
+          Text(
+            _originPersistenceError!,
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+          ),
+        if (controller?.error != null)
+          Text(
+            controller!.error!,
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+          ),
+        if (_retiredProgress.isNotEmpty ||
+            controller?.hasUnsavedReadingProgress == true) ...[
+          const SizedBox(height: 12),
+          const Text('部分阅读进度尚未保存；原服务和身份的记录仍保留，可继续连接服务。'),
+          CupertinoButton(
+            onPressed: _retryingProgress ? null : _retryProgress,
+            child: const Text('重试保存所有进度'),
+          ),
+        ],
       ],
     );
   }

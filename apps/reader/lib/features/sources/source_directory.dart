@@ -1,4 +1,5 @@
 import '../../widgets/choice_field.dart';
+import '../../theme/app_theme.dart';
 
 import 'dart:async';
 
@@ -156,6 +157,8 @@ class const SourceDirectory({
           second = saved(b.packageName, b.source.id);
       return first != second
           ? (first ? -1 : 1)
+          : a.source.lang != b.source.lang
+          ? a.source.lang.compareTo(b.source.lang)
           : a.source.name.toLowerCase().compareTo(b.source.name.toLowerCase());
     });
     final languages = rows.map((row) => row.source.lang).toSet().toList()
@@ -176,9 +179,11 @@ class const SourceDirectory({
         .toList();
     final hasFilter = query.isNotEmpty || language.value != null;
     final canEdit = settings.canEdit == true && !catalog.busy;
+    String group(String packageName, wire.CatalogSource source) =>
+        saved(packageName, source.id) ? '收藏的漫画源' : sourceLanguage(source.lang);
     return ListView(
       key: const PageStorageKey('source-directory-scroll'),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       children: [
         Row(
           children: [
@@ -187,7 +192,18 @@ class const SourceDirectory({
                 key: const ValueKey('source-directory-search'),
                 controller: search,
                 placeholder: '查找漫画源名称',
-                prefix: Icon(CupertinoIcons.search),
+                prefix: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    CupertinoIcons.search,
+                    color: AppColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+                clearButtonMode: OverlayVisibilityMode.editing,
+                decoration: BoxDecoration(
+                  color: AppColors.groupedSurface.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             CupertinoButton(
@@ -287,7 +303,24 @@ class const SourceDirectory({
               ],
             ),
           ),
-        for (final row in visible)
+        for (final (index, row) in visible.indexed) ...[
+          if (index == 0 ||
+              group(row.packageName, row.source) !=
+                  group(
+                    visible[index - 1].packageName,
+                    visible[index - 1].source,
+                  ))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+              child: Text(
+                group(row.packageName, row.source),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: catalog.busy
@@ -310,6 +343,10 @@ class const SourceDirectory({
                   if ((nameCounts[row.source.name] ?? 0) > 1)
                     row.extension?.name ?? row.packageName.split('.').last,
                 ].join(' · '),
+                maxLines: 3,
+                style: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
               ),
               trailing: GestureDetector(
                 excludeFromSemantics: true,
@@ -348,12 +385,19 @@ class const SourceDirectory({
               ),
             ),
           ),
+        ],
         for (final extension in pendingExtensions)
           CupertinoListTile(
             key: ValueKey(('source-extension-blocked', extension.packageName)),
             leading: const Icon(CupertinoIcons.cube),
             title: Text('${extension.name}（扩展待处理）'),
-            subtitle: Text(extension.blockedReason ?? '所选构建的漫画源资料不可用'),
+            subtitle: Text(
+              extension.blockedReason ?? '所选构建的漫画源资料不可用',
+              maxLines: 3,
+              style: TextStyle(
+                color: AppColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
             trailing: CupertinoButton(
               onPressed: onManage,
               child: const Text('管理扩展'),

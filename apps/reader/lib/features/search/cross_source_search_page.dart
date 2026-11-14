@@ -7,7 +7,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../browse/catalog_controller.dart';
-import '../browse/manga_list_tile.dart';
+import '../browse/manga_cover_tile.dart';
 import '../extensions/extension_listing.dart';
 import 'cross_source_search_controller.dart';
 
@@ -29,6 +29,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   late final CrossSourceSearchController controller;
   late TextEditingController _query;
   late TextEditingController _sourceFilter;
+  late ExpansibleController _scope;
   int _sourcePage = 0;
   bool _allowPop = false;
   bool _leaving = false;
@@ -73,6 +74,13 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
       return;
     }
     await widget.onOpen(details);
+  }
+
+  Future<void> _start(String query) async {
+    await controller.start(query);
+    if (mounted && controller.error == null && controller.groups.isNotEmpty) {
+      _scope.collapse();
+    }
   }
 
   Widget _sourceChoices() {
@@ -223,13 +231,25 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
           ),
         if (group.limitReason != null && group.limitReason != group.error)
           Text(group.limitReason!),
-        for (var index = 0; index < group.mangas.length; index++)
-          MangaListTile(
-            key: ValueKey(('cross-search-result', group.target.key, index)),
-            manga: group.mangas[index],
-            onTap: controller.canChange && controller.cleanupError == null
-                ? () => unawaited(_open(group, group.mangas[index]))
-                : null,
+        if (group.mangas.isNotEmpty)
+          SizedBox(
+            height:
+                192 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
+            child: ListView.separated(
+              key: ValueKey(('cross-search-results', group.target.key)),
+              scrollDirection: Axis.horizontal,
+              itemCount: group.mangas.length,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 4),
+              itemBuilder: (context, index) => MangaCoverTile(
+                key: ValueKey(('cross-search-result', group.target.key, index)),
+                title: group.mangas[index].title,
+                onPressed:
+                    controller.canChange && controller.cleanupError == null
+                    ? () => unawaited(_open(group, group.mangas[index]))
+                    : null,
+              ),
+            ),
           ),
         if (group.status == SourceSearchStatus.complete && group.mangas.isEmpty)
           const Text('此漫画源没有找到漫画。'),
@@ -278,6 +298,11 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   Widget build(BuildContext context) {
     _query = useTextEditingController();
     _sourceFilter = useTextEditingController();
+    _scope = useExpansibleController();
+    useEffect(() {
+      _scope.expand();
+      return null;
+    }, const []);
     useListenable(controller);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
     return PopScope<void>(
@@ -337,26 +362,41 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                         ),
                       ],
                     ),
-                  _sourceChoices(),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: CupertinoButton(
-                      key: const ValueKey('cross-search-refresh'),
-                      onPressed: controller.canSelect
-                          ? () => unawaited(controller.loadTargets())
-                          : null,
-                      child: const Text('刷新可选漫画源'),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   CupertinoTextField(
                     key: const ValueKey('cross-search-query'),
                     controller: _query,
                     enabled: controller.available && !controller.opening,
                     maxLength: crossSourceQueryLimit,
                     textInputAction: TextInputAction.search,
-                    onSubmitted: (value) => unawaited(controller.start(value)),
+                    onSubmitted: (value) => unawaited(_start(value)),
                     placeholder: '搜索漫画',
+                    prefix: const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Icon(CupertinoIcons.search),
+                    ),
+                    clearButtonMode: OverlayVisibilityMode.editing,
+                    decoration: BoxDecoration(
+                      color: AppColors.groupedSurface.resolveFrom(context),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  CupertinoExpansionTile(
+                    key: const ValueKey('cross-search-scope'),
+                    controller: _scope,
+                    title: Text('搜索范围 · 已选 ${controller.selected.length} 个漫画源'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _sourceChoices(),
+                        CupertinoButton(
+                          key: const ValueKey('cross-search-refresh'),
+                          onPressed: controller.canSelect
+                              ? () => unawaited(controller.loadTargets())
+                              : null,
+                          child: const Text('刷新可选漫画源'),
+                        ),
+                      ],
+                    ),
                   ),
                   Wrap(
                     spacing: 8,
@@ -364,7 +404,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                       CupertinoButton.filled(
                         key: const ValueKey('cross-search-submit'),
                         onPressed: controller.canChange
-                            ? () => unawaited(controller.start(_query.text))
+                            ? () => unawaited(_start(_query.text))
                             : null,
                         child: const Text('搜索所选漫画源'),
                       ),

@@ -300,6 +300,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('服务连接'));
+      await tester.tap(find.text('服务连接'));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(CupertinoTextField),
         replacement.origin.toString(),
@@ -338,6 +341,9 @@ void main() {
       );
       server.failWrites = false;
       await tester.tap(find.text('设置').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('服务连接'));
+      await tester.tap(find.text('服务连接'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(CupertinoTextField),
