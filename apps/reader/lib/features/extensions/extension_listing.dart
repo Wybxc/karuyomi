@@ -53,6 +53,8 @@ final class ExtensionListing {
         ..sort();
   String get languageLabel =>
       languages.isEmpty ? '语言未知' : languages.map(sourceLanguage).join(' · ');
+  String get languageSummary =>
+      languages.length > 3 ? '${languages.length} 种语言' : languageLabel;
   bool get registered => catalog.isRepositoryRegistered(reference);
   String? get repositoryError =>
       catalog.repositoryErrors[catalogReferenceKey(reference)];

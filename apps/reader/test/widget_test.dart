@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
@@ -39,6 +40,82 @@ Future<void> _browseDetails(WidgetTester tester) async {
 }
 
 void main() {
+  for (final key in [
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+  ]) {
+    testWidgets('app buttons activate with Web ${key.keyLabel}', (
+      tester,
+    ) async {
+      await tester.pumpApp(const KaruyomiApp());
+      await tester.pumpAndSettle();
+      final shortcuts = tester
+          .widget<CupertinoApp>(find.byType(CupertinoApp))
+          .shortcuts;
+      var first = 0;
+      var second = 0;
+      const input = ValueKey('shortcut-input');
+      const secondButton = ValueKey('shortcut-second');
+      await tester.pumpApp(
+        CupertinoApp(
+          shortcuts: {
+            ...WidgetsApp.defaultShortcuts,
+            const SingleActivator(LogicalKeyboardKey.enter):
+                const ButtonActivateIntent(),
+            const SingleActivator(LogicalKeyboardKey.numpadEnter):
+                const ButtonActivateIntent(),
+            ...?shortcuts,
+          },
+          home: CupertinoPageScaffold(
+            child: Column(
+              children: [
+                CupertinoButton(
+                  autofocus: true,
+                  onPressed: () => first++,
+                  child: const Text('第一个操作'),
+                ),
+                const CupertinoTextField(key: input),
+                const CupertinoButton(onPressed: null, child: Text('不可用操作')),
+                CupertinoButton(
+                  key: secondButton,
+                  onPressed: () => second++,
+                  child: const Text('第二个操作'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(first, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.enterText(find.byKey(input), '草稿');
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(
+        first,
+        1,
+        reason: 'text input does not activate an unrelated button',
+      );
+      expect(second, 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<CupertinoButton>()
+            ?.key,
+        secondButton,
+      );
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(second, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final disableAnimations in [false, true]) {
     testWidgets(
       'reduced motion keeps pages stationary (disabled: $disableAnimations)',

@@ -467,6 +467,74 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
+      'many languages keep the extension version and status visible in $appearance',
+      (tester) async {
+        final index = wire.decodeProtoJson(
+          wire.ExtensionIndex(),
+          platform.inventory,
+        );
+        final build = index.builds.single;
+        build.sources
+          ..clear()
+          ..addAll(
+            List.generate(
+              61,
+              (index) => wire.CatalogSource(
+                id: '${1000 + index}',
+                name: 'Test Source',
+                lang: 'lang$index',
+              ),
+            ),
+          );
+        build.sourceIds
+          ..clear()
+          ..addAll(build.sources.map((source) => source.id));
+        platform.inventory = wire.encodeProtoJson(index);
+        await show(tester, appearance: appearance, size: const Size(360, 800));
+        final row = find.byKey(
+          ValueKey((
+            'extension-available',
+            catalog.catalogUrl,
+            build.packageName,
+          )),
+        );
+        final expected = '${build.version} · 61 种语言 · 可安装';
+        expect(
+          (tester.widget<CupertinoListTile>(row).subtitle! as Text).data,
+          expected,
+        );
+        await tester.tap(
+          find.byKey(
+            ValueKey((
+              'extension-details',
+              catalog.catalogUrl,
+              build.packageName,
+            )),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final status = find.ancestor(
+          of: find.text('扩展状态'),
+          matching: find.byType(CupertinoListTile),
+        );
+        expect(
+          (tester.widget<CupertinoListTile>(status).subtitle! as Text).data,
+          expected,
+        );
+        expect(find.text('lang60'), findsOneWidget);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
       'extension details are reachable by Tab and Enter in $appearance',
       (tester) async {
         await show(tester, appearance: appearance, size: const Size(360, 800));

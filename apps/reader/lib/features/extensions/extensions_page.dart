@@ -139,8 +139,8 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
               title: Text(item.name, maxLines: 2),
               subtitle: Text(
                 [
-                  item.languageLabel,
                   ?version,
+                  item.languageSummary,
                   item.status(_controller.cache),
                   if (sameName) item.repositoryName,
                 ].join(' · '),
@@ -583,8 +583,8 @@ class const ExtensionDetailsPage({
                   title: const Text('扩展状态'),
                   subtitle: Text(
                     [
-                      item.languageLabel,
                       ?version,
+                      item.languageSummary,
                       item.status(controller.cache),
                     ].join(' · '),
                     maxLines: 3,

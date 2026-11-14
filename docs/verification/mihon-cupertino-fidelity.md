@@ -130,6 +130,12 @@
 
 Source偏好toggle仍无真实浏览器证据。已只读核对现网190包索引和MangaDex 1.6.1清单：907135B编码包、61个Source、宿主ABI与共享材料身份与当前两包快照相同，官方源码提供多个SwitchPreferenceCompat；可通过隔离账户的额外仓库登记尝试真实验证，不需重新AOT。材料匹配不是初始化或偏好运行通过，尚未执行该包。
 
+`5ed6dd6`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43626496683)完整成功，含793项Dart（22 + 87 + 684）、531项Vitest及Web/候选Wasm构建。其正式Web产物在隔离harness中确认行已是`role=button, tabindex=0`，实际Tab可在详情和安装之间移动；Enter仍未激活，空格才进入候选详情。独立`GET /api/settings`确认导航前后`global.revision=1`、`accountRevision=1`，未写安装选择。`karuyomi-5ed6dd6-extensions-available-light.jpg`与`extension-candidate-space-light`仅为当前布局及空格激活证据，不能标为Enter验收通过。
+
+真实MangaDex的61语言摘要在列表/详情中占满三行，版本和状态被截断；原始画面保留为`mangadex-enabled-light-before-summary-fix`。后续修复缩短语言摘要并优先显示精确版本，同时在应用入口修正Web Enter intent；新增模拟Web默认映射的Enter/小键盘Enter、输入不误激活及Tab跳过禁用操作回归，61语言的列表/详情双主题回归也已加入。该批57项定向测试通过，完整CI与后续正式Web证据另记。
+
+`5d8bd71`的额外仓库预览实际失败，未登记或执行Source；现网公开索引响应未提供跨源CORS，且其`keiyoushi`身份与默认仓库重复。随后仅为隔离验收，从现有公开发布中提取MangaDex清单和编码包，传输时验证编码/原文长度及哈希，确认共享材料身份一致，与原两包组成三包临时静态输入；其派生build-state绑定该子集，不是发布baseline，不重新AOT或修改上游业务。`5ed6dd6`已通过正式UI安装MangaDex并取得账户确认；首次打开英文Source和一次正式重试均出现“运行容器已中断”，偏好入口不可用，未取得toggle证据。保存`karuyomi-5ed6dd6-browser-findings.json`及失败主图；控制台无warn/error，视口已恢复、临时标签已关闭、harness退出0。初始化、偏好开关与在线阅读仍须分别验收，不能由安装成功推断兼容。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。

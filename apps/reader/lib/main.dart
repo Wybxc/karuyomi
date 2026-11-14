@@ -3,6 +3,7 @@ import 'widgets/app_page_route.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -48,6 +49,14 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
   @override
   Widget build(BuildContext context) => CupertinoApp(
     title: 'Karuyomi',
+    // Web's default Enter intent is ButtonActivateIntent; CupertinoButton
+    // handles ActivateIntent. Keep the other platform shortcuts unchanged.
+    shortcuts: {
+      ...WidgetsApp.defaultShortcuts,
+      const SingleActivator(LogicalKeyboardKey.enter): const ActivateIntent(),
+      const SingleActivator(LogicalKeyboardKey.numpadEnter):
+          const ActivateIntent(),
+    },
     builder: readerBaselineEnabled
         ? (context, child) => ReaderBaselineHost(child: child!)
         : null,
