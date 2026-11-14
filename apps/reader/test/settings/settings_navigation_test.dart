@@ -842,6 +842,7 @@ void main() {
       expect(_reader(tester).key, leafBeforeFit);
       expect(_reader(tester).fit, ReaderFit.height);
       expect(_reader(tester).cropBorders, false);
+      await _tap(tester, find.byKey(const ValueKey('reader-chapter-options')));
       await _tap(tester, find.text('重新阅读本章'));
       final reset = _reader(tester).positionRequest!.value!;
       expect(reset.normalizedOffset, 0);

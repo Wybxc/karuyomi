@@ -126,6 +126,11 @@ class const ChoicePage<T>({
               child: CupertinoSearchTextField(
                 controller: query,
                 placeholder: '查找$label',
+                placeholderStyle: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                itemColor: AppColors.secondaryLabel.resolveFrom(context),
+                backgroundColor: AppColors.groupedSurface.resolveFrom(context),
               ),
             ),
             Expanded(
