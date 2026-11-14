@@ -471,6 +471,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           key: const ValueKey('service-origin'),
           controller: _originField,
           readOnly: kIsWeb || _restoringOrigin,
+          autofillHints: null,
           keyboardType: TextInputType.url,
           autocorrect: false,
           placeholder: 'https://你的服务域名',

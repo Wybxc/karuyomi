@@ -298,7 +298,7 @@ class const _SettingsEditor({
     final r = draft?.reader;
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
-    Widget group(String title, List<Widget> fields) =>
+    Widget group(String title, List<Widget> fields, {String? footer}) =>
         CupertinoListSection.insetGrouped(
           backgroundColor: AppColors.background.resolveFrom(context),
           separatorColor: AppColors.separator.resolveFrom(context),
@@ -308,6 +308,7 @@ class const _SettingsEditor({
           ),
           margin: const EdgeInsets.symmetric(vertical: 8),
           header: manga ? Text(title) : null,
+          footer: footer == null ? null : Text(footer),
           hasLeading: false,
           children: fields,
         );
@@ -378,7 +379,7 @@ class const _SettingsEditor({
                 inherit: false,
               ),
             ]),
-          if (manga || section == _SettingsSection.reading)
+          if (manga || section == _SettingsSection.reading) ...[
             group('阅读显示', [
               choice(
                 'mode',
@@ -420,11 +421,12 @@ class const _SettingsEditor({
                 (value) => r.background = value,
                 r.clearBackground,
               ),
+            ]),
+            group('应用内调暗', [
               if (manga)
                 MergeSemantics(
                   child: CupertinoFormRow(
                     prefix: Expanded(flex: 3, child: const Text('调暗跟随全局')),
-                    padding: EdgeInsets.zero,
                     child: CupertinoSwitch(
                       key: ValueKey('$scope-dim-inherit'),
                       value: dim == null,
@@ -440,21 +442,37 @@ class const _SettingsEditor({
                     ),
                   ),
                 ),
-              Text(dim == null ? '应用内调暗：跟随全局（$inheritedDim%）' : '应用内调暗：$dim%'),
-              CupertinoSlider(
-                key: ValueKey('$scope-dim'),
-                value: (dim ?? inheritedDim).toDouble(),
-                min: 0,
-                max: 80,
-                divisions: 80,
-                onChanged: state.canEdit && dim != null
-                    ? (value) => change(() => r.dimPercent = value.round())
-                    : null,
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      dim == null
+                          ? '应用内调暗：跟随全局（$inheritedDim%）'
+                          : '应用内调暗：$dim%',
+                    ),
+                    CupertinoSlider(
+                      key: ValueKey('$scope-dim'),
+                      value: (dim ?? inheritedDim).toDouble(),
+                      min: 0,
+                      max: 80,
+                      divisions: 80,
+                      onChanged: state.canEdit && dim != null
+                          ? (value) =>
+                                change(() => r.dimPercent = value.round())
+                          : null,
+                    ),
+                  ],
+                ),
               ),
-              const Text('仅调暗阅读内容，不改变系统亮度。'),
-            ]),
-          if (manga || section == _SettingsSection.input)
-            group('翻页与快捷键', [
+            ], footer: '仅调暗阅读内容，不改变系统亮度。'),
+          ],
+          if (manga || section == _SettingsSection.input) ...[
+            group('分页点击区', [
               choice(
                 'tap-zones',
                 '分页点击区',
@@ -463,8 +481,8 @@ class const _SettingsEditor({
                 (value) => r.tapZones = value,
                 r.clearTapZones,
               ),
-              const Text('反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
-              const SizedBox(height: 16),
+            ], footer: '反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
+            group('阅读快捷键', [
               choice(
                 'keyboard',
                 '阅读快捷键',
@@ -473,8 +491,8 @@ class const _SettingsEditor({
                 (value) => r.keyboard = value,
                 r.clearKeyboard,
               ),
-              const Text('反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
-            ]),
+            ], footer: '反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
+          ],
         ],
         if (manga ||
             {
@@ -629,31 +647,34 @@ class const _SettingsEditor({
                     ),
                   Expanded(
                     key: const ValueKey('settings-detail'),
-                    child: NavigatorPopHandler<void>(
-                      enabled: !wide,
-                      onPopWithResult: (_) => navigator.currentState!.pop(),
-                      child: Navigator(
-                        key: navigator,
-                        pages: [
-                          if (!wide)
-                            AppPage<void>(
-                              key: const ValueKey('settings-directory-page'),
-                              title: '设置',
-                              child: directory,
-                            ),
-                          if (showDetail)
-                            AppPage<void>(
-                              key: const ValueKey('settings-detail-page'),
-                              title: section.title,
-                              child: detail,
-                            ),
-                        ],
-                        onDidRemovePage: (page) {
-                          if (page.key ==
-                              const ValueKey('settings-detail-page')) {
-                            selected.value = null;
-                          }
-                        },
+                    child: Semantics(
+                      container: true,
+                      child: NavigatorPopHandler<void>(
+                        enabled: !wide,
+                        onPopWithResult: (_) => navigator.currentState!.pop(),
+                        child: Navigator(
+                          key: navigator,
+                          pages: [
+                            if (!wide)
+                              AppPage<void>(
+                                key: const ValueKey('settings-directory-page'),
+                                title: '设置',
+                                child: directory,
+                              ),
+                            if (showDetail)
+                              AppPage<void>(
+                                key: const ValueKey('settings-detail-page'),
+                                title: section.title,
+                                child: detail,
+                              ),
+                          ],
+                          onDidRemovePage: (page) {
+                            if (page.key ==
+                                const ValueKey('settings-detail-page')) {
+                              selected.value = null;
+                            }
+                          },
+                        ),
                       ),
                     ),
                   ),

@@ -6,7 +6,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 import 'test_app.dart';
 
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -248,6 +248,110 @@ void main() {
           expect(tester.takeException(), isNull);
         }
         expect(platform.businessServer.appliedMutations, 0);
+      },
+    );
+
+    testWidgets(
+      'tablet settings exposes both panes to accessibility in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final semantics = tester.ensureSemantics();
+        try {
+          final platform = TestPlatform(seedDefaultInstallation: false);
+          await tester.pumpApp(KaruyomiApp(platform: platform));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+          await tester.pumpAndSettle();
+
+          void expectDirectory() {
+            for (final label in ['外观与主题', '阅读显示', '翻页与快捷键', '服务连接', '关于']) {
+              expect(
+                find.semantics.byPredicate(
+                  (node) =>
+                      node.label.startsWith(label) &&
+                      node.getSemanticsData().hasAction(SemanticsAction.tap),
+                ),
+                findsOne,
+                reason:
+                    'the visible directory $label must remain reachable from the semantics root',
+              );
+            }
+          }
+
+          expectDirectory();
+          await tester.tap(
+            find.byKey(const ValueKey('settings-section-connection')),
+          );
+          await tester.pumpAndSettle();
+          expectDirectory();
+          expect(find.semantics.byLabel('连接服务'), findsOne);
+          tester.view.physicalSize = const Size(360, 800);
+          await tester.pumpAndSettle();
+          expect(find.semantics.byLabel('连接服务'), findsOne);
+          expect(find.semantics.byLabel(RegExp('^外观与主题')), findsNothing);
+          tester.view.physicalSize = const Size(768, 1024);
+          await tester.pumpAndSettle();
+          expectDirectory();
+          expect(find.semantics.byLabel('连接服务'), findsOne);
+          expect(platform.businessServer.appliedMutations, 0);
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
+      'service origin leaves no autofill clients after $brightness navigation',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await tester.pumpApp(KaruyomiApp(platform: platform));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-connection')),
+        );
+        await tester.pumpAndSettle();
+        final origin = find.byKey(const ValueKey('service-origin'));
+        await tester.enterText(origin, 'https://draft.example');
+        expect(tester.testTextInput.hasAnyClients, true);
+        expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-appearance')),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.testTextInput.hasAnyClients, false);
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-connection')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<CupertinoTextField>(origin).controller!.text,
+          'https://draft.example',
+        );
+        await tester.enterText(origin, 'https://second.example');
+        expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
+        await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
+        await tester.pumpAndSettle();
+        expect(tester.testTextInput.hasAnyClients, false);
+        expect(platform.businessServer.appliedMutations, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
       },
     );
 

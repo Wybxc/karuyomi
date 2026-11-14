@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-14，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，尚未通过全范围视觉或生产验收。第一阶段`a9538f1`侧栏几何/内容保留的完整CI与隔离双主题正式Web证据继续保留，最终按用户要求自然化为Cupertino导航、控件、配色与转场。[状态机](verification/mihon-state-coverage.md)已取得跟随系统/显式主题优先的双主题参考。`ebcba1b`九字段自动填充修复完整push/PR CI通过，正式Web在浅/深各两轮输入、离页及重开确认旧搜索/提交节点清理、标签唯一；不外推其它输入类型。设置目录/双栏与最终语义主题正在回归，新CI/Web待验。此前真实xkcd三类画布、一次容器中断/重试恢复和JPEG限制继续保留；Source toggle、超长诊断滚动、迁移执行、全页像素/最终Cupertino及生产Access/续读仍待。
+2026-11-15，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，尚未通过全范围视觉或生产验收。第一阶段`a9538f1`侧栏几何/内容保留的完整CI与隔离双主题正式Web证据继续保留，最终按用户要求自然化为Cupertino导航、控件、配色与转场。`d600711`最终语义主题/设置路由完整push/PR CI通过，含783项Dart、531项Vitest及Web/Wasm构建；隔离设置双主题检查及独立API确认完成，部分转场截图排除稳定目标图。发现的平板目录语义遮蔽和服务地址自动填充残留已修复，说明改为分组页脚，49项相关回归通过，新CI与稳定Web复验待补。[状态机](verification/mihon-state-coverage.md)按节点继续跟踪。此前真实xkcd三类画布、一次容器中断/重试恢复和JPEG限制保留；Source toggle、超长诊断滚动、迁移执行、全页像素/最终Cupertino及生产Access/续读仍待。
 
 2026-11-13，[Liquid Glass](verification/liquid-glass.md)已按用户决定终止，[统一 Cupertino 已恢复并生产上线](verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源与匿名 Access 门禁通过；内置浏览器确认导航、真实图片、翻页保存、主题保存及独立新文档第 2 页续读，独立 D1 核对续读前后状态一致。玻璃库、专用设置及资源已移除。原玻璃性能对照未完成，不宣称能耗结论；代码削减另立重构，原生现场验证保持停止。
 
