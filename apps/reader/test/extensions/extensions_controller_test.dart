@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
 import 'package:karuyomi/data/settings_repository.dart';
@@ -465,6 +466,42 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'extension details are reachable by Tab and Enter in $appearance',
+      (tester) async {
+        await show(tester, appearance: appearance, size: const Size(360, 800));
+        final key = ValueKey((
+          'extension-details',
+          catalog.catalogUrl,
+          'eu.kanade.source.test',
+        ));
+        Key? focusedButton() => FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<CupertinoButton>()
+            ?.key;
+        for (
+          var attempt = 0;
+          attempt < 16 && focusedButton() != key;
+          attempt++
+        ) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+        }
+        expect(focusedButton(), key);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(find.byType(ExtensionDetailsPage), findsOneWidget);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'compact extension accessories install without opening details at $appearance / $scale',

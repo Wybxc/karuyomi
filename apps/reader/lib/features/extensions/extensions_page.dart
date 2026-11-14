@@ -113,40 +113,54 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       label = '管理';
       action = () => unawaited(_details(item));
     }
-    return CupertinoListTile(
-      key: installed != null
-          ? ValueKey(('extension-installed', item.packageName))
-          : ValueKey((
-              'extension-available',
+    return Row(
+      children: [
+        Expanded(
+          child: CupertinoButton(
+            key: ValueKey((
+              'extension-details',
               item.reference.catalogUrl,
               item.packageName,
             )),
-      onTap: () => _details(item),
-      leading: Icon(
-        CupertinoIcons.cube_box,
-        color: AppColors.accent.resolveFrom(context),
-      ),
-      title: Text(item.name, maxLines: 2),
-      subtitle: Text(
-        [
-          item.languageLabel,
-          ?version,
-          item.status(_controller.cache),
-          if (sameName) item.repositoryName,
-        ].join(' · '),
-        maxLines: 3,
-      ),
-      trailing: CupertinoButton(
-        key: installed == null
-            ? ValueKey((
-                'extension-install',
-                item.reference.catalogUrl,
-                item.packageName,
-              ))
-            : ValueKey(('extension-primary', item.packageName)),
-        onPressed: action,
-        child: Text(label),
-      ),
+            padding: EdgeInsets.zero,
+            onPressed: () => unawaited(_details(item)),
+            child: CupertinoListTile(
+              key: installed != null
+                  ? ValueKey(('extension-installed', item.packageName))
+                  : ValueKey((
+                      'extension-available',
+                      item.reference.catalogUrl,
+                      item.packageName,
+                    )),
+              leading: Icon(
+                CupertinoIcons.cube_box,
+                color: AppColors.accent.resolveFrom(context),
+              ),
+              title: Text(item.name, maxLines: 2),
+              subtitle: Text(
+                [
+                  item.languageLabel,
+                  ?version,
+                  item.status(_controller.cache),
+                  if (sameName) item.repositoryName,
+                ].join(' · '),
+                maxLines: 3,
+              ),
+            ),
+          ),
+        ),
+        CupertinoButton(
+          key: installed == null
+              ? ValueKey((
+                  'extension-install',
+                  item.reference.catalogUrl,
+                  item.packageName,
+                ))
+              : ValueKey(('extension-primary', item.packageName)),
+          onPressed: action,
+          child: Text(label),
+        ),
+      ],
     );
   }
 

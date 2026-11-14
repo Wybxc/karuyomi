@@ -919,6 +919,75 @@ stateDiagram-v2
 
 同一正式CI产物、官方隔离harness和临时D1，无fixture/Source。上述JPEG及联系表已实看，缺文字/底栏的早期帧已排除，原因未定，不能把重拍当作全部转场验收。两主题平板五项各有唯一可访问节点；聚焦只读地址后离页的DOM输入/提交均为0，独立API确认两次主题保存后revision为2、主题DARK。未保存/待确认、保存失败/精确重试、身份/Access恢复、字号/减少动态和全部导航转换的最终Web画面仍待；跨尺寸草稿/光标/焦点以及原生可编辑服务地址保留组件证据，不计为本次浏览器通过。证据范围见[验证记录](mihon-cupertino-fidelity.md#最终-cupertino-配色导航与设置路由)。
 
+### 08–09：Karuyomi 最终 Cupertino 扩展管理
+
+以下记录产品当前的账户安装关系与可丢弃本机副本，不照搬Android安装权限或系统卸载框。行内容与尾部主操作采用并列官方按钮，分别进入详情和执行维护；启用只由详情开关修改，读取列表和展开诊断不提交账户。业务冲突、身份/Access失效、取消准备与清理失败仍按独有状态表逐项验收。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Available
+    state "08.K1 可安装列表" as Available
+    state "08.K2 已安装列表" as Installed
+    state "08.K3 搜索无匹配" as EmptySearch
+    state "08.K4 语言选择" as Language
+    state "08.K5 扩展选项菜单" as Options
+    state "08.K6 正在准备本机产物" as Preparing
+    state "08.K7 正在等待账户确认" as Saving
+    state "08.K8 原操作结果待确认" as Pending
+    state "09.K1 未安装候选详情" as Candidate
+    state "09.K2 已启用详情" as Enabled
+    state "09.K3 已停用详情" as Disabled
+    state "09.K4 展开诊断" as Diagnostics
+    state "09.K5 已卸载详情" as Uninstalled
+    Available --> Candidate: 点列表行
+    Candidate --> Preparing: 安装
+    Available --> Preparing: 尾部安装，不打开详情
+    Preparing --> Saving: 产物准备完成
+    Saving --> Installed: 从列表发起并获确认
+    Saving --> Enabled: 从详情安装并获确认
+    Saving --> Disabled: 更新后保留停用状态
+    Saving --> Pending: 未收到确认
+    Pending --> Installed: 精确重试获确认
+    Installed --> EmptySearch: 输入无匹配查询
+    EmptySearch --> Installed: 清空
+    Available --> Language: 语言
+    Installed --> Language: 语言
+    Language --> Available: 无已安装项时选择或取消
+    Language --> Installed: 有已安装项时选择或取消
+    Installed --> Options: 更多
+    Options --> Installed: 关闭
+    Installed --> Enabled: 点启用项
+    Installed --> Disabled: 点停用项
+    Enabled --> Disabled: 关闭开关并获确认
+    Disabled --> Enabled: 打开开关并获确认
+    Enabled --> Diagnostics: 展开
+    Disabled --> Diagnostics: 展开
+    Diagnostics --> Enabled: 收起且仍启用
+    Diagnostics --> Disabled: 收起且仍停用
+    Enabled --> Uninstalled: 卸载并获确认
+    Disabled --> Uninstalled: 卸载并获确认
+    Uninstalled --> Available: 返回列表
+    Enabled --> Candidate: 从候选页安装后再卸载
+```
+
+| 状态 ID | 最小必要信息                                           | 浅色正式Web                                                                               | 深色正式Web |
+| ------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ----------- |
+| 08.K1   | 分组、名称、当前候选版本/语言、状态、独立安装与行详情  | `karuyomi-5d8bd71-extensions-available-light.jpg`（布局主图；键盘入口失败，排除最终验收） | 待          |
+| 08.K2   | 已确认安装、精确版本/语言、本机准备状态、管理入口      | 待                                                                                        | 待          |
+| 08.K3   | 当前查询、无匹配原因、清空或清除筛选                   | 待                                                                                        | 待          |
+| 08.K4   | 当前语言、可选语言、全部语言与取消                     | 待                                                                                        | 待          |
+| 08.K5   | 仓库管理、本机存储和关闭                               | 待                                                                                        | 待          |
+| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装           | 待                                                                                        | 待          |
+| 08.K7   | 等待账户确认、停用重复写入、保留原操作                 | 待                                                                                        | 待          |
+| 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取             | 待                                                                                        | 待          |
+| 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源       | 待                                                                                        | 待          |
+| 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口  | 待                                                                                        | 待          |
+| 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开           | 待                                                                                        | 待          |
+| 09.K4   | 原仓库/包/构建身份、完整可选取正文、当前展开状态与收起 | 待                                                                                        | 待          |
+| 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留           | 待                                                                                        | 待          |
+
+这里只跟踪当前目标画面；主图、变体及每条转换分别验收。08.K8的冲突/拒绝/结果未知、资源清理失败、已移除仓库/已下架构建、长文本与减少动态效果仍须分项补充，不用正常启停主图代替。
+
 ### 15：Karuyomi 跨源搜索的目标状态
 
 这张图跟踪产品自身的明确选源、独立重试与停止确认，不填入 Mihon 的参考画面。下表记录真实 CI Web 产物 `b826249` 与错误修复 `07342fb` 的隔离内置浏览器证据；已有截图不代表全部变体或最终配色验收完成。浏览器截图实际编码为 JPEG，不用于精确颜色采样。
