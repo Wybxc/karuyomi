@@ -64,12 +64,19 @@ class const ChoiceField<T>({
             ),
     );
 
+    final initialMenuValue =
+        options.containsKey(value) && !disabledValues.contains(value)
+        ? value
+        : options.keys
+              .where((item) => !disabledValues.contains(item))
+              .firstOrNull;
     return options.length <= 8
         ? CupertinoMenuAnchor(
             childFocusNode: focus,
             menuChildren: [
               for (final item in options.entries)
                 CupertinoMenuItem(
+                  autofocus: item.key == initialMenuValue,
                   onPressed:
                       onChanged == null || disabledValues.contains(item.key)
                       ? null

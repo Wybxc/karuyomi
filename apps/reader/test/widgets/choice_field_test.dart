@@ -92,7 +92,32 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(find.byType(CupertinoMenuItem), findsNWidgets(3));
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(changed, ['one']);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(changed, ['one', 'two']);
+    expect(find.byType(CupertinoMenuItem), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a disabled current choice focuses the first enabled value', (
+    tester,
+  ) async {
+    final changed = <String?>[];
+    await show(
+      tester,
+      options: short,
+      onChanged: changed.add,
+      disabled: {'one'},
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(changed, [null]);

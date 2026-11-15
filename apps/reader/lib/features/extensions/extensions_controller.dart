@@ -200,7 +200,12 @@ final class ExtensionsController extends ChangeNotifier {
     RepositoryPreview? result;
     final baseline = settings.snapshot!;
     await _run(() async {
-      final uri = Uri.parse(url.trim());
+      final uri = Uri.tryParse(url.trim());
+      if (uri == null ||
+          !uri.hasAuthority ||
+          !{'http', 'https'}.contains(uri.scheme)) {
+        throw const FormatException('请填写有效的 HTTPS 仓库地址。');
+      }
       if (uri.userInfo.isNotEmpty) {
         throw const FormatException('仓库地址不能包含用户名或密码。');
       }
@@ -210,7 +215,13 @@ final class ExtensionsController extends ChangeNotifier {
               !uri.hasFragment
           ? '${uri.origin}/extensions/index.json'
           : url.trim();
-      validateBusinessCatalogUrl(canonical);
+      try {
+        validateBusinessCatalogUrl(canonical);
+      } on FormatException {
+        throw const FormatException(
+          '请使用 HTTPS 仓库地址，目录路径须为 /extensions/index.json。',
+        );
+      }
       final document = await catalog.previewRepository(
         canonical,
         shouldContinue: () => available,

@@ -919,6 +919,130 @@ stateDiagram-v2
 
 同一正式CI产物、官方隔离harness和临时D1，无fixture/Source。上述JPEG及联系表已实看，缺文字/底栏的早期帧已排除，原因未定，不能把重拍当作全部转场验收。两主题平板五项各有唯一可访问节点；聚焦只读地址后离页的DOM输入/提交均为0，独立API确认两次主题保存后revision为2、主题DARK。未保存/待确认、保存失败/精确重试、身份/Access恢复、字号/减少动态和全部导航转换的最终Web画面仍待；跨尺寸草稿/光标/焦点以及原生可编辑服务地址保留组件证据，不计为本次浏览器通过。证据范围见[验证记录](mihon-cupertino-fidelity.md#最终-cupertino-配色导航与设置路由)。
 
+### 07/10/11：Karuyomi 最终 Cupertino 源目录、仓库与本机存储
+
+`7fddb0e`直接采用官方分组表面；浅色源目录主图与键盘/账户确认已核对，仓库/存储说明层级及菜单初始焦点仍有实拍缺口，修复后另验。以下分别跟踪真实客户端状态，源收藏使用账户确认，仓库需要只读预览和第二次明确确认，清理只删除本机可丢弃副本。组件双主题/双倍字号及键盘用例不能填入正式Web截图；加载与确认等待的瞬态未截到时继续留空。原Mihon参考节点和全部变体门槛保持不变。
+
+```mermaid
+stateDiagram-v2
+    [*] --> ReadingSources
+    state "07.K1 正在读取漫画源" as ReadingSources
+    state "07.K2 尚无漫画源" as NoSources
+    state "07.K3 语言分组列表" as Sources
+    state "07.K4 已确认收藏分组" as Favorites
+    state "07.K5 收藏等待确认" as SavingFavorite
+    state "07.K6 筛选无匹配" as NoSourceMatch
+    state "07.K7 语言选择菜单" as SourceLanguages
+    state "07.K8 漫画源受阻" as BlockedSource
+    state "07.K9 收藏待处理" as FavoriteRecovery
+    ReadingSources --> NoSources: 无已安装源
+    ReadingSources --> Sources: 静态资料与账户已读
+    Sources --> SavingFavorite: 收藏
+    Favorites --> SavingFavorite: 取消收藏
+    SavingFavorite --> Favorites: 服务端确认收藏
+    SavingFavorite --> Sources: 服务端确认取消
+    SavingFavorite --> FavoriteRecovery: 冲突或原操作待处理
+    FavoriteRecovery --> Favorites: 原操作确认且值为收藏
+    FavoriteRecovery --> Sources: 重新读取后处理
+    Sources --> SourceLanguages: 选择语言
+    SourceLanguages --> Sources: 选择或取消
+    Sources --> NoSourceMatch: 名称无匹配
+    NoSourceMatch --> Sources: 清除筛选
+    Sources --> BlockedSource: 目录缺失或扩展停用
+    BlockedSource --> Sources: 管理扩展并恢复
+```
+
+| 状态 ID | 最小必要信息                                  | 浅色正式Web                                   | 深色正式Web |
+| ------- | --------------------------------------------- | --------------------------------------------- | ----------- |
+| 07.K1   | 正在读取、原筛选与可用恢复入口                | 待                                            | 待          |
+| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-7fddb0e-sources-empty-light.jpg`    | 待          |
+| 07.K3   | 分组、源名、语言、独立打开与收藏动作          | `karuyomi-7fddb0e-sources-list-light.jpg`     | 待          |
+| 07.K4   | 收藏分组、确认后的星标与取消入口              | `karuyomi-7fddb0e-sources-favorite-light.jpg` | 待          |
+| 07.K5   | 正在保存的源、等待标记、禁止重复提交          | 待                                            | 待          |
+| 07.K6   | 当前筛选、无匹配说明与清除入口                | `karuyomi-7fddb0e-sources-no-match-light.jpg` | 待          |
+| 07.K7   | 全部可用语言、当前值与取消操作                | 待                                            | 待          |
+| 07.K8   | 源身份、受阻原因、管理或恢复入口              | 待                                            | 待          |
+| 07.K9   | 原收藏操作、冲突或未知说明、精确重试/重新读取 | 待                                            | 待          |
+
+```mermaid
+stateDiagram-v2
+    [*] --> Repositories
+    state "10.K1 仓库列表" as Repositories
+    state "10.K2 空白仓库输入" as EmptyRepositoryInput
+    state "10.K3 已填写仓库输入" as RepositoryInput
+    state "10.K4 只读预览等待" as PreviewingRepository
+    state "10.K5 仓库输入或预览错误" as RepositoryError
+    state "10.K6 添加仓库确认" as ConfirmingRepository
+    state "10.K7 添加等待确认" as SavingRepository
+    state "10.K8 移除仓库确认" as RemovingRepository
+    state "10.K9 移除等待确认" as SavingRemoval
+    state "10.K10 仓库完整诊断" as RepositoryDiagnostics
+    Repositories --> EmptyRepositoryInput: 添加
+    EmptyRepositoryInput --> RepositoryInput: 填写地址与可选名称
+    RepositoryInput --> Repositories: 取消且不写账户
+    EmptyRepositoryInput --> Repositories: 取消
+    RepositoryInput --> PreviewingRepository: 只读预览
+    PreviewingRepository --> RepositoryError: 地址不合法或读取失败
+    PreviewingRepository --> ConfirmingRepository: 解析成功且身份未登记
+    RepositoryError --> EmptyRepositoryInput: 修正重试
+    ConfirmingRepository --> Repositories: 取消且不写账户
+    ConfirmingRepository --> SavingRepository: 明确确认添加
+    SavingRepository --> Repositories: 服务端确认
+    SavingRepository --> RepositoryError: 结果未知或失败
+    Repositories --> RemovingRepository: 移除额外仓库
+    RemovingRepository --> Repositories: 取消
+    RemovingRepository --> SavingRemoval: 明确确认移除
+    SavingRemoval --> Repositories: 服务端确认
+    SavingRemoval --> RepositoryError: 结果未知或失败
+    Repositories --> RepositoryDiagnostics: 展开
+    RepositoryDiagnostics --> Repositories: 收起
+```
+
+| 状态 ID | 最小必要信息                                      | 浅色正式Web | 深色正式Web |
+| ------- | ------------------------------------------------- | ----------- | ----------- |
+| 10.K1   | 仓库名、地址/状态、默认标记、添加/刷新与诊断入口  | 待          | 待          |
+| 10.K2   | 地址、可选名称、预览与取消                        | 待          | 待          |
+| 10.K3   | 已填写地址/名称、预览与取消、键盘                 | 待          | 待          |
+| 10.K4   | 正在预览、列表上下文、编辑禁用且尚未写账户        | 待          | 待          |
+| 10.K5   | 具体错误、修改/重试入口和已登记列表               | 待          | 待          |
+| 10.K6   | 解析后的名称/域名/扩展数、明确添加与取消          | 待          | 待          |
+| 10.K7   | 原提交对象、等待服务端、禁止新操作                | 待          | 待          |
+| 10.K8   | 待移除对象、对安装选择/记录的影响、危险确认与取消 | 待          | 待          |
+| 10.K9   | 待移除对象、未确认状态和恢复入口                  | 待          | 待          |
+| 10.K10  | 仓库完整URL/身份与读取错误、滚动和收起            | 待          | 待          |
+
+```mermaid
+stateDiagram-v2
+    [*] --> ReadingCache
+    state "11.K1 正在检查本机副本" as ReadingCache
+    state "11.K2 存储摘要与副本列表" as CachedCopies
+    state "11.K3 正在清理副本" as CleaningCopy
+    state "11.K4 无本机副本" as NoCopies
+    state "11.K5 清理失败与恢复" as CleaningFailed
+    state "11.K6 完整存储诊断" as CacheDiagnostics
+    ReadingCache --> CachedCopies: 存在副本
+    ReadingCache --> NoCopies: 无副本
+    CachedCopies --> CleaningCopy: 明确清理
+    CleaningCopy --> NoCopies: 最后一个副本清理成功
+    CleaningCopy --> CachedCopies: 仍有副本
+    CleaningCopy --> CleaningFailed: 关闭或清理未确认
+    CleaningFailed --> CleaningCopy: 重试同一资源清理
+    CachedCopies --> CacheDiagnostics: 展开
+    NoCopies --> CacheDiagnostics: 展开
+    CacheDiagnostics --> CachedCopies: 收起且仍有副本
+    CacheDiagnostics --> NoCopies: 收起且无副本
+    NoCopies --> ReadingCache: 重新读取
+```
+
+| 状态 ID | 最小必要信息                                     | 浅色正式Web | 深色正式Web |
+| ------- | ------------------------------------------------ | ----------- | ----------- |
+| 11.K1   | 正在检查、读取指示及账户/缓存作用范围            | 待          | 待          |
+| 11.K2   | 数量/总占用、每副本名称/大小、独立清理与作用范围 | 待          | 待          |
+| 11.K3   | 正在清理、重复操作受阻、账户安装保持             | 待          | 待          |
+| 11.K4   | 零副本/占用、可重新下载与重新读取入口            | 待          | 待          |
+| 11.K5   | 失败原因、未完成资源、精确重试/必要重建          | 待          | 待          |
+| 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起          | 待          | 待          |
+
 ### 08–09：Karuyomi 最终 Cupertino 扩展管理
 
 以下记录产品当前的账户安装关系与可丢弃本机副本，不照搬Android安装权限或系统卸载框。行内容与尾部主操作采用并列官方按钮，分别进入详情和执行维护；启用只由详情开关修改，读取列表和展开诊断不提交账户。业务冲突、身份/Access失效、取消准备与清理失败仍按独有状态表逐项验收。

@@ -118,6 +118,8 @@ Mihon 的更新/日历、历史、下载队列及下载设置、统计、tracker
 
 惰性Sliver中的搜索采用CupertinoTextField的官方前缀/清空能力，避免CupertinoSearchTextField在滚动重布局时读取dirty RenderObject的问题。固定Mihon的`ListPreferenceWidget.kt`采用可滚动单选列表，不提供查询；语言筛选的`SourcesFilterScreen.kt`和`ExtensionFilterScreen.kt`采用开关列表。Karuyomi的可搜索长选项和无匹配状态因此单列为产品独有状态29.K1/29.K2，不能伪造对应的Mihon参考图。
 
+短选项使用官方菜单，打开时以autofocus将键盘焦点落到当前可用项；当前值不可用时选择首个可用项。操作菜单聚焦首个可执行动作，Enter可直接执行，Escape取消后返回触发按钮；不能只凭无障碍树显示focused推断真实Flutter焦点。仓库与本机存储的辅助说明采用官方CupertinoFormSection页脚获得13px次级文字，普通导航分组继续使用CupertinoListSection，不能假定后者会替footer设置说明层级。
+
 检索输入显式设置`autofillHints:null`，避免Flutter Web为检索词保留离页后的自动填充合成表单。长选项查询同样直接使用官方CupertinoTextField及前缀/清空能力，不新增输入控件包装；编辑值、焦点、光标和输入连接分别验收。服务地址同样禁用自动填充，Web继续只读，Native保持可编辑；不把此项外推为其它配置/凭据编辑已验收。
 
 Mihon 的 Source 筛选实测在返回收起后保留未应用草稿，重新展开恢复该值，点击筛选才查询。Karuyomi 的显式“取消”按已有合同丢弃草稿，应用成功才更改目录；这是操作语义差异，不能为了外观复刻静默改变。Source 偏好的单选、多选、文本与筛选分别对照；文本是否允许空值由实际偏好约束确定，不一律把空输入禁用。

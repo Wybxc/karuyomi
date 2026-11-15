@@ -417,6 +417,48 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'extension menu immediately activates its first keyboard item in $appearance',
+      (tester) async {
+        await show(tester, appearance: appearance, size: const Size(360, 800));
+        final anchor = find.byKey(const ValueKey('extensions-more'));
+        final button = find
+            .descendant(of: anchor, matching: find.byType(CupertinoButton))
+            .first;
+        for (var attempt = 0; attempt < 12; attempt++) {
+          final focused = FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<CupertinoButton>();
+          if (focused == tester.widget<CupertinoButton>(button)) break;
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(
+          FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<CupertinoMenuItem>()
+              ?.child,
+          isA<Text>().having((text) => text.data, 'focused menu item', '仓库管理'),
+        );
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(find.byType(ExtensionRepositoriesPage), findsOneWidget);
+        final footer = tester.element(find.text('仓库提供可安装的扩展目录；添加仓库不会自动安装扩展。'));
+        final footerStyle = DefaultTextStyle.of(footer).style;
+        expect(footerStyle.fontSize, 13);
+        expect(footerStyle.color, AppColors.secondaryLabel.resolveFrom(footer));
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'storage exposes keyboard diagnostics and clears only the local copy at $appearance / $scale',
@@ -437,6 +479,12 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          final note = tester.element(
+            find.text('清理副本后仍是账户已安装状态，重新打开时会再次下载。书架与阅读记录保留。'),
+          );
+          final noteStyle = DefaultTextStyle.of(note).style;
+          expect(noteStyle.fontSize, 13);
+          expect(noteStyle.color, AppColors.secondaryLabel.resolveFrom(note));
           final clear = find.byKey(ValueKey(('extension-forget', 'a' * 64)));
           final diagnostics = find.widgetWithText(CupertinoButton, '诊断信息');
           CupertinoButton? focusedButton() => FocusManager

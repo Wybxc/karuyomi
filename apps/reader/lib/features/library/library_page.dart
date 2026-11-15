@@ -730,6 +730,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               key: const ValueKey('library-more'),
               menuChildren: [
                 CupertinoMenuItem(
+                  autofocus: true,
                   onPressed:
                       available && !pending && batch == null && !_selecting
                       ? () => unawaited(_editCategories(view))
@@ -737,6 +738,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   child: const Text('管理分类'),
                 ),
                 CupertinoMenuItem(
+                  autofocus:
+                      !(available && !pending && batch == null && !_selecting),
                   onPressed: () => unawaited(_refresh()),
                   child: const Text('刷新服务端书架'),
                 ),
@@ -913,6 +916,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                         (_LibrarySort.title, '标题'),
                       ])
                         CupertinoMenuItem(
+                          autofocus: sort == _sort,
                           onPressed: () => setState(() => _sort = sort),
                           trailing: _sort == sort
                               ? const Icon(CupertinoIcons.check_mark)
@@ -1080,6 +1084,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                           key: ValueKey(('library-more', entry.mangaKey)),
                           menuChildren: [
                             CupertinoMenuItem(
+                              autofocus: true,
                               onPressed: canCategorize
                                   ? () => unawaited(
                                       _editCategories(view, entry: entry),
@@ -1092,6 +1097,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                               child: const Text('设置分类'),
                             ),
                             CupertinoMenuItem(
+                              autofocus: !canCategorize,
                               onPressed: canOpen && !_editing
                                   ? () => unawaited(_migrate(entry))
                                   : null,

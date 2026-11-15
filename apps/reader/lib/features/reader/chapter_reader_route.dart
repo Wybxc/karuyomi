@@ -740,6 +740,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
               menuChildren: [
                 if (progress != null) ...[
                   CupertinoMenuItem(
+                    autofocus: true,
                     onPressed: disabled
                         ? null
                         : progress.needsReopen(_chapter.key)
@@ -781,6 +782,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                 ],
                 if (bookmarks != null)
                   CupertinoMenuItem(
+                    autofocus: progress == null,
                     onPressed:
                         !disabled && !_initializing && bookmarks.canRefresh
                         ? () => unawaited(bookmarks.refresh())
@@ -793,6 +795,12 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                 ])
                   CupertinoMenuItem(
                     key: ValueKey(('reader-chapter-order', order)),
+                    autofocus:
+                        progress == null &&
+                        (bookmarks == null ||
+                            _initializing ||
+                            !bookmarks.canRefresh) &&
+                        _order == order,
                     onPressed: disabled ? null : () => _changeOrder(order),
                     trailing: _order == order
                         ? Icon(

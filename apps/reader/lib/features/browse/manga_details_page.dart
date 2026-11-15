@@ -1131,6 +1131,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
               key: const ValueKey('details-more'),
               menuChildren: [
                 CupertinoMenuItem(
+                  autofocus: true,
                   onPressed:
                       !_migrating &&
                           !_detailsExpired &&

@@ -301,6 +301,28 @@ void main() {
     );
   });
 
+  test('invalid repository addresses explain the correction without reads or writes', () async {
+    final reads = platform.publicReads.length;
+    final before = manager.settings.snapshot!;
+    for (final (address, message) in [
+      ('987654321', '请填写有效的 HTTPS 仓库地址。'),
+      (
+        'https://community.example/not-catalog',
+        '请使用 HTTPS 仓库地址，目录路径须为 /extensions/index.json。',
+      ),
+      (
+        'http://community.example',
+        '请使用 HTTPS 仓库地址，目录路径须为 /extensions/index.json。',
+      ),
+    ]) {
+      expect(await manager.previewRepository(address, ''), isNull);
+      expect(manager.error, message, reason: address);
+      expect(platform.publicReads, hasLength(reads));
+      expect(posts(), isEmpty);
+      expect(manager.settings.snapshot, same(before));
+    }
+  });
+
   test('invalid credentials, reserved and duplicate repository identities never mutate the account', () async {
     expect(
       await manager.previewRepository(

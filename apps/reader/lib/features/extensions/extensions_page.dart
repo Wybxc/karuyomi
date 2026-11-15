@@ -238,6 +238,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                     key: const ValueKey('extensions-more'),
                     menuChildren: [
                       CupertinoMenuItem(
+                        autofocus: true,
                         onPressed: _repositories,
                         child: Text('仓库管理'),
                       ),
@@ -837,7 +838,7 @@ class const ExtensionRepositoriesPage({
                 keyboardType: TextInputType.url,
                 textInputAction: TextInputAction.next,
                 onChanged: (value) => address = value,
-                placeholder: '仓库地址或 /extensions/index.json URL',
+                placeholder: 'HTTPS 仓库地址',
               ),
               const SizedBox(height: 8),
               CupertinoTextField(
@@ -942,8 +943,7 @@ class const ExtensionRepositoriesPage({
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ExtensionOperationStatus(controller: controller),
             ),
-            CupertinoListSection.insetGrouped(
-              hasLeading: false,
+            CupertinoFormSection.insetGrouped(
               footer: const Text('仓库提供可安装的扩展目录；添加仓库不会自动安装扩展。'),
               children: [
                 for (final repository in catalog.repositories)
@@ -1101,8 +1101,7 @@ class const ExtensionStoragePage({
                 showStorageAction: false,
               ),
             ),
-            CupertinoListSection.insetGrouped(
-              hasLeading: false,
+            CupertinoFormSection.insetGrouped(
               footer: const Text('清理副本后仍是账户已安装状态，重新打开时会再次下载。书架与阅读记录保留。'),
               children: [
                 CupertinoListTile(

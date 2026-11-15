@@ -168,7 +168,13 @@
 
 后续实现直接采用官方CupertinoListSection，延用systemGroupedBackground/secondarySystemGroupedBackground、label/secondaryLabel和官方页脚；仓库添加/刷新采用actionTextStyle，移除采用系统危险红。源列表主动作与收藏改为并列按钮并标记已收藏语义，保留原确认链路；原嵌套结构的两项新增键盘用例本身已通过，因此不把此次结构调整描述为已复现的键盘故障修复。仓库输入恢复官方文本框装饰、禁用自动填充和URL自动更正。无自身State的仓库页面改为HookWidget，控制器订阅与展开生命周期仍由Hooks管理。
 
-本机低优先级、单并发运行源收藏/语言/目录及扩展/仓库回归，首轮65项通过；新增仓库双主题/双倍字号、移除确认/取消和存储Tab/Enter/Space、清理后账户安装与revision保持的用例后，扩展/仓库55项通过。两轮去重合计72项不同用例。严格分析先发现一项if缺大括号，已直接修正；最终复查、完整CI及正式Web的双主题画面、状态转换和独立API核对仍待，不把组件成功当作页面验收。
+本机低优先级、单并发运行源收藏/语言/目录及扩展/仓库回归，首轮65项通过；新增仓库双主题/双倍字号、移除确认/取消和存储Tab/Enter/Space、清理后账户安装与revision保持的用例后，扩展/仓库55项通过。两轮去重合计72项不同用例。严格分析先发现一项if缺大括号，修正后5文件严格分析通过；完整格式、format:check和标准prek通过。
+
+`7fddb0e`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43666151805)完整成功，含816项Dart（22 + 87 + 707）、531项Vitest及正式Web/候选Wasm构建。校验39项Flutter清单后，仅低优先级Vite组装，在官方Wrangler隔离harness、临时D1、acceptance-owner、无fixture下用内置浏览器核对360×800浅色画面。安装xkcd 1.6.1和Komiic 1.6.11后显示两副本/6.1MiB；源分组、收藏、语言、无匹配实看，实际Tab/Space收藏英文xkcd，再Return打开真实目录。普通封面仍为占位，未验读图。
+
+仓库列表、空白/填写输入、取消及非法`987654321`已操作；取消后DOM输入为0。存储逐个清至零副本/0.0MiB，完整空缓存诊断已实看。初始SYSTEM/revision=0，经两次安装与收藏为revision=3；源导航、菜单筛选、仓库输入/取消/非法预览、诊断和清理前后账户JSON字节完全相同。证据前缀`karuyomi-7fddb0e-`，`api-checks.json`及`browser-findings.json`保留范围；控制台无warn/error，视口恢复、临时标签关闭、harness退出0。该版未做深色、额外仓库添加/移除、生产Access或原生验收。
+
+实拍发现菜单虽然显示首项聚焦，直接Return却未执行，Down后Return才进入仓库。新增双主题组件回归复现首项实际未获得Flutter焦点，保留失败日志；在菜单项指定官方autofocus，短选择优先当前可用项并回退首个可用项，扩展、书架、详情和阅读菜单采用同一规则。仓库/存储原ListSection的说明实为17px正文，改用官方FormSection页脚以获得13px次级文字；地址占位缩短并补中文纠错。选择/扩展45项、仓库/书架/详情/阅读42项定向回归、9文件严格分析及完整format/format:check通过，包含双主题页脚颜色及键盘、非法地址零读写；完整CI及新正式Web复验待续。旧仓库诊断图处于展开早期且正文未完整，排除主图；此缺帧不直接归因于动画，也不覆盖此前诊断首次深色缺项问题。
 
 ### 实拍布局与颜色锚点
 
