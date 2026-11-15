@@ -214,7 +214,11 @@
 
 独立API确认浅/深筛选的取消、重置与应用前后账户JSON逐字节相同。全程四次明确写入为Komiic安装、镜像偏好、xkcd安装及DARK外观，accountRevision为0→1→2→3→4；镜像偏好独立GET确认为revision1/text1。Komiic默认热门返回请求失败；镜像保存虽已确认，随后容器中断，重新连接及新文档仍中断，typed字段没有取得本轮正式Web证据，不记运行兼容通过。tab21警告/错误为0，viewport恢复且临时标签已关闭，harness正常exit0。原始记录在忽略目录的`karuyomi-86e7925-api-checks.json`、`karuyomi-86e7925-console.json`与两张`filters-*-pair.png`。
 
-验收中浅/深两次成功应用后的AX均短暂出现“漫画源会话已变化”，实际搜索随后成功；这是正常路由退出时把isActive=false当成会话失效的呈现缺口，不能记为真实Source故障。两个定向用例先复现误报，再区分会话身份与路由可接受操作状态；退出保留内容、冻结动作，真正容器丢失仍显示错误并隐藏旧字段。新增两项与原筛选/控制器/目录/选择共32项回归通过，完整检查及新CI/Web复验另记。
+验收中浅/深两次成功应用后的AX均短暂出现“漫画源会话已变化”，实际搜索随后成功；这是正常路由退出时把isActive=false当成会话失效的呈现缺口，不能记为真实Source故障。两个定向用例先复现误报，再区分会话身份与路由可接受操作状态；退出保留内容、冻结动作，真正容器丢失仍显示错误并隐藏旧字段。新增两项与原筛选/控制器/目录/选择共32项回归通过。`c353604`的两文件严格分析、完整格式、标准prek及[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43687285256)/[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43687290796)通过，含831项Dart（22+87+722）、531项Vitest和Web/Wasm；正常转场正式Web复验待续。
+
+随后仍用`86e7925`正式产物，在新的官方harness和空D1取得Komiic默认站点的双主题实际select字段（排序/状态/分级）、初始值和应用失败保留状态；浅色指针及深色真实Tab/Return完成排序菜单与草稿操作，取消重开后恢复默认排序，两主题重置后继续保留字段。默认站点实际查询均失败，应用失败时状态“完結”草稿仍可编辑，取消回到原热门错误，不记为成功查询或运行兼容。无镜像保存及故障fixture，独立API确认所有筛选操作零附写；全程仅安装和DARK外观两次明确写入，accountRevision为0→1→2。真实字段就绪与失败的两张联系表完整实看；菜单与草稿的两张联系表缺少标题/底部动作，保留AX操作证据，不能作为完整主图。tab22警告/错误为0，临时标签关闭、viewport恢复、harness正常exit0。原始记录为忽略目录的`karuyomi-86e7925-clean-api-checks.json`、`karuyomi-86e7925-clean-browser-findings.json`及`clean-filters-*-pair.png`。
+
+这轮实际画面另发现独立说明标题仍被ListSection改为17px主文字。原四项浅/深×1x/2x回归增加独立标题的实际继承文字检查，均先复现；在header传入点设置13px/secondaryLabel后，同文件12项通过，两文件严格分析通过。此修复的完整检查、新CI及正式Web仍待，旧17px画面保留为缺口，不当作最终说明层级通过；未加载的类型checkbox、text、tri-state及SortFilter方向仍只具组件证据。
 
 ### Source 偏好的空内容与首项分组
 

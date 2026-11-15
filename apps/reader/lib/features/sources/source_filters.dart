@@ -212,7 +212,15 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
           container: true,
           explicitChildNodes: true,
           child: rows.isEmpty
-              ? CupertinoListSection.insetGrouped(header: header)
+              ? CupertinoListSection.insetGrouped(
+                  header: DefaultTextStyle(
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.secondaryLabel.resolveFrom(context),
+                    ),
+                    child: header!,
+                  ),
+                )
               : CupertinoFormSection.insetGrouped(
                   header: header,
                   children: rows,

@@ -300,6 +300,13 @@ void main() {
             isTrue,
           );
           await reveal(tester, find.text('独立说明标题'));
+          final standaloneHeading = tester.element(find.text('独立说明标题'));
+          final standaloneStyle = DefaultTextStyle.of(standaloneHeading).style;
+          expect(standaloneStyle.fontSize, 13);
+          expect(
+            standaloneStyle.color,
+            CupertinoColors.secondaryLabel.resolveFrom(standaloneHeading),
+          );
           expect(platform.invocations, hasLength(callsBefore));
           expect(catalog.appliedSourceFilters, isNull);
           await tester.tap(apply());
