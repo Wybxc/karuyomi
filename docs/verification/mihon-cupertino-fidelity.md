@@ -298,6 +298,12 @@
 
 原实现已在新增用例中复现读取失败仍显示已确认；早期测试未识别请求末尾的问号，不据此声称复现阻塞加载。修正URI路径匹配并在首次失败后移除已完成的阻塞回调，新增流程全部通过；原始失败、诊断与最终日志留在忽略目录`cover-states-{before,probe,related,analyze}.log`。该结果属于组件和数据/传输测试，不是系统文件选择器、Web辅助树或生产验收；19.K1–K12的浅深主图、拒绝/失效的全部触发阶段和图片失败实拍继续待办。
 
+`69db369`已提交推送，完整格式、校验及标准prek通过；[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43722877234)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43722995910)均在reader静态分析失败，未运行reader测试和Web构建。原因是格式化把新增测试的清除阻塞条件分行后触发`curly_braces_in_flow_control_structures`，此前两文件分析在格式化前通过，不能代替最终格式的检查。后续补齐该条件的大括号，完整格式化/校验后两文件严格分析通过，不降低lint级别。完整日志留在`ci-69db369-failed.log`和`cover-lint-{format,format-check,analyze}.log`，后续CI及Web结果另记。
+
+迁移向导同时补[20.K1–K18、21.K1–K6目标状态](mihon-state-coverage.md)，区分输入、原章节、目标源/列表/预览、映射/超限、确认与原请求恢复的最小信息。当前迁移呈现尚未修改，全部新主图保留待验。
+
+另尝试已全绿的`a39248c`正式Web artifact（14164452592、16,294,861字节），GitHub重定向成功，但新的`productionresultssa17.blob.core.windows.net`节点仍在45秒内未完成下载；没有取得ZIP，也未启动harness。此提交包含选择语义修复、尚不含封面调整，未把本次输入获取尝试记作任何新界面通过。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。

@@ -1116,6 +1116,111 @@ stateDiagram-v2
 
 19.K1/K2与已确认快照、替换/清除草稿、等待确认的最小信息按当前业务边界验收。关闭未提交草稿不承诺跨会话恢复；19.K9的原请求由当前业务会话保留，重开和读取失败作为该节点变体单列。图中失效箭头仅列主要异步入口，已确认/草稿/拒绝状态同样必须验证身份变化，不能用一条箭头替代全部触发阶段。上述是目标清单，不是新增产品能力或通过证据。
 
+### 20–21：Karuyomi 迁移向导的目标状态
+
+以下依据MigrationPage、MigrationController与MigrationRepository的正式分支整理，区分只读输入、草稿和写入确认；全部新主图待验。现有界面仍用手工段落呈现，错误与说明同色，首次输入加载时还会同时出现“没有其他可用源”；这些不作为目标状态通过。原请求的ID、版本与内部键留给诊断，主流程优先显示原/目标作品、源名称、所选范围及实际可用操作。
+
+```mermaid
+stateDiagram-v2
+    [*] --> MigrationInputs
+    state "20.K1 读取迁移输入" as MigrationInputs
+    state "20.K2 输入读取失败" as MigrationInputError
+    state "20.K3 选择原作品数据范围" as MigrationScope
+    state "20.K4 读取原作品章节" as MigrationOriginalLoad
+    state "20.K5 仅收藏与分类" as MigrationCategories
+    state "20.K6 已捕获原章节" as MigrationOriginalReady
+    state "20.K7 已确认无目标源" as MigrationNoSources
+    state "20.K8 打开目标源" as MigrationOpenSource
+    state "20.K9 目标源已就绪" as MigrationSearch
+    state "20.K10 读取目标列表" as MigrationListing
+    state "20.K11 目标列表为空" as MigrationEmpty
+    state "20.K12 目标列表有结果" as MigrationResults
+    state "20.K13 目标源或列表失败" as MigrationTargetError
+    state "20.K14 读取目标详情与预览" as MigrationPreviewLoad
+    state "20.K15 预览读取失败" as MigrationPreviewError
+    state "20.K16 只读迁移预览" as MigrationPreview
+    state "20.K17 选择目标章节" as MigrationChapterChoice
+    state "20.K18 章节映射超限" as MigrationLimit
+    state "21.K1 迁移提交确认" as MigrationConfirm
+    state "21.K2 等待服务端确认" as MigrationSending
+    state "21.K3 原迁移结果未知" as MigrationUnknown
+    state "21.K4 原迁移已拒绝" as MigrationRejected
+    state "21.K5 服务端已确认" as MigrationDone
+    state "21.K6 身份或服务已失效" as MigrationExpired
+    MigrationInputs --> MigrationInputError: 读取失败
+    MigrationInputError --> MigrationInputs: 明确重读
+    MigrationInputs --> MigrationScope: 无原章节快照
+    MigrationInputs --> MigrationOriginalReady: 已携带原章节快照
+    MigrationScope --> MigrationOriginalLoad: 读取原源章节
+    MigrationOriginalLoad --> MigrationOriginalReady: 成功捕获
+    MigrationOriginalLoad --> MigrationScope: 失败并保留改选入口
+    MigrationScope --> MigrationCategories: 明确仅迁移收藏和分类
+    MigrationOriginalReady --> MigrationNoSources: 已确认无其他可用源
+    MigrationCategories --> MigrationNoSources: 已确认无其他可用源
+    MigrationNoSources --> MigrationInputs: 只读刷新
+    MigrationOriginalReady --> MigrationOpenSource: 选择目标源
+    MigrationCategories --> MigrationOpenSource: 选择目标源
+    MigrationOpenSource --> MigrationSearch: 打开成功
+    MigrationOpenSource --> MigrationTargetError: 打开失败
+    MigrationSearch --> MigrationListing: 搜索或热门
+    MigrationListing --> MigrationEmpty: 首次成功且无结果
+    MigrationListing --> MigrationResults: 首次或追加成功
+    MigrationListing --> MigrationTargetError: 首次或追加失败
+    MigrationEmpty --> MigrationListing: 改查询或热门
+    MigrationResults --> MigrationListing: 重新查询或加载更多
+    MigrationTargetError --> MigrationOpenSource: 明确重开目标源
+    MigrationTargetError --> MigrationListing: 明确重试列表
+    MigrationResults --> MigrationPreviewLoad: 选择精确作品
+    MigrationPreviewLoad --> MigrationPreviewError: 详情或权威读取失败
+    MigrationPreviewError --> MigrationPreviewLoad: 明确重新读取
+    MigrationPreviewLoad --> MigrationPreview: 只读预览成功
+    MigrationPreview --> MigrationChapterChoice: 选择目标章节
+    MigrationChapterChoice --> MigrationPreview: 选择或取消并保留其它草稿
+    MigrationPreview --> MigrationLimit: 选中超过单次上限
+    MigrationLimit --> MigrationPreview: 明确减少选择
+    MigrationPreview --> MigrationConfirm: 检查并确认
+    MigrationConfirm --> MigrationPreview: 返回检查或取消
+    MigrationConfirm --> MigrationSending: 明确提交
+    MigrationSending --> MigrationUnknown: 未取得确认
+    MigrationSending --> MigrationRejected: 明确冲突或拒绝
+    MigrationSending --> MigrationDone: 原请求获服务端确认
+    MigrationUnknown --> MigrationSending: 精确重试原请求
+    MigrationRejected --> MigrationPreviewLoad: 明确结束被拒绝原请求并重读
+    MigrationInputs --> MigrationExpired: 身份或服务变化
+    MigrationListing --> MigrationExpired: 身份或服务变化
+    MigrationPreviewLoad --> MigrationExpired: 身份或服务变化
+    MigrationSending --> MigrationExpired: 身份或服务变化
+```
+
+| 状态ID | 目标画面的最小必要信息及分别验收的变体                                                                                         | 浅色 | 深色 |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------ | ---- | ---- |
+| 20.K1  | 原作品/源、读取输入进度、写入禁用；读取成功前不宣称无目标源                                                                    | 待   | 待   |
+| 20.K2  | 原作品、读取失败与明确重读/返回；无目标源和读取失败不混淆                                                                      | 待   | 待   |
+| 20.K3  | 原作品、未读取章节、读取章节或仅收藏/分类两种选择及影响                                                                        | 待   | 待   |
+| 20.K4  | 原作品/源、正在读取章节、编辑禁用；失败仍可重读或明确改为仅收藏/分类                                                           | 待   | 待   |
+| 20.K5  | 已选择仅收藏/分类、章节与位置不复制、可选目标源                                                                                | 待   | 待   |
+| 20.K6  | 已捕获章节数、快照随目标切换保留、可选目标源                                                                                   | 待   | 待   |
+| 20.K7  | 已确认无其他已安装且启用的源、扩展管理指引、只读刷新和返回                                                                     | 待   | 待   |
+| 20.K8  | 正在打开的精确目标源、原作品上下文、操作禁用；失败不得误标已切换                                                               | 待   | 待   |
+| 20.K9  | 当前目标源、查询、搜索/热门动作及原作品；尚未请求不显示无结果                                                                  | 待   | 待   |
+| 20.K10 | 当前目标源、查询或热门、首次/追加进度；追加时保留已有结果                                                                      | 待   | 待   |
+| 20.K11 | 当前源和查询或热门、成功为空、修改查询或改浏览热门；两种空态分别验                                                             | 待   | 待   |
+| 20.K12 | 精确目标作品名称、源/URL区分、打开与有界分页；不因同名打开其它条目                                                             | 待   | 待   |
+| 20.K13 | 失败源/操作、可恢复原因、重试；开源失败保留原选择，追加失败保留结果和分页上下文，分别验                                        | 待   | 待   |
+| 20.K14 | 精确目标作品/源、读取详情/章节或权威预览的实际进度；取得预览前不能提交                                                         | 待   | 待   |
+| 20.K15 | 失败的目标和阶段、明确重读、零迁移提交；初次失败/重取失败分别验                                                                | 待   | 待   |
+| 20.K16 | 原/目标、原作品保留、目标已有数据保留、分类与章节复制选项、已选/上限及未复制标记数；仅分类、无标记、已占用目标和映射分页分别验 | 待   | 待   |
+| 20.K17 | 原章节、当前目标、完整名称/来源序号、占用禁用、查询/无匹配/清空与取消；取消保持原映射和其它选择                                | 待   | 待   |
+| 20.K18 | 当前已选与上限、系统错误色、明确减少选择、确认禁用；不自动分批或部分提交                                                       | 待   | 待   |
+| 21.K1  | 原/目标名称和源、所选复制影响、保留原作品/目标已有状态、返回检查和明确确认；弹窗/取消零写入                                    | 待   | 待   |
+| 21.K2  | 原请求的目标与复制范围、等待确认、编辑与重复提交禁用；未确认前不显示完成                                                       | 待   | 待   |
+| 21.K3  | 尚未确认、原目标和范围、精确重试及返回；同会话重开/只读刷新不重发，不允许改目标或映射覆盖原请求                                | 待   | 待   |
+| 21.K4  | 原目标、冲突或拒绝原因、提交/精确重试禁用、明确结束被拒绝原请求并重新预览；重读失败另验                                        | 待   | 待   |
+| 21.K5  | 明确服务端确认、确认的目标、实际新增已读/书签数、原作品保留及返回；新请求/原请求重试成功分别验                                 | 待   | 待   |
+| 21.K6  | 身份或服务已变化、旧向导永久停用及返回；各读取/预览/提交/待确认阶段分别触发并丢弃迟到结果                                      | 待   | 待   |
+
+图中仅列主要失效入口，范围草稿、已加载列表、映射、拒绝及完成后同样检查身份变化；不能用一条箭头替代全部触发阶段。20.K13/K14的操作阶段、20.K16/K17的长列表与无标记、21.K3/K4的重开和重读失败须独立取图。预览、筛选、映射、分页与取消均为只读；只有21.K1明确确认和21.K3明确原请求重试可触发写入。上述为后续实现与验收目标，不能填作已有组件或正式Web通过。
+
 ### 26：Karuyomi 最终 Cupertino 设置导航
 
 以下沿用26组参考结构，同时保留Karuyomi的服务端确认语义；这是最终目标画面清单，不能用第一阶段旧配色截图填入。代码/组件验证与正式Web实拍分别记录。蓝色仅代表`729cbe3`的双主题主图已核对，全部变体与转换仍待。

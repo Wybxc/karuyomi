@@ -298,8 +298,9 @@ void main() {
           });
           server.beforeRequest = (request) async {
             if (request.method == 'POST' &&
-                request.uri.path == '/api/state/mutations')
+                request.uri.path == '/api/state/mutations') {
               await clearGate.future;
+            }
             return null;
           };
           await _tap(tester, control('cover-save'), settle: false);
