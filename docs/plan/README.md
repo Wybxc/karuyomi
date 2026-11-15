@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、配色与转场。筛选、空偏好及退场误报修复完整push/PR CI通过，最新831项Dart、531项Vitest及Web/Wasm；正式Web双主题实看xkcd无筛选和Komiic实际select字段/失败保留，独立API确认零附写。Komiic查询失败和镜像后容器中断保留；菜单/草稿缺完整帧。独立标题次级说明的12项回归与严格分析通过，新CI/Web继续。按[逐状态流程图](../verification/mihon-state-coverage.md)推进全部页面、转换和变体，生产验收仍待。
+**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场。最新`75c618a`完整push/PR CI通过，含831项Dart、531项Vitest及Web/Wasm；正式Web补齐双主题筛选次级说明、完整菜单/草稿及360↔390尺寸往返，取消重开恢复默认，独立API确认零附写。正常退出误报也已正式双主题复验；Komiic查询失败和镜像后容器中断保留，未记兼容通过。按[逐状态流程图](../verification/mihon-state-coverage.md)继续全部页面、转换和变体，空偏好正式Web及生产验收仍待。
 
 参考采集按[状态机与双主题截图清单](../verification/mihon-state-coverage.md)推进；加载、空态、失败、选择、编辑与弹层逐状态记录，只有单主题或只有根页截图均不算完成。
 

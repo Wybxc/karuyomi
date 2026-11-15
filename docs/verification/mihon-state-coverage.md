@@ -1124,7 +1124,7 @@ stateDiagram-v2
 
 ### 13：Karuyomi typed Source 筛选的目标状态
 
-这里跟踪最终Cupertino表单的产品状态，与上方Mihon参考13.01–13.07分别验收。`86e7925`正式Web已取得真实xkcd无筛选及干净会话Komiic select字段/失败的双主题主图，实际取消、重置及独立API零附写通过；瞬时进度未截到。Komiic镜像确认后容器中断的失败记录保留，默认站点真实查询同样失败，不记兼容通过。后续32项组件/控制器回归包含正常关闭转场误报的复现/修复，未当作浏览器主图；独立说明17px缺口另已修复，当前旧图不能代表最终说明层级通过。分组仍保留Source原始path，加载、重置、应用和失败不能合成一个已通过状态。
+这里跟踪最终Cupertino表单的产品状态，与上方Mihon参考13.01–13.07分别验收。`86e7925`正式Web取得真实xkcd无筛选及干净会话Komiic select字段/失败的双主题主图，实际取消、重置及独立API零附写通过；瞬时进度未截到。Komiic镜像确认后容器中断的失败记录保留，默认站点真实查询同样失败，不记兼容通过。`c353604`已取得双主题正常关闭转场，`75c618a`补齐13px次级说明、菜单和草稿的完整双主题画面。蓝色仅表示主图成对取得；分组仍保留Source原始path，加载、重置、应用、失败及其它控件变体分别验收。
 
 ```mermaid
 stateDiagram-v2
@@ -1173,25 +1173,29 @@ stateDiagram-v2
     ResettingFilters --> [*]: 取消请求并关闭，会话可能退役
     ApplyingFilters --> [*]: 取消请求并关闭，会话可能退役
     FilterSessionChanged --> [*]: 关闭后重新打开
+    classDef paired fill:#dbeafe,color:#172554,stroke:#2563eb
+    class FiltersReady,FilterDraft,FilterChoice,FilterApplyFailed,EmptyFilters,DismissingFilters paired
 ```
 
 | 状态 ID | 最小必要信息                                                 | 浅色正式Web                                              | 深色正式Web                                             |
 | ------- | ------------------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------- |
 | 13.K1   | 源内查询上下文、读取进度、取消后果、重复动作禁用             | 待                                                       | 待                                                      |
-| 13.K2   | 分组与typed当前值、重置/应用/取消；说明标题与空分组不丢失    | `karuyomi-86e7925-clean-filters-ready-light.jpg`         | `karuyomi-86e7925-clean-filters-ready-dark.jpg`         |
-| 13.K3   | 修改后的值、仍未应用、原列表保持、明确应用/取消              | 待                                                       | 待                                                      |
-| 13.K4   | 选项、当前选择及键盘焦点、取消；长选项另走29组查询页         | 待                                                       | 待                                                      |
+| 13.K2   | 分组与typed当前值、重置/应用/取消；说明标题与空分组不丢失    | `karuyomi-75c618a-filters-ready-light.jpg`               | `karuyomi-75c618a-filters-ready-dark.jpg`               |
+| 13.K3   | 修改后的值、仍未应用、原列表保持、明确应用/取消              | `karuyomi-75c618a-filters-draft-light.jpg`               | `karuyomi-75c618a-filters-draft-dark.jpg`               |
+| 13.K4   | 选项、当前选择及键盘焦点、取消；长选项另走29组查询页         | `karuyomi-75c618a-filters-choice-light-390.jpg`          | `karuyomi-75c618a-filters-choice-dark-390.jpg`          |
 | 13.K5   | 明确重置进度、旧已应用条件不变、取消后果、重复动作禁用       | 待                                                       | 待                                                      |
 | 13.K6   | 明确应用进度、冻结的草稿、原列表保持、取消后果、重复动作禁用 | 待                                                       | 待                                                      |
 | 13.K7   | 读取/重置失败原因、重试/关闭、原列表保持                     | 待                                                       | 待                                                      |
 | 13.K8   | 应用失败原因、保留的草稿、可编辑并重试/取消、原列表保持      | `karuyomi-86e7925-clean-filters-apply-outcome-light.jpg` | `karuyomi-86e7925-clean-filters-apply-outcome-dark.jpg` |
 | 13.K9   | 会话变化说明、停止使用旧草稿、关闭并重新打开                 | 待                                                       | 待                                                      |
 | 13.K10  | 无额外筛选说明、默认条件搜索与取消、仍可重置                 | `karuyomi-86e7925-filters-empty-light.jpg`               | `karuyomi-86e7925-filters-empty-dark.jpg`               |
-| 13.K11  | 退场期间保留原内容、停止接受操作、正常关闭不误报会话变化     | 待                                                       | 待                                                      |
+| 13.K11  | 退场期间保留原内容、停止接受操作、正常关闭不误报会话变化     | `karuyomi-c353604-filters-closing-observation-light.jpg` | `karuyomi-c353604-filters-closing-observation-dark.jpg` |
 
 两主题取消后返回焦点至筛选入口：浅色使用Tab/Return，深色使用Tab/Space。重置与应用走真实Source，浅色应用后空结果主图为`karuyomi-86e7925-filters-applied-empty-result-light.jpg`，深色稳定同状态图为`karuyomi-86e7925-filters-cancel-space-dark.jpg`；两张联系表已实看。最后一次深色应用截图缺文字，排除主图；工具观察到的正常退场误报保留为修复依据，不能填作13.K9真正会话失效。全部瞬时进度、typed字段和失败变体仍待补齐。
 
-13.K2/K8当前仅实测Komiic真实select条件，无加载的分类checkbox；17px独立标题仍待最终修复画面。两主题指针/键盘排序草稿、取消重开、重置、失败保留与原列表恢复已实际操作，但菜单与草稿截图缺少完整标题/底部动作，因此13.K3/K4仍待主图。未外推text、tri-state、SortFilter方向或失败重试成功；这些控件继续分别验收。
+13.K11为`c353604`正式Web真实xkcd成功应用后的两个自然退场时刻，浅深动画位置不同；不是全部转场帧或减少动态效果验收。
+
+13.K2/K3/K4当前仅实测Komiic真实select条件，无加载的分类checkbox。`75c618a`已补13px次级标题的双主题正式画面、完整菜单与草稿主图；菜单在390×844、表单与草稿在360×800，不能作同视口叠图。两主题菜单随360→390收起且原值保留，重开选择“喜愛數”后回360仍保留草稿，取消重开恢复默认；深色真实Tab/Return选择并保留焦点圈。独立API确认筛选全程零附写，默认查询仍失败。13.K8继续使用旧版失败主图，其17px标题历史缺口不当作已修复；未外推text、tri-state、SortFilter方向、失败重试成功或全部转场。
 
 ### 14：Karuyomi Source 会话偏好的目标状态
 
