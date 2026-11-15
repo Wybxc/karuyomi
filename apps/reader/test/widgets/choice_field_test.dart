@@ -40,6 +40,77 @@ void main() {
 
   for (final brightness in Brightness.values) {
     for (final scale in [1.0, 2.0]) {
+      for (final searchable in [false, true]) {
+        testWidgets(
+          '${searchable ? 'searchable choices' : 'short menu'} expose selection on each named action in $brightness at ${scale}x',
+          (tester) async {
+            tester.view.physicalSize = const Size(360, 800);
+            tester.view.devicePixelRatio = 1;
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final semantics = tester.ensureSemantics();
+            try {
+              final changed = <String?>[];
+              await show(
+                tester,
+                options: {
+                  ...short,
+                  if (searchable)
+                    for (var index = 3; index < 10; index++)
+                      '$index': '其它选项 $index',
+                },
+                onChanged: changed.add,
+                disabled: {'two'},
+                brightness: brightness,
+              );
+              await tester.tap(find.byKey(field));
+              await tester.pumpAndSettle();
+              void expectChoice(String label, bool selected, bool enabled) {
+                expect(
+                  tester.getSemantics(find.text(label).last),
+                  isSemantics(
+                    label: label,
+                    hasSelectedState: true,
+                    isSelected: selected,
+                    hasEnabledState: true,
+                    isEnabled: enabled,
+                    isInMutuallyExclusiveGroup: true,
+                    hasTapAction: enabled,
+                  ),
+                );
+              }
+
+              expectChoice('单页', true, true);
+              expectChoice('跟随全局', false, true);
+              expectChoice('双页', false, false);
+              if (searchable) {
+                await tester.enterText(
+                  find.widgetWithText(CupertinoTextField, '查找选择'),
+                  '单页',
+                );
+                await tester.pumpAndSettle();
+                expectChoice('单页', true, true);
+                await tester.tap(find.bySemanticsLabel('清空选项搜索'));
+                await tester.pumpAndSettle();
+                expectChoice('跟随全局', false, true);
+                await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+              } else {
+                await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+              }
+              await tester.pumpAndSettle();
+              expect(changed, isEmpty);
+              expect(tester.takeException(), isNull);
+            } finally {
+              semantics.dispose();
+            }
+          },
+        );
+      }
+
       testWidgets(
         'long choices preserve the visible occurrence and keyboard selection in $brightness at ${scale}x',
         (tester) async {

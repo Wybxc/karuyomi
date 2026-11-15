@@ -84,10 +84,14 @@ class const ChoiceField<T>({
                   trailing: item.key == value
                       ? const Icon(CupertinoIcons.check_mark)
                       : null,
-                  child: Builder(
-                    builder: (context) => DefaultTextStyle(
-                      style: DefaultTextStyle.of(context).style,
-                      child: Text(item.value),
+                  child: Semantics(
+                    selected: item.key == value,
+                    inMutuallyExclusiveGroup: true,
+                    child: Builder(
+                      builder: (context) => DefaultTextStyle(
+                        style: DefaultTextStyle.of(context).style,
+                        child: Text(item.value),
+                      ),
                     ),
                   ),
                 ),
@@ -165,23 +169,29 @@ class const ChoicePage<T>({
                       itemCount: visible.length,
                       itemBuilder: (context, index) {
                         final item = visible[index];
-                        return CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          onPressed: disabledValues.contains(item.key)
-                              ? null
-                              : () =>
-                                    Navigator.of(context)
-                                        .pop((value: item.key)),
-                          child: CupertinoListTile(
-                            title: Builder(
-                              builder: (context) => DefaultTextStyle(
-                                style: DefaultTextStyle.of(context).style,
-                                child: Text(item.value),
+                        return Semantics(
+                          selected: item.key == value,
+                          enabled: !disabledValues.contains(item.key),
+                          blockUserActions: disabledValues.contains(item.key),
+                          inMutuallyExclusiveGroup: true,
+                          child: CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            onPressed: disabledValues.contains(item.key)
+                                ? null
+                                : () =>
+                                      Navigator.of(context)
+                                          .pop((value: item.key)),
+                            child: CupertinoListTile(
+                              title: Builder(
+                                builder: (context) => DefaultTextStyle(
+                                  style: DefaultTextStyle.of(context).style,
+                                  child: Text(item.value),
+                                ),
                               ),
+                              trailing: item.key == value
+                                  ? const Icon(CupertinoIcons.check_mark)
+                                  : null,
                             ),
-                            trailing: item.key == value
-                                ? const Icon(CupertinoIcons.check_mark)
-                                : null,
                           ),
                         );
                       },

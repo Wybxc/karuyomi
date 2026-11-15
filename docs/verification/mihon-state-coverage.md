@@ -1046,6 +1046,8 @@ stateDiagram-v2
 
 `0c4da11`在新的临时D1中补齐完整长选项和来源第8→13项的六章范围。两主题均Tab/Return打开起点、实际查询/无匹配/清空/取消并恢复焦点，浅色另Tab/Return精确选择第8项；重开已选起点、改无匹配并取消仍保留两个端点及六章。清单中Shift/Tab聚焦取消，深色Return、浅色Space退出均保留原范围，明确退出才清空。独立Protobuf解析确认两主题的完整账户/作品快照前后相同：最终accountRevision/global.revision3，只有两次主题和一次安装，漫画revision0、无收藏/书签/进度或续读。三张`range-{form-pair,query-pairs,preview-pair}.jpg`联系表已实看，深色水平转场中间帧排除主图，选项首屏图滚动锚点不同。原图与检查结果留在忽略目录，console无warn/error，Source正常收尾，临时标签和harness已关闭。
 
+后续八项浅/深×1x/2x回归已复现并修复短菜单和长列表的选中语义缺失，保留选中/未选中、互斥组与禁用状态；选择组件19项及相关共73项回归通过。修复后的完整CI和正式Web辅助树仍待，既有可见勾选主图不能替代。详见[选择语义](mihon-cupertino-fidelity.md#选择状态的辅助语义)。
+
 普通Source封面、重复章节/扫描组实拍、30.K各故障、全部变体及生产仍待；双倍字号仅为组件证据。资料丢确认后重试及读取失败的正文/错误分离也只有组件证据，详见[章节验证](mihon-cupertino-fidelity.md#章节文字与书架资料确认的-cupertino-呈现)和[长选项验证](mihon-cupertino-fidelity.md#长选项与范围表单的自然尺寸)。
 
 ### 26：Karuyomi 最终 Cupertino 设置导航
