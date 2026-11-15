@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:karuyomi/data/business_state_client.dart';
@@ -18,6 +19,7 @@ import 'package:karuyomi/features/covers/custom_cover.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/runtime/api_fetch.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -110,6 +112,220 @@ void main() {
   tearDown(() {
     FileSelectorPlatform.instance = previous;
   });
+
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'cover states separate reads, drafts and server confirmation in $brightness at ${scale}x',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final server = TestBusinessServer();
+          final transport = TestCoverTransport(server);
+          final platform = TestPlatform(businessServer: server)
+            ..covers = transport;
+          final controller = await _details(tester, platform);
+          final sourceCalls = platform.invocations.length;
+          final writes = server.appliedMutations;
+          final mangaKey = ChapterSequence(
+            packageName: 'eu.kanade.source.test',
+            sourceId: sourceId,
+            mangaUrl: testManga.url,
+            chapters: const [],
+          ).mangaKey;
+          final readPath = '/api/state/manga/$mangaKey';
+          final readGate = Completer<void>();
+          var failRead = true;
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == readPath) await readGate.future;
+          };
+          platform.afterBusinessReply = (request, reply) async {
+            if (failRead &&
+                request.method == 'GET' &&
+                request.uri.path == readPath) {
+              failRead = false;
+              return ApiReply(
+                status: 503,
+                redirected: false,
+                headers: reply.headers,
+                body: reply.body,
+              );
+            }
+            return reply;
+          };
+          addTearDown(() {
+            if (!readGate.isCompleted) readGate.complete();
+          });
+          Finder control(String key) => find.byKey(ValueKey(key));
+          await _tap(tester, control('custom-cover-editor'), settle: false);
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(control('cover-editor'), findsOneWidget);
+          expect(find.text('服务端已确认'), findsNothing);
+          expect(find.text('正在读取封面'), findsOneWidget);
+          expect(
+            tester
+                .widget<CupertinoButton>(control('cover-select-image'))
+                .onPressed,
+            isNull,
+          );
+          readGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          platform.beforeApiFetch = null;
+          expect(find.text('服务端已确认'), findsNothing);
+          expect(find.text('正在读取封面'), findsNothing);
+          expect(find.text('尚未读取服务端封面'), findsOneWidget);
+          expect(find.byType(CupertinoActivityIndicator), findsNothing);
+          void expectErrorColor() {
+            final error = control('cover-error');
+            expect(error, findsOneWidget);
+            final text = tester.renderObject<RenderParagraph>(error);
+            expect(
+              text.text.style?.color,
+              AppColors.error.resolveFrom(tester.element(error)),
+            );
+          }
+
+          expectErrorColor();
+          await _tap(tester, find.text('重新读取'));
+          expect(find.text('服务端已确认'), findsOneWidget);
+          expect(find.text('未设置自定义封面'), findsOneWidget);
+          expect(find.byType(CupertinoFormSection), findsWidgets);
+          expect(control('cover-error'), findsNothing);
+          picker.files.add(null);
+          await _tap(tester, control('cover-select-image'));
+          expect(control('cover-save'), findsNothing);
+          expect(server.appliedMutations, writes);
+          picker.files.add(
+            XFile.fromData(
+              Uint8List.fromList([1, 2, 3]),
+              name: 'invalid.png',
+              mimeType: 'image/png',
+            ),
+          );
+          await _tap(tester, control('cover-select-image'));
+          expectErrorColor();
+          expect(control('cover-save'), findsNothing);
+          expect(server.appliedMutations, writes);
+          final pickGate = Completer<XFile?>();
+          addTearDown(() {
+            if (!pickGate.isCompleted) pickGate.complete(null);
+          });
+          picker.waiting = pickGate;
+          await _tap(tester, control('cover-select-image'), settle: false);
+          expect(find.text('正在读取所选图片'), findsOneWidget);
+          expect(server.appliedMutations, writes);
+          pickGate.complete(_imageFile());
+          picker.waiting = null;
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('待保存的修改'), findsOneWidget);
+          expect(transport.uploads, isEmpty);
+          final saveGate = Completer<void>();
+          addTearDown(() {
+            if (!saveGate.isCompleted) saveGate.complete();
+          });
+          transport.beforeUpload = (_) => saveGate.future;
+          server.loseNextResponse = true;
+          await _tap(tester, control('cover-save'), settle: false);
+          expect(find.text('正在等待服务端确认'), findsOneWidget);
+          expect(find.text('服务端已确认'), findsNothing);
+          expect(find.text('上次服务端确认'), findsOneWidget);
+          expect(find.text('尚未确认的修改'), findsOneWidget);
+          expect(find.text('未设置自定义封面'), findsOneWidget);
+          expect(server.appliedMutations, writes);
+          saveGate.complete();
+          transport.beforeUpload = null;
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('正在等待服务端确认'), findsNothing);
+          expectErrorColor();
+          expect(control('cover-retry'), findsOneWidget);
+          expect(server.appliedMutations, writes + 1);
+          final original = transport.uploads.single;
+          final asset = server.manga(mangaKey)!.customCover.assetId;
+          await _tap(tester, find.text('稍后处理'));
+          failRead = true;
+          await _tap(tester, control('custom-cover-editor'));
+          expect(find.text('服务端已确认'), findsNothing);
+          expect(find.text('尚未确认的修改'), findsOneWidget);
+          expectErrorColor();
+          await _tap(tester, control('cover-retry'));
+          expect(transport.uploads, hasLength(2));
+          expect(transport.uploads.last.mutation, original.mutation);
+          expect(transport.uploads.last.bytes, orderedEquals(original.bytes));
+          expect(server.appliedMutations, writes + 1);
+          expect(find.text('服务端已确认'), findsOneWidget);
+          expect(find.text('尚未确认的修改'), findsNothing);
+          expect(control('cover-error'), findsNothing);
+          final clearText = find.descendant(
+            of: control('cover-clear'),
+            matching: find.text('清除封面'),
+          );
+          expect(
+            tester.renderObject<RenderParagraph>(clearText).text.style?.color,
+            AppColors.error.resolveFrom(tester.element(clearText)),
+          );
+          await _tap(tester, control('cover-clear'));
+          expect(find.text('清除自定义封面'), findsOneWidget);
+          expect(server.manga(mangaKey)!.customCover.assetId, asset);
+          picker.files.add(null);
+          await _tap(tester, control('cover-select-image'));
+          expect(find.text('清除自定义封面'), findsOneWidget);
+          expect(server.appliedMutations, writes + 1);
+          await _tap(tester, find.text('关闭'));
+          await _tap(tester, control('custom-cover-editor'));
+          expect(find.text('待保存的修改'), findsNothing);
+          expect(server.manga(mangaKey)!.customCover.assetId, asset);
+          await _tap(tester, control('cover-clear'));
+          final clearGate = Completer<void>();
+          addTearDown(() {
+            if (!clearGate.isCompleted) clearGate.complete();
+          });
+          server.beforeRequest = (request) async {
+            if (request.method == 'POST' &&
+                request.uri.path == '/api/state/mutations')
+              await clearGate.future;
+            return null;
+          };
+          await _tap(tester, control('cover-save'), settle: false);
+          expect(find.text('正在等待服务端确认'), findsOneWidget);
+          expect(find.text('上次服务端确认'), findsOneWidget);
+          expect(server.manga(mangaKey)!.customCover.assetId, asset);
+          expect(server.appliedMutations, writes + 1);
+          clearGate.complete();
+          server.beforeRequest = null;
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          expect(server.appliedMutations, writes + 2);
+          expect(server.manga(mangaKey)!.hasCustomCover(), false);
+          expect(find.text('未设置自定义封面'), findsOneWidget);
+          expect(find.text('待保存的修改'), findsNothing);
+          expect(transport.uploads, hasLength(2));
+          expect(platform.invocations, hasLength(sourceCalls));
+          expect(platform.imageControls, isEmpty);
+          await _tap(tester, find.text('关闭'));
+          await _finish(tester, controller);
+        },
+      );
+    }
+  }
 
   test('cover normalization bakes orientation, bounds output and rejects huge headers before decode', () {
     final oriented = img.Image(width: 20, height: 40);

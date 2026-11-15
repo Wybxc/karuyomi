@@ -9,6 +9,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../../data/business_state_client.dart';
 import '../../data/cover_repository.dart';
+import '../../theme/app_theme.dart';
 import '../browse/catalog_controller.dart';
 import 'cover_selection.dart';
 import 'custom_cover.dart';
@@ -43,11 +44,14 @@ class const _CoverEditor({
   State<_CoverEditor> createState() => _CoverEditorState();
 }
 
+enum _CoverOperation { load, pick, save }
+
 class _CoverEditorState extends State<_CoverEditor> {
   CoverSnapshot? _confirmed;
   Uint8List? _selected;
   bool _clearing = false;
-  bool _busy = false;
+  _CoverOperation? _operation;
+  bool get _busy => _operation != null;
   bool _attempted = false;
   bool _saved = false;
   bool _blocked = false;
@@ -82,7 +86,7 @@ class _CoverEditorState extends State<_CoverEditor> {
   Future<void> _load() async {
     if (!_current || _busy) return;
     setState(() {
-      _busy = true;
+      _operation = _CoverOperation.load;
       _error = null;
     });
     try {
@@ -100,14 +104,14 @@ class _CoverEditorState extends State<_CoverEditor> {
     } catch (_) {
       if (_current) setState(() => _error = '未能读取服务端封面，请重试。');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _operation = null);
     }
   }
 
   Future<void> _select() async {
     if (!_current || _busy || _pending != null) return;
     setState(() {
-      _busy = true;
+      _operation = _CoverOperation.pick;
       _error = null;
     });
     try {
@@ -123,7 +127,7 @@ class _CoverEditorState extends State<_CoverEditor> {
     } catch (_) {
       if (_current) setState(() => _error = '未能读取所选图片，请重新选择。');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _operation = null);
     }
   }
 
@@ -133,7 +137,7 @@ class _CoverEditorState extends State<_CoverEditor> {
       return;
     }
     setState(() {
-      _busy = true;
+      _operation = _CoverOperation.save;
       _attempted = true;
       _error = null;
     });
@@ -176,7 +180,7 @@ class _CoverEditorState extends State<_CoverEditor> {
             ? '封面或作品已在其他设备更新。请重新读取后确认，不会覆盖远端修改。'
             : _blocked
             ? '封面未保存，请重新读取后再修改。'
-            : '尚未确认保存。请重试原修改，当前显示的服务端封面未变。';
+            : '尚未确认保存。请重试原修改，当前展示上次确认的封面。';
       });
     } on BusinessPendingMutationException {
       if (_current) {
@@ -186,9 +190,9 @@ class _CoverEditorState extends State<_CoverEditor> {
         });
       }
     } catch (_) {
-      if (_current) setState(() => _error = '尚未确认保存。请重试原修改，当前会话保留所选封面。');
+      if (_current) setState(() => _error = '尚未确认保存。请重试原修改，当前会话保留原修改。');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _operation = null);
     }
   }
 
@@ -224,50 +228,99 @@ class _CoverEditorState extends State<_CoverEditor> {
         key: const ValueKey('cover-editor'),
         title: const Text('自定义封面'),
         content: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_expired)
-                const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。')
-              else ...[
-                const Text('服务端已确认'),
-                const SizedBox(height: 8),
-                if (_confirmed case final confirmed?)
-                  CustomCover(
-                    repository: widget.repository,
-                    cover: confirmed.cover,
-                    width: 120,
-                    height: 160,
-                  )
-                else
-                  const Text('正在读取封面'),
-                if (preview != null || clearing) ...[
-                  const SizedBox(height: 16),
-                  Text(_attempted || pending != null ? '尚未确认的修改' : '待保存的修改'),
-                  if (clearing)
-                    const Text('清除自定义封面')
-                  else
-                    Image.memory(
-                      preview!,
-                      width: 120,
-                      height: 160,
-                      fit: BoxFit.cover,
-                    ),
-                ],
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
+                CupertinoListSection.insetGrouped(
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        '身份或服务已变化，原窗口已停用。请关闭后重新打开。',
+                        style: TextStyle(
+                          color: AppColors.error.resolveFrom(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                CupertinoFormSection.insetGrouped(
+                  header: Text(
+                    _confirmed == null
+                        ? '服务端封面'
+                        : _attempted || pending != null
+                        ? '上次服务端确认'
+                        : '服务端已确认',
+                  ),
+                  footer: _error == null
+                      ? null
+                      : Semantics(
+                          container: true,
+                          liveRegion: true,
+                          child: Text(
+                            _error!,
+                            key: const ValueKey('cover-error'),
+                            style: TextStyle(
+                              color: AppColors.error.resolveFrom(context),
+                            ),
+                          ),
+                        ),
+                  children: [
+                    if (_confirmed case final confirmed?)
+                      CupertinoFormRow(
+                        prefix: confirmed.cover == null
+                            ? null
+                            : Expanded(child: const Text('当前自定义封面')),
+                        child: confirmed.cover == null
+                            ? const Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text('未设置自定义封面'),
+                              )
+                            : CustomCover(
+                                repository: widget.repository,
+                                cover: confirmed.cover,
+                                width: 120,
+                                height: 160,
+                              ),
+                      )
+                    else if (!_busy)
+                      const CupertinoFormRow(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text('尚未读取服务端封面'),
+                        ),
+                      ),
+                    if (_operation case final operation?)
+                      Semantics(
+                        container: true,
+                        liveRegion: true,
+                        child: CupertinoFormRow(
+                          prefix: Expanded(
+                            child: Text(switch (operation) {
+                              _CoverOperation.load => '正在读取封面',
+                              _CoverOperation.pick => '正在读取所选图片',
+                              _CoverOperation.save => '正在等待服务端确认',
+                            }),
+                          ),
+                          child: const CupertinoActivityIndicator(),
+                        ),
+                      ),
                     CupertinoButton(
                       key: const ValueKey('cover-select-image'),
+                      alignment: AlignmentDirectional.centerStart,
                       onPressed: editable ? _select : null,
                       child: Text(_confirmed?.cover == null ? '选择图片' : '替换图片'),
                     ),
                     if (_confirmed?.cover != null)
                       CupertinoButton(
                         key: const ValueKey('cover-clear'),
+                        alignment: AlignmentDirectional.centerStart,
+                        foregroundColor: editable
+                            ? AppColors.error.resolveFrom(context)
+                            : null,
                         onPressed: editable
                             ? () => setState(() {
                                 _selected = null;
@@ -279,9 +332,35 @@ class _CoverEditorState extends State<_CoverEditor> {
                       ),
                   ],
                 ),
-                if (_busy) const CupertinoActivityIndicator(),
-                if (pending != null) const Text('当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'),
-                if (_error case final error?) Text(error),
+                if (preview != null || clearing)
+                  CupertinoFormSection.insetGrouped(
+                    header: Text(
+                      _attempted || pending != null ? '尚未确认的修改' : '待保存的修改',
+                    ),
+                    footer: Text(
+                      pending != null
+                          ? '当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'
+                          : '仅当前会话保留，保存并收到服务端确认后才更新封面。',
+                    ),
+                    children: [
+                      CupertinoFormRow(
+                        child: clearing
+                            ? const Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text('清除自定义封面'),
+                              )
+                            : Image.memory(
+                                preview!,
+                                width: 120,
+                                height: 160,
+                                fit: BoxFit.cover,
+                                semanticLabel: _attempted || pending != null
+                                    ? '尚未确认的封面预览'
+                                    : '待保存的封面预览',
+                              ),
+                      ),
+                    ],
+                  ),
               ],
             ],
           ),
