@@ -417,6 +417,73 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'storage exposes keyboard diagnostics and clears only the local copy at $appearance / $scale',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          await manager.install(catalog.builds.single);
+          final confirmed = await manager.repository.loadGlobal();
+          final writes = platform.businessServer.requests
+              .where((request) => request.method == 'POST')
+              .length;
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ExtensionStoragePage(controller: manager),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final clear = find.byKey(ValueKey(('extension-forget', 'a' * 64)));
+          final diagnostics = find.widgetWithText(CupertinoButton, '诊断信息');
+          CupertinoButton? focusedButton() => FocusManager
+              .instance
+              .primaryFocus
+              ?.context
+              ?.findAncestorWidgetOfExactType<CupertinoButton>();
+          for (
+            var attempt = 0;
+            attempt < 12 &&
+                focusedButton() != tester.widget<CupertinoButton>(diagnostics);
+            attempt++
+          ) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pump();
+          }
+          expect(focusedButton(), tester.widget<CupertinoButton>(diagnostics));
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+          expect(find.textContaining('a' * 64), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.pump();
+          expect(focusedButton(), tester.widget<CupertinoButton>(clear));
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await tester.pumpAndSettle();
+          expect(find.text('本机没有扩展副本'), findsOneWidget);
+          expect(platform.cachedArtifacts, isEmpty);
+          expect(manager.installed.single, testInstalledExtension());
+          final after = await manager.repository.loadGlobal();
+          expect(after.global, confirmed.global);
+          expect(after.globalRevision, confirmed.globalRevision);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            hasLength(writes),
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+
     testWidgets(
       'installed source and diagnostic actions have independent keyboard access in $appearance',
       (tester) async {

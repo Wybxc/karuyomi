@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
 import 'package:karuyomi/data/settings_repository.dart';
@@ -14,6 +15,7 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -93,11 +95,16 @@ void main() {
     return value;
   }
 
-  Future<void> show(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(480, 800));
+  Future<void> show(
+    WidgetTester tester, {
+    Brightness? appearance,
+    Size size = const Size(480, 800),
+  }) async {
+    await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
+        theme: appearance == null ? null : readerAppTheme(appearance),
         home: CupertinoPageScaffold(
           child: CatalogPage(
             controller: catalog,
@@ -155,6 +162,83 @@ void main() {
             request.uri.path == '/api/settings/mutations',
       )
       .toList();
+
+  for (final appearance in Brightness.values) {
+    testWidgets(
+      'directory opening and favorite actions are separate keyboard targets in $appearance',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+          );
+          final source = open('eu.kanade.source.test');
+          final sourceNode = tester.getSemantics(source);
+          for (
+            var parent = tester.getSemantics(toggle()).parent;
+            parent != null;
+            parent = parent.parent
+          ) {
+            expect(
+              parent.id,
+              isNot(sourceNode.id),
+              reason:
+                  'the favorite action must not be nested in the open action',
+            );
+          }
+          CupertinoButton? focusedButton() => FocusManager
+              .instance
+              .primaryFocus
+              ?.context
+              ?.findAncestorWidgetOfExactType<CupertinoButton>();
+          for (
+            var attempt = 0;
+            attempt < 16 &&
+                focusedButton()?.key != toggle().evaluate().single.widget.key;
+            attempt++
+          ) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pump();
+          }
+          expect(focusedButton(), tester.widget<CupertinoButton>(toggle()));
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await tester.pumpAndSettle();
+          expect(platform.openedBuilds, isEmpty);
+          expect(posts(), hasLength(1));
+          expect(
+            (await remoteSettings.loadGlobal())
+                .global
+                .favoriteSources
+                .single
+                .sourceId,
+            sourceId,
+          );
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.pump();
+          expect(
+            find.descendant(
+              of: find.byWidget(focusedButton()!),
+              matching: source,
+            ),
+            findsOneWidget,
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+          expect(platform.openedBuilds, ['build-1']);
+          expect(catalog.activeSource!.id, sourceId);
+          expect(posts(), hasLength(1));
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
 
   testWidgets(
     'stars wait for account ACK and preserve all other global settings',

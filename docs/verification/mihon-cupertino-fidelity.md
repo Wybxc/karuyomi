@@ -164,6 +164,12 @@
 
 独立`karuyomi-16baf47-api-checks.json`确认浅色会话操作前后账户完全相同（revision=1），主题保存后为DARK/revision=2，深色开关与范围导航前后同样完全相同，Source账户entries为空。匿名manifest读回的两项静态颜色均为`#F2F2F7`；未验安装后启动画面或动态浏览器chrome。`browser-findings.json`保留精确范围；控制台无warn/error，视口恢复、临时标签关闭、harness退出0。未做该版本新文档续读、动漫屋图片、生产Access或原生现场验收。两种颜色截图仍是JPEG，不把采样当作无损色值或全页面完成。
 
+### 源目录、仓库与本机存储的分组收敛
+
+后续实现直接采用官方CupertinoListSection，延用systemGroupedBackground/secondarySystemGroupedBackground、label/secondaryLabel和官方页脚；仓库添加/刷新采用actionTextStyle，移除采用系统危险红。源列表主动作与收藏改为并列按钮并标记已收藏语义，保留原确认链路；原嵌套结构的两项新增键盘用例本身已通过，因此不把此次结构调整描述为已复现的键盘故障修复。仓库输入恢复官方文本框装饰、禁用自动填充和URL自动更正。无自身State的仓库页面改为HookWidget，控制器订阅与展开生命周期仍由Hooks管理。
+
+本机低优先级、单并发运行源收藏/语言/目录及扩展/仓库回归，首轮65项通过；新增仓库双主题/双倍字号、移除确认/取消和存储Tab/Enter/Space、清理后账户安装与revision保持的用例后，扩展/仓库55项通过。两轮去重合计72项不同用例。严格分析先发现一项if缺大括号，已直接修正；最终复查、完整CI及正式Web的双主题画面、状态转换和独立API核对仍待，不把组件成功当作页面验收。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。

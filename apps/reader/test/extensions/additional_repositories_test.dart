@@ -13,6 +13,7 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/runtime/catalog_transport.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -557,47 +558,91 @@ void main() {
     expect(posts(), isEmpty);
   });
 
-  testWidgets(
-    'repository dialog previews before an explicit second confirmation writes the account',
-    (tester) async {
-      await tester.pumpApp(
-        CupertinoApp(
-          home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
-        ),
+  for (final appearance in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'repository dialog confirms account changes explicitly at $appearance / $scale',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ExtensionsPage(
+                catalog: catalog,
+                repository: catalog.settings!,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('extensions-more')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('仓库管理'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('repositories-add')));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('repository-url')),
+            'https://community.example',
+          );
+          await tester.enterText(
+            find.byKey(const ValueKey('repository-name')),
+            '社区',
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('repository-preview-submit')),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('确认添加仓库'), findsOneWidget);
+          expect(posts(), isEmpty);
+          expect(platform.preparations, isEmpty);
+          await tester.tap(
+            find.byKey(const ValueKey('repository-add-confirm')),
+          );
+          await tester.pumpAndSettle();
+          expect(posts(), hasLength(1));
+          expect(
+            catalog.repositories.any(
+              (repository) => repository.catalogUrl == extraUrl,
+            ),
+            true,
+          );
+          final remove = find.byKey(ValueKey(('repository-remove', extraUrl)));
+          await tester.ensureVisible(remove);
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          final confirm = find.byKey(
+            const ValueKey('repository-remove-confirm'),
+          );
+          expect(
+            tester.widget<CupertinoDialogAction>(confirm).isDestructiveAction,
+            true,
+          );
+          await tester.tap(find.text('取消'));
+          await tester.pumpAndSettle();
+          expect(posts(), hasLength(1));
+          expect(
+            catalog.repositories.any((item) => item.catalogUrl == extraUrl),
+            true,
+          );
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          await tester.tap(confirm);
+          await tester.pumpAndSettle();
+          expect(posts(), hasLength(2));
+          expect(
+            catalog.repositories.any((item) => item.catalogUrl == extraUrl),
+            false,
+          );
+          expect(catalog.installedExtensions.single, testInstalledExtension());
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox());
+        },
       );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('extensions-more')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('仓库管理'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('repositories-add')));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('repository-url')),
-        'https://community.example',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('repository-name')),
-        '社区',
-      );
-      await tester.tap(find.byKey(const ValueKey('repository-preview-submit')));
-      await tester.pumpAndSettle();
-      expect(find.text('确认添加仓库'), findsOneWidget);
-      expect(posts(), isEmpty);
-      expect(platform.preparations, isEmpty);
-      await tester.tap(find.byKey(const ValueKey('repository-add-confirm')));
-      await tester.pumpAndSettle();
-      expect(posts(), hasLength(1));
-      expect(
-        catalog.repositories.any(
-          (repository) => repository.catalogUrl == extraUrl,
-        ),
-        true,
-      );
-      expect(tester.takeException(), isNull);
-      await tester.pumpApp(const SizedBox());
-    },
-  );
+    }
+  }
 
   testWidgets(
     'installed source-name search keeps same-package repository identities separate',
