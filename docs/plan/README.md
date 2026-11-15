@@ -69,6 +69,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 **当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场。最新`75c618a`完整push/PR CI通过，含831项Dart、531项Vitest及Web/Wasm；正式Web补齐双主题筛选次级说明、完整菜单/草稿及360↔390尺寸往返，取消重开恢复默认，独立API确认零附写。正常退出误报也已正式双主题复验；Komiic查询失败和镜像后容器中断保留，未记兼容通过。按[逐状态流程图](../verification/mihon-state-coverage.md)继续全部页面、转换和变体，空偏好正式Web及生产验收仍待。
 
+当前继续分类与批量清单的自然Cupertino分组：名称导航、独立更多菜单、系统危险红确认及可换行的逐项业务结果已实现，52项书架/分类/批量/续读组件回归与四文件严格分析通过；本批完整检查、CI及正式双主题Web另验。新增目标状态均先记待，不把组件结果填为浏览器主图。
+
 参考采集按[状态机与双主题截图清单](../verification/mihon-state-coverage.md)推进；加载、空态、失败、选择、编辑与弹层逐状态记录，只有单主题或只有根页截图均不算完成。
 
 **当前 UI 交付**：[统一 Cupertino 已恢复并生产上线](cupertino-ui.md#恢复-cupertino)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源和 Access 门禁通过；内置浏览器重新确认导航、真实图片、设置保存和独立新文档续读，独立 D1 核对状态一致，见[恢复验证](../verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。Web / iOS / Android 保持一套 Cupertino 共享实现，沿用 generator、Hooks 与现有权威读写/生命周期。[Liquid Glass](liquid-glass.md)已终止，玻璃库、专用材质设置及资源已移除；[评估](../design/liquid-glass-evaluation.md)与[执行证据](../verification/liquid-glass.md)保留历史及未完成性能门，不宣称能耗结论。[代码削减](ui-code-consolidation.md)仍独立规划，原生现场验证继续停止。

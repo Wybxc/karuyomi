@@ -874,6 +874,105 @@ stateDiagram-v2
 
 各业务页需要分别覆盖：书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。共享状态机仅归纳语义，表中目标画面仍分别待验，不能用一张设置错误截图代替全部业务上下文。
 
+### 04–06：Karuyomi 分类与批量确认的目标状态
+
+固定Mihon的参考主图见05.01–05.10、06.01–06.04和04.01–04.04。最终界面采用官方Cupertino分组、名称导航、更多菜单及危险红，不把原生Material四动作排列或对话框尺寸作为最终样式。以下状态来自正式分类草稿与批量控制器的实际分支；52项组件回归不代替正式Web主图，所有新增主图先记待。
+
+```mermaid
+stateDiagram-v2
+    [*] --> EmptyCategories
+    state "05.K1 无分类" as EmptyCategories
+    state "05.K2 分类列表" as Categories
+    state "05.K3 分类更多菜单" as CategoryMenu
+    state "05.K4 空名称输入" as EmptyCategoryName
+    state "05.K5 名称草稿" as CategoryName
+    state "05.K6 名称校验失败" as InvalidCategoryName
+    state "05.K7 删除分类确认" as DeleteCategory
+    state "05.K8 正在确认分类修改" as SavingCategory
+    state "05.K9 原修改未确认或读回失败" as UncertainCategory
+    state "05.K10 修改被拒绝需重读" as RejectedCategory
+    state "05.K11 身份或服务变化" as ExpiredCategory
+    state "06.K1 无可选分类" as NoCategoryChoices
+    state "06.K2 分类当前选择" as CategoryChoices
+    state "06.K3 分类选择草稿" as CategoryChoiceDraft
+    EmptyCategories --> EmptyCategoryName: 新建
+    Categories --> EmptyCategoryName: 新建
+    EmptyCategoryName --> CategoryName: 输入名称
+    CategoryName --> InvalidCategoryName: 提交无效名称
+    InvalidCategoryName --> CategoryName: 修正
+    Categories --> CategoryName: 点按名称重命名
+    Categories --> CategoryMenu: 更多
+    CategoryMenu --> Categories: Escape或取消
+    CategoryMenu --> SavingCategory: 上移或下移
+    CategoryMenu --> DeleteCategory: 删除
+    DeleteCategory --> Categories: 取消
+    CategoryName --> Categories: 取消且不发送
+    CategoryName --> SavingCategory: 保存
+    DeleteCategory --> SavingCategory: 明确确认
+    CategoryChoices --> CategoryChoiceDraft: 勾选或清空
+    CategoryChoiceDraft --> SavingCategory: 保存
+    CategoryChoiceDraft --> CategoryChoices: 取消并重新打开
+    SavingCategory --> Categories: 管理修改获确认
+    SavingCategory --> [*]: 单作品选择获确认
+    SavingCategory --> UncertainCategory: 结果未知或确认后读回失败
+    SavingCategory --> RejectedCategory: CAS或明确拒绝
+    UncertainCategory --> SavingCategory: 仅重试原请求或读回
+    RejectedCategory --> Categories: 重新读取并关闭后重开
+    CategoryName --> ExpiredCategory: 身份或服务变化
+    SavingCategory --> ExpiredCategory: 身份或服务变化
+    ExpiredCategory --> [*]: 关闭旧窗口
+    state "04.K1 批量移出确认清单" as RemoveReview
+    state "04.K2 批量分类选择清单" as BatchCategoryReview
+    state "04.K3 批量操作进行中" as SendingBatch
+    state "04.K4 部分提交与未确认项" as UncertainBatch
+    state "04.K5 已暂停的剩余清单" as PausedBatch
+    state "04.K6 原批次被拒绝" as RejectedBatch
+    state "04.K7 批次全部确认" as ConfirmedBatch
+    state "04.K8 批次身份失效" as ExpiredBatch
+    RemoveReview --> SendingBatch: 明确确认
+    BatchCategoryReview --> SendingBatch: 选择分类后明确确认
+    RemoveReview --> [*]: 取消且零写入
+    BatchCategoryReview --> [*]: 取消且零写入
+    SendingBatch --> UncertainBatch: 某项结果未知
+    SendingBatch --> PausedBatch: 请求暂停并等待当前项
+    SendingBatch --> RejectedBatch: 某项CAS或明确拒绝
+    SendingBatch --> ConfirmedBatch: 所有项获确认
+    UncertainBatch --> PausedBatch: 重试原项获确认且还有剩余
+    UncertainBatch --> ConfirmedBatch: 重试最后原项获确认
+    PausedBatch --> SendingBatch: 明确继续原剩余清单
+    PausedBatch --> [*]: 明确结束未发送部分
+    RejectedBatch --> [*]: 重新读取并结束原批次
+    SendingBatch --> ExpiredBatch: 身份或服务变化
+    UncertainBatch --> ExpiredBatch: 身份或服务变化
+    ExpiredBatch --> [*]: 关闭，不发送剩余
+    ConfirmedBatch --> [*]: 完成返回书架
+```
+
+| 状态 ID | 最小必要信息                                                        | 浅色正式Web | 深色正式Web |
+| ------- | ------------------------------------------------------------------- | ----------- | ----------- |
+| 05.K1   | 无分类说明、新建、完成                                              | 待          | 待          |
+| 05.K2   | 按确认顺序的名称、重命名和独立更多入口、新建、完成                  | 待          | 待          |
+| 05.K3   | 分类上下文、上/下移边界禁用、危险删除、焦点与取消                   | 待          | 待          |
+| 05.K4   | 空名称、字段标识、约束、取消与保存                                  | 待          | 待          |
+| 05.K5   | 原名称或新名称草稿、保存、取消及键盘上方操作                        | 待          | 待          |
+| 05.K6   | 保留输入、可读校验错误、修正入口、不发送                            | 待          | 待          |
+| 05.K7   | 精确分类名、删除关联影响、保留收藏/进度、系统红确认与取消           | 待          | 待          |
+| 05.K8   | 原修改、等待确认、冻结动作、禁止忙碌关闭；排序与输入各验            | 待          | 待          |
+| 05.K9   | 原请求保留、未确认与已确认后读回失败分别说明、对应精确重试/稍后处理 | 待          | 待          |
+| 05.K10  | 拒绝/冲突说明、冻结原草稿、重新读取并关闭、不能自动重基             | 待          | 待          |
+| 05.K11  | 失效说明、旧动作禁用、明确关闭与重开                                | 待          | 待          |
+| 06.K1   | 作品名、无分类原因、管理分类指引、关闭                              | 待          | 待          |
+| 06.K2   | 精确作品、完整分类名与确认选择、保存与取消                          | 待          | 待          |
+| 06.K3   | 未提交选择、未分类含义、保存/取消、原服务端值保留                   | 待          | 待          |
+| 04.K1   | 完整漫画清单、数量、保留进度/书签/分类的影响、危险确认及取消        | 待          | 待          |
+| 04.K2   | 添加/移出范围、待选分类、逐项原→目标关联、数量、确认/取消           | 待          | 待          |
+| 04.K3   | 确认数/未开始数、逐项状态、当前等待、暂停及忙碌关闭禁用             | 待          | 待          |
+| 04.K4   | 已确认/未开始/未确认项、系统红错误、仅重试原项、稍后处理            | 待          | 待          |
+| 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | 待          | 待          |
+| 04.K6   | 逐项拒绝原因、原清单、重新读取并结束、不得直接重试新revision        | 待          | 待          |
+| 04.K7   | 全部确认文字、逐项确认状态、完成及返回实际书架                      | 待          | 待          |
+| 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | 待          | 待          |
+
 ### 26：Karuyomi 最终 Cupertino 设置导航
 
 以下沿用26组参考结构，同时保留Karuyomi的服务端确认语义；这是最终目标画面清单，不能用第一阶段旧配色截图填入。代码/组件验证与正式Web实拍分别记录。蓝色仅代表`729cbe3`的双主题主图已核对，全部变体与转换仍待。

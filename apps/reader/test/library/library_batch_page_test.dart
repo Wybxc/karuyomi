@@ -5,12 +5,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -82,9 +84,19 @@ void main() {
     );
   }
 
-  Future<void> show(WidgetTester tester) async {
+  Future<void> show(
+    WidgetTester tester, {
+    Brightness brightness = Brightness.light,
+    double textScale = 1,
+  }) async {
     await tester.pumpApp(
       CupertinoApp(
+        theme: readerAppTheme(brightness),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: CupertinoPageScaffold(
           child: LibraryPage(
             controller: controller,
@@ -142,6 +154,80 @@ void main() {
 
   Finder batchEntry(String key) => find.byKey(ValueKey(('batch-item', key)));
   Finder category(String id) => find.byKey(ValueKey(('batch-category', id)));
+
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'batch review preserves readable outcomes in $brightness at $textScale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final alpha = await favorite(tester, '等待确认的漫画');
+          await show(tester, brightness: brightness, textScale: textScale);
+          server.requests.clear();
+          await selectAll(tester);
+          await tap(
+            tester,
+            find.byKey(const ValueKey('library-batch-remove-favorites')),
+          );
+          final review = find.byKey(const ValueKey('library-batch-review'));
+          expect(
+            find.descendant(
+              of: review,
+              matching: find.byType(CupertinoFormSection),
+            ),
+            findsOneWidget,
+          );
+          final confirm = find.widgetWithText(CupertinoButton, '确认并开始');
+          expect(
+            tester.widget<CupertinoButton>(confirm).color,
+            AppColors.error.resolveFrom(tester.element(confirm)),
+          );
+          expect(mutations(), isEmpty);
+          platform.afterBusinessReply = (request, reply) {
+            if (request.method != 'POST' ||
+                request.uri.path != '/api/state/mutations') {
+              return reply;
+            }
+            platform.afterBusinessReply = null;
+            return const ApiReply(
+              status: 503,
+              headers: {'content-type': 'text/plain'},
+              body: 'Mutation acknowledgement unavailable',
+              redirected: false,
+            );
+          };
+          await tap(tester, confirm);
+          final outcome = find.descendant(
+            of: batchEntry(alpha.mangaKey),
+            matching: find.text('尚未确认，需重试原操作'),
+          );
+          await tester.ensureVisible(outcome);
+          await tester.pumpAndSettle();
+          expect(outcome, findsOneWidget);
+          final paragraph = tester.renderObject<RenderParagraph>(outcome);
+          expect(
+            paragraph.maxLines,
+            isNull,
+            reason: 'the per-item status must not be truncated by ListTile subtitle defaults',
+          );
+          expect(
+            paragraph.text.style!.color,
+            AppColors.error.resolveFrom(tester.element(outcome)),
+          );
+          expect(mutations(), hasLength(1));
+          expect(find.text('全部修改已由服务端确认。'), findsNothing);
+          expect(find.text('重试原未确认操作').hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tap(tester, find.text('稍后处理'));
+          expect(mutations(), hasLength(1));
+          await hide(tester);
+        },
+      );
+    }
+  }
 
   testWidgets(
     'visible selection preserves hidden choices and confirms the complete removal list',

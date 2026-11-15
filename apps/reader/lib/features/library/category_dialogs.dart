@@ -123,6 +123,7 @@ final class _CategoryDraft extends ChangeNotifier {
     Set<String> selection = const {},
     this.submitLabel = '保存',
     this.reorder = false,
+    this.destructive = false,
   }) : selection = Set.unmodifiable(selection);
 
   final LibraryRepository repository;
@@ -133,6 +134,7 @@ final class _CategoryDraft extends ChangeNotifier {
   final List<LibraryCategory>? categories;
   final String submitLabel;
   final bool reorder;
+  final bool destructive;
   final _Submit submit;
   String? name;
   Set<String> selection;
@@ -408,6 +410,7 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
               ? '删除“${category!.name}”及其漫画关联？漫画收藏和阅读进度会保留。'
               : null,
           submitLabel: delete ? '删除' : '保存',
+          destructive: delete,
           submit: (name, _) => delete
               ? widget.repository.deleteCategory(
                   categoryId: id,
@@ -438,38 +441,60 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
       child: EditSheet(
         key: const ValueKey('category-manager'),
         title: const Text('管理分类'),
-        content: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              status(_draft),
-              if (_view.categories.isEmpty) const Text('还没有分类。'),
-              for (var index = 0; index < _view.categories.length; index++)
-                _categoryRow(_view.categories[index], index),
-              const SizedBox(height: 12),
-              CupertinoButton(
-                onPressed: editable && _view.categories.length < 64
-                    ? _command
-                    : null,
-                child: const Text('新建分类'),
+        content: ListView(
+          children: [
+            if (expired || _draft != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: status(_draft),
               ),
-              if (_view.categories.length == 64) const Text('最多可创建 64 个分类。'),
-              if (_draft case final draft? when !expired) ...[
-                if (draft.blocked && !draft.completed)
-                  CupertinoButton.filled(
-                    onPressed: draft.busy ? null : _reload,
-                    child: const Text('重新读取并关闭'),
-                  )
-                else if (draft.attempted && !draft.completed)
-                  CupertinoButton.filled(
-                    onPressed: draft.busy ? null : () => _execute(draft),
-                    child: Text(draft.reorder ? draft.retryLabel : '继续未确认修改'),
+            CupertinoFormSection.insetGrouped(
+              header: const Text('分类'),
+              footer: Text(
+                _view.categories.isEmpty
+                    ? '还没有分类。'
+                    : _view.categories.length == 64
+                    ? '最多可创建 64 个分类。点按名称重命名，更多菜单可调整顺序或删除。'
+                    : '点按名称重命名，更多菜单可调整顺序或删除。',
+              ),
+              children: [
+                for (var index = 0; index < _view.categories.length; index++)
+                  _categoryRow(_view.categories[index], index),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: editable && _view.categories.length < 64
+                      ? _command
+                      : null,
+                  child: CupertinoListTile(
+                    leading: const Icon(CupertinoIcons.add),
+                    title: Text(
+                      '新建分类',
+                      style: CupertinoTheme.of(context)
+                          .textTheme
+                          .actionTextStyle,
+                    ),
                   ),
+                ),
               ],
-            ],
-          ),
+            ),
+            if (_draft case final draft? when !expired)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: draft.blocked && !draft.completed
+                    ? CupertinoButton.filled(
+                        onPressed: draft.busy ? null : _reload,
+                        child: const Text('重新读取并关闭'),
+                      )
+                    : draft.attempted && !draft.completed
+                    ? CupertinoButton.filled(
+                        onPressed: draft.busy ? null : () => _execute(draft),
+                        child: Text(
+                          draft.reorder ? draft.retryLabel : '继续未确认修改',
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+          ],
         ),
         actions: [
           CupertinoButton(
@@ -487,50 +512,61 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
     );
   }
 
-  Widget _categoryRow(LibraryCategory category, int index) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _categoryRow(LibraryCategory category, int index) => Semantics(
+    key: ValueKey(('category-row', category.id)),
+    container: true,
+    explicitChildNodes: true,
+    child: Row(
       children: [
-        Text(
-          category.name,
-          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-        ),
-        Wrap(
-          children: [
-            for (final (icon, label, action)
-                in <(IconData, String, VoidCallback?)>[
-                  (
-                    CupertinoIcons.arrow_up,
-                    '上移分类',
-                    editable && index > 0 ? () => _move(index, -1) : null,
-                  ),
-                  (
-                    CupertinoIcons.arrow_down,
-                    '下移分类',
-                    editable && index + 1 < _view.categories.length
-                        ? () => _move(index, 1)
-                        : null,
-                  ),
-                  (
-                    CupertinoIcons.pencil,
-                    '重命名分类',
-                    editable ? () => _command(category: category) : null,
-                  ),
-                  (
-                    CupertinoIcons.trash,
-                    '删除分类',
-                    editable
-                        ? () => _command(category: category, delete: true)
-                        : null,
-                  ),
-                ])
-              CupertinoButton(
-                onPressed: action,
-                padding: const EdgeInsets.all(8),
-                child: Icon(icon, semanticLabel: '$label ${category.name}'),
+        Expanded(
+          child: CupertinoButton(
+            key: ValueKey(('category-rename', category.id)),
+            padding: EdgeInsets.zero,
+            onPressed: editable ? () => _command(category: category) : null,
+            child: CupertinoListTile(
+              title: DefaultTextStyle(
+                style: CupertinoTheme.of(context).textTheme.textStyle,
+                child: Text(category.name),
               ),
+              trailing: const CupertinoListTileChevron(),
+            ),
+          ),
+        ),
+        CupertinoMenuAnchor(
+          menuChildren: [
+            CupertinoMenuItem(
+              autofocus: index > 0,
+              leading: const Icon(CupertinoIcons.arrow_up),
+              onPressed: editable && index > 0 ? () => _move(index, -1) : null,
+              child: const Text('上移分类'),
+            ),
+            CupertinoMenuItem(
+              autofocus: index == 0 && _view.categories.length > 1,
+              leading: const Icon(CupertinoIcons.arrow_down),
+              onPressed: editable && index + 1 < _view.categories.length
+                  ? () => _move(index, 1)
+                  : null,
+              child: const Text('下移分类'),
+            ),
+            CupertinoMenuItem(
+              autofocus: _view.categories.length == 1,
+              isDestructiveAction: true,
+              leading: const Icon(CupertinoIcons.trash),
+              onPressed: editable
+                  ? () => _command(category: category, delete: true)
+                  : null,
+              child: const Text('删除分类'),
+            ),
           ],
+          builder: (context, menu, _) => CupertinoButton(
+            onPressed: editable
+                ? () => menu.isOpen ? menu.close() : menu.open()
+                : null,
+            child: Icon(
+              CupertinoIcons.ellipsis,
+              semanticLabel: '分类选项 ${category.name}',
+            ),
+          ),
         ),
       ],
     ),
@@ -589,60 +625,77 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
       child: EditSheet(
         key: const ValueKey('category-command'),
         title: Text(draft.title),
-        content: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (draft.description case final description?)
-                  Text(description),
-                if (draft.name != null)
-                  CupertinoTextFormFieldRow(
-                    controller: _name,
-                    enabled: editable,
-                    autofocus: true,
-                    validator: (text) {
-                      try {
-                        validateBusinessCategoryName((text ?? '').trim());
-                        return null;
-                      } on FormatException {
-                        return '名称不能为空，且最多 100 字、256 字节。';
-                      }
-                    },
-                    prefix: Text('分类名称'),
+        content: Form(
+          key: _form,
+          child: ListView(
+            children: [
+              if (draft.description case final description?)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(description),
+                ),
+              if (draft.name != null)
+                CupertinoFormSection.insetGrouped(
+                  header: const Text('分类名称'),
+                  footer: const Text('名称最多 100 字、256 字节。保存后等待服务端确认。'),
+                  children: [
+                    CupertinoTextFormFieldRow(
+                      autofillHints: null,
+                      controller: _name,
+                      placeholder: '分类名称',
+                      enabled: editable,
+                      autofocus: true,
+                      validator: (text) {
+                        try {
+                          validateBusinessCategoryName((text ?? '').trim());
+                          return null;
+                        } on FormatException {
+                          return '名称不能为空，且最多 100 字、256 字节。';
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              if (draft.categories case final categories?) ...[
+                if (categories.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text('还没有分类，请先在书架中管理分类。'),
                   ),
-                if (draft.categories case final categories?) ...[
-                  if (categories.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Text('还没有分类，请先在书架中管理分类。'),
-                    ),
-                  for (final category in categories)
-                    MergeSemantics(
-                      child: CupertinoFormRow(
-                        prefix: Expanded(flex: 3, child: Text(category.name)),
-                        padding: EdgeInsets.zero,
-                        child: CupertinoCheckbox(
-                          value: _selection.contains(category.id),
-                          onChanged: editable
-                              ? (selected) => setState(() {
-                                  if (selected == true) {
-                                    _selection.add(category.id);
-                                  } else {
-                                    _selection.remove(category.id);
-                                  }
-                                })
-                              : null,
+                if (categories.isNotEmpty)
+                  CupertinoFormSection.insetGrouped(
+                    header: const Text('分类'),
+                    footer: const Text('不选择任何分类则为未分类。保存后等待服务端确认。'),
+                    children: [
+                      for (final category in categories)
+                        MergeSemantics(
+                          child: CupertinoFormRow(
+                            prefix: Expanded(
+                              flex: 3,
+                              child: Text(category.name),
+                            ),
+                            child: CupertinoCheckbox(
+                              value: _selection.contains(category.id),
+                              onChanged: editable
+                                  ? (selected) => setState(() {
+                                      if (selected == true) {
+                                        _selection.add(category.id);
+                                      } else {
+                                        _selection.remove(category.id);
+                                      }
+                                    })
+                                  : null,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                ],
-                status(draft),
+                    ],
+                  ),
               ],
-            ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: status(draft),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -665,6 +718,9 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
             )
           else
             CupertinoButton.filled(
+              color: draft.destructive
+                  ? AppColors.error.resolveFrom(context)
+                  : null,
               onPressed: expired || draft.busy || draft.completed
                   ? null
                   : _save,

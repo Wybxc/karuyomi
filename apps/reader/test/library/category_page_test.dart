@@ -8,12 +8,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -55,10 +57,21 @@ void main() {
     await platform.dispose();
   });
 
-  Future<void> show(WidgetTester tester, {CatalogController? service}) async {
+  Future<void> show(
+    WidgetTester tester, {
+    CatalogController? service,
+    Brightness brightness = Brightness.light,
+    double textScale = 1,
+  }) async {
     final current = service ?? controller;
     await tester.pumpApp(
       CupertinoApp(
+        theme: readerAppTheme(brightness),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: CupertinoPageScaffold(
           child: LibraryPage(
             controller: current,
@@ -88,6 +101,20 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     });
     await tester.pumpAndSettle();
+  }
+
+  Finder categoryTitle(String name) => find.descendant(
+    of: find.byKey(const ValueKey('category-manager')),
+    matching: find.text(name),
+  );
+
+  Future<void> categoryAction(
+    WidgetTester tester,
+    String name,
+    String action,
+  ) async {
+    await tap(tester, iconLabel('分类选项 $name'));
+    await tap(tester, find.widgetWithText(CupertinoMenuItem, action));
   }
 
   final categoryFilter = find.byKey(const ValueKey('library-category-filter'));
@@ -144,6 +171,79 @@ void main() {
     (request) => request.method == 'POST' && request.uri.path == path,
   );
 
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'category groups, menu and destructive confirmation adapt to $brightness at $textScale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final name = '长' * 70 + '想读';
+          await create(tester, name: name);
+          await create(tester, id: _second, name: '科幻');
+          await show(tester, brightness: brightness, textScale: textScale);
+          await tap(tester, find.text('管理分类'));
+          final manager = find.byKey(const ValueKey('category-manager'));
+          expect(
+            find.descendant(
+              of: manager,
+              matching: find.byType(CupertinoFormSection),
+            ),
+            findsOneWidget,
+          );
+          final rename = find.byKey(
+            const ValueKey(('category-rename', _first)),
+          );
+          final options = iconLabel('分类选项 $name');
+          expect(rename, findsOneWidget);
+          expect(options, findsOneWidget);
+          expect(iconLabel('上移分类 $name'), findsNothing);
+          expect(tester.takeException(), isNull);
+          server.requests.clear();
+          await tap(tester, options);
+          final up = find.widgetWithText(CupertinoMenuItem, '上移分类');
+          final down = find.widgetWithText(CupertinoMenuItem, '下移分类');
+          final remove = find.widgetWithText(CupertinoMenuItem, '删除分类');
+          expect(tester.widget<CupertinoMenuItem>(up).onPressed, isNull);
+          expect(tester.widget<CupertinoMenuItem>(down).onPressed, isNotNull);
+          expect(
+            tester.widget<CupertinoMenuItem>(remove).isDestructiveAction,
+            isTrue,
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pumpAndSettle();
+          expect(remove, findsNothing);
+          expect(posts('/api/categories/mutations'), isEmpty);
+          await tap(tester, options);
+          await tap(tester, remove);
+          final delete = find.widgetWithText(CupertinoButton, '删除');
+          expect(
+            tester.widget<CupertinoButton>(delete).color,
+            AppColors.error.resolveFrom(tester.element(delete)),
+          );
+          await tap(tester, find.text('取消'));
+          await tap(tester, rename);
+          final field = find.byType(CupertinoTextField).last;
+          await tester.enterText(field, '新的分类草稿');
+          tester.view.physicalSize = const Size(390, 844);
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<CupertinoTextField>(field).controller!.text,
+            '新的分类草稿',
+          );
+          expect(find.text('保存').hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tap(tester, find.text('取消'));
+          expect(posts('/api/categories/mutations'), isEmpty);
+          expect(server.catalog().categories.first.name, name);
+          await hide(tester);
+        },
+      );
+    }
+  }
+
   testWidgets(
     'an empty shelf can create, rename, reorder and delete server categories',
     (tester) async {
@@ -160,20 +260,20 @@ void main() {
         '想读',
         '科幻',
       ]);
-      await tap(tester, iconLabel('上移分类 科幻'));
+      await categoryAction(tester, '科幻', '上移分类');
       expect(server.catalog().categories.map((value) => value.name), [
         '科幻',
         '想读',
       ]);
-      await tap(tester, iconLabel('下移分类 科幻'));
+      await categoryAction(tester, '科幻', '下移分类');
       expect(server.catalog().categories.map((value) => value.name), [
         '想读',
         '科幻',
       ]);
-      await tap(tester, iconLabel('重命名分类 想读'));
+      await tap(tester, categoryTitle('想读'));
       await nameAndSave(tester, '待读');
       expect(server.catalog().categories.first.name, '待读');
-      await tap(tester, iconLabel('删除分类 科幻'));
+      await categoryAction(tester, '科幻', '删除分类');
       await tap(tester, find.text('删除'));
       expect(server.catalog().categories.map((value) => value.name), ['待读']);
       await tap(tester, find.text('完成'));
@@ -228,7 +328,7 @@ void main() {
       await create(tester);
       await show(tester);
       await tap(tester, find.text('管理分类'));
-      await tap(tester, iconLabel('重命名分类 想读'));
+      await tap(tester, categoryTitle('想读'));
       await tester.enterText(find.byType(CupertinoTextField).last, '本端草稿');
       await tester.runAsync(
         () => remote.renameCategory(
@@ -424,10 +524,10 @@ void main() {
       await show(tester);
       expect(tester.takeException(), isNull);
       await tap(tester, find.text('管理分类'));
-      expect(iconLabel('重命名分类 $name'), findsOneWidget);
-      expect(iconLabel('删除分类 $name'), findsOneWidget);
+      expect(categoryTitle(name), findsOneWidget);
+      expect(iconLabel('分类选项 $name'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tap(tester, iconLabel('重命名分类 $name'));
+      await tap(tester, categoryTitle(name));
       tester.view.viewInsets = const FakeViewPadding(bottom: 320);
       addTearDown(tester.view.resetViewInsets);
       await tester.pumpAndSettle();
@@ -716,7 +816,7 @@ void main() {
       );
       await acknowledge();
       expect(find.byType(EditSheet), findsOneWidget);
-      expect(iconLabel('重命名分类 迟到确认'), findsOneWidget);
+      expect(categoryTitle('迟到确认'), findsOneWidget);
       expect(
         tester
             .widget<CupertinoButton>(
@@ -839,7 +939,7 @@ void main() {
       await filter(tester, '想读');
       expect(find.text('Beta'), findsNothing);
       await tap(tester, find.text('管理分类'));
-      await tap(tester, iconLabel('删除分类 想读'));
+      await categoryAction(tester, '想读', '删除分类');
       await tap(tester, find.text('删除'));
       await tap(tester, find.text('完成'));
       expect(hasCategory(tester, '想读'), false);
