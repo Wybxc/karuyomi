@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-2026-11-16，迁移向导已采用官方Cupertino分组、次级说明和系统错误色，区分实际读取、未确认原请求与已确认结果；相关65项不同定向回归、最终格式的三文件严格分析和完整格式校验通过。迁移的正式Web全部双主题主图仍待，详见[实现与证据](../verification/mihon-cupertino-fidelity.md#迁移向导的-cupertino-状态呈现)。
+2026-11-16，迁移向导的官方Cupertino分组与确认状态已通过完整CI；`8c398d3`正式Web补齐双主题正常流程，九路API核对两次明确迁移及取消零写入。实拍发现候选窄行、同名源缺语言和预览语义合并，修复后的19项回归通过，新正式Web仍待；加载、故障及全部变体继续按状态图推进，详见[实现与证据](../verification/mihon-cupertino-fidelity.md#迁移正常流程的正式-web-分项)。
 
 **当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场。`c5f6759`完整push/PR CI通过（864项Dart、531项Vitest、Web/Wasm），正式Web双主题已核对短/长选择菜单的当前项DOM语义，以及封面草稿、保存、替换、取消清除、清除与新文档读回。独立API确认六次封面提交各写一次、草稿/取消零附写；19.K3/K4/K6/K7正常主图与K5非法输入变体已有。按[逐状态流程图](../verification/mihon-state-coverage.md)保留加载/等待、故障、禁用项、资料、迁移、全部变体与生产待办，不以正常流程替代。详细检查、缺帧与运行环境见[验证记录](../verification/mihon-cupertino-fidelity.md#封面与选择语义的正式-web-分项)，Komiic失败未记兼容通过。
 

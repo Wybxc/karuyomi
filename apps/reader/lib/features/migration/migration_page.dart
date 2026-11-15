@@ -56,8 +56,8 @@ class _MigrationPageState extends State<MigrationPage> {
       builder: (context) => CupertinoAlertDialog(
         title: const Text('确认迁移到目标作品'),
         content: Text(
-          '原作品“${widget.seed.metadata.manga.title}”（${widget.seed.metadata.sourceName}）保留。\n'
-          '将目标“${target.manga.title}”（${target.sourceName}）加入书架。\n'
+          '原作品“${widget.seed.metadata.manga.title}”（${widget.seed.metadata.sourceName} · ${widget.seed.metadata.sourceLang}）保留。\n'
+          '将目标“${target.manga.title}”（${target.sourceName} · ${target.sourceLang}）加入书架。\n'
           '分类：${controller.copyCategories ? '合并原作品分类' : '不复制'}。$copyScope\n'
           '目标已有状态、封面和阅读位置保留；原页面位置不复制。',
         ),
@@ -196,191 +196,197 @@ class _MigrationPageState extends State<MigrationPage> {
     final start = page * 50;
     final end = (start + 50).clamp(0, mappings.length);
     final selected = controller.selectedChapters.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        CupertinoFormSection.insetGrouped(
-          header: const Text('迁移预览'),
-          footer: const Text('目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。'),
-          children: [
-            CupertinoFormRow(
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  '原作品：${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName}',
-                ),
-              ),
-            ),
-            CupertinoFormRow(
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  '目标：${controller.targetMetadata!.manga.title} · ${controller.targetMetadata!.sourceName}',
-                  key: const ValueKey('migration-target-preview'),
-                ),
-              ),
-            ),
-          ],
-        ),
-        CupertinoFormSection.insetGrouped(
-          header: const Text('复制内容'),
-          footer: Text(
-            controller.sourceSequence == null
-                ? '原章节未读取：仅迁移收藏和所选分类；章节未映射，已读、书签与页面位置均不复制。'
-                : '请逐项检查建议。重复、模糊或没有依据的章节不会自动映射；原页面锚点不跨漫画源复制。',
-          ),
-          children: [
-            MergeSemantics(
-              child: CupertinoFormRow(
-                prefix: Expanded(flex: 3, child: const Text('合并原作品分类')),
-                helper: Text(
-                  preview.source.categoryIds.isEmpty
-                      ? '原作品没有分类'
-                      : preview.categories.categories
-                            .where(
-                              (category) => preview.source.categoryIds.contains(
-                                category.id,
-                              ),
-                            )
-                            .map((category) => category.name)
-                            .join('、'),
-                  style: TextStyle(
-                    color: AppColors.secondaryLabel.resolveFrom(context),
-                    fontSize: 13,
-                  ),
-                ),
-                child: CupertinoSwitch(
-                  value: controller.copyCategories,
-                  onChanged: controller.canChange
-                      ? (value) => controller.setCopyOptions(categories: value)
-                      : null,
-                ),
-              ),
-            ),
-            if (controller.sourceSequence != null) ...[
-              MergeSemantics(
-                child: CupertinoFormRow(
-                  prefix: Expanded(flex: 3, child: const Text('补充缺失的目标已读状态')),
-                  child: CupertinoSwitch(
-                    value: controller.copyRead,
-                    onChanged: controller.canChange
-                        ? (value) => controller.setCopyOptions(read: value)
-                        : null,
-                  ),
-                ),
-              ),
-              MergeSemantics(
-                child: CupertinoFormRow(
-                  prefix: Expanded(flex: 3, child: const Text('补充缺失的目标书签')),
-                  child: CupertinoSwitch(
-                    value: controller.copyBookmarks,
-                    onChanged: controller.canChange
-                        ? (value) => controller.setCopyOptions(bookmarks: value)
-                        : null,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        if (controller.sourceSequence != null) ...[
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           CupertinoFormSection.insetGrouped(
-            header: const Text('章节映射'),
-            footer: const Text('未选或未映射的原标记不复制；一次确认全部提交，不自动分批。'),
+            header: const Text('迁移预览'),
+            footer: const Text('目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。'),
             children: [
               CupertinoFormRow(
-                error: controller.tooMany
-                    ? Text(
-                        '已超出单次上限，请取消部分选中项后再确认；不会自动分批或部分提交。',
-                        key: const ValueKey('migration-over-limit'),
-                        style: TextStyle(
-                          color: AppColors.error.resolveFrom(context),
-                        ),
-                      )
-                    : null,
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    '已选 $selected / $migrationChapterLimit 条映射；未选或未映射的原标记 ${controller.unmappedStoredMarks} 项不复制。',
-                    key: const ValueKey('migration-selection-count'),
+                    '原作品：${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName} · ${widget.seed.metadata.sourceLang}',
                   ),
                 ),
               ),
-              CupertinoButton(
-                alignment: AlignmentDirectional.centerStart,
-                onPressed: controller.canChange
-                    ? controller.clearSelection
-                    : null,
-                child: const Text('取消全部章节选择'),
-              ),
-              MergeSemantics(
-                child: CupertinoFormRow(
-                  prefix: Expanded(
-                    flex: 3,
-                    child: const Text('只显示原作已读或有书签的章节'),
-                  ),
-                  child: CupertinoSwitch(
-                    key: const ValueKey('migration-only-marked'),
-                    value: _showMarkedOnly,
-                    onChanged: (value) => setState(() {
-                      _showMarkedOnly = value;
-                      _mappingPage = 0;
-                    }),
+              CupertinoFormRow(
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    '目标：${controller.targetMetadata!.manga.title} · ${controller.targetMetadata!.sourceName} · ${controller.targetMetadata!.sourceLang}',
+                    key: const ValueKey('migration-target-preview'),
                   ),
                 ),
               ),
-              if (_showMarkedOnly && mappings.isEmpty)
-                const CupertinoFormRow(child: Text('原作品没有已读或有书签的章节。')),
-              if (mappings.isNotEmpty)
-                CupertinoFormRow(
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      CupertinoButton(
-                        onPressed: page > 0
-                            ? () => setState(() => _mappingPage = page - 1)
-                            : null,
-                        child: const Text('上一页映射'),
-                      ),
-                      Text('${start + 1}–$end / ${mappings.length}'),
-                      CupertinoButton(
-                        onPressed: end < mappings.length
-                            ? () => setState(() => _mappingPage = page + 1)
-                            : null,
-                        child: const Text('下一页映射'),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
-          for (final match in mappings.sublist(start, end)) _mappingRow(match),
-        ],
-        CupertinoFormSection.insetGrouped(
-          footer: const Text('只有在下一步明确确认后，才会向服务端提交迁移。'),
-          children: [
-            CupertinoButton(
-              key: const ValueKey('migration-refresh-preview'),
-              alignment: AlignmentDirectional.centerStart,
-              onPressed:
-                  controller.available &&
-                      !controller.busy &&
-                      !controller.completed
-                  ? () => unawaited(controller.refreshPreview())
-                  : null,
-              child: const Text('重新读取迁移预览（只读）'),
+          CupertinoFormSection.insetGrouped(
+            header: const Text('复制内容'),
+            footer: Text(
+              controller.sourceSequence == null
+                  ? '原章节未读取：仅迁移收藏和所选分类；章节未映射，已读、书签与页面位置均不复制。'
+                  : '请逐项检查建议。重复、模糊或没有依据的章节不会自动映射；原页面锚点不跨漫画源复制。',
             ),
-            CupertinoButton.filled(
-              key: const ValueKey('migration-confirm'),
-              onPressed: controller.canChange && !controller.tooMany
-                  ? () => unawaited(_confirm())
-                  : null,
-              child: const Text('检查并确认迁移'),
+            children: [
+              MergeSemantics(
+                child: CupertinoFormRow(
+                  prefix: Expanded(flex: 3, child: const Text('合并原作品分类')),
+                  helper: Text(
+                    preview.source.categoryIds.isEmpty
+                        ? '原作品没有分类'
+                        : preview.categories.categories
+                              .where(
+                                (category) => preview.source.categoryIds
+                                    .contains(category.id),
+                              )
+                              .map((category) => category.name)
+                              .join('、'),
+                    style: TextStyle(
+                      color: AppColors.secondaryLabel.resolveFrom(context),
+                      fontSize: 13,
+                    ),
+                  ),
+                  child: CupertinoSwitch(
+                    value: controller.copyCategories,
+                    onChanged: controller.canChange
+                        ? (value) =>
+                              controller.setCopyOptions(categories: value)
+                        : null,
+                  ),
+                ),
+              ),
+              if (controller.sourceSequence != null) ...[
+                MergeSemantics(
+                  child: CupertinoFormRow(
+                    prefix: Expanded(flex: 3, child: const Text('补充缺失的目标已读状态')),
+                    child: CupertinoSwitch(
+                      value: controller.copyRead,
+                      onChanged: controller.canChange
+                          ? (value) => controller.setCopyOptions(read: value)
+                          : null,
+                    ),
+                  ),
+                ),
+                MergeSemantics(
+                  child: CupertinoFormRow(
+                    prefix: Expanded(flex: 3, child: const Text('补充缺失的目标书签')),
+                    child: CupertinoSwitch(
+                      value: controller.copyBookmarks,
+                      onChanged: controller.canChange
+                          ? (value) =>
+                                controller.setCopyOptions(bookmarks: value)
+                          : null,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (controller.sourceSequence != null) ...[
+            CupertinoFormSection.insetGrouped(
+              header: const Text('章节映射'),
+              footer: const Text('未选或未映射的原标记不复制；一次确认全部提交，不自动分批。'),
+              children: [
+                CupertinoFormRow(
+                  error: controller.tooMany
+                      ? Text(
+                          '已超出单次上限，请取消部分选中项后再确认；不会自动分批或部分提交。',
+                          key: const ValueKey('migration-over-limit'),
+                          style: TextStyle(
+                            color: AppColors.error.resolveFrom(context),
+                          ),
+                        )
+                      : null,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      '已选 $selected / $migrationChapterLimit 条映射；未选或未映射的原标记 ${controller.unmappedStoredMarks} 项不复制。',
+                      key: const ValueKey('migration-selection-count'),
+                    ),
+                  ),
+                ),
+                CupertinoButton(
+                  alignment: AlignmentDirectional.centerStart,
+                  onPressed: controller.canChange
+                      ? controller.clearSelection
+                      : null,
+                  child: const Text('取消全部章节选择'),
+                ),
+                MergeSemantics(
+                  child: CupertinoFormRow(
+                    prefix: Expanded(
+                      flex: 3,
+                      child: const Text('只显示原作已读或有书签的章节'),
+                    ),
+                    child: CupertinoSwitch(
+                      key: const ValueKey('migration-only-marked'),
+                      value: _showMarkedOnly,
+                      onChanged: (value) => setState(() {
+                        _showMarkedOnly = value;
+                        _mappingPage = 0;
+                      }),
+                    ),
+                  ),
+                ),
+                if (_showMarkedOnly && mappings.isEmpty)
+                  const CupertinoFormRow(child: Text('原作品没有已读或有书签的章节。')),
+                if (mappings.isNotEmpty)
+                  CupertinoFormRow(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        CupertinoButton(
+                          onPressed: page > 0
+                              ? () => setState(() => _mappingPage = page - 1)
+                              : null,
+                          child: const Text('上一页映射'),
+                        ),
+                        Text('${start + 1}–$end / ${mappings.length}'),
+                        CupertinoButton(
+                          onPressed: end < mappings.length
+                              ? () => setState(() => _mappingPage = page + 1)
+                              : null,
+                          child: const Text('下一页映射'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
+            for (final match in mappings.sublist(start, end))
+              _mappingRow(match),
           ],
-        ),
-      ],
+          CupertinoFormSection.insetGrouped(
+            footer: const Text('只有在下一步明确确认后，才会向服务端提交迁移。'),
+            children: [
+              CupertinoButton(
+                key: const ValueKey('migration-refresh-preview'),
+                alignment: AlignmentDirectional.centerStart,
+                onPressed:
+                    controller.available &&
+                        !controller.busy &&
+                        !controller.completed
+                    ? () => unawaited(controller.refreshPreview())
+                    : null,
+                child: const Text('重新读取迁移预览（只读）'),
+              ),
+              CupertinoButton.filled(
+                key: const ValueKey('migration-confirm'),
+                onPressed: controller.canChange && !controller.tooMany
+                    ? () => unawaited(_confirm())
+                    : null,
+                child: const Text('检查并确认迁移'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -465,7 +471,7 @@ class _MigrationPageState extends State<MigrationPage> {
                     child: Align(
                       alignment: AlignmentDirectional.centerStart,
                       child: Text(
-                        '${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName}',
+                        '${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName} · ${widget.seed.metadata.sourceLang}',
                       ),
                     ),
                   ),
@@ -504,7 +510,7 @@ class _MigrationPageState extends State<MigrationPage> {
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Text(
-                          '${target!.manga.title} · ${target.sourceName}',
+                          '${target!.manga.title} · ${target.sourceName} · ${target.sourceLang}',
                         ),
                       ),
                     ),
@@ -561,7 +567,7 @@ class _MigrationPageState extends State<MigrationPage> {
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Text(
-                          '${target!.manga.title} · ${target.sourceName}',
+                          '${target!.manga.title} · ${target.sourceName} · ${target.sourceLang}',
                         ),
                       ),
                     ),
@@ -669,33 +675,36 @@ class _MigrationPageState extends State<MigrationPage> {
                         index < controller.results.length;
                         index++
                       )
-                        CupertinoButton(
-                          key: ValueKey(('migration-result', index)),
-                          alignment: AlignmentDirectional.centerStart,
-                          onPressed: controller.canChange
-                              ? () {
-                                  _mappingPage = 0;
-                                  unawaited(
-                                    controller.chooseManga(
-                                      controller.results[index],
+                        SizedBox(
+                          width: double.infinity,
+                          child: CupertinoButton(
+                            key: ValueKey(('migration-result', index)),
+                            alignment: AlignmentDirectional.centerStart,
+                            onPressed: controller.canChange
+                                ? () {
+                                    _mappingPage = 0;
+                                    unawaited(
+                                      controller.chooseManga(
+                                        controller.results[index],
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(controller.results[index].title),
+                                Text(
+                                  controller.results[index].url,
+                                  style: TextStyle(
+                                    color: AppColors.secondaryLabel.resolveFrom(
+                                      context,
                                     ),
-                                  );
-                                }
-                              : null,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(controller.results[index].title),
-                              Text(
-                                controller.results[index].url,
-                                style: TextStyle(
-                                  color: AppColors.secondaryLabel.resolveFrom(
-                                    context,
+                                    fontSize: 13,
                                   ),
-                                  fontSize: 13,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       if (controller.hasNextPage)
@@ -721,7 +730,7 @@ class _MigrationPageState extends State<MigrationPage> {
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: Text(
-                            '${metadata.manga.title} · ${metadata.sourceName}',
+                            '${metadata.manga.title} · ${metadata.sourceName} · ${metadata.sourceLang}',
                           ),
                         ),
                       ),

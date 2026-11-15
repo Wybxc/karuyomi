@@ -326,9 +326,28 @@ Controller 区分首次输入未就绪与已确认无目标源，并为读取输
 
 新增浅/深×1x/2x、360×800 四项完整组件流程，实际复现并修复首次输入误报无目标源；前两份尝试日志因缺导入/不可用组件而未加载，不算界面复现。最终流程覆盖首次读取阻塞/503/明确重读、精确目标选择、预览次级色、打开确认零写、保存阻塞、丢确认、只读诊断/关闭、同会话重开只读等待、原请求精确重试和确认目标。测试通过真实滚动与点击等待转场，未用直接调用按钮回调替代操作；两次发送只应用一次，原请求正文相同。身份失效入口、原章节不可用、256 条上限、目标已有标记、取消和热门分页等既有回归保留。
 
-迁移 controller、repository、matching、选择与主题合计65项不同定向回归通过；补充重开只读阻塞后19项迁移回归再次通过。完整格式化/校验后，三个改动文件严格分析无问题。固定 Flutter 3.50 / Dart 3.14，低优先级单并发，无 Flutter/AOT 构建。原始失败、滚动/转场诊断和最终结果留在忽略目录 `migration-states-{before-ui,after,after-fixes,pending-diagnostic,settled}.log`、`migration-cupertino-{related,reopen,analyze,final-format,format-check}.log`。这是组件与数据链证据，完整 CI 和正式 Web 双主题主图尚待；[20.K1–K18、21.K1–K6](mihon-state-coverage.md#20–21karuyomi-迁移向导的目标状态)全部截图格仍为待验，不以组件流程代替实际浏览器或生产验收。
+迁移 controller、repository、matching、选择与主题合计65项不同定向回归通过；补充重开只读阻塞后19项迁移回归再次通过。完整格式化/校验后，三个改动文件严格分析无问题。固定 Flutter 3.50 / Dart 3.14，低优先级单并发，无本机 Flutter/AOT 构建。原始失败、滚动/转场诊断和最终结果留在忽略目录 `migration-states-{before-ui,after,after-fixes,pending-diagnostic,settled}.log`、`migration-cupertino-{related,reopen,analyze,final-format,format-check}.log`。这是组件与数据链证据；后续 CI 和正式 Web 分项见下文，不以组件流程替代全部状态、实际浏览器或生产验收。
 
-后续按状态机复核发现：目标详情成功但权威预览失败时，原页面没有独立的只读重读入口。四种主题/文字组合再次实际复现后，新增“迁移预览尚未取得”分组，保留精确目标、未提交说明与只读重读；取得预览前不显示确认按钮。确认框同时列出原作品与目标的实际名称/源、分类复制选择及选中映射范围，不只依赖底层预览说明。19项迁移回归通过，原始失败/修复日志为 `migration-preview-retry-{before,after}.log`；正式Web证据仍待。
+后续按状态机复核发现：目标详情成功但权威预览失败时，原页面没有独立的只读重读入口。四种主题/文字组合再次实际复现后，新增“迁移预览尚未取得”分组，保留精确目标、未提交说明与只读重读；取得预览前不显示确认按钮。确认框同时列出原作品与目标的实际名称/源、分类复制选择及选中映射范围，不只依赖底层预览说明。19项迁移回归通过，原始失败/修复日志为 `migration-preview-retry-{before,after}.log`；预览失败的正式 Web 主图仍待。
+
+### 迁移正常流程的正式 Web 分项
+
+2026-11-16，`d19b69c`与`8c398d3`的完整 push/PR CI 均通过；后者的[push](https://github.com/Wybxc/karuyomi/actions/runs/43741507244)和[PR](https://github.com/Wybxc/karuyomi/actions/runs/43741513427)包含868项 Dart（22+87+759）、531项 Vitest、完整 Web 与 Wasm 构建。日志为 `ci-8c398d3-check.log`。采用该提交的 CI artifact `14173310464`（16,296,945字节），在下载边界核对 GitHub SHA-256 `333fb2938ea8dc8096aca90434d00035d1f0a6bb761c2d7d54324d8de5d45db5`，再核对39条 Flutter 资源；本机只通过官方 Vite 组装 Static Assets 与 acceptance entry，没有 Flutter/AOT 编译。
+
+Codex 内置浏览器以360×800视口运行正式 Web，官方 `pnpm acceptance:serve` 使用临时 D1/R2、空 fixture 和 `acceptance-owner`。静态快照包含真实 xkcd、Komiic 两包，本轮仅操作 xkcd。深色跟随当前系统，浅色由 UI 明确保存后生效；这不是生产 Access 或原生验收。
+
+深色由真实英文 xkcd 详情取得3,323章，收藏作品后，将 `2978: Stranded` 明确设为已读并添加书签。分别验证详情入口携带章节快照、书架入口先选范围、仅收藏/分类草稿、目标源菜单与 `xkcd · zh`。真实搜索 `xkcd` 成功为空，改浏览热门取得 `xkcd / SINGLE`，读取中文详情与权威预览。初始没有自动复制有歧义的标记；手动映射至中文 `2978: 困住` 后再明确勾选，确认框列出1条映射。返回检查保留草稿，随后重新确认；服务端结果为新增已读1章、书签1个，原作品保留。
+
+浅色改由中文作品开始，实际读取697章，选择英文源，补齐范围、源菜单、搜索就绪/空态、热门结果、只读预览和目标章节查询。手动反向映射 `2978: 困住 → 2978: Stranded` 时，目标已有标记得到保留说明，复制勾选禁用。返回检查后重新明确提交，服务端结果为新增已读0章、书签0个，没有重复标记。两主题是同一账户的顺序验证，源方向和章节数不同，不算同数据像素叠图。
+
+独立读取 settings、library、categories、双方 manga、bookmarks、progress 共九份响应，通过正式 Protobuf 模型核对：
+
+- 深色从进入向导到目标列表，再到映射/确认取消，九份完整对象均与 `baseline-dark` 相同；提交只推进 accountRevision4→5、目标 revision0→1，并新增同一章的已读和书签各1项，不复制 current/furthest 页位。原作品及其标记、分类和全局设置保留。
+- 浅色保存主题后的 `baseline-light-reverse` 到确认框和取消同样九份对象相同；反向提交只推进 accountRevision6→7、目标 revision3→4，双方已有标记保留，新增均为0。主题保存本身为 accountRevision5→6，未混入迁移结果。
+
+原图为 `karuyomi-8c398d3-migration-{scope,categories-only,original-snapshot,source-choices,search-ready,search-empty,target-list,confirm,completed}-{light,dark}.jpg`，以及深色 `{preview,mapping,selected,chapter-choice}`、浅色 `{preview,preview-summary,existing-mapping,chapter-choice}`。九路快照、相等性/提交检查为同前缀 JSON，留在忽略目录。瞬态加载未取得稳定主图，不能把随后成功画面填作加载；浅色章节选择只取得查询变体，其余取消、占用和无匹配仍待。视口已恢复、临时标签已关闭，harness正常退出。
+
+本次实拍保留三个未通过点：候选按钮缩成约80px宽窄卡片；同名源的原/目标摘要和确认没有语言；预览说明与50章文本合成巨大辅助描述。下一里程碑已直接让候选官方按钮填满分组，并在各阶段源摘要加语言，预览用官方 Semantics 分开子信息。四项浅/深×1x/2x回归先复现行宽，再复现说明合并；最终19项迁移回归核对行右侧点击、独立原/目标及保留说明语义、不同源语言、预览重读、等待/丢确认及精确重试全部通过，两文件最终格式的严格分析无问题。测试初版的语义句柄释放位置另已修正，不把该测试自身失败当产品缺陷。日志为 `migration-row-semantics-{before,after-width,after,final}.log` 与 `migration-row-analyze.log`；完整CI和新正式Web仍待，不用`8c398d3`截图冒充修复后画面。
 
 ### 实拍布局与颜色锚点
 

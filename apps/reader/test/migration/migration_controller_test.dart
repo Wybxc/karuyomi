@@ -49,7 +49,7 @@ void main() {
     );
     platform.inventory = wire.encodeProtoJson(index);
     platform.sourceInventory = [
-      wire.SourceInfo(id: sourceId, name: '原源', lang: 'zh'),
+      wire.SourceInfo(id: sourceId, name: '原源', lang: 'en'),
       wire.SourceInfo(id: _targetId, name: '目标源', lang: 'zh'),
     ];
     platform.invokeHandler = (call) async => switch (call.whichRequest()) {
@@ -80,7 +80,7 @@ void main() {
       packageName: _package,
       sourceId: sourceId,
       sourceName: '原源',
-      sourceLang: 'zh',
+      sourceLang: 'en',
       manga: testManga,
       favorite: true,
     );
@@ -111,7 +111,7 @@ void main() {
         packageName: _package,
         sourceId: sourceId,
         sourceName: '原源',
-        sourceLang: 'zh',
+        sourceLang: 'en',
         manga: testManga,
       ),
       sequence: sequence,
@@ -746,12 +746,21 @@ void main() {
           await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
           await tester.pumpAndSettle();
           await tap('migration-search-submit');
+          final rowWidth = tester.getSize(control('migration-search')).width;
           final firstResult = find.byKey(
             const ValueKey(('migration-result', 0)),
           );
           await reveal(firstResult);
+          expect(
+            tester.getSize(firstResult).width,
+            greaterThanOrEqualTo(rowWidth),
+            reason:
+                'A short candidate title still needs a complete tappable row',
+          );
           failRead = true;
-          await tester.tap(firstResult);
+          await tester.tapAt(
+            tester.getRect(firstResult).centerRight - const Offset(8, 0),
+          );
           await tester.pumpAndSettle();
           await errorColor();
           expect(control('migration-confirm'), findsNothing);
@@ -760,6 +769,29 @@ void main() {
           expect(control('migration-error'), findsNothing);
           final retained = find.text('目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。');
           await reveal(retained);
+          final semantics = tester.ensureSemantics();
+          try {
+            await tester.pump();
+            expect(
+              tester.getSemantics(retained).label,
+              '目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。',
+              reason: 'Preview guidance must be readable separately from chapter mappings',
+            );
+            expect(
+              tester
+                  .getSemantics(
+                    find.text('原作品：${seed.metadata.manga.title} · 原源 · en'),
+                  )
+                  .label,
+              '原作品：${seed.metadata.manga.title} · 原源 · en',
+            );
+            expect(
+              tester.getSemantics(control('migration-target-preview')).label,
+              '目标：目标作品 · 目标源 · zh',
+            );
+          } finally {
+            semantics.dispose();
+          }
           expect(
             tester.renderObject<RenderParagraph>(retained).text.style?.color,
             AppColors.secondaryLabel.resolveFrom(tester.element(retained)),
@@ -778,10 +810,15 @@ void main() {
           await tap('migration-confirm');
           expect(find.byType(CupertinoAlertDialog), findsOneWidget);
           expect(
-            find.textContaining('原作品“${seed.metadata.manga.title}”（原源）保留。'),
+            find.textContaining(
+              '原作品“${seed.metadata.manga.title}”（原源 · en）保留。',
+            ),
             findsOneWidget,
           );
-          expect(find.textContaining('将目标“目标作品”（目标源）加入书架。'), findsOneWidget);
+          expect(
+            find.textContaining('将目标“目标作品”（目标源 · zh）加入书架。'),
+            findsOneWidget,
+          );
           expect(find.textContaining('选中 1 条章节映射'), findsOneWidget);
           expect(posts(), hasLength(writes));
           await tap('migration-confirm-send', settle: false);
@@ -840,12 +877,12 @@ void main() {
           );
           await tester.pumpAndSettle();
           platform.beforeApiFetch = null;
-          expect(find.text('目标作品 · 目标源'), findsOneWidget);
+          expect(find.text('目标作品 · 目标源 · zh'), findsOneWidget);
           expect(find.textContaining(command.mutationId), findsNothing);
           expect(posts(), hasLength(writes + 1));
           await tap('migration-retry-original');
           expect(find.textContaining('原迁移操作已由服务端确认'), findsOneWidget);
-          expect(find.text('目标作品 · 目标源'), findsOneWidget);
+          expect(find.text('目标作品 · 目标源 · zh'), findsOneWidget);
           expect(posts(), hasLength(writes + 2));
           expect(posts().last, original);
           expect(platform.businessServer.appliedMutations, applied + 1);
