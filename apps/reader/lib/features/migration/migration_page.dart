@@ -55,15 +55,17 @@ class _MigrationPageState extends State<MigrationPage> {
           '按预览复制所选分类和章节标记；目标已有状态、封面和阅读位置保留。原页面位置不会复制。',
         ),
         actions: [
-          CupertinoDialogAction(
+          CupertinoButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('返回检查'),
           ),
-          CupertinoDialogAction(
+          CupertinoButton(
             key: const ValueKey('migration-confirm-send'),
             onPressed: () => Navigator.pop(context, true),
-            isDefaultAction: true,
-            child: const Text('确认迁移'),
+            child: const Text(
+              '确认迁移',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

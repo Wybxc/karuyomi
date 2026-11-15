@@ -483,14 +483,16 @@ class const _PreferenceTextDialog({required final wire.PreferenceNode node})
         ),
       ),
       actions: [
-        CupertinoDialogAction(
+        CupertinoButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('取消'),
         ),
-        CupertinoDialogAction(
+        CupertinoButton(
           onPressed: () => Navigator.pop(context, input.text),
-          isDefaultAction: true,
-          child: const Text('应用此设置'),
+          child: const Text(
+            '应用此设置',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     );

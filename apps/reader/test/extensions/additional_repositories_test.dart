@@ -5,6 +5,7 @@ import '../test_app.dart';
 import 'dart:async';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
@@ -647,11 +648,13 @@ void main() {
               const ValueKey('repository-remove-confirm'),
             );
             expect(
-              tester.widget<CupertinoDialogAction>(confirm).isDestructiveAction,
-              true,
+              tester.widget<CupertinoButton>(confirm).foregroundColor,
+              AppColors.error.resolveFrom(tester.element(confirm)),
             );
-            await tester.tap(find.text('取消'));
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
             await tester.pumpAndSettle();
+            expect(find.text('移除仓库'), findsNothing);
             expect(posts(), hasLength(1));
             expect(
               catalog.repositories.any((item) => item.catalogUrl == extraUrl),
@@ -659,7 +662,9 @@ void main() {
             );
             await tester.tap(remove);
             await tester.pumpAndSettle();
-            await tester.tap(confirm);
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyEvent(LogicalKeyboardKey.space);
             await tester.pumpAndSettle();
             expect(posts(), hasLength(2));
             expect(

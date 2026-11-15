@@ -951,13 +951,13 @@ stateDiagram-v2
     Sources --> BlockedSource: 目录缺失或扩展停用
     BlockedSource --> Sources: 管理扩展并恢复
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class Sources,Favorites,NoSourceMatch,SourceLanguages paired
+    class NoSources,Sources,Favorites,NoSourceMatch,SourceLanguages paired
 ```
 
 | 状态 ID | 最小必要信息                                  | 浅色正式Web                                    | 深色正式Web                                   |
 | ------- | --------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
 | 07.K1   | 正在读取、原筛选与可用恢复入口                | 待                                             | 待                                            |
-| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-76309ed-sources-empty-light.jpg`     | 待                                            |
+| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-1e50a82-sources-empty-light.jpg`     | `karuyomi-1e50a82-sources-empty-dark.jpg`     |
 | 07.K3   | 分组、源名、语言、独立打开与收藏动作          | `karuyomi-76309ed-sources-list-light.jpg`      | `karuyomi-76309ed-sources-list-dark.jpg`      |
 | 07.K4   | 收藏分组、确认后的星标与取消入口              | `karuyomi-76309ed-sources-favorite-light.jpg`  | `karuyomi-76309ed-sources-favorite-dark.jpg`  |
 | 07.K5   | 正在保存的源、等待标记、禁止重复提交          | 待                                             | 待                                            |
@@ -999,21 +999,21 @@ stateDiagram-v2
     Repositories --> RepositoryDiagnostics: 展开
     RepositoryDiagnostics --> Repositories: 收起
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class Repositories,EmptyRepositoryInput,RepositoryInput,RepositoryError,ConfirmingRepository,RepositoryDiagnostics paired
+    class Repositories,EmptyRepositoryInput,RepositoryInput,RepositoryError,ConfirmingRepository,RemovingRepository,RepositoryDiagnostics paired
 ```
 
-| 状态 ID | 最小必要信息                                      | 浅色正式Web                                            | 深色正式Web                                           |
-| ------- | ------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------- |
-| 10.K1   | 仓库名、地址/状态、默认标记、添加/刷新与诊断入口  | `karuyomi-76309ed-repositories-list-light.jpg`         | `karuyomi-76309ed-repositories-list-dark.jpg`         |
-| 10.K2   | 地址、可选名称、预览与取消                        | `karuyomi-76309ed-repositories-input-empty-light.jpg`  | `karuyomi-76309ed-repositories-input-empty-dark.jpg`  |
-| 10.K3   | 已填写地址/名称、预览与取消、键盘                 | `karuyomi-76309ed-repositories-input-filled-light.jpg` | `karuyomi-76309ed-repositories-input-filled-dark.jpg` |
-| 10.K4   | 正在预览、列表上下文、编辑禁用且尚未写账户        | 待                                                     | 待                                                    |
-| 10.K5   | 具体错误、修改/重试入口和已登记列表               | `karuyomi-76309ed-repositories-invalid-light.jpg`      | `karuyomi-76309ed-repositories-invalid-dark.jpg`      |
-| 10.K6   | 解析后的名称/域名/扩展数、明确添加与取消          | `karuyomi-76309ed-repositories-confirm-light.jpg`      | `karuyomi-76309ed-repositories-confirm-dark.jpg`      |
-| 10.K7   | 原提交对象、等待服务端、禁止新操作                | 待                                                     | 待                                                    |
-| 10.K8   | 待移除对象、对安装选择/记录的影响、危险确认与取消 | 待                                                     | 待                                                    |
-| 10.K9   | 待移除对象、未确认状态和恢复入口                  | 待                                                     | 待                                                    |
-| 10.K10  | 仓库完整URL/身份与读取错误、滚动和收起            | `karuyomi-76309ed-repositories-diagnostics-light.jpg`  | `karuyomi-76309ed-repositories-diagnostics-dark.jpg`  |
+| 状态 ID | 最小必要信息                                                       | 浅色正式Web                                              | 深色正式Web                                            |
+| ------- | ------------------------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------ |
+| 10.K1   | 仓库名、地址/状态、默认标记、独立移除、添加/刷新与诊断入口         | `karuyomi-1e50a82-repositories-added-light.jpg`          | `karuyomi-1e50a82-repositories-added-dark.jpg`         |
+| 10.K2   | 地址、可选名称、预览与取消                                         | `karuyomi-76309ed-repositories-input-empty-light.jpg`    | `karuyomi-76309ed-repositories-input-empty-dark.jpg`   |
+| 10.K3   | 已填写地址/名称、预览与取消、键盘                                  | `karuyomi-76309ed-repositories-input-filled-light.jpg`   | `karuyomi-76309ed-repositories-input-filled-dark.jpg`  |
+| 10.K4   | 正在预览、列表上下文、编辑禁用且尚未写账户                         | 待                                                       | 待                                                     |
+| 10.K5   | 具体错误、修改/重试入口和已登记列表                                | `karuyomi-76309ed-repositories-invalid-light.jpg`        | `karuyomi-76309ed-repositories-invalid-dark.jpg`       |
+| 10.K6   | 解析后的名称/域名/扩展数、明确添加与取消                           | `karuyomi-76309ed-repositories-confirm-light.jpg`        | `karuyomi-76309ed-repositories-confirm-dark.jpg`       |
+| 10.K7   | 原提交对象、等待服务端、禁止新操作                                 | 待                                                       | 待                                                     |
+| 10.K8   | 待移除对象、影响为空时明确“无”、危险确认与取消；弹窗内键盘另待修复 | `karuyomi-1e50a82-repositories-remove-confirm-light.jpg` | `karuyomi-1e50a82-repositories-remove-stable-dark.jpg` |
+| 10.K9   | 待移除对象、未确认状态和恢复入口                                   | 待                                                       | 待                                                     |
+| 10.K10  | 仓库完整URL/身份与读取错误、滚动和收起                             | `karuyomi-76309ed-repositories-diagnostics-light.jpg`    | `karuyomi-76309ed-repositories-diagnostics-dark.jpg`   |
 
 ```mermaid
 stateDiagram-v2
@@ -1037,17 +1037,17 @@ stateDiagram-v2
     CacheDiagnostics --> NoCopies: 收起且无副本
     NoCopies --> ReadingCache: 重新读取
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class NoCopies,CacheDiagnostics paired
+    class CachedCopies,NoCopies,CacheDiagnostics paired
 ```
 
-| 状态 ID | 最小必要信息                                     | 浅色正式Web                                      | 深色正式Web                                      |
-| ------- | ------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------ |
-| 11.K1   | 正在检查、读取指示及账户/缓存作用范围            | 待                                               | 待                                               |
-| 11.K2   | 数量/总占用、每副本名称/大小、独立清理与作用范围 | 待                                               | 待                                               |
-| 11.K3   | 正在清理、重复操作受阻、账户安装保持             | 待                                               | 待                                               |
-| 11.K4   | 零副本/占用、可重新下载与重新读取入口            | `karuyomi-76309ed-storage-empty-light.jpg`       | `karuyomi-76309ed-storage-empty-stable-dark.jpg` |
-| 11.K5   | 失败原因、未完成资源、精确重试/必要重建          | 待                                               | 待                                               |
-| 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起          | `karuyomi-76309ed-storage-diagnostics-light.jpg` | `karuyomi-76309ed-storage-diagnostics-dark.jpg`  |
+| 状态 ID | 最小必要信息                                               | 浅色正式Web                                      | 深色正式Web                                     |
+| ------- | ---------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------- |
+| 11.K1   | 正在检查、读取指示及账户/缓存作用范围                      | 待                                               | 待                                              |
+| 11.K2   | 数量/总占用、每副本名称/大小、含对象名的独立清理与作用范围 | `karuyomi-1e50a82-storage-copies-light.jpg`      | `karuyomi-1e50a82-storage-copies-dark.jpg`      |
+| 11.K3   | 正在清理、重复操作受阻、账户安装保持                       | 待                                               | 待                                              |
+| 11.K4   | 零副本/占用、可重新下载与重新读取入口                      | `karuyomi-1e50a82-storage-empty-light.jpg`       | `karuyomi-1e50a82-storage-empty-dark.jpg`       |
+| 11.K5   | 失败原因、未完成资源、精确重试/必要重建                    | 待                                               | 待                                              |
+| 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起                    | `karuyomi-76309ed-storage-diagnostics-light.jpg` | `karuyomi-76309ed-storage-diagnostics-dark.jpg` |
 
 ### 08–09：Karuyomi 最终 Cupertino 扩展管理
 

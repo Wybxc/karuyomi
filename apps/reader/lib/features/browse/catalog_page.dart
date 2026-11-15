@@ -79,7 +79,7 @@ class const CatalogPage({
             error is StateError ? error.message.toString() : error.toString(),
           ),
           actions: [
-            CupertinoDialogAction(
+            CupertinoButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('关闭'),
             ),

@@ -120,6 +120,8 @@ Mihon 的更新/日历、历史、下载队列及下载设置、统计、tracker
 
 短选项使用官方菜单，打开时以autofocus将键盘焦点落到当前可用项；当前值不可用时选择首个可用项。操作菜单聚焦首个可执行动作，Enter可直接执行，Escape取消后返回触发按钮；不能只凭无障碍树显示focused推断真实Flutter焦点。仓库与本机存储的辅助说明采用官方CupertinoFormSection页脚获得13px次级文字，普通导航分组继续使用CupertinoListSection，不能假定后者会替footer设置说明层级。
 
+当前固定的cupertino_ui中，CupertinoDialogAction没有键盘焦点入口，实际Web确认框及组件回归均已复现。保留CupertinoAlertDialog的内容、分隔与原始确认合同，动作直接使用官方CupertinoButton，以取得Tab、Enter和Space支持；危险动作使用系统红，默认动作仍加粗。沿用官方文字度量与自然按钮高度，不自制焦点包装或复制上游组件。确认前不能因导航或焦点变化提交操作。
+
 检索输入显式设置`autofillHints:null`，避免Flutter Web为检索词保留离页后的自动填充合成表单。长选项查询同样直接使用官方CupertinoTextField及前缀/清空能力，不新增输入控件包装；编辑值、焦点、光标和输入连接分别验收。服务地址同样禁用自动填充，Web继续只读，Native保持可编辑；不把此项外推为其它配置/凭据编辑已验收。
 
 Mihon 的 Source 筛选实测在返回收起后保留未应用草稿，重新展开恢复该值，点击筛选才查询。Karuyomi 的显式“取消”按已有合同丢弃草稿，应用成功才更改目录；这是操作语义差异，不能为了外观复刻静默改变。Source 偏好的单选、多选、文本与筛选分别对照；文本是否允许空值由实际偏好约束确定，不一律把空输入禁用。

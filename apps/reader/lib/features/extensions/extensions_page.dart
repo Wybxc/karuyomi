@@ -369,15 +369,17 @@ Future<void> installExtension(
           '原仓库：${Uri.parse(previous.catalogUrl).host}\n新仓库：${Uri.parse(build.catalogUrl).host}\n书架、收藏源和阅读记录保留；源设置、Cookie 和登录不会继承到新仓库。',
         ),
         actions: [
-          CupertinoDialogAction(
+          CupertinoButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          CupertinoDialogAction(
+          CupertinoButton(
             key: const ValueKey('extension-replace-confirm'),
             onPressed: () => Navigator.pop(context, true),
-            isDefaultAction: true,
-            child: const Text('确认替换'),
+            child: const Text(
+              '确认替换',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -852,15 +854,17 @@ class const ExtensionRepositoriesPage({
           ),
         ),
         actions: [
-          CupertinoDialogAction(
+          CupertinoButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          CupertinoDialogAction(
+          CupertinoButton(
             key: const ValueKey('repository-preview-submit'),
             onPressed: () => Navigator.pop(context, true),
-            isDefaultAction: true,
-            child: const Text('只读预览'),
+            child: const Text(
+              '只读预览',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -878,15 +882,17 @@ class const ExtensionRepositoriesPage({
           ),
         ),
         actions: [
-          CupertinoDialogAction(
+          CupertinoButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          CupertinoDialogAction(
+          CupertinoButton(
             key: const ValueKey('repository-add-confirm'),
             onPressed: () => Navigator.pop(context, true),
-            isDefaultAction: true,
-            child: const Text('确认添加'),
+            child: const Text(
+              '确认添加',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -921,14 +927,14 @@ class const ExtensionRepositoriesPage({
           '移除“${repository.name}”后，对应扩展暂时不可用；安装选择、书架和阅读记录保留。\n受影响扩展：${affected.isEmpty ? '无' : affected.join('、')}',
         ),
         actions: [
-          CupertinoDialogAction(
+          CupertinoButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          CupertinoDialogAction(
+          CupertinoButton(
             key: const ValueKey('repository-remove-confirm'),
             onPressed: () => Navigator.pop(context, true),
-            isDestructiveAction: true,
+            foregroundColor: AppColors.error.resolveFrom(context),
             child: const Text('确认移除'),
           ),
         ],

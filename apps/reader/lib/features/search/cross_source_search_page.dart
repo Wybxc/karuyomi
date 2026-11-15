@@ -295,7 +295,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                             title: Text('${group.target.source.name} · 错误详情'),
                             content: Text(details),
                             actions: [
-                              CupertinoDialogAction(
+                              CupertinoButton(
                                 onPressed: () => Navigator.of(context).pop(),
                                 child: const Text('关闭'),
                               ),
