@@ -460,18 +460,21 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
               children: [
                 for (var index = 0; index < _view.categories.length; index++)
                   _categoryRow(_view.categories[index], index),
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: editable && _view.categories.length < 64
-                      ? _command
-                      : null,
-                  child: CupertinoListTile(
-                    leading: const Icon(CupertinoIcons.add),
-                    title: Text(
-                      '新建分类',
-                      style: CupertinoTheme.of(context)
-                          .textTheme
-                          .actionTextStyle,
+                Semantics(
+                  container: true,
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: editable && _view.categories.length < 64
+                        ? _command
+                        : null,
+                    child: CupertinoListTile(
+                      leading: const Icon(CupertinoIcons.add),
+                      title: Text(
+                        '新建分类',
+                        style: CupertinoTheme.of(context)
+                            .textTheme
+                            .actionTextStyle,
+                      ),
                     ),
                   ),
                 ),

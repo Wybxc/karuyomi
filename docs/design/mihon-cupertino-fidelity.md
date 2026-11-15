@@ -61,20 +61,21 @@ Mihon 的更新/日历、历史、下载队列及下载设置、统计、tracker
 
 最终交付直接采用固定 `cupertino_ui` 中的官方语义颜色，在当前已确认主题、对比度和界面层级中解析；不把 Mihon 的 Material DEFAULT 色值套入 Cupertino 组件。依据 Apple 的[颜色](https://developer.apple.com/design/human-interface-guidelines/color)、[列表](https://developer.apple.com/design/human-interface-guidelines/lists-and-tables)与[标签栏](https://developer.apple.com/design/human-interface-guidelines/tab-bars)规范，信息层级仍完整保留，视觉角色使用以下映射。
 
-| 角色           | Cupertino 来源                         | 用途                             |
-| -------------- | -------------------------------------- | -------------------------------- |
-| tint           | `activeBlue` / 默认主题 `primaryColor` | 可操作文字、活动图标、进度       |
-| 强调色上的文字 | `white`                                | 官方实色主按钮与强调徽标         |
-| 选中容器与文字 | `tertiarySystemFill` / `label`         | 设置双栏的当前栏目及已有选择区域 |
-| 页面基底       | `systemGroupedBackground`              | 分组界面与滚动正文               |
-| 正文与辅助文字 | `label` / `secondaryLabel`             | 标题、作者、语言与说明           |
-| 分组表面       | `secondarySystemGroupedBackground`     | 官方列表组、封面占位             |
-| 导航与工具表面 | 不透明 `systemBackground`              | 页面导航、标签栏、阅读上下工具   |
-| 分隔           | `separator`                            | 列表和内容层次                   |
-| 危险与错误     | `destructiveRed`                       | 失败文字、危险操作               |
-| 成功与开关开启 | `activeGreen` / 官方开关默认值         | 可用标记、标准绿色开关           |
+| 角色           | Cupertino 来源                         | 用途                               |
+| -------------- | -------------------------------------- | ---------------------------------- |
+| tint           | `activeBlue` / 默认主题 `primaryColor` | 可操作文字、活动图标、进度         |
+| 强调色上的文字 | `white`                                | 官方实色主按钮与强调徽标           |
+| 选中容器与文字 | `tertiarySystemFill` / `label`         | 设置双栏的当前栏目及已有选择区域   |
+| 页面基底       | `systemGroupedBackground`              | 分组界面与滚动正文                 |
+| 正文与辅助文字 | `label` / `secondaryLabel`             | 标题、作者、语言与说明             |
+| 分组表面       | `secondarySystemGroupedBackground`     | 官方列表组、封面占位               |
+| 导航与工具表面 | 不透明 `systemBackground`              | 页面导航、标签栏、阅读上下工具     |
+| 分隔           | `separator`                            | 列表和内容层次                     |
+| 危险与错误     | `destructiveRed`                       | 失败文字、危险操作                 |
+| 保存确认文字   | `label`                                | 已确认摘要和逐项结果，保证正文可读 |
+| 开关开启       | 官方开关默认值                         | 标准绿色开关                       |
 
-普通浅/深色下，系统蓝分别为 `#007AFF` / `#0A84FF`，分组背景为 `#F2F2F7` / `#000000`，分组表面为白色 / `#1C1C1E`；这些只是默认解析值，源码不复制常量。提高对比度与弹层层级仍由官方动态颜色解析。`CupertinoThemeData` 保留默认文字样式与 `applyThemeToAll=false`，删除四处强制轨道/滑块色，恢复官方开关配色。颜色不能承担唯一状态信号，保存、失败与选中仍有文字或语义。
+普通浅/深色下，系统蓝分别为 `#007AFF` / `#0A84FF`，分组背景为 `#F2F2F7` / `#000000`，分组表面为白色 / `#1C1C1E`；这些只是默认解析值，源码不复制常量。提高对比度与弹层层级仍由官方动态颜色解析。`CupertinoThemeData` 保留默认文字样式与 `applyThemeToAll=false`，删除四处强制轨道/滑块色，恢复官方开关配色。颜色不能承担唯一状态信号，保存、失败与选中仍有文字或语义。批量确认实拍发现浅色绿色正文偏淡，确认摘要和逐项结果改用系统正文色；标准绿色开关继续使用官方默认值。
 
 用户选择的黑/白阅读背景保持业务值，“跟随应用主题”使用对应应用语义表面与文字。上下工具独立使用不透明系统背景，不再按 Material elevation 或画布混色；封面叠图保留必要的黑色渐变和白字对比，不给内容图片染色。不恢复 Liquid Glass、模糊或额外渲染采样。
 

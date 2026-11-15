@@ -18,7 +18,6 @@ abstract final class AppColors {
   static const toolbar = CupertinoColors.systemBackground;
   static const separator = CupertinoColors.separator;
   static const error = CupertinoColors.destructiveRed;
-  static const success = CupertinoColors.activeGreen;
 }
 
 CupertinoThemeData readerAppTheme(Brightness? brightness) => CupertinoThemeData(

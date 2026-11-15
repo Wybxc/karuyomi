@@ -221,8 +221,32 @@ void main() {
           expect(find.text('全部修改已由服务端确认。'), findsNothing);
           expect(find.text('重试原未确认操作').hitTestable(), findsOneWidget);
           expect(tester.takeException(), isNull);
-          await tap(tester, find.text('稍后处理'));
-          expect(mutations(), hasLength(1));
+          await tap(tester, find.text('重试原未确认操作'));
+          for (final message in ['已由服务端确认', '全部修改已由服务端确认。']) {
+            final confirmation = find.text(message);
+            await tester.ensureVisible(confirmation);
+            await tester.pumpAndSettle();
+            final text = tester.renderObject<RenderParagraph>(confirmation);
+            final context = tester.element(confirmation);
+            final foreground = text.text.style!.color!;
+            expect(foreground, CupertinoColors.label.resolveFrom(context));
+            for (final surface in [
+              CupertinoTheme.of(context).scaffoldBackgroundColor,
+              CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
+                context,
+              ),
+            ]) {
+              final a = foreground.computeLuminance();
+              final b = surface.computeLuminance();
+              final ratio = a > b
+                  ? (a + .05) / (b + .05)
+                  : (b + .05) / (a + .05);
+              expect(ratio, greaterThanOrEqualTo(4.5));
+            }
+          }
+          expect(mutations(), hasLength(2));
+          expect(command(mutations().first), command(mutations().last));
+          await tap(tester, find.text('完成'));
           await hide(tester);
         },
       );

@@ -876,7 +876,7 @@ stateDiagram-v2
 
 ### 04–06：Karuyomi 分类与批量确认的目标状态
 
-固定Mihon的参考主图见05.01–05.10、06.01–06.04和04.01–04.04。最终界面采用官方Cupertino分组、名称导航、更多菜单及危险红，不把原生Material四动作排列或对话框尺寸作为最终样式。以下状态来自正式分类草稿与批量控制器的实际分支；52项组件回归不代替正式Web主图，所有新增主图先记待。
+固定Mihon的参考主图见05.01–05.10、06.01–06.04和04.01–04.04。最终界面采用官方Cupertino分组、名称导航、更多菜单及危险红，不把原生Material四动作排列或对话框尺寸作为最终样式。以下状态来自正式分类草稿与批量控制器的实际分支。蓝色仅表示`a9fb310`正式Web双主题主图已取得；全部变体与转换继续分开验收。浅色空分类只有单主题，列表新建语义及批量绿色确认文字发现缺口，修复主图仍待；组件回归不填补它们。
 
 ```mermaid
 stateDiagram-v2
@@ -946,32 +946,36 @@ stateDiagram-v2
     UncertainBatch --> ExpiredBatch: 身份或服务变化
     ExpiredBatch --> [*]: 关闭，不发送剩余
     ConfirmedBatch --> [*]: 完成返回书架
+    classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    class CategoryMenu,EmptyCategoryName,CategoryName,InvalidCategoryName,DeleteCategory,CategoryChoices,CategoryChoiceDraft,RemoveReview,BatchCategoryReview paired
 ```
 
-| 状态 ID | 最小必要信息                                                        | 浅色正式Web | 深色正式Web |
-| ------- | ------------------------------------------------------------------- | ----------- | ----------- |
-| 05.K1   | 无分类说明、新建、完成                                              | 待          | 待          |
-| 05.K2   | 按确认顺序的名称、重命名和独立更多入口、新建、完成                  | 待          | 待          |
-| 05.K3   | 分类上下文、上/下移边界禁用、危险删除、焦点与取消                   | 待          | 待          |
-| 05.K4   | 空名称、字段标识、约束、取消与保存                                  | 待          | 待          |
-| 05.K5   | 原名称或新名称草稿、保存、取消及键盘上方操作                        | 待          | 待          |
-| 05.K6   | 保留输入、可读校验错误、修正入口、不发送                            | 待          | 待          |
-| 05.K7   | 精确分类名、删除关联影响、保留收藏/进度、系统红确认与取消           | 待          | 待          |
-| 05.K8   | 原修改、等待确认、冻结动作、禁止忙碌关闭；排序与输入各验            | 待          | 待          |
-| 05.K9   | 原请求保留、未确认与已确认后读回失败分别说明、对应精确重试/稍后处理 | 待          | 待          |
-| 05.K10  | 拒绝/冲突说明、冻结原草稿、重新读取并关闭、不能自动重基             | 待          | 待          |
-| 05.K11  | 失效说明、旧动作禁用、明确关闭与重开                                | 待          | 待          |
-| 06.K1   | 作品名、无分类原因、管理分类指引、关闭                              | 待          | 待          |
-| 06.K2   | 精确作品、完整分类名与确认选择、保存与取消                          | 待          | 待          |
-| 06.K3   | 未提交选择、未分类含义、保存/取消、原服务端值保留                   | 待          | 待          |
-| 04.K1   | 完整漫画清单、数量、保留进度/书签/分类的影响、危险确认及取消        | 待          | 待          |
-| 04.K2   | 添加/移出范围、待选分类、逐项原→目标关联、数量、确认/取消           | 待          | 待          |
-| 04.K3   | 确认数/未开始数、逐项状态、当前等待、暂停及忙碌关闭禁用             | 待          | 待          |
-| 04.K4   | 已确认/未开始/未确认项、系统红错误、仅重试原项、稍后处理            | 待          | 待          |
-| 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | 待          | 待          |
-| 04.K6   | 逐项拒绝原因、原清单、重新读取并结束、不得直接重试新revision        | 待          | 待          |
-| 04.K7   | 全部确认文字、逐项确认状态、完成及返回实际书架                      | 待          | 待          |
-| 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | 待          | 待          |
+| 状态 ID | 最小必要信息                                                        | 浅色正式Web                                                  | 深色正式Web                                                 |
+| ------- | ------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| 05.K1   | 无分类说明、新建、完成                                              | `karuyomi-a9fb310-category-empty-light.jpg`，新建语义待复验  | 待                                                          |
+| 05.K2   | 按确认顺序的名称、重命名和独立更多入口、新建、完成                  | `karuyomi-a9fb310-category-list-light.jpg`，新建语义待复验   | `karuyomi-a9fb310-category-list-dark.jpg`，新建语义待复验   |
+| 05.K3   | 分类上下文、上/下移边界禁用、危险删除、焦点与取消                   | `karuyomi-a9fb310-category-menu-light.jpg`                   | `karuyomi-a9fb310-category-menu-dark.jpg`                   |
+| 05.K4   | 空名称、字段标识、约束、取消与保存                                  | `karuyomi-a9fb310-category-name-empty-light.jpg`             | `karuyomi-a9fb310-category-name-empty-dark.jpg`             |
+| 05.K5   | 原名称或新名称草稿、保存、取消及键盘上方操作                        | `karuyomi-a9fb310-category-rename-draft-light.jpg`           | `karuyomi-a9fb310-category-rename-draft-dark.jpg`           |
+| 05.K6   | 保留输入、可读校验错误、修正入口、不发送                            | `karuyomi-a9fb310-category-name-invalid-light.jpg`           | `karuyomi-a9fb310-category-name-invalid-dark.jpg`           |
+| 05.K7   | 精确分类名、删除关联影响、保留收藏/进度、系统红确认与取消           | `karuyomi-a9fb310-category-delete-preview-light.jpg`         | `karuyomi-a9fb310-category-delete-preview-dark.jpg`         |
+| 05.K8   | 原修改、等待确认、冻结动作、禁止忙碌关闭；排序与输入各验            | 待                                                           | 待                                                          |
+| 05.K9   | 原请求保留、未确认与已确认后读回失败分别说明、对应精确重试/稍后处理 | 待                                                           | 待                                                          |
+| 05.K10  | 拒绝/冲突说明、冻结原草稿、重新读取并关闭、不能自动重基             | 待                                                           | 待                                                          |
+| 05.K11  | 失效说明、旧动作禁用、明确关闭与重开                                | 待                                                           | 待                                                          |
+| 06.K1   | 作品名、无分类原因、管理分类指引、关闭                              | 待                                                           | 待                                                          |
+| 06.K2   | 精确作品、完整分类名与确认选择、保存与取消                          | `karuyomi-a9fb310-category-picker-current-light.jpg`         | `karuyomi-a9fb310-category-picker-current-dark.jpg`         |
+| 06.K3   | 未提交选择、未分类含义、保存/取消、原服务端值保留                   | `karuyomi-a9fb310-category-picker-draft-light.jpg`           | `karuyomi-a9fb310-category-picker-draft-dark.jpg`           |
+| 04.K1   | 完整漫画清单、数量、保留进度/书签/分类的影响、危险确认及取消        | `karuyomi-a9fb310-batch-remove-preview-light.jpg`            | `karuyomi-a9fb310-batch-remove-preview-dark.jpg`            |
+| 04.K2   | 添加/移出范围、待选分类、逐项原→目标关联、数量、确认/取消           | `karuyomi-a9fb310-batch-categories-preview-light.jpg`        | `karuyomi-a9fb310-batch-categories-preview-dark.jpg`        |
+| 04.K3   | 确认数/未开始数、逐项状态、当前等待、暂停及忙碌关闭禁用             | 待                                                           | 待                                                          |
+| 04.K4   | 已确认/未开始/未确认项、系统红错误、仅重试原项、稍后处理            | 待                                                           | 待                                                          |
+| 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | 待                                                           | 待                                                          |
+| 04.K6   | 逐项拒绝原因、原清单、重新读取并结束、不得直接重试新revision        | 待                                                           | 待                                                          |
+| 04.K7   | 全部确认文字、逐项确认状态、完成及返回实际书架                      | `karuyomi-a9fb310-batch-confirmed-light.jpg`，确认正文待复验 | `karuyomi-a9fb310-batch-confirmed-dark.jpg`，确认正文待复验 |
+| 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | 待                                                           | 待                                                          |
+
+浅色实际执行重排再恢复，名称草稿跨360↔390保留后取消；深色核对相同名称/顺序、菜单边界、输入校验与取消。浅色单作品初次勾选后误点保存，后续独立重做取消，不能把该次写入记为零写。批量全部确认浅色为添加分类、深色为移出分类，二者不是同一操作的全部变体。绿色确认正文和新建语义的修复待正式新产物复验，故相应节点不标蓝。实际Web没有软件键盘，05.K5的软键盘上方操作仅有组件证据，仍待目标平台。独立API和完整边界见[分类验证](mihon-cupertino-fidelity.md#分类管理与批量确认的-cupertino-分组)。
 
 ### 26：Karuyomi 最终 Cupertino 设置导航
 

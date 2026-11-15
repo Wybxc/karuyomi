@@ -224,7 +224,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                 style: TextStyle(
                   color: switch (item.status) {
                     LibraryBatchItemStatus.confirmed =>
-                      AppColors.success.resolveFrom(context),
+                      AppColors.label.resolveFrom(context),
                     LibraryBatchItemStatus.uncertain ||
                     LibraryBatchItemStatus.blocked =>
                       AppColors.error.resolveFrom(context),
@@ -326,12 +326,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                           ),
                         ),
                       if (!_expired && draft.completed)
-                        Text(
-                          '全部修改已由服务端确认。',
-                          style: TextStyle(
-                            color: AppColors.success.resolveFrom(context),
-                          ),
-                        ),
+                        const Text('全部修改已由服务端确认。'),
                       if (!_expired && draft.finished && !draft.completed)
                         const Text('原批次已结束，剩余漫画未再发送。请按最新书架重新确认。'),
                       if (draft.attempted && !draft.finished)

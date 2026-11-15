@@ -176,6 +176,7 @@ void main() {
       testWidgets(
         'category groups, menu and destructive confirmation adapt to $brightness at $textScale',
         (tester) async {
+          final semantics = tester.ensureSemantics();
           tester.view.devicePixelRatio = 1;
           tester.view.physicalSize = const Size(360, 800);
           addTearDown(tester.view.resetPhysicalSize);
@@ -199,6 +200,15 @@ void main() {
           final options = iconLabel('分类选项 $name');
           expect(rename, findsOneWidget);
           expect(options, findsOneWidget);
+          try {
+            expect(
+              tester.getSemantics(find.text('新建分类')).label,
+              '新建分类',
+              reason: 'the create action must not absorb section captions or other categories',
+            );
+          } finally {
+            semantics.dispose();
+          }
           expect(iconLabel('上移分类 $name'), findsNothing);
           expect(tester.takeException(), isNull);
           server.requests.clear();
