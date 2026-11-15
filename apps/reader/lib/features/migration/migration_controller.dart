@@ -63,6 +63,7 @@ final class MigrationController extends ChangeNotifier {
   bool copyBookmarks = true;
   bool completed = false;
   bool _sourceConfirmed = false;
+  bool get inputsReady => _sourceConfirmed;
   bool get sourceDecided => sourceSequence != null || categoriesOnly;
   bool get canChange =>
       available && !busy && pending == null && !completed && _sourceConfirmed;
@@ -96,6 +97,7 @@ final class MigrationController extends ChangeNotifier {
   ChapterSequence? targetSequence;
   String? error;
   String? notice;
+  String operationLabel = '读取迁移输入';
   bool _busy = false;
   final _cancelled = Completer<void>();
   bool _disposed = false;
@@ -123,8 +125,8 @@ final class MigrationController extends ChangeNotifier {
   }
 
   Future<void> refreshSources() async {
-    if (!available || busy) return;
-    await _run((epoch) async {
+    if (!available || busy || completed) return;
+    await _run('读取迁移输入', (epoch) async {
       await catalog.refreshInstallations();
       if (!_current(epoch)) return;
       await catalog.refreshCatalog(
@@ -161,7 +163,7 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> readOriginalChapters() async {
     if (!canChange || selectedSource != null) return;
-    await _run((epoch) async {
+    await _run('读取原作品章节', (epoch) async {
       final ref = await catalog.openSelectedSource(
         packageName: seed.metadata.packageName,
         sourceId: seed.metadata.sourceId,
@@ -192,7 +194,9 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> chooseSource(MigrationSourceChoice choice) async {
     if (!canChange || !sourceDecided) return;
-    await _run((epoch) async {
+    await _run('打开目标漫画源“${choice.source.name}”（${choice.source.lang}）', (
+      epoch,
+    ) async {
       final ref = await catalog.openMigrationSource(
         build: choice.build,
         sourceId: choice.source.id,
@@ -227,7 +231,7 @@ final class MigrationController extends ChangeNotifier {
   Future<void> _listTargets(String? search, {bool more = false}) async {
     final ref = _targetReference;
     if (!canChange || ref == null) return;
-    await _run((epoch) async {
+    await _run(more ? '加载更多目标作品' : '查找目标作品', (epoch) async {
       final next = more ? _listingPage + 1 : 1;
       final found = await catalog.listMigrationTargets(
         source: ref,
@@ -250,7 +254,7 @@ final class MigrationController extends ChangeNotifier {
     final ref = _targetReference;
     final selected = selectedSource;
     if (!canChange || ref == null || selected == null) return;
-    await _run((epoch) async {
+    await _run('读取目标作品“${manga.title}”与迁移预览', (epoch) async {
       preview = null;
       targetMetadata = null;
       targetSequence = null;
@@ -391,7 +395,7 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> refreshPreview() async {
     if (!available || busy || completed) return;
-    await _run((epoch) async {
+    await _run('重新读取迁移预览', (epoch) async {
       await _loadPreview(epoch);
     });
   }
@@ -422,7 +426,7 @@ final class MigrationController extends ChangeNotifier {
                 !value.targetBookmarks.contains(mappedTargets[sourceChapter]),
           ),
     ];
-    await _run((epoch) async {
+    await _run('等待服务端确认', (epoch) async {
       final result = await repository.commit(
         value,
         chapters: chapters,
@@ -437,13 +441,15 @@ final class MigrationController extends ChangeNotifier {
   }
 
   Future<void> retry() async {
-    if (!available || busy || pending?.retryable != true) return;
-    await _run((epoch) async {
+    final original = pending;
+    if (!available || busy || original == null || !original.retryable) return;
+    await _run('等待服务端确认', (epoch) async {
       final result = await repository.retry(
         sourceKey,
         shouldContinue: () => _current(epoch),
       );
       if (!_current(epoch)) return;
+      targetMetadata = original.request.migrateFrom.targetMetadata;
       completed = true;
       notice =
           '原迁移操作已由服务端确认：新增已读 ${result.migration.copiedReadChapters} 章、书签 ${result.migration.copiedBookmarks} 个。';
@@ -452,14 +458,18 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> discardRejected() async {
     if (!available || busy || pending?.retryable != false) return;
-    await _run((epoch) async {
+    await _run('重新读取迁移预览', (epoch) async {
       repository.discardRejected(sourceKey);
       await _loadPreview(epoch);
     });
   }
 
-  Future<void> _run(Future<void> Function(int epoch) action) async {
+  Future<void> _run(
+    String label,
+    Future<void> Function(int epoch) action,
+  ) async {
     _busy = true;
+    operationLabel = label;
     final epoch = ++_epoch;
     error = null;
     notice = null;

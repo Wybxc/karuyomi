@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -13,6 +14,8 @@ import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/migration/migration_controller.dart';
 import 'package:karuyomi/features/migration/migration_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
+import 'package:karuyomi/runtime/api_fetch.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -174,6 +177,11 @@ void main() {
     expect(copied.epoch, 1);
     expect(copied.hasCurrent(), false);
     expect(copied.hasFurthest(), false);
+    final notice = controller.notice;
+    final requests = platform.businessServer.requests.length;
+    await controller.refreshSources();
+    expect(controller.notice, notice);
+    expect(platform.businessServer.requests, hasLength(requests));
   });
 
   test('lost ACK survives closing the wizard and only explicit retry resends its original body', () async {
@@ -601,18 +609,235 @@ void main() {
             expect(catalog.library!.client, same(clickedClient));
             await catalog.refreshInstallations();
             await tester.pumpAndSettle();
+            expect(find.text('迁移已停用'), findsOneWidget);
             expect(
-              tester
-                  .widget<CupertinoButton>(
-                    find.byKey(const ValueKey('migration-refresh-sources')),
-                  )
-                  .onPressed,
-              isNull,
+              find.byKey(const ValueKey('migration-refresh-sources')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('migration-source')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('migration-confirm')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('migration-retry-original')),
+              findsNothing,
             );
             expect(posts(), hasLength(before));
             expect(platform.invocations, hasLength(calls));
             expect(platform.openedBuilds, hasLength(opened));
           }
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+  }
+
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'migration Cupertino states $brightness ${scale}x keep reads, drafts and original confirmation distinct',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final readPath = '/api/state/manga/${sequence.mangaKey}';
+          final readGate = Completer<void>();
+          var failRead = true;
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == readPath) {
+              await readGate.future;
+            }
+          };
+          platform.afterBusinessReply = (request, reply) async {
+            if (failRead &&
+                request.method == 'GET' &&
+                request.uri.path == readPath) {
+              failRead = false;
+              return ApiReply(
+                status: 503,
+                redirected: false,
+                headers: reply.headers,
+                body: reply.body,
+              );
+            }
+            return reply;
+          };
+          addTearDown(() {
+            if (!readGate.isCompleted) readGate.complete();
+          });
+          Widget page() => CupertinoApp(
+            home: MigrationPage(
+              catalog: catalog,
+              client: catalog.library!.client,
+              seed: seed,
+            ),
+          );
+          Finder control(String key) => find.byKey(ValueKey(key));
+          Future<void> reveal(
+            Finder finder, {
+            double delta = 300,
+            bool settle = true,
+          }) async {
+            await tester.scrollUntilVisible(
+              finder,
+              delta,
+              scrollable: find.byType(Scrollable).first,
+            );
+            if (settle) {
+              await tester.pumpAndSettle();
+            } else {
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 400));
+            }
+          }
+
+          Future<void> tap(String key, {bool settle = true}) async {
+            await reveal(control(key));
+            await tester.tap(control(key));
+            if (settle) {
+              await tester.pumpAndSettle();
+            } else {
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 400));
+            }
+          }
+
+          Future<void> errorColor() async {
+            final error = control('migration-error');
+            await reveal(error, delta: -300);
+            expect(error, findsOneWidget);
+            expect(
+              tester.renderObject<RenderParagraph>(error).text.style?.color,
+              AppColors.error.resolveFrom(tester.element(error)),
+            );
+          }
+
+          final writes = posts().length;
+          final applied = platform.businessServer.appliedMutations;
+          await tester.pumpApp(page());
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(find.text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'), findsNothing);
+          expect(find.text('正在读取迁移输入'), findsOneWidget);
+          expect(find.text('尚未读取迁移输入'), findsNothing);
+          expect(posts(), hasLength(writes));
+          readGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          platform.beforeApiFetch = null;
+          await errorColor();
+          expect(find.byType(CupertinoActivityIndicator), findsNothing);
+          expect(find.text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'), findsNothing);
+          await tap('migration-refresh-sources');
+          expect(control('migration-error'), findsNothing);
+          expect(find.byType(CupertinoFormSection), findsWidgets);
+          await tap('migration-source');
+          await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+          await tester.pumpAndSettle();
+          await tap('migration-search-submit');
+          final firstResult = find.byKey(
+            const ValueKey(('migration-result', 0)),
+          );
+          await reveal(firstResult);
+          await tester.tap(firstResult);
+          await tester.pumpAndSettle();
+          final retained = find.text('目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。');
+          await reveal(retained);
+          expect(
+            tester.renderObject<RenderParagraph>(retained).text.style?.color,
+            AppColors.secondaryLabel.resolveFrom(tester.element(retained)),
+          );
+          expect(posts(), hasLength(writes));
+          final saveGate = Completer<void>();
+          addTearDown(() {
+            if (!saveGate.isCompleted) saveGate.complete();
+          });
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == '/api/state/mutations') {
+              await saveGate.future;
+            }
+          };
+          platform.businessServer.loseNextResponse = true;
+          await tap('migration-confirm');
+          expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+          expect(posts(), hasLength(writes));
+          await tap('migration-confirm-send', settle: false);
+          await reveal(find.text('正在等待服务端确认'), delta: -300, settle: false);
+          expect(find.text('正在等待服务端确认'), findsOneWidget);
+          expect(find.textContaining('迁移已由服务端确认'), findsNothing);
+          expect(control('migration-search'), findsNothing);
+          expect(
+            tester
+                .widget<CupertinoButton>(control('migration-retry-original'))
+                .onPressed,
+            isNull,
+          );
+          saveGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          platform.beforeApiFetch = null;
+          await errorColor();
+          final original = posts().last;
+          final command = wire.decodeProtoJson(
+            wire.StateMutation(),
+            jsonDecode(original),
+          );
+          expect(posts(), hasLength(writes + 1));
+          expect(platform.businessServer.appliedMutations, applied + 1);
+          expect(find.textContaining(command.mutationId), findsNothing);
+          expect(find.textContaining(command.mangaKey), findsNothing);
+          await tap('migration-original-details');
+          expect(find.textContaining(command.mutationId), findsOneWidget);
+          expect(posts(), hasLength(writes + 1));
+          await tester.tap(find.text('关闭'));
+          await tester.pumpAndSettle();
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          final reopenGate = Completer<void>();
+          addTearDown(() {
+            if (!reopenGate.isCompleted) reopenGate.complete();
+          });
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == readPath) {
+              await reopenGate.future;
+            }
+          };
+          await tester.pumpApp(page());
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(find.text('正在读取迁移输入'), findsOneWidget);
+          await reveal(find.text('原迁移尚未确认'), settle: false);
+          expect(find.text('等待服务端确认'), findsNothing);
+          expect(posts(), hasLength(writes + 1));
+          reopenGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          platform.beforeApiFetch = null;
+          expect(find.text('目标作品 · 目标源'), findsOneWidget);
+          expect(find.textContaining(command.mutationId), findsNothing);
+          expect(posts(), hasLength(writes + 1));
+          await tap('migration-retry-original');
+          expect(find.textContaining('原迁移操作已由服务端确认'), findsOneWidget);
+          expect(find.text('目标作品 · 目标源'), findsOneWidget);
+          expect(posts(), hasLength(writes + 2));
+          expect(posts().last, original);
+          expect(platform.businessServer.appliedMutations, applied + 1);
+          expect(tester.takeException(), isNull);
           await tester.pumpApp(const SizedBox.shrink());
           await tester.pumpAndSettle();
         },
@@ -692,6 +917,7 @@ void main() {
       await tester.scrollUntilVisible(unmarked, 300, scrollable: scroller);
       expect(unmarked, findsOneWidget);
       await tester.ensureVisible(filter);
+      await tester.pumpAndSettle();
       await tester.tap(filter);
       await tester.pumpAndSettle();
       expect(unmarked, findsNothing);

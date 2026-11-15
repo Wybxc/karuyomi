@@ -1127,7 +1127,7 @@ K5非法图片变体为`karuyomi-c5f6759-cover-invalid-{light,dark}.jpg`，等�
 
 ### 20–21：Karuyomi 迁移向导的目标状态
 
-以下依据MigrationPage、MigrationController与MigrationRepository的正式分支整理，区分只读输入、草稿和写入确认；全部新主图待验。现有界面仍用手工段落呈现，错误与说明同色，首次输入加载时还会同时出现“没有其他可用源”；这些不作为目标状态通过。原请求的ID、版本与内部键留给诊断，主流程优先显示原/目标作品、源名称、所选范围及实际可用操作。
+以下依据MigrationPage、MigrationController与MigrationRepository的正式分支整理，区分只读输入、草稿和写入确认；全部新主图待验。2026-11-16实现改用官方Cupertino表单、次级说明与系统错误色，修复首次输入加载误报“没有其他可用源”。浅/深×1x/2x组件流程已验证读取失败/重读、预览、提交阻塞/丢确认、只读诊断、重开只读等待和精确重试；组件证据不填入主图格。原请求的ID、版本与内部键移入诊断，主流程优先显示原/目标作品、源名称、所选范围及实际可用操作，检查范围见[验证记录](mihon-cupertino-fidelity.md#迁移向导的-cupertino-状态呈现)。
 
 ```mermaid
 stateDiagram-v2
@@ -1156,6 +1156,15 @@ stateDiagram-v2
     state "21.K4 原迁移已拒绝" as MigrationRejected
     state "21.K5 服务端已确认" as MigrationDone
     state "21.K6 身份或服务已失效" as MigrationExpired
+    note left of MigrationInputs
+      浅/深 × 1x/2x 组件流程已过
+      正式 Web 全部主图待验
+    end note
+    note right of MigrationUnknown
+      已验组件：重开只读不重发
+      明确重试复用原请求，只应用一次
+      正式 Web 主图待验
+    end note
     MigrationInputs --> MigrationInputError: 读取失败
     MigrationInputError --> MigrationInputs: 明确重读
     MigrationInputs --> MigrationScope: 无原章节快照
