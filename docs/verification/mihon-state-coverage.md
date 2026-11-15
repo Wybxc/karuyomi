@@ -851,26 +851,28 @@ stateDiagram-v2
     Q0 --> K6: 选择草稿
     Q0 --> K5: 取消并返回原值
     Q1 --> K5: 取消并返回原值
+    classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    class Q0,Q1 paired
 ```
 
-| 状态 ID | 最小必要信息与操作边界                                           | 浅色                                                                             | 深色                                                                                                                             |
-| ------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| 27.K1   | 当前服务地址、尚未连接、连接入口；地址非法时给出可修正原因       | 待                                                                               | 待                                                                                                                               |
-| 27.K2   | 正在连接的服务、进度及当前可用操作；不显示旧身份的已保存状态     | 待                                                                               | 待                                                                                                                               |
-| 27.K3   | 登录已失效、受影响操作、显式登录/重试入口及未确认草稿提示        | 待                                                                               | 待                                                                                                                               |
-| 27.K4   | 当前服务、拒绝访问原因和切换账号/连接入口                        | 待                                                                               | 待                                                                                                                               |
-| 27.K5   | 已确认的服务与身份、连接状态和后续可用入口                       | 待                                                                               | 待                                                                                                                               |
-| 30.K1   | 当前对象、服务端已确认值及适用的保存反馈                         | 待                                                                               | 待                                                                                                                               |
-| 30.K2   | 当前对象与草稿、尚未保存提示、可提交/校验原因及取消              | 待                                                                               | 待                                                                                                                               |
-| 30.K3   | 保存中、操作对象和提交范围；禁止重复提交并保留草稿               | 待                                                                               | 待                                                                                                                               |
-| 30.K4   | 结果尚未确认、保留的原操作及同一操作重试；不误报成功或失败       | 待                                                                               | 待                                                                                                                               |
-| 30.K5   | 服务端值已变化、受影响草稿与显式重新读取入口                     | 待                                                                               | 待                                                                                                                               |
-| 30.K6   | 已确认/失败/未知的对象及数量、剩余操作和精确重试                 | 待                                                                               | 待                                                                                                                               |
-| 30.K7   | 原身份或来源已失效、受影响草稿、旧操作不可继续及恢复入口         | 待                                                                               | 待                                                                                                                               |
-| 28.K1   | 正在关闭的页面/资源、等待确认及受阻操作                          | 待                                                                               | 待                                                                                                                               |
-| 28.K2   | 尚未释放的资源、失败原因和同一清理重试入口                       | 待                                                                               | 待                                                                                                                               |
-| 29.K1   | 当前项、可搜索长列表、查询/清空/取消与键盘；选择只更新调用方草稿 | 待完整资料和其它转换；已拍`karuyomi-b6bc240-chapter-range-{start,end}-light.jpg` | 待完整资料和其它转换；已拍`karuyomi-b6bc240-chapter-range-start-dark-settled.jpg`、`karuyomi-b6bc240-chapter-range-end-dark.jpg` |
-| 29.K2   | 当前查询、无匹配、清空或修改查询及取消；保留调用方原值           | 待                                                                               | 待                                                                                                                               |
+| 状态 ID | 最小必要信息与操作边界                                                | 浅色                                                                            | 深色                                                                           |
+| ------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 27.K1   | 当前服务地址、尚未连接、连接入口；地址非法时给出可修正原因            | 待                                                                              | 待                                                                             |
+| 27.K2   | 正在连接的服务、进度及当前可用操作；不显示旧身份的已保存状态          | 待                                                                              | 待                                                                             |
+| 27.K3   | 登录已失效、受影响操作、显式登录/重试入口及未确认草稿提示             | 待                                                                              | 待                                                                             |
+| 27.K4   | 当前服务、拒绝访问原因和切换账号/连接入口                             | 待                                                                              | 待                                                                             |
+| 27.K5   | 已确认的服务与身份、连接状态和后续可用入口                            | 待                                                                              | 待                                                                             |
+| 30.K1   | 当前对象、服务端已确认值及适用的保存反馈                              | 待                                                                              | 待                                                                             |
+| 30.K2   | 当前对象与草稿、尚未保存提示、可提交/校验原因及取消                   | 待                                                                              | 待                                                                             |
+| 30.K3   | 保存中、操作对象和提交范围；禁止重复提交并保留草稿                    | 待                                                                              | 待                                                                             |
+| 30.K4   | 结果尚未确认、保留的原操作及同一操作重试；不误报成功或失败            | 待                                                                              | 待                                                                             |
+| 30.K5   | 服务端值已变化、受影响草稿与显式重新读取入口                          | 待                                                                              | 待                                                                             |
+| 30.K6   | 已确认/失败/未知的对象及数量、剩余操作和精确重试                      | 待                                                                              | 待                                                                             |
+| 30.K7   | 原身份或来源已失效、受影响草稿、旧操作不可继续及恢复入口              | 待                                                                              | 待                                                                             |
+| 28.K1   | 正在关闭的页面/资源、等待确认及受阻操作                               | 待                                                                              | 待                                                                             |
+| 28.K2   | 尚未释放的资源、失败原因和同一清理重试入口                            | 待                                                                              | 待                                                                             |
+| 29.K1   | 当前项、完整长名称/来源序号、查询/清空/取消与键盘；本轮为xkcd范围草稿 | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-light.jpg` | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-dark.jpg` |
+| 29.K2   | 当前查询、无匹配、清空或修改查询及取消；保留调用方原值                | `karuyomi-0c4da11-range-search-empty-light.jpg`                                 | `karuyomi-0c4da11-range-search-empty-dark.jpg`                                 |
 
 各业务页需要分别覆盖：书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。共享状态机仅归纳语义，表中目标画面仍分别待验，不能用一张设置错误截图代替全部业务上下文。
 
@@ -979,9 +981,9 @@ stateDiagram-v2
 
 ### 16–18：Karuyomi 作品与章节的目标状态
 
-`b6bc240`正式Web在官方Wrangler临时D1、acceptance-owner、无fixture、360×800内置浏览器中打开真实英文xkcd及相同3323章。蓝色仅表示此版两主题主图已实看，不能代表全部转换和变体通过。长范围选项及已选起止标签仍省略必要的来源序号；18.K2和共享29.K1继续待完整资料，不能用完整AX名称代替可见画面。
+`b6bc240`正式Web在官方Wrangler临时D1、acceptance-owner、无fixture、360×800内置浏览器中打开真实英文xkcd及相同3323章。当时长范围选项及已选起止标签仍省略必要的来源序号；该历史缺口保留，不能用完整AX名称代替可见画面。后续`0c4da11`补长选项与自然范围表单；蓝色仅表示表中对应版本的双主题主图已实看，不能代表全部转换和变体通过。
 
-后续实现已解除完整选择行/菜单/查询列表的单行限制，范围改为官方表单并删除固定宽度与排序重复标签。八项双主题/双倍文字用例及73项不同相关回归通过，取消保留三章且零POST；这些是组件证据，新正式Web的18.K2及29.K1/K2仍待验，不改变下面蓝色主图范围。详见[长选项回归](mihon-cupertino-fidelity.md#长选项与范围表单的自然尺寸)。
+`0c4da11`已解除完整选择行/菜单/查询列表的单行限制，范围改为官方表单并删除固定宽度与排序重复标签。八项双主题/双倍文字用例及73项不同相关回归、完整push/PR CI通过；正式Web两主题的18.K2及29.K1/K2主图与已执行转换已补，独立API确认零附写。详见[长选项回归](mihon-cupertino-fidelity.md#长选项与范围表单的自然尺寸)。
 
 ```mermaid
 stateDiagram-v2
@@ -996,6 +998,7 @@ stateDiagram-v2
     state "18.K3 章节只读确认" as ChapterReview
     state "18.K4 单章书签获确认" as ChapterBookmarked
     state "29.K1 可搜索范围长选项" as ChapterEndpoint
+    state "29.K2 范围查询无匹配" as ChapterEndpointEmpty
     state "30.K3 等待章节确认" as ChapterSending
     state "30.K4 章节结果未知" as ChapterUnknown
     state "30.K5 章节写入冲突" as ChapterConflict
@@ -1008,10 +1011,14 @@ stateDiagram-v2
     ChapterOrderMenu --> ChapterOptions: Escape关闭
     ChapterOptions --> NoChapterSelection: 选择章节
     NoChapterSelection --> ChapterEndpoint: 起点或终点
-    ChapterEndpoint --> NoChapterSelection: 返回端点草稿
+    ChapterEndpoint --> NoChapterSelection: 选定端点或初次取消，仍零选择
+    ChapterEndpoint --> ChapterEndpointEmpty: 查询无匹配
+    ChapterEndpointEmpty --> ChapterEndpoint: 清空查询
+    ChapterRange --> ChapterEndpoint: 重开起点，保留原范围
+    ChapterEndpointEmpty --> ChapterRange: 取消，保留原起止和六章
     NoChapterSelection --> ChapterRange: 起止确定后选中范围
     ChapterRange --> ChapterReview: 预览已读清单
-    ChapterReview --> ChapterRange: 取消且保留两章选择
+    ChapterReview --> ChapterRange: 取消且保留六章选择
     ChapterRange --> ChapterOptions: 明确退出并清空选择
     UncollectedDetails --> ChapterBookmarked: Tab和Return仅标记书签
     ChapterBookmarked --> UncollectedDetails: 明确移除书签
@@ -1020,22 +1027,26 @@ stateDiagram-v2
     ChapterSending --> ChapterConflict: revision冲突，待验
     ChapterSending --> ChapterExpired: 身份或Source失效，待验
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class UncollectedDetails,ChapterMatch,ChapterEmpty,ChapterOptions,ChapterOrderMenu,NoChapterSelection,ChapterReview,ChapterBookmarked paired
+    class UncollectedDetails,ChapterMatch,ChapterEmpty,ChapterOptions,ChapterOrderMenu,NoChapterSelection,ChapterRange,ChapterReview,ChapterBookmarked,ChapterEndpoint,ChapterEndpointEmpty paired
 ```
 
-| 状态 ID | 最小必要信息                                                | 浅色正式Web                                                         | 深色正式Web                                                        |
-| ------- | ----------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| 16.K1   | 名称、作者/源、简介、未收藏动作、章节数和返回；封面仍占位   | `karuyomi-b6bc240-details-uncollected-light.jpg`                    | `karuyomi-b6bc240-details-uncollected-dark.jpg`                    |
-| 17.K1   | 当前查询、1/3323数量、完整两行标题、次级章号/读态、独立书签 | `karuyomi-b6bc240-chapter-search-match-light.jpg`                   | `karuyomi-b6bc240-chapter-search-match-dark.jpg`                   |
-| 17.K2   | 查询、0/3323、无匹配说明及清空                              | `karuyomi-b6bc240-chapter-search-empty-light.jpg`                   | `karuyomi-b6bc240-chapter-search-empty-dark.jpg`                   |
-| 17.K3   | 展开状态、当前排序、仅书签及数量、读态筛选与刷新            | `karuyomi-b6bc240-chapter-options-light.jpg`                        | `karuyomi-b6bc240-chapter-options-dark.jpg`                        |
-| 17.K4   | 当前排序勾选、另一方向、官方菜单表面与可关闭                | `karuyomi-b6bc240-chapter-sort-light.jpg`                           | `karuyomi-b6bc240-chapter-sort-dark.jpg`                           |
-| 18.K1   | 已选0/隐藏0、退出/全选、清空禁用、范围起止未选              | `karuyomi-b6bc240-chapter-select-empty-light.jpg`                   | `karuyomi-b6bc240-chapter-select-empty-dark.jpg`                   |
-| 18.K2   | 选中数、隐藏数、完整起止身份、包含两端说明和提交前预览      | 待完整起止；已拍`karuyomi-b6bc240-chapter-range-selected-light.jpg` | 待完整起止；已拍`karuyomi-b6bc240-chapter-range-selected-dark.jpg` |
-| 18.K3   | 两章完整名称/来源序号、逐章提交与失败暂停影响、取消/确认    | `karuyomi-b6bc240-chapter-read-preview-light.jpg`                   | `karuyomi-b6bc240-chapter-read-preview-dark.jpg`                   |
-| 18.K4   | 书签图标/移除名称、对应首章、未读保持；API核对仅此章        | `karuyomi-b6bc240-chapter-bookmarked-light.jpg`                     | `karuyomi-b6bc240-chapter-bookmarked-dark.jpg`                     |
+| 状态 ID | 最小必要信息                                                | 浅色正式Web                                       | 深色正式Web                                      |
+| ------- | ----------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------ |
+| 16.K1   | 名称、作者/源、简介、未收藏动作、章节数和返回；封面仍占位   | `karuyomi-b6bc240-details-uncollected-light.jpg`  | `karuyomi-b6bc240-details-uncollected-dark.jpg`  |
+| 17.K1   | 当前查询、1/3323数量、完整两行标题、次级章号/读态、独立书签 | `karuyomi-b6bc240-chapter-search-match-light.jpg` | `karuyomi-b6bc240-chapter-search-match-dark.jpg` |
+| 17.K2   | 查询、0/3323、无匹配说明及清空                              | `karuyomi-b6bc240-chapter-search-empty-light.jpg` | `karuyomi-b6bc240-chapter-search-empty-dark.jpg` |
+| 17.K3   | 展开状态、当前排序、仅书签及数量、读态筛选与刷新            | `karuyomi-0c4da11-range-options-light.jpg`        | `karuyomi-0c4da11-range-options-dark.jpg`        |
+| 17.K4   | 当前排序勾选、另一方向、官方菜单表面与可关闭                | `karuyomi-b6bc240-chapter-sort-light.jpg`         | `karuyomi-b6bc240-chapter-sort-dark.jpg`         |
+| 18.K1   | 已选0/隐藏0、退出/全选、清空禁用、范围起止未选              | `karuyomi-b6bc240-chapter-select-empty-light.jpg` | `karuyomi-b6bc240-chapter-select-empty-dark.jpg` |
+| 18.K2   | 六章/隐藏0、完整起止身份、包含两端说明和提交前预览          | `karuyomi-0c4da11-range-selected-light.jpg`       | `karuyomi-0c4da11-range-selected-dark.jpg`       |
+| 18.K3   | 六章完整名称/来源序号、逐章提交与失败暂停影响、取消/确认    | `karuyomi-0c4da11-range-preview-light.jpg`        | `karuyomi-0c4da11-range-preview-dark.jpg`        |
+| 18.K4   | 书签图标/移除名称、对应首章、未读保持；API核对仅此章        | `karuyomi-b6bc240-chapter-bookmarked-light.jpg`   | `karuyomi-b6bc240-chapter-bookmarked-dark.jpg`   |
 
-两主题均实际选择来源第1→2项、预览两章并用Enter取消，再明确退出；未提交章节读态。单章书签由Tab聚焦后Return标记，未进入阅读器，随后明确移除。独立API最终accountRevision8，仅含三次主题、一次安装和四次书签增删；两主题预览取消零附写。搜索匹配、已选范围两图滚动锚点有差异，不计同位置像素对齐；普通Source封面、重复章节/扫描组实拍、长选项完整资料、30.K各故障与生产仍待。资料丢确认后重试及读取失败的正文/错误分离只有组件证据，详见[本轮验证](mihon-cupertino-fidelity.md#章节文字与书架资料确认的-cupertino-呈现)。
+历史`b6bc240`两主题实际选择来源第1→2项、预览两章并用Enter取消，再明确退出；单章书签由Tab聚焦后Return标记，未进入阅读器，随后明确移除。该轮独立API最终accountRevision8，仅含三次主题、一次安装和四次书签增删；两主题预览取消零附写。搜索匹配、已选范围两图滚动锚点有差异，不计同位置像素对齐。
+
+`0c4da11`在新的临时D1中补齐完整长选项和来源第8→13项的六章范围。两主题均Tab/Return打开起点、实际查询/无匹配/清空/取消并恢复焦点，浅色另Tab/Return精确选择第8项；重开已选起点、改无匹配并取消仍保留两个端点及六章。清单中Shift/Tab聚焦取消，深色Return、浅色Space退出均保留原范围，明确退出才清空。独立Protobuf解析确认两主题的完整账户/作品快照前后相同：最终accountRevision/global.revision3，只有两次主题和一次安装，漫画revision0、无收藏/书签/进度或续读。三张`range-{form-pair,query-pairs,preview-pair}.jpg`联系表已实看，深色水平转场中间帧排除主图，选项首屏图滚动锚点不同。原图与检查结果留在忽略目录，console无warn/error，Source正常收尾，临时标签和harness已关闭。
+
+普通Source封面、重复章节/扫描组实拍、30.K各故障、全部变体及生产仍待；双倍字号仅为组件证据。资料丢确认后重试及读取失败的正文/错误分离也只有组件证据，详见[章节验证](mihon-cupertino-fidelity.md#章节文字与书架资料确认的-cupertino-呈现)和[长选项验证](mihon-cupertino-fidelity.md#长选项与范围表单的自然尺寸)。
 
 ### 26：Karuyomi 最终 Cupertino 设置导航
 

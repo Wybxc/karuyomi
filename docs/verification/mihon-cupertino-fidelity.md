@@ -272,6 +272,12 @@
 
 共享选择、章节读态/列表、Source筛选/偏好、设置和主题共73项不同定向回归通过，五个改动Dart文件严格分析及依赖分层通过，均为本机低优先级单并发检查。日志留在忽略目录`long-choice-{verified,regression,chapter-list,analyze,dependencies}.log`；完整格式、标准hook、CI和新正式Web主图按后续结果记录。18.K2及29.K1/K2仍不填入已通过浏览器证据，保留`b6bc240`的历史省略缺口；尚未验证生产或Karuyomi原生。
 
+`0c4da11`随后通过完整格式、校验及标准prek，[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43707665730)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43707791195)完整通过，包含22+87+743=852项Dart、531项Vitest、严格分析、生成、Web及Wasm构建。CI Web的39条Flutter资源核验后，Vite组装68个公开文件和四个现有扩展；本机未运行Flutter/AOT编译。官方Wrangler临时D1、acceptance-owner、无fixture、360×800内置浏览器，在浅/深明确保存的主题中均打开真实英文xkcd及相同3323章，取得完整长选项、当前来源第8项勾选、查询命中/无匹配/清空、范围表单及六章只读清单的主图。`karuyomi-0c4da11-range-{form-pair,query-pairs,preview-pair}.jpg`三张联系表已实看。
+
+两主题实际Tab/Return打开范围起点，清空和取消回到零选择并恢复原按钮焦点；浅色另从查询输入Tab到唯一命中的来源第8项，再Return精确选择。两主题均选择来源第8→13项，完整起止名称与来源序号可见，确认清单为六章；重开起点、输入无匹配后取消仍保留两个端点与六章选择。清单中Shift/Tab回到实际取消按钮，深色Return、浅色Space取消均保留原范围，明确退出才清空；未提交章节读态或进入阅读器。
+
+正式Protobuf解析的独立API核对两主题各自完整账户和作品快照前后相同。最终accountRevision和global.revision均3，仅两次主题保存与一次扩展安装；主题LIGHT，漫画revision0，无收藏、资料、书签、进度或续读位置，分页游标为空。结果为`karuyomi-0c4da11-api-checks.json`，可复验脚本和原始快照留在忽略目录。Source正常返回目录，console无warn/error，视口恢复、标签关闭，harness退出0。第一次深色当前项图拍在水平转场中，另存`range-current-choice-dark-transition.jpg`并排除主图，稳定重拍已核对；两张章节选项图的滚动锚点不同，不能计同位置叠图。JPEG不作无损像素或精确颜色结论，双倍字号仍仅为组件证据；生产Access、资料故障、重复条目实拍、全部转换与变体继续待。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。
