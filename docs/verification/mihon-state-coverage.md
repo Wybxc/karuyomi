@@ -992,7 +992,7 @@ stateDiagram-v2
 
 ### 14：Karuyomi Source 会话偏好的目标状态
 
-此图补充真实Source的会话开关验证；文本、单选、多选、依赖、取消与账户恢复仍按14组参考和独有状态逐项补齐。以下`2df0551`主图已采用新表单分组，但Sheet顶部露出宿主浅灰背景，不能填作最终Cupertino全画面完成；根背景修复另验。历史`5ed6dd6`主图仍保留在本地记录，不再充当最新表单证据。
+此图补充真实Source的会话开关验证；文本、单选、多选、依赖、取消与账户恢复仍按14组参考和独有状态逐项补齐。`16baf47`已复验Sheet外围的双主题背景，替换关闭/开启及unsupported的主图；蓝色只表示最新双主题主画面已取得，转换及其它变体仍单列。重开/新文档的转换证据继续标明`2df0551`版本，该版顶部背景缺口保留；历史`5ed6dd6`主图也继续留存，不充当最新表单证据。
 
 ```mermaid
 stateDiagram-v2
@@ -1021,21 +1021,25 @@ stateDiagram-v2
     ToggleOn --> NewDocument: 新文档重新打开
     NewDocument --> ToggleOff: 会话设置恢复默认
     LoadingPreferences --> UnsupportedPreference: 节点不受支持
+    classDef paired fill:#dbeafe,color:#172554,stroke:#2563eb
+    class ToggleOff,ToggleOn,UnsupportedPreference paired
 ```
 
 | 状态 ID | 最小必要信息                            | 浅色正式Web                                                    | 深色正式Web                                             |
 | ------- | --------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------- |
 | 14.K1   | 源身份、正在读取、关闭可取消            | 待                                                             | 待                                                      |
-| 14.K2   | 设置名、关闭值、会话范围                | `karuyomi-2df0551-source-preferences-off-light.jpg`            | `karuyomi-2df0551-source-preferences-off-dark.jpg`      |
-| 14.K3   | 设置名、开启值、会话范围                | `karuyomi-2df0551-source-preferences-on-light.jpg`             | `karuyomi-2df0551-source-preferences-on-dark.jpg`       |
+| 14.K2   | 设置名、关闭值、会话范围                | `karuyomi-16baf47-source-preferences-off-light.jpg`            | `karuyomi-16baf47-source-preferences-off-dark.jpg`      |
+| 14.K3   | 设置名、开启值、会话范围                | `karuyomi-16baf47-source-preferences-on-light.jpg`             | `karuyomi-16baf47-source-preferences-on-dark.jpg`       |
 | 14.K4   | 请求进行中、重复操作禁用、关闭的影响    | 待                                                             | 待                                                      |
 | 14.K5   | 原请求身份/值、未知结果、精确重试与恢复 | 待                                                             | 待                                                      |
 | 14.K6   | 失败原因、现值、明确恢复入口            | 待                                                             | 待                                                      |
-| 14.K7   | 设置名、不支持原因、不可误操作          | `karuyomi-2df0551-source-preferences-off-light.jpg`            | `karuyomi-2df0551-source-preferences-off-dark.jpg`      |
+| 14.K7   | 设置名、不支持原因、不可误操作          | `karuyomi-16baf47-source-preferences-off-light.jpg`            | `karuyomi-16baf47-source-preferences-off-dark.jpg`      |
 | 14.K8   | 同一会话、已改值、范围说明              | `karuyomi-2df0551-source-preferences-reopened-light.jpg`       | `karuyomi-2df0551-source-preferences-reopened-dark.jpg` |
 | 14.K9   | 独立新文档、默认值、会话范围            | `karuyomi-2df0551-source-preferences-fresh-document-light.jpg` | 待                                                      |
 
 `2df0551`完整CI含805项Dart/531项Vitest及Web/Wasm通过；以上最新表单已双主题实看，Source与诊断均实际Tab/Enter可达，各独立操作不再合并，诊断末端完整。动漫屋1.6.3的“章末吐槽页”两主题完成0→1和同会话重开仍1，深色恢复0；镜像菜单均Enter打开/Escape取消，未改镜像。浅色实际reload后确认会话值为0，安装与主题从服务端恢复；独立API确认这些操作不变更账户，Source entries为空。浅色独立卸载后revision从3到4。跨源范围仅浅色实际Tab/Enter展开/收起，深色继续待验；诊断首次深色缺项帧保留并排除主图。未执行unsupported Cookie或动漫屋图片阅读；新背景修复、其它偏好控件及全部转换仍待，不将这些主图称作全组通过。
+
+随后`16baf47`完整CI通过（807项Dart/531项Vitest及Web/Wasm）。正式Web的新关闭/开启主图与`source-preferences-pair.png`已双主题实看，系统浅色/显式深色的Sheet顶部不再露出宿主浅灰背景；标准绿/灰开关与次级说明正常。同会话浅色0→1、改深色再进Source仍1、深色键盘Space恢复0及重开仍0通过。深色跨源范围也完成实际Tab/Enter收起/展开，图为`karuyomi-16baf47-cross-scope-{collapsed,expanded}-dark.jpg`，该缺口已补；独立API确认会话修改与范围导航不写账户。新文档转换仍只保留上版浅色证据，诊断首次缺项和其它类型/变体继续待办；这不是全组通过。
 
 ### 15：Karuyomi 跨源搜索的目标状态
 

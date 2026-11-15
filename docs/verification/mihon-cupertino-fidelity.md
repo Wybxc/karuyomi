@@ -146,7 +146,7 @@
 
 此前`5ed6dd6`中，现有公开动漫屋1.6.3包经传输验证后纳入隔离静态子集（Source 293789630396851172）；其真实热门目录有海贼王、青之芦苇等结果。真实“章末吐槽页”在系统深色和已确认浅色均完成关闭→开启→同会话关闭/重开仍开启，深色随后恢复关闭。该包无账户偏好同步规则；独立GET确认开关修改前后账户/全局revision分别保持1和2，Source账户entries为空。`karuyomi-5ed6dd6-dm5-{preferences-*,toggle-checks.json}`保留画面与检查。另留新文档浅色关闭图，但旧检查文件未确认该转换，继续待最新版本重放；不将会话内保存解释为跨文档同步。原“清除Cookie”缺少storage key，仍显示unsupported且未执行。MangaDex初次/重试中断和额外仓库预览失败保持原记录，不能被动漫屋成功覆盖。
 
-后续实现修正Source/设置目录/展开入口的键盘焦点，拆分独立操作语义，并将Source偏好改为官方表单分组、次级说明与系统红错误。66项定向回归和8文件严格分析通过，覆盖双主题键盘、独立操作、偏好会话/账户及既有恢复流程；新增测试首轮因语义句柄释放时机失败，修正测试生命周期后通过，原日志保留。完整格式/标准hook、CI和新正式Web仍分别待验，不以本地回归外推最终画面。
+后续实现修正Source/设置目录/展开入口的键盘焦点，拆分独立操作语义，并将Source偏好改为官方表单分组、次级说明与系统红错误。66项定向回归和8文件严格分析通过，覆盖双主题键盘、独立操作、偏好会话/账户及既有恢复流程；新增测试首轮因语义句柄释放时机失败，修正测试生命周期后通过，原日志保留。完整工程与新正式Web的后续结果如下，不以本地回归外推最终画面。
 
 该修改提交`2df0551`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43654041595)和[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43654046926)均完整成功，含805项Dart（22 + 87 + 696）、531项Vitest和正式Web/候选Wasm构建，未部署。完整format、format:check及标准prek已通过。39项Flutter静态清单长度/哈希验证后，仅本机低优先级Vite组装，复用官方Wrangler隔离harness、临时D1、acceptance-owner、无fixture和四个已发布扩展包；没有Flutter/AOT编译。
 
@@ -157,6 +157,12 @@
 深色Sheet内部颜色正确，但顶部露出浅灰宿主背景；DOM检查html/body/Flutter容器背景均透明。新增`app_backdrop_test.dart`用实际Sheet和根RepaintBoundary采样，在系统与显式主题相反时，两主题的外露像素均只有alpha=24，先复现失败。根应用builder增加按当前Cupertino主题绘制的背景后，外露像素不透明、颜色符合相应主题及官方转场遮罩，两项回归通过；连同原主题共7项通过，2文件严格分析零问题。Web manifest静态颜色也从模板蓝改为默认浅色分组背景。完整格式/标准hook、CI及该修复的新Web画面另验；这些本机渲染证据不替代正式浏览器复验。
 
 诊断展开后的首张深色图仍出现标题/部分内容缺项，滚动后恢复完整；失败图`extension-diagnostics-dark`保留且排除主图，不能无证据归因于动画，根背景修复也不声称解决此问题。全页、全状态/转换和生产验收继续待办。
+
+根背景修复提交`16baf47`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43662020089)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43662143831)完整成功：807项Dart（22 + 87 + 698）、531项Vitest、正式Web与候选Wasm构建通过，未部署。完整格式、format:check与标准prek通过。下载产物并验证39项Flutter清单后，仍仅以低优先级Vite组装、本机不编译Flutter/AOT；复用官方隔离harness、临时D1、acceptance-owner、无fixture及四个已发布扩展。
+
+该正式Web在360×800内置浏览器中完成系统浅色与显式深色的Source表单实看。系统仍为浅色且html/body透明，深色Sheet外露顶部现为黑色，正文/分组表面、辅助文字、标准绿/灰开关正常；`karuyomi-16baf47-source-preferences-{off,on}-{light,dark}.jpg`与`source-preferences-pair.png`已实看。浅色开关0→1，同会话返回设置确认深色后再进Source仍1；深色实际Tab至开关并Space恢复0、重开仍0。深色跨源范围实际Tab/Enter收起/展开，最终DOM的aria-expanded=true，成对状态图保留；浅色范围键盘证据仍对应`2df0551`。
+
+独立`karuyomi-16baf47-api-checks.json`确认浅色会话操作前后账户完全相同（revision=1），主题保存后为DARK/revision=2，深色开关与范围导航前后同样完全相同，Source账户entries为空。匿名manifest读回的两项静态颜色均为`#F2F2F7`；未验安装后启动画面或动态浏览器chrome。`browser-findings.json`保留精确范围；控制台无warn/error，视口恢复、临时标签关闭、harness退出0。未做该版本新文档续读、动漫屋图片、生产Access或原生现场验收。两种颜色截图仍是JPEG，不把采样当作无损色值或全页面完成。
 
 ### 实拍布局与颜色锚点
 
