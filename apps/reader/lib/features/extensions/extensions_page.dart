@@ -900,12 +900,25 @@ class const ExtensionRepositoriesPage({
     BuildContext context,
     wire.ExtensionRepository repository,
   ) async {
+    final affected = controller.installed
+        .where(
+          (item) =>
+              item.catalogUrl == repository.catalogUrl &&
+              item.repoId == repository.repoId,
+        )
+        .map(
+          (item) => ExtensionListing(
+            catalog: controller.catalog,
+            installed: item,
+          ).name,
+        )
+        .toList();
     final accepted = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('移除仓库'),
         content: Text(
-          '移除“${repository.name}”后，对应扩展暂时不可用；安装选择、书架和阅读记录保留。\n受影响扩展：${controller.installed.where((item) => item.catalogUrl == repository.catalogUrl && item.repoId == repository.repoId).map((item) => ExtensionListing(catalog: controller.catalog, installed: item).name).join('、')}',
+          '移除“${repository.name}”后，对应扩展暂时不可用；安装选择、书架和阅读记录保留。\n受影响扩展：${affected.isEmpty ? '无' : affected.join('、')}',
         ),
         actions: [
           CupertinoDialogAction(
@@ -958,23 +971,26 @@ class const ExtensionRepositoriesPage({
                         : null,
                     trailing: repository.catalogUrl == catalog.catalogUrl
                         ? null
-                        : CupertinoButton(
-                            key: ValueKey((
-                              'repository-remove',
-                              repository.catalogUrl,
-                            )),
-                            onPressed: controller.canEdit
-                                ? () => unawaited(
-                                    _removeRepository(context, repository),
-                                  )
-                                : null,
-                            padding: const EdgeInsets.all(8),
-                            foregroundColor: AppColors.error.resolveFrom(
-                              context,
-                            ),
-                            child: Icon(
-                              CupertinoIcons.trash,
-                              semanticLabel: '移除仓库：${repository.name}',
+                        : Semantics(
+                            container: true,
+                            child: CupertinoButton(
+                              key: ValueKey((
+                                'repository-remove',
+                                repository.catalogUrl,
+                              )),
+                              onPressed: controller.canEdit
+                                  ? () => unawaited(
+                                      _removeRepository(context, repository),
+                                    )
+                                  : null,
+                              padding: const EdgeInsets.all(8),
+                              foregroundColor: AppColors.error.resolveFrom(
+                                context,
+                              ),
+                              child: Icon(
+                                CupertinoIcons.trash,
+                                semanticLabel: '移除仓库：${repository.name}',
+                              ),
                             ),
                           ),
                   ),
@@ -1129,17 +1145,26 @@ class const ExtensionStoragePage({
                       CupertinoListTile(
                         title: Text(_name(artifact.sha256), maxLines: 2),
                         subtitle: Text(_bytes(artifact.byteLength)),
-                        trailing: CupertinoButton(
-                          key: ValueKey(('extension-forget', artifact.sha256)),
-                          onPressed:
-                              !controller.available ||
-                                  controller.busy ||
-                                  controller.catalog.busy
-                              ? null
-                              : () => unawaited(
-                                  controller.forget(artifact.sha256),
-                                ),
-                          child: const Text('清理副本'),
+                        trailing: Semantics(
+                          container: true,
+                          child: CupertinoButton(
+                            key: ValueKey((
+                              'extension-forget',
+                              artifact.sha256,
+                            )),
+                            onPressed:
+                                !controller.available ||
+                                    controller.busy ||
+                                    controller.catalog.busy
+                                ? null
+                                : () => unawaited(
+                                    controller.forget(artifact.sha256),
+                                  ),
+                            child: Text(
+                              '清理副本',
+                              semanticsLabel: '清理副本：${_name(artifact.sha256)}',
+                            ),
+                          ),
                         ),
                       ),
                   ],

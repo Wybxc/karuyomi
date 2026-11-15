@@ -585,82 +585,96 @@ void main() {
       testWidgets(
         'repository dialog confirms account changes explicitly at $appearance / $scale',
         (tester) async {
-          tester.platformDispatcher.textScaleFactorTestValue = scale;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          await tester.binding.setSurfaceSize(const Size(360, 800));
-          addTearDown(() => tester.binding.setSurfaceSize(null));
-          await tester.pumpApp(
-            CupertinoApp(
-              theme: readerAppTheme(appearance),
-              home: ExtensionsPage(
-                catalog: catalog,
-                repository: catalog.settings!,
+          final semantics = tester.ensureSemantics();
+          try {
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            await tester.binding.setSurfaceSize(const Size(360, 800));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            await tester.pumpApp(
+              CupertinoApp(
+                theme: readerAppTheme(appearance),
+                home: ExtensionsPage(
+                  catalog: catalog,
+                  repository: catalog.settings!,
+                ),
               ),
-            ),
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('extensions-more')));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('仓库管理'));
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('repositories-add')));
-          await tester.pumpAndSettle();
-          await tester.enterText(
-            find.byKey(const ValueKey('repository-url')),
-            'https://community.example',
-          );
-          await tester.enterText(
-            find.byKey(const ValueKey('repository-name')),
-            '社区',
-          );
-          await tester.tap(
-            find.byKey(const ValueKey('repository-preview-submit')),
-          );
-          await tester.pumpAndSettle();
-          expect(find.text('确认添加仓库'), findsOneWidget);
-          expect(posts(), isEmpty);
-          expect(platform.preparations, isEmpty);
-          await tester.tap(
-            find.byKey(const ValueKey('repository-add-confirm')),
-          );
-          await tester.pumpAndSettle();
-          expect(posts(), hasLength(1));
-          expect(
-            catalog.repositories.any(
-              (repository) => repository.catalogUrl == extraUrl,
-            ),
-            true,
-          );
-          final remove = find.byKey(ValueKey(('repository-remove', extraUrl)));
-          await tester.ensureVisible(remove);
-          await tester.tap(remove);
-          await tester.pumpAndSettle();
-          final confirm = find.byKey(
-            const ValueKey('repository-remove-confirm'),
-          );
-          expect(
-            tester.widget<CupertinoDialogAction>(confirm).isDestructiveAction,
-            true,
-          );
-          await tester.tap(find.text('取消'));
-          await tester.pumpAndSettle();
-          expect(posts(), hasLength(1));
-          expect(
-            catalog.repositories.any((item) => item.catalogUrl == extraUrl),
-            true,
-          );
-          await tester.tap(remove);
-          await tester.pumpAndSettle();
-          await tester.tap(confirm);
-          await tester.pumpAndSettle();
-          expect(posts(), hasLength(2));
-          expect(
-            catalog.repositories.any((item) => item.catalogUrl == extraUrl),
-            false,
-          );
-          expect(catalog.installedExtensions.single, testInstalledExtension());
-          expect(tester.takeException(), isNull);
-          await tester.pumpApp(const SizedBox());
+            );
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const ValueKey('extensions-more')));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('仓库管理'));
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const ValueKey('repositories-add')));
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('repository-url')),
+              'https://community.example',
+            );
+            await tester.enterText(
+              find.byKey(const ValueKey('repository-name')),
+              '社区',
+            );
+            await tester.tap(
+              find.byKey(const ValueKey('repository-preview-submit')),
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('确认添加仓库'), findsOneWidget);
+            expect(posts(), isEmpty);
+            expect(platform.preparations, isEmpty);
+            await tester.tap(
+              find.byKey(const ValueKey('repository-add-confirm')),
+            );
+            await tester.pumpAndSettle();
+            expect(posts(), hasLength(1));
+            expect(
+              catalog.repositories.any(
+                (repository) => repository.catalogUrl == extraUrl,
+              ),
+              true,
+            );
+            final remove = find.byKey(
+              ValueKey(('repository-remove', extraUrl)),
+            );
+            await tester.ensureVisible(remove);
+            expect(tester.getSemantics(remove).label, '移除仓库：社区');
+            await tester.tap(remove);
+            await tester.pumpAndSettle();
+            expect(find.textContaining('受影响扩展：无'), findsOneWidget);
+            final confirm = find.byKey(
+              const ValueKey('repository-remove-confirm'),
+            );
+            expect(
+              tester.widget<CupertinoDialogAction>(confirm).isDestructiveAction,
+              true,
+            );
+            await tester.tap(find.text('取消'));
+            await tester.pumpAndSettle();
+            expect(posts(), hasLength(1));
+            expect(
+              catalog.repositories.any((item) => item.catalogUrl == extraUrl),
+              true,
+            );
+            await tester.tap(remove);
+            await tester.pumpAndSettle();
+            await tester.tap(confirm);
+            await tester.pumpAndSettle();
+            expect(posts(), hasLength(2));
+            expect(
+              catalog.repositories.any((item) => item.catalogUrl == extraUrl),
+              false,
+            );
+            expect(
+              catalog.installedExtensions.single,
+              testInstalledExtension(),
+            );
+            expect(tester.takeException(), isNull);
+            await tester.pumpApp(const SizedBox());
+          } finally {
+            semantics.dispose();
+          }
         },
       );
     }

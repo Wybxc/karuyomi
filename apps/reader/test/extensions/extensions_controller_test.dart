@@ -463,71 +463,86 @@ void main() {
       testWidgets(
         'storage exposes keyboard diagnostics and clears only the local copy at $appearance / $scale',
         (tester) async {
-          tester.platformDispatcher.textScaleFactorTestValue = scale;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          await tester.binding.setSurfaceSize(const Size(360, 800));
-          addTearDown(() => tester.binding.setSurfaceSize(null));
-          await manager.install(catalog.builds.single);
-          final confirmed = await manager.repository.loadGlobal();
-          final writes = platform.businessServer.requests
-              .where((request) => request.method == 'POST')
-              .length;
-          await tester.pumpApp(
-            CupertinoApp(
-              theme: readerAppTheme(appearance),
-              home: ExtensionStoragePage(controller: manager),
-            ),
-          );
-          await tester.pumpAndSettle();
-          final note = tester.element(
-            find.text('清理副本后仍是账户已安装状态，重新打开时会再次下载。书架与阅读记录保留。'),
-          );
-          final noteStyle = DefaultTextStyle.of(note).style;
-          expect(noteStyle.fontSize, 13);
-          expect(noteStyle.color, AppColors.secondaryLabel.resolveFrom(note));
-          final clear = find.byKey(ValueKey(('extension-forget', 'a' * 64)));
-          final diagnostics = find.widgetWithText(CupertinoButton, '诊断信息');
-          CupertinoButton? focusedButton() => FocusManager
-              .instance
-              .primaryFocus
-              ?.context
-              ?.findAncestorWidgetOfExactType<CupertinoButton>();
-          for (
-            var attempt = 0;
-            attempt < 12 &&
-                focusedButton() != tester.widget<CupertinoButton>(diagnostics);
-            attempt++
-          ) {
+          final semantics = tester.ensureSemantics();
+          try {
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            await tester.binding.setSurfaceSize(const Size(360, 800));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            await manager.install(catalog.builds.single);
+            final confirmed = await manager.repository.loadGlobal();
+            final writes = platform.businessServer.requests
+                .where((request) => request.method == 'POST')
+                .length;
+            await tester.pumpApp(
+              CupertinoApp(
+                theme: readerAppTheme(appearance),
+                home: ExtensionStoragePage(controller: manager),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final note = tester.element(
+              find.text('清理副本后仍是账户已安装状态，重新打开时会再次下载。书架与阅读记录保留。'),
+            );
+            final noteStyle = DefaultTextStyle.of(note).style;
+            expect(noteStyle.fontSize, 13);
+            expect(noteStyle.color, AppColors.secondaryLabel.resolveFrom(note));
+            final clear = find.byKey(ValueKey(('extension-forget', 'a' * 64)));
+            expect(
+              tester.getSemantics(clear).label,
+              '清理副本：${testCatalogSource.name}',
+            );
+            final diagnostics = find.widgetWithText(CupertinoButton, '诊断信息');
+            CupertinoButton? focusedButton() => FocusManager
+                .instance
+                .primaryFocus
+                ?.context
+                ?.findAncestorWidgetOfExactType<CupertinoButton>();
+            for (
+              var attempt = 0;
+              attempt < 12 &&
+                  focusedButton() !=
+                      tester.widget<CupertinoButton>(diagnostics);
+              attempt++
+            ) {
+              await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+              await tester.pump();
+            }
+            expect(
+              focusedButton(),
+              tester.widget<CupertinoButton>(diagnostics),
+            );
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+            await tester.pumpAndSettle();
+            expect(find.textContaining('a' * 64), findsOneWidget);
+            expect(tester.takeException(), isNull);
+            await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
             await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
             await tester.pump();
+            expect(focusedButton(), tester.widget<CupertinoButton>(clear));
+            await tester.sendKeyEvent(LogicalKeyboardKey.space);
+            await tester.pumpAndSettle();
+            expect(find.text('本机没有扩展副本'), findsOneWidget);
+            expect(platform.cachedArtifacts, isEmpty);
+            expect(manager.installed.single, testInstalledExtension());
+            final after = await manager.repository.loadGlobal();
+            expect(after.global, confirmed.global);
+            expect(after.globalRevision, confirmed.globalRevision);
+            expect(
+              platform.businessServer.requests.where(
+                (request) => request.method == 'POST',
+              ),
+              hasLength(writes),
+            );
+            expect(tester.takeException(), isNull);
+            await tester.pumpApp(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+          } finally {
+            semantics.dispose();
           }
-          expect(focusedButton(), tester.widget<CupertinoButton>(diagnostics));
-          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-          await tester.pumpAndSettle();
-          expect(find.textContaining('a' * 64), findsOneWidget);
-          expect(tester.takeException(), isNull);
-          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-          await tester.pump();
-          expect(focusedButton(), tester.widget<CupertinoButton>(clear));
-          await tester.sendKeyEvent(LogicalKeyboardKey.space);
-          await tester.pumpAndSettle();
-          expect(find.text('本机没有扩展副本'), findsOneWidget);
-          expect(platform.cachedArtifacts, isEmpty);
-          expect(manager.installed.single, testInstalledExtension());
-          final after = await manager.repository.loadGlobal();
-          expect(after.global, confirmed.global);
-          expect(after.globalRevision, confirmed.globalRevision);
-          expect(
-            platform.businessServer.requests.where(
-              (request) => request.method == 'POST',
-            ),
-            hasLength(writes),
-          );
-          expect(tester.takeException(), isNull);
-          await tester.pumpApp(const SizedBox.shrink());
-          await tester.pumpAndSettle();
         },
       );
     }
