@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场。选择语义修复`10379e5`完整push/PR CI通过，正式Web辅助树因CI产物下载超时待验；此前长选项与范围表单的双主题实拍及独立API证据保留。封面编辑器已区分读取、选图、等待确认和草稿，相关回归与严格分析通过，正式Web仍待。按[逐状态流程图](../verification/mihon-state-coverage.md)推进，19.K1–K12主图全部待验；资料故障、迁移、全部变体与生产继续待办。详细检查与运行环境见[验证记录](../verification/mihon-cupertino-fidelity.md)，Komiic失败未记兼容通过。
+**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场。`c5f6759`完整push/PR CI通过（864项Dart、531项Vitest、Web/Wasm），正式Web双主题已核对短/长选择菜单的当前项DOM语义，以及封面草稿、保存、替换、取消清除、清除与新文档读回。独立API确认六次封面提交各写一次、草稿/取消零附写；19.K3/K4/K6/K7正常主图与K5非法输入变体已有。按[逐状态流程图](../verification/mihon-state-coverage.md)保留加载/等待、故障、禁用项、资料、迁移、全部变体与生产待办，不以正常流程替代。详细检查、缺帧与运行环境见[验证记录](../verification/mihon-cupertino-fidelity.md#封面与选择语义的正式-web-分项)，Komiic失败未记兼容通过。
 
 分类与批量清单`a9fb310`已有正式Web双主题菜单、名称/校验、草稿/取消、危险预览和分类选择分项，独立API核对十次UI写入和各取消区间零附写。`bbf69d7`进一步修复浅色确认正文和新建语义；57项书架/主题回归、五文件严格分析及正式Web双主题空态/列表、Tab/Return、草稿取消和确认正文复验通过，独立API核对九次UI写入。保存、未确认、暂停、拒绝和身份失效等主图仍待，分支未部署。
 
