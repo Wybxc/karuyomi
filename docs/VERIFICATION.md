@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-15，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场，尚未通过全范围视觉或生产验收。最新代码`b6bc240`完整push/PR CI通过，含844项Dart、531项Vitest及Web/Wasm。正式Web双主题补验真实xkcd章节完整长标题、搜索/选项、范围只读确认和独立书签，Protobuf解析的独立API核对八次明确UI写入及取消零附写。长范围选项省略和资料故障正式Web仍待。Komiic查询失败及镜像后容器中断不记兼容通过，空偏好正式Web仍待。[状态机](verification/mihon-state-coverage.md)继续逐项跟踪全部主图、转换与变体；生产Access/续读未验，Karuyomi原生现场验收保持停止。
+2026-11-15，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场，尚未通过全范围视觉或生产验收。已验证代码`b6bc240`完整push/PR CI通过，含844项Dart、531项Vitest及Web/Wasm。正式Web双主题补验真实xkcd章节完整长标题、搜索/选项、范围只读确认和独立书签，Protobuf解析的独立API核对八次明确UI写入及取消零附写。后续长选项与范围表单的73项相关组件回归、五文件严格分析通过，新正式Web及资料故障仍待。Komiic查询失败及镜像后容器中断不记兼容通过，空偏好正式Web仍待。[状态机](verification/mihon-state-coverage.md)继续逐项跟踪全部主图、转换与变体；生产Access/续读未验，Karuyomi原生现场验收保持停止。
 
 分类与批量分组`a9fb310`已有正式Web双主题菜单、名称/校验、草稿/取消、危险预览、分类选择与结果分项，独立API核对十次UI写入及各取消区间零附写。`bbf69d7`确认正文与新建语义修复的57项书架/主题回归、五文件严格分析和正式Web双主题空态/列表、Tab/Return、草稿取消及批量结果通过，独立API核对九次UI写入。未确认、暂停、拒绝和身份失效等主图仍待。
 

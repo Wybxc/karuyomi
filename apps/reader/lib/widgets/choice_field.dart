@@ -48,16 +48,16 @@ class const ChoiceField<T>({
               ],
             )
           : CupertinoListTile(
-              title: Text(
-                label,
-                maxLines: 2,
-                style: TextStyle(color: AppColors.label.resolveFrom(context)),
+              title: Builder(
+                builder: (context) => DefaultTextStyle(
+                  style: DefaultTextStyle.of(context).style,
+                  child: Text(label),
+                ),
               ),
-              subtitle: Text(
-                options[value] ?? '选择',
-                maxLines: 3,
-                style: TextStyle(
-                  color: AppColors.secondaryLabel.resolveFrom(context),
+              subtitle: Builder(
+                builder: (context) => DefaultTextStyle(
+                  style: DefaultTextStyle.of(context).style,
+                  child: Text(options[value] ?? '选择'),
                 ),
               ),
               trailing: const CupertinoListTileChevron(),
@@ -84,7 +84,12 @@ class const ChoiceField<T>({
                   trailing: item.key == value
                       ? const Icon(CupertinoIcons.check_mark)
                       : null,
-                  child: Text(item.value),
+                  child: Builder(
+                    builder: (context) => DefaultTextStyle(
+                      style: DefaultTextStyle.of(context).style,
+                      child: Text(item.value),
+                    ),
+                  ),
                 ),
             ],
             builder: (context, menu, child) =>
@@ -146,6 +151,7 @@ class const ChoicePage<T>({
                   ),
                 ),
                 clearButtonMode: OverlayVisibilityMode.editing,
+                clearButtonSemanticLabel: '清空选项搜索',
                 decoration: BoxDecoration(
                   color: AppColors.groupedSurface.resolveFrom(context),
                   borderRadius: BorderRadius.circular(10),
@@ -167,7 +173,12 @@ class const ChoicePage<T>({
                                     Navigator.of(context)
                                         .pop((value: item.key)),
                           child: CupertinoListTile(
-                            title: Text(item.value),
+                            title: Builder(
+                              builder: (context) => DefaultTextStyle(
+                                style: DefaultTextStyle.of(context).style,
+                                child: Text(item.value),
+                              ),
+                            ),
                             trailing: item.key == value
                                 ? const Icon(CupertinoIcons.check_mark)
                                 : null,

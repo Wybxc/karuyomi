@@ -1,5 +1,6 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/widgets/choice_field.dart';
 
@@ -16,13 +17,17 @@ void main() {
     required Map<String?, String> options,
     required ValueChanged<String?>? onChanged,
     Set<String?> disabled = const {},
+    bool inline = true,
+    Brightness? brightness,
   }) => tester.pumpWidget(
     CupertinoApp(
+      theme: CupertinoThemeData(brightness: brightness),
       home: CupertinoPageScaffold(
         child: Center(
           child: ChoiceField<String>(
             key: field,
             label: '选择',
+            inline: inline,
             value: 'one',
             options: options,
             disabledValues: disabled,
@@ -32,6 +37,88 @@ void main() {
       ),
     ),
   );
+
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'long choices preserve the visible occurrence and keyboard selection in $brightness at ${scale}x',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final semantics = tester.ensureSemantics();
+          try {
+            const title = '同名的很长章节名称，需要完整保留最后的来源序号才能区分独立条目';
+            const first = '$title · 来源第 1 项';
+            const second = '$title · 来源第 2 项';
+            final options = <String?, String>{
+              'one': first,
+              'two': second,
+              for (var index = 3; index < 12; index++) '$index': '其它章 $index',
+            };
+            final changed = <String?>[];
+            await show(
+              tester,
+              options: options,
+              onChanged: changed.add,
+              inline: false,
+              brightness: brightness,
+            );
+            expect(
+              tester
+                  .renderObject<RenderParagraph>(find.text(first))
+                  .didExceedMaxLines,
+              false,
+              reason:
+                  'the selected value must expose its full occurrence identity',
+            );
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+            await tester.pumpAndSettle();
+            final query = find.widgetWithText(CupertinoTextField, '查找选择');
+            await tester.enterText(query, '没有此来源');
+            await tester.pumpAndSettle();
+            expect(find.text('没有匹配的选项'), findsOneWidget);
+            expect(changed, isEmpty);
+            await tester.tap(find.bySemanticsLabel('清空选项搜索'));
+            await tester.pumpAndSettle();
+            expect(
+              tester.widget<CupertinoTextField>(query).controller!.text,
+              isEmpty,
+            );
+            await tester.enterText(query, '来源第 2 项');
+            await tester.pumpAndSettle();
+            expect(
+              tester
+                  .renderObject<RenderParagraph>(find.text(second))
+                  .didExceedMaxLines,
+              false,
+              reason: 'search results must retain the suffix distinguishing duplicate names',
+            );
+            await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+            await tester.pumpAndSettle();
+            expect(changed, isEmpty);
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+            await tester.pumpAndSettle();
+            await tester.enterText(query, '来源第 2 项');
+            await tester.pumpAndSettle();
+            Focus.of(tester.element(find.text(second))).requestFocus();
+            await tester.pumpAndSettle();
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+            await tester.pumpAndSettle();
+            expect(changed, ['two']);
+            expect(find.byType(ChoicePage<String>), findsNothing);
+            expect(tester.takeException(), isNull);
+          } finally {
+            semantics.dispose();
+          }
+        },
+      );
+    }
+  }
 
   testWidgets('a short menu can select null and restores trigger focus', (
     tester,

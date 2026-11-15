@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/rendering.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -58,12 +59,12 @@ ChapterSequence get _sequence => ChapterSequence(
   chapters: _chapters,
 );
 
-TestPlatform _platform() =>
+TestPlatform _platform({List<wire.Chapter>? chapters}) =>
     TestPlatform()
       ..invokeHandler = (call) async => switch (call.whichRequest()) {
         wire.SourceCall_Request.details => wire.SourceResult(manga: testManga),
         wire.SourceCall_Request.chapters => wire.SourceResult(
-          chapters: wire.ChapterList(chapters: _chapters),
+          chapters: wire.ChapterList(chapters: chapters ?? _chapters),
         ),
         wire.SourceCall_Request.pages => throw StateError(
           'Chapter marking must not fetch Source pages',
@@ -213,6 +214,69 @@ wire.StateMutation _command(TestBusinessRequest request) =>
     wire.decodeProtoJson(wire.StateMutation(), jsonDecode(request.body!));
 
 void main() {
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'long duplicate range endpoints remain readable without submitting in $brightness at ${scale}x',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          const name = '重复的很长章节标题，选择范围时需要完整保留来源序号';
+          final chapters = _chapters;
+          chapters[0].name = name;
+          chapters[2].name = name;
+          final platform = _platform(chapters: chapters);
+          final catalog = await _details(tester, platform);
+          platform.businessServer.requests.clear();
+          await _tap(tester, _control('chapter-selection-toggle'));
+          for (final (endpoint, occurrence) in [('start', 1), ('end', 3)]) {
+            final control = _control('chapter-range-$endpoint');
+            final label = '$name · 来源第 $occurrence 项';
+            await _tap(tester, control);
+            final option = find.text(label).last;
+            expect(
+              tester.renderObject<RenderParagraph>(option).didExceedMaxLines,
+              false,
+              reason: 'the menu must show the occurrence after the full name',
+            );
+            await _tap(tester, option);
+            await _reveal(tester, control);
+            final selected = find.descendant(
+              of: find.descendant(
+                of: control,
+                matching: find.byType(CupertinoListTile),
+              ),
+              matching: find.text(label),
+            );
+            expect(selected, findsOneWidget);
+            expect(
+              tester.renderObject<RenderParagraph>(selected).didExceedMaxLines,
+              false,
+              reason: 'the selected endpoint must retain the full occurrence',
+            );
+          }
+          await _tap(tester, _control('chapter-select-range'));
+          await _tap(tester, _control('chapter-mark-read'));
+          expect(find.text('确认清单：3 章'), findsOneWidget);
+          expect(_posts(platform), isEmpty);
+          await _tap(tester, find.text('取消'));
+          final selection = find.text('已选 3 章 · 当前隐藏 0 章');
+          await _reveal(tester, selection);
+          expect(selection, findsOneWidget);
+          expect(_posts(platform), isEmpty);
+          await _finish(tester, platform, catalog);
+        },
+      );
+    }
+  }
   for (final retire in [false, true]) {
     test(
       'a queued chapter refresh respects an in-flight read and retirement: $retire',

@@ -723,18 +723,16 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
       String key,
       String? value,
       ValueChanged<String?> change,
-    ) => SizedBox(
-      width: 280,
-      child: ChoiceField<String>(
-        key: ValueKey(key),
-        label: label,
-        value: value,
-        options: {
-          for (final chapter in visible)
-            chapter.key: '${chapter.name} · 来源第 ${chapter.sourceIndex + 1} 项',
-        },
-        onChanged: canSelect ? change : null,
-      ),
+    ) => ChoiceField<String>(
+      key: ValueKey(key),
+      inline: false,
+      label: label,
+      value: value,
+      options: {
+        for (final chapter in visible)
+          chapter.key: '${chapter.name} · 来源第 ${chapter.sourceIndex + 1} 项',
+      },
+      onChanged: canSelect ? change : null,
     );
     return [
       Wrap(
@@ -840,9 +838,9 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
             ),
           ],
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        CupertinoFormSection.insetGrouped(
+          margin: EdgeInsets.zero,
+          footer: const Text('范围按当前显示顺序的两个端点选择，包含两端；重复条目分别保留。'),
           children: [
             rangeEndpoint(
               '范围起点',
@@ -879,7 +877,6 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
             ),
           ],
         ),
-        const Text('范围按当前显示顺序的两个端点选择，包含两端；重复条目分别保留。'),
         Wrap(
           spacing: 8,
           children: [
@@ -987,33 +984,26 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                     _chapterRead!.mangaKey,
                   ) !=
                   null)) ...[
-        Row(
-          children: [
-            const Text('章节排序'),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ChoiceField<ChapterOrder>(
-                key: const ValueKey('chapter-list-order'),
-                label: '章节排序',
-                value: _chapterOrder,
-                options: {
-                  ChapterOrder.source: '来源顺序',
-                  ChapterOrder.reversed: '反向来源顺序',
+        ChoiceField<ChapterOrder>(
+          key: const ValueKey('chapter-list-order'),
+          inline: false,
+          label: '章节排序',
+          value: _chapterOrder,
+          options: {
+            ChapterOrder.source: '来源顺序',
+            ChapterOrder.reversed: '反向来源顺序',
+          },
+          onChanged: _opening
+              ? null
+              : (order) {
+                  if (order != null) {
+                    setState(() {
+                      _chapterOrder = order;
+                      _chapterOrderChosen = true;
+                      _resetRange();
+                    });
+                  }
                 },
-                onChanged: _opening
-                    ? null
-                    : (order) {
-                        if (order != null) {
-                          setState(() {
-                            _chapterOrder = order;
-                            _chapterOrderChosen = true;
-                            _resetRange();
-                          });
-                        }
-                      },
-              ),
-            ),
-          ],
         ),
         if (_bookmarks case final bookmarks?) ...[
           MergeSemantics(

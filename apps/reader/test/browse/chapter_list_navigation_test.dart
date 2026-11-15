@@ -134,7 +134,10 @@ Future<CatalogController> _details(
 
 Finder get _tiles => find.descendant(
   of: find.byType(MangaDetailsPage),
-  matching: find.byType(CupertinoListTile),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is CupertinoListTile && widget.key is ValueKey<String>,
+    description: 'chapter rows with occurrence keys',
+  ),
 );
 
 Finder _row(int sourceIndex) =>
