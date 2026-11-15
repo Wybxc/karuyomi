@@ -1122,6 +1122,69 @@ stateDiagram-v2
 
 `5ed6dd6`浅色列表与候选详情已实看，Tab/空格可达，Enter仍失败，61语言还截断版本/状态，因此继续排除08.K1/09.K1最终通过。已安装MangaDex的绿色开关、系统红卸载及页脚已有浅色布局图，同样因摘要缺口不计09.K2完成。`9a09331`完整CI和上述双主题正式Web已确认版本/状态可见，候选Enter可用；历史失败继续保留。浅色列表有一个已安装项，深色可安装图尚未安装，不能作为同数据像素叠图。当时Source及诊断入口无键盘焦点，09.K2/09.K3仅为画面和启停证据；后续`2df0551`已补双主题键盘与独立语义，正文选择/复制和其它变体仍待。准备/等待确认未截到主图，诊断展开中标题缺失帧也排除。MangaDex英文Source初次和一次重试均容器中断，不能填入Source toggle的通过项。
 
+### 13：Karuyomi typed Source 筛选的目标状态
+
+这里跟踪最终Cupertino表单的产品状态，与上方Mihon参考13.01–13.07分别验收。当前只有30项相关组件/控制器回归，正式Web主图尚待采集；不将模拟描述或历史Material配色的画面填成通过。分组仍保留Source原始path，加载、重置、应用和失败不能合成一个已通过状态。
+
+```mermaid
+stateDiagram-v2
+    [*] --> LoadingFilters
+    state "13.K1 正在读取筛选" as LoadingFilters
+    state "13.K2 筛选字段就绪" as FiltersReady
+    state "13.K3 已修改筛选草稿" as FilterDraft
+    state "13.K4 选择项展开" as FilterChoice
+    state "13.K5 正在重置筛选" as ResettingFilters
+    state "13.K6 正在应用筛选" as ApplyingFilters
+    state "13.K7 描述读取失败" as FilterLoadFailed
+    state "13.K8 应用失败保留草稿" as FilterApplyFailed
+    state "13.K9 会话已变化" as FilterSessionChanged
+    state "13.K10 无额外筛选" as EmptyFilters
+    LoadingFilters --> FiltersReady: 描述成功且有字段
+    LoadingFilters --> EmptyFilters: 描述成功且无字段
+    LoadingFilters --> FilterLoadFailed: 读取失败
+    FilterLoadFailed --> LoadingFilters: 明确重试
+    FiltersReady --> FilterDraft: 编辑开关或文本
+    FiltersReady --> FilterChoice: 打开选择
+    FilterDraft --> FilterChoice: 打开选择
+    FilterChoice --> FiltersReady: 取消且原无修改
+    FilterChoice --> FilterDraft: 选择或原有草稿
+    FiltersReady --> ResettingFilters: 重置
+    FilterDraft --> ResettingFilters: 重置
+    EmptyFilters --> ResettingFilters: 重新取得描述
+    ResettingFilters --> FiltersReady: 新草稿且有字段
+    ResettingFilters --> EmptyFilters: 新草稿且无字段
+    ResettingFilters --> FilterLoadFailed: 重置失败且原列表保留
+    FiltersReady --> ApplyingFilters: 应用
+    FilterDraft --> ApplyingFilters: 应用
+    EmptyFilters --> ApplyingFilters: 按默认条件搜索
+    ApplyingFilters --> FilterApplyFailed: 失败且原列表保留
+    FilterApplyFailed --> ApplyingFilters: 重试当前草稿
+    FilterApplyFailed --> FilterDraft: 修改后重试
+    ApplyingFilters --> [*]: 搜索成功后关闭并展示新列表
+    LoadingFilters --> FilterSessionChanged: 身份或会话变化
+    FiltersReady --> FilterSessionChanged: 身份或会话变化
+    ApplyingFilters --> FilterSessionChanged: 身份或会话变化
+    FiltersReady --> [*]: 取消并丢弃未应用草稿
+    FilterDraft --> [*]: 取消并丢弃未应用草稿
+    LoadingFilters --> [*]: 取消请求并关闭，会话可能退役
+    ResettingFilters --> [*]: 取消请求并关闭，会话可能退役
+    ApplyingFilters --> [*]: 取消请求并关闭，会话可能退役
+    FilterSessionChanged --> [*]: 关闭后重新打开
+```
+
+| 状态 ID | 最小必要信息                                                 | 浅色正式Web | 深色正式Web |
+| ------- | ------------------------------------------------------------ | ----------- | ----------- |
+| 13.K1   | 源内查询上下文、读取进度、取消后果、重复动作禁用             | 待          | 待          |
+| 13.K2   | 分组与typed当前值、重置/应用/取消；说明标题与空分组不丢失    | 待          | 待          |
+| 13.K3   | 修改后的值、仍未应用、原列表保持、明确应用/取消              | 待          | 待          |
+| 13.K4   | 选项、当前选择及键盘焦点、取消；长选项另走29组查询页         | 待          | 待          |
+| 13.K5   | 明确重置进度、旧已应用条件不变、取消后果、重复动作禁用       | 待          | 待          |
+| 13.K6   | 明确应用进度、冻结的草稿、原列表保持、取消后果、重复动作禁用 | 待          | 待          |
+| 13.K7   | 读取/重置失败原因、重试/关闭、原列表保持                     | 待          | 待          |
+| 13.K8   | 应用失败原因、保留的草稿、可编辑并重试/取消、原列表保持      | 待          | 待          |
+| 13.K9   | 会话变化说明、停止使用旧草稿、关闭并重新打开                 | 待          | 待          |
+| 13.K10  | 无额外筛选说明、默认条件搜索与取消、仍可重置                 | 待          | 待          |
+
 ### 14：Karuyomi Source 会话偏好的目标状态
 
 此图补充真实Source的会话开关验证；文本、单选、多选、依赖、取消与账户恢复仍按14组参考和独有状态逐项补齐。`16baf47`已复验Sheet外围的双主题背景，替换关闭/开启及unsupported的主图；蓝色只表示最新双主题主画面已取得，转换及其它变体仍单列。重开/新文档的转换证据继续标明`2df0551`版本，该版顶部背景缺口保留；历史`5ed6dd6`主图也继续留存，不充当最新表单证据。
