@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
 import 'package:karuyomi/theme/app_theme.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
 import 'preference_fixtures.dart';
 
@@ -71,6 +72,86 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'empty and group-first Source preferences keep their labels and inherited disabled state in $appearance',
+      (tester) async {
+        final original = fixture.platform.invokeHandler!;
+        var empty = false;
+        fixture.platform.invokeHandler = (call) async {
+          final result = await original(call);
+          if (call.hasGetPreferences()) {
+            final toggle = result.preferences.nodes.first.deepCopy();
+            result.preferences.nodes
+              ..clear()
+              ..addAll(
+                empty
+                    ? []
+                    : [
+                        wire.PreferenceNode(
+                          title: '父级已禁用',
+                          visible: true,
+                          enabled: false,
+                          syncScope: accountScope,
+                          group: wire.PreferenceGroup(
+                            nodes: [
+                              wire.PreferenceNode(
+                                title: '空分组说明',
+                                visible: true,
+                                enabled: true,
+                                syncScope: accountScope,
+                                group: wire.PreferenceGroup(),
+                              ),
+                              wire.PreferenceNode(
+                                title: '嵌套条件',
+                                visible: true,
+                                enabled: true,
+                                syncScope: accountScope,
+                                group: wire.PreferenceGroup(nodes: [toggle]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+              );
+          }
+          return result;
+        };
+        await open(tester, appearance: appearance);
+        expect(tester.takeException(), isNull);
+        expect(find.text('父级已禁用'), findsOneWidget);
+        expect(find.text('空分组说明'), findsOneWidget);
+        expect(find.text('嵌套条件'), findsOneWidget);
+        final toggle = find.byKey(
+          const ValueKey(('source-preference', '0.1.0')),
+        );
+        expect(tester.widget<CupertinoSwitch>(toggle).onChanged, isNull);
+        final footer = tester.element(find.textContaining('每次修改只执行一次漫画源操作。'));
+        expect(DefaultTextStyle.of(footer).style.fontSize, 13);
+        expect(
+          DefaultTextStyle.of(footer).style.color,
+          CupertinoColors.secondaryLabel.resolveFrom(footer),
+        );
+        empty = true;
+        final refresh = find.byKey(
+          const ValueKey('source-preferences-refresh'),
+        );
+        await tester.ensureVisible(refresh);
+        await tester.tap(refresh);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final noPreferences = tester.element(find.text('这个漫画源没有额外设置。'));
+        expect(DefaultTextStyle.of(noPreferences).style.fontSize, 13);
+        expect(
+          DefaultTextStyle.of(noPreferences).style.color,
+          CupertinoColors.secondaryLabel.resolveFrom(noPreferences),
+        );
+        expect(find.text('父级已禁用'), findsNothing);
+        expect(fixture.postedBodies, isEmpty);
+        expect(fixture.callbacks, 0);
+        await tester.tap(iconLabel('关闭设置'));
+        await tester.pumpAndSettle();
+      },
+    );
     testWidgets(
       'source preference controls and help keep separate semantic roles in $appearance',
       (tester) async {

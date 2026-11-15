@@ -294,6 +294,10 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
     Widget? footer,
   }) {
     final sections = <Widget>[];
+    final captionStyle = TextStyle(
+      fontSize: 13,
+      color: AppColors.secondaryLabel.resolveFrom(context),
+    );
     var rows = <Widget>[];
     void flush() {
       if (rows.isEmpty && header == null) return;
@@ -301,11 +305,20 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
         Semantics(
           container: true,
           explicitChildNodes: true,
-          child: CupertinoFormSection.insetGrouped(
-            header: header,
-            footer: footer,
-            children: rows,
-          ),
+          child: rows.isEmpty
+              ? CupertinoListSection.insetGrouped(
+                  header: header == null
+                      ? null
+                      : DefaultTextStyle(style: captionStyle, child: header!),
+                  footer: footer == null
+                      ? null
+                      : DefaultTextStyle(style: captionStyle, child: footer!),
+                )
+              : CupertinoFormSection.insetGrouped(
+                  header: header,
+                  footer: footer,
+                  children: rows,
+                ),
         ),
       );
       rows = [];
