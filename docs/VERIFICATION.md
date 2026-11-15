@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-15，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场，尚未通过全范围视觉或生产验收。`1e50a82`完整push/PR CI通过（820项Dart、531项Vitest及Web/Wasm），正式Web双主题验证源空态、仓库独立移除名称和空影响、单/多副本的真实键盘入口；深色Return/Space清零，独立API确认清理零附写。浅色首次确认未提交、确认框内部键盘与诊断缺项帧保留；14个弹窗动作改用官方按钮后95项定向回归通过，最新完整CI/Web继续。[状态机](verification/mihon-state-coverage.md)逐项跟踪全部主图、转换与变体，生产Access/续读仍待，Karuyomi原生现场验收保持停止。
+2026-11-15，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场，尚未通过全范围视觉或生产验收。确认框键盘修复`4467ceb`的95项定向回归、6文件严格分析及完整push/PR CI通过（820项Dart、531项Vitest及Web/Wasm）；正式Web双主题实际Tab进入弹窗，以Return/Space完成仓库添加与移除，独立API确认预览/取消零附写和五次明确写入。此前`1e50a82`的源空态、独立操作名称和副本清理证据保留，浅色首次移除失败及诊断缺项帧不抹除。[状态机](verification/mihon-state-coverage.md)逐项跟踪全部主图、转换与变体，其它弹窗的正式Web、生产Access/续读仍待，Karuyomi原生现场验收保持停止。
 
 2026-11-13，[Liquid Glass](verification/liquid-glass.md)已按用户决定终止，[统一 Cupertino 已恢复并生产上线](verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源与匿名 Access 门禁通过；内置浏览器确认导航、真实图片、翻页保存、主题保存及独立新文档第 2 页续读，独立 D1 核对续读前后状态一致。玻璃库、专用设置及资源已移除。原玻璃性能对照未完成，不宣称能耗结论；代码削减另立重构，原生现场验证保持停止。
 

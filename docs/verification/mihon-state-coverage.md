@@ -1002,18 +1002,20 @@ stateDiagram-v2
     class Repositories,EmptyRepositoryInput,RepositoryInput,RepositoryError,ConfirmingRepository,RemovingRepository,RepositoryDiagnostics paired
 ```
 
-| 状态 ID | 最小必要信息                                                       | 浅色正式Web                                              | 深色正式Web                                            |
-| ------- | ------------------------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------ |
-| 10.K1   | 仓库名、地址/状态、默认标记、独立移除、添加/刷新与诊断入口         | `karuyomi-1e50a82-repositories-added-light.jpg`          | `karuyomi-1e50a82-repositories-added-dark.jpg`         |
-| 10.K2   | 地址、可选名称、预览与取消                                         | `karuyomi-76309ed-repositories-input-empty-light.jpg`    | `karuyomi-76309ed-repositories-input-empty-dark.jpg`   |
-| 10.K3   | 已填写地址/名称、预览与取消、键盘                                  | `karuyomi-76309ed-repositories-input-filled-light.jpg`   | `karuyomi-76309ed-repositories-input-filled-dark.jpg`  |
-| 10.K4   | 正在预览、列表上下文、编辑禁用且尚未写账户                         | 待                                                       | 待                                                     |
-| 10.K5   | 具体错误、修改/重试入口和已登记列表                                | `karuyomi-76309ed-repositories-invalid-light.jpg`        | `karuyomi-76309ed-repositories-invalid-dark.jpg`       |
-| 10.K6   | 解析后的名称/域名/扩展数、明确添加与取消                           | `karuyomi-76309ed-repositories-confirm-light.jpg`        | `karuyomi-76309ed-repositories-confirm-dark.jpg`       |
-| 10.K7   | 原提交对象、等待服务端、禁止新操作                                 | 待                                                       | 待                                                     |
-| 10.K8   | 待移除对象、影响为空时明确“无”、危险确认与取消；弹窗内键盘另待修复 | `karuyomi-1e50a82-repositories-remove-confirm-light.jpg` | `karuyomi-1e50a82-repositories-remove-stable-dark.jpg` |
-| 10.K9   | 待移除对象、未确认状态和恢复入口                                   | 待                                                       | 待                                                     |
-| 10.K10  | 仓库完整URL/身份与读取错误、滚动和收起                             | `karuyomi-76309ed-repositories-diagnostics-light.jpg`    | `karuyomi-76309ed-repositories-diagnostics-dark.jpg`   |
+| 状态 ID | 最小必要信息                                                         | 浅色正式Web                                                                                        | 深色正式Web                                                                                      |
+| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 10.K1   | 仓库名、地址/状态、默认标记、独立移除、添加/刷新与诊断入口           | `karuyomi-4467ceb-repositories-added-light.jpg`、`karuyomi-4467ceb-repositories-removed-light.jpg` | `karuyomi-4467ceb-repositories-added-dark.jpg`、`karuyomi-4467ceb-repositories-removed-dark.jpg` |
+| 10.K2   | 地址、可选名称、预览与取消                                           | `karuyomi-4467ceb-repositories-input-empty-light.jpg`                                              | `karuyomi-4467ceb-repositories-input-empty-dark.jpg`                                             |
+| 10.K3   | 已填写地址/名称、预览与取消、键盘                                    | `karuyomi-4467ceb-repositories-input-filled-light.jpg`                                             | `karuyomi-4467ceb-repositories-input-filled-dark.jpg`                                            |
+| 10.K4   | 正在预览、列表上下文、编辑禁用且尚未写账户                           | 待                                                                                                 | 待                                                                                               |
+| 10.K5   | 具体错误、修改/重试入口和已登记列表                                  | `karuyomi-76309ed-repositories-invalid-light.jpg`                                                  | `karuyomi-76309ed-repositories-invalid-dark.jpg`                                                 |
+| 10.K6   | 解析后的名称/域名/扩展数、明确添加与取消、真实Tab与键盘确认          | `karuyomi-4467ceb-repositories-add-confirm-light.jpg`                                              | `karuyomi-4467ceb-repositories-add-confirm-dark.jpg`                                             |
+| 10.K7   | 原提交对象、等待服务端、禁止新操作                                   | 待                                                                                                 | 待                                                                                               |
+| 10.K8   | 待移除对象、影响为空时明确“无”、危险确认与取消、真实Tab/Return/Space | `karuyomi-4467ceb-repositories-remove-confirm-light.jpg`                                           | `karuyomi-4467ceb-repositories-remove-confirm-dark.jpg`                                          |
+| 10.K9   | 待移除对象、未确认状态和恢复入口                                     | 待                                                                                                 | 待                                                                                               |
+| 10.K10  | 仓库完整URL/身份与读取错误、滚动和收起                               | `karuyomi-76309ed-repositories-diagnostics-light.jpg`                                              | `karuyomi-76309ed-repositories-diagnostics-dark.jpg`                                             |
+
+`4467ceb`已实际完成两主题输入→预览→取消/确认添加→列表→取消/确认移除→列表的键盘转换，独立API确认取消不写入，五次明确写入至revision5。此处的主图标记仍不代表预览/保存瞬态、错误恢复、其它变体或整组已验；旧版`1e50a82`浅色确认点击未提交与诊断缺帧继续保留在验证记录。
 
 ```mermaid
 stateDiagram-v2

@@ -196,6 +196,14 @@
 
 `storage-empty-diagnostics-dark.jpg`仍缺顶部标题与摘要，AX含有这些内容；该帧排除主图，原因未定。初次深色移除确认偏透明，完整稳定帧作为主图，早期帧保留；不把重拍算作缺帧根因已解决。全部截图为JPEG，不能用于无损像素/颜色结论。`console-tab19.json`无warn/error；两harness正常退出0，视口恢复且临时标签关闭。本轮未打开实际Source目录或图片，未执行生产Access、续读或原生现场验收。
 
+### 确认弹窗的双主题键盘复验
+
+`4467ceb`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43680418792)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43680529738)完整成功，包含820项Dart（22 + 87 + 711）、531项Vitest及正式Web/候选Wasm构建。39项Flutter清单长度/哈希通过后，仅低优先级Vite组装；官方Wrangler隔离harness、临时D1、acceptance-owner、360×800内置浏览器继续使用，无应用fixture、无扩展安装。空仓库由独立官方Static Assets harness提供，仅验证预览和账户确认，不代表第三方兼容性。
+
+两主题的空白/已填写仓库输入、添加确认、已添加列表、取消焦点、移除确认与已移除列表均已保存AX/JPEG。真实Tab依次到达地址、名称、取消与只读预览；浅色Return取消预览，Space确认添加/移除，Return取消移除；深色Return确认添加/移除，Space取消移除。弹窗内部按钮名称独立，默认强调、系统蓝/危险红和焦点圈已实看。浅/深移除确认与结果联系表也已实看；JPEG原图不能作无损颜色或像素结论。
+
+`karuyomi-4467ceb-api-checks.json`断言只读预览、预览取消和两主题移除取消前后账户JSON字节相同；五次明确写入为浅色添加/移除、DARK主题、深色添加/移除，revision依次0→1→2→3→4→5。最终DARK、零扩展安装、零额外仓库。`karuyomi-4467ceb-browser-findings.json`记录环境与范围，tab20无warn/error；视口恢复、临时标签关闭，两harness正常退出0。此次仅对仓库的添加/移除确认完成正式Web复验，其余弹窗保留95项组件回归的证据边界；未执行Source、真实图片、生产Access、续读或原生现场验收。`1e50a82`的浅色失败和诊断缺帧保留，不以新版本成功覆盖旧事实。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。
