@@ -67,7 +67,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
-**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，完整保留两阶段及全部现有页面范围，最终统一Cupertino。`9a09331`完整CI与扩展双主题正式Web分项通过；Source/目录/展开键盘和偏好表单的后续修改已通过66项定向回归、8文件严格分析，最新CI/Web待验。旧版动漫屋真实会话toggle已取得双主题证据，MangaDex失败保留。按[逐状态流程图](../verification/mihon-state-coverage.md)继续补齐转换、变体和逐页对照，全部差异与证据见对应记录；生产验收仍待。
+**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，保留两阶段和全部现有页面范围，最终统一Cupertino导航、控件、配色与转场。`2df0551`完整CI通过（805项Dart、531项Vitest及Web/Wasm），正式Web补验双主题Source/诊断键盘、独立语义和偏好表单、浅色新文档会话恢复及卸载，独立API核对通过。Sheet外露宿主底色已定位并修复，7项主题/渲染回归及严格分析通过，新CI/Web待验；诊断首帧缺项与MangaDex失败继续保留。按[逐状态流程图](../verification/mihon-state-coverage.md)补齐全部转换、变体和逐页对照，生产验收仍待。
 
 参考采集按[状态机与双主题截图清单](../verification/mihon-state-coverage.md)推进；加载、空态、失败、选择、编辑与弹层逐状态记录，只有单主题或只有根页截图均不算完成。
 

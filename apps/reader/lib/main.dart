@@ -57,9 +57,12 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
       const SingleActivator(LogicalKeyboardKey.numpadEnter):
           const ActivateIntent(),
     },
-    builder: readerBaselineEnabled
-        ? (context, child) => ReaderBaselineHost(child: child!)
-        : null,
+    // Sheet transitions expose the area outside the transformed page. Paint
+    // that area in the confirmed appearance rather than the host's background.
+    builder: (context, child) => ColoredBox(
+      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      child: readerBaselineEnabled ? ReaderBaselineHost(child: child!) : child!,
+    ),
     debugShowCheckedModeBanner: false,
     locale: const Locale('zh'),
     supportedLocales: const [Locale('zh'), Locale('en')],

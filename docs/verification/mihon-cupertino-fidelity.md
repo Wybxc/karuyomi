@@ -148,6 +148,16 @@
 
 后续实现修正Source/设置目录/展开入口的键盘焦点，拆分独立操作语义，并将Source偏好改为官方表单分组、次级说明与系统红错误。66项定向回归和8文件严格分析通过，覆盖双主题键盘、独立操作、偏好会话/账户及既有恢复流程；新增测试首轮因语义句柄释放时机失败，修正测试生命周期后通过，原日志保留。完整格式/标准hook、CI和新正式Web仍分别待验，不以本地回归外推最终画面。
 
+该修改提交`2df0551`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43654041595)和[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43654046926)均完整成功，含805项Dart（22 + 87 + 696）、531项Vitest和正式Web/候选Wasm构建，未部署。完整format、format:check及标准prek已通过。39项Flutter静态清单长度/哈希验证后，仅本机低优先级Vite组装，复用官方Wrangler隔离harness、临时D1、acceptance-owner、无fixture和四个已发布扩展包；没有Flutter/AOT编译。
+
+在360×800内置浏览器中，系统实际浅色，随后由UI确认深色再确认浅色。两主题均实际Tab到Source/诊断并Enter打开，卸载、源与状态信息各有独立语义；诊断滚动至最后一行完整构建哈希。最新Source表单的镜像选择、两个开关、unsupported说明互相独立，辅助说明使用次级文字。动漫屋真实“章末吐槽页”两主题完成0→1、关闭/同会话重开仍1，深色恢复0；镜像菜单均只查看并Escape取消。浅色跨源范围Tab/Enter收起及展开、深色设置目录Tab/Enter进入外观详情也已实测。
+
+浅色实际reload后重新打开同一Source，开关为0；安装关系与LIGHT主题从服务端恢复。随后用独立卸载按钮Enter操作，页面显示账户卸载已确认。`karuyomi-2df0551-api-checks.json`独立核对：导航前后账户JSON相同；深色主题保存/安装后revision=2，切浅色后=3；两主题会话修改/重开/菜单、reload与范围导航均不增加revision，账户Source entries为空；卸载后revision=4且安装列表为空。这是会话边界与隔离账户确认，不是跨端偏好同步或生产读写。`karuyomi-2df0551-browser-findings.json`及同前缀JPEG/AX保留范围，控制台无warn/error；视口恢复、临时标签关闭、harness退出0。未执行unsupported Cookie或动漫屋图片阅读，MangaDex容器中断继续保留。
+
+深色Sheet内部颜色正确，但顶部露出浅灰宿主背景；DOM检查html/body/Flutter容器背景均透明。新增`app_backdrop_test.dart`用实际Sheet和根RepaintBoundary采样，在系统与显式主题相反时，两主题的外露像素均只有alpha=24，先复现失败。根应用builder增加按当前Cupertino主题绘制的背景后，外露像素不透明、颜色符合相应主题及官方转场遮罩，两项回归通过；连同原主题共7项通过，2文件严格分析零问题。Web manifest静态颜色也从模板蓝改为默认浅色分组背景。完整格式/标准hook、CI及该修复的新Web画面另验；这些本机渲染证据不替代正式浏览器复验。
+
+诊断展开后的首张深色图仍出现标题/部分内容缺项，滚动后恢复完整；失败图`extension-diagnostics-dark`保留且排除主图，不能无证据归因于动画，根背景修复也不声称解决此问题。全页、全状态/转换和生产验收继续待办。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。
