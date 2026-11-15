@@ -1,6 +1,6 @@
 # 实施验证记录
 
-2026-11-15，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场，尚未通过全范围视觉或生产验收。最新代码`0c4da11`完整push/PR CI通过，含852项Dart、531项Vitest及Web/Wasm，73项相关定向回归、五文件严格分析通过。正式Web双主题补齐完整长选项/当前勾选、查询/无匹配/清空、自然范围表单与六章只读清单，Protobuf解析的独立API核对两主题完整账户/作品快照前后相同。资料故障、迁移/封面状态及全部变体仍待。Komiic查询失败及镜像后容器中断不记兼容通过，空偏好正式Web仍待。[状态机](verification/mihon-state-coverage.md)继续逐项跟踪；生产Access/续读未验，Karuyomi原生现场验收保持停止。
+2026-11-15，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场，尚未通过全范围视觉或生产验收。最新选择语义修复`10379e5`完整push/PR CI通过，含860项Dart、531项Vitest及Web/Wasm，73项相关定向回归、两文件严格分析通过；新Web辅助树因CI产物的Azure Blob下载超时继续待验。此前`0c4da11`正式Web双主题已补齐完整长选项/勾选、查询/无匹配/清空、自然范围表单与六章只读清单，独立API确认两主题完整账户/作品快照前后相同，不替代新语义运行证据。[状态机](verification/mihon-state-coverage.md)新增19.K1–K12封面目标流程，全部新主图待验。资料故障、迁移/封面状态、空偏好及全部变体仍待；Komiic查询失败与镜像后容器中断不记兼容通过。生产Access/续读未验，Karuyomi原生现场验收保持停止。
 
 分类与批量分组`a9fb310`已有正式Web双主题菜单、名称/校验、草稿/取消、危险预览、分类选择与结果分项，独立API核对十次UI写入及各取消区间零附写。`bbf69d7`确认正文与新建语义修复的57项书架/主题回归、五文件严格分析和正式Web双主题空态/列表、Tab/Return、草稿取消及批量结果通过，独立API核对九次UI写入。未确认、暂停、拒绝和身份失效等主图仍待。
 

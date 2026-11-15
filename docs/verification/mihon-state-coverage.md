@@ -1046,9 +1046,75 @@ stateDiagram-v2
 
 `0c4da11`在新的临时D1中补齐完整长选项和来源第8→13项的六章范围。两主题均Tab/Return打开起点、实际查询/无匹配/清空/取消并恢复焦点，浅色另Tab/Return精确选择第8项；重开已选起点、改无匹配并取消仍保留两个端点及六章。清单中Shift/Tab聚焦取消，深色Return、浅色Space退出均保留原范围，明确退出才清空。独立Protobuf解析确认两主题的完整账户/作品快照前后相同：最终accountRevision/global.revision3，只有两次主题和一次安装，漫画revision0、无收藏/书签/进度或续读。三张`range-{form-pair,query-pairs,preview-pair}.jpg`联系表已实看，深色水平转场中间帧排除主图，选项首屏图滚动锚点不同。原图与检查结果留在忽略目录，console无warn/error，Source正常收尾，临时标签和harness已关闭。
 
-后续八项浅/深×1x/2x回归已复现并修复短菜单和长列表的选中语义缺失，保留选中/未选中、互斥组与禁用状态；选择组件19项及相关共73项回归通过。修复后的完整CI和正式Web辅助树仍待，既有可见勾选主图不能替代。详见[选择语义](mihon-cupertino-fidelity.md#选择状态的辅助语义)。
+后续八项浅/深×1x/2x回归已复现并修复短菜单和长列表的选中语义缺失，保留选中/未选中、互斥组与禁用状态；选择组件19项及相关共73项回归通过。`10379e5`完整格式/标准hook、两文件严格分析及push/PR CI通过，含860项Dart、531项Vitest、Web/Wasm。新artifact的Azure Blob下载超时，正式Web辅助树仍待，既有可见勾选主图不能替代。详见[选择语义](mihon-cupertino-fidelity.md#选择状态的辅助语义)。
 
 普通Source封面、重复章节/扫描组实拍、30.K各故障、全部变体及生产仍待；双倍字号仅为组件证据。资料丢确认后重试及读取失败的正文/错误分离也只有组件证据，详见[章节验证](mihon-cupertino-fidelity.md#章节文字与书架资料确认的-cupertino-呈现)和[长选项验证](mihon-cupertino-fidelity.md#长选项与范围表单的自然尺寸)。
+
+### 19：Karuyomi 自定义封面的目标状态
+
+以下由正式封面编辑器和CoverRepository的读取、原命令重试及身份生命周期分支整理，全部主图继续待验。当前源码在首次读取成功前已显示“服务端已确认”，不能填入19.K1/K2；最终呈现须先区分读取状态，再展示已确认快照及独立草稿。未知结果、已拒绝、后续重取失败和身份失效分别保留，不合并成一个通用错误。读取图片字节失败是CustomCover自身的重试状态，不能据此把已确认封面记录改为未保存。
+
+```mermaid
+stateDiagram-v2
+    state "19.K1 读取服务端封面" as CoverLoad
+    state "19.K2 首次读取失败" as CoverReadError
+    state "19.K3 已确认无自定义封面" as CoverNone
+    state "19.K4 已确认有自定义封面" as CoverReady
+    state "19.K5 选图处理中" as CoverPick
+    state "19.K6 替换图片草稿" as CoverReplace
+    state "19.K7 清除封面草稿" as CoverClear
+    state "19.K8 等待服务端确认" as CoverSave
+    state "19.K9 原修改结果未知" as CoverUnknown
+    state "19.K10 原修改已拒绝" as CoverRejected
+    state "19.K11 身份或服务失效" as CoverExpired
+    state "19.K12 已确认图片读取失败" as CoverImageError
+    [*] --> CoverLoad: 打开编辑器
+    CoverLoad --> CoverReadError: 未取得快照
+    CoverReadError --> CoverLoad: 明确重新读取
+    CoverLoad --> CoverNone: 确认未设置封面
+    CoverLoad --> CoverReady: 确认封面记录
+    CoverNone --> CoverPick: 选择图片
+    CoverReady --> CoverPick: 替换图片
+    CoverPick --> CoverReplace: 读取并校验所选图片
+    CoverPick --> CoverNone: 无原封面且取消
+    CoverPick --> CoverReady: 有原封面且取消
+    CoverReplace --> CoverPick: 重新选择
+    CoverClear --> CoverPick: 改为选择图片
+    CoverPick --> CoverReplace: 已有替换草稿且取消或读取失败
+    CoverPick --> CoverClear: 已有清除草稿且取消或读取失败
+    CoverReady --> CoverClear: 选择清除
+    CoverReplace --> CoverSave: 明确保存
+    CoverClear --> CoverSave: 明确保存
+    CoverSave --> CoverReady: 替换获确认
+    CoverSave --> CoverNone: 清除获确认
+    CoverSave --> CoverUnknown: 响应未确认
+    CoverUnknown --> CoverSave: 明确重试原命令
+    CoverSave --> CoverRejected: 冲突或不可重试
+    CoverRejected --> CoverLoad: 明确重新读取
+    CoverReady --> CoverImageError: 已确认记录的图片加载失败
+    CoverImageError --> CoverReady: 重试同一资源成功
+    CoverPick --> CoverExpired: 身份或服务变化
+    CoverSave --> CoverExpired: 身份或服务变化
+    CoverUnknown --> CoverExpired: 身份或服务变化
+    CoverExpired --> [*]: 关闭并丢弃迟到结果
+```
+
+| 状态 ID | 最小必要信息与操作边界                                                                          | 浅色 | 深色 |
+| ------- | ----------------------------------------------------------------------------------------------- | ---- | ---- |
+| 19.K1   | 正在读取服务端封面、进度、编辑禁用；未取得快照时不显示已确认                                    | 待   | 待   |
+| 19.K2   | 未取得服务端快照、读取失败原因、明确重读与关闭；不显示永不结束的加载文字                        | 待   | 待   |
+| 19.K3   | 已确认未设置自定义封面、选择图片和关闭；不把占位图当作已保存图片                                | 待   | 待   |
+| 19.K4   | 已确认的当前封面、替换和清除入口；清除用系统危险色，最终提交须由保存触发                        | 待   | 待   |
+| 19.K5   | 原已确认封面、选图处理中、编辑禁用；取消保持原值，非法/读取失败保留可修正原因，身份变化另转失效 | 待   | 待   |
+| 19.K6   | 已确认封面与待保存图片分区、仅当前会话保留、明确保存或关闭；选图本身零上传                      | 待   | 待   |
+| 19.K7   | 当前封面、待清除提示、明确保存或关闭；清除草稿不先修改远端                                      | 待   | 待   |
+| 19.K8   | 原确认值、正在提交的原修改、等待确认、动作禁用；不能提前显示已保存，替换/清除分别验             | 待   | 待   |
+| 19.K9   | 尚未确认及原草稿、精确重试、稍后处理；重开/重取失败时仍保留原命令，不能换图覆盖                 | 待   | 待   |
+| 19.K10  | 冲突或拒绝原因、原确认值、明确重读；禁用提交与重试，重取失败仍保留错误及原确认快照              | 待   | 待   |
+| 19.K11  | 编辑已停用及关闭入口、旧操作结果不再应用；加载/选图/保存/待确认阶段分别触发并丢弃迟到结果       | 待   | 待   |
+| 19.K12  | 已确认封面记录保持、图片未能读取、重试同一资源；字节失败不得触发上传或清除记录                  | 待   | 待   |
+
+19.K1/K2与已确认快照、替换/清除草稿、等待确认的最小信息按当前业务边界验收。关闭未提交草稿不承诺跨会话恢复；19.K9的原请求由当前业务会话保留，重开和读取失败作为该节点变体单列。图中失效箭头仅列主要异步入口，已确认/草稿/拒绝状态同样必须验证身份变化，不能用一条箭头替代全部触发阶段。上述是目标清单，不是新增产品能力或通过证据。
 
 ### 26：Karuyomi 最终 Cupertino 设置导航
 

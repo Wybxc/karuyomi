@@ -284,6 +284,12 @@
 
 八项修复后通过，覆盖命名动作的选中、未选中、禁用/点击边界，查询命中和清空后的标记保留，以及取消零回调；连同既有选择用例共19项通过。语言、Source偏好/筛选、章节列表和迁移相关共73项不同回归通过，使用固定Flutter/Dart、低优先级单并发。测试采用当前isSemantics API，保留最初八项失败日志及修复记录于忽略目录`choice-semantics-{before,after,related,analyze}.log`。完整格式、标准hook、CI及修复后的正式Web辅助树按后续结果记录；本段不声称读屏软件、Native或生产验收。
 
+`10379e5`随后通过两文件严格分析、依赖分层、完整`pnpm format`→`pnpm format:check`及标准prek，[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43718242063)和[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43718246916)均完整通过。日志明确记录22+87+751=860项Dart、531项Vitest，以及生成、Web和Wasm构建。120秒watcher退出0，完整日志为`ci-10379e5-completed.log`。本机只运行定向检查，用户原有锁文件改动未纳入提交。
+
+修复后正式Web仍待输入获取：GitHub REST确认artifact `14163870898`（16,294,863字节）存在、未过期且属于该精确提交。原`gh run download`无产物后已结束；随后同一artifact的90秒CLI请求超时，独立Node HTTP取得GitHub重定向后，在`productionresultssa9.blob.core.windows.net`的45秒下载仍超时，尚未取得可核验ZIP或Flutter清单。凭据和临时签名URL没有输出或落盘。未重启harness或打开验收标签，预备的API脚本没有产生新业务结果；已有`0c4da11`双主题主图不能填作本次正式Web语义通过。此处仅记录实际下载限制，不推断GitHub或整个网络不可用。
+
+另按当前封面编辑器、CoverRepository及CustomCover分支补[19.K1–K12目标状态图](mihon-state-coverage.md#19karuyomi-自定义封面的目标状态)，分别列首次读取、已确认有/无封面、选图、两种草稿、等待确认、未知、拒绝、失效及图片读取失败的最小信息。全部新主图保留待验，首次读取前的已确认误报仍待实现修复。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。
