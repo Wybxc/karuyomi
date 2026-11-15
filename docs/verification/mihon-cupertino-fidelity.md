@@ -328,6 +328,8 @@ Controller 区分首次输入未就绪与已确认无目标源，并为读取输
 
 迁移 controller、repository、matching、选择与主题合计65项不同定向回归通过；补充重开只读阻塞后19项迁移回归再次通过。完整格式化/校验后，三个改动文件严格分析无问题。固定 Flutter 3.50 / Dart 3.14，低优先级单并发，无 Flutter/AOT 构建。原始失败、滚动/转场诊断和最终结果留在忽略目录 `migration-states-{before-ui,after,after-fixes,pending-diagnostic,settled}.log`、`migration-cupertino-{related,reopen,analyze,final-format,format-check}.log`。这是组件与数据链证据，完整 CI 和正式 Web 双主题主图尚待；[20.K1–K18、21.K1–K6](mihon-state-coverage.md#20–21karuyomi-迁移向导的目标状态)全部截图格仍为待验，不以组件流程代替实际浏览器或生产验收。
 
+后续按状态机复核发现：目标详情成功但权威预览失败时，原页面没有独立的只读重读入口。四种主题/文字组合再次实际复现后，新增“迁移预览尚未取得”分组，保留精确目标、未提交说明与只读重读；取得预览前不显示确认按钮。确认框同时列出原作品与目标的实际名称/源、分类复制选择及选中映射范围，不只依赖底层预览说明。19项迁移回归通过，原始失败/修复日志为 `migration-preview-retry-{before,after}.log`；正式Web证据仍待。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。

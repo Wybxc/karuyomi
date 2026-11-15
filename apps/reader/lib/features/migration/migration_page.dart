@@ -46,13 +46,20 @@ class _MigrationPageState extends State<MigrationPage> {
   Future<void> _confirm() async {
     final target = controller.targetMetadata;
     if (!controller.canChange || target == null || controller.tooMany) return;
+    final copyScope = controller.sourceSequence == null
+        ? '仅迁移收藏和所选分类，章节标记不复制。'
+        : '选中 ${controller.selectedChapters.length} 条章节映射；'
+              '已读：${controller.copyRead ? '补充缺失标记' : '不复制'}；'
+              '书签：${controller.copyBookmarks ? '补充缺失标记' : '不复制'}。';
     final accepted = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('确认迁移到目标作品'),
         content: Text(
-          '将“${target.manga.title}”（${target.sourceName}）加入书架，保留原作品。\n'
-          '按预览复制所选分类和章节标记；目标已有状态、封面和阅读位置保留。原页面位置不会复制。',
+          '原作品“${widget.seed.metadata.manga.title}”（${widget.seed.metadata.sourceName}）保留。\n'
+          '将目标“${target.manga.title}”（${target.sourceName}）加入书架。\n'
+          '分类：${controller.copyCategories ? '合并原作品分类' : '不复制'}。$copyScope\n'
+          '目标已有状态、封面和阅读位置保留；原页面位置不复制。',
         ),
         actions: [
           CupertinoButton(
@@ -702,7 +709,32 @@ class _MigrationPageState extends State<MigrationPage> {
                         ),
                     ],
                   ),
-                if (controller.preview != null) _preview(),
+                if (controller.preview != null)
+                  _preview()
+                else if (controller.targetMetadata case final metadata?
+                    when controller.targetSequence != null)
+                  CupertinoFormSection.insetGrouped(
+                    header: const Text('迁移预览尚未取得'),
+                    footer: const Text('尚未提交迁移。重新读取当前资料后，才能检查复制范围并确认。'),
+                    children: [
+                      CupertinoFormRow(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            '${metadata.manga.title} · ${metadata.sourceName}',
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        key: const ValueKey('migration-refresh-preview'),
+                        alignment: AlignmentDirectional.centerStart,
+                        onPressed: controller.canChange
+                            ? () => unawaited(controller.refreshPreview())
+                            : null,
+                        child: const Text('重新读取迁移预览（只读）'),
+                      ),
+                    ],
+                  ),
               ],
             ],
           ],

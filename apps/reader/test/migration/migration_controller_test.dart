@@ -750,8 +750,14 @@ void main() {
             const ValueKey(('migration-result', 0)),
           );
           await reveal(firstResult);
+          failRead = true;
           await tester.tap(firstResult);
           await tester.pumpAndSettle();
+          await errorColor();
+          expect(control('migration-confirm'), findsNothing);
+          expect(posts(), hasLength(writes));
+          await tap('migration-refresh-preview');
+          expect(control('migration-error'), findsNothing);
           final retained = find.text('目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。');
           await reveal(retained);
           expect(
@@ -771,6 +777,12 @@ void main() {
           platform.businessServer.loseNextResponse = true;
           await tap('migration-confirm');
           expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+          expect(
+            find.textContaining('原作品“${seed.metadata.manga.title}”（原源）保留。'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('将目标“目标作品”（目标源）加入书架。'), findsOneWidget);
+          expect(find.textContaining('选中 1 条章节映射'), findsOneWidget);
           expect(posts(), hasLength(writes));
           await tap('migration-confirm-send', settle: false);
           await reveal(find.text('正在等待服务端确认'), delta: -300, settle: false);
