@@ -208,11 +208,17 @@
 
 后续将筛选的header/separator/group映射为官方同层表单分组，移除24px实色分隔、每字段额外底边距及手工表面。独立说明保留为仅标题ListSection；布尔条件改为系统开关，单选/三态/排序采用完整列表行，排序方向单独成行。加载、重置、应用显示各自操作，错误用系统红、取消影响用13px次级文字。源协议的snapshotId、原始path、草稿、取消退役和原列表保留链未改。
 
-四项浅/深×1x/2x窄屏用例在旧实现复现没有正式表单及排序行溢出；改动后验证无嵌套圆角表单、嵌套路径6.1.0与后续6.2准确提交、描述读取后编辑不调用Source，以及实际输入配置禁用autofill。加载/应用延迟及失败重试、错误/说明颜色、重置取消和晚结果另有双主题用例。筛选组件10项、筛选控制器/源目录/选择控件20项，共30项不同定向回归通过，低优先级单并发执行。完整检查、CI和正式Web画面继续；这些组件证据不填入目标状态机的浏览器主图。
+四项浅/深×1x/2x窄屏用例在旧实现复现没有正式表单及排序行溢出；改动后验证无嵌套圆角表单、嵌套路径6.1.0与后续6.2准确提交、描述读取后编辑不调用Source，以及实际输入配置禁用autofill。加载/应用延迟及失败重试、错误/说明颜色、重置取消和晚结果另有双主题用例。筛选组件10项、筛选控制器/源目录/选择控件20项，共30项不同定向回归通过，低优先级单并发执行。`86e7925`完整格式、两文件严格分析、标准prek及[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43684076159)/[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43684079790)通过，含827项Dart（22+87+718）、531项Vitest及Web/Wasm构建。
+
+其正式Web的39项Flutter清单长度/hash核验后，使用官方Wrangler隔离harness、临时D1和360×800内置浏览器，无故障fixture。双主题已实看真实xkcd的“无额外筛选”弹层：浅色Tab/Return取消、深色Tab/Space取消，均保留原列表；两主题执行重置和默认条件应用，浅色点击、深色Tab/Return后获得已应用的空搜索结果。稳定空态与落点联系表已实看；最后一次深色应用截图缺文字，排除主图，采用此前稳定的同状态画面。瞬时读取/重置/应用未截到，不以操作完成替代主图。
+
+独立API确认浅/深筛选的取消、重置与应用前后账户JSON逐字节相同。全程四次明确写入为Komiic安装、镜像偏好、xkcd安装及DARK外观，accountRevision为0→1→2→3→4；镜像偏好独立GET确认为revision1/text1。Komiic默认热门返回请求失败；镜像保存虽已确认，随后容器中断，重新连接及新文档仍中断，typed字段没有取得本轮正式Web证据，不记运行兼容通过。tab21警告/错误为0，viewport恢复且临时标签已关闭，harness正常exit0。原始记录在忽略目录的`karuyomi-86e7925-api-checks.json`、`karuyomi-86e7925-console.json`与两张`filters-*-pair.png`。
+
+验收中浅/深两次成功应用后的AX均短暂出现“漫画源会话已变化”，实际搜索随后成功；这是正常路由退出时把isActive=false当成会话失效的呈现缺口，不能记为真实Source故障。两个定向用例先复现误报，再区分会话身份与路由可接受操作状态；退出保留内容、冻结动作，真正容器丢失仍显示错误并隐藏旧字段。新增两项与原筛选/控制器/目录/选择共32项回归通过，完整检查及新CI/Web复验另记。
 
 ### Source 偏好的空内容与首项分组
 
-筛选等待CI期间，以两个双主题用例复现偏好描述的有效边界：首项为分组、空分组或全空描述，会把空children交给CupertinoFormSection并触发`children.length > 0`断言。仅标题部分改用官方CupertinoListSection，含字段部分继续使用FormSection，保留原path和父级禁用。中间实现的外层DefaultTextStyle被ListSection内部重新覆盖，说明仍为17px；改为在header/footer传入点设置13px/secondaryLabel后，两个用例和原偏好组件/控制器共19项通过，确认嵌套0.1.0不可编辑、刷新为空态、无回调或账户写入。完整格式、严格分析与新CI另记；`86e7925`的Web产物不包含这项后续修复，正式浏览器证据不能混用。
+筛选等待CI期间，以两个双主题用例复现偏好描述的有效边界：首项为分组、空分组或全空描述，会把空children交给CupertinoFormSection并触发`children.length > 0`断言。仅标题部分改用官方CupertinoListSection，含字段部分继续使用FormSection，保留原path和父级禁用。中间实现的外层DefaultTextStyle被ListSection内部重新覆盖，说明仍为17px；改为在header/footer传入点设置13px/secondaryLabel后，两个用例和原偏好组件/控制器共19项通过，确认嵌套0.1.0不可编辑、刷新为空态、无回调或账户写入。`8a3abbe`完整格式、两文件严格分析、标准prek及[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43685070980)/[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43685166442)通过，含829项Dart（22+87+720）、531项Vitest及Web/Wasm构建；`86e7925`的Web产物不包含这项后续修复，正式浏览器证据不能混用。空描述、空分组及继承禁用仍仅有组件证据。
 
 ### 实拍布局与颜色锚点
 

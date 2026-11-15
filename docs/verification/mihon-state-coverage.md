@@ -1124,7 +1124,7 @@ stateDiagram-v2
 
 ### 13：Karuyomi typed Source 筛选的目标状态
 
-这里跟踪最终Cupertino表单的产品状态，与上方Mihon参考13.01–13.07分别验收。当前只有30项相关组件/控制器回归，正式Web主图尚待采集；不将模拟描述或历史Material配色的画面填成通过。分组仍保留Source原始path，加载、重置、应用和失败不能合成一个已通过状态。
+这里跟踪最终Cupertino表单的产品状态，与上方Mihon参考13.01–13.07分别验收。`86e7925`正式Web已取得真实xkcd无筛选的双主题主图，实际取消、重置、默认条件应用及独立API零附写通过；瞬时进度未截到，Komiic镜像设置确认后容器中断，typed字段仍待。后续32项组件/控制器回归包含正常关闭转场误报的复现/修复，未当作浏览器主图。分组仍保留Source原始path，加载、重置、应用和失败不能合成一个已通过状态。
 
 ```mermaid
 stateDiagram-v2
@@ -1139,6 +1139,7 @@ stateDiagram-v2
     state "13.K8 应用失败保留草稿" as FilterApplyFailed
     state "13.K9 会话已变化" as FilterSessionChanged
     state "13.K10 无额外筛选" as EmptyFilters
+    state "13.K11 正常关闭转场" as DismissingFilters
     LoadingFilters --> FiltersReady: 描述成功且有字段
     LoadingFilters --> EmptyFilters: 描述成功且无字段
     LoadingFilters --> FilterLoadFailed: 读取失败
@@ -1160,30 +1161,35 @@ stateDiagram-v2
     ApplyingFilters --> FilterApplyFailed: 失败且原列表保留
     FilterApplyFailed --> ApplyingFilters: 重试当前草稿
     FilterApplyFailed --> FilterDraft: 修改后重试
-    ApplyingFilters --> [*]: 搜索成功后关闭并展示新列表
+    ApplyingFilters --> DismissingFilters: 搜索成功后关闭
     LoadingFilters --> FilterSessionChanged: 身份或会话变化
     FiltersReady --> FilterSessionChanged: 身份或会话变化
     ApplyingFilters --> FilterSessionChanged: 身份或会话变化
-    FiltersReady --> [*]: 取消并丢弃未应用草稿
-    FilterDraft --> [*]: 取消并丢弃未应用草稿
+    FiltersReady --> DismissingFilters: 取消并丢弃未应用草稿
+    FilterDraft --> DismissingFilters: 取消并丢弃未应用草稿
+    EmptyFilters --> DismissingFilters: 取消并保留原列表
+    DismissingFilters --> [*]: 退出动画结束，展示原或新列表
     LoadingFilters --> [*]: 取消请求并关闭，会话可能退役
     ResettingFilters --> [*]: 取消请求并关闭，会话可能退役
     ApplyingFilters --> [*]: 取消请求并关闭，会话可能退役
     FilterSessionChanged --> [*]: 关闭后重新打开
 ```
 
-| 状态 ID | 最小必要信息                                                 | 浅色正式Web | 深色正式Web |
-| ------- | ------------------------------------------------------------ | ----------- | ----------- |
-| 13.K1   | 源内查询上下文、读取进度、取消后果、重复动作禁用             | 待          | 待          |
-| 13.K2   | 分组与typed当前值、重置/应用/取消；说明标题与空分组不丢失    | 待          | 待          |
-| 13.K3   | 修改后的值、仍未应用、原列表保持、明确应用/取消              | 待          | 待          |
-| 13.K4   | 选项、当前选择及键盘焦点、取消；长选项另走29组查询页         | 待          | 待          |
-| 13.K5   | 明确重置进度、旧已应用条件不变、取消后果、重复动作禁用       | 待          | 待          |
-| 13.K6   | 明确应用进度、冻结的草稿、原列表保持、取消后果、重复动作禁用 | 待          | 待          |
-| 13.K7   | 读取/重置失败原因、重试/关闭、原列表保持                     | 待          | 待          |
-| 13.K8   | 应用失败原因、保留的草稿、可编辑并重试/取消、原列表保持      | 待          | 待          |
-| 13.K9   | 会话变化说明、停止使用旧草稿、关闭并重新打开                 | 待          | 待          |
-| 13.K10  | 无额外筛选说明、默认条件搜索与取消、仍可重置                 | 待          | 待          |
+| 状态 ID | 最小必要信息                                                 | 浅色正式Web                                | 深色正式Web                               |
+| ------- | ------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------- |
+| 13.K1   | 源内查询上下文、读取进度、取消后果、重复动作禁用             | 待                                         | 待                                        |
+| 13.K2   | 分组与typed当前值、重置/应用/取消；说明标题与空分组不丢失    | 待                                         | 待                                        |
+| 13.K3   | 修改后的值、仍未应用、原列表保持、明确应用/取消              | 待                                         | 待                                        |
+| 13.K4   | 选项、当前选择及键盘焦点、取消；长选项另走29组查询页         | 待                                         | 待                                        |
+| 13.K5   | 明确重置进度、旧已应用条件不变、取消后果、重复动作禁用       | 待                                         | 待                                        |
+| 13.K6   | 明确应用进度、冻结的草稿、原列表保持、取消后果、重复动作禁用 | 待                                         | 待                                        |
+| 13.K7   | 读取/重置失败原因、重试/关闭、原列表保持                     | 待                                         | 待                                        |
+| 13.K8   | 应用失败原因、保留的草稿、可编辑并重试/取消、原列表保持      | 待                                         | 待                                        |
+| 13.K9   | 会话变化说明、停止使用旧草稿、关闭并重新打开                 | 待                                         | 待                                        |
+| 13.K10  | 无额外筛选说明、默认条件搜索与取消、仍可重置                 | `karuyomi-86e7925-filters-empty-light.jpg` | `karuyomi-86e7925-filters-empty-dark.jpg` |
+| 13.K11  | 退场期间保留原内容、停止接受操作、正常关闭不误报会话变化     | 待                                         | 待                                        |
+
+两主题取消后返回焦点至筛选入口：浅色使用Tab/Return，深色使用Tab/Space。重置与应用走真实Source，浅色应用后空结果主图为`karuyomi-86e7925-filters-applied-empty-result-light.jpg`，深色稳定同状态图为`karuyomi-86e7925-filters-cancel-space-dark.jpg`；两张联系表已实看。最后一次深色应用截图缺文字，排除主图；工具观察到的正常退场误报保留为修复依据，不能填作13.K9真正会话失效。全部瞬时进度、typed字段和失败变体仍待补齐。
 
 ### 14：Karuyomi Source 会话偏好的目标状态
 

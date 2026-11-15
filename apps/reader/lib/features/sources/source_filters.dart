@@ -49,13 +49,17 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
     });
   }
 
-  bool get _current =>
+  // A dismissed route stops accepting work while its content animates out.
+  bool get _sameSession =>
       mounted &&
       !_disposing &&
-      !_closing &&
       widget.catalog.subject == _subject &&
       widget.catalog.session?.workerInstanceId == _worker &&
-      widget.catalog.isCurrentSource(_source) &&
+      widget.catalog.isCurrentSource(_source);
+
+  bool get _current =>
+      _sameSession &&
+      !_closing &&
       // A dropdown is a child popup route; it must not invalidate its sheet.
       // Popping the sheet itself makes its owning route inactive immediately.
       ModalRoute.of(context)?.isActive == true;
@@ -170,6 +174,10 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
       return;
     }
     if (applied) {
+      setState(() {
+        _closing = true;
+        _work = null;
+      });
       Navigator.of(context).pop(true);
     } else {
       setState(() {
@@ -180,7 +188,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
   }
 
   void _close() {
-    _closing = true;
+    setState(() => _closing = true);
     final requestId = _requestId;
     _requestId = null;
     if (requestId != null) {
@@ -355,6 +363,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
   Widget build(BuildContext context) {
     useListenable(widget.catalog);
     final current = _current;
+    final sameSession = _sameSession;
     final enabled = current && !_working && !widget.catalog.busy;
     final draft = _draft;
     return EditSheet(
@@ -393,7 +402,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
                     ),
                   ),
                 ],
-                if (!current)
+                if (!sameSession)
                   Text(
                     '漫画源会话已变化，请关闭后重新打开筛选。',
                     style: TextStyle(
@@ -417,7 +426,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
               ],
             ),
           ),
-          if (current && draft != null)
+          if (sameSession && draft != null)
             KeyedSubtree(
               key: ValueKey(draft.snapshotId),
               child: Column(

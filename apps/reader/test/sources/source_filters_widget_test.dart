@@ -363,6 +363,51 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets(
+      'filter dismissal retains its content without a false session warning in $brightness',
+      (tester) async {
+        await show(tester, brightness: brightness);
+        final writesBefore = platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length;
+        await tap(tester, open());
+        await tester.tap(iconLabel('取消筛选编辑'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(find.text('筛选漫画'), findsOneWidget);
+        expect(find.text('漫画源会话已变化，请关闭后重新打开筛选。'), findsNothing);
+        expect(control('text', '1'), findsOneWidget);
+        await tester.pumpAndSettle();
+        expect(catalog.appliedSourceFilters, isNull);
+
+        await tap(tester, open());
+        await tester.tap(apply());
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(find.text('筛选漫画'), findsOneWidget);
+        expect(find.text('漫画源会话已变化，请关闭后重新打开筛选。'), findsNothing);
+        expect(control('text', '1'), findsOneWidget);
+        expect(tester.widget<CupertinoButton>(apply()).onPressed, isNull);
+        await tester.pumpAndSettle();
+        expect(catalog.appliedSourceFilters, isNotNull);
+        expect(catalog.listing, 'search');
+
+        await tap(tester, open());
+        runtime.containerLost('Filter session really ended');
+        await tester.pump();
+        expect(find.text('漫画源会话已变化，请关闭后重新打开筛选。'), findsOneWidget);
+        expect(control('text', '1'), findsNothing);
+        expect(tester.widget<CupertinoButton>(apply()).onPressed, isNull);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          hasLength(writesBefore),
+        );
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+    testWidgets(
       'filter loading and application show the active operation and retain a failed draft in $brightness',
       (tester) async {
         final loading = Completer<wire.SourceResult>();
