@@ -20,6 +20,7 @@ import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -140,11 +141,12 @@ void main() {
   Finder getContinue() =>
       find.byKey(ValueKey(('library-continue', entry.mangaKey)));
 
-  Future<void> show(WidgetTester tester) async {
+  Future<void> show(WidgetTester tester, {Brightness? brightness}) async {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
+        theme: readerAppTheme(brightness),
         home: CupertinoPageScaffold(
           child: LibraryPage(
             controller: catalog,
@@ -400,94 +402,117 @@ void main() {
     await hide(tester);
   });
 
-  testWidgets(
-    'lost metadata acknowledgement retries only its original command and separates a failed shelf read',
-    (tester) async {
-      detailManga = testManga..title = 'Source refreshed metadata';
-      var loseAck = true;
-      final entered = Completer<void>();
-      final release = Completer<void>();
-      addTearDown(() {
-        if (!release.isCompleted) release.complete();
-      });
-      final bodies = <String>[];
-      final appliedBefore = platform.businessServer.appliedMutations;
-      platform.afterBusinessReply = (request, reply) async {
-        if (request.method == 'POST' &&
-            request.uri.path == '/api/state/mutations' &&
-            wire
-                .decodeProtoJson(
-                  wire.StateMutation(),
-                  jsonDecode(request.body!),
-                )
-                .hasUpdateMetadata()) {
-          bodies.add(request.body!);
-          if (loseAck) {
-            loseAck = false;
-            return const ApiReply(
-              status: 502,
-              headers: {'content-type': 'text/plain'},
-              body: 'Committed metadata ACK lost at the response boundary',
-              redirected: false,
-            );
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'lost metadata acknowledgement keeps its confirmed $brightness message separate from a failed shelf read',
+      (tester) async {
+        detailManga = testManga..title = 'Source refreshed metadata';
+        var loseAck = true;
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        addTearDown(() {
+          if (!release.isCompleted) release.complete();
+        });
+        final bodies = <String>[];
+        final appliedBefore = platform.businessServer.appliedMutations;
+        platform.afterBusinessReply = (request, reply) async {
+          if (request.method == 'POST' &&
+              request.uri.path == '/api/state/mutations' &&
+              wire
+                  .decodeProtoJson(
+                    wire.StateMutation(),
+                    jsonDecode(request.body!),
+                  )
+                  .hasUpdateMetadata()) {
+            bodies.add(request.body!);
+            if (loseAck) {
+              loseAck = false;
+              return const ApiReply(
+                status: 502,
+                headers: {'content-type': 'text/plain'},
+                body: 'Committed metadata ACK lost at the response boundary',
+                redirected: false,
+              );
+            }
+            entered.complete();
+            await release.future;
           }
-          entered.complete();
-          await release.future;
-        }
-        return reply;
-      };
-      await show(tester);
-      await tester.tap(find.text(entry.title));
-      await tester.pumpAndSettle();
-      expect(find.byType(MangaDetailsPage), findsOneWidget);
-      expect(platform.businessServer.appliedMutations, appliedBefore + 1);
-      expect(catalog.library!.client.hasPendingMetadata(entry.mangaKey), true);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
-      await tester.pumpAndSettle();
-      final retry = find.byKey(
-        ValueKey(('library-retry-metadata', entry.mangaKey)),
-      );
-      await tester.ensureVisible(retry);
-      await tester.pumpAndSettle();
-      expect(find.text('书架资料尚未由服务端确认'), findsOneWidget);
-      final retryRow = tester.widget<CupertinoListTile>(
-        find.ancestor(of: retry, matching: find.byType(CupertinoListTile)),
-      );
-      expect((retryRow.title as Text).data, isNotEmpty);
-      expect(tester.widget<CupertinoButton>(retry).onPressed, isNotNull);
-      expect(bodies, hasLength(1));
-      await tester.tap(retry);
-      await tester.tap(retry);
-      await tester.pump();
-      await tester.runAsync(
-        () => entered.future.timeout(const Duration(seconds: 5)),
-      );
-      expect(tester.widget<CupertinoButton>(retry).onPressed, isNull);
-      expect(bodies, hasLength(2));
-      expect(bodies.last, bodies.first);
-      expect(platform.businessServer.appliedMutations, appliedBefore + 1);
-      platform.businessServer.beforeRequest = (request) =>
-          request.uri.path == '/api/library'
-          ? const ApiReply(
-              status: 503,
-              headers: {'content-type': 'text/plain'},
-              body: 'Injected read failure after confirmed metadata retry',
-              redirected: false,
-            )
-          : null;
-      release.complete();
-      await tester.pumpAndSettle();
-      expect(catalog.library!.client.hasPendingMetadata(entry.mangaKey), false);
-      expect(retry, findsNothing);
-      expect(find.text('书架资料已获服务器确认。'), findsOneWidget);
-      expect(find.text('未能刷新服务端书架，当前显示上次确认的结果。'), findsOneWidget);
-      expect(find.text('书架资料仍未获确认，原操作已保留，请明确重试保存。'), findsNothing);
-      expect(find.text('书架资料尚未确认，仍可继续阅读；请返回书架处理未确认操作。'), findsNothing);
-      expect(bodies, hasLength(2));
-      expect(tester.takeException(), isNull);
-      await hide(tester);
-    },
-  );
+          return reply;
+        };
+        await show(tester, brightness: brightness);
+        await tester.tap(find.text(entry.title));
+        await tester.pumpAndSettle();
+        expect(find.byType(MangaDetailsPage), findsOneWidget);
+        expect(platform.businessServer.appliedMutations, appliedBefore + 1);
+        expect(
+          catalog.library!.client.hasPendingMetadata(entry.mangaKey),
+          true,
+        );
+        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+        await tester.pumpAndSettle();
+        final retry = find.byKey(
+          ValueKey(('library-retry-metadata', entry.mangaKey)),
+        );
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        expect(find.text('书架资料尚未由服务端确认'), findsOneWidget);
+        final retryRow = tester.widget<CupertinoListTile>(
+          find.ancestor(of: retry, matching: find.byType(CupertinoListTile)),
+        );
+        expect((retryRow.title as Text).data, isNotEmpty);
+        expect(tester.widget<CupertinoButton>(retry).onPressed, isNotNull);
+        expect(bodies, hasLength(1));
+        await tester.tap(retry);
+        await tester.tap(retry);
+        await tester.pump();
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        expect(tester.widget<CupertinoButton>(retry).onPressed, isNull);
+        expect(bodies, hasLength(2));
+        expect(bodies.last, bodies.first);
+        expect(platform.businessServer.appliedMutations, appliedBefore + 1);
+        platform.businessServer.beforeRequest = (request) =>
+            request.uri.path == '/api/library'
+            ? const ApiReply(
+                status: 503,
+                headers: {'content-type': 'text/plain'},
+                body: 'Injected read failure after confirmed metadata retry',
+                redirected: false,
+              )
+            : null;
+        release.complete();
+        await tester.pumpAndSettle();
+        expect(
+          catalog.library!.client.hasPendingMetadata(entry.mangaKey),
+          false,
+        );
+        expect(retry, findsNothing);
+        expect(find.text('书架资料已获服务器确认。'), findsOneWidget);
+        final confirmation = find.text('书架资料已获服务器确认。');
+        final context = tester.element(confirmation);
+        expect(
+          DefaultTextStyle.of(context).style
+              .merge(tester.widget<Text>(confirmation).style)
+              .color,
+          AppColors.label.resolveFrom(context),
+          reason:
+              'a confirmed write must not inherit the later read error color',
+        );
+        final readError = find.text('未能刷新服务端书架，当前显示上次确认的结果。');
+        expect(
+          tester.widget<Text>(readError).style!.color,
+          AppColors.error.resolveFrom(context),
+        );
+        expect(find.text('未能刷新服务端书架，当前显示上次确认的结果。'), findsOneWidget);
+        expect(find.text('书架资料仍未获确认，原操作已保留，请明确重试保存。'), findsNothing);
+        expect(find.text('书架资料尚未确认，仍可继续阅读；请返回书架处理未确认操作。'), findsNothing);
+        expect(bodies, hasLength(2));
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+  }
 
   testWidgets(
     'unsaved session chapter takes priority without metadata replaying the pending write',

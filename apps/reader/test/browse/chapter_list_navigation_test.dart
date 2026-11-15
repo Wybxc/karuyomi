@@ -6,6 +6,8 @@ import 'dart:async';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/data/reading_progress.dart';
@@ -82,8 +84,10 @@ Future<CatalogController> _details(
   WidgetTester tester,
   TestPlatform platform, {
   bool settleDetails = true,
+  Size viewport = const Size(1100, 2400),
+  bool openOptions = true,
 }) async {
-  tester.view.physicalSize = const Size(1100, 2400);
+  tester.view.physicalSize = viewport;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -120,7 +124,7 @@ Future<CatalogController> _details(
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(MangaDetailsPage), findsOneWidget);
   }
-  if (settleDetails) {
+  if (settleDetails && openOptions) {
     await _tap(tester, find.byKey(const ValueKey('chapter-options')));
   }
   return tester
@@ -183,6 +187,106 @@ Future<void> _leaveReader(
 }
 
 void main() {
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'chapter text and independent keyboard actions remain readable in $brightness at ${scale}x',
+        (tester) async {
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final semantics = tester.ensureSemantics();
+          try {
+            final platform = _platform();
+            final catalog = await _details(
+              tester,
+              platform,
+              viewport: const Size(360, 800),
+              openOptions: false,
+            );
+            final chapter = _sequence.entries[2];
+            final row = _row(2);
+            await tester.scrollUntilVisible(
+              row,
+              250,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(MangaDetailsPage),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            final button = find
+                .ancestor(of: row, matching: find.byType(CupertinoButton))
+                .first;
+            expect(
+              tester.getSemantics(button).getSemanticsData().label,
+              isNot(contains('标记章节书签')),
+              reason:
+                  'opening and bookmarking must announce independent actions',
+            );
+            final subtitle = find.descendant(
+              of: row,
+              matching: find.textContaining('来源第 3 项'),
+            );
+            expect(
+              tester.renderObject<RenderParagraph>(subtitle).didExceedMaxLines,
+              false,
+              reason: 'duplicate occurrence identity and read status must remain visible',
+            );
+            final name = find.descendant(of: row, matching: find.text('同名章'));
+            Focus.of(tester.element(name)).requestFocus();
+            await tester.pumpAndSettle();
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pumpAndSettle();
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+            await tester.pumpAndSettle();
+            expect(
+              platform.businessServer.bookmarked(
+                _sequence.mangaKey,
+                chapter.key,
+              ),
+              true,
+            );
+            expect(find.byType(ReaderScreen), findsNothing);
+            expect(
+              platform.businessServer.bookmarked(
+                _sequence.mangaKey,
+                _sequence.entries.first.key,
+              ),
+              false,
+            );
+            await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+            await tester.pumpAndSettle();
+            await tester.runAsync(() async {
+              await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+              await Future<void>.delayed(Duration.zero);
+            });
+            await tester.pumpAndSettle();
+            expect(find.byType(ReaderScreen), findsOneWidget);
+            expect(
+              tester
+                  .widget<ChapterReaderRoute>(find.byType(ChapterReaderRoute))
+                  .initialChapter
+                  .key,
+              chapter.key,
+            );
+            await _leaveReader(tester, catalog);
+            await _finish(tester, catalog);
+          } finally {
+            semantics.dispose();
+          }
+        },
+      );
+    }
+  }
+
   testWidgets(
     'chapter list preserves duplicate occurrences and Source order with absent and fractional numbers',
     (tester) async {

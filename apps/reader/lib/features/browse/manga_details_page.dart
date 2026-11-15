@@ -1084,16 +1084,25 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                         : (_) => _toggleChapter(chapter.key),
                   )
                 : const Icon(CupertinoIcons.doc_text),
-            title: Text(chapter.name),
-            subtitle: Text(
-              [
-                ?_chapterSubtitle(chapter),
-                switch (_chapterRead?.completed(chapter.key)) {
-                  true => '已读',
-                  false => '未读',
-                  null => '状态未知',
-                },
-              ].join(' · '),
+            title: DefaultTextStyle(
+              style: CupertinoTheme.of(context).textTheme.textStyle,
+              child: Text(chapter.name),
+            ),
+            subtitle: DefaultTextStyle(
+              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                fontSize: 12,
+                color: AppColors.secondaryLabel.resolveFrom(context),
+              ),
+              child: Text(
+                [
+                  ?_chapterSubtitle(chapter),
+                  switch (_chapterRead?.completed(chapter.key)) {
+                    true => '已读',
+                    false => '未读',
+                    null => '状态未知',
+                  },
+                ].join(' · '),
+              ),
             ),
             trailing: _selectingChapters || _bookmarks == null
                 ? null

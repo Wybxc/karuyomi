@@ -53,6 +53,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   bool _catalogChangeScheduled = false;
   String? _refreshError;
   String? _openError;
+  bool _metadataConfirmed = false;
   String? _retryingMetadata;
   Object? _metadataAttempt;
   final _selection = <String>{};
@@ -96,6 +97,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     _selecting = false;
     _refreshError = null;
     _openError = null;
+    _metadataConfirmed = false;
     _retryingMetadata = null;
     _metadataAttempt = null;
     _categoryFilter = null;
@@ -147,6 +149,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     setState(() {
       _opening = true;
       _openError = null;
+      _metadataConfirmed = false;
     });
     try {
       final details = await controller.openLibraryEntry(
@@ -328,13 +331,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       _metadataAttempt = attempt;
       _retryingMetadata = entry.mangaKey;
       _openError = null;
+      _metadataConfirmed = false;
     });
     try {
       await repository.client.retryMetadata(entry.mangaKey);
       if (!isCurrent()) return;
       setState(() {
         if (controller.error == originalCatalogError) controller.error = null;
-        _openError = '书架资料已获服务器确认。';
+        _metadataConfirmed = true;
       });
       // A failed read after the ACK cannot make the completed write pending.
       // Refresh has its own read-failure state and never resends the command.
@@ -540,6 +544,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                               color: AppColors.error.resolveFrom(context),
                             ),
                           ),
+                        if (_metadataConfirmed) const Text('书架资料已获服务器确认。'),
                         if (widget.controller case final controller?)
                           if (controller.status != ServiceStatus.ready)
                             _connection(controller),
