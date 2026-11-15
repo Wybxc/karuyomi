@@ -745,6 +745,9 @@ void main() {
           await tap('migration-source');
           await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
           await tester.pumpAndSettle();
+          await reveal(control('migration-search'));
+          await tester.tap(control('migration-search'));
+          await tester.enterText(control('migration-search'), '目标作品');
           await tap('migration-search-submit');
           final rowWidth = tester.getSize(control('migration-search')).width;
           final firstResult = find.byKey(
@@ -796,6 +799,59 @@ void main() {
             tester.renderObject<RenderParagraph>(retained).text.style?.color,
             AppColors.secondaryLabel.resolveFrom(tester.element(retained)),
           );
+          expect(posts(), hasLength(writes));
+          final chooseChapter = find.byKey(
+            ValueKey(('migration-map-choose', sequence.entries.first.key)),
+          );
+          await reveal(chooseChapter);
+          final mainScroll = tester.state<ScrollableState>(
+            find.byType(Scrollable).first,
+          );
+          final beforeChoice = mainScroll.position.pixels;
+          await tester.tap(chooseChapter);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byType(CupertinoTextField).last,
+            '没有这个章节',
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('没有匹配的选项'), findsOneWidget);
+          await tester.tap(find.byType(CupertinoNavigationBarBackButton).last);
+          await tester.pumpAndSettle();
+          expect(
+            mainScroll.position.pixels,
+            closeTo(beforeChoice, 1),
+            reason:
+                'Cancelling a chapter choice must keep the mapping position',
+          );
+          expect(
+            Focus.of(
+              tester.element(
+                find.descendant(
+                  of: chooseChapter,
+                  matching: find.text('选择目标章节'),
+                ),
+              ),
+            ).hasPrimaryFocus,
+            isTrue,
+            reason: 'Chapter choice must return keyboard focus to its trigger',
+          );
+          expect(tester.testTextInput.isVisible, isFalse);
+          await tap('migration-confirm');
+          final beforeConfirm = mainScroll.position.pixels;
+          await tester.tap(find.text('返回检查'));
+          await tester.pumpAndSettle();
+          expect(
+            mainScroll.position.pixels,
+            closeTo(beforeConfirm, 1),
+            reason: 'Cancelling confirmation must keep the review position',
+          );
+          expect(
+            Focus.of(tester.element(find.text('检查并确认迁移'))).hasPrimaryFocus,
+            isTrue,
+            reason: 'Confirmation must return keyboard focus to its trigger',
+          );
+          expect(tester.testTextInput.isVisible, isFalse);
           expect(posts(), hasLength(writes));
           final saveGate = Completer<void>();
           addTearDown(() {

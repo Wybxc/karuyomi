@@ -26,6 +26,7 @@ class const MigrationPage({
 class _MigrationPageState extends State<MigrationPage> {
   late final MigrationController controller;
   late TextEditingController _search;
+  late FocusNode _confirmFocus;
   int _mappingPage = 0;
   bool _showMarkedOnly = false;
 
@@ -46,6 +47,7 @@ class _MigrationPageState extends State<MigrationPage> {
   Future<void> _confirm() async {
     final target = controller.targetMetadata;
     if (!controller.canChange || target == null || controller.tooMany) return;
+    _confirmFocus.requestFocus();
     final copyScope = controller.sourceSequence == null
         ? '仅迁移收藏和所选分类，章节标记不复制。'
         : '选中 ${controller.selectedChapters.length} 条章节映射；'
@@ -77,12 +79,22 @@ class _MigrationPageState extends State<MigrationPage> {
         ],
       ),
     );
-    if (accepted == true && mounted) await controller.confirm();
+    if (!mounted) return;
+    if (accepted == true) {
+      await controller.confirm();
+    } else if (controller.canChange) {
+      _confirmFocus.requestFocus();
+    }
   }
 
-  Future<void> _chooseChapter(MigrationChapterMatch match) async {
+  Future<void> _chooseChapter(
+    BuildContext context,
+    MigrationChapterMatch match,
+    FocusNode focus,
+  ) async {
     final sequence = controller.targetSequence;
     if (!controller.canChange || sequence == null) return;
+    focus.requestFocus();
     final options = <String?, String>{
       null: '不映射此章节',
       for (final chapter in sequence.entries)
@@ -103,11 +115,13 @@ class _MigrationPageState extends State<MigrationPage> {
         ),
       ),
     );
-    if (mounted &&
+    if (context.mounted &&
         controller.canChange &&
-        identical(sequence, controller.targetSequence) &&
-        result != null) {
-      controller.mapChapter(match.source.key, result.value);
+        identical(sequence, controller.targetSequence)) {
+      focus.requestFocus();
+      if (result != null) {
+        controller.mapChapter(match.source.key, result.value);
+      }
     }
   }
 
@@ -146,6 +160,7 @@ class _MigrationPageState extends State<MigrationPage> {
         (state.targetProgress.containsKey(target.key) ||
             state.targetBookmarks.contains(target.key));
     return CupertinoFormSection.insetGrouped(
+      key: ValueKey(('migration-map-row', key)),
       footer: Text(
         '原标记：${read ? '已读 ' : ''}${bookmark ? '书签' : ''}${!read && !bookmark ? '无' : ''}\n'
         '目标：${target == null ? '未映射' : '${target.sourceIndex + 1}. ${target.name}'}\n${match.reason}'
@@ -170,13 +185,19 @@ class _MigrationPageState extends State<MigrationPage> {
             ),
           ),
         ),
-        CupertinoButton(
-          key: ValueKey(('migration-map-choose', key)),
-          alignment: AlignmentDirectional.centerStart,
-          onPressed: controller.canChange
-              ? () => unawaited(_chooseChapter(match))
-              : null,
-          child: const Text('选择目标章节'),
+        HookBuilder(
+          builder: (context) {
+            final focus = useFocusNode();
+            return CupertinoButton(
+              key: ValueKey(('migration-map-choose', key)),
+              focusNode: focus,
+              alignment: AlignmentDirectional.centerStart,
+              onPressed: controller.canChange
+                  ? () => unawaited(_chooseChapter(context, match, focus))
+                  : null,
+              child: const Text('选择目标章节'),
+            );
+          },
         ),
       ],
     );
@@ -378,6 +399,7 @@ class _MigrationPageState extends State<MigrationPage> {
               ),
               CupertinoButton.filled(
                 key: const ValueKey('migration-confirm'),
+                focusNode: _confirmFocus,
                 onPressed: controller.canChange && !controller.tooMany
                     ? () => unawaited(_confirm())
                     : null,
@@ -393,6 +415,7 @@ class _MigrationPageState extends State<MigrationPage> {
   @override
   Widget build(BuildContext context) {
     _search = useTextEditingController(text: widget.seed.metadata.manga.title);
+    _confirmFocus = useFocusNode();
     useListenable(controller);
     final pending = controller.pending;
     final selectedKey = controller.selectedSource?.key;

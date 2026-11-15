@@ -347,7 +347,21 @@ Codex 内置浏览器以360×800视口运行正式 Web，官方 `pnpm acceptance
 
 原图为 `karuyomi-8c398d3-migration-{scope,categories-only,original-snapshot,source-choices,search-ready,search-empty,target-list,confirm,completed}-{light,dark}.jpg`，以及深色 `{preview,mapping,selected,chapter-choice}`、浅色 `{preview,preview-summary,existing-mapping,chapter-choice}`。九路快照、相等性/提交检查为同前缀 JSON，留在忽略目录。瞬态加载未取得稳定主图，不能把随后成功画面填作加载；浅色章节选择只取得查询变体，其余取消、占用和无匹配仍待。视口已恢复、临时标签已关闭，harness正常退出。
 
-本次实拍保留三个未通过点：候选按钮缩成约80px宽窄卡片；同名源的原/目标摘要和确认没有语言；预览说明与50章文本合成巨大辅助描述。下一里程碑已直接让候选官方按钮填满分组，并在各阶段源摘要加语言，预览用官方 Semantics 分开子信息。四项浅/深×1x/2x回归先复现行宽，再复现说明合并；最终19项迁移回归核对行右侧点击、独立原/目标及保留说明语义、不同源语言、预览重读、等待/丢确认及精确重试全部通过，两文件最终格式的严格分析无问题。测试初版的语义句柄释放位置另已修正，不把该测试自身失败当产品缺陷。日志为 `migration-row-semantics-{before,after-width,after,final}.log` 与 `migration-row-analyze.log`；完整CI和新正式Web仍待，不用`8c398d3`截图冒充修复后画面。
+本次实拍保留三个未通过点：候选按钮缩成约80px宽窄卡片；同名源的原/目标摘要和确认没有语言；预览说明与50章文本合成巨大辅助描述。后续已直接让候选官方按钮填满分组，并在各阶段源摘要加语言，预览用官方 Semantics 分开子信息。四项浅/深×1x/2x回归先复现行宽，再复现说明合并；最终19项迁移回归核对行右侧点击、独立原/目标及保留说明语义、不同源语言、预览重读、等待/丢确认及精确重试全部通过，两文件最终格式的严格分析无问题。测试初版的语义句柄释放位置另已修正，不把该测试自身失败当产品缺陷。日志为 `migration-row-semantics-{before,after-width,after,final}.log` 与 `migration-row-analyze.log`。修复后的CI与正式Web见下文，`8c398d3`问题图仍保留。
+
+### 迁移行宽、语言与语义的正式 Web 复验
+
+2026-11-16，`9228c116aa7ca7587fc733adb9e607a80edce9a4`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43746307671)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43746312402)均成功，含868项Dart（22+87+759）、531项Vitest、完整Web及Wasm构建，分支部署跳过。日志为`ci-9228c11-check.log`。下载正式Web artifact `14174658196`（16,297,023字节），在传输边界核对GitHub归档SHA-256 `2a46df111d12724b5761ef6f76fdf1a9d8a6a53033b502c36a1c0c7e6f351bf6`，再核对39条Flutter资源。本机仅通过官方Vite组装静态资源和acceptance入口，没有Flutter或AOT编译。
+
+Codex内置浏览器以360×800视口操作官方Wrangler临时D1/R2、空fixture和`acceptance-owner`；静态快照含xkcd和Komiic，仅使用xkcd。启动时Wrangler写用户目录日志受到沙箱限制，但正式harness正常服务，退出码0；不将这次启动记为零错误。深色跟随系统，浅色由UI保存。两主题均以真实英文xkcd的3,323章为原快照、中文xkcd为目标，原作没有已读或书签。
+
+浅/深实拍均确认候选官方按钮填满320px分组，实际点击行右侧`(323,604)`打开正确目标；原作、目标、确认与完成摘要分别包含`en`和`zh`。预览DOM中标题、原作、目标、保留说明、复制选项和章节信息分别可读，不再合成50章的大段辅助描述。实际映射翻页至51–100/3323，打开`3274: Arthurian Connector`的章节选择，当前“不映射此章节”报告`aria-current=true`，`3062: Off by one（已占用）`确为禁用。输入“没有这个章节”取得无匹配画面，清空恢复当前项与禁用态，取消不改变原映射或页码。过滤仅有标记章节后，显示“原作品没有已读或有书签的章节。”。
+
+确认框与取消、再次明确提交及完成均成对实拍。独立读取九路完整ProtoJSON对象核对：两主题预览、查询、分页、映射取消和确认取消均与各自baseline相同；两次明确确认均新增已读0、书签0，只推进一次账户与目标作品revision。深色账户2→3、中文目标0→1，浅色主题保存3→4后建立baseline，浅色迁移账户4→5、中文目标1→2；英文原作revision1及双方标记、分类和其它设置保留。快照与检查结果为`karuyomi-9228c11-migration-{baseline,preview-cancel,confirmed}-{light,dark}.json`及同前缀`*-check.json`，留在忽略目录。
+
+原图前缀`karuyomi-9228c11-migration-`，两主题均有`{original-snapshot,search-ready,target-list,mapping-page2,chapter-choice,chapter-no-match,no-marks,confirm,completed}`；浅色另有`{scope,categories-only,search-empty}`，预览独立语义保存为`preview-{light,dark}.dom.txt`。源范围深色与搜索空态深色仍只有旧版问题图，加载/故障未取得主图，不用正常结果填补。已恢复浏览器视口、关闭临时标签并正常退出harness；不是生产Access或原生验收。
+
+本轮新发现取消章节选择或确认后，画面可能先保持原处，再延迟向页面前段滚动，浅/深均观察到；分页、映射和复制草稿仍保留。证据为`choice-return-position-{light,dark}.jpg`及`delayed-return-position-light.jpg`，不将转场第一帧当稳定位置。带输入焦点的四种主题/字号组件流程中，滚动本身未复现，分别先复现章节选择和确认取消未恢复原按钮焦点；因此仅认定焦点缺陷已在组件复现，不声称已确定Web延迟滚动的唯一原因。后续直接以Hooks管理按钮FocusNode、保留原章节键，并在弹层前后恢复触发按钮焦点。19项迁移回归通过，核对取消后的原按钮焦点、滚动位置、键盘关闭及零写入；日志为`migration-return-{position-before,focus-before,focus-after-choice,focus-after}.log`。完整CI和正式Web位置复验继续待办。
 
 ### 实拍布局与颜色锚点
 
