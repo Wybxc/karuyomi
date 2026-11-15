@@ -41,6 +41,8 @@ Source host 的第三方源码输入包含已初始化、HEAD 与已提交 gitli
 
 ## 首次本地全量与恢复
 
+2026-11-15 用户补充构建位置：AOT 可 offload 到 `ssh macbook-pro-4`。该机为 M4 MacBook Pro，用户说明其性能强于 clab；为节约当前本机电量，后续重编可优先使用该机，仍不使用 pku-dasys。本节的“本地”指非 CI 的开发/构建机，包含已授权的 SSH 主机；不是要求在当前笔记本执行。开始实际构建前在目标机核对固定工具链、仓库提交和 checkpoint，并按实测资源确定并发；本次仅记录授权及设备信息，尚未运行该机上的 AOT 或性能比较。
+
 先提交稳定的当前 host，使用固定提交、干净的独立 clone。下列命令在该 clone 内执行；长批次必须同时固定 supervisor、verifier、builder 和 submodules，不能只固定 builder 却让其它阶段读取持续变化的开发目录。state、plan、builds 和 snapshot 可以使用绝对路径放在统一的忽略目录。
 
 ```sh
