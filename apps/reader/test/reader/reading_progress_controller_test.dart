@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
+import 'package:karuyomi/data/library_repository.dart';
 import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/data/reading_progress.dart';
+import 'package:karuyomi/data/source_migration_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/reader/reading_progress_controller.dart';
+import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:reader_core/reader_core.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
 import '../browse/fakes.dart';
@@ -45,6 +50,120 @@ void main() {
     controller.dispose();
     await shared.dispose();
   });
+
+  for (final rejected in [false, true]) {
+    for (final resetting in [false, true]) {
+      test(
+        '${rejected ? 'rejected' : 'unknown'} migration explains blocked ${resetting ? 'reset' : 'progress'} and keeps its draft until explicit retry',
+        () async {
+          final library = LibraryRepository(shared);
+          await library.setFavorite(
+            packageName: 'eu.kanade.source.test',
+            sourceId: sourceId,
+            sourceName: '原源',
+            sourceLang: 'en',
+            manga: testManga,
+            favorite: true,
+          );
+          final sourceKey =
+              (await library.watchEntries().first).single.mangaKey;
+          final reader = ReadingProgressController(
+            repository: repository,
+            mangaKey: sourceKey,
+          );
+          addTearDown(reader.dispose);
+          await reader.restore(_manifest);
+          final migrations = MigrationRepository(shared);
+          final preview = await migrations.preview(
+            sourceKey: sourceKey,
+            targetMetadata: wire.LibraryMetadata(
+              packageName: 'eu.kanade.source.test',
+              sourceId: '42',
+              sourceName: '目标源',
+              sourceLang: 'zh',
+              manga: wire.Manga(url: '/target', title: '目标作品'),
+            ),
+          );
+          if (rejected) {
+            server.beforeRequest = (request) {
+              if (request.method != 'POST') return null;
+              final command = wire.decodeProtoJson(
+                wire.StateMutation(),
+                jsonDecode(request.body!),
+              );
+              return ApiReply(
+                status: 400,
+                redirected: false,
+                headers: const {'content-type': 'application/json'},
+                body: jsonEncode(
+                  wire.encodeProtoJson(
+                    wire.StateMutationResponse(
+                      schemaVersion: 1,
+                      mutationId: command.mutationId,
+                      error: wire.BusinessStateError(
+                        code: wire
+                            .BusinessStateErrorCode
+                            .BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+                        message: 'Injected migration rejection',
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            };
+          } else {
+            server.loseNextResponse = true;
+          }
+          await expectLater(
+            migrations.commit(preview, chapters: const []),
+            rejected
+                ? throwsA(isA<BusinessStateException>())
+                : throwsStateError,
+          );
+          server.beforeRequest = null;
+          final original = migrations.pending(sourceKey)!;
+          final writes = server.requests
+              .where((request) => request.method == 'POST')
+              .length;
+          if (resetting) {
+            expect(await reader.reset(_manifest), isNull);
+          } else {
+            reader.observe(
+              manifest: _manifest,
+              current: _manifest.positionAt(1),
+              observed: _manifest.positionAt(1, offset: .7),
+              reversedOrder: false,
+            );
+            expect(await reader.flush(), false);
+          }
+          expect(reader.unsaved, true);
+          expect(reader.error, contains('源或目标漫画有未确认迁移'));
+          expect(reader.error, contains('处理原操作后再显式重试'));
+          expect(reader.error, contains('草稿仅保留在当前会话'));
+          expect(migrations.pending(sourceKey)!.request, original.request);
+          expect(await reader.retry(), false);
+          expect(
+            server.requests.where((request) => request.method == 'POST'),
+            hasLength(writes),
+          );
+          if (rejected) {
+            migrations.discardRejected(sourceKey);
+          } else {
+            await migrations.retry(sourceKey);
+          }
+          expect(reader.unsaved, true);
+          expect(server.progress(sourceKey, _manifest.chapterKey), isNull);
+          expect(await reader.retry(), true);
+          expect(reader.unsaved, false);
+          expect(reader.error, isNull);
+          final saved = server.progress(sourceKey, _manifest.chapterKey)!;
+          expect(saved.epoch, resetting ? 1 : 0);
+          if (!resetting) expect(saved.current.pageIndexHint, 1);
+          expect(server.appliedMutations, rejected ? 2 : 3);
+        },
+      );
+    }
+  }
 
   test('two readers can resume the same saved chapter before a real navigation writes', () async {
     final manifest = _manifest;

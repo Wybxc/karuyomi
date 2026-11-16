@@ -476,13 +476,30 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   Widget _connectionSettings() {
     final controller = _catalog;
+    final connecting =
+        _changingService || controller?.status == ServiceStatus.connecting;
+    final confirmed =
+        !_restoringOrigin &&
+        !connecting &&
+        controller?.status == ServiceStatus.ready;
+    final status = _restoringOrigin
+        ? '正在读取服务地址'
+        : connecting
+        ? '正在连接服务'
+        : switch (controller?.status) {
+            ServiceStatus.ready => '已连接，身份已确认',
+            ServiceStatus.loginRequired => '需要重新登录',
+            ServiceStatus.denied => '访问被拒绝',
+            ServiceStatus.failed => '连接未完成',
+            _ => '尚未连接',
+          };
     final form = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         CupertinoTextField(
           key: const ValueKey('service-origin'),
           controller: _originField,
-          readOnly: kIsWeb || _restoringOrigin,
+          readOnly: kIsWeb || _restoringOrigin || _changingService,
           autofillHints: null,
           keyboardType: TextInputType.url,
           autocorrect: false,
@@ -511,7 +528,11 @@ class _AppShellState extends ConsumerState<AppShell> {
               child: const Text('连接服务'),
             ),
             CupertinoButton.filled(
-              onPressed: _platform == null || controller?.busy == true
+              onPressed:
+                  _platform == null ||
+                      controller?.busy == true ||
+                      _changingService ||
+                      _restoringOrigin
                   ? null
                   : _authenticate,
               child: const Text('登录'),
@@ -523,14 +544,42 @@ class _AppShellState extends ConsumerState<AppShell> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        form,
-        if (controller?.email != null)
-          Text(
-            '账号：${controller!.email}',
-            style: TextStyle(
-              color: AppColors.secondaryLabel.resolveFrom(context),
+        CupertinoFormSection.insetGrouped(
+          margin: EdgeInsets.zero,
+          children: [
+            if (_platform != null)
+              CupertinoFormRow(
+                prefix: const Text('服务'),
+                child: Text(
+                  _changingService
+                      ? _originField.text.trim()
+                      : _platform!.origin.origin,
+                ),
+              ),
+            CupertinoFormRow(
+              prefix: const Text('状态'),
+              child: Semantics(
+                liveRegion: true,
+                child: Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (_restoringOrigin || connecting)
+                      const CupertinoActivityIndicator(),
+                    Text(status),
+                  ],
+                ),
+              ),
             ),
-          ),
+            if (confirmed && controller?.email != null)
+              CupertinoFormRow(
+                prefix: const Text('账号'),
+                child: Text(controller!.email!),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        form,
         if (_configurationError != null)
           Text(
             _configurationError!,

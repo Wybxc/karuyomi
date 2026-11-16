@@ -374,6 +374,11 @@ final class ReadingProgressController extends ChangeNotifier {
           }
           if (_conflicted.isEmpty) error = null;
         }
+      } on BusinessPendingMutationException catch (failure) {
+        if (_closed) return;
+        error = '${failure.message} 处理原操作后再显式重试；草稿仅保留在当前会话。';
+        _notify();
+        return;
       } on BusinessStateException catch (failure) {
         if (_closed) return;
         if (failure.conflict) {
@@ -418,6 +423,11 @@ final class ReadingProgressController extends ChangeNotifier {
         _currentChapter = entry.key;
         storageMode = ProgressStorageMode.serverConfirmed;
         error = null;
+      } on BusinessPendingMutationException catch (failure) {
+        if (_closed) return;
+        error = '${failure.message} 处理原操作后再显式重试；草稿仅保留在当前会话。';
+        _notify();
+        return;
       } on BusinessStateException catch (failure) {
         if (_closed) return;
         if (failure.conflict) {

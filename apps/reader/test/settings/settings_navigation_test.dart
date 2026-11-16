@@ -228,6 +228,133 @@ Future<void> _finish(WidgetTester tester, CatalogController catalog) async {
 }
 
 void main() {
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'service connection reports confirmed, connecting and Access states in $brightness at ${textScale}x',
+        (tester) async {
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          tester.platformDispatcher.textScaleFactorTestValue = textScale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final platform = TestPlatform(seedDefaultInstallation: false);
+          await _start(tester, platform, size: const Size(360, 1100));
+          await _tap(tester, _navigation('设置'));
+          await openSettingsSection(tester, 'connection');
+          expect(find.text('已连接，身份已确认'), findsOneWidget);
+          expect(find.text('owner@example.com'), findsOneWidget);
+          final rebuilding = Completer<void>();
+          final rebuilt = Completer<void>();
+          final bootstrapping = Completer<void>();
+          final bootstrapped = Completer<void>();
+          addTearDown(() {
+            if (!rebuilt.isCompleted) rebuilt.complete();
+            if (!bootstrapped.isCompleted) bootstrapped.complete();
+          });
+          platform.beforeRebuild = () async {
+            rebuilding.complete();
+            await rebuilt.future;
+          };
+          platform.beforeApiFetch = (path) async {
+            if (path != '/api/bootstrap') return;
+            bootstrapping.complete();
+            await bootstrapped.future;
+          };
+          await tester.runAsync(() async {
+            await tester.tap(find.text('连接服务'));
+            await Future<void>.delayed(Duration.zero);
+          });
+          await tester.pump(const Duration(milliseconds: 500));
+          await tester.runAsync(
+            () => rebuilding.future.timeout(const Duration(seconds: 5)),
+          );
+          expect(find.text('正在连接服务'), findsOneWidget);
+          expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+          expect(find.text('owner@example.com'), findsNothing);
+          expect(
+            tester
+                .widget<CupertinoButton>(
+                  find.widgetWithText(CupertinoButton, '登录'),
+                )
+                .onPressed,
+            isNull,
+          );
+          await tester.runAsync(() async {
+            platform.beforeRebuild = null;
+            rebuilt.complete();
+            await Future<void>.delayed(Duration.zero);
+          });
+          await tester.pump();
+          await tester.runAsync(
+            () => bootstrapping.future.timeout(const Duration(seconds: 5)),
+          );
+          expect(find.text('正在连接服务'), findsOneWidget);
+          expect(find.text('owner@example.com'), findsNothing);
+          await tester.runAsync(() async {
+            bootstrapped.complete();
+            await Future<void>.delayed(Duration.zero);
+          });
+          await tester.pumpAndSettle();
+          platform.beforeRebuild = null;
+          platform.beforeApiFetch = null;
+          expect(find.text('已连接，身份已确认'), findsOneWidget);
+          expect(find.text('owner@example.com'), findsOneWidget);
+          for (final (status, label) in [
+            (401, '需要重新登录'),
+            (403, '访问被拒绝'),
+            (503, '连接未完成'),
+          ]) {
+            platform.bootstrapStatus = status;
+            await _tap(tester, find.text('连接服务'));
+            expect(find.text(label), findsOneWidget);
+            expect(find.text('owner@example.com'), findsNothing);
+            expect(find.text('已连接，身份已确认'), findsNothing);
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'unconfigured service exposes its status and a correctable address',
+    (tester) async {
+      await tester.pumpApp(
+        KaruyomiApp(
+          platformFactory: (_) => throw ArgumentError('Missing service'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _tap(tester, _navigation('设置'));
+      expect(find.text('尚未连接'), findsOneWidget);
+      expect(find.text('请先在设置中填写服务的 HTTPS 地址。'), findsOneWidget);
+      expect(find.text('账号'), findsNothing);
+      expect(
+        tester
+            .widget<CupertinoTextField>(
+              find.byKey(const ValueKey('service-origin')),
+            )
+            .readOnly,
+        false,
+      );
+      expect(
+        tester
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '连接服务'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpApp(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('returning to the foreground reads a confirmed remote theme', (
     tester,
   ) async {
@@ -353,7 +480,18 @@ void main() {
         expect(platform.businessServer.appliedMutations, 1);
         expect(platform.openedBuilds, isEmpty);
         await openSettingsSection(tester, 'connection');
+        expect(find.text(denied ? '访问被拒绝' : '需要重新登录'), findsOneWidget);
+        expect(
+          tester
+              .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
+              .catalog
+              .email,
+          'owner@example.com',
+        );
+        expect(find.text('owner@example.com'), findsNothing);
         await _tap(tester, find.text('登录'));
+        expect(find.text('已连接，身份已确认'), findsOneWidget);
+        expect(find.text('owner@example.com'), findsOneWidget);
         final recovered = globalSettings(tester);
         expect(platform.authCalls, 1);
         expect(recovered.repository.client, same(initial.repository.client));
