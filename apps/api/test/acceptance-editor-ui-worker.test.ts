@@ -8,6 +8,7 @@ import {
 } from '@karuyomi/contracts';
 import {
   BusinessStateErrorCode,
+  LibraryMetadataSchema,
   ReaderMode,
   SettingsMutationSchema,
   StateMutationSchema,
@@ -15,6 +16,7 @@ import {
 import { applyD1Migrations, createExecutionContext } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { exportJWK, exportPKCS8, generateKeyPair } from 'jose';
+import { createHash } from 'node:crypto';
 import { afterEach, beforeAll, beforeEach, expect, test } from 'vitest';
 import acceptance from './acceptance-entry.ts';
 import {
@@ -171,6 +173,80 @@ async function entered() {
   throw new Error('Editor UI request did not enter the fixture');
 }
 
+async function seedMigration() {
+  const metadata = (sourceId: string) =>
+    create(LibraryMetadataSchema, {
+      packageName: 'eu.kanade.test',
+      sourceId,
+      sourceName: 'Test source ' + sourceId,
+      sourceLang: 'en',
+      manga: { url: '/comic', title: 'Comic ' + sourceId },
+    });
+  const key = (value: ReturnType<typeof metadata>) =>
+    createHash('sha256')
+      .update(
+        JSON.stringify([value.packageName, value.sourceId, value.manga?.url]),
+      )
+      .digest('hex');
+  const sourceMetadata = metadata('1');
+  const targetMetadata = metadata('2');
+  const sourceKey = key(sourceMetadata);
+  const targetKey = key(targetMetadata);
+  const favorite = toJsonString(
+    StateMutationSchema,
+    create(StateMutationSchema, {
+      schemaVersion: businessSchemaVersion,
+      mutationId: crypto.randomUUID(),
+      mangaKey: sourceKey,
+      operation: {
+        case: 'setFavorite',
+        value: { favorite: true, metadata: sourceMetadata },
+      },
+    }),
+  );
+  expect((await request('/api/state/mutations', favorite, false)).status).toBe(
+    200,
+  );
+  const command = () =>
+    toJsonString(
+      StateMutationSchema,
+      create(StateMutationSchema, {
+        schemaVersion: businessSchemaVersion,
+        mutationId: crypto.randomUUID(),
+        mangaKey: targetKey,
+        operation: {
+          case: 'migrateFrom',
+          value: {
+            sourceMangaKey: sourceKey,
+            expectedSourceRevision: 1,
+            expectedCatalogRevision: 0,
+            targetMetadata,
+            copyCategories: true,
+          },
+        },
+      }),
+    );
+  const snapshot = async () => {
+    const source = await request(
+      '/api/state/manga/' + sourceKey,
+      undefined,
+      false,
+    );
+    const target = await request(
+      '/api/state/manga/' + targetKey,
+      undefined,
+      false,
+    );
+    expect(source.status).toBe(200);
+    expect(target.status).toBe(200);
+    return {
+      source: mangaStateResponseSchema.parse(await source.json()),
+      target: mangaStateResponseSchema.parse(await target.json()),
+    };
+  };
+  return { sourceKey, targetKey, command, snapshot };
+}
+
 test('fixture stays opt-in, loopback-only, scoped and absent from other APIs', async () => {
   await setEditorUiMode(env.DB, 'fail-read', 'manga');
   expect((await request(mangaPath, undefined, false)).status).toBe(200);
@@ -196,6 +272,7 @@ test('fixture stays opt-in, loopback-only, scoped and absent from other APIs', a
 test.each([
   ['manga', mangaPath],
   ['cover', coverPath],
+  ['migration', coverPath],
 ])(
   'reading %s remains pending until an explicit stdin-controlled generation change',
   async (scope, path) => {
@@ -227,6 +304,7 @@ test.each([
 test.each([
   ['manga', mangaPath],
   ['cover', coverPath],
+  ['migration', coverPath],
 ])(
   'an aborted %s reader leaves the gate without dispatching a late request',
   async (scope, path) => {
@@ -432,4 +510,95 @@ test('cover byte failure preserves the record and retries the same private resou
   expect(
     (await editorUiAttempts(env.DB)).every((row) => row.body === null),
   ).toBe(true);
+});
+
+test('migration confirmation waits for delivery after the target commits and preserves the original', async () => {
+  const migration = await seedMigration();
+  const before = await migration.snapshot();
+  await setEditorUiMode(env.DB, 'hold-confirm', 'migration');
+  const body = migration.command();
+  let delivered = false;
+  const pending = request('/api/state/mutations', body).then((reply) => {
+    delivered = true;
+    return reply;
+  });
+  try {
+    await entered();
+    for (
+      let attempt = 0;
+      attempt < 30 && (await migration.snapshot()).target.manga?.revision !== 1;
+      attempt++
+    ) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    }
+    const committed = await migration.snapshot();
+    expect(committed.target.manga?.favorite).toBe(true);
+    expect(committed.target.manga?.revision).toBe(1);
+    expect(committed.target.accountRevision).toBe(2);
+    expect(committed.source.manga).toEqual(before.source.manga);
+    expect(delivered).toBe(false);
+  } finally {
+    await setEditorUiMode(env.DB, 'pass', 'migration');
+  }
+  const ack = stateMutationResponseSchema.parse(await (await pending).json());
+  expect(ack.manga?.mangaKey).toBe(migration.targetKey);
+  expect(ack.manga?.revision).toBe(1);
+  expect(ack.migration).toMatchObject({
+    copiedReadChapters: 0,
+    copiedBookmarks: 0,
+  });
+  expect(await editorUiAttempts(env.DB)).toEqual([
+    expect.objectContaining({ body, worker_status: 200, client_status: 200 }),
+  ]);
+});
+
+test('lost migration ACK retries the same command without applying twice and fresh stale commands conflict', async () => {
+  const migration = await seedMigration();
+  await setEditorUiMode(env.DB, 'lose-confirm', 'migration');
+  const body = migration.command();
+  expect((await request('/api/state/mutations', body)).status).toBe(502);
+  const committed = await migration.snapshot();
+  expect(committed.target.manga?.revision).toBe(1);
+  await setEditorUiMode(env.DB, 'pass', 'migration');
+  expect((await request('/api/state/mutations', body)).status).toBe(200);
+  expect(await migration.snapshot()).toEqual(committed);
+  const stale = await request('/api/state/mutations', migration.command());
+  expect(stale.status).toBe(409);
+  expect(
+    stateMutationResponseSchema.parse(await stale.json()).error?.code,
+  ).toBe(BusinessStateErrorCode.REVISION_CONFLICT);
+  expect(await migration.snapshot()).toEqual(committed);
+  expect((await editorUiAttempts(env.DB)).slice(0, 2)).toEqual([
+    expect.objectContaining({ body, worker_status: 200, client_status: 502 }),
+    expect.objectContaining({ body, worker_status: 200, client_status: 200 }),
+  ]);
+});
+
+test('migration read/rejection/login faults preserve both works and leave settings on its real path', async () => {
+  const migration = await seedMigration();
+  const before = await migration.snapshot();
+  await setEditorUiMode(env.DB, 'fail-read', 'migration');
+  expect(
+    (await request('/api/state/manga/' + migration.sourceKey)).status,
+  ).toBe(503);
+  expect(
+    (await request('/api/state/manga/' + migration.targetKey)).status,
+  ).toBe(503);
+  expect((await request('/api/settings')).status).toBe(200);
+  expect((await request(mangaPath)).status).toBe(200);
+  await setEditorUiMode(env.DB, 'reject-save', 'migration');
+  const rejected = await request('/api/state/mutations', migration.command());
+  expect(rejected.status).toBe(400);
+  expect(
+    stateMutationResponseSchema.parse(await rejected.json()).error,
+  ).toMatchObject({
+    code: BusinessStateErrorCode.INVALID_INPUT,
+    retryable: false,
+  });
+  expect(await migration.snapshot()).toEqual(before);
+  await setEditorUiMode(env.DB, 'login-required', 'migration');
+  const login = await request('/api/state/manga/' + migration.sourceKey);
+  expect(login.status).toBe(401);
+  expect(login.headers.get('content-type')).toBe('text/html');
+  expect(await migration.snapshot()).toEqual(before);
 });

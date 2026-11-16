@@ -484,8 +484,10 @@ final class MigrationController extends ChangeNotifier {
             ? failure.message
             : failure is BusinessStateException && failure.conflict
             ? '迁移预览已在其他设备改变，请重新读取后确认。'
+            : pending?.retryable == false
+            ? '原迁移已被服务端拒绝，请重新读取后再修改。'
             : pending != null
-            ? '迁移尚未确认。请明确重试原操作；已确认冲突须先重新读取。'
+            ? '迁移尚未确认。请明确重试原操作。'
             : '操作未完成，请重试；尚未提交迁移。';
       }
     } finally {

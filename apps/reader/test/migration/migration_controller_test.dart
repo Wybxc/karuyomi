@@ -209,6 +209,66 @@ void main() {
     expect(posts(), hasLength(count + 1));
   });
 
+  test('a rejected migration requires a read before a new command and never suggests retrying the rejected operation', () async {
+    await targetPreview();
+    final before = posts().length;
+    final applied = platform.businessServer.appliedMutations;
+    final originalState = platform.businessServer.manga(sequence.mangaKey);
+    final targetKey = controller.preview!.targetKey;
+    platform.businessServer.beforeRequest = (request) {
+      if (request.method != 'POST' ||
+          request.uri.path != '/api/state/mutations') {
+        return null;
+      }
+      final command = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(request.body!),
+      );
+      return ApiReply(
+        status: 400,
+        redirected: false,
+        headers: const {'content-type': 'application/json'},
+        body: jsonEncode(
+          wire.encodeProtoJson(
+            wire.StateMutationResponse(
+              schemaVersion: 1,
+              mutationId: command.mutationId,
+              error: wire.BusinessStateError(
+                code: wire
+                    .BusinessStateErrorCode
+                    .BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+                message: 'Injected pre-dispatch rejection',
+                retryable: false,
+              ),
+            ),
+          ),
+        ),
+      );
+    };
+    await controller.confirm();
+    platform.businessServer.beforeRequest = null;
+    expect(controller.completed, false);
+    expect(controller.pending?.retryable, false);
+    expect(controller.error, contains('重新读取'));
+    expect(controller.error, isNot(contains('重试')));
+    expect(controller.canChange, false);
+    final original = controller.pending!.request;
+    await controller.retry();
+    await controller.confirm();
+    await controller.refreshSources();
+    expect(controller.pending!.request, original);
+    expect(posts(), hasLength(before + 1));
+    expect(platform.businessServer.appliedMutations, applied);
+    expect(platform.businessServer.manga(sequence.mangaKey), originalState);
+    expect(platform.businessServer.manga(targetKey), isNull);
+    await controller.discardRejected();
+    expect(controller.pending, isNull);
+    expect(controller.preview, isNotNull);
+    expect(controller.canChange, true);
+    expect(posts(), hasLength(before + 1));
+    expect(platform.businessServer.appliedMutations, applied);
+  });
+
   test(
     'unavailable original chapters require an explicit categories-only choice',
     () async {

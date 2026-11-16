@@ -578,6 +578,14 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 新增六对主图使跨版本覆盖92→98/169（58.0%），不是PR整体或当前HEAD全部状态完成率。K5深色处理中、手动系统取消、替换提交/故障、K11全部失效阶段、原生及真实生产继续待验。临时标签已关闭、视口恢复，harness正常退出0；PR继续草稿、分支未部署。
 
+## 明确拒绝状态与迁移故障验收入口
+
+2026-11-16，依据封面正式双主题拒绝画面，修正页脚仍建议不可用重试的缺口：已拒绝状态引导重新读取后再修改；结果未知继续保留精确重试说明。迁移控制器也有同类问题，新增真实组件supplier的400拒绝流程先复现错误提示，再修正为明确重读。核对原请求保留、提交与重试均无新POST、读取后才能恢复编辑，原作品/目标及应用次数不变。
+
+低优先级单并发运行`flutter test --no-pub --concurrency=1 test/covers/cover_navigation_test.dart test/widgets/edit_sheet_test.dart test/migration/migration_controller_test.dart test/data/source_migration_repository_test.dart`，52项通过，含浅/深×1x/2x、读取关闭、CAS与丢确认精确重试。三份改动Dart严格分析、API/test严格类型及依赖分层通过；本机未执行完整Flutter或AOT编译。
+
+现有editor-ui只新增migration范围，控制命令见[工具说明](../TOOLING.md)。正式`migrateFrom`仍执行真实D1事务，等待与丢确认发生在成功提交之后；明确拒绝在提交前返回类型正确的400，不伪造成功。17项官方Workers/D1/R2回归通过，含挂起释放与取消、迁移原作品保留、目标仅应用一次、相同正文重试及新旧请求真实409。分页和Source调用保持实际链路。尚未取得本次正式Web双主题证据，不增加98/169主图计数，也不以受控登录响应代替真实Access。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

@@ -366,7 +366,9 @@ class _CoverEditorState extends State<_CoverEditor> {
                       _attempted || pending != null ? '尚未确认的修改' : '待保存的修改',
                     ),
                     footer: Text(
-                      pending != null
+                      _blocked || pending?.retryable == false
+                          ? '当前会话保留原修改。请重新读取后再修改，不会覆盖新的远端版本。'
+                          : pending != null
                           ? '当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'
                           : '仅当前会话保留，保存并收到服务端确认后才更新封面。',
                     ),

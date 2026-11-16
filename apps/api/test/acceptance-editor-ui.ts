@@ -21,7 +21,7 @@ const modes = [
   'login-required',
 ] as const;
 type EditorUiMode = (typeof modes)[number];
-type EditorUiScope = 'manga' | 'global' | 'cover';
+type EditorUiScope = 'manga' | 'global' | 'cover' | 'migration';
 interface Control {
   mode: EditorUiMode;
   scope: EditorUiScope;
@@ -52,9 +52,14 @@ export async function setEditorUiMode(
 ) {
   if (
     !modes.some((value) => value === mode) ||
-    (scope !== 'manga' && scope !== 'global' && scope !== 'cover')
+    (scope !== 'manga' &&
+      scope !== 'global' &&
+      scope !== 'cover' &&
+      scope !== 'migration')
   ) {
-    throw new Error('Expected an editor UI mode and manga/global/cover scope');
+    throw new Error(
+      'Expected an editor UI mode and manga/global/cover/migration scope',
+    );
   }
   await db
     .prepare(
@@ -125,7 +130,7 @@ export async function withEditorUi(
     request.method === 'GET' &&
     (url.pathname === '/api/settings' ||
       url.pathname.startsWith('/api/settings/manga/'));
-  const coverReading =
+  const mangaReading =
     request.method === 'GET' &&
     /^\/api\/state\/manga\/[a-f0-9]{64}$/.test(url.pathname);
   const coverImage =
@@ -136,7 +141,7 @@ export async function withEditorUi(
     request.method === 'POST' && url.pathname === '/api/state/mutations';
   if (
     !settingsReading &&
-    !coverReading &&
+    !mangaReading &&
     !coverImage &&
     !settingsSaving &&
     !stateSaving
@@ -148,26 +153,30 @@ export async function withEditorUi(
   const stateCommand = stateSaving
     ? stateMutationSchema.parse(await readJson(request.clone()))
     : undefined;
-  // Multipart upload remains on its real path. Only a JSON cover clear is
-  // faulted; unrelated state mutations must never enter this fixture.
+  // Multipart upload remains on its real path. Only a JSON cover clear or
+  // migration is faulted; unrelated state mutations never enter this fixture.
   if (
     stateCommand &&
+    stateCommand.operation.case !== 'migrateFrom' &&
     (stateCommand.operation.case !== 'setCustomCover' ||
       stateCommand.operation.value.cover !== undefined)
   )
     return dispatch();
   const command = settingsCommand ?? stateCommand;
-  const scope =
-    stateCommand || coverReading || coverImage
-      ? 'cover'
-      : settingsCommand
-        ? settingsCommand.operation.case === 'setGlobal'
-          ? 'global'
-          : 'manga'
-        : url.pathname === '/api/settings'
-          ? 'global'
-          : 'manga';
   const control = await readControl(db);
+  const scope: EditorUiScope =
+    stateCommand?.operation.case === 'migrateFrom' ||
+    (mangaReading && control.scope === 'migration')
+      ? 'migration'
+      : stateCommand || mangaReading || coverImage
+        ? 'cover'
+        : settingsCommand
+          ? settingsCommand.operation.case === 'setGlobal'
+            ? 'global'
+            : 'manga'
+          : url.pathname === '/api/settings'
+            ? 'global'
+            : 'manga';
   const mode = control.scope === scope ? control.mode : 'pass';
   // requestJson has already enforced the body bound before retaining exact bytes.
   const body = command ? await request.clone().text() : null;
@@ -186,7 +195,7 @@ export async function withEditorUi(
       '<!doctype html><title>Test Access login required</title>',
       { status: 401, headers: { 'Content-Type': 'text/html' } },
     );
-  } else if ((settingsReading || coverReading) && mode === 'fail-read') {
+  } else if ((settingsReading || mangaReading) && mode === 'fail-read') {
     response = new Response('Injected editor read failure', { status: 503 });
   } else if (coverImage && mode === 'fail-image') {
     response = new Response('Injected cover image failure', { status: 503 });
@@ -213,7 +222,7 @@ export async function withEditorUi(
       { status: 400, headers: { 'Content-Type': 'application/json' } },
     );
   } else {
-    if ((settingsReading || coverReading) && mode === 'hold-read')
+    if ((settingsReading || mangaReading) && mode === 'hold-read')
       await waitForRelease(db, control.generation, request.signal);
     response = await dispatch();
     workerStatus = response.status;
