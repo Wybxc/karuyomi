@@ -437,7 +437,7 @@ final class MigrationController extends ChangeNotifier {
       completed = true;
       notice =
           '迁移已由服务端确认：新增已读 ${result.migration.copiedReadChapters} 章、书签 ${result.migration.copiedBookmarks} 个。原作品及目标原有数据保留。';
-    });
+    }, submitting: true);
   }
 
   Future<void> retry() async {
@@ -453,7 +453,7 @@ final class MigrationController extends ChangeNotifier {
       completed = true;
       notice =
           '原迁移操作已由服务端确认：新增已读 ${result.migration.copiedReadChapters} 章、书签 ${result.migration.copiedBookmarks} 个。';
-    });
+    }, submitting: true);
   }
 
   Future<void> discardRejected() async {
@@ -466,8 +466,9 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> _run(
     String label,
-    Future<void> Function(int epoch) action,
-  ) async {
+    Future<void> Function(int epoch) action, {
+    bool submitting = false,
+  }) async {
     _busy = true;
     operationLabel = label;
     final epoch = ++_epoch;
@@ -484,6 +485,8 @@ final class MigrationController extends ChangeNotifier {
             ? failure.message
             : failure is BusinessStateException && failure.conflict
             ? '迁移预览已在其他设备改变，请重新读取后确认。'
+            : pending != null && !submitting
+            ? '本次读取未完成，请重新读取。原迁移操作保持不变。'
             : pending?.retryable == false
             ? '原迁移已被服务端拒绝，请重新读取后再修改。'
             : pending != null

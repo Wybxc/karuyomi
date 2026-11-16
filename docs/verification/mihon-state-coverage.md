@@ -1115,20 +1115,20 @@ stateDiagram-v2
     class CoverLoad,CoverReadError,CoverNone,CoverReady,CoverReplace,CoverClear,CoverSave,CoverUnknown,CoverRejected,CoverImageError paired
 ```
 
-| 状态 ID | 最小必要信息与操作边界                                                                          | 浅色                                                       | 深色                                                      |
-| ------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
-| 19.K1   | 正在读取服务端封面、进度、编辑禁用、允许关闭；未取得快照时不显示已确认                          | `karuyomi-a9d880a-cover-k1-light.jpg`                      | `karuyomi-a9d880a-cover-k1-dark.jpg`                      |
-| 19.K2   | 未取得服务端快照、读取失败原因、明确重读与关闭；不显示永不结束的加载文字                        | `karuyomi-a9d880a-cover-k2-light.jpg`                      | `karuyomi-a9d880a-cover-k2-dark.jpg`                      |
-| 19.K3   | 已确认未设置自定义封面、选择图片和关闭；不把占位图当作已保存图片                                | `karuyomi-0e605c5-editors-cover-none-light.jpg`            | `karuyomi-0e605c5-editors-cover-none-dark.jpg`            |
-| 19.K4   | 已确认的当前封面、替换和清除入口；清除用系统危险色，最终提交须由保存触发                        | `karuyomi-0e605c5-editors-cover-confirmed-light.jpg`       | `karuyomi-0e605c5-editors-cover-confirmed-dark.jpg`       |
-| 19.K5   | 原已确认封面、选图处理中、编辑禁用；取消保持原值，非法/读取失败保留可修正原因，身份变化另转失效 | `karuyomi-0e605c5-editors-cover-picking-light.jpg`         | 待                                                        |
-| 19.K6   | 已确认封面与待保存图片分区、仅当前会话保留、明确保存或关闭；选图本身零上传                      | `karuyomi-c5f6759-cover-{draft,replace-draft}-light.jpg`   | `karuyomi-c5f6759-cover-{draft,replace-draft}-dark.jpg`   |
-| 19.K7   | 当前封面、待清除提示、明确保存或关闭；清除草稿不先修改远端                                      | `karuyomi-0e605c5-editors-cover-clear-draft-light.jpg`     | `karuyomi-0e605c5-editors-cover-clear-draft-dark.jpg`     |
-| 19.K8   | 原确认值、正在提交的原修改、等待确认、动作禁用；不能提前显示已保存，替换/清除分别验             | `karuyomi-a9d880a-cover-k8-light.jpg`，清除                | `karuyomi-a9d880a-cover-k8-dark.jpg`，清除                |
-| 19.K9   | 尚未确认及原草稿、精确重试、稍后处理；重开/重取失败时仍保留原命令，不能换图覆盖                 | `karuyomi-a9d880a-cover-k9-light.jpg`                      | `karuyomi-a9d880a-cover-k9-dark.jpg`                      |
-| 19.K10  | 冲突或拒绝原因、原确认值、明确重读；禁用提交与重试，重取失败仍保留错误及原确认快照              | `karuyomi-a9d880a-cover-k10-light.jpg`，拒绝；真实冲突另图 | `karuyomi-a9d880a-cover-k10-dark.jpg`，拒绝；真实冲突另图 |
-| 19.K11  | 编辑已停用及关闭入口、旧操作结果不再应用；加载/选图/保存/待确认阶段分别触发并丢弃迟到结果       | 待                                                         | 待                                                        |
-| 19.K12  | 已确认封面记录保持、图片未能读取、重试同一资源；字节失败不得触发上传或清除记录                  | `karuyomi-a9d880a-cover-k12-light.jpg`                     | `karuyomi-a9d880a-cover-k12-dark.jpg`                     |
+| 状态 ID | 最小必要信息与操作边界                                                                          | 浅色                                                     | 深色                                                    |
+| ------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| 19.K1   | 正在读取服务端封面、进度、编辑禁用、允许关闭；未取得快照时不显示已确认                          | `karuyomi-a9d880a-cover-k1-light.jpg`                    | `karuyomi-a9d880a-cover-k1-dark.jpg`                    |
+| 19.K2   | 未取得服务端快照、读取失败原因、明确重读与关闭；不显示永不结束的加载文字                        | `karuyomi-a9d880a-cover-k2-light.jpg`                    | `karuyomi-a9d880a-cover-k2-dark.jpg`                    |
+| 19.K3   | 已确认未设置自定义封面、选择图片和关闭；不把占位图当作已保存图片                                | `karuyomi-0e605c5-editors-cover-none-light.jpg`          | `karuyomi-0e605c5-editors-cover-none-dark.jpg`          |
+| 19.K4   | 已确认的当前封面、替换和清除入口；清除用系统危险色，最终提交须由保存触发                        | `karuyomi-0e605c5-editors-cover-confirmed-light.jpg`     | `karuyomi-0e605c5-editors-cover-confirmed-dark.jpg`     |
+| 19.K5   | 原已确认封面、选图处理中、编辑禁用；取消保持原值，非法/读取失败保留可修正原因，身份变化另转失效 | `karuyomi-0e605c5-editors-cover-picking-light.jpg`       | 待                                                      |
+| 19.K6   | 已确认封面与待保存图片分区、仅当前会话保留、明确保存或关闭；选图本身零上传                      | `karuyomi-c5f6759-cover-{draft,replace-draft}-light.jpg` | `karuyomi-c5f6759-cover-{draft,replace-draft}-dark.jpg` |
+| 19.K7   | 当前封面、待清除提示、明确保存或关闭；清除草稿不先修改远端                                      | `karuyomi-0e605c5-editors-cover-clear-draft-light.jpg`   | `karuyomi-0e605c5-editors-cover-clear-draft-dark.jpg`   |
+| 19.K8   | 原确认值、正在提交的原修改、等待确认、动作禁用；不能提前显示已保存，替换/清除分别验             | `karuyomi-a9d880a-cover-k8-light.jpg`，清除              | `karuyomi-a9d880a-cover-k8-dark.jpg`，清除              |
+| 19.K9   | 尚未确认及原草稿、精确重试、稍后处理；重开/重取失败时仍保留原命令，不能换图覆盖                 | `karuyomi-a9d880a-cover-k9-light.jpg`                    | `karuyomi-a9d880a-cover-k9-dark.jpg`                    |
+| 19.K10  | 冲突或拒绝原因、原确认值、明确重读；禁用提交与重试，重取失败仍保留错误及原确认快照              | `karuyomi-3a57cdf-migration-cover-rejected-light.jpg`    | `karuyomi-3a57cdf-migration-cover-rejected-dark.jpg`    |
+| 19.K11  | 编辑已停用及关闭入口、旧操作结果不再应用；加载/选图/保存/待确认阶段分别触发并丢弃迟到结果       | 待                                                       | 待                                                      |
+| 19.K12  | 已确认封面记录保持、图片未能读取、重试同一资源；字节失败不得触发上传或清除记录                  | `karuyomi-a9d880a-cover-k12-light.jpg`                   | `karuyomi-a9d880a-cover-k12-dark.jpg`                   |
 
 19.K1/K2与已确认快照、替换/清除草稿、等待确认的最小信息按当前业务边界验收。关闭未提交草稿不承诺跨会话恢复；19.K9的原请求由当前业务会话保留，重开和读取失败作为该节点变体单列。图中失效箭头仅列主要异步入口，已确认/草稿/拒绝状态同样必须验证身份变化，不能用一条箭头替代全部触发阶段。未填主图的节点仍为目标清单，不是通过证据。
 
@@ -1136,7 +1136,7 @@ K5非法图片变体为`karuyomi-c5f6759-cover-invalid-{light,dark}.jpg`，等�
 
 `0e605c5`更新K3/K4/K7双主题主图，短表单从顶部导航下方开始排列；浅色另复验选图草稿与取消清除，深色复用已保存图片后明确清除。16组六路快照确认三次UI应用及其它区间零附写；此轮未提供请求审计。K5只补浅色处理中，深色仍待，不增加成对计数；K6及其它历史变体保留原版本，全部故障和当前版深色选图未外推通过，见[导航起点修复](mihon-cupertino-fidelity.md#短编辑内容的导航起点修复)。
 
-`a9d880a`正式Web新增K1/K2/K8/K9/K10/K12六对主图，三张`a9d880a-cover-{reading,save,errors}-pairs.jpg`已实看；深色K1首次转场图另存并排除。两主题均实际关闭读取中的窗口，释放迟到结果后未重开；读取失败后明确重读，结果未知下关闭/重开及再次读取失败仍可精确重试。真实409与冲突后读取失败另存`cover-{conflict,conflict-read-failed}-{light,dark}.jpg`；图片503后重试同一资源恢复，权威记录不变。32组六路API快照与154条审计核对四次UI清除各应用一次、两次丢确认精确重试、两次真实409及两次明确400；API预置不计UI选图。浅色首次等待有主图，但审计sequence20未完成，不计正常释放成功；其原正文重试未重复应用，深色挂起正常释放。明确拒绝状态的辅助说明仍提到重试，保留为待修文案；全部变体与K11继续待，详见[正式故障复验](mihon-cupertino-fidelity.md#封面故障状态的正式-web-复验)。
+`a9d880a`正式Web新增K1/K2/K8/K9/K10/K12六对主图，三张`a9d880a-cover-{reading,save,errors}-pairs.jpg`已实看；深色K1首次转场图另存并排除。两主题均实际关闭读取中的窗口，释放迟到结果后未重开；读取失败后明确重读，结果未知下关闭/重开及再次读取失败仍可精确重试。真实409与冲突后读取失败另存`cover-{conflict,conflict-read-failed}-{light,dark}.jpg`；图片503后重试同一资源恢复，权威记录不变。32组六路API快照与154条审计核对四次UI清除各应用一次、两次丢确认精确重试、两次真实409及两次明确400；API预置不计UI选图。浅色首次等待有主图，但审计sequence20未完成，不计正常释放成功；其原正文重试未重复应用，深色挂起正常释放。该版本明确拒绝状态的辅助说明仍提到重试，保留为原缺口；`3a57cdf`已修复并取得双主题拒绝说明主图，明确引导重新读取，API快照确认清除拒绝零覆盖。全部变体与K11继续待，详见[正式故障复验](mihon-cupertino-fidelity.md#封面故障状态的正式-web-复验)。
 
 ### 20–21：Karuyomi 迁移向导的目标状态
 
@@ -1170,18 +1170,18 @@ stateDiagram-v2
     state "21.K5 服务端已确认" as MigrationDone
     state "21.K6 身份或服务已失效" as MigrationExpired
     classDef captured fill:#e7f1ff,stroke:#2471c8,color:#112b4a
-    class MigrationScope,MigrationCategories,MigrationEmpty,MigrationPreview,MigrationChapterChoice,MigrationConfirm,MigrationOriginalReady,MigrationSearch,MigrationResults,MigrationDone captured
+    class MigrationInputs,MigrationInputError,MigrationScope,MigrationOriginalLoad,MigrationCategories,MigrationOriginalReady,MigrationNoSources,MigrationSearch,MigrationEmpty,MigrationResults,MigrationPreviewLoad,MigrationPreviewError,MigrationPreview,MigrationChapterChoice,MigrationConfirm,MigrationSending,MigrationUnknown,MigrationRejected,MigrationDone captured
     note left of MigrationInputs
       浅/深 × 1x/2x 组件流程已过
-      蓝色仅表示正常主图已成对核对
+      蓝色仅表示主图已成对核对
       实际点击取消恢复位置与焦点
       全部输入及转换仍分别验收
-      加载与故障主图待验
+      3a57cdf新增九对加载/故障主图
     end note
     note right of MigrationUnknown
-      已验组件：重开只读不重发
-      明确重试复用原请求，只应用一次
-      正式 Web 主图待验
+      双主题正式Web：精确重试不重复
+      深色重开/只读刷新无新POST
+      新读取失败提示修复待新产物复验
     end note
     MigrationInputs --> MigrationInputError: 读取失败
     MigrationInputError --> MigrationInputs: 明确重读
@@ -1221,6 +1221,8 @@ stateDiagram-v2
     MigrationSending --> MigrationRejected: 明确冲突或拒绝
     MigrationSending --> MigrationDone: 原请求获服务端确认
     MigrationUnknown --> MigrationSending: 精确重试原请求
+    MigrationUnknown --> MigrationUnknown: 同会话重开或只读刷新，不重发
+    MigrationRejected --> MigrationRejected: 只读输入刷新，保留原拒绝
     MigrationRejected --> MigrationPreviewLoad: 明确结束被拒绝原请求并重读
     MigrationInputs --> MigrationExpired: 身份或服务变化
     MigrationListing --> MigrationExpired: 身份或服务变化
@@ -1230,32 +1232,34 @@ stateDiagram-v2
 
 | 状态ID | 目标画面的最小必要信息及分别验收的变体                                                                                         | 浅色                                                                                        | 深色                                                                                  |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 20.K1  | 原作品/源、读取输入进度、写入禁用；读取成功前不宣称无目标源                                                                    | 待                                                                                          | 待                                                                                    |
-| 20.K2  | 原作品、读取失败与明确重读/返回；无目标源和读取失败不混淆                                                                      | 待                                                                                          | 待                                                                                    |
+| 20.K1  | 原作品/源、读取输入进度、写入禁用；读取成功前不宣称无目标源                                                                    | `karuyomi-3a57cdf-migration-k1-light.jpg`                                                   | `karuyomi-3a57cdf-migration-k1-dark.jpg`                                              |
+| 20.K2  | 原作品、读取失败与明确重读/返回；无目标源和读取失败不混淆                                                                      | `karuyomi-3a57cdf-migration-k2-light.jpg`                                                   | `karuyomi-3a57cdf-migration-k2-dark.jpg`                                              |
 | 20.K3  | 原作品、未读取章节、读取章节或仅收藏/分类两种选择及影响                                                                        | `karuyomi-9228c11-migration-scope-light.jpg`                                                | `karuyomi-86d27e7-migration-scope-dark.jpg`                                           |
-| 20.K4  | 原作品/源、正在读取章节、编辑禁用；失败仍可重读或明确改为仅收藏/分类                                                           | 待                                                                                          | 待                                                                                    |
+| 20.K4  | 原作品/源、正在读取章节、编辑禁用；失败仍可重读或明确改为仅收藏/分类                                                           | `karuyomi-3a57cdf-migration-k4-light.jpg`                                                   | `karuyomi-3a57cdf-migration-k4-dark.jpg`                                              |
 | 20.K5  | 已选择仅收藏/分类、章节与位置不复制、可选目标源                                                                                | `karuyomi-9228c11-migration-categories-only-light.jpg`                                      | `karuyomi-86d27e7-migration-categories-only-dark.jpg`                                 |
 | 20.K6  | 已捕获章节数、快照随目标切换保留、可选目标源                                                                                   | `karuyomi-9228c11-migration-original-snapshot-light.jpg`                                    | `karuyomi-9228c11-migration-original-snapshot-dark.jpg`                               |
-| 20.K7  | 已确认无其他已安装且启用的源、扩展管理指引、只读刷新和返回                                                                     | 待                                                                                          | 待                                                                                    |
+| 20.K7  | 已确认无其他已安装且启用的源、扩展管理指引、只读刷新和返回                                                                     | `karuyomi-3a57cdf-migration-k7-light.jpg`                                                   | `karuyomi-3a57cdf-migration-k7-dark.jpg`                                              |
 | 20.K8  | 正在打开的精确目标源、原作品上下文、操作禁用；失败不得误标已切换                                                               | 待                                                                                          | 待                                                                                    |
 | 20.K9  | 当前目标源、查询、搜索/热门动作及原作品；尚未请求不显示无结果                                                                  | `karuyomi-9228c11-migration-search-ready-light.jpg`                                         | `karuyomi-9228c11-migration-search-ready-dark.jpg`                                    |
 | 20.K10 | 当前目标源、查询或热门、首次/追加进度；追加时保留已有结果                                                                      | 待                                                                                          | 待                                                                                    |
 | 20.K11 | 当前源和查询或热门、成功为空、修改查询或改浏览热门；两种空态分别验                                                             | `karuyomi-86d27e7-migration-search-empty-light.jpg`，仅搜索                                 | `karuyomi-86d27e7-migration-search-empty-dark.jpg`，仅搜索                            |
 | 20.K12 | 精确目标作品名称、源/URL区分、打开与有界分页；不因同名打开其它条目                                                             | `karuyomi-9228c11-migration-target-list-light.jpg`                                          | `karuyomi-9228c11-migration-target-list-dark.jpg`                                     |
 | 20.K13 | 失败源/操作、可恢复原因、重试；开源失败保留原选择，追加失败保留结果和分页上下文，分别验                                        | 待                                                                                          | 待                                                                                    |
-| 20.K14 | 精确目标作品/源、读取详情/章节或权威预览的实际进度；取得预览前不能提交                                                         | 待                                                                                          | 待                                                                                    |
-| 20.K15 | 失败的目标和阶段、明确重读、零迁移提交；初次失败/重取失败分别验                                                                | 待                                                                                          | 待                                                                                    |
+| 20.K14 | 精确目标作品/源、读取详情/章节或权威预览的实际进度；取得预览前不能提交                                                         | `karuyomi-3a57cdf-migration-k14-light.jpg`                                                  | `karuyomi-3a57cdf-migration-k14-dark.jpg`                                             |
+| 20.K15 | 失败的目标和阶段、明确重读、零迁移提交；初次失败/重取失败分别验                                                                | `karuyomi-3a57cdf-migration-{k15,k15-actions,k15-reread-failed}-light.jpg`                  | `karuyomi-3a57cdf-migration-{k15,k15-actions,k15-reread-failed}-dark.jpg`             |
 | 20.K16 | 原/目标、原作品保留、目标已有数据保留、分类与章节复制选项、已选/上限及未复制标记数；仅分类、无标记、已占用目标和映射分页分别验 | `karuyomi-86d27e7-migration-{preview-summary,native-return,confirm-return}-light.jpg`       | `karuyomi-86d27e7-migration-{preview-summary,native-return,confirm-return}-dark.jpg`  |
 | 20.K17 | 原章节、当前目标、完整名称/来源序号、占用禁用、查询/无匹配/清空与取消；取消保持原映射、其它选择及位置                          | `karuyomi-9228c11-migration-{chapter-choice,chapter-no-match}-light.jpg`；`86d27e7`实际返回 | `karuyomi-86d27e7-migration-{chapter-choice,chapter-no-match,native-return}-dark.jpg` |
 | 20.K18 | 当前已选与上限、系统错误色、明确减少选择、确认禁用；不自动分批或部分提交                                                       | 待                                                                                          | 待                                                                                    |
 | 21.K1  | 原/目标名称和源、所选复制影响、保留原作品/目标已有状态、返回检查和明确确认；弹窗/取消零写入                                    | `karuyomi-86d27e7-migration-{confirm,confirm-return}-light.jpg`                             | `karuyomi-86d27e7-migration-{confirm,confirm-return}-dark.jpg`                        |
-| 21.K2  | 原请求的目标与复制范围、等待确认、编辑与重复提交禁用；未确认前不显示完成                                                       | 待                                                                                          | 待                                                                                    |
-| 21.K3  | 尚未确认、原目标和范围、精确重试及返回；同会话重开/只读刷新不重发，不允许改目标或映射覆盖原请求                                | 待                                                                                          | 待                                                                                    |
-| 21.K4  | 原目标、冲突或拒绝原因、提交/精确重试禁用、明确结束被拒绝原请求并重新预览；重读失败另验                                        | 待                                                                                          | 待                                                                                    |
+| 21.K2  | 原请求的目标与复制范围、等待确认、编辑与重复提交禁用；未确认前不显示完成                                                       | `karuyomi-3a57cdf-migration-sending-light.jpg`                                              | `karuyomi-3a57cdf-migration-sending-dark.jpg`                                         |
+| 21.K3  | 尚未确认、原目标和范围、精确重试及返回；同会话重开/只读刷新不重发，不允许改目标或映射覆盖原请求                                | `karuyomi-3a57cdf-migration-unknown-light.jpg`                                              | `karuyomi-3a57cdf-migration-unknown-dark.jpg`                                         |
+| 21.K4  | 原目标、冲突或拒绝原因、提交/精确重试禁用、明确结束被拒绝原请求并重新预览；重读失败另验                                        | `karuyomi-3a57cdf-migration-{rejected,conflict}-light.jpg`                                  | `karuyomi-3a57cdf-migration-{rejected,conflict}-dark.jpg`                             |
 | 21.K5  | 明确服务端确认、确认的目标、实际新增已读/书签数、原作品保留及返回；新请求/原请求重试成功分别验                                 | `karuyomi-9228c11-migration-completed-light.jpg`，正常请求                                  | `karuyomi-9228c11-migration-completed-dark.jpg`，正常请求                             |
 | 21.K6  | 身份或服务已变化、旧向导永久停用及返回；各读取/预览/提交/待确认阶段分别触发并丢弃迟到结果                                      | 待                                                                                          | 待                                                                                    |
 
-图中仅列主要失效入口，范围草稿、已加载列表、映射、拒绝及完成后同样检查身份变化；不能用一条箭头替代全部触发阶段。20.K13/K14的操作阶段、仅分类预览、21.K3/K4的重开和重读失败须独立取图。预览、筛选、映射、分页与取消均为只读；只有21.K1明确确认和21.K3明确原请求重试可触发写入。`8c398d3`的新增标记和保留已有标记证据继续保留；`9228c11`两主题均为英文3,323章→中文的无标记流程，明确提交均新增0/0且各推进一次版本，九路完整快照确认查询/分页/取消零附写。章节选择已核对当前项`aria-current=true`、占用项禁用、无匹配及清空；`86d27e7`实际点击取消后映射、页码、位置保持且焦点恢复，跨独立API后的延迟只读观测同样保持，四个九路快照比较确认零写入。本轮未提交迁移，不新增完成写入次数。语义定位动作后的滚动观察和旧问题图保留，不将实际点击结果外推全部输入与转换，详见[返回行为复验](mihon-cupertino-fidelity.md#迁移返回焦点与位置的正式-web-复验)。
+图中仅列主要失效入口，范围草稿、已加载列表、映射、拒绝及完成后同样检查身份变化；不能用一条箭头替代全部触发阶段。20.K13/K14的操作阶段、仅分类预览、21.K3/K4的重开和重读失败须独立取图。预览、筛选、映射、分页与取消均为只读；只有21.K1明确确认和21.K3明确原请求重试可触发写入。`8c398d3`的新增标记和保留已有标记证据继续保留；`9228c11`两主题均为英文3,323章→中文的无标记流程，明确提交均新增0/0且各推进一次版本，九路完整快照确认查询/分页/取消零附写。章节选择已核对当前项`aria-current=true`、占用项禁用、无匹配及清空；`86d27e7`实际点击取消后映射、页码、位置保持且焦点恢复，跨独立API后的延迟只读观测同样保持，四个九路快照比较确认零写入。`86d27e7`返回复验未提交迁移，未新增完成写入次数。语义定位动作后的滚动观察和旧问题图保留，不将实际点击结果外推全部输入与转换，详见[返回行为复验](mihon-cupertino-fidelity.md#迁移返回焦点与位置的正式-web-复验)。
+
+`3a57cdf`新增20.K1/K2/K4/K7/K14/K15和21.K2/K3/K4九对双主题主图；19.K10改用修正拒绝说明后的当前正式图。33组九路快照与256条审计核对三条原迁移各应用一次、两次原正文精确重试无重复、两次真实409与四次迁移/封面400零覆盖。浅色挂起sequence49未完整释放，深色sequence149正常释放；深色502后重开和只读失败无新POST，精确重试只应用一次。21.K3/K4的读取失败提示存在实际缺口，已在组件先复现并修正，但新产物Web仍待；原问题图不记该变体最终通过。K8/K10没有截到加载指示，保持待验；最终有效快照之后夹具达到256条上限，额外封面读取失败排除。详情、原始图与五张联系表见[迁移故障正式Web复验](mihon-cupertino-fidelity.md#迁移加载与故障的正式-web-复验)。
 
 ### 24：Karuyomi 本漫画阅读设置的目标状态
 

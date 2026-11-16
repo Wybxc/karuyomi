@@ -133,6 +133,19 @@ void main() {
       .where((request) => request.method == 'POST')
       .map((request) => request.body!)
       .toList();
+  void failOriginalRead() {
+    platform.businessServer.beforeRequest = (request) =>
+        request.method == 'GET' &&
+            request.uri.path == '/api/state/manga/${sequence.mangaKey}'
+        ? const ApiReply(
+            status: 503,
+            redirected: false,
+            headers: {'content-type': 'text/plain'},
+            body: 'Injected read failure',
+          )
+        : null;
+  }
+
   Future<void> targetPreview() async {
     await controller.refreshSources();
     await controller.chooseSource(controller.sources.single);
@@ -203,6 +216,18 @@ void main() {
     await controller.refreshPreview();
     expect(posts(), hasLength(count));
     expect(controller.canChange, false);
+    failOriginalRead();
+    await controller.refreshSources();
+    platform.businessServer.beforeRequest = null;
+    expect(controller.operationLabel, '读取迁移输入');
+    expect(controller.error, '本次读取未完成，请重新读取。原迁移操作保持不变。');
+    expect(controller.pending?.retryable, true);
+    expect(
+      wire.encodeProtoJson(controller.pending!.request),
+      jsonDecode(original),
+    );
+    expect(controller.canChange, false);
+    expect(posts(), hasLength(count));
     await controller.retry();
     expect(controller.completed, true, reason: controller.error);
     expect(posts().last, original);
@@ -261,6 +286,16 @@ void main() {
     expect(platform.businessServer.appliedMutations, applied);
     expect(platform.businessServer.manga(sequence.mangaKey), originalState);
     expect(platform.businessServer.manga(targetKey), isNull);
+    failOriginalRead();
+    await controller.refreshSources();
+    platform.businessServer.beforeRequest = null;
+    expect(controller.operationLabel, '读取迁移输入');
+    expect(controller.error, '本次读取未完成，请重新读取。原迁移操作保持不变。');
+    expect(controller.pending!.request, original);
+    expect(controller.pending?.retryable, false);
+    expect(controller.canChange, false);
+    expect(posts(), hasLength(before + 1));
+    expect(platform.businessServer.appliedMutations, applied);
     await controller.discardRejected();
     expect(controller.pending, isNull);
     expect(controller.preview, isNotNull);
@@ -996,6 +1031,14 @@ void main() {
           expect(find.text('目标作品 · 目标源 · zh'), findsOneWidget);
           expect(find.textContaining(command.mutationId), findsNothing);
           expect(posts(), hasLength(writes + 1));
+          failRead = true;
+          await tap('migration-refresh-sources');
+          await errorColor();
+          expect(find.text('本次读取未完成，请重新读取。原迁移操作保持不变。'), findsOneWidget);
+          expect(find.text('原迁移尚未确认'), findsOneWidget);
+          expect(control('migration-search'), findsNothing);
+          expect(posts(), hasLength(writes + 1));
+          expect(platform.businessServer.appliedMutations, applied + 1);
           await tap('migration-retry-original');
           expect(find.textContaining('原迁移操作已由服务端确认'), findsOneWidget);
           expect(find.text('目标作品 · 目标源 · zh'), findsOneWidget);
