@@ -236,7 +236,7 @@ try {
       }
     } else if (editorUi) {
       console.log(
-        'Use editor <mode> [manga|global|cover|migration] to control faults, audit to inspect exact requests, or stop to close the server.',
+        'Use editor <mode> [manga|global|cover|migration|connection] to control faults, audit to inspect exact requests, or stop to close the server.',
       );
     } else {
       console.log(

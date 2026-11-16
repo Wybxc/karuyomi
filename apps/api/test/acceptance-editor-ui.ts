@@ -19,9 +19,10 @@ const modes = [
   'lose-confirm',
   'reject-save',
   'login-required',
+  'access-denied',
 ] as const;
 type EditorUiMode = (typeof modes)[number];
-type EditorUiScope = 'manga' | 'global' | 'cover' | 'migration';
+type EditorUiScope = 'manga' | 'global' | 'cover' | 'migration' | 'connection';
 interface Control {
   mode: EditorUiMode;
   scope: EditorUiScope;
@@ -55,10 +56,11 @@ export async function setEditorUiMode(
     (scope !== 'manga' &&
       scope !== 'global' &&
       scope !== 'cover' &&
-      scope !== 'migration')
+      scope !== 'migration' &&
+      scope !== 'connection')
   ) {
     throw new Error(
-      'Expected an editor UI mode and manga/global/cover/migration scope',
+      'Expected an editor UI mode and manga/global/cover/migration/connection scope',
     );
   }
   await db
@@ -126,6 +128,8 @@ export async function withEditorUi(
     url.search !== ''
   )
     return dispatch();
+  const bootstrapReading =
+    request.method === 'GET' && url.pathname === '/api/bootstrap';
   const settingsReading =
     request.method === 'GET' &&
     (url.pathname === '/api/settings' ||
@@ -140,6 +144,7 @@ export async function withEditorUi(
   const stateSaving =
     request.method === 'POST' && url.pathname === '/api/state/mutations';
   if (
+    !bootstrapReading &&
     !settingsReading &&
     !mangaReading &&
     !coverImage &&
@@ -164,9 +169,10 @@ export async function withEditorUi(
     return dispatch();
   const command = settingsCommand ?? stateCommand;
   const control = await readControl(db);
-  const scope: EditorUiScope =
-    stateCommand?.operation.case === 'migrateFrom' ||
-    (mangaReading && control.scope === 'migration')
+  const scope: EditorUiScope = bootstrapReading
+    ? 'connection'
+    : stateCommand?.operation.case === 'migrateFrom' ||
+        (mangaReading && control.scope === 'migration')
       ? 'migration'
       : stateCommand || mangaReading || coverImage
         ? 'cover'
@@ -178,6 +184,7 @@ export async function withEditorUi(
             ? 'global'
             : 'manga';
   const mode = control.scope === scope ? control.mode : 'pass';
+  const reading = bootstrapReading || settingsReading || mangaReading;
   // requestJson has already enforced the body bound before retaining exact bytes.
   const body = command ? await request.clone().text() : null;
   const inserted = await db
@@ -195,7 +202,12 @@ export async function withEditorUi(
       '<!doctype html><title>Test Access login required</title>',
       { status: 401, headers: { 'Content-Type': 'text/html' } },
     );
-  } else if ((settingsReading || mangaReading) && mode === 'fail-read') {
+  } else if (mode === 'access-denied') {
+    response = new Response(
+      '<!doctype html><title>Test Access denied</title>',
+      { status: 403, headers: { 'Content-Type': 'text/html' } },
+    );
+  } else if (reading && mode === 'fail-read') {
     response = new Response('Injected editor read failure', { status: 503 });
   } else if (coverImage && mode === 'fail-image') {
     response = new Response('Injected cover image failure', { status: 503 });
@@ -222,7 +234,7 @@ export async function withEditorUi(
       { status: 400, headers: { 'Content-Type': 'application/json' } },
     );
   } else {
-    if ((settingsReading || mangaReading) && mode === 'hold-read')
+    if (reading && mode === 'hold-read')
       await waitForRelease(db, control.generation, request.signal);
     response = await dispatch();
     workerStatus = response.status;

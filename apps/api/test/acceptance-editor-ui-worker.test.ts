@@ -1,6 +1,7 @@
 import { create, toJsonString } from '@bufbuild/protobuf';
 import {
   businessSchemaVersion,
+  bootstrapSchema,
   settingsMutationResponseSchema,
   settingsResponseSchema,
   mangaStateResponseSchema,
@@ -270,6 +271,7 @@ test('fixture stays opt-in, loopback-only, scoped and absent from other APIs', a
 });
 
 test.each([
+  ['connection', '/api/bootstrap'],
   ['manga', mangaPath],
   ['cover', coverPath],
   ['migration', coverPath],
@@ -302,6 +304,7 @@ test.each([
 );
 
 test.each([
+  ['connection', '/api/bootstrap'],
   ['manga', mangaPath],
   ['cover', coverPath],
   ['migration', coverPath],
@@ -321,6 +324,55 @@ test.each([
     });
   },
 );
+
+test('connection faults preserve real identity and state outside the exact bootstrap read', async () => {
+  const before = await snapshot();
+  for (const [mode, status] of [
+    ['fail-read', 503],
+    ['login-required', 401],
+    ['access-denied', 403],
+  ] as const) {
+    await setEditorUiMode(env.DB, mode, 'connection');
+    const reply = await request('/api/bootstrap');
+    expect(reply.status).toBe(status);
+    const normal = await request('/api/bootstrap', undefined, false);
+    expect(normal.status).toBe(200);
+    expect(bootstrapSchema.parse(await normal.json()).identity.subject).toBe(
+      subject,
+    );
+    const queried = await request('/api/bootstrap?probe=1');
+    expect(queried.status).toBe(200);
+    expect(bootstrapSchema.parse(await queried.json()).identity.subject).toBe(
+      subject,
+    );
+    expect(await snapshot()).toEqual(before);
+  }
+  const attempts = await editorUiAttempts(env.DB);
+  expect(attempts.filter((row) => row.path === '/api/bootstrap')).toEqual([
+    expect.objectContaining({
+      method: 'GET',
+      mode: 'fail-read',
+      body: null,
+      worker_status: null,
+      client_status: 503,
+    }),
+    expect.objectContaining({
+      method: 'GET',
+      mode: 'login-required',
+      body: null,
+      worker_status: null,
+      client_status: 401,
+    }),
+    expect.objectContaining({
+      method: 'GET',
+      mode: 'access-denied',
+      body: null,
+      worker_status: null,
+      client_status: 403,
+    }),
+  ]);
+  expect(attempts.every((row) => row.method === 'GET')).toBe(true);
+});
 
 test('confirmation gate holds delivery after the real D1 transaction commits', async () => {
   await setEditorUiMode(env.DB, 'hold-confirm', 'manga');
