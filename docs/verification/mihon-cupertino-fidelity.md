@@ -361,7 +361,26 @@ Codex内置浏览器以360×800视口操作官方Wrangler临时D1/R2、空fixtur
 
 原图前缀`karuyomi-9228c11-migration-`，两主题均有`{original-snapshot,search-ready,target-list,mapping-page2,chapter-choice,chapter-no-match,no-marks,confirm,completed}`；浅色另有`{scope,categories-only,search-empty}`，预览独立语义保存为`preview-{light,dark}.dom.txt`。源范围深色与搜索空态深色仍只有旧版问题图，加载/故障未取得主图，不用正常结果填补。已恢复浏览器视口、关闭临时标签并正常退出harness；不是生产Access或原生验收。
 
-本轮新发现取消章节选择或确认后，画面可能先保持原处，再延迟向页面前段滚动，浅/深均观察到；分页、映射和复制草稿仍保留。证据为`choice-return-position-{light,dark}.jpg`及`delayed-return-position-light.jpg`，不将转场第一帧当稳定位置。带输入焦点的四种主题/字号组件流程中，滚动本身未复现，分别先复现章节选择和确认取消未恢复原按钮焦点；因此仅认定焦点缺陷已在组件复现，不声称已确定Web延迟滚动的唯一原因。后续直接以Hooks管理按钮FocusNode、保留原章节键，并在弹层前后恢复触发按钮焦点。19项迁移回归通过，核对取消后的原按钮焦点、滚动位置、键盘关闭及零写入；日志为`migration-return-{position-before,focus-before,focus-after-choice,focus-after}.log`。完整CI和正式Web位置复验继续待办。
+本轮新发现取消章节选择或确认后，画面可能先保持原处，再延迟向页面前段滚动，浅/深均观察到；分页、映射和复制草稿仍保留。证据为`choice-return-position-{light,dark}.jpg`及`delayed-return-position-light.jpg`，不将转场第一帧当稳定位置。带输入焦点的四种主题/字号组件流程中，滚动本身未复现，分别先复现章节选择和确认取消未恢复原按钮焦点；因此仅认定焦点缺陷已在组件复现，不声称已确定Web延迟滚动的唯一原因。后续直接以Hooks管理按钮FocusNode、保留原章节键，并在弹层前后恢复触发按钮焦点。19项迁移回归通过，核对取消后的原按钮焦点、滚动位置、键盘关闭及零写入；日志为`migration-return-{position-before,focus-before,focus-after-choice,focus-after}.log`。后续完整CI及正式Web实际点击证据见下项，原问题图保留。
+
+### 迁移返回焦点与位置的正式 Web 复验
+
+2026-11-16，`86d27e76198bda65e0d19261414759ab39f2a63e`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43750349677)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43750355450)均成功，含868项Dart（22+87+759）、531项Vitest、完整Web与Wasm，分支部署跳过。完整日志`ci-86d27e7-check.log`已取得。正式Web artifact `14176770930`为16,297,151字节，传输边界归档SHA-256核对为`cbea07f1835e72fe7a20ef2c7ebf0be52e714d341f0b1578719b22989a5428f5`，另核对39条Flutter资源；不重复计算已验证的归档摘要。本机只组装Vite静态资源及官方acceptance入口，没有Flutter或AOT编译。
+
+Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`acceptance-owner`。浅色跟随系统；深色由UI明确保存并获服务端确认。真实英文xkcd的3,323章快照与中文目标相同，原作没有已读或书签。深色另补范围未选、明确仅收藏/分类、读取原章节成功及搜索成功为空的完整主图，替换相应旧版问题图；瞬时读取画面没有稳定截图，不填入加载节点。
+
+本轮刻意分开两种操作：使用语义定位点击的浅色一次记录中，按钮由y547变为393.5；后续定位开关曾报未匹配，再次观察已在页面前段。这些原图和DOM继续保留，工具自动滚动是可能影响，不据此认定唯一产品原因。全程以截图坐标实际点击打开章节页及导航返回箭头后，两主题的原按钮均保持位置并恢复`:focus`；章节页取消时保留“无匹配章节”查询焦点，以覆盖原失焦触发条件。第二页51–100、原章节3274及原映射不变。当前“不映射此章节”为`aria-current=true`，3062占用项仍禁用。
+
+| 实际点击场景 | 打开前触发按钮y / 高度 | 返回后及跨工具延迟观测y / 高度 | 返回焦点 |
+| ------------ | ---------------------- | ------------------------------ | -------- |
+| 浅色章节选择 | 733 / 57               | 733 / 57                       | 原按钮   |
+| 深色章节选择 | 731 / 57               | 731 / 57                       | 原按钮   |
+| 浅色迁移确认 | 684 / 57               | 684 / 57                       | 原按钮   |
+| 深色迁移确认 | 684 / 57               | 684 / 57                       | 原按钮   |
+
+两主题均在无标记过滤后实际打开确认框，再点“返回检查”；焦点恢复和位置保持见上表。每次返回后先独立读取九路完整ProtoJSON，再检查按钮矩形，并在后续工具调用再次只读观测，不使用退场首帧作为稳定结果。`native-choice-cancel-{light,dark}`及`confirm-cancel-{light,dark}`与各主题baseline九路对象完全相同。浅色账户revision保持2，保存深色主题后为3并保持；原作revision1、目标未收藏，双方章节标记和书签仍为空。本轮没有提交迁移，不重复计入前版两次明确写入。
+
+忽略目录原图前缀`karuyomi-86d27e7-migration-`，双主题有`{original-snapshot,search-empty,preview-summary,native-before,native-return,confirm,confirm-return}`；深色另有`{scope,categories-only,chapter-choice,chapter-no-match}`。`return-dom.json`记录按钮前后矩形、焦点、延迟观测和当前/禁用语义，`*-check.json`记录九路相等检查。`return-pair.jpg`及`confirm-return-pair.jpg`两份联系表已实看。语义定位动作的浅色问题图另存`choice-{trigger-before,trigger-return,coordinate-return,delayed-observation}-light.jpg`，不删除或当作实际点击通过证据。已恢复视口并关闭临时标签，官方harness正常退出0。全部输入方式、状态变体、加载/故障、真实读屏、生产及原生仍未完成；这些分项不因本轮返回流程通过而清零。
 
 ### 实拍布局与颜色锚点
 
