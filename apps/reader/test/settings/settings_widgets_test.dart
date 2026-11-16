@@ -181,7 +181,7 @@ void main() {
             matching: find.byType(PopScope),
           );
           expect(tester.widget<PopScope>(pop).canPop, true);
-          await tester.tap(find.text('关闭设置'));
+          await tester.tap(find.text('关闭'));
           await tester.pumpAndSettle();
           expect(find.byType(MangaSettingsEditor), findsNothing);
           expect(find.text('打开漫画设置').hitTestable(), findsOneWidget);
@@ -268,8 +268,8 @@ void main() {
           await select<wire.ReaderMode>(tester, '从右到左');
           expect(find.text('修改尚未保存。'), findsOneWidget);
           expect(find.text('修改尚未保存。').hitTestable(), findsOneWidget);
-          await tester.ensureVisible(find.text('保存本漫画设置'));
-          await tester.tap(find.text('保存本漫画设置'));
+          await tester.ensureVisible(find.text('保存'));
+          await tester.tap(find.text('保存'));
           await tester.runAsync(() => saving.future);
           await tester.pump();
           expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
@@ -280,7 +280,7 @@ void main() {
           expect(
             tester
                 .widget<CupertinoButton>(
-                  find.widgetWithText(CupertinoButton, '关闭设置'),
+                  find.widgetWithText(CupertinoButton, '关闭'),
                 )
                 .onPressed,
             isNull,
@@ -350,7 +350,7 @@ void main() {
               basedOnRevision: 1,
             ),
           );
-          await tap(tester, find.text('保存本漫画设置'));
+          await tap(tester, find.text('保存'));
           expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
           expect(find.text('重试原设置操作'), findsNothing);
           expect(state(manga: true).canEdit, false);
@@ -648,7 +648,7 @@ void main() {
         isNull,
       );
       await select<wire.ReaderPageLayout>(tester, '自动');
-      await tap(tester, find.text('保存本漫画设置'));
+      await tap(tester, find.text('保存'));
       expect(state(manga: true).snapshot!.overrides!.hasPageLayout(), true);
       expect(
         state(manga: true).snapshot!.effectiveReader.pageLayout,
@@ -663,7 +663,7 @@ void main() {
             .value,
         isNull,
       );
-      await tap(tester, find.text('保存本漫画设置'));
+      await tap(tester, find.text('保存'));
       expect(state(manga: true).snapshot!.overrides!.hasPageLayout(), false);
       expect(
         state(manga: true).snapshot!.effectiveReader.pageLayout,
@@ -695,7 +695,7 @@ void main() {
         basedOnRevision: 0,
       ),
     );
-    await tap(tester, find.text('保存本漫画设置'));
+    await tap(tester, find.text('保存'));
     expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
     expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
     expect(find.text('重试原设置操作'), findsNothing);
@@ -728,7 +728,7 @@ void main() {
           await select<wire.AppTheme>(tester, '深色');
         }
         server.loseNextResponse = true;
-        await tap(tester, find.text(manga ? '保存本漫画设置' : '保存全局设置'));
+        await tap(tester, find.text(manga ? '保存' : '保存全局设置'));
         final original = writes().single.body;
         expect(server.appliedMutations, 1);
         expect(state(manga: manga).pending?.retryable, true);
@@ -779,10 +779,7 @@ void main() {
         expect(
           tester
               .widget<CupertinoButton>(
-                find.widgetWithText(
-                  CupertinoButton,
-                  manga ? '保存本漫画设置' : '保存全局设置',
-                ),
+                find.widgetWithText(CupertinoButton, manga ? '保存' : '保存全局设置'),
               )
               .onPressed,
           isNull,

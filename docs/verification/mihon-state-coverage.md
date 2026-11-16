@@ -1269,10 +1269,12 @@ stateDiagram-v2
     end note
     ReadingOverrides --> InitialSettingsError: 首次读取失败
     ReadingOverrides --> [*]: 关闭，不提交
+    InitialSettingsError --> [*]: 关闭，不提交
     InitialSettingsError --> ReadingOverrides: 明确重新读取
     ReadingOverrides --> ConfirmedOverrides: 取得已确认快照
     ConfirmedOverrides --> DraftOverrides: 修改覆盖或继承
     ConfirmedOverrides --> SavingOverrides: 明确保存当前值
+    ConfirmedOverrides --> [*]: 关闭，不提交
     DraftOverrides --> [*]: 关闭且不提交
     ConfirmedOverrides --> ReloadingOverrides: 明确重新读取
     DraftOverrides --> ReloadingOverrides: 明确重读，等待期间保留草稿提示
@@ -1286,12 +1288,16 @@ stateDiagram-v2
     UnknownOverrides --> ReloadingOverrides: 只读重取，不重发
     ConflictingOverrides --> ReloadingOverrides: 明确重取并结束被拒绝原命令
     RejectedOverrides --> ReloadingOverrides: 明确重取并结束被拒绝原命令
+    ConflictingOverrides --> [*]: 关闭，不重试原请求
+    RejectedOverrides --> [*]: 关闭，不重试原请求
     ReloadingOverrides --> ConfirmedOverrides: 无未知原命令且重读成功
     ReloadingOverrides --> UnknownOverrides: 未知原命令仍须明确重试
     ReloadingOverrides --> SettingsReloadError: 读取失败且保留原值或原命令
+    ReloadingOverrides --> [*]: 关闭，不提交且不等待读回
     SettingsReloadError --> ReloadingOverrides: 明确重新读取
     SettingsReloadError --> DraftOverrides: 无冻结原命令时继续编辑
     SettingsReloadError --> SavingOverrides: 仅未知原命令可精确重试
+    SettingsReloadError --> [*]: 关闭，不提交
     DraftOverrides --> UnavailableOverrides: 身份或服务变化
     ReadingOverrides --> UnavailableOverrides: 身份或服务变化
     SavingOverrides --> UnavailableOverrides: 身份或服务变化，丢弃迟到结果
@@ -1299,19 +1305,19 @@ stateDiagram-v2
     UnavailableOverrides --> [*]: 关闭后恢复连接并重新打开
 ```
 
-| 状态 ID | 最小必要信息与操作边界                                                   | 浅色正式Web | 深色正式Web |
-| ------- | ------------------------------------------------------------------------ | ----------- | ----------- |
-| 24.K1   | 本漫画范围、明确读取进度、无已确认提示、编辑与保存不可用、关闭           | 待          | 待          |
-| 24.K2   | 本漫画范围、读取失败、明确重新读取与关闭；无连接误报或假确认             | 待          | 待          |
-| 24.K3   | 本漫画范围、各字段继承/显式值、已确认状态、修改与重读                    | 待          | 待          |
-| 24.K4   | 原字段与当前草稿、尚未保存、明确保存和关闭；关闭零写入                   | 待          | 待          |
-| 24.K5   | 本漫画范围、正在提交的设置、等待服务端确认、编辑/重复保存/关闭禁用       | 待          | 待          |
-| 24.K6   | 原提交值、结果未确认、同一命令重试、只读重取；不能改值或误报成功         | 待          | 待          |
-| 24.K7   | 原草稿、具体版本冲突、重读入口、禁止重试新版本；重读成功前冻结           | 待          | 待          |
-| 24.K8   | 原草稿、明确拒绝、重读入口、原命令不可重试；与未知结果分开               | 待          | 待          |
-| 24.K9   | 明确读取进度、保留的原值/草稿/未知原命令、禁用重复动作；只读零提交       | 待          | 待          |
-| 24.K10  | 读取错误与原值、原未知命令仍保留、对应重读/精确重试/关闭；失败不撤回确认 | 待          | 待          |
-| 24.K11  | 连接与身份确认要求、隐藏旧字段和旧确认、禁止旧动作、明确关闭             | 待          | 待          |
+| 状态 ID | 最小必要信息与操作边界                                                       | 浅色正式Web | 深色正式Web |
+| ------- | ---------------------------------------------------------------------------- | ----------- | ----------- |
+| 24.K1   | 本漫画范围、明确读取进度、无已确认提示、编辑与保存不可用、关闭               | 待          | 待          |
+| 24.K2   | 本漫画范围、读取失败、明确重新读取与关闭；无连接误报或假确认                 | 待          | 待          |
+| 24.K3   | 本漫画范围、各字段继承/显式值、已确认状态、修改与重读                        | 待          | 待          |
+| 24.K4   | 原字段与当前草稿、尚未保存、明确保存和关闭；关闭零写入                       | 待          | 待          |
+| 24.K5   | 本漫画范围、正在提交的设置、等待服务端确认、编辑/重复保存/关闭禁用           | 待          | 待          |
+| 24.K6   | 原提交值、结果未确认、同一命令重试、只读重取；不能改值或误报成功             | 待          | 待          |
+| 24.K7   | 原草稿、具体版本冲突、重读入口、禁止重试新版本；重读成功前冻结               | 待          | 待          |
+| 24.K8   | 原草稿、明确拒绝、重读入口、原命令不可重试；与未知结果分开                   | 待          | 待          |
+| 24.K9   | 明确读取进度、保留的原值/草稿/未知原命令、禁用重复动作、允许关闭；只读零提交 | 待          | 待          |
+| 24.K10  | 读取错误与原值、原未知命令仍保留、对应重读/精确重试/关闭；失败不撤回确认     | 待          | 待          |
+| 24.K11  | 连接与身份确认要求、隐藏旧字段和旧确认、禁止旧动作、明确关闭                 | 待          | 待          |
 
 各确认/草稿/故障状态的身份变化均须分别验收，图中只列主要异步入口。初次无身份与旧身份失效是K11的不同触发变体；读取时关闭、重开未知原命令、明确拒绝、所有字段类型、键盘和减少动态仍分别跟踪。表中留空的是正式Web双主题主图，已有控制器或组件证据不能填入。
 

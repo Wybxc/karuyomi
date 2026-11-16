@@ -253,6 +253,13 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
     useOnListenableChange(_draft, _draftChanged);
     final draft = _draft;
     final locked = _expired || draft != null;
+    final canStart =
+        !locked &&
+        _entries.isNotEmpty &&
+        (!_needsCategories || _categoryIds.isNotEmpty);
+    final actionColor = !_expired && !_needsCategories
+        ? AppColors.error.resolveFrom(context)
+        : null;
     return PopScope<Set<String>>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -261,6 +268,50 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
       child: EditSheet(
         key: const ValueKey('library-batch-review'),
         title: Text(_title),
+        leading: draft?.finished == true
+            ? null
+            : CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: !_expired && draft?.busy == true ? null : _close,
+                child: Text(
+                  draft == null || !draft.attempted ? '取消' : '稍后',
+                  semanticsLabel: draft?.attempted == true ? '稍后处理' : null,
+                ),
+              ),
+        trailing: draft?.finished == true
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _close,
+                child: const Text('完成'),
+              )
+            : draft == null
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                foregroundColor: canStart ? actionColor : null,
+                onPressed: canStart ? _start : null,
+                child: const Text('开始', semanticsLabel: '确认并开始'),
+              )
+            : draft.canRetry
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                foregroundColor: actionColor,
+                onPressed: _expired ? null : _retry,
+                child: const Text('重试', semanticsLabel: '重试原未确认操作'),
+              )
+            : draft.canContinue
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                foregroundColor: actionColor,
+                onPressed: _expired ? null : _continue,
+                child: const Text('继续', semanticsLabel: '继续剩余原清单'),
+              )
+            : draft.canReloadAndFinish
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _expired ? null : _reload,
+                child: const Text('重读', semanticsLabel: '重新读取并结束原批次'),
+              )
+            : null,
         content: ListView(
           children: [
             if (_needsCategories &&
@@ -362,70 +413,22 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                     for (final entry in _entries) _entry(entry),
                 ],
               ),
-          ],
-        ),
-        actions: [
-          if (!_expired && draft?.busy == true)
-            CupertinoButton(
-              onPressed: draft!.pauseRequested ? null : draft.pause,
-              child: const Text('暂停剩余操作'),
-            ),
-          CupertinoButton(
-            onPressed: !_expired && draft?.busy == true ? null : _close,
-            child: Text(
-              draft == null || !draft.attempted
-                  ? '取消'
-                  : draft.finished
-                  ? '完成'
-                  : '稍后处理',
-            ),
-          ),
-          if (draft == null)
-            CupertinoButton.filled(
-              color: !_needsCategories
-                  ? AppColors.error.resolveFrom(context)
-                  : null,
-              onPressed:
-                  locked ||
-                      _entries.isEmpty ||
-                      (_needsCategories && _categoryIds.isEmpty)
-                  ? null
-                  : _start,
-              child: const Text('确认并开始'),
-            )
-          else ...[
-            if (draft.canRetry)
-              CupertinoButton.filled(
-                color: !_needsCategories
-                    ? AppColors.error.resolveFrom(context)
-                    : null,
-                onPressed: _expired ? null : _retry,
-                child: const Text('重试原未确认操作'),
+            if (!_expired && draft?.busy == true)
+              CupertinoButton(
+                onPressed: draft!.pauseRequested ? null : draft.pause,
+                child: const Text('暂停剩余操作'),
               ),
-            if (draft.canContinue)
-              CupertinoButton.filled(
-                color: !_needsCategories
-                    ? AppColors.error.resolveFrom(context)
-                    : null,
-                onPressed: _expired ? null : _continue,
-                child: const Text('继续剩余原清单'),
-              ),
-            if (draft.canContinue)
+            if (draft?.canContinue == true)
               CupertinoButton(
                 onPressed: _expired
                     ? null
                     : () {
-                        if (_current) draft.finishRemaining();
+                        if (_current) draft!.finishRemaining();
                       },
                 child: const Text('结束剩余操作'),
               ),
-            if (draft.canReloadAndFinish)
-              CupertinoButton.filled(
-                onPressed: _expired ? null : _reload,
-                child: const Text('重新读取并结束原批次'),
-              ),
           ],
-        ],
+        ),
       ),
     );
   }

@@ -67,7 +67,7 @@ void main() {
   }
 
   Future<void> apply(WidgetTester tester) async {
-    await tester.tap(find.text('应用此设置'));
+    await tester.tap(find.text('应用'));
     await tester.pumpAndSettle();
   }
 

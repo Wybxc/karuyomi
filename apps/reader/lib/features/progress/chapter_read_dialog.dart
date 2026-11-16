@@ -142,6 +142,47 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
       child: EditSheet(
         key: const ValueKey('chapter-read-review'),
         title: Text(draft.read ? '标记为已读' : '标记为未读'),
+        leading: draft.finished
+            ? null
+            : CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: !_expired && draft.busy ? null : _close,
+                child: Text(
+                  !draft.attempted ? '取消' : '稍后',
+                  semanticsLabel: draft.attempted ? '稍后处理' : null,
+                ),
+              ),
+        trailing: draft.finished
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _close,
+                child: const Text('完成'),
+              )
+            : !draft.attempted
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _expired ? null : _start,
+                child: const Text('开始', semanticsLabel: '确认并开始'),
+              )
+            : draft.canRetry
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _expired ? null : _retry,
+                child: const Text('重试', semanticsLabel: '重试原未确认操作'),
+              )
+            : draft.canContinue
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _expired ? null : _continue,
+                child: const Text('继续', semanticsLabel: '继续剩余原清单'),
+              )
+            : draft.canReloadAndFinish
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _expired ? null : _reload,
+                child: const Text('重读', semanticsLabel: '重新读取并结束原批次'),
+              )
+            : null,
         content: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -161,6 +202,20 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
               if (!draft.finished) const Text('当前会话保留原清单和未确认操作；关闭不会撤回已发请求。'),
             ],
             if (draft.error case final error?) Text(error),
+            if (!_expired && draft.busy)
+              CupertinoButton(
+                onPressed: draft.pauseRequested ? null : draft.pause,
+                child: const Text('暂停剩余操作'),
+              ),
+            if (draft.canContinue)
+              CupertinoButton(
+                onPressed: _expired
+                    ? null
+                    : () {
+                        if (_current) draft.finishRemaining();
+                      },
+                child: const Text('结束剩余操作'),
+              ),
             for (final item in draft.items)
               CupertinoListTile(
                 key: ValueKey(('chapter-read-item', item.chapter.key)),
@@ -183,52 +238,6 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
               ),
           ],
         ),
-        actions: [
-          if (!_expired && draft.busy)
-            CupertinoButton(
-              onPressed: draft.pauseRequested ? null : draft.pause,
-              child: const Text('暂停剩余操作'),
-            ),
-          CupertinoButton(
-            onPressed: !_expired && draft.busy ? null : _close,
-            child: Text(
-              !draft.attempted
-                  ? '取消'
-                  : draft.finished
-                  ? '完成'
-                  : '稍后处理',
-            ),
-          ),
-          if (!draft.attempted)
-            CupertinoButton.filled(
-              onPressed: _expired ? null : _start,
-              child: const Text('确认并开始'),
-            ),
-          if (draft.canRetry)
-            CupertinoButton.filled(
-              onPressed: _expired ? null : _retry,
-              child: const Text('重试原未确认操作'),
-            ),
-          if (draft.canContinue) ...[
-            CupertinoButton.filled(
-              onPressed: _expired ? null : _continue,
-              child: const Text('继续剩余原清单'),
-            ),
-            CupertinoButton(
-              onPressed: _expired
-                  ? null
-                  : () {
-                      if (_current) draft.finishRemaining();
-                    },
-              child: const Text('结束剩余操作'),
-            ),
-          ],
-          if (draft.canReloadAndFinish)
-            CupertinoButton.filled(
-              onPressed: _expired ? null : _reload,
-              child: const Text('重新读取并结束原批次'),
-            ),
-        ],
       ),
     );
   }

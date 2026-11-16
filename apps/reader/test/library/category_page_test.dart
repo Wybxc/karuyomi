@@ -230,7 +230,7 @@ void main() {
           await tap(tester, remove);
           final delete = find.widgetWithText(CupertinoButton, '删除');
           expect(
-            tester.widget<CupertinoButton>(delete).color,
+            tester.widget<CupertinoButton>(delete).foregroundColor,
             AppColors.error.resolveFrom(tester.element(delete)),
           );
           await tap(tester, find.text('取消'));
@@ -360,7 +360,7 @@ void main() {
       expect(attempted.renameCategory.name, '本端草稿');
       final postCount = posts('/api/categories/mutations').length;
       // A conflict cannot become an implicit retry against the new revision.
-      expect(find.text('重试保存'), findsNothing);
+      expect(find.text('重试'), findsNothing);
       expect(posts('/api/categories/mutations').length, postCount);
       expect(tester.takeException(), isNull);
       await hide(tester);
@@ -393,7 +393,7 @@ void main() {
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first]);
       // The data layer can reject the stale manga CAS before sending a request.
       expect(posts('/api/state/mutations').length, postCount);
-      expect(find.text('重试保存'), findsNothing);
+      expect(find.text('重试'), findsNothing);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -432,7 +432,7 @@ void main() {
         false,
       );
       expect(hasCategory(tester, '想读'), false);
-      await tap(tester, find.text('稍后处理').last);
+      await tap(tester, find.text('稍后').last);
       expect(
         tester
             .widget<CupertinoButton>(
@@ -441,7 +441,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tap(tester, find.text('稍后处理'));
+      await tap(tester, find.text('稍后'));
       expect(find.text('处理未确认修改'), findsOneWidget);
       await tap(tester, find.text('处理未确认修改'));
       await tap(tester, find.text('继续未确认修改'));
@@ -452,7 +452,7 @@ void main() {
             .enabled,
         false,
       );
-      await tap(tester, find.text('重试保存'));
+      await tap(tester, find.text('重试'));
       expect(posts('/api/categories/mutations').map((value) => value.body), [
         initial,
         initial,
@@ -485,7 +485,7 @@ void main() {
       final first = posts('/api/state/mutations').last.body;
       final postCount = posts('/api/state/mutations').length;
       server.failWrites = false;
-      await tap(tester, find.text('重试保存'));
+      await tap(tester, find.text('重试'));
       expect(posts('/api/state/mutations').length, postCount + 1);
       expect(posts('/api/state/mutations').last.body, first);
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first]);
@@ -586,8 +586,8 @@ void main() {
       expect(rejected.expectedRevision, alpha.revision);
       expect(rejected.setCategories.expectedCatalogRevision, 2);
       final attempts = posts('/api/state/mutations').length;
-      expect(find.text('重试保存'), findsNothing);
-      await tap(tester, find.text('重新读取并关闭'));
+      expect(find.text('重试'), findsNothing);
+      await tap(tester, find.text('重读'));
       expect(posts('/api/state/mutations').length, attempts);
       await tap(tester, iconLabel('更多操作：Alpha'));
       await tap(tester, iconLabel('设置分类：Alpha'));
@@ -793,7 +793,7 @@ void main() {
       await tapBusy(
         find.descendant(
           of: find.byKey(const ValueKey('category-command')),
-          matching: find.text('稍后处理'),
+          matching: find.text('稍后'),
         ),
       );
       // Sheets retain a departing route for their delegated transition. Count
@@ -808,7 +808,7 @@ void main() {
         tester,
         find.descendant(
           of: find.byKey(const ValueKey('category-manager')),
-          matching: find.text('稍后处理'),
+          matching: find.text('稍后'),
         ),
       );
       expect(activeSheets, findsNothing);
@@ -851,7 +851,7 @@ void main() {
       await tester.runAsync(controller.connect);
       await tester.pump(const Duration(milliseconds: 32));
       expect(find.text(_expired), findsWidgets);
-      await tap(tester, find.text('稍后处理'));
+      await tap(tester, find.text('稍后'));
       expect(find.byType(EditSheet), findsNothing);
       await tapBusy(find.text('处理未确认修改'));
       expect(find.text('设置分类'), findsOneWidget);
@@ -913,9 +913,9 @@ void main() {
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));
       expect(find.textContaining('先处理原操作'), findsOneWidget);
-      expect(find.text('重新读取并关闭'), findsOneWidget);
+      expect(find.text('重读'), findsOneWidget);
       expect(posts('/api/state/mutations'), hasLength(sent));
-      await tap(tester, find.text('重新读取并关闭'));
+      await tap(tester, find.text('重读'));
       expect(find.byType(EditSheet), findsNothing);
       expect(find.text('处理未确认修改'), findsNothing);
       expect(find.text('书架还是空的'), findsOneWidget);

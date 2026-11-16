@@ -43,17 +43,21 @@ Mihon 的展示源码根为 `app/src/main/java/eu/kanade/presentation/`；表中
 | 21  | 迁移只读预览、章节映射和确认         | `ui/browse/migration/manga/MigrateMangaScreen.kt`                                                       | 原/目标对应信息、映射选择、提交摘要与冲突                        |
 | 22  | 阅读画布、工具显隐、页码与跳转       | `reader/appbars/ReaderTopBar.kt`、`ReaderBottomBar.kt`、`ReaderAppBars.kt`                              | 画布占主面积，工具贴近上下边界，不用长表单压缩图片               |
 | 23  | 阅读章节/模式/缩放工具、书签         | `reader/ReaderPageActionsDialog.kt`、`reader/appbars/`                                                  | 主操作常驻，次操作入面板；键盘、触屏和鼠标可达                   |
-| 24  | 本作品阅读设置、覆盖/继承            | `reader/settings/ReaderSettingsDialog.kt`、`ReadingModePage.kt`、`GeneralSettingsPage.kt`               | 设置分组、当前范围、固定保存/关闭，确认前不应用                  |
+| 24  | 本作品阅读设置、覆盖/继承            | `reader/settings/ReaderSettingsDialog.kt`、`ReadingModePage.kt`、`GeneralSettingsPage.kt`               | 设置分组、当前范围、顶部保存/关闭与可见状态，确认前不应用        |
 | 25  | 图片查看/放大、失败/重试             | `manga/components/MangaCoverDialog.kt`、`reader/ReaderContentOverlay.kt`                                | 内容自适应、操作不遮图、独立失败与退出                           |
 | 26  | 全局设置、外观、阅读布局与输入偏好   | `more/settings/screen/SettingsMainScreen.kt`、`SettingsAppearanceScreen.kt`、`SettingsReaderScreen.kt`  | 分类入口/分组行、当前值和说明；不把所有字段纵向铺在根页          |
 | 27  | 服务连接、登录与失效/无权限恢复      | `webview/WebViewScreenContent.kt`、通用错误状态                                                         | Karuyomi 特有业务；对齐页面骨架与颜色，不仿制不存在的 Mihon 登录 |
 | 28  | 诊断、运行时恢复、性能记录工具       | `more/settings/screen/debug/DebugInfoScreen.kt`、`WorkerInfoScreen.kt`                                  | 次级入口、分组信息和明确动作；主流程不暴露内部字段               |
 | 29  | 少量选择菜单、长选项搜索页           | 通用 `AppBarActions`、`components/`、设置选择控件                                                       | 当前选择、搜索/取消、键盘焦点、长中文与双倍字号                  |
-| 30  | 全部编辑 Sheet、确认框与业务状态提示 | `category/components/CategoryDialogs.kt`、`manga/components/MangaDialogs.kt`                            | 正文可滚动、底部操作可达、未确认/冲突/结果未知持续可见           |
+| 30  | 全部编辑 Sheet、确认框与业务状态提示 | `category/components/CategoryDialogs.kt`、`manga/components/MangaDialogs.kt`                            | 正文可滚动、顶部动作可达、未确认/冲突/结果未知持续可见           |
 
 以上路径中的 `ui/` 指 `app/src/main/java/eu/kanade/tachiyomi/` 下的路由实现。所有 ID 均须分别记录常态与相关状态，不用根页面的截图代替二级页面。
 
 Mihon 的更新/日历、历史、下载队列及下载设置、统计、tracker 绑定/搜索/状态/章节/评分/日期选择与移除、笔记、备份创建/恢复、安全/隐私设置、本地漫画、应用语言、设置全局搜索、引导/版本更新、开源许可及数据库清理/备份 schema 等独立界面，Karuyomi 当前没有相应业务入口。它们已纳入差异清单，本轮按用户选择列作后续能力；不向已有设置页复制无效开关或假数据。通用 WebView 不代表 Karuyomi 已有站点登录，原生 Access 只覆盖自身服务认证。
+
+## 编辑面导航的最终规范
+
+2026-11-16复核Apple官方[Sheet规范](https://developer.apple.com/design/human-interface-guidelines/sheets)：单页编辑面的关闭/取消位于顶部起始侧，保存/完成位于顶部末尾侧。现有9个EditSheet调用点采用官方导航栏：分类管理及已结束批次在末尾呈现“完成”，编辑时取消在起始侧、保存或应用在末尾。长操作保留完整辅助语义，视觉标签简化为“保存”“应用”“重试”“继续”“重读”；危险提交使用系统红文字。重置、刷新、暂停及结束原清单继续按内容滚动。本漫画确认反馈固定在导航下方，表单独立滚动；旧底部动作栏的截图只保留为中间证据，新的正式渲染另验。确认状态须持续可见，读取可关闭、提交等待禁止重复操作，业务提交与原命令恢复合同不变。多步骤使用导航返回到上一步，不能把返回和关闭混为同一动作。
 
 ## 配色系统
 
@@ -119,7 +123,7 @@ Mihon 的更新/日历、历史、下载队列及下载设置、统计、tracker
 
 所有栏目共用一个内存草稿及其原始revision，切栏目、返回目录或切尺寸不隐式提交；保存/冲突/结果未知与精确重试继续走同一个控制器。Access失效原因和“服务连接与登录”在当前栏目可见，不能藏进另一栏目。目录和详情不重复显示同一重试操作；稳定的详情子树保留连接输入的焦点和光标。内层导航有独立语义容器，目录和详情均须从根无障碍树可达。设置说明放在官方分组页脚，调暗标签与滑块保持一组内容，避免说明、留白和控件之间出现多余分隔线。漫画覆盖仍在编辑面板中分组。配色分别使用正文、次级文字、强调、分组表面、按下容器和错误角色，两主题单独验收。此设计落点及组件回归不替代正式Web的画面与交互证据。
 
-设置读取与保存使用明确的活动阶段并推导忙碌状态。已确认身份、尚未取得漫画快照时显示读取进度；连接要求只在身份不可用时显示。提交显示等待服务端确认，原草稿冻结，不能仍称尚未提交或提前显示已确认；只读重取时则保留未提交草稿或未知原命令的说明。源收藏和阅读器快捷设置也必须在活动期间显示共享状态，不能只在错误或未知结果后显示。继承规则放在阅读显示的官方分组页脚，阶段和待确认说明采用13px次级文字，具体错误使用系统红。读取失败、后续重取失败、原命令未知、版本冲突和明确拒绝分别保留对应恢复入口；重读未知请求不重发，精确重试继续复用原UUID/CAS/正文。
+设置读取与保存使用明确的活动阶段并推导忙碌状态。已确认身份、尚未取得漫画快照时显示读取进度；连接要求只在身份不可用时显示。提交显示等待服务端确认，原草稿冻结，不能仍称尚未提交或提前显示已确认；只读重取时则保留未提交草稿或未知原命令的说明。漫画表单独立滚动，确认反馈固定在操作区上方，保证首屏保存时可见；读取期间允许关闭，仅保存活动禁止返回，关闭本身不提交，迟到读回不重新打开编辑面。源收藏和阅读器快捷设置也必须在活动期间显示共享状态，不能只在错误或未知结果后显示。继承规则放在阅读显示的官方分组页脚，阶段和待确认说明采用13px次级文字，具体错误使用系统红。读取失败、后续重取失败、原命令未知、版本冲突和明确拒绝分别保留对应恢复入口；重读未知请求不重发，精确重试继续复用原UUID/CAS/正文。
 
 惰性Sliver中的搜索采用CupertinoTextField的官方前缀/清空能力，避免CupertinoSearchTextField在滚动重布局时读取dirty RenderObject的问题。固定Mihon的`ListPreferenceWidget.kt`采用可滚动单选列表，不提供查询；语言筛选的`SourcesFilterScreen.kt`和`ExtensionFilterScreen.kt`采用开关列表。Karuyomi的可搜索长选项和无匹配状态因此单列为产品独有状态29.K1/29.K2，不能伪造对应的Mihon参考图。
 

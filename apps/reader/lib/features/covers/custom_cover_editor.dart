@@ -227,6 +227,32 @@ class _CoverEditorState extends State<_CoverEditor> {
       child: EditSheet(
         key: const ValueKey('cover-editor'),
         title: const Text('自定义封面'),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: !_expired && _busy ? null : _close,
+          child: Text(
+            pending != null ? '稍后' : '关闭',
+            semanticsLabel: pending != null ? '稍后处理' : null,
+          ),
+        ),
+        trailing: !_expired && !_blocked && pending?.retryable == true
+            ? CupertinoButton(
+                key: const ValueKey('cover-retry'),
+                padding: EdgeInsets.zero,
+                onPressed: _busy ? null : () => _save(retry: true),
+                child: const Text('重试', semanticsLabel: '重试原修改'),
+              )
+            : !_expired &&
+                  pending == null &&
+                  !_blocked &&
+                  (_selected != null || _clearing)
+            ? CupertinoButton(
+                key: const ValueKey('cover-save'),
+                padding: EdgeInsets.zero,
+                onPressed: _busy || _confirmed == null ? null : _save,
+                child: const Text('保存', semanticsLabel: '保存封面'),
+              )
+            : null,
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -361,37 +387,17 @@ class _CoverEditorState extends State<_CoverEditor> {
                       ),
                     ],
                   ),
+                if (_blocked ||
+                    pending?.retryable == false ||
+                    _confirmed == null)
+                  CupertinoButton(
+                    onPressed: _busy ? null : _load,
+                    child: const Text('重新读取'),
+                  ),
               ],
             ],
           ),
         ),
-        actions: [
-          CupertinoButton(
-            onPressed: !_expired && _busy ? null : _close,
-            child: Text(pending != null ? '稍后处理' : '关闭'),
-          ),
-          if (!_expired &&
-              (_blocked || pending?.retryable == false || _confirmed == null))
-            CupertinoButton.filled(
-              onPressed: _busy ? null : _load,
-              child: const Text('重新读取'),
-            ),
-          if (!_expired && !_blocked && pending?.retryable == true)
-            CupertinoButton.filled(
-              key: const ValueKey('cover-retry'),
-              onPressed: _busy ? null : () => _save(retry: true),
-              child: const Text('重试原修改'),
-            ),
-          if (!_expired &&
-              pending == null &&
-              !_blocked &&
-              (_selected != null || _clearing))
-            CupertinoButton.filled(
-              key: const ValueKey('cover-save'),
-              onPressed: _busy || _confirmed == null ? null : _save,
-              child: const Text('保存封面'),
-            ),
-        ],
       ),
     );
   }

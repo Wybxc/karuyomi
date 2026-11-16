@@ -193,7 +193,7 @@ Future<void> _confirmFirstThree(WidgetTester tester) async {
   await _tap(tester, _control('chapter-select-range'));
   await _tap(tester, _control('chapter-mark-read'));
   expect(find.text('确认清单：3 章'), findsOneWidget);
-  await _tap(tester, find.text('确认并开始'));
+  await _tap(tester, find.text('开始'));
   expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
 }
 
@@ -560,7 +560,7 @@ void main() {
       await _search(tester, '同名');
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-read'));
-      await _tap(tester, find.text('确认并开始'));
+      await _tap(tester, find.text('开始'));
       expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
       expect(
         _posts(platform).map(_command).map((value) => value.expectedRevision),
@@ -574,7 +574,7 @@ void main() {
       await _shown(tester, [2, 0]);
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-unread'));
-      await _tap(tester, find.text('确认并开始'));
+      await _tap(tester, find.text('开始'));
       await _back(tester);
       await _search(tester, '');
       await _tap(tester, _readFilter('unread'));
@@ -623,15 +623,15 @@ void main() {
       };
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-read'));
-      await _tap(tester, find.text('确认并开始'));
+      await _tap(tester, find.text('开始'));
       expect(find.text('已确认 1 / 4 章 · 未开始 2 章'), findsOneWidget);
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
       expect(_posts(platform), hasLength(2));
       final uncertain = _posts(platform).last.body;
-      await _tap(tester, find.text('稍后处理'));
+      await _tap(tester, find.text('稍后'));
       await _tap(tester, _control('chapter-read-resume'));
       expect(_posts(platform), hasLength(2));
-      await _tap(tester, find.text('重试原未确认操作'));
+      await _tap(tester, find.text('重试'));
       expect(_posts(platform), hasLength(3));
       expect(_posts(platform).last.body, uncertain);
       expect(find.text('已确认 2 / 4 章 · 未开始 2 章'), findsOneWidget);
@@ -642,7 +642,7 @@ void main() {
         ),
         isNull,
       );
-      await _tap(tester, find.text('继续剩余原清单'));
+      await _tap(tester, find.text('继续'));
       expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
       expect(
         _posts(platform).map(_command).map((value) => value.expectedRevision),
@@ -730,7 +730,7 @@ void main() {
       expect(_preview(0), findsOneWidget);
       expect(_preview(2), findsOneWidget);
       expect(_posts(platform), hasLength(beforePending + 1));
-      await _tap(tester, find.text('重试原未确认操作'));
+      await _tap(tester, find.text('重试'));
       expect(_posts(platform).last.body, frozenBody);
       expect(pending.remainingKeys, {_sequence.entries[2].key});
       await _tap(tester, find.text('结束剩余操作'));
@@ -779,10 +779,10 @@ void main() {
         ),
       );
       platform.businessServer.requests.clear();
-      await _tap(tester, find.text('确认并开始'));
+      await _tap(tester, find.text('开始'));
       expect(find.textContaining('重新读取章节状态'), findsWidgets);
-      expect(find.text('重试原未确认操作'), findsNothing);
-      expect(find.text('继续剩余原清单'), findsNothing);
+      expect(find.text('重试'), findsNothing);
+      expect(find.text('继续'), findsNothing);
       expect(_posts(platform).length, lessThanOrEqualTo(1));
       expect(
         _posts(platform)
@@ -791,7 +791,7 @@ void main() {
         true,
       );
       final posts = _posts(platform).length;
-      await _tap(tester, find.text('重新读取并结束原批次'));
+      await _tap(tester, find.text('重读'));
       expect(_posts(platform), hasLength(posts));
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
       expect(
@@ -833,7 +833,7 @@ void main() {
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-read'));
       await tester.runAsync(() async {
-        await tester.tap(find.text('确认并开始'));
+        await tester.tap(find.text('开始'));
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pump(const Duration(milliseconds: 32));

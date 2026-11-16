@@ -258,7 +258,7 @@ void main() {
           expect(server.appliedMutations, writes + 1);
           final original = transport.uploads.single;
           final asset = server.manga(mangaKey)!.customCover.assetId;
-          await _tap(tester, find.text('稍后处理'));
+          await _tap(tester, find.text('稍后'));
           failRead = true;
           await _tap(tester, control('custom-cover-editor'));
           expect(find.text('服务端已确认'), findsNothing);
@@ -519,7 +519,7 @@ void main() {
         await _tap(tester, control('chapter-select-range'));
         await _tap(tester, control('chapter-mark-read'));
         expect(find.text('确认清单：2 章'), findsOneWidget);
-        await _tap(tester, find.text('确认并开始'));
+        await _tap(tester, find.text('开始'));
 
         final range = server.requests
             .where(
@@ -573,7 +573,7 @@ void main() {
       expect(find.byKey(const ValueKey('cover-retry')), findsOneWidget);
       final original = transport.uploads.single;
       final asset = server.manga(original.mangaKey)!.customCover.assetId;
-      await _tap(tester, find.text('稍后处理'));
+      await _tap(tester, find.text('稍后'));
       var failRead = true;
       platform.afterBusinessReply = (request, reply) async {
         if (failRead &&

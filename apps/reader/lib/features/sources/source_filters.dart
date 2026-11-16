@@ -376,6 +376,20 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
     final draft = _draft;
     return EditSheet(
       title: const Text('筛选漫画'),
+      leading: CupertinoButton(
+        onPressed: _close,
+        padding: EdgeInsets.zero,
+        child: Icon(
+          CupertinoIcons.xmark,
+          semanticLabel: _working ? '取消请求并关闭筛选' : '取消筛选编辑',
+        ),
+      ),
+      trailing: CupertinoButton(
+        key: const ValueKey('source-filter-apply'),
+        padding: EdgeInsets.zero,
+        onPressed: enabled && draft != null ? _apply : null,
+        child: const Text('应用', semanticsLabel: '应用筛选'),
+      ),
       content: ListView(
         key: const ValueKey('source-filter-form'),
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -449,28 +463,13 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
                 ],
               ),
             ),
+          CupertinoButton(
+            key: const ValueKey('source-filter-reset'),
+            onPressed: enabled ? () => _load(reset: true) : null,
+            child: const Text('重置筛选'),
+          ),
         ],
       ),
-      actions: [
-        CupertinoButton(
-          onPressed: _close,
-          padding: const EdgeInsets.all(8),
-          child: Icon(
-            CupertinoIcons.xmark,
-            semanticLabel: _working ? '取消请求并关闭筛选' : '取消筛选编辑',
-          ),
-        ),
-        CupertinoButton(
-          key: const ValueKey('source-filter-reset'),
-          onPressed: enabled ? () => _load(reset: true) : null,
-          child: const Text('重置筛选'),
-        ),
-        CupertinoButton.filled(
-          key: const ValueKey('source-filter-apply'),
-          onPressed: enabled && draft != null ? _apply : null,
-          child: const Text('应用筛选'),
-        ),
-      ],
     );
   }
 

@@ -69,6 +69,19 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
       scrollableBuilder: (context, _) => StatefulBuilder(
         builder: (context, setDialogState) => EditSheet(
           title: Text(node.title),
+          leading: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(
+              context,
+              selected.intersection(available).toList(),
+            ),
+            child: const Text('应用', semanticsLabel: '应用此设置'),
+          ),
           content: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -93,20 +106,6 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                 ),
             ],
           ),
-          actions: [
-            CupertinoButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            CupertinoButton(
-              onPressed: () => Navigator.pop(
-                context,
-                selected.intersection(available).toList(),
-              ),
-
-              child: const Text('应用此设置'),
-            ),
-          ],
         ),
       ),
     );
@@ -348,6 +347,15 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
     final pending = _controller.pending;
     return EditSheet(
       title: const Text('漫画源设置'),
+      leading: CupertinoButton(
+        onPressed: () {
+          _closing = true;
+          _controller.cancelActiveRequest();
+          Navigator.of(context).pop();
+        },
+        padding: EdgeInsets.zero,
+        child: const Icon(CupertinoIcons.xmark, semanticLabel: '关闭设置'),
+      ),
       content: ListView(
         key: const ValueKey('source-preferences-form'),
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -430,27 +438,16 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
               ),
             ),
           ],
+          CupertinoButton(
+            key: const ValueKey('source-preferences-refresh'),
+            onPressed:
+                _controller.available && !_controller.busy && pending == null
+                ? () => unawaited(_controller.load(reopen: true))
+                : null,
+            child: const Text('重新读取并刷新漫画源'),
+          ),
         ],
       ),
-      actions: [
-        CupertinoButton(
-          onPressed: () {
-            _closing = true;
-            _controller.cancelActiveRequest();
-            Navigator.of(context).pop();
-          },
-          padding: const EdgeInsets.all(8),
-          child: const Icon(CupertinoIcons.xmark, semanticLabel: '关闭设置'),
-        ),
-        CupertinoButton(
-          key: const ValueKey('source-preferences-refresh'),
-          onPressed:
-              _controller.available && !_controller.busy && pending == null
-              ? () => unawaited(_controller.load(reopen: true))
-              : null,
-          child: const Text('重新读取并刷新漫画源'),
-        ),
-      ],
     );
   }
 
@@ -503,7 +500,8 @@ class const _PreferenceTextDialog({required final wire.PreferenceNode node})
         CupertinoButton(
           onPressed: () => Navigator.pop(context, input.text),
           child: const Text(
-            '应用此设置',
+            '应用',
+            semanticsLabel: '应用此设置',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
         ),

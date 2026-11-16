@@ -483,6 +483,18 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 全局阅读设置的背景实测为浅 `#FEFBFF` / 深 `#1B1B1F`，标题实色为 `#1B1B1F` / `#E3E2E6`，当前值的合成后字色为 `#4E4D51` / `#B6B6BA`。开启轨道为 `#0058CA` / `#B0C6FF`，开启滑块为白色 / `#002D6E`。模式选择弹层容器为 `#FCF7FF` / `#292730`，选项字形为 `#44464F` / `#C5C6D0`，选中指示为强调色；不能拿页面表面或反转颜色替代弹层角色。此处仅建立 Mihon 参考，还没有对应 Karuyomi 同状态叠图。
 
+## 编辑面顶部操作收敛
+
+2026-11-16，将既有9个EditSheet调用点集中改为官方CupertinoNavigationBar：Source筛选、Source偏好及多选、漫画阅读设置、分类管理及编辑、书架批量、章节批量和封面编辑。编辑时关闭/取消在起始侧、保存/应用在末尾侧；分类管理与已结束批次的“完成”在末尾侧。长操作使用简短可见标签及完整辅助语义，危险提交采用系统红文字；刷新、重置、暂停和结束原批次进入滚动内容。本漫画反馈固定在导航下方，不随长表单离开视口。
+
+- 新增4项浅/深×1x/2x布局用例。在320×640、240px键盘遮挡下，顶部操作保持可点击，正文末端可滚动到达，输入和零自动提交保持。旧实现四项均先失败，动作底边为628px而要求顶部64px内；新实现四项通过，完整保存语义也单独匹配实际语义节点。
+- 定向验证覆盖9份文件的115个不同用例，改动收敛后按影响范围分组通过；最后调整完成按钮位置后重跑对应45项业务用例及4项布局用例。包含读取可关闭、保存期间禁用、未确认原操作保留、精确重试、CAS冲突、部分批次、身份更替、迟到回复与封面资源生命周期；未改业务控制器、协议或服务端。
+- 可复验命令为`flutter test --no-pub --concurrency=1`，文件：`test/widgets/edit_sheet_test.dart`、`test/sources/source_preferences_widget_test.dart`、`test/sources/source_filters_widget_test.dart`、`test/settings/settings_widgets_test.dart`、`test/settings/settings_navigation_test.dart`、`test/library/category_page_test.dart`、`test/library/library_batch_page_test.dart`、`test/browse/chapter_read_navigation_test.dart`、`test/covers/cover_navigation_test.dart`。日志保存在忽略目录的`edit-sheet-regressions-final.log`、`edit-sheet-completion-regressions.log`和`edit-sheet-layout-final.log`；前两者中间失败属于测试语义选择/释放的修正，最终布局用例已通过，不把中间失败说成整轮成功。
+
+最近的正式版本`f015956`已通过[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43794985695)和[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43794994599)，包含Web/Wasm，分支未部署。该版隔离正式Web补得浅色完整设置故障流程和深色读取关闭、等待、未知重开、精确重试、真实409及重读；共74条原始设置审计保存在`karuyomi-f015956-settings-harness.log`，独立API快照与JPG/AX以`karuyomi-f015956-settings-`为前缀。初始挂起门超时记录保留；深色拒绝/失效、逐图复核和快照汇总未完成，不填最终主图。为避免继续验收即将替换的布局，已收存证据、恢复视口并关闭临时标签，harness正常退出。
+
+顶部导航的完整CI、正式Web双主题画面和全状态验收仍待；上述组件与中间版本行为证据不代替新导航渲染、真实Access或生产读写。原始日志不提交，用户的pnpm锁文件保持原样且不纳入本次提交。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

@@ -333,7 +333,8 @@ class const _SettingsEditor({
 
     final save = draft == null || r == null
         ? null
-        : CupertinoButton.filled(
+        : CupertinoButton(
+            padding: manga ? EdgeInsets.zero : null,
             onPressed: state.canEdit
                 ? () async {
                     final saved = manga
@@ -348,7 +349,10 @@ class const _SettingsEditor({
                     if (saved) reset();
                   }
                 : null,
-            child: Text(manga ? '保存本漫画设置' : '保存全局设置'),
+            child: Text(
+              manga ? '保存' : '保存全局设置',
+              semanticsLabel: manga ? '保存本漫画设置' : null,
+            ),
           );
     Widget feedback() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -363,7 +367,8 @@ class const _SettingsEditor({
             state.error == null &&
             state.pending == null)
           const Text('当前设置已获服务端确认。'),
-        if (!manga && save != null) save,
+        if (!manga && save != null)
+          CupertinoButton.filled(onPressed: save.onPressed, child: save.child),
         SettingsStatus(controller: controller, state: state, onReloaded: reset),
       ],
     );
@@ -546,8 +551,20 @@ class const _SettingsEditor({
             canPop: state.activity != SettingsActivity.saving,
             child: EditSheet(
               title: const Text('本漫画阅读设置'),
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: state.activity == SettingsActivity.saving
+                    ? null
+                    : () => Navigator.pop(context),
+                child: const Text('关闭', semanticsLabel: '关闭设置'),
+              ),
+              trailing: save,
               content: Column(
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                    child: feedback(),
+                  ),
                   Expanded(
                     child: SingleChildScrollView(
                       controller: detailScroll,
@@ -555,21 +572,8 @@ class const _SettingsEditor({
                       child: content(null),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: feedback(),
-                  ),
                 ],
               ),
-              actions: [
-                CupertinoButton(
-                  onPressed: state.activity == SettingsActivity.saving
-                      ? null
-                      : () => Navigator.pop(context),
-                  child: const Text('关闭设置'),
-                ),
-                ?save,
-              ],
             ),
           )
         : LayoutBuilder(

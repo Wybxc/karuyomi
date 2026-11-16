@@ -441,6 +441,21 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
       child: EditSheet(
         key: const ValueKey('category-manager'),
         title: const Text('管理分类'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: !expired && _draft?.busy == true
+              ? null
+              : () => Navigator.pop(context),
+          child: Text(
+            _draft?.attempted == true && _draft?.completed != true
+                ? '稍后'
+                : '完成',
+            semanticsLabel:
+                _draft?.attempted == true && _draft?.completed != true
+                ? '稍后处理'
+                : null,
+          ),
+        ),
         content: ListView(
           children: [
             if (expired || _draft != null)
@@ -499,18 +514,6 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
               ),
           ],
         ),
-        actions: [
-          CupertinoButton(
-            onPressed: !expired && _draft?.busy == true
-                ? null
-                : () => Navigator.pop(context),
-            child: Text(
-              _draft?.attempted == true && _draft?.completed != true
-                  ? '稍后处理'
-                  : '完成',
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -628,6 +631,47 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
       child: EditSheet(
         key: const ValueKey('category-command'),
         title: Text(draft.title),
+        leading: draft.completed
+            ? null
+            : CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: !expired && draft.busy
+                    ? null
+                    : () => Navigator.pop(context),
+                child: Text(
+                  draft.attempted ? '稍后' : '取消',
+                  semanticsLabel: draft.attempted ? '稍后处理' : null,
+                ),
+              ),
+        trailing: draft.completed
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => Navigator.pop(context),
+                child: const Text('完成'),
+              )
+            : draft.blocked
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: expired || draft.busy ? null : _reload,
+                child: const Text('重读', semanticsLabel: '重新读取并关闭'),
+              )
+            : CupertinoButton(
+                padding: EdgeInsets.zero,
+                foregroundColor:
+                    draft.destructive &&
+                        !expired &&
+                        !draft.busy &&
+                        !draft.completed
+                    ? AppColors.error.resolveFrom(context)
+                    : null,
+                onPressed: expired || draft.busy || draft.completed
+                    ? null
+                    : _save,
+                child: Text(
+                  draft.attempted ? '重试' : draft.submitLabel,
+                  semanticsLabel: draft.attempted ? draft.retryLabel : null,
+                ),
+              ),
         content: Form(
           key: _form,
           child: ListView(
@@ -701,37 +745,6 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
             ],
           ),
         ),
-        actions: [
-          CupertinoButton(
-            onPressed: !expired && draft.busy
-                ? null
-                : () => Navigator.pop(context),
-            child: Text(
-              draft.completed
-                  ? '完成'
-                  : draft.attempted
-                  ? '稍后处理'
-                  : '取消',
-            ),
-          ),
-          if (draft.blocked)
-            CupertinoButton.filled(
-              onPressed: expired || draft.busy ? null : _reload,
-              child: const Text('重新读取并关闭'),
-            )
-          else
-            CupertinoButton.filled(
-              color: draft.destructive
-                  ? AppColors.error.resolveFrom(context)
-                  : null,
-              onPressed: expired || draft.busy || draft.completed
-                  ? null
-                  : _save,
-              child: Text(
-                draft.attempted ? draft.retryLabel : draft.submitLabel,
-              ),
-            ),
-        ],
       ),
     );
   }

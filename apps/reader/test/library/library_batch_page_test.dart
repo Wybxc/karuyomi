@@ -180,9 +180,9 @@ void main() {
             ),
             findsOneWidget,
           );
-          final confirm = find.widgetWithText(CupertinoButton, '确认并开始');
+          final confirm = find.widgetWithText(CupertinoButton, '开始');
           expect(
-            tester.widget<CupertinoButton>(confirm).color,
+            tester.widget<CupertinoButton>(confirm).foregroundColor,
             AppColors.error.resolveFrom(tester.element(confirm)),
           );
           expect(mutations(), isEmpty);
@@ -219,9 +219,9 @@ void main() {
           );
           expect(mutations(), hasLength(1));
           expect(find.text('全部修改已由服务端确认。'), findsNothing);
-          expect(find.text('重试原未确认操作').hitTestable(), findsOneWidget);
+          expect(find.text('重试').hitTestable(), findsOneWidget);
           expect(tester.takeException(), isNull);
-          await tap(tester, find.text('重试原未确认操作'));
+          await tap(tester, find.text('重试'));
           for (final message in ['已由服务端确认', '全部修改已由服务端确认。']) {
             final confirmation = find.text(message);
             await tester.ensureVisible(confirmation);
@@ -280,7 +280,7 @@ void main() {
       expect(batchEntry(beta.mangaKey), findsOneWidget);
       expect(batchEntry(gamma.mangaKey), findsNothing);
       expect(mutations(), isEmpty);
-      await tap(tester, find.text('确认并开始'));
+      await tap(tester, find.text('开始'));
       expect(find.text('全部修改已由服务端确认。'), findsOneWidget);
       expect(mutations(), hasLength(2));
       expect(server.manga(alpha.mangaKey)!.favorite, false);
@@ -340,7 +340,7 @@ void main() {
       await tap(tester, category(_first));
       await tap(tester, category(_third));
       expect(mutations(), isEmpty);
-      await tap(tester, find.text('确认并开始'));
+      await tap(tester, find.text('开始'));
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first, _third]);
       expect(server.manga(beta.mangaKey)!.categoryIds, [
         _first,
@@ -354,7 +354,7 @@ void main() {
         find.byKey(const ValueKey('library-batch-remove-categories')),
       );
       await tap(tester, category(_first));
-      await tap(tester, find.text('确认并开始'));
+      await tap(tester, find.text('开始'));
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_third]);
       expect(server.manga(beta.mangaKey)!.categoryIds, [_second, _third]);
       expect(mutations(), hasLength(4));
@@ -405,7 +405,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('library-batch-remove-favorites')),
       );
-      await tap(tester, find.text('确认并开始'));
+      await tap(tester, find.text('开始'));
       expect(find.text('已确认 1 / 3 部 · 未开始 1 部'), findsOneWidget);
       expect(find.text('全部修改已由服务端确认。'), findsNothing);
       expect(server.appliedMutations, appliedBefore + 2);
@@ -415,7 +415,7 @@ void main() {
       final third = (await tester.runAsync(() => remote.watchView().first))!
           .entries
           .single;
-      await tap(tester, find.text('稍后处理'));
+      await tap(tester, find.text('稍后'));
       expect(
         find.byKey(const ValueKey('library-resume-batch')),
         findsOneWidget,
@@ -423,7 +423,7 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('library-resume-batch')));
       expect(find.text('已确认 1 / 3 部 · 未开始 1 部'), findsOneWidget);
       expect(mutations(), hasLength(2));
-      await tap(tester, find.text('重试原未确认操作'));
+      await tap(tester, find.text('重试'));
       expect(mutations(), hasLength(3));
       expect(mutations().last.body, uncertain.body);
       expect(server.appliedMutations, appliedBefore + 2);
@@ -435,7 +435,7 @@ void main() {
         ),
         hasLength(1),
       );
-      await tap(tester, find.text('继续剩余原清单'));
+      await tap(tester, find.text('继续'));
       expect(mutations(), hasLength(4));
       expect(server.appliedMutations, appliedBefore + 3);
       expect(server.manga(third.mangaKey)!.favorite, false);
@@ -475,14 +475,14 @@ void main() {
         await controller.library!.refresh();
       });
       server.requests.clear();
-      await tap(tester, find.text('确认并开始'));
+      await tap(tester, find.text('开始'));
       expect(find.textContaining('需重新读取'), findsWidgets);
-      expect(find.text('重试原未确认操作'), findsNothing);
-      expect(find.text('继续剩余原清单'), findsNothing);
+      expect(find.text('重试'), findsNothing);
+      expect(find.text('继续'), findsNothing);
       expect(mutations(), isEmpty);
       expect(server.manga(changed.mangaKey)!.categoryIds, [_first]);
       expect(server.manga(view.entries.last.mangaKey)!.categoryIds, isEmpty);
-      await tap(tester, find.text('重新读取并结束原批次'));
+      await tap(tester, find.text('重读'));
       expect(mutations(), isEmpty);
       expect(find.text('全部修改已由服务端确认。'), findsNothing);
       await tap(tester, find.text('完成'));
@@ -522,7 +522,7 @@ void main() {
       );
       await tap(tester, category(_first));
       await tester.runAsync(() async {
-        await tester.tap(find.text('确认并开始'));
+        await tester.tap(find.text('开始'));
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pump(const Duration(milliseconds: 32));
@@ -602,7 +602,7 @@ void main() {
         find.byKey(const ValueKey('library-batch-remove-favorites')),
       );
       await tester.runAsync(() async {
-        await tester.tap(find.text('确认并开始'));
+        await tester.tap(find.text('开始'));
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pump(const Duration(milliseconds: 32));
@@ -631,7 +631,7 @@ void main() {
             .value,
         'owner-subject',
       );
-      await tap(tester, find.text('稍后处理'));
+      await tap(tester, find.text('稍后'));
       expect(find.text('书架还是空的'), findsOneWidget);
       expect(find.byKey(const ValueKey('library-resume-batch')), findsNothing);
       expect(find.textContaining('已选 '), findsNothing);
