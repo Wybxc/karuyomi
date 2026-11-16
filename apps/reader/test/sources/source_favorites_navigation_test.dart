@@ -14,6 +14,7 @@ import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
+import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -264,7 +265,15 @@ void main() {
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
       expect(catalog.installationSettings!.global.favoriteSources, isEmpty);
-      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SettingsStatus),
+          matching: find.byType(CupertinoActivityIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
+      expect(toggle(), findsNothing);
       final command = wire.decodeProtoJson(
         wire.SettingsMutation(),
         jsonDecode(posts().last.body!),
@@ -273,6 +282,7 @@ void main() {
       expect(command.setGlobal.theme, original.theme);
       release.complete();
       await tester.pumpAndSettle();
+      expect(find.text('正在等待服务端确认设置修改'), findsNothing);
       expect(
         tester.widget<CupertinoButton>(toggle()).child,
         isA<Icon>().having(

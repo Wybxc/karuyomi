@@ -108,13 +108,38 @@ class const SettingsStatus({
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      if (state.busy) const CupertinoActivityIndicator(),
+      if (state.activity case final activity?)
+        Row(
+          children: [
+            const CupertinoActivityIndicator(),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                switch (activity) {
+                  SettingsActivity.reading => '正在读取服务端设置',
+                  SettingsActivity.saving => '正在等待服务端确认设置修改',
+                },
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            ),
+          ],
+        ),
       if (state.error case final error?)
         Text(
           error,
           style: TextStyle(color: AppColors.error.resolveFrom(context)),
         ),
-      if (state.pending?.retryable == true) const Text('设置尚未确认，本会话保留原操作。'),
+      if (state.pending?.retryable == true)
+        Text(
+          '设置尚未确认，本会话保留原操作。',
+          style: TextStyle(
+            fontSize: 13,
+            color: AppColors.secondaryLabel.resolveFrom(context),
+          ),
+        ),
       Wrap(
         children: [
           CupertinoButton(
@@ -329,7 +354,6 @@ class const _SettingsEditor({
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (manga) const Text('选择“跟随全局”时，之后的全局修改会应用到此漫画。'),
         if (connection != null &&
             section != _SettingsSection.connection &&
             catalog.status != ServiceStatus.ready) ...[
@@ -351,6 +375,7 @@ class const _SettingsEditor({
             trailing: Text('0.1.0'),
           ),
         if (draft == null &&
+            !state.available &&
             section != _SettingsSection.about &&
             section != _SettingsSection.connection)
           const Text('连接并确认身份后可读取和保存同步设置。'),
@@ -414,7 +439,7 @@ class const _SettingsEditor({
                 (value) => r.background = value,
                 r.clearBackground,
               ),
-            ]),
+            ], footer: manga ? '选择“跟随全局”时，之后的全局修改会应用到此漫画。' : null),
             group('应用内调暗', [
               if (manga)
                 MergeSemantics(
@@ -496,7 +521,9 @@ class const _SettingsEditor({
             draft?.dirty == true ||
             state.pending != null ||
             state.error != null) ...[
-          if (draft?.dirty == true && state.pending == null)
+          if (draft?.dirty == true &&
+              state.pending == null &&
+              state.activity != SettingsActivity.saving)
             const Text('修改尚未保存。')
           else if (state.snapshot != null &&
               !state.busy &&

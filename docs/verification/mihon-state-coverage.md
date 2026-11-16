@@ -1244,6 +1244,77 @@ stateDiagram-v2
 
 图中仅列主要失效入口，范围草稿、已加载列表、映射、拒绝及完成后同样检查身份变化；不能用一条箭头替代全部触发阶段。20.K13/K14的操作阶段、仅分类预览、21.K3/K4的重开和重读失败须独立取图。预览、筛选、映射、分页与取消均为只读；只有21.K1明确确认和21.K3明确原请求重试可触发写入。`8c398d3`的新增标记和保留已有标记证据继续保留；`9228c11`两主题均为英文3,323章→中文的无标记流程，明确提交均新增0/0且各推进一次版本，九路完整快照确认查询/分页/取消零附写。章节选择已核对当前项`aria-current=true`、占用项禁用、无匹配及清空；`86d27e7`实际点击取消后映射、页码、位置保持且焦点恢复，跨独立API后的延迟只读观测同样保持，四个九路快照比较确认零写入。本轮未提交迁移，不新增完成写入次数。语义定位动作后的滚动观察和旧问题图保留，不将实际点击结果外推全部输入与转换，详见[返回行为复验](mihon-cupertino-fidelity.md#迁移返回焦点与位置的正式-web-复验)。
 
+### 24：Karuyomi 本漫画阅读设置的目标状态
+
+以下依据共用SettingsEditor、SettingsController及SettingsRepository的正式分支。读取和提交使用不同activity；`busy`由activity推导，不增加独立、可能分歧的忙碌标志。标题限定本漫画，覆盖字段的空值表示继承，显式AUTO/0仍为真实覆盖值。继承说明采用官方Cupertino分组页脚，读取阶段不误报需要先确认身份，提交阶段不再显示尚未提交草稿。此图跟踪漫画编辑面；全局设置与阅读工具中的共享提示须分别取得画面，不以组件或本漫画主图代替。
+
+```mermaid
+stateDiagram-v2
+    [*] --> ReadingOverrides
+    state "24.K1 首次读取设置" as ReadingOverrides
+    state "24.K2 首次读取失败" as InitialSettingsError
+    state "24.K3 已确认继承或覆盖" as ConfirmedOverrides
+    state "24.K4 未提交设置草稿" as DraftOverrides
+    state "24.K5 等待设置提交确认" as SavingOverrides
+    state "24.K6 原设置修改结果未知" as UnknownOverrides
+    state "24.K7 原设置版本冲突" as ConflictingOverrides
+    state "24.K8 原设置修改已拒绝" as RejectedOverrides
+    state "24.K9 正在重新读取设置" as ReloadingOverrides
+    state "24.K10 后续读取失败" as SettingsReloadError
+    state "24.K11 身份未确认或失效" as UnavailableOverrides
+    note right of ReadingOverrides
+      状态来自正式控制器与编辑器
+      浅深主题、字号和所有转换分别验
+      正式 Web 主图均待取得
+    end note
+    ReadingOverrides --> InitialSettingsError: 首次读取失败
+    ReadingOverrides --> [*]: 关闭，不提交
+    InitialSettingsError --> ReadingOverrides: 明确重新读取
+    ReadingOverrides --> ConfirmedOverrides: 取得已确认快照
+    ConfirmedOverrides --> DraftOverrides: 修改覆盖或继承
+    ConfirmedOverrides --> SavingOverrides: 明确保存当前值
+    DraftOverrides --> [*]: 关闭且不提交
+    ConfirmedOverrides --> ReloadingOverrides: 明确重新读取
+    DraftOverrides --> ReloadingOverrides: 明确重读，等待期间保留草稿提示
+    DraftOverrides --> SavingOverrides: 明确保存
+    SavingOverrides --> ConfirmedOverrides: 取得原命令确认
+    SavingOverrides --> UnknownOverrides: 未取得确认
+    SavingOverrides --> ConflictingOverrides: 版本冲突
+    SavingOverrides --> RejectedOverrides: 明确拒绝
+    UnknownOverrides --> SavingOverrides: 明确精确重试原命令
+    UnknownOverrides --> [*]: 稍后处理，同会话保留原命令
+    UnknownOverrides --> ReloadingOverrides: 只读重取，不重发
+    ConflictingOverrides --> ReloadingOverrides: 明确重取并结束被拒绝原命令
+    RejectedOverrides --> ReloadingOverrides: 明确重取并结束被拒绝原命令
+    ReloadingOverrides --> ConfirmedOverrides: 无未知原命令且重读成功
+    ReloadingOverrides --> UnknownOverrides: 未知原命令仍须明确重试
+    ReloadingOverrides --> SettingsReloadError: 读取失败且保留原值或原命令
+    SettingsReloadError --> ReloadingOverrides: 明确重新读取
+    SettingsReloadError --> DraftOverrides: 无冻结原命令时继续编辑
+    SettingsReloadError --> SavingOverrides: 仅未知原命令可精确重试
+    DraftOverrides --> UnavailableOverrides: 身份或服务变化
+    ReadingOverrides --> UnavailableOverrides: 身份或服务变化
+    SavingOverrides --> UnavailableOverrides: 身份或服务变化，丢弃迟到结果
+    UnknownOverrides --> UnavailableOverrides: 身份或服务变化
+    UnavailableOverrides --> [*]: 关闭后恢复连接并重新打开
+```
+
+| 状态 ID | 最小必要信息与操作边界                                                   | 浅色正式Web | 深色正式Web |
+| ------- | ------------------------------------------------------------------------ | ----------- | ----------- |
+| 24.K1   | 本漫画范围、明确读取进度、无已确认提示、编辑与保存不可用、关闭           | 待          | 待          |
+| 24.K2   | 本漫画范围、读取失败、明确重新读取与关闭；无连接误报或假确认             | 待          | 待          |
+| 24.K3   | 本漫画范围、各字段继承/显式值、已确认状态、修改与重读                    | 待          | 待          |
+| 24.K4   | 原字段与当前草稿、尚未保存、明确保存和关闭；关闭零写入                   | 待          | 待          |
+| 24.K5   | 本漫画范围、正在提交的设置、等待服务端确认、编辑/重复保存/关闭禁用       | 待          | 待          |
+| 24.K6   | 原提交值、结果未确认、同一命令重试、只读重取；不能改值或误报成功         | 待          | 待          |
+| 24.K7   | 原草稿、具体版本冲突、重读入口、禁止重试新版本；重读成功前冻结           | 待          | 待          |
+| 24.K8   | 原草稿、明确拒绝、重读入口、原命令不可重试；与未知结果分开               | 待          | 待          |
+| 24.K9   | 明确读取进度、保留的原值/草稿/未知原命令、禁用重复动作；只读零提交       | 待          | 待          |
+| 24.K10  | 读取错误与原值、原未知命令仍保留、对应重读/精确重试/关闭；失败不撤回确认 | 待          | 待          |
+| 24.K11  | 连接与身份确认要求、隐藏旧字段和旧确认、禁止旧动作、明确关闭             | 待          | 待          |
+
+各确认/草稿/故障状态的身份变化均须分别验收，图中只列主要异步入口。初次无身份与旧身份失效是K11的不同触发变体；读取时关闭、重开未知原命令、明确拒绝、所有字段类型、键盘和减少动态仍分别跟踪。表中留空的是正式Web双主题主图，已有控制器或组件证据不能填入。
+
 ### 26：Karuyomi 最终 Cupertino 设置导航
 
 以下沿用26组参考结构，同时保留Karuyomi的服务端确认语义；这是最终目标画面清单，不能用第一阶段旧配色截图填入。代码/组件验证与正式Web实拍分别记录。蓝色仅代表`729cbe3`的双主题主图已核对，全部变体与转换仍待。

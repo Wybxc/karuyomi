@@ -67,6 +67,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 ## 当前交付顺序
 
+2026-11-16，设置编辑器已修复首次读取误提示身份未确认、读取与保存阶段无明确区分的问题，源收藏和阅读器快捷设置同样显示等待确认。50项定向回归与七文件严格分析通过，保留原命令精确重试、冲突重读及身份隔离；[本漫画设置状态图](../verification/mihon-state-coverage.md#24karuyomi-本漫画阅读设置的目标状态)新增11项最小信息，正式Web主图和完整CI继续验收。详细范围见[设置状态证据](../verification/mihon-cupertino-fidelity.md#本漫画阅读设置的阶段与确认)。
+
 2026-11-16，`86d27e7`完整push/PR CI通过，Hooks焦点修复已在正式Web浅/深实际点击复验：章节选择和确认取消后原按钮位置保持、焦点恢复，九路API确认零写入；补深色范围、仅分类和搜索空态主图。语义定位动作后的位置变化单列为工具影响可能性，未认定唯一原因。加载、故障、全部变体与生产按[状态图](../verification/mihon-state-coverage.md)推进，详见[返回行为复验](../verification/mihon-cupertino-fidelity.md#迁移返回焦点与位置的正式-web-复验)。`9228c11`的行宽、源语言、独立预览语义和两次明确迁移证据继续保留；本轮分支仍未部署。
 
 **当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场。`c5f6759`完整push/PR CI通过（864项Dart、531项Vitest、Web/Wasm），正式Web双主题已核对短/长选择菜单的当前项DOM语义，以及封面草稿、保存、替换、取消清除、清除与新文档读回。独立API确认六次封面提交各写一次、草稿/取消零附写；19.K3/K4/K6/K7正常主图与K5非法输入变体已有。按[逐状态流程图](../verification/mihon-state-coverage.md)保留加载/等待、故障、禁用项、资料、迁移、全部变体与生产待办，不以正常流程替代。详细检查、缺帧与运行环境见[验证记录](../verification/mihon-cupertino-fidelity.md#封面与选择语义的正式-web-分项)，Komiic失败未记兼容通过。

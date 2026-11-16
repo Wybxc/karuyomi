@@ -2,6 +2,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -61,8 +62,11 @@ void main() {
     bool reduceMotion = false,
     bool disableAnimations = false,
     bool openAppearance = true,
+    bool settle = true,
+    double textScale = 1,
+    Size size = const Size(480, 1000),
   }) async {
-    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -73,6 +77,7 @@ void main() {
           data: MediaQuery.of(context).copyWith(
             reduceMotion: reduceMotion,
             disableAnimations: disableAnimations,
+            textScaler: TextScaler.linear(textScale),
           ),
           child: child!,
         ),
@@ -82,7 +87,11 @@ void main() {
       ),
       container: fixture.container,
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
     if (!manga && openAppearance) {
       await openSettingsSection(tester, 'appearance');
     }
@@ -109,6 +118,182 @@ void main() {
 
   List<TestBusinessRequest> writes() =>
       server.requests.where((request) => request.method == 'POST').toList();
+
+  for (final appearance in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'manga settings distinguish reading, saving and recovery in $appearance at ${scale}x text',
+        (tester) async {
+          final initialRead = Completer<void>();
+          final saving = Completer<void>();
+          final releaseSave = Completer<void>();
+          Completer<void>? reloadGate;
+          addTearDown(() {
+            if (!initialRead.isCompleted) initialRead.complete();
+            if (!releaseSave.isCompleted) releaseSave.complete();
+            if (reloadGate case final gate? when !gate.isCompleted) {
+              gate.complete();
+            }
+          });
+          var failRead = true;
+          server.beforeRequest = (request) async {
+            if (request.method == 'GET' &&
+                request.uri.path == '/api/settings/manga/$_key') {
+              if (!initialRead.isCompleted) await initialRead.future;
+              if (reloadGate case final gate?) await gate.future;
+              if (failRead) throw StateError('Settings read unavailable');
+            }
+            return null;
+          };
+          var holdSave = true;
+          fixture.platform.afterBusinessReply = (request, reply) async {
+            if (holdSave &&
+                request.method == 'POST' &&
+                request.uri.path == '/api/settings/mutations') {
+              saving.complete();
+              await releaseSave.future;
+              throw StateError('Settings acknowledgement lost');
+            }
+            return reply;
+          };
+          final controller = editor(manga: true);
+          await show(
+            tester,
+            controller,
+            manga: true,
+            appearance: appearance,
+            textScale: scale,
+            size: const Size(360, 800),
+            settle: false,
+          );
+          expect(find.text('正在读取服务端设置'), findsOneWidget);
+          expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsNothing);
+          expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(find.byType(ChoiceField<wire.ReaderMode>), findsNothing);
+          expect(writes(), isEmpty);
+
+          initialRead.complete();
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+          expect(find.text('未能读取服务端设置；当前阅读仍可继续。'), findsOneWidget);
+          expect(find.text('正在读取服务端设置'), findsNothing);
+          expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          failRead = false;
+          await tap(tester, find.text('重新读取设置'));
+          expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
+          final inheritance = find.text('选择“跟随全局”时，之后的全局修改会应用到此漫画。');
+          expect(
+            find.ancestor(
+              of: inheritance,
+              matching: find.byType(CupertinoFormSection),
+            ),
+            findsOneWidget,
+          );
+          await select<wire.ReaderMode>(tester, '从右到左');
+          expect(find.text('修改尚未保存。'), findsOneWidget);
+          await tester.ensureVisible(find.text('保存本漫画设置'));
+          await tester.tap(find.text('保存本漫画设置'));
+          await tester.runAsync(() => saving.future);
+          await tester.pump();
+          expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
+          expect(find.text('正在读取服务端设置'), findsNothing);
+          expect(find.text('修改尚未保存。'), findsNothing);
+          expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(
+            tester
+                .widget<CupertinoButton>(
+                  find.widgetWithText(CupertinoButton, '关闭设置'),
+                )
+                .onPressed,
+            isNull,
+          );
+          expect(state(manga: true).canEdit, false);
+          releaseSave.complete();
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+          expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
+          expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(writes(), hasLength(1));
+          final original = writes().single.body;
+          failRead = true;
+          await tap(tester, find.text('重新读取设置'));
+          expect(find.text('未能读取服务端设置；当前阅读仍可继续。'), findsOneWidget);
+          expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
+          expect(state(manga: true).pending?.retryable, true);
+          expect(writes(), hasLength(1));
+
+          holdSave = false;
+          failRead = false;
+          await tap(tester, find.text('重试原设置操作'));
+          expect(writes().map((request) => request.body), [original, original]);
+          expect(server.appliedMutations, 1);
+          expect(state(manga: true).pending, isNull);
+          expect(
+            state(manga: true).snapshot!.overrides!.mode,
+            wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+          );
+          expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
+
+          await select<wire.ReaderMode>(tester, '竖向连续');
+          reloadGate = Completer<void>();
+          await tester.ensureVisible(find.text('重新读取设置'));
+          await tester.tap(find.text('重新读取设置'));
+          await tester.pump();
+          expect(find.text('正在读取服务端设置'), findsOneWidget);
+          expect(find.text('修改尚未保存。'), findsOneWidget);
+          expect(find.text('正在等待服务端确认设置修改'), findsNothing);
+          expect(writes(), hasLength(2));
+          reloadGate.complete();
+          reloadGate = null;
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+          expect(
+            state(manga: true).snapshot!.overrides!.mode,
+            wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+          );
+          expect(find.text('修改尚未保存。'), findsNothing);
+          expect(writes(), hasLength(2));
+          await select<wire.ReaderMode>(tester, '竖向连续');
+          final remoteClient = BusinessStateClient(
+            api: server,
+            identity: client.identity,
+          );
+          addTearDown(remoteClient.dispose);
+          await tester.runAsync(
+            () => SettingsRepository(remoteClient).setManga(
+              mangaKey: _key,
+              overrides: wire.ReaderSettingsOverride(
+                pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+              ),
+              basedOnRevision: 1,
+            ),
+          );
+          await tap(tester, find.text('保存本漫画设置'));
+          expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
+          expect(find.text('重试原设置操作'), findsNothing);
+          expect(state(manga: true).canEdit, false);
+          final writesBeforeRead = writes().length;
+          await tap(tester, find.text('重新读取设置'));
+          expect(writes(), hasLength(writesBeforeRead));
+          expect(
+            state(manga: true).snapshot!.overrides!.pageLayout,
+            wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+          );
+          expect(state(manga: true).snapshot!.overrides!.hasMode(), false);
+
+          fixture.platform.loginHtml = true;
+          await tester.runAsync(fixture.catalog.connect);
+          await tester.pumpAndSettle();
+          expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+          expect(find.byType(ChoiceField<wire.ReaderMode>), findsNothing);
+          expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(writes(), hasLength(writesBeforeRead));
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
+  }
 
   for (final disabled in [false, true]) {
     testWidgets(

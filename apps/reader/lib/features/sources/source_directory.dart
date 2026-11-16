@@ -261,7 +261,8 @@ class const SourceDirectory({
             ],
           ),
         ),
-        if ((settings.snapshot == null ||
+        if ((settings.busy ||
+            settings.snapshot == null ||
             settings.error != null ||
             settings.pending != null)) ...[
           SettingsStatus(controller: commands, state: settings),

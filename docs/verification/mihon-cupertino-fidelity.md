@@ -382,6 +382,18 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 忽略目录原图前缀`karuyomi-86d27e7-migration-`，双主题有`{original-snapshot,search-empty,preview-summary,native-before,native-return,confirm,confirm-return}`；深色另有`{scope,categories-only,chapter-choice,chapter-no-match}`。`return-dom.json`记录按钮前后矩形、焦点、延迟观测和当前/禁用语义，`*-check.json`记录九路相等检查。`return-pair.jpg`及`confirm-return-pair.jpg`两份联系表已实看。语义定位动作的浅色问题图另存`choice-{trigger-before,trigger-return,coordinate-return,delayed-observation}-light.jpg`，不删除或当作实际点击通过证据。已恢复视口并关闭临时标签，官方harness正常退出0。全部输入方式、状态变体、加载/故障、真实读屏、生产及原生仍未完成；这些分项不因本轮返回流程通过而清零。
 
+### 本漫画阅读设置的阶段与确认
+
+2026-11-16，共用设置编辑器的四项浅/深×1x/2x组件流程，在360×800下均先复现首次读取没有文字说明，且误显示“连接并确认身份后可读取和保存同步设置。”。当时身份已确认，仅漫画设置的只读请求尚未返回；不能把尚无快照解释为尚无身份。日志为`settings-state-before.log`。
+
+实现以`SettingsActivity.reading/saving`替代独立busy字段，busy由活动推导；保存和读取的禁用条件继续沿用原控制器。明确显示“正在读取服务端设置”或“正在等待服务端确认设置修改”，进度与待确认说明采用13px次级文字。保存等待时不再显示尚未提交草稿，正在只读重取时仍保留未提交草稿提示；继承说明移入阅读显示的官方Cupertino分组页脚。首次失败、原提交未知、版本冲突、明确拒绝与身份变化的既有业务分支和恢复动作保留，不增加兼容层或新保存通道。
+
+四项完整流程分别核对：阻塞首次读取→失败→明确重读；本漫画从左到右→从右到左草稿；提交后阻塞确认、禁止关闭与重复修改；已提交丢确认→再次读取失败→精确重试。两次POST正文相同且只应用一次。另核对带本地草稿的阻塞只读重取，读取说明与未保存提示共存，零附写；明确重取成功才丢弃该草稿并恢复已确认值。之后由第二客户端真实发出协议写入制造CAS冲突，原编辑器保持冻结且无精确重试入口，明确重读只读回远端双页设置，不自动重基或重发。最后模拟Access返回登录HTML，旧字段与旧确认消失，没有额外POST。
+
+随后在源目录和阅读器工具实际调用点发现，外层条件仍只在无快照、错误或未知结果时显示共享状态。阻塞源收藏确认及浅/深阅读模式修改的三项回归在旧条件下均失败，见`settings-consumers-before-valid.log`；将活动期间纳入呈现条件后，确认到达前保留原快照、禁用重复动作并显示等待说明，确认后更新快照且原提交只有一条。测试最初的菜单计时与异步屏障问题另存日志，不能作为产品缺口依据。
+
+最终五个相关测试文件的50项不同回归通过：`settings_controller_test`、`settings_widgets_test`、`settings_navigation_test`、`source_favorites_navigation_test`和`chapter_reader_route_test`，日志为`settings-state-regressions-final.log`。七个修改Dart文件严格分析零问题，完整格式化/校验、依赖分层和标准prek通过；迁移24节点及本漫画设置11节点的图表ID一致性检查通过，后者不代表截图验收。新增四种主题/文字组合在同一流程覆盖读取、保存、未知、冲突和身份失效；明确非冲突拒绝、全部字段、真实键盘及减少动态仍单列。测试使用生成协议与组件测试supplier，不是正式D1、Source在线、浏览器或生产证据。Riverpod代码已用固定generator重生；完整CI与正式Web各状态双主题继续待验，24.K1–K11主图不填入组件结果。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。

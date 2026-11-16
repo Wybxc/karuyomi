@@ -6,6 +6,7 @@ import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'settings_probe.dart';
 import '../test_app.dart';
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -803,6 +804,94 @@ void main() {
       await _finish(tester, catalog);
     },
   );
+
+  for (final appearance in Brightness.values) {
+    testWidgets(
+      'reader quick settings show waiting until server confirmation in $appearance',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = appearance;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final platform = _platform();
+        await _start(tester, platform, size: const Size(480, 800));
+        final catalog = await _details(tester);
+        await _tap(tester, find.text('第一章'));
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(ReaderScreen)),
+          listen: false,
+        );
+        final provider = settingsControllerProvider(
+          catalog,
+          catalog.settings,
+          mangaKey: _mangaKey,
+        );
+        final originalRevision = container
+            .read(provider)
+            .snapshot!
+            .mangaRevision;
+        final entered = Completer<void>(), release = Completer<void>();
+        addTearDown(() {
+          if (!release.isCompleted) release.complete();
+        });
+        platform.afterBusinessReply = (request, reply) async {
+          if (!release.isCompleted &&
+              request.method == 'POST' &&
+              request.uri.path == '/api/settings/mutations') {
+            entered.complete();
+            await release.future;
+          }
+          return reply;
+        };
+        await _tap(tester, find.byType(ChoiceField<ReadingMode>));
+        await tester.runAsync(() async {
+          await tester.tap(find.widgetWithText(CupertinoMenuItem, '从右到左'));
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
+        expect(find.text('正在读取服务端设置'), findsNothing);
+        expect(
+          container.read(provider).snapshot!.mangaRevision,
+          originalRevision,
+        );
+        expect(container.read(provider).snapshot!.overrides!.hasMode(), false);
+        expect(
+          tester
+              .widget<ChoiceField<ReadingMode>>(
+                find.byType(ChoiceField<ReadingMode>),
+              )
+              .onChanged,
+          isNull,
+        );
+        await tester.runAsync(() async {
+          release.complete();
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pumpAndSettle();
+        expect(find.text('正在等待服务端确认设置修改'), findsNothing);
+        expect(
+          container.read(provider).snapshot!.mangaRevision,
+          originalRevision! + 1,
+        );
+        expect(
+          container.read(provider).snapshot!.overrides!.mode,
+          wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+        );
+        expect(
+          platform.businessServer.requests.where(
+            (request) =>
+                request.method == 'POST' &&
+                request.uri.path == '/api/settings/mutations',
+          ),
+          hasLength(1),
+        );
+        await _leaveReader(tester, catalog);
+        await _finish(tester, catalog);
+      },
+    );
+  }
 
   testWidgets(
     'reader choices save manga overrides, modal inheritance is per field, and AUTO survives chapter replacement and reopening',

@@ -12,14 +12,17 @@ part 'settings_controller.g.dart';
 
 enum SettingsFailure { conflict, rejected, unknown }
 
+enum SettingsActivity { reading, saving }
+
 final class const SettingsState({
   final SettingsSnapshot? snapshot,
   final SettingsDraft? pending,
   final bool available = false,
-  final bool busy = false,
+  final SettingsActivity? activity,
   final String? error,
   final SettingsFailure? failure,
 }) {
+  bool get busy => activity != null;
   bool get canEdit => available && !busy && snapshot != null && pending == null;
   bool get canRefresh => available && !busy;
   bool get canRetry => available && !busy && pending?.retryable == true;
@@ -60,7 +63,7 @@ class SettingsController extends _$SettingsController {
       }
       state = _next(
         snapshot: value,
-        busy: state.busy,
+        activity: state.activity,
         error: state.error,
         failure: state.failure,
       );
@@ -94,14 +97,14 @@ class SettingsController extends _$SettingsController {
 
   SettingsState _next({
     SettingsSnapshot? snapshot,
-    bool busy = false,
+    SettingsActivity? activity,
     String? error,
     SettingsFailure? failure,
   }) => SettingsState(
     snapshot: snapshot ?? state.snapshot,
     pending: _pending(),
     available: _current(_generation),
-    busy: busy,
+    activity: activity,
     error: error,
     failure: failure,
   );
@@ -118,7 +121,7 @@ class SettingsController extends _$SettingsController {
 
   Future<bool> refresh() async {
     if (!_current(_generation) || !state.canRefresh) return false;
-    state = _next(busy: true);
+    state = _next(activity: SettingsActivity.reading);
     final generation = _generation;
     try {
       final snapshot = mangaKey == null
@@ -179,7 +182,7 @@ class SettingsController extends _$SettingsController {
       return false;
     }
     final generation = _generation;
-    state = _next(busy: true);
+    state = _next(activity: SettingsActivity.saving);
     try {
       final snapshot = await send();
       if (!_current(generation)) return false;

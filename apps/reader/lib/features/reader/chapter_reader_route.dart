@@ -693,7 +693,9 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
             ),
           ),
         if (_settings case final settings?)
-          if (_settingsState.error != null || _settingsState.pending != null)
+          if (_settingsState.busy ||
+              _settingsState.error != null ||
+              _settingsState.pending != null)
             settings_ui.SettingsStatus(
               controller: settings,
               state: _settingsState,
