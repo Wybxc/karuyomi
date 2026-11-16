@@ -540,7 +540,15 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 2026-11-16，复核上一节正式封面JPG时确认导航与首个表单之间有大段空白。共享`EditSheet`使用`Center`，短`SingleChildScrollView`按内容高度垂直居中，读取、已确认值和选图草稿切换也改变正文起点。四项实际封面组件流程（浅/深×1x/2x）新增位置断言后均先失败：导航底为108px，正文顶为366px（1x）或318.5px（2x），分别空出258px和210.5px。原图保留为历史，不能据其称最终布局已通过。
 
-共享编辑面改用顶部水平居中排列，继续保留原640px最大阅读宽度和安全区；空分类指引与作品说明统一16px水平边距。未修改提交、取消、CAS、原请求或资源生命周期。`flutter test --no-pub --concurrency=1 test/widgets/edit_sheet_test.dart test/covers/cover_navigation_test.dart`全部14项通过，原四项流程在读取、无封面和选图草稿阶段的正文顶均与导航底相接；其余用例继续核对键盘遮挡下顶部动作、确认/丢确认、精确重试、拒绝、身份更替及迟到选图。三个改动Dart文件严格分析通过；日志为`edit-sheet-top-content-{before,after,analysis}.log`。这是组件位置和业务回归，正式Web双主题稳定画面及完整CI仍待，不新增主图计数。
+共享编辑面改用顶部水平居中排列，继续保留原640px最大阅读宽度和安全区；空分类指引与作品说明统一16px水平边距。未修改提交、取消、CAS、原请求或资源生命周期。`flutter test --no-pub --concurrency=1 test/widgets/edit_sheet_test.dart test/covers/cover_navigation_test.dart`全部14项通过，原四项流程在读取、无封面和选图草稿阶段的正文顶均与导航底相接；其余用例继续核对键盘遮挡下顶部动作、确认/丢确认、精确重试、拒绝、身份更替及迟到选图。三个改动Dart文件严格分析通过；日志为`edit-sheet-top-content-{before,after,analysis}.log`。
+
+修复提交`0e605c5743b0c30bf2c5f91c09c300760af32b2a`已通过[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43814852391)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43815059269)，包含完整检查及Web/Wasm；分支未部署。CI Web artifact `14202372551`为16,297,491字节，下载边界核对GitHub SHA-256 `42f9e78846290b6f2790c4d842d21339ad5aa8f720bb8b5fdaa0ee33db2be09d`及35条公开Flutter资源清单，再通过正式Vite入口组装既有四源快照与runtime。未在本机重编Flutter或AOT。
+
+官方Wrangler harness的`categories`夹具、临时D1、`acceptance-owner`与内置浏览器360×800完成双主题复验：无分类指引左右边距正确；无封面、已确认封面和清除草稿始终从导航下方开始排列，未再出现随内容高度变化的大段顶部留白。浅色执行选图草稿→保存确认→清除草稿→关闭取消，深色读回该封面→清除草稿→保存确认。正常主图/JPG与AX前缀为`karuyomi-0e605c5-editors-`，均已实看；浅色另有选图处理中图，深色选图、首次/替换图片草稿与手动系统取消未补验，不新增成对状态计数。
+
+`node .local/mihon-reference/verify-0e605c5-editors-evidence.ts`以生成的Protobuf模型严格解析16组六路API快照，脚本严格TypeScript检查通过，receipt为`0e605c5-editors-evidence-receipt.json`。两次初始fixture写入及两次独立API安装/收藏预置后accountRevision为4；三次已确认UI应用仅为浅色封面保存、主题保存和深色清除，最终accountRevision7、globalRevision2、作品revision3。分类查看/取消、选图/清除草稿、取消清除及关闭浏览器均无额外写入，其他作品、分类、章节进度及书签保持不变。此夹具没有请求审计，不能据版本算术外推POST尝试次数；API预置不计UI安装验收。
+
+06.K1、19.K3/K4/K7主图更新到本次正式产物，旧图保留作历史；19.K5仅补浅色候选，覆盖保持92/169。遵照新增的文件传输指引，深色复用已保存的测试封面，未再次通过浏览器传文件。临时标签已关闭、视口恢复，harness正常退出0。其余编辑面状态、全部变体及真实生产闭环仍待。
 
 ## 仍需的证据
 
