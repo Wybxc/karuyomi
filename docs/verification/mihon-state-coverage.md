@@ -1077,6 +1077,7 @@ stateDiagram-v2
     state "19.K11 身份或服务失效" as CoverExpired
     state "19.K12 已确认图片读取失败" as CoverImageError
     [*] --> CoverLoad: 打开编辑器
+    CoverLoad --> [*]: 明确关闭，迟到读取不重开
     CoverLoad --> CoverReadError: 未取得快照
     CoverReadError --> CoverLoad: 明确重新读取
     CoverLoad --> CoverNone: 确认未设置封面
@@ -1106,32 +1107,36 @@ stateDiagram-v2
     CoverUnknown --> CoverExpired: 身份或服务变化
     CoverExpired --> [*]: 关闭并丢弃迟到结果
     note right of CoverReady
-        K3/K4/K6/K7正常双主题主图已取得
-        K5仅非法输入变体已有主图
-        等待、故障与其余变体继续待验
+        a9d880a补齐K1/K2/K8/K9/K10/K12双主题主图
+        K8只验清除，浅色首次挂起未完整释放
+        K5深色处理中、K11及其余变体继续待验
     end note
+    classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    class CoverLoad,CoverReadError,CoverNone,CoverReady,CoverReplace,CoverClear,CoverSave,CoverUnknown,CoverRejected,CoverImageError paired
 ```
 
-| 状态 ID | 最小必要信息与操作边界                                                                          | 浅色                                                     | 深色                                                    |
-| ------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
-| 19.K1   | 正在读取服务端封面、进度、编辑禁用；未取得快照时不显示已确认                                    | 待                                                       | 待                                                      |
-| 19.K2   | 未取得服务端快照、读取失败原因、明确重读与关闭；不显示永不结束的加载文字                        | 待                                                       | 待                                                      |
-| 19.K3   | 已确认未设置自定义封面、选择图片和关闭；不把占位图当作已保存图片                                | `karuyomi-0e605c5-editors-cover-none-light.jpg`          | `karuyomi-0e605c5-editors-cover-none-dark.jpg`          |
-| 19.K4   | 已确认的当前封面、替换和清除入口；清除用系统危险色，最终提交须由保存触发                        | `karuyomi-0e605c5-editors-cover-confirmed-light.jpg`     | `karuyomi-0e605c5-editors-cover-confirmed-dark.jpg`     |
-| 19.K5   | 原已确认封面、选图处理中、编辑禁用；取消保持原值，非法/读取失败保留可修正原因，身份变化另转失效 | `karuyomi-0e605c5-editors-cover-picking-light.jpg`       | 待                                                      |
-| 19.K6   | 已确认封面与待保存图片分区、仅当前会话保留、明确保存或关闭；选图本身零上传                      | `karuyomi-c5f6759-cover-{draft,replace-draft}-light.jpg` | `karuyomi-c5f6759-cover-{draft,replace-draft}-dark.jpg` |
-| 19.K7   | 当前封面、待清除提示、明确保存或关闭；清除草稿不先修改远端                                      | `karuyomi-0e605c5-editors-cover-clear-draft-light.jpg`   | `karuyomi-0e605c5-editors-cover-clear-draft-dark.jpg`   |
-| 19.K8   | 原确认值、正在提交的原修改、等待确认、动作禁用；不能提前显示已保存，替换/清除分别验             | 待                                                       | 待                                                      |
-| 19.K9   | 尚未确认及原草稿、精确重试、稍后处理；重开/重取失败时仍保留原命令，不能换图覆盖                 | 待                                                       | 待                                                      |
-| 19.K10  | 冲突或拒绝原因、原确认值、明确重读；禁用提交与重试，重取失败仍保留错误及原确认快照              | 待                                                       | 待                                                      |
-| 19.K11  | 编辑已停用及关闭入口、旧操作结果不再应用；加载/选图/保存/待确认阶段分别触发并丢弃迟到结果       | 待                                                       | 待                                                      |
-| 19.K12  | 已确认封面记录保持、图片未能读取、重试同一资源；字节失败不得触发上传或清除记录                  | 待                                                       | 待                                                      |
+| 状态 ID | 最小必要信息与操作边界                                                                          | 浅色                                                       | 深色                                                      |
+| ------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
+| 19.K1   | 正在读取服务端封面、进度、编辑禁用、允许关闭；未取得快照时不显示已确认                          | `karuyomi-a9d880a-cover-k1-light.jpg`                      | `karuyomi-a9d880a-cover-k1-dark.jpg`                      |
+| 19.K2   | 未取得服务端快照、读取失败原因、明确重读与关闭；不显示永不结束的加载文字                        | `karuyomi-a9d880a-cover-k2-light.jpg`                      | `karuyomi-a9d880a-cover-k2-dark.jpg`                      |
+| 19.K3   | 已确认未设置自定义封面、选择图片和关闭；不把占位图当作已保存图片                                | `karuyomi-0e605c5-editors-cover-none-light.jpg`            | `karuyomi-0e605c5-editors-cover-none-dark.jpg`            |
+| 19.K4   | 已确认的当前封面、替换和清除入口；清除用系统危险色，最终提交须由保存触发                        | `karuyomi-0e605c5-editors-cover-confirmed-light.jpg`       | `karuyomi-0e605c5-editors-cover-confirmed-dark.jpg`       |
+| 19.K5   | 原已确认封面、选图处理中、编辑禁用；取消保持原值，非法/读取失败保留可修正原因，身份变化另转失效 | `karuyomi-0e605c5-editors-cover-picking-light.jpg`         | 待                                                        |
+| 19.K6   | 已确认封面与待保存图片分区、仅当前会话保留、明确保存或关闭；选图本身零上传                      | `karuyomi-c5f6759-cover-{draft,replace-draft}-light.jpg`   | `karuyomi-c5f6759-cover-{draft,replace-draft}-dark.jpg`   |
+| 19.K7   | 当前封面、待清除提示、明确保存或关闭；清除草稿不先修改远端                                      | `karuyomi-0e605c5-editors-cover-clear-draft-light.jpg`     | `karuyomi-0e605c5-editors-cover-clear-draft-dark.jpg`     |
+| 19.K8   | 原确认值、正在提交的原修改、等待确认、动作禁用；不能提前显示已保存，替换/清除分别验             | `karuyomi-a9d880a-cover-k8-light.jpg`，清除                | `karuyomi-a9d880a-cover-k8-dark.jpg`，清除                |
+| 19.K9   | 尚未确认及原草稿、精确重试、稍后处理；重开/重取失败时仍保留原命令，不能换图覆盖                 | `karuyomi-a9d880a-cover-k9-light.jpg`                      | `karuyomi-a9d880a-cover-k9-dark.jpg`                      |
+| 19.K10  | 冲突或拒绝原因、原确认值、明确重读；禁用提交与重试，重取失败仍保留错误及原确认快照              | `karuyomi-a9d880a-cover-k10-light.jpg`，拒绝；真实冲突另图 | `karuyomi-a9d880a-cover-k10-dark.jpg`，拒绝；真实冲突另图 |
+| 19.K11  | 编辑已停用及关闭入口、旧操作结果不再应用；加载/选图/保存/待确认阶段分别触发并丢弃迟到结果       | 待                                                         | 待                                                        |
+| 19.K12  | 已确认封面记录保持、图片未能读取、重试同一资源；字节失败不得触发上传或清除记录                  | `karuyomi-a9d880a-cover-k12-light.jpg`                     | `karuyomi-a9d880a-cover-k12-dark.jpg`                     |
 
 19.K1/K2与已确认快照、替换/清除草稿、等待确认的最小信息按当前业务边界验收。关闭未提交草稿不承诺跨会话恢复；19.K9的原请求由当前业务会话保留，重开和读取失败作为该节点变体单列。图中失效箭头仅列主要异步入口，已确认/草稿/拒绝状态同样必须验证身份变化，不能用一条箭头替代全部触发阶段。未填主图的节点仍为目标清单，不是通过证据。
 
 K5非法图片变体为`karuyomi-c5f6759-cover-invalid-{light,dark}.jpg`，等待和手动系统取消仍待。正常转换已实测两主题的首次选图→草稿→确认、替换→草稿→确认、清除草稿→关闭→重开旧封面及再次清除→确认无封面；六次提交分别仅推进一次账户/作品revision，草稿、取消及重开零附写。最终accountRevision9、作品revision7，浅色另在新文档读回无封面。浅色清除的首张缺标题/底部动作帧保留为`cover-cleared-light-incomplete.jpg`且排除主图，后续新文档图完整；不把重拍计作全部转场通过。详细输入、边界与独立API见[本轮分项](mihon-cupertino-fidelity.md#封面与选择语义的正式-web-分项)。
 
 `0e605c5`更新K3/K4/K7双主题主图，短表单从顶部导航下方开始排列；浅色另复验选图草稿与取消清除，深色复用已保存图片后明确清除。16组六路快照确认三次UI应用及其它区间零附写；此轮未提供请求审计。K5只补浅色处理中，深色仍待，不增加成对计数；K6及其它历史变体保留原版本，全部故障和当前版深色选图未外推通过，见[导航起点修复](mihon-cupertino-fidelity.md#短编辑内容的导航起点修复)。
+
+`a9d880a`正式Web新增K1/K2/K8/K9/K10/K12六对主图，三张`a9d880a-cover-{reading,save,errors}-pairs.jpg`已实看；深色K1首次转场图另存并排除。两主题均实际关闭读取中的窗口，释放迟到结果后未重开；读取失败后明确重读，结果未知下关闭/重开及再次读取失败仍可精确重试。真实409与冲突后读取失败另存`cover-{conflict,conflict-read-failed}-{light,dark}.jpg`；图片503后重试同一资源恢复，权威记录不变。32组六路API快照与154条审计核对四次UI清除各应用一次、两次丢确认精确重试、两次真实409及两次明确400；API预置不计UI选图。浅色首次等待有主图，但审计sequence20未完成，不计正常释放成功；其原正文重试未重复应用，深色挂起正常释放。明确拒绝状态的辅助说明仍提到重试，保留为待修文案；全部变体与K11继续待，详见[正式故障复验](mihon-cupertino-fidelity.md#封面故障状态的正式-web-复验)。
 
 ### 20–21：Karuyomi 迁移向导的目标状态
 
