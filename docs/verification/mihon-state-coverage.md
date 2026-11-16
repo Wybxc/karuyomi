@@ -1265,7 +1265,8 @@ stateDiagram-v2
     note right of ReadingOverrides
       状态来自正式控制器与编辑器
       浅深主题、字号和所有转换分别验
-      正式 Web 主图均待取得
+      bcac704 的 K1–K10 双主题主图已核对
+      K11、全部变体与转换分别待验
     end note
     ReadingOverrides --> InitialSettingsError: 首次读取失败
     ReadingOverrides --> [*]: 关闭，不提交
@@ -1303,25 +1304,29 @@ stateDiagram-v2
     SavingOverrides --> UnavailableOverrides: 身份或服务变化，丢弃迟到结果
     UnknownOverrides --> UnavailableOverrides: 身份或服务变化
     UnavailableOverrides --> [*]: 关闭后恢复连接并重新打开
+    classDef paired fill:#dbeafe,color:#172554,stroke:#2563eb
+    class ReadingOverrides,InitialSettingsError,ConfirmedOverrides,DraftOverrides,SavingOverrides,UnknownOverrides,ConflictingOverrides,RejectedOverrides,ReloadingOverrides,SettingsReloadError paired
 ```
 
-| 状态 ID | 最小必要信息与操作边界                                                       | 浅色正式Web | 深色正式Web |
-| ------- | ---------------------------------------------------------------------------- | ----------- | ----------- |
-| 24.K1   | 本漫画范围、明确读取进度、无已确认提示、编辑与保存不可用、关闭               | 待          | 待          |
-| 24.K2   | 本漫画范围、读取失败、明确重新读取与关闭；无连接误报或假确认                 | 待          | 待          |
-| 24.K3   | 本漫画范围、各字段继承/显式值、已确认状态、修改与重读                        | 待          | 待          |
-| 24.K4   | 原字段与当前草稿、尚未保存、明确保存和关闭；关闭零写入                       | 待          | 待          |
-| 24.K5   | 本漫画范围、正在提交的设置、等待服务端确认、编辑/重复保存/关闭禁用           | 待          | 待          |
-| 24.K6   | 原提交值、结果未确认、同一命令重试、只读重取；不能改值或误报成功             | 待          | 待          |
-| 24.K7   | 原草稿、具体版本冲突、重读入口、禁止重试新版本；重读成功前冻结               | 待          | 待          |
-| 24.K8   | 原草稿、明确拒绝、重读入口、原命令不可重试；与未知结果分开                   | 待          | 待          |
-| 24.K9   | 明确读取进度、保留的原值/草稿/未知原命令、禁用重复动作、允许关闭；只读零提交 | 待          | 待          |
-| 24.K10  | 读取错误与原值、原未知命令仍保留、对应重读/精确重试/关闭；失败不撤回确认     | 待          | 待          |
-| 24.K11  | 连接与身份确认要求、隐藏旧字段和旧确认、禁止旧动作、明确关闭                 | 待          | 待          |
+| 状态 ID | 最小必要信息与操作边界                                                       | 浅色正式Web                               | 深色正式Web                              |
+| ------- | ---------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
+| 24.K1   | 本漫画范围、明确读取进度、无已确认提示、编辑与保存不可用、关闭               | `karuyomi-bcac704-settings-k1-light.jpg`  | `karuyomi-bcac704-settings-k1-dark.jpg`  |
+| 24.K2   | 本漫画范围、读取失败、明确重新读取与关闭；无连接误报或假确认                 | `karuyomi-bcac704-settings-k2-light.jpg`  | `karuyomi-bcac704-settings-k2-dark.jpg`  |
+| 24.K3   | 本漫画范围、各字段继承/显式值、已确认状态、修改与重读                        | `karuyomi-bcac704-settings-k3-light.jpg`  | `karuyomi-bcac704-settings-k3-dark.jpg`  |
+| 24.K4   | 原字段与当前草稿、尚未保存、明确保存和关闭；关闭零写入                       | `karuyomi-bcac704-settings-k4-light.jpg`  | `karuyomi-bcac704-settings-k4-dark.jpg`  |
+| 24.K5   | 本漫画范围、正在提交的设置、等待服务端确认、编辑/重复保存/关闭禁用           | `karuyomi-bcac704-settings-k5-light.jpg`  | `karuyomi-bcac704-settings-k5-dark.jpg`  |
+| 24.K6   | 原提交值、结果未确认、同一命令重试、只读重取；不能改值或误报成功             | `karuyomi-bcac704-settings-k6-light.jpg`  | `karuyomi-bcac704-settings-k6-dark.jpg`  |
+| 24.K7   | 原草稿、具体版本冲突、重读入口、禁止重试新版本；重读成功前冻结               | `karuyomi-bcac704-settings-k7-light.jpg`  | `karuyomi-bcac704-settings-k7-dark.jpg`  |
+| 24.K8   | 原草稿、明确拒绝、重读入口、原命令不可重试；与未知结果分开                   | `karuyomi-bcac704-settings-k8-light.jpg`  | `karuyomi-bcac704-settings-k8-dark.jpg`  |
+| 24.K9   | 明确读取进度、保留的原值/草稿/未知原命令、禁用重复动作、允许关闭；只读零提交 | `karuyomi-bcac704-settings-k9-light.jpg`  | `karuyomi-bcac704-settings-k9-dark.jpg`  |
+| 24.K10  | 读取错误与原值、原未知命令仍保留、对应重读/精确重试/关闭；失败不撤回确认     | `karuyomi-bcac704-settings-k10-light.jpg` | `karuyomi-bcac704-settings-k10-dark.jpg` |
+| 24.K11  | 连接与身份确认要求、隐藏旧字段和旧确认、禁止旧动作、明确关闭                 | 待                                        | 待                                       |
 
-各确认/草稿/故障状态的身份变化均须分别验收，图中只列主要异步入口。初次无身份与旧身份失效是K11的不同触发变体；读取时关闭、重开未知原命令、明确拒绝、所有字段类型、键盘和减少动态仍分别跟踪。表中留空的是正式Web双主题主图，已有控制器或组件证据不能填入。
+各确认/草稿/故障状态的身份变化均须分别验收，图中只列主要异步入口。初次无身份与旧身份失效是K11的不同触发变体；所有字段类型、键盘和减少动态仍分别跟踪。表中已有的是指定版本的主状态截图，不能外推全部变体或转换，留空处不能用控制器或组件证据填入。
 
-`42bc9bb`已执行浅色正式Web故障流程与七路独立D1审计，保留等待、未知、重读、冲突、拒绝及身份失效图；首次读取过渡帧、hold-read超时和草稿旧字段帧均单列，见[分项证据](mihon-cupertino-fidelity.md#正式-web-浅色故障流程与关闭反馈修复)。实拍暴露读取关闭与长表单反馈缺口，浅/深×1x/2x八项组件流程修复后通过，54项相关回归通过；正式Web双主题须在新修复版本重验，因此本表继续留空，不增加主图完成数。
+`bcac704`的K1–K10主图及三张联系表已逐图实看；浅色K3初始为全继承，深色K3为浅色流程已经确认的覆盖值，不冒充同数据的像素叠图。两主题分别执行首次读取关闭、草稿关闭、保存等待、丢确认、失败重读、挂起重读关闭、重开精确重试、真实409恢复及明确拒绝。81条审计无超时或未完成门，18组七路快照确认两次精确重试不重复应用、草稿关闭零写入、冲突/拒绝零覆盖。K11的旧图仍以`settings-k11-{light,dark}.jpg`收存：浅色缺完整导航，深色失效后按当前实现回到系统浅色；不填本表主图。源收藏等待、全局保存等待和阅读工具提示仅取得实际执行的分项，完整共享状态及其余8处编辑面仍待，详见[分项复验](mihon-cupertino-fidelity.md#顶部导航正式-web-的设置状态复验)。
+
+`42bc9bb`已执行浅色正式Web故障流程与七路独立D1审计，保留等待、未知、重读、冲突、拒绝及身份失效图；首次读取过渡帧、hold-read超时和草稿旧字段帧均单列，见[分项证据](mihon-cupertino-fidelity.md#正式-web-浅色故障流程与关闭反馈修复)。实拍暴露读取关闭与长表单反馈缺口，浅/深×1x/2x八项组件流程修复后通过，54项相关回归通过；这些历史证据当时未填主图，现仅以上述`bcac704`稳定画面填写K1–K10。
 
 ### 26：Karuyomi 最终 Cupertino 设置导航
 

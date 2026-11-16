@@ -493,7 +493,25 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 最近的正式版本`f015956`已通过[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43794985695)和[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43794994599)，包含Web/Wasm，分支未部署。该版隔离正式Web补得浅色完整设置故障流程和深色读取关闭、等待、未知重开、精确重试、真实409及重读；共74条原始设置审计保存在`karuyomi-f015956-settings-harness.log`，独立API快照与JPG/AX以`karuyomi-f015956-settings-`为前缀。初始挂起门超时记录保留；深色拒绝/失效、逐图复核和快照汇总未完成，不填最终主图。为避免继续验收即将替换的布局，已收存证据、恢复视口并关闭临时标签，harness正常退出。
 
-顶部导航的完整CI、正式Web双主题画面和全状态验收仍待；上述组件与中间版本行为证据不代替新导航渲染、真实Access或生产读写。原始日志不提交，用户的pnpm锁文件保持原样且不纳入本次提交。
+顶部导航提交`bcac70481a7d7cd8a7cc0c80d66090a8d21a98e6`已通过[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43800842514)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43800848771)，包含完整检查和Web/Wasm。正式Web分项如下；全部编辑面、真实Access和生产读写仍待。原始日志不提交，用户的pnpm锁文件保持原样且不纳入本次提交。
+
+## 顶部导航正式 Web 的设置状态复验
+
+2026-11-16，复用`bcac704`的CI Web artifact `14195694580`（16,297,509字节，下载边界核对GitHub SHA-256 `20b479a149d2e331a4c75afe058e5d1da5e41dce01e4415913cc105fbcf20c97`），再核对39条Flutter资源清单。通过正式Vite入口组装既有xkcd/Komiic扩展快照与runtime，官方Wrangler harness的`settings-ui`夹具、临时D1和内置浏览器360×800执行；未本机重编Flutter或AOT。真实源为xkcd英文，指定3323章Meteor Fear的2页中第1页。
+
+24.K1–K10各取得浅/深主图，文件为`karuyomi-bcac704-settings-k{1..10}-{light,dark}.jpg`，同名TXT保留AX；三张`karuyomi-bcac704-settings-paired-{1,2,3}.png`已逐图实看。导航标题及关闭/保存保持顶部，读取、确认、草稿、未知、冲突、拒绝与后续读取错误分别呈现，反馈固定在长表单上方。浅色初始全继承，深色继承前一流程的已确认覆盖值；只计状态与颜色角色，不计同数据像素叠图。
+
+两主题分别执行首次读取失败→挂起重读→关闭→迟到响应、草稿→关闭、保存等待→确认、实际写入后丢确认→失败重读→挂起重读关闭→重开原命令→精确重试、独立第二客户端修改→真实409→只读恢复、合法ProtoJSON明确拒绝及401 HTML失效。深色等待确认时另实际点按关闭，编辑器保持打开；关闭读取后迟到响应均未重新导航。401、503及提交交付502为隔离故障注入，不是生产Access或生产故障证据。
+
+`karuyomi-bcac704-settings-harness.log`保存81条请求审计，18组API快照各核对global/manga settings、library、categories、state、progress与bookmarks；复验脚本为`node .local/mihon-reference/verify-bcac704-settings-evidence.ts`。结果：
+
+- 浅色账户revision为3→4→5→6，漫画0→1→2→3；深色账户8→9→10→11，漫画3→4→5→6。各主题内global设置及其它五路业务数据保持不变，只有明确漫画命令推进版本。
+- 共12次漫画设置POST，其中4次UI明确成功写入、2次第二客户端写入、2次原命令精确重试、2次409和2次400；两次重试的请求正文/UUID与各自丢确认原命令完全相同，全部七路快照不变。冲突及拒绝后的快照与远端获胜快照完全相同，草稿取消前后也完全相同。
+- 四次挂起读取全部正常释放，无超时或未完成审计。其余3次global写入是明确安装、主题保存及源收藏。全局浅色等待、确认后深色、深色源收藏等待及双主题阅读工具不可用/待确认提示只计这些实际分项，不外推共享控件全部状态。
+
+24.K11的两个旧画面保留但不填通过：浅色截图缺完整导航，深色失效时应用因已确认账户不可用而跟随系统浅色（`main.dart`按`state.available`取主题），需补稳定帧及系统深色外观。AX已确认旧字段、旧确认和保存入口隐藏，独立快照确认失效区间零写入；这些行为结果不代替完整双主题画面。其余8处EditSheet正式Web、各阶段身份变化、所有字段/字号/键盘/减少动态变体与生产闭环仍待。
+
+本轮新增10对主图，Karuyomi跨版本已登记主图从79增至89/169；该计数不代表最新HEAD的全范围验收。临时标签已关闭、视口已恢复，harness正常退出0；没有新增真机或真实生产Access结论。
 
 ## 仍需的证据
 
