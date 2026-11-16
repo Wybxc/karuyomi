@@ -706,7 +706,7 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
               if (draft.categories case final categories?) ...[
                 if (categories.isEmpty)
                   const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                    padding: EdgeInsets.all(16),
                     child: Text('还没有分类，请先在书架中管理分类。'),
                   ),
                 if (categories.isNotEmpty)

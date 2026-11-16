@@ -165,11 +165,29 @@ void main() {
             if (!readGate.isCompleted) readGate.complete();
           });
           Finder control(String key) => find.byKey(ValueKey(key));
+          void expectContentBelowNavigation() {
+            final editor = control('cover-editor');
+            final navigation = find.descendant(
+              of: editor,
+              matching: find.byType(CupertinoNavigationBar),
+            );
+            final scroll = find.descendant(
+              of: editor,
+              matching: find.byType(SingleChildScrollView),
+            );
+            expect(
+              tester.getTopLeft(scroll).dy,
+              closeTo(tester.getBottomLeft(navigation).dy, 1),
+              reason: 'Short cover content must start below the navigation.',
+            );
+          }
+
           await _tap(tester, control('custom-cover-editor'), settle: false);
           await tester.pump(const Duration(milliseconds: 500));
           expect(control('cover-editor'), findsOneWidget);
           expect(find.text('服务端已确认'), findsNothing);
           expect(find.text('正在读取封面'), findsOneWidget);
+          expectContentBelowNavigation();
           expect(
             tester
                 .widget<CupertinoButton>(control('cover-select-image'))
@@ -202,6 +220,7 @@ void main() {
           expect(find.text('未设置自定义封面'), findsOneWidget);
           expect(find.byType(CupertinoFormSection), findsWidgets);
           expect(control('cover-error'), findsNothing);
+          expectContentBelowNavigation();
           picker.files.add(null);
           await _tap(tester, control('cover-select-image'));
           expect(control('cover-save'), findsNothing);
@@ -233,6 +252,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.text('待保存的修改'), findsOneWidget);
           expect(transport.uploads, isEmpty);
+          expectContentBelowNavigation();
           final saveGate = Completer<void>();
           addTearDown(() {
             if (!saveGate.isCompleted) saveGate.complete();

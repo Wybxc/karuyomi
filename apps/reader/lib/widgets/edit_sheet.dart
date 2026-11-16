@@ -18,7 +18,8 @@ class const EditSheet({
       trailing: trailing,
     ),
     child: SafeArea(
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: content,
