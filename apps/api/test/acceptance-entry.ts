@@ -28,7 +28,7 @@ import {
   shouldObserveProgressD1Error,
   withProgressD1Error,
 } from './acceptance-progress-d1-error.ts';
-import { withSettingsUi } from './acceptance-settings-ui.ts';
+import { withEditorUi } from './acceptance-editor-ui.ts';
 
 export { RuntimeSession } from '../src/runtime-session.js';
 
@@ -41,7 +41,7 @@ export interface AcceptanceBindings extends Bindings {
   ACCEPTANCE_PROGRESS_CAS_RACE?: '1';
   ACCEPTANCE_PROGRESS_D1_ERROR?: '1';
   ACCEPTANCE_BRIDGE_ERROR_URL?: string;
-  ACCEPTANCE_SETTINGS_UI?: '1';
+  ACCEPTANCE_EDITOR_UI?: '1';
 }
 
 export default {
@@ -127,8 +127,8 @@ export default {
             )
           : dispatch();
       const response =
-        env.ACCEPTANCE_SETTINGS_UI === '1'
-          ? await withSettingsUi(
+        env.ACCEPTANCE_EDITOR_UI === '1'
+          ? await withEditorUi(
               forwarded,
               env.DB,
               env.APP_ORIGIN,

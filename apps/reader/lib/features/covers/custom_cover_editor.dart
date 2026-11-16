@@ -57,6 +57,8 @@ class _CoverEditorState extends State<_CoverEditor> {
   bool _blocked = false;
   bool _expired = false;
   String? _error;
+  bool get _canClose =>
+      _expired || _operation == null || _operation == _CoverOperation.load;
   CoverDraft? get _pending => widget.repository.pending(widget.mangaKey);
   bool get _current {
     _checkCurrent();
@@ -197,7 +199,7 @@ class _CoverEditorState extends State<_CoverEditor> {
   }
 
   void _close() {
-    if ((!_expired && _busy) || ModalRoute.of(context)?.isCurrent != true) {
+    if (!_canClose || ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
     Navigator.pop(context, _saved);
@@ -229,7 +231,7 @@ class _CoverEditorState extends State<_CoverEditor> {
         title: const Text('自定义封面'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: !_expired && _busy ? null : _close,
+          onPressed: _canClose ? _close : null,
           child: Text(
             pending != null ? '稍后' : '关闭',
             semanticsLabel: pending != null ? '稍后处理' : null,

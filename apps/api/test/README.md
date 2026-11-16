@@ -38,3 +38,7 @@ Wrangler 只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker�
 `ACCEPTANCE_FIXTURE=progress-cas-race` 使用独立 D1 和当前英文 xkcd 的 `SINGLE`、`/3319/`。先用正式客户端把两个 Reader 准备到同一已保存且未完成的第 2 页、相同清单与写入基线。一个点「读完本章」，另一个点「重新阅读本章」。普通翻页不会占用名额；只有同基线、不同 UUID 的这两个意图能占满两个槽。第一条最多等待 15 秒；两条正式请求进入 Worker 后，最多再等待 5 秒以确认两边都已通过前置校验并到达 D1 原子批次。夹具原样提交业务批次，缺少任一请求则不会提交本轮批次。
 
 正常停服输出 `ACCEPTANCE_PROGRESS_RACE_AUDIT`。要求两个 Worker 处理时段重叠，两条都到达原子批次；一个 HTTP 200 有持久回执，另一个 HTTP 409 为 revision 冲突且无回执；两条返回同一权威状态，独立只读确认账户和作品 revision 只各增加 1。双 Reader 的保持画面、冲突提示和明确重开另由正式 UI 验收；Workers 回归只验证 API 和 D1。
+
+`ACCEPTANCE_FIXTURE=editor-ui pnpm acceptance:serve` 为设置与封面编辑状态提供隔离故障控制。仅通过进程 stdin 输入 `editor <mode> [manga|global|cover]`，没有 HTTP 控制入口；`manga`、`global` 对应阅读设置，`cover` 对应作品快照、JSON 清除封面及私有图片读取。图片预置通过正式 multipart API，上传路径本身不注入故障，也不把图片字节存入审计。
+
+模式为 `pass`、`hold-read`、`fail-read`、`fail-image`、`hold-confirm`、`lose-confirm`、`reject-save`、`login-required`。`hold-confirm` 先等待真实 D1 提交，再暂停回执交付；`lose-confirm` 仅在成功提交后返回502。挂起最多30秒，以新的控制命令推进 generation 释放；取消会退出等待，未释放超时不记成功。`fail-image` 仅对私有图片字节返回503，作品记录保持真实。用 `audit` 查看最多256条请求正文/状态审计，`stop` 正常停服并输出 `ACCEPTANCE_EDITOR_UI_AUDIT`。此入口替代先前仅设置的夹具，生产入口与配置不包含测试控制。

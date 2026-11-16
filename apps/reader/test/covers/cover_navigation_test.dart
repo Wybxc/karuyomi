@@ -116,6 +116,79 @@ void main() {
   for (final brightness in Brightness.values) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
+        'cover reads can be closed before a late reply in $brightness at ${scale}x',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final server = TestBusinessServer();
+          final platform = TestPlatform(businessServer: server)
+            ..covers = TestCoverTransport(server);
+          final controller = await _details(tester, platform);
+          final sourceCalls = platform.invocations.length;
+          final writes = server.appliedMutations;
+          final mangaKey = ChapterSequence(
+            packageName: 'eu.kanade.source.test',
+            sourceId: sourceId,
+            mangaUrl: testManga.url,
+            chapters: const [],
+          ).mangaKey;
+          final readGate = Completer<void>();
+          addTearDown(() {
+            if (!readGate.isCompleted) readGate.complete();
+          });
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == '/api/state/manga/$mangaKey') {
+              await readGate.future;
+            }
+          };
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('custom-cover-editor')),
+            settle: false,
+          );
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(find.byKey(const ValueKey('cover-editor')), findsOneWidget);
+          expect(find.text('正在读取封面'), findsOneWidget);
+          final close = find.widgetWithText(CupertinoButton, '关闭');
+          expect(
+            tester.widget<CupertinoButton>(close).onPressed,
+            isNotNull,
+            reason: 'A read must not trap the user in the editor.',
+          );
+          expect(ModalRoute.of(tester.element(close))?.isCurrent, isTrue);
+          await tester.tap(close);
+          await tester.pumpAndSettle(
+            const Duration(milliseconds: 100),
+            EnginePhase.sendSemanticsUpdate,
+            const Duration(seconds: 3),
+          );
+          expect(find.byKey(const ValueKey('cover-editor')), findsNothing);
+          readGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('cover-editor')), findsNothing);
+          expect(find.byType(MangaDetailsPage), findsOneWidget);
+          expect(platform.invocations.length, sourceCalls);
+          expect(server.appliedMutations, writes);
+          await _finish(tester, controller);
+        },
+      );
+    }
+  }
+
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
         'cover states separate reads, drafts and server confirmation in $brightness at ${scale}x',
         (tester) async {
           tester.view.physicalSize = const Size(360, 800);
@@ -243,6 +316,14 @@ void main() {
           picker.waiting = pickGate;
           await _tap(tester, control('cover-select-image'), settle: false);
           expect(find.text('正在读取所选图片'), findsOneWidget);
+          expect(
+            tester
+                .widget<CupertinoButton>(
+                  find.widgetWithText(CupertinoButton, '关闭'),
+                )
+                .onPressed,
+            isNull,
+          );
           expect(server.appliedMutations, writes);
           pickGate.complete(_imageFile());
           picker.waiting = null;
@@ -261,6 +342,14 @@ void main() {
           server.loseNextResponse = true;
           await _tap(tester, control('cover-save'), settle: false);
           expect(find.text('正在等待服务端确认'), findsOneWidget);
+          expect(
+            tester
+                .widget<CupertinoButton>(
+                  find.widgetWithText(CupertinoButton, '稍后'),
+                )
+                .onPressed,
+            isNull,
+          );
           expect(find.text('服务端已确认'), findsNothing);
           expect(find.text('上次服务端确认'), findsOneWidget);
           expect(find.text('尚未确认的修改'), findsOneWidget);

@@ -36,10 +36,10 @@ import {
   progressD1ErrorAttempts,
 } from './acceptance-progress-d1-error.ts';
 import {
-  prepareSettingsUi,
-  setSettingsUiMode,
-  settingsUiAttempts,
-} from './acceptance-settings-ui.ts';
+  prepareEditorUi,
+  setEditorUiMode,
+  editorUiAttempts,
+} from './acceptance-editor-ui.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -66,7 +66,7 @@ if (nextConfigPath && fixture !== '') {
 }
 const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const settingsRace = fixture === 'settings-cas-race';
-const settingsUi = fixture === 'settings-ui';
+const editorUi = fixture === 'editor-ui';
 const progressRace = fixture === 'progress-cas-race';
 const progressD1Error = fixture === 'progress-d1-error';
 const bridgeError =
@@ -85,7 +85,7 @@ const options = (
         APP_ORIGIN: publicOrigin,
         ...(ackLoss ? { ACCEPTANCE_ACK_LOSS: ackLoss } : {}),
         ...(settingsRace ? { ACCEPTANCE_SETTINGS_CAS_RACE: '1' } : {}),
-        ...(settingsUi ? { ACCEPTANCE_SETTINGS_UI: '1' } : {}),
+        ...(editorUi ? { ACCEPTANCE_EDITOR_UI: '1' } : {}),
         ...(progressRace ? { ACCEPTANCE_PROGRESS_CAS_RACE: '1' } : {}),
         ...(progressD1Error ? { ACCEPTANCE_PROGRESS_D1_ERROR: '1' } : {}),
         ...(bridgeError ? { ACCEPTANCE_BRIDGE_ERROR_URL: bridgeError } : {}),
@@ -107,7 +107,7 @@ process.once('SIGINT', requestStop);
 process.once('SIGTERM', requestStop);
 process.stdin.once('end', requestStop);
 const commands =
-  nextConfigPath || settingsUi
+  nextConfigPath || editorUi
     ? createInterface({ input: process.stdin })
     : undefined;
 if (commands) {
@@ -120,20 +120,20 @@ if (commands) {
 }
 
 let fixtureAuditDb: D1Database | undefined;
-let settingsUiCommands = Promise.resolve();
+let editorUiCommands = Promise.resolve();
 try {
   if (
     fixture !== '' &&
     fixture !== 'categories' &&
     !ackLoss &&
     !settingsRace &&
-    !settingsUi &&
+    !editorUi &&
     !progressRace &&
     !progressD1Error &&
     !bridgeError
   ) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, bookmark-ack-loss, settings-cas-race, settings-ui, progress-cas-race, progress-d1-error, bridge-once-error or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, bookmark-ack-loss, settings-cas-race, editor-ui, progress-cas-race, progress-d1-error, bridge-once-error or empty',
     );
   }
   const { url } = await server.listen();
@@ -154,7 +154,7 @@ try {
     !stopRequested &&
     (ackLoss ||
       settingsRace ||
-      settingsUi ||
+      editorUi ||
       progressRace ||
       progressD1Error ||
       bridgeError)
@@ -162,36 +162,34 @@ try {
     const db = (await worker.getEnv()).DB;
     if (ackLoss) await prepareAckLoss(db);
     else if (settingsRace) await prepareSettingsRace(db);
-    else if (settingsUi) await prepareSettingsUi(db);
+    else if (editorUi) await prepareEditorUi(db);
     else if (progressRace) await prepareProgressRace(db);
     else if (progressD1Error) await prepareProgressD1Error(db);
     else await prepareBridgeError(db);
     fixtureAuditDb = db;
   }
-  if (settingsUi && commands && fixtureAuditDb) {
+  if (editorUi && commands && fixtureAuditDb) {
     const db = fixtureAuditDb;
     commands.on('line', (line) => {
-      settingsUiCommands = settingsUiCommands
+      editorUiCommands = editorUiCommands
         .then(async () => {
           if (line === 'audit') {
             console.log(
-              'ACCEPTANCE_SETTINGS_UI_AUDIT=' +
-                JSON.stringify(await settingsUiAttempts(db)),
+              'ACCEPTANCE_EDITOR_UI_AUDIT=' +
+                JSON.stringify(await editorUiAttempts(db)),
             );
-          } else if (line.startsWith('settings ')) {
+          } else if (line.startsWith('editor ')) {
             const [, mode, scope = 'manga'] = line.split(' ');
-            if (!mode) throw new Error('Settings UI mode is required');
+            if (!mode) throw new Error('Editor UI mode is required');
             console.log(
-              'ACCEPTANCE_SETTINGS_UI_CONTROL=' +
-                JSON.stringify(await setSettingsUiMode(db, mode, scope)),
+              'ACCEPTANCE_EDITOR_UI_CONTROL=' +
+                JSON.stringify(await setEditorUiMode(db, mode, scope)),
             );
           }
         })
         .catch((error) =>
           console.error(
-            error instanceof Error
-              ? error.message
-              : 'Settings UI command failed',
+            error instanceof Error ? error.message : 'Editor UI command failed',
           ),
         );
     });
@@ -236,9 +234,9 @@ try {
         }
         if (!stopRequested) console.log('ACCEPTANCE_SWITCH=switched');
       }
-    } else if (settingsUi) {
+    } else if (editorUi) {
       console.log(
-        'Use settings <mode> [manga|global] to control faults, audit to inspect exact requests, or stop to close the server.',
+        'Use editor <mode> [manga|global|cover] to control faults, audit to inspect exact requests, or stop to close the server.',
       );
     } else {
       console.log(
@@ -249,7 +247,7 @@ try {
   }
 } finally {
   commands?.close();
-  await settingsUiCommands;
+  await editorUiCommands;
   process.stdin.pause();
   process.stdin.removeListener('data', requestStop);
   process.stdin.removeListener('end', requestStop);
@@ -262,10 +260,10 @@ try {
           '_AUDIT=' +
           JSON.stringify(await ackAttempts(fixtureAuditDb, ackLoss)),
       );
-    } else if (settingsUi && fixtureAuditDb) {
+    } else if (editorUi && fixtureAuditDb) {
       console.log(
-        'ACCEPTANCE_SETTINGS_UI_AUDIT=' +
-          JSON.stringify(await settingsUiAttempts(fixtureAuditDb)),
+        'ACCEPTANCE_EDITOR_UI_AUDIT=' +
+          JSON.stringify(await editorUiAttempts(fixtureAuditDb)),
       );
     } else if (settingsRace && fixtureAuditDb) {
       console.log(
