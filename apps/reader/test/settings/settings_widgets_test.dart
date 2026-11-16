@@ -13,6 +13,7 @@ import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/theme/app_theme.dart';
+import 'package:karuyomi/widgets/app_page_route.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../data/business_state_server.dart';
@@ -122,6 +123,80 @@ void main() {
   for (final appearance in Brightness.values) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
+        'manga settings can close during a read without a late navigation or write in $appearance at ${scale}x text',
+        (tester) async {
+          final reading = Completer<void>();
+          final releaseRead = Completer<void>();
+          addTearDown(() {
+            if (!releaseRead.isCompleted) releaseRead.complete();
+          });
+          server.beforeRequest = (request) async {
+            if (request.method == 'GET' &&
+                request.uri.path == '/api/settings/manga/$_key' &&
+                !releaseRead.isCompleted) {
+              reading.complete();
+              await releaseRead.future;
+            }
+            return null;
+          };
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: Builder(
+                builder: (context) => CupertinoPageScaffold(
+                  child: Center(
+                    child: CupertinoButton(
+                      onPressed: () => Navigator.of(context).push<void>(
+                        AppPageRoute<void>(
+                          builder: (_) => MangaSettingsEditor(
+                            catalog: fixture.catalog,
+                            mangaKey: _key,
+                          ),
+                        ),
+                      ),
+                      child: const Text('打开漫画设置'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            container: fixture.container,
+          );
+          await tester.tap(find.text('打开漫画设置'));
+          await tester.pump();
+          await tester.runAsync(() => reading.future);
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(find.text('正在读取服务端设置').hitTestable(), findsOneWidget);
+          final pop = find.descendant(
+            of: find.byType(MangaSettingsEditor),
+            matching: find.byType(PopScope),
+          );
+          expect(tester.widget<PopScope>(pop).canPop, true);
+          await tester.tap(find.text('关闭设置'));
+          await tester.pumpAndSettle();
+          expect(find.byType(MangaSettingsEditor), findsNothing);
+          expect(find.text('打开漫画设置').hitTestable(), findsOneWidget);
+          releaseRead.complete();
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+          expect(find.byType(MangaSettingsEditor), findsNothing);
+          expect(writes(), isEmpty);
+          expect(server.appliedMutations, 0);
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+
+      testWidgets(
         'manga settings distinguish reading, saving and recovery in $appearance at ${scale}x text',
         (tester) async {
           final initialRead = Completer<void>();
@@ -181,6 +256,7 @@ void main() {
           failRead = false;
           await tap(tester, find.text('重新读取设置'));
           expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
+          expect(find.text('当前设置已获服务端确认。').hitTestable(), findsOneWidget);
           final inheritance = find.text('选择“跟随全局”时，之后的全局修改会应用到此漫画。');
           expect(
             find.ancestor(
@@ -191,11 +267,13 @@ void main() {
           );
           await select<wire.ReaderMode>(tester, '从右到左');
           expect(find.text('修改尚未保存。'), findsOneWidget);
+          expect(find.text('修改尚未保存。').hitTestable(), findsOneWidget);
           await tester.ensureVisible(find.text('保存本漫画设置'));
           await tester.tap(find.text('保存本漫画设置'));
           await tester.runAsync(() => saving.future);
           await tester.pump();
           expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
+          expect(find.text('正在等待服务端确认设置修改').hitTestable(), findsOneWidget);
           expect(find.text('正在读取服务端设置'), findsNothing);
           expect(find.text('修改尚未保存。'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
@@ -208,10 +286,12 @@ void main() {
             isNull,
           );
           expect(state(manga: true).canEdit, false);
+          expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, false);
           releaseSave.complete();
           await tester.runAsync(() => Future<void>.delayed(Duration.zero));
           await tester.pumpAndSettle();
           expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
+          expect(find.text('设置尚未确认，本会话保留原操作。').hitTestable(), findsOneWidget);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
           expect(writes(), hasLength(1));
           final original = writes().single.body;
@@ -241,6 +321,8 @@ void main() {
           await tester.pump();
           expect(find.text('正在读取服务端设置'), findsOneWidget);
           expect(find.text('修改尚未保存。'), findsOneWidget);
+          expect(find.text('正在读取服务端设置').hitTestable(), findsOneWidget);
+          expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, true);
           expect(find.text('正在等待服务端确认设置修改'), findsNothing);
           expect(writes(), hasLength(2));
           reloadGate.complete();

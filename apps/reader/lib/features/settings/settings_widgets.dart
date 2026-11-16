@@ -350,6 +350,23 @@ class const _SettingsEditor({
                 : null,
             child: Text(manga ? '保存本漫画设置' : '保存全局设置'),
           );
+    Widget feedback() => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (draft?.dirty == true &&
+            state.pending == null &&
+            state.activity != SettingsActivity.saving)
+          const Text('修改尚未保存。')
+        else if (state.snapshot != null &&
+            !state.busy &&
+            state.error == null &&
+            state.pending == null)
+          const Text('当前设置已获服务端确认。'),
+        if (!manga && save != null) save,
+        SettingsStatus(controller: controller, state: state, onReloaded: reset),
+      ],
+    );
     Widget content(_SettingsSection? section) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -512,46 +529,43 @@ class const _SettingsEditor({
             ], footer: '反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
           ],
         ],
-        if (manga ||
-            {
-              _SettingsSection.appearance,
-              _SettingsSection.reading,
-              _SettingsSection.input,
-            }.contains(section) ||
-            draft?.dirty == true ||
-            state.pending != null ||
-            state.error != null) ...[
-          if (draft?.dirty == true &&
-              state.pending == null &&
-              state.activity != SettingsActivity.saving)
-            const Text('修改尚未保存。')
-          else if (state.snapshot != null &&
-              !state.busy &&
-              state.error == null &&
-              state.pending == null)
-            const Text('当前设置已获服务端确认。'),
-          if (!manga && save != null) save,
-          SettingsStatus(
-            controller: controller,
-            state: state,
-            onReloaded: reset,
-          ),
-        ],
+        if (!manga &&
+            ({
+                  _SettingsSection.appearance,
+                  _SettingsSection.reading,
+                  _SettingsSection.input,
+                }.contains(section) ||
+                draft?.dirty == true ||
+                state.pending != null ||
+                state.error != null))
+          feedback(),
       ],
     );
     return manga
         ? PopScope(
-            canPop: !state.busy,
+            canPop: state.activity != SettingsActivity.saving,
             child: EditSheet(
               title: const Text('本漫画阅读设置'),
-              content: SingleChildScrollView(
-                controller: detailScroll,
-                padding: const EdgeInsets.all(24),
-                child: content(null),
+              content: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: detailScroll,
+                      padding: const EdgeInsets.all(24),
+                      child: content(null),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: feedback(),
+                  ),
+                ],
               ),
               actions: [
                 CupertinoButton(
-                  onPressed: state.busy ? null : () => Navigator.pop(context),
+                  onPressed: state.activity == SettingsActivity.saving
+                      ? null
+                      : () => Navigator.pop(context),
                   child: const Text('关闭设置'),
                 ),
                 ?save,

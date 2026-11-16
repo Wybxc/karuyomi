@@ -35,6 +35,11 @@ import {
   prepareProgressD1Error,
   progressD1ErrorAttempts,
 } from './acceptance-progress-d1-error.ts';
+import {
+  prepareSettingsUi,
+  setSettingsUiMode,
+  settingsUiAttempts,
+} from './acceptance-settings-ui.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
 const publicKey = await exportJWK(keys.publicKey);
@@ -61,6 +66,7 @@ if (nextConfigPath && fixture !== '') {
 }
 const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const settingsRace = fixture === 'settings-cas-race';
+const settingsUi = fixture === 'settings-ui';
 const progressRace = fixture === 'progress-cas-race';
 const progressD1Error = fixture === 'progress-d1-error';
 const bridgeError =
@@ -79,6 +85,7 @@ const options = (
         APP_ORIGIN: publicOrigin,
         ...(ackLoss ? { ACCEPTANCE_ACK_LOSS: ackLoss } : {}),
         ...(settingsRace ? { ACCEPTANCE_SETTINGS_CAS_RACE: '1' } : {}),
+        ...(settingsUi ? { ACCEPTANCE_SETTINGS_UI: '1' } : {}),
         ...(progressRace ? { ACCEPTANCE_PROGRESS_CAS_RACE: '1' } : {}),
         ...(progressD1Error ? { ACCEPTANCE_PROGRESS_D1_ERROR: '1' } : {}),
         ...(bridgeError ? { ACCEPTANCE_BRIDGE_ERROR_URL: bridgeError } : {}),
@@ -99,9 +106,10 @@ const stopped = new Promise<void>((resolve) => {
 process.once('SIGINT', requestStop);
 process.once('SIGTERM', requestStop);
 process.stdin.once('end', requestStop);
-const commands = nextConfigPath
-  ? createInterface({ input: process.stdin })
-  : undefined;
+const commands =
+  nextConfigPath || settingsUi
+    ? createInterface({ input: process.stdin })
+    : undefined;
 if (commands) {
   commands.on('line', (line) => {
     if (line === 'stop') requestStop();
@@ -112,18 +120,20 @@ if (commands) {
 }
 
 let fixtureAuditDb: D1Database | undefined;
+let settingsUiCommands = Promise.resolve();
 try {
   if (
     fixture !== '' &&
     fixture !== 'categories' &&
     !ackLoss &&
     !settingsRace &&
+    !settingsUi &&
     !progressRace &&
     !progressD1Error &&
     !bridgeError
   ) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, bookmark-ack-loss, settings-cas-race, progress-cas-race, progress-d1-error, bridge-once-error or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, bookmark-ack-loss, settings-cas-race, settings-ui, progress-cas-race, progress-d1-error, bridge-once-error or empty',
     );
   }
   const { url } = await server.listen();
@@ -142,15 +152,49 @@ try {
   await worker.applyD1Migrations('DB');
   if (
     !stopRequested &&
-    (ackLoss || settingsRace || progressRace || progressD1Error || bridgeError)
+    (ackLoss ||
+      settingsRace ||
+      settingsUi ||
+      progressRace ||
+      progressD1Error ||
+      bridgeError)
   ) {
     const db = (await worker.getEnv()).DB;
     if (ackLoss) await prepareAckLoss(db);
     else if (settingsRace) await prepareSettingsRace(db);
+    else if (settingsUi) await prepareSettingsUi(db);
     else if (progressRace) await prepareProgressRace(db);
     else if (progressD1Error) await prepareProgressD1Error(db);
     else await prepareBridgeError(db);
     fixtureAuditDb = db;
+  }
+  if (settingsUi && commands && fixtureAuditDb) {
+    const db = fixtureAuditDb;
+    commands.on('line', (line) => {
+      settingsUiCommands = settingsUiCommands
+        .then(async () => {
+          if (line === 'audit') {
+            console.log(
+              'ACCEPTANCE_SETTINGS_UI_AUDIT=' +
+                JSON.stringify(await settingsUiAttempts(db)),
+            );
+          } else if (line.startsWith('settings ')) {
+            const [, mode, scope = 'manga'] = line.split(' ');
+            if (!mode) throw new Error('Settings UI mode is required');
+            console.log(
+              'ACCEPTANCE_SETTINGS_UI_CONTROL=' +
+                JSON.stringify(await setSettingsUiMode(db, mode, scope)),
+            );
+          }
+        })
+        .catch((error) =>
+          console.error(
+            error instanceof Error
+              ? error.message
+              : 'Settings UI command failed',
+          ),
+        );
+    });
   }
   if (!stopRequested && fixture === 'categories') {
     await initializeCategoryFixture(url.origin);
@@ -192,6 +236,10 @@ try {
         }
         if (!stopRequested) console.log('ACCEPTANCE_SWITCH=switched');
       }
+    } else if (settingsUi) {
+      console.log(
+        'Use settings <mode> [manga|global] to control faults, audit to inspect exact requests, or stop to close the server.',
+      );
     } else {
       console.log(
         'Use independent clients at this URL. Press Enter or Ctrl-C to stop.',
@@ -201,6 +249,7 @@ try {
   }
 } finally {
   commands?.close();
+  await settingsUiCommands;
   process.stdin.pause();
   process.stdin.removeListener('data', requestStop);
   process.stdin.removeListener('end', requestStop);
@@ -212,6 +261,11 @@ try {
         ackLossLabel(ackLoss) +
           '_AUDIT=' +
           JSON.stringify(await ackAttempts(fixtureAuditDb, ackLoss)),
+      );
+    } else if (settingsUi && fixtureAuditDb) {
+      console.log(
+        'ACCEPTANCE_SETTINGS_UI_AUDIT=' +
+          JSON.stringify(await settingsUiAttempts(fixtureAuditDb)),
       );
     } else if (settingsRace && fixtureAuditDb) {
       console.log(

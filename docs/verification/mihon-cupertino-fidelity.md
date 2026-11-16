@@ -394,6 +394,22 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 最终五个相关测试文件的50项不同回归通过：`settings_controller_test`、`settings_widgets_test`、`settings_navigation_test`、`source_favorites_navigation_test`和`chapter_reader_route_test`，日志为`settings-state-regressions-final.log`。七个修改Dart文件严格分析零问题，完整格式化/校验、依赖分层和标准prek通过；迁移24节点及本漫画设置11节点的图表ID一致性检查通过，后者不代表截图验收。新增四种主题/文字组合在同一流程覆盖读取、保存、未知、冲突和身份失效；明确非冲突拒绝、全部字段、真实键盘及减少动态仍单列。测试使用生成协议与组件测试supplier，不是正式D1、Source在线、浏览器或生产证据。Riverpod代码已用固定generator重生；完整CI与正式Web各状态双主题继续待验，24.K1–K11主图不填入组件结果。
 
+### 正式 Web 浅色故障流程与关闭反馈修复
+
+2026-11-16，`42bc9bb92b5dca0f57974cc64821a6f559484b3f`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43788163867)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43788287368)完整成功，push正式Web及Wasm构建均通过，部署未触发。正式客户端归档artifact `14191277471`在传输边界核对GitHub摘要`8861d4c0053abd3af6850ad7449cc540b7d984269605fb617bc01983b06ed67e`，39项Flutter资源复用既有核验收据，不重复计算归档摘要；本机没有编译Flutter或AOT。
+
+通过官方Vite acceptance入口、Wrangler harness、临时D1与内置浏览器360×800执行，正式客户端没有插桩。配套测试入口随本次修改增加`settings-ui`夹具，生产入口不启用；stdin选择读取阻塞/失败、提交后阻塞/丢确认、明确拒绝和登录HTML。阻塞最长30秒且检查取消，审计最多256条；12项官方Workers/D1集成回归及API/test严格类型检查通过，命令见[工具说明](../TOOLING.md)。fixture的503、400与401不是生产故障或真实Access证据；CAS冲突由第二独立客户端使用正式协议修改产生。
+
+使用真实xkcd扩展与3323 Meteor Fear的两页内容，先通过UI确认浅色、安装并收藏英文源。漫画key为`62c3d5a079471dde67f80c71005112fde078e4fa3111e6faedc9757350392a6f`。随后执行首次读取/读取失败、已确认继承、草稿、等待提交、丢确认、未知命令下重读失败/重读等待、精确重试、第二客户端竞争、冲突后明确重读、明确拒绝和身份失效。源收藏等待另有浅色图。所有画面与AX分开保留；未取得深色，不提升双主题主图计数。
+
+独立脚本使用生成的ProtoJSON模型读取global/manga settings、library/categories、manga state/progress/bookmarks七路。最终解析完整harness日志中的43条设置审计，漫画POST六次，包含三条不同成功原命令、一次同UUID/CAS/精确正文重试、一次409与一次派发前400。七阶段账户revision为5→6→7→7→8→8→8，漫画设置revision为0→1→2→2→3→3→3，全局revision保持3。确认门阻塞时D1已提交；未知→精确重试的七路对象完全相同，远端获胜→冲突重读→拒绝后的七路对象也完全相同。其余业务快照除账户revision外全程不变，没有因读取、拒绝或重试增加附带提交。
+
+原始材料前缀为`.local/mihon-reference/karuyomi-42bc9bb-settings-`：`{baseline,waiting,unknown,retried,remote-won,conflict-reloaded,rejected}-light.json`、`audit.json`和`evidence-receipt.json`记录独立审计；`states-light-{0,1}.jpg`两张联系表已实看。`initial-reading-light`是尚未完成呈现的过渡画面，首次hold-read门后来超过30秒，sequence13没有完成响应状态；该次不算释放成功，后续`initial-read-error-light`记录实际失败。`draft-light`的AX选值与JPEG旧字段不一致，保留且排除主图；`draft-status-light`只证明滚到底可见未保存提示。不得根据AX或文件名替代稳定画面验收。
+
+实拍和组件共同确认两个缺口：读取时`busy`错误地禁止返回；长表单的反馈位于滚动末端，却有独立固定保存按钮，导致用户在首屏保存时看不到确认状态。新增浅/深×1x/2x八项流程在旧实现均失败：四项读取关闭检查失败，另四项已确认反馈在视口外。修复仅在保存活动时禁止关闭，漫画表单继续独立滚动，原共享反馈固定在操作区上方；全局设置继续复用同一反馈，不复制状态分支或新增保存通道。八项流程修复后通过，另检查草稿/等待/未知/重读反馈实际可命中，读取中关闭后迟到结果不跳回编辑面且零写入，保存等待仍禁止返回，精确重试和冲突规则保持。
+
+最终五文件54项定向回归通过，见`settings-footer-regressions-final.log`，两文件严格分析零问题；新增fixture的12项回归见`settings-ui-fixture-regressions-final.log`。新修复完整格式/CI与正式Web双主题继续待验，不以组件通过或旧浅色图填写新最终主图。临时标签已关闭，视口已恢复，官方harness正常退出0；本轮没有生产Access或原生现场验收。
+
 ### 实拍布局与颜色锚点
 
 以下为实际 PNG/XML 的物理像素，两主题的列举矩形相同；320dpi 下除以 2 得逻辑单位。导航手机横屏为 1600×720，平板为 1536×2048，分类/阅读为 720×1600，不能把不同尺寸叠成同一视口。
