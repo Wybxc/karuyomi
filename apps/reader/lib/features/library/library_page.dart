@@ -1042,11 +1042,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               itemCount: visible.length,
               itemBuilder: (context, index) {
                 final entry = visible[index];
+                final sourceLabel = '${entry.sourceLang} · ${entry.sourceName}';
+                final label = '${entry.title} · $sourceLabel';
                 final draft =
                     controller?.readingDraftResume(entry.mangaKey) != null;
                 return MangaCoverTile(
                   key: ValueKey(entry.mangaKey),
                   title: entry.title,
+                  subtitle: sourceLabel,
                   entry: entry,
                   covers: _covers,
                   selected: _selecting
@@ -1077,8 +1080,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   continueKey: ValueKey(('library-continue', entry.mangaKey)),
                   continueLabel: !_selecting && (entry.resume != null || draft)
                       ? draft
-                            ? '继续阅读（未保存）：${entry.title}'
-                            : '继续阅读：${entry.title}'
+                            ? '继续阅读（未保存）：$label'
+                            : '继续阅读：$label'
                       : null,
                   onContinue: canOpen
                       ? () => unawaited(_open(entry, continueReading: true))
@@ -1097,7 +1100,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   : null,
                               leading: Icon(
                                 CupertinoIcons.folder,
-                                semanticLabel: '设置分类：${entry.title}',
+                                semanticLabel: '设置分类：$label',
                               ),
                               child: const Text('设置分类'),
                             ),
@@ -1118,7 +1121,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                               CupertinoIcons.ellipsis,
                               color: const Color(0xFFFFFFFF),
                               shadows: const [Shadow(blurRadius: 4)],
-                              semanticLabel: '更多操作：${entry.title}',
+                              semanticLabel: '更多操作：$label',
                             ),
                           ),
                         ),

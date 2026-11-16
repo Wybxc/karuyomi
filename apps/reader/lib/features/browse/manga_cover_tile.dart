@@ -11,6 +11,7 @@ class const MangaCoverTile({
   super.key,
   required final String title,
   required final VoidCallback? onPressed,
+  final String? subtitle,
   final LibraryEntry? entry,
   final CoverRepository? covers,
   final VoidCallback? onLongPress,
@@ -73,10 +74,7 @@ class const MangaCoverTile({
                             continueLabel == null ? 8 : 48,
                             8,
                           ),
-                          child: Text(
-                            title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                          child: DefaultTextStyle(
                             style: CupertinoTheme.of(context)
                                 .textTheme
                                 .textStyle
@@ -85,6 +83,28 @@ class const MangaCoverTile({
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFFFFFFFF),
                                 ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (subtitle case final caption?)
+                                  Text(
+                                    caption,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.normal,
+                                      color: Color(0xDDFFFFFF),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

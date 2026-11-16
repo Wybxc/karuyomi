@@ -70,6 +70,8 @@ void main() {
           final reader = ReadingProgressController(
             repository: repository,
             mangaKey: sourceKey,
+            debounce: const Duration(milliseconds: 10),
+            maxWait: const Duration(milliseconds: 20),
           );
           addTearDown(reader.dispose);
           await reader.restore(_manifest);
@@ -146,11 +148,35 @@ void main() {
             server.requests.where((request) => request.method == 'POST'),
             hasLength(writes),
           );
+          await reader.restore(_manifest);
+          expect(reader.error, contains('处理原操作后再显式重试'));
           if (rejected) {
             migrations.discardRejected(sourceKey);
           } else {
             await migrations.retry(sourceKey);
           }
+          final releasedWrites = server.requests
+              .where((request) => request.method == 'POST')
+              .length;
+          // Reentering the route restores the retained controller. Neither
+          // its first viewport nor route release/foreground refresh authorizes
+          // a draft whose UI still asks for an explicit retry.
+          await reader.restore(_manifest);
+          expect(reader.error, contains('处理原操作后再显式重试'));
+          reader.observe(
+            manifest: _manifest,
+            current: _manifest.positionAt(2),
+            observed: _manifest.positionAt(2, offset: .8),
+            reversedOrder: false,
+          );
+          expect(await reader.flush(), false);
+          await reader.refreshFromServer(_manifest);
+          expect(await reader.reset(_manifest), isNull);
+          await Future<void>.delayed(const Duration(milliseconds: 40));
+          expect(
+            server.requests.where((request) => request.method == 'POST'),
+            hasLength(releasedWrites),
+          );
           expect(reader.unsaved, true);
           expect(server.progress(sourceKey, _manifest.chapterKey), isNull);
           expect(await reader.retry(), true);
@@ -158,8 +184,24 @@ void main() {
           expect(reader.error, isNull);
           final saved = server.progress(sourceKey, _manifest.chapterKey)!;
           expect(saved.epoch, resetting ? 1 : 0);
-          if (!resetting) expect(saved.current.pageIndexHint, 1);
+          if (!resetting) expect(saved.current.pageIndexHint, 2);
           expect(server.appliedMutations, rejected ? 2 : 3);
+          reader.observe(
+            manifest: _manifest,
+            current: _manifest.positionAt(0, offset: .4),
+            observed: _manifest.positionAt(0, offset: .4),
+            reversedOrder: false,
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 40));
+          expect(reader.unsaved, false);
+          expect(
+            server
+                .progress(sourceKey, _manifest.chapterKey)!
+                .current
+                .pageIndexHint,
+            0,
+          );
+          expect(server.appliedMutations, rejected ? 3 : 4);
         },
       );
     }

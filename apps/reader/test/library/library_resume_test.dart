@@ -175,7 +175,12 @@ void main() {
     'shelf keeps details navigation and directly resumes fresh server chapter and anchor once',
     (tester) async {
       await show(tester);
-      expect(iconLabel('继续阅读：${entry.title}'), findsOneWidget);
+      expect(
+        iconLabel(
+          '继续阅读：${entry.title} · ${entry.sourceLang} · ${entry.sourceName}',
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.text(entry.title));
       await tester.pumpAndSettle();
       expect(find.byType(MangaDetailsPage), findsOneWidget);
@@ -540,7 +545,12 @@ void main() {
         await release.future;
       };
       await show(tester);
-      expect(iconLabel('继续阅读（未保存）：${entry.title}'), findsOneWidget);
+      expect(
+        iconLabel(
+          '继续阅读（未保存）：${entry.title} · ${entry.sourceLang} · ${entry.sourceName}',
+        ),
+        findsOneWidget,
+      );
       await tester.tap(getContinue());
       await tester.pump();
       await tester.runAsync(

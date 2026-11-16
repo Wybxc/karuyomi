@@ -1825,6 +1825,21 @@ stateDiagram-v2
 
 ## 当前采集顺序与变体门槛
 
+2026-11-16，`19c2260`正式Web取得迁移未知时的浅/深阅读进度与重新阅读阻塞提示，作为现有阅读状态的转换分项，不增加169个主状态的分母或108个成对分子。浅色从详情明确恢复原迁移、另行保存、续读通过；深色从书架重开却自动推进两次进度revision，保留为失败。19组九路快照、13个完全相等区间及121条范围内审计已核对，审计不包含进度POST。新门控修复的45项回归和同名作品身份修复的38项回归通过，正式新Web仍待，见[阅读进度复验](mihon-cupertino-fidelity.md#阅读进度阻塞的正式-web-复验与重开修复)。
+
+```mermaid
+stateDiagram-v2
+    state "迁移未知，阅读草稿受阻：浅/深已实看" as BlockedReading
+    state "原迁移明确重试成功，草稿仍未保存" as ReleasedReading
+    state "明确保存后续读：浅色已通过" as SavedReading
+    state "从书架重开：旧正式Web深色失败" as ReopenedReading
+    BlockedReading --> BlockedReading: 进度重试/重新阅读，零进度写入
+    BlockedReading --> ReleasedReading: 明确重试原迁移，零重复应用
+    ReleasedReading --> SavedReading: 明确重试保存进度
+    ReleasedReading --> ReopenedReading: 继续阅读未保存草稿
+    ReopenedReading --> ReleasedReading: 新修复应保持门控，组件通过，正式Web待验
+```
+
 2026-11-16，`19c2260`完整push/PR CI与Web/Wasm通过；正式Web新增27.K5双主题主图，跨版本成对主图107→108/169（63.9%）。27.K2/K3/K4只取得真实系统深色图，继续橙色partial；普通503连接失败另存，不替代27.K1未配置地址。7组六路快照与29条完成审计确认连接等待、401/403/503及显式恢复均不附写，1次明确UI主题保存单列。受控故障不是生产Access，登录交互、带进度草稿及全部其它变体仍待，详见[连接复验](mihon-cupertino-fidelity.md#连接状态的正式-web-复验)。
 
 1. 书架/分类已完成首批成对核对，空书架、空分类管理、移出可提交及混合分类主态已补；继续补混合项修改/确认、深色移出成功及全部转换。流程图绿色只代表所标具体状态，不能代表该组全部状态已完成。

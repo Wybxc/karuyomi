@@ -302,8 +302,8 @@ void main() {
       final alpha = await favorite(tester, 'Alpha');
       await favorite(tester, 'Beta');
       await show(tester);
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, checkboxLabel('科幻'));
       await tap(tester, find.text('保存'));
@@ -317,8 +317,8 @@ void main() {
       await filter(tester, '全部');
       expect(find.text('Alpha'), findsOneWidget);
       expect(find.text('Beta'), findsOneWidget);
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, checkboxLabel('科幻'));
       await tap(tester, find.text('保存'));
@@ -374,8 +374,8 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('科幻'));
       await tester.runAsync(
         () => remote.setCategories(
@@ -471,8 +471,8 @@ void main() {
       await create(tester);
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       server.failWrites = true;
       await tap(tester, find.text('保存'));
@@ -549,8 +549,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(server.catalog().categories.first.name, '长篇·待读');
       await tap(tester, find.text('完成'));
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       expect(checkboxLabel('长篇·待读'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await hide(tester);
@@ -564,8 +564,8 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       await tester.runAsync(
         () => remote.renameCategory(
@@ -589,8 +589,8 @@ void main() {
       expect(find.text('重试'), findsNothing);
       await tap(tester, find.text('重读'));
       expect(posts('/api/state/mutations').length, attempts);
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       expect(checkboxLabel('新名字'), findsOneWidget);
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));
@@ -840,8 +840,8 @@ void main() {
 
       final alpha = await favorite(tester, 'Alpha');
       await tester.pumpAndSettle();
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('迟到确认'));
       received = Completer<void>();
       release = Completer<void>();
@@ -908,8 +908,8 @@ void main() {
       );
       final original = posts('/api/state/mutations').last.body;
       final sent = posts('/api/state/mutations').length;
-      await tap(tester, iconLabel('更多操作：Alpha'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));
       expect(find.textContaining('先处理原操作'), findsOneWidget);

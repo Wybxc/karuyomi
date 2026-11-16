@@ -45,15 +45,17 @@ void main() {
   Future<void> favorite({
     wire.Manga? manga,
     String sourceName = '测试漫画源',
+    String mangaSourceId = sourceId,
+    String sourceLang = 'zh',
     DateTime? addedAt,
   }) async {
     if (addedAt != null) serverNow = addedAt;
     final repository = controller.library!;
     await repository.setFavorite(
       packageName: 'eu.kanade.source.test',
-      sourceId: sourceId,
+      sourceId: mangaSourceId,
       sourceName: sourceName,
-      sourceLang: 'zh',
+      sourceLang: sourceLang,
       manga: manga ?? testManga,
       favorite: true,
     );
@@ -78,6 +80,76 @@ void main() {
   Future<void> hide(WidgetTester tester) async {
     await tester.pumpApp(const SizedBox.shrink());
     await tester.pumpAndSettle();
+  }
+
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'same-title shelf entries expose language and Source in $brightness at ${textScale}x',
+        (tester) async {
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = textScale;
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final semantics = tester.ensureSemantics();
+          try {
+            const title = '同名作品 · A long title spanning several lines';
+            const name = '很长的漫画源名称，含多种语言版本';
+            for (final (id, language) in [('11', 'en'), ('12', 'zh')]) {
+              await favorite(
+                manga: wire.Manga(url: '/same', title: title),
+                sourceName: name,
+                mangaSourceId: id,
+                sourceLang: language,
+              );
+            }
+            final writesBefore = platform.businessServer.requests
+                .where((request) => request.method == 'POST')
+                .length;
+            await show(tester);
+            for (final language in ['en', 'zh']) {
+              final caption = find.text('$language · $name');
+              expect(caption, findsOneWidget);
+              final button = find
+                  .ancestor(of: caption, matching: find.byType(CupertinoButton))
+                  .first;
+              expect(
+                tester.getSemantics(button).getSemanticsData().label,
+                '$title\n$language · $name',
+              );
+              expect(
+                tester.getRect(button).contains(tester.getCenter(caption)),
+                isTrue,
+              );
+              expect(
+                iconLabel('更多操作：$title · $language · $name'),
+                findsOneWidget,
+              );
+            }
+            await tester.tap(iconLabel('更多操作：$title · en · $name'));
+            await tester.pumpAndSettle();
+            expect(find.text('迁移到其他漫画源'), findsOneWidget);
+            expect(
+              platform.businessServer.requests
+                  .where((request) => request.method == 'POST')
+                  .length,
+              writesBefore,
+            );
+            expect(platform.invocations, isEmpty);
+            expect(tester.takeException(), isNull);
+            await hide(tester);
+          } finally {
+            semantics.dispose();
+          }
+        },
+      );
+    }
   }
 
   testWidgets('shelf search and sorting only use stored metadata', (
