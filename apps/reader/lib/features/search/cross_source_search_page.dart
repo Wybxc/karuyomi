@@ -573,7 +573,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                           ),
                         ),
                         Expansible(
-                          key: const ValueKey('cross-search-scope'),
+                          key: const PageStorageKey('cross-search-scope'),
                           controller: _scope,
                           animationStyle:
                               MediaQuery.reduceMotionOf(context) ||

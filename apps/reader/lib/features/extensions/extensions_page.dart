@@ -456,7 +456,7 @@ class const ExtensionOperationStatus({
             child: const Text('重试原设置操作'),
           ),
           Expansible(
-            key: const ValueKey('extensions-pending-values'),
+            key: const PageStorageKey('extensions-pending-values'),
             controller: expansion,
             animationStyle:
                 MediaQuery.reduceMotionOf(context) ||
@@ -755,6 +755,7 @@ class const ExtensionDetailsPage({
               hasLeading: false,
               children: [
                 Expansible(
+                  key: const PageStorageKey('extension-details-diagnostics'),
                   controller: diagnostics,
                   animationStyle:
                       MediaQuery.reduceMotionOf(context) ||
@@ -1031,6 +1032,9 @@ class const ExtensionRepositoriesPage({
               hasLeading: false,
               children: [
                 Expansible(
+                  key: const PageStorageKey(
+                    'extension-repositories-diagnostics',
+                  ),
                   controller: diagnostics,
                   animationStyle:
                       MediaQuery.reduceMotionOf(context) ||
@@ -1179,6 +1183,7 @@ class const ExtensionStoragePage({
                 hasLeading: false,
                 children: [
                   Expansible(
+                    key: const PageStorageKey('extension-storage-diagnostics'),
                     controller: diagnostics,
                     animationStyle:
                         MediaQuery.reduceMotionOf(context) ||

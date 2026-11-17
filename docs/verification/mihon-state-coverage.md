@@ -1458,6 +1458,8 @@ stateDiagram-v2
 | 07.K8   | 源身份、受阻原因、管理或恢复入口              | 待                                             | 待                                            |
 | 07.K9   | 原收藏操作、冲突或未知说明、精确重试/重新读取 | 待                                             | 待                                            |
 
+`fe57f2c`正式Web完成浅色读取、等待与未知恢复，但展开/收起原值并重试后，深色重开源目录因页面存储类型冲突而未能渲染。`source-pending-formal`系列中的两张深色空内容图（包括名为`sources-reading-dark`的进入图）均为失败证据，不能作为读取主图。存储隔离修复后的正式双主题仍待，07.K1/K5/K9不填入旧产物照片，详见[记录](mihon-cupertino-fidelity.md#展开状态与滚动位置的存储隔离)。
+
 ```mermaid
 stateDiagram-v2
     [*] --> Repositories

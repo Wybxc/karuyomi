@@ -400,23 +400,105 @@ void main() {
     }
   }
 
+  Future<void> tap(WidgetTester tester, Finder finder) async {
+    final scrollable = find.byType(Scrollable).first;
+    if (finder.evaluate().isEmpty) {
+      await tester.drag(scrollable, const Offset(0, 4000));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
+    }
+    await tester.ensureVisible(finder);
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
   Future<void> show(
     WidgetTester tester, {
     Brightness? appearance,
     Size size = const Size(600, 1100),
+    PageStorageBucket? pageStorage,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
         theme: appearance == null ? null : readerAppTheme(appearance),
-        home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
+        home: PageStorage(
+          bucket: pageStorage ?? PageStorageBucket(),
+          child: ExtensionsPage(
+            catalog: catalog,
+            repository: catalog.settings!,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
   }
 
   for (final appearance in Brightness.values) {
+    for (final expanded in [false, true]) {
+      testWidgets(
+        'extension recovery keeps scroll storage separate in $appearance when expanded=$expanded',
+        (tester) async {
+          final bucket = PageStorageBucket();
+          platform.businessServer.loseNextResponse = true;
+          await manager.install(catalog.builds.single);
+          final original = platform.businessServer.requests
+              .where((request) => request.method == 'POST')
+              .single
+              .body;
+          final applied = platform.businessServer.appliedMutations;
+          await show(tester, appearance: appearance, pageStorage: bucket);
+          await tap(tester, find.text('查看未确认的原操作'));
+          if (!expanded) {
+            await tap(tester, find.text('查看未确认的原操作'));
+          }
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          await show(tester, appearance: appearance, pageStorage: bucket);
+          expect(tester.takeException(), isNull);
+          expect(find.text('查看未确认的原操作'), findsOneWidget);
+          expect(
+            find.text('未确认的原全局设置内容'),
+            expanded ? findsOneWidget : findsNothing,
+          );
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            hasLength(1),
+          );
+          await tap(tester, find.text('重试原设置操作'));
+          final writes = platform.businessServer.requests
+              .where((request) => request.method == 'POST')
+              .toList();
+          expect(writes, hasLength(2));
+          expect(writes.last.body, original);
+          expect(platform.businessServer.appliedMutations, applied);
+          expect(platform.preparations, hasLength(1));
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          await show(
+            tester,
+            appearance: appearance == Brightness.light
+                ? Brightness.dark
+                : Brightness.light,
+            pageStorage: bucket,
+          );
+          expect(tester.takeException(), isNull);
+          expect(find.text('查看未确认的原操作'), findsNothing);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            hasLength(2),
+          );
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+
     testWidgets(
       'extension menu immediately activates its first keyboard item in $appearance',
       (tester) async {
@@ -665,18 +747,6 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-  }
-
-  Future<void> tap(WidgetTester tester, Finder finder) async {
-    final scrollable = find.byType(Scrollable).first;
-    if (finder.evaluate().isEmpty) {
-      await tester.drag(scrollable, const Offset(0, 4000));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
-    }
-    await tester.ensureVisible(finder);
-    await tester.tap(finder);
-    await tester.pumpAndSettle();
   }
 
   for (final appearance in Brightness.values) {

@@ -101,6 +101,7 @@ void main() {
     Brightness? appearance,
     Size size = const Size(480, 800),
     double textScale = 1,
+    PageStorageBucket? pageStorage,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -113,10 +114,13 @@ void main() {
           child: child!,
         ),
         home: CupertinoPageScaffold(
-          child: CatalogPage(
-            controller: catalog,
-            onConnect: () {},
-            onAuthenticate: () {},
+          child: PageStorage(
+            bucket: pageStorage ?? PageStorageBucket(),
+            child: CatalogPage(
+              controller: catalog,
+              onConnect: () {},
+              onAuthenticate: () {},
+            ),
           ),
         ),
       ),
@@ -436,6 +440,52 @@ void main() {
   );
 
   for (final appearance in Brightness.values) {
+    for (final expanded in [false, true]) {
+      testWidgets(
+        'source recovery keeps scroll storage separate in $appearance when expanded=$expanded',
+        (tester) async {
+          final bucket = PageStorageBucket();
+          await seed(_values(favorites: [_favorite()]));
+          await show(tester, appearance: appearance, pageStorage: bucket);
+          platform.businessServer.loseNextResponse = true;
+          await tap(tester, toggle());
+          final original = posts().last.body;
+          final postCount = posts().length;
+          final applied = platform.businessServer.appliedMutations;
+          await tap(tester, find.text('查看未确认的原全局设置'));
+          if (!expanded) {
+            await tap(tester, find.text('查看未确认的原全局设置'));
+          }
+          await hide(tester);
+          await show(tester, appearance: appearance, pageStorage: bucket);
+          expect(tester.takeException(), isNull);
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          expect(
+            find.textContaining('应用主题：'),
+            expanded ? findsOneWidget : findsNothing,
+          );
+          expect(posts(), hasLength(postCount));
+          await tap(tester, find.text('重试原设置操作'));
+          expect(posts(), hasLength(postCount + 1));
+          expect(posts().last.body, original);
+          expect(platform.businessServer.appliedMutations, applied);
+          expect(catalog.settings!.pendingGlobal(), isNull);
+          await hide(tester);
+          await show(
+            tester,
+            appearance: appearance == Brightness.light
+                ? Brightness.dark
+                : Brightness.light,
+            pageStorage: bucket,
+          );
+          expect(tester.takeException(), isNull);
+          expect(toggle(), findsOneWidget);
+          expect(posts(), hasLength(postCount + 1));
+          await hide(tester);
+        },
+      );
+    }
+
     for (final textScale in [1.0, 2.0]) {
       testWidgets(
         'pending source cancellation keeps its original object and natural insets in $appearance at $textScale',

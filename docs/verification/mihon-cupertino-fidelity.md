@@ -920,6 +920,18 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 浅深色×普通/双倍文字的四项360×800组件回归先因x=0失败，再通过留白、原对象、刷新/重开、完整值展开与精确重试断言，日志为`source-pending-layout-red.log`、`source-pending-layout-green-initial.log`。八文件124项相关数据、设置、Source及扩展回归最终通过，见`source-pending-layout-targeted.log`；组件供应端不等同于真实D1或正式渲染。五文件严格分析、完整格式/校验、证据工具严格类型和依赖检查通过，日志使用`source-pending-layout-`前缀；新提交完整CI及新正式Web双主题仍待。覆盖保持119/169（70.4%），没有把修复前实拍计作Source读取/等待/未知三对完成，PR #8仍草稿，未合并、未部署，原生与生产门不变。
 
+## 展开状态与滚动位置的存储隔离
+
+2026-11-18，客户端及夹具`fe57f2cdcbd65bdcb4243d3f73aeedd8b5baa2de`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44154200070)、[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44154216791)、Web及push Wasm全部成功，deploy跳过。正式归档下载边界大小/SHA-256及39条资源校验通过，仅复制生成的Web/runtime；官方API与acceptance Vite顺序装配，HTTP交付清单35条与CI相同，入口`main.dart.c06e6c38.js`。官方Wrangler临时D1/R2、`acceptance-owner`、既有静态快照和内置浏览器360×800，地址`127.0.0.1:65316`，没有本地完整Flutter/AOT构建。
+
+浅色实际核对读取与保存等待的留白、英文xkcd筛选、已确认收藏、取消已提交但丢确认、只读刷新、书架/源目录重开、完整原值展开/收起与明确原文重试。刷新后的当前列表已取消，原对象仍显示“取消收藏源：xkcd”，完整原值默认收起且可查看；浅色补取一次明确只读刷新并再次重开，分段快照均保持。正式UI保存深色主题后重开源目录，内容区持续空白/灰色，控制台报告`bool`不能读取为`double?`；两张深色图均为失败，不能解释为加载或转场。停止补拍该中间版本。
+
+`verify-fe57f2c-source-render-failure.ts`通过生成ProtoJSON模型、固定清单、实际HTTP清单和图片尺寸核对十组六路完整快照（60份响应）、六个完全相等区间及49条连续终态审计。六条POST为两次独立准备、两次源原操作、一次明确UI主题保存及一次相同UUID/CAS/正文重试；三条UI原操作各应用一次，重试零重复。丢确认一条真实Worker200/客户端502，其余均200；最终账户5、全局4/DARK、收藏源为空，书架作品revision1，分类、书签、进度、续读、资料与其它设置保持。11张JPEG/完整DOM、控制台和收据使用`karuyomi-fe57f2c-source-pending-formal-`前缀；校验与严格类型日志为`fe57f2c-source-render-failure-evidence-check.log`及`fe57f2c-source-render-failure-typecheck.log`，收据为`interrupted-evidence-receipt.json`。未执行Source，标签、视口及harness均已正常清理，退出0。
+
+正式产物堆栈落在`ScrollPosition.restoreScrollOffset`，与固定Flutter SDK的`Expansible`和`PageStorage`实现对应：普通ValueKey不参与存储身份，折叠组件向父列表同一标识写入bool，重开列表按double读取便失败。按官方要求，六处Expansible现分别使用独立PageStorageKey，包括源/扩展原值、扩展详情/仓库/存储诊断与跨源搜索范围，不关闭滚动恢复、不捕获类型错误或绕过检查，也不改变业务请求。
+
+共享同一PageStorageBucket、双主题和展开/收起的源目录四项组件回归先复现；扩展首轮因本地tap helper声明顺序未编译，首轮日志保留，调整后扩展四项同样复现bool/double错误。八项修复后全部通过，日志为`expansion-page-storage-red.log`、`expansion-page-storage-extensions-red-corrected.log`及`expansion-page-storage-green.log`。用例继续验证原对象、完整原值、精确重试零重复，以及确认清除后切换主题重开；四文件100项源、扩展、仓库和跨源搜索相关回归通过，见`expansion-page-storage-targeted.log`。五文件严格分析、完整格式/校验、证据工具严格类型和依赖检查通过，日志使用`expansion-page-storage-`前缀；新提交完整CI与存储隔离修复后的正式Web双主题仍待。独立计数器再次核对119/169（70.4%）、单侧9、双侧均缺41，见`expansion-page-storage-state-coverage-count.json`，没有新增主图。PR #8仍草稿、未合并、未部署，原生及生产门不变。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

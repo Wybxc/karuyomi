@@ -316,7 +316,7 @@ class const SourceDirectory({
             ),
           if (settings.pending?.global case final values?)
             Expansible(
-              key: const ValueKey('source-pending-global-values'),
+              key: const PageStorageKey('source-pending-global-values'),
               controller: expansion,
               animationStyle:
                   MediaQuery.reduceMotionOf(context) ||
