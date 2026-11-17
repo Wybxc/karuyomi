@@ -765,8 +765,7 @@ stateDiagram-v2
     U11 --> U0: 确认或取消
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class U13 partial
-    class U0,U1,U2,U3,U4,U5,U12,U14,U15,U16 paired
+    class U0,U1,U2,U3,U4,U5,U12,U13,U14,U15,U16 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                             | 浅色                                                                    | 深色                                                                  |
@@ -780,7 +779,7 @@ stateDiagram-v2
 | 28.01   | 高级设置首屏、数据/网络、书架和阅读/扩展末段；中段有滚动偏差，未操作维护/网络选项 | `s2801-advanced-{top,network,library,extensions}-light`                 | `s2801-advanced-{top,network,library,extensions}-dark`                |
 | 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段               | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`           | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`           |
 | 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体          | `s2803-worker-info-light`、`s2804-worker-horizontal-light`              | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`              |
-| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                  | 待（`s2803-worker-copy-light` 只有空容器，排除）                        | `s2803-worker-copy-dark`（含测试任务ID开头的系统预览；完整内容待验）  |
+| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                  | `s2804-worker-copy-readable-light`                                      | `s2804-worker-copy-readable-dark`                                     |
 | 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变                      | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light`      | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`      |
 | 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | 待                                                                      | `category-create-default-dark`（分类分项）                            |
 | 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | 待                                                                      | `category-ime-default-dark`（分类分项）                               |
@@ -796,6 +795,10 @@ stateDiagram-v2
 26.05/26.06 已实看 `theme-system-reference-pairs.jpg`、`theme-explicit-reference-pairs.jpg` 与 `theme-explicit-transition-pairs.jpg`。先选择跟随系统，参考模拟器系统由浅变深时应用随之变化；再选显式浅色/深色，分别核对与系统相反的主图，以及系统变化后页面和选中值保持。跟随系统处于浅色时仍显示纯黑模式行，而显式浅色隐藏该行，不能用两种设置下的浅色图直接叠图。最后恢复原系统浅色、应用显式深色并暂停模拟器，未改网络、分类或阅读设置。以上是Mihon本地偏好的参考；Karuyomi主题仍须取得服务端确认才应用，两种保存语义分开验收。
 
 28 和 29 已实看 `settings-reference-pairs-3.jpg` 至 `settings-reference-pairs-5.jpg`，并单独核对 Worker info 横向滚动及深色复制图。28.03 是 Mihon 的 Android WorkManager 诊断，与 Cloudflare Worker 无关；当时仅有一项 Enqueued，Finished/Running 为 `-`，其它运行状态仍待。横向滚动会移动整块正文，标题栏保持位置。28.04 属于独立 Android 系统反馈，不将系统容器配色纳入 Mihon 应用角色；未验证完整复制内容。29.01 本轮只取消，没有改动默认阅读模式；选中其他模式并返回仍待。
+
+2026-11-17补齐28.04：在同一Mihon 0.21.3参考实例、720×1600物理像素/360×800dp下，实际切换应用显式浅色与深色，逐张实看`s2804-worker-copy-readable-{light,dark}.png`。两张系统预览均包含可读的测试任务ID及Tags开头，底层WorkManager诊断XML正文完全一致；没有独立读取或校验完整剪贴板。系统夜间模式始终为`no`，系统预览容器没有随应用主题变化，不能将它作为系统深色反馈证据。复制后先截PNG再导出XML，后者不代表同一瞬时的预览。旧`s2803-worker-copy-light`仅有空容器，继续排除。原图、较早瞬时帧及XML均保留在忽略目录`.local/mihon-reference/`。
+
+本次将在线语言分组暂时关闭后仍有Local source，不是07.03真空态；切换标签后尚未稳定的旧画面也不计加载证据。语言分组与原Source选择已恢复，应用恢复原显式深色/DEFAULT/非纯黑，系统浅色保持；单实例2核/2GB参考模拟器已关闭，ADB设备列表为空。上述只补Mihon参考图，不增加Karuyomi的108/169主图计数，全部参考变体和转换继续按原门槛验收。
 
 28.01 后续补齐 `network`、`library`、`extensions` 三段，已实看 `extension-storage-pairs-5.jpg` / `extension-storage-pairs-6.jpg`。网络/书架中段约有 14 物理像素滚动差，上边缘个别文字受裁切；末段布局一致。未修改 DoH、User Agent、日志保护、数据库清理或文件名设置。仅通过正式“撤销已信任的未知插件”触发参考扩展未加载，完成两主题提示与取消后，已恢复原 MangaDex / xkcd 信任及 Afrikaans 启用。模拟器暂停在深色 MangaDex 详情。
 

@@ -254,10 +254,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                       Text(
                         group.target.source.name,
                         style: CupertinoTheme.of(context).textTheme.textStyle
-                            .copyWith(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            .copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -268,7 +265,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                           group.target.key,
                         )),
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           color: AppColors.secondaryLabel.resolveFrom(context),
                         ),
                       ),
