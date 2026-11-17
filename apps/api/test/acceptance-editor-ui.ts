@@ -21,6 +21,7 @@ const modes = [
   'hold-confirm',
   'delay-confirm',
   'confirm-read-failure',
+  'confirm-next-loss',
   'lose-confirm',
   'reject-save',
   'login-required',
@@ -304,7 +305,8 @@ export async function withEditorUi(
       command &&
       (mode === 'hold-confirm' ||
         mode === 'delay-confirm' ||
-        mode === 'confirm-read-failure')
+        mode === 'confirm-read-failure' ||
+        mode === 'confirm-next-loss')
     ) {
       await waitForRelease(
         db,
@@ -312,14 +314,21 @@ export async function withEditorUi(
         request.signal,
         mode === 'hold-confirm' ? undefined : 2_000,
       );
-      if (mode === 'confirm-read-failure' && response.ok) {
+      if (
+        (mode === 'confirm-read-failure' || mode === 'confirm-next-loss') &&
+        response.ok
+      ) {
         // Arm only this generation. An explicit control change wins over a
         // delayed response and must never be replaced by its scheduled fault.
         await db
           .prepare(
-            "UPDATE acceptance_editor_ui_control SET mode = 'fail-read', generation = generation + 1 WHERE singleton = 1 AND generation = ? AND scope = ?",
+            'UPDATE acceptance_editor_ui_control SET mode = ?, generation = generation + 1 WHERE singleton = 1 AND generation = ? AND scope = ?',
           )
-          .bind(control.generation, control.scope)
+          .bind(
+            mode === 'confirm-read-failure' ? 'fail-read' : 'lose-confirm',
+            control.generation,
+            control.scope,
+          )
           .run();
       }
     }
