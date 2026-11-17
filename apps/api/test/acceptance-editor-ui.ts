@@ -158,15 +158,13 @@ export async function withEditorUi(
   const stateCommand = stateSaving
     ? stateMutationSchema.parse(await readJson(request.clone()))
     : undefined;
-  // Multipart upload remains on its real path. Only a JSON cover clear or
-  // migration is faulted; unrelated state mutations never enter this fixture.
-  if (
-    stateCommand &&
+  // Audit bounded JSON state commands, including progress, while faulting only
+  // cover clears and migration. Multipart upload remains on its real path.
+  const forwardOnlyState =
+    stateCommand !== undefined &&
     stateCommand.operation.case !== 'migrateFrom' &&
     (stateCommand.operation.case !== 'setCustomCover' ||
-      stateCommand.operation.value.cover !== undefined)
-  )
-    return dispatch();
+      stateCommand.operation.value.cover !== undefined);
   const command = settingsCommand ?? stateCommand;
   const control = await readControl(db);
   const scope: EditorUiScope = bootstrapReading
@@ -183,7 +181,8 @@ export async function withEditorUi(
           : url.pathname === '/api/settings'
             ? 'global'
             : 'manga';
-  const mode = control.scope === scope ? control.mode : 'pass';
+  const mode =
+    !forwardOnlyState && control.scope === scope ? control.mode : 'pass';
   const reading = bootstrapReading || settingsReading || mangaReading;
   // requestJson has already enforced the body bound before retaining exact bytes.
   const body = command ? await request.clone().text() : null;

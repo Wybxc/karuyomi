@@ -271,6 +271,65 @@ test('fixture stays opt-in, loopback-only, scoped and absent from other APIs', a
 });
 
 test.each([
+  ['hold-confirm', 'cover'],
+  ['lose-confirm', 'migration'],
+  ['reject-save', 'cover'],
+  ['login-required', 'connection'],
+])(
+  'unrelated progress is audited without %s faults in %s',
+  async (mode, scope) => {
+    await setEditorUiMode(env.DB, mode, scope);
+    const anchor = {
+      chapterKey: 'chapter-1',
+      manifestVersion: 'manifest-1',
+      pageKey: 'one',
+    };
+    const body = toJsonString(
+      StateMutationSchema,
+      create(StateMutationSchema, {
+        schemaVersion: businessSchemaVersion,
+        mutationId: crypto.randomUUID(),
+        mangaKey,
+        operation: {
+          case: 'saveProgress',
+          value: {
+            snapshot: {
+              chapterKey: anchor.chapterKey,
+              manifestVersion: anchor.manifestVersion,
+              pageKeys: ['one'],
+            },
+            progress: {
+              chapterKey: anchor.chapterKey,
+              current: anchor,
+              furthest: anchor,
+            },
+          },
+        },
+      }),
+    );
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const reply = await request('/api/state/mutations', body);
+      expect(reply.status).toBe(200);
+      const saved = stateMutationResponseSchema.parse(await reply.json());
+      expect(saved.accountRevision).toBe(1);
+      expect(saved.manga?.revision).toBe(1);
+      expect(saved.progress?.current?.pageKey).toBe('one');
+    }
+    expect(await editorUiAttempts(env.DB)).toEqual(
+      [1, 2].map((sequence) => ({
+        sequence,
+        path: '/api/state/mutations',
+        method: 'POST',
+        mode: 'pass',
+        body,
+        worker_status: 200,
+        client_status: 200,
+      })),
+    );
+  },
+);
+
+test.each([
   ['connection', '/api/bootstrap'],
   ['manga', mangaPath],
   ['cover', coverPath],
