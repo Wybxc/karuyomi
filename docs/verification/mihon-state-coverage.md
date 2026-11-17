@@ -887,7 +887,7 @@ stateDiagram-v2
 
 2026-11-17，单作品及批量分类改用完整官方选项行，名称点击与勾选框共用同一草稿动作；两项现有业务流程先复现名称点击未选中，再修复，分类/批量29项回归及相关严格分析通过。正式Web新行布局及故障/变体仍待，历史主图不替代本版，计数不增加，见[选择行记录](mihon-cupertino-fidelity.md#选择行与搜索反馈的-cupertino-收敛)。
 
-固定Mihon的参考主图见05.01–05.10、06.01–06.04和04.01–04.04。最终界面采用官方Cupertino分组、名称导航、更多菜单及危险红，不把原生Material四动作排列或对话框尺寸作为最终样式。以下状态来自正式分类草稿与批量控制器的实际分支。蓝色仅表示`a9fb310`或后续修复`bbf69d7`的正式Web双主题主图已取得，全部变体与转换继续分开验收。新建语义及确认正文缺口已有正式修复图，旧图保留在验证记录，不用组件回归填补其余待办。
+固定Mihon的参考主图见05.01–05.10、06.01–06.04和04.01–04.04。最终界面采用官方Cupertino分组、名称导航、更多菜单及危险红，不把原生Material四动作排列或对话框尺寸作为最终样式。以下状态来自正式分类草稿与批量控制器的实际分支。蓝色仅表示表中对应版本的正式Web双主题主图已取得，橙色为只完成一种主题，全部变体与转换继续分开验收。新建语义及确认正文缺口已有正式修复图，旧图保留在验证记录，不用组件回归填补其余待办。
 
 ```mermaid
 stateDiagram-v2
@@ -958,33 +958,35 @@ stateDiagram-v2
     ExpiredBatch --> [*]: 关闭，不发送剩余
     ConfirmedBatch --> [*]: 完成返回书架
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class EmptyCategories,Categories,CategoryMenu,EmptyCategoryName,CategoryName,InvalidCategoryName,DeleteCategory,NoCategoryChoices,CategoryChoices,CategoryChoiceDraft,RemoveReview,BatchCategoryReview,SendingBatch,PausedBatch,ConfirmedBatch paired
+    class EmptyCategories,Categories,CategoryMenu,EmptyCategoryName,CategoryName,InvalidCategoryName,DeleteCategory,SavingCategory,UncertainCategory,NoCategoryChoices,CategoryChoices,CategoryChoiceDraft,RemoveReview,BatchCategoryReview,SendingBatch,PausedBatch,ConfirmedBatch paired
+    classDef oneSided fill:#ffedd5,stroke:#ea580c,color:#0f172a
+    class ExpiredCategory oneSided
 ```
 
-| 状态 ID | 最小必要信息                                                        | 浅色正式Web                                           | 深色正式Web                                          |
-| ------- | ------------------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
-| 05.K1   | 无分类说明、新建、完成                                              | `karuyomi-bbf69d7-category-empty-light.jpg`           | `karuyomi-bbf69d7-category-empty-dark.jpg`           |
-| 05.K2   | 按确认顺序的名称、重命名和独立更多入口、新建、完成                  | `karuyomi-bbf69d7-category-list-light.jpg`            | `karuyomi-bbf69d7-category-list-dark.jpg`            |
-| 05.K3   | 分类上下文、上/下移边界禁用、危险删除、焦点与取消                   | `karuyomi-a9fb310-category-menu-light.jpg`            | `karuyomi-a9fb310-category-menu-dark.jpg`            |
-| 05.K4   | 空名称、字段标识、约束、取消与保存                                  | `karuyomi-a9fb310-category-name-empty-light.jpg`      | `karuyomi-a9fb310-category-name-empty-dark.jpg`      |
-| 05.K5   | 原名称或新名称草稿、保存、取消及键盘上方操作                        | `karuyomi-a9fb310-category-rename-draft-light.jpg`    | `karuyomi-a9fb310-category-rename-draft-dark.jpg`    |
-| 05.K6   | 保留输入、可读校验错误、修正入口、不发送                            | `karuyomi-a9fb310-category-name-invalid-light.jpg`    | `karuyomi-a9fb310-category-name-invalid-dark.jpg`    |
-| 05.K7   | 精确分类名、删除关联影响、保留收藏/进度、系统红确认与取消           | `karuyomi-a9fb310-category-delete-preview-light.jpg`  | `karuyomi-a9fb310-category-delete-preview-dark.jpg`  |
-| 05.K8   | 原修改、等待确认、冻结动作、禁止忙碌关闭；排序与输入各验            | 待                                                    | 待                                                   |
-| 05.K9   | 原请求保留、未确认与已确认后读回失败分别说明、对应精确重试/稍后处理 | 待                                                    | 待                                                   |
-| 05.K10  | 拒绝/冲突说明、冻结原草稿、重新读取并关闭、不能自动重基             | 待                                                    | 待                                                   |
-| 05.K11  | 失效说明、旧动作禁用、明确关闭与重开                                | 待                                                    | 待                                                   |
-| 06.K1   | 作品名、无分类原因、管理分类指引、关闭                              | `karuyomi-0e605c5-editors-category-empty-light.jpg`   | `karuyomi-0e605c5-editors-category-empty-dark.jpg`   |
-| 06.K2   | 精确作品、完整分类名与确认选择、保存与取消                          | `karuyomi-a9fb310-category-picker-current-light.jpg`  | `karuyomi-a9fb310-category-picker-current-dark.jpg`  |
-| 06.K3   | 未提交选择、未分类含义、保存/取消、原服务端值保留                   | `karuyomi-a9fb310-category-picker-draft-light.jpg`    | `karuyomi-a9fb310-category-picker-draft-dark.jpg`    |
-| 04.K1   | 完整漫画清单、数量、保留进度/书签/分类的影响、危险确认及取消        | `karuyomi-a9fb310-batch-remove-preview-light.jpg`     | `karuyomi-a9fb310-batch-remove-preview-dark.jpg`     |
-| 04.K2   | 添加/移出范围、待选分类、逐项原→目标关联、数量、确认/取消           | `karuyomi-a9fb310-batch-categories-preview-light.jpg` | `karuyomi-a9fb310-batch-categories-preview-dark.jpg` |
-| 04.K3   | 确认数/未开始数、逐项状态、当前等待、暂停及忙碌关闭禁用             | `karuyomi-94b7b82-category-batch-waiting-light.jpg`   | `karuyomi-94b7b82-category-batch-waiting-dark.jpg`   |
-| 04.K4   | 已确认/未开始/未确认项、系统红错误、仅重试原项、稍后处理            | 待                                                    | 待                                                   |
-| 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | `karuyomi-94b7b82-category-batch-paused-light.jpg`    | `karuyomi-94b7b82-category-batch-paused-dark.jpg`    |
-| 04.K6   | 逐项拒绝原因、原清单、重新读取并结束、不得直接重试新revision        | 待                                                    | 待                                                   |
-| 04.K7   | 全部确认文字、逐项确认状态、完成及返回实际书架                      | `karuyomi-bbf69d7-batch-confirmed-light.jpg`          | `karuyomi-bbf69d7-batch-confirmed-dark.jpg`          |
-| 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | 待                                                    | 待                                                   |
+| 状态 ID | 最小必要信息                                                        | 浅色正式Web                                                                                                           | 深色正式Web                                                                                                         |
+| ------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 05.K1   | 无分类说明、新建、完成                                              | `karuyomi-bbf69d7-category-empty-light.jpg`                                                                           | `karuyomi-bbf69d7-category-empty-dark.jpg`                                                                          |
+| 05.K2   | 按确认顺序的名称、重命名和独立更多入口、新建、完成                  | `karuyomi-bbf69d7-category-list-light.jpg`                                                                            | `karuyomi-bbf69d7-category-list-dark.jpg`                                                                           |
+| 05.K3   | 分类上下文、上/下移边界禁用、危险删除、焦点与取消                   | `karuyomi-a9fb310-category-menu-light.jpg`                                                                            | `karuyomi-a9fb310-category-menu-dark.jpg`                                                                           |
+| 05.K4   | 空名称、字段标识、约束、取消与保存                                  | `karuyomi-a9fb310-category-name-empty-light.jpg`                                                                      | `karuyomi-a9fb310-category-name-empty-dark.jpg`                                                                     |
+| 05.K5   | 原名称或新名称草稿、保存、取消及键盘上方操作                        | `karuyomi-a9fb310-category-rename-draft-light.jpg`                                                                    | `karuyomi-a9fb310-category-rename-draft-dark.jpg`                                                                   |
+| 05.K6   | 保留输入、可读校验错误、修正入口、不发送                            | `karuyomi-a9fb310-category-name-invalid-light.jpg`                                                                    | `karuyomi-a9fb310-category-name-invalid-dark.jpg`                                                                   |
+| 05.K7   | 精确分类名、删除关联影响、保留收藏/进度、系统红确认与取消           | `karuyomi-a9fb310-category-delete-preview-light.jpg`                                                                  | `karuyomi-a9fb310-category-delete-preview-dark.jpg`                                                                 |
+| 05.K8   | 原修改、等待确认、冻结动作、禁止忙碌关闭；排序与输入各验            | `karuyomi-49f3482-category-auto-rename-waiting-light.jpg`、`karuyomi-49f3482-category-auto-reorder-waiting-light.jpg` | `karuyomi-49f3482-category-auto-rename-waiting-dark.jpg`、`karuyomi-49f3482-category-auto-reorder-waiting-dark.jpg` |
+| 05.K9   | 原请求保留、未确认与已确认后读回失败分别说明、对应精确重试/稍后处理 | `karuyomi-49f3482-category-auto-unknown-light.jpg`、`karuyomi-49f3482-category-auto-confirmed-read-failed-light.jpg`  | `karuyomi-49f3482-category-auto-unknown-dark.jpg`、`karuyomi-49f3482-category-auto-confirmed-read-failed-dark.jpg`  |
+| 05.K10  | 拒绝/冲突说明、冻结原草稿、重新读取并关闭、不能自动重基             | 待                                                                                                                    | 待                                                                                                                  |
+| 05.K11  | 失效说明、旧动作禁用、明确关闭与重开                                | 待                                                                                                                    | `karuyomi-49f3482-category-auto-expired-dark.jpg`                                                                   |
+| 06.K1   | 作品名、无分类原因、管理分类指引、关闭                              | `karuyomi-0e605c5-editors-category-empty-light.jpg`                                                                   | `karuyomi-0e605c5-editors-category-empty-dark.jpg`                                                                  |
+| 06.K2   | 精确作品、完整分类名与确认选择、保存与取消                          | `karuyomi-a9fb310-category-picker-current-light.jpg`                                                                  | `karuyomi-a9fb310-category-picker-current-dark.jpg`                                                                 |
+| 06.K3   | 未提交选择、未分类含义、保存/取消、原服务端值保留                   | `karuyomi-a9fb310-category-picker-draft-light.jpg`                                                                    | `karuyomi-a9fb310-category-picker-draft-dark.jpg`                                                                   |
+| 04.K1   | 完整漫画清单、数量、保留进度/书签/分类的影响、危险确认及取消        | `karuyomi-a9fb310-batch-remove-preview-light.jpg`                                                                     | `karuyomi-a9fb310-batch-remove-preview-dark.jpg`                                                                    |
+| 04.K2   | 添加/移出范围、待选分类、逐项原→目标关联、数量、确认/取消           | `karuyomi-a9fb310-batch-categories-preview-light.jpg`                                                                 | `karuyomi-a9fb310-batch-categories-preview-dark.jpg`                                                                |
+| 04.K3   | 确认数/未开始数、逐项状态、当前等待、暂停及忙碌关闭禁用             | `karuyomi-94b7b82-category-batch-waiting-light.jpg`                                                                   | `karuyomi-94b7b82-category-batch-waiting-dark.jpg`                                                                  |
+| 04.K4   | 已确认/未开始/未确认项、系统红错误、仅重试原项、稍后处理            | 待                                                                                                                    | 待                                                                                                                  |
+| 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | `karuyomi-94b7b82-category-batch-paused-light.jpg`                                                                    | `karuyomi-94b7b82-category-batch-paused-dark.jpg`                                                                   |
+| 04.K6   | 逐项拒绝原因、原清单、重新读取并结束、不得直接重试新revision        | 待                                                                                                                    | 待                                                                                                                  |
+| 04.K7   | 全部确认文字、逐项确认状态、完成及返回实际书架                      | `karuyomi-bbf69d7-batch-confirmed-light.jpg`                                                                          | `karuyomi-bbf69d7-batch-confirmed-dark.jpg`                                                                         |
+| 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | 待                                                                                                                    | 待                                                                                                                  |
 
 `a9fb310`浅色实际执行重排再恢复，名称草稿跨360↔390保留后取消；深色核对相同名称/顺序、菜单边界、输入校验与取消。浅色单作品初次勾选后误点保存，后续独立重做取消，不能把该次写入记为零写。批量全部确认浅色为添加分类、深色为移出分类，二者不是同一操作的全部变体。`bbf69d7`正式双主题主图进一步核对空态/列表独立新建、Tab/Return和批量系统正文色；新建草稿取消零附写。实际Web没有软件键盘，05.K5的软键盘上方操作仅有组件证据，仍待目标平台。独立API和完整边界见[分类验证](mihon-cupertino-fidelity.md#分类管理与批量确认的-cupertino-分组)。
 
@@ -1880,3 +1882,5 @@ stateDiagram-v2
 `500b5a3`完整CI/Web/Wasm通过，但本轮内置浏览器四次控制调用均超时，未进入产品页面，不补05.K8/K9。确认后即时读取、只读关闭/书架重开、冲突读回交接及首次快照被无关通知提前放行均先复现再修复，相关154项回归通过；组件及仓库不替代正式Web，没有新主图，114/169及其它缺口保持，见[读取与关闭](mihon-cupertino-fidelity.md#分类确认后读取阶段的即时反馈)。
 
 `49f3482`完整CI/Web/Wasm通过，刷新库存并选择当次实际内置浏览器后控制恢复；先前四次超时和未确认根因保留。正式Web浅色初探取得保存阶段、未知原命令重试及返回列表分项，首次确认交付sequence17无终态，不计正常释放。四组九路快照、两个相等区间和36条审计（35完成）核对一次UI应用与一次零重复重试；四张DOM实拍和一张辅助AX图不补05.K8/K9，仍114/169及原缺口。官方夹具新增短自动确认/读取及确认后读取失败，57项Workers/D1/R2回归和严格类型通过，新夹具完整CI、排序/已确认读取/冲突/失效及双主题正式验收仍待，见[恢复后的浅色复验](mihon-cupertino-fidelity.md#内置浏览器恢复后的分类浅色复验)。
+
+正式CI客户端`49f3482`与夹具`5979361`随后完成双主题分类输入/排序确认、未知精确重试和已确认后读取失败，补05.K8/K9两对主图，114→116/169（68.6%）。读取中关闭、书架重开复用原任务，最新结果只更新新窗口；真实409后再次远端改名，重读仍交接最新目录并恢复编辑。05.K11只补深色：旧动作禁用且可关闭，同一身份重连保留原请求，未明确重试不附写。两主题400/409辅助说明沿用未知请求指引的实拍保留为失败，不补05.K10；已修复并通过69项相关回归，正式新提示仍待。28组九路快照、九个相等区间与247条完成审计已核对，31张DOM图中五张转场重开图不作主图，详见[正式双主题复验](mihon-cupertino-fidelity.md#分类保存与恢复的正式-web-双主题复验)。当前仅单侧9、双侧均缺44，剩余53个主状态及全部变体/最终产物；不代表PR整体完成。

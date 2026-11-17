@@ -327,7 +327,9 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
-            draft.confirmationReceived
+            draft.blocked
+                ? '原草稿不会自动提交。请重新读取并关闭，再按最新内容重新编辑。'
+                : draft.confirmationReceived
                 ? '原修改已保存；可稍后在当前会话继续读取最新书架。'
                 : '原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。',
           ),

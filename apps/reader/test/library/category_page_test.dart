@@ -25,6 +25,7 @@ const _first = '10000000-0000-4000-8000-000000000001';
 const _second = '10000000-0000-4000-8000-000000000002';
 const _conflict = '分类或漫画已在其他设备修改，请重新读取后重开编辑。';
 const _expired = '身份或服务已变化，请关闭后重新打开。';
+const _blockedDraft = '原草稿不会自动提交。请重新读取并关闭，再按最新内容重新编辑。';
 
 void main() {
   late TestBusinessServer server;
@@ -458,6 +459,75 @@ void main() {
             );
             expect(tester.takeException(), isNull);
           }
+          final confirmedCatalog = server.catalog();
+          final confirmedAccount = server.accountRevision;
+          final confirmedPosts = posts('/api/categories/mutations').length;
+          server.beforeRequest = (request) {
+            if (request.method != 'POST' ||
+                request.uri.path != '/api/categories/mutations') {
+              return null;
+            }
+            server.beforeRequest = null;
+            final mutation = wire.decodeProtoJson(
+              wire.CategoryMutation(),
+              jsonDecode(request.body!),
+            );
+            return ApiReply(
+              status: 400,
+              headers: const {'content-type': 'application/json'},
+              body: jsonEncode(
+                wire.encodeProtoJson(
+                  wire.CategoryMutationResponse(
+                    schemaVersion: 1,
+                    mutationId: mutation.mutationId,
+                    accountRevision: confirmedAccount,
+                    categoryCatalog: confirmedCatalog,
+                    error: wire.BusinessStateError(
+                      code: wire
+                          .BusinessStateErrorCode
+                          .BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+                      message: 'Injected category rejection',
+                      retryable: false,
+                    ),
+                  ),
+                ),
+              ),
+              redirected: false,
+            );
+          };
+          await tap(tester, categoryTitle('已确认名称'));
+          await nameAndSave(tester, '被拒绝的草稿');
+          final command = find.byKey(const ValueKey('category-command'));
+          expect(
+            find.descendant(of: command, matching: find.text(_blockedDraft)),
+            findsOneWidget,
+          );
+          expect(find.text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'), findsNothing);
+          expect(server.catalog(), confirmedCatalog);
+          expect(server.accountRevision, confirmedAccount);
+          await tap(
+            tester,
+            find.descendant(
+              of: command,
+              matching: find.widgetWithText(CupertinoButton, '稍后'),
+            ),
+          );
+          expect(
+            find.descendant(of: manager, matching: find.text(_blockedDraft)),
+            findsOneWidget,
+          );
+          await tap(tester, find.text('重新读取并关闭'));
+          expect(manager, findsNothing);
+          await tap(tester, find.text('管理分类'));
+          expect(categoryTitle('已确认名称'), findsOneWidget);
+          expect(categoryTitle('被拒绝的草稿'), findsNothing);
+          expect(
+            posts('/api/categories/mutations'),
+            hasLength(confirmedPosts + 1),
+          );
+          expect(server.catalog(), confirmedCatalog);
+          expect(server.accountRevision, confirmedAccount);
+          expect(tester.takeException(), isNull);
           await hide(tester);
         },
       );
@@ -561,6 +631,8 @@ void main() {
       await tester.pumpAndSettle();
       await tap(tester, find.text('保存'));
       expect(find.text(_conflict), findsWidgets);
+      expect(find.text(_blockedDraft), findsWidgets);
+      expect(find.text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'), findsNothing);
       expect(server.catalog().categories.single.name, '另一设备');
       final attempted = wire.decodeProtoJson(
         wire.CategoryMutation(),
