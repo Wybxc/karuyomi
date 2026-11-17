@@ -111,6 +111,7 @@ final class _PendingCategoryMutation {
   final String fingerprint;
   final wire.CategoryMutation request;
   final String body;
+  wire.CategoryMutationResponse? confirmation;
   BusinessStateException? rejection;
 }
 
@@ -167,6 +168,13 @@ final class BusinessStateClient {
   int _accountRevision = 0;
   bool _closed = false;
   Future<void>? _refreshing;
+
+  /// A verified ACK is retained while authoritative reads remain unfinished.
+  /// Resuming its original command reads again without another mutation POST.
+  bool get categoryMutationNeedsRead =>
+      !_closed &&
+      _pendingCategory?.confirmation != null &&
+      _pendingCategory?.rejection == null;
 
   bool hasOnlyLocalChangesSince(
     String key, {
@@ -1083,7 +1091,8 @@ final class BusinessStateClient {
   }
 
   /// Catalog commands have their own queue, independent of manga progress and
-  /// associations. A retry retains the exact UUID, CAS and serialized body.
+  /// associations. An unconfirmed retry retains the exact UUID, CAS and body;
+  /// an acknowledged command only retries its authoritative reads.
   Future<wire.CategoryMutationResponse> mutateCategories(
     wire.CategoryMutation operation,
   ) {
@@ -1154,46 +1163,51 @@ final class BusinessStateClient {
   ) async {
     _ensureOpen();
     if (pending.rejection != null) throw pending.rejection!;
-    final reply = await api.fetchApi(
-      '/api/categories/mutations',
-      method: 'POST',
-      headers: {..._headers, 'Content-Type': 'application/json'},
-      body: pending.body,
-    );
-    _ensureOpen();
-    _budget(reply);
-    final value = wire.decodeProtoJson(
-      wire.CategoryMutationResponse(),
-      jsonDecode(reply.body),
-      maxBytes: _responseLimit,
-    );
-    _version(value.schemaVersion);
-    validateBusinessRevision(value.accountRevision);
-    if (value.mutationId != pending.request.mutationId) {
-      throw const FormatException(
-        'Category mutation response identity mismatch',
+    var value = pending.confirmation;
+    if (value == null) {
+      final reply = await api.fetchApi(
+        '/api/categories/mutations',
+        method: 'POST',
+        headers: {..._headers, 'Content-Type': 'application/json'},
+        body: pending.body,
       );
-    }
-    if (value.hasCategoryCatalog()) {
-      _validateCatalog(true, value.categoryCatalog, value.accountRevision);
-    }
-    if (value.hasError()) {
-      validateBusinessError(value.error);
-      final failure = BusinessStateException(value.error);
-      if (!value.error.retryable) pending.rejection = failure;
-      throw failure;
-    }
-    _success(reply);
-    _validateCatalog(
-      value.hasCategoryCatalog(),
-      value.categoryCatalog,
-      value.accountRevision,
-    );
-    if (value.categoryCatalog.revision !=
-        pending.request.expectedRevision + 1) {
-      throw const FormatException(
-        'Category mutation did not confirm a new revision',
+      _ensureOpen();
+      _budget(reply);
+      value = wire.decodeProtoJson(
+        wire.CategoryMutationResponse(),
+        jsonDecode(reply.body),
+        maxBytes: _responseLimit,
       );
+      _version(value.schemaVersion);
+      validateBusinessRevision(value.accountRevision);
+      if (value.mutationId != pending.request.mutationId) {
+        throw const FormatException(
+          'Category mutation response identity mismatch',
+        );
+      }
+      if (value.hasCategoryCatalog()) {
+        _validateCatalog(true, value.categoryCatalog, value.accountRevision);
+      }
+      if (value.hasError()) {
+        validateBusinessError(value.error);
+        final failure = BusinessStateException(value.error);
+        if (!value.error.retryable) pending.rejection = failure;
+        throw failure;
+      }
+      _success(reply);
+      _validateCatalog(
+        value.hasCategoryCatalog(),
+        value.categoryCatalog,
+        value.accountRevision,
+      );
+      if (value.categoryCatalog.revision !=
+          pending.request.expectedRevision + 1) {
+        throw const FormatException(
+          'Category mutation did not confirm a new revision',
+        );
+      }
+      value.freeze();
+      pending.confirmation = value;
     }
     // Even a successful ACK can be an old idempotency record. Read back the
     // current catalog before accepting it; a deleted category stays deleted.

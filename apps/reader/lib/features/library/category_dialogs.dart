@@ -19,10 +19,13 @@ const _expired = '身份或服务已变化，请关闭后重新打开。';
 
 // Keep an uncertain command with its repository for this session, including
 // when a dialog or shelf route closes. A new command must not silently retry it.
-final _pendingEdits = Expando<_CategoryDraft>('unconfirmed category edit');
+final _pendingEdits = Expando<_CategoryDraft>('unfinished category edit');
 
 bool hasPendingLibraryCategoryEdit(LibraryRepository repository) =>
     _pendingEdits[repository.client] != null;
+
+bool hasPendingLibraryCategoryRead(LibraryRepository repository) =>
+    _pendingEdits[repository.client]?.confirmationReceived == true;
 
 Future<void> showLibraryCategoryManager({
   required BuildContext context,
@@ -146,11 +149,14 @@ final class _CategoryDraft extends ChangeNotifier {
   String? error;
   LibraryView? confirmedView;
 
-  String get retryLabel => confirmed ? '重试读取' : '重试保存';
-  String get busyLabel => blocked || confirmed ? '读取中' : '保存中';
+  bool get confirmationReceived =>
+      confirmed ||
+      (entry == null && repository.client.categoryMutationNeedsRead);
+  String get retryLabel => confirmationReceived ? '重试读取' : '重试保存';
+  String get busyLabel => blocked || confirmationReceived ? '读取中' : '保存中';
   String get activityLabel => blocked
       ? '正在重新读取服务端分类。'
-      : confirmed
+      : confirmationReceived
       ? '正在读取已确认修改后的书架。'
       : '正在等待服务端确认分类修改。';
 
@@ -189,7 +195,7 @@ final class _CategoryDraft extends ChangeNotifier {
       blocked = true;
       error = '该漫画已有另一项未确认修改，请先处理原操作，再重新读取后重开分类编辑。';
     } on BusinessStateException catch (failure) {
-      if (confirmed) {
+      if (confirmationReceived) {
         error = '修改已确认，但未能读取最新书架。请重试读取。';
       } else {
         blocked = failure.conflict || !failure.error.retryable;
@@ -200,7 +206,7 @@ final class _CategoryDraft extends ChangeNotifier {
             : '尚未确认保存，请原样重试。';
       }
     } catch (_) {
-      error = confirmed ? '修改已确认，但未能读取最新书架。请重试读取。' : '尚未确认保存，请原样重试。';
+      error = confirmationReceived ? '修改已确认，但未能读取最新书架。请重试读取。' : '尚未确认保存，请原样重试。';
     } finally {
       busy = false;
       notifyListeners();
@@ -226,7 +232,7 @@ final class _CategoryDraft extends ChangeNotifier {
 }
 
 /// Once a service or identity is lost, an open editor never becomes writable
-/// again. Explicit reopening can resume the same frozen, unconfirmed command.
+/// again. Explicit reopening can resume the same frozen command or its reads.
 abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
   CatalogController get controller;
   Listenable get lifecycle;
@@ -275,6 +281,12 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
+      if (!expired && draft?.reorder == true)
+        if (draft?.description case final description?)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(description),
+          ),
       if (!expired && draft?.busy == true)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -306,9 +318,13 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
           draft?.attempted == true &&
           !draft!.busy &&
           !draft.completed)
-        const Padding(
-          padding: EdgeInsets.only(bottom: 12),
-          child: Text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            draft.confirmationReceived
+                ? '原修改已保存；可稍后在当前会话继续读取最新书架。'
+                : '原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。',
+          ),
         ),
     ],
   );
@@ -402,6 +418,8 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
           repository: widget.repository,
           view: view,
           title: '调整分类顺序',
+          description:
+              '将“${view.categories[index].name}”移至第 ${index + delta + 1} 位。',
           reorder: true,
           submit: (_, _) => widget.repository.reorderCategories(
             categoryIds: ids,
@@ -532,6 +550,8 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
                               ? draft.busyLabel
                               : draft.reorder
                               ? draft.retryLabel
+                              : draft.confirmationReceived
+                              ? '继续读取已确认修改'
                               : '继续未确认修改',
                         ),
                       )

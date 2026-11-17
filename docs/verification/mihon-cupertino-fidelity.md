@@ -806,6 +806,18 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 分类保存阶段的缺口已在四项既有浅/深×1x/2x流程复现；初轮用例的异步释放与父页查找范围已修正，最终四项均在缺少等待说明处失败。现按原busy/blocked/confirmed推导保存、重读及已确认后的读取说明，等待期间隐藏未确认后的会话指引，动作显示“保存中”/“读取中”并保持冻结；说明与官方旋转指示共同呈现，辅助通知可读取。原请求、CAS、失效和迟到结果规则未改。四项流程继续核对名称和排序等待、实际关闭受阻、确认后无额外POST；分类和批量相关35项回归通过，日志为`category-confirmation-label-{red,regressions,analyze}.log`。新提示完整CI及新正式Web仍待，不把本轮旧提示图当作修复后通过；其它状态/变体与生产门保持原记录。
 
+## 分类确认与读取失败的正式 Web 复验
+
+2026-11-17，`61608c5088958239c70cd1fc38983087861ccb02`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44077550241)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44077561146)完整成功，Web与push Wasm通过，deploy跳过。正式Web artifact 14325368443共16,299,369字节，传输边界摘要`e5835153a8c3984962565c325cf7fd650ff2123cd63678371599d0fef9728682`及39条资源校验通过。官方API和acceptance Vite装配后，实际HTTP的35条Web资源与CI清单相等，入口`main.dart.e0813d2d.js`；`61608c5-category-confirmation-served-client-check.json`同时记录相同客户端/夹具提交。环境为官方Wrangler临时D1/R2、`acceptance-owner`、四包既有输入与三包安装、`editor-ui`、内置浏览器360×800，仅浅色，地址`127.0.0.1:58166`；未本地编译Flutter/AOT、未运行Source或原生、未部署生产。
+
+五次独立准备为浅色/三包安装、英文/法文同名xkcd收藏、分类“待读”和“稍后”，原始收据`karuyomi-61608c5-category-confirmation-setup.json`逐项与审计原文相等。实际重命名“待读”至“已读”并挂起确认时，保存中与等待服务端确认文字正确，正常释放后列表读回成功。随后上移“稍后”的等待虽有正确通用阶段，却没有移动对象和目标位置；保留`reorder-waiting-light`作为缺口，不填05.K8。第三次重命名恢复“待读”，原POST正常交付200后仅下一次目录读取交付503；界面仍称“尚未确认保存，请原样重试”，动作仍为“重试保存”，`confirmed-readback-failure-light`保留失败。明确重试发送与原请求完全相同的UUID/CAS/正文，真实D1没有重复应用，但这是已收到有效ACK后的多余POST。最后明确恢复初始分类顺序并返回书架。
+
+`verify-61608c5-category-confirmation-evidence.ts`用生成ProtoJSON模型核对七组九路快照（63条响应）、两个相等区间和64条连续完成审计。仅sequence36为受控目录读取503、无Worker响应，其余均Worker/客户端200；17、26、35三次确认挂起均正常释放。十条POST为五次独立准备、四条UI分类原命令及sequence42一次已知ACK后的额外精确重试；原命令各应用一次，重试没有增加revision。目录revision从2至6、账户5至9，最终名称/顺序恢复；两部作品始终revision1、已收藏、无分类/进度/书签/续读，全局1/LIGHT及其余内容不变。读失败/重试前后和恢复顺序/最终书架分别完全相等；没有UI主题或其它业务POST，审计不代表Source运行时等全部网络请求。
+
+针对上述两个真实缺口，分类目录客户端仅在既有完整ACK校验后冻结本会话确认，读取失败时明确继续只重读；未知、无效和丢失ACK仍保留原命令精确重试，最新目录冲突仍阻止旧ACK恢复远端删除。编辑面、管理面及书架重开均保持已确认读取阶段，覆盖目录读取、首个书架读取和已发布书架读取三个失败点；排序增加冻结的完整名称与目标位置。八项最初失败、追加书架入口失败及后续已发布读取入口失败均先复现再修复。分类组件/仓库、书架、批量与迁移相关83项回归通过，同时覆盖旧ACK、身份关闭和原命令边界；日志`category-confirmed-readback-{red,shelf-red,published-red,regressions}.log`。新修复的完整CI和正式Web双主题仍待，不把旧失败图或组件结果当作新产物通过。
+
+忽略目录`.local/mihon-reference/`保留八张实际浅色JPEG和完整AX，统一前缀`karuyomi-61608c5-category-`，以及七组快照、`category-{readback-audit,ui-audit-final,ui-evidence-receipt}.json`和`61608c5-category-confirmation-evidence-check.log`。本轮新增成对主图为0，仍114/169（67.5%），仅单侧8、双侧均缺47，剩余55个主状态及全部变体/最终产物；不外推分类全流程通过或PR整体完成。已离开客户端、恢复视口，harness正常退出0，原生停止及生产待验状态不变。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

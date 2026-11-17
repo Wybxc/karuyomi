@@ -295,6 +295,15 @@ void main() {
               );
               await tester.pump();
               expect(waiting, findsOneWidget);
+              if (reorder) {
+                expect(
+                  find.descendant(
+                    of: editor,
+                    matching: find.text('将“已确认名称”移至第 2 位。'),
+                  ),
+                  findsOneWidget,
+                );
+              }
               expect(
                 find.descendant(
                   of: editor,
@@ -553,6 +562,71 @@ void main() {
       await hide(tester);
     },
   );
+
+  for (final failingRead in ['catalog', 'library', 'published shelf']) {
+    testWidgets(
+      'confirmed category read-back $failingRead failure reopens and retries reads without another POST',
+      (tester) async {
+        await show(tester);
+        await tap(tester, find.text('管理分类'));
+        await tap(tester, find.text('新建分类'));
+        var acknowledged = false;
+        var failReads = true;
+        var libraryReads = 0;
+        platform.afterBusinessReply = (request, reply) {
+          if (request.method == 'POST' &&
+              request.uri.path == '/api/categories/mutations') {
+            acknowledged = true;
+          } else if (acknowledged && request.method == 'GET') {
+            final libraryRead = request.uri.path == '/api/library';
+            if (libraryRead) {
+              libraryReads++;
+            }
+            final selected = failingRead == 'catalog'
+                ? request.uri.path == '/api/categories'
+                : libraryRead &&
+                      (failingRead == 'library' || libraryReads >= 2);
+            if (failReads && selected) {
+              return const ApiReply(
+                status: 503,
+                headers: {'content-type': 'text/plain'},
+                body: 'Confirmed category read unavailable',
+                redirected: false,
+              );
+            }
+          }
+          return reply;
+        };
+        await nameAndSave(tester, '想读');
+        expect(acknowledged, isTrue);
+        expect(server.catalog().categories.single.name, '想读');
+        expect(server.appliedMutations, 1);
+        expect(posts('/api/categories/mutations'), hasLength(1));
+        expect(find.text('修改已确认，但未能读取最新书架。请重试读取。'), findsWidgets);
+        expect(find.textContaining('尚未确认保存'), findsNothing);
+        final retryLabel = find.byWidgetPredicate(
+          (widget) => widget is Text && widget.semanticsLabel == '重试读取',
+        );
+        expect(retryLabel, findsOneWidget);
+        await tap(tester, find.text('稍后').last);
+        expect(find.text('继续读取已确认修改'), findsOneWidget);
+        expect(posts('/api/categories/mutations'), hasLength(1));
+        await tap(tester, find.text('稍后'));
+        expect(find.text('继续读取最新书架'), findsOneWidget);
+        expect(find.text('处理未确认修改'), findsNothing);
+        await tap(tester, find.text('继续读取最新书架'));
+        await tap(tester, find.text('继续读取已确认修改'));
+        expect(retryLabel, findsOneWidget);
+        failReads = false;
+        await tap(tester, retryLabel);
+        expect(posts('/api/categories/mutations'), hasLength(1));
+        expect(server.appliedMutations, 1);
+        expect(hasCategory(tester, '想读'), isTrue);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+  }
 
   testWidgets(
     'a failed association remains unsaved until an exact explicit retry succeeds',

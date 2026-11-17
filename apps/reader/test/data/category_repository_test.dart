@@ -204,6 +204,91 @@ void main() {
     },
   );
 
+  for (final failingPath in ['/api/categories', '/api/library']) {
+    test(
+      'confirmed category retry reads $failingPath without resending its mutation',
+      () async {
+        final server = TestBusinessServer();
+        final client = _client(server);
+        addTearDown(client.dispose);
+        final repository = LibraryRepository(client);
+        var failRead = true;
+        server.beforeRequest = (request) =>
+            failRead &&
+                request.method == 'GET' &&
+                request.uri.path == failingPath
+            ? const ApiReply(
+                status: 503,
+                headers: {'content-type': 'text/plain'},
+                body: 'Read unavailable after ACK',
+                redirected: false,
+              )
+            : null;
+        await expectLater(
+          _create(repository),
+          throwsA(isA<BusinessStateTransportException>()),
+        );
+        expect(server.appliedMutations, 1);
+        failRead = false;
+        await _create(repository);
+        expect(
+          server.requests.where((request) => request.method == 'POST'),
+          hasLength(1),
+        );
+        expect(server.appliedMutations, 1);
+        final view = await repository.watchView().first;
+        expect(view.categoryRevision, 1);
+        expect(view.categories.single.id, _first);
+      },
+    );
+  }
+
+  test('cached category confirmation cannot restore a category deleted before its read retry', () async {
+    final server = TestBusinessServer();
+    final client = _client(server);
+    final remote = _client(server);
+    addTearDown(client.dispose);
+    addTearDown(remote.dispose);
+    final repository = LibraryRepository(client);
+    var failRead = true;
+    server.beforeRequest = (request) =>
+        failRead &&
+            request.method == 'GET' &&
+            request.uri.path == '/api/categories'
+        ? const ApiReply(
+            status: 503,
+            headers: {'content-type': 'text/plain'},
+            body: 'Read unavailable after ACK',
+            redirected: false,
+          )
+        : null;
+    await expectLater(
+      _create(repository),
+      throwsA(isA<BusinessStateTransportException>()),
+    );
+    failRead = false;
+    await LibraryRepository(remote)
+        .deleteCategory(categoryId: _first, expectedRevision: 1);
+    await expectLater(
+      _create(repository),
+      throwsA(
+        isA<BusinessStateException>().having(
+          (error) => error.conflict,
+          'stale cached confirmation',
+          true,
+        ),
+      ),
+    );
+    final view = await repository.watchView().first;
+    expect(view.categoryRevision, 2);
+    expect(view.categories, isEmpty);
+    expect(
+      server.requests.where((request) => request.method == 'POST'),
+      hasLength(2),
+    );
+    expect(server.appliedMutations, 2);
+  });
+
   test(
     'an old creation ACK cannot resurrect a remotely deleted category',
     () async {
@@ -519,26 +604,34 @@ void main() {
     },
   );
 
-  test('closing a subject drops a late category ACK and leaves the next identity isolated', () async {
-    final server = TestBusinessServer();
-    final gate = _ResponseGate(server)
-      ..hold('/api/categories/mutations', verb: 'POST');
-    final client = _client(gate);
-    final write = _create(LibraryRepository(client));
-    final failed = expectLater(write, throwsStateError);
-    await gate.received!.future;
-    await client.dispose();
-    final next = _client(server.forSubject('other'), subject: 'other');
-    addTearDown(next.dispose);
-    expect(
-      (await LibraryRepository(next).watchView().first).categories,
-      isEmpty,
+  for (final holdAck in [true, false]) {
+    test(
+      'closing a subject drops a late category ${holdAck ? 'ACK' : 'confirmed read'} and leaves the next identity isolated',
+      () async {
+        final server = TestBusinessServer();
+        final gate = _ResponseGate(server)
+          ..hold(
+            holdAck ? '/api/categories/mutations' : '/api/categories',
+            verb: holdAck ? 'POST' : 'GET',
+          );
+        final client = _client(gate);
+        final write = _create(LibraryRepository(client));
+        final failed = expectLater(write, throwsStateError);
+        await gate.received!.future;
+        await client.dispose();
+        final next = _client(server.forSubject('other'), subject: 'other');
+        addTearDown(next.dispose);
+        expect(
+          (await LibraryRepository(next).watchView().first).categories,
+          isEmpty,
+        );
+        gate.release!.complete();
+        await failed;
+        expect(server.catalog().categories.single.id, _first);
+        expect(server.catalog(subject: 'other').categories, isEmpty);
+      },
     );
-    gate.release!.complete();
-    await failed;
-    expect(server.catalog().categories.single.id, _first);
-    expect(server.catalog(subject: 'other').categories, isEmpty);
-  });
+  }
 
   test(
     'category responses reject invalid IDs, catalogs and oversized bodies',

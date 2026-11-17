@@ -680,6 +680,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final repository = _repository;
     final pending =
         repository != null && hasPendingLibraryCategoryEdit(repository);
+    final confirmedRead =
+        repository != null && hasPendingLibraryCategoryRead(repository);
     final batch = repository == null ? null : pendingLibraryBatch(repository);
     final available =
         !_editing &&
@@ -691,14 +693,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (pending) ...[
-          Text('有一项分类修改尚未处理。请继续原修改，当前列表仅显示服务端已确认的结果。'),
+          Text(
+            confirmedRead
+                ? '分类修改已获确认，请继续完成目录和书架的读取核对。'
+                : '有一项分类修改尚未处理。请继续原修改，当前列表仅显示服务端已确认的结果。',
+          ),
           Align(
             alignment: Alignment.centerLeft,
             child: CupertinoButton.tinted(
               onPressed: available
                   ? () => unawaited(_editCategories(view))
                   : null,
-              child: const Text('处理未确认修改'),
+              child: Text(confirmedRead ? '继续读取最新书架' : '处理未确认修改'),
             ),
           ),
           const SizedBox(height: 8),
