@@ -1,11 +1,13 @@
 import { create, toJsonString } from '@bufbuild/protobuf';
 import {
   businessSchemaVersion,
+  categoryMutationSchema,
   settingsMutationSchema,
   stateMutationSchema,
 } from '@karuyomi/contracts';
 import {
   BusinessStateErrorCode,
+  CategoryMutationResponseSchema,
   SettingsMutationResponseSchema,
   StateMutationResponseSchema,
 } from '@karuyomi/protocol';
@@ -22,7 +24,14 @@ const modes = [
   'access-denied',
 ] as const;
 type EditorUiMode = (typeof modes)[number];
-type EditorUiScope = 'manga' | 'global' | 'cover' | 'migration' | 'connection';
+type EditorUiScope =
+  | 'manga'
+  | 'global'
+  | 'cover'
+  | 'migration'
+  | 'connection'
+  | 'categories'
+  | 'classification';
 interface Control {
   mode: EditorUiMode;
   scope: EditorUiScope;
@@ -57,10 +66,12 @@ export async function setEditorUiMode(
       scope !== 'global' &&
       scope !== 'cover' &&
       scope !== 'migration' &&
-      scope !== 'connection')
+      scope !== 'connection' &&
+      scope !== 'categories' &&
+      scope !== 'classification')
   ) {
     throw new Error(
-      'Expected an editor UI mode and manga/global/cover/migration/connection scope',
+      'Expected an editor UI mode and manga/global/cover/migration/connection/categories/classification scope',
     );
   }
   await db
@@ -141,6 +152,12 @@ export async function withEditorUi(
     request.method === 'GET' && url.pathname.startsWith('/api/covers/');
   const settingsSaving =
     request.method === 'POST' && url.pathname === '/api/settings/mutations';
+  const categoriesReading =
+    request.method === 'GET' && url.pathname === '/api/categories';
+  const libraryReading =
+    request.method === 'GET' && url.pathname === '/api/library';
+  const categoriesSaving =
+    request.method === 'POST' && url.pathname === '/api/categories/mutations';
   const stateSaving =
     request.method === 'POST' && url.pathname === '/api/state/mutations';
   if (
@@ -149,6 +166,9 @@ export async function withEditorUi(
     !mangaReading &&
     !coverImage &&
     !settingsSaving &&
+    !categoriesReading &&
+    !libraryReading &&
+    !categoriesSaving &&
     !stateSaving
   )
     return dispatch();
@@ -158,32 +178,58 @@ export async function withEditorUi(
   const stateCommand = stateSaving
     ? stateMutationSchema.parse(await readJson(request.clone()))
     : undefined;
+  const categoryCommand = categoriesSaving
+    ? categoryMutationSchema.parse(await readJson(request.clone()))
+    : undefined;
+  const classificationSaving = stateCommand?.operation.case === 'setCategories';
   // Audit bounded JSON state commands, including progress, while faulting only
-  // cover clears and migration. Multipart upload remains on its real path.
+  // cover clears, migration and classification. Multipart upload stays real.
   const forwardOnlyState =
     stateCommand !== undefined &&
+    !classificationSaving &&
     stateCommand.operation.case !== 'migrateFrom' &&
     (stateCommand.operation.case !== 'setCustomCover' ||
       stateCommand.operation.value.cover !== undefined);
-  const command = settingsCommand ?? stateCommand;
+  const command = settingsCommand ?? stateCommand ?? categoryCommand;
   const control = await readControl(db);
-  const scope: EditorUiScope = bootstrapReading
-    ? 'connection'
-    : stateCommand?.operation.case === 'migrateFrom' ||
-        (mangaReading && control.scope === 'migration')
-      ? 'migration'
-      : stateCommand || mangaReading || coverImage
-        ? 'cover'
-        : settingsCommand
-          ? settingsCommand.operation.case === 'setGlobal'
-            ? 'global'
-            : 'manga'
-          : url.pathname === '/api/settings'
-            ? 'global'
-            : 'manga';
+  if (
+    libraryReading &&
+    control.scope !== 'categories' &&
+    control.scope !== 'classification'
+  )
+    return dispatch();
+  let scope: EditorUiScope = 'manga';
+  if (
+    categoriesReading ||
+    categoryCommand ||
+    (libraryReading && control.scope === 'categories')
+  )
+    scope = 'categories';
+  else if (
+    classificationSaving ||
+    ((mangaReading || libraryReading) && control.scope === 'classification')
+  )
+    scope = 'classification';
+  else if (bootstrapReading) scope = 'connection';
+  else if (
+    stateCommand?.operation.case === 'migrateFrom' ||
+    (mangaReading && control.scope === 'migration')
+  )
+    scope = 'migration';
+  else if (stateCommand || mangaReading || coverImage) scope = 'cover';
+  else if (
+    settingsCommand?.operation.case === 'setGlobal' ||
+    (!settingsCommand && url.pathname === '/api/settings')
+  )
+    scope = 'global';
   const mode =
     !forwardOnlyState && control.scope === scope ? control.mode : 'pass';
-  const reading = bootstrapReading || settingsReading || mangaReading;
+  const reading =
+    bootstrapReading ||
+    settingsReading ||
+    mangaReading ||
+    categoriesReading ||
+    libraryReading;
   // requestJson has already enforced the body bound before retaining exact bytes.
   const body = command ? await request.clone().text() : null;
   const inserted = await db
@@ -221,15 +267,20 @@ export async function withEditorUi(
       },
     };
     response = new Response(
-      stateCommand
+      categoryCommand
         ? toJsonString(
-            StateMutationResponseSchema,
-            create(StateMutationResponseSchema, rejection),
+            CategoryMutationResponseSchema,
+            create(CategoryMutationResponseSchema, rejection),
           )
-        : toJsonString(
-            SettingsMutationResponseSchema,
-            create(SettingsMutationResponseSchema, rejection),
-          ),
+        : stateCommand
+          ? toJsonString(
+              StateMutationResponseSchema,
+              create(StateMutationResponseSchema, rejection),
+            )
+          : toJsonString(
+              SettingsMutationResponseSchema,
+              create(SettingsMutationResponseSchema, rejection),
+            ),
       { status: 400, headers: { 'Content-Type': 'application/json' } },
     );
   } else {

@@ -2,6 +2,8 @@ import { create, toJsonString } from '@bufbuild/protobuf';
 import {
   businessSchemaVersion,
   bootstrapSchema,
+  categoryCatalogResponseSchema,
+  categoryMutationResponseSchema,
   settingsMutationResponseSchema,
   settingsResponseSchema,
   mangaStateResponseSchema,
@@ -9,6 +11,8 @@ import {
 } from '@karuyomi/contracts';
 import {
   BusinessStateErrorCode,
+  CategoryMutationSchema,
+  CategorySchema,
   LibraryMetadataSchema,
   ReaderMode,
   SettingsMutationSchema,
@@ -248,6 +252,253 @@ async function seedMigration() {
   return { sourceKey, targetKey, command, snapshot };
 }
 
+async function seedLibraryScope(scope: 'categories' | 'classification') {
+  const mangas = await seedMigration();
+  const category = create(CategorySchema, {
+    id: crypto.randomUUID(),
+    name: '待读',
+  });
+  const categoryBody = (mutationId: string) =>
+    toJsonString(
+      CategoryMutationSchema,
+      create(CategoryMutationSchema, {
+        schemaVersion: businessSchemaVersion,
+        mutationId,
+        operation: { case: 'createCategory', value: { category } },
+      }),
+    );
+  if (scope === 'classification') {
+    expect(
+      (
+        await request(
+          '/api/categories/mutations',
+          categoryBody(crypto.randomUUID()),
+          false,
+        )
+      ).status,
+    ).toBe(200);
+  }
+  const command = () => {
+    const mutationId = crypto.randomUUID();
+    return {
+      mutationId,
+      body:
+        scope === 'categories'
+          ? categoryBody(mutationId)
+          : toJsonString(
+              StateMutationSchema,
+              create(StateMutationSchema, {
+                schemaVersion: businessSchemaVersion,
+                mutationId,
+                mangaKey: mangas.sourceKey,
+                expectedRevision: 1,
+                operation: {
+                  case: 'setCategories',
+                  value: {
+                    categoryIds: [category.id],
+                    expectedCatalogRevision: 1,
+                  },
+                },
+              }),
+            ),
+    };
+  };
+  const read = async () => {
+    const categories = await request('/api/categories', undefined, false);
+    expect(categories.status).toBe(200);
+    return {
+      ...(await mangas.snapshot()),
+      categories: categoryCatalogResponseSchema.parse(await categories.json()),
+    };
+  };
+  const before = await read();
+  const committed = structuredClone(before);
+  for (const state of Object.values(committed)) state.accountRevision++;
+  if (scope === 'categories') {
+    for (const state of Object.values(committed)) {
+      if (!state.categoryCatalog) throw new Error('Category catalog missing');
+      state.categoryCatalog.revision = 1;
+      state.categoryCatalog.categories = [category];
+    }
+  } else {
+    if (!committed.source.manga) throw new Error('Favorite missing');
+    committed.source.manga.revision = 2;
+    committed.source.manga.categoryIds = [category.id];
+  }
+  return {
+    before,
+    committed,
+    read,
+    command,
+    path:
+      scope === 'categories'
+        ? '/api/categories/mutations'
+        : '/api/state/mutations',
+    readPath:
+      scope === 'categories'
+        ? '/api/categories'
+        : '/api/state/manga/' + mangas.sourceKey,
+  };
+}
+
+test.each(['categories', 'classification'] as const)(
+  '%s waits for ACK delivery after its real D1 transaction, retaining unrelated works',
+  async (scope) => {
+    const fixture = await seedLibraryScope(scope);
+    await setEditorUiMode(env.DB, 'hold-confirm', scope);
+    const original = fixture.command();
+    let delivered = false;
+    const pending = request(fixture.path, original.body).then((reply) => {
+      delivered = true;
+      return reply;
+    });
+    try {
+      await entered();
+      for (let attempt = 0; attempt < 30; attempt++) {
+        if (
+          (await fixture.read()).source.accountRevision ===
+          fixture.committed.source.accountRevision
+        )
+          break;
+        await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await fixture.read()).toEqual(fixture.committed);
+      expect(delivered).toBe(false);
+    } finally {
+      await setEditorUiMode(env.DB, 'pass', scope);
+      await pending;
+    }
+    const reply = await pending;
+    expect(reply.status).toBe(200);
+    const json = await reply.json();
+    const ack =
+      scope === 'categories'
+        ? categoryMutationResponseSchema.parse(json)
+        : stateMutationResponseSchema.parse(json);
+    expect(ack.mutationId).toBe(original.mutationId);
+    expect(await editorUiAttempts(env.DB)).toEqual([
+      expect.objectContaining({
+        body: original.body,
+        mode: 'hold-confirm',
+        worker_status: 200,
+        client_status: 200,
+      }),
+    ]);
+  },
+);
+
+test.each(['categories', 'classification'] as const)(
+  '%s retries the identical lost ACK without applying twice; fresh stale commands still conflict',
+  async (scope) => {
+    const fixture = await seedLibraryScope(scope);
+    const original = fixture.command();
+    await setEditorUiMode(env.DB, 'lose-confirm', scope);
+    expect((await request(fixture.path, original.body)).status).toBe(502);
+    expect(await fixture.read()).toEqual(fixture.committed);
+    await setEditorUiMode(env.DB, 'pass', scope);
+    const retry = await request(fixture.path, original.body);
+    expect(retry.status).toBe(200);
+    const json = await retry.json();
+    const ack =
+      scope === 'categories'
+        ? categoryMutationResponseSchema.parse(json)
+        : stateMutationResponseSchema.parse(json);
+    expect(ack.mutationId).toBe(original.mutationId);
+    expect(await fixture.read()).toEqual(fixture.committed);
+    const stale = fixture.command();
+    expect(stale.mutationId).not.toBe(original.mutationId);
+    const conflict = await request(fixture.path, stale.body);
+    expect(conflict.status).toBe(409);
+    const raw = await conflict.json();
+    const failure =
+      scope === 'categories'
+        ? categoryMutationResponseSchema.parse(raw)
+        : stateMutationResponseSchema.parse(raw);
+    expect(failure.error?.code).toBe(BusinessStateErrorCode.REVISION_CONFLICT);
+    expect(await fixture.read()).toEqual(fixture.committed);
+    expect(await editorUiAttempts(env.DB)).toEqual([
+      expect.objectContaining({
+        body: original.body,
+        worker_status: 200,
+        client_status: 502,
+      }),
+      expect.objectContaining({
+        body: original.body,
+        worker_status: 200,
+        client_status: 200,
+      }),
+      expect.objectContaining({
+        body: stale.body,
+        worker_status: 409,
+        client_status: 409,
+      }),
+    ]);
+  },
+);
+
+test.each(['categories', 'classification'] as const)(
+  '%s read failure, rejection and expired login preserve catalog and both works',
+  async (scope) => {
+    const fixture = await seedLibraryScope(scope);
+    await setEditorUiMode(env.DB, 'fail-read', scope);
+    expect((await request(fixture.readPath)).status).toBe(503);
+    expect((await request('/api/library')).status).toBe(503);
+    expect(await fixture.read()).toEqual(fixture.before);
+    const original = fixture.command();
+    await setEditorUiMode(env.DB, 'reject-save', scope);
+    const rejected = await request(fixture.path, original.body);
+    expect(rejected.status).toBe(400);
+    const json = await rejected.json();
+    const ack =
+      scope === 'categories'
+        ? categoryMutationResponseSchema.parse(json)
+        : stateMutationResponseSchema.parse(json);
+    expect(ack.mutationId).toBe(original.mutationId);
+    expect(ack.error?.code).toBe(BusinessStateErrorCode.INVALID_INPUT);
+    expect(await fixture.read()).toEqual(fixture.before);
+    await setEditorUiMode(env.DB, 'login-required', scope);
+    const expired = await request(fixture.path, original.body);
+    expect(expired.status).toBe(401);
+    expect(expired.headers.get('Content-Type')).toBe('text/html');
+    expect(await fixture.read()).toEqual(fixture.before);
+    expect((await request('/api/settings')).status).toBe(200);
+    expect((await request(fixture.readPath + '?unrelated=1')).status).toBe(200);
+    expect(await editorUiAttempts(env.DB)).toEqual([
+      expect.objectContaining({
+        method: 'GET',
+        mode: 'fail-read',
+        worker_status: null,
+        client_status: 503,
+      }),
+      expect.objectContaining({
+        path: '/api/library',
+        method: 'GET',
+        mode: 'fail-read',
+        worker_status: null,
+        client_status: 503,
+      }),
+      expect.objectContaining({
+        body: original.body,
+        mode: 'reject-save',
+        worker_status: null,
+        client_status: 400,
+      }),
+      expect.objectContaining({
+        body: original.body,
+        mode: 'login-required',
+        worker_status: null,
+        client_status: 401,
+      }),
+      expect.objectContaining({
+        path: '/api/settings',
+        mode: 'pass',
+        worker_status: 200,
+        client_status: 200,
+      }),
+    ]);
+  },
+);
+
 test('fixture stays opt-in, loopback-only, scoped and absent from other APIs', async () => {
   await setEditorUiMode(env.DB, 'fail-read', 'manga');
   expect((await request(mangaPath, undefined, false)).status).toBe(200);
@@ -275,6 +526,10 @@ test.each([
   ['lose-confirm', 'migration'],
   ['reject-save', 'cover'],
   ['login-required', 'connection'],
+  ['hold-confirm', 'categories'],
+  ['lose-confirm', 'classification'],
+  ['reject-save', 'categories'],
+  ['login-required', 'classification'],
 ])(
   'unrelated progress is audited without %s faults in %s',
   async (mode, scope) => {
@@ -334,6 +589,10 @@ test.each([
   ['manga', mangaPath],
   ['cover', coverPath],
   ['migration', coverPath],
+  ['categories', '/api/categories'],
+  ['classification', coverPath],
+  ['categories', '/api/library'],
+  ['classification', '/api/library'],
 ])(
   'reading %s remains pending until an explicit stdin-controlled generation change',
   async (scope, path) => {
@@ -367,6 +626,10 @@ test.each([
   ['manga', mangaPath],
   ['cover', coverPath],
   ['migration', coverPath],
+  ['categories', '/api/categories'],
+  ['classification', coverPath],
+  ['categories', '/api/library'],
+  ['classification', '/api/library'],
 ])(
   'an aborted %s reader leaves the gate without dispatching a late request',
   async (scope, path) => {

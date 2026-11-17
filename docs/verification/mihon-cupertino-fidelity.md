@@ -784,6 +784,14 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 忽略目录`.local/mihon-reference/`保留23张360×800 JPEG与完整AX，统一前缀`karuyomi-ef5f3dd-selection-`，以及九组快照、偏好响应、`selection-ui-{audit-final,evidence-receipt}.json`和`ef5f3dd-selection-evidence-check.log`。上述八张实际加载图补20.K10一对主图及首次/追加、热门/搜索分项，跨版本成对主图111→112/169（66.3%），仅单侧8、双侧均缺49，剩余57个主状态。其余图为已存在节点的转换与空分类变体，不增加分子。静态扫描未发现正式客户端的Material导入或常见Material控件，仍不代替实际配色/导航/转场验收。完成后离开客户端、恢复视口，harness正常退出0；其余状态/变体、生产与已停止的Karuyomi原生门保持原记录，PR #8仍草稿、未合并、未部署。
 
+## 分类目录与批量操作的故障验收入口
+
+2026-11-17，现有官方`editor-ui`夹具增加`categories`及`classification`范围，分别覆盖正式分类目录命令和作品`setCategories`命令。分类目录读取、作品快照及两种范围内首段书架读回可明确挂起/失败；带查询的分页继续走原路径。仅stdin配置模式，既有30秒/每秒检查一次的有界等待、loopback及显式fixture限制和256条审计上限保留，普通验收和生产入口不启用。确认挂起与丢响应先运行正式D1事务；拒绝和身份HTML仍是明确测试故障，不代表真实Access。进度、收藏和其它范围继续原样通过，有界JSON原文与真实状态可核对，multipart图片不入审计正文。
+
+42项既有及新增[官方Workers测试](https://developers.cloudflare.com/workers/testing/vitest-integration/test-apis/)通过，使用项目固定的Cloudflare Vitest插件与真实临时D1/R2。覆盖目录/作品分类/书架读取的等待和取消、实际事务提交后才挂起确认、丢确认时完全相同正文的精确重试零重复、全新旧版本请求的真实409，以及读取失败/400/401时目录和两部作品不被覆盖。初轮两个目录用例遗漏作品响应内同步返回的共享目录，修正预期后全部通过；没有把该测试预期错误记录成产品缺陷。API/test严格类型、全范围格式及依赖分层均通过；新提交完整CI和新范围正式Web仍待。日志为`categories-classification-fixture-{workers,typecheck,format,format-check,dependencies}.log`。
+
+这一步提供05.K8–K11、04.K3–K6/K8的实际验收入口，尚未取得它们的新正式Web主图，不增加112/169计数。后续复用已核验的正式CI客户端时，分别记录客户端与夹具提交、核对实际交付清单，并以独立权威快照和原始审计验收UI转换；等待、未知、明确拒绝、暂停、失效及原命令重试不能相互替代。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。
