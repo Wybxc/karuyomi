@@ -12,7 +12,7 @@
 - 固定 `TachiyomiColorScheme.kt` 与 `UiPreferences.kt` 确认 DEFAULT 浅/深角色和 Monet 的设备依赖。已提取颜色表，尚未据此宣布应用全部表面和状态完成迁移。
 - `LazyLibraryGrid.kt` 的自适应最小列宽为 128dp、额外内容 padding 为 8dp；`CommonMangaItem.kt` 的格间距为 4dp、封面标题区渐变占高度的 0.33、标题 padding 为 8dp。上游截图采用的具体列数和密度须与实际画面核对，不能直接把这些 dp 当作 PNG 物理像素。
 - `flutter test --no-pub --concurrency=1 test/theme/app_theme_test.dart`：本机 Flutter 3.50 / Dart 3.14 的 3 项主题测试通过。覆盖系统浅/深、已确认主题覆盖系统、实际导航标题/实色按钮和各文字角色的至少 4.5:1 对比；这项结果不覆盖尚未接入的页面表面。
-- 用户已允许本机参考模拟器；复用仓库 Android SDK 与 API 36 arm64 镜像，单实例 `mihon-reference` 已启动完成，720×1600、320dpi，即 360×800 逻辑视口，2 核/2GB。官方 arm64 APK 的 SHA-256 与发布页一致：`0026bd25ce5b1c6bdc5bd2c9589a08a811ddc4fa7c994cf937729d5b7010619d`。早期采集仍为 Monet，不能算固定主题证据；随后在外观页明确选中第一张 DEFAULT 卡，`settings-appearance-default-dark` 确认卡片选中及背景采样 `#1B1B1F`。后续带 `default-dark` 的有效截图据此采集。系统顶部 68dp、底部约 24dp 单独计量。
+- 用户已允许本机参考模拟器；复用仓库 Android SDK 与 API 36 arm64 镜像，单实例 `mihon-reference` 已启动完成，720×1600、320dpi，即 360×800 逻辑视口。AVD配置2核/2048MB，但启动日志记录上调至2560MB，不能称作实际2GB内存验收；Guest内存和宿主RSS未独立测量。官方 arm64 APK 的 SHA-256 与发布页一致：`0026bd25ce5b1c6bdc5bd2c9589a08a811ddc4fa7c994cf937729d5b7010619d`。早期采集仍为 Monet，不能算固定主题证据；随后在外观页明确选中第一张 DEFAULT 卡，`settings-appearance-default-dark` 确认卡片选中及背景采样 `#1B1B1F`。后续带 `default-dark` 的有效截图据此采集。系统顶部 68dp、底部约 24dp 单独计量。
 - 书架与源内作品已从行列表改为惰性封面网格，保持 2:3 封面、底部标题、独立续读、选择与菜单。普通 Source 缩略图尚无正式资源通道，仍为占位；仅已有账户自定义封面读取已验证字节，不能将占位图称为真实封面验收。
 - 本机单并发运行 `flutter test --no-pub --concurrency=1 test/library test/browse/source_browse_page_test.dart test/browse/manga_cover_tile_test.dart test/migration/migration_controller_test.dart test/theme/app_theme_test.dart`：**70 项通过**，无命中警告。覆盖分类/CAS/确认、隐藏选择与部分提交、续读和身份变化、源查询失败/取消/迟到丢弃、迁移入口、主题，以及双倍字号下封面的打开/长按与独立续读触控范围。改动文件严格分析通过；完整工程检查仍由分支 CI 验证。
 - 首个里程碑 `b138967` 的 [push CI](https://github.com/Wybxc/karuyomi/actions/runs/43523374793) 与 [PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43524983955) 均通过；包含 747 项 Dart、531 项 TypeScript/Workers、严格分析、格式、生成和 Web 构建。分支未部署。
@@ -692,7 +692,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 2026-11-17，复核最终源码的Cupertino文字角色：跨源结果的源名取消16px硬编码，直接继承官方正文主题（默认17px）并保留半粗；状态由14px改为13px次级说明。复用既有`cross_source_search_page_test.dart`的23项页面回归，窄屏、浅/深、线性/非线性文字缩放、源名和状态自然增高、重试入口及清理路径均通过；单文件`dart analyze --fatal-infos`无问题，没有为这一低影响字号调整新增重复测试。原始输出为`.local/mihon-reference/cross-typography-{regressions,analyze}.log`。这是源码与组件证据，新提交完整CI和正式Web另行验收。
 
-同日复用既有官方Android SDK/AVD及Mihon 0.21.3（versionCode39），单实例2核/2048MB、720×1600像素、320dpi，补齐[参考状态表](mihon-state-coverage.md)的28.04应用浅/深主图`s2804-worker-copy-readable-{light,dark}.png`。两张已逐图实看，系统复制预览实际显示可读任务ID/Tags开头；底层WorkManager诊断XML正文一致，只能确认可见片段，没有验证完整剪贴板内容。系统夜间模式始终为`no`，应用浅/深不等于系统复制容器浅/深。PNG在复制后先采，XML稍后采，不把它们称为同一瞬时；较早帧和旧的空浅色预览保留，空容器不计通过。
+同日复用既有官方Android SDK/AVD及Mihon 0.21.3（versionCode39），单实例AVD配置2核/2048MB、720×1600像素、320dpi，补齐[参考状态表](mihon-state-coverage.md)的28.04应用浅/深主图`s2804-worker-copy-readable-{light,dark}.png`。后续核对`20261117-emulator.log`发现启动器将RAM上调至2560MB，配置值不是实际内存证据，Guest内存和宿主RSS仍未测量。两张已逐图实看，系统复制预览实际显示可读任务ID/Tags开头；底层WorkManager诊断XML正文一致，只能确认可见片段，没有验证完整剪贴板内容。系统夜间模式始终为`no`，应用浅/深不等于系统复制容器浅/深。PNG在复制后先采，XML稍后采，不把它们称为同一瞬时；较早帧和旧的空浅色预览保留，空容器不计通过。
 
 在线语言组关闭后仍显示Local source，不满足真正空列表；切换标签后的旧/过渡帧也不记作加载。已恢复原语言组和Source勾选、显式深色、DEFAULT及非纯黑，未变更网络、权限、扩展安装、日志或阅读设置。已向本次参考模拟器发送正常退出并确认ADB设备列表为空。原始图片与XML留在忽略目录，不提交测试实例任务ID等临时输出。
 
@@ -751,6 +751,26 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 同名书架卡片、更多/分类/续读辅助名称已双主题确认，但分类编辑面内仍只有“xkcd”，缺少源身份；深色从书架重开并确认迁移后，原作品页脚仍要求先读取章节或选择范围。两处失败实拍均保留。分类对象现使用官方Cupertino表单分组，完整标题与语言/源名次级页脚自然换行；迁移页脚按待确认与完成阶段显示固定范围/确认说明。八项既有浅/深×1x/2x流程先在缺少身份或阶段说明处失败，再通过；迁移用例从不携带章节快照的书架入口重开原命令，继续核对精确重试只应用一次。书架、分类与迁移相关51项回归及四文件严格分析通过，日志为`editor-object-context-{red-visible,regressions,analyze}.log`。新说明完整CI及修复后正式Web仍待。
 
 本轮补的是现有阅读与书架转换，成对主图不增加，仍111/169（65.7%），剩余58个主状态及全部变体继续验收。没有据此通过拒绝/重置/Access等所有转换、生产Access、生产图片或原生性能；PR #8继续草稿、未合并、未部署。
+
+## 分类对象与迁移页脚的正式 Web 双主题复验
+
+2026-11-17，对象/阶段说明修复`25be6f5ec38c87e6ec4f6d873df0a364c655614f`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44033443457)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44033451647)完整成功，正式Web及push Wasm通过，deploy跳过。Web artifact 14306686562长16,299,145字节，下载边界SHA-256为`d8b4bbb3244e527bb5705cf0f785ec8da2320a1700202d699230fc3eecc72a6e`；校验归档和39条Flutter资源后复用，没有本地Flutter或AOT编译。
+
+首次本地组装仅重建API产物，遗漏独立acceptance构建，因此旧验收目录仍向浏览器交付`a12c779`的`main.dart.863ad073.js`。这属于本地组装错误；原始截图、13条审计和快照改名保留为`25be6f5-stale-*`/`object-stale-*`，不计新版本通过。修正为依次运行官方`pnpm --filter @karuyomi/api build`与`pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts`，再启动`ACCEPTANCE_FIXTURE=editor-ui BROWSER=none pnpm acceptance:serve`。未运行会触发完整Flutter构建的`acceptance:build`。正式操作前，实际HTTP读取的`precache_manifest.json`经正式schema解析，与CI资源经官方Web过滤后的35条清单逐项相等，主入口为`main.dart.0d1c3cf3.js`；39条中的四条Native资源按既有合同排除。`25be6f5-served-client-check.json`保存完整校验结果，以后也先核对实际交付版本。
+
+纠正后的验收使用官方Vite/Wrangler临时D1/R2、四包既有静态输入、`acceptance-owner`、`editor-ui`和内置浏览器360×800，地址为`127.0.0.1:49761`。四次独立API准备分别为浅色/三包安装、英文收藏、分类“待读”和法文收藏；分类目录准备接口不在editor-ui审计范围，另外三次准备POST在范围内。原始准备收据独立保存为`karuyomi-25be6f5-object-context-setup.json`，不把准备操作算普通UI操作。
+
+浅色英文与深色法文的分类面均在官方“漫画”分组显示完整标题，次级页脚分别显示`en · xkcd`、`fr · xkcd`。实际点击分类名称修改草稿、取消及重开后恢复原值，再明确保存，各仅修改对应作品的分类并推进一次版本，另一部同名作品不变。`category-{current,draft,confirmed}-{light,dark}`已逐图实看；两个主题故意使用不同对象来核对身份，不称为同内容像素叠图。批量两作品浅色执行添加分类、深色执行移除分类；名称点击只改预览，取消零写入，明确开始各发两条命令并显示2/2确认。`batch-category-{current,draft,confirmed}-{light,dark}`是不同操作的业务分项，不替换既有同操作双主题主图。新对象分组的空分类变体仍待新正式Web。
+
+两主题均从不携带章节快照的书架入口，明确选择仅收藏/分类，经真实法文Source热门、详情与权威预览后提交。D1各实际应用一次，夹具随后交付502；待确认页脚显示“原操作的复制范围已固定，原作品保留。”。返回书架并重开仍显示相同固定范围说明；明确精确重试原UUID/CAS/正文后，页脚显示“原作品已保留；迁移结果见下方服务端确认。”，没有重复应用。`migration-{pending-footer,reopened-pending-footer,confirmed-footer}-{light,dark}`均实看；旧正常请求和其余复制范围证据继续保留，不以本轮两次仅分类重试代表所有变体。
+
+`verify-25be6f5-object-evidence.ts`经生成ProtoJSON模型核对21组九路快照（189条响应）、13个完全相等区间及107条连续完成审计。普通UI包括两次单作品分类、四条批量分类命令、两次迁移及两次精确重试、一次明确主题保存，没有其它业务POST。审计内另外三条POST为上述独立准备；第四条目录准备由原始收据及独立快照核对。除两次丢确认的客户端502外均透传200，审计无未完成项；精确重试不增加版本。账户最终revision 13、英文4、法文6、全局2；主题草稿不提前应用，明确保存才LIGHT→DARK。其余书架/元数据/分类目录/书签/进度/续读状态逐组保持，只有每个明确操作对应的版本、分类或主题改变。审计不含分类准备接口及Source运行时请求，不称为完整网络日志。
+
+忽略目录`.local/mihon-reference/`保留25张实际新版本360×800 JPEG及完整AX、上述快照、`karuyomi-25be6f5-object-ui-{audit-final,evidence-receipt}.json`和`25be6f5-object-evidence-check.log`。新版本图片统一前缀`karuyomi-25be6f5-object-`，排除含`stale-`的旧版本图。`migration-opening-candidate-light`虽有实际旋转指示但仍处转场，不登记20.K8；`migration-preview-loading-candidate-light`已是内容，不补加载格。`migration-listing-candidate-light`确有热门加载指示，但说明仍泛称“正在查找目标作品”，查询框还保留原文，未完整说明当前热门操作，不登记20.K10通过。观察确认按钮的短等待曾超时，实际预览已成功且按钮在视口下方，滚动后明确确认正常；不据此认定Source或浏览器连接失败。完成后离开客户端、恢复视口，harness正常退出0。
+
+此次还保留两个实际呈现缺口：书架卡片辅助名称已含身份，独立勾选框却无名称；目标热门/搜索及追加提示缺少具体操作和原查询。四项既有浅/深×1x/2x书架流程与两个既有迁移流程共六项先复现，再直接给官方CupertinoCheckbox补完整标题/语言/源名，并按真实请求区分热门、搜索、追加及原查询。未提交的新输入不改变追加请求的说明。相关51项单并发回归和四文件严格分析通过，日志为`selection-listing-context-{red,regressions,analyze}.log`；新完整CI及修复后的正式Web仍待，不以组件结果替代浏览器证据。
+
+本轮是已有分类与迁移状态的补充分项，成对主图仍111/169（65.7%），仅单侧8、双侧均缺50，剩余58个主状态及全部变体继续验收。Mihon参考环境另纠正为AVD配置2048MB、启动日志实际要求提升到2560MB，实际Guest/RSS未独立测量；未在本轮重启或把它当作2GB性能证据。关闭在线语言仍保留Local source，普通UI未取得07.03纯空态，源码说明不替代截图。PR #8继续草稿、未合并、未部署，生产及已停止的Karuyomi原生现场门槛保持原记录。
 
 ## 仍需的证据
 

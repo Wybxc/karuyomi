@@ -231,7 +231,14 @@ final class MigrationController extends ChangeNotifier {
   Future<void> _listTargets(String? search, {bool more = false}) async {
     final ref = _targetReference;
     if (!canChange || ref == null) return;
-    await _run(more ? '加载更多目标作品' : '查找目标作品', (epoch) async {
+    final operation = search == null
+        ? more
+              ? '加载更多目标源热门作品'
+              : '浏览目标源热门作品'
+        : more
+        ? '加载更多“$search”的搜索结果'
+        : '搜索目标作品“$search”';
+    await _run(operation, (epoch) async {
       final next = more ? _listingPage + 1 : 1;
       final found = await catalog.listMigrationTargets(
         source: ref,

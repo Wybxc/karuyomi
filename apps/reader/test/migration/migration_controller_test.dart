@@ -158,8 +158,40 @@ void main() {
     await controller.refreshSources();
     expect(controller.sources.single.source.id, _targetId);
     await controller.chooseSource(controller.sources.single);
-    await controller.search('原作品');
-    await controller.loadMore();
+    final normal = platform.invokeHandler!;
+    var entered = Completer<void>();
+    var release = Completer<void>();
+    platform.invokeHandler = (call) async {
+      if (call.hasSearch()) {
+        entered.complete();
+        await release.future;
+      }
+      return normal(call);
+    };
+    final search = controller.search('原作品');
+    try {
+      await entered.future.timeout(const Duration(seconds: 5));
+      expect(controller.busy, isTrue);
+      expect(controller.canChange, isFalse);
+      expect(controller.operationLabel, '搜索目标作品“原作品”');
+      expect(posts(), hasLength(before));
+    } finally {
+      release.complete();
+      await search;
+    }
+    final retained = controller.results;
+    entered = Completer<void>();
+    release = Completer<void>();
+    final more = controller.loadMore();
+    try {
+      await entered.future.timeout(const Duration(seconds: 5));
+      expect(controller.operationLabel, '加载更多“原作品”的搜索结果');
+      expect(controller.results, orderedEquals(retained));
+      expect(posts(), hasLength(before));
+    } finally {
+      release.complete();
+      await more;
+    }
     final searches = platform.invocations
         .where((call) => call.hasSearch())
         .toList();
@@ -1061,11 +1093,15 @@ void main() {
     'wizard browses a target without search results and filters marks before confirmation',
     (tester) async {
       final normal = platform.invokeHandler!;
+      var entered = Completer<void>();
+      var release = Completer<void>();
       platform.invokeHandler = (call) async {
         if (call.hasSearch()) {
           return wire.SourceResult(mangaPage: wire.MangaPage());
         }
         if (call.hasPopular()) {
+          entered.complete();
+          await release.future;
           return wire.SourceResult(
             mangaPage: wire.MangaPage(
               mangas: [
@@ -1080,7 +1116,7 @@ void main() {
         }
         return normal(call);
       };
-      await tester.binding.setSurfaceSize(const Size(700, 1000));
+      await tester.binding.setSurfaceSize(const Size(360, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpApp(
         CupertinoApp(
@@ -1102,12 +1138,45 @@ void main() {
       expect(find.text('没有搜索结果，可尝试浏览目标源热门作品。'), findsOneWidget);
       expect(platform.invocations.where((call) => call.hasPopular()), isEmpty);
       await tester.tap(find.byKey(const ValueKey('migration-popular')));
-      await tester.pumpAndSettle();
+      try {
+        await tester.pump();
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.ensureVisible(find.byType(CupertinoActivityIndicator));
+        await tester.pump();
+        expect(find.text('正在浏览目标源热门作品'), findsOneWidget);
+        expect(posts(), hasLength(before));
+      } finally {
+        release.complete();
+        await tester.pumpAndSettle();
+      }
       expect(find.text('目标作品'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('migration-search')),
+        '尚未提交的新查询',
+      );
+      await tester.pumpAndSettle();
+      entered = Completer<void>();
+      release = Completer<void>();
       final more = find.byKey(const ValueKey('migration-search-more'));
       await tester.ensureVisible(more);
       await tester.tap(more);
-      await tester.pumpAndSettle();
+      try {
+        await tester.pump();
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.ensureVisible(find.byType(CupertinoActivityIndicator));
+        await tester.pump();
+        expect(find.text('正在加载更多目标源热门作品'), findsOneWidget);
+        expect(posts(), hasLength(before));
+      } finally {
+        release.complete();
+        await tester.pumpAndSettle();
+      }
       expect(find.text('第二页作品'), findsOneWidget);
       final popular = platform.invocations.where((call) => call.hasPopular());
       expect(popular.map((call) => call.popular.page), [1, 2]);

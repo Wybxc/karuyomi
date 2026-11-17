@@ -151,6 +151,40 @@ void main() {
             await tester.pumpAndSettle();
             expect(editor, findsNothing);
             expect(find.text('en · $name'), findsOneWidget);
+            await tester.tap(iconLabel('选择漫画'));
+            await tester.pumpAndSettle();
+            Finder selection(String language) => find.byWidgetPredicate(
+              (widget) =>
+                  widget is CupertinoCheckbox &&
+                  widget.semanticLabel == '选择漫画：$title · $language · $name',
+            );
+            for (final language in ['en', 'zh']) {
+              final checkbox = selection(language);
+              expect(checkbox, findsOneWidget);
+              expect(
+                tester.getSemantics(checkbox).getSemanticsData().label,
+                '选择漫画：$title · $language · $name',
+              );
+              expect(tester.widget<CupertinoCheckbox>(checkbox).value, isFalse);
+            }
+            await tester.tap(selection('en'));
+            await tester.pumpAndSettle();
+            expect(
+              tester.widget<CupertinoCheckbox>(selection('en')).value,
+              isTrue,
+            );
+            expect(
+              tester.widget<CupertinoCheckbox>(selection('zh')).value,
+              isFalse,
+            );
+            expect(find.text('已选 1 部 · 当前隐藏 0 部'), findsOneWidget);
+            await tester.tap(selection('en'));
+            await tester.pumpAndSettle();
+            expect(
+              tester.widget<CupertinoCheckbox>(selection('en')).value,
+              isFalse,
+            );
+            expect(find.text('已选 0 部 · 当前隐藏 0 部'), findsOneWidget);
             expect(
               platform.businessServer.requests
                   .where((request) => request.method == 'POST')

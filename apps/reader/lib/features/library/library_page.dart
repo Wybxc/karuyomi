@@ -1071,6 +1071,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   badge: _selecting
                       ? CupertinoCheckbox(
                           key: ValueKey(('library-select', entry.mangaKey)),
+                          semanticLabel: '选择漫画：$label',
                           value: selected.contains(entry.mangaKey),
                           onChanged: canSelect
                               ? (_) => _toggleSelection(entry.mangaKey)
