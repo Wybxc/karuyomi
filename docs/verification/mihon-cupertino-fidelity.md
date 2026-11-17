@@ -950,6 +950,8 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 最终十文件189项相关数据、设置、扩展、仓库和源收藏组件回归通过，见`extension-settings-recovery-targeted-corrected.log`。首次广度回归186项通过、一项旧测试在展开完整值后未滚回被延迟构建的收藏按钮；补充显式滚动后通过，原日志`extension-settings-recovery-targeted.log`保留。最终还覆盖已确认读取失败的扩展页面重开、读取重试零额外POST、无效ACK和已知拒绝重建。十四文件严格分析与依赖检查通过，日志使用`extension-settings-recovery-`前缀；首轮两处缺少花括号已修正，`analyze-corrected.log`无问题。组件供应端不等同于真实Worker/D1或正式Web，新提交完整CI和正式双主题仍待；覆盖保持122/169（72.2%），PR #8草稿未部署，未新增Source运行、原生或生产证据。
 
+`891029a`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44175170127)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44175183359)中，`pnpm check`通过，`pnpm flutter:check`在生成一致性阶段失败，未进入完整Dart回归或Web构建。遗漏的Riverpod控制器哈希现由官方`pnpm flutter:generate`更新，独立`pnpm flutter:generate:check`通过，不手工编辑生成文件；日志为`extension-settings-recovery-generate.log`及`extension-settings-recovery-generate-check.log`。本地仍不运行完整Flutter检查、构建或AOT，新提交完整CI及正式Web继续待验，覆盖不变。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。
