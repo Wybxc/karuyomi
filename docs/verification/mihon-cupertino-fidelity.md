@@ -952,6 +952,24 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `891029a`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44175170127)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44175183359)中，`pnpm check`通过，`pnpm flutter:check`在生成一致性阶段失败，未进入完整Dart回归或Web构建。遗漏的Riverpod控制器哈希现由官方`pnpm flutter:generate`更新，独立`pnpm flutter:generate:check`通过，不手工编辑生成文件；日志为`extension-settings-recovery-generate.log`及`extension-settings-recovery-generate-check.log`。本地仍不运行完整Flutter检查、构建或AOT，新提交完整CI及正式Web继续待验，覆盖不变。
 
+## 扩展与共享设置恢复的正式 Web 双主题验收
+
+2026-11-18，客户端及夹具`2512c51a4a021ccfa333ac682b2638ce4a878979`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44176813008)、[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44176825421)、Web及push Wasm全部成功，deploy跳过，补齐上一提交遗漏的Riverpod生成哈希。正式归档`14370652915`在下载边界核对大小`16304327`及GitHub SHA-256，39条资源校验后只复制生成的Web/runtime；官方API和acceptance Vite依次装配，没有本地完整Flutter或AOT构建。官方Wrangler临时D1/R2、`acceptance-owner`、既有四包静态快照与内置浏览器360×800，地址`127.0.0.1:53180`；实际HTTP清单35条与CI相等，入口`main.dart.913e5f50.js`。归档摘要和完整CI结果分别保存在`ci-web-2512c51-integrity.json`与`2512c51-final-checks.json`。
+
+两次独立API准备为浅色、两个其它已安装包、保留但未安装的英文xkcd收藏源，以及一部xkcd书架收藏。正式UI在双主题核对受阻源显示身份/原因、实际转到扩展管理、安装确认等待与成功、卸载丢确认、原对象刷新/书架及源/扩展往返、未知卸载的完整原全局值展开/收起、Tab到末端和明确原文重试。完整值包括保留的两包启用、仓库、构建和产物身份及额外仓库空列表；卸载对象与已更新当前列表分开。默认DOM摘要省略长分组正文，精确文本/离屏字段定位未命中，另保存实际未隐藏的ARIA标签并核对全部内容，同一内置浏览器AX滚回操作区；不是产品缺字段，也未改用其它浏览器或外推真实读屏。
+
+双主题有效ACK后读取503均明确显示“已确认”，原安装对象及读取阶段在书架、源目录和扩展重开后保持；故障下明确重试仍读取，解除故障后由用户明确恢复并清除原操作。浅色→深色先保留未保存草稿的浅色画布，确认保存后才应用深色；深色另完成正常已确认卸载及返回列表。等待时重复点击安装没有新增请求，但DOM未报告aria-disabled，只据此确认功能阻止重复，禁用辅助语义仍待验。准备阶段实际未截到，不能把已进入保存的`extension-install-start-light`计作准备图。
+
+首次人工`hold-confirm`的sequence14没有客户端终态，原记录与未知安装画面保留，不能计正常释放或追补终态。该安装明确重试前后完整快照相同，重试复用原UUID/CAS/正文且不重复应用；后续等待改用既有两秒自动确认，正常交付真实200 ACK。此人工中断与受控502/503分别记录，不将harness正常退出或后续成功当作其原交付完成。
+
+`verify-extension-recovery-formal.ts`使用生成ProtoJSON模型、静态清单、实际HTTP清单、DOM/ARIA和JPEG尺寸核对22组六路完整快照（132份响应）、14个完全相等区间及113条连续审计；112条有客户端终态，只有上述sequence14无终态。13条POST逐字核对为两次独立准备、八条UI原操作（含一次主题保存）与三次相同UUID/CAS/正文重试。八条原操作各应用一次，三次重试零重复，有效确认后读取/重开/恢复零额外POST；八次读取503与两次已提交后502单列。最终账户10、全局9/DARK、安装选择三包、收藏源一项；书架作品始终revision1且已收藏，无分类关联/书签/进度/续读/自定义封面，资料、目录及其它设置保持。审计不包含Source运行时等所有网络请求；本轮没有主动打开或执行Source，不提升任何包的运行兼容层级。
+
+41张360×800 JPEG及对应DOM、两份完整ARIA已实看核对；校验日志和收据为`2512c51-extension-recovery-evidence-check.log`及`karuyomi-2512c51-extension-recovery-formal-evidence-receipt.json`。五个证据/计数工具严格类型通过；控制台最终错误/警告为空，确认清除后的再次重开正常。结束后导航空白页、恢复默认视口、关闭临时标签并确认列表为空；harness明确stop正常退出0。新增07.K8、08.K7/K8三对及09.K5深色，使跨版本主图122→126/169（74.6%），单侧8、双侧均缺35，独立计数见`extension-recovery-state-coverage-count.json`，剩余43个主状态及全部变体/转换/最终产物。08.K6、仓库正式恢复、真实CAS/身份、Mihon参考和最终像素门仍待，没有Native或生产增量；PR #8仍草稿、未合并、未部署。
+
+### 已确认原值标题的残留修正
+
+上述正式批次没有展开已确认操作的原值。提交前源码复核发现，共享内容标题仍固定为“未确认的原全局设置内容”，与已确认的外层提示矛盾；既有双主题恢复流程加入展开与不出现“未确认”的阶段约束，两项均先失败，见`confirmed-global-heading-red.log`。标题现改为中性的“原全局设置内容”，外层仍按有效ACK区分读取恢复与未知写入，不增加状态分支或改变请求。五文件134项扩展、仓库、源收藏及设置UI回归通过，见`confirmed-global-heading-targeted.log`；两文件严格分析和官方生成一致性通过，日志使用`confirmed-global-heading-`前缀。新完整CI见[PR #8检查](https://github.com/Wybxc/karuyomi/pull/8/checks)，中性标题的新正式Web复验仍待，不把组件通过追溯为上述正式产物已显示新标题，也不增加126/169计数。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

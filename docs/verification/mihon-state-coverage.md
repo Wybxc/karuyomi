@@ -1440,27 +1440,29 @@ stateDiagram-v2
     SourceLanguages --> Sources: 选择或取消
     Sources --> NoSourceMatch: 名称无匹配
     NoSourceMatch --> Sources: 清除筛选
-    Sources --> BlockedSource: 目录缺失或扩展停用
+    Sources --> BlockedSource: 扩展未安装/停用或目录缺失
     BlockedSource --> Sources: 管理扩展并恢复
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class ReadingSources,NoSources,Sources,Favorites,SavingFavorite,NoSourceMatch,SourceLanguages,FavoriteRecovery paired
+    class ReadingSources,NoSources,Sources,Favorites,SavingFavorite,NoSourceMatch,SourceLanguages,BlockedSource,FavoriteRecovery paired
 ```
 
-| 状态 ID | 最小必要信息                                  | 浅色正式Web                                                         | 深色正式Web                                                        |
-| ------- | --------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| 07.K1   | 正在读取、原筛选与可用恢复入口                | `karuyomi-1bc3c70-source-pending-formal-sources-reading-light.jpg`  | `karuyomi-1bc3c70-source-pending-formal-sources-reading-dark.jpg`  |
-| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-1e50a82-sources-empty-light.jpg`                          | `karuyomi-1e50a82-sources-empty-dark.jpg`                          |
-| 07.K3   | 分组、源名、语言、独立打开与收藏动作          | `karuyomi-76309ed-sources-list-light.jpg`                           | `karuyomi-76309ed-sources-list-dark.jpg`                           |
-| 07.K4   | 收藏分组、确认后的星标与取消入口              | `karuyomi-76309ed-sources-favorite-light.jpg`                       | `karuyomi-76309ed-sources-favorite-dark.jpg`                       |
-| 07.K5   | 正在保存的源、等待标记、禁止重复提交          | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-light.jpg` | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-dark.jpg` |
-| 07.K6   | 当前筛选、无匹配说明与清除入口                | `karuyomi-76309ed-sources-no-match-light.jpg`                       | `karuyomi-76309ed-sources-no-match-dark.jpg`                       |
-| 07.K7   | 全部可用语言、当前值与取消操作                | `karuyomi-76309ed-sources-languages-light.jpg`                      | `karuyomi-76309ed-sources-languages-dark.jpg`                      |
-| 07.K8   | 源身份、受阻原因、管理或恢复入口              | 待                                                                  | 待                                                                 |
-| 07.K9   | 原收藏操作、冲突或未知说明、精确重试/重新读取 | `karuyomi-1bc3c70-source-pending-formal-favorite-unknown-light.jpg` | `karuyomi-1bc3c70-source-pending-formal-favorite-unknown-dark.jpg` |
+| 状态 ID | 最小必要信息                                  | 浅色正式Web                                                           | 深色正式Web                                                          |
+| ------- | --------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 07.K1   | 正在读取、原筛选与可用恢复入口                | `karuyomi-1bc3c70-source-pending-formal-sources-reading-light.jpg`    | `karuyomi-1bc3c70-source-pending-formal-sources-reading-dark.jpg`    |
+| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-1e50a82-sources-empty-light.jpg`                            | `karuyomi-1e50a82-sources-empty-dark.jpg`                            |
+| 07.K3   | 分组、源名、语言、独立打开与收藏动作          | `karuyomi-76309ed-sources-list-light.jpg`                             | `karuyomi-76309ed-sources-list-dark.jpg`                             |
+| 07.K4   | 收藏分组、确认后的星标与取消入口              | `karuyomi-76309ed-sources-favorite-light.jpg`                         | `karuyomi-76309ed-sources-favorite-dark.jpg`                         |
+| 07.K5   | 正在保存的源、等待标记、禁止重复提交          | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-light.jpg`   | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-dark.jpg`   |
+| 07.K6   | 当前筛选、无匹配说明与清除入口                | `karuyomi-76309ed-sources-no-match-light.jpg`                         | `karuyomi-76309ed-sources-no-match-dark.jpg`                         |
+| 07.K7   | 全部可用语言、当前值与取消操作                | `karuyomi-76309ed-sources-languages-light.jpg`                        | `karuyomi-76309ed-sources-languages-dark.jpg`                        |
+| 07.K8   | 源身份、受阻原因、管理或恢复入口              | `karuyomi-2512c51-extension-recovery-formal-blocked-source-light.jpg` | `karuyomi-2512c51-extension-recovery-formal-blocked-source-dark.jpg` |
+| 07.K9   | 原收藏操作、冲突或未知说明、精确重试/重新读取 | `karuyomi-1bc3c70-source-pending-formal-favorite-unknown-light.jpg`   | `karuyomi-1bc3c70-source-pending-formal-favorite-unknown-dark.jpg`   |
 
 `fe57f2c`正式Web完成浅色读取、等待与未知恢复，但展开/收起原值并重试后，深色重开源目录因页面存储类型冲突而未能渲染。该提交`source-pending-formal`系列中的两张深色空内容图（包括名为`sources-reading-dark`的进入图）均为失败证据，不能作为读取主图，也未追溯填入下表，详见[记录](mihon-cupertino-fidelity.md#展开状态与滚动位置的存储隔离)。
 
 `1bc3c70`新正式产物的双主题独立批次已补齐07.K1/K5/K9三对。真实加载/等待文案、原取消对象、刷新/重开、完整原值展开/收起与原文重试均核对；此前失败的深色重开及确认清除后的再次重开成功，控制台无错误/警告。16组六路快照、十个相等区间及73条终态审计核对两次准备、五次UI原操作（含一次主题保存）与两次零重复重试。07.K8、真实CAS/身份等变体、Mihon参考和最终像素门继续待验，见[正式双主题记录](mihon-cupertino-fidelity.md#源收藏与存储隔离的正式-web-双主题验收)。
+
+`2512c51`完整CI与正式Web已补齐07.K8双主题：保留收藏的xkcd未安装时显示原源名、语言与受阻原因，实际点击转到扩展管理，不执行Source。与扩展共享的原卸载/安装对象及已确认读取恢复也已跨页复验；41张图、22组六路完整快照及113条审计的范围与首条人工挂起无终态限制见[正式记录](mihon-cupertino-fidelity.md#扩展与共享设置恢复的正式-web-双主题验收)。真实CAS/身份等全部变体、Mihon参考和最终像素门继续待验。
 
 ```mermaid
 stateDiagram-v2
@@ -1596,27 +1598,31 @@ stateDiagram-v2
     Disabled --> Uninstalled: 卸载并获确认
     Uninstalled --> Available: 返回列表
     Enabled --> Candidate: 从候选页安装后再卸载
+    classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    class Available,Installed,EmptySearch,Language,Options,Saving,Pending,Candidate,Enabled,Disabled,Diagnostics,Uninstalled paired
 ```
 
-| 状态 ID | 最小必要信息                                          | 浅色正式Web                                                     | 深色正式Web                                                    |
-| ------- | ----------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
-| 08.K1   | 分组、名称、当前候选版本/语言、状态、独立安装与行详情 | `karuyomi-9a09331-extensions-installed-light.jpg`               | `karuyomi-9a09331-extensions-available-system-dark.jpg`        |
-| 08.K2   | 已确认安装、精确版本/语言、本机准备状态、管理入口     | `karuyomi-9a09331-extensions-installed-light.jpg`               | `karuyomi-9a09331-extensions-install-observed-system-dark.jpg` |
-| 08.K3   | 当前查询、无匹配原因、清空或清除筛选                  | `karuyomi-9a09331-extensions-empty-light.jpg`                   | `karuyomi-9a09331-extensions-empty-system-dark.jpg`            |
-| 08.K4   | 当前语言、可选语言、全部语言与取消                    | `karuyomi-9a09331-extensions-language-light.jpg`                | `karuyomi-9a09331-extensions-language-system-dark.jpg`         |
-| 08.K5   | 仓库管理、本机存储和关闭                              | `karuyomi-9a09331-extensions-menu-light.jpg`                    | `karuyomi-9a09331-extensions-menu-system-dark.jpg`             |
-| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装          | 待                                                              | 待                                                             |
-| 08.K7   | 等待账户确认、停用重复写入、保留原操作                | 待                                                              | 待                                                             |
-| 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取            | 待                                                              | 待                                                             |
-| 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源      | `karuyomi-9a09331-extension-candidate-enter-light.jpg`          | `karuyomi-9a09331-extension-candidate-enter-system-dark.jpg`   |
-| 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口 | `karuyomi-2df0551-extension-enabled-light.jpg`                  | `karuyomi-2df0551-extension-enabled-dark.jpg`                  |
-| 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开          | `karuyomi-9a09331-extension-disabled-light.jpg`                 | `karuyomi-9a09331-extension-disabled-system-dark.jpg`          |
-| 09.K4   | 原仓库/包/构建身份、完整可选取正文、末端与收起        | `karuyomi-2df0551-extension-diagnostics-after-scroll-light.jpg` | `karuyomi-2df0551-extension-diagnostics-after-scroll-dark.jpg` |
-| 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留          | `karuyomi-2df0551-extension-uninstalled-light.jpg`              | 待                                                             |
+| 状态 ID | 最小必要信息                                          | 浅色正式Web                                                                           | 深色正式Web                                                                       |
+| ------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 08.K1   | 分组、名称、当前候选版本/语言、状态、独立安装与行详情 | `karuyomi-9a09331-extensions-installed-light.jpg`                                     | `karuyomi-9a09331-extensions-available-system-dark.jpg`                           |
+| 08.K2   | 已确认安装、精确版本/语言、本机准备状态、管理入口     | `karuyomi-9a09331-extensions-installed-light.jpg`                                     | `karuyomi-9a09331-extensions-install-observed-system-dark.jpg`                    |
+| 08.K3   | 当前查询、无匹配原因、清空或清除筛选                  | `karuyomi-9a09331-extensions-empty-light.jpg`                                         | `karuyomi-9a09331-extensions-empty-system-dark.jpg`                               |
+| 08.K4   | 当前语言、可选语言、全部语言与取消                    | `karuyomi-9a09331-extensions-language-light.jpg`                                      | `karuyomi-9a09331-extensions-language-system-dark.jpg`                            |
+| 08.K5   | 仓库管理、本机存储和关闭                              | `karuyomi-9a09331-extensions-menu-light.jpg`                                          | `karuyomi-9a09331-extensions-menu-system-dark.jpg`                                |
+| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装          | 待                                                                                    | 待                                                                                |
+| 08.K7   | 等待账户确认、停用重复写入、保留原操作                | `karuyomi-2512c51-extension-recovery-formal-extension-install-auto-waiting-light.jpg` | `karuyomi-2512c51-extension-recovery-formal-extension-install-waiting-dark.jpg`   |
+| 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取            | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-light.jpg`    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-dark.jpg` |
+| 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源      | `karuyomi-9a09331-extension-candidate-enter-light.jpg`                                | `karuyomi-9a09331-extension-candidate-enter-system-dark.jpg`                      |
+| 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口 | `karuyomi-2df0551-extension-enabled-light.jpg`                                        | `karuyomi-2df0551-extension-enabled-dark.jpg`                                     |
+| 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开          | `karuyomi-9a09331-extension-disabled-light.jpg`                                       | `karuyomi-9a09331-extension-disabled-system-dark.jpg`                             |
+| 09.K4   | 原仓库/包/构建身份、完整可选取正文、末端与收起        | `karuyomi-2df0551-extension-diagnostics-after-scroll-light.jpg`                       | `karuyomi-2df0551-extension-diagnostics-after-scroll-dark.jpg`                    |
+| 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留          | `karuyomi-2df0551-extension-uninstalled-light.jpg`                                    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstalled-dark.jpg`       |
 
 这里只跟踪当前目标画面；主图、变体及每条转换分别验收。08.K8的冲突/拒绝/结果未知、资源清理失败、已移除仓库/已下架构建、长文本与减少动态效果仍须分项补充，不用正常启停主图代替。
 
 `5ed6dd6`浅色列表与候选详情已实看，Tab/空格可达，Enter仍失败，61语言还截断版本/状态，因此继续排除08.K1/09.K1最终通过。已安装MangaDex的绿色开关、系统红卸载及页脚已有浅色布局图，同样因摘要缺口不计09.K2完成。`9a09331`完整CI和上述双主题正式Web已确认版本/状态可见，候选Enter可用；历史失败继续保留。浅色列表有一个已安装项，深色可安装图尚未安装，不能作为同数据像素叠图。当时Source及诊断入口无键盘焦点，09.K2/09.K3仅为画面和启停证据；后续`2df0551`已补双主题键盘与独立语义，正文选择/复制和其它变体仍待。准备/等待确认未截到主图，诊断展开中标题缺失帧也排除。MangaDex英文Source初次和一次重试均容器中断，不能填入Source toggle的通过项。
+
+`2512c51`完整push/PR CI、Web及push Wasm通过。正式内置浏览器补齐08.K7/K8两对主图和09.K5深色：自动等待收到真实确认，未知卸载保留原对象，刷新、跨页重开及完整原值末端可达，原请求精确重试无重复；有效ACK后的补读失败与未知分开，恢复只读。首次人工挂起sequence14无客户端终态，不能计正常释放；普通DOM摘要省略长组，另保存实际ARIA完整值。等待时重复安装实点零附写，但DOM未报告aria-disabled，禁用辅助语义继续待验。准备阶段仍未截到，08.K6保持待；冲突/拒绝、资源清理、身份、其它变体及最终像素门不变，详见[正式记录](mihon-cupertino-fidelity.md#扩展与共享设置恢复的正式-web-双主题验收)。
 
 ### 13：Karuyomi typed Source 筛选的目标状态
 

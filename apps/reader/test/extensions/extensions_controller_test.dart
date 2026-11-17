@@ -469,6 +469,9 @@ void main() {
         await show(tester, appearance: appearance, size: const Size(360, 800));
         expect(find.text('重试读取最新设置'), findsOneWidget);
         expect(find.textContaining('安装扩展：'), findsOneWidget);
+        await tap(tester, find.text('查看已确认的原操作'));
+        expect(find.textContaining('未确认'), findsNothing);
+        await tap(tester, find.text('查看已确认的原操作'));
         failReads = false;
         await tap(tester, find.text('重试读取最新设置'));
         expect(
@@ -626,7 +629,7 @@ void main() {
           expect(tester.takeException(), isNull);
           expect(find.text('查看未确认的原操作'), findsOneWidget);
           expect(
-            find.text('未确认的原全局设置内容'),
+            find.text('原全局设置内容'),
             expanded ? findsOneWidget : findsNothing,
           );
           expect(
@@ -1230,7 +1233,7 @@ void main() {
       expect(find.textContaining('结果待确认'), findsOneWidget);
       expect(find.textContaining('安装扩展：'), findsOneWidget);
       await tap(tester, find.text('查看未确认的原操作'));
-      expect(find.text('未确认的原全局设置内容'), findsOneWidget);
+      expect(find.text('原全局设置内容'), findsOneWidget);
       expect(
         find.textContaining('扩展安装选择：eu.kanade.source.test'),
         findsOneWidget,

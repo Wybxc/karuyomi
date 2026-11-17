@@ -18,7 +18,7 @@ class const PendingGlobalSettings({
         color: AppColors.groupedSurface.resolveFrom(context),
       ),
       key: const ValueKey('favorite-source-pending-global'),
-      header: const Text('未确认的原全局设置内容'),
+      header: const Text('原全局设置内容'),
       footer: Text('原操作基于版本 $revision；重试会保留全部原内容。'),
       children: [
         Align(
