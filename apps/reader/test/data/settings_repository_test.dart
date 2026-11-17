@@ -156,6 +156,49 @@ final class _ResponseGate implements ApiFetch {
   }
 }
 
+final class _FailedSettingsReads implements ApiFetch {
+  _FailedSettingsReads(this.api);
+  final ApiFetch api;
+  bool failReads = false;
+  bool corruptAck = false;
+  bool corruptRead = false;
+
+  @override
+  Future<ApiReply> fetchApi(
+    String path, {
+    String method = 'GET',
+    Map<String, String> headers = const {},
+    String? body,
+  }) async {
+    final reply = await api.fetchApi(
+      path,
+      method: method,
+      headers: headers,
+      body: body,
+    );
+    if (method == 'POST' && corruptAck) {
+      final value = wire.decodeProtoJson(
+        wire.SettingsMutationResponse(),
+        jsonDecode(reply.body),
+      );
+      value.mutationId = '00000000-0000-4000-8000-000000000000';
+      return _reply(value);
+    }
+    if (failReads && method == 'GET' && path.startsWith('/api/settings')) {
+      throw StateError('Confirmed settings could not be read');
+    }
+    if (corruptRead && method == 'GET' && path.startsWith('/api/settings')) {
+      final value = wire.decodeProtoJson(
+        wire.SettingsResponse(),
+        jsonDecode(reply.body),
+      );
+      value.global.values.theme = wire.AppTheme.APP_THEME_LIGHT;
+      return _reply(value);
+    }
+    return reply;
+  }
+}
+
 void main() {
   late TestBusinessServer server;
   late BusinessStateClient client;
@@ -167,6 +210,118 @@ void main() {
     repository = SettingsRepository(client);
   });
   tearDown(() => client.dispose());
+
+  test('invalid settings ACK never confirms or suppresses the required original POST', () async {
+    final transport = _FailedSettingsReads(server);
+    final session = _client(transport);
+    addTearDown(session.dispose);
+    final editor = SettingsRepository(session);
+    await editor.loadGlobal();
+    var confirmations = 0;
+    transport.corruptAck = true;
+    await expectLater(
+      editor.setGlobal(
+        values: _global(),
+        basedOnRevision: 0,
+        onAcknowledged: () => confirmations++,
+      ),
+      throwsFormatException,
+    );
+    expect(confirmations, 0);
+    expect(editor.pendingGlobal()!.acknowledged, false);
+    final original = server.requests
+        .where((request) => request.method == 'POST')
+        .single
+        .body;
+    transport.corruptAck = false;
+    await editor.setGlobal(
+      values: _global(),
+      basedOnRevision: 0,
+      onAcknowledged: () => confirmations++,
+    );
+    final writes = server.requests
+        .where((request) => request.method == 'POST')
+        .toList();
+    expect(writes, hasLength(2));
+    expect(writes.last.body, original);
+    expect(confirmations, 1);
+    expect(server.appliedMutations, 1);
+  });
+
+  test('acknowledged settings reject inconsistent reads before caching and retry without a POST', () async {
+    final transport = _FailedSettingsReads(server);
+    final session = _client(transport);
+    addTearDown(session.dispose);
+    final editor = SettingsRepository(session);
+    await editor.loadGlobal();
+    transport.corruptRead = true;
+    await expectLater(
+      editor.setGlobal(values: _global(), basedOnRevision: 0),
+      throwsFormatException,
+    );
+    expect(editor.pendingGlobal()!.acknowledged, true);
+    expect(editor.pendingGlobal()!.retryable, true);
+    transport.corruptRead = false;
+    final saved = await editor.setGlobal(values: _global(), basedOnRevision: 0);
+    expect(saved.global.theme, wire.AppTheme.APP_THEME_DARK);
+    expect(
+      server.requests.where((request) => request.method == 'POST'),
+      hasLength(1),
+    );
+    expect(server.appliedMutations, 1);
+  });
+
+  for (final manga in [false, true]) {
+    for (final refresh in [false, true]) {
+      test(
+        'acknowledged settings read recovery never repeats a POST manga=$manga refresh=$refresh',
+        () async {
+          final transport = _FailedSettingsReads(server);
+          final session = _client(transport);
+          addTearDown(session.dispose);
+          var editor = SettingsRepository(session);
+          Future<SettingsSnapshot> read() =>
+              manga ? editor.loadManga(_key) : editor.loadGlobal();
+          Future<SettingsSnapshot> save() => manga
+              ? editor.setManga(
+                  mangaKey: _key,
+                  overrides: wire.ReaderSettingsOverride(cropBorders: true),
+                  basedOnRevision: 0,
+                )
+              : editor.setGlobal(values: _global(), basedOnRevision: 0);
+          await read();
+          transport.failReads = true;
+          await expectLater(save(), throwsStateError);
+          final original = server.requests
+              .where((request) => request.method == 'POST')
+              .single
+              .body;
+          expect(server.appliedMutations, 1);
+          editor = SettingsRepository(session);
+          await expectLater(save(), throwsStateError);
+          expect(
+            server.requests.where((request) => request.method == 'POST'),
+            hasLength(1),
+          );
+          transport.failReads = false;
+          final saved = await (refresh ? read() : save());
+          expect(manga ? saved.mangaRevision : saved.globalRevision, 1);
+          expect(
+            server.requests
+                .where((request) => request.method == 'POST')
+                .single
+                .body,
+            original,
+          );
+          expect(server.appliedMutations, 1);
+          expect(
+            manga ? editor.pendingManga(_key) : editor.pendingGlobal(),
+            isNull,
+          );
+        },
+      );
+    }
+  }
 
   List<TestBusinessRequest> writes() => server.requests
       .where(

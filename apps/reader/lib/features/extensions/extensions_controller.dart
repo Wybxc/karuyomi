@@ -458,6 +458,10 @@ final class ExtensionsController extends ChangeNotifier {
   Future<void> retry() async {
     if (!available || busy) return;
     await _run(() async {
+      activity = settings.pending?.acknowledged == true
+          ? ExtensionActivity.reading
+          : ExtensionActivity.saving;
+      _changed();
       if (await _settingsCommands.retry() && available) {
         await catalog.applyConfirmedInstallations(settings.snapshot!);
         cache = await catalog.runtime.extensionCache();

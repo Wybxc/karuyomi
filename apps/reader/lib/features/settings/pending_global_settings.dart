@@ -54,6 +54,12 @@ class const PendingGlobalSettings({
               if (values.favoriteSources.isEmpty) '收藏源：空列表',
               for (final source in values.favoriteSources)
                 '收藏源：${source.sourceName} · ${source.sourceLang} · ${source.packageName} · ${source.sourceId}',
+              if (values.installedExtensions.isEmpty) '扩展安装选择：空列表',
+              for (final extension in values.installedExtensions)
+                '扩展安装选择：${extension.packageName}（${extension.enabled ? '启用' : '停用'}）\n仓库：${extension.repoId} · ${extension.catalogUrl}\n构建：${extension.buildId}\n产物标识：${extension.bundleSha256}',
+              if (values.repositories.isEmpty) '额外仓库：空列表',
+              for (final repository in values.repositories)
+                '额外仓库：${repository.name}\n${repository.repoId} · ${repository.catalogUrl}',
             ].join('\n'),
           ),
         ),

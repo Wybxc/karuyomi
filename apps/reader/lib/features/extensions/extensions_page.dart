@@ -18,6 +18,7 @@ import '../settings/settings_controller.dart';
 import '../settings/pending_global_settings.dart';
 import 'extension_listing.dart';
 import 'extensions_controller.dart';
+import 'pending_extension_changes.dart';
 
 class const ExtensionsPage({
   super.key,
@@ -409,12 +410,20 @@ class const ExtensionOperationStatus({
       children: [
         if (controller.busy) ...[
           const CupertinoActivityIndicator(),
-          Text(switch (controller.activity) {
-            ExtensionActivity.preparing => '正在准备扩展',
-            ExtensionActivity.saving => '正在保存账户选择，等待确认',
-            ExtensionActivity.cleaning => '账户已确认，正在清理本机副本',
-            _ => '正在读取账户、目录与本机副本',
-          }),
+          Text(
+            controller.settings.pending?.acknowledged == true &&
+                    {
+                      ExtensionActivity.reading,
+                      ExtensionActivity.saving,
+                    }.contains(controller.activity)
+                ? '原账户操作已确认，正在读取最新设置'
+                : switch (controller.activity) {
+                    ExtensionActivity.preparing => '正在准备扩展',
+                    ExtensionActivity.saving => '正在保存账户选择，等待确认',
+                    ExtensionActivity.cleaning => '账户已确认，正在清理本机副本',
+                    _ => '正在读取账户、目录与本机副本',
+                  },
+          ),
         ],
         if (controller.preparing)
           CupertinoButton(
@@ -446,14 +455,39 @@ class const ExtensionOperationStatus({
           Text(switch (failure) {
             SettingsFailure.conflict => '账户已在其他设备修改，请读取最新状态后重新选择。',
             SettingsFailure.rejected => '操作未保存，请读取最新状态后处理。',
-            _ => pending.retryable ? '结果待确认：请确认或重试原操作。' : '原操作尚未确认，请读取最新状态。',
+            SettingsFailure.confirmedRead => '原账户操作已确认，请重试读取最新状态。',
+            _ =>
+              pending.acknowledged
+                  ? '原账户操作已确认，请读取最新状态。'
+                  : pending.retryable
+                  ? '结果待确认：请确认或重试原操作。'
+                  : '原操作已被拒绝，请读取最新状态。',
           }),
+          if (pending.global case final values?)
+            PendingExtensionChanges(
+              previous: pending.previousGlobal,
+              submitted: values,
+              extensionLabel: (extension) => extensionName(
+                extension.packageName,
+                controller.catalog.builds
+                        .where(
+                          (build) =>
+                              build.packageName == extension.packageName &&
+                              build.id == extension.buildId &&
+                              build.repoId == extension.repoId &&
+                              build.catalogUrl == extension.catalogUrl,
+                        )
+                        .firstOrNull
+                        ?.sources ??
+                    const [],
+              ),
+            ),
           CupertinoButton(
             key: const ValueKey('extensions-retry-settings'),
             onPressed: controller.busy || !controller.settings.canRetry
                 ? null
                 : () => unawaited(controller.retry()),
-            child: const Text('重试原设置操作'),
+            child: Text(pending.acknowledged ? '重试读取最新设置' : '重试原设置操作'),
           ),
           Expansible(
             key: const PageStorageKey('extensions-pending-values'),
@@ -472,7 +506,7 @@ class const ExtensionOperationStatus({
                     ? expansion.collapse()
                     : expansion.expand(),
                 child: CupertinoListTile(
-                  title: const Text('查看未确认的原操作'),
+                  title: Text(pending.acknowledged ? '查看已确认的原操作' : '查看未确认的原操作'),
                   trailing: RotationTransition(
                     turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
                     child: Icon(

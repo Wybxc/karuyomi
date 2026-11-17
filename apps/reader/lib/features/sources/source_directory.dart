@@ -13,6 +13,7 @@ import '../../data/business_state_validation.dart';
 import '../../state/account_providers.dart';
 import '../browse/catalog_controller.dart';
 import '../extensions/extension_listing.dart';
+import '../extensions/pending_extension_changes.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_widgets.dart';
 import '../settings/pending_global_settings.dart';
@@ -287,9 +288,35 @@ class const SourceDirectory({
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SettingsStatus(controller: commands, state: settings),
           ),
+          if (settings.pending?.global case final values?)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: PendingExtensionChanges(
+                previous: settings.pending?.previousGlobal,
+                submitted: values,
+                extensionLabel: (extension) => extensionName(
+                  extension.packageName,
+                  catalog.builds
+                          .where(
+                            (build) =>
+                                build.packageName == extension.packageName &&
+                                build.id == extension.buildId &&
+                                build.repoId == extension.repoId &&
+                                build.catalogUrl == extension.catalogUrl,
+                          )
+                          .firstOrNull
+                          ?.sources ??
+                      const [],
+                ),
+              ),
+            ),
           if (sourceChanges.isNotEmpty)
             CupertinoListSection.insetGrouped(
-              header: const Text('未确认的原收藏操作'),
+              header: Text(
+                settings.pending?.acknowledged == true
+                    ? '已确认的原收藏操作'
+                    : '未确认的原收藏操作',
+              ),
               children: [
                 for (final change in sourceChanges)
                   CupertinoListTile(
@@ -332,7 +359,11 @@ class const SourceDirectory({
                       ? expansion.collapse()
                       : expansion.expand(),
                   child: CupertinoListTile(
-                    title: const Text('查看未确认的原全局设置'),
+                    title: Text(
+                      settings.pending?.acknowledged == true
+                          ? '查看已确认的原全局设置'
+                          : '查看未确认的原全局设置',
+                    ),
                     trailing: RotationTransition(
                       turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
                       child: Icon(

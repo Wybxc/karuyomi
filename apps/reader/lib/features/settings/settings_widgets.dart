@@ -116,7 +116,10 @@ class const SettingsStatus({
             Flexible(
               child: Text(
                 switch (activity) {
-                  SettingsActivity.reading => '正在读取服务端设置',
+                  SettingsActivity.reading =>
+                    state.pending?.acknowledged == true
+                        ? '原设置已确认，正在读取最新状态'
+                        : '正在读取服务端设置',
                   SettingsActivity.saving => '正在等待服务端确认设置修改',
                 },
                 style: TextStyle(
@@ -134,7 +137,9 @@ class const SettingsStatus({
         ),
       if (state.pending?.retryable == true)
         Text(
-          '设置尚未确认，本会话保留原操作。',
+          state.pending?.acknowledged == true
+              ? '原设置已确认，本会话保留原操作等待读取。'
+              : '设置尚未确认，本会话保留原操作。',
           style: TextStyle(
             fontSize: 13,
             color: AppColors.secondaryLabel.resolveFrom(context),
@@ -142,14 +147,16 @@ class const SettingsStatus({
         ),
       Wrap(
         children: [
-          CupertinoButton(
-            onPressed: state.canRefresh
-                ? () async {
-                    if (await controller.refresh()) onReloaded?.call();
-                  }
-                : null,
-            child: const Text('重新读取设置'),
-          ),
+          if (state.pending?.acknowledged != true ||
+              state.pending?.retryable != true)
+            CupertinoButton(
+              onPressed: state.canRefresh
+                  ? () async {
+                      if (await controller.refresh()) onReloaded?.call();
+                    }
+                  : null,
+              child: const Text('重新读取设置'),
+            ),
           if (state.pending?.retryable == true)
             CupertinoButton(
               onPressed: state.canRetry
@@ -157,7 +164,9 @@ class const SettingsStatus({
                       if (await controller.retry()) onReloaded?.call();
                     }
                   : null,
-              child: const Text('重试原设置操作'),
+              child: Text(
+                state.pending?.acknowledged == true ? '重试读取最新设置' : '重试原设置操作',
+              ),
             ),
         ],
       ),

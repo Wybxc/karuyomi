@@ -114,6 +114,85 @@ void main() {
     return catalog.builds.singleWhere((build) => build.catalogUrl == extraUrl);
   }
 
+  for (final appearance in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      for (final adding in [false, true]) {
+        testWidgets(
+          'frozen account operation preserves the repository name and submitted list in $appearance at $textScale adding=$adding',
+          (tester) async {
+            const name = '原社区仓库的完整名称：漫画与图像来源；离开页面再返回也须保留原操作对象';
+            final preview = await manager.previewRepository(extraUrl, name);
+            expect(preview, isNotNull);
+            if (!adding) await manager.addRepository(preview!);
+            platform.businessServer.loseNextResponse = true;
+            if (adding) {
+              await manager.addRepository(preview!);
+            } else {
+              await manager.removeRepository(
+                manager.settings.snapshot!.global.repositories.single,
+              );
+            }
+            final original = posts().last.body;
+            final count = posts().length;
+            final applied = platform.businessServer.appliedMutations;
+            Future<void> showRepository() async {
+              await tester.binding.setSurfaceSize(const Size(360, 800));
+              await tester.pumpApp(
+                CupertinoApp(
+                  theme: readerAppTheme(appearance),
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: TextScaler.linear(textScale)),
+                    child: child!,
+                  ),
+                  home: ExtensionRepositoriesPage(controller: manager),
+                ),
+              );
+              await tester.pumpAndSettle();
+            }
+
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final action = '${adding ? '添加' : '移除'}仓库：$name';
+            await showRepository();
+            expect(find.text(action), findsOneWidget);
+            await manager.refresh(catalogToo: true);
+            await tester.pumpAndSettle();
+            expect(
+              manager.settings.snapshot!.global.repositories,
+              hasLength(adding ? 1 : 0),
+            );
+            expect(find.text(action), findsOneWidget);
+            await tester.pumpApp(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+            await showRepository();
+            expect(find.text(action), findsOneWidget);
+            expect(posts(), hasLength(count));
+            final expand = find.text('查看未确认的原操作');
+            await tester.ensureVisible(expand);
+            await tester.tap(expand);
+            await tester.pumpAndSettle();
+            expect(
+              find.textContaining(adding ? '额外仓库：$name' : '额外仓库：空列表'),
+              findsOneWidget,
+            );
+            if (adding) expect(find.textContaining(extraUrl), findsWidgets);
+            final retry = find.text('重试原设置操作');
+            await tester.ensureVisible(retry);
+            await tester.tap(retry);
+            await tester.pumpAndSettle();
+            expect(posts(), hasLength(count + 1));
+            expect(posts().last.body, original);
+            expect(platform.businessServer.appliedMutations, applied);
+            expect(find.text(action), findsNothing);
+            expect(tester.takeException(), isNull);
+            await tester.pumpApp(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+          },
+        );
+      }
+    }
+  }
+
   test('preview is read-only; confirming one global CAS synchronizes the repository without installing', () async {
     final before = manager.installed.single.deepCopy();
     final preview = await manager.previewRepository(extraUrl, '社区');

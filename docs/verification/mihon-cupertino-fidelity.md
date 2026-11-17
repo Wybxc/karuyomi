@@ -942,6 +942,14 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 18张360×800 JPEG及对应完整DOM已核对，新增07.K1/K5/K9三对。源目录在主题切换及确认后的再次重开均正常，控制台错误/警告记录为空。校验日志与收据为`1bc3c70-source-pending-formal-evidence-check.log`及`karuyomi-1bc3c70-source-pending-formal-evidence-receipt.json`；控制台为同前缀`console-final.json`。全部旧失败保留，未覆盖`fe57f2c`文件。完成后导航空白页、恢复默认视口、关闭临时标签并确认列表为空；harness明确stop正常退出0。跨版本主图119→122/169（72.2%）、单侧9、双侧均缺38；独立计数见`source-pending-state-coverage-count.json`。Source受阻、真实CAS/身份、其它组件展开、全部相关变体和最终像素/产物门继续待验，PR #8仍草稿，未合并、未部署，Native与生产门不变。
 
+## 扩展原操作与设置确认后的读取恢复
+
+2026-11-18，组件与数据边界回归发现扩展/仓库结果未知时没有独立原对象，完整原全局值也遗漏安装选择和额外仓库；刷新已应用的卸载或移除后，当前列表无法说明原操作。十四项浅/深、普通/双倍文字及源目录共享恢复流程先失败后通过，日志为`extension-pending-original-red.log`与`extension-pending-original-green-initial.log`。现按冻结基线显示原操作，完整值保留包、启用、仓库、构建和产物身份；只读刷新与页面重建不替换原对象，也不猜测未知基线。两项真实组件供应端重试另复现发送写入时仍显示读取，修正为原响应抵达前显示保存，日志为`extension-pending-retry-phase-red.log`及下述通过记录。
+
+共享设置边界另有有效 ACK 后 GET 失败仍重复 POST，并误报“未确认”的缺口；全局/漫画设置、显式刷新/原操作恢复及即时阶段反馈六项先复现，见`settings-ack-read-red.log`。现只在 ACK 完整校验后保留冻结确认，立即切为读取；补读失败显示已确认，重试和显式刷新都只读取。低 revision 继续有界重读，同 revision 不一致在缓存前拒绝，无效 ACK 不阻止必要的原命令重试；较新远端值不匹配仍为冲突，已知拒绝在重建后保留。`settings-ack-read-green-initial.log`八项通过，其中包含上述两项扩展写入阶段回归。
+
+最终十文件189项相关数据、设置、扩展、仓库和源收藏组件回归通过，见`extension-settings-recovery-targeted-corrected.log`。首次广度回归186项通过、一项旧测试在展开完整值后未滚回被延迟构建的收藏按钮；补充显式滚动后通过，原日志`extension-settings-recovery-targeted.log`保留。最终还覆盖已确认读取失败的扩展页面重开、读取重试零额外POST、无效ACK和已知拒绝重建。十四文件严格分析与依赖检查通过，日志使用`extension-settings-recovery-`前缀；首轮两处缺少花括号已修正，`analyze-corrected.log`无问题。组件供应端不等同于真实Worker/D1或正式Web，新提交完整CI和正式双主题仍待；覆盖保持122/169（72.2%），PR #8草稿未部署，未新增Source运行、原生或生产证据。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

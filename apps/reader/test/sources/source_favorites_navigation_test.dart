@@ -422,6 +422,7 @@ void main() {
       expect(find.textContaining('应用主题：深色'), findsNothing);
       await tap(tester, find.text('查看未确认的原全局设置'));
       expect(find.textContaining('应用主题：深色'), findsOneWidget);
+      await reveal(tester, toggle());
       expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNull);
       await tap(tester, find.text('重新读取设置'));
       expect(posts(), hasLength(1));
@@ -555,6 +556,40 @@ void main() {
       expect(catalog.subject, 'another-owner');
       expect(open('remote.extension'), findsNothing);
       expect(posts(), hasLength(before));
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
+    'frozen account operation remains identifiable from the source directory',
+    (tester) async {
+      final repository = catalog.settings!;
+      final provider = settingsControllerProvider(catalog, repository);
+      final subscription = container.listen(provider, (_, _) {});
+      final editor = container.read(provider.notifier);
+      expect(await editor.refresh(), true);
+      final before = container.read(provider).snapshot!;
+      final values = before.global.deepCopy()..installedExtensions.clear();
+      platform.businessServer.loseNextResponse = true;
+      expect(await editor.saveGlobal(values, before.globalRevision), false);
+      final original = posts().single.body;
+      final applied = platform.businessServer.appliedMutations;
+      subscription.close();
+      await show(tester);
+      expect(find.textContaining('卸载扩展：'), findsOneWidget);
+      expect(find.textContaining('eu.kanade.source.test'), findsWidgets);
+      await tap(tester, find.text('重新读取设置'));
+      await hide(tester);
+      await show(tester);
+      expect(find.textContaining('卸载扩展：'), findsOneWidget);
+      await tap(tester, find.text('查看未确认的原全局设置'));
+      expect(find.textContaining('扩展安装选择：空列表'), findsOneWidget);
+      expect(posts(), hasLength(1));
+      await tap(tester, find.text('重试原设置操作'));
+      expect(posts(), hasLength(2));
+      expect(posts().last.body, original);
+      expect(platform.businessServer.appliedMutations, applied);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

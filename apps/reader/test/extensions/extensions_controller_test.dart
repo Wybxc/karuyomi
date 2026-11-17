@@ -417,12 +417,18 @@ void main() {
     Brightness? appearance,
     Size size = const Size(600, 1100),
     PageStorageBucket? pageStorage,
+    double textScale = 1,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
         theme: appearance == null ? null : readerAppTheme(appearance),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: PageStorage(
           bucket: pageStorage ?? PageStorageBucket(),
           child: ExtensionsPage(
@@ -436,6 +442,167 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'confirmed extension read recovery survives reentry and only reads in $appearance',
+      (tester) async {
+        var failReads = true;
+        platform.afterBusinessReply = (request, reply) {
+          if (failReads &&
+              request.method == 'GET' &&
+              request.uri.path == '/api/settings') {
+            throw StateError('Latest account settings unavailable');
+          }
+          return reply;
+        };
+        await manager.install(catalog.builds.single);
+        final writes = platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length;
+        final applied = platform.businessServer.appliedMutations;
+        await show(tester, appearance: appearance, size: const Size(360, 800));
+        expect(find.textContaining('安装扩展：'), findsOneWidget);
+        expect(find.text('重试读取最新设置'), findsOneWidget);
+        expect(find.text('重试原设置操作'), findsNothing);
+        expect(find.textContaining('结果待确认'), findsNothing);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await show(tester, appearance: appearance, size: const Size(360, 800));
+        expect(find.text('重试读取最新设置'), findsOneWidget);
+        expect(find.textContaining('安装扩展：'), findsOneWidget);
+        failReads = false;
+        await tap(tester, find.text('重试读取最新设置'));
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          hasLength(writes),
+        );
+        expect(platform.businessServer.appliedMutations, applied);
+        expect(find.text('重试读取最新设置'), findsNothing);
+        expect(find.textContaining('安装扩展：'), findsNothing);
+        expect(
+          find.byKey(
+            const ValueKey(('extension-installed', 'eu.kanade.source.test')),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
+      'original account retry shows saving until its real reply arrives in $appearance',
+      (tester) async {
+        platform.businessServer.loseNextResponse = true;
+        await manager.install(catalog.builds.single);
+        final original = platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .single
+            .body;
+        final applied = platform.businessServer.appliedMutations;
+        await show(tester, appearance: appearance, size: const Size(360, 800));
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        platform.afterBusinessReply = (request, reply) async {
+          if (request.method == 'POST' &&
+              request.uri.path == '/api/settings/mutations') {
+            entered.complete();
+            await release.future;
+          }
+          return reply;
+        };
+        try {
+          final retry = find.text('重试原设置操作');
+          await tester.ensureVisible(retry);
+          await tester.tap(retry);
+          await tester.pump();
+          expect(entered.isCompleted, true);
+          expect(find.text('正在保存账户选择，等待确认'), findsOneWidget);
+          expect(find.textContaining('安装扩展：'), findsOneWidget);
+          expect(
+            tester
+                .widget<CupertinoButton>(
+                  find.byKey(const ValueKey('extensions-retry-settings')),
+                )
+                .onPressed,
+            isNull,
+          );
+        } finally {
+          release.complete();
+          await tester.pumpAndSettle();
+          platform.afterBusinessReply = null;
+        }
+        final writes = platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .toList();
+        expect(writes, hasLength(2));
+        expect(writes.last.body, original);
+        expect(platform.businessServer.appliedMutations, applied);
+        expect(find.text('正在保存账户选择，等待确认'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'frozen account operation identifies the removed extension after refresh and reentry in $appearance at $textScale',
+        (tester) async {
+          await manager.install(catalog.builds.single);
+          platform.businessServer.loseNextResponse = true;
+          await manager.uninstall(manager.installed.single);
+          final writes = platform.businessServer.requests
+              .where((request) => request.method == 'POST')
+              .toList();
+          final original = writes.last.body;
+          final applied = platform.businessServer.appliedMutations;
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+            textScale: textScale,
+          );
+          expect(find.textContaining('卸载扩展：'), findsOneWidget);
+          expect(find.textContaining('eu.kanade.source.test'), findsWidgets);
+          await manager.refresh(catalogToo: true);
+          await tester.pumpAndSettle();
+          expect(manager.installed, isEmpty);
+          expect(find.textContaining('卸载扩展：'), findsOneWidget);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+            textScale: textScale,
+          );
+          expect(find.textContaining('卸载扩展：'), findsOneWidget);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            hasLength(writes.length),
+          );
+          await tap(tester, find.text('查看未确认的原操作'));
+          expect(find.textContaining('扩展安装选择：空列表'), findsOneWidget);
+          await tap(tester, find.text('重试原设置操作'));
+          final retried = platform.businessServer.requests
+              .where((request) => request.method == 'POST')
+              .toList();
+          expect(retried, hasLength(writes.length + 1));
+          expect(retried.last.body, original);
+          expect(platform.businessServer.appliedMutations, applied);
+          expect(find.textContaining('卸载扩展：'), findsNothing);
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+
     for (final expanded in [false, true]) {
       testWidgets(
         'extension recovery keeps scroll storage separate in $appearance when expanded=$expanded',
@@ -1061,8 +1228,15 @@ void main() {
           .length;
       await show(tester);
       expect(find.textContaining('结果待确认'), findsOneWidget);
+      expect(find.textContaining('安装扩展：'), findsOneWidget);
       await tap(tester, find.text('查看未确认的原操作'));
       expect(find.text('未确认的原全局设置内容'), findsOneWidget);
+      expect(
+        find.textContaining('扩展安装选择：eu.kanade.source.test'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('build-1'), findsOneWidget);
+      expect(find.textContaining('a' * 64), findsOneWidget);
       expect(find.text('重试原设置操作'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tap(

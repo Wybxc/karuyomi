@@ -25,6 +25,8 @@ final class SettingsDraft._(
   wire.SettingsMutation value,
   final bool retryable,
   final wire.GlobalSettingsValues? previousGlobal,
+  final bool acknowledged,
+  final wire.BusinessStateErrorCode? rejectionCode,
 ) {
   final String? mangaKey = value.hasSetManga() ? value.setManga.mangaKey : null;
   final wire.GlobalSettingsValues? global = value.hasSetGlobal()
@@ -48,7 +50,13 @@ final class SettingsRepository(final BusinessStateClient client) {
     final value = client.pendingSettings(mangaKey: mangaKey);
     return value == null
         ? null
-        : SettingsDraft._(value.request, value.retryable, value.previousGlobal);
+        : SettingsDraft._(
+            value.request,
+            value.retryable,
+            value.previousGlobal,
+            value.acknowledged,
+            value.rejectionCode,
+          );
   }
 
   Future<SettingsSnapshot> loadGlobal() async =>
@@ -59,12 +67,14 @@ final class SettingsRepository(final BusinessStateClient client) {
   Future<SettingsSnapshot> setGlobal({
     required wire.GlobalSettingsValues values,
     required int basedOnRevision,
+    void Function()? onAcknowledged,
   }) async => SettingsSnapshot._(
     await client.mutateSettings(
       wire.SettingsMutation(
         expectedRevision: basedOnRevision,
         setGlobal: values,
       ),
+      onAcknowledged: onAcknowledged,
     ),
   );
 
@@ -72,6 +82,7 @@ final class SettingsRepository(final BusinessStateClient client) {
     required String mangaKey,
     required wire.ReaderSettingsOverride overrides,
     required int basedOnRevision,
+    void Function()? onAcknowledged,
   }) async => SettingsSnapshot._(
     await client.mutateSettings(
       wire.SettingsMutation(
@@ -81,6 +92,7 @@ final class SettingsRepository(final BusinessStateClient client) {
           overrides: overrides,
         ),
       ),
+      onAcknowledged: onAcknowledged,
     ),
   );
 }
