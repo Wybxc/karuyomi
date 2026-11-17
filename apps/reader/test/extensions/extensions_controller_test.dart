@@ -524,6 +524,7 @@ void main() {
           expect(entered.isCompleted, true);
           expect(find.text('正在保存账户选择，等待确认'), findsOneWidget);
           expect(find.textContaining('安装扩展：'), findsOneWidget);
+          expect(find.textContaining('结果待确认'), findsNothing);
           expect(
             tester
                 .widget<CupertinoButton>(

@@ -403,6 +403,7 @@ class const ExtensionOperationStatus({
     final expansion = useMemoized(ExpansibleController.new);
     useEffect(() => expansion.dispose, [expansion]);
     final pending = controller.settings.pending;
+    final repositoryTarget = controller.repositoryTarget;
     final failure = controller.settings.failure;
     final errorStyle = TextStyle(color: AppColors.error.resolveFrom(context));
     return Column(
@@ -418,6 +419,7 @@ class const ExtensionOperationStatus({
                     }.contains(controller.activity)
                 ? '原账户操作已确认，正在读取最新设置'
                 : switch (controller.activity) {
+                    ExtensionActivity.previewing => '正在预览仓库',
                     ExtensionActivity.preparing => '正在准备扩展',
                     ExtensionActivity.saving => '正在保存账户选择，等待确认',
                     ExtensionActivity.cleaning => '账户已确认，正在清理本机副本',
@@ -425,6 +427,30 @@ class const ExtensionOperationStatus({
                   },
           ),
         ],
+        if (controller.busy && pending == null && repositoryTarget != null)
+          CupertinoListSection.insetGrouped(
+            margin: EdgeInsets.zero,
+            header: const Text('当前仓库'),
+            footer: controller.activity == ExtensionActivity.previewing
+                ? const Text('只读预览不会更改账户或安装扩展。')
+                : null,
+            children: [
+              CupertinoListTile(
+                title: DefaultTextStyle(
+                  style: CupertinoTheme.of(context).textTheme.textStyle,
+                  child: Text(repositoryTarget.name),
+                ),
+                subtitle: DefaultTextStyle(
+                  style: CupertinoTheme.of(context).textTheme.textStyle
+                      .copyWith(
+                        fontSize: 13,
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                      ),
+                  child: Text(repositoryTarget.catalogUrl),
+                ),
+              ),
+            ],
+          ),
         if (controller.preparing)
           CupertinoButton(
             key: const ValueKey('extensions-cancel-prepare'),
@@ -452,17 +478,18 @@ class const ExtensionOperationStatus({
             child: const Text('管理本机存储'),
           ),
         if (pending != null) ...[
-          Text(switch (failure) {
-            SettingsFailure.conflict => '账户已在其他设备修改，请读取最新状态后重新选择。',
-            SettingsFailure.rejected => '操作未保存，请读取最新状态后处理。',
-            SettingsFailure.confirmedRead => '原账户操作已确认，请重试读取最新状态。',
-            _ =>
-              pending.acknowledged
-                  ? '原账户操作已确认，请读取最新状态。'
-                  : pending.retryable
-                  ? '结果待确认：请确认或重试原操作。'
-                  : '原操作已被拒绝，请读取最新状态。',
-          }),
+          if (!controller.busy)
+            Text(switch (failure) {
+              SettingsFailure.conflict => '账户已在其他设备修改，请读取最新状态后重新选择。',
+              SettingsFailure.rejected => '操作未保存，请读取最新状态后处理。',
+              SettingsFailure.confirmedRead => '原账户操作已确认，请重试读取最新状态。',
+              _ =>
+                pending.acknowledged
+                    ? '原账户操作已确认，请读取最新状态。'
+                    : pending.retryable
+                    ? '结果待确认：请确认或重试原操作。'
+                    : '原操作已被拒绝，请读取最新状态。',
+            }),
           if (pending.global case final values?)
             PendingExtensionChanges(
               previous: pending.previousGlobal,

@@ -13,7 +13,7 @@ import '../settings/settings_controller.dart';
 
 /// Account intent reuses the identity-bound global settings queue. Artifacts
 /// remain disposable local copies; preparation never opens a Source.
-enum ExtensionActivity { reading, preparing, saving, cleaning }
+enum ExtensionActivity { reading, previewing, preparing, saving, cleaning }
 
 final class ExtensionsController extends ChangeNotifier {
   ExtensionsController({
@@ -47,6 +47,7 @@ final class ExtensionsController extends ChangeNotifier {
   String? message;
   String? _preparationId;
   ExtensionActivity? activity;
+  ({String name, String catalogUrl})? repositoryTarget;
   RuntimeErrorCode? operationFailure;
   String? cleanupSha256;
   String? cleanupError;
@@ -68,6 +69,7 @@ final class ExtensionsController extends ChangeNotifier {
 
   void _retire() {
     _retired = true;
+    repositoryTarget = null;
     error = '身份或服务已改变，请关闭后重新打开扩展管理。';
     if (!_cancelled.isCompleted) _cancelled.complete();
   }
@@ -182,7 +184,11 @@ final class ExtensionsController extends ChangeNotifier {
       _changed();
       final saved = await _settingsCommands.saveGlobal(values, revision);
       if (!available) return;
-      if (saved) await catalog.applyConfirmedInstallations(settings.snapshot!);
+      if (saved) {
+        activity = ExtensionActivity.reading;
+        _changed();
+        await catalog.applyConfirmedInstallations(settings.snapshot!);
+      }
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
       if (saved) {
@@ -222,6 +228,12 @@ final class ExtensionsController extends ChangeNotifier {
           '请使用 HTTPS 仓库地址，目录路径须为 /extensions/index.json。',
         );
       }
+      repositoryTarget = (
+        name: name.trim().isEmpty ? uri.host : name.trim(),
+        catalogUrl: canonical,
+      );
+      activity = ExtensionActivity.previewing;
+      _changed();
       final document = await catalog.previewRepository(
         canonical,
         shouldContinue: () => available,
@@ -260,6 +272,10 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       _validateNewRepository(preview.repository, values.repositories);
       values.repositories.add(preview.repository.deepCopy());
+      repositoryTarget = (
+        name: preview.repository.name,
+        catalogUrl: preview.repository.catalogUrl,
+      );
       activity = ExtensionActivity.saving;
       _changed();
       final saved = await _settingsCommands.saveGlobal(
@@ -267,6 +283,8 @@ final class ExtensionsController extends ChangeNotifier {
         preview.baseline.globalRevision,
       );
       if (!saved || !available) return;
+      activity = ExtensionActivity.reading;
+      _changed();
       await catalog.applyConfirmedInstallations(settings.snapshot!);
       if (!available) return;
       await catalog.refreshCatalog(
@@ -292,6 +310,10 @@ final class ExtensionsController extends ChangeNotifier {
           value.repoId == repository.repoId,
     );
     await _run(() async {
+      repositoryTarget = (
+        name: repository.name,
+        catalogUrl: repository.catalogUrl,
+      );
       activity = ExtensionActivity.saving;
       _changed();
       final saved = await _settingsCommands.saveGlobal(
@@ -299,6 +321,8 @@ final class ExtensionsController extends ChangeNotifier {
         initial.globalRevision,
       );
       if (!saved || !available) return;
+      activity = ExtensionActivity.reading;
+      _changed();
       message = '仓库已移除；安装选择、书架和来源数据保留，对应运行槽将关闭。';
       await catalog.applyConfirmedInstallations(settings.snapshot!);
     });
@@ -321,6 +345,8 @@ final class ExtensionsController extends ChangeNotifier {
       _changed();
       if (await _settingsCommands.saveGlobal(values, initial.globalRevision) &&
           available) {
+        activity = ExtensionActivity.reading;
+        _changed();
         await catalog.applyConfirmedInstallations(settings.snapshot!);
         message = enabled ? '账户已确认启用。' : '账户已确认停用。';
       }
@@ -345,6 +371,8 @@ final class ExtensionsController extends ChangeNotifier {
           !available) {
         return;
       }
+      activity = ExtensionActivity.reading;
+      _changed();
       message = '账户已确认卸载；书架、阅读进度和漫画源数据保留。';
       await catalog.applyConfirmedInstallations(settings.snapshot!);
       await _cleanup(removed.bundleSha256);
@@ -463,6 +491,8 @@ final class ExtensionsController extends ChangeNotifier {
           : ExtensionActivity.saving;
       _changed();
       if (await _settingsCommands.retry() && available) {
+        activity = ExtensionActivity.reading;
+        _changed();
         await catalog.applyConfirmedInstallations(settings.snapshot!);
         cache = await catalog.runtime.extensionCache();
         message = '原设置操作已由服务端确认；请检查本机缓存状态。';
@@ -473,6 +503,7 @@ final class ExtensionsController extends ChangeNotifier {
   Future<void> _run(Future<void> Function() operation) async {
     _busy = true;
     activity = ExtensionActivity.reading;
+    repositoryTarget = null;
     operationFailure = null;
     error = null;
     message = null;
@@ -498,6 +529,7 @@ final class ExtensionsController extends ChangeNotifier {
       }
     } finally {
       _preparationId = null;
+      repositoryTarget = null;
       if (!_disposed) {
         _busy = false;
         activity = null;
@@ -511,6 +543,7 @@ final class ExtensionsController extends ChangeNotifier {
     if (!_cancelled.isCompleted) _cancelled.complete();
     final id = _preparationId;
     _preparationId = null;
+    repositoryTarget = null;
     _disposed = true;
     if (id != null) {
       unawaited(
