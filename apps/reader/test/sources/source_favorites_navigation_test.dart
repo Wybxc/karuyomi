@@ -100,12 +100,18 @@ void main() {
     WidgetTester tester, {
     Brightness? appearance,
     Size size = const Size(480, 800),
+    double textScale = 1,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
         theme: appearance == null ? null : readerAppTheme(appearance),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: CupertinoPageScaffold(
           child: CatalogPage(
             controller: catalog,
@@ -409,6 +415,8 @@ void main() {
       subscription.close();
       await show(tester);
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
+      expect(find.textContaining('应用主题：深色'), findsNothing);
+      await tap(tester, find.text('查看未确认的原全局设置'));
       expect(find.textContaining('应用主题：深色'), findsOneWidget);
       expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNull);
       await tap(tester, find.text('重新读取设置'));
@@ -426,6 +434,57 @@ void main() {
       await hide(tester);
     },
   );
+
+  for (final appearance in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'pending source cancellation keeps its original object and natural insets in $appearance at $textScale',
+        (tester) async {
+          await seed(_values(favorites: [_favorite()]));
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+            textScale: textScale,
+          );
+          platform.businessServer.loseNextResponse = true;
+          await tap(tester, toggle());
+          final original = posts().last.body;
+          final postCount = posts().length;
+          final applied = platform.businessServer.appliedMutations;
+          final error = find.text('设置修改尚未确认，请明确重试原操作。');
+          expect(tester.getTopLeft(error).dx, greaterThanOrEqualTo(16));
+          expect(tester.getBottomRight(error).dx, lessThanOrEqualTo(344));
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          expect(find.textContaining('应用主题：'), findsNothing);
+          await tap(tester, find.text('重新读取设置'));
+          expect(posts(), hasLength(postCount));
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          await hide(tester);
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+            textScale: textScale,
+          );
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          await tap(tester, find.text('查看未确认的原全局设置'));
+          expect(find.textContaining('应用主题：深色'), findsOneWidget);
+          await tap(tester, find.text('重试原设置操作'));
+          expect(posts(), hasLength(postCount + 1));
+          expect(posts().last.body, original);
+          expect(platform.businessServer.appliedMutations, applied);
+          expect(catalog.settings!.pendingGlobal(), isNull);
+          expect(
+            (await remoteSettings.loadGlobal()).global.favoriteSources,
+            isEmpty,
+          );
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
+  }
 
   testWidgets(
     'conflicts require a fresh read and changed identity discards old favorites',

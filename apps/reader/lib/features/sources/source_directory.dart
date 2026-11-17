@@ -44,6 +44,8 @@ class const SourceDirectory({
     useListenable(search);
     final language = useState<String?>(null);
     final saving = useState<(String, String)?>(null);
+    final expansion = useMemoized(ExpansibleController.new);
+    useEffect(() => expansion.dispose, [expansion]);
     final provider = settingsControllerProvider(catalog, catalog.settings);
     final settings = ref.watch(provider);
     final commands = ref.read(provider.notifier);
@@ -98,6 +100,22 @@ class const SourceDirectory({
       catalog,
       catalog.installedExtensions,
     ).where((item) => item.installed != null).toList();
+    final originalFavorites = settings.pending?.previousGlobal?.favoriteSources;
+    final submittedFavorites = settings.pending?.global?.favoriteSources;
+    final sourceChanges = <({bool removing, wire.FavoriteSource source})>[
+      if (originalFavorites != null && submittedFavorites != null) ...[
+        for (final source in originalFavorites)
+          if (!submittedFavorites.any(
+            (item) => _same(item, source.packageName, source.sourceId),
+          ))
+            (removing: true, source: source),
+        for (final source in submittedFavorites)
+          if (!originalFavorites.any(
+            (item) => _same(item, source.packageName, source.sourceId),
+          ))
+            (removing: false, source: source),
+      ],
+    ];
     final rows =
         <
           ({
@@ -265,11 +283,74 @@ class const SourceDirectory({
             settings.snapshot == null ||
             settings.error != null ||
             settings.pending != null)) ...[
-          SettingsStatus(controller: commands, state: settings),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SettingsStatus(controller: commands, state: settings),
+          ),
+          if (sourceChanges.isNotEmpty)
+            CupertinoListSection.insetGrouped(
+              header: const Text('未确认的原收藏操作'),
+              children: [
+                for (final change in sourceChanges)
+                  CupertinoListTile(
+                    title: DefaultTextStyle(
+                      style: CupertinoTheme.of(context).textTheme.textStyle,
+                      child: Text(
+                        '${change.removing ? '取消收藏源' : '收藏源'}：${change.source.sourceName}',
+                      ),
+                    ),
+                    subtitle: DefaultTextStyle(
+                      style: CupertinoTheme.of(context).textTheme.textStyle
+                          .copyWith(
+                            fontSize: 13,
+                            color: AppColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
+                          ),
+                      child: Text(
+                        '${sourceLanguage(change.source.sourceLang)} · ${extensions.firstWhereOrNull((item) => item.packageName == change.source.packageName)?.name ?? change.source.packageName}',
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           if (settings.pending?.global case final values?)
-            PendingGlobalSettings(
-              values: values,
-              revision: settings.pending!.basedOnRevision,
+            Expansible(
+              key: const ValueKey('source-pending-global-values'),
+              controller: expansion,
+              animationStyle:
+                  MediaQuery.reduceMotionOf(context) ||
+                      MediaQuery.disableAnimationsOf(context)
+                  ? AnimationStyle.noAnimation
+                  : null,
+              headerBuilder: (context, animation) => Semantics(
+                container: true,
+                expanded: expansion.isExpanded,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => expansion.isExpanded
+                      ? expansion.collapse()
+                      : expansion.expand(),
+                  child: CupertinoListTile(
+                    title: const Text('查看未确认的原全局设置'),
+                    trailing: RotationTransition(
+                      turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                      child: Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: AppColors.accent.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              bodyBuilder: (context, animation) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: PendingGlobalSettings(
+                  values: values,
+                  revision: settings.pending!.basedOnRevision,
+                ),
+              ),
             ),
         ],
         for (final target in catalog.sourcePreferenceRecoveries)

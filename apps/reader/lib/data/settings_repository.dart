@@ -19,8 +19,13 @@ final class SettingsSnapshot._(wire.SettingsResponse value) {
     ..freeze();
 }
 
-/// Frozen submitted values. Retrying this exact draft retains its UUID/CAS.
-final class SettingsDraft._(wire.SettingsMutation value, final bool retryable) {
+/// Frozen submitted values and their known confirmed baseline. Refreshing
+/// cannot replace the original object description or the exact UUID/CAS.
+final class SettingsDraft._(
+  wire.SettingsMutation value,
+  final bool retryable,
+  final wire.GlobalSettingsValues? previousGlobal,
+) {
   final String? mangaKey = value.hasSetManga() ? value.setManga.mangaKey : null;
   final wire.GlobalSettingsValues? global = value.hasSetGlobal()
       ? (value.setGlobal.deepCopy()..freeze())
@@ -43,7 +48,7 @@ final class SettingsRepository(final BusinessStateClient client) {
     final value = client.pendingSettings(mangaKey: mangaKey);
     return value == null
         ? null
-        : SettingsDraft._(value.request, value.retryable);
+        : SettingsDraft._(value.request, value.retryable, value.previousGlobal);
   }
 
   Future<SettingsSnapshot> loadGlobal() async =>

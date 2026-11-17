@@ -117,10 +117,16 @@ final class _PendingCategoryMutation {
 }
 
 final class _PendingSettingsMutation {
-  _PendingSettingsMutation(this.fingerprint, this.request, this.body);
+  _PendingSettingsMutation(
+    this.fingerprint,
+    this.request,
+    this.body,
+    this.previousGlobal,
+  );
   final String fingerprint;
   final wire.SettingsMutation request;
   final String body;
+  final wire.GlobalSettingsValues? previousGlobal;
   BusinessStateException? rejection;
 }
 
@@ -1289,14 +1295,21 @@ final class BusinessStateClient {
     if (_closed) sink.close();
   });
 
-  ({wire.SettingsMutation request, bool retryable})? pendingSettings({
-    String? mangaKey,
-  }) {
+  ({
+    wire.SettingsMutation request,
+    bool retryable,
+    wire.GlobalSettingsValues? previousGlobal,
+  })?
+  pendingSettings({String? mangaKey}) {
     if (_closed) return null;
     final pending = _pendingSettings[_settingsScope(mangaKey)];
     return pending == null
         ? null
-        : (request: pending.request, retryable: pending.rejection == null);
+        : (
+            request: pending.request,
+            retryable: pending.rejection == null,
+            previousGlobal: pending.previousGlobal,
+          );
   }
 
   Future<wire.SettingsResponse> readSettings({String? mangaKey}) {
@@ -1388,12 +1401,16 @@ final class BusinessStateClient {
       }
       command.mutationId = _uuid.v4();
       command.freeze();
+      final global = command.hasSetGlobal() ? _latestGlobalSettings : null;
       final pending = _PendingSettingsMutation(
         fingerprint,
         command,
         jsonEncode(
           wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
         ),
+        global != null && global.revision == command.expectedRevision
+            ? global.values
+            : null,
       );
       _pendingSettings[scope] = pending;
       return _sendSettings(pending, mangaKey: mangaKey);

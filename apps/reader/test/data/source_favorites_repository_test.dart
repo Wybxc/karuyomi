@@ -142,6 +142,7 @@ void main() {
     await attachFixture();
     var controller = fixture.editor();
     expect(await controller.refresh(), true);
+    final previous = fixture.state().snapshot!.global;
     final favorite = _values(favorites: [_source('source.a')]);
     server.loseNextResponse = true;
     expect(await controller.saveGlobal(favorite, 0), false);
@@ -160,6 +161,8 @@ void main() {
     );
     expect(sent.expectedRevision, 0);
     expect(fixture.state().pending!.global, favorite);
+    expect(fixture.state().pending!.previousGlobal, previous);
+    expect(fixture.state().pending!.previousGlobal!.isFrozen, true);
     fixture.invalidate();
     final recreated = SettingsRepository(client);
     controller = fixture.editor();
@@ -167,6 +170,7 @@ void main() {
     expect(_writes(server), hasLength(1));
     expect(fixture.state().pending!.global, favorite);
     expect(fixture.state().pending!.basedOnRevision, 0);
+    expect(fixture.state().pending!.previousGlobal, previous);
     expect(fixture.state().canEdit, false);
     expect(fixture.state().canRetry, true);
     final changed = favorite.deepCopy()..favoriteSources.clear();

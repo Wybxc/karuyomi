@@ -71,6 +71,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 **当前视觉重构**：[Mihon全界面布局与配色对照](mihon-cupertino-fidelity.md)按全部现有状态推进，统一Cupertino导航、控件、动态语义色与转场。`9a1c03c`完整CI/Web/Wasm通过，内置浏览器控制恢复后的[正式双主题验收](../verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-双主题验收)补齐04.K4/K6、05.K10三对。跨版本双主题主图119/169（70.4%），剩余50个主状态（单侧9、双侧均缺41）及全部变体、转换、最终产物和生产门；该计数不代表PR整体完成率。
 
+源收藏浅色等待/未知恢复已实拍复现布局缺陷，现修复状态留白、原取消对象和完整全局值展示；八文件124项相关回归通过。[新正式产物双主题复验](../verification/mihon-cupertino-fidelity.md#源收藏恢复布局的浅色复现与修复)仍待，本次不增加主图计数。
+
 此前[批量等待与暂停](../verification/mihon-cupertino-fidelity.md#批量等待与暂停的正式-web-复验)已补齐双主题主图；浅色明确继续、深色明确结束均按原范围处理，首次分类交付未完成的记录单列保留。先前四次浏览器控制超时及未确认根因继续保留，恢复后没有改用其它浏览器。官方[故障验收入口](../verification/mihon-cupertino-fidelity.md#分类目录与批量操作的故障验收入口)的短自动延迟、取消和确认后读取失败经57项Workers/D1/R2回归与正式Web分项核对；深色身份失效后旧动作禁用，同一身份重连保留原命令且不自动提交，浅色失效仍待。接下来补批量身份失效、真实CAS等变体、Source与选源、连接浅色及其它编辑面[状态机](../verification/mihon-state-coverage.md)缺口。各版本实拍、历史失败、像素/配色依据与环境限制保存在[验证记录](../verification/mihon-cupertino-fidelity.md)，逐项里程碑和剩余门槛维护在[交付表](mihon-cupertino-fidelity.md#目标与当前状态)。PR #8保持草稿，未合并、未部署；真实生产Access、图片/保存/新文档续读仍待，Karuyomi原生现场验收保持停止。
 
 为实际验收部分提交，官方夹具新增[首项确认后丢后项确认](../verification/mihon-cupertino-fidelity.md#批量部分提交的确定性故障入口)，62项Workers/D1/R2回归及`c6f1ce6`完整CI/Web/Wasm通过；生产入口不启用，原取消/generation及审计上限保持。[正式Web准备](../verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)已核对35条交付资源、六次独立准备、十二路基线及18条完成审计，UI业务写入为0；内置浏览器四次控制调用超时，没有新主图，视口是否改变/恢复未确认。新拒绝说明和部分批量正式Web继续待验，不能把确定性入口计作04.K4已完成。
