@@ -870,6 +870,20 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 62项官方Workers/D1/R2回归通过，覆盖目录和作品分类的第一条200、第二条真实提交/502、同UUID/正文重试200且零重复，以及新增模式的取消和显式覆盖。初轮分类关联第二作品尚未收藏，实际API拒绝400，`editor-ui-partial-batch-workers.log`保留该测试准备错误；分类夹具补齐两部真实收藏后，`editor-ui-partial-batch-workers-corrected.log`全部通过，没有以假回执绕过校验。API/test严格类型与本轮完整检查另行执行，新夹具完整CI和对应正式Web仍待，116/169（68.6%）保持。这是验收入口，不是部分批量、拒绝、失效或Source运行能力已完成。
 
+## 分类与部分批量的正式 Web 准备受阻
+
+2026-11-18，夹具`c6f1ce6f3185e08bc88b98e48bd6f6e0fdaa3478`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44124744792)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44124760947)完整成功，Web及push Wasm通过、deploy跳过。API/test严格类型、完整格式/校验、依赖分层和标准prek hook通过。正式客户端复用已验证的`d09212b`，客户端、协议、runtime及生产API源码相对该提交均无差异；通过官方API和acceptance Vite分别装配，实际HTTP交付35条Web资源与CI相等，入口`main.dart.7733b8cd.js`，原收据`c6f1ce6-library-faults-served-client-check.json`保留。环境为官方Wrangler临时D1/R2、`acceptance-owner`、四包既有输入、`editor-ui`，地址`127.0.0.1:49790`；没有本地Flutter/AOT构建。
+
+六次独立API准备为浅色/三包安装、英文/法文同名xkcd收藏、两分类以及西语xkcd测试收藏。西语Source身份来自已固定清单，资料为明确受控准备，未执行该Source或声称运行兼容。`verify-c6f1ce6-browser-unavailable.ts`以生成ProtoJSON模型核对十二路完整基线及18条连续完成审计，全部Worker/客户端200，六条POST与准备原正文逐字相等；UI业务写入为0。账户6、目录2、全局1/LIGHT，三作品各revision1且已收藏，无分类关联/书签/阅读进度/续读，资料与各自准备命令一致，书架完整三项。快照、准备、审计和`unavailable-evidence-receipt.json`使用前缀`karuyomi-d09212b-library-faults-`，校验日志为`c6f1ce6-browser-unavailable-evidence-check.log`。
+
+内置浏览器先以同一调用设置360×800、创建隐藏标签并绑定现代接口，约30秒超时后重置；无法判定其中哪一步未返回。随后完整库存、显式`iab`的实际URL标签定位，以及再次显式`iab`选择三个独立调用也各约30秒超时并重置。此前只读标签库存曾正常返回空列表，不代表后续控制健康。没有可核验的新产品画面、AX/DOM或截图，标签是否建立及视口是否改变/恢复均未确认；根因仍未知，不归因于审批额度、产品服务或某一个组合步骤。原事实保存在`c6f1ce6-browser-unavailable.json`，未改用其它浏览器。恢复后先核对实际浏览器、标签和视口，再启动新的独立验收批次；本次harness由明确stop正常退出0，不把控制观察超时当成服务失败或重启依据。
+
+同轮后续只读诊断在实际安装的ChatGPT 26.1111.21308桌面日志中，按当前聊天与当前turn筛出IAB `getInfo`的直接拒绝：`IAB browser belongs to another task.`，栈位于`prepareSessionRoute`。精简计数与时间范围保存在`c6f1ce6-browser-ownership-diagnostic.json`，未把完整桌面日志复制入库。官方`open_in_codex`为当前聊天打开内置浏览器面板返回queued；该入口只排队，不代表页面或控制恢复，已请求用户显示当前聊天的浏览器后继续。为什么桌面归属不一致仍未确定；同时出现的Local Work rendezvous WebSocket超时不是本次浏览器因果证据，不据此更改网络、审批或归属校验。
+
+用户随后确认当前聊天的内置浏览器已打开。新的显式iab选择约33秒、完整库存约30秒后仍超时并重置，累计六次控制调用无画面。最新桌面owner sync的`ownerRoutePath`确实指向本持久聊天，而`conversationId`仍是`client-new-thread`临时身份；本聊天请求继续收到相同归属拒绝，官方面板入口再次queued。精简后续事实保存在`c6f1ce6-browser-ownership-after-handoff.json`，不能归因于用户切错聊天，也不能将普通打开面板记作恢复。更深桌面状态原因尚未证明，待重建桌面连接后再验；未改写浏览器owner或绕过控制路径，未重新启动已正常停止的harness。
+
+没有新主图，仍116/169（68.6%）、仅单侧9、双侧均缺44，剩余53个主状态及全部相关变体、转换和最终产物门。05.K10修复后的双主题、04.K4/K6/K8及其它待办继续按原状态机推进；本次API准备不替代正式渲染、真实Access、Source、原生或生产证据，PR #8保持草稿、未合并、未部署。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。
