@@ -212,18 +212,26 @@ final class BusinessStateClient {
 
   Stream<BusinessLibrarySnapshot> watchLibrarySnapshot() =>
       Stream.multi((sink) {
+        // Another manga read can publish changes while this shelf is in flight.
+        // The first value must still come after this authoritative refresh.
+        var waitingForInitialRead = true;
         final subscription = _changes.stream.listen(
-          (_) => sink.add(_librarySnapshot),
+          (_) {
+            if (!waitingForInitialRead) sink.add(_librarySnapshot);
+          },
           onError: sink.addError,
           onDone: sink.close,
         );
         sink.onCancel = subscription.cancel;
         refreshLibrary().then(
           (_) {
+            waitingForInitialRead = false;
             if (!_closed) sink.add(_librarySnapshot);
           },
-          onError: (Object error, StackTrace stack) =>
-              sink.addError(error, stack),
+          onError: (Object error, StackTrace stack) {
+            waitingForInitialRead = false;
+            sink.addError(error, stack);
+          },
         );
       });
 
@@ -1093,9 +1101,11 @@ final class BusinessStateClient {
   /// Catalog commands have their own queue, independent of manga progress and
   /// associations. An unconfirmed retry retains the exact UUID, CAS and body;
   /// an acknowledged command only retries its authoritative reads.
+  /// The callback reports a validated ACK before its read-back completes.
   Future<wire.CategoryMutationResponse> mutateCategories(
-    wire.CategoryMutation operation,
-  ) {
+    wire.CategoryMutation operation, {
+    void Function()? onAcknowledged,
+  }) {
     _assertNoMigrationCatalog();
     final command = operation.deepCopy();
     command.clearMutationId();
@@ -1109,7 +1119,7 @@ final class BusinessStateClient {
         if (previous.fingerprint != fingerprint) {
           throw StateError('请先处理书架中的未确认分类修改。');
         }
-        return _sendCategories(previous);
+        return _sendCategories(previous, onAcknowledged: onAcknowledged);
       }
       command.mutationId = _uuid.v4();
       command.freeze();
@@ -1119,7 +1129,7 @@ final class BusinessStateClient {
         jsonEncode(wire.encodeProtoJson(command)),
       );
       _pendingCategory = pending;
-      return _sendCategories(pending);
+      return _sendCategories(pending, onAcknowledged: onAcknowledged);
     });
   }
 
@@ -1159,8 +1169,9 @@ final class BusinessStateClient {
   }
 
   Future<wire.CategoryMutationResponse> _sendCategories(
-    _PendingCategoryMutation pending,
-  ) async {
+    _PendingCategoryMutation pending, {
+    void Function()? onAcknowledged,
+  }) async {
     _ensureOpen();
     if (pending.rejection != null) throw pending.rejection!;
     var value = pending.confirmation;
@@ -1209,6 +1220,7 @@ final class BusinessStateClient {
       value.freeze();
       pending.confirmation = value;
     }
+    onAcknowledged?.call();
     // Even a successful ACK can be an old idempotency record. Read back the
     // current catalog before accepting it; a deleted category stays deleted.
     await _readCategories();

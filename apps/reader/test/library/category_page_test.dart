@@ -103,6 +103,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> tapDuringRead(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.runAsync(() async {
+      await tester.tap(finder);
+      await Future<void>.delayed(Duration.zero);
+    });
+    // The pending read keeps a spinner active; settle the button and route
+    // transitions without waiting for every animation to become idle.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+  }
+
   Finder categoryTitle(String name) => find.descendant(
     of: find.byKey(const ValueKey('category-manager')),
     matching: find.text(name),
@@ -251,6 +263,9 @@ void main() {
           for (final reorder in [false, true]) {
             final received = Completer<void>();
             final release = Completer<void>();
+            final readReceived = Completer<void>();
+            final readRelease = Completer<void>();
+            var acknowledged = false;
             late Finder action;
             if (reorder) {
               await tap(tester, iconLabel('分类选项 已确认名称'));
@@ -264,13 +279,18 @@ void main() {
               action = find.text('保存').hitTestable();
             }
             platform.afterBusinessReply = (request, reply) async {
-              if (request.method != 'POST' ||
-                  request.uri.path != '/api/categories/mutations') {
-                return reply;
+              if (request.method == 'POST' &&
+                  request.uri.path == '/api/categories/mutations') {
+                received.complete();
+                await release.future;
+                acknowledged = true;
+              } else if (acknowledged &&
+                  request.method == 'GET' &&
+                  request.uri.path == '/api/categories') {
+                platform.afterBusinessReply = null;
+                readReceived.complete();
+                await readRelease.future;
               }
-              platform.afterBusinessReply = null;
-              received.complete();
-              await release.future;
               return reply;
             };
             try {
@@ -317,6 +337,15 @@ void main() {
               );
               expect(saving, findsOneWidget);
               expect(tester.widget<CupertinoButton>(saving).onPressed, isNull);
+              final dismissal = find.descendant(
+                of: editor,
+                matching: find.widgetWithText(CupertinoButton, '稍后'),
+              );
+              expect(dismissal, findsOneWidget);
+              expect(
+                tester.widget<CupertinoButton>(dismissal).onPressed,
+                isNull,
+              );
               await tester.sendKeyEvent(LogicalKeyboardKey.escape);
               await tester.pump(const Duration(milliseconds: 400));
               expect(editor, findsOneWidget);
@@ -329,9 +358,87 @@ void main() {
                 reorder ? '科幻' : '已确认名称',
               );
               expect(tester.takeException(), isNull);
-            } finally {
               await tester.runAsync(() async {
                 release.complete();
+                await readReceived.future.timeout(const Duration(seconds: 5));
+              });
+              await tester.pump(const Duration(milliseconds: 400));
+              expect(
+                find.descendant(
+                  of: editor,
+                  matching: find.text('正在读取已确认修改后的书架。'),
+                ),
+                findsOneWidget,
+              );
+              expect(waiting, findsNothing);
+              final reading = find.descendant(
+                of: editor,
+                matching: find.widgetWithText(CupertinoButton, '读取中'),
+              );
+              expect(reading, findsOneWidget);
+              expect(tester.widget<CupertinoButton>(reading).onPressed, isNull);
+              expect(
+                tester.widget<CupertinoButton>(dismissal).onPressed,
+                isNotNull,
+              );
+              final pendingReads = server.requests
+                  .where(
+                    (request) =>
+                        request.method == 'GET' &&
+                        request.uri.path == '/api/categories',
+                  )
+                  .length;
+              await tapDuringRead(tester, dismissal);
+              expect(
+                find.byKey(const ValueKey('category-command')),
+                findsNothing,
+              );
+              if (!reorder) {
+                expect(manager, findsOneWidget);
+                expect(
+                  find.descendant(
+                    of: manager,
+                    matching: find.text('重命名分类：“已确认名称”。'),
+                  ),
+                  findsOneWidget,
+                );
+                await tapDuringRead(
+                  tester,
+                  find.descendant(
+                    of: manager,
+                    matching: find.widgetWithText(CupertinoButton, '稍后'),
+                  ),
+                );
+              }
+              expect(manager, findsNothing);
+              final continueRead = find.text('继续读取最新书架');
+              expect(continueRead, findsOneWidget);
+              await tapDuringRead(tester, continueRead);
+              expect(manager, findsOneWidget);
+              expect(
+                find.descendant(
+                  of: manager,
+                  matching: find.text('正在读取已确认修改后的书架。'),
+                ),
+                findsOneWidget,
+              );
+              expect(
+                posts('/api/categories/mutations'),
+                hasLength(reorder ? 2 : 1),
+              );
+              expect(
+                server.requests.where(
+                  (request) =>
+                      request.method == 'GET' &&
+                      request.uri.path == '/api/categories',
+                ),
+                hasLength(pendingReads),
+                reason: 'reopening keeps the original in-flight read',
+              );
+            } finally {
+              await tester.runAsync(() async {
+                if (!release.isCompleted) release.complete();
+                if (!readRelease.isCompleted) readRelease.complete();
                 await Future<void>.delayed(Duration.zero);
               });
               await tester.pumpAndSettle();
@@ -343,6 +450,11 @@ void main() {
             expect(
               find.byKey(const ValueKey('category-command')),
               findsNothing,
+            );
+            expect(
+              manager,
+              findsOneWidget,
+              reason: 'a late read must update the reopened manager without closing its route',
             );
             expect(tester.takeException(), isNull);
           }
@@ -460,6 +572,70 @@ void main() {
       // A conflict cannot become an implicit retry against the new revision.
       expect(find.text('重试'), findsNothing);
       expect(posts('/api/categories/mutations').length, postCount);
+      await tester.runAsync(
+        () => remote.renameCategory(
+          categoryId: _first,
+          name: '读取之后',
+          expectedRevision: 2,
+        ),
+      );
+      final finalPosts = posts('/api/categories/mutations').length;
+      final received = Completer<void>();
+      final release = Completer<void>();
+      platform.afterBusinessReply = (request, reply) async {
+        if (request.method == 'GET' && request.uri.path == '/api/library') {
+          platform.afterBusinessReply = null;
+          received.complete();
+          await release.future;
+        }
+        return reply;
+      };
+      final manager = find.byKey(const ValueKey('category-manager'));
+      final command = find.byKey(const ValueKey('category-command'));
+      try {
+        await tapDuringRead(tester, find.text('重读'));
+        await tester.runAsync(
+          () => received.future.timeout(const Duration(seconds: 5)),
+        );
+        expect(find.text('正在重新读取服务端分类。'), findsWidgets);
+        await tapDuringRead(
+          tester,
+          find.descendant(
+            of: command,
+            matching: find.widgetWithText(CupertinoButton, '稍后'),
+          ),
+        );
+        await tapDuringRead(
+          tester,
+          find.descendant(
+            of: manager,
+            matching: find.widgetWithText(CupertinoButton, '稍后'),
+          ),
+        );
+        expect(manager, findsNothing);
+        await tapDuringRead(tester, find.text('处理未确认修改'));
+        expect(manager, findsOneWidget);
+        expect(find.text('重命名分类：“本端草稿”。'), findsOneWidget);
+        expect(posts('/api/categories/mutations').length, finalPosts);
+      } finally {
+        await tester.runAsync(() async {
+          release.complete();
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pumpAndSettle();
+      }
+      expect(manager, findsOneWidget);
+      expect(categoryTitle('读取之后'), findsOneWidget);
+      expect(categoryTitle('另一设备'), findsNothing);
+      expect(
+        tester
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '新建分类'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(posts('/api/categories/mutations').length, finalPosts);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

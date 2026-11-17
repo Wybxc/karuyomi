@@ -25,10 +25,12 @@ Future<void> _create(
   LibraryRepository repository, {
   String id = _first,
   int revision = 0,
+  void Function()? onAcknowledged,
 }) => repository.createCategory(
   categoryId: id,
   name: 'Read',
   expectedRevision: revision,
+  onAcknowledged: onAcknowledged,
 );
 Future<void> _favorite(
   LibraryRepository repository, [
@@ -615,7 +617,11 @@ void main() {
             verb: holdAck ? 'POST' : 'GET',
           );
         final client = _client(gate);
-        final write = _create(LibraryRepository(client));
+        var acknowledgements = 0;
+        final write = _create(
+          LibraryRepository(client),
+          onAcknowledged: () => acknowledgements++,
+        );
         final failed = expectLater(write, throwsStateError);
         await gate.received!.future;
         await client.dispose();
@@ -627,6 +633,7 @@ void main() {
         );
         gate.release!.complete();
         await failed;
+        expect(acknowledgements, holdAck ? 0 : 1);
         expect(server.catalog().categories.single.id, _first);
         expect(server.catalog(subject: 'other').categories, isEmpty);
       },
@@ -640,6 +647,7 @@ void main() {
       final client = _client(server);
       addTearDown(client.dispose);
       final repository = LibraryRepository(client);
+      var acknowledged = false;
       server.beforeRequest = (request) {
         if (request.uri.path != '/api/categories/mutations') return null;
         return ApiReply(
@@ -658,7 +666,11 @@ void main() {
           redirected: false,
         );
       };
-      await expectLater(_create(repository), throwsFormatException);
+      await expectLater(
+        _create(repository, onAcknowledged: () => acknowledged = true),
+        throwsFormatException,
+      );
+      expect(acknowledged, isFalse);
       server.beforeRequest = (request) => request.uri.path == '/api/categories'
           ? const ApiReply(
               status: 200,

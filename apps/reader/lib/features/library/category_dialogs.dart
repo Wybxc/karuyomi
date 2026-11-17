@@ -17,7 +17,7 @@ import 'library_batch.dart';
 const _changed = '分类或漫画已在其他设备修改，请重新读取后重开编辑。';
 const _expired = '身份或服务已变化，请关闭后重新打开。';
 
-// Keep an uncertain command with its repository for this session, including
+// Keep an unfinished edit with its repository for this session, including
 // when a dialog or shelf route closes. A new command must not silently retry it.
 final _pendingEdits = Expando<_CategoryDraft>('unfinished category edit');
 
@@ -80,7 +80,7 @@ Future<void> showLibraryCategoryPicker({
     title: '设置分类',
     categories: view.categories,
     selection: entry.categoryIds.toSet(),
-    submit: (_, selection) => repository.setCategories(
+    submit: (_, selection, _) => repository.setCategories(
       mangaKey: entry.mangaKey,
       categoryIds: view.categories
           .where((category) => selection.contains(category.id))
@@ -110,7 +110,11 @@ Future<void> _showCommand(
   ),
 );
 
-typedef _Submit = Future<void> Function(String name, Set<String> selection);
+typedef _Submit = Future<void> Function(
+  String name,
+  Set<String> selection,
+  void Function() onAcknowledged,
+);
 
 final class _CategoryDraft extends ChangeNotifier {
   _CategoryDraft({
@@ -152,6 +156,9 @@ final class _CategoryDraft extends ChangeNotifier {
   bool get confirmationReceived =>
       confirmed ||
       (entry == null && repository.client.categoryMutationNeedsRead);
+  bool get waitingForConfirmation => busy && !blocked && !confirmationReceived;
+  String get commandSummary =>
+      description ?? (name == null ? title : '$title：“$name”。');
   String get retryLabel => confirmationReceived ? '重试读取' : '重试保存';
   String get busyLabel => blocked || confirmationReceived ? '读取中' : '保存中';
   String get activityLabel => blocked
@@ -184,7 +191,7 @@ final class _CategoryDraft extends ChangeNotifier {
     try {
       // An ACK followed by a failed shelf read must only retry the read.
       if (!confirmed) {
-        await submit(name ?? '', selection);
+        await submit(name ?? '', selection, notifyListeners);
         confirmed = true;
       }
       if (entry == null) {
@@ -219,7 +226,7 @@ final class _CategoryDraft extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      await repository.refresh();
+      confirmedView = await repository.watchView().first;
       reloaded = true;
       _finish();
     } catch (_) {
@@ -277,16 +284,15 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
   bool get canCloseCurrentRoute =>
       current && ModalRoute.of(context)?.isCurrent == true;
 
-  Widget status(_CategoryDraft? draft) => Column(
+  Widget status(_CategoryDraft? draft, {bool showCommand = false}) => Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (!expired && draft?.reorder == true)
-        if (draft?.description case final description?)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(description),
-          ),
+      if (!expired && draft != null && (showCommand || draft.reorder))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(draft.commandSummary),
+        ),
       if (!expired && draft?.busy == true)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -362,8 +368,8 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
       if (!expired &&
           isCurrent() &&
           !_childOpen &&
-          draft?.completed == true &&
-          !draft!.reloaded) {
+          draft != null &&
+          draft.completed) {
         _view = draft.confirmedView ?? _view;
         _draft = null;
       }
@@ -421,9 +427,10 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
           description:
               '将“${view.categories[index].name}”移至第 ${index + delta + 1} 位。',
           reorder: true,
-          submit: (_, _) => widget.repository.reorderCategories(
+          submit: (_, _, onAcknowledged) => widget.repository.reorderCategories(
             categoryIds: ids,
             expectedRevision: view.categoryRevision,
+            onAcknowledged: onAcknowledged,
           ),
         ),
       ),
@@ -450,21 +457,24 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
               : null,
           submitLabel: delete ? '删除' : '保存',
           destructive: delete,
-          submit: (name, _) => delete
+          submit: (name, _, onAcknowledged) => delete
               ? widget.repository.deleteCategory(
                   categoryId: id,
                   expectedRevision: view.categoryRevision,
+                  onAcknowledged: onAcknowledged,
                 )
               : category == null
               ? widget.repository.createCategory(
                   categoryId: id,
                   name: name,
                   expectedRevision: view.categoryRevision,
+                  onAcknowledged: onAcknowledged,
                 )
               : widget.repository.renameCategory(
                   categoryId: id,
                   name: name,
                   expectedRevision: view.categoryRevision,
+                  onAcknowledged: onAcknowledged,
                 ),
         ),
       ),
@@ -476,13 +486,13 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
     useSession();
     useOnListenableChange(_draft, _draftChanged);
     return PopScope(
-      canPop: expired || _draft?.busy != true,
+      canPop: expired || _draft?.waitingForConfirmation != true,
       child: EditSheet(
         key: const ValueKey('category-manager'),
         title: const Text('管理分类'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: !expired && _draft?.busy == true
+          onPressed: !expired && _draft?.waitingForConfirmation == true
               ? null
               : () => Navigator.pop(context),
           child: Text(
@@ -500,7 +510,7 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
             if (expired || _draft != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: status(_draft),
+                child: status(_draft, showCommand: true),
               ),
             CupertinoFormSection.insetGrouped(
               header: const Text('分类'),
@@ -683,7 +693,7 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
     _name = useTextEditingController(text: draft.name ?? '');
     useListenable(draft);
     return PopScope(
-      canPop: expired || !draft.busy,
+      canPop: expired || !draft.waitingForConfirmation,
       child: EditSheet(
         key: const ValueKey('category-command'),
         title: Text(draft.title),
@@ -691,7 +701,7 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
             ? null
             : CupertinoButton(
                 padding: EdgeInsets.zero,
-                onPressed: !expired && draft.busy
+                onPressed: !expired && draft.waitingForConfirmation
                     ? null
                     : () => Navigator.pop(context),
                 child: Text(

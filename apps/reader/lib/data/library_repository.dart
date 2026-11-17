@@ -106,6 +106,7 @@ final class LibraryRepository {
     required String categoryId,
     required String name,
     required int expectedRevision,
+    void Function()? onAcknowledged,
   }) async {
     await client.mutateCategories(
       wire.CategoryMutation(
@@ -114,6 +115,7 @@ final class LibraryRepository {
           category: wire.Category(id: categoryId, name: name.trim()),
         ),
       ),
+      onAcknowledged: onAcknowledged,
     );
   }
 
@@ -121,6 +123,7 @@ final class LibraryRepository {
     required String categoryId,
     required String name,
     required int expectedRevision,
+    void Function()? onAcknowledged,
   }) async {
     await client.mutateCategories(
       wire.CategoryMutation(
@@ -130,30 +133,35 @@ final class LibraryRepository {
           name: name.trim(),
         ),
       ),
+      onAcknowledged: onAcknowledged,
     );
   }
 
   Future<void> reorderCategories({
     required List<String> categoryIds,
     required int expectedRevision,
+    void Function()? onAcknowledged,
   }) async {
     await client.mutateCategories(
       wire.CategoryMutation(
         expectedRevision: expectedRevision,
         reorderCategories: wire.ReorderCategories(categoryIds: categoryIds),
       ),
+      onAcknowledged: onAcknowledged,
     );
   }
 
   Future<void> deleteCategory({
     required String categoryId,
     required int expectedRevision,
+    void Function()? onAcknowledged,
   }) async {
     await client.mutateCategories(
       wire.CategoryMutation(
         expectedRevision: expectedRevision,
         deleteCategory: wire.DeleteCategory(categoryId: categoryId),
       ),
+      onAcknowledged: onAcknowledged,
     );
   }
 
