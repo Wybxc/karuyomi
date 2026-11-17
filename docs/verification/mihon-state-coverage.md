@@ -1181,7 +1181,7 @@ stateDiagram-v2
     state "21.K5 服务端已确认" as MigrationDone
     state "21.K6 身份或服务已失效" as MigrationExpired
     classDef captured fill:#e7f1ff,stroke:#2471c8,color:#112b4a
-    class MigrationInputs,MigrationInputError,MigrationScope,MigrationOriginalLoad,MigrationCategories,MigrationOriginalReady,MigrationNoSources,MigrationSearch,MigrationEmpty,MigrationResults,MigrationPreviewLoad,MigrationPreviewError,MigrationPreview,MigrationChapterChoice,MigrationConfirm,MigrationSending,MigrationUnknown,MigrationRejected,MigrationDone captured
+    class MigrationInputs,MigrationInputError,MigrationScope,MigrationOriginalLoad,MigrationCategories,MigrationOriginalReady,MigrationNoSources,MigrationSearch,MigrationListing,MigrationEmpty,MigrationResults,MigrationPreviewLoad,MigrationPreviewError,MigrationPreview,MigrationChapterChoice,MigrationConfirm,MigrationSending,MigrationUnknown,MigrationRejected,MigrationDone captured
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     class MigrationExpired partial
     note left of MigrationInputs
@@ -1254,7 +1254,7 @@ stateDiagram-v2
 | 20.K7  | 已确认无其他已安装且启用的源、扩展管理指引、只读刷新和返回                                                                     | `karuyomi-3a57cdf-migration-k7-light.jpg`                                                   | `karuyomi-3a57cdf-migration-k7-dark.jpg`                                              |
 | 20.K8  | 正在打开的精确目标源、原作品上下文、操作禁用；失败不得误标已切换                                                               | 待                                                                                          | 待                                                                                    |
 | 20.K9  | 当前目标源、查询、搜索/热门动作及原作品；尚未请求不显示无结果                                                                  | `karuyomi-9228c11-migration-search-ready-light.jpg`                                         | `karuyomi-9228c11-migration-search-ready-dark.jpg`                                    |
-| 20.K10 | 当前目标源、查询或热门、首次/追加进度；追加时保留已有结果                                                                      | 待                                                                                          | 待                                                                                    |
+| 20.K10 | 当前目标源、查询或热门、首次/追加进度；追加时保留已有结果                                                                      | `karuyomi-ef5f3dd-selection-migration-popular-loading-candidate-light.jpg`                  | `karuyomi-ef5f3dd-selection-migration-popular-loading-candidate-dark.jpg`             |
 | 20.K11 | 当前源和查询或热门、成功为空、修改查询或改浏览热门；两种空态分别验                                                             | `karuyomi-86d27e7-migration-search-empty-light.jpg`，仅搜索                                 | `karuyomi-86d27e7-migration-search-empty-dark.jpg`，仅搜索                            |
 | 20.K12 | 精确目标作品名称、源/URL区分、打开与有界分页；不因同名打开其它条目                                                             | `karuyomi-9228c11-migration-target-list-light.jpg`                                          | `karuyomi-9228c11-migration-target-list-dark.jpg`                                     |
 | 20.K13 | 失败源/操作、可恢复原因、重试；开源失败保留原选择，追加失败保留结果和分页上下文，分别验                                        | 待                                                                                          | 待                                                                                    |
@@ -1870,3 +1870,5 @@ stateDiagram-v2
 已排除的误计：`reader-loading-default-dark` 是 Android 全屏引导；`cover-view-default-dark` 仍为详情；`extension-details-selected-default-dark` 仍为扩展列表；`settings-main-default-dark` 是更多页；`category-create-filled-default-dark` 输入仍为空。它们均不填入所命名的目标状态。
 
 2026-11-16，`e8646f5`新读取提示的完整CI及正式Web双主题复验通过，33组九路快照与202条完成审计核对未知/拒绝的读取反馈、原请求保留及精确重试零重复。19.K11、21.K6、24.K11只登记有效深色主图；名义浅色截图实际也为系统深色，故成对主图仍107/169（63.3%）。其余触发阶段及设置禁用语义继续待验；20.K8/K10未截到进度，仍不计通过。连接阶段和阅读进度被迁移阻塞的提示已发现缺口，新增组件修复不能代替正式Web主图，详见[本轮复验](mihon-cupertino-fidelity.md#迁移读取提示及失效状态的正式-web-复验)。
+
+2026-11-17，`ef5f3dd`正式CI Web双主题新增20.K10主图，首次热门、搜索与两种追加共八张实际旋转画面均已实看，文件为`karuyomi-ef5f3dd-selection-migration-{popular,more-popular,search,more-search}-loading-candidate-{light,dark}.jpg`。未提交输入不改变热门或原查询`one piece`的追加说明，等待时原候选保留；返回后实际取得新的列表尾部。开源候选已经是搜索内容，不填20.K8。九组九路快照、七个相等区间和43条完成审计核对三次独立准备、一次明确UI主题保存及其余零业务POST；另补同名勾选框实际键盘与四张空分类对象分项。跨版本成对主图111→112/169（66.3%），仅单侧8、双侧均缺49，剩余57个主状态及全部变体/转换/最终产物；历史主图覆盖不代表当前HEAD全部验收或PR整体完成。完整环境、23张实拍及边界见[正式双主题复验](mihon-cupertino-fidelity.md#勾选身份与目标列表加载的正式-web-双主题复验)。

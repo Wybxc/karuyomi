@@ -772,6 +772,18 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 本轮是已有分类与迁移状态的补充分项，成对主图仍111/169（65.7%），仅单侧8、双侧均缺50，剩余58个主状态及全部变体继续验收。Mihon参考环境另纠正为AVD配置2048MB、启动日志实际要求提升到2560MB，实际Guest/RSS未独立测量；未在本轮重启或把它当作2GB性能证据。关闭在线语言仍保留Local source，普通UI未取得07.03纯空态，源码说明不替代截图。PR #8继续草稿、未合并、未部署，生产及已停止的Karuyomi原生现场门槛保持原记录。
 
+## 勾选身份与目标列表加载的正式 Web 双主题复验
+
+2026-11-17，`ef5f3dd25c76cb6b41cea36f0d5150e12b0a4bef`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44049345683)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44049354273)完整成功，Web及push Wasm通过、deploy跳过。正式Web artifact 14313142954长16,299,212字节，下载边界SHA-256为`fe1de7e3228fe855f28534b3a07ecfd6fcae4dfdd2e95512e29ae25f4bee02ae`，随后核验39条Flutter资源。本机只依次运行官方API和独立acceptance Vite构建，实际HTTP的35条Web清单与CI逐项相等，主入口`main.dart.56c97092.js`；`ef5f3dd-served-client-check.json`保存完整结果。官方Wrangler临时D1/R2、四包既有材料、`editor-ui`、`acceptance-owner`及内置浏览器360×800，地址`127.0.0.1:64217`；没有本地Flutter/AOT构建或生产部署。
+
+三次独立API准备为浅色/三包安装、英文收藏和法文收藏，分类目录保持revision 0且为空，收据独立保存为`karuyomi-ef5f3dd-selection-listing-setup.json`。浅/深均打开英文和法文同名作品的空分类面，官方对象分组、完整标题、语言/源名次级页脚及空分类指引均实看，随后取消；四张`category-empty-{en,fr}-{light,dark}`补齐新对象分组的空分类变体。浅色明确勾选英文、深色明确勾选法文时，另一项保持未选，独立AX勾选框各含完整标题/语言/源名；Tab/Shift-Tab回到该勾选框后按Space取消，数量从1回到0。`checkbox-{en-selected-light,fr-selected-dark,keyboard-cleared-light,keyboard-cleared-dark}`保留截图和完整AX，验证实际键盘操作，不以卡片按钮名称代替控件身份。
+
+两主题均从英文书架入口明确选择仅分类，打开真实MangaDex英文目标源，执行热门、热门追加、`one piece`搜索与搜索追加。八张`migration-{popular,more-popular,search,more-search}-loading-candidate-{light,dark}`均实际截到旋转指示、准确操作、原作品与目标源；candidate文件名不表示推测。追加前分别把输入改为“尚未提交的新查询”及“尚未提交的搜索词”但不提交，热门追加仍说明热门，搜索追加仍说明原查询`one piece`，已有候选在等待期间保留且禁用。两种追加返回后均实看新的列表尾部，保存`migration-{popular,search}-page-two-{light,dark}`。MangaDex已提供真实分页，无需修改xkcd分组偏好；本轮未变更任何Source偏好。`migration-source-open-candidate-light`已经是搜索待用内容，不登记20.K8；没有用它冒充打开进度。
+
+`verify-ef5f3dd-selection-evidence.ts`使用生成ProtoJSON模型核对九组九路快照（81条响应）、七个完全相等区间及43条连续完成审计。全部审计为pass/200，仅三次独立准备POST与一次明确UI主题保存；普通选择、取消、目标Source浏览、查询和分页没有其它业务POST。五组浅色状态完全相等、账户revision 3；主题草稿仍浅色且零附写，明确保存后账户4、全局2和DARK是唯一变化，四组深色状态相等。两部作品revision始终1，分类目录/元数据/收藏/书签/进度/续读均保持；独立最终MangaDex偏好响应的sources为空、accountRevision为4。审计不包含Source运行时请求或偏好API，不称为完整网络日志。
+
+忽略目录`.local/mihon-reference/`保留23张360×800 JPEG与完整AX，统一前缀`karuyomi-ef5f3dd-selection-`，以及九组快照、偏好响应、`selection-ui-{audit-final,evidence-receipt}.json`和`ef5f3dd-selection-evidence-check.log`。上述八张实际加载图补20.K10一对主图及首次/追加、热门/搜索分项，跨版本成对主图111→112/169（66.3%），仅单侧8、双侧均缺49，剩余57个主状态。其余图为已存在节点的转换与空分类变体，不增加分子。静态扫描未发现正式客户端的Material导入或常见Material控件，仍不代替实际配色/导航/转场验收。完成后离开客户端、恢复视口，harness正常退出0；其余状态/变体、生产与已停止的Karuyomi原生门保持原记录，PR #8仍草稿、未合并、未部署。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。
