@@ -5,6 +5,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 import '../test_app.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
@@ -25,14 +26,21 @@ void main() {
     WidgetTester tester, {
     Future<void> Function()? beforeFirstFrame,
     Brightness? appearance,
+    double textScale = 1,
+    Size size = const Size(480, 800),
   }) async {
-    tester.view.physicalSize = const Size(480, 800);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpApp(
       CupertinoApp(
         theme: readerAppTheme(appearance),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: CupertinoPageScaffold(
           child: SourceBrowsePage(
             catalog: fixture.catalog,
@@ -72,6 +80,141 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'multi-choice preferences group long options and keep cancel and apply explicit in $appearance at $textScale',
+        (tester) async {
+          final original = fixture.platform.invokeHandler!;
+          final longLabel = '中文章节与完整扫描组名称' * 6;
+          fixture.platform.invokeHandler = (call) async {
+            final result = await original(call);
+            if (call.hasGetPreferences()) {
+              final multi = result.preferences.nodes[3].multiChoice;
+              multi.values
+                ..clear()
+                ..addAll(['en', 'removed']);
+              multi.options.first.label = longLabel;
+            }
+            return result;
+          };
+          await open(
+            tester,
+            appearance: appearance,
+            textScale: textScale,
+            size: const Size(360, 800),
+          );
+          await item(tester, '3');
+          final label = find.text(longLabel);
+          expect(
+            find.ancestor(
+              of: label,
+              matching: find.byType(CupertinoFormSection),
+            ),
+            findsOneWidget,
+            reason: 'multi-choice rows use the same native grouped form as other preference controls',
+          );
+          expect(
+            tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+            isFalse,
+          );
+          final note = tester.element(
+            find.text('部分当前值已不在可选列表中。应用新的选择时将移除这些不可用项。'),
+          );
+          expect(DefaultTextStyle.of(note).style.fontSize, 13);
+          expect(
+            DefaultTextStyle.of(note).style.color,
+            CupertinoColors.secondaryLabel.resolveFrom(note),
+          );
+          expect(tester.takeException(), isNull);
+          await tester.ensureVisible(label);
+          await tester.tap(label);
+          await tester.pumpAndSettle();
+          expect(fixture.callbacks, 0);
+          expect(fixture.postedBodies, isEmpty);
+          await tester.tap(find.widgetWithText(CupertinoButton, '取消').last);
+          await tester.pumpAndSettle();
+          expect(fixture.callbacks, 0);
+          await item(tester, '3');
+          final options = tester.widgetList<CupertinoCheckbox>(
+            find.byType(CupertinoCheckbox),
+          );
+          expect(options.map((option) => option.value), [false, true]);
+          await tester.ensureVisible(label);
+          await tester.tap(label);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('应用'));
+          await tester.pump();
+          expect(find.text('身份或漫画源已变化，请关闭后重新打开设置。'), findsNothing);
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(find.text('身份或漫画源已变化，请关闭后重新打开设置。'), findsNothing);
+          await tester.pumpAndSettle();
+          expect(fixture.callbacks, 1);
+          expect(fixture.edits.single.change.strings.values.toSet(), {
+            'en',
+            'zh',
+          });
+          expect(fixture.postedBodies, hasLength(1));
+          expect(fixture.postedBodies.single, isNot(contains('removed')));
+          expect(tester.takeException(), isNull);
+          await tester.tap(iconLabel('关闭设置'));
+          await tester.pumpAndSettle();
+        },
+      );
+      for (final multi in [false, true]) {
+        for (final denied in [false, true]) {
+          testWidgets(
+            '${multi ? 'multi-choice' : 'text'} subeditor hides its draft after ${denied ? 'Access loss' : 'identity change'} in $appearance at $textScale',
+            (tester) async {
+              await open(
+                tester,
+                appearance: appearance,
+                textScale: textScale,
+                size: const Size(360, 800),
+              );
+              await item(tester, multi ? '3' : '1');
+              if (multi) {
+                await tester.tap(find.text('中文').last);
+              } else {
+                await tester.enterText(
+                  find.byType(CupertinoTextField).last,
+                  'unsaved-private-value',
+                );
+              }
+              await tester.pumpAndSettle();
+              if (denied) {
+                fixture.platform.bootstrapStatus = 403;
+              } else {
+                fixture.platform.bootstrapSubject = 'other-subject';
+              }
+              await fixture.catalog.connect();
+              await tester.pumpAndSettle();
+              expect(find.text('身份或漫画源已变化，请关闭后重新打开设置。'), findsOneWidget);
+              expect(find.widgetWithText(CupertinoButton, '应用'), findsNothing);
+              if (multi) {
+                expect(find.byType(CupertinoCheckbox), findsNothing);
+              } else {
+                expect(
+                  find.descendant(
+                    of: find.byType(CupertinoAlertDialog),
+                    matching: find.byType(CupertinoTextField),
+                  ),
+                  findsNothing,
+                );
+              }
+              expect(fixture.callbacks, 0);
+              expect(fixture.postedBodies, isEmpty);
+              await tester.tap(find.widgetWithText(CupertinoButton, '关闭').last);
+              await tester.pumpAndSettle();
+              expect(fixture.callbacks, 0);
+              expect(fixture.postedBodies, isEmpty);
+              expect(tester.takeException(), isNull);
+              await tester.tap(iconLabel('关闭设置'));
+              await tester.pumpAndSettle();
+            },
+          );
+        }
+      }
+    }
     testWidgets(
       'empty and group-first Source preferences keep their labels and inherited disabled state in $appearance',
       (tester) async {

@@ -50,7 +50,8 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
   Future<void> _text(wire.PreferenceNode node, List<int> path) async {
     final result = await showCupertinoDialog<String>(
       context: context,
-      builder: (_) => _PreferenceTextDialog(node: node),
+      builder: (_) =>
+          _PreferenceTextDialog(node: node, controller: _controller),
     );
     if (_current && result != null && _controller.canEdit) {
       await _controller.change(path, wire.PreferenceValue(text: result));
@@ -63,49 +64,93 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
         .map((option) => option.value)
         .toSet();
     final missing = selected.difference(available);
+    var closing = false;
     final result = await showCupertinoSheet<List<String>>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) => StatefulBuilder(
-        builder: (context, setDialogState) => EditSheet(
-          title: Text(node.title),
-          leading: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          trailing: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => Navigator.pop(
-              context,
-              selected.intersection(available).toList(),
-            ),
-            child: const Text('应用', semanticsLabel: '应用此设置'),
-          ),
-          content: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (missing.isNotEmpty)
-                const Text('部分当前值已不在可选列表中。应用新的选择时将移除这些不可用项。'),
-              for (final option in node.multiChoice.options)
-                MergeSemantics(
-                  child: CupertinoFormRow(
-                    prefix: Expanded(flex: 3, child: Text(option.label)),
-                    padding: EdgeInsets.zero,
-                    child: CupertinoCheckbox(
-                      value: selected.contains(option.value),
-                      onChanged: (value) => setDialogState(() {
-                        if (value == true) {
-                          selected.add(option.value);
-                        } else {
-                          selected.remove(option.value);
-                        }
-                      }),
-                    ),
+        builder: (context, setDialogState) => ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            // A successful dismissal can start saving before the reverse
+            // transition ends. Keep that frame stable and freeze its actions.
+            final editable = closing || _controller.canEdit;
+            void dismiss([List<String>? value]) {
+              if (closing) return;
+              closing = true;
+              Navigator.pop(context, value);
+            }
+
+            void change(String value, bool checked) {
+              if (closing || !_controller.canEdit) return;
+              setDialogState(() {
+                if (checked) {
+                  selected.add(value);
+                } else {
+                  selected.remove(value);
+                }
+              });
+            }
+
+            return EditSheet(
+              title: Text(node.title),
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: dismiss,
+                child: Text(editable ? '取消' : '关闭'),
+              ),
+              trailing: editable
+                  ? CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () =>
+                          dismiss(selected.intersection(available).toList()),
+                      child: const Text('应用', semanticsLabel: '应用此设置'),
+                    )
+                  : null,
+              content: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                children: [
+                  CupertinoFormSection.insetGrouped(
+                    footer: editable
+                        ? Text(
+                            missing.isNotEmpty
+                                ? '部分当前值已不在可选列表中。应用新的选择时将移除这些不可用项。'
+                                : '应用前只保留当前选择，取消不会修改设置。',
+                          )
+                        : null,
+                    children: [
+                      if (!editable)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('身份或漫画源已变化，请关闭后重新打开设置。'),
+                        )
+                      else
+                        for (final option in node.multiChoice.options)
+                          MergeSemantics(
+                            child: CupertinoListTile(
+                              onTap: () => change(
+                                option.value,
+                                !selected.contains(option.value),
+                              ),
+                              title: Builder(
+                                builder: (context) => DefaultTextStyle(
+                                  style: DefaultTextStyle.of(context).style,
+                                  child: Text(option.label),
+                                ),
+                              ),
+                              trailing: CupertinoCheckbox(
+                                value: selected.contains(option.value),
+                                onChanged: (value) =>
+                                    change(option.value, value == true),
+                              ),
+                            ),
+                          ),
+                    ],
                   ),
-                ),
-            ],
-          ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -459,10 +504,15 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
   }
 }
 
-class const _PreferenceTextDialog({required final wire.PreferenceNode node})
-    extends HookWidget {
+class const _PreferenceTextDialog({
+  required final wire.PreferenceNode node,
+  required final SourcePreferencesController controller,
+}) extends HookWidget {
   @override
   Widget build(BuildContext context) {
+    useListenable(controller);
+    final closing = useRef(false);
+    final editable = closing.value || controller.canEdit;
     final preference = node.text;
     final text = preference.hasValue() ? preference.value : '';
     final input = useTextEditingController(text: text);
@@ -475,36 +525,39 @@ class const _PreferenceTextDialog({required final wire.PreferenceNode node})
       }
       return null;
     }, const []);
+    void dismiss([String? value]) {
+      if (closing.value) return;
+      closing.value = true;
+      Navigator.pop(context, value);
+    }
+
     return CupertinoAlertDialog(
       title: Text(node.title),
-      content: CupertinoTextField(
-        controller: input,
-        autofocus: true,
-        obscureText: preference.secret,
-        maxLength: 4096,
-        placeholder: preference.hasHint() ? preference.hint : null,
-        placeholderStyle: TextStyle(
-          color: AppColors.secondaryLabel.resolveFrom(context),
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.groupedSurface.resolveFrom(context),
-          border: Border.all(color: AppColors.separator.resolveFrom(context)),
-          borderRadius: BorderRadius.circular(6),
-        ),
-      ),
+      content: editable
+          ? CupertinoTextField(
+              controller: input,
+              readOnly: closing.value,
+              autofocus: true,
+              autofillHints: null,
+              obscureText: preference.secret,
+              maxLength: 4096,
+              placeholder: preference.hasHint() ? preference.hint : null,
+            )
+          : const Text('身份或漫画源已变化，请关闭后重新打开设置。'),
       actions: [
         CupertinoButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          onPressed: dismiss,
+          child: Text(editable ? '取消' : '关闭'),
         ),
-        CupertinoButton(
-          onPressed: () => Navigator.pop(context, input.text),
-          child: const Text(
-            '应用',
-            semanticsLabel: '应用此设置',
-            style: TextStyle(fontWeight: FontWeight.w600),
+        if (editable)
+          CupertinoButton(
+            onPressed: () => dismiss(input.text),
+            child: const Text(
+              '应用',
+              semanticsLabel: '应用此设置',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
-        ),
       ],
     );
   }

@@ -660,6 +660,18 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 同一正式Web还暴露书架同名身份缺失：迁移后英文和中文xkcd都只显示标题，更多/续读辅助名称也无法区分。书架补语言在前的源名说明，并将语言/源名纳入更多、分类和续读语义；源内浏览已有源上下文，不额外复制说明。四项浅/深×1x/2x、360×800的同名长标题/源名回归先在缺少说明处失败；修复后书架、续读和分类38项通过，核对完整合并语义、说明位于卡片内及打开菜单零业务POST/Source执行。新正式画面仍待。
 
+## Source 偏好子编辑器的分组与失效
+
+2026-11-17，续办时确认`3a3976d`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/43888254204)和[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/43888545574)成功，包含正式Web与push Wasm；上一节同名身份和受阻草稿修复的完整CI门已通过，正式Web闭环仍待。已有Web归档、传输摘要与39条Flutter资源核验记录保留。本轮内置浏览器的`getState`和创建IAB标签两次均在30秒超时，未取得新页面状态；未执行新的正式浏览器、生产或原生验收。
+
+对照已核对的Mihon `s1403-source-multiple-{light,dark}`与正式Source偏好组件，新增20项360×800、浅/深×1x/2x回归。旧实现分别在多选没有官方分组，以及文本/多选身份变化后没有停用反馈处失败。修复后16项子面流程分别触发身份切换与403：隐藏旧输入、勾选项及应用入口，明确关闭，零Source编辑回调和业务POST。多选采用官方分组、13px/secondaryLabel页脚及完整选项行，文本恢复官方输入框装饰。
+
+四项长选项流程随后复现另一缺口：点击选项文字没有切换勾选，实际提交只含原英文值。改为官方CupertinoListTile整行切换、勾选框共用同一草稿，长名称解除单行省略后通过。测试核对实际RenderParagraph没有截断、取消及重开保留原值、明确应用仅执行一次并移除不可用旧值；应用后两个退出转场时刻没有误报身份变化。正常秘密/会话字段不上传、丢确认精确重试及依赖禁用等既有回归同时通过。
+
+`source_preferences_widget_test.dart`29项、`source_preferences_controller_test.dart`10项及`edit_sheet_test.dart`4项共43项单并发通过，两份改动Dart文件`dart analyze --fatal-infos`无问题。Flutter首次沙箱运行未能创建回环端口，不计产品失败；获准使用本机端口后才执行上述红绿回归。原始输出保留于`.local/mihon-reference/preference-subeditors-{red,green,regressions,analyze}.log`。这是组件/控制器证据，未填正式Web主图或声称MangaDex运行通过，覆盖保持108/169。
+
+审计夹具已提交为`88433e1`：补齐editor-ui进度与收藏等有界JSON命令的审计，仅原样转发这些命令，不注入编辑器故障；multipart仍沿真实通道且不记录图片。24项官方Workers/D1/R2回归、API/test严格类型及依赖分层通过，包括四种故障模式下进度重复请求的真实200、同一回执与原正文审计。全范围`pnpm format`、`pnpm format:check`及该提交的标准prek hook通过；新提交CI及正式Web另行记录。旧`19c2260`审计不含进度POST的范围限制保持不变。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。
