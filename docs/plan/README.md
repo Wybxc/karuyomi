@@ -69,17 +69,17 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 2026-11-16，调整PR #8的推进顺序：先收敛同类最终界面实现并提交，再集中验收正式产物；不再为已知即将修改的中间布局反复补拍全套主图。停止使用没有固定权重的“约50%”，改为报告“最终界面代码、最终版本逐状态验收、合并发布与生产闭环”三项实绩和剩余门槛，详见[当前交付表](mihon-cupertino-fidelity.md#目标与当前状态)。状态覆盖和双主题验收范围保持不变。
 
-**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)继续逐状态推进，最终统一Cupertino导航、控件、动态语义配色与转场。`d09212b`完整push/PR CI与Web/Wasm通过；正式CI客户端`49f3482`完成[分类保存与恢复双主题复验](../verification/mihon-cupertino-fidelity.md#分类保存与恢复的正式-web-双主题复验)，保存/排序等待、未知精确重试、已确认读取与关闭重开已有实际证据。28组九路快照及247条完成审计确认原操作、零重复与读取零额外POST；拒绝/冲突辅助说明的实拍缺口已修复，相关69项回归及完整CI通过，修复后正式Web仍待。跨版本双主题主图116/169（68.6%），剩余53个主状态（仅单侧9、双侧均缺44）及全部相关变体、转换和最终产物门槛；该计数不代表PR整体完成率。
+**当前视觉重构**：[Mihon全界面布局与配色对照](mihon-cupertino-fidelity.md)按全部现有状态推进，统一Cupertino导航、控件、动态语义色与转场。`9a1c03c`完整CI/Web/Wasm通过，内置浏览器控制恢复后的[正式双主题验收](../verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-双主题验收)补齐04.K4/K6、05.K10三对。跨版本双主题主图119/169（70.4%），剩余50个主状态（单侧9、双侧均缺41）及全部变体、转换、最终产物和生产门；该计数不代表PR整体完成率。
 
-此前[批量等待与暂停](../verification/mihon-cupertino-fidelity.md#批量等待与暂停的正式-web-复验)已补齐双主题主图；浅色明确继续、深色明确结束均按原范围处理，首次分类交付未完成的记录单列保留。先前四次浏览器控制超时及未确认根因继续保留，恢复后没有改用其它浏览器。官方[故障验收入口](../verification/mihon-cupertino-fidelity.md#分类目录与批量操作的故障验收入口)的短自动延迟、取消和确认后读取失败经57项Workers/D1/R2回归与正式Web分项核对；深色身份失效后旧动作禁用，同一身份重连保留原命令且不自动提交，浅色失效仍待。接下来补拒绝说明修复后的正式双主题、批量剩余状态、Source与选源、连接浅色及其它编辑面[状态机](../verification/mihon-state-coverage.md)缺口。各版本实拍、历史失败、像素/配色依据与环境限制保存在[验证记录](../verification/mihon-cupertino-fidelity.md)，逐项里程碑和剩余门槛维护在[交付表](mihon-cupertino-fidelity.md#目标与当前状态)。PR #8保持草稿，未合并、未部署；真实生产Access、图片/保存/新文档续读仍待，Karuyomi原生现场验收保持停止。
+此前[批量等待与暂停](../verification/mihon-cupertino-fidelity.md#批量等待与暂停的正式-web-复验)已补齐双主题主图；浅色明确继续、深色明确结束均按原范围处理，首次分类交付未完成的记录单列保留。先前四次浏览器控制超时及未确认根因继续保留，恢复后没有改用其它浏览器。官方[故障验收入口](../verification/mihon-cupertino-fidelity.md#分类目录与批量操作的故障验收入口)的短自动延迟、取消和确认后读取失败经57项Workers/D1/R2回归与正式Web分项核对；深色身份失效后旧动作禁用，同一身份重连保留原命令且不自动提交，浅色失效仍待。接下来补批量身份失效、真实CAS等变体、Source与选源、连接浅色及其它编辑面[状态机](../verification/mihon-state-coverage.md)缺口。各版本实拍、历史失败、像素/配色依据与环境限制保存在[验证记录](../verification/mihon-cupertino-fidelity.md)，逐项里程碑和剩余门槛维护在[交付表](mihon-cupertino-fidelity.md#目标与当前状态)。PR #8保持草稿，未合并、未部署；真实生产Access、图片/保存/新文档续读仍待，Karuyomi原生现场验收保持停止。
 
 为实际验收部分提交，官方夹具新增[首项确认后丢后项确认](../verification/mihon-cupertino-fidelity.md#批量部分提交的确定性故障入口)，62项Workers/D1/R2回归及`c6f1ce6`完整CI/Web/Wasm通过；生产入口不启用，原取消/generation及审计上限保持。[正式Web准备](../verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)已核对35条交付资源、六次独立准备、十二路基线及18条完成审计，UI业务写入为0；内置浏览器四次控制调用超时，没有新主图，视口是否改变/恢复未确认。新拒绝说明和部分批量正式Web继续待验，不能把确定性入口计作04.K4已完成。
 
-后续当前聊天/turn的桌面日志明确记录IAB归属拒绝，打开本聊天浏览器面板的入口返回queued；已请求显示当前聊天的浏览器后再继续验证控制。归属为什么不一致仍未确认，不把其它WebSocket警告或审批额度推断为原因，详见同一[准备受阻记录](../verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)。
+恢复前的桌面日志明确记录IAB归属拒绝，打开本聊天浏览器面板的入口返回queued；已请求显示当前聊天的浏览器后再继续验证控制。归属为什么不一致仍未确认，不把其它WebSocket警告或审批额度推断为原因，详见同一[准备受阻记录](../verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)。
 
-用户确认面板已打开后，两次新控制仍超时。最新记录显示页面路由已是本聊天、浏览器归属却仍为`client-new-thread`临时会话；普通打开面板没有刷新绑定，待重建桌面连接后再核对控制，当前仍无新主图。
+恢复前，用户确认面板已打开后，两次新控制仍超时。最新记录显示页面路由已是本聊天、浏览器归属却仍为`client-new-thread`临时会话；普通打开面板没有刷新绑定，当时待重建桌面连接，未取得新主图；后续恢复与新增证据见当前交付表。
 
-浏览器恢复期间已复现并修复[单作品与批量确认后的读取恢复](../verification/mihon-cupertino-fidelity.md#单作品与批量确认后的读取恢复)：有效ACK后读回失败只重读，界面区分已确认读取与未知结果，批量暂停后续项。十三文件159项相关回归通过，新提交完整CI见PR #8检查，正式Web仍待；主图继续116/169，不以组件通过替代实际双主题画面。
+[单作品与批量读取恢复](../verification/mihon-cupertino-fidelity.md#单作品与批量确认后的读取恢复)先复现后修复，有效ACK后只重读，批量暂停后续项。十三文件159项相关回归与完整CI通过，本轮[正式双主题证据](../verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-双主题验收)进一步核对未知原文重试、确认读取失败与重开、部分批量和受控拒绝，不外推全部状态或生产通过。
 
 **当前 UI 交付**：[统一 Cupertino 已恢复并生产上线](cupertino-ui.md#恢复-cupertino)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源和 Access 门禁通过；内置浏览器重新确认导航、真实图片、设置保存和独立新文档续读，独立 D1 核对状态一致，见[恢复验证](../verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。Web / iOS / Android 保持一套 Cupertino 共享实现，沿用 generator、Hooks 与现有权威读写/生命周期。[Liquid Glass](liquid-glass.md)已终止，玻璃库、专用材质设置及资源已移除；[评估](../design/liquid-glass-evaluation.md)与[执行证据](../verification/liquid-glass.md)保留历史及未完成性能门，不宣称能耗结论。[代码削减](ui-code-consolidation.md)仍独立规划，原生现场验证继续停止。
 
