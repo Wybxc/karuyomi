@@ -1443,22 +1443,24 @@ stateDiagram-v2
     Sources --> BlockedSource: 目录缺失或扩展停用
     BlockedSource --> Sources: 管理扩展并恢复
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class NoSources,Sources,Favorites,NoSourceMatch,SourceLanguages paired
+    class ReadingSources,NoSources,Sources,Favorites,SavingFavorite,NoSourceMatch,SourceLanguages,FavoriteRecovery paired
 ```
 
-| 状态 ID | 最小必要信息                                  | 浅色正式Web                                    | 深色正式Web                                   |
-| ------- | --------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| 07.K1   | 正在读取、原筛选与可用恢复入口                | 待                                             | 待                                            |
-| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-1e50a82-sources-empty-light.jpg`     | `karuyomi-1e50a82-sources-empty-dark.jpg`     |
-| 07.K3   | 分组、源名、语言、独立打开与收藏动作          | `karuyomi-76309ed-sources-list-light.jpg`      | `karuyomi-76309ed-sources-list-dark.jpg`      |
-| 07.K4   | 收藏分组、确认后的星标与取消入口              | `karuyomi-76309ed-sources-favorite-light.jpg`  | `karuyomi-76309ed-sources-favorite-dark.jpg`  |
-| 07.K5   | 正在保存的源、等待标记、禁止重复提交          | 待                                             | 待                                            |
-| 07.K6   | 当前筛选、无匹配说明与清除入口                | `karuyomi-76309ed-sources-no-match-light.jpg`  | `karuyomi-76309ed-sources-no-match-dark.jpg`  |
-| 07.K7   | 全部可用语言、当前值与取消操作                | `karuyomi-76309ed-sources-languages-light.jpg` | `karuyomi-76309ed-sources-languages-dark.jpg` |
-| 07.K8   | 源身份、受阻原因、管理或恢复入口              | 待                                             | 待                                            |
-| 07.K9   | 原收藏操作、冲突或未知说明、精确重试/重新读取 | 待                                             | 待                                            |
+| 状态 ID | 最小必要信息                                  | 浅色正式Web                                                         | 深色正式Web                                                        |
+| ------- | --------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 07.K1   | 正在读取、原筛选与可用恢复入口                | `karuyomi-1bc3c70-source-pending-formal-sources-reading-light.jpg`  | `karuyomi-1bc3c70-source-pending-formal-sources-reading-dark.jpg`  |
+| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-1e50a82-sources-empty-light.jpg`                          | `karuyomi-1e50a82-sources-empty-dark.jpg`                          |
+| 07.K3   | 分组、源名、语言、独立打开与收藏动作          | `karuyomi-76309ed-sources-list-light.jpg`                           | `karuyomi-76309ed-sources-list-dark.jpg`                           |
+| 07.K4   | 收藏分组、确认后的星标与取消入口              | `karuyomi-76309ed-sources-favorite-light.jpg`                       | `karuyomi-76309ed-sources-favorite-dark.jpg`                       |
+| 07.K5   | 正在保存的源、等待标记、禁止重复提交          | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-light.jpg` | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-dark.jpg` |
+| 07.K6   | 当前筛选、无匹配说明与清除入口                | `karuyomi-76309ed-sources-no-match-light.jpg`                       | `karuyomi-76309ed-sources-no-match-dark.jpg`                       |
+| 07.K7   | 全部可用语言、当前值与取消操作                | `karuyomi-76309ed-sources-languages-light.jpg`                      | `karuyomi-76309ed-sources-languages-dark.jpg`                      |
+| 07.K8   | 源身份、受阻原因、管理或恢复入口              | 待                                                                  | 待                                                                 |
+| 07.K9   | 原收藏操作、冲突或未知说明、精确重试/重新读取 | `karuyomi-1bc3c70-source-pending-formal-favorite-unknown-light.jpg` | `karuyomi-1bc3c70-source-pending-formal-favorite-unknown-dark.jpg` |
 
-`fe57f2c`正式Web完成浅色读取、等待与未知恢复，但展开/收起原值并重试后，深色重开源目录因页面存储类型冲突而未能渲染。`source-pending-formal`系列中的两张深色空内容图（包括名为`sources-reading-dark`的进入图）均为失败证据，不能作为读取主图。存储隔离修复后的正式双主题仍待，07.K1/K5/K9不填入旧产物照片，详见[记录](mihon-cupertino-fidelity.md#展开状态与滚动位置的存储隔离)。
+`fe57f2c`正式Web完成浅色读取、等待与未知恢复，但展开/收起原值并重试后，深色重开源目录因页面存储类型冲突而未能渲染。该提交`source-pending-formal`系列中的两张深色空内容图（包括名为`sources-reading-dark`的进入图）均为失败证据，不能作为读取主图，也未追溯填入下表，详见[记录](mihon-cupertino-fidelity.md#展开状态与滚动位置的存储隔离)。
+
+`1bc3c70`新正式产物的双主题独立批次已补齐07.K1/K5/K9三对。真实加载/等待文案、原取消对象、刷新/重开、完整原值展开/收起与原文重试均核对；此前失败的深色重开及确认清除后的再次重开成功，控制台无错误/警告。16组六路快照、十个相等区间及73条终态审计核对两次准备、五次UI原操作（含一次主题保存）与两次零重复重试。07.K8、真实CAS/身份等变体、Mihon参考和最终像素门继续待验，见[正式双主题记录](mihon-cupertino-fidelity.md#源收藏与存储隔离的正式-web-双主题验收)。
 
 ```mermaid
 stateDiagram-v2

@@ -26,4 +26,4 @@
 
 只读刷新与恢复前台不重发写入。确定冲突后重新读取当前全局值，才解除已拒绝草稿；不确定写入仍保留原请求。幂等 ACK 只证明原写入发生过，成功后重新 GET 并核对当前完整值，另一端之后取消的收藏不能被旧 ACK 复活。关闭身份后丢弃迟到 ACK，不通知新身份的界面。
 
-本次不实现全目录语言筛选、跨源搜索、typed filters/preferences、扩展安装或源迁移。当前静态索引没有完整 Source 名称/语言；收藏快照和已加载 `SourceInfo` 不能冒充全目录元数据。业务协议与生成文件变化仍进入正式 host 输入指纹，工程检查不代表扩展 AOT baseline 已重新完成。
+全目录语言筛选、跨源搜索、typed filters/preferences、扩展安装与源迁移使用各自合同和计划，见 [P3](../plan/p3-extensions-and-migration.md)。源目录的名称/语言以 Static Assets 当前索引的 `CatalogSource` 投影为准，见[静态目录设计](source-language-filter.md)；收藏快照和已加载 `SourceInfo` 不替代正式目录资料。业务协议与生成文件变化仍进入正式 host 输入指纹，工程检查不代表扩展 AOT baseline 已重新完成。

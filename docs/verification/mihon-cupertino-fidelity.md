@@ -932,6 +932,16 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 共享同一PageStorageBucket、双主题和展开/收起的源目录四项组件回归先复现；扩展首轮因本地tap helper声明顺序未编译，首轮日志保留，调整后扩展四项同样复现bool/double错误。八项修复后全部通过，日志为`expansion-page-storage-red.log`、`expansion-page-storage-extensions-red-corrected.log`及`expansion-page-storage-green.log`。用例继续验证原对象、完整原值、精确重试零重复，以及确认清除后切换主题重开；四文件100项源、扩展、仓库和跨源搜索相关回归通过，见`expansion-page-storage-targeted.log`。五文件严格分析、完整格式/校验、证据工具严格类型和依赖检查通过，日志使用`expansion-page-storage-`前缀；新提交完整CI与存储隔离修复后的正式Web双主题仍待。独立计数器再次核对119/169（70.4%）、单侧9、双侧均缺41，见`expansion-page-storage-state-coverage-count.json`，没有新增主图。PR #8仍草稿、未合并、未部署，原生及生产门不变。
 
+## 源收藏与存储隔离的正式 Web 双主题验收
+
+2026-11-18，客户端及夹具`1bc3c70816262b65deca1c7f23a5bb1f149eed3b`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44160170997)、[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44160183317)、Web及push Wasm全部成功，deploy跳过。正式归档在下载边界校验大小/SHA-256，39条资源校验后只复制生成的Web/runtime；官方API和acceptance Vite装配通过，没有本地完整Flutter或AOT构建。官方Wrangler临时D1/R2、`acceptance-owner`、既有静态快照和内置浏览器360×800，地址`127.0.0.1:54791`；实际HTTP交付清单35条与CI一致，入口`main.dart.3fd12e0d.js`。
+
+两次独立API准备为浅色与三包安装、英文xkcd书架收藏。此后只经正式UI操作源目录读取、名称/英文筛选、收藏等待、已确认收藏、取消已提交但丢确认、只读刷新、书架/源目录重开、完整原值展开/收起及明确原文重试；另有一次明确UI主题保存。双主题原取消对象都在当前列表已更新后继续显示，原值默认收起且可完整核对。浅色展开/收起后确认原操作、切换深色并重开，正面复验此前失败路径；深色完成同样恢复后再次重开也正常。读取与等待均保存真实文案、指示器和当前列表，不以文件名推断加载状态。
+
+`verify-source-pending-formal.ts`使用生成ProtoJSON模型、固定Source清单、HTTP资源清单与实际DOM核对16组六路完整快照（96份响应）、十个完全相等区间及73条连续终态审计。九条POST逐字核对为两次独立准备、五次UI原操作（四次源收藏变化与一次主题保存）、两次相同UUID/CAS/正文重试；五条UI原操作各应用一次，两次重试零重复，刷新、重开与查看原值没有额外POST。两条取消的真实Worker200/客户端502单列，其余均200；最终账户7、全局6/DARK、收藏源为空，书架作品revision1且仍收藏，无分类关联/书签/进度/续读/自定义封面，资料与其它设置保持。目录只使用静态元数据，没有主动打开或执行Source，书架无自定义封面；不据此声明Source在线兼容或阅读能力。
+
+18张360×800 JPEG及对应完整DOM已核对，新增07.K1/K5/K9三对。源目录在主题切换及确认后的再次重开均正常，控制台错误/警告记录为空。校验日志与收据为`1bc3c70-source-pending-formal-evidence-check.log`及`karuyomi-1bc3c70-source-pending-formal-evidence-receipt.json`；控制台为同前缀`console-final.json`。全部旧失败保留，未覆盖`fe57f2c`文件。完成后导航空白页、恢复默认视口、关闭临时标签并确认列表为空；harness明确stop正常退出0。跨版本主图119→122/169（72.2%）、单侧9、双侧均缺38；独立计数见`source-pending-state-coverage-count.json`。Source受阻、真实CAS/身份、其它组件展开、全部相关变体和最终像素/产物门继续待验，PR #8仍草稿，未合并、未部署，Native与生产门不变。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。
